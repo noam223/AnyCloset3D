@@ -5,6 +5,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AnyCloset 3D | מערכת הדמיה מקצועית לארונות</title>
 <link rel="icon" type="image/png" href="images/icon-logo.png">
+<!-- Supabase SDK — used only for session check (redirect logged-in users to app) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(async function() {
+  try {
+    var _sb = supabase.createClient(
+      'https://meqxnsjycvfgfhdepguo.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lcXhuc2p5Y3ZmZ2ZoZGVwZ3VvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3MDA5NDAsImV4cCI6MjA5MjI3Njk0MH0.w63bl0-1-Rgt9Nx6sVW5ueEGMojiMaxoehlPXlPH2N0'
+    );
+    var result = await _sb.auth.getSession();
+    if (result.data && result.data.session) {
+      window.location.replace('projects.html');
+    }
+  } catch(e) { /* ignore — show landing normally */ }
+})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Heebo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -914,16 +930,21 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.disabled = true;
     btn.textContent = 'שולח...';
 
-    const plan  = document.getElementById('trial-plan-input').value;
-    const name  = document.getElementById('trial-name').value.trim();
-    const email = document.getElementById('trial-email').value.trim();
-    const phone = document.getElementById('trial-phone').value.trim();
+    const plan     = document.getElementById('trial-plan-input').value;
+    const fullName = document.getElementById('trial-name').value.trim();
+    const email    = document.getElementById('trial-email').value.trim();
+    const rawPhone = document.getElementById('trial-phone').value.trim();
+
+    // Normalize phone: +972XXXXXXXXX → 0XXXXXXXXX
+    let phone = rawPhone;
+    if (phone.startsWith('+972')) phone = '0' + phone.slice(4);
+    else if (phone.startsWith('972')) phone = '0' + phone.slice(3);
 
     try {
       const res = await fetch(MAKE_TRIAL_WEBHOOK, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan, name, email, phone })
+        body: JSON.stringify({ plan, name: fullName, fullName, email, phone })
       });
       const text = await res.text();
       let data;
