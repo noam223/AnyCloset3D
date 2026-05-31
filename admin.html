@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>פאנל ניהול | הדמיית ארונות</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --primary:   #1e3a5f;
+            --primary-l: #2a4f80;
+            --accent:    #f59e0b;
+            --accent-l:  #fbbf24;
+            --bg:        #f0f4f8;
+            --white:     #ffffff;
+            --border:    #e2e8f0;
+            --text:      #1e293b;
+            --muted:     #64748b;
+            --error:     #ef4444;
+            --success:   #22c55e;
+            --radius:    12px;
+        }
+        body { font-family: 'Inter', 'Heebo', sans-serif; background: var(--bg); min-height: 100dvh; color: var(--text); }
+
+        /* ── Admin gate ── */
+        #admin-gate {
+            position: fixed; inset: 0; background: var(--primary);
+            display: flex; align-items: center; justify-content: center; z-index: 9999;
+        }
+        .gate-box {
+            background: white; border-radius: 20px; padding: 36px 40px;
+            width: 100%; max-width: 360px; text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+        }
+        .gate-box i { font-size: 2rem; color: var(--accent); margin-bottom: 12px; display: block; }
+        .gate-box h2 { font-size: 1.2rem; font-weight: 800; color: var(--primary); margin-bottom: 6px; }
+        .gate-box p { font-size: 0.82rem; color: var(--muted); margin-bottom: 20px; }
+        .gate-input {
+            width: 100%; height: 44px; border: 1.5px solid var(--border); border-radius: 10px;
+            padding: 0 14px; font-size: 0.95rem; font-family: inherit; outline: none;
+            margin-bottom: 14px; text-align: center; letter-spacing: 0.1em;
+            transition: border-color 0.2s;
+        }
+        .gate-input:focus { border-color: var(--primary); }
+        .gate-btn {
+            width: 100%; height: 44px; background: var(--primary); color: white;
+            border: none; border-radius: 10px; font-size: 0.95rem; font-weight: 700;
+            font-family: inherit; cursor: pointer; transition: all 0.2s;
+        }
+        .gate-btn:hover { background: var(--primary-l); }
+        .gate-error { color: var(--error); font-size: 0.82rem; margin-top: 10px; }
+
+        /* ── Topbar ── */
+        .topbar {
+            background: var(--primary); color: white; padding: 0 28px; height: 60px;
+            display: flex; align-items: center; justify-content: space-between;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.18); position: sticky; top: 0; z-index: 100;
+        }
+        .topbar-brand { display: flex; align-items: center; gap: 10px; font-size: 1rem; font-weight: 800; }
+        .topbar-brand i { color: var(--accent); }
+        .admin-badge { background: var(--error); color: white; font-size: 0.65rem; font-weight: 700; padding: 2px 7px; border-radius: 20px; }
+        .topbar-right { display: flex; align-items: center; gap: 10px; }
+        .btn-topbar { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 8px; padding: 6px 14px; font-size: 0.8rem; font-family: inherit; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+        .btn-topbar:hover { background: rgba(255,255,255,0.2); }
+
+        /* ── Main ── */
+        .main { max-width: 1200px; margin: 0 auto; padding: 32px 24px 60px; }
+
+        /* ── Tabs ── */
+        .admin-tabs { display: flex; gap: 4px; margin-bottom: 28px; border-bottom: 2px solid var(--border); }
+        .admin-tab { padding: 10px 22px; font-size: 0.88rem; font-weight: 700; font-family: inherit; background: none; border: none; border-bottom: 3px solid transparent; margin-bottom: -2px; cursor: pointer; color: var(--muted); transition: all 0.18s; border-radius: 8px 8px 0 0; display: flex; align-items: center; gap: 7px; }
+        .admin-tab:hover { color: var(--primary); background: #f1f5f9; }
+        .admin-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        /* ── Stats row ── */
+        .stats-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; margin-bottom: 28px; }
+        .stat-card { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; }
+        .stat-label { font-size: 0.75rem; color: var(--muted); font-weight: 500; margin-bottom: 6px; }
+        .stat-value { font-size: 1.6rem; font-weight: 800; color: var(--primary); }
+        .stat-sub { font-size: 0.72rem; color: var(--muted); margin-top: 3px; }
+
+        /* ── Toolbar ── */
+        .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+        .search-wrap { position: relative; flex: 1; min-width: 200px; }
+        .search-wrap i { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 0.85rem; }
+        .search-input { width: 100%; height: 40px; border: 1.5px solid var(--border); border-radius: 10px; padding: 0 36px 0 14px; font-size: 0.88rem; font-family: inherit; outline: none; transition: border-color 0.2s; }
+        .search-input:focus { border-color: var(--primary); }
+        .filter-select { height: 40px; border: 1.5px solid var(--border); border-radius: 10px; padding: 0 12px; font-size: 0.85rem; font-family: inherit; outline: none; background: white; cursor: pointer; }
+        .btn-refresh { height: 40px; background: var(--primary); color: white; border: none; border-radius: 10px; padding: 0 16px; font-size: 0.85rem; font-weight: 600; font-family: inherit; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+        .btn-refresh:hover { background: var(--primary-l); }
+
+        /* ── Users table ── */
+        .table-wrap { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; }
+        thead { background: #f8fafc; }
+        th { padding: 12px 16px; text-align: right; font-size: 0.75rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--border); white-space: nowrap; }
+        td { padding: 13px 16px; font-size: 0.85rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: #f8fafc; }
+        .user-cell { display: flex; align-items: center; gap: 10px; }
+        .user-avatar { width: 32px; height: 32px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; color: white; flex-shrink: 0; }
+        .user-name { font-weight: 600; color: var(--text); }
+        .user-email { font-size: 0.75rem; color: var(--muted); }
+
+        /* ── Plan badge ── */
+        .plan-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 0.72rem; font-weight: 700; padding: 3px 9px; border-radius: 20px; white-space: nowrap; }
+        .plan-badge.designer_single   { background: #ede9fe; color: #5b21b6; }
+        .plan-badge.designer_monthly  { background: #ddd6fe; color: #4c1d95; }
+        .plan-badge.carpenter_basic   { background: #dcfce7; color: #166534; }
+        .plan-badge.carpenter_pro     { background: #bbf7d0; color: #14532d; }
+        .plan-badge.company_standard  { background: #dbeafe; color: #1e40af; }
+        .plan-badge.company_enterprise{ background: #bfdbfe; color: #1e3a8a; }
+        .plan-badge.free              { background: #f1f5f9; color: var(--muted); }
+
+        /* ── Status badge ── */
+        .status-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 0.72rem; font-weight: 700; padding: 3px 9px; border-radius: 20px; }
+        .status-badge.active   { background: #dcfce7; color: #166534; }
+        .status-badge.inactive { background: #fee2e2; color: #991b1b; }
+        .status-badge.trial    { background: #fffbeb; color: #92400e; }
+
+        /* ── Action buttons ── */
+        .btn-action { background: none; border: 1px solid var(--border); border-radius: 7px; padding: 5px 10px; font-size: 0.75rem; font-weight: 600; font-family: inherit; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 4px; color: var(--text); }
+        .btn-action:hover { background: #f1f5f9; }
+        .btn-action.primary { background: var(--primary); color: white; border-color: var(--primary); }
+        .btn-action.primary:hover { background: var(--primary-l); }
+        .btn-action.danger { color: var(--error); border-color: #fecaca; }
+        .btn-action.danger:hover { background: #fef2f2; }
+        .btn-action.warning { color: #d97706; border-color: #fde68a; }
+        .btn-action.warning:hover { background: #fffbeb; }
+        .status-badge.cancelled { background: #f1f5f9; color: #475569; }
+        .status-badge.trial { background: #fffbeb; color: #92400e; }
+        .actions-cell { display: flex; gap: 5px; flex-wrap: wrap; }
+
+        /* ── Modal ── */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(3px); }
+        .modal-overlay.open { display: flex; }
+        .modal-box { background: white; border-radius: 20px; padding: 28px 30px; width: 100%; max-width: 460px; box-shadow: 0 20px 60px rgba(0,0,0,0.2); animation: popIn 0.2s ease; }
+        @keyframes popIn { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .modal-title { font-size: 1.05rem; font-weight: 800; color: var(--primary); margin-bottom: 18px; display: flex; align-items: center; gap: 8px; }
+        .modal-field { margin-bottom: 14px; }
+        .modal-label { font-size: 0.8rem; font-weight: 600; color: var(--text); margin-bottom: 5px; display: block; }
+        .modal-select { width: 100%; height: 42px; border: 1.5px solid var(--border); border-radius: 10px; padding: 0 12px; font-size: 0.9rem; font-family: inherit; outline: none; background: white; }
+        .modal-select:focus { border-color: var(--primary); }
+        .modal-input { width: 100%; height: 42px; border: 1.5px solid var(--border); border-radius: 10px; padding: 0 12px; font-size: 0.9rem; font-family: inherit; outline: none; }
+        .modal-input:focus { border-color: var(--primary); }
+        .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+        .btn-modal { flex: 1; height: 42px; border-radius: 10px; border: none; font-size: 0.88rem; font-weight: 700; font-family: inherit; cursor: pointer; transition: all 0.15s; }
+        .btn-modal.primary { background: var(--primary); color: white; }
+        .btn-modal.primary:hover { background: var(--primary-l); }
+        .btn-modal.ghost { background: #f1f5f9; color: var(--text); }
+        .btn-modal.ghost:hover { background: #e2e8f0; }
+        .modal-user-info { background: #f8fafc; border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; font-size: 0.85rem; }
+        .modal-user-info strong { color: var(--primary); }
+
+        /* ── Toast ── */
+        .toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(80px); background: #1e293b; color: white; padding: 12px 22px; border-radius: 12px; font-size: 0.88rem; font-weight: 500; z-index: 999; transition: transform 0.3s ease; white-space: nowrap; box-shadow: 0 4px 20px rgba(0,0,0,0.25); display: flex; align-items: center; gap: 8px; pointer-events: none; }
+        .toast.show { transform: translateX(-50%) translateY(0); }
+        .toast.success i { color: var(--success); }
+        .toast.error   i { color: var(--error); }
+
+        /* ── Loading ── */
+        .loading-row td { text-align: center; padding: 40px; color: var(--muted); }
+        .spinner-lg { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 10px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Pricing panel ── */
+        .pricing-user-select-wrap { background: white; border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 24px; margin-bottom: 20px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+        .pricing-user-select-wrap label { font-size: 0.85rem; font-weight: 700; color: var(--text); white-space: nowrap; }
+        .pricing-user-select { height: 42px; border: 1.5px solid var(--border); border-radius: 10px; padding: 0 14px; font-size: 0.88rem; font-family: inherit; outline: none; background: white; min-width: 260px; flex: 1; }
+        .pricing-user-select:focus { border-color: var(--primary); }
+        .btn-load-pricing { height: 42px; background: var(--primary); color: white; border: none; border-radius: 10px; padding: 0 20px; font-size: 0.85rem; font-weight: 700; font-family: inherit; cursor: pointer; display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+        .btn-load-pricing:hover { background: var(--primary-l); }
+        .btn-reset-pricing { height: 42px; background: #f1f5f9; color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 0 16px; font-size: 0.85rem; font-weight: 600; font-family: inherit; cursor: pointer; display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+        .btn-reset-pricing:hover { background: #e2e8f0; }
+        .pricing-form { background: white; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+        .pricing-section { padding: 20px 24px; border-bottom: 1px solid var(--border); }
+        .pricing-section:last-child { border-bottom: none; }
+        .pricing-section-title { font-size: 0.9rem; font-weight: 800; color: var(--primary); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+        .pricing-section-title i { color: var(--accent); }
+        .pricing-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+        .pricing-field { display: flex; flex-direction: column; gap: 5px; }
+        .pricing-field label { font-size: 0.75rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+        .pricing-input { height: 40px; border: 1.5px solid var(--border); border-radius: 9px; padding: 0 12px; font-size: 0.9rem; font-family: inherit; outline: none; transition: border-color 0.18s; width: 100%; }
+        .pricing-input:focus { border-color: var(--primary); }
+        .pricing-mode-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+        .pricing-mode-btn { padding: 9px 18px; border-radius: 9px; border: 1.5px solid var(--border); background: #f8fafc; color: var(--text); font-size: 0.82rem; font-weight: 700; font-family: inherit; cursor: pointer; transition: all 0.15s; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+        .pricing-mode-btn:hover { border-color: var(--primary); color: var(--primary); }
+        .pricing-mode-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .pricing-mode-btn small { font-size: 0.68rem; font-weight: 500; opacity: 0.8; }
+        .pricing-save-bar { padding: 16px 24px; background: #f8fafc; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
+        .btn-save-pricing { height: 44px; background: var(--primary); color: white; border: none; border-radius: 10px; padding: 0 28px; font-size: 0.9rem; font-weight: 700; font-family: inherit; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+        .btn-save-pricing:hover { background: var(--primary-l); }
+        .pricing-saved-note { font-size: 0.82rem; color: var(--success); font-weight: 600; display: none; }
+        .mode-section { display: none; }
+        .mode-section.visible { display: block; }
+        .ranges-table { width: 100%; border-collapse: collapse; min-width: 480px; }
+        .ranges-table th { padding: 8px 10px; text-align: center; font-size: 0.75rem; color: var(--muted); font-weight: 700; border-bottom: 1px solid var(--border); }
+        .ranges-table th:first-child { text-align: right; }
+        .ranges-table td { padding: 6px 6px; border-bottom: 1px solid #f1f5f9; }
+        .ranges-table td:first-child { font-size: 0.8rem; font-weight: 700; color: var(--text); padding-right: 10px; white-space: nowrap; }
+        .ranges-table input { height: 36px; border: 1.5px solid var(--border); border-radius: 8px; padding: 0 8px; font-size: 0.85rem; font-family: inherit; outline: none; width: 100%; text-align: center; }
+        .ranges-table input:focus { border-color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .main { padding: 20px 14px 50px; }
+            .stats-row { grid-template-columns: repeat(2, 1fr); }
+            table { font-size: 0.78rem; }
+            th, td { padding: 10px 10px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ── Admin gate ── -->
+<div id="admin-gate">
+    <div class="gate-box">
+        <i class="fa-solid fa-shield-halved"></i>
+        <h2>פאנל ניהול</h2>
+        <p>הזן את סיסמת האדמין כדי להמשיך</p>
+        <input type="password" class="gate-input" id="gate-password" placeholder="סיסמת אדמין"
+               onkeydown="if(event.key==='Enter') checkAdminPassword()">
+        <button class="gate-btn" onclick="checkAdminPassword()">
+            <i class="fa-solid fa-unlock"></i> כניסה
+        </button>
+        <div class="gate-error" id="gate-error" style="display:none;">סיסמה שגויה</div>
+    </div>
+</div>
+
+<!-- ── Topbar ── -->
+<header class="topbar">
+    <div class="topbar-brand">
+        <i class="fa-solid fa-shield-halved"></i>
+        פאנל ניהול
+        <span class="admin-badge">ADMIN</span>
+    </div>
+    <div class="topbar-right">
+        <button class="btn-topbar" onclick="loadUsers()">
+            <i class="fa-solid fa-rotate"></i> רענן
+        </button>
+        <a href="projects.html" class="btn-topbar" style="text-decoration:none;">
+            <i class="fa-solid fa-arrow-right"></i> חזרה לאפליקציה
+        </a>
+    </div>
+</header>
+
+<main class="main">
+
+    <!-- ── Tab navigation ── -->
+    <div class="admin-tabs">
+        <button class="admin-tab active" id="tab-btn-users" onclick="switchTab('users')">
+            <i class="fa-solid fa-users"></i> משתמשים
+        </button>
+        <button class="admin-tab" id="tab-btn-pricing" onclick="switchTab('pricing')">
+            <i class="fa-solid fa-tags"></i> תמחור
+        </button>
+    </div>
+
+    <!-- ══ Tab: Users ══ -->
+    <div class="tab-panel active" id="tab-users">
+
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-label">סה"כ משתמשים</div>
+                <div class="stat-value" id="stat-total">—</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">מנויים פעילים</div>
+                <div class="stat-value" id="stat-active">—</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">מעצבות</div>
+                <div class="stat-value" id="stat-designers">—</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">נגרים</div>
+                <div class="stat-value" id="stat-carpenters">—</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">חברות</div>
+                <div class="stat-value" id="stat-companies">—</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">חינמיים</div>
+                <div class="stat-value" id="stat-free">—</div>
+            </div>
+        </div>
+
+        <div class="toolbar">
+            <div class="search-wrap">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" class="search-input" id="search-input" placeholder="חיפוש לפי שם / אימייל..."
+                       oninput="filterUsers()">
+            </div>
+            <select class="filter-select" id="filter-plan" onchange="filterUsers()">
+                <option value="">כל התוכניות</option>
+                <option value="free">חינמי</option>
+                <option value="designer_single">מעצבת — בודד</option>
+                <option value="designer_monthly">מעצבת — חודשי</option>
+                <option value="carpenter_basic">נגר — בסיסי</option>
+                <option value="carpenter_pro">נגר — מקצועי</option>
+                <option value="company_standard">חברה — סטנדרט</option>
+                <option value="company_enterprise">חברה — ארגוני</option>
+            </select>
+            <select class="filter-select" id="filter-status" onchange="filterUsers()">
+                <option value="">כל הסטטוסים</option>
+                <option value="active">פעיל</option>
+                <option value="trial">ניסיון</option>
+                <option value="inactive">לא פעיל</option>
+                <option value="cancelled">בוטל</option>
+            </select>
+            <button class="btn-refresh" onclick="loadUsers()">
+                <i class="fa-solid fa-rotate"></i> רענן
+            </button>
+        </div>
+
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>משתמש</th>
+                        <th>תוכנית</th>
+                        <th>סטטוס</th>
+                        <th>מייל מאושר</th>
+                        <th>פרויקטים</th>
+                        <th>מכשירים</th>
+                        <th>נרשם</th>
+                        <th>פעולות</th>
+                    </tr>
+                </thead>
+                <tbody id="users-tbody">
+                    <tr class="loading-row">
+                        <td colspan="8">
+                            <div class="spinner-lg"></div>
+                            טוען משתמשים...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div><!-- /tab-users -->
+
+    <!-- ══ Tab: Pricing ══ -->
+    <div class="tab-panel" id="tab-pricing">
+
+        <!-- User selector bar -->
+        <div class="pricing-user-select-wrap">
+            <label><i class="fa-solid fa-user"></i> בחר לקוח:</label>
+            <select class="pricing-user-select" id="pricing-user-select">
+                <option value="">— בחר משתמש —</option>
+            </select>
+            <button class="btn-load-pricing" onclick="loadPricingForUser()">
+                <i class="fa-solid fa-download"></i> טען הגדרות
+            </button>
+            <button class="btn-reset-pricing" onclick="resetPricingToDefaults()">
+                <i class="fa-solid fa-rotate-left"></i> אפס לברירות מחדל
+            </button>
+        </div>
+
+        <!-- Pricing form (hidden until user selected) -->
+        <div id="pricing-form" style="display:none;">
+
+            <div class="pricing-form">
+
+                <!-- ① Pricing mode -->
+                <div class="pricing-section">
+                    <div class="pricing-section-title"><i class="fa-solid fa-sliders"></i> שיטת תמחור</div>
+                    <div class="pricing-mode-btns" id="pricing-mode-btns">
+                        <button class="pricing-mode-btn active" data-mode="ranges" onclick="setPricingMode('ranges')">טווחי מידות<br><small>לפי רוחב</small></button>
+                        <button class="pricing-mode-btn" data-mode="sqm" onclick="setPricingMode('sqm')">מ"ר<br><small>מחיר למטר רבוע</small></button>
+                        <button class="pricing-mode-btn" data-mode="lm" onclick="setPricingMode('lm')">מ"א<br><small>מחיר למטר אורך</small></button>
+                        <button class="pricing-mode-btn" data-mode="lm_height" onclick="setPricingMode('lm_height')">מ"א + גובה<br><small>עם תוספת גובה</small></button>
+                        <button class="pricing-mode-btn" data-mode="materials" onclick="setPricingMode('materials')">חומרים<br><small>לוחות × מכפיל</small></button>
+                    </div>
+                </div>
+                <div class="pricing-section mode-section" id="mode-sqm">
+                    <div class="pricing-section-title"><i class="fa-solid fa-ruler-combined"></i> מחיר למ"ר</div>
+                    <div class="pricing-grid">
+                        <div class="pricing-field"><label>מ"ר — מלמין (₪)</label><input type="number" class="pricing-input" id="p-sqmPrice" min="0" step="10"></div>
+                        <div class="pricing-field"><label>מ"ר — לא מלמין (₪)</label><input type="number" class="pricing-input" id="p-sqmPriceNonMel" min="0" step="10"></div>
+                    </div>
+                </div>
+                <div class="pricing-section mode-section" id="mode-lm">
+                    <div class="pricing-section-title"><i class="fa-solid fa-ruler-horizontal"></i> מחיר למ"א</div>
+                    <div class="pricing-grid">
+                        <div class="pricing-field"><label>מ"א — מלמין (₪)</label><input type="number" class="pricing-input" id="p-lmPrice" min="0" step="10"></div>
+                        <div class="pricing-field"><label>מ"א — לא מלמין (₪)</label><input type="number" class="pricing-input" id="p-lmPriceNonMel" min="0" step="10"></div>
+                    </div>
+                </div>
+                <div class="pricing-section mode-section" id="mode-lm_height">
+                    <div class="pricing-section-title"><i class="fa-solid fa-ruler-vertical"></i> מ"א + תוספת גובה</div>
+                    <div class="pricing-grid">
+                        <div class="pricing-field"><label>בסיס מ"א — מלמין (₪)</label><input type="number" class="pricing-input" id="p-lmHeightBase" min="0" step="10"></div>
+                        <div class="pricing-field"><label>בסיס מ"א — לא מלמין (₪)</label><input type="number" class="pricing-input" id="p-lmHeightBaseNonMel" min="0" step="10"></div>
+                        <div class="pricing-field"><label>סף גובה (ס"מ)</label><input type="number" class="pricing-input" id="p-lmHeightThresholdCm" min="0" step="10"></div>
+                        <div class="pricing-field"><label>צעד גובה (ס"מ)</label><input type="number" class="pricing-input" id="p-lmHeightStepCm" min="1" step="5"></div>
+                        <div class="pricing-field"><label>תוספת לצעד (%)</label><input type="number" class="pricing-input" id="p-lmHeightStepPct" min="0" max="100" step="1"></div>
+                    </div>
+                </div>
+                <div class="pricing-section mode-section" id="mode-materials">
+                    <div class="pricing-section-title"><i class="fa-solid fa-layer-group"></i> תמחור לפי חומרים</div>
+                    <div class="pricing-grid">
+                        <div class="pricing-field"><label>מחיר לוח (₪)</label><input type="number" class="pricing-input" id="p-materialsBoardPrice" min="0" step="5"></div>
+                        <div class="pricing-field"><label>לוחות למ"ר</label><input type="number" class="pricing-input" id="p-materialsBoardsPerSqm" min="0.1" step="0.1"></div>
+                        <div class="pricing-field"><label>מכפיל רווח</label><input type="number" class="pricing-input" id="p-materialsMultiplier" min="1" step="0.1"></div>
+                    </div>
+                </div>
+                <div class="pricing-section mode-section" id="mode-ranges">
+                    <div class="pricing-section-title"><i class="fa-solid fa-table"></i> טבלת מחירים לפי טווח רוחב</div>
+                    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:14px;">מחירי עלות (לפני רווח) לפי רוחב ארון בס"מ.</p>
+                    <div style="overflow-x:auto;"><table class="ranges-table">
+                        <thead><tr><th>חומר</th><th>עד 80</th><th>עד 120</th><th>עד 160</th><th>עד 200</th><th>עד 240</th></tr></thead>
+                        <tbody id="ranges-tbody"></tbody>
+                    </table></div>
+                </div>
+                <div class="pricing-section">
+                    <div class="pricing-section-title"><i class="fa-solid fa-percent"></i> תוספות ורווח</div>
+                    <div class="pricing-grid">
+                        <div class="pricing-field"><label>תוספת גובה מעל 240 (%)</label><input type="number" class="pricing-input" id="p-heightSurcharge" min="0" max="100" step="1"></div>
+                        <div class="pricing-field"><label>תוספת עומק מעל 54 (%)</label><input type="number" class="pricing-input" id="p-depthSurcharge" min="0" max="100" step="1"></div>
+                        <div class="pricing-field"><label>תוספת צבע סנדוויץ' (%)</label><input type="number" class="pricing-input" id="p-sandwichSurcharge" min="0" max="100" step="1"></div>
+                        <div class="pricing-field"><label>מכפיל רווח ללקוח</label><input type="number" class="pricing-input" id="p-profitMultiplier" min="1" step="0.05"></div>
+                    </div>
+                </div>
+                <div class="pricing-section">
+                    <div class="pricing-section-title"><i class="fa-solid fa-screwdriver-wrench"></i> מחיר התקנה</div>
+                    <div class="pricing-grid">
+                        <div class="pricing-field"><label>מחיר ליחידת התקנה (₪)</label><input type="number" class="pricing-input" id="p-installPricePerUnit" min="0" step="5"></div>
+                        <div class="pricing-field"><label>רוחב יחידת התקנה (ס"מ)</label><input type="number" class="pricing-input" id="p-installUnitCm" min="1" step="0.5"></div>
+                        <div class="pricing-field"><label>תוספת גובה להתקנה (%)</label><input type="number" class="pricing-input" id="p-installHeightSurcharge" min="0" max="100" step="1"></div>
+                    </div>
+                </div>
+                <div class="pricing-section">
+                    <div class="pricing-section-title"><i class="fa-solid fa-plus-circle"></i> מגירות, תאים, מדפים</div>
+                    <div class="pricing-grid">
+                        <div class="pricing-field"><label>מגירה פנימית (₪)</label><input type="number" class="pricing-input" id="p-internalDrawer" min="0" step="10"></div>
+                        <div class="pricing-field"><label>מגירה חיצונית (₪)</label><input type="number" class="pricing-input" id="p-externalDrawer" min="0" step="10"></div>
+                        <div class="pricing-field"><label>תא פתוח / סורבטו (₪)</label><input type="number" class="pricing-input" id="p-openCell" min="0" step="10"></div>
+                        <div class="pricing-field"><label>מחיצה (₪)</label><input type="number" class="pricing-input" id="p-partition" min="0" step="10"></div>
+                        <div class="pricing-field"><label>מדפים חינם למטר</label><input type="number" class="pricing-input" id="p-shelfFreePerMeter" min="0" step="0.5"></div>
+                        <div class="pricing-field"><label>מדף נוסף — מלמין (₪)</label><input type="number" class="pricing-input" id="p-extraShelfMel" min="0" step="5"></div>
+                        <div class="pricing-field"><label>מדף נוסף — לא מלמין (₪)</label><input type="number" class="pricing-input" id="p-extraShelfNonMel" min="0" step="5"></div>
+                        <div class="pricing-field"><label>שולחן צד (₪)</label><input type="number" class="pricing-input" id="p-deskUnit" min="0" step="50"></div>
+                    </div>
+                </div>
+                <div class="pricing-section">
+                    <div class="pricing-section-title"><i class="fa-solid fa-door-open"></i> דלתות</div>
+                    <div class="pricing-grid">
+                        <div class="pricing-field"><label>דלת ממסגרת מלמין (₪)</label><input type="number" class="pricing-input" id="p-doorFramedMel" min="0" step="10"></div>
+                        <div class="pricing-field"><label>דלת זכוכית מלמין (₪)</label><input type="number" class="pricing-input" id="p-doorGlassMel" min="0" step="10"></div>
+                        <div class="pricing-field"><label>דלת זכוכית שחורה/זהב (₪)</label><input type="number" class="pricing-input" id="p-doorGlassBlack" min="0" step="10"></div>
+                        <div class="pricing-field"><label>דלת מראה (₪)</label><input type="number" class="pricing-input" id="p-doorMirror" min="0" step="10"></div>
+                    </div>
+                </div>
+                <div class="pricing-section">
+                    <div class="pricing-section-title"><i class="fa-solid fa-layer-group"></i> יחידה עליונה</div>
+                    <div class="pricing-grid">
+                        <div class="pricing-field"><label>יחידה עליונה עד 160 (₪)</label><input type="number" class="pricing-input" id="p-upperUnit160" min="0" step="50"></div>
+                        <div class="pricing-field"><label>יחידה עליונה עד 240 (₪)</label><input type="number" class="pricing-input" id="p-upperUnit240" min="0" step="50"></div>
+                        <div class="pricing-field"><label>יחידה עליונה מעל 240 (₪/ס"מ)</label><input type="number" class="pricing-input" id="p-upperUnitPerCm" min="0" step="0.25"></div>
+                    </div>
+                </div>
+                <div class="pricing-section">
+                    <div class="pricing-section-title"><i class="fa-solid fa-turn-up"></i> יחידת פינה</div>
+                    <div class="pricing-grid">
+                        <div class="pricing-field"><label>פינה 3 מגירות (₪)</label><input type="number" class="pricing-input" id="p-cornerDrawers3" min="0" step="10"></div>
+                        <div class="pricing-field"><label>פינה 4 מגירות (₪)</label><input type="number" class="pricing-input" id="p-cornerDrawers4" min="0" step="10"></div>
+                        <div class="pricing-field"><label>מגירה נוספת בפינה (₪)</label><input type="number" class="pricing-input" id="p-cornerDrawerExtra" min="0" step="10"></div>
+                        <div class="pricing-field"><label>שולחן פינה (₪)</label><input type="number" class="pricing-input" id="p-cornerDesk" min="0" step="50"></div>
+                        <div class="pricing-field"><label>פינה מלאה — בסיס (₪)</label><input type="number" class="pricing-input" id="p-fullCornerBase" min="0" step="50"></div>
+                        <div class="pricing-field"><label>מדף בפינה מלאה (₪)</label><input type="number" class="pricing-input" id="p-fullCornerShelf" min="0" step="10"></div>
+                        <div class="pricing-field"><label>חיבור כנפיים (₪)</label><input type="number" class="pricing-input" id="p-wingConnection" min="0" step="50"></div>
+                    </div>
+                </div>
+                <div class="pricing-section">
+                    <div class="pricing-section-title"><i class="fa-solid fa-box"></i> ארון צד</div>
+                    <div class="pricing-grid">
+                        <div class="pricing-field"><label>ארון צד מלמין (₪/ס"מ)</label><input type="number" class="pricing-input" id="p-sideCabMel" min="0" step="1"></div>
+                        <div class="pricing-field"><label>ארון צד לא מלמין (₪/ס"מ)</label><input type="number" class="pricing-input" id="p-sideCabNonMel" min="0" step="1"></div>
+                        <div class="pricing-field"><label>דלתות לארון צד (₪)</label><input type="number" class="pricing-input" id="p-sideCabDoors" min="0" step="50"></div>
+                    </div>
+                </div>
+                <div class="pricing-section">
+                    <div class="pricing-section-title"><i class="fa-solid fa-arrows-left-right"></i> ארון הזזה</div>
+                    <div class="pricing-grid">
+                        <div class="pricing-field"><label>בסיס הזזה (₪)</label><input type="number" class="pricing-input" id="p-slidingBase" min="0" step="50"></div>
+                        <div class="pricing-field"><label>דלת הזזה (₪)</label><input type="number" class="pricing-input" id="p-slidingDoor" min="0" step="10"></div>
+                        <div class="pricing-field"><label>תוספת זכוכית (₪/דלת)</label><input type="number" class="pricing-input" id="p-slidingGlass" min="0" step="10"></div>
+                        <div class="pricing-field"><label>תוספת מראה (₪/דלת)</label><input type="number" class="pricing-input" id="p-slidingMirror" min="0" step="10"></div>
+                        <div class="pricing-field"><label>תוספת פרופיל זהב (₪/דלת)</label><input type="number" class="pricing-input" id="p-slidingGold" min="0" step="10"></div>
+                        <div class="pricing-field"><label>תוספת פרופיל שחור (₪/דלת)</label><input type="number" class="pricing-input" id="p-slidingBlack" min="0" step="10"></div>
+                        <div class="pricing-field"><label>תוספת גובה הזזה (%)</label><input type="number" class="pricing-input" id="p-slidingHeightSurcharge" min="0" max="100" step="1"></div>
+                    </div>
+                </div>
+                <div class="pricing-save-bar">
+                    <button class="btn-save-pricing" onclick="savePricingConfig()">
+                        <i class="fa-solid fa-floppy-disk"></i> שמור הגדרות תמחור
+                    </button>
+                    <span class="pricing-saved-note" id="pricing-saved-note">
+                        <i class="fa-solid fa-circle-check"></i> נשמר בהצלחה!
+                    </span>
+                </div>
+            </div><!-- /pricing-form inner -->
+        </div><!-- /pricing-form outer -->
+    </div><!-- /tab-pricing -->
+</main>
+
+<div class="modal-overlay" id="modal-edit-plan">
+    <div class="modal-box">
+        <div class="modal-title"><i class="fa-solid fa-pen"></i> עריכת תוכנית משתמש</div>
+        <div class="modal-user-info" id="edit-user-info"></div>
+        <input type="hidden" id="edit-user-id">
+        <div class="modal-field"><label class="modal-label">תוכנית</label>
+            <select class="modal-select" id="edit-plan-select">
+                <option value="free">חינמי</option><option value="designer_single">מעצבת — פרויקט בודד</option>
+                <option value="designer_monthly">מעצבת — חודשי</option><option value="carpenter_basic">נגר — בסיסי</option>
+                <option value="carpenter_pro">נגר — מקצועי</option><option value="company_standard">חברה — סטנדרט</option>
+                <option value="company_enterprise">חברה — ארגוני</option>
+            </select></div>
+        <div class="modal-field"><label class="modal-label">סטטוס מנוי</label>
+            <select class="modal-select" id="edit-status-select">
+                <option value="active">פעיל</option><option value="inactive">לא פעיל</option><option value="trial">ניסיון</option>
+            </select></div>
+        <div class="modal-field"><label class="modal-label">מכשירים מקסימום</label>
+            <input type="number" class="modal-input" id="edit-max-devices" placeholder="ריק = ברירת מחדל" min="1" max="100"></div>
+        <div class="modal-field"><label class="modal-label">הערות אדמין</label>
+            <input type="text" class="modal-input" id="edit-notes" placeholder="הערה פנימית"></div>
+        <div class="modal-actions">
+            <button class="btn-modal ghost" onclick="closeModal('modal-edit-plan')">ביטול</button>
+            <button class="btn-modal primary" onclick="saveUserPlan()">שמור שינויים</button>
+        </div>
+    </div>
+</div>
+<div class="modal-overlay" id="modal-user-details">
+    <div class="modal-box" style="max-width:520px;">
+        <div class="modal-title"><i class="fa-solid fa-user"></i> פרטי משתמש</div>
+        <div id="user-details-content" style="font-size:0.85rem;line-height:1.8;"></div>
+        <div class="modal-actions" style="margin-top:18px;">
+            <button class="btn-modal ghost" onclick="closeModal('modal-user-details')">סגור</button>
+            <button class="btn-modal primary" onclick="openEditFromDetails()"><i class="fa-solid fa-pen"></i> ערוך תוכנית</button>
+        </div>
+    </div>
+</div>
+<div class="modal-overlay" id="modal-cancel-subscription">
+    <div class="modal-box">
+        <div class="modal-title" style="color:#d97706;"><i class="fa-solid fa-ban"></i> ביטול מנוי</div>
+        <div class="modal-user-info" id="cancel-user-info"></div>
+        <input type="hidden" id="cancel-user-id">
+        <p style="font-size:0.85rem;color:var(--muted);margin-bottom:16px;line-height:1.6;">
+            ביטול המנוי ישנה את הסטטוס ל-<strong>cancelled</strong> וימנע חיוב עתידי.<br>
+            הגישה למערכת תיחסם בכניסה הבאה של המשתמש.
+        </p>
+        <div class="modal-actions">
+            <button class="btn-modal ghost" onclick="closeModal('modal-cancel-subscription')">חזרה</button>
+            <button class="btn-modal" style="background:#d97706;color:white;" onclick="confirmCancelSubscription()">
+                <i class="fa-solid fa-ban"></i> אשר ביטול מנוי
+            </button>
+        </div>
+    </div>
+</div>
+<div class="toast" id="toast"><i id="toast-icon" class="fa-solid fa-circle-check"></i><span id="toast-text"></span></div>
+
+<script>
+var ADMIN_PASSWORD='123123';
+var _ADMIN_SB_URL='https://meqxnsjycvfgfhdepguo.supabase.co';
+var _ADMIN_SB_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lcXhuc2p5Y3ZmZ2ZoZGVwZ3VvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3MDA5NDAsImV4cCI6MjA5MjI3Njk0MH0.w63bl0-1-Rgt9Nx6sVW5ueEGMojiMaxoehlPXlPH2N0';
+var _sb=null,_allUsers=[],_currentEditUserId=null,_currentPricingUserId=null,_toastTimer=null;
+var PLAN_LABELS={free:'חינמי',designer_single:'מעצבת — בודד',designer_monthly:'מעצבת — חודשי',carpenter_basic:'נגר — בסיסי',carpenter_pro:'נגר — מקצועי',company_standard:'חברה — סטנדרט',company_enterprise:'חברה — ארגוני'};
+var PLAN_USER_TYPE={free:'free',designer_single:'designer',designer_monthly:'designer',carpenter_basic:'carpenter',carpenter_pro:'carpenter',company_standard:'company',company_enterprise:'company'};
+var DEFAULT_PRICING={pricingMode:'ranges',sqmPrice:800,sqmPriceNonMel:1040,lmPrice:1200,lmPriceNonMel:1560,lmHeightBase:1200,lmHeightBaseNonMel:1560,lmHeightThresholdCm:240,lmHeightStepCm:30,lmHeightStepPct:0.10,materialsBoardPrice:180,materialsBoardsPerSqm:1.4,materialsMultiplier:2.5,profitMultiplier:1.7,installPricePerUnit:110,installUnitCm:42.5,installHeightSurcharge:0.20,heightSurcharge:0.20,depthSurcharge:0.20,sandwichSurcharge:0.15,ranges:{maya:{melamine:{80:1050,120:1462,160:1658,200:2073,240:2487},nonMelamine:{80:1360,120:1900,160:2155,200:2700,240:3233}}},extras:{internalDrawer:150,externalDrawer:200,openCell:400,partition:150,shelfFreePerMeter:3,extraShelfMel:60,extraShelfNonMel:80,deskUnit:900,doorFramedMel:80,doorGlassMel:400,doorGlassBlack:600,doorMirror:350,upperUnit160:600,upperUnit240:900,upperUnitPerCm:3.75,cornerDrawers3:832,cornerDrawers4:907,cornerDrawerExtra:200,cornerDesk:900,fullCornerBase:2800,fullCornerShelf:120,wingConnection:400,sideCabMel:12,sideCabNonMel:15,sideCabDoors:300,slidingBase:800,slidingDoor:350,slidingGlass:200,slidingMirror:350,slidingGold:80,slidingBlack:50,slidingHeightSurcharge:0.15,nickelLegPrice:100}};
+
+function checkAdminPassword(){var pw=document.getElementById('gate-password').value;if(pw===ADMIN_PASSWORD){document.getElementById('admin-gate').style.display='none';_sb=supabase.createClient(_ADMIN_SB_URL,_ADMIN_SB_ANON);loadUsers();}else{document.getElementById('gate-error').style.display='block';document.getElementById('gate-password').value='';document.getElementById('gate-password').focus();}}
+function switchTab(tab){document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active');});document.querySelectorAll('.admin-tab').forEach(function(b){b.classList.remove('active');});document.getElementById('tab-'+tab).classList.add('active');document.getElementById('tab-btn-'+tab).classList.add('active');if(tab==='pricing')_populatePricingUserSelect();}
+async function loadUsers(){showLoadingRow();var{data:profiles,error:pErr}=await _sb.from('profiles').select('*').order('id',{ascending:false});if(pErr){showToast('שגיאה: '+pErr.message,'error');return;}var{data:authUsers}=await _sb.rpc('admin_get_auth_users');var authMap={};(authUsers||[]).forEach(function(u){authMap[u.id]=u;});var{data:projCounts}=await _sb.rpc('admin_get_project_counts');var projMap={};(projCounts||[]).forEach(function(p){projMap[p.user_id]=Number(p.project_count)||0;});var{data:devCounts}=await _sb.from('devices').select('user_id, is_active');var devMap={};(devCounts||[]).forEach(function(d){if(!devMap[d.user_id])devMap[d.user_id]={total:0,active:0};devMap[d.user_id].total++;if(d.is_active)devMap[d.user_id].active++;});_allUsers=(profiles||[]).map(function(p){var au=authMap[p.id]||{};return Object.assign({},p,{_projectCount:projMap[p.id]||0,_deviceInfo:devMap[p.id]||{total:0,active:0},_emailConfirmed:!!(au.email_confirmed_at)});});updateStats();renderTable(_allUsers);}
+function showLoadingRow(){document.getElementById('users-tbody').innerHTML='<tr class="loading-row"><td colspan="8"><div class="spinner-lg"></div>טוען...</td></tr>';}
+function updateStats(){var t=_allUsers.length,a=_allUsers.filter(function(u){return u.subscription_status==='active'&&u.plan&&u.plan!=='free';}).length,d=_allUsers.filter(function(u){return PLAN_USER_TYPE[u.plan]==='designer';}).length,c=_allUsers.filter(function(u){return PLAN_USER_TYPE[u.plan]==='carpenter';}).length,co=_allUsers.filter(function(u){return PLAN_USER_TYPE[u.plan]==='company';}).length,f=_allUsers.filter(function(u){return !u.plan||u.plan==='free';}).length;document.getElementById('stat-total').textContent=t;document.getElementById('stat-active').textContent=a;document.getElementById('stat-designers').textContent=d;document.getElementById('stat-carpenters').textContent=c;document.getElementById('stat-companies').textContent=co;document.getElementById('stat-free').textContent=f;}
+function renderTable(users){var tbody=document.getElementById('users-tbody');if(!users.length){tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--muted);">לא נמצאו משתמשים</td></tr>';return;}tbody.innerHTML='';users.forEach(function(u){var plan=u.plan||'free',status=u.subscription_status||'active',di=u._deviceInfo;var cancelBtn=(status==='trial'||status==='active')?'<button class="btn-action warning" onclick="openCancelSubscription(\''+u.id+'\')" title="בטל מנוי"><i class="fa-solid fa-ban"></i> בטל</button>':'';var tr=document.createElement('tr');tr.innerHTML='<td><div class="user-cell"><div class="user-avatar">'+_esc(_initials(u.full_name||u.email||'?'))+'</div><div><div class="user-name">'+_esc(u.full_name||'—')+'</div><div class="user-email">'+_esc(u.email||u.id)+'</div></div></div></td><td><span class="plan-badge '+plan+'">'+(PLAN_LABELS[plan]||plan)+'</span></td><td><span class="status-badge '+status+'">'+_statusLabel(status)+'</span></td><td>'+(u._emailConfirmed?'<span class="status-badge active"><i class="fa-solid fa-check"></i> מאושר</span>':'<span class="status-badge inactive"><i class="fa-solid fa-xmark"></i> לא מאושר</span>')+'</td><td>'+u._projectCount+'</td><td>'+(di.active>0?di.active+' פעיל'+(di.total>di.active?' / '+di.total:''):'—')+'</td><td>'+_formatDate(u.created_at)+'</td><td><div class="actions-cell"><button class="btn-action primary" onclick="openEditPlan(\''+u.id+'\')"><i class="fa-solid fa-pen"></i> ערוך</button>'+cancelBtn+(!u._emailConfirmed?'<button class="btn-action" style="color:#16a34a;border-color:#bbf7d0;" onclick="confirmEmail(\''+u.id+'\')" title="אשר מייל"><i class="fa-solid fa-envelope-circle-check"></i></button>':'')+'<button class="btn-action" onclick="openUserDetails(\''+u.id+'\')"><i class="fa-solid fa-eye"></i></button><button class="btn-action" style="color:#dc2626;border-color:#fecaca;" onclick="deleteUser(\''+u.id+'\',\''+_esc(u.email||u.id)+'\')" title="מחק"><i class="fa-solid fa-trash"></i></button></div></td>';tbody.appendChild(tr);});}
+function filterUsers(){var q=document.getElementById('search-input').value.toLowerCase(),plan=document.getElementById('filter-plan').value,status=document.getElementById('filter-status').value;renderTable(_allUsers.filter(function(u){return(!q||(u.full_name&&u.full_name.toLowerCase().includes(q))||(u.email&&u.email.toLowerCase().includes(q)))&&(!plan||(u.plan||'free')===plan)&&(!status||(u.subscription_status||'active')===status);}));}
+function openEditPlan(userId){var u=_allUsers.find(function(x){return x.id===userId;});if(!u)return;_currentEditUserId=userId;document.getElementById('edit-user-id').value=userId;document.getElementById('edit-user-info').innerHTML='<strong>'+_esc(u.full_name||'—')+'</strong> · '+_esc(u.email||u.id);document.getElementById('edit-plan-select').value=u.plan||'free';document.getElementById('edit-status-select').value=u.subscription_status||'active';document.getElementById('edit-max-devices').value=u.max_devices||'';document.getElementById('edit-notes').value=u.admin_notes||'';openModal('modal-edit-plan');}
+async function saveUserPlan(){var userId=document.getElementById('edit-user-id').value,plan=document.getElementById('edit-plan-select').value,status=document.getElementById('edit-status-select').value,maxDevRaw=document.getElementById('edit-max-devices').value,notes=document.getElementById('edit-notes').value.trim(),maxDevices=maxDevRaw?parseInt(maxDevRaw):null;var payload={plan:plan,subscription_status:status,admin_notes:notes||null};if(maxDevices!==null)payload.max_devices=maxDevices;var{error}=await _sb.from('profiles').update(payload).eq('id',userId);if(error){showToast('שגיאה: '+error.message,'error');return;}var u=_allUsers.find(function(x){return x.id===userId;});if(u){u.plan=plan;u.subscription_status=status;if(maxDevices!==null)u.max_devices=maxDevices;u.admin_notes=notes||null;}closeModal('modal-edit-plan');updateStats();filterUsers();showToast('התוכנית עודכנה','success');}
+function openUserDetails(userId){var u=_allUsers.find(function(x){return x.id===userId;});if(!u)return;_currentEditUserId=userId;var plan=u.plan||'free',status=u.subscription_status||'active',di=u._deviceInfo;document.getElementById('user-details-content').innerHTML='<table style="width:100%;border-collapse:collapse;">'+_dr('שם',u.full_name||'—')+_dr('אימייל',u.email||u.id)+_dr('תוכנית','<span class="plan-badge '+plan+'">'+(PLAN_LABELS[plan]||plan)+'</span>')+_dr('סטטוס','<span class="status-badge '+status+'">'+_statusLabel(status)+'</span>')+_dr('פרויקטים',u._projectCount)+_dr('מכשירים',di.active+' פעילים / '+di.total+' סה"כ')+_dr('מכשירים מקסימום',u.max_devices||'ברירת מחדל')+_dr('נרשם',_formatDate(u.created_at))+(u.subscription_ends_at?_dr('מנוי עד',_formatDate(u.subscription_ends_at)):'')+( u.admin_notes?_dr('הערות אדמין',u.admin_notes):'')+' </table>';openModal('modal-user-details');}
+function _dr(l,v){return '<tr><td style="padding:5px 0;color:var(--muted);font-size:0.78rem;width:40%;font-weight:600;">'+l+'</td><td style="padding:5px 0;font-size:0.85rem;">'+v+'</td></tr>';}
+function openEditFromDetails(){closeModal('modal-user-details');if(_currentEditUserId)openEditPlan(_currentEditUserId);}
+async function confirmEmail(userId){var{error}=await _sb.rpc('admin_confirm_user_email',{user_id:userId});if(error){showToast('שגיאה: '+error.message,'error');return;}var u=_allUsers.find(function(x){return x.id===userId;});if(u)u._emailConfirmed=true;filterUsers();showToast('המייל אושר ✓','success');}
+async function deleteUser(userId,userEmail){if(!confirm('האם אתה בטוח שברצונך למחוק:\n'+userEmail+'\n\nפעולה זו בלתי הפיכה!'))return;var{error}=await _sb.rpc('admin_delete_user',{user_id:userId});if(error){showToast('שגיאה: '+error.message,'error');return;}_allUsers=_allUsers.filter(function(x){return x.id!==userId;});updateStats();filterUsers();showToast('המשתמש נמחק','success');}
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+document.addEventListener('click',function(e){if(e.target.classList.contains('modal-overlay'))e.target.classList.remove('open');});
+function showToast(msg,type){type=type||'success';var toast=document.getElementById('toast');document.getElementById('toast-text').textContent=msg;document.getElementById('toast-icon').className=type==='error'?'fa-solid fa-circle-exclamation':'fa-solid fa-circle-check';toast.className='toast '+type+' show';clearTimeout(_toastTimer);_toastTimer=setTimeout(function(){toast.className='toast '+type;},3500);}
+function _initials(name){if(!name)return '?';var parts=name.trim().split(/\s+/);if(parts.length>=2)return(parts[0][0]+parts[1][0]).toUpperCase();return name.slice(0,2).toUpperCase();}
+function _esc(str){return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function _formatDate(iso){if(!iso)return '—';var d=new Date(iso);return d.toLocaleDateString('he-IL',{day:'numeric',month:'short',year:'numeric'});}
+function _statusLabel(s){if(s==='active')return 'פעיל';if(s==='inactive')return 'לא פעיל';if(s==='trial')return 'ניסיון';if(s==='cancelled')return 'בוטל';return s;}
+function openCancelSubscription(userId){var u=_allUsers.find(function(x){return x.id===userId;});if(!u)return;document.getElementById('cancel-user-id').value=userId;document.getElementById('cancel-user-info').innerHTML='<strong>'+_esc(u.full_name||'—')+'</strong> · '+_esc(u.email||u.id)+'<br><span style="font-size:0.78rem;color:var(--muted);">סטטוס נוכחי: '+_statusLabel(u.subscription_status||'active')+'</span>';openModal('modal-cancel-subscription');}
+async function confirmCancelSubscription(){var userId=document.getElementById('cancel-user-id').value;if(!userId)return;var{error}=await _sb.from('profiles').update({subscription_status:'cancelled'}).eq('id',userId);if(error){showToast('שגיאה: '+error.message,'error');return;}var u=_allUsers.find(function(x){return x.id===userId;});if(u)u.subscription_status='cancelled';closeModal('modal-cancel-subscription');updateStats();filterUsers();showToast('המנוי בוטל בהצלחה ✓','success');}
+function _pct(v){return Math.round((v||0)*100);}
+function _frac(v){return (parseFloat(v)||0)/100;}
+function _populatePricingUserSelect(){var sel=document.getElementById('pricing-user-select');var prev=sel.value;sel.innerHTML='<option value="">— בחר משתמש —</option>';_allUsers.forEach(function(u){var opt=document.createElement('option');opt.value=u.id;opt.textContent=(u.full_name||'—')+' ('+( u.email||u.id)+')';sel.appendChild(opt);});if(prev)sel.value=prev;}
+async function loadPricingForUser(){var userId=document.getElementById('pricing-user-select').value;if(!userId){document.getElementById('pricing-form').style.display='none';return;}_currentPricingUserId=userId;document.getElementById('pricing-form').style.display='block';try{var{data,error}=await _sb.rpc('admin_get_pricing_config',{target_user_id:userId});if(error)throw error;var cfg=data&&Object.keys(data).length>0?data:null;_fillPricingForm(cfg||DEFAULT_PRICING);}catch(e){showToast('שגיאה בטעינת תמחור: '+e.message,'error');_fillPricingForm(DEFAULT_PRICING);}}
+function resetPricingToDefaults(){_fillPricingForm(DEFAULT_PRICING);}
+function _fillPricingForm(cfg){var c=cfg||DEFAULT_PRICING;setPricingMode(c.pricingMode||'ranges');document.getElementById('p-sqmPrice').value=c.sqmPrice||800;document.getElementById('p-sqmPriceNonMel').value=c.sqmPriceNonMel||1040;document.getElementById('p-lmPrice').value=c.lmPrice||1200;document.getElementById('p-lmPriceNonMel').value=c.lmPriceNonMel||1560;document.getElementById('p-lmHeightBase').value=c.lmHeightBase||1200;document.getElementById('p-lmHeightBaseNonMel').value=c.lmHeightBaseNonMel||1560;document.getElementById('p-lmHeightThresholdCm').value=c.lmHeightThresholdCm||240;document.getElementById('p-lmHeightStepCm').value=c.lmHeightStepCm||30;document.getElementById('p-lmHeightStepPct').value=_pct(c.lmHeightStepPct||0.10);document.getElementById('p-materialsBoardPrice').value=c.materialsBoardPrice||180;document.getElementById('p-materialsBoardsPerSqm').value=c.materialsBoardsPerSqm||1.4;document.getElementById('p-materialsMultiplier').value=c.materialsMultiplier||2.5;document.getElementById('p-profitMultiplier').value=c.profitMultiplier||1.7;document.getElementById('p-heightSurcharge').value=_pct(c.heightSurcharge||0.20);document.getElementById('p-depthSurcharge').value=_pct(c.depthSurcharge||0.20);document.getElementById('p-sandwichSurcharge').value=_pct(c.sandwichSurcharge||0.15);document.getElementById('p-installPricePerUnit').value=c.installPricePerUnit||110;document.getElementById('p-installUnitCm').value=c.installUnitCm||42.5;document.getElementById('p-installHeightSurcharge').value=_pct(c.installHeightSurcharge||0.20);var ex=c.extras||DEFAULT_PRICING.extras;document.getElementById('p-internalDrawer').value=ex.internalDrawer||150;document.getElementById('p-externalDrawer').value=ex.externalDrawer||200;document.getElementById('p-openCell').value=ex.openCell||400;document.getElementById('p-partition').value=ex.partition||150;document.getElementById('p-shelfFreePerMeter').value=ex.shelfFreePerMeter||3;document.getElementById('p-extraShelfMel').value=ex.extraShelfMel||60;document.getElementById('p-extraShelfNonMel').value=ex.extraShelfNonMel||80;document.getElementById('p-deskUnit').value=ex.deskUnit||900;document.getElementById('p-doorFramedMel').value=ex.doorFramedMel||80;document.getElementById('p-doorGlassMel').value=ex.doorGlassMel||400;document.getElementById('p-doorGlassBlack').value=ex.doorGlassBlack||600;document.getElementById('p-doorMirror').value=ex.doorMirror||350;document.getElementById('p-upperUnit160').value=ex.upperUnit160||600;document.getElementById('p-upperUnit240').value=ex.upperUnit240||900;document.getElementById('p-upperUnitPerCm').value=ex.upperUnitPerCm||3.75;document.getElementById('p-cornerDrawers3').value=ex.cornerDrawers3||832;document.getElementById('p-cornerDrawers4').value=ex.cornerDrawers4||907;document.getElementById('p-cornerDrawerExtra').value=ex.cornerDrawerExtra||200;document.getElementById('p-cornerDesk').value=ex.cornerDesk||900;document.getElementById('p-fullCornerBase').value=ex.fullCornerBase||2800;document.getElementById('p-fullCornerShelf').value=ex.fullCornerShelf||120;document.getElementById('p-wingConnection').value=ex.wingConnection||400;document.getElementById('p-sideCabMel').value=ex.sideCabMel||12;document.getElementById('p-sideCabNonMel').value=ex.sideCabNonMel||15;document.getElementById('p-sideCabDoors').value=ex.sideCabDoors||300;document.getElementById('p-slidingBase').value=ex.slidingBase||800;document.getElementById('p-slidingDoor').value=ex.slidingDoor||350;document.getElementById('p-slidingGlass').value=ex.slidingGlass||200;document.getElementById('p-slidingMirror').value=ex.slidingMirror||350;document.getElementById('p-slidingGold').value=ex.slidingGold||80;document.getElementById('p-slidingBlack').value=ex.slidingBlack||50;document.getElementById('p-slidingHeightSurcharge').value=_pct(ex.slidingHeightSurcharge||0.15);document.getElementById('p-nickelLegPrice').value=ex.nickelLegPrice||100;var ranges=c.ranges||DEFAULT_PRICING.ranges;_buildRangesTable(ranges);}
+function _buildRangesTable(ranges){var tbody=document.getElementById('ranges-tbody');tbody.innerHTML='';var models=Object.keys(ranges);if(!models.length){models=['maya'];}models.forEach(function(model){var mData=ranges[model]||{melamine:{},nonMelamine:{}};var mel=mData.melamine||{};var nonMel=mData.nonMelamine||{};var widths=[80,120,160,200,240];widths.forEach(function(w){var tr=document.createElement('tr');tr.innerHTML='<td><input class="pricing-input" style="width:80px;" value="'+_esc(model)+'" data-field="model" data-width="'+w+'"></td>'+'<td style="text-align:center;font-weight:600;">'+w+'</td>'+'<td><input class="pricing-input" type="number" min="0" value="'+(mel[w]||0)+'" data-field="mel" data-model="'+_esc(model)+'" data-width="'+w+'"></td>'+'<td><input class="pricing-input" type="number" min="0" value="'+(nonMel[w]||0)+'" data-field="nonmel" data-model="'+_esc(model)+'" data-width="'+w+'"></td>';tbody.appendChild(tr);});}); }
+function _readRangesTable(){var tbody=document.getElementById('ranges-tbody');var result={};var rows=tbody.querySelectorAll('tr');rows.forEach(function(tr){var modelInp=tr.querySelector('[data-field="model"]');var melInp=tr.querySelector('[data-field="mel"]');var nonmelInp=tr.querySelector('[data-field="nonmel"]');if(!modelInp||!melInp||!nonmelInp)return;var model=modelInp.value.trim()||'maya';var width=parseInt(modelInp.getAttribute('data-width'))||80;var melVal=parseInt(melInp.value)||0;var nonmelVal=parseInt(nonmelInp.value)||0;if(!result[model])result[model]={melamine:{},nonMelamine:{}};result[model].melamine[width]=melVal;result[model].nonMelamine[width]=nonmelVal;});return result;}
+function setPricingMode(mode){document.querySelectorAll('.pricing-mode-btn').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-mode')===mode);});document.querySelectorAll('.mode-section').forEach(function(s){s.classList.remove('visible');});var sec=document.getElementById('mode-'+mode);if(sec)sec.classList.add('visible');}
+function _readPricingForm(){var ex={internalDrawer:parseInt(document.getElementById('p-internalDrawer').value)||150,externalDrawer:parseInt(document.getElementById('p-externalDrawer').value)||200,openCell:parseInt(document.getElementById('p-openCell').value)||400,partition:parseInt(document.getElementById('p-partition').value)||150,shelfFreePerMeter:parseFloat(document.getElementById('p-shelfFreePerMeter').value)||3,extraShelfMel:parseInt(document.getElementById('p-extraShelfMel').value)||60,extraShelfNonMel:parseInt(document.getElementById('p-extraShelfNonMel').value)||80,deskUnit:parseInt(document.getElementById('p-deskUnit').value)||900,doorFramedMel:parseInt(document.getElementById('p-doorFramedMel').value)||80,doorGlassMel:parseInt(document.getElementById('p-doorGlassMel').value)||400,doorGlassBlack:parseInt(document.getElementById('p-doorGlassBlack').value)||600,doorMirror:parseInt(document.getElementById('p-doorMirror').value)||350,upperUnit160:parseInt(document.getElementById('p-upperUnit160').value)||600,upperUnit240:parseInt(document.getElementById('p-upperUnit240').value)||900,upperUnitPerCm:parseFloat(document.getElementById('p-upperUnitPerCm').value)||3.75,cornerDrawers3:parseInt(document.getElementById('p-cornerDrawers3').value)||832,cornerDrawers4:parseInt(document.getElementById('p-cornerDrawers4').value)||907,cornerDrawerExtra:parseInt(document.getElementById('p-cornerDrawerExtra').value)||200,cornerDesk:parseInt(document.getElementById('p-cornerDesk').value)||900,fullCornerBase:parseInt(document.getElementById('p-fullCornerBase').value)||2800,fullCornerShelf:parseInt(document.getElementById('p-fullCornerShelf').value)||120,wingConnection:parseInt(document.getElementById('p-wingConnection').value)||400,sideCabMel:parseInt(document.getElementById('p-sideCabMel').value)||12,sideCabNonMel:parseInt(document.getElementById('p-sideCabNonMel').value)||15,sideCabDoors:parseInt(document.getElementById('p-sideCabDoors').value)||300,slidingBase:parseInt(document.getElementById('p-slidingBase').value)||800,slidingDoor:parseInt(document.getElementById('p-slidingDoor').value)||350,slidingGlass:parseInt(document.getElementById('p-slidingGlass').value)||200,slidingMirror:parseInt(document.getElementById('p-slidingMirror').value)||350,slidingGold:parseInt(document.getElementById('p-slidingGold').value)||80,slidingBlack:parseInt(document.getElementById('p-slidingBlack').value)||50,slidingHeightSurcharge:_frac(document.getElementById('p-slidingHeightSurcharge').value),nickelLegPrice:parseInt(document.getElementById('p-nickelLegPrice').value)||100};var activeMode=document.querySelector('.pricing-mode-btn.active');var mode=activeMode?activeMode.getAttribute('data-mode'):'ranges';return {pricingMode:mode,sqmPrice:parseInt(document.getElementById('p-sqmPrice').value)||800,sqmPriceNonMel:parseInt(document.getElementById('p-sqmPriceNonMel').value)||1040,lmPrice:parseInt(document.getElementById('p-lmPrice').value)||1200,lmPriceNonMel:parseInt(document.getElementById('p-lmPriceNonMel').value)||1560,lmHeightBase:parseInt(document.getElementById('p-lmHeightBase').value)||1200,lmHeightBaseNonMel:parseInt(document.getElementById('p-lmHeightBaseNonMel').value)||1560,lmHeightThresholdCm:parseInt(document.getElementById('p-lmHeightThresholdCm').value)||240,lmHeightStepCm:parseInt(document.getElementById('p-lmHeightStepCm').value)||30,lmHeightStepPct:_frac(document.getElementById('p-lmHeightStepPct').value),materialsBoardPrice:parseInt(document.getElementById('p-materialsBoardPrice').value)||180,materialsBoardsPerSqm:parseFloat(document.getElementById('p-materialsBoardsPerSqm').value)||1.4,materialsMultiplier:parseFloat(document.getElementById('p-materialsMultiplier').value)||2.5,profitMultiplier:parseFloat(document.getElementById('p-profitMultiplier').value)||1.7,heightSurcharge:_frac(document.getElementById('p-heightSurcharge').value),depthSurcharge:_frac(document.getElementById('p-depthSurcharge').value),sandwichSurcharge:_frac(document.getElementById('p-sandwichSurcharge').value),installPricePerUnit:parseInt(document.getElementById('p-installPricePerUnit').value)||110,installUnitCm:parseFloat(document.getElementById('p-installUnitCm').value)||42.5,installHeightSurcharge:_frac(document.getElementById('p-installHeightSurcharge').value),ranges:_readRangesTable(),extras:ex};}
+async function savePricingConfig(){if(!_currentPricingUserId){showToast('יש לבחור משתמש תחילה','error');return;}var cfg=_readPricingForm();try{var{error}=await _sb.rpc('admin_set_pricing_config',{target_user_id:_currentPricingUserId,config_data:cfg});if(error)throw error;showToast('התמחור נשמר בהצלחה ✓','success');}catch(e){showToast('שגיאה בשמירה: '+e.message,'error');}}
+</script>
+</body>
+</html>

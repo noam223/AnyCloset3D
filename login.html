@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>כניסה | AnyCloset 3D</title>
+    <link rel="icon" type="image/png" href="images/icon-logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --primary:   #1e3a5f;
+            --primary-l: #2a4f80;
+            --accent:    #f59e0b;
+            --accent-l:  #fbbf24;
+            --bg:        #f0f4f8;
+            --white:     #ffffff;
+            --border:    #e2e8f0;
+            --text:      #1e293b;
+            --muted:     #64748b;
+            --error:     #ef4444;
+            --success:   #22c55e;
+            --radius:    14px;
+        }
+        body {
+            font-family: 'Inter', 'Heebo', sans-serif;
+            background: linear-gradient(135deg, #1e3a5f 0%, #2a4f80 50%, #1e3a5f 100%);
+            min-height: 100dvh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .auth-card {
+            background: var(--white);
+            border-radius: 24px;
+            width: 100%;
+            max-width: 440px;
+            box-shadow: 0 24px 80px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .auth-header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-l) 100%);
+            padding: 28px 32px 24px;
+            text-align: center;
+            color: white;
+        }
+        .auth-logo {
+            width: 56px; height: 56px;
+            background: rgba(255,255,255,0.15);
+            border-radius: 16px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.6rem; color: var(--accent);
+            margin: 0 auto 12px;
+        }
+        .auth-title { font-size: 1.3rem; font-weight: 800; margin-bottom: 4px; }
+        .auth-subtitle { font-size: 0.82rem; opacity: 0.75; }
+
+        /* ── Tabs ── */
+        .auth-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+            background: #f8fafc;
+        }
+        .auth-tab {
+            flex: 1; padding: 13px 8px;
+            background: none; border: none;
+            font-family: inherit; font-size: 0.85rem; font-weight: 600;
+            color: var(--muted); cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        .auth-tab.active { color: var(--primary); border-bottom-color: var(--primary); background: white; }
+        .auth-tab:hover:not(.active) { color: var(--text); background: #f1f5f9; }
+
+        /* ── Body ── */
+        .auth-body { padding: 28px 32px 24px; }
+
+        /* ── Message ── */
+        .auth-message {
+            display: none; align-items: flex-start; gap: 8px;
+            padding: 10px 14px; border-radius: 10px;
+            font-size: 0.84rem; font-weight: 500; margin-bottom: 18px;
+            line-height: 1.5;
+        }
+        .auth-message.error   { display: flex; background: #fef2f2; color: var(--error); border: 1px solid #fecaca; }
+        .auth-message.success { display: flex; background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+        .auth-message.info    { display: flex; background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+
+        /* ── Form elements ── */
+        .form-group { margin-bottom: 16px; }
+        .form-label { display: block; font-size: 0.82rem; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+        .input-wrap { position: relative; display: flex; align-items: center; }
+        .input-wrap > i { position: absolute; right: 13px; color: var(--muted); font-size: 0.9rem; pointer-events: none; }
+        .form-input {
+            width: 100%; height: 44px;
+            border: 1.5px solid var(--border); border-radius: 10px;
+            padding: 0 38px 0 14px;
+            font-size: 0.92rem; font-family: inherit; color: var(--text);
+            outline: none; transition: border-color 0.2s;
+            direction: rtl;
+        }
+        .form-input:focus { border-color: var(--primary); }
+        .toggle-pass {
+            position: absolute; left: 10px;
+            background: none; border: none; cursor: pointer;
+            color: var(--muted); padding: 4px; font-size: 0.9rem;
+        }
+        .forgot-link {
+            display: block; text-align: left; font-size: 0.78rem;
+            color: var(--primary); cursor: pointer; margin-top: 6px;
+            text-decoration: none;
+        }
+        .forgot-link:hover { text-decoration: underline; }
+
+        /* ── User type selector ── */
+        .user-type-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+            margin-bottom: 18px;
+        }
+        .user-type-card {
+            border: 2px solid var(--border); border-radius: 12px;
+            padding: 12px 6px; text-align: center; cursor: pointer;
+            transition: all 0.18s; background: white;
+        }
+        .user-type-card:hover { border-color: var(--primary-l); background: #f8fafc; }
+        .user-type-card.selected { border-color: var(--accent); background: #fffbeb; }
+        .user-type-card i { font-size: 1.4rem; color: var(--muted); display: block; margin-bottom: 6px; }
+        .user-type-card.selected i { color: var(--accent); }
+        .user-type-card .utc-label { font-size: 0.78rem; font-weight: 700; color: var(--text); }
+        .user-type-card .utc-sub { font-size: 0.65rem; color: var(--muted); margin-top: 2px; }
+
+        /* ── Plan selector ── */
+        .plan-selector { margin-bottom: 18px; }
+        .plan-selector-title { font-size: 0.82rem; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+        .plan-options { display: flex; flex-direction: column; gap: 6px; }
+        .plan-option {
+            display: flex; align-items: center; gap: 10px;
+            border: 1.5px solid var(--border); border-radius: 10px;
+            padding: 10px 14px; cursor: pointer; transition: all 0.18s;
+            background: white;
+        }
+        .plan-option:hover { border-color: var(--primary-l); background: #f8fafc; }
+        .plan-option.selected { border-color: var(--accent); background: #fffbeb; }
+        .plan-option input[type="radio"] { display: none; }
+        .plan-option-dot {
+            width: 16px; height: 16px; border-radius: 50%;
+            border: 2px solid var(--border); flex-shrink: 0;
+            transition: all 0.15s;
+        }
+        .plan-option.selected .plan-option-dot { border-color: var(--accent); background: var(--accent); }
+        .plan-option-info { flex: 1; }
+        .plan-option-name { font-size: 0.85rem; font-weight: 700; color: var(--text); }
+        .plan-option-desc { font-size: 0.72rem; color: var(--muted); margin-top: 1px; }
+        .plan-option-price { font-size: 0.78rem; font-weight: 700; color: var(--accent); white-space: nowrap; }
+
+        /* ── Step indicator ── */
+        .step-indicator {
+            display: flex; align-items: center; justify-content: center;
+            gap: 6px; margin-bottom: 20px;
+        }
+        .step-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--border); transition: all 0.2s;
+        }
+        .step-dot.active { background: var(--primary); width: 20px; border-radius: 4px; }
+        .step-dot.done { background: var(--success); }
+
+        /* ── Buttons ── */
+        .btn-submit {
+            width: 100%; height: 46px;
+            background: var(--primary); color: white;
+            border: none; border-radius: 12px;
+            font-size: 0.95rem; font-weight: 700; font-family: inherit;
+            cursor: pointer; transition: all 0.2s;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .btn-submit:hover { background: var(--primary-l); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(30,58,95,0.25); }
+        .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+        .btn-submit.accent { background: var(--accent); color: var(--primary); }
+        .btn-submit.accent:hover { background: var(--accent-l); }
+        .btn-back {
+            width: 100%; height: 40px;
+            background: #f1f5f9; color: var(--text);
+            border: none; border-radius: 10px;
+            font-size: 0.85rem; font-weight: 600; font-family: inherit;
+            cursor: pointer; transition: all 0.15s; margin-top: 8px;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        .btn-back:hover { background: #e2e8f0; }
+
+        /* ── Spinner ── */
+        .spinner {
+            width: 20px; height: 20px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Divider ── */
+        .auth-divider {
+            text-align: center; font-size: 0.78rem; color: var(--muted);
+            margin-top: 16px;
+        }
+        .auth-divider a { color: var(--primary); cursor: pointer; text-decoration: none; font-weight: 600; }
+        .auth-divider a:hover { text-decoration: underline; }
+
+        /* ── Footer ── */
+        .auth-footer {
+            text-align: center; font-size: 0.72rem; color: var(--muted);
+            padding: 14px 32px 20px; border-top: 1px solid var(--border);
+        }
+
+        /* ── Payment redirect screen ── */
+        .payment-redirect {
+            text-align: center; padding: 10px 0 20px;
+        }
+        .payment-redirect i { font-size: 2.5rem; color: var(--accent); margin-bottom: 14px; display: block; }
+        .payment-redirect h3 { font-size: 1.05rem; font-weight: 800; color: var(--primary); margin-bottom: 8px; }
+        .payment-redirect p { font-size: 0.85rem; color: var(--muted); line-height: 1.6; margin-bottom: 18px; }
+        .payment-redirect .plan-summary {
+            background: #fffbeb; border: 1px solid #fcd34d; border-radius: 10px;
+            padding: 12px 16px; margin-bottom: 18px; text-align: right;
+        }
+        .payment-redirect .plan-summary-name { font-size: 0.9rem; font-weight: 700; color: var(--primary); }
+        .payment-redirect .plan-summary-desc { font-size: 0.78rem; color: var(--muted); margin-top: 3px; }
+
+        @media (max-width: 480px) {
+            .auth-body { padding: 22px 20px 18px; }
+            .auth-header { padding: 22px 20px 18px; }
+            .user-type-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="auth-card">
+
+    <!-- Header -->
+    <div class="auth-header">
+        <div class="auth-logo"><i class="fa-solid fa-cabinet-filing"></i></div>
+        <div class="auth-title">הדמיית ארונות</div>
+        <div class="auth-subtitle">מערכת עיצוב ארונות מקצועית</div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="auth-tabs" id="auth-tabs">
+        <button class="auth-tab active" id="tab-login" onclick="switchTab('login')">
+            <i class="fa-solid fa-right-to-bracket"></i> כניסה
+        </button>
+        <button class="auth-tab" id="tab-register" onclick="switchTab('register')">
+            <i class="fa-solid fa-user-plus"></i> הרשמה
+        </button>
+    </div>
+
+    <!-- Body -->
+    <div class="auth-body">
+
+        <!-- Message box -->
+        <div class="auth-message" id="auth-message">
+            <i class="fa-solid fa-circle-exclamation"></i>
+            <span id="auth-message-text"></span>
+        </div>
+
+        <!-- ── LOGIN FORM ── -->
+        <form id="form-login" onsubmit="handleLogin(event)">
+            <div class="form-group">
+                <label class="form-label">אימייל</label>
+                <div class="input-wrap">
+                    <i class="fa-regular fa-envelope"></i>
+                    <input type="email" id="login-email" class="form-input" placeholder="your@email.com" required autocomplete="email">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">סיסמה</label>
+                <div class="input-wrap">
+                    <i class="fa-solid fa-lock"></i>
+                    <input type="password" id="login-password" class="form-input" placeholder="••••••••" required autocomplete="current-password">
+                    <button type="button" class="toggle-pass" onclick="togglePassword('login-password', this)">
+                        <i class="fa-regular fa-eye"></i>
+                    </button>
+                </div>
+                <a class="forgot-link" onclick="handleForgotPassword()">שכחתי סיסמה</a>
+            </div>
+            <button type="submit" class="btn-submit" id="btn-login">
+                <i class="fa-solid fa-right-to-bracket"></i> כניסה
+            </button>
+        </form>
+
+        <!-- ── REGISTER: STEP 1 — User type ── -->
+        <div id="form-register-step1" style="display:none;">
+            <div class="step-indicator">
+                <div class="step-dot active" id="sdot-1"></div>
+                <div class="step-dot" id="sdot-2"></div>
+                <div class="step-dot" id="sdot-3"></div>
+            </div>
+            <div class="form-label" style="margin-bottom:10px;font-size:0.9rem;">מי אתה? בחר את הפרופיל המתאים לך:</div>
+            <div class="user-type-grid">
+                <div class="user-type-card" data-type="designer" onclick="selectUserType('designer')">
+                    <i class="fa-solid fa-pen-ruler"></i>
+                    <div class="utc-label">מעצב/ת פנים</div>
+                    <div class="utc-sub">עיצוב ללקוחות</div>
+                </div>
+                <div class="user-type-card" data-type="carpenter" onclick="selectUserType('carpenter')">
+                    <i class="fa-solid fa-hammer"></i>
+                    <div class="utc-label">נגר</div>
+                    <div class="utc-sub">ייצור ותמחור</div>
+                </div>
+                <div class="user-type-card" data-type="company" onclick="selectUserType('company')">
+                    <i class="fa-solid fa-building"></i>
+                    <div class="utc-label">חברת ריהוט</div>
+                    <div class="utc-sub">צוות + סניפים</div>
+                </div>
+            </div>
+            <button class="btn-submit" id="btn-step1-next" onclick="goToStep2()" disabled>
+                המשך <i class="fa-solid fa-arrow-left"></i>
+            </button>
+        </div>
+
+        <!-- ── REGISTER: STEP 2 — Plan selection ── -->
+        <div id="form-register-step2" style="display:none;">
+            <div class="step-indicator">
+                <div class="step-dot done" id="sdot2-1"></div>
+                <div class="step-dot active" id="sdot2-2"></div>
+                <div class="step-dot" id="sdot2-3"></div>
+            </div>
+            <div class="plan-selector">
+                <div class="plan-selector-title">בחר תוכנית:</div>
+                <div class="plan-options" id="plan-options-list">
+                    <!-- populated dynamically -->
+                </div>
+            </div>
+            <button class="btn-submit" id="btn-step2-next" onclick="goToStep3()" disabled>
+                המשך <i class="fa-solid fa-arrow-left"></i>
+            </button>
+            <button class="btn-back" onclick="goToStep1()">
+                <i class="fa-solid fa-arrow-right"></i> חזרה
+            </button>
+        </div>
+
+        <!-- ── REGISTER: STEP 3 — Account details ── -->
+        <div id="form-register-step3" style="display:none;">
+            <div class="step-indicator">
+                <div class="step-dot done" id="sdot3-1"></div>
+                <div class="step-dot done" id="sdot3-2"></div>
+                <div class="step-dot active" id="sdot3-3"></div>
+            </div>
+            <!-- Row: first + last name -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">שם פרטי</label>
+                    <div class="input-wrap">
+                        <i class="fa-solid fa-user"></i>
+                        <input type="text" id="reg-first-name" class="form-input" placeholder="ישראל" required autocomplete="given-name">
+                    </div>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">שם משפחה</label>
+                    <div class="input-wrap">
+                        <i class="fa-solid fa-user"></i>
+                        <input type="text" id="reg-last-name" class="form-input" placeholder="ישראלי" required autocomplete="family-name">
+                    </div>
+                </div>
+            </div>
+            <div class="form-group" style="margin-top:12px;">
+                <label class="form-label">טלפון</label>
+                <div class="input-wrap">
+                    <i class="fa-solid fa-phone"></i>
+                    <input type="tel" id="reg-phone" class="form-input" placeholder="050-0000000" required autocomplete="tel" dir="ltr">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">סוג עוסק</label>
+                <div class="input-wrap">
+                    <i class="fa-solid fa-briefcase"></i>
+                    <select id="reg-business-type" class="form-input" required onchange="_businessIdVerified=false;document.getElementById('business-id-status').style.display='none';" style="padding-right:38px;">
+                        <option value="">-- בחר סוג עוסק --</option>
+                        <option value="exempt">עוסק פטור</option>
+                        <option value="licensed">עוסק מורשה</option>
+                        <option value="company">חברה בע"מ</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">מספר ח.פ. / ע.מ.</label>
+                <div class="input-wrap">
+                    <i class="fa-solid fa-building"></i>
+                    <input type="text" id="reg-business-id" class="form-input" placeholder="123456789" required maxlength="9" inputmode="numeric" dir="ltr" oninput="this.value=this.value.replace(/\D/g,'');_businessIdVerified=false;document.getElementById('business-id-status').style.display='none';">
+                    <button type="button" id="btn-verify-id" onclick="verifyBusinessId()" style="position:absolute;left:6px;background:var(--primary);color:white;border:none;border-radius:7px;padding:4px 10px;font-size:0.75rem;font-weight:700;cursor:pointer;font-family:inherit;">אמת</button>
+                </div>
+                <div id="business-id-status" style="font-size:0.75rem;margin-top:4px;display:none;"></div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">שם משתמש</label>
+                <div class="input-wrap">
+                    <i class="fa-solid fa-at"></i>
+                    <input type="text" id="reg-username" class="form-input" placeholder="israel123" required autocomplete="username" dir="ltr" oninput="this.value=this.value.replace(/\s/g,'')">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">אימייל</label>
+                <div class="input-wrap">
+                    <i class="fa-regular fa-envelope"></i>
+                    <input type="email" id="reg-email" class="form-input" placeholder="your@email.com" required autocomplete="email">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">סיסמה (לפחות 6 תווים)</label>
+                <div class="input-wrap">
+                    <i class="fa-solid fa-lock"></i>
+                    <input type="password" id="reg-password" class="form-input" placeholder="••••••••" required minlength="6" autocomplete="new-password">
+                    <button type="button" class="toggle-pass" onclick="togglePassword('reg-password', this)">
+                        <i class="fa-regular fa-eye"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">אימות סיסמה</label>
+                <div class="input-wrap">
+                    <i class="fa-solid fa-lock"></i>
+                    <input type="password" id="reg-password-confirm" class="form-input" placeholder="••••••••" required minlength="6" autocomplete="new-password">
+                    <button type="button" class="toggle-pass" onclick="togglePassword('reg-password-confirm', this)">
+                        <i class="fa-regular fa-eye"></i>
+                    </button>
+                </div>
+            </div>
+            <button class="btn-submit" id="btn-register" onclick="handleRegister()">
+                <i class="fa-solid fa-user-plus"></i> צור חשבון
+            </button>
+            <button class="btn-back" onclick="goBackToStep2()">
+                <i class="fa-solid fa-arrow-right"></i> חזרה
+            </button>
+            <div class="auth-divider" style="margin-top:14px;font-size:0.75rem;">
+                בהרשמה אתה מסכים ל<a href="#">תנאי השימוש</a> ו<a href="#">מדיניות הפרטיות</a>
+            </div>
+        </div>
+
+        <!-- ── REGISTER: STEP 4 — Payment redirect ── -->
+        <div id="form-register-step4" style="display:none;">
+            <div class="payment-redirect">
+                <i class="fa-solid fa-circle-check" style="color:var(--success);"></i>
+                <h3>החשבון נוצר בהצלחה!</h3>
+                <p>כדי להפעיל את התוכנית שבחרת, יש להשלים את התשלום:</p>
+                <div class="plan-summary">
+                    <div class="plan-summary-name" id="payment-plan-name"></div>
+                    <div class="plan-summary-desc" id="payment-plan-desc"></div>
+                </div>
+                <button class="btn-submit accent" id="btn-go-payment" onclick="goToPayment()">
+                    <i class="fa-solid fa-credit-card"></i> עבור לתשלום
+                </button>
+                <button class="btn-back" style="margin-top:10px;" onclick="skipPayment()">
+                    <i class="fa-solid fa-forward"></i> דלג לעת עתה (תוכנית חינמית)
+                </button>
+            </div>
+        </div>
+
+        <!-- ── FORGOT PASSWORD FORM ── -->
+        <form id="form-forgot" style="display:none;" onsubmit="handleResetPassword(event)">
+            <p style="font-size:0.88rem;color:var(--muted);margin-bottom:18px;line-height:1.5;">
+                הזן את האימייל שלך ונשלח לך קישור לאיפוס סיסמה.
+            </p>
+            <div class="form-group">
+                <label class="form-label">אימייל</label>
+                <div class="input-wrap">
+                    <i class="fa-regular fa-envelope"></i>
+                    <input type="email" id="forgot-email" class="form-input" placeholder="your@email.com" required>
+                </div>
+            </div>
+            <button type="submit" class="btn-submit" id="btn-forgot">
+                <i class="fa-solid fa-paper-plane"></i> שלח קישור איפוס
+            </button>
+            <div class="auth-divider" style="margin-top:16px;">
+                <a onclick="switchTab('login')">← חזרה לכניסה</a>
+            </div>
+        </form>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="auth-footer">
+        © 2025 הדמיית ארונות · כל הזכויות שמורות
+    </div>
+
+</div>
+
+<script src="auth.js"></script>
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+var _selectedUserType = null;
+var _selectedPlanKey  = null;
+
+// Plans per user type
+var _PLANS_BY_TYPE = {
+    designer: [
+        { key: 'designer_monthly', name: 'מנוי חודשי',  price: '₪399/חודש', desc: 'שבוע ניסיון חינם · 3 חודשים ראשונים ₪399, לאחר מכן ₪499' },
+        { key: 'designer_annual',  name: 'מנוי שנתי',   price: '₪369/חודש', desc: 'שבוע ניסיון חינם · חיסכון 26% · ₪4,428 לשנה' }
+    ],
+    carpenter: [
+        { key: 'carpenter_basic',  name: 'בסיסי',        price: '₪X/חודש',  desc: 'תמחור + הדמיה, עד 30 פרויקטים' },
+        { key: 'carpenter_pro',    name: 'מקצועי',        price: '₪X/חודש',  desc: 'הכל כולל דוח לקוח + ייצוא לנגר' }
+    ],
+    company: [
+        { key: 'company_standard',   name: 'סטנדרט',     price: '₪X/חודש',  desc: 'עד 10 מכשירים, כל הפיצ\'רים' },
+        { key: 'company_enterprise', name: 'ארגוני',      price: 'צור קשר',  desc: 'עד 30 מכשירים, תמיכה מלאה' }
+    ]
+};
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(tab) {
+    clearMessage();
+    document.getElementById('form-login').style.display           = 'none';
+    document.getElementById('form-register-step1').style.display  = 'none';
+    document.getElementById('form-register-step2').style.display  = 'none';
+    document.getElementById('form-register-step3').style.display  = 'none';
+    document.getElementById('form-register-step4').style.display  = 'none';
+    document.getElementById('form-forgot').style.display          = 'none';
+    document.getElementById('auth-tabs').style.display            = tab === 'forgot' ? 'none' : 'flex';
+    document.getElementById('tab-login').classList.toggle('active',    tab === 'login');
+    document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+
+    if (tab === 'login')    document.getElementById('form-login').style.display = 'block';
+    if (tab === 'register') document.getElementById('form-register-step1').style.display = 'block';
+    if (tab === 'forgot')   document.getElementById('form-forgot').style.display = 'block';
+}
+
+function handleForgotPassword() {
+    clearMessage();
+    switchTab('forgot');
+}
+
+// ── Step 1: User type ─────────────────────────────────────────────────────────
+function selectUserType(type) {
+    _selectedUserType = type;
+    document.querySelectorAll('.user-type-card').forEach(function(c) {
+        c.classList.toggle('selected', c.dataset.type === type);
+    });
+    document.getElementById('btn-step1-next').disabled = false;
+}
+
+function goToStep2() {
+    if (!_selectedUserType) return;
+    clearMessage();
+
+    // Build plan options for selected user type
+    var plans = _PLANS_BY_TYPE[_selectedUserType] || [];
+    var container = document.getElementById('plan-options-list');
+    container.innerHTML = '';
+    _selectedPlanKey = null;
+    document.getElementById('btn-step2-next').disabled = true;
+
+    plans.forEach(function(plan) {
+        var opt = document.createElement('div');
+        opt.className = 'plan-option';
+        opt.dataset.key = plan.key;
+        opt.innerHTML =
+            '<div class="plan-option-dot"></div>' +
+            '<div class="plan-option-info">' +
+                '<div class="plan-option-name">' + plan.name + '</div>' +
+                '<div class="plan-option-desc">' + plan.desc + '</div>' +
+            '</div>' +
+            '<div class="plan-option-price">' + plan.price + '</div>';
+        opt.onclick = function() {
+            container.querySelectorAll('.plan-option').forEach(function(o) { o.classList.remove('selected'); });
+            opt.classList.add('selected');
+            _selectedPlanKey = plan.key;
+            document.getElementById('btn-step2-next').disabled = false;
+        };
+        container.appendChild(opt);
+    });
+
+    document.getElementById('form-register-step1').style.display = 'none';
+    document.getElementById('form-register-step2').style.display = 'block';
+}
+
+function goToStep1() {
+    document.getElementById('form-register-step2').style.display = 'none';
+    document.getElementById('form-register-step1').style.display = 'block';
+}
+
+function goToStep3() {
+    if (!_selectedPlanKey) return;
+    clearMessage();
+    document.getElementById('form-register-step2').style.display = 'none';
+    document.getElementById('form-register-step3').style.display = 'block';
+}
+
+function goBackToStep2() {
+    clearMessage();
+    document.getElementById('form-register-step3').style.display = 'none';
+    document.getElementById('form-register-step2').style.display = 'block';
+}
+
+// ── Business ID (ח.פ.) verification ──────────────────────────────────────────
+var _businessIdVerified = false;
+var _businessName = '';
+
+// Israeli ID checksum (Luhn-like) — validates ת.ז. / ח.פ. / ע.מ.
+function _validateIsraeliId(id) {
+    id = String(id).replace(/\D/g, '');
+    if (id.length < 8 || id.length > 9) return false;
+    id = id.padStart(9, '0');
+    var sum = 0;
+    for (var i = 0; i < 9; i++) {
+        var d = parseInt(id[i]) * (i % 2 === 0 ? 1 : 2);
+        sum += d > 9 ? d - 9 : d;
+    }
+    return sum % 10 === 0;
+}
+
+async function verifyBusinessId() {
+    var id = document.getElementById('reg-business-id').value.trim().replace(/\D/g, '');
+    var businessType = document.getElementById('reg-business-type').value;
+    var statusEl = document.getElementById('business-id-status');
+    var btn = document.getElementById('btn-verify-id');
+
+    statusEl.style.display = 'block';
+    _businessIdVerified = false;
+
+    if (!businessType) {
+        statusEl.style.color = 'var(--error)';
+        statusEl.textContent = 'יש לבחור סוג עוסק תחילה';
+        return;
+    }
+
+    if (!id || id.length < 8) {
+        statusEl.style.color = 'var(--error)';
+        statusEl.textContent = 'יש להזין מספר ח.פ. תקין (8-9 ספרות)';
+        return;
+    }
+
+    // Step 1: validate checksum
+    if (!_validateIsraeliId(id)) {
+        statusEl.style.color = 'var(--error)';
+        statusEl.textContent = '✗ מספר ח.פ. לא תקין (ספרת ביקורת שגויה)';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '...';
+    statusEl.style.color = 'var(--muted)';
+    statusEl.textContent = 'בודק...';
+
+    try {
+        // Step 2: check uniqueness in Supabase
+        var sb = window.supabase ? window.supabase.createClient(
+            'https://meqxnsjycvfgfhdepguo.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lcXhuc2p5Y3ZmZ2ZoZGVwZ3VvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3MDA5NDAsImV4cCI6MjA5MjI3Njk0MH0.w63bl0-1-Rgt9Nx6sVW5ueEGMojiMaxoehlPXlPH2N0'
+        ) : null;
+
+        if (sb) {
+            var { data: existing } = await sb.from('profiles').select('id').eq('business_id', id).maybeSingle();
+            if (existing) {
+                statusEl.style.color = 'var(--error)';
+                statusEl.textContent = '✗ מספר ח.פ. זה כבר רשום במערכת';
+                btn.disabled = false;
+                btn.textContent = 'אמת';
+                return;
+            }
+        }
+
+        // Step 3: for חברה בע"מ — verify against company registry
+        if (businessType === 'company') {
+            statusEl.textContent = 'מאמת מול רשם החברות...';
+            var url = 'https://data.gov.il/api/3/action/datastore_search?resource_id=f004176c-b85f-4542-8901-7b3176f9a054&filters=%7B%22%D7%9E%D7%A1%D7%A4%D7%A8%20%D7%97%D7%91%D7%A8%D7%94%22%3A' + id + '%7D&limit=1';
+            var res = await fetch(url);
+            var json = await res.json();
+
+            if (json.success && json.result && json.result.records && json.result.records.length > 0) {
+                var match = json.result.records[0];
+                _businessName = match['שם חברה'] || '';
+                _businessIdVerified = true;
+                statusEl.style.color = 'var(--success)';
+                statusEl.textContent = '✓ נמצא ברשם החברות: ' + (_businessName || id);
+            } else {
+                statusEl.style.color = 'var(--error)';
+                statusEl.textContent = '✗ חברה בע"מ לא נמצאה ברשם החברות';
+                _businessIdVerified = false;
+            }
+        } else {
+            // עוסק פטור / עוסק מורשה — checksum is sufficient
+            _businessIdVerified = true;
+            _businessName = '';
+            statusEl.style.color = 'var(--success)';
+            var typeLabel = businessType === 'exempt' ? 'עוסק פטור' : 'עוסק מורשה';
+            statusEl.textContent = '✓ מספר ע.מ. תקין (' + typeLabel + ')';
+        }
+    } catch(e) {
+        // API unavailable — accept valid checksum
+        _businessIdVerified = true;
+        statusEl.style.color = '#d97706';
+        statusEl.textContent = '⚠ אומת לפי ספרת ביקורת (שרת לא זמין)';
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'אמת';
+}
+
+// ── Step 3: Create account ────────────────────────────────────────────────────
+async function handleRegister() {
+    clearMessage();
+    var firstName    = document.getElementById('reg-first-name').value.trim();
+    var lastName     = document.getElementById('reg-last-name').value.trim();
+    var phone        = document.getElementById('reg-phone').value.trim();
+    var businessType = document.getElementById('reg-business-type').value;
+    var businessId   = document.getElementById('reg-business-id').value.trim().replace(/\D/g,'');
+    var username     = document.getElementById('reg-username').value.trim();
+    var email        = document.getElementById('reg-email').value.trim();
+    var password     = document.getElementById('reg-password').value;
+    var passwordCfm  = document.getElementById('reg-password-confirm').value;
+
+    if (!firstName)    { showMessage('יש להזין שם פרטי', 'error'); return; }
+    if (!lastName)     { showMessage('יש להזין שם משפחה', 'error'); return; }
+    if (!phone)        { showMessage('יש להזין מספר טלפון', 'error'); return; }
+    if (!businessType) { showMessage('יש לבחור סוג עוסק', 'error'); return; }
+    if (!businessId)   { showMessage('יש להזין מספר ח.פ.', 'error'); return; }
+    if (!_businessIdVerified) { showMessage('יש לאמת את מספר ח.פ. לפני ההרשמה', 'error'); return; }
+    if (!username)     { showMessage('יש להזין שם משתמש', 'error'); return; }
+    if (!email)        { showMessage('יש להזין אימייל', 'error'); return; }
+    if (password.length < 6) { showMessage('הסיסמה חייבת להכיל לפחות 6 תווים', 'error'); return; }
+    if (password !== passwordCfm) { showMessage('הסיסמאות אינן תואמות', 'error'); return; }
+
+    var fullName = firstName + ' ' + lastName;
+    var businessTypeLabel = { exempt: 'עוסק פטור', licensed: 'עוסק מורשה', company: 'חברה בע"מ' }[businessType] || businessType;
+
+    setLoading('btn-register', true);
+    var result = await Auth.register(email, password, fullName, {
+        first_name:    firstName,
+        last_name:     lastName,
+        phone:         phone,
+        business_id:   businessId,
+        business_name: _businessName || businessTypeLabel,
+        business_type: businessType,
+        username:      username
+    });
+    setLoading('btn-register', false);
+
+    if (result.error) {
+        showMessage(_translateError(result.error), 'error');
+        return;
+    }
+
+    // Account created — show payment step
+    goToStep4();
+}
+
+function goToStep4() {
+    // Find selected plan info
+    var allPlans = [].concat(
+        _PLANS_BY_TYPE.designer,
+        _PLANS_BY_TYPE.carpenter,
+        _PLANS_BY_TYPE.company
+    );
+    var plan = allPlans.find(function(p) { return p.key === _selectedPlanKey; });
+
+    document.getElementById('payment-plan-name').textContent = plan ? plan.name : _selectedPlanKey;
+    document.getElementById('payment-plan-desc').textContent = plan ? plan.desc : '';
+
+    document.getElementById('form-register-step3').style.display = 'none';
+    document.getElementById('form-register-step4').style.display = 'block';
+    document.getElementById('auth-tabs').style.display = 'none';
+}
+
+async function goToPayment() {
+    var btn = document.getElementById('btn-go-payment');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<div class="spinner"></div>'; }
+
+    try {
+        var _fn = document.getElementById('reg-first-name');
+        var _ln = document.getElementById('reg-last-name');
+        var _ph = document.getElementById('reg-phone');
+        var _fullName = (_fn ? _fn.value.trim() : '') + ' ' + (_ln ? _ln.value.trim() : '');
+        var res = await fetch(GrowPayments.MAKE_TRIAL_WEBHOOK, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                plan:  _selectedPlanKey,
+                email: document.getElementById('reg-email').value.trim(),
+                name:  _fullName.trim() || document.getElementById('reg-email').value.trim(),
+                phone: (_ph && _ph.value.trim()) ? _ph.value.trim() : '0500000000'
+            })
+        });
+        var text = await res.text();
+        var data;
+        try {
+            data = JSON.parse(text);
+        } catch(e) {
+            // Make returned non-JSON — show raw response for debugging
+            throw new Error('תגובה מהשרת: ' + text.substring(0, 200));
+        }
+        if (data.payment_url) {
+            window.location.href = data.payment_url;
+        } else if (data.url) {
+            window.location.href = data.url;
+        } else {
+            throw new Error(data.error || 'לא התקבל קישור תשלום. תגובה: ' + JSON.stringify(data).substring(0, 200));
+        }
+    } catch(err) {
+        showMessage('שגיאה: ' + (err.message || 'נסה שוב'), 'error');
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-credit-card"></i> עבור לתשלום'; }
+    }
+}
+
+function skipPayment() {
+    // Go to projects with free plan
+    window.location.href = 'projects.html';
+}
+
+// ── Login ─────────────────────────────────────────────────────────────────────
+async function handleLogin(e) {
+    e.preventDefault();
+    clearMessage();
+    var email    = document.getElementById('login-email').value.trim();
+    var password = document.getElementById('login-password').value;
+    setLoading('btn-login', true);
+    var result = await Auth.login(email, password);
+    setLoading('btn-login', false);
+    if (result.error) {
+        showMessage(_translateError(result.error), 'error');
+        return;
+    }
+    window.location.href = 'projects.html';
+}
+
+// ── Reset password ────────────────────────────────────────────────────────────
+async function handleResetPassword(e) {
+    e.preventDefault();
+    clearMessage();
+    var email = document.getElementById('forgot-email').value.trim();
+    setLoading('btn-forgot', true);
+    var sb = supabase.createClient(
+        'https://meqxnsjycvfgfhdepguo.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lcXhuc2p5Y3ZmZ2ZoZGVwZ3VvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3MDA5NDAsImV4cCI6MjA5MjI3Njk0MH0.w63bl0-1-Rgt9Nx6sVW5ueEGMojiMaxoehlPXlPH2N0'
+    );
+    var res = await sb.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + '/login.html'
+    });
+    setLoading('btn-forgot', false);
+    if (res.error) {
+        showMessage(_translateError(res.error.message), 'error');
+    } else {
+        showMessage('קישור לאיפוס סיסמה נשלח לאימייל שלך!', 'success');
+    }
+}
+
+// ── Message helpers ───────────────────────────────────────────────────────────
+function showMessage(text, type) {
+    type = type || 'error';
+    var el = document.getElementById('auth-message');
+    var icon = el.querySelector('i');
+    el.className = 'auth-message ' + type;
+    icon.className = type === 'error'
+        ? 'fa-solid fa-circle-exclamation'
+        : type === 'success'
+            ? 'fa-solid fa-circle-check'
+            : 'fa-solid fa-circle-info';
+    document.getElementById('auth-message-text').textContent = text;
+}
+function clearMessage() {
+    document.getElementById('auth-message').className = 'auth-message';
+}
+
+// ── Password toggle ───────────────────────────────────────────────────────────
+function togglePassword(inputId, btn) {
+    var inp = document.getElementById(inputId);
+    var isPass = inp.type === 'password';
+    inp.type = isPass ? 'text' : 'password';
+    btn.querySelector('i').className = isPass ? 'fa-regular fa-eye-slash' : 'fa-regular fa-eye';
+}
+
+// ── Button loading state ──────────────────────────────────────────────────────
+function setLoading(btnId, loading) {
+    var btn = document.getElementById(btnId);
+    if (!btn) return;
+    if (loading) {
+        btn._origHTML = btn.innerHTML;
+        btn.innerHTML = '<div class="spinner"></div>';
+        btn.disabled = true;
+    } else {
+        btn.innerHTML = btn._origHTML || btn.innerHTML;
+        btn.disabled = false;
+    }
+}
+
+// ── Translate Supabase errors ─────────────────────────────────────────────────
+function _translateError(msg) {
+    if (!msg) return 'שגיאה לא ידועה';
+    if (msg.includes('Invalid login credentials'))  return 'אימייל או סיסמה שגויים';
+    if (msg.includes('Email not confirmed'))        return 'יש לאשר את האימייל לפני הכניסה';
+    if (msg.includes('User already registered'))    return 'כתובת האימייל כבר רשומה במערכת';
+    if (msg.includes('Password should be'))         return 'הסיסמה חייבת להכיל לפחות 6 תווים';
+    if (msg.includes('rate limit'))                 return 'יותר מדי ניסיונות. נסה שוב בעוד מספר דקות';
+    if (msg.includes('network'))                    return 'בעיית חיבור לאינטרנט';
+    return msg;
+}
+
+// ── On load: if already logged in, redirect ───────────────────────────────────
+(async function() {
+    if (await Auth.isLoggedIn()) {
+        window.location.href = 'projects.html';
+    }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,7042 @@
+// ==========================================
+// 3. ממשק משתמש (UI), אירועים ופעולות
+// ==========================================
+
+// ── Debounced buildCabinet for drag operations ──────────────────────────────
+// Uses requestAnimationFrame so at most one rebuild fires per display frame,
+// preventing the renderer from being called dozens of times per second while
+// the user is dragging a handle.
+let _buildCabinetRafId = null;
+function buildCabinetDebounced() {
+    if (_buildCabinetRafId) cancelAnimationFrame(_buildCabinetRafId);
+    _buildCabinetRafId = requestAnimationFrame(() => {
+        _buildCabinetRafId = null;
+        buildCabinet();
+    });
+}
+
+// ── Drag-mode build: hides room (floor + walls) during pointer drag ──
+// Call this from pointermove handlers instead of buildCabinetDebounced().
+// Call _endDrag() from pointerup to restore the room.
+window._isDragging = false;
+function buildCabinetDragging() {
+    window._isDragging = true;
+    // Hide room immediately — walls/floor textures are the main perf bottleneck
+    if (window._roomGroup) window._roomGroup.visible = false;
+    buildCabinetDebounced();
+}
+function _endDrag() {
+    if (!window._isDragging) return;
+    window._isDragging = false;
+    if (window._roomGroup) window._roomGroup.visible = true;
+    buildCabinet(); // full rebuild restores room
+}
+// ────────────────────────────────────────────────────────────────────────────
+
+const colorNamesHebrew = {
+    white_matte: 'לבן מט 2100', c3110: '3110', c795: '759', u727: 'U727',
+    w1200: 'W1200', u232: 'U232', u604: 'U604', u638: 'U638',
+    c3207: '3207', black_matte: 'שחור מט', custom: 'מותאם אישית',
+    '2020': 'גוון 2020', 'H1367': 'H1367', 'H1307': 'H1307', 'H1227': 'H1227',
+    '2025': 'גוון 2025', '2040': 'גוון 2040', '2041': 'גוון 2041', '2044': 'גוון 2044',
+    '2047': 'גוון 2047', '2049': 'גוון 2049', '2062': 'גוון 2062', '5600': 'גוון 5600',
+    '7180': 'גוון 7180', '456': 'גוון 456', '462': 'גוון 462', '463': 'גוון 463',
+    '464': 'גוון 464', '480': 'גוון 480'
+};
+
+const placementHebrew = {
+    'wall': 'ארון קיר חופשי',
+    'between_walls': 'ארון בין קירות',
+    'niche': 'ארון בנישה'
+};
+
+// ── Drawer count helpers ──────────────────────────────────────────────────────
+// Auto-count: 1 drawer per 20cm; thresholds: ≥12cm=1, ≥32cm=2, ≥52cm=3, ...
+function calcAutoDrawerCount(cellHeightCm) {
+    if (cellHeightCm < 12) return 0; // cell too short for any drawer
+    return Math.floor((cellHeightCm - 11) / 20) + 1;
+}
+// Min-count: no single drawer may exceed 60cm
+function calcMinDrawerCount(cellHeightCm) {
+    return Math.ceil(cellHeightCm / 60);
+}
+// Returns the displayed cell height (cm) of compartment row r in column col.
+// Returns a rounded integer to match what the dimension label shows (Math.round).
+function _cellHeight(col, r, wingData) {
+    const plinthH = wingData ? wingData.plinthHeight : state.plinthHeight;
+    const t       = wingData ? wingData.thickness    : state.thickness;
+    const fo      = col.floorOffset || 0;
+    // startShelvesY mirrors engine-core.js logic: noPlinth columns start at t (not plinthH+t)
+    const startY  = fo > 0 ? fo + t : ((col.type === 'desk') ? col.deskHeight + col.deskClearance + t : (col.noPlinth ? t : plinthH + t));
+    // prevY: bottom of cell r
+    const bottomY = (r === 0) ? startY : col.shelvesY[r - 1] + t / 2;
+    // topY: top of cell r
+    const topY    = (r >= col.shelvesY.length) ? col.height - t : col.shelvesY[r] - t / 2;
+    // Round to match the displayed dimension label (engine.js uses Math.round)
+    return Math.round(Math.max(0, topY - bottomY));
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
+function updateQuickEditPanelUI() {
+    const panel = document.getElementById('column-quick-edit');
+    const fcPanel = document.getElementById('full-corner-quick-edit');
+    // In viewer mode these panels don't exist — bail out silently
+    if (!panel && !fcPanel) return;
+
+    // ---- Full corner quick edit panel ----
+    const isFCEditMode = state.activeWing === 'full_corner_right' || state.activeWing === 'full_corner_left';
+    const fcRealSide = isFCEditMode ? state.activeWing.replace('full_corner_', '') : null;
+    const activeWingData = isFCEditMode
+        ? state.wings[fcRealSide]
+        : (state.activeWing && state.activeWing !== 'center' ? state.wings[state.activeWing] : null);
+    const isFullCornerEdit = state.wingEditMode && isFCEditMode && activeWingData;
+
+    if (fcPanel) {
+        if (isFullCornerEdit) {
+            const fc = activeWingData.fullCorner || {};
+            // Update shelf count display
+            const fcSVal = document.getElementById('fc-qe-s-val');
+            if (fcSVal) fcSVal.value = fc.shelves || 0;
+            fcPanel.classList.add('visible');
+        } else {
+            fcPanel.classList.remove('visible');
+        }
+    }
+
+    if (state.activeEditCol === -1 || state.viewMode !== 'front' || !state.columns[state.activeEditCol]) {
+        // Even when panel is hidden, still update copy/paste group if selection is full-column
+        const copyPasteGroup = document.getElementById('qe-copypaste-group');
+        if (copyPasteGroup) copyPasteGroup.style.display = 'none';
+        panel.classList.remove('visible'); return;
+    }
+    const col = state.columns[state.activeEditCol];
+
+    document.getElementById('qe-s-val').value = col.shelves;
+
+    // No-plinth toggle button
+    const btnNoplinth = document.getElementById('qe-btn-noplinth');
+    if (btnNoplinth) {
+        const isNoplinth = col.noPlinth || (col.floorOffset > 0);
+        btnNoplinth.classList.toggle('active', !!isNoplinth);
+    }
+
+    // Top panel toggle button
+    const btnTopPanel = document.getElementById('qe-btn-top-panel');
+    if (btnTopPanel) {
+        btnTopPanel.classList.toggle('active', !!col.topPanel);
+    }
+
+    // Sink panel toggle button
+    const btnSinkPanel = document.getElementById('qe-btn-sink-panel');
+    if (btnSinkPanel) {
+        btnSinkPanel.classList.toggle('active', !!col.sinkPanel);
+    }
+
+    // Internal desk toggle — only show for normal/desk columns (not drawers-only)
+    const deskGroup = document.getElementById('qe-desk-group');
+    const deskDrawersGroup = document.getElementById('qe-desk-drawers-group');
+    const btnDesk = document.getElementById('qe-btn-desk');
+    const isDesk = col.type === 'desk';
+    const showDesk = col.type === 'desk' || col.type === 'normal' || !col.type;
+    if (deskGroup) deskGroup.style.display = showDesk ? '' : 'none';
+    if (btnDesk) btnDesk.classList.toggle('active', isDesk);
+    if (deskDrawersGroup) {
+        deskDrawersGroup.style.display = isDesk ? '' : 'none';
+        const cb = document.getElementById('qe-desk-drawers-cb');
+        if (cb) cb.checked = !!col.hasDrawers;
+    }
+
+    // Desk drawer count stepper — only when desk is active AND drawers are enabled
+    const deskDrawerCountGroup = document.getElementById('qe-desk-drawer-count-group');
+    if (deskDrawerCountGroup) {
+        const showCount = isDesk && !!col.hasDrawers;
+        deskDrawerCountGroup.style.display = showCount ? '' : 'none';
+        if (showCount) {
+            const autoDefault = col.width <= 80 ? 1 : 2;
+            const inp = document.getElementById('qe-desk-drawer-count-val');
+            if (inp) inp.value = col.deskDrawerCount != null ? col.deskDrawerCount : autoDefault;
+        }
+    }
+
+    // Copy/Paste group — show only when the entire column is selected
+    // Use selection.colIndex (may differ from activeEditCol when user clicks select-all)
+    const copyPasteGroup = document.getElementById('qe-copypaste-group');
+    if (copyPasteGroup) {
+        const selCol = state.selection.colIndex;
+        const selColData = selCol !== -1 ? state.columns[selCol] : null;
+        const isFullColSelected = selColData &&
+            state.selection.rows.length === (selColData.shelves + 1);
+        copyPasteGroup.style.display = isFullColSelected ? '' : 'none';
+        // Show paste button only when clipboard has data
+        const pasteBtn = document.getElementById('qe-btn-paste');
+        if (pasteBtn) pasteBtn.style.display = (_copiedColumn && isFullColSelected) ? '' : 'none';
+    }
+
+    panel.classList.add('visible');
+}
+
+window.toggleNoPlinth = function() {
+    if (state.activeEditCol === -1 || !state.columns[state.activeEditCol]) return;
+    const col = state.columns[state.activeEditCol];
+    const isActive = col.noPlinth || (col.floorOffset > 0);
+    if (isActive) {
+        col.noPlinth = false;
+        col.floorOffset = 0;
+    } else {
+        col.noPlinth = true;
+    }
+    buildCabinet(); calculatePrice(); updateQuickEditPanelUI();
+    saveHistoryState();
+}
+
+window.toggleTopPanel = function() {
+    if (state.activeEditCol === -1 || !state.columns[state.activeEditCol]) return;
+    const col = state.columns[state.activeEditCol];
+    col.topPanel = !col.topPanel;
+    // Sink panel and top panel are mutually exclusive
+    if (col.topPanel) col.sinkPanel = false;
+    buildCabinet(); calculatePrice(); updateQuickEditPanelUI();
+    if (typeof syncUIFromState === 'function') syncUIFromState();
+    saveHistoryState();
+}
+
+window.toggleSinkPanel = function() {
+    if (state.activeEditCol === -1 || !state.columns[state.activeEditCol]) return;
+    const col = state.columns[state.activeEditCol];
+    col.sinkPanel = !col.sinkPanel;
+    // Sink panel and top panel are mutually exclusive
+    if (col.sinkPanel) col.topPanel = false;
+    buildCabinet(); calculatePrice(); updateQuickEditPanelUI();
+    if (typeof syncUIFromState === 'function') syncUIFromState();
+    saveHistoryState();
+}
+
+window.resetFloorOffset = function() {
+    if (state.activeEditCol === -1 || !state.columns[state.activeEditCol]) return;
+    const col = state.columns[state.activeEditCol];
+    col.floorOffset = 0;
+    col.noPlinth = false;
+    buildCabinet(); calculatePrice(); updateQuickEditPanelUI();
+    saveHistoryState();
+}
+
+window.updateQEFloorOffset = function(delta) {
+    if (state.activeEditCol === -1 || !state.columns[state.activeEditCol]) return;
+    const col = state.columns[state.activeEditCol];
+    const newFO = Math.round(Math.max(0, Math.min(col.height - 10, (col.floorOffset || 0) + delta)));
+    col.floorOffset = newFO;
+    col.noPlinth = newFO > 0;
+    buildCabinet(); calculatePrice();
+    if (typeof updateMobileColSheetUI === 'function') updateMobileColSheetUI();
+    updateQuickEditPanelUI();
+    saveHistoryState();
+}
+
+window.toggleInternalDesk = function() {
+    if (state.activeEditCol === -1 || !state.columns[state.activeEditCol]) return;
+    const col = state.columns[state.activeEditCol];
+    if (col.type === 'desk') {
+        col.type = 'normal';
+        delete col.deskHeight; delete col.deskClearance; delete col.hasDrawers; delete col.drawerHeight;
+    } else {
+        col.type = 'desk';
+        col.deskHeight = 80;
+        col.deskClearance = 80;
+        col.hasDrawers = true;
+        col.drawerHeight = 12;
+    }
+    distributeShelves(col);
+    buildCabinet(); calculatePrice(); updateQuickEditPanelUI();
+    saveHistoryState();
+}
+
+window.toggleInternalDeskDrawers = function(isChecked) {
+    if (state.activeEditCol === -1 || !state.columns[state.activeEditCol]) return;
+    const col = state.columns[state.activeEditCol];
+    if (col.type === 'desk') {
+        col.hasDrawers = isChecked;
+        buildCabinet(); calculatePrice();
+        updateQuickEditPanelUI();
+        saveHistoryState();
+    }
+}
+
+window.updateDeskDrawerCount = function(delta) {
+    if (state.activeEditCol === -1 || !state.columns[state.activeEditCol]) return;
+    const col = state.columns[state.activeEditCol];
+    if (col.type !== 'desk' || !col.hasDrawers) return;
+    const autoDefault = col.width <= 80 ? 1 : 2;
+    const current = col.deskDrawerCount != null ? col.deskDrawerCount : autoDefault;
+    col.deskDrawerCount = Math.max(1, Math.min(4, current + delta));
+    const inp = document.getElementById('qe-desk-drawer-count-val');
+    if (inp) inp.value = col.deskDrawerCount;
+    buildCabinet(); calculatePrice();
+    saveHistoryState();
+}
+
+window.updateDeskDrawerCountInput = function(val) {
+    if (state.activeEditCol === -1 || !state.columns[state.activeEditCol]) return;
+    const col = state.columns[state.activeEditCol];
+    if (col.type !== 'desk' || !col.hasDrawers) return;
+    const n = parseInt(val);
+    if (isNaN(n)) return;
+    col.deskDrawerCount = Math.max(1, Math.min(4, n));
+    buildCabinet(); calculatePrice();
+    saveHistoryState();
+}
+
+// ---- Per-door panel type tabs for sliding wardrobe sidebar ----
+window._rebuildDoorPanelTabs = function() {
+    const container = document.getElementById('sd-door-panels-container');
+    if (!container) return;
+    const sd = getSlidingDoor();
+    if (!sd || !sd.enabled) { container.innerHTML = ''; return; }
+    const numDoors = sd.numDoors || 2;
+    if (!sd.doorPanels || sd.doorPanels.length < numDoors) {
+        if (!sd.doorPanels) sd.doorPanels = [];
+        while (sd.doorPanels.length < numDoors) sd.doorPanels.push(sd.doorPanelType || 'solid');
+    }
+    if (!sd.doorColors) sd.doorColors = [];
+
+    const panelOptions = [
+        { value: 'solid',  icon: 'fa-solid fa-square',            label: 'חלק' },
+        { value: 'glass',  icon: 'fa-regular fa-square',          label: 'זכוכית' },
+        { value: 'mirror', icon: 'fa-solid fa-circle-half-stroke', label: 'מראה' }
+    ];
+    // mirror sub-types: shown below the main buttons when mirror/mirror_dark is active
+    const mirrorSubOptions = [
+        { value: 'mirror',      label: 'מראה רגילה' },
+        { value: 'mirror_dark', label: 'מראה כהה' }
+    ];
+
+    // All colors available for door coloring (solid + textures)
+    const solidColors = [
+        { key: 'white_matte', bg: '#f7f7f7',  border: '#ccc', label: 'לבן מט 2100' },
+        { key: 'c3110',       bg: '#f0ede9',  border: '#bbb', label: '3110' },
+        { key: 'c795',        bg: '#ece0d4',  border: '#bbb', label: '759' },
+        { key: 'c705',        bg: '#dbd6c6',  border: '#bbb', label: '705' },
+        { key: 'u727',        bg: '#a79786',  border: '#bbb', label: 'U727' },
+        { key: 'w1200',       bg: '#e7e1da',  border: '#bbb', label: 'W1200' },
+        { key: 'u232',        bg: '#c59578',  border: '#bbb', label: 'U232' },
+        { key: 'u604',        bg: '#8f8e76',  border: '#bbb', label: 'U604' },
+        { key: 'u638',        bg: '#c0b598',  border: '#bbb', label: 'U638' },
+        { key: 'c3207',       bg: '#F7ECD9',  border: '#bbb', label: '3207' },
+        { key: 'black_matte', bg: '#000007',  border: '#444', label: 'שחור מט' },
+        // Wood / texture colors
+        { key: '2020',  img: 'textures/2020.jpg',  border: '#bbb', label: '2020' },
+        { key: 'H1367', img: 'textures/H1367.jpg', border: '#bbb', label: 'H1367' },
+        { key: 'H1307', img: 'textures/H1307.jpg', border: '#bbb', label: 'H1307' },
+        { key: 'H1227', img: 'textures/H1227.jpg', border: '#bbb', label: 'H1227' },
+        { key: '2025',  img: 'textures/2025.jpg',  border: '#bbb', label: '2025' },
+        { key: '2040',  img: 'textures/2040.jpg',  border: '#bbb', label: '2040' },
+        { key: '2041',  img: 'textures/2041.jpg',  border: '#bbb', label: '2041' },
+        { key: '2044',  img: 'textures/2044.jpg',  border: '#bbb', label: '2044' },
+        { key: '2047',  img: 'textures/2047.jpg',  border: '#bbb', label: '2047' },
+        { key: '2049',  img: 'textures/2049.jpg',  border: '#bbb', label: '2049' },
+        { key: '2062',  img: 'textures/2062.jpg',  border: '#bbb', label: '2062' },
+        { key: '5600',  img: 'textures/5600.jpg',  border: '#bbb', label: '5600' },
+        { key: '7180',  img: 'textures/7180.jpg',  border: '#bbb', label: '7180' },
+        { key: '456',   img: 'textures/456.jpg',   border: '#bbb', label: '456' },
+        { key: '462',   img: 'textures/462.jpg',   border: '#bbb', label: '462' },
+        { key: '463',   img: 'textures/463.jpg',   border: '#bbb', label: '463' },
+        { key: '464',   img: 'textures/464.jpg',   border: '#bbb', label: '464' },
+        { key: '480',   img: 'textures/480.jpg',   border: '#bbb', label: '480' },
+    ];
+
+    let html = `<div style="font-size:0.78rem;color:var(--text-light);margin-bottom:6px;">סוג פנל לכל דלת</div>`;
+
+    // Get body material key for default color display
+    const bodyMatKey = (state.wings && state.wings.center && state.wings.center.materialBody) || 'white_matte';
+
+    for (let i = 0; i < numDoors; i++) {
+        const current = sd.doorPanels[i] || 'solid';
+        const isMirrorActive = current === 'mirror' || current === 'mirror_dark';
+        const currentColor = sd.doorColors[i] || null; // null = use body color
+        const effectiveColor = currentColor || bodyMatKey; // what engine actually uses
+        const mainRowMargin = (current === 'solid' || isMirrorActive) ? '8px' : '0';
+        html += `<div style="margin-bottom:10px;padding:8px;background:var(--bg-light);border-radius:10px;border:1px solid var(--border);">`;
+        html += `<div style="font-size:0.72rem;font-weight:700;color:var(--text-dark);margin-bottom:6px;">דלת ${i + 1}</div>`;
+        html += `<div style="display:flex;gap:5px;margin-bottom:${mainRowMargin};">`;
+        panelOptions.forEach(opt => {
+            // "מראה" button is active when current is mirror OR mirror_dark
+            const isActive = opt.value === 'mirror' ? isMirrorActive : current === opt.value;
+            html += `<button onclick="updateSlidingDoorPanel(${i},'${opt.value}')"
+                style="flex:1;padding:6px 3px;border-radius:8px;border:${isActive ? '2px solid var(--accent)' : '1.5px solid var(--border)'};
+                background:${isActive ? 'var(--accent-light,#e8f0fe)' : 'white'};
+                color:${isActive ? 'var(--accent)' : 'var(--text-dark)'};
+                font-size:0.72rem;font-weight:600;cursor:pointer;transition:all 0.15s;
+                display:flex;flex-direction:column;align-items:center;gap:2px;">
+                <i class="${opt.icon}" style="font-size:1rem;"></i>
+                <span>${opt.label}</span>
+            </button>`;
+        });
+        html += `</div>`;
+        // Mirror sub-row — shown when mirror or mirror_dark is active
+        if (isMirrorActive) {
+            html += `<div style="display:flex;gap:5px;margin-bottom:0;padding:6px 0 2px 0;border-top:1px solid var(--border);">`;
+            mirrorSubOptions.forEach(sub => {
+                const isSubActive = current === sub.value;
+                html += `<button onclick="updateSlidingDoorPanel(${i},'${sub.value}')"
+                    style="flex:1;padding:5px 4px;border-radius:7px;border:${isSubActive ? '2px solid var(--accent)' : '1.5px solid var(--border)'};
+                    background:${isSubActive ? 'var(--accent-light,#e8f0fe)' : 'white'};
+                    color:${isSubActive ? 'var(--accent)' : 'var(--text-dark)'};
+                    font-size:0.7rem;font-weight:600;cursor:pointer;transition:all 0.15s;">
+                    ${sub.label}
+                </button>`;
+            });
+            html += `</div>`;
+        }
+        // Color swatches — only shown when panel type is 'solid'
+        if (current === 'solid') {
+            html += `<div style="font-size:0.7rem;color:var(--text-light);margin-bottom:5px;">צבע דלת:</div>`;
+            html += `<div style="display:flex;flex-wrap:wrap;gap:5px;">`;
+            solidColors.forEach(c => {
+                const isColorActive = c.key === effectiveColor;
+                const bgStyle = c.img
+                    ? `background-image:url('${c.img}');background-size:cover;background-color:#ccc;`
+                    : `background:${c.bg};`;
+                html += `<button onclick="updateSlidingDoorColor(${i},'${c.key}')" title="${c.label}"
+                    style="width:26px;height:26px;border-radius:50%;${bgStyle}
+                    border:${isColorActive ? '2.5px solid var(--accent)' : `1.5px solid ${c.border}`};
+                    cursor:pointer;transition:all 0.15s;outline:${isColorActive ? '2px solid var(--accent)' : 'none'};outline-offset:1px;">
+                </button>`;
+            });
+            html += `</div>`;
+        }
+        html += `</div>`;
+    }
+
+    container.innerHTML = html;
+};
+
+function buildDimensionsAndButtonsUI() {
+    dimLayer.innerHTML = '';
+    buttonsLayer.innerHTML = '';
+    // ---- Column width labels (always-visible layer, separate from hover-fade dimensions-layer) ----
+    const colWidthsLayer = document.getElementById('col-widths-layer');
+    if (colWidthsLayer) colWidthsLayer.innerHTML = '';
+    if (state.viewMode !== 'front') return;
+
+    state.dimData.forEach(d => {
+        // isSubCellBtn and isCellSelectBtn entries are handled separately below — skip here
+        if (d.isSubCellBtn) return;
+        if (d.isCellSelectBtn) return;
+
+        // ---- Column width label above each column ----
+        if (d.isColWidth) {
+            if (!colWidthsLayer) return;
+            const colWidthEl = document.createElement('div');
+            colWidthEl.className = 'col-width-label';
+            colWidthEl.dataset.x3d = d.x;
+            colWidthEl.dataset.y3d = d.y;
+            colWidthEl.style.cssText = 'position:absolute;transform:translate(-50%,-50%);background:rgba(16,185,129,0.13);border:1.5px solid rgba(16,185,129,0.5);border-radius:8px;padding:3px 8px;display:flex;align-items:baseline;gap:3px;pointer-events:none;white-space:nowrap;';
+            const valSpan = document.createElement('span');
+            valSpan.style.cssText = 'font-size:0.82rem;font-weight:700;color:#059669;';
+            valSpan.innerText = Math.round(d.h);
+            const unitSpan = document.createElement('span');
+            unitSpan.style.cssText = 'font-size:0.72rem;color:#059669;font-weight:600;';
+            unitSpan.innerText = 'ס"מ';
+            colWidthEl.appendChild(valSpan);
+            colWidthEl.appendChild(unitSpan);
+            colWidthsLayer.appendChild(colWidthEl);
+            return;
+        }
+
+        const dimEl = document.createElement('div');
+        dimEl.className = 'dim-container';
+        dimEl.dataset.x3d = d.x; dimEl.dataset.y3d = d.y;
+        
+        const input = document.createElement('input');
+        input.className = 'dim-input';
+        input.type = 'number'; input.step = '1';
+        input.value = Math.round(d.h);
+
+        // Wing open-width label: two-line layout — "פתח גלוי" on top, "30 ס"מ" below
+        if (d.isWingOpenWidth) {
+            input.readOnly = true;
+            input.title = 'רוחב פתח גלוי';
+            dimEl.style.pointerEvents = 'none';
+            dimEl.style.background = 'rgba(30,100,220,0.13)';
+            dimEl.style.border = '1.5px solid rgba(30,100,220,0.45)';
+            dimEl.style.borderRadius = '8px';
+            dimEl.style.padding = '3px 8px';
+            dimEl.style.width = 'fit-content';
+            dimEl.style.minWidth = '0';
+            dimEl.style.flexDirection = 'column';
+            dimEl.style.alignItems = 'center';
+            dimEl.style.gap = '1px';
+            input.style.color = '#1a5fd4';
+            input.style.fontWeight = '700';
+            input.style.width = '3.5em';
+            input.style.minWidth = '2.5em';
+            input.style.textAlign = 'center';
+            const openLabel = document.createElement('div');
+            openLabel.style.cssText = 'font-size:10px;color:#1a5fd4;font-weight:600;text-align:center;white-space:nowrap;line-height:1.2;';
+            openLabel.innerText = 'פתח גלוי';
+            dimEl.appendChild(openLabel);
+            const row2 = document.createElement('div');
+            row2.style.cssText = 'display:flex;align-items:baseline;gap:2px;white-space:nowrap;';
+            dimEl.appendChild(row2);
+            dimEl._wingOpenRow2 = row2;
+        }
+        
+        input.addEventListener('change', (e) => {
+            let desiredH = parseInt(e.target.value);
+            if(isNaN(desiredH)) return;
+            
+            if (d.isDeskWidth) {
+                state.desk.width = Math.max(40, Math.min(200, desiredH));
+                if (document.getElementById('inp-num-desk-width')) document.getElementById('inp-num-desk-width').value = state.desk.width;
+                if (document.getElementById('inp-desk-width')) document.getElementById('inp-desk-width').value = state.desk.width;
+            } else if (d.isDeskHeight) {
+                state.desk.height = Math.max(50, Math.min(120, desiredH));
+            } else if (d.isDeskDrawer) {
+                state.desk.drawerHeight = Math.max(12, Math.min(40, desiredH));
+            } else if (d.isInternalDeskSurface) {
+                const col = state.columns[d.colIndex];
+                if(col) col.deskHeight = Math.max(50, Math.min(col.deskHeight + col.deskClearance - MIN_SHELF_GAP, desiredH));
+                distributeShelves(col);
+            } else if (d.isInternalDeskClearance) {
+                const col = state.columns[d.colIndex];
+                if(col) col.deskClearance = Math.max(30, desiredH);
+                distributeShelves(col);
+            } else if (d.isInternalDeskDrawer) {
+                if(state.columns[d.colIndex]) state.columns[d.colIndex].drawerHeight = Math.max(8, Math.min(40, desiredH));
+            } else {
+                const diff = desiredH - d.h;
+                const col = state.columns[d.colIndex];
+                if(!col) return;
+                const t = state.thickness;
+                const cBaseY = col.type === 'desk' ? col.deskHeight + col.deskClearance : state.plinthHeight;
+                if (d.isTop) {
+                    if (col.shelves > 0) {
+                        const shelfIdx = col.shelves - 1;
+                        const currentY = col.shelvesY[shelfIdx];
+                        const obs = [cBaseY + t / 2, col.height - t / 2];
+                        if (col.splitY) { obs.push(col.splitY - t); obs.push(col.splitY + t); }
+                        col.shelvesY.forEach((y, i) => { if (i !== shelfIdx) obs.push(y); });
+                        const limitMin = Math.max(...obs.filter(y => y < currentY)) + MIN_SHELF_GAP + t;
+                        const limitMax = Math.min(...obs.filter(y => y > currentY)) - MIN_SHELF_GAP - t;
+                        col.shelvesY[shelfIdx] = Math.round(Math.max(limitMin, Math.min(limitMax, currentY - diff)) * 10) / 10;
+                        e.target.value = Math.round(col.height - t - col.shelvesY[shelfIdx] - t / 2);
+                    }
+                } else {
+                    const div = d.divAbove;
+                    if (!div) return;
+                    if (div.type === 'split') {
+                        let newSplitY = col.splitY + diff;
+                        let maxAllowable = Math.min(getSplitThreshold(), ...state.columns.filter(c => c.splitY).map(c => c.height - 2*state.thickness - MIN_SHELF_GAP));
+                        if (newSplitY > maxAllowable) newSplitY = maxAllowable;
+                        state.columns.forEach(c => { if (c.splitY) c.splitY = newSplitY; });
+                    } else {
+                        const shelfIdx = div.idx;
+                        const currentY = col.shelvesY[shelfIdx];
+                        const obs = [cBaseY + t / 2, col.height - t / 2];
+                        if (col.splitY) { obs.push(col.splitY - t); obs.push(col.splitY + t); }
+                        col.shelvesY.forEach((y, i) => { if (i !== shelfIdx) obs.push(y); });
+                        const limitMin = Math.max(...obs.filter(y => y < currentY)) + MIN_SHELF_GAP + t;
+                        const limitMax = Math.min(...obs.filter(y => y > currentY)) - MIN_SHELF_GAP - t;
+                        col.shelvesY[shelfIdx] = Math.round(Math.max(limitMin, Math.min(limitMax, currentY + diff)) * 10) / 10;
+                        e.target.value = Math.round(col.shelvesY[shelfIdx] - (shelfIdx === 0 ? cBaseY + t : col.shelvesY[shelfIdx - 1] + t / 2) - t / 2);
+                    }
+                }
+                checkSplits();
+            }
+            buildCabinet(); updateCameraView(); calculatePrice(); saveHistoryState();
+        });
+
+        // Append input (and suffix for wing-open-width)
+        if (dimEl._wingOpenRow2) {
+            const suffix = document.createElement('span');
+            suffix.className = 'dim-suffix'; suffix.innerText = 'ס"מ';
+            suffix.style.marginRight = '0';
+            suffix.style.fontSize = '0.8rem';
+            dimEl._wingOpenRow2.appendChild(input);
+            dimEl._wingOpenRow2.appendChild(suffix);
+        } else {
+            input.style.fontSize = '0.78rem';
+            input.style.width = '3.3em';
+            input.style.minWidth = '2.5em';
+            dimEl.appendChild(input);
+        }
+
+        // For regular cell dims: embed the action button(s) directly inside the dim-container
+        // Skip action buttons for partitioned cells — sub-cell buttons handle interaction instead
+        if (!d.isDeskWidth && !d.isDeskHeight && !d.isDeskDrawer && !d.isInternalDeskSurface && !d.isInternalDeskClearance && !d.isInternalDeskDrawer && !d.isWingOpenWidth && !d.isSubCellBtn && !d.isPartitionedCell) {
+            const isSelectedRow = state.selection.colIndex === d.colIndex && state.selection.rows.includes(d.rowIndex);
+            const col = state.columns[d.colIndex];
+            const comp = col.compartments[d.rowIndex];
+            const hasContent = comp && comp.type !== 'empty';
+
+            // Helper: adjust cell height by delta cm (moves the shelf boundary)
+            const _adjustCellHeight = (delta) => {
+                const t = state.thickness;
+                const cBaseY = col.type === 'desk' ? col.deskHeight + col.deskClearance : state.plinthHeight;
+                if (d.isTop) {
+                    if (col.shelves > 0) {
+                        const shelfIdx = col.shelves - 1;
+                        const currentY = col.shelvesY[shelfIdx];
+                        const obs = [cBaseY + t / 2, col.height - t / 2];
+                        if (col.splitY) { obs.push(col.splitY - t); obs.push(col.splitY + t); }
+                        col.shelvesY.forEach((y, i) => { if (i !== shelfIdx) obs.push(y); });
+                        const limitMin = Math.max(...obs.filter(y => y < currentY)) + MIN_SHELF_GAP + t;
+                        const limitMax = Math.min(...obs.filter(y => y > currentY)) - MIN_SHELF_GAP - t;
+                        col.shelvesY[shelfIdx] = Math.round(Math.max(limitMin, Math.min(limitMax, currentY - delta)) * 10) / 10;
+                    }
+                } else {
+                    const div = d.divAbove;
+                    if (!div) return;
+                    if (div.type === 'split') {
+                        let newSplitY = col.splitY + delta;
+                        let maxAllowable = Math.min(getSplitThreshold(), ...state.columns.filter(c => c.splitY).map(c => c.height - 2*state.thickness - MIN_SHELF_GAP));
+                        if (newSplitY > maxAllowable) newSplitY = maxAllowable;
+                        state.columns.forEach(c => { if (c.splitY) c.splitY = newSplitY; });
+                    } else {
+                        const shelfIdx = div.idx;
+                        const currentY = col.shelvesY[shelfIdx];
+                        const obs = [cBaseY + t / 2, col.height - t / 2];
+                        if (col.splitY) { obs.push(col.splitY - t); obs.push(col.splitY + t); }
+                        col.shelvesY.forEach((y, i) => { if (i !== shelfIdx) obs.push(y); });
+                        const limitMin = Math.max(...obs.filter(y => y < currentY)) + MIN_SHELF_GAP + t;
+                        const limitMax = Math.min(...obs.filter(y => y > currentY)) - MIN_SHELF_GAP - t;
+                        col.shelvesY[shelfIdx] = Math.round(Math.max(limitMin, Math.min(limitMax, currentY + delta)) * 10) / 10;
+                    }
+                }
+                checkSplits();
+                buildCabinet(); updateCameraView(); calculatePrice(); saveHistoryState();
+            };
+
+            // Remove the plain input from dimEl — we'll show height inside the pill instead
+            if (dimEl.contains(input)) dimEl.removeChild(input);
+
+            // Strip dim-container's own frame — the pill IS the visual container
+            dimEl.classList.add('pill-mode');
+
+            if (isSelectedRow) {
+                // Selected state: just the green ✓ circle — no pill wrapper needed
+                const checkCircle = document.createElement('div');
+                checkCircle.innerHTML = '<i class="fa-solid fa-check" style="font-size:0.75rem;pointer-events:none;"></i>';
+                checkCircle.style.cssText = 'display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#10b981,#059669);color:white;cursor:pointer;flex-shrink:0;transition:transform 0.15s,box-shadow 0.15s;box-shadow:0 2px 8px rgba(16,185,129,0.55);';
+                checkCircle.addEventListener('mouseenter', () => { checkCircle.style.transform = 'scale(1.15)'; checkCircle.style.boxShadow = '0 3px 12px rgba(16,185,129,0.7)'; });
+                checkCircle.addEventListener('mouseleave', () => { checkCircle.style.transform = 'scale(1)'; checkCircle.style.boxShadow = '0 2px 8px rgba(16,185,129,0.55)'; });
+                checkCircle.addEventListener('click', (e) => { e.stopPropagation(); toggleSelection(d.colIndex, d.rowIndex); });
+                dimEl.insertBefore(checkCircle, dimEl.firstChild);
+            } else {
+                // Build pill container — direction:ltr so internal order is predictable
+                const pill = document.createElement('div');
+                pill.style.cssText = 'display:flex;align-items:center;gap:0;direction:ltr;background:rgba(30,30,40,0.82);border-radius:20px;padding:3px 8px 3px 6px;box-shadow:0 2px 10px rgba(0,0,0,0.35);flex-shrink:0;';
+                // Pill layout (LTR inside pill): [(trash | divider)? | height▲▼ | divider | +]
+                // In RTL context: + on visual LEFT, height in middle, trash on visual RIGHT
+
+                if (hasContent) {
+                    // Trash — first in DOM = visual left in LTR (= visual right in RTL page)
+                    const trashBtn = document.createElement('div');
+                    trashBtn.innerHTML = '<i class="fa-solid fa-trash" style="font-size:0.65rem;pointer-events:none;"></i>';
+                    trashBtn.style.cssText = 'display:flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;color:rgba(255,255,255,0.55);cursor:pointer;transition:color 0.15s,background 0.15s;flex-shrink:0;';
+                    trashBtn.title = 'מחק תכולה מאיזור זה';
+                    trashBtn.addEventListener('mouseenter', () => { trashBtn.style.color = '#ef4444'; trashBtn.style.background = 'rgba(239,68,68,0.15)'; });
+                    trashBtn.addEventListener('mouseleave', () => { trashBtn.style.color = 'rgba(255,255,255,0.55)'; trashBtn.style.background = 'transparent'; });
+                    trashBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        if (state.columns[d.colIndex].compartments[d.rowIndex]) {
+                            state.columns[d.colIndex].compartments[d.rowIndex].type = 'empty';
+                            delete state.columns[d.colIndex].compartments[d.rowIndex].partition;
+                            delete state.columns[d.colIndex].compartments[d.rowIndex].partitions;
+                            delete state.columns[d.colIndex].compartments[d.rowIndex].subCells;
+                            _activeSubCellIdxs = new Set();
+                        }
+                        buildCabinet(); calculatePrice(); saveHistoryState();
+                    });
+                    pill.appendChild(trashBtn);
+
+                    // Divider after trash
+                    const div1 = document.createElement('div');
+                    div1.style.cssText = 'width:1px;height:14px;background:rgba(255,255,255,0.2);margin:0 5px;flex-shrink:0;';
+                    pill.appendChild(div1);
+                }
+
+                // Height display with ▲▼ arrows — middle
+                // Use d.h (from state.dimData, computed by engine-core with noPlinth-aware startShelvesY)
+                // instead of _cellHeight() which ignores col.noPlinth.
+                const cellH = Math.round(d.h);
+                const heightGroup = document.createElement('div');
+                heightGroup.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:0;';
+
+                const upBtn = document.createElement('div');
+                upBtn.innerHTML = '▲';
+                upBtn.style.cssText = 'font-size:0.55rem;color:rgba(255,255,255,0.7);cursor:pointer;line-height:1;padding:1px 3px;border-radius:3px;transition:color 0.15s;user-select:none;';
+                upBtn.addEventListener('mouseenter', () => upBtn.style.color = 'white');
+                upBtn.addEventListener('mouseleave', () => upBtn.style.color = 'rgba(255,255,255,0.7)');
+                upBtn.addEventListener('click', (e) => { e.stopPropagation(); _adjustCellHeight(1); });
+
+                const heightLabel = document.createElement('span');
+                heightLabel.textContent = cellH;
+                heightLabel.style.cssText = 'font-size:0.72rem;font-weight:700;color:rgba(255,255,255,0.9);line-height:1.1;min-width:1.8em;text-align:center;';
+
+                const downBtn = document.createElement('div');
+                downBtn.innerHTML = '▼';
+                downBtn.style.cssText = 'font-size:0.55rem;color:rgba(255,255,255,0.7);cursor:pointer;line-height:1;padding:1px 3px;border-radius:3px;transition:color 0.15s;user-select:none;';
+                downBtn.addEventListener('mouseenter', () => downBtn.style.color = 'white');
+                downBtn.addEventListener('mouseleave', () => downBtn.style.color = 'rgba(255,255,255,0.7)');
+                downBtn.addEventListener('click', (e) => { e.stopPropagation(); _adjustCellHeight(-1); });
+
+                heightGroup.appendChild(upBtn);
+                heightGroup.appendChild(heightLabel);
+                heightGroup.appendChild(downBtn);
+                pill.appendChild(heightGroup);
+
+                // Divider between height and +
+                const div2 = document.createElement('div');
+                div2.style.cssText = 'width:1px;height:14px;background:rgba(255,255,255,0.2);margin:0 5px;flex-shrink:0;';
+                pill.appendChild(div2);
+
+                // + button — last in DOM = visual right in LTR (= visual left in RTL page)
+                const plusBtn = document.createElement('div');
+                plusBtn.innerHTML = '<i class="fa-solid fa-plus" style="font-size:0.75rem;pointer-events:none;"></i>';
+                plusBtn.style.cssText = 'display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;cursor:pointer;flex-shrink:0;transition:transform 0.15s,box-shadow 0.15s;box-shadow:0 2px 6px rgba(99,102,241,0.5);';
+                plusBtn.addEventListener('mouseenter', () => { plusBtn.style.transform = 'scale(1.15)'; plusBtn.style.boxShadow = '0 3px 10px rgba(99,102,241,0.7)'; });
+                plusBtn.addEventListener('mouseleave', () => { plusBtn.style.transform = 'scale(1)'; plusBtn.style.boxShadow = '0 2px 6px rgba(99,102,241,0.5)'; });
+                plusBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleSelection(d.colIndex, d.rowIndex); });
+                pill.appendChild(plusBtn);
+
+                // Insert pill BEFORE any existing children (= visual right in RTL)
+                dimEl.insertBefore(pill, dimEl.firstChild);
+            }
+
+            dimEl.style.cursor = 'default';
+        }
+
+        dimLayer.appendChild(dimEl);
+    });
+
+    // Cell-select button: one per partitioned cell, at cell center (shifted down)
+    // Clicking it selects the whole cell so the user can add doors or change partition count
+    state.dimData.filter(d => d.isCellSelectBtn).forEach(d => {
+        const col = state.columns[d.colIndex];
+        if (!col) return;
+
+        // Cell-select button shows as selected only when the whole cell is selected AND no sub-cell is active
+        const isSelected = state.selection.colIndex === d.colIndex &&
+                           state.selection.rows.includes(d.rowIndex) &&
+                           _activeSubCellIdxs.size === 0;
+
+        const btn = document.createElement('div');
+        // Use position:absolute directly — bypass dim-container class to avoid CSS overrides
+        btn.className = 'cell-select-btn';
+        btn.style.cssText = 'position:absolute;transform:translate(-50%,-50%);pointer-events:auto;';
+        btn.dataset.x3d = d.x;
+        btn.dataset.y3d = d.y;
+        btn.title = isSelected ? 'בטל בחירת תא' : 'בחר תא שלם (להוספת דלת / שינוי מחיצות)';
+
+        if (isSelected) {
+            // Selected state: green check circle
+            btn.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#10b981,#059669);box-shadow:0 2px 8px rgba(16,185,129,0.55);cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;"><i class="fa-solid fa-check" style="font-size:0.8rem;color:white;pointer-events:none;"></i></div>';
+        } else {
+            // Unselected: purple + circle (same style as other + buttons)
+            btn.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);box-shadow:0 2px 8px rgba(99,102,241,0.55);cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;"><i class="fa-solid fa-plus" style="font-size:0.9rem;color:white;pointer-events:none;font-weight:700;"></i></div>';
+            const circle = btn.querySelector('div');
+            btn.addEventListener('mouseenter', () => { circle.style.transform = 'scale(1.18)'; circle.style.boxShadow = '0 3px 12px rgba(99,102,241,0.75)'; });
+            btn.addEventListener('mouseleave', () => { circle.style.transform = 'scale(1)'; circle.style.boxShadow = '0 2px 8px rgba(99,102,241,0.55)'; });
+        }
+
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            // Clear sub-cell mode so toolbar operates on the whole cell
+            _activeSubCellIdxs = new Set();
+            toggleSelection(d.colIndex, d.rowIndex);
+        });
+
+        dimLayer.appendChild(btn);
+    });
+
+    // Sub-cell + buttons: one per zone in partitioned cells (per-zone composite key "si:z")
+    state.dimData.filter(d => d.isSubCellBtn).forEach(d => {
+        const col = state.columns[d.colIndex];
+        if (!col) return;
+        const comp = col.compartments[d.rowIndex];
+        if (!comp || !comp.partition) return;
+
+        // Composite key for this zone button
+        const zoneKey = _subKey(d.subCellIdx, d.zoneIdx !== undefined ? d.zoneIdx : 0);
+
+        const isSelected = _activeSubCellIdxs.has(zoneKey) &&
+                           state.selection.colIndex === d.colIndex &&
+                           state.selection.rows.includes(d.rowIndex);
+
+        // Determine zone content: use zonesType[z] if available, else sub.type
+        const sub = comp.subCells && comp.subCells[d.subCellIdx];
+        const zoneIdx = d.zoneIdx !== undefined ? d.zoneIdx : 0;
+        let zoneType = 'empty';
+        if (sub) {
+            if (Array.isArray(sub.zonesType) && sub.zonesType[zoneIdx]) {
+                zoneType = sub.zonesType[zoneIdx];
+            } else if (sub.type && sub.type !== 'empty') {
+                zoneType = sub.type;
+            }
+        }
+        const hasSubContent = zoneType !== 'empty';
+
+        const btn = document.createElement('div');
+        btn.className = 'sub-cell-btn';
+        btn.style.cssText = 'position:absolute;transform:translate(-50%,-50%);pointer-events:auto;background:transparent;border:none;box-shadow:none;padding:0;cursor:pointer;';
+        btn.dataset.x3d = d.x;
+        btn.dataset.y3d = d.y;
+        // Show zone label if multiple zones exist in this sub-cell
+        const zoneLabel = (d.numZones && d.numZones > 1) ? `תא ${d.subCellIdx + 1} אזור ${zoneIdx + 1}` : `תא ${d.subCellIdx + 1}`;
+        btn.title = zoneLabel;
+
+        // Stop pointer events from bubbling to canvas (prevents canvas pointerup from clearing state.selection)
+        btn.addEventListener('pointerdown', e => e.stopPropagation());
+        btn.addEventListener('pointerup', e => e.stopPropagation());
+
+        if (isSelected) {
+            // Selected: green X circle — click to deselect
+            btn.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#10b981,#059669);box-shadow:0 2px 8px rgba(16,185,129,0.55);cursor:pointer;"><i class="fa-solid fa-xmark" style="font-size:0.7rem;color:white;pointer-events:none;"></i></div>`;
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                // Select the cell first if not selected
+                if (!(state.selection.colIndex === d.colIndex && state.selection.rows.includes(d.rowIndex))) {
+                    state.selection = { colIndex: d.colIndex, rows: [d.rowIndex] };
+                }
+                window.setActiveSubCell(zoneKey); // toggles off — rebuilds overlay + toolbar
+            });
+        } else if (hasSubContent) {
+            // Has content: circular pill with pen + trash
+            btn.innerHTML = `<div style="display:flex;align-items:center;gap:5px;background:rgba(30,30,40,0.82);border-radius:20px;padding:4px 8px;box-shadow:0 2px 8px rgba(0,0,0,0.3);">
+                <i class="fa-solid fa-pen sub-btn-edit" style="font-size:9px;color:rgba(255,255,255,0.8);cursor:pointer;transition:color 0.15s;" title="ערוך תא"></i>
+                <div style="width:1px;height:10px;background:rgba(255,255,255,0.25);"></div>
+                <i class="fa-solid fa-trash sub-btn-trash" style="font-size:9px;color:rgba(255,255,255,0.6);cursor:pointer;transition:color 0.15s;" title="נקה תא"></i>
+            </div>`;
+            btn.querySelector('.sub-btn-edit').addEventListener('mouseenter', e => { e.target.style.color = 'white'; });
+            btn.querySelector('.sub-btn-edit').addEventListener('mouseleave', e => { e.target.style.color = 'rgba(255,255,255,0.8)'; });
+            btn.querySelector('.sub-btn-trash').addEventListener('mouseenter', e => { e.target.style.color = '#ef4444'; });
+            btn.querySelector('.sub-btn-trash').addEventListener('mouseleave', e => { e.target.style.color = 'rgba(255,255,255,0.6)'; });
+            btn.querySelector('.sub-btn-edit').addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (!(state.selection.colIndex === d.colIndex && state.selection.rows.includes(d.rowIndex))) {
+                    state.selection = { colIndex: d.colIndex, rows: [d.rowIndex] };
+                }
+                window.setActiveSubCell(zoneKey); // toggle select — rebuilds overlay + toolbar
+            });
+            btn.querySelector('.sub-btn-trash').addEventListener('click', (e) => {
+                e.stopPropagation();
+                // Clear this zone's content (and all selected zones)
+                const keysToClear = _activeSubCellIdxs.size > 0 ? new Set(_activeSubCellIdxs) : new Set([zoneKey]);
+                keysToClear.forEach(k => {
+                    const { si, z } = _parseSubKey(k);
+                    const s = comp.subCells && comp.subCells[si];
+                    if (!s) return;
+                    if (Array.isArray(s.zonesType)) {
+                        s.zonesType[z] = 'empty';
+                        // If all zones are empty, also clear sub.type
+                        if (s.zonesType.every(t => !t || t === 'empty')) {
+                            s.type = 'empty';
+                        }
+                    } else {
+                        s.type = 'empty'; s.shelves = 0; delete s.shelvesY;
+                    }
+                });
+                _activeSubCellIdxs = new Set();
+                buildCabinet(); calculatePrice(); saveHistoryState();
+                updateToolbarButtonHighlights();
+            });
+        } else {
+            // Empty zone: circular + button in teal/cyan
+            btn.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#06b6d4,#0891b2);transition:all 0.18s cubic-bezier(.4,0,.2,1);box-shadow:0 2px 6px rgba(6,182,212,0.5);cursor:pointer;"><i class="fa-solid fa-plus" style="font-size:10px;color:white;pointer-events:none;font-weight:700;"></i></div>`;
+            const circle = btn.querySelector('div');
+            btn.addEventListener('mouseenter', () => { circle.style.background = 'linear-gradient(135deg,#0891b2,#0e7490)'; circle.style.transform = 'scale(1.2)'; circle.style.boxShadow = '0 3px 10px rgba(6,182,212,0.7)'; });
+            btn.addEventListener('mouseleave', () => { circle.style.background = 'linear-gradient(135deg,#06b6d4,#0891b2)'; circle.style.transform = 'scale(1)'; circle.style.boxShadow = '0 2px 6px rgba(6,182,212,0.5)'; });
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (!(state.selection.colIndex === d.colIndex && state.selection.rows.includes(d.rowIndex))) {
+                    state.selection = { colIndex: d.colIndex, rows: [d.rowIndex] };
+                }
+                window.setActiveSubCell(zoneKey); // toggle select — rebuilds overlay + toolbar
+            });
+        }
+
+        dimLayer.appendChild(btn);
+    });
+
+    // Select-all-column buttons: one per column, centered on the plinth
+    if (dragHandlesData && dragHandlesData.selectAll) {
+        dragHandlesData.selectAll.forEach(item => {
+            const col = state.columns[item.colIndex];
+            if (!col) return;
+            const numRows = col.shelves + 1;
+            const allSelected = state.selection.colIndex === item.colIndex && state.selection.rows.length === numRows;
+
+            const btn = document.createElement('div');
+            btn.className = 'select-all-col-btn' + (allSelected ? ' all-selected' : '');
+            btn.dataset.x3d = item.x;
+            btn.dataset.y3d = item.y;
+            btn.dataset.colIndex = item.colIndex;
+            btn.title = allSelected ? 'בטל בחירת כל התאים' : 'בחר את כל התאים בעמודה';
+            btn.innerHTML = allSelected ? '<i class="fa-solid fa-check-double"></i>' : '<i class="fa-solid fa-table-cells"></i>';
+
+            btn.addEventListener('click', () => selectAllColumn(item.colIndex));
+            buttonsLayer.appendChild(btn);
+        });
+    }
+
+    updateOverlaysPosition();
+}
+
+function updateToolbarState() {
+    const toolbar = document.getElementById('bottom-floating-toolbar');
+    if(!toolbar) return;
+    
+    const hasSelection = (state.selection.colIndex > -1 && state.selection.rows.length > 0);
+    const viewModeOK = (state.viewMode === 'front');
+
+    if (hasSelection && viewModeOK) {
+        toolbar.classList.add('show-toolbar');
+        updateToolbarButtonHighlights();
+        
+        const colIndex = state.selection.colIndex;
+        const col = state.columns[colIndex];
+        const midRow = state.selection.rows[Math.floor(state.selection.rows.length / 2)];
+        
+        // For partitioned cells, regular dimData entry is suppressed — fall back to isSubCellBtn entry
+        const dim = state.dimData.find(d => d.colIndex === colIndex && d.rowIndex === midRow && !d.isSubCellBtn)
+                 || state.dimData.find(d => d.colIndex === colIndex && d.rowIndex === midRow && d.isSubCellBtn);
+        
+        if (dim) {
+            const rightEdgeX = dim.x + (col.width / 4);
+            const vector = new THREE.Vector3(rightEdgeX, dim.y, state.depth / 2);
+            // Apply wing group transform so wing columns project correctly
+            if (window._activeWingGroup) {
+                window._activeWingGroup.updateMatrixWorld(true);
+                vector.applyMatrix4(window._activeWingGroup.matrixWorld);
+            }
+            vector.project(camera);
+
+            const cw = container.clientWidth;
+            const ch = container.clientHeight;
+            
+            let x = (vector.x * 0.5 + 0.5) * cw;
+            let y = (-(vector.y * 0.5) + 0.5) * ch;
+            
+            // Clamp toolbar within canvas
+            const w = toolbar.offsetWidth || 380;
+            const h = toolbar.offsetHeight || 150;
+
+            x = Math.max(w/2 + 10, Math.min(cw - w/2 - 10, x));
+            y = Math.max(h/2 + 10, Math.min(ch - h/2 - 10, y));
+            
+            toolbar.style.left = `${x}px`;
+            toolbar.style.top = `${y}px`;
+            // Sub-panels are now inline inside the toolbar — no separate positioning needed
+        }
+    } else {
+        toolbar.classList.remove('show-toolbar');
+        // Close content sub-panels when toolbar hides
+        closeContentSubPanels();
+    }
+    // Sync room wall selector visibility and highlights
+    if (typeof window._updateRoomWallUI === 'function') window._updateRoomWallUI();
+}
+
+function updateToolbarButtonHighlights() {
+    const toolbar = document.getElementById('bottom-floating-toolbar');
+    if(!toolbar) return;
+    toolbar.querySelectorAll('button.toolbar-btn').forEach(b => b.classList.remove('active'));
+    // Also clear sub-panel button highlights
+    ['hanging-sub-panel','drawer-sub-panel','honeycomb-sub-panel'].forEach(id => {
+        const p = document.getElementById(id);
+        if (p) p.querySelectorAll('button.toolbar-btn').forEach(b => b.classList.remove('active'));
+    });
+
+    // Re-sync sub-panel-open highlight: whichever sub-panel is currently visible
+    const _subPanelMap = { 'hanging-sub-panel': 'tb-btn-hanging', 'drawer-sub-panel': 'tb-btn-drawer', 'honeycomb-sub-panel': 'tb-btn-honeycomb' };
+    Object.entries(_subPanelMap).forEach(([panelId, btnId]) => {
+        const panel = document.getElementById(panelId);
+        const btn = document.getElementById(btnId);
+        if (!btn) return;
+        if (panel && panel.style.display !== 'none') {
+            btn.classList.add('sub-panel-open');
+        } else {
+            btn.classList.remove('sub-panel-open');
+        }
+    });
+
+    if (state.selection.colIndex === -1 || state.selection.rows.length === 0) {
+        // Do NOT clear _activeSubCellIdxs here — it is managed by setActiveSubCell/clearSelection
+        // Hide partition counter
+        const pc = document.getElementById('tb-partition-counter');
+        if (pc) pc.style.display = 'none';
+        return;
+    }
+    const col = state.columns[state.selection.colIndex];
+    const startR = Math.min(...state.selection.rows);
+    const endR = Math.max(...state.selection.rows);
+
+    // "תאים שווים" button: show only when 2+ consecutive rows are selected
+    const equalCellsBtn = document.getElementById('tb-btn-equal-cells');
+    if (equalCellsBtn) {
+        const selRows = state.selection.rows.slice().sort((a, b) => a - b);
+        const isConsecutive = selRows.length >= 2 &&
+            selRows[selRows.length - 1] - selRows[0] + 1 === selRows.length;
+        equalCellsBtn.style.display = isConsecutive ? '' : 'none';
+    }
+
+    // For sliding wardrobes: hide כוורת, מגירות חיצוניות, דלתות, door-style-panel
+    const _isSliding = state.presetId === 'sliding' && state.slidingDoor && state.slidingDoor.enabled;
+    const btnHoneycomb = document.getElementById('tb-btn-honeycomb');
+    const btnDrawer = document.getElementById('tb-btn-drawer');
+    const extDrawerBtn = document.querySelector('#drawer-sub-panel button[data-drawer-type="external_drawers"]');
+    const honeycombSubPanel = document.getElementById('honeycomb-sub-panel');
+    // Door section: the toolbar-section containing door buttons (ללא/ימין/שמאל/כפול)
+    const doorSection = document.querySelector('.toolbar-section:has(button[onclick="applyDoor(\'empty\')"])');
+    const _doorStylePanels = {
+        right: document.getElementById('door-style-panel-right'),
+        left:  document.getElementById('door-style-panel-left'),
+        double: document.getElementById('door-style-panel-double'),
+        flap:  document.getElementById('door-style-panel-flap'),
+    };
+
+    const firstComp = col.compartments[state.selection.rows[0]];
+
+    // ── Partition counter UI: show [−] N [+] next to מחיצה button when partition is active ──
+    const hasPartition = firstComp && firstComp.partition &&
+                         firstComp.type !== 'open_cell' && firstComp.type !== 'side_open_cell' &&
+                         state.selection.rows.length === 1;
+    const partCounter = document.getElementById('tb-partition-counter');
+    const partCountDisplay = document.getElementById('tb-partition-count');
+    if (partCounter) {
+        if (hasPartition) {
+            const nBoards = Array.isArray(firstComp.partitions) ? firstComp.partitions.length : 1;
+            partCounter.style.display = 'flex';
+            if (partCountDisplay) partCountDisplay.innerText = nBoards;
+        } else {
+            partCounter.style.display = 'none';
+        }
+    }
+
+    // ── Sub-cell mode: when sub-cells are selected, show sub-cell title and highlight content ──
+    const subCellTitleEl = document.getElementById('tb-subcell-title');
+    const _hasActiveSubCells = _activeSubCellIdxs.size > 0;
+    if (subCellTitleEl) {
+        if (_hasActiveSubCells && hasPartition) {
+            subCellTitleEl.style.display = '';
+            if (_activeSubCellIdxs.size === 1) {
+                const { si: _tSi, z: _tZ } = _parseSubKey(_activeSubCellIdxs.values().next().value);
+                const _activeSub = firstComp.subCells && firstComp.subCells[_tSi];
+                const _numZones = _activeSub && Array.isArray(_activeSub.zonesType) ? _activeSub.zonesType.length : 1;
+                if (_numZones > 1) {
+                    subCellTitleEl.innerText = `תא ${_tSi + 1} אזור ${_tZ + 1}`;
+                } else {
+                    subCellTitleEl.innerText = `תא ${_tSi + 1}`;
+                }
+            } else {
+                subCellTitleEl.innerText = `${_activeSubCellIdxs.size} אזורים נבחרו`;
+            }
+        } else {
+            subCellTitleEl.style.display = 'none';
+        }
+    }
+
+    // In sub-cell mode: highlight the active zone's content type in the main toolbar
+    if (_hasActiveSubCells && hasPartition && Array.isArray(firstComp.subCells)) {
+        // Use first selected zone for toolbar highlight
+        const { si: _activeSi, z: _activeZ } = _parseSubKey(_activeSubCellIdxs.values().next().value);
+        const activeSub = firstComp.subCells[_activeSi];
+        // Get zone-specific type: use zonesType[z] if available, else sub.type
+        let subType = 'empty';
+        if (activeSub) {
+            if (Array.isArray(activeSub.zonesType) && activeSub.zonesType[_activeZ]) {
+                subType = activeSub.zonesType[_activeZ];
+            } else {
+                subType = activeSub.type || 'empty';
+            }
+        }
+        if (subType === 'hanging' || subType === 'sorbet') {
+            const btn = document.getElementById('tb-btn-hanging');
+            if (btn) btn.classList.add('active');
+            const subBtn = document.querySelector(`#hanging-sub-panel button[data-hanging-type="${subType}"]`);
+            if (subBtn) subBtn.classList.add('active');
+        } else if (subType === 'internal_drawers') {
+            const btn = document.getElementById('tb-btn-drawer');
+            if (btn) btn.classList.add('active');
+            const subBtn = document.querySelector(`#drawer-sub-panel button[data-drawer-type="${subType}"]`);
+            if (subBtn) subBtn.classList.add('active');
+        } else if (subType === 'honeycomb' || subType === 'open_cell') {
+            const btn = document.getElementById('tb-btn-honeycomb');
+            if (btn) btn.classList.add('active');
+        } else if (subType !== 'empty') {
+            const btnContent = toolbar.querySelector(`button[onclick="applyContent('${subType}')"]`);
+            if (btnContent) btnContent.classList.add('active');
+        }
+        // Update shelf counter for active sub-cell
+        const shelfCountEl = document.getElementById('tb-subcell-shelf-count');
+        if (shelfCountEl && activeSub) shelfCountEl.innerText = activeSub.shelves || 0;
+        const shelfSection = document.getElementById('tb-subcell-shelf-section');
+        if (shelfSection) shelfSection.style.display = 'flex';
+        // Hide door section in sub-cell mode (sub-cells don't have doors)
+        if (doorSection) doorSection.style.display = 'none';
+        Object.values(_doorStylePanels).forEach(p => { if (p) p.style.display = 'none'; });
+        // Hide drawer count section in sub-cell mode
+        const drawerSection = document.getElementById('drawer-count-section');
+        if (drawerSection) drawerSection.style.display = 'none';
+        return;
+    }
+
+    // Not in sub-cell mode — hide sub-cell shelf section
+    const shelfSection = document.getElementById('tb-subcell-shelf-section');
+    if (shelfSection) shelfSection.style.display = 'none';
+
+    if (_isSliding) {
+        if (btnHoneycomb) btnHoneycomb.style.display = 'none';
+        if (extDrawerBtn) extDrawerBtn.style.display = 'none';
+        if (honeycombSubPanel) honeycombSubPanel.style.display = 'none';
+        if (doorSection) doorSection.style.display = 'none';
+        Object.values(_doorStylePanels).forEach(p => { if (p) p.style.display = 'none'; });
+    } else {
+        if (btnHoneycomb) btnHoneycomb.style.display = '';
+        if (extDrawerBtn) extDrawerBtn.style.display = '';
+        // Do NOT restore honeycomb sub-panel here — its open/closed state is managed
+        // exclusively by toggleContentSubPanel() and closeContentSubPanels().
+        // Restoring display='' here caused the panel to appear on every toolbar update.
+        if (doorSection) doorSection.style.display = '';
+    }
+
+    if (firstComp && firstComp.type !== 'empty') {
+        const t = firstComp.type;
+        // Grouped button highlighting
+        if (t === 'hanging' || t === 'sorbet') {
+            const btn = document.getElementById('tb-btn-hanging');
+            if (btn) btn.classList.add('active');
+            // Highlight sub-panel button
+            const subBtn = document.querySelector(`#hanging-sub-panel button[data-hanging-type="${t}"]`);
+            if (subBtn) subBtn.classList.add('active');
+        } else if (t === 'internal_drawers' || t === 'external_drawers') {
+            const btn = document.getElementById('tb-btn-drawer');
+            if (btn) btn.classList.add('active');
+            const subBtn = document.querySelector(`#drawer-sub-panel button[data-drawer-type="${t}"]`);
+            if (subBtn) subBtn.classList.add('active');
+        } else if (!_isSliding && (t === 'open_cell' || t === 'side_open_cell')) {
+            const btn = document.getElementById('tb-btn-honeycomb');
+            if (btn) btn.classList.add('active');
+            const subBtn = document.querySelector(`#honeycomb-sub-panel button[data-honeycomb-type="${t}"]`);
+            if (subBtn) subBtn.classList.add('active');
+        } else {
+            // Fallback for any direct onclick buttons
+            const btnContent = toolbar.querySelector(`button[onclick="applyContent('${t}')"]`);
+            if (btnContent) btnContent.classList.add('active');
+        }
+    }
+    // Highlight partition button if partition is active
+    if(firstComp && firstComp.partition) {
+        const btnPartition = toolbar.querySelector(`button[onclick="applyContent('partition')"]`);
+        if(btnPartition) btnPartition.classList.add('active');
+    }
+
+    const existingDoor = col.doors.find(door => {
+        return state.selection.rows.some(r => r >= door.startRow && r <= door.endRow);
+    });
+
+    if(existingDoor) {
+        const btnDoor = toolbar.querySelector(`button[onclick="applyDoor('${existingDoor.type}')"]`);
+        if(btnDoor) btnDoor.classList.add('active');
+    } else {
+        const btnNoDoor = toolbar.querySelector(`button[onclick="applyDoor('empty')"]`);
+        if(btnNoDoor) btnNoDoor.classList.add('active');
+    }
+
+    // Door style panels: show the panel matching the active door type
+    if (!_isSliding) {
+        const showDoor = !!existingDoor;
+        const activeDoorType = existingDoor ? existingDoor.type : null;
+        const activeStyle = existingDoor ? (existingDoor.style || 'solid') : null;
+        Object.entries(_doorStylePanels).forEach(([type, panel]) => {
+            if (!panel) return;
+            const show = showDoor && type === activeDoorType;
+            panel.style.display = show ? 'flex' : 'none';
+            if (show && activeStyle) {
+                panel.querySelectorAll('button[data-door-style]').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.doorStyle === activeStyle);
+                });
+            }
+        });
+    }
+
+    const drawerSection = document.getElementById('drawer-count-section');
+    const drawerDisplay = document.getElementById('floating-drawer-count');
+    const drawerMinLabel = document.getElementById('floating-drawer-min');
+
+    let isDrawerSelected = false;
+    let currentCount = 2;
+    let minCount = 1;
+
+    state.selection.rows.forEach(r => {
+        const comp = col.compartments[r];
+        if (comp && (comp.type === 'internal_drawers' || comp.type === 'external_drawers')) {
+            isDrawerSelected = true;
+            currentCount = comp.count;
+            minCount = calcMinDrawerCount(_cellHeight(col, r));
+        }
+    });
+
+    if (drawerSection && drawerDisplay) {
+        if (isDrawerSelected) {
+            drawerSection.style.display = 'flex';
+            drawerDisplay.innerText = currentCount;
+            if (drawerMinLabel) drawerMinLabel.innerText = `מינ׳ ${minCount}`;
+        } else {
+            drawerSection.style.display = 'none';
+        }
+    }
+}
+
+function selectAllColumn(colIndex) {
+    const col = state.columns[colIndex];
+    if (!col) return;
+    // Use compartments.length so that the extra compartment created by splitY is included
+    const numRows = col.compartments ? col.compartments.length : (col.shelves + 1);
+    // If all rows already selected → deselect
+    if (state.selection.colIndex === colIndex && state.selection.rows.length === numRows) {
+        state.selection = { colIndex: -1, rows: [] };
+        buildCabinet();
+        return;
+    }
+    // Allow selection always — height check moved to applyDoor
+    state.selection = { colIndex, rows: Array.from({ length: numRows }, (_, i) => i) };
+    buildCabinet();
+}
+
+// ── Column Copy / Paste ──────────────────────────────────────────────────────
+// Clipboard: stores a deep-copy of the last copied column structure
+let _copiedColumn = null;
+
+// Helper: check if the entire column is currently selected
+function _isFullColumnSelected() {
+    if (state.selection.colIndex === -1 || state.selection.rows.length === 0) return false;
+    const col = state.columns[state.selection.colIndex];
+    if (!col) return false;
+    // Use compartments.length so that the extra compartment created by splitY is included
+    const numRows = col.compartments ? col.compartments.length : (col.shelves + 1);
+    return state.selection.rows.length === numRows;
+}
+
+window.copyColumn = function() {
+    if (!_isFullColumnSelected()) return;
+    const col = state.columns[state.selection.colIndex];
+    if (!col) return;
+    // Deep-copy the column structure (shelves, compartments, doors, type, etc.)
+    // _height is stored so pasteColumn can scale shelf positions proportionally
+    _copiedColumn = JSON.parse(JSON.stringify({
+        shelves:      col.shelves,
+        shelvesY:     col.shelvesY,
+        compartments: col.compartments,
+        doors:        col.doors,
+        type:         col.type,
+        splitY:       col.splitY,
+        floorOffset:  col.floorOffset || 0,
+        noPlinth:     col.noPlinth || false,
+        topPanel:     col.topPanel || false,
+        sinkPanel:    col.sinkPanel || false,
+        _height:      col.height,   // source height — used for proportional scaling on paste
+        // desk-type extras
+        deskHeight:    col.deskHeight,
+        deskClearance: col.deskClearance,
+        hasDrawers:    col.hasDrawers,
+        drawerHeight:  col.drawerHeight,
+    }));
+    // Show paste button now that clipboard has data
+    const pasteBtn = document.getElementById('qe-btn-paste');
+    if (pasteBtn) pasteBtn.style.display = '';
+    // Visual feedback toast
+    _showToast('עמודה הועתקה ✓', 1800);
+};
+
+window.pasteColumn = function() {
+    if (!_copiedColumn) return;
+    if (!_isFullColumnSelected()) return;
+    const targetIdx = state.selection.colIndex;
+    const target = state.columns[targetIdx];
+    if (!target) return;
+
+    // Preserve the target column's width and height — only copy internal structure
+    const savedWidth  = target.width;
+    const savedHeight = target.height;
+
+    // Apply copied structure (deep copy)
+    const src = JSON.parse(JSON.stringify(_copiedColumn));
+    target.shelves      = src.shelves;
+    target.compartments = src.compartments;
+    // Migrate any legacy partitionX → partitions[] in pasted compartments
+    if (Array.isArray(target.compartments)) {
+        target.compartments.forEach(comp => {
+            if (comp && comp.partition && !Array.isArray(comp.partitions)) {
+                comp.partitions = [typeof comp.partitionX === 'number' ? comp.partitionX : 0.5];
+                delete comp.partitionX;
+                if (!Array.isArray(comp.subCells)) {
+                    comp.subCells = [{ type: 'empty', shelves: 0 }, { type: 'empty', shelves: 0 }];
+                }
+            }
+        });
+    }
+    target.doors        = src.doors;
+    target.type         = src.type;
+    target.floorOffset  = src.floorOffset;
+    target.noPlinth     = src.noPlinth;
+    target.topPanel     = src.topPanel || false;
+    target.sinkPanel    = src.sinkPanel || false;
+    if (src.type === 'desk') {
+        target.deskHeight    = src.deskHeight;
+        target.deskClearance = src.deskClearance;
+        target.hasDrawers    = src.hasDrawers;
+        target.drawerHeight  = src.drawerHeight;
+    }
+
+    // Restore geometry
+    target.width  = savedWidth;
+    target.height = savedHeight;
+
+    // Scale shelf positions proportionally from source height to target height.
+    // This preserves the relative cell proportions instead of re-distributing evenly.
+    const srcHeight = src._height || savedHeight; // fallback: same height → no scaling
+    if (src.shelvesY && src.shelvesY.length > 0 && srcHeight > 0) {
+        const scale = savedHeight / srcHeight;
+        target.shelvesY = src.shelvesY.map(y => Math.round(y * scale * 10) / 10);
+    } else {
+        target.shelvesY = src.shelvesY ? src.shelvesY.slice() : [];
+    }
+
+    // Scale splitY proportionally too
+    target.splitY = src.splitY ? Math.round(src.splitY * (savedHeight / srcHeight) * 10) / 10 : null;
+
+    // Validate drawer counts for each compartment based on new cell heights.
+    // Preserve the original count from the copied column — only clamp to the
+    // minimum required by the new cell height (no single drawer > 60 cm).
+    // If the cell is too short for any drawer, reset to empty.
+    const t = state.thickness;
+    const baseY = (target.type === 'desk')
+        ? (target.deskHeight + target.deskClearance)
+        : Math.max(state.plinthHeight, target.floorOffset || 0);
+    for (let r = 0; r < target.compartments.length; r++) {
+        const comp = target.compartments[r];
+        if (!comp || (comp.type !== 'internal_drawers' && comp.type !== 'external_drawers')) continue;
+        const bottomY = (r === 0) ? baseY + t : (target.shelvesY[r - 1] || baseY) + t / 2;
+        const topY    = (r >= target.shelvesY.length) ? savedHeight - t : target.shelvesY[r] - t / 2;
+        const cellH   = Math.max(0, Math.round(topY - bottomY));
+        if (cellH < 12) {
+            // Cell too short for any drawer — reset
+            comp.type = 'empty';
+        } else {
+            // Keep the original copied count, but enforce the minimum
+            // (no single drawer may exceed 60 cm → minCount = ceil(cellH/60))
+            const minCount = calcMinDrawerCount(cellH);
+            comp.count = Math.max(minCount, comp.count || 1);
+        }
+    }
+
+    checkSplits();
+    buildCabinet(); calculatePrice(); saveHistoryState();
+    _showToast('עמודה הודבקה ✓', 1800);
+};
+
+// Keyboard shortcut: Ctrl+C / Ctrl+V when full column is selected
+document.addEventListener('keydown', function(e) {
+    // Ignore when typing in an input/textarea
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+    if (!_isFullColumnSelected()) return;
+    if (e.ctrlKey && e.key === 'c') {
+        e.preventDefault();
+        window.copyColumn();
+    } else if (e.ctrlKey && e.key === 'v') {
+        e.preventDefault();
+        window.pasteColumn();
+    }
+});
+// ─────────────────────────────────────────────────────────────────────────────
+
+function toggleSelection(c, r) {
+    if (state.selection.colIndex !== c) {
+        state.selection = { colIndex: c, rows: [r] };
+    } else {
+        if (state.selection.rows.includes(r)) {
+            state.selection.rows = state.selection.rows.filter(row => row !== r);
+            if(state.selection.rows.length === 0) state.selection.colIndex = -1;
+        } else {
+            state.selection.rows.push(r);
+        }
+    }
+    buildCabinet(); 
+}
+
+function clearSelection() {
+    _activeSubCellIdxs = new Set();
+    if (state.selection.colIndex !== -1 || state.selection.rows.length > 0) {
+        state.selection = { colIndex: -1, rows: [] };
+        buildCabinet();
+    }
+}
+
+// ---- FC cell selection + toolbar (shown in 3D FC edit mode) ----
+// Persistent DOM: only recreate when structure changes, update positions every frame.
+let _fcCellBtnSide = null;
+let _fcCellBtnCount = 0;
+let _fcCellBtnStateKey = '';
+let _fcShelfDragSide = null;
+let _fcShelfDragCount = 0;
+let _fcSelection = { rows: [] };  // selected row indices in the full corner unit
+
+// Toggle selection of a FC cell row
+function _toggleFCSelection(r) {
+    const idx = _fcSelection.rows.indexOf(r);
+    if (idx === -1) _fcSelection.rows.push(r);
+    else _fcSelection.rows.splice(idx, 1);
+    // Refresh button appearances
+    document.querySelectorAll('.fc-cell-btn').forEach(btn => {
+        const row = parseInt(btn.dataset.fcRow);
+        _applyFCBtnState(btn, row);
+    });
+    updateFCToolbarState();
+}
+
+window._clearFCSelection = function _clearFCSelection() {
+    _fcSelection.rows = [];
+    document.querySelectorAll('.fc-cell-btn').forEach(btn => {
+        const row = parseInt(btn.dataset.fcRow);
+        _applyFCBtnState(btn, row);
+    });
+    updateFCToolbarState();
+}
+
+// Apply visual state to a FC cell button based on selection + content
+function _applyFCBtnState(btn, r) {
+    const fcSide = state.activeWing ? state.activeWing.replace('full_corner_', '') : null;
+    const fc = fcSide && state.wings[fcSide] ? state.wings[fcSide].fullCorner : null;
+    const comp = (fc && fc.compartments && fc.compartments[r]) || {};
+    const content = comp.content !== undefined ? comp.content : (comp.type === 'cross_hanging' ? 'cross_hanging' : 'empty');
+    const door = comp.door !== undefined ? comp.door : (comp.type === 'door_regular' || comp.type === 'door_glass' ? 'right' : 'empty');
+    const hasContent = content !== 'empty' || door !== 'empty';
+    const isSelected = _fcSelection.rows.includes(r);
+
+    const cellH = btn.dataset.fcHeight ? `${btn.dataset.fcHeight}` : '';
+    if (isSelected) {
+        btn.style.background = 'var(--secondary, #10b981)';
+        btn.style.color = '#fff';
+        btn.style.width = '30px';
+        btn.style.height = '30px';
+        btn.style.padding = '0';
+        btn.style.borderRadius = '6px';
+        btn.innerHTML = '<i class="fa-solid fa-check" style="font-size:1rem;"></i>';
+        btn.title = 'תא נבחר — לחץ לביטול';
+    } else if (hasContent) {
+        btn.style.background = 'rgba(30,30,40,0.82)';
+        btn.style.color = '#fff';
+        btn.style.width = 'auto';
+        btn.style.padding = '4px 10px';
+        btn.style.borderRadius = '20px';
+        btn.innerHTML = `
+            <div style="display:flex;align-items:center;gap:8px;">
+                <i class="fa-solid fa-trash fc-cell-delete" style="cursor:pointer;transition:color 0.2s;" onmouseenter="this.style.color='#ffcccc'" onmouseleave="this.style.color=''"></i>
+                <div style="width:1px;height:14px;background:rgba(255,255,255,0.4);"></div>
+                ${cellH ? `<span style="font-size:0.72rem;font-weight:700;opacity:0.85;">${cellH}</span><div style="width:1px;height:14px;background:rgba(255,255,255,0.4);"></div>` : ''}
+                <i class="fa-solid fa-plus" style="font-size:0.8rem;"></i>
+            </div>`;
+        btn.title = 'לחץ לבחירה';
+    } else {
+        btn.style.background = 'rgba(30,30,40,0.75)';
+        btn.style.color = '#fff';
+        btn.style.width = 'auto';
+        btn.style.padding = '4px 10px';
+        btn.style.borderRadius = '20px';
+        btn.innerHTML = `
+            <div style="display:flex;align-items:center;gap:6px;">
+                ${cellH ? `<span style="font-size:0.72rem;font-weight:700;opacity:0.85;">${cellH}</span><div style="width:1px;height:14px;background:rgba(255,255,255,0.4);"></div>` : ''}
+                <i class="fa-solid fa-plus" style="font-size:0.8rem;"></i>
+            </div>`;
+        btn.title = 'לחץ לבחירה';
+    }
+}
+
+function _rebuildFCCellButtons(fcRealSide, wingData, fc, allY, comps, fcGroup, localCenterX, localCenterZ) {
+    document.querySelectorAll('.fc-cell-btn').forEach(el => el.remove());
+    _fcCellBtnSide = fcRealSide;
+    _fcCellBtnCount = allY.length - 1;
+    // Clear selection when rebuilding
+    _fcSelection.rows = [];
+
+    for (let r = 0; r < allY.length - 1; r++) {
+        const btn = document.createElement('button');
+        btn.className = 'fc-cell-btn plus-btn';
+        btn.dataset.fcRow = r;
+        btn.dataset.fcHeight = Math.round(allY[r + 1] - allY[r]);
+        btn.style.cssText = 'position:absolute;left:0;top:0;transform:translate(-50%,-50%);z-index:40;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1rem;transition:background 0.15s;min-width:26px;height:26px;';
+
+        _applyFCBtnState(btn, r);
+
+        btn.addEventListener('pointerdown', e => e.stopPropagation());
+        btn.addEventListener('mousedown', e => e.stopPropagation());
+        btn.addEventListener('click', e => {
+            e.stopPropagation();
+            e.preventDefault();
+            // Delete button inside pill
+            if (e.target.classList.contains('fc-cell-delete') || e.target.closest('.fc-cell-delete')) {
+                const fcSide2 = state.activeWing.replace('full_corner_', '');
+                const wd2 = state.wings[fcSide2];
+                if (wd2 && wd2.fullCorner && wd2.fullCorner.compartments[r]) {
+                    wd2.fullCorner.compartments[r] = { content: 'empty', door: 'empty' };
+                }
+                buildCabinet(); calculatePrice(); saveHistoryState();
+                return;
+            }
+            _toggleFCSelection(r);
+        });
+
+        container.appendChild(btn);
+    }
+    updateFCToolbarState();
+}
+
+// ---- FC Toolbar state update ----
+window.updateFCToolbarState = function() {
+    const toolbar = document.getElementById('fc-toolbar');
+    if (!toolbar) return;
+
+    const isFCEditMode = state.wingEditMode &&
+        (state.activeWing === 'full_corner_right' || state.activeWing === 'full_corner_left');
+
+    if (!isFCEditMode || _fcSelection.rows.length === 0) {
+        toolbar.classList.remove('show-toolbar');
+        const dsp = document.getElementById('fc-door-style-panel');
+        if (dsp) dsp.style.display = 'none';
+        return;
+    }
+
+    toolbar.classList.add('show-toolbar');
+
+    // Position toolbar near center of FC unit
+    const fcRealSide = state.activeWing.replace('full_corner_', '');
+    const fcGroup = window[`_fullCornerGroup_${fcRealSide}`];
+    if (fcGroup) {
+        const wingData = state.wings[fcRealSide];
+        const fc = wingData && wingData.fullCorner;
+        const cw_px = container.clientWidth;
+        const ch_px = container.clientHeight;
+        const fcSize = (fc && fc.size) || 100;
+        const sign = (fcRealSide === 'right') ? 1 : -1;
+        const centerWing = state.wings.center;
+        const bodyD = centerWing ? centerWing.depth : (wingData ? wingData.depth : 54);
+        const localCenterX = -sign * fcSize / 2;
+        const localCenterZ = bodyD / 2;
+        const midRow = _fcSelection.rows[Math.floor(_fcSelection.rows.length / 2)];
+        const allY2 = fc ? [wingData.plinthHeight + (wingData.thickness || 1.7), ...(fc.shelvesY || []), wingData.globalHeight - (wingData.thickness || 1.7)] : [];
+        const midY = allY2.length > midRow + 1 ? (allY2[midRow] + allY2[midRow + 1]) / 2 : (wingData ? wingData.globalHeight / 2 : 120);
+        fcGroup.updateMatrixWorld(true);
+        const localPt = new THREE.Vector3(localCenterX, midY, localCenterZ);
+        localPt.applyMatrix4(fcGroup.matrixWorld);
+        const projected = localPt.clone().project(camera);
+        let tx = (projected.x * 0.5 + 0.5) * cw_px;
+        let ty = (-projected.y * 0.5 + 0.5) * ch_px;
+        const tw = toolbar.offsetWidth || 300;
+        const th = toolbar.offsetHeight || 60;
+        tx = Math.max(tw / 2 + 10, Math.min(cw_px - tw / 2 - 10, tx));
+        ty = Math.max(th / 2 + 10, Math.min(ch_px - th / 2 - 10, ty));
+        toolbar.style.left = `${tx}px`;
+        toolbar.style.top = `${ty}px`;
+    }
+
+    // Highlight buttons based on first selected row
+    const fcSide = state.activeWing.replace('full_corner_', '');
+    const fc2 = state.wings[fcSide] && state.wings[fcSide].fullCorner;
+    const firstComp = (fc2 && fc2.compartments && fc2.compartments[_fcSelection.rows[0]]) || {};
+    const content = firstComp.content !== undefined ? firstComp.content : (firstComp.type === 'cross_hanging' ? 'cross_hanging' : 'empty');
+    const door = firstComp.door !== undefined ? firstComp.door : (firstComp.type === 'door_regular' || firstComp.type === 'door_glass' ? 'right' : 'empty');
+    const doorStyle = firstComp.doorStyle || 'solid';
+
+    document.getElementById('fc-btn-hanging')?.classList.toggle('active', content === 'cross_hanging');
+    document.getElementById('fc-btn-empty-content')?.classList.toggle('active', content === 'empty');
+    // Door: 'on' button active when any non-empty door is set; 'empty' button active when no door
+    document.getElementById('fc-btn-door-on')?.classList.toggle('active', door !== 'empty');
+    document.getElementById('fc-btn-door-empty')?.classList.toggle('active', door === 'empty');
+
+    // Door style inline sub-panel — show when door is active, hide otherwise
+    const dsp = document.getElementById('fc-door-style-panel');
+    if (dsp) {
+        dsp.style.display = (door !== 'empty') ? 'flex' : 'none';
+        if (door !== 'empty') {
+            dsp.querySelectorAll('button[data-fc-door-style]').forEach(b => {
+                b.classList.toggle('active', b.dataset.fcDoorStyle === doorStyle);
+            });
+        }
+    }
+};
+
+// ---- FC apply functions ----
+window.applyFCContent = function(contentType) {
+    const fcSide = state.activeWing ? state.activeWing.replace('full_corner_', '') : null;
+    if (!fcSide) return;
+    window.updateFullCornerContent(_fcSelection.rows, contentType);
+    document.querySelectorAll('.fc-cell-btn').forEach(btn => _applyFCBtnState(btn, parseInt(btn.dataset.fcRow)));
+    _clearFCSelection(); // close toolbar after applying
+};
+
+window.applyFCDoor = function(doorType) {
+    const fcSide = state.activeWing ? state.activeWing.replace('full_corner_', '') : null;
+    if (!fcSide) return;
+    // 'on' maps to 'right' internally (both doors always shown together)
+    const internalDoorType = doorType === 'on' ? 'right' : doorType;
+    window.updateFullCornerDoor(_fcSelection.rows, internalDoorType);
+    document.querySelectorAll('.fc-cell-btn').forEach(btn => _applyFCBtnState(btn, parseInt(btn.dataset.fcRow)));
+    _clearFCSelection(); // close toolbar after applying
+};
+
+window.applyFCDoorStyle = function(style) {
+    const fcSide = state.activeWing ? state.activeWing.replace('full_corner_', '') : null;
+    if (!fcSide) return;
+    window.updateFullCornerDoorStyle(_fcSelection.rows, style);
+    _clearFCSelection(); // close toolbar after applying
+};
+
+// ── Global splitY sync helper ────────────────────────────────────────────────
+// Updates splitY on ALL columns across ALL wings AND all full corner units.
+// This ensures the קושרת is always at the same height throughout the entire wardrobe.
+function _syncAllSplitY(newSplitY) {
+    // 1. Update all columns in the active wing (state.columns proxy)
+    state.columns.forEach(c => { if (c.splitY) c.splitY = newSplitY; });
+    // 2. Update columns in all other wings
+    ['center', 'left', 'right'].forEach(side => {
+        const w = state.wings[side];
+        if (!w || !w.columns) return;
+        w.columns.forEach(c => { if (c.splitY) c.splitY = newSplitY; });
+        // 3. Update full corner unit splitY if present
+        if (w.fullCorner && w.fullCorner.splitY) {
+            w.fullCorner.splitY = newSplitY;
+        }
+    });
+}
+
+// ── FC Split (קושרת) drag handle ────────────────────────────────────────────
+let _fcSplitDragSide = null;
+
+function _rebuildFCSplitDragHandle(fcRealSide, wingData, fc) {
+    // Remove any existing split drag handle
+    document.querySelectorAll('.fc-split-drag').forEach(el => el.remove());
+    _fcSplitDragSide = fcRealSide;
+
+    if (!fc.splitY) return; // no split board → no handle
+
+    const t = wingData.thickness || 1.7;
+    const plinthH = wingData.plinthHeight || 7;
+    const colH = wingData.globalHeight || 240;
+    const mat = wingData.boardMaterial || 'melamine';
+    const threshold = mat === 'sandwich' ? 240 : 270;
+    const MIN_GAP = 20;
+
+    const handle = document.createElement('div');
+    handle.className = 'fc-split-drag drag-handle';
+    handle.style.cssText = [
+        'position:absolute;left:0;top:0;transform:translate(-50%,-50%);z-index:46;',
+        'width:27px;height:27px;border-radius:50%;background:white;',
+        'border:2px solid #e74c3c;display:flex;align-items:center;justify-content:center;',
+        'cursor:ns-resize;box-shadow:0 2px 10px rgba(231,76,60,0.4);'
+    ].join('');
+    handle.innerHTML = '<i class="fa-solid fa-arrows-up-down" style="font-size:0.55rem;color:#e74c3c;"></i>';
+    handle.title = 'גרור להזזת קושרת';
+
+    let _dragStartY = 0;
+    let _dragStartSplitY = 0;
+    let _isDragging = false;
+
+    handle.addEventListener('pointerdown', e => {
+        e.stopPropagation();
+        e.preventDefault();
+        _isDragging = true;
+        _dragStartY = e.clientY;
+        _dragStartSplitY = fc.splitY;
+        handle.setPointerCapture(e.pointerId);
+    });
+
+    handle.addEventListener('pointermove', e => {
+        if (!_isDragging) return;
+        e.stopPropagation();
+        const fcSide2 = state.activeWing.replace('full_corner_', '');
+        const wd2 = state.wings[fcSide2];
+        if (!wd2 || !wd2.fullCorner) return;
+        const fc2 = wd2.fullCorner;
+
+        // Convert pixel delta to cm
+        const pxPerCm = container.clientHeight / colH;
+        const deltaCm = -(e.clientY - _dragStartY) / pxPerCm;
+        let newSplitY = _dragStartSplitY + deltaCm;
+
+        // Clamp: must stay above plinth+t+MIN_GAP and below threshold and below colH-t-MIN_GAP
+        // Also must not cross any shelf
+        const shelvesY2 = fc2.shelvesY || [];
+        const allY2 = [plinthH + t, ...shelvesY2, colH - t];
+        // Find the neighbours of splitY in allY2 (splitY sits between two allY entries)
+        // splitY is the top face of the double board; the board occupies splitY-2t .. splitY
+        // Minimum: must leave MIN_GAP above the board bottom (splitY-2t) and below the board top (splitY)
+        const minSplitY = plinthH + t + 2 * t + MIN_GAP;
+        const maxSplitY = Math.min(threshold, colH - t - MIN_GAP);
+
+        newSplitY = Math.max(minSplitY, Math.min(maxSplitY, newSplitY));
+        newSplitY = Math.round(newSplitY * 10) / 10;
+
+        _syncAllSplitY(newSplitY);
+        buildCabinetDragging();
+    });
+
+    handle.addEventListener('pointerup', e => {
+        if (!_isDragging) return;
+        _isDragging = false;
+        e.stopPropagation();
+        _endDrag();
+        calculatePrice();
+        saveHistoryState();
+    });
+
+    container.appendChild(handle);
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
+function _rebuildFCShelfDragHandles(fcRealSide, wingData, fc, shelvesY) {
+    document.querySelectorAll('.fc-shelf-drag').forEach(el => el.remove());
+    _fcShelfDragSide = fcRealSide;
+    _fcShelfDragCount = shelvesY.length;
+
+    const t = wingData.thickness || 1.7;
+    const plinthH = wingData.plinthHeight || 7;
+    const colH = wingData.globalHeight || 240;
+    const innerH = colH - plinthH - 2 * t;
+    const MIN_GAP = 20; // minimum cell height in cm
+
+    shelvesY.forEach((sy, si) => {
+        const handle = document.createElement('div');
+        handle.className = 'fc-shelf-drag drag-handle';
+        handle.dataset.fcShelfIdx = si;
+        handle.style.cssText = 'position:absolute;left:0;top:0;transform:translate(-50%,-50%);z-index:45;width:25px;height:25px;border-radius:50%;background:white;border:2px solid var(--secondary);display:flex;align-items:center;justify-content:center;cursor:ns-resize;box-shadow:0 2px 6px rgba(0,0,0,0.2);';
+        handle.innerHTML = '<i class="fa-solid fa-arrows-up-down" style="font-size:0.55rem;color:var(--secondary);"></i>';
+        handle.title = 'גרור להזזת מדף';
+
+        let _dragStartY = 0;
+        let _dragStartSy = 0;
+        let _isDragging = false;
+
+        handle.addEventListener('pointerdown', e => {
+            e.stopPropagation();
+            e.preventDefault();
+            _isDragging = true;
+            _dragStartY = e.clientY;
+            _dragStartSy = sy;
+            handle.setPointerCapture(e.pointerId);
+        });
+
+        handle.addEventListener('pointermove', e => {
+            if (!_isDragging) return;
+            e.stopPropagation();
+            const fcSide2 = state.activeWing.replace('full_corner_', '');
+            const wd2 = state.wings[fcSide2];
+            if (!wd2 || !wd2.fullCorner) return;
+            const fc2 = wd2.fullCorner;
+            const shelvesY2 = fc2.shelvesY || [];
+            const allY2 = [plinthH + t, ...shelvesY2, colH - t];
+
+            // Convert pixel delta to cm: use canvas height vs colH
+            const pxPerCm = container.clientHeight / colH;
+            const deltaCm = -(e.clientY - _dragStartY) / pxPerCm;
+            let newSy = _dragStartSy + deltaCm;
+
+            // Clamp between neighbours
+            const prevY = allY2[si] || (plinthH + t);
+            const nextY = allY2[si + 2] || (colH - t);
+            newSy = Math.max(prevY + MIN_GAP, Math.min(nextY - MIN_GAP, newSy));
+            newSy = Math.round(newSy * 10) / 10;
+
+            fc2.shelvesY[si] = newSy;
+            buildCabinetDragging();
+        });
+
+        handle.addEventListener('pointerup', e => {
+            if (!_isDragging) return;
+            _isDragging = false;
+            e.stopPropagation();
+            _endDrag();
+            calculatePrice();
+            saveHistoryState();
+        });
+
+        container.appendChild(handle);
+    });
+}
+
+function _updateFCCellButtons() {
+    const isFCEditMode = state.activeWing === 'full_corner_right' || state.activeWing === 'full_corner_left';
+    if (!state.wingEditMode || !isFCEditMode) {
+        document.querySelectorAll('.fc-cell-btn').forEach(el => el.remove());
+        document.querySelectorAll('.fc-shelf-drag').forEach(el => el.remove());
+        document.querySelectorAll('.fc-split-drag').forEach(el => el.remove());
+        _fcCellBtnSide = null; _fcCellBtnCount = 0; _fcCellBtnStateKey = '';
+        _fcShelfDragSide = null; _fcShelfDragCount = 0;
+        _fcSplitDragSide = null;
+        return;
+    }
+
+    const fcRealSide = state.activeWing.replace('full_corner_', '');
+    const wingData = state.wings[fcRealSide];
+    if (!wingData || !wingData.fullCorner) return;
+
+    const fcGroup = window[`_fullCornerGroup_${fcRealSide}`];
+    if (!fcGroup) return;
+
+    const fc = wingData.fullCorner;
+    const cw_px = container.clientWidth;
+    const ch_px = container.clientHeight;
+
+    const centerWing = state.wings.center;
+    const bodyD = centerWing ? centerWing.depth : (wingData.depth || 54);
+    const t = wingData.thickness || 1.7;
+    const plinthH = wingData.plinthHeight || 7;
+    const colH = wingData.globalHeight || 240;
+    const fcSize = fc.size || 100;
+    const frontD = bodyD;
+    const sign = (fcRealSide === 'right') ? 1 : -1;
+
+    const shelvesY = fc.shelvesY || [];
+    const allY = [plinthH + t, ...shelvesY, colH - t];
+    const comps = fc.compartments || [];
+
+    const localCenterX = -sign * fcSize / 2;
+    const localCenterZ = frontD / 2;
+
+    fcGroup.updateMatrixWorld(true);
+
+    // Rebuild cell buttons if structure or compartment state changed
+    const stateKey = comps.map(c => (c && c.type) || 'empty').join(',');
+    const needRebuildBtns = (_fcCellBtnSide !== fcRealSide || _fcCellBtnCount !== allY.length - 1 || _fcCellBtnStateKey !== stateKey);
+    if (needRebuildBtns) {
+        _fcCellBtnStateKey = stateKey;
+        _rebuildFCCellButtons(fcRealSide, wingData, fc, allY, comps, fcGroup, localCenterX, localCenterZ);
+    }
+
+    // Rebuild shelf drag handles if structure changed
+    const needRebuildDrag = (_fcShelfDragSide !== fcRealSide || _fcShelfDragCount !== shelvesY.length);
+    if (needRebuildDrag) {
+        _rebuildFCShelfDragHandles(fcRealSide, wingData, fc, shelvesY);
+    }
+
+    // Rebuild split drag handle if splitY presence changed
+    const hasSplit = !!fc.splitY;
+    const splitHandleExists = !!document.querySelector('.fc-split-drag');
+    if (_fcSplitDragSide !== fcRealSide || hasSplit !== splitHandleExists) {
+        _rebuildFCSplitDragHandle(fcRealSide, wingData, fc);
+    }
+
+    // Update positions of cell buttons every frame
+    const cellBtns = document.querySelectorAll('.fc-cell-btn');
+    for (let r = 0; r < allY.length - 1; r++) {
+        const btn = cellBtns[r];
+        if (!btn) continue;
+        const midY = (allY[r] + allY[r + 1]) / 2;
+        const localPt = new THREE.Vector3(localCenterX, midY, localCenterZ);
+        localPt.applyMatrix4(fcGroup.matrixWorld);
+        const projected = localPt.clone().project(camera);
+        let bx = Math.max(20, Math.min(cw_px - 20, (projected.x * 0.5 + 0.5) * cw_px));
+        let by = Math.max(20, Math.min(ch_px - 20, (-projected.y * 0.5 + 0.5) * ch_px));
+        btn.style.left = `${bx}px`;
+        btn.style.top = `${by}px`;
+    }
+
+    // Update positions of shelf drag handles every frame
+    const dragHandles = document.querySelectorAll('.fc-shelf-drag');
+    shelvesY.forEach((sy, si) => {
+        const handle = dragHandles[si];
+        if (!handle) return;
+        const localPt = new THREE.Vector3(localCenterX, sy, localCenterZ);
+        localPt.applyMatrix4(fcGroup.matrixWorld);
+        const projected = localPt.clone().project(camera);
+        let bx = Math.max(20, Math.min(cw_px - 20, (projected.x * 0.5 + 0.5) * cw_px));
+        let by = Math.max(20, Math.min(ch_px - 20, (-projected.y * 0.5 + 0.5) * ch_px));
+        handle.style.left = `${bx}px`;
+        handle.style.top = `${by}px`;
+    });
+
+    // Update position of split drag handle every frame
+    const splitHandle = document.querySelector('.fc-split-drag');
+    if (splitHandle && fc.splitY) {
+        // Position at the center of the double-thickness board: fc.splitY (board occupies fc.splitY-t .. fc.splitY+t)
+        const splitMidY = fc.splitY;
+        const localPt = new THREE.Vector3(localCenterX, splitMidY, localCenterZ);
+        localPt.applyMatrix4(fcGroup.matrixWorld);
+        const projected = localPt.clone().project(camera);
+        let bx = Math.max(20, Math.min(cw_px - 20, (projected.x * 0.5 + 0.5) * cw_px));
+        let by = Math.max(20, Math.min(ch_px - 20, (-projected.y * 0.5 + 0.5) * ch_px));
+        splitHandle.style.left = `${bx}px`;
+        splitHandle.style.top = `${by}px`;
+    }
+}
+
+function updateOverlaysPosition() {
+    // In 3D mode: only handle FC cell buttons and FC panel (if in FC edit mode)
+    const isFCEditMode3d = state.wingEditMode &&
+        (state.activeWing === 'full_corner_right' || state.activeWing === 'full_corner_left');
+
+    if (state.viewMode === '3d') {
+        _updateFCCellButtons();
+        // Position FC panel in 3D mode
+        const fcPanel = document.getElementById('full-corner-quick-edit');
+        if (fcPanel && fcPanel.classList.contains('visible') && isFCEditMode3d) {
+            const fcRealSide = state.activeWing.replace('full_corner_', '');
+            const activeWingData = state.wings[fcRealSide];
+            if (activeWingData) {
+                const fcGroup = window[`_fullCornerGroup_${fcRealSide}`];
+                const fcSize = (activeWingData.fullCorner && activeWingData.fullCorner.size) || 100;
+                const centerWingData = state.wings.center;
+                const mainW = centerWingData ? centerWingData.width : (state.width || 200);
+                const bodyD = centerWingData ? centerWingData.depth : (state.depth || 60);
+                const wingD = activeWingData.depth || 54;
+                const sign = (fcRealSide === 'right') ? 1 : -1;
+                const originX = sign * (mainW / 2 + fcSize);
+                const originZ = -bodyD / 2;
+                const fcCenterX = originX - sign * fcSize / 2;
+                const fcCenterZ = originZ + bodyD / 2;
+                const worldPt = new THREE.Vector3(fcCenterX, 0, fcCenterZ);
+                const projected = worldPt.clone().project(camera);
+                const cw_px = container.clientWidth;
+                const ch_px = container.clientHeight;
+                let fcX = (projected.x * 0.5 + 0.5) * cw_px;
+                let fcY = (-projected.y * 0.5 + 0.5) * ch_px;
+                const pw = fcPanel.offsetWidth || 200;
+                const ph = fcPanel.offsetHeight || 50;
+                fcX = Math.max(pw / 2 + 10, Math.min(cw_px - pw / 2 - 10, fcX));
+                fcY = Math.min(ch_px - ph - 10, Math.max(ph / 2 + 10, fcY));
+                fcPanel.style.left = `${fcX}px`;
+                fcPanel.style.top = `${fcY}px`;
+            }
+        }
+        return;
+    }
+
+    // Remove FC cell buttons when not in 3D
+    document.querySelectorAll('.fc-cell-btn').forEach(el => el.remove());
+
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+
+    // Helper: convert local wing coords (x, y) to world 3D, then project to 2D screen
+    const projectWingPoint = (localX, localY) => {
+        const localPt = new THREE.Vector3(localX, localY, state.depth / 2);
+        if (window._activeWingGroup) {
+            // Transform from wing local space to world space
+            window._activeWingGroup.updateMatrixWorld(true);
+            localPt.applyMatrix4(window._activeWingGroup.matrixWorld);
+        }
+        return localPt.project(camera);
+    };
+
+    document.querySelectorAll('.dim-container, .select-all-col-btn, .sub-cell-btn, .cell-select-btn').forEach(el => {
+        const pos = projectWingPoint(parseFloat(el.dataset.x3d), parseFloat(el.dataset.y3d));
+        let x = (pos.x * .5 + .5) * cw;
+        let y = (-(pos.y * .5) + .5) * ch;
+
+        const w = el.offsetWidth || 50;
+        const h = el.offsetHeight || 24;
+
+        x = Math.max(w/2 + 5, Math.min(cw - w/2 - 5, x));
+        y = Math.max(h/2 + 5, Math.min(ch - h/2 - 5, y));
+
+        el.style.left = `${x}px`;
+        el.style.top = `${y}px`;
+    });
+
+    // ---- Column width labels (always-visible layer) ----
+    document.querySelectorAll('#col-widths-layer .col-width-label').forEach(el => {
+        if (!el.dataset.x3d) return;
+        const pos = projectWingPoint(parseFloat(el.dataset.x3d), parseFloat(el.dataset.y3d));
+        let x = (pos.x * .5 + .5) * cw;
+        let y = (-(pos.y * .5) + .5) * ch;
+        const w = el.offsetWidth || 50;
+        const h = el.offsetHeight || 22;
+        x = Math.max(w/2 + 5, Math.min(cw - w/2 - 5, x));
+        y = Math.max(h/2 + 5, Math.min(ch - h/2 - 5, y));
+        el.style.left = `${x}px`;
+        el.style.top = `${y}px`;
+    });
+
+    if (state.activeEditCol !== -1 && state.columns[state.activeEditCol] && state.viewMode === 'front') {
+        const panel = document.getElementById('column-quick-edit');
+        if(!panel) return;
+        let currentX = -state.width/2 + state.thickness;
+        for (let c = 0; c < state.activeEditCol; c++) {
+            if(state.columns[c]) currentX += state.columns[c].width + state.thickness;
+        }
+        const colCenterX = currentX + state.columns[state.activeEditCol].width/2;
+        // Position panel below the plinth: y=0 is the bottom of the cabinet (floor level)
+        const pos = projectWingPoint(colCenterX, 0);
+        
+        let x = (pos.x * .5 + .5) * cw;
+        let y = (-(pos.y * .5) + .5) * ch;
+        
+        // גבולות גזרה לפאנל העריכה המהירה
+        const pw = panel.offsetWidth || 200;
+        x = Math.max(pw/2 + 10, Math.min(cw - pw/2 - 10, x));
+        // Clamp so panel doesn't go below canvas bottom
+        const ph = panel.offsetHeight || 50;
+        y = Math.min(ch - ph - 10, y);
+        
+        panel.style.left = `${x}px`;
+        panel.style.top = `${y}px`;
+    }
+
+    // ---- Full corner quick edit panel positioning ----
+    const fcPanel = document.getElementById('full-corner-quick-edit');
+    if (fcPanel && fcPanel.classList.contains('visible') && state.wingEditMode) {
+        const isFCEditMode = state.activeWing === 'full_corner_right' || state.activeWing === 'full_corner_left';
+        const fcRealSide = isFCEditMode ? state.activeWing.replace('full_corner_', '') : null;
+        const activeWingData = isFCEditMode ? state.wings[fcRealSide] : null;
+        if (activeWingData) {
+            const fcSize = (activeWingData.fullCorner && activeWingData.fullCorner.size) || 100;
+            const centerWingData = state.wings.center;
+            const mainW = centerWingData ? centerWingData.width : (state.width || 200);
+            const bodyD = centerWingData ? centerWingData.depth : (state.depth || 60);
+            const wingD = activeWingData.depth || 54;
+            const cd = bodyD + wingD;
+            const sign = (fcRealSide === 'right') ? 1 : -1;
+            // L origin: back-outer corner at (sign*(mainW/2+fcSize), 0, -bodyD/2)
+            const originX = sign * (mainW / 2 + fcSize);
+            const originZ = -bodyD / 2;
+            const fcCenterX = originX - sign * fcSize / 2;
+            const fcCenterZ = originZ + cd / 2;
+            const worldPt = new THREE.Vector3(fcCenterX, 0, fcCenterZ);
+            const projected = worldPt.clone().project(camera);
+            let fcX = (projected.x * 0.5 + 0.5) * cw;
+            let fcY = (-projected.y * 0.5 + 0.5) * ch;
+            const pw = fcPanel.offsetWidth || 260;
+            const ph = fcPanel.offsetHeight || 60;
+            fcX = Math.max(pw / 2 + 10, Math.min(cw - pw / 2 - 10, fcX));
+            fcY = Math.min(ch - ph - 10, fcY);
+            fcPanel.style.left = `${fcX}px`;
+            fcPanel.style.top = `${fcY}px`;
+        }
+    }
+}
+
+window.toggleContentSubPanel = function(panelKey, triggerBtn) {
+    const panels = { hanging: 'hanging-sub-panel', drawer: 'drawer-sub-panel', honeycomb: 'honeycomb-sub-panel' };
+    const triggerBtnIds = { hanging: 'tb-btn-hanging', drawer: 'tb-btn-drawer', honeycomb: 'tb-btn-honeycomb' };
+    const targetId = panels[panelKey];
+    if (!targetId) return;
+
+    // Check if this panel is already open
+    const target = document.getElementById(targetId);
+    const isOpen = target && target.style.display !== 'none';
+
+    // Hide all content sub-panels and remove trigger highlights
+    Object.keys(panels).forEach(key => {
+        const el = document.getElementById(panels[key]);
+        if (el) el.style.display = 'none';
+        const btn = document.getElementById(triggerBtnIds[key]);
+        if (btn) btn.classList.remove('sub-panel-open');
+    });
+
+    if (!isOpen) {
+        // Open the target panel inline and highlight its trigger button
+        if (target) target.style.display = 'flex';
+        const trigBtn = document.getElementById(triggerBtnIds[panelKey]);
+        if (trigBtn) trigBtn.classList.add('sub-panel-open');
+        updateToolbarButtonHighlights();
+    }
+};
+
+// IDs that are managed separately (not touched by subcell open/close)
+const _SUBCELL_SKIP_IDS = new Set(['drawer-count-section']);
+
+// ── Sub-cell editing state ──
+// _activeSubCellIdxs: Set of selected composite keys "si:z" (sub-cell index : zone index)
+// _activeSubCellIdx: convenience getter — first selected sub-cell index (integer), or -1 if none
+let _activeSubCellIdxs = new Set();
+Object.defineProperty(window, '_activeSubCellIdx', {
+    get() {
+        const v = _activeSubCellIdxs.values().next();
+        if (v.done) return -1;
+        const key = v.value;
+        // key may be "si:z" or legacy integer
+        if (typeof key === 'string' && key.includes(':')) return parseInt(key.split(':')[0], 10);
+        return typeof key === 'number' ? key : parseInt(key, 10);
+    },
+    set(v) { _activeSubCellIdxs = v >= 0 ? new Set([String(v) + ':0']) : new Set(); }
+});
+
+// Helper: parse composite key "si:z" → { si, z }
+function _parseSubKey(key) {
+    if (typeof key === 'string' && key.includes(':')) {
+        const parts = key.split(':');
+        return { si: parseInt(parts[0], 10), z: parseInt(parts[1], 10) };
+    }
+    return { si: parseInt(key, 10), z: 0 };
+}
+
+// Helper: build composite key from si and z
+function _subKey(si, z) { return `${si}:${z}`; }
+
+window.setActiveSubCell = function(key) {
+    // key is a composite string "si:z" or legacy integer si
+    const compositeKey = (typeof key === 'number') ? _subKey(key, 0) : String(key);
+    // Single-select by default: clicking a new zone replaces the selection.
+    // Clicking an already-selected zone deselects it (toggle off).
+    if (_activeSubCellIdxs.has(compositeKey) && _activeSubCellIdxs.size === 1) {
+        // Only this zone selected — toggle off
+        _activeSubCellIdxs = new Set();
+    } else {
+        // Select only this zone (replace any previous selection)
+        _activeSubCellIdxs = new Set([compositeKey]);
+    }
+    // Rebuild overlay so sub-cell buttons reflect the new selection state (green ✕ vs cyan +)
+    buildDimensionsAndButtonsUI();
+    updateOverlaysPosition();
+    updateToolbarState();
+    updateToolbarButtonHighlights();
+};
+
+window.clearActiveSubCell = function() {
+    _activeSubCellIdxs = new Set();
+    buildDimensionsAndButtonsUI();
+    updateOverlaysPosition();
+    updateToolbarState();
+    updateToolbarButtonHighlights();
+};
+
+// Add one partition board to the selected cell (max 4 sub-cells = 3 boards)
+window.addPartition = function() {
+    if (state.selection.colIndex === -1 || state.selection.rows.length === 0) return;
+    const c = state.selection.colIndex;
+    const r = state.selection.rows[0];
+    const comp = state.columns[c] && state.columns[c].compartments[r];
+    if (!comp || !comp.partition) return;
+    if (!Array.isArray(comp.partitions)) comp.partitions = [0.5];
+    const n = comp.partitions.length;
+    if (n >= 3) return; // max 3 boards = 4 sub-cells
+    // Insert new partition evenly spaced
+    const newPartitions = [];
+    for (let i = 0; i <= n; i++) {
+        newPartitions.push((i + 1) / (n + 2));
+    }
+    comp.partitions = newPartitions;
+    // Ensure subCells array has n+2 entries
+    if (!Array.isArray(comp.subCells)) comp.subCells = [];
+    while (comp.subCells.length < n + 2) comp.subCells.push({ type: 'empty', shelves: 0 });
+    buildCabinet(); calculatePrice(); saveHistoryState();
+    updateToolbarButtonHighlights();
+};
+
+// Remove last partition board from the selected cell (min 1 board)
+window.removePartition = function() {
+    if (state.selection.colIndex === -1 || state.selection.rows.length === 0) return;
+    const c = state.selection.colIndex;
+    const r = state.selection.rows[0];
+    const comp = state.columns[c] && state.columns[c].compartments[r];
+    if (!comp || !comp.partition || !Array.isArray(comp.partitions)) return;
+    if (comp.partitions.length <= 1) {
+        // Remove partition entirely
+        delete comp.partition;
+        delete comp.partitions;
+        delete comp.subCells;
+        _activeSubCellIdxs = new Set();
+        buildCabinet(); calculatePrice(); saveHistoryState();
+        updateToolbarButtonHighlights();
+        return;
+    }
+    comp.partitions.pop();
+    if (Array.isArray(comp.subCells) && comp.subCells.length > comp.partitions.length + 1) {
+        comp.subCells.length = comp.partitions.length + 1;
+    }
+    // Clear selection if the active sub-cell no longer exists
+    const maxSi = comp.partitions.length;
+    _activeSubCellIdxs.forEach(k => {
+        const { si } = _parseSubKey(k);
+        if (si > maxSi) _activeSubCellIdxs.delete(k);
+    });
+    buildCabinet(); calculatePrice(); saveHistoryState();
+    updateToolbarButtonHighlights();
+};
+
+// Set content type for all active sub-cell zones (per-zone composite key "si:z" support)
+// Maps open_cell/side_open_cell → honeycomb for sub-cell context
+window.setSubCellType = function(type) {
+    if (state.selection.colIndex === -1 || state.selection.rows.length === 0) return;
+    if (_activeSubCellIdxs.size === 0) return;
+    const c = state.selection.colIndex;
+    const r = state.selection.rows[0];
+    const comp = state.columns[c] && state.columns[c].compartments[r];
+    if (!comp || !comp.partition) return;
+    // Auto-create subCells if missing (e.g. legacy open_cell partitions)
+    if (!Array.isArray(comp.subCells)) {
+        const nSubs = Array.isArray(comp.partitions) ? comp.partitions.length + 1 : 2;
+        comp.subCells = Array.from({ length: nSubs }, () => ({ type: 'empty', shelves: 0 }));
+    }
+
+    // Map open_cell / side_open_cell → honeycomb for sub-cell context
+    const subType = (type === 'open_cell' || type === 'side_open_cell') ? 'honeycomb' : type;
+
+    _activeSubCellIdxs.forEach(key => {
+        const { si, z } = _parseSubKey(key);
+        const sub = comp.subCells[si];
+        if (!sub) return;
+
+        // Ensure zonesType array exists and is sized correctly
+        const numZones = Array.isArray(sub.zonesType) ? sub.zonesType.length : 1;
+        if (!Array.isArray(sub.zonesType) || sub.zonesType.length < 1) {
+            sub.zonesType = [sub.type || 'empty'];
+        }
+        // Expand zonesType if needed (e.g. shelves were added after selection)
+        while (sub.zonesType.length <= z) sub.zonesType.push('empty');
+
+        // Toggle: clicking same type → empty
+        const current = sub.zonesType[z] || 'empty';
+        let newType;
+        if (subType === 'door_right' && current === 'door_left') {
+            newType = 'door_double';
+        } else if (subType === 'door_left' && current === 'door_right') {
+            newType = 'door_double';
+        } else if ((subType === 'door_right' || subType === 'door_left') && current === 'door_double') {
+            newType = 'empty';
+        } else {
+            newType = (current === subType) ? 'empty' : subType;
+        }
+        sub.zonesType[z] = newType;
+
+        // Keep sub.type in sync: if all zones have the same type, set sub.type to that;
+        // otherwise set sub.type to the most common non-empty type (for backward compat)
+        const nonEmpty = sub.zonesType.filter(t => t && t !== 'empty');
+        if (nonEmpty.length === 0) {
+            sub.type = 'empty';
+        } else if (sub.zonesType.every(t => t === nonEmpty[0])) {
+            sub.type = nonEmpty[0];
+        } else {
+            // Mixed zones — keep sub.type as the first non-empty zone type
+            sub.type = nonEmpty[0];
+        }
+    });
+    buildCabinet(); calculatePrice(); saveHistoryState();
+    updateToolbarButtonHighlights();
+};
+
+// Helper: distribute sub-cell shelvesY evenly within a compartment's Y range
+function _distributeSubCellShelves(sub, prevY, compH, numShelves) {
+    if (numShelves <= 0) { sub.shelvesY = []; return; }
+    const zoneH = compH / (numShelves + 1);
+    sub.shelvesY = [];
+    for (let s = 1; s <= numShelves; s++) {
+        sub.shelvesY.push(prevY + zoneH * s);
+    }
+}
+
+// Helper: get prevY and compH for a compartment row
+function _getSubCellCompBounds(col, r) {
+    const t = state.thickness;
+    const divs = col.compartments.map((comp, i) => {
+        if (i === 0) return null;
+        // shelvesY[i-1] is the Y of the shelf between row i-1 and row i
+        return col.shelvesY && col.shelvesY[i - 1] !== undefined ? col.shelvesY[i - 1] : null;
+    });
+    const baseY = col.type === 'desk' ? col.deskHeight + col.deskClearance : state.plinthHeight;
+    const prevY = r === 0 ? baseY + t/2 : (col.shelvesY[r - 1] + t/2);
+    const nextY = r >= col.compartments.length - 1 ? col.height - t/2 : (col.shelvesY[r] - t/2);
+    return { prevY, compH: nextY - prevY };
+}
+
+// Update shelf count for the active sub-cell
+window.updateSubCellShelves = function(delta) {
+    if (state.selection.colIndex === -1 || state.selection.rows.length === 0) return;
+    if (_activeSubCellIdxs.size === 0) return;
+    const c = state.selection.colIndex;
+    const r = state.selection.rows[0];
+    const col = state.columns[c];
+    const comp = col && col.compartments[r];
+    if (!comp || !comp.partition || !Array.isArray(comp.subCells)) return;
+    // Use the first active zone's sub-cell index
+    const { si: activeSi } = _parseSubKey(_activeSubCellIdxs.values().next().value);
+    const sub = comp.subCells[activeSi];
+    if (!sub) return;
+    const newCount = Math.max(0, Math.min(8, (sub.shelves || 0) + delta));
+    sub.shelves = newCount;
+    // Redistribute shelvesY evenly
+    const { prevY, compH } = _getSubCellCompBounds(col, r);
+    _distributeSubCellShelves(sub, prevY, compH, newCount);
+    // After shelf count changes, zonesType array size may change — clear it so engine rebuilds it
+    delete sub.zonesType;
+    // Update active key to zone 0 of same sub-cell (shelf zones reset)
+    _activeSubCellIdxs = new Set([_subKey(activeSi, 0)]);
+    buildCabinet(); calculatePrice(); saveHistoryState();
+};
+
+// Legacy stubs — kept for backward compatibility with any saved HTML onclick references
+window.closeSubcellToolbarUser = function() {
+    _activeSubCellIdxs = new Set();
+    updateToolbarButtonHighlights();
+};
+window.openSubcellToolbar = function() {};
+window.closeSubcellToolbar = function() {};
+
+window.closeContentSubPanels = function() {
+    ['hanging-sub-panel','drawer-sub-panel','honeycomb-sub-panel',
+     'door-style-panel-right','door-style-panel-left','door-style-panel-double'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+    // Clear trigger button highlights
+    ['tb-btn-hanging','tb-btn-drawer','tb-btn-honeycomb'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.classList.remove('sub-panel-open');
+    });
+    // Also restore main toolbar section if subcell toolbar is open
+    closeSubcellToolbar();
+};
+
+// applyContentForce: always sets the type (no toggle) — used by sub-panel buttons
+// When _activeSubCellIdx is set, routes to setSubCellType instead
+window.applyContentForce = function(type) {
+    if (state.selection.colIndex === -1 || state.selection.rows.length === 0) return;
+
+    // Route to sub-cell if a sub-cell is active
+    if (_activeSubCellIdxs.size > 0) {
+        setSubCellType(type);
+        return;
+    }
+
+    // Guard: if the selected compartment has a partition and no sub-cell is selected,
+    // do NOT apply the type to the whole compartment (would destroy the partition),
+    // UNLESS the type is open_cell/side_open_cell (honeycomb) — those clear the partition.
+    const _guardComp = state.columns[state.selection.colIndex] &&
+                       state.columns[state.selection.colIndex].compartments[state.selection.rows[0]];
+    const _isHoneycombType = (type === 'open_cell' || type === 'side_open_cell');
+    if (_guardComp && _guardComp.partition && !_isHoneycombType) return;
+
+    const c = state.selection.colIndex;
+
+    // side_open_cell: validate that the cell is exposed to air on at least one side
+    if (type === 'side_open_cell') {
+        const col = state.columns[c];
+        const startR = Math.min(...state.selection.rows);
+        const baseY = (col.type === 'desk') ? col.deskHeight + col.deskClearance : state.plinthHeight;
+        const bottomY = (startR === 0) ? baseY + state.thickness : col.shelvesY[startR - 1] + state.thickness / 2;
+        const canOpenLeft  = (c === 0) || (state.columns[c - 1] && state.columns[c - 1].height <= bottomY + 0.5);
+        const canOpenRight = (c === state.columns.length - 1) || (state.columns[c + 1] && state.columns[c + 1].height <= bottomY + 0.5);
+        if (!canOpenLeft && !canOpenRight) {
+            alert('לא ניתן למקם כוורת צד כאן. הכוורת חייבת להיות חשופה לאוויר (או בקצה הארון, או ממוקמת מעל גובה העמודה הסמוכה לה).');
+            return;
+        }
+    }
+
+    // Sorbet: minimum cell height 110cm
+    if (type === 'sorbet') {
+        const col = state.columns[c];
+        const blocked = state.selection.rows.some(r => _cellHeight(col, r) < 110);
+        if (blocked) {
+            alert('סורבטו דורש גובה תא מינימלי של 110 ס"מ. הגדל את גובה התא ונסה שוב.');
+            return;
+        }
+    }
+
+    const col = state.columns[c];
+    let blockedCount = 0;
+
+    state.selection.rows.forEach(r => {
+        if (!col.compartments[r]) return;
+        const newType = type;
+
+        if ((newType === 'internal_drawers' || newType === 'external_drawers')) {
+            const cellH = _cellHeight(col, r);
+            if (cellH < 12) {
+                blockedCount++;
+                return;
+            }
+            col.compartments[r].type = newType;
+            col.compartments[r].count = calcAutoDrawerCount(cellH);
+        } else {
+            col.compartments[r].type = newType;
+        }
+
+        // Clear partition data when switching to types that are incompatible with partitions
+        if (newType === 'external_drawers' || newType === 'hanging' || newType === 'sorbet' || newType === 'empty' ||
+            newType === 'open_cell' || newType === 'side_open_cell') {
+            delete col.compartments[r].partition;
+            delete col.compartments[r].partitions;
+            delete col.compartments[r].subCells;
+        }
+
+        const finalType = col.compartments[r].type;
+        if (finalType === 'external_drawers' || finalType === 'open_cell' || finalType === 'side_open_cell') {
+            col.doors = col.doors.filter(door => (r < door.startRow || r > door.endRow));
+        }
+    });
+
+    if (blockedCount > 0) {
+        const toast = document.createElement('div');
+        toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(239,68,68,0.95);color:white;padding:10px 20px;border-radius:12px;font-weight:600;font-size:0.9rem;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.2);pointer-events:none;';
+        toast.innerText = 'גובה התא קטן מ-12 ס"מ — לא ניתן להוסיף מגירה';
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
+
+    // Clear selection BEFORE buildCabinet so the render has no highlight
+    // Keep selection for drawer types so the drawer-count section stays visible
+    const _keepsSelSCT = ['internal_drawers', 'external_drawers'];
+    if (!_keepsSelSCT.includes(type)) {
+        state.selection = { colIndex: -1, rows: [] };
+        closeContentSubPanels();
+    }
+    buildCabinet(); calculatePrice(); saveHistoryState();
+};
+
+window.applyContent = function(type) {
+    if (state.selection.colIndex === -1 || state.selection.rows.length === 0) return;
+
+    // Route to sub-cell if a sub-cell is active
+    if (_activeSubCellIdxs.size > 0) {
+        setSubCellType(type);
+        return;
+    }
+
+    const c = state.selection.colIndex;
+
+    // Guard: if the selected compartment has a partition and no sub-cell is selected,
+    // and the type is not 'partition' itself, do NOT overwrite the partition.
+    if (type !== 'partition') {
+        const _guardComp2 = state.columns[c] && state.columns[c].compartments[state.selection.rows[0]];
+        if (_guardComp2 && _guardComp2.partition) return;
+    }
+    
+    // Special handling: 'partition' now toggles partition flag on the cell
+    if (type === 'partition') {
+        state.selection.rows.forEach(r => {
+            const comp = state.columns[c].compartments[r];
+            if (!comp) return;
+            if (comp.partition) {
+                // Turn off partition
+                delete comp.partition;
+                delete comp.partitions;
+                delete comp.subCells;
+                _activeSubCellIdxs = new Set();
+            } else {
+                // Turn on partition with new partitions[] array
+                comp.partition = true;
+                comp.partitions = [0.5];
+                // Always create subCells — all cell types support sub-cell content
+                comp.subCells = [{ type: 'empty', shelves: 0 }, { type: 'empty', shelves: 0 }];
+            }
+        });
+        buildCabinet(); calculatePrice(); saveHistoryState();
+        updateToolbarButtonHighlights();
+        return;
+    }
+
+    if (type === 'side_open_cell') {
+        const col = state.columns[c];
+        const startR = Math.min(...state.selection.rows);
+        const baseY = (col.type === 'desk') ? col.deskHeight + col.deskClearance : state.plinthHeight;
+        let bottomY = (startR === 0) ? baseY + state.thickness : col.shelvesY[startR - 1] + state.thickness/2;
+        
+        let canOpenLeft = (c === 0) || (state.columns[c-1] && state.columns[c-1].height <= bottomY + 0.5);
+        let canOpenRight = (c === state.columns.length - 1) || (state.columns[c+1] && state.columns[c+1].height <= bottomY + 0.5);
+
+        if (!canOpenLeft && !canOpenRight) {
+            alert('לא ניתן למקם כוורת צד כאן. הכוורת חייבת להיות חשופה לאוויר (או בקצה הארון, או ממוקמת מעל גובה העמודה הסמוכה לה).');
+            return;
+        }
+    }
+
+    // Sorbet: minimum cell height 110cm
+    if (type === 'sorbet') {
+        const col = state.columns[c];
+        const blocked = state.selection.rows.some(r => _cellHeight(col, r) < 110);
+        if (blocked) {
+            alert('סורבטו דורש גובה תא מינימלי של 110 ס"מ. הגדל את גובה התא ונסה שוב.');
+            return;
+        }
+    }
+    
+    const col = state.columns[c];
+    let blockedCount = 0;
+
+    state.selection.rows.forEach(r => {
+        if (!col.compartments[r]) return;
+        const currentType = col.compartments[r].type;
+        const newType = (currentType === type) ? 'empty' : type;
+
+        // Block drawer assignment if cell is too short
+        if ((newType === 'internal_drawers' || newType === 'external_drawers') && newType !== 'empty') {
+            const cellH = _cellHeight(col, r);
+            if (cellH < 12) {
+                blockedCount++;
+                return; // skip this row
+            }
+            // Auto-set drawer count based on cell height
+            col.compartments[r].type = newType;
+            col.compartments[r].count = calcAutoDrawerCount(cellH);
+        } else {
+            col.compartments[r].type = newType;
+        }
+
+        // Clear partition when switching to incompatible types
+        if (newType === 'external_drawers' || newType === 'hanging' || newType === 'sorbet' || newType === 'empty') {
+            delete col.compartments[r].partition;
+            delete col.compartments[r].partitions;
+            delete col.compartments[r].subCells;
+        }
+
+        const finalType = col.compartments[r].type;
+        if (finalType === 'external_drawers' || finalType === 'open_cell' || finalType === 'side_open_cell') {
+            col.doors = col.doors.filter(door => (r < door.startRow || r > door.endRow));
+        }
+    });
+
+    if (blockedCount > 0) {
+        const toast = document.createElement('div');
+        toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(239,68,68,0.95);color:white;padding:10px 20px;border-radius:12px;font-weight:600;font-size:0.9rem;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.2);pointer-events:none;';
+        toast.innerText = 'גובה התא קטן מ-23 ס"מ — לא ניתן להוסיף מגירה';
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
+
+    // Clear selection BEFORE buildCabinet for simple types; keep for types that open sub-panels
+    // 'partition' keeps selection so subcell panel stays visible
+    // 'hanging', 'external_drawers', 'honeycomb' keep selection so style sub-panel can be used
+    // 'internal_drawers' keeps selection so drawer-count section stays visible
+    const keepsSelection = ['partition', 'hanging', 'external_drawers', 'honeycomb', 'internal_drawers'];
+    if (!keepsSelection.includes(type)) {
+        state.selection = { colIndex: -1, rows: [] };
+        closeContentSubPanels();
+    }
+    buildCabinet(); calculatePrice(); saveHistoryState();
+};
+
+// Legacy stub — kept for backward compatibility
+window.applySubCellContent = function(side, type) {
+    const idx = (side === 'left') ? 0 : 1;
+    const prevKeys = new Set(_activeSubCellIdxs);
+    _activeSubCellIdxs = new Set([_subKey(idx, 0)]);
+    setSubCellType(type);
+    _activeSubCellIdxs = prevKeys;
+};
+
+window.applyDoor = function(type) {
+    if (state.selection.colIndex === -1 || state.selection.rows.length === 0) return;
+    const c = state.selection.colIndex;
+    let startR = Math.min(...state.selection.rows);
+    let endR = Math.max(...state.selection.rows);
+
+    // Minimum column width for a door is 20 cm
+    const MIN_DOOR_WIDTH = 20;
+    if (type !== 'empty' && state.columns[c].width < MIN_DOOR_WIDTH) {
+        alert(`לא ניתן להתקין דלת על פתח פחות מ-${MIN_DOOR_WIDTH} ס"מ (רוחב נוכחי: ${Math.round(state.columns[c].width)} ס"מ).`);
+        return;
+    }
+
+    // Height > threshold: prevent a door from spanning across the split board boundary.
+    // Doors are allowed on either the lower unit OR the upper unit independently.
+    if (type !== 'empty') {
+        const col = state.columns[c];
+        if (col.height > getSplitThreshold() && col.splitY) {
+            // Number of shelves that are below the split board = lower-unit row count - 1
+            // shelvesY entries below splitY belong to the lower unit
+            const bottomShelves = col.shelvesY.filter(y => y < col.splitY).length;
+            // splitRowBoundary: first row index of the upper unit
+            // rows 0 .. bottomShelves  → lower unit  (bottomShelves+1 compartments)
+            // rows bottomShelves+1 .. end → upper unit
+            const splitRowBoundary = bottomShelves + 1;
+            const selectionCrossesplit = startR < splitRowBoundary && endR >= splitRowBoundary;
+            if (selectionCrossesplit) {
+                // Clip to whichever unit contains the majority of the selection
+                const belowCount = splitRowBoundary - startR;
+                const aboveCount = endR - splitRowBoundary + 1;
+                if (belowCount >= aboveCount) {
+                    endR = splitRowBoundary - 1;
+                } else {
+                    startR = splitRowBoundary;
+                }
+                _showToast('לא ניתן להחיל דלת על שתי היחידות יחד — הדלת הוחלה על יחידה אחת בלבד', 3500);
+            }
+        }
+    }
+
+    let hasOpenCell = false;
+    for(let r = startR; r <= endR; r++) {
+        const compType = state.columns[c].compartments[r] && state.columns[c].compartments[r].type;
+        if(compType === 'open_cell' || compType === 'side_open_cell') hasOpenCell = true;
+    }
+    if (hasOpenCell && type !== 'empty') {
+        alert('לא ניתן להתקין דלתות על אזור שמוגדר ככוורת.');
+        return;
+    }
+
+    const existingDoorIdx = state.columns[c].doors.findIndex(door => {
+        return state.selection.rows.some(r => r >= door.startRow && r <= door.endRow);
+    });
+    
+    const isSameType = existingDoorIdx > -1 && state.columns[c].doors[existingDoorIdx].type === type;
+
+    state.columns[c].doors = state.columns[c].doors.filter(door => {
+        return !state.selection.rows.some(r => r >= door.startRow && r <= door.endRow);
+    });
+    
+    if (type !== 'empty' && !isSameType) {
+        state.columns[c].doors.push({ startRow: startR, endRow: endR, type: type });
+        state.selection.rows.forEach(r => {
+            if (state.columns[c].compartments[r] && state.columns[c].compartments[r].type === 'external_drawers') {
+                state.columns[c].compartments[r].type = 'empty';
+            }
+        });
+    }
+    buildCabinet(); calculatePrice(); saveHistoryState();
+    // Keep selection open — door style panel will open for style selection
+};
+
+window.applyDoorStyle = function(style) {
+    if (state.selection.colIndex === -1 || state.selection.rows.length === 0) return;
+    const c = state.selection.colIndex;
+    const col = state.columns[c];
+    const door = col.doors.find(door => {
+        return state.selection.rows.some(r => r >= door.startRow && r <= door.endRow);
+    });
+    if (!door) return;
+    door.style = style;
+    // Clear selection BEFORE buildCabinet so the render has no highlight
+    state.selection = { colIndex: -1, rows: [] };
+    closeContentSubPanels();
+    buildCabinet(); calculatePrice(); saveHistoryState();
+};
+
+window.applyEqualCells = function() {
+    if (state.selection.colIndex === -1 || state.selection.rows.length < 2) return;
+    const c = state.selection.colIndex;
+    const col = state.columns[c];
+    if (!col) return;
+
+    // Sort selected rows and verify they are consecutive
+    const selRows = state.selection.rows.slice().sort((a, b) => a - b);
+    const startR = selRows[0];
+    const endR = selRows[selRows.length - 1];
+    if (endR - startR + 1 !== selRows.length) return; // not consecutive — do nothing
+
+    const t = state.thickness;
+    const baseY = (col.type === 'desk') ? col.deskHeight + col.deskClearance : state.plinthHeight;
+
+    // If there is a splitY crossing the span, equalize each sub-span independently
+    const splitY = col.splitY;
+    const splitCrossed = splitY && splitY > baseY + t && splitY < col.height - t;
+
+    const _equalizeSubSpan = (subStart, subEnd) => {
+        if (subEnd <= subStart) return;
+
+        // Blueprint cell height formula: cellHeight = shelvesY[k] - prevBound - t
+        // where prevBound is the previous shelf's bottom edge (or baseY for the first cell)
+        // rowBounds = [baseY, shelvesY[subStart], ..., shelvesY[subEnd-1], topBound]
+        // So: shelvesY[k] = prevBound + cellHeight + t
+
+        // Bottom bound: baseY (top of plinth / desk base) — NOT baseY+t
+        const bottomBound = (subStart === 0) ? baseY
+            : (col.shelvesY[subStart - 1] !== undefined ? col.shelvesY[subStart - 1] : baseY);
+        // Top bound: col.height (or bottom of next shelf above span)
+        const topBound = (subEnd >= col.shelvesY.length) ? col.height
+            : (col.shelvesY[subEnd] !== undefined ? col.shelvesY[subEnd] : col.height);
+
+        const numCells = subEnd - subStart + 1;
+        const tMM = Math.round(t * 10); // shelf thickness in whole mm
+
+        // Total span = bottomBound..topBound
+        // Each cell contributes: cellMM + tMM (cell height + shelf board above it)
+        // So: pureCellSpaceMM = totalSpanMM - numCells * tMM
+        const totalSpanMM = Math.round((topBound - bottomBound) * 10);
+        const pureCellSpaceMM = totalSpanMM - numCells * tMM;
+
+        // Distribute in whole mm: bottom N cells get (floor+1), rest get floor
+        // e.g. 803mm / 3 = 267.666 → numLargerCells=2, bottom 2 cells=268mm, top cell=267mm
+        // e.g. 900mm / 3 = 300 exactly → numLargerCells=0, all cells=300mm
+        const floorCellMM = Math.floor(pureCellSpaceMM / numCells);
+        const numLargerCells = pureCellSpaceMM % numCells;
+
+        // Place internal shelves (indices subStart..subEnd-1)
+        // shelvesY[i] = bottomBound + sum of (cellMM + tMM) for cells 0..k
+        let curPosMM = Math.round(bottomBound * 10);
+        for (let i = subStart; i < subEnd; i++) {
+            const k = i - subStart; // 0-based index of this shelf
+            const thisCellMM = (k < numLargerCells) ? (floorCellMM + 1) : floorCellMM;
+            curPosMM += thisCellMM + tMM; // cell height + shelf board thickness
+            col.shelvesY[i] = curPosMM / 10;
+        }
+    };
+
+    if (splitCrossed) {
+        // Find which rows are below split and which are above
+        // splitY is between shelvesY entries; find the split shelf index
+        // The split board sits at splitY; rows below it end at the row whose top is splitY
+        // shelvesY is sorted; find first shelf >= splitY
+        const splitShelfIdx = col.shelvesY.findIndex(y => y >= splitY);
+        // splitShelfIdx is the index of the first shelf in the upper section
+        // rows 0..splitShelfIdx-1 are below split, rows splitShelfIdx..numRows-1 are above
+        const splitRowBoundary = (splitShelfIdx === -1) ? col.shelvesY.length : splitShelfIdx;
+
+        // Equalize below-split sub-span (clamped to selected range)
+        const belowStart = startR;
+        const belowEnd = Math.min(endR, splitRowBoundary - 1);
+        if (belowEnd >= belowStart + 1) _equalizeSubSpan(belowStart, belowEnd);
+
+        // Equalize above-split sub-span (clamped to selected range)
+        const aboveStart = Math.max(startR, splitRowBoundary);
+        const aboveEnd = endR;
+        if (aboveEnd >= aboveStart + 1) _equalizeSubSpan(aboveStart, aboveEnd);
+    } else {
+        _equalizeSubSpan(startR, endR);
+    }
+
+    buildCabinet(); calculatePrice(); saveHistoryState();
+};
+
+window.updateDrawerCount = function(delta) {
+    if (state.selection.colIndex === -1 || state.selection.rows.length === 0) return;
+    const c = state.selection.colIndex;
+    const col = state.columns[c];
+    let changed = false;
+
+    state.selection.rows.forEach(r => {
+        const comp = col.compartments[r];
+        if (comp && (comp.type === 'internal_drawers' || comp.type === 'external_drawers')) {
+            const cellH = _cellHeight(col, r);
+            const minCount = calcMinDrawerCount(cellH);
+            let newCount = comp.count + delta;
+            // Clamp: minimum enforced by cell height, maximum 8
+            newCount = Math.max(minCount, Math.min(8, newCount));
+            if (newCount !== comp.count) {
+                comp.count = newCount;
+                changed = true;
+            }
+        }
+    });
+
+    if (changed) {
+        buildCabinet(); calculatePrice(); saveHistoryState();
+    }
+};
+
+// Global horizontal drag state — survives buildDragHandlesUI() rebuilds
+// tooltipText: kept in sync so newly-rebuilt handles show current value
+window._hDrag = null; // { index, startMouseX, startWLeft, startWRight, activeWing, wingEditMode, tooltipText }
+
+// Single global pointermove/pointerup for horizontal column drag handles
+// Registered once at module load — not inside buildDragHandlesUI() to avoid accumulation
+window.addEventListener('pointermove', e => {
+    const d = window._hDrag;
+    if (!d) return;
+    e.preventDefault();
+    let pxToCm;
+    if (d.wingEditMode && d.activeWing !== 'center') {
+        const hw = state.width / 2;
+        const pxA = ((new THREE.Vector3(0, 0,  hw).project(camera).x + 1) / 2 * container.clientWidth);
+        const pxB = ((new THREE.Vector3(0, 0, -hw).project(camera).x + 1) / 2 * container.clientWidth);
+        pxToCm = (d.activeWing === 'left')
+            ? state.width / (pxB - pxA)
+            : state.width / (pxA - pxB);
+    } else {
+        pxToCm = state.width / (((new THREE.Vector3(state.width/2,0,0).project(camera).x + 1)/2 * container.clientWidth) - ((new THREE.Vector3(-state.width/2,0,0).project(camera).x + 1)/2 * container.clientWidth));
+    }
+    const idx = d.index;
+    let newL = Math.round(d.startWLeft  + (e.clientX - d.startMouseX) * pxToCm);
+    let newR = Math.round(d.startWRight - (e.clientX - d.startMouseX) * pxToCm);
+
+    const _activeWingData = state.wings[state.activeWing];
+    const _wingPos = _activeWingData ? (_activeWingData.wingPosition || 'side') : null;
+    const _centerD = state.wings.center ? state.wings.center.depth : state.depth;
+    const _numCols = state.columns.length;
+    const _hiddenIsLast = (state.activeWing === 'left');
+    const _isHiddenSide = (_wingPos === 'side' && state.activeWing !== 'center');
+    const _minFirst  = (_isHiddenSide && !_hiddenIsLast && idx === 0)              ? (_centerD + 30) : MIN_COL_WIDTH;
+    const _minSecond = (_isHiddenSide && _hiddenIsLast  && idx + 1 === _numCols - 1) ? (_centerD + 30) : MIN_COL_WIDTH;
+
+    if (newL < _minFirst)  { newL = _minFirst;  newR = Math.round(d.startWLeft + d.startWRight - _minFirst); }
+    if (newR < _minSecond) { newR = _minSecond; newL = Math.round(d.startWLeft + d.startWRight - _minSecond); }
+    if (newL < MIN_COL_WIDTH) { newL = MIN_COL_WIDTH; newR = Math.round(d.startWLeft + d.startWRight - MIN_COL_WIDTH); }
+    if (newR < MIN_COL_WIDTH) { newR = MIN_COL_WIDTH; newL = Math.round(d.startWLeft + d.startWRight - MIN_COL_WIDTH); }
+
+    state.columns[idx].width = newL; state.columns[idx+1].width = newR;
+    // Store tooltip text in drag state so rebuilt handles can pick it up
+    d.tooltipText = `ימין: ${newR} ס"מ | שמאל: ${newL} ס"מ`;
+    // Update tooltip on the currently active handle (if still in DOM after rebuild)
+    const activeHandle = dragLayer.querySelector(`.drag-handle.horizontal[data-idx="${idx}"]`);
+    if (activeHandle) activeHandle.querySelector('.drag-tooltip').innerText = d.tooltipText;
+    buildCabinetDragging();
+});
+
+window.addEventListener('pointerup', () => {
+    if (!window._hDrag) return;
+    window._hDrag = null;
+    controls.enabled = true;
+    document.body.classList.remove('dragging', 'dragging-h', 'dragging-v');
+    _endDrag();
+    calculatePrice();
+    saveHistoryState();
+});
+
+// ── Global floor-offset drag state — survives buildDragHandlesUI() rebuilds ──
+window._floorDrag = null; // { colIndex, startMouseY, startFO }
+window._floorSnapActive = false; // true when snap is engaged during floor drag
+
+window.addEventListener('pointermove', e => {
+    const d = window._floorDrag;
+    if (!d) return;
+    e.preventDefault();
+    const col = state.columns[d.colIndex];
+    if (!col) return;
+    const pxToCm = 100 / (Math.abs(new THREE.Vector3(0,100,0).project(camera).y - new THREE.Vector3(0,0,0).project(camera).y) * container.clientHeight / 2);
+    const deltaCm = -(e.clientY - d.startMouseY) * pxToCm;
+    const maxFO = col.height - 10;
+    let _desiredFO = Math.max(0, Math.min(maxFO, d.startFO + deltaCm));
+
+    // Snap to adjacent column floorOffset within 2cm
+    let _floorSnapped = false;
+    {
+        const SNAP_THRESHOLD = 2;
+        const cols = state.columns;
+        let bestDist = SNAP_THRESHOLD + 1;
+        // Also snap to 0 (floor level)
+        const snapTargets = [0];
+        [-1, 1].forEach(offset => {
+            const nc = d.colIndex + offset;
+            if (nc < 0 || nc >= cols.length) return;
+            const neighbor = cols[nc];
+            if (neighbor) snapTargets.push(neighbor.floorOffset || 0);
+        });
+        snapTargets.forEach(target => {
+            const dist = Math.abs(_desiredFO - target);
+            if (dist <= SNAP_THRESHOLD && dist < bestDist) {
+                bestDist = dist;
+                _desiredFO = target;
+                _floorSnapped = true;
+            }
+        });
+    }
+    window._floorSnapActive = _floorSnapped;
+
+    col.floorOffset = Math.round(_desiredFO);
+    col.noPlinth = col.floorOffset > 0;
+    d.tooltipText = col.floorOffset > 0 ? `תחתית: ${col.floorOffset} ס"מ` : 'גרור למעלה ליחידה תלויה';
+    buildCabinetDragging();
+    updateQuickEditPanelUI();
+});
+
+window.addEventListener('pointerup', () => {
+    if (!window._floorDrag) return;
+    window._floorDrag = null;
+    window._floorSnapActive = false;
+    controls.enabled = true;
+    document.body.classList.remove('dragging');
+    _endDrag();
+    calculatePrice();
+    saveHistoryState();
+});
+
+// ── Global roof (column height) drag state — survives buildDragHandlesUI() rebuilds ──
+window._roofDrag = null; // { colIndex, startMouseY, startHeight }
+
+window.addEventListener('pointermove', e => {
+    const d = window._roofDrag;
+    if (!d) return;
+    e.preventDefault();
+    const col = state.columns[d.colIndex];
+    if (!col) return;
+    const pxToCm = 100 / (Math.abs(new THREE.Vector3(0,100,0).project(camera).y - new THREE.Vector3(0,0,0).project(camera).y) * container.clientHeight / 2);
+    const deltaCm = -(e.clientY - d.startMouseY) * pxToCm;
+
+    let baseY = col.type === 'desk' ? col.deskHeight + col.deskClearance : state.plinthHeight;
+    let minH = col.shelves > 0 ? col.shelvesY[col.shelves-1] + MIN_SHELF_GAP + state.thickness : baseY + MIN_SHELF_GAP;
+    if (col.splitY && deltaCm < 0) {
+        const splitMinH = col.splitY + MIN_SHELF_GAP + 2*state.thickness;
+        if (d.startHeight + deltaCm <= splitMinH) {
+            col.splitY = null;
+            distributeShelves(col);
+        }
+    }
+    if (col.splitY) minH = Math.max(minH, col.splitY + MIN_SHELF_GAP + 2*state.thickness);
+
+    let _desiredH = Math.round(Math.max(minH, Math.min(MAX_GLOBAL_HEIGHT, d.startHeight + deltaCm)));
+
+    // Snap to adjacent column height (always — regardless of topPanel)
+    let _snapNeighborIdx = -1;
+    {
+        const SNAP_THRESHOLD = 0.5; // cm (5mm)
+        const cols = state.columns;
+        let bestDist = SNAP_THRESHOLD + 1;
+        [-1, 1].forEach(offset => {
+            const nc = d.colIndex + offset;
+            if (nc < 0 || nc >= cols.length) return;
+            const neighbor = cols[nc];
+            if (!neighbor) return;
+            const dist = Math.abs(_desiredH - neighbor.height);
+            if (dist <= SNAP_THRESHOLD && dist < bestDist) {
+                bestDist = dist;
+                _desiredH = neighbor.height;
+                _snapNeighborIdx = nc;
+            }
+        });
+    }
+    window._topPanelSnapHighlight = _snapNeighborIdx !== -1
+        ? { colIdx: d.colIndex, neighborColIdx: _snapNeighborIdx }
+        : null;
+
+    // Check sorbet minimum height
+    let _roofSorbetBlocked = false;
+    if (col.compartments && col.compartments.length > 0) {
+        const topR = col.compartments.length - 1;
+        const topComp = col.compartments[topR];
+        if (topComp && topComp.type === 'sorbet') {
+            const _prevH = col.height;
+            col.height = _desiredH;
+            checkSplits();
+            const cellH = _cellHeight(col, topR);
+            if (cellH < 110) {
+                col.height = _prevH;
+                _roofSorbetBlocked = true;
+                window._roofDrag = null;
+                controls.enabled = true;
+                window._topPanelSnapHighlight = null;
+                document.body.classList.remove('dragging');
+                if (confirm('הסורבטו דורש גובה תא מינימלי של 110 ס"מ.\nלמחוק את הסורבטו ולהמשיך?')) {
+                    topComp.type = 'empty';
+                    col.height = _desiredH;
+                    checkSplits();
+                }
+                buildCabinet(); saveHistoryState();
+                return;
+            }
+        }
+    }
+    if (!_roofSorbetBlocked) {
+        col.height = _desiredH;
+        checkSplits();
+    }
+
+    d.tooltipText = `גובה: ${col.height} ס"מ`;
+    buildCabinetDragging();
+    // Restore active + snap highlight on newly-rebuilt handles
+    document.querySelectorAll('.drag-handle.vertical[data-colindex]').forEach(h => {
+        const hCol = parseInt(h.dataset.colindex);
+        const snap = window._topPanelSnapHighlight;
+        if (hCol === d.colIndex) h.classList.add('active');
+        if (snap && (hCol === snap.colIdx || hCol === snap.neighborColIdx)) {
+            h.classList.add('snapped');
+        } else {
+            h.classList.remove('snapped');
+        }
+    });
+});
+
+window.addEventListener('pointerup', () => {
+    if (!window._roofDrag) return;
+    window._roofDrag = null;
+    window._topPanelSnapHighlight = null;
+    controls.enabled = true;
+    document.body.classList.remove('dragging');
+    state.globalHeight = Math.max(...state.columns.map(c => c.height));
+    _endDrag();
+    calculatePrice();
+    saveHistoryState();
+});
+
+function buildDragHandlesUI() {
+    dragLayer.innerHTML = '';
+    if(state.viewMode !== 'front') return;
+
+    dragHandlesData.horizontal.forEach((x3d, index) => {
+        // Tooltip convention (same for all wings):
+        //   ימין = columns[index+1] (higher local X = screen right)
+        //   שמאל = columns[index]   (lower  local X = screen left)
+        // If a drag is in progress for this index, show the live tooltip text
+        const d = window._hDrag;
+        const isActiveDrag = d && d.index === index;
+        const initialText = isActiveDrag && d.tooltipText
+            ? d.tooltipText
+            : `ימין: ${Math.round(state.columns[index+1].width)} ס"מ | שמאל: ${Math.round(state.columns[index].width)} ס"מ`;
+        const handle = createHandle('horizontal', x3d, null, initialText);
+        handle.dataset.idx = index; // used by pointermove to find handle after rebuild
+        if (isActiveDrag) handle.classList.add('active'); // restore active class after rebuild
+        dragLayer.appendChild(handle);
+        
+        handle.addEventListener('pointerdown', e => {
+            e.preventDefault();
+            handle.setPointerCapture(e.pointerId); // keep pointer events on this element
+            handle.classList.add('active');
+            controls.enabled = false;
+            document.body.classList.add('dragging', 'dragging-h');
+            window._hDrag = {
+                index,
+                startMouseX: e.clientX,
+                startWLeft:  state.columns[index].width,
+                startWRight: state.columns[index+1].width,
+                activeWing:  state.activeWing,
+                wingEditMode: state.wingEditMode,
+                tooltipText: null
+            };
+        });
+    });
+
+    dragHandlesData.desk.forEach(d => {
+        if (d.type === 'deskWidth') {
+            const handle = createHandle('horizontal', d.x, d.y, 'רוחב שולחן');
+            dragLayer.appendChild(handle);
+            let startMouseX = 0, startW = 0, isDragging = false;
+            handle.addEventListener('pointerdown', e => {
+                isDragging = true; startMouseX = e.clientX; startW = state.desk.width; handle.classList.add('active'); controls.enabled = false; document.body.classList.add('dragging');
+            });
+            window.addEventListener('pointermove', e => {
+                if (!isDragging) return;
+                e.preventDefault();
+                const pxToCm = state.width / (((new THREE.Vector3(state.width/2,0,0).project(camera).x + 1)/2 * container.clientWidth) - ((new THREE.Vector3(-state.width/2,0,0).project(camera).x + 1)/2 * container.clientWidth));
+                const deltaX = (e.clientX - startMouseX) * pxToCm;
+                let delta = d.side === 'left' ? -deltaX : deltaX;
+                state.desk.width = Math.round(Math.max(40, Math.min(200, startW + delta)));
+                
+                if (document.getElementById('inp-num-desk-width')) document.getElementById('inp-num-desk-width').value = state.desk.width;
+                if (document.getElementById('inp-desk-width')) document.getElementById('inp-desk-width').value = state.desk.width;
+                
+                handle.querySelector('.drag-tooltip').innerText = `רוחב: ${state.desk.width} ס"מ`;
+                buildCabinetDragging(); updateCameraView();
+            });
+            window.addEventListener('pointerup', () => { if(isDragging){ isDragging = false; handle.classList.remove('active'); controls.enabled = true; document.body.classList.remove('dragging'); _endDrag(); calculatePrice(); saveHistoryState(); }});
+        }
+        else if (d.type === 'deskHeight') {
+            const handle = createHandle('vertical', d.x, d.y, 'גובה שולחן');
+            dragLayer.appendChild(handle);
+            let startMouseY = 0, startH = 0, isDragging = false;
+            handle.addEventListener('pointerdown', e => {
+                isDragging = true; startMouseY = e.clientY; startH = state.desk.height; handle.classList.add('active'); controls.enabled = false; document.body.classList.add('dragging');
+            });
+            window.addEventListener('pointermove', e => {
+                if (!isDragging) return;
+                e.preventDefault();
+                const pxToCm = 100 / (Math.abs(new THREE.Vector3(0,100,0).project(camera).y - new THREE.Vector3(0,0,0).project(camera).y) * container.clientHeight / 2);
+                const deltaCm = -(e.clientY - startMouseY) * pxToCm;
+                state.desk.height = Math.round(Math.max(50, Math.min(120, startH + deltaCm)));
+                handle.querySelector('.drag-tooltip').innerText = `גובה: ${state.desk.height} ס"מ`;
+                buildCabinetDragging(); updateCameraView();
+            });
+            window.addEventListener('pointerup', () => { if(isDragging){ isDragging = false; handle.classList.remove('active'); controls.enabled = true; document.body.classList.remove('dragging'); _endDrag(); calculatePrice(); saveHistoryState(); }});
+        }
+        else if (d.type === 'deskDrawer') {
+            const handle = createHandle('vertical', d.x, d.y, 'גובה מגירה');
+            dragLayer.appendChild(handle);
+            let startMouseY = 0, startH = 0, isDragging = false;
+            handle.addEventListener('pointerdown', e => {
+                isDragging = true; startMouseY = e.clientY; startH = state.desk.drawerHeight; handle.classList.add('active'); controls.enabled = false; document.body.classList.add('dragging');
+            });
+            window.addEventListener('pointermove', e => {
+                if (!isDragging) return;
+                e.preventDefault();
+                const pxToCm = 100 / (Math.abs(new THREE.Vector3(0,100,0).project(camera).y - new THREE.Vector3(0,0,0).project(camera).y) * container.clientHeight / 2);
+                const deltaCm = -(e.clientY - startMouseY) * pxToCm;
+                state.desk.drawerHeight = Math.round(Math.max(12, Math.min(40, startH - deltaCm)));
+                handle.querySelector('.drag-tooltip').innerText = `מגירה: ${state.desk.drawerHeight} ס"מ`;
+                buildCabinetDragging();
+            });
+            window.addEventListener('pointerup', () => { if(isDragging){ isDragging = false; handle.classList.remove('active'); controls.enabled = true; document.body.classList.remove('dragging'); _endDrag(); calculatePrice(); saveHistoryState(); }});
+        }
+    });
+
+    // Determine which column to show roof/floor handle for:
+    // During an active roof or floor drag, always show the dragged column's handle (even if hover moved away)
+    const _roofDragActive = window._roofDrag;
+    const _floorDragActiveGlobal = window._floorDrag;
+    const _roofColIndex = _roofDragActive ? _roofDragActive.colIndex
+        : _floorDragActiveGlobal ? _floorDragActiveGlobal.colIndex
+        : state.hoveredColIndex;
+
+    if (_roofColIndex !== -1 && state.columns[_roofColIndex]) {
+        const cIndex = _roofColIndex; const col = state.columns[cIndex];
+
+        const roof = dragHandlesData.roofs.find(r => r.colIndex === cIndex);
+        if (roof) {
+            const tooltipText = _roofDragActive ? (_roofDragActive.tooltipText || `גובה: ${Math.round(col.height)} ס"מ`) : `גובה עמודה: ${Math.round(col.height)}`;
+            const rHandle = createHandle('vertical', roof.x, roof.y, tooltipText);
+            rHandle.dataset.colindex = cIndex; // lowercase — matches HTML attribute
+            // Restore active class if drag is in progress
+            if (_roofDragActive) rHandle.classList.add('active');
+            // Restore snap highlight
+            const snap = window._topPanelSnapHighlight;
+            if (snap && (cIndex === snap.colIdx || cIndex === snap.neighborColIdx)) rHandle.classList.add('snapped');
+            dragLayer.appendChild(rHandle);
+
+            rHandle.addEventListener('pointerdown', e => {
+                e.preventDefault();
+                window._roofDrag = { colIndex: cIndex, startMouseY: e.clientY, startHeight: col.height, tooltipText: null };
+                rHandle.classList.add('active');
+                controls.enabled = false;
+                document.body.classList.add('dragging');
+            });
+        }
+
+        // Also show neighbor's roof handle with snap highlight during drag
+        const _snapNow = window._topPanelSnapHighlight;
+        if (_roofDragActive && _snapNow) {
+            const nIdx = _snapNow.neighborColIdx;
+            const nCol = state.columns[nIdx];
+            const nRoof = nIdx !== cIndex && nCol && dragHandlesData.roofs.find(r => r.colIndex === nIdx);
+            if (nRoof) {
+                const nHandle = createHandle('vertical', nRoof.x, nRoof.y, `גובה: ${Math.round(nCol.height)} ס"מ`);
+                nHandle.dataset.colindex = nIdx;
+                nHandle.classList.add('snapped');
+                dragLayer.appendChild(nHandle);
+            }
+        }
+
+        // Floor offset drag handle — orange, at bottom of column (always visible on hover)
+        const floorH = dragHandlesData.floors && dragHandlesData.floors.find(f => f.colIndex === cIndex);
+        if (floorH) {
+            const _floorDragActive = window._floorDrag;
+            const fo = floorH.fo !== undefined ? floorH.fo : (col.floorOffset || 0);
+            const tooltipText = _floorDragActive && _floorDragActive.colIndex === cIndex
+                ? (_floorDragActive.tooltipText || (fo > 0 ? `תחתית: ${fo} ס"מ` : 'גרור למעלה ליחידה תלויה'))
+                : (fo > 0 ? `תחתית: ${fo} ס"מ` : 'גרור למעלה ליחידה תלויה');
+            const fHandle = createHandle('vertical', floorH.x, floorH.y, tooltipText);
+            fHandle.style.borderColor = '#f97316';
+            fHandle.style.boxShadow = '0 2px 10px rgba(249,115,22,0.4)';
+            if (_floorDragActive && _floorDragActive.colIndex === cIndex) fHandle.classList.add('active');
+            if (_floorDragActive && _floorDragActive.colIndex === cIndex && window._floorSnapActive) fHandle.classList.add('snapped');
+            dragLayer.appendChild(fHandle);
+            fHandle.addEventListener('pointerdown', e => {
+                e.preventDefault();
+                window._floorDrag = { colIndex: cIndex, startMouseY: e.clientY, startFO: col.floorOffset || 0, tooltipText: null };
+                fHandle.classList.add('active');
+                controls.enabled = false;
+                document.body.classList.add('dragging');
+            });
+        }
+
+        dragHandlesData.vertical.filter(v => v.colIndex === cIndex).forEach(v => {
+            let text = 'הזז מדף';
+            if(v.isSplit) text = 'הזז הפרדת יחידות';
+            if(v.isInternalDeskSurface) text = 'משטח שולחן פנימי';
+            if(v.isInternalDeskClearance) text = 'גובה חלל עבודה';
+            if(v.isInternalDeskDrawer) text = 'גובה מגירה פנימית';
+            if(v.isSubCellShelf) text = 'הזז מדף תא';
+
+            const sHandle = createHandle('vertical', v.x, v.y, text);
+            if(v.isSplit) { sHandle.style.borderColor = '#e74c3c'; sHandle.style.boxShadow = '0 2px 10px rgba(231, 76, 60, 0.4)'; }
+            if(v.isInternalDeskSurface || v.isInternalDeskClearance) sHandle.style.borderColor = '#f1c40f';
+            if(v.isSubCellShelf) { sHandle.style.borderColor = '#06b6d4'; sHandle.style.boxShadow = '0 2px 10px rgba(6,182,212,0.4)'; }
+            // Store colIndex + shelfIdx for snap highlight lookup
+            if (!v.isSplit && !v.isInternalDeskSurface && !v.isInternalDeskClearance && !v.isInternalDeskDrawer && !v.isSubCellShelf) {
+                sHandle.dataset.colIndex = v.colIndex;
+                sHandle.dataset.shelfIdx = v.shelfIdx;
+            }
+            dragLayer.appendChild(sHandle);
+            
+            let startMouseY = 0, startY = 0, isDragging = false;
+            sHandle.addEventListener('pointerdown', e => {
+                isDragging = true; startMouseY = e.clientY;
+                if(v.isSplit) startY = col.splitY;
+                else if(v.isInternalDeskSurface) startY = col.deskHeight;
+                else if(v.isInternalDeskClearance) startY = col.deskHeight + col.deskClearance;
+                else if(v.isInternalDeskDrawer) startY = col.drawerHeight;
+                else if(v.isSubCellShelf) {
+                    const _comp = col.compartments[v.rowIndex];
+                    const _sub = _comp && _comp.subCells && _comp.subCells[v.subCellIdx];
+                    startY = _sub && _sub.shelvesY ? _sub.shelvesY[v.subShelfIdx] : v.y;
+                }
+                else startY = col.shelvesY[v.shelfIdx];
+                sHandle.classList.add('active'); controls.enabled = false; document.body.classList.add('dragging');
+            });
+            window.addEventListener('pointermove', e => {
+                if (!isDragging) return;
+                e.preventDefault();
+                const pxToCm = 100 / (Math.abs(new THREE.Vector3(0,100,0).project(camera).y - new THREE.Vector3(0,0,0).project(camera).y) * container.clientHeight / 2);
+                const deltaCm = -(e.clientY - startMouseY) * pxToCm;
+                const t = state.thickness;
+
+                if (v.isSubCellShelf) {
+                    const _comp = col.compartments[v.rowIndex];
+                    const _sub = _comp && _comp.subCells && _comp.subCells[v.subCellIdx];
+                    if (!_sub || !Array.isArray(_sub.shelvesY)) return;
+                    const { prevY: compPrevY, compH } = _getSubCellCompBounds(col, v.rowIndex);
+                    const compTopY = compPrevY + compH;
+                    // Obstacles: comp boundaries + other shelves in same sub-cell
+                    const obs = [compPrevY + t/2, compTopY - t/2];
+                    _sub.shelvesY.forEach((y, i) => { if (i !== v.subShelfIdx) obs.push(y); });
+                    const limitMin = Math.max(...obs.filter(y => y < startY)) + MIN_SHELF_GAP + t;
+                    const limitMax = Math.min(...obs.filter(y => y > startY)) - MIN_SHELF_GAP - t;
+                    const newY = Math.round(Math.max(limitMin, Math.min(limitMax, startY + deltaCm)) * 10) / 10;
+                    _sub.shelvesY[v.subShelfIdx] = newY;
+                    const aboveH = newY - (v.subShelfIdx > 0 ? _sub.shelvesY[v.subShelfIdx - 1] : compPrevY);
+                    const belowH = (v.subShelfIdx < _sub.shelvesY.length - 1 ? _sub.shelvesY[v.subShelfIdx + 1] : compTopY) - newY;
+                    sHandle.querySelector('.drag-tooltip').innerText = `מעל: ${Math.round(aboveH)} ס"מ | מתחת: ${Math.round(belowH)} ס"מ`;
+                    buildCabinetDragging();
+                }
+                else if (v.isSplit) {
+                    let minLimits = [], maxLimits = [];
+                    state.columns.forEach(c => {
+                        if (c.splitY) {
+                            const cBaseY = c.type === 'desk' ? c.deskHeight + c.deskClearance : state.plinthHeight;
+                            minLimits.push(Math.max(...c.shelvesY.filter(y => y < startY), cBaseY + t) + t + MIN_SHELF_GAP + t);
+                            maxLimits.push(Math.min(...c.shelvesY.filter(y => y > startY), c.height - t) - t - MIN_SHELF_GAP - t);
+                        }
+                    });
+                    const limitMin = Math.max(...minLimits);
+                    const limitMax = Math.min(getSplitThreshold(), ...maxLimits); 
+                    const newSplitY = Math.round(Math.max(limitMin, Math.min(limitMax, startY + deltaCm)));
+                    _syncAllSplitY(newSplitY);
+                } 
+                else if (v.isInternalDeskSurface) {
+                    col.deskHeight = Math.round(Math.max(50, Math.min(col.deskHeight + col.deskClearance - MIN_SHELF_GAP, startY + deltaCm)));
+                    distributeShelves(col);
+                }
+                else if (v.isInternalDeskClearance) {
+                    let maxLimits = col.shelvesY.length > 0 ? col.shelvesY[0] - MIN_SHELF_GAP : col.height - MIN_SHELF_GAP;
+                    if (col.splitY) maxLimits = Math.min(maxLimits, col.splitY - MIN_SHELF_GAP);
+                    let desiredY = Math.round(Math.max(col.deskHeight + 30, Math.min(maxLimits, startY + deltaCm)));
+                    col.deskClearance = desiredY - col.deskHeight;
+                    distributeShelves(col);
+                }
+                else if (v.isInternalDeskDrawer) {
+                    col.drawerHeight = Math.round(Math.max(8, Math.min(40, startY - deltaCm)));
+                }
+                else {
+                    const cBaseY = col.type === 'desk' ? col.deskHeight + col.deskClearance : state.plinthHeight;
+                    let obs = [cBaseY + t/2, col.height - t/2];
+                    // splitY is intentionally NOT added as an obstacle — shelves can cross the split crossbar
+                    col.shelvesY.forEach((y, i) => { if (i !== v.shelfIdx) obs.push(y); });
+
+                    const limitMin = Math.max(...obs.filter(y => y < startY)) + MIN_SHELF_GAP + t;
+                    const limitMax = Math.min(...obs.filter(y => y > startY)) - MIN_SHELF_GAP - t;
+                    // Round to 0.1cm (1mm) — same resolution as _distributeShelves
+                    let newY = Math.round(Math.max(limitMin, Math.min(limitMax, startY + deltaCm)) * 10) / 10;
+
+                    // ── Snap + highlight: if within 5mm of a neighbor shelf, snap to it ──
+                    const SNAP_THRESHOLD = 0.5; // 5mm in cm
+                    let highlightNeighborColIdx = -1;
+                    let highlightNeighborShelfIdx = -1;
+                    let bestDist = SNAP_THRESHOLD + 1;
+                    [-1, 1].forEach(offset => {
+                        const nc = v.colIndex + offset;
+                        if (nc < 0 || nc >= state.columns.length) return;
+                        const neighbor = state.columns[nc];
+                        if (!neighbor || !neighbor.shelvesY) return;
+                        neighbor.shelvesY.forEach((ny, ni) => {
+                            const dist = Math.abs(ny - newY);
+                            if (dist <= SNAP_THRESHOLD && dist < bestDist) {
+                                // Only snap if the snapped position is within limits
+                                if (ny >= limitMin && ny <= limitMax) {
+                                    bestDist = dist;
+                                    highlightNeighborColIdx = nc;
+                                    highlightNeighborShelfIdx = ni;
+                                    newY = ny; // snap to neighbor's exact position
+                                }
+                            }
+                        });
+                    });
+
+                    col.shelvesY[v.shelfIdx] = newY; // apply position to state
+
+                    // Store snap info for engine.js shelf material highlight + handle highlight
+                    if (highlightNeighborColIdx !== -1) {
+                        window._snapHighlight = {
+                            colIdx: v.colIndex,
+                            shelfIdx: v.shelfIdx,
+                            neighborColIdx: highlightNeighborColIdx,
+                            neighborShelfIdx: highlightNeighborShelfIdx
+                        };
+                    } else {
+                        window._snapHighlight = null;
+                    }
+                    sHandle._highlightNeighborColIdx = highlightNeighborColIdx;
+                    sHandle._highlightNeighborShelfIdx = highlightNeighborShelfIdx;
+                    // ─────────────────────────────────────────────────────────────────
+
+                    // Auto-update drawer counts for the two cells adjacent to the moved shelf
+                    // Also check sorbet minimum height — if violated, snap shelf back and ask user
+                    let _sorbetBlocked = false;
+                    const _checkSorbetRow = (r) => {
+                        const comp = col.compartments[r];
+                        if (!comp || comp.type !== 'sorbet') return false;
+                        return _cellHeight(col, r) < 110;
+                    };
+                    if (_checkSorbetRow(v.shelfIdx) || _checkSorbetRow(v.shelfIdx + 1)) {
+                        // Revert shelf to original position
+                        col.shelvesY[v.shelfIdx] = startY;
+                        newY = startY;
+                        _sorbetBlocked = true;
+                        // Stop drag immediately before showing dialog (dialog blocks pointer events)
+                        isDragging = false;
+                        sHandle.classList.remove('active');
+                        controls.enabled = true;
+                        window._snapHighlight = null;
+                        // Ask user: delete sorbet or cancel
+                        const blockedR = (_checkSorbetRow(v.shelfIdx)) ? v.shelfIdx : v.shelfIdx + 1;
+                        if (confirm('הסורבטו דורש גובה תא מינימלי של 110 ס"מ.\nלמחוק את הסורבטו ולהמשיך?')) {
+                            col.compartments[blockedR].type = 'empty';
+                            col.shelvesY[v.shelfIdx] = Math.round(Math.max(limitMin, Math.min(limitMax, startY + deltaCm)) * 10) / 10;
+                        }
+                        buildCabinet(); saveHistoryState();
+                        return;
+                    }
+                    if (!_sorbetBlocked) {
+                        const _autoDrawerRow = (r) => {
+                            const comp = col.compartments[r];
+                            if (!comp || (comp.type !== 'internal_drawers' && comp.type !== 'external_drawers')) return;
+                            const cellH = _cellHeight(col, r);
+                            if (cellH < 12) { comp.type = 'empty'; return; }
+                            comp.count = calcAutoDrawerCount(cellH);
+                        };
+                        _autoDrawerRow(v.shelfIdx);
+                        _autoDrawerRow(v.shelfIdx + 1);
+                    }
+                }
+                buildCabinetDragging();
+                // Apply proximity highlight AFTER buildCabinetDragging (which rebuilds all handles)
+                // Use the module-level _snapHighlight (survives handle rebuild)
+                {
+                    const snap = window._snapHighlight;
+                    document.querySelectorAll('.drag-handle.vertical').forEach(h => {
+                        const hCol = parseInt(h.dataset.colIndex);
+                        const hShelf = parseInt(h.dataset.shelfIdx);
+                        if (snap) {
+                            if (hCol === snap.colIdx && hShelf === snap.shelfIdx) {
+                                h.classList.add('snapped', 'active');
+                            }
+                            if (hCol === snap.neighborColIdx && hShelf === snap.neighborShelfIdx) {
+                                h.classList.add('snapped');
+                            }
+                        }
+                    });
+                }
+                updateToolbarButtonHighlights();
+            });
+            window.addEventListener('pointerup', () => { if(isDragging){ isDragging = false; sHandle.classList.remove('active'); controls.enabled = true; document.body.classList.remove('dragging'); window._snapHighlight = null; _endDrag(); saveHistoryState(); }});
+        });
+    }
+
+    // Partition drag handles — horizontal handles inside partitioned cells (N boards support)
+    // Each handle sits on the partition board and drags left/right to resize sub-cells.
+    // Pattern mirrors horizontal column handles: uses window._partDrag for state,
+    // and window.addEventListener for move/up so the handle survives dragLayer rebuilds.
+    if (dragHandlesData.partitions) {
+        dragHandlesData.partitions.forEach(p => {
+            const col = state.columns[p.colIndex];
+            if (!col) return;
+            const comp = p.comp;
+            if (!Array.isArray(comp.partitions)) return;
+            const pi = p.partIdx;
+            const partitions = comp.partitions;
+
+            // Compute sub-cell widths for tooltip
+            const _getSubWidths = (pxArr) => {
+                const colW = col.width;
+                const boundaries = [0, ...pxArr.map(px => colW * px), colW];
+                return boundaries.slice(1).map((b, i) => Math.round(b - boundaries[i]));
+            };
+
+            const subWidths = _getSubWidths(partitions);
+            const tooltipText = subWidths.map((w, i) => `תא ${i+1}: ${w}`).join(' | ');
+
+            // Check if this is the currently active drag (survives dragLayer rebuild)
+            const activeDrag = window._partDrag;
+            const isActiveDrag = activeDrag &&
+                activeDrag.colIndex === p.colIndex &&
+                activeDrag.rowIndex === p.rowIndex &&
+                activeDrag.pi === pi;
+
+            const pHandle = createHandle('horizontal', p.x, p.y, tooltipText);
+            pHandle.dataset.colIndex = p.colIndex;
+            pHandle.dataset.rowIndex = p.rowIndex;
+            pHandle.dataset.partIdx = pi;
+            pHandle.style.borderColor = '#f97316';
+            pHandle.style.boxShadow = '0 2px 10px rgba(249,115,22,0.4)';
+            if (isActiveDrag) {
+                pHandle.classList.add('active');
+                // Update the drag state to point to the new handle element
+                activeDrag.tooltipEl = pHandle.querySelector('.drag-tooltip');
+            }
+            dragLayer.appendChild(pHandle);
+
+            const MIN_SUB_WIDTH_RATIO = 8 / col.width; // minimum 8cm sub-cell
+
+            pHandle.addEventListener('pointerdown', e => {
+                e.preventDefault();
+                pHandle.classList.add('active');
+                controls.enabled = false;
+                document.body.classList.add('dragging');
+                window._partDrag = {
+                    colIndex: p.colIndex,
+                    rowIndex: p.rowIndex,
+                    pi,
+                    col,
+                    startMouseX: e.clientX,
+                    startPX: partitions[pi],
+                    getSubWidths: _getSubWidths,
+                    minRatio: MIN_SUB_WIDTH_RATIO,
+                    tooltipEl: pHandle.querySelector('.drag-tooltip'),
+                };
+            });
+        });
+
+        // Single window-level pointermove/pointerup for all partition handles
+        // (added once per buildDragHandlesUI call — old ones are replaced by the rebuild)
+        window._partMoveHandler && window.removeEventListener('pointermove', window._partMoveHandler);
+        window._partUpHandler   && window.removeEventListener('pointerup',   window._partUpHandler);
+
+        window._partMoveHandler = (e) => {
+            const d = window._partDrag;
+            if (!d) return;
+            e.preventDefault();
+            // Always read live partitions from state (avoids stale reference after addPartition replaces array)
+            const _liveCol = state.columns[d.colIndex];
+            if (!_liveCol) return;
+            const _liveComp = _liveCol.compartments[d.rowIndex];
+            if (!_liveComp || !Array.isArray(_liveComp.partitions)) return;
+            const livePartitions = _liveComp.partitions;
+
+            const leftPx  = (new THREE.Vector3(-state.width/2, 0, 0).project(camera).x + 1) / 2 * container.clientWidth;
+            const rightPx = (new THREE.Vector3( state.width/2, 0, 0).project(camera).x + 1) / 2 * container.clientWidth;
+            const totalPxWidth = rightPx - leftPx;
+            const pxToCm = totalPxWidth > 0 ? state.width / totalPxWidth : 1;
+            const deltaCm = (e.clientX - d.startMouseX) * pxToCm;
+            const rawNewPX = d.startPX + deltaCm / d.col.width;
+
+            const lowerBound = (d.pi === 0) ? d.minRatio : (livePartitions[d.pi - 1] + d.minRatio);
+            const upperBound = (d.pi === livePartitions.length - 1) ? (1 - d.minRatio) : (livePartitions[d.pi + 1] - d.minRatio);
+            livePartitions[d.pi] = Math.max(lowerBound, Math.min(upperBound, rawNewPX));
+
+            if (d.tooltipEl) {
+                const newSubWidths = d.getSubWidths(livePartitions);
+                d.tooltipEl.innerText = newSubWidths.map((w, i) => `תא ${i+1}: ${w}`).join(' | ');
+            }
+            buildCabinetDragging();
+        };
+
+        window._partUpHandler = () => {
+            if (!window._partDrag) return;
+            window._partDrag = null;
+            controls.enabled = true;
+            document.body.classList.remove('dragging');
+            // Find and deactivate any active partition handle
+            document.querySelectorAll('.drag-handle.horizontal').forEach(h => {
+                if (h.dataset.partIdx !== undefined) h.classList.remove('active');
+            });
+            _endDrag();
+            calculatePrice();
+            saveHistoryState();
+        };
+
+        window.addEventListener('pointermove', window._partMoveHandler);
+        window.addEventListener('pointerup',   window._partUpHandler);
+    }
+
+    // ---- Vessel sink single centered drag handle (bathroom countertop) ----
+    // Always rendered when bathroom preset is active — not dependent on column hover.
+    // Appears on hover over the handle itself (CSS :hover on .drag-handle).
+    if (dragHandlesData.vesselSink && dragHandlesData.vesselSink.length > 0 && state.presetId === 'bathroom') {
+        const vsHandle = dragHandlesData.vesselSink[0]; // always drawn at c===0
+        if (vsHandle) {
+            const sHandle = createHandle('horizontal', vsHandle.centerX, vsHandle.y, 'גרור כיור ימינה/שמאלה');
+            sHandle.style.borderColor = '#06b6d4';
+            sHandle.style.boxShadow = '0 2px 10px rgba(6,182,212,0.4)';
+            sHandle.dataset.colIndex = vsHandle.colIndex;
+            dragLayer.appendChild(sHandle);
+
+            sHandle.addEventListener('pointerdown', e => {
+                e.preventDefault();
+                controls.enabled = false;
+                document.body.classList.add('dragging');
+                window._vesselSinkDragging = true; // disable butcher texture during drag for performance
+                const startX = e.clientX;
+                const startOffset = vsHandle.currentOffsetX;
+                // Compute pixels-per-cm from projected slab width
+                const _slabLeftPt  = new THREE.Vector3(vsHandle.slabLeftX,  vsHandle.y, state.depth / 2);
+                const _slabRightPt = new THREE.Vector3(vsHandle.slabRightX, vsHandle.y, state.depth / 2);
+                if (window._activeWingGroup) {
+                    window._activeWingGroup.updateMatrixWorld(true);
+                    _slabLeftPt.applyMatrix4(window._activeWingGroup.matrixWorld);
+                    _slabRightPt.applyMatrix4(window._activeWingGroup.matrixWorld);
+                }
+                const _lProj = _slabLeftPt.clone().project(camera);
+                const _rProj = _slabRightPt.clone().project(camera);
+                const _slabPxW = (_rProj.x - _lProj.x) * container.clientWidth / 2;
+                const _slabCmW = vsHandle.slabRightX - vsHandle.slabLeftX;
+                const _pxPerCm = _slabPxW / _slabCmW;
+
+                const _onMove = (me) => {
+                    const dx = me.clientX - startX;
+                    const dCm = _pxPerCm > 0 ? dx / _pxPerCm : 0;
+                    const newOffset = startOffset + dCm;
+                    const maxOff = (_slabCmW / 2) - vsHandle.vesselW / 2 - 1;
+                    const clamped = Math.max(-maxOff, Math.min(maxOff, newOffset));
+                    const cw = state.wings && state.wings.center;
+                    if (cw) {
+                        cw.vesselSinkOffsetX = clamped;
+                        buildCabinetDragging(); // fast rebuild — no texture load during drag
+                        updateDragHandlesPosition();
+                    }
+                };
+                const _onUp = () => {
+                    window._vesselSinkDragging = false; // restore butcher texture
+                    controls.enabled = true;
+                    document.body.classList.remove('dragging');
+                    window.removeEventListener('pointermove', _onMove);
+                    window.removeEventListener('pointerup', _onUp);
+                    buildCabinet(); // full rebuild with texture restored
+                    if (typeof saveHistoryState === 'function') saveHistoryState();
+                };
+                window.addEventListener('pointermove', _onMove);
+                window.addEventListener('pointerup', _onUp);
+            });
+        }
+    }
+
+    // ---- Upper unit horizontal drag handles (reposition left/right) ----
+    // Restore active class if drag is in progress (handle was rebuilt during drag)
+    if (dragHandlesData.upperUnit && dragHandlesData.upperUnit.length > 0) {
+        dragHandlesData.upperUnit.forEach(d => {
+            const uuWing = state.wings[d.uuKey];
+            if (!uuWing) return;
+            const offsetX = uuWing._upperOffsetX || 0;
+            const handle = document.createElement('div');
+            handle.className = 'drag-handle horizontal uu-move-handle';
+            handle.dataset.uuKey = d.uuKey;
+            handle.dataset.worldX = d.worldX;
+            handle.dataset.worldY = d.worldY;
+            handle.dataset.world = '1'; // flag: use world-space projection
+            handle.innerHTML = `<div class="drag-tooltip">הזזה: ${Math.round(offsetX)} ס"מ</div>`;
+            handle.style.display = 'flex';
+            // Restore active class if this handle's drag is in progress
+            if (window._uuDrag && window._uuDrag.uuKey === d.uuKey) handle.classList.add('active');
+            dragLayer.appendChild(handle);
+
+            handle.addEventListener('pointerdown', e => {
+                e.preventDefault();
+                controls.enabled = false;
+                document.body.classList.add('dragging', 'dragging-h');
+                window._uuDrag = {
+                    uuKey: d.uuKey,
+                    startMouseX: e.clientX,
+                    startOffsetX: uuWing._upperOffsetX || 0
+                };
+                handle.classList.add('active');
+            });
+        });
+
+        // Global move/up handlers — survive handle rebuild
+        if (window._uuMoveHandler) window.removeEventListener('pointermove', window._uuMoveHandler);
+        if (window._uuUpHandler)   window.removeEventListener('pointerup',   window._uuUpHandler);
+
+        window._uuMoveHandler = e => {
+            if (!window._uuDrag) return;
+            e.preventDefault();
+            const { uuKey, startMouseX, startOffsetX } = window._uuDrag;
+            const uuW2 = state.wings[uuKey];
+            if (!uuW2) return;
+            // Convert pixel delta to cm using a fixed 100cm reference span
+            const cw = container.clientWidth;
+            const leftPx  = (new THREE.Vector3(-50, 0, 0).project(camera).x * 0.5 + 0.5) * cw;
+            const rightPx = (new THREE.Vector3( 50, 0, 0).project(camera).x * 0.5 + 0.5) * cw;
+            const pxPerCm = Math.max(1, (rightPx - leftPx) / 100);
+            const deltaCm = (e.clientX - startMouseX) / pxPerCm;
+            // Clamp so upper unit stays within the lower cabinet's left/right edges
+            // Lower cabinet width from center wing (direct access, not proxy)
+            const lowerW = (state.wings.center && state.wings.center.width) || 200;
+            const uuWidth = uuW2.width || 160;
+            const maxOffset = Math.max(0, (lowerW - uuWidth) / 2);
+            let newOffset = Math.max(-maxOffset, Math.min(maxOffset, startOffsetX + deltaCm));
+            // Snap to center (offset=0) when within 3cm
+            const SNAP_THRESHOLD = 3;
+            const snapped = Math.abs(newOffset) < SNAP_THRESHOLD;
+            if (snapped) newOffset = 0;
+            uuW2._upperOffsetX = Math.round(newOffset);
+            // Update tooltip on the active handle
+            const activeHandle = dragLayer.querySelector(`.uu-move-handle[data-uu-key="${uuKey}"]`);
+            if (activeHandle) {
+                activeHandle.querySelector('.drag-tooltip').innerText = snapped ? 'מרכז ✓' : `הזזה: ${uuW2._upperOffsetX} ס"מ`;
+                if (snapped) activeHandle.classList.add('snapped'); else activeHandle.classList.remove('snapped');
+            }
+            buildCabinetDragging();
+        };
+        window._uuUpHandler = () => {
+            if (!window._uuDrag) return;
+            window._uuDrag = null;
+            controls.enabled = true;
+            document.body.classList.remove('dragging', 'dragging-h');
+            _endDrag();
+            saveHistoryState();
+        };
+        window.addEventListener('pointermove', window._uuMoveHandler);
+        window.addEventListener('pointerup',   window._uuUpHandler);
+    }
+
+    updateOverlaysPosition();
+    updateDragHandlesPosition();
+}
+
+function createHandle(dir, x3d, y3d = null, text = 'גרירה') {
+    const el = document.createElement('div');
+    el.className = `drag-handle ${dir}`;
+    el.dataset.x3d = x3d; if(y3d) el.dataset.y3d = y3d;
+    // For vertical handles add a larger invisible hit area for easier grabbing
+    const hitArea = dir === 'vertical' ? '<div class="drag-hit-area"></div>' : '';
+    el.innerHTML = `<div class="drag-tooltip">${text}</div>${hitArea}`;
+    el.style.display = 'flex';
+    return el;
+}
+
+function updateDragHandlesPosition() {
+    if(state.viewMode !== 'front') return;
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+
+    document.querySelectorAll('.drag-handle').forEach(handle => {
+        let worldPt;
+        if (handle.dataset.world === '1') {
+            // World-space handle (e.g. upper unit move handle): use worldX/worldY directly
+            const wx = parseFloat(handle.dataset.worldX);
+            const wy = parseFloat(handle.dataset.worldY);
+            // Update worldX from current upper unit position (it may have moved during drag)
+            const uuKey = handle.dataset.uuKey;
+            const uuWing = uuKey && state.wings[uuKey];
+            let currentWX = wx;
+            if (uuWing) {
+                // Recompute world X from current _upperOffsetX
+                const parentId = uuWing._parentWingId || 'center';
+                const centerWing = state.wings.center;
+                if (parentId === 'left') {
+                    const leftEdgeX = centerWing ? -centerWing.width / 2 : -80;
+                    const parentWing = state.wings[parentId];
+                    const parentD = parentWing ? (parentWing.depth || 54) : 54;
+                    currentWX = leftEdgeX - parentD / 2 + (uuWing._upperOffsetX || 0);
+                } else if (parentId === 'right') {
+                    const rightEdgeX = centerWing ? centerWing.width / 2 : 80;
+                    const parentWing = state.wings[parentId];
+                    const parentD = parentWing ? (parentWing.depth || 54) : 54;
+                    currentWX = rightEdgeX + parentD / 2 + (uuWing._upperOffsetX || 0);
+                } else {
+                    currentWX = (uuWing._upperOffsetX || 0);
+                }
+            }
+            worldPt = new THREE.Vector3(currentWX, wy, state.depth / 2);
+        } else {
+            const x3d = parseFloat(handle.dataset.x3d);
+            const y3d = handle.dataset.y3d ? parseFloat(handle.dataset.y3d) : Math.max(...state.columns.map(c => c.height));
+            worldPt = new THREE.Vector3(x3d, y3d, state.depth / 2);
+            if (window._activeWingGroup) {
+                window._activeWingGroup.updateMatrixWorld(true);
+                worldPt.applyMatrix4(window._activeWingGroup.matrixWorld);
+            }
+        }
+        const pos = worldPt.project(camera);
+        
+        let x = (pos.x * .5 + .5) * cw;
+        let y = (-(pos.y * .5) + .5) * ch;
+
+        // גבולות גזרה לידיות הגרירה
+        const w = handle.offsetWidth || 24;
+        const h = handle.offsetHeight || 24;
+        x = Math.max(w/2 + 5, Math.min(cw - w/2 - 5, x));
+        y = Math.max(h/2 + 5, Math.min(ch - h/2 - 5, y));
+
+        handle.style.left = `${x}px`;
+        // Upper unit move handle: raise 20px above projected position
+        handle.style.top = `${handle.classList.contains('uu-move-handle') ? y - 20 : y}px`;
+    });
+}
+
+// ── Bed controls toolbar ──────────────────────────────────────────────────────
+// A compact grouped toolbar appears near the bed when:
+//   - Room is visible AND bed is loaded
+//   - Mouse is hovering over the bed area (within ~80px of projected bed center)
+//   - OR a drag is in progress
+//
+// Buttons:
+//   #bed-handle-x      — drag left/right  → changes window._bedPos.x
+//   #bed-handle-z      — drag up/down     → changes window._bedPos.z
+//   #bed-handle-rotate — click to rotate 90°
+//
+// Wall clamping: bed position is clamped to window._roomBounds so it can't
+// pass through walls. Half-size of bed (~100cm) is used as margin.
+
+window._bedDrag      = null;   // { axis:'x'|'z', startMouseX, startMouseY, startVal }
+window._bedHovered   = false;  // true when mouse is near bed center on screen
+const BED_HALF = 100;          // approximate half-size of bed in cm (for wall clamping)
+
+// Clamp bed position to room bounds
+function _clampBedPos(bp) {
+    const b = window._roomBounds;
+    if (!b) return bp;
+    bp.x = Math.max(b.leftX  + BED_HALF, Math.min(b.rightX - BED_HALF, bp.x));
+    bp.z = Math.max(b.backZ  + BED_HALF, Math.min(b.frontZ - BED_HALF, bp.z));
+    return bp;
+}
+
+// Project bed center to screen coords; returns {sx, sy} or null if behind camera
+function _projectBedCenter() {
+    const bp = window._bedPos || { x: 100, z: 200 };
+    const bedY = 50;
+    const worldPt = new THREE.Vector3(bp.x, bedY, bp.z);
+    const pos = worldPt.project(camera);
+    if (pos.z > 1) return null; // behind camera
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+    return {
+        sx: (pos.x *  0.5 + 0.5) * cw,
+        sy: (pos.y * -0.5 + 0.5) * ch
+    };
+}
+
+window._updateBedHandles = function() {
+    const tb = document.getElementById('bed-toolbar');
+    if (!tb) return;
+
+    const shouldShow = window._roomVisible && window._bedGroup &&
+                       (window._bedHovered || window._bedDrag);
+    if (!shouldShow) { tb.style.display = 'none'; return; }
+
+    const proj = _projectBedCenter();
+    if (!proj) { tb.style.display = 'none'; return; }
+
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+    // Position toolbar just above the projected bed center
+    const tbW = 120; // approximate toolbar width
+    const tbH = 40;  // approximate toolbar height
+    const left = Math.max(tbW / 2, Math.min(cw - tbW / 2, proj.sx));
+    const top  = Math.max(tbH / 2 + 10, proj.sy - 50);
+
+    tb.style.display = 'block';
+    tb.style.left = left + 'px';
+    tb.style.top  = top  + 'px';
+};
+
+// Wire up bed toolbar events (runs once after DOM is ready)
+(function _bindBedHandles() {
+    const tb = document.getElementById('bed-toolbar');
+    const hx = document.getElementById('bed-handle-x');
+    const hz = document.getElementById('bed-handle-z');
+    if (!tb || !hx || !hz) { setTimeout(_bindBedHandles, 300); return; }
+
+    // Show toolbar on hover near bed center
+    container.addEventListener('pointermove', function(e) {
+        if (window._bedDrag) return; // keep visible during drag
+        if (!window._roomVisible || !window._bedGroup) {
+            window._bedHovered = false;
+            return;
+        }
+        // Also stay visible when hovering over the toolbar itself
+        const overToolbar = e.target.closest('#bed-toolbar');
+        if (overToolbar) { window._bedHovered = true; return; }
+        const proj = _projectBedCenter();
+        if (!proj) { window._bedHovered = false; return; }
+        // Convert client coords to canvas-relative coords for distance check
+        const rect = container.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        const dx = mx - proj.sx;
+        const dy = my - proj.sy;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        window._bedHovered = dist < 90;
+    });
+
+    // Hide toolbar when mouse leaves canvas (unless dragging)
+    container.addEventListener('pointerleave', function() {
+        if (!window._bedDrag) window._bedHovered = false;
+    });
+
+    function onBedPointerDown(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const axis = this.dataset.axis; // 'x' or 'z'
+        const bp = window._bedPos || { x: 100, z: 200 };
+        window._bedDrag = {
+            axis,
+            startMouseX: e.clientX,
+            startMouseY: e.clientY,
+            startVal: axis === 'x' ? bp.x : bp.z
+        };
+        this.classList.add('dragging');
+        if (typeof controls !== 'undefined') controls.enabled = false;
+        document.body.classList.add('dragging');
+    }
+
+    hx.addEventListener('pointerdown', onBedPointerDown);
+    hz.addEventListener('pointerdown', onBedPointerDown);
+
+    window.addEventListener('pointermove', function(e) {
+        const d = window._bedDrag;
+        if (!d) return;
+        const bp = window._bedPos || { x: 100, z: 200 };
+
+        // Convert pixel delta to cm using camera projection
+        const cw = container.clientWidth;
+        const ch = container.clientHeight;
+        const refPt  = new THREE.Vector3(0, 50, 100).project(camera);
+        const refPt2 = new THREE.Vector3(1, 50, 100).project(camera);
+        const pxPerCmX = Math.abs((refPt2.x - refPt.x) * cw / 2) || 1;
+        const refPt3 = new THREE.Vector3(0, 50, 101).project(camera);
+        const pxPerCmZ = Math.abs((refPt3.y - refPt.y) * ch / 2) || 1;
+
+        if (d.axis === 'x') {
+            bp.x = d.startVal + (e.clientX - d.startMouseX) / pxPerCmX;
+        } else {
+            // Z axis: drag up = move toward camera (smaller Z), drag down = away
+            bp.z = d.startVal + (e.clientY - d.startMouseY) / pxPerCmZ;
+        }
+        // Clamp to room walls
+        _clampBedPos(bp);
+        window._bedPos = bp;
+
+        if (typeof _buildRoom === 'function') _buildRoom();
+        window._updateBedHandles();
+    });
+
+    window.addEventListener('pointerup', function() {
+        if (!window._bedDrag) return;
+        document.querySelectorAll('.bed-tb-btn').forEach(h => h.classList.remove('dragging'));
+        window._bedDrag = null;
+        if (typeof controls !== 'undefined') controls.enabled = true;
+        document.body.classList.remove('dragging');
+    });
+})();
+
+// ── Room wall position helpers ────────────────────────────────────────────────
+window._roomWall          = window._roomWall          || 'center';
+window._roomWidth         = window._roomWidth         || 0;   // 0 = auto (based on cabinet)
+window._roomDepth         = window._roomDepth         || 0;   // 0 = auto
+window._roomHeight        = window._roomHeight        || 0;   // 0 = auto (300cm default)
+window._closureEnabled    = (window._closureEnabled !== undefined) ? window._closureEnabled : true;
+window._closureWidth      = window._closureWidth      || 1.8; // cm — left side panel width
+window._closureWidthRight = window._closureWidthRight || 1.8; // cm — right side panel width (for 'both' mode)
+window._closureCeilWidth  = window._closureCeilWidth  || 1.8; // cm — ceiling panel thickness
+window._closureDepthWidth = window._closureDepthWidth || 1.8; // cm — depth (front) panel thickness
+// 'cabinet' = front face flush with cabinet front; 'door' = front face extends to door front (+1.7cm)
+window._closureFrontLine  = window._closureFrontLine  || 'cabinet';
+// Array of ceiling closure meshes — populated by buildCabinet, used by animate() for camera-based visibility
+window._closureCeilMeshes = window._closureCeilMeshes || [];
+
+// ── Niche (ארון בנישה) globals ──────────────────────────────────────────────
+window._nicheEnabled             = window._nicheEnabled             || false;
+window._nicheWidth               = window._nicheWidth               || 200;
+window._nicheDepth               = window._nicheDepth               || 30;
+window._nicheClosureEnabled      = window._nicheClosureEnabled      || false;
+window._nicheClosureWidthLeft    = window._nicheClosureWidthLeft    || 1.8;
+window._nicheClosureWidthRight   = window._nicheClosureWidthRight   || 1.8;
+window._nicheClosureCeilHeight   = window._nicheClosureCeilHeight   || 1.8;
+
+window._setRoomWall = function(wall) {
+    window._roomWall = wall;
+    state.roomWall   = wall;
+    // If a cabinet is currently being edited, update its rawState in the cart too
+    if (state.editingCartIndex > -1 && state.orderCart[state.editingCartIndex]) {
+        if (!state.orderCart[state.editingCartIndex].rawState) state.orderCart[state.editingCartIndex].rawState = {};
+        state.orderCart[state.editingCartIndex].rawState.roomWall = wall;
+    }
+    window._updateRoomWallUI();
+    buildCabinet();
+    updateLeftSidebar();
+};
+
+window._setNicheEnabled = function(enabled) {
+    window._nicheEnabled = !!enabled;
+    const tog = document.getElementById('inp-niche-enabled');
+    if (tog) tog.checked = window._nicheEnabled;
+    window._updateNicheUI();
+    buildCabinet();
+};
+
+window._setNicheWidth = function(val) {
+    const v = Math.max(50, Math.min(600, parseFloat(val) || 200));
+    window._nicheWidth = v;
+    const numEl = document.getElementById('inp-num-niche-width');
+    const slEl  = document.getElementById('inp-niche-width');
+    if (numEl) numEl.value = v;
+    if (slEl)  slEl.value  = v;
+    window._updateNicheUI(); // update closure slider max when niche width changes
+    buildCabinet();
+};
+
+window._setNicheDepth = function(val) {
+    const v = Math.max(10, Math.min(200, parseFloat(val) || 30));
+    window._nicheDepth = v;
+    const numEl = document.getElementById('inp-num-niche-depth');
+    const slEl  = document.getElementById('inp-niche-depth');
+    if (numEl) numEl.value = v;
+    if (slEl)  slEl.value  = v;
+    buildCabinet();
+};
+
+window._setNicheClosureEnabled = function(enabled) {
+    window._nicheClosureEnabled = !!enabled;
+    const tog = document.getElementById('inp-niche-closure-enabled');
+    if (tog) tog.checked = window._nicheClosureEnabled;
+    window._updateNicheUI();
+    buildCabinet();
+};
+
+window._setNicheClosureWidthLeft = function(val) {
+    const _nW   = Math.max(50, parseFloat(window._nicheWidth) || 200);
+    const _cabW = (state.wings && state.wings.center) ? (state.wings.center.width || 160) : (state.width || 160);
+    const _maxS = Math.max(1.8, (_nW - _cabW) / 2);
+    const v = Math.max(1.8, Math.min(_maxS, parseFloat(val) || 1.8));
+    window._nicheClosureWidthLeft = v;
+    const numEl = document.getElementById('inp-num-niche-closure-left');
+    const slEl  = document.getElementById('inp-niche-closure-left');
+    if (numEl) numEl.value = v;
+    if (slEl)  slEl.value  = v;
+    buildCabinet();
+};
+
+window._setNicheClosureWidthRight = function(val) {
+    const _nW   = Math.max(50, parseFloat(window._nicheWidth) || 200);
+    const _cabW = (state.wings && state.wings.center) ? (state.wings.center.width || 160) : (state.width || 160);
+    const _maxS = Math.max(1.8, (_nW - _cabW) / 2);
+    const v = Math.max(1.8, Math.min(_maxS, parseFloat(val) || 1.8));
+    window._nicheClosureWidthRight = v;
+    const numEl = document.getElementById('inp-num-niche-closure-right');
+    const slEl  = document.getElementById('inp-niche-closure-right');
+    if (numEl) numEl.value = v;
+    if (slEl)  slEl.value  = v;
+    buildCabinet();
+};
+
+window._setNicheClosureCeilHeight = function(val) {
+    const v = Math.max(1.8, Math.min(30, parseFloat(val) || 1.8));
+    window._nicheClosureCeilHeight = v;
+    const numEl = document.getElementById('inp-num-niche-closure-ceil');
+    const slEl  = document.getElementById('inp-niche-closure-ceil');
+    if (numEl) numEl.value = v;
+    if (slEl)  slEl.value  = v;
+    buildCabinet();
+};
+
+window._updateNicheUI = function() {
+    const nicheRow  = document.getElementById('niche-toggle-row');
+    const nicheCtrl = document.getElementById('niche-controls');
+    const tog       = document.getElementById('inp-niche-enabled');
+    const _preset   = state.presetId || 'linear';
+    const _isLS     = (_preset === 'linear' || _preset === 'sliding');
+    if (nicheRow) nicheRow.style.display = _isLS ? '' : 'none';
+    if (tog) tog.checked = !!window._nicheEnabled;
+    if (nicheCtrl) nicheCtrl.style.display = (window._nicheEnabled && _isLS) ? '' : 'none';
+    // Sync slider values
+    const nwNum = document.getElementById('inp-num-niche-width');
+    const nwSl  = document.getElementById('inp-niche-width');
+    const ndNum = document.getElementById('inp-num-niche-depth');
+    const ndSl  = document.getElementById('inp-niche-depth');
+    if (nwNum) nwNum.value = window._nicheWidth  || 200;
+    if (nwSl)  nwSl.value  = window._nicheWidth  || 200;
+    if (ndNum) ndNum.value = window._nicheDepth   || 30;
+    if (ndSl)  ndSl.value  = window._nicheDepth   || 30;
+    // Show/hide niche closure toggle: whenever niche is enabled (for linear/sliding)
+    const nicheClosureRow = document.getElementById('niche-closure-row');
+    if (nicheClosureRow) {
+        const _showClosure = (window._nicheEnabled && _isLS);
+        nicheClosureRow.style.display = _showClosure ? '' : 'none';
+        if (!_showClosure) window._nicheClosureEnabled = false;
+    }
+    // Sync closure toggle checkbox
+    const closureTog = document.getElementById('inp-niche-closure-enabled');
+    if (closureTog) closureTog.checked = !!window._nicheClosureEnabled;
+    // Show/hide niche closure sliders
+    const nicheClosureSliders = document.getElementById('niche-closure-sliders');
+    if (nicheClosureSliders) {
+        nicheClosureSliders.style.display = (window._nicheEnabled && _isLS && window._nicheClosureEnabled) ? '' : 'none';
+    }
+    // Compute max side panel thickness = (nicheWidth - cabinetWidth) / 2
+    const _ncNW   = Math.max(50, parseFloat(window._nicheWidth) || 200);
+    const _ncCabW = state.wings && state.wings.center ? (state.wings.center.width || 160) : (state.width || 160);
+    const _ncMaxSide = Math.max(1.8, (_ncNW - _ncCabW) / 2);
+    // Sync niche closure slider values and max
+    const _ncL = document.getElementById('inp-niche-closure-left');
+    const _ncLn = document.getElementById('inp-num-niche-closure-left');
+    const _ncR = document.getElementById('inp-niche-closure-right');
+    const _ncRn = document.getElementById('inp-num-niche-closure-right');
+    const _ncC = document.getElementById('inp-niche-closure-ceil');
+    const _ncCn = document.getElementById('inp-num-niche-closure-ceil');
+    if (_ncL)  { _ncL.max  = _ncMaxSide; _ncL.value  = Math.min(window._nicheClosureWidthLeft  || 1.8, _ncMaxSide); }
+    if (_ncLn) { _ncLn.max = _ncMaxSide; _ncLn.value = Math.min(window._nicheClosureWidthLeft  || 1.8, _ncMaxSide); }
+    if (_ncR)  { _ncR.max  = _ncMaxSide; _ncR.value  = Math.min(window._nicheClosureWidthRight || 1.8, _ncMaxSide); }
+    if (_ncRn) { _ncRn.max = _ncMaxSide; _ncRn.value = Math.min(window._nicheClosureWidthRight || 1.8, _ncMaxSide); }
+    if (_ncC)  _ncC.value  = window._nicheClosureCeilHeight || 1.8;
+    if (_ncCn) _ncCn.value = window._nicheClosureCeilHeight || 1.8;
+};
+
+window._setClosureEnabled = function(enabled) {
+    window._closureEnabled = !!enabled;
+    // Sync toggle checkbox
+    const tog = document.getElementById('inp-closure-enabled');
+    if (tog) tog.checked = window._closureEnabled;
+    // Re-sync all slider rows via _updateRoomWallUI
+    if (typeof window._updateRoomWallUI === 'function') window._updateRoomWallUI();
+    buildCabinet();
+};
+
+window._setClosureWidthRight = function(val) {
+    const v = Math.max(1.8, Math.min(30, parseFloat(val) || 1.8));
+    window._closureWidthRight = v;
+    const numEl = document.getElementById('inp-num-closure-width-right');
+    const slEl  = document.getElementById('inp-closure-width-right');
+    if (numEl) numEl.value = v;
+    if (slEl)  slEl.value  = v;
+    buildCabinet();
+};
+
+window._setClosureFrontLine = function(val) {
+    window._closureFrontLine = (val === 'door') ? 'door' : 'cabinet';
+    // Sync button active states via inline styles (buttons use inline styling, not ppm-btn class)
+    const btnCab  = document.getElementById('closure-fl-cabinet');
+    const btnDoor = document.getElementById('closure-fl-door');
+    if (btnCab) {
+        const isCab = window._closureFrontLine === 'cabinet';
+        btnCab.style.background  = isCab ? 'var(--accent)' : 'var(--bg-light)';
+        btnCab.style.color       = isCab ? 'white' : 'var(--text-dark)';
+        btnCab.style.borderColor = isCab ? 'var(--accent)' : 'var(--border)';
+    }
+    if (btnDoor) {
+        const isDoor = window._closureFrontLine === 'door';
+        btnDoor.style.background  = isDoor ? 'var(--accent)' : 'var(--bg-light)';
+        btnDoor.style.color       = isDoor ? 'white' : 'var(--text-dark)';
+        btnDoor.style.borderColor = isDoor ? 'var(--accent)' : 'var(--border)';
+    }
+    buildCabinet();
+};
+
+window._setClosureWidth = function(val) {
+    const v = Math.max(1.8, Math.min(30, parseFloat(val) || 1.8));
+    window._closureWidth = v;
+    const numEl = document.getElementById('inp-num-closure-width');
+    const slEl  = document.getElementById('inp-closure-width');
+    if (numEl) numEl.value = v;
+    if (slEl)  slEl.value  = v;
+    buildCabinet();
+};
+
+window._setClosureCeilWidth = function(val) {
+    const v = Math.max(1.8, Math.min(30, parseFloat(val) || 1.8));
+    window._closureCeilWidth = v;
+    const numEl = document.getElementById('inp-num-closure-ceil');
+    const slEl  = document.getElementById('inp-closure-ceil');
+    if (numEl) numEl.value = v;
+    if (slEl)  slEl.value  = v;
+    buildCabinet();
+};
+
+window._setClosureDepthWidth = function(val) {
+    const v = Math.max(1.8, Math.min(30, parseFloat(val) || 1.8));
+    window._closureDepthWidth = v;
+    const numEl = document.getElementById('inp-num-closure-depth');
+    const slEl  = document.getElementById('inp-closure-depth');
+    if (numEl) numEl.value = v;
+    if (slEl)  slEl.value  = v;
+    buildCabinet();
+};
+
+window._setRoomSize = function(dim, val) {
+    const v = Math.max(200, parseInt(val) || 0);
+    if (dim === 'width')  window._roomWidth  = v;
+    if (dim === 'depth')  window._roomDepth  = v;
+    if (dim === 'height') window._roomHeight = v;
+
+    // Sync room inputs
+    const numEl = document.getElementById('inp-num-room-' + dim);
+    const slEl  = document.getElementById('inp-room-' + dim);
+    if (numEl) numEl.value = v;
+    if (slEl)  slEl.value  = v;
+
+    // Update cabinet slider max to match room constraint
+    if (dim === 'width') {
+        const cabWidthSlider = document.getElementById('inp-width');
+        const cabWidthNum    = document.getElementById('inp-num-width');
+        if (cabWidthSlider) cabWidthSlider.max = v;
+        if (cabWidthNum)    cabWidthNum.max    = v;
+        // Clamp current cabinet width if it exceeds new room width
+        const _cw = state.wings && state.wings.center ? state.wings.center.width : (state.width || 160);
+        if (_cw > v && typeof updateDim === 'function') updateDim('width', 0, v);
+    }
+    if (dim === 'height') {
+        const cabHeightSlider = document.getElementById('inp-height');
+        const cabHeightNum    = document.getElementById('inp-num-height');
+        if (cabHeightSlider) cabHeightSlider.max = v;
+        if (cabHeightNum)    cabHeightNum.max    = v;
+        // Clamp current cabinet height if it exceeds new room height
+        const _ch = state.globalHeight || 240;
+        if (_ch > v && typeof updateDim === 'function') updateDim('height', 0, v);
+    }
+
+    buildCabinet();
+};
+
+window._updateRoomWallUI = function() {
+    const _preset = state.presetId || 'linear';
+    const _isLinearOrSliding = (_preset === 'linear' || _preset === 'sliding');
+
+    // Sync sidebar room-wall-section visibility
+    const rwSec = document.getElementById('room-wall-section');
+    if (rwSec) rwSec.style.display = _isLinearOrSliding ? '' : 'none';
+
+    const _rw = window._roomWall || 'center';
+
+    // ── Position buttons: always visible for linear/sliding ─────────────────
+    const posRow  = document.getElementById('room-wall-pos-row');
+    const ctrlDiv = document.getElementById('closure-controls');
+
+    if (!_isLinearOrSliding) {
+        if (posRow)  posRow.style.display  = 'none';
+        if (ctrlDiv) ctrlDiv.style.display = 'none';
+        // Also hide niche toggle for non-linear presets
+        if (typeof window._updateNicheUI === 'function') window._updateNicheUI();
+        return;
+    }
+
+    // Show position buttons row
+    if (posRow) posRow.style.display = '';
+
+    // Highlight active position button
+    ['center','left','both','right'].forEach(function(w) {
+        const btn = document.getElementById('rw-btn-' + w);
+        if (!btn) return;
+        const isActive = (_rw === w);
+        btn.style.background  = isActive ? 'var(--accent)' : 'var(--bg-light)';
+        btn.style.color       = isActive ? 'white' : 'var(--text-dark)';
+        btn.style.borderColor = isActive ? 'var(--accent)' : 'var(--border)';
+    });
+
+    // Show closure controls only when position ≠ center
+    if (_rw === 'center') {
+        if (ctrlDiv) ctrlDiv.style.display = 'none';
+    } else {
+        if (ctrlDiv) ctrlDiv.style.display = '';
+
+        // Sync closure toggle checkbox
+        const _cOn = (window._closureEnabled !== false);
+        const togEl = document.getElementById('inp-closure-enabled');
+        if (togEl) togEl.checked = _cOn;
+
+        // Show/hide slider rows based on mode and enabled state
+        const _showSliders = _cOn;
+
+        // Left side panel row: shown for 'left' and 'both'
+        const cwRow = document.getElementById('closure-width-row');
+        if (cwRow) cwRow.style.display = (_showSliders && (_rw === 'left' || _rw === 'both')) ? '' : 'none';
+        const cwSlider = document.getElementById('inp-closure-width');
+        const cwNum    = document.getElementById('inp-num-closure-width');
+        if (cwSlider) cwSlider.value = window._closureWidth || 1.8;
+        if (cwNum)    cwNum.value    = window._closureWidth || 1.8;
+
+        // Right side panel row: shown for 'right' and 'both'
+        const cwrRow = document.getElementById('closure-width-right-row');
+        if (cwrRow) cwrRow.style.display = (_showSliders && (_rw === 'right' || _rw === 'both')) ? '' : 'none';
+        const cwrSlider = document.getElementById('inp-closure-width-right');
+        const cwrNum    = document.getElementById('inp-num-closure-width-right');
+        if (cwrSlider) cwrSlider.value = window._closureWidthRight || 1.8;
+        if (cwrNum)    cwrNum.value    = window._closureWidthRight || 1.8;
+
+        // Ceiling panel row: shown for all active modes
+        const ccRow = document.getElementById('closure-ceil-row');
+        if (ccRow) ccRow.style.display = _showSliders ? '' : 'none';
+        const ccSlider = document.getElementById('inp-closure-ceil');
+        const ccNum    = document.getElementById('inp-num-closure-ceil');
+        if (ccSlider) ccSlider.value = window._closureCeilWidth || 1.8;
+        if (ccNum)    ccNum.value    = window._closureCeilWidth || 1.8;
+
+        // Depth panel row: shown for all active modes
+        const cdRow = document.getElementById('closure-depth-row');
+        if (cdRow) cdRow.style.display = _showSliders ? '' : 'none';
+        const cdSlider = document.getElementById('inp-closure-depth');
+        const cdNum    = document.getElementById('inp-num-closure-depth');
+        if (cdSlider) cdSlider.value = window._closureDepthWidth || 1.8;
+        if (cdNum)    cdNum.value    = window._closureDepthWidth || 1.8;
+
+        // Front-line toggle row
+        const flRow = document.getElementById('closure-frontline-row');
+        if (flRow) flRow.style.display = _showSliders ? '' : 'none';
+        const _fl = window._closureFrontLine || 'cabinet';
+        const btnCab  = document.getElementById('closure-fl-cabinet');
+        const btnDoor = document.getElementById('closure-fl-door');
+        if (btnCab) {
+            btnCab.style.background  = (_fl === 'cabinet') ? 'var(--accent)' : 'var(--bg-light)';
+            btnCab.style.color       = (_fl === 'cabinet') ? 'white' : 'var(--text-dark)';
+            btnCab.style.borderColor = (_fl === 'cabinet') ? 'var(--accent)' : 'var(--border)';
+        }
+        if (btnDoor) {
+            btnDoor.style.background  = (_fl === 'door') ? 'var(--accent)' : 'var(--bg-light)';
+            btnDoor.style.color       = (_fl === 'door') ? 'white' : 'var(--text-dark)';
+            btnDoor.style.borderColor = (_fl === 'door') ? 'var(--accent)' : 'var(--border)';
+        }
+    }
+
+    // Sync niche UI
+    if (typeof window._updateNicheUI === 'function') window._updateNicheUI();
+};
+
+function bindUI() {
+    // In viewer mode the editor DOM elements don't exist — skip all bindings
+    if (window._VIEWER_MODE) return;
+
+    // ── Smooth room-slider dragging: strip textures while dragging, restore on release ──
+    // Any range input in the sidebar sets _roomTexDragging=true while held.
+    // On pointerup/pointercancel we clear the flag and do a full rebuild with textures.
+    window._roomTexDragging = false;
+    const _sidebar = document.getElementById('sidebar');
+    if (_sidebar) {
+        _sidebar.addEventListener('pointerdown', function(e) {
+            if (e.target && e.target.type === 'range') {
+                window._roomTexDragging = true;
+            }
+        });
+    }
+    document.addEventListener('pointerup', function() {
+        if (window._roomTexDragging) {
+            window._roomTexDragging = false;
+            buildCabinet();
+        }
+    });
+    document.addEventListener('pointercancel', function() {
+        if (window._roomTexDragging) {
+            window._roomTexDragging = false;
+            buildCabinet();
+        }
+    });
+
+    // Patch sub-panel content buttons to use applyContentForce (handles cached index.html)
+    [
+        { selector: '#hanging-sub-panel button[data-hanging-type]', attr: 'data-hanging-type' },
+        { selector: '#drawer-sub-panel button[data-drawer-type]', attr: 'data-drawer-type' },
+        { selector: '#honeycomb-sub-panel button[data-honeycomb-type]', attr: 'data-honeycomb-type' },
+    ].forEach(({ selector, attr }) => {
+        document.querySelectorAll(selector).forEach(btn => {
+            const contentType = btn.getAttribute(attr);
+            btn.onclick = function() {
+                applyContentForce(contentType);
+                closeContentSubPanels();
+            };
+        });
+    });
+    // Patch main toolbar toggle buttons to pass themselves as triggerBtn (handles cached index.html)
+    [
+        { id: 'tb-btn-hanging', key: 'hanging' },
+        { id: 'tb-btn-drawer', key: 'drawer' },
+        { id: 'tb-btn-honeycomb', key: 'honeycomb' },
+    ].forEach(({ id, key }) => {
+        const btn = document.getElementById(id);
+        if (btn) btn.onclick = function() { toggleContentSubPanel(key, this); };
+    });
+
+    const _bfv = document.getElementById('btn-front-view');
+    if (_bfv) _bfv.addEventListener('click', (e) => {
+        document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+        window._orbitFree = false;
+        const rb = document.getElementById('btn-reset-view'); if (rb) rb.style.display = 'none';
+        state.viewMode = 'front'; updateCameraView(); buildCabinet();
+    });
+    const _b3v = document.getElementById('btn-3d-view');
+    if (_b3v) _b3v.addEventListener('click', () => {
+        window._enterPresentationMode();
+    });
+    const _bbv = document.getElementById('btn-blueprint-view');
+    if (_bbv) _bbv.addEventListener('click', (e) => {
+        document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+        window._orbitFree = false;
+        const rb = document.getElementById('btn-reset-view'); if (rb) rb.style.display = 'none';
+        state.viewMode = 'blueprint'; updateCameraView(); buildCabinet();
+    });
+
+    const priceDisplay = document.getElementById('price-display');
+    if (priceDisplay) {
+        priceDisplay.addEventListener('change', (e) => {
+            state.manualPrice = parseInt(e.target.value) || 0; calculatePrice(); saveHistoryState();
+        });
+    }
+
+    const btnResetPrice = document.getElementById('btn-reset-price');
+    if (btnResetPrice) {
+        btnResetPrice.addEventListener('click', () => {
+            state.manualPrice = null; calculatePrice(); saveHistoryState();
+        });
+    }
+
+    const installPriceDisplay = document.getElementById('install-price-display');
+    if (installPriceDisplay) {
+        installPriceDisplay.addEventListener('change', (e) => {
+            const v = parseInt(e.target.value);
+            getWing().manualInstallPrice = isNaN(v) ? null : v;
+            calculatePrice(); saveHistoryState();
+        });
+    }
+
+    const btnResetInstallPrice = document.getElementById('btn-reset-install-price');
+    if (btnResetInstallPrice) {
+        btnResetInstallPrice.addEventListener('click', () => {
+            getWing().manualInstallPrice = null; calculatePrice(); saveHistoryState();
+        });
+    }
+
+    document.getElementById('inp-plinth').addEventListener('change', (e) => {
+        const val = e.target.value;
+        state.cabinetModel = val;
+        
+        if (val === 'maya') state.plinthHeight = 7;
+        else if (val === 'c9') state.plinthHeight = 8.75;
+        else if (val === 'ab2') state.plinthHeight = 8.75;
+        else if (val === 'regalim') state.plinthHeight = 10;
+        
+        state.manualPrice = null;
+        
+        if (val === 'ab2') {
+            state.width = 160;
+            state.globalHeight = 240;
+            document.getElementById('inp-width').value = 160;
+            document.getElementById('inp-num-width').value = 160;
+            document.getElementById('inp-height').value = 240;
+            document.getElementById('inp-num-height').value = 240;
+            document.getElementById('inp-columns').value = 2;
+            document.getElementById('val-columns').innerText = 2;
+            
+            distributeColumns(2);
+            
+            const rightCol = state.columns[1];
+            if(rightCol) {
+                rightCol.shelves = 5; 
+                distributeShelves(rightCol); 
+                
+                if(rightCol.compartments.length > 0) {
+                    const targetRow = 2; 
+                    rightCol.compartments[targetRow].type = 'side_open_cell';
+                    rightCol.doors = []; 
+                }
+            }
+        } else {
+            state.columns.forEach(col => distributeShelves(col)); 
+        }
+        
+        checkSplits(); buildCabinet(); calculatePrice(); saveHistoryState();
+    });
+
+    const placementEl = document.getElementById('inp-placement');
+    if (placementEl) {
+        placementEl.addEventListener('change', (e) => {
+            state.placement = e.target.value;
+            saveHistoryState();
+        });
+    }
+
+    document.getElementById('inp-desk-side').addEventListener('change', (e) => {
+        state.desk.side = e.target.value; state.manualPrice = null;
+        document.getElementById('desk-controls').style.display = (state.desk.side === 'none') ? 'none' : 'block';
+        buildCabinet(); updateCameraView(); calculatePrice(); saveHistoryState();
+    });
+    
+    document.getElementById('inp-desk-drawers').addEventListener('change', (e) => {
+        state.desk.hasDrawers = e.target.checked; state.manualPrice = null;
+        // Sync button-style UI (CSS handles styling via .active class)
+        const hasD = e.target.checked;
+        document.querySelectorAll('.desk-drawers-btn').forEach(function(b) {
+            b.classList.toggle('active', (b.dataset.drawers === 'true') === hasD);
+        });
+        buildCabinet(); calculatePrice(); saveHistoryState();
+    });
+
+    ['width', 'height', 'depth'].forEach(id => {
+        const slider = document.getElementById(`inp-${id}`);
+        const numInp = document.getElementById(`inp-num-${id}`);
+        if(slider) {
+            // Hide room only after the slider actually moves (input event), restore on release
+            let _sliderMoved = false;
+            slider.addEventListener('pointerdown', () => { _sliderMoved = false; });
+            slider.addEventListener('input', (e) => {
+                if (!_sliderMoved) {
+                    _sliderMoved = true;
+                    window._isDragging = true;
+                    if (window._roomGroup) window._roomGroup.visible = false;
+                }
+                updateDim(id, null, e.target.value);
+            });
+            slider.addEventListener('pointerup', () => { if (_sliderMoved) { _sliderMoved = false; _endDrag(); } saveHistoryState(); });
+            slider.addEventListener('change', () => saveHistoryState());
+        }
+        if(numInp) { numInp.addEventListener('change', (e) => { updateDim(id, null, e.target.value); saveHistoryState(); }); }
+    });
+
+    const deskWidthSlider = document.getElementById('inp-desk-width');
+    const deskWidthNum = document.getElementById('inp-num-desk-width');
+    if(deskWidthSlider) {
+        let _deskSliderMoved = false;
+        deskWidthSlider.addEventListener('pointerdown', () => { _deskSliderMoved = false; });
+        deskWidthSlider.addEventListener('input', (e) => {
+            if (!_deskSliderMoved) {
+                _deskSliderMoved = true;
+                window._isDragging = true;
+                if (window._roomGroup) window._roomGroup.visible = false;
+            }
+            updateDim('deskWidth', null, e.target.value);
+        });
+        deskWidthSlider.addEventListener('pointerup', () => { if (_deskSliderMoved) { _deskSliderMoved = false; _endDrag(); } saveHistoryState(); });
+        deskWidthSlider.addEventListener('change', () => saveHistoryState());
+    }
+    if(deskWidthNum) { deskWidthNum.addEventListener('change', (e) => { updateDim('deskWidth', null, e.target.value); saveHistoryState(); }); }
+
+    const handleInp = document.getElementById('inp-handle-type');
+    if (handleInp) handleInp.addEventListener('change', (e) => { state.handleType = e.target.value; saveHistoryState(); });
+
+    const cabNameInp = document.getElementById('inp-cabinet-name');
+    if (cabNameInp) cabNameInp.addEventListener('change', (e) => { state.cabinetName = e.target.value; saveHistoryState(); });
+
+    ['name', 'phone', 'order-num', 'address'].forEach(field => {
+        const el = document.getElementById(`cust-${field}`);
+        if(el) el.addEventListener('input', (e) => { 
+            let key = field === 'order-num' ? 'orderNum' : field; state.customer[key] = e.target.value; 
+        });
+    });
+
+    document.getElementById('inp-columns').addEventListener('change', (e) => {
+        const val = parseInt(e.target.value); state.manualPrice = null;
+        document.getElementById('val-columns').innerText = val;
+        distributeColumns(val); buildCabinet(); calculatePrice(); saveHistoryState();
+    });
+
+    // Show/hide colors not available in sandwich board material
+    window._updateSandwichColorVisibility = function() {
+        const isSandwich = state.boardMaterial === 'sandwich';
+        // On the "חזיתות" (external fronts) tab, show ALL colors even in sandwich mode
+        // because sandwich cabinet fronts are melamine and can use any melamine color
+        const isExternalTab = state.activeColorPart === 'materialExternal';
+
+        // Colors marked data-no-sandwich: hide on non-external tabs when sandwich is active;
+        // show on ALL tabs when melamine is active, and also show on external tab even in sandwich mode
+        document.querySelectorAll('.mat-item[data-no-sandwich="true"]').forEach(el => {
+            el.style.display = (isSandwich && !isExternalTab) ? 'none' : '';
+        });
+
+        // If sandwich is active and a no-sandwich color is currently selected on any part, reset it
+        // Exception: materialExternal is allowed to keep any color (fronts are melamine in sandwich)
+        if (isSandwich) {
+            const NO_SANDWICH = new Set(['c705','u727','w1200','u232','u604','u638','H1367','H1307','H1227']);
+            ['materialBody','materialInternal','materialDesk','materialOpenCell','materialBack'].forEach(part => {
+                if (NO_SANDWICH.has(state[part])) {
+                    state[part] = 'white_matte';
+                }
+            });
+        }
+    };
+
+    document.getElementById('inp-board-mat').addEventListener('change', (e) => {
+        state.boardMaterial = e.target.value; state.manualPrice = null;
+        _updateSandwichColorVisibility();
+        checkSplits(); buildCabinet(); updateCameraView(); calculatePrice(); saveHistoryState();
+    });
+
+    document.getElementById('inp-has-doors').addEventListener('change', (e) => {
+        const val = e.target.checked;
+        // Update hasDoors on ALL wings so the toggle affects the entire cabinet
+        ['center', 'left', 'right'].forEach(side => {
+            if (state.wings[side]) state.wings[side].hasDoors = val;
+        });
+        state.manualPrice = null;
+        buildCabinet(); saveHistoryState();
+    });
+
+    document.querySelectorAll('.part-tab-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const clickedPart = e.target.getAttribute('data-part');
+
+            // Special: "חלק עליון" tab — delegate to _selectUpperUnitColorTab
+            if (clickedPart === 'materialUpperUnit') {
+                window._selectUpperUnitColorTab(e.target);
+                return;
+            }
+
+            document.querySelectorAll('.part-tab-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            state.activeColorPart = clickedPart;
+            _updateSandwichColorVisibility();
+
+            document.querySelectorAll('.material-btn').forEach(b => b.classList.remove('active'));
+
+            // Special: "ארון צד" tab — show the side cabinet's current body color
+            if (clickedPart === 'materialSideCabinet') {
+                const sc = state.wings.center ? state.wings.center.sideCabinet : null;
+                const scMat = sc ? sc.materialBody : 'white_matte';
+                const scBtn = document.querySelector(`.material-btn[data-mat="${scMat}"]`);
+                if (scBtn) scBtn.classList.add('active');
+                return;
+            }
+
+            const currentMat = state[state.activeColorPart];
+            const matBtn = document.querySelector(`.material-btn[data-mat="${currentMat}"]`);
+            if (matBtn) matBtn.classList.add('active');
+            else if (currentMat === 'custom') document.getElementById('btn-upload-texture').classList.add('active');
+        });
+    });
+
+    // Helper: select the "חלק עליון" color tab — shows upper unit's current body color
+    window._selectUpperUnitColorTab = function(tabEl) {
+        const uuKey = state._activeUpperUnit || ('upperUnit_' + state.activeWing);
+        const uuWing = state.wings[uuKey];
+        if (!uuWing) return;
+        document.querySelectorAll('.part-tab-btn').forEach(b => b.classList.remove('active'));
+        if (tabEl) tabEl.classList.add('active');
+        else {
+            const t = document.getElementById('tab-materialUpperUnit');
+            if (t) t.classList.add('active');
+        }
+        // Store a sentinel so material-btn clicks know to apply to upper unit
+        state.activeColorPart = 'materialUpperUnit';
+        _updateSandwichColorVisibility();
+        document.querySelectorAll('.material-btn').forEach(b => b.classList.remove('active'));
+        const uuMat = uuWing.materialBody || 'white_matte';
+        const uuBtn = document.querySelector(`.material-btn[data-mat="${uuMat}"]`);
+        if (uuBtn) uuBtn.classList.add('active');
+    };
+
+    document.querySelectorAll('.material-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            if(e.target.closest('#btn-upload-texture')) return;
+            document.querySelectorAll('.material-btn').forEach(b => b.classList.remove('active'));
+            const targetBtn = e.target.classList.contains('material-btn') ? e.target : e.target.closest('.material-btn');
+            targetBtn.classList.add('active');
+            const matValue = targetBtn.getAttribute('data-mat');
+            // Special: "חלק עליון" material tab — apply color to upper unit wing
+            if (state.activeColorPart === 'materialUpperUnit') {
+                if (typeof window.applyUpperUnitMaterial === 'function') window.applyUpperUnitMaterial(matValue);
+                return;
+            }
+            // Special: "ארון צד" material tab — apply color to all side cabinet material fields
+            if (state.activeColorPart === 'materialSideCabinet') {
+                const sc = state.wings.center ? state.wings.center.sideCabinet : null;
+                if (sc) {
+                    sc.materialBody = matValue;
+                    sc.materialInternal = matValue;
+                    sc.materialExternal = matValue;
+                    sc.materialDesk = matValue;
+                    sc.materialOpenCell = matValue;
+                    sc.materialBack = matValue;
+                    // Also update the parent wing's materialSideCabinet reference color
+                    if (state.wings.center) state.wings.center.materialSideCabinet = matValue;
+                }
+            } else {
+                state[state.activeColorPart] = matValue;
+            }
+            buildCabinet(); saveHistoryState();
+        });
+    });
+
+    const btnUpload = document.getElementById('btn-upload-texture');
+    const inpTexture = document.getElementById('inp-texture');
+
+    if (btnUpload && inpTexture) {
+        btnUpload.addEventListener('click', () => inpTexture.click());
+        inpTexture.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const url = URL.createObjectURL(file);
+            const textureLoader = new THREE.TextureLoader();
+            textureLoader.load(url, (texture) => {
+                texture.wrapS = THREE.RepeatWrapping; texture.wrapT = THREE.RepeatWrapping; texture.repeat.set(1, 1);
+                materials.custom.map = texture; materials.custom.needsUpdate = true;
+                document.querySelectorAll('.material-btn').forEach(b => b.classList.remove('active'));
+                btnUpload.classList.add('active');
+                // Special: "ארון צד" material tab — apply custom texture to all side cabinet material fields
+                if (state.activeColorPart === 'materialSideCabinet') {
+                    const sc = state.wings.center ? state.wings.center.sideCabinet : null;
+                    if (sc) {
+                        sc.materialBody = 'custom';
+                        sc.materialInternal = 'custom';
+                        sc.materialExternal = 'custom';
+                        sc.materialDesk = 'custom';
+                        sc.materialOpenCell = 'custom';
+                        sc.materialBack = 'custom';
+                        if (state.wings.center) state.wings.center.materialSideCabinet = 'custom';
+                    }
+                } else {
+                    state[state.activeColorPart] = 'custom';
+                }
+                buildCabinet(); saveHistoryState();
+            });
+        });
+    }
+
+    window.addEventListener('resize', () => {
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix(); renderer.setSize(container.clientWidth, container.clientHeight);
+        updateCameraView();
+    });
+
+    // ---- Wing hover highlight (blue overlay mesh) ----
+    let _hoveredWingId = null;
+    let _wingHighlightMesh = null;
+
+    function _removeWingHighlight() {
+        if (_wingHighlightMesh) {
+            scene.remove(_wingHighlightMesh);
+            _wingHighlightMesh.geometry.dispose();
+            _wingHighlightMesh = null;
+        }
+    }
+    // Expose for engine.js buildCabinet cleanup
+    window._removeWingHighlight = _removeWingHighlight;
+
+    function _showWingHighlight(wingId) {
+        _removeWingHighlight();
+        // Find the hit box for this wing to get its position/size
+        const hb = wingHitBoxes.find(h => h.userData.wingId === wingId);
+        if (!hb) return;
+        const geo = hb.geometry.clone();
+        const mat = new THREE.MeshBasicMaterial({
+            color: 0x4a9eff,
+            transparent: true,
+            opacity: 0.18,
+            depthWrite: false,
+            side: THREE.FrontSide
+        });
+        _wingHighlightMesh = new THREE.Mesh(geo, mat);
+        _wingHighlightMesh.position.copy(hb.position);
+        _wingHighlightMesh.rotation.copy(hb.rotation);
+        scene.add(_wingHighlightMesh);
+    }
+
+    container.addEventListener('pointermove', (e) => {
+        if (e.target.closest('#column-quick-edit') || e.target.closest('#bottom-floating-toolbar') || e.target.closest('.drag-handle') || e.target.closest('.dim-container') || e.target.closest('.select-all-col-btn')) {
+            if (currentHoveredDoor && !e.target.closest('.plus-btn') && !e.target.closest('.select-all-col-btn')) {
+                currentHoveredDoor.material.transparent = false;
+                currentHoveredDoor.material.opacity = 1;
+                currentHoveredDoor = null;
+            }
+        }
+
+        const rect = container.getBoundingClientRect();
+        mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+
+        // Wing hover highlight:
+        // - Free mode: highlight any wing hit box
+        // - Wing edit mode: highlight upperUnit_* hit boxes only (so user can see the upper unit is clickable)
+        // - Upper unit edit mode: no highlight
+        if (!state._activeUpperUnit && wingHitBoxes && wingHitBoxes.length > 0) {
+            const wingIntersects = raycaster.intersectObjects(wingHitBoxes);
+            const _rawHoveredId = wingIntersects.length > 0 ? wingIntersects[0].object.userData.wingId : null;
+            // In wing edit mode, only highlight upperUnit_* hit boxes
+            const newHoveredWingId = (!state.wingEditMode || (_rawHoveredId && _rawHoveredId.startsWith('upperUnit_')))
+                ? _rawHoveredId : null;
+            if (newHoveredWingId !== _hoveredWingId) {
+                _hoveredWingId = newHoveredWingId;
+                if (_hoveredWingId) {
+                    _showWingHighlight(_hoveredWingId);
+                } else {
+                    _removeWingHighlight();
+                }
+            }
+        } else if (state._activeUpperUnit && _wingHighlightMesh) {
+            _removeWingHighlight();
+            _hoveredWingId = null;
+        }
+        
+        const doorIntersects = raycaster.intersectObjects(doorMeshes);
+        if (doorIntersects.length > 0) {
+            const hoveredDoor = doorIntersects[0].object;
+            if (currentHoveredDoor !== hoveredDoor) {
+                if (currentHoveredDoor) {
+                    currentHoveredDoor.material.transparent = false;
+                    currentHoveredDoor.material.opacity = 1;
+                }
+                currentHoveredDoor = hoveredDoor;
+                currentHoveredDoor.material.transparent = true;
+                currentHoveredDoor.material.opacity = 0.15;
+            }
+        } else {
+            if (currentHoveredDoor) {
+                currentHoveredDoor.material.transparent = false;
+                currentHoveredDoor.material.opacity = 1;
+                currentHoveredDoor = null;
+            }
+        }
+
+        const intersects = raycaster.intersectObjects(hitBoxes);
+        let hoverCol = -1;
+        if (intersects.length > 0) hoverCol = intersects[0].object.userData.colIndex;
+
+        // Desk hover detection — show drag handles when hovering anywhere over the external desk
+        const deskIntersects = (typeof deskHitBoxes !== 'undefined' && deskHitBoxes.length > 0)
+            ? raycaster.intersectObjects(deskHitBoxes) : [];
+        const newHoveredDesk = deskIntersects.length > 0;
+        if (newHoveredDesk !== !!state.hoveredDesk) {
+            state.hoveredDesk = newHoveredDesk;
+            buildDragHandlesUI();
+        }
+        
+        if (hoverCol !== -1 && hoverCol !== state.hoveredColIndex) {
+            state.hoveredColIndex = hoverCol; state.activeEditCol = hoverCol;
+            hitBoxes.forEach(hb => {
+                if (hb.userData.noHighlight) return; // invisible trigger zones — never show highlight
+                const isSelected = (hb.userData.colIndex === state.selection.colIndex && state.selection.rows.includes(hb.userData.rowIndex));
+                const isHovered = (hb.userData.colIndex === state.hoveredColIndex);
+                hb.material.opacity = isSelected ? 0.3 : (isHovered ? 0.05 : 0.0);
+            });
+            buildDragHandlesUI(); updateQuickEditPanelUI();
+        } else if (hoverCol === -1 && state.hoveredColIndex !== -1) {
+            state.hoveredColIndex = -1;
+            hitBoxes.forEach(hb => {
+                if (hb.userData.noHighlight) return; // invisible trigger zones — never show highlight
+                const isSelected = (hb.userData.colIndex === state.selection.colIndex && state.selection.rows.includes(hb.userData.rowIndex));
+                hb.material.opacity = isSelected ? 0.3 : 0.0;
+            });
+            buildDragHandlesUI();
+        }
+
+        const isOverUI = e.target.closest('#dimensions-layer, #buttons-layer, #drag-handles-layer, #column-quick-edit, #bottom-floating-toolbar');
+        const isSelected = state.selection.colIndex !== -1;
+        const shouldShowUI = (hoverCol !== -1) || isOverUI || isSelected || state.hoveredDesk;
+
+        ['dimensions-layer', 'buttons-layer', 'drag-handles-layer'].forEach(id => {
+            const layer = document.getElementById(id);
+            if (layer) {
+                if (shouldShowUI) {
+                    layer.style.transition = 'none'; 
+                    layer.style.opacity = '1';
+                    layer.style.pointerEvents = ''; 
+                } else {
+                    layer.style.transition = 'opacity 0.3s ease-out'; 
+                    layer.style.opacity = '0';
+                    layer.style.pointerEvents = 'none'; 
+                }
+            }
+        });
+    });
+
+    container.addEventListener('mouseleave', () => {
+        // Remove wing highlight when mouse leaves canvas
+        if (!state.wingEditMode) {
+            _hoveredWingId = null;
+            _removeWingHighlight();
+        }
+        state.hoveredDesk = false;
+        if (state.selection.colIndex !== -1) return;
+        ['dimensions-layer', 'buttons-layer', 'drag-handles-layer'].forEach(id => {
+            const layer = document.getElementById(id);
+            if (layer) {
+                layer.style.transition = 'opacity 0.3s ease-out';
+                layer.style.opacity = '0';
+                layer.style.pointerEvents = 'none';
+            }
+        });
+    });
+
+    // Track pointerdown position to distinguish click vs drag
+    let _pointerDownX = 0, _pointerDownY = 0;
+    let _pointerDownWingId = null; // wing hit at pointerdown (for click detection)
+    let _pointerDownOnDeadSpace = false; // pointerdown on dead space in wing edit mode
+
+    container.addEventListener('pointerdown', (e) => {
+        if (e.target.closest('#column-quick-edit') || e.target.closest('#full-corner-quick-edit') || e.target.closest('#bottom-floating-toolbar') || e.target.closest('.drag-handle') || e.target.closest('.dim-container') || e.target.closest('.plus-btn') || e.target.closest('.fc-cell-btn') || e.target.closest('.select-all-col-btn')) return;
+        if (e.button !== 0) return;
+
+        _pointerDownX = e.clientX;
+        _pointerDownY = e.clientY;
+        _pointerDownWingId = null;
+        _pointerDownOnDeadSpace = false;
+
+        const rect = container.getBoundingClientRect();
+        mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+
+        // In wing edit mode: record if pointerdown is on dead space
+        const _isFCEditNow = state.activeWing === 'full_corner_right' || state.activeWing === 'full_corner_left';
+        if (state.wingEditMode && !_isFCEditNow) {
+            // Regular wing edit: dead space = not hitting any hitBox mesh AND not hitting an upperUnit hit box
+            const hitIntersects = raycaster.intersectObjects(hitBoxes);
+            const uuHitBoxes = (wingHitBoxes || []).filter(h => h.userData.wingId && h.userData.wingId.startsWith('upperUnit_'));
+            const uuIntersects = uuHitBoxes.length > 0 ? raycaster.intersectObjects(uuHitBoxes) : [];
+            if (hitIntersects.length === 0 && uuIntersects.length === 0) {
+                _pointerDownOnDeadSpace = true;
+            }
+        } else if (state.wingEditMode && _isFCEditNow) {
+            // FC edit mode: dead space = not hitting the full corner group meshes
+            const fcSide = state.activeWing.replace('full_corner_', '');
+            const fcGroup = window[`_fullCornerGroup_${fcSide}`];
+            if (fcGroup) {
+                const fcMeshes = [];
+                fcGroup.traverse(obj => { if (obj.isMesh) fcMeshes.push(obj); });
+                const fcIntersects = raycaster.intersectObjects(fcMeshes);
+                if (fcIntersects.length === 0) {
+                    _pointerDownOnDeadSpace = true;
+                }
+            } else {
+                // No FC group found — treat any click as dead space exit
+                _pointerDownOnDeadSpace = true;
+            }
+        }
+
+        // Record which wing was hit at pointerdown (for click detection)
+        if (!state._activeUpperUnit && wingHitBoxes && wingHitBoxes.length > 0) {
+            // In free mode: record any wing hit. In wing edit mode: only record upperUnit_* hits
+            // (so clicking the upper unit above a side wing while editing that wing works)
+            const wingIntersects = raycaster.intersectObjects(wingHitBoxes);
+            if (wingIntersects.length > 0) {
+                const _hitWingId = wingIntersects[0].object.userData.wingId || null;
+                if (!state.wingEditMode || (_hitWingId && _hitWingId.startsWith('upperUnit_'))) {
+                    _pointerDownWingId = _hitWingId;
+                }
+            }
+        }
+    });
+
+    container.addEventListener('pointerup', (e) => {
+        if (e.target.closest('#column-quick-edit') || e.target.closest('#full-corner-quick-edit') || e.target.closest('#bottom-floating-toolbar') || e.target.closest('.drag-handle') || e.target.closest('.dim-container') || e.target.closest('.plus-btn') || e.target.closest('.fc-cell-btn') || e.target.closest('.select-all-col-btn')) return;
+        if (e.button !== 0) return;
+
+        // Only treat as a click if pointer didn't move more than 5px (not a drag)
+        const dx = e.clientX - _pointerDownX;
+        const dy = e.clientY - _pointerDownY;
+        const isClick = (dx * dx + dy * dy) < 25; // 5px threshold
+
+        if (!isClick) return;
+
+        const rect = container.getBoundingClientRect();
+        mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+
+        // In wing edit mode: click on dead space → exit to free mode
+        if (state.wingEditMode && _pointerDownOnDeadSpace) {
+            const _isFCExitNow = state.activeWing === 'full_corner_right' || state.activeWing === 'full_corner_left';
+            if (_isFCExitNow) {
+                // FC edit mode: any click outside the FC group exits
+                exitWingEditMode();
+                return;
+            }
+            const hitIntersects = raycaster.intersectObjects(hitBoxes);
+            if (hitIntersects.length === 0) {
+                exitWingEditMode();
+                return;
+            }
+        }
+
+        // Click on a wing hit box → enter wing edit mode (or upper unit inline edit)
+        // Only if pointerdown AND pointerup are both over the same wing
+        if (!state._activeUpperUnit && _pointerDownWingId && wingHitBoxes && wingHitBoxes.length > 0) {
+            const wingIntersects = raycaster.intersectObjects(wingHitBoxes);
+            if (wingIntersects.length > 0) {
+                const wingId = wingIntersects[0].object.userData.wingId;
+                if (wingId && wingId === _pointerDownWingId) {
+                    // Upper unit hit box → enter inline upper unit edit mode
+                    // Allowed in free mode (center upper unit) OR in wing edit mode (side wing upper unit)
+                    if (wingId.startsWith('upperUnit_') && typeof window._enterUpperUnitEdit === 'function') {
+                        const parentId = wingId.replace('upperUnit_', '');
+                        window._enterUpperUnitEdit(parentId);
+                        return;
+                    }
+                    // Wing hit box in free mode → enter wing edit mode
+                    if (!state.wingEditMode) {
+                        enterWingEditMode(wingId);
+                        return;
+                    }
+                }
+            }
+        }
+
+        let needsRebuild = false;
+
+        if (state.selection.colIndex !== -1 || state.selection.rows.length > 0) {
+            state.selection = { colIndex: -1, rows: [] };
+            needsRebuild = true;
+        }
+
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(hitBoxes);
+        if (intersects.length === 0) {
+            state.activeEditCol = -1;
+            updateQuickEditPanelUI();
+        }
+
+        if (needsRebuild) buildCabinet();
+    });
+
+    document.getElementById('btn-save-json').addEventListener('click', () => {
+        const activeCabinet = JSON.parse(JSON.stringify({
+            cabinetModel: state.cabinetModel,
+            placement: state.placement,
+            width: state.width, globalHeight: state.globalHeight, depth: state.depth, thickness: state.thickness,
+            plinthHeight: state.plinthHeight, hasDoors: state.hasDoors, handleType: state.handleType,
+            cabinetName: state.cabinetName, manualPrice: state.manualPrice,
+            boardMaterial: state.boardMaterial, materialBody: state.materialBody, materialInternal: state.materialInternal,
+            materialExternal: state.materialExternal, materialDesk: state.materialDesk, materialOpenCell: state.materialOpenCell, materialBack: state.materialBack, columns: state.columns, desk: state.desk
+        }));
+
+        const projectData = {
+            customer: state.customer,
+            cart: state.orderCart,
+            activeCabinet: activeCabinet,
+            wings: state.wings,
+            activeWing: state.activeWing,
+            presetId: state.presetId
+        };
+        
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(projectData));
+        const dlAnchorElem = document.createElement('a');
+        dlAnchorElem.setAttribute("href", dataStr);
+        let fileName = state.customer.name ? `hazmana_${state.customer.name}.json` : "hazmana_hadasha.json";
+        dlAnchorElem.setAttribute("download", fileName);
+        dlAnchorElem.click();
+    });
+
+    document.getElementById('inp-load-json').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = JSON.parse(e.target.result);
+                if(data.customer) {
+                    state.customer = data.customer;
+                    document.getElementById('cust-name').value = state.customer.name || '';
+                    document.getElementById('cust-phone').value = state.customer.phone || '';
+                    document.getElementById('cust-order-num').value = state.customer.orderNum || '';
+                    document.getElementById('cust-address').value = state.customer.address || '';
+                }
+                if(data.cart) {
+                    state.orderCart = data.cart;
+                    const cc1 = document.getElementById('cart-count');
+                    if (cc1) cc1.innerText = state.orderCart.length;
+                    updateLeftSidebar();
+                }
+                
+                if(data.wings) {
+                    // New format: restore full wings structure
+                    state.wings.center = data.wings.center || state.wings.center;
+                    state.wings.left = data.wings.left || null;
+                    state.wings.right = data.wings.right || null;
+                    state.activeWing = data.activeWing || 'center';
+                    // Restore presetId if present
+                    if (data.presetId) {
+                        state.presetId = data.presetId;
+                        // Show/hide sliding door section based on preset
+                        const sdSection = document.getElementById('sliding-door-section');
+                        const suSection = document.getElementById('side-unit-section');
+                        const cuSection = document.getElementById('corner-unit-section');
+                        const plinthRow = document.getElementById('plinth-model-row');
+                        const mobilePlinthRow = document.getElementById('mobile-plinth-model-row');
+                        const isSliding = data.presetId === 'sliding';
+                        if (sdSection) sdSection.style.display = isSliding ? '' : 'none';
+                        if (suSection) suSection.style.display = isSliding ? 'none' : '';
+                        if (cuSection) cuSection.style.display = isSliding ? 'none' : '';
+                        if (plinthRow) plinthRow.style.display = isSliding ? 'none' : '';
+                        if (mobilePlinthRow) mobilePlinthRow.style.display = isSliding ? 'none' : '';
+                        // Update preset button highlights
+                        document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+                        const activePresetBtn = document.getElementById(`preset-btn-${data.presetId}`);
+                        if (activePresetBtn) activePresetBtn.classList.add('active');
+                        const mobileActivePresetBtn = document.getElementById(`mobile-preset-btn-${data.presetId}`);
+                        if (mobileActivePresetBtn) mobileActivePresetBtn.classList.add('active');
+                    }
+                    // Show/hide wing tabs
+                    ['left','right'].forEach(side => {
+                        const tab = document.getElementById(`wing-tab-${side}`);
+                        if (tab) tab.style.display = state.wings[side] ? '' : 'none';
+                    });
+                    document.querySelectorAll('.wing-tab-btn').forEach(b => {
+                        b.classList.toggle('active', b.dataset.wing === state.activeWing);
+                        b.style.background = b.dataset.wing === state.activeWing ? 'var(--accent)' : 'var(--bg-light)';
+                        b.style.color = b.dataset.wing === state.activeWing ? 'white' : 'var(--text)';
+                    });
+                    syncSidebarToWing();
+                    buildCabinet(); updateCameraView(); calculatePrice(); saveHistoryState();
+                } else if(data.activeCabinet) {
+                    // Legacy format: restore flat cabinet data into center wing
+                    Object.assign(state, data.activeCabinet);
+                    syncSidebarToWing();
+                    buildCabinet(); updateCameraView(); calculatePrice(); saveHistoryState();
+                }
+                
+                alert('הפרויקט נטען בהצלחה!');
+            } catch(err) { alert('שגיאה בטעינת הקובץ.'); }
+        };
+        reader.readAsText(file);
+    });
+
+    document.getElementById('btn-add-to-cart').addEventListener('click', () => {
+        const originalDoorsState = state.hasDoors;
+        const originalViewMode = state.viewMode;
+
+        // Save current camera state so we can restore it after screenshot
+        const _savedCamPos = camera.position.clone();
+        const _savedTarget = controls.target.clone();
+        const _savedCamAnim = window._camAnim;
+        const _savedCamFov = camera.fov;
+
+        // Position camera directly at front view (no animation) for screenshot capture.
+        // Mirrors the math in updateCameraView() for viewMode === 'front'.
+        const _snapCenterWing = state.wings.center;
+        const _snapCols = _snapCenterWing && _snapCenterWing.columns && _snapCenterWing.columns.length > 0
+            ? _snapCenterWing.columns : null;
+        const _snapW = _snapCenterWing ? _snapCenterWing.width : state.width;
+        const _snapH = _snapCols ? Math.max(..._snapCols.map(c => c.height)) : state.globalHeight;
+        const _snapFitH = _snapH + 120;
+        const _snapFitW = _snapW + 150;
+        camera.fov = 45; camera.updateProjectionMatrix();
+        const _snapDistY = (_snapFitH / 2) / Math.tan(Math.PI * 45 / 360);
+        const _snapDistX = (_snapFitW / 2) / Math.tan(Math.PI * 45 / 360) / camera.aspect;
+        const _snapDist = Math.max(_snapDistY, _snapDistX);
+        const _snapMidY = _snapH / 2;
+        window._camAnim = null;
+        camera.position.set(0, _snapMidY, _snapDist);
+        controls.target.set(0, _snapMidY, 0);
+        controls.update();
+
+        state.viewMode = 'front';
+        state.hasDoors = true; buildCabinet(); renderer.render(scene, camera);
+        const imgWithDoors = renderer.domElement.toDataURL('image/png');
+        
+        state.hasDoors = false; buildCabinet(); renderer.render(scene, camera);
+        const imgNoDoors = renderer.domElement.toDataURL('image/png');
+
+        // Skip old Three.js blueprint capture — multi-view SVG blueprint is used instead
+        const imgBlueprint = null;
+
+        // Restore camera state
+        camera.fov = _savedCamFov; camera.updateProjectionMatrix();
+        camera.position.copy(_savedCamPos);
+        controls.target.copy(_savedTarget);
+        controls.update();
+        window._camAnim = _savedCamAnim;
+
+        state.viewMode = originalViewMode; updateCameraView();
+        state.hasDoors = originalDoorsState; buildCabinet(); renderer.render(scene, camera);
+
+        let totalShelves = 0, hangingRods = 0, intDrawers = 0, extDrawers = 0, openCellsCount = 0;
+        state.columns.forEach(col => {
+            totalShelves += col.shelves;
+            col.compartments.forEach(comp => {
+                if (comp.type === 'hanging') hangingRods++;
+                if (comp.type === 'internal_drawers') intDrawers += comp.count;
+                if (comp.type === 'external_drawers') extDrawers += comp.count;
+                if (comp.type === 'open_cell' || comp.type === 'side_open_cell') openCellsCount++;
+            });
+        });
+
+        let modelNameText = 'מאיה';
+        if(state.cabinetModel === 'c9') modelNameText = 'C9';
+        if(state.cabinetModel === 'ab2_nohoney') modelNameText = 'חזית פנימית';
+        if(state.cabinetModel === 'ab2') modelNameText = 'AB2';
+        if(state.cabinetModel === 'regalim') modelNameText = 'רגלי ניקל';
+        // Sliding wardrobe: override model name based on whether any door panel is a mirror
+        if (state.presetId === 'sliding') {
+            const _sdWing = state.wings.center;
+            const _sdData = _sdWing && _sdWing.slidingDoor;
+            const _sdPanels = (_sdData && _sdData.doorPanels) || [];
+            const _hasMirrorPanel = _sdPanels.some(p => p === 'mirror' || p === 'mirror_dark');
+            modelNameText = _hasMirrorPanel ? 'HRM2100' : 'HR2300';
+        }
+
+        let plinthTypeText = 'צוקל נסתר';
+        if(state.cabinetModel === 'c9') plinthTypeText = 'צוקל רגיל';
+        if(state.cabinetModel === 'ab2_nohoney') plinthTypeText = 'צוקל נסתר (חזית פנימית)';
+        if(state.cabinetModel === 'ab2') plinthTypeText = 'צוקל נסתר (חזית פנימית טאצ\')';
+        if(state.cabinetModel === 'regalim') plinthTypeText = 'רגלי ניקל גליל 5 ס"מ';
+
+        let deskInfo = 'ללא';
+        if (state.desk.side === 'left') deskInfo = 'מצורף שולחן חיצוני (משמאל)';
+        else if (state.desk.side === 'right') deskInfo = 'מצורף שולחן חיצוני (מימין)';
+        else if (state.columns.some(c => c.type === 'desk')) deskInfo = 'שולחן עבודה פנימי משולב';
+
+        const currentDisplayPrice = parseInt(document.getElementById('price-display').value) || 0;
+        const priceStr = '₪' + currentDisplayPrice.toLocaleString();
+
+        const rawState = JSON.parse(JSON.stringify({
+            cabinetModel: state.cabinetModel,
+            placement: state.placement,
+            width: state.width, globalHeight: state.globalHeight, depth: state.depth, thickness: state.thickness,
+            plinthHeight: state.plinthHeight, hasDoors: state.hasDoors, handleType: state.handleType,
+            cabinetName: state.cabinetName, manualPrice: state.manualPrice,
+            manualInstallPrice: getWing().manualInstallPrice != null ? getWing().manualInstallPrice : null,
+            boardMaterial: state.boardMaterial, materialBody: state.materialBody, materialInternal: state.materialInternal,
+            materialExternal: state.materialExternal, materialDesk: state.materialDesk, materialOpenCell: state.materialOpenCell, materialBack: state.materialBack, columns: state.columns, desk: state.desk,
+            // Wing system — needed to restore corner/walkin/sliding cabinets correctly
+            wings: state.wings, activeWing: state.activeWing, presetId: state.presetId,
+            // Room wall position (closure panel)
+            roomWall: window._roomWall || state.roomWall || 'center',
+            closureEnabled:    (window._closureEnabled !== undefined) ? window._closureEnabled : true,
+            closureWidth:      window._closureWidth      || 1.8,
+            closureWidthRight: window._closureWidthRight || 1.8,
+            closureCeilWidth:  window._closureCeilWidth  || 1.8,
+            closureDepthWidth: window._closureDepthWidth || 1.8,
+            closureFrontLine:       window._closureFrontLine  || 'cabinet',
+            nicheEnabled:           (window._nicheEnabled !== undefined) ? window._nicheEnabled : false,
+            nicheWidth:                window._nicheWidth || 200,
+            nicheDepth:                window._nicheDepth || 30,
+            nicheClosureEnabled:       (window._nicheClosureEnabled !== undefined) ? window._nicheClosureEnabled : false,
+            nicheClosureWidthLeft:     window._nicheClosureWidthLeft  || 1.8,
+            nicheClosureWidthRight:    window._nicheClosureWidthRight || 1.8,
+            nicheClosureCeilHeight:    window._nicheClosureCeilHeight || 1.8
+        }));
+
+        // Collect unique extra colors from per-part overrides
+        const _extraColorsSet = new Set();
+        if (state.partColors && typeof state.partColors === 'object') {
+            Object.values(state.partColors).forEach(key => {
+                if (key) _extraColorsSet.add(colorNamesHebrew[key] || key);
+            });
+        }
+        const extraColorsStr = _extraColorsSet.size > 0 ? Array.from(_extraColorsSet).join(', ') : null;
+
+        // Build sliding door summary for spec sheet
+        const _sd = state.presetId === 'sliding' && state.slidingDoor && state.slidingDoor.enabled ? state.slidingDoor : null;
+        let slidingDoorSpec = null;
+        if (_sd) {
+            const _panelTypeLabel = { solid: 'אטום', glass: 'זכוכית', mirror: 'מראה רגילה', mirror_dark: 'מראה כהה' };
+            const _profileColorLabel = { nickel: 'ניקל', black: 'שחור', white: 'לבן', cream: 'קרם', gold_matte: 'זהב מט' };
+            const numDoors = _sd.numDoors || 2;
+            const doorPanels = _sd.doorPanels || [];
+            const doorColors = _sd.doorColors || [];
+            const bodyMatKey = state.materialExternal || state.materialBody;
+
+            // Check if any door is mirror
+            const hasMirror = doorPanels.some(p => p === 'mirror' || p === 'mirror_dark');
+
+            // Build per-door color list — use per-door override or fall back to external/body color
+            const doorColorsList = Array.from({ length: numDoors }, (_, i) => {
+                const panel = doorPanels[i] || 'solid';
+                const isMirrorDoor = panel === 'mirror' || panel === 'mirror_dark';
+                if (isMirrorDoor) return _panelTypeLabel[panel] || 'מראה';
+                const colorKey = doorColors[i] || bodyMatKey;
+                return colorNamesHebrew[colorKey] || colorKey || 'ברירת מחדל';
+            });
+
+            slidingDoorSpec = {
+                numDoors,
+                profileColor: _profileColorLabel[_sd.profileColor] || _sd.profileColor || 'ניקל',
+                hasMirror,
+                doorColorsList,   // array of per-door color/type strings
+                doorColorsStr: doorColorsList.map((c, i) => `דלת ${i + 1}: ${c}`).join(' | ')
+            };
+        }
+
+        const cabinetSpec = {
+            customName: state.cabinetName, modelName: modelNameText, plinthType: plinthTypeText,
+            placement: placementHebrew[state.placement] || 'ארון קיר חופשי',
+            dimsStr: `רוחב: ${state.width} ס"מ | גובה: ${state.globalHeight} ס"מ | עומק: ${state.depth} ס"מ`,
+            material: state.boardMaterial === 'melamine' ? 'מלמין' : "סנדביץ'",
+            handle: state.handleType || 'לא צוין', desk: deskInfo,
+            colorBody: colorNamesHebrew[state.materialBody] || 'ברירת מחדל',
+            colorInternal: colorNamesHebrew[state.materialInternal] || 'ברירת מחדל',
+            colorBack: colorNamesHebrew[state.materialBack] || 'ברירת מחדל',
+            colorExternal: colorNamesHebrew[state.materialExternal] || 'ברירת מחדל',
+            colorDesk: colorNamesHebrew[state.materialDesk] || 'ברירת מחדל',
+            colorOpenCell: colorNamesHebrew[state.materialOpenCell] || 'ברירת מחדל',
+            hasOpenCells: openCellsCount > 0,
+            extraColors: extraColorsStr,
+            shelves: totalShelves, hanging: hangingRods, drawersInt: intDrawers, drawersExt: extDrawers,
+            price: priceStr, costPrice: '₪' + state.currentCostPrice.toLocaleString(),
+            installPrice: getWing().manualInstallPrice != null ? getWing().manualInstallPrice : state.currentInstallPrice,
+            imgDoors: imgWithDoors, imgOpen: imgNoDoors, imgBlueprint: imgBlueprint,
+            corner: state.corner ? JSON.parse(JSON.stringify(state.corner)) : null,
+            slidingDoor: slidingDoorSpec,
+            multiViewSVG: (typeof window._generateMultiViewBlueprintSVG === 'function')
+                ? window._generateMultiViewBlueprintSVG() : null,
+            multiViewPages: (typeof window._generateMultiViewBlueprintPages === 'function')
+                ? window._generateMultiViewBlueprintPages().map(pg => pg.svg) : []
+        };
+
+        const cartItem = { spec: cabinetSpec, rawState: rawState };
+        const btn = document.getElementById('btn-add-to-cart');
+        const originalText = btn.innerHTML;
+
+        if (state.editingCartIndex > -1) {
+            state.orderCart[state.editingCartIndex] = cartItem;
+            state.editingCartIndex = -1;
+            btn.innerHTML = `<i class="fa-solid fa-check"></i> הארון עודכן בהצלחה!`;
+            setTimeout(() => { btn.innerHTML = `<i class="fa-solid fa-plus"></i> הוסף ארון להזמנה`; btn.style.background = ""; }, 2000);
+        } else {
+            state.orderCart.push(cartItem);
+            btn.innerHTML = `<i class="fa-solid fa-check"></i> נשמר בעגלה!`;
+            setTimeout(() => { btn.innerHTML = originalText; btn.style.background = ""; }, 2000);
+        }
+
+        btn.style.background = "var(--success)";
+        const cc2 = document.getElementById('cart-count');
+        if (cc2) cc2.innerText = state.orderCart.length;
+        updateLeftSidebar();
+        // Trigger auto-save so the updated cart is persisted to the project
+        if (typeof saveHistoryState === 'function') saveHistoryState();
+    });
+
+    // Legacy click handler — delegates to openOrderModal
+    document.getElementById('btn-open-cart').addEventListener('click', () => openOrderModal('customer'));
+
+    document.getElementById('btn-close-cart').addEventListener('click', () => { document.getElementById('order-modal').style.display = 'none'; });
+    
+    document.getElementById('order-modal').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('order-modal')) { document.getElementById('order-modal').style.display = 'none'; }
+    });
+}
+
+function _showToast(msg, duration = 4000) {
+    let toast = document.getElementById('autosave-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'autosave-toast';
+        toast.style.cssText = `
+            position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+            background: rgba(30,40,60,0.92); color: white; padding: 12px 24px;
+            border-radius: 12px; font-size: 0.95rem; font-weight: 600;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3); z-index: 99999;
+            transition: opacity 0.4s; pointer-events: none; white-space: nowrap;
+        `;
+        document.body.appendChild(toast);
+    }
+    toast.innerText = msg;
+    toast.style.opacity = '1';
+    clearTimeout(toast._hideTimer);
+    toast._hideTimer = setTimeout(() => { toast.style.opacity = '0'; }, duration);
+}
+
+window.openOrderModal = function(mode) {
+    // mode: 'customer' or 'factory'
+
+    // Feature gate: factory mode requires canExportCarpenter
+    if (mode === 'factory' && window._features && !window._features.canExportCarpenter) {
+        _showToast('תכונה זו אינה זמינה בתוכנית הנוכחית שלך. שדרג כדי לגשת לשליחה לייצור.', 5000);
+        return;
+    }
+
+    const modal = document.getElementById('order-modal');
+    const container = document.getElementById('order-items-container');
+    if (!modal || !container) return;
+
+    // Set modal mode
+    modal.dataset.mode = mode;
+    const isFactory = mode === 'factory';
+
+    // Update title
+    const titleEl = document.getElementById('order-modal-title');
+    if (titleEl) {
+        titleEl.innerHTML = isFactory
+            ? '<i class="fa-solid fa-industry"></i> שליחה לייצור — עלויות רכש'
+            : '<i class="fa-solid fa-file-invoice-dollar"></i> הצעת מחיר ללקוח';
+    }
+
+    // Update print buttons
+    const actionsEl = document.getElementById('modal-print-actions');
+    if (actionsEl) {
+        actionsEl.innerHTML = isFactory
+            ? `<button class="print-btn-large" onclick="printFactory()" style="flex:1;background:#475569;box-shadow:0 4px 15px rgba(71,85,105,0.4);"><i class="fa-solid fa-industry"></i> הדפס לייצור (עלויות רכש)</button>`
+            : `<button class="print-btn-large" onclick="printCustomer()" style="flex:1;"><i class="fa-solid fa-file-invoice-dollar"></i> הדפס ללקוח (מחירון)</button>`;
+    }
+
+    container.innerHTML = '';
+    let totalOrderPrice = 0, totalInstallPrice = 0, totalCostPrice = 0;
+
+    document.getElementById('print-c-name').innerText = state.customer.name || 'לא צוין';
+    document.getElementById('print-c-phone').innerText = state.customer.phone || 'לא צוין';
+    document.getElementById('print-c-order').innerText = state.customer.orderNum || 'לא צוין';
+    document.getElementById('print-c-address').innerText = state.customer.address || 'לא צוין';
+
+    if (state.orderCart.length === 0) {
+        container.innerHTML = '<p style="text-align:center; color:var(--text-light); font-size: 1.2rem;">ההזמנה ריקה. הוסף ארונות קודם.</p>';
+        document.getElementById('modal-footer-summary').innerHTML = '';
+        modal.style.display = 'flex';
+        return;
+    }
+
+    state.orderCart.forEach((itemObj, index) => {
+        const item = itemObj.spec;
+        const titleText = item.customName ? item.customName : `ארון מס' ${index + 1}`;
+        const numericPrice = parseInt(item.price.replace('₪', '').replace(/,/g, ''));
+        const itemInstall = item.installPrice || 0;
+        const itemCost = item.costPrice ? parseInt(item.costPrice.replace('₪', '').replace(/,/g, '')) : 0;
+        if (!isNaN(numericPrice)) totalOrderPrice += numericPrice;
+        totalInstallPrice += itemInstall; totalCostPrice += itemCost;
+
+        const cabinetHTML = `
+            <div class="cabinet-print-page">
+                <div class="cabinet-header-wrapper">
+                    <h3 class="cabinet-title">פרטי ארון: ${titleText}</h3>
+                    <div class="cart-item-actions">
+                        <button class="action-btn edit-btn" onclick="editCartItem(${index})"><i class="fa-solid fa-pen"></i> ערוך ארון</button>
+                        <button class="action-btn del-btn" onclick="deleteCartItem(${index})"><i class="fa-solid fa-trash"></i> מחיקה</button>
+                    </div>
+                </div>
+                <table class="spec-table">
+                    <tr><th>דגם ארון</th><td><strong>${item.modelName}</strong></td></tr>
+                    <tr><th>מיקום / התקנה</th><td>${item.placement}</td></tr>
+                    <tr><th>מידות חיצוניות</th><td dir="rtl">${item.dimsStr}</td></tr>
+                    <tr><th>חומר גוף</th><td>${item.material}</td></tr>
+                    <tr><th>סוג רגליים / צוקל</th><td>${item.plinthType}</td></tr>
+                    <tr><th>תוספת שולחן</th><td>${item.desk}</td></tr>
+                    <tr><td colspan="2" style="background:#f1f5f8; text-align:center; font-weight:bold;">גוונים וגימורים</td></tr>
+                    <tr><th>צבע גוף וצוקל</th><td>${item.colorBody}</td></tr>
+                    <tr><th>צבע פנים (מדפים/מגירות)</th><td>${item.colorInternal}</td></tr>
+                    <tr><th>צבע חזיתות (דלתות)</th><td>${item.colorExternal}</td></tr>
+                    <tr><th>צבע גב ארון</th><td>${(item.colorBack && item.colorBack !== 'undefined') ? item.colorBack : 'לבן מט'}</td></tr>
+                    ${item.desk !== 'ללא' ? `<tr><th>צבע שולחן עבודה</th><td>${item.colorDesk}</td></tr>` : ''}
+                    ${item.hasOpenCells ? `<tr><th>צבע כוורת</th><td>${item.colorOpenCell}</td></tr>` : ''}
+                    ${item.extraColors ? `<tr><th>צבעים נוספים בארון</th><td>${item.extraColors}</td></tr>` : ''}
+                    <tr><td colspan="2" style="background:#f1f5f8; text-align:center; font-weight:bold;">פרזול ותכולה</td></tr>
+                    <tr><th>סוג ידיות לחזיתות</th><td><strong>${item.handle}</strong></td></tr>
+                    <tr><th>מספר מגירות חיצוניות</th><td>${item.drawersExt} יחידות</td></tr>
+                    <tr><th>מספר מגירות פנימיות</th><td>${item.drawersInt} יחידות</td></tr>
+                    <tr><th>מדפים נשלפים</th><td>${item.shelves} יחידות</td></tr>
+                    <tr><th>מוטות תלייה לקולבים</th><td>${item.hanging} יחידות</td></tr>
+
+                    ${!isFactory ? `
+                    <tr class="view-customer">
+                        <th style="background:var(--highlight); vertical-align:middle;">מחיר ארון ללקוח</th>
+                        <td style="font-weight:bold; color:var(--primary); font-size:1.15rem; text-align:right;">
+                            <div style="display:flex; align-items:center; justify-content:flex-start; gap:4px;">
+                                <input type="number" class="modal-price-input" data-index="${index}" value="${numericPrice}" style="font-size:1.15rem; font-weight:bold; color:var(--primary); border:1px solid var(--border); border-radius:6px; width:80px; text-align:right; direction:ltr; outline:none; font-family:inherit; padding:2px 4px; background:white;">
+                                <span>₪</span>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr class="view-customer">
+                        <th style="background:var(--highlight);">הובלה והתקנה</th>
+                        <td style="font-weight:bold; color:var(--primary); font-size:1.15rem; text-align:right;">
+                            <div style="display:flex; align-items:center; justify-content:flex-start; gap:4px;">
+                                <input type="number" class="modal-install-input" data-index="${index}" value="${itemInstall}" style="font-size:1.15rem; font-weight:bold; color:var(--primary); border:1px solid var(--border); border-radius:6px; width:80px; text-align:right; direction:ltr; outline:none; font-family:inherit; padding:2px 4px; background:white;">
+                                <span>₪</span>
+                            </div>
+                        </td>
+                    </tr>
+                    ` : `
+                    <tr class="view-factory">
+                        <th style="background:#fef08a;">עלות ייצור (רכש)</th>
+                        <td style="font-weight:bold; color:#854d0e; font-size:1.15rem; text-align:right;">
+                            <div style="display:flex; align-items:center; justify-content:flex-start; gap:4px;">
+                                <input type="number" class="modal-cost-input" data-index="${index}" value="${itemCost}" style="font-size:1.15rem; font-weight:bold; color:#854d0e; border:1px solid #fef08a; border-radius:6px; width:80px; text-align:right; direction:ltr; outline:none; font-family:inherit; padding:2px 4px; background:#fefce8;">
+                                <span>₪</span>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr class="view-factory">
+                        <th style="background:#fef9c3;">עלות משלוח/התקנה</th>
+                        <td style="font-weight:bold; color:#713f12; font-size:1.15rem; text-align:right;">
+                            <div style="display:flex; align-items:center; justify-content:flex-start; gap:4px;">
+                                <input type="number" class="modal-install-input" data-index="${index}" value="${itemInstall}" style="font-size:1.15rem; font-weight:bold; color:#713f12; border:1px solid #fef9c3; border-radius:6px; width:80px; text-align:right; direction:ltr; outline:none; font-family:inherit; padding:2px 4px; background:#fefce8;">
+                                <span>₪</span>
+                            </div>
+                        </td>
+                    </tr>
+                    `}
+                </table>
+                <div class="print-images-container">
+                    <div class="print-img-wrapper"><div class="img-label">תצוגת חוץ (חזיתות)</div><img src="${item.imgDoors}" alt="ארון סגור"></div>
+                    <div class="print-img-wrapper"><div class="img-label">תצוגת פנים (חלוקה טכנית)</div><img src="${item.imgOpen}" alt="ארון פתוח"></div>
+                </div>
+                ${(item.multiViewPages && item.multiViewPages.length > 0) ? `
+                <div style="margin-top:12px;">
+                    <div class="img-label" style="background:#e8f0fe;color:#1e3a5f;border:1px solid #93c5fd;padding:6px 10px;font-weight:bold;margin-bottom:6px;">שרטוט ייצור</div>
+                    <div style="border:1px solid #bfdbfe;border-radius:4px;overflow:hidden;">${item.multiViewPages[0]}</div>
+                    ${item.multiViewPages.length > 1 ? `<div style="font-size:0.8rem;color:#64748b;margin-top:4px;text-align:center;">+ ${item.multiViewPages.length - 1} דפים נוספים (ראה הדפסה)</div>` : ''}
+                </div>` : (item.multiViewSVG ? `
+                <div style="margin-top:12px;">
+                    <div class="img-label" style="background:#e8f0fe;color:#1e3a5f;border:1px solid #93c5fd;padding:6px 10px;font-weight:bold;margin-bottom:6px;">שרטוט ייצור</div>
+                    <div style="border:1px solid #bfdbfe;border-radius:4px;overflow:hidden;">${item.multiViewSVG}</div>
+                </div>` : '')}
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', cabinetHTML);
+    });
+
+    // Wire up editable inputs
+    container.querySelectorAll('.modal-price-input').forEach(input => {
+        input.addEventListener('change', (e) => {
+            const idx = parseInt(e.target.getAttribute('data-index'));
+            const newPrice = parseInt(e.target.value) || 0;
+            state.orderCart[idx].spec.price = '₪' + newPrice.toLocaleString();
+            state.orderCart[idx].rawState.manualPrice = newPrice;
+            openOrderModal(mode); updateLeftSidebar();
+        });
+    });
+    container.querySelectorAll('.modal-cost-input').forEach(input => {
+        input.addEventListener('change', (e) => {
+            const idx = parseInt(e.target.getAttribute('data-index'));
+            const newCost = parseInt(e.target.value) || 0;
+            state.orderCart[idx].spec.costPrice = '₪' + newCost.toLocaleString();
+            openOrderModal(mode); updateLeftSidebar();
+        });
+    });
+    container.querySelectorAll('.modal-install-input').forEach(input => {
+        input.addEventListener('change', (e) => {
+            const idx = parseInt(e.target.getAttribute('data-index'));
+            const newInstall = parseInt(e.target.value) || 0;
+            state.orderCart[idx].spec.installPrice = newInstall;
+            openOrderModal(mode); updateLeftSidebar();
+        });
+    });
+
+    // Footer summary
+    const footerHTML = isFactory ? `
+        <div class="summary-factory" style="display:block;">
+            <div class="summary-row"><span>סה"כ עלויות ייצור (רכש):</span> <span dir="ltr" style="font-weight:bold;color:#854d0e;">₪${totalCostPrice.toLocaleString()}</span></div>
+            <div class="summary-row"><span>סה"כ עלויות משלוח/התקנה:</span> <span dir="ltr" style="font-weight:bold;color:#713f12;">₪${totalInstallPrice.toLocaleString()}</span></div>
+            <div class="summary-row final-total" style="color:#854d0e; border-top: 2px solid #fef08a;"><span>סה"כ עלויות פרויקט (רכש נטו):</span> <span dir="ltr">₪${(totalCostPrice + totalInstallPrice).toLocaleString()}</span></div>
+        </div>
+    ` : `
+        <div class="summary-customer">
+            <div class="summary-row"><span>סה"כ ארונות (ללא התקנה):</span> <span dir="ltr" style="font-weight:bold;">₪${totalOrderPrice.toLocaleString()}</span></div>
+            <div class="summary-row"><span>סה"כ הובלה והתקנה:</span> <span dir="ltr" style="font-weight:bold;">₪${totalInstallPrice.toLocaleString()}</span></div>
+            <div class="summary-row final-total"><span>סה"כ לתשלום ללקוח:</span> <span dir="ltr">₪${(totalOrderPrice + totalInstallPrice).toLocaleString()}</span></div>
+        </div>
+    `;
+    document.getElementById('modal-footer-summary').innerHTML = footerHTML;
+    modal.style.display = 'flex';
+};
+
+window.deleteCartItem = function(index) {
+    // Use a toast-style inline confirm to avoid browser confirm() suppression issues
+    const _doDelete = function() {
+        state.orderCart.splice(index, 1);
+        if(state.editingCartIndex === index) {
+            state.editingCartIndex = -1;
+            const addBtn = document.getElementById('btn-add-to-cart');
+            if (addBtn) addBtn.innerHTML = `<i class="fa-solid fa-plus"></i> הוסף ארון להזמנה`;
+        } else if (state.editingCartIndex > index) { state.editingCartIndex--; }
+        const cc3 = document.getElementById('cart-count');
+        if (cc3) cc3.innerText = state.orderCart.length;
+        updateLeftSidebar();
+        if(document.getElementById('order-modal').style.display === 'flex') {
+            const currentMode = document.getElementById('order-modal').dataset.mode || 'customer';
+            openOrderModal(currentMode);
+        }
+        saveHistoryState();
+    };
+
+    // Centered modal confirm with blurred backdrop (avoids browser confirm() suppression)
+    const existing = document.getElementById('_delete-confirm-toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.id = '_delete-confirm-toast';
+    // Backdrop: full-screen, blurred background
+    toast.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);';
+    toast.innerHTML = `
+        <div style="background:#1e2840;color:white;padding:36px 40px;border-radius:20px;font-size:1.15rem;font-weight:600;box-shadow:0 8px 48px rgba(0,0,0,0.55);display:flex;flex-direction:column;align-items:center;gap:24px;min-width:300px;max-width:90vw;text-align:center;">
+            <div style="font-size:2.2rem;">🗑️</div>
+            <div style="font-size:1.2rem;font-weight:700;line-height:1.5;">למחוק ארון זה מההזמנה?</div>
+            <div style="display:flex;gap:14px;width:100%;">
+                <button onclick="document.getElementById('_delete-confirm-toast').remove(); window._pendingDelete && window._pendingDelete();" style="flex:1;background:#ef4444;color:white;border:none;border-radius:10px;padding:12px 0;font-size:1.05rem;font-weight:700;cursor:pointer;transition:background 0.2s;">מחק</button>
+                <button onclick="document.getElementById('_delete-confirm-toast').remove();" style="flex:1;background:rgba(255,255,255,0.15);color:white;border:none;border-radius:10px;padding:12px 0;font-size:1.05rem;font-weight:600;cursor:pointer;transition:background 0.2s;">ביטול</button>
+            </div>
+        </div>
+    `;
+    window._pendingDelete = _doDelete;
+    document.body.appendChild(toast);
+    setTimeout(() => { const t = document.getElementById('_delete-confirm-toast'); if (t) t.remove(); }, 10000);
+}
+
+window.editCartItem = function(index) {
+    const rawState = state.orderCart[index].rawState;
+    const rs = JSON.parse(JSON.stringify(rawState));
+
+    // Restore wing system if saved (new format), otherwise fall back to flat fields
+    if (rs.wings) {
+        state.wings.center = rs.wings.center || state.wings.center;
+        state.wings.left   = rs.wings.left   || null;
+        state.wings.right  = rs.wings.right  || null;
+        state.activeWing   = rs.activeWing   || 'center';
+        state.presetId     = rs.presetId     || 'linear';
+    } else {
+        // Legacy rawState (no wings) — treat as linear, restore flat fields to center wing
+        state.presetId   = 'linear';
+        state.activeWing = 'center';
+        state.wings.left  = null;
+        state.wings.right = null;
+        // Apply flat fields to center wing via proxy setters
+        const flatFields = ['cabinetModel','placement','width','globalHeight','depth','thickness',
+            'plinthHeight','hasDoors','handleType','cabinetName','manualPrice','boardMaterial',
+            'materialBody','materialInternal','materialExternal','materialDesk','materialOpenCell',
+            'materialBack','columns','desk'];
+        flatFields.forEach(function(f) { if (rs[f] !== undefined) state[f] = rs[f]; });
+    }
+
+    // Always exit wing edit mode when loading a cabinet (prevents stale wingEditMode from previous corner cabinet)
+    state.wingEditMode = false;
+    state.wingEditSnapshot = null;
+
+    // Reset viewMode and orbit state based on preset type
+    // Linear/sliding cabinets use front view; corner/walkin use 3d view
+    const _loadedPreset = state.presetId || 'linear';
+    const _isLinearPreset = (_loadedPreset === 'linear' || _loadedPreset === 'sliding');
+    if (_isLinearPreset) {
+        state.viewMode = 'front';
+        window._orbitFree = false;
+    } else {
+        state.viewMode = '3d';
+        window._orbitFree = false; // reset orbit so camera snaps to preset position
+    }
+    // Sync view button highlights
+    document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+    const _activeViewBtn = document.getElementById(_isLinearPreset ? 'btn-front-view' : 'btn-3d-view');
+    if (_activeViewBtn) _activeViewBtn.classList.add('active');
+    const _resetViewBtn = document.getElementById('btn-reset-view');
+    if (_resetViewBtn) _resetViewBtn.style.display = 'none';
+
+    // Restore room wall position
+    window._roomWall = rawState.roomWall || 'center';
+    state.roomWall   = window._roomWall;
+
+    // Restore closure panel settings
+    window._closureEnabled    = (rawState.closureEnabled !== undefined) ? rawState.closureEnabled : true;
+    window._closureWidth      = rawState.closureWidth      || 1.8;
+    window._closureWidthRight = rawState.closureWidthRight || 1.8;
+    window._closureCeilWidth  = rawState.closureCeilWidth  || 1.8;
+    window._closureDepthWidth = rawState.closureDepthWidth || 1.8;
+    window._closureFrontLine  = rawState.closureFrontLine  || 'cabinet';
+    // Restore niche settings
+    window._nicheEnabled             = (rawState.nicheEnabled !== undefined) ? rawState.nicheEnabled : false;
+    window._nicheWidth               = rawState.nicheWidth || 200;
+    window._nicheDepth               = rawState.nicheDepth || 30;
+    window._nicheClosureEnabled      = (rawState.nicheClosureEnabled !== undefined) ? rawState.nicheClosureEnabled : false;
+    window._nicheClosureWidthLeft    = rawState.nicheClosureWidthLeft  || 1.8;
+    window._nicheClosureWidthRight   = rawState.nicheClosureWidthRight || 1.8;
+    window._nicheClosureCeilHeight   = rawState.nicheClosureCeilHeight || 1.8;
+    // Sync closure + niche UI
+    if (typeof window._updateRoomWallUI === 'function') window._updateRoomWallUI();
+
+    // Explicitly restore manualInstallPrice (not in old rawState saves → default null)
+    state.manualInstallPrice = (rawState.manualInstallPrice != null) ? rawState.manualInstallPrice : null;
+    state.editingCartIndex = index;
+
+    document.getElementById('order-modal').style.display = 'none';
+    document.getElementById('btn-add-to-cart').innerHTML = `<i class="fa-solid fa-save"></i> שמור שינויים לארון`;
+
+    // Restore preset UI (button highlights, wing tabs, section visibility)
+    if (typeof window._restorePresetUI === 'function') window._restorePresetUI();
+    buildCabinet(); updateCameraView(); calculatePrice(); updateLeftSidebar(); saveHistoryState();
+}
+
+window.startNewCabinet = function() {
+    state.editingCartIndex = -1; state.cabinetName = ''; state.manualPrice = null; state.manualInstallPrice = null;
+    const cabNameInp = document.getElementById('inp-cabinet-name'); if (cabNameInp) cabNameInp.value = '';
+    document.getElementById('btn-add-to-cart').innerHTML = `<i class="fa-solid fa-plus"></i> הוסף ארון להזמנה`;
+    updateLeftSidebar(); alert('הקנבס פנוי לעיצוב ארון חדש! (המידות נשארו לטובת נוחות, אך הארון הקודם שמור בעגלה ולא ייפגע)');
+}
+
+window.newProject = function() {
+    if (!confirm('האם אתה בטוח שברצונך להתחיל פרויקט חדש?\nכל הארונות בפרויקט הנוכחי יימחקו לצמיתות.')) return;
+    // Clear the entire cart / project
+    state.orderCart = [];
+    state.editingCartIndex = -1;
+    state.cabinetName = '';
+    state.manualPrice = null;
+    state.manualInstallPrice = null;
+    // Clear project ID so auto-save does NOT save to Supabase until user explicitly saves
+    window._currentProjectId   = null;
+    window._currentProjectName = null;
+    // Reset cart-count badge
+    const cc = document.getElementById('cart-count');
+    if (cc) cc.innerText = '0';
+    // Reset add-to-cart button label
+    const addBtn = document.getElementById('btn-add-to-cart');
+    if (addBtn) addBtn.innerHTML = `<i class="fa-solid fa-plus"></i> הוסף ארון להזמנה`;
+    // Reset cabinet name input
+    const cabNameInp = document.getElementById('inp-cabinet-name');
+    if (cabNameInp) cabNameInp.value = '';
+    // Close order modal if open
+    const orderModal = document.getElementById('order-modal');
+    if (orderModal) orderModal.style.display = 'none';
+    // Apply fresh linear preset (resets all state + rebuilds)
+    if (typeof applyPreset === 'function') applyPreset('linear');
+    updateLeftSidebar();
+}
+
+window.updateLeftSidebar = function() {
+    const listContainer = document.getElementById('cart-items-list');
+    const totalEl = document.getElementById('left-sidebar-total');
+    const cabTotalEl = document.getElementById('sidebar-cab-total');
+    const instTotalEl = document.getElementById('sidebar-inst-total');
+
+    if (!listContainer || !totalEl) return;
+    listContainer.innerHTML = '';
+    let totalCabinetsPrice = 0; let totalInstallPrice = 0;
+
+    if (state.orderCart.length === 0) {
+        listContainer.innerHTML = '<div style="text-align:center; padding: 40px 10px; color:var(--text-light);"><i class="fa-solid fa-box-open" style="font-size:3.5rem; margin-bottom:15px; opacity:0.4;"></i><br><b style="font-size:1.1rem;">הפרויקט ריק</b><br>עצב את הארון הראשון שלך ולחץ על הוספה.</div>';
+        totalEl.innerText = '₪0';
+        if (cabTotalEl) cabTotalEl.innerText = '₪0';
+        if (instTotalEl) instTotalEl.innerText = '₪0';
+        return;
+    }
+
+    state.orderCart.forEach((itemObj, index) => {
+        const item = itemObj.spec;
+        const numericPrice = parseInt(item.price.replace('₪', '').replace(/,/g, ''));
+        const itemInstall = item.installPrice || 0;
+        
+        if (!isNaN(numericPrice)) totalCabinetsPrice += numericPrice;
+        totalInstallPrice += itemInstall;
+
+        const isEditing = state.editingCartIndex === index;
+        const activeClass = isEditing ? 'active-editing' : '';
+        const activeLabel = isEditing ? '<div style="position:absolute; top:-12px; right:15px; background:var(--accent); color:white; font-size:11px; padding:3px 10px; border-radius:12px; font-weight:bold; box-shadow:0 2px 5px rgba(0,0,0,0.15); border: 2px solid white;"><i class="fa-solid fa-pen"></i> בעריכה כעת</div>' : '';
+        const titleText = item.customName ? item.customName : `ארון מס' ${index + 1}`;
+
+        // Room wall position selector (only for linear/sliding presets)
+        const _itemPreset = (itemObj.rawState && itemObj.rawState.presetId) || 'linear';
+        const _isLinearOrSliding = (_itemPreset === 'linear' || _itemPreset === 'sliding');
+        const _curRoomWall = (itemObj.rawState && itemObj.rawState.roomWall) || 'center';
+        const _wallSelectorHTML = _isLinearOrSliding ? `
+            <div style="display:flex;align-items:center;gap:4px;margin-top:6px;padding-top:6px;border-top:1px solid var(--border);">
+                <span style="font-size:0.78rem;color:var(--text-light);flex-shrink:0;">מיקום בחדר:</span>
+                <div style="display:flex;gap:3px;flex:1;">
+                    <button onclick="event.stopPropagation(); window.setCartItemRoomWall(${index},'left');"
+                        style="flex:1;padding:3px 4px;font-size:0.75rem;border-radius:5px;border:1.5px solid ${_curRoomWall==='left'?'var(--accent)':'var(--border)'};background:${_curRoomWall==='left'?'rgba(var(--accent-rgb,99,102,241),0.12)':'transparent'};color:${_curRoomWall==='left'?'var(--accent)':'var(--text-light)'};cursor:pointer;font-weight:${_curRoomWall==='left'?'700':'400'};" title="צמוד לקיר שמאל">
+                        ← שמאל
+                    </button>
+                    <button onclick="event.stopPropagation(); window.setCartItemRoomWall(${index},'center');"
+                        style="flex:1;padding:3px 4px;font-size:0.75rem;border-radius:5px;border:1.5px solid ${_curRoomWall==='center'?'var(--accent)':'var(--border)'};background:${_curRoomWall==='center'?'rgba(var(--accent-rgb,99,102,241),0.12)':'transparent'};color:${_curRoomWall==='center'?'var(--accent)':'var(--text-light)'};cursor:pointer;font-weight:${_curRoomWall==='center'?'700':'400'};" title="מרכז">
+                        מרכז
+                    </button>
+                    <button onclick="event.stopPropagation(); window.setCartItemRoomWall(${index},'right');"
+                        style="flex:1;padding:3px 4px;font-size:0.75rem;border-radius:5px;border:1.5px solid ${_curRoomWall==='right'?'var(--accent)':'var(--border)'};background:${_curRoomWall==='right'?'rgba(var(--accent-rgb,99,102,241),0.12)':'transparent'};color:${_curRoomWall==='right'?'var(--accent)':'var(--text-light)'};cursor:pointer;font-weight:${_curRoomWall==='right'?'700':'400'};" title="צמוד לקיר ימין">
+                        ימין →
+                    </button>
+                </div>
+            </div>` : '';
+
+        const card = document.createElement('div');
+        card.className = `cart-mini-card ${activeClass}`;
+        card.onclick = () => { if(!isEditing) editCartItem(index); };
+        
+        card.innerHTML = `
+            ${activeLabel}
+            <div class="cart-mini-card-title">${titleText}</div>
+            <div class="cart-mini-card-desc" dir="rtl">${item.dimsStr}</div>
+            <div class="cart-mini-card-price"><span dir="ltr">${item.price}</span> <span style="font-size:0.85rem; font-weight:normal; color:var(--text-light);">+ <span dir="ltr">₪${itemInstall.toLocaleString()}</span> התקנה</span></div>
+            ${_wallSelectorHTML}
+            <div class="cart-mini-actions">
+                <button class="cart-mini-btn btn-edit-mini" onclick="event.stopPropagation(); editCartItem(${index});"><i class="fa-solid fa-pen"></i> ערוך</button>
+                <button class="cart-mini-btn btn-del-mini" onclick="event.stopPropagation(); deleteCartItem(${index});"><i class="fa-solid fa-trash"></i> מחק</button>
+                <div style="position:relative;display:inline-flex;">
+                    <button class="cart-mini-btn" id="notes-btn-cart-${index}" onclick="event.stopPropagation(); window._openDesignerNotesForCabinet(${index});" style="color:#2563eb;border-color:rgba(37,99,235,0.35);background:rgba(37,99,235,0.07);">
+                        <i class="fa-solid fa-note-sticky"></i> תיקונים
+                    </button>
+                    <span id="notes-badge-cart-${index}" style="display:none;position:absolute;top:-5px;left:-5px;background:#ef4444;color:white;border-radius:50%;width:15px;height:15px;font-size:9px;font-weight:700;align-items:center;justify-content:center;line-height:1;z-index:10;pointer-events:none;"></span>
+                </div>
+            </div>
+        `;
+        listContainer.appendChild(card);
+    });
+
+    const grandTotal = totalCabinetsPrice + totalInstallPrice;
+    if (cabTotalEl) cabTotalEl.innerHTML = `<span dir="ltr">₪${totalCabinetsPrice.toLocaleString()}</span>`;
+    if (instTotalEl) instTotalEl.innerHTML = `<span dir="ltr">₪${totalInstallPrice.toLocaleString()}</span>`;
+    totalEl.innerHTML = `<span dir="ltr">₪${grandTotal.toLocaleString()}</span>`;
+
+    // Restore cart notes badges after re-render (badge elements are recreated as display:none)
+    if (typeof window._updateCartNotesBadges === 'function' && window._currentShareToken) {
+        window._updateCartNotesBadges(window._currentShareToken);
+    }
+};
+
+// Set room wall position for a specific cart item
+window.setCartItemRoomWall = function(index, wall) {
+    if (!state.orderCart[index]) return;
+    if (!state.orderCart[index].rawState) state.orderCart[index].rawState = {};
+    state.orderCart[index].rawState.roomWall = wall;
+    // If this cabinet is currently being edited, apply immediately
+    if (state.editingCartIndex === index) {
+        window._roomWall = wall;
+        state.roomWall   = wall;
+        buildCabinet();
+    }
+    updateLeftSidebar();
+};
+
+window.calcQuickPrice = function(autoUpdateShelves = false) {
+    const w = parseFloat(document.getElementById('qc-w').value) || 0;
+    const h = parseFloat(document.getElementById('qc-h').value) || 0;
+    const d = parseFloat(document.getElementById('qc-d').value) || 0;
+    const modelEl = document.getElementById('qc-plinth');
+    const model = modelEl ? modelEl.value : 'maya';
+    const isMelamine = document.getElementById('qc-mat').value === 'melamine';
+    const intDrawers = parseInt(document.getElementById('qc-int-d').value) || 0;
+    const extDrawers = parseInt(document.getElementById('qc-ext-d').value) || 0;
+    let openCells = parseInt(document.getElementById('qc-open-cells').value) || 0;
+    const hasDesk = document.getElementById('qc-desk').checked;
+
+    let allowedShelves = 0;
+    if (model !== 'c9') {
+        if (w <= 80) allowedShelves = 5; else if (w <= 160) allowedShelves = 8; else allowedShelves = 13; 
+    } else {
+        if (w <= 80) allowedShelves = 2; else if (w <= 160) allowedShelves = 7; else allowedShelves = 12;
+    }
+    if (w > 240) { 
+        const extraChunks = Math.ceil((w - 240) / 80); 
+        allowedShelves += (extraChunks * 5); 
+    }
+    if (h > 240) {
+        allowedShelves += Math.ceil(w / 80); 
+    }
+
+    const labelEl = document.getElementById('qc-allowed-shelves-label');
+    if (labelEl) labelEl.innerText = `(כלול: ${allowedShelves})`;
+
+    if (autoUpdateShelves === true) {
+        const shelvesInput = document.getElementById('qc-shelves');
+        if(shelvesInput) shelvesInput.value = allowedShelves;
+    }
+
+    const shelvesEl = document.getElementById('qc-shelves');
+    const shelves = shelvesEl ? (parseInt(shelvesEl.value) || 0) : 0;
+
+    let basePrice = 0;
+    let price240 = 0; 
+    
+    if (model === 'ab2') {
+        if (isMelamine) {
+            price240 = 3013;
+            if (w <= 80) basePrice = 1004; else if (w <= 120) basePrice = 1507; else if (w <= 160) basePrice = 2009; else if (w <= 200) basePrice = 2511; else basePrice = price240; 
+        } else { 
+            price240 = 3918;
+            if (w <= 80) basePrice = 1305; else if (w <= 120) basePrice = 1959; else if (w <= 160) basePrice = 2612; else if (w <= 200) basePrice = 3265; else basePrice = price240;
+        }
+    } else if (model === 'c9') {
+        if (isMelamine) {
+            price240 = 2250;
+            if (w <= 80) basePrice = 970; else if (w <= 120) basePrice = 1340; else if (w <= 160) basePrice = 1500; else if (w <= 200) basePrice = 1870; else basePrice = price240; 
+        } else { 
+            price240 = 2920;
+            if (w <= 80) basePrice = 1250; else if (w <= 120) basePrice = 1600; else if (w <= 160) basePrice = 1945; else if (w <= 200) basePrice = 2433; else basePrice = price240;
+        }
+    } else {
+        if (isMelamine) {
+            price240 = 2487;
+            if (w <= 80) basePrice = 1050; else if (w <= 120) basePrice = 1462; else if (w <= 160) basePrice = 1658; else if (w <= 200) basePrice = 2073; else basePrice = price240;
+        } else { 
+            price240 = 3233;
+            if (w <= 80) basePrice = 1360; else if (w <= 120) basePrice = 1900; else if (w <= 160) basePrice = 2155; else if (w <= 200) basePrice = 2700; else basePrice = price240;
+        }
+    }
+
+    if (w > 240) basePrice = (price240 / 240) * w;
+    if (h >= 241 && isMelamine) basePrice *= 1.20;
+    if (d > 54) basePrice *= 1.20;
+
+    let finalCost = basePrice;
+
+    if (shelves > allowedShelves) {
+        const extraShelves = shelves - allowedShelves;
+        const shelfPrice = isMelamine ? 60 : 80;
+        finalCost += (extraShelves * shelfPrice);
+    }
+
+    if (hasDesk) finalCost += 900;
+    finalCost += (intDrawers * 150);
+    finalCost += (extDrawers * 200);
+    
+    if (model === 'ab2' && openCells > 0) openCells -= 1;
+    finalCost += (openCells * 400);
+
+    const splitThreshold = isMelamine ? 270 : 240;
+    if (h > splitThreshold) {
+        let topUnitCost = 0;
+        if (w <= 160) topUnitCost = 600; 
+        else if (w <= 240) topUnitCost = 900; 
+        else topUnitCost = w * 3.75; 
+        
+        finalCost += topUnitCost; 
+    }
+
+    let installPrice = Math.ceil(w / 42.5) * 110;
+    if (h > 240) installPrice *= 1.2;
+    
+    const priceToCustomer = finalCost * 1.7;
+
+    document.getElementById('qc-total-cost').innerText = '₪' + Math.round(finalCost).toLocaleString();
+    document.getElementById('qc-install').innerText = '₪' + Math.round(installPrice).toLocaleString();
+    document.getElementById('qc-total-cust').innerText = '₪' + Math.round(priceToCustomer).toLocaleString();
+};
+
+function _buildPrintHTML(mode) {
+    // mode: 'customer' or 'factory'
+    const isFactory = mode === 'factory';
+
+    // Table cell styles (defined before forEach so they're available in template literals)
+    const thStyle = 'width:35%;background:#f8fafc;text-align:right;font-weight:600;color:#1e293b;padding:10px 14px;border:1px solid #e2e8f0;';
+    const tdStyle = 'text-align:right;color:#1e293b;padding:10px 14px;border:1px solid #e2e8f0;background:white;';
+
+    // Collect cart data
+    let totalOrderPrice = 0, totalInstallPrice = 0, totalCostPrice = 0;
+    let cabinetsHTML = '';
+
+    state.orderCart.forEach((itemObj, index) => {
+        const item = itemObj.spec;
+        const titleText = item.customName ? item.customName : `ארון מס' ${index + 1}`;
+        const numericPrice = parseInt(item.price.replace('₪', '').replace(/,/g, '')) || 0;
+        const itemInstall = item.installPrice || 0;
+        const itemCost = item.costPrice ? parseInt(item.costPrice.replace('₪', '').replace(/,/g, '')) : 0;
+        totalOrderPrice += numericPrice;
+        totalInstallPrice += itemInstall;
+        totalCostPrice += itemCost;
+
+        const priceRows = isFactory
+            ? `<tr><th style="background:#fef9c3;">מחיר התקנה ללקוח</th><td style="font-weight:bold;color:#713f12;font-size:1.1rem;text-align:right;">₪${(item.installPrice || 0).toLocaleString()}</td></tr>`
+            : `<tr><th style="background:#eff6ff;">מחיר ארון ללקוח</th><td style="font-weight:bold;color:#1e3a5f;font-size:1.1rem;text-align:right;">₪${numericPrice.toLocaleString()}</td></tr>
+               <tr><th style="background:#eff6ff;">הובלה והתקנה</th><td style="font-weight:bold;color:#1e3a5f;font-size:1.1rem;text-align:right;">₪${itemInstall.toLocaleString()}</td></tr>`;
+
+        if (isFactory) {
+            // Factory: page 1 = spec table; page 2 = 3D images (paired); then blueprint pages paired (2 per print page)
+            const bpPages = item.multiViewPages && item.multiViewPages.length > 0
+                ? item.multiViewPages
+                : (item.multiViewSVG ? [item.multiViewSVG] : []);
+
+            cabinetsHTML += `
+            <div style="page-break-after:always;">
+                <h3 style="font-size:1.3rem;color:#1e3a5f;margin:0 0 12px;padding:10px 15px;background:#f8fafc;border-radius:8px;border-right:4px solid #1e3a5f;">
+                    פרטי ארון: ${titleText}
+                </h3>
+                <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:1rem;border:1px solid #e2e8f0;">
+                    <tr><th style="${thStyle}">דגם ארון</th><td style="${tdStyle}"><strong>${item.modelName}</strong></td></tr>
+                    <tr><th style="${thStyle}">מיקום / התקנה</th><td style="${tdStyle}">${item.placement}</td></tr>
+                    <tr><th style="${thStyle}">מידות חיצוניות</th><td style="${tdStyle}" dir="rtl">${item.dimsStr}</td></tr>
+                    <tr><th style="${thStyle}">חומר גוף</th><td style="${tdStyle}">${item.material}</td></tr>
+                    <tr><th style="${thStyle}">סוג רגליים / צוקל</th><td style="${tdStyle}">${item.plinthType}</td></tr>
+                    <tr><th style="${thStyle}">תוספת שולחן</th><td style="${tdStyle}">${item.desk}</td></tr>
+                    <tr><td colspan="2" style="background:#f1f5f8;text-align:center;font-weight:bold;padding:8px;border:1px solid #e2e8f0;">גוונים וגימורים</td></tr>
+                    <tr><th style="${thStyle}">צבע גוף וצוקל</th><td style="${tdStyle}">${item.colorBody}</td></tr>
+                    <tr><th style="${thStyle}">צבע פנים (מדפים/מגירות)</th><td style="${tdStyle}">${item.colorInternal}</td></tr>
+                    ${item.slidingDoor ? `<tr><th style="${thStyle}">צבע חזיתות הזזה</th><td style="${tdStyle}">${item.slidingDoor.doorColorsStr}</td></tr>` : `<tr><th style="${thStyle}">צבע חזיתות (דלתות)</th><td style="${tdStyle}">${item.colorExternal}</td></tr>`}
+                    <tr><th style="${thStyle}">צבע גב ארון</th><td style="${tdStyle}">${(item.colorBack && item.colorBack !== 'undefined') ? item.colorBack : 'לבן מט'}</td></tr>
+                    ${item.desk !== 'ללא' ? `<tr><th style="${thStyle}">צבע שולחן עבודה</th><td style="${tdStyle}">${item.colorDesk}</td></tr>` : ''}
+                    ${item.hasOpenCells ? `<tr><th style="${thStyle}">צבע כוורת</th><td style="${tdStyle}">${item.colorOpenCell}</td></tr>` : ''}
+                    ${item.extraColors ? `<tr><th style="${thStyle}">צבעים נוספים בארון</th><td style="${tdStyle}">${item.extraColors}</td></tr>` : ''}
+                    <tr><td colspan="2" style="background:#f1f5f8;text-align:center;font-weight:bold;padding:8px;border:1px solid #e2e8f0;">פרזול ותכולה</td></tr>
+                    ${item.slidingDoor ? `
+                    <tr><th style="${thStyle}">מספר דלתות הזזה</th><td style="${tdStyle}">${item.slidingDoor.numDoors} דלתות</td></tr>
+                    <tr><th style="${thStyle}">צבע פרופיל הזזה</th><td style="${tdStyle}">${item.slidingDoor.profileColor}</td></tr>
+                    ${item.slidingDoor.hasMirror ? `<tr><th style="${thStyle}">דלת מראה</th><td style="${tdStyle}"><strong style="color:#1e3a5f;">✓ כולל דלת מראה</strong></td></tr>` : ''}
+                    ` : `<tr><th style="${thStyle}">סוג ידיות לחזיתות</th><td style="${tdStyle}"><strong>${item.handle}</strong></td></tr>`}
+                    <tr><th style="${thStyle}">מגירות חיצוניות</th><td style="${tdStyle}">${item.drawersExt} יחידות</td></tr>
+                    <tr><th style="${thStyle}">מגירות פנימיות</th><td style="${tdStyle}">${item.drawersInt} יחידות</td></tr>
+                    <tr><th style="${thStyle}">מדפים נשלפים</th><td style="${tdStyle}">${item.shelves} יחידות</td></tr>
+                    <tr><th style="${thStyle}">מוטות תלייה לקולבים</th><td style="${tdStyle}">${item.hanging} יחידות</td></tr>
+                    ${priceRows}
+                </table>
+            </div>
+            <div style="page-break-after:always;">
+                <h3 style="font-size:1.2rem;color:#1e3a5f;margin:0 0 16px;padding:10px 15px;background:#f8fafc;border-radius:8px;border-right:4px solid #1e3a5f;">
+                    תמונות ארון: ${titleText}
+                </h3>
+                <div style="display:flex;flex-direction:column;gap:16px;height:calc(100vh - 120px);">
+                    <div style="flex:1;display:flex;flex-direction:column;min-height:0;">
+                        <div style="font-size:0.85rem;font-weight:600;color:#475569;margin-bottom:4px;padding:4px 8px;background:#f1f5f8;border-radius:4px;">תצוגת חוץ (חזיתות)</div>
+                        <img src="${item.imgDoors}" style="flex:1;min-height:0;width:100%;object-fit:contain;border:1px solid #e2e8f0;border-radius:4px;" alt="ארון סגור">
+                    </div>
+                    <div style="flex:1;display:flex;flex-direction:column;min-height:0;">
+                        <div style="font-size:0.85rem;font-weight:600;color:#475569;margin-bottom:4px;padding:4px 8px;background:#f1f5f8;border-radius:4px;">תצוגת פנים (חלוקה טכנית)</div>
+                        <img src="${item.imgOpen}" style="flex:1;min-height:0;width:100%;object-fit:contain;border:1px solid #e2e8f0;border-radius:4px;" alt="ארון פתוח">
+                    </div>
+                </div>
+            </div>
+            ${(() => {
+                const pairs = [];
+                for (let pi = 0; pi < bpPages.length; pi += 2) {
+                    pairs.push(bpPages.slice(pi, pi + 2));
+                }
+                return pairs.map((pair, pairIdx) => `
+            <div class="bp-page" style="page-break-after:always;page-break-inside:avoid;">
+                ${pair.map((svg, si) => {
+                    const globalIdx = pairIdx * 2 + si;
+                    return `<div style="margin-bottom:${si === 0 && pair.length > 1 ? '16px' : '0'};">
+                    <div style="font-size:1rem;font-weight:bold;margin-bottom:6px;background:#e8f0fe;padding:6px;text-align:center;border:1px solid #93c5fd;border-bottom:none;">
+                        שרטוט טכני — ${titleText}${bpPages.length > 1 ? ` (עמוד ${globalIdx + 1}/${bpPages.length})` : ''}
+                    </div>
+                    <div style="border:2px solid #93c5fd;display:block;overflow:hidden;width:100%;">${svg}</div>
+                </div>`;
+                }).join('')}
+            </div>`).join('');
+            })()}`;
+        } else {
+            // Customer: page 1 = spec table; page 2 = 3D images; then blueprint pages paired (2 per print page)
+            const bpPages = item.multiViewPages && item.multiViewPages.length > 0
+                ? item.multiViewPages
+                : (item.multiViewSVG ? [item.multiViewSVG] : []);
+
+            cabinetsHTML += `
+            <div style="page-break-after:always;">
+                <h3 style="font-size:1.3rem;color:#1e3a5f;margin:0 0 12px;padding:10px 15px;background:#f8fafc;border-radius:8px;border-right:4px solid #1e3a5f;">
+                    פרטי ארון: ${titleText}
+                </h3>
+                <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:1rem;border:1px solid #e2e8f0;">
+                    <tr><th style="${thStyle}">דגם ארון</th><td style="${tdStyle}"><strong>${item.modelName}</strong></td></tr>
+                    <tr><th style="${thStyle}">מיקום / התקנה</th><td style="${tdStyle}">${item.placement}</td></tr>
+                    <tr><th style="${thStyle}">מידות חיצוניות</th><td style="${tdStyle}" dir="rtl">${item.dimsStr}</td></tr>
+                    <tr><th style="${thStyle}">חומר גוף</th><td style="${tdStyle}">${item.material}</td></tr>
+                    <tr><th style="${thStyle}">סוג רגליים / צוקל</th><td style="${tdStyle}">${item.plinthType}</td></tr>
+                    <tr><th style="${thStyle}">תוספת שולחן</th><td style="${tdStyle}">${item.desk}</td></tr>
+                    <tr><td colspan="2" style="background:#f1f5f8;text-align:center;font-weight:bold;padding:8px;border:1px solid #e2e8f0;">גוונים וגימורים</td></tr>
+                    <tr><th style="${thStyle}">צבע גוף וצוקל</th><td style="${tdStyle}">${item.colorBody}</td></tr>
+                    <tr><th style="${thStyle}">צבע פנים (מדפים/מגירות)</th><td style="${tdStyle}">${item.colorInternal}</td></tr>
+                    ${item.slidingDoor ? `<tr><th style="${thStyle}">צבע חזיתות הזזה</th><td style="${tdStyle}">${item.slidingDoor.doorColorsStr}</td></tr>` : `<tr><th style="${thStyle}">צבע חזיתות (דלתות)</th><td style="${tdStyle}">${item.colorExternal}</td></tr>`}
+                    <tr><th style="${thStyle}">צבע גב ארון</th><td style="${tdStyle}">${(item.colorBack && item.colorBack !== 'undefined') ? item.colorBack : 'לבן מט'}</td></tr>
+                    ${item.desk !== 'ללא' ? `<tr><th style="${thStyle}">צבע שולחן עבודה</th><td style="${tdStyle}">${item.colorDesk}</td></tr>` : ''}
+                    ${item.hasOpenCells ? `<tr><th style="${thStyle}">צבע כוורת</th><td style="${tdStyle}">${item.colorOpenCell}</td></tr>` : ''}
+                    ${item.extraColors ? `<tr><th style="${thStyle}">צבעים נוספים בארון</th><td style="${tdStyle}">${item.extraColors}</td></tr>` : ''}
+                    <tr><td colspan="2" style="background:#f1f5f8;text-align:center;font-weight:bold;padding:8px;border:1px solid #e2e8f0;">פרזול ותכולה</td></tr>
+                    ${item.slidingDoor ? `
+                    <tr><th style="${thStyle}">מספר דלתות הזזה</th><td style="${tdStyle}">${item.slidingDoor.numDoors} דלתות</td></tr>
+                    <tr><th style="${thStyle}">צבע פרופיל הזזה</th><td style="${tdStyle}">${item.slidingDoor.profileColor}</td></tr>
+                    ${item.slidingDoor.hasMirror ? `<tr><th style="${thStyle}">דלת מראה</th><td style="${tdStyle}"><strong style="color:#1e3a5f;">✓ כולל דלת מראה</strong></td></tr>` : ''}
+                    ` : `<tr><th style="${thStyle}">סוג ידיות לחזיתות</th><td style="${tdStyle}"><strong>${item.handle}</strong></td></tr>`}
+                    <tr><th style="${thStyle}">מגירות חיצוניות</th><td style="${tdStyle}">${item.drawersExt} יחידות</td></tr>
+                    <tr><th style="${thStyle}">מגירות פנימיות</th><td style="${tdStyle}">${item.drawersInt} יחידות</td></tr>
+                    <tr><th style="${thStyle}">מדפים נשלפים</th><td style="${tdStyle}">${item.shelves} יחידות</td></tr>
+                    <tr><th style="${thStyle}">מוטות תלייה לקולבים</th><td style="${tdStyle}">${item.hanging} יחידות</td></tr>
+                    ${priceRows}
+                </table>
+            </div>
+            <div style="page-break-after:always;">
+                <h3 style="font-size:1.2rem;color:#1e3a5f;margin:0 0 16px;padding:10px 15px;background:#f8fafc;border-radius:8px;border-right:4px solid #1e3a5f;">
+                    תמונות ארון: ${titleText}
+                </h3>
+                <div style="display:flex;flex-direction:column;gap:16px;height:calc(100vh - 120px);">
+                    <div style="flex:1;display:flex;flex-direction:column;min-height:0;">
+                        <div style="font-size:0.85rem;font-weight:600;color:#475569;margin-bottom:4px;padding:4px 8px;background:#f1f5f8;border-radius:4px;">תצוגת חוץ (חזיתות)</div>
+                        <img src="${item.imgDoors}" style="flex:1;min-height:0;width:100%;object-fit:contain;border:1px solid #e2e8f0;border-radius:4px;" alt="ארון סגור">
+                    </div>
+                    <div style="flex:1;display:flex;flex-direction:column;min-height:0;">
+                        <div style="font-size:0.85rem;font-weight:600;color:#475569;margin-bottom:4px;padding:4px 8px;background:#f1f5f8;border-radius:4px;">תצוגת פנים (חלוקה טכנית)</div>
+                        <img src="${item.imgOpen}" style="flex:1;min-height:0;width:100%;object-fit:contain;border:1px solid #e2e8f0;border-radius:4px;" alt="ארון פתוח">
+                    </div>
+                </div>
+            </div>
+            ${(() => {
+                const pairs = [];
+                for (let pi = 0; pi < bpPages.length; pi += 2) {
+                    pairs.push(bpPages.slice(pi, pi + 2));
+                }
+                return pairs.map((pair, pairIdx) => `
+            <div class="bp-page" style="page-break-after:always;page-break-inside:avoid;">
+                ${pair.map((svg, si) => {
+                    const globalIdx = pairIdx * 2 + si;
+                    return `<div style="margin-bottom:${si === 0 && pair.length > 1 ? '16px' : '0'};">
+                    <div style="font-size:1rem;font-weight:bold;margin-bottom:6px;background:#e8f0fe;padding:6px;text-align:center;border:1px solid #93c5fd;border-bottom:none;">
+                        שרטוט טכני — ${titleText}${bpPages.length > 1 ? ` (עמוד ${globalIdx + 1}/${bpPages.length})` : ''}
+                    </div>
+                    <div style="border:2px solid #93c5fd;display:block;overflow:hidden;width:100%;">${svg}</div>
+                </div>`;
+                }).join('')}
+            </div>`).join('');
+            })()}`;
+        }
+    });
+
+    const summaryHTML = isFactory
+        ? `<div style="margin-top:20px;padding:15px;background:#fefce8;border:2px solid #fef08a;border-radius:8px;">
+               <div style="font-size:1.4rem;font-weight:800;color:#713f12;display:flex;justify-content:space-between;">
+                   <span>סה"כ עלות התקנה:</span><span dir="ltr">₪${totalInstallPrice.toLocaleString()}</span>
+               </div>
+           </div>`
+        : `<div style="margin-top:20px;padding:15px;background:#eff6ff;border:2px solid #bfdbfe;border-radius:8px;">
+               <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:1rem;color:#475569;">
+                   <span>סה"כ ארונות (ללא התקנה):</span><span dir="ltr" style="font-weight:bold;">₪${totalOrderPrice.toLocaleString()}</span>
+               </div>
+               <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:1rem;color:#475569;">
+                   <span>סה"כ הובלה והתקנה:</span><span dir="ltr" style="font-weight:bold;">₪${totalInstallPrice.toLocaleString()}</span>
+               </div>
+               <div style="display:flex;justify-content:space-between;font-size:1.6rem;font-weight:800;color:#1e3a5f;border-top:2px solid #bfdbfe;padding-top:12px;margin-top:8px;">
+                   <span>סה"כ לתשלום ללקוח:</span><span dir="ltr">₪${(totalOrderPrice + totalInstallPrice).toLocaleString()}</span>
+               </div>
+           </div>`;
+
+    const title = isFactory ? 'שרטוט ייצור והתקנה' : 'הצעת מחיר ללקוח';
+    const custName = state.customer.name || 'לא צוין';
+    const custPhone = state.customer.phone || 'לא צוין';
+    const custOrder = state.customer.orderNum || 'לא צוין';
+    const custAddr = state.customer.address || 'לא צוין';
+
+    // Build PDF filename: סוגרים הכל לדירה (orderNum) (custName)
+    const _pdfOrderPart = (state.customer && state.customer.orderNum) ? state.customer.orderNum : '';
+    const _pdfNamePart  = (state.customer && state.customer.name)     ? state.customer.name     : '';
+    const _pdfTitleParts = ['סוגרים הכל לדירה'];
+    if (_pdfOrderPart) _pdfTitleParts.push(_pdfOrderPart);
+    if (_pdfNamePart)  _pdfTitleParts.push(_pdfNamePart);
+    const pdfTitle = _pdfTitleParts.join(' ');
+
+    return `<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>${pdfTitle}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; direction: rtl; background: white; color: #1e293b; padding: 20px; font-size: 14px; }
+  h1 { font-size: 1.6rem; color: #1e3a5f; margin-bottom: 6px; }
+  .header-bar { border-bottom: 3px solid #1e3a5f; padding-bottom: 12px; margin-bottom: 20px; }
+  .cust-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 20px; background: #f8fafc; padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 0.95rem; border: 1px solid #e2e8f0; }
+  @media print {
+    body { padding: 10px; }
+    @page { margin: 15mm; size: A4; }
+  }
+  .bp-page svg { width: 100% !important; height: auto !important; display: block; }
+  .bp-page { width: 100%; overflow: hidden; }
+</style>
+</head>
+<body>
+<div class="header-bar">
+  <h1>📋 ${title}</h1>
+  <div style="font-size:0.85rem;color:#64748b;margin-top:4px;">תאריך: ${new Date().toLocaleDateString('he-IL')}</div>
+</div>
+<div class="cust-grid">
+  <div><strong>שם פרויקט/לקוח:</strong> ${custName}</div>
+  <div><strong>טלפון:</strong> ${custPhone}</div>
+  <div><strong>מספר הזמנה:</strong> ${custOrder}</div>
+  <div><strong>כתובת:</strong> ${custAddr}</div>
+</div>
+${cabinetsHTML}
+${summaryHTML}
+</body>
+</html>`;
+}
+
+window.printCustomer = function() {
+    const html = _buildPrintHTML('customer');
+    const win = window.open('', '_blank', 'width=900,height=700');
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    // Build PDF filename: סוגרים הכל לדירה (orderNum) (custName)
+    const _pdfOrder = (state.customer && state.customer.orderNum) ? state.customer.orderNum : '';
+    const _pdfName  = (state.customer && state.customer.name)     ? state.customer.name     : '';
+    const _pdfParts = ['סוגרים הכל לדירה'];
+    if (_pdfOrder) _pdfParts.push(_pdfOrder);
+    if (_pdfName)  _pdfParts.push(_pdfName);
+    const _pdfTitle = _pdfParts.join(' ');
+    // Set title inside setTimeout so it runs after document is fully parsed
+    setTimeout(() => { win.document.title = _pdfTitle; win.print(); }, 600);
+};
+window.printFactory = function() {
+    const html = _buildPrintHTML('factory');
+    const win = window.open('', '_blank', 'width=900,height=700');
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    // Build PDF filename: סוגרים הכל לדירה (orderNum) (custName)
+    const _pdfOrder = (state.customer && state.customer.orderNum) ? state.customer.orderNum : '';
+    const _pdfName  = (state.customer && state.customer.name)     ? state.customer.name     : '';
+    const _pdfParts = ['סוגרים הכל לדירה'];
+    if (_pdfOrder) _pdfParts.push(_pdfOrder);
+    if (_pdfName)  _pdfParts.push(_pdfName);
+    const _pdfTitle = _pdfParts.join(' ');
+    // Set title inside setTimeout so it runs after document is fully parsed
+    setTimeout(() => { win.document.title = _pdfTitle; win.print(); }, 600);
+};
+
+// ==========================================
+// 7a-2. Multi-View Blueprint Modal (paged)
+// ==========================================
+window._mvbpPages = [];   // array of { label, svg }
+window._mvbpIndex = 0;    // current page index
+
+window._mvbpShow = function(idx) {
+    const pages = window._mvbpPages;
+    if (!pages.length) return;
+    idx = Math.max(0, Math.min(pages.length - 1, idx));
+    window._mvbpIndex = idx;
+    const content = document.getElementById('multiview-blueprint-content');
+    if (content) content.innerHTML = pages[idx].svg;
+    const lbl = document.getElementById('mvbp-page-label');
+    if (lbl) lbl.textContent = `${pages[idx].label}  (${idx + 1} / ${pages.length})`;
+    const prev = document.getElementById('mvbp-prev');
+    const next = document.getElementById('mvbp-next');
+    if (prev) prev.disabled = idx === 0;
+    if (next) next.disabled = idx === pages.length - 1;
+    if (prev) prev.style.opacity = idx === 0 ? '0.4' : '1';
+    if (next) next.style.opacity = idx === pages.length - 1 ? '0.4' : '1';
+};
+
+window._mvbpNav = function(delta) {
+    window._mvbpShow(window._mvbpIndex + delta);
+};
+
+// ---- Blueprint pinch-to-zoom ----
+// SVG uses viewBox — set pixel width on wrapper div to zoom in/out
+// Container is overflow:auto so native scroll handles pan when zoomed
+window._mvbpScale = 1.0;
+window._mvbpBaseW = 0; // natural container width at 1×
+
+window._mvbpZoom = function(delta) {
+    window._mvbpScale = Math.max(0.5, Math.min(5.0, window._mvbpScale + delta));
+    window._mvbpApplyZoom();
+};
+
+window._mvbpZoomReset = function() {
+    window._mvbpScale = 1.0;
+    window._mvbpApplyZoom();
+};
+
+window._mvbpApplyZoom = function() {
+    const wrap = document.getElementById('mvbp-svg-wrap');
+    if (wrap && window._mvbpBaseW > 0) {
+        const w = Math.round(window._mvbpBaseW * window._mvbpScale);
+        wrap.style.width = w + 'px';
+        wrap.style.flexShrink = '0';
+    }
+};
+
+// Override _mvbpShow to wrap SVG and reset zoom on page change
+const _origMvbpShow = window._mvbpShow;
+window._mvbpShow = function(idx) {
+    _origMvbpShow(idx);
+    const content = document.getElementById('multiview-blueprint-content');
+    if (content) {
+        const svg = content.querySelector('svg');
+        if (svg) {
+            // Ensure SVG fills its wrapper naturally
+            svg.style.width = '100%';
+            svg.style.height = 'auto';
+            svg.style.display = 'block';
+            // Wrap in a sizing div if not already
+            let wrap = document.getElementById('mvbp-svg-wrap');
+            if (!wrap) {
+                wrap = document.createElement('div');
+                wrap.id = 'mvbp-svg-wrap';
+                svg.parentNode.insertBefore(wrap, svg);
+            } else {
+                wrap.innerHTML = '';
+            }
+            wrap.appendChild(svg);
+        }
+    }
+    // Capture natural width and reset scale
+    window._mvbpScale = 1.0;
+    requestAnimationFrame(function() {
+        const content2 = document.getElementById('multiview-blueprint-content');
+        if (content2) {
+            window._mvbpBaseW = content2.clientWidth || content2.offsetWidth || 360;
+            const wrap = document.getElementById('mvbp-svg-wrap');
+            if (wrap) {
+                wrap.style.width = window._mvbpBaseW + 'px';
+                wrap.style.flexShrink = '0';
+            }
+        }
+        window._mvbpBindGestures();
+        if (typeof window._mvbpBindDimDrag === 'function') window._mvbpBindDimDrag();
+    });
+};
+
+// Bind pinch-to-zoom — native scroll handles pan automatically (overflow:auto)
+window._mvbpBindGestures = function() {
+    const content = document.getElementById('multiview-blueprint-content');
+    if (!content || content._gestureBound) return;
+    content._gestureBound = true;
+
+    let startDist = 0, startScale = 1;
+
+    content.addEventListener('touchstart', function(e) {
+        if (e.touches.length === 2) {
+            startDist = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX,
+                e.touches[0].clientY - e.touches[1].clientY
+            );
+            startScale = window._mvbpScale;
+            e.preventDefault();
+        }
+    }, { passive: false });
+
+    content.addEventListener('touchmove', function(e) {
+        if (e.touches.length === 2 && startDist > 0) {
+            const dist = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX,
+                e.touches[0].clientY - e.touches[1].clientY
+            );
+            window._mvbpScale = Math.max(0.5, Math.min(5.0, startScale * (dist / startDist)));
+            window._mvbpApplyZoom();
+            e.preventDefault();
+        }
+    }, { passive: false });
+
+    content.addEventListener('touchend', function(e) {
+        if (e.touches.length < 2) startDist = 0;
+    }, { passive: true });
+};
+
+// ---- Blueprint dimension drag (move dim labels along constrained axis) ----
+window._mvbpBindDimDrag = function() {
+    const content = document.getElementById('multiview-blueprint-content');
+    if (!content) return;
+    const svg = content.querySelector('svg');
+    if (!svg) return;
+
+    const dims = svg.querySelectorAll('.bp-dim-draggable');
+    dims.forEach(function(g) {
+        if (g._dimDragBound) return;
+        g._dimDragBound = true;
+
+        const axis = g.getAttribute('data-dim'); // 'h' = horizontal dim (drag Y), 'v' = vertical dim (drag X)
+        let dragging = false;
+        let startX = 0, startY = 0;
+        let curTx = 0, curTy = 0;
+
+        function getTranslate() {
+            const t = g.getAttribute('transform') || '';
+            const m = t.match(/translate\(\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\)/);
+            return m ? { x: parseFloat(m[1]), y: parseFloat(m[2]) } : { x: 0, y: 0 };
+        }
+
+        function getSVGScale() {
+            // Account for zoom: SVG viewBox vs rendered size
+            const vb = svg.viewBox.baseVal;
+            const rect = svg.getBoundingClientRect();
+            return vb.width > 0 ? rect.width / vb.width : 1;
+        }
+
+        function onMouseDown(e) {
+            if (e.button !== 0) return;
+            dragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            const t = getTranslate();
+            curTx = t.x; curTy = t.y;
+            e.preventDefault();
+            e.stopPropagation();
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        }
+
+        function onMouseMove(e) {
+            if (!dragging) return;
+            const sc = getSVGScale();
+            const dx = (e.clientX - startX) / sc;
+            const dy = (e.clientY - startY) / sc;
+            let tx = curTx, ty = curTy;
+            if (axis === 'h') {
+                ty = curTy + dy; // horizontal dim: move up/down only
+            } else {
+                tx = curTx + dx; // vertical dim: move left/right only
+            }
+            g.setAttribute('transform', `translate(${tx.toFixed(1)},${ty.toFixed(1)})`);
+        }
+
+        function onMouseUp() {
+            dragging = false;
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+        }
+
+        // Touch support
+        function onTouchStart(e) {
+            if (e.touches.length !== 1) return;
+            dragging = true;
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+            const t = getTranslate();
+            curTx = t.x; curTy = t.y;
+            e.stopPropagation();
+        }
+
+        function onTouchMove(e) {
+            if (!dragging || e.touches.length !== 1) return;
+            const sc = getSVGScale();
+            const dx = (e.touches[0].clientX - startX) / sc;
+            const dy = (e.touches[0].clientY - startY) / sc;
+            let tx = curTx, ty = curTy;
+            if (axis === 'h') {
+                ty = curTy + dy;
+            } else {
+                tx = curTx + dx;
+            }
+            g.setAttribute('transform', `translate(${tx.toFixed(1)},${ty.toFixed(1)})`);
+            e.preventDefault();
+        }
+
+        function onTouchEnd() { dragging = false; }
+
+        g.addEventListener('mousedown', onMouseDown);
+        g.addEventListener('touchstart', onTouchStart, { passive: true });
+        g.addEventListener('touchmove', onTouchMove, { passive: false });
+        g.addEventListener('touchend', onTouchEnd, { passive: true });
+    });
+};
+
+// ---- Blueprint fullscreen (no orientation lock) ----
+window._mvbpToggleFullscreen = function() {
+    const modal = document.getElementById('multiview-blueprint-modal');
+    if (!modal) return;
+    const inner = modal.querySelector('div');
+    const btn = document.getElementById('mvbp-fullscreen-btn');
+    const isFs = document.fullscreenElement || document.webkitFullscreenElement;
+    if (!isFs) {
+        const el = modal;
+        if (el.requestFullscreen) el.requestFullscreen().catch(function(){});
+        else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+        if (btn) btn.innerHTML = '<i class="fa-solid fa-compress"></i>';
+        if (inner) { inner.style.maxWidth='100vw'; inner.style.maxHeight='100vh'; inner.style.width='100vw'; inner.style.borderRadius='0'; }
+    } else {
+        if (document.exitFullscreen) document.exitFullscreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        if (btn) btn.innerHTML = '<i class="fa-solid fa-expand"></i>';
+        if (inner) { inner.style.maxWidth='95vw'; inner.style.maxHeight='100vh'; inner.style.width='92vw'; inner.style.borderRadius='14px'; }
+    }
+};
+
+// Restore button on Esc
+document.addEventListener('fullscreenchange', function() {
+    const btn = document.getElementById('mvbp-fullscreen-btn');
+    const inner = document.querySelector('#multiview-blueprint-modal > div');
+    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+        if (btn) btn.innerHTML = '<i class="fa-solid fa-expand"></i>';
+        if (inner) { inner.style.maxWidth='95vw'; inner.style.maxHeight='100vh'; inner.style.width='92vw'; inner.style.borderRadius='14px'; }
+    }
+});
+
+window.openMultiViewBlueprint = function() {
+    // Feature gate: blueprint export requires canExportCarpenter
+    if (window._features && !window._features.canExportCarpenter) {
+        _showToast('ייצוא שרטוט ייצור אינו זמין בתוכנית הנוכחית שלך. שדרג לתוכנית מקצועית.', 5000);
+        return;
+    }
+    if (typeof window._generateMultiViewBlueprintPages !== 'function') {
+        alert('פונקציית השרטוט אינה זמינה');
+        return;
+    }
+    window._mvbpScale = 1.0;
+    window._mvbpPages = window._generateMultiViewBlueprintPages();
+    window._mvbpIndex = 0;
+    window._mvbpShow(0);
+    const modal = document.getElementById('multiview-blueprint-modal');
+    if (modal) modal.style.display = 'flex';
+};
+
+window._downloadMultiViewSVG = function() {
+    // Download all pages as separate SVG files (or just current page)
+    const pages = window._mvbpPages;
+    if (!pages || !pages.length) {
+        // Fallback: generate fresh
+        if (typeof window._generateMultiViewBlueprintPages === 'function') {
+            window._mvbpPages = window._generateMultiViewBlueprintPages();
+        } else if (typeof window._generateMultiViewBlueprintSVG === 'function') {
+            const svgStr = window._generateMultiViewBlueprintSVG();
+            const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'שרטוט-מרובה-זוויות.svg';
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a); URL.revokeObjectURL(url);
+            return;
+        }
+    }
+    // Download each page as a separate SVG
+    (window._mvbpPages || []).forEach((pg, i) => {
+        const blob = new Blob([pg.svg], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `שרטוט-${i+1}-${pg.label.replace(/[^א-תa-zA-Z0-9]/g,'-')}.svg`;
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a); URL.revokeObjectURL(url);
+    });
+};
+
+window._printMultiViewSVG = function() {
+    const pages = window._mvbpPages && window._mvbpPages.length
+        ? window._mvbpPages
+        : (typeof window._generateMultiViewBlueprintPages === 'function' ? window._generateMultiViewBlueprintPages() : null);
+    if (!pages || !pages.length) return;
+    // Each page gets its own print page via page-break-after
+    const pagesHtml = pages.map((pg, i) =>
+        `<div class="bp-page"${i === pages.length - 1 ? ' style="page-break-after:avoid"' : ''}>${pg.svg}</div>`
+    ).join('');
+    const win = window.open('', '_blank', 'width=1300,height=1000');
+    win.document.write(`<!DOCTYPE html><html lang="he" dir="rtl"><head><meta charset="UTF-8"><title>שרטוט מרובה זוויות</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:white; }
+.bp-page { display:flex; align-items:center; justify-content:center; width:100%; page-break-after:always; padding:10mm 0; }
+.bp-page svg { max-width:100%; height:auto; }
+@media print { @page { size: A3 landscape; margin: 8mm; } .bp-page { padding:0; } }
+</style></head>
+<body>${pagesHtml}</body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); }, 500);
+};
+
+// ==========================================
+// 7b. סיכום ללקוח (Customer Summary Print)
+// ==========================================
+// Helper: build cart data array for reuse in HTML + Excel
+function _buildCartData() {
+    const rows = [];
+    state.orderCart.forEach((itemObj, index) => {
+        const item = itemObj.spec;
+        const title = item.customName ? item.customName : `ארון מס' ${index + 1}`;
+        const cabPrice = parseInt((item.price || '0').replace('₪','').replace(/,/g,'')) || 0;
+        const instPrice = item.installPrice || 0;
+        const costPrice = item.costPrice ? (parseInt(item.costPrice.replace('₪','').replace(/,/g,'')) || 0) : 0;
+        const totalRevenue = cabPrice + instPrice;
+        const profit = totalRevenue - costPrice;
+        const profitPct = costPrice > 0 ? Math.round((profit / totalRevenue) * 100) : 0;
+
+        const details = [];
+        details.push(item.dimsStr || '');
+        if (item.drawersExt > 0) details.push(`מגירות חיצוניות: ${item.drawersExt}`);
+        if (item.drawersInt > 0) details.push(`מגירות פנימיות: ${item.drawersInt}`);
+        if (item.desk && item.desk !== 'ללא') details.push(item.desk);
+        const cu = item.corner;
+        if (cu && cu.side !== 'none') {
+            const cuSide = cu.side === 'right' ? 'ימין' : 'שמאל';
+            details.push(cu.type === 'desk' ? `יחידה פינתית שולחן (${cuSide})` : `יחידה פינתית מגירות ×${cu.drawerCount || 4} (${cuSide})`);
+        }
+        // Sliding door details
+        if (item.slidingDoor) {
+            details.push(`ארון הזזה — ${item.slidingDoor.numDoors} דלתות | פרופיל: ${item.slidingDoor.profileColor}`);
+            details.push(item.slidingDoor.doorColorsStr);
+            if (item.slidingDoor.hasMirror) details.push('✓ כולל דלת מראה');
+        }
+
+        rows.push({ title, details: details.join(' | '), cabPrice, instPrice, costPrice, totalRevenue, profit, profitPct });
+    });
+    return rows;
+}
+
+function _buildCustomerSummaryHTML(logoDataUrl) {
+    const custName  = state.customer?.name    || 'לא צוין';
+    const custPhone = state.customer?.phone   || '';
+    const custOrder = state.customer?.orderNum || '';
+    const custAddr  = state.customer?.address  || '';
+
+    const rows = _buildCartData();
+    let totalCabPrice = 0, totalInstallPrice = 0;
+    let rowsHTML = '';
+
+    rows.forEach(r => {
+        totalCabPrice    += r.cabPrice;
+        totalInstallPrice += r.instPrice;
+        rowsHTML += `
+        <tr>
+            <td style="padding:10px 14px;border:1px solid #e2e8f0;font-weight:600;color:#1e3a5f;">${r.title}</td>
+            <td style="padding:10px 14px;border:1px solid #e2e8f0;font-size:0.9rem;color:#334155;line-height:1.6;">${r.details.replace(/ \| /g,'<br>')}</td>
+            <td style="padding:10px 14px;border:1px solid #e2e8f0;text-align:center;font-weight:700;color:#1e3a5f;white-space:nowrap;">₪${r.cabPrice.toLocaleString()}</td>
+            <td style="padding:10px 14px;border:1px solid #e2e8f0;text-align:center;color:#475569;white-space:nowrap;">₪${r.instPrice.toLocaleString()}</td>
+        </tr>`;
+    });
+
+    const grandTotal = totalCabPrice + totalInstallPrice;
+
+    return `<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>סיכום הזמנה ללקוח</title>
+<style>
+  body { font-family: 'Segoe UI', Arial, sans-serif; direction: rtl; margin: 0; padding: 30px; color: #1e293b; background: white; }
+  h1 { font-size: 1.6rem; color: #1e3a5f; margin: 0 0 4px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; border-bottom: 2px solid #1e3a5f; padding-bottom: 14px; }
+  .cust-info { font-size: 0.95rem; color: #475569; line-height: 1.7; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.97rem; }
+  th { background: #1e3a5f; color: white; padding: 10px 14px; text-align: right; font-weight: 600; border: 1px solid #1e3a5f; }
+  .totals-row td { background: #f8fafc; font-weight: 600; border-top: 2px solid #1e3a5f; }
+  .grand-total { margin-top: 10px; font-size: 1.2rem; font-weight: 800; color: #1e3a5f; }
+  .action-bar { display: flex; gap: 10px; margin-bottom: 22px; flex-wrap: wrap; }
+  .action-btn { padding: 9px 20px; border-radius: 8px; border: none; font-size: 0.95rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 7px; font-family: inherit; }
+  .btn-print  { background: #1e3a5f; color: white; }
+  .btn-excel  { background: #16a34a; color: white; }
+  @media print { .action-bar { display: none !important; } body { padding: 15px; } }
+</style>
+</head>
+<body>
+
+<div class="action-bar">
+  <button class="action-btn btn-print"  onclick="window.print()">🖨️ הדפסה / PDF</button>
+  <button class="action-btn btn-excel"  onclick="_downloadExcel()">📊 הורדת Excel</button>
+</div>
+
+<div class="header">
+  <div>
+    <h1>סיכום הזמנה ללקוח</h1>
+    <div style="font-size:0.85rem;color:#64748b;margin-top:4px;">תאריך: ${new Date().toLocaleDateString('he-IL')}</div>
+  </div>
+  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+    ${logoDataUrl ? `<img src="${logoDataUrl}" style="max-height:60px;max-width:180px;object-fit:contain;" alt="לוגו">` : ''}
+    <div class="cust-info" style="text-align:right;">
+      ${custName ? `<div><strong>לקוח:</strong> ${custName}</div>` : ''}
+      ${custPhone ? `<div><strong>טלפון:</strong> ${custPhone}</div>` : ''}
+      ${custOrder ? `<div><strong>מס' הזמנה:</strong> ${custOrder}</div>` : ''}
+      ${custAddr  ? `<div><strong>כתובת:</strong> ${custAddr}</div>` : ''}
+    </div>
+  </div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width:18%;">ארון</th>
+      <th>פירוט</th>
+      <th style="width:14%;text-align:center;">מחיר ארון</th>
+      <th style="width:14%;text-align:center;">התקנה</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${rowsHTML}
+    <tr class="totals-row">
+      <td colspan="2" style="padding:10px 14px;border:1px solid #e2e8f0;text-align:right;">סה"כ</td>
+      <td style="padding:10px 14px;border:1px solid #e2e8f0;text-align:center;color:#1e3a5f;">₪${totalCabPrice.toLocaleString()}</td>
+      <td style="padding:10px 14px;border:1px solid #e2e8f0;text-align:center;color:#1e3a5f;">₪${totalInstallPrice.toLocaleString()}</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="grand-total">סה"כ לתשלום (כולל התקנה): ₪${grandTotal.toLocaleString()}</div>
+</body>
+</html>`;
+}
+
+// ── Excel builder — runs in the PARENT window context, called from child window ──
+function _buildExcelXML(d) {
+    function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    var rows = d.rows;
+    var xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
+    xml += '<?mso-application progid="Excel.Sheet"?>\n';
+    xml += '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet" xmlns:x="urn:schemas-microsoft-com:office:excel">\n';
+    xml += '<Styles>\n';
+    xml += '<Style ss:ID="hdr"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#1e3a5f" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center"/></Style>\n';
+    xml += '<Style ss:ID="bold"><Font ss:Bold="1"/></Style>\n';
+    xml += '<Style ss:ID="tot"><Font ss:Bold="1"/><Interior ss:Color="#f0f9ff" ss:Pattern="Solid"/></Style>\n';
+    xml += '<Style ss:ID="grn"><Font ss:Bold="1" ss:Color="#16a34a"/></Style>\n';
+    xml += '<Style ss:ID="red"><Font ss:Bold="1" ss:Color="#dc2626"/></Style>\n';
+    xml += '</Styles>\n';
+
+    // Sheet 1: Customer Summary
+    xml += '<Worksheet ss:Name="סיכום ללקוח"><Table>\n';
+    xml += '<Column ss:Width="130"/><Column ss:Width="200"/><Column ss:Width="100"/><Column ss:Width="100"/><Column ss:Width="110"/>\n';
+    xml += '<Row><Cell ss:StyleID="bold"><Data ss:Type="String">לקוח:</Data></Cell><Cell><Data ss:Type="String">' + esc(d.custName) + '</Data></Cell></Row>\n';
+    if (d.custPhone) xml += '<Row><Cell ss:StyleID="bold"><Data ss:Type="String">טלפון:</Data></Cell><Cell><Data ss:Type="String">' + esc(d.custPhone) + '</Data></Cell></Row>\n';
+    if (d.custOrder) xml += '<Row><Cell ss:StyleID="bold"><Data ss:Type="String">מס\' הזמנה:</Data></Cell><Cell><Data ss:Type="String">' + esc(d.custOrder) + '</Data></Cell></Row>\n';
+    if (d.custAddr)  xml += '<Row><Cell ss:StyleID="bold"><Data ss:Type="String">כתובת:</Data></Cell><Cell><Data ss:Type="String">' + esc(d.custAddr) + '</Data></Cell></Row>\n';
+    xml += '<Row><Cell><Data ss:Type="String">תאריך:</Data></Cell><Cell><Data ss:Type="String">' + esc(d.date) + '</Data></Cell></Row>\n<Row/>\n';
+    xml += '<Row>' + ['ארון','פירוט','מחיר ארון','התקנה','סה"כ ללקוח'].map(h => '<Cell ss:StyleID="hdr"><Data ss:Type="String">' + esc(h) + '</Data></Cell>').join('') + '</Row>\n';
+    rows.forEach(function(r) {
+        xml += '<Row><Cell><Data ss:Type="String">' + esc(r.title) + '</Data></Cell><Cell><Data ss:Type="String">' + esc(r.details) + '</Data></Cell><Cell><Data ss:Type="Number">' + r.cabPrice + '</Data></Cell><Cell><Data ss:Type="Number">' + r.instPrice + '</Data></Cell><Cell ss:StyleID="bold"><Data ss:Type="Number">' + r.totalRevenue + '</Data></Cell></Row>\n';
+    });
+    xml += '<Row><Cell ss:StyleID="tot"><Data ss:Type="String">סה"כ</Data></Cell><Cell ss:StyleID="tot"><Data ss:Type="String"></Data></Cell><Cell ss:StyleID="tot"><Data ss:Type="Number">' + d.totalCabPrice + '</Data></Cell><Cell ss:StyleID="tot"><Data ss:Type="Number">' + d.totalInstallPrice + '</Data></Cell><Cell ss:StyleID="tot"><Data ss:Type="Number">' + d.grandTotal + '</Data></Cell></Row>\n';
+    xml += '</Table></Worksheet>\n';
+
+    // Sheet 2: Profitability
+    xml += '<Worksheet ss:Name="רווחיות"><Table>\n';
+    xml += '<Column ss:Width="130"/><Column ss:Width="100"/><Column ss:Width="100"/><Column ss:Width="100"/><Column ss:Width="110"/><Column ss:Width="90"/>\n';
+    xml += '<Row>' + ['ארון','מחיר ארון ללקוח','עלות ייצור','עלות התקנה','רווח גולמי','% רווח'].map(h => '<Cell ss:StyleID="hdr"><Data ss:Type="String">' + esc(h) + '</Data></Cell>').join('') + '</Row>\n';
+    var totalCabAll = 0, totalCostAll = 0, totalProfitAll = 0;
+    rows.forEach(function(r) {
+        // profit = cabinet price only minus production cost (installation is a pass-through)
+        var cabProfit = r.cabPrice - r.costPrice;
+        var cabProfitPct = r.cabPrice > 0 ? Math.round((cabProfit / r.cabPrice) * 100) : 0;
+        totalCabAll += r.cabPrice; totalCostAll += r.costPrice; totalProfitAll += cabProfit;
+        var st = cabProfit >= 0 ? 'grn' : 'red';
+        xml += '<Row><Cell><Data ss:Type="String">' + esc(r.title) + '</Data></Cell><Cell><Data ss:Type="Number">' + r.cabPrice + '</Data></Cell><Cell><Data ss:Type="Number">' + r.costPrice + '</Data></Cell><Cell><Data ss:Type="Number">' + r.instPrice + '</Data></Cell><Cell ss:StyleID="' + st + '"><Data ss:Type="Number">' + cabProfit + '</Data></Cell><Cell ss:StyleID="' + st + '"><Data ss:Type="String">' + cabProfitPct + '%</Data></Cell></Row>\n';
+    });
+    var totalPct = totalCabAll > 0 ? Math.round((totalProfitAll / totalCabAll) * 100) : 0;
+    xml += '<Row><Cell ss:StyleID="tot"><Data ss:Type="String">סה"כ</Data></Cell><Cell ss:StyleID="tot"><Data ss:Type="Number">' + totalCabAll + '</Data></Cell><Cell ss:StyleID="tot"><Data ss:Type="Number">' + totalCostAll + '</Data></Cell><Cell ss:StyleID="tot"><Data ss:Type="Number">' + d.totalInstallPrice + '</Data></Cell><Cell ss:StyleID="tot"><Data ss:Type="Number">' + totalProfitAll + '</Data></Cell><Cell ss:StyleID="tot"><Data ss:Type="String">' + totalPct + '%</Data></Cell></Row>\n';
+    xml += '</Table></Worksheet>\n</Workbook>';
+    return xml;
+}
+
+window.printCustomerSummary = async function() {
+    // Feature gate: requires canViewCustomerReport
+    if (window._features && !window._features.canViewCustomerReport) {
+        _showToast('תכונה זו אינה זמינה בתוכנית הנוכחית שלך. שדרג לתוכנית מקצועית כדי לגשת לסיכום ללקוח.', 5000);
+        return;
+    }
+
+    if (!state.orderCart || state.orderCart.length === 0) {
+        alert('אין ארונות בהזמנה. הוסף ארונות קודם.');
+        return;
+    }
+    // Load logo as base64 data URL so it works in the print window
+    let logoDataUrl = '';
+    try {
+        const resp = await fetch('logo.webp');
+        if (resp.ok) {
+            const blob = await resp.blob();
+            logoDataUrl = await new Promise(resolve => {
+                const reader = new FileReader();
+                reader.onload = e => resolve(e.target.result);
+                reader.readAsDataURL(blob);
+            });
+        }
+    } catch(e) { /* logo not found, skip */ }
+
+    // Build cart data in parent window context (has access to state)
+    const excelData = {
+        custName:  state.customer?.name    || 'לא צוין',
+        custPhone: state.customer?.phone   || '',
+        custOrder: state.customer?.orderNum || '',
+        custAddr:  state.customer?.address  || '',
+        rows: _buildCartData(),
+        totalCabPrice: 0, totalInstallPrice: 0, grandTotal: 0,
+        date: new Date().toLocaleDateString('he-IL')
+    };
+    excelData.rows.forEach(r => { excelData.totalCabPrice += r.cabPrice; excelData.totalInstallPrice += r.instPrice; });
+    excelData.grandTotal = excelData.totalCabPrice + excelData.totalInstallPrice;
+
+    const html = _buildCustomerSummaryHTML(logoDataUrl);
+    const win = window.open('', '_blank', 'width=960,height=780');
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+
+    // Inject functions directly into child window — avoids </script> parsing issues
+    win._excelData = excelData;
+    win._buildExcelXML = _buildExcelXML;
+
+    win._downloadExcel = function() {
+        var xml = win._buildExcelXML(win._excelData);
+        var blob = new win.Blob(['\uFEFF' + xml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+        var url = win.URL.createObjectURL(blob);
+        var a = win.document.createElement('a');
+        a.href = url;
+        var safeName = (win._excelData.custName || 'ללקוח').replace(/[<>:"/\\|?*]/g, '');
+        a.download = 'הזמנה_' + safeName + '_' + win._excelData.date.replace(/\//g,'-') + '.xls';
+        win.document.body.appendChild(a);
+        a.click();
+        setTimeout(function() { win.URL.revokeObjectURL(url); a.remove(); }, 1000);
+    };
+    // No auto-print — user clicks the buttons in the opened page
+};
+
+// ==========================================
+// 8. אתחול המערכת (Initialization)
+// ==========================================
+if (!window._VIEWER_MODE) {
+    distributeColumns(2);
+    bindUI();
+    if (typeof _updateSandwichColorVisibility === 'function') _updateSandwichColorVisibility();
+
+    setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+        // Try to restore from localStorage first; if successful, skip default buildCabinet
+        const savedAt = window._restoreFromLocalStorage && window._restoreFromLocalStorage();
+        if (savedAt) {
+            const date = new Date(savedAt);
+            const timeStr = date.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+            const dateStr = date.toLocaleDateString('he-IL');
+            _showToast(`✅ הפרויקט שוחזר אוטומטית מגיבוי (${dateStr} ${timeStr})`);
+        } else {
+            buildCabinet();
+            calculatePrice();
+            updateLeftSidebar();
+            saveHistoryState();
+            // Highlight the default preset button (linear) on fresh page load
+            if (typeof window._restorePresetUI === 'function') window._restorePresetUI();
+        }
+        calcQuickPrice(true);
+    }, 100);
+}
+
+// ==========================================
+// Wing tab UI helpers
+// ==========================================
+
+window.showAddWingMenu = function() {
+    const hasLeft = !!state.wings.left;
+    const hasRight = !!state.wings.right;
+
+    if (hasLeft && hasRight) {
+        // Both exist — offer remove options
+        const choice = confirm('שתי הדפנות כבר קיימות.\nלחץ אישור להסרת הדופן הפעילה, ביטול לביטול.');
+        if (choice && state.activeWing !== 'center') {
+            removeWing(state.activeWing);
+        }
+        return;
+    }
+
+    // Build a simple popup menu
+    const existing = document.getElementById('_wing-add-popup');
+    if (existing) { existing.remove(); return; }
+
+    const popup = document.createElement('div');
+    popup.id = '_wing-add-popup';
+    popup.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border:1px solid var(--border);border-radius:12px;padding:20px;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,0.18);min-width:260px;text-align:center;';
+    
+    let btns = '';
+    if (!hasLeft) btns += `<button onclick="addWing('left');document.getElementById('_wing-add-popup').remove();" style="display:block;width:100%;margin-bottom:10px;padding:12px;background:var(--accent);color:white;border:none;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;"><i class='fa-solid fa-arrow-right-to-bracket fa-flip-horizontal'></i> הוסף דופן שמאל</button>`;
+    if (!hasRight) btns += `<button onclick="addWing('right');document.getElementById('_wing-add-popup').remove();" style="display:block;width:100%;margin-bottom:10px;padding:12px;background:var(--accent);color:white;border:none;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;"><i class='fa-solid fa-arrow-right-to-bracket'></i> הוסף דופן ימין</button>`;
+    btns += `<button onclick="document.getElementById('_wing-add-popup').remove();" style="display:block;width:100%;padding:10px;background:var(--bg-light);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:0.9rem;cursor:pointer;">ביטול</button>`;
+    
+    popup.innerHTML = `<div style="font-weight:700;font-size:1.05rem;margin-bottom:14px;color:var(--text);">הוסף דופן פינתית</div>${btns}`;
+    document.body.appendChild(popup);
+    
+    // Close on outside click
+    setTimeout(() => {
+        document.addEventListener('click', function handler(e) {
+            if (!popup.contains(e.target)) { popup.remove(); document.removeEventListener('click', handler); }
+        });
+    }, 100);
+};
+
+// Update wing tab button styles when switching
+(function _patchWingTabStyles() {
+    const origSwitch = window.switchWing;
+    window.switchWing = function(wingId) {
+        origSwitch(wingId);
+        document.querySelectorAll('.wing-tab-btn').forEach(b => {
+            const isActive = b.dataset.wing === state.activeWing;
+            b.style.background = isActive ? 'var(--accent)' : 'var(--bg-light)';
+            b.style.color = isActive ? 'white' : 'var(--text)';
+            b.style.borderColor = isActive ? 'var(--accent)' : 'var(--border)';
+        });
+    };
+})();
+
+let _lastFrameTime = performance.now();
+let _camHudVisible = false;
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+    // Ignore when typing in an input/textarea
+    const tag = document.activeElement?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+    // Ctrl+Z — Undo
+    if (e.ctrlKey && !e.shiftKey && e.key === 'z') {
+        e.preventDefault();
+        undo();
+        return;
+    }
+    // Ctrl+Y or Ctrl+Shift+Z — Redo
+    if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'z')) {
+        e.preventDefault();
+        redo();
+        return;
+    }
+    // Escape — clear selection and close sub-panels
+    if (e.key === 'Escape') {
+        if (state.selection.colIndex > -1 || state.selection.rows.length > 0) {
+            state.selection = { colIndex: -1, rows: [] };
+            closeContentSubPanels();
+            buildCabinet();
+        }
+        return;
+    }
+    // Delete / Backspace — clear content of selected cells
+    if ((e.key === 'Delete' || e.key === 'Backspace') && state.viewMode === 'front') {
+        const { colIndex, rows } = state.selection;
+        if (colIndex > -1 && rows.length > 0 && state.columns[colIndex]) {
+            let changed = false;
+            rows.forEach(r => {
+                const comp = state.columns[colIndex].compartments[r];
+                if (comp && comp.type !== 'empty') {
+                    comp.type = 'empty';
+                    delete comp.partition; delete comp.partitionX; delete comp.subCells;
+                    changed = true;
+                }
+            });
+            if (changed) {
+                state.selection = { colIndex: -1, rows: [] };
+                closeContentSubPanels();
+                buildCabinet(); calculatePrice(); saveHistoryState();
+            }
+        }
+        return;
+    }
+    // Ctrl+Shift+C — Toggle camera HUD
+    if (e.ctrlKey && e.shiftKey && e.key === 'C') {
+        _camHudVisible = !_camHudVisible;
+        const hud = document.getElementById('cam-hud');
+        if (hud) hud.style.display = _camHudVisible ? 'block' : 'none';
+    }
+});
+
+function _r(v) { return Math.round(v * 10) / 10; } // round to 1 decimal
+
+function animate() {
+    requestAnimationFrame(animate);
+    const now = performance.now();
+    const dt = Math.min((now - _lastFrameTime) / 1000, 0.1);
+    _lastFrameTime = now;
+
+    // Drive camera animation (window._camAnim set by updateCameraView in engine.js)
+    if (window._camAnim) {
+        window._camAnim.t += dt / window._camAnim.duration;
+        if (window._camAnim.t >= 1) {
+            // Animation complete — snap to final position
+            camera.position.copy(window._camAnim.toPos);
+            controls.target.copy(window._camAnim.toTarget);
+            camera.lookAt(controls.target);
+            const cb = window._camAnim.onDone;
+            window._camAnim = null;
+            // Sync OrbitControls internal spherical BEFORE re-enabling damping
+            // enableDamping=false forces update() to re-read camera.position into spherical
+            controls.enableDamping = false;
+            controls.enabled = true;
+            controls.update(); // syncs internal spherical from current camera.position
+            controls.enableDamping = true; // restore damping for user interaction
+            if (typeof cb === 'function') cb();
+        } else {
+            // Interpolate camera position — do NOT call controls.update() here
+            // as it would override camera.position from OrbitControls' internal spherical
+            const ease = window._camAnim.t < 0.5
+                ? 2 * window._camAnim.t * window._camAnim.t
+                : -1 + (4 - 2 * window._camAnim.t) * window._camAnim.t;
+            camera.position.lerpVectors(window._camAnim.fromPos, window._camAnim.toPos, ease);
+            controls.target.lerpVectors(window._camAnim.fromTarget, window._camAnim.toTarget, ease);
+            camera.lookAt(controls.target);
+        }
+    } else {
+        controls.update();
+    }
+
+    // Update camera HUD
+    if (_camHudVisible) {
+        const hud = document.getElementById('cam-hud');
+        if (hud && camera && controls) {
+            const p = camera.position;
+            const t = controls.target;
+            hud.innerHTML =
+                `<b style="color:#fff;font-size:0.75rem;">📷 מצלמה</b><br>` +
+                `pos: [${_r(p.x)}, ${_r(p.y)}, ${_r(p.z)}]<br>` +
+                `target: [${_r(t.x)}, ${_r(t.y)}, ${_r(t.z)}]<br>` +
+                `<span style="color:#aaa;font-size:0.65rem;">Ctrl+Shift+C להסתיר</span>`;
+        }
+    }
+
+    if(typeof updateOverlaysPosition === 'function') updateOverlaysPosition();
+    if(typeof updateDragHandlesPosition === 'function') updateDragHandlesPosition();
+    if(typeof updateToolbarState === 'function') updateToolbarState();
+    if(typeof window._updateBedHandles === 'function') window._updateBedHandles();
+
+    // ── Ceiling closure panel visibility ──────────────────────────────────────
+    // Show ceiling when camera is BELOW the ceiling (inside the room).
+    // Hide ceiling when camera is ABOVE the ceiling (bird's-eye view from outside).
+    if (window._closureCeilMeshes && window._closureCeilMeshes.length > 0) {
+        window._closureCeilMeshes.forEach(function(m) {
+            if (!m) return;
+            // Panel top Y in world space = cabinetGroup.position.y + panel center Y + half thickness
+            const panelTopY = (cabinetGroup ? cabinetGroup.position.y : 0) + m.position.y + (m.geometry && m.geometry.parameters ? m.geometry.parameters.height / 2 : 0);
+            m.visible = (camera.position.y < panelTopY);
+        });
+    }
+
+    renderer.render(scene, camera);
+}
+animate();
+
+// ==========================================
+// Presentation Mode — תצוגה חופשית עם חדר, ללא ממשק עריכה
+// ==========================================
+window._enterPresentationMode = function() {
+    // Save current state to restore on exit
+    window._presentationSaved = {
+        viewMode:     state.viewMode,
+        roomVisible:  window._roomVisible,
+        orbitFree:    window._orbitFree,
+    };
+
+    // Enable room
+    if (!window._roomVisible) {
+        window._roomVisible = true;
+        if (typeof _buildRoom === 'function') _buildRoom();
+        const roomBtn = document.getElementById('btn-toggle-room');
+        if (roomBtn) roomBtn.classList.remove('toggled-off');
+    }
+
+    // Switch to free-orbit 3D view
+    state.viewMode = '3d';
+    window._orbitFree = true;
+
+    // Apply presentation class — hides all UI chrome via CSS
+    document.body.classList.add('presentation-mode');
+
+    // Show exit button
+    const exitBtn = document.getElementById('presentation-exit-btn');
+    if (exitBtn) exitBtn.style.display = 'flex';
+
+    // Wait one frame for CSS layout to settle, then fix camera aspect + renderer size
+    requestAnimationFrame(function() {
+        const cont = document.getElementById('canvas-container');
+        if (cont && typeof camera !== 'undefined' && typeof renderer !== 'undefined') {
+            const w = cont.clientWidth;
+            const h = cont.clientHeight;
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+            renderer.setSize(w, h);
+        }
+        buildCabinet();
+        updateCameraView();
+    });
+};
+
+window._exitPresentationMode = function() {
+    document.body.classList.remove('presentation-mode');
+
+    // Hide exit button
+    const exitBtn = document.getElementById('presentation-exit-btn');
+    if (exitBtn) exitBtn.style.display = 'none';
+
+    // Restore saved state
+    if (window._presentationSaved) {
+        state.viewMode    = window._presentationSaved.viewMode;
+        window._orbitFree = window._presentationSaved.orbitFree;
+
+        // Restore room visibility
+        const wasRoomVisible = window._presentationSaved.roomVisible;
+        if (window._roomVisible !== wasRoomVisible) {
+            window._roomVisible = wasRoomVisible;
+            if (typeof _buildRoom === 'function') _buildRoom();
+            const roomBtn = document.getElementById('btn-toggle-room');
+            if (roomBtn) roomBtn.classList.toggle('toggled-off', !wasRoomVisible);
+        }
+        window._presentationSaved = null;
+    }
+
+    // Restore active view button highlight
+    document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+    const activeBtn = document.getElementById(state.viewMode === 'front' ? 'btn-front-view' : 'btn-3d-view');
+    if (activeBtn) activeBtn.classList.add('active');
+
+    // Wait one frame for CSS layout to settle, then fix camera aspect + renderer size
+    requestAnimationFrame(function() {
+        const cont = document.getElementById('canvas-container');
+        if (cont && typeof camera !== 'undefined' && typeof renderer !== 'undefined') {
+            const w = cont.clientWidth;
+            const h = cont.clientHeight;
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+            renderer.setSize(w, h);
+        }
+        buildCabinet();
+        updateCameraView();
+    });
+};
+
+// ── Pricing Settings (user self-service) ──────────────────────────────────────
+function _upsPct(v) { return Math.round((v || 0) * 100); }
+function _upsFrac(v) { return (parseFloat(v) || 0) / 100; }
+
+function upsSetMode(mode) {
+    document.querySelectorAll('.ups-mode-btn').forEach(function(b) {
+        const isActive = b.getAttribute('data-mode') === mode;
+        b.style.background = isActive ? '#4f46e5' : '#f8fafc';
+        b.style.color = isActive ? 'white' : '#374151';
+        b.style.borderColor = isActive ? '#4f46e5' : '#e2e8f0';
+    });
+    document.querySelectorAll('.ups-mode-section').forEach(function(s) {
+        s.style.display = 'none';
+    });
+    const sec = document.getElementById('ups-mode-' + mode);
+    if (sec) sec.style.display = 'block';
+}
+
+function openPricingSettings() {
+    const modal = document.getElementById('pricing-settings-modal');
+    if (!modal) return;
+    // Get current config: window._pricingConfig or DEFAULT_PRICING_CONFIG
+    const cfg = window._pricingConfig || (typeof DEFAULT_PRICING_CONFIG !== 'undefined' ? DEFAULT_PRICING_CONFIG : null);
+    if (cfg) _fillUserPricingForm(cfg);
+    modal.style.display = 'flex';
+}
+
+function closePricingSettings() {
+    const modal = document.getElementById('pricing-settings-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function _fillUserPricingForm(cfg) {
+    const c = cfg || {};
+    upsSetMode(c.pricingMode || 'ranges');
+    const _sv = function(id, val) { const el = document.getElementById(id); if (el) el.value = val; };
+    _sv('ups-sqmPrice', c.sqmPrice || 800);
+    _sv('ups-sqmPriceNonMel', c.sqmPriceNonMel || 1040);
+    _sv('ups-lmPrice', c.lmPrice || 1200);
+    _sv('ups-lmPriceNonMel', c.lmPriceNonMel || 1560);
+    _sv('ups-lmHeightBase', c.lmHeightBase || 1200);
+    _sv('ups-lmHeightBaseNonMel', c.lmHeightBaseNonMel || 1560);
+    _sv('ups-lmHeightThresholdCm', c.lmHeightThresholdCm || 240);
+    _sv('ups-lmHeightStepCm', c.lmHeightStepCm || 30);
+    _sv('ups-lmHeightStepPct', _upsPct(c.lmHeightStepPct || 0.10));
+    _sv('ups-materialsBoardPrice', c.materialsBoardPrice || 180);
+    _sv('ups-materialsBoardsPerSqm', c.materialsBoardsPerSqm || 1.4);
+    _sv('ups-materialsMultiplier', c.materialsMultiplier || 2.5);
+    _sv('ups-profitMultiplier', c.profitMultiplier || 1.7);
+    _sv('ups-heightSurcharge', _upsPct(c.heightSurcharge || 0.20));
+    _sv('ups-depthSurcharge', _upsPct(c.depthSurcharge || 0.20));
+    _sv('ups-sandwichSurcharge', _upsPct(c.sandwichSurcharge || 0.15));
+    _sv('ups-installPricePerUnit', c.installPricePerUnit || 110);
+    _sv('ups-installUnitCm', c.installUnitCm || 42.5);
+    _sv('ups-installHeightSurcharge', _upsPct(c.installHeightSurcharge || 0.20));
+    const ex = c.extras || {};
+    _sv('ups-internalDrawer', ex.internalDrawer || 150);
+    _sv('ups-externalDrawer', ex.externalDrawer || 200);
+    _sv('ups-openCell', ex.openCell || 400);
+    _sv('ups-partition', ex.partition || 150);
+    _sv('ups-shelfFreePerMeter', ex.shelfFreePerMeter || 3);
+    _sv('ups-extraShelfMel', ex.extraShelfMel || 60);
+    _sv('ups-extraShelfNonMel', ex.extraShelfNonMel || 80);
+    _sv('ups-deskUnit', ex.deskUnit || 900);
+    _sv('ups-doorFramedMel', ex.doorFramedMel || 80);
+    _sv('ups-doorGlassMel', ex.doorGlassMel || 400);
+    _sv('ups-doorGlassBlack', ex.doorGlassBlack || 600);
+    _sv('ups-doorMirror', ex.doorMirror || 350);
+}
+
+function _readUserPricingForm() {
+    const _gv = function(id) { const el = document.getElementById(id); return el ? el.value : ''; };
+    const activeBtn = document.querySelector('.ups-mode-btn[style*="background: rgb(79, 70, 229)"], .ups-mode-btn[style*="background:#4f46e5"], .ups-mode-btn[style*="background: #4f46e5"]');
+    // Fallback: find by inline style background color
+    let mode = 'ranges';
+    document.querySelectorAll('.ups-mode-btn').forEach(function(b) {
+        if (b.style.background === 'rgb(79, 70, 229)' || b.style.background === '#4f46e5') {
+            mode = b.getAttribute('data-mode') || 'ranges';
+        }
+    });
+    // Get existing config to preserve ranges and other fields not shown
+    const existing = window._pricingConfig || (typeof DEFAULT_PRICING_CONFIG !== 'undefined' ? DEFAULT_PRICING_CONFIG : {});
+    const existingExtras = (existing.extras) || {};
+    return {
+        pricingMode: mode,
+        sqmPrice: parseInt(_gv('ups-sqmPrice')) || 800,
+        sqmPriceNonMel: parseInt(_gv('ups-sqmPriceNonMel')) || 1040,
+        lmPrice: parseInt(_gv('ups-lmPrice')) || 1200,
+        lmPriceNonMel: parseInt(_gv('ups-lmPriceNonMel')) || 1560,
+        lmHeightBase: parseInt(_gv('ups-lmHeightBase')) || 1200,
+        lmHeightBaseNonMel: parseInt(_gv('ups-lmHeightBaseNonMel')) || 1560,
+        lmHeightThresholdCm: parseInt(_gv('ups-lmHeightThresholdCm')) || 240,
+        lmHeightStepCm: parseInt(_gv('ups-lmHeightStepCm')) || 30,
+        lmHeightStepPct: _upsFrac(_gv('ups-lmHeightStepPct')),
+        materialsBoardPrice: parseInt(_gv('ups-materialsBoardPrice')) || 180,
+        materialsBoardsPerSqm: parseFloat(_gv('ups-materialsBoardsPerSqm')) || 1.4,
+        materialsMultiplier: parseFloat(_gv('ups-materialsMultiplier')) || 2.5,
+        profitMultiplier: parseFloat(_gv('ups-profitMultiplier')) || 1.7,
+        heightSurcharge: _upsFrac(_gv('ups-heightSurcharge')),
+        depthSurcharge: _upsFrac(_gv('ups-depthSurcharge')),
+        sandwichSurcharge: _upsFrac(_gv('ups-sandwichSurcharge')),
+        installPricePerUnit: parseInt(_gv('ups-installPricePerUnit')) || 110,
+        installUnitCm: parseFloat(_gv('ups-installUnitCm')) || 42.5,
+        installHeightSurcharge: _upsFrac(_gv('ups-installHeightSurcharge')),
+        ranges: existing.ranges || {},
+        extras: Object.assign({}, existingExtras, {
+            internalDrawer: parseInt(_gv('ups-internalDrawer')) || 150,
+            externalDrawer: parseInt(_gv('ups-externalDrawer')) || 200,
+            openCell: parseInt(_gv('ups-openCell')) || 400,
+            partition: parseInt(_gv('ups-partition')) || 150,
+            shelfFreePerMeter: parseFloat(_gv('ups-shelfFreePerMeter')) || 3,
+            extraShelfMel: parseInt(_gv('ups-extraShelfMel')) || 60,
+            extraShelfNonMel: parseInt(_gv('ups-extraShelfNonMel')) || 80,
+            deskUnit: parseInt(_gv('ups-deskUnit')) || 900,
+            doorFramedMel: parseInt(_gv('ups-doorFramedMel')) || 80,
+            doorGlassMel: parseInt(_gv('ups-doorGlassMel')) || 400,
+            doorGlassBlack: parseInt(_gv('ups-doorGlassBlack')) || 600,
+            doorMirror: parseInt(_gv('ups-doorMirror')) || 350,
+        })
+    };
+}
+
+async function saveUserPricingConfig() {
+    const cfg = _readUserPricingForm();
+    try {
+        const sb = window._supabase;
+        if (!sb) throw new Error('לא מחובר');
+        const { data: { user } } = await sb.auth.getUser();
+        if (!user) throw new Error('לא מחובר');
+        const { error } = await sb.from('pricing_configs').upsert(
+            { user_id: user.id, config: cfg, updated_at: new Date().toISOString() },
+            { onConflict: 'user_id' }
+        );
+        if (error) throw error;
+        window._pricingConfig = cfg;
+        closePricingSettings();
+        if (typeof _showToast === 'function') _showToast('הגדרות התמחור נשמרו ✓', 3000);
+        // Recalculate price with new config
+        if (typeof calculatePrice === 'function') calculatePrice();
+    } catch(e) {
+        if (typeof _showToast === 'function') _showToast('שגיאה בשמירה: ' + e.message, 4000);
+        else alert('שגיאה בשמירה: ' + e.message);
+    }
+}

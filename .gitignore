@@ -1,0 +1,34 @@
+# ── OS / Editor ──────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+*.code-workspace
+
+# ── Source / Design files ─────────────────────────────
+images/*.psd
+images/logo.psd
+images/logo2.psd
+
+# ── Large binary source files (not needed at runtime) ─
+images/monochrome_studio_04_4k.hdr
+images/botcher.jpg
+
+# ── Documentation / internal ──────────────────────────
+*.pdf
+מדריך לחיבור עם מייק מעודכן.pdf
+
+# ── Database scripts (keep locally only) ──────────────
+*.sql
+supabase_schema.sql
+fix_signup_trigger.sql
+make-blueprints/
+
+# ── Old/backup versions ───────────────────────────────
+ישן/
+9/
+
+# ── Dev notes (internal) ──────────────────────────────
+notes.js
+
+# ── Logs ──────────────────────────────────────────────
+*.log

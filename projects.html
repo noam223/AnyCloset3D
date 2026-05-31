@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>הפרויקטים שלי | AnyCloset 3D</title>
+    <link rel="icon" type="image/png" href="images/icon-logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --primary: #1e3a5f; --primary-l: #2a4f80; --primary-d: #152b47;
+            --secondary: #2563eb; --accent: #f59e0b; --accent-l: #fbbf24; --accent-d: #d97706;
+            --success: #059669; --bg: #f0f4f9; --bg-card: #ffffff;
+            --border: #dde3ec; --border-l: #f1f5f9;
+            --text: #0f172a; --text-2: #334155; --muted: #64748b; --error: #ef4444;
+            --radius: 16px; --radius-sm: 10px;
+            --shadow-sm: 0 1px 4px rgba(15,23,42,.07),0 1px 2px rgba(15,23,42,.05);
+            --shadow-md: 0 4px 20px rgba(15,23,42,.10),0 2px 8px rgba(15,23,42,.06);
+            --shadow-lg: 0 12px 40px rgba(15,23,42,.14),0 4px 14px rgba(15,23,42,.08);
+            --shadow-xl: 0 24px 64px rgba(15,23,42,.20),0 8px 24px rgba(15,23,42,.10);
+            --transition: 220ms cubic-bezier(0.4,0,0.2,1);
+            --sidebar-w: 280px;
+        }
+        body { font-family: 'Inter','Heebo',sans-serif; background: var(--bg); min-height: 100dvh; color: var(--text); -webkit-font-smoothing: antialiased; display: flex; }
+        .sidebar { width: var(--sidebar-w); min-height: 100dvh; background: linear-gradient(180deg,var(--primary-d) 0%,var(--primary) 60%,var(--primary-l) 100%); display: flex; flex-direction: column; position: fixed; right: 0; top: 0; bottom: 0; z-index: 50; box-shadow: -4px 0 32px rgba(15,23,42,.25); overflow: hidden; }
+        .sidebar::before { content: ''; position: absolute; top: -80px; left: -80px; width: 260px; height: 260px; background: radial-gradient(circle,rgba(37,99,235,.22) 0%,transparent 70%); pointer-events: none; }
+        .sidebar-logo { padding: 28px 24px 20px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid rgba(255,255,255,.08); position: relative; z-index: 1; }
+        .sidebar-logo-icon { width: 42px; height: 42px; background: linear-gradient(135deg,var(--accent) 0%,var(--accent-d) 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; color: var(--primary-d); box-shadow: 0 4px 14px rgba(245,158,11,.4); flex-shrink: 0; }
+        .sidebar-logo-text { font-size: 1rem; font-weight: 800; color: white; letter-spacing: -.02em; line-height: 1.2; }
+        .sidebar-logo-sub { font-size: .7rem; color: rgba(255,255,255,.5); font-weight: 400; margin-top: 1px; }
+        .sidebar-user { padding: 20px 24px; border-bottom: 1px solid rgba(255,255,255,.08); position: relative; z-index: 1; }
+        .sidebar-user-avatar { width: 48px; height: 48px; background: linear-gradient(135deg,var(--accent) 0%,var(--accent-d) 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; font-weight: 800; color: var(--primary-d); margin-bottom: 10px; box-shadow: 0 4px 14px rgba(245,158,11,.4); }
+        .sidebar-user-name { font-size: .9rem; font-weight: 700; color: white; margin-bottom: 4px; }
+        .sidebar-user-email { font-size: .72rem; color: rgba(255,255,255,.5); margin-bottom: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .plan-badge { display: inline-flex; align-items: center; gap: 5px; font-size: .67rem; font-weight: 800; padding: 4px 10px; border-radius: 20px; background: linear-gradient(135deg,var(--accent) 0%,var(--accent-d) 100%); color: var(--primary-d); letter-spacing: .04em; text-transform: uppercase; box-shadow: 0 2px 8px rgba(245,158,11,.38); }
+        .sidebar-nav { flex: 1; padding: 16px; position: relative; z-index: 1; }
+        .sidebar-nav-label { font-size: .65rem; font-weight: 800; color: rgba(255,255,255,.35); text-transform: uppercase; letter-spacing: .1em; padding: 0 8px; margin-bottom: 6px; margin-top: 16px; }
+        .sidebar-nav-label:first-child { margin-top: 0; }
+        .sidebar-nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; color: rgba(255,255,255,.7); font-size: .87rem; font-weight: 500; cursor: pointer; transition: all var(--transition); margin-bottom: 2px; text-decoration: none; }
+        .sidebar-nav-item:hover { background: rgba(255,255,255,.10); color: white; }
+        .sidebar-nav-item.active { background: rgba(255,255,255,.15); color: white; font-weight: 700; }
+        .sidebar-nav-item i { width: 18px; text-align: center; font-size: .9rem; }
+        .sidebar-footer { padding: 16px; border-top: 1px solid rgba(255,255,255,.08); position: relative; z-index: 1; }
+        .btn-logout { width: 100%; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); color: rgba(255,255,255,.8); border-radius: 10px; padding: 10px 16px; font-size: .85rem; font-family: inherit; font-weight: 500; cursor: pointer; transition: all var(--transition); display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn-logout:hover { background: rgba(255,255,255,.16); color: white; }
+        .page-wrap { margin-right: var(--sidebar-w); flex: 1; min-height: 100dvh; display: flex; flex-direction: column; }
+        .hero { background: linear-gradient(135deg,var(--primary-d) 0%,var(--primary) 50%,#1a4a7a 100%); padding: 52px 56px 60px; position: relative; overflow: hidden; color: white; }
+        .hero::before { content: ''; position: absolute; top: -100px; left: -100px; width: 500px; height: 500px; background: radial-gradient(circle,rgba(37,99,235,.22) 0%,transparent 65%); pointer-events: none; }
+        .hero::after { content: ''; position: absolute; bottom: -80px; right: 8%; width: 380px; height: 380px; background: radial-gradient(circle,rgba(245,158,11,.13) 0%,transparent 65%); pointer-events: none; }
+        .hero-inner { display: flex; align-items: center; justify-content: space-between; gap: 40px; position: relative; z-index: 1; flex-wrap: wrap; }
+        .hero-left { flex: 1; min-width: 280px; }
+        .hero-right { display: flex; flex-direction: column; align-items: flex-end; gap: 16px; flex-shrink: 0; }
+        .hero-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; flex-wrap: wrap; position: relative; z-index: 1; }
+        .hero-greeting { font-size: .9rem; color: rgba(255,255,255,.55); font-weight: 500; margin-bottom: 8px; letter-spacing: .03em; text-transform: uppercase; }
+        .hero-title { font-size: 2.8rem; font-weight: 900; letter-spacing: -.04em; line-height: 1.05; margin-bottom: 10px; }
+        .hero-subtitle { font-size: .95rem; color: rgba(255,255,255,.6); font-weight: 400; }
+        .btn-new { background: linear-gradient(135deg,var(--accent) 0%,var(--accent-d) 100%); color: var(--primary-d); border: none; border-radius: 14px; padding: 14px 28px; font-size: .97rem; font-weight: 800; font-family: inherit; cursor: pointer; transition: all var(--transition); display: flex; align-items: center; gap: 9px; box-shadow: 0 6px 20px rgba(245,158,11,.45); position: relative; overflow: hidden; white-space: nowrap; flex-shrink: 0; }
+        .btn-new::after { content: ''; position: absolute; top: 0; left: -100%; width: 60%; height: 100%; background: linear-gradient(90deg,transparent,rgba(255,255,255,.25),transparent); transition: left .5s ease; }
+        .btn-new:hover { background: linear-gradient(135deg,var(--accent-l) 0%,var(--accent) 100%); transform: translateY(-2px); box-shadow: 0 10px 30px rgba(245,158,11,.55); }
+        .btn-new:hover::after { left: 140%; }
+        .btn-new:active { transform: translateY(0); }
+        .btn-new:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
+        .btn-new:disabled::after { display: none; }
+        .hero-stats { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 40px; position: relative; z-index: 1; }
+        .hero-stat { background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.14); border-radius: 16px; padding: 20px 28px; backdrop-filter: blur(10px); min-width: 150px; }
+        .hero-stat-value { font-size: 2.2rem; font-weight: 900; letter-spacing: -.04em; line-height: 1; }
+        .hero-stat-label { font-size: .73rem; color: rgba(255,255,255,.55); margin-top: 5px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+        .hero-plan-bar { margin-top: 32px; position: relative; z-index: 1; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); border-radius: 14px; padding: 18px 24px; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+        .hero-plan-info { flex: 1; min-width: 180px; }
+        .hero-plan-label { font-size: .72rem; color: rgba(255,255,255,.5); margin-bottom: 7px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; }
+        .hero-plan-track { height: 8px; background: rgba(255,255,255,.15); border-radius: 99px; overflow: hidden; }
+        .hero-plan-fill { height: 100%; background: linear-gradient(90deg,var(--accent),var(--accent-l)); border-radius: 99px; transition: width .7s cubic-bezier(.4,0,.2,1); box-shadow: 0 0 8px rgba(245,158,11,.5); }
+        .hero-plan-fill.warn { background: linear-gradient(90deg,#fb923c,#f97316); }
+        .hero-plan-fill.full { background: linear-gradient(90deg,#f87171,#ef4444); }
+        .hero-plan-count { font-size: .78rem; color: rgba(255,255,255,.55); margin-top: 5px; }
+        .hero-plan-devices { font-size: .75rem; color: rgba(255,255,255,.5); margin-top: 3px; display: none; }
+        .btn-upgrade { background: rgba(255,255,255,.15); color: white; border: 1px solid rgba(255,255,255,.25); border-radius: 10px; padding: 9px 18px; font-size: .83rem; font-weight: 700; font-family: inherit; cursor: pointer; transition: all var(--transition); display: flex; align-items: center; gap: 6px; white-space: nowrap; backdrop-filter: blur(8px); }
+        .btn-upgrade:hover { background: rgba(255,255,255,.25); transform: translateY(-1px); }
+        .content { flex: 1; padding: 44px 56px 80px; }
+        .content-inner { max-width: 1400px; }
+        .content-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; flex-wrap: wrap; gap: 12px; }
+        .content-title { font-size: 1.15rem; font-weight: 800; color: var(--primary); letter-spacing: -.02em; }
+        .content-count { font-size: .82rem; color: var(--muted); font-weight: 500; background: var(--border-l); padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border); }
+        .projects-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 26px; }
+        .project-card { background: var(--bg-card); border-radius: 20px; overflow: hidden; transition: box-shadow var(--transition),transform var(--transition); position: relative; box-shadow: var(--shadow-sm); border: 1px solid var(--border); display: flex; flex-direction: column; }
+        .project-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-5px); }
+        .project-card.is-locked { border-color: #fca5a5; }
+        .project-thumb { width: 100%; height: 220px; background: linear-gradient(135deg,#c8d8ec 0%,#a8c0d8 100%); display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; cursor: pointer; flex-shrink: 0; }
+        .project-thumb::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg,transparent 40%,rgba(15,23,42,.55) 100%); opacity: 0; transition: opacity var(--transition); }
+        .project-card:hover .project-thumb::after { opacity: 1; }
+        .project-thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform .5s ease; }
+        .project-card:hover .project-thumb img { transform: scale(1.06); }
+        .project-thumb-icon { font-size: 3.5rem; color: rgba(255,255,255,.4); }
+        .project-thumb-date { position: absolute; bottom: 12px; left: 12px; background: rgba(15,23,42,.65); color: rgba(255,255,255,.9); font-size: .68rem; font-weight: 500; padding: 4px 10px; border-radius: 8px; backdrop-filter: blur(6px); z-index: 2; }
+        .cabinet-count-badge { position: absolute; top: 12px; right: 12px; background: rgba(30,58,95,.8); color: white; font-size: .68rem; font-weight: 700; padding: 4px 10px; border-radius: 8px; backdrop-filter: blur(6px); display: flex; align-items: center; gap: 5px; z-index: 2; }
+        .project-open-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity var(--transition); z-index: 3; }
+        .project-card:hover .project-open-overlay { opacity: 1; }
+        .project-open-btn { background: rgba(255,255,255,.95); color: var(--primary); border: none; border-radius: 12px; padding: 10px 22px; font-size: .85rem; font-weight: 800; font-family: inherit; cursor: pointer; display: flex; align-items: center; gap: 7px; box-shadow: 0 4px 20px rgba(0,0,0,.3); transform: translateY(6px); transition: transform var(--transition); }
+        .project-card:hover .project-open-btn { transform: translateY(0); }
+        .project-body { padding: 18px 20px 14px; flex: 1; cursor: pointer; }
+        .project-name { font-size: 1rem; font-weight: 800; color: var(--text); margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.02em; }
+        .project-meta { font-size: .75rem; color: var(--muted); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .project-meta-item { display: flex; align-items: center; gap: 4px; }
+        .project-actions { display: flex; gap: 8px; padding: 0 20px 18px; }
+        .btn-card { flex: 1; padding: 10px 8px; border-radius: 11px; border: 1.5px solid var(--border); background: var(--border-l); font-size: .78rem; font-weight: 700; font-family: inherit; cursor: pointer; transition: all var(--transition); display: flex; align-items: center; justify-content: center; gap: 5px; color: var(--text-2); }
+        .btn-card:hover { background: #e2e8f0; border-color: #c8d4e4; transform: translateY(-1px); }
+        .btn-card.primary { background: linear-gradient(135deg,var(--primary) 0%,var(--primary-l) 100%); color: white; border-color: transparent; box-shadow: 0 3px 10px rgba(30,58,95,.28); }
+        .btn-card.primary:hover { background: linear-gradient(135deg,var(--primary-l) 0%,#3a6fa8 100%); box-shadow: 0 5px 16px rgba(30,58,95,.38); transform: translateY(-2px); }
+        .btn-card.danger { color: var(--error); border-color: #fecaca; background: #fff5f5; }
+        .btn-card.danger:hover { background: #fee2e2; border-color: #fca5a5; transform: translateY(-1px); }
+        .btn-card.icon-only { flex: 0 0 40px; padding: 10px 0; }
+        .btn-card.locked-btn { background: linear-gradient(135deg,#fee2e2,#fecaca); color: var(--error); border-color: #fca5a5; }
+        .btn-card.extend-btn { background: linear-gradient(135deg,#fffbeb,#fef3c7); color: #92400e; border-color: #fcd34d; font-size: .75rem; }
+        .btn-card.extend-btn:hover { background: linear-gradient(135deg,#fef3c7,#fde68a); }
+        .lock-badge { display: flex; align-items: center; gap: 7px; font-size: .75rem; font-weight: 700; padding: 7px 20px; }
+        .lock-badge.locked { background: linear-gradient(90deg,#fee2e2,#fff5f5); color: var(--error); }
+        .lock-badge.expiring { background: linear-gradient(90deg,#fffbeb,#fef9ee); color: #92400e; }
+        .lock-badge.expiring.urgent { background: linear-gradient(90deg,#fff7ed,#fff3e8); color: #c2410c; }
+        .empty-state { grid-column: 1/-1; text-align: center; padding: 80px 20px; color: var(--muted); }
+        .empty-state-icon { width: 80px; height: 80px; background: linear-gradient(135deg,#e0e7ff,#c7d2fe); border-radius: 24px; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; }
+        .empty-state-icon i { font-size: 2rem; color: var(--secondary); }
+        .empty-state h3 { font-size: 1.3rem; font-weight: 800; color: var(--text); margin-bottom: 10px; letter-spacing: -.02em; }
+        .empty-state p { font-size: .9rem; margin-bottom: 28px; line-height: 1.6; max-width: 360px; margin-left: auto; margin-right: auto; }
+        .skeleton-card { background: var(--bg-card); border-radius: 20px; overflow: hidden; box-shadow: var(--shadow-sm); border: 1px solid var(--border); }
+        .skeleton-thumb { width: 100%; height: 220px; background: linear-gradient(90deg,#e8eef5 25%,#d4dde9 50%,#e8eef5 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
+        .skeleton-body { padding: 18px 20px; }
+        .skeleton-line { height: 14px; border-radius: 7px; background: linear-gradient(90deg,#e8eef5 25%,#d4dde9 50%,#e8eef5 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; margin-bottom: 10px; }
+        .skeleton-line.short { width: 55%; }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        .devices-section { background: var(--bg-card); border: 1px solid var(--border); border-radius: 20px; padding: 24px 28px; margin-top: 40px; display: none; box-shadow: var(--shadow-sm); position: relative; overflow: hidden; }
+        .devices-section::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg,var(--primary),var(--secondary)); }
+        .devices-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+        .devices-section-title { font-size: 1.05rem; font-weight: 800; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+        .devices-count-badge { font-size: .75rem; font-weight: 700; background: linear-gradient(135deg,#e0e7ff,#c7d2fe); color: #3730a3; padding: 4px 12px; border-radius: 20px; }
+        .btn-manage-devices { background: linear-gradient(135deg,var(--primary),var(--primary-l)); color: white; border: none; border-radius: 10px; padding: 9px 18px; font-size: .83rem; font-weight: 700; font-family: inherit; cursor: pointer; display: flex; align-items: center; gap: 7px; transition: all var(--transition); box-shadow: 0 3px 10px rgba(30,58,95,.25); }
+        .btn-manage-devices:hover { transform: translateY(-1px); box-shadow: 0 5px 16px rgba(30,58,95,.35); }
+        .device-row { display: flex; align-items: center; gap: 14px; padding: 13px 0; border-bottom: 1px solid var(--border-l); }
+        .device-row:last-child { border-bottom: none; }
+        .device-row.inactive { opacity: .5; }
+        .device-info { flex: 1; }
+        .device-name { font-size: .9rem; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 7px; }
+        .device-meta { font-size: .75rem; color: var(--muted); margin-top: 3px; }
+        .device-status { font-size: .7rem; font-weight: 800; padding: 3px 10px; border-radius: 20px; text-transform: uppercase; }
+        .device-status.active { background: #dcfce7; color: #166534; }
+        .device-status.inactive { background: #f1f5f9; color: var(--muted); }
+        .btn-device-deactivate { background: none; border: 1.5px solid #fecaca; color: var(--error); border-radius: 8px; padding: 6px 10px; font-size: .78rem; font-weight: 600; cursor: pointer; transition: all var(--transition); }
+        .btn-device-deactivate:hover { background: #fee2e2; transform: translateY(-1px); }
+        .devices-empty { text-align: center; color: var(--muted); font-size: .9rem; padding: 24px 0; }
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15,23,42,.6); z-index: 200; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(8px); }
+        .modal-overlay.open { display: flex; }
+        .modal-box { background: white; border-radius: 24px; padding: 34px 36px; width: 100%; max-width: 460px; box-shadow: var(--shadow-xl); animation: popIn .24s cubic-bezier(.34,1.56,.64,1); position: relative; overflow: hidden; }
+        .modal-box::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg,var(--secondary),var(--primary)); }
+        .modal-box.wide { max-width: 600px; }
+        @keyframes popIn { from { transform: scale(.88) translateY(12px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
+        .modal-title { font-size: 1.2rem; font-weight: 800; color: var(--primary); margin-bottom: 20px; display: flex; align-items: center; gap: 10px; letter-spacing: -.02em; }
+        .modal-input { width: 100%; height: 50px; border: 1.5px solid var(--border); border-radius: 13px; padding: 0 16px; font-size: .95rem; font-family: inherit; color: var(--text); outline: none; margin-bottom: 20px; transition: border-color var(--transition),box-shadow var(--transition); direction: rtl; background: var(--border-l); }
+        .modal-input:focus { border-color: var(--secondary); box-shadow: 0 0 0 3px rgba(37,99,235,.12); background: white; }
+        .modal-actions { display: flex; gap: 10px; }
+        .btn-modal { flex: 1; height: 50px; border-radius: 13px; border: none; font-size: .93rem; font-weight: 700; font-family: inherit; cursor: pointer; transition: all var(--transition); display: flex; align-items: center; justify-content: center; gap: 7px; position: relative; overflow: hidden; }
+        .btn-modal::after { content: ''; position: absolute; top: 0; left: -100%; width: 60%; height: 100%; background: linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent); transition: left .5s ease; }
+        .btn-modal:hover::after { left: 140%; }
+        .btn-modal.primary { background: linear-gradient(135deg,var(--primary),var(--primary-l)); color: white; box-shadow: 0 3px 12px rgba(30,58,95,.28); }
+        .btn-modal.primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(30,58,95,.38); }
+        .btn-modal.danger { background: linear-gradient(135deg,#ef4444,#dc2626); color: white; box-shadow: 0 3px 12px rgba(239,68,68,.28); }
+        .btn-modal.danger:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(239,68,68,.38); }
+        .btn-modal.ghost { background: var(--border-l); color: var(--text-2); border: 1.5px solid var(--border); }
+        .btn-modal.ghost:hover { background: #e2e8f0; }
+        .btn-modal.accent { background: linear-gradient(135deg,var(--accent),var(--accent-d)); color: var(--primary-d); box-shadow: 0 3px 12px rgba(245,158,11,.28); }
+        .btn-modal.accent:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(245,158,11,.38); }
+        .upgrade-section { margin-bottom: 20px; }
+        .upgrade-section-title { font-size: .75rem; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+        .plans-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; }
+        .plan-card { border: 2px solid var(--border); border-radius: 14px; padding: 14px 12px; text-align: center; cursor: pointer; transition: all var(--transition); background: white; }
+        .plan-card:hover { border-color: var(--secondary); box-shadow: var(--shadow-md); transform: translateY(-2px); }
+        .plan-card.selected { border-color: var(--accent); background: linear-gradient(135deg,#fffbeb,#fef9ee); }
+        .plan-card .plan-name { font-size: .85rem; font-weight: 800; color: var(--text); }
+        .plan-card .plan-price { font-size: .8rem; color: var(--accent-d); font-weight: 700; margin-top: 4px; }
+        .plan-card .plan-limit { font-size: .72rem; color: var(--muted); margin-top: 3px; }
+        .plan-card .plan-desc { font-size: .7rem; color: var(--muted); margin-top: 5px; line-height: 1.4; }
+        .plan-card.selected .plan-name { color: var(--primary); }
+        .lock-info-box { background: linear-gradient(135deg,#fff8f8,#fff5f5); border: 1.5px solid #fca5a5; border-radius: 14px; padding: 16px 18px; margin-bottom: 20px; }
+        .lock-info-box p { font-size: .88rem; color: #7f1d1d; line-height: 1.7; }
+        .lock-info-box strong { color: var(--error); font-weight: 800; }
+        .modal-devices-list { max-height: 320px; overflow-y: auto; margin-bottom: 18px; }
+        .toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(80px); background: linear-gradient(135deg,#0f172a,#1e293b); color: white; padding: 13px 24px; border-radius: 14px; font-size: .88rem; font-weight: 500; z-index: 999; transition: transform .35s cubic-bezier(.34,1.56,.64,1); white-space: nowrap; box-shadow: 0 8px 32px rgba(0,0,0,.35); display: flex; align-items: center; gap: 9px; pointer-events: none; border: 1px solid rgba(255,255,255,.08); }
+        .toast.show { transform: translateX(-50%) translateY(0); }
+        .toast.success i { color: #34d399; }
+        .toast.error i { color: #f87171; }
+        @media (max-width: 1280px) {
+            .projects-grid { grid-template-columns: repeat(2,1fr); }
+            .hero { padding: 44px 44px 52px; }
+            .content { padding: 36px 44px 80px; }
+        }
+        @media (max-width: 1100px) {
+            :root { --sidebar-w: 240px; }
+            .hero-title { font-size: 2.2rem; }
+            .hero-stat { padding: 16px 20px; }
+            .hero-stat-value { font-size: 1.8rem; }
+        }
+        @media (max-width: 900px) {
+            .sidebar { display: none; }
+            .page-wrap { margin-right: 0; }
+            .hero { padding: 32px 24px 40px; }
+            .hero-title { font-size: 1.8rem; }
+            .content { padding: 28px 20px 60px; }
+            .projects-grid { grid-template-columns: 1fr; gap: 16px; }
+            .plans-grid { grid-template-columns: 1fr; }
+            .modal-box { padding: 24px 20px; }
+            .hero-stat-value { font-size: 1.6rem; }
+        }
+        @media (min-width: 1600px) {
+            :root { --sidebar-w: 300px; }
+            .hero { padding: 60px 64px 68px; }
+            .hero-title { font-size: 3.2rem; }
+            .content { padding: 52px 64px 80px; }
+            .projects-grid { grid-template-columns: repeat(4,1fr); }
+        }
+        /* ── User panel tabs ── */
+        .page-tab { display: none; }
+        .page-tab.active { display: block; }
+        .sidebar-nav-item.active { background: rgba(255,255,255,.18); color: white; font-weight: 700; }
+        /* ── Profile panel ── */
+        .profile-wrap { max-width: 760px; }
+        .profile-section { background: var(--bg-card); border: 1px solid var(--border); border-radius: 20px; padding: 28px 32px; margin-bottom: 24px; box-shadow: var(--shadow-sm); position: relative; overflow: hidden; }
+        .profile-section::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg,var(--primary),var(--secondary)); }
+        .profile-section-title { font-size: 1rem; font-weight: 800; color: var(--primary); margin-bottom: 20px; display: flex; align-items: center; gap: 9px; }
+        .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .profile-field { display: flex; flex-direction: column; gap: 6px; }
+        .profile-field.full { grid-column: 1 / -1; }
+        .profile-label { font-size: .75rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+        .profile-input { height: 46px; border: 1.5px solid var(--border); border-radius: 12px; padding: 0 14px; font-size: .92rem; font-family: inherit; color: var(--text); outline: none; transition: border-color var(--transition),box-shadow var(--transition); background: var(--border-l); direction: rtl; }
+        .profile-input:focus { border-color: var(--secondary); box-shadow: 0 0 0 3px rgba(37,99,235,.1); background: white; }
+        .profile-input:disabled { opacity: .55; cursor: not-allowed; }
+        .profile-select { height: 46px; border: 1.5px solid var(--border); border-radius: 12px; padding: 0 14px; font-size: .92rem; font-family: inherit; color: var(--text); outline: none; background: var(--border-l); direction: rtl; cursor: pointer; }
+        .profile-select:focus { border-color: var(--secondary); box-shadow: 0 0 0 3px rgba(37,99,235,.1); background: white; }
+        .profile-save-btn { display: inline-flex; align-items: center; gap: 8px; padding: 11px 24px; background: linear-gradient(135deg,var(--primary),var(--primary-l)); color: white; border: none; border-radius: 12px; font-size: .9rem; font-weight: 700; font-family: inherit; cursor: pointer; transition: all var(--transition); box-shadow: 0 3px 12px rgba(30,58,95,.25); margin-top: 4px; }
+        .profile-save-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(30,58,95,.35); }
+        .profile-save-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+        .profile-save-btn.accent { background: linear-gradient(135deg,#4f46e5,#6366f1); box-shadow: 0 3px 12px rgba(99,102,241,.25); }
+        .profile-save-btn.accent:hover { box-shadow: 0 6px 20px rgba(99,102,241,.35); }
+        .profile-avatar-row { display: flex; align-items: center; gap: 20px; margin-bottom: 20px; }
+        .profile-avatar-big { width: 72px; height: 72px; background: linear-gradient(135deg,var(--accent),var(--accent-d)); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; font-weight: 800; color: var(--primary-d); box-shadow: 0 4px 16px rgba(245,158,11,.4); flex-shrink: 0; }
+        .profile-avatar-info { flex: 1; }
+        .profile-avatar-name { font-size: 1.1rem; font-weight: 800; color: var(--text); margin-bottom: 3px; }
+        .profile-avatar-email { font-size: .82rem; color: var(--muted); }
+        /* ── Pricing panel ── */
+        .pricing-panel-wrap { max-width: 860px; }
+        .pricing-mode-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+        .pp-mode-btn { padding: 8px 16px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--border-l); font-size: .83rem; font-weight: 600; cursor: pointer; font-family: inherit; color: var(--text-2); transition: all var(--transition); }
+        .pp-mode-btn.active { background: linear-gradient(135deg,var(--primary),var(--primary-l)); color: white; border-color: transparent; box-shadow: 0 3px 10px rgba(30,58,95,.25); }
+        .pp-section { background: var(--bg-card); border: 1px solid var(--border); border-radius: 20px; padding: 24px 28px; margin-bottom: 20px; box-shadow: var(--shadow-sm); position: relative; overflow: hidden; }
+        .pp-section::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg,var(--primary),var(--secondary)); }
+        .pp-section-title { font-size: .9rem; font-weight: 800; color: var(--primary); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+        .pp-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
+        .pp-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .pp-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+        .pp-field { display: flex; flex-direction: column; gap: 5px; }
+        .pp-label { font-size: .72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+        .pp-input { height: 42px; border: 1.5px solid var(--border); border-radius: 10px; padding: 0 12px; font-size: .88rem; font-family: inherit; color: var(--text); outline: none; background: var(--border-l); direction: ltr; text-align: right; transition: border-color var(--transition); }
+        .pp-input:focus { border-color: var(--secondary); box-shadow: 0 0 0 3px rgba(37,99,235,.1); background: white; }
+        .pp-mode-section { display: none; }
+        .pp-mode-section.visible { display: block; }
+        @media (max-width: 900px) {
+            .profile-grid { grid-template-columns: 1fr; }
+            .pp-grid { grid-template-columns: 1fr 1fr; }
+            .pp-grid-3 { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 600px) {
+            .pp-grid { grid-template-columns: 1fr 1fr; }
+            .profile-section { padding: 20px 18px; }
+            .pp-section { padding: 18px 16px; }
+        }
+    </style>
+</head>
+<body>
+
+<aside class="sidebar">
+    <div class="sidebar-logo">
+        <div class="sidebar-logo-icon"><i class="fa-solid fa-cabinet-filing"></i></div>
+        <div>
+            <div class="sidebar-logo-text">הדמיית ארונות</div>
+            <div class="sidebar-logo-sub">מערכת עיצוב מקצועית</div>
+        </div>
+    </div>
+    <div class="sidebar-user">
+        <div class="sidebar-user-avatar" id="user-avatar">?</div>
+        <div class="sidebar-user-name" id="user-name">טוען...</div>
+        <div class="sidebar-user-email" id="user-email"></div>
+        <span class="plan-badge" id="plan-badge">חינמי</span>
+    </div>
+    <nav class="sidebar-nav">
+        <div class="sidebar-nav-label">ניווט</div>
+        <a class="sidebar-nav-item active" id="nav-projects" href="#" onclick="switchPage('projects');return false;">
+            <i class="fa-solid fa-folder-open"></i> הפרויקטים שלי
+        </a>
+        <a class="sidebar-nav-item" href="index.html">
+            <i class="fa-solid fa-plus-circle"></i> פרויקט חדש
+        </a>
+        <div class="sidebar-nav-label">חשבון</div>
+        <a class="sidebar-nav-item" id="nav-profile" href="#" onclick="switchPage('profile');return false;">
+            <i class="fa-solid fa-user-circle"></i> הפרופיל שלי
+        </a>
+        <a class="sidebar-nav-item" id="nav-pricing" href="#" onclick="switchPage('pricing');return false;">
+            <i class="fa-solid fa-tags"></i> הגדרות תמחור
+        </a>
+    </nav>
+    <div class="sidebar-footer">
+        <button class="btn-logout" onclick="Auth.logout()">
+            <i class="fa-solid fa-right-from-bracket"></i> יציאה מהמערכת
+        </button>
+    </div>
+</aside>
+
+<div class="page-wrap">
+    <div class="hero" id="page-hero">
+        <div class="hero-inner">
+            <div class="hero-left">
+                <div class="hero-greeting" id="hero-greeting">ברוך הבא,</div>
+                <div class="hero-title" id="hero-title">הפרויקטים שלי</div>
+                <div class="hero-subtitle" id="page-subtitle">טוען...</div>
+                <div class="hero-stats" id="hero-stats">
+                    <div class="hero-stat">
+                        <div class="hero-stat-value" id="stat-projects">—</div>
+                        <div class="hero-stat-label">פרויקטים</div>
+                    </div>
+                    <div class="hero-stat">
+                        <div class="hero-stat-value" id="stat-plan">—</div>
+                        <div class="hero-stat-label">תוכנית נוכחית</div>
+                    </div>
+                </div>
+            </div>
+            <div class="hero-right" id="hero-right">
+                <button class="btn-new" id="btn-new-project" onclick="newProject()" disabled>
+                    <i class="fa-solid fa-plus"></i> פרויקט חדש
+                </button>
+            </div>
+        </div>
+        <div class="hero-plan-bar" id="plan-bar" style="display:none;">
+            <div class="hero-plan-info">
+                <div class="hero-plan-label" id="plan-bar-label">שימוש בתוכנית</div>
+                <div class="hero-plan-track">
+                    <div class="hero-plan-fill" id="plan-bar-fill" style="width:0%"></div>
+                </div>
+                <div class="hero-plan-count" id="plan-bar-count"></div>
+                <div class="hero-plan-devices" id="plan-bar-devices">
+                    <i class="fa-solid fa-desktop"></i>
+                    <span id="plan-bar-devices-text"></span>
+                </div>
+            </div>
+            <button class="btn-upgrade" id="btn-upgrade" onclick="openUpgradeModal()" style="display:none;">
+                <i class="fa-solid fa-arrow-up"></i> שדרג תוכנית
+            </button>
+        </div>
+    </div>
+
+    <div class="content">
+        <div class="content-inner">
+
+        <!-- TAB: PROJECTS -->
+        <div class="page-tab active" id="tab-projects">
+            <div class="content-header">
+                <div class="content-title">כל הפרויקטים</div>
+                <div class="content-count" id="content-count"></div>
+            </div>
+            <div class="projects-grid" id="projects-grid">
+                <div class="skeleton-card"><div class="skeleton-thumb"></div><div class="skeleton-body"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>
+                <div class="skeleton-card"><div class="skeleton-thumb"></div><div class="skeleton-body"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>
+                <div class="skeleton-card"><div class="skeleton-thumb"></div><div class="skeleton-body"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>
+            </div>
+            <div class="devices-section" id="devices-section">
+                <div class="devices-section-header">
+                    <div class="devices-section-title">
+                        <i class="fa-solid fa-desktop"></i> ניהול מכשירים
+                        <span class="devices-count-badge" id="devices-count">0 / 0 פעילים</span>
+                    </div>
+                    <button class="btn-manage-devices" onclick="openDevicesModal()">
+                        <i class="fa-solid fa-sliders"></i> נהל מכשירים
+                    </button>
+                </div>
+                <div id="devices-list"></div>
+            </div>
+        </div>
+
+        <!-- TAB: PROFILE -->
+        <div class="page-tab" id="tab-profile">
+            <div class="profile-wrap">
+                <div class="profile-section">
+                    <div class="profile-section-title"><i class="fa-solid fa-user"></i> פרטים אישיים</div>
+                    <div class="profile-avatar-row">
+                        <div class="profile-avatar-big" id="profile-avatar-big">?</div>
+                        <div class="profile-avatar-info">
+                            <div class="profile-avatar-name" id="profile-avatar-name">טוען...</div>
+                            <div class="profile-avatar-email" id="profile-avatar-email"></div>
+                        </div>
+                    </div>
+                    <div class="profile-grid">
+                        <div class="profile-field"><label class="profile-label">שם מלא</label><input class="profile-input" id="prof-full-name" type="text" placeholder="שם מלא" maxlength="80"></div>
+                        <div class="profile-field"><label class="profile-label">טלפון</label><input class="profile-input" id="prof-phone" type="tel" placeholder="050-0000000" maxlength="20"></div>
+                        <div class="profile-field full"><label class="profile-label">אימייל (לא ניתן לשינוי)</label><input class="profile-input" id="prof-email" type="email" disabled></div>
+                    </div>
+                    <div style="margin-top:18px;"><button class="profile-save-btn" onclick="savePersonalInfo()"><i class="fa-solid fa-floppy-disk"></i> שמור פרטים</button></div>
+                </div>
+                <div class="profile-section">
+                    <div class="profile-section-title"><i class="fa-solid fa-lock"></i> שינוי סיסמה</div>
+                    <div class="profile-grid">
+                        <div class="profile-field"><label class="profile-label">סיסמה חדשה</label><input class="profile-input" id="prof-new-password" type="password" placeholder="לפחות 6 תווים" minlength="6"></div>
+                        <div class="profile-field"><label class="profile-label">אימות סיסמה</label><input class="profile-input" id="prof-confirm-password" type="password" placeholder="חזור על הסיסמה"></div>
+                    </div>
+                    <div style="margin-top:18px;"><button class="profile-save-btn" onclick="savePassword()"><i class="fa-solid fa-key"></i> עדכן סיסמה</button></div>
+                </div>
+                <div class="profile-section">
+                    <div class="profile-section-title"><i class="fa-solid fa-building"></i> פרטי עסק</div>
+                    <div class="profile-grid">
+                        <div class="profile-field"><label class="profile-label">שם העסק</label><input class="profile-input" id="prof-business-name" type="text" placeholder="שם העסק / החברה" maxlength="100"></div>
+                        <div class="profile-field"><label class="profile-label">סוג עסק</label><select class="profile-select" id="prof-business-type"><option value="">— בחר —</option><option value="sole_proprietor">עוסק מורשה</option><option value="ltd">חברה בע"מ</option><option value="partnership">שותפות</option><option value="other">אחר</option></select></div>
+                        <div class="profile-field"><label class="profile-label">ח.פ / ע.מ</label><input class="profile-input" id="prof-tax-id" type="text" placeholder="מספר עוסק / ח.פ" maxlength="20"></div>
+                        <div class="profile-field"><label class="profile-label">כתובת</label><input class="profile-input" id="prof-address" type="text" placeholder="רחוב, עיר" maxlength="120"></div>
+                        <div class="profile-field"><label class="profile-label">אתר אינטרנט</label><input class="profile-input" id="prof-website" type="url" placeholder="https://..." maxlength="120"></div>
+                        <div class="profile-field"><label class="profile-label">לוגו URL</label><input class="profile-input" id="prof-logo-url" type="url" placeholder="https://..." maxlength="300"></div>
+                        <div class="profile-field full"><label class="profile-label">תיאור עסק</label><textarea class="profile-input" id="prof-bio" rows="3" placeholder="תיאור קצר של העסק..." maxlength="400" style="height:auto;padding:10px 14px;resize:vertical;"></textarea></div>
+                    </div>
+                    <div style="margin-top:18px;"><button class="profile-save-btn" onclick="saveBusinessInfo()"><i class="fa-solid fa-floppy-disk"></i> שמור פרטי עסק</button></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: PRICING -->
+        <div class="page-tab" id="tab-pricing">
+            <div class="pricing-panel-wrap">
+                <div class="pp-section">
+                    <div class="pp-section-title"><i class="fa-solid fa-sliders"></i> שיטת תמחור</div>
+                    <p style="font-size:.83rem;color:var(--muted);margin-bottom:14px;line-height:1.5;">בחר כיצד מחושב המחיר האוטומטי. ההגדרות נשמרות לחשבונך ומשפיעות על כל הפרויקטים.</p>
+                    <div class="pricing-mode-row" id="pp-mode-btns">
+                        <button class="pp-mode-btn" data-mode="ranges" onclick="ppSetMode('ranges')">טווחים</button>
+                        <button class="pp-mode-btn" data-mode="sqm" onclick="ppSetMode('sqm')">מ"ר</button>
+                        <button class="pp-mode-btn" data-mode="lm" onclick="ppSetMode('lm')">מ"א</button>
+                        <button class="pp-mode-btn" data-mode="lm_height" onclick="ppSetMode('lm_height')">מ"א + גובה</button>
+                        <button class="pp-mode-btn" data-mode="materials" onclick="ppSetMode('materials')">חומרים</button>
+                    </div>
+                </div>
+                <!-- RANGES section -->
+                <div class="pp-section pp-mode-section" id="pp-mode-ranges">
+                    <div class="pp-section-title"><i class="fa-solid fa-table-list"></i> טבלת טווחים לפי רוחב</div>
+                    <p style="font-size:.78rem;color:var(--muted);margin-bottom:12px;line-height:1.5;">הגדר מחיר לכל רוחב ארון (ס"מ) לפי דגם. המחיר הוא לארון שלם (מלמין / לא מלמין).</p>
+                    <div style="overflow-x:auto;margin-bottom:12px;">
+                        <table style="width:100%;border-collapse:collapse;font-size:.83rem;" id="pp-ranges-table">
+                            <thead>
+                                <tr style="background:var(--border-l);">
+                                    <th style="padding:8px 10px;text-align:right;font-weight:700;color:var(--primary);border:1px solid var(--border);">דגם</th>
+                                    <th style="padding:8px 10px;text-align:center;font-weight:700;color:var(--primary);border:1px solid var(--border);">רוחב (ס"מ)</th>
+                                    <th style="padding:8px 10px;text-align:center;font-weight:700;color:var(--primary);border:1px solid var(--border);">מלמין ₪</th>
+                                    <th style="padding:8px 10px;text-align:center;font-weight:700;color:var(--primary);border:1px solid var(--border);">לא מלמין ₪</th>
+                                    <th style="padding:8px 10px;text-align:center;border:1px solid var(--border);"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="pp-ranges-tbody"></tbody>
+                        </table>
+                    </div>
+                    <button onclick="ppAddRangeRow()" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:rgba(37,99,235,.08);border:1.5px solid rgba(37,99,235,.25);color:var(--secondary);border-radius:10px;font-size:.82rem;font-weight:600;cursor:pointer;font-family:inherit;">
+                        <i class="fa-solid fa-plus"></i> הוסף שורה
+                    </button>
+                </div>
+
+                <div class="pp-section pp-mode-section" id="pp-mode-sqm">
+                    <div class="pp-section-title"><i class="fa-solid fa-ruler-combined"></i> תמחור לפי מ"ר</div>
+                    <div class="pp-grid-2">
+                        <div class="pp-field"><label class="pp-label">מחיר מ"ר מלמין ₪</label><input class="pp-input" id="pp-sqmPrice" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">מחיר מ"ר לא מלמין ₪</label><input class="pp-input" id="pp-sqmPriceNonMel" type="number" min="0"></div>
+                    </div>
+                </div>
+                <div class="pp-section pp-mode-section" id="pp-mode-lm">
+                    <div class="pp-section-title"><i class="fa-solid fa-ruler-horizontal"></i> תמחור לפי מ"א</div>
+                    <div class="pp-grid-2">
+                        <div class="pp-field"><label class="pp-label">מחיר מ"א מלמין ₪</label><input class="pp-input" id="pp-lmPrice" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">מחיר מ"א לא מלמין ₪</label><input class="pp-input" id="pp-lmPriceNonMel" type="number" min="0"></div>
+                    </div>
+                </div>
+                <div class="pp-section pp-mode-section" id="pp-mode-lm_height">
+                    <div class="pp-section-title"><i class="fa-solid fa-ruler-vertical"></i> תמחור לפי מ"א + גובה</div>
+                    <div class="pp-grid">
+                        <div class="pp-field"><label class="pp-label">בסיס מ"א מלמין ₪</label><input class="pp-input" id="pp-lmHeightBase" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">בסיס מ"א לא מלמין ₪</label><input class="pp-input" id="pp-lmHeightBaseNonMel" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">סף גובה ס"מ</label><input class="pp-input" id="pp-lmHeightThresholdCm" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">צעד גובה ס"מ</label><input class="pp-input" id="pp-lmHeightStepCm" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">תוספת לצעד %</label><input class="pp-input" id="pp-lmHeightStepPct" type="number" min="0"></div>
+                    </div>
+                </div>
+                <div class="pp-section pp-mode-section" id="pp-mode-materials">
+                    <div class="pp-section-title"><i class="fa-solid fa-layer-group"></i> תמחור לפי חומרים</div>
+                    <div class="pp-grid-3">
+                        <div class="pp-field"><label class="pp-label">מחיר לוח ₪</label><input class="pp-input" id="pp-materialsBoardPrice" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">לוחות למ"ר</label><input class="pp-input" id="pp-materialsBoardsPerSqm" type="number" min="0" step="0.1"></div>
+                        <div class="pp-field"><label class="pp-label">מכפיל חומרים</label><input class="pp-input" id="pp-materialsMultiplier" type="number" min="0" step="0.1"></div>
+                    </div>
+                </div>
+                <div class="pp-section">
+                    <div class="pp-section-title"><i class="fa-solid fa-percent"></i> תוספות כלליות</div>
+                    <div class="pp-grid">
+                        <div class="pp-field"><label class="pp-label">מכפיל רווח</label><input class="pp-input" id="pp-profitMultiplier" type="number" min="0" step="0.1"></div>
+                        <div class="pp-field"><label class="pp-label">תוספת גובה %</label><input class="pp-input" id="pp-heightSurcharge" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">תוספת עומק %</label><input class="pp-input" id="pp-depthSurcharge" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">תוספת סנדוויץ' %</label><input class="pp-input" id="pp-sandwichSurcharge" type="number" min="0"></div>
+                    </div>
+                </div>
+                <div class="pp-section">
+                    <div class="pp-section-title"><i class="fa-solid fa-screwdriver-wrench"></i> התקנה</div>
+                    <div class="pp-grid-3">
+                        <div class="pp-field"><label class="pp-label">מחיר ליחידה ₪</label><input class="pp-input" id="pp-installPricePerUnit" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">ס"מ ליחידה</label><input class="pp-input" id="pp-installUnitCm" type="number" min="0" step="0.5"></div>
+                        <div class="pp-field"><label class="pp-label">תוספת גובה %</label><input class="pp-input" id="pp-installHeightSurcharge" type="number" min="0"></div>
+                    </div>
+                </div>
+                <div class="pp-section">
+                    <div class="pp-section-title"><i class="fa-solid fa-plus-circle"></i> תוספות</div>
+                    <div class="pp-grid">
+                        <div class="pp-field"><label class="pp-label">מגירה פנימית ₪</label><input class="pp-input" id="pp-internalDrawer" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">מגירה חיצונית ₪</label><input class="pp-input" id="pp-externalDrawer" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">תא פתוח ₪</label><input class="pp-input" id="pp-openCell" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">מחיצה ₪</label><input class="pp-input" id="pp-partition" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">מדפים חינם/מ'</label><input class="pp-input" id="pp-shelfFreePerMeter" type="number" min="0" step="0.5"></div>
+                        <div class="pp-field"><label class="pp-label">מדף מלמין ₪</label><input class="pp-input" id="pp-extraShelfMel" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">מדף לא מלמין ₪</label><input class="pp-input" id="pp-extraShelfNonMel" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">שולחן צד ₪</label><input class="pp-input" id="pp-deskUnit" type="number" min="0"></div>
+                    </div>
+                </div>
+                <div class="pp-section">
+                    <div class="pp-section-title"><i class="fa-solid fa-door-open"></i> דלתות</div>
+                    <div class="pp-grid">
+                        <div class="pp-field"><label class="pp-label">מסגרת מלמין ₪</label><input class="pp-input" id="pp-doorFramedMel" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">זכוכית מלמין ₪</label><input class="pp-input" id="pp-doorGlassMel" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">זכוכית שחורה ₪</label><input class="pp-input" id="pp-doorGlassBlack" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">מראה ₪</label><input class="pp-input" id="pp-doorMirror" type="number" min="0"></div>
+                    </div>
+                </div>
+                <div class="pp-section">
+                    <div class="pp-section-title"><i class="fa-solid fa-box"></i> יחידה עילית + פינה + צד</div>
+                    <div class="pp-grid">
+                        <div class="pp-field"><label class="pp-label">יחידה עילית 160 ₪</label><input class="pp-input" id="pp-upperUnit160" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">יחידה עילית 240 ₪</label><input class="pp-input" id="pp-upperUnit240" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">יחידה עילית לס"מ ₪</label><input class="pp-input" id="pp-upperUnitPerCm" type="number" min="0" step="0.25"></div>
+                        <div class="pp-field"><label class="pp-label">פינה מגירות 3 ₪</label><input class="pp-input" id="pp-cornerDrawers3" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">פינה מגירות 4 ₪</label><input class="pp-input" id="pp-cornerDrawers4" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">מגירת פינה נוספת ₪</label><input class="pp-input" id="pp-cornerDrawerExtra" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">פינה שולחן ₪</label><input class="pp-input" id="pp-cornerDesk" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">פינה מלאה בסיס ₪</label><input class="pp-input" id="pp-fullCornerBase" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">מדף פינה מלאה ₪</label><input class="pp-input" id="pp-fullCornerShelf" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">חיבור כנפיים ₪</label><input class="pp-input" id="pp-wingConnection" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">ארון צד מלמין/ס"מ ₪</label><input class="pp-input" id="pp-sideCabMel" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">ארון צד לא מלמין/ס"מ ₪</label><input class="pp-input" id="pp-sideCabNonMel" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">דלתות ארון צד ₪</label><input class="pp-input" id="pp-sideCabDoors" type="number" min="0"></div>
+                    </div>
+                </div>
+                <div class="pp-section">
+                    <div class="pp-section-title"><i class="fa-solid fa-arrows-left-right"></i> ארון הזזה</div>
+                    <div class="pp-grid">
+                        <div class="pp-field"><label class="pp-label">בסיס הזזה ₪</label><input class="pp-input" id="pp-slidingBase" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">דלת הזזה ₪</label><input class="pp-input" id="pp-slidingDoor" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">זכוכית הזזה ₪</label><input class="pp-input" id="pp-slidingGlass" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">מראה הזזה ₪</label><input class="pp-input" id="pp-slidingMirror" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">פרופיל זהב ₪</label><input class="pp-input" id="pp-slidingGold" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">פרופיל שחור ₪</label><input class="pp-input" id="pp-slidingBlack" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">תוספת גובה הזזה %</label><input class="pp-input" id="pp-slidingHeightSurcharge" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">רגל ניקל ₪</label><input class="pp-input" id="pp-nickelLegPrice" type="number" min="0"></div>
+                    </div>
+                </div>
+                <div style="display:flex;gap:12px;align-items:center;padding:8px 0 24px;">
+                    <button class="profile-save-btn accent" onclick="savePricingSettings()">
+                        <i class="fa-solid fa-floppy-disk"></i> שמור הגדרות תמחור
+                    </button>
+                    <button class="profile-save-btn" style="background:var(--border-l);color:var(--text-2);box-shadow:none;border:1.5px solid var(--border);" onclick="resetPricingToDefaults()">
+                        <i class="fa-solid fa-rotate-right"></i> אפס לברירת מחדל
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        </div><!-- /.content-inner -->
+    </div>
+</div>
+
+<!-- Modal: Rename -->
+<div class="modal-overlay" id="modal-rename">
+    <div class="modal-box">
+        <div class="modal-title"><i class="fa-solid fa-pen"></i> שינוי שם פרויקט</div>
+        <input type="text" class="modal-input" id="rename-input" placeholder="שם הפרויקט" maxlength="80"
+               onkeydown="if(event.key==='Enter') confirmRename()">
+        <div class="modal-actions">
+            <button class="btn-modal ghost" onclick="closeModal('modal-rename')">ביטול</button>
+            <button class="btn-modal primary" onclick="confirmRename()">שמור</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Delete -->
+<div class="modal-overlay" id="modal-delete">
+    <div class="modal-box">
+        <div class="modal-title" style="color:var(--error)"><i class="fa-solid fa-trash"></i> מחיקת פרויקט</div>
+        <p style="font-size:.9rem;color:var(--muted);margin-bottom:20px;line-height:1.6;">
+            האם אתה בטוח שברצונך למחוק את הפרויקט <strong id="delete-project-name"></strong>?<br>
+            פעולה זו אינה ניתנת לביטול.
+        </p>
+        <div class="modal-actions">
+            <button class="btn-modal ghost" onclick="closeModal('modal-delete')">ביטול</button>
+            <button class="btn-modal danger" onclick="confirmDelete()">מחק</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Upgrade plan -->
+<div class="modal-overlay" id="modal-upgrade">
+    <div class="modal-box wide">
+        <div class="modal-title"><i class="fa-solid fa-crown" style="color:var(--accent)"></i> שדרוג תוכנית</div>
+        <p style="font-size:.85rem;color:var(--muted);margin-bottom:18px;">בחר תוכנית מתאימה לצרכים שלך:</p>
+        <div id="upgrade-plans-container" style="max-height:420px;overflow-y:auto;padding-left:2px;"></div>
+        <div class="modal-actions" style="margin-top:18px;">
+            <button class="btn-modal ghost" onclick="closeModal('modal-upgrade')">ביטול</button>
+            <button class="btn-modal primary" id="btn-go-upgrade" onclick="goUpgrade()">
+                <i class="fa-solid fa-credit-card"></i> עבור לתשלום
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Locked project -->
+<div class="modal-overlay" id="modal-locked">
+    <div class="modal-box">
+        <div class="modal-title" style="color:var(--error)">
+            <i class="fa-solid fa-lock"></i> פרויקט נעול לעריכה
+        </div>
+        <div class="lock-info-box">
+            <p>
+                הפרויקט <strong id="locked-project-name"></strong> נעול לעריכה.<br>
+                חלון העריכה של 3 הימים הסתיים.<br>
+                ניתן להאריך את חלון העריכה בתשלום סמלי.
+            </p>
+        </div>
+        <input type="hidden" id="locked-project-id">
+        <div class="modal-actions">
+            <button class="btn-modal ghost" onclick="closeModal('modal-locked')">סגור</button>
+            <button class="btn-modal accent" id="btn-extend-from-lock" onclick="confirmExtendProject()" style="display:none;">
+                <i class="fa-solid fa-rotate-right"></i> הארך עריכה
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Device management -->
+<div class="modal-overlay" id="modal-devices">
+    <div class="modal-box wide">
+        <div class="modal-title">
+            <i class="fa-solid fa-desktop"></i> ניהול מכשירים
+        </div>
+        <p style="font-size:.82rem;color:var(--muted);margin-bottom:14px;line-height:1.5;">
+            מכשירים פעילים יכולים לגשת לתוכנה. השבת מכשיר כדי לפנות מקום למכשיר חדש.
+        </p>
+        <div class="modal-devices-list" id="modal-devices-list"></div>
+        <div class="modal-actions">
+            <button class="btn-modal ghost" onclick="closeModal('modal-devices')">סגור</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast">
+    <i id="toast-icon" class="fa-solid fa-circle-check"></i>
+    <span id="toast-text"></span>
+</div>
+
+<script src="auth.js"></script>
+<script src="projects.js"></script>
+</body>
+</html>
