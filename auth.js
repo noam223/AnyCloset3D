@@ -778,6 +778,27 @@ window.GrowPayments = {
                 }
             }
 
+            // If no phone — ask user before proceeding (Grow requires valid phone)
+            if (!phone || phone.trim() === '') {
+                phone = window.prompt('נא להזין מספר טלפון לצורך יצירת קישור תשלום:', '05');
+                if (!phone || phone.trim() === '') {
+                    alert('נדרש מספר טלפון להמשך התהליך.');
+                    return;
+                }
+                // Save phone to profile for future use
+                if (sb) {
+                    await sb.from('profiles').update({ phone: phone.trim() }).eq('id', user.id);
+                }
+            }
+
+            // Normalize phone: convert +972XXXXXXXXX → 0XXXXXXXXX (Israeli local format)
+            let normalizedPhone = phone.trim();
+            if (normalizedPhone.startsWith('+972')) {
+                normalizedPhone = '0' + normalizedPhone.slice(4);
+            } else if (normalizedPhone.startsWith('972')) {
+                normalizedPhone = '0' + normalizedPhone.slice(3);
+            }
+
             const res = await fetch(this.MAKE_TRIAL_WEBHOOK, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -786,7 +807,7 @@ window.GrowPayments = {
                     email:    user.email,
                     name:     fullName || user.email,   // kept for backward compat
                     fullName: fullName || user.email,   // Make scenario field name
-                    phone:    phone || ''               // empty string if no phone
+                    phone:    normalizedPhone
                 })
             });
             const data = await res.json();
