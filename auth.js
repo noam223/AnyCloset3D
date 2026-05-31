@@ -762,14 +762,31 @@ window.GrowPayments = {
         }
 
         try {
+            // Try to get phone from profiles table (more up-to-date than user_metadata)
+            const sb = _getClient();
+            let phone = user.user_metadata?.phone || '';
+            let fullName = user.user_metadata?.full_name || '';
+            if (sb) {
+                const { data: profile } = await sb
+                    .from('profiles')
+                    .select('phone, full_name')
+                    .eq('id', user.id)
+                    .single();
+                if (profile) {
+                    phone    = profile.phone    || phone;
+                    fullName = profile.full_name || fullName;
+                }
+            }
+
             const res = await fetch(this.MAKE_TRIAL_WEBHOOK, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     plan,
-                    email: user.email,
-                    name:  user.user_metadata?.full_name || user.email,
-                    phone: user.user_metadata?.phone || '0500000000'
+                    email:    user.email,
+                    name:     fullName || user.email,   // kept for backward compat
+                    fullName: fullName || user.email,   // Make scenario field name
+                    phone:    phone || ''               // empty string if no phone
                 })
             });
             const data = await res.json();
