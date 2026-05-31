@@ -805,8 +805,8 @@ window.GrowPayments = {
                 body: JSON.stringify({
                     plan,
                     email:    user.email,
-                    name:     fullName || user.email,   // kept for backward compat
-                    fullName: fullName || user.email,   // Make scenario field name
+                    name:     fullName || user.email,
+                    fullName: fullName || user.email,
                     phone:    normalizedPhone
                 })
             });
