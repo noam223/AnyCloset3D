@@ -431,7 +431,7 @@ function _tourEnsureDOM() {
         'transition:all 0.15s ease;';
     document.body.appendChild(ring);
 
-    // Tooltip
+    // Tooltip — title + text only (no nav buttons)
     var tt = document.createElement('div');
     tt.id = 'tour-tooltip';
     tt.innerHTML =
@@ -439,16 +439,18 @@ function _tourEnsureDOM() {
             '<span id="tour-tt-title"></span>' +
             '<button class="tour-close-btn" onclick="window._stopTour()" title="סגור מדריך">✕</button>' +
         '</div>' +
-        '<div id="tour-tt-text"></div>' +
-        '<div class="tour-tt-footer">' +
-            '<div class="tour-dots" id="tour-dots"></div>' +
-            '<div class="tour-nav-btns">' +
-                '<button id="tour-btn-skip" onclick="window._stopTour()">דלג</button>' +
-                '<button id="tour-btn-prev" onclick="window._tourPrev()">‹ הקודם</button>' +
-                '<button id="tour-btn-next" onclick="window._tourNext()">הבא ›</button>' +
-            '</div>' +
-        '</div>';
+        '<div id="tour-tt-text"></div>';
     document.body.appendChild(tt);
+
+    // Fixed bottom nav bar — always at bottom-center, never moves
+    var nav = document.createElement('div');
+    nav.id = 'tour-nav-bar';
+    nav.innerHTML =
+        '<button id="tour-btn-skip" onclick="window._stopTour()">דלג</button>' +
+        '<button id="tour-btn-prev" onclick="window._tourPrev()">‹ הקודם</button>' +
+        '<div class="tour-dots" id="tour-dots"></div>' +
+        '<button id="tour-btn-next" onclick="window._tourNext()">הבא ›</button>';
+    document.body.appendChild(nav);
 
     // Resize listener
     window.addEventListener('resize', function() {
@@ -463,9 +465,11 @@ function _tourHideDOM() {
     var ov   = document.getElementById('tour-overlay');
     var tt   = document.getElementById('tour-tooltip');
     var ring = document.getElementById('tour-highlight-ring');
+    var nav  = document.getElementById('tour-nav-bar');
     if (ov)   ov.style.display   = 'none';
     if (tt)   tt.style.display   = 'none';
     if (ring) ring.style.display = 'none';
+    if (nav)  nav.style.display  = 'none';
 }
 
 // ── ניווט ─────────────────────────────────────────────────────────────────────
@@ -541,11 +545,13 @@ function _tourShowStep(idx) {
         if (nextBtn) nextBtn.textContent = idx === steps.length - 1 ? 'סיום ✓' : 'הבא ›';
         if (skipBtn) skipBtn.style.display = idx === steps.length - 1 ? 'none' : '';
 
-        // Show overlay + tooltip
-        var ov = document.getElementById('tour-overlay');
-        var tt = document.getElementById('tour-tooltip');
-        if (ov) ov.style.display = 'block';
-        if (tt) tt.style.display = 'block';
+        // Show overlay + tooltip + nav bar
+        var ov  = document.getElementById('tour-overlay');
+        var tt  = document.getElementById('tour-tooltip');
+        var nav = document.getElementById('tour-nav-bar');
+        if (ov)  ov.style.display  = 'block';
+        if (tt)  tt.style.display  = 'block';
+        if (nav) nav.style.display = 'flex';
 
         if (!el) {
             _tourSetSpotlight(null);

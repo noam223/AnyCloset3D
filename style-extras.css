@@ -749,27 +749,36 @@ body.viewer-mode #canvas-container canvas {
 .tour-close-btn:hover { background: rgba(255,255,255,0.32); }
 
 #tour-tt-text {
-    padding: 14px 16px 10px;
+    padding: 14px 16px 14px;
     font-size: 0.88rem;
     color: #334155;
     line-height: 1.6;
 }
 
-.tour-tt-footer {
-    display: flex;
+/* ── Fixed bottom nav bar — always at bottom-center ── */
+#tour-nav-bar {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100004;
+    display: none;
     align-items: center;
-    justify-content: space-between;
-    padding: 8px 14px 12px;
-    gap: 8px;
-    border-top: 1px solid #e2e8f0;
-    background: #f8fafc;
+    gap: 10px;
+    background: #fff;
+    border-radius: 99px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.22), 0 1px 6px rgba(0,0,0,0.10);
+    padding: 8px 16px;
+    direction: rtl;
+    white-space: nowrap;
+    animation: tourFadeIn 0.22s ease;
 }
 
 .tour-dots {
     display: flex;
     gap: 5px;
     align-items: center;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
 }
 
 .tour-dot {
@@ -789,16 +798,9 @@ body.viewer-mode #canvas-container canvas {
 }
 .tour-dot:hover { background: #94a3b8; }
 
-.tour-nav-btns {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    flex-shrink: 0;
-}
-
-.tour-nav-btns button {
-    padding: 6px 13px;
-    border-radius: 8px;
+#tour-nav-bar button {
+    padding: 6px 14px;
+    border-radius: 99px;
     border: 1.5px solid #cbd5e1;
     background: #fff;
     color: #1e293b;
@@ -809,7 +811,7 @@ body.viewer-mode #canvas-container canvas {
     transition: all 0.15s;
     white-space: nowrap;
 }
-.tour-nav-btns button:hover {
+#tour-nav-bar button:hover {
     background: #f1f5f9;
     border-color: #94a3b8;
 }
@@ -828,11 +830,11 @@ body.viewer-mode #canvas-container canvas {
     color: #94a3b8 !important;
     border-color: transparent !important;
     background: transparent !important;
-    padding: 6px 6px !important;
 }
 #tour-btn-skip:hover {
     color: #64748b !important;
     background: #f1f5f9 !important;
+    border-color: #e2e8f0 !important;
 }
 
 /* ׳›׳₪׳×׳•׳¨ ׳”׳“׳¨׳›׳” ׳‘-top-bar */
