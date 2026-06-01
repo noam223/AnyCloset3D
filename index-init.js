@@ -31,12 +31,12 @@
                     '</div>' +
                     '<span>' + _escHtml(name) + '</span>' +
                 '</div>' +
-                '<button onclick="Auth.logout()" title="יציאה" style="background:transparent;' +
+                '<button onclick="window._confirmLeave(null, function(){ Auth.logout(); })" title="יציאה" style="background:transparent;' +
                 'border:1px solid var(--border);color:var(--text-light);border-radius:7px;padding:4px 9px;' +
                 'font-size:0.75rem;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;">' +
                     '<i class="fa-solid fa-right-from-bracket"></i> יציאה' +
                 '</button>' +
-                '<a href="projects.html" title="הפרויקטים שלי" style="background:transparent;' +
+                '<a href="projects.html" onclick="event.preventDefault();window._confirmLeave(\'projects.html\')" title="הפרויקטים שלי" style="background:transparent;' +
                 'border:1px solid var(--border);color:var(--text-light);border-radius:7px;padding:4px 9px;' +
                 'font-size:0.75rem;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;' +
                 'text-decoration:none;">' +
@@ -254,6 +254,8 @@
         if (result && result.error) {
             console.error('[' + label + '] Failed:', result.error);
             if (typeof _showToast === 'function') _showToast('⚠️ שגיאה בשמירת הפרויקט: ' + result.error, 5000);
+        } else {
+            window._isDirty = false;
         }
     }
 
@@ -261,6 +263,8 @@
     if (typeof _origSaveHistory === 'function') {
         window.saveHistoryState = function() {
             _origSaveHistory.apply(this, arguments);
+            // Mark project as having unsaved changes
+            window._isDirty = true;
             if (!window._currentProjectId) return;
 
             // Regular auto-save — every 60s debounce
@@ -274,6 +278,59 @@
             }
         };
     }
+
+    // ── Unsaved-changes guard ─────────────────────────────────────────────────
+    // 1. Native browser dialog for F5 / tab close / external navigation
+    window.addEventListener('beforeunload', function(e) {
+        if (!window._isDirty) return;
+        e.preventDefault();
+        e.returnValue = ''; // required for Chrome
+    });
+
+    // 2. Custom Hebrew dialog for internal SPA-style navigation links
+    //    (logo → projects.html, "פרויקטים" button, logout)
+    window._confirmLeave = async function(destination, action) {
+        if (!window._isDirty) {
+            if (typeof action === 'function') action();
+            else if (destination) window.location.href = destination;
+            return;
+        }
+        // Build modal
+        var overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;';
+        overlay.innerHTML =
+            '<div style="background:#fff;border-radius:16px;padding:28px 28px 22px;max-width:360px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,0.3);text-align:center;direction:rtl;">' +
+                '<div style="font-size:2rem;margin-bottom:10px;">💾</div>' +
+                '<h3 style="margin:0 0 8px;font-size:1.1rem;color:#1e3a5f;">יש שינויים שלא נשמרו</h3>' +
+                '<p style="margin:0 0 22px;font-size:0.88rem;color:#64748b;line-height:1.5;">האם לשמור את השינויים לפני היציאה?</p>' +
+                '<div style="display:flex;flex-direction:column;gap:8px;">' +
+                    '<button id="_leave-save" style="padding:10px;border-radius:9px;border:none;background:#6366f1;color:#fff;font-size:0.92rem;font-weight:700;cursor:pointer;font-family:inherit;">💾 שמור ויצא</button>' +
+                    '<button id="_leave-discard" style="padding:10px;border-radius:9px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#374151;font-size:0.92rem;font-weight:600;cursor:pointer;font-family:inherit;">🗑️ יצא בלי לשמור</button>' +
+                    '<button id="_leave-cancel" style="padding:10px;border-radius:9px;border:none;background:transparent;color:#94a3b8;font-size:0.88rem;cursor:pointer;font-family:inherit;">ביטול</button>' +
+                '</div>' +
+            '</div>';
+        document.body.appendChild(overlay);
+
+        function _close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
+
+        document.getElementById('_leave-cancel').onclick = _close;
+        overlay.addEventListener('click', function(e) { if (e.target === overlay) _close(); });
+
+        document.getElementById('_leave-discard').onclick = function() {
+            _close();
+            window._isDirty = false;
+            if (typeof action === 'function') action();
+            else if (destination) window.location.href = destination;
+        };
+
+        document.getElementById('_leave-save').onclick = async function() {
+            _close();
+            await window._saveProjectNow();
+            window._isDirty = false;
+            if (typeof action === 'function') action();
+            else if (destination) window.location.href = destination;
+        };
+    };
 })();
 
 // ── Desk drawers toggle buttons ──────────────────────────────────────────────
@@ -386,6 +443,7 @@ window._saveProjectNow = async function() {
                 console.log('[SaveNow] New project created with id:', window._currentProjectId);
             }
             console.log('[SaveNow] Saved successfully');
+            window._isDirty = false;
             if (btn) { btn.innerHTML = '<i class="fa-solid fa-check"></i> נשמר!'; btn.disabled = false; }
             setTimeout(function() { if (btn) btn.innerHTML = origHTML; }, 2000);
             if (typeof _showToast === 'function') _showToast('✅ הפרויקט נשמר בהצלחה', 3000);
