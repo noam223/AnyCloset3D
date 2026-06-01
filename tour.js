@@ -14,11 +14,10 @@ function _tourEnsureToolbar() {
         var tb = document.getElementById('bottom-floating-toolbar');
         if (tb) {
             if (typeof updateToolbarState === 'function') updateToolbarState();
-            // Just raise z-index above overlay — do NOT move to body
-            // This keeps getBoundingClientRect() accurate for spotlight
-            tb.dataset.tourOrigZ   = tb.style.zIndex   || '';
-            tb.dataset.tourOrigPos = tb.style.position || '';
-            tb.style.zIndex = '100002';
+            // Keep toolbar BELOW overlay (z-index < 100001) so SVG spotlight cutout
+            // shows it as "lit up" through the dark overlay mask
+            tb.dataset.tourOrigZ = tb.style.zIndex || '';
+            tb.style.zIndex = '99999';
         }
     } catch(e) { console.warn('[tour] _tourEnsureToolbar error:', e); }
 }
@@ -27,13 +26,8 @@ function _tourRestoreToolbar() {
     try {
         var tb = document.getElementById('bottom-floating-toolbar');
         if (tb) {
-            tb.style.zIndex   = tb.dataset.tourOrigZ   || '';
-            tb.style.position = tb.dataset.tourOrigPos || '';
+            tb.style.zIndex = tb.dataset.tourOrigZ || '';
             delete tb.dataset.tourOrigZ;
-            delete tb.dataset.tourOrigPos;
-            delete tb.dataset.tourMoved;
-            delete tb.dataset.tourOrigParent2;
-            delete tb.dataset.tourOrigParent;
         }
         if (typeof clearSelection === 'function') clearSelection();
         else if (typeof window.clearSelection === 'function') window.clearSelection();
