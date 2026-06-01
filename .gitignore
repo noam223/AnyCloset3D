@@ -11,7 +11,6 @@ images/logo2.psd
 
 # ── Large binary source files (not needed at runtime) ─
 images/monochrome_studio_04_4k.hdr
-images/botcher.jpg
 
 # ── Documentation / internal ──────────────────────────
 *.pdf
@@ -26,9 +25,6 @@ make-blueprints/
 # ── Old/backup versions ───────────────────────────────
 ישן/
 9/
-
-# ── Dev notes (internal) ──────────────────────────────
-notes.js
 
 # ── Logs ──────────────────────────────────────────────
 *.log

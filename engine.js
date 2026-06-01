@@ -2498,11 +2498,14 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         const isHiddenByDoor = (yPos) => {
             if (!isInset || !col.doors) return false;
             let baseForInset = col.type === 'desk' ? col.deskHeight + col.deskClearance : Math.max(state.plinthHeight, fo);
-            return col.doors.some(door => {
-                let doorBottomY = (door.startRow === 0) ? (baseForInset + t) : (dividersAsc[door.startRow - 1].y + dividersAsc[door.startRow - 1].thick/2);
-                let doorTopY = (door.endRow === dividersAsc.length) ? (col.height - t) : (dividersAsc[door.endRow].y - dividersAsc[door.endRow].thick/2);
-                return yPos > doorBottomY + 0.1 && yPos < doorTopY - 0.1;
-            });
+                return col.doors.some(door => {
+                    // Clamp door row indices to valid range (guard against stale saved state)
+                    const _safeStartRow = Math.max(0, Math.min(door.startRow, dividersAsc.length));
+                    const _safeEndRow   = Math.max(0, Math.min(door.endRow,   dividersAsc.length));
+                    let doorBottomY = (_safeStartRow === 0) ? (baseForInset + t) : (dividersAsc[_safeStartRow - 1].y + dividersAsc[_safeStartRow - 1].thick/2);
+                    let doorTopY = (_safeEndRow === dividersAsc.length) ? (col.height - t) : (dividersAsc[_safeEndRow].y - dividersAsc[_safeEndRow].thick/2);
+                    return yPos > doorBottomY + 0.1 && yPos < doorTopY - 0.1;
+                });
         };
 
         dividers.sort((a, b) => b.y - a.y);
@@ -3108,20 +3111,23 @@ if (compData && compData.type === 'hanging') {
 
             col.doors.forEach(door => {
                 let doorBottomY, doorTopY;
+                // Clamp door row indices to valid range (guard against stale saved state)
+                const _safeStartRow = Math.max(0, Math.min(door.startRow, dividersAsc.length));
+                const _safeEndRow   = Math.max(0, Math.min(door.endRow,   dividersAsc.length));
                 // Use dividersAsc (ascending by Y) — dividers was re-sorted descending at line 729
                 if (isInset) {
                     let baseForInset = col.type === 'desk' ? col.deskHeight + col.deskClearance : Math.max(state.plinthHeight, fo);
-                    doorBottomY = (door.startRow === 0) ? (baseForInset + t) : (dividersAsc[door.startRow - 1].y + dividersAsc[door.startRow - 1].thick/2);
-                    doorTopY = (door.endRow === dividersAsc.length) ? (col.height - t) : (dividersAsc[door.endRow].y - dividersAsc[door.endRow].thick/2);
+                    doorBottomY = (_safeStartRow === 0) ? (baseForInset + t) : (dividersAsc[_safeStartRow - 1].y + dividersAsc[_safeStartRow - 1].thick/2);
+                    doorTopY = (_safeEndRow === dividersAsc.length) ? (col.height - t) : (dividersAsc[_safeEndRow].y - dividersAsc[_safeEndRow].thick/2);
                     doorBottomY += doorGap/2;
                     doorTopY -= doorGap/2;
                 } else {
                     // For bathroom regalim: extend door fronts down by t to cover the bottom plate face.
                     const _bathRegalimDoor = (state.presetId === 'bathroom' && isRegalim && door.startRow === 0 && fo === 0 && col.type !== 'desk');
                     let baseY = col.type === 'desk' ? col.deskHeight + col.deskClearance : (_bathRegalimDoor ? state.plinthHeight - t : Math.max(state.plinthHeight, fo));
-                    if (door.startRow === 0 && col.type !== 'desk' && state.plinthHeight === 7 && fo === 0 && !_bathRegalimDoor) baseY = 1.5;
-                    doorBottomY = (door.startRow === 0) ? (baseY + doorGap/2) : (dividersAsc[door.startRow - 1].y + doorGap/2);
-                    doorTopY = (door.endRow === dividersAsc.length) ? (col.height - doorGap/2) : (dividersAsc[door.endRow].y - doorGap/2);
+                    if (_safeStartRow === 0 && col.type !== 'desk' && state.plinthHeight === 7 && fo === 0 && !_bathRegalimDoor) baseY = 1.5;
+                    doorBottomY = (_safeStartRow === 0) ? (baseY + doorGap/2) : (dividersAsc[_safeStartRow - 1].y + doorGap/2);
+                    doorTopY = (_safeEndRow === dividersAsc.length) ? (col.height - doorGap/2) : (dividersAsc[_safeEndRow].y - doorGap/2);
                 }
                 
                 const dH = doorTopY - doorBottomY;
