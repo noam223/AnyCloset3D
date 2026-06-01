@@ -252,16 +252,18 @@ function _buildRoom() {
     // For the free side (no wing): add SIDE_MARGIN.
     let leftWallX, rightWallX;
 
-    // A wing "snaps" to the wall when it's in 'side' or 'full_corner' position
-    const hasLeftWing  = state.wings && state.wings.left  && (leftWingPos  === 'side' || leftWingPos  === 'full_corner');
-    const hasRightWing = state.wings && state.wings.right && (rightWingPos === 'side' || rightWingPos === 'full_corner');
+    // A wing "snaps" to the wall when it's in 'side', 'full_corner', or 'front' position
+    // 'front' wings sit in front of the center cabinet (no side extension), so their outer X = center edge
+    const hasLeftWing  = state.wings && state.wings.left  && (leftWingPos  === 'side' || leftWingPos  === 'full_corner' || leftWingPos  === 'front');
+    const hasRightWing = state.wings && state.wings.right && (rightWingPos === 'side' || rightWingPos === 'full_corner' || rightWingPos === 'front');
 
     // Outer back face X of each wing (the face that touches the side wall)
+    // For 'front' wings: no side extension — outer X = center cabinet edge
     const rightWingOuterX = hasRightWing
-        ? (rightWingPos === 'full_corner' ? centerEdgeR + rightFcSize : centerEdgeR + rightWingD)
+        ? (rightWingPos === 'full_corner' ? centerEdgeR + rightFcSize : rightWingPos === 'front' ? centerEdgeR : centerEdgeR + rightWingD)
         : null;
     const leftWingOuterX = hasLeftWing
-        ? (leftWingPos === 'full_corner' ? -(Math.abs(centerEdgeL) + leftFcSize) : -(Math.abs(centerEdgeL) + leftWingD))
+        ? (leftWingPos === 'full_corner' ? -(Math.abs(centerEdgeL) + leftFcSize) : leftWingPos === 'front' ? centerEdgeL : -(Math.abs(centerEdgeL) + leftWingD))
         : null;
 
     if (preset === 'corner-right' && hasRightWing) {
@@ -3081,6 +3083,25 @@ if (compData && compData.type === 'hanging') {
                     // Hidden zone is to the LEFT of _lineX — clip door's left edge
                     _doorOverlayLeftX = Math.max(_doorOverlayLeftX, _lineX);
                 }
+            } else if (_thisWingId === 'center') {
+                // Center cabinet with a front wing: clip doors on the corner column
+                // Right front wing covers the RIGHT edge → clip rightmost column's door right edge
+                // Left front wing covers the LEFT edge → clip leftmost column's door left edge
+                const _rightWing = state.wings.right;
+                const _leftWing  = state.wings.left;
+                const _rightIsFront = _rightWing && (_rightWing.wingPosition || 'side') === 'front';
+                const _leftIsFront  = _leftWing  && (_leftWing.wingPosition  || 'side') === 'front';
+                const _wingW = state.width;
+                if (_rightIsFront) {
+                    const _frontD = _rightWing.depth || state.depth;
+                    const _lineX = _wingW / 2 - _frontD;
+                    _doorOverlayRightX = Math.min(_doorOverlayRightX, _lineX);
+                }
+                if (_leftIsFront) {
+                    const _frontD = _leftWing.depth || state.depth;
+                    const _lineX = -_wingW / 2 + _frontD;
+                    _doorOverlayLeftX = Math.max(_doorOverlayLeftX, _lineX);
+                }
             }
             const _doorOverlayW = _doorOverlayRightX - _doorOverlayLeftX;
             const _doorOverlayCenterX = (_doorOverlayLeftX + _doorOverlayRightX) / 2;
@@ -3535,29 +3556,34 @@ if (compData && compData.type === 'hanging') {
             const leftIsFront  = leftWing  && (leftWing.wingPosition  || 'side') === 'front';
 
             if (rightIsFront || leftIsFront) {
+                const _numCols = state.columns.length;
                 if (rightIsFront) {
                     // Right front wing covers the RIGHT edge of center cabinet
                     // Hidden strip width = front wing's depth
                     const frontWingD = rightWing.depth || state.depth;
-                    _drawRedZone(_buildGroup, frontWingD, wingW, wingH, false /* right edge */);
-                    // Visible opening = full cabinet width minus the covered depth strip
-                    // The visible strip runs from -wingW/2 to wingW/2 - frontWingD
-                    const visibleOpening = Math.max(0, wingW - frontWingD);
+                    const { lineX: rLineX } = _drawRedZone(_buildGroup, frontWingD, wingW, wingH, false /* right edge */);
+                    // Visible opening = corner column width (rightmost col) minus the hidden depth
+                    const cornerColR = state.columns[_numCols - 1];
+                    const visibleOpening = Math.max(0, Math.round(cornerColR.width - frontWingD));
                     if (visibleOpening > 0) {
-                        // Center of the visible strip
-                        const openingCenterX = (-wingW/2 + (wingW/2 - frontWingD)) / 2;
-                        state.dimData.push({ isWingOpenWidth: true, x: openingCenterX, y: wingH / 2 - 20, h: Math.round(visibleOpening) });
+                        // Label centered on the corner column's visible portion
+                        const colLeftEdge = wingW / 2 - cornerColR.width;
+                        const openingCenterX = (colLeftEdge + rLineX) / 2;
+                        state.dimData.push({ isWingOpenWidth: true, x: openingCenterX, y: wingH / 2 - 20, h: visibleOpening });
                     }
                 }
                 if (leftIsFront) {
                     // Left front wing covers the LEFT edge of center cabinet
                     const frontWingD = leftWing.depth || state.depth;
-                    _drawRedZone(_buildGroup, frontWingD, wingW, wingH, true /* left edge */);
-                    // The visible strip runs from -wingW/2 + frontWingD to wingW/2
-                    const visibleOpening = Math.max(0, wingW - frontWingD);
+                    const { lineX: lLineX } = _drawRedZone(_buildGroup, frontWingD, wingW, wingH, true /* left edge */);
+                    // Corner column for left front wing = first column (index 0, leftmost)
+                    const cornerColL = state.columns[0];
+                    const visibleOpening = Math.max(0, Math.round(cornerColL.width - frontWingD));
                     if (visibleOpening > 0) {
-                        const openingCenterX = ((-wingW/2 + frontWingD) + wingW/2) / 2;
-                        state.dimData.push({ isWingOpenWidth: true, x: openingCenterX, y: wingH / 2 - 20, h: Math.round(visibleOpening) });
+                        // Label centered on the corner column's visible portion
+                        const colRightEdge = -wingW / 2 + cornerColL.width;
+                        const openingCenterX = (lLineX + colRightEdge) / 2;
+                        state.dimData.push({ isWingOpenWidth: true, x: openingCenterX, y: wingH / 2 - 20, h: visibleOpening });
                     }
                 }
             }
