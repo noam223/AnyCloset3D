@@ -13,33 +13,12 @@ function _tourEnsureToolbar() {
         }
         var tb = document.getElementById('bottom-floating-toolbar');
         if (tb) {
-            // updateToolbarState positions toolbar using canvas-container pixel coords.
-            // Call it while toolbar is still inside canvas-container so coords are correct.
             if (typeof updateToolbarState === 'function') updateToolbarState();
-
-            // Read the canvas-relative left/top that updateToolbarState just set
-            var tbLeft = parseFloat(tb.style.left)  || 0;
-            var tbTop  = parseFloat(tb.style.top)   || 0;
-
-            // Get canvas-container's viewport offset so we can convert to viewport coords
-            var canvasEl = document.getElementById('canvas-container');
-            var canvasRect = canvasEl ? canvasEl.getBoundingClientRect() : { left: 0, top: 0 };
-
-            // Now move toolbar to body (position:fixed relative to viewport)
-            if (!tb.dataset.tourMoved) {
-                tb.dataset.tourOrigParent2 = tb.parentElement ? tb.parentElement.id : '';
-                document.body.appendChild(tb);
-                tb.dataset.tourMoved = '1';
-            }
-
-            // Apply viewport-corrected position + raise above overlay.
-            // Do NOT override transform — CSS already has translate(20px, -50%) which is correct.
-            // Toolbar sits above the overlay so all buttons are visible.
-            // The highlight ring (z-index 100003) marks the specific button.
-            tb.style.position = 'fixed';
-            tb.style.left     = (canvasRect.left + tbLeft) + 'px';
-            tb.style.top      = (canvasRect.top  + tbTop)  + 'px';
-            tb.style.zIndex   = '100002';
+            // Just raise z-index above overlay — do NOT move to body
+            // This keeps getBoundingClientRect() accurate for spotlight
+            tb.dataset.tourOrigZ   = tb.style.zIndex   || '';
+            tb.dataset.tourOrigPos = tb.style.position || '';
+            tb.style.zIndex = '100002';
         }
     } catch(e) { console.warn('[tour] _tourEnsureToolbar error:', e); }
 }
@@ -47,22 +26,14 @@ function _tourEnsureToolbar() {
 function _tourRestoreToolbar() {
     try {
         var tb = document.getElementById('bottom-floating-toolbar');
-        if (tb && tb.dataset.tourMoved) {
-            var origParentId = tb.dataset.tourOrigParent2 || tb.dataset.tourOrigParent;
-            if (origParentId) {
-                var origParent = document.getElementById(origParentId);
-                if (origParent) origParent.appendChild(tb);
-            }
-            tb.style.position  = '';
-            tb.style.left      = '';
-            tb.style.top       = '';
-            tb.style.transform = '';
-            tb.style.zIndex    = '';
+        if (tb) {
+            tb.style.zIndex   = tb.dataset.tourOrigZ   || '';
+            tb.style.position = tb.dataset.tourOrigPos || '';
+            delete tb.dataset.tourOrigZ;
+            delete tb.dataset.tourOrigPos;
             delete tb.dataset.tourMoved;
             delete tb.dataset.tourOrigParent2;
             delete tb.dataset.tourOrigParent;
-            delete tb.dataset.tourOrigZ;
-            delete tb.dataset.tourOrigPos;
         }
         if (typeof clearSelection === 'function') clearSelection();
         else if (typeof window.clearSelection === 'function') window.clearSelection();
