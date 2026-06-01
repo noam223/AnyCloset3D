@@ -595,30 +595,10 @@ function _tourHighlightElement(el) {
 
     var rect = el.getBoundingClientRect();
 
-    // Decide whether to use SVG spotlight (sidebar/regular elements)
-    // or highlight ring (toolbar buttons that can't escape stacking context)
-    var isToolbarChild = false;
-    var tb = document.getElementById('bottom-floating-toolbar');
-    if (tb && tb.contains(el)) isToolbarChild = true;
-
-    if (isToolbarChild || el.id === 'bottom-floating-toolbar') {
-        // Use highlight ring above overlay
-        _tourSetSpotlight(null);
-        var ring = document.getElementById('tour-highlight-ring');
-        if (ring) {
-            var pad = 6;
-            ring.style.display = 'block';
-            ring.style.left    = (rect.left   - pad) + 'px';
-            ring.style.top     = (rect.top    - pad) + 'px';
-            ring.style.width   = (rect.width  + pad * 2) + 'px';
-            ring.style.height  = (rect.height + pad * 2) + 'px';
-        }
-    } else {
-        // Use SVG spotlight cutout
-        var ring2 = document.getElementById('tour-highlight-ring');
-        if (ring2) ring2.style.display = 'none';
-        _tourSetSpotlight(el);
-    }
+    // Always use SVG spotlight — toolbar is now fixed/body so getBoundingClientRect is correct
+    var ring = document.getElementById('tour-highlight-ring');
+    if (ring) ring.style.display = 'none';
+    _tourSetSpotlight(el);
 }
 
 function _tourRemoveHighlight() {
