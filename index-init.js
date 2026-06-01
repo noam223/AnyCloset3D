@@ -2,7 +2,11 @@
 (async function _authInit() {
     // 1. Require login — redirects to login.html if no session
     var ok = await Auth.requireAuth();
-    if (!ok) return;
+    if (!ok) return; // requireAuth already redirected — gate stays visible
+
+    // Auth passed — remove the loading gate so the app is visible
+    var gate = document.getElementById('auth-gate');
+    if (gate) gate.remove();
 
     // 2. Load user info and inject into top-bar
     var user = await Auth.getUser();
