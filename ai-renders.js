@@ -1,0 +1,469 @@
+// ── AI Renders — generate & display photorealistic renders ────────────────────
+
+(function() {
+
+var _sbRenders = null;
+var _currentUserId = null;
+var _panelOpen = false;
+var _projectRenders = [];  // renders for current project
+var _lightboxIndex = -1;
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+window._initAiRenders = async function() {
+    var sb = window._supabase;
+    if (!sb) return;
+    _sbRenders = sb;
+
+    var { data: { user } } = await sb.auth.getUser();
+    if (!user) return;
+    _currentUserId = user.id;
+
+    _injectStyles();
+    _injectPanel();
+    _injectToolbarBtn();
+    _injectLightbox();
+};
+
+// ── Toolbar button ─────────────────────────────────────────────────────────
+function _injectToolbarBtn() {
+    var toolbar = document.querySelector('.top-controls');
+    if (!toolbar || document.getElementById('btn-ai-render')) return;
+
+    var btn = document.createElement('button');
+    btn.id = 'btn-ai-render';
+    btn.className = 'view-btn';
+    btn.title = 'הדמיה פוטוריאליסטית';
+    btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> <span style="font-size:0.82rem;">הדמיה</span>';
+    btn.onclick = _togglePanel;
+
+    // Insert before the divider at end of toolbar
+    toolbar.appendChild(btn);
+}
+
+// ── Side panel ────────────────────────────────────────────────────────────────
+function _injectPanel() {
+    if (document.getElementById('ai-renders-panel')) return;
+
+    var panel = document.createElement('div');
+    panel.id = 'ai-renders-panel';
+    panel.className = 'ai-renders-panel';
+    panel.innerHTML = `
+        <div class="ai-renders-panel-header">
+            <div style="display:flex;align-items:center;gap:8px;">
+                <i class="fa-solid fa-wand-magic-sparkles" style="color:#a855f7;"></i>
+                <span style="font-weight:700;font-size:1rem;">הדמיות פוטוריאליסטיות</span>
+            </div>
+            <button onclick="window._closeAiPanel()" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:1.1rem;padding:4px;">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="ai-renders-quota-bar" id="ai-renders-quota-bar">
+            <span id="ai-renders-quota-text" style="font-size:0.8rem;color:#64748b;">טוען...</span>
+            <div class="ai-renders-quota-track">
+                <div class="ai-renders-quota-fill" id="ai-renders-quota-fill" style="width:0%"></div>
+            </div>
+        </div>
+        <button id="btn-generate-render" class="btn-generate-render" onclick="window._generateRender()">
+            <i class="fa-solid fa-sparkles"></i> צור הדמיה חדשה
+        </button>
+        <div id="ai-renders-status" class="ai-renders-status" style="display:none;"></div>
+        <div id="ai-renders-grid" class="ai-renders-grid"></div>
+    `;
+    document.body.appendChild(panel);
+}
+
+// ── Lightbox ──────────────────────────────────────────────────────────────────
+function _injectLightbox() {
+    if (document.getElementById('ai-lightbox')) return;
+    var lb = document.createElement('div');
+    lb.id = 'ai-lightbox';
+    lb.className = 'ai-lightbox';
+    lb.onclick = function(e) { if (e.target === lb) window._closeAiLightbox(); };
+    lb.innerHTML = `
+        <div class="ai-lightbox-inner">
+            <button onclick="window._closeAiLightbox()" class="ai-lightbox-close"><i class="fa-solid fa-xmark"></i></button>
+            <button onclick="window._lightboxNav(-1)" class="ai-lightbox-nav ai-lightbox-prev"><i class="fa-solid fa-chevron-right"></i></button>
+            <img id="ai-lightbox-img" src="" alt="הדמיה פוטוריאליסטית">
+            <button onclick="window._lightboxNav(1)" class="ai-lightbox-nav ai-lightbox-next"><i class="fa-solid fa-chevron-left"></i></button>
+            <div class="ai-lightbox-footer">
+                <span id="ai-lightbox-date" style="font-size:0.82rem;color:#94a3b8;"></span>
+                <a id="ai-lightbox-download" href="#" download="render.jpg" target="_blank"
+                   style="font-size:0.82rem;color:#a855f7;text-decoration:none;display:flex;align-items:center;gap:5px;">
+                    <i class="fa-solid fa-download"></i> הורד תמונה
+                </a>
+                <button onclick="window._deleteRender(_projectRenders[_lightboxIndex]?.id)"
+                        style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:0.82rem;display:flex;align-items:center;gap:5px;">
+                    <i class="fa-solid fa-trash"></i> מחק
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(lb);
+}
+
+// ── Toggle panel ──────────────────────────────────────────────────────────────
+window._togglePanel = function() {
+    _panelOpen ? window._closeAiPanel() : window._openAiPanel();
+};
+
+window._openAiPanel = async function() {
+    _panelOpen = true;
+    var panel = document.getElementById('ai-renders-panel');
+    if (panel) panel.classList.add('open');
+    await _loadProjectRenders();
+};
+
+window._closeAiPanel = function() {
+    _panelOpen = false;
+    var panel = document.getElementById('ai-renders-panel');
+    if (panel) panel.classList.remove('open');
+};
+
+// ── Load renders for current project ──────────────────────────────────────────
+async function _loadProjectRenders() {
+    if (!_sbRenders || !_currentUserId) return;
+
+    var projectId = window._currentProjectId || null;
+    var query = _sbRenders.from('ai_renders')
+        .select('id, image_url, hex_color, created_at, project_id')
+        .eq('user_id', _currentUserId)
+        .order('created_at', { ascending: false });
+
+    if (projectId) query = query.eq('project_id', projectId);
+
+    var { data, error } = await query.limit(50);
+    if (error) { console.error('[ai-renders] load error:', error); return; }
+
+    _projectRenders = data || [];
+    _renderGrid();
+    await _updateQuota();
+}
+
+async function _updateQuota() {
+    if (!_sbRenders) return;
+    var { data: count } = await _sbRenders.rpc('get_ai_renders_count_this_month', { p_user_id: _currentUserId });
+    var used = count ?? 0;
+    var limit = 50;
+    var pct = Math.min(100, Math.round(used / limit * 100));
+
+    var text = document.getElementById('ai-renders-quota-text');
+    var fill = document.getElementById('ai-renders-quota-fill');
+    if (text) text.textContent = 'השתמשת ב-' + used + ' מתוך ' + limit + ' הדמיות החודש';
+    if (fill) { fill.style.width = pct + '%'; fill.style.background = pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : '#a855f7'; }
+
+    var btn = document.getElementById('btn-generate-render');
+    if (btn) { btn.disabled = used >= limit; btn.title = used >= limit ? 'הגעת למכסה החודשית' : 'צור הדמיה חדשה'; }
+}
+
+// ── Render grid ───────────────────────────────────────────────────────────────
+function _renderGrid() {
+    var grid = document.getElementById('ai-renders-grid');
+    if (!grid) return;
+
+    if (!_projectRenders.length) {
+        grid.innerHTML = '<div style="text-align:center;padding:40px 20px;color:#94a3b8;"><i class="fa-solid fa-image" style="font-size:2.5rem;opacity:0.3;margin-bottom:12px;display:block;"></i><div style="font-size:0.88rem;">אין הדמיות עדיין<br>לחץ "צור הדמיה חדשה" כדי להתחיל</div></div>';
+        return;
+    }
+
+    grid.innerHTML = '';
+    _projectRenders.forEach(function(r, i) {
+        var thumb = document.createElement('div');
+        thumb.className = 'ai-render-thumb';
+        thumb.onclick = function() { window._openAiLightbox(i); };
+        var date = new Date(r.created_at).toLocaleDateString('he-IL', { day:'2-digit', month:'2-digit' });
+        thumb.innerHTML = '<img src="' + r.image_url + '" loading="lazy" alt="הדמיה ' + (i+1) + '">' +
+            '<div class="ai-render-thumb-overlay"><span>' + date + '</span></div>';
+        grid.appendChild(thumb);
+    });
+}
+
+// ── Generate ──────────────────────────────────────────────────────────────────
+window._generateRender = async function() {
+    var btn = document.getElementById('btn-generate-render');
+    var status = document.getElementById('ai-renders-status');
+    if (!btn || btn.disabled) return;
+
+    // Get screenshot from Three.js renderer
+    if (!window.renderer) { _showStatus('error', 'לא נמצא renderer'); return; }
+
+    // Switch to 3D view for better render
+    var prevMode = (typeof state !== 'undefined') ? state.viewMode : '3d';
+    if (typeof window.set3DView === 'function') window.set3DView();
+
+    _showStatus('loading', '<i class="fa-solid fa-spinner fa-spin"></i> מצלם את הארון...');
+    btn.disabled = true;
+
+    // Wait a frame for render to update
+    await new Promise(function(r) { setTimeout(r, 300); });
+
+    var imageBase64;
+    try {
+        imageBase64 = window.renderer.domElement.toDataURL('image/jpeg', 0.85);
+    } catch(e) {
+        _showStatus('error', 'שגיאה בצילום המסך');
+        btn.disabled = false;
+        return;
+    }
+
+    // Get dominant hex color from current material
+    var hexColor = _getDominantColor();
+
+    _showStatus('loading', '<i class="fa-solid fa-spinner fa-spin"></i> שולח ל-AI... (עשוי לקחת 15-30 שניות)');
+
+    try {
+        var sb = window._supabase;
+        var { data: { session } } = await sb.auth.getSession();
+
+        var res = await fetch(
+            'https://meqxnsjycvfgfhdepguo.supabase.co/functions/v1/generate-render',
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + session.access_token,
+                },
+                body: JSON.stringify({
+                    image_base64:  imageBase64,
+                    hex_color:     hexColor,
+                    project_id:    window._currentProjectId || null,
+                    preset_id:     (typeof state !== 'undefined') ? state.presetId : null,
+                    cabinet_spec:  _getCabinetSpec(),
+                })
+            }
+        );
+
+        var data = await res.json();
+
+        if (!res.ok) {
+            if (data.error === 'quota_exceeded') {
+                _showStatus('error', 'הגעת למכסה של 50 הדמיות החודש');
+            } else {
+                _showStatus('error', 'שגיאה: ' + (data.error || 'תקשורת עם השרת נכשלה'));
+            }
+            btn.disabled = false;
+            return;
+        }
+
+        _showStatus('success', '<i class="fa-solid fa-check"></i> ההדמיה נוצרה בהצלחה!');
+        setTimeout(function() { _hideStatus(); }, 3000);
+
+        // Add to top of grid
+        _projectRenders.unshift({ id: data.id, image_url: data.image_url, created_at: data.created_at });
+        _renderGrid();
+        await _updateQuota();
+
+        // Open lightbox on new render
+        window._openAiLightbox(0);
+
+    } catch(e) {
+        console.error('[ai-renders] generate error:', e);
+        _showStatus('error', 'שגיאת תקשורת: ' + e.message);
+    } finally {
+        btn.disabled = false;
+    }
+};
+
+// ── Delete ─────────────────────────────────────────────────────────────────────
+window._deleteRender = async function(id) {
+    if (!id) return;
+    if (!confirm('למחוק הדמיה זו?')) return;
+    window._closeAiLightbox();
+    var { error } = await _sbRenders.from('ai_renders').delete().eq('id', id);
+    if (!error) {
+        _projectRenders = _projectRenders.filter(function(r) { return r.id !== id; });
+        _renderGrid();
+        await _updateQuota();
+    }
+};
+
+// ── Lightbox ──────────────────────────────────────────────────────────────────
+window._openAiLightbox = function(index) {
+    _lightboxIndex = index;
+    var r = _projectRenders[index];
+    if (!r) return;
+    var lb = document.getElementById('ai-lightbox');
+    var img = document.getElementById('ai-lightbox-img');
+    var date = document.getElementById('ai-lightbox-date');
+    var dl = document.getElementById('ai-lightbox-download');
+    if (img) img.src = r.image_url;
+    if (date) date.textContent = new Date(r.created_at).toLocaleString('he-IL');
+    if (dl) dl.href = r.image_url;
+    if (lb) lb.classList.add('open');
+    _updateLightboxNav();
+};
+
+window._closeAiLightbox = function() {
+    var lb = document.getElementById('ai-lightbox');
+    if (lb) lb.classList.remove('open');
+};
+
+window._lightboxNav = function(dir) {
+    var next = _lightboxIndex + dir;
+    if (next < 0 || next >= _projectRenders.length) return;
+    window._openAiLightbox(next);
+};
+
+function _updateLightboxNav() {
+    var prev = document.querySelector('.ai-lightbox-prev');
+    var next = document.querySelector('.ai-lightbox-next');
+    if (prev) prev.style.opacity = _lightboxIndex >= _projectRenders.length - 1 ? '0.3' : '1';
+    if (next) next.style.opacity = _lightboxIndex <= 0 ? '0.3' : '1';
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function _getDominantColor() {
+    try {
+        if (typeof state === 'undefined') return null;
+        var wing = typeof getWing === 'function' ? getWing() : null;
+        if (!wing) return null;
+        var mat = wing.materialBody || wing.materialExternal || null;
+        if (!mat) return null;
+        // Map material name to approximate hex (basic mapping)
+        var colorMap = {
+            'white_matte':'#F5F5F5', 'white_gloss':'#FFFFFF', 'black_matte':'#1a1a1a',
+            'gray_light':'#D1D5DB', 'gray_dark':'#4B5563', 'beige':'#E8DCC8',
+            'brown_light':'#C4A882', 'brown_dark':'#7C5C3E', 'oak':'#B8935A',
+            'walnut':'#6B4C2A', 'pine':'#D4A86A'
+        };
+        return colorMap[mat] || null;
+    } catch(e) { return null; }
+}
+
+function _getCabinetSpec() {
+    try {
+        if (typeof state === 'undefined') return null;
+        return {
+            presetId: state.presetId,
+            width: state.globalWidth,
+            height: state.globalHeight,
+            depth: state.globalDepth,
+            material: state.boardMaterial,
+        };
+    } catch(e) { return null; }
+}
+
+function _showStatus(type, html) {
+    var el = document.getElementById('ai-renders-status');
+    if (!el) return;
+    el.style.display = 'flex';
+    el.className = 'ai-renders-status ai-renders-status--' + type;
+    el.innerHTML = html;
+}
+
+function _hideStatus() {
+    var el = document.getElementById('ai-renders-status');
+    if (el) el.style.display = 'none';
+}
+
+// ── CSS ───────────────────────────────────────────────────────────────────────
+function _injectStyles() {
+    if (document.getElementById('ai-renders-styles')) return;
+    var s = document.createElement('style');
+    s.id = 'ai-renders-styles';
+    s.textContent = `
+        .ai-renders-panel {
+            position: fixed; top: 0; left: 0; width: 320px; height: 100vh;
+            background: #fff; z-index: 1100; display: flex; flex-direction: column;
+            box-shadow: 4px 0 24px rgba(0,0,0,0.13); border-right: 1px solid #e2e8f0;
+            transform: translateX(-100%); transition: transform 0.28s cubic-bezier(.4,0,.2,1);
+            direction: rtl;
+        }
+        .ai-renders-panel.open { transform: translateX(0); }
+
+        .ai-renders-panel-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 16px 18px; border-bottom: 1px solid #f1f5f9;
+            background: linear-gradient(135deg,#faf5ff,#f3e8ff);
+        }
+        .ai-renders-quota-bar { padding: 12px 18px 8px; }
+        .ai-renders-quota-track {
+            height: 6px; background: #f1f5f9; border-radius: 99px; margin-top: 6px; overflow: hidden;
+        }
+        .ai-renders-quota-fill { height: 100%; border-radius: 99px; transition: width 0.4s, background 0.3s; }
+
+        .btn-generate-render {
+            margin: 8px 16px 12px; padding: 12px; border-radius: 10px; border: none; cursor: pointer;
+            background: linear-gradient(135deg,#a855f7,#7c3aed); color: white;
+            font-size: 0.92rem; font-weight: 700; font-family: inherit;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            transition: opacity 0.2s, transform 0.15s;
+        }
+        .btn-generate-render:hover:not(:disabled) { opacity: 0.92; transform: translateY(-1px); }
+        .btn-generate-render:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+        .ai-renders-status {
+            margin: 0 16px 10px; padding: 10px 14px; border-radius: 8px;
+            font-size: 0.83rem; font-weight: 600; display: flex; align-items: center; gap: 8px;
+        }
+        .ai-renders-status--loading { background: #f0f9ff; color: #0369a1; }
+        .ai-renders-status--success { background: #f0fdf4; color: #166534; }
+        .ai-renders-status--error   { background: #fef2f2; color: #dc2626; }
+
+        .ai-renders-grid {
+            flex: 1; overflow-y: auto; padding: 4px 12px 20px;
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+        }
+        .ai-render-thumb {
+            position: relative; border-radius: 10px; overflow: hidden;
+            aspect-ratio: 4/3; cursor: pointer; background: #f1f5f9;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            transition: transform 0.18s, box-shadow 0.18s;
+        }
+        .ai-render-thumb:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.14); }
+        .ai-render-thumb img { width: 100%; height: 100%; object-fit: cover; }
+        .ai-render-thumb-overlay {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            background: linear-gradient(transparent, rgba(0,0,0,0.55));
+            padding: 6px 8px 5px; color: white; font-size: 0.72rem;
+        }
+
+        /* Lightbox */
+        .ai-lightbox {
+            position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.88);
+            display: none; align-items: center; justify-content: center;
+        }
+        .ai-lightbox.open { display: flex; }
+        .ai-lightbox-inner {
+            position: relative; max-width: 90vw; max-height: 90vh;
+            display: flex; flex-direction: column; align-items: center; gap: 12px;
+        }
+        .ai-lightbox-inner img {
+            max-width: 90vw; max-height: 80vh; border-radius: 12px;
+            object-fit: contain; box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+        }
+        .ai-lightbox-close {
+            position: absolute; top: -14px; right: -14px; width: 34px; height: 34px;
+            border-radius: 50%; background: white; border: none; cursor: pointer;
+            font-size: 1rem; color: #374151; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .ai-lightbox-nav {
+            position: absolute; top: 50%; transform: translateY(-50%);
+            width: 38px; height: 38px; border-radius: 50%; background: rgba(255,255,255,0.15);
+            border: none; cursor: pointer; color: white; font-size: 1rem;
+            display: flex; align-items: center; justify-content: center;
+            transition: background 0.2s, opacity 0.2s;
+        }
+        .ai-lightbox-nav:hover { background: rgba(255,255,255,0.28); }
+        .ai-lightbox-prev { right: calc(100% + 12px); }
+        .ai-lightbox-next { left:  calc(100% + 12px); }
+        .ai-lightbox-footer {
+            display: flex; align-items: center; gap: 18px;
+            background: rgba(255,255,255,0.07); border-radius: 8px; padding: 8px 16px;
+        }
+
+        /* Toolbar button */
+        #btn-ai-render {
+            background: linear-gradient(135deg,#faf5ff,#f3e8ff) !important;
+            color: #7c3aed !important; border: 1.5px solid #ddd6fe !important;
+            display: flex; align-items: center; gap: 5px;
+        }
+        #btn-ai-render:hover { background: linear-gradient(135deg,#f3e8ff,#ede9fe) !important; }
+    `;
+    document.head.appendChild(s);
+}
+
+// expose for projects page use
+window._aiRendersLoaded = true;
+
+})();

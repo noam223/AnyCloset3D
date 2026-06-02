@@ -2260,6 +2260,18 @@
 
 <script src="notes.js"></script>
 <script src="tour.js?v=20260520n"></script>
+<script src="ai-renders.js?v=20260603a"></script>
+<script>
+    // Init AI renders after auth is ready
+    document.addEventListener('DOMContentLoaded', function() {
+        var _aiInitInterval = setInterval(function() {
+            if (window._supabase && window._initAiRenders) {
+                clearInterval(_aiInitInterval);
+                window._initAiRenders();
+            }
+        }, 300);
+    });
+</script>
 
 <!-- ===== TOUR SELECTION BOTTOM SHEET ===== -->
 <div id="tour-sheet-backdrop" onclick="window._closeTourSheet()" style="display:none;position:fixed;inset:0;z-index:99995;background:rgba(0,0,0,0.45);"></div>

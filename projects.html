@@ -307,6 +307,9 @@
         <a class="sidebar-nav-item" id="nav-pricing" href="#" onclick="switchPage('pricing');return false;">
             <i class="fa-solid fa-tags"></i> הגדרות תמחור
         </a>
+        <a class="sidebar-nav-item" id="nav-renders" href="#" onclick="switchPage('renders');return false;">
+            <i class="fa-solid fa-wand-magic-sparkles" style="color:#c084fc;"></i> הדמיות AI
+        </a>
     </nav>
     <div class="sidebar-footer">
         <button class="btn-logout" onclick="Auth.logout()">
@@ -612,9 +615,47 @@
             </div>
         </div>
 
+        <!-- TAB: AI RENDERS -->
+        <div class="page-tab" id="tab-renders">
+            <div style="max-width:1200px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
+                    <div>
+                        <div style="font-size:1.1rem;font-weight:800;color:#1e3a5f;display:flex;align-items:center;gap:10px;">
+                            <i class="fa-solid fa-wand-magic-sparkles" style="color:#a855f7;"></i> כל ההדמיות שלי
+                        </div>
+                        <div id="renders-quota-text" style="font-size:0.82rem;color:#94a3b8;margin-top:4px;">טוען...</div>
+                    </div>
+                </div>
+                <div id="renders-gallery-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;"></div>
+            </div>
+        </div>
+
         </div><!-- /.content-inner -->
     </div>
 </div>
+
+<!-- Gallery lightbox -->
+<div id="gallery-lightbox" onclick="if(event.target===this)window._closeGalleryLightbox()"
+     style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.88);align-items:center;justify-content:center;">
+    <div style="position:relative;max-width:90vw;max-height:90vh;">
+        <button onclick="window._closeGalleryLightbox()"
+                style="position:absolute;top:-14px;right:-14px;width:34px;height:34px;border-radius:50%;background:white;border:none;cursor:pointer;font-size:1rem;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+        <img id="gallery-lightbox-img" src="" alt="הדמיה" style="max-width:90vw;max-height:88vh;border-radius:12px;object-fit:contain;box-shadow:0 8px 40px rgba(0,0,0,0.5);">
+    </div>
+</div>
+
+<style>
+.renders-gallery-card { border-radius: 12px; overflow: hidden; background: white; box-shadow: 0 2px 12px rgba(0,0,0,0.08); transition: transform 0.18s, box-shadow 0.18s; }
+.renders-gallery-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.14); }
+.renders-gallery-card img { width: 100%; aspect-ratio: 4/3; object-fit: cover; cursor: pointer; display: block; }
+.renders-gallery-card-info { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: white; }
+.renders-gallery-proj { font-size: 0.78rem; font-weight: 700; color: #1e3a5f; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.renders-gallery-date { font-size: 0.75rem; color: #94a3b8; white-space: nowrap; }
+.renders-gallery-dl { color: #a855f7; font-size: 0.82rem; text-decoration: none; padding: 2px 4px; }
+.renders-gallery-dl:hover { color: #7c3aed; }
+</style>
 
 <!-- Modal: Rename -->
 <div class="modal-overlay" id="modal-rename">

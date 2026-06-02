@@ -184,6 +184,7 @@ function _getClient() {
     if (_sb) return _sb;
     if (typeof supabase === 'undefined') { console.error('Supabase SDK not loaded'); return null; }
     _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+    window._supabase = _sb; // expose for ai-renders.js and other modules
     return _sb;
 }
 

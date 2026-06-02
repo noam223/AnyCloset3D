@@ -857,12 +857,12 @@ var _PP_DEFAULTS = {
 // ── Tab switching ─────────────────────────────────────────────────────────────
 function switchPage(page) {
     // Update sidebar nav
-    ['projects','profile','pricing'].forEach(function(p) {
+    ['projects','profile','pricing','renders'].forEach(function(p) {
         var el = document.getElementById('nav-' + p);
         if (el) el.classList.toggle('active', p === page);
     });
     // Show/hide tabs
-    ['projects','profile','pricing'].forEach(function(p) {
+    ['projects','profile','pricing','renders'].forEach(function(p) {
         var tab = document.getElementById('tab-' + p);
         if (tab) tab.classList.toggle('active', p === page);
     });
@@ -888,9 +888,98 @@ function switchPage(page) {
         if (heroStats) heroStats.style.display = 'none';
         if (planBar)   planBar.style.display = 'none';
         _loadPricingForm();
+    } else if (page === 'renders') {
+        if (heroTitle) heroTitle.textContent = 'הדמיות פוטוריאליסטיות';
+        if (heroRight) heroRight.style.display = 'none';
+        if (heroStats) heroStats.style.display = 'none';
+        if (planBar)   planBar.style.display = 'none';
+        _loadAllRendersGallery();
     }
     // Check URL hash
     if (history.replaceState) history.replaceState(null, '', page === 'projects' ? 'projects.html' : 'projects.html#' + page);
+}
+
+// ── AI Renders gallery (all renders for user) ─────────────────────────────────
+async function _loadAllRendersGallery() {
+    var grid = document.getElementById('renders-gallery-grid');
+    var quota = document.getElementById('renders-quota-text');
+    if (!grid) return;
+
+    grid.innerHTML = '<div style="text-align:center;padding:60px;color:#94a3b8;"><i class="fa-solid fa-spinner fa-spin" style="font-size:2rem;"></i></div>';
+
+    try {
+        var sb = supabase.createClient(
+            'https://meqxnsjycvfgfhdepguo.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lcXhuc2p5Y3ZmZ2ZoZGVwZ3VvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3MDA5NDAsImV4cCI6MjA5MjI3Njk0MH0.w63bl0-1-Rgt9Nx6sVW5ueEGMojiMaxoehlPXlPH2N0'
+        );
+        var { data: { user } } = await sb.auth.getUser();
+        if (!user) return;
+
+        // Load all renders + project names
+        var { data: renders, error } = await sb
+            .from('ai_renders')
+            .select('id, image_url, hex_color, created_at, project_id')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        // Load quota
+        var { data: countData } = await sb.rpc('get_ai_renders_count_this_month', { p_user_id: user.id });
+        var used = countData ?? 0;
+        if (quota) quota.textContent = 'השתמשת ב-' + used + ' מתוך 50 הדמיות החודש';
+
+        if (!renders || !renders.length) {
+            grid.innerHTML = '<div style="text-align:center;padding:80px 20px;color:#94a3b8;">' +
+                '<i class="fa-solid fa-wand-magic-sparkles" style="font-size:3rem;opacity:0.3;display:block;margin-bottom:16px;"></i>' +
+                '<div style="font-size:1rem;font-weight:600;margin-bottom:8px;">אין הדמיות עדיין</div>' +
+                '<div style="font-size:0.85rem;">פתח פרויקט ולחץ על כפתור ✨ הדמיה ליצירת הדמיה ראשונה</div>' +
+                '</div>';
+            return;
+        }
+
+        // Load project names
+        var projectIds = [...new Set(renders.filter(function(r) { return r.project_id; }).map(function(r) { return r.project_id; }))];
+        var projectNames = {};
+        if (projectIds.length) {
+            var { data: projects } = await sb.from('projects').select('id,name').in('id', projectIds);
+            if (projects) projects.forEach(function(p) { projectNames[p.id] = p.name; });
+        }
+
+        grid.innerHTML = '';
+        renders.forEach(function(r, i) {
+            var projName = r.project_id ? (projectNames[r.project_id] || 'פרויקט') : '';
+            var date = new Date(r.created_at).toLocaleDateString('he-IL', { day:'2-digit', month:'2-digit', year:'2-digit' });
+            var card = document.createElement('div');
+            card.className = 'renders-gallery-card';
+            card.innerHTML =
+                '<img src="' + r.image_url + '" loading="lazy" onclick="window._openGalleryLightbox(' + i + ')" alt="הדמיה">' +
+                '<div class="renders-gallery-card-info">' +
+                    (projName ? '<span class="renders-gallery-proj">' + projName + '</span>' : '') +
+                    '<span class="renders-gallery-date">' + date + '</span>' +
+                    '<a href="' + r.image_url + '" target="_blank" download class="renders-gallery-dl" title="הורד"><i class="fa-solid fa-download"></i></a>' +
+                '</div>';
+            grid.appendChild(card);
+        });
+
+        // Simple lightbox for gallery
+        window._galleryRenders = renders;
+        window._galleryLightboxIdx = 0;
+        window._openGalleryLightbox = function(idx) {
+            window._galleryLightboxIdx = idx;
+            var lb = document.getElementById('gallery-lightbox');
+            var img = document.getElementById('gallery-lightbox-img');
+            if (lb && img) { img.src = renders[idx].image_url; lb.style.display = 'flex'; }
+        };
+        window._closeGalleryLightbox = function() {
+            var lb = document.getElementById('gallery-lightbox');
+            if (lb) lb.style.display = 'none';
+        };
+
+    } catch(e) {
+        console.error('[renders gallery]', e);
+        grid.innerHTML = '<div style="text-align:center;padding:40px;color:#ef4444;">שגיאה בטעינת הגלריה</div>';
+    }
 }
 
 // ── Profile: load & save ──────────────────────────────────────────────────────
@@ -1354,7 +1443,7 @@ function resetPricingToDefaults() {
 // ── Handle URL hash on load ───────────────────────────────────────────────────
 (function() {
     var hash = window.location.hash.replace('#', '');
-    if (hash === 'profile' || hash === 'pricing') {
+    if (hash === 'profile' || hash === 'pricing' || hash === 'renders') {
         // Delay to let init() finish
         setTimeout(function() { switchPage(hash); }, 300);
     }
