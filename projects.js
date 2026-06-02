@@ -140,19 +140,45 @@ function _showTrialBanner(trialEndsAt, plan) {
     document.body.insertBefore(banner, document.body.firstChild);
 }
 
+// ── Build plan cards HTML for paywall popup ───────────────────────────────────
+function _buildPaywallPlansHTML(userType) {
+    var plans = _UPGRADE_PLANS.filter(function(p) { return p.userType === userType; });
+    if (!plans.length) {
+        // fallback: show all plans
+        plans = _UPGRADE_PLANS;
+    }
+    var html = '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">';
+    plans.forEach(function(p) {
+        var isPopular = p.key.indexOf('monthly') !== -1 || p.key.indexOf('pro') !== -1 || p.key.indexOf('standard') !== -1;
+        html += '<div style="border:2px solid ' + (isPopular ? '#0099cc' : '#e5e7eb') + ';border-radius:12px;padding:14px 16px;text-align:right;background:' + (isPopular ? 'rgba(0,153,204,0.06)' : '#fafafa') + ';">' +
+            '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">' +
+            '<button onclick="_openPayment(\'' + p.key + '\')" style="background:' + (isPopular ? 'linear-gradient(135deg,#00d4ff,#0099cc)' : '#f1f5f9') + ';color:' + (isPopular ? '#0a1628' : '#334155') + ';border:none;border-radius:8px;padding:8px 18px;font-weight:700;font-size:.9rem;cursor:pointer;font-family:inherit;white-space:nowrap;">בחר</button>' +
+            '<div style="flex:1;">' +
+            '<div style="font-weight:700;color:#0f2040;font-size:.95rem;">' + p.label + '</div>' +
+            '<div style="font-size:.8rem;color:#64748b;margin-top:2px;">' + p.desc + '</div>' +
+            '</div>' +
+            '<div style="font-weight:800;color:#0099cc;font-size:1rem;white-space:nowrap;">' + p.price + '</div>' +
+            '</div>' +
+            '</div>';
+    });
+    html += '</div>';
+    return html;
+}
+
 function _showTrialExpiredBanner(plan) {
     var existing = document.getElementById('trial-expired-overlay');
     if (existing) return;
 
+    var userType = (plan && plan.key) ? plan.key.split('_')[0] : 'designer';
     var overlay = document.createElement('div');
     overlay.id = 'trial-expired-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(10,22,40,0.92);display:flex;align-items:center;justify-content:center;';
-    overlay.innerHTML = '<div style="background:#fff;border-radius:20px;padding:40px;max-width:440px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,0.4);">' +
-        '<div style="font-size:3rem;margin-bottom:16px;">⏰</div>' +
-        '<h2 style="color:#0f2040;margin-bottom:12px;">תקופת הניסיון הסתיימה</h2>' +
-        '<p style="color:#475569;margin-bottom:24px;line-height:1.6;">7 ימי הניסיון החינמיים שלך הסתיימו.<br>כדי להמשיך להשתמש במערכת, בחר תוכנית מנוי.</p>' +
-        '<button onclick="_openPayment(\'' + plan.key + '\')" style="display:block;width:100%;background:linear-gradient(135deg,#00d4ff,#0099cc);color:#0a1628;padding:14px 32px;border-radius:12px;font-weight:800;border:none;cursor:pointer;font-size:1.1rem;margin-bottom:12px;font-family:inherit;">בחר תוכנית מנוי</button>' +
-        '<a href="landing.html#pricing" style="color:#475569;font-size:.85rem;">צפה בכל התוכניות</a>' +
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(10,22,40,0.92);display:flex;align-items:center;justify-content:center;overflow-y:auto;padding:20px;box-sizing:border-box;';
+    overlay.innerHTML =
+        '<div style="background:#fff;border-radius:20px;padding:32px;max-width:480px;width:100%;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,0.4);">' +
+        '<div style="font-size:2.5rem;margin-bottom:12px;">⏰</div>' +
+        '<h2 style="color:#0f2040;margin-bottom:8px;font-size:1.3rem;">תקופת הניסיון הסתיימה</h2>' +
+        '<p style="color:#475569;margin-bottom:20px;line-height:1.6;font-size:.9rem;">7 ימי הניסיון החינמיים שלך הסתיימו.<br>בחר תוכנית מנוי כדי להמשיך.</p>' +
+        _buildPaywallPlansHTML(userType) +
         '</div>';
     document.body.appendChild(overlay);
 }
@@ -161,15 +187,16 @@ function _showSubscriptionExpiredBanner(plan) {
     var existing = document.getElementById('trial-expired-overlay');
     if (existing) return;
 
+    var userType = (plan && plan.key) ? plan.key.split('_')[0] : 'designer';
     var overlay = document.createElement('div');
     overlay.id = 'trial-expired-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(10,22,40,0.92);display:flex;align-items:center;justify-content:center;';
-    overlay.innerHTML = '<div style="background:#fff;border-radius:20px;padding:40px;max-width:440px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,0.4);">' +
-        '<div style="font-size:3rem;margin-bottom:16px;">💳</div>' +
-        '<h2 style="color:#0f2040;margin-bottom:12px;">חידוש המנוי נכשל</h2>' +
-        '<p style="color:#475569;margin-bottom:24px;line-height:1.6;">לא הצלחנו לחייב את כרטיס האשראי שלך.<br>כדי להמשיך להשתמש במערכת, יש לחדש את המנוי.</p>' +
-        '<button onclick="_openPayment(\'' + plan.key + '\')" style="display:block;width:100%;background:linear-gradient(135deg,#00d4ff,#0099cc);color:#0a1628;padding:14px 32px;border-radius:12px;font-weight:800;font-size:1.1rem;border:none;cursor:pointer;margin-bottom:12px;">חדש מנוי עכשיו</button>' +
-        '<a href="landing.html#pricing" style="color:#475569;font-size:.85rem;">צפה בכל התוכניות</a>' +
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(10,22,40,0.92);display:flex;align-items:center;justify-content:center;overflow-y:auto;padding:20px;box-sizing:border-box;';
+    overlay.innerHTML =
+        '<div style="background:#fff;border-radius:20px;padding:32px;max-width:480px;width:100%;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,0.4);">' +
+        '<div style="font-size:2.5rem;margin-bottom:12px;">💳</div>' +
+        '<h2 style="color:#0f2040;margin-bottom:8px;font-size:1.3rem;">חידוש המנוי נכשל</h2>' +
+        '<p style="color:#475569;margin-bottom:20px;line-height:1.6;font-size:.9rem;">לא הצלחנו לחייב את כרטיס האשראי שלך.<br>בחר תוכנית מנוי כדי להמשיך.</p>' +
+        _buildPaywallPlansHTML(userType) +
         '</div>';
     document.body.appendChild(overlay);
 }
@@ -178,14 +205,16 @@ function _showInactiveBanner(plan) {
     var existing = document.getElementById('trial-expired-overlay');
     if (existing) return;
 
+    var userType = (plan && plan.key) ? plan.key.split('_')[0] : 'designer';
     var overlay = document.createElement('div');
     overlay.id = 'trial-expired-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(10,22,40,0.92);display:flex;align-items:center;justify-content:center;';
-    overlay.innerHTML = '<div style="background:#fff;border-radius:20px;padding:40px;max-width:440px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,0.4);">' +
-        '<div style="font-size:3rem;margin-bottom:16px;">🔒</div>' +
-        '<h2 style="color:#0f2040;margin-bottom:12px;">המנוי אינו פעיל</h2>' +
-        '<p style="color:#475569;margin-bottom:24px;line-height:1.6;">כדי להמשיך להשתמש במערכת, חדש את המנוי שלך.</p>' +
-        '<button onclick="_openPayment(\'' + plan.key + '\')" style="display:block;width:100%;background:linear-gradient(135deg,#00d4ff,#0099cc);color:#0a1628;padding:14px 32px;border-radius:12px;font-weight:800;border:none;cursor:pointer;font-size:1.1rem;font-family:inherit;">חדש מנוי</button>' +
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(10,22,40,0.92);display:flex;align-items:center;justify-content:center;overflow-y:auto;padding:20px;box-sizing:border-box;';
+    overlay.innerHTML =
+        '<div style="background:#fff;border-radius:20px;padding:32px;max-width:480px;width:100%;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,0.4);">' +
+        '<div style="font-size:2.5rem;margin-bottom:12px;">🔒</div>' +
+        '<h2 style="color:#0f2040;margin-bottom:8px;font-size:1.3rem;">המנוי אינו פעיל</h2>' +
+        '<p style="color:#475569;margin-bottom:20px;line-height:1.6;font-size:.9rem;">כדי להמשיך להשתמש במערכת, בחר תוכנית מנוי.</p>' +
+        _buildPaywallPlansHTML(userType) +
         '</div>';
     document.body.appendChild(overlay);
 }
