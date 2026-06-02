@@ -553,8 +553,9 @@
         <div class="modal-user-info" id="cancel-user-info"></div>
         <input type="hidden" id="cancel-user-id">
         <p style="font-size:0.85rem;color:var(--muted);margin-bottom:16px;line-height:1.6;">
-            ביטול המנוי ישנה את הסטטוס ל-<strong>cancelled</strong> וימנע חיוב עתידי.<br>
-            הגישה למערכת תיחסם בכניסה הבאה של המשתמש.
+            ביטול המנוי ימנע חיוב עתידי.<br>
+            אם הניסיון <strong>לא מומש</strong> — המשתמש יוחזר לתקופת ניסיון של 7 ימים.<br>
+            אם הניסיון <strong>כבר מומש</strong> — הגישה תיחסם מיידית (סטטוס: לא פעיל).
         </p>
         <div class="modal-actions">
             <button class="btn-modal ghost" onclick="closeModal('modal-cancel-subscription')">חזרה</button>
@@ -612,7 +613,63 @@ function _esc(str){return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&l
 function _formatDate(iso){if(!iso)return '—';var d=new Date(iso);return d.toLocaleDateString('he-IL',{day:'numeric',month:'short',year:'numeric'});}
 function _statusLabel(s){if(s==='active')return 'פעיל';if(s==='inactive')return 'לא פעיל';if(s==='trial')return 'ניסיון';if(s==='cancelled')return 'בוטל';return s;}
 function openCancelSubscription(userId){var u=_allUsers.find(function(x){return x.id===userId;});if(!u)return;document.getElementById('cancel-user-id').value=userId;document.getElementById('cancel-user-info').innerHTML='<strong>'+_esc(u.full_name||'—')+'</strong> · '+_esc(u.email||u.id)+'<br><span style="font-size:0.78rem;color:var(--muted);">סטטוס נוכחי: '+_statusLabel(u.subscription_status||'active')+'</span>';openModal('modal-cancel-subscription');}
-async function confirmCancelSubscription(){var userId=document.getElementById('cancel-user-id').value;if(!userId)return;var{error}=await _sb.rpc('admin_update_profile',{p_user_id:userId,p_subscription_status:'cancelled'});if(error){showToast('שגיאה: '+error.message,'error');return;}var u=_allUsers.find(function(x){return x.id===userId;});if(u)u.subscription_status='cancelled';closeModal('modal-cancel-subscription');updateStats();filterUsers();showToast('המנוי בוטל בהצלחה ✓','success');}
+async function confirmCancelSubscription(){
+    var userId=document.getElementById('cancel-user-id').value;
+    if(!userId)return;
+    var u=_allUsers.find(function(x){return x.id===userId;});
+    if(!u)return;
+
+    // Check if trial was already used:
+    // trial_ends_at exists and is in the past → trial was used
+    // subscription_status was 'active' (paid) → trial was definitely used
+    var trialAlreadyUsed = false;
+    if(u.trial_ends_at && new Date(u.trial_ends_at) < new Date()) {
+        trialAlreadyUsed = true;
+    }
+    // If user had an active paid subscription, trial was used
+    if(u.subscription_status === 'active' || u.subscription_status === 'cancelled') {
+        trialAlreadyUsed = true;
+    }
+
+    var newStatus, newTrialEndsAt, successMsg;
+    if(trialAlreadyUsed) {
+        // Trial already used — set to inactive, show message
+        newStatus = 'inactive';
+        newTrialEndsAt = undefined;
+        successMsg = 'המנוי בוטל — הניסיון כבר מומש, הגישה נחסמה ✓';
+    } else {
+        // Trial not yet used — return to trial status
+        var trialEnd = new Date();
+        trialEnd.setDate(trialEnd.getDate() + 7);
+        newStatus = 'trial';
+        newTrialEndsAt = trialEnd.toISOString();
+        successMsg = 'המנוי בוטל — המשתמש הוחזר לתקופת ניסיון ✓';
+    }
+
+    var updateParams = {p_user_id: userId, p_subscription_status: newStatus, p_plan: u.plan || 'free'};
+    var {error} = await _sb.rpc('admin_update_profile', updateParams);
+    if(error){showToast('שגיאה: '+error.message,'error');return;}
+
+    // If returning to trial, also update trial_ends_at via direct update
+    if(newStatus === 'trial' && newTrialEndsAt) {
+        await _sb.from('profiles').update({
+            trial_ends_at: newTrialEndsAt,
+            subscription_ends_at: null,
+            grow_token: null
+        }).eq('id', userId);
+    } else if(newStatus === 'inactive') {
+        await _sb.from('profiles').update({
+            subscription_ends_at: null,
+            grow_token: null
+        }).eq('id', userId);
+    }
+
+    if(u) u.subscription_status = newStatus;
+    closeModal('modal-cancel-subscription');
+    updateStats();
+    filterUsers();
+    showToast(successMsg, 'success');
+}
 function _pct(v){return Math.round((v||0)*100);}
 function _frac(v){return (parseFloat(v)||0)/100;}
 function _populatePricingUserSelect(){var sel=document.getElementById('pricing-user-select');var prev=sel.value;sel.innerHTML='<option value="">— בחר משתמש —</option>';_allUsers.forEach(function(u){var opt=document.createElement('option');opt.value=u.id;opt.textContent=(u.full_name||'—')+' ('+( u.email||u.id)+')';sel.appendChild(opt);});if(prev)sel.value=prev;}

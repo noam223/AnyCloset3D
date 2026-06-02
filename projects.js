@@ -35,6 +35,13 @@ var _USER_TYPE_LABELS = {
     var ok = await Auth.requireAuth();
     if (!ok) return;
 
+    // If returning from payment, bust profile cache and wait for Make/Supabase to update
+    var _urlStatusEarly = new URLSearchParams(window.location.search).get('status');
+    if (_urlStatusEarly === 'payment_success') {
+        if (Auth._profileCache !== undefined) Auth._profileCache = null;
+        await new Promise(function(r) { setTimeout(r, 1500); });
+    }
+
     var user, plan, projects, subStatus;
     try {
         var results = await Promise.all([Auth.getUser(), Auth.getPlan(), Projects.list(), Auth.isSubscriptionActive()]);
