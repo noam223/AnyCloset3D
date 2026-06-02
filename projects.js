@@ -221,7 +221,7 @@ function _showInactiveBanner(plan) {
 
 // ── Open payment via Make Scenario 1 (creates Grow payment link dynamically) ──
 async function _openPayment(planKey) {
-    var SCENARIO1_WEBHOOK = 'https://hook.eu1.make.com/YOUR_SCENARIO1_WEBHOOK_URL';
+    var SCENARIO1_WEBHOOK = 'https://hook.eu1.make.com/2p1w789m4oeh3glw0pry61y0dd6vnlvd';
 
     // If webhook not configured yet, go to pricing page
     if (SCENARIO1_WEBHOOK.indexOf('YOUR_SCENARIO1') !== -1) {

@@ -820,7 +820,7 @@ window.GrowPayments = {
 
     // ── Make Scenario 1 webhook — creates Grow payment link dynamically ──
     // Replace with your actual Scenario 1 webhook URL after importing the blueprint
-    MAKE_PAYMENT_WEBHOOK: 'https://hook.eu1.make.com/YOUR_SCENARIO1_WEBHOOK_URL',
+    MAKE_PAYMENT_WEBHOOK: 'https://hook.eu1.make.com/2p1w789m4oeh3glw0pry61y0dd6vnlvd',
 
     // Start free trial — no payment required, just set trial period in DB
     startTrial: async function(plan) {
