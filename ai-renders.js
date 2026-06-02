@@ -236,7 +236,9 @@ window._generateRender = async function() {
 
         if (!res.ok) {
             if (data.error === 'quota_exceeded') {
-                _showStatus('error', 'הגעת למכסה של 50 הדמיות החודש');
+                _showStatus('error', 'הגעת למכסה החודשית של ' + data.limit + ' הדמיות');
+            } else if (data.error === 'ai_disabled') {
+                _showStatus('error', 'פיצ\'ר ההדמיות אינו זמין עבור חשבונך');
             } else {
                 _showStatus('error', 'שגיאה: ' + (data.error || 'תקשורת עם השרת נכשלה'));
             }

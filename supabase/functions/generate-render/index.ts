@@ -6,8 +6,6 @@ const CORS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const QUOTA = 50; // renders per month per user
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
 
@@ -26,7 +24,18 @@ serve(async (req) => {
     );
     if (authErr || !user) return json({ error: 'Unauthorized' }, 401);
 
-    // ── 2. Check quota ───────────────────────────────────────────────────────
+    // ── 2. Check quota & enabled flag from profile ───────────────────────────
+    const { data: profile } = await sb
+      .from('profiles')
+      .select('ai_renders_enabled, ai_renders_quota')
+      .eq('id', user.id)
+      .single();
+
+    const aiEnabled = profile?.ai_renders_enabled !== false;
+    if (!aiEnabled) return json({ error: 'ai_disabled' }, 403);
+
+    const QUOTA = profile?.ai_renders_quota ?? 50;
+
     const { data: countData, error: countErr } = await sb.rpc(
       'get_ai_renders_count_this_month',
       { p_user_id: user.id }
@@ -44,13 +53,16 @@ serve(async (req) => {
 
     // ── 4. Call Gemini API ───────────────────────────────────────────────────
     const GEMINI_KEY = Deno.env.get('GEMINI_API_KEY')!;
-    const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${GEMINI_KEY}`;
+    const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent?key=${GEMINI_KEY}`;
 
     const colorDesc = hex_color ? `הצבע הדומיננטי של הארון הוא ${hex_color}.` : '';
     const prompt = `זהו ארון בגדים שעוצב על ידי לקוח. ${colorDesc}
 צור הדמיה פוטוריאליסטית של הארון הזה מוטמע בתוך חדר שינה מעוצב ומודרני.
 שמור על מידות הארון וצבעיו בדיוק. החדר צריך להיות מואר היטב עם תאורה טבעית.
 הצג את הארון בזווית פרונטלית קלה (3/4) כדי לראות את העיצוב במלואו.`;
+
+    const cleanBase64 = image_base64.replace(/^data:image\/\w+;base64,/, '');
+    const mimeType = image_base64.startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
 
     const geminiRes = await fetch(GEMINI_URL, {
       method: 'POST',
@@ -60,14 +72,16 @@ serve(async (req) => {
           parts: [
             { text: prompt },
             {
-              inline_data: {
-                mime_type: 'image/jpeg',
-                data: image_base64.replace(/^data:image\/\w+;base64,/, '')
+              inlineData: {
+                mimeType: mimeType,
+                data: cleanBase64,
               }
             }
           ]
         }],
-        generationConfig: { responseModalities: ['IMAGE', 'TEXT'] }
+        generationConfig: {
+          responseModalities: ['IMAGE', 'TEXT'],
+        }
       })
     });
 
@@ -79,11 +93,14 @@ serve(async (req) => {
 
     const geminiData = await geminiRes.json();
     const imagePart = geminiData?.candidates?.[0]?.content?.parts?.find(
-      (p: any) => p.inline_data?.mime_type?.startsWith('image/')
+      (p: any) => p.inlineData?.mimeType?.startsWith('image/')
     );
-    if (!imagePart) return json({ error: 'No image returned from Gemini' }, 502);
+    if (!imagePart) {
+      console.error('No image part in Gemini response:', JSON.stringify(geminiData));
+      return json({ error: 'No image returned from Gemini', details: geminiData }, 502);
+    }
 
-    const resultBase64 = `data:${imagePart.inline_data.mime_type};base64,${imagePart.inline_data.data}`;
+    const resultBase64 = `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
 
     // ── 5. Upload to Cloudinary ──────────────────────────────────────────────
     const CLOUD_NAME    = Deno.env.get('CLOUDINARY_CLOUD_NAME')!;
