@@ -441,22 +441,19 @@
             </div>
         </div>
 
-        <!-- ── REGISTER: STEP 4 — Payment redirect ── -->
+        <!-- ── REGISTER: STEP 4 — Trial activated ── -->
         <div id="form-register-step4" style="display:none;">
             <div class="payment-redirect">
                 <i class="fa-solid fa-circle-check" style="color:var(--success);"></i>
                 <h3>החשבון נוצר בהצלחה!</h3>
-                <p>כדי להפעיל את התוכנית שבחרת, יש להשלים את התשלום:</p>
+                <p id="step4-desc">מפעיל את תקופת הניסיון שלך...</p>
                 <div class="plan-summary">
                     <div class="plan-summary-name" id="payment-plan-name"></div>
                     <div class="plan-summary-desc" id="payment-plan-desc"></div>
                 </div>
-                <button class="btn-submit accent" id="btn-go-payment" onclick="goToPayment()">
-                    <i class="fa-solid fa-credit-card"></i> עבור לתשלום
-                </button>
-                <button class="btn-back" style="margin-top:10px;" onclick="skipPayment()">
-                    <i class="fa-solid fa-forward"></i> דלג לעת עתה (תוכנית חינמית)
-                </button>
+                <div id="step4-spinner" style="display:flex;justify-content:center;margin:16px 0;">
+                    <div class="spinner" style="border-color:rgba(30,58,95,0.2);border-top-color:var(--primary);"></div>
+                </div>
             </div>
         </div>
 
@@ -749,8 +746,8 @@ async function handleRegister() {
     goToStep4();
 }
 
-function goToStep4() {
-    // Find selected plan info
+async function goToStep4() {
+    // Find selected plan info for display
     var allPlans = [].concat(
         _PLANS_BY_TYPE.designer,
         _PLANS_BY_TYPE.carpenter,
@@ -759,56 +756,27 @@ function goToStep4() {
     var plan = allPlans.find(function(p) { return p.key === _selectedPlanKey; });
 
     document.getElementById('payment-plan-name').textContent = plan ? plan.name : _selectedPlanKey;
-    document.getElementById('payment-plan-desc').textContent = plan ? plan.desc : '';
+    document.getElementById('payment-plan-desc').textContent = plan ? '7 ימי ניסיון חינמיים · ללא כרטיס אשראי' : '';
 
     document.getElementById('form-register-step3').style.display = 'none';
     document.getElementById('form-register-step4').style.display = 'block';
     document.getElementById('auth-tabs').style.display = 'none';
-}
 
-async function goToPayment() {
-    var btn = document.getElementById('btn-go-payment');
-    if (btn) { btn.disabled = true; btn.innerHTML = '<div class="spinner"></div>'; }
-
+    // Activate free trial directly in DB — no payment needed
     try {
-        var _fn = document.getElementById('reg-first-name');
-        var _ln = document.getElementById('reg-last-name');
-        var _ph = document.getElementById('reg-phone');
-        var _fullName = (_fn ? _fn.value.trim() : '') + ' ' + (_ln ? _ln.value.trim() : '');
-        var res = await fetch(GrowPayments.MAKE_TRIAL_WEBHOOK, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                plan:  _selectedPlanKey,
-                email: document.getElementById('reg-email').value.trim(),
-                name:  _fullName.trim() || document.getElementById('reg-email').value.trim(),
-                phone: (_ph && _ph.value.trim()) ? _ph.value.trim() : '0500000000'
-            })
-        });
-        var text = await res.text();
-        var data;
-        try {
-            data = JSON.parse(text);
-        } catch(e) {
-            // Make returned non-JSON — show raw response for debugging
-            throw new Error('תגובה מהשרת: ' + text.substring(0, 200));
-        }
-        if (data.payment_url) {
-            window.location.href = data.payment_url;
-        } else if (data.url) {
-            window.location.href = data.url;
-        } else {
-            throw new Error(data.error || 'לא התקבל קישור תשלום. תגובה: ' + JSON.stringify(data).substring(0, 200));
-        }
+        var result = await Auth.startFreeTrial(_selectedPlanKey);
+        if (result && result.error) throw new Error(result.error);
+        document.getElementById('step4-desc').textContent = '✅ תקופת הניסיון הופעלה! מעביר אותך למערכת...';
+        document.getElementById('step4-spinner').style.display = 'none';
+        setTimeout(function() {
+            window.location.href = 'projects.html?status=trial_started&plan=' + encodeURIComponent(_selectedPlanKey);
+        }, 1200);
     } catch(err) {
-        showMessage('שגיאה: ' + (err.message || 'נסה שוב'), 'error');
-        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-credit-card"></i> עבור לתשלום'; }
+        document.getElementById('step4-desc').textContent = 'החשבון נוצר! ניתן להיכנס למערכת.';
+        document.getElementById('step4-spinner').style.display = 'none';
+        showMessage('שגיאה בהפעלת הניסיון: ' + (err.message || 'נסה שוב'), 'error');
+        setTimeout(function() { window.location.href = 'projects.html'; }, 2500);
     }
-}
-
-function skipPayment() {
-    // Go to projects with free plan
-    window.location.href = 'projects.html';
 }
 
 // ── Login ─────────────────────────────────────────────────────────────────────
@@ -899,10 +867,31 @@ function _translateError(msg) {
     return msg;
 }
 
-// ── On load: if already logged in, redirect ───────────────────────────────────
+// ── On load: if already logged in, redirect; pre-select plan from URL ─────────
 (async function() {
     if (await Auth.isLoggedIn()) {
         window.location.href = 'projects.html';
+        return;
+    }
+    // If ?plan=<key> in URL (coming from landing.html pricing buttons),
+    // switch to register tab and pre-select the plan after user type is chosen
+    var urlPlan = new URLSearchParams(window.location.search).get('plan');
+    if (urlPlan) {
+        // Determine user type from plan key prefix
+        var typeFromPlan = urlPlan.startsWith('designer') ? 'designer'
+                         : urlPlan.startsWith('carpenter') ? 'carpenter'
+                         : urlPlan.startsWith('company') ? 'company'
+                         : null;
+        switchTab('register');
+        if (typeFromPlan) {
+            selectUserType(typeFromPlan);
+            // Auto-advance to step 2 and pre-select the plan
+            goToStep2();
+            setTimeout(function() {
+                var opt = document.querySelector('.plan-option[data-key="' + urlPlan + '"]');
+                if (opt) opt.click();
+            }, 50);
+        }
     }
 })();
 </script>

@@ -425,6 +425,40 @@
                     </div>
                     <div style="margin-top:18px;"><button class="profile-save-btn" onclick="saveBusinessInfo()"><i class="fa-solid fa-floppy-disk"></i> שמור פרטי עסק</button></div>
                 </div>
+
+                <!-- Subscription management section -->
+                <div class="profile-section" id="subscription-section" style="display:none;">
+                    <div class="profile-section-title"><i class="fa-solid fa-credit-card"></i> מנוי</div>
+                    <div id="subscription-info-box" style="background:var(--bg-light,#f8f9fa);border:1px solid var(--border-l,#e5e7eb);border-radius:12px;padding:16px 20px;margin-bottom:18px;">
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                            <span id="sub-status-badge" style="display:inline-block;padding:3px 12px;border-radius:20px;font-size:.78rem;font-weight:700;"></span>
+                            <span id="sub-plan-label" style="font-size:.9rem;font-weight:600;color:var(--text-dark,#1f2937);"></span>
+                        </div>
+                        <div id="sub-ends-row" style="font-size:.85rem;color:var(--muted,#6b7280);display:none;">
+                            <i class="fa-regular fa-calendar"></i>
+                            <span id="sub-ends-label"></span>
+                        </div>
+                    </div>
+                    <div id="sub-cancel-wrap" style="display:none;">
+                        <p style="font-size:.85rem;color:var(--muted,#6b7280);margin-bottom:14px;line-height:1.6;">
+                            ביטול המנוי יפסיק את החיוב החודשי הבא. תוכל להמשיך להשתמש במערכת עד סוף תקופת המנוי הנוכחית.
+                        </p>
+                        <button class="profile-save-btn" id="btn-cancel-sub"
+                            style="background:var(--danger,#ef4444);border-color:var(--danger,#ef4444);"
+                            onclick="cancelSubscription()">
+                            <i class="fa-solid fa-ban"></i> בטל מנוי
+                        </button>
+                    </div>
+                    <div id="sub-cancelled-notice" style="display:none;">
+                        <p style="font-size:.85rem;color:var(--muted,#6b7280);line-height:1.6;">
+                            המנוי בוטל. לא יבוצעו חיובים נוספים. הגישה למערכת תישמר עד סוף תקופת המנוי.
+                        </p>
+                        <a id="sub-reactivate-link" href="#" onclick="switchPage('pricing');return false;"
+                            style="font-size:.85rem;color:var(--accent,#6366f1);font-weight:600;text-decoration:none;">
+                            <i class="fa-solid fa-rotate-right"></i> חדש מנוי
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
 

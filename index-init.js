@@ -4,6 +4,19 @@
     var ok = await Auth.requireAuth();
     if (!ok) return; // requireAuth already redirected — gate stays visible
 
+    // 2. Check subscription / trial status — redirect to projects.html if expired
+    try {
+        var subStatus = await Auth.isSubscriptionActive();
+        if (subStatus && !subStatus.active) {
+            // Trial expired or subscription inactive — projects.html shows the paywall
+            window.location.href = 'projects.html';
+            return;
+        }
+    } catch(e) {
+        console.warn('[auth] Could not check subscription status:', e);
+        // On error, allow access — don't block the user
+    }
+
     // Auth passed — remove the loading gate so the app is visible
     var gate = document.getElementById('auth-gate');
     if (gate) gate.remove();
