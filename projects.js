@@ -14,8 +14,8 @@ var _devicesList         = [];
 // Organized by user type, shown in upgrade modal
 var _UPGRADE_PLANS = [
     // מעצבות
-    { key: 'designer_monthly',  label: 'מעצבת — חודשי',        price: '₪399/חודש',  userType: 'designer',  maxProjects: 30,   maxDevices: 1,  desc: 'עד 30 פרויקטים, 12 ארונות לפרויקט, מחיר השקה ל-3 חודשים' },
-    { key: 'designer_annual',   label: 'מעצבת — שנתי',         price: '₪369/חודש',  userType: 'designer',  maxProjects: 30,   maxDevices: 1,  desc: 'עד 30 פרויקטים, 12 ארונות לפרויקט, ₪4,428 לשנה' },
+    { key: 'designer_monthly',  label: 'מעצבת — חודשי',        price: '₪399/חודש',  userType: 'designer',  maxProjects: 30,   maxDevices: 1,  desc: 'עד 30 פרויקטים, 12 ארונות לפרויקט' },
+    { key: 'designer_annual',   label: 'מעצבת — שנתי',         price: '₪359/חודש',  userType: 'designer',  maxProjects: 30,   maxDevices: 1,  desc: 'עד 30 פרויקטים, 12 ארונות לפרויקט, ₪4,308 לשנה — חיסכון 10%' },
     // נגרים
     { key: 'carpenter_basic',   label: 'נגר — בסיסי',           price: '₪X/חודש',    userType: 'carpenter', maxProjects: 30,   maxDevices: 1,  desc: 'תמחור + הדמיה, עד 30 פרויקטים' },
     { key: 'carpenter_pro',     label: 'נגר — מקצועי',          price: '₪X/חודש',    userType: 'carpenter', maxProjects: null, maxDevices: 2,  desc: 'הכל כולל דוח לקוח + ייצוא לנגר' },
@@ -148,18 +148,21 @@ function _buildPaywallPlansHTML(userType) {
     // Feature bullets per plan key
     var FEATURES = {
         designer_monthly:   ['עד 30 פרויקטים', '12 ארונות לפרויקט', 'הדמיה תלת-ממדית', 'ייצוא PDF'],
-        designer_annual:    ['עד 30 פרויקטים', '12 ארונות לפרויקט', 'הדמיה תלת-ממדית', 'ייצוא PDF', 'חיסכון של 7.5%'],
+        designer_annual:    ['עד 30 פרויקטים', '12 ארונות לפרויקט', 'הדמיה תלת-ממדית', 'ייצוא PDF', 'חיסכון 10% לעומת חודשי'],
         carpenter_basic:    ['עד 30 פרויקטים', 'תמחור אוטומטי', 'הדמיה תלת-ממדית'],
         carpenter_pro:      ['פרויקטים ללא הגבלה', 'תמחור + דוח לקוח', 'ייצוא לנגר', '2 מכשירים'],
         company_standard:   ['פרויקטים ללא הגבלה', 'עד 10 מכשירים', 'כל הפיצ\'רים', 'ניהול צוות'],
         company_enterprise: ['פרויקטים ללא הגבלה', 'עד 30 מכשירים', 'תמיכה מלאה', 'SLA מובטח'],
     };
 
+    // "Popular" = annual plans (best value) or pro/enterprise for other types
+    var POPULAR_KEYS = ['designer_annual', 'carpenter_pro', 'company_standard'];
+
     var useSideBySide = plans.length === 2;
     var html = '<div style="display:' + (useSideBySide ? 'grid;grid-template-columns:1fr 1fr' : 'flex;flex-direction:column') + ';gap:12px;margin-bottom:8px;">';
 
     plans.forEach(function(p, i) {
-        var isPopular = p.key.indexOf('monthly') !== -1 || p.key.indexOf('pro') !== -1 || p.key.indexOf('standard') !== -1;
+        var isPopular = POPULAR_KEYS.indexOf(p.key) !== -1;
         var feats = FEATURES[p.key] || [];
         var featHtml = feats.map(function(f) {
             return '<div style="display:flex;align-items:center;gap:6px;font-size:.78rem;color:#475569;margin-bottom:4px;">' +
