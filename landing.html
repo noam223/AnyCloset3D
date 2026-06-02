@@ -16,7 +16,26 @@
     );
     var result = await _sb.auth.getSession();
     if (result.data && result.data.session) {
-      window.location.replace('projects.html');
+      // User is logged in — show their name in navbar instead of redirecting
+      var user = result.data.session.user;
+      var name = (user.user_metadata && user.user_metadata.full_name)
+        ? user.user_metadata.full_name
+        : user.email;
+      var initials = name.trim().split(/\s+/).slice(0,2).map(function(w){return w[0];}).join('').toUpperCase();
+      // Replace login/CTA buttons with user avatar + "הפרויקטים שלי" link
+      var navActions = document.getElementById('nav-actions');
+      if (navActions) {
+        navActions.innerHTML =
+          '<a href="projects.html" style="display:flex;align-items:center;gap:8px;text-decoration:none;' +
+          'background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:20px;' +
+          'padding:6px 14px 6px 8px;font-size:0.85rem;font-weight:600;color:var(--t);">' +
+            '<div style="width:28px;height:28px;background:#f59e0b;border-radius:50%;display:flex;' +
+            'align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;color:#1e3a5f;flex-shrink:0;">' +
+              initials +
+            '</div>' +
+            '<span>' + name.split(' ')[0] + '</span>' +
+          '</a>';
+      }
     }
   } catch(e) { /* ignore — show landing normally */ }
 })();
@@ -297,7 +316,7 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
     <li><a href="#audience">למי זה מיועד</a></li>
     <li><a href="#pricing">חבילות מנויים</a></li>
   </ul>
-  <div class="nav-actions">
+  <div class="nav-actions" id="nav-actions">
     <a href="login.html" class="nav-login">התחברות</a>
     <a href="login.html" class="nav-cta">הצטרף עכשיו</a>
   </div>
@@ -540,7 +559,7 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
           <li><i class="fa-solid fa-check y"></i> ייצוא תלת-מימד</li>
           <li><i class="fa-solid fa-check y"></i> שמירה בענן</li>
         </ul>
-        <button class="btn-plan btn-plan-o" onclick="startTrial('designer_monthly')">התחל שבוע ניסיון חינם</button>
+        <a href="login.html?plan=designer_monthly" class="btn-plan btn-plan-o">התחל שבוע ניסיון חינם</a>
       </div>
 
       <!-- מנוי שנתי -->
@@ -566,7 +585,7 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
           <li><i class="fa-solid fa-check y"></i> ייצוא תלת-מימד</li>
           <li><i class="fa-solid fa-check y"></i> שמירה בענן</li>
         </ul>
-        <button class="btn-plan btn-plan-p" onclick="startTrial('designer_annual')">התחל שבוע ניסיון חינם</button>
+        <a href="login.html?plan=designer_annual" class="btn-plan btn-plan-p">התחל שבוע ניסיון חינם</a>
       </div>
 
     </div>
@@ -893,112 +912,10 @@ function toggleFaq(btn) {
 }
 
 // ── Trial signup flow ──────────────────────────────────────────
-// Webhook URL for Make Scenario 1 — replace after importing scenario
-const MAKE_TRIAL_WEBHOOK = 'https://hook.eu1.make.com/2p1w789m4oeh3glw0pry61y0dd6vnlvd';
-
-const PLAN_LABELS = {
-  designer_monthly: 'מנוי חודשי — מעצבת פנים',
-  designer_annual:  'מנוי שנתי — מעצבת פנים'
-};
-
-function startTrial(plan) {
-  // If webhook not configured yet, fall back to login page
-  if (!MAKE_TRIAL_WEBHOOK || MAKE_TRIAL_WEBHOOK.startsWith('REPLACE_')) {
-    window.location.href = 'login.html';
-    return;
-  }
-  // Show modal
-  document.getElementById('trial-plan-input').value = plan;
-  document.getElementById('trial-plan-label').textContent = PLAN_LABELS[plan] || plan;
-  document.getElementById('trial-modal').classList.add('open');
-  document.getElementById('trial-name').focus();
-}
-
-function closeTrialModal() {
-  document.getElementById('trial-modal').classList.remove('open');
-  document.getElementById('trial-form').reset();
-  document.getElementById('trial-error').textContent = '';
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  const form = document.getElementById('trial-form');
-  if (!form) return;
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const btn  = document.getElementById('trial-submit-btn');
-    const errEl = document.getElementById('trial-error');
-    errEl.textContent = '';
-    btn.disabled = true;
-    btn.textContent = 'שולח...';
-
-    const plan     = document.getElementById('trial-plan-input').value;
-    const fullName = document.getElementById('trial-name').value.trim();
-    const email    = document.getElementById('trial-email').value.trim();
-    const rawPhone = document.getElementById('trial-phone').value.trim();
-
-    // Normalize phone: +972XXXXXXXXX → 0XXXXXXXXX
-    let phone = rawPhone;
-    if (phone.startsWith('+972')) phone = '0' + phone.slice(4);
-    else if (phone.startsWith('972')) phone = '0' + phone.slice(3);
-
-    try {
-      const res = await fetch(MAKE_TRIAL_WEBHOOK, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan, name: fullName, fullName, email, phone })
-      });
-      const text = await res.text();
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        // Make returned non-JSON — log for debugging
-        console.error('Make response (non-JSON):', text);
-        throw new Error('שגיאה בשרת — נסה שוב בעוד רגע');
-      }
-      if (data.payment_url) {
-        window.location.href = data.payment_url;
-      } else {
-        console.error('Make response:', data);
-        throw new Error(data.error || 'לא התקבל קישור תשלום — בדוק את Make Scenario 1');
-      }
-    } catch (err) {
-      errEl.textContent = err.message || 'שגיאה — נסה שוב או פנה לתמיכה';
-      btn.disabled = false;
-      btn.textContent = 'המשך לתשלום';
-    }
-  });
-});
+// Free trial — no payment required.
+// Pricing buttons link to login.html?plan=<key>
+// After registration, login.html calls Auth.startFreeTrial(plan) automatically.
 </script>
-
-<!-- Trial Signup Modal -->
-<div id="trial-modal" class="trial-overlay" onclick="if(event.target===this)closeTrialModal()">
-  <div class="trial-box">
-    <button class="trial-close" onclick="closeTrialModal()" aria-label="סגור">✕</button>
-    <div class="trial-icon">🎁</div>
-    <h3 class="trial-title">שבוע ניסיון חינם</h3>
-    <p class="trial-sub" id="trial-plan-label">מנוי חודשי — מעצבת פנים</p>
-    <p class="trial-desc">הזן פרטים ותועבר לדף אימות כרטיס מאובטח.<br>לא יחויב כלום עכשיו — לאחר 7 ימים יחויב המנוי המלא אוטומטית אם לא בוטל.</p>
-    <form id="trial-form" novalidate>
-      <input type="hidden" id="trial-plan-input" name="plan">
-      <div class="trial-field">
-        <label for="trial-name">שם מלא</label>
-        <input type="text" id="trial-name" name="name" placeholder="ישראל ישראלי" required autocomplete="name">
-      </div>
-      <div class="trial-field">
-        <label for="trial-email">אימייל</label>
-        <input type="email" id="trial-email" name="email" placeholder="you@example.com" required autocomplete="email">
-      </div>
-      <div class="trial-field">
-        <label for="trial-phone">טלפון</label>
-        <input type="tel" id="trial-phone" name="phone" placeholder="050-0000000" required autocomplete="tel">
-      </div>
-      <p id="trial-error" class="trial-error"></p>
-      <button type="submit" id="trial-submit-btn" class="btn-plan btn-plan-p" style="width:100%;margin-top:8px">המשך לתשלום →</button>
-    </form>
-    <p class="trial-fine">ללא חיוב עכשיו · לאחר 7 ימים יחויב המנוי המלא · ביטול בכל עת</p>
-  </div>
-</div>
 
 <!-- WhatsApp Floating Button -->
 <a href="https://wa.me/972546659798?text=שלום%2C%20אני%20מעוניין%20לשמוע%20עוד%20על%20מערכת%20הדמיית%20הארונות"
