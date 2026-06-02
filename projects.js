@@ -246,12 +246,15 @@ async function _openPayment(planKey) {
                 phone:    (profile && profile.phone) ? profile.phone : ''
             })
         });
-        var data = await res.json();
+        var rawText = await res.text();
+        console.log('Make response status:', res.status, 'body:', rawText);
+        var data = {};
+        try { data = JSON.parse(rawText); } catch(pe) { /* not JSON */ }
         if (data.payment_url) {
             window.location.href = data.payment_url;
         } else {
             if (btn) { btn.disabled = false; btn.textContent = 'בחר תוכנית מנוי'; }
-            alert('שגיאה ביצירת קישור תשלום — נסה שוב');
+            alert('שגיאה ביצירת קישור תשלום\n\nתשובת Make:\n' + rawText);
         }
     } catch(e) {
         if (btn) { btn.disabled = false; btn.textContent = 'בחר תוכנית מנוי'; }
