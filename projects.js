@@ -143,24 +143,75 @@ function _showTrialBanner(trialEndsAt, plan) {
 // ── Build plan cards HTML for paywall popup ───────────────────────────────────
 function _buildPaywallPlansHTML(userType) {
     var plans = _UPGRADE_PLANS.filter(function(p) { return p.userType === userType; });
-    if (!plans.length) {
-        // fallback: show all plans
-        plans = _UPGRADE_PLANS;
-    }
-    var html = '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">';
-    plans.forEach(function(p) {
+    if (!plans.length) plans = _UPGRADE_PLANS;
+
+    // Feature bullets per plan key
+    var FEATURES = {
+        designer_monthly:   ['עד 30 פרויקטים', '12 ארונות לפרויקט', 'הדמיה תלת-ממדית', 'ייצוא PDF'],
+        designer_annual:    ['עד 30 פרויקטים', '12 ארונות לפרויקט', 'הדמיה תלת-ממדית', 'ייצוא PDF', 'חיסכון של 7.5%'],
+        carpenter_basic:    ['עד 30 פרויקטים', 'תמחור אוטומטי', 'הדמיה תלת-ממדית'],
+        carpenter_pro:      ['פרויקטים ללא הגבלה', 'תמחור + דוח לקוח', 'ייצוא לנגר', '2 מכשירים'],
+        company_standard:   ['פרויקטים ללא הגבלה', 'עד 10 מכשירים', 'כל הפיצ\'רים', 'ניהול צוות'],
+        company_enterprise: ['פרויקטים ללא הגבלה', 'עד 30 מכשירים', 'תמיכה מלאה', 'SLA מובטח'],
+    };
+
+    var useSideBySide = plans.length === 2;
+    var html = '<div style="display:' + (useSideBySide ? 'grid;grid-template-columns:1fr 1fr' : 'flex;flex-direction:column') + ';gap:12px;margin-bottom:8px;">';
+
+    plans.forEach(function(p, i) {
         var isPopular = p.key.indexOf('monthly') !== -1 || p.key.indexOf('pro') !== -1 || p.key.indexOf('standard') !== -1;
-        html += '<div style="border:2px solid ' + (isPopular ? '#0099cc' : '#e5e7eb') + ';border-radius:12px;padding:14px 16px;text-align:right;background:' + (isPopular ? 'rgba(0,153,204,0.06)' : '#fafafa') + ';">' +
-            '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">' +
-            '<button onclick="_openPayment(\'' + p.key + '\')" style="background:' + (isPopular ? 'linear-gradient(135deg,#00d4ff,#0099cc)' : '#f1f5f9') + ';color:' + (isPopular ? '#0a1628' : '#334155') + ';border:none;border-radius:8px;padding:8px 18px;font-weight:700;font-size:.9rem;cursor:pointer;font-family:inherit;white-space:nowrap;">בחר</button>' +
-            '<div style="flex:1;">' +
-            '<div style="font-weight:700;color:#0f2040;font-size:.95rem;">' + p.label + '</div>' +
-            '<div style="font-size:.8rem;color:#64748b;margin-top:2px;">' + p.desc + '</div>' +
-            '</div>' +
-            '<div style="font-weight:800;color:#0099cc;font-size:1rem;white-space:nowrap;">' + p.price + '</div>' +
-            '</div>' +
+        var feats = FEATURES[p.key] || [];
+        var featHtml = feats.map(function(f) {
+            return '<div style="display:flex;align-items:center;gap:6px;font-size:.78rem;color:#475569;margin-bottom:4px;">' +
+                '<span style="color:#0099cc;font-size:.7rem;">✓</span>' + f + '</div>';
+        }).join('');
+
+        html += '<div style="' +
+            'border:2px solid ' + (isPopular ? '#0099cc' : '#e2e8f0') + ';' +
+            'border-radius:14px;' +
+            'padding:16px 14px 14px;' +
+            'background:' + (isPopular ? 'linear-gradient(160deg,#f0faff 0%,#e6f7ff 100%)' : '#fafafa') + ';' +
+            'display:flex;flex-direction:column;' +
+            'position:relative;' +
+            'text-align:right;' +
+            '">';
+
+        // Popular badge
+        if (isPopular) {
+            html += '<div style="position:absolute;top:-11px;right:50%;transform:translateX(50%);' +
+                'background:linear-gradient(135deg,#00d4ff,#0099cc);color:#0a1628;' +
+                'font-size:.7rem;font-weight:800;padding:3px 12px;border-radius:20px;white-space:nowrap;">' +
+                '⭐ מומלץ</div>';
+        }
+
+        // Plan name
+        var nameParts = p.label.split('—');
+        html += '<div style="font-weight:800;color:#0f2040;font-size:.95rem;margin-bottom:2px;">' +
+            (nameParts[1] ? nameParts[1].trim() : p.label) + '</div>';
+
+        // Price
+        var priceParts = p.price.split('/');
+        html += '<div style="margin-bottom:10px;">' +
+            '<span style="font-size:1.5rem;font-weight:900;color:#0099cc;">' + priceParts[0] + '</span>' +
+            (priceParts[1] ? '<span style="font-size:.75rem;color:#94a3b8;">/' + priceParts[1] + '</span>' : '') +
             '</div>';
+
+        // Features
+        html += '<div style="flex:1;margin-bottom:12px;">' + featHtml + '</div>';
+
+        // CTA button
+        html += '<button onclick="_openPayment(\'' + p.key + '\')" style="' +
+            'width:100%;' +
+            'background:' + (isPopular ? 'linear-gradient(135deg,#00d4ff,#0099cc)' : '#e2e8f0') + ';' +
+            'color:' + (isPopular ? '#0a1628' : '#334155') + ';' +
+            'border:none;border-radius:10px;padding:10px 0;' +
+            'font-weight:800;font-size:.9rem;cursor:pointer;font-family:inherit;' +
+            'transition:opacity .15s;' +
+            '">' + (isPopular ? 'התחל עכשיו' : 'בחר תוכנית') + '</button>';
+
+        html += '</div>';
     });
+
     html += '</div>';
     return html;
 }
