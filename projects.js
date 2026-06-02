@@ -1,6 +1,7 @@
 // ==========================================
 // projects.js — Project Manager Logic
 // ==========================================
+console.log('[DEBUG] projects.js loaded v2');
 
 var _projects            = [];
 var _plan                = null;
@@ -35,10 +36,11 @@ var _USER_TYPE_LABELS = {
     var ok = await Auth.requireAuth();
     if (!ok) return;
 
-    var results  = await Promise.all([Auth.getUser(), Auth.getPlan(), Projects.list()]);
+    var results  = await Promise.all([Auth.getUser(), Auth.getPlan(), Projects.list(), Auth.isSubscriptionActive()]);
     var user     = results[0];
     var plan     = results[1];
     var projects = results[2];
+    var subStatus = results[3];
 
     _plan     = plan;
     _projects = projects;
@@ -53,6 +55,40 @@ var _USER_TYPE_LABELS = {
         // populate new sidebar email + hero stats
         var emailEl = document.getElementById('user-email');
         if (emailEl) emailEl.textContent = user.email || '';
+    }
+
+    // ── Welcome toasts for new trial / payment success ────────────────────────
+    var _urlStatus = new URLSearchParams(window.location.search).get('status');
+    if (_urlStatus === 'trial_started') {
+        history.replaceState(null, '', 'projects.html');
+        setTimeout(function() {
+            showToast('🎉 ברוך הבא! 7 ימי ניסיון חינמיים הופעלו. תהנה!', 'success');
+        }, 600);
+    } else if (_urlStatus === 'payment_success') {
+        history.replaceState(null, '', 'projects.html');
+        setTimeout(function() {
+            showToast('✅ התשלום התקבל! המנוי שלך פעיל. ברוך הבא!', 'success');
+        }, 600);
+    }
+
+    // ── Trial / subscription status check ────────────────────────────────────
+    console.log('[DEBUG] subStatus:', JSON.stringify(subStatus));
+    console.log('[DEBUG] plan:', JSON.stringify(plan));
+    if (subStatus.reason === 'trial_expired') {
+        // Trial expired — show paywall, block new projects
+        _showTrialExpiredBanner(plan);
+        document.getElementById('btn-new-project').disabled = true;
+    } else if (subStatus.reason === 'subscription_expired') {
+        // Paid subscription expired (recurring charge failed)
+        _showSubscriptionExpiredBanner(plan);
+        document.getElementById('btn-new-project').disabled = true;
+    } else if (subStatus.reason === 'trial') {
+        // Active trial — show countdown banner
+        _showTrialBanner(subStatus.trialEndsAt, plan);
+    } else if (!subStatus.active) {
+        // Inactive subscription
+        _showInactiveBanner(plan);
+        document.getElementById('btn-new-project').disabled = true;
     }
 
     // Hero stat cards
@@ -74,12 +110,108 @@ var _USER_TYPE_LABELS = {
         _loadDevices();
     }
 
-    document.getElementById('btn-new-project').disabled = false;
+    document.getElementById('btn-new-project').disabled = (document.getElementById('btn-new-project').disabled) || false;
     document.getElementById('page-subtitle').textContent =
         projects.length === 0
             ? 'אין פרויקטים עדיין'
             : projects.length + ' פרויקט' + (projects.length !== 1 ? 'ים' : '');
 })();
+
+// ── Trial banner helpers ───────────────────────────────────────────────────────
+function _showTrialBanner(trialEndsAt, plan) {
+    var existing = document.getElementById('trial-banner');
+    if (existing) return;
+
+    var daysLeft = Math.ceil((new Date(trialEndsAt) - new Date()) / (1000 * 60 * 60 * 24));
+    var banner = document.createElement('div');
+    banner.id = 'trial-banner';
+    banner.style.cssText = 'background:linear-gradient(135deg,#0f2040,#1a3a6b);color:#fff;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;font-size:.9rem;border-bottom:2px solid #00d4ff;position:sticky;top:0;z-index:100;';
+    banner.innerHTML = '<span>⏳ <strong>' + daysLeft + ' ימי ניסיון נותרו</strong> — תוכנית ' + plan.label + '</span>' +
+        '<a href="' + _getPaymentLink(plan.key) + '" style="background:#00d4ff;color:#0a1628;padding:7px 18px;border-radius:8px;font-weight:700;text-decoration:none;white-space:nowrap;">שדרג עכשיו</a>';
+    document.body.insertBefore(banner, document.body.firstChild);
+}
+
+function _showTrialExpiredBanner(plan) {
+    var existing = document.getElementById('trial-expired-overlay');
+    if (existing) return;
+
+    var overlay = document.createElement('div');
+    overlay.id = 'trial-expired-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(10,22,40,0.92);display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = '<div style="background:#fff;border-radius:20px;padding:40px;max-width:440px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,0.4);">' +
+        '<div style="font-size:3rem;margin-bottom:16px;">⏰</div>' +
+        '<h2 style="color:#0f2040;margin-bottom:12px;">תקופת הניסיון הסתיימה</h2>' +
+        '<p style="color:#475569;margin-bottom:24px;line-height:1.6;">7 ימי הניסיון החינמיים שלך הסתיימו.<br>כדי להמשיך להשתמש במערכת, בחר תוכנית מנוי.</p>' +
+        '<a href="' + _getPaymentLink(plan.key) + '" style="display:block;background:linear-gradient(135deg,#00d4ff,#0099cc);color:#0a1628;padding:14px 32px;border-radius:12px;font-weight:800;text-decoration:none;font-size:1.1rem;margin-bottom:12px;">בחר תוכנית מנוי</a>' +
+        '<a href="landing.html#pricing" style="color:#475569;font-size:.85rem;">צפה בכל התוכניות</a>' +
+        '</div>';
+    document.body.appendChild(overlay);
+}
+
+function _showSubscriptionExpiredBanner(plan) {
+    var existing = document.getElementById('trial-expired-overlay');
+    if (existing) return;
+
+    var overlay = document.createElement('div');
+    overlay.id = 'trial-expired-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(10,22,40,0.92);display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = '<div style="background:#fff;border-radius:20px;padding:40px;max-width:440px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,0.4);">' +
+        '<div style="font-size:3rem;margin-bottom:16px;">💳</div>' +
+        '<h2 style="color:#0f2040;margin-bottom:12px;">חידוש המנוי נכשל</h2>' +
+        '<p style="color:#475569;margin-bottom:24px;line-height:1.6;">לא הצלחנו לחייב את כרטיס האשראי שלך.<br>כדי להמשיך להשתמש במערכת, יש לחדש את המנוי.</p>' +
+        '<button onclick="_openPayment(\'' + plan.key + '\')" style="display:block;width:100%;background:linear-gradient(135deg,#00d4ff,#0099cc);color:#0a1628;padding:14px 32px;border-radius:12px;font-weight:800;font-size:1.1rem;border:none;cursor:pointer;margin-bottom:12px;">חדש מנוי עכשיו</button>' +
+        '<a href="landing.html#pricing" style="color:#475569;font-size:.85rem;">צפה בכל התוכניות</a>' +
+        '</div>';
+    document.body.appendChild(overlay);
+}
+
+function _showInactiveBanner(plan) {
+    var existing = document.getElementById('trial-expired-overlay');
+    if (existing) return;
+
+    var overlay = document.createElement('div');
+    overlay.id = 'trial-expired-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(10,22,40,0.92);display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = '<div style="background:#fff;border-radius:20px;padding:40px;max-width:440px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,0.4);">' +
+        '<div style="font-size:3rem;margin-bottom:16px;">🔒</div>' +
+        '<h2 style="color:#0f2040;margin-bottom:12px;">המנוי אינו פעיל</h2>' +
+        '<p style="color:#475569;margin-bottom:24px;line-height:1.6;">כדי להמשיך להשתמש במערכת, חדש את המנוי שלך.</p>' +
+        '<a href="' + _getPaymentLink(plan.key) + '" style="display:block;background:linear-gradient(135deg,#00d4ff,#0099cc);color:#0a1628;padding:14px 32px;border-radius:12px;font-weight:800;text-decoration:none;font-size:1.1rem;">חדש מנוי</a>' +
+        '</div>';
+    document.body.appendChild(overlay);
+}
+
+// ── Open payment via Make Scenario 1 (creates Grow payment link dynamically) ──
+async function _openPayment(planKey) {
+    var SCENARIO1_WEBHOOK = 'https://hook.eu1.make.com/YOUR_SCENARIO1_WEBHOOK_URL';
+    try {
+        var user = await Auth.getUser();
+        var profile = await Auth.getProfile();
+        var res = await fetch(SCENARIO1_WEBHOOK, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                plan:     planKey,
+                email:    user ? user.email : '',
+                fullName: (profile && profile.full_name) ? profile.full_name : (user ? user.email : ''),
+                phone:    (profile && profile.phone) ? profile.phone : ''
+            })
+        });
+        var data = await res.json();
+        if (data.payment_url) {
+            window.location.href = data.payment_url;
+        } else {
+            showToast('שגיאה ביצירת קישור תשלום — נסה שוב', 'error');
+        }
+    } catch(e) {
+        showToast('שגיאת חיבור — נסה שוב', 'error');
+    }
+}
+
+function _getPaymentLink(planKey) {
+    // Returns a JS call string for onclick — actual payment goes through Make Scenario 1
+    return 'javascript:_openPayment(\'' + planKey + '\')';
+}
 
 // ── Plan bar ──────────────────────────────────────────────────────────────────
 function _renderPlanBar() {
@@ -646,8 +778,102 @@ async function _loadProfileForm() {
         document.getElementById('prof-website').value        = biz.website || '';
         document.getElementById('prof-logo-url').value       = biz.logoUrl || '';
         document.getElementById('prof-bio').value            = biz.bio || '';
+
+        // Subscription section
+        _loadSubscriptionSection(profile);
     } catch(e) {
         showToast('שגיאה בטעינת פרופיל: ' + e.message, 'error');
+    }
+}
+
+// ── Subscription management section in profile tab ───────────────────────────
+function _loadSubscriptionSection(profile) {
+    var section = document.getElementById('subscription-section');
+    if (!section || !profile) return;
+
+    var status = profile.subscription_status || '';
+    var plan   = profile.plan || '';
+
+    // Only show section for paid/cancelled subscriptions (not trial/free)
+    var showSection = (status === 'active' || status === 'cancelled');
+    section.style.display = showSection ? '' : 'none';
+    if (!showSection) return;
+
+    // Plan label
+    var PLAN_NAMES = {
+        designer_monthly: 'מעצב — חודשי',
+        designer_annual:  'מעצב — שנתי',
+        carpenter_basic:  'נגר — בסיסי',
+        carpenter_pro:    'נגר — פרו',
+        company_standard: 'חברה — סטנדרט',
+        company_enterprise: 'חברה — אנטרפרייז'
+    };
+    var planLabel = document.getElementById('sub-plan-label');
+    if (planLabel) planLabel.textContent = PLAN_NAMES[plan] || plan || '—';
+
+    // Status badge
+    var badge = document.getElementById('sub-status-badge');
+    if (badge) {
+        if (status === 'active') {
+            badge.textContent = 'פעיל';
+            badge.style.background = 'rgba(16,185,129,.15)';
+            badge.style.color = '#059669';
+        } else if (status === 'cancelled') {
+            badge.textContent = 'בוטל';
+            badge.style.background = 'rgba(239,68,68,.12)';
+            badge.style.color = '#dc2626';
+        }
+    }
+
+    // Period end date
+    var endsRow   = document.getElementById('sub-ends-row');
+    var endsLabel = document.getElementById('sub-ends-label');
+    if (profile.subscription_ends_at && endsRow && endsLabel) {
+        var endsDate = new Date(profile.subscription_ends_at);
+        var isAnnual = plan && plan.indexOf('annual') !== -1;
+        var prefix   = status === 'cancelled'
+            ? 'גישה עד: '
+            : (isAnnual ? 'חידוש שנתי ב: ' : 'חידוש חודשי ב: ');
+        endsLabel.textContent = prefix + _formatDate(profile.subscription_ends_at);
+        endsRow.style.display = '';
+    } else if (endsRow) {
+        endsRow.style.display = 'none';
+    }
+
+    // Show/hide cancel button vs cancelled notice
+    var cancelWrap    = document.getElementById('sub-cancel-wrap');
+    var cancelledNote = document.getElementById('sub-cancelled-notice');
+    if (status === 'active') {
+        if (cancelWrap)    cancelWrap.style.display    = '';
+        if (cancelledNote) cancelledNote.style.display = 'none';
+    } else {
+        if (cancelWrap)    cancelWrap.style.display    = 'none';
+        if (cancelledNote) cancelledNote.style.display = '';
+    }
+}
+
+// ── Cancel subscription handler ───────────────────────────────────────────────
+async function cancelSubscription() {
+    // Confirmation dialog
+    if (!confirm('האם אתה בטוח שברצונך לבטל את המנוי?\n\nהחיוב הבא יבוטל, אך תוכל להמשיך להשתמש במערכת עד סוף תקופת המנוי הנוכחית.')) {
+        return;
+    }
+
+    var btn = document.getElementById('btn-cancel-sub');
+    if (btn) { btn.disabled = true; btn.textContent = 'מבטל...'; }
+
+    try {
+        var result = await Auth.cancelSubscription();
+        if (result && result.error) throw new Error(result.error);
+
+        showToast('המנוי בוטל בהצלחה. הגישה תישמר עד סוף תקופת המנוי.', 'success');
+
+        // Refresh subscription section UI
+        var profile = await Auth.getProfile();
+        _loadSubscriptionSection(profile);
+    } catch(e) {
+        showToast('שגיאה בביטול המנוי: ' + e.message, 'error');
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-ban"></i> בטל מנוי'; }
     }
 }
 
