@@ -209,30 +209,14 @@ function _buildPaywallPlansHTML(userType) {
         // Features
         html += '<div style="flex:1;margin-bottom:12px;">' + featHtml + '</div>';
 
-        // Installments toggle for annual plans
-        var hasInstallments = p.key.indexOf('annual') !== -1;
-        if (hasInstallments) {
-            var cardId = 'annual-toggle-' + p.key;
-            html += '<div style="display:flex;border:1.5px solid #cbd5e1;border-radius:8px;overflow:hidden;margin-bottom:10px;font-size:.78rem;font-weight:700;">' +
-                '<button id="' + cardId + '-full" onclick="_annualToggle(\'' + p.key + '\',1)" style="flex:1;padding:6px 4px;border:none;background:#0099cc;color:#fff;cursor:pointer;font-family:inherit;font-weight:700;font-size:.78rem;">תשלום מלא</button>' +
-                '<button id="' + cardId + '-inst" onclick="_annualToggle(\'' + p.key + '\',12)" style="flex:1;padding:6px 4px;border:none;background:#f1f5f9;color:#475569;cursor:pointer;font-family:inherit;font-weight:700;font-size:.78rem;">12 תשלומים</button>' +
-                '</div>';
-            html += '<button id="' + cardId + '-cta" onclick="_openPayment(\'' + p.key + '\',1)" style="' +
-                'width:100%;' +
-                'background:linear-gradient(135deg,#00d4ff,#0099cc);color:#0a1628;' +
-                'border:none;border-radius:10px;padding:10px 0;' +
-                'font-weight:800;font-size:.9rem;cursor:pointer;font-family:inherit;' +
-                '">התחל עכשיו</button>';
-        } else {
-            // CTA button (no installments)
-            html += '<button onclick="_openPayment(\'' + p.key + '\',1)" style="' +
-                'width:100%;' +
-                'background:' + (isPopular ? 'linear-gradient(135deg,#00d4ff,#0099cc)' : '#e2e8f0') + ';' +
-                'color:' + (isPopular ? '#0a1628' : '#334155') + ';' +
-                'border:none;border-radius:10px;padding:10px 0;' +
-                'font-weight:800;font-size:.9rem;cursor:pointer;font-family:inherit;' +
-                '">' + (isPopular ? 'התחל עכשיו' : 'בחר תוכנית') + '</button>';
-        }
+        // CTA button — same text for all plans
+        html += '<button onclick="_openPayment(\'' + p.key + '\')" style="' +
+            'width:100%;' +
+            'background:' + (isPopular ? 'linear-gradient(135deg,#00d4ff,#0099cc)' : '#e2e8f0') + ';' +
+            'color:' + (isPopular ? '#0a1628' : '#334155') + ';' +
+            'border:none;border-radius:10px;padding:10px 0;' +
+            'font-weight:800;font-size:.9rem;cursor:pointer;font-family:inherit;' +
+            '">התחל עכשיו</button>';
 
         html += '</div>';
     });
