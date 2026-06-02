@@ -302,6 +302,7 @@
                 <option value="free">חינמי</option>
                 <option value="designer_single">מעצבת — בודד</option>
                 <option value="designer_monthly">מעצבת — חודשי</option>
+                <option value="designer_annual">מעצבת — שנתי</option>
                 <option value="carpenter_basic">נגר — בסיסי</option>
                 <option value="carpenter_pro">נגר — מקצועי</option>
                 <option value="company_standard">חברה — סטנדרט</option>
@@ -519,7 +520,7 @@
         <div class="modal-field"><label class="modal-label">תוכנית</label>
             <select class="modal-select" id="edit-plan-select">
                 <option value="free">חינמי</option><option value="designer_single">מעצבת — פרויקט בודד</option>
-                <option value="designer_monthly">מעצבת — חודשי</option><option value="carpenter_basic">נגר — בסיסי</option>
+                <option value="designer_monthly">מעצבת — חודשי</option><option value="designer_annual">מעצבת — שנתי</option><option value="carpenter_basic">נגר — בסיסי</option>
                 <option value="carpenter_pro">נגר — מקצועי</option><option value="company_standard">חברה — סטנדרט</option>
                 <option value="company_enterprise">חברה — ארגוני</option>
             </select></div>
@@ -586,8 +587,8 @@ async function _hashPassword(pw) {
     var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw));
     return [...new Uint8Array(buf)].map(x => x.toString(16).padStart(2,'0')).join('');
 }
-var PLAN_LABELS={free:'חינמי',designer_single:'מעצבת — בודד',designer_monthly:'מעצבת — חודשי',carpenter_basic:'נגר — בסיסי',carpenter_pro:'נגר — מקצועי',company_standard:'חברה — סטנדרט',company_enterprise:'חברה — ארגוני'};
-var PLAN_USER_TYPE={free:'free',designer_single:'designer',designer_monthly:'designer',carpenter_basic:'carpenter',carpenter_pro:'carpenter',company_standard:'company',company_enterprise:'company'};
+var PLAN_LABELS={free:'חינמי',designer_single:'מעצבת — בודד',designer_monthly:'מעצבת — חודשי',designer_annual:'מעצבת — שנתי',carpenter_basic:'נגר — בסיסי',carpenter_pro:'נגר — מקצועי',company_standard:'חברה — סטנדרט',company_enterprise:'חברה — ארגוני'};
+var PLAN_USER_TYPE={free:'free',designer_single:'designer',designer_monthly:'designer',designer_annual:'designer',carpenter_basic:'carpenter',carpenter_pro:'carpenter',company_standard:'company',company_enterprise:'company'};
 var DEFAULT_PRICING={pricingMode:'ranges',sqmPrice:800,sqmPriceNonMel:1040,lmPrice:1200,lmPriceNonMel:1560,lmHeightBase:1200,lmHeightBaseNonMel:1560,lmHeightThresholdCm:240,lmHeightStepCm:30,lmHeightStepPct:0.10,materialsBoardPrice:180,materialsBoardsPerSqm:1.4,materialsMultiplier:2.5,profitMultiplier:1.7,installPricePerUnit:110,installUnitCm:42.5,installHeightSurcharge:0.20,heightSurcharge:0.20,depthSurcharge:0.20,sandwichSurcharge:0.15,ranges:{maya:{melamine:{80:1050,120:1462,160:1658,200:2073,240:2487},nonMelamine:{80:1360,120:1900,160:2155,200:2700,240:3233}}},extras:{internalDrawer:150,externalDrawer:200,openCell:400,partition:150,shelfFreePerMeter:3,extraShelfMel:60,extraShelfNonMel:80,deskUnit:900,doorFramedMel:80,doorGlassMel:400,doorGlassBlack:600,doorMirror:350,upperUnit160:600,upperUnit240:900,upperUnitPerCm:3.75,cornerDrawers3:832,cornerDrawers4:907,cornerDrawerExtra:200,cornerDesk:900,fullCornerBase:2800,fullCornerShelf:120,wingConnection:400,sideCabMel:12,sideCabNonMel:15,sideCabDoors:300,slidingBase:800,slidingDoor:350,slidingGlass:200,slidingMirror:350,slidingGold:80,slidingBlack:50,slidingHeightSurcharge:0.15,nickelLegPrice:100}};
 
 async function checkAdminPassword(){var pw=document.getElementById('gate-password').value;var hash=await _hashPassword(pw);if(hash===ADMIN_PASSWORD_HASH){document.getElementById('admin-gate').style.display='none';_sb=supabase.createClient(_ADMIN_SB_URL,_ADMIN_SB_ANON);loadUsers();}else{document.getElementById('gate-error').style.display='block';document.getElementById('gate-password').value='';document.getElementById('gate-password').focus();}}
