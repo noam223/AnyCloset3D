@@ -193,6 +193,17 @@ function _showInactiveBanner(plan) {
 // ── Open payment via Make Scenario 1 (creates Grow payment link dynamically) ──
 async function _openPayment(planKey) {
     var SCENARIO1_WEBHOOK = 'https://hook.eu1.make.com/YOUR_SCENARIO1_WEBHOOK_URL';
+
+    // If webhook not configured yet, go to pricing page
+    if (SCENARIO1_WEBHOOK.indexOf('YOUR_SCENARIO1') !== -1) {
+        window.location.href = 'landing.html#pricing';
+        return;
+    }
+
+    // Show loading state on button
+    var btn = document.querySelector('#trial-expired-overlay button, #inactive-overlay button');
+    if (btn) { btn.disabled = true; btn.textContent = 'טוען...'; }
+
     try {
         var user = await Auth.getUser();
         var profile = await Auth.getProfile();
@@ -210,12 +221,15 @@ async function _openPayment(planKey) {
         if (data.payment_url) {
             window.location.href = data.payment_url;
         } else {
-            showToast('שגיאה ביצירת קישור תשלום — נסה שוב', 'error');
+            if (btn) { btn.disabled = false; btn.textContent = 'בחר תוכנית מנוי'; }
+            alert('שגיאה ביצירת קישור תשלום — נסה שוב');
         }
     } catch(e) {
-        showToast('שגיאת חיבור — נסה שוב', 'error');
+        if (btn) { btn.disabled = false; btn.textContent = 'בחר תוכנית מנוי'; }
+        alert('שגיאת חיבור — נסה שוב');
     }
 }
+window._openPayment = _openPayment;
 
 function _getPaymentLink(planKey) {
     // Returns a JS call string for onclick — actual payment goes through Make Scenario 1
