@@ -310,11 +310,24 @@ async function _openPayment(planKey, installments) {
         return;
     }
 
-    // Show loading state on CTA button
-    var cardId = 'annual-toggle-' + planKey;
-    var ctaBtn = document.getElementById(cardId + '-cta');
-    var btn = ctaBtn || document.querySelector('#trial-expired-overlay button[onclick*="_openPayment"]');
-    if (btn) { btn.disabled = true; btn.textContent = 'טוען...'; }
+    // Find the clicked button — any button with onclick containing this planKey
+    var btn = document.querySelector('button[onclick*="_openPayment(\'' + planKey + '\'"]');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ מעבד...'; }
+
+    // Show full-screen loading overlay so user knows something is happening
+    var loadingOverlay = document.createElement('div');
+    loadingOverlay.id = '_payment-loading-overlay';
+    loadingOverlay.style.cssText = 'position:fixed;inset:0;background:rgba(10,22,40,0.7);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;';
+    loadingOverlay.innerHTML = '<div style="width:48px;height:48px;border:4px solid rgba(255,255,255,0.2);border-top-color:#00d4ff;border-radius:50%;animation:_spin 0.8s linear infinite;"></div>' +
+        '<div style="color:#fff;font-size:1rem;font-weight:700;">מכין דף תשלום...</div>' +
+        '<style>@keyframes _spin{to{transform:rotate(360deg)}}</style>';
+    document.body.appendChild(loadingOverlay);
+
+    var removeLoading = function() {
+        var el = document.getElementById('_payment-loading-overlay');
+        if (el) el.remove();
+        if (btn) { btn.disabled = false; btn.textContent = 'התחל עכשיו'; }
+    };
 
     try {
         var user = await Auth.getUser();
@@ -335,13 +348,14 @@ async function _openPayment(planKey, installments) {
         var data = {};
         try { data = JSON.parse(rawText); } catch(pe) { /* not JSON */ }
         if (data.payment_url) {
+            // Keep loading overlay while redirecting
             window.location.href = data.payment_url;
         } else {
-            if (btn) { btn.disabled = false; btn.textContent = 'התחל עכשיו'; }
+            removeLoading();
             alert('שגיאה ביצירת קישור תשלום\n\nתשובת Make:\n' + rawText);
         }
     } catch(e) {
-        if (btn) { btn.disabled = false; btn.textContent = 'התחל עכשיו'; }
+        removeLoading();
         alert('שגיאת חיבור — נסה שוב');
     }
 }
