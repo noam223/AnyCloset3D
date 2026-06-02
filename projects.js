@@ -151,7 +151,7 @@ function _showTrialExpiredBanner(plan) {
         '<div style="font-size:3rem;margin-bottom:16px;">⏰</div>' +
         '<h2 style="color:#0f2040;margin-bottom:12px;">תקופת הניסיון הסתיימה</h2>' +
         '<p style="color:#475569;margin-bottom:24px;line-height:1.6;">7 ימי הניסיון החינמיים שלך הסתיימו.<br>כדי להמשיך להשתמש במערכת, בחר תוכנית מנוי.</p>' +
-        '<a href="' + _getPaymentLink(plan.key) + '" style="display:block;background:linear-gradient(135deg,#00d4ff,#0099cc);color:#0a1628;padding:14px 32px;border-radius:12px;font-weight:800;text-decoration:none;font-size:1.1rem;margin-bottom:12px;">בחר תוכנית מנוי</a>' +
+        '<button onclick="_openPayment(\'' + plan.key + '\')" style="display:block;width:100%;background:linear-gradient(135deg,#00d4ff,#0099cc);color:#0a1628;padding:14px 32px;border-radius:12px;font-weight:800;border:none;cursor:pointer;font-size:1.1rem;margin-bottom:12px;font-family:inherit;">בחר תוכנית מנוי</button>' +
         '<a href="landing.html#pricing" style="color:#475569;font-size:.85rem;">צפה בכל התוכניות</a>' +
         '</div>';
     document.body.appendChild(overlay);
@@ -185,7 +185,7 @@ function _showInactiveBanner(plan) {
         '<div style="font-size:3rem;margin-bottom:16px;">🔒</div>' +
         '<h2 style="color:#0f2040;margin-bottom:12px;">המנוי אינו פעיל</h2>' +
         '<p style="color:#475569;margin-bottom:24px;line-height:1.6;">כדי להמשיך להשתמש במערכת, חדש את המנוי שלך.</p>' +
-        '<a href="' + _getPaymentLink(plan.key) + '" style="display:block;background:linear-gradient(135deg,#00d4ff,#0099cc);color:#0a1628;padding:14px 32px;border-radius:12px;font-weight:800;text-decoration:none;font-size:1.1rem;">חדש מנוי</a>' +
+        '<button onclick="_openPayment(\'' + plan.key + '\')" style="display:block;width:100%;background:linear-gradient(135deg,#00d4ff,#0099cc);color:#0a1628;padding:14px 32px;border-radius:12px;font-weight:800;border:none;cursor:pointer;font-size:1.1rem;font-family:inherit;">חדש מנוי</button>' +
         '</div>';
     document.body.appendChild(overlay);
 }
