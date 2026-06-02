@@ -202,15 +202,30 @@ function _buildPaywallPlansHTML(userType) {
         // Features
         html += '<div style="flex:1;margin-bottom:12px;">' + featHtml + '</div>';
 
-        // CTA button
-        html += '<button onclick="_openPayment(\'' + p.key + '\')" style="' +
-            'width:100%;' +
-            'background:' + (isPopular ? 'linear-gradient(135deg,#00d4ff,#0099cc)' : '#e2e8f0') + ';' +
-            'color:' + (isPopular ? '#0a1628' : '#334155') + ';' +
-            'border:none;border-radius:10px;padding:10px 0;' +
-            'font-weight:800;font-size:.9rem;cursor:pointer;font-family:inherit;' +
-            'transition:opacity .15s;' +
-            '">' + (isPopular ? 'התחל עכשיו' : 'בחר תוכנית') + '</button>';
+        // Installments toggle for annual plans
+        var hasInstallments = p.key.indexOf('annual') !== -1;
+        if (hasInstallments) {
+            var cardId = 'annual-toggle-' + p.key;
+            html += '<div style="display:flex;border:1.5px solid #cbd5e1;border-radius:8px;overflow:hidden;margin-bottom:10px;font-size:.78rem;font-weight:700;">' +
+                '<button id="' + cardId + '-full" onclick="_annualToggle(\'' + p.key + '\',1)" style="flex:1;padding:6px 4px;border:none;background:#0099cc;color:#fff;cursor:pointer;font-family:inherit;font-weight:700;font-size:.78rem;">תשלום מלא</button>' +
+                '<button id="' + cardId + '-inst" onclick="_annualToggle(\'' + p.key + '\',12)" style="flex:1;padding:6px 4px;border:none;background:#f1f5f9;color:#475569;cursor:pointer;font-family:inherit;font-weight:700;font-size:.78rem;">12 תשלומים</button>' +
+                '</div>';
+            html += '<button id="' + cardId + '-cta" onclick="_openPayment(\'' + p.key + '\',1)" style="' +
+                'width:100%;' +
+                'background:linear-gradient(135deg,#00d4ff,#0099cc);color:#0a1628;' +
+                'border:none;border-radius:10px;padding:10px 0;' +
+                'font-weight:800;font-size:.9rem;cursor:pointer;font-family:inherit;' +
+                '">התחל עכשיו</button>';
+        } else {
+            // CTA button (no installments)
+            html += '<button onclick="_openPayment(\'' + p.key + '\',1)" style="' +
+                'width:100%;' +
+                'background:' + (isPopular ? 'linear-gradient(135deg,#00d4ff,#0099cc)' : '#e2e8f0') + ';' +
+                'color:' + (isPopular ? '#0a1628' : '#334155') + ';' +
+                'border:none;border-radius:10px;padding:10px 0;' +
+                'font-weight:800;font-size:.9rem;cursor:pointer;font-family:inherit;' +
+                '">' + (isPopular ? 'התחל עכשיו' : 'בחר תוכנית') + '</button>';
+        }
 
         html += '</div>';
     });
@@ -273,8 +288,29 @@ function _showInactiveBanner(plan) {
     document.body.appendChild(overlay);
 }
 
+// ── Toggle annual installments UI ────────────────────────────────────────────
+function _annualToggle(planKey, installments) {
+    var cardId = 'annual-toggle-' + planKey;
+    var btnFull = document.getElementById(cardId + '-full');
+    var btnInst = document.getElementById(cardId + '-inst');
+    var btnCta  = document.getElementById(cardId + '-cta');
+    if (!btnFull || !btnInst || !btnCta) return;
+
+    var isInst = installments === 12;
+    btnFull.style.background = isInst ? '#f1f5f9' : '#0099cc';
+    btnFull.style.color      = isInst ? '#475569'  : '#fff';
+    btnInst.style.background = isInst ? '#0099cc'  : '#f1f5f9';
+    btnInst.style.color      = isInst ? '#fff'     : '#475569';
+
+    // Update CTA onclick
+    btnCta.setAttribute('onclick', '_openPayment(\'' + planKey + '\',' + installments + ')');
+    btnCta.textContent = isInst ? 'התחל ב-12 תשלומים' : 'התחל עכשיו';
+}
+window._annualToggle = _annualToggle;
+
 // ── Open payment via Make Scenario 1 (creates Grow payment link dynamically) ──
-async function _openPayment(planKey) {
+async function _openPayment(planKey, installments) {
+    installments = installments || 1;
     var SCENARIO1_WEBHOOK = 'https://hook.eu1.make.com/2p1w789m4oeh3glw0pry61y0dd6vnlvd';
 
     // If webhook not configured yet, go to pricing page
@@ -283,8 +319,10 @@ async function _openPayment(planKey) {
         return;
     }
 
-    // Show loading state on button
-    var btn = document.querySelector('#trial-expired-overlay button, #inactive-overlay button');
+    // Show loading state on CTA button
+    var cardId = 'annual-toggle-' + planKey;
+    var ctaBtn = document.getElementById(cardId + '-cta');
+    var btn = ctaBtn || document.querySelector('#trial-expired-overlay button[onclick*="_openPayment"]');
     if (btn) { btn.disabled = true; btn.textContent = 'טוען...'; }
 
     try {
@@ -294,10 +332,11 @@ async function _openPayment(planKey) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                plan:     planKey,
-                email:    user ? user.email : '',
-                fullName: (profile && profile.full_name) ? profile.full_name : (user ? user.email : ''),
-                phone:    (profile && profile.phone) ? profile.phone : ''
+                plan:         planKey,
+                installments: installments,
+                email:        user ? user.email : '',
+                fullName:     (profile && profile.full_name) ? profile.full_name : (user ? user.email : ''),
+                phone:        (profile && profile.phone) ? profile.phone : ''
             })
         });
         var rawText = await res.text();
@@ -307,11 +346,11 @@ async function _openPayment(planKey) {
         if (data.payment_url) {
             window.location.href = data.payment_url;
         } else {
-            if (btn) { btn.disabled = false; btn.textContent = 'בחר תוכנית מנוי'; }
+            if (btn) { btn.disabled = false; btn.textContent = 'התחל עכשיו'; }
             alert('שגיאה ביצירת קישור תשלום\n\nתשובת Make:\n' + rawText);
         }
     } catch(e) {
-        if (btn) { btn.disabled = false; btn.textContent = 'בחר תוכנית מנוי'; }
+        if (btn) { btn.disabled = false; btn.textContent = 'התחל עכשיו'; }
         alert('שגיאת חיבור — נסה שוב');
     }
 }
