@@ -92,11 +92,12 @@
     var _features = await loadFeatures();
     var _planInfo  = window._plan;
 
-    // Hide pricing section for designers (showPricing: false)
-    // Only hide the price boxes row — NOT the whole wrapper, so btn-add-to-cart stays visible
-    if (_features && _features.showPricing === false) {
+    // price-boxes-row starts hidden (display:none in HTML) — show only if showPricing is true
+    window._showPricing = (_features && _features.showPricing === true);
+    if (window._showPricing) {
         var priceBoxesRow = document.getElementById('price-boxes-row');
-        if (priceBoxesRow) priceBoxesRow.style.display = 'none';
+        if (priceBoxesRow) priceBoxesRow.style.display = 'flex';
+    } else {
         var lsFooter = document.querySelector('.left-sidebar-footer');
         if (lsFooter) lsFooter.style.display = 'none';
     }

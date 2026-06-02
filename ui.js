@@ -5598,7 +5598,7 @@ window.updateLeftSidebar = function() {
             ${activeLabel}
             <div class="cart-mini-card-title">${titleText}</div>
             <div class="cart-mini-card-desc" dir="rtl">${item.dimsStr}</div>
-            <div class="cart-mini-card-price"><span dir="ltr">${item.price}</span> <span style="font-size:0.85rem; font-weight:normal; color:var(--text-light);">+ <span dir="ltr">₪${itemInstall.toLocaleString()}</span> התקנה</span></div>
+            ${window._showPricing !== false ? `<div class="cart-mini-card-price"><span dir="ltr">${item.price}</span> <span style="font-size:0.85rem; font-weight:normal; color:var(--text-light);">+ <span dir="ltr">₪${itemInstall.toLocaleString()}</span> התקנה</span></div>` : ''}
             ${_wallSelectorHTML}
             <div class="cart-mini-actions">
                 <button class="cart-mini-btn btn-edit-mini" onclick="event.stopPropagation(); editCartItem(${index});"><i class="fa-solid fa-pen"></i> ערוך</button>
