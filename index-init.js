@@ -93,9 +93,10 @@
     var _planInfo  = window._plan;
 
     // Hide pricing section for designers (showPricing: false)
+    // Only hide the price boxes row — NOT the whole wrapper, so btn-add-to-cart stays visible
     if (_features && _features.showPricing === false) {
-        var priceSec = document.getElementById('price-section-wrap');
-        if (priceSec) priceSec.style.display = 'none';
+        var priceBoxesRow = document.getElementById('price-boxes-row');
+        if (priceBoxesRow) priceBoxesRow.style.display = 'none';
         var lsFooter = document.querySelector('.left-sidebar-footer');
         if (lsFooter) lsFooter.style.display = 'none';
     }
