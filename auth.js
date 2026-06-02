@@ -354,6 +354,7 @@ window.Auth = {
             maxDevices,
             subscriptionStatus: (profile && profile.subscription_status) || 'active',
             subscriptionEndsAt: (profile && profile.subscription_ends_at) || null,
+            trialEndsAt: (profile && profile.trial_ends_at) || null,
         };
     },
 
@@ -364,11 +365,91 @@ window.Auth = {
     },
 
     // ── Check if subscription is active ─────────────────────────────────────
+    // Returns: { active: bool, reason: 'active'|'cancelled'|'trial'|'trial_expired'|'subscription_expired'|'inactive'|'free',
+    //            trialEndsAt?, subscriptionEndsAt? }
     isSubscriptionActive: async function() {
         const profile = await this.getProfile();
-        if (!profile) return false;
-        if (!profile.plan || profile.plan === 'free') return true;
-        return profile.subscription_status === 'active';
+        if (!profile) return { active: false, reason: 'no_profile' };
+
+        const status = profile.subscription_status;
+
+        // Trial period check
+        if (status === 'trial') {
+            if (!profile.trial_ends_at) return { active: true, reason: 'trial' };
+            const trialEnd = new Date(profile.trial_ends_at);
+            if (new Date() < trialEnd) {
+                return { active: true, reason: 'trial', trialEndsAt: trialEnd };
+            } else {
+                return { active: false, reason: 'trial_expired', trialEndsAt: trialEnd };
+            }
+        }
+
+        // Active subscription — also check subscription_ends_at if set
+        if (status === 'active') {
+            if (profile.subscription_ends_at) {
+                const subEnd = new Date(profile.subscription_ends_at);
+                if (new Date() > subEnd) {
+                    // Subscription period ended — Scenario 3 should have renewed it,
+                    // but if it failed (charge failed), treat as expired
+                    return { active: false, reason: 'subscription_expired', subscriptionEndsAt: subEnd };
+                }
+            }
+            return { active: true, reason: 'active' };
+        }
+
+        // Cancelled subscription — user cancelled but still within paid period
+        if (status === 'cancelled') {
+            if (profile.subscription_ends_at) {
+                const subEnd = new Date(profile.subscription_ends_at);
+                if (new Date() < subEnd) {
+                    // Still within paid period — allow access, show "cancelled" notice
+                    return { active: true, reason: 'cancelled', subscriptionEndsAt: subEnd };
+                }
+            }
+            // Period has ended — block access
+            return { active: false, reason: 'subscription_expired' };
+        }
+
+        // No plan / free — allow access
+        if (!profile.plan || profile.plan === 'free') return { active: true, reason: 'free' };
+
+        return { active: false, reason: 'inactive' };
+    },
+
+    // ── Cancel subscription (stops future charges, access until period end) ──
+    cancelSubscription: async function() {
+        const sb = _getClient(); if (!sb) return { error: 'SDK not loaded' };
+        const user = await this.getUser();
+        if (!user) return { error: 'Not logged in' };
+
+        // Set status to 'cancelled' — Scenario 3 skips cancelled subscriptions
+        // subscription_ends_at is intentionally left unchanged so user keeps access
+        const { error } = await sb.from('profiles').update({
+            subscription_status: 'cancelled'
+        }).eq('id', user.id);
+
+        if (error) return { error: error.message };
+
+        // Bust profile cache so next call to isSubscriptionActive() sees new status
+        this._profileCache = null;
+        return { success: true };
+    },
+
+    // ── Start free trial (no payment required) ───────────────────────────────
+    startFreeTrial: async function(plan) {
+        const sb = _getClient(); if (!sb) return { error: 'SDK not loaded' };
+        const user = await this.getUser();
+        if (!user) return { error: 'Not logged in' };
+
+        const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        const { error } = await sb.from('profiles').update({
+            plan,
+            subscription_status: 'trial',
+            trial_ends_at: trialEndsAt
+        }).eq('id', user.id);
+
+        if (error) return { error: error.message };
+        return { success: true, trialEndsAt };
     },
 
     // ── Listen to auth state changes ─────────────────────────────────────────
@@ -737,106 +818,57 @@ window.Projects = {
 
 window.GrowPayments = {
 
-    // ── Make Scenario 1 webhook ──
-    MAKE_TRIAL_WEBHOOK: 'https://hook.eu1.make.com/2p1w789m4oeh3glw0pry61y0dd6vnlvd',
+    // ── Make Scenario 1 webhook — creates Grow payment link dynamically ──
+    // Replace with your actual Scenario 1 webhook URL after importing the blueprint
+    MAKE_PAYMENT_WEBHOOK: 'https://hook.eu1.make.com/YOUR_SCENARIO1_WEBHOOK_URL',
 
-    PAYMENT_LINKS: {
-        designer_monthly:  'https://grow.co.il/pay/YOUR_DESIGNER_MONTHLY_LINK',
-        designer_annual:   'https://grow.co.il/pay/YOUR_DESIGNER_ANNUAL_LINK',
-        carpenter_basic:   'https://grow.co.il/pay/YOUR_CARPENTER_BASIC_LINK',
-        carpenter_pro:     'https://grow.co.il/pay/YOUR_CARPENTER_PRO_LINK',
-        company_standard:  'https://grow.co.il/pay/YOUR_COMPANY_STANDARD_LINK',
-        company_enterprise:'https://grow.co.il/pay/YOUR_COMPANY_ENTERPRISE_LINK',
-        // Project extension payment link
-        project_extension: 'https://grow.co.il/pay/YOUR_EXTENSION_LINK'
-    },
-
-    // Start free-week trial via Make → GROW tokenization flow
+    // Start free trial — no payment required, just set trial period in DB
     startTrial: async function(plan) {
         const user = await Auth.getUser();
         if (!user) { window.location.href = 'login.html'; return; }
 
-        if (!this.MAKE_TRIAL_WEBHOOK || this.MAKE_TRIAL_WEBHOOK.startsWith('REPLACE_')) {
-            alert('מערכת התשלומים עדיין לא מוגדרת. פנה לתמיכה.');
-            return;
+        try {
+            const result = await Auth.startFreeTrial(plan);
+            if (result.error) throw new Error(result.error);
+            // Redirect to app after trial started
+            window.location.href = 'projects.html?status=trial_started&plan=' + plan;
+        } catch (err) {
+            alert('שגיאה: ' + (err.message || 'נסה שוב'));
         }
+    },
+
+    // Open payment page — calls Make Scenario 1 which creates a Grow payment link
+    openPayment: async function(plan) {
+        const user = await Auth.getUser();
+        if (!user) { window.location.href = 'login.html'; return; }
 
         try {
-            // Try to get phone from profiles table (more up-to-date than user_metadata)
-            const sb = _getClient();
-            let phone = user.user_metadata?.phone || '';
-            let fullName = user.user_metadata?.full_name || '';
-            if (sb) {
-                const { data: profile } = await sb
-                    .from('profiles')
-                    .select('phone, full_name')
-                    .eq('id', user.id)
-                    .single();
-                if (profile) {
-                    phone    = profile.phone    || phone;
-                    fullName = profile.full_name || fullName;
-                }
-            }
-
-            // If no phone — ask user before proceeding (Grow requires valid phone)
-            if (!phone || phone.trim() === '') {
-                phone = window.prompt('נא להזין מספר טלפון לצורך יצירת קישור תשלום:', '05');
-                if (!phone || phone.trim() === '') {
-                    alert('נדרש מספר טלפון להמשך התהליך.');
-                    return;
-                }
-                // Save phone to profile for future use
-                if (sb) {
-                    await sb.from('profiles').update({ phone: phone.trim() }).eq('id', user.id);
-                }
-            }
-
-            // Normalize phone: convert +972XXXXXXXXX → 0XXXXXXXXX (Israeli local format)
-            let normalizedPhone = phone.trim();
-            if (normalizedPhone.startsWith('+972')) {
-                normalizedPhone = '0' + normalizedPhone.slice(4);
-            } else if (normalizedPhone.startsWith('972')) {
-                normalizedPhone = '0' + normalizedPhone.slice(3);
-            }
-
-            const res = await fetch(this.MAKE_TRIAL_WEBHOOK, {
+            const profile = await Auth.getProfile();
+            const res = await fetch(this.MAKE_PAYMENT_WEBHOOK, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     plan,
                     email:    user.email,
-                    name:     fullName || user.email,
-                    fullName: fullName || user.email,
-                    phone:    normalizedPhone
+                    fullName: (profile && profile.full_name) ? profile.full_name : user.email,
+                    phone:    (profile && profile.phone) ? profile.phone : ''
                 })
             });
             const data = await res.json();
             if (data.payment_url) {
                 window.location.href = data.payment_url;
             } else {
-                throw new Error(data.error || 'שגיאה ביצירת קישור תשלום');
+                alert('שגיאה ביצירת קישור תשלום — נסה שוב');
             }
-        } catch (err) {
-            alert('שגיאה: ' + (err.message || 'נסה שוב'));
+        } catch(err) {
+            alert('שגיאת חיבור — נסה שוב: ' + (err.message || ''));
         }
     },
 
-    openPayment: async function(plan) {
-        const user = await Auth.getUser();
-        if (!user) { window.location.href = 'login.html'; return; }
-        const link = this.PAYMENT_LINKS[plan];
-        if (!link) return;
-        const url = `${link}?email=${encodeURIComponent(user.email)}&user_id=${user.id}&plan=${plan}`;
-        window.open(url, '_blank');
-    },
-
     openProjectExtension: async function(projectId) {
-        const user = await Auth.getUser();
-        if (!user) { window.location.href = 'login.html'; return; }
-        const link = this.PAYMENT_LINKS['project_extension'];
-        if (!link) return;
-        const url = `${link}?email=${encodeURIComponent(user.email)}&user_id=${user.id}&project_id=${projectId}&action=extend`;
-        window.open(url, '_blank');
+        // For project extensions, use openPayment with a special plan key
+        // or implement a separate Grow payment link for extensions
+        await this.openPayment('project_extension');
     }
 };
 
