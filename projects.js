@@ -36,11 +36,25 @@ var _USER_TYPE_LABELS = {
     var ok = await Auth.requireAuth();
     if (!ok) return;
 
-    var results  = await Promise.all([Auth.getUser(), Auth.getPlan(), Projects.list(), Auth.isSubscriptionActive()]);
-    var user     = results[0];
-    var plan     = results[1];
-    var projects = results[2];
-    var subStatus = results[3];
+    var user, plan, projects, subStatus;
+    try {
+        var results = await Promise.all([Auth.getUser(), Auth.getPlan(), Projects.list(), Auth.isSubscriptionActive()]);
+        user      = results[0];
+        plan      = results[1];
+        projects  = results[2];
+        subStatus = results[3];
+    } catch(e) {
+        console.error('[DEBUG] Promise.all failed:', e);
+        // Fallback: load individually so one failure doesn't block everything
+        try { user      = await Auth.getUser(); }           catch(e2) { console.error('[DEBUG] getUser failed:', e2); }
+        try { plan      = await Auth.getPlan(); }           catch(e2) { console.error('[DEBUG] getPlan failed:', e2); }
+        try { projects  = await Projects.list(); }          catch(e2) { console.error('[DEBUG] Projects.list failed:', e2); }
+        try { subStatus = await Auth.isSubscriptionActive(); } catch(e2) { console.error('[DEBUG] isSubscriptionActive failed:', e2); }
+    }
+    console.log('[DEBUG] subStatus after load:', JSON.stringify(subStatus));
+    subStatus = subStatus || { active: true, reason: 'free' };
+    plan      = plan      || { label: '—', key: 'free', features: {} };
+    projects  = projects  || [];
 
     _plan     = plan;
     _projects = projects;
