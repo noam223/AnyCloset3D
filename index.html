@@ -897,12 +897,14 @@
     </div>
     <div class="cart-items-list" id="cart-items-list"></div>
     <div class="left-sidebar-footer">
+        <div id="sidebar-pricing-summary" style="display:none;">
         <div class="sidebar-summary-breakdown" style="font-size: 0.95rem; color: var(--text-light); margin-bottom: 12px; font-weight: 500;">
             <div style="display: flex; justify-content: space-between; margin-bottom: 6px;"><span>סה"כ ארונות:</span><span id="sidebar-cab-total" style="color: var(--text-dark); font-weight: 600;">₪0</span></div>
             <div style="display: flex; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px dashed var(--border); padding-bottom: 8px;"><span>סה"כ התקנות:</span><span id="sidebar-inst-total" style="color: var(--text-dark); font-weight: 600;">₪0</span></div>
         </div>
         <div class="total-label">סה"כ פרויקט לתשלום:</div>
         <div class="total-price" id="left-sidebar-total">₪0</div>
+        </div>
         <div style="display:flex; gap:8px; margin-top:15px;">
             <button class="view-btn cart-btn" style="flex:1; justify-content: center; background: var(--primary); color: white; border: none; padding: 12px; font-size: 1rem;" onclick="openOrderModal('customer')">
                 <i class="fa-solid fa-file-invoice-dollar"></i> הצעת מחיר

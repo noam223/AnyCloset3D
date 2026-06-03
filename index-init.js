@@ -92,14 +92,13 @@
     var _features = await loadFeatures();
     var _planInfo  = window._plan;
 
-    // price-boxes-row starts hidden (display:none in HTML) — show only if showPricing is true
+    // price-boxes-row and sidebar-pricing-summary start hidden — show only if showPricing is true
     window._showPricing = (_features && _features.showPricing === true);
     if (window._showPricing) {
         var priceBoxesRow = document.getElementById('price-boxes-row');
         if (priceBoxesRow) priceBoxesRow.style.display = 'flex';
-    } else {
-        var lsFooter = document.querySelector('.left-sidebar-footer');
-        if (lsFooter) lsFooter.style.display = 'none';
+        var pricingSummary = document.getElementById('sidebar-pricing-summary');
+        if (pricingSummary) pricingSummary.style.display = 'block';
     }
 
     // All feature buttons start hidden in HTML — show them based on plan features
