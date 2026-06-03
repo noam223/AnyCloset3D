@@ -276,8 +276,16 @@ function _openPromptDialog(imageFront, image3dLeft, image3dRight, hexColor, cabi
     var dims = [spec.widthCm && 'רוחב '+spec.widthCm+' ס"מ', spec.heightCm && 'גובה '+spec.heightCm+' ס"מ', spec.depthCm && 'עומק '+spec.depthCm+' ס"מ'].filter(Boolean).join(', ');
     var openNote = '';
     if (spec.hasOpenCells) {
-        openNote = '\n- חשוב: לארון ' + (spec.openCellCount||'') + ' תאים פתוחים ללא דלתות — יש להציג אותם פתוחים.';
-        if (spec.hasSideOpenCells) openNote += '\n- חלק מהתאים הם כוורת צד — הדופן הצדדית פתוחה ואין לוח סוגר מהצד.';
+        var cnt = spec.openCellCount || 1;
+        if (spec.hasSideOpenCells) {
+            openNote = cnt === 1
+                ? '\n- חשוב: לארון תא פתוח אחד ללא דלת, פתוח מהחזית ומהצד (ללא לוח צד סוגר). יש להציג אותו פתוח לחלוטין.'
+                : '\n- חשוב: לארון ' + cnt + ' תאים פתוחים ללא דלתות, חלקם פתוחים גם מהצד. יש להציג אותם פתוחים.';
+        } else {
+            openNote = cnt === 1
+                ? '\n- חשוב: לארון תא פתוח אחד ללא דלת — יש להציג אותו פתוח.'
+                : '\n- חשוב: לארון ' + cnt + ' תאים פתוחים ללא דלתות — יש להציג אותם פתוחים.';
+        }
     }
     var defaultPrompt = 'צור הדמיה פוטוריאליסטית של ארון זה מותקן בחדר שינה מעוצב מול קיר.' +
         '\nשמור על צבעים, פרופורציות ופרטי עיצוב מדויקים משלוש תמונות הייחוס (חזית, זווית שמאל, זווית ימין).' +

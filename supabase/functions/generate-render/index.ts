@@ -66,9 +66,16 @@ serve(async (req) => {
 
     let openCellsDesc = '';
     if (spec.hasOpenCells) {
-      openCellsDesc = `חשוב: לארון ${spec.openCellCount || ''} תא/תאים פתוחים ללא דלתות — יש להציג אותם פתוחים בהדמיה.`;
+      const count = spec.openCellCount || 1;
       if (spec.hasSideOpenCells) {
-        openCellsDesc += ' חלק מהתאים הפתוחים הם כוורת צד — כלומר הדופן הצדדית של הכוורת פתוחה ואין לה לוח סוגר מהצד.';
+        // Side open cell — one open compartment with no side panel
+        openCellsDesc = count === 1
+          ? 'חשוב: לארון תא פתוח אחד ללא דלת — התא פתוח מהחזית ומהצד (אין לוח צד סוגר). יש להציג את התא הזה פתוח לחלוטין משני הכיוונים.'
+          : `חשוב: לארון ${count} תאים פתוחים ללא דלתות — חלקם פתוחים גם מהצד (ללא לוח צד). יש להציג את כל התאים הפתוחים.`;
+      } else {
+        openCellsDesc = count === 1
+          ? 'חשוב: לארון תא פתוח אחד ללא דלת — יש להציג אותו פתוח בהדמיה.'
+          : `חשוב: לארון ${count} תאים פתוחים ללא דלתות — יש להציג אותם פתוחים בהדמיה.`;
       }
     }
 
