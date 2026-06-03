@@ -17,6 +17,7 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap; // softer shadow edges
 container.appendChild(renderer.domElement);
 window.renderer = renderer;
 window.camera = camera;
+window.scene = scene;
 
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; controls.maxPolarAngle = Math.PI / 2;
