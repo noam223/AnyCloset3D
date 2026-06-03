@@ -19,6 +19,7 @@ window.camera = camera;
 
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; controls.maxPolarAngle = Math.PI / 2;
+window.controls = controls;
 
 // Track whether user has manually orbited (so we don't reset camera on every rebuild)
 window._orbitFree = false;
