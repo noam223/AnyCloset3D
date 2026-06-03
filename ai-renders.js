@@ -648,7 +648,7 @@ function _injectStyles() {
         }
         .ai-render-thumb {
             position: relative; border-radius: 10px; overflow: hidden;
-            aspect-ratio: 3/4; cursor: pointer; background: #f1f5f9;
+            aspect-ratio: 1/1; cursor: pointer; background: #f1f5f9;
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
             transition: transform 0.18s, box-shadow 0.18s;
         }
