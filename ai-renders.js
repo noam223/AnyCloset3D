@@ -645,6 +645,7 @@ function _injectStyles() {
         .ai-renders-grid {
             flex: 1; overflow-y: auto; padding: 4px 12px 20px;
             display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+            align-items: start;
         }
         .ai-render-thumb {
             position: relative; border-radius: 10px; overflow: hidden;
