@@ -5768,7 +5768,8 @@ function _buildPrintHTML(mode) {
         totalInstallPrice += itemInstall;
         totalCostPrice += itemCost;
 
-        const priceRows = isFactory
+        const _hidePrices = (window._showPricing === false);
+        const priceRows = _hidePrices ? '' : isFactory
             ? `<tr><th style="background:#fef9c3;">מחיר התקנה ללקוח</th><td style="font-weight:bold;color:#713f12;font-size:1.1rem;text-align:right;">₪${(item.installPrice || 0).toLocaleString()}</td></tr>`
             : `<tr><th style="background:#eff6ff;">מחיר ארון ללקוח</th><td style="font-weight:bold;color:#1e3a5f;font-size:1.1rem;text-align:right;">₪${numericPrice.toLocaleString()}</td></tr>
                <tr><th style="background:#eff6ff;">הובלה והתקנה</th><td style="font-weight:bold;color:#1e3a5f;font-size:1.1rem;text-align:right;">₪${itemInstall.toLocaleString()}</td></tr>`;
@@ -5920,7 +5921,7 @@ function _buildPrintHTML(mode) {
         }
     });
 
-    const summaryHTML = isFactory
+    const summaryHTML = _hidePrices ? '' : isFactory
         ? `<div style="margin-top:20px;padding:15px;background:#fefce8;border:2px solid #fef08a;border-radius:8px;">
                <div style="font-size:1.4rem;font-weight:800;color:#713f12;display:flex;justify-content:space-between;">
                    <span>סה"כ עלות התקנה:</span><span dir="ltr">₪${totalInstallPrice.toLocaleString()}</span>
@@ -5938,7 +5939,7 @@ function _buildPrintHTML(mode) {
                </div>
            </div>`;
 
-    const title = isFactory ? 'שרטוט ייצור והתקנה' : 'הצעת מחיר ללקוח';
+    const title = isFactory ? 'שרטוט ייצור והתקנה' : (_hidePrices ? 'סיכום פרויקט ללקוח' : 'הצעת מחיר ללקוח');
     const custName = state.customer.name || 'לא צוין';
     const custPhone = state.customer.phone || 'לא צוין';
     const custOrder = state.customer.orderNum || 'לא צוין';
@@ -6394,6 +6395,7 @@ function _buildCustomerSummaryHTML(logoDataUrl) {
     const custPhone = state.customer?.phone   || '';
     const custOrder = state.customer?.orderNum || '';
     const custAddr  = state.customer?.address  || '';
+    const _hidePrices = (window._showPricing === false);
 
     const rows = _buildCartData();
     let totalCabPrice = 0, totalInstallPrice = 0;
@@ -6406,8 +6408,8 @@ function _buildCustomerSummaryHTML(logoDataUrl) {
         <tr>
             <td style="padding:10px 14px;border:1px solid #e2e8f0;font-weight:600;color:#1e3a5f;">${r.title}</td>
             <td style="padding:10px 14px;border:1px solid #e2e8f0;font-size:0.9rem;color:#334155;line-height:1.6;">${r.details.replace(/ \| /g,'<br>')}</td>
-            <td style="padding:10px 14px;border:1px solid #e2e8f0;text-align:center;font-weight:700;color:#1e3a5f;white-space:nowrap;">₪${r.cabPrice.toLocaleString()}</td>
-            <td style="padding:10px 14px;border:1px solid #e2e8f0;text-align:center;color:#475569;white-space:nowrap;">₪${r.instPrice.toLocaleString()}</td>
+            ${_hidePrices ? '' : `<td style="padding:10px 14px;border:1px solid #e2e8f0;text-align:center;font-weight:700;color:#1e3a5f;white-space:nowrap;">₪${r.cabPrice.toLocaleString()}</td>
+            <td style="padding:10px 14px;border:1px solid #e2e8f0;text-align:center;color:#475569;white-space:nowrap;">₪${r.instPrice.toLocaleString()}</td>`}
         </tr>`;
     });
 
@@ -6462,21 +6464,21 @@ function _buildCustomerSummaryHTML(logoDataUrl) {
     <tr>
       <th style="width:18%;">ארון</th>
       <th>פירוט</th>
-      <th style="width:14%;text-align:center;">מחיר ארון</th>
-      <th style="width:14%;text-align:center;">התקנה</th>
+      ${_hidePrices ? '' : `<th style="width:14%;text-align:center;">מחיר ארון</th>
+      <th style="width:14%;text-align:center;">התקנה</th>`}
     </tr>
   </thead>
   <tbody>
     ${rowsHTML}
-    <tr class="totals-row">
+    ${_hidePrices ? '' : `<tr class="totals-row">
       <td colspan="2" style="padding:10px 14px;border:1px solid #e2e8f0;text-align:right;">סה"כ</td>
       <td style="padding:10px 14px;border:1px solid #e2e8f0;text-align:center;color:#1e3a5f;">₪${totalCabPrice.toLocaleString()}</td>
       <td style="padding:10px 14px;border:1px solid #e2e8f0;text-align:center;color:#1e3a5f;">₪${totalInstallPrice.toLocaleString()}</td>
-    </tr>
+    </tr>`}
   </tbody>
 </table>
 
-<div class="grand-total">סה"כ לתשלום (כולל התקנה): ₪${grandTotal.toLocaleString()}</div>
+${_hidePrices ? '' : `<div class="grand-total">סה"כ לתשלום (כולל התקנה): ₪${grandTotal.toLocaleString()}</div>`}
 </body>
 </html>`;
 }
