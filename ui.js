@@ -3790,6 +3790,9 @@ window._updateBedHandles = function() {
         window._bedDrag = null;
         if (typeof controls !== 'undefined') controls.enabled = true;
         document.body.classList.remove('dragging');
+        // Rebuild room with full GLB bed now that drag ended
+        if (typeof _buildRoom === 'function') _buildRoom();
+        window._updateBedHandles();
     });
 })();
 

@@ -795,35 +795,50 @@ function _buildRoom() {
     }
 
     // ── Bed model ──────────────────────────────────────────────────────────────
-    // Add the loaded GLB bed to the room group at the stored position.
-    // The bed sits on the floor (Y=0). Position is in world-space cm.
+    // Add bed to the room group at the stored position.
+    // During drag: show a lightweight proxy box instead of the GLB for smooth performance.
     if (window._bedGroup) {
-        const bed = window._bedGroup.clone();
-        // Ensure shadows are cast (clone doesn't always preserve castShadow)
-        bed.traverse(function(child) {
-            if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }
-        });
         const bp = window._bedPos || { x: 100, z: 200 };
-        // Use manual scale if set, otherwise use auto-computed scale (meters→cm)
         const bs = (window._bedScale !== null && window._bedScale !== undefined)
             ? window._bedScale
             : (window._bedAutoScale || 100);
-        bed.scale.setScalar(bs);
-
-        // Apply Y-axis rotation (0/90/180/270 degrees)
         const bedRotRad = ((window._bedRotation || 0) * Math.PI) / 180;
-        bed.rotation.y = bedRotRad;
 
-        // After scaling + rotation, compute bounding box to find the bottom of the model
-        // so we can place it exactly on the floor (Y=0).
-        bed.updateMatrixWorld(true);
-        const bedBox = new THREE.Box3().setFromObject(bed);
-        const bedMinY = bedBox.min.y;  // bottom of scaled model in local space
-        // Shift up so bottom sits at Y=0
-        bed.position.set(bp.x, -bedMinY, bp.z);
-        rg.add(bed);
-        // Store reference to the live clone for handle positioning
-        window._bedMesh = bed;
+        if (window._bedDrag) {
+            // ── Proxy box during drag ──────────────────────────────────────
+            // Compute bed bounding box size from the GLB (cached after first load)
+            if (!window._bedBoxSize) {
+                const tmp = window._bedGroup.clone();
+                tmp.scale.setScalar(bs);
+                tmp.rotation.y = bedRotRad;
+                tmp.updateMatrixWorld(true);
+                const b = new THREE.Box3().setFromObject(tmp);
+                window._bedBoxSize = b.getSize(new THREE.Vector3());
+            }
+            const sz = window._bedBoxSize;
+            const geo = new THREE.BoxGeometry(sz.x, sz.y, sz.z);
+            const mat = new THREE.MeshLambertMaterial({ color: 0xd4b896, transparent: true, opacity: 0.7 });
+            const proxy = new THREE.Mesh(geo, mat);
+            proxy.castShadow = false;
+            proxy.rotation.y = bedRotRad;
+            proxy.position.set(bp.x, sz.y / 2, bp.z);
+            rg.add(proxy);
+            window._bedMesh = proxy;
+        } else {
+            // ── Full GLB bed ───────────────────────────────────────────────
+            const bed = window._bedGroup.clone();
+            bed.traverse(function(child) {
+                if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }
+            });
+            bed.scale.setScalar(bs);
+            bed.rotation.y = bedRotRad;
+            bed.updateMatrixWorld(true);
+            const bedBox = new THREE.Box3().setFromObject(bed);
+            const bedMinY = bedBox.min.y;
+            bed.position.set(bp.x, -bedMinY, bp.z);
+            rg.add(bed);
+            window._bedMesh = bed;
+        }
     }
 
     // ── Office Chair model ────────────────────────────────────────────────────
