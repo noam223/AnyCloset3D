@@ -211,6 +211,23 @@ window._generateRender = async function() {
         if (typeof buildCabinet === 'function') buildCabinet();
     }
     await new Promise(function(r) { setTimeout(r, 600); });
+
+    // Debug: log camera position for calibration
+    if (window.camera) {
+        console.log('[AI Render] Camera position after 3D switch:', {
+            x: Math.round(window.camera.position.x),
+            y: Math.round(window.camera.position.y),
+            z: Math.round(window.camera.position.z),
+        });
+        if (window.controls) {
+            console.log('[AI Render] Controls target:', {
+                x: Math.round(window.controls.target.x),
+                y: Math.round(window.controls.target.y),
+                z: Math.round(window.controls.target.z),
+            });
+        }
+    }
+
     var image3d;
     try { image3d = window.renderer.domElement.toDataURL('image/jpeg', 0.85); }
     catch(e) { image3d = imageFront; }
