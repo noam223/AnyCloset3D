@@ -217,9 +217,9 @@ window._generateRender = async function() {
     try { imageFront = window.renderer.domElement.toDataURL('image/jpeg', 0.85); }
     catch(e) { _showStatus('error', 'שגיאה בצילום חזית'); btn.disabled = false; return; }
 
-    // Screenshot 2: 3D angle — user-calibrated position, please update after debug
-    _showStatus('loading', '<i class="fa-solid fa-spinner fa-spin"></i> מצלם זווית...');
-    var image3d;
+    // Screenshot 2: 3D angle left (-291, 185, 511)
+    _showStatus('loading', '<i class="fa-solid fa-spinner fa-spin"></i> מצלם זווית שמאל...');
+    var image3dLeft;
     try {
         if (window.camera && window.controls && window.renderer && window.scene) {
             window.camera.position.set(-291, 185, 511);
@@ -227,11 +227,25 @@ window._generateRender = async function() {
             window.controls.update();
             window.camera.updateMatrixWorld(true);
             window.renderer.render(window.scene, window.camera);
-            console.log('[3D shot]', window.camera.position.x.toFixed(0), window.camera.position.y.toFixed(0), window.camera.position.z.toFixed(0));
         }
         await new Promise(function(r) { setTimeout(r, 100); });
-        image3d = window.renderer.domElement.toDataURL('image/jpeg', 0.85);
-    } catch(e) { image3d = imageFront; }
+        image3dLeft = window.renderer.domElement.toDataURL('image/jpeg', 0.85);
+    } catch(e) { image3dLeft = imageFront; }
+
+    // Screenshot 3: 3D angle right (344, 178, 368)
+    _showStatus('loading', '<i class="fa-solid fa-spinner fa-spin"></i> מצלם זווית ימין...');
+    var image3dRight;
+    try {
+        if (window.camera && window.controls && window.renderer && window.scene) {
+            window.camera.position.set(344, 178, 368);
+            window.controls.target.set(0, cabinetH / 2, 0);
+            window.controls.update();
+            window.camera.updateMatrixWorld(true);
+            window.renderer.render(window.scene, window.camera);
+        }
+        await new Promise(function(r) { setTimeout(r, 100); });
+        image3dRight = window.renderer.domElement.toDataURL('image/jpeg', 0.85);
+    } catch(e) { image3dRight = imageFront; }
 
     // Restore original camera
     if (_savedPos && window.camera && window.controls) {
@@ -241,35 +255,18 @@ window._generateRender = async function() {
         window.renderer.render(window.scene, window.camera);
     }
 
+    var image3d = image3dLeft; // keep backward compat
+
     _hideStatus();
     btn.disabled = false;
 
-    // DEBUG: show both screenshots before sending
-    var dbg = document.createElement('div');
-    dbg.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;';
-    dbg.innerHTML =
-        '<div style="color:white;font-size:1rem;font-weight:700;">DEBUG — 2 screenshots captured</div>' +
-        '<div style="display:flex;gap:16px;">' +
-            '<div style="text-align:center;"><div style="color:#94a3b8;font-size:0.8rem;margin-bottom:6px;">חזית (image_front)</div><img src="'+imageFront+'" style="height:300px;border-radius:8px;border:2px solid #22c55e;"></div>' +
-            '<div style="text-align:center;"><div style="color:#94a3b8;font-size:0.8rem;margin-bottom:6px;">זווית (image_3d)</div><img src="'+image3d+'" style="height:300px;border-radius:8px;border:2px solid #a855f7;"></div>' +
-        '</div>' +
-        '<div style="display:flex;gap:12px;">' +
-            '<button id="dbg-cancel" style="padding:10px 24px;border-radius:9px;border:1.5px solid #475569;background:transparent;color:white;font-size:0.88rem;cursor:pointer;">ביטול</button>' +
-            '<button id="dbg-continue" style="padding:10px 24px;border-radius:9px;border:none;background:#a855f7;color:white;font-size:0.88rem;font-weight:700;cursor:pointer;">המשך להדמיה ←</button>' +
-        '</div>';
-    document.body.appendChild(dbg);
-    document.getElementById('dbg-cancel').onclick = function() { dbg.remove(); };
-    document.getElementById('dbg-continue').onclick = function() {
-        dbg.remove();
-        _openPromptDialog(imageFront, image3d, _getDominantColor(), _getCabinetSpec());
-    };
-    return; // don't auto-open prompt dialog in debug mode
+    _openPromptDialog(imageFront, image3dLeft, image3dRight, _getDominantColor(), _getCabinetSpec());
 };
 
 // ── Prompt dialog ─────────────────────────────────────────────────────────────
 var _extraImages = []; // extra user-uploaded images
 
-function _openPromptDialog(imageFront, image3d, hexColor, cabinetSpec) {
+function _openPromptDialog(imageFront, image3dLeft, image3dRight, hexColor, cabinetSpec) {
     var existing = document.getElementById('ai-prompt-dialog');
     if (existing) existing.remove();
     _extraImages = [];
@@ -283,7 +280,7 @@ function _openPromptDialog(imageFront, image3d, hexColor, cabinetSpec) {
         if (spec.hasSideOpenCells) openNote += '\n- חלק מהתאים הם כוורת צד — הדופן הצדדית פתוחה ואין לוח סוגר מהצד.';
     }
     var defaultPrompt = 'צור הדמיה פוטוריאליסטית של ארון זה מותקן בחדר שינה מעוצב מול קיר.' +
-        '\nשמור על צבעים, פרופורציות ופרטי עיצוב מדויקים משתי תמונות הייחוס.' +
+        '\nשמור על צבעים, פרופורציות ופרטי עיצוב מדויקים משלוש תמונות הייחוס (חזית, זווית שמאל, זווית ימין).' +
         (dims ? '\nמידות: ' + dims + '.' : '') +
         (hexColor ? '\nצבע: ' + hexColor + '.' : '') +
         openNote +
@@ -307,8 +304,12 @@ function _openPromptDialog(imageFront, image3d, hexColor, cabinetSpec) {
                         '<span style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.55);color:white;font-size:0.65rem;padding:2px 6px;border-radius:4px;">חזית</span>' +
                     '</div>' +
                     '<div style="position:relative;">' +
-                        '<img src="'+image3d+'" style="width:120px;height:90px;object-fit:cover;border-radius:8px;border:2px solid #e2e8f0;">' +
-                        '<span style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.55);color:white;font-size:0.65rem;padding:2px 6px;border-radius:4px;">זווית</span>' +
+                        '<img src="'+image3dLeft+'" style="width:120px;height:90px;object-fit:cover;border-radius:8px;border:2px solid #e2e8f0;">' +
+                        '<span style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.55);color:white;font-size:0.65rem;padding:2px 6px;border-radius:4px;">זווית שמאל</span>' +
+                    '</div>' +
+                    '<div style="position:relative;">' +
+                        '<img src="'+image3dRight+'" style="width:120px;height:90px;object-fit:cover;border-radius:8px;border:2px solid #e2e8f0;">' +
+                        '<span style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.55);color:white;font-size:0.65rem;padding:2px 6px;border-radius:4px;">זווית ימין</span>' +
                     '</div>' +
                     '<label style="width:90px;height:90px;border:2px dashed #cbd5e1;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;color:#94a3b8;font-size:0.72rem;gap:4px;transition:border-color 0.2s;" onmouseover="this.style.borderColor=\'#a855f7\'" onmouseout="this.style.borderColor=\'#cbd5e1\'">' +
                         '<i class="fa-solid fa-plus" style="font-size:1.2rem;"></i>הוסף תמונה' +
@@ -330,10 +331,11 @@ function _openPromptDialog(imageFront, image3d, hexColor, cabinetSpec) {
         '</div>';
 
     // Store data for submit
-    dlg._imageFront  = imageFront;
-    dlg._image3d     = image3d;
-    dlg._hexColor    = hexColor;
-    dlg._cabinetSpec = cabinetSpec;
+    dlg._imageFront   = imageFront;
+    dlg._image3dLeft  = image3dLeft;
+    dlg._image3dRight = image3dRight;
+    dlg._hexColor     = hexColor;
+    dlg._cabinetSpec  = cabinetSpec;
     document.body.appendChild(dlg);
 }
 
@@ -367,10 +369,11 @@ window._submitRender = async function() {
     var dlg = document.getElementById('ai-prompt-dialog');
     if (!dlg) return;
 
-    var imageFront  = dlg._imageFront;
-    var image3d     = dlg._image3d;
-    var hexColor    = dlg._hexColor;
-    var cabinetSpec = dlg._cabinetSpec;
+    var imageFront   = dlg._imageFront;
+    var image3dLeft  = dlg._image3dLeft;
+    var image3dRight = dlg._image3dRight;
+    var hexColor     = dlg._hexColor;
+    var cabinetSpec  = dlg._cabinetSpec;
     var customPrompt = document.getElementById('ai-prompt-text').value.trim();
     var extras = _extraImages.filter(Boolean);
 
@@ -393,9 +396,10 @@ window._submitRender = async function() {
                     'Authorization': 'Bearer ' + session.access_token,
                 },
                 body: JSON.stringify({
-                    image_front:   imageFront,
-                    image_3d:      image3d,
-                    extra_images:  extras.length ? extras : undefined,
+                    image_front:     imageFront,
+                    image_3d:        image3dLeft,
+                    image_3d_right:  image3dRight,
+                    extra_images:    extras.length ? extras : undefined,
                     hex_color:     hexColor,
                     project_id:    window._currentProjectId || null,
                     preset_id:     (typeof state !== 'undefined') ? state.presetId : null,

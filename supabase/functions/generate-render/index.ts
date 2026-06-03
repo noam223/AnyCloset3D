@@ -48,7 +48,7 @@ serve(async (req) => {
     }
 
     // ── 3. Parse body ────────────────────────────────────────────────────────
-    const { image_front, image_3d, extra_images, hex_color, project_id, preset_id, cabinet_spec, custom_prompt } = await req.json();
+    const { image_front, image_3d, image_3d_right, extra_images, hex_color, project_id, preset_id, cabinet_spec, custom_prompt } = await req.json();
     if (!image_front) return json({ error: 'image_front required' }, 400);
 
     // ── 4. Build prompt ───────────────────────────────────────────────────────
@@ -72,7 +72,12 @@ serve(async (req) => {
       }
     }
 
-    const basePrompt = custom_prompt || `מצורפות שתי תמונות ייחוס של ארון בגדים שעוצב על ידי לקוח: תצוגת חזית ותצוגת זווית תלת-ממד.
+    const numImages = image_3d_right ? 'שלוש' : 'שתי';
+    const imagesDesc = image_3d_right
+      ? 'תצוגת חזית, תצוגת זווית שמאל ותצוגת זווית ימין'
+      : 'תצוגת חזית ותצוגת זווית תלת-ממד';
+
+    const basePrompt = custom_prompt || `מצורפות ${numImages} תמונות ייחוס של ארון בגדים שעוצב על ידי לקוח: ${imagesDesc}.
 צור הדמיה פוטוריאליסטית של ארון זה מותקן בחדר שינה מעוצב ומודרני.
 
 מפרט הארון:
@@ -104,6 +109,13 @@ serve(async (req) => {
       { inlineData: { mimeType: 'image/jpeg', data: cleanFront } },
       { inlineData: { mimeType: mime3d,        data: clean3d   } },
     ];
+
+    // Add right angle image if provided
+    if (image_3d_right) {
+      const mime3dR  = image_3d_right.startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
+      const clean3dR = image_3d_right.replace(/^data:image\/\w+;base64,/, '');
+      parts.push({ inlineData: { mimeType: mime3dR, data: clean3dR } });
+    }
 
     // Add extra user-uploaded images
     if (extra_images && Array.isArray(extra_images)) {
