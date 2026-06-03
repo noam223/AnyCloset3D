@@ -3737,6 +3737,30 @@ window._updateBedHandles = function() {
         if (!window._bedDrag) window._bedHovered = false;
     });
 
+    // Simple flat material used during drag to kill texture overhead
+    const _bedDragMat = new THREE.MeshLambertMaterial({ color: 0xddd8cc, side: THREE.FrontSide });
+    window._roomMatBackup = null; // { mesh → originalMaterial }
+
+    function _stripRoomTextures() {
+        if (window._roomMatBackup) return; // already stripped
+        window._roomMatBackup = new Map();
+        if (!window._roomGroup) return;
+        window._roomGroup.traverse(function(obj) {
+            if (obj.isMesh && obj.material) {
+                window._roomMatBackup.set(obj, obj.material);
+                obj.material = _bedDragMat;
+            }
+        });
+    }
+
+    function _restoreRoomTextures() {
+        if (!window._roomMatBackup) return;
+        window._roomMatBackup.forEach(function(mat, obj) {
+            obj.material = mat;
+        });
+        window._roomMatBackup = null;
+    }
+
     function onBedPointerDown(e) {
         e.preventDefault();
         e.stopPropagation();
@@ -3751,6 +3775,7 @@ window._updateBedHandles = function() {
         this.classList.add('dragging');
         if (typeof controls !== 'undefined') controls.enabled = false;
         document.body.classList.add('dragging');
+        _stripRoomTextures();
     }
 
     hx.addEventListener('pointerdown', onBedPointerDown);
@@ -3780,7 +3805,12 @@ window._updateBedHandles = function() {
         _clampBedPos(bp);
         window._bedPos = bp;
 
-        if (typeof _buildRoom === 'function') _buildRoom();
+        if (typeof _buildRoom === 'function') {
+            _buildRoom();
+            // Re-strip textures since _buildRoom creates new objects
+            window._roomMatBackup = null;
+            _stripRoomTextures();
+        }
         window._updateBedHandles();
     });
 
@@ -3790,6 +3820,7 @@ window._updateBedHandles = function() {
         window._bedDrag = null;
         if (typeof controls !== 'undefined') controls.enabled = true;
         document.body.classList.remove('dragging');
+        _restoreRoomTextures();
         // Rebuild room with full GLB bed now that drag ended
         if (typeof _buildRoom === 'function') _buildRoom();
         window._updateBedHandles();
