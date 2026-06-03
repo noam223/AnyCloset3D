@@ -99,7 +99,7 @@ function _injectLightbox() {
                    style="font-size:0.82rem;color:#a855f7;text-decoration:none;display:flex;align-items:center;gap:5px;">
                     <i class="fa-solid fa-download"></i> הורד תמונה
                 </a>
-                <button onclick="window._deleteRender(_projectRenders[_lightboxIndex]?.id)"
+                <button id="ai-lightbox-delete" onclick="window._deleteCurrentRender()"
                         style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:0.82rem;display:flex;align-items:center;gap:5px;">
                     <i class="fa-solid fa-trash"></i> מחק
                 </button>
@@ -451,13 +451,15 @@ window._submitRender = async function() {
 };
 
 // ── Delete ─────────────────────────────────────────────────────────────────────
-window._deleteRender = async function(id) {
-    if (!id) return;
+window._deleteCurrentRender = async function() {
+    var r = _projectRenders[_lightboxIndex];
+    if (!r || !r.id) return;
     if (!confirm('למחוק הדמיה זו?')) return;
+    var id = r.id;
     window._closeAiLightbox();
     var { error } = await _sbRenders.from('ai_renders').delete().eq('id', id);
     if (!error) {
-        _projectRenders = _projectRenders.filter(function(r) { return r.id !== id; });
+        _projectRenders = _projectRenders.filter(function(x) { return x.id !== id; });
         _renderGrid();
         await _updateQuota();
     }
@@ -646,12 +648,12 @@ function _injectStyles() {
         }
         .ai-render-thumb {
             position: relative; border-radius: 10px; overflow: hidden;
-            aspect-ratio: 4/3; cursor: pointer; background: #f1f5f9;
+            cursor: pointer; background: #f1f5f9;
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
             transition: transform 0.18s, box-shadow 0.18s;
         }
         .ai-render-thumb:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.14); }
-        .ai-render-thumb img { width: 100%; height: 100%; object-fit: cover; }
+        .ai-render-thumb img { width: 100%; height: auto; display: block; object-fit: cover; }
         .ai-render-thumb-overlay {
             position: absolute; bottom: 0; left: 0; right: 0;
             background: linear-gradient(transparent, rgba(0,0,0,0.55));
