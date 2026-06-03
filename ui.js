@@ -5755,6 +5755,7 @@ function _buildPrintHTML(mode) {
     const tdStyle = 'text-align:right;color:#1e293b;padding:10px 14px;border:1px solid #e2e8f0;background:white;';
 
     // Collect cart data
+    const _hidePrices = (window._showPricing === false);
     let totalOrderPrice = 0, totalInstallPrice = 0, totalCostPrice = 0;
     let cabinetsHTML = '';
 
@@ -5767,8 +5768,6 @@ function _buildPrintHTML(mode) {
         totalOrderPrice += numericPrice;
         totalInstallPrice += itemInstall;
         totalCostPrice += itemCost;
-
-        const _hidePrices = (window._showPricing === false);
         const priceRows = _hidePrices ? '' : isFactory
             ? `<tr><th style="background:#fef9c3;">מחיר התקנה ללקוח</th><td style="font-weight:bold;color:#713f12;font-size:1.1rem;text-align:right;">₪${(item.installPrice || 0).toLocaleString()}</td></tr>`
             : `<tr><th style="background:#eff6ff;">מחיר ארון ללקוח</th><td style="font-weight:bold;color:#1e3a5f;font-size:1.1rem;text-align:right;">₪${numericPrice.toLocaleString()}</td></tr>
