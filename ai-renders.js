@@ -36,16 +36,6 @@ function _injectToolbarBtn() {
     btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> <span style="font-size:0.82rem;">הדמיה</span>';
     btn.onclick = _togglePanel;
     toolbar.appendChild(btn);
-
-    // Debug button (small, hidden by default — toggle with window._toggleCameraDebug())
-    var dbgBtn = document.createElement('button');
-    dbgBtn.id = 'btn-camera-debug';
-    dbgBtn.className = 'view-btn icon-btn';
-    dbgBtn.title = 'Camera Debug';
-    dbgBtn.innerHTML = '<i class="fa-solid fa-crosshairs" style="font-size:0.8rem;"></i>';
-    dbgBtn.style.cssText = 'opacity:0.4;font-size:0.75rem;';
-    dbgBtn.onclick = window._toggleCameraDebug;
-    toolbar.appendChild(dbgBtn);
 }
 
 // ── Side panel ────────────────────────────────────────────────────────────────
@@ -706,38 +696,6 @@ function _injectStyles() {
     `;
     document.head.appendChild(s);
 }
-
-// ── Camera debug overlay ──────────────────────────────────────────────────────
-window._toggleCameraDebug = function() {
-    var existing = document.getElementById('camera-debug-overlay');
-    if (existing) { existing.remove(); return; }
-
-    var el = document.createElement('div');
-    el.id = 'camera-debug-overlay';
-    el.style.cssText = 'position:fixed;bottom:80px;left:16px;z-index:9999;background:rgba(0,0,0,0.82);color:#00ff88;font-family:monospace;font-size:0.78rem;padding:10px 14px;border-radius:10px;line-height:1.8;pointer-events:none;min-width:220px;';
-    el.innerHTML = 'Camera debug...';
-    document.body.appendChild(el);
-
-    function _update() {
-        if (!document.getElementById('camera-debug-overlay')) return;
-        if (window.camera) {
-            var p = window.camera.position;
-            var t = window.controls ? window.controls.target : {x:0,y:0,z:0};
-            el.innerHTML =
-                '<b style="color:#fff;">📷 Camera</b><br>' +
-                'pos.x: <b>' + Math.round(p.x) + '</b><br>' +
-                'pos.y: <b>' + Math.round(p.y) + '</b><br>' +
-                'pos.z: <b>' + Math.round(p.z) + '</b><br>' +
-                '<b style="color:#fff;">🎯 Target</b><br>' +
-                'tgt.x: <b>' + Math.round(t.x) + '</b><br>' +
-                'tgt.y: <b>' + Math.round(t.y) + '</b><br>' +
-                'tgt.z: <b>' + Math.round(t.z) + '</b><br>' +
-                '<span style="color:#94a3b8;">viewMode: ' + (typeof state !== 'undefined' ? state.viewMode : '?') + '</span>';
-        }
-        requestAnimationFrame(_update);
-    }
-    _update();
-};
 
 // expose for projects page use
 window._aiRendersLoaded = true;
