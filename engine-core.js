@@ -804,42 +804,19 @@ function _buildRoom() {
             : (window._bedAutoScale || 100);
         const bedRotRad = ((window._bedRotation || 0) * Math.PI) / 180;
 
-        if (window._bedDrag) {
-            // ── Proxy box during drag ──────────────────────────────────────
-            // Compute bed bounding box size from the GLB (cached after first load)
-            if (!window._bedBoxSize) {
-                const tmp = window._bedGroup.clone();
-                tmp.scale.setScalar(bs);
-                tmp.rotation.y = bedRotRad;
-                tmp.updateMatrixWorld(true);
-                const b = new THREE.Box3().setFromObject(tmp);
-                window._bedBoxSize = b.getSize(new THREE.Vector3());
-            }
-            const sz = window._bedBoxSize;
-            const proxyH = 50; // fixed height 50cm
-            const geo = new THREE.BoxGeometry(sz.x, proxyH, sz.z);
-            const mat = new THREE.MeshLambertMaterial({ color: 0xd4b896, transparent: true, opacity: 0.7 });
-            const proxy = new THREE.Mesh(geo, mat);
-            proxy.castShadow = false;
-            proxy.rotation.y = bedRotRad;
-            proxy.position.set(bp.x, proxyH / 2, bp.z);
-            rg.add(proxy);
-            window._bedMesh = proxy;
-        } else {
-            // ── Full GLB bed ───────────────────────────────────────────────
-            const bed = window._bedGroup.clone();
-            bed.traverse(function(child) {
-                if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }
-            });
-            bed.scale.setScalar(bs);
-            bed.rotation.y = bedRotRad;
-            bed.updateMatrixWorld(true);
-            const bedBox = new THREE.Box3().setFromObject(bed);
-            const bedMinY = bedBox.min.y;
-            bed.position.set(bp.x, -bedMinY, bp.z);
-            rg.add(bed);
-            window._bedMesh = bed;
-        }
+        // ── Full GLB bed (always) ──────────────────────────────────────────
+        const bed = window._bedGroup.clone();
+        bed.traverse(function(child) {
+            if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }
+        });
+        bed.scale.setScalar(bs);
+        bed.rotation.y = bedRotRad;
+        bed.updateMatrixWorld(true);
+        const bedBox = new THREE.Box3().setFromObject(bed);
+        const bedMinY = bedBox.min.y;
+        bed.position.set(bp.x, -bedMinY, bp.z);
+        rg.add(bed);
+        window._bedMesh = bed;
     }
 
     // ── Office Chair model ────────────────────────────────────────────────────
