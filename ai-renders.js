@@ -186,21 +186,42 @@ window._generateRender = async function() {
     _showStatus('loading', '<i class="fa-solid fa-spinner fa-spin"></i> מצלם חזית...');
     btn.disabled = true;
 
+    // Save current view state to restore after screenshots
+    var _savedViewMode = (typeof state !== 'undefined') ? state.viewMode : 'front';
+    var _savedOrbitFree = window._orbitFree;
+
     // Screenshot 1: front view
-    if (typeof window.setFrontView === 'function') window.setFrontView();
-    else if (typeof state !== 'undefined') { state.viewMode = 'front'; if (typeof buildCabinet === 'function') buildCabinet(); }
-    await new Promise(function(r) { setTimeout(r, 400); });
+    if (typeof state !== 'undefined') {
+        state.viewMode = 'front';
+        window._orbitFree = false;
+        if (typeof updateCameraView === 'function') updateCameraView();
+        if (typeof buildCabinet === 'function') buildCabinet();
+    }
+    await new Promise(function(r) { setTimeout(r, 500); });
     var imageFront;
     try { imageFront = window.renderer.domElement.toDataURL('image/jpeg', 0.85); }
     catch(e) { _showStatus('error', 'שגיאה בצילום חזית'); btn.disabled = false; return; }
 
-    // Screenshot 2: 3D angle view
+    // Screenshot 2: 3D angle view — reset orbit so camera goes to default 3D position
     _showStatus('loading', '<i class="fa-solid fa-spinner fa-spin"></i> מצלם זווית...');
-    if (typeof window.set3DView === 'function') window.set3DView();
-    await new Promise(function(r) { setTimeout(r, 400); });
+    if (typeof state !== 'undefined') {
+        state.viewMode = '3d';
+        window._orbitFree = false;
+        if (typeof updateCameraView === 'function') updateCameraView();
+        if (typeof buildCabinet === 'function') buildCabinet();
+    }
+    await new Promise(function(r) { setTimeout(r, 600); });
     var image3d;
     try { image3d = window.renderer.domElement.toDataURL('image/jpeg', 0.85); }
     catch(e) { image3d = imageFront; }
+
+    // Restore original view
+    if (typeof state !== 'undefined') {
+        state.viewMode = _savedViewMode;
+        window._orbitFree = _savedOrbitFree;
+        if (typeof updateCameraView === 'function') updateCameraView();
+        if (typeof buildCabinet === 'function') buildCabinet();
+    }
 
     _hideStatus();
     btn.disabled = false;
