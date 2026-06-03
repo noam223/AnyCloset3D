@@ -5216,7 +5216,9 @@ window.openOrderModal = function(mode) {
     if (actionsEl) {
         actionsEl.innerHTML = isFactory
             ? `<button class="print-btn-large" onclick="printFactory()" style="flex:1;background:#475569;box-shadow:0 4px 15px rgba(71,85,105,0.4);"><i class="fa-solid fa-industry"></i> הדפס לייצור (עלויות רכש)</button>`
-            : `<button class="print-btn-large" onclick="printCustomer()" style="flex:1;"><i class="fa-solid fa-file-invoice-dollar"></i> הדפס ללקוח (מחירון)</button>`;
+            : window._showPricing !== false
+                ? `<button class="print-btn-large" onclick="printCustomer()" style="flex:1;"><i class="fa-solid fa-file-invoice-dollar"></i> הדפס ללקוח (מחירון)</button>`
+                : `<button class="print-btn-large" onclick="printCustomer()" style="flex:1;"><i class="fa-solid fa-file-invoice-dollar"></i> הדפס סיכום ללקוח</button>`;
     }
 
     container.innerHTML = '';
@@ -5274,7 +5276,7 @@ window.openOrderModal = function(mode) {
                     <tr><th>מדפים נשלפים</th><td>${item.shelves} יחידות</td></tr>
                     <tr><th>מוטות תלייה לקולבים</th><td>${item.hanging} יחידות</td></tr>
 
-                    ${!isFactory ? `
+                    ${!isFactory && window._showPricing !== false ? `
                     <tr class="view-customer">
                         <th style="background:var(--highlight); vertical-align:middle;">מחיר ארון ללקוח</th>
                         <td style="font-weight:bold; color:var(--primary); font-size:1.15rem; text-align:right;">
@@ -5367,12 +5369,12 @@ window.openOrderModal = function(mode) {
             <div class="summary-row"><span>סה"כ עלויות משלוח/התקנה:</span> <span dir="ltr" style="font-weight:bold;color:#713f12;">₪${totalInstallPrice.toLocaleString()}</span></div>
             <div class="summary-row final-total" style="color:#854d0e; border-top: 2px solid #fef08a;"><span>סה"כ עלויות פרויקט (רכש נטו):</span> <span dir="ltr">₪${(totalCostPrice + totalInstallPrice).toLocaleString()}</span></div>
         </div>
-    ` : `
+    ` : window._showPricing !== false ? `
         <div class="summary-customer">
             <div class="summary-row"><span>סה"כ ארונות (ללא התקנה):</span> <span dir="ltr" style="font-weight:bold;">₪${totalOrderPrice.toLocaleString()}</span></div>
             <div class="summary-row"><span>סה"כ הובלה והתקנה:</span> <span dir="ltr" style="font-weight:bold;">₪${totalInstallPrice.toLocaleString()}</span></div>
             <div class="summary-row final-total"><span>סה"כ לתשלום ללקוח:</span> <span dir="ltr">₪${(totalOrderPrice + totalInstallPrice).toLocaleString()}</span></div>
-        </div>
+        </div>` : `<div></div>
     `;
     document.getElementById('modal-footer-summary').innerHTML = footerHTML;
     modal.style.display = 'flex';

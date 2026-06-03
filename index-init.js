@@ -102,7 +102,7 @@
         if (lsFooter) lsFooter.style.display = 'none';
     }
 
-    // Hide "שליחה לייצור" (factory export / carpenter blueprint) for non-carpenter plans
+    // Hide "שליחה לייצור" (factory export) — only for canExportCarpenter
     if (_features && !_features.canExportCarpenter) {
         var btnFactory = document.getElementById('btn-factory-order');
         if (btnFactory) btnFactory.style.display = 'none';
@@ -120,8 +120,9 @@
         if (btnCalc) btnCalc.style.display = 'none';
     }
 
-    // Hide multiview blueprint (שרטוט ייצור) for non-carpenter plans
-    if (_features && !_features.canExportCarpenter) {
+    // Hide multiview blueprint (שרטוט ייצור) — uses canExportBlueprint (falls back to canExportCarpenter)
+    var canBlueprint = _features && (_features.canExportBlueprint || _features.canExportCarpenter);
+    if (!canBlueprint) {
         var btnMvbp = document.getElementById('btn-multiview-blueprint');
         if (btnMvbp) btnMvbp.style.display = 'none';
     }

@@ -20,14 +20,15 @@ const PLAN_LIMITS = {
         projectLockDays:        3,           // נעילה אחרי 3 ימים
         extensionDays:          3,           // הארכה בתשלום — 3 ימים נוספים
         features: {
-            showPricing:        false,       // מעצבת לא רואה תמחור
-            canExportPDF:       true,
-            canExport3D:        true,
-            canExportCarpenter: false,       // ייצוא תוכנית לנגר — לא
-            canViewCustomerReport: false,
-            canExtendProject:   true,        // הארכה בתשלום
-            canManageDevices:   false,
-            isCompany:          false,
+            showPricing:           false,    // מעצבת לא רואה תמחור
+            canExportPDF:          true,
+            canExport3D:           true,
+            canExportCarpenter:    false,    // שליחה לייצור — לא
+            canExportBlueprint:    true,     // שרטוט מרובה זוויות — כן
+            canViewCustomerReport: true,     // סיכום ללקוח — כן (ללא מחירים)
+            canExtendProject:      true,     // הארכה בתשלום
+            canManageDevices:      false,
+            isCompany:             false,
         }
     },
     designer_monthly: {
@@ -37,17 +38,18 @@ const PLAN_LIMITS = {
         maxProjects:            30,
         maxCabinetsPerProject:  12,
         maxDevices:             1,
-        projectLockDays:        null,        // ללא נעילה
+        projectLockDays:        null,
         extensionDays:          null,
         features: {
-            showPricing:        false,
-            canExportPDF:       true,
-            canExport3D:        true,
-            canExportCarpenter: false,
-            canViewCustomerReport: false,
-            canExtendProject:   false,
-            canManageDevices:   false,
-            isCompany:          false,
+            showPricing:           false,
+            canExportPDF:          true,
+            canExport3D:           true,
+            canExportCarpenter:    false,
+            canExportBlueprint:    true,
+            canViewCustomerReport: true,
+            canExtendProject:      false,
+            canManageDevices:      false,
+            isCompany:             false,
         }
     },
     designer_annual: {
@@ -60,14 +62,15 @@ const PLAN_LIMITS = {
         projectLockDays:        null,
         extensionDays:          null,
         features: {
-            showPricing:        false,
-            canExportPDF:       true,
-            canExport3D:        true,
-            canExportCarpenter: false,
-            canViewCustomerReport: false,
-            canExtendProject:   false,
-            canManageDevices:   false,
-            isCompany:          false,
+            showPricing:           false,
+            canExportPDF:          true,
+            canExport3D:           true,
+            canExportCarpenter:    false,
+            canExportBlueprint:    true,
+            canViewCustomerReport: true,
+            canExtendProject:      false,
+            canManageDevices:      false,
+            isCompany:             false,
         }
     },
 
