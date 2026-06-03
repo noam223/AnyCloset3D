@@ -649,12 +649,12 @@ function _injectStyles() {
         }
         .ai-render-thumb {
             position: relative; border-radius: 10px; overflow: hidden;
-            aspect-ratio: 1/1; cursor: pointer; background: #f1f5f9;
+            cursor: pointer; background: #f1f5f9;
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
             transition: transform 0.18s, box-shadow 0.18s;
         }
         .ai-render-thumb:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.14); }
-        .ai-render-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .ai-render-thumb img { width: 100%; height: auto; display: block; }
         .ai-render-thumb-overlay {
             position: absolute; bottom: 0; left: 0; right: 0;
             background: linear-gradient(transparent, rgba(0,0,0,0.55));
