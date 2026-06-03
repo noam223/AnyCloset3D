@@ -48,40 +48,72 @@ serve(async (req) => {
     }
 
     // ── 3. Parse body ────────────────────────────────────────────────────────
-    const { image_base64, hex_color, project_id, preset_id, cabinet_spec } = await req.json();
-    if (!image_base64) return json({ error: 'image_base64 required' }, 400);
+    const { image_front, image_3d, extra_images, hex_color, project_id, preset_id, cabinet_spec, custom_prompt } = await req.json();
+    if (!image_front) return json({ error: 'image_front required' }, 400);
 
-    // ── 4. Call Gemini API ───────────────────────────────────────────────────
+    // ── 4. Build prompt ───────────────────────────────────────────────────────
+    const spec = cabinet_spec || {};
+    const w = spec.widthCm ? `${spec.widthCm}cm wide` : '';
+    const h = spec.heightCm ? `${spec.heightCm}cm tall` : '';
+    const d = spec.depthCm ? `${spec.depthCm}cm deep` : '';
+    const dims = [w, h, d].filter(Boolean).join(', ');
+    const colorDesc = hex_color ? `The dominant cabinet color is ${hex_color}.` : '';
+    const openCellsDesc = spec.hasOpenCells
+      ? `IMPORTANT: The cabinet contains ${spec.openCellCount || 'some'} open shelving compartment(s) with NO doors — these must remain visibly open in the render.`
+      : '';
+    const drawersDesc = spec.hasDrawers ? 'The cabinet includes drawer units at the bottom.' : '';
+    const doorsDesc = spec.hasDoors === false ? 'This cabinet has NO doors — all compartments are open.' : '';
+    const columnsDesc = spec.columns ? `The cabinet has ${spec.columns} vertical columns.` : '';
+
+    const basePrompt = custom_prompt || `You are provided with two reference images of a custom-designed wardrobe cabinet: a front view and a 3D angled view.
+Create a photorealistic interior design render of this exact cabinet installed in a modern, elegantly furnished bedroom.
+
+Cabinet specifications:
+- Dimensions: ${dims || 'as shown in reference images'}
+- ${colorDesc}
+- ${columnsDesc}
+- ${openCellsDesc}
+- ${drawersDesc}
+- ${doorsDesc}
+
+Requirements:
+- Preserve the cabinet's exact dimensions, proportions, colors, and design details from BOTH reference images
+- Show the cabinet from a slight 3/4 front angle so the full design is visible
+- Place it naturally against a bedroom wall with complementary furniture and decor
+- Use warm, natural lighting from a window on one side
+- The room should feel modern and aspirational
+- Do NOT add doors where there are open shelves, and do NOT remove doors where they exist`;
+
+    // ── 5. Call Gemini API ────────────────────────────────────────────────────
     const GEMINI_KEY = Deno.env.get('GEMINI_API_KEY')!;
     const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent?key=${GEMINI_KEY}`;
 
-    const colorDesc = hex_color ? `הצבע הדומיננטי של הארון הוא ${hex_color}.` : '';
-    const prompt = `זהו ארון בגדים שעוצב על ידי לקוח. ${colorDesc}
-צור הדמיה פוטוריאליסטית של הארון הזה מוטמע בתוך חדר שינה מעוצב ומודרני.
-שמור על מידות הארון וצבעיו בדיוק. החדר צריך להיות מואר היטב עם תאורה טבעית.
-הצג את הארון בזווית פרונטלית קלה (3/4) כדי לראות את העיצוב במלואו.`;
+    const cleanFront  = image_front.replace(/^data:image\/\w+;base64,/, '');
+    const mime3d      = (image_3d || '').startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
+    const clean3d     = (image_3d || image_front).replace(/^data:image\/\w+;base64,/, '');
 
-    const cleanBase64 = image_base64.replace(/^data:image\/\w+;base64,/, '');
-    const mimeType = image_base64.startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
+    const parts: any[] = [
+      { text: basePrompt },
+      { inlineData: { mimeType: 'image/jpeg', data: cleanFront } },
+      { inlineData: { mimeType: mime3d,        data: clean3d   } },
+    ];
+
+    // Add extra user-uploaded images
+    if (extra_images && Array.isArray(extra_images)) {
+      extra_images.forEach((img: string) => {
+        if (!img) return;
+        const extraMime = img.startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
+        const extraData = img.replace(/^data:image\/\w+;base64,/, '');
+        parts.push({ inlineData: { mimeType: extraMime, data: extraData } });
+      });
+    }
 
     const geminiRes = await fetch(GEMINI_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: prompt },
-            {
-              inlineData: {
-                mimeType: mimeType,
-                data: cleanBase64,
-              }
-            }
-          ]
-        }],
-        generationConfig: {
-          responseModalities: ['IMAGE', 'TEXT'],
-        }
+        contents: [{ parts }],
+        generationConfig: { responseModalities: ['IMAGE', 'TEXT'] }
       })
     });
 

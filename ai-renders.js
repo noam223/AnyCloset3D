@@ -177,38 +177,147 @@ function _renderGrid() {
     });
 }
 
-// ── Generate ──────────────────────────────────────────────────────────────────
+// ── Generate: step 1 — capture screenshots then open prompt dialog ────────────
 window._generateRender = async function() {
     var btn = document.getElementById('btn-generate-render');
-    var status = document.getElementById('ai-renders-status');
     if (!btn || btn.disabled) return;
-
-    // Get screenshot from Three.js renderer
     if (!window.renderer) { _showStatus('error', 'לא נמצא renderer'); return; }
 
-    // Switch to 3D view for better render
-    var prevMode = (typeof state !== 'undefined') ? state.viewMode : '3d';
-    if (typeof window.set3DView === 'function') window.set3DView();
-
-    _showStatus('loading', '<i class="fa-solid fa-spinner fa-spin"></i> מצלם את הארון...');
+    _showStatus('loading', '<i class="fa-solid fa-spinner fa-spin"></i> מצלם חזית...');
     btn.disabled = true;
 
-    // Wait a frame for render to update
-    await new Promise(function(r) { setTimeout(r, 300); });
+    // Screenshot 1: front view
+    if (typeof window.setFrontView === 'function') window.setFrontView();
+    else if (typeof state !== 'undefined') { state.viewMode = 'front'; if (typeof buildCabinet === 'function') buildCabinet(); }
+    await new Promise(function(r) { setTimeout(r, 400); });
+    var imageFront;
+    try { imageFront = window.renderer.domElement.toDataURL('image/jpeg', 0.85); }
+    catch(e) { _showStatus('error', 'שגיאה בצילום חזית'); btn.disabled = false; return; }
 
-    var imageBase64;
-    try {
-        imageBase64 = window.renderer.domElement.toDataURL('image/jpeg', 0.85);
-    } catch(e) {
-        _showStatus('error', 'שגיאה בצילום המסך');
-        btn.disabled = false;
-        return;
-    }
+    // Screenshot 2: 3D angle view
+    _showStatus('loading', '<i class="fa-solid fa-spinner fa-spin"></i> מצלם זווית...');
+    if (typeof window.set3DView === 'function') window.set3DView();
+    await new Promise(function(r) { setTimeout(r, 400); });
+    var image3d;
+    try { image3d = window.renderer.domElement.toDataURL('image/jpeg', 0.85); }
+    catch(e) { image3d = imageFront; }
 
-    // Get dominant hex color from current material
-    var hexColor = _getDominantColor();
+    _hideStatus();
+    btn.disabled = false;
 
-    _showStatus('loading', '<i class="fa-solid fa-spinner fa-spin"></i> שולח ל-AI... (עשוי לקחת 15-30 שניות)');
+    // Open prompt dialog with captured images
+    _openPromptDialog(imageFront, image3d, _getDominantColor(), _getCabinetSpec());
+};
+
+// ── Prompt dialog ─────────────────────────────────────────────────────────────
+var _extraImages = []; // extra user-uploaded images
+
+function _openPromptDialog(imageFront, image3d, hexColor, cabinetSpec) {
+    var existing = document.getElementById('ai-prompt-dialog');
+    if (existing) existing.remove();
+    _extraImages = [];
+
+    // Build default prompt description for textarea
+    var spec = cabinetSpec || {};
+    var dims = [spec.widthCm && spec.widthCm+'cm wide', spec.heightCm && spec.heightCm+'cm tall', spec.depthCm && spec.depthCm+'cm deep'].filter(Boolean).join(', ');
+    var openNote = spec.hasOpenCells ? '\n- IMPORTANT: Cabinet has ' + (spec.openCellCount||'') + ' open compartment(s) with NO doors — keep them open.' : '';
+    var defaultPrompt = 'Create a photorealistic bedroom render with this cabinet installed naturally against a wall.' +
+        '\nPreserve exact colors, proportions and design details from both reference images.' +
+        (dims ? '\nDimensions: ' + dims + '.' : '') +
+        (hexColor ? '\nColor: ' + hexColor + '.' : '') +
+        openNote +
+        '\nModern, elegantly furnished room, warm natural lighting from a window.';
+
+    var dlg = document.createElement('div');
+    dlg.id = 'ai-prompt-dialog';
+    dlg.style.cssText = 'position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;padding:16px;';
+    dlg.innerHTML =
+        '<div style="background:#fff;border-radius:16px;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;direction:rtl;box-shadow:0 8px 40px rgba(0,0,0,0.25);">' +
+            '<div style="padding:20px 22px 0;display:flex;align-items:center;justify-content:space-between;">' +
+                '<div style="font-size:1rem;font-weight:800;color:#1e3a5f;display:flex;align-items:center;gap:8px;"><i class="fa-solid fa-wand-magic-sparkles" style="color:#a855f7;"></i> הגדרות הדמיה</div>' +
+                '<button onclick="document.getElementById(\'ai-prompt-dialog\').remove()" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:1.2rem;"><i class="fa-solid fa-xmark"></i></button>' +
+            '</div>' +
+            // Images row
+            '<div style="padding:16px 22px 0;">' +
+                '<div style="font-size:0.8rem;font-weight:700;color:#64748b;margin-bottom:8px;">תמונות ייחוס <span style="font-weight:400;color:#94a3b8;">(ניתן לגרור/להוסיף נוספות)</span></div>' +
+                '<div id="ai-prompt-images" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start;">' +
+                    '<div style="position:relative;">' +
+                        '<img src="'+imageFront+'" style="width:120px;height:90px;object-fit:cover;border-radius:8px;border:2px solid #e2e8f0;">' +
+                        '<span style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.55);color:white;font-size:0.65rem;padding:2px 6px;border-radius:4px;">חזית</span>' +
+                    '</div>' +
+                    '<div style="position:relative;">' +
+                        '<img src="'+image3d+'" style="width:120px;height:90px;object-fit:cover;border-radius:8px;border:2px solid #e2e8f0;">' +
+                        '<span style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.55);color:white;font-size:0.65rem;padding:2px 6px;border-radius:4px;">זווית</span>' +
+                    '</div>' +
+                    '<label style="width:90px;height:90px;border:2px dashed #cbd5e1;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;color:#94a3b8;font-size:0.72rem;gap:4px;transition:border-color 0.2s;" onmouseover="this.style.borderColor=\'#a855f7\'" onmouseout="this.style.borderColor=\'#cbd5e1\'">' +
+                        '<i class="fa-solid fa-plus" style="font-size:1.2rem;"></i>הוסף תמונה' +
+                        '<input type="file" accept="image/*" multiple style="display:none;" onchange="window._aiAddExtraImages(this)">' +
+                    '</label>' +
+                    '<div id="ai-extra-images-row" style="display:flex;gap:8px;flex-wrap:wrap;"></div>' +
+                '</div>' +
+            '</div>' +
+            // Prompt textarea
+            '<div style="padding:14px 22px 0;">' +
+                '<div style="font-size:0.8rem;font-weight:700;color:#64748b;margin-bottom:6px;">פרומפט <span style="font-weight:400;color:#94a3b8;">(ניתן לערוך)</span></div>' +
+                '<textarea id="ai-prompt-text" style="width:100%;height:160px;border:1.5px solid #e2e8f0;border-radius:10px;padding:12px;font-size:0.83rem;font-family:inherit;resize:vertical;outline:none;line-height:1.6;direction:ltr;text-align:left;" onfocus="this.style.borderColor=\'#a855f7\'" onblur="this.style.borderColor=\'#e2e8f0\'">' + defaultPrompt + '</textarea>' +
+            '</div>' +
+            // Actions
+            '<div style="padding:16px 22px 20px;display:flex;gap:10px;justify-content:flex-end;">' +
+                '<button onclick="document.getElementById(\'ai-prompt-dialog\').remove()" style="padding:10px 20px;border-radius:9px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#374151;font-size:0.88rem;font-weight:600;font-family:inherit;cursor:pointer;">ביטול</button>' +
+                '<button onclick="window._submitRender()" style="padding:10px 24px;border-radius:9px;border:none;background:linear-gradient(135deg,#a855f7,#7c3aed);color:white;font-size:0.88rem;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:8px;"><i class="fa-solid fa-sparkles"></i> צור הדמיה</button>' +
+            '</div>' +
+        '</div>';
+
+    // Store data for submit
+    dlg._imageFront  = imageFront;
+    dlg._image3d     = image3d;
+    dlg._hexColor    = hexColor;
+    dlg._cabinetSpec = cabinetSpec;
+    document.body.appendChild(dlg);
+}
+
+// Add extra user images
+window._aiAddExtraImages = function(input) {
+    var row = document.getElementById('ai-extra-images-row');
+    Array.from(input.files).forEach(function(file) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            var b64 = e.target.result;
+            _extraImages.push(b64);
+            var idx = _extraImages.length - 1;
+            var wrap = document.createElement('div');
+            wrap.style.cssText = 'position:relative;';
+            wrap.innerHTML = '<img src="'+b64+'" style="width:90px;height:90px;object-fit:cover;border-radius:8px;border:2px solid #e2e8f0;">' +
+                '<button onclick="window._aiRemoveExtra('+idx+',this.parentNode)" style="position:absolute;top:-6px;left:-6px;width:20px;height:20px;border-radius:50%;background:#ef4444;border:none;color:white;font-size:0.7rem;cursor:pointer;display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-xmark"></i></button>';
+            if (row) row.appendChild(wrap);
+        };
+        reader.readAsDataURL(file);
+    });
+    input.value = '';
+};
+
+window._aiRemoveExtra = function(idx, el) {
+    _extraImages[idx] = null;
+    if (el) el.remove();
+};
+
+// ── Submit render ─────────────────────────────────────────────────────────────
+window._submitRender = async function() {
+    var dlg = document.getElementById('ai-prompt-dialog');
+    if (!dlg) return;
+
+    var imageFront  = dlg._imageFront;
+    var image3d     = dlg._image3d;
+    var hexColor    = dlg._hexColor;
+    var cabinetSpec = dlg._cabinetSpec;
+    var customPrompt = document.getElementById('ai-prompt-text').value.trim();
+    var extras = _extraImages.filter(Boolean);
+
+    dlg.remove();
+
+    var btn = document.getElementById('btn-generate-render');
+    if (btn) btn.disabled = true;
+    _showStatus('loading', '<i class="fa-solid fa-spinner fa-spin"></i> שולח ל-AI... (15-30 שניות)');
 
     try {
         var sb = window._supabase;
@@ -223,11 +332,14 @@ window._generateRender = async function() {
                     'Authorization': 'Bearer ' + session.access_token,
                 },
                 body: JSON.stringify({
-                    image_base64:  imageBase64,
+                    image_front:   imageFront,
+                    image_3d:      image3d,
+                    extra_images:  extras.length ? extras : undefined,
                     hex_color:     hexColor,
                     project_id:    window._currentProjectId || null,
                     preset_id:     (typeof state !== 'undefined') ? state.presetId : null,
-                    cabinet_spec:  _getCabinetSpec(),
+                    cabinet_spec:  cabinetSpec,
+                    custom_prompt: customPrompt || undefined,
                 })
             }
         );
@@ -242,26 +354,23 @@ window._generateRender = async function() {
             } else {
                 _showStatus('error', 'שגיאה: ' + (data.error || 'תקשורת עם השרת נכשלה'));
             }
-            btn.disabled = false;
+            if (btn) btn.disabled = false;
             return;
         }
 
         _showStatus('success', '<i class="fa-solid fa-check"></i> ההדמיה נוצרה בהצלחה!');
         setTimeout(function() { _hideStatus(); }, 3000);
 
-        // Add to top of grid
         _projectRenders.unshift({ id: data.id, image_url: data.image_url, created_at: data.created_at });
         _renderGrid();
         await _updateQuota();
-
-        // Open lightbox on new render
         window._openAiLightbox(0);
 
     } catch(e) {
         console.error('[ai-renders] generate error:', e);
         _showStatus('error', 'שגיאת תקשורת: ' + e.message);
     } finally {
-        btn.disabled = false;
+        if (btn) btn.disabled = false;
     }
 };
 
@@ -334,12 +443,46 @@ function _getDominantColor() {
 function _getCabinetSpec() {
     try {
         if (typeof state === 'undefined') return null;
+        var wing = typeof getWing === 'function' ? getWing() : null;
+
+        // Detect open cells from compartments
+        var hasOpenCells = false;
+        var openCellCount = 0;
+        if (wing && wing.columns) {
+            wing.columns.forEach(function(col) {
+                if (col.compartments) {
+                    col.compartments.forEach(function(comp) {
+                        if (comp && (comp.type === 'open_cell' || comp.type === 'side_open_cell')) {
+                            hasOpenCells = true;
+                            openCellCount++;
+                        }
+                    });
+                }
+            });
+        }
+
+        // Detect drawers
+        var hasDrawers = false;
+        if (wing && wing.columns) {
+            wing.columns.forEach(function(col) {
+                if (col.type === 'desk' || (col.compartments && col.compartments.some(function(c) { return c && c.type === 'drawer'; }))) {
+                    hasDrawers = true;
+                }
+            });
+        }
+
         return {
-            presetId: state.presetId,
-            width: state.globalWidth,
-            height: state.globalHeight,
-            depth: state.globalDepth,
-            material: state.boardMaterial,
+            presetId:      state.presetId,
+            widthCm:       Math.round(state.globalWidth),
+            heightCm:      Math.round(state.globalHeight),
+            depthCm:       Math.round(state.globalDepth || 58),
+            material:      wing ? (wing.boardMaterial || state.boardMaterial) : state.boardMaterial,
+            materialBody:  wing ? wing.materialBody : null,
+            hasDoors:      wing ? wing.hasDoors : true,
+            hasOpenCells:  hasOpenCells,
+            openCellCount: openCellCount,
+            hasDrawers:    hasDrawers,
+            columns:       wing ? wing.columns.length : null,
         };
     } catch(e) { return null; }
 }
