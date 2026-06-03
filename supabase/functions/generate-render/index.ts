@@ -131,8 +131,16 @@ serve(async (req) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts }],
-        generationConfig: { responseModalities: ['IMAGE', 'TEXT'] }
+        contents: [{ role: 'user', parts }],
+        generationConfig: {
+          responseModalities: ['IMAGE', 'TEXT'],
+          responseFormat: {
+            image: {
+              aspectRatio: '4:3',
+              imageSize: '2K',
+            }
+          }
+        }
       })
     });
 
