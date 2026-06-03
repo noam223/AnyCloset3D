@@ -214,15 +214,16 @@ window._generateRender = async function() {
     _showStatus('loading', '<i class="fa-solid fa-spinner fa-spin"></i> מצלם זווית...');
     var image3d;
     try {
-        if (window.camera && window.controls) {
-            // Scale position relative to cabinet width so it works for all sizes
+        if (window.camera && window.controls && window.renderer && window.scene) {
             var cabinetW = (typeof state !== 'undefined' && state.globalWidth) ? state.globalWidth : 160;
             var scale = cabinetW / 160;
             window.camera.position.set(-291 * scale, 185 * scale, 511 * scale);
             window.controls.target.set(0, 0, 0);
             window.controls.update();
+            // Force render with new camera position
+            window.renderer.render(window.scene, window.camera);
         }
-        await new Promise(function(r) { setTimeout(r, 300); });
+        await new Promise(function(r) { setTimeout(r, 100); });
         image3d = window.renderer.domElement.toDataURL('image/jpeg', 0.85);
     } catch(e) { image3d = imageFront; }
 
