@@ -278,9 +278,12 @@ function _openPromptDialog(imageFront, image3dLeft, image3dRight, hexColor, cabi
     if (spec.hasOpenCells) {
         var cnt = spec.openCellCount || 1;
         if (spec.hasSideOpenCells) {
+            var dirMap = { left: 'שמאל', right: 'ימין', both: 'שני הצדדים' };
+            var dirHe = spec.sideOpenDir ? (dirMap[spec.sideOpenDir] || '') : '';
+            var sideDesc = dirHe ? ' הדופן הפתוחה בצד ' + dirHe + '.' : ' הדופן הצדדית פתוחה.';
             openNote = cnt === 1
-                ? '\n- חשוב: לארון תא פתוח אחד ללא דלת, פתוח מהחזית ומהצד (ללא לוח צד סוגר). יש להציג אותו פתוח לחלוטין.'
-                : '\n- חשוב: לארון ' + cnt + ' תאים פתוחים ללא דלתות, חלקם פתוחים גם מהצד. יש להציג אותם פתוחים.';
+                ? '\n- חשוב: לארון תא פתוח אחד ללא דלת, פתוח מהחזית ומהצד (ללא לוח צד סוגר).' + sideDesc
+                : '\n- חשוב: לארון ' + cnt + ' תאים פתוחים ללא דלתות, חלקם פתוחים גם מהצד.' + sideDesc;
         } else {
             openNote = cnt === 1
                 ? '\n- חשוב: לארון תא פתוח אחד ללא דלת — יש להציג אותו פתוח.'
@@ -522,8 +525,10 @@ function _getCabinetSpec() {
         var hasOpenCells = false;
         var hasSideOpenCells = false;
         var openCellCount = 0;
+        var sideOpenDir = null; // 'left', 'right', or 'both'
         if (wing && wing.columns) {
-            wing.columns.forEach(function(col) {
+            var totalCols = wing.columns.length;
+            wing.columns.forEach(function(col, colIdx) {
                 if (col.compartments) {
                     col.compartments.forEach(function(comp) {
                         if (comp && comp.type === 'open_cell') {
@@ -534,6 +539,16 @@ function _getCabinetSpec() {
                             hasOpenCells = true;
                             hasSideOpenCells = true;
                             openCellCount++;
+                            // Determine open side based on column position
+                            // (mirrors engine-core.js logic)
+                            var isLeftCol  = (colIdx === 0);
+                            var isRightCol = (colIdx === totalCols - 1);
+                            var dir;
+                            if (isLeftCol)       dir = 'right'; // leftmost col → open toward right
+                            else if (isRightCol) dir = 'left';  // rightmost col → open toward left
+                            else                 dir = colIdx < totalCols / 2 ? 'left' : 'right';
+                            if (!sideOpenDir) sideOpenDir = dir;
+                            else if (sideOpenDir !== dir) sideOpenDir = 'both';
                         }
                     });
                 }
@@ -560,6 +575,7 @@ function _getCabinetSpec() {
             hasDoors:         wing ? wing.hasDoors : true,
             hasOpenCells:     hasOpenCells,
             hasSideOpenCells: hasSideOpenCells,
+            sideOpenDir:      sideOpenDir,
             openCellCount:    openCellCount,
             hasDrawers:       hasDrawers,
             columns:          wing ? wing.columns.length : null,

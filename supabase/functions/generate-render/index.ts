@@ -68,10 +68,12 @@ serve(async (req) => {
     if (spec.hasOpenCells) {
       const count = spec.openCellCount || 1;
       if (spec.hasSideOpenCells) {
-        // Side open cell — one open compartment with no side panel
+        const dirMap: Record<string, string> = { left: 'שמאל', right: 'ימין', both: 'שני הצדדים' };
+        const dirHe = spec.sideOpenDir ? (dirMap[spec.sideOpenDir] || '') : '';
+        const sideDesc = dirHe ? ` הדופן הפתוחה נמצאת בצד ${dirHe}.` : ' הדופן הצדדית פתוחה.';
         openCellsDesc = count === 1
-          ? 'חשוב: לארון תא פתוח אחד ללא דלת — התא פתוח מהחזית ומהצד (אין לוח צד סוגר). יש להציג את התא הזה פתוח לחלוטין משני הכיוונים.'
-          : `חשוב: לארון ${count} תאים פתוחים ללא דלתות — חלקם פתוחים גם מהצד (ללא לוח צד). יש להציג את כל התאים הפתוחים.`;
+          ? `חשוב: לארון תא פתוח אחד ללא דלת — התא פתוח מהחזית ומהצד (אין לוח צד סוגר).${sideDesc} יש להציג את התא פתוח לחלוטין.`
+          : `חשוב: לארון ${count} תאים פתוחים ללא דלתות — חלקם פתוחים גם מהצד.${sideDesc} יש להציג את כל התאים הפתוחים.`;
       } else {
         openCellsDesc = count === 1
           ? 'חשוב: לארון תא פתוח אחד ללא דלת — יש להציג אותו פתוח בהדמיה.'
