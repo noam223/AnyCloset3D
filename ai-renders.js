@@ -217,15 +217,22 @@ window._generateRender = async function() {
         if (window.camera && window.controls && window.renderer && window.scene) {
             var cabinetW = (typeof state !== 'undefined' && state.globalWidth) ? state.globalWidth : 160;
             var scale = cabinetW / 160;
+
+            // Log camera BEFORE change
+            console.log('[3D shot] BEFORE — pos:', window.camera.position.clone(), 'target:', window.controls.target.clone());
+
             window.camera.position.set(-291 * scale, 185 * scale, 511 * scale);
-            window.controls.target.set(0, 0, 0);
+            window.controls.target.set(0, 80, 0); // target center of cabinet height
             window.controls.update();
-            // Force render with new camera position
+            window.camera.updateMatrixWorld(true);
             window.renderer.render(window.scene, window.camera);
+
+            // Log camera AFTER change
+            console.log('[3D shot] AFTER — pos:', window.camera.position.clone(), 'target:', window.controls.target.clone());
         }
-        await new Promise(function(r) { setTimeout(r, 100); });
+        await new Promise(function(r) { setTimeout(r, 150); });
         image3d = window.renderer.domElement.toDataURL('image/jpeg', 0.85);
-    } catch(e) { image3d = imageFront; }
+    } catch(e) { console.error('[3D shot] error:', e); image3d = imageFront; }
 
     // Restore original view
     if (typeof state !== 'undefined') {
