@@ -27,14 +27,15 @@ serve(async (req) => {
     // ── 2. Check quota & enabled flag from profile ───────────────────────────
     const { data: profile } = await sb
       .from('profiles')
-      .select('ai_renders_enabled, ai_renders_quota')
+      .select('ai_renders_enabled, ai_renders_quota, subscription_status')
       .eq('id', user.id)
       .single();
 
     const aiEnabled = profile?.ai_renders_enabled !== false;
     if (!aiEnabled) return json({ error: 'ai_disabled' }, 403);
 
-    const QUOTA = profile?.ai_renders_quota ?? 50;
+    const isTrial = profile?.subscription_status === 'trial';
+    const QUOTA = isTrial ? 5 : (profile?.ai_renders_quota ?? 50);
 
     const { data: countData, error: countErr } = await sb.rpc(
       'get_ai_renders_count_this_month',
