@@ -5295,7 +5295,7 @@ window.openOrderModal = function(mode) {
                             </div>
                         </td>
                     </tr>
-                    ` : `
+                    ` : !isFactory ? `` : `
                     <tr class="view-factory">
                         <th style="background:#fef08a;">עלות ייצור (רכש)</th>
                         <td style="font-weight:bold; color:#854d0e; font-size:1.15rem; text-align:right;">
