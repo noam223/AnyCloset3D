@@ -194,52 +194,48 @@ window._generateRender = async function() {
     _showStatus('loading', '<i class="fa-solid fa-spinner fa-spin"></i> מצלם חזית...');
     btn.disabled = true;
 
-    // Save current view state to restore after screenshots
-    var _savedViewMode = (typeof state !== 'undefined') ? state.viewMode : 'front';
-    var _savedOrbitFree = window._orbitFree;
+    // Save current camera state
+    var _savedPos    = window.camera ? window.camera.position.clone() : null;
+    var _savedTarget = window.controls ? window.controls.target.clone() : null;
 
-    // Screenshot 1: front view
-    if (typeof state !== 'undefined') {
-        state.viewMode = 'front';
-        window._orbitFree = false;
-        if (typeof updateCameraView === 'function') updateCameraView();
-        if (typeof buildCabinet === 'function') buildCabinet();
+    // Screenshot 1: front view — move camera to front position directly
+    if (window.camera && window.controls && window.renderer && window.scene) {
+        var cabinetW = (typeof state !== 'undefined' && state.globalWidth) ? state.globalWidth : 160;
+        var cabinetH = (typeof state !== 'undefined' && state.globalHeight) ? state.globalHeight : 240;
+        var targetY  = cabinetH / 2;
+        var distFront = Math.max(cabinetW, cabinetH) * 2.2;
+        window.camera.position.set(0, targetY, distFront);
+        window.controls.target.set(0, targetY, 0);
+        window.controls.update();
+        window.camera.updateMatrixWorld(true);
+        window.renderer.render(window.scene, window.camera);
     }
-    await new Promise(function(r) { setTimeout(r, 500); });
+    await new Promise(function(r) { setTimeout(r, 100); });
     var imageFront;
     try { imageFront = window.renderer.domElement.toDataURL('image/jpeg', 0.85); }
     catch(e) { _showStatus('error', 'שגיאה בצילום חזית'); btn.disabled = false; return; }
 
-    // Screenshot 2: 3D angle view — move camera directly to calibrated position
+    // Screenshot 2: 3D angle — calibrated position (-291, 185, 511) scaled to cabinet size
     _showStatus('loading', '<i class="fa-solid fa-spinner fa-spin"></i> מצלם זווית...');
     var image3d;
     try {
         if (window.camera && window.controls && window.renderer && window.scene) {
-            var cabinetW = (typeof state !== 'undefined' && state.globalWidth) ? state.globalWidth : 160;
-            var scale = cabinetW / 160;
-
-            // Log camera BEFORE change
-            console.log('[3D shot] BEFORE — pos:', window.camera.position.clone(), 'target:', window.controls.target.clone());
-
+            var scale = (cabinetW || 160) / 160;
             window.camera.position.set(-291 * scale, 185 * scale, 511 * scale);
-            window.controls.target.set(0, 80, 0); // target center of cabinet height
+            window.controls.target.set(0, targetY || 80, 0);
             window.controls.update();
             window.camera.updateMatrixWorld(true);
             window.renderer.render(window.scene, window.camera);
-
-            // Log camera AFTER change
-            console.log('[3D shot] AFTER — pos:', window.camera.position.clone(), 'target:', window.controls.target.clone());
         }
-        await new Promise(function(r) { setTimeout(r, 150); });
+        await new Promise(function(r) { setTimeout(r, 100); });
         image3d = window.renderer.domElement.toDataURL('image/jpeg', 0.85);
-    } catch(e) { console.error('[3D shot] error:', e); image3d = imageFront; }
+    } catch(e) { image3d = imageFront; }
 
-    // Restore original view
-    if (typeof state !== 'undefined') {
-        state.viewMode = _savedViewMode;
-        window._orbitFree = _savedOrbitFree;
-        if (typeof updateCameraView === 'function') updateCameraView();
-        if (typeof buildCabinet === 'function') buildCabinet();
+    // Restore original camera
+    if (_savedPos && window.camera) {
+        window.camera.position.copy(_savedPos);
+        window.controls.target.copy(_savedTarget);
+        window.controls.update();
     }
 
     _hideStatus();
