@@ -238,8 +238,26 @@ window._generateRender = async function() {
     _hideStatus();
     btn.disabled = false;
 
-    // Open prompt dialog with captured images
-    _openPromptDialog(imageFront, image3d, _getDominantColor(), _getCabinetSpec());
+    // DEBUG: show both screenshots before sending
+    var dbg = document.createElement('div');
+    dbg.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;';
+    dbg.innerHTML =
+        '<div style="color:white;font-size:1rem;font-weight:700;">DEBUG — 2 screenshots captured</div>' +
+        '<div style="display:flex;gap:16px;">' +
+            '<div style="text-align:center;"><div style="color:#94a3b8;font-size:0.8rem;margin-bottom:6px;">חזית (image_front)</div><img src="'+imageFront+'" style="height:300px;border-radius:8px;border:2px solid #22c55e;"></div>' +
+            '<div style="text-align:center;"><div style="color:#94a3b8;font-size:0.8rem;margin-bottom:6px;">זווית (image_3d)</div><img src="'+image3d+'" style="height:300px;border-radius:8px;border:2px solid #a855f7;"></div>' +
+        '</div>' +
+        '<div style="display:flex;gap:12px;">' +
+            '<button id="dbg-cancel" style="padding:10px 24px;border-radius:9px;border:1.5px solid #475569;background:transparent;color:white;font-size:0.88rem;cursor:pointer;">ביטול</button>' +
+            '<button id="dbg-continue" style="padding:10px 24px;border-radius:9px;border:none;background:#a855f7;color:white;font-size:0.88rem;font-weight:700;cursor:pointer;">המשך להדמיה ←</button>' +
+        '</div>';
+    document.body.appendChild(dbg);
+    document.getElementById('dbg-cancel').onclick = function() { dbg.remove(); };
+    document.getElementById('dbg-continue').onclick = function() {
+        dbg.remove();
+        _openPromptDialog(imageFront, image3d, _getDominantColor(), _getCabinetSpec());
+    };
+    return; // don't auto-open prompt dialog in debug mode
 };
 
 // ── Prompt dialog ─────────────────────────────────────────────────────────────
