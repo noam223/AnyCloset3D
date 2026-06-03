@@ -134,12 +134,6 @@ serve(async (req) => {
         contents: [{ role: 'user', parts }],
         generationConfig: {
           responseModalities: ['IMAGE', 'TEXT'],
-          responseFormat: {
-            image: {
-              aspectRatio: '4:3',
-              imageSize: '2K',
-            }
-          }
         }
       })
     });
