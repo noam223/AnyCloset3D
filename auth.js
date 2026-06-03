@@ -23,7 +23,7 @@ const PLAN_LIMITS = {
             showPricing:           false,    // מעצבת לא רואה תמחור
             canExportPDF:          true,
             canExport3D:           true,
-            canExportCarpenter:    false,    // שליחה לייצור — לא
+            canExportCarpenter:    true,     // שליחה לייצור — כן
             canExportBlueprint:    true,     // שרטוט מרובה זוויות — כן
             canViewCustomerReport: true,     // סיכום ללקוח — כן (ללא מחירים)
             canExtendProject:      true,     // הארכה בתשלום
@@ -44,7 +44,7 @@ const PLAN_LIMITS = {
             showPricing:           false,
             canExportPDF:          true,
             canExport3D:           true,
-            canExportCarpenter:    false,
+            canExportCarpenter:    true,
             canExportBlueprint:    true,
             canViewCustomerReport: true,
             canExtendProject:      false,
@@ -65,7 +65,7 @@ const PLAN_LIMITS = {
             showPricing:           false,
             canExportPDF:          true,
             canExport3D:           true,
-            canExportCarpenter:    false,
+            canExportCarpenter:    true,
             canExportBlueprint:    true,
             canViewCustomerReport: true,
             canExtendProject:      false,

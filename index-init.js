@@ -102,29 +102,25 @@
         if (lsFooter) lsFooter.style.display = 'none';
     }
 
-    // Hide "שליחה לייצור" (factory export) — only for canExportCarpenter
-    if (_features && !_features.canExportCarpenter) {
+    // All feature buttons start hidden in HTML — show them based on plan features
+    if (_features && _features.canExportCarpenter) {
         var btnFactory = document.getElementById('btn-factory-order');
-        if (btnFactory) btnFactory.style.display = 'none';
+        if (btnFactory) btnFactory.style.display = 'flex';
     }
 
-    // Hide "סיכום ללקוח" (customer report) for plans without canViewCustomerReport
-    if (_features && !_features.canViewCustomerReport) {
+    if (_features && _features.canViewCustomerReport) {
         var btnReport = document.getElementById('btn-customer-report');
-        if (btnReport) btnReport.style.display = 'none';
+        if (btnReport) btnReport.style.display = 'flex';
     }
 
-    // Hide "מחשבון מהיר" for designers (no pricing)
-    if (_features && _features.showPricing === false) {
+    if (_features && _features.showPricing !== false) {
         var btnCalc = document.getElementById('btn-quick-calc-open');
-        if (btnCalc) btnCalc.style.display = 'none';
+        if (btnCalc) btnCalc.style.display = 'flex';
     }
 
-    // Hide multiview blueprint (שרטוט ייצור) — uses canExportBlueprint (falls back to canExportCarpenter)
-    var canBlueprint = _features && (_features.canExportBlueprint || _features.canExportCarpenter);
-    if (!canBlueprint) {
+    if (_features && (_features.canExportBlueprint || _features.canExportCarpenter)) {
         var btnMvbp = document.getElementById('btn-multiview-blueprint');
-        if (btnMvbp) btnMvbp.style.display = 'none';
+        if (btnMvbp) btnMvbp.style.display = 'inline-flex';
     }
 
     // Note: btn-3d-view is always available — it now enters presentation mode (free-orbit + room).

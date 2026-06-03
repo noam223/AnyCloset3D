@@ -65,7 +65,7 @@
 <div id="top-bar">
     <button class="view-btn active" id="btn-front-view"><i class="fa-solid fa-pen-ruler"></i> עריכת חזית</button>
     <button class="view-btn" id="btn-blueprint-view" style="display:none;"><i class="fa-solid fa-drafting-compass"></i> שרטוט ייצור</button>
-    <button class="view-btn" id="btn-multiview-blueprint" onclick="openMultiViewBlueprint()"><i class="fa-solid fa-layer-group"></i> שרטוט ייצור</button>
+    <button class="view-btn" id="btn-multiview-blueprint" onclick="openMultiViewBlueprint()" style="display:none;"><i class="fa-solid fa-layer-group"></i> שרטוט ייצור</button>
     <button class="view-btn" id="btn-3d-view" onclick="window._enterPresentationMode()"><i class="fa-solid fa-cube"></i> תצוגה חופשית</button>
     <button class="view-btn icon-btn" id="btn-reset-view" title="איפוס זווית מצלמה" style="display:none;" onclick="window._orbitFree=false; const b=document.getElementById('btn-reset-view'); if(b) b.style.display='none'; updateCameraView();"><i class="fa-solid fa-arrows-rotate"></i></button>
     <button class="view-btn icon-btn toggled-off" id="btn-toggle-room" title="הצג/הסתר חדר" onclick="window._toggleRoom()" style="color:#64748b;"><i class="fa-solid fa-house"></i></button>
@@ -907,15 +907,15 @@
             <button class="view-btn cart-btn" style="flex:1; justify-content: center; background: var(--primary); color: white; border: none; padding: 12px; font-size: 1rem;" onclick="openOrderModal('customer')">
                 <i class="fa-solid fa-file-invoice-dollar"></i> הצעת מחיר
             </button>
-            <button id="btn-factory-order" class="view-btn" style="flex:1; justify-content: center; background: #475569; color: white; border: none; padding: 12px; font-size: 1rem; border-radius:10px; cursor:pointer;" onclick="openOrderModal('factory')">
+            <button id="btn-factory-order" class="view-btn" style="display:none; flex:1; justify-content: center; background: #475569; color: white; border: none; padding: 12px; font-size: 1rem; border-radius:10px; cursor:pointer;" onclick="openOrderModal('factory')">
                 <i class="fa-solid fa-industry"></i> שליחה לייצור
             </button>
         </div>
         <div style="display: flex; gap: 8px; margin-top: 10px;">
-            <button id="btn-quick-calc-open" class="view-btn" style="flex: 1; justify-content: center; background: var(--accent); color: white; border: none; padding: 10px; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);" onclick="document.getElementById('quick-calc-modal').style.display='flex'">
+            <button id="btn-quick-calc-open" class="view-btn" style="display:none; flex: 1; justify-content: center; background: var(--accent); color: white; border: none; padding: 10px; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);" onclick="document.getElementById('quick-calc-modal').style.display='flex'">
                 <i class="fa-solid fa-calculator"></i> מחשבון מהיר
             </button>
-            <button id="btn-customer-report" class="view-btn" style="flex: 1; justify-content: center; border: 1px solid var(--border); background: white; padding: 10px;" onclick="printCustomerSummary()">
+            <button id="btn-customer-report" class="view-btn" style="display:none; flex: 1; justify-content: center; border: 1px solid var(--border); background: white; padding: 10px;" onclick="printCustomerSummary()">
                 <i class="fa-solid fa-file-invoice"></i> סיכום ללקוח
             </button>
         </div>
