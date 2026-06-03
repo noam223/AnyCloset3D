@@ -210,35 +210,21 @@ window._generateRender = async function() {
     try { imageFront = window.renderer.domElement.toDataURL('image/jpeg', 0.85); }
     catch(e) { _showStatus('error', 'שגיאה בצילום חזית'); btn.disabled = false; return; }
 
-    // Screenshot 2: 3D angle view — reset orbit so camera goes to default 3D position
+    // Screenshot 2: 3D angle view — move camera directly to calibrated position
     _showStatus('loading', '<i class="fa-solid fa-spinner fa-spin"></i> מצלם זווית...');
-    if (typeof state !== 'undefined') {
-        state.viewMode = '3d';
-        window._orbitFree = false;
-        if (typeof updateCameraView === 'function') updateCameraView();
-        if (typeof buildCabinet === 'function') buildCabinet();
-    }
-    await new Promise(function(r) { setTimeout(r, 600); });
-
-    // Debug: log camera position for calibration
-    if (window.camera) {
-        console.log('[AI Render] Camera position after 3D switch:', {
-            x: Math.round(window.camera.position.x),
-            y: Math.round(window.camera.position.y),
-            z: Math.round(window.camera.position.z),
-        });
-        if (window.controls) {
-            console.log('[AI Render] Controls target:', {
-                x: Math.round(window.controls.target.x),
-                y: Math.round(window.controls.target.y),
-                z: Math.round(window.controls.target.z),
-            });
-        }
-    }
-
     var image3d;
-    try { image3d = window.renderer.domElement.toDataURL('image/jpeg', 0.85); }
-    catch(e) { image3d = imageFront; }
+    try {
+        if (window.camera && window.controls) {
+            // Scale position relative to cabinet width so it works for all sizes
+            var cabinetW = (typeof state !== 'undefined' && state.globalWidth) ? state.globalWidth : 160;
+            var scale = cabinetW / 160;
+            window.camera.position.set(-291 * scale, 185 * scale, 511 * scale);
+            window.controls.target.set(0, 0, 0);
+            window.controls.update();
+        }
+        await new Promise(function(r) { setTimeout(r, 300); });
+        image3d = window.renderer.domElement.toDataURL('image/jpeg', 0.85);
+    } catch(e) { image3d = imageFront; }
 
     // Restore original view
     if (typeof state !== 'undefined') {
