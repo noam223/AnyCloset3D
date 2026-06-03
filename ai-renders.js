@@ -276,14 +276,18 @@ function _openPromptDialog(imageFront, image3d, hexColor, cabinetSpec) {
 
     // Build default prompt description for textarea
     var spec = cabinetSpec || {};
-    var dims = [spec.widthCm && spec.widthCm+'cm wide', spec.heightCm && spec.heightCm+'cm tall', spec.depthCm && spec.depthCm+'cm deep'].filter(Boolean).join(', ');
-    var openNote = spec.hasOpenCells ? '\n- IMPORTANT: Cabinet has ' + (spec.openCellCount||'') + ' open compartment(s) with NO doors — keep them open.' : '';
-    var defaultPrompt = 'Create a photorealistic bedroom render with this cabinet installed naturally against a wall.' +
-        '\nPreserve exact colors, proportions and design details from both reference images.' +
-        (dims ? '\nDimensions: ' + dims + '.' : '') +
-        (hexColor ? '\nColor: ' + hexColor + '.' : '') +
+    var dims = [spec.widthCm && 'רוחב '+spec.widthCm+' ס"מ', spec.heightCm && 'גובה '+spec.heightCm+' ס"מ', spec.depthCm && 'עומק '+spec.depthCm+' ס"מ'].filter(Boolean).join(', ');
+    var openNote = '';
+    if (spec.hasOpenCells) {
+        openNote = '\n- חשוב: לארון ' + (spec.openCellCount||'') + ' תאים פתוחים ללא דלתות — יש להציג אותם פתוחים.';
+        if (spec.hasSideOpenCells) openNote += '\n- חלק מהתאים הם כוורת צד — הדופן הצדדית פתוחה ואין לוח סוגר מהצד.';
+    }
+    var defaultPrompt = 'צור הדמיה פוטוריאליסטית של ארון זה מותקן בחדר שינה מעוצב מול קיר.' +
+        '\nשמור על צבעים, פרופורציות ופרטי עיצוב מדויקים משתי תמונות הייחוס.' +
+        (dims ? '\nמידות: ' + dims + '.' : '') +
+        (hexColor ? '\nצבע: ' + hexColor + '.' : '') +
         openNote +
-        '\nModern, elegantly furnished room, warm natural lighting from a window.';
+        '\nחדר מודרני ואיכותי, תאורה טבעית וחמה מחלון.';
 
     var dlg = document.createElement('div');
     dlg.id = 'ai-prompt-dialog';
@@ -504,13 +508,19 @@ function _getCabinetSpec() {
 
         // Detect open cells from compartments
         var hasOpenCells = false;
+        var hasSideOpenCells = false;
         var openCellCount = 0;
         if (wing && wing.columns) {
             wing.columns.forEach(function(col) {
                 if (col.compartments) {
                     col.compartments.forEach(function(comp) {
-                        if (comp && (comp.type === 'open_cell' || comp.type === 'side_open_cell')) {
+                        if (comp && comp.type === 'open_cell') {
                             hasOpenCells = true;
+                            openCellCount++;
+                        }
+                        if (comp && comp.type === 'side_open_cell') {
+                            hasOpenCells = true;
+                            hasSideOpenCells = true;
                             openCellCount++;
                         }
                     });
@@ -529,17 +539,18 @@ function _getCabinetSpec() {
         }
 
         return {
-            presetId:      state.presetId,
-            widthCm:       Math.round(state.globalWidth),
-            heightCm:      Math.round(state.globalHeight),
-            depthCm:       Math.round(state.globalDepth || 58),
-            material:      wing ? (wing.boardMaterial || state.boardMaterial) : state.boardMaterial,
-            materialBody:  wing ? wing.materialBody : null,
-            hasDoors:      wing ? wing.hasDoors : true,
-            hasOpenCells:  hasOpenCells,
-            openCellCount: openCellCount,
-            hasDrawers:    hasDrawers,
-            columns:       wing ? wing.columns.length : null,
+            presetId:         state.presetId,
+            widthCm:          Math.round(state.globalWidth),
+            heightCm:         Math.round(state.globalHeight),
+            depthCm:          Math.round(state.globalDepth || 58),
+            material:         wing ? (wing.boardMaterial || state.boardMaterial) : state.boardMaterial,
+            materialBody:     wing ? wing.materialBody : null,
+            hasDoors:         wing ? wing.hasDoors : true,
+            hasOpenCells:     hasOpenCells,
+            hasSideOpenCells: hasSideOpenCells,
+            openCellCount:    openCellCount,
+            hasDrawers:       hasDrawers,
+            columns:          wing ? wing.columns.length : null,
         };
     } catch(e) { return null; }
 }

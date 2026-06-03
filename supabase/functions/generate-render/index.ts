@@ -53,36 +53,43 @@ serve(async (req) => {
 
     // ── 4. Build prompt ───────────────────────────────────────────────────────
     const spec = cabinet_spec || {};
-    const w = spec.widthCm ? `${spec.widthCm}cm wide` : '';
-    const h = spec.heightCm ? `${spec.heightCm}cm tall` : '';
-    const d = spec.depthCm ? `${spec.depthCm}cm deep` : '';
-    const dims = [w, h, d].filter(Boolean).join(', ');
-    const colorDesc = hex_color ? `The dominant cabinet color is ${hex_color}.` : '';
-    const openCellsDesc = spec.hasOpenCells
-      ? `IMPORTANT: The cabinet contains ${spec.openCellCount || 'some'} open shelving compartment(s) with NO doors — these must remain visibly open in the render.`
-      : '';
-    const drawersDesc = spec.hasDrawers ? 'The cabinet includes drawer units at the bottom.' : '';
-    const doorsDesc = spec.hasDoors === false ? 'This cabinet has NO doors — all compartments are open.' : '';
-    const columnsDesc = spec.columns ? `The cabinet has ${spec.columns} vertical columns.` : '';
+    const dims = [
+      spec.widthCm  ? `רוחב ${spec.widthCm} ס"מ`  : '',
+      spec.heightCm ? `גובה ${spec.heightCm} ס"מ` : '',
+      spec.depthCm  ? `עומק ${spec.depthCm} ס"מ`  : '',
+    ].filter(Boolean).join(', ');
 
-    const basePrompt = custom_prompt || `You are provided with two reference images of a custom-designed wardrobe cabinet: a front view and a 3D angled view.
-Create a photorealistic interior design render of this exact cabinet installed in a modern, elegantly furnished bedroom.
+    const colorDesc       = hex_color ? `צבע הארון הדומיננטי הוא ${hex_color}.` : '';
+    const columnsDesc     = spec.columns ? `לארון ${spec.columns} עמודות אנכיות.` : '';
+    const drawersDesc     = spec.hasDrawers ? 'הארון כולל מגירות בחלק התחתון.' : '';
+    const doorsDesc       = spec.hasDoors === false ? 'לארון אין דלתות — כל התאים פתוחים.' : '';
 
-Cabinet specifications:
-- Dimensions: ${dims || 'as shown in reference images'}
+    let openCellsDesc = '';
+    if (spec.hasOpenCells) {
+      openCellsDesc = `חשוב: לארון ${spec.openCellCount || ''} תא/תאים פתוחים ללא דלתות — יש להציג אותם פתוחים בהדמיה.`;
+      if (spec.hasSideOpenCells) {
+        openCellsDesc += ' חלק מהתאים הפתוחים הם כוורת צד — כלומר הדופן הצדדית של הכוורת פתוחה ואין לה לוח סוגר מהצד.';
+      }
+    }
+
+    const basePrompt = custom_prompt || `מצורפות שתי תמונות ייחוס של ארון בגדים שעוצב על ידי לקוח: תצוגת חזית ותצוגת זווית תלת-ממד.
+צור הדמיה פוטוריאליסטית של ארון זה מותקן בחדר שינה מעוצב ומודרני.
+
+מפרט הארון:
+- מידות: ${dims || 'כפי שמוצג בתמונות הייחוס'}
 - ${colorDesc}
 - ${columnsDesc}
 - ${openCellsDesc}
 - ${drawersDesc}
 - ${doorsDesc}
 
-Requirements:
-- Preserve the cabinet's exact dimensions, proportions, colors, and design details from BOTH reference images
-- Show the cabinet from a slight 3/4 front angle so the full design is visible
-- Place it naturally against a bedroom wall with complementary furniture and decor
-- Use warm, natural lighting from a window on one side
-- The room should feel modern and aspirational
-- Do NOT add doors where there are open shelves, and do NOT remove doors where they exist`;
+דרישות:
+- שמור על המידות המדויקות, הפרופורציות, הצבעים ופרטי העיצוב של הארון משתי תמונות הייחוס
+- הצג את הארון בזווית 3/4 קדמית קלה כדי שניתן לראות את העיצוב המלא
+- מקם את הארון באופן טבעי מול קיר בחדר עם ריהוט ועיצוב משלים
+- השתמש בתאורה טבעית וחמה מחלון מצד אחד
+- החדר צריך להיות מודרני ואיכותי
+- אל תוסיף דלתות לתאים פתוחים, ואל תסיר דלתות קיימות`;
 
     // ── 5. Call Gemini API ────────────────────────────────────────────────────
     const GEMINI_KEY = Deno.env.get('GEMINI_API_KEY')!;
