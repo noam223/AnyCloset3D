@@ -816,12 +816,13 @@ function _buildRoom() {
                 window._bedBoxSize = b.getSize(new THREE.Vector3());
             }
             const sz = window._bedBoxSize;
-            const geo = new THREE.BoxGeometry(sz.x, sz.y, sz.z);
+            const proxyH = 50; // fixed height 50cm
+            const geo = new THREE.BoxGeometry(sz.x, proxyH, sz.z);
             const mat = new THREE.MeshLambertMaterial({ color: 0xd4b896, transparent: true, opacity: 0.7 });
             const proxy = new THREE.Mesh(geo, mat);
             proxy.castShadow = false;
             proxy.rotation.y = bedRotRad;
-            proxy.position.set(bp.x, sz.y / 2, bp.z);
+            proxy.position.set(bp.x, proxyH / 2, bp.z);
             rg.add(proxy);
             window._bedMesh = proxy;
         } else {
