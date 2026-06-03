@@ -198,46 +198,47 @@ window._generateRender = async function() {
     var _savedPos    = window.camera ? window.camera.position.clone() : null;
     var _savedTarget = window.controls ? window.controls.target.clone() : null;
 
-    // Screenshot 1: front view — move camera to front position directly
+    var cabinetW = (typeof state !== 'undefined' && state.globalWidth)  ? state.globalWidth  : 160;
+    var cabinetH = (typeof state !== 'undefined' && state.globalHeight) ? state.globalHeight : 240;
+
+    // Screenshot 1: front view — straight on, centered on cabinet
+    var imageFront;
     if (window.camera && window.controls && window.renderer && window.scene) {
-        var cabinetW = (typeof state !== 'undefined' && state.globalWidth) ? state.globalWidth : 160;
-        var cabinetH = (typeof state !== 'undefined' && state.globalHeight) ? state.globalHeight : 240;
-        var targetY  = cabinetH / 2;
-        var distFront = Math.max(cabinetW, cabinetH) * 2.2;
-        window.camera.position.set(0, targetY, distFront);
-        window.controls.target.set(0, targetY, 0);
+        var targetCenterY = cabinetH / 2;
+        var distFront = cabinetH * 2.5;
+        window.camera.position.set(0, targetCenterY, distFront);
+        window.controls.target.set(0, targetCenterY, 0);
         window.controls.update();
         window.camera.updateMatrixWorld(true);
         window.renderer.render(window.scene, window.camera);
+        console.log('[Front shot]', window.camera.position.x.toFixed(0), window.camera.position.y.toFixed(0), window.camera.position.z.toFixed(0));
     }
     await new Promise(function(r) { setTimeout(r, 100); });
-    var imageFront;
     try { imageFront = window.renderer.domElement.toDataURL('image/jpeg', 0.85); }
     catch(e) { _showStatus('error', 'שגיאה בצילום חזית'); btn.disabled = false; return; }
 
-    // Screenshot 2: 3D angle — calibrated position (-291, 185, 511) scaled to cabinet size
+    // Screenshot 2: 3D angle — user-calibrated position, please update after debug
     _showStatus('loading', '<i class="fa-solid fa-spinner fa-spin"></i> מצלם זווית...');
     var image3d;
     try {
         if (window.camera && window.controls && window.renderer && window.scene) {
-            // Use absolute values — no scaling
             window.camera.position.set(-291, 185, 511);
-            window.controls.target.set(0, targetY || 120, 0);
+            window.controls.target.set(0, cabinetH / 2, 0);
             window.controls.update();
             window.camera.updateMatrixWorld(true);
             window.renderer.render(window.scene, window.camera);
-            console.log('[3D shot] camera pos:', window.camera.position.x.toFixed(0), window.camera.position.y.toFixed(0), window.camera.position.z.toFixed(0));
-            console.log('[3D shot] target:', window.controls.target.x.toFixed(0), window.controls.target.y.toFixed(0), window.controls.target.z.toFixed(0));
+            console.log('[3D shot]', window.camera.position.x.toFixed(0), window.camera.position.y.toFixed(0), window.camera.position.z.toFixed(0));
         }
         await new Promise(function(r) { setTimeout(r, 100); });
         image3d = window.renderer.domElement.toDataURL('image/jpeg', 0.85);
     } catch(e) { image3d = imageFront; }
 
     // Restore original camera
-    if (_savedPos && window.camera) {
+    if (_savedPos && window.camera && window.controls) {
         window.camera.position.copy(_savedPos);
         window.controls.target.copy(_savedTarget);
         window.controls.update();
+        window.renderer.render(window.scene, window.camera);
     }
 
     _hideStatus();
