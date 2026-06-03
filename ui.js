@@ -3737,27 +3737,35 @@ window._updateBedHandles = function() {
         if (!window._bedDrag) window._bedHovered = false;
     });
 
-    // Simple flat material used during drag to kill texture overhead
-    const _bedDragMat = new THREE.MeshLambertMaterial({ color: 0xddd8cc, side: THREE.FrontSide });
-    window._roomMatBackup = null; // { mesh → originalMaterial }
+    // Drag materials — floor warm brown, walls white, bed keeps original
+    const _dragMatFloor = new THREE.MeshLambertMaterial({ color: 0xc8966a });
+    const _dragMatWall  = new THREE.MeshLambertMaterial({ color: 0xf0ede8 });
+    window._roomMatBackup = null;
 
     function _stripRoomTextures() {
-        if (window._roomMatBackup) return; // already stripped
+        if (window._roomMatBackup) return;
         window._roomMatBackup = new Map();
         if (!window._roomGroup) return;
         window._roomGroup.traverse(function(obj) {
-            if (obj.isMesh && obj.material) {
-                window._roomMatBackup.set(obj, obj.material);
-                obj.material = _bedDragMat;
-            }
+            if (!obj.isMesh || !obj.material) return;
+            // Keep bed meshes with their original material
+            var isBedMesh = false;
+            var p = obj.parent;
+            while (p) { if (p === window._bedMesh) { isBedMesh = true; break; } p = p.parent; }
+            if (isBedMesh) return;
+
+            window._roomMatBackup.set(obj, obj.material);
+            // Floor: rotated -90° on X axis (PlaneGeometry facing up)
+            var isFloor = obj.userData.roomPart === 'floor' ||
+                          (obj.geometry && obj.geometry.type === 'PlaneGeometry' &&
+                           Math.abs(obj.rotation.x + Math.PI / 2) < 0.01);
+            obj.material = isFloor ? _dragMatFloor : _dragMatWall;
         });
     }
 
     function _restoreRoomTextures() {
         if (!window._roomMatBackup) return;
-        window._roomMatBackup.forEach(function(mat, obj) {
-            obj.material = mat;
-        });
+        window._roomMatBackup.forEach(function(mat, obj) { obj.material = mat; });
         window._roomMatBackup = null;
     }
 

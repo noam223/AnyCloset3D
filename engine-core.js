@@ -659,6 +659,7 @@ function _buildRoom() {
     floorMesh.rotation.x = -Math.PI / 2;
     floorMesh.position.set(roomCenterX, 0, backZ + roomD / 2 - wallT);
     floorMesh.receiveShadow = true;
+    floorMesh.userData.roomPart = 'floor';
     rg.add(floorMesh);
 
     // ── Niche floor (extends floor into the alcove) ────────────────────────
