@@ -220,12 +220,14 @@ window._generateRender = async function() {
     var image3d;
     try {
         if (window.camera && window.controls && window.renderer && window.scene) {
-            var scale = (cabinetW || 160) / 160;
-            window.camera.position.set(-291 * scale, 185 * scale, 511 * scale);
-            window.controls.target.set(0, targetY || 80, 0);
+            // Use absolute values — no scaling
+            window.camera.position.set(-291, 185, 511);
+            window.controls.target.set(0, targetY || 120, 0);
             window.controls.update();
             window.camera.updateMatrixWorld(true);
             window.renderer.render(window.scene, window.camera);
+            console.log('[3D shot] camera pos:', window.camera.position.x.toFixed(0), window.camera.position.y.toFixed(0), window.camera.position.z.toFixed(0));
+            console.log('[3D shot] target:', window.controls.target.x.toFixed(0), window.controls.target.y.toFixed(0), window.controls.target.z.toFixed(0));
         }
         await new Promise(function(r) { setTimeout(r, 100); });
         image3d = window.renderer.domElement.toDataURL('image/jpeg', 0.85);
