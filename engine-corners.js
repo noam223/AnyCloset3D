@@ -383,8 +383,8 @@ function buildCornerUnit() {
             const handleMat = new THREE.MeshStandardMaterial({ color: 0xb0b0b0, metalness: 0.85, roughness: 0.15 });
             for (let i = 0; i < numDeskDrawers; i++) {
                 const dY = plinthH + drawerH / 2 + i * (drawerH + 0.4);
-                const fX = sign * (cuD / 2 + t / 2 + 0.1); // drawer front faces opening
-                const dMesh = addBoard(t, drawerH - 0.5, drawerUnitD, fX, dY + plinthH / 2, duZ, matExternal);
+                const fX = sign * (-cuD / 2 - t / 2 - 0.1); // drawer front faces opening (inward)
+                const dMesh = addBoard(t, drawerH - 0.5, drawerUnitD, fX, dY, duZ, matExternal);
                 // Handle
                 const barLen = Math.min(drawerUnitD * 0.5, 14);
                 const barR = 0.3;
