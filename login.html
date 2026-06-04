@@ -557,11 +557,11 @@ function _showResetPasswordForm() {
             '<input type="password" id="reset-confirm-password" class="form-input" placeholder="חזור על הסיסמה">' +
         '</div>' +
         '<div id="reset-message" style="margin-bottom:12px;font-size:0.85rem;"></div>' +
-        '<button class="btn-submit" onclick="handleResetPassword()" style="width:100%;">עדכן סיסמה</button>';
+        '<button class="btn-submit" onclick="handleSetNewPassword()" style="width:100%;">עדכן סיסמה</button>';
     card.appendChild(resetDiv);
 }
 
-async function handleResetPassword() {
+async function handleSetNewPassword() {
     var newPw  = document.getElementById('reset-new-password').value;
     var confPw = document.getElementById('reset-confirm-password').value;
     var msgEl  = document.getElementById('reset-message');
