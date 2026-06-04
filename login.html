@@ -931,9 +931,24 @@ function _translateError(msg) {
     return msg;
 }
 
+// ── Listen for Supabase auth events — catch recovery BEFORE isLoggedIn redirect
+(function() {
+    var sb = window.supabase && window.supabase.createClient
+        ? window.supabase.createClient(
+            'https://meqxnsjycvfgfhdepguo.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lcXhuc2p5Y3ZmZ2ZoZGVwZ3VvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3MDA5NDAsImV4cCI6MjA5MjI3Njk0MH0.w63bl0-1-Rgt9Nx6sVW5ueEGMojiMaxoehlPXlPH2N0')
+        : null;
+    if (!sb) return;
+    sb.auth.onAuthStateChange(function(event, session) {
+        if (event === 'PASSWORD_RECOVERY') {
+            _showResetPasswordForm();
+        }
+    });
+})();
+
 // ── On load: if already logged in, redirect; pre-select plan from URL ─────────
 (async function() {
-    // Check for password recovery token in URL hash BEFORE checking login state
+    // Also check hash directly (in case event already fired)
     var _hash = window.location.hash;
     if (_hash && _hash.includes('type=recovery')) {
         _showResetPasswordForm();
