@@ -531,6 +531,70 @@ function handleForgotPassword() {
     switchTab('forgot');
 }
 
+// ── Reset password form (after clicking email link) ───────────────────────────
+function _showResetPasswordForm() {
+    // Hide all tabs, show reset form
+    document.querySelectorAll('.tab-content').forEach(function(t) { t.style.display = 'none'; });
+    document.querySelectorAll('.tab-btn').forEach(function(b) { b.style.display = 'none'; });
+
+    var card = document.querySelector('.login-card');
+    if (!card) return;
+
+    var resetDiv = document.createElement('div');
+    resetDiv.id = 'form-reset-password';
+    resetDiv.innerHTML =
+        '<div style="text-align:center;margin-bottom:24px;">' +
+            '<div style="font-size:2rem;margin-bottom:8px;">🔐</div>' +
+            '<h2 style="font-size:1.2rem;font-weight:800;color:var(--primary);margin-bottom:4px;">הגדרת סיסמה חדשה</h2>' +
+            '<p style="font-size:0.85rem;color:var(--text-light);">הזן סיסמה חדשה לחשבונך</p>' +
+        '</div>' +
+        '<div class="form-group">' +
+            '<label class="form-label">סיסמה חדשה</label>' +
+            '<input type="password" id="reset-new-password" class="form-input" placeholder="לפחות 6 תווים" minlength="6">' +
+        '</div>' +
+        '<div class="form-group">' +
+            '<label class="form-label">אימות סיסמה</label>' +
+            '<input type="password" id="reset-confirm-password" class="form-input" placeholder="חזור על הסיסמה">' +
+        '</div>' +
+        '<div id="reset-message" style="margin-bottom:12px;font-size:0.85rem;"></div>' +
+        '<button class="btn-submit" onclick="handleResetPassword()" style="width:100%;">עדכן סיסמה</button>';
+    card.appendChild(resetDiv);
+}
+
+async function handleResetPassword() {
+    var newPw  = document.getElementById('reset-new-password').value;
+    var confPw = document.getElementById('reset-confirm-password').value;
+    var msgEl  = document.getElementById('reset-message');
+
+    if (newPw.length < 6) {
+        msgEl.innerHTML = '<span style="color:#dc2626;">הסיסמה חייבת להכיל לפחות 6 תווים</span>';
+        return;
+    }
+    if (newPw !== confPw) {
+        msgEl.innerHTML = '<span style="color:#dc2626;">הסיסמאות אינן תואמות</span>';
+        return;
+    }
+
+    var btn = document.querySelector('#form-reset-password .btn-submit');
+    if (btn) { btn.disabled = true; btn.textContent = 'מעדכן...'; }
+
+    try {
+        var sb = window._supabase || (window.supabase && window.supabase.createClient
+            ? window.supabase.createClient(
+                'https://meqxnsjycvfgfhdepguo.supabase.co',
+                'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lcXhuc2p5Y3ZmZ2ZoZGVwZ3VvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3MDA5NDAsImV4cCI6MjA5MjI3Njk0MH0.w63bl0-1-Rgt9Nx6sVW5ueEGMojiMaxoehlPXlPH2N0')
+            : null);
+        if (!sb) throw new Error('לא מחובר');
+        var { error } = await sb.auth.updateUser({ password: newPw });
+        if (error) throw error;
+        msgEl.innerHTML = '<span style="color:#16a34a;">✓ הסיסמה עודכנה בהצלחה! מעביר אותך...</span>';
+        setTimeout(function() { window.location.href = 'projects.html'; }, 1500);
+    } catch(e) {
+        msgEl.innerHTML = '<span style="color:#dc2626;">שגיאה: ' + e.message + '</span>';
+        if (btn) { btn.disabled = false; btn.textContent = 'עדכן סיסמה'; }
+    }
+}
+
 // ── Step 1: User type ─────────────────────────────────────────────────────────
 function selectUserType(type) {
     _selectedUserType = type;
@@ -869,6 +933,13 @@ function _translateError(msg) {
 
 // ── On load: if already logged in, redirect; pre-select plan from URL ─────────
 (async function() {
+    // Check for password recovery token in URL hash BEFORE checking login state
+    var _hash = window.location.hash;
+    if (_hash && _hash.includes('type=recovery')) {
+        _showResetPasswordForm();
+        return;
+    }
+
     if (await Auth.isLoggedIn()) {
         window.location.href = 'projects.html';
         return;
