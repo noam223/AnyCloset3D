@@ -139,9 +139,14 @@ async function _loadProjectRenders() {
 
 async function _updateQuota() {
     if (!_sbRenders) return;
-    var { data: count } = await _sbRenders.rpc('get_ai_renders_count_this_month', { p_user_id: _currentUserId });
-    var used = count ?? 0;
-    var limit = 50;
+    var [countRes, profileRes] = await Promise.all([
+        _sbRenders.rpc('get_ai_renders_count_this_month', { p_user_id: _currentUserId }),
+        _sbRenders.from('profiles').select('ai_renders_quota, subscription_status').eq('id', _currentUserId).single()
+    ]);
+    var used = countRes.data ?? 0;
+    var profile = profileRes.data || {};
+    var isTrial = profile.subscription_status === 'trial';
+    var limit = isTrial ? 5 : (profile.ai_renders_quota ?? 50);
     var pct = Math.min(100, Math.round(used / limit * 100));
 
     var text = document.getElementById('ai-renders-quota-text');
