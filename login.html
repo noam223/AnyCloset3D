@@ -940,7 +940,9 @@ function _translateError(msg) {
         : null;
     if (!sb) return;
     sb.auth.onAuthStateChange(function(event, session) {
+        console.log('[Auth] event:', event, 'session:', session ? 'yes' : 'no');
         if (event === 'PASSWORD_RECOVERY') {
+            console.log('[Auth] PASSWORD_RECOVERY detected — showing reset form');
             _showResetPasswordForm();
         }
     });
@@ -950,7 +952,9 @@ function _translateError(msg) {
 (async function() {
     // Also check hash directly (in case event already fired)
     var _hash = window.location.hash;
+    console.log('[Login] hash:', _hash || '(empty)');
     if (_hash && _hash.includes('type=recovery')) {
+        console.log('[Login] recovery in hash — showing reset form');
         _showResetPasswordForm();
         return;
     }
