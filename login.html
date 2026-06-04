@@ -534,16 +534,16 @@ function handleForgotPassword() {
 // ── Reset password form (after clicking email link) ───────────────────────────
 function _showResetPasswordForm() {
     if (document.getElementById('form-reset-password')) return; // already shown
-    // Hide everything inside the card except header
-    document.querySelectorAll('.tab-content').forEach(function(t) { t.style.display = 'none'; });
-    document.querySelectorAll('.tab-btn').forEach(function(b) { b.style.display = 'none'; });
-    var tabsBar = document.getElementById('auth-tabs');
-    if (tabsBar) tabsBar.style.display = 'none';
-    var msgEl = document.getElementById('auth-message');
-    if (msgEl) msgEl.style.display = 'none';
 
     var card = document.querySelector('.auth-card');
     if (!card) return;
+
+    // Hide ALL children of card except the header
+    Array.from(card.children).forEach(function(el) {
+        if (!el.classList.contains('auth-header')) {
+            el.style.display = 'none';
+        }
+    });
 
     var resetDiv = document.createElement('div');
     resetDiv.id = 'form-reset-password';
