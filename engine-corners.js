@@ -370,37 +370,41 @@ function buildCornerUnit() {
         addBoard(cuD, t, cuW, 0, deskH - t / 2, 0, matDesk);
         // Back leg at far Z (outer end wall, far from main cabinet front face)
         addBoard(cuD, deskH, t, 0, deskH / 2, backWallZ, matDesk);
-        // Optional drawers under desk surface
+        // Optional drawers under desk surface — same logic as side desk (engine.js)
         const numDeskDrawers = cu.deskDrawerCount || 0;
         if (numDeskDrawers > 0) {
-            // Drawer unit on the side-wall side (far X)
-            const drawerUnitW = Math.min(cuD * 0.45, 40); // width of drawer unit in X
-            const drawerUnitD = cuW - t;                   // depth in Z (inner)
             const drawerH = cu.deskDrawerHeight || 13;
-            const duX = sign * (cuD / 2 - drawerUnitW / 2); // positioned at far-X side
-            const duZ = t / 2;                              // inset from opening
-            const handleMat = new THREE.MeshStandardMaterial({ color: 0xb0b0b0, metalness: 0.85, roughness: 0.15 });
+            const gap = 0.4;
+            // Drawers span the full inner X width, side by side (same as side desk spans width side by side)
+            const innerW = cuD - t;                        // inner width in X (excluding side wall)
+            const drawerW = (innerW - gap * (numDeskDrawers + 1)) / numDeskDrawers;
+            const drawerBottomY = deskH - t - drawerH;
+            const drawerCenterY = drawerBottomY + drawerH / 2;
+            // Drawer fronts face the opening: local Z = -cuW/2 (front face of the corner unit)
+            const fZ = -cuW / 2 - t / 2 - 0.1;
+            const handleMat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.8, roughness: 0.2 });
             for (let i = 0; i < numDeskDrawers; i++) {
-                const dY = plinthH + drawerH / 2 + i * (drawerH + 0.4);
-                const fX = sign * (-cuD / 2 - t / 2 - 0.1); // drawer front faces opening (inward)
-                const dMesh = addBoard(t, drawerH - 0.5, drawerUnitD, fX, dY, duZ, matExternal);
-                // Handle
-                const barLen = Math.min(drawerUnitD * 0.5, 14);
-                const barR = 0.3;
-                const postH = 1.0;
-                const hOffX = sign * (-t / 2 - postH - barR * 0.5);
+                // X center of each drawer, starting from inner open side (sign*(-cuD/2)) toward side wall
+                const dX = sign * (-cuD / 2 + gap + drawerW / 2 + i * (drawerW + gap));
+                // Drawer front: width in X, height in Y, thickness in Z
+                const dMesh = addBoard(drawerW, drawerH - 0.5, t, dX, drawerCenterY, fZ, matExternal);
+                // Handle: horizontal bar along X axis
+                const barLen = Math.min(drawerW * 0.55, 18);
+                const barR = 0.35;
+                const postH = 1.2;
                 const bar = new THREE.Mesh(
-                    new THREE.CylinderGeometry(barR, barR, barLen, 10).rotateX(Math.PI / 2),
+                    new THREE.CylinderGeometry(barR, barR, barLen, 12).rotateZ(Math.PI / 2),
                     handleMat
                 );
-                bar.position.set(hOffX, 0, 0);
+                bar.position.set(0, 0, -(t / 2 + postH + barR * 0.5));
                 dMesh.add(bar);
-                [-barLen / 2, barLen / 2].forEach(pz => {
+                // Two end posts along Z connecting bar to drawer face
+                [-barLen / 2, barLen / 2].forEach(px => {
                     const post = new THREE.Mesh(
-                        new THREE.CylinderGeometry(barR, barR, postH, 8).rotateZ(Math.PI / 2),
+                        new THREE.CylinderGeometry(barR, barR, postH, 10).rotateX(Math.PI / 2),
                         handleMat
                     );
-                    post.position.set(sign * (-t / 2 - postH / 2), 0, pz);
+                    post.position.set(px, 0, -(t / 2 + postH / 2));
                     dMesh.add(post);
                 });
             }
