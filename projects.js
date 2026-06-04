@@ -1018,8 +1018,12 @@ async function _loadProfileForm() {
         document.getElementById('prof-tax-id').value         = biz.taxId || '';
         document.getElementById('prof-address').value        = biz.address || '';
         document.getElementById('prof-website').value        = biz.website || '';
-        document.getElementById('prof-logo-url').value       = biz.logoUrl || '';
         document.getElementById('prof-bio').value            = biz.bio || '';
+
+        // Logo — from profiles.logo_url (direct storage) or legacy business_info.logoUrl
+        var logoUrl = (_userProfile.logo_url) || biz.logoUrl || '';
+        document.getElementById('prof-logo-url').value = logoUrl;
+        _updateLogoPreview(logoUrl);
 
         // Subscription section
         _loadSubscriptionSection(profile);
@@ -1174,21 +1178,84 @@ async function saveBusinessInfo() {
         );
         var { data: { user } } = await sb.auth.getUser();
         if (!user) return;
+        // Upload logo file if selected
+        var logoFile = document.getElementById('prof-logo-file') && document.getElementById('prof-logo-file').files[0];
+        var logoUrl  = document.getElementById('prof-logo-url').value.trim();
+        if (logoFile) {
+            var statusEl = document.getElementById('logo-upload-status');
+            if (statusEl) statusEl.innerHTML = '<span style="color:#2563eb;">מעלה לוגו...</span>';
+            var ext  = logoFile.name.split('.').pop().toLowerCase();
+            var path = user.id + '/logo.' + ext;
+            var { error: upErr } = await sb.storage.from('logos').upload(path, logoFile, { upsert: true, contentType: logoFile.type });
+            if (upErr) throw upErr;
+            var { data: urlData } = sb.storage.from('logos').getPublicUrl(path);
+            logoUrl = urlData.publicUrl + '?t=' + Date.now(); // bust cache
+            document.getElementById('prof-logo-url').value = logoUrl;
+            _updateLogoPreview(logoUrl);
+            if (statusEl) statusEl.innerHTML = '';
+            document.getElementById('prof-logo-file').value = '';
+        }
+
         var biz = {
             name:    document.getElementById('prof-business-name').value.trim(),
             type:    document.getElementById('prof-business-type').value,
             taxId:   document.getElementById('prof-tax-id').value.trim(),
             address: document.getElementById('prof-address').value.trim(),
             website: document.getElementById('prof-website').value.trim(),
-            logoUrl: document.getElementById('prof-logo-url').value.trim(),
             bio:     document.getElementById('prof-bio').value.trim()
         };
-        var { error } = await sb.from('profiles').update({ business_info: biz }).eq('id', user.id);
+        var { error } = await sb.from('profiles').update({ business_info: biz, logo_url: logoUrl || null }).eq('id', user.id);
         if (error) throw error;
+        window._userLogoUrl = logoUrl || null; // update global for print functions
         showToast('פרטי העסק נשמרו ✓', 'success');
     } catch(e) {
         showToast('שגיאה: ' + e.message, 'error');
     }
+}
+
+// ── Logo upload helpers ───────────────────────────────────────────────────────
+function _updateLogoPreview(url) {
+    var img  = document.getElementById('logo-preview-img');
+    var icon = document.getElementById('logo-preview-icon');
+    var rmBtn = document.getElementById('logo-remove-btn');
+    if (!img) return;
+    if (url) {
+        img.src = url; img.style.display = 'block';
+        if (icon)  icon.style.display  = 'none';
+        if (rmBtn) rmBtn.style.display = 'inline-flex';
+    } else {
+        img.src = ''; img.style.display = 'none';
+        if (icon)  icon.style.display  = '';
+        if (rmBtn) rmBtn.style.display = 'none';
+    }
+}
+
+function previewLogo(input) {
+    var file = input.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { showToast('הקובץ גדול מדי — מקסימום 2MB', 'error'); input.value = ''; return; }
+    var reader = new FileReader();
+    reader.onload = function(e) { _updateLogoPreview(e.target.result); };
+    reader.readAsDataURL(file);
+}
+
+async function removeLogo() {
+    if (!confirm('להסיר את הלוגו?')) return;
+    document.getElementById('prof-logo-url').value = '';
+    _updateLogoPreview('');
+    var fileInp = document.getElementById('prof-logo-file');
+    if (fileInp) fileInp.value = '';
+    // Save empty logo_url immediately
+    try {
+        var sb = supabase.createClient(
+            'https://meqxnsjycvfgfhdepguo.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lcXhuc2p5Y3ZmZ2ZoZGVwZ3VvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3MDA5NDAsImV4cCI6MjA5MjI3Njk0MH0.w63bl0-1-Rgt9Nx6sVW5ueEGMojiMaxoehlPXlPH2N0'
+        );
+        var { data: { user } } = await sb.auth.getUser();
+        if (user) await sb.from('profiles').update({ logo_url: null }).eq('id', user.id);
+        window._userLogoUrl = null;
+        showToast('הלוגו הוסר', 'success');
+    } catch(e) { showToast('שגיאה: ' + e.message, 'error'); }
 }
 
 // ── Pricing panel ─────────────────────────────────────────────────────────────

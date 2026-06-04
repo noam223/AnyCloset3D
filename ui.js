@@ -5994,6 +5994,10 @@ function _buildPrintHTML(mode) {
     if (_pdfNamePart)  _pdfTitleParts.push(_pdfNamePart);
     const pdfTitle = _pdfTitleParts.join(' ');
 
+    const _logoHtml = window._userLogoUrl
+        ? `<img src="${window._userLogoUrl}" style="max-height:56px;max-width:160px;object-fit:contain;display:block;" alt="לוגו">`
+        : '';
+
     return `<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
@@ -6003,7 +6007,7 @@ function _buildPrintHTML(mode) {
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; direction: rtl; background: white; color: #1e293b; padding: 20px; font-size: 14px; }
   h1 { font-size: 1.6rem; color: #1e3a5f; margin-bottom: 6px; }
-  .header-bar { border-bottom: 3px solid #1e3a5f; padding-bottom: 12px; margin-bottom: 20px; }
+  .header-bar { border-bottom: 3px solid #1e3a5f; padding-bottom: 12px; margin-bottom: 20px; display:flex; justify-content:space-between; align-items:flex-end; }
   .cust-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 20px; background: #f8fafc; padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 0.95rem; border: 1px solid #e2e8f0; }
   @media print {
     body { padding: 10px; }
@@ -6015,8 +6019,11 @@ function _buildPrintHTML(mode) {
 </head>
 <body>
 <div class="header-bar">
-  <h1>📋 ${title}</h1>
-  <div style="font-size:0.85rem;color:#64748b;margin-top:4px;">תאריך: ${new Date().toLocaleDateString('he-IL')}</div>
+  <div>
+    <h1>📋 ${title}</h1>
+    <div style="font-size:0.85rem;color:#64748b;margin-top:4px;">תאריך: ${new Date().toLocaleDateString('he-IL')}</div>
+  </div>
+  ${_logoHtml}
 </div>
 <div class="cust-grid">
   <div><strong>שם פרויקט/לקוח:</strong> ${custName}</div>
@@ -6584,10 +6591,11 @@ window.printCustomerSummary = async function() {
         alert('אין ארונות בהזמנה. הוסף ארונות קודם.');
         return;
     }
-    // Load logo as base64 data URL so it works in the print window
+    // Load logo: prefer user's uploaded logo, fallback to system logo.webp
     let logoDataUrl = '';
     try {
-        const resp = await fetch('logo.webp');
+        const logoSrc = window._userLogoUrl || 'logo.webp';
+        const resp = await fetch(logoSrc);
         if (resp.ok) {
             const blob = await resp.blob();
             logoDataUrl = await new Promise(resolve => {

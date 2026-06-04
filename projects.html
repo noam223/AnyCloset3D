@@ -423,7 +423,27 @@
                         <div class="profile-field"><label class="profile-label">ח.פ / ע.מ</label><input class="profile-input" id="prof-tax-id" type="text" placeholder="מספר עוסק / ח.פ" maxlength="20"></div>
                         <div class="profile-field"><label class="profile-label">כתובת</label><input class="profile-input" id="prof-address" type="text" placeholder="רחוב, עיר" maxlength="120"></div>
                         <div class="profile-field"><label class="profile-label">אתר אינטרנט</label><input class="profile-input" id="prof-website" type="url" placeholder="https://..." maxlength="120"></div>
-                        <div class="profile-field"><label class="profile-label">לוגו URL</label><input class="profile-input" id="prof-logo-url" type="url" placeholder="https://..." maxlength="300"></div>
+                        <div class="profile-field full">
+                            <label class="profile-label">לוגו העסק</label>
+                            <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:4px;">
+                                <div id="logo-preview-wrap" style="width:80px;height:56px;border:2px dashed var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;background:#f8fafc;overflow:hidden;flex-shrink:0;">
+                                    <img id="logo-preview-img" src="" alt="" style="display:none;max-width:76px;max-height:52px;object-fit:contain;">
+                                    <i id="logo-preview-icon" class="fa-solid fa-image" style="color:#cbd5e1;font-size:1.4rem;"></i>
+                                </div>
+                                <div style="flex:1;">
+                                    <label style="display:inline-flex;align-items:center;gap:7px;padding:8px 16px;background:var(--primary);color:white;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600;">
+                                        <i class="fa-solid fa-upload"></i> בחר לוגו
+                                        <input type="file" id="prof-logo-file" accept="image/jpeg,image/png,image/webp,image/svg+xml" style="display:none;" onchange="previewLogo(this)">
+                                    </label>
+                                    <div style="font-size:0.75rem;color:var(--muted);margin-top:5px;">JPG, PNG, WebP, SVG · עד 2MB</div>
+                                    <div id="logo-upload-status" style="font-size:0.78rem;margin-top:4px;"></div>
+                                </div>
+                                <button id="logo-remove-btn" onclick="removeLogo()" style="display:none;background:none;border:1px solid #fecaca;color:#dc2626;border-radius:8px;padding:7px 12px;font-size:0.82rem;cursor:pointer;font-family:inherit;">
+                                    <i class="fa-solid fa-trash"></i> הסר לוגו
+                                </button>
+                            </div>
+                            <input type="hidden" id="prof-logo-url">
+                        </div>
                         <div class="profile-field full"><label class="profile-label">תיאור עסק</label><textarea class="profile-input" id="prof-bio" rows="3" placeholder="תיאור קצר של העסק..." maxlength="400" style="height:auto;padding:10px 14px;resize:vertical;"></textarea></div>
                     </div>
                     <div style="margin-top:18px;"><button class="profile-save-btn" onclick="saveBusinessInfo()"><i class="fa-solid fa-floppy-disk"></i> שמור פרטי עסק</button></div>

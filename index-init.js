@@ -88,6 +88,18 @@
         }
     }
 
+    // 3b. Load user logo
+    if (user && _sb_init) {
+        try {
+            var { data: _profileRow } = await _sb_init
+                .from('profiles')
+                .select('logo_url')
+                .eq('id', user.id)
+                .single();
+            window._userLogoUrl = (_profileRow && _profileRow.logo_url) ? _profileRow.logo_url : null;
+        } catch(e) { window._userLogoUrl = null; }
+    }
+
     // 4. Load features and apply UI gates based on plan  (was §3 before pricing block)
     var _features = await loadFeatures();
     var _planInfo  = window._plan;
