@@ -2458,6 +2458,8 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
 
     for (let c = 0; c < state.columns.length; c++) {
         const col = state.columns[c];
+        // Per-column depth: null means use global bodyD
+        const colD = (col.depth !== null && col.depth !== undefined) ? col.depth : bodyD;
         const _fo = col.floorOffset || 0;
         let startShelvesY = _fo > 0 ? _fo + t : state.plinthHeight + t;
         if (col.type === 'desk') startShelvesY = col.deskHeight + col.deskClearance + t;
@@ -2682,8 +2684,13 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
             const wallTopY = rightH;
             const wallTotalH = wallTopY - wallBottomY;
             // For sliding wardrobes: internal partitions are set back 6cm from front face
-            const _partD = _slidingPartD;
-            const _partZ = _slidingPartZ;
+            // Per-column depth: use the deeper of the two adjacent columns for the partition
+            const nextCol2 = _cols[c + 1];
+            const colDLeft  = (col.depth !== null && col.depth !== undefined) ? col.depth : bodyD;
+            const colDRight = nextCol2 ? ((nextCol2.depth !== null && nextCol2.depth !== undefined) ? nextCol2.depth : bodyD) : bodyD;
+            const partColD  = Math.max(colDLeft, colDRight);
+            const _partD = _isSlidingWardrobe ? (partColD - _slidingPartSetback) : partColD;
+            const _partZ = _slidingPartZ + (partColD - bodyD) / 2;
             
             let sortedHoles = internalHoles[c].sort((a,b) => a.bottom - b.bottom);
             let currentY = wallBottomY;
@@ -3167,22 +3174,22 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
             let boardW = col.width;
             let boardX = colCenterX;
             // For sliding wardrobes: shelves are set back 10cm from front face (door zone = 10cm)
-            let boardD = _isSlidingWardrobe ? (bodyD - 10) : bodyD;
-            let boardZ = _isSlidingWardrobe ? -5 : 0; // shift back so front face is 10cm behind cabinet front
+            let boardD = _isSlidingWardrobe ? (colD - 10) : colD;
+            let boardZ = _isSlidingWardrobe ? -5 : (colD - bodyD) / 2; // recessed if colD < bodyD
             let boardMat = matInternal;
-            
+
             if (insideBlock && !isBP) {
                 boardMat = matOpenCell;
-                boardZ = _isSlidingWardrobe ? -4 : 1;
-                boardD = _isSlidingWardrobe ? (bodyD - 12) : (bodyD - 2);
+                boardZ = _isSlidingWardrobe ? -4 : 1 + (colD - bodyD) / 2;
+                boardD = _isSlidingWardrobe ? (colD - 12) : (colD - 2);
                 if (insideBlock.type === 'side_open_cell') {
                     if (insideBlock.openDir === 'left') { boardW += t; boardX -= t/2; }
                     else if (insideBlock.openDir === 'right') { boardW += t; boardX += t/2; }
                 }
             } else {
                 if (isHiddenByDoor(div.y) && !isBP) {
-                    boardD = bodyD - t;
-                    boardZ = -t/2;
+                    boardD = colD - t;
+                    boardZ = -t/2 + (colD - bodyD) / 2;
                 }
                 
                 // מדפים שתוחמים כוורת (גלויים מבחוץ) → צבע גוף

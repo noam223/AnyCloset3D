@@ -236,7 +236,7 @@ const state = {
     const innerWidth = w.width - (w.thickness * 2) - w.thickness;
     const colWidth = innerWidth / 2;
     w.columns = [0, 1].map(() => {
-        const col = { type: 'normal', width: colWidth, height: w.globalHeight, shelves: 0, splitY: null, shelvesY: [], compartments: [], doors: [], floorOffset: 0 };
+        const col = { type: 'normal', width: colWidth, height: w.globalHeight, depth: null, shelves: 0, splitY: null, shelvesY: [], compartments: [], doors: [], floorOffset: 0 };
         _distributeShelves(col, w);
         return col;
     });
@@ -2152,6 +2152,12 @@ window.updateQE = function(field, delta) {
             col.shelves = newS; distributeShelves(col); clearSelection();
         }
     }
+    if (field === 'col_depth') {
+        const globalD = state.globalDepth || 58;
+        const currentD = col.depth !== null && col.depth !== undefined ? col.depth : globalD;
+        const newD = Math.max(10, Math.min(globalD + 30, Math.round(currentD + delta)));
+        col.depth = newD;
+    }
     checkSplits(); buildCabinet(); calculatePrice(); saveHistoryState();
 }
 
@@ -2163,6 +2169,18 @@ window.updateQEInput = function(field, value) {
     if (field === 'height') updateQE('height', val - col.height);
     else if (field === 'width') updateQE('width', val - col.width);
     else if (field === 'shelves') updateQE('shelves', val - col.shelves);
+    else if (field === 'col_depth') {
+        const globalD = state.globalDepth || 58;
+        const currentD = col.depth !== null && col.depth !== undefined ? col.depth : globalD;
+        updateQE('col_depth', val - currentD);
+    }
+}
+
+window.resetColDepth = function() {
+    const col = state.columns[state.activeEditCol];
+    if (!col) return;
+    col.depth = null;
+    buildCabinet(); calculatePrice(); saveHistoryState();
 }
 
 window.updateColumns = function(delta) {

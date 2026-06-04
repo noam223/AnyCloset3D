@@ -1184,6 +1184,16 @@
             <div class="qe-input-wrap"><input class="qe-input qe-input-sm" id="qe-desk-drawer-count-val" type="number" step="1" min="1" max="4" onchange="updateDeskDrawerCountInput(this.value)"/></div>
             <button class="qe-btn" onclick="updateDeskDrawerCount(-1)"><i class="fa-solid fa-minus"></i></button>
         </div>
+        <div class="qe-divider"></div>
+        <div class="qe-group" id="qe-coldepth-group">
+            <span class="qe-label"><i class="fa-solid fa-arrows-left-right-to-line"></i> עומק</span>
+            <button class="qe-btn" onclick="updateQE('col_depth',5)"><i class="fa-solid fa-plus"></i></button>
+            <div class="qe-input-wrap"><input class="qe-input qe-input-sm" id="qe-coldepth-val" type="number" step="1" min="10" onchange="updateQEInput('col_depth',this.value)"/></div>
+            <button class="qe-btn" onclick="updateQE('col_depth',-5)"><i class="fa-solid fa-minus"></i></button>
+            <button id="qe-btn-coldepth-reset" class="qe-toggle-btn" onclick="resetColDepth()" title="איפוס לעומק גלובלי" style="padding:2px 6px;font-size:0.7rem;">
+                <i class="fa-solid fa-rotate-right"></i>
+            </button>
+        </div>
         <!-- Copy/Paste buttons — shown only when entire column is selected -->
         <div class="qe-group" id="qe-copypaste-group" style="display:none;">
             <div class="qe-divider"></div>

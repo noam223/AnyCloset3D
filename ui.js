@@ -113,6 +113,16 @@ function updateQuickEditPanelUI() {
 
     document.getElementById('qe-s-val').value = col.shelves;
 
+    // Per-column depth
+    const colDepthEl = document.getElementById('qe-coldepth-val');
+    if (colDepthEl) {
+        const globalD = state.globalDepth || 58;
+        colDepthEl.value = (col.depth !== null && col.depth !== undefined) ? col.depth : globalD;
+        colDepthEl.max = globalD + 30;
+        const resetBtn = document.getElementById('qe-btn-coldepth-reset');
+        if (resetBtn) resetBtn.classList.toggle('active', col.depth !== null && col.depth !== undefined);
+    }
+
     // No-plinth toggle button
     const btnNoplinth = document.getElementById('qe-btn-noplinth');
     if (btnNoplinth) {
