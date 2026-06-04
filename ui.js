@@ -4354,7 +4354,7 @@ function bindUI() {
     if (placementEl) {
         placementEl.addEventListener('change', (e) => {
             state.placement = e.target.value;
-            saveHistoryState();
+            buildCabinet(); calculatePrice(); saveHistoryState();
         });
     }
 

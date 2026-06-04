@@ -1969,7 +1969,7 @@ function buildCabinet() {
         buildSlidingDoorCabinet();
     }
 
-    addBlueprintSprites();
+    if (typeof addBlueprintSprites === 'function') addBlueprintSprites();
     if(typeof buildDimensionsAndButtonsUI === 'function') buildDimensionsAndButtonsUI();
     if(typeof buildDragHandlesUI === 'function') buildDragHandlesUI();
     if(typeof updateQuickEditPanelUI === 'function') updateQuickEditPanelUI();

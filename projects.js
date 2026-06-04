@@ -51,10 +51,10 @@ var _USER_TYPE_LABELS = {
         subStatus = results[3];
     } catch(e) {
         // Fallback: load individually so one failure doesn't block everything
-        try { user      = await Auth.getUser(); }           catch(e2) { /* ignore */ }
-        try { plan      = await Auth.getPlan(); }           catch(e2) { /* ignore */ }
-        try { projects  = await Projects.list(); }          catch(e2) { /* ignore */ }
-        try { subStatus = await Auth.isSubscriptionActive(); } catch(e2) { /* ignore */ }
+        try { user      = await Auth.getUser(); }           catch(e2) { console.warn('[init] getUser failed:', e2); }
+        try { plan      = await Auth.getPlan(); }           catch(e2) { console.warn('[init] getPlan failed:', e2); }
+        try { projects  = await Projects.list(); }          catch(e2) { console.warn('[init] projects.list failed:', e2); showToast('שגיאה בטעינת הפרויקטים. רענן את הדף.', 'error'); }
+        try { subStatus = await Auth.isSubscriptionActive(); } catch(e2) { console.warn('[init] subStatus failed:', e2); }
     }
     subStatus = subStatus || { active: true, reason: 'free' };
     plan      = plan      || { label: '—', key: 'free', features: {} };

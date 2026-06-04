@@ -415,7 +415,10 @@
                     </div>
                     <!-- Front-line toggle: קו ארון / קו דלתות -->
                     <div id="closure-frontline-row" style="display:none;margin-bottom:8px;">
-                        <div class="label-row" style="margin-bottom:5px;"><span style="font-size:0.82rem;font-weight:600;color:var(--text-dark);">קו חזית</span></div>
+                        <div class="label-row" style="margin-bottom:5px;">
+                            <span style="font-size:0.82rem;font-weight:600;color:var(--text-dark);">קו חזית</span>
+                            <span title="קו ארון: לוח הסגירה מיושר עם חזית הארון&#10;קו דלתות: לוח הסגירה מיושר עם חזית הדלתות (בולט 1.7 ס&quot;מ קדימה)" style="cursor:help;color:var(--text-light);font-size:0.78rem;margin-right:4px;">&#9432;</span>
+                        </div>
                         <div style="display:flex;gap:6px;">
                             <button id="closure-fl-cabinet" onclick="window._setClosureFrontLine('cabinet')" style="flex:1;font-size:0.78rem;font-weight:600;padding:6px 4px;border-radius:7px;border:1.5px solid var(--border);background:var(--accent);color:white;cursor:pointer;transition:all 0.15s;font-family:inherit;">קו ארון</button>
                             <button id="closure-fl-door"    onclick="window._setClosureFrontLine('door')"    style="flex:1;font-size:0.78rem;font-weight:600;padding:6px 4px;border-radius:7px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);cursor:pointer;transition:all 0.15s;font-family:inherit;">קו דלתות</button>
@@ -591,7 +594,7 @@
                         </div>
                     </div>
                     <div class="control-group" style="margin-bottom:0;">
-                        <div class="label-row"><span>רוחב שולחן (ס"מ)</span><input type="number" id="inp-num-desk-width" class="value-badge-input" value="100" min="40" max="200"></div>
+                        <div class="label-row"><span>רוחב שולחן (ס"מ)</span><input type="number" id="inp-num-desk-width" class="value-badge-input" value="100" min="40" max="200" onchange="updateDim('deskWidth',null,this.value)"></div>
                         <div class="slider-row">
                             <button class="slider-btn" onclick="updateDim('deskWidth', 1)"><i class="fa-solid fa-plus"></i></button>
                             <input type="range" id="inp-desk-width" min="40" max="200" value="100" step="1">
