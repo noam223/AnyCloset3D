@@ -142,10 +142,18 @@ function _showTrialBanner(trialEndsAt, plan) {
     var daysLeft = Math.ceil((new Date(trialEndsAt) - new Date()) / (1000 * 60 * 60 * 24));
     var banner = document.createElement('div');
     banner.id = 'trial-banner';
-    banner.style.cssText = 'background:linear-gradient(135deg,#0f2040,#1a3a6b);color:#fff;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;font-size:.9rem;border-bottom:2px solid #00d4ff;position:sticky;top:0;z-index:100;';
-    banner.innerHTML = '<span>⏳ <strong>' + daysLeft + ' ימי ניסיון נותרו</strong> — תוכנית ' + plan.label + '</span>' +
-        '<a href="' + _getPaymentLink(plan.key) + '" style="background:#00d4ff;color:#0a1628;padding:7px 18px;border-radius:8px;font-weight:700;text-decoration:none;white-space:nowrap;">שדרג עכשיו</a>';
-    document.body.insertBefore(banner, document.body.firstChild);
+    banner.style.cssText = 'background:linear-gradient(135deg,#0f2040,#1a3a6b);color:#fff;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:.85rem;border-bottom:2px solid #00d4ff;flex-shrink:0;flex-wrap:wrap;';
+    banner.innerHTML =
+        '<span style="display:flex;align-items:center;gap:8px;">⏳ <strong>' + daysLeft + ' ימי ניסיון נותרו</strong> — תוכנית ' + plan.label + '</span>' +
+        '<button onclick="window.location.href=\'' + _getPaymentLink(plan.key) + '\'" style="background:#00d4ff;color:#0a1628;padding:6px 16px;border-radius:8px;font-weight:700;border:none;cursor:pointer;white-space:nowrap;font-family:inherit;font-size:.82rem;">שדרג עכשיו</button>' +
+        '<button onclick="this.parentNode.remove()" style="background:none;border:none;color:rgba(255,255,255,.6);cursor:pointer;font-size:1.1rem;padding:0 4px;line-height:1;">×</button>';
+    // Insert at top of page-wrap (main content area), not body
+    var pageWrap = document.querySelector('.page-wrap');
+    if (pageWrap) {
+        pageWrap.insertBefore(banner, pageWrap.firstChild);
+    } else {
+        document.body.insertBefore(banner, document.body.firstChild);
+    }
 }
 
 // ── Build plan cards HTML for paywall popup ───────────────────────────────────
