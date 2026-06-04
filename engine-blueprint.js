@@ -170,6 +170,36 @@ window._generateMultiViewBlueprintSVG = function() {
         // Label "חזית" on center front edge
         p.push(`<text x="${wx(0).toFixed(1)}" y="${(wz(cD)+11).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.6">חזית</text>`);
 
+        // ---- Per-column depth in top view ----
+        // Draw each column's depth rectangle and dividers when columns have different depths
+        if (centerWing && centerWing.columns && centerWing.columns.length > 1) {
+            const tvCols = centerWing.columns;
+            const hasVaryingDepth = tvCols.some(c => c.depth !== null && c.depth !== undefined && c.depth !== cD);
+            let _tvAccX = -cW / 2;
+            tvCols.forEach((tvCol, tci) => {
+                const tvColW = tvCol.width || (cW / tvCols.length);
+                const tvColD = (tvCol.depth !== null && tvCol.depth !== undefined) ? tvCol.depth : cD;
+                // Draw column depth rect (shaded if different from global)
+                if (hasVaryingDepth && tvColD !== cD) {
+                    const FILL_RECESS = tvColD < cD ? 'rgba(148,163,184,0.25)' : 'rgba(251,191,36,0.18)';
+                    rect(wx(_tvAccX), wz(0), tvColW * sc, tvColD * sc, FILL_RECESS, 'none', 0);
+                    // Front edge line to show actual depth
+                    p.push(`<line x1="${wx(_tvAccX).toFixed(1)}" y1="${wz(tvColD).toFixed(1)}" x2="${wx(_tvAccX + tvColW).toFixed(1)}" y2="${wz(tvColD).toFixed(1)}" stroke="${STROKE}" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.7"/>`);
+                    // Depth label in the middle of this column
+                    p.push(`<text x="${wx(_tvAccX + tvColW/2).toFixed(1)}" y="${(wz(tvColD/2)+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="10" fill="${STROKE}" opacity="0.8">${Math.round(tvColD)}</text>`);
+                }
+                // Column divider line
+                if (tci > 0) {
+                    p.push(`<line x1="${wx(_tvAccX).toFixed(1)}" y1="${wz(0).toFixed(1)}" x2="${wx(_tvAccX).toFixed(1)}" y2="${wz(cD).toFixed(1)}" stroke="${STROKE}" stroke-width="0.8" stroke-dasharray="3,3" opacity="0.5"/>`);
+                }
+                _tvAccX += tvColW;
+            });
+            // If any column has non-global depth, show depth dimension for the global depth too
+            if (hasVaryingDepth) {
+                dimVLeft(wx(-cW/2) - 14, wz(0), wz(cD), `${Math.round(cD * 10)}`);
+            }
+        }
+
         // ---- Bathroom sink — top view ----
         if (pid === 'bathroom' && centerWing) {
             const _bpCT = centerWing.countertopType || 'integral';
