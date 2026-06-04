@@ -943,6 +943,7 @@ function _translateError(msg) {
         console.log('[Auth] event:', event, 'session:', session ? 'yes' : 'no');
         if (event === 'PASSWORD_RECOVERY') {
             console.log('[Auth] PASSWORD_RECOVERY detected — showing reset form');
+            window._recoveryMode = true;
             _showResetPasswordForm();
         }
     });
@@ -956,8 +957,12 @@ function _translateError(msg) {
     if (_hash && _hash.includes('type=recovery')) {
         console.log('[Login] recovery in hash — showing reset form');
         _showResetPasswordForm();
-        return;
+        return; // DO NOT check isLoggedIn — stay on this page
     }
+
+    // Wait briefly for PASSWORD_RECOVERY event before redirecting
+    await new Promise(function(r) { setTimeout(r, 300); });
+    if (window._recoveryMode) return; // event fired during wait
 
     if (await Auth.isLoggedIn()) {
         window.location.href = 'projects.html';
