@@ -714,12 +714,20 @@
                 </div>
                 <!-- Desk drawer count (shown when type=desk) -->
                 <div id="corner-desk-drawer-section" style="display:none;">
-                    <div class="control-group" style="margin-bottom:0;">
+                    <div class="control-group" style="margin-bottom:6px;">
                         <div class="label-row"><span>מגירות מתחת לשולחן</span><span id="val-corner-desk-drawers" class="value-badge">0</span></div>
                         <div class="slider-row">
                             <button class="slider-btn" onclick="updateCorner('deskDrawerCount', (state.corner.deskDrawerCount||0)+1)"><i class="fa-solid fa-plus"></i></button>
                             <input type="range" id="inp-corner-desk-drawers" min="0" max="4" value="0" step="1" oninput="document.getElementById('val-corner-desk-drawers').innerText=this.value; updateCorner('deskDrawerCount', this.value)">
                             <button class="slider-btn" onclick="updateCorner('deskDrawerCount', (state.corner.deskDrawerCount||0)-1)"><i class="fa-solid fa-minus"></i></button>
+                        </div>
+                    </div>
+                    <div class="control-group" id="corner-desk-drawer-height-row" style="display:none;margin-bottom:0;">
+                        <div class="label-row"><span>גובה מגירה</span><span id="val-corner-desk-drawer-height" class="value-badge">13 ס"מ</span></div>
+                        <div class="slider-row">
+                            <button class="slider-btn" onclick="updateCorner('deskDrawerHeight', (state.corner.deskDrawerHeight||13)+1)"><i class="fa-solid fa-plus"></i></button>
+                            <input type="range" id="inp-corner-desk-drawer-height" min="8" max="30" value="13" step="1" oninput="document.getElementById('val-corner-desk-drawer-height').innerText=this.value+' ס\'\'מ'; updateCorner('deskDrawerHeight', this.value)">
+                            <button class="slider-btn" onclick="updateCorner('deskDrawerHeight', (state.corner.deskDrawerHeight||13)-1)"><i class="fa-solid fa-minus"></i></button>
                         </div>
                     </div>
                 </div>

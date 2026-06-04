@@ -1371,6 +1371,13 @@ window.syncSidebarToWing = function() {
             const cuDDCEl = document.getElementById('val-corner-desk-drawers');
             if (cuDDCEl) cuDDCEl.innerText = w.corner.deskDrawerCount || 0;
             setVal('inp-corner-desk-drawers', w.corner.deskDrawerCount || 0);
+            const ddCount = w.corner.deskDrawerCount || 0;
+            const ddHRow = document.getElementById('corner-desk-drawer-height-row');
+            if (ddHRow) ddHRow.style.display = ddCount > 0 ? 'block' : 'none';
+            const ddH = w.corner.deskDrawerHeight || 13;
+            const ddHEl = document.getElementById('val-corner-desk-drawer-height');
+            if (ddHEl) ddHEl.innerText = ddH + ' ס"מ';
+            setVal('inp-corner-desk-drawer-height', ddH);
         }
     }
 
@@ -1905,6 +1912,13 @@ window.updateCorner = function(field, value) {
         w.corner.deskDrawerCount = Math.max(0, Math.min(4, parseInt(value) || 0));
         const el = document.getElementById('val-corner-desk-drawers');
         if (el) el.innerText = w.corner.deskDrawerCount;
+        const ddHRow = document.getElementById('corner-desk-drawer-height-row');
+        if (ddHRow) ddHRow.style.display = w.corner.deskDrawerCount > 0 ? 'block' : 'none';
+    } else if (field === 'deskDrawerHeight') {
+        w.corner.deskDrawerHeight = Math.max(8, Math.min(30, parseInt(value) || 13));
+        const el = document.getElementById('val-corner-desk-drawer-height');
+        if (el) el.innerText = w.corner.deskDrawerHeight + ' ס"מ';
+        setVal('inp-corner-desk-drawer-height', w.corner.deskDrawerHeight);
     }
     buildCabinet(); calculatePrice(); saveHistoryState();
     updateCameraView();

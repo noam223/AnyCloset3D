@@ -376,8 +376,7 @@ function buildCornerUnit() {
             // Drawer unit on the side-wall side (far X)
             const drawerUnitW = Math.min(cuD * 0.45, 40); // width of drawer unit in X
             const drawerUnitD = cuW - t;                   // depth in Z (inner)
-            const drawerUnitH = deskH - plinthH - t;       // height from plinth to desk surface
-            const drawerH = (drawerUnitH - 0.4 * (numDeskDrawers - 1)) / numDeskDrawers;
+            const drawerH = cu.deskDrawerHeight || 13;
             const duX = sign * (cuD / 2 - drawerUnitW / 2); // positioned at far-X side
             const duZ = t / 2;                              // inset from opening
             const handleMat = new THREE.MeshStandardMaterial({ color: 0xb0b0b0, metalness: 0.85, roughness: 0.15 });
