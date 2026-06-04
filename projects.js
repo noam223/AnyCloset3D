@@ -126,7 +126,8 @@ var _USER_TYPE_LABELS = {
         _loadDevices();
     }
 
-    document.getElementById('btn-new-project').disabled = (document.getElementById('btn-new-project').disabled) || false;
+    // Button starts enabled in HTML — only disabled above for expired/inactive subscriptions
+    // (No-op line kept for clarity)
     document.getElementById('page-subtitle').textContent =
         projects.length === 0
             ? 'אין פרויקטים עדיין'
