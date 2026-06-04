@@ -533,6 +533,7 @@ function handleForgotPassword() {
 
 // ── Reset password form (after clicking email link) ───────────────────────────
 function _showResetPasswordForm() {
+    if (document.getElementById('form-reset-password')) return; // already shown
     // Hide all tabs, show reset form
     document.querySelectorAll('.tab-content').forEach(function(t) { t.style.display = 'none'; });
     document.querySelectorAll('.tab-btn').forEach(function(b) { b.style.display = 'none'; });
@@ -961,10 +962,25 @@ function _translateError(msg) {
     }
 
     // Wait briefly for PASSWORD_RECOVERY event before redirecting
-    await new Promise(function(r) { setTimeout(r, 300); });
+    await new Promise(function(r) { setTimeout(r, 400); });
     if (window._recoveryMode) return; // event fired during wait
 
     if (await Auth.isLoggedIn()) {
+        // Check if this session came from a recovery link (amr contains otp)
+        try {
+            var sb2 = window.supabase.createClient(
+                'https://meqxnsjycvfgfhdepguo.supabase.co',
+                'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lcXhuc2p5Y3ZmZ2ZoZGVwZ3VvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3MDA5NDAsImV4cCI6MjA5MjI3Njk0MH0.w63bl0-1-Rgt9Nx6sVW5ueEGMojiMaxoehlPXlPH2N0');
+            var { data: { session } } = await sb2.auth.getSession();
+            // If session has amr with 'otp' method, it came from a magic link / recovery
+            var amr = session && session.user && session.user.amr;
+            var isRecovery = amr && amr.some(function(a) { return a.method === 'otp'; }) &&
+                             window.location.hash.length === 0; // hash already cleared = was recovery
+            if (isRecovery) {
+                console.log('[Login] session from otp/recovery — staying on reset form');
+                return; // _showResetPasswordForm will be called by onAuthStateChange
+            }
+        } catch(e) { /* ignore */ }
         window.location.href = 'projects.html';
         return;
     }
