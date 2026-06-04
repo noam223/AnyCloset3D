@@ -304,7 +304,11 @@
 
     // ── Unsaved-changes guard ─────────────────────────────────────────────────
     // 1. Native browser dialog for F5 / tab close / external navigation
+    // Clear ?project= from URL before unload so a reload opens a blank editor
     window.addEventListener('beforeunload', function(e) {
+        if (window._currentProjectId && history.replaceState) {
+            history.replaceState(null, '', 'index.html');
+        }
         if (!window._isDirty) return;
         e.preventDefault();
         e.returnValue = ''; // required for Chrome

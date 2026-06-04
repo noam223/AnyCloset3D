@@ -4921,10 +4921,18 @@ function bindUI() {
     document.getElementById('inp-load-json').addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                const data = JSON.parse(e.target.result);
+
+        const _doLoad = () => {
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                try {
+                    const data = JSON.parse(ev.target.result);
+                    // Disconnect from cloud project — loading JSON creates a standalone session
+                    window._currentProjectId   = null;
+                    window._currentProjectName = null;
+                    window._isDirty            = false;
+                    // Clear ?project= param so refresh opens a blank editor (not old project)
+                    if (history.replaceState) history.replaceState(null, '', 'index.html');
                 if(data.customer) {
                     state.customer = data.customer;
                     document.getElementById('cust-name').value = state.customer.name || '';
@@ -4986,10 +4994,25 @@ function bindUI() {
                     buildCabinet(); updateCameraView(); calculatePrice(); saveHistoryState();
                 }
                 
-                alert('הפרויקט נטען בהצלחה!');
+                if (typeof _showToast === 'function') _showToast('הקובץ נטען בהצלחה ✓', 3000);
+                else alert('הפרויקט נטען בהצלחה!');
             } catch(err) { alert('שגיאה בטעינת הקובץ.'); }
-        };
-        reader.readAsText(file);
+            };
+            reader.readAsText(file);
+        }; // end _doLoad
+
+        // If a cloud project is open — warn before overwriting
+        if (window._currentProjectId) {
+            if (typeof window._confirmLeave === 'function') {
+                window._confirmLeave(null, _doLoad);
+            } else if (confirm('פרויקט ענן פתוח כעת. טעינת קובץ תנתק אותך ממנו (השינויים לא יישמרו). להמשיך?')) {
+                _doLoad();
+            }
+        } else {
+            _doLoad();
+        }
+        // Reset input so same file can be loaded again
+        e.target.value = '';
     });
 
     document.getElementById('btn-add-to-cart').addEventListener('click', () => {
