@@ -371,36 +371,36 @@ function buildCornerUnit() {
         // Back leg at far Z (outer end wall, far from main cabinet front face)
         addBoard(cuD, deskH, t, 0, deskH / 2, backWallZ, matDesk);
         // Optional drawers under desk surface
-        const numDeskDrawers = cu.deskDrawerCount || 0;
+        const numDeskDrawers = Math.min(cu.deskDrawerCount || 0, 3);
         if (numDeskDrawers > 0) {
-            // Drawer unit on the side-wall side (far X)
-            const drawerUnitW = Math.min(cuD * 0.45, 40); // width of drawer unit in X
-            const drawerUnitD = cuW - t;                   // depth in Z (inner)
+            // All drawers in a single row at the top, split side-by-side
             const drawerH = cu.deskDrawerHeight || 13;
-            const duX = sign * (cuD / 2 - drawerUnitW / 2); // positioned at far-X side
-            const duZ = t / 2;                              // inset from opening
+            const gap = 0.4;
+            const totalInnerW = cuD - t;  // full inner width in X
+            const drawerW = (totalInnerW - gap * (numDeskDrawers + 1)) / numDeskDrawers;
+            const dY = deskH - t - drawerH / 2;  // just below desk surface
+            const fZ = -cuW / 2 - t / 2 - 0.1;  // just outside front opening
             const handleMat = new THREE.MeshStandardMaterial({ color: 0xb0b0b0, metalness: 0.85, roughness: 0.15 });
             for (let i = 0; i < numDeskDrawers; i++) {
-                const dY = deskH - t - drawerH / 2 - i * (drawerH + 0.4);
-                const fX = sign * (-cuD / 2 - t / 2 - 0.1); // drawer front faces opening (inward)
-                const dMesh = addBoard(t, drawerH - 0.5, drawerUnitD, fX, dY, duZ, matExternal);
+                // X position: start from inner open side, step toward side wall
+                const dX = sign * (-cuD / 2 + gap + drawerW / 2 + i * (drawerW + gap));
+                const dMesh = addBoard(drawerW, drawerH - 0.5, t, dX, dY, fZ, matExternal);
                 // Handle
-                const barLen = Math.min(drawerUnitD * 0.5, 14);
+                const barLen = Math.min(drawerW * 0.55, 18);
                 const barR = 0.3;
                 const postH = 1.0;
-                const hOffX = sign * (-t / 2 - postH - barR * 0.5);
                 const bar = new THREE.Mesh(
-                    new THREE.CylinderGeometry(barR, barR, barLen, 10).rotateX(Math.PI / 2),
+                    new THREE.CylinderGeometry(barR, barR, barLen, 10).rotateZ(Math.PI / 2),
                     handleMat
                 );
-                bar.position.set(hOffX, 0, 0);
+                bar.position.set(0, 0, -(t / 2 + postH + barR * 0.5));
                 dMesh.add(bar);
-                [-barLen / 2, barLen / 2].forEach(pz => {
+                [-barLen / 2, barLen / 2].forEach(px => {
                     const post = new THREE.Mesh(
-                        new THREE.CylinderGeometry(barR, barR, postH, 8).rotateZ(Math.PI / 2),
+                        new THREE.CylinderGeometry(barR, barR, postH, 8).rotateX(Math.PI / 2),
                         handleMat
                     );
-                    post.position.set(sign * (-t / 2 - postH / 2), 0, pz);
+                    post.position.set(px, 0, -(t / 2 + postH / 2));
                     dMesh.add(post);
                 });
             }

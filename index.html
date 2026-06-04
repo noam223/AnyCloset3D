@@ -718,7 +718,7 @@
                         <div class="label-row"><span>מגירות מתחת לשולחן</span><span id="val-corner-desk-drawers" class="value-badge">0</span></div>
                         <div class="slider-row">
                             <button class="slider-btn" onclick="updateCorner('deskDrawerCount', (state.corner.deskDrawerCount||0)+1)"><i class="fa-solid fa-plus"></i></button>
-                            <input type="range" id="inp-corner-desk-drawers" min="0" max="4" value="0" step="1" oninput="document.getElementById('val-corner-desk-drawers').innerText=this.value; updateCorner('deskDrawerCount', this.value)">
+                            <input type="range" id="inp-corner-desk-drawers" min="0" max="3" value="0" step="1" oninput="document.getElementById('val-corner-desk-drawers').innerText=this.value; updateCorner('deskDrawerCount', this.value)">
                             <button class="slider-btn" onclick="updateCorner('deskDrawerCount', (state.corner.deskDrawerCount||0)-1)"><i class="fa-solid fa-minus"></i></button>
                         </div>
                     </div>

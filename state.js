@@ -1909,7 +1909,7 @@ window.updateCorner = function(field, value) {
         const cuDCEl = document.getElementById('val-corner-drawers');
         if (cuDCEl) cuDCEl.innerText = w.corner.drawerCount;
     } else if (field === 'deskDrawerCount') {
-        w.corner.deskDrawerCount = Math.max(0, Math.min(4, parseInt(value) || 0));
+        w.corner.deskDrawerCount = Math.max(0, Math.min(3, parseInt(value) || 0));
         const el = document.getElementById('val-corner-desk-drawers');
         if (el) el.innerText = w.corner.deskDrawerCount;
         const ddHRow = document.getElementById('corner-desk-drawer-height-row');
