@@ -284,10 +284,11 @@
             </div>
             <!-- ===== NICHE TOGGLE ===== -->
             <div id="niche-toggle-row" style="margin-top:10px;display:none;">
-                <label class="qe-checkbox-row" style="cursor:pointer;display:flex;align-items:center;gap:8px;padding:6px 0;">
-                    <input type="checkbox" id="inp-niche-enabled" onchange="window._setNicheEnabled(this.checked)" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent);">
-                    <span style="font-size:0.85rem;font-weight:600;">ארון בנישה</span>
-                </label>
+                <input type="checkbox" id="inp-niche-enabled" onchange="window._setNicheEnabled(this.checked)" style="display:none;">
+                <button class="sidebar-toggle-btn" id="btn-niche-toggle" onclick="var c=document.getElementById('inp-niche-enabled');c.checked=!c.checked;c.dispatchEvent(new Event('change'));this.classList.toggle('active',c.checked);">
+                    <i class="fa-solid fa-border-all"></i> ארון בנישה
+                    <span class="toggle-pill"></span>
+                </button>
                 <div id="niche-controls" style="display:none;margin-top:4px;">
                     <div class="control-group" style="margin-bottom:8px;">
                         <div class="label-row"><span>רוחב נישה (ס"מ)</span><input type="number" id="inp-num-niche-width" class="value-badge-input" value="200" min="50" max="600" step="1" onchange="window._setNicheWidth(this.value)"></div>
@@ -307,10 +308,11 @@
                     </div>
                     <!-- Niche closure toggle + sliders -->
                     <div id="niche-closure-row" style="display:none;padding-top:4px;border-top:1px solid var(--border);margin-top:4px;">
-                        <label class="qe-checkbox-row" style="cursor:pointer;display:flex;align-items:center;gap:8px;padding:4px 0;">
-                            <input type="checkbox" id="inp-niche-closure-enabled" onchange="window._setNicheClosureEnabled(this.checked)" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent);">
-                            <span style="font-size:0.82rem;font-weight:600;">סגירות בנישה</span>
-                        </label>
+                        <input type="checkbox" id="inp-niche-closure-enabled" onchange="window._setNicheClosureEnabled(this.checked)" style="display:none;">
+                        <button class="sidebar-toggle-btn sidebar-toggle-btn--sm" id="btn-niche-closure-toggle" onclick="var c=document.getElementById('inp-niche-closure-enabled');c.checked=!c.checked;c.dispatchEvent(new Event('change'));this.classList.toggle('active',c.checked);">
+                            <i class="fa-solid fa-table-columns"></i> סגירות בנישה
+                            <span class="toggle-pill"></span>
+                        </button>
                         <div id="niche-closure-sliders" style="display:none;margin-top:4px;">
                             <div class="control-group" style="margin-bottom:8px;">
                                 <div class="label-row"><span>סגירה שמאל (ס"מ)</span><input type="number" id="inp-num-niche-closure-left" class="value-badge-input" value="1.8" min="1.8" max="30" step="0.1" onchange="window._setNicheClosureWidthLeft(this.value)"></div>
@@ -380,10 +382,11 @@
                 <div style="font-size:0.8rem;font-weight:600;color:var(--text-dark);margin-bottom:8px;padding:5px 0;border-bottom:1px solid var(--border);">סגירות</div>
 
                 <!-- Show/hide panels toggle -->
-                <label class="qe-checkbox-row" style="margin-bottom:10px;cursor:pointer;display:flex;align-items:center;gap:8px;padding:6px 0;">
-                    <input type="checkbox" id="inp-closure-enabled" checked onchange="window._setClosureEnabled(this.checked)" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent);">
-                    <span style="font-size:0.85rem;font-weight:600;">הצג לוחות סגירה</span>
-                </label>
+                <input type="checkbox" id="inp-closure-enabled" checked onchange="window._setClosureEnabled(this.checked)" style="display:none;">
+                <button class="sidebar-toggle-btn active" id="btn-closure-toggle" style="margin-bottom:10px;" onclick="var c=document.getElementById('inp-closure-enabled');c.checked=!c.checked;c.dispatchEvent(new Event('change'));this.classList.toggle('active',c.checked);">
+                    <i class="fa-solid fa-border-none"></i> לוחות סגירה
+                    <span class="toggle-pill"></span>
+                </button>
 
                 <div id="closure-sliders-wrap">
                     <!-- Left side closure (shown for 'left' and 'both') -->
@@ -460,10 +463,11 @@
         <!-- ===== UPPER UNIT SECTION ===== -->
         <div class="section" id="upper-unit-section" style="display:none;">
             <div class="section-title"><i class="fa-solid fa-layer-group"></i> יחידה עליונה</div>
-            <label class="qe-checkbox-row" style="margin-bottom:10px;cursor:pointer;display:flex;align-items:center;gap:8px;">
-                <input type="checkbox" id="inp-upper-unit-enabled" onchange="toggleUpperUnit()" style="width:16px;height:16px;cursor:pointer;">
-                <span style="font-size:0.85rem;font-weight:600;">הוסף יחידה עליונה</span>
-            </label>
+            <input type="checkbox" id="inp-upper-unit-enabled" onchange="toggleUpperUnit()" style="display:none;">
+            <button class="sidebar-toggle-btn" id="btn-upper-unit-toggle" style="margin-bottom:10px;" onclick="var c=document.getElementById('inp-upper-unit-enabled');c.checked=!c.checked;c.dispatchEvent(new Event('change'));this.classList.toggle('active',c.checked);">
+                <i class="fa-solid fa-layer-group"></i> הוסף יחידה עליונה
+                <span class="toggle-pill"></span>
+            </button>
             <div id="upper-unit-controls" style="display:none;">
                 <div class="control-group" style="margin-bottom:10px;">
                     <div class="label-row"><span>מרחק מהארון (ס"מ)</span><input type="number" id="inp-num-upper-gap" class="value-badge-input" value="60" min="0" max="200" onchange="setUpperUnitGap(this.value)"></div>
