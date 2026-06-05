@@ -30,7 +30,7 @@ window._shareLiveLink = async function() {
         }
 
         // Generate / retrieve share token
-        var result = await Auth.generateShareToken(window._currentProjectId);
+        var result = await Projects.generateShareToken(window._currentProjectId);
         if (result && result.error) throw new Error(result.error);
 
         var token  = result.token;
@@ -104,7 +104,7 @@ window._revokeShareLink = async function() {
     if (!confirm('לבטל את הקישור? הלקוח לא יוכל לצפות יותר.')) return;
 
     try {
-        var result = await Auth.revokeShareToken(window._currentProjectId);
+        var result = await Projects.revokeShareToken(window._currentProjectId);
         if (result && result.error) throw new Error(result.error);
 
         window._currentShareToken = null;
