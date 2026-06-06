@@ -1455,15 +1455,8 @@ window.syncSidebarToWing = function() {
     // Show/hide sandwich-only colors based on board material
     if (typeof window._updateSandwichColorVisibility === 'function') window._updateSandwichColorVisibility();
 
-    // Sync dimensions pills row
-    var _pw = document.getElementById('dim-pill-width');
-    var _ph = document.getElementById('dim-pill-height');
-    var _pd = document.getElementById('dim-pill-depth');
-    var _pp = document.getElementById('dim-pill-plinth');
-    if (_pw) _pw.value = Math.round(state.globalWidth || w.width || 160);
-    if (_ph) _ph.value = Math.round(state.globalHeight || w.globalHeight || 240);
-    if (_pd) _pd.value = Math.round(state.globalDepth || w.depth || 58);
-    if (_pp) _pp.value = (state.plinthHeight || w.plinthHeight || 8.75).toFixed(1);
+    _syncDimPills();
+    if (typeof window._syncAllRangeFills === 'function') window._syncAllRangeFills();
 };
 
 window._updateMaterialTabVisibility = function(w) {
@@ -2392,6 +2385,7 @@ window.updateDim = function(dim, delta, absoluteValue = null) {
         document.getElementById('inp-num-desk-width').value = val;
     }
     _syncDimPills();
+    if (typeof window._syncAllRangeFills === 'function') window._syncAllRangeFills();
     buildCabinetDebounced(); updateCameraView(); calculatePrice();
 }
 
@@ -2401,23 +2395,43 @@ function _syncDimPills() {
     const ph = document.getElementById('dim-pill-height');
     const pd = document.getElementById('dim-pill-depth');
     const pp = document.getElementById('dim-pill-plinth');
-    if (pw) pw.value = Math.round(state.width || (w && w.width) || 160);
-    if (ph) ph.value = Math.round(state.globalHeight || (w && w.globalHeight) || 240);
-    if (pd) pd.value = Math.round(state.depth || (w && w.depth) || 54);
-    if (pp) pp.value = (state.plinthHeight || (w && w.plinthHeight) || 8.75).toFixed(1);
+    const sw = document.getElementById('inp-width');
+    const sh = document.getElementById('inp-height');
+    const sd = document.getElementById('inp-depth');
+    const sp = document.getElementById('inp-plinth-height');
+    const roundW = Math.round(state.width || (w && w.width) || 160);
+    const roundH = Math.round(state.globalHeight || (w && w.globalHeight) || 240);
+    const roundD = Math.round(state.depth || (w && w.depth) || 54);
+    const plinthV = parseFloat((state.plinthHeight || (w && w.plinthHeight) || 8.75).toFixed(1));
+    if (pw) pw.value = roundW;
+    if (ph) ph.value = roundH;
+    if (pd) pd.value = roundD;
+    if (pp) pp.value = plinthV.toFixed(1);
+    if (sw) sw.value = roundW;
+    if (sh) sh.value = roundH;
+    if (sd) sd.value = roundD;
+    if (sp) sp.value = plinthV;
+    if (typeof window._syncRangeFill === 'function') {
+        [sw, sh, sd, sp].forEach(function(el) { if (el) window._syncRangeFill(el); });
+    }
 }
 
-window._setPlinthHeight = function(val) {
+window._setPlinthHeight = function(val, skipSave) {
     const v = Math.max(0, Math.min(30, parseFloat(val) || 8.75));
     const w = getWing();
     if (w) w.plinthHeight = v;
     state.plinthHeight = v;
     const pill = document.getElementById('dim-pill-plinth');
     if (pill) pill.value = v.toFixed(1);
+    const plinthSlider = document.getElementById('inp-plinth-height');
+    if (plinthSlider) {
+        plinthSlider.value = v;
+        if (typeof window._syncRangeFill === 'function') window._syncRangeFill(plinthSlider);
+    }
     state.manualPrice = null;
     buildCabinetDebounced();
     calculatePrice();
-    saveHistoryState();
+    if (!skipSave) saveHistoryState();
 };
 
 // ── Side desk drawer count ────────────────────────────────────────────────────

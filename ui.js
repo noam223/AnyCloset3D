@@ -3892,7 +3892,7 @@ window._setNicheWidth = function(val) {
     const numEl = document.getElementById('inp-num-niche-width');
     const slEl  = document.getElementById('inp-niche-width');
     if (numEl) numEl.value = v;
-    if (slEl)  slEl.value  = v;
+    window._setRangeEl(slEl, v);
     window._updateNicheUI(); // update closure slider max when niche width changes
     buildCabinet();
 };
@@ -3903,7 +3903,7 @@ window._setNicheDepth = function(val) {
     const numEl = document.getElementById('inp-num-niche-depth');
     const slEl  = document.getElementById('inp-niche-depth');
     if (numEl) numEl.value = v;
-    if (slEl)  slEl.value  = v;
+    window._setRangeEl(slEl, v);
     buildCabinet();
 };
 
@@ -3924,7 +3924,7 @@ window._setNicheClosureWidthLeft = function(val) {
     const numEl = document.getElementById('inp-num-niche-closure-left');
     const slEl  = document.getElementById('inp-niche-closure-left');
     if (numEl) numEl.value = v;
-    if (slEl)  slEl.value  = v;
+    window._setRangeEl(slEl, v);
     buildCabinet();
 };
 
@@ -3937,7 +3937,7 @@ window._setNicheClosureWidthRight = function(val) {
     const numEl = document.getElementById('inp-num-niche-closure-right');
     const slEl  = document.getElementById('inp-niche-closure-right');
     if (numEl) numEl.value = v;
-    if (slEl)  slEl.value  = v;
+    window._setRangeEl(slEl, v);
     buildCabinet();
 };
 
@@ -3947,7 +3947,7 @@ window._setNicheClosureCeilHeight = function(val) {
     const numEl = document.getElementById('inp-num-niche-closure-ceil');
     const slEl  = document.getElementById('inp-niche-closure-ceil');
     if (numEl) numEl.value = v;
-    if (slEl)  slEl.value  = v;
+    window._setRangeEl(slEl, v);
     buildCabinet();
 };
 
@@ -4023,7 +4023,7 @@ window._setClosureWidthRight = function(val) {
     const numEl = document.getElementById('inp-num-closure-width-right');
     const slEl  = document.getElementById('inp-closure-width-right');
     if (numEl) numEl.value = v;
-    if (slEl)  slEl.value  = v;
+    window._setRangeEl(slEl, v);
     buildCabinet();
 };
 
@@ -4053,7 +4053,7 @@ window._setClosureWidth = function(val) {
     const numEl = document.getElementById('inp-num-closure-width');
     const slEl  = document.getElementById('inp-closure-width');
     if (numEl) numEl.value = v;
-    if (slEl)  slEl.value  = v;
+    window._setRangeEl(slEl, v);
     buildCabinet();
 };
 
@@ -4063,7 +4063,7 @@ window._setClosureCeilWidth = function(val) {
     const numEl = document.getElementById('inp-num-closure-ceil');
     const slEl  = document.getElementById('inp-closure-ceil');
     if (numEl) numEl.value = v;
-    if (slEl)  slEl.value  = v;
+    window._setRangeEl(slEl, v);
     buildCabinet();
 };
 
@@ -4073,7 +4073,7 @@ window._setClosureDepthWidth = function(val) {
     const numEl = document.getElementById('inp-num-closure-depth');
     const slEl  = document.getElementById('inp-closure-depth');
     if (numEl) numEl.value = v;
-    if (slEl)  slEl.value  = v;
+    window._setRangeEl(slEl, v);
     buildCabinet();
 };
 
@@ -4087,7 +4087,7 @@ window._setRoomSize = function(dim, val) {
     const numEl = document.getElementById('inp-num-room-' + dim);
     const slEl  = document.getElementById('inp-room-' + dim);
     if (numEl) numEl.value = v;
-    if (slEl)  slEl.value  = v;
+    window._setRangeEl(slEl, v);
 
     // Update cabinet slider max to match room constraint
     if (dim === 'width') {
@@ -4146,80 +4146,97 @@ window._updateRoomWallUI = function() {
         btn.style.borderColor = isActive ? 'var(--accent)' : 'var(--border)';
     });
 
-    // Show closure toggle only when position ≠ center
-    if (_rw === 'center') {
-        if (wrapClosure) wrapClosure.style.display = 'none';
-    } else {
-        if (wrapClosure) wrapClosure.style.display = '';
+    // Closure toggle: always visible for linear/sliding (not only when צמוד לקיר)
+    if (wrapClosure) wrapClosure.style.display = '';
 
-        // Sync closure toggle checkbox
-        const _cOn = (window._closureEnabled !== false);
-        const togEl = document.getElementById('inp-closure-enabled');
-        const btnClosure = document.getElementById('btn-closure-toggle');
-        if (togEl) togEl.checked = _cOn;
-        if (wrapClosure) wrapClosure.classList.toggle('open', _cOn);
-        if (btnClosure) btnClosure.classList.toggle('active', _cOn);
+    const _cOn = (window._closureEnabled !== false);
+    const togEl = document.getElementById('inp-closure-enabled');
+    const btnClosure = document.getElementById('btn-closure-toggle');
+    if (togEl) togEl.checked = _cOn;
+    if (wrapClosure) wrapClosure.classList.toggle('open', _cOn);
+    if (btnClosure) btnClosure.classList.toggle('active', _cOn);
 
-        // Show/hide slider rows based on mode and enabled state
-        const _showSliders = _cOn;
+    const _showSliders = _cOn;
 
-        // Left side panel row: shown for 'left' and 'both'
-        const cwRow = document.getElementById('closure-width-row');
-        if (cwRow) cwRow.style.display = (_showSliders && (_rw === 'left' || _rw === 'both')) ? '' : 'none';
-        const cwSlider = document.getElementById('inp-closure-width');
-        const cwNum    = document.getElementById('inp-num-closure-width');
-        if (cwSlider) cwSlider.value = window._closureWidth || 1.8;
-        if (cwNum)    cwNum.value    = window._closureWidth || 1.8;
+    const cwRow = document.getElementById('closure-width-row');
+    if (cwRow) cwRow.style.display = (_showSliders && (_rw === 'left' || _rw === 'both')) ? '' : 'none';
+    const cwSlider = document.getElementById('inp-closure-width');
+    const cwNum    = document.getElementById('inp-num-closure-width');
+    if (cwSlider) cwSlider.value = window._closureWidth || 1.8;
+    if (cwNum)    cwNum.value    = window._closureWidth || 1.8;
 
-        // Right side panel row: shown for 'right' and 'both'
-        const cwrRow = document.getElementById('closure-width-right-row');
-        if (cwrRow) cwrRow.style.display = (_showSliders && (_rw === 'right' || _rw === 'both')) ? '' : 'none';
-        const cwrSlider = document.getElementById('inp-closure-width-right');
-        const cwrNum    = document.getElementById('inp-num-closure-width-right');
-        if (cwrSlider) cwrSlider.value = window._closureWidthRight || 1.8;
-        if (cwrNum)    cwrNum.value    = window._closureWidthRight || 1.8;
+    const cwrRow = document.getElementById('closure-width-right-row');
+    if (cwrRow) cwrRow.style.display = (_showSliders && (_rw === 'right' || _rw === 'both')) ? '' : 'none';
+    const cwrSlider = document.getElementById('inp-closure-width-right');
+    const cwrNum    = document.getElementById('inp-num-closure-width-right');
+    if (cwrSlider) cwrSlider.value = window._closureWidthRight || 1.8;
+    if (cwrNum)    cwrNum.value    = window._closureWidthRight || 1.8;
 
-        // Ceiling panel row: shown for all active modes
-        const ccRow = document.getElementById('closure-ceil-row');
-        if (ccRow) ccRow.style.display = _showSliders ? '' : 'none';
-        const ccSlider = document.getElementById('inp-closure-ceil');
-        const ccNum    = document.getElementById('inp-num-closure-ceil');
-        if (ccSlider) ccSlider.value = window._closureCeilWidth || 1.8;
-        if (ccNum)    ccNum.value    = window._closureCeilWidth || 1.8;
+    const ccRow = document.getElementById('closure-ceil-row');
+    if (ccRow) ccRow.style.display = _showSliders ? '' : 'none';
+    const ccSlider = document.getElementById('inp-closure-ceil');
+    const ccNum    = document.getElementById('inp-num-closure-ceil');
+    if (ccSlider) ccSlider.value = window._closureCeilWidth || 1.8;
+    if (ccNum)    ccNum.value    = window._closureCeilWidth || 1.8;
 
-        // Depth panel row: shown for all active modes
-        const cdRow = document.getElementById('closure-depth-row');
-        if (cdRow) cdRow.style.display = _showSliders ? '' : 'none';
-        const cdSlider = document.getElementById('inp-closure-depth');
-        const cdNum    = document.getElementById('inp-num-closure-depth');
-        if (cdSlider) cdSlider.value = window._closureDepthWidth || 1.8;
-        if (cdNum)    cdNum.value    = window._closureDepthWidth || 1.8;
+    const cdRow = document.getElementById('closure-depth-row');
+    if (cdRow) cdRow.style.display = _showSliders ? '' : 'none';
+    const cdSlider = document.getElementById('inp-closure-depth');
+    const cdNum    = document.getElementById('inp-num-closure-depth');
+    if (cdSlider) cdSlider.value = window._closureDepthWidth || 1.8;
+    if (cdNum)    cdNum.value    = window._closureDepthWidth || 1.8;
 
-        // Front-line toggle row
-        const flRow = document.getElementById('closure-frontline-row');
-        if (flRow) flRow.style.display = _showSliders ? '' : 'none';
-        const _fl = window._closureFrontLine || 'cabinet';
-        const btnCab  = document.getElementById('closure-fl-cabinet');
-        const btnDoor = document.getElementById('closure-fl-door');
-        if (btnCab) {
-            btnCab.style.background  = (_fl === 'cabinet') ? 'var(--accent)' : 'var(--bg-light)';
-            btnCab.style.color       = (_fl === 'cabinet') ? 'white' : 'var(--text-dark)';
-            btnCab.style.borderColor = (_fl === 'cabinet') ? 'var(--accent)' : 'var(--border)';
-        }
-        if (btnDoor) {
-            btnDoor.style.background  = (_fl === 'door') ? 'var(--accent)' : 'var(--bg-light)';
-            btnDoor.style.color       = (_fl === 'door') ? 'white' : 'var(--text-dark)';
-            btnDoor.style.borderColor = (_fl === 'door') ? 'var(--accent)' : 'var(--border)';
-        }
+    const flRow = document.getElementById('closure-frontline-row');
+    if (flRow) flRow.style.display = (_showSliders && _rw !== 'center') ? '' : 'none';
+    const _fl = window._closureFrontLine || 'cabinet';
+    const btnCab  = document.getElementById('closure-fl-cabinet');
+    const btnDoor = document.getElementById('closure-fl-door');
+    if (btnCab) {
+        btnCab.style.background  = (_fl === 'cabinet') ? 'var(--accent)' : 'var(--bg-light)';
+        btnCab.style.color       = (_fl === 'cabinet') ? 'white' : 'var(--text-dark)';
+        btnCab.style.borderColor = (_fl === 'cabinet') ? 'var(--accent)' : 'var(--border)';
+    }
+    if (btnDoor) {
+        btnDoor.style.background  = (_fl === 'door') ? 'var(--accent)' : 'var(--bg-light)';
+        btnDoor.style.color       = (_fl === 'door') ? 'white' : 'var(--text-dark)';
+        btnDoor.style.borderColor = (_fl === 'door') ? 'var(--accent)' : 'var(--border)';
     }
 
     // Sync niche UI
     if (typeof window._updateNicheUI === 'function') window._updateNicheUI();
 };
 
+window._syncRangeFill = function(slider) {
+    if (!slider || slider.type !== 'range') return;
+    const min = parseFloat(slider.min);
+    const max = parseFloat(slider.max);
+    const val = parseFloat(slider.value);
+    if (isNaN(min) || isNaN(max) || max <= min || isNaN(val)) return;
+    const pct = Math.max(0, Math.min(100, ((val - min) / (max - min)) * 100));
+    slider.style.setProperty('--range-pct', pct + '%');
+};
+
+window._syncAllRangeFills = function(root) {
+    (root || document).querySelectorAll('input[type="range"]').forEach(function(el) {
+        window._syncRangeFill(el);
+    });
+};
+
+window._setRangeEl = function(el, v) {
+    if (!el) return;
+    el.value = v;
+    window._syncRangeFill(el);
+};
+
 function bindUI() {
     // In viewer mode the editor DOM elements don't exist — skip all bindings
     if (window._VIEWER_MODE) return;
+
+    // Keep range track fill in sync with thumb position
+    document.addEventListener('input', function(e) {
+        if (e.target && e.target.type === 'range') window._syncRangeFill(e.target);
+    }, true);
+    window._syncAllRangeFills();
 
     // ── Smooth room-slider dragging: strip textures while dragging, restore on release ──
     // Any range input in the sidebar sets _roomTexDragging=true while held.
@@ -4330,8 +4347,9 @@ function bindUI() {
         else if (val === 'ab2') state.plinthHeight = 8.75;
         else         if (val === 'regalim') state.plinthHeight = 10;
 
-        const _plinthPill = document.getElementById('dim-pill-plinth');
-        if (_plinthPill) _plinthPill.value = (state.plinthHeight || 8.75).toFixed(1);
+        if (typeof window._setPlinthHeight === 'function') {
+            window._setPlinthHeight(state.plinthHeight || 8.75);
+        }
         
         state.manualPrice = null;
         
@@ -4409,6 +4427,23 @@ function bindUI() {
         }
         if(numInp) { numInp.addEventListener('change', (e) => { updateDim(id, null, e.target.value); saveHistoryState(); }); }
     });
+
+    const plinthHeightSlider = document.getElementById('inp-plinth-height');
+    if (plinthHeightSlider) {
+        let _plinthSliderMoved = false;
+        plinthHeightSlider.addEventListener('pointerdown', () => { _plinthSliderMoved = false; });
+        plinthHeightSlider.addEventListener('input', (e) => {
+            if (!_plinthSliderMoved) {
+                _plinthSliderMoved = true;
+                window._isDragging = true;
+                if (window._roomGroup) window._roomGroup.visible = false;
+            }
+            window._setPlinthHeight(e.target.value, true);
+        });
+        plinthHeightSlider.addEventListener('pointerup', () => {
+            if (_plinthSliderMoved) { _plinthSliderMoved = false; _endDrag(); saveHistoryState(); }
+        });
+    }
 
     const deskWidthSlider = document.getElementById('inp-desk-width');
     const deskWidthNum = document.getElementById('inp-num-desk-width');

@@ -36,7 +36,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260607b">
     <link rel="stylesheet" href="style-mobile.css?v=20260607b">
     <link rel="stylesheet" href="style-extras.css?v=20260607b">
-    <link rel="stylesheet" href="style.css?v=20260607b">
+    <link rel="stylesheet" href="style.css?v=20260607f">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -167,6 +167,40 @@
                 </div>
             </div>
         </div>
+        <!-- Dimension sliders (synced with pills above) -->
+        <div class="header-dims-sliders" id="header-dims-sliders">
+            <div class="header-dim-slider-item">
+                <div class="header-slider-row">
+                    <button type="button" class="header-slider-btn" onclick="updateDim('width',-1);saveHistoryState();"><i class="fa-solid fa-minus"></i></button>
+                    <input type="range" id="inp-width" min="30" max="600" value="160" step="1">
+                    <button type="button" class="header-slider-btn" onclick="updateDim('width',1);saveHistoryState();"><i class="fa-solid fa-plus"></i></button>
+                </div>
+            </div>
+            <div class="header-dim-slider-item">
+                <div class="header-slider-row">
+                    <button type="button" class="header-slider-btn" onclick="updateDim('height',-1);saveHistoryState();"><i class="fa-solid fa-minus"></i></button>
+                    <input type="range" id="inp-height" min="40" max="320" value="240" step="1">
+                    <button type="button" class="header-slider-btn" onclick="updateDim('height',1);saveHistoryState();"><i class="fa-solid fa-plus"></i></button>
+                </div>
+            </div>
+            <div class="header-dim-slider-item">
+                <div class="header-slider-row">
+                    <button type="button" class="header-slider-btn" onclick="updateDim('depth',-1);saveHistoryState();"><i class="fa-solid fa-minus"></i></button>
+                    <input type="range" id="inp-depth" min="10" max="80" value="54" step="1">
+                    <button type="button" class="header-slider-btn" onclick="updateDim('depth',1);saveHistoryState();"><i class="fa-solid fa-plus"></i></button>
+                </div>
+            </div>
+            <div class="header-dim-slider-item">
+                <div class="header-slider-row">
+                    <button type="button" class="header-slider-btn" onclick="window._setPlinthHeight((parseFloat(document.getElementById('dim-pill-plinth').value)||8.75)-0.5)"><i class="fa-solid fa-minus"></i></button>
+                    <input type="range" id="inp-plinth-height" min="0" max="30" value="8.8" step="0.1">
+                    <button type="button" class="header-slider-btn" onclick="window._setPlinthHeight((parseFloat(document.getElementById('dim-pill-plinth').value)||8.75)+0.5)"><i class="fa-solid fa-plus"></i></button>
+                </div>
+            </div>
+        </div>
+        <input type="number" id="inp-num-width" class="visually-hidden-dim" value="160" min="30" max="600" onchange="updateDim('width',null,this.value);saveHistoryState()">
+        <input type="number" id="inp-num-height" class="visually-hidden-dim" value="240" min="40" max="320" onchange="updateDim('height',null,this.value);saveHistoryState()">
+        <input type="number" id="inp-num-depth" class="visually-hidden-dim" value="54" min="10" max="80" onchange="updateDim('depth',null,this.value);saveHistoryState()">
         <!-- Wing position sub-menu (shown after selecting corner/walkin preset) -->
         <div id="preset-position-menu" style="display:none;margin-top:8px;padding:0 2px;">
             <!-- Single corner variant -->
@@ -231,6 +265,31 @@
         </div>
     </div>
 
+        <!-- ===== ROOM WALL POSITION — top of sidebar, below dimensions ===== -->
+        <div class="section" id="room-wall-section" style="padding-top:14px;">
+            <div class="section-title"><i class="fa-solid fa-border-all"></i> מיקום ארון בחדר</div>
+            <div id="room-wall-pos-row">
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px;">
+                    <button id="rw-btn-center" onclick="window._setRoomWall('center')" style="padding:7px 2px;border-radius:8px;border:1.5px solid var(--border);background:var(--accent);color:white;font-size:0.72rem;font-weight:600;cursor:pointer;transition:all 0.15s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:2px;">
+                        <i class="fa-solid fa-minus" style="font-size:0.9rem;"></i>
+                        <span>מרכז</span>
+                    </button>
+                    <button id="rw-btn-left" onclick="window._setRoomWall('left')" style="padding:7px 2px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.72rem;font-weight:600;cursor:pointer;transition:all 0.15s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:2px;">
+                        <i class="fa-solid fa-arrow-right-to-bracket" style="transform:scaleX(-1);font-size:0.9rem;"></i>
+                        <span>צמוד שמאל</span>
+                    </button>
+                    <button id="rw-btn-both" onclick="window._setRoomWall('both')" style="padding:7px 2px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.72rem;font-weight:600;cursor:pointer;transition:all 0.15s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:2px;">
+                        <i class="fa-solid fa-arrows-left-right" style="font-size:0.9rem;"></i>
+                        <span>בין קירות</span>
+                    </button>
+                    <button id="rw-btn-right" onclick="window._setRoomWall('right')" style="padding:7px 2px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.72rem;font-weight:600;cursor:pointer;transition:all 0.15s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:2px;">
+                        <i class="fa-solid fa-arrow-right-to-bracket" style="font-size:0.9rem;"></i>
+                        <span>צמוד ימין</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <div class="section" style="background-color: var(--highlight);">
             <div class="section-title"><i class="fa-solid fa-user-tag"></i> פרטי לקוח ופרויקט</div>
             <div class="control-group" style="display: flex; flex-direction: column; gap: 9px; margin-bottom:0;">
@@ -282,30 +341,6 @@
                     <option value="sandwich">סנדביץ' (עד 240 ס"מ)</option>
                 </select>
             </div>
-            <div class="control-group cabinet-dim-slider">
-                <div class="label-row"><span>רוחב (ס"מ)</span><input type="number" id="inp-num-width" class="value-badge-input" value="160" min="30" max="600" onchange="updateDim('width',null,this.value);saveHistoryState()"></div>
-                <div class="slider-row">
-                    <button class="slider-btn" onclick="updateDim('width', 1)"><i class="fa-solid fa-plus"></i></button>
-                    <input type="range" id="inp-width" min="30" max="600" value="160" step="1">
-                    <button class="slider-btn" onclick="updateDim('width', -1)"><i class="fa-solid fa-minus"></i></button>
-                </div>
-            </div>
-            <div class="control-group cabinet-dim-slider">
-                <div class="label-row"><span>גובה (ס"מ)</span><input type="number" id="inp-num-height" class="value-badge-input" value="240" min="40" max="320" onchange="updateDim('height',null,this.value);saveHistoryState()"></div>
-                <div class="slider-row">
-                    <button class="slider-btn" onclick="updateDim('height', 1)"><i class="fa-solid fa-plus"></i></button>
-                    <input type="range" id="inp-height" min="40" max="320" value="240" step="1">
-                    <button class="slider-btn" onclick="updateDim('height', -1)"><i class="fa-solid fa-minus"></i></button>
-                </div>
-            </div>
-            <div class="control-group cabinet-dim-slider">
-                <div class="label-row"><span>עומק (ס"מ)</span><input type="number" id="inp-num-depth" class="value-badge-input" value="54" min="10" max="80" onchange="updateDim('depth',null,this.value);saveHistoryState()"></div>
-                <div class="slider-row">
-                    <button class="slider-btn" onclick="updateDim('depth', 1)"><i class="fa-solid fa-plus"></i></button>
-                    <input type="range" id="inp-depth" min="10" max="80" value="54" step="1">
-                    <button class="slider-btn" onclick="updateDim('depth', -1)"><i class="fa-solid fa-minus"></i></button>
-                </div>
-            </div>
             <div class="control-group" style="margin-bottom:0;">
                 <div class="label-row"><span>עמודות פנימיות</span><span id="val-columns" class="value-badge">2</span></div>
                 <div class="slider-row">
@@ -320,33 +355,6 @@
                     <option value="side">צדדי — חזית מיושרת עם הארון המרכזי</option>
                     <option value="front">קדמי — בולט קדימה מחזית הארון המרכזי</option>
                 </select>
-            </div>
-        </div>
-
-        <!-- ===== ROOM WALL POSITION SECTION ===== -->
-        <div class="section" id="room-wall-section">
-            <div class="section-title"><i class="fa-solid fa-border-all"></i> מיקום ארון בחדר</div>
-
-            <!-- Position buttons: always visible for linear/sliding presets -->
-            <div id="room-wall-pos-row" style="margin-bottom:10px;">
-                <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px;">
-                    <button id="rw-btn-center" onclick="window._setRoomWall('center')" style="padding:7px 2px;border-radius:8px;border:1.5px solid var(--border);background:var(--accent);color:white;font-size:0.72rem;font-weight:600;cursor:pointer;transition:all 0.15s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:2px;">
-                        <i class="fa-solid fa-minus" style="font-size:0.9rem;"></i>
-                        <span>מרכז</span>
-                    </button>
-                    <button id="rw-btn-left" onclick="window._setRoomWall('left')" style="padding:7px 2px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.72rem;font-weight:600;cursor:pointer;transition:all 0.15s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:2px;">
-                        <i class="fa-solid fa-arrow-right-to-bracket" style="transform:scaleX(-1);font-size:0.9rem;"></i>
-                        <span>צמוד שמאל</span>
-                    </button>
-                    <button id="rw-btn-both" onclick="window._setRoomWall('both')" style="padding:7px 2px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.72rem;font-weight:600;cursor:pointer;transition:all 0.15s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:2px;">
-                        <i class="fa-solid fa-arrows-left-right" style="font-size:0.9rem;"></i>
-                        <span>בין קירות</span>
-                    </button>
-                    <button id="rw-btn-right" onclick="window._setRoomWall('right')" style="padding:7px 2px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.72rem;font-weight:600;cursor:pointer;transition:all 0.15s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:2px;">
-                        <i class="fa-solid fa-arrow-right-to-bracket" style="font-size:0.9rem;"></i>
-                        <span>צמוד ימין</span>
-                    </button>
-                </div>
             </div>
         </div>
 
@@ -405,11 +413,11 @@
                 </div>
             </div>
 
-            <div class="toggle-wrap" id="wrap-closure" style="display:none;">
+            <div class="toggle-wrap" id="wrap-closure">
                 <input type="checkbox" id="inp-closure-enabled" checked onchange="window._setClosureEnabled(this.checked)" style="display:none;">
                 <button class="sidebar-toggle-btn active" id="btn-closure-toggle" onclick="var c=document.getElementById('inp-closure-enabled');c.checked=!c.checked;c.dispatchEvent(new Event('change'));this.classList.toggle('active',c.checked);">
                     <i class="fa-solid fa-border-none"></i>
-                    <span class="toggle-label">לוחות סגירה</span>
+                    <span class="toggle-label">סגירות</span>
                     <span class="toggle-pill"></span>
                 </button>
                 <div class="toggle-submenu" id="closure-sliders-wrap">
@@ -2211,12 +2219,12 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js"></script>
-<script src="state.js?v=20260607b"></script>
+<script src="state.js?v=20260607f"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="engine-core.js?v=20260527m"></script>
 <script src="engine-corners.js?v=20260520k"></script>
 <script src="engine-blueprint.js?v=20260527k"></script>
-<script src="ui.js?v=20260607b"></script>
+<script src="ui.js?v=20260607f"></script>
 <script src="mobile.js?v=20260520k"></script>
 <script src="part-paint.js?v=20260520k"></script>
 <script src="index-init.js?v=20260520k"></script>
