@@ -2129,42 +2129,43 @@ function _handleMat3D() {
     return new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.8, roughness: 0.2 });
 }
 
-function _addDoorHandleToGroup(group, x, y, z, doorW, doorH, style, edgeX) {
-    if (style === 'touch') return;
-    const mat = _handleMat3D();
-    if (style === 'riding') {
-        const barLen = Math.min((doorW || 50) * 0.5, 28);
-        const bar = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.45, 0.45, barLen, 12).rotateZ(Math.PI / 2),
-            mat
-        );
-        bar.position.set(x, y, z);
-        group.add(bar);
-    } else {
-        const handleH = Math.min((doorH || 60) * 0.35, 15);
-        const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, handleH, 16), mat);
-        handle.position.set(edgeX != null ? edgeX : x, y, z);
-        group.add(handle);
-    }
+function _ridingHandleMat() {
+    return new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.35, roughness: 0.45 });
+}
+
+/** Riding handle on doors: tall vertical profile on the seam between door leaves. */
+function _addRidingDoorHandle(group, x, y, zFace, doorH) {
+    const mat = _ridingHandleMat();
+    const handleH = Math.min((doorH || 60) * 0.62, 140);
+    const profileW = 1.0;
+    const profileD = 1.1;
+    const handle = new THREE.Mesh(new THREE.BoxGeometry(profileW, handleH, profileD), mat);
+    handle.position.set(x, y, zFace + profileD / 2);
+    group.add(handle);
+}
+
+/** Riding handle on drawers: slim horizontal profile on the top edge of the front. */
+function _addRidingDrawerHandle(mesh, panelW, panelH) {
+    const mat = _ridingHandleMat();
+    const t = state.thickness;
+    const barLen = Math.min((panelW || 40) * 0.58, (panelW || 40) - 3);
+    const barH = 0.75;
+    const barD = 0.9;
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(barLen, barH, barD), mat);
+    bar.position.set(0, panelH / 2 - barH / 2 - 0.15, t / 2 + barD / 2 + 0.4);
+    mesh.add(bar);
 }
 
 function _addPanelHandleLocal(mesh, panelW, panelH, style) {
     if (style === 'touch') return;
-    const mat = _handleMat3D();
     const t = state.thickness;
     if (style === 'riding') {
-        const barLen = Math.min((panelW || 50) * 0.5, 24);
-        const bar = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.45, 0.45, barLen, 12).rotateZ(Math.PI / 2),
-            mat
-        );
-        bar.position.set(0, 0, t / 2 + 1.5);
-        mesh.add(bar);
+        _addRidingDrawerHandle(mesh, panelW, panelH);
     } else {
         const handleH = Math.min((panelH || 40) * 0.35, 15);
         const handle = new THREE.Mesh(
             new THREE.CylinderGeometry(0.5, 0.5, handleH, 16).rotateZ(Math.PI / 2),
-            mat
+            _handleMat3D()
         );
         handle.position.set(0, 0, t / 2 + 1.5);
         mesh.add(handle);
@@ -3554,8 +3555,7 @@ if (compData && compData.type === 'hanging') {
                             if (!isBP) {
                                 const hz = fZ + t / 2 + 1.5;
                                 if (_handleStyle === 'riding') {
-                                    _addDoorHandleToGroup(_buildGroup, lCX, doorY, hz, halfW, doorH, 'riding');
-                                    _addDoorHandleToGroup(_buildGroup, rCX, doorY, hz, halfW, doorH, 'riding');
+                                    _addRidingDoorHandle(_buildGroup, subCenterX, doorY, hz, doorH);
                                 } else if (_handleStyle === 'pipe') {
                                     const handleH = Math.min(doorH * 0.35, 12);
                                     const handleMatD = _handleMat3D();
@@ -3573,7 +3573,10 @@ if (compData && compData.type === 'hanging') {
                             if (!isBP) {
                                 const hz = fZ + t / 2 + 1.5;
                                 if (_handleStyle === 'riding') {
-                                    _addDoorHandleToGroup(_buildGroup, subCenterX, doorY, hz, doorW, doorH, 'riding');
+                                    const seamX = subType === 'door_right'
+                                        ? subCenterX - doorW / 2
+                                        : subCenterX + doorW / 2;
+                                    _addRidingDoorHandle(_buildGroup, seamX, doorY, hz, doorH);
                                 } else if (_handleStyle === 'pipe') {
                                     const isRight = subType === 'door_right';
                                     const handleX = isRight ? subCenterX - subW * 0.35 : subCenterX + subW * 0.35;
@@ -3824,25 +3827,20 @@ if (compData && compData.type === 'hanging') {
                     flapMesh.position.set(flapCenterX, flapY, flapZ);
                     if (isBP) flapMesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(flapGeo), new THREE.LineBasicMaterial({ color: 0x000000 })));
                     _buildGroup.add(flapMesh);
-                    if (!isBP && _handleStyle !== 'touch') {
-                        const hz = flapZ + t / 2 + 1.5;
-                        if (_handleStyle === 'riding') {
-                            const handleLen = Math.min(flapW * 0.6, 40);
-                            const handleMesh = new THREE.Mesh(
-                                new THREE.CylinderGeometry(0.5, 0.5, handleLen, 16).rotateZ(Math.PI / 2),
-                                _handleMat3D()
-                            );
-                            handleMesh.position.set(flapCenterX, flapBaseY + 4, hz);
-                            _buildGroup.add(handleMesh);
-                        } else {
-                            const handleH = Math.min(flapH * 0.25, 12);
-                            const handleMesh = new THREE.Mesh(
-                                new THREE.CylinderGeometry(0.5, 0.5, handleH, 12),
-                                _handleMat3D()
-                            );
-                            handleMesh.position.set(flapCenterX + flapW * 0.35, flapBaseY + 4, hz);
-                            _buildGroup.add(handleMesh);
-                        }
+                    if (!isBP && _handleStyle === 'pipe') {
+                        const handleH = Math.min(flapH * 0.25, 12);
+                        const handleMesh = new THREE.Mesh(
+                            new THREE.CylinderGeometry(0.5, 0.5, handleH, 12),
+                            _handleMat3D()
+                        );
+                        handleMesh.position.set(flapCenterX + flapW * 0.35, flapBaseY + 4, flapZ + t / 2 + 1.5);
+                        _buildGroup.add(handleMesh);
+                    } else if (!isBP && _handleStyle === 'riding') {
+                        const barLen = Math.min(flapW * 0.55, flapW - 4);
+                        const mat = _ridingHandleMat();
+                        const bar = new THREE.Mesh(new THREE.BoxGeometry(barLen, 0.75, 0.9), mat);
+                        bar.position.set(flapCenterX, flapBaseY + 0.6, flapZ + t / 2 + 0.85);
+                        _buildGroup.add(bar);
                     }
                     return; // flap door rendered — skip regular door logic
                 }
@@ -3934,15 +3932,10 @@ if (compData && compData.type === 'hanging') {
                         mesh.position.set(doorLocalX, 0, 0);
                         mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geometry), edgeMat));
                         
-                        if (!isBP) {
-                            const hz = t / 2 + 1.5;
-                            if (_handleStyle === 'riding') {
-                                _addDoorHandleToGroup(doorGroup, doorLocalX, 0, hz, w, dH, 'riding');
-                            } else if (_handleStyle === 'pipe') {
-                                const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 15, 16), _handleMat3D());
-                                handle.position.set(isLeft ? w/2 - 4 : -w/2 + 4, 0, hz);
-                                mesh.add(handle);
-                            }
+                        if (!isBP && _handleStyle === 'pipe') {
+                            const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 15, 16), _handleMat3D());
+                            handle.position.set(isLeft ? w/2 - 4 : -w/2 + 4, 0, t / 2 + 1.5);
+                            mesh.add(handle);
                         }
                         doorGroup.add(mesh);
                         if (_isActiveWingBuild) doorMeshes.push(mesh);
@@ -3973,15 +3966,10 @@ if (compData && compData.type === 'hanging') {
                         // glass_black / glass_gold: no handle (aluminum frame doors don't have separate handles)
                         const isAlumFrame = (style === 'glass_black' || style === 'glass_gold');
                         // For glass_melamine: add handle on the frame (no back panel — glass is transparent)
-                        if (isGlass && !isTouch && !isAlumFrame) {
-                            const hz = fz + fd / 2 + 1.5;
-                            if (_handleStyle === 'riding') {
-                                _addDoorHandleToGroup(doorGroup, doorLocalX, 0, hz, w, dH, 'riding');
-                            } else if (_handleStyle === 'pipe') {
-                                const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 15, 16), _handleMat3D());
-                                handle.position.set(doorLocalX + (isLeft ? w/2 - 4 : -w/2 + 4), 0, hz);
-                                doorGroup.add(handle);
-                            }
+                        if (isGlass && !isTouch && !isAlumFrame && _handleStyle === 'pipe') {
+                            const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 15, 16), _handleMat3D());
+                            handle.position.set(doorLocalX + (isLeft ? w/2 - 4 : -w/2 + 4), 0, fz + fd / 2 + 1.5);
+                            doorGroup.add(handle);
                         }
 
                         // Top frame bar
@@ -4037,12 +4025,22 @@ if (compData && compData.type === 'hanging') {
                 const doorStyle = door.style || 'solid';
                 // Use clipped overlay dimensions (_doorOverlayW / _doorOverlayCenterX)
                 // so doors don't extend into the hidden zone behind the center cabinet
+                const _doorHz = zPos + t / 2 + 1.5 + ((doorStyle !== 'solid' && doorStyle !== 'glass_mirror') ? 1.5 : 0);
                 if (door.type === 'left') makeDoor(_doorOverlayW, true, _doorOverlayCenterX, doorStyle);
                 if (door.type === 'right') makeDoor(_doorOverlayW, false, _doorOverlayCenterX, doorStyle);
                 if (door.type === 'double') {
                     const w = (_doorOverlayW / 2) - (doorGap / 2);
                     makeDoor(w, true, _doorOverlayCenterX - w/2 - doorGap/2, doorStyle, _doorOverlayW);
                     makeDoor(w, false, _doorOverlayCenterX + w/2 + doorGap/2, doorStyle, _doorOverlayW);
+                }
+                if (!isBP && _handleStyle === 'riding' && doorStyle !== 'glass_mirror') {
+                    if (door.type === 'double') {
+                        _addRidingDoorHandle(_buildGroup, _doorOverlayCenterX, dY, _doorHz, dH);
+                    } else if (door.type === 'left') {
+                        _addRidingDoorHandle(_buildGroup, _doorOverlayCenterX + _doorOverlayW / 2, dY, _doorHz, dH);
+                    } else if (door.type === 'right') {
+                        _addRidingDoorHandle(_buildGroup, _doorOverlayCenterX - _doorOverlayW / 2, dY, _doorHz, dH);
+                    }
                 }
             });
         }
