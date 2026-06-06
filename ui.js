@@ -4212,8 +4212,9 @@ window._syncRangeFill = function(slider) {
     const max = parseFloat(slider.max);
     const val = parseFloat(slider.value);
     if (isNaN(min) || isNaN(max) || max <= min || isNaN(val)) return;
-    const pct = Math.max(0, Math.min(100, ((val - min) / (max - min)) * 100));
-    slider.style.setProperty('--range-pct', pct + '%');
+    const ratio = Math.max(0, Math.min(1, (val - min) / (max - min)));
+    slider.style.setProperty('--range-ratio', String(ratio));
+    slider.style.setProperty('--range-pct', (ratio * 100) + '%');
 };
 
 window._syncAllRangeFills = function(root) {
