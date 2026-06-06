@@ -678,19 +678,18 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); box-sha
 .sticky-price {
     position: sticky; bottom: 0; background: white; padding: 10px 12px;
     box-shadow: 0 -4px 20px rgba(15,23,42,0.08); border-top: 1px solid var(--border);
-    z-index: 20; display: flex; flex-direction: row; align-items: center; gap: 8px;
+    z-index: 20; display: flex; flex-direction: column; gap: 8px;
 }
 .price-box {
-    flex: 1;
     background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
     border: 1px solid rgba(37,99,235,0.2);
-    border-radius: var(--radius-sm); padding: 8px 10px;
-    text-align: center; display: flex; flex-direction: column;
-    align-items: center; gap: 2px;
+    border-radius: var(--radius-sm); padding: 6px 12px;
+    text-align: center; display: flex; align-items: center; gap: 6px;
+    flex-shrink: 0;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
 }
-.price-label { font-size: 0.6rem; font-weight: 700; color: var(--secondary); text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap; }
-.price-amount { font-size: 1.15rem; color: var(--primary); font-weight: 800; margin-top: 0; letter-spacing: -0.02em; }
+.price-label { font-size: 0.65rem; font-weight: 700; color: var(--secondary); text-transform: uppercase; letter-spacing: 0.07em; white-space: nowrap; }
+.price-amount { font-size: 1.25rem; color: var(--primary); font-weight: 800; margin-top: 0; letter-spacing: -0.02em; }
 
 .btn-add-cart {
     flex: 1;
