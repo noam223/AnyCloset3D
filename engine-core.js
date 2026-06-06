@@ -2129,6 +2129,8 @@ function _handleMat3D() {
     return new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.8, roughness: 0.2 });
 }
 
+const RIDING_HANDLE_LEN = 30; // cm — standard riding-handle length
+
 function _ridingHandleMat() {
     return new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.35, roughness: 0.45 });
 }
@@ -2136,7 +2138,7 @@ function _ridingHandleMat() {
 /** Riding handle on doors: tall vertical profile on the seam between door leaves. */
 function _addRidingDoorHandle(group, x, y, zFace, doorH) {
     const mat = _ridingHandleMat();
-    const handleH = Math.min((doorH || 60) * 0.62, 140);
+    const handleH = Math.min(RIDING_HANDLE_LEN, Math.max(8, (doorH || 60) - 2));
     const profileW = 1.0;
     const profileD = 1.1;
     const handle = new THREE.Mesh(new THREE.BoxGeometry(profileW, handleH, profileD), mat);
@@ -2148,7 +2150,7 @@ function _addRidingDoorHandle(group, x, y, zFace, doorH) {
 function _addRidingDrawerHandle(mesh, panelW, panelH) {
     const mat = _ridingHandleMat();
     const t = state.thickness;
-    const barLen = Math.min((panelW || 40) * 0.58, (panelW || 40) - 3);
+    const barLen = Math.min(RIDING_HANDLE_LEN, Math.max(8, (panelW || 40) - 3));
     const barH = 0.75;
     const barD = 0.9;
     const bar = new THREE.Mesh(new THREE.BoxGeometry(barLen, barH, barD), mat);
@@ -3836,7 +3838,7 @@ if (compData && compData.type === 'hanging') {
                         handleMesh.position.set(flapCenterX + flapW * 0.35, flapBaseY + 4, flapZ + t / 2 + 1.5);
                         _buildGroup.add(handleMesh);
                     } else if (!isBP && _handleStyle === 'riding') {
-                        const barLen = Math.min(flapW * 0.55, flapW - 4);
+                        const barLen = Math.min(RIDING_HANDLE_LEN, Math.max(8, flapW - 4));
                         const mat = _ridingHandleMat();
                         const bar = new THREE.Mesh(new THREE.BoxGeometry(barLen, 0.75, 0.9), mat);
                         bar.position.set(flapCenterX, flapBaseY + 0.6, flapZ + t / 2 + 0.85);
