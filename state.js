@@ -453,11 +453,14 @@ window.toggleUpperUnit = function(wingId) {
         state.wings[key] = uuWing;
         _showUpperUnitTab(wingId);
     }
-    // Sync checkbox UI
+    // Sync checkbox + toggle-wrap UI
+    const _uuEnabled = !!state.wings['upperUnit_' + wingId];
     const cb = document.getElementById('inp-upper-unit-enabled');
-    if (cb) cb.checked = !!state.wings['upperUnit_' + wingId];
-    const ctrl = document.getElementById('upper-unit-controls');
-    if (ctrl) ctrl.style.display = state.wings['upperUnit_' + wingId] ? 'block' : 'none';
+    if (cb) cb.checked = _uuEnabled;
+    const wrap = document.getElementById('wrap-upper-unit');
+    const btn  = document.getElementById('btn-upper-unit-toggle');
+    if (wrap) wrap.classList.toggle('open', _uuEnabled);
+    if (btn)  btn.classList.toggle('active', _uuEnabled);
     buildCabinet(); calculatePrice(); saveHistoryState();
 };
 
@@ -1443,6 +1446,16 @@ window.syncSidebarToWing = function() {
     _updateMaterialTabVisibility(w);
     // Show/hide sandwich-only colors based on board material
     if (typeof window._updateSandwichColorVisibility === 'function') window._updateSandwichColorVisibility();
+
+    // Sync dimensions pills row
+    var _pw = document.getElementById('dim-pill-width');
+    var _ph = document.getElementById('dim-pill-height');
+    var _pd = document.getElementById('dim-pill-depth');
+    var _pp = document.getElementById('dim-pill-plinth');
+    if (_pw) _pw.value = Math.round(state.globalWidth || w.width || 160);
+    if (_ph) _ph.value = Math.round(state.globalHeight || w.globalHeight || 240);
+    if (_pd) _pd.value = Math.round(state.globalDepth || w.depth || 58);
+    if (_pp) _pp.value = (state.plinthHeight || w.plinthHeight || 8.75).toFixed(1);
 };
 
 window._updateMaterialTabVisibility = function(w) {

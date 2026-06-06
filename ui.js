@@ -3876,6 +3876,12 @@ window._setNicheEnabled = function(enabled) {
     window._nicheEnabled = !!enabled;
     const tog = document.getElementById('inp-niche-enabled');
     if (tog) tog.checked = window._nicheEnabled;
+    // sync toggle-wrap and button
+    const wrap = document.getElementById('wrap-niche');
+    const btn  = document.getElementById('btn-niche-toggle');
+    if (wrap) wrap.classList.toggle('open', !!enabled);
+    if (btn)  btn.classList.toggle('active', !!enabled);
+    const sw = btn && btn.querySelector('.toggle-switch');
     window._updateNicheUI();
     buildCabinet();
 };
@@ -3999,10 +4005,13 @@ window._updateNicheUI = function() {
 
 window._setClosureEnabled = function(enabled) {
     window._closureEnabled = !!enabled;
-    // Sync toggle checkbox
     const tog = document.getElementById('inp-closure-enabled');
     if (tog) tog.checked = window._closureEnabled;
-    // Re-sync all slider rows via _updateRoomWallUI
+    // sync toggle-wrap and button
+    const wrap = document.getElementById('wrap-closure');
+    const btn  = document.getElementById('btn-closure-toggle');
+    if (wrap) wrap.classList.toggle('open', !!enabled);
+    if (btn)  btn.classList.toggle('active', !!enabled);
     if (typeof window._updateRoomWallUI === 'function') window._updateRoomWallUI();
     buildCabinet();
 };

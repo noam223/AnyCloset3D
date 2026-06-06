@@ -197,6 +197,45 @@
             <button class="wing-tab-btn" id="wing-tab-right" data-wing="right" onclick="enterWingEditMode('right')"></button>
             <button class="wing-tab-btn" id="wing-tab-upperUnit" data-wing="upperUnit" style="display:none;">חלק עליון</button>
         </div>
+        <!-- ── Dimensions pills row ── -->
+        <div class="dims-pills-row" id="dims-pills-row">
+            <div class="dim-pill" title="שנה רוחב">
+                <label>רוחב</label>
+                <div class="dim-pill-val">
+                    <input type="number" id="dim-pill-width" min="40" max="600" step="1"
+                           onchange="updateDim('width',null,this.value)"
+                           onfocus="this.select()">
+                    <span>ס"מ</span>
+                </div>
+            </div>
+            <div class="dim-pill" title="שנה גובה">
+                <label>גובה</label>
+                <div class="dim-pill-val">
+                    <input type="number" id="dim-pill-height" min="100" max="300" step="1"
+                           onchange="updateDim('height',null,this.value)"
+                           onfocus="this.select()">
+                    <span>ס"מ</span>
+                </div>
+            </div>
+            <div class="dim-pill" title="שנה עומק">
+                <label>עומק</label>
+                <div class="dim-pill-val">
+                    <input type="number" id="dim-pill-depth" min="20" max="120" step="1"
+                           onchange="updateDim('depth',null,this.value)"
+                           onfocus="this.select()">
+                    <span>ס"מ</span>
+                </div>
+            </div>
+            <div class="dim-pill" title="שנה גובה צוקל">
+                <label>צוקל</label>
+                <div class="dim-pill-val">
+                    <input type="number" id="dim-pill-plinth" min="0" max="30" step="0.5"
+                           onchange="updateDim('plinthHeight',null,this.value)"
+                           onfocus="this.select()">
+                    <span>ס"מ</span>
+                </div>
+            </div>
+        </div>
     </div>
 
         <div class="section" style="background-color: var(--highlight);">
@@ -285,11 +324,13 @@
             <!-- ===== NICHE TOGGLE ===== -->
             <div id="niche-toggle-row" style="margin-top:10px;display:none;">
                 <input type="checkbox" id="inp-niche-enabled" onchange="window._setNicheEnabled(this.checked)" style="display:none;">
-                <button class="sidebar-toggle-btn" id="btn-niche-toggle" onclick="var c=document.getElementById('inp-niche-enabled');c.checked=!c.checked;c.dispatchEvent(new Event('change'));this.classList.toggle('active',c.checked);">
-                    <i class="fa-solid fa-border-all"></i> ארון בנישה
-                    <span class="toggle-pill"></span>
+                <div class="toggle-wrap" id="wrap-niche">
+                <button class="sidebar-toggle-btn" id="btn-niche-toggle" onclick="var c=document.getElementById('inp-niche-enabled');c.checked=!c.checked;c.dispatchEvent(new Event('change'));this.classList.toggle('active',c.checked);document.getElementById('wrap-niche').classList.toggle('open',c.checked);">
+                    <i class="fa-solid fa-border-all"></i>
+                    <span class="t-label">ארון בנישה</span>
+                    <div class="toggle-switch"></div>
                 </button>
-                <div id="niche-controls" style="display:none;margin-top:4px;">
+                <div class="toggle-sub" id="niche-controls">
                     <div class="control-group" style="margin-bottom:8px;">
                         <div class="label-row"><span>רוחב נישה (ס"מ)</span><input type="number" id="inp-num-niche-width" class="value-badge-input" value="200" min="50" max="600" step="1" onchange="window._setNicheWidth(this.value)"></div>
                         <div class="slider-row">
@@ -341,7 +382,9 @@
                         </div>
                     </div>
                 </div>
-            </div>
+                </div><!-- /.toggle-sub niche-controls -->
+                </div><!-- /.toggle-wrap wrap-niche -->
+            </div><!-- /#niche-toggle-row -->
             <div id="wing-position-row" style="display:none;margin-top:10px;">
                 <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:3px;">מיקום כנף</div>
                 <select id="inp-wing-position" class="editor-select" style="margin:0;" onchange="updateWingPosition(this.value);">
@@ -383,12 +426,13 @@
 
                 <!-- Show/hide panels toggle -->
                 <input type="checkbox" id="inp-closure-enabled" checked onchange="window._setClosureEnabled(this.checked)" style="display:none;">
-                <button class="sidebar-toggle-btn active" id="btn-closure-toggle" style="margin-bottom:10px;" onclick="var c=document.getElementById('inp-closure-enabled');c.checked=!c.checked;c.dispatchEvent(new Event('change'));this.classList.toggle('active',c.checked);">
-                    <i class="fa-solid fa-border-none"></i> לוחות סגירה
-                    <span class="toggle-pill"></span>
+                <div class="toggle-wrap open" id="wrap-closure">
+                <button class="sidebar-toggle-btn active" id="btn-closure-toggle" onclick="var c=document.getElementById('inp-closure-enabled');c.checked=!c.checked;c.dispatchEvent(new Event('change'));this.classList.toggle('active',c.checked);document.getElementById('wrap-closure').classList.toggle('open',c.checked);">
+                    <i class="fa-solid fa-border-none"></i>
+                    <span class="t-label">לוחות סגירה</span>
+                    <div class="toggle-switch"></div>
                 </button>
-
-                <div id="closure-sliders-wrap">
+                <div class="toggle-sub" id="closure-sliders-wrap">
                     <!-- Left side closure (shown for 'left' and 'both') -->
                     <div id="closure-width-row" class="control-group" style="margin-bottom:8px;display:none;">
                         <div class="label-row"><span>סגירה שמאל (ס"מ)</span><input type="number" id="inp-num-closure-width" class="value-badge-input" value="1.8" min="1.8" max="30" step="0.1" onchange="window._setClosureWidth(this.value)"></div>
@@ -428,6 +472,8 @@
                         </div>
                     </div>
                 </div>
+                </div><!-- /.toggle-sub closure-sliders-wrap -->
+                </div><!-- /.toggle-wrap wrap-closure -->
             </div>
         </div>
 
@@ -464,11 +510,13 @@
         <div class="section" id="upper-unit-section" style="display:none;">
             <div class="section-title"><i class="fa-solid fa-layer-group"></i> יחידה עליונה</div>
             <input type="checkbox" id="inp-upper-unit-enabled" onchange="toggleUpperUnit()" style="display:none;">
-            <button class="sidebar-toggle-btn" id="btn-upper-unit-toggle" style="margin-bottom:10px;" onclick="var c=document.getElementById('inp-upper-unit-enabled');c.checked=!c.checked;c.dispatchEvent(new Event('change'));this.classList.toggle('active',c.checked);">
-                <i class="fa-solid fa-layer-group"></i> הוסף יחידה עליונה
-                <span class="toggle-pill"></span>
+            <div class="toggle-wrap" id="wrap-upper-unit">
+            <button class="sidebar-toggle-btn" id="btn-upper-unit-toggle" onclick="var c=document.getElementById('inp-upper-unit-enabled');c.checked=!c.checked;c.dispatchEvent(new Event('change'));this.classList.toggle('active',c.checked);document.getElementById('wrap-upper-unit').classList.toggle('open',c.checked);">
+                <i class="fa-solid fa-layer-group"></i>
+                <span class="t-label">הוסף יחידה עליונה</span>
+                <div class="toggle-switch"></div>
             </button>
-            <div id="upper-unit-controls" style="display:none;">
+            <div class="toggle-sub" id="upper-unit-controls">
                 <div class="control-group" style="margin-bottom:10px;">
                     <div class="label-row"><span>מרחק מהארון (ס"מ)</span><input type="number" id="inp-num-upper-gap" class="value-badge-input" value="60" min="0" max="200" onchange="setUpperUnitGap(this.value)"></div>
                     <div class="slider-row">
@@ -477,10 +525,11 @@
                         <button class="slider-btn" onclick="updateUpperUnitGap(-1)"><i class="fa-solid fa-minus"></i></button>
                     </div>
                 </div>
-                <button id="btn-edit-upper-unit" onclick="window._enterUpperUnitEdit()" style="width:100%;padding:9px 12px;border-radius:9px;border:1.5px solid var(--accent);background:linear-gradient(135deg,#f0f9ff,#e0f0ff);color:var(--accent);font-size:0.88rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all 0.18s;">
+                <button id="btn-edit-upper-unit" onclick="window._enterUpperUnitEdit()" style="width:100%;padding:9px 12px;border-radius:9px;border:1.5px solid var(--secondary);background:linear-gradient(135deg,#eff6ff,#dbeafe);color:var(--secondary);font-size:0.88rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all 0.18s;">
                     <i class="fa-solid fa-pen-to-square"></i> ערוך יחידה עליונה
                 </button>
-            </div>
+            </div><!-- /.toggle-sub upper-unit-controls -->
+            </div><!-- /.toggle-wrap wrap-upper-unit -->
         </div>
 
         <!-- ===== SLIDING WARDROBE SECTION (shown only for 'sliding' preset) ===== -->
