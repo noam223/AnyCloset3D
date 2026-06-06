@@ -370,39 +370,58 @@ function buildCornerUnit() {
         addBoard(cuD, t, cuW, 0, deskH - t / 2, 0, matDesk);
         // Back leg at far Z (outer end wall, far from main cabinet front face)
         addBoard(cuD, deskH, t, 0, deskH / 2, backWallZ, matDesk);
-        // Optional drawers under desk surface
+        // Optional drawers under desk surface — fronts face the inner open side (same as drawer-type corner unit)
         const numDeskDrawers = Math.min(cu.deskDrawerCount || 0, 3);
         if (numDeskDrawers > 0) {
-            // All drawers in a single row at the top, split side-by-side
             const drawerH = cu.deskDrawerHeight || 13;
             const gap = 0.4;
-            const totalInnerW = cuD - t;  // full inner width in X
-            const drawerW = (totalInnerW - gap * (numDeskDrawers + 1)) / numDeskDrawers;
-            const dY = deskH - t - drawerH / 2;  // just below desk surface
-            const fZ = -cuW / 2 - t / 2 - 0.1;  // just outside front opening
+            const dY = deskH - t - drawerH / 2;
+            const fX = sign * (-cuD / 2 - t / 2 - 0.1);
             const handleMat = new THREE.MeshStandardMaterial({ color: 0xb0b0b0, metalness: 0.85, roughness: 0.15 });
-            for (let i = 0; i < numDeskDrawers; i++) {
-                // X position: start from inner open side, step toward side wall
-                const dX = sign * (-cuD / 2 + gap + drawerW / 2 + i * (drawerW + gap));
-                const dMesh = addBoard(drawerW, drawerH - 0.5, t, dX, dY, fZ, matExternal);
-                // Handle
-                const barLen = Math.min(drawerW * 0.55, 18);
-                const barR = 0.3;
-                const postH = 1.0;
+            if (numDeskDrawers === 1) {
+                const dMesh = addBoard(t, drawerH - 0.5, innerD, fX, dY, innerCtrZ, matExternal);
+                const barLen = Math.min(innerD * 0.55, 18);
+                const barR = 0.35;
+                const postH = 1.2;
+                const hOffX = sign * (-t / 2 - postH - barR * 0.5);
                 const bar = new THREE.Mesh(
-                    new THREE.CylinderGeometry(barR, barR, barLen, 10).rotateZ(Math.PI / 2),
+                    new THREE.CylinderGeometry(barR, barR, barLen, 12).rotateX(Math.PI / 2),
                     handleMat
                 );
-                bar.position.set(0, 0, -(t / 2 + postH + barR * 0.5));
+                bar.position.set(hOffX, 0, 0);
                 dMesh.add(bar);
-                [-barLen / 2, barLen / 2].forEach(px => {
+                [-barLen / 2, barLen / 2].forEach(pz => {
                     const post = new THREE.Mesh(
-                        new THREE.CylinderGeometry(barR, barR, postH, 8).rotateX(Math.PI / 2),
+                        new THREE.CylinderGeometry(barR, barR, postH, 10).rotateZ(Math.PI / 2),
                         handleMat
                     );
-                    post.position.set(px, 0, -(t / 2 + postH / 2));
+                    post.position.set(sign * (-t / 2 - postH / 2), 0, pz);
                     dMesh.add(post);
                 });
+            } else {
+                const drawerD = (innerD - gap * (numDeskDrawers + 1)) / numDeskDrawers;
+                for (let i = 0; i < numDeskDrawers; i++) {
+                    const dZ = -innerD / 2 + gap + drawerD / 2 + i * (drawerD + gap);
+                    const dMesh = addBoard(t, drawerH - 0.5, drawerD, fX, dY, dZ, matExternal);
+                    const barLen = Math.min(drawerD * 0.55, 18);
+                    const barR = 0.35;
+                    const postH = 1.2;
+                    const hOffX = sign * (-t / 2 - postH - barR * 0.5);
+                    const bar = new THREE.Mesh(
+                        new THREE.CylinderGeometry(barR, barR, barLen, 12).rotateX(Math.PI / 2),
+                        handleMat
+                    );
+                    bar.position.set(hOffX, 0, 0);
+                    dMesh.add(bar);
+                    [-barLen / 2, barLen / 2].forEach(pz => {
+                        const post = new THREE.Mesh(
+                            new THREE.CylinderGeometry(barR, barR, postH, 10).rotateZ(Math.PI / 2),
+                            handleMat
+                        );
+                        post.position.set(sign * (-t / 2 - postH / 2), 0, pz);
+                        dMesh.add(post);
+                    });
+                }
             }
         }
     } else {
