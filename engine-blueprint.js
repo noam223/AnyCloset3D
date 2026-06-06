@@ -1,4 +1,4 @@
-﻿
+
 // ==========================================
 // Multi-view blueprint SVG generator
 // ==========================================
@@ -3041,4 +3041,3 @@ function _easeInOut(t) {
     return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
 }
 // Note: animate() loop lives in ui.js — _camAnim is read there each frame.
-
