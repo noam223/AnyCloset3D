@@ -2119,6 +2119,58 @@ function _drawGroovesOnPanel(group, grooveStyle, panelW, panelH, panelT, cx, cy,
     }
 }
 
+function _getHandleStyle() {
+    if (state.cabinetModel === 'ab2') return 'touch';
+    const s = state.handleStyle || 'pipe';
+    return (s === 'touch' || s === 'riding' || s === 'pipe') ? s : 'pipe';
+}
+
+function _handleMat3D() {
+    return new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.8, roughness: 0.2 });
+}
+
+function _addDoorHandleToGroup(group, x, y, z, doorW, doorH, style, edgeX) {
+    if (style === 'touch') return;
+    const mat = _handleMat3D();
+    if (style === 'riding') {
+        const barLen = Math.min((doorW || 50) * 0.5, 28);
+        const bar = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.45, 0.45, barLen, 12).rotateZ(Math.PI / 2),
+            mat
+        );
+        bar.position.set(x, y, z);
+        group.add(bar);
+    } else {
+        const handleH = Math.min((doorH || 60) * 0.35, 15);
+        const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, handleH, 16), mat);
+        handle.position.set(edgeX != null ? edgeX : x, y, z);
+        group.add(handle);
+    }
+}
+
+function _addPanelHandleLocal(mesh, panelW, panelH, style) {
+    if (style === 'touch') return;
+    const mat = _handleMat3D();
+    const t = state.thickness;
+    if (style === 'riding') {
+        const barLen = Math.min((panelW || 50) * 0.5, 24);
+        const bar = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.45, 0.45, barLen, 12).rotateZ(Math.PI / 2),
+            mat
+        );
+        bar.position.set(0, 0, t / 2 + 1.5);
+        mesh.add(bar);
+    } else {
+        const handleH = Math.min((panelH || 40) * 0.35, 15);
+        const handle = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.5, 0.5, handleH, 16).rotateZ(Math.PI / 2),
+            mat
+        );
+        handle.position.set(0, 0, t / 2 + 1.5);
+        mesh.add(handle);
+    }
+}
+
 function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveWing) {
     const isBP = state.viewMode === 'blueprint';
     const bpMat = new THREE.MeshBasicMaterial({ color: 0xffffff, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
@@ -2141,8 +2193,8 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
     const _slidingPartZ = _isSlidingWardrobe ? (-_slidingPartSetback / 2) : 0; // shift back so front face is 6cm behind cabinet front
     const backT = 0.5;
     const isInset = (state.cabinetModel === 'ab2' || state.cabinetModel === 'ab2_nohoney');
-    // ab2 = touch (no handles); ab2_nohoney = inset doors but WITH regular handles
-    const isTouch = (state.cabinetModel === 'ab2');
+    const _handleStyle = _getHandleStyle();
+    const isTouch = (_handleStyle === 'touch');
     const isRegalim = (state.cabinetModel === 'regalim');
 
     // ---- רגלי ניקל: מצויר פעם אחת לכל כנף (לא לכל עמודה) ----
@@ -2417,10 +2469,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
             for(let i=0; i<numDrawers; i++) {
                 let dx = (dSide === 'left') ? (startX - innerWidth) + gap + drawerWidth/2 + i * (drawerWidth + gap) : startX + gap + drawerWidth/2 + i * (drawerWidth + gap);
                 let mesh = createBoard(drawerWidth, drawerH, t, dx, drawerCenterY, fZ, matExternal);
-                if (!isBP && !isTouch) {
-                    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 15, 16).rotateZ(Math.PI/2), new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.8 }));
-                    handle.position.set(0, 0, t/2 + 1.5); mesh.add(handle);
-                }
+                if (!isBP) _addPanelHandleLocal(mesh, dWidth, drawerH, _handleStyle);
                 if (!isBP) {
                     const backPanel = new THREE.Mesh(new THREE.BoxGeometry(drawerWidth - 2, 2.5, 0.5), new THREE.MeshStandardMaterial({ color: 0x222222 }));
                     backPanel.position.set(dx, drawerBottomY + drawerH - 1.25, bodyD/2 - t/2 - 1.5 - t/2 - 0.25);
@@ -3037,10 +3086,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                     let innerStartX = colCenterX - col.width/2;
                     let dx = innerStartX + gap + drawerWidth/2 + i * (drawerWidth + gap);
                     let mesh = createBoard(drawerWidth, col.drawerHeight, t, dx, drawerCenterY, fZ, matExternal);
-                    if (!isTouch) {
-                        const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 15, 16).rotateZ(Math.PI/2), new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.8 }));
-                        handle.position.set(0, 0, t/2 + 1.5); mesh.add(handle);
-                    }
+                    if (!isBP) _addPanelHandleLocal(mesh, drawerWidth, col.drawerHeight, _handleStyle);
                     const backPanel = new THREE.Mesh(new THREE.BoxGeometry(drawerWidth - 2, 2.5, 0.5), new THREE.MeshStandardMaterial({ color: 0x222222 }));
                     backPanel.position.set(dx, drawerBottomY + col.drawerHeight - 1.25, bodyD/2 - t/2 - 1.5 - t/2 - 0.25);
                     _buildGroup.add(backPanel);
@@ -3361,10 +3407,7 @@ if (compData && compData.type === 'hanging') {
                         _ppPartId = `drawer_ext_c${c}_r${r}_d${d}`;
                         const mesh = createBoard(overlayW, extDrawerH, t, overlayCenterX, dY, fZ, matExternal);
                         _ppPartId = '';
-                        if (!isTouch) {
-                            const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 15, 16).rotateZ(Math.PI/2), new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.8 }));
-                            handle.position.set(0, 0, t/2 + 1.5); mesh.add(handle);
-                        }
+                        if (!isBP) _addPanelHandleLocal(mesh, overlayW, extDrawerH, _handleStyle);
                         // ---- Bathroom groove overlay on external drawer ----
                         const _bathGrooveExt = state.presetId === 'bathroom'
                             ? ((state.wings.center && state.wings.center.doorGrooveStyle) || 'plain')
@@ -3508,28 +3551,39 @@ if (compData && compData.type === 'hanging') {
                             const rCX = subCenterX + halfW / 2;
                             createBoard(halfW, doorH, t, lCX, doorY, fZ, matExternal);
                             createBoard(halfW, doorH, t, rCX, doorY, fZ, matExternal);
-                            if (!isTouch) {
-                                const handleH = Math.min(doorH * 0.35, 12);
-                                const handleMatD = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.8 });
-                                const hL = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, handleH, 12), handleMatD);
-                                hL.position.set(lCX + halfW * 0.35, doorY, fZ + t/2 + 1.5);
-                                _buildGroup.add(hL);
-                                const hR = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, handleH, 12), handleMatD);
-                                hR.position.set(rCX - halfW * 0.35, doorY, fZ + t/2 + 1.5);
-                                _buildGroup.add(hR);
+                            if (!isBP) {
+                                const hz = fZ + t / 2 + 1.5;
+                                if (_handleStyle === 'riding') {
+                                    _addDoorHandleToGroup(_buildGroup, lCX, doorY, hz, halfW, doorH, 'riding');
+                                    _addDoorHandleToGroup(_buildGroup, rCX, doorY, hz, halfW, doorH, 'riding');
+                                } else if (_handleStyle === 'pipe') {
+                                    const handleH = Math.min(doorH * 0.35, 12);
+                                    const handleMatD = _handleMat3D();
+                                    const hL = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, handleH, 12), handleMatD);
+                                    hL.position.set(lCX + halfW * 0.35, doorY, hz);
+                                    _buildGroup.add(hL);
+                                    const hR = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, handleH, 12), handleMatD);
+                                    hR.position.set(rCX - halfW * 0.35, doorY, hz);
+                                    _buildGroup.add(hR);
+                                }
                             }
                         } else {
                             const doorW = subW + t;
                             createBoard(doorW, doorH, t, subCenterX, doorY, fZ, matExternal);
-                            if (!isTouch) {
-                                const isRight = subType === 'door_right';
-                                const handleX = isRight ? subCenterX - subW * 0.35 : subCenterX + subW * 0.35;
-                                const handleMesh = new THREE.Mesh(
-                                    new THREE.CylinderGeometry(0.5, 0.5, Math.min(doorH * 0.35, 12), 12),
-                                    new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.8 })
-                                );
-                                handleMesh.position.set(handleX, doorY, fZ + t/2 + 1.5);
-                                _buildGroup.add(handleMesh);
+                            if (!isBP) {
+                                const hz = fZ + t / 2 + 1.5;
+                                if (_handleStyle === 'riding') {
+                                    _addDoorHandleToGroup(_buildGroup, subCenterX, doorY, hz, doorW, doorH, 'riding');
+                                } else if (_handleStyle === 'pipe') {
+                                    const isRight = subType === 'door_right';
+                                    const handleX = isRight ? subCenterX - subW * 0.35 : subCenterX + subW * 0.35;
+                                    const handleMesh = new THREE.Mesh(
+                                        new THREE.CylinderGeometry(0.5, 0.5, Math.min(doorH * 0.35, 12), 12),
+                                        _handleMat3D()
+                                    );
+                                    handleMesh.position.set(handleX, doorY, hz);
+                                    _buildGroup.add(handleMesh);
+                                }
                             }
                         }
                     } else if (subType === 'honeycomb') {
@@ -3770,16 +3824,25 @@ if (compData && compData.type === 'hanging') {
                     flapMesh.position.set(flapCenterX, flapY, flapZ);
                     if (isBP) flapMesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(flapGeo), new THREE.LineBasicMaterial({ color: 0x000000 })));
                     _buildGroup.add(flapMesh);
-                    // Horizontal tube handle at bottom of flap (4cm from bottom edge)
-                    if (!isBP && !isTouch) {
-                        const handleLen = Math.min(flapW * 0.6, 40);
-                        const handleMat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.8, roughness: 0.2 });
-                        const handleMesh = new THREE.Mesh(
-                            new THREE.CylinderGeometry(0.5, 0.5, handleLen, 16).rotateZ(Math.PI / 2),
-                            handleMat
-                        );
-                        handleMesh.position.set(flapCenterX, flapBaseY + 4, flapZ + t / 2 + 1.5);
-                        _buildGroup.add(handleMesh);
+                    if (!isBP && _handleStyle !== 'touch') {
+                        const hz = flapZ + t / 2 + 1.5;
+                        if (_handleStyle === 'riding') {
+                            const handleLen = Math.min(flapW * 0.6, 40);
+                            const handleMesh = new THREE.Mesh(
+                                new THREE.CylinderGeometry(0.5, 0.5, handleLen, 16).rotateZ(Math.PI / 2),
+                                _handleMat3D()
+                            );
+                            handleMesh.position.set(flapCenterX, flapBaseY + 4, hz);
+                            _buildGroup.add(handleMesh);
+                        } else {
+                            const handleH = Math.min(flapH * 0.25, 12);
+                            const handleMesh = new THREE.Mesh(
+                                new THREE.CylinderGeometry(0.5, 0.5, handleH, 12),
+                                _handleMat3D()
+                            );
+                            handleMesh.position.set(flapCenterX + flapW * 0.35, flapBaseY + 4, hz);
+                            _buildGroup.add(handleMesh);
+                        }
                     }
                     return; // flap door rendered — skip regular door logic
                 }
@@ -3871,10 +3934,15 @@ if (compData && compData.type === 'hanging') {
                         mesh.position.set(doorLocalX, 0, 0);
                         mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geometry), edgeMat));
                         
-                        if (!isTouch) {
-                            const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 15, 16), new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.8 }));
-                            handle.position.set(isLeft ? w/2 - 4 : -w/2 + 4, 0, t/2 + 1.5);
-                            mesh.add(handle);
+                        if (!isBP) {
+                            const hz = t / 2 + 1.5;
+                            if (_handleStyle === 'riding') {
+                                _addDoorHandleToGroup(doorGroup, doorLocalX, 0, hz, w, dH, 'riding');
+                            } else if (_handleStyle === 'pipe') {
+                                const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 15, 16), _handleMat3D());
+                                handle.position.set(isLeft ? w/2 - 4 : -w/2 + 4, 0, hz);
+                                mesh.add(handle);
+                            }
                         }
                         doorGroup.add(mesh);
                         if (_isActiveWingBuild) doorMeshes.push(mesh);
@@ -3906,10 +3974,14 @@ if (compData && compData.type === 'hanging') {
                         const isAlumFrame = (style === 'glass_black' || style === 'glass_gold');
                         // For glass_melamine: add handle on the frame (no back panel — glass is transparent)
                         if (isGlass && !isTouch && !isAlumFrame) {
-                            // Attach handle to doorGroup directly (no back panel)
-                            const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 15, 16), new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.8 }));
-                            handle.position.set(doorLocalX + (isLeft ? w/2 - 4 : -w/2 + 4), 0, fz + fd/2 + 1.5);
-                            doorGroup.add(handle);
+                            const hz = fz + fd / 2 + 1.5;
+                            if (_handleStyle === 'riding') {
+                                _addDoorHandleToGroup(doorGroup, doorLocalX, 0, hz, w, dH, 'riding');
+                            } else if (_handleStyle === 'pipe') {
+                                const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 15, 16), _handleMat3D());
+                                handle.position.set(doorLocalX + (isLeft ? w/2 - 4 : -w/2 + 4), 0, hz);
+                                doorGroup.add(handle);
+                            }
                         }
 
                         // Top frame bar

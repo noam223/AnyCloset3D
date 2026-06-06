@@ -16,6 +16,7 @@ function createWingData(overrides) {
         plinthHeight: 8.75,
         hasDoors: true,
         handleType: '',
+        handleStyle: 'pipe',
         cabinetName: '',
         boardMaterial: 'melamine',
         materialBody: 'white_matte',
@@ -258,7 +259,7 @@ window.getWing = function() {
 // These getters/setters make existing code like state.width work transparently
 const _wingFields = [
     'cabinetModel','placement','width','globalHeight','depth','thickness','plinthHeight',
-    'hasDoors','handleType','cabinetName','boardMaterial',
+    'hasDoors','handleType','handleStyle','cabinetName','boardMaterial',
     'materialBody','materialInternal','materialExternal','materialDesk','materialOpenCell','materialBack',
     'materialSideCabinet','materialTopPanel',
     'activeColorPart','columns','desk','corner','fullCorner','sideCabinet','manualPrice','manualInstallPrice',
@@ -1275,6 +1276,13 @@ window.syncSidebarToWing = function() {
     if (colGroup) colGroup.style.display = _isSlidingWard ? 'none' : '';
     setChecked('inp-has-doors', w.hasDoors);
     setVal('inp-handle-type', w.handleType || '');
+    const _hs = w.handleStyle || 'pipe';
+    document.querySelectorAll('.handle-style-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.style === _hs);
+    });
+    document.querySelectorAll('.mobile-handle-style-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.style === _hs);
+    });
     setVal('inp-cabinet-name', w.cabinetName || '');
     setVal('inp-wing-position', w.wingPosition || 'side');
     // Show/hide wing position selector only for left/right wings (not for upper unit edit)
@@ -1585,7 +1593,7 @@ window.resetCurrentCabinet = function() {
     w.cabinetModel = 'c9';
     w.placement = 'wall';
     w.width = 160; w.globalHeight = 240; w.depth = 54;
-    w.plinthHeight = 8.75; w.hasDoors = true; w.handleType = ''; w.cabinetName = '';
+    w.plinthHeight = 8.75; w.hasDoors = true; w.handleType = ''; w.handleStyle = 'pipe'; w.cabinetName = '';
     w.boardMaterial = 'melamine'; w.materialBody = 'white_matte'; w.materialInternal = 'white_matte';
     w.materialExternal = 'white_matte'; w.materialDesk = 'white_matte'; w.materialOpenCell = 'white_matte'; w.materialBack = 'white_matte';
     w.materialSideCabinet = 'white_matte';
@@ -1939,6 +1947,18 @@ window.updateCorner = function(field, value) {
 };
 
 // Helper: called by corner-side-btn onclick
+window.updateHandleStyle = function(style) {
+    const w = getWing();
+    if (!w) return;
+    if (style !== 'pipe' && style !== 'riding' && style !== 'touch') return;
+    w.handleStyle = style;
+    document.querySelectorAll('.handle-style-btn, .mobile-handle-style-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.style === style);
+    });
+    buildCabinet();
+    saveHistoryState();
+};
+
 window.updateCornerSide = function(side) {
     updateCorner('side', side);
 };

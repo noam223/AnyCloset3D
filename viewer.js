@@ -1407,7 +1407,7 @@ var _editFunctions = [
     'updateDrawerCount','updateSubCellShelves','applyPreset',
     'applyPresetPosition','setPendingWingPos','enterWingEditMode',
     'exitWingEditMode','confirmWingEdit','cancelWingEdit',
-    'updateSideUnitType','updateSideCabinet','updateCorner',
+    'updateSideUnitType','updateSideCabinet','updateCorner','updateHandleStyle',
     'updateCornerSide','updateCornerType','updateSlidingDoor',
     'updateSlidingDoorPanel','updateSlidingDoorColor',
     'resetCurrentCabinet','undo','redo','saveHistoryState',

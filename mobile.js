@@ -1050,6 +1050,10 @@ function _syncMobileInputsFromState() {
 
     const mHandleType = document.getElementById('mobile-inp-handle-type');
     if (mHandleType) mHandleType.value = state.handleType || '';
+    const _hs = state.handleStyle || 'pipe';
+    document.querySelectorAll('.mobile-handle-style-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.style === _hs);
+    });
 
     ['front', 'blueprint', '3d'].forEach(m => {
         const btn = document.getElementById('mbtn-' + m + '-view');

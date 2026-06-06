@@ -4946,7 +4946,7 @@ function bindUI() {
             cabinetModel: state.cabinetModel,
             placement: state.placement,
             width: state.width, globalHeight: state.globalHeight, depth: state.depth, thickness: state.thickness,
-            plinthHeight: state.plinthHeight, hasDoors: state.hasDoors, handleType: state.handleType,
+            plinthHeight: state.plinthHeight, hasDoors: state.hasDoors, handleType: state.handleType, handleStyle: state.handleStyle,
             cabinetName: state.cabinetName, manualPrice: state.manualPrice,
             boardMaterial: state.boardMaterial, materialBody: state.materialBody, materialInternal: state.materialInternal,
             materialExternal: state.materialExternal, materialDesk: state.materialDesk, materialOpenCell: state.materialOpenCell, materialBack: state.materialBack, columns: state.columns, desk: state.desk
@@ -5158,7 +5158,7 @@ function bindUI() {
             cabinetModel: state.cabinetModel,
             placement: state.placement,
             width: state.width, globalHeight: state.globalHeight, depth: state.depth, thickness: state.thickness,
-            plinthHeight: state.plinthHeight, hasDoors: state.hasDoors, handleType: state.handleType,
+            plinthHeight: state.plinthHeight, hasDoors: state.hasDoors, handleType: state.handleType, handleStyle: state.handleStyle,
             cabinetName: state.cabinetName, manualPrice: state.manualPrice,
             manualInstallPrice: getWing().manualInstallPrice != null ? getWing().manualInstallPrice : null,
             boardMaterial: state.boardMaterial, materialBody: state.materialBody, materialInternal: state.materialInternal,
@@ -5228,7 +5228,13 @@ function bindUI() {
             placement: placementHebrew[state.placement] || 'ארון קיר חופשי',
             dimsStr: `רוחב: ${state.width} ס"מ | גובה: ${state.globalHeight} ס"מ | עומק: ${state.depth} ס"מ`,
             material: state.boardMaterial === 'melamine' ? 'מלמין' : "סנדביץ'",
-            handle: state.handleType || 'לא צוין', desk: deskInfo,
+            handle: (function() {
+                const labels = { pipe: 'ידית צינור', riding: 'ידית רוכבת', touch: "ידית טאצ'" };
+                const style = labels[state.handleStyle] || labels.pipe;
+                const model = (state.handleType || '').trim();
+                return model ? style + ' — ' + model : style;
+            })(),
+            desk: deskInfo,
             colorBody: colorNamesHebrew[state.materialBody] || 'ברירת מחדל',
             colorInternal: colorNamesHebrew[state.materialInternal] || 'ברירת מחדל',
             colorBack: colorNamesHebrew[state.materialBack] || 'ברירת מחדל',
@@ -5557,7 +5563,7 @@ window.editCartItem = function(index) {
         state.wings.right = null;
         // Apply flat fields to center wing via proxy setters
         const flatFields = ['cabinetModel','placement','width','globalHeight','depth','thickness',
-            'plinthHeight','hasDoors','handleType','cabinetName','manualPrice','boardMaterial',
+            'plinthHeight','hasDoors','handleType','handleStyle','cabinetName','manualPrice','boardMaterial',
             'materialBody','materialInternal','materialExternal','materialDesk','materialOpenCell',
             'materialBack','columns','desk'];
         flatFields.forEach(function(f) { if (rs[f] !== undefined) state[f] = rs[f]; });

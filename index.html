@@ -36,7 +36,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260607b">
     <link rel="stylesheet" href="style-mobile.css?v=20260607b">
     <link rel="stylesheet" href="style-extras.css?v=20260607b">
-    <link rel="stylesheet" href="style.css?v=20260607g">
+    <link rel="stylesheet" href="style.css?v=20260608a">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -832,10 +832,21 @@
         <div class="section" id="materials-section" style="border-bottom: none;">
             <div class="section-title"><i class="fa-solid fa-palette"></i> חומרים וגימורים</div>
             <div id="handle-type-row" class="control-group" style="margin-bottom:12px;">
-                <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:3px;">סוג ידית / פרזול</div>
+                <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:6px;">סוג ידית / פרזול</div>
+                <div class="handle-style-row">
+                    <button type="button" class="handle-style-btn" data-style="riding" onclick="updateHandleStyle('riding')" title="ידית רוכבת">
+                        <i class="fa-solid fa-grip-lines"></i><span>רוכבת</span>
+                    </button>
+                    <button type="button" class="handle-style-btn" data-style="touch" onclick="updateHandleStyle('touch')" title="ידית טאצ'">
+                        <i class="fa-solid fa-hand-pointer"></i><span>טאצ'</span>
+                    </button>
+                    <button type="button" class="handle-style-btn active" data-style="pipe" onclick="updateHandleStyle('pipe')" title="ידית צינור">
+                        <i class="fa-solid fa-grip-lines-vertical"></i><span>צינור</span>
+                    </button>
+                </div>
                 <div class="input-icon-wrap">
-                    <i class="fa-solid fa-grip-lines-vertical"></i>
-                    <input type="text" id="inp-handle-type" class="editor-select" placeholder="סוג ידית (ב-AB2 אין ידיות)..." style="margin-bottom: 0;">
+                    <i class="fa-solid fa-tag"></i>
+                    <input type="text" id="inp-handle-type" class="editor-select" placeholder="דגם / הערות (אופציונלי)..." style="margin-bottom: 0;">
                 </div>
             </div>
             <div class="control-group">
@@ -1767,9 +1778,20 @@
 
         <div class="mobile-panel-divider"></div>
         <div class="mobile-section-title">ידיות ופרזול</div>
+        <div class="handle-style-row" style="margin-bottom:10px;">
+            <button type="button" class="handle-style-btn mobile-handle-style-btn" data-style="riding" onclick="updateHandleStyle('riding')">
+                <i class="fa-solid fa-grip-lines"></i><span>רוכבת</span>
+            </button>
+            <button type="button" class="handle-style-btn mobile-handle-style-btn" data-style="touch" onclick="updateHandleStyle('touch')">
+                <i class="fa-solid fa-hand-pointer"></i><span>טאצ'</span>
+            </button>
+            <button type="button" class="handle-style-btn mobile-handle-style-btn active" data-style="pipe" onclick="updateHandleStyle('pipe')">
+                <i class="fa-solid fa-grip-lines-vertical"></i><span>צינור</span>
+            </button>
+        </div>
         <div class="input-icon-wrap" style="margin-bottom:15px;">
-            <i class="fa-solid fa-grip-lines-vertical"></i>
-            <input type="text" id="mobile-inp-handle-type" class="editor-select" placeholder="סוג ידית..." style="margin:0;"
+            <i class="fa-solid fa-tag"></i>
+            <input type="text" id="mobile-inp-handle-type" class="editor-select" placeholder="דגם / הערות..." style="margin:0;"
                 oninput="document.getElementById('inp-handle-type').value=this.value; state.handleType=this.value; saveHistoryState();">
         </div>
     </div>
@@ -2216,13 +2238,13 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js"></script>
-<script src="state.js?v=20260607f"></script>
+<script src="state.js?v=20260608a"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
-<script src="engine-core.js?v=20260527m"></script>
+<script src="engine-core.js?v=20260608a"></script>
 <script src="engine-corners.js?v=20260607h"></script>
 <script src="engine-blueprint.js?v=20260527k"></script>
-<script src="ui.js?v=20260607g"></script>
-<script src="mobile.js?v=20260520k"></script>
+<script src="ui.js?v=20260608a"></script>
+<script src="mobile.js?v=20260608a"></script>
 <script src="part-paint.js?v=20260520k"></script>
 <script src="index-init.js?v=20260520k"></script>
 

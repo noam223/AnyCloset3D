@@ -410,6 +410,44 @@ body {
     box-shadow: 0 2px 8px rgba(181,129,58,0.2);
 }
 
+/* ---- Handle style buttons ---- */
+.handle-style-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+.handle-style-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 8px 4px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    color: var(--text-mid);
+    cursor: pointer;
+    font-size: 0.72rem;
+    font-weight: 600;
+    font-family: inherit;
+    transition: all var(--transition);
+}
+.handle-style-btn i { font-size: 0.95rem; opacity: 0.85; }
+.handle-style-btn span { font-size: 0.68rem; }
+.handle-style-btn:hover {
+    background: var(--accent-pale);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+.handle-style-btn.active {
+    background: linear-gradient(135deg, var(--secondary) 0%, var(--primary-light) 100%);
+    border-color: var(--secondary);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(37,99,235,0.25);
+}
+
 /* ---- Closure position buttons ---- */
 .closure-pos-btn {
     display: flex;
