@@ -3410,7 +3410,7 @@ if (compData && compData.type === 'hanging') {
                         _ppPartId = `drawer_ext_c${c}_r${r}_d${d}`;
                         const mesh = createBoard(overlayW, extDrawerH, t, overlayCenterX, dY, fZ, matExternal);
                         _ppPartId = '';
-                        if (!isBP) _addPanelHandleLocal(mesh, overlayW, extDrawerH, _handleStyle);
+                        if (!isBP) _addPanelHandleLocal(mesh, overlayW, extDrawerH, compData.handleStyle || _handleStyle);
                         // ---- Bathroom groove overlay on external drawer ----
                         const _bathGrooveExt = state.presetId === 'bathroom'
                             ? ((state.wings.center && state.wings.center.doorGrooveStyle) || 'plain')
@@ -3829,7 +3829,8 @@ if (compData && compData.type === 'hanging') {
                     flapMesh.position.set(flapCenterX, flapY, flapZ);
                     if (isBP) flapMesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(flapGeo), new THREE.LineBasicMaterial({ color: 0x000000 })));
                     _buildGroup.add(flapMesh);
-                    if (!isBP && _handleStyle === 'pipe') {
+                    const _flapHandleStyle = door.handleStyle || _handleStyle;
+                    if (!isBP && _flapHandleStyle === 'pipe') {
                         const handleH = Math.min(flapH * 0.25, 12);
                         const handleMesh = new THREE.Mesh(
                             new THREE.CylinderGeometry(0.5, 0.5, handleH, 12),
@@ -3837,7 +3838,7 @@ if (compData && compData.type === 'hanging') {
                         );
                         handleMesh.position.set(flapCenterX + flapW * 0.35, flapBaseY + 4, flapZ + t / 2 + 1.5);
                         _buildGroup.add(handleMesh);
-                    } else if (!isBP && _handleStyle === 'riding') {
+                    } else if (!isBP && _flapHandleStyle === 'riding') {
                         const barLen = Math.min(RIDING_HANDLE_LEN, Math.max(8, flapW - 4));
                         const mat = _ridingHandleMat();
                         const bar = new THREE.Mesh(new THREE.BoxGeometry(barLen, 0.75, 0.9), mat);
@@ -3934,7 +3935,7 @@ if (compData && compData.type === 'hanging') {
                         mesh.position.set(doorLocalX, 0, 0);
                         mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geometry), edgeMat));
                         
-                        if (!isBP && _handleStyle === 'pipe') {
+                        if (!isBP && (door.handleStyle || _handleStyle) === 'pipe') {
                             const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 15, 16), _handleMat3D());
                             handle.position.set(isLeft ? w/2 - 4 : -w/2 + 4, 0, t / 2 + 1.5);
                             mesh.add(handle);
@@ -3968,7 +3969,7 @@ if (compData && compData.type === 'hanging') {
                         // glass_black / glass_gold: no handle (aluminum frame doors don't have separate handles)
                         const isAlumFrame = (style === 'glass_black' || style === 'glass_gold');
                         // For glass_melamine: add handle on the frame (no back panel — glass is transparent)
-                        if (isGlass && !isTouch && !isAlumFrame && _handleStyle === 'pipe') {
+                        if (isGlass && !isAlumFrame && (door.handleStyle || _handleStyle) === 'pipe') {
                             const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 15, 16), _handleMat3D());
                             handle.position.set(doorLocalX + (isLeft ? w/2 - 4 : -w/2 + 4), 0, fz + fd / 2 + 1.5);
                             doorGroup.add(handle);
@@ -4035,7 +4036,7 @@ if (compData && compData.type === 'hanging') {
                     makeDoor(w, true, _doorOverlayCenterX - w/2 - doorGap/2, doorStyle, _doorOverlayW);
                     makeDoor(w, false, _doorOverlayCenterX + w/2 + doorGap/2, doorStyle, _doorOverlayW);
                 }
-                if (!isBP && _handleStyle === 'riding' && doorStyle !== 'glass_mirror') {
+                if (!isBP && (door.handleStyle || _handleStyle) === 'riding' && doorStyle !== 'glass_mirror') {
                     if (door.type === 'double') {
                         _addRidingDoorHandle(_buildGroup, _doorOverlayCenterX, dY, _doorHz, dH);
                     } else if (door.type === 'left') {

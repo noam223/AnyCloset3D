@@ -882,6 +882,141 @@ function buildDimensionsAndButtonsUI() {
     updateOverlaysPosition();
 }
 
+// ── Handle Picker Popup ─────────────────────────────────────────────────────
+
+const HANDLE_CATALOG = [
+    {
+        id: 'touch',
+        label: 'ללא ידית',
+        sub: 'פתיחה בלחיצה',
+        svgPath: `<svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" width="28" height="28">
+            <rect x="4" y="10" width="28" height="16" rx="8" fill="currentColor" opacity="0.15"/>
+            <path d="M12 18h12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="3 3"/>
+            <circle cx="18" cy="18" r="3" fill="currentColor"/>
+        </svg>`
+    },
+    {
+        id: 'pipe',
+        label: 'צינור',
+        sub: 'ידית צינור אופקית',
+        svgPath: `<svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" width="28" height="28">
+            <rect x="6" y="15" width="24" height="6" rx="3" fill="currentColor"/>
+            <rect x="9" y="12" width="2" height="12" rx="1" fill="currentColor" opacity="0.5"/>
+            <rect x="25" y="12" width="2" height="12" rx="1" fill="currentColor" opacity="0.5"/>
+        </svg>`
+    },
+    {
+        id: 'riding',
+        label: 'רוכבת',
+        sub: 'ידית רוכבת',
+        svgPath: `<svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" width="28" height="28">
+            <rect x="4" y="16" width="28" height="4" rx="2" fill="currentColor"/>
+            <rect x="4" y="16" width="28" height="4" rx="2" fill="currentColor" opacity="0.3" transform="translate(0,6)"/>
+        </svg>`
+    },
+];
+
+window.openHandlePicker = function() {
+    const selCol = state.selection.colIndex;
+    const col = selCol >= 0 ? state.columns[selCol] : null;
+    if (!col || state.selection.rows.length === 0) return;
+
+    const firstComp = col.compartments[state.selection.rows[0]];
+    const existingDoor = col.doors.find(d =>
+        d.type !== 'empty' && state.selection.rows.some(r => r >= d.startRow && r <= d.endRow)
+    );
+
+    const isExtDrawer = firstComp && firstComp.type === 'external_drawers';
+
+    // Resolve current style for this cell (override or wing default)
+    let currentStyle = state.handleStyle || 'pipe';
+    if (isExtDrawer && firstComp.handleStyle) currentStyle = firstComp.handleStyle;
+    else if (existingDoor && existingDoor.handleStyle) currentStyle = existingDoor.handleStyle;
+
+    // Description text
+    const descEl = document.getElementById('handle-picker-desc-text');
+    if (descEl) {
+        if (isExtDrawer && existingDoor) descEl.textContent = 'ידית למגירות החיצוניות ולדלת';
+        else if (isExtDrawer) descEl.textContent = 'ידית למגירות החיצוניות בתא';
+        else descEl.textContent = 'ידית לדלת';
+    }
+
+    // Build grid
+    const grid = document.getElementById('handle-picker-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    HANDLE_CATALOG.forEach(h => {
+        const card = document.createElement('div');
+        card.className = 'handle-picker-card' + (h.id === currentStyle ? ' active' : '');
+        card.innerHTML = `
+            <div class="handle-picker-icon" style="color:${h.id === currentStyle ? '#fff' : 'var(--primary)'};">${h.svgPath}</div>
+            <div class="handle-picker-name">${h.label}</div>
+            <div class="handle-picker-sub">${h.sub}</div>
+        `;
+        card.addEventListener('click', () => {
+            applyHandleStyleToCell(h.id);
+            closeHandlePicker();
+        });
+        grid.appendChild(card);
+    });
+
+    const overlay = document.getElementById('handle-picker-overlay');
+    const sheet = document.getElementById('handle-picker-sheet');
+    if (!overlay || !sheet) return;
+    overlay.style.display = 'flex';
+    sheet.style.transform = 'translateY(100%)';
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => { sheet.style.transform = ''; });
+    });
+    document.body.style.overflow = 'hidden';
+};
+
+window.closeHandlePicker = function() {
+    const overlay = document.getElementById('handle-picker-overlay');
+    const sheet = document.getElementById('handle-picker-sheet');
+    if (!overlay || !sheet) return;
+    sheet.style.transform = 'translateY(100%)';
+    setTimeout(() => {
+        overlay.style.display = 'none';
+        sheet.style.transform = '';
+    }, 280);
+    document.body.style.overflow = '';
+};
+
+window.applyHandleStyleToCell = function(style) {
+    const selCol = state.selection.colIndex;
+    const col = selCol >= 0 ? state.columns[selCol] : null;
+    if (!col || state.selection.rows.length === 0) return;
+
+    let changed = false;
+    // Apply to external_drawers compartments in selected rows
+    state.selection.rows.forEach(r => {
+        const comp = col.compartments[r];
+        if (comp && comp.type === 'external_drawers') {
+            comp.handleStyle = style;
+            changed = true;
+        }
+    });
+    // Apply to doors that cover any selected row
+    col.doors.forEach(door => {
+        if (door.type === 'empty') return;
+        if (state.selection.rows.some(r => r >= door.startRow && r <= door.endRow)) {
+            door.handleStyle = style;
+            changed = true;
+        }
+    });
+
+    if (changed) {
+        buildCabinet();
+        calculatePrice();
+        saveHistoryState();
+        updateToolbarButtonHighlights();
+        if (typeof updateMobileCellSheetState === 'function') updateMobileCellSheetState();
+    }
+};
+
+// ── End Handle Picker ────────────────────────────────────────────────────────
+
 function updateToolbarState() {
     const toolbar = document.getElementById('bottom-floating-toolbar');
     if(!toolbar) return;
@@ -1185,6 +1320,42 @@ function updateToolbarButtonHighlights() {
         } else {
             drawerSection.style.display = 'none';
         }
+    }
+
+    // ── Handle picker button visibility ──
+    const _handleLabels = { pipe: 'צינור', riding: 'רוכבת', touch: 'ללא ידית' };
+    const tbHandlePickerRow = document.getElementById('tb-handle-picker-row');
+    const tbHandlePickerDoorRow = document.getElementById('tb-handle-picker-door-row');
+
+    let _showHandleForCell = false;
+    let _cellHandleStyle = null;
+    state.selection.rows.forEach(r => {
+        const comp = col.compartments[r];
+        if (comp && comp.type === 'external_drawers') {
+            _showHandleForCell = true;
+            _cellHandleStyle = comp.handleStyle || null;
+        }
+    });
+    const _showHandleForDoor = !!(existingDoor && existingDoor.type !== 'empty');
+
+    if (tbHandlePickerRow) tbHandlePickerRow.style.display = (_showHandleForCell && !_isSliding) ? '' : 'none';
+    if (tbHandlePickerDoorRow) tbHandlePickerDoorRow.style.display = (_showHandleForDoor && !_isSliding) ? '' : 'none';
+
+    // Update cell handle button label
+    if (_showHandleForCell && !_isSliding) {
+        const resolvedCell = _cellHandleStyle || state.handleStyle || 'pipe';
+        const labelEl = document.getElementById('tb-handle-picker-label');
+        if (labelEl) labelEl.textContent = 'ידית: ' + (_handleLabels[resolvedCell] || 'צינור');
+        const tbHandleBtn = document.getElementById('tb-btn-handle-picker');
+        if (tbHandleBtn) tbHandleBtn.classList.toggle('active', !!_cellHandleStyle);
+    }
+    // Update door handle button label
+    if (_showHandleForDoor && !_isSliding && existingDoor) {
+        const resolvedDoor = existingDoor.handleStyle || state.handleStyle || 'pipe';
+        const doorLabelEl = document.getElementById('tb-handle-picker-door-label');
+        if (doorLabelEl) doorLabelEl.textContent = 'ידית: ' + (_handleLabels[resolvedDoor] || 'צינור');
+        const tbHandleDoorBtn = document.getElementById('tb-btn-handle-picker-door');
+        if (tbHandleDoorBtn) tbHandleDoorBtn.classList.toggle('active', !!existingDoor.handleStyle);
     }
 }
 

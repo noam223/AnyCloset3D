@@ -249,6 +249,34 @@ function updateMobileCellSheetState() {
     if (drawerSection) drawerSection.style.display = isDrawerSelected ? 'flex' : 'none';
     if (drawerDisplay) drawerDisplay.innerText = currentCount;
 
+    // ── Handle picker button visibility ──
+    let _showHandleR = false;
+    let _cellHandleOverride = null;
+    state.selection.rows.forEach(r => {
+        const comp = col.compartments[r];
+        if (comp && comp.type === 'external_drawers') {
+            _showHandleR = true;
+            _cellHandleOverride = comp.handleStyle || null;
+        }
+    });
+    const _showHandleL = !!(existingDoor && existingDoor.type !== 'empty');
+
+    const mcpHandleSepR = document.getElementById('mcp-handle-sep-r');
+    const mcpHandleBtnR = document.getElementById('mcp-handle-btn-r');
+    if (mcpHandleSepR) mcpHandleSepR.style.display = _showHandleR ? '' : 'none';
+    if (mcpHandleBtnR) {
+        mcpHandleBtnR.style.display = _showHandleR ? 'flex' : 'none';
+        mcpHandleBtnR.classList.toggle('active', !!_cellHandleOverride);
+    }
+
+    const mcpHandleSepL = document.getElementById('mcp-handle-sep-l');
+    const mcpHandleBtnL = document.getElementById('mcp-handle-btn-l');
+    if (mcpHandleSepL) mcpHandleSepL.style.display = _showHandleL ? '' : 'none';
+    if (mcpHandleBtnL) {
+        mcpHandleBtnL.style.display = _showHandleL ? 'flex' : 'none';
+        mcpHandleBtnL.classList.toggle('active', !!(existingDoor && existingDoor.handleStyle));
+    }
+
     // Sub-cell highlights for partition sub-view
     const firstComp2 = col.compartments[state.selection.rows[0]];
     const hasPartition = firstComp2 && firstComp2.partition && firstComp2.subCells &&

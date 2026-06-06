@@ -1121,6 +1121,12 @@
                 <button class="slider-btn" style="width:26px;height:26px;" onclick="updateDrawerCount(-1)"><i class="fa-solid fa-minus"></i></button>
                 <span id="floating-drawer-min" style="font-size:0.7rem;color:var(--text-light);margin-right:2px;"></span>
             </div>
+            <!-- ידית button — shown only when external_drawers is selected -->
+            <div class="toolbar-row" id="tb-handle-picker-row" style="display:none;">
+                <button class="toolbar-btn" id="tb-btn-handle-picker" onclick="openHandlePicker()">
+                    <i class="fa-solid fa-grip-lines"></i><span id="tb-handle-picker-label">ידית</span>
+                </button>
+            </div>
         </div>
         <div class="toolbar-divider" id="toolbar-divider-main"></div>
         <div class="toolbar-section" id="toolbar-section-doors">
@@ -1180,6 +1186,12 @@
                     <button class="toolbar-btn" data-door-style="glass_gold" onclick="applyDoorStyle('glass_gold')" style="color:#e5ba70;"><i class="fa-solid fa-circle-half-stroke"></i><span>זהב</span></button>
                     <button class="toolbar-btn" data-door-style="glass_mirror" onclick="applyDoorStyle('glass_mirror')"><i class="fa-solid fa-mirror"></i><span>מראה</span></button>
                 </div>
+            </div>
+            <!-- ידית button for doors — shown only when a door exists -->
+            <div class="toolbar-row" id="tb-handle-picker-door-row" style="display:none;">
+                <button class="toolbar-btn" id="tb-btn-handle-picker-door" onclick="openHandlePicker()">
+                    <i class="fa-solid fa-grip-lines"></i><span id="tb-handle-picker-door-label">ידית</span>
+                </button>
             </div>
         </div>
         <!-- Sub-cell mode title + shelf counter — shown at bottom when a sub-cell zone is active -->
@@ -2048,6 +2060,12 @@
             <button class="mcell-mini-btn" onclick="updateDrawerCount(-1); updateMobileCellSheetState();"><i class="fa-solid fa-minus"></i></button>
         </div>
 
+        <!-- Handle picker — shown only when external_drawers is selected -->
+        <div class="mcell-panel-sep" id="mcp-handle-sep-r" style="display:none;"></div>
+        <button class="mcell-cat-btn" id="mcp-handle-btn-r" style="display:none;" onclick="openHandlePicker()">
+            <i class="fa-solid fa-grip-lines"></i><span>ידית</span>
+        </button>
+
         <!-- Cell height stepper -->
         <div class="mcell-panel-sep"></div>
         <div class="mcell-panel-label" style="font-size:0.58rem;">גובה</div>
@@ -2163,6 +2181,11 @@
             <i class="fa-solid fa-mirror"></i><span>מראה</span>
         </button>
     </div>
+    <!-- Handle picker — shown only when door exists -->
+    <div class="mcell-panel-sep" id="mcp-handle-sep-l" style="display:none;"></div>
+    <button class="mcell-side-btn" id="mcp-handle-btn-l" style="display:none;" onclick="openHandlePicker()">
+        <i class="fa-solid fa-grip-lines"></i><span>ידית</span>
+    </button>
 </div>
 
 <!-- ===== MOBILE COLUMN QUICK EDIT SHEET ===== -->
@@ -2241,7 +2264,7 @@
 <script src="state.js?v=20260608a"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="engine-core.js?v=20260608c"></script>
-<script src="engine-corners.js?v=20260607h"></script>
+<script src="engine-corners.js?v=20260608d"></script>
 <script src="engine-blueprint.js?v=20260527k"></script>
 <script src="ui.js?v=20260608a"></script>
 <script src="mobile.js?v=20260608a"></script>
@@ -2653,6 +2676,31 @@
 })();
 </script>
 <!-- ===== END LAPTOP Y MOVE TOOL ===== -->
+
+<!-- ===== HANDLE PICKER POPUP ===== -->
+<div id="handle-picker-overlay" onclick="if(event.target===this)closeHandlePicker()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.52);z-index:99997;flex-direction:column;justify-content:flex-end;align-items:stretch;">
+    <div id="handle-picker-sheet" style="background:#fff;border-radius:22px 22px 0 0;padding:0 0 env(safe-area-inset-bottom,0) 0;max-height:82vh;overflow-y:auto;box-shadow:0 -8px 40px rgba(0,0,0,0.22);transition:transform 0.28s cubic-bezier(0.32,0.72,0,1);direction:rtl;font-family:inherit;">
+        <!-- Drag handle -->
+        <div style="display:flex;justify-content:center;padding:12px 0 0;">
+            <div style="width:38px;height:4px;background:#e2e8f0;border-radius:2px;"></div>
+        </div>
+        <!-- Header -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px 10px;">
+            <h3 style="margin:0;font-size:1.08rem;font-weight:800;color:#1e293b;display:flex;align-items:center;gap:8px;">
+                <i class="fa-solid fa-grip-lines" style="color:var(--primary);font-size:1rem;"></i>
+                בחירת ידית
+            </h3>
+            <button onclick="closeHandlePicker()" style="border:none;background:rgba(0,0,0,0.06);border-radius:50%;width:30px;height:30px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#64748b;font-size:0.85rem;transition:background 0.15s;" onmouseenter="this.style.background='#fee2e2';this.style.color='#ef4444'" onmouseleave="this.style.background='rgba(0,0,0,0.06)';this.style.color='#64748b'">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <!-- Description -->
+        <p id="handle-picker-desc-text" style="margin:0 20px 14px;font-size:0.8rem;color:#64748b;"></p>
+        <!-- Handle grid -->
+        <div id="handle-picker-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:0 16px 20px;"></div>
+    </div>
+</div>
+<!-- ===== END HANDLE PICKER POPUP ===== -->
 
 </body>
 </html>
