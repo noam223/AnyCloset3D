@@ -1182,19 +1182,26 @@ window.syncSidebarToWing = function() {
     if (_placeholder) _placeholder.style.display = _isEditing ? 'none' : 'flex';
     if (!_isEditing) return; // nothing to sync in free mode
 
-    // Show/hide upper-unit-section: always visible (not in sliding mode)
-    const _uuSection = document.getElementById('upper-unit-section');
-    if (_uuSection) {
-        const _showUU = state.presetId !== 'sliding';
-        _uuSection.style.display = _showUU ? '' : 'none';
-        if (_showUU) {
-            // Sync checkbox and controls visibility
+    // Show/hide units-content-section (יחידות ותכולה)
+    const _unitsSection = document.getElementById('units-content-section');
+    const _isLinearOrSliding = (state.presetId === 'linear' || state.presetId === 'sliding');
+    if (_unitsSection) {
+        _unitsSection.style.display = (_isLinearOrSliding && !_isUUEdit) ? '' : 'none';
+    }
+    const _wrapUU = document.getElementById('wrap-upper-unit');
+    if (_wrapUU) {
+        _wrapUU.style.display = (_isLinearOrSliding && state.presetId !== 'sliding' && !_isUUEdit) ? '' : 'none';
+    }
+    if (_isLinearOrSliding && state.presetId !== 'sliding') {
+            // Sync checkbox and sub-menu visibility
             const _uuKey = 'upperUnit_' + _parentWingId;
             const _uuExists = !!state.wings[_uuKey];
             const cb = document.getElementById('inp-upper-unit-enabled');
             if (cb) cb.checked = _uuExists;
-            const ctrl = document.getElementById('upper-unit-controls');
-            if (ctrl) ctrl.style.display = _uuExists ? 'block' : 'none';
+            const wrap = document.getElementById('wrap-upper-unit');
+            const btn = document.getElementById('btn-upper-unit-toggle');
+            if (wrap) wrap.classList.toggle('open', _uuExists);
+            if (btn) btn.classList.toggle('active', _uuExists);
             if (_uuExists) {
                 const uuW = state.wings[_uuKey];
                 const gapSlider = document.getElementById('inp-upper-gap');
@@ -1219,8 +1226,9 @@ window.syncSidebarToWing = function() {
                     editBtn.style.color = 'var(--accent)';
                 }
             }
-        }
     }
+    if (typeof window._updateNicheUI === 'function') window._updateNicheUI();
+    if (typeof window._updateRoomWallUI === 'function') window._updateRoomWallUI();
 
     // Hide drawer-related UI when editing upper unit inline (no drawers for upper unit)
     const _drawerCountSection = document.getElementById('drawer-count-section');
@@ -2383,8 +2391,34 @@ window.updateDim = function(dim, delta, absoluteValue = null) {
         document.getElementById('inp-desk-width').value = val;
         document.getElementById('inp-num-desk-width').value = val;
     }
+    _syncDimPills();
     buildCabinetDebounced(); updateCameraView(); calculatePrice();
 }
+
+function _syncDimPills() {
+    const w = getWing();
+    const pw = document.getElementById('dim-pill-width');
+    const ph = document.getElementById('dim-pill-height');
+    const pd = document.getElementById('dim-pill-depth');
+    const pp = document.getElementById('dim-pill-plinth');
+    if (pw) pw.value = Math.round(state.width || (w && w.width) || 160);
+    if (ph) ph.value = Math.round(state.globalHeight || (w && w.globalHeight) || 240);
+    if (pd) pd.value = Math.round(state.depth || (w && w.depth) || 54);
+    if (pp) pp.value = (state.plinthHeight || (w && w.plinthHeight) || 8.75).toFixed(1);
+}
+
+window._setPlinthHeight = function(val) {
+    const v = Math.max(0, Math.min(30, parseFloat(val) || 8.75));
+    const w = getWing();
+    if (w) w.plinthHeight = v;
+    state.plinthHeight = v;
+    const pill = document.getElementById('dim-pill-plinth');
+    if (pill) pill.value = v.toFixed(1);
+    state.manualPrice = null;
+    buildCabinetDebounced();
+    calculatePrice();
+    saveHistoryState();
+};
 
 // ── Side desk drawer count ────────────────────────────────────────────────────
 function _autoSideDeskDrawerCount(deskWidth) {

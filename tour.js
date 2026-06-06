@@ -179,14 +179,14 @@ window._TOURS = {
             scrollTo: true,
         },
         {
-            target:   '#closure-controls',
+            target:   '#wrap-closure',
             title:    '🧱 לוחות סגירה',
             text:     'כאשר הארון צמוד לקיר, ניתן להוסיף לוחות סגירה בצד שמאל, ימין ובתקרה. ניתן לשנות את עובי כל לוח בנפרד.',
             position: 'left',
             scrollTo: true,
         },
         {
-            target:   '#niche-toggle-row',
+            target:   '#wrap-niche',
             title:    '🕳️ ארון בנישה',
             text:     'אם הארון ממוקם בתוך נישה בקיר, הפעל אפשרות זו. הגדר את רוחב ועומק הנישה, ואת לוחות הסגירה בתוכה.',
             position: 'left',
@@ -211,7 +211,7 @@ window._TOURS = {
     // ── 4. יחידות נוספות ────────────────────────────────────────────────────
     extras: [
         {
-            target:   '#upper-unit-section',
+            target:   '#units-content-section',
             title:    '⬆️ יחידה עליונה',
             text:     'הוסף יחידת ארון עליונה מעל הארון הראשי. ניתן לשנות את המרחק בין היחידות ולערוך את תוכן היחידה העליונה בנפרד.',
             position: 'left',

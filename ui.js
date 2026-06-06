@@ -3952,14 +3952,15 @@ window._setNicheClosureCeilHeight = function(val) {
 };
 
 window._updateNicheUI = function() {
-    const nicheRow  = document.getElementById('niche-toggle-row');
-    const nicheCtrl = document.getElementById('niche-controls');
+    const wrapNiche = document.getElementById('wrap-niche');
+    const btnNiche  = document.getElementById('btn-niche-toggle');
     const tog       = document.getElementById('inp-niche-enabled');
     const _preset   = state.presetId || 'linear';
     const _isLS     = (_preset === 'linear' || _preset === 'sliding');
-    if (nicheRow) nicheRow.style.display = _isLS ? '' : 'none';
+    if (wrapNiche) wrapNiche.style.display = _isLS ? '' : 'none';
     if (tog) tog.checked = !!window._nicheEnabled;
-    if (nicheCtrl) nicheCtrl.style.display = (window._nicheEnabled && _isLS) ? '' : 'none';
+    if (wrapNiche) wrapNiche.classList.toggle('open', !!(window._nicheEnabled && _isLS));
+    if (btnNiche) btnNiche.classList.toggle('active', !!window._nicheEnabled);
     // Sync slider values
     const nwNum = document.getElementById('inp-num-niche-width');
     const nwSl  = document.getElementById('inp-niche-width');
@@ -4122,13 +4123,12 @@ window._updateRoomWallUI = function() {
     const _rw = window._roomWall || 'center';
 
     // ── Position buttons: always visible for linear/sliding ─────────────────
-    const posRow  = document.getElementById('room-wall-pos-row');
-    const ctrlDiv = document.getElementById('closure-controls');
+    const posRow      = document.getElementById('room-wall-pos-row');
+    const wrapClosure = document.getElementById('wrap-closure');
 
     if (!_isLinearOrSliding) {
-        if (posRow)  posRow.style.display  = 'none';
-        if (ctrlDiv) ctrlDiv.style.display = 'none';
-        // Also hide niche toggle for non-linear presets
+        if (posRow)      posRow.style.display      = 'none';
+        if (wrapClosure) wrapClosure.style.display = 'none';
         if (typeof window._updateNicheUI === 'function') window._updateNicheUI();
         return;
     }
@@ -4146,16 +4146,19 @@ window._updateRoomWallUI = function() {
         btn.style.borderColor = isActive ? 'var(--accent)' : 'var(--border)';
     });
 
-    // Show closure controls only when position ≠ center
+    // Show closure toggle only when position ≠ center
     if (_rw === 'center') {
-        if (ctrlDiv) ctrlDiv.style.display = 'none';
+        if (wrapClosure) wrapClosure.style.display = 'none';
     } else {
-        if (ctrlDiv) ctrlDiv.style.display = '';
+        if (wrapClosure) wrapClosure.style.display = '';
 
         // Sync closure toggle checkbox
         const _cOn = (window._closureEnabled !== false);
         const togEl = document.getElementById('inp-closure-enabled');
+        const btnClosure = document.getElementById('btn-closure-toggle');
         if (togEl) togEl.checked = _cOn;
+        if (wrapClosure) wrapClosure.classList.toggle('open', _cOn);
+        if (btnClosure) btnClosure.classList.toggle('active', _cOn);
 
         // Show/hide slider rows based on mode and enabled state
         const _showSliders = _cOn;
@@ -4325,7 +4328,10 @@ function bindUI() {
         if (val === 'maya') state.plinthHeight = 7;
         else if (val === 'c9') state.plinthHeight = 8.75;
         else if (val === 'ab2') state.plinthHeight = 8.75;
-        else if (val === 'regalim') state.plinthHeight = 10;
+        else         if (val === 'regalim') state.plinthHeight = 10;
+
+        const _plinthPill = document.getElementById('dim-pill-plinth');
+        if (_plinthPill) _plinthPill.value = (state.plinthHeight || 8.75).toFixed(1);
         
         state.manualPrice = null;
         

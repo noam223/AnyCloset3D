@@ -36,6 +36,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260526">
     <link rel="stylesheet" href="style-mobile.css?v=20260526">
     <link rel="stylesheet" href="style-extras.css?v=20260526">
+    <link rel="stylesheet" href="style.css?v=20260607a">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -103,8 +104,8 @@
         </div>
         <p style="font-size:1rem;font-weight:700;color:#fff;margin-top:8px;letter-spacing:0.3px;">אנא בחר סוג ארון:</p>
         <!-- Cabinet preset buttons -->
-        <div id="cabinet-presets-row" style="display:flex;flex-direction:column;gap:6px;margin-top:10px;padding:0 2px;">
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
+        <div id="cabinet-presets-row" style="margin-top:10px;">
+            <div class="presets-grid presets-grid--4">
                 <button class="preset-btn" onclick="applyPreset('linear')" title="ארון רגיל">
                     <img src="images/linear_closet.png" alt="ארון רגיל" style="width:36px;height:36px;object-fit:contain;opacity:0.9;">
                     <span>ארון רגיל</span>
@@ -122,7 +123,7 @@
                     <span>חדר ארונות</span>
                 </button>
             </div>
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
+            <div class="presets-grid presets-grid--4">
                 <div></div>
                 <button class="preset-btn" id="preset-btn-sliding" onclick="applyPreset('sliding')" title="ארון הזזה">
                     <i class="fa-solid fa-arrows-left-right" style="font-size:1.4rem;opacity:0.9;"></i>
@@ -133,6 +134,37 @@
                     <span>אמבטיה</span>
                 </button>
                 <div></div>
+            </div>
+        </div>
+        <!-- Dimension pills row -->
+        <div class="dims-row" id="header-dims-row">
+            <div class="dim-pill">
+                <label for="dim-pill-width">רוחב</label>
+                <div class="dim-pill-val">
+                    <input type="number" id="dim-pill-width" min="30" max="600" value="160" onchange="updateDim('width',null,this.value);saveHistoryState();">
+                    <span>ס"מ</span>
+                </div>
+            </div>
+            <div class="dim-pill">
+                <label for="dim-pill-height">גובה</label>
+                <div class="dim-pill-val">
+                    <input type="number" id="dim-pill-height" min="40" max="320" value="240" onchange="updateDim('height',null,this.value);saveHistoryState();">
+                    <span>ס"מ</span>
+                </div>
+            </div>
+            <div class="dim-pill">
+                <label for="dim-pill-depth">עומק</label>
+                <div class="dim-pill-val">
+                    <input type="number" id="dim-pill-depth" min="10" max="80" value="54" onchange="updateDim('depth',null,this.value);saveHistoryState();">
+                    <span>ס"מ</span>
+                </div>
+            </div>
+            <div class="dim-pill">
+                <label for="dim-pill-plinth">צוקל</label>
+                <div class="dim-pill-val">
+                    <input type="number" id="dim-pill-plinth" min="0" max="30" step="0.1" value="8.8" onchange="window._setPlinthHeight(this.value)">
+                    <span>ס"מ</span>
+                </div>
             </div>
         </div>
         <!-- Wing position sub-menu (shown after selecting corner/walkin preset) -->
@@ -250,7 +282,7 @@
                     <option value="sandwich">סנדביץ' (עד 240 ס"מ)</option>
                 </select>
             </div>
-            <div class="control-group">
+            <div class="control-group cabinet-dim-slider">
                 <div class="label-row"><span>רוחב (ס"מ)</span><input type="number" id="inp-num-width" class="value-badge-input" value="160" min="30" max="600" onchange="updateDim('width',null,this.value);saveHistoryState()"></div>
                 <div class="slider-row">
                     <button class="slider-btn" onclick="updateDim('width', 1)"><i class="fa-solid fa-plus"></i></button>
@@ -258,7 +290,7 @@
                     <button class="slider-btn" onclick="updateDim('width', -1)"><i class="fa-solid fa-minus"></i></button>
                 </div>
             </div>
-            <div class="control-group">
+            <div class="control-group cabinet-dim-slider">
                 <div class="label-row"><span>גובה (ס"מ)</span><input type="number" id="inp-num-height" class="value-badge-input" value="240" min="40" max="320" onchange="updateDim('height',null,this.value);saveHistoryState()"></div>
                 <div class="slider-row">
                     <button class="slider-btn" onclick="updateDim('height', 1)"><i class="fa-solid fa-plus"></i></button>
@@ -266,7 +298,7 @@
                     <button class="slider-btn" onclick="updateDim('height', -1)"><i class="fa-solid fa-minus"></i></button>
                 </div>
             </div>
-            <div class="control-group">
+            <div class="control-group cabinet-dim-slider">
                 <div class="label-row"><span>עומק (ס"מ)</span><input type="number" id="inp-num-depth" class="value-badge-input" value="54" min="10" max="80" onchange="updateDim('depth',null,this.value);saveHistoryState()"></div>
                 <div class="slider-row">
                     <button class="slider-btn" onclick="updateDim('depth', 1)"><i class="fa-solid fa-plus"></i></button>
@@ -280,66 +312,6 @@
                     <button class="slider-btn" onclick="updateColumns(1)"><i class="fa-solid fa-plus"></i></button>
                     <input type="range" id="inp-columns" min="2" max="6" value="2" step="1">
                     <button class="slider-btn" onclick="updateColumns(-1)"><i class="fa-solid fa-minus"></i></button>
-                </div>
-            </div>
-            <!-- ===== NICHE TOGGLE ===== -->
-            <div id="niche-toggle-row" style="margin-top:10px;display:none;">
-                <input type="checkbox" id="inp-niche-enabled" onchange="window._setNicheEnabled(this.checked)" style="display:none;">
-                <button class="sidebar-toggle-btn" id="btn-niche-toggle" onclick="var c=document.getElementById('inp-niche-enabled');c.checked=!c.checked;c.dispatchEvent(new Event('change'));this.classList.toggle('active',c.checked);">
-                    <i class="fa-solid fa-border-all"></i> ארון בנישה
-                    <span class="toggle-pill"></span>
-                </button>
-                <div id="niche-controls" style="display:none;margin-top:4px;">
-                    <div class="control-group" style="margin-bottom:8px;">
-                        <div class="label-row"><span>רוחב נישה (ס"מ)</span><input type="number" id="inp-num-niche-width" class="value-badge-input" value="200" min="50" max="600" step="1" onchange="window._setNicheWidth(this.value)"></div>
-                        <div class="slider-row">
-                            <button class="slider-btn" onclick="window._setNicheWidth((parseFloat(document.getElementById('inp-num-niche-width').value)||200)+5)"><i class="fa-solid fa-plus"></i></button>
-                            <input type="range" id="inp-niche-width" min="50" max="600" value="200" step="1" oninput="window._setNicheWidth(this.value)">
-                            <button class="slider-btn" onclick="window._setNicheWidth((parseFloat(document.getElementById('inp-num-niche-width').value)||200)-5)"><i class="fa-solid fa-minus"></i></button>
-                        </div>
-                    </div>
-                    <div class="control-group" style="margin-bottom:8px;">
-                        <div class="label-row"><span>עומק נישה (ס"מ)</span><input type="number" id="inp-num-niche-depth" class="value-badge-input" value="30" min="10" max="200" step="1" onchange="window._setNicheDepth(this.value)"></div>
-                        <div class="slider-row">
-                            <button class="slider-btn" onclick="window._setNicheDepth((parseFloat(document.getElementById('inp-num-niche-depth').value)||30)+5)"><i class="fa-solid fa-plus"></i></button>
-                            <input type="range" id="inp-niche-depth" min="10" max="200" value="30" step="1" oninput="window._setNicheDepth(this.value)">
-                            <button class="slider-btn" onclick="window._setNicheDepth((parseFloat(document.getElementById('inp-num-niche-depth').value)||30)-5)"><i class="fa-solid fa-minus"></i></button>
-                        </div>
-                    </div>
-                    <!-- Niche closure toggle + sliders -->
-                    <div id="niche-closure-row" style="display:none;padding-top:4px;border-top:1px solid var(--border);margin-top:4px;">
-                        <input type="checkbox" id="inp-niche-closure-enabled" onchange="window._setNicheClosureEnabled(this.checked)" style="display:none;">
-                        <button class="sidebar-toggle-btn sidebar-toggle-btn--sm" id="btn-niche-closure-toggle" onclick="var c=document.getElementById('inp-niche-closure-enabled');c.checked=!c.checked;c.dispatchEvent(new Event('change'));this.classList.toggle('active',c.checked);">
-                            <i class="fa-solid fa-table-columns"></i> סגירות בנישה
-                            <span class="toggle-pill"></span>
-                        </button>
-                        <div id="niche-closure-sliders" style="display:none;margin-top:4px;">
-                            <div class="control-group" style="margin-bottom:8px;">
-                                <div class="label-row"><span>סגירה שמאל (ס"מ)</span><input type="number" id="inp-num-niche-closure-left" class="value-badge-input" value="1.8" min="1.8" max="30" step="0.1" onchange="window._setNicheClosureWidthLeft(this.value)"></div>
-                                <div class="slider-row">
-                                    <button class="slider-btn" onclick="window._setNicheClosureWidthLeft((parseFloat(document.getElementById('inp-num-niche-closure-left').value)||1.8)+0.5)"><i class="fa-solid fa-plus"></i></button>
-                                    <input type="range" id="inp-niche-closure-left" min="1.8" max="30" value="1.8" step="0.1" oninput="window._setNicheClosureWidthLeft(this.value)">
-                                    <button class="slider-btn" onclick="window._setNicheClosureWidthLeft((parseFloat(document.getElementById('inp-num-niche-closure-left').value)||1.8)-0.5)"><i class="fa-solid fa-minus"></i></button>
-                                </div>
-                            </div>
-                            <div class="control-group" style="margin-bottom:8px;">
-                                <div class="label-row"><span>סגירה ימין (ס"מ)</span><input type="number" id="inp-num-niche-closure-right" class="value-badge-input" value="1.8" min="1.8" max="30" step="0.1" onchange="window._setNicheClosureWidthRight(this.value)"></div>
-                                <div class="slider-row">
-                                    <button class="slider-btn" onclick="window._setNicheClosureWidthRight((parseFloat(document.getElementById('inp-num-niche-closure-right').value)||1.8)+0.5)"><i class="fa-solid fa-plus"></i></button>
-                                    <input type="range" id="inp-niche-closure-right" min="1.8" max="30" value="1.8" step="0.1" oninput="window._setNicheClosureWidthRight(this.value)">
-                                    <button class="slider-btn" onclick="window._setNicheClosureWidthRight((parseFloat(document.getElementById('inp-num-niche-closure-right').value)||1.8)-0.5)"><i class="fa-solid fa-minus"></i></button>
-                                </div>
-                            </div>
-                            <div class="control-group" style="margin-bottom:0;">
-                                <div class="label-row"><span>סגירה עליונה (ס"מ)</span><input type="number" id="inp-num-niche-closure-ceil" class="value-badge-input" value="1.8" min="1.8" max="30" step="0.1" onchange="window._setNicheClosureCeilHeight(this.value)"></div>
-                                <div class="slider-row">
-                                    <button class="slider-btn" onclick="window._setNicheClosureCeilHeight((parseFloat(document.getElementById('inp-num-niche-closure-ceil').value)||1.8)+0.5)"><i class="fa-solid fa-plus"></i></button>
-                                    <input type="range" id="inp-niche-closure-ceil" min="1.8" max="30" value="1.8" step="0.1" oninput="window._setNicheClosureCeilHeight(this.value)">
-                                    <button class="slider-btn" onclick="window._setNicheClosureCeilHeight((parseFloat(document.getElementById('inp-num-niche-closure-ceil').value)||1.8)-0.5)"><i class="fa-solid fa-minus"></i></button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
             <div id="wing-position-row" style="display:none;margin-top:10px;">
@@ -376,59 +348,6 @@
                     </button>
                 </div>
             </div>
-
-            <!-- Closure controls: shown when position ≠ center -->
-            <div id="closure-controls" style="display:none;">
-                <div style="font-size:0.8rem;font-weight:600;color:var(--text-dark);margin-bottom:8px;padding:5px 0;border-bottom:1px solid var(--border);">סגירות</div>
-
-                <!-- Show/hide panels toggle -->
-                <input type="checkbox" id="inp-closure-enabled" checked onchange="window._setClosureEnabled(this.checked)" style="display:none;">
-                <button class="sidebar-toggle-btn active" id="btn-closure-toggle" style="margin-bottom:10px;" onclick="var c=document.getElementById('inp-closure-enabled');c.checked=!c.checked;c.dispatchEvent(new Event('change'));this.classList.toggle('active',c.checked);">
-                    <i class="fa-solid fa-border-none"></i> לוחות סגירה
-                    <span class="toggle-pill"></span>
-                </button>
-
-                <div id="closure-sliders-wrap">
-                    <!-- Left side closure (shown for 'left' and 'both') -->
-                    <div id="closure-width-row" class="control-group" style="margin-bottom:8px;display:none;">
-                        <div class="label-row"><span>סגירה שמאל (ס"מ)</span><input type="number" id="inp-num-closure-width" class="value-badge-input" value="1.8" min="1.8" max="30" step="0.1" onchange="window._setClosureWidth(this.value)"></div>
-                        <div class="slider-row">
-                            <button class="slider-btn" onclick="window._setClosureWidth((parseFloat(document.getElementById('inp-num-closure-width').value)||1.8)+0.5)"><i class="fa-solid fa-plus"></i></button>
-                            <input type="range" id="inp-closure-width" min="1.8" max="30" value="1.8" step="0.1" oninput="window._setClosureWidth(this.value)">
-                            <button class="slider-btn" onclick="window._setClosureWidth((parseFloat(document.getElementById('inp-num-closure-width').value)||1.8)-0.5)"><i class="fa-solid fa-minus"></i></button>
-                        </div>
-                    </div>
-                    <!-- Right side closure (shown for 'right' and 'both') -->
-                    <div id="closure-width-right-row" class="control-group" style="margin-bottom:8px;display:none;">
-                        <div class="label-row"><span>סגירה ימין (ס"מ)</span><input type="number" id="inp-num-closure-width-right" class="value-badge-input" value="1.8" min="1.8" max="30" step="0.1" onchange="window._setClosureWidthRight(this.value)"></div>
-                        <div class="slider-row">
-                            <button class="slider-btn" onclick="window._setClosureWidthRight((parseFloat(document.getElementById('inp-num-closure-width-right').value)||1.8)+0.5)"><i class="fa-solid fa-plus"></i></button>
-                            <input type="range" id="inp-closure-width-right" min="1.8" max="30" value="1.8" step="0.1" oninput="window._setClosureWidthRight(this.value)">
-                            <button class="slider-btn" onclick="window._setClosureWidthRight((parseFloat(document.getElementById('inp-num-closure-width-right').value)||1.8)-0.5)"><i class="fa-solid fa-minus"></i></button>
-                        </div>
-                    </div>
-                    <!-- Ceiling closure -->
-                    <div id="closure-ceil-row" class="control-group" style="margin-bottom:8px;display:none;">
-                        <div class="label-row"><span>סגירה עליונה (ס"מ)</span><input type="number" id="inp-num-closure-ceil" class="value-badge-input" value="1.8" min="1.8" max="30" step="0.1" onchange="window._setClosureCeilWidth(this.value)"></div>
-                        <div class="slider-row">
-                            <button class="slider-btn" onclick="window._setClosureCeilWidth((parseFloat(document.getElementById('inp-num-closure-ceil').value)||1.8)+0.5)"><i class="fa-solid fa-plus"></i></button>
-                            <input type="range" id="inp-closure-ceil" min="1.8" max="30" value="1.8" step="0.1" oninput="window._setClosureCeilWidth(this.value)">
-                            <button class="slider-btn" onclick="window._setClosureCeilWidth((parseFloat(document.getElementById('inp-num-closure-ceil').value)||1.8)-0.5)"><i class="fa-solid fa-minus"></i></button>
-                        </div>
-                    </div>
-                    <!-- Front-line toggle: קו ארון / קו דלתות -->
-                    <div id="closure-frontline-row" style="display:none;margin-bottom:8px;">
-                        <div class="label-row" style="margin-bottom:5px;">
-                            <span style="font-size:0.82rem;font-weight:600;color:var(--text-dark);">קו חזית</span>
-                            <span title="קו ארון: לוח הסגירה מיושר עם חזית הארון&#10;קו דלתות: לוח הסגירה מיושר עם חזית הדלתות (בולט 1.7 ס&quot;מ קדימה)" style="cursor:help;color:var(--text-light);font-size:0.78rem;margin-right:4px;">&#9432;</span>
-                        </div>
-                        <div style="display:flex;gap:6px;">
-                            <button id="closure-fl-cabinet" onclick="window._setClosureFrontLine('cabinet')" style="flex:1;font-size:0.78rem;font-weight:600;padding:6px 4px;border-radius:7px;border:1.5px solid var(--border);background:var(--accent);color:white;cursor:pointer;transition:all 0.15s;font-family:inherit;">קו ארון</button>
-                            <button id="closure-fl-door"    onclick="window._setClosureFrontLine('door')"    style="flex:1;font-size:0.78rem;font-weight:600;padding:6px 4px;border-radius:7px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);cursor:pointer;transition:all 0.15s;font-family:inherit;">קו דלתות</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
 
         <!-- ===== ROOM SETTINGS SECTION ===== -->
@@ -460,26 +379,136 @@
             </div>
         </div>
 
-        <!-- ===== UPPER UNIT SECTION ===== -->
-        <div class="section" id="upper-unit-section" style="display:none;">
-            <div class="section-title"><i class="fa-solid fa-layer-group"></i> יחידה עליונה</div>
-            <input type="checkbox" id="inp-upper-unit-enabled" onchange="toggleUpperUnit()" style="display:none;">
-            <button class="sidebar-toggle-btn" id="btn-upper-unit-toggle" style="margin-bottom:10px;" onclick="var c=document.getElementById('inp-upper-unit-enabled');c.checked=!c.checked;c.dispatchEvent(new Event('change'));this.classList.toggle('active',c.checked);">
-                <i class="fa-solid fa-layer-group"></i> הוסף יחידה עליונה
-                <span class="toggle-pill"></span>
-            </button>
-            <div id="upper-unit-controls" style="display:none;">
-                <div class="control-group" style="margin-bottom:10px;">
-                    <div class="label-row"><span>מרחק מהארון (ס"מ)</span><input type="number" id="inp-num-upper-gap" class="value-badge-input" value="60" min="0" max="200" onchange="setUpperUnitGap(this.value)"></div>
-                    <div class="slider-row">
-                        <button class="slider-btn" onclick="updateUpperUnitGap(1)"><i class="fa-solid fa-plus"></i></button>
-                        <input type="range" id="inp-upper-gap" min="0" max="200" value="60" step="1" oninput="setUpperUnitGap(this.value)">
-                        <button class="slider-btn" onclick="updateUpperUnitGap(-1)"><i class="fa-solid fa-minus"></i></button>
+        <!-- ===== UNITS & CONTENT SECTION ===== -->
+        <div class="section" id="units-content-section" style="display:none;">
+            <div class="section-title"><i class="fa-solid fa-layer-group"></i> יחידות ותכולה</div>
+
+            <div class="toggle-wrap" id="wrap-upper-unit">
+                <input type="checkbox" id="inp-upper-unit-enabled" onchange="toggleUpperUnit()" style="display:none;">
+                <button class="sidebar-toggle-btn" id="btn-upper-unit-toggle" onclick="var c=document.getElementById('inp-upper-unit-enabled');c.checked=!c.checked;c.dispatchEvent(new Event('change'));this.classList.toggle('active',c.checked);">
+                    <i class="fa-solid fa-layer-group"></i>
+                    <span class="toggle-label">יחידה עליונה</span>
+                    <span class="toggle-pill"></span>
+                </button>
+                <div class="toggle-submenu" id="upper-unit-controls">
+                    <div class="control-group" style="margin-bottom:10px;">
+                        <div class="label-row"><span>מרחק מהארון (ס"מ)</span><input type="number" id="inp-num-upper-gap" class="value-badge-input" value="60" min="0" max="200" onchange="setUpperUnitGap(this.value)"></div>
+                        <div class="slider-row">
+                            <button class="slider-btn" onclick="updateUpperUnitGap(1)"><i class="fa-solid fa-plus"></i></button>
+                            <input type="range" id="inp-upper-gap" min="0" max="200" value="60" step="1" oninput="setUpperUnitGap(this.value)">
+                            <button class="slider-btn" onclick="updateUpperUnitGap(-1)"><i class="fa-solid fa-minus"></i></button>
+                        </div>
+                    </div>
+                    <button id="btn-edit-upper-unit" onclick="window._enterUpperUnitEdit()" style="width:100%;padding:9px 12px;border-radius:9px;border:1.5px solid var(--accent);background:linear-gradient(135deg,#f0f9ff,#e0f0ff);color:var(--accent);font-size:0.88rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all 0.18s;">
+                        <i class="fa-solid fa-pen-to-square"></i> ערוך יחידה עליונה
+                    </button>
+                </div>
+            </div>
+
+            <div class="toggle-wrap" id="wrap-closure" style="display:none;">
+                <input type="checkbox" id="inp-closure-enabled" checked onchange="window._setClosureEnabled(this.checked)" style="display:none;">
+                <button class="sidebar-toggle-btn active" id="btn-closure-toggle" onclick="var c=document.getElementById('inp-closure-enabled');c.checked=!c.checked;c.dispatchEvent(new Event('change'));this.classList.toggle('active',c.checked);">
+                    <i class="fa-solid fa-border-none"></i>
+                    <span class="toggle-label">לוחות סגירה</span>
+                    <span class="toggle-pill"></span>
+                </button>
+                <div class="toggle-submenu" id="closure-sliders-wrap">
+                    <div id="closure-width-row" class="control-group" style="margin-bottom:8px;display:none;">
+                        <div class="label-row"><span>סגירה שמאל (ס"מ)</span><input type="number" id="inp-num-closure-width" class="value-badge-input" value="1.8" min="1.8" max="30" step="0.1" onchange="window._setClosureWidth(this.value)"></div>
+                        <div class="slider-row">
+                            <button class="slider-btn" onclick="window._setClosureWidth((parseFloat(document.getElementById('inp-num-closure-width').value)||1.8)+0.5)"><i class="fa-solid fa-plus"></i></button>
+                            <input type="range" id="inp-closure-width" min="1.8" max="30" value="1.8" step="0.1" oninput="window._setClosureWidth(this.value)">
+                            <button class="slider-btn" onclick="window._setClosureWidth((parseFloat(document.getElementById('inp-num-closure-width').value)||1.8)-0.5)"><i class="fa-solid fa-minus"></i></button>
+                        </div>
+                    </div>
+                    <div id="closure-width-right-row" class="control-group" style="margin-bottom:8px;display:none;">
+                        <div class="label-row"><span>סגירה ימין (ס"מ)</span><input type="number" id="inp-num-closure-width-right" class="value-badge-input" value="1.8" min="1.8" max="30" step="0.1" onchange="window._setClosureWidthRight(this.value)"></div>
+                        <div class="slider-row">
+                            <button class="slider-btn" onclick="window._setClosureWidthRight((parseFloat(document.getElementById('inp-num-closure-width-right').value)||1.8)+0.5)"><i class="fa-solid fa-plus"></i></button>
+                            <input type="range" id="inp-closure-width-right" min="1.8" max="30" value="1.8" step="0.1" oninput="window._setClosureWidthRight(this.value)">
+                            <button class="slider-btn" onclick="window._setClosureWidthRight((parseFloat(document.getElementById('inp-num-closure-width-right').value)||1.8)-0.5)"><i class="fa-solid fa-minus"></i></button>
+                        </div>
+                    </div>
+                    <div id="closure-ceil-row" class="control-group" style="margin-bottom:8px;display:none;">
+                        <div class="label-row"><span>סגירה עליונה (ס"מ)</span><input type="number" id="inp-num-closure-ceil" class="value-badge-input" value="1.8" min="1.8" max="30" step="0.1" onchange="window._setClosureCeilWidth(this.value)"></div>
+                        <div class="slider-row">
+                            <button class="slider-btn" onclick="window._setClosureCeilWidth((parseFloat(document.getElementById('inp-num-closure-ceil').value)||1.8)+0.5)"><i class="fa-solid fa-plus"></i></button>
+                            <input type="range" id="inp-closure-ceil" min="1.8" max="30" value="1.8" step="0.1" oninput="window._setClosureCeilWidth(this.value)">
+                            <button class="slider-btn" onclick="window._setClosureCeilWidth((parseFloat(document.getElementById('inp-num-closure-ceil').value)||1.8)-0.5)"><i class="fa-solid fa-minus"></i></button>
+                        </div>
+                    </div>
+                    <div id="closure-frontline-row" style="display:none;margin-bottom:8px;">
+                        <div class="label-row" style="margin-bottom:5px;">
+                            <span style="font-size:0.82rem;font-weight:600;color:var(--text-dark);">קו חזית</span>
+                            <span title="קו ארון: לוח הסגירה מיושר עם חזית הארון&#10;קו דלתות: לוח הסגירה מיושר עם חזית הדלתות (בולט 1.7 ס&quot;מ קדימה)" style="cursor:help;color:var(--text-light);font-size:0.78rem;margin-right:4px;">&#9432;</span>
+                        </div>
+                        <div style="display:flex;gap:6px;">
+                            <button id="closure-fl-cabinet" onclick="window._setClosureFrontLine('cabinet')" style="flex:1;font-size:0.78rem;font-weight:600;padding:6px 4px;border-radius:7px;border:1.5px solid var(--border);background:var(--accent);color:white;cursor:pointer;transition:all 0.15s;font-family:inherit;">קו ארון</button>
+                            <button id="closure-fl-door" onclick="window._setClosureFrontLine('door')" style="flex:1;font-size:0.78rem;font-weight:600;padding:6px 4px;border-radius:7px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);cursor:pointer;transition:all 0.15s;font-family:inherit;">קו דלתות</button>
+                        </div>
                     </div>
                 </div>
-                <button id="btn-edit-upper-unit" onclick="window._enterUpperUnitEdit()" style="width:100%;padding:9px 12px;border-radius:9px;border:1.5px solid var(--accent);background:linear-gradient(135deg,#f0f9ff,#e0f0ff);color:var(--accent);font-size:0.88rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all 0.18s;">
-                    <i class="fa-solid fa-pen-to-square"></i> ערוך יחידה עליונה
+            </div>
+
+            <div class="toggle-wrap" id="wrap-niche" style="display:none;">
+                <input type="checkbox" id="inp-niche-enabled" onchange="window._setNicheEnabled(this.checked)" style="display:none;">
+                <button class="sidebar-toggle-btn" id="btn-niche-toggle" onclick="var c=document.getElementById('inp-niche-enabled');c.checked=!c.checked;c.dispatchEvent(new Event('change'));this.classList.toggle('active',c.checked);">
+                    <i class="fa-solid fa-border-all"></i>
+                    <span class="toggle-label">ארון בנישה</span>
+                    <span class="toggle-pill"></span>
                 </button>
+                <div class="toggle-submenu" id="niche-controls">
+                    <div class="control-group" style="margin-bottom:8px;">
+                        <div class="label-row"><span>רוחב נישה (ס"מ)</span><input type="number" id="inp-num-niche-width" class="value-badge-input" value="200" min="50" max="600" step="1" onchange="window._setNicheWidth(this.value)"></div>
+                        <div class="slider-row">
+                            <button class="slider-btn" onclick="window._setNicheWidth((parseFloat(document.getElementById('inp-num-niche-width').value)||200)+5)"><i class="fa-solid fa-plus"></i></button>
+                            <input type="range" id="inp-niche-width" min="50" max="600" value="200" step="1" oninput="window._setNicheWidth(this.value)">
+                            <button class="slider-btn" onclick="window._setNicheWidth((parseFloat(document.getElementById('inp-num-niche-width').value)||200)-5)"><i class="fa-solid fa-minus"></i></button>
+                        </div>
+                    </div>
+                    <div class="control-group" style="margin-bottom:8px;">
+                        <div class="label-row"><span>עומק נישה (ס"מ)</span><input type="number" id="inp-num-niche-depth" class="value-badge-input" value="30" min="10" max="200" step="1" onchange="window._setNicheDepth(this.value)"></div>
+                        <div class="slider-row">
+                            <button class="slider-btn" onclick="window._setNicheDepth((parseFloat(document.getElementById('inp-num-niche-depth').value)||30)+5)"><i class="fa-solid fa-plus"></i></button>
+                            <input type="range" id="inp-niche-depth" min="10" max="200" value="30" step="1" oninput="window._setNicheDepth(this.value)">
+                            <button class="slider-btn" onclick="window._setNicheDepth((parseFloat(document.getElementById('inp-num-niche-depth').value)||30)-5)"><i class="fa-solid fa-minus"></i></button>
+                        </div>
+                    </div>
+                    <div id="niche-closure-row" style="display:none;padding-top:4px;border-top:1px solid var(--border);margin-top:4px;">
+                        <input type="checkbox" id="inp-niche-closure-enabled" onchange="window._setNicheClosureEnabled(this.checked)" style="display:none;">
+                        <button class="sidebar-toggle-btn sidebar-toggle-btn--sm" id="btn-niche-closure-toggle" onclick="var c=document.getElementById('inp-niche-closure-enabled');c.checked=!c.checked;c.dispatchEvent(new Event('change'));this.classList.toggle('active',c.checked);">
+                            <i class="fa-solid fa-table-columns"></i>
+                            <span class="toggle-label">סגירות בנישה</span>
+                            <span class="toggle-pill"></span>
+                        </button>
+                        <div id="niche-closure-sliders" style="display:none;margin-top:4px;">
+                            <div class="control-group" style="margin-bottom:8px;">
+                                <div class="label-row"><span>סגירה שמאל (ס"מ)</span><input type="number" id="inp-num-niche-closure-left" class="value-badge-input" value="1.8" min="1.8" max="30" step="0.1" onchange="window._setNicheClosureWidthLeft(this.value)"></div>
+                                <div class="slider-row">
+                                    <button class="slider-btn" onclick="window._setNicheClosureWidthLeft((parseFloat(document.getElementById('inp-num-niche-closure-left').value)||1.8)+0.5)"><i class="fa-solid fa-plus"></i></button>
+                                    <input type="range" id="inp-niche-closure-left" min="1.8" max="30" value="1.8" step="0.1" oninput="window._setNicheClosureWidthLeft(this.value)">
+                                    <button class="slider-btn" onclick="window._setNicheClosureWidthLeft((parseFloat(document.getElementById('inp-num-niche-closure-left').value)||1.8)-0.5)"><i class="fa-solid fa-minus"></i></button>
+                                </div>
+                            </div>
+                            <div class="control-group" style="margin-bottom:8px;">
+                                <div class="label-row"><span>סגירה ימין (ס"מ)</span><input type="number" id="inp-num-niche-closure-right" class="value-badge-input" value="1.8" min="1.8" max="30" step="0.1" onchange="window._setNicheClosureWidthRight(this.value)"></div>
+                                <div class="slider-row">
+                                    <button class="slider-btn" onclick="window._setNicheClosureWidthRight((parseFloat(document.getElementById('inp-num-niche-closure-right').value)||1.8)+0.5)"><i class="fa-solid fa-plus"></i></button>
+                                    <input type="range" id="inp-niche-closure-right" min="1.8" max="30" value="1.8" step="0.1" oninput="window._setNicheClosureWidthRight(this.value)">
+                                    <button class="slider-btn" onclick="window._setNicheClosureWidthRight((parseFloat(document.getElementById('inp-num-niche-closure-right').value)||1.8)-0.5)"><i class="fa-solid fa-minus"></i></button>
+                                </div>
+                            </div>
+                            <div class="control-group" style="margin-bottom:0;">
+                                <div class="label-row"><span>סגירה עליונה (ס"מ)</span><input type="number" id="inp-num-niche-closure-ceil" class="value-badge-input" value="1.8" min="1.8" max="30" step="0.1" onchange="window._setNicheClosureCeilHeight(this.value)"></div>
+                                <div class="slider-row">
+                                    <button class="slider-btn" onclick="window._setNicheClosureCeilHeight((parseFloat(document.getElementById('inp-num-niche-closure-ceil').value)||1.8)+0.5)"><i class="fa-solid fa-plus"></i></button>
+                                    <input type="range" id="inp-niche-closure-ceil" min="1.8" max="30" value="1.8" step="0.1" oninput="window._setNicheClosureCeilHeight(this.value)">
+                                    <button class="slider-btn" onclick="window._setNicheClosureCeilHeight((parseFloat(document.getElementById('inp-num-niche-closure-ceil').value)||1.8)-0.5)"><i class="fa-solid fa-minus"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -863,18 +892,22 @@
 
         <!-- Price section: always visible (outside sidebar-edit-content) -->
         <div class="price-section sticky-price" id="price-section-wrap" style="flex-direction:column; gap:8px; align-items:stretch;">
-            <div id="price-boxes-row" style="display:none; gap:8px; align-items:center;">
-                <div class="price-box" style="flex:1;">
-                    <span class="price-label">מחיר:</span>
-                    <span style="font-size: 1.3rem; color: var(--primary); font-weight: 800;">₪</span>
-                    <input type="number" id="price-display" class="price-amount" value="0" style="background: transparent; border: none; outline: none; width: 70px; text-align: center; padding: 0; margin: 0; font-size:1.3rem; font-weight:800; color:var(--primary);">
-                    <button id="btn-reset-price" style="display:none; background:none; border:none; color:var(--secondary); cursor:pointer; font-size:0.78rem; padding:2px 4px; border-radius:4px; font-weight:bold;" title="מחיר אוטומטי"><i class="fa-solid fa-rotate-right"></i></button>
+            <div id="price-boxes-row" class="price-row" style="display:none;">
+                <div class="price-box">
+                    <label class="price-label">מחיר</label>
+                    <div class="price-val-row">
+                        <span class="price-currency">₪</span>
+                        <input type="number" id="price-display" class="price-amount" value="0">
+                        <button id="btn-reset-price" style="display:none; background:none; border:none; color:var(--secondary); cursor:pointer; font-size:0.78rem; padding:2px 4px; border-radius:4px; font-weight:bold;" title="מחיר אוטומטי"><i class="fa-solid fa-rotate-right"></i></button>
+                    </div>
                 </div>
-                <div class="price-box" style="flex:1;">
-                    <span class="price-label">התקנה:</span>
-                    <span style="font-size: 1.3rem; color: var(--primary); font-weight: 800;">₪</span>
-                    <input type="number" id="install-price-display" class="price-amount" value="0" style="background: transparent; border: none; outline: none; width: 70px; text-align: center; padding: 0; margin: 0; font-size:1.3rem; font-weight:800; color:var(--primary);">
-                    <button id="btn-reset-install-price" style="display:none; background:none; border:none; color:var(--secondary); cursor:pointer; font-size:0.78rem; padding:2px 4px; border-radius:4px; font-weight:bold;" title="עלות התקנה אוטומטית"><i class="fa-solid fa-rotate-right"></i></button>
+                <div class="price-box">
+                    <label class="price-label">התקנה</label>
+                    <div class="price-val-row">
+                        <span class="price-currency">₪</span>
+                        <input type="number" id="install-price-display" class="price-amount" value="0">
+                        <button id="btn-reset-install-price" style="display:none; background:none; border:none; color:var(--secondary); cursor:pointer; font-size:0.78rem; padding:2px 4px; border-radius:4px; font-weight:bold;" title="עלות התקנה אוטומטית"><i class="fa-solid fa-rotate-right"></i></button>
+                    </div>
                 </div>
             </div>
             <button id="btn-add-to-cart" class="btn-add-cart" style="width:100%;"><i class="fa-solid fa-plus"></i> הוסף להזמנה</button>
