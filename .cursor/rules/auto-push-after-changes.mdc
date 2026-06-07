@@ -1,0 +1,19 @@
+---
+description: Automatically commit and push to remote after every code change
+alwaysApply: true
+---
+
+# Auto commit & push
+
+After completing any code change in this project:
+
+1. Run `git status` and `git diff` to verify what changed.
+2. If there are meaningful changes, stage only relevant files (never `.env`, credentials, or `api.txt` unless explicitly requested).
+3. Create a concise commit message describing the why.
+4. Push to `origin` on the current branch immediately — do not wait for the user to ask.
+5. Report the commit hash and confirm push succeeded.
+
+Skip commit/push only when:
+- The user explicitly says not to push or commit.
+- There are no file changes.
+- The task was question-only with no edits.
