@@ -1546,25 +1546,218 @@ window.applyUpperUnitMaterial = function(matKey) {
 // ==========================================
 // History
 // ==========================================
-function saveHistoryState() {
-    if (state.isRestoring) return;
-    if (state.historyIndex < state.history.length - 1) {
-        state.history = state.history.slice(0, state.historyIndex + 1);
+const MAX_HISTORY = 20;
+
+const _COMP_TYPE_LABELS = {
+    empty: 'ריק',
+    hanging: 'תלייה',
+    internal_drawers: 'מגירות פנימיות',
+    external_drawers: 'מגירות חיצוניות',
+    open_cell: 'תא פתוח',
+    side_open_cell: 'תא פתוח צד',
+    honeycomb: 'כוורת',
+    partition: 'מחיצה',
+    flap: 'דלת קיפ',
+    sliding: 'דלת הזזה',
+    door: 'דלת'
+};
+
+function _historyWingSnap(snap, wingKey) {
+    if (!snap || !snap.wings) return null;
+    return snap.wings[wingKey || snap.activeWing || 'center'] || snap.wings.center || null;
+}
+
+function _computeHistoryLabel(prevSnap, nextSnap) {
+    if (!prevSnap) return 'מצב התחלתי';
+
+    const pw = _historyWingSnap(prevSnap, 'center');
+    const nw = _historyWingSnap(nextSnap, 'center');
+
+    if (pw && nw) {
+        if (Math.round(pw.width || 0) !== Math.round(nw.width || 0)) {
+            return 'שינוי רוחב ל-' + Math.round(nw.width) + ' ס"מ';
+        }
+        if (Math.round(pw.globalHeight || 0) !== Math.round(nw.globalHeight || 0)) {
+            return 'שינוי גובה ל-' + Math.round(nw.globalHeight) + ' ס"מ';
+        }
+        if (Math.round(pw.depth || 0) !== Math.round(nw.depth || 0)) {
+            return 'שינוי עומק ל-' + Math.round(nw.depth) + ' ס"מ';
+        }
+        if ((pw.columns || []).length !== (nw.columns || []).length) {
+            return 'שינוי ל-' + (nw.columns || []).length + ' עמודות';
+        }
+        if (pw.hasDoors !== nw.hasDoors) return nw.hasDoors ? 'הצגת דלתות' : 'הסתרת דלתות';
+        if (pw.handleStyle !== nw.handleStyle) return 'שינוי סגנון ידית';
+        if (pw.boardMaterial !== nw.boardMaterial) return 'שינוי חומר לוח';
+        if (pw.materialBody !== nw.materialBody || pw.materialExternal !== nw.materialExternal) return 'שינוי חומר';
+        if (JSON.stringify(pw.desk || {}) !== JSON.stringify(nw.desk || {})) return 'שינוי שולחן';
+        if (JSON.stringify(pw.corner || {}) !== JSON.stringify(nw.corner || {})) return 'שינוי יחידה פינתית';
+        if (JSON.stringify(pw.sideCabinet || {}) !== JSON.stringify(nw.sideCabinet || {})) return 'שינוי ארון צד';
+
+        for (let ci = 0; ci < (nw.columns || []).length; ci++) {
+            const pc = (pw.columns || [])[ci];
+            const nc = nw.columns[ci];
+            if (!pc || !nc) continue;
+            if (pc.type !== nc.type) {
+                if (nc.type === 'desk') return 'הוספת שולחן פנימי';
+                return 'שינוי עמודה';
+            }
+            const ps = (pc.shelvesY || []).length;
+            const ns = (nc.shelvesY || []).length;
+            if (ps !== ns) return ns > ps ? 'הוספת מדף' : 'הסרת מדף';
+            for (let ri = 0; ri < (nc.compartments || []).length; ri++) {
+                const pComp = (pc.compartments || [])[ri];
+                const nComp = (nc.compartments || [])[ri];
+                if (pComp && nComp && pComp.type !== nComp.type) {
+                    return 'שינוי תא: ' + (_COMP_TYPE_LABELS[nComp.type] || nComp.type);
+                }
+            }
+        }
     }
-    
-    const snapshot = JSON.parse(JSON.stringify({
+
+    if (prevSnap.presetId !== nextSnap.presetId) return 'שינוי פריסה';
+    if (prevSnap.activeWing !== nextSnap.activeWing) return 'שינוי כנף פעילה';
+    if (JSON.stringify(prevSnap.partColors || {}) !== JSON.stringify(nextSnap.partColors || {})) return 'שינוי צבע';
+    if (!prevSnap.wings.left && nextSnap.wings.left) return 'הוספת כנף שמאל';
+    if (prevSnap.wings.left && !nextSnap.wings.left) return 'הסרת כנף שמאל';
+    if (!prevSnap.wings.right && nextSnap.wings.right) return 'הוספת כנף ימין';
+    if (prevSnap.wings.right && !nextSnap.wings.right) return 'הסרת כנף ימין';
+
+    return 'עריכה';
+}
+
+function _makeHistorySnapshot() {
+    return JSON.parse(JSON.stringify({
         activeWing: state.activeWing,
         presetId: state.presetId,
         wings: state.wings,
         partColors: state.partColors || {}
     }));
-    
-    state.history.push(snapshot);
-    if (state.history.length > 30) state.history.shift();
-    else state.historyIndex++;
-    updateUndoRedoUI();
-    // localStorage autosave disabled — all persistence is via Supabase database
 }
+
+function saveHistoryState(optionalLabel) {
+    if (state.isRestoring) return;
+    if (state.historyIndex < state.history.length - 1) {
+        state.history = state.history.slice(0, state.historyIndex + 1);
+    }
+
+    const prevSnap = state.historyIndex >= 0 ? state.history[state.historyIndex] : null;
+    const snapshot = _makeHistorySnapshot();
+    snapshot._historyLabel = optionalLabel || _computeHistoryLabel(prevSnap, snapshot);
+
+    state.history.push(snapshot);
+    if (state.history.length > MAX_HISTORY) state.history.shift();
+    state.historyIndex = state.history.length - 1;
+    updateUndoRedoUI();
+}
+
+window.saveHistoryState = saveHistoryState;
+
+function _updateHistoryPanelUI() {
+    const list = document.getElementById('history-list');
+    const countEl = document.getElementById('history-panel-count');
+    if (!list) return;
+
+    list.innerHTML = '';
+    if (!state.history.length) {
+        list.innerHTML = '<div class="history-empty">אין פעולות עדיין</div>';
+        if (countEl) countEl.textContent = '';
+        return;
+    }
+
+    if (countEl) {
+        countEl.textContent = (state.historyIndex + 1) + ' / ' + state.history.length;
+    }
+
+    state.history.forEach(function(snap, i) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'history-item' +
+            (i === state.historyIndex ? ' active' : '') +
+            (i > state.historyIndex ? ' future' : '');
+        btn.textContent = snap._historyLabel || ('פעולה ' + (i + 1));
+        btn.title = snap._historyLabel || '';
+        btn.onclick = function(ev) {
+            ev.stopPropagation();
+            window.jumpToHistory(i);
+        };
+        list.appendChild(btn);
+    });
+
+    const activeEl = list.querySelector('.history-item.active');
+    if (activeEl) activeEl.scrollIntoView({ block: 'nearest' });
+}
+
+function _positionHistoryPanel(anchorEl) {
+    const panel = document.getElementById('history-panel');
+    if (!panel || !anchorEl) return;
+    const r = anchorEl.getBoundingClientRect();
+    const panelW = 280;
+    let left = r.left + (r.width / 2) - (panelW / 2);
+    left = Math.max(8, Math.min(left, window.innerWidth - panelW - 8));
+    panel.style.top = (r.bottom + 8) + 'px';
+    panel.style.left = left + 'px';
+    panel.style.width = panelW + 'px';
+}
+
+function _historyOutsideClick(e) {
+    const panel = document.getElementById('history-panel');
+    if (!panel || !panel.classList.contains('open')) return;
+    const anchors = ['btn-history', 'mbtn-history', 'mbtn-history2'];
+    if (anchors.some(function(id) {
+        const el = document.getElementById(id);
+        return el && (el === e.target || el.contains(e.target));
+    })) return;
+    if (!panel.contains(e.target)) window.closeHistoryPanel();
+}
+
+window.toggleHistoryPanel = function(ev) {
+    if (ev && ev.stopPropagation) ev.stopPropagation();
+    const panel = document.getElementById('history-panel');
+    if (!panel) return;
+
+    if (panel.classList.contains('open')) {
+        window.closeHistoryPanel();
+        return;
+    }
+
+    _updateHistoryPanelUI();
+    const anchor = document.getElementById('btn-history') ||
+        document.getElementById('mbtn-history2') ||
+        document.getElementById('mbtn-history');
+    _positionHistoryPanel(anchor);
+    panel.classList.add('open');
+
+    ['btn-history', 'mbtn-history', 'mbtn-history2'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('active');
+    });
+
+    setTimeout(function() {
+        document.addEventListener('click', _historyOutsideClick, true);
+    }, 0);
+};
+
+window.closeHistoryPanel = function() {
+    const panel = document.getElementById('history-panel');
+    if (panel) panel.classList.remove('open');
+    document.removeEventListener('click', _historyOutsideClick, true);
+    ['btn-history', 'mbtn-history', 'mbtn-history2'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('active');
+    });
+};
+
+window.jumpToHistory = function(index) {
+    if (index < 0 || index >= state.history.length) return;
+    if (index === state.historyIndex) {
+        window.closeHistoryPanel();
+        return;
+    }
+    state.historyIndex = index;
+    restoreHistoryState();
+    window.closeHistoryPanel();
+};
 
 // No-op: localStorage autosave is disabled. Projects are saved to Supabase only.
 window._restoreFromLocalStorage = function() { return false; };
@@ -1973,7 +2166,10 @@ function updateUndoRedoUI() {
     const btnRedo = document.getElementById('btn-redo');
     if(btnUndo) btnUndo.disabled = state.historyIndex <= 0;
     if(btnRedo) btnRedo.disabled = state.historyIndex >= state.history.length - 1;
+    _updateHistoryPanelUI();
 }
+
+window.updateUndoRedoUI = updateUndoRedoUI;
 
 function getSplitThreshold() { return state.boardMaterial === 'sandwich' ? 240 : 270; }
 

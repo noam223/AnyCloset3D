@@ -187,6 +187,86 @@ body {
 .divider { width: 1px; height: 16px; background: var(--border); margin: 0 3px; opacity: 0.6; }
 .top-controls { display: flex; align-items: center; gap: 4px; }
 
+/* History panel (Photoshop-style) */
+.history-panel {
+    display: none;
+    position: fixed;
+    z-index: 10050;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 12px 40px rgba(15, 23, 42, 0.18);
+    overflow: hidden;
+    direction: rtl;
+}
+.history-panel.open { display: flex; flex-direction: column; }
+.history-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+}
+.history-panel-title {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.history-panel-count {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-light);
+}
+.history-list {
+    max-height: min(360px, 50vh);
+    overflow-y: auto;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.history-item {
+    width: 100%;
+    text-align: right;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-dark);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.history-item:hover { background: rgba(37, 99, 235, 0.08); }
+.history-item.active {
+    background: rgba(37, 99, 235, 0.14);
+    color: var(--primary);
+    font-weight: 700;
+    cursor: default;
+}
+.history-item.future { color: var(--text-light); }
+.history-empty {
+    padding: 16px 12px;
+    text-align: center;
+    font-size: 0.78rem;
+    color: var(--text-light);
+}
+#btn-history.active,
+#mbtn-history2.active {
+    color: var(--primary);
+    background: rgba(37, 99, 235, 0.1);
+}
+
 /* === סידור המסך מימין לשמאל === */
 #sidebar {
     width: var(--layout-sidebar-right);
