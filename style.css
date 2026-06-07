@@ -47,6 +47,12 @@
     --radius-lg:  20px;
     --radius-xl:  28px;
 
+    /* ── Desktop layout (sidebar widths) ── */
+    --layout-sidebar-left:  360px;
+    --layout-sidebar-right: 420px;
+    --layout-canvas-center: calc(var(--layout-sidebar-left) + (100vw - var(--layout-sidebar-left) - var(--layout-sidebar-right)) / 2);
+    --layout-canvas-width:  calc(100vw - var(--layout-sidebar-left) - var(--layout-sidebar-right));
+
     /* ── Spacing ── */
     --space-xs:   6px;
     --space-sm:   10px;
@@ -100,20 +106,23 @@ body {
 ::-webkit-scrollbar-thumb:hover { background: var(--accent-light); }
 
 #top-bar {
-    position: absolute;
+    position: fixed;
     top: 14px;
-    left: 50%;
+    left: var(--layout-canvas-center);
     transform: translateX(-50%);
     width: max-content;
+    max-width: calc(var(--layout-canvas-width) - 24px);
     background: rgba(255,255,255,0.92);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     padding: 5px 10px;
     border-radius: 50px;
     box-shadow: var(--shadow-md), 0 0 0 1px rgba(37,99,235,0.08);
-    display: flex; align-items: center; justify-content: center; gap: 2px; z-index: 20;
+    display: flex; align-items: center; justify-content: center; gap: 2px;
+    z-index: 100;
     border: 1px solid rgba(255,255,255,0.8);
     animation: fadeInUp 0.4s var(--transition-slow) both;
+    pointer-events: auto;
 }
 
 #top-bar .icon-btn { padding: 6px 12px; font-size: 1rem; }
@@ -174,7 +183,7 @@ body {
 
 /* === סידור המסך מימין לשמאל === */
 #sidebar {
-    width: 420px;
+    width: var(--layout-sidebar-right);
     background: var(--bg-sidebar);
     box-shadow: -1px 0 0 var(--border), -4px 0 24px rgba(28,25,23,0.06);
     z-index: 10; display: flex; flex-direction: column;
@@ -191,7 +200,7 @@ body {
 #canvas-container.front-mode:active { cursor: default; }
 
 #left-sidebar {
-    width: 360px; background: var(--bg-sidebar);
+    width: var(--layout-sidebar-left); background: var(--bg-sidebar);
     box-shadow: 2px 0 20px rgba(0,0,0,0.07), 1px 0 0 var(--border); z-index: 10;
     display: flex; flex-direction: column; border-right: 1px solid var(--border);
     order: 3;

@@ -36,7 +36,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260608b">
     <link rel="stylesheet" href="style-mobile.css?v=20260607b">
     <link rel="stylesheet" href="style-extras.css?v=20260607b">
-    <link rel="stylesheet" href="style.css?v=20260608b">
+    <link rel="stylesheet" href="style.css?v=20260608c">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -990,37 +990,38 @@
     </div>
 </div>
 
+<!-- ===== TOP BAR (Desktop — fixed over canvas center) ===== -->
+<div id="top-bar">
+    <button class="view-btn active" id="btn-front-view"><i class="fa-solid fa-pen-ruler"></i> עריכת חזית</button>
+    <button class="view-btn" id="btn-blueprint-view" style="display:none;"><i class="fa-solid fa-drafting-compass"></i> שרטוט ייצור</button>
+    <button class="view-btn" id="btn-multiview-blueprint" onclick="openMultiViewBlueprint()" style="display:none;"><i class="fa-solid fa-layer-group"></i> שרטוט ייצור</button>
+    <button class="view-btn" id="btn-3d-view" onclick="window._enterPresentationMode()"><i class="fa-solid fa-cube"></i> תצוגה חופשית</button>
+    <button class="view-btn icon-btn" id="btn-reset-view" title="איפוס זווית מצלמה" style="display:none;" onclick="window._orbitFree=false; const b=document.getElementById('btn-reset-view'); if(b) b.style.display='none'; updateCameraView();"><i class="fa-solid fa-arrows-rotate"></i></button>
+    <button class="view-btn icon-btn toggled-off" id="btn-toggle-room" title="הצג/הסתר חדר" onclick="window._toggleRoom()" style="color:#64748b;"><i class="fa-solid fa-house"></i></button>
+    <button class="view-btn icon-btn" id="btn-toggle-doors" title="הצג/הסתר חזיתות" onclick="(function(){var chk=document.getElementById('inp-has-doors');chk.checked=!chk.checked;chk.dispatchEvent(new Event('change'));document.getElementById('btn-toggle-doors').classList.toggle('toggled-off',!chk.checked);})()"><i class="fa-solid fa-door-closed"></i></button>
+    <!-- Room wall position selector — only shown for linear/sliding presets -->
+    <div id="room-wall-selector" style="display:none; align-items:center; gap:3px; margin:0 4px;" title="מיקום ארון בחדר">
+        <button id="btn-wall-left"   class="view-btn icon-btn" style="font-size:0.72rem;padding:4px 7px;" title="צמוד לקיר שמאל"  onclick="window._setRoomWall('left')">← שמאל</button>
+        <button id="btn-wall-center" class="view-btn icon-btn" style="font-size:0.72rem;padding:4px 7px;" title="מרכז"             onclick="window._setRoomWall('center')">מרכז</button>
+        <button id="btn-wall-right"  class="view-btn icon-btn" style="font-size:0.72rem;padding:4px 7px;" title="צמוד לקיר ימין"  onclick="window._setRoomWall('right')">ימין →</button>
+    </div>
+    <div class="divider"></div>
+    <div class="top-controls">
+        <button class="view-btn icon-btn" id="btn-undo" onclick="undo()" title="בטל פעולה אחרונה" disabled><i class="fa-solid fa-rotate-right"></i></button>
+        <button class="view-btn icon-btn" id="btn-redo" onclick="redo()" title="בצע שוב" disabled><i class="fa-solid fa-rotate-left"></i></button>
+        <button class="view-btn icon-btn text-danger" id="btn-reset" onclick="resetCurrentCabinet()" title="אפס ארון נוכחי לחלוטין"><i class="fa-solid fa-trash-arrow-up"></i></button>
+        <div class="divider"></div>
+        <button class="view-btn file-btn" id="btn-save-json"><i class="fa-solid fa-save"></i> שמור</button>
+        <button class="view-btn file-btn" id="btn-load-json" onclick="document.getElementById('inp-load-json').click()"><i class="fa-solid fa-folder-open"></i> טען</button>
+        <input type="file" id="inp-load-json" accept=".json" style="display:none;">
+        <div class="divider"></div>
+        <input type="checkbox" id="inp-has-doors" checked style="display:none;">
+        <button class="view-btn cart-btn" id="btn-open-cart" onclick="openOrderModal('customer')" style="display:none;"></button>
+    </div>
+</div>
+
 <!-- ===== CANVAS CONTAINER ===== -->
 <div id="canvas-container" class="front-mode">
-    <!-- Top bar — inside canvas so it stays centered over the workspace -->
-    <div id="top-bar">
-        <button class="view-btn active" id="btn-front-view"><i class="fa-solid fa-pen-ruler"></i> עריכת חזית</button>
-        <button class="view-btn" id="btn-blueprint-view" style="display:none;"><i class="fa-solid fa-drafting-compass"></i> שרטוט ייצור</button>
-        <button class="view-btn" id="btn-multiview-blueprint" onclick="openMultiViewBlueprint()" style="display:none;"><i class="fa-solid fa-layer-group"></i> שרטוט ייצור</button>
-        <button class="view-btn" id="btn-3d-view" onclick="window._enterPresentationMode()"><i class="fa-solid fa-cube"></i> תצוגה חופשית</button>
-        <button class="view-btn icon-btn" id="btn-reset-view" title="איפוס זווית מצלמה" style="display:none;" onclick="window._orbitFree=false; const b=document.getElementById('btn-reset-view'); if(b) b.style.display='none'; updateCameraView();"><i class="fa-solid fa-arrows-rotate"></i></button>
-        <button class="view-btn icon-btn toggled-off" id="btn-toggle-room" title="הצג/הסתר חדר" onclick="window._toggleRoom()" style="color:#64748b;"><i class="fa-solid fa-house"></i></button>
-        <button class="view-btn icon-btn" id="btn-toggle-doors" title="הצג/הסתר חזיתות" onclick="(function(){var chk=document.getElementById('inp-has-doors');chk.checked=!chk.checked;chk.dispatchEvent(new Event('change'));document.getElementById('btn-toggle-doors').classList.toggle('toggled-off',!chk.checked);})()"><i class="fa-solid fa-door-closed"></i></button>
-        <!-- Room wall position selector — only shown for linear/sliding presets -->
-        <div id="room-wall-selector" style="display:none; align-items:center; gap:3px; margin:0 4px;" title="מיקום ארון בחדר">
-            <button id="btn-wall-left"   class="view-btn icon-btn" style="font-size:0.72rem;padding:4px 7px;" title="צמוד לקיר שמאל"  onclick="window._setRoomWall('left')">← שמאל</button>
-            <button id="btn-wall-center" class="view-btn icon-btn" style="font-size:0.72rem;padding:4px 7px;" title="מרכז"             onclick="window._setRoomWall('center')">מרכז</button>
-            <button id="btn-wall-right"  class="view-btn icon-btn" style="font-size:0.72rem;padding:4px 7px;" title="צמוד לקיר ימין"  onclick="window._setRoomWall('right')">ימין →</button>
-        </div>
-        <div class="divider"></div>
-        <div class="top-controls">
-            <button class="view-btn icon-btn" id="btn-undo" onclick="undo()" title="בטל פעולה אחרונה" disabled><i class="fa-solid fa-rotate-right"></i></button>
-            <button class="view-btn icon-btn" id="btn-redo" onclick="redo()" title="בצע שוב" disabled><i class="fa-solid fa-rotate-left"></i></button>
-            <button class="view-btn icon-btn text-danger" id="btn-reset" onclick="resetCurrentCabinet()" title="אפס ארון נוכחי לחלוטין"><i class="fa-solid fa-trash-arrow-up"></i></button>
-            <div class="divider"></div>
-            <button class="view-btn file-btn" id="btn-save-json"><i class="fa-solid fa-save"></i> שמור</button>
-            <button class="view-btn file-btn" id="btn-load-json" onclick="document.getElementById('inp-load-json').click()"><i class="fa-solid fa-folder-open"></i> טען</button>
-            <input type="file" id="inp-load-json" accept=".json" style="display:none;">
-            <div class="divider"></div>
-            <input type="checkbox" id="inp-has-doors" checked style="display:none;">
-            <button class="view-btn cart-btn" id="btn-open-cart" onclick="openOrderModal('customer')" style="display:none;"></button>
-        </div>
-    </div>
     <div id="dimensions-layer"></div>
     <div id="buttons-layer"></div>
     <div id="drag-handles-layer"></div>

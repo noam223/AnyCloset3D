@@ -85,15 +85,17 @@ body {
 ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
 #top-bar {
-    position: absolute;
+    position: fixed;
     top: 15px;
-    left: 50%;
+    left: var(--layout-canvas-center, calc(360px + (100vw - 780px) / 2));
     transform: translateX(-50%);
     width: max-content;
+    max-width: calc(100vw - 360px - 420px - 24px);
     background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px);
     padding: 5px 8px; border-radius: 40px;
     box-shadow: var(--shadow-md);
-    display: flex; align-items: center; justify-content: center; gap: 3px; z-index: 20;
+    display: flex; align-items: center; justify-content: center; gap: 3px;
+    z-index: 100;
     border: 1px solid rgba(255,255,255,0.7);
 }
 
