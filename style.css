@@ -596,6 +596,9 @@ body {
     min-width: 0;
     transition: border-color var(--transition), background var(--transition);
 }
+.header-dim-card--full {
+    grid-column: 1 / -1;
+}
 .header-dim-card:hover {
     background: rgba(255,255,255,0.14);
     border-color: rgba(99,179,237,0.45);
