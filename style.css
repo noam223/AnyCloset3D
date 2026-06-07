@@ -643,6 +643,11 @@ body {
 .header-dim-val input::-webkit-outer-spin-button,
 .header-dim-val input::-webkit-inner-spin-button { -webkit-appearance: none; }
 .header-dim-val span { font-size: 0.65rem; color: rgba(255,255,255,0.4); }
+.header-dim-val .header-dim-count {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: white;
+}
 
 /* Wing position sub-menu buttons */
 .ppm-btn {

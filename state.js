@@ -1272,7 +1272,7 @@ window.syncSidebarToWing = function() {
     const valCols = document.getElementById('val-columns'); if (valCols) valCols.innerText = w.columns.length;
     // For sliding wardrobes: hide the column slider (columns are auto-managed = 1 per door)
     const _isSlidingWard = state.presetId === 'sliding' && w.slidingDoor && w.slidingDoor.enabled;
-    const colGroup = document.getElementById('inp-columns') ? document.getElementById('inp-columns').closest('.control-group') : null;
+    const colGroup = document.getElementById('header-columns-card');
     if (colGroup) colGroup.style.display = _isSlidingWard ? 'none' : '';
     setChecked('inp-has-doors', w.hasDoors);
     setVal('inp-handle-type', w.handleType || '');

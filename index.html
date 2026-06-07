@@ -36,7 +36,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260608b">
     <link rel="stylesheet" href="style-mobile.css?v=20260607b">
     <link rel="stylesheet" href="style-extras.css?v=20260607b">
-    <link rel="stylesheet" href="style.css?v=20260608k">
+    <link rel="stylesheet" href="style.css?v=20260608l">
     <style>
         html.thumb-only-mode #left-sidebar,
         html.thumb-only-mode #right-sidebar,
@@ -160,6 +160,19 @@
                     <button type="button" class="header-slider-btn" onclick="updateDim('depth',-1);saveHistoryState();"><i class="fa-solid fa-minus"></i></button>
                     <input type="range" id="inp-depth" min="10" max="80" value="54" step="1">
                     <button type="button" class="header-slider-btn" onclick="updateDim('depth',1);saveHistoryState();"><i class="fa-solid fa-plus"></i></button>
+                </div>
+            </div>
+            <div class="header-dim-card header-dim-card--full" id="header-columns-card">
+                <div class="header-dim-top">
+                    <label for="inp-columns">עמודות פנימיות</label>
+                    <div class="header-dim-val">
+                        <span id="val-columns" class="header-dim-count">2</span>
+                    </div>
+                </div>
+                <div class="header-slider-row">
+                    <button type="button" class="header-slider-btn" onclick="updateColumns(-1)"><i class="fa-solid fa-minus"></i></button>
+                    <input type="range" id="inp-columns" min="2" max="6" value="2" step="1">
+                    <button type="button" class="header-slider-btn" onclick="updateColumns(1)"><i class="fa-solid fa-plus"></i></button>
                 </div>
             </div>
         </div>
@@ -305,14 +318,6 @@
                     <option value="melamine" selected>מלמין (עד 270 ס"מ)</option>
                     <option value="sandwich">סנדביץ' (עד 240 ס"מ)</option>
                 </select>
-            </div>
-            <div class="control-group" style="margin-bottom:0;">
-                <div class="label-row"><span>עמודות פנימיות</span><span id="val-columns" class="value-badge">2</span></div>
-                <div class="slider-row">
-                    <button class="slider-btn" onclick="updateColumns(1)"><i class="fa-solid fa-plus"></i></button>
-                    <input type="range" id="inp-columns" min="2" max="6" value="2" step="1">
-                    <button class="slider-btn" onclick="updateColumns(-1)"><i class="fa-solid fa-minus"></i></button>
-                </div>
             </div>
             <div id="wing-position-row" style="display:none;margin-top:10px;">
                 <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:3px;">מיקום כנף</div>

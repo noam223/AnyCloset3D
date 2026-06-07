@@ -4584,6 +4584,11 @@ function bindUI() {
         });
     });
 
+    document.getElementById('inp-columns').addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        const valEl = document.getElementById('val-columns');
+        if (valEl && !isNaN(val)) valEl.innerText = val;
+    });
     document.getElementById('inp-columns').addEventListener('change', (e) => {
         const val = parseInt(e.target.value); state.manualPrice = null;
         document.getElementById('val-columns').innerText = val;
