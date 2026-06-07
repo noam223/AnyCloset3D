@@ -36,7 +36,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260608b">
     <link rel="stylesheet" href="style-mobile.css?v=20260607b">
     <link rel="stylesheet" href="style-extras.css?v=20260607b">
-    <link rel="stylesheet" href="style.css?v=20260608l">
+    <link rel="stylesheet" href="style.css?v=20260608m">
     <style>
         html.thumb-only-mode #left-sidebar,
         html.thumb-only-mode #right-sidebar,
@@ -325,6 +325,10 @@
                     <option value="side">צדדי — חזית מיושרת עם הארון המרכזי</option>
                     <option value="front">קדמי — בולט קדימה מחזית הארון המרכזי</option>
                 </select>
+            </div>
+            <div class="control-group" style="margin-top:12px;margin-bottom:0;">
+                <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:3px;"><i class="fa-solid fa-note-sticky" style="margin-left:4px;opacity:0.7;"></i> הערות לארון</div>
+                <textarea id="inp-cabinet-notes" class="editor-select cabinet-notes-input" rows="3" placeholder="הערות לייצור, התקנה או לקוח — יופיעו בהדפסות" style="margin:0;"></textarea>
             </div>
         </div>
 
@@ -1555,6 +1559,9 @@
             <input type="text" id="mobile-inp-cabinet-name" class="editor-select" placeholder="למשל: ארון חדר הורים..." style="margin:0;"
                 oninput="document.getElementById('inp-cabinet-name').value=this.value; state.cabinetName=this.value; saveHistoryState();">
         </div>
+        <div class="mobile-section-title">הערות לארון</div>
+        <textarea id="mobile-inp-cabinet-notes" class="editor-select cabinet-notes-input" rows="3" placeholder="הערות לייצור, התקנה או לקוח — יופיעו בהדפסות" style="margin:0 0 15px;"
+            oninput="document.getElementById('inp-cabinet-notes').value=this.value; state.cabinetNotes=this.value; saveHistoryState();"></textarea>
         <div class="mobile-section-title">סוג ארון</div>
         <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px;">
             <button class="preset-btn" onclick="applyPreset('linear')" title="ארון רגיל"
@@ -2232,12 +2239,12 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js"></script>
-<script src="state.js?v=20260608i"></script>
+<script src="state.js?v=20260608j"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="engine-core.js?v=20260608f"></script>
 <script src="engine-corners.js?v=20260608e"></script>
 <script src="engine-blueprint.js?v=20260608e"></script>
-<script src="ui.js?v=20260608j"></script>
+<script src="ui.js?v=20260608k"></script>
 <script src="mobile.js?v=20260608a"></script>
 <script src="part-paint.js?v=20260520k"></script>
 <script src="index-init.js?v=20260608j"></script>

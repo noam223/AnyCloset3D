@@ -18,6 +18,7 @@ function createWingData(overrides) {
         handleType: '',
         handleStyle: 'pipe',
         cabinetName: '',
+        cabinetNotes: '',
         boardMaterial: 'melamine',
         materialBody: 'white_matte',
         materialInternal: 'white_matte',
@@ -259,7 +260,7 @@ window.getWing = function() {
 // These getters/setters make existing code like state.width work transparently
 const _wingFields = [
     'cabinetModel','placement','width','globalHeight','depth','thickness','plinthHeight',
-    'hasDoors','handleType','handleStyle','cabinetName','boardMaterial',
+    'hasDoors','handleType','handleStyle','cabinetName','cabinetNotes','boardMaterial',
     'materialBody','materialInternal','materialExternal','materialDesk','materialOpenCell','materialBack',
     'materialSideCabinet','materialTopPanel',
     'activeColorPart','columns','desk','corner','fullCorner','sideCabinet','manualPrice','manualInstallPrice',
@@ -1284,6 +1285,7 @@ window.syncSidebarToWing = function() {
         b.classList.toggle('active', b.dataset.style === _hs);
     });
     setVal('inp-cabinet-name', w.cabinetName || '');
+    setVal('inp-cabinet-notes', w.cabinetNotes || '');
     setVal('inp-wing-position', w.wingPosition || 'side');
     // Show/hide wing position selector only for left/right wings (not for upper unit edit)
     const wingPosRow = document.getElementById('wing-position-row');
@@ -1786,7 +1788,7 @@ window.resetCurrentCabinet = function() {
     w.cabinetModel = 'c9';
     w.placement = 'wall';
     w.width = 160; w.globalHeight = 240; w.depth = 54;
-    w.plinthHeight = 8.75; w.hasDoors = true; w.handleType = ''; w.handleStyle = 'pipe'; w.cabinetName = '';
+    w.plinthHeight = 8.75; w.hasDoors = true; w.handleType = ''; w.handleStyle = 'pipe'; w.cabinetName = ''; w.cabinetNotes = '';
     w.boardMaterial = 'melamine'; w.materialBody = 'white_matte'; w.materialInternal = 'white_matte';
     w.materialExternal = 'white_matte'; w.materialDesk = 'white_matte'; w.materialOpenCell = 'white_matte'; w.materialBack = 'white_matte';
     w.materialSideCabinet = 'white_matte';

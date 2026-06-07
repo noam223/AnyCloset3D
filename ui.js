@@ -4577,6 +4577,16 @@ function bindUI() {
     const cabNameInp = document.getElementById('inp-cabinet-name');
     if (cabNameInp) cabNameInp.addEventListener('change', (e) => { state.cabinetName = e.target.value; saveHistoryState(); });
 
+    const cabNotesInp = document.getElementById('inp-cabinet-notes');
+    if (cabNotesInp) {
+        cabNotesInp.addEventListener('input', (e) => {
+            state.cabinetNotes = e.target.value;
+            const mNotes = document.getElementById('mobile-inp-cabinet-notes');
+            if (mNotes && mNotes.value !== e.target.value) mNotes.value = e.target.value;
+        });
+        cabNotesInp.addEventListener('change', () => saveHistoryState());
+    }
+
     ['name', 'phone', 'order-num', 'address'].forEach(field => {
         const el = document.getElementById(`cust-${field}`);
         if(el) el.addEventListener('input', (e) => { 
@@ -5059,7 +5069,7 @@ function bindUI() {
             placement: state.placement,
             width: state.width, globalHeight: state.globalHeight, depth: state.depth, thickness: state.thickness,
             plinthHeight: state.plinthHeight, hasDoors: state.hasDoors, handleType: state.handleType, handleStyle: state.handleStyle,
-            cabinetName: state.cabinetName, manualPrice: state.manualPrice,
+            cabinetName: state.cabinetName, cabinetNotes: state.cabinetNotes, manualPrice: state.manualPrice,
             boardMaterial: state.boardMaterial, materialBody: state.materialBody, materialInternal: state.materialInternal,
             materialExternal: state.materialExternal, materialDesk: state.materialDesk, materialOpenCell: state.materialOpenCell, materialBack: state.materialBack, columns: state.columns, desk: state.desk
         }));
@@ -5271,7 +5281,7 @@ function bindUI() {
             placement: state.placement,
             width: state.width, globalHeight: state.globalHeight, depth: state.depth, thickness: state.thickness,
             plinthHeight: state.plinthHeight, hasDoors: state.hasDoors, handleType: state.handleType, handleStyle: state.handleStyle,
-            cabinetName: state.cabinetName, manualPrice: state.manualPrice,
+            cabinetName: state.cabinetName, cabinetNotes: state.cabinetNotes, manualPrice: state.manualPrice,
             manualInstallPrice: getWing().manualInstallPrice != null ? getWing().manualInstallPrice : null,
             boardMaterial: state.boardMaterial, materialBody: state.materialBody, materialInternal: state.materialInternal,
             materialExternal: state.materialExternal, materialDesk: state.materialDesk, materialOpenCell: state.materialOpenCell, materialBack: state.materialBack, columns: state.columns, desk: state.desk,
@@ -5336,7 +5346,7 @@ function bindUI() {
         }
 
         const cabinetSpec = {
-            customName: state.cabinetName, modelName: modelNameText, plinthType: plinthTypeText,
+            customName: state.cabinetName, cabinetNotes: (state.cabinetNotes || '').trim(), modelName: modelNameText, plinthType: plinthTypeText,
             placement: placementHebrew[state.placement] || 'ארון קיר חופשי',
             dimsStr: `רוחב: ${state.width} ס"מ | גובה: ${state.globalHeight} ס"מ | עומק: ${state.depth} ס"מ`,
             material: state.boardMaterial === 'melamine' ? 'מלמין' : "סנדביץ'",
@@ -5509,6 +5519,7 @@ window.openOrderModal = function(mode) {
                     <tr><th>מספר מגירות פנימיות</th><td>${item.drawersInt} יחידות</td></tr>
                     <tr><th>מדפים נשלפים</th><td>${item.shelves} יחידות</td></tr>
                     <tr><th>מוטות תלייה לקולבים</th><td>${item.hanging} יחידות</td></tr>
+                    ${item.cabinetNotes ? `<tr><th>הערות</th><td style="white-space:pre-wrap;line-height:1.55;">${String(item.cabinetNotes).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')}</td></tr>` : ''}
 
                     ${!isFactory && window._showPricing !== false ? `
                     <tr class="view-customer">
@@ -5675,7 +5686,7 @@ window.editCartItem = function(index) {
         state.wings.right = null;
         // Apply flat fields to center wing via proxy setters
         const flatFields = ['cabinetModel','placement','width','globalHeight','depth','thickness',
-            'plinthHeight','hasDoors','handleType','handleStyle','cabinetName','manualPrice','boardMaterial',
+            'plinthHeight','hasDoors','handleType','handleStyle','cabinetName','cabinetNotes','manualPrice','boardMaterial',
             'materialBody','materialInternal','materialExternal','materialDesk','materialOpenCell',
             'materialBack','columns','desk'];
         flatFields.forEach(function(f) { if (rs[f] !== undefined) state[f] = rs[f]; });
@@ -5992,6 +6003,21 @@ window.calcQuickPrice = function(autoUpdateShelves = false) {
     document.getElementById('qc-total-cust').innerText = '₪' + Math.round(priceToCustomer).toLocaleString();
 };
 
+function _escPrintHtml(s) {
+    return String(s || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/\n/g, '<br>');
+}
+
+function _printCabinetNotesRow(notes, thStyle, tdStyle) {
+    const n = (notes || '').trim();
+    if (!n) return '';
+    return `<tr><th style="${thStyle}">הערות</th><td style="${tdStyle}white-space:pre-wrap;line-height:1.55;">${_escPrintHtml(n)}</td></tr>`;
+}
+
 function _buildPrintHTML(mode) {
     // mode: 'customer' or 'factory'
     const isFactory = mode === 'factory';
@@ -6055,6 +6081,7 @@ function _buildPrintHTML(mode) {
                     <tr><th style="${thStyle}">מגירות פנימיות</th><td style="${tdStyle}">${item.drawersInt} יחידות</td></tr>
                     <tr><th style="${thStyle}">מדפים נשלפים</th><td style="${tdStyle}">${item.shelves} יחידות</td></tr>
                     <tr><th style="${thStyle}">מוטות תלייה לקולבים</th><td style="${tdStyle}">${item.hanging} יחידות</td></tr>
+                    ${_printCabinetNotesRow(item.cabinetNotes, thStyle, tdStyle)}
                     ${priceRows}
                 </table>
             </div>
@@ -6127,6 +6154,7 @@ function _buildPrintHTML(mode) {
                     <tr><th style="${thStyle}">מגירות פנימיות</th><td style="${tdStyle}">${item.drawersInt} יחידות</td></tr>
                     <tr><th style="${thStyle}">מדפים נשלפים</th><td style="${tdStyle}">${item.shelves} יחידות</td></tr>
                     <tr><th style="${thStyle}">מוטות תלייה לקולבים</th><td style="${tdStyle}">${item.hanging} יחידות</td></tr>
+                    ${_printCabinetNotesRow(item.cabinetNotes, thStyle, tdStyle)}
                     ${priceRows}
                 </table>
             </div>
@@ -6585,9 +6613,13 @@ window._printMultiViewSVG = function() {
         ? window._mvbpPages
         : (typeof window._generateMultiViewBlueprintPages === 'function' ? window._generateMultiViewBlueprintPages() : null);
     if (!pages || !pages.length) return;
+    const notes = (typeof state !== 'undefined' && state.cabinetNotes) ? String(state.cabinetNotes).trim() : '';
+    const notesHeader = notes
+        ? `<div style="padding:10px 14px;margin-bottom:10px;background:#fef9c3;border:1px solid #fde047;border-radius:8px;font-size:0.92rem;line-height:1.55;"><strong>הערות:</strong> ${_escPrintHtml(notes)}</div>`
+        : '';
     // Each page gets its own print page via page-break-after
     const pagesHtml = pages.map((pg, i) =>
-        `<div class="bp-page"${i === pages.length - 1 ? ' style="page-break-after:avoid"' : ''}>${pg.svg}</div>`
+        `<div class="bp-page"${i === pages.length - 1 ? ' style="page-break-after:avoid"' : ''}>${i === 0 ? notesHeader : ''}${pg.svg}</div>`
     ).join('');
     const win = window.open('', '_blank', 'width=1300,height=1000');
     win.document.write(`<!DOCTYPE html><html lang="he" dir="rtl"><head><meta charset="UTF-8"><title>שרטוט מרובה זוויות</title>
@@ -6635,6 +6667,9 @@ function _buildCartData() {
             details.push(`ארון הזזה — ${item.slidingDoor.numDoors} דלתות | פרופיל: ${item.slidingDoor.profileColor}`);
             details.push(item.slidingDoor.doorColorsStr);
             if (item.slidingDoor.hasMirror) details.push('✓ כולל דלת מראה');
+        }
+        if (item.cabinetNotes && item.cabinetNotes.trim()) {
+            details.push('הערות: ' + item.cabinetNotes.trim());
         }
 
         rows.push({ title, details: details.join(' | '), cabPrice, instPrice, costPrice, totalRevenue, profit, profitPct });

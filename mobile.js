@@ -1076,6 +1076,9 @@ function _syncMobileInputsFromState() {
     const mCabName = document.getElementById('mobile-inp-cabinet-name');
     if (mCabName) mCabName.value = state.cabinetName || '';
 
+    const mCabNotes = document.getElementById('mobile-inp-cabinet-notes');
+    if (mCabNotes) mCabNotes.value = state.cabinetNotes || '';
+
     const mHandleType = document.getElementById('mobile-inp-handle-type');
     if (mHandleType) mHandleType.value = state.handleType || '';
     const _hs = state.handleStyle || 'pipe';

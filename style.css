@@ -909,6 +909,12 @@ body {
 }
 .editor-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(181,129,58,0.12); background-color: white; }
 input[type="tel"].editor-select, input[type="number"].editor-select { direction: rtl; }
+textarea.editor-select.cabinet-notes-input {
+    min-height: 72px;
+    resize: vertical;
+    line-height: 1.45;
+    padding: 9px 12px;
+}
 
 .slider-row { display: flex; align-items: center; gap: 12px; margin-top: 5px; }
 input[type="range"] {
