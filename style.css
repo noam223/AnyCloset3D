@@ -362,6 +362,30 @@ body {
     white-space: nowrap;
     text-align: right;
 }
+.sidebar-project-name[contenteditable="true"] {
+    cursor: text;
+    border-radius: 6px;
+    padding: 2px 6px;
+    margin: -2px -6px;
+    transition: background 0.15s, box-shadow 0.15s;
+}
+.sidebar-project-name[contenteditable="true"]:hover {
+    background: rgba(59,130,246,0.07);
+}
+.sidebar-project-name[contenteditable="true"]:focus {
+    outline: none;
+    background: white;
+    box-shadow: 0 0 0 2px rgba(59,130,246,0.32);
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+}
+.sidebar-project-name:empty::before {
+    content: attr(data-placeholder);
+    color: var(--text-light);
+    opacity: 0.55;
+    font-weight: 700;
+}
 .left-sidebar-header-actions {
     display: flex;
     gap: 6px;

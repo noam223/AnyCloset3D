@@ -5796,10 +5796,10 @@ window.updateLeftSidebar = function() {
 
     const nameEl = document.getElementById('sidebar-project-name');
     const countEl = document.getElementById('sidebar-cabinets-count');
-    if (nameEl) {
+    if (nameEl && document.activeElement !== nameEl) {
         const projName = (window._currentProjectName || '').trim() || 'פרויקט חדש';
-        nameEl.textContent = projName;
-        nameEl.title = projName;
+        if (nameEl.textContent !== projName) nameEl.textContent = projName;
+        nameEl.title = projName + ' — לחץ לעריכה';
     }
     if (countEl) {
         const n = (state.orderCart && state.orderCart.length) || 0;

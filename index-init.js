@@ -454,10 +454,16 @@ window._syncSCsideBtns = function() {
 window._saveProjectNow = async function() {
     // If no project is open yet, ask for a name and create one
     if (!window._currentProjectId) {
-        var projectName = window.prompt('שם הפרויקט החדש:', state.cabinetName || 'פרויקט חדש');
-        if (!projectName) return; // user cancelled
+        var el = document.getElementById('sidebar-project-name');
+        var sidebarName = el ? (el.textContent || '').replace(/\s+/g, ' ').trim() : '';
+        var projectName = sidebarName || window._currentProjectName || state.cabinetName || 'פרויקט חדש';
+        if (!sidebarName) {
+            projectName = window.prompt('שם הפרויקט החדש:', projectName);
+            if (!projectName) return;
+        }
         projectName = projectName.trim() || 'פרויקט חדש';
         window._currentProjectName = projectName;
+        if (el) { el.textContent = projectName; el.title = projectName + ' — לחץ לעריכה'; }
         // Will be assigned after first save below (projectId = null → insert)
     }
 
@@ -527,3 +533,75 @@ function _escHtml(str) {
         .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
         .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
+
+// ── Inline project name editor (left sidebar) ───────────────────────────────
+window._commitProjectNameEdit = async function() {
+    var el = document.getElementById('sidebar-project-name');
+    if (!el) return;
+    var name = (el.textContent || '').replace(/\s+/g, ' ').trim();
+    if (!name) name = 'פרויקט חדש';
+    if (name.length > 80) name = name.slice(0, 80);
+    var prev = (window._projectNameBeforeEdit || window._currentProjectName || '').trim() || 'פרויקט חדש';
+    el.textContent = name;
+    el.title = name + ' — לחץ לעריכה';
+    window._currentProjectName = name;
+    if (name === prev) return;
+    window._isDirty = true;
+    if (window._currentProjectId && typeof Projects !== 'undefined' && Projects.rename) {
+        var result = await Projects.rename(window._currentProjectId, name);
+        if (result && result.error) {
+            window._currentProjectName = prev;
+            el.textContent = prev;
+            el.title = prev + ' — לחץ לעריכה';
+            if (typeof _showToast === 'function') _showToast('לא ניתן לעדכן שם: ' + result.error, 4000);
+        }
+    }
+};
+
+(function _initProjectNameEditor() {
+    var el = document.getElementById('sidebar-project-name');
+    if (!el || el.dataset.nameEditBound) return;
+    el.dataset.nameEditBound = '1';
+
+    el.addEventListener('focus', function() {
+        window._projectNameBeforeEdit = (window._currentProjectName || el.textContent || '').trim() || 'פרויקט חדש';
+    });
+
+    el.addEventListener('blur', function() {
+        window._commitProjectNameEdit();
+    });
+
+    el.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            el.blur();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            var prev = (window._projectNameBeforeEdit || 'פרויקט חדש').trim() || 'פרויקט חדש';
+            el.textContent = prev;
+            el.blur();
+        }
+    });
+
+    el.addEventListener('paste', function(e) {
+        e.preventDefault();
+        var text = ((e.clipboardData || window.clipboardData).getData('text') || '').replace(/\s+/g, ' ').trim();
+        if (text.length > 80) text = text.slice(0, 80);
+        if (document.queryCommandSupported && document.queryCommandSupported('insertText')) {
+            document.execCommand('insertText', false, text);
+        } else {
+            el.textContent = text;
+        }
+    });
+
+    el.addEventListener('input', function() {
+        if ((el.textContent || '').length > 80) {
+            el.textContent = el.textContent.slice(0, 80);
+            var range = document.createRange();
+            range.selectNodeContents(el);
+            range.collapse(false);
+            var sel = window.getSelection();
+            if (sel) { sel.removeAllRanges(); sel.addRange(range); }
+        }
+    });
+})();
