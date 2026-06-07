@@ -378,51 +378,6 @@
                 </div>
             </div>
 
-            <div class="toggle-wrap" id="wrap-closure">
-                <input type="checkbox" id="inp-closure-enabled" checked onchange="window._setClosureEnabled(this.checked)" style="display:none;">
-                <button class="sidebar-toggle-btn active" id="btn-closure-toggle" onclick="var c=document.getElementById('inp-closure-enabled');c.checked=!c.checked;c.dispatchEvent(new Event('change'));this.classList.toggle('active',c.checked);">
-                    <i class="fa-solid fa-border-none"></i>
-                    <span class="toggle-label">סגירות</span>
-                    <span class="toggle-pill"></span>
-                </button>
-                <div class="toggle-submenu" id="closure-sliders-wrap">
-                    <div id="closure-width-row" class="control-group" style="margin-bottom:8px;display:none;">
-                        <div class="label-row"><span>סגירה שמאל (ס"מ)</span><input type="number" id="inp-num-closure-width" class="value-badge-input" value="1.8" min="1.8" max="30" step="0.1" onchange="window._setClosureWidth(this.value)"></div>
-                        <div class="slider-row">
-                            <button class="slider-btn" onclick="window._setClosureWidth((parseFloat(document.getElementById('inp-num-closure-width').value)||1.8)+0.5)"><i class="fa-solid fa-plus"></i></button>
-                            <input type="range" id="inp-closure-width" min="1.8" max="30" value="1.8" step="0.1" oninput="window._setClosureWidth(this.value)">
-                            <button class="slider-btn" onclick="window._setClosureWidth((parseFloat(document.getElementById('inp-num-closure-width').value)||1.8)-0.5)"><i class="fa-solid fa-minus"></i></button>
-                        </div>
-                    </div>
-                    <div id="closure-width-right-row" class="control-group" style="margin-bottom:8px;display:none;">
-                        <div class="label-row"><span>סגירה ימין (ס"מ)</span><input type="number" id="inp-num-closure-width-right" class="value-badge-input" value="1.8" min="1.8" max="30" step="0.1" onchange="window._setClosureWidthRight(this.value)"></div>
-                        <div class="slider-row">
-                            <button class="slider-btn" onclick="window._setClosureWidthRight((parseFloat(document.getElementById('inp-num-closure-width-right').value)||1.8)+0.5)"><i class="fa-solid fa-plus"></i></button>
-                            <input type="range" id="inp-closure-width-right" min="1.8" max="30" value="1.8" step="0.1" oninput="window._setClosureWidthRight(this.value)">
-                            <button class="slider-btn" onclick="window._setClosureWidthRight((parseFloat(document.getElementById('inp-num-closure-width-right').value)||1.8)-0.5)"><i class="fa-solid fa-minus"></i></button>
-                        </div>
-                    </div>
-                    <div id="closure-ceil-row" class="control-group" style="margin-bottom:8px;display:none;">
-                        <div class="label-row"><span>סגירה עליונה (ס"מ)</span><input type="number" id="inp-num-closure-ceil" class="value-badge-input" value="1.8" min="1.8" max="30" step="0.1" onchange="window._setClosureCeilWidth(this.value)"></div>
-                        <div class="slider-row">
-                            <button class="slider-btn" onclick="window._setClosureCeilWidth((parseFloat(document.getElementById('inp-num-closure-ceil').value)||1.8)+0.5)"><i class="fa-solid fa-plus"></i></button>
-                            <input type="range" id="inp-closure-ceil" min="1.8" max="30" value="1.8" step="0.1" oninput="window._setClosureCeilWidth(this.value)">
-                            <button class="slider-btn" onclick="window._setClosureCeilWidth((parseFloat(document.getElementById('inp-num-closure-ceil').value)||1.8)-0.5)"><i class="fa-solid fa-minus"></i></button>
-                        </div>
-                    </div>
-                    <div id="closure-frontline-row" style="display:none;margin-bottom:8px;">
-                        <div class="label-row" style="margin-bottom:5px;">
-                            <span style="font-size:0.82rem;font-weight:600;color:var(--text-dark);">קו חזית</span>
-                            <span title="קו ארון: לוח הסגירה מיושר עם חזית הארון&#10;קו דלתות: לוח הסגירה מיושר עם חזית הדלתות (בולט 1.7 ס&quot;מ קדימה)" style="cursor:help;color:var(--text-light);font-size:0.78rem;margin-right:4px;">&#9432;</span>
-                        </div>
-                        <div style="display:flex;gap:6px;">
-                            <button id="closure-fl-cabinet" onclick="window._setClosureFrontLine('cabinet')" style="flex:1;font-size:0.78rem;font-weight:600;padding:6px 4px;border-radius:7px;border:1.5px solid var(--border);background:var(--accent);color:white;cursor:pointer;transition:all 0.15s;font-family:inherit;">קו ארון</button>
-                            <button id="closure-fl-door" onclick="window._setClosureFrontLine('door')" style="flex:1;font-size:0.78rem;font-weight:600;padding:6px 4px;border-radius:7px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);cursor:pointer;transition:all 0.15s;font-family:inherit;">קו דלתות</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <div class="toggle-wrap" id="wrap-niche" style="display:none;">
                 <input type="checkbox" id="inp-niche-enabled" onchange="window._setNicheEnabled(this.checked)" style="display:none;">
                 <button class="sidebar-toggle-btn" id="btn-niche-toggle" onclick="var c=document.getElementById('inp-niche-enabled');c.checked=!c.checked;c.dispatchEvent(new Event('change'));this.classList.toggle('active',c.checked);">
@@ -2264,10 +2219,10 @@
 <script src="engine-core.js?v=20260608f"></script>
 <script src="engine-corners.js?v=20260608e"></script>
 <script src="engine-blueprint.js?v=20260608e"></script>
-<script src="ui.js?v=20260608a"></script>
+<script src="ui.js?v=20260608h"></script>
 <script src="mobile.js?v=20260608a"></script>
 <script src="part-paint.js?v=20260520k"></script>
-<script src="index-init.js?v=20260608g"></script>
+<script src="index-init.js?v=20260608h"></script>
 
 <!-- ===== SHARE LIVE LINK MODAL (tasks 3, 4, 12) ===== -->
 <div id="share-live-modal" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.55);align-items:center;justify-content:center;padding:16px;" onclick="if(event.target===this)document.getElementById('share-live-modal').style.display='none'">
@@ -2357,7 +2312,7 @@
 </button>
 
 <script src="notes.js"></script>
-<script src="tour.js?v=20260607b"></script>
+<script src="tour.js?v=20260608h"></script>
 <script src="ai-renders.js?v=20260603k"></script>
 <script>
     // Init AI renders after auth is ready
@@ -2405,7 +2360,7 @@
             <span class="tour-sheet-icon">🏠</span>
             <div class="tour-sheet-info">
                 <div class="tour-sheet-title">מיקום וסגירות</div>
-                <div class="tour-sheet-desc">קירות, נישות, לוחות סגירה, הגדרות חדר — 5 שלבים</div>
+                <div class="tour-sheet-desc">קירות, נישות, הגדרות חדר — 4 שלבים</div>
             </div>
             <i class="fa-solid fa-chevron-left tour-sheet-arrow"></i>
         </button>

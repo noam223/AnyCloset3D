@@ -171,7 +171,7 @@
                         window._roomWall = 'center';
                     }
                     // Restore closure panel settings
-                    window._closureEnabled    = (snap.closureEnabled !== undefined) ? snap.closureEnabled : true;
+                    window._closureEnabled    = true;
                     window._closureWidth      = snap.closureWidth      || 1.8;
                     window._closureWidthRight = snap.closureWidthRight || 1.8;
                     window._closureCeilWidth  = snap.closureCeilWidth  || 1.8;

@@ -4011,7 +4011,7 @@ window._roomWall          = window._roomWall          || 'center';
 window._roomWidth         = window._roomWidth         || 0;   // 0 = auto (based on cabinet)
 window._roomDepth         = window._roomDepth         || 0;   // 0 = auto
 window._roomHeight        = window._roomHeight        || 0;   // 0 = auto (300cm default)
-window._closureEnabled    = (window._closureEnabled !== undefined) ? window._closureEnabled : true;
+window._closureEnabled    = true;
 window._closureWidth      = window._closureWidth      || 1.8; // cm — left side panel width
 window._closureWidthRight = window._closureWidthRight || 1.8; // cm — right side panel width (for 'both' mode)
 window._closureCeilWidth  = window._closureCeilWidth  || 1.8; // cm — ceiling panel thickness
@@ -4175,16 +4175,8 @@ window._updateNicheUI = function() {
     if (_ncCn) _ncCn.value = window._nicheClosureCeilHeight || 1.8;
 };
 
-window._setClosureEnabled = function(enabled) {
-    window._closureEnabled = !!enabled;
-    const tog = document.getElementById('inp-closure-enabled');
-    if (tog) tog.checked = window._closureEnabled;
-    // sync toggle-wrap and button
-    const wrap = document.getElementById('wrap-closure');
-    const btn  = document.getElementById('btn-closure-toggle');
-    if (wrap) wrap.classList.toggle('open', !!enabled);
-    if (btn)  btn.classList.toggle('active', !!enabled);
-    if (typeof window._updateRoomWallUI === 'function') window._updateRoomWallUI();
+window._setClosureEnabled = function(_enabled) {
+    window._closureEnabled = true;
     buildCabinet();
 };
 
@@ -4294,12 +4286,10 @@ window._updateRoomWallUI = function() {
     const _rw = window._roomWall || 'center';
 
     // ── Position buttons: always visible for linear/sliding ─────────────────
-    const posRow      = document.getElementById('room-wall-pos-row');
-    const wrapClosure = document.getElementById('wrap-closure');
+    const posRow = document.getElementById('room-wall-pos-row');
 
     if (!_isLinearOrSliding) {
-        if (posRow)      posRow.style.display      = 'none';
-        if (wrapClosure) wrapClosure.style.display = 'none';
+        if (posRow) posRow.style.display = 'none';
         if (typeof window._updateNicheUI === 'function') window._updateNicheUI();
         return;
     }
@@ -4317,61 +4307,7 @@ window._updateRoomWallUI = function() {
         btn.style.borderColor = isActive ? 'var(--accent)' : 'var(--border)';
     });
 
-    // Closure toggle: always visible for linear/sliding (not only when צמוד לקיר)
-    if (wrapClosure) wrapClosure.style.display = '';
-
-    const _cOn = (window._closureEnabled !== false);
-    const togEl = document.getElementById('inp-closure-enabled');
-    const btnClosure = document.getElementById('btn-closure-toggle');
-    if (togEl) togEl.checked = _cOn;
-    if (wrapClosure) wrapClosure.classList.toggle('open', _cOn);
-    if (btnClosure) btnClosure.classList.toggle('active', _cOn);
-
-    const _showSliders = _cOn;
-
-    const cwRow = document.getElementById('closure-width-row');
-    if (cwRow) cwRow.style.display = (_showSliders && (_rw === 'left' || _rw === 'both')) ? '' : 'none';
-    const cwSlider = document.getElementById('inp-closure-width');
-    const cwNum    = document.getElementById('inp-num-closure-width');
-    if (cwSlider) cwSlider.value = window._closureWidth || 1.8;
-    if (cwNum)    cwNum.value    = window._closureWidth || 1.8;
-
-    const cwrRow = document.getElementById('closure-width-right-row');
-    if (cwrRow) cwrRow.style.display = (_showSliders && (_rw === 'right' || _rw === 'both')) ? '' : 'none';
-    const cwrSlider = document.getElementById('inp-closure-width-right');
-    const cwrNum    = document.getElementById('inp-num-closure-width-right');
-    if (cwrSlider) cwrSlider.value = window._closureWidthRight || 1.8;
-    if (cwrNum)    cwrNum.value    = window._closureWidthRight || 1.8;
-
-    const ccRow = document.getElementById('closure-ceil-row');
-    if (ccRow) ccRow.style.display = _showSliders ? '' : 'none';
-    const ccSlider = document.getElementById('inp-closure-ceil');
-    const ccNum    = document.getElementById('inp-num-closure-ceil');
-    if (ccSlider) ccSlider.value = window._closureCeilWidth || 1.8;
-    if (ccNum)    ccNum.value    = window._closureCeilWidth || 1.8;
-
-    const cdRow = document.getElementById('closure-depth-row');
-    if (cdRow) cdRow.style.display = _showSliders ? '' : 'none';
-    const cdSlider = document.getElementById('inp-closure-depth');
-    const cdNum    = document.getElementById('inp-num-closure-depth');
-    if (cdSlider) cdSlider.value = window._closureDepthWidth || 1.8;
-    if (cdNum)    cdNum.value    = window._closureDepthWidth || 1.8;
-
-    const flRow = document.getElementById('closure-frontline-row');
-    if (flRow) flRow.style.display = (_showSliders && _rw !== 'center') ? '' : 'none';
-    const _fl = window._closureFrontLine || 'cabinet';
-    const btnCab  = document.getElementById('closure-fl-cabinet');
-    const btnDoor = document.getElementById('closure-fl-door');
-    if (btnCab) {
-        btnCab.style.background  = (_fl === 'cabinet') ? 'var(--accent)' : 'var(--bg-light)';
-        btnCab.style.color       = (_fl === 'cabinet') ? 'white' : 'var(--text-dark)';
-        btnCab.style.borderColor = (_fl === 'cabinet') ? 'var(--accent)' : 'var(--border)';
-    }
-    if (btnDoor) {
-        btnDoor.style.background  = (_fl === 'door') ? 'var(--accent)' : 'var(--bg-light)';
-        btnDoor.style.color       = (_fl === 'door') ? 'white' : 'var(--text-dark)';
-        btnDoor.style.borderColor = (_fl === 'door') ? 'var(--accent)' : 'var(--border)';
-    }
+    window._closureEnabled = true;
 
     // Sync niche UI
     if (typeof window._updateNicheUI === 'function') window._updateNicheUI();
@@ -5767,7 +5703,7 @@ window.editCartItem = function(index) {
     state.roomWall   = window._roomWall;
 
     // Restore closure panel settings
-    window._closureEnabled    = (rawState.closureEnabled !== undefined) ? rawState.closureEnabled : true;
+    window._closureEnabled    = true;
     window._closureWidth      = rawState.closureWidth      || 1.8;
     window._closureWidthRight = rawState.closureWidthRight || 1.8;
     window._closureCeilWidth  = rawState.closureCeilWidth  || 1.8;
