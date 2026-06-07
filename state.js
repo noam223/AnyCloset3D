@@ -2760,7 +2760,9 @@ function _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel) {
     if (cfgR.melamine && !cfgR.maya) {
         rt = wMelamine ? cfgR.melamine : (cfgR.nonMelamine||cfgR.melamine);
     } else {
-        const mk = cfgR[wEffectiveModel] ? wEffectiveModel : 'maya';
+        let pricingModel = wEffectiveModel;
+        if (!cfgR[pricingModel] && pricingModel === 'ab2_nohoney') pricingModel = 'c9';
+        const mk = cfgR[pricingModel] ? pricingModel : 'maya';
         const mr = cfgR[mk] || DEFAULT_PRICING_CONFIG.ranges.maya;
         rt = wMelamine ? mr.melamine : (mr.nonMelamine||mr.melamine);
     }
@@ -2772,170 +2774,216 @@ function _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel) {
     if(wh>=241) bp*=(1+hS); if(wd>54) bp*=(1+dS); return bp;
 }
 
+var SANDWICH_COLORS = new Set(['2025','2044','2041','456','2024','2049','2062','2047','7180','c3110','2040','2020']);
+
+function _calcIncludedShelves(ww, wh, wModel) {
+    const isC9Like = (wModel === 'c9' || wModel === 'ab2_nohoney');
+    let allowed = 0;
+    if (!isC9Like) {
+        if (ww <= 80) allowed = 5; else if (ww <= 160) allowed = 8; else allowed = 13;
+    } else {
+        if (ww <= 80) allowed = 2; else if (ww <= 160) allowed = 7; else allowed = 12;
+    }
+    if (ww > 240) allowed += Math.ceil((ww - 240) / 80) * 5;
+    if (wh > 240) allowed += Math.ceil(ww / 80);
+    return allowed;
+}
+
+function _calcAllowedShelves(cfg, ww, wh, wModel) {
+    const mode = cfg.pricingMode || 'ranges';
+    const ex = cfg.extras || DEFAULT_PRICING_CONFIG.extras;
+    if (mode === 'ranges') return _calcIncludedShelves(ww, wh, wModel);
+    const freePerM = ex.shelfFreePerMeter != null ? ex.shelfFreePerMeter : 3;
+    return Math.round(freePerM * (ww / 100));
+}
+
+function _calcWingInstallPrice(cfg, ww, wh) {
+    const instUnit = cfg.installUnitCm || 42.5;
+    const instPer  = cfg.installPricePerUnit || 110;
+    const instHS   = cfg.installHeightSurcharge != null ? cfg.installHeightSurcharge : 0.20;
+    let inst = Math.ceil(ww / instUnit) * instPer;
+    if (wh > 240) inst *= (1 + instHS);
+    return Math.round(inst);
+}
+
+function _calcWingCost(cfg, wing) {
+    const ex  = cfg.extras || DEFAULT_PRICING_CONFIG.extras;
+    const ww = wing.width, wh = wing.globalHeight, wd = wing.depth;
+    const wMelamine = wing.boardMaterial === 'melamine';
+    const wModel = wing.cabinetModel || 'maya';
+    const wHasSideOpenCell = wModel === 'ab2_nohoney' && wing.columns && wing.columns.some(col =>
+        col.compartments && col.compartments.some(comp => comp && comp.type === 'side_open_cell'));
+    const wEffectiveModel = (wModel === 'ab2_nohoney' && wHasSideOpenCell) ? 'ab2' : wModel;
+
+    let basePrice = _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel);
+    const sandwichPct = cfg.sandwichSurcharge != null ? cfg.sandwichSurcharge : 0.15;
+    if (SANDWICH_COLORS.has(wing.materialBody)) basePrice *= (1 + sandwichPct);
+    if (wEffectiveModel === 'regalim' && (cfg.pricingMode||'ranges') === 'ranges') {
+        const legCount = ww<=110 ? 4 : ww<=180 ? 6 : 8;
+        basePrice += legCount * (ex.nickelLegPrice!=null ? ex.nickelLegPrice : 100);
+    }
+
+    let finalCost = basePrice;
+
+    const allowedShelves = _calcAllowedShelves(cfg, ww, wh, wModel);
+    let actualShelves = 0;
+    wing.columns.forEach(col => { actualShelves += (col.shelves||0); });
+    if (actualShelves > allowedShelves)
+        finalCost += (actualShelves-allowedShelves) * (wMelamine ? (ex.extraShelfMel||60) : (ex.extraShelfNonMel||80));
+
+    let hasAnyDesk = (wing.desk && wing.desk.side !== 'none') || wing.columns.some(col => col.type === 'desk');
+    if (hasAnyDesk) finalCost += (ex.deskUnit||900);
+
+    let openCellBlocks = 0, partitionBlocks = 0;
+    wing.columns.forEach(col => {
+        let inBlock = false;
+        col.compartments.forEach(comp => {
+            if (comp.type === 'internal_drawers') finalCost += comp.count*(ex.internalDrawer||150);
+            else if (comp.type === 'external_drawers') finalCost += comp.count*(ex.externalDrawer||200);
+            if (comp && (comp.type==='open_cell'||comp.type==='side_open_cell')) { if(!inBlock){openCellBlocks++;inBlock=true;} } else { inBlock=false; }
+            if (comp && comp.partition) { partitionBlocks += Array.isArray(comp.partitions)?comp.partitions.length:1; }
+        });
+    });
+    if ((wModel==='ab2'||wEffectiveModel==='ab2') && openCellBlocks>0) openCellBlocks--;
+    finalCost += openCellBlocks*(ex.openCell||400);
+    finalCost += partitionBlocks*(ex.partition||150);
+
+    if (wing.hasDoors) {
+        wing.columns.forEach(col => {
+            if (!col.doors) return;
+            col.doors.forEach(door => {
+                const style  = door.style || 'solid';
+                const leaves = (door.type === 'double') ? 2 : 1;
+                let styleExtra = 0;
+                if      (style === 'framed_melamine')                       styleExtra = ex.doorFramedMel  || 80;
+                else if (style === 'glass_melamine')                        styleExtra = ex.doorGlassMel   || 400;
+                else if (style === 'glass_black' || style === 'glass_gold') styleExtra = ex.doorGlassBlack || 600;
+                else if (style === 'glass_mirror')                          styleExtra = ex.doorMirror     || 350;
+                finalCost += styleExtra * leaves;
+            });
+        });
+    }
+
+    const splitThreshold = wMelamine ? 270 : 240;
+    if (wh > splitThreshold) {
+        let topUnitCost = 0;
+        if      (ww <= 160) topUnitCost = ex.upperUnit160   || 600;
+        else if (ww <= 240) topUnitCost = ex.upperUnit240   || 900;
+        else                topUnitCost = ww * (ex.upperUnitPerCm || 3.75);
+        finalCost += topUnitCost;
+    }
+
+    if (wing.corner && wing.corner.side !== 'none') {
+        const cu = wing.corner;
+        let cuCost = 0;
+        if (cu.type === 'desk') {
+            cuCost = ex.cornerDesk || 900;
+        } else {
+            const n = cu.drawerCount || 4;
+            if      (n <= 3)  cuCost = ex.cornerDrawers3 || 832;
+            else if (n === 4) cuCost = ex.cornerDrawers4 || 907;
+            else              cuCost = (ex.cornerDrawers4||907) + (n-4)*(ex.cornerDrawerExtra||200);
+        }
+        finalCost += cuCost;
+    }
+
+    if (wing.wingPosition === 'full_corner') {
+        const fc = wing.fullCorner || {};
+        finalCost += (ex.fullCornerBase  || 2800);
+        finalCost += (fc.shelves || 0) * (ex.fullCornerShelf || 120);
+    }
+
+    if (wing.sideCabinet && wing.sideCabinet.side !== 'none') {
+        const sc    = wing.sideCabinet;
+        const scH   = wing.globalHeight || 240;
+        const scMel = (sc.boardMaterial || wing.boardMaterial) === 'melamine';
+        let scShelves = 0;
+        if (sc.columns) sc.columns.forEach(col => { scShelves += (col.shelves||0); });
+        const _calcOneSC = (scW) => {
+            let base = scMel ? scW*(ex.sideCabMel||12) : scW*(ex.sideCabNonMel||15);
+            if (scH > 240) base *= 1.2;
+            base += scShelves * (scMel ? (ex.extraShelfMel||60) : (ex.extraShelfNonMel||80));
+            if (sc.hasDoors) base += (ex.sideCabDoors || 300);
+            return Math.round(base);
+        };
+        if (sc.side === 'right' || sc.side === 'both') finalCost += _calcOneSC(sc.widthRight || sc.width || 40);
+        if (sc.side === 'left'  || sc.side === 'both') finalCost += _calcOneSC(sc.widthLeft  || sc.width || 40);
+    }
+
+    if (wing.slidingDoor && wing.slidingDoor.enabled) {
+        const sd       = wing.slidingDoor;
+        const numDoors = sd.numDoors || _calcSlidingDoorCount(ww);
+        let sdBase     = (ex.slidingBase||800) + numDoors*(ex.slidingDoor||350);
+        if (sd.doorPanelType === 'glass')  sdBase += numDoors*(ex.slidingGlass  || 200);
+        else if (sd.doorPanelType === 'mirror') sdBase += numDoors*(ex.slidingMirror || 350);
+        if (sd.profileColor === 'gold_matte') sdBase += numDoors*(ex.slidingGold || 80);
+        else if (sd.profileColor === 'black') sdBase += numDoors*(ex.slidingBlack || 50);
+        if (wh > 240) sdBase *= (1 + (ex.slidingHeightSurcharge || 0.15));
+        finalCost += Math.round(sdBase);
+    }
+
+    if (wing.columns && wing.columns.some(col => col.topPanel)) {
+        const t = wing.thickness || 1.7;
+        const pricePerCm = ex.topPanelPerCm != null ? ex.topPanelPerCm : 8;
+        const colLeftEdges = [];
+        let _cx = 0;
+        for (let ci = 0; ci < wing.columns.length; ci++) {
+            colLeftEdges.push(_cx);
+            _cx += wing.columns[ci].width + t;
+        }
+        let spanStart = -1;
+        for (let ci = 0; ci <= wing.columns.length; ci++) {
+            const col = wing.columns[ci];
+            const inSpan = col && col.topPanel;
+            if (inSpan && spanStart === -1) {
+                spanStart = ci;
+            } else if ((!inSpan || ci === wing.columns.length) && spanStart !== -1) {
+                const lastIdx = ci - 1;
+                const panelW = (colLeftEdges[lastIdx] + wing.columns[lastIdx].width + t / 2) - (colLeftEdges[spanStart] - t / 2);
+                finalCost += Math.round(panelW * pricePerCm);
+                spanStart = -1;
+            }
+        }
+    }
+
+    return finalCost;
+}
+
+function _buildQuickCalcWing(w, h, d, model, isMelamine, shelves, intDrawers, extDrawers, openCells, hasDesk) {
+    const compartments = [];
+    if (intDrawers > 0) compartments.push({ type: 'internal_drawers', count: intDrawers });
+    if (extDrawers > 0) compartments.push({ type: 'external_drawers', count: extDrawers });
+    const cellType = (model === 'ab2_nohoney') ? 'side_open_cell' : 'open_cell';
+    for (let i = 0; i < openCells; i++) compartments.push({ type: cellType });
+    return {
+        width: w,
+        globalHeight: h,
+        depth: d,
+        boardMaterial: isMelamine ? 'melamine' : 'sandwich',
+        materialBody: isMelamine ? 'white' : 'sandwich',
+        cabinetModel: model,
+        thickness: 1.7,
+        columns: [{
+            type: hasDesk ? 'desk' : 'normal',
+            width: w,
+            height: h,
+            shelves: shelves,
+            compartments: compartments,
+            doors: []
+        }],
+        desk: { side: 'none' },
+        hasDoors: false,
+        corner: { side: 'none' },
+        wingPosition: 'center',
+        sideCabinet: { side: 'none' },
+        slidingDoor: { enabled: false },
+        fullCorner: {}
+    };
+}
+
 function calculatePrice() {
     const cfg = _getPricingCfg();
     const ex  = cfg.extras || DEFAULT_PRICING_CONFIG.extras;
-    const SANDWICH_COLORS = new Set(['2025','2044','2041','456','2024','2049','2062','2047','7180','c3110','2040','2020']);
-
-    function _calcWingCost(wing) {
-        const ww = wing.width, wh = wing.globalHeight, wd = wing.depth;
-        const wMelamine = wing.boardMaterial === 'melamine';
-        const wModel = wing.cabinetModel || 'maya';
-        const wHasSideOpenCell = wModel === 'ab2_nohoney' && wing.columns && wing.columns.some(col =>
-            col.compartments && col.compartments.some(comp => comp && comp.type === 'side_open_cell'));
-        const wEffectiveModel = (wModel === 'ab2_nohoney' && wHasSideOpenCell) ? 'ab2' : wModel;
-
-        let basePrice = _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel);
-        const sandwichPct = cfg.sandwichSurcharge != null ? cfg.sandwichSurcharge : 0.15;
-        if (SANDWICH_COLORS.has(wing.materialBody)) basePrice *= (1 + sandwichPct);
-        if (wEffectiveModel === 'regalim' && (cfg.pricingMode||'ranges') === 'ranges') {
-            const legCount = ww<=110 ? 4 : ww<=180 ? 6 : 8;
-            basePrice += legCount * (ex.nickelLegPrice!=null ? ex.nickelLegPrice : 100);
-        }
-
-        let finalCost = basePrice;
-
-        // Shelves
-        const freePerM = ex.shelfFreePerMeter != null ? ex.shelfFreePerMeter : 3;
-        const allowedShelves = Math.round(freePerM * (ww/100));
-        let actualShelves = 0;
-        wing.columns.forEach(col => { actualShelves += (col.shelves||0); });
-        if (actualShelves > allowedShelves)
-            finalCost += (actualShelves-allowedShelves) * (wMelamine ? (ex.extraShelfMel||60) : (ex.extraShelfNonMel||80));
-
-        // Desk
-        let hasAnyDesk = (wing.desk && wing.desk.side !== 'none') || wing.columns.some(col => col.type === 'desk');
-        if (hasAnyDesk) finalCost += (ex.deskUnit||900);
-
-        // Drawers, open cells, partitions
-        let openCellBlocks = 0, partitionBlocks = 0;
-        wing.columns.forEach(col => {
-            let inBlock = false;
-            col.compartments.forEach(comp => {
-                if (comp.type === 'internal_drawers') finalCost += comp.count*(ex.internalDrawer||150);
-                else if (comp.type === 'external_drawers') finalCost += comp.count*(ex.externalDrawer||200);
-                if (comp && (comp.type==='open_cell'||comp.type==='side_open_cell')) { if(!inBlock){openCellBlocks++;inBlock=true;} } else { inBlock=false; }
-                if (comp && comp.partition) { partitionBlocks += Array.isArray(comp.partitions)?comp.partitions.length:1; }
-            });
-        });
-        if ((wModel==='ab2'||wEffectiveModel==='ab2') && openCellBlocks>0) openCellBlocks--;
-        finalCost += openCellBlocks*(ex.openCell||400);
-        finalCost += partitionBlocks*(ex.partition||150);
-
-        // Door styles
-        if (wing.hasDoors) {
-            wing.columns.forEach(col => {
-                if (!col.doors) return;
-                col.doors.forEach(door => {
-                    const style  = door.style || 'solid';
-                    const leaves = (door.type === 'double') ? 2 : 1;
-                    let styleExtra = 0;
-                    if      (style === 'framed_melamine')                       styleExtra = ex.doorFramedMel  || 80;
-                    else if (style === 'glass_melamine')                        styleExtra = ex.doorGlassMel   || 400;
-                    else if (style === 'glass_black' || style === 'glass_gold') styleExtra = ex.doorGlassBlack || 600;
-                    else if (style === 'glass_mirror')                          styleExtra = ex.doorMirror     || 350;
-                    finalCost += styleExtra * leaves;
-                });
-            });
-        }
-
-        // Upper unit
-        const splitThreshold = wMelamine ? 270 : 240;
-        if (wh > splitThreshold) {
-            let topUnitCost = 0;
-            if      (ww <= 160) topUnitCost = ex.upperUnit160   || 600;
-            else if (ww <= 240) topUnitCost = ex.upperUnit240   || 900;
-            else                topUnitCost = ww * (ex.upperUnitPerCm || 3.75);
-            finalCost += topUnitCost;
-        }
-
-        // Corner unit
-        if (wing.corner && wing.corner.side !== 'none') {
-            const cu = wing.corner;
-            let cuCost = 0;
-            if (cu.type === 'desk') {
-                cuCost = ex.cornerDesk || 900;
-            } else {
-                const n = cu.drawerCount || 4;
-                if      (n <= 3)  cuCost = ex.cornerDrawers3 || 832;
-                else if (n === 4) cuCost = ex.cornerDrawers4 || 907;
-                else              cuCost = (ex.cornerDrawers4||907) + (n-4)*(ex.cornerDrawerExtra||200);
-            }
-            finalCost += cuCost;
-        }
-
-        // Full corner unit (L-shape)
-        if (wing.wingPosition === 'full_corner') {
-            const fc = wing.fullCorner || {};
-            finalCost += (ex.fullCornerBase  || 2800);
-            finalCost += (fc.shelves || 0) * (ex.fullCornerShelf || 120);
-        }
-
-        // Side cabinet — price each side separately (may have different widths)
-        if (wing.sideCabinet && wing.sideCabinet.side !== 'none') {
-            const sc    = wing.sideCabinet;
-            const scH   = wing.globalHeight || 240;
-            const scMel = (sc.boardMaterial || wing.boardMaterial) === 'melamine';
-            let scShelves = 0;
-            if (sc.columns) sc.columns.forEach(col => { scShelves += (col.shelves||0); });
-            const _calcOneSC = (scW) => {
-                let base = scMel ? scW*(ex.sideCabMel||12) : scW*(ex.sideCabNonMel||15);
-                if (scH > 240) base *= 1.2;
-                base += scShelves * (scMel ? (ex.extraShelfMel||60) : (ex.extraShelfNonMel||80));
-                if (sc.hasDoors) base += (ex.sideCabDoors || 300);
-                return Math.round(base);
-            };
-            if (sc.side === 'right' || sc.side === 'both') finalCost += _calcOneSC(sc.widthRight || sc.width || 40);
-            if (sc.side === 'left'  || sc.side === 'both') finalCost += _calcOneSC(sc.widthLeft  || sc.width || 40);
-        }
-
-        // Sliding wardrobe
-        if (wing.slidingDoor && wing.slidingDoor.enabled) {
-            const sd       = wing.slidingDoor;
-            const numDoors = sd.numDoors || _calcSlidingDoorCount(ww);
-            let sdBase     = (ex.slidingBase||800) + numDoors*(ex.slidingDoor||350);
-            if (sd.doorPanelType === 'glass')  sdBase += numDoors*(ex.slidingGlass  || 200);
-            else if (sd.doorPanelType === 'mirror') sdBase += numDoors*(ex.slidingMirror || 350);
-            if (sd.profileColor === 'gold_matte') sdBase += numDoors*(ex.slidingGold || 80);
-            else if (sd.profileColor === 'black') sdBase += numDoors*(ex.slidingBlack || 50);
-            if (wh > 240) sdBase *= (1 + (ex.slidingHeightSurcharge || 0.15));
-            finalCost += Math.round(sdBase);
-        }
-
-        // Top panels (28mm surface boards on top of columns)
-        // Price per cm of panel width (merged spans counted once)
-        if (wing.columns && wing.columns.some(col => col.topPanel)) {
-            const t = wing.thickness || 1.7;
-            const TOP_PANEL_T = 2.8; // 28mm
-            const pricePerCm = ex.topPanelPerCm != null ? ex.topPanelPerCm : 8; // default ₪8/cm
-            // Build column left edges
-            const colLeftEdges = [];
-            let _cx = 0; // relative, just for width calculation
-            for (let ci = 0; ci < wing.columns.length; ci++) {
-                colLeftEdges.push(_cx);
-                _cx += wing.columns[ci].width + t;
-            }
-            // Find merged spans and sum total panel width
-            let spanStart = -1;
-            for (let ci = 0; ci <= wing.columns.length; ci++) {
-                const col = wing.columns[ci];
-                const inSpan = col && col.topPanel;
-                if (inSpan && spanStart === -1) {
-                    spanStart = ci;
-                } else if ((!inSpan || ci === wing.columns.length) && spanStart !== -1) {
-                    const spanCols = wing.columns.slice(spanStart, ci);
-                    const spanH = spanCols[0].height;
-                    const allSameH = spanCols.every(sc => Math.abs(sc.height - spanH) < 0.1);
-                    const lastIdx = ci - 1;
-                    const panelW = (colLeftEdges[lastIdx] + wing.columns[lastIdx].width + t / 2) - (colLeftEdges[spanStart] - t / 2);
-                    finalCost += Math.round(panelW * pricePerCm);
-                    spanStart = -1;
-                }
-            }
-        }
-
-        return finalCost;
-    }
 
     // Sum cost across all active wings
     let totalCost = 0;
@@ -2943,14 +2991,8 @@ function calculatePrice() {
     ['center','left','right'].forEach(side => {
         const wing = state.wings[side];
         if (!wing) return;
-        totalCost += _calcWingCost(wing);
-        const ww = wing.width, wh = wing.globalHeight;
-        const instUnit = cfg.installUnitCm || 42.5;
-        const instPer  = cfg.installPricePerUnit || 110;
-        const instHS   = cfg.installHeightSurcharge != null ? cfg.installHeightSurcharge : 0.20;
-        let inst = Math.ceil(ww / instUnit) * instPer;
-        if (wh > 240) inst *= (1 + instHS);
-        totalInstall += Math.round(inst);
+        totalCost += _calcWingCost(cfg, wing);
+        totalInstall += _calcWingInstallPrice(cfg, wing.width, wing.globalHeight);
     });
 
     // Wing connection surcharge
@@ -2984,112 +3026,37 @@ window.calcQuickPrice = function(autoUpdateShelves = false) {
     const w = parseFloat(document.getElementById('qc-w').value) || 0;
     const h = parseFloat(document.getElementById('qc-h').value) || 0;
     const d = parseFloat(document.getElementById('qc-d').value) || 0;
-    const model = document.getElementById('qc-plinth') ? document.getElementById('qc-plinth').value : 'maya';
+    const modelEl = document.getElementById('qc-plinth');
+    const model = modelEl ? modelEl.value : 'maya';
     const isMelamine = document.getElementById('qc-mat').value === 'melamine';
     const intDrawers = parseInt(document.getElementById('qc-int-d').value) || 0;
     const extDrawers = parseInt(document.getElementById('qc-ext-d').value) || 0;
-    let openCells = parseInt(document.getElementById('qc-open-cells').value) || 0;
+    const openCells = parseInt(document.getElementById('qc-open-cells').value) || 0;
     const hasDesk = document.getElementById('qc-desk').checked;
 
-    let allowedShelves = 0;
-    if (model !== 'c9') {
-        if (w <= 80) allowedShelves = 5; else if (w <= 160) allowedShelves = 8; else allowedShelves = 13;
-    } else {
-        if (w <= 80) allowedShelves = 2; else if (w <= 160) allowedShelves = 7; else allowedShelves = 12;
-    }
-    if (w > 240) {
-        const extraChunks = Math.ceil((w - 240) / 80);
-        allowedShelves += (extraChunks * 5);
-    }
-    if (h > 240) {
-        allowedShelves += Math.ceil(w / 80);
-    }
-
+    const allowedShelves = _calcIncludedShelves(w, h, model);
     const labelEl = document.getElementById('qc-allowed-shelves-label');
     if (labelEl) labelEl.innerText = `(כלול: ${allowedShelves})`;
 
     if (autoUpdateShelves === true) {
         const shelvesInput = document.getElementById('qc-shelves');
-        if(shelvesInput) shelvesInput.value = allowedShelves;
+        if (shelvesInput) shelvesInput.value = allowedShelves;
     }
 
     const shelvesEl = document.getElementById('qc-shelves');
     const shelves = shelvesEl ? (parseInt(shelvesEl.value) || 0) : 0;
 
-    let basePrice = 0;
-    let price240 = 0;
-    
-    if (model === 'ab2') {
-        if (isMelamine) {
-            price240 = 3013;
-            if (w <= 80) basePrice = 1004; else if (w <= 120) basePrice = 1507; else if (w <= 160) basePrice = 2009; else if (w <= 200) basePrice = 2511; else basePrice = price240;
-        } else {
-            price240 = 3918;
-            if (w <= 80) basePrice = 1305; else if (w <= 120) basePrice = 1959; else if (w <= 160) basePrice = 2612; else if (w <= 200) basePrice = 3265; else basePrice = price240;
-        }
-    } else if (model === 'c9' || model === 'ab2_nohoney') {
-        if (isMelamine) {
-            price240 = 2250;
-            if (w <= 80) basePrice = 970; else if (w <= 120) basePrice = 1340; else if (w <= 160) basePrice = 1500; else if (w <= 200) basePrice = 1870; else basePrice = price240;
-        } else {
-            price240 = 2920;
-            if (w <= 80) basePrice = 1250; else if (w <= 120) basePrice = 1600; else if (w <= 160) basePrice = 1945; else if (w <= 200) basePrice = 2433; else basePrice = price240;
-        }
-    } else if (model === 'regalim') {
-        if (isMelamine) {
-            price240 = 2487;
-            if (w <= 80) basePrice = 1050; else if (w <= 120) basePrice = 1462; else if (w <= 160) basePrice = 1658; else if (w <= 200) basePrice = 2073; else basePrice = price240;
-        } else {
-            price240 = 3233;
-            if (w <= 80) basePrice = 1360; else if (w <= 120) basePrice = 1900; else if (w <= 160) basePrice = 2155; else if (w <= 200) basePrice = 2700; else basePrice = price240;
-        }
-        const legCount = w <= 110 ? 4 : w <= 180 ? 6 : 8;
-        basePrice += legCount * 100;
-    } else {
-        if (isMelamine) {
-            price240 = 2487;
-            if (w <= 80) basePrice = 1050; else if (w <= 120) basePrice = 1462; else if (w <= 160) basePrice = 1658; else if (w <= 200) basePrice = 2073; else basePrice = price240;
-        } else {
-            price240 = 3233;
-            if (w <= 80) basePrice = 1360; else if (w <= 120) basePrice = 1900; else if (w <= 160) basePrice = 2155; else if (w <= 200) basePrice = 2700; else basePrice = price240;
-        }
-    }
+    const cfg = _getPricingCfg();
+    const wing = _buildQuickCalcWing(w, h, d, model, isMelamine, shelves, intDrawers, extDrawers, openCells, hasDesk);
+    const finalCost = _calcWingCost(cfg, wing);
+    const installPrice = _calcWingInstallPrice(cfg, w, h);
+    const profitMult = cfg.profitMultiplier != null ? cfg.profitMultiplier : 1.7;
+    const priceToCustomer = finalCost * profitMult;
 
-    if (w > 240) basePrice = (price240 / 240) * w;
-    if (h >= 241 && isMelamine) basePrice *= 1.20;
-    if (d > 54) basePrice *= 1.20;
-
-    let finalCost = basePrice;
-
-    if (shelves > allowedShelves) {
-        const extraShelves = shelves - allowedShelves;
-        const shelfPrice = isMelamine ? 60 : 80;
-        finalCost += (extraShelves * shelfPrice);
-    }
-
-    if (hasDesk) finalCost += 900;
-    finalCost += (intDrawers * 150);
-    finalCost += (extDrawers * 200);
-    
-    if ((model === 'ab2') && openCells > 0) openCells -= 1;
-    finalCost += (openCells * 400);
-
-    const splitThreshold = isMelamine ? 270 : 240;
-    if (h > splitThreshold) {
-        let topUnitCost = 0;
-        if (w <= 160) topUnitCost = 600;
-        else if (w <= 240) topUnitCost = 900;
-        else topUnitCost = w * 3.75;
-        
-        finalCost += topUnitCost;
-    }
-
-    let installPrice = Math.ceil(w / 42.5) * 110;
-    if (h > 240) installPrice *= 1.2;
-    
-    const priceToCustomer = finalCost * 1.7;
-
-    document.getElementById('qc-total-cost').innerText = '₪' + Math.round(finalCost).toLocaleString();
-    document.getElementById('qc-install').innerText = '₪' + Math.round(installPrice).toLocaleString();
-    document.getElementById('qc-total-cust').innerText = '₪' + Math.round(priceToCustomer).toLocaleString();
+    const costEl = document.getElementById('qc-total-cost');
+    const installEl = document.getElementById('qc-install');
+    const custEl = document.getElementById('qc-total-cust');
+    if (costEl) costEl.innerText = '₪' + Math.round(finalCost).toLocaleString();
+    if (installEl) installEl.innerText = '₪' + Math.round(installPrice).toLocaleString();
+    if (custEl) custEl.innerText = '₪' + Math.round(priceToCustomer).toLocaleString();
 };
