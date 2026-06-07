@@ -719,6 +719,10 @@ function _applyPresetCore(presetId, rightPos, leftPos) {
     _hideWingTab('right');
     state.activeWing = 'center';
     window._orbitFree = false;
+    window._forceCameraAnim = true;
+    window._corner3dCamPositioned = false;
+    window._frontCamPositioned = false;
+    window._wingEditCamInit = false;
 
     // Reset room wall position when switching presets
     state.roomWall = 'center';
@@ -1061,6 +1065,7 @@ window.enterWingEditMode = function(wingId) {
     }
     state.wingEditMode = true;
     state.activeWing = wingId;  // store full_corner_right / full_corner_left
+    window._wingEditCamInit = true;
     // Hide room when entering wing edit mode (for performance and clarity)
     if (window._roomGroup) window._roomGroup.visible = false;
     // Switch to front view (3D for full corner so camera can orbit)
@@ -1118,6 +1123,9 @@ window.confirmWingEdit = function() {
     state.viewMode = '3d';
     // Force camera animation back to default position (reset _orbitFree so updateCameraView animates)
     window._orbitFree = false;
+    window._forceCameraAnim = true;
+    window._corner3dCamPositioned = false;
+    window._wingEditCamInit = false;
     saveHistoryState();
     buildCabinet(); calculatePrice();
     // Animate camera back to free/front view
@@ -1865,6 +1873,10 @@ function restoreHistoryState() {
     const _snapIsLinear = (_snapPreset === 'linear' || _snapPreset === 'sliding');
     state.viewMode = _snapIsLinear ? 'front' : '3d';
     window._orbitFree = false;
+    window._forceCameraAnim = true;
+    window._corner3dCamPositioned = false;
+    window._frontCamPositioned = false;
+    window._wingEditCamInit = false;
     // Sync view button highlights
     document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
     const _snapViewBtn = document.getElementById(_snapIsLinear ? 'btn-front-view' : 'btn-3d-view');
@@ -2065,6 +2077,7 @@ window.enterSideCabinetEditMode = function(scSide) {
     }
     state.wingEditMode = true;
     state.activeWing = wingId;
+    window._wingEditCamInit = true;
     state.viewMode = 'front';
     window._orbitFree = false;
     const banner = document.getElementById('wing-edit-banner');

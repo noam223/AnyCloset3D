@@ -1035,7 +1035,6 @@ function updateCameraView() {
             // Keep default lighting — wing edit mode uses same intensity as free mode
             dirLight.intensity = 0.7;
             ambientLight.intensity = 0.6;
-            window._orbitFree = false;
             controls.enableRotate = true;
             container.classList.add('front-mode');
             scene.background = new THREE.Color(0xeceff1);
@@ -1044,6 +1043,18 @@ function updateCameraView() {
             floor.visible = true;
             const bpLayer = document.getElementById('blueprint-layer');
             if (bpLayer) { bpLayer.style.display = 'none'; bpLayer.innerHTML = ''; }
+
+            // Only snap camera on first entry to wing edit — not on every rebuild/edit action
+            const shouldAnimWingEditCam = !!window._wingEditCamInit;
+            if (shouldAnimWingEditCam) window._wingEditCamInit = false;
+
+            if (!shouldAnimWingEditCam) {
+                if (!window._camAnim) controls.enabled = true;
+                if (typeof buildDragHandlesUI === 'function') buildDragHandlesUI();
+                if (typeof updateQuickEditPanelUI === 'function') updateQuickEditPanelUI();
+                return;
+            }
+
             // Animate smoothly from current camera position to the wing's front view
             const oldCamPos = camera.position.clone();
             const oldTarget = controls.target.clone();
@@ -1136,8 +1147,27 @@ function updateCameraView() {
 
     // 3D mode with wings or corner: use preset-specific camera positions
     if ((hasAnyWing || hasCorner) && state.viewMode !== 'front' && state.viewMode !== 'blueprint') {
-        if (!window._orbitFree) {
-            // Use hardcoded camera positions per preset type
+        controls.enableRotate = true; container.classList.remove('front-mode');
+        scene.background = new THREE.Color(0xeceff1);
+        dirLight.position.set(120, 510, 600);
+        dirLight.intensity = 0.10;
+        ambientLight.intensity = 0.95;
+        dimLayer.style.display = 'none'; buttonsLayer.style.display = 'none';
+        floor.visible = true;
+
+        // User already orbited — keep their camera angle, just refresh overlays
+        if (window._orbitFree) {
+            controls.enabled = true;
+            controls.update();
+            if (typeof buildDragHandlesUI === 'function') buildDragHandlesUI();
+            if (typeof updateQuickEditPanelUI === 'function') updateQuickEditPanelUI();
+            return;
+        }
+
+        // Snap to preset camera only once — don't restart animation on every dimension change
+        if (!window._camAnim && (window._forceCameraAnim || !window._corner3dCamPositioned)) {
+            window._forceCameraAnim = false;
+            window._corner3dCamPositioned = true;
             const pid = state.presetId || '';
             let camPos, camTarget;
             if (pid === 'corner-right') {
@@ -1150,7 +1180,6 @@ function updateCameraView() {
                 camPos    = new THREE.Vector3(-248.77, 336.74, 494.33);
                 camTarget = new THREE.Vector3(107.54, 109.88, 32.81);
             } else {
-                // Fallback: calibrated position for full_corner / generic walkin setups
                 camPos    = new THREE.Vector3(-273.30, 268.26, 509.30);
                 camTarget = new THREE.Vector3(85.38, 124.15, 68.29);
             }
@@ -1167,14 +1196,9 @@ function updateCameraView() {
                 duration: 0.6,
                 onDone:   null
             };
+        } else if (!window._camAnim) {
+            controls.enabled = true;
         }
-        controls.enableRotate = true; container.classList.remove('front-mode');
-        scene.background = new THREE.Color(0xeceff1);
-        dirLight.position.set(120, 510, 600);
-        dirLight.intensity = 0.10;
-        ambientLight.intensity = 0.95;
-        dimLayer.style.display = 'none'; buttonsLayer.style.display = 'none';
-        floor.visible = true;
         controls.update();
         if(typeof buildDragHandlesUI === 'function') buildDragHandlesUI();
         if(typeof updateQuickEditPanelUI === 'function') updateQuickEditPanelUI();
@@ -1205,20 +1229,28 @@ function updateCameraView() {
             const bpLayer = document.getElementById('blueprint-layer');
             if (bpLayer) { bpLayer.style.display = 'none'; bpLayer.innerHTML = ''; }
         }
-        // Animate camera to new position
-        const oldCamPos = camera.position.clone();
-        const oldTarget = controls.target.clone();
-        controls.enabled = false;
-        controls.enableDamping = false;
-        window._camAnim = {
-            fromPos: oldCamPos,
-            fromTarget: oldTarget,
-            toPos: new THREE.Vector3(...toPosArr),
-            toTarget: new THREE.Vector3(...toTargetArr),
-            t: 0,
-            duration: 0.6,
-            onDone: null
-        };
+
+        // Don't restart camera animation on every dimension change — only when explicitly requested
+        const shouldAnimFrontCam = !window._camAnim && (window._forceCameraAnim || !window._frontCamPositioned);
+        if (shouldAnimFrontCam) {
+            window._forceCameraAnim = false;
+            window._frontCamPositioned = true;
+            const oldCamPos = camera.position.clone();
+            const oldTarget = controls.target.clone();
+            controls.enabled = false;
+            controls.enableDamping = false;
+            window._camAnim = {
+                fromPos: oldCamPos,
+                fromTarget: oldTarget,
+                toPos: new THREE.Vector3(...toPosArr),
+                toTarget: new THREE.Vector3(...toTargetArr),
+                t: 0,
+                duration: 0.6,
+                onDone: null
+            };
+        } else if (!window._camAnim) {
+            controls.enabled = true;
+        }
     } else {
         // 3D mode — only reset camera if user hasn't manually orbited
         if (!window._orbitFree) {
@@ -1232,6 +1264,7 @@ function updateCameraView() {
         ambientLight.intensity = 0.95;
         dimLayer.style.display = 'none'; buttonsLayer.style.display = 'none';
         floor.visible = true;
+        controls.enabled = true;
         controls.update();
     }
     if(typeof buildDragHandlesUI === 'function') buildDragHandlesUI();

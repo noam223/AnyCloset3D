@@ -4400,6 +4400,9 @@ function bindUI() {
         document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
         e.target.classList.add('active');
         window._orbitFree = false;
+        window._forceCameraAnim = true;
+        window._frontCamPositioned = false;
+        window._corner3dCamPositioned = false;
         const rb = document.getElementById('btn-reset-view'); if (rb) rb.style.display = 'none';
         state.viewMode = 'front'; updateCameraView(); buildCabinet();
     });
@@ -4412,6 +4415,8 @@ function bindUI() {
         document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
         e.target.classList.add('active');
         window._orbitFree = false;
+        window._forceCameraAnim = true;
+        window._frontCamPositioned = false;
         const rb = document.getElementById('btn-reset-view'); if (rb) rb.style.display = 'none';
         state.viewMode = 'blueprint'; updateCameraView(); buildCabinet();
     });
