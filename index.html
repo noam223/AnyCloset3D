@@ -36,7 +36,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260608b">
     <link rel="stylesheet" href="style-mobile.css?v=20260607b">
     <link rel="stylesheet" href="style-extras.css?v=20260607b">
-    <link rel="stylesheet" href="style.css?v=20260608i">
+    <link rel="stylesheet" href="style.css?v=20260608j">
     <style>
         html.thumb-only-mode #left-sidebar,
         html.thumb-only-mode #right-sidebar,
@@ -858,28 +858,33 @@
 <div id="left-sidebar">
     <div id="left-sidebar-toolbar">
     </div>
-    <div class="left-sidebar-header" style="display:flex; flex-direction:column; gap:8px;">
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-            <h2 style="margin:0;"><i class="fa-solid fa-list-check"></i> הארונות בפרויקט</h2>
-            <div style="display:flex;gap:6px;flex-shrink:0;">
-                <button id="btn-save-project-sidebar" onclick="window._saveProjectNow()" title="שמור פרויקט" style="background:rgba(59,130,246,0.12); border:1px solid rgba(59,130,246,0.35); color:#3b82f6; border-radius:8px; padding:5px 10px; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; white-space:nowrap;">
+    <div class="left-sidebar-header">
+        <div class="left-sidebar-header-top">
+            <h2 id="sidebar-project-name" class="sidebar-project-name" title="פרויקט חדש">פרויקט חדש</h2>
+            <div class="left-sidebar-header-actions">
+                <button id="btn-save-project-sidebar" onclick="window._saveProjectNow()" title="שמור פרויקט">
                     <i class="fa-solid fa-cloud-arrow-up"></i> שמור
                 </button>
-                <button onclick="newProject()" title="פרויקט חדש" style="background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.35); color:#ef4444; border-radius:8px; padding:5px 10px; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; white-space:nowrap;">
+                <button onclick="newProject()" title="פרויקט חדש">
                     <i class="fa-solid fa-plus"></i> חדש
                 </button>
             </div>
         </div>
-        <div style="display:flex;gap:6px;width:100%;">
-            <button id="btn-share-live" onclick="window._shareLiveLink()" title="שתף קישור צפייה חיה ללקוח" style="flex:1;background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.35); color:#10b981; border-radius:8px; padding:7px 12px; font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; position:relative;">
+        <div class="left-sidebar-share-row">
+            <button id="btn-share-live" onclick="window._shareLiveLink()" title="שתף קישור צפייה חיה ללקוח" class="left-sidebar-share-btn">
                 <i class="fa-solid fa-share-nodes"></i> שתף ללקוח
             </button>
-            <div style="position:relative;display:inline-flex;flex-shrink:0;">
-                <button id="btn-designer-notes" onclick="window._openDesignerNotes()" title="תיקונים" style="background:rgba(37,99,235,0.1); border:1px solid rgba(37,99,235,0.3); color:#2563eb; border-radius:8px; padding:7px 12px; font-size:13px; cursor:pointer; display:none; align-items:center; justify-content:center; gap:5px; white-space:nowrap;">
+            <div class="left-sidebar-notes-wrap">
+                <button id="btn-designer-notes" onclick="window._openDesignerNotes()" title="תיקונים" class="left-sidebar-notes-btn">
                     <i class="fa-solid fa-note-sticky"></i> תיקונים
                 </button>
-                <span id="chat-unread-badge" style="display:none;position:absolute;top:-5px;right:-5px;background:#ef4444;color:white;border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:700;align-items:center;justify-content:center;line-height:1;z-index:10;">0</span>
+                <span id="chat-unread-badge">0</span>
             </div>
+        </div>
+        <div id="sidebar-cabinets-label" class="sidebar-cabinets-label">
+            <i class="fa-solid fa-list-check"></i>
+            <span>ארונות בפרויקט</span>
+            <span id="sidebar-cabinets-count" class="sidebar-cabinets-count"></span>
         </div>
     </div>
     <div class="cart-items-list" id="cart-items-list"></div>

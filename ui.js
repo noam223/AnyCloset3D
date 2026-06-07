@@ -5773,6 +5773,18 @@ window.updateLeftSidebar = function() {
     const cabTotalEl = document.getElementById('sidebar-cab-total');
     const instTotalEl = document.getElementById('sidebar-inst-total');
 
+    const nameEl = document.getElementById('sidebar-project-name');
+    const countEl = document.getElementById('sidebar-cabinets-count');
+    if (nameEl) {
+        const projName = (window._currentProjectName || '').trim() || 'פרויקט חדש';
+        nameEl.textContent = projName;
+        nameEl.title = projName;
+    }
+    if (countEl) {
+        const n = (state.orderCart && state.orderCart.length) || 0;
+        countEl.textContent = n > 0 ? '(' + n + ')' : '';
+    }
+
     if (!listContainer || !totalEl) return;
     listContainer.innerHTML = '';
     let totalCabinetsPrice = 0; let totalInstallPrice = 0;

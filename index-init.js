@@ -513,6 +513,7 @@ window._saveProjectNow = async function() {
             if (btn) { btn.innerHTML = '<i class="fa-solid fa-check"></i> נשמר!'; btn.disabled = false; }
             setTimeout(function() { if (btn) btn.innerHTML = origHTML; }, 2000);
             if (typeof _showToast === 'function') _showToast('✅ הפרויקט נשמר בהצלחה', 3000);
+            if (typeof updateLeftSidebar === 'function') updateLeftSidebar();
         }
     } catch(e) {
         console.error('[SaveNow] Exception:', e);
