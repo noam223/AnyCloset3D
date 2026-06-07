@@ -108,10 +108,11 @@ body {
 #top-bar {
     position: fixed;
     top: 14px;
-    left: var(--layout-canvas-center);
-    transform: translateX(-50%);
+    left: var(--layout-sidebar-left);
+    right: var(--layout-sidebar-right);
     width: max-content;
-    max-width: calc(var(--layout-canvas-width) - 24px);
+    max-width: calc(100% - 24px);
+    margin-inline: auto;
     background: rgba(255,255,255,0.92);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
@@ -121,8 +122,13 @@ body {
     display: flex; align-items: center; justify-content: center; gap: 2px;
     z-index: 100;
     border: 1px solid rgba(255,255,255,0.8);
-    animation: fadeInUp 0.4s var(--transition-slow) both;
+    animation: topBarFadeIn 0.4s var(--transition-slow) both;
     pointer-events: auto;
+}
+
+@keyframes topBarFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
 }
 
 #top-bar .icon-btn { padding: 6px 12px; font-size: 1rem; }

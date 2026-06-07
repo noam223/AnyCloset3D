@@ -87,10 +87,11 @@ body {
 #top-bar {
     position: fixed;
     top: 15px;
-    left: var(--layout-canvas-center, calc(360px + (100vw - 780px) / 2));
-    transform: translateX(-50%);
+    left: var(--layout-sidebar-left, 360px);
+    right: var(--layout-sidebar-right, 420px);
     width: max-content;
-    max-width: calc(100vw - 360px - 420px - 24px);
+    max-width: calc(100% - 24px);
+    margin-inline: auto;
     background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px);
     padding: 5px 8px; border-radius: 40px;
     box-shadow: var(--shadow-md);
