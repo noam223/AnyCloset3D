@@ -696,9 +696,10 @@ window.Projects = {
 
         const payload = {
             name,
-            project_data: projectData,
             updated_at: new Date().toISOString(),
-            ...(thumbnail && { thumbnail })
+            ...(projectData != null && { project_data: projectData }),
+            ...(thumbnail && { thumbnail }),
+            ...(cabinetCount != null && { cabinet_count: cabinetCount })
         };
 
         if (projectId) {
@@ -719,6 +720,20 @@ window.Projects = {
             if (error) return { error: error.message };
             return { data };
         }
+    },
+
+    // ── Update thumbnail only (no project_data change) ─────────────────────
+    updateThumbnail: async function(projectId, thumbnail) {
+        const sb = _getClient(); if (!sb) return { error: 'SDK not loaded' };
+        if (!projectId || !thumbnail) return { error: 'Missing id or thumbnail' };
+        const { data, error } = await sb
+            .from('projects')
+            .update({ thumbnail, updated_at: new Date().toISOString() })
+            .eq('id', projectId)
+            .select('id, thumbnail')
+            .single();
+        if (error) return { error: error.message };
+        return { data };
     },
 
     // ── Delete project ───────────────────────────────────────────────────────

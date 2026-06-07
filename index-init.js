@@ -138,11 +138,16 @@
 
     // 4. Load project from URL param ?project=<id>
     var projectId = new URLSearchParams(window.location.search).get('project');
+    var _thumbOnly = new URLSearchParams(window.location.search).get('thumbOnly') === '1';
+    if (_thumbOnly) {
+        document.documentElement.classList.add('thumb-only-mode');
+    }
     if (projectId) {
         var proj = await Projects.load(projectId);
         if (proj && proj.project_data) {
             window._currentProjectId   = proj.id;
             window._currentProjectName = proj.name;
+            window._needsThumbnailBackfill = !proj.thumbnail && !_thumbOnly;
             try {
                 var snap = typeof proj.project_data === 'string'
                     ? JSON.parse(proj.project_data)
@@ -218,6 +223,32 @@
                     if (notesBtn) notesBtn.style.display = 'flex';
                 }, 500);
             }
+            // Generate thumbnail for projects page (iframe backfill mode)
+            if (_thumbOnly) {
+                setTimeout(function() { _runThumbOnlyCapture(); }, 2500);
+            } else if (window._needsThumbnailBackfill) {
+                setTimeout(function() { _backfillProjectThumbnail(); }, 2000);
+            }
+        }
+    }
+
+    async function _backfillProjectThumbnail() {
+        if (!window._currentProjectId || typeof window.captureProjectThumbnail !== 'function') return;
+        var thumb = window.captureProjectThumbnail();
+        if (!thumb) return;
+        var res = await Projects.updateThumbnail(window._currentProjectId, thumb);
+        if (!res || res.error) console.warn('[Thumbnail] backfill failed:', res && res.error);
+        else window._needsThumbnailBackfill = false;
+    }
+
+    async function _runThumbOnlyCapture() {
+        if (!window._currentProjectId || typeof window.captureProjectThumbnail !== 'function') return;
+        var thumb = window.captureProjectThumbnail();
+        if (thumb) {
+            await Projects.updateThumbnail(window._currentProjectId, thumb);
+            try {
+                window.parent.postMessage({ type: 'project-thumbnail', id: window._currentProjectId, thumbnail: thumb }, '*');
+            } catch (e) {}
         }
     }
 
@@ -272,8 +303,12 @@
         if (!window._currentProjectId) return;
         var snap;
         try { snap = _buildSnap(); } catch(e) { console.error('[Save] Serialization error:', e); return; }
+        var thumb = null;
+        try {
+            if (typeof window.captureProjectThumbnail === 'function') thumb = window.captureProjectThumbnail();
+        } catch (e) { console.warn('[Save] Thumbnail capture failed:', e); }
         console.log('[' + label + '] Saving, size:', Math.round(JSON.stringify(snap).length/1024) + 'KB');
-        var result = await Projects.save(window._currentProjectId, window._currentProjectName, snap);
+        var result = await Projects.save(window._currentProjectId, window._currentProjectName, snap, thumb);
         if (result && result.error) {
             console.error('[' + label + '] Failed:', result.error);
             if (typeof _showToast === 'function') _showToast('⚠️ שגיאה בשמירת הפרויקט: ' + result.error, 5000);
@@ -458,7 +493,11 @@ window._saveProjectNow = async function() {
             customer:      state.customer
         }));
         console.log('[SaveNow] Saving project "' + window._currentProjectName + '", payload size:', Math.round(JSON.stringify(snap).length/1024) + 'KB, cart items:', lightCart.length);
-        var result = await Projects.save(window._currentProjectId, window._currentProjectName, snap);
+        var thumb = null;
+        try {
+            if (typeof window.captureProjectThumbnail === 'function') thumb = window.captureProjectThumbnail();
+        } catch (e) { console.warn('[SaveNow] Thumbnail capture failed:', e); }
+        var result = await Projects.save(window._currentProjectId, window._currentProjectName, snap, thumb);
         if (result && result.error) {
             console.error('[SaveNow] Failed:', result.error);
             if (typeof _showToast === 'function') _showToast('⚠️ שגיאה בשמירה: ' + result.error, 5000);

@@ -37,6 +37,14 @@
     <link rel="stylesheet" href="style-mobile.css?v=20260607b">
     <link rel="stylesheet" href="style-extras.css?v=20260607b">
     <link rel="stylesheet" href="style.css?v=20260608d">
+    <style>
+        html.thumb-only-mode #left-sidebar,
+        html.thumb-only-mode #right-sidebar,
+        html.thumb-only-mode #top-bar,
+        html.thumb-only-mode #mobile-bottom-bar,
+        html.thumb-only-mode #auth-gate { display: none !important; }
+        html.thumb-only-mode #canvas-container { inset: 0 !important; }
+    </style>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -2253,13 +2261,13 @@
 <script src="auth.js"></script>
 <script src="state.js?v=20260608a"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
-<script src="engine-core.js?v=20260608e"></script>
+<script src="engine-core.js?v=20260608f"></script>
 <script src="engine-corners.js?v=20260608e"></script>
 <script src="engine-blueprint.js?v=20260608e"></script>
 <script src="ui.js?v=20260608a"></script>
 <script src="mobile.js?v=20260608a"></script>
 <script src="part-paint.js?v=20260520k"></script>
-<script src="index-init.js?v=20260520k"></script>
+<script src="index-init.js?v=20260608f"></script>
 
 <!-- ===== SHARE LIVE LINK MODAL (tasks 3, 4, 12) ===== -->
 <div id="share-live-modal" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.55);align-items:center;justify-content:center;padding:16px;" onclick="if(event.target===this)document.getElementById('share-live-modal').style.display='none'">

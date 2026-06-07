@@ -4354,3 +4354,68 @@ if (compData && compData.type === 'hanging') {
         buildCornerUnit();
     }
 }
+
+// Capture a JPEG thumbnail of the current cabinet for project cards
+window.captureProjectThumbnail = function() {
+    try {
+        if (!renderer || !camera || !controls || !scene) return null;
+
+        var savedPos = camera.position.clone();
+        var savedTarget = controls.target.clone();
+        var savedFov = camera.fov;
+        var savedCamAnim = window._camAnim;
+        var savedViewMode = state.viewMode;
+        var savedHasDoors = state.hasDoors;
+        var savedDimDisplay = dimLayer ? dimLayer.style.display : '';
+        var savedBtnDisplay = buttonsLayer ? buttonsLayer.style.display : '';
+
+        state.viewMode = 'front';
+        state.hasDoors = true;
+        buildCabinet();
+        updateCameraView();
+        if (window._camAnim) {
+            camera.position.copy(window._camAnim.toPos);
+            controls.target.copy(window._camAnim.toTarget);
+            window._camAnim = null;
+        }
+        controls.update();
+        if (dimLayer) dimLayer.style.display = 'none';
+        if (buttonsLayer) buttonsLayer.style.display = 'none';
+        renderer.render(scene, camera);
+
+        var tw = 480, th = 360;
+        var cvs = document.createElement('canvas');
+        cvs.width = tw;
+        cvs.height = th;
+        var ctx = cvs.getContext('2d');
+        ctx.fillStyle = '#eceff1';
+        ctx.fillRect(0, 0, tw, th);
+        ctx.drawImage(renderer.domElement, 0, 0, tw, th);
+        var dataUrl = cvs.toDataURL('image/jpeg', 0.72);
+
+        camera.fov = savedFov;
+        camera.updateProjectionMatrix();
+        camera.position.copy(savedPos);
+        controls.target.copy(savedTarget);
+        controls.update();
+        window._camAnim = savedCamAnim;
+        state.viewMode = savedViewMode;
+        state.hasDoors = savedHasDoors;
+        if (dimLayer) dimLayer.style.display = savedDimDisplay;
+        if (buttonsLayer) buttonsLayer.style.display = savedBtnDisplay;
+        buildCabinet();
+        updateCameraView();
+        if (window._camAnim) {
+            camera.position.copy(window._camAnim.toPos);
+            controls.target.copy(window._camAnim.toTarget);
+            window._camAnim = null;
+        }
+        controls.update();
+        renderer.render(scene, camera);
+
+        return dataUrl;
+    } catch (e) {
+        console.warn('[captureProjectThumbnail]', e);
+        return null;
+    }
+};
