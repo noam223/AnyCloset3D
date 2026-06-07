@@ -102,7 +102,7 @@ body {
 #top-bar {
     position: absolute;
     top: 14px;
-    left: calc(50% - 30px);
+    left: 50%;
     transform: translateX(-50%);
     width: max-content;
     background: rgba(255,255,255,0.92);
@@ -249,6 +249,30 @@ body {
 }
 .left-sidebar-header h2 { font-size: 1.15rem; display: flex; align-items: center; justify-content: center; gap: 8px;}
 .sidebar-header p { margin: 4px 0 0 0; color: rgba(255,255,255,0.5); font-size: 0.8rem; font-weight: 400; }
+
+.sidebar-logo-link {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    flex-shrink: 0;
+}
+.sidebar-logo-img {
+    height: 44px;
+    width: auto;
+    min-width: 100px;
+    max-width: 220px;
+    object-fit: contain;
+    flex-shrink: 0;
+    filter: brightness(0) invert(1);
+}
+.sidebar-section-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #fff;
+    margin: 14px 0 0 0;
+    letter-spacing: 0.3px;
+    text-align: center;
+}
 
 /* Cabinet preset buttons */
 #cabinet-presets-row { padding: 0 2px; }
