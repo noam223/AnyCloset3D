@@ -2,6 +2,8 @@
 // ==========================================
 // Multi-view blueprint SVG generator
 // ==========================================
+const DESK_SURFACE_T = 2.8; // 28mm — all desk horizontal surfaces
+
 window._generateMultiViewBlueprintSVG = function() {
     const pid = state.presetId;
     const centerWing = state.wings.center;
@@ -467,7 +469,8 @@ window._generateMultiViewBlueprintSVG = function() {
             const drawerH = state.desk.drawerHeight || 12;
             const dSvgW  = dWidth  * sc;
             const dSvgH  = dHeight * sc;
-            const legT   = (state.thickness || 1.7) * sc; // board thickness in SVG pixels
+            const legT   = (state.thickness || 1.7) * sc; // vertical leg board
+            const deskSurfT = DESK_SURFACE_T * sc;
             // Desk sits to the left or right of the cabinet body
             const deskX  = dSide === 'left' ? (ox - dSvgW) : (ox + dW);
             const deskBotY = oy + dH; // floor level
@@ -475,15 +478,15 @@ window._generateMultiViewBlueprintSVG = function() {
             // Outer leg (vertical board)
             const legX = dSide === 'left' ? deskX : (deskX + dSvgW - legT);
             rect(legX, deskTopY, legT, dSvgH, wg.fill, STROKE, 1.5);
-            // Desk surface (horizontal board at top)
-            rect(deskX, deskTopY, dSvgW, legT, wg.fill, STROKE, 1.5);
+            // Desk surface (horizontal board at top, 28mm)
+            rect(deskX, deskTopY, dSvgW, deskSurfT, wg.fill, STROKE, 1.5);
             // Drawers (if any) — sit just below the desk surface, inside the leg
             if (state.desk.hasDrawers) {
                 const numDrawers = (state.desk.drawerCount != null) ? state.desk.drawerCount : (dWidth <= 80 ? 1 : 2);
                 const innerSvgW = dSvgW - legT; // width between cabinet wall and leg
                 const drawerSvgW = innerSvgW / numDrawers;
                 const drawerSvgH = drawerH * sc;
-                const drawerSvgY = deskTopY + legT; // just below desk surface
+                const drawerSvgY = deskTopY + deskSurfT; // just below desk surface
                 const drawerStartX = dSide === 'left' ? deskX : (deskX + legT);
                 for (let di = 0; di < numDrawers; di++) {
                     const dx = drawerStartX + di * drawerSvgW;
@@ -496,15 +499,15 @@ window._generateMultiViewBlueprintSVG = function() {
                 }
                 // Dimension: drawer height (inner side of desk)
                 const dimInnerX = dSide === 'left' ? (deskX + dSvgW + 14) : (deskX - 14);
-                const drawerSvgY0 = deskTopY + legT;
+                const drawerSvgY0 = deskTopY + deskSurfT;
                 if (dSide === 'left') {
                     dimV(dimInnerX, drawerSvgY0, drawerSvgY0 + drawerH * sc, `${Math.round(drawerH * 10)}`);
                     // Dimension: floor to drawer bottom (gap below drawer)
-                    dimV(dimInnerX + 36, drawerSvgY0 + drawerH * sc, deskBotY, `${Math.round((dHeight - (state.thickness || 1.7) - drawerH) * 10)}`);
+                    dimV(dimInnerX + 36, drawerSvgY0 + drawerH * sc, deskBotY, `${Math.round((dHeight - DESK_SURFACE_T - drawerH) * 10)}`);
                 } else {
                     dimVLeft(dimInnerX, drawerSvgY0, drawerSvgY0 + drawerH * sc, `${Math.round(drawerH * 10)}`);
                     // Dimension: floor to drawer bottom (gap below drawer)
-                    dimVLeft(dimInnerX - 36, drawerSvgY0 + drawerH * sc, deskBotY, `${Math.round((dHeight - (state.thickness || 1.7) - drawerH) * 10)}`);
+                    dimVLeft(dimInnerX - 36, drawerSvgY0 + drawerH * sc, deskBotY, `${Math.round((dHeight - DESK_SURFACE_T - drawerH) * 10)}`);
                 }
             }
             // Dimension: desk width (below)
@@ -583,13 +586,14 @@ window._generateMultiViewBlueprintSVG = function() {
                 rect(colX, openTop, colW, openBot - openTop, 'white', STROKE_THIN, 0.5);
                 // Desk surface line
                 p.push(`<line x1="${colX.toFixed(1)}" y1="${openTop.toFixed(1)}" x2="${(colX+colW).toFixed(1)}" y2="${openTop.toFixed(1)}" stroke="${STROKE}" stroke-width="1.5"/>`);
+                const deskSurfPx = DESK_SURFACE_T * sc;
                 // Drawers below desk surface
                 if (col.hasDrawers) {
                     const drawerH = col.drawerHeight || 12;
                     const numDrawers = (col.width || wg.w) <= 80 ? 1 : 2;
                     const drawerW = colW / numDrawers;
                     const drawerPxH = drawerH * sc;
-                    const drawerY = openTop + 2; // just below desk surface
+                    const drawerY = openTop + deskSurfPx;
                     for (let di = 0; di < numDrawers; di++) {
                         const dx = colX + di * drawerW;
                         rect(dx + 2, drawerY, drawerW - 4, drawerPxH - 2, 'rgba(255,255,255,0.7)', STROKE_THIN, 0.8);
@@ -601,7 +605,7 @@ window._generateMultiViewBlueprintSVG = function() {
                     // Dimension: drawer height (right side of column)
                     dimV(colX + colW + 14, drawerY, drawerY + drawerPxH, `${Math.round(drawerH * 10)}`);
                     // Dimension: floor to drawer bottom (gap from floor to bottom of drawer)
-                    dimV(colX + colW + 50, drawerY + drawerPxH, _colBotY, `${Math.round((deskH - (state.thickness || 1.7) - drawerH) * 10)}`);
+                    dimV(colX + colW + 50, drawerY + drawerPxH, _colBotY, `${Math.round((deskH - DESK_SURFACE_T - drawerH) * 10)}`);
                 }
                 // Clearance board (shelf above clearance zone) — measured from column bottom
                 const clrBoardY = _colBotY - (deskH + deskClr) * sc;
@@ -1488,7 +1492,8 @@ window._generateMultiViewBlueprintPages = function() {
             const drawerH = state.desk.drawerHeight || 12;
             const dSvgW   = dWidth  * sc;
             const dSvgH   = dHeight * sc;
-            const legT    = (state.thickness || 1.7) * sc; // board thickness in SVG pixels
+            const legT    = (state.thickness || 1.7) * sc; // vertical leg board
+            const deskSurfT = DESK_SURFACE_T * sc;
             // Desk sits to the left or right of the cabinet body
             const deskX   = dSide === 'left' ? (ox - dSvgW) : (ox + dW);
             const deskBotY = oy + dH; // floor level
@@ -1496,15 +1501,15 @@ window._generateMultiViewBlueprintPages = function() {
             // Outer leg (vertical board)
             const legX = dSide === 'left' ? deskX : (deskX + dSvgW - legT);
             makeRect(p, legX, deskTopY, legT, dSvgH, wg.fill, STROKE, 1.5);
-            // Desk surface (horizontal board at top)
-            makeRect(p, deskX, deskTopY, dSvgW, legT, wg.fill, STROKE, 1.5);
+            // Desk surface (horizontal board at top, 28mm)
+            makeRect(p, deskX, deskTopY, dSvgW, deskSurfT, wg.fill, STROKE, 1.5);
             // Drawers (if any) — sit just below the desk surface, inside the leg
             if (state.desk.hasDrawers) {
                 const numDrawers = (state.desk.drawerCount != null) ? state.desk.drawerCount : (dWidth <= 80 ? 1 : 2);
                 const innerSvgW = dSvgW - legT; // width between cabinet wall and leg
                 const drawerSvgW = innerSvgW / numDrawers;
                 const drawerSvgH = drawerH * sc;
-                const drawerSvgY = deskTopY + legT; // just below desk surface
+                const drawerSvgY = deskTopY + deskSurfT; // just below desk surface
                 const drawerStartX = dSide === 'left' ? deskX : (deskX + legT);
                 for (let di = 0; di < numDrawers; di++) {
                     const dx = drawerStartX + di * drawerSvgW;
@@ -1517,15 +1522,15 @@ window._generateMultiViewBlueprintPages = function() {
                 }
                 // Dimension: drawer height (inner side of desk)
                 const dimInnerX = dSide === 'left' ? (deskX + dSvgW + 14) : (deskX - 14);
-                const drawerSvgY0 = deskTopY + legT;
+                const drawerSvgY0 = deskTopY + deskSurfT;
                 if (dSide === 'left') {
                     makeDimV(p, dimInnerX, drawerSvgY0, drawerSvgY0 + drawerH * sc, `${Math.round(drawerH * 10)}`);
                     // Dimension: floor to drawer bottom (gap below drawer)
-                    makeDimV(p, dimInnerX + 36, drawerSvgY0 + drawerH * sc, deskBotY, `${Math.round((dHeight - (state.thickness || 1.7) - drawerH) * 10)}`);
+                    makeDimV(p, dimInnerX + 36, drawerSvgY0 + drawerH * sc, deskBotY, `${Math.round((dHeight - DESK_SURFACE_T - drawerH) * 10)}`);
                 } else {
                     makeDimVLeft(p, dimInnerX, drawerSvgY0, drawerSvgY0 + drawerH * sc, `${Math.round(drawerH * 10)}`);
                     // Dimension: floor to drawer bottom (gap below drawer)
-                    makeDimVLeft(p, dimInnerX - 36, drawerSvgY0 + drawerH * sc, deskBotY, `${Math.round((dHeight - (state.thickness || 1.7) - drawerH) * 10)}`);
+                    makeDimVLeft(p, dimInnerX - 36, drawerSvgY0 + drawerH * sc, deskBotY, `${Math.round((dHeight - DESK_SURFACE_T - drawerH) * 10)}`);
                 }
             }
             // Dimension: desk width (below)
@@ -1605,13 +1610,14 @@ window._generateMultiViewBlueprintPages = function() {
                 makeRect(p, colX, openTop, colW, openBot - openTop, 'white', STROKE_THIN, 0.5);
                 // Desk surface line
                 p.push(`<line x1="${colX.toFixed(1)}" y1="${openTop.toFixed(1)}" x2="${(colX+colW).toFixed(1)}" y2="${openTop.toFixed(1)}" stroke="${STROKE}" stroke-width="1.5"/>`);
+                const deskSurfPx = DESK_SURFACE_T * sc;
                 // Drawers below desk surface
                 if (col.hasDrawers) {
                     const drawerH = col.drawerHeight || 12;
                     const numDrawers = (col.width || wg.w) <= 80 ? 1 : 2;
                     const drawerW = colW / numDrawers;
                     const drawerPxH = drawerH * sc;
-                    const drawerY = openTop + 2;
+                    const drawerY = openTop + deskSurfPx;
                     for (let di = 0; di < numDrawers; di++) {
                         const dx = colX + di * drawerW;
                         makeRect(p, dx + 2, drawerY, drawerW - 4, drawerPxH - 2, 'rgba(255,255,255,0.7)', STROKE_THIN, 0.8);
@@ -1623,7 +1629,7 @@ window._generateMultiViewBlueprintPages = function() {
                     // Dimension: drawer height (right side of column)
                     makeDimV(p, colX + colW + 14, drawerY, drawerY + drawerPxH, `${Math.round(drawerH * 10)}`);
                     // Dimension: floor to drawer bottom (gap from floor to bottom of drawer)
-                    makeDimV(p, colX + colW + 50, drawerY + drawerPxH, _colBotSvgY, `${Math.round((deskH - (state.thickness || 1.7) - drawerH) * 10)}`);
+                    makeDimV(p, colX + colW + 50, drawerY + drawerPxH, _colBotSvgY, `${Math.round((deskH - DESK_SURFACE_T - drawerH) * 10)}`);
                 }
                 // Clearance board (shelf above clearance zone)
                 const clrBoardY = _colBotSvgY - (deskH + deskClr) * sc;
@@ -2397,10 +2403,10 @@ window._generateMultiViewBlueprintPages = function() {
             const numDeskDrawers = cu.deskDrawerCount || 0;
             if (numDeskDrawers > 0) {
                 const drawerUnitW = Math.min(dW * 0.45, 60); // drawer unit width in SVG px
-                const innerH_cm = cuH - pH - (state.thickness || 1.7);
+                const innerH_cm = cuH - pH - DESK_SURFACE_T;
                 const drawerH_cm = (innerH_cm - 0.4 * (numDeskDrawers - 1)) / numDeskDrawers;
                 for (let di = 0; di < numDeskDrawers; di++) {
-                    const drawerBotCm = pH + (state.thickness || 1.7) + di * (drawerH_cm + 0.4);
+                    const drawerBotCm = pH + DESK_SURFACE_T + di * (drawerH_cm + 0.4);
                     const drawerTopCm = drawerBotCm + drawerH_cm;
                     const dy1 = oy + dH - drawerTopCm * sc;
                     const dy2 = oy + dH - drawerBotCm * sc;

@@ -349,6 +349,7 @@ function buildCornerUnit() {
     const cuD = cu.depth || bodyD; // width in X (default = main cabinet depth)
     const plinthH = state.plinthHeight;
     const sign = (cu.side === 'right') ? 1 : -1;
+    const deskT = 2.8; // 28mm — desk horizontal surfaces
 
     // Group center in world space:
     // X center: sign * (mainW/2 - cuD/2)  — inside cabinet
@@ -407,17 +408,17 @@ function buildCornerUnit() {
     if (cu.type === 'desk') {
         const matDesk = materials[state.materialDesk] || matBody;
         const deskH = cu.height || 80;
-        // Surface: full width × full depth
-        addBoard(cuD, t, cuW, 0, deskH - t / 2, 0, matDesk);
+        // Surface: full width × full depth (28mm thick)
+        addBoard(cuD, deskT, cuW, 0, deskH - deskT / 2, 0, matDesk);
         // Back leg at far Z (outer end wall, far from main cabinet front face)
         addBoard(cuD, deskH, t, 0, deskH / 2, backWallZ, matDesk);
-        // Optional drawers under desk surface — fronts face the inner open side (same as drawer-type corner unit)
+        // Drawers under desk — internal (recessed inside frame), external handles
         const numDeskDrawers = Math.min(cu.deskDrawerCount || 0, 3);
         if (numDeskDrawers > 0) {
             const drawerH = cu.deskDrawerHeight || 13;
             const gap = 0.4;
-            const dY = deskH - t - drawerH / 2;
-            const fX = sign * (-cuD / 2 - t / 2 - 0.1);
+            const dY = deskH - deskT - drawerH / 2;
+            const fX = sign * (-cuD / 2 + t / 2 + 1.5);
             if (numDeskDrawers === 1) {
                 const dMesh = addBoard(t, drawerH - 0.5, innerD, fX, dY, innerCtrZ, matExternal);
                 if (!isBP) _cuAddDrawerHandle(dMesh, innerD, drawerH, sign, t);
