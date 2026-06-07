@@ -50,10 +50,10 @@
     gap: 20px;
 }
 .auth-gate-logo {
-    width: min(280px, 72vw);
+    width: min(420px, 88vw);
     height: auto;
-    min-height: 72px;
-    max-height: 110px;
+    min-height: 100px;
+    max-height: 160px;
     object-fit: contain;
     flex-shrink: 0;
     opacity: 0.95;
