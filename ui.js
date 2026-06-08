@@ -783,7 +783,7 @@ function buildDimensionsAndButtonsUI() {
         btn.dataset.y3d = d.y;
         // Show zone label if multiple zones exist in this sub-cell
         const zoneLabel = (d.numZones && d.numZones > 1) ? `תא ${d.subCellIdx + 1} אזור ${zoneIdx + 1}` : `תא ${d.subCellIdx + 1}`;
-        btn.title = zoneLabel;
+        btn.title = zoneLabel + ' (Ctrl+לחיצה לבחירה מרובה)';
 
         // Stop pointer events from bubbling to canvas (prevents canvas pointerup from clearing state.selection)
         btn.addEventListener('pointerdown', e => e.stopPropagation());
@@ -798,7 +798,7 @@ function buildDimensionsAndButtonsUI() {
                 if (!(state.selection.colIndex === d.colIndex && state.selection.rows.includes(d.rowIndex))) {
                     state.selection = { colIndex: d.colIndex, rows: [d.rowIndex] };
                 }
-                window.setActiveSubCell(zoneKey); // toggles off — rebuilds overlay + toolbar
+                window.setActiveSubCell(zoneKey, e.ctrlKey || e.metaKey || e.shiftKey);
             });
         } else if (hasSubContent) {
             // Has content: circular pill with pen + trash
@@ -816,7 +816,7 @@ function buildDimensionsAndButtonsUI() {
                 if (!(state.selection.colIndex === d.colIndex && state.selection.rows.includes(d.rowIndex))) {
                     state.selection = { colIndex: d.colIndex, rows: [d.rowIndex] };
                 }
-                window.setActiveSubCell(zoneKey); // toggle select — rebuilds overlay + toolbar
+                window.setActiveSubCell(zoneKey, e.ctrlKey || e.metaKey || e.shiftKey);
             });
             btn.querySelector('.sub-btn-trash').addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -828,7 +828,7 @@ function buildDimensionsAndButtonsUI() {
                     if (!s) return;
                     if (Array.isArray(s.zonesType)) {
                         s.zonesType[z] = 'empty';
-                        // If all zones are empty, also clear sub.type
+                        if (Array.isArray(s.zonesDoorStyle)) s.zonesDoorStyle[z] = 'solid';
                         if (s.zonesType.every(t => !t || t === 'empty')) {
                             s.type = 'empty';
                         }
@@ -851,7 +851,7 @@ function buildDimensionsAndButtonsUI() {
                 if (!(state.selection.colIndex === d.colIndex && state.selection.rows.includes(d.rowIndex))) {
                     state.selection = { colIndex: d.colIndex, rows: [d.rowIndex] };
                 }
-                window.setActiveSubCell(zoneKey); // toggle select — rebuilds overlay + toolbar
+                window.setActiveSubCell(zoneKey, e.ctrlKey || e.metaKey || e.shiftKey);
             });
         }
 
@@ -1190,7 +1190,7 @@ function updateToolbarButtonHighlights() {
             if (btn) btn.classList.add('active');
             const subBtn = document.querySelector(`#hanging-sub-panel button[data-hanging-type="${subType}"]`);
             if (subBtn) subBtn.classList.add('active');
-        } else if (subType === 'internal_drawers') {
+        } else if (subType === 'internal_drawers' || subType === 'external_drawers') {
             const btn = document.getElementById('tb-btn-drawer');
             if (btn) btn.classList.add('active');
             const subBtn = document.querySelector(`#drawer-sub-panel button[data-drawer-type="${subType}"]`);
@@ -1202,14 +1202,39 @@ function updateToolbarButtonHighlights() {
             const btnContent = toolbar.querySelector(`button[onclick="applyContent('${subType}')"]`);
             if (btnContent) btnContent.classList.add('active');
         }
+        // Door buttons for sub-cell zones
+        const _subTypeToDoor = { door_right: 'right', door_left: 'left', door_double: 'double', door_flap: 'flap' };
+        const _subDoorParam = _subTypeToDoor[subType];
+        if (_subDoorParam) {
+            const btnDoor = toolbar.querySelector(`button[onclick="applyDoor('${_subDoorParam}')"]`);
+            if (btnDoor) btnDoor.classList.add('active');
+        } else {
+            const btnNoDoor = toolbar.querySelector(`button[onclick="applyDoor('empty')"]`);
+            if (btnNoDoor) btnNoDoor.classList.add('active');
+        }
         // Update shelf counter for active sub-cell
         const shelfCountEl = document.getElementById('tb-subcell-shelf-count');
         if (shelfCountEl && activeSub) shelfCountEl.innerText = activeSub.shelves || 0;
         const shelfSection = document.getElementById('tb-subcell-shelf-section');
         if (shelfSection) shelfSection.style.display = 'flex';
-        // Hide door section in sub-cell mode (sub-cells don't have doors)
-        if (doorSection) doorSection.style.display = 'none';
-        Object.values(_doorStylePanels).forEach(p => { if (p) p.style.display = 'none'; });
+        // Show door section + style panel for sub-cell doors
+        if (!_isSliding && doorSection) doorSection.style.display = '';
+        if (!_isSliding && _subDoorParam) {
+            const activeStyle = (Array.isArray(activeSub.zonesDoorStyle) && activeSub.zonesDoorStyle[_activeZ])
+                ? activeSub.zonesDoorStyle[_activeZ] : 'solid';
+            Object.entries(_doorStylePanels).forEach(([type, panel]) => {
+                if (!panel) return;
+                const show = type === _subDoorParam;
+                panel.style.display = show ? 'flex' : 'none';
+                if (show) {
+                    panel.querySelectorAll('button[data-door-style]').forEach(btn => {
+                        btn.classList.toggle('active', btn.dataset.doorStyle === activeStyle);
+                    });
+                }
+            });
+        } else {
+            Object.values(_doorStylePanels).forEach(p => { if (p) p.style.display = 'none'; });
+        }
         // Hide drawer count section in sub-cell mode
         const drawerSection = document.getElementById('drawer-count-section');
         if (drawerSection) drawerSection.style.display = 'none';
@@ -2244,16 +2269,19 @@ function _parseSubKey(key) {
 // Helper: build composite key from si and z
 function _subKey(si, z) { return `${si}:${z}`; }
 
-window.setActiveSubCell = function(key) {
+window.setActiveSubCell = function(key, additive) {
     // key is a composite string "si:z" or legacy integer si
     const compositeKey = (typeof key === 'number') ? _subKey(key, 0) : String(key);
-    // Single-select by default: clicking a new zone replaces the selection.
-    // Clicking an already-selected zone deselects it (toggle off).
-    if (_activeSubCellIdxs.has(compositeKey) && _activeSubCellIdxs.size === 1) {
-        // Only this zone selected — toggle off
+    if (additive) {
+        // Ctrl/Cmd/Shift+click: toggle zone in/out of multi-selection
+        if (_activeSubCellIdxs.has(compositeKey)) {
+            _activeSubCellIdxs.delete(compositeKey);
+        } else {
+            _activeSubCellIdxs.add(compositeKey);
+        }
+    } else if (_activeSubCellIdxs.has(compositeKey) && _activeSubCellIdxs.size === 1) {
         _activeSubCellIdxs = new Set();
     } else {
-        // Select only this zone (replace any previous selection)
         _activeSubCellIdxs = new Set([compositeKey]);
     }
     // Rebuild overlay so sub-cell buttons reflect the new selection state (green ✕ vs cyan +)
@@ -2369,8 +2397,14 @@ window.setSubCellType = function(type) {
             newType = (current === subType) ? 'empty' : subType;
         }
         sub.zonesType[z] = newType;
+        if (newType === 'empty' && Array.isArray(sub.zonesDoorStyle)) {
+            sub.zonesDoorStyle[z] = 'solid';
+        } else if (newType && newType.startsWith('door_')) {
+            if (!Array.isArray(sub.zonesDoorStyle)) sub.zonesDoorStyle = [];
+            while (sub.zonesDoorStyle.length <= z) sub.zonesDoorStyle.push('solid');
+        }
 
-        // Keep sub.type in sync: if all zones have the same type, set sub.type to that;
+        // Keep sub.type in sync:
         // otherwise set sub.type to the most common non-empty type (for backward compat)
         const nonEmpty = sub.zonesType.filter(t => t && t !== 'empty');
         if (nonEmpty.length === 0) {
@@ -2687,6 +2721,14 @@ window.applySubCellContent = function(side, type) {
 
 window.applyDoor = function(type) {
     if (state.selection.colIndex === -1 || state.selection.rows.length === 0) return;
+
+    // Route to sub-cell zones when partition sub-cells are selected
+    if (_activeSubCellIdxs.size > 0) {
+        const _subDoorMap = { empty: 'empty', right: 'door_right', left: 'door_left', double: 'door_double', flap: 'door_flap' };
+        setSubCellType(_subDoorMap[type] || type);
+        return;
+    }
+
     const c = state.selection.colIndex;
     let startR = Math.min(...state.selection.rows);
     let endR = Math.max(...state.selection.rows);
@@ -2761,6 +2803,27 @@ window.applyDoorStyle = function(style) {
     if (state.selection.colIndex === -1 || state.selection.rows.length === 0) return;
     const c = state.selection.colIndex;
     const col = state.columns[c];
+
+    // Apply door style to selected partition sub-cell zones
+    if (_activeSubCellIdxs.size > 0) {
+        const r = state.selection.rows[0];
+        const comp = col.compartments[r];
+        if (!comp || !comp.partition) return;
+        _activeSubCellIdxs.forEach(key => {
+            const { si, z } = _parseSubKey(key);
+            const sub = comp.subCells && comp.subCells[si];
+            if (!sub) return;
+            const zoneType = (Array.isArray(sub.zonesType) && sub.zonesType[z]) ? sub.zonesType[z] : (sub.type || 'empty');
+            if (!zoneType || !zoneType.startsWith('door_')) return;
+            if (!Array.isArray(sub.zonesDoorStyle)) sub.zonesDoorStyle = [];
+            while (sub.zonesDoorStyle.length <= z) sub.zonesDoorStyle.push('solid');
+            sub.zonesDoorStyle[z] = style;
+        });
+        buildCabinet(); calculatePrice(); saveHistoryState();
+        updateToolbarButtonHighlights();
+        return;
+    }
+
     const door = col.doors.find(door => {
         return state.selection.rows.some(r => r >= door.startRow && r <= door.endRow);
     });
