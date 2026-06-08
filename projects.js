@@ -501,9 +501,9 @@ function _renderProjects() {
             '<div class="project-actions">' +
                 openBtnHtml +
                 extendBtnHtml +
-                '<button class="btn-card" onclick="startRename(\'' + p.id + '\',\'' + safeName + '\')">' +
+                '<button class="btn-card" onclick="event.stopPropagation(); startRename(\'' + p.id + '\')">' +
                     '<i class="fa-solid fa-pen"></i> שנה שם</button>' +
-                '<button class="btn-card danger icon-only" title="מחק" onclick="startDelete(\'' + p.id + '\',\'' + safeName + '\')">' +
+                '<button class="btn-card danger icon-only" title="מחק" onclick="event.stopPropagation(); startDelete(\'' + p.id + '\')">' +
                     '<i class="fa-solid fa-trash"></i></button>' +
             '</div>';
 
@@ -624,9 +624,10 @@ async function confirmExtendProject() {
 }
 
 // ── Rename ────────────────────────────────────────────────────────────────────
-function startRename(id, currentName) {
+function startRename(id) {
+    var p = _projects.find(function(x) { return x.id === id; });
     _renameId = id;
-    document.getElementById('rename-input').value = currentName;
+    document.getElementById('rename-input').value = p ? p.name : '';
     openModal('modal-rename');
     setTimeout(function() { document.getElementById('rename-input').focus(); }, 120);
 }
@@ -648,9 +649,10 @@ async function confirmRename() {
 }
 
 // ── Delete ────────────────────────────────────────────────────────────────────
-function startDelete(id, name) {
+function startDelete(id) {
+    var p = _projects.find(function(x) { return x.id === id; });
     _deleteId = id;
-    document.getElementById('delete-project-name').textContent = name;
+    document.getElementById('delete-project-name').textContent = p ? p.name : '';
     openModal('modal-delete');
 }
 

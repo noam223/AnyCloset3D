@@ -1640,7 +1640,8 @@ function buildCabinet() {
     //
     // World position:
     //   X: right → mainW/2 + scProtrusion/2; left → -mainW/2 - scProtrusion/2
-    //   Z: cabinet spans full main cabinet depth, centered at 0 (+ door thickness when adjacent column has doors)
+    //   Z: cabinet spans full main cabinet depth, centered at 0
+    //   When doorExtra > 0: width grows toward the front only (inner local-X shift), back stays flush
 
     function _sideCabDoorExtraForSide(centerWing, scSide) {
         if (!centerWing || !centerWing.hasDoors) return 0;
@@ -1656,7 +1657,8 @@ function buildCabinet() {
         const centerD = centerWing ? centerWing.depth : 54;
         const doorExtra = _sideCabDoorExtraForSide(centerWing, scSide);
         const scLocalW = centerD + doorExtra;
-        const scZOffset = doorExtra / 2;
+        const scInnerX = doorExtra > 0 ? doorExtra / 2 : 0;
+        const scHitZ = doorExtra / 2;
         // Use per-side width; fall back to shared width for backward compat
         const scProtrusion = (scSide === 'right')
             ? (scData.widthRight || scData.width || 40)
@@ -1675,16 +1677,20 @@ function buildCabinet() {
         const scRotY = (scSide === 'right') ? Math.PI / 2 : -Math.PI / 2;
         scGroup.rotation.y = scRotY;
         const scX = (scSide === 'right') ? (mainW / 2 + scProtrusion / 2) : (-mainW / 2 - scProtrusion / 2);
-        scGroup.position.set(scX, 0, scZOffset);
+        scGroup.position.set(scX, 0, 0);
         scGroup.userData.wingId = wingIdStr;
         cabinetGroup.add(scGroup);
 
+        const scInner = new THREE.Group();
+        scInner.position.set(scInnerX, 0, 0);
+        scGroup.add(scInner);
+
         const prevActiveWing = state.activeWing;
         state.activeWing = wingIdStr;
-        _buildGroup = scGroup;
+        _buildGroup = scInner;
         _isActiveWingBuild = isActive;
         _ppWingId = wingIdStr;
-        _buildWingGeometry(scGroup, 0, 0, 0, isActive);
+        _buildWingGeometry(scInner, 0, 0, 0, isActive);
         _ppWingId = 'center';
         _buildGroup = cabinetGroup;
         state.activeWing = prevActiveWing;
@@ -1703,7 +1709,7 @@ function buildCabinet() {
             const whbMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, depthTest: false });
             const whb = new THREE.Mesh(whbGeo, whbMat);
             whb.renderOrder = 999;
-            whb.position.set(scX, scH / 2, scZOffset);
+            whb.position.set(scX, scH / 2, scHitZ);
             whb.userData = { wingId: wingIdStr };
             cabinetGroup.add(whb);
             wingHitBoxes.push(whb);
@@ -1743,12 +1749,16 @@ function buildCabinet() {
             }
 
             const scEditGroup = new THREE.Group();
-            scEditGroup.position.set(0, 0, doorExtra2 / 2);
+            const scEditInner = new THREE.Group();
+            if (doorExtra2 > 0) {
+                scEditInner.position.set(doorExtra2 / 2, 0, 0);
+            }
+            scEditGroup.add(scEditInner);
             cabinetGroup.add(scEditGroup);
             state.activeWing = savedActiveWing;
-            _buildGroup = scEditGroup;
+            _buildGroup = scEditInner;
             _isActiveWingBuild = true;
-            _buildWingGeometry(scEditGroup, 0, 0, 0, true);
+            _buildWingGeometry(scEditInner, 0, 0, 0, true);
             _buildGroup = cabinetGroup;
 
             scData.width = origWidth2;
