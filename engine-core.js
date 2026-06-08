@@ -1663,8 +1663,10 @@ function buildCabinet() {
             ? ((scSide === 'right') ? -doorExtra / 2 : doorExtra / 2)
             : 0;
         const scHitZ = doorExtra / 2;
-        // Pull toward main cabinet on X to close the side-panel seam (~door thickness when doors present).
-        const scXFlush = doorExtra;
+        // X seam at top/back corner: after +PI/2, local z of top edge ≈ -depth/2+t/2 → world X = scX + z
+        // sits t/2 past mainW/2; shift inward by half panel thickness (not full doorExtra).
+        const scT = (centerWing && centerWing.thickness) || scData.thickness || state.thickness || 1.7;
+        const scXFlush = doorExtra > 0 ? scT / 2 : 0;
         // Use per-side width; fall back to shared width for backward compat
         const scProtrusion = (scSide === 'right')
             ? (scData.widthRight || scData.width || 40)
