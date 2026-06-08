@@ -3787,6 +3787,35 @@ if (compData && compData.type === 'hanging') {
 
                 // Draw sub-cell shelves and content (N+1 sub-cells)
                 if (compData.subCells && (compData.type !== 'open_cell' && compData.type !== 'side_open_cell')) {
+                    const _parseSubKeyEng = (key) => {
+                        const parts = String(key).split(':');
+                        return { si: parseInt(parts[0], 10), z: parseInt(parts[1] || '0', 10) };
+                    };
+                    const _subZoneYBounds = (sub, z) => {
+                        const numShelves = (sub && sub.shelves) || 0;
+                        const compTopY = prevY + compH;
+                        if (numShelves <= 0) return { bottomY: prevY, topY: compTopY, h: compH };
+                        let subShelvesY = [];
+                        if (Array.isArray(sub.shelvesY) && sub.shelvesY.length === numShelves) {
+                            subShelvesY = sub.shelvesY;
+                        } else {
+                            const zoneH = compH / (numShelves + 1);
+                            for (let s = 1; s <= numShelves; s++) subShelvesY.push(prevY + zoneH * s);
+                        }
+                        const rawBounds = [prevY, ...subShelvesY, compTopY];
+                        const clearBounds = rawBounds.map((y, i) => {
+                            if (i === 0 || i === rawBounds.length - 1) return y;
+                            return y + t / 2;
+                        });
+                        const zoneBottomY = clearBounds[z];
+                        const zoneTopY = (z < subShelvesY.length) ? rawBounds[z + 1] - t / 2 : compTopY;
+                        return { bottomY: zoneBottomY, topY: zoneTopY, h: zoneTopY - zoneBottomY };
+                    };
+                    const _keyInDoorGroup = (si, z) => {
+                        const k = `${si}:${z}`;
+                        return (compData.zoneDoorGroups || []).some(g => g.keys.includes(k));
+                    };
+
                     for (let si = 0; si < boundaryXs.length - 1; si++) {
                         const sub = compData.subCells[si];
                         if (!sub) continue;
@@ -3819,12 +3848,16 @@ if (compData && compData.type === 'hanging') {
                             }
                             for (let z = 0; z < numZones; z++) {
                                 const zoneCenterY = (zoneBounds[z] + zoneBounds[z + 1]) / 2;
+                                const zoneKey = `${si}:${z}`;
+                                const doorGrp = (compData.zoneDoorGroups || []).find(g => g.keys.includes(zoneKey));
+                                let btnSubType = sub.zonesType[z] || 'empty';
+                                if (doorGrp) btnSubType = doorGrp.type;
                                 state.dimData.push({
                                     isSubCellBtn: true,
                                     colIndex: c, rowIndex: r, subCellIdx: si,
                                     zoneIdx: z, numZones,
                                     x: subCenterX, y: zoneCenterY,
-                                    subType: sub.zonesType[z] || 'empty'
+                                    subType: btnSubType
                                 });
                             }
                             // Push drag handles for each sub-cell shelf
@@ -3862,16 +3895,42 @@ if (compData && compData.type === 'hanging') {
                                     if (zoneH <= 0) continue;
                                     // Per-zone type: use zonesType[z] if available, else fall back to sub.type
                                     const zoneType = (Array.isArray(sub.zonesType) && sub.zonesType[z]) ? sub.zonesType[z] : (sub.type || 'empty');
-                                    if (zoneType && zoneType !== 'empty') {
+                                    if (zoneType && zoneType !== 'empty' && !_keyInDoorGroup(si, z)) {
                                         const zoneStyle = (Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[z]) ? sub.zonesDoorStyle[z] : 'solid';
                                         _renderSubContent(zoneType, subCenterX, subW, zoneBottomY, zoneH, si, zoneStyle);
                                     }
                                 }
                             }
-                        } else if (!isBP && sub.type && sub.type !== 'empty') {
+                        } else if (!isBP && sub.type && sub.type !== 'empty' && !_keyInDoorGroup(si, 0)) {
                             const zoneStyle = (Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[0]) ? sub.zonesDoorStyle[0] : 'solid';
                             _renderSubContent(sub.type, subCenterX, subW, prevY, compH, si, zoneStyle);
                         }
+                    }
+
+                    // Merged doors spanning multiple sub-cell zones
+                    if (!isBP && Array.isArray(compData.zoneDoorGroups)) {
+                        compData.zoneDoorGroups.forEach(group => {
+                            if (!group || !group.keys || !group.keys.length || !group.type) return;
+                            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+                            group.keys.forEach(key => {
+                                const { si, z } = _parseSubKeyEng(key);
+                                const sub = compData.subCells[si];
+                                if (!sub || si < 0 || si >= boundaryXs.length - 1) return;
+                                const x1 = boundaryXs[si] + (si === 0 ? 0 : t / 2);
+                                const x2 = boundaryXs[si + 1] - (si === boundaryXs.length - 2 ? 0 : t / 2);
+                                const yb = _subZoneYBounds(sub, z);
+                                if (yb.h <= 0) return;
+                                minX = Math.min(minX, x1);
+                                maxX = Math.max(maxX, x2);
+                                minY = Math.min(minY, yb.bottomY);
+                                maxY = Math.max(maxY, yb.topY);
+                            });
+                            if (!isFinite(minX) || maxY - minY <= 0 || maxX - minX <= 0) return;
+                            const spanW = maxX - minX;
+                            const spanH = maxY - minY;
+                            const centerX = (minX + maxX) / 2;
+                            _renderSubContent(group.type, centerX, spanW, minY, spanH, -1, group.style || 'solid');
+                        });
                     }
                 }
             }

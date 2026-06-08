@@ -197,6 +197,54 @@ window._generateMultiViewBlueprintSVG = function() {
         }
     };
 
+    // Draw merged doors that span multiple sub-cell zones
+    const _drawPartitionMergedDoors = (comp, boundaryXs, rowBotCm, rowTopCm, colBotSvgY, sc, ci, cols) => {
+        if (!comp || !Array.isArray(comp.zoneDoorGroups) || !comp.subCells) return;
+        comp.zoneDoorGroups.forEach(group => {
+            if (!group || !group.keys || !group.keys.length || !group.type) return;
+            let minX = Infinity, maxX = -Infinity, minSvgTop = Infinity, maxSvgBot = -Infinity;
+            group.keys.forEach(key => {
+                const parts = String(key).split(':');
+                const si = parseInt(parts[0], 10);
+                const z = parseInt(parts[1] || '0', 10);
+                if (si < 0 || si >= boundaryXs.length - 1) return;
+                const sub = comp.subCells[si];
+                if (!sub) return;
+                const x1 = boundaryXs[si], x2 = boundaryXs[si + 1];
+                const numShelves = (sub && sub.shelves) || 0;
+                let shelfYcms = [];
+                if (numShelves > 0) {
+                    if (Array.isArray(sub.shelvesY) && sub.shelvesY.length === numShelves) {
+                        shelfYcms = sub.shelvesY.slice();
+                    } else {
+                        const zoneHcm = (rowTopCm - rowBotCm) / (numShelves + 1);
+                        for (let s = 1; s <= numShelves; s++) shelfYcms.push(rowBotCm + zoneHcm * s);
+                    }
+                }
+                const zoneBoundsCm = [rowBotCm, ...shelfYcms, rowTopCm];
+                if (z < 0 || z >= zoneBoundsCm.length - 1) return;
+                const zBotCm = zoneBoundsCm[z], zTopCm = zoneBoundsCm[z + 1];
+                const zSvgTop = colBotSvgY - zTopCm * sc;
+                const zSvgBot = colBotSvgY - zBotCm * sc;
+                minX = Math.min(minX, x1);
+                maxX = Math.max(maxX, x2);
+                minSvgTop = Math.min(minSvgTop, zSvgTop);
+                maxSvgBot = Math.max(maxSvgBot, zSvgBot);
+            });
+            if (!isFinite(minX)) return;
+            const subZoneW = maxX - minX;
+            const zSvgH = maxSvgBot - minSvgTop;
+            const subZoneCX = (minX + maxX) / 2;
+            const _opensLeft = ci === 0;
+            const _opensRight = ci === cols.length - 1;
+            let openDir = 'left';
+            if (_opensLeft && _opensRight) openDir = (ci < cols.length / 2) ? 'left' : 'right';
+            else if (_opensLeft) openDir = 'left';
+            else if (_opensRight) openDir = 'right';
+            _drawPartitionZoneContent(group.type, group.style || 'solid', minX, maxX, minSvgTop, zSvgH, subZoneCX, subZoneW, openDir);
+        });
+    };
+
     // ---- PANEL 0: TOP VIEW (floor plan) — correct L/U geometry ----
     // 'side' wing is PERPENDICULAR: its depth (lD/rD) goes along X, its width (lW/rW) goes along Z
     {
@@ -877,8 +925,10 @@ window._generateMultiViewBlueprintSVG = function() {
                                     : (sub && sub.type ? sub.type : 'empty');
                                 const zoneStyle = (sub && Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[z])
                                     ? sub.zonesDoorStyle[z] : 'solid';
+                                const zoneKey = `${zi}:${z}`;
+                                const inDoorGroup = (comp.zoneDoorGroups || []).some(g => g.keys.includes(zoneKey));
 
-                                if (zoneType && zoneType !== 'empty') {
+                                if (zoneType && zoneType !== 'empty' && !inDoorGroup) {
                                     const _opensLeft = ci === 0;
                                     const _opensRight = ci === cols.length - 1;
                                     let openDir = 'left';
@@ -895,6 +945,7 @@ window._generateMultiViewBlueprintSVG = function() {
                                 }
                             }
                         }
+                        _drawPartitionMergedDoors(comp, boundaryXs, rowBotCm, rowTopCm, _colBotY, sc, ci, cols);
                     }
                 }
 
@@ -1881,8 +1932,10 @@ window._generateMultiViewBlueprintPages = function() {
                                     : (sub && sub.type ? sub.type : 'empty');
                                 const zoneStyle = (sub && Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[z])
                                     ? sub.zonesDoorStyle[z] : 'solid';
+                                const zoneKey = `${zi}:${z}`;
+                                const inDoorGroup = (comp.zoneDoorGroups || []).some(g => g.keys.includes(zoneKey));
 
-                                if (zoneType && zoneType !== 'empty') {
+                                if (zoneType && zoneType !== 'empty' && !inDoorGroup) {
                                     const _opensLeft = ci === 0;
                                     const _opensRight = ci === cols.length - 1;
                                     let openDir = 'left';
@@ -1899,6 +1952,7 @@ window._generateMultiViewBlueprintPages = function() {
                                 }
                             }
                         }
+                        _drawPartitionMergedDoors(comp, boundaryXs, rowBotCm, rowTopCm, _colBotSvgY, sc, ci, cols);
                     }
                 }
 

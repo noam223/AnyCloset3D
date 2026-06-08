@@ -715,10 +715,10 @@ body {
     flex-shrink: 0;
 }
 .sidebar-logo-img {
-    height: 88px;
+    height: 120px;
     width: auto;
-    max-width: min(240px, 100%);
-    min-height: 56px;
+    max-width: min(300px, 100%);
+    min-height: 72px;
     object-fit: contain;
     object-position: right center;
     flex-shrink: 0;

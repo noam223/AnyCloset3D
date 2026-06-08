@@ -768,7 +768,11 @@ function buildDimensionsAndButtonsUI() {
         const zoneIdx = d.zoneIdx !== undefined ? d.zoneIdx : 0;
         let zoneType = 'empty';
         if (sub) {
-            if (Array.isArray(sub.zonesType) && sub.zonesType[zoneIdx]) {
+            const zoneKey = _subKey(d.subCellIdx, zoneIdx);
+            const doorGroup = _zoneDoorGroupForKey(comp, zoneKey);
+            if (doorGroup) {
+                zoneType = doorGroup.type;
+            } else if (Array.isArray(sub.zonesType) && sub.zonesType[zoneIdx]) {
                 zoneType = sub.zonesType[zoneIdx];
             } else if (sub.type && sub.type !== 'empty') {
                 zoneType = sub.type;
@@ -820,22 +824,14 @@ function buildDimensionsAndButtonsUI() {
             });
             btn.querySelector('.sub-btn-trash').addEventListener('click', (e) => {
                 e.stopPropagation();
-                // Clear this zone's content (and all selected zones)
                 const keysToClear = _activeSubCellIdxs.size > 0 ? new Set(_activeSubCellIdxs) : new Set([zoneKey]);
-                keysToClear.forEach(k => {
-                    const { si, z } = _parseSubKey(k);
-                    const s = comp.subCells && comp.subCells[si];
-                    if (!s) return;
-                    if (Array.isArray(s.zonesType)) {
-                        s.zonesType[z] = 'empty';
-                        if (Array.isArray(s.zonesDoorStyle)) s.zonesDoorStyle[z] = 'solid';
-                        if (s.zonesType.every(t => !t || t === 'empty')) {
-                            s.type = 'empty';
-                        }
-                    } else {
-                        s.type = 'empty'; s.shelves = 0; delete s.shelvesY;
-                    }
+                keysToClear.forEach(key => {
+                    const { si, z } = _parseSubKey(key);
+                    const sub = comp.subCells && comp.subCells[si];
+                    if (!sub) return;
+                    _clearSubZoneContent(sub, z);
                 });
+                _removeZoneDoorGroupsForKeys(comp, [...keysToClear]);
                 _activeSubCellIdxs = new Set();
                 buildCabinet(); calculatePrice(); saveHistoryState();
                 updateToolbarButtonHighlights();
@@ -1186,13 +1182,20 @@ function updateToolbarButtonHighlights() {
 
     // In sub-cell mode: highlight the active zone's content type in the main toolbar
     if (_hasActiveSubCells && hasPartition && Array.isArray(firstComp.subCells)) {
-        // Use first selected zone for toolbar highlight
-        const { si: _activeSi, z: _activeZ } = _parseSubKey(_activeSubCellIdxs.values().next().value);
+        const selectedKeysArr = _sortedSubKeys(_activeSubCellIdxs);
+        const mergedGroup = _findZoneDoorGroup(firstComp, selectedKeysArr);
+        // Use first selected zone for toolbar highlight (or merged door group)
+        const { si: _activeSi, z: _activeZ } = _parseSubKey(selectedKeysArr[0]);
         const activeSub = firstComp.subCells[_activeSi];
-        // Get zone-specific type: use zonesType[z] if available, else sub.type
+        // Get zone-specific type: merged group, zonesType[z], or sub.type
         let subType = 'empty';
-        if (activeSub) {
-            if (Array.isArray(activeSub.zonesType) && activeSub.zonesType[_activeZ]) {
+        if (mergedGroup && _subKeysEqual(mergedGroup.keys, selectedKeysArr)) {
+            subType = mergedGroup.type;
+        } else if (activeSub) {
+            const firstKey = selectedKeysArr[0];
+            const partialGroup = _zoneDoorGroupForKey(firstComp, firstKey);
+            if (partialGroup) subType = partialGroup.type;
+            else if (Array.isArray(activeSub.zonesType) && activeSub.zonesType[_activeZ]) {
                 subType = activeSub.zonesType[_activeZ];
             } else {
                 subType = activeSub.type || 'empty';
@@ -1233,8 +1236,10 @@ function updateToolbarButtonHighlights() {
         // Show door section + style panel for sub-cell doors
         if (!_isSliding && doorSection) doorSection.style.display = '';
         if (!_isSliding && _subDoorParam) {
-            const activeStyle = (Array.isArray(activeSub.zonesDoorStyle) && activeSub.zonesDoorStyle[_activeZ])
-                ? activeSub.zonesDoorStyle[_activeZ] : 'solid';
+            const activeStyle = mergedGroup && _subKeysEqual(mergedGroup.keys, selectedKeysArr)
+                ? (mergedGroup.style || 'solid')
+                : ((Array.isArray(activeSub.zonesDoorStyle) && activeSub.zonesDoorStyle[_activeZ])
+                    ? activeSub.zonesDoorStyle[_activeZ] : 'solid');
             Object.entries(_doorStylePanels).forEach(([type, panel]) => {
                 if (!panel) return;
                 const show = type === _subDoorParam;
@@ -2286,6 +2291,46 @@ function _parseSubKey(key) {
 // Helper: build composite key from si and z
 function _subKey(si, z) { return `${si}:${z}`; }
 
+const _DOOR_ZONE_TYPES = new Set(['door_right', 'door_left', 'door_double', 'door_flap']);
+
+function _sortedSubKeys(keys) {
+    return [...keys].sort((a, b) => {
+        const pa = _parseSubKey(a), pb = _parseSubKey(b);
+        return pa.si - pb.si || pa.z - pb.z;
+    });
+}
+
+function _subKeysEqual(a, b) {
+    const sa = _sortedSubKeys(a), sb = _sortedSubKeys(b);
+    return sa.length === sb.length && sa.every((k, i) => k === sb[i]);
+}
+
+function _findZoneDoorGroup(comp, keys) {
+    if (!comp || !Array.isArray(comp.zoneDoorGroups)) return null;
+    return comp.zoneDoorGroups.find(g => _subKeysEqual(g.keys, keys)) || null;
+}
+
+function _removeZoneDoorGroupsForKeys(comp, keys) {
+    if (!comp || !Array.isArray(comp.zoneDoorGroups)) return;
+    const keySet = new Set(keys);
+    comp.zoneDoorGroups = comp.zoneDoorGroups.filter(g => !g.keys.some(k => keySet.has(k)));
+}
+
+function _zoneDoorGroupForKey(comp, key) {
+    if (!comp || !Array.isArray(comp.zoneDoorGroups)) return null;
+    return comp.zoneDoorGroups.find(g => g.keys.includes(key)) || null;
+}
+
+function _clearSubZoneContent(sub, z) {
+    if (!sub) return;
+    if (Array.isArray(sub.zonesType)) {
+        sub.zonesType[z] = 'empty';
+        if (Array.isArray(sub.zonesDoorStyle)) sub.zonesDoorStyle[z] = 'solid';
+    } else {
+        sub.type = 'empty';
+    }
+}
+
 window.setActiveSubCell = function(key) {
     // key is a composite string "si:z" or legacy integer si
     const compositeKey = (typeof key === 'number') ? _subKey(key, 0) : String(key);
@@ -2364,6 +2409,7 @@ window.removePartition = function() {
         delete comp.partition;
         delete comp.partitions;
         delete comp.subCells;
+        delete comp.zoneDoorGroups;
         _activeSubCellIdxs = new Set();
         buildCabinet(); calculatePrice(); saveHistoryState();
         updateToolbarButtonHighlights();
@@ -2400,8 +2446,49 @@ window.setSubCellType = function(type) {
 
     // Map open_cell / side_open_cell → honeycomb for sub-cell context
     const subType = (type === 'open_cell' || type === 'side_open_cell') ? 'honeycomb' : type;
+    const selectedKeys = _sortedSubKeys(_activeSubCellIdxs);
 
-    _activeSubCellIdxs.forEach(key => {
+    // Clear content on selected zones (+ remove merged door groups)
+    if (subType === 'empty') {
+        selectedKeys.forEach(key => {
+            const { si, z } = _parseSubKey(key);
+            _clearSubZoneContent(comp.subCells[si], z);
+        });
+        _removeZoneDoorGroupsForKeys(comp, selectedKeys);
+        buildCabinet(); calculatePrice(); saveHistoryState();
+        updateToolbarButtonHighlights();
+        return;
+    }
+
+    // Multiple zones + door → one merged door spanning the combined area
+    if (_DOOR_ZONE_TYPES.has(subType) && selectedKeys.length > 1) {
+        if (!Array.isArray(comp.zoneDoorGroups)) comp.zoneDoorGroups = [];
+        const existing = _findZoneDoorGroup(comp, selectedKeys);
+        if (existing && existing.type === subType) {
+            _removeZoneDoorGroupsForKeys(comp, selectedKeys);
+        } else {
+            _removeZoneDoorGroupsForKeys(comp, selectedKeys);
+            selectedKeys.forEach(key => {
+                const { si, z } = _parseSubKey(key);
+                const sub = comp.subCells[si];
+                if (!sub) return;
+                if (!Array.isArray(sub.zonesType)) sub.zonesType = [sub.type || 'empty'];
+                while (sub.zonesType.length <= z) sub.zonesType.push('empty');
+                sub.zonesType[z] = 'empty';
+            });
+            comp.zoneDoorGroups.push({ keys: selectedKeys, type: subType, style: 'solid' });
+        }
+        buildCabinet(); calculatePrice(); saveHistoryState();
+        updateToolbarButtonHighlights();
+        return;
+    }
+
+    // Single-zone door: remove merged group if this zone belonged to one
+    if (_DOOR_ZONE_TYPES.has(subType) && selectedKeys.length === 1) {
+        _removeZoneDoorGroupsForKeys(comp, selectedKeys);
+    }
+
+    selectedKeys.forEach(key => {
         const { si, z } = _parseSubKey(key);
         const sub = comp.subCells[si];
         if (!sub) return;
@@ -2494,6 +2581,7 @@ window.updateSubCellShelves = function(delta) {
     _distributeSubCellShelves(sub, prevY, compH, newCount);
     // After shelf count changes, zonesType array size may change — clear it so engine rebuilds it
     delete sub.zonesType;
+    if (comp) delete comp.zoneDoorGroups;
     // Update active key to zone 0 of same sub-cell (shelf zones reset)
     _activeSubCellIdxs = new Set([_subKey(activeSi, 0)]);
     buildCabinet(); calculatePrice(); saveHistoryState();
@@ -2850,16 +2938,24 @@ window.applyDoorStyle = function(style) {
         const r = state.selection.rows[0];
         const comp = col.compartments[r];
         if (!comp || !comp.partition) return;
-        _activeSubCellIdxs.forEach(key => {
-            const { si, z } = _parseSubKey(key);
-            const sub = comp.subCells && comp.subCells[si];
-            if (!sub) return;
-            const zoneType = (Array.isArray(sub.zonesType) && sub.zonesType[z]) ? sub.zonesType[z] : (sub.type || 'empty');
-            if (!zoneType || !zoneType.startsWith('door_')) return;
-            if (!Array.isArray(sub.zonesDoorStyle)) sub.zonesDoorStyle = [];
-            while (sub.zonesDoorStyle.length <= z) sub.zonesDoorStyle.push('solid');
-            sub.zonesDoorStyle[z] = style;
-        });
+        const selectedKeys = _sortedSubKeys(_activeSubCellIdxs);
+        const mergedGroup = _findZoneDoorGroup(comp, selectedKeys);
+        if (mergedGroup && _subKeysEqual(mergedGroup.keys, selectedKeys)) {
+            mergedGroup.style = style;
+        } else {
+            selectedKeys.forEach(key => {
+                const { si, z } = _parseSubKey(key);
+                const sub = comp.subCells && comp.subCells[si];
+                if (!sub) return;
+                const grp = _zoneDoorGroupForKey(comp, key);
+                if (grp) { grp.style = style; return; }
+                const zoneType = (Array.isArray(sub.zonesType) && sub.zonesType[z]) ? sub.zonesType[z] : (sub.type || 'empty');
+                if (!zoneType || !zoneType.startsWith('door_')) return;
+                if (!Array.isArray(sub.zonesDoorStyle)) sub.zonesDoorStyle = [];
+                while (sub.zonesDoorStyle.length <= z) sub.zonesDoorStyle.push('solid');
+                sub.zonesDoorStyle[z] = style;
+            });
+        }
         buildCabinet(); calculatePrice(); saveHistoryState();
         updateToolbarButtonHighlights();
         return;
