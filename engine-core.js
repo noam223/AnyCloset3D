@@ -3815,6 +3815,17 @@ if (compData && compData.type === 'hanging') {
                         const k = `${si}:${z}`;
                         return (compData.zoneDoorGroups || []).some(g => g.keys.includes(k));
                     };
+                    const _subZoneIsHoneycomb = (si, z) => {
+                        const sub = compData.subCells[si];
+                        if (!sub) return false;
+                        const zoneKey = `${si}:${z}`;
+                        const grp = (compData.zoneDoorGroups || []).find(g => g.keys.includes(zoneKey));
+                        if (grp) return grp.type === 'honeycomb';
+                        const zoneType = (Array.isArray(sub.zonesType) && sub.zonesType[z])
+                            ? sub.zonesType[z]
+                            : ((sub.shelves || 0) <= 0 ? (sub.type || 'empty') : 'empty');
+                        return zoneType === 'honeycomb' || zoneType === 'open_cell' || zoneType === 'side_open_cell';
+                    };
 
                     for (let si = 0; si < boundaryXs.length - 1; si++) {
                         const sub = compData.subCells[si];
@@ -3873,7 +3884,10 @@ if (compData && compData.type === 'hanging') {
                         if (numShelves > 0) {
                             const subD = bodyD - 2;
                             for (let s = 0; s < subShelvesY.length; s++) {
-                                createBoard(subW, t, subD, subCenterX, subShelvesY[s], 0, matInternal);
+                                const shelfInHoneycomb = _subZoneIsHoneycomb(si, s) || _subZoneIsHoneycomb(si, s + 1);
+                                const shelfMat = shelfInHoneycomb ? matOpenCell : matInternal;
+                                const shelfZ = shelfInHoneycomb ? 1 : 0;
+                                createBoard(subW, t, subD, subCenterX, subShelvesY[s], shelfZ, shelfMat);
                             }
                             if (!isBP) {
                                 const compTopY = prevY + compH;
