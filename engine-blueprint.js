@@ -4,6 +4,135 @@
 // ==========================================
 const DESK_SURFACE_T = 2.8; // 28mm — all desk horizontal surfaces
 
+const _BP_STROKE = '#1e3a5f';
+const _BP_STROKE_THIN = '#94a3b8';
+const _BP_FONT = 'Rubik,Tahoma,sans-serif';
+const _BP_DOOR_STYLE_SUFFIX = { solid: '', framed_melamine: ' מסגרת', glass_melamine: ' זכוכית', glass_black: ' זכ.שחורה', glass_gold: ' זכ.זהב', glass_mirror: ' מראה' };
+
+function _bpDrawPartitionZoneContent(p, zoneType, zoneStyle, x1, x2, zSvgTop, zSvgH, subZoneCX, subZoneW, openDir) {
+    zoneStyle = zoneStyle || 'solid';
+    const styleSuffix = _BP_DOOR_STYLE_SUFFIX[zoneStyle] || '';
+    if (zoneType === 'hanging' || zoneType === 'sorbet') {
+        const rodY = zSvgTop + zSvgH * 0.25;
+        const rX1 = x1 + 4, rX2 = x2 - 4;
+        if (rX2 > rX1) {
+            p.push(`<line x1="${rX1.toFixed(1)}" y1="${rodY.toFixed(1)}" x2="${rX2.toFixed(1)}" y2="${rodY.toFixed(1)}" stroke="${_BP_STROKE}" stroke-width="1.5"/>`);
+            p.push(`<circle cx="${rX1.toFixed(1)}" cy="${rodY.toFixed(1)}" r="1.5" fill="${_BP_STROKE}"/>`);
+            p.push(`<circle cx="${rX2.toFixed(1)}" cy="${rodY.toFixed(1)}" r="1.5" fill="${_BP_STROKE}"/>`);
+        }
+        if (zSvgH > 18) p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 20).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="10" fill="${_BP_STROKE}" opacity="0.6">${zoneType === 'sorbet' ? 'סורבטו' : 'תלייה'}</text>`);
+    } else if (zoneType === 'honeycomb' || zoneType === 'open_cell') {
+        const pad = 4;
+        const fx = x1 + pad, fy = zSvgTop + pad, fw = subZoneW - pad*2, fh = zSvgH - pad*2;
+        if (fw > 2 && fh > 2) p.push(`<rect x="${fx.toFixed(1)}" y="${fy.toFixed(1)}" width="${fw.toFixed(1)}" height="${fh.toFixed(1)}" fill="none" stroke="${_BP_STROKE}" stroke-width="1"/>`);
+        if (zSvgH > 18) p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 14).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="10" fill="${_BP_STROKE}" opacity="0.6">כוורת</text>`);
+    } else if (zoneType === 'side_open_cell') {
+        const pad = 4;
+        const fx = x1 + pad, fy = zSvgTop + pad, fw = subZoneW - pad*2, fh = zSvgH - pad*2;
+        if (fw > 2 && fh > 2) {
+            if (openDir === 'left') {
+                p.push(`<polyline points="${fx.toFixed(1)},${fy.toFixed(1)} ${(fx+fw).toFixed(1)},${fy.toFixed(1)} ${(fx+fw).toFixed(1)},${(fy+fh).toFixed(1)} ${fx.toFixed(1)},${(fy+fh).toFixed(1)}" fill="none" stroke="${_BP_STROKE}" stroke-width="1"/>`);
+            } else {
+                p.push(`<polyline points="${(fx+fw).toFixed(1)},${fy.toFixed(1)} ${fx.toFixed(1)},${fy.toFixed(1)} ${fx.toFixed(1)},${(fy+fh).toFixed(1)} ${(fx+fw).toFixed(1)},${(fy+fh).toFixed(1)}" fill="none" stroke="${_BP_STROKE}" stroke-width="1"/>`);
+            }
+        }
+        if (zSvgH > 18) p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 14).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="10" fill="${_BP_STROKE}" opacity="0.6">כוורת צד</text>`);
+    } else if (zoneType === 'internal_drawers' || zoneType === 'external_drawers') {
+        const dCount = 2;
+        const dh = zSvgH / dCount;
+        for (let di = 0; di < dCount; di++) {
+            const dy = zSvgTop + di * dh;
+            p.push(`<rect x="${(x1+2).toFixed(1)}" y="${(dy+1).toFixed(1)}" width="${(subZoneW-4).toFixed(1)}" height="${(dh-2).toFixed(1)}" fill="none" stroke="${_BP_STROKE_THIN}" stroke-width="0.8" opacity="0.7"/>`);
+            if (zoneType === 'external_drawers') {
+                const hndW = Math.min(subZoneW * 0.35, 18);
+                const hndX = x1 + (subZoneW - hndW) / 2;
+                const hndY = dy + dh * 0.5;
+                p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${_BP_STROKE}" stroke-width="1.2"/>`);
+            }
+        }
+        if (zoneType === 'external_drawers' && zSvgH > 18) {
+            p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 14).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="10" fill="${_BP_STROKE}" opacity="0.6">מגירות חיצוניות</text>`);
+        }
+    } else if (zoneType === 'door_right' || zoneType === 'door_left' || zoneType === 'door_double') {
+        const pad = 3;
+        const fx = x1 + pad, fy = zSvgTop + pad, fw = subZoneW - pad*2, fh = zSvgH - pad*2;
+        if (fw > 2 && fh > 2) {
+            p.push(`<rect x="${fx.toFixed(1)}" y="${fy.toFixed(1)}" width="${fw.toFixed(1)}" height="${fh.toFixed(1)}" fill="none" stroke="${_BP_STROKE}" stroke-width="1.2"/>`);
+            if (zoneType === 'door_right') {
+                p.push(`<line x1="${(fx+fw).toFixed(1)}" y1="${fy.toFixed(1)}" x2="${fx.toFixed(1)}" y2="${(fy+fh).toFixed(1)}" stroke="${_BP_STROKE_THIN}" stroke-width="1" stroke-dasharray="3,2"/>`);
+            } else if (zoneType === 'door_left') {
+                p.push(`<line x1="${fx.toFixed(1)}" y1="${fy.toFixed(1)}" x2="${(fx+fw).toFixed(1)}" y2="${(fy+fh).toFixed(1)}" stroke="${_BP_STROKE_THIN}" stroke-width="1" stroke-dasharray="3,2"/>`);
+            } else {
+                const midX = fx + fw / 2;
+                p.push(`<line x1="${fx.toFixed(1)}" y1="${fy.toFixed(1)}" x2="${midX.toFixed(1)}" y2="${(fy+fh).toFixed(1)}" stroke="${_BP_STROKE_THIN}" stroke-width="1" stroke-dasharray="3,2"/>`);
+                p.push(`<line x1="${(fx+fw).toFixed(1)}" y1="${fy.toFixed(1)}" x2="${midX.toFixed(1)}" y2="${(fy+fh).toFixed(1)}" stroke="${_BP_STROKE_THIN}" stroke-width="1" stroke-dasharray="3,2"/>`);
+            }
+            if (zoneStyle.startsWith('glass')) {
+                p.push(`<line x1="${(fx+fw*0.2).toFixed(1)}" y1="${(fy+fh*0.3).toFixed(1)}" x2="${(fx+fw*0.8).toFixed(1)}" y2="${(fy+fh*0.7).toFixed(1)}" stroke="${_BP_STROKE_THIN}" stroke-width="0.8" opacity="0.5"/>`);
+            }
+        }
+        const doorLabels = { door_right: 'דלת ימין', door_left: 'דלת שמאל', door_double: 'דלת כפולה' };
+        if (zSvgH > 18) p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 20).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="10" fill="${_BP_STROKE}" opacity="0.6">${doorLabels[zoneType]}${styleSuffix}</text>`);
+    } else if (zoneType === 'door_flap') {
+        const pad = 3;
+        const fx = x1 + pad, fy = zSvgTop + pad, fw = subZoneW - pad*2, fh = zSvgH - pad*2;
+        if (fw > 2 && fh > 2) {
+            p.push(`<rect x="${fx.toFixed(1)}" y="${fy.toFixed(1)}" width="${fw.toFixed(1)}" height="${fh.toFixed(1)}" fill="none" stroke="${_BP_STROKE}" stroke-width="1.2"/>`);
+            const flapH = Math.min(fh * 0.35, 18);
+            p.push(`<rect x="${fx.toFixed(1)}" y="${fy.toFixed(1)}" width="${fw.toFixed(1)}" height="${flapH.toFixed(1)}" fill="rgba(30,58,95,0.08)" stroke="${_BP_STROKE}" stroke-width="1"/>`);
+            p.push(`<line x1="${fx.toFixed(1)}" y1="${(fy+flapH).toFixed(1)}" x2="${subZoneCX.toFixed(1)}" y2="${(fy+fh).toFixed(1)}" stroke="${_BP_STROKE_THIN}" stroke-width="1" stroke-dasharray="3,2"/>`);
+        }
+        if (zSvgH > 18) p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 20).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="10" fill="${_BP_STROKE}" opacity="0.6">קלפה${styleSuffix}</text>`);
+    }
+}
+
+function _bpDrawPartitionMergedDoors(p, comp, boundaryXs, rowBotCm, rowTopCm, colBotSvgY, sc, ci, cols) {
+    if (!comp || !Array.isArray(comp.zoneDoorGroups) || !comp.subCells) return;
+    comp.zoneDoorGroups.forEach(group => {
+        if (!group || !group.keys || !group.keys.length || !group.type) return;
+        let minX = Infinity, maxX = -Infinity, minSvgTop = Infinity, maxSvgBot = -Infinity;
+        group.keys.forEach(key => {
+            const parts = String(key).split(':');
+            const si = parseInt(parts[0], 10);
+            const z = parseInt(parts[1] || '0', 10);
+            if (si < 0 || si >= boundaryXs.length - 1) return;
+            const sub = comp.subCells[si];
+            if (!sub) return;
+            const x1 = boundaryXs[si], x2 = boundaryXs[si + 1];
+            const numShelves = (sub && sub.shelves) || 0;
+            let shelfYcms = [];
+            if (numShelves > 0) {
+                if (Array.isArray(sub.shelvesY) && sub.shelvesY.length === numShelves) {
+                    shelfYcms = sub.shelvesY.slice();
+                } else {
+                    const zoneHcm = (rowTopCm - rowBotCm) / (numShelves + 1);
+                    for (let s = 1; s <= numShelves; s++) shelfYcms.push(rowBotCm + zoneHcm * s);
+                }
+            }
+            const zoneBoundsCm = [rowBotCm, ...shelfYcms, rowTopCm];
+            if (z < 0 || z >= zoneBoundsCm.length - 1) return;
+            const zBotCm = zoneBoundsCm[z], zTopCm = zoneBoundsCm[z + 1];
+            const zSvgTop = colBotSvgY - zTopCm * sc;
+            const zSvgBot = colBotSvgY - zBotCm * sc;
+            minX = Math.min(minX, x1);
+            maxX = Math.max(maxX, x2);
+            minSvgTop = Math.min(minSvgTop, zSvgTop);
+            maxSvgBot = Math.max(maxSvgBot, zSvgBot);
+        });
+        if (!isFinite(minX)) return;
+        const subZoneW = maxX - minX;
+        const zSvgH = maxSvgBot - minSvgTop;
+        const subZoneCX = (minX + maxX) / 2;
+        const _opensLeft = ci === 0;
+        const _opensRight = ci === cols.length - 1;
+        let openDir = 'left';
+        if (_opensLeft && _opensRight) openDir = (ci < cols.length / 2) ? 'left' : 'right';
+        else if (_opensLeft) openDir = 'left';
+        else if (_opensRight) openDir = 'right';
+        _bpDrawPartitionZoneContent(p, group.type, group.style || 'solid', minX, maxX, minSvgTop, zSvgH, subZoneCX, subZoneW, openDir);
+    });
+}
+
 window._generateMultiViewBlueprintSVG = function() {
     const pid = state.presetId;
     const centerWing = state.wings.center;
@@ -116,133 +245,6 @@ window._generateMultiViewBlueprintSVG = function() {
         const my = (+y1+y2)/2;
         const tx = x - 14;
         p.push(`<text x="${tx.toFixed(1)}" y="${(my+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="13" fill="${DIM_C}" transform="rotate(-90,${tx.toFixed(1)},${my.toFixed(1)})">${lbl}</text>`);
-    };
-
-    // Partition sub-zone content symbols (shared by both front-view passes)
-    const _doorStyleSuffix = { solid: '', framed_melamine: ' מסגרת', glass_melamine: ' זכוכית', glass_black: ' זכ.שחורה', glass_gold: ' זכ.זהב', glass_mirror: ' מראה' };
-    const _drawPartitionZoneContent = (zoneType, zoneStyle, x1, x2, zSvgTop, zSvgH, subZoneCX, subZoneW, openDir) => {
-        zoneStyle = zoneStyle || 'solid';
-        const styleSuffix = _doorStyleSuffix[zoneStyle] || '';
-        if (zoneType === 'hanging' || zoneType === 'sorbet') {
-            const rodY = zSvgTop + zSvgH * 0.25;
-            const rX1 = x1 + 4, rX2 = x2 - 4;
-            if (rX2 > rX1) {
-                p.push(`<line x1="${rX1.toFixed(1)}" y1="${rodY.toFixed(1)}" x2="${rX2.toFixed(1)}" y2="${rodY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.5"/>`);
-                p.push(`<circle cx="${rX1.toFixed(1)}" cy="${rodY.toFixed(1)}" r="1.5" fill="${STROKE}"/>`);
-                p.push(`<circle cx="${rX2.toFixed(1)}" cy="${rodY.toFixed(1)}" r="1.5" fill="${STROKE}"/>`);
-            }
-            if (zSvgH > 18) p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 20).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="10" fill="${STROKE}" opacity="0.6">${zoneType === 'sorbet' ? 'סורבטו' : 'תלייה'}</text>`);
-        } else if (zoneType === 'honeycomb' || zoneType === 'open_cell') {
-            const pad = 4;
-            const fx = x1 + pad, fy = zSvgTop + pad, fw = subZoneW - pad*2, fh = zSvgH - pad*2;
-            if (fw > 2 && fh > 2) p.push(`<rect x="${fx.toFixed(1)}" y="${fy.toFixed(1)}" width="${fw.toFixed(1)}" height="${fh.toFixed(1)}" fill="none" stroke="${STROKE}" stroke-width="1"/>`);
-            if (zSvgH > 18) p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 14).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="10" fill="${STROKE}" opacity="0.6">כוורת</text>`);
-        } else if (zoneType === 'side_open_cell') {
-            const pad = 4;
-            const fx = x1 + pad, fy = zSvgTop + pad, fw = subZoneW - pad*2, fh = zSvgH - pad*2;
-            if (fw > 2 && fh > 2) {
-                if (openDir === 'left') {
-                    p.push(`<polyline points="${fx.toFixed(1)},${fy.toFixed(1)} ${(fx+fw).toFixed(1)},${fy.toFixed(1)} ${(fx+fw).toFixed(1)},${(fy+fh).toFixed(1)} ${fx.toFixed(1)},${(fy+fh).toFixed(1)}" fill="none" stroke="${STROKE}" stroke-width="1"/>`);
-                } else {
-                    p.push(`<polyline points="${(fx+fw).toFixed(1)},${fy.toFixed(1)} ${fx.toFixed(1)},${fy.toFixed(1)} ${fx.toFixed(1)},${(fy+fh).toFixed(1)} ${(fx+fw).toFixed(1)},${(fy+fh).toFixed(1)}" fill="none" stroke="${STROKE}" stroke-width="1"/>`);
-                }
-            }
-            if (zSvgH > 18) p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 14).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="10" fill="${STROKE}" opacity="0.6">כוורת צד</text>`);
-        } else if (zoneType === 'internal_drawers' || zoneType === 'external_drawers') {
-            const dCount = 2;
-            const dh = zSvgH / dCount;
-            for (let di = 0; di < dCount; di++) {
-                const dy = zSvgTop + di * dh;
-                p.push(`<rect x="${(x1+2).toFixed(1)}" y="${(dy+1).toFixed(1)}" width="${(subZoneW-4).toFixed(1)}" height="${(dh-2).toFixed(1)}" fill="none" stroke="${STROKE_THIN}" stroke-width="0.8" opacity="0.7"/>`);
-                if (zoneType === 'external_drawers') {
-                    const hndW = Math.min(subZoneW * 0.35, 18);
-                    const hndX = x1 + (subZoneW - hndW) / 2;
-                    const hndY = dy + dh * 0.5;
-                    p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.2"/>`);
-                }
-            }
-            if (zoneType === 'external_drawers' && zSvgH > 18) {
-                p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 14).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="10" fill="${STROKE}" opacity="0.6">מגירות חיצוניות</text>`);
-            }
-        } else if (zoneType === 'door_right' || zoneType === 'door_left' || zoneType === 'door_double') {
-            const pad = 3;
-            const fx = x1 + pad, fy = zSvgTop + pad, fw = subZoneW - pad*2, fh = zSvgH - pad*2;
-            if (fw > 2 && fh > 2) {
-                p.push(`<rect x="${fx.toFixed(1)}" y="${fy.toFixed(1)}" width="${fw.toFixed(1)}" height="${fh.toFixed(1)}" fill="none" stroke="${STROKE}" stroke-width="1.2"/>`);
-                if (zoneType === 'door_right') {
-                    p.push(`<line x1="${(fx+fw).toFixed(1)}" y1="${fy.toFixed(1)}" x2="${fx.toFixed(1)}" y2="${(fy+fh).toFixed(1)}" stroke="${STROKE_THIN}" stroke-width="1" stroke-dasharray="3,2"/>`);
-                } else if (zoneType === 'door_left') {
-                    p.push(`<line x1="${fx.toFixed(1)}" y1="${fy.toFixed(1)}" x2="${(fx+fw).toFixed(1)}" y2="${(fy+fh).toFixed(1)}" stroke="${STROKE_THIN}" stroke-width="1" stroke-dasharray="3,2"/>`);
-                } else {
-                    const midX = fx + fw / 2;
-                    p.push(`<line x1="${fx.toFixed(1)}" y1="${fy.toFixed(1)}" x2="${midX.toFixed(1)}" y2="${(fy+fh).toFixed(1)}" stroke="${STROKE_THIN}" stroke-width="1" stroke-dasharray="3,2"/>`);
-                    p.push(`<line x1="${(fx+fw).toFixed(1)}" y1="${fy.toFixed(1)}" x2="${midX.toFixed(1)}" y2="${(fy+fh).toFixed(1)}" stroke="${STROKE_THIN}" stroke-width="1" stroke-dasharray="3,2"/>`);
-                }
-                if (zoneStyle.startsWith('glass')) {
-                    p.push(`<line x1="${(fx+fw*0.2).toFixed(1)}" y1="${(fy+fh*0.3).toFixed(1)}" x2="${(fx+fw*0.8).toFixed(1)}" y2="${(fy+fh*0.7).toFixed(1)}" stroke="${STROKE_THIN}" stroke-width="0.8" opacity="0.5"/>`);
-                }
-            }
-            const doorLabels = { door_right: 'דלת ימין', door_left: 'דלת שמאל', door_double: 'דלת כפולה' };
-            if (zSvgH > 18) p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 20).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="10" fill="${STROKE}" opacity="0.6">${doorLabels[zoneType]}${styleSuffix}</text>`);
-        } else if (zoneType === 'door_flap') {
-            const pad = 3;
-            const fx = x1 + pad, fy = zSvgTop + pad, fw = subZoneW - pad*2, fh = zSvgH - pad*2;
-            if (fw > 2 && fh > 2) {
-                p.push(`<rect x="${fx.toFixed(1)}" y="${fy.toFixed(1)}" width="${fw.toFixed(1)}" height="${fh.toFixed(1)}" fill="none" stroke="${STROKE}" stroke-width="1.2"/>`);
-                const flapH = Math.min(fh * 0.35, 18);
-                p.push(`<rect x="${fx.toFixed(1)}" y="${fy.toFixed(1)}" width="${fw.toFixed(1)}" height="${flapH.toFixed(1)}" fill="rgba(30,58,95,0.08)" stroke="${STROKE}" stroke-width="1"/>`);
-                p.push(`<line x1="${fx.toFixed(1)}" y1="${(fy+flapH).toFixed(1)}" x2="${subZoneCX.toFixed(1)}" y2="${(fy+fh).toFixed(1)}" stroke="${STROKE_THIN}" stroke-width="1" stroke-dasharray="3,2"/>`);
-            }
-            if (zSvgH > 18) p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 20).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="10" fill="${STROKE}" opacity="0.6">קלפה${styleSuffix}</text>`);
-        }
-    };
-
-    // Draw merged doors / honeycomb spanning multiple sub-cell zones
-    const _drawPartitionMergedDoors = (comp, boundaryXs, rowBotCm, rowTopCm, colBotSvgY, sc, ci, cols) => {
-        if (!comp || !Array.isArray(comp.zoneDoorGroups) || !comp.subCells) return;
-        comp.zoneDoorGroups.forEach(group => {
-            if (!group || !group.keys || !group.keys.length || !group.type) return;
-            let minX = Infinity, maxX = -Infinity, minSvgTop = Infinity, maxSvgBot = -Infinity;
-            group.keys.forEach(key => {
-                const parts = String(key).split(':');
-                const si = parseInt(parts[0], 10);
-                const z = parseInt(parts[1] || '0', 10);
-                if (si < 0 || si >= boundaryXs.length - 1) return;
-                const sub = comp.subCells[si];
-                if (!sub) return;
-                const x1 = boundaryXs[si], x2 = boundaryXs[si + 1];
-                const numShelves = (sub && sub.shelves) || 0;
-                let shelfYcms = [];
-                if (numShelves > 0) {
-                    if (Array.isArray(sub.shelvesY) && sub.shelvesY.length === numShelves) {
-                        shelfYcms = sub.shelvesY.slice();
-                    } else {
-                        const zoneHcm = (rowTopCm - rowBotCm) / (numShelves + 1);
-                        for (let s = 1; s <= numShelves; s++) shelfYcms.push(rowBotCm + zoneHcm * s);
-                    }
-                }
-                const zoneBoundsCm = [rowBotCm, ...shelfYcms, rowTopCm];
-                if (z < 0 || z >= zoneBoundsCm.length - 1) return;
-                const zBotCm = zoneBoundsCm[z], zTopCm = zoneBoundsCm[z + 1];
-                const zSvgTop = colBotSvgY - zTopCm * sc;
-                const zSvgBot = colBotSvgY - zBotCm * sc;
-                minX = Math.min(minX, x1);
-                maxX = Math.max(maxX, x2);
-                minSvgTop = Math.min(minSvgTop, zSvgTop);
-                maxSvgBot = Math.max(maxSvgBot, zSvgBot);
-            });
-            if (!isFinite(minX)) return;
-            const subZoneW = maxX - minX;
-            const zSvgH = maxSvgBot - minSvgTop;
-            const subZoneCX = (minX + maxX) / 2;
-            const _opensLeft = ci === 0;
-            const _opensRight = ci === cols.length - 1;
-            let openDir = 'left';
-            if (_opensLeft && _opensRight) openDir = (ci < cols.length / 2) ? 'left' : 'right';
-            else if (_opensLeft) openDir = 'left';
-            else if (_opensRight) openDir = 'right';
-            _drawPartitionZoneContent(group.type, group.style || 'solid', minX, maxX, minSvgTop, zSvgH, subZoneCX, subZoneW, openDir);
-        });
     };
 
     // ---- PANEL 0: TOP VIEW (floor plan) — correct L/U geometry ----
@@ -935,7 +937,7 @@ window._generateMultiViewBlueprintSVG = function() {
                                     if (_opensLeft && _opensRight) openDir = (ci < cols.length / 2) ? 'left' : 'right';
                                     else if (_opensLeft) openDir = 'left';
                                     else if (_opensRight) openDir = 'right';
-                                    _drawPartitionZoneContent(zoneType, zoneStyle, x1, x2, zSvgTop, zSvgH, subZoneCX, subZoneW, openDir);
+                                    _bpDrawPartitionZoneContent(p,zoneType, zoneStyle, x1, x2, zSvgTop, zSvgH, subZoneCX, subZoneW, openDir);
                                 }
 
                                 // Zone height label
@@ -945,7 +947,7 @@ window._generateMultiViewBlueprintSVG = function() {
                                 }
                             }
                         }
-                        _drawPartitionMergedDoors(comp, boundaryXs, rowBotCm, rowTopCm, _colBotY, sc, ci, cols);
+                        _bpDrawPartitionMergedDoors(p,comp, boundaryXs, rowBotCm, rowTopCm, _colBotY, sc, ci, cols);
                     }
                 }
 
@@ -1942,7 +1944,7 @@ window._generateMultiViewBlueprintPages = function() {
                                     if (_opensLeft && _opensRight) openDir = (ci < cols.length / 2) ? 'left' : 'right';
                                     else if (_opensLeft) openDir = 'left';
                                     else if (_opensRight) openDir = 'right';
-                                    _drawPartitionZoneContent(zoneType, zoneStyle, x1, x2, zSvgTop, zSvgH, subZoneCX, subZoneW, openDir);
+                                    _bpDrawPartitionZoneContent(p,zoneType, zoneStyle, x1, x2, zSvgTop, zSvgH, subZoneCX, subZoneW, openDir);
                                 }
 
                                 // Zone height label
@@ -1952,7 +1954,7 @@ window._generateMultiViewBlueprintPages = function() {
                                 }
                             }
                         }
-                        _drawPartitionMergedDoors(comp, boundaryXs, rowBotCm, rowTopCm, _colBotSvgY, sc, ci, cols);
+                        _bpDrawPartitionMergedDoors(p,comp, boundaryXs, rowBotCm, rowTopCm, _colBotSvgY, sc, ci, cols);
                     }
                 }
 
