@@ -1657,7 +1657,11 @@ function buildCabinet() {
         const centerD = centerWing ? centerWing.depth : 54;
         const doorExtra = _sideCabDoorExtraForSide(centerWing, scSide);
         const scLocalW = centerD + doorExtra;
-        const scInnerX = doorExtra > 0 ? doorExtra / 2 : 0;
+        // Asymmetric width: extend toward front (door line), keep rear flush with main cabinet.
+        // +PI/2 maps local X→world -Z; -PI/2 maps local X→world +Z — opposite build offsets.
+        const scBuildOx = doorExtra > 0
+            ? ((scSide === 'right') ? -doorExtra / 2 : doorExtra / 2)
+            : 0;
         const scHitZ = doorExtra / 2;
         // Use per-side width; fall back to shared width for backward compat
         const scProtrusion = (scSide === 'right')
@@ -1681,16 +1685,12 @@ function buildCabinet() {
         scGroup.userData.wingId = wingIdStr;
         cabinetGroup.add(scGroup);
 
-        const scInner = new THREE.Group();
-        scInner.position.set(scInnerX, 0, 0);
-        scGroup.add(scInner);
-
         const prevActiveWing = state.activeWing;
         state.activeWing = wingIdStr;
-        _buildGroup = scInner;
+        _buildGroup = scGroup;
         _isActiveWingBuild = isActive;
         _ppWingId = wingIdStr;
-        _buildWingGeometry(scInner, 0, 0, 0, isActive);
+        _buildWingGeometry(scGroup, scBuildOx, 0, 0, isActive);
         _ppWingId = 'center';
         _buildGroup = cabinetGroup;
         state.activeWing = prevActiveWing;
@@ -1748,17 +1748,16 @@ function buildCabinet() {
                 scData.columns[0].width = (centerD2 + doorExtra2) - (scData.thickness || 1.7) * 2;
             }
 
+            const scBuildOx2 = doorExtra2 > 0
+                ? ((_editSide2 === 'right') ? -doorExtra2 / 2 : doorExtra2 / 2)
+                : 0;
+
             const scEditGroup = new THREE.Group();
-            const scEditInner = new THREE.Group();
-            if (doorExtra2 > 0) {
-                scEditInner.position.set(doorExtra2 / 2, 0, 0);
-            }
-            scEditGroup.add(scEditInner);
             cabinetGroup.add(scEditGroup);
             state.activeWing = savedActiveWing;
-            _buildGroup = scEditInner;
+            _buildGroup = scEditGroup;
             _isActiveWingBuild = true;
-            _buildWingGeometry(scEditInner, 0, 0, 0, true);
+            _buildWingGeometry(scEditGroup, scBuildOx2, 0, 0, true);
             _buildGroup = cabinetGroup;
 
             scData.width = origWidth2;
@@ -2270,6 +2269,8 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
     const matTopPanel = isBP ? bpMat : (materials[state.materialTopPanel] || materials[state.materialBody]);
     const activeEdgeMat = isBP ? new THREE.LineBasicMaterial({ color: 0x000000 }) : edgeMat;
 
+    const _ox = _offsetX || 0;
+
     const t = state.thickness;
     const bodyD = state.depth;
     const deskT = 2.8; // 28mm — all desk horizontal surfaces
@@ -2663,7 +2664,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         columnBlocks.push(blocks);
     }
 
-    let currentX = -state.width/2 + t;
+    let currentX = -state.width/2 + t + _ox;
     let compCounter = 1;
     // True when rendering an upper unit wing (noPlinth is forced on all columns, and a bottom board is needed)
     const _isUpperUnitBuild = !!(state.activeWing && state.activeWing.startsWith('upperUnit_'));
@@ -2758,14 +2759,14 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
             for(let hole of sortedHoles) {
                 if (hole.bottom - currentY > 0.01) {
                     const segH = hole.bottom - currentY;
-                    const wm = createBoard(t, segH, bodyD, -state.width/2 + t/2, currentY + segH/2, 0);
+                    const wm = createBoard(t, segH, bodyD, -state.width/2 + t/2 + _ox, currentY + segH/2, 0);
                     _applyVertWallUV(wm, currentY - wallBottomY, segH, wallTotalH, bodyD, t);
                 }
                 currentY = Math.max(currentY, hole.top);
             }
             if (wallTopY - currentY > 0.01) {
                 const segH = wallTopY - currentY;
-                const wm = createBoard(t, segH, bodyD, -state.width/2 + t/2, currentY + segH/2, 0);
+                const wm = createBoard(t, segH, bodyD, -state.width/2 + t/2 + _ox, currentY + segH/2, 0);
                 _applyVertWallUV(wm, currentY - wallBottomY, segH, wallTotalH, bodyD, t);
             }
             _ppPartId = '';
@@ -4140,7 +4141,7 @@ if (compData && compData.type === 'hanging') {
     if (_wingCols && _wingCols.some(col => col.topPanel)) {
         // Build column X positions (left edge of each column's inner space)
         const colLeftEdges = [];
-        let _cx = -state.width / 2 + t;
+        let _cx = -state.width / 2 + t + _ox;
         for (let c = 0; c < _wingCols.length; c++) {
             colLeftEdges.push(_cx);
             _cx += _wingCols[c].width + t;
