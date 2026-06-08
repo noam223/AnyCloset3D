@@ -712,12 +712,13 @@ body {
     flex: 1 1 auto;
     min-width: 0;
     overflow: visible;
+    flex-shrink: 0;
 }
 .sidebar-logo-img {
-    width: 210px;
-    height: auto;
+    height: 88px;
+    width: auto;
+    max-width: min(240px, 100%);
     min-height: 56px;
-    max-height: 68px;
     object-fit: contain;
     object-position: right center;
     flex-shrink: 0;

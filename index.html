@@ -36,7 +36,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260608b">
     <link rel="stylesheet" href="style-mobile.css?v=20260607b">
     <link rel="stylesheet" href="style-extras.css?v=20260607b">
-    <link rel="stylesheet" href="style.css?v=20260608q">
+    <link rel="stylesheet" href="style.css?v=20260608r">
     <style>
         html.thumb-only-mode #left-sidebar,
         html.thumb-only-mode #right-sidebar,
@@ -1172,6 +1172,10 @@
         <!-- Sub-cell mode title + shelf counter — shown at bottom when a sub-cell zone is active -->
         <div id="tb-subcell-shelf-section" style="display:none;flex-direction:column;gap:3px;padding:5px 8px;background:rgba(99,102,241,0.08);border-radius:8px;border:1px solid rgba(99,102,241,0.25);width:100%;box-sizing:border-box;margin-top:4px;">
             <span id="tb-subcell-title" style="font-size:0.72rem;font-weight:700;color:var(--secondary);white-space:nowrap;text-align:center;"></span>
+            <div id="tb-subcell-select-row" style="display:none;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;">
+                <button type="button" class="slider-btn" style="height:24px;padding:0 10px;font-size:0.72rem;white-space:nowrap;" onclick="selectAllSubCellZones()"><i class="fa-solid fa-table-cells"></i> בחר הכל</button>
+                <button type="button" class="slider-btn" style="height:24px;padding:0 10px;font-size:0.72rem;white-space:nowrap;" onclick="clearActiveSubCell()"><i class="fa-solid fa-xmark"></i> נקה</button>
+            </div>
             <div style="display:flex;align-items:center;justify-content:center;gap:6px;">
                 <button class="slider-btn" style="width:22px;height:22px;font-size:0.75rem;" onclick="updateSubCellShelves(-1)"><i class="fa-solid fa-minus"></i></button>
                 <span id="tb-subcell-shelf-count" style="font-weight:900;color:var(--primary);font-size:0.9rem;min-width:16px;text-align:center;">0</span>
@@ -2255,7 +2259,7 @@
 <script src="engine-corners.js?v=20260608e"></script>
 <script src="engine-blueprint.js?v=20260608f"></script>
 <script src="tambour-color-picker.js?v=20260608a"></script>
-<script src="ui.js?v=20260608o"></script>
+<script src="ui.js?v=20260608p"></script>
 <script src="mobile.js?v=20260608a"></script>
 <script src="part-paint.js?v=20260520k"></script>
 <script src="index-init.js?v=20260608l"></script>

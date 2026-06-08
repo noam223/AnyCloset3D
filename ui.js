@@ -783,22 +783,22 @@ function buildDimensionsAndButtonsUI() {
         btn.dataset.y3d = d.y;
         // Show zone label if multiple zones exist in this sub-cell
         const zoneLabel = (d.numZones && d.numZones > 1) ? `תא ${d.subCellIdx + 1} אזור ${zoneIdx + 1}` : `תא ${d.subCellIdx + 1}`;
-        btn.title = zoneLabel + ' (Ctrl+לחיצה לבחירה מרובה)';
+        btn.title = zoneLabel + ' — לחץ לבחירה (ניתן לבחור כמה אזורים)';
 
         // Stop pointer events from bubbling to canvas (prevents canvas pointerup from clearing state.selection)
         btn.addEventListener('pointerdown', e => e.stopPropagation());
         btn.addEventListener('pointerup', e => e.stopPropagation());
 
         if (isSelected) {
-            // Selected: green X circle — click to deselect
-            btn.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#10b981,#059669);box-shadow:0 2px 8px rgba(16,185,129,0.55);cursor:pointer;"><i class="fa-solid fa-xmark" style="font-size:0.7rem;color:white;pointer-events:none;"></i></div>`;
+            // Selected: green check — click again to remove from multi-selection
+            btn.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#10b981,#059669);box-shadow:0 0 0 2px rgba(16,185,129,0.35),0 2px 8px rgba(16,185,129,0.55);cursor:pointer;"><i class="fa-solid fa-check" style="font-size:0.75rem;color:white;pointer-events:none;"></i></div>`;
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 // Select the cell first if not selected
                 if (!(state.selection.colIndex === d.colIndex && state.selection.rows.includes(d.rowIndex))) {
                     state.selection = { colIndex: d.colIndex, rows: [d.rowIndex] };
                 }
-                window.setActiveSubCell(zoneKey, e.ctrlKey || e.metaKey || e.shiftKey);
+                window.setActiveSubCell(zoneKey);
             });
         } else if (hasSubContent) {
             // Has content: circular pill with pen + trash
@@ -816,7 +816,7 @@ function buildDimensionsAndButtonsUI() {
                 if (!(state.selection.colIndex === d.colIndex && state.selection.rows.includes(d.rowIndex))) {
                     state.selection = { colIndex: d.colIndex, rows: [d.rowIndex] };
                 }
-                window.setActiveSubCell(zoneKey, e.ctrlKey || e.metaKey || e.shiftKey);
+                window.setActiveSubCell(zoneKey);
             });
             btn.querySelector('.sub-btn-trash').addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -851,7 +851,7 @@ function buildDimensionsAndButtonsUI() {
                 if (!(state.selection.colIndex === d.colIndex && state.selection.rows.includes(d.rowIndex))) {
                     state.selection = { colIndex: d.colIndex, rows: [d.rowIndex] };
                 }
-                window.setActiveSubCell(zoneKey, e.ctrlKey || e.metaKey || e.shiftKey);
+                window.setActiveSubCell(zoneKey);
             });
         }
 
@@ -1166,9 +1166,22 @@ function updateToolbarButtonHighlights() {
             } else {
                 subCellTitleEl.innerText = `${_activeSubCellIdxs.size} אזורים נבחרו`;
             }
+        } else if (hasPartition && state.selection.rows.length === 1) {
+            subCellTitleEl.style.display = '';
+            subCellTitleEl.innerText = 'לחץ על + בכל אזור — ניתן לבחור כמה';
         } else {
             subCellTitleEl.style.display = 'none';
         }
+    }
+
+    const shelfSection = document.getElementById('tb-subcell-shelf-section');
+    const selectAllRow = document.getElementById('tb-subcell-select-row');
+    if (hasPartition && state.selection.rows.length === 1) {
+        if (shelfSection) shelfSection.style.display = 'flex';
+        if (selectAllRow) selectAllRow.style.display = 'flex';
+    } else if (shelfSection && !_hasActiveSubCells) {
+        shelfSection.style.display = 'none';
+        if (selectAllRow) selectAllRow.style.display = 'none';
     }
 
     // In sub-cell mode: highlight the active zone's content type in the main toolbar
@@ -1241,9 +1254,13 @@ function updateToolbarButtonHighlights() {
         return;
     }
 
-    // Not in sub-cell mode — hide sub-cell shelf section
-    const shelfSection = document.getElementById('tb-subcell-shelf-section');
-    if (shelfSection) shelfSection.style.display = 'none';
+    // Not in sub-cell mode — hide sub-cell panel unless partition cell is selected
+    if (!hasPartition || state.selection.rows.length !== 1) {
+        const shelfSectionHide = document.getElementById('tb-subcell-shelf-section');
+        const selectAllRowHide = document.getElementById('tb-subcell-select-row');
+        if (shelfSectionHide) shelfSectionHide.style.display = 'none';
+        if (selectAllRowHide) selectAllRowHide.style.display = 'none';
+    }
 
     if (_isSliding) {
         if (btnHoneycomb) btnHoneycomb.style.display = 'none';
@@ -2269,22 +2286,35 @@ function _parseSubKey(key) {
 // Helper: build composite key from si and z
 function _subKey(si, z) { return `${si}:${z}`; }
 
-window.setActiveSubCell = function(key, additive) {
+window.setActiveSubCell = function(key) {
     // key is a composite string "si:z" or legacy integer si
     const compositeKey = (typeof key === 'number') ? _subKey(key, 0) : String(key);
-    if (additive) {
-        // Ctrl/Cmd/Shift+click: toggle zone in/out of multi-selection
-        if (_activeSubCellIdxs.has(compositeKey)) {
-            _activeSubCellIdxs.delete(compositeKey);
-        } else {
-            _activeSubCellIdxs.add(compositeKey);
-        }
-    } else if (_activeSubCellIdxs.has(compositeKey) && _activeSubCellIdxs.size === 1) {
-        _activeSubCellIdxs = new Set();
+    // Every click toggles the zone in/out of the selection (multi-select by default)
+    if (_activeSubCellIdxs.has(compositeKey)) {
+        _activeSubCellIdxs.delete(compositeKey);
     } else {
-        _activeSubCellIdxs = new Set([compositeKey]);
+        _activeSubCellIdxs.add(compositeKey);
     }
-    // Rebuild overlay so sub-cell buttons reflect the new selection state (green ✕ vs cyan +)
+    buildDimensionsAndButtonsUI();
+    updateOverlaysPosition();
+    updateToolbarState();
+    updateToolbarButtonHighlights();
+};
+
+// Select every shelf-zone inside the active partitioned cell
+window.selectAllSubCellZones = function() {
+    if (state.selection.colIndex === -1 || state.selection.rows.length !== 1) return;
+    const c = state.selection.colIndex;
+    const r = state.selection.rows[0];
+    const comp = state.columns[c] && state.columns[c].compartments[r];
+    if (!comp || !comp.partition || !Array.isArray(comp.subCells)) return;
+    const keys = new Set();
+    comp.subCells.forEach((sub, si) => {
+        const numZones = Math.max(1, (sub && sub.shelves ? sub.shelves + 1 : 0),
+            (sub && Array.isArray(sub.zonesType) ? sub.zonesType.length : 0));
+        for (let z = 0; z < numZones; z++) keys.add(_subKey(si, z));
+    });
+    _activeSubCellIdxs = keys;
     buildDimensionsAndButtonsUI();
     updateOverlaysPosition();
     updateToolbarState();
@@ -2509,7 +2539,10 @@ window.applyContentForce = function(type) {
     const _guardComp = state.columns[state.selection.colIndex] &&
                        state.columns[state.selection.colIndex].compartments[state.selection.rows[0]];
     const _isHoneycombType = (type === 'open_cell' || type === 'side_open_cell');
-    if (_guardComp && _guardComp.partition && !_isHoneycombType) return;
+    if (_guardComp && _guardComp.partition && !_isHoneycombType) {
+        _showToast('יש לבחור אזור אחד או יותר במחיצה (לחץ על + בכל אזור, או "בחר הכל")', 4500);
+        return;
+    }
 
     const c = state.selection.colIndex;
 
@@ -2599,11 +2632,13 @@ window.applyContent = function(type) {
 
     const c = state.selection.colIndex;
 
-    // Guard: if the selected compartment has a partition and no sub-cell is selected,
-    // and the type is not 'partition' itself, do NOT overwrite the partition.
+    // Guard: partitioned cell requires at least one zone selected
     if (type !== 'partition') {
         const _guardComp2 = state.columns[c] && state.columns[c].compartments[state.selection.rows[0]];
-        if (_guardComp2 && _guardComp2.partition) return;
+        if (_guardComp2 && _guardComp2.partition) {
+            _showToast('יש לבחור אזור אחד או יותר במחיצה (לחץ על + בכל אזור, או "בחר הכל")', 4500);
+            return;
+        }
     }
     
     // Special handling: 'partition' now toggles partition flag on the cell
@@ -2730,6 +2765,12 @@ window.applyDoor = function(type) {
     }
 
     const c = state.selection.colIndex;
+    const _doorPartComp = state.columns[c] && state.columns[c].compartments[Math.min(...state.selection.rows)];
+    if (_doorPartComp && _doorPartComp.partition && state.selection.rows.length === 1) {
+        _showToast('יש לבחור אזור אחד או יותר במחיצה (לחץ על + בכל אזור, או "בחר הכל")', 4500);
+        return;
+    }
+
     let startR = Math.min(...state.selection.rows);
     let endR = Math.max(...state.selection.rows);
 
