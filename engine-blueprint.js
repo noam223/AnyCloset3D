@@ -197,7 +197,7 @@ window._generateMultiViewBlueprintSVG = function() {
         }
     };
 
-    // Draw merged doors that span multiple sub-cell zones
+    // Draw merged doors / honeycomb spanning multiple sub-cell zones
     const _drawPartitionMergedDoors = (comp, boundaryXs, rowBotCm, rowTopCm, colBotSvgY, sc, ci, cols) => {
         if (!comp || !Array.isArray(comp.zoneDoorGroups) || !comp.subCells) return;
         comp.zoneDoorGroups.forEach(group => {
@@ -926,9 +926,9 @@ window._generateMultiViewBlueprintSVG = function() {
                                 const zoneStyle = (sub && Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[z])
                                     ? sub.zonesDoorStyle[z] : 'solid';
                                 const zoneKey = `${zi}:${z}`;
-                                const inDoorGroup = (comp.zoneDoorGroups || []).some(g => g.keys.includes(zoneKey));
+                                const inMergeGroup = (comp.zoneDoorGroups || []).some(g => g.keys.includes(zoneKey));
 
-                                if (zoneType && zoneType !== 'empty' && !inDoorGroup) {
+                                if (zoneType && zoneType !== 'empty' && !inMergeGroup) {
                                     const _opensLeft = ci === 0;
                                     const _opensRight = ci === cols.length - 1;
                                     let openDir = 'left';
@@ -1933,9 +1933,9 @@ window._generateMultiViewBlueprintPages = function() {
                                 const zoneStyle = (sub && Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[z])
                                     ? sub.zonesDoorStyle[z] : 'solid';
                                 const zoneKey = `${zi}:${z}`;
-                                const inDoorGroup = (comp.zoneDoorGroups || []).some(g => g.keys.includes(zoneKey));
+                                const inMergeGroup = (comp.zoneDoorGroups || []).some(g => g.keys.includes(zoneKey));
 
-                                if (zoneType && zoneType !== 'empty' && !inDoorGroup) {
+                                if (zoneType && zoneType !== 'empty' && !inMergeGroup) {
                                     const _opensLeft = ci === 0;
                                     const _opensRight = ci === cols.length - 1;
                                     let openDir = 'left';

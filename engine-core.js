@@ -3907,7 +3907,7 @@ if (compData && compData.type === 'hanging') {
                         }
                     }
 
-                    // Merged doors spanning multiple sub-cell zones
+                    // Merged doors / honeycomb spanning multiple sub-cell zones
                     if (!isBP && Array.isArray(compData.zoneDoorGroups)) {
                         compData.zoneDoorGroups.forEach(group => {
                             if (!group || !group.keys || !group.keys.length || !group.type) return;

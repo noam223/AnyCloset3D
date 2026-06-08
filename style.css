@@ -318,6 +318,9 @@ body {
     position: relative;
     overflow: hidden;
 }
+.sidebar-header {
+    padding: 10px 20px 14px;
+}
 .sidebar-header::before {
     content: '';
     position: absolute;
@@ -703,6 +706,7 @@ body {
     align-items: center;
     justify-content: space-between;
     gap: 10px;
+    margin: 0 0 6px 0;
 }
 .sidebar-logo-link {
     display: flex;
@@ -713,17 +717,45 @@ body {
     min-width: 0;
     overflow: visible;
     flex-shrink: 0;
+    line-height: 0;
+    margin: 0;
+    padding: 0;
 }
 .sidebar-logo-img {
-    height: 120px;
+    height: 96px;
     width: auto;
-    max-width: min(300px, 100%);
-    min-height: 72px;
+    max-width: min(280px, 100%);
     object-fit: contain;
     object-position: right center;
     flex-shrink: 0;
     filter: brightness(0) invert(1);
     display: block;
+    margin: 0;
+}
+.sidebar-header .sidebar-preset-prompt {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #fff;
+    margin: 0;
+    letter-spacing: 0.3px;
+    text-align: right;
+}
+#btn-start-tour {
+    background: rgba(255,255,255,0.18);
+    border: 1.5px solid rgba(255,255,255,0.35);
+    color: #fff;
+    border-radius: 8px;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    align-self: center;
+    font-family: inherit;
 }
 .sidebar-section-title {
     font-size: 1rem;

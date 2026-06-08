@@ -1477,6 +1477,37 @@ window.syncSidebarToWing = function() {
     if (typeof window._syncAllRangeFills === 'function') window._syncAllRangeFills();
 };
 
+function _compHasOpenCell(comp) {
+    if (!comp) return false;
+    if (comp.type === 'open_cell' || comp.type === 'side_open_cell') return true;
+    if (Array.isArray(comp.zoneDoorGroups) &&
+        comp.zoneDoorGroups.some(g => g && g.type === 'honeycomb')) return true;
+    if (!Array.isArray(comp.subCells)) return false;
+    return comp.subCells.some(sub => {
+        if (!sub) return false;
+        if (sub.type === 'honeycomb' || sub.type === 'open_cell' || sub.type === 'side_open_cell') return true;
+        return Array.isArray(sub.zonesType) &&
+            sub.zonesType.some(zt => zt === 'honeycomb' || zt === 'open_cell' || zt === 'side_open_cell');
+    });
+}
+
+window._activateColorPartTab = function(part) {
+    const w = getWing();
+    if (!w || !part) return;
+    w.activeColorPart = part;
+    document.querySelectorAll('.part-tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll(`.part-tab-btn[data-part="${part}"]`).forEach(b => b.classList.add('active'));
+    if (typeof window._updateSandwichColorVisibility === 'function') window._updateSandwichColorVisibility();
+    document.querySelectorAll('.material-btn').forEach(b => b.classList.remove('active'));
+    const currentMat = w[part];
+    const matBtn = document.querySelector(`.material-btn[data-mat="${currentMat}"]`);
+    if (matBtn) matBtn.classList.add('active');
+    else if (currentMat === 'custom') {
+        const uploadBtn = document.getElementById('btn-upload-texture');
+        if (uploadBtn) uploadBtn.classList.add('active');
+    }
+};
+
 window._updateMaterialTabVisibility = function(w) {
     if (!w) w = getWing();
     if (!w) return;
@@ -1490,8 +1521,7 @@ window._updateMaterialTabVisibility = function(w) {
                     (w.columns && w.columns.some(c => c.type === 'desk')) ||
                     (w.corner && w.corner.side !== 'none' && w.corner.type === 'desk');
     const hasOpenCell = w.columns && w.columns.some(col =>
-        col.compartments && col.compartments.some(comp =>
-            comp && (comp.type === 'open_cell' || comp.type === 'side_open_cell')));
+        col.compartments && col.compartments.some(comp => _compHasOpenCell(comp)));
     const hasDoors = w.hasDoors;
     const hasExternalDrawers = w.columns && w.columns.some(col =>
         col.compartments && col.compartments.some(comp =>

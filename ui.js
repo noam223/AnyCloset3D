@@ -769,9 +769,9 @@ function buildDimensionsAndButtonsUI() {
         let zoneType = 'empty';
         if (sub) {
             const zoneKey = _subKey(d.subCellIdx, zoneIdx);
-            const doorGroup = _zoneDoorGroupForKey(comp, zoneKey);
-            if (doorGroup) {
-                zoneType = doorGroup.type;
+            const mergeGrp = _zoneDoorGroupForKey(comp, zoneKey);
+            if (mergeGrp) {
+                zoneType = mergeGrp.type;
             } else if (Array.isArray(sub.zonesType) && sub.zonesType[zoneIdx]) {
                 zoneType = sub.zonesType[zoneIdx];
             } else if (sub.type && sub.type !== 'empty') {
@@ -1407,6 +1407,7 @@ function updateToolbarButtonHighlights() {
 }
 
 function selectAllColumn(colIndex) {
+    _activeSubCellIdxs = new Set();
     const col = state.columns[colIndex];
     if (!col) return;
     // Use compartments.length so that the extra compartment created by splitY is included
@@ -1570,6 +1571,7 @@ document.addEventListener('keydown', function(e) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function toggleSelection(c, r) {
+    _activeSubCellIdxs = new Set();
     if (state.selection.colIndex !== c) {
         state.selection = { colIndex: c, rows: [r] };
     } else {
@@ -2292,6 +2294,7 @@ function _parseSubKey(key) {
 function _subKey(si, z) { return `${si}:${z}`; }
 
 const _DOOR_ZONE_TYPES = new Set(['door_right', 'door_left', 'door_double', 'door_flap']);
+const _MERGE_ZONE_TYPES = new Set([..._DOOR_ZONE_TYPES, 'honeycomb']);
 
 function _sortedSubKeys(keys) {
     return [...keys].sort((a, b) => {
@@ -2329,6 +2332,43 @@ function _clearSubZoneContent(sub, z) {
     } else {
         sub.type = 'empty';
     }
+}
+
+function _finishSubCellApply(opts) {
+    _activeSubCellIdxs = new Set();
+    buildCabinet();
+    if (opts && opts.activateOpenCellTab && typeof window._activateColorPartTab === 'function') {
+        window._activateColorPartTab('materialOpenCell');
+    }
+    calculatePrice();
+    saveHistoryState();
+    buildDimensionsAndButtonsUI();
+    updateOverlaysPosition();
+    updateToolbarState();
+    updateToolbarButtonHighlights();
+}
+
+function _applyMergedZoneGroup(comp, selectedKeys, subType) {
+    if (!Array.isArray(comp.zoneDoorGroups)) comp.zoneDoorGroups = [];
+    const existing = _findZoneDoorGroup(comp, selectedKeys);
+    if (existing && existing.type === subType) {
+        _removeZoneDoorGroupsForKeys(comp, selectedKeys);
+        return;
+    }
+    _removeZoneDoorGroupsForKeys(comp, selectedKeys);
+    selectedKeys.forEach(key => {
+        const { si, z } = _parseSubKey(key);
+        const sub = comp.subCells[si];
+        if (!sub) return;
+        if (!Array.isArray(sub.zonesType)) sub.zonesType = [sub.type || 'empty'];
+        while (sub.zonesType.length <= z) sub.zonesType.push('empty');
+        sub.zonesType[z] = 'empty';
+    });
+    comp.zoneDoorGroups.push({
+        keys: selectedKeys,
+        type: subType,
+        style: subType.startsWith('door_') ? 'solid' : undefined
+    });
 }
 
 window.setActiveSubCell = function(key) {
@@ -2448,6 +2488,8 @@ window.setSubCellType = function(type) {
     const subType = (type === 'open_cell' || type === 'side_open_cell') ? 'honeycomb' : type;
     const selectedKeys = _sortedSubKeys(_activeSubCellIdxs);
 
+    let activateOpenCellTab = false;
+
     // Clear content on selected zones (+ remove merged door groups)
     if (subType === 'empty') {
         selectedKeys.forEach(key => {
@@ -2455,36 +2497,22 @@ window.setSubCellType = function(type) {
             _clearSubZoneContent(comp.subCells[si], z);
         });
         _removeZoneDoorGroupsForKeys(comp, selectedKeys);
-        buildCabinet(); calculatePrice(); saveHistoryState();
-        updateToolbarButtonHighlights();
+        _finishSubCellApply();
         return;
     }
 
-    // Multiple zones + door → one merged door spanning the combined area
-    if (_DOOR_ZONE_TYPES.has(subType) && selectedKeys.length > 1) {
-        if (!Array.isArray(comp.zoneDoorGroups)) comp.zoneDoorGroups = [];
-        const existing = _findZoneDoorGroup(comp, selectedKeys);
-        if (existing && existing.type === subType) {
-            _removeZoneDoorGroupsForKeys(comp, selectedKeys);
-        } else {
-            _removeZoneDoorGroupsForKeys(comp, selectedKeys);
-            selectedKeys.forEach(key => {
-                const { si, z } = _parseSubKey(key);
-                const sub = comp.subCells[si];
-                if (!sub) return;
-                if (!Array.isArray(sub.zonesType)) sub.zonesType = [sub.type || 'empty'];
-                while (sub.zonesType.length <= z) sub.zonesType.push('empty');
-                sub.zonesType[z] = 'empty';
-            });
-            comp.zoneDoorGroups.push({ keys: selectedKeys, type: subType, style: 'solid' });
-        }
-        buildCabinet(); calculatePrice(); saveHistoryState();
-        updateToolbarButtonHighlights();
+    // Multiple zones + door/honeycomb → one merged unit spanning the combined area
+    if (_MERGE_ZONE_TYPES.has(subType) && selectedKeys.length > 1) {
+        const existingMerged = _findZoneDoorGroup(comp, selectedKeys);
+        const togglingOff = existingMerged && existingMerged.type === subType;
+        _applyMergedZoneGroup(comp, selectedKeys, subType);
+        activateOpenCellTab = subType === 'honeycomb' && !togglingOff;
+        _finishSubCellApply({ activateOpenCellTab });
         return;
     }
 
-    // Single-zone door: remove merged group if this zone belonged to one
-    if (_DOOR_ZONE_TYPES.has(subType) && selectedKeys.length === 1) {
+    // Single-zone door/honeycomb: remove merged group if this zone belonged to one
+    if (_MERGE_ZONE_TYPES.has(subType) && selectedKeys.length === 1) {
         _removeZoneDoorGroupsForKeys(comp, selectedKeys);
     }
 
@@ -2513,6 +2541,7 @@ window.setSubCellType = function(type) {
         } else {
             newType = (current === subType) ? 'empty' : subType;
         }
+        if (subType === 'honeycomb' && newType === 'honeycomb') activateOpenCellTab = true;
         sub.zonesType[z] = newType;
         if (newType === 'empty' && Array.isArray(sub.zonesDoorStyle)) {
             sub.zonesDoorStyle[z] = 'solid';
@@ -2533,8 +2562,7 @@ window.setSubCellType = function(type) {
             sub.type = nonEmpty[0];
         }
     });
-    buildCabinet(); calculatePrice(); saveHistoryState();
-    updateToolbarButtonHighlights();
+    _finishSubCellApply({ activateOpenCellTab });
 };
 
 // Helper: distribute sub-cell shelvesY evenly within a compartment's Y range
