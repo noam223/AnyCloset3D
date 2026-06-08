@@ -69,6 +69,13 @@
     animation: _agSpin 0.7s linear infinite;
     flex-shrink: 0;
 }
+.auth-gate-message {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 1rem;
+    font-family: 'Rubik', sans-serif;
+    letter-spacing: 0.02em;
+}
 
 body {
     margin: 0; padding: 0; display: flex;

@@ -7014,6 +7014,16 @@ window.printCustomerSummary = async function() {
 // ==========================================
 // 8. אתחול המערכת (Initialization)
 // ==========================================
+window._runDeferredDefaultInit = function() {
+    if (window._cabinetBuiltOnce) return;
+    window._cabinetBuiltOnce = true;
+    buildCabinet();
+    calculatePrice();
+    updateLeftSidebar();
+    saveHistoryState();
+    if (typeof window._restorePresetUI === 'function') window._restorePresetUI();
+};
+
 if (!window._VIEWER_MODE) {
     distributeColumns(2);
     bindUI();
@@ -7021,20 +7031,20 @@ if (!window._VIEWER_MODE) {
 
     setTimeout(() => {
         window.dispatchEvent(new Event('resize'));
+        if (window._pendingProjectLoad) {
+            calcQuickPrice(true);
+            return;
+        }
         // Try to restore from localStorage first; if successful, skip default buildCabinet
         const savedAt = window._restoreFromLocalStorage && window._restoreFromLocalStorage();
         if (savedAt) {
+            window._cabinetBuiltOnce = true;
             const date = new Date(savedAt);
             const timeStr = date.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
             const dateStr = date.toLocaleDateString('he-IL');
             _showToast(`✅ הפרויקט שוחזר אוטומטית מגיבוי (${dateStr} ${timeStr})`);
         } else {
-            buildCabinet();
-            calculatePrice();
-            updateLeftSidebar();
-            saveHistoryState();
-            // Highlight the default preset button (linear) on fresh page load
-            if (typeof window._restorePresetUI === 'function') window._restorePresetUI();
+            window._runDeferredDefaultInit();
         }
         calcQuickPrice(true);
     }, 100);

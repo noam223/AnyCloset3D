@@ -319,7 +319,7 @@ body {
     overflow: hidden;
 }
 .sidebar-header {
-    padding: 10px 20px 14px;
+    padding: 8px 18px 12px;
 }
 .sidebar-header::before {
     content: '';
@@ -722,9 +722,9 @@ body {
     padding: 0;
 }
 .sidebar-logo-img {
-    height: 96px;
+    height: 120px;
     width: auto;
-    max-width: min(280px, 100%);
+    max-width: min(320px, 100%);
     object-fit: contain;
     object-position: right center;
     flex-shrink: 0;

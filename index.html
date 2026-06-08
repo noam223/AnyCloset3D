@@ -28,15 +28,16 @@
             window.location.replace('login.html');
         }
     })();
+    window._pendingProjectLoad = !!new URLSearchParams(window.location.search).get('project');
     </script>
     <!-- ── End early auth check ── -->
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="style-base.css?v=20260608c">
+    <link rel="stylesheet" href="style-base.css?v=20260608d">
     <link rel="stylesheet" href="style-mobile.css?v=20260607b">
     <link rel="stylesheet" href="style-extras.css?v=20260607b">
-    <link rel="stylesheet" href="style.css?v=20260608t">
+    <link rel="stylesheet" href="style.css?v=20260608u">
     <style>
         html.thumb-only-mode #left-sidebar,
         html.thumb-only-mode #right-sidebar,
@@ -57,6 +58,7 @@
 <div id="auth-gate">
   <img src="images/logo.png" alt="AnyCloset 3D" class="auth-gate-logo">
   <div class="auth-gate-spinner"></div>
+  <p id="auth-gate-msg" class="auth-gate-message" aria-live="polite">טוען...</p>
 </div>
 
 <!-- ===== RIGHT SIDEBAR (Desktop only) ===== -->
@@ -2259,10 +2261,10 @@
 <script src="engine-corners.js?v=20260608e"></script>
 <script src="engine-blueprint.js?v=20260608v"></script>
 <script src="tambour-color-picker.js?v=20260608a"></script>
-<script src="ui.js?v=20260608s"></script>
+<script src="ui.js?v=20260608t"></script>
 <script src="mobile.js?v=20260608a"></script>
 <script src="part-paint.js?v=20260520k"></script>
-<script src="index-init.js?v=20260608l"></script>
+<script src="index-init.js?v=20260608m"></script>
 
 <!-- ===== TAMBOUR FULL PALETTE MODAL ===== -->
 <div id="tambour-palette-modal" class="tambour-palette-overlay">

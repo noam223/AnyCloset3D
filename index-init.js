@@ -1,4 +1,16 @@
 // ── Auth guard + project load on startup ──────────────────────────────────────
+(function _loadGateHelpers() {
+    window._dismissLoadGate = function() {
+        var gate = document.getElementById('auth-gate');
+        if (gate) gate.remove();
+        window._pendingProjectLoad = false;
+    };
+    window._setLoadGateMessage = function(text) {
+        var el = document.getElementById('auth-gate-msg');
+        if (el) el.textContent = text;
+    };
+})();
+
 (async function _authInit() {
     // 1. Require login — redirects to login.html if no session
     var ok = await Auth.requireAuth();
@@ -17,9 +29,13 @@
         // On error, allow access — don't block the user
     }
 
-    // Auth passed — remove the loading gate so the app is visible
-    var gate = document.getElementById('auth-gate');
-    if (gate) gate.remove();
+    // Auth passed — show app unless a project is loading from URL
+    var projectId = new URLSearchParams(window.location.search).get('project');
+    if (projectId) {
+        window._setLoadGateMessage('טוען פרויקט...');
+    } else {
+        window._dismissLoadGate();
+    }
 
     // 2. Load user info and inject into top-bar
     var user = await Auth.getUser();
@@ -137,7 +153,6 @@
     // Note: btn-3d-view is always available — it now enters presentation mode (free-orbit + room).
 
     // 4. Load project from URL param ?project=<id>
-    var projectId = new URLSearchParams(window.location.search).get('project');
     var _thumbOnly = new URLSearchParams(window.location.search).get('thumbOnly') === '1';
     if (_thumbOnly) {
         document.documentElement.classList.add('thumb-only-mode');
@@ -206,6 +221,7 @@
                         custFields.forEach(function(f) { var el = document.getElementById(f[0]); if (el) el.value = state.customer[f[1]] || ''; });
                     }
                     buildCabinet();
+                    window._cabinetBuiltOnce = true;
                     if (typeof window._restorePresetUI === 'function') window._restorePresetUI();
                     if (typeof updateLeftSidebar === 'function') updateLeftSidebar();
                     saveHistoryState();
@@ -235,6 +251,11 @@
             } else if (window._needsThumbnailBackfill) {
                 setTimeout(function() { _backfillProjectThumbnail(); }, 2000);
             }
+        }
+        window._dismissLoadGate();
+        if (!window._cabinetBuiltOnce && typeof window._runDeferredDefaultInit === 'function') {
+            window._runDeferredDefaultInit();
+            if (typeof calcQuickPrice === 'function') calcQuickPrice(true);
         }
     }
 
