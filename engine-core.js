@@ -1663,6 +1663,8 @@ function buildCabinet() {
             ? ((scSide === 'right') ? -doorExtra / 2 : doorExtra / 2)
             : 0;
         const scHitZ = doorExtra / 2;
+        // Pull toward main cabinet on X to close the side-panel seam (~door thickness when doors present).
+        const scXFlush = doorExtra;
         // Use per-side width; fall back to shared width for backward compat
         const scProtrusion = (scSide === 'right')
             ? (scData.widthRight || scData.width || 40)
@@ -1680,7 +1682,9 @@ function buildCabinet() {
         const scGroup = new THREE.Group();
         const scRotY = (scSide === 'right') ? Math.PI / 2 : -Math.PI / 2;
         scGroup.rotation.y = scRotY;
-        const scX = (scSide === 'right') ? (mainW / 2 + scProtrusion / 2) : (-mainW / 2 - scProtrusion / 2);
+        const scX = (scSide === 'right')
+            ? (mainW / 2 + scProtrusion / 2 - scXFlush)
+            : (-mainW / 2 - scProtrusion / 2 + scXFlush);
         scGroup.position.set(scX, 0, 0);
         scGroup.userData.wingId = wingIdStr;
         cabinetGroup.add(scGroup);
