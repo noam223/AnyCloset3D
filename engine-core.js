@@ -912,6 +912,34 @@ const materials = {
     custom: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 })
 };
 
+window.materials = materials;
+
+window._tambourMatKey = function(colorId) {
+    return 'tambour_' + String(colorId || '').replace(/[^a-zA-Z0-9]/g, '_');
+};
+
+window._registerTambourMaterial = function(colorId, hex) {
+    const key = window._tambourMatKey(colorId);
+    const color = new THREE.Color(hex);
+    if (!materials[key]) {
+        materials[key] = new THREE.MeshStandardMaterial({ color: color, roughness: 0.6 });
+    } else {
+        materials[key].color.copy(color);
+        materials[key].needsUpdate = true;
+    }
+    return key;
+};
+
+window._syncTambourPalette = function(palette) {
+    if (!palette || typeof palette !== 'object') return;
+    Object.keys(palette).forEach(function(key) {
+        const entry = palette[key];
+        if (entry && entry.hex) {
+            window._registerTambourMaterial(entry.id || key.replace(/^tambour_/, ''), entry.hex);
+        }
+    });
+};
+
 const textureLoader = new THREE.TextureLoader();
 const textureNames = ['2020', 'H1367', 'H1307', 'H1227', '2025', '2040', '2041', '2044', '2047', '2049', '2062', '5600', '7180', '456', '462', '463', '464', '480'];
 

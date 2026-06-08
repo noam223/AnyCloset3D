@@ -162,6 +162,12 @@
                     }
                     if (snap.activeWing) state.activeWing = snap.activeWing;
                     if (snap.presetId)   state.presetId   = snap.presetId;
+                    if (snap.tambourPalette) {
+                        state.tambourPalette = snap.tambourPalette;
+                        if (typeof window._syncTambourPalette === 'function') {
+                            window._syncTambourPalette(state.tambourPalette);
+                        }
+                    }
                     // Restore room wall position
                     if (snap.roomWall) {
                         state.roomWall   = snap.roomWall;
@@ -295,7 +301,8 @@
             nicheClosureEnabled:       (window._nicheClosureEnabled !== undefined) ? window._nicheClosureEnabled : false,
             nicheClosureWidthLeft:     window._nicheClosureWidthLeft  || 1.8,
             nicheClosureWidthRight:    window._nicheClosureWidthRight || 1.8,
-            nicheClosureCeilHeight:    window._nicheClosureCeilHeight || 1.8
+            nicheClosureCeilHeight:    window._nicheClosureCeilHeight || 1.8,
+            tambourPalette:            state.tambourPalette || {}
         }));
     }
 
@@ -496,7 +503,8 @@ window._saveProjectNow = async function() {
             activeWing:    state.activeWing,
             presetId:      state.presetId,
             orderCart:     lightCart,
-            customer:      state.customer
+            customer:      state.customer,
+            tambourPalette: state.tambourPalette || {}
         }));
         console.log('[SaveNow] Saving project "' + window._currentProjectName + '", payload size:', Math.round(JSON.stringify(snap).length/1024) + 'KB, cart items:', lightCart.length);
         var thumb = null;

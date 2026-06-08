@@ -36,7 +36,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260608b">
     <link rel="stylesheet" href="style-mobile.css?v=20260607b">
     <link rel="stylesheet" href="style-extras.css?v=20260607b">
-    <link rel="stylesheet" href="style.css?v=20260608p">
+    <link rel="stylesheet" href="style.css?v=20260608q">
     <style>
         html.thumb-only-mode #left-sidebar,
         html.thumb-only-mode #right-sidebar,
@@ -828,6 +828,13 @@
                 <div class="mat-item"><button class="material-btn" data-mat="463" style="background-image: url('textures/463.jpg'); background-size: cover;" title="463"></button><span onclick="this.previousElementSibling.click()">463</span></div>
                 <div class="mat-item"><button class="material-btn" data-mat="464" style="background-image: url('textures/464.jpg'); background-size: cover;" title="464"></button><span onclick="this.previousElementSibling.click()">464</span></div>
                 <div class="mat-item"><button class="material-btn" data-mat="480" style="background-image: url('textures/480.jpg'); background-size: cover;" title="480"></button><span onclick="this.previousElementSibling.click()">480</span></div>
+            </div>
+
+            <button type="button" class="btn-open-tambour-palette" title="מניפת גוונים מלאה של טמבור">
+                <i class="fa-solid fa-swatchbook"></i> מניפת טמבור — 1651 גוונים
+            </button>
+
+            <div class="materials-flat-grid">
                 <div class="mat-item" style="grid-column: 1 / -1;">
                     <button id="btn-part-paint" onclick="enterPartPaintMode()" title="עריכת צבעים מתקדמת" style="width: 100%; border-radius: 8px; height: 38px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.9rem; border: 1.5px solid var(--primary); background: linear-gradient(135deg,#f0f9ff,#e0f0ff); color: var(--primary); font-weight: 600; cursor: pointer; transition: all 0.18s;">
                         <i class="fa-solid fa-paintbrush"></i> עריכת צבעים מתקדמת
@@ -1840,6 +1847,9 @@
             <div class="mat-item"><button class="material-btn" data-mat="464" style="background-image:url('textures/464.jpg');background-size:cover;"></button><span onclick="this.previousElementSibling.click()">464</span></div>
             <div class="mat-item"><button class="material-btn" data-mat="480" style="background-image:url('textures/480.jpg');background-size:cover;"></button><span onclick="this.previousElementSibling.click()">480</span></div>
         </div>
+        <button type="button" class="btn-open-tambour-palette" style="margin-bottom:12px;" title="מניפת גוונים מלאה של טמבור">
+            <i class="fa-solid fa-swatchbook"></i> מניפת טמבור — 1651 גוונים
+        </button>
         <button id="btn-part-paint-mobile" onclick="enterPartPaintMode()" style="width:100%;border-radius:8px;height:44px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:0.9rem;border:1.5px solid var(--primary);background:linear-gradient(135deg,#f0f9ff,#e0f0ff);color:var(--primary);font-weight:600;cursor:pointer;margin-bottom:10px;">
             <i class="fa-solid fa-paintbrush"></i> עריכת צבעים מתקדמת
         </button>
@@ -2241,13 +2251,33 @@
 <script src="auth.js"></script>
 <script src="state.js?v=20260608p"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
-<script src="engine-core.js?v=20260608g"></script>
+<script src="engine-core.js?v=20260608h"></script>
 <script src="engine-corners.js?v=20260608e"></script>
 <script src="engine-blueprint.js?v=20260608e"></script>
+<script src="tambour-color-picker.js?v=20260608a"></script>
 <script src="ui.js?v=20260608n"></script>
 <script src="mobile.js?v=20260608a"></script>
 <script src="part-paint.js?v=20260520k"></script>
-<script src="index-init.js?v=20260608k"></script>
+<script src="index-init.js?v=20260608l"></script>
+
+<!-- ===== TAMBOUR FULL PALETTE MODAL ===== -->
+<div id="tambour-palette-modal" class="tambour-palette-overlay">
+    <div class="tambour-palette-content">
+        <div class="tambour-palette-header">
+            <div class="tambour-palette-header-main">
+                <h2>מניפת הגוונים המלאה של טמבור</h2>
+                <p id="tambour-palette-count">טוען צבעים...</p>
+            </div>
+            <div class="tambour-palette-search-wrap">
+                <input type="text" id="tambour-palette-search" placeholder="חפש לפי שם גוון או קוד (למשל: SWAN WING או OW11P)...">
+            </div>
+            <button type="button" id="tambour-palette-close" class="tambour-palette-close" aria-label="סגור">✕</button>
+        </div>
+        <div id="tambour-palette-body" class="tambour-palette-body">
+            <div id="tambour-colors-grid" class="tambour-colors-grid"></div>
+        </div>
+    </div>
+</div>
 
 <!-- ===== SHARE LIVE LINK MODAL (tasks 3, 4, 12) ===== -->
 <div id="share-live-modal" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.55);align-items:center;justify-content:center;padding:16px;" onclick="if(event.target===this)document.getElementById('share-live-modal').style.display='none'">
