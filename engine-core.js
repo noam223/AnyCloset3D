@@ -1640,12 +1640,23 @@ function buildCabinet() {
     //
     // World position:
     //   X: right → mainW/2 + scProtrusion/2; left → -mainW/2 - scProtrusion/2
-    //   Z: cabinet spans full main cabinet depth, centered at 0
+    //   Z: cabinet spans full main cabinet depth, centered at 0 (+ door thickness when adjacent column has doors)
+
+    function _sideCabDoorExtraForSide(centerWing, scSide) {
+        if (!centerWing || !centerWing.hasDoors) return 0;
+        const cols = centerWing.columns;
+        if (!cols || !cols.length) return 0;
+        const edgeCol = (scSide === 'right') ? cols[cols.length - 1] : cols[0];
+        if (!edgeCol.doors || !edgeCol.doors.length) return 0;
+        return centerWing.thickness || state.thickness || 1.7;
+    }
 
     const _renderOneSideCabinet = (scData, scSide, wingIdStr, isActive) => {
         const mainW = centerWing ? centerWing.width : 160;
         const centerD = centerWing ? centerWing.depth : 54;
-        const scLocalW = centerD;
+        const doorExtra = _sideCabDoorExtraForSide(centerWing, scSide);
+        const scLocalW = centerD + doorExtra;
+        const scZOffset = doorExtra / 2;
         // Use per-side width; fall back to shared width for backward compat
         const scProtrusion = (scSide === 'right')
             ? (scData.widthRight || scData.width || 40)
@@ -1664,7 +1675,7 @@ function buildCabinet() {
         const scRotY = (scSide === 'right') ? Math.PI / 2 : -Math.PI / 2;
         scGroup.rotation.y = scRotY;
         const scX = (scSide === 'right') ? (mainW / 2 + scProtrusion / 2) : (-mainW / 2 - scProtrusion / 2);
-        scGroup.position.set(scX, 0, 0);
+        scGroup.position.set(scX, 0, scZOffset);
         scGroup.userData.wingId = wingIdStr;
         cabinetGroup.add(scGroup);
 
@@ -1688,11 +1699,11 @@ function buildCabinet() {
                 ? Math.max(...scData.columns.map(c => c.height))
                 : (scData.globalHeight || 240);
             // In world space after rotation: local X (centerD) → world Z, local Z (scProtrusion) → world X
-            const whbGeo = new THREE.BoxGeometry(scProtrusion + 2, scH + 2, centerD + 2);
+            const whbGeo = new THREE.BoxGeometry(scProtrusion + 2, scH + 2, centerD + doorExtra + 2);
             const whbMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, depthTest: false });
             const whb = new THREE.Mesh(whbGeo, whbMat);
             whb.renderOrder = 999;
-            whb.position.set(scX, scH / 2, 0);
+            whb.position.set(scX, scH / 2, scZOffset);
             whb.userData = { wingId: wingIdStr };
             cabinetGroup.add(whb);
             wingHitBoxes.push(whb);
@@ -1718,20 +1729,21 @@ function buildCabinet() {
         if (scData && scData.columns && scData.columns.length > 0) {
             const centerD2 = centerWing ? centerWing.depth : 54;
             const _editSide2 = (savedActiveWing === 'sideCabinetRight') ? 'right' : 'left';
+            const doorExtra2 = _sideCabDoorExtraForSide(centerWing, _editSide2);
             const scProtrusion2 = (_editSide2 === 'right')
                 ? (scData.widthRight || scData.width || 40)
                 : (scData.widthLeft  || scData.width || 40);
             const origWidth2 = scData.width;
             const origDepth2 = scData.depth;
             const origColWidth2 = scData.columns[0] ? scData.columns[0].width : null;
-            scData.width = centerD2;
+            scData.width = centerD2 + doorExtra2;
             scData.depth = scProtrusion2;
             if (scData.columns[0]) {
-                scData.columns[0].width = centerD2 - (scData.thickness || 1.7) * 2;
+                scData.columns[0].width = (centerD2 + doorExtra2) - (scData.thickness || 1.7) * 2;
             }
 
             const scEditGroup = new THREE.Group();
-            scEditGroup.position.set(0, 0, 0);
+            scEditGroup.position.set(0, 0, doorExtra2 / 2);
             cabinetGroup.add(scEditGroup);
             state.activeWing = savedActiveWing;
             _buildGroup = scEditGroup;
