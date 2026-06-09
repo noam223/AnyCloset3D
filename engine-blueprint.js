@@ -130,6 +130,41 @@ window._bpReplaceCutoutInSvg = function(svg, co, ox, oy, dW, dH, sc, cabWidthCm,
     }
 };
 
+const _BP_HONEYCOMB_TYPES = new Set(['open_cell', 'side_open_cell', 'honeycomb']);
+
+function _bpIsHoneycombType(t) {
+    return !!t && _BP_HONEYCOMB_TYPES.has(t);
+}
+
+function _bpColumnHasHoneycomb(col) {
+    if (!col || !col.compartments) return false;
+    for (let i = 0; i < col.compartments.length; i++) {
+        const comp = col.compartments[i];
+        if (!comp) continue;
+        if (_bpIsHoneycombType(comp.type)) return true;
+        if (comp.partition && comp.subCells) {
+            for (const sub of comp.subCells) {
+                if (!sub) continue;
+                if (_bpIsHoneycombType(sub.type)) return true;
+                if (Array.isArray(sub.zonesType) && sub.zonesType.some(_bpIsHoneycombType)) return true;
+            }
+        }
+    }
+    return false;
+}
+
+function _bpHoneycombInnerWidthMm(wCm, tCm) {
+    return Math.round((wCm - 2 * tCm) * 10);
+}
+
+function _bpHoneycombInnerSvgSpan(cp, sc, tCm) {
+    const tPx = tCm * sc;
+    const x1 = cp.x1 + tPx * 1.5;
+    const x2 = cp.x2 - tPx * 1.5;
+    if (x2 - x1 < 8) return null;
+    return { x1, x2, lbl: `${_bpHoneycombInnerWidthMm(cp.wCm, tCm)}` };
+}
+
 function _bpHoneycombBlocksFromCompartments(compartments, numRows) {
     const blocks = [];
     let cur = null;
@@ -190,23 +225,31 @@ function _bpDrawHoneycombBlock(p, ctx) {
     const wallH = blockBotSvg - blockTopSvg;
     if (wallH < 2 || tPx < 0.4) return;
 
-    const innerPad = 5;
-    const innerL = colX + innerPad;
-    const innerR = colX + colW - innerPad;
-    const shelfX1 = innerL + tPx;
-    const shelfX2 = innerR - tPx;
+    const leftCabInner = colX + tPx / 2;
+    const rightCabInner = colX + colW - tPx / 2;
+    const leftWallX1 = leftCabInner;
+    const leftWallX2 = leftCabInner + tPx;
+    const rightWallX1 = rightCabInner - tPx;
+    const rightWallX2 = rightCabInner;
+    const shelfX1 = leftWallX2;
+    const shelfX2 = rightWallX1;
     if (shelfX2 - shelfX1 < 4) return;
 
-    const drawSideWall = (centerX, showLabel) => {
-        makeRectFn(p, centerX - tPx / 2, blockTopSvg, tPx, wallH, boardFill, strokeThin, 1);
+    const drawSepLine = (x) => {
+        p.push(`<line x1="${x.toFixed(1)}" y1="${blockTopSvg.toFixed(1)}" x2="${x.toFixed(1)}" y2="${blockBotSvg.toFixed(1)}" stroke="${stroke}" stroke-width="0.75" opacity="0.85"/>`);
+    };
+
+    const drawSideWall = (x1, x2, showLabel, sepX) => {
+        makeRectFn(p, x1, blockTopSvg, x2 - x1, wallH, boardFill, strokeThin, 1);
+        if (sepX != null) drawSepLine(sepX);
         if (showLabel) {
-            p.push(`<text x="${(centerX + tPx / 2 + 3).toFixed(1)}" y="${((blockTopSvg + blockBotSvg) / 2 + 3).toFixed(1)}" text-anchor="start" font-family="${font}" font-size="8" fill="${stroke}" opacity="0.62">${tMm}</text>`);
+            p.push(`<text x="${(x2 + 3).toFixed(1)}" y="${((blockTopSvg + blockBotSvg) / 2 + 3).toFixed(1)}" text-anchor="start" font-family="${font}" font-size="8" fill="${stroke}" opacity="0.62">${tMm}</text>`);
         }
     };
 
     const openDir = block.type === 'side_open_cell' ? _bpSideOpenCellOpenDir(ci, numCols) : null;
-    if (block.type === 'open_cell' || openDir !== 'left') drawSideWall(innerL + tPx / 2, true);
-    if (block.type === 'open_cell' || openDir !== 'right') drawSideWall(innerR - tPx / 2, false);
+    if (block.type === 'open_cell' || openDir !== 'left') drawSideWall(leftWallX1, leftWallX2, true, leftCabInner);
+    if (block.type === 'open_cell' || openDir !== 'right') drawSideWall(rightWallX1, rightWallX2, false, rightCabInner);
 
     for (let ri = block.startR; ri < block.endR; ri++) {
         const shelfY = colBotSvgY - rowBounds[ri + 1] * sc;
@@ -1206,9 +1249,19 @@ window._generateMultiViewBlueprintSVG = function() {
         // Total width (below plinth)
         dimH(ox, ox + dW, dimY, `${Math.round(wg.w * 10)}`);
         // Per-column width dims — placed just below the plinth bottom
-        if (_hasMultiCols) {
+        {
+            const _tCmHC = state.thickness || 1.7;
             colXPositions.forEach((cp, ci) => {
-                dimH(cp.x1, cp.x2, _plinthBottomY + 18, `${Math.round(cp.wCm * 10)}`, false);
+                const col = cols[ci];
+                if (_bpColumnHasHoneycomb(col)) {
+                    const inner = _bpHoneycombInnerSvgSpan(cp, sc, _tCmHC);
+                    if (inner) dimH(inner.x1, inner.x2, _plinthBottomY + 6, inner.lbl, false);
+                }
+                if (_hasMultiCols) {
+                    dimH(cp.x1, cp.x2, _plinthBottomY + 18, `${Math.round(cp.wCm * 10)}`, false);
+                } else if (_bpColumnHasHoneycomb(col)) {
+                    dimH(cp.x1, cp.x2, _plinthBottomY + 18, `${Math.round(cp.wCm * 10)}`, false);
+                }
             });
         }
         // Total height (left side) — from floor (oy+dH) to highest column top
@@ -2271,10 +2324,19 @@ window._generateMultiViewBlueprintPages = function() {
         const _hasMultiCols2 = colXPositions.length > 1;
         const dimY = oy + dH + (_hasMultiCols2 ? 54 : 36);
         makeDimH(p, ox, ox + dW, dimY, `${Math.round(wg.w * 10)}`);
-        if (_hasMultiCols2) {
-            // Per-column width labels: placed just below the cabinet bottom
+        {
+            const _tCmHC2 = state.thickness || 1.7;
             colXPositions.forEach((cp, ci) => {
-                makeDimH(p, cp.x1, cp.x2, oy + dH + 18, `${Math.round(cp.wCm * 10)}`, false);
+                const col = cols[ci];
+                if (_bpColumnHasHoneycomb(col)) {
+                    const inner = _bpHoneycombInnerSvgSpan(cp, sc, _tCmHC2);
+                    if (inner) makeDimH(p, inner.x1, inner.x2, oy + dH + 6, inner.lbl, false);
+                }
+                if (_hasMultiCols2) {
+                    makeDimH(p, cp.x1, cp.x2, oy + dH + 18, `${Math.round(cp.wCm * 10)}`, false);
+                } else if (_bpColumnHasHoneycomb(col)) {
+                    makeDimH(p, cp.x1, cp.x2, oy + dH + 18, `${Math.round(cp.wCm * 10)}`, false);
+                }
             });
         }
         // Overall height dimension: from lowest bottom to highest top across all columns
@@ -2683,8 +2745,20 @@ window._generateMultiViewBlueprintPages = function() {
         const _hasMultiCols2 = colXPositions.length > 1;
         const dimY = oy + dH + (_hasMultiCols2 ? 54 : 36);
         makeDimH(p, ox, ox + dW, dimY, `${Math.round(wg.w * 10)}`);
-        if (_hasMultiCols2) {
-            colXPositions.forEach(cp => makeDimH(p, cp.x1, cp.x2, oy + dH + 18, `${Math.round(cp.wCm * 10)}`, false));
+        {
+            const _tCmHCFc = state.thickness || 1.7;
+            colXPositions.forEach((cp, ci) => {
+                const col = cols[ci];
+                if (_bpColumnHasHoneycomb(col)) {
+                    const inner = _bpHoneycombInnerSvgSpan(cp, sc, _tCmHCFc);
+                    if (inner) makeDimH(p, inner.x1, inner.x2, oy + dH + 6, inner.lbl, false);
+                }
+                if (_hasMultiCols2) {
+                    makeDimH(p, cp.x1, cp.x2, oy + dH + 18, `${Math.round(cp.wCm * 10)}`, false);
+                } else if (_bpColumnHasHoneycomb(col)) {
+                    makeDimH(p, cp.x1, cp.x2, oy + dH + 18, `${Math.round(cp.wCm * 10)}`, false);
+                }
+            });
         }
         makeDimV(p, ox - 54, oy, oy + dH, `${Math.round(wg.h * 10)}`);
         if (pH > 0) {
@@ -2935,8 +3009,20 @@ window._generateMultiViewBlueprintPages = function() {
                 const _plinthBotYSC = oy + dH + scPH * scScale;
                 const dimY = _plinthBotYSC + (_hasMultiColsSC ? 54 : 36);
                 makeDimH(p, ox, ox + dW, dimY, `${Math.round(scW * 10)}`);
-                if (_hasMultiColsSC) {
-                    colXPositions.forEach(cp => makeDimH(p, cp.x1, cp.x2, _plinthBotYSC + 18, `${Math.round(cp.wCm * 10)}`, false));
+                {
+                    const _tCmHCSc = state.thickness || 1.7;
+                    colXPositions.forEach((cp, ci) => {
+                        const col = cols[ci];
+                        if (_bpColumnHasHoneycomb(col)) {
+                            const inner = _bpHoneycombInnerSvgSpan(cp, scScale, _tCmHCSc);
+                            if (inner) makeDimH(p, inner.x1, inner.x2, _plinthBotYSC + 6, inner.lbl, false);
+                        }
+                        if (_hasMultiColsSC) {
+                            makeDimH(p, cp.x1, cp.x2, _plinthBotYSC + 18, `${Math.round(cp.wCm * 10)}`, false);
+                        } else if (_bpColumnHasHoneycomb(col)) {
+                            makeDimH(p, cp.x1, cp.x2, _plinthBotYSC + 18, `${Math.round(cp.wCm * 10)}`, false);
+                        }
+                    });
                 }
                 makeDimV(p, ox - 54, oy, oy + dH, `${Math.round(scH * 10)}`);
                 if (scPH > 0) makeDimV(p, ox + dW + 18, oy + dH - scPH*scScale, oy + dH, `${Math.round(scPH * 10)}`);
@@ -3151,8 +3237,20 @@ window._generateMultiViewBlueprintPages = function() {
         const _hasMultiColsUU = colXPositions.length > 1;
         const dimY = oy + dH + (_hasMultiColsUU ? 54 : 36);
         makeDimH(p, ox, ox + dW, dimY, `${Math.round(uuW * 10)}`);
-        if (_hasMultiColsUU) {
-            colXPositions.forEach(cp => makeDimH(p, cp.x1, cp.x2, oy + dH + 18, `${Math.round(cp.wCm * 10)}`, false));
+        {
+            const _tCmHCUu = state.thickness || 1.7;
+            colXPositions.forEach((cp, ci) => {
+                const col = cols[ci];
+                if (_bpColumnHasHoneycomb(col)) {
+                    const inner = _bpHoneycombInnerSvgSpan(cp, sc, _tCmHCUu);
+                    if (inner) makeDimH(p, inner.x1, inner.x2, oy + dH + 6, inner.lbl, false);
+                }
+                if (_hasMultiColsUU) {
+                    makeDimH(p, cp.x1, cp.x2, oy + dH + 18, `${Math.round(cp.wCm * 10)}`, false);
+                } else if (_bpColumnHasHoneycomb(col)) {
+                    makeDimH(p, cp.x1, cp.x2, oy + dH + 18, `${Math.round(cp.wCm * 10)}`, false);
+                }
+            });
         }
         makeDimV(p, ox - 54, oy, oy + dH, `${Math.round(uuH * 10)}`);
         // Gap label (distance between upper unit and main cabinet)
