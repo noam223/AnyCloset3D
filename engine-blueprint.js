@@ -130,6 +130,84 @@ window._bpReplaceCutoutInSvg = function(svg, co, ox, oy, dW, dH, sc, cabWidthCm,
     }
 };
 
+function _bpHoneycombBlocksFromCompartments(compartments, numRows) {
+    const blocks = [];
+    let cur = null;
+    for (let ri = 0; ri < numRows; ri++) {
+        const ct = (compartments && compartments[ri]) ? compartments[ri].type : 'empty';
+        if (ct === 'open_cell' || ct === 'side_open_cell') {
+            if (!cur || cur.type !== ct) {
+                if (cur) blocks.push(cur);
+                cur = { type: ct, startR: ri, endR: ri };
+            } else {
+                cur.endR = ri;
+            }
+        } else if (cur) {
+            blocks.push(cur);
+            cur = null;
+        }
+    }
+    if (cur) blocks.push(cur);
+    return blocks;
+}
+
+function _bpIsHoneycombInternalShelf(blocks, rowBounds, syAdj) {
+    for (let bi = 0; bi < blocks.length; bi++) {
+        const b = blocks[bi];
+        for (let ri = b.startR; ri < b.endR; ri++) {
+            if (Math.abs(syAdj - rowBounds[ri + 1]) < 0.05) return true;
+        }
+    }
+    return false;
+}
+
+function _bpSideOpenCellOpenDir(ci, numCols) {
+    const opensLeft = ci === 0;
+    const opensRight = ci === numCols - 1;
+    if (opensLeft && opensRight) return ci < numCols / 2 ? 'left' : 'right';
+    if (opensLeft) return 'left';
+    if (opensRight) return 'right';
+    return 'none';
+}
+
+function _bpDrawHoneycombBlock(p, ctx) {
+    const {
+        block, colX, colW, sc, colBotSvgY, rowBounds, ci, numCols,
+        boardFill, strokeThin, stroke, font, makeRectFn, makeShelfFn
+    } = ctx;
+    const tCm = state.thickness || 1.7;
+    const tPx = tCm * sc;
+    const tMm = Math.round(tCm * 10);
+    const botCm = rowBounds[block.startR];
+    const topCm = rowBounds[block.endR + 1];
+    const blockTopSvg = colBotSvgY - topCm * sc;
+    const blockBotSvg = colBotSvgY - botCm * sc;
+    const wallH = blockBotSvg - blockTopSvg;
+    if (wallH < 2 || tPx < 0.4) return;
+
+    const innerPad = 5;
+    const innerL = colX + innerPad;
+    const innerR = colX + colW - innerPad;
+    const shelfX1 = innerL + 2 * tPx;
+    const shelfX2 = innerR - 2 * tPx;
+    if (shelfX2 - shelfX1 < 4) return;
+
+    const drawDoubleWall = (x) => {
+        makeRectFn(p, x, blockTopSvg, tPx, wallH, boardFill, strokeThin, 1);
+        makeRectFn(p, x + tPx, blockTopSvg, tPx, wallH, boardFill, strokeThin, 1);
+        p.push(`<text x="${(x + tPx).toFixed(1)}" y="${((blockTopSvg + blockBotSvg) / 2 + 3).toFixed(1)}" text-anchor="middle" font-family="${font}" font-size="8" fill="${stroke}" opacity="0.62">${tMm}</text>`);
+    };
+
+    const openDir = block.type === 'side_open_cell' ? _bpSideOpenCellOpenDir(ci, numCols) : null;
+    if (block.type === 'open_cell' || openDir !== 'left') drawDoubleWall(innerL);
+    if (block.type === 'open_cell' || openDir !== 'right') drawDoubleWall(innerR - 2 * tPx);
+
+    for (let ri = block.startR; ri < block.endR; ri++) {
+        const shelfY = colBotSvgY - rowBounds[ri + 1] * sc;
+        makeShelfFn(p, shelfX1, shelfY, shelfX2, sc, tCm, false);
+    }
+}
+
 function _bpDrawPartitionZoneContent(p, zoneType, zoneStyle, x1, x2, zSvgTop, zSvgH, subZoneCX, subZoneW, openDir) {
     zoneStyle = zoneStyle || 'solid';
     const styleSuffix = _BP_DOOR_STYLE_SUFFIX[zoneStyle] || '';
@@ -143,20 +221,8 @@ function _bpDrawPartitionZoneContent(p, zoneType, zoneStyle, x1, x2, zSvgTop, zS
         }
         if (zSvgH > 18) p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 20).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="10" fill="${_BP_STROKE}" opacity="0.6">${zoneType === 'sorbet' ? 'סורבטו' : 'תלייה'}</text>`);
     } else if (zoneType === 'honeycomb' || zoneType === 'open_cell') {
-        const pad = 4;
-        const fx = x1 + pad, fy = zSvgTop + pad, fw = subZoneW - pad*2, fh = zSvgH - pad*2;
-        if (fw > 2 && fh > 2) p.push(`<rect x="${fx.toFixed(1)}" y="${fy.toFixed(1)}" width="${fw.toFixed(1)}" height="${fh.toFixed(1)}" fill="none" stroke="${_BP_STROKE}" stroke-width="1"/>`);
         if (zSvgH > 18) p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 14).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="10" fill="${_BP_STROKE}" opacity="0.6">כוורת</text>`);
     } else if (zoneType === 'side_open_cell') {
-        const pad = 4;
-        const fx = x1 + pad, fy = zSvgTop + pad, fw = subZoneW - pad*2, fh = zSvgH - pad*2;
-        if (fw > 2 && fh > 2) {
-            if (openDir === 'left') {
-                p.push(`<polyline points="${fx.toFixed(1)},${fy.toFixed(1)} ${(fx+fw).toFixed(1)},${fy.toFixed(1)} ${(fx+fw).toFixed(1)},${(fy+fh).toFixed(1)} ${fx.toFixed(1)},${(fy+fh).toFixed(1)}" fill="none" stroke="${_BP_STROKE}" stroke-width="1"/>`);
-            } else {
-                p.push(`<polyline points="${(fx+fw).toFixed(1)},${fy.toFixed(1)} ${fx.toFixed(1)},${fy.toFixed(1)} ${fx.toFixed(1)},${(fy+fh).toFixed(1)} ${(fx+fw).toFixed(1)},${(fy+fh).toFixed(1)}" fill="none" stroke="${_BP_STROKE}" stroke-width="1"/>`);
-            }
-        }
         if (zSvgH > 18) p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 14).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="10" fill="${_BP_STROKE}" opacity="0.6">כוורת צד</text>`);
     } else if (zoneType === 'internal_drawers' || zoneType === 'external_drawers') {
         const dCount = 2;
@@ -328,13 +394,13 @@ window._generateMultiViewBlueprintSVG = function() {
     p.push(`<text x="${SVG_W/2}" y="26" text-anchor="middle" font-family="${FONT}" font-size="18" font-weight="bold" fill="${STROKE}">שרטוט טכני — ${presetLabel}</text>`);
 
     const rect = (x,y,w,h,fill,stroke,sw=1.5) => p.push(`<rect x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" width="${(+w).toFixed(1)}" height="${(+h).toFixed(1)}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`);
-    const shelfLine = (x1, sy, x2, sc) => {
-        const t = state.thickness || 1.7;
+    const shelfLine = (x1, sy, x2, sc, tCm, showLabel) => {
+        const t = tCm != null ? tCm : (state.thickness || 1.7);
         const tPx = t * sc;
         if (tPx < 0.4) return;
         const halfT = tPx / 2;
         rect(x1, sy - halfT, x2 - x1, tPx, '#94a3b8', STROKE_THIN, 1);
-        if (x2 - x1 > 16) p.push(`<text x="${((x1+x2)/2).toFixed(1)}" y="${(sy+3).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(t * 10)}</text>`);
+        if (showLabel !== false && x2 - x1 > 16) p.push(`<text x="${((x1+x2)/2).toFixed(1)}" y="${(sy+3).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(t * 10)}</text>`);
     };
     const vline = (x, y1, y2, sc) => {
         const t = state.thickness || 1.7;
@@ -816,14 +882,26 @@ window._generateMultiViewBlueprintSVG = function() {
                 vline(colX, sepTopY, sepBotY, sc);
             }
 
-            // Shelves — only within visible height, measured from column bottom upward
             const _splitYOld = col.splitY || 0;
             const _splitTOld = (state.thickness || 1.7) * 2;
+            // Shelves — skip internal honeycomb shelves (drawn with block geometry)
+            const shelvesArrEarly = (col.shelvesY || []).slice().sort((a,b) => a-b);
+            const deskBaseEarly = (col.type === 'desk') ? (col.deskHeight || 80) + (col.deskClearance || 80) : colPlinthH;
+            const adjShelvesEarly = shelvesArrEarly.map(sy => sy - _fo).filter(sy => sy > 0 && sy < _visibleH);
+            const _splitYOldAdjE = _splitYOld > 0 ? (_splitYOld - _fo) : 0;
+            const _splitTopOldAdjE = _splitYOldAdjE > 0 ? _splitYOldAdjE + _splitTOld : 0;
+            let _allBoundsEarly = [...adjShelvesEarly];
+            if (_splitYOldAdjE > deskBaseEarly && _splitYOldAdjE < _visibleH) {
+                if (!_allBoundsEarly.includes(_splitYOldAdjE)) _allBoundsEarly.push(_splitYOldAdjE);
+                if (_splitTopOldAdjE < _visibleH && !_allBoundsEarly.includes(_splitTopOldAdjE)) _allBoundsEarly.push(_splitTopOldAdjE);
+                _allBoundsEarly.sort((a,b) => a-b);
+            }
+            const rowBoundsEarly = [deskBaseEarly, ..._allBoundsEarly.filter(sy => sy > deskBaseEarly), _visibleH];
+            const _hcBlocksOld = _bpHoneycombBlocksFromCompartments(col.compartments, rowBoundsEarly.length - 1);
             (col.shelvesY || []).forEach(sy => {
-                // shelf positions are stored from original bottom; adjust by floorOffset
                 const syAdjusted = sy - _fo;
-                // Skip shelves inside the split band (splitY is in absolute coords, syAdjusted is relative to floor)
                 if (_splitYOld > 0 && syAdjusted >= _splitYOld && syAdjusted <= _splitYOld + _splitTOld) return;
+                if (_bpIsHoneycombInternalShelf(_hcBlocksOld, rowBoundsEarly, syAdjusted)) return;
                 if (syAdjusted > 0 && syAdjusted < _visibleH) shelfLine(colX, _colBotY - syAdjusted*sc, colX + colW, sc);
             });
 
@@ -884,20 +962,9 @@ window._generateMultiViewBlueprintSVG = function() {
             }
 
             // Draw cell contents (hangers & drawers) per row
-            // shelf positions are stored from original bottom; adjust by floorOffset
-            const shelvesArr = (col.shelvesY || []).slice().sort((a,b) => a-b);
-            const adjShelvesArr = shelvesArr.map(sy => sy - _fo).filter(sy => sy > 0 && sy < _visibleH);
-            const deskBase = (col.type === 'desk') ? (col.deskHeight || 80) + (col.deskClearance || 80) : colPlinthH;
-            // Insert split band boundaries so cells don't span across the split
-            const _splitYOldAdj = _splitYOld > 0 ? (_splitYOld - _fo) : 0;
-            const _splitTopOldAdj = _splitYOldAdj > 0 ? _splitYOldAdj + _splitTOld : 0;
-            let _allBoundsOld = [...adjShelvesArr];
-            if (_splitYOldAdj > deskBase && _splitYOldAdj < _visibleH) {
-                if (!_allBoundsOld.includes(_splitYOldAdj)) _allBoundsOld.push(_splitYOldAdj);
-                if (_splitTopOldAdj < _visibleH && !_allBoundsOld.includes(_splitTopOldAdj)) _allBoundsOld.push(_splitTopOldAdj);
-                _allBoundsOld.sort((a,b) => a-b);
-            }
-            const rowBounds = [deskBase, ..._allBoundsOld.filter(sy => sy > deskBase), _visibleH];
+            const rowBounds = rowBoundsEarly;
+            const _splitYOldAdj = _splitYOldAdjE;
+            const _splitTopOldAdj = _splitTopOldAdjE;
             const numRows = rowBounds.length - 1;
             const _t_shelf = state.thickness || 1.7;
             for (let ri = 0; ri < numRows; ri++) {
@@ -964,34 +1031,8 @@ window._generateMultiViewBlueprintSVG = function() {
                         p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
                     }
                 } else if (cellType === 'open_cell') {
-                    // כוורת — inner rectangle (frame inside the cell)
-                    const pad = 5;
-                    const fx = colX + pad, fy = cellY1 + pad, fw = colW - pad*2, fh = cellH - pad*2;
-                    if (fw > 2 && fh > 2) p.push(`<rect x="${fx.toFixed(1)}" y="${fy.toFixed(1)}" width="${fw.toFixed(1)}" height="${fh.toFixed(1)}" fill="none" stroke="${STROKE}" stroke-width="1.2"/>`);
-                    // Label at top of cell to avoid overlapping height number
                     if (cellH > 18) p.push(`<text x="${cellCX.toFixed(1)}" y="${(cellY1 + 20).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.6">כוורת</text>`);
                 } else if (cellType === 'side_open_cell') {
-                    // כוורת צד — inner frame open on one side (3-sided C-shape)
-                    // openDir is NOT stored on comp — compute it from column position (same logic as 3D engine)
-                    const pad = 5;
-                    const _opensLeft = ci === 0;
-                    const _opensRight = ci === cols.length - 1;
-                    let openDir;
-                    if (_opensLeft && _opensRight) openDir = (ci < cols.length / 2) ? 'left' : 'right';
-                    else if (_opensLeft) openDir = 'left';
-                    else if (_opensRight) openDir = 'right';
-                    else openDir = 'left'; // fallback: center column, open left
-                    const fx = colX + pad, fy = cellY1 + pad, fw = colW - pad*2, fh = cellH - pad*2;
-                    if (fw > 2 && fh > 2) {
-                        if (openDir === 'left') {
-                            // Left side open: top-left → top-right → bottom-right → bottom-left (gap = left wall)
-                            p.push(`<polyline points="${fx.toFixed(1)},${fy.toFixed(1)} ${(fx+fw).toFixed(1)},${fy.toFixed(1)} ${(fx+fw).toFixed(1)},${(fy+fh).toFixed(1)} ${fx.toFixed(1)},${(fy+fh).toFixed(1)}" fill="none" stroke="${STROKE}" stroke-width="1.2"/>`);
-                        } else {
-                            // Right side open: top-right → top-left → bottom-left → bottom-right (gap = right wall)
-                            p.push(`<polyline points="${(fx+fw).toFixed(1)},${fy.toFixed(1)} ${fx.toFixed(1)},${fy.toFixed(1)} ${fx.toFixed(1)},${(fy+fh).toFixed(1)} ${(fx+fw).toFixed(1)},${(fy+fh).toFixed(1)}" fill="none" stroke="${STROKE}" stroke-width="1.2"/>`);
-                        }
-                    }
-                    // Label at top of cell to avoid overlapping height number
                     if (cellH > 18) p.push(`<text x="${cellCX.toFixed(1)}" y="${(cellY1 + 20).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.6">כוורת צד</text>`);
                 }
 
@@ -1101,6 +1142,14 @@ window._generateMultiViewBlueprintSVG = function() {
                     p.push(`<text x="${lblCX.toFixed(1)}" y="${lblCY.toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="15" fill="${DIM_C}" opacity="0.75">↕ ${cellHeightCm}</text>`);
                 }
             }
+            _hcBlocksOld.forEach(block => {
+                _bpDrawHoneycombBlock(p, {
+                    block, colX, colW, sc, colBotSvgY: _colBotY, rowBounds, ci, numCols: cols.length,
+                    boardFill: '#94a3b8', strokeThin: STROKE_THIN, stroke: STROKE, font: FONT,
+                    makeRectFn: (pp, x, y, w, h, fill, stroke, sw) => rect(x, y, w, h, fill, stroke, sw),
+                    makeShelfFn: (pp, x1, sy, x2, scc, tCm, showLabel) => shelfLine(x1, sy, x2, scc, tCm, showLabel)
+                });
+            });
             colX += colW;
         });
 
@@ -1341,13 +1390,13 @@ window._generateMultiViewBlueprintPages = function() {
     };
     const makeRect = (p, x,y,w,h,fill,stroke,sw=1.5) =>
         p.push(`<rect x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" width="${(+w).toFixed(1)}" height="${(+h).toFixed(1)}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`);
-    const makeShelfLine = (p, x1, sy, x2, sc, tCm) => {
+    const makeShelfLine = (p, x1, sy, x2, sc, tCm, showLabel) => {
         const t = tCm != null ? tCm : (state.thickness || 1.7);
         const tPx = t * sc;
         if (tPx < 0.4) return;
         const halfT = tPx / 2;
         makeRect(p, x1, sy - halfT, x2 - x1, tPx, '#94a3b8', STROKE_THIN, 1);
-        if (x2 - x1 > 16) p.push(`<text x="${((x1+x2)/2).toFixed(1)}" y="${(sy+3).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(t * 10)}</text>`);
+        if (showLabel !== false && x2 - x1 > 16) p.push(`<text x="${((x1+x2)/2).toFixed(1)}" y="${(sy+3).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(t * 10)}</text>`);
     };
     const makeVline = (p, x, y1, y2, sc, tCm, labelSide) => {
         const t = tCm != null ? tCm : (state.thickness || 1.7);
@@ -1848,14 +1897,29 @@ window._generateMultiViewBlueprintPages = function() {
                 makeVline(p, colX, sepTopY, sepBotY, sc);
             }
 
-            // Shelf lines — adjust by floorOffset, only within visible height
-            // Skip shelves that are inside the split band (between splitY and splitY+2t)
+            const shelvesArr = (col.shelvesY || []).slice().sort((a,b) => a-b);
+            const deskBase = (col.type === 'desk') ? (col.deskHeight || 80) + (col.deskClearance || 80) : colPlinthH;
+            const adjShelvesArr2 = shelvesArr.map(sy => sy - _fo2).filter(sy => sy > 0 && sy < _visibleH2);
+            const _splitYAdj = (col.splitY || 0) > 0 ? (col.splitY - _fo2) : 0;
+            const _splitT3 = (state.thickness || 1.7) * 2;
+            const _splitTopAdj = _splitYAdj > 0 ? _splitYAdj + _splitT3 : 0;
+            let _allBounds = [...adjShelvesArr2];
+            if (_splitYAdj > deskBase && _splitYAdj < _visibleH2) {
+                if (!_allBounds.includes(_splitYAdj)) _allBounds.push(_splitYAdj);
+                if (_splitTopAdj < _visibleH2 && !_allBounds.includes(_splitTopAdj)) _allBounds.push(_splitTopAdj);
+                _allBounds.sort((a,b) => a-b);
+            }
+            const rowBounds = [deskBase, ..._allBounds.filter(sy => sy > deskBase), _visibleH2];
+            const numRows = rowBounds.length - 1;
+            const _hcBlocks = _bpHoneycombBlocksFromCompartments(col.compartments, numRows);
+
+            // Shelf lines — skip internal honeycomb shelves (drawn with block geometry)
             const _splitY2 = col.splitY || 0;
-            const _splitT2 = (state.thickness || 1.7) * 2; // double board thickness
+            const _splitT2 = (state.thickness || 1.7) * 2;
             (col.shelvesY || []).forEach(sy => {
                 const syAdj = sy - _fo2;
-                // Skip shelves that fall within the split band (splitY is absolute, syAdj is relative to floor)
                 if (_splitY2 > 0 && syAdj >= _splitY2 && syAdj <= _splitY2 + _splitT2) return;
+                if (_bpIsHoneycombInternalShelf(_hcBlocks, rowBounds, syAdj)) return;
                 if (syAdj > 0 && syAdj < _visibleH2) makeShelfLine(p, colX, _colBotSvgY - syAdj*sc, colX + colW, sc);
             });
 
@@ -1916,23 +1980,6 @@ window._generateMultiViewBlueprintPages = function() {
                 p.push(`<text x="${(colX+colW/2).toFixed(1)}" y="${lblY.toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.5">שולחן</text>`);
             }
 
-            const shelvesArr = (col.shelvesY || []).slice().sort((a,b) => a-b);
-            const deskBase = (col.type === 'desk') ? (col.deskHeight || 80) + (col.deskClearance || 80) : colPlinthH;
-            // visibleH = height - floorOffset; shelf positions adjusted by floorOffset
-            const adjShelvesArr2 = shelvesArr.map(sy => sy - _fo2).filter(sy => sy > 0 && sy < _visibleH2);
-            // Insert split band boundaries into rowBounds so cells don't span across the split
-            const _splitYAdj = (col.splitY || 0) > 0 ? (col.splitY - _fo2) : 0;
-            const _splitT3 = (state.thickness || 1.7) * 2;
-            const _splitTopAdj = _splitYAdj > 0 ? _splitYAdj + _splitT3 : 0;
-            let _allBounds = [...adjShelvesArr2];
-            if (_splitYAdj > deskBase && _splitYAdj < _visibleH2) {
-                // Add both edges of the split band as boundaries
-                if (!_allBounds.includes(_splitYAdj)) _allBounds.push(_splitYAdj);
-                if (_splitTopAdj < _visibleH2 && !_allBounds.includes(_splitTopAdj)) _allBounds.push(_splitTopAdj);
-                _allBounds.sort((a,b) => a-b);
-            }
-            const rowBounds = [deskBase, ..._allBounds.filter(sy => sy > deskBase), _visibleH2];
-            const numRows = rowBounds.length - 1;
             const _t_shelf2 = state.thickness || 1.7;
             for (let ri = 0; ri < numRows; ri++) {
                 const rowBotCm = rowBounds[ri];
@@ -1991,34 +2038,8 @@ window._generateMultiViewBlueprintPages = function() {
                         p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
                     }
                 } else if (cellType === 'open_cell') {
-                    // כוורת — inner rectangle (frame inside the cell)
-                    const pad = 5;
-                    const fx = colX + pad, fy = cellY1 + pad, fw = colW - pad*2, fh = cellH - pad*2;
-                    if (fw > 2 && fh > 2) p.push(`<rect x="${fx.toFixed(1)}" y="${fy.toFixed(1)}" width="${fw.toFixed(1)}" height="${fh.toFixed(1)}" fill="none" stroke="${STROKE}" stroke-width="1.2"/>`);
-                    // Label at top of cell to avoid overlapping height number
                     if (cellH > 18) p.push(`<text x="${cellCX.toFixed(1)}" y="${(cellY1 + 20).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.6">כוורת</text>`);
                 } else if (cellType === 'side_open_cell') {
-                    // כוורת צד — inner frame open on one side (3-sided C-shape)
-                    // openDir is NOT stored on comp — compute from column position (same logic as 3D engine)
-                    const pad = 5;
-                    const _opensLeft2 = ci === 0;
-                    const _opensRight2 = ci === cols.length - 1;
-                    let openDir2;
-                    if (_opensLeft2 && _opensRight2) openDir2 = (ci < cols.length / 2) ? 'left' : 'right';
-                    else if (_opensLeft2) openDir2 = 'left';
-                    else if (_opensRight2) openDir2 = 'right';
-                    else openDir2 = 'left';
-                    const fx = colX + pad, fy = cellY1 + pad, fw = colW - pad*2, fh = cellH - pad*2;
-                    if (fw > 2 && fh > 2) {
-                        if (openDir2 === 'left') {
-                            // Left side open: top-left → top-right → bottom-right → bottom-left (gap = left wall)
-                            p.push(`<polyline points="${fx.toFixed(1)},${fy.toFixed(1)} ${(fx+fw).toFixed(1)},${fy.toFixed(1)} ${(fx+fw).toFixed(1)},${(fy+fh).toFixed(1)} ${fx.toFixed(1)},${(fy+fh).toFixed(1)}" fill="none" stroke="${STROKE}" stroke-width="1.2"/>`);
-                        } else {
-                            // Right side open: top-right → top-left → bottom-left → bottom-right (gap = right wall)
-                            p.push(`<polyline points="${(fx+fw).toFixed(1)},${fy.toFixed(1)} ${fx.toFixed(1)},${fy.toFixed(1)} ${fx.toFixed(1)},${(fy+fh).toFixed(1)} ${(fx+fw).toFixed(1)},${(fy+fh).toFixed(1)}" fill="none" stroke="${STROKE}" stroke-width="1.2"/>`);
-                        }
-                    }
-                    // Label at top of cell to avoid overlapping height number
                     if (cellH > 18) p.push(`<text x="${cellCX.toFixed(1)}" y="${(cellY1 + 20).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.6">כוורת צד</text>`);
                 }
 
@@ -2067,7 +2088,20 @@ window._generateMultiViewBlueprintPages = function() {
                                     const zoneHcm = cellHcm / (numShelves + 1);
                                     for (let s = 1; s <= numShelves; s++) shelfYcms.push(rowBotCm + zoneHcm * s);
                                 }
-                                // Draw shelf lines
+                            }
+                            const zoneBoundsCm = [rowBotCm, ...shelfYcms, rowTopCm];
+                            const isSubHoney = sub && (sub.type === 'honeycomb' || sub.type === 'open_cell');
+                            if (isSubHoney) {
+                                const subNumRows = zoneBoundsCm.length - 1;
+                                if (subNumRows > 0) {
+                                    _bpDrawHoneycombBlock(p, {
+                                        block: { type: 'open_cell', startR: 0, endR: subNumRows - 1 },
+                                        colX: x1, colW: x2 - x1, sc, colBotSvgY: _colBotSvgY, rowBounds: zoneBoundsCm,
+                                        ci, numCols: cols.length, boardFill: '#94a3b8', strokeThin: STROKE_THIN, stroke: STROKE, font: FONT,
+                                        makeRectFn: makeRect, makeShelfFn: makeShelfLine
+                                    });
+                                }
+                            } else if (numShelves > 0) {
                                 for (const shelfYcm of shelfYcms) {
                                     const shelfSvgY = _colBotSvgY - shelfYcm * sc;
                                     makeShelfLine(p, x1, shelfSvgY, x2, sc);
@@ -2075,7 +2109,6 @@ window._generateMultiViewBlueprintPages = function() {
                             }
 
                             // Zone bounds in SVG Y
-                            const zoneBoundsCm = [rowBotCm, ...shelfYcms, rowTopCm];
                             for (let z = 0; z < zoneBoundsCm.length - 1; z++) {
                                 const zBotCm = zoneBoundsCm[z];
                                 const zTopCm = zoneBoundsCm[z + 1];
@@ -2094,7 +2127,8 @@ window._generateMultiViewBlueprintPages = function() {
                                 const zoneKey = `${zi}:${z}`;
                                 const inMergeGroup = (comp.zoneDoorGroups || []).some(g => g.keys.includes(zoneKey));
 
-                                if (zoneType && zoneType !== 'empty' && !inMergeGroup) {
+                                if (zoneType && zoneType !== 'empty' && !inMergeGroup
+                                    && zoneType !== 'honeycomb' && zoneType !== 'open_cell' && zoneType !== 'side_open_cell') {
                                     const _opensLeft = ci === 0;
                                     const _opensRight = ci === cols.length - 1;
                                     let openDir = 'left';
@@ -2102,6 +2136,14 @@ window._generateMultiViewBlueprintPages = function() {
                                     else if (_opensLeft) openDir = 'left';
                                     else if (_opensRight) openDir = 'right';
                                     _bpDrawPartitionZoneContent(p,zoneType, zoneStyle, x1, x2, zSvgTop, zSvgH, subZoneCX, subZoneW, openDir);
+                                } else if ((zoneType === 'honeycomb' || zoneType === 'open_cell') && !inMergeGroup) {
+                                    if (zSvgH > 18) p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 14).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="10" fill="${STROKE}" opacity="0.6">כוורת</text>`);
+                                    _bpDrawHoneycombBlock(p, {
+                                        block: { type: 'open_cell', startR: 0, endR: 0 },
+                                        colX: x1, colW: x2 - x1, sc, colBotSvgY: _colBotSvgY, rowBounds: [zBotCm, zTopCm],
+                                        ci, numCols: cols.length, boardFill: '#94a3b8', strokeThin: STROKE_THIN, stroke: STROKE, font: FONT,
+                                        makeRectFn: makeRect, makeShelfFn: makeShelfLine
+                                    });
                                 }
 
                                 // Zone height label
@@ -2126,6 +2168,13 @@ window._generateMultiViewBlueprintPages = function() {
                     p.push(`<text x="${lblCX.toFixed(1)}" y="${lblCY.toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="15" fill="${DIM_C}" opacity="0.75">↕ ${cellHeightCm}</text>`);
                 }
             }
+            _hcBlocks.forEach(block => {
+                _bpDrawHoneycombBlock(p, {
+                    block, colX, colW, sc, colBotSvgY: _colBotSvgY, rowBounds, ci, numCols: cols.length,
+                    boardFill: '#94a3b8', strokeThin: STROKE_THIN, stroke: STROKE, font: FONT,
+                    makeRectFn: makeRect, makeShelfFn: makeShelfLine
+                });
+            });
             colX += colW;
         });
 
