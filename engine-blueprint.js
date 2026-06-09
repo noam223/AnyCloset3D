@@ -328,8 +328,25 @@ window._generateMultiViewBlueprintSVG = function() {
     p.push(`<text x="${SVG_W/2}" y="26" text-anchor="middle" font-family="${FONT}" font-size="18" font-weight="bold" fill="${STROKE}">שרטוט טכני — ${presetLabel}</text>`);
 
     const rect = (x,y,w,h,fill,stroke,sw=1.5) => p.push(`<rect x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" width="${(+w).toFixed(1)}" height="${(+h).toFixed(1)}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`);
-    const shelfLine = (x1,sy,x2) => p.push(`<line x1="${(+x1).toFixed(1)}" y1="${(+sy).toFixed(1)}" x2="${(+x2).toFixed(1)}" y2="${(+sy).toFixed(1)}" stroke="${STROKE_THIN}" stroke-width="1" stroke-dasharray="6,3"/>`);
-    const vline = (x,y1,y2) => p.push(`<line x1="${(+x).toFixed(1)}" y1="${(+y1).toFixed(1)}" x2="${(+x).toFixed(1)}" y2="${(+y2).toFixed(1)}" stroke="${STROKE_THIN}" stroke-width="0.8"/>`);
+    const shelfLine = (x1, sy, x2, sc) => {
+        const t = state.thickness || 1.7;
+        const tPx = t * sc;
+        if (tPx < 0.4) return;
+        const halfT = tPx / 2;
+        rect(x1, sy - halfT, x2 - x1, tPx, '#94a3b8', STROKE_THIN, 1);
+        if (x2 - x1 > 16) p.push(`<text x="${((x1+x2)/2).toFixed(1)}" y="${(sy+3).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(t * 10)}</text>`);
+    };
+    const vline = (x, y1, y2, sc) => {
+        const t = state.thickness || 1.7;
+        const tPx = t * sc;
+        if (tPx < 0.4 || y2 - y1 < 2) return;
+        const halfT = tPx / 2;
+        rect(x - halfT, y1, tPx, y2 - y1, '#94a3b8', STROKE_THIN, 1);
+        if (y2 - y1 > 14) {
+            const my = (y1 + y2) / 2;
+            p.push(`<text x="${(x + halfT + 3).toFixed(1)}" y="${(my+3).toFixed(1)}" text-anchor="start" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(t * 10)}</text>`);
+        }
+    };
     const panelBox = (px,py,pw,ph,lbl) => {
         p.push(`<rect x="${px}" y="${py}" width="${pw}" height="${ph+LABEL_H}" rx="4" fill="white" stroke="${STROKE_THIN}" stroke-width="1"/>`);
         p.push(`<rect x="${px}" y="${py}" width="${pw}" height="${LABEL_H}" fill="#f1f5f9" stroke="${STROKE_THIN}" stroke-width="1"/>`);
@@ -796,7 +813,7 @@ window._generateMultiViewBlueprintSVG = function() {
                 const prevTopY = prevBotY - prevVisibleH * sc;
                 const sepTopY = Math.min(_colTopY, prevTopY);
                 const sepBotY = Math.max(_colBotY, prevBotY);
-                vline(colX, sepTopY, sepBotY);
+                vline(colX, sepTopY, sepBotY, sc);
             }
 
             // Shelves — only within visible height, measured from column bottom upward
@@ -807,7 +824,7 @@ window._generateMultiViewBlueprintSVG = function() {
                 const syAdjusted = sy - _fo;
                 // Skip shelves inside the split band (splitY is in absolute coords, syAdjusted is relative to floor)
                 if (_splitYOld > 0 && syAdjusted >= _splitYOld && syAdjusted <= _splitYOld + _splitTOld) return;
-                if (syAdjusted > 0 && syAdjusted < _visibleH) shelfLine(colX, _colBotY - syAdjusted*sc, colX + colW);
+                if (syAdjusted > 0 && syAdjusted < _visibleH) shelfLine(colX, _colBotY - syAdjusted*sc, colX + colW, sc);
             });
 
             // Split band (ארון עליון / ארון תחתון divider) — double board drawn as filled rect
@@ -822,6 +839,7 @@ window._generateMultiViewBlueprintSVG = function() {
                     const upperMidOld = (_colTopY + _splitBandTopOld) / 2;
                     p.push(`<text x="${(colX + 6).toFixed(1)}" y="${(lowerMidOld + 4).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.5">ארון תחתון</text>`);
                     p.push(`<text x="${(colX + 6).toFixed(1)}" y="${(upperMidOld + 4).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.5">ארון עליון</text>`);
+                    p.push(`<text x="${(colX + colW / 2).toFixed(1)}" y="${(_splitBandTopOld + _splitBandHOld / 2 + 3).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(_splitTOld * 10)}</text>`);
                 }
             }
 
@@ -859,7 +877,7 @@ window._generateMultiViewBlueprintSVG = function() {
                 }
                 // Clearance board (shelf above clearance zone) — measured from column bottom
                 const clrBoardY = _colBotY - (deskH + deskClr) * sc;
-                p.push(`<line x1="${colX.toFixed(1)}" y1="${clrBoardY.toFixed(1)}" x2="${(colX+colW).toFixed(1)}" y2="${clrBoardY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.2"/>`);
+                shelfLine(colX, clrBoardY, colX + colW, sc);
                 // Label "שולחן" inside the open area
                 const lblY = openTop + (openBot - openTop) / 2 + 4;
                 p.push(`<text x="${(colX+colW/2).toFixed(1)}" y="${lblY.toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.5">שולחן</text>`);
@@ -989,10 +1007,10 @@ window._generateMultiViewBlueprintSVG = function() {
                     const cellHcm = rowTopCm - rowBotCm;
                     // Build boundary SVG X positions: [colX, partX0, partX1, ..., colX+colW]
                     const boundaryXs = [colX, ...partitions.map(px => colX + colW * px), colX + colW];
-                    // Draw a dashed line for each partition
+                    // Draw partition wall(s) with board thickness
                     partitions.forEach(px => {
                         const partSvgX = colX + colW * px;
-                        p.push(`<line x1="${partSvgX.toFixed(1)}" y1="${cellY1.toFixed(1)}" x2="${partSvgX.toFixed(1)}" y2="${cellY2.toFixed(1)}" stroke="${STROKE}" stroke-width="1.5" stroke-dasharray="5,3"/>`);
+                        vline(partSvgX, cellY1, cellY2, sc);
                     });
                     // Width dim for each sub-zone
                     for (let zi = 0; zi < boundaryXs.length - 1; zi++) {
@@ -1027,7 +1045,7 @@ window._generateMultiViewBlueprintSVG = function() {
                                 // Draw shelf lines
                                 for (const shelfYcm of shelfYcms) {
                                     const shelfSvgY = _colBotY - shelfYcm * sc;
-                                    p.push(`<line x1="${x1.toFixed(1)}" y1="${shelfSvgY.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${shelfSvgY.toFixed(1)}" stroke="${STROKE_THIN}" stroke-width="1" stroke-dasharray="6,3"/>`);
+                                    shelfLine(x1, shelfSvgY, x2, sc);
                                 }
                             }
 
@@ -1323,10 +1341,27 @@ window._generateMultiViewBlueprintPages = function() {
     };
     const makeRect = (p, x,y,w,h,fill,stroke,sw=1.5) =>
         p.push(`<rect x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" width="${(+w).toFixed(1)}" height="${(+h).toFixed(1)}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`);
-    const makeShelfLine = (p, x1,sy,x2) =>
-        p.push(`<line x1="${(+x1).toFixed(1)}" y1="${(+sy).toFixed(1)}" x2="${(+x2).toFixed(1)}" y2="${(+sy).toFixed(1)}" stroke="${STROKE_THIN}" stroke-width="1" stroke-dasharray="6,3"/>`);
-    const makeVline = (p, x,y1,y2) =>
-        p.push(`<line x1="${(+x).toFixed(1)}" y1="${(+y1).toFixed(1)}" x2="${(+x).toFixed(1)}" y2="${(+y2).toFixed(1)}" stroke="${STROKE_THIN}" stroke-width="0.8"/>`);
+    const makeShelfLine = (p, x1, sy, x2, sc, tCm) => {
+        const t = tCm != null ? tCm : (state.thickness || 1.7);
+        const tPx = t * sc;
+        if (tPx < 0.4) return;
+        const halfT = tPx / 2;
+        makeRect(p, x1, sy - halfT, x2 - x1, tPx, '#94a3b8', STROKE_THIN, 1);
+        if (x2 - x1 > 16) p.push(`<text x="${((x1+x2)/2).toFixed(1)}" y="${(sy+3).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(t * 10)}</text>`);
+    };
+    const makeVline = (p, x, y1, y2, sc, tCm, labelSide) => {
+        const t = tCm != null ? tCm : (state.thickness || 1.7);
+        const tPx = t * sc;
+        if (tPx < 0.4 || y2 - y1 < 2) return;
+        const halfT = tPx / 2;
+        makeRect(p, x - halfT, y1, tPx, y2 - y1, '#94a3b8', STROKE_THIN, 1);
+        if (y2 - y1 > 14) {
+            const my = (y1 + y2) / 2;
+            const side = labelSide || 'right';
+            if (side === 'left') p.push(`<text x="${(x - halfT - 3).toFixed(1)}" y="${(my+3).toFixed(1)}" text-anchor="end" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(t * 10)}</text>`);
+            else p.push(`<text x="${(x + halfT + 3).toFixed(1)}" y="${(my+3).toFixed(1)}" text-anchor="start" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(t * 10)}</text>`);
+        }
+    };
     let _dimIdCounter = 0;
     const makeDimH = (p, x1,x2,y,lbl,above=true) => {
         const tk=8, lo=above?-10:16;
@@ -1810,7 +1845,7 @@ window._generateMultiViewBlueprintPages = function() {
                 const prevTopY2 = prevBotY2 - prevVisibleH2 * sc;
                 const sepTopY = Math.min(_colTopSvgY, prevTopY2);
                 const sepBotY = Math.max(_colBotSvgY, prevBotY2);
-                makeVline(p, colX, sepTopY, sepBotY);
+                makeVline(p, colX, sepTopY, sepBotY, sc);
             }
 
             // Shelf lines — adjust by floorOffset, only within visible height
@@ -1821,7 +1856,7 @@ window._generateMultiViewBlueprintPages = function() {
                 const syAdj = sy - _fo2;
                 // Skip shelves that fall within the split band (splitY is absolute, syAdj is relative to floor)
                 if (_splitY2 > 0 && syAdj >= _splitY2 && syAdj <= _splitY2 + _splitT2) return;
-                if (syAdj > 0 && syAdj < _visibleH2) makeShelfLine(p, colX, _colBotSvgY - syAdj*sc, colX + colW);
+                if (syAdj > 0 && syAdj < _visibleH2) makeShelfLine(p, colX, _colBotSvgY - syAdj*sc, colX + colW, sc);
             });
 
             // Split band (ארון עליון / ארון תחתון divider) — double board drawn as filled rect
@@ -1838,6 +1873,7 @@ window._generateMultiViewBlueprintPages = function() {
                     const upperMidY = (_colTopSvgY + splitBandTopY) / 2;
                     p.push(`<text x="${(colX + 6).toFixed(1)}" y="${(lowerMidY + 4).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.5">ארון תחתון</text>`);
                     p.push(`<text x="${(colX + 6).toFixed(1)}" y="${(upperMidY + 4).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.5">ארון עליון</text>`);
+                    p.push(`<text x="${(colX + colW / 2).toFixed(1)}" y="${(splitBandTopY + splitBandH / 2 + 3).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(_splitT2 * 10)}</text>`);
                 }
             }
 
@@ -1874,7 +1910,7 @@ window._generateMultiViewBlueprintPages = function() {
                 }
                 // Clearance board (shelf above clearance zone)
                 const clrBoardY = _colBotSvgY - (deskH + deskClr) * sc;
-                p.push(`<line x1="${colX.toFixed(1)}" y1="${clrBoardY.toFixed(1)}" x2="${(colX+colW).toFixed(1)}" y2="${clrBoardY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.2"/>`);
+                makeShelfLine(p, colX, clrBoardY, colX + colW, sc);
                 // Label inside open area
                 const lblY = openTop + (openBot - openTop) / 2 + 4;
                 p.push(`<text x="${(colX+colW/2).toFixed(1)}" y="${lblY.toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.5">שולחן</text>`);
@@ -1998,10 +2034,10 @@ window._generateMultiViewBlueprintPages = function() {
                     const cellHcm = rowTopCm - rowBotCm;
                     // Build boundary SVG X positions: [colX, partX0, partX1, ..., colX+colW]
                     const boundaryXs = [colX, ...partitions.map(px => colX + colW * px), colX + colW];
-                    // Draw a dashed line for each partition
+                    // Draw partition wall(s) with board thickness
                     partitions.forEach(px => {
                         const partSvgX = colX + colW * px;
-                        p.push(`<line x1="${partSvgX.toFixed(1)}" y1="${cellY1.toFixed(1)}" x2="${partSvgX.toFixed(1)}" y2="${cellY2.toFixed(1)}" stroke="${STROKE}" stroke-width="1.5" stroke-dasharray="5,3"/>`);
+                        makeVline(p, partSvgX, cellY1, cellY2, sc);
                     });
                     // Width dim for each sub-zone
                     for (let zi = 0; zi < boundaryXs.length - 1; zi++) {
@@ -2034,7 +2070,7 @@ window._generateMultiViewBlueprintPages = function() {
                                 // Draw shelf lines
                                 for (const shelfYcm of shelfYcms) {
                                     const shelfSvgY = _colBotSvgY - shelfYcm * sc;
-                                    p.push(`<line x1="${x1.toFixed(1)}" y1="${shelfSvgY.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${shelfSvgY.toFixed(1)}" stroke="${STROKE_THIN}" stroke-width="1" stroke-dasharray="6,3"/>`);
+                                    makeShelfLine(p, x1, shelfSvgY, x2, sc);
                                 }
                             }
 
@@ -2092,6 +2128,12 @@ window._generateMultiViewBlueprintPages = function() {
             }
             colX += colW;
         });
+
+        // Outer side wall board thickness (left & right cabinet faces)
+        if (cols.length > 0) {
+            makeVline(p, ox, oy, oy + dH, sc, null, 'left');
+            makeVline(p, ox + dW, oy, oy + dH, sc, null, 'right');
+        }
 
         // ---- Side-open-cell wall gap overlay ----
         // For each side_open_cell on the outer left or right wall, paint a fill-colored
@@ -2266,7 +2308,7 @@ window._generateMultiViewBlueprintPages = function() {
                     makeDimV(p, ox + dW + 54, _splitTopY, _colTopY3, `${_upperH}`);
                     // Split band thickness label (small, centered on band)
                     const _bandMidY = (_splitBotY + _splitTopY) / 2;
-                    p.push(`<text x="${(ox + dW + 54 + 22).toFixed(1)}" y="${(_bandMidY + 4).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.6">${Math.round(_t2 * 10)}</text>`);
+                    p.push(`<text x="${(ox + dW + 54 + 22).toFixed(1)}" y="${(_bandMidY + 3).toFixed(1)}" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(_t2 * 10)}</text>`);
                 }
             }
             // floorOffset dimension: for each floating column, show the gap below it (floor to column bottom)
@@ -2373,7 +2415,7 @@ window._generateMultiViewBlueprintPages = function() {
             // Skip shelves inside the split band
             if (fcSplitY > 0 && sy >= fcSplitY && sy <= fcSplitY + fcSplitT) return;
             const sy_px = oy + dH - sy * sc;
-            p.push(`<line x1="${ox.toFixed(1)}" y1="${sy_px.toFixed(1)}" x2="${(ox+dW).toFixed(1)}" y2="${sy_px.toFixed(1)}" stroke="${STROKE_THIN}" stroke-width="1" stroke-dasharray="6,3"/>`);
+            makeShelfLine(p, ox, sy_px, ox + dW, sc);
         });
 
         // Split band for full-corner face
@@ -2385,6 +2427,7 @@ window._generateMultiViewBlueprintPages = function() {
             // Labels
             p.push(`<text x="${(ox + 6).toFixed(1)}" y="${((oy + dH + fcSplitBotY) / 2 + 4).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.5">ארון תחתון</text>`);
             p.push(`<text x="${(ox + 6).toFixed(1)}" y="${((oy + fcSplitTopY) / 2 + 4).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.5">ארון עליון</text>`);
+            p.push(`<text x="${(ox + dW / 2).toFixed(1)}" y="${(fcSplitTopY + fcSplitBandH / 2 + 3).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(fcSplitT * 10)}</text>`);
         }
 
         // Cell height labels inside each cell
@@ -2465,14 +2508,14 @@ window._generateMultiViewBlueprintPages = function() {
             const colPlinthH = col.noPlinth ? 0 : pH;
             colXPositions.push({ x1: colX, x2: colX + colW, wCm: Math.round(col.width || wg.w) });
 
-            if (ci > 0) makeVline(p, colX, oy, oy + dH);
+            if (ci > 0) makeVline(p, colX, oy, oy + dH, sc);
 
             const _splitYFC = col.splitY || 0;
             const _splitTFC = (state.thickness || 1.7) * 2;
             (col.shelvesY || []).forEach(sy => {
                 // Skip shelves inside the split band
                 if (_splitYFC > 0 && sy >= _splitYFC && sy <= _splitYFC + _splitTFC) return;
-                makeShelfLine(p, colX, oy + dH - sy*sc, colX + colW);
+                makeShelfLine(p, colX, oy + dH - sy*sc, colX + colW, sc);
             });
 
             // Split band for additional wing
@@ -2486,6 +2529,7 @@ window._generateMultiViewBlueprintPages = function() {
                     const upperMidFC = (oy + _splitTopYFC) / 2;
                     p.push(`<text x="${(colX + 6).toFixed(1)}" y="${(lowerMidFC + 4).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.5">ארון תחתון</text>`);
                     p.push(`<text x="${(colX + 6).toFixed(1)}" y="${(upperMidFC + 4).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.5">ארון עליון</text>`);
+                    p.push(`<text x="${(colX + colW / 2).toFixed(1)}" y="${(_splitTopYFC + _splitBandHFC / 2 + 3).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(_splitTFC * 10)}</text>`);
                 }
             }
 
@@ -2723,13 +2767,11 @@ window._generateMultiViewBlueprintPages = function() {
                     const colPlinthH = col.noPlinth ? 0 : scPH;
                     colXPositions.push({ x1: colX, x2: colX + colW, wCm: Math.round(col.width || scW) });
 
-                    if (ci > 0) makeVline(p, colX, oy, oy + dH);
-
-                    const _splitYSC = col.splitY || 0;
+                    if (ci > 0) makeVline(p, colX, oy, oy + dH, scScale);
                     const _splitTSC = (state.thickness || 1.7) * 2;
                     (col.shelvesY || []).forEach(sy => {
                         if (_splitYSC > 0 && sy >= _splitYSC && sy <= _splitYSC + _splitTSC) return;
-                        makeShelfLine(p, colX, oy + dH - sy*scScale, colX + colW);
+                        makeShelfLine(p, colX, oy + dH - sy*scScale, colX + colW, scScale);
                     });
 
                     // Split band for side cabinet
@@ -2741,6 +2783,7 @@ window._generateMultiViewBlueprintPages = function() {
                         if (ci === 0) {
                             p.push(`<text x="${(colX + 6).toFixed(1)}" y="${((oy + dH + _splitBotYSC) / 2 + 4).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.5">ארון תחתון</text>`);
                             p.push(`<text x="${(colX + 6).toFixed(1)}" y="${((oy + _splitTopYSC) / 2 + 4).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.5">ארון עליון</text>`);
+                            p.push(`<text x="${(colX + colW / 2).toFixed(1)}" y="${(_splitTopYSC + _splitBandHSC / 2 + 3).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(_splitTSC * 10)}</text>`);
                         }
                     }
 
@@ -2989,11 +3032,11 @@ window._generateMultiViewBlueprintPages = function() {
             const colW = isLastCol ? (ox + dW - colX) : (col.width || uuW) * sc;
             colXPositions.push({ x1: colX, x2: colX + colW, wCm: Math.round(col.width || uuW) });
 
-            if (ci > 0) makeVline(p, colX, oy, oy + dH);
+            if (ci > 0) makeVline(p, colX, oy, oy + dH, sc);
 
             // Shelf lines
             (col.shelvesY || []).forEach(sy => {
-                makeShelfLine(p, colX, oy + dH - sy*sc, colX + colW);
+                makeShelfLine(p, colX, oy + dH - sy*sc, colX + colW, sc);
             });
 
             // Cell height labels
