@@ -95,6 +95,16 @@ function _bpAppendViewCutouts(p, viewKey, ox, oy, dW, dH, sc, cabWidthCm, cabHei
     });
 }
 
+function _bpParseSvgFragment(svgString) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(
+        '<svg xmlns="http://www.w3.org/2000/svg">' + svgString + '</svg>',
+        'image/svg+xml'
+    );
+    if (doc.querySelector('parsererror')) return null;
+    return doc.documentElement.firstElementChild;
+}
+
 window._bpReplaceCutoutInSvg = function(svg, co, ox, oy, dW, dH, sc, cabWidthCm, cabHeightCm) {
     if (!svg || !co) return;
     const built = _bpBuildCutoutSvg(co, ox, oy, dW, dH, sc, cabWidthCm, cabHeightCm);
@@ -103,14 +113,12 @@ window._bpReplaceCutoutInSvg = function(svg, co, ox, oy, dW, dH, sc, cabWidthCm,
     const oldCut = svg.querySelector('.bp-cutout[data-cutout-id="' + co.id + '"]');
     const oldDims = svg.querySelector('.bp-cutout-dims[data-cutout-id="' + co.id + '"]');
     if (oldCut) {
-        const tmp = document.createElement('div');
-        tmp.innerHTML = built.cutoutG;
-        oldCut.replaceWith(tmp.firstElementChild);
+        const newCut = _bpParseSvgFragment(built.cutoutG);
+        if (newCut) oldCut.replaceWith(svg.ownerDocument.importNode(newCut, true));
     }
     if (oldDims) {
-        const tmp2 = document.createElement('div');
-        tmp2.innerHTML = built.dimsG;
-        oldDims.replaceWith(tmp2.firstElementChild);
+        const newDims = _bpParseSvgFragment(built.dimsG);
+        if (newDims) oldDims.replaceWith(svg.ownerDocument.importNode(newDims, true));
     }
 };
 
