@@ -170,6 +170,11 @@ function _bpSideOpenCellOpenDir(ci, numCols) {
     return 'none';
 }
 
+const _BP_HANG_ROD_BELOW_SHELF_CM = 7;
+function _bpHangRodSvgY(cellTopSvgY, sc) {
+    return cellTopSvgY + _BP_HANG_ROD_BELOW_SHELF_CM * sc;
+}
+
 function _bpDrawHoneycombBlock(p, ctx) {
     const {
         block, colX, colW, sc, colBotSvgY, rowBounds, ci, numCols,
@@ -188,19 +193,20 @@ function _bpDrawHoneycombBlock(p, ctx) {
     const innerPad = 5;
     const innerL = colX + innerPad;
     const innerR = colX + colW - innerPad;
-    const shelfX1 = innerL + 2 * tPx;
-    const shelfX2 = innerR - 2 * tPx;
+    const shelfX1 = innerL + tPx;
+    const shelfX2 = innerR - tPx;
     if (shelfX2 - shelfX1 < 4) return;
 
-    const drawDoubleWall = (x) => {
-        makeRectFn(p, x, blockTopSvg, tPx, wallH, boardFill, strokeThin, 1);
-        makeRectFn(p, x + tPx, blockTopSvg, tPx, wallH, boardFill, strokeThin, 1);
-        p.push(`<text x="${(x + tPx).toFixed(1)}" y="${((blockTopSvg + blockBotSvg) / 2 + 3).toFixed(1)}" text-anchor="middle" font-family="${font}" font-size="8" fill="${stroke}" opacity="0.62">${tMm}</text>`);
+    const drawSideWall = (centerX, showLabel) => {
+        makeRectFn(p, centerX - tPx / 2, blockTopSvg, tPx, wallH, boardFill, strokeThin, 1);
+        if (showLabel) {
+            p.push(`<text x="${(centerX + tPx / 2 + 3).toFixed(1)}" y="${((blockTopSvg + blockBotSvg) / 2 + 3).toFixed(1)}" text-anchor="start" font-family="${font}" font-size="8" fill="${stroke}" opacity="0.62">${tMm}</text>`);
+        }
     };
 
     const openDir = block.type === 'side_open_cell' ? _bpSideOpenCellOpenDir(ci, numCols) : null;
-    if (block.type === 'open_cell' || openDir !== 'left') drawDoubleWall(innerL);
-    if (block.type === 'open_cell' || openDir !== 'right') drawDoubleWall(innerR - 2 * tPx);
+    if (block.type === 'open_cell' || openDir !== 'left') drawSideWall(innerL + tPx / 2, true);
+    if (block.type === 'open_cell' || openDir !== 'right') drawSideWall(innerR - tPx / 2, false);
 
     for (let ri = block.startR; ri < block.endR; ri++) {
         const shelfY = colBotSvgY - rowBounds[ri + 1] * sc;
@@ -208,10 +214,19 @@ function _bpDrawHoneycombBlock(p, ctx) {
     }
 }
 
-function _bpDrawPartitionZoneContent(p, zoneType, zoneStyle, x1, x2, zSvgTop, zSvgH, subZoneCX, subZoneW, openDir) {
+function _bpDrawPartitionZoneContent(p, zoneType, zoneStyle, x1, x2, zSvgTop, zSvgH, subZoneCX, subZoneW, openDir, sc) {
     zoneStyle = zoneStyle || 'solid';
     const styleSuffix = _BP_DOOR_STYLE_SUFFIX[zoneStyle] || '';
-    if (zoneType === 'hanging' || zoneType === 'sorbet') {
+    if (zoneType === 'hanging') {
+        const rodY = _bpHangRodSvgY(zSvgTop, sc);
+        const rX1 = x1 + 4, rX2 = x2 - 4;
+        if (rX2 > rX1) {
+            p.push(`<line x1="${rX1.toFixed(1)}" y1="${rodY.toFixed(1)}" x2="${rX2.toFixed(1)}" y2="${rodY.toFixed(1)}" stroke="${_BP_STROKE}" stroke-width="1.5"/>`);
+            p.push(`<circle cx="${rX1.toFixed(1)}" cy="${rodY.toFixed(1)}" r="1.5" fill="${_BP_STROKE}"/>`);
+            p.push(`<circle cx="${rX2.toFixed(1)}" cy="${rodY.toFixed(1)}" r="1.5" fill="${_BP_STROKE}"/>`);
+        }
+        if (zSvgH > 18) p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 20).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="10" fill="${_BP_STROKE}" opacity="0.6">תלייה</text>`);
+    } else if (zoneType === 'sorbet') {
         const rodY = zSvgTop + zSvgH * 0.25;
         const rX1 = x1 + 4, rX2 = x2 - 4;
         if (rX2 > rX1) {
@@ -219,7 +234,7 @@ function _bpDrawPartitionZoneContent(p, zoneType, zoneStyle, x1, x2, zSvgTop, zS
             p.push(`<circle cx="${rX1.toFixed(1)}" cy="${rodY.toFixed(1)}" r="1.5" fill="${_BP_STROKE}"/>`);
             p.push(`<circle cx="${rX2.toFixed(1)}" cy="${rodY.toFixed(1)}" r="1.5" fill="${_BP_STROKE}"/>`);
         }
-        if (zSvgH > 18) p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 20).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="10" fill="${_BP_STROKE}" opacity="0.6">${zoneType === 'sorbet' ? 'סורבטו' : 'תלייה'}</text>`);
+        if (zSvgH > 18) p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 20).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="10" fill="${_BP_STROKE}" opacity="0.6">סורבטו</text>`);
     } else if (zoneType === 'honeycomb' || zoneType === 'open_cell') {
         if (zSvgH > 18) p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 14).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="10" fill="${_BP_STROKE}" opacity="0.6">כוורת</text>`);
     } else if (zoneType === 'side_open_cell') {
@@ -316,7 +331,7 @@ function _bpDrawPartitionMergedDoors(p, comp, boundaryXs, rowBotCm, rowTopCm, co
         if (_opensLeft && _opensRight) openDir = (ci < cols.length / 2) ? 'left' : 'right';
         else if (_opensLeft) openDir = 'left';
         else if (_opensRight) openDir = 'right';
-        _bpDrawPartitionZoneContent(p, group.type, group.style || 'solid', minX, maxX, minSvgTop, zSvgH, subZoneCX, subZoneW, openDir);
+        _bpDrawPartitionZoneContent(p, group.type, group.style || 'solid', minX, maxX, minSvgTop, zSvgH, subZoneCX, subZoneW, openDir, sc);
     });
 }
 
@@ -982,7 +997,7 @@ window._generateMultiViewBlueprintSVG = function() {
 
                 if (cellType === 'hanging') {
                     // Hanger symbol: horizontal hanging rod near top of cell
-                    const rodY   = cellY1 + cellH * 0.25;
+                    const rodY   = _bpHangRodSvgY(cellY1, sc);
                     const hRodX1 = colX + 4;
                     const hRodX2 = colX + colW - 4;
                     p.push(`<line x1="${hRodX1.toFixed(1)}" y1="${rodY.toFixed(1)}" x2="${hRodX2.toFixed(1)}" y2="${rodY.toFixed(1)}" stroke="${STROKE}" stroke-width="2"/>`);
@@ -1117,7 +1132,7 @@ window._generateMultiViewBlueprintSVG = function() {
                                     if (_opensLeft && _opensRight) openDir = (ci < cols.length / 2) ? 'left' : 'right';
                                     else if (_opensLeft) openDir = 'left';
                                     else if (_opensRight) openDir = 'right';
-                                    _bpDrawPartitionZoneContent(p,zoneType, zoneStyle, x1, x2, zSvgTop, zSvgH, subZoneCX, subZoneW, openDir);
+                                    _bpDrawPartitionZoneContent(p,zoneType, zoneStyle, x1, x2, zSvgTop, zSvgH, subZoneCX, subZoneW, openDir, sc);
                                 }
 
                                 // Zone height label
@@ -1995,7 +2010,7 @@ window._generateMultiViewBlueprintPages = function() {
 
                 if (cellType === 'hanging') {
                     // Hanger symbol: horizontal hanging rod near top of cell (no vertical rod)
-                    const rodY   = cellY1 + cellH * 0.25;
+                    const rodY   = _bpHangRodSvgY(cellY1, sc);
                     const hRodX1 = colX + 4;
                     const hRodX2 = colX + colW - 4;
                     p.push(`<line x1="${hRodX1.toFixed(1)}" y1="${rodY.toFixed(1)}" x2="${hRodX2.toFixed(1)}" y2="${rodY.toFixed(1)}" stroke="${STROKE}" stroke-width="2"/>`);
@@ -2135,7 +2150,7 @@ window._generateMultiViewBlueprintPages = function() {
                                     if (_opensLeft && _opensRight) openDir = (ci < cols.length / 2) ? 'left' : 'right';
                                     else if (_opensLeft) openDir = 'left';
                                     else if (_opensRight) openDir = 'right';
-                                    _bpDrawPartitionZoneContent(p,zoneType, zoneStyle, x1, x2, zSvgTop, zSvgH, subZoneCX, subZoneW, openDir);
+                                    _bpDrawPartitionZoneContent(p,zoneType, zoneStyle, x1, x2, zSvgTop, zSvgH, subZoneCX, subZoneW, openDir, sc);
                                 } else if ((zoneType === 'honeycomb' || zoneType === 'open_cell') && !inMergeGroup) {
                                     if (zSvgH > 18) p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 14).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="10" fill="${STROKE}" opacity="0.6">כוורת</text>`);
                                     _bpDrawHoneycombBlock(p, {
@@ -2608,15 +2623,12 @@ window._generateMultiViewBlueprintPages = function() {
                 const cellType = comp ? (comp.type || 'empty') : 'empty';
 
                 if (cellType === 'hanging') {
-                    const rodTopY  = cellY1 + 4;
-                    const rodBotY  = cellY1 + cellH * 0.32;
-                    const rodX     = cellCX;
-                    const hRodX1   = colX + 4;
-                    const hRodX2   = colX + colW - 4;
-                    p.push(`<line x1="${rodX.toFixed(1)}" y1="${rodTopY.toFixed(1)}" x2="${rodX.toFixed(1)}" y2="${rodBotY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.5"/>`);
-                    p.push(`<line x1="${hRodX1.toFixed(1)}" y1="${rodBotY.toFixed(1)}" x2="${hRodX2.toFixed(1)}" y2="${rodBotY.toFixed(1)}" stroke="${STROKE}" stroke-width="2"/>`);
-                    p.push(`<circle cx="${hRodX1.toFixed(1)}" cy="${rodBotY.toFixed(1)}" r="2" fill="${STROKE}"/>`);
-                    p.push(`<circle cx="${hRodX2.toFixed(1)}" cy="${rodBotY.toFixed(1)}" r="2" fill="${STROKE}"/>`);
+                    const rodY   = _bpHangRodSvgY(cellY1, sc);
+                    const hRodX1 = colX + 4;
+                    const hRodX2 = colX + colW - 4;
+                    p.push(`<line x1="${hRodX1.toFixed(1)}" y1="${rodY.toFixed(1)}" x2="${hRodX2.toFixed(1)}" y2="${rodY.toFixed(1)}" stroke="${STROKE}" stroke-width="2"/>`);
+                    p.push(`<circle cx="${hRodX1.toFixed(1)}" cy="${rodY.toFixed(1)}" r="2" fill="${STROKE}"/>`);
+                    p.push(`<circle cx="${hRodX2.toFixed(1)}" cy="${rodY.toFixed(1)}" r="2" fill="${STROKE}"/>`);
                 } else if (cellType === 'sorbet') {
                     // סורבטו — מנגנון תלייה מתרומם (ממורכז אנכית בתא)
                     const mechH  = cellH * 0.5;
@@ -2861,7 +2873,7 @@ window._generateMultiViewBlueprintPages = function() {
                         const cellType = comp ? (comp.type || 'empty') : 'empty';
 
                         if (cellType === 'hanging') {
-                            const rodY  = cellY1 + cellH * 0.25;
+                            const rodY  = _bpHangRodSvgY(cellY1, sc);
                             const hRodX1 = colX + 4, hRodX2 = colX + colW - 4;
                             p.push(`<line x1="${hRodX1.toFixed(1)}" y1="${rodY.toFixed(1)}" x2="${hRodX2.toFixed(1)}" y2="${rodY.toFixed(1)}" stroke="${STROKE}" stroke-width="2"/>`);
                             p.push(`<circle cx="${hRodX1.toFixed(1)}" cy="${rodY.toFixed(1)}" r="2" fill="${STROKE}"/>`);
@@ -3105,7 +3117,7 @@ window._generateMultiViewBlueprintPages = function() {
                 const cellType = comp ? (comp.type || 'empty') : 'empty';
 
                 if (cellType === 'hanging') {
-                    const rodY = cellY1 + cellH * 0.25;
+                    const rodY = _bpHangRodSvgY(cellY1, sc);
                     const hRodX1 = colX + 4, hRodX2 = colX + colW - 4;
                     p.push(`<line x1="${hRodX1.toFixed(1)}" y1="${rodY.toFixed(1)}" x2="${hRodX2.toFixed(1)}" y2="${rodY.toFixed(1)}" stroke="${STROKE}" stroke-width="2"/>`);
                     p.push(`<circle cx="${hRodX1.toFixed(1)}" cy="${rodY.toFixed(1)}" r="2" fill="${STROKE}"/>`);
