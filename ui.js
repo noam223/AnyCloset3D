@@ -5422,53 +5422,10 @@ function bindUI() {
     });
 
     document.getElementById('btn-add-to-cart').addEventListener('click', () => {
-        const originalDoorsState = state.hasDoors;
-        const originalViewMode = state.viewMode;
-
-        // Save current camera state so we can restore it after screenshot
-        const _savedCamPos = camera.position.clone();
-        const _savedTarget = controls.target.clone();
-        const _savedCamAnim = window._camAnim;
-        const _savedCamFov = camera.fov;
-
-        // Position camera directly at front view (no animation) for screenshot capture.
-        // Mirrors the math in updateCameraView() for viewMode === 'front'.
-        const _snapCenterWing = state.wings.center;
-        const _snapCols = _snapCenterWing && _snapCenterWing.columns && _snapCenterWing.columns.length > 0
-            ? _snapCenterWing.columns : null;
-        const _snapW = _snapCenterWing ? _snapCenterWing.width : state.width;
-        const _snapH = _snapCols ? Math.max(..._snapCols.map(c => c.height)) : state.globalHeight;
-        const _snapFitH = _snapH + 120;
-        const _snapFitW = _snapW + 150;
-        camera.fov = 45; camera.updateProjectionMatrix();
-        const _snapDistY = (_snapFitH / 2) / Math.tan(Math.PI * 45 / 360);
-        const _snapDistX = (_snapFitW / 2) / Math.tan(Math.PI * 45 / 360) / camera.aspect;
-        const _snapDist = Math.max(_snapDistY, _snapDistX);
-        const _snapMidY = _snapH / 2;
-        window._camAnim = null;
-        camera.position.set(0, _snapMidY, _snapDist);
-        controls.target.set(0, _snapMidY, 0);
-        controls.update();
-
-        state.viewMode = 'front';
-        state.hasDoors = true; buildCabinet(); renderer.render(scene, camera);
-        const imgWithDoors = renderer.domElement.toDataURL('image/png');
-        
-        state.hasDoors = false; buildCabinet(); renderer.render(scene, camera);
-        const imgNoDoors = renderer.domElement.toDataURL('image/png');
-
-        // Skip old Three.js blueprint capture — multi-view SVG blueprint is used instead
+        const preview = window._captureCabinetPreviewImages();
+        const imgWithDoors = preview.imgDoors;
+        const imgNoDoors = preview.imgOpen;
         const imgBlueprint = null;
-
-        // Restore camera state
-        camera.fov = _savedCamFov; camera.updateProjectionMatrix();
-        camera.position.copy(_savedCamPos);
-        controls.target.copy(_savedTarget);
-        controls.update();
-        window._camAnim = _savedCamAnim;
-
-        state.viewMode = originalViewMode; updateCameraView();
-        state.hasDoors = originalDoorsState; buildCabinet(); renderer.render(scene, camera);
 
         let totalShelves = 0, hangingRods = 0, intDrawers = 0, extDrawers = 0, openCellsCount = 0;
         state.columns.forEach(col => {
@@ -5605,10 +5562,11 @@ function bindUI() {
             imgDoors: imgWithDoors, imgOpen: imgNoDoors, imgBlueprint: imgBlueprint,
             corner: state.corner ? JSON.parse(JSON.stringify(state.corner)) : null,
             slidingDoor: slidingDoorSpec,
-            multiViewSVG: (typeof window._generateMultiViewBlueprintSVG === 'function')
-                ? window._generateMultiViewBlueprintSVG() : null,
-            multiViewPages: (typeof window._generateMultiViewBlueprintPages === 'function')
-                ? window._generateMultiViewBlueprintPages().map(pg => pg.svg) : []
+            multiViewSVG: preview.multiViewSVG || ((typeof window._generateMultiViewBlueprintSVG === 'function')
+                ? window._generateMultiViewBlueprintSVG() : null),
+            multiViewPages: preview.multiViewPages.length ? preview.multiViewPages
+                : ((typeof window._generateMultiViewBlueprintPages === 'function')
+                ? window._generateMultiViewBlueprintPages().map(pg => pg.svg) : [])
         };
 
         const cartItem = { spec: cabinetSpec, rawState: rawState };
@@ -5664,13 +5622,257 @@ function _showToast(msg, duration = 4000) {
     toast._hideTimer = setTimeout(() => { toast.style.opacity = '0'; }, duration);
 }
 
-window.openOrderModal = function(mode) {
+// ---- Cart preview refresh (images stripped on project save — regenerate from rawState) ----
+window._captureCabinetPreviewImages = function() {
+    const cam = window.camera;
+    const ctrl = window.controls;
+    const ren = window.renderer;
+    const scn = window.scene;
+    if (!cam || !ctrl || !ren || !scn) {
+        return { imgDoors: null, imgOpen: null, multiViewPages: [], multiViewSVG: null };
+    }
+
+    const originalDoorsState = state.hasDoors;
+    const originalViewMode = state.viewMode;
+    const savedCamPos = cam.position.clone();
+    const savedTarget = ctrl.target.clone();
+    const savedCamAnim = window._camAnim;
+    const savedCamFov = cam.fov;
+
+    const snapCenterWing = state.wings.center;
+    const snapCols = snapCenterWing && snapCenterWing.columns && snapCenterWing.columns.length > 0
+        ? snapCenterWing.columns : null;
+    const snapW = snapCenterWing ? snapCenterWing.width : state.width;
+    const snapH = snapCols ? Math.max(...snapCols.map(c => c.height)) : state.globalHeight;
+    const snapFitH = snapH + 120;
+    const snapFitW = snapW + 150;
+    cam.fov = 45;
+    cam.updateProjectionMatrix();
+    const snapDistY = (snapFitH / 2) / Math.tan(Math.PI * 45 / 360);
+    const snapDistX = (snapFitW / 2) / Math.tan(Math.PI * 45 / 360) / cam.aspect;
+    const snapDist = Math.max(snapDistY, snapDistX);
+    const snapMidY = snapH / 2;
+    window._camAnim = null;
+    cam.position.set(0, snapMidY, snapDist);
+    ctrl.target.set(0, snapMidY, 0);
+    ctrl.update();
+
+    state.viewMode = 'front';
+    state.hasDoors = true;
+    buildCabinet();
+    ren.render(scn, cam);
+    const imgWithDoors = ren.domElement.toDataURL('image/png');
+
+    state.hasDoors = false;
+    buildCabinet();
+    ren.render(scn, cam);
+    const imgNoDoors = ren.domElement.toDataURL('image/png');
+
+    let multiViewPages = [];
+    let multiViewSVG = null;
+    try {
+        if (typeof window._generateMultiViewBlueprintPages === 'function') {
+            multiViewPages = window._generateMultiViewBlueprintPages().map(pg => pg.svg);
+        }
+        if (typeof window._generateMultiViewBlueprintSVG === 'function') {
+            multiViewSVG = window._generateMultiViewBlueprintSVG();
+        }
+    } catch (e) {
+        console.warn('[capture] blueprint generation failed:', e);
+    }
+
+    cam.fov = savedCamFov;
+    cam.updateProjectionMatrix();
+    cam.position.copy(savedCamPos);
+    ctrl.target.copy(savedTarget);
+    ctrl.update();
+    window._camAnim = savedCamAnim;
+    state.viewMode = originalViewMode;
+    updateCameraView();
+    state.hasDoors = originalDoorsState;
+    buildCabinet();
+    ren.render(scn, cam);
+
+    return { imgDoors: imgWithDoors, imgOpen: imgNoDoors, multiViewPages, multiViewSVG };
+};
+
+function _cartImageValid(src) {
+    return src && typeof src === 'string' && src.startsWith('data:image');
+}
+
+window._cartItemNeedsMediaRefresh = function(itemObj) {
+    if (!itemObj || !itemObj.rawState || !itemObj.spec) return false;
+    const spec = itemObj.spec;
+    if (!_cartImageValid(spec.imgDoors) || !_cartImageValid(spec.imgOpen)) return true;
+    if (!spec.multiViewPages || !spec.multiViewPages.length) return true;
+    return false;
+};
+
+function _snapshotEditorState() {
+    const cam = window.camera;
+    const ctrl = window.controls;
+    return {
+        wings: JSON.parse(JSON.stringify(state.wings)),
+        activeWing: state.activeWing,
+        presetId: state.presetId,
+        viewMode: state.viewMode,
+        hasDoors: state.hasDoors,
+        wingEditMode: state.wingEditMode,
+        wingEditSnapshot: state.wingEditSnapshot,
+        editingCartIndex: state.editingCartIndex,
+        blueprintCutouts: JSON.parse(JSON.stringify(state.blueprintCutouts || [])),
+        partColors: JSON.parse(JSON.stringify(state.partColors || {})),
+        roomWall: window._roomWall || state.roomWall || 'center',
+        closureEnabled: window._closureEnabled,
+        closureWidth: window._closureWidth,
+        closureWidthRight: window._closureWidthRight,
+        closureCeilWidth: window._closureCeilWidth,
+        closureDepthWidth: window._closureDepthWidth,
+        closureFrontLine: window._closureFrontLine,
+        nicheEnabled: window._nicheEnabled,
+        nicheWidth: window._nicheWidth,
+        nicheDepth: window._nicheDepth,
+        nicheClosureEnabled: window._nicheClosureEnabled,
+        nicheClosureWidthLeft: window._nicheClosureWidthLeft,
+        nicheClosureWidthRight: window._nicheClosureWidthRight,
+        nicheClosureCeilHeight: window._nicheClosureCeilHeight,
+        camFov: cam ? cam.fov : 45,
+        camPos: cam ? cam.position.clone() : null,
+        camTarget: ctrl ? ctrl.target.clone() : null,
+        camAnim: window._camAnim,
+        orbitFree: window._orbitFree
+    };
+}
+
+function _restoreEditorState(snap) {
+    if (!snap) return;
+    state.wings = snap.wings;
+    state.activeWing = snap.activeWing;
+    state.presetId = snap.presetId;
+    state.viewMode = snap.viewMode;
+    state.hasDoors = snap.hasDoors;
+    state.wingEditMode = snap.wingEditMode;
+    state.wingEditSnapshot = snap.wingEditSnapshot;
+    state.editingCartIndex = snap.editingCartIndex;
+    state.blueprintCutouts = snap.blueprintCutouts || [];
+    state.partColors = snap.partColors || {};
+    window._roomWall = snap.roomWall;
+    state.roomWall = snap.roomWall;
+    window._closureEnabled = snap.closureEnabled;
+    window._closureWidth = snap.closureWidth;
+    window._closureWidthRight = snap.closureWidthRight;
+    window._closureCeilWidth = snap.closureCeilWidth;
+    window._closureDepthWidth = snap.closureDepthWidth;
+    window._closureFrontLine = snap.closureFrontLine;
+    window._nicheEnabled = snap.nicheEnabled;
+    window._nicheWidth = snap.nicheWidth;
+    window._nicheDepth = snap.nicheDepth;
+    window._nicheClosureEnabled = snap.nicheClosureEnabled;
+    window._nicheClosureWidthLeft = snap.nicheClosureWidthLeft;
+    window._nicheClosureWidthRight = snap.nicheClosureWidthRight;
+    window._nicheClosureCeilHeight = snap.nicheClosureCeilHeight;
+    const cam = window.camera;
+    const ctrl = window.controls;
+    const ren = window.renderer;
+    const scn = window.scene;
+    if (cam && snap.camPos) {
+        cam.fov = snap.camFov;
+        cam.updateProjectionMatrix();
+        cam.position.copy(snap.camPos);
+    }
+    if (ctrl && snap.camTarget) {
+        ctrl.target.copy(snap.camTarget);
+        ctrl.update();
+    }
+    window._camAnim = snap.camAnim;
+    window._orbitFree = snap.orbitFree;
+    buildCabinet();
+    updateCameraView();
+    if (ren && scn && cam) ren.render(scn, cam);
+}
+
+function _applyRawStateForCapture(rawState) {
+    const rs = JSON.parse(JSON.stringify(rawState));
+    if (rs.wings) {
+        state.wings = JSON.parse(JSON.stringify(rs.wings));
+        state.activeWing = rs.activeWing || 'center';
+        state.presetId = rs.presetId || 'linear';
+    } else {
+        state.presetId = 'linear';
+        state.activeWing = 'center';
+        state.wings.left = null;
+        state.wings.right = null;
+        const flatFields = ['cabinetModel', 'placement', 'width', 'globalHeight', 'depth', 'thickness',
+            'plinthHeight', 'hasDoors', 'handleType', 'handleStyle', 'cabinetName', 'cabinetNotes', 'manualPrice', 'boardMaterial',
+            'materialBody', 'materialInternal', 'materialExternal', 'materialDesk', 'materialOpenCell',
+            'materialBack', 'columns', 'desk'];
+        flatFields.forEach(f => { if (rs[f] !== undefined) state[f] = rs[f]; });
+    }
+    state.wingEditMode = false;
+    state.wingEditSnapshot = null;
+    state.viewMode = 'front';
+    window._roomWall = rs.roomWall || 'center';
+    state.roomWall = window._roomWall;
+    window._closureEnabled = true;
+    window._closureWidth = rs.closureWidth || 1.8;
+    window._closureWidthRight = rs.closureWidthRight || 1.8;
+    window._closureCeilWidth = rs.closureCeilWidth || 1.8;
+    window._closureDepthWidth = rs.closureDepthWidth || 1.8;
+    window._closureFrontLine = rs.closureFrontLine || 'cabinet';
+    window._nicheEnabled = (rs.nicheEnabled !== undefined) ? rs.nicheEnabled : false;
+    window._nicheWidth = rs.nicheWidth || 200;
+    window._nicheDepth = rs.nicheDepth || 30;
+    window._nicheClosureEnabled = (rs.nicheClosureEnabled !== undefined) ? rs.nicheClosureEnabled : false;
+    window._nicheClosureWidthLeft = rs.nicheClosureWidthLeft || 1.8;
+    window._nicheClosureWidthRight = rs.nicheClosureWidthRight || 1.8;
+    window._nicheClosureCeilHeight = rs.nicheClosureCeilHeight || 1.8;
+    state.blueprintCutouts = rs.blueprintCutouts ? JSON.parse(JSON.stringify(rs.blueprintCutouts)) : [];
+}
+
+window._refreshCartMediaForPrint = async function() {
+    if (!state.orderCart.length || window._cartMediaRefreshRunning) return;
+    const needsRefresh = state.orderCart.some(window._cartItemNeedsMediaRefresh);
+    if (!needsRefresh) return;
+
+    window._cartMediaRefreshRunning = true;
+    const snap = _snapshotEditorState();
+    try {
+        for (let i = 0; i < state.orderCart.length; i++) {
+            const itemObj = state.orderCart[i];
+            if (!window._cartItemNeedsMediaRefresh(itemObj)) continue;
+            _applyRawStateForCapture(itemObj.rawState);
+            const media = window._captureCabinetPreviewImages();
+            if (media.imgDoors) itemObj.spec.imgDoors = media.imgDoors;
+            if (media.imgOpen) itemObj.spec.imgOpen = media.imgOpen;
+            if (media.multiViewPages && media.multiViewPages.length) {
+                itemObj.spec.multiViewPages = media.multiViewPages;
+            }
+            if (media.multiViewSVG) itemObj.spec.multiViewSVG = media.multiViewSVG;
+            await new Promise(r => setTimeout(r, 0));
+        }
+    } finally {
+        _restoreEditorState(snap);
+        window._cartMediaRefreshRunning = false;
+    }
+};
+
+window.openOrderModal = async function(mode) {
     // mode: 'customer' or 'factory'
 
     // Feature gate: factory mode requires canExportCarpenter
     if (mode === 'factory' && window._features && !window._features.canExportCarpenter) {
         _showToast('תכונה זו אינה זמינה בתוכנית הנוכחית שלך. שדרג כדי לגשת לשליחה לייצור.', 5000);
         return;
+    }
+
+    if (state.orderCart.length > 0 && state.orderCart.some(window._cartItemNeedsMediaRefresh)) {
+        _showToast('🔄 מרענן תמונות ארונות...', 3500);
+        try {
+            await window._refreshCartMediaForPrint();
+        } catch (e) {
+            console.warn('[openOrderModal] media refresh failed:', e);
+            _showToast('⚠️ חלק מהתמונות לא עודכנו — נסה שוב', 4000);
+        }
     }
 
     const modal = document.getElementById('order-modal');
@@ -6400,7 +6602,11 @@ ${summaryHTML}
 </html>`;
 }
 
-window.printCustomer = function() {
+window.printCustomer = async function() {
+    if (state.orderCart.some(window._cartItemNeedsMediaRefresh)) {
+        _showToast('🔄 מרענן תמונות לפני הדפסה...', 3000);
+        try { await window._refreshCartMediaForPrint(); } catch (e) { console.warn('[printCustomer]', e); }
+    }
     const html = _buildPrintHTML('customer');
     const win = window.open('', '_blank', 'width=900,height=700');
     win.document.write(html);
@@ -6416,7 +6622,11 @@ window.printCustomer = function() {
     // Set title inside setTimeout so it runs after document is fully parsed
     setTimeout(() => { win.document.title = _pdfTitle; win.print(); }, 600);
 };
-window.printFactory = function() {
+window.printFactory = async function() {
+    if (state.orderCart.some(window._cartItemNeedsMediaRefresh)) {
+        _showToast('🔄 מרענן תמונות לפני הדפסה...', 3000);
+        try { await window._refreshCartMediaForPrint(); } catch (e) { console.warn('[printFactory]', e); }
+    }
     const html = _buildPrintHTML('factory');
     const win = window.open('', '_blank', 'width=900,height=700');
     win.document.write(html);
@@ -6677,6 +6887,28 @@ window._mvbpUpdateCutoutToolbar = function() {
     if (!bar) return;
     const pg = (window._mvbpPages || [])[window._mvbpIndex];
     bar.style.display = (pg && pg.viewKey) ? 'flex' : 'none';
+    window._mvbpSyncCutoutLabelField();
+};
+
+window._mvbpSyncCutoutLabelField = function() {
+    const inp = document.getElementById('mvbp-cut-label');
+    if (!inp) return;
+    const co = (state.blueprintCutouts || []).find(function(c) { return c.id === window._mvbpSelectedCutoutId; });
+    inp.value = co ? (co.label || '') : '';
+};
+
+window._mvbpApplyCutoutLabel = function() {
+    const id = window._mvbpSelectedCutoutId;
+    if (!id) {
+        if (typeof _showToast === 'function') _showToast('בחר פתח בשרטוט לעדכון התיאור', 2500);
+        return;
+    }
+    const co = (state.blueprintCutouts || []).find(function(c) { return c.id === id; });
+    if (!co) return;
+    const inp = document.getElementById('mvbp-cut-label');
+    co.label = inp ? String(inp.value || '').trim().slice(0, 24) : '';
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+    window._mvbpRegenerateAndShow();
 };
 
 window._mvbpRegenerateAndShow = function() {
@@ -6694,8 +6926,10 @@ window._mvbpAddCutout = function() {
     }
     const wInp = document.getElementById('mvbp-cut-w');
     const hInp = document.getElementById('mvbp-cut-h');
+    const lblInp = document.getElementById('mvbp-cut-label');
     const widthMm = Math.max(10, Math.min(500, parseInt(wInp && wInp.value, 10) || 80));
     const heightMm = Math.max(10, Math.min(500, parseInt(hInp && hInp.value, 10) || 120));
+    const label = lblInp ? String(lblInp.value || '').trim().slice(0, 24) : '';
     const cabWMm = Math.round((pg.cabWidthCm || 160) * 10);
     const cabHMm = Math.round((pg.cabHeightCm || 240) * 10);
     if (!state.blueprintCutouts) state.blueprintCutouts = [];
@@ -6706,7 +6940,7 @@ window._mvbpAddCutout = function() {
         heightMm: heightMm,
         leftMm: Math.max(0, Math.round((cabWMm - widthMm) / 2)),
         bottomMm: Math.min(1000, Math.max(0, cabHMm - heightMm)),
-        label: 'שקע'
+        label: label
     };
     state.blueprintCutouts.push(co);
     window._mvbpSelectedCutoutId = co.id;
@@ -6756,6 +6990,7 @@ window._mvbpBindCutoutDrag = function() {
         svg.querySelectorAll('.bp-cutout').forEach(function(el) { el.classList.remove('bp-cutout-selected'); });
         const g = svg.querySelector('.bp-cutout[data-cutout-id="' + id + '"]');
         if (g) g.classList.add('bp-cutout-selected');
+        window._mvbpSyncCutoutLabelField();
     }
 
     function getCo(id) {
@@ -6843,6 +7078,14 @@ window._mvbpBindCutoutDrag = function() {
     }, { passive: false });
 
     content.addEventListener('touchend', function() { endDrag(); }, { passive: true });
+
+    const lblInp = document.getElementById('mvbp-cut-label');
+    if (lblInp && !lblInp._cutoutLabelBound) {
+        lblInp._cutoutLabelBound = true;
+        lblInp.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') window._mvbpApplyCutoutLabel();
+        });
+    }
 };
 
 // ---- Blueprint fullscreen (no orientation lock) ----

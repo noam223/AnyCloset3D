@@ -4951,9 +4951,13 @@ body.viewer-mode #canvas-container canvas {
 }
 
 /* Multi-view blueprint cutout markers */
+.bp-cutout-rect {
+    vector-effect: non-scaling-stroke;
+}
 .bp-cutout-selected .bp-cutout-rect {
-    stroke-width: 3;
-    fill: rgba(220, 38, 38, 0.28);
+    stroke-width: 1.2;
+    stroke-opacity: 0.85;
+    fill: rgba(220, 38, 38, 0.1);
 }
 .bp-cutout-dims line,
 .bp-cutout-dims text {

@@ -8,7 +8,14 @@ const _BP_STROKE = '#1e3a5f';
 const _BP_STROKE_THIN = '#94a3b8';
 const _BP_FONT = 'Rubik,Tahoma,sans-serif';
 const _BP_CUT_STROKE = '#dc2626';
+const _BP_CUT_DIM_OPACITY = 0.72;
 const _BP_DOOR_STYLE_SUFFIX = { solid: '', framed_melamine: ' מסגרת', glass_melamine: ' זכוכית', glass_black: ' זכ.שחורה', glass_gold: ' זכ.זהב', glass_mirror: ' מראה' };
+
+function _bpEscSvgText(str) {
+    return String(str || '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
 
 function _bpEnsureCutouts() {
     if (!state.blueprintCutouts) state.blueprintCutouts = [];
@@ -16,23 +23,23 @@ function _bpEnsureCutouts() {
 }
 
 function _bpCutoutDimH(x1, x2, y, lbl, above) {
-    const tk = 6, lo = above ? -8 : 12;
+    const tk = 4, lo = above ? -6 : 10;
     const mx = (x1 + x2) / 2;
     return [
-        `<line x1="${x1.toFixed(1)}" y1="${(y - tk / 2).toFixed(1)}" x2="${x1.toFixed(1)}" y2="${(y + tk / 2).toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="1.2"/>`,
-        `<line x1="${x2.toFixed(1)}" y1="${(y - tk / 2).toFixed(1)}" x2="${x2.toFixed(1)}" y2="${(y + tk / 2).toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="1.2"/>`,
-        `<line x1="${x1.toFixed(1)}" y1="${y.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="1.2"/>`,
-        `<text x="${mx.toFixed(1)}" y="${(y + lo).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="13" font-weight="600" fill="${_BP_CUT_STROKE}">${lbl}</text>`
+        `<line x1="${x1.toFixed(1)}" y1="${(y - tk / 2).toFixed(1)}" x2="${x1.toFixed(1)}" y2="${(y + tk / 2).toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="0.75" stroke-opacity="${_BP_CUT_DIM_OPACITY}"/>`,
+        `<line x1="${x2.toFixed(1)}" y1="${(y - tk / 2).toFixed(1)}" x2="${x2.toFixed(1)}" y2="${(y + tk / 2).toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="0.75" stroke-opacity="${_BP_CUT_DIM_OPACITY}"/>`,
+        `<line x1="${x1.toFixed(1)}" y1="${y.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="0.75" stroke-opacity="${_BP_CUT_DIM_OPACITY}"/>`,
+        `<text x="${mx.toFixed(1)}" y="${(y + lo).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="9.5" font-weight="500" fill="${_BP_CUT_STROKE}" fill-opacity="${_BP_CUT_DIM_OPACITY}">${lbl}</text>`
     ].join('');
 }
 
 function _bpCutoutDimV(x, y1, y2, lbl) {
-    const tk = 6, my = (y1 + y2) / 2, tx = x + 14;
+    const tk = 4, my = (y1 + y2) / 2, tx = x + 12;
     return [
-        `<line x1="${(x - tk / 2).toFixed(1)}" y1="${y1.toFixed(1)}" x2="${(x + tk / 2).toFixed(1)}" y2="${y1.toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="1.2"/>`,
-        `<line x1="${(x - tk / 2).toFixed(1)}" y1="${y2.toFixed(1)}" x2="${(x + tk / 2).toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="1.2"/>`,
-        `<line x1="${x.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="1.2"/>`,
-        `<text x="${tx.toFixed(1)}" y="${(my + 4).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="13" font-weight="600" fill="${_BP_CUT_STROKE}" transform="rotate(-90,${tx.toFixed(1)},${my.toFixed(1)})">${lbl}</text>`
+        `<line x1="${(x - tk / 2).toFixed(1)}" y1="${y1.toFixed(1)}" x2="${(x + tk / 2).toFixed(1)}" y2="${y1.toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="0.75" stroke-opacity="${_BP_CUT_DIM_OPACITY}"/>`,
+        `<line x1="${(x - tk / 2).toFixed(1)}" y1="${y2.toFixed(1)}" x2="${(x + tk / 2).toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="0.75" stroke-opacity="${_BP_CUT_DIM_OPACITY}"/>`,
+        `<line x1="${x.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="0.75" stroke-opacity="${_BP_CUT_DIM_OPACITY}"/>`,
+        `<text x="${tx.toFixed(1)}" y="${(my + 3).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="9.5" font-weight="500" fill="${_BP_CUT_STROKE}" fill-opacity="${_BP_CUT_DIM_OPACITY}" transform="rotate(-90,${tx.toFixed(1)},${my.toFixed(1)})">${lbl}</text>`
     ].join('');
 }
 
@@ -52,7 +59,8 @@ function _bpBuildCutoutSvg(co, ox, oy, dW, dH, sc, cabWidthCm, cabHeightCm) {
     const rw = wCm * sc;
     const rh = hCm * sc;
     const ry = floorY - (bottomMm / 10 + hCm) * sc;
-    const lbl = co.label || 'חיתוך';
+    const lblRaw = (co.label || '').trim();
+    const lbl = lblRaw ? _bpEscSvgText(lblRaw) : '';
 
     const cutoutG = [
         `<g class="bp-cutout" data-cutout-id="${co.id}" data-view-key="${co.viewKey}"`,
@@ -60,9 +68,9 @@ function _bpBuildCutoutSvg(co, ox, oy, dW, dH, sc, cabWidthCm, cabHeightCm) {
         ` data-sc="${sc.toFixed(4)}" data-cab-w-mm="${cabWidthMm}" data-cab-h-mm="${cabHeightMm}"`,
         ` data-w-mm="${wMm}" data-h-mm="${hMm}" style="cursor:move">`,
         `<rect class="bp-cutout-rect" x="${rx.toFixed(1)}" y="${ry.toFixed(1)}" width="${rw.toFixed(1)}" height="${rh.toFixed(1)}"`,
-        ` fill="rgba(220,38,38,0.12)" stroke="${_BP_CUT_STROKE}" stroke-width="2" stroke-dasharray="5,3"/>`,
-        `<text class="bp-cutout-label" x="${(rx + rw / 2).toFixed(1)}" y="${(ry + rh / 2 + 4).toFixed(1)}" text-anchor="middle"`,
-        ` font-family="${_BP_FONT}" font-size="11" font-weight="600" fill="${_BP_CUT_STROKE}" pointer-events="none">${lbl}</text>`,
+        ` fill="rgba(220,38,38,0.06)" stroke="${_BP_CUT_STROKE}" stroke-width="1" stroke-opacity="0.55" stroke-dasharray="3,2"/>`,
+        lbl ? `<text class="bp-cutout-label" x="${(rx + rw / 2).toFixed(1)}" y="${(ry + rh / 2 + 3).toFixed(1)}" text-anchor="middle"` +
+        ` font-family="${_BP_FONT}" font-size="9" font-weight="600" fill="${_BP_CUT_STROKE}" fill-opacity="0.75" pointer-events="none">${lbl}</text>` : '',
         `</g>`
     ].join('');
 

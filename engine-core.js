@@ -2398,6 +2398,19 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         _buildGroup.add(plateMesh);
     }
 
+    function _ppResolveMat(baseMat, partIdSuffix) {
+        if (isBP || !partIdSuffix) return baseMat;
+        const overrideKey = (state.partColors || {})[_ppWingId + '_' + partIdSuffix];
+        if (overrideKey && materials[overrideKey]) return materials[overrideKey];
+        return baseMat;
+    }
+
+    function _ppRegisterMesh(mesh, partIdSuffix) {
+        if (isBP || !partIdSuffix || !mesh) return;
+        mesh.userData.partId = _ppWingId + '_' + partIdSuffix;
+        window.partMeshes.push(mesh);
+    }
+
     function createBoard(w, h, d, x, y, z, specificMat = matBody) {
         // Part-paint mode: apply per-part color override if one exists
         if (!isBP && _ppPartId) {
@@ -2562,7 +2575,9 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
             if (!isBP) createBoard(innerWidth, deskT, bodyD - 2, startX + dir * (innerWidth/2), drawerBottomY + deskT/2, 0, matDesk);
             for(let i=0; i<numDrawers; i++) {
                 let dx = (dSide === 'left') ? (startX - innerWidth) + gap + drawerWidth/2 + i * (drawerWidth + gap) : startX + gap + drawerWidth/2 + i * (drawerWidth + gap);
+                _ppPartId = `desk_drawer_d${i}`;
                 let mesh = createBoard(drawerWidth, drawerH, t, dx, drawerCenterY, _deskDrawerFZ, matExternal);
+                _ppPartId = '';
                 if (!isBP) _addPanelHandleLocal(mesh, drawerWidth, drawerH, _handleStyle);
                 if (!isBP) {
                     const backPanel = new THREE.Mesh(new THREE.BoxGeometry(drawerWidth - 2, 2.5, 0.5), new THREE.MeshStandardMaterial({ color: 0x222222 }));
@@ -4000,7 +4015,8 @@ if (compData && compData.type === 'hanging') {
             const _doorOverlayW = _doorOverlayRightX - _doorOverlayLeftX;
             const _doorOverlayCenterX = (_doorOverlayLeftX + _doorOverlayRightX) / 2;
 
-            col.doors.forEach(door => {
+            col.doors.forEach((door, doorIdx) => {
+                const doorPartId = `door_c${c}_d${doorIdx}`;
                 let doorBottomY, doorTopY;
                 // Clamp door row indices to valid range (guard against stale saved state)
                 const _safeStartRow = Math.max(0, Math.min(door.startRow, dividersAsc.length));
@@ -4042,12 +4058,14 @@ if (compData && compData.type === 'hanging') {
                     // Position in front of the cabinet face
                     const flapZ = isInset ? (bodyD / 2 - t / 2) : (bodyD / 2 + t / 2 + 0.1);
                     const flapY = flapBaseY + flapH / 2;
-                    const flapMat = isBP ? new THREE.MeshBasicMaterial({ color: 0xffffff, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }) : matExternal;
+                    const flapMatBase = isBP ? new THREE.MeshBasicMaterial({ color: 0xffffff, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }) : matExternal;
+                    const flapMat = isBP ? flapMatBase : _ppResolveMat(flapMatBase, doorPartId);
                     const flapGeo = new THREE.BoxGeometry(flapW, flapH, t);
                     const flapMesh = new THREE.Mesh(flapGeo, flapMat);
                     flapMesh.position.set(flapCenterX, flapY, flapZ);
                     if (isBP) flapMesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(flapGeo), new THREE.LineBasicMaterial({ color: 0x000000 })));
                     _buildGroup.add(flapMesh);
+                    _ppRegisterMesh(flapMesh, doorPartId);
                     const _flapHandleStyle = door.handleStyle || _handleStyle;
                     if (!isBP && _flapHandleStyle === 'pipe') {
                         const handleH = Math.min(flapH * 0.25, 12);
@@ -4070,8 +4088,9 @@ if (compData && compData.type === 'hanging') {
                 const dY = doorBottomY + dH/2;
                 const zPos = isInset ? (bodyD/2 - t/2) : (bodyD/2 + t/2 + 0.1);
 
-                const makeDoor = (w, isLeft, centerX, style, uvTotalW) => {
+                const makeDoor = (w, isLeft, centerX, style, uvTotalW, partIdSuffix) => {
                     style = style || 'solid';
+                    partIdSuffix = partIdSuffix || doorPartId;
                     // For framed/glass styles, the frame profiles protrude fd=1.5cm in front of the door panel.
                     // To keep all door styles flush at the same front face, shift the door group back by fd
                     // so the frame's front face aligns with a solid door's front face.
@@ -4102,6 +4121,7 @@ if (compData && compData.type === 'hanging') {
                         mirrorMesh.position.set(doorLocalX, 0, 0);
                         mirrorMesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(mirrorGeo), edgeMat));
                         doorGroup.add(mirrorMesh);
+                        _ppRegisterMesh(mirrorMesh, partIdSuffix);
                         if (_isActiveWingBuild) doorMeshes.push(mirrorMesh);
                         return; // no handle, no frame
                     }
@@ -4136,7 +4156,7 @@ if (compData && compData.type === 'hanging') {
                             }
                             uv.needsUpdate = true;
                         }
-                        const doorMat = matExternal.clone();
+                        const doorMat = _ppResolveMat(matExternal, partIdSuffix).clone();
 
                         // ---- Bathroom groove style: slightly darken base panel for all groove styles ----
                         const _bathGroove = state.presetId === 'bathroom'
@@ -4160,6 +4180,7 @@ if (compData && compData.type === 'hanging') {
                             mesh.add(handle);
                         }
                         doorGroup.add(mesh);
+                        _ppRegisterMesh(mesh, partIdSuffix);
                         if (_isActiveWingBuild) doorMeshes.push(mesh);
 
                         if (_bathGroove !== 'plain') {
@@ -4176,9 +4197,9 @@ if (compData && compData.type === 'hanging') {
 
                         let frameMat;
                         if (style === 'framed_melamine') {
-                            frameMat = matExternal.clone();
+                            frameMat = _ppResolveMat(matExternal, partIdSuffix).clone();
                         } else if (style === 'glass_melamine') {
-                            frameMat = matExternal.clone();
+                            frameMat = _ppResolveMat(matExternal, partIdSuffix).clone();
                         } else if (style === 'glass_black') {
                             frameMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.15, roughness: 0.3 });
                         } else if (style === 'glass_gold') {
@@ -4194,30 +4215,35 @@ if (compData && compData.type === 'hanging') {
                             doorGroup.add(handle);
                         }
 
+                        const _addFramePart = (frameMesh) => {
+                            doorGroup.add(frameMesh);
+                            _ppRegisterMesh(frameMesh, partIdSuffix);
+                        };
+
                         // Top frame bar
                         const topGeo = new THREE.BoxGeometry(w, fw, fd);
                         const topMesh = new THREE.Mesh(topGeo, frameMat);
                         topMesh.position.set(doorLocalX, dH/2 - fw/2, fz);
-                        doorGroup.add(topMesh);
+                        _addFramePart(topMesh);
 
                         // Bottom frame bar
                         const botGeo = new THREE.BoxGeometry(w, fw, fd);
                         const botMesh = new THREE.Mesh(botGeo, frameMat);
                         botMesh.position.set(doorLocalX, -dH/2 + fw/2, fz);
-                        doorGroup.add(botMesh);
+                        _addFramePart(botMesh);
 
                         // Left side bar (between top and bottom bars)
                         const sideH = dH - fw * 2;
                         const leftGeo = new THREE.BoxGeometry(fw, sideH, fd);
                         const leftMesh = new THREE.Mesh(leftGeo, frameMat);
                         leftMesh.position.set(doorLocalX - w/2 + fw/2, 0, fz);
-                        doorGroup.add(leftMesh);
+                        _addFramePart(leftMesh);
 
                         // Right side bar
                         const rightGeo = new THREE.BoxGeometry(fw, sideH, fd);
                         const rightMesh = new THREE.Mesh(rightGeo, frameMat);
                         rightMesh.position.set(doorLocalX + w/2 - fw/2, 0, fz);
-                        doorGroup.add(rightMesh);
+                        _addFramePart(rightMesh);
 
                         // Glass center panel (for glass styles)
                         if (isGlass) {
