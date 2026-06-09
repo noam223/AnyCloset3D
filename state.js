@@ -204,6 +204,7 @@ const state = {
     activeEditCol: -1,
     dimData: [],
     bpData: [],
+    blueprintCutouts: [],
     customer: { name: '', phone: '', orderNum: '', address: '' },
     orderCart: [],
     editingCartIndex: -1,

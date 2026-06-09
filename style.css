@@ -4949,3 +4949,13 @@ body.viewer-mode #canvas-container canvas {
     .tambour-colors-grid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
     .tambour-palette-body { padding: 14px; }
 }
+
+/* Multi-view blueprint cutout markers */
+.bp-cutout-selected .bp-cutout-rect {
+    stroke-width: 3;
+    fill: rgba(220, 38, 38, 0.28);
+}
+.bp-cutout-dims line,
+.bp-cutout-dims text {
+    pointer-events: none;
+}

@@ -183,6 +183,11 @@
                             window._syncTambourPalette(state.tambourPalette);
                         }
                     }
+                    if (snap.blueprintCutouts) {
+                        state.blueprintCutouts = snap.blueprintCutouts;
+                    } else if (!state.blueprintCutouts) {
+                        state.blueprintCutouts = [];
+                    }
                     // Restore room wall position
                     if (snap.roomWall) {
                         state.roomWall   = snap.roomWall;
@@ -323,7 +328,8 @@
             nicheClosureWidthLeft:     window._nicheClosureWidthLeft  || 1.8,
             nicheClosureWidthRight:    window._nicheClosureWidthRight || 1.8,
             nicheClosureCeilHeight:    window._nicheClosureCeilHeight || 1.8,
-            tambourPalette:            state.tambourPalette || {}
+            tambourPalette:            state.tambourPalette || {},
+            blueprintCutouts:          state.blueprintCutouts || []
         }));
     }
 
@@ -525,7 +531,8 @@ window._saveProjectNow = async function() {
             presetId:      state.presetId,
             orderCart:     lightCart,
             customer:      state.customer,
-            tambourPalette: state.tambourPalette || {}
+            tambourPalette: state.tambourPalette || {},
+            blueprintCutouts: state.blueprintCutouts || []
         }));
         console.log('[SaveNow] Saving project "' + window._currentProjectName + '", payload size:', Math.round(JSON.stringify(snap).length/1024) + 'KB, cart items:', lightCart.length);
         var thumb = null;

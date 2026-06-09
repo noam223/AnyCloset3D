@@ -5534,7 +5534,8 @@ function bindUI() {
             nicheClosureEnabled:       (window._nicheClosureEnabled !== undefined) ? window._nicheClosureEnabled : false,
             nicheClosureWidthLeft:     window._nicheClosureWidthLeft  || 1.8,
             nicheClosureWidthRight:    window._nicheClosureWidthRight || 1.8,
-            nicheClosureCeilHeight:    window._nicheClosureCeilHeight || 1.8
+            nicheClosureCeilHeight:    window._nicheClosureCeilHeight || 1.8,
+            blueprintCutouts: state.blueprintCutouts || []
         }));
 
         // Collect unique extra colors from per-part overrides
@@ -5968,6 +5969,8 @@ window.editCartItem = function(index) {
     window._nicheClosureCeilHeight   = rawState.nicheClosureCeilHeight || 1.8;
     // Sync closure + niche UI
     if (typeof window._updateRoomWallUI === 'function') window._updateRoomWallUI();
+
+    state.blueprintCutouts = rawState.blueprintCutouts ? JSON.parse(JSON.stringify(rawState.blueprintCutouts)) : [];
 
     // Explicitly restore manualInstallPrice (not in old rawState saves → default null)
     state.manualInstallPrice = (rawState.manualInstallPrice != null) ? rawState.manualInstallPrice : null;
@@ -6520,6 +6523,15 @@ window._mvbpShow = function(idx) {
         }
         window._mvbpBindGestures();
         if (typeof window._mvbpBindDimDrag === 'function') window._mvbpBindDimDrag();
+        if (typeof window._mvbpBindCutoutDrag === 'function') window._mvbpBindCutoutDrag();
+        if (typeof window._mvbpUpdateCutoutToolbar === 'function') window._mvbpUpdateCutoutToolbar();
+        if (window._mvbpSelectedCutoutId && content2) {
+            const svgSel = content2.querySelector('svg');
+            if (svgSel) {
+                const sel = svgSel.querySelector('.bp-cutout[data-cutout-id="' + window._mvbpSelectedCutoutId + '"]');
+                if (sel) sel.classList.add('bp-cutout-selected');
+            }
+        }
     });
 };
 
@@ -6655,6 +6667,182 @@ window._mvbpBindDimDrag = function() {
         g.addEventListener('touchmove', onTouchMove, { passive: false });
         g.addEventListener('touchend', onTouchEnd, { passive: true });
     });
+};
+
+// ---- Blueprint cutout markers (outlets / switches) ----
+window._mvbpSelectedCutoutId = null;
+
+window._mvbpUpdateCutoutToolbar = function() {
+    const bar = document.getElementById('mvbp-cutout-toolbar');
+    if (!bar) return;
+    const pg = (window._mvbpPages || [])[window._mvbpIndex];
+    bar.style.display = (pg && pg.viewKey) ? 'flex' : 'none';
+};
+
+window._mvbpRegenerateAndShow = function() {
+    const idx = window._mvbpIndex;
+    if (typeof window._generateMultiViewBlueprintPages !== 'function') return;
+    window._mvbpPages = window._generateMultiViewBlueprintPages();
+    window._mvbpShow(idx);
+};
+
+window._mvbpAddCutout = function() {
+    const pg = (window._mvbpPages || [])[window._mvbpIndex];
+    if (!pg || !pg.viewKey) {
+        if (typeof _showToast === 'function') _showToast('ניתן להוסיף חיתוך רק בשרטוטי חזית', 3000);
+        return;
+    }
+    const wInp = document.getElementById('mvbp-cut-w');
+    const hInp = document.getElementById('mvbp-cut-h');
+    const widthMm = Math.max(10, Math.min(500, parseInt(wInp && wInp.value, 10) || 80));
+    const heightMm = Math.max(10, Math.min(500, parseInt(hInp && hInp.value, 10) || 120));
+    const cabWMm = Math.round((pg.cabWidthCm || 160) * 10);
+    const cabHMm = Math.round((pg.cabHeightCm || 240) * 10);
+    if (!state.blueprintCutouts) state.blueprintCutouts = [];
+    const co = {
+        id: 'bc-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+        viewKey: pg.viewKey,
+        widthMm: widthMm,
+        heightMm: heightMm,
+        leftMm: Math.max(0, Math.round((cabWMm - widthMm) / 2)),
+        bottomMm: Math.min(1000, Math.max(0, cabHMm - heightMm)),
+        label: 'שקע'
+    };
+    state.blueprintCutouts.push(co);
+    window._mvbpSelectedCutoutId = co.id;
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+    window._mvbpRegenerateAndShow();
+};
+
+window._mvbpDeleteSelectedCutout = function() {
+    const id = window._mvbpSelectedCutoutId;
+    if (!id || !state.blueprintCutouts) return;
+    state.blueprintCutouts = state.blueprintCutouts.filter(function(c) { return c.id !== id; });
+    window._mvbpSelectedCutoutId = null;
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+    window._mvbpRegenerateAndShow();
+};
+
+window._mvbpBindCutoutDrag = function() {
+    const content = document.getElementById('multiview-blueprint-content');
+    if (!content || content._cutoutDragBound) return;
+    content._cutoutDragBound = true;
+
+    let drag = null;
+
+    function svgScale(svg) {
+        const vb = svg.viewBox.baseVal;
+        const rect = svg.getBoundingClientRect();
+        return vb.width > 0 ? rect.width / vb.width : 1;
+    }
+
+    function readMeta(g) {
+        return {
+            id: g.getAttribute('data-cutout-id'),
+            ox: parseFloat(g.getAttribute('data-ox')),
+            oy: parseFloat(g.getAttribute('data-oy')),
+            dW: parseFloat(g.getAttribute('data-dw')),
+            dH: parseFloat(g.getAttribute('data-dh')),
+            sc: parseFloat(g.getAttribute('data-sc')),
+            cabWMm: parseInt(g.getAttribute('data-cab-w-mm'), 10),
+            cabHMm: parseInt(g.getAttribute('data-cab-h-mm'), 10),
+            wMm: parseInt(g.getAttribute('data-w-mm'), 10),
+            hMm: parseInt(g.getAttribute('data-h-mm'), 10)
+        };
+    }
+
+    function selectCutout(svg, id) {
+        window._mvbpSelectedCutoutId = id;
+        svg.querySelectorAll('.bp-cutout').forEach(function(el) { el.classList.remove('bp-cutout-selected'); });
+        const g = svg.querySelector('.bp-cutout[data-cutout-id="' + id + '"]');
+        if (g) g.classList.add('bp-cutout-selected');
+    }
+
+    function getCo(id) {
+        return (state.blueprintCutouts || []).find(function(c) { return c.id === id; });
+    }
+
+    function applyDrag(clientX, clientY) {
+        if (!drag) return;
+        const co = getCo(drag.id);
+        if (!co) return;
+        const scPx = svgScale(drag.svg);
+        const dx = (clientX - drag.startX) / scPx;
+        const dy = (clientY - drag.startY) / scPx;
+        const deltaLeftMm = Math.round((dx / drag.sc) * 10);
+        const deltaBottomMm = Math.round(-(dy / drag.sc) * 10);
+        co.leftMm = Math.max(0, Math.min(drag.cabWMm - drag.wMm, drag.startLeft + deltaLeftMm));
+        co.bottomMm = Math.max(0, Math.min(drag.cabHMm - drag.hMm, drag.startBottom + deltaBottomMm));
+        if (typeof window._bpReplaceCutoutInSvg === 'function') {
+            window._bpReplaceCutoutInSvg(drag.svg, co, drag.ox, drag.oy, drag.dW, drag.dH, drag.sc, drag.cabWMm / 10, drag.cabHMm / 10);
+            const newG = drag.svg.querySelector('.bp-cutout[data-cutout-id="' + drag.id + '"]');
+            if (newG) newG.classList.add('bp-cutout-selected');
+        }
+    }
+
+    function endDrag() {
+        if (!drag) return;
+        if (typeof saveHistoryState === 'function') saveHistoryState();
+        const wrap = document.getElementById('mvbp-svg-wrap');
+        const idx = window._mvbpIndex;
+        if (wrap && window._mvbpPages[idx]) {
+            const svg = wrap.querySelector('svg');
+            if (svg) window._mvbpPages[idx].svg = svg.outerHTML;
+        }
+        drag = null;
+    }
+
+    function startDrag(g, clientX, clientY) {
+        const svg = content.querySelector('svg');
+        if (!svg) return;
+        const m = readMeta(g);
+        const co = getCo(m.id);
+        if (!co) return;
+        selectCutout(svg, m.id);
+        drag = {
+            svg: svg,
+            id: m.id,
+            startX: clientX,
+            startY: clientY,
+            startLeft: co.leftMm,
+            startBottom: co.bottomMm,
+            ox: m.ox, oy: m.oy, dW: m.dW, dH: m.dH, sc: m.sc,
+            cabWMm: m.cabWMm, cabHMm: m.cabHMm, wMm: m.wMm, hMm: m.hMm
+        };
+    }
+
+    content.addEventListener('mousedown', function(e) {
+        const g = e.target.closest && e.target.closest('.bp-cutout');
+        if (!g || !content.contains(g)) return;
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        startDrag(g, e.clientX, e.clientY);
+        document.addEventListener('mousemove', onDocMove);
+        document.addEventListener('mouseup', onDocUp);
+    });
+
+    function onDocMove(e) { applyDrag(e.clientX, e.clientY); }
+    function onDocUp() {
+        document.removeEventListener('mousemove', onDocMove);
+        document.removeEventListener('mouseup', onDocUp);
+        endDrag();
+    }
+
+    content.addEventListener('touchstart', function(e) {
+        const g = e.target.closest && e.target.closest('.bp-cutout');
+        if (!g || !content.contains(g) || e.touches.length !== 1) return;
+        e.stopPropagation();
+        startDrag(g, e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: true });
+
+    content.addEventListener('touchmove', function(e) {
+        if (!drag || e.touches.length !== 1) return;
+        applyDrag(e.touches[0].clientX, e.touches[0].clientY);
+        e.preventDefault();
+    }, { passive: false });
+
+    content.addEventListener('touchend', function() { endDrag(); }, { passive: true });
 };
 
 // ---- Blueprint fullscreen (no orientation lock) ----

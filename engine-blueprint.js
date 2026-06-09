@@ -7,7 +7,112 @@ const DESK_SURFACE_T = 2.8; // 28mm — all desk horizontal surfaces
 const _BP_STROKE = '#1e3a5f';
 const _BP_STROKE_THIN = '#94a3b8';
 const _BP_FONT = 'Rubik,Tahoma,sans-serif';
+const _BP_CUT_STROKE = '#dc2626';
 const _BP_DOOR_STYLE_SUFFIX = { solid: '', framed_melamine: ' מסגרת', glass_melamine: ' זכוכית', glass_black: ' זכ.שחורה', glass_gold: ' זכ.זהב', glass_mirror: ' מראה' };
+
+function _bpEnsureCutouts() {
+    if (!state.blueprintCutouts) state.blueprintCutouts = [];
+    return state.blueprintCutouts;
+}
+
+function _bpCutoutDimH(x1, x2, y, lbl, above) {
+    const tk = 6, lo = above ? -8 : 12;
+    const mx = (x1 + x2) / 2;
+    return [
+        `<line x1="${x1.toFixed(1)}" y1="${(y - tk / 2).toFixed(1)}" x2="${x1.toFixed(1)}" y2="${(y + tk / 2).toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="1.2"/>`,
+        `<line x1="${x2.toFixed(1)}" y1="${(y - tk / 2).toFixed(1)}" x2="${x2.toFixed(1)}" y2="${(y + tk / 2).toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="1.2"/>`,
+        `<line x1="${x1.toFixed(1)}" y1="${y.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="1.2"/>`,
+        `<text x="${mx.toFixed(1)}" y="${(y + lo).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="13" font-weight="600" fill="${_BP_CUT_STROKE}">${lbl}</text>`
+    ].join('');
+}
+
+function _bpCutoutDimV(x, y1, y2, lbl) {
+    const tk = 6, my = (y1 + y2) / 2, tx = x + 14;
+    return [
+        `<line x1="${(x - tk / 2).toFixed(1)}" y1="${y1.toFixed(1)}" x2="${(x + tk / 2).toFixed(1)}" y2="${y1.toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="1.2"/>`,
+        `<line x1="${(x - tk / 2).toFixed(1)}" y1="${y2.toFixed(1)}" x2="${(x + tk / 2).toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="1.2"/>`,
+        `<line x1="${x.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="1.2"/>`,
+        `<text x="${tx.toFixed(1)}" y="${(my + 4).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="13" font-weight="600" fill="${_BP_CUT_STROKE}" transform="rotate(-90,${tx.toFixed(1)},${my.toFixed(1)})">${lbl}</text>`
+    ].join('');
+}
+
+function _bpBuildCutoutSvg(co, ox, oy, dW, dH, sc, cabWidthCm, cabHeightCm) {
+    const cabWidthMm = Math.round(cabWidthCm * 10);
+    const cabHeightMm = Math.round(cabHeightCm * 10);
+    const wMm = co.widthMm || 80;
+    const hMm = co.heightMm || 120;
+    let leftMm = co.leftMm || 0;
+    let bottomMm = co.bottomMm || 0;
+    leftMm = Math.max(0, Math.min(cabWidthMm - wMm, leftMm));
+    bottomMm = Math.max(0, Math.min(cabHeightMm - hMm, bottomMm));
+
+    const wCm = wMm / 10, hCm = hMm / 10;
+    const floorY = oy + dH;
+    const rx = ox + (leftMm / 10) * sc;
+    const rw = wCm * sc;
+    const rh = hCm * sc;
+    const ry = floorY - (bottomMm / 10 + hCm) * sc;
+    const lbl = co.label || 'חיתוך';
+
+    const cutoutG = [
+        `<g class="bp-cutout" data-cutout-id="${co.id}" data-view-key="${co.viewKey}"`,
+        ` data-ox="${ox.toFixed(2)}" data-oy="${oy.toFixed(2)}" data-dw="${dW.toFixed(2)}" data-dh="${dH.toFixed(2)}"`,
+        ` data-sc="${sc.toFixed(4)}" data-cab-w-mm="${cabWidthMm}" data-cab-h-mm="${cabHeightMm}"`,
+        ` data-w-mm="${wMm}" data-h-mm="${hMm}" style="cursor:move">`,
+        `<rect class="bp-cutout-rect" x="${rx.toFixed(1)}" y="${ry.toFixed(1)}" width="${rw.toFixed(1)}" height="${rh.toFixed(1)}"`,
+        ` fill="rgba(220,38,38,0.12)" stroke="${_BP_CUT_STROKE}" stroke-width="2" stroke-dasharray="5,3"/>`,
+        `<text class="bp-cutout-label" x="${(rx + rw / 2).toFixed(1)}" y="${(ry + rh / 2 + 4).toFixed(1)}" text-anchor="middle"`,
+        ` font-family="${_BP_FONT}" font-size="11" font-weight="600" fill="${_BP_CUT_STROKE}" pointer-events="none">${lbl}</text>`,
+        `</g>`
+    ].join('');
+
+    const distLeft = leftMm;
+    const distRight = cabWidthMm - leftMm - wMm;
+    const wallDim = distLeft <= distRight
+        ? _bpCutoutDimH(ox, rx, floorY + 24, `${distLeft}`, false)
+        : _bpCutoutDimH(rx + rw, ox + dW, floorY + 24, `${distRight}`, false);
+
+    const dimsG = [
+        `<g class="bp-cutout-dims" data-cutout-id="${co.id}">`,
+        _bpCutoutDimH(rx, rx + rw, ry - 10, `${wMm}`, true),
+        _bpCutoutDimV(rx + rw + 14, ry, ry + rh, `${hMm}`),
+        _bpCutoutDimV(rx - 14, ry + rh, floorY, `${bottomMm}`),
+        wallDim,
+        `</g>`
+    ].join('');
+
+    return { cutoutG, dimsG, leftMm, bottomMm };
+}
+
+function _bpAppendViewCutouts(p, viewKey, ox, oy, dW, dH, sc, cabWidthCm, cabHeightCm) {
+    const cutouts = _bpEnsureCutouts().filter(c => c.viewKey === viewKey);
+    cutouts.forEach(co => {
+        const built = _bpBuildCutoutSvg(co, ox, oy, dW, dH, sc, cabWidthCm, cabHeightCm);
+        co.leftMm = built.leftMm;
+        co.bottomMm = built.bottomMm;
+        p.push(built.cutoutG);
+        p.push(built.dimsG);
+    });
+}
+
+window._bpReplaceCutoutInSvg = function(svg, co, ox, oy, dW, dH, sc, cabWidthCm, cabHeightCm) {
+    if (!svg || !co) return;
+    const built = _bpBuildCutoutSvg(co, ox, oy, dW, dH, sc, cabWidthCm, cabHeightCm);
+    co.leftMm = built.leftMm;
+    co.bottomMm = built.bottomMm;
+    const oldCut = svg.querySelector('.bp-cutout[data-cutout-id="' + co.id + '"]');
+    const oldDims = svg.querySelector('.bp-cutout-dims[data-cutout-id="' + co.id + '"]');
+    if (oldCut) {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = built.cutoutG;
+        oldCut.replaceWith(tmp.firstElementChild);
+    }
+    if (oldDims) {
+        const tmp2 = document.createElement('div');
+        tmp2.innerHTML = built.dimsG;
+        oldDims.replaceWith(tmp2.firstElementChild);
+    }
+};
 
 function _bpDrawPartitionZoneContent(p, zoneType, zoneStyle, x1, x2, zSvgTop, zSvgH, subZoneCX, subZoneW, openDir) {
     zoneStyle = zoneStyle || 'solid';
@@ -2205,7 +2310,9 @@ window._generateMultiViewBlueprintPages = function() {
             makeDimV(p, ox + dW + 18, oy + dH - pH*sc, oy + dH, `${Math.round(pH * 10)}`);
         }
 
-        pages.push({ label: wg.label, svgParts: p });
+        const _vkWing = wg.wd === leftWing ? 'left' : wg.wd === rightWing ? 'right' : 'center';
+        _bpAppendViewCutouts(p, _vkWing, ox, oy, dW, dH, sc, wg.w, wg.h);
+        pages.push({ label: wg.label, svgParts: p, viewKey: _vkWing, cabWidthCm: wg.w, cabHeightCm: wg.h, viewMeta: { ox, oy, dW, dH, sc } });
     });
 
     // ---- Full-corner diagonal face pages ----
@@ -2306,7 +2413,9 @@ window._generateMultiViewBlueprintPages = function() {
         // Also show the actual corner size
         makeDimH(p, ox, ox + dW, oy - 16, `${Math.round(fc.fcSize * 10)} × ${Math.round(fc.fcSize * 10)}`);
 
-        pages.push({ label: fc.label, svgParts: p });
+        const _vkFC = fc.wd === leftWing ? 'fc-left' : 'fc-right';
+        _bpAppendViewCutouts(p, _vkFC, ox, oy, dW, dH, sc, diagW, cH);
+        pages.push({ label: fc.label, svgParts: p, viewKey: _vkFC, cabWidthCm: diagW, cabHeightCm: cH, viewMeta: { ox, oy, dW, dH, sc } });
     });
 
     // ---- Additional wing front-view pages (for wings attached to full_corner corners) ----
@@ -2474,7 +2583,9 @@ window._generateMultiViewBlueprintPages = function() {
             }
         }
 
-        pages.push({ label: wg.label, svgParts: p });
+        const _vkFCA = wg.wd === leftWing ? 'fc-left-extra' : 'fc-right-extra';
+        _bpAppendViewCutouts(p, _vkFCA, ox, oy, dW, dH, sc, wg.w, wg.h);
+        pages.push({ label: wg.label, svgParts: p, viewKey: _vkFCA, cabWidthCm: wg.w, cabHeightCm: wg.h, viewMeta: { ox, oy, dW, dH, sc } });
     });
 
     // ---- Corner unit page (שולחן פינתי / שידת מגירות פינתית) ----
@@ -2555,7 +2666,9 @@ window._generateMultiViewBlueprintPages = function() {
         makeDimV(p, ox - 34, oy, oy + dH, `${Math.round(cuH * 10)}`);
         if (pH > 0) makeDimV(p, ox + dW + 18, oy + dH - pH*sc, oy + dH, `${Math.round(pH * 10)}`);
 
-        pages.push({ label: cuLabel, svgParts: p });
+        const _vkCU = cu.side === 'right' ? 'corner-right' : 'corner-left';
+        _bpAppendViewCutouts(p, _vkCU, ox, oy, dW, dH, sc, cuW, cuH);
+        pages.push({ label: cuLabel, svgParts: p, viewKey: _vkCU, cabWidthCm: cuW, cabHeightCm: cuH, viewMeta: { ox, oy, dW, dH, sc } });
     }
 
     // ---- Side cabinet front-view pages ----
@@ -2569,7 +2682,7 @@ window._generateMultiViewBlueprintPages = function() {
             const scPH = scData.plinthHeight || pH;
             const FILL_SC = '#e0f2fe'; // light blue
 
-            const _drawSCPage = (sideLbl, scW) => {
+            const _drawSCPage = (sideLbl, scW, viewKey) => {
                 const scLabel = `שרטוט חזית — ארון צד ${sideLbl}`;
                 const p = [];
                 const drawAreaY = 65;
@@ -2720,11 +2833,12 @@ window._generateMultiViewBlueprintPages = function() {
                     }
                 }
 
-                pages.push({ label: scLabel, svgParts: p });
+                _bpAppendViewCutouts(p, viewKey, ox, oy, dW, dH, scScale, scW, scH);
+                pages.push({ label: scLabel, svgParts: p, viewKey: viewKey, cabWidthCm: scW, cabHeightCm: scH, viewMeta: { ox, oy, dW, dH, sc: scScale } });
             };
 
-            if (scSideVal === 'right' || scSideVal === 'both') _drawSCPage('ימין',  scData.widthRight || scData.width || 40);
-            if (scSideVal === 'left'  || scSideVal === 'both') _drawSCPage('שמאל', scData.widthLeft  || scData.width || 40);
+            if (scSideVal === 'right' || scSideVal === 'both') _drawSCPage('ימין',  scData.widthRight || scData.width || 40, 'side-cab-right');
+            if (scSideVal === 'left'  || scSideVal === 'both') _drawSCPage('שמאל', scData.widthLeft  || scData.width || 40, 'side-cab-left');
         }
     }
 
@@ -2815,7 +2929,9 @@ window._generateMultiViewBlueprintPages = function() {
             const panelTypeHeb = { solid: 'חלק', glass: 'זכוכית', mirror: 'מראה', mirror_dark: 'מראה כהה' };
             p.push(`<text x="${(MARGIN + 10).toFixed(1)}" y="${(PAGE_H - MARGIN - 30).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}">פרזול: ${profileColorHeb[sd.profileColor] || sd.profileColor} | פנל: ${panelTypeHeb[sd.doorPanelType] || sd.doorPanelType} | ${sdNumDoors} דלתות</text>`);
 
-            pages.push({ label: 'ארון הזזה — חזית', svgParts: p });
+            const _sdDW = sdW * sc, _sdDH = sdH * sc;
+            _bpAppendViewCutouts(p, 'sliding', ox, oy, _sdDW, _sdDH, sc, sdW, sdH);
+            pages.push({ label: 'ארון הזזה — חזית', svgParts: p, viewKey: 'sliding', cabWidthCm: sdW, cabHeightCm: sdH, viewMeta: { ox, oy, dW: _sdDW, dH: _sdDH, sc } });
         }
     }
 
@@ -2923,7 +3039,9 @@ window._generateMultiViewBlueprintPages = function() {
         const uuGap = uuWing._upperGap || 60;
         p.push(`<text x="${(ox + dW + 14).toFixed(1)}" y="${(oy + dH + 14).toFixed(1)}" font-family="${FONT}" font-size="13" fill="${STROKE}" opacity="0.7">מרווח מהארון: ${Math.round(uuGap * 10)} מ"מ</text>`);
 
-        pages.push({ label: uuLabel, svgParts: p });
+        const _vkUU = 'upper-' + parentId;
+        _bpAppendViewCutouts(p, _vkUU, ox, oy, dW, dH, sc, uuW, uuH);
+        pages.push({ label: uuLabel, svgParts: p, viewKey: _vkUU, cabWidthCm: uuW, cabHeightCm: uuH, viewMeta: { ox, oy, dW, dH, sc } });
     });
 
     // Reorder: front views first, top view (מבט עליון) last
@@ -2937,6 +3055,10 @@ window._generateMultiViewBlueprintPages = function() {
     const total = pages.length;
     return pages.map((pg, i) => ({
         label: pg.label,
+        viewKey: pg.viewKey || null,
+        cabWidthCm: pg.cabWidthCm || 0,
+        cabHeightCm: pg.cabHeightCm || 0,
+        viewMeta: pg.viewMeta || null,
         svg: wrapSVG(pg.svgParts, pg.label, i + 1, total)
     }));
 };

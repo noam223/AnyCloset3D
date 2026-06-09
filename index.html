@@ -37,7 +37,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260608d">
     <link rel="stylesheet" href="style-mobile.css?v=20260607b">
     <link rel="stylesheet" href="style-extras.css?v=20260607b">
-    <link rel="stylesheet" href="style.css?v=20260608u">
+    <link rel="stylesheet" href="style.css?v=20260608w">
     <style>
         html.thumb-only-mode #left-sidebar,
         html.thumb-only-mode #right-sidebar,
@@ -1323,6 +1323,15 @@
                 הבא <i class="fa-solid fa-chevron-left"></i>
             </button>
         </div>
+        <!-- Cutout toolbar (front views only) -->
+        <div id="mvbp-cutout-toolbar" style="display:none;align-items:center;justify-content:center;flex-wrap:wrap;gap:10px;padding:8px 18px;border-bottom:1px solid #e2e8f0;background:#fff7ed;flex-shrink:0;font-size:0.85rem;color:#1e3a5f;">
+            <span style="font-weight:700;"><i class="fa-solid fa-plug"></i> סימון חיתוך (שקע/מפסק):</span>
+            <label style="display:flex;align-items:center;gap:4px;">רוחב <input id="mvbp-cut-w" type="number" value="80" min="10" max="500" step="1" style="width:58px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:6px;font-family:inherit;"> מ"מ</label>
+            <label style="display:flex;align-items:center;gap:4px;">גובה <input id="mvbp-cut-h" type="number" value="120" min="10" max="500" step="1" style="width:58px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:6px;font-family:inherit;"> מ"מ</label>
+            <button type="button" onclick="window._mvbpAddCutout()" style="display:flex;align-items:center;gap:5px;padding:6px 12px;background:#dc2626;color:white;border:none;border-radius:8px;cursor:pointer;font-size:0.85rem;font-family:inherit;font-weight:600;"><i class="fa-solid fa-plus"></i> הוסף</button>
+            <button type="button" onclick="window._mvbpDeleteSelectedCutout()" style="display:flex;align-items:center;gap:5px;padding:6px 12px;background:#e2e8f0;color:#1e3a5f;border:none;border-radius:8px;cursor:pointer;font-size:0.85rem;font-family:inherit;font-weight:600;"><i class="fa-solid fa-trash"></i> מחק נבחר</button>
+            <span style="font-size:0.78rem;color:#64748b;">גרור את המלבן — המרחק מהקיר הקרוב ומהרצפה מתעדכן בזמן אמת</span>
+        </div>
         <!-- SVG content area (pinch-to-zoom, native scroll for pan) -->
         <div id="multiview-blueprint-content" style="overflow:auto;padding:16px;flex:1;display:flex;align-items:flex-start;justify-content:flex-start;background:#f1f5f9;">
             <!-- SVG injected here -->
@@ -2255,16 +2264,16 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js"></script>
-<script src="state.js?v=20260608s"></script>
+<script src="state.js?v=20260608x"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="engine-core.js?v=20260608u"></script>
 <script src="engine-corners.js?v=20260608e"></script>
-<script src="engine-blueprint.js?v=20260608v"></script>
+<script src="engine-blueprint.js?v=20260608w"></script>
 <script src="tambour-color-picker.js?v=20260608a"></script>
-<script src="ui.js?v=20260608t"></script>
+<script src="ui.js?v=20260608w"></script>
 <script src="mobile.js?v=20260608a"></script>
 <script src="part-paint.js?v=20260520k"></script>
-<script src="index-init.js?v=20260608m"></script>
+<script src="index-init.js?v=20260608n"></script>
 
 <!-- ===== TAMBOUR FULL PALETTE MODAL ===== -->
 <div id="tambour-palette-modal" class="tambour-palette-overlay">
