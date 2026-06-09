@@ -6738,6 +6738,7 @@ window._mvbpShow = function(idx) {
         window._mvbpBindGestures();
         if (typeof window._mvbpBindDimDrag === 'function') window._mvbpBindDimDrag();
         if (typeof window._mvbpBindCutoutDrag === 'function') window._mvbpBindCutoutDrag();
+        if (typeof window._mvbpBindCutoutDimDrag === 'function') window._mvbpBindCutoutDimDrag();
         if (typeof window._mvbpUpdateCutoutToolbar === 'function') window._mvbpUpdateCutoutToolbar();
         if (window._mvbpSelectedCutoutId && content2) {
             const svgSel = content2.querySelector('svg');
@@ -6875,6 +6876,119 @@ window._mvbpBindDimDrag = function() {
         }
 
         function onTouchEnd() { dragging = false; }
+
+        g.addEventListener('mousedown', onMouseDown);
+        g.addEventListener('touchstart', onTouchStart, { passive: true });
+        g.addEventListener('touchmove', onTouchMove, { passive: false });
+        g.addEventListener('touchend', onTouchEnd, { passive: true });
+    });
+};
+
+// ---- Blueprint cutout dimension drag (move dim lines along constrained axis) ----
+window._mvbpBindCutoutDimDrag = function() {
+    const content = document.getElementById('multiview-blueprint-content');
+    if (!content) return;
+    const svg = content.querySelector('svg');
+    if (!svg) return;
+
+    function getSVGScale() {
+        const vb = svg.viewBox.baseVal;
+        const rect = svg.getBoundingClientRect();
+        return vb.width > 0 ? rect.width / vb.width : 1;
+    }
+
+    function getTranslate(g) {
+        const t = g.getAttribute('transform') || '';
+        const m = t.match(/translate\(\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\)/);
+        return m ? { x: parseFloat(m[1]), y: parseFloat(m[2]) } : { x: 0, y: 0 };
+    }
+
+    function saveOffset(g) {
+        const dimsG = g.closest('.bp-cutout-dims');
+        const cutoutId = dimsG ? dimsG.getAttribute('data-cutout-id') : null;
+        const role = g.getAttribute('data-dim-role');
+        if (!cutoutId || !role) return;
+        const co = (state.blueprintCutouts || []).find(function(c) { return c.id === cutoutId; });
+        if (!co) return;
+        if (!co.dimOffsets) co.dimOffsets = {};
+        const t = getTranslate(g);
+        co.dimOffsets[role] = { x: t.x, y: t.y };
+        if (typeof saveHistoryState === 'function') saveHistoryState();
+        const wrap = document.getElementById('mvbp-svg-wrap');
+        const idx = window._mvbpIndex;
+        if (wrap && window._mvbpPages[idx]) {
+            const svgEl = wrap.querySelector('svg');
+            if (svgEl) window._mvbpPages[idx].svg = svgEl.outerHTML;
+        }
+    }
+
+    svg.querySelectorAll('.bp-cutout-dim-draggable').forEach(function(g) {
+        if (g._cutoutDimDragBound) return;
+        g._cutoutDimDragBound = true;
+
+        const axis = g.getAttribute('data-dim');
+        let dragging = false;
+        let startX = 0, startY = 0, curTx = 0, curTy = 0;
+
+        function onMouseDown(e) {
+            if (e.button !== 0) return;
+            dragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            const t = getTranslate(g);
+            curTx = t.x;
+            curTy = t.y;
+            e.preventDefault();
+            e.stopPropagation();
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        }
+
+        function applyDrag(clientX, clientY) {
+            const sc = getSVGScale();
+            const dx = (clientX - startX) / sc;
+            const dy = (clientY - startY) / sc;
+            let tx = curTx, ty = curTy;
+            if (axis === 'h') ty = curTy + dy;
+            else tx = curTx + dx;
+            g.setAttribute('transform', 'translate(' + tx.toFixed(1) + ',' + ty.toFixed(1) + ')');
+        }
+
+        function onMouseMove(e) {
+            if (!dragging) return;
+            applyDrag(e.clientX, e.clientY);
+        }
+
+        function onMouseUp() {
+            if (!dragging) return;
+            dragging = false;
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            saveOffset(g);
+        }
+
+        function onTouchStart(e) {
+            if (e.touches.length !== 1) return;
+            dragging = true;
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+            const t = getTranslate(g);
+            curTx = t.x;
+            curTy = t.y;
+            e.stopPropagation();
+        }
+
+        function onTouchMove(e) {
+            if (!dragging || e.touches.length !== 1) return;
+            applyDrag(e.touches[0].clientX, e.touches[0].clientY);
+            e.preventDefault();
+        }
+
+        function onTouchEnd() {
+            if (!dragging) return;
+            dragging = false;
+            saveOffset(g);
+        }
 
         g.addEventListener('mousedown', onMouseDown);
         g.addEventListener('touchstart', onTouchStart, { passive: true });
@@ -7065,6 +7179,7 @@ window._mvbpBindCutoutDrag = function() {
             const svg = wrap.querySelector('svg');
             if (svg) window._mvbpPages[idx].svg = svg.outerHTML;
         }
+        if (typeof window._mvbpBindCutoutDimDrag === 'function') window._mvbpBindCutoutDimDrag();
         drag = null;
     }
 

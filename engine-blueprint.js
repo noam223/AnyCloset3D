@@ -22,25 +22,53 @@ function _bpEnsureCutouts() {
     return state.blueprintCutouts;
 }
 
-function _bpCutoutDimH(x1, x2, y, lbl, above) {
+function _bpCutoutDimHInner(x1, x2, y, lbl, above) {
     const tk = 4, lo = above ? -6 : 10;
     const mx = (x1 + x2) / 2;
     return [
         `<line x1="${x1.toFixed(1)}" y1="${(y - tk / 2).toFixed(1)}" x2="${x1.toFixed(1)}" y2="${(y + tk / 2).toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="0.75" stroke-opacity="${_BP_CUT_DIM_OPACITY}"/>`,
         `<line x1="${x2.toFixed(1)}" y1="${(y - tk / 2).toFixed(1)}" x2="${x2.toFixed(1)}" y2="${(y + tk / 2).toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="0.75" stroke-opacity="${_BP_CUT_DIM_OPACITY}"/>`,
+        `<line class="bp-cutout-dim-hit" x1="${x1.toFixed(1)}" y1="${y.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="8" stroke-opacity="0.001"/>`,
         `<line x1="${x1.toFixed(1)}" y1="${y.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="0.75" stroke-opacity="${_BP_CUT_DIM_OPACITY}"/>`,
         `<text x="${mx.toFixed(1)}" y="${(y + lo).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="9.5" font-weight="500" fill="${_BP_CUT_STROKE}" fill-opacity="${_BP_CUT_DIM_OPACITY}">${lbl}</text>`
     ].join('');
 }
 
-function _bpCutoutDimV(x, y1, y2, lbl) {
+function _bpCutoutDimVInner(x, y1, y2, lbl) {
     const tk = 4, my = (y1 + y2) / 2, tx = x + 12;
     return [
         `<line x1="${(x - tk / 2).toFixed(1)}" y1="${y1.toFixed(1)}" x2="${(x + tk / 2).toFixed(1)}" y2="${y1.toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="0.75" stroke-opacity="${_BP_CUT_DIM_OPACITY}"/>`,
         `<line x1="${(x - tk / 2).toFixed(1)}" y1="${y2.toFixed(1)}" x2="${(x + tk / 2).toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="0.75" stroke-opacity="${_BP_CUT_DIM_OPACITY}"/>`,
+        `<line class="bp-cutout-dim-hit" x1="${x.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="8" stroke-opacity="0.001"/>`,
         `<line x1="${x.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="0.75" stroke-opacity="${_BP_CUT_DIM_OPACITY}"/>`,
         `<text x="${tx.toFixed(1)}" y="${(my + 3).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="9.5" font-weight="500" fill="${_BP_CUT_STROKE}" fill-opacity="${_BP_CUT_DIM_OPACITY}" transform="rotate(-90,${tx.toFixed(1)},${my.toFixed(1)})">${lbl}</text>`
     ].join('');
+}
+
+function _bpCutoutDimOffset(co, role) {
+    const off = co.dimOffsets && co.dimOffsets[role];
+    return { x: off && off.x ? off.x : 0, y: off && off.y ? off.y : 0 };
+}
+
+function _bpCutoutDimTransform(off) {
+    if (!off || (!off.x && !off.y)) return '';
+    return ` transform="translate(${off.x.toFixed(1)},${off.y.toFixed(1)})"`;
+}
+
+function _bpCutoutDimHGroup(role, x1, x2, y, lbl, above, offset) {
+    return `<g class="bp-cutout-dim-draggable" data-dim="h" data-dim-role="${role}"${_bpCutoutDimTransform(offset)} style="cursor:ns-resize">${_bpCutoutDimHInner(x1, x2, y, lbl, above)}</g>`;
+}
+
+function _bpCutoutDimVGroup(role, x, y1, y2, lbl, offset) {
+    return `<g class="bp-cutout-dim-draggable" data-dim="v" data-dim-role="${role}"${_bpCutoutDimTransform(offset)} style="cursor:ew-resize">${_bpCutoutDimVInner(x, y1, y2, lbl)}</g>`;
+}
+
+function _bpCutoutDimH(x1, x2, y, lbl, above) {
+    return _bpCutoutDimHInner(x1, x2, y, lbl, above);
+}
+
+function _bpCutoutDimV(x, y1, y2, lbl) {
+    return _bpCutoutDimVInner(x, y1, y2, lbl);
 }
 
 function _bpBuildCutoutSvg(co, ox, oy, dW, dH, sc, cabWidthCm, cabHeightCm) {
@@ -77,14 +105,14 @@ function _bpBuildCutoutSvg(co, ox, oy, dW, dH, sc, cabWidthCm, cabHeightCm) {
     const distLeft = leftMm;
     const distRight = cabWidthMm - leftMm - wMm;
     const wallDim = distLeft <= distRight
-        ? _bpCutoutDimH(ox, rx, floorY + 24, `${distLeft}`, false)
-        : _bpCutoutDimH(rx + rw, ox + dW, floorY + 24, `${distRight}`, false);
+        ? _bpCutoutDimHGroup('wall', ox, rx, floorY + 24, `${distLeft}`, false, _bpCutoutDimOffset(co, 'wall'))
+        : _bpCutoutDimHGroup('wall', rx + rw, ox + dW, floorY + 24, `${distRight}`, false, _bpCutoutDimOffset(co, 'wall'));
 
     const dimsG = [
         `<g class="bp-cutout-dims" data-cutout-id="${co.id}">`,
-        _bpCutoutDimH(rx, rx + rw, ry - 10, `${wMm}`, true),
-        _bpCutoutDimV(rx + rw + 14, ry, ry + rh, `${hMm}`),
-        _bpCutoutDimV(rx - 14, ry + rh, floorY, `${bottomMm}`),
+        _bpCutoutDimHGroup('w', rx, rx + rw, ry - 10, `${wMm}`, true, _bpCutoutDimOffset(co, 'w')),
+        _bpCutoutDimVGroup('h', rx + rw + 14, ry, ry + rh, `${hMm}`, _bpCutoutDimOffset(co, 'h')),
+        _bpCutoutDimVGroup('bottom', rx - 14, ry + rh, floorY, `${bottomMm}`, _bpCutoutDimOffset(co, 'bottom')),
         wallDim,
         `</g>`
     ].join('');
@@ -210,6 +238,28 @@ function _bpHangRodSvgY(cellTopSvgY, sc) {
     return cellTopSvgY + _BP_HANG_ROD_BELOW_SHELF_CM * sc;
 }
 
+let _bpHoneycombSepQueue = null;
+
+function _bpHoneycombSepBegin() {
+    _bpHoneycombSepQueue = [];
+}
+
+function _bpHoneycombSepQueueLine(x, y1, y2, stroke) {
+    if (!_bpHoneycombSepQueue) return;
+    _bpHoneycombSepQueue.push({ x, y1, y2, stroke: stroke || _BP_STROKE });
+}
+
+function _bpHoneycombSepFlush(p) {
+    if (!_bpHoneycombSepQueue || !_bpHoneycombSepQueue.length) {
+        _bpHoneycombSepQueue = null;
+        return;
+    }
+    _bpHoneycombSepQueue.forEach(ln => {
+        p.push(`<line x1="${ln.x.toFixed(1)}" y1="${ln.y1.toFixed(1)}" x2="${ln.x.toFixed(1)}" y2="${ln.y2.toFixed(1)}" stroke="${ln.stroke}" stroke-width="1" opacity="0.9"/>`);
+    });
+    _bpHoneycombSepQueue = null;
+}
+
 function _bpDrawHoneycombBlock(p, ctx) {
     const {
         block, colX, colW, sc, colBotSvgY, rowBounds, ci, numCols,
@@ -236,7 +286,7 @@ function _bpDrawHoneycombBlock(p, ctx) {
     if (shelfX2 - shelfX1 < 4) return;
 
     const drawSepLine = (x) => {
-        p.push(`<line x1="${x.toFixed(1)}" y1="${blockTopSvg.toFixed(1)}" x2="${x.toFixed(1)}" y2="${blockBotSvg.toFixed(1)}" stroke="${stroke}" stroke-width="0.75" opacity="0.85"/>`);
+        _bpHoneycombSepQueueLine(x, blockTopSvg, blockBotSvg, stroke);
     };
 
     const drawSideWall = (x1, x2, showLabel, sepX) => {
@@ -913,6 +963,7 @@ window._generateMultiViewBlueprintSVG = function() {
 
         // Track column X positions for per-column width dims
         const colXPositions = []; // [{x1, x2, wCm, colTopY, colBotY}]
+        _bpHoneycombSepBegin();
         let colX = ox;
         cols.forEach((col, ci) => {
             const isLastCol = (ci === cols.length - 1);
@@ -1210,6 +1261,7 @@ window._generateMultiViewBlueprintSVG = function() {
             });
             colX += colW;
         });
+        _bpHoneycombSepFlush(p);
 
         // ---- Side-open-cell wall gap overlay ----
         {
@@ -1938,6 +1990,7 @@ window._generateMultiViewBlueprintPages = function() {
 
         // Columns, shelves, hangers & drawers
         const colXPositions = [];
+        _bpHoneycombSepBegin();
         let colX = ox;
         cols.forEach((col, ci) => {
             const isLastCol = (ci === cols.length - 1);
@@ -2251,6 +2304,7 @@ window._generateMultiViewBlueprintPages = function() {
             makeVline(p, ox, oy, oy + dH, sc, null, 'left');
             makeVline(p, ox + dW, oy, oy + dH, sc, null, 'right');
         }
+        _bpHoneycombSepFlush(p);
 
         // ---- Side-open-cell wall gap overlay ----
         // For each side_open_cell on the outer left or right wall, paint a fill-colored

@@ -4959,7 +4959,16 @@ body.viewer-mode #canvas-container canvas {
     stroke-opacity: 0.85;
     fill: rgba(220, 38, 38, 0.1);
 }
-.bp-cutout-dims line,
-.bp-cutout-dims text {
+.bp-cutout-dim-draggable text {
     pointer-events: none;
+}
+.bp-cutout-dim-draggable .bp-cutout-dim-hit {
+    pointer-events: stroke;
+    cursor: inherit;
+}
+.bp-cutout-dim-draggable[data-dim="h"] {
+    cursor: ns-resize;
+}
+.bp-cutout-dim-draggable[data-dim="v"] {
+    cursor: ew-resize;
 }
