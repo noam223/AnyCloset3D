@@ -1843,8 +1843,9 @@ function _rebuildFCSplitDragHandle(fcRealSide, wingData, fc) {
     const t = wingData.thickness || 1.7;
     const plinthH = wingData.plinthHeight || 7;
     const colH = wingData.globalHeight || 240;
-    const mat = wingData.boardMaterial || 'melamine';
-    const threshold = mat === 'sandwich' ? 240 : 270;
+    const threshold = typeof getSplitThreshold === 'function'
+        ? getSplitThreshold(wingData)
+        : ((wingData.boardMaterial || 'melamine') === 'sandwich' ? 240 : 270);
     const MIN_GAP = 20;
 
     const handle = document.createElement('div');
@@ -4960,7 +4961,10 @@ function bindUI() {
             } else {
                 state[state.activeColorPart] = matValue;
             }
-            buildCabinet(); saveHistoryState();
+            if (state.activeColorPart === 'materialBody' && typeof checkSplits === 'function') checkSplits();
+            buildCabinet();
+            if (typeof calculatePrice === 'function') calculatePrice();
+            saveHistoryState();
         });
     });
 

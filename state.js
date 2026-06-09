@@ -542,14 +542,13 @@ window._distributeFullCornerShelves = function(wing) {
 };
 
 // ---- Full corner split (קושרת) logic ----
-// When the full corner height exceeds the threshold (240 sandwich / 270 melamine),
+// When the full corner height exceeds the threshold (240 sandwich / 270–275 melamine),
 // a split board (L-shaped) is added at the threshold position.
 function _checkFCSplit(wing) {
     if (!wing || !wing.fullCorner) return;
     const fc = wing.fullCorner;
     const colH = wing.globalHeight || 240;
-    const mat = wing.boardMaterial || state.boardMaterial || 'melamine';
-    const threshold = mat === 'sandwich' ? 240 : 270;
+    const threshold = getSplitThreshold(wing);
     if (colH > threshold) {
         // Use existing splitY if already set, otherwise default to threshold - 40
         if (!fc.splitY) fc.splitY = threshold === 240 ? 200 : 240;
@@ -2217,7 +2216,24 @@ function updateUndoRedoUI() {
 
 window.updateUndoRedoUI = updateUndoRedoUI;
 
-function getSplitThreshold() { return state.boardMaterial === 'sandwich' ? 240 : 270; }
+// Melamine body colors that allow up to 275 cm without upper split / surcharge
+const MELAMINE_EXTENDED_HEIGHT_COLORS = new Set([
+    'w1200', 'H1367', 'H1307', 'H1227', 'u727', 'u232', 'u604', 'u638'
+]);
+
+function _materialAllowsExtendedMelamineHeight(materialKey) {
+    return !!materialKey && MELAMINE_EXTENDED_HEIGHT_COLORS.has(String(materialKey));
+}
+
+function getSplitThreshold(wingData) {
+    const w = wingData || (typeof getWing === 'function' ? getWing() : null);
+    const mat = (w && w.boardMaterial) || state.boardMaterial || 'melamine';
+    if (mat === 'sandwich') return 240;
+    const bodyColor = w ? w.materialBody : state.materialBody;
+    if (_materialAllowsExtendedMelamineHeight(bodyColor)) return 275;
+    return 270;
+}
+window.getSplitThreshold = getSplitThreshold;
 
 // ── Partition data migration: convert legacy comp.partitionX → comp.partitions[] ──
 function _migratePartitions(col) {
@@ -2268,7 +2284,7 @@ function checkSplits() {
         if (!fw || !fw.fullCorner) return;
         if (fw.wingPosition === 'full_corner') {
             const fcColH = fw.globalHeight || state.globalHeight;
-            const fcThreshold = (fw.boardMaterial || state.boardMaterial || 'melamine') === 'sandwich' ? 240 : 270;
+            const fcThreshold = getSplitThreshold(fw);
             if (fcColH > fcThreshold) {
                 // Use the same splitY as the columns (if any column has one), otherwise use default
                 const colSplitY = shouldHaveSplit
@@ -2895,7 +2911,7 @@ function _calcWingCost(cfg, wing) {
         });
     }
 
-    const splitThreshold = wMelamine ? 270 : 240;
+    const splitThreshold = getSplitThreshold(wing);
     if (wh > splitThreshold) {
         let topUnitCost = 0;
         if      (ww <= 160) topUnitCost = ex.upperUnit160   || 600;
