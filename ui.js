@@ -5431,16 +5431,12 @@ function bindUI() {
         const imgNoDoors = preview.imgOpen;
         const imgBlueprint = null;
 
-        let totalShelves = 0, hangingRods = 0, intDrawers = 0, extDrawers = 0, openCellsCount = 0;
-        state.columns.forEach(col => {
-            totalShelves += col.shelves;
-            col.compartments.forEach(comp => {
-                if (comp.type === 'hanging') hangingRods++;
-                if (comp.type === 'internal_drawers') intDrawers += comp.count;
-                if (comp.type === 'external_drawers') extDrawers += comp.count;
-                if (comp.type === 'open_cell' || comp.type === 'side_open_cell') openCellsCount++;
-            });
-        });
+        const contentCounts = _countCabinetContentFromRawState({ wings: state.wings, columns: state.columns });
+        const totalShelves = contentCounts.shelves;
+        const hangingRods = contentCounts.hanging + contentCounts.sorbet;
+        const intDrawers = contentCounts.drawersInt;
+        const extDrawers = contentCounts.drawersExt;
+        const openCellsCount = contentCounts.openCells;
 
         let modelNameText = 'מאיה';
         if(state.cabinetModel === 'c9') modelNameText = 'C9';
@@ -5561,7 +5557,7 @@ function bindUI() {
             colorOpenCell: colorNamesHebrew[state.materialOpenCell] || 'ברירת מחדל',
             hasOpenCells: openCellsCount > 0,
             extraColors: extraColorsStr,
-            shelves: totalShelves, hanging: hangingRods, drawersInt: intDrawers, drawersExt: extDrawers,
+            shelves: totalShelves, hanging: hangingRods, sorbetCount: contentCounts.sorbet, drawersInt: intDrawers, drawersExt: extDrawers,
             price: priceStr, costPrice: '₪' + state.currentCostPrice.toLocaleString(),
             installPrice: getWing().manualInstallPrice != null ? getWing().manualInstallPrice : state.currentInstallPrice,
             imgDoors: imgWithDoors, imgOpen: imgNoDoors, imgBlueprint: imgBlueprint,
@@ -5962,7 +5958,7 @@ window.openOrderModal = async function(mode) {
                     <tr><th>מספר מגירות חיצוניות</th><td>${item.drawersExt} יחידות</td></tr>
                     <tr><th>מספר מגירות פנימיות</th><td>${item.drawersInt} יחידות</td></tr>
                     <tr><th>מדפים נשלפים</th><td>${item.shelves} יחידות</td></tr>
-                    <tr><th>מוטות תלייה לקולבים</th><td>${item.hanging} יחידות</td></tr>
+                    <tr><th>מוטות תלייה לקולבים</th><td>${_formatHangingRodsDisplay(itemObj)}</td></tr>
                     ${item.cabinetNotes ? `<tr><th>הערות</th><td style="white-space:pre-wrap;line-height:1.55;">${String(item.cabinetNotes).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')}</td></tr>` : ''}
 
                     ${!isFactory && window._showPricing !== false ? `
@@ -6354,6 +6350,73 @@ function _escPrintHtml(s) {
         .replace(/\n/g, '<br>');
 }
 
+function _emptyContentCounts() {
+    return { shelves: 0, hanging: 0, sorbet: 0, drawersInt: 0, drawersExt: 0, openCells: 0 };
+}
+
+function _addContentTypeToCounts(counts, type, comp) {
+    if (type === 'hanging' || type === 'cross_hanging') counts.hanging++;
+    else if (type === 'sorbet') counts.sorbet++;
+    else if (type === 'internal_drawers') counts.drawersInt += (comp && comp.count) || 1;
+    else if (type === 'external_drawers') counts.drawersExt += (comp && comp.count) || 1;
+    else if (type === 'open_cell' || type === 'side_open_cell') counts.openCells++;
+}
+
+function _accumulateCompContentCounts(counts, comp) {
+    if (!comp) return;
+    if (comp.partition && Array.isArray(comp.subCells)) {
+        comp.subCells.forEach(function(sub) {
+            if (!sub) return;
+            if (Array.isArray(sub.zonesType) && sub.zonesType.length) {
+                sub.zonesType.forEach(function(zt) { _addContentTypeToCounts(counts, zt, sub); });
+            } else {
+                _addContentTypeToCounts(counts, sub.type, sub);
+            }
+        });
+        return;
+    }
+    _addContentTypeToCounts(counts, comp.type, comp);
+}
+
+function _countCabinetContent(columns) {
+    const counts = _emptyContentCounts();
+    if (!Array.isArray(columns)) return counts;
+    columns.forEach(function(col) {
+        counts.shelves += col.shelves || 0;
+        (col.compartments || []).forEach(function(comp) { _accumulateCompContentCounts(counts, comp); });
+    });
+    return counts;
+}
+
+function _countCabinetContentFromRawState(rawState) {
+    if (!rawState) return _emptyContentCounts();
+    const merged = _emptyContentCounts();
+    if (rawState.wings) {
+        ['center', 'left', 'right'].forEach(function(side) {
+            const w = rawState.wings[side];
+            if (!w || !Array.isArray(w.columns)) return;
+            const c = _countCabinetContent(w.columns);
+            merged.shelves += c.shelves;
+            merged.hanging += c.hanging;
+            merged.sorbet += c.sorbet;
+            merged.drawersInt += c.drawersInt;
+            merged.drawersExt += c.drawersExt;
+            merged.openCells += c.openCells;
+        });
+        return merged;
+    }
+    return _countCabinetContent(rawState.columns);
+}
+
+function _formatHangingRodsDisplay(itemObj) {
+    const counts = itemObj && itemObj.rawState
+        ? _countCabinetContentFromRawState(itemObj.rawState)
+        : _emptyContentCounts();
+    const total = counts.hanging + counts.sorbet;
+    if (counts.sorbet > 0) return `${total} יחידות (${counts.sorbet} סורבטו)`;
+    return `${total} יחידות`;
+}
+
 function _printCabinetNotesRow(notes, thStyle, tdStyle) {
     const n = (notes || '').trim();
     if (!n) return '';
@@ -6422,7 +6485,7 @@ function _buildPrintHTML(mode) {
                     <tr><th style="${thStyle}">מגירות חיצוניות</th><td style="${tdStyle}">${item.drawersExt} יחידות</td></tr>
                     <tr><th style="${thStyle}">מגירות פנימיות</th><td style="${tdStyle}">${item.drawersInt} יחידות</td></tr>
                     <tr><th style="${thStyle}">מדפים נשלפים</th><td style="${tdStyle}">${item.shelves} יחידות</td></tr>
-                    <tr><th style="${thStyle}">מוטות תלייה לקולבים</th><td style="${tdStyle}">${item.hanging} יחידות</td></tr>
+                    <tr><th style="${thStyle}">מוטות תלייה לקולבים</th><td style="${tdStyle}">${_formatHangingRodsDisplay(itemObj)}</td></tr>
                     ${_printCabinetNotesRow(item.cabinetNotes, thStyle, tdStyle)}
                     ${priceRows}
                 </table>
@@ -6495,7 +6558,7 @@ function _buildPrintHTML(mode) {
                     <tr><th style="${thStyle}">מגירות חיצוניות</th><td style="${tdStyle}">${item.drawersExt} יחידות</td></tr>
                     <tr><th style="${thStyle}">מגירות פנימיות</th><td style="${tdStyle}">${item.drawersInt} יחידות</td></tr>
                     <tr><th style="${thStyle}">מדפים נשלפים</th><td style="${tdStyle}">${item.shelves} יחידות</td></tr>
-                    <tr><th style="${thStyle}">מוטות תלייה לקולבים</th><td style="${tdStyle}">${item.hanging} יחידות</td></tr>
+                    <tr><th style="${thStyle}">מוטות תלייה לקולבים</th><td style="${tdStyle}">${_formatHangingRodsDisplay(itemObj)}</td></tr>
                     ${_printCabinetNotesRow(item.cabinetNotes, thStyle, tdStyle)}
                     ${priceRows}
                 </table>
