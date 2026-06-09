@@ -188,6 +188,11 @@
                     } else if (!state.blueprintCutouts) {
                         state.blueprintCutouts = [];
                     }
+                    if (snap.blueprintCellDimOffsets) {
+                        state.blueprintCellDimOffsets = snap.blueprintCellDimOffsets;
+                    } else if (!state.blueprintCellDimOffsets) {
+                        state.blueprintCellDimOffsets = {};
+                    }
                     // Restore room wall position
                     if (snap.roomWall) {
                         state.roomWall   = snap.roomWall;
@@ -329,7 +334,8 @@
             nicheClosureWidthRight:    window._nicheClosureWidthRight || 1.8,
             nicheClosureCeilHeight:    window._nicheClosureCeilHeight || 1.8,
             tambourPalette:            state.tambourPalette || {},
-            blueprintCutouts:          state.blueprintCutouts || []
+            blueprintCutouts:          state.blueprintCutouts || [],
+            blueprintCellDimOffsets:   state.blueprintCellDimOffsets || {}
         }));
     }
 
@@ -532,7 +538,8 @@ window._saveProjectNow = async function() {
             orderCart:     lightCart,
             customer:      state.customer,
             tambourPalette: state.tambourPalette || {},
-            blueprintCutouts: state.blueprintCutouts || []
+            blueprintCutouts: state.blueprintCutouts || [],
+            blueprintCellDimOffsets: state.blueprintCellDimOffsets || {}
         }));
         console.log('[SaveNow] Saving project "' + window._currentProjectName + '", payload size:', Math.round(JSON.stringify(snap).length/1024) + 'KB, cart items:', lightCart.length);
         var thumb = null;

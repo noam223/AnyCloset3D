@@ -9,6 +9,8 @@ const _BP_STROKE_THIN = '#94a3b8';
 const _BP_FONT = 'Rubik,Tahoma,sans-serif';
 const _BP_CUT_STROKE = '#dc2626';
 const _BP_CUT_DIM_OPACITY = 0.72;
+const _BP_DIM_FONT = 11;
+const _BP_CELL_DIM_FONT = 10;
 const _BP_DOOR_STYLE_SUFFIX = { solid: '', framed_melamine: ' מסגרת', glass_melamine: ' זכוכית', glass_black: ' זכ.שחורה', glass_gold: ' זכ.זהב', glass_mirror: ' מראה' };
 
 function _bpEscSvgText(str) {
@@ -30,6 +32,7 @@ function _bpCutoutDimHInner(x1, x2, y, lbl, above) {
         `<line x1="${x2.toFixed(1)}" y1="${(y - tk / 2).toFixed(1)}" x2="${x2.toFixed(1)}" y2="${(y + tk / 2).toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="0.75" stroke-opacity="${_BP_CUT_DIM_OPACITY}"/>`,
         `<line class="bp-cutout-dim-hit" x1="${x1.toFixed(1)}" y1="${y.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="8" stroke-opacity="0.001"/>`,
         `<line x1="${x1.toFixed(1)}" y1="${y.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="0.75" stroke-opacity="${_BP_CUT_DIM_OPACITY}"/>`,
+        `<rect class="bp-cutout-dim-label-hit" x="${(mx - 24).toFixed(1)}" y="${(y + lo - 9).toFixed(1)}" width="48" height="12" fill="transparent"/>`,
         `<text x="${mx.toFixed(1)}" y="${(y + lo).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="9.5" font-weight="500" fill="${_BP_CUT_STROKE}" fill-opacity="${_BP_CUT_DIM_OPACITY}">${lbl}</text>`
     ].join('');
 }
@@ -41,6 +44,7 @@ function _bpCutoutDimVInner(x, y1, y2, lbl) {
         `<line x1="${(x - tk / 2).toFixed(1)}" y1="${y2.toFixed(1)}" x2="${(x + tk / 2).toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="0.75" stroke-opacity="${_BP_CUT_DIM_OPACITY}"/>`,
         `<line class="bp-cutout-dim-hit" x1="${x.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="8" stroke-opacity="0.001"/>`,
         `<line x1="${x.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${_BP_CUT_STROKE}" stroke-width="0.75" stroke-opacity="${_BP_CUT_DIM_OPACITY}"/>`,
+        `<rect class="bp-cutout-dim-label-hit" x="${(tx - 24).toFixed(1)}" y="${(my + 3 - 9).toFixed(1)}" width="48" height="12" fill="transparent" transform="rotate(-90,${tx.toFixed(1)},${(my + 3).toFixed(1)})"/>`,
         `<text x="${tx.toFixed(1)}" y="${(my + 3).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="9.5" font-weight="500" fill="${_BP_CUT_STROKE}" fill-opacity="${_BP_CUT_DIM_OPACITY}" transform="rotate(-90,${tx.toFixed(1)},${my.toFixed(1)})">${lbl}</text>`
     ].join('');
 }
@@ -118,6 +122,30 @@ function _bpBuildCutoutSvg(co, ox, oy, dW, dH, sc, cabWidthCm, cabHeightCm) {
     ].join('');
 
     return { cutoutG, dimsG, leftMm, bottomMm };
+}
+
+function _bpEnsureCellDimOffsets() {
+    if (!state.blueprintCellDimOffsets) state.blueprintCellDimOffsets = {};
+    return state.blueprintCellDimOffsets;
+}
+
+function _bpCellDimStoreKey(viewKey, cellKey) {
+    return String(viewKey || 'center') + '|' + cellKey;
+}
+
+function _bpCellDimOffset(viewKey, cellKey) {
+    const off = _bpEnsureCellDimOffsets()[_bpCellDimStoreKey(viewKey, cellKey)];
+    return off ? { x: off.x || 0, y: off.y || 0 } : { x: 0, y: 0 };
+}
+
+function _bpPushCellDimLabel(p, viewKey, cellKey, x, y, heightVal) {
+    const off = _bpCellDimOffset(viewKey, cellKey);
+    const tf = (off.x || off.y) ? ` transform="translate(${off.x.toFixed(1)},${off.y.toFixed(1)})"` : '';
+    p.push(
+        `<g class="bp-cell-dim-draggable" data-dim="v" data-cell-dim-key="${cellKey}" data-view-key="${viewKey || 'center'}"${tf} style="cursor:ew-resize">` +
+        `<rect class="bp-cell-dim-hit" x="${(x - 26).toFixed(1)}" y="${(y - 10).toFixed(1)}" width="52" height="12" fill="transparent"/>` +
+        `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="${_BP_CELL_DIM_FONT}" fill="${_BP_STROKE}" opacity="0.75" pointer-events="none">↕ ${heightVal}</text></g>`
+    );
 }
 
 function _bpAppendViewCutouts(p, viewKey, ox, oy, dW, dH, sc, cabWidthCm, cabHeightCm) {
@@ -534,7 +562,7 @@ window._generateMultiViewBlueprintSVG = function() {
         p.push(`<line x1="${(+x1).toFixed(1)}" y1="${(+y).toFixed(1)}" x2="${(+x2).toFixed(1)}" y2="${(+y).toFixed(1)}" stroke="${DIM_C}" stroke-width="1" marker-start="url(#as)" marker-end="url(#ae)"/>`);
         const mx=(+x1+x2)/2;
         const lblW = Math.max(lbl.length * 7, 36);
-        p.push(`<text x="${mx.toFixed(1)}" y="${(y+lo).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="13" fill="${DIM_C}">${lbl}</text>`);
+        p.push(`<text x="${mx.toFixed(1)}" y="${(y+lo).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="11" fill="${DIM_C}">${lbl}</text>`);
     };
     // dimV: vertical dimension line — label placed to the RIGHT of the line
     // Use for lines on the LEFT side of cabinet (label goes right = toward cabinet)
@@ -545,7 +573,7 @@ window._generateMultiViewBlueprintSVG = function() {
         p.push(`<line x1="${(+x).toFixed(1)}" y1="${(+y1).toFixed(1)}" x2="${(+x).toFixed(1)}" y2="${(+y2).toFixed(1)}" stroke="${DIM_C}" stroke-width="1" marker-start="url(#as)" marker-end="url(#ae)"/>`);
         const my = (+y1+y2)/2;
         const tx = x + 14;
-        p.push(`<text x="${tx.toFixed(1)}" y="${(my+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="13" fill="${DIM_C}" transform="rotate(-90,${tx.toFixed(1)},${my.toFixed(1)})">${lbl}</text>`);
+        p.push(`<text x="${tx.toFixed(1)}" y="${(my+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="11" fill="${DIM_C}" transform="rotate(-90,${tx.toFixed(1)},${my.toFixed(1)})">${lbl}</text>`);
     };
     // dimVLeft: vertical dimension line — label placed to the LEFT of the line
     // Use for lines on the RIGHT side of cabinet (label goes left = toward cabinet)
@@ -556,7 +584,7 @@ window._generateMultiViewBlueprintSVG = function() {
         p.push(`<line x1="${(+x).toFixed(1)}" y1="${(+y1).toFixed(1)}" x2="${(+x).toFixed(1)}" y2="${(+y2).toFixed(1)}" stroke="${DIM_C}" stroke-width="1" marker-start="url(#as)" marker-end="url(#ae)"/>`);
         const my = (+y1+y2)/2;
         const tx = x - 14;
-        p.push(`<text x="${tx.toFixed(1)}" y="${(my+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="13" fill="${DIM_C}" transform="rotate(-90,${tx.toFixed(1)},${my.toFixed(1)})">${lbl}</text>`);
+        p.push(`<text x="${tx.toFixed(1)}" y="${(my+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="11" fill="${DIM_C}" transform="rotate(-90,${tx.toFixed(1)},${my.toFixed(1)})">${lbl}</text>`);
     };
 
     // ---- PANEL 0: TOP VIEW (floor plan) — correct L/U geometry ----
@@ -802,6 +830,7 @@ window._generateMultiViewBlueprintSVG = function() {
 
     // ---- PANELS 1..N: Per-wing front views with hangers & drawers ----
     wingList.forEach((wg, wi) => {
+        const _bpViewKey = wg.wd === leftWing ? 'left' : wg.wd === rightWing ? 'right' : 'center';
         const py = MARGIN + 22 + GAP + (TOP_H + LABEL_H) + GAP + wi * (WING_H + LABEL_H + GAP);
         const pw = SVG_W - MARGIN * 2;
         panelBox(MARGIN, py, pw, WING_H, `שרטוט חזית — ${wg.label} | רוחב: ${Math.round(wg.w * 10)} מ"מ | גובה: ${Math.round(wg.h * 10)} מ"מ | עומק: ${Math.round(wg.d * 10)} מ"מ`);
@@ -1232,7 +1261,7 @@ window._generateMultiViewBlueprintSVG = function() {
                                 // Zone height label
                                 const zHcmRound = Math.round(zHcm);
                                 if (zSvgH > 14 && zHcmRound > 0) {
-                                    p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgCY + 4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="11" fill="${DIM_C}" opacity="0.7">↕ ${zHcmRound}</text>`);
+                                    _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}p${zi}z${z}`, subZoneCX, zSvgCY + 4, zHcmRound);
                                 }
                             }
                         }
@@ -1248,7 +1277,7 @@ window._generateMultiViewBlueprintSVG = function() {
                 if (pid !== 'bathroom' && cellHeightCm > 0 && cellH > 14 && !_isSplitBandOld) {
                     const lblCX = colX + colW / 2;
                     const lblCY = (cellY1 + cellY2) / 2 + 4;
-                    p.push(`<text x="${lblCX.toFixed(1)}" y="${lblCY.toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="15" fill="${DIM_C}" opacity="0.75">↕ ${cellHeightCm}</text>`);
+                    _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, lblCX, lblCY, cellHeightCm);
                 }
             }
             _hcBlocksOld.forEach(block => {
@@ -1540,7 +1569,7 @@ window._generateMultiViewBlueprintPages = function() {
         p.push(`<line x1="${(+x2).toFixed(1)}" y1="${(y-tk/2).toFixed(1)}" x2="${(+x2).toFixed(1)}" y2="${(y+tk/2).toFixed(1)}" stroke="${DIM_C}" stroke-width="1.5"/>`);
         p.push(`<line x1="${(+x1).toFixed(1)}" y1="${(+y).toFixed(1)}" x2="${(+x2).toFixed(1)}" y2="${(+y).toFixed(1)}" stroke="${DIM_C}" stroke-width="1.5" marker-start="url(#as)" marker-end="url(#ae)"/>`);
         const mx=(+x1+x2)/2;
-        p.push(`<text x="${mx.toFixed(1)}" y="${(y+lo).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="17" font-weight="600" fill="${DIM_C}">${lbl}</text>`);
+        p.push(`<text x="${mx.toFixed(1)}" y="${(y+lo).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="${_BP_DIM_FONT}" font-weight="500" fill="${DIM_C}">${lbl}</text>`);
         p.push(`</g>`);
     };
     const makeDimV = (p, x,y1,y2,lbl) => {
@@ -1551,7 +1580,7 @@ window._generateMultiViewBlueprintPages = function() {
         p.push(`<line x1="${(x-tk/2).toFixed(1)}" y1="${(+y2).toFixed(1)}" x2="${(x+tk/2).toFixed(1)}" y2="${(+y2).toFixed(1)}" stroke="${DIM_C}" stroke-width="1.5"/>`);
         p.push(`<line x1="${(+x).toFixed(1)}" y1="${(+y1).toFixed(1)}" x2="${(+x).toFixed(1)}" y2="${(+y2).toFixed(1)}" stroke="${DIM_C}" stroke-width="1.5" marker-start="url(#as)" marker-end="url(#ae)"/>`);
         const my = (+y1+y2)/2, tx = x + 18;
-        p.push(`<text x="${tx.toFixed(1)}" y="${(my+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="17" font-weight="600" fill="${DIM_C}" transform="rotate(-90,${tx.toFixed(1)},${my.toFixed(1)})">${lbl}</text>`);
+        p.push(`<text x="${tx.toFixed(1)}" y="${(my+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="${_BP_DIM_FONT}" font-weight="500" fill="${DIM_C}" transform="rotate(-90,${tx.toFixed(1)},${my.toFixed(1)})">${lbl}</text>`);
         p.push(`</g>`);
     };
     const makeDimVLeft = (p, x,y1,y2,lbl) => {
@@ -1562,7 +1591,7 @@ window._generateMultiViewBlueprintPages = function() {
         p.push(`<line x1="${(x-tk/2).toFixed(1)}" y1="${(+y2).toFixed(1)}" x2="${(x+tk/2).toFixed(1)}" y2="${(+y2).toFixed(1)}" stroke="${DIM_C}" stroke-width="1.5"/>`);
         p.push(`<line x1="${(+x).toFixed(1)}" y1="${(+y1).toFixed(1)}" x2="${(+x).toFixed(1)}" y2="${(+y2).toFixed(1)}" stroke="${DIM_C}" stroke-width="1.5" marker-start="url(#as)" marker-end="url(#ae)"/>`);
         const my = (+y1+y2)/2, tx = x - 18;
-        p.push(`<text x="${tx.toFixed(1)}" y="${(my+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="17" font-weight="600" fill="${DIM_C}" transform="rotate(-90,${tx.toFixed(1)},${my.toFixed(1)})">${lbl}</text>`);
+        p.push(`<text x="${tx.toFixed(1)}" y="${(my+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="${_BP_DIM_FONT}" font-weight="500" fill="${DIM_C}" transform="rotate(-90,${tx.toFixed(1)},${my.toFixed(1)})">${lbl}</text>`);
         p.push(`</g>`);
     };
     const wrapSVG = (p, label, pageNum, totalPages) => {
@@ -1831,6 +1860,7 @@ window._generateMultiViewBlueprintPages = function() {
     if (hasRight && rPos !== 'full_corner') wingList.push({ wd: rightWing,   label: 'שרטוט חזית — כנף ימין',   fill: FILL_WING_R, w: rW, h: _wingMaxH(rightWing, cH), d: rD });
 
     wingList.forEach((wg) => {
+        const _bpViewKey = wg.wd === leftWing ? 'left' : wg.wd === rightWing ? 'right' : 'center';
         const p = [];
         const drawAreaY = 65;
         const drawAreaH = PAGE_H - drawAreaY - MARGIN - 80; // reserve 80px at bottom for dim labels
@@ -2270,7 +2300,7 @@ window._generateMultiViewBlueprintPages = function() {
                                 // Zone height label
                                 const zHcmRound = Math.round(zHcm);
                                 if (zSvgH > 14 && zHcmRound > 0) {
-                                    p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgCY + 4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="11" fill="${DIM_C}" opacity="0.7">↕ ${zHcmRound}</text>`);
+                                    _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}p${zi}z${z}`, subZoneCX, zSvgCY + 4, zHcmRound);
                                 }
                             }
                         }
@@ -2286,7 +2316,7 @@ window._generateMultiViewBlueprintPages = function() {
                 if (!_isBathroomBP && cellHeightCm > 0 && cellH > 14 && !_isSplitBandCell) {
                     const lblCX = colX + colW / 2;
                     const lblCY = (cellY1 + cellY2) / 2 + 4;
-                    p.push(`<text x="${lblCX.toFixed(1)}" y="${lblCY.toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="15" fill="${DIM_C}" opacity="0.75">↕ ${cellHeightCm}</text>`);
+                    _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, lblCX, lblCY, cellHeightCm);
                 }
             }
             _hcBlocks.forEach(block => {
@@ -2562,6 +2592,7 @@ window._generateMultiViewBlueprintPages = function() {
     if (hasRight && rPos === 'full_corner') fcWings.push({ wd: rightWing, label: 'שרטוט חזית — פינה מלאה ימין',  fcSize: fcSizeR, wingD: rD, fill: FILL_FC_R });
 
     fcWings.forEach((fc) => {
+        const _bpViewKey = fc.wd === leftWing ? 'fc-left' : 'fc-right';
         const p = [];
         const drawAreaY = 65;
         const drawAreaH = PAGE_H - drawAreaY - MARGIN - 80; // reserve 80px at bottom for dim labels
@@ -2632,7 +2663,7 @@ window._generateMultiViewBlueprintPages = function() {
             // Skip label for split band cell
             const isFCSplitBand = fcSplitY > 0 && rowBotCm >= fcSplitY - 0.1 && rowTopCm <= fcSplitY + fcSplitT + 0.1;
             if (cellHeightCm > 0 && cellH > 14 && !isFCSplitBand) {
-                p.push(`<text x="${(ox+dW/2).toFixed(1)}" y="${((cellY1+cellY2)/2+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="15" fill="${DIM_C}" opacity="0.75">↕ ${cellHeightCm}</text>`);
+                _bpPushCellDimLabel(p, _bpViewKey, `r${ri}`, ox + dW / 2, (cellY1 + cellY2) / 2 + 4, cellHeightCm);
             }
         }
 
@@ -2664,6 +2695,7 @@ window._generateMultiViewBlueprintPages = function() {
     if (hasRight && rPos === 'full_corner' && rW > 0) fcAdditionalWings.push({ wd: rightWing, label: 'שרטוט חזית — כנף ימין (המשך פינה)',  fill: FILL_WING_R, w: rW, h: cH, d: rD });
 
     fcAdditionalWings.forEach((wg) => {
+        const _bpViewKey = wg.wd === leftWing ? 'fc-left-extra' : 'fc-right-extra';
         const p = [];
         const drawAreaY = 65;
         const drawAreaH = PAGE_H - drawAreaY - MARGIN - 80; // reserve 80px at bottom for dim labels
@@ -2789,7 +2821,7 @@ window._generateMultiViewBlueprintPages = function() {
                 if (cellHeightCm > 0 && cellH > 14 && !_isSplitBandFC) {
                     const lblCX = colX + colW / 2;
                     const lblCY = (cellY1 + cellY2) / 2 + 4;
-                    p.push(`<text x="${lblCX.toFixed(1)}" y="${lblCY.toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="15" fill="${DIM_C}" opacity="0.75">↕ ${cellHeightCm}</text>`);
+                    _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, lblCX, lblCY, cellHeightCm);
                 }
             }
             colX += colW;
@@ -2932,6 +2964,7 @@ window._generateMultiViewBlueprintPages = function() {
             const FILL_SC = '#e0f2fe'; // light blue
 
             const _drawSCPage = (sideLbl, scW, viewKey) => {
+                const _bpViewKey = viewKey;
                 const scLabel = `שרטוט חזית — ארון צד ${sideLbl}`;
                 const p = [];
                 const drawAreaY = 65;
@@ -3052,7 +3085,7 @@ window._generateMultiViewBlueprintPages = function() {
                         const _isSplitBandSC = _splitYSC > 0 &&
                             rowBotCm >= _splitYSCAdj - 0.1 && rowTopCm <= _splitTopSCAdj + 0.1;
                         if (cellHeightCm > 0 && cellH > 14 && !_isSplitBandSC) {
-                            p.push(`<text x="${cellCX.toFixed(1)}" y="${((cellY1+cellY2)/2+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="15" fill="${DIM_C}" opacity="0.75">↕ ${cellHeightCm}</text>`);
+                            _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, cellCX, (cellY1 + cellY2) / 2 + 4, cellHeightCm);
                         }
                     }
                     colX += colW;
@@ -3212,6 +3245,7 @@ window._generateMultiViewBlueprintPages = function() {
         const uuH = uuCols.length > 0 ? Math.max(...uuCols.map(c => c.height || 40)) : (uuWing.globalHeight || 40);
         const uuPH = 0; // upper units have no plinth (noPlinth: true)
         const uuFill = '#f0f9ff'; // light sky blue for upper unit
+        const _bpViewKey = 'upper-' + parentId;
 
         const p = [];
         const drawAreaY = 65;
@@ -3281,7 +3315,7 @@ window._generateMultiViewBlueprintPages = function() {
                 }
 
                 if (cellHeightCm > 0 && cellH > 14) {
-                    p.push(`<text x="${cellCX.toFixed(1)}" y="${((cellY1+cellY2)/2+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="15" fill="${DIM_C}" opacity="0.75">↕ ${cellHeightCm}</text>`);
+                    _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, cellCX, (cellY1 + cellY2) / 2 + 4, cellHeightCm);
                 }
             }
             colX += colW;

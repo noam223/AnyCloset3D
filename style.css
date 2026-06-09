@@ -4966,9 +4966,26 @@ body.viewer-mode #canvas-container canvas {
     pointer-events: stroke;
     cursor: inherit;
 }
+.bp-cutout-dim-draggable .bp-cutout-dim-label-hit {
+    pointer-events: all;
+    cursor: inherit;
+}
 .bp-cutout-dim-draggable[data-dim="h"] {
     cursor: ns-resize;
 }
 .bp-cutout-dim-draggable[data-dim="v"] {
+    cursor: ew-resize;
+}
+.bp-cell-dim-draggable text {
+    pointer-events: none;
+}
+.bp-cell-dim-draggable .bp-cell-dim-hit {
+    pointer-events: all;
+    cursor: inherit;
+}
+.bp-cell-dim-draggable[data-dim="h"] {
+    cursor: ns-resize;
+}
+.bp-cell-dim-draggable[data-dim="v"] {
     cursor: ew-resize;
 }

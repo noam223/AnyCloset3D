@@ -205,6 +205,7 @@ const state = {
     dimData: [],
     bpData: [],
     blueprintCutouts: [],
+    blueprintCellDimOffsets: {},
     customer: { name: '', phone: '', orderNum: '', address: '' },
     orderCart: [],
     editingCartIndex: -1,

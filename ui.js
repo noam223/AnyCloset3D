@@ -5496,7 +5496,8 @@ function bindUI() {
             nicheClosureWidthLeft:     window._nicheClosureWidthLeft  || 1.8,
             nicheClosureWidthRight:    window._nicheClosureWidthRight || 1.8,
             nicheClosureCeilHeight:    window._nicheClosureCeilHeight || 1.8,
-            blueprintCutouts: state.blueprintCutouts || []
+            blueprintCutouts: state.blueprintCutouts || [],
+            blueprintCellDimOffsets: state.blueprintCellDimOffsets || {}
         }));
 
         // Collect unique extra colors from per-part overrides
@@ -5725,6 +5726,7 @@ function _snapshotEditorState() {
         wingEditSnapshot: state.wingEditSnapshot,
         editingCartIndex: state.editingCartIndex,
         blueprintCutouts: JSON.parse(JSON.stringify(state.blueprintCutouts || [])),
+        blueprintCellDimOffsets: JSON.parse(JSON.stringify(state.blueprintCellDimOffsets || {})),
         partColors: JSON.parse(JSON.stringify(state.partColors || {})),
         roomWall: window._roomWall || state.roomWall || 'center',
         closureEnabled: window._closureEnabled,
@@ -5759,6 +5761,7 @@ function _restoreEditorState(snap) {
     state.wingEditSnapshot = snap.wingEditSnapshot;
     state.editingCartIndex = snap.editingCartIndex;
     state.blueprintCutouts = snap.blueprintCutouts || [];
+    state.blueprintCellDimOffsets = snap.blueprintCellDimOffsets || {};
     state.partColors = snap.partColors || {};
     window._roomWall = snap.roomWall;
     state.roomWall = snap.roomWall;
@@ -5831,6 +5834,7 @@ function _applyRawStateForCapture(rawState) {
     window._nicheClosureWidthRight = rs.nicheClosureWidthRight || 1.8;
     window._nicheClosureCeilHeight = rs.nicheClosureCeilHeight || 1.8;
     state.blueprintCutouts = rs.blueprintCutouts ? JSON.parse(JSON.stringify(rs.blueprintCutouts)) : [];
+    state.blueprintCellDimOffsets = rs.blueprintCellDimOffsets ? JSON.parse(JSON.stringify(rs.blueprintCellDimOffsets)) : {};
 }
 
 window._refreshCartMediaForPrint = async function() {
@@ -6177,6 +6181,7 @@ window.editCartItem = function(index) {
     if (typeof window._updateRoomWallUI === 'function') window._updateRoomWallUI();
 
     state.blueprintCutouts = rawState.blueprintCutouts ? JSON.parse(JSON.stringify(rawState.blueprintCutouts)) : [];
+    state.blueprintCellDimOffsets = rawState.blueprintCellDimOffsets ? JSON.parse(JSON.stringify(rawState.blueprintCellDimOffsets)) : {};
 
     // Explicitly restore manualInstallPrice (not in old rawState saves → default null)
     state.manualInstallPrice = (rawState.manualInstallPrice != null) ? rawState.manualInstallPrice : null;
@@ -6739,6 +6744,7 @@ window._mvbpShow = function(idx) {
         if (typeof window._mvbpBindDimDrag === 'function') window._mvbpBindDimDrag();
         if (typeof window._mvbpBindCutoutDrag === 'function') window._mvbpBindCutoutDrag();
         if (typeof window._mvbpBindCutoutDimDrag === 'function') window._mvbpBindCutoutDimDrag();
+        if (typeof window._mvbpBindCellDimDrag === 'function') window._mvbpBindCellDimDrag();
         if (typeof window._mvbpUpdateCutoutToolbar === 'function') window._mvbpUpdateCutoutToolbar();
         if (window._mvbpSelectedCutoutId && content2) {
             const svgSel = content2.querySelector('svg');
@@ -6927,6 +6933,116 @@ window._mvbpBindCutoutDimDrag = function() {
         g._cutoutDimDragBound = true;
 
         const axis = g.getAttribute('data-dim');
+        let dragging = false;
+        let startX = 0, startY = 0, curTx = 0, curTy = 0;
+
+        function onMouseDown(e) {
+            if (e.button !== 0) return;
+            dragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            const t = getTranslate(g);
+            curTx = t.x;
+            curTy = t.y;
+            e.preventDefault();
+            e.stopPropagation();
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        }
+
+        function applyDrag(clientX, clientY) {
+            const sc = getSVGScale();
+            const dx = (clientX - startX) / sc;
+            const dy = (clientY - startY) / sc;
+            let tx = curTx, ty = curTy;
+            if (axis === 'h') ty = curTy + dy;
+            else tx = curTx + dx;
+            g.setAttribute('transform', 'translate(' + tx.toFixed(1) + ',' + ty.toFixed(1) + ')');
+        }
+
+        function onMouseMove(e) {
+            if (!dragging) return;
+            applyDrag(e.clientX, e.clientY);
+        }
+
+        function onMouseUp() {
+            if (!dragging) return;
+            dragging = false;
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            saveOffset(g);
+        }
+
+        function onTouchStart(e) {
+            if (e.touches.length !== 1) return;
+            dragging = true;
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+            const t = getTranslate(g);
+            curTx = t.x;
+            curTy = t.y;
+            e.stopPropagation();
+        }
+
+        function onTouchMove(e) {
+            if (!dragging || e.touches.length !== 1) return;
+            applyDrag(e.touches[0].clientX, e.touches[0].clientY);
+            e.preventDefault();
+        }
+
+        function onTouchEnd() {
+            if (!dragging) return;
+            dragging = false;
+            saveOffset(g);
+        }
+
+        g.addEventListener('mousedown', onMouseDown);
+        g.addEventListener('touchstart', onTouchStart, { passive: true });
+        g.addEventListener('touchmove', onTouchMove, { passive: false });
+        g.addEventListener('touchend', onTouchEnd, { passive: true });
+    });
+};
+
+// ---- Blueprint in-cell height label drag ----
+window._mvbpBindCellDimDrag = function() {
+    const content = document.getElementById('multiview-blueprint-content');
+    if (!content) return;
+    const svg = content.querySelector('svg');
+    if (!svg) return;
+
+    function getSVGScale() {
+        const vb = svg.viewBox.baseVal;
+        const rect = svg.getBoundingClientRect();
+        return vb.width > 0 ? rect.width / vb.width : 1;
+    }
+
+    function getTranslate(g) {
+        const t = g.getAttribute('transform') || '';
+        const m = t.match(/translate\(\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\)/);
+        return m ? { x: parseFloat(m[1]), y: parseFloat(m[2]) } : { x: 0, y: 0 };
+    }
+
+    function saveOffset(g) {
+        const viewKey = g.getAttribute('data-view-key');
+        const cellKey = g.getAttribute('data-cell-dim-key');
+        if (!viewKey || !cellKey) return;
+        if (!state.blueprintCellDimOffsets) state.blueprintCellDimOffsets = {};
+        const t = getTranslate(g);
+        state.blueprintCellDimOffsets[viewKey + '|' + cellKey] = { x: t.x, y: t.y };
+        if (typeof saveHistoryState === 'function') saveHistoryState();
+        const wrap = document.getElementById('mvbp-svg-wrap');
+        const idx = window._mvbpIndex;
+        if (wrap && window._mvbpPages[idx]) {
+            const svgEl = wrap.querySelector('svg');
+            if (svgEl) window._mvbpPages[idx].svg = svgEl.outerHTML;
+        }
+    }
+
+    svg.querySelectorAll('.bp-cell-dim-draggable').forEach(function(g) {
+        if (g._cellDimDragBound) return;
+        g._cellDimDragBound = true;
+
+        const axis = g.getAttribute('data-dim') || 'v';
         let dragging = false;
         let startX = 0, startY = 0, curTx = 0, curTy = 0;
 
