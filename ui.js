@@ -6895,10 +6895,46 @@ window._mvbpUpdateCutoutToolbar = function() {
 };
 
 window._mvbpSyncCutoutLabelField = function() {
-    const inp = document.getElementById('mvbp-cut-label');
-    if (!inp) return;
+    window._mvbpSyncCutoutFields();
+};
+
+window._mvbpSyncCutoutFields = function() {
     const co = (state.blueprintCutouts || []).find(function(c) { return c.id === window._mvbpSelectedCutoutId; });
-    inp.value = co ? (co.label || '') : '';
+    const lblInp = document.getElementById('mvbp-cut-label');
+    const leftInp = document.getElementById('mvbp-cut-left');
+    const bottomInp = document.getElementById('mvbp-cut-bottom');
+    if (lblInp) lblInp.value = co ? (co.label || '') : '';
+    if (leftInp) {
+        leftInp.disabled = !co;
+        leftInp.value = co ? co.leftMm : '';
+    }
+    if (bottomInp) {
+        bottomInp.disabled = !co;
+        bottomInp.value = co ? co.bottomMm : '';
+    }
+};
+
+window._mvbpApplyCutoutPosition = function() {
+    const id = window._mvbpSelectedCutoutId;
+    if (!id) {
+        if (typeof _showToast === 'function') _showToast('בחר פתח בשרטוט לעדכון המיקום', 2500);
+        return;
+    }
+    const co = (state.blueprintCutouts || []).find(function(c) { return c.id === id; });
+    if (!co) return;
+    const pg = (window._mvbpPages || [])[window._mvbpIndex];
+    if (!pg) return;
+    const cabWMm = Math.round((pg.cabWidthCm || 160) * 10);
+    const cabHMm = Math.round((pg.cabHeightCm || 240) * 10);
+    const wMm = co.widthMm || 80;
+    const hMm = co.heightMm || 120;
+    const leftInp = document.getElementById('mvbp-cut-left');
+    const bottomInp = document.getElementById('mvbp-cut-bottom');
+    co.leftMm = Math.max(0, Math.min(cabWMm - wMm, parseInt(leftInp && leftInp.value, 10) || 0));
+    co.bottomMm = Math.max(0, Math.min(cabHMm - hMm, parseInt(bottomInp && bottomInp.value, 10) || 0));
+    window._mvbpSyncCutoutFields();
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+    window._mvbpRegenerateAndShow();
 };
 
 window._mvbpApplyCutoutLabel = function() {
@@ -7017,6 +7053,7 @@ window._mvbpBindCutoutDrag = function() {
             const newG = drag.svg.querySelector('.bp-cutout[data-cutout-id="' + drag.id + '"]');
             if (newG) newG.classList.add('bp-cutout-selected');
         }
+        window._mvbpSyncCutoutFields();
     }
 
     function endDrag() {
@@ -7090,6 +7127,16 @@ window._mvbpBindCutoutDrag = function() {
             if (e.key === 'Enter') window._mvbpApplyCutoutLabel();
         });
     }
+
+    ['mvbp-cut-left', 'mvbp-cut-bottom'].forEach(function(id) {
+        const inp = document.getElementById(id);
+        if (!inp || inp._cutoutPosBound) return;
+        inp._cutoutPosBound = true;
+        inp.addEventListener('change', function() { window._mvbpApplyCutoutPosition(); });
+        inp.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') window._mvbpApplyCutoutPosition();
+        });
+    });
 };
 
 // ---- Blueprint fullscreen (no orientation lock) ----
