@@ -400,10 +400,21 @@
         <div class="page-tab active" id="tab-projects">
             <div class="content-header">
                 <div class="content-title">כל הפרויקטים</div>
-                <div class="projects-search-wrap">
+                <form class="projects-search-wrap" role="search" autocomplete="off" onsubmit="return false;">
                     <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="search" class="projects-search-input" id="projects-search" placeholder="חיפוש לפי שם פרויקט, לקוח או מספר רכש..." oninput="onProjectsSearch(this.value)">
-                </div>
+                    <input type="text"
+                           class="projects-search-input"
+                           id="projects-search"
+                           name="project-list-filter"
+                           autocomplete="off"
+                           autocorrect="off"
+                           autocapitalize="off"
+                           spellcheck="false"
+                           data-lpignore="true"
+                           data-1p-ignore
+                           placeholder="חיפוש לפי שם פרויקט, לקוח או מספר רכש..."
+                           oninput="onProjectsSearch(this.value, true)">
+                </form>
                 <div class="content-count" id="content-count"></div>
             </div>
             <div class="projects-grid" id="projects-grid">
@@ -829,6 +840,6 @@
 </div>
 
 <script src="auth.js?v=20260608h"></script>
-<script src="projects.js?v=20260608h"></script>
+<script src="projects.js?v=20260608i"></script>
 </body>
 </html>

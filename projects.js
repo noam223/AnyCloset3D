@@ -117,6 +117,9 @@ var _USER_TYPE_LABELS = {
 
     _renderPlanBar();
     _renderProjects();
+    _resetProjectsSearchIfAutofilled();
+    setTimeout(_resetProjectsSearchIfAutofilled, 150);
+    setTimeout(_resetProjectsSearchIfAutofilled, 600);
     _startMissingThumbnailBackfill();
 
     // content count
@@ -438,8 +441,21 @@ function _projectMatchesSearch(p) {
     return fields.some(function(f) { return f && String(f).toLowerCase().indexOf(q) !== -1; });
 }
 
-function onProjectsSearch(value) {
+function onProjectsSearch(value, fromUser) {
+    if (fromUser) {
+        var el = document.getElementById('projects-search');
+        if (el) el.dataset.userTyped = '1';
+    }
     _searchQuery = (value || '').trim();
+    _renderProjects();
+}
+
+function _resetProjectsSearchIfAutofilled() {
+    var el = document.getElementById('projects-search');
+    if (!el || el.dataset.userTyped === '1') return;
+    if (!el.value) return;
+    el.value = '';
+    _searchQuery = '';
     _renderProjects();
 }
 
