@@ -148,6 +148,35 @@ function _bpPushCellDimLabel(p, viewKey, cellKey, x, y, heightVal) {
     );
 }
 
+function _bpShelfTCm() {
+    return state.thickness || 1.7;
+}
+
+// Match engine-core startShelvesY — bottom of first clear cell row (cm from floor)
+function _bpRowBaseCm(col, plinthH) {
+    const t = _bpShelfTCm();
+    const fo = col.floorOffset || 0;
+    if (col.type === 'desk') return (col.deskHeight || 80) + (col.deskClearance || 80);
+    if (fo > 0) return fo + t;
+    if (col.noPlinth) return t;
+    const isBathroomRegalim = state.presetId === 'bathroom' && state.cabinetModel === 'regalim';
+    if (isBathroomRegalim) return plinthH;
+    return plinthH + t;
+}
+
+function _bpClearCellHeightCm(rowBotCm, rowTopCm, shelfT) {
+    const t = shelfT != null ? shelfT : _bpShelfTCm();
+    return Math.max(0, rowTopCm - rowBotCm - t);
+}
+
+function _bpClearCellHeightMm(rowBotCm, rowTopCm, shelfT) {
+    return Math.round(_bpClearCellHeightCm(rowBotCm, rowTopCm, shelfT) * 10);
+}
+
+function _bpClearCellHeightLabel(rowBotCm, rowTopCm, shelfT) {
+    return Math.round(_bpClearCellHeightCm(rowBotCm, rowTopCm, shelfT));
+}
+
 function _bpAppendViewCutouts(p, viewKey, ox, oy, dW, dH, sc, cabWidthCm, cabHeightCm) {
     const cutouts = _bpEnsureCutouts().filter(c => c.viewKey === viewKey);
     cutouts.forEach(co => {
@@ -1024,7 +1053,7 @@ window._generateMultiViewBlueprintSVG = function() {
             const _splitTOld = (state.thickness || 1.7) * 2;
             // Shelves — skip internal honeycomb shelves (drawn with block geometry)
             const shelvesArrEarly = (col.shelvesY || []).slice().sort((a,b) => a-b);
-            const deskBaseEarly = (col.type === 'desk') ? (col.deskHeight || 80) + (col.deskClearance || 80) : colPlinthH;
+            const deskBaseEarly = (col.type === 'desk') ? (col.deskHeight || 80) + (col.deskClearance || 80) : _bpRowBaseCm(col, colPlinthH);
             const adjShelvesEarly = shelvesArrEarly.map(sy => sy - _fo).filter(sy => sy > 0 && sy < _visibleH);
             const _splitYOldAdjE = _splitYOld > 0 ? (_splitYOld - _fo) : 0;
             const _splitTopOldAdjE = _splitYOldAdjE > 0 ? _splitYOldAdjE + _splitTOld : 0;
@@ -1108,7 +1137,7 @@ window._generateMultiViewBlueprintSVG = function() {
             for (let ri = 0; ri < numRows; ri++) {
                 const rowBotCm = rowBounds[ri];
                 const rowTopCm = rowBounds[ri + 1];
-                const cellHeightCm = Math.round((rowTopCm - rowBotCm - _t_shelf) * 10);
+                const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _t_shelf);
                 const cellY1 = _colBotY - rowTopCm * sc; // SVG top of cell
                 const cellY2 = _colBotY - rowBotCm * sc; // SVG bottom of cell
                 const cellH = cellY2 - cellY1;
@@ -1259,7 +1288,7 @@ window._generateMultiViewBlueprintSVG = function() {
                                 }
 
                                 // Zone height label
-                                const zHcmRound = Math.round(zHcm);
+                                const zHcmRound = _bpClearCellHeightLabel(zBotCm, zTopCm, _t_shelf);
                                 if (zSvgH > 14 && zHcmRound > 0) {
                                     _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}p${zi}z${z}`, subZoneCX, zSvgCY + 4, zHcmRound);
                                 }
@@ -1274,10 +1303,10 @@ window._generateMultiViewBlueprintSVG = function() {
                 // For bathroom preset: skip all internal cell height labels
                 const _isSplitBandOld = _splitYOldAdj > 0 &&
                     rowBotCm >= _splitYOldAdj - 0.1 && rowTopCm <= _splitTopOldAdj + 0.1;
-                if (pid !== 'bathroom' && cellHeightCm > 0 && cellH > 14 && !_isSplitBandOld) {
+                if (pid !== 'bathroom' && cellHeightLabel > 0 && cellH > 14 && !_isSplitBandOld) {
                     const lblCX = colX + colW / 2;
                     const lblCY = (cellY1 + cellY2) / 2 + 4;
-                    _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, lblCX, lblCY, cellHeightCm);
+                    _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, lblCX, lblCY, cellHeightLabel);
                 }
             }
             _hcBlocksOld.forEach(block => {
@@ -1306,7 +1335,8 @@ window._generateMultiViewBlueprintSVG = function() {
                 const shelvesArr = (col.shelvesY || []).slice().sort((a,b) => a-b);
                 // adjust shelf positions by floorOffset
                 const adjShelves = shelvesArr.map(sy => sy - _fo).filter(sy => sy > 0 && sy < _visibleH);
-                const rowBounds = [colPlinthH, ...adjShelves.filter(sy => sy > colPlinthH), _visibleH];
+                const _rowBaseOld = _bpRowBaseCm(col, colPlinthH);
+                const rowBounds = [_rowBaseOld, ...adjShelves.filter(sy => sy > _rowBaseOld), _visibleH];
                 for (let ri = 0; ri < rowBounds.length - 1; ri++) {
                     const comp = col.compartments ? col.compartments[ri] : null;
                     if (!comp || comp.type !== 'side_open_cell') continue;
@@ -2049,7 +2079,7 @@ window._generateMultiViewBlueprintPages = function() {
             }
 
             const shelvesArr = (col.shelvesY || []).slice().sort((a,b) => a-b);
-            const deskBase = (col.type === 'desk') ? (col.deskHeight || 80) + (col.deskClearance || 80) : colPlinthH;
+            const deskBase = (col.type === 'desk') ? (col.deskHeight || 80) + (col.deskClearance || 80) : _bpRowBaseCm(col, colPlinthH);
             const adjShelvesArr2 = shelvesArr.map(sy => sy - _fo2).filter(sy => sy > 0 && sy < _visibleH2);
             const _splitYAdj = (col.splitY || 0) > 0 ? (col.splitY - _fo2) : 0;
             const _splitT3 = (state.thickness || 1.7) * 2;
@@ -2135,7 +2165,7 @@ window._generateMultiViewBlueprintPages = function() {
             for (let ri = 0; ri < numRows; ri++) {
                 const rowBotCm = rowBounds[ri];
                 const rowTopCm = rowBounds[ri + 1];
-                const cellHeightCm = Math.round((rowTopCm - rowBotCm - _t_shelf2) * 10);
+                const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _t_shelf2);
                 const cellY1 = _colBotSvgY - rowTopCm * sc;
                 const cellY2 = _colBotSvgY - rowBotCm * sc;
                 const cellH = cellY2 - cellY1;
@@ -2298,7 +2328,7 @@ window._generateMultiViewBlueprintPages = function() {
                                 }
 
                                 // Zone height label
-                                const zHcmRound = Math.round(zHcm);
+                                const zHcmRound = _bpClearCellHeightLabel(zBotCm, zTopCm, _t_shelf2);
                                 if (zSvgH > 14 && zHcmRound > 0) {
                                     _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}p${zi}z${z}`, subZoneCX, zSvgCY + 4, zHcmRound);
                                 }
@@ -2313,10 +2343,10 @@ window._generateMultiViewBlueprintPages = function() {
                 const _isSplitBandCell = _splitYAdj > 0 &&
                     rowBotCm >= _splitYAdj - 0.1 && rowTopCm <= _splitTopAdj + 0.1;
                 const _isBathroomBP = (pid === 'bathroom');
-                if (!_isBathroomBP && cellHeightCm > 0 && cellH > 14 && !_isSplitBandCell) {
+                if (!_isBathroomBP && cellHeightLabel > 0 && cellH > 14 && !_isSplitBandCell) {
                     const lblCX = colX + colW / 2;
                     const lblCY = (cellY1 + cellY2) / 2 + 4;
-                    _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, lblCX, lblCY, cellHeightCm);
+                    _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, lblCX, lblCY, cellHeightLabel);
                 }
             }
             _hcBlocks.forEach(block => {
@@ -2353,7 +2383,8 @@ window._generateMultiViewBlueprintPages = function() {
                 const _colTopW = _colBotW - _visibleH3 * sc;
                 const shelvesArr = (col.shelvesY || []).slice().sort((a,b) => a-b);
                 const adjShelves3 = shelvesArr.map(sy => sy - _foW).filter(sy => sy > 0 && sy < _visibleH3);
-                const rowBounds = [colPlinthH, ...adjShelves3.filter(sy => sy > colPlinthH), _visibleH3];
+                const _rowBase3 = _bpRowBaseCm(col, colPlinthH);
+                const rowBounds = [_rowBase3, ...adjShelves3.filter(sy => sy > _rowBase3), _visibleH3];
                 for (let ri = 0; ri < rowBounds.length - 1; ri++) {
                     const comp = col.compartments ? col.compartments[ri] : null;
                     if (!comp || comp.type !== 'side_open_cell') continue;
@@ -2656,14 +2687,14 @@ window._generateMultiViewBlueprintPages = function() {
         for (let ri = 0; ri < rowBounds.length - 1; ri++) {
             const rowBotCm = rowBounds[ri];
             const rowTopCm = rowBounds[ri + 1];
-            const cellHeightCm = Math.round((rowTopCm - rowBotCm - _t_shelfFC) * 10);
+            const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _t_shelfFC);
             const cellY1 = oy + dH - rowTopCm * sc;
             const cellY2 = oy + dH - rowBotCm * sc;
             const cellH = cellY2 - cellY1;
             // Skip label for split band cell
             const isFCSplitBand = fcSplitY > 0 && rowBotCm >= fcSplitY - 0.1 && rowTopCm <= fcSplitY + fcSplitT + 0.1;
-            if (cellHeightCm > 0 && cellH > 14 && !isFCSplitBand) {
-                _bpPushCellDimLabel(p, _bpViewKey, `r${ri}`, ox + dW / 2, (cellY1 + cellY2) / 2 + 4, cellHeightCm);
+            if (cellHeightLabel > 0 && cellH > 14 && !isFCSplitBand) {
+                _bpPushCellDimLabel(p, _bpViewKey, `r${ri}`, ox + dW / 2, (cellY1 + cellY2) / 2 + 4, cellHeightLabel);
             }
         }
 
@@ -2750,18 +2781,19 @@ window._generateMultiViewBlueprintPages = function() {
             const _splitYFCAdj = _splitYFC;
             const _splitTopFCAdj = _splitYFC > 0 ? _splitYFC + _splitTFC : 0;
             let _allBoundsFC = [...shelvesArr];
-            if (_splitYFC > colPlinthH && _splitYFC < wg.h) {
+            if (_splitYFC > _bpRowBaseCm(col, colPlinthH) && _splitYFC < wg.h) {
                 if (!_allBoundsFC.includes(_splitYFCAdj)) _allBoundsFC.push(_splitYFCAdj);
                 if (_splitTopFCAdj < wg.h && !_allBoundsFC.includes(_splitTopFCAdj)) _allBoundsFC.push(_splitTopFCAdj);
                 _allBoundsFC.sort((a,b) => a-b);
             }
-            const rowBounds = [colPlinthH, ..._allBoundsFC.filter(sy => sy > colPlinthH), wg.h];
+            const _rowBaseFC = _bpRowBaseCm(col, colPlinthH);
+            const rowBounds = [_rowBaseFC, ..._allBoundsFC.filter(sy => sy > _rowBaseFC), wg.h];
             const numRows = rowBounds.length - 1;
             const _t_shelfFCW = state.thickness || 1.7;
             for (let ri = 0; ri < numRows; ri++) {
                 const rowBotCm = rowBounds[ri];
                 const rowTopCm = rowBounds[ri + 1];
-                const cellHeightCm = Math.round((rowTopCm - rowBotCm - _t_shelfFCW) * 10);
+                const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _t_shelfFCW);
                 const cellY1 = oy + dH - rowTopCm * sc;
                 const cellY2 = oy + dH - rowBotCm * sc;
                 const cellH = cellY2 - cellY1;
@@ -2818,10 +2850,10 @@ window._generateMultiViewBlueprintPages = function() {
                 // Skip height label for split band cells
                 const _isSplitBandFC = _splitYFC > 0 &&
                     rowBotCm >= _splitYFCAdj - 0.1 && rowTopCm <= _splitTopFCAdj + 0.1;
-                if (cellHeightCm > 0 && cellH > 14 && !_isSplitBandFC) {
+                if (cellHeightLabel > 0 && cellH > 14 && !_isSplitBandFC) {
                     const lblCX = colX + colW / 2;
                     const lblCY = (cellY1 + cellY2) / 2 + 4;
-                    _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, lblCX, lblCY, cellHeightCm);
+                    _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, lblCX, lblCY, cellHeightLabel);
                 }
             }
             colX += colW;
@@ -2990,6 +3022,7 @@ window._generateMultiViewBlueprintPages = function() {
                     colXPositions.push({ x1: colX, x2: colX + colW, wCm: Math.round(col.width || scW) });
 
                     if (ci > 0) makeVline(p, colX, oy, oy + dH, scScale);
+                    const _splitYSC = col.splitY || 0;
                     const _splitTSC = (state.thickness || 1.7) * 2;
                     (col.shelvesY || []).forEach(sy => {
                         if (_splitYSC > 0 && sy >= _splitYSC && sy <= _splitYSC + _splitTSC) return;
@@ -3003,8 +3036,10 @@ window._generateMultiViewBlueprintPages = function() {
                         const _splitTopYSC = _splitBotYSC - _splitBandHSC;
                         makeRect(p, colX, _splitTopYSC, colW, _splitBandHSC, '#94a3b8', STROKE, 1.5);
                         if (ci === 0) {
-                            p.push(`<text x="${(colX + 6).toFixed(1)}" y="${((oy + dH + _splitBotYSC) / 2 + 4).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.5">ארון תחתון</text>`);
-                            p.push(`<text x="${(colX + 6).toFixed(1)}" y="${((oy + _splitTopYSC) / 2 + 4).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.5">ארון עליון</text>`);
+                            const lowerMidSC = (_splitBotYSC + oy + dH) / 2;
+                            const upperMidSC = (oy + _splitTopYSC) / 2;
+                            p.push(`<text x="${(colX + 6).toFixed(1)}" y="${(lowerMidSC + 4).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.5">ארון תחתון</text>`);
+                            p.push(`<text x="${(colX + 6).toFixed(1)}" y="${(upperMidSC + 4).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.5">ארון עליון</text>`);
                             p.push(`<text x="${(colX + colW / 2).toFixed(1)}" y="${(_splitTopYSC + _splitBandHSC / 2 + 3).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(_splitTSC * 10)}</text>`);
                         }
                     }
@@ -3013,18 +3048,19 @@ window._generateMultiViewBlueprintPages = function() {
                     const _splitYSCAdj = _splitYSC;
                     const _splitTopSCAdj = _splitYSC > 0 ? _splitYSC + _splitTSC : 0;
                     let _allBoundsSC = [...shelvesArr];
-                    if (_splitYSC > colPlinthH && _splitYSC < scH) {
+                    if (_splitYSC > _rowBaseSC && _splitYSC < scH) {
                         if (!_allBoundsSC.includes(_splitYSCAdj)) _allBoundsSC.push(_splitYSCAdj);
                         if (_splitTopSCAdj < scH && !_allBoundsSC.includes(_splitTopSCAdj)) _allBoundsSC.push(_splitTopSCAdj);
                         _allBoundsSC.sort((a,b) => a-b);
                     }
-                    const rowBounds = [colPlinthH, ..._allBoundsSC.filter(sy => sy > colPlinthH), scH];
+                    const _rowBaseSC = _bpRowBaseCm(col, colPlinthH);
+                    const rowBounds = [_rowBaseSC, ..._allBoundsSC.filter(sy => sy > _rowBaseSC), scH];
                     const numRows = rowBounds.length - 1;
                     const _t_shelfSC = state.thickness || 1.7;
                     for (let ri = 0; ri < numRows; ri++) {
                         const rowBotCm = rowBounds[ri];
                         const rowTopCm = rowBounds[ri + 1];
-                        const cellHeightCm = Math.round((rowTopCm - rowBotCm - _t_shelfSC) * 10);
+                        const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _t_shelfSC);
                         const cellY1 = oy + dH - rowTopCm * scScale;
                         const cellY2 = oy + dH - rowBotCm * scScale;
                         const cellH  = cellY2 - cellY1;
@@ -3034,7 +3070,7 @@ window._generateMultiViewBlueprintPages = function() {
                         const cellType = comp ? (comp.type || 'empty') : 'empty';
 
                         if (cellType === 'hanging') {
-                            const rodY  = _bpHangRodSvgY(cellY1, sc);
+                            const rodY  = _bpHangRodSvgY(cellY1, scScale);
                             const hRodX1 = colX + 4, hRodX2 = colX + colW - 4;
                             p.push(`<line x1="${hRodX1.toFixed(1)}" y1="${rodY.toFixed(1)}" x2="${hRodX2.toFixed(1)}" y2="${rodY.toFixed(1)}" stroke="${STROKE}" stroke-width="2"/>`);
                             p.push(`<circle cx="${hRodX1.toFixed(1)}" cy="${rodY.toFixed(1)}" r="2" fill="${STROKE}"/>`);
@@ -3084,8 +3120,8 @@ window._generateMultiViewBlueprintPages = function() {
 
                         const _isSplitBandSC = _splitYSC > 0 &&
                             rowBotCm >= _splitYSCAdj - 0.1 && rowTopCm <= _splitTopSCAdj + 0.1;
-                        if (cellHeightCm > 0 && cellH > 14 && !_isSplitBandSC) {
-                            _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, cellCX, (cellY1 + cellY2) / 2 + 4, cellHeightCm);
+                        if (cellHeightLabel > 0 && cellH > 14 && !_isSplitBandSC) {
+                            _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, cellCX, (cellY1 + cellY2) / 2 + 4, cellHeightLabel);
                         }
                     }
                     colX += colW;
@@ -3281,7 +3317,7 @@ window._generateMultiViewBlueprintPages = function() {
             for (let ri = 0; ri < rowBounds.length - 1; ri++) {
                 const rowBotCm = rowBounds[ri];
                 const rowTopCm = rowBounds[ri + 1];
-                const cellHeightCm = Math.round((rowTopCm - rowBotCm - _t_shelfUU) * 10);
+                const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _t_shelfUU);
                 const cellY1 = oy + dH - rowTopCm * sc;
                 const cellY2 = oy + dH - rowBotCm * sc;
                 const cellH = cellY2 - cellY1;
@@ -3314,8 +3350,8 @@ window._generateMultiViewBlueprintPages = function() {
                     if (cellH > 18) p.push(`<text x="${cellCX.toFixed(1)}" y="${(cellY1+20).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.6">כוורת</text>`);
                 }
 
-                if (cellHeightCm > 0 && cellH > 14) {
-                    _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, cellCX, (cellY1 + cellY2) / 2 + 4, cellHeightCm);
+                if (cellHeightLabel > 0 && cellH > 14) {
+                    _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, cellCX, (cellY1 + cellY2) / 2 + 4, cellHeightLabel);
                 }
             }
             colX += colW;

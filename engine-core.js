@@ -3307,7 +3307,6 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
             const compCenterY = (prevYTopDown + (div.y + div.thick/2)) / 2;
             if(isBP && !isDesk) {
                 state.bpData.push({ type: 'num', val: compCounter++, x: currentX + 6, y: prevYTopDown - 6 });
-                state.bpData.push({ type: 'height', val: Math.round(compH), x: colCenterX, y: compCenterY, halfH: compH / 2 });
             }
             
             let insideBlock = myBlocks.find(b => div.y > b.bottomY && div.y < b.topY);
@@ -3362,7 +3361,6 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         const lastCompH = prevYTopDown - startShelvesY;
         if(isBP && !isDesk) {
             state.bpData.push({ type: 'num', val: compCounter++, x: currentX + 15, y: prevYTopDown - 10 });
-            state.bpData.push({ type: 'height', val: Math.round(lastCompH), x: colCenterX, y: startShelvesY + lastCompH/2, halfH: lastCompH / 2 });
         }
 
         dividers.sort((a, b) => a.y - b.y);
@@ -3386,6 +3384,10 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                 else if (isTop || isBottom) displayH = compH - t;
             }
             displayH = Math.max(0.1, displayH);
+
+            if (isBP && !isDesk && compH > 0) {
+                state.bpData.push({ type: 'height', val: Math.round(displayH), x: colCenterX, y: compCenterY, halfH: compH / 2 });
+            }
 
             if(!isBP && compH > 0) {
                 if (_isActiveWingBuild) {
