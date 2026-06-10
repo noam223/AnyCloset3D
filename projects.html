@@ -27,6 +27,11 @@
             --shadow-xl: 0 24px 64px rgba(28,25,23,.16),0 8px 24px rgba(28,25,23,.09);
             --transition: 200ms cubic-bezier(0.4,0,0.2,1);
             --sidebar-w: 280px;
+            --pastel-quote: #b8d4f5; --pastel-quote-deep: #7eb3e8; --pastel-quote-bg: #eef5fd; --pastel-quote-text: #3d6a9e;
+            --pastel-ordered: #a8e6c8; --pastel-ordered-deep: #6ecfaa; --pastel-ordered-bg: #edfbf4; --pastel-ordered-text: #2d7a5a;
+            --pastel-production: #ffd4b0; --pastel-production-deep: #f5b07a; --pastel-production-bg: #fff7ef; --pastel-production-text: #b86a2e;
+            --pastel-service: #d4c4f0; --pastel-service-deep: #b8a0e0; --pastel-service-bg: #f5f0fc; --pastel-service-text: #6b4fa8;
+            --pastel-installed: #b0e8e0; --pastel-installed-deep: #7dd4c8; --pastel-installed-bg: #eefaf8; --pastel-installed-text: #2a8a7a;
         }
         body { font-family: 'Rubik','Inter',sans-serif; background: var(--bg); min-height: 100dvh; color: var(--text); -webkit-font-smoothing: antialiased; display: flex; }
         .sidebar { width: var(--sidebar-w); min-height: 100dvh; background: linear-gradient(180deg,var(--primary-d) 0%,var(--primary) 70%,var(--primary-l) 100%); display: flex; flex-direction: column; position: fixed; right: 0; top: 0; bottom: 0; z-index: 50; box-shadow: -2px 0 24px rgba(28,25,23,.2); overflow: hidden; }
@@ -89,59 +94,73 @@
         .content-title { font-size: 1.1rem; font-weight: 700; color: var(--primary); letter-spacing: -.02em; }
         .content-count { font-size: .78rem; color: var(--muted); font-weight: 500; background: var(--border-l); padding: 3px 11px; border-radius: 20px; border: 1px solid var(--border); }
         .projects-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 22px; }
-        .project-card { background: var(--bg-card); border-radius: 16px; overflow: hidden; transition: box-shadow 300ms cubic-bezier(0.34,1.56,0.64,1),transform 300ms cubic-bezier(0.34,1.56,0.64,1); position: relative; box-shadow: var(--shadow-sm); border: 1px solid var(--border-l); display: flex; flex-direction: column; animation: fadeInUp 0.35s ease both; }
+        .project-card { border-radius: 18px; overflow: hidden; transition: transform 320ms cubic-bezier(0.34,1.4,0.64,1), box-shadow 320ms ease; position: relative; border: 1px solid rgba(255,255,255,.8); display: flex; flex-direction: column; animation: fadeInUp 0.35s ease both; }
+        .project-card::before { content: ''; position: absolute; inset: 0; z-index: 0; opacity: .55; pointer-events: none; }
+        .project-card > * { position: relative; z-index: 1; }
         .project-card:nth-child(1) { animation-delay: 0ms; }
         .project-card:nth-child(2) { animation-delay: 60ms; }
         .project-card:nth-child(3) { animation-delay: 120ms; }
         .project-card:nth-child(4) { animation-delay: 180ms; }
         .project-card:nth-child(5) { animation-delay: 220ms; }
         .project-card:nth-child(6) { animation-delay: 260ms; }
-        .project-card:hover { box-shadow: var(--shadow-lg), 0 0 0 2px rgba(37,99,235,0.12); transform: translateY(-6px) scale(1.01); }
+        .project-card.status-quote::before { background: linear-gradient(145deg, var(--pastel-quote-bg) 0%, #fff 55%, var(--pastel-quote) 100%); }
+        .project-card.status-ordered::before { background: linear-gradient(145deg, var(--pastel-ordered-bg) 0%, #fff 55%, var(--pastel-ordered) 100%); }
+        .project-card.status-production::before { background: linear-gradient(145deg, var(--pastel-production-bg) 0%, #fff 55%, var(--pastel-production) 100%); }
+        .project-card.status-service::before { background: linear-gradient(145deg, var(--pastel-service-bg) 0%, #fff 55%, var(--pastel-service) 100%); }
+        .project-card.status-installed::before { background: linear-gradient(145deg, var(--pastel-installed-bg) 0%, #fff 55%, var(--pastel-installed) 100%); }
+        .project-card.status-quote { box-shadow: 0 4px 24px rgba(126,179,232,.22); }
+        .project-card.status-ordered { box-shadow: 0 4px 24px rgba(110,207,170,.22); }
+        .project-card.status-production { box-shadow: 0 4px 24px rgba(245,176,122,.22); }
+        .project-card.status-service { box-shadow: 0 4px 24px rgba(184,160,224,.22); }
+        .project-card.status-installed { box-shadow: 0 4px 24px rgba(125,212,200,.22); }
+        .project-card:hover { transform: translateY(-7px); }
+        .project-card.status-quote:hover { box-shadow: 0 16px 48px rgba(126,179,232,.32); }
+        .project-card.status-ordered:hover { box-shadow: 0 16px 48px rgba(110,207,170,.32); }
+        .project-card.status-production:hover { box-shadow: 0 16px 48px rgba(245,176,122,.32); }
+        .project-card.status-service:hover { box-shadow: 0 16px 48px rgba(184,160,224,.32); }
+        .project-card.status-installed:hover { box-shadow: 0 16px 48px rgba(125,212,200,.32); }
         .project-card.is-locked { border-color: #fca5a5; }
-        .project-card.status-quote { box-shadow: 0 4px 18px rgba(37,99,235,.1); }
-        .project-card.status-ordered { box-shadow: 0 4px 18px rgba(5,150,105,.1); }
-        .project-card.status-production { box-shadow: 0 4px 18px rgba(234,88,12,.1); }
-        .project-card.status-service { box-shadow: 0 4px 18px rgba(124,58,237,.12); }
-        .project-card.status-installed { box-shadow: 0 4px 18px rgba(13,148,136,.12); }
-        .project-thumb { width: 100%; height: 200px; background: linear-gradient(135deg,#ddd5c8 0%,#c8bfb2 100%); display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; cursor: pointer; flex-shrink: 0; border-bottom: 4px solid transparent; }
-        .project-card.status-quote .project-thumb { border-bottom-color: #2563eb; }
-        .project-card.status-ordered .project-thumb { border-bottom-color: #059669; }
-        .project-card.status-production .project-thumb { border-bottom-color: #ea580c; }
-        .project-card.status-service .project-thumb { border-bottom-color: #7c3aed; }
-        .project-card.status-installed .project-thumb { border-bottom-color: #0d9488; }
-        .project-thumb::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg,transparent 40%,rgba(28,25,23,.5) 100%); opacity: 0; transition: opacity var(--transition); z-index: 4; pointer-events: none; }
+        .project-thumb { width: 100%; height: 200px; background: linear-gradient(135deg,#e8e2d8 0%,#d4cdc3 100%); display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; cursor: pointer; flex-shrink: 0; }
+        .project-card.status-quote .project-thumb::before { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(180deg, rgba(184,212,245,.15) 0%, rgba(184,212,245,.45) 100%); }
+        .project-card.status-ordered .project-thumb::before { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(180deg, rgba(168,230,200,.15) 0%, rgba(168,230,200,.45) 100%); }
+        .project-card.status-production .project-thumb::before { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(180deg, rgba(255,212,176,.15) 0%, rgba(255,212,176,.45) 100%); }
+        .project-card.status-service .project-thumb::before { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(180deg, rgba(212,196,240,.15) 0%, rgba(212,196,240,.45) 100%); }
+        .project-card.status-installed .project-thumb::before { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(180deg, rgba(176,232,224,.15) 0%, rgba(176,232,224,.45) 100%); }
+        .project-thumb::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg,transparent 30%,rgba(30,41,59,.35) 100%); opacity: 0; transition: opacity var(--transition); z-index: 4; pointer-events: none; }
         .project-card:hover .project-thumb::after { opacity: 1; }
         .project-thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform .5s ease; position: relative; z-index: 0; }
         .project-card:hover .project-thumb img { transform: scale(1.05); }
-        .project-thumb-icon { font-size: 3.2rem; color: rgba(255,255,255,.35); position: relative; z-index: 0; }
+        .project-thumb-icon { font-size: 3.2rem; color: rgba(255,255,255,.4); position: relative; z-index: 1; }
         .project-status-chip {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
-            width: 76px; height: 76px; border-radius: 20px;
+            width: 80px; height: 80px; border-radius: 22px;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             gap: 4px; font-size: .62rem; font-weight: 800; text-align: center; line-height: 1.15;
-            box-shadow: 0 8px 28px rgba(0,0,0,.28);
-            border: 3px solid rgba(255,255,255,.92);
+            backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+            border: 2px solid rgba(255,255,255,.75);
+            box-shadow: 0 8px 32px rgba(0,0,0,.1), inset 0 1px 0 rgba(255,255,255,.5);
             z-index: 3; pointer-events: none;
+            transition: opacity var(--transition), transform var(--transition);
         }
-        .project-status-chip i { font-size: 1.35rem; }
-        .project-status-chip.status-quote { background: #2563eb; color: #fff; }
-        .project-status-chip.status-ordered { background: #059669; color: #fff; }
-        .project-status-chip.status-production { background: #ea580c; color: #fff; }
-        .project-status-chip.status-service { background: #7c3aed; color: #fff; }
-        .project-status-chip.status-installed { background: #0d9488; color: #fff; }
-        .project-card:hover .project-status-chip { opacity: 0; transition: opacity var(--transition); }
-        .project-thumb-date { position: absolute; bottom: 10px; left: 10px; background: rgba(28,25,23,.6); color: rgba(255,255,255,.9); font-size: .65rem; font-weight: 500; padding: 3px 9px; border-radius: 7px; backdrop-filter: blur(6px); z-index: 2; }
-        .cabinet-count-badge { position: absolute; top: 10px; right: 10px; background: rgba(30,58,95,.75); color: white; font-size: .65rem; font-weight: 700; padding: 3px 9px; border-radius: 7px; backdrop-filter: blur(6px); display: flex; align-items: center; gap: 4px; z-index: 2; }
+        .project-status-chip i { font-size: 1.3rem; }
+        .project-status-chip.status-quote { background: rgba(184,212,245,.72); color: var(--pastel-quote-text); }
+        .project-status-chip.status-ordered { background: rgba(168,230,200,.72); color: var(--pastel-ordered-text); }
+        .project-status-chip.status-production { background: rgba(255,212,176,.72); color: var(--pastel-production-text); }
+        .project-status-chip.status-service { background: rgba(212,196,240,.72); color: var(--pastel-service-text); }
+        .project-status-chip.status-installed { background: rgba(176,232,224,.72); color: var(--pastel-installed-text); }
+        .project-card:hover .project-status-chip { opacity: 0; transform: translate(-50%,-50%) scale(.9); }
+        .project-thumb-date { position: absolute; bottom: 10px; left: 10px; background: rgba(255,255,255,.55); color: #475569; font-size: .65rem; font-weight: 600; padding: 4px 10px; border-radius: 999px; backdrop-filter: blur(8px); z-index: 5; border: 1px solid rgba(255,255,255,.7); }
+        .cabinet-count-badge { position: absolute; top: 10px; right: 10px; background: rgba(255,255,255,.55); color: #334155; font-size: .65rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; backdrop-filter: blur(8px); display: flex; align-items: center; gap: 4px; z-index: 5; border: 1px solid rgba(255,255,255,.7); }
         .project-open-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity var(--transition); z-index: 5; }
         .project-card:hover .project-open-overlay { opacity: 1; }
         .project-open-btn { background: rgba(255,255,255,.95); color: var(--primary); border: none; border-radius: 12px; padding: 10px 22px; font-size: .85rem; font-weight: 800; font-family: inherit; cursor: pointer; display: flex; align-items: center; gap: 7px; box-shadow: 0 4px 20px rgba(0,0,0,.3); transform: translateY(6px); transition: transform var(--transition); }
         .project-card:hover .project-open-btn { transform: translateY(0); }
         .project-body { padding: 18px 20px 14px; flex: 1; cursor: pointer; transition: background var(--transition); }
-        .project-body.status-quote { background: linear-gradient(180deg, rgba(219,234,254,.72) 0%, rgba(239,246,255,.35) 100%); }
-        .project-body.status-ordered { background: linear-gradient(180deg, rgba(167,243,208,.62) 0%, rgba(236,253,245,.3) 100%); }
-        .project-body.status-production { background: linear-gradient(180deg, rgba(254,215,170,.68) 0%, rgba(255,247,237,.32) 100%); }
-        .project-body.status-service { background: linear-gradient(180deg, rgba(221,214,254,.72) 0%, rgba(245,243,255,.35) 100%); }
-        .project-body.status-installed { background: linear-gradient(180deg, rgba(153,246,228,.62) 0%, rgba(240,253,250,.32) 100%); }
+        .project-body.status-quote { background: linear-gradient(180deg, rgba(184,212,245,.35) 0%, transparent 100%); }
+        .project-body.status-ordered { background: linear-gradient(180deg, rgba(168,230,200,.35) 0%, transparent 100%); }
+        .project-body.status-production { background: linear-gradient(180deg, rgba(255,212,176,.38) 0%, transparent 100%); }
+        .project-body.status-service { background: linear-gradient(180deg, rgba(212,196,240,.35) 0%, transparent 100%); }
+        .project-body.status-installed { background: linear-gradient(180deg, rgba(176,232,224,.35) 0%, transparent 100%); }
         .project-status-foot {
             margin: 0 14px 12px;
             border-radius: 12px;
@@ -149,15 +168,15 @@
             display: flex; align-items: center; justify-content: space-between;
             font-size: .8rem; font-weight: 800;
             cursor: pointer; font-family: inherit;
-            border: 2px solid transparent;
-            transition: opacity var(--transition), transform var(--transition);
+            border: none;
+            transition: transform var(--transition), box-shadow var(--transition);
         }
-        .project-status-foot:hover { opacity: .92; transform: translateY(-1px); }
-        .project-status-foot.status-quote { background: #dbeafe; color: #1e40af; border-color: rgba(37,99,235,.25); }
-        .project-status-foot.status-ordered { background: #a7f3d0; color: #065f46; border-color: rgba(5,150,105,.25); }
-        .project-status-foot.status-production { background: #fed7aa; color: #9a3412; border-color: rgba(234,88,12,.25); }
-        .project-status-foot.status-service { background: #ddd6fe; color: #5b21b6; border-color: rgba(124,58,237,.25); }
-        .project-status-foot.status-installed { background: #99f6e4; color: #115e59; border-color: rgba(13,148,136,.25); }
+        .project-status-foot:hover { transform: translateY(-1px); }
+        .project-status-foot.status-quote { background: linear-gradient(135deg, var(--pastel-quote-bg), var(--pastel-quote)); color: var(--pastel-quote-text); box-shadow: 0 2px 8px rgba(126,179,232,.15); }
+        .project-status-foot.status-ordered { background: linear-gradient(135deg, var(--pastel-ordered-bg), var(--pastel-ordered)); color: var(--pastel-ordered-text); box-shadow: 0 2px 8px rgba(110,207,170,.15); }
+        .project-status-foot.status-production { background: linear-gradient(135deg, var(--pastel-production-bg), var(--pastel-production)); color: var(--pastel-production-text); box-shadow: 0 2px 8px rgba(245,176,122,.15); }
+        .project-status-foot.status-service { background: linear-gradient(135deg, var(--pastel-service-bg), var(--pastel-service)); color: var(--pastel-service-text); box-shadow: 0 2px 8px rgba(184,160,224,.15); }
+        .project-status-foot.status-installed { background: linear-gradient(135deg, var(--pastel-installed-bg), var(--pastel-installed)); color: var(--pastel-installed-text); box-shadow: 0 2px 8px rgba(125,212,200,.15); }
         .project-status-foot-left { display: flex; align-items: center; gap: 8px; }
         .project-status-foot-left i { font-size: 1rem; }
         .project-status-foot-hint { font-size: .68rem; font-weight: 600; opacity: .75; }
@@ -193,12 +212,12 @@
         .status-filter-btn:hover { border-color: #c8d4e4; transform: translateY(-1px); }
         .status-filter-btn.active { color: #fff; border-color: transparent; box-shadow: 0 3px 10px rgba(15,23,42,.12); }
         .status-filter-btn.active[data-status="all"] { background: var(--primary); }
-        .status-filter-btn.active.status-quote { background: #2563eb; }
-        .status-filter-btn.active.status-ordered { background: #059669; }
-        .status-filter-btn.active.status-production { background: #ea580c; }
-        .status-filter-btn.active.status-service { background: #7c3aed; }
-        .status-filter-btn.active.status-installed { background: #0d9488; }
-        .status-filter-btn:not(.active) { opacity: .72; }
+        .status-filter-btn.active.status-quote { background: var(--pastel-quote-deep); }
+        .status-filter-btn.active.status-ordered { background: var(--pastel-ordered-deep); }
+        .status-filter-btn.active.status-production { background: var(--pastel-production-deep); }
+        .status-filter-btn.active.status-service { background: var(--pastel-service-deep); }
+        .status-filter-btn.active.status-installed { background: var(--pastel-installed-deep); }
+        .status-filter-btn:not(.active) { opacity: .65; }
         .status-filter-btn i { font-size: .82rem; }
         .status-options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; max-height: 360px; overflow-y: auto; }
         .status-option { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 2px solid var(--border); border-radius: 14px; background: var(--border-l); cursor: pointer; font-family: inherit; font-size: .92rem; font-weight: 700; color: var(--text-2); transition: all var(--transition); text-align: right; width: 100%; }
@@ -217,7 +236,7 @@
         .status-option.status-installed .status-option-dot { background: #14b8a6; }
         .project-meta { font-size: .75rem; color: var(--muted); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         .project-meta-item { display: flex; align-items: center; gap: 4px; }
-        .project-actions { display: flex; gap: 8px; padding: 0 20px 18px; }
+        .project-actions { display: flex; gap: 8px; padding: 0 20px 18px; background: rgba(255,255,255,.5); }
         .btn-card { flex: 1; padding: 10px 8px; border-radius: 11px; border: 1.5px solid var(--border); background: var(--border-l); font-size: .78rem; font-weight: 700; font-family: inherit; cursor: pointer; transition: all var(--transition); display: flex; align-items: center; justify-content: center; gap: 5px; color: var(--text-2); }
         .btn-card:hover { background: #e2e8f0; border-color: #c8d4e4; transform: translateY(-1px); }
         .btn-card.primary { background: linear-gradient(135deg,var(--primary) 0%,var(--primary-l) 100%); color: white; border-color: transparent; box-shadow: 0 3px 10px rgba(30,58,95,.28); }
@@ -502,19 +521,19 @@
                     <button type="button" class="status-filter-btn active" data-status="all" onclick="setStatusFilterAll()">
                         <i class="fa-solid fa-layer-group"></i> הכל
                     </button>
-                    <button type="button" class="status-filter-btn active status-quote" data-status="quote" onclick="toggleStatusFilter('quote')">
+                    <button type="button" class="status-filter-btn status-quote" data-status="quote" onclick="setStatusFilter('quote')">
                         <i class="fa-solid fa-file-invoice-dollar"></i> הצעת מחיר
                     </button>
-                    <button type="button" class="status-filter-btn active status-ordered" data-status="ordered" onclick="toggleStatusFilter('ordered')">
+                    <button type="button" class="status-filter-btn status-ordered" data-status="ordered" onclick="setStatusFilter('ordered')">
                         <i class="fa-solid fa-circle-check"></i> בוצעה הזמנה
                     </button>
-                    <button type="button" class="status-filter-btn active status-production" data-status="production" onclick="toggleStatusFilter('production')">
+                    <button type="button" class="status-filter-btn status-production" data-status="production" onclick="setStatusFilter('production')">
                         <i class="fa-solid fa-industry"></i> נשלח לייצור
                     </button>
-                    <button type="button" class="status-filter-btn active status-service" data-status="service" onclick="toggleStatusFilter('service')">
+                    <button type="button" class="status-filter-btn status-service" data-status="service" onclick="setStatusFilter('service')">
                         <i class="fa-solid fa-screwdriver-wrench"></i> קריאת שירות
                     </button>
-                    <button type="button" class="status-filter-btn active status-installed" data-status="installed" onclick="toggleStatusFilter('installed')">
+                    <button type="button" class="status-filter-btn status-installed" data-status="installed" onclick="setStatusFilter('installed')">
                         <i class="fa-solid fa-house-circle-check"></i> התקנה הושלמה
                     </button>
                 </div>
@@ -950,6 +969,6 @@
 </div>
 
 <script src="auth.js?v=20260608h"></script>
-<script src="projects.js?v=20260608m"></script>
+<script src="projects.js?v=20260608n"></script>
 </body>
 </html>

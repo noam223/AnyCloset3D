@@ -8,7 +8,7 @@ var _renameId            = null;
 var _deleteId            = null;
 var _statusChangeId      = null;
 var _searchQuery         = '';
-var _statusFilters       = { quote: true, ordered: true, production: true, service: true, installed: true };
+var _statusFilter        = 'all';
 var _selectedUpgradePlan = null;
 var _toastTimer          = null;
 var _devicesList         = [];
@@ -469,48 +469,27 @@ function _projectMatchesSearch(p) {
     return fields.some(function(f) { return f && String(f).toLowerCase().indexOf(q) !== -1; });
 }
 
-function _allStatusFiltersActive() {
-    return _ORDER_STATUS_KEYS.every(function(key) { return _statusFilters[key]; });
-}
-
-function _countActiveStatusFilters() {
-    var n = 0;
-    _ORDER_STATUS_KEYS.forEach(function(key) {
-        if (_statusFilters[key]) n++;
-    });
-    return n;
-}
-
 function _projectMatchesStatusFilter(p) {
-    var status = _normalizeOrderStatus(p.order_status);
-    return !!_statusFilters[status];
+    if (_statusFilter === 'all') return true;
+    return _normalizeOrderStatus(p.order_status) === _statusFilter;
 }
 
 function _syncStatusFilterUI() {
-    var allActive = _allStatusFiltersActive();
     document.querySelectorAll('#projects-status-filters .status-filter-btn').forEach(function(btn) {
         var key = btn.dataset.status;
-        if (key === 'all') {
-            btn.classList.toggle('active', allActive);
-        } else {
-            btn.classList.toggle('active', !!_statusFilters[key]);
-        }
+        btn.classList.toggle('active', key === _statusFilter);
     });
 }
 
 function setStatusFilterAll() {
-    _ORDER_STATUS_KEYS.forEach(function(key) { _statusFilters[key] = true; });
+    _statusFilter = 'all';
     _syncStatusFilterUI();
     _renderProjects();
 }
 
-function toggleStatusFilter(status) {
-    if (!_statusFilters.hasOwnProperty(status)) return;
-    if (_statusFilters[status] && _countActiveStatusFilters() <= 1) {
-        showToast('חייב להישאר לפחות סטטוס אחד מסומן', 'error');
-        return;
-    }
-    _statusFilters[status] = !_statusFilters[status];
+function setStatusFilter(status) {
+    if (_ORDER_STATUS_KEYS.indexOf(status) === -1) return;
+    _statusFilter = status;
     _syncStatusFilterUI();
     _renderProjects();
 }

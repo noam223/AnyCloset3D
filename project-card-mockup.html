@@ -3,181 +3,169 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mockup — גרסה C סופית (לאישור)</title>
+    <title>Mockup — 3 גרסאות פסטל לכרטיסי פרויקט</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
             --primary: #1e3a5f;
-            --text: #0f172a;
-            --text-2: #334155;
-            --muted: #64748b;
+            --text: #1e293b;
+            --text-2: #475569;
+            --muted: #94a3b8;
             --border: #e2e8f0;
-            --border-l: #f1f5f9;
-            --transition: 200ms cubic-bezier(0.4,0,0.2,1);
+            --transition: 220ms cubic-bezier(0.4,0,0.2,1);
+
+            /* Pastel palette — 5 statuses */
+            --pastel-quote:       #b8d4f5;
+            --pastel-quote-deep:  #7eb3e8;
+            --pastel-quote-bg:    #eef5fd;
+            --pastel-quote-text:  #3d6a9e;
+
+            --pastel-ordered:       #a8e6c8;
+            --pastel-ordered-deep:    #6ecfaa;
+            --pastel-ordered-bg:      #edfbf4;
+            --pastel-ordered-text:    #2d7a5a;
+
+            --pastel-production:       #ffd4b0;
+            --pastel-production-deep:  #f5b07a;
+            --pastel-production-bg:    #fff7ef;
+            --pastel-production-text:  #b86a2e;
+
+            --pastel-service:       #d4c4f0;
+            --pastel-service-deep:    #b8a0e0;
+            --pastel-service-bg:      #f5f0fc;
+            --pastel-service-text:    #6b4fa8;
+
+            --pastel-installed:       #b0e8e0;
+            --pastel-installed-deep:  #7dd4c8;
+            --pastel-installed-bg:    #eefaf8;
+            --pastel-installed-text:  #2a8a7a;
         }
+
         * { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
             font-family: 'Rubik', sans-serif;
-            background: #e8edf3;
+            background: linear-gradient(160deg, #f0f4f8 0%, #e8eef5 40%, #f5f0fa 100%);
             color: var(--text);
-            padding: 32px 24px 64px;
+            padding: 36px 20px 72px;
+            min-height: 100vh;
         }
+
         .page-head {
-            max-width: 1100px;
-            margin: 0 auto 28px;
+            max-width: 1180px;
+            margin: 0 auto 36px;
             text-align: center;
         }
-        .page-head h1 { font-size: 1.55rem; font-weight: 800; margin-bottom: 8px; }
-        .page-head p { color: var(--muted); line-height: 1.65; max-width: 640px; margin: 0 auto; font-size: .92rem; }
-        .approve-badge {
-            display: inline-flex; align-items: center; gap: 8px;
-            margin-top: 14px; padding: 8px 16px; border-radius: 999px;
-            background: #ecfdf5; color: #047857; border: 2px solid #a7f3d0;
-            font-size: .82rem; font-weight: 800;
+        .page-head h1 {
+            font-size: 1.65rem;
+            font-weight: 800;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #1e3a5f, #6b8fbe);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
-        .preview-wrap {
-            max-width: 1100px;
+        .page-head p {
+            color: var(--muted);
+            line-height: 1.7;
+            max-width: 680px;
             margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            padding: 28px;
-            box-shadow: 0 8px 32px rgba(15,23,42,.08);
-            border: 1px solid var(--border);
+            font-size: .92rem;
         }
-        .preview-note {
-            font-size: .84rem; color: var(--muted); margin-bottom: 22px; line-height: 1.55;
-            padding: 14px 16px; background: #f8fafc; border-radius: 12px; border: 1px solid var(--border);
+
+        .version-section {
+            max-width: 1180px;
+            margin: 0 auto 48px;
         }
+        .version-label {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 18px;
+        }
+        .version-badge {
+            width: 44px; height: 44px;
+            border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.1rem; font-weight: 800; color: white;
+            flex-shrink: 0;
+        }
+        .version-section[data-v="a"] .version-badge { background: linear-gradient(135deg, #a8c5f0, #c4b5fd); }
+        .version-section[data-v="b"] .version-badge { background: linear-gradient(135deg, #a8e6c8, #b0e8e0); }
+        .version-section[data-v="c"] .version-badge { background: linear-gradient(135deg, #ffd4b0, #f5c4e0); }
+
+        .version-label h2 { font-size: 1.15rem; font-weight: 800; }
+        .version-label p { font-size: .82rem; color: var(--muted); margin-top: 2px; }
+
+        .version-panel {
+            background: rgba(255,255,255,.72);
+            backdrop-filter: blur(12px);
+            border-radius: 22px;
+            padding: 26px;
+            border: 1px solid rgba(255,255,255,.9);
+            box-shadow: 0 8px 40px rgba(15,23,42,.06);
+        }
+
         .projects-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 22px;
         }
-        @media (max-width: 900px) { .projects-grid { grid-template-columns: 1fr; } }
+        @media (max-width: 960px) { .projects-grid { grid-template-columns: 1fr; } }
 
-        /* ── Exact styles from projects.html (version C + body tint) ── */
-        .project-card {
-            background: #fff;
-            border-radius: 16px;
-            overflow: hidden;
-            transition: box-shadow 300ms cubic-bezier(0.34,1.56,0.64,1), transform 300ms cubic-bezier(0.34,1.56,0.64,1);
-            position: relative;
-            box-shadow: 0 1px 4px rgba(28,25,23,.07);
-            border: 1px solid var(--border-l);
-            display: flex;
-            flex-direction: column;
-        }
-        .project-card:hover {
-            box-shadow: 0 12px 40px rgba(28,25,23,.12), 0 0 0 2px rgba(37,99,235,0.12);
-            transform: translateY(-6px) scale(1.01);
-        }
-        .project-card.status-quote { box-shadow: 0 4px 18px rgba(37,99,235,.1); }
-        .project-card.status-ordered { box-shadow: 0 4px 18px rgba(5,150,105,.1); }
-        .project-card.status-production { box-shadow: 0 4px 18px rgba(234,88,12,.1); }
-
+        /* ── Shared card internals ── */
         .project-thumb {
-            width: 100%; height: 200px;
-            background: linear-gradient(135deg,#ddd5c8 0%,#c8bfb2 100%);
+            width: 100%; height: 188px;
+            background: linear-gradient(135deg, #e8e2d8 0%, #d4cdc3 100%);
             display: flex; align-items: center; justify-content: center;
             overflow: hidden; position: relative; cursor: pointer; flex-shrink: 0;
-            border-bottom: 4px solid transparent;
         }
-        .project-card.status-quote .project-thumb { border-bottom-color: #2563eb; }
-        .project-card.status-ordered .project-thumb { border-bottom-color: #059669; }
-        .project-card.status-production .project-thumb { border-bottom-color: #ea580c; }
-
-        .project-thumb::after {
-            content: ''; position: absolute; inset: 0;
-            background: linear-gradient(180deg,transparent 40%,rgba(28,25,23,.5) 100%);
-            opacity: 0; transition: opacity var(--transition);
-            z-index: 4; pointer-events: none;
-        }
-        .project-card:hover .project-thumb::after { opacity: 1; }
-
-        .project-thumb img {
-            width: 100%; height: 100%; object-fit: cover;
-            transition: transform .5s ease; position: relative; z-index: 0;
-        }
-        .project-card:hover .project-thumb img { transform: scale(1.05); }
-
-        .project-thumb-icon {
-            font-size: 3.2rem; color: rgba(255,255,255,.35);
-            position: relative; z-index: 0;
-        }
-
-        .project-status-chip {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
-            width: 76px; height: 76px; border-radius: 20px;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            gap: 4px; font-size: .62rem; font-weight: 800; text-align: center; line-height: 1.15;
-            box-shadow: 0 8px 28px rgba(0,0,0,.28);
-            border: 3px solid rgba(255,255,255,.92);
-            z-index: 3; pointer-events: none;
-        }
-        .project-status-chip i { font-size: 1.35rem; }
-        .project-status-chip.status-quote { background: #2563eb; color: #fff; }
-        .project-status-chip.status-ordered { background: #059669; color: #fff; }
-        .project-status-chip.status-production { background: #ea580c; color: #fff; }
-        .project-card:hover .project-status-chip { opacity: 0; transition: opacity var(--transition); }
-
+        .project-thumb-icon { font-size: 3rem; color: rgba(255,255,255,.4); position: relative; z-index: 1; }
         .project-thumb-date {
             position: absolute; bottom: 10px; left: 10px;
-            background: rgba(28,25,23,.6); color: rgba(255,255,255,.9);
-            font-size: .65rem; font-weight: 500; padding: 3px 9px;
-            border-radius: 7px; backdrop-filter: blur(6px); z-index: 2;
+            background: rgba(255,255,255,.55); color: #475569;
+            font-size: .64rem; font-weight: 600; padding: 4px 10px;
+            border-radius: 999px; backdrop-filter: blur(8px); z-index: 4;
+            border: 1px solid rgba(255,255,255,.7);
         }
         .cabinet-count-badge {
             position: absolute; top: 10px; right: 10px;
-            background: rgba(30,58,95,.75); color: white;
-            font-size: .65rem; font-weight: 700; padding: 3px 9px;
-            border-radius: 7px; backdrop-filter: blur(6px);
-            display: flex; align-items: center; gap: 4px; z-index: 2;
+            background: rgba(255,255,255,.55); color: #334155;
+            font-size: .64rem; font-weight: 700; padding: 4px 10px;
+            border-radius: 999px; backdrop-filter: blur(8px);
+            display: flex; align-items: center; gap: 4px; z-index: 4;
+            border: 1px solid rgba(255,255,255,.7);
         }
         .project-open-overlay {
             position: absolute; inset: 0;
             display: flex; align-items: center; justify-content: center;
-            opacity: 0; transition: opacity var(--transition); z-index: 5;
+            opacity: 0; transition: opacity var(--transition); z-index: 6;
         }
         .project-card:hover .project-open-overlay { opacity: 1; }
         .project-open-btn {
-            background: rgba(255,255,255,.95); color: var(--primary);
-            border: none; border-radius: 12px; padding: 10px 22px;
-            font-size: .85rem; font-weight: 800; font-family: inherit; cursor: pointer;
+            background: rgba(255,255,255,.92); color: var(--primary);
+            border: none; border-radius: 12px; padding: 10px 20px;
+            font-size: .82rem; font-weight: 800; font-family: inherit; cursor: pointer;
             display: flex; align-items: center; gap: 7px;
-            box-shadow: 0 4px 20px rgba(0,0,0,.3);
+            box-shadow: 0 6px 24px rgba(0,0,0,.15);
             transform: translateY(6px); transition: transform var(--transition);
         }
         .project-card:hover .project-open-btn { transform: translateY(0); }
 
-        /* ★ Body tint behind project name */
-        .project-body {
-            padding: 18px 20px 14px; flex: 1; cursor: pointer;
-            transition: background var(--transition);
-        }
-        .project-body.status-quote {
-            background: linear-gradient(180deg, rgba(219,234,254,.72) 0%, rgba(239,246,255,.35) 100%);
-        }
-        .project-body.status-ordered {
-            background: linear-gradient(180deg, rgba(167,243,208,.62) 0%, rgba(236,253,245,.3) 100%);
-        }
-        .project-body.status-production {
-            background: linear-gradient(180deg, rgba(254,215,170,.68) 0%, rgba(255,247,237,.32) 100%);
-        }
-
         .project-name {
-            font-size: 1rem; font-weight: 800; color: var(--text);
+            font-size: .98rem; font-weight: 800; color: var(--text);
             margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
         .project-customer {
-            font-size: .78rem; color: var(--text-2); margin-bottom: 6px;
+            font-size: .76rem; color: var(--text-2); margin-bottom: 6px;
             display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
         }
         .project-customer-name { font-weight: 600; }
         .project-order-num { color: var(--muted); font-weight: 500; display: inline-flex; align-items: center; gap: 3px; }
         .project-customer-sep { color: #cbd5e1; }
         .project-meta {
-            font-size: .75rem; color: var(--muted);
+            font-size: .72rem; color: var(--muted);
             display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
         }
         .project-meta-item { display: flex; align-items: center; gap: 4px; }
@@ -185,53 +173,253 @@
         .project-status-foot {
             margin: 0 14px 12px;
             border-radius: 12px;
-            padding: 11px 14px;
+            padding: 10px 14px;
             display: flex; align-items: center; justify-content: space-between;
-            font-size: .8rem; font-weight: 800;
-            cursor: pointer; font-family: inherit;
-            border: 2px solid transparent;
-            transition: opacity var(--transition), transform var(--transition);
+            font-size: .78rem; font-weight: 700;
+            cursor: pointer; font-family: inherit; border: none;
+            transition: transform var(--transition), box-shadow var(--transition);
         }
-        .project-status-foot:hover { opacity: .92; transform: translateY(-1px); }
-        .project-status-foot.status-quote { background: #dbeafe; color: #1e40af; border-color: rgba(37,99,235,.25); }
-        .project-status-foot.status-ordered { background: #a7f3d0; color: #065f46; border-color: rgba(5,150,105,.25); }
-        .project-status-foot.status-production { background: #fed7aa; color: #9a3412; border-color: rgba(234,88,12,.25); }
+        .project-status-foot:hover { transform: translateY(-1px); }
         .project-status-foot-left { display: flex; align-items: center; gap: 8px; }
-        .project-status-foot-left i { font-size: 1rem; }
-        .project-status-foot-hint { font-size: .68rem; font-weight: 600; opacity: .75; }
+        .project-status-foot-left i { font-size: .95rem; }
+        .project-status-foot-hint { font-size: .66rem; font-weight: 600; opacity: .7; }
 
-        .project-actions { display: flex; gap: 8px; padding: 0 20px 18px; }
+        .project-actions { display: flex; gap: 8px; padding: 0 16px 16px; }
         .btn-card {
-            flex: 1; padding: 10px 8px; border-radius: 11px;
-            border: 1.5px solid var(--border); background: var(--border-l);
-            font-size: .78rem; font-weight: 700; font-family: inherit; cursor: pointer;
+            flex: 1; padding: 9px 8px; border-radius: 10px;
+            border: 1.5px solid var(--border); background: #f8fafc;
+            font-size: .76rem; font-weight: 700; font-family: inherit; cursor: pointer;
             display: flex; align-items: center; justify-content: center; gap: 5px;
-            color: var(--text-2);
+            color: var(--text-2); transition: background var(--transition);
         }
         .btn-card.primary {
-            background: linear-gradient(135deg,var(--primary) 0%,#2a4f80 100%);
+            background: linear-gradient(135deg, #4a6fa5 0%, #1e3a5f 100%);
             color: white; border-color: transparent;
         }
-        .btn-card.danger {
-            flex: 0 0 40px; color: #ef4444;
-            border-color: #fecaca; background: #fff5f5;
+        .btn-card.danger { flex: 0 0 38px; color: #e879a0; border-color: #fce7f0; background: #fff5f8; }
+
+        .project-status-chip {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 4px; font-size: .6rem; font-weight: 800; text-align: center; line-height: 1.15;
+            z-index: 3; pointer-events: none;
+            transition: opacity var(--transition), transform var(--transition);
+        }
+        .project-status-chip i { font-size: 1.25rem; }
+        .project-card:hover .project-status-chip { opacity: 0; transform: translate(-50%,-50%) scale(.9); }
+
+        .project-body { padding: 16px 18px 12px; flex: 1; cursor: pointer; }
+
+        /* ══════════════════════════════════════
+           VERSION A — Aurora Wash
+           Full-card pastel gradient glow
+        ══════════════════════════════════════ */
+        .v-a .project-card {
+            border-radius: 18px; overflow: hidden;
+            display: flex; flex-direction: column;
+            position: relative;
+            transition: transform 320ms cubic-bezier(0.34,1.4,0.64,1), box-shadow 320ms ease;
+            border: 1px solid rgba(255,255,255,.8);
+        }
+        .v-a .project-card::before {
+            content: ''; position: absolute; inset: 0; z-index: 0; opacity: .55;
+            transition: opacity var(--transition);
+        }
+        .v-a .project-card > * { position: relative; z-index: 1; }
+        .v-a .project-card.status-quote::before { background: linear-gradient(145deg, var(--pastel-quote-bg) 0%, #fff 55%, var(--pastel-quote) 100%); }
+        .v-a .project-card.status-ordered::before { background: linear-gradient(145deg, var(--pastel-ordered-bg) 0%, #fff 55%, var(--pastel-ordered) 100%); }
+        .v-a .project-card.status-production::before { background: linear-gradient(145deg, var(--pastel-production-bg) 0%, #fff 55%, var(--pastel-production) 100%); }
+
+        .v-a .project-card.status-quote { box-shadow: 0 4px 24px rgba(126,179,232,.22); }
+        .v-a .project-card.status-ordered { box-shadow: 0 4px 24px rgba(110,207,170,.22); }
+        .v-a .project-card.status-production { box-shadow: 0 4px 24px rgba(245,176,122,.22); }
+        .v-a .project-card:hover { transform: translateY(-7px); }
+        .v-a .project-card.status-quote:hover { box-shadow: 0 16px 48px rgba(126,179,232,.32); }
+        .v-a .project-card.status-ordered:hover { box-shadow: 0 16px 48px rgba(110,207,170,.32); }
+        .v-a .project-card.status-production:hover { box-shadow: 0 16px 48px rgba(245,176,122,.32); }
+
+        .v-a .project-thumb { border-bottom: none; }
+        .v-a .project-thumb::after {
+            content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+            opacity: 0; transition: opacity var(--transition);
+            background: linear-gradient(180deg, transparent 30%, rgba(30,41,59,.35) 100%);
+        }
+        .v-a .project-card:hover .project-thumb::after { opacity: 1; }
+
+        .v-a .project-status-chip {
+            width: 72px; height: 72px; border-radius: 50%;
+            box-shadow: 0 6px 20px rgba(0,0,0,.12), inset 0 1px 0 rgba(255,255,255,.6);
+        }
+        .v-a .status-quote .project-status-chip { background: linear-gradient(145deg, var(--pastel-quote) 0%, var(--pastel-quote-deep) 100%); color: var(--pastel-quote-text); }
+        .v-a .status-ordered .project-status-chip { background: linear-gradient(145deg, var(--pastel-ordered) 0%, var(--pastel-ordered-deep) 100%); color: var(--pastel-ordered-text); }
+        .v-a .status-production .project-status-chip { background: linear-gradient(145deg, var(--pastel-production) 0%, var(--pastel-production-deep) 100%); color: var(--pastel-production-text); }
+
+        .v-a .project-body.status-quote { background: linear-gradient(180deg, rgba(184,212,245,.35) 0%, transparent 100%); }
+        .v-a .project-body.status-ordered { background: linear-gradient(180deg, rgba(168,230,200,.35) 0%, transparent 100%); }
+        .v-a .project-body.status-production { background: linear-gradient(180deg, rgba(255,212,176,.38) 0%, transparent 100%); }
+
+        .v-a .project-status-foot.status-quote { background: linear-gradient(135deg, var(--pastel-quote-bg), var(--pastel-quote)); color: var(--pastel-quote-text); box-shadow: 0 2px 8px rgba(126,179,232,.15); }
+        .v-a .project-status-foot.status-ordered { background: linear-gradient(135deg, var(--pastel-ordered-bg), var(--pastel-ordered)); color: var(--pastel-ordered-text); box-shadow: 0 2px 8px rgba(110,207,170,.15); }
+        .v-a .project-status-foot.status-production { background: linear-gradient(135deg, var(--pastel-production-bg), var(--pastel-production)); color: var(--pastel-production-text); box-shadow: 0 2px 8px rgba(245,176,122,.15); }
+
+        .v-a .project-actions { background: rgba(255,255,255,.5); }
+
+        /* ══════════════════════════════════════
+           VERSION B — Frosted Glass
+           Glassmorphism chip + blur accents
+        ══════════════════════════════════════ */
+        .v-b .project-card {
+            background: rgba(255,255,255,.78);
+            backdrop-filter: blur(16px);
+            border-radius: 20px; overflow: hidden;
+            display: flex; flex-direction: column;
+            border: 1px solid rgba(255,255,255,.95);
+            box-shadow: 0 2px 16px rgba(15,23,42,.05);
+            transition: transform 300ms ease, box-shadow 300ms ease, border-color 300ms ease;
+        }
+        .v-b .project-card:hover { transform: translateY(-5px); }
+
+        .v-b .project-card.status-quote { border-color: rgba(184,212,245,.6); box-shadow: 0 8px 32px rgba(184,212,245,.25), inset 0 1px 0 rgba(255,255,255,.8); }
+        .v-b .project-card.status-ordered { border-color: rgba(168,230,200,.6); box-shadow: 0 8px 32px rgba(168,230,200,.25), inset 0 1px 0 rgba(255,255,255,.8); }
+        .v-b .project-card.status-production { border-color: rgba(255,212,176,.6); box-shadow: 0 8px 32px rgba(255,212,176,.25), inset 0 1px 0 rgba(255,255,255,.8); }
+
+        .v-b .project-thumb::before {
+            content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+        }
+        .v-b .status-quote .project-thumb::before { background: linear-gradient(180deg, rgba(184,212,245,.15) 0%, rgba(184,212,245,.45) 100%); }
+        .v-b .status-ordered .project-thumb::before { background: linear-gradient(180deg, rgba(168,230,200,.15) 0%, rgba(168,230,200,.45) 100%); }
+        .v-b .status-production .project-thumb::before { background: linear-gradient(180deg, rgba(255,212,176,.15) 0%, rgba(255,212,176,.45) 100%); }
+
+        .v-b .project-status-chip {
+            width: 80px; height: 80px; border-radius: 22px;
+            backdrop-filter: blur(14px);
+            border: 2px solid rgba(255,255,255,.75);
+            box-shadow: 0 8px 32px rgba(0,0,0,.1), inset 0 1px 0 rgba(255,255,255,.5);
+        }
+        .v-b .status-quote .project-status-chip { background: rgba(184,212,245,.72); color: var(--pastel-quote-text); }
+        .v-b .status-ordered .project-status-chip { background: rgba(168,230,200,.72); color: var(--pastel-ordered-text); }
+        .v-b .status-production .project-status-chip { background: rgba(255,212,176,.72); color: var(--pastel-production-text); }
+
+        .v-b .project-body { backdrop-filter: blur(4px); }
+        .v-b .project-body.status-quote { background: rgba(238,245,253,.65); border-top: 1px solid rgba(184,212,245,.3); }
+        .v-b .project-body.status-ordered { background: rgba(237,251,244,.65); border-top: 1px solid rgba(168,230,200,.3); }
+        .v-b .project-body.status-production { background: rgba(255,247,239,.65); border-top: 1px solid rgba(255,212,176,.3); }
+
+        .v-b .project-status-foot {
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,.6) !important;
+        }
+        .v-b .project-status-foot.status-quote { background: rgba(184,212,245,.45); color: var(--pastel-quote-text); }
+        .v-b .project-status-foot.status-ordered { background: rgba(168,230,200,.45); color: var(--pastel-ordered-text); }
+        .v-b .project-status-foot.status-production { background: rgba(255,212,176,.45); color: var(--pastel-production-text); }
+
+        .v-b .btn-card { background: rgba(255,255,255,.6); backdrop-filter: blur(4px); }
+
+        /* Shimmer on hover */
+        .v-b .project-card::after {
+            content: ''; position: absolute; top: 0; left: -100%; width: 60%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,.25), transparent);
+            transition: left .6s ease; pointer-events: none; z-index: 10;
+        }
+        .v-b .project-card { position: relative; overflow: hidden; }
+        .v-b .project-card:hover::after { left: 140%; }
+
+        /* ══════════════════════════════════════
+           VERSION C — Accent Ribbon
+           Clean white + pastel side ribbon + top band
+        ══════════════════════════════════════ */
+        .v-c .project-card {
+            background: #fff;
+            border-radius: 16px; overflow: hidden;
+            display: flex; flex-direction: column;
+            position: relative;
+            box-shadow: 0 2px 12px rgba(15,23,42,.06);
+            transition: transform 280ms ease, box-shadow 280ms ease;
+        }
+        .v-c .project-card:hover { transform: translateY(-6px); box-shadow: 0 14px 40px rgba(15,23,42,.1); }
+
+        /* Side ribbon */
+        .v-c .project-card::before {
+            content: ''; position: absolute; top: 0; right: 0;
+            width: 5px; height: 100%; z-index: 5;
+        }
+        .v-c .project-card.status-quote::before { background: linear-gradient(180deg, var(--pastel-quote), var(--pastel-quote-deep)); }
+        .v-c .project-card.status-ordered::before { background: linear-gradient(180deg, var(--pastel-ordered), var(--pastel-ordered-deep)); }
+        .v-c .project-card.status-production::before { background: linear-gradient(180deg, var(--pastel-production), var(--pastel-production-deep)); }
+
+        /* Top gradient band on thumb */
+        .v-c .project-thumb::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 6px; z-index: 4;
+        }
+        .v-c .status-quote .project-thumb::before { background: linear-gradient(90deg, var(--pastel-quote-deep), var(--pastel-quote), var(--pastel-quote-deep)); }
+        .v-c .status-ordered .project-thumb::before { background: linear-gradient(90deg, var(--pastel-ordered-deep), var(--pastel-ordered), var(--pastel-ordered-deep)); }
+        .v-c .status-production .project-thumb::before { background: linear-gradient(90deg, var(--pastel-production-deep), var(--pastel-production), var(--pastel-production-deep)); }
+
+        .v-c .project-status-chip {
+            top: auto; bottom: 14px; left: 50%; transform: translateX(-50%);
+            width: auto; min-width: 88px; height: auto;
+            padding: 7px 14px; border-radius: 999px;
+            flex-direction: row; gap: 6px; font-size: .68rem;
+            box-shadow: 0 4px 16px rgba(0,0,0,.1);
+        }
+        .v-c .project-status-chip i { font-size: .85rem; }
+        .v-c .project-status-chip span { white-space: nowrap; }
+        .v-c .project-card:hover .project-status-chip { opacity: 0; transform: translateX(-50%) translateY(4px); }
+
+        .v-c .status-quote .project-status-chip { background: var(--pastel-quote-bg); color: var(--pastel-quote-text); border: 2px solid var(--pastel-quote); }
+        .v-c .status-ordered .project-status-chip { background: var(--pastel-ordered-bg); color: var(--pastel-ordered-text); border: 2px solid var(--pastel-ordered); }
+        .v-c .status-production .project-status-chip { background: var(--pastel-production-bg); color: var(--pastel-production-text); border: 2px solid var(--pastel-production); }
+
+        .v-c .project-body.status-quote {
+            background: linear-gradient(90deg, var(--pastel-quote-bg) 0%, #fff 70%);
+            border-bottom: 1px dashed rgba(184,212,245,.4);
+        }
+        .v-c .project-body.status-ordered {
+            background: linear-gradient(90deg, var(--pastel-ordered-bg) 0%, #fff 70%);
+            border-bottom: 1px dashed rgba(168,230,200,.4);
+        }
+        .v-c .project-body.status-production {
+            background: linear-gradient(90deg, var(--pastel-production-bg) 0%, #fff 70%);
+            border-bottom: 1px dashed rgba(255,212,176,.4);
         }
 
-        .legend {
-            display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;
-            margin-top: 24px; font-size: .78rem; color: var(--muted);
+        .v-c .project-status-foot {
+            margin: 0 14px 12px 19px;
+            border-radius: 10px;
+            border-right: 3px solid transparent !important;
         }
-        .legend span { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
-        .legend i { width: 12px; height: 12px; border-radius: 4px; display: inline-block; }
-        .legend .q i { background: #2563eb; }
-        .legend .o i { background: #059669; }
-        .legend .p i { background: #ea580c; }
+        .v-c .project-status-foot.status-quote { background: var(--pastel-quote-bg); color: var(--pastel-quote-text); border-right-color: var(--pastel-quote-deep) !important; }
+        .v-c .project-status-foot.status-ordered { background: var(--pastel-ordered-bg); color: var(--pastel-ordered-text); border-right-color: var(--pastel-ordered-deep) !important; }
+        .v-c .project-status-foot.status-production { background: var(--pastel-production-bg); color: var(--pastel-production-text); border-right-color: var(--pastel-production-deep) !important; }
+
+        .v-c .project-actions { padding-right: 22px; }
+
+        /* ── Pastel legend ── */
+        .pastel-legend {
+            max-width: 1180px; margin: 0 auto 32px;
+            display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
+        }
+        .pastel-swatch {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 8px 14px; border-radius: 999px;
+            font-size: .74rem; font-weight: 700; color: var(--text-2);
+            background: rgba(255,255,255,.7); border: 1px solid rgba(255,255,255,.9);
+        }
+        .pastel-swatch i {
+            width: 14px; height: 14px; border-radius: 50%; display: inline-block;
+        }
+        .sw-q i { background: linear-gradient(135deg, var(--pastel-quote), var(--pastel-quote-deep)); }
+        .sw-o i { background: linear-gradient(135deg, var(--pastel-ordered), var(--pastel-ordered-deep)); }
+        .sw-p i { background: linear-gradient(135deg, var(--pastel-production), var(--pastel-production-deep)); }
+        .sw-s i { background: linear-gradient(135deg, var(--pastel-service), var(--pastel-service-deep)); }
+        .sw-i i { background: linear-gradient(135deg, var(--pastel-installed), var(--pastel-installed-deep)); }
 
         .pick-note {
-            max-width: 1100px; margin: 24px auto 0;
+            max-width: 1180px; margin: 8px auto 0;
             text-align: center; color: var(--muted); font-size: .9rem;
-            padding: 18px 20px; background: #fff; border-radius: 14px;
-            border: 2px dashed #cbd5e1;
+            padding: 22px 24px; background: rgba(255,255,255,.85);
+            border-radius: 16px; border: 2px dashed #c8d5e4;
+            line-height: 1.75;
         }
         .pick-note strong { color: var(--text); }
     </style>
@@ -239,142 +427,137 @@
 <body>
 
 <div class="page-head">
-    <h1>Mockup — גרסה C סופית</h1>
-    <p>Chip על התמונה · tint צבעוני מאחורי שם הפרויקט · פס סטטוס לחיץ · כפתורי פעולה<br>זהה לקוד שממתין לאישור ב-<code>projects.html</code></p>
-    <div class="approve-badge"><i class="fa-solid fa-eye"></i> ריחוף על כרטיס = chip נעלם + כפתור "פתח לעריכה"</div>
+    <h1>Mockup — 3 גרסאות פסטל</h1>
+    <p>גרדיינטים עדינים · צבעים פסטליים · אותה מבנה (chip, tint, פס סטטוס, כפתורים)<br>
+    ריחוף על כרטיס = chip נעלם + כפתור "פתח לעריכה"</p>
 </div>
 
-<div class="preview-wrap">
-    <div class="preview-note">
-        <strong>מה חדש לעומת mockup הקודם:</strong> אזור שם הפרויקט + לקוח + תאריך מקבל רקע gradient בצבע הסטטוס (כחול / ירוק / כתום). שאר הכרטיס (כפתורים) נשאר לבן.
-    </div>
-
-    <div class="projects-grid">
-
-        <!-- הצעת מחיר -->
-        <article class="project-card status-quote">
-            <div class="project-thumb">
-                <i class="fa-solid fa-cabinet-filing project-thumb-icon"></i>
-                <div class="project-status-chip status-quote">
-                    <i class="fa-solid fa-file-invoice-dollar"></i>
-                    <span>הצעת<br>מחיר</span>
-                </div>
-                <div class="project-thumb-date"><i class="fa-regular fa-clock" style="margin-left:4px"></i> לפני 24 שעות</div>
-                <div class="cabinet-count-badge"><i class="fa-solid fa-layer-group"></i> 3</div>
-                <div class="project-open-overlay">
-                    <button class="project-open-btn"><i class="fa-solid fa-pencil-ruler"></i> פתח לעריכה</button>
-                </div>
-            </div>
-            <div class="project-body status-quote">
-                <div class="project-name">שני עזרא</div>
-                <div class="project-customer">
-                    <span class="project-customer-name">אסתר לב</span>
-                    <span class="project-customer-sep">·</span>
-                    <span class="project-order-num"><i class="fa-solid fa-hashtag"></i> 1421</span>
-                </div>
-                <div class="project-meta">
-                    <span class="project-meta-item"><i class="fa-regular fa-calendar"></i> לפני 24 שעות</span>
-                    <span class="project-meta-item"><i class="fa-solid fa-layer-group"></i> 3 ארונות</span>
-                </div>
-            </div>
-            <button type="button" class="project-status-foot status-quote">
-                <span class="project-status-foot-left"><i class="fa-solid fa-file-invoice-dollar"></i> הצעת מחיר</span>
-                <span class="project-status-foot-hint">לחץ לשינוי ▾</span>
-            </button>
-            <div class="project-actions">
-                <button class="btn-card primary"><i class="fa-solid fa-pencil-ruler"></i> פתח</button>
-                <button class="btn-card"><i class="fa-solid fa-pen"></i> שנה שם</button>
-                <button class="btn-card danger"><i class="fa-solid fa-trash"></i></button>
-            </div>
-        </article>
-
-        <!-- בוצע הזמנה -->
-        <article class="project-card status-ordered">
-            <div class="project-thumb">
-                <i class="fa-solid fa-cabinet-filing project-thumb-icon"></i>
-                <div class="project-status-chip status-ordered">
-                    <i class="fa-solid fa-circle-check"></i>
-                    <span>בוצע<br>הזמנה</span>
-                </div>
-                <div class="project-thumb-date"><i class="fa-regular fa-clock" style="margin-left:4px"></i> לפני 21 שעות</div>
-                <div class="cabinet-count-badge"><i class="fa-solid fa-layer-group"></i> 2</div>
-                <div class="project-open-overlay">
-                    <button class="project-open-btn"><i class="fa-solid fa-pencil-ruler"></i> פתח לעריכה</button>
-                </div>
-            </div>
-            <div class="project-body status-ordered">
-                <div class="project-name">עפרה כ"ץ</div>
-                <div class="project-customer">
-                    <span class="project-customer-name">עינת</span>
-                    <span class="project-customer-sep">·</span>
-                    <span class="project-order-num"><i class="fa-solid fa-hashtag"></i> 1418</span>
-                </div>
-                <div class="project-meta">
-                    <span class="project-meta-item"><i class="fa-regular fa-calendar"></i> לפני 21 שעות</span>
-                    <span class="project-meta-item"><i class="fa-solid fa-layer-group"></i> 2 ארונות</span>
-                </div>
-            </div>
-            <button type="button" class="project-status-foot status-ordered">
-                <span class="project-status-foot-left"><i class="fa-solid fa-circle-check"></i> בוצע הזמנה</span>
-                <span class="project-status-foot-hint">לחץ לשינוי ▾</span>
-            </button>
-            <div class="project-actions">
-                <button class="btn-card primary"><i class="fa-solid fa-pencil-ruler"></i> פתח</button>
-                <button class="btn-card"><i class="fa-solid fa-pen"></i> שנה שם</button>
-                <button class="btn-card danger"><i class="fa-solid fa-trash"></i></button>
-            </div>
-        </article>
-
-        <!-- נשלח לייצור -->
-        <article class="project-card status-production">
-            <div class="project-thumb">
-                <i class="fa-solid fa-cabinet-filing project-thumb-icon"></i>
-                <div class="project-status-chip status-production">
-                    <i class="fa-solid fa-industry"></i>
-                    <span>נשלח<br>לייצור</span>
-                </div>
-                <div class="project-thumb-date"><i class="fa-regular fa-clock" style="margin-left:4px"></i> לפני 10 שעות</div>
-                <div class="cabinet-count-badge"><i class="fa-solid fa-layer-group"></i> 4</div>
-                <div class="project-open-overlay">
-                    <button class="project-open-btn"><i class="fa-solid fa-pencil-ruler"></i> פתח לעריכה</button>
-                </div>
-            </div>
-            <div class="project-body status-production">
-                <div class="project-name">נטע מיימון</div>
-                <div class="project-customer">
-                    <span class="project-customer-name">נאוה דמרי</span>
-                    <span class="project-customer-sep">·</span>
-                    <span class="project-order-num"><i class="fa-solid fa-hashtag"></i> 1432</span>
-                </div>
-                <div class="project-meta">
-                    <span class="project-meta-item"><i class="fa-regular fa-calendar"></i> לפני 10 שעות</span>
-                    <span class="project-meta-item"><i class="fa-solid fa-layer-group"></i> 4 ארונות</span>
-                </div>
-            </div>
-            <button type="button" class="project-status-foot status-production">
-                <span class="project-status-foot-left"><i class="fa-solid fa-industry"></i> נשלח לייצור</span>
-                <span class="project-status-foot-hint">לחץ לשינוי ▾</span>
-            </button>
-            <div class="project-actions">
-                <button class="btn-card primary"><i class="fa-solid fa-pencil-ruler"></i> פתח</button>
-                <button class="btn-card"><i class="fa-solid fa-pen"></i> שנה שם</button>
-                <button class="btn-card danger"><i class="fa-solid fa-trash"></i></button>
-            </div>
-        </article>
-
-    </div>
-
-    <div class="legend">
-        <span class="q"><i></i> הצעת מחיר — כחול</span>
-        <span class="o"><i></i> בוצע הזמנה — ירוק</span>
-        <span class="p"><i></i> נשלח לייצור — כתום</span>
-    </div>
+<div class="pastel-legend">
+    <span class="pastel-swatch sw-q"><i></i> הצעת מחיר</span>
+    <span class="pastel-swatch sw-o"><i></i> בוצעה הזמנה</span>
+    <span class="pastel-swatch sw-p"><i></i> נשלח לייצור</span>
+    <span class="pastel-swatch sw-s"><i></i> קריאת שירות</span>
+    <span class="pastel-swatch sw-i"><i></i> התקנה הושלמה</span>
 </div>
+
+<!-- ═══ VERSION A ═══ -->
+<section class="version-section" data-v="a">
+    <div class="version-label">
+        <div class="version-badge">A</div>
+        <div>
+            <h2>Aurora Wash — gradient מלא על הכרטיס</h2>
+            <p>זוהר פסטלי סביב הכרטיס · chip עגול עם gradient · tint רך מאחורי השם</p>
+        </div>
+    </div>
+    <div class="version-panel v-a">
+        <div class="projects-grid" id="grid-a"></div>
+    </div>
+</section>
+
+<!-- ═══ VERSION B ═══ -->
+<section class="version-section" data-v="b">
+    <div class="version-label">
+        <div class="version-badge">B</div>
+        <div>
+            <h2>Frosted Glass — זכוכית מטושטשת</h2>
+            <p>backdrop-filter · chip שקוף-frosted · shimmer עדין ב-hover · גבולות רכים</p>
+        </div>
+    </div>
+    <div class="version-panel v-b">
+        <div class="projects-grid" id="grid-b"></div>
+    </div>
+</section>
+
+<!-- ═══ VERSION C ═══ -->
+<section class="version-section" data-v="c">
+    <div class="version-label">
+        <div class="version-badge">C</div>
+        <div>
+            <h2>Accent Ribbon — סרט צבעוני</h2>
+            <p>כרטיס לבן נקי · פס gradient למעלה + סרט צד · chip pill בתחתית התמונה</p>
+        </div>
+    </div>
+    <div class="version-panel v-c">
+        <div class="projects-grid" id="grid-c"></div>
+    </div>
+</section>
 
 <p class="pick-note">
-    ✅ <strong>מאשר?</strong> כתוב "מאשר" ואעשה push ל-production.<br>
-    ✏️ <strong>שינויים?</strong> למשל: tint חזק יותר / חלש יותר, chip קטן יותר, בלי chip ב-hover — כתוב מה לשנות.
+    בחר גרסה: <strong>A</strong> / <strong>B</strong> / <strong>C</strong> (או שילוב — למשל chip מ-B + ribbon מ-C)<br>
+    ✏️ רוצה tint חזק/חלש יותר? chip במקום אחר? — כתוב מה לשנות.<br>
+    ✅ כשמאשר — אעדכן את <code>projects.html</code> ואעשה push.
 </p>
+
+<script>
+const CARDS = [
+    {
+        status: 'quote', cls: 'status-quote',
+        icon: 'fa-file-invoice-dollar', chipLines: ['הצעת', 'מחיר'], footLabel: 'הצעת מחיר',
+        name: 'שני עזרא', customer: 'אסתר לב', order: '1421',
+        time: 'לפני 24 שעות', cabinets: 3
+    },
+    {
+        status: 'ordered', cls: 'status-ordered',
+        icon: 'fa-circle-check', chipLines: ['בוצעה', 'הזמנה'], footLabel: 'בוצעה הזמנה',
+        name: 'עפרה כ"ץ', customer: 'עינת', order: '1418',
+        time: 'לפני 21 שעות', cabinets: 2
+    },
+    {
+        status: 'production', cls: 'status-production',
+        icon: 'fa-industry', chipLines: ['נשלח', 'לייצור'], footLabel: 'נשלח לייצור',
+        name: 'נטע מיימון', customer: 'נאוה דמרי', order: '1432',
+        time: 'לפני 10 שעות', cabinets: 4
+    }
+];
+
+function chipHtml(c, version) {
+    const label = version === 'c'
+        ? `<span>${c.footLabel}</span>`
+        : `<span>${c.chipLines.join('<br>')}</span>`;
+    return `<div class="project-status-chip ${c.cls}">
+        <i class="fa-solid ${c.icon}"></i>${label}
+    </div>`;
+}
+
+function cardHtml(c, version) {
+    return `<article class="project-card ${c.cls}">
+        <div class="project-thumb">
+            <i class="fa-solid fa-cabinet-filing project-thumb-icon"></i>
+            ${chipHtml(c, version)}
+            <div class="project-thumb-date"><i class="fa-regular fa-clock" style="margin-left:4px"></i> ${c.time}</div>
+            <div class="cabinet-count-badge"><i class="fa-solid fa-layer-group"></i> ${c.cabinets}</div>
+            <div class="project-open-overlay">
+                <button class="project-open-btn"><i class="fa-solid fa-pencil-ruler"></i> פתח לעריכה</button>
+            </div>
+        </div>
+        <div class="project-body ${c.cls}">
+            <div class="project-name">${c.name}</div>
+            <div class="project-customer">
+                <span class="project-customer-name">${c.customer}</span>
+                <span class="project-customer-sep">·</span>
+                <span class="project-order-num"><i class="fa-solid fa-hashtag"></i> ${c.order}</span>
+            </div>
+            <div class="project-meta">
+                <span class="project-meta-item"><i class="fa-regular fa-calendar"></i> ${c.time}</span>
+                <span class="project-meta-item"><i class="fa-solid fa-layer-group"></i> ${c.cabinets} ארונות</span>
+            </div>
+        </div>
+        <button type="button" class="project-status-foot ${c.cls}">
+            <span class="project-status-foot-left"><i class="fa-solid ${c.icon}"></i> ${c.footLabel}</span>
+            <span class="project-status-foot-hint">לחץ לשינוי ▾</span>
+        </button>
+        <div class="project-actions">
+            <button class="btn-card primary"><i class="fa-solid fa-pencil-ruler"></i> פתח</button>
+            <button class="btn-card"><i class="fa-solid fa-pen"></i> שנה שם</button>
+            <button class="btn-card danger"><i class="fa-solid fa-trash"></i></button>
+        </div>
+    </article>`;
+}
+
+['a','b','c'].forEach(v => {
+    document.getElementById('grid-' + v).innerHTML = CARDS.map(c => cardHtml(c, v)).join('');
+});
+</script>
 
 </body>
 </html>
