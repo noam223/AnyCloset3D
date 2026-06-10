@@ -98,28 +98,69 @@
         .project-card:nth-child(6) { animation-delay: 260ms; }
         .project-card:hover { box-shadow: var(--shadow-lg), 0 0 0 2px rgba(37,99,235,0.12); transform: translateY(-6px) scale(1.01); }
         .project-card.is-locked { border-color: #fca5a5; }
-        .project-thumb { width: 100%; height: 200px; background: linear-gradient(135deg,#ddd5c8 0%,#c8bfb2 100%); display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; cursor: pointer; flex-shrink: 0; }
-        .project-thumb::before { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0.28; transition: opacity var(--transition); }
-        .project-thumb.status-quote::before { background: linear-gradient(180deg, rgba(59,130,246,0.55) 0%, rgba(59,130,246,0.08) 42%, transparent 68%); }
-        .project-thumb.status-ordered::before { background: linear-gradient(180deg, rgba(16,185,129,0.55) 0%, rgba(16,185,129,0.08) 42%, transparent 68%); }
-        .project-thumb.status-production::before { background: linear-gradient(180deg, rgba(249,115,22,0.55) 0%, rgba(249,115,22,0.08) 42%, transparent 68%); }
-        .project-thumb::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg,transparent 40%,rgba(28,25,23,.5) 100%); opacity: 0; transition: opacity var(--transition); z-index: 1; pointer-events: none; }
+        .project-card.status-quote { box-shadow: 0 4px 18px rgba(37,99,235,.1); }
+        .project-card.status-ordered { box-shadow: 0 4px 18px rgba(5,150,105,.1); }
+        .project-card.status-production { box-shadow: 0 4px 18px rgba(234,88,12,.1); }
+        .project-card.status-service { box-shadow: 0 4px 18px rgba(124,58,237,.12); }
+        .project-card.status-installed { box-shadow: 0 4px 18px rgba(13,148,136,.12); }
+        .project-thumb { width: 100%; height: 200px; background: linear-gradient(135deg,#ddd5c8 0%,#c8bfb2 100%); display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; cursor: pointer; flex-shrink: 0; border-bottom: 4px solid transparent; }
+        .project-card.status-quote .project-thumb { border-bottom-color: #2563eb; }
+        .project-card.status-ordered .project-thumb { border-bottom-color: #059669; }
+        .project-card.status-production .project-thumb { border-bottom-color: #ea580c; }
+        .project-card.status-service .project-thumb { border-bottom-color: #7c3aed; }
+        .project-card.status-installed .project-thumb { border-bottom-color: #0d9488; }
+        .project-thumb::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg,transparent 40%,rgba(28,25,23,.5) 100%); opacity: 0; transition: opacity var(--transition); z-index: 4; pointer-events: none; }
         .project-card:hover .project-thumb::after { opacity: 1; }
         .project-thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform .5s ease; position: relative; z-index: 0; }
         .project-card:hover .project-thumb img { transform: scale(1.05); }
         .project-thumb-icon { font-size: 3.2rem; color: rgba(255,255,255,.35); position: relative; z-index: 0; }
+        .project-status-chip {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+            width: 76px; height: 76px; border-radius: 20px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 4px; font-size: .62rem; font-weight: 800; text-align: center; line-height: 1.15;
+            box-shadow: 0 8px 28px rgba(0,0,0,.28);
+            border: 3px solid rgba(255,255,255,.92);
+            z-index: 3; pointer-events: none;
+        }
+        .project-status-chip i { font-size: 1.35rem; }
+        .project-status-chip.status-quote { background: #2563eb; color: #fff; }
+        .project-status-chip.status-ordered { background: #059669; color: #fff; }
+        .project-status-chip.status-production { background: #ea580c; color: #fff; }
+        .project-status-chip.status-service { background: #7c3aed; color: #fff; }
+        .project-status-chip.status-installed { background: #0d9488; color: #fff; }
+        .project-card:hover .project-status-chip { opacity: 0; transition: opacity var(--transition); }
         .project-thumb-date { position: absolute; bottom: 10px; left: 10px; background: rgba(28,25,23,.6); color: rgba(255,255,255,.9); font-size: .65rem; font-weight: 500; padding: 3px 9px; border-radius: 7px; backdrop-filter: blur(6px); z-index: 2; }
-        .project-thumb-status { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: flex-start; gap: 6px; font-size: .72rem; font-weight: 700; padding: 9px 14px; border: none; width: 100%; cursor: pointer; font-family: inherit; transition: opacity var(--transition); text-align: right; z-index: 3; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
-        .project-thumb-status:hover { opacity: .92; }
-        .project-thumb-status.status-quote { background: rgba(239,246,255,0.94); color: #1d4ed8; border-bottom: 2px solid rgba(59,130,246,0.35); }
-        .project-thumb-status.status-ordered { background: rgba(236,253,245,0.94); color: #047857; border-bottom: 2px solid rgba(16,185,129,0.35); }
-        .project-thumb-status.status-production { background: rgba(255,247,237,0.94); color: #c2410c; border-bottom: 2px solid rgba(249,115,22,0.35); }
-        .cabinet-count-badge { position: absolute; top: 44px; right: 10px; background: rgba(30,58,95,.75); color: white; font-size: .65rem; font-weight: 700; padding: 3px 9px; border-radius: 7px; backdrop-filter: blur(6px); display: flex; align-items: center; gap: 4px; z-index: 2; }
-        .project-open-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity var(--transition); z-index: 3; }
+        .cabinet-count-badge { position: absolute; top: 10px; right: 10px; background: rgba(30,58,95,.75); color: white; font-size: .65rem; font-weight: 700; padding: 3px 9px; border-radius: 7px; backdrop-filter: blur(6px); display: flex; align-items: center; gap: 4px; z-index: 2; }
+        .project-open-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity var(--transition); z-index: 5; }
         .project-card:hover .project-open-overlay { opacity: 1; }
         .project-open-btn { background: rgba(255,255,255,.95); color: var(--primary); border: none; border-radius: 12px; padding: 10px 22px; font-size: .85rem; font-weight: 800; font-family: inherit; cursor: pointer; display: flex; align-items: center; gap: 7px; box-shadow: 0 4px 20px rgba(0,0,0,.3); transform: translateY(6px); transition: transform var(--transition); }
         .project-card:hover .project-open-btn { transform: translateY(0); }
-        .project-body { padding: 18px 20px 14px; flex: 1; cursor: pointer; }
+        .project-body { padding: 18px 20px 14px; flex: 1; cursor: pointer; transition: background var(--transition); }
+        .project-body.status-quote { background: linear-gradient(180deg, rgba(219,234,254,.72) 0%, rgba(239,246,255,.35) 100%); }
+        .project-body.status-ordered { background: linear-gradient(180deg, rgba(167,243,208,.62) 0%, rgba(236,253,245,.3) 100%); }
+        .project-body.status-production { background: linear-gradient(180deg, rgba(254,215,170,.68) 0%, rgba(255,247,237,.32) 100%); }
+        .project-body.status-service { background: linear-gradient(180deg, rgba(221,214,254,.72) 0%, rgba(245,243,255,.35) 100%); }
+        .project-body.status-installed { background: linear-gradient(180deg, rgba(153,246,228,.62) 0%, rgba(240,253,250,.32) 100%); }
+        .project-status-foot {
+            margin: 0 14px 12px;
+            border-radius: 12px;
+            padding: 11px 14px;
+            display: flex; align-items: center; justify-content: space-between;
+            font-size: .8rem; font-weight: 800;
+            cursor: pointer; font-family: inherit;
+            border: 2px solid transparent;
+            transition: opacity var(--transition), transform var(--transition);
+        }
+        .project-status-foot:hover { opacity: .92; transform: translateY(-1px); }
+        .project-status-foot.status-quote { background: #dbeafe; color: #1e40af; border-color: rgba(37,99,235,.25); }
+        .project-status-foot.status-ordered { background: #a7f3d0; color: #065f46; border-color: rgba(5,150,105,.25); }
+        .project-status-foot.status-production { background: #fed7aa; color: #9a3412; border-color: rgba(234,88,12,.25); }
+        .project-status-foot.status-service { background: #ddd6fe; color: #5b21b6; border-color: rgba(124,58,237,.25); }
+        .project-status-foot.status-installed { background: #99f6e4; color: #115e59; border-color: rgba(13,148,136,.25); }
+        .project-status-foot-left { display: flex; align-items: center; gap: 8px; }
+        .project-status-foot-left i { font-size: 1rem; }
+        .project-status-foot-hint { font-size: .68rem; font-weight: 600; opacity: .75; }
         .project-name { font-size: 1rem; font-weight: 800; color: var(--text); margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.02em; }
         .project-customer { font-size: .78rem; color: var(--text-2); margin-bottom: 6px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; line-height: 1.4; }
         .project-customer-name { font-weight: 600; }
@@ -129,17 +170,51 @@
         .projects-search-wrap i { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: .85rem; pointer-events: none; }
         .projects-search-input { width: 100%; height: 42px; border: 1.5px solid var(--border); border-radius: 12px; padding: 0 40px 0 14px; font-size: .88rem; font-family: inherit; color: var(--text); background: var(--bg-card); outline: none; transition: border-color var(--transition), box-shadow var(--transition); direction: rtl; }
         .projects-search-input:focus { border-color: var(--secondary); box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
-        .status-options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+        .projects-toolbar { margin-bottom: 22px; }
+        .projects-status-filters {
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+            padding: 12px 14px; background: var(--bg-card);
+            border: 1px solid var(--border); border-radius: 14px;
+            box-shadow: var(--shadow-sm);
+        }
+        .projects-filter-label {
+            font-size: .78rem; font-weight: 700; color: var(--muted);
+            display: inline-flex; align-items: center; gap: 6px;
+            margin-left: 4px; white-space: nowrap;
+        }
+        .status-filter-btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 8px 14px; border-radius: 999px;
+            border: 2px solid var(--border); background: #fff;
+            font-size: .78rem; font-weight: 700; font-family: inherit;
+            color: var(--text-2); cursor: pointer;
+            transition: all var(--transition); white-space: nowrap;
+        }
+        .status-filter-btn:hover { border-color: #c8d4e4; transform: translateY(-1px); }
+        .status-filter-btn.active { color: #fff; border-color: transparent; box-shadow: 0 3px 10px rgba(15,23,42,.12); }
+        .status-filter-btn.active[data-status="all"] { background: var(--primary); }
+        .status-filter-btn.active.status-quote { background: #2563eb; }
+        .status-filter-btn.active.status-ordered { background: #059669; }
+        .status-filter-btn.active.status-production { background: #ea580c; }
+        .status-filter-btn.active.status-service { background: #7c3aed; }
+        .status-filter-btn.active.status-installed { background: #0d9488; }
+        .status-filter-btn:not(.active) { opacity: .72; }
+        .status-filter-btn i { font-size: .82rem; }
+        .status-options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; max-height: 360px; overflow-y: auto; }
         .status-option { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 2px solid var(--border); border-radius: 14px; background: var(--border-l); cursor: pointer; font-family: inherit; font-size: .92rem; font-weight: 700; color: var(--text-2); transition: all var(--transition); text-align: right; width: 100%; }
         .status-option:hover { border-color: #c8d4e4; background: white; }
         .status-option.selected { border-color: var(--secondary); background: #eff6ff; color: var(--primary); }
         .status-option.status-quote.selected { border-color: #3b82f6; background: #eff6ff; color: #1d4ed8; }
         .status-option.status-ordered.selected { border-color: #10b981; background: #ecfdf5; color: #047857; }
         .status-option.status-production.selected { border-color: #f97316; background: #fff7ed; color: #c2410c; }
+        .status-option.status-service.selected { border-color: #8b5cf6; background: #f5f3ff; color: #6d28d9; }
+        .status-option.status-installed.selected { border-color: #14b8a6; background: #f0fdfa; color: #0f766e; }
         .status-option-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
         .status-option.status-quote .status-option-dot { background: #3b82f6; }
         .status-option.status-ordered .status-option-dot { background: #10b981; }
         .status-option.status-production .status-option-dot { background: #f97316; }
+        .status-option.status-service .status-option-dot { background: #8b5cf6; }
+        .status-option.status-installed .status-option-dot { background: #14b8a6; }
         .project-meta { font-size: .75rem; color: var(--muted); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         .project-meta-item { display: flex; align-items: center; gap: 4px; }
         .project-actions { display: flex; gap: 8px; padding: 0 20px 18px; }
@@ -420,6 +495,29 @@
                            oninput="onProjectsSearch(this.value, true)">
                 </form>
                 <div class="content-count" id="content-count"></div>
+            </div>
+            <div class="projects-toolbar">
+                <div class="projects-status-filters" id="projects-status-filters">
+                    <span class="projects-filter-label"><i class="fa-solid fa-filter"></i> הצג:</span>
+                    <button type="button" class="status-filter-btn active" data-status="all" onclick="setStatusFilterAll()">
+                        <i class="fa-solid fa-layer-group"></i> הכל
+                    </button>
+                    <button type="button" class="status-filter-btn active status-quote" data-status="quote" onclick="toggleStatusFilter('quote')">
+                        <i class="fa-solid fa-file-invoice-dollar"></i> הצעת מחיר
+                    </button>
+                    <button type="button" class="status-filter-btn active status-ordered" data-status="ordered" onclick="toggleStatusFilter('ordered')">
+                        <i class="fa-solid fa-circle-check"></i> בוצעה הזמנה
+                    </button>
+                    <button type="button" class="status-filter-btn active status-production" data-status="production" onclick="toggleStatusFilter('production')">
+                        <i class="fa-solid fa-industry"></i> נשלח לייצור
+                    </button>
+                    <button type="button" class="status-filter-btn active status-service" data-status="service" onclick="toggleStatusFilter('service')">
+                        <i class="fa-solid fa-screwdriver-wrench"></i> קריאת שירות
+                    </button>
+                    <button type="button" class="status-filter-btn active status-installed" data-status="installed" onclick="toggleStatusFilter('installed')">
+                        <i class="fa-solid fa-house-circle-check"></i> התקנה הושלמה
+                    </button>
+                </div>
             </div>
             <div class="projects-grid" id="projects-grid">
                 <div class="skeleton-card"><div class="skeleton-thumb"></div><div class="skeleton-body"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>
@@ -749,6 +847,14 @@
                 <span class="status-option-dot"></span>
                 <span>נשלח לייצור</span>
             </button>
+            <button type="button" class="status-option status-service" data-status="service" onclick="confirmStatusChange('service')">
+                <span class="status-option-dot"></span>
+                <span>קריאת שירות</span>
+            </button>
+            <button type="button" class="status-option status-installed" data-status="installed" onclick="confirmStatusChange('installed')">
+                <span class="status-option-dot"></span>
+                <span>התקנה הושלמה</span>
+            </button>
         </div>
         <div class="modal-actions">
             <button class="btn-modal ghost" onclick="closeModal('modal-status')">ביטול</button>
@@ -844,6 +950,6 @@
 </div>
 
 <script src="auth.js?v=20260608h"></script>
-<script src="projects.js?v=20260608j"></script>
+<script src="projects.js?v=20260608m"></script>
 </body>
 </html>

@@ -8,6 +8,7 @@ var _renameId            = null;
 var _deleteId            = null;
 var _statusChangeId      = null;
 var _searchQuery         = '';
+var _statusFilters       = { quote: true, ordered: true, production: true, service: true, installed: true };
 var _selectedUpgradePlan = null;
 var _toastTimer          = null;
 var _devicesList         = [];
@@ -116,6 +117,7 @@ var _USER_TYPE_LABELS = {
     if (statPlan) statPlan.textContent = plan.label || '—';
 
     _renderPlanBar();
+    _syncStatusFilterUI();
     _renderProjects();
     _resetProjectsSearchIfAutofilled();
     setTimeout(_resetProjectsSearchIfAutofilled, 150);
@@ -423,15 +425,41 @@ function _renderPlanBar() {
 }
 
 // ── Order status helpers ──────────────────────────────────────────────────────
+var _ORDER_STATUS_KEYS = (window.Projects && Projects.ORDER_STATUS_KEYS)
+    || ['quote', 'ordered', 'production', 'service', 'installed'];
+
 function _orderStatusLabel(status) {
     var map = (window.Projects && Projects.ORDER_STATUSES) || {
-        quote: 'הצעת מחיר', ordered: 'בוצע הזמנה', production: 'נשלח לייצור'
+        quote: 'הצעת מחיר', ordered: 'בוצעה הזמנה', production: 'נשלח לייצור',
+        service: 'קריאת שירות', installed: 'התקנה הושלמה'
     };
     return map[status] || map.quote;
 }
 
 function _normalizeOrderStatus(status) {
-    return (status === 'ordered' || status === 'production') ? status : 'quote';
+    return _ORDER_STATUS_KEYS.indexOf(status) !== -1 ? status : 'quote';
+}
+
+function _statusIconClass(status) {
+    var icons = {
+        quote: 'fa-file-invoice-dollar',
+        ordered: 'fa-circle-check',
+        production: 'fa-industry',
+        service: 'fa-screwdriver-wrench',
+        installed: 'fa-house-circle-check'
+    };
+    return icons[_normalizeOrderStatus(status)] || icons.quote;
+}
+
+function _statusChipLabelHtml(status) {
+    var labels = {
+        quote: 'הצעת<br>מחיר',
+        ordered: 'בוצעה<br>הזמנה',
+        production: 'נשלח<br>לייצור',
+        service: 'קריאת<br>שירות',
+        installed: 'התקנה<br>הושלמה'
+    };
+    return labels[_normalizeOrderStatus(status)] || labels.quote;
 }
 
 function _projectMatchesSearch(p) {
@@ -439,6 +467,52 @@ function _projectMatchesSearch(p) {
     var q = _searchQuery.toLowerCase();
     var fields = [p.name, p.customer_name, p.customer_order_num];
     return fields.some(function(f) { return f && String(f).toLowerCase().indexOf(q) !== -1; });
+}
+
+function _allStatusFiltersActive() {
+    return _ORDER_STATUS_KEYS.every(function(key) { return _statusFilters[key]; });
+}
+
+function _countActiveStatusFilters() {
+    var n = 0;
+    _ORDER_STATUS_KEYS.forEach(function(key) {
+        if (_statusFilters[key]) n++;
+    });
+    return n;
+}
+
+function _projectMatchesStatusFilter(p) {
+    var status = _normalizeOrderStatus(p.order_status);
+    return !!_statusFilters[status];
+}
+
+function _syncStatusFilterUI() {
+    var allActive = _allStatusFiltersActive();
+    document.querySelectorAll('#projects-status-filters .status-filter-btn').forEach(function(btn) {
+        var key = btn.dataset.status;
+        if (key === 'all') {
+            btn.classList.toggle('active', allActive);
+        } else {
+            btn.classList.toggle('active', !!_statusFilters[key]);
+        }
+    });
+}
+
+function setStatusFilterAll() {
+    _ORDER_STATUS_KEYS.forEach(function(key) { _statusFilters[key] = true; });
+    _syncStatusFilterUI();
+    _renderProjects();
+}
+
+function toggleStatusFilter(status) {
+    if (!_statusFilters.hasOwnProperty(status)) return;
+    if (_statusFilters[status] && _countActiveStatusFilters() <= 1) {
+        showToast('חייב להישאר לפחות סטטוס אחד מסומן', 'error');
+        return;
+    }
+    _statusFilters[status] = !_statusFilters[status];
+    _syncStatusFilterUI();
+    _renderProjects();
 }
 
 function onProjectsSearch(value, fromUser) {
@@ -464,11 +538,14 @@ function _renderProjects() {
     var grid = document.getElementById('projects-grid');
     grid.innerHTML = '';
 
-    var visible = _projects.filter(_projectMatchesSearch);
+    var visible = _projects.filter(function(p) {
+        return _projectMatchesSearch(p) && _projectMatchesStatusFilter(p);
+    });
 
     var countEl = document.getElementById('content-count');
     if (countEl) {
-        countEl.textContent = _searchQuery
+        var filtered = !_allStatusFiltersActive() || _searchQuery;
+        countEl.textContent = filtered
             ? (visible.length + ' מתוך ' + _projects.length + ' פרויקטים')
             : (_projects.length + ' פרויקטים');
     }
@@ -487,18 +564,21 @@ function _renderProjects() {
     }
 
     if (visible.length === 0) {
+        var emptyHint = _searchQuery && !_allStatusFiltersActive()
+            ? 'נסה חיפוש אחר או שנה את סינון הסטטוס'
+            : (_searchQuery ? 'נסה חיפוש אחר או נקה את שדה החיפוש' : 'נסה לבחור סטטוסים נוספים בסינון');
         grid.innerHTML =
             '<div class="empty-state">' +
                 '<div class="empty-state-icon"><i class="fa-solid fa-magnifying-glass"></i></div>' +
                 '<h3>לא נמצאו פרויקטים</h3>' +
-                '<p>נסה חיפוש אחר או נקה את שדה החיפוש</p>' +
+                '<p>' + emptyHint + '</p>' +
             '</div>';
         return;
     }
 
     visible.forEach(function(p) {
         var card     = document.createElement('div');
-        card.className  = 'project-card';
+        card.className  = 'project-card status-' + _normalizeOrderStatus(p.order_status);
         card.dataset.id = p.id;
 
         // Check lock status for designer_single
@@ -528,11 +608,15 @@ function _renderProjects() {
             if (p.customer_order_num) parts.push('<span class="project-order-num"><i class="fa-solid fa-hashtag"></i> ' + _esc(p.customer_order_num) + '</span>');
             customerLine = '<div class="project-customer">' + parts.join('<span class="project-customer-sep">·</span>') + '</div>';
         }
-        var statusBadgeHtml =
-            '<button type="button" class="project-thumb-status status-' + orderStatus + '" ' +
+        var statusChipHtml =
+            '<div class="project-status-chip status-' + orderStatus + '">' +
+            '<i class="fa-solid ' + _statusIconClass(orderStatus) + '"></i>' +
+            '<span>' + _statusChipLabelHtml(orderStatus) + '</span></div>';
+        var statusFootHtml =
+            '<button type="button" class="project-status-foot status-' + orderStatus + '" ' +
             'onclick="event.stopPropagation(); startStatusChange(\'' + p.id + '\')" title="לחץ לשינוי סטטוס">' +
-            '<i class="fa-solid fa-circle-dot"></i> ' + statusLabel +
-            '</button>';
+            '<span class="project-status-foot-left"><i class="fa-solid ' + _statusIconClass(orderStatus) + '"></i> ' + statusLabel + '</span>' +
+            '<span class="project-status-foot-hint">לחץ לשינוי ▾</span></button>';
         var thumbHtml = p.thumbnail
             ? '<img src="' + p.thumbnail + '" alt="' + safeName + '" loading="lazy">'
             : '<i class="fa-solid fa-cabinet-filing project-thumb-icon"></i>';
@@ -559,15 +643,15 @@ function _renderProjects() {
 
         var openFn = isLocked ? 'openLockedProject' : 'openProject';
         card.innerHTML =
-            '<div class="project-thumb status-' + orderStatus + '" onclick="' + openFn + '(\'' + p.id + '\')">' +
+            '<div class="project-thumb" onclick="' + openFn + '(\'' + p.id + '\')">' +
                 thumbHtml +
-                statusBadgeHtml +
+                statusChipHtml +
                 '<div class="project-thumb-date"><i class="fa-regular fa-clock" style="margin-left:4px"></i>' + dateStr + '</div>' +
                 cabinetBadge +
                 (!isLocked ? '<div class="project-open-overlay"><button class="project-open-btn" onclick="openProject(\'' + p.id + '\')"><i class="fa-solid fa-pencil-ruler"></i> פתח לעריכה</button></div>' : '') +
             '</div>' +
             lockBadgeHtml +
-            '<div class="project-body" onclick="' + openFn + '(\'' + p.id + '\')">' +
+            '<div class="project-body status-' + orderStatus + '" onclick="' + openFn + '(\'' + p.id + '\')">' +
                 '<div class="project-name" title="' + safeName + '">' + safeName + '</div>' +
                 customerLine +
                 '<div class="project-meta">' +
@@ -575,6 +659,7 @@ function _renderProjects() {
                     (p.cabinet_count ? '<span class="project-meta-item"><i class="fa-solid fa-layer-group"></i> ' + p.cabinet_count + ' ארונות</span>' : '') +
                 '</div>' +
             '</div>' +
+            statusFootHtml +
             '<div class="project-actions">' +
                 openBtnHtml +
                 extendBtnHtml +

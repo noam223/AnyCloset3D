@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mockup — גרסה C סופית (לאישור)</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #1e3a5f;
+            --text: #0f172a;
+            --text-2: #334155;
+            --muted: #64748b;
+            --border: #e2e8f0;
+            --border-l: #f1f5f9;
+            --transition: 200ms cubic-bezier(0.4,0,0.2,1);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Rubik', sans-serif;
+            background: #e8edf3;
+            color: var(--text);
+            padding: 32px 24px 64px;
+        }
+        .page-head {
+            max-width: 1100px;
+            margin: 0 auto 28px;
+            text-align: center;
+        }
+        .page-head h1 { font-size: 1.55rem; font-weight: 800; margin-bottom: 8px; }
+        .page-head p { color: var(--muted); line-height: 1.65; max-width: 640px; margin: 0 auto; font-size: .92rem; }
+        .approve-badge {
+            display: inline-flex; align-items: center; gap: 8px;
+            margin-top: 14px; padding: 8px 16px; border-radius: 999px;
+            background: #ecfdf5; color: #047857; border: 2px solid #a7f3d0;
+            font-size: .82rem; font-weight: 800;
+        }
+        .preview-wrap {
+            max-width: 1100px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 28px;
+            box-shadow: 0 8px 32px rgba(15,23,42,.08);
+            border: 1px solid var(--border);
+        }
+        .preview-note {
+            font-size: .84rem; color: var(--muted); margin-bottom: 22px; line-height: 1.55;
+            padding: 14px 16px; background: #f8fafc; border-radius: 12px; border: 1px solid var(--border);
+        }
+        .projects-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 22px;
+        }
+        @media (max-width: 900px) { .projects-grid { grid-template-columns: 1fr; } }
+
+        /* ── Exact styles from projects.html (version C + body tint) ── */
+        .project-card {
+            background: #fff;
+            border-radius: 16px;
+            overflow: hidden;
+            transition: box-shadow 300ms cubic-bezier(0.34,1.56,0.64,1), transform 300ms cubic-bezier(0.34,1.56,0.64,1);
+            position: relative;
+            box-shadow: 0 1px 4px rgba(28,25,23,.07);
+            border: 1px solid var(--border-l);
+            display: flex;
+            flex-direction: column;
+        }
+        .project-card:hover {
+            box-shadow: 0 12px 40px rgba(28,25,23,.12), 0 0 0 2px rgba(37,99,235,0.12);
+            transform: translateY(-6px) scale(1.01);
+        }
+        .project-card.status-quote { box-shadow: 0 4px 18px rgba(37,99,235,.1); }
+        .project-card.status-ordered { box-shadow: 0 4px 18px rgba(5,150,105,.1); }
+        .project-card.status-production { box-shadow: 0 4px 18px rgba(234,88,12,.1); }
+
+        .project-thumb {
+            width: 100%; height: 200px;
+            background: linear-gradient(135deg,#ddd5c8 0%,#c8bfb2 100%);
+            display: flex; align-items: center; justify-content: center;
+            overflow: hidden; position: relative; cursor: pointer; flex-shrink: 0;
+            border-bottom: 4px solid transparent;
+        }
+        .project-card.status-quote .project-thumb { border-bottom-color: #2563eb; }
+        .project-card.status-ordered .project-thumb { border-bottom-color: #059669; }
+        .project-card.status-production .project-thumb { border-bottom-color: #ea580c; }
+
+        .project-thumb::after {
+            content: ''; position: absolute; inset: 0;
+            background: linear-gradient(180deg,transparent 40%,rgba(28,25,23,.5) 100%);
+            opacity: 0; transition: opacity var(--transition);
+            z-index: 4; pointer-events: none;
+        }
+        .project-card:hover .project-thumb::after { opacity: 1; }
+
+        .project-thumb img {
+            width: 100%; height: 100%; object-fit: cover;
+            transition: transform .5s ease; position: relative; z-index: 0;
+        }
+        .project-card:hover .project-thumb img { transform: scale(1.05); }
+
+        .project-thumb-icon {
+            font-size: 3.2rem; color: rgba(255,255,255,.35);
+            position: relative; z-index: 0;
+        }
+
+        .project-status-chip {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+            width: 76px; height: 76px; border-radius: 20px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 4px; font-size: .62rem; font-weight: 800; text-align: center; line-height: 1.15;
+            box-shadow: 0 8px 28px rgba(0,0,0,.28);
+            border: 3px solid rgba(255,255,255,.92);
+            z-index: 3; pointer-events: none;
+        }
+        .project-status-chip i { font-size: 1.35rem; }
+        .project-status-chip.status-quote { background: #2563eb; color: #fff; }
+        .project-status-chip.status-ordered { background: #059669; color: #fff; }
+        .project-status-chip.status-production { background: #ea580c; color: #fff; }
+        .project-card:hover .project-status-chip { opacity: 0; transition: opacity var(--transition); }
+
+        .project-thumb-date {
+            position: absolute; bottom: 10px; left: 10px;
+            background: rgba(28,25,23,.6); color: rgba(255,255,255,.9);
+            font-size: .65rem; font-weight: 500; padding: 3px 9px;
+            border-radius: 7px; backdrop-filter: blur(6px); z-index: 2;
+        }
+        .cabinet-count-badge {
+            position: absolute; top: 10px; right: 10px;
+            background: rgba(30,58,95,.75); color: white;
+            font-size: .65rem; font-weight: 700; padding: 3px 9px;
+            border-radius: 7px; backdrop-filter: blur(6px);
+            display: flex; align-items: center; gap: 4px; z-index: 2;
+        }
+        .project-open-overlay {
+            position: absolute; inset: 0;
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0; transition: opacity var(--transition); z-index: 5;
+        }
+        .project-card:hover .project-open-overlay { opacity: 1; }
+        .project-open-btn {
+            background: rgba(255,255,255,.95); color: var(--primary);
+            border: none; border-radius: 12px; padding: 10px 22px;
+            font-size: .85rem; font-weight: 800; font-family: inherit; cursor: pointer;
+            display: flex; align-items: center; gap: 7px;
+            box-shadow: 0 4px 20px rgba(0,0,0,.3);
+            transform: translateY(6px); transition: transform var(--transition);
+        }
+        .project-card:hover .project-open-btn { transform: translateY(0); }
+
+        /* ★ Body tint behind project name */
+        .project-body {
+            padding: 18px 20px 14px; flex: 1; cursor: pointer;
+            transition: background var(--transition);
+        }
+        .project-body.status-quote {
+            background: linear-gradient(180deg, rgba(219,234,254,.72) 0%, rgba(239,246,255,.35) 100%);
+        }
+        .project-body.status-ordered {
+            background: linear-gradient(180deg, rgba(167,243,208,.62) 0%, rgba(236,253,245,.3) 100%);
+        }
+        .project-body.status-production {
+            background: linear-gradient(180deg, rgba(254,215,170,.68) 0%, rgba(255,247,237,.32) 100%);
+        }
+
+        .project-name {
+            font-size: 1rem; font-weight: 800; color: var(--text);
+            margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .project-customer {
+            font-size: .78rem; color: var(--text-2); margin-bottom: 6px;
+            display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+        }
+        .project-customer-name { font-weight: 600; }
+        .project-order-num { color: var(--muted); font-weight: 500; display: inline-flex; align-items: center; gap: 3px; }
+        .project-customer-sep { color: #cbd5e1; }
+        .project-meta {
+            font-size: .75rem; color: var(--muted);
+            display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        }
+        .project-meta-item { display: flex; align-items: center; gap: 4px; }
+
+        .project-status-foot {
+            margin: 0 14px 12px;
+            border-radius: 12px;
+            padding: 11px 14px;
+            display: flex; align-items: center; justify-content: space-between;
+            font-size: .8rem; font-weight: 800;
+            cursor: pointer; font-family: inherit;
+            border: 2px solid transparent;
+            transition: opacity var(--transition), transform var(--transition);
+        }
+        .project-status-foot:hover { opacity: .92; transform: translateY(-1px); }
+        .project-status-foot.status-quote { background: #dbeafe; color: #1e40af; border-color: rgba(37,99,235,.25); }
+        .project-status-foot.status-ordered { background: #a7f3d0; color: #065f46; border-color: rgba(5,150,105,.25); }
+        .project-status-foot.status-production { background: #fed7aa; color: #9a3412; border-color: rgba(234,88,12,.25); }
+        .project-status-foot-left { display: flex; align-items: center; gap: 8px; }
+        .project-status-foot-left i { font-size: 1rem; }
+        .project-status-foot-hint { font-size: .68rem; font-weight: 600; opacity: .75; }
+
+        .project-actions { display: flex; gap: 8px; padding: 0 20px 18px; }
+        .btn-card {
+            flex: 1; padding: 10px 8px; border-radius: 11px;
+            border: 1.5px solid var(--border); background: var(--border-l);
+            font-size: .78rem; font-weight: 700; font-family: inherit; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 5px;
+            color: var(--text-2);
+        }
+        .btn-card.primary {
+            background: linear-gradient(135deg,var(--primary) 0%,#2a4f80 100%);
+            color: white; border-color: transparent;
+        }
+        .btn-card.danger {
+            flex: 0 0 40px; color: #ef4444;
+            border-color: #fecaca; background: #fff5f5;
+        }
+
+        .legend {
+            display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;
+            margin-top: 24px; font-size: .78rem; color: var(--muted);
+        }
+        .legend span { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+        .legend i { width: 12px; height: 12px; border-radius: 4px; display: inline-block; }
+        .legend .q i { background: #2563eb; }
+        .legend .o i { background: #059669; }
+        .legend .p i { background: #ea580c; }
+
+        .pick-note {
+            max-width: 1100px; margin: 24px auto 0;
+            text-align: center; color: var(--muted); font-size: .9rem;
+            padding: 18px 20px; background: #fff; border-radius: 14px;
+            border: 2px dashed #cbd5e1;
+        }
+        .pick-note strong { color: var(--text); }
+    </style>
+</head>
+<body>
+
+<div class="page-head">
+    <h1>Mockup — גרסה C סופית</h1>
+    <p>Chip על התמונה · tint צבעוני מאחורי שם הפרויקט · פס סטטוס לחיץ · כפתורי פעולה<br>זהה לקוד שממתין לאישור ב-<code>projects.html</code></p>
+    <div class="approve-badge"><i class="fa-solid fa-eye"></i> ריחוף על כרטיס = chip נעלם + כפתור "פתח לעריכה"</div>
+</div>
+
+<div class="preview-wrap">
+    <div class="preview-note">
+        <strong>מה חדש לעומת mockup הקודם:</strong> אזור שם הפרויקט + לקוח + תאריך מקבל רקע gradient בצבע הסטטוס (כחול / ירוק / כתום). שאר הכרטיס (כפתורים) נשאר לבן.
+    </div>
+
+    <div class="projects-grid">
+
+        <!-- הצעת מחיר -->
+        <article class="project-card status-quote">
+            <div class="project-thumb">
+                <i class="fa-solid fa-cabinet-filing project-thumb-icon"></i>
+                <div class="project-status-chip status-quote">
+                    <i class="fa-solid fa-file-invoice-dollar"></i>
+                    <span>הצעת<br>מחיר</span>
+                </div>
+                <div class="project-thumb-date"><i class="fa-regular fa-clock" style="margin-left:4px"></i> לפני 24 שעות</div>
+                <div class="cabinet-count-badge"><i class="fa-solid fa-layer-group"></i> 3</div>
+                <div class="project-open-overlay">
+                    <button class="project-open-btn"><i class="fa-solid fa-pencil-ruler"></i> פתח לעריכה</button>
+                </div>
+            </div>
+            <div class="project-body status-quote">
+                <div class="project-name">שני עזרא</div>
+                <div class="project-customer">
+                    <span class="project-customer-name">אסתר לב</span>
+                    <span class="project-customer-sep">·</span>
+                    <span class="project-order-num"><i class="fa-solid fa-hashtag"></i> 1421</span>
+                </div>
+                <div class="project-meta">
+                    <span class="project-meta-item"><i class="fa-regular fa-calendar"></i> לפני 24 שעות</span>
+                    <span class="project-meta-item"><i class="fa-solid fa-layer-group"></i> 3 ארונות</span>
+                </div>
+            </div>
+            <button type="button" class="project-status-foot status-quote">
+                <span class="project-status-foot-left"><i class="fa-solid fa-file-invoice-dollar"></i> הצעת מחיר</span>
+                <span class="project-status-foot-hint">לחץ לשינוי ▾</span>
+            </button>
+            <div class="project-actions">
+                <button class="btn-card primary"><i class="fa-solid fa-pencil-ruler"></i> פתח</button>
+                <button class="btn-card"><i class="fa-solid fa-pen"></i> שנה שם</button>
+                <button class="btn-card danger"><i class="fa-solid fa-trash"></i></button>
+            </div>
+        </article>
+
+        <!-- בוצע הזמנה -->
+        <article class="project-card status-ordered">
+            <div class="project-thumb">
+                <i class="fa-solid fa-cabinet-filing project-thumb-icon"></i>
+                <div class="project-status-chip status-ordered">
+                    <i class="fa-solid fa-circle-check"></i>
+                    <span>בוצע<br>הזמנה</span>
+                </div>
+                <div class="project-thumb-date"><i class="fa-regular fa-clock" style="margin-left:4px"></i> לפני 21 שעות</div>
+                <div class="cabinet-count-badge"><i class="fa-solid fa-layer-group"></i> 2</div>
+                <div class="project-open-overlay">
+                    <button class="project-open-btn"><i class="fa-solid fa-pencil-ruler"></i> פתח לעריכה</button>
+                </div>
+            </div>
+            <div class="project-body status-ordered">
+                <div class="project-name">עפרה כ"ץ</div>
+                <div class="project-customer">
+                    <span class="project-customer-name">עינת</span>
+                    <span class="project-customer-sep">·</span>
+                    <span class="project-order-num"><i class="fa-solid fa-hashtag"></i> 1418</span>
+                </div>
+                <div class="project-meta">
+                    <span class="project-meta-item"><i class="fa-regular fa-calendar"></i> לפני 21 שעות</span>
+                    <span class="project-meta-item"><i class="fa-solid fa-layer-group"></i> 2 ארונות</span>
+                </div>
+            </div>
+            <button type="button" class="project-status-foot status-ordered">
+                <span class="project-status-foot-left"><i class="fa-solid fa-circle-check"></i> בוצע הזמנה</span>
+                <span class="project-status-foot-hint">לחץ לשינוי ▾</span>
+            </button>
+            <div class="project-actions">
+                <button class="btn-card primary"><i class="fa-solid fa-pencil-ruler"></i> פתח</button>
+                <button class="btn-card"><i class="fa-solid fa-pen"></i> שנה שם</button>
+                <button class="btn-card danger"><i class="fa-solid fa-trash"></i></button>
+            </div>
+        </article>
+
+        <!-- נשלח לייצור -->
+        <article class="project-card status-production">
+            <div class="project-thumb">
+                <i class="fa-solid fa-cabinet-filing project-thumb-icon"></i>
+                <div class="project-status-chip status-production">
+                    <i class="fa-solid fa-industry"></i>
+                    <span>נשלח<br>לייצור</span>
+                </div>
+                <div class="project-thumb-date"><i class="fa-regular fa-clock" style="margin-left:4px"></i> לפני 10 שעות</div>
+                <div class="cabinet-count-badge"><i class="fa-solid fa-layer-group"></i> 4</div>
+                <div class="project-open-overlay">
+                    <button class="project-open-btn"><i class="fa-solid fa-pencil-ruler"></i> פתח לעריכה</button>
+                </div>
+            </div>
+            <div class="project-body status-production">
+                <div class="project-name">נטע מיימון</div>
+                <div class="project-customer">
+                    <span class="project-customer-name">נאוה דמרי</span>
+                    <span class="project-customer-sep">·</span>
+                    <span class="project-order-num"><i class="fa-solid fa-hashtag"></i> 1432</span>
+                </div>
+                <div class="project-meta">
+                    <span class="project-meta-item"><i class="fa-regular fa-calendar"></i> לפני 10 שעות</span>
+                    <span class="project-meta-item"><i class="fa-solid fa-layer-group"></i> 4 ארונות</span>
+                </div>
+            </div>
+            <button type="button" class="project-status-foot status-production">
+                <span class="project-status-foot-left"><i class="fa-solid fa-industry"></i> נשלח לייצור</span>
+                <span class="project-status-foot-hint">לחץ לשינוי ▾</span>
+            </button>
+            <div class="project-actions">
+                <button class="btn-card primary"><i class="fa-solid fa-pencil-ruler"></i> פתח</button>
+                <button class="btn-card"><i class="fa-solid fa-pen"></i> שנה שם</button>
+                <button class="btn-card danger"><i class="fa-solid fa-trash"></i></button>
+            </div>
+        </article>
+
+    </div>
+
+    <div class="legend">
+        <span class="q"><i></i> הצעת מחיר — כחול</span>
+        <span class="o"><i></i> בוצע הזמנה — ירוק</span>
+        <span class="p"><i></i> נשלח לייצור — כתום</span>
+    </div>
+</div>
+
+<p class="pick-note">
+    ✅ <strong>מאשר?</strong> כתוב "מאשר" ואעשה push ל-production.<br>
+    ✏️ <strong>שינויים?</strong> למשל: tint חזק יותר / חלש יותר, chip קטן יותר, בלי chip ב-hover — כתוב מה לשנות.
+</p>
+
+</body>
+</html>

@@ -644,17 +644,21 @@ window.Auth = {
 
 window.Projects = {
 
+    ORDER_STATUS_KEYS: ['quote', 'ordered', 'production', 'service', 'installed'],
+
     ORDER_STATUSES: {
         quote:      'הצעת מחיר',
-        ordered:    'בוצע הזמנה',
-        production: 'נשלח לייצור'
+        ordered:    'בוצעה הזמנה',
+        production: 'נשלח לייצור',
+        service:    'קריאת שירות',
+        installed:  'התקנה הושלמה'
     },
 
     _extractProjectMeta: function(projectData) {
         if (!projectData) return {};
         const cust = projectData.customer || {};
         const status = projectData.orderStatus || 'quote';
-        const valid = ['quote', 'ordered', 'production'];
+        const valid = this.ORDER_STATUS_KEYS;
         return {
             customer_name:       (cust.name || '').trim() || null,
             customer_order_num:  (cust.orderNum || '').trim() || null,
@@ -798,7 +802,7 @@ window.Projects = {
     // ── Update order status only ─────────────────────────────────────────────
     updateOrderStatus: async function(projectId, status) {
         const sb = _getClient(); if (!sb) return { error: 'SDK not loaded' };
-        const valid = ['quote', 'ordered', 'production'];
+        const valid = this.ORDER_STATUS_KEYS;
         if (valid.indexOf(status) === -1) return { error: 'סטטוס לא תקין' };
 
         let { data, error } = await sb

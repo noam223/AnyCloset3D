@@ -167,7 +167,7 @@
                 var snap = typeof proj.project_data === 'string'
                     ? JSON.parse(proj.project_data)
                     : proj.project_data;
-                var _validStatuses = ['quote', 'ordered', 'production'];
+                var _validStatuses = (Projects && Projects.ORDER_STATUS_KEYS) || ['quote', 'ordered', 'production', 'service', 'installed'];
                 var _loadedStatus = proj.order_status || (snap && snap.orderStatus) || 'quote';
                 window._currentOrderStatus = _validStatuses.indexOf(_loadedStatus) !== -1 ? _loadedStatus : 'quote';
                 if (typeof window._syncOrderStatusUI === 'function') window._syncOrderStatusUI();
@@ -593,7 +593,7 @@ window._syncOrderStatusUI = function() {
 };
 
 window._setProjectOrderStatus = async function(status) {
-    var valid = ['quote', 'ordered', 'production'];
+    var valid = (Projects && Projects.ORDER_STATUS_KEYS) || ['quote', 'ordered', 'production', 'service', 'installed'];
     if (valid.indexOf(status) === -1) return;
     if (status === window._currentOrderStatus) return;
 
@@ -610,7 +610,8 @@ window._setProjectOrderStatus = async function(status) {
 
     window._isDirty = true;
     var labels = (Projects && Projects.ORDER_STATUSES) || {
-        quote: 'הצעת מחיר', ordered: 'בוצע הזמנה', production: 'נשלח לייצור'
+        quote: 'הצעת מחיר', ordered: 'בוצעה הזמנה', production: 'נשלח לייצור',
+        service: 'קריאת שירות', installed: 'התקנה הושלמה'
     };
     if (typeof _showToast === 'function') _showToast('סטטוס: ' + (labels[status] || status), 2500);
 };

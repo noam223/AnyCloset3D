@@ -511,6 +511,16 @@ body {
     border-color: #f97316;
     color: #c2410c;
 }
+.sidebar-status-btn.active[data-status="service"] {
+    background: #f5f3ff;
+    border-color: #8b5cf6;
+    color: #6d28d9;
+}
+.sidebar-status-btn.active[data-status="installed"] {
+    background: #f0fdfa;
+    border-color: #14b8a6;
+    color: #0f766e;
+}
 #chat-unread-badge {
     display: none;
     position: absolute;
