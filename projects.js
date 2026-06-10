@@ -529,7 +529,7 @@ function _renderProjects() {
             customerLine = '<div class="project-customer">' + parts.join('<span class="project-customer-sep">·</span>') + '</div>';
         }
         var statusBadgeHtml =
-            '<button type="button" class="project-status-badge status-' + orderStatus + '" ' +
+            '<button type="button" class="project-thumb-status status-' + orderStatus + '" ' +
             'onclick="event.stopPropagation(); startStatusChange(\'' + p.id + '\')" title="לחץ לשינוי סטטוס">' +
             '<i class="fa-solid fa-circle-dot"></i> ' + statusLabel +
             '</button>';
@@ -559,14 +559,14 @@ function _renderProjects() {
 
         var openFn = isLocked ? 'openLockedProject' : 'openProject';
         card.innerHTML =
-            '<div class="project-thumb" onclick="' + openFn + '(\'' + p.id + '\')">' +
+            '<div class="project-thumb status-' + orderStatus + '" onclick="' + openFn + '(\'' + p.id + '\')">' +
                 thumbHtml +
+                statusBadgeHtml +
                 '<div class="project-thumb-date"><i class="fa-regular fa-clock" style="margin-left:4px"></i>' + dateStr + '</div>' +
                 cabinetBadge +
                 (!isLocked ? '<div class="project-open-overlay"><button class="project-open-btn" onclick="openProject(\'' + p.id + '\')"><i class="fa-solid fa-pencil-ruler"></i> פתח לעריכה</button></div>' : '') +
             '</div>' +
             lockBadgeHtml +
-            statusBadgeHtml +
             '<div class="project-body" onclick="' + openFn + '(\'' + p.id + '\')">' +
                 '<div class="project-name" title="' + safeName + '">' + safeName + '</div>' +
                 customerLine +

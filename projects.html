@@ -99,13 +99,22 @@
         .project-card:hover { box-shadow: var(--shadow-lg), 0 0 0 2px rgba(37,99,235,0.12); transform: translateY(-6px) scale(1.01); }
         .project-card.is-locked { border-color: #fca5a5; }
         .project-thumb { width: 100%; height: 200px; background: linear-gradient(135deg,#ddd5c8 0%,#c8bfb2 100%); display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; cursor: pointer; flex-shrink: 0; }
-        .project-thumb::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg,transparent 40%,rgba(28,25,23,.5) 100%); opacity: 0; transition: opacity var(--transition); }
+        .project-thumb::before { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0.28; transition: opacity var(--transition); }
+        .project-thumb.status-quote::before { background: linear-gradient(180deg, rgba(59,130,246,0.55) 0%, rgba(59,130,246,0.08) 42%, transparent 68%); }
+        .project-thumb.status-ordered::before { background: linear-gradient(180deg, rgba(16,185,129,0.55) 0%, rgba(16,185,129,0.08) 42%, transparent 68%); }
+        .project-thumb.status-production::before { background: linear-gradient(180deg, rgba(249,115,22,0.55) 0%, rgba(249,115,22,0.08) 42%, transparent 68%); }
+        .project-thumb::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg,transparent 40%,rgba(28,25,23,.5) 100%); opacity: 0; transition: opacity var(--transition); z-index: 1; pointer-events: none; }
         .project-card:hover .project-thumb::after { opacity: 1; }
-        .project-thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform .5s ease; }
+        .project-thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform .5s ease; position: relative; z-index: 0; }
         .project-card:hover .project-thumb img { transform: scale(1.05); }
-        .project-thumb-icon { font-size: 3.2rem; color: rgba(255,255,255,.35); }
+        .project-thumb-icon { font-size: 3.2rem; color: rgba(255,255,255,.35); position: relative; z-index: 0; }
         .project-thumb-date { position: absolute; bottom: 10px; left: 10px; background: rgba(28,25,23,.6); color: rgba(255,255,255,.9); font-size: .65rem; font-weight: 500; padding: 3px 9px; border-radius: 7px; backdrop-filter: blur(6px); z-index: 2; }
-        .cabinet-count-badge { position: absolute; top: 10px; right: 10px; background: rgba(30,58,95,.75); color: white; font-size: .65rem; font-weight: 700; padding: 3px 9px; border-radius: 7px; backdrop-filter: blur(6px); display: flex; align-items: center; gap: 4px; z-index: 2; }
+        .project-thumb-status { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: flex-start; gap: 6px; font-size: .72rem; font-weight: 700; padding: 9px 14px; border: none; width: 100%; cursor: pointer; font-family: inherit; transition: opacity var(--transition); text-align: right; z-index: 3; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+        .project-thumb-status:hover { opacity: .92; }
+        .project-thumb-status.status-quote { background: rgba(239,246,255,0.94); color: #1d4ed8; border-bottom: 2px solid rgba(59,130,246,0.35); }
+        .project-thumb-status.status-ordered { background: rgba(236,253,245,0.94); color: #047857; border-bottom: 2px solid rgba(16,185,129,0.35); }
+        .project-thumb-status.status-production { background: rgba(255,247,237,0.94); color: #c2410c; border-bottom: 2px solid rgba(249,115,22,0.35); }
+        .cabinet-count-badge { position: absolute; top: 44px; right: 10px; background: rgba(30,58,95,.75); color: white; font-size: .65rem; font-weight: 700; padding: 3px 9px; border-radius: 7px; backdrop-filter: blur(6px); display: flex; align-items: center; gap: 4px; z-index: 2; }
         .project-open-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity var(--transition); z-index: 3; }
         .project-card:hover .project-open-overlay { opacity: 1; }
         .project-open-btn { background: rgba(255,255,255,.95); color: var(--primary); border: none; border-radius: 12px; padding: 10px 22px; font-size: .85rem; font-weight: 800; font-family: inherit; cursor: pointer; display: flex; align-items: center; gap: 7px; box-shadow: 0 4px 20px rgba(0,0,0,.3); transform: translateY(6px); transition: transform var(--transition); }
@@ -116,11 +125,6 @@
         .project-customer-name { font-weight: 600; }
         .project-order-num { color: var(--muted); font-weight: 500; display: inline-flex; align-items: center; gap: 3px; }
         .project-customer-sep { color: #cbd5e1; }
-        .project-status-badge { display: inline-flex; align-items: center; gap: 6px; font-size: .72rem; font-weight: 700; padding: 6px 20px; border: none; border-bottom: 1px solid var(--border-l); width: 100%; cursor: pointer; font-family: inherit; transition: opacity var(--transition); text-align: right; }
-        .project-status-badge:hover { opacity: .85; }
-        .project-status-badge.status-quote { background: linear-gradient(90deg,#eff6ff,#f0f9ff); color: #1d4ed8; }
-        .project-status-badge.status-ordered { background: linear-gradient(90deg,#ecfdf5,#f0fdf4); color: #047857; }
-        .project-status-badge.status-production { background: linear-gradient(90deg,#fff7ed,#fffbeb); color: #c2410c; }
         .projects-search-wrap { position: relative; flex: 1; max-width: 360px; min-width: 200px; }
         .projects-search-wrap i { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: .85rem; pointer-events: none; }
         .projects-search-input { width: 100%; height: 42px; border: 1.5px solid var(--border); border-radius: 12px; padding: 0 40px 0 14px; font-size: .88rem; font-family: inherit; color: var(--text); background: var(--bg-card); outline: none; transition: border-color var(--transition), box-shadow var(--transition); direction: rtl; }
@@ -840,6 +844,6 @@
 </div>
 
 <script src="auth.js?v=20260608h"></script>
-<script src="projects.js?v=20260608i"></script>
+<script src="projects.js?v=20260608j"></script>
 </body>
 </html>
