@@ -523,7 +523,7 @@ function _renderProjects() {
 
     var countEl = document.getElementById('content-count');
     if (countEl) {
-        var filtered = !_allStatusFiltersActive() || _searchQuery;
+        var filtered = _statusFilter !== 'all' || _searchQuery;
         countEl.textContent = filtered
             ? (visible.length + ' מתוך ' + _projects.length + ' פרויקטים')
             : (_projects.length + ' פרויקטים');
@@ -543,9 +543,9 @@ function _renderProjects() {
     }
 
     if (visible.length === 0) {
-        var emptyHint = _searchQuery && !_allStatusFiltersActive()
+        var emptyHint = _searchQuery && _statusFilter !== 'all'
             ? 'נסה חיפוש אחר או שנה את סינון הסטטוס'
-            : (_searchQuery ? 'נסה חיפוש אחר או נקה את שדה החיפוש' : 'נסה לבחור סטטוסים נוספים בסינון');
+            : (_searchQuery ? 'נסה חיפוש אחר או נקה את שדה החיפוש' : 'אין פרויקטים בסטטוס זה — נסה לבחור "הכל"');
         grid.innerHTML =
             '<div class="empty-state">' +
                 '<div class="empty-state-icon"><i class="fa-solid fa-magnifying-glass"></i></div>' +
