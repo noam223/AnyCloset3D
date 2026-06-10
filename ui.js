@@ -893,8 +893,8 @@ const HANDLE_CATALOG = [
     },
     {
         id: 'pipe',
-        label: 'צינור',
-        sub: 'ידית צינור אופקית',
+        label: 'חיצונית',
+        sub: 'ידית חיצונית אופקית',
         svgPath: `<svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" width="28" height="28">
             <rect x="6" y="15" width="24" height="6" rx="3" fill="currentColor"/>
             <rect x="9" y="12" width="2" height="12" rx="1" fill="currentColor" opacity="0.5"/>
@@ -1370,7 +1370,7 @@ function updateToolbarButtonHighlights() {
     }
 
     // ── Handle picker button visibility ──
-    const _handleLabels = { pipe: 'צינור', riding: 'רוכבת', touch: 'ללא ידית' };
+    const _handleLabels = { pipe: 'חיצונית', riding: 'רוכבת', touch: 'ללא ידית' };
     const tbHandlePickerRow = document.getElementById('tb-handle-picker-row');
     const tbHandlePickerDoorRow = document.getElementById('tb-handle-picker-door-row');
 
@@ -1392,7 +1392,7 @@ function updateToolbarButtonHighlights() {
     if (_showHandleForCell && !_isSliding) {
         const resolvedCell = _cellHandleStyle || state.handleStyle || 'pipe';
         const labelEl = document.getElementById('tb-handle-picker-label');
-        if (labelEl) labelEl.textContent = 'ידית: ' + (_handleLabels[resolvedCell] || 'צינור');
+        if (labelEl) labelEl.textContent = 'ידית: ' + (_handleLabels[resolvedCell] || 'חיצונית');
         const tbHandleBtn = document.getElementById('tb-btn-handle-picker');
         if (tbHandleBtn) tbHandleBtn.classList.toggle('active', !!_cellHandleStyle);
     }
@@ -1400,7 +1400,7 @@ function updateToolbarButtonHighlights() {
     if (_showHandleForDoor && !_isSliding && existingDoor) {
         const resolvedDoor = existingDoor.handleStyle || state.handleStyle || 'pipe';
         const doorLabelEl = document.getElementById('tb-handle-picker-door-label');
-        if (doorLabelEl) doorLabelEl.textContent = 'ידית: ' + (_handleLabels[resolvedDoor] || 'צינור');
+        if (doorLabelEl) doorLabelEl.textContent = 'ידית: ' + (_handleLabels[resolvedDoor] || 'חיצונית');
         const tbHandleDoorBtn = document.getElementById('tb-btn-handle-picker-door');
         if (tbHandleDoorBtn) tbHandleDoorBtn.classList.toggle('active', !!existingDoor.handleStyle);
     }
@@ -5543,7 +5543,7 @@ function bindUI() {
             dimsStr: `רוחב: ${state.width} ס"מ | גובה: ${state.globalHeight} ס"מ | עומק: ${state.depth} ס"מ`,
             material: state.boardMaterial === 'melamine' ? 'מלמין' : "סנדביץ'",
             handle: (function() {
-                const labels = { pipe: 'ידית צינור', riding: 'ידית רוכבת', touch: "ידית טאצ'" };
+                const labels = { pipe: 'ידית חיצונית', riding: 'ידית רוכבת', touch: "ידית טאצ'" };
                 const style = labels[state.handleStyle] || labels.pipe;
                 const model = (state.handleType || '').trim();
                 return model ? style + ' — ' + model : style;
