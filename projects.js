@@ -6,6 +6,8 @@ var _projects            = [];
 var _plan                = null;
 var _renameId            = null;
 var _deleteId            = null;
+var _statusChangeId      = null;
+var _searchQuery         = '';
 var _selectedUpgradePlan = null;
 var _toastTimer          = null;
 var _devicesList         = [];
@@ -417,10 +419,43 @@ function _renderPlanBar() {
     }
 }
 
+// ── Order status helpers ──────────────────────────────────────────────────────
+function _orderStatusLabel(status) {
+    var map = (window.Projects && Projects.ORDER_STATUSES) || {
+        quote: 'הצעת מחיר', ordered: 'בוצע הזמנה', production: 'נשלח לייצור'
+    };
+    return map[status] || map.quote;
+}
+
+function _normalizeOrderStatus(status) {
+    return (status === 'ordered' || status === 'production') ? status : 'quote';
+}
+
+function _projectMatchesSearch(p) {
+    if (!_searchQuery) return true;
+    var q = _searchQuery.toLowerCase();
+    var fields = [p.name, p.customer_name, p.customer_order_num];
+    return fields.some(function(f) { return f && String(f).toLowerCase().indexOf(q) !== -1; });
+}
+
+function onProjectsSearch(value) {
+    _searchQuery = (value || '').trim();
+    _renderProjects();
+}
+
 // ── Projects grid ─────────────────────────────────────────────────────────────
 function _renderProjects() {
     var grid = document.getElementById('projects-grid');
     grid.innerHTML = '';
+
+    var visible = _projects.filter(_projectMatchesSearch);
+
+    var countEl = document.getElementById('content-count');
+    if (countEl) {
+        countEl.textContent = _searchQuery
+            ? (visible.length + ' מתוך ' + _projects.length + ' פרויקטים')
+            : (_projects.length + ' פרויקטים');
+    }
 
     if (_projects.length === 0) {
         grid.innerHTML =
@@ -435,7 +470,17 @@ function _renderProjects() {
         return;
     }
 
-    _projects.forEach(function(p) {
+    if (visible.length === 0) {
+        grid.innerHTML =
+            '<div class="empty-state">' +
+                '<div class="empty-state-icon"><i class="fa-solid fa-magnifying-glass"></i></div>' +
+                '<h3>לא נמצאו פרויקטים</h3>' +
+                '<p>נסה חיפוש אחר או נקה את שדה החיפוש</p>' +
+            '</div>';
+        return;
+    }
+
+    visible.forEach(function(p) {
         var card     = document.createElement('div');
         card.className  = 'project-card';
         card.dataset.id = p.id;
@@ -458,6 +503,20 @@ function _renderProjects() {
 
         var dateStr  = _formatDate(p.updated_at);
         var safeName = _esc(p.name);
+        var orderStatus = _normalizeOrderStatus(p.order_status);
+        var statusLabel = _orderStatusLabel(orderStatus);
+        var customerLine = '';
+        if (p.customer_name || p.customer_order_num) {
+            var parts = [];
+            if (p.customer_name) parts.push('<span class="project-customer-name">' + _esc(p.customer_name) + '</span>');
+            if (p.customer_order_num) parts.push('<span class="project-order-num"><i class="fa-solid fa-hashtag"></i> ' + _esc(p.customer_order_num) + '</span>');
+            customerLine = '<div class="project-customer">' + parts.join('<span class="project-customer-sep">·</span>') + '</div>';
+        }
+        var statusBadgeHtml =
+            '<button type="button" class="project-status-badge status-' + orderStatus + '" ' +
+            'onclick="event.stopPropagation(); startStatusChange(\'' + p.id + '\')" title="לחץ לשינוי סטטוס">' +
+            '<i class="fa-solid fa-circle-dot"></i> ' + statusLabel +
+            '</button>';
         var thumbHtml = p.thumbnail
             ? '<img src="' + p.thumbnail + '" alt="' + safeName + '" loading="lazy">'
             : '<i class="fa-solid fa-cabinet-filing project-thumb-icon"></i>';
@@ -491,8 +550,10 @@ function _renderProjects() {
                 (!isLocked ? '<div class="project-open-overlay"><button class="project-open-btn" onclick="openProject(\'' + p.id + '\')"><i class="fa-solid fa-pencil-ruler"></i> פתח לעריכה</button></div>' : '') +
             '</div>' +
             lockBadgeHtml +
+            statusBadgeHtml +
             '<div class="project-body" onclick="' + openFn + '(\'' + p.id + '\')">' +
                 '<div class="project-name" title="' + safeName + '">' + safeName + '</div>' +
+                customerLine +
                 '<div class="project-meta">' +
                     '<span class="project-meta-item"><i class="fa-regular fa-calendar"></i> ' + dateStr + '</span>' +
                     (p.cabinet_count ? '<span class="project-meta-item"><i class="fa-solid fa-layer-group"></i> ' + p.cabinet_count + ' ארונות</span>' : '') +
@@ -671,6 +732,36 @@ async function confirmDelete() {
             ? 'אין פרויקטים עדיין'
             : _projects.length + ' פרויקט' + (_projects.length !== 1 ? 'ים' : '');
     showToast('הפרויקט נמחק', 'success');
+}
+
+// ── Order status change ───────────────────────────────────────────────────────
+function startStatusChange(id) {
+    var p = _projects.find(function(x) { return x.id === id; });
+    if (!p) return;
+    _statusChangeId = id;
+    document.getElementById('status-change-project-name').textContent = p.name || '';
+    var current = _normalizeOrderStatus(p.order_status);
+    document.querySelectorAll('#status-options .status-option').forEach(function(btn) {
+        btn.classList.toggle('selected', btn.dataset.status === current);
+    });
+    openModal('modal-status');
+}
+
+async function confirmStatusChange(status) {
+    if (!_statusChangeId) return;
+    status = _normalizeOrderStatus(status);
+    closeModal('modal-status');
+
+    var result = await Projects.updateOrderStatus(_statusChangeId, status);
+    if (result.error) {
+        showToast(result.error, 'error');
+        return;
+    }
+    var p = _projects.find(function(x) { return x.id === _statusChangeId; });
+    if (p) p.order_status = status;
+    _renderProjects();
+    showToast('סטטוס ההזמנה עודכן — ' + _orderStatusLabel(status), 'success');
+    _statusChangeId = null;
 }
 
 // ── Upgrade modal ─────────────────────────────────────────────────────────────

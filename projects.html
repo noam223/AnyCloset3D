@@ -112,6 +112,30 @@
         .project-card:hover .project-open-btn { transform: translateY(0); }
         .project-body { padding: 18px 20px 14px; flex: 1; cursor: pointer; }
         .project-name { font-size: 1rem; font-weight: 800; color: var(--text); margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.02em; }
+        .project-customer { font-size: .78rem; color: var(--text-2); margin-bottom: 6px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; line-height: 1.4; }
+        .project-customer-name { font-weight: 600; }
+        .project-order-num { color: var(--muted); font-weight: 500; display: inline-flex; align-items: center; gap: 3px; }
+        .project-customer-sep { color: #cbd5e1; }
+        .project-status-badge { display: inline-flex; align-items: center; gap: 6px; font-size: .72rem; font-weight: 700; padding: 6px 20px; border: none; border-bottom: 1px solid var(--border-l); width: 100%; cursor: pointer; font-family: inherit; transition: opacity var(--transition); text-align: right; }
+        .project-status-badge:hover { opacity: .85; }
+        .project-status-badge.status-quote { background: linear-gradient(90deg,#eff6ff,#f0f9ff); color: #1d4ed8; }
+        .project-status-badge.status-ordered { background: linear-gradient(90deg,#ecfdf5,#f0fdf4); color: #047857; }
+        .project-status-badge.status-production { background: linear-gradient(90deg,#fff7ed,#fffbeb); color: #c2410c; }
+        .projects-search-wrap { position: relative; flex: 1; max-width: 360px; min-width: 200px; }
+        .projects-search-wrap i { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: .85rem; pointer-events: none; }
+        .projects-search-input { width: 100%; height: 42px; border: 1.5px solid var(--border); border-radius: 12px; padding: 0 40px 0 14px; font-size: .88rem; font-family: inherit; color: var(--text); background: var(--bg-card); outline: none; transition: border-color var(--transition), box-shadow var(--transition); direction: rtl; }
+        .projects-search-input:focus { border-color: var(--secondary); box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+        .status-options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+        .status-option { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 2px solid var(--border); border-radius: 14px; background: var(--border-l); cursor: pointer; font-family: inherit; font-size: .92rem; font-weight: 700; color: var(--text-2); transition: all var(--transition); text-align: right; width: 100%; }
+        .status-option:hover { border-color: #c8d4e4; background: white; }
+        .status-option.selected { border-color: var(--secondary); background: #eff6ff; color: var(--primary); }
+        .status-option.status-quote.selected { border-color: #3b82f6; background: #eff6ff; color: #1d4ed8; }
+        .status-option.status-ordered.selected { border-color: #10b981; background: #ecfdf5; color: #047857; }
+        .status-option.status-production.selected { border-color: #f97316; background: #fff7ed; color: #c2410c; }
+        .status-option-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+        .status-option.status-quote .status-option-dot { background: #3b82f6; }
+        .status-option.status-ordered .status-option-dot { background: #10b981; }
+        .status-option.status-production .status-option-dot { background: #f97316; }
         .project-meta { font-size: .75rem; color: var(--muted); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         .project-meta-item { display: flex; align-items: center; gap: 4px; }
         .project-actions { display: flex; gap: 8px; padding: 0 20px 18px; }
@@ -376,6 +400,10 @@
         <div class="page-tab active" id="tab-projects">
             <div class="content-header">
                 <div class="content-title">כל הפרויקטים</div>
+                <div class="projects-search-wrap">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="search" class="projects-search-input" id="projects-search" placeholder="חיפוש לפי שם פרויקט, לקוח או מספר רכש..." oninput="onProjectsSearch(this.value)">
+                </div>
                 <div class="content-count" id="content-count"></div>
             </div>
             <div class="projects-grid" id="projects-grid">
@@ -686,6 +714,33 @@
 .renders-gallery-dl:hover { color: #7c3aed; }
 </style>
 
+<!-- Modal: Order status -->
+<div class="modal-overlay" id="modal-status">
+    <div class="modal-box">
+        <div class="modal-title"><i class="fa-solid fa-clipboard-list"></i> סטטוס הזמנה</div>
+        <p style="font-size:.88rem;color:var(--muted);margin-bottom:16px;line-height:1.5;">
+            בחר סטטוס עבור <strong id="status-change-project-name"></strong>:
+        </p>
+        <div class="status-options" id="status-options">
+            <button type="button" class="status-option status-quote" data-status="quote" onclick="confirmStatusChange('quote')">
+                <span class="status-option-dot"></span>
+                <span>הצעת מחיר</span>
+            </button>
+            <button type="button" class="status-option status-ordered" data-status="ordered" onclick="confirmStatusChange('ordered')">
+                <span class="status-option-dot"></span>
+                <span>בוצע הזמנה</span>
+            </button>
+            <button type="button" class="status-option status-production" data-status="production" onclick="confirmStatusChange('production')">
+                <span class="status-option-dot"></span>
+                <span>נשלח לייצור</span>
+            </button>
+        </div>
+        <div class="modal-actions">
+            <button class="btn-modal ghost" onclick="closeModal('modal-status')">ביטול</button>
+        </div>
+    </div>
+</div>
+
 <!-- Modal: Rename -->
 <div class="modal-overlay" id="modal-rename">
     <div class="modal-box">
@@ -773,7 +828,7 @@
     <span id="toast-text"></span>
 </div>
 
-<script src="auth.js?v=20260608f"></script>
-<script src="projects.js?v=20260608g"></script>
+<script src="auth.js?v=20260608h"></script>
+<script src="projects.js?v=20260608h"></script>
 </body>
 </html>

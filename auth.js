@@ -644,13 +644,31 @@ window.Auth = {
 
 window.Projects = {
 
+    ORDER_STATUSES: {
+        quote:      'הצעת מחיר',
+        ordered:    'בוצע הזמנה',
+        production: 'נשלח לייצור'
+    },
+
+    _extractProjectMeta: function(projectData) {
+        if (!projectData) return {};
+        const cust = projectData.customer || {};
+        const status = projectData.orderStatus || 'quote';
+        const valid = ['quote', 'ordered', 'production'];
+        return {
+            customer_name:       (cust.name || '').trim() || null,
+            customer_order_num:  (cust.orderNum || '').trim() || null,
+            order_status:        valid.indexOf(status) !== -1 ? status : 'quote'
+        };
+    },
+
     // ── List all projects for current user ───────────────────────────────────
     list: async function() {
         const sb = _getClient(); if (!sb) return [];
         // Try full column list first; fall back to minimal columns if schema migration hasn't run yet
         let { data, error } = await sb
             .from('projects')
-            .select('id, name, thumbnail, created_at, updated_at, locked_at, extension_expires_at, lock_extensions, cabinet_count')
+            .select('id, name, thumbnail, created_at, updated_at, locked_at, extension_expires_at, lock_extensions, cabinet_count, order_status, customer_name, customer_order_num')
             .order('updated_at', { ascending: false });
         if (error) {
             console.warn('Projects.list full select failed (' + (error.message || error) + '), retrying with minimal columns');
@@ -694,29 +712,62 @@ window.Projects = {
             }
         }
 
+        const meta = projectData != null ? this._extractProjectMeta(projectData) : {};
         const payload = {
             name,
             updated_at: new Date().toISOString(),
             ...(projectData != null && { project_data: projectData }),
             ...(thumbnail && { thumbnail }),
-            ...(cabinetCount != null && { cabinet_count: cabinetCount })
+            ...(cabinetCount != null && { cabinet_count: cabinetCount }),
+            ...(projectData != null && {
+                customer_name: meta.customer_name || null,
+                customer_order_num: meta.customer_order_num || null,
+                order_status: meta.order_status
+            })
+        };
+
+        const _stripMetaFields = function(obj) {
+            var copy = Object.assign({}, obj);
+            delete copy.customer_name;
+            delete copy.customer_order_num;
+            delete copy.order_status;
+            return copy;
         };
 
         if (projectId) {
-            const { data, error } = await sb
+            let { data, error } = await sb
                 .from('projects')
                 .update(payload)
                 .eq('id', projectId)
                 .select()
                 .single();
+            if (error && projectData != null) {
+                const res2 = await sb
+                    .from('projects')
+                    .update(_stripMetaFields(payload))
+                    .eq('id', projectId)
+                    .select()
+                    .single();
+                data = res2.data;
+                error = res2.error;
+            }
             if (error) return { error: error.message };
             return { data };
         } else {
-            const { data, error } = await sb
+            let { data, error } = await sb
                 .from('projects')
                 .insert({ ...payload, user_id: user.id })
                 .select()
                 .single();
+            if (error && projectData != null) {
+                const res2 = await sb
+                    .from('projects')
+                    .insert({ ..._stripMetaFields(payload), user_id: user.id })
+                    .select()
+                    .single();
+                data = res2.data;
+                error = res2.error;
+            }
             if (error) return { error: error.message };
             return { data };
         }
@@ -742,6 +793,45 @@ window.Projects = {
         const { error } = await sb.from('projects').delete().eq('id', projectId);
         if (error) return { error: error.message };
         return { success: true };
+    },
+
+    // ── Update order status only ─────────────────────────────────────────────
+    updateOrderStatus: async function(projectId, status) {
+        const sb = _getClient(); if (!sb) return { error: 'SDK not loaded' };
+        const valid = ['quote', 'ordered', 'production'];
+        if (valid.indexOf(status) === -1) return { error: 'סטטוס לא תקין' };
+
+        let { data, error } = await sb
+            .from('projects')
+            .update({ order_status: status, updated_at: new Date().toISOString() })
+            .eq('id', projectId)
+            .select('id, order_status')
+            .single();
+
+        if (error) {
+            const { data: proj, error: loadErr } = await sb
+                .from('projects')
+                .select('project_data')
+                .eq('id', projectId)
+                .single();
+            if (loadErr || !proj) return { error: error.message || loadErr.message };
+
+            let pd = proj.project_data || {};
+            if (typeof pd === 'string') {
+                try { pd = JSON.parse(pd); } catch (e) { pd = {}; }
+            }
+            pd.orderStatus = status;
+
+            const res2 = await sb
+                .from('projects')
+                .update({ project_data: pd, updated_at: new Date().toISOString() })
+                .eq('id', projectId)
+                .select('id')
+                .single();
+            if (res2.error) return { error: res2.error.message };
+            return { data: { id: projectId, order_status: status } };
+        }
+        return { data };
     },
 
     // ── Rename project ───────────────────────────────────────────────────────

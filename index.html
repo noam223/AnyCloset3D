@@ -37,7 +37,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260608d">
     <link rel="stylesheet" href="style-mobile.css?v=20260607b">
     <link rel="stylesheet" href="style-extras.css?v=20260607b">
-    <link rel="stylesheet" href="style.css?v=20260608aa">
+    <link rel="stylesheet" href="style.css?v=20260608ab">
     <style>
         html.thumb-only-mode #left-sidebar,
         html.thumb-only-mode #right-sidebar,
@@ -897,6 +897,14 @@
                     <i class="fa-solid fa-note-sticky"></i> תיקונים
                 </button>
                 <span id="chat-unread-badge">0</span>
+            </div>
+        </div>
+        <div class="left-sidebar-status-row">
+            <div class="sidebar-status-label"><i class="fa-solid fa-clipboard-list"></i> סטטוס הזמנה</div>
+            <div class="sidebar-status-btns" id="sidebar-order-status">
+                <button type="button" class="sidebar-status-btn" data-status="quote" onclick="window._setProjectOrderStatus('quote')">הצעת מחיר</button>
+                <button type="button" class="sidebar-status-btn" data-status="ordered" onclick="window._setProjectOrderStatus('ordered')">בוצע הזמנה</button>
+                <button type="button" class="sidebar-status-btn" data-status="production" onclick="window._setProjectOrderStatus('production')">נשלח לייצור</button>
             </div>
         </div>
         <div id="sidebar-cabinets-label" class="sidebar-cabinets-label">
@@ -2285,7 +2293,7 @@
 <script src="ui.js?v=20260608ab"></script>
 <script src="mobile.js?v=20260608a"></script>
 <script src="part-paint.js?v=20260520k"></script>
-<script src="index-init.js?v=20260608n"></script>
+<script src="index-init.js?v=20260608o"></script>
 
 <!-- ===== TAMBOUR FULL PALETTE MODAL ===== -->
 <div id="tambour-palette-modal" class="tambour-palette-overlay">

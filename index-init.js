@@ -167,6 +167,10 @@
                 var snap = typeof proj.project_data === 'string'
                     ? JSON.parse(proj.project_data)
                     : proj.project_data;
+                var _validStatuses = ['quote', 'ordered', 'production'];
+                var _loadedStatus = proj.order_status || (snap && snap.orderStatus) || 'quote';
+                window._currentOrderStatus = _validStatuses.indexOf(_loadedStatus) !== -1 ? _loadedStatus : 'quote';
+                if (typeof window._syncOrderStatusUI === 'function') window._syncOrderStatusUI();
                 if (snap && typeof state !== 'undefined') {
                     // Restore wings FIRST (before proxy fields) to avoid writing flat fields
                     // to the wrong wing via the proxy setters
@@ -319,6 +323,7 @@
             presetId:      state.presetId,
             orderCart:         lightCart,
             customer:          state.customer,
+            orderStatus:       window._currentOrderStatus || 'quote',
             roomWall:          window._roomWall || state.roomWall || 'center',
             closureEnabled:    (window._closureEnabled !== undefined) ? window._closureEnabled : true,
             closureWidth:      window._closureWidth      || 1.8,
@@ -537,6 +542,7 @@ window._saveProjectNow = async function() {
             presetId:      state.presetId,
             orderCart:     lightCart,
             customer:      state.customer,
+            orderStatus:   window._currentOrderStatus || 'quote',
             tambourPalette: state.tambourPalette || {},
             blueprintCutouts: state.blueprintCutouts || [],
             blueprintCellDimOffsets: state.blueprintCellDimOffsets || {}
@@ -576,6 +582,40 @@ function _escHtml(str) {
         .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
         .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
+
+window._currentOrderStatus = window._currentOrderStatus || 'quote';
+
+window._syncOrderStatusUI = function() {
+    var status = window._currentOrderStatus || 'quote';
+    document.querySelectorAll('#sidebar-order-status .sidebar-status-btn').forEach(function(btn) {
+        btn.classList.toggle('active', btn.dataset.status === status);
+    });
+};
+
+window._setProjectOrderStatus = async function(status) {
+    var valid = ['quote', 'ordered', 'production'];
+    if (valid.indexOf(status) === -1) return;
+    if (status === window._currentOrderStatus) return;
+
+    window._currentOrderStatus = status;
+    window._syncOrderStatusUI();
+
+    if (window._currentProjectId && typeof Projects !== 'undefined' && Projects.updateOrderStatus) {
+        var result = await Projects.updateOrderStatus(window._currentProjectId, status);
+        if (result && result.error) {
+            if (typeof _showToast === 'function') _showToast('⚠️ שגיאה בעדכון סטטוס: ' + result.error, 5000);
+            return;
+        }
+    }
+
+    window._isDirty = true;
+    var labels = (Projects && Projects.ORDER_STATUSES) || {
+        quote: 'הצעת מחיר', ordered: 'בוצע הזמנה', production: 'נשלח לייצור'
+    };
+    if (typeof _showToast === 'function') _showToast('סטטוס: ' + (labels[status] || status), 2500);
+};
+
+window._syncOrderStatusUI();
 
 // ── Inline project name editor (left sidebar) ───────────────────────────────
 window._commitProjectNameEdit = async function() {
