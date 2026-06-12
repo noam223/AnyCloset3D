@@ -1725,6 +1725,9 @@ function buildCabinet() {
     if (!inEditMode || savedActiveWing === 'center') {
         const scData = centerWing ? centerWing.sideCabinet : null;
         if (scData && scData.side !== 'none' && scData.columns && scData.columns.length > 0) {
+            if (!scData.hasDoors && scData.columns.some(c => c.doors && c.doors.length > 0)) {
+                scData.hasDoors = true;
+            }
             const scSideVal = scData.side;
             if (scSideVal === 'right' || scSideVal === 'both') {
                 _renderOneSideCabinet(scData, 'right', 'sideCabinetRight', false);
@@ -1739,6 +1742,9 @@ function buildCabinet() {
     if (inEditMode && (savedActiveWing === 'sideCabinetRight' || savedActiveWing === 'sideCabinetLeft')) {
         const scData = centerWing ? centerWing.sideCabinet : null;
         if (scData && scData.columns && scData.columns.length > 0) {
+            if (!scData.hasDoors && scData.columns.some(c => c.doors && c.doors.length > 0)) {
+                scData.hasDoors = true;
+            }
             const centerD2 = centerWing ? centerWing.depth : 54;
             const _editSide2 = (savedActiveWing === 'sideCabinetRight') ? 'right' : 'left';
             const doorExtra2 = _sideCabDoorExtraForSide(centerWing, _editSide2);

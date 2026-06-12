@@ -3047,13 +3047,13 @@ window._generateMultiViewBlueprintPages = function() {
                     const shelvesArr = (col.shelvesY || []).slice().sort((a,b) => a-b);
                     const _splitYSCAdj = _splitYSC;
                     const _splitTopSCAdj = _splitYSC > 0 ? _splitYSC + _splitTSC : 0;
+                    const _rowBaseSC = _bpRowBaseCm(col, colPlinthH);
                     let _allBoundsSC = [...shelvesArr];
                     if (_splitYSC > _rowBaseSC && _splitYSC < scH) {
                         if (!_allBoundsSC.includes(_splitYSCAdj)) _allBoundsSC.push(_splitYSCAdj);
                         if (_splitTopSCAdj < scH && !_allBoundsSC.includes(_splitTopSCAdj)) _allBoundsSC.push(_splitTopSCAdj);
                         _allBoundsSC.sort((a,b) => a-b);
                     }
-                    const _rowBaseSC = _bpRowBaseCm(col, colPlinthH);
                     const rowBounds = [_rowBaseSC, ..._allBoundsSC.filter(sy => sy > _rowBaseSC), scH];
                     const numRows = rowBounds.length - 1;
                     const _t_shelfSC = state.thickness || 1.7;

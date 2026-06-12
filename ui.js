@@ -4872,10 +4872,17 @@ function bindUI() {
 
     document.getElementById('inp-has-doors').addEventListener('change', (e) => {
         const val = e.target.checked;
-        // Update hasDoors on ALL wings so the toggle affects the entire cabinet
-        ['center', 'left', 'right'].forEach(side => {
-            if (state.wings[side]) state.wings[side].hasDoors = val;
-        });
+        const aw = state.activeWing;
+        if (aw === 'sideCabinetRight' || aw === 'sideCabinetLeft') {
+            const sc = state.wings.center && state.wings.center.sideCabinet;
+            if (sc) sc.hasDoors = val;
+        } else {
+            ['center', 'left', 'right'].forEach(side => {
+                if (state.wings[side]) state.wings[side].hasDoors = val;
+            });
+            const sc = state.wings.center && state.wings.center.sideCabinet;
+            if (sc && sc.side !== 'none') sc.hasDoors = val;
+        }
         state.manualPrice = null;
         buildCabinet(); saveHistoryState();
     });
@@ -5426,6 +5433,9 @@ function bindUI() {
     });
 
     document.getElementById('btn-add-to-cart').addEventListener('click', () => {
+        if (state.wingEditMode && typeof window.confirmWingEdit === 'function') {
+            window.confirmWingEdit();
+        }
         const preview = window._captureCabinetPreviewImages();
         const imgWithDoors = preview.imgDoors;
         const imgNoDoors = preview.imgOpen;
@@ -5537,6 +5547,18 @@ function bindUI() {
             };
         }
 
+        let multiViewPages = [];
+        let multiViewSVG = null;
+        try {
+            multiViewSVG = preview.multiViewSVG || ((typeof window._generateMultiViewBlueprintSVG === 'function')
+                ? window._generateMultiViewBlueprintSVG() : null);
+            multiViewPages = preview.multiViewPages.length ? preview.multiViewPages
+                : ((typeof window._generateMultiViewBlueprintPages === 'function')
+                ? window._generateMultiViewBlueprintPages().map(pg => pg.svg) : []);
+        } catch (bpErr) {
+            console.warn('[add-to-cart] blueprint generation failed:', bpErr);
+        }
+
         const cabinetSpec = {
             customName: state.cabinetName, cabinetNotes: (state.cabinetNotes || '').trim(), modelName: modelNameText, plinthType: plinthTypeText,
             placement: placementHebrew[state.placement] || 'ארון קיר חופשי',
@@ -5563,11 +5585,8 @@ function bindUI() {
             imgDoors: imgWithDoors, imgOpen: imgNoDoors, imgBlueprint: imgBlueprint,
             corner: state.corner ? JSON.parse(JSON.stringify(state.corner)) : null,
             slidingDoor: slidingDoorSpec,
-            multiViewSVG: preview.multiViewSVG || ((typeof window._generateMultiViewBlueprintSVG === 'function')
-                ? window._generateMultiViewBlueprintSVG() : null),
-            multiViewPages: preview.multiViewPages.length ? preview.multiViewPages
-                : ((typeof window._generateMultiViewBlueprintPages === 'function')
-                ? window._generateMultiViewBlueprintPages().map(pg => pg.svg) : [])
+            multiViewSVG: multiViewSVG,
+            multiViewPages: multiViewPages
         };
 
         const cartItem = { spec: cabinetSpec, rawState: rawState };
@@ -6403,6 +6422,16 @@ function _countCabinetContentFromRawState(rawState) {
             merged.drawersExt += c.drawersExt;
             merged.openCells += c.openCells;
         });
+        const sc = rawState.wings.center && rawState.wings.center.sideCabinet;
+        if (sc && sc.side !== 'none' && Array.isArray(sc.columns)) {
+            const c = _countCabinetContent(sc.columns);
+            merged.shelves += c.shelves;
+            merged.hanging += c.hanging;
+            merged.sorbet += c.sorbet;
+            merged.drawersInt += c.drawersInt;
+            merged.drawersExt += c.drawersExt;
+            merged.openCells += c.openCells;
+        }
         return merged;
     }
     return _countCabinetContent(rawState.columns);
