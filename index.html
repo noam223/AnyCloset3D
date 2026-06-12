@@ -689,6 +689,13 @@
                 </div>
                 <!-- Desk drawer count (shown when type=desk) -->
                 <div id="corner-desk-drawer-section" style="display:none;">
+                    <div class="control-group" style="margin-bottom:8px;">
+                        <button type="button" id="corner-desk-float-btn" onclick="updateCorner('deskFloating', !(state.corner && state.corner.deskFloating))"
+                            style="width:100%;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.78rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all 0.18s;">
+                            <i class="fa-solid fa-feather-pointed"></i>
+                            <span>שולחן מרחף (ללא רגל בקצה)</span>
+                        </button>
+                    </div>
                     <div class="control-group" style="margin-bottom:6px;">
                         <div class="label-row"><span>מגירות מתחת לשולחן</span><span id="val-corner-desk-drawers" class="value-badge">0</span></div>
                         <div class="slider-row">
@@ -2286,11 +2293,11 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js"></script>
-<script src="state.js?v=20260608x"></script>
+<script src="state.js?v=20260608y"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="engine-core.js?v=20260608z"></script>
-<script src="engine-corners.js?v=20260608f"></script>
-<script src="engine-blueprint.js?v=20260608al"></script>
+<script src="engine-corners.js?v=20260608g"></script>
+<script src="engine-blueprint.js?v=20260608am"></script>
 <script src="tambour-color-picker.js?v=20260608a"></script>
 <script src="ui.js?v=20260608ad"></script>
 <script src="mobile.js?v=20260608a"></script>

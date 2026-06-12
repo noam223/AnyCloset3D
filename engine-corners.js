@@ -418,8 +418,10 @@ function buildCornerUnit() {
         const innerGap = 0.4;
         // Surface: full width × full depth (28mm thick)
         addBoard(cuD, deskT, cuW, 0, deskH - deskT / 2, 0, matDesk);
-        // Back leg at far Z (outer end wall, far from main cabinet front face)
-        addBoard(cuD, deskH, t, 0, deskH / 2, backWallZ, matDesk);
+        // Back leg at far Z (outer end) — omitted when deskFloating
+        if (!cu.deskFloating) {
+            addBoard(cuD, deskH, t, 0, deskH / 2, backWallZ, matDesk);
+        }
         // Drawers under desk — internal fronts inside frame, external handles
         const numDeskDrawers = Math.min(cu.deskDrawerCount || 0, 3);
         if (numDeskDrawers > 0) {

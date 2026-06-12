@@ -1410,6 +1410,14 @@ window.syncSidebarToWing = function() {
             const ddHEl = document.getElementById('val-corner-desk-drawer-height');
             if (ddHEl) ddHEl.innerText = ddH + ' ס"מ';
             setVal('inp-corner-desk-drawer-height', ddH);
+            const floatBtn = document.getElementById('corner-desk-float-btn');
+            if (floatBtn) {
+                const isFloat = !!w.corner.deskFloating;
+                floatBtn.classList.toggle('active', isFloat);
+                floatBtn.style.background = isFloat ? 'var(--accent)' : 'var(--bg-light)';
+                floatBtn.style.color = isFloat ? 'white' : 'var(--text-dark)';
+                floatBtn.style.borderColor = isFloat ? 'var(--accent)' : 'var(--border)';
+            }
         }
     }
 
@@ -2182,6 +2190,15 @@ window.updateCorner = function(field, value) {
         const el = document.getElementById('val-corner-desk-drawer-height');
         if (el) el.innerText = w.corner.deskDrawerHeight + ' ס"מ';
         setVal('inp-corner-desk-drawer-height', w.corner.deskDrawerHeight);
+    } else if (field === 'deskFloating') {
+        w.corner.deskFloating = !!value;
+        const floatBtn = document.getElementById('corner-desk-float-btn');
+        if (floatBtn) {
+            floatBtn.classList.toggle('active', w.corner.deskFloating);
+            floatBtn.style.background = w.corner.deskFloating ? 'var(--accent)' : 'var(--bg-light)';
+            floatBtn.style.color = w.corner.deskFloating ? 'white' : 'var(--text-dark)';
+            floatBtn.style.borderColor = w.corner.deskFloating ? 'var(--accent)' : 'var(--border)';
+        }
     }
     buildCabinet(); calculatePrice(); saveHistoryState();
     updateCameraView();

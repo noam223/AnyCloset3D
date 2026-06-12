@@ -2933,7 +2933,7 @@ window._generateMultiViewBlueprintPages = function() {
             // Desk surface line (top board)
             p.push(`<line x1="${ox.toFixed(1)}" y1="${oy.toFixed(1)}" x2="${(ox+dW).toFixed(1)}" y2="${oy.toFixed(1)}" stroke="${STROKE}" stroke-width="2"/>`);
             // Label
-            p.push(`<text x="${(ox+dW/2).toFixed(1)}" y="${(oy+dH/2+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="14" fill="${STROKE}" opacity="0.5">שולחן פינתי</text>`);
+            p.push(`<text x="${(ox+dW/2).toFixed(1)}" y="${(oy+dH/2+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="14" fill="${STROKE}" opacity="0.5">שולחן פינתי${cu.deskFloating ? ' (מרחף)' : ''}</text>`);
             // Optional drawers under desk
             const numDeskDrawers = cu.deskDrawerCount || 0;
             if (numDeskDrawers > 0) {
