@@ -287,8 +287,14 @@ function _cuGetHandleStyle() {
     return (s === 'touch' || s === 'riding' || s === 'pipe') ? s : 'pipe';
 }
 
-function _cuAddDrawerHandle(dMesh, drawerDepth, drawerFaceH, sign, t) {
-    const style = _cuGetHandleStyle();
+function _cuGetCornerDeskHandleStyle(cu) {
+    if (state.cabinetModel === 'ab2') return 'touch';
+    const s = (cu && cu.deskHandleStyle) || state.handleStyle || 'pipe';
+    return (s === 'touch' || s === 'riding' || s === 'pipe') ? s : 'pipe';
+}
+
+function _cuAddDrawerHandle(dMesh, drawerDepth, drawerFaceH, sign, t, styleOverride) {
+    const style = styleOverride || _cuGetHandleStyle();
     if (style === 'touch') return;
     const faceH = drawerFaceH - 0.5;
     if (style === 'riding') {
@@ -408,28 +414,71 @@ function buildCornerUnit() {
     if (cu.type === 'desk') {
         const matDesk = materials[state.materialDesk] || matBody;
         const deskH = cu.height || 80;
+        const fingerGap = 2.5;
+        const innerGap = 0.4;
         // Surface: full width × full depth (28mm thick)
         addBoard(cuD, deskT, cuW, 0, deskH - deskT / 2, 0, matDesk);
         // Back leg at far Z (outer end wall, far from main cabinet front face)
         addBoard(cuD, deskH, t, 0, deskH / 2, backWallZ, matDesk);
-        // Drawers under desk — internal (recessed inside frame), external handles
+        // Drawers under desk — internal fronts inside frame, external handles
         const numDeskDrawers = Math.min(cu.deskDrawerCount || 0, 3);
         if (numDeskDrawers > 0) {
             const drawerH = cu.deskDrawerHeight || 13;
             const gap = 0.4;
-            const dY = deskH - deskT - drawerH / 2;
-            const fX = sign * (-cuD / 2 + t / 2 + 1.5);
+            const drawerZoneH = numDeskDrawers * drawerH + gap * (numDeskDrawers - 1);
+            const zoneTopY = deskH - deskT;
+            const zoneBotY = zoneTopY - drawerZoneH;
+            const zoneCenterY = (zoneTopY + zoneBotY) / 2;
+            const frameX = sign * (-cuD / 2 + t / 2 + 0.1);
+            const drwFrontX = sign * (-cuD / 2 + t + 1.5);
+            const handleStyle = _cuGetCornerDeskHandleStyle(cu);
+            const actualDrawerH = drawerH - fingerGap;
+            const zLeft = innerCtrZ - innerD / 2 + t / 2;
+            const zRight = innerCtrZ + innerD / 2 - t / 2;
+
+            // Frame rails at opening
+            addBoard(t, t, innerD, frameX, zoneTopY - t / 2, innerCtrZ, matBody);
+            addBoard(t, t, innerD, frameX, zoneBotY + t / 2, innerCtrZ, matBody);
+            addBoard(t, drawerZoneH - t * 2, t, frameX, zoneCenterY, zLeft, matBody);
+            addBoard(t, drawerZoneH - t * 2, t, frameX, zoneCenterY, zRight, matBody);
+
+            const _addFingerGap = (dY, drwW, dZ) => {
+                const backPanel = new THREE.Mesh(
+                    new THREE.BoxGeometry(Math.max(drwW - 2, 1), fingerGap, 0.5),
+                    new THREE.MeshStandardMaterial({ color: 0x222222 })
+                );
+                backPanel.position.set(drwFrontX - sign * (t / 2 + 0.25), dY + drawerH / 2 - fingerGap / 2, dZ);
+                cuGroup.add(backPanel);
+            };
+
             if (numDeskDrawers === 1) {
-                const dMesh = addBoard(t, drawerH - 0.5, innerD, fX, dY, innerCtrZ, matExternal);
-                if (!isBP) _cuAddDrawerHandle(dMesh, innerD, drawerH, sign, t);
+                const dY = zoneTopY - drawerH / 2;
+                const actualDY = dY - fingerGap / 2;
+                const drwW = innerD - innerGap * 2;
+                const dMesh = addBoard(t, actualDrawerH, drwW, drwFrontX, actualDY, innerCtrZ, matInternal);
+                _cuAddDrawerHandle(dMesh, drwW, drawerH, sign, t, handleStyle);
+                _addFingerGap(dY, drwW, innerCtrZ);
             } else {
                 const drawerD = (innerD - gap * (numDeskDrawers + 1)) / numDeskDrawers;
                 for (let i = 0; i < numDeskDrawers; i++) {
                     const dZ = -innerD / 2 + gap + drawerD / 2 + i * (drawerD + gap);
-                    const dMesh = addBoard(t, drawerH - 0.5, drawerD, fX, dY, dZ, matExternal);
-                    if (!isBP) _cuAddDrawerHandle(dMesh, drawerD, drawerH, sign, t);
+                    const dY = zoneTopY - drawerH / 2 - i * (drawerH + gap);
+                    const actualDY = dY - fingerGap / 2;
+                    const drwW = drawerD - innerGap;
+                    const dMesh = addBoard(t, actualDrawerH, drwW, drwFrontX, actualDY, dZ, matInternal);
+                    _cuAddDrawerHandle(dMesh, drwW, drawerH, sign, t, handleStyle);
+                    _addFingerGap(dY, drwW, dZ);
                 }
             }
+        }
+
+        // Hit box — click desk to change drawer handle style
+        if (window.deskHitBoxes) {
+            const hitMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+            const hitBox = new THREE.Mesh(new THREE.BoxGeometry(cuD, deskH, cuW), hitMat);
+            hitBox.userData = { isCornerDesk: true };
+            cuGroup.add(hitBox);
+            window.deskHitBoxes.push(hitBox);
         }
     } else {
         // drawers (default)

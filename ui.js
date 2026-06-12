@@ -912,6 +912,42 @@ const HANDLE_CATALOG = [
     },
 ];
 
+window._handlePickerApply = null;
+
+function _openHandlePickerSheet(currentStyle, descText, onSelect) {
+    window._handlePickerApply = onSelect;
+    const descEl = document.getElementById('handle-picker-desc-text');
+    if (descEl) descEl.textContent = descText;
+
+    const grid = document.getElementById('handle-picker-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    HANDLE_CATALOG.forEach(h => {
+        const card = document.createElement('div');
+        card.className = 'handle-picker-card' + (h.id === currentStyle ? ' active' : '');
+        card.innerHTML = `
+            <div class="handle-picker-icon" style="color:${h.id === currentStyle ? '#fff' : 'var(--primary)'};">${h.svgPath}</div>
+            <div class="handle-picker-name">${h.label}</div>
+            <div class="handle-picker-sub">${h.sub}</div>
+        `;
+        card.addEventListener('click', () => {
+            if (typeof window._handlePickerApply === 'function') window._handlePickerApply(h.id);
+            closeHandlePicker();
+        });
+        grid.appendChild(card);
+    });
+
+    const overlay = document.getElementById('handle-picker-overlay');
+    const sheet = document.getElementById('handle-picker-sheet');
+    if (!overlay || !sheet) return;
+    overlay.style.display = 'flex';
+    sheet.style.transform = 'translateY(100%)';
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => { sheet.style.transform = ''; });
+    });
+    document.body.style.overflow = 'hidden';
+}
+
 window.openHandlePicker = function() {
     const selCol = state.selection.colIndex;
     const col = selCol >= 0 ? state.columns[selCol] : null;
@@ -929,42 +965,25 @@ window.openHandlePicker = function() {
     if (isExtDrawer && firstComp.handleStyle) currentStyle = firstComp.handleStyle;
     else if (existingDoor && existingDoor.handleStyle) currentStyle = existingDoor.handleStyle;
 
-    // Description text
-    const descEl = document.getElementById('handle-picker-desc-text');
-    if (descEl) {
-        if (isExtDrawer && existingDoor) descEl.textContent = 'ידית למגירות החיצוניות ולדלת';
-        else if (isExtDrawer) descEl.textContent = 'ידית למגירות החיצוניות בתא';
-        else descEl.textContent = 'ידית לדלת';
-    }
+    let descText = 'ידית לדלת';
+    if (isExtDrawer && existingDoor) descText = 'ידית למגירות החיצוניות ולדלת';
+    else if (isExtDrawer) descText = 'ידית למגירות החיצוניות בתא';
 
-    // Build grid
-    const grid = document.getElementById('handle-picker-grid');
-    if (!grid) return;
-    grid.innerHTML = '';
-    HANDLE_CATALOG.forEach(h => {
-        const card = document.createElement('div');
-        card.className = 'handle-picker-card' + (h.id === currentStyle ? ' active' : '');
-        card.innerHTML = `
-            <div class="handle-picker-icon" style="color:${h.id === currentStyle ? '#fff' : 'var(--primary)'};">${h.svgPath}</div>
-            <div class="handle-picker-name">${h.label}</div>
-            <div class="handle-picker-sub">${h.sub}</div>
-        `;
-        card.addEventListener('click', () => {
-            applyHandleStyleToCell(h.id);
-            closeHandlePicker();
-        });
-        grid.appendChild(card);
-    });
+    _openHandlePickerSheet(currentStyle, descText, applyHandleStyleToCell);
+};
 
-    const overlay = document.getElementById('handle-picker-overlay');
-    const sheet = document.getElementById('handle-picker-sheet');
-    if (!overlay || !sheet) return;
-    overlay.style.display = 'flex';
-    sheet.style.transform = 'translateY(100%)';
-    requestAnimationFrame(() => {
-        requestAnimationFrame(() => { sheet.style.transform = ''; });
+window.openCornerDeskHandlePicker = function() {
+    const w = getWing();
+    if (!w || !w.corner || w.corner.side === 'none' || w.corner.type !== 'desk') return;
+    const cu = w.corner;
+    let currentStyle = cu.deskHandleStyle || state.handleStyle || 'pipe';
+    if (state.cabinetModel === 'ab2') currentStyle = 'touch';
+    _openHandlePickerSheet(currentStyle, 'ידית למגירות שולחן פינתי', function(style) {
+        cu.deskHandleStyle = style;
+        buildCabinet();
+        calculatePrice();
+        saveHistoryState();
     });
-    document.body.style.overflow = 'hidden';
 };
 
 window.closeHandlePicker = function() {
@@ -5111,8 +5130,8 @@ function bindUI() {
         if (intersects.length > 0) hoverCol = intersects[0].object.userData.colIndex;
 
         // Desk hover detection — show drag handles when hovering anywhere over the external desk
-        const deskIntersects = (typeof deskHitBoxes !== 'undefined' && deskHitBoxes.length > 0)
-            ? raycaster.intersectObjects(deskHitBoxes) : [];
+        const deskIntersects = (window.deskHitBoxes && window.deskHitBoxes.length > 0)
+            ? raycaster.intersectObjects(window.deskHitBoxes) : [];
         const newHoveredDesk = deskIntersects.length > 0;
         if (newHoveredDesk !== !!state.hoveredDesk) {
             state.hoveredDesk = newHoveredDesk;
@@ -5181,6 +5200,8 @@ function bindUI() {
     let _pointerDownWingId = null; // wing hit at pointerdown (for click detection)
     let _pointerDownOnDeadSpace = false; // pointerdown on dead space in wing edit mode
 
+    let _pointerDownCornerDesk = false;
+
     container.addEventListener('pointerdown', (e) => {
         if (e.target.closest('#column-quick-edit') || e.target.closest('#full-corner-quick-edit') || e.target.closest('#bottom-floating-toolbar') || e.target.closest('.drag-handle') || e.target.closest('.dim-container') || e.target.closest('.plus-btn') || e.target.closest('.fc-cell-btn') || e.target.closest('.select-all-col-btn')) return;
         if (e.button !== 0) return;
@@ -5189,6 +5210,7 @@ function bindUI() {
         _pointerDownY = e.clientY;
         _pointerDownWingId = null;
         _pointerDownOnDeadSpace = false;
+        _pointerDownCornerDesk = false;
 
         const rect = container.getBoundingClientRect();
         mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -5222,6 +5244,11 @@ function bindUI() {
             }
         }
 
+        // Corner desk click — change drawer handle style
+        const deskDownHits = (window.deskHitBoxes && window.deskHitBoxes.length > 0)
+            ? raycaster.intersectObjects(window.deskHitBoxes) : [];
+        _pointerDownCornerDesk = deskDownHits.some(h => h.object.userData.isCornerDesk);
+
         // Record which wing was hit at pointerdown (for click detection)
         if (!state._activeUpperUnit && wingHitBoxes && wingHitBoxes.length > 0) {
             // In free mode: record any wing hit. In wing edit mode: only record upperUnit_* hits
@@ -5251,6 +5278,18 @@ function bindUI() {
         mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
         mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
+
+        // Click on corner desk → handle picker
+        if (_pointerDownCornerDesk) {
+            const deskUpHits = (window.deskHitBoxes && window.deskHitBoxes.length > 0)
+                ? raycaster.intersectObjects(window.deskHitBoxes) : [];
+            if (deskUpHits.some(h => h.object.userData.isCornerDesk)) {
+                if (typeof window.openCornerDeskHandlePicker === 'function') {
+                    window.openCornerDeskHandlePicker();
+                }
+                return;
+            }
+        }
 
         // In wing edit mode: click on dead space → exit to free mode
         if (state.wingEditMode && _pointerDownOnDeadSpace) {

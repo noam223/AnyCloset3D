@@ -973,6 +973,7 @@ let _ppPartId = '';
 let hitBoxes = [];
 let wingHitBoxes = [];
 let deskHitBoxes = [];
+window.deskHitBoxes = deskHitBoxes;
 let doorMeshes = [];
 let currentHoveredDoor = null;
 let dragHandlesData = { horizontal: [], vertical: [], roofs: [], desk: [] };
@@ -1304,6 +1305,7 @@ function buildCabinet() {
     hitBoxes = [];
     wingHitBoxes = [];
     deskHitBoxes = [];
+    window.deskHitBoxes = deskHitBoxes;
     doorMeshes = [];
     currentHoveredDoor = null;
     state.dimData = []; state.bpData = [];
