@@ -296,12 +296,15 @@ function _cuGetCornerDeskHandleStyle(cu) {
 function _cuAddDrawerHandle(dMesh, drawerDepth, drawerFaceH, sign, t, styleOverride) {
     const style = styleOverride || _cuGetHandleStyle();
     if (style === 'touch') return;
-    const faceH = drawerFaceH - 0.5;
+    const panelH = drawerFaceH - 0.5;
     if (style === 'riding') {
         const barLen = Math.min(CU_RIDING_HANDLE_LEN, Math.max(8, drawerDepth - 3));
+        const barH = 0.75;
+        const barD = 0.9;
         const mat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.35, roughness: 0.45 });
-        const bar = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.75, barLen), mat);
-        bar.position.set(sign * (-(t / 2) - 0.65), faceH / 2 - 0.5, 0);
+        // X-facing drawer front: horizontal lip on top edge, protruding toward opening
+        const bar = new THREE.Mesh(new THREE.BoxGeometry(barD, barH, barLen), mat);
+        bar.position.set(sign * (-t / 2 - barD / 2 - 0.4), panelH / 2 - barH / 2 - 0.15, 0);
         dMesh.add(bar);
         return;
     }
@@ -432,9 +435,15 @@ function buildCornerUnit() {
             const zoneBotY = zoneTopY - drawerZoneH;
             const zoneCenterY = (zoneTopY + zoneBotY) / 2;
             const frameX = sign * (-cuD / 2 + t / 2 + 0.1);
-            const drwFrontX = sign * (-cuD / 2 + t + 1.5);
+            const drwRecess = 1.5;
+            const openingX = sign * (-cuD / 2);
+            const drwFrontX = openingX + sign * (t / 2 + drwRecess);
+            const drwBackX = sign * (cuD / 2 - t - 1);
+            const boxDepthInner = Math.max(Math.abs(drwBackX - drwFrontX) - t, t);
+            const boxCenterX = drwFrontX + sign * (t + boxDepthInner / 2);
             const handleStyle = _cuGetCornerDeskHandleStyle(cu);
-            const actualDrawerH = drawerH - fingerGap;
+            const useFingerGap = handleStyle === 'touch';
+            const actualDrawerH = useFingerGap ? (drawerH - fingerGap) : drawerH;
             const zLeft = innerCtrZ - innerD / 2 + t / 2;
             const zRight = innerCtrZ + innerD / 2 - t / 2;
 
@@ -453,23 +462,35 @@ function buildCornerUnit() {
                 cuGroup.add(backPanel);
             };
 
+            const _addDrawerBox = (dY, drwW, dZ) => {
+                const actualDY = useFingerGap ? (dY - fingerGap / 2) : dY;
+                const boxH = actualDrawerH;
+                const boxBottomY = actualDY - boxH / 2;
+                const dMesh = addBoard(t, boxH, drwW, drwFrontX, actualDY, dZ, matInternal);
+                if (!isBP) {
+                    _cuAddDrawerHandle(dMesh, drwW, drawerH, sign, t, handleStyle);
+                    if (useFingerGap) _addFingerGap(dY, drwW, dZ);
+                }
+                // Bottom
+                addBoard(boxDepthInner, t, drwW, boxCenterX, boxBottomY + t / 2, dZ, matInternal);
+                // Side walls (Z)
+                addBoard(boxDepthInner, boxH, t, boxCenterX, actualDY, dZ - drwW / 2 + t / 2, matInternal);
+                addBoard(boxDepthInner, boxH, t, boxCenterX, actualDY, dZ + drwW / 2 - t / 2, matInternal);
+                // Back panel (X)
+                addBoard(Math.max(drwW - t * 2, 1), boxH, t, drwBackX, actualDY, dZ, matInternal);
+            };
+
             if (numDeskDrawers === 1) {
                 const dY = zoneTopY - drawerH / 2;
-                const actualDY = dY - fingerGap / 2;
-                const drwW = innerD - innerGap * 2;
-                const dMesh = addBoard(t, actualDrawerH, drwW, drwFrontX, actualDY, innerCtrZ, matInternal);
-                _cuAddDrawerHandle(dMesh, drwW, drawerH, sign, t, handleStyle);
-                _addFingerGap(dY, drwW, innerCtrZ);
+                const drwW = innerD - t * 2;
+                _addDrawerBox(dY, drwW, innerCtrZ);
             } else {
                 const drawerD = (innerD - gap * (numDeskDrawers + 1)) / numDeskDrawers;
                 for (let i = 0; i < numDeskDrawers; i++) {
                     const dZ = -innerD / 2 + gap + drawerD / 2 + i * (drawerD + gap);
                     const dY = zoneTopY - drawerH / 2 - i * (drawerH + gap);
-                    const actualDY = dY - fingerGap / 2;
                     const drwW = drawerD - innerGap;
-                    const dMesh = addBoard(t, actualDrawerH, drwW, drwFrontX, actualDY, dZ, matInternal);
-                    _cuAddDrawerHandle(dMesh, drwW, drawerH, sign, t, handleStyle);
-                    _addFingerGap(dY, drwW, dZ);
+                    _addDrawerBox(dY, drwW, dZ);
                 }
             }
         }

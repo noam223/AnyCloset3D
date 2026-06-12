@@ -696,6 +696,20 @@
                             <span>שולחן מרחף (ללא רגל בקצה)</span>
                         </button>
                     </div>
+                    <div class="control-group" id="corner-desk-handle-row" style="margin-bottom:8px;">
+                        <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:6px;">סוג ידית למגירות</div>
+                        <div class="handle-style-row">
+                            <button type="button" class="corner-desk-handle-btn handle-style-btn" data-style="riding" onclick="updateCornerDeskHandleStyle('riding')" title="ידית רוכבת">
+                                <i class="fa-solid fa-grip-lines"></i><span>רוכבת</span>
+                            </button>
+                            <button type="button" class="corner-desk-handle-btn handle-style-btn" data-style="touch" onclick="updateCornerDeskHandleStyle('touch')" title="ידית טאצ'">
+                                <i class="fa-solid fa-hand-pointer"></i><span>טאצ'</span>
+                            </button>
+                            <button type="button" class="corner-desk-handle-btn handle-style-btn active" data-style="pipe" onclick="updateCornerDeskHandleStyle('pipe')" title="ידית חיצונית">
+                                <i class="fa-solid fa-grip-lines-vertical"></i><span>חיצונית</span>
+                            </button>
+                        </div>
+                    </div>
                     <div class="control-group" style="margin-bottom:6px;">
                         <div class="label-row"><span>מגירות מתחת לשולחן</span><span id="val-corner-desk-drawers" class="value-badge">0</span></div>
                         <div class="slider-row">
@@ -2293,13 +2307,13 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js"></script>
-<script src="state.js?v=20260608y"></script>
+<script src="state.js?v=20260608z"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="engine-core.js?v=20260608z"></script>
-<script src="engine-corners.js?v=20260608g"></script>
+<script src="engine-corners.js?v=20260608i"></script>
 <script src="engine-blueprint.js?v=20260608am"></script>
 <script src="tambour-color-picker.js?v=20260608a"></script>
-<script src="ui.js?v=20260608ad"></script>
+<script src="ui.js?v=20260608ae"></script>
 <script src="mobile.js?v=20260608a"></script>
 <script src="part-paint.js?v=20260520k"></script>
 <script src="index-init.js?v=20260608p"></script>

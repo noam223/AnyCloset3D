@@ -980,6 +980,7 @@ window.openCornerDeskHandlePicker = function() {
     if (state.cabinetModel === 'ab2') currentStyle = 'touch';
     _openHandlePickerSheet(currentStyle, 'ידית למגירות שולחן פינתי', function(style) {
         cu.deskHandleStyle = style;
+        if (typeof window._syncCornerDeskHandleUI === 'function') window._syncCornerDeskHandleUI(w);
         buildCabinet();
         calculatePrice();
         saveHistoryState();

@@ -1289,7 +1289,7 @@ window.syncSidebarToWing = function() {
     setChecked('inp-has-doors', w.hasDoors);
     setVal('inp-handle-type', w.handleType || '');
     const _hs = w.handleStyle || 'pipe';
-    document.querySelectorAll('.handle-style-btn').forEach(b => {
+    document.querySelectorAll('.handle-style-btn:not(.corner-desk-handle-btn)').forEach(b => {
         b.classList.toggle('active', b.dataset.style === _hs);
     });
     document.querySelectorAll('.mobile-handle-style-btn').forEach(b => {
@@ -1418,6 +1418,7 @@ window.syncSidebarToWing = function() {
                 floatBtn.style.color = isFloat ? 'white' : 'var(--text-dark)';
                 floatBtn.style.borderColor = isFloat ? 'var(--accent)' : 'var(--border)';
             }
+            if (typeof window._syncCornerDeskHandleUI === 'function') window._syncCornerDeskHandleUI(w);
         }
     }
 
@@ -2205,14 +2206,37 @@ window.updateCorner = function(field, value) {
 };
 
 // Helper: called by corner-side-btn onclick
+window._syncCornerDeskHandleUI = function(w) {
+    if (!w) w = getWing();
+    if (!w || !w.corner) return;
+    let hs = w.corner.deskHandleStyle || w.handleStyle || 'pipe';
+    if (w.cabinetModel === 'ab2') hs = 'touch';
+    document.querySelectorAll('.corner-desk-handle-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.style === hs);
+    });
+};
+
+window.updateCornerDeskHandleStyle = function(style) {
+    const w = getWing();
+    if (!w || !w.corner || w.corner.side === 'none' || w.corner.type !== 'desk') return;
+    if (w.cabinetModel === 'ab2') style = 'touch';
+    if (style !== 'pipe' && style !== 'riding' && style !== 'touch') return;
+    w.corner.deskHandleStyle = style;
+    window._syncCornerDeskHandleUI(w);
+    buildCabinet();
+    calculatePrice();
+    saveHistoryState();
+};
+
 window.updateHandleStyle = function(style) {
     const w = getWing();
     if (!w) return;
     if (style !== 'pipe' && style !== 'riding' && style !== 'touch') return;
     w.handleStyle = style;
-    document.querySelectorAll('.handle-style-btn, .mobile-handle-style-btn').forEach(b => {
+    document.querySelectorAll('.handle-style-btn:not(.corner-desk-handle-btn), .mobile-handle-style-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.style === style);
     });
+    if (typeof window._syncCornerDeskHandleUI === 'function') window._syncCornerDeskHandleUI(w);
     buildCabinet();
     saveHistoryState();
 };
