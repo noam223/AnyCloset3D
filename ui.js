@@ -4073,14 +4073,17 @@ function updateDragHandlesPosition() {
 
 window._bedDrag      = null;   // { axis:'x'|'z', startMouseX, startMouseY, startVal }
 window._bedHovered   = false;  // true when mouse is near bed center on screen
-const BED_HALF = 100;          // approximate half-size of bed in cm (for wall clamping)
+const BED_HALF = 100;          // fallback half-size (cm) when mesh not yet built
 
-// Clamp bed position to room bounds
+// Clamp bed position to room bounds using actual bed footprint when available
 function _clampBedPos(bp) {
     const b = window._roomBounds;
     if (!b) return bp;
-    bp.x = Math.max(b.leftX  + BED_HALF, Math.min(b.rightX - BED_HALF, bp.x));
-    bp.z = Math.max(b.backZ  + BED_HALF, Math.min(b.frontZ - BED_HALF, bp.z));
+    const ext = (typeof window._getBedClampHalfExtents === 'function')
+        ? window._getBedClampHalfExtents()
+        : { halfX: BED_HALF, halfZ: BED_HALF };
+    bp.x = Math.max(b.leftX + ext.halfX, Math.min(b.rightX - ext.halfX, bp.x));
+    bp.z = Math.max(b.backZ + ext.halfZ, Math.min(b.frontZ - ext.halfZ, bp.z));
     return bp;
 }
 
