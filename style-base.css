@@ -1196,3 +1196,43 @@ body.dragging-v { cursor: ns-resize !important; }
     margin: 0 2px;
     flex-shrink: 0;
 }
+
+/* ---- Room furniture toolbar (bottom bar: bed/chair visibility) ---- */
+.room-furniture-toolbar-inner {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(15, 23, 42, 0.88);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 14px;
+    padding: 6px 10px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+}
+.room-furn-btn {
+    border: none;
+    border-radius: 10px;
+    padding: 8px 14px;
+    background: rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.92);
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    transition: background 0.15s, opacity 0.15s;
+    white-space: nowrap;
+}
+.room-furn-btn:hover {
+    background: rgba(99,102,241,0.55);
+}
+.room-furn-btn:not(.active) {
+    opacity: 0.72;
+    background: rgba(255,255,255,0.06);
+}
+.room-furn-btn:not(.active):hover {
+    opacity: 1;
+    background: rgba(16,185,129,0.45);
+}

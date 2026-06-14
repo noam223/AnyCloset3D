@@ -4215,6 +4215,14 @@ window._updateBedHandles = function() {
         btn.addEventListener('pointerup', function(e) { e.stopPropagation(); });
     });
 
+    const furnBar = document.getElementById('room-furniture-toolbar');
+    if (furnBar) {
+        furnBar.querySelectorAll('button').forEach(function(btn) {
+            btn.addEventListener('pointerdown', function(e) { e.stopPropagation(); });
+            btn.addEventListener('pointerup', function(e) { e.stopPropagation(); });
+        });
+    }
+
     window.addEventListener('pointermove', function(e) {
         const d = window._bedDrag;
         if (!d) return;
@@ -5271,7 +5279,7 @@ function bindUI() {
     });
 
     container.addEventListener('pointerup', (e) => {
-        if (e.target.closest('#column-quick-edit') || e.target.closest('#full-corner-quick-edit') || e.target.closest('#bottom-floating-toolbar') || e.target.closest('.drag-handle') || e.target.closest('.dim-container') || e.target.closest('.plus-btn') || e.target.closest('.fc-cell-btn') || e.target.closest('.select-all-col-btn') || e.target.closest('#bed-toolbar') || e.target.closest('#room-props-row')) return;
+        if (e.target.closest('#column-quick-edit') || e.target.closest('#full-corner-quick-edit') || e.target.closest('#bottom-floating-toolbar') || e.target.closest('.drag-handle') || e.target.closest('.dim-container') || e.target.closest('.plus-btn') || e.target.closest('.fc-cell-btn') || e.target.closest('.select-all-col-btn') || e.target.closest('#bed-toolbar') || e.target.closest('#room-props-row') || e.target.closest('#room-furniture-toolbar')) return;
         if (e.button !== 0) return;
 
         // Only treat as a click if pointer didn't move more than 5px (not a drag)
@@ -5285,26 +5293,6 @@ function bindUI() {
         mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
         mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
-
-        // Room view: click bed/chair to toggle visibility
-        if (window._roomVisible && window._roomGroup) {
-            const roomHits = raycaster.intersectObjects(window._roomGroup.children, true);
-            for (let i = 0; i < roomHits.length; i++) {
-                let obj = roomHits[i].object;
-                while (obj) {
-                    const prop = obj.userData && obj.userData.roomProp;
-                    if (prop === 'bed' && typeof window._toggleBedVisible === 'function') {
-                        window._toggleBedVisible();
-                        return;
-                    }
-                    if (prop === 'chair' && typeof window._toggleChairVisible === 'function') {
-                        window._toggleChairVisible();
-                        return;
-                    }
-                    obj = obj.parent;
-                }
-            }
-        }
 
         // Click on corner desk → handle picker
         if (_pointerDownCornerDesk) {

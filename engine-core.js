@@ -363,7 +363,7 @@ function _getLaptopPos() {
             x: _clampX(cp.cabOffX + cp.cuCenterX),
             y: cp.deskH,
             z: cp.cuCenterZ,
-            rotY: cp.sign === -1 ? Math.PI : 0
+            rotY: cp.sign === -1 ? Math.PI / 2 : -Math.PI / 2
         };
     }
 
@@ -478,28 +478,28 @@ window._toggleChairVisible = function() {
 };
 
 window._updateRoomPropsUI = function() {
-    const bedBtn = document.getElementById('btn-toggle-bed-visible');
-    const chairBtn = document.getElementById('btn-toggle-chair-visible');
+    const _syncToggleBtn = (id, show, hideLabel, showLabel, icon) => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        btn.classList.toggle('active', show);
+        btn.innerHTML = show
+            ? '<i class="fa-solid fa-' + icon + '"></i><span>' + hideLabel + '</span>'
+            : '<i class="fa-solid fa-' + icon + '"></i><span>' + showLabel + '</span>';
+    };
+    const bedShow = window._bedVisible !== false;
+    const chairShow = window._chairVisible !== false;
+    _syncToggleBtn('room-btn-toggle-bed', bedShow, 'הסתר מיטה', 'הצג מיטה', 'bed');
+    _syncToggleBtn('room-btn-toggle-chair', chairShow, 'הסתר כסא', 'הצג כסא', 'chair');
+
     const widthLbl = document.getElementById('bed-width-label');
-    if (bedBtn) {
-        const show = window._bedVisible !== false;
-        bedBtn.classList.toggle('active', show);
-        bedBtn.innerHTML = show
-            ? '<i class="fa-solid fa-bed"></i><span>הסתר מיטה</span>'
-            : '<i class="fa-solid fa-bed"></i><span>הצג מיטה</span>';
-    }
-    if (chairBtn) {
-        const show = window._chairVisible !== false;
-        chairBtn.classList.toggle('active', show);
-        chairBtn.innerHTML = show
-            ? '<i class="fa-solid fa-chair"></i><span>הסתר כסא</span>'
-            : '<i class="fa-solid fa-chair"></i><span>הצג כסא</span>';
-    }
     if (widthLbl) widthLbl.textContent = (window._bedWidthCm || 160) + ' ס"מ';
     const tbWidth = document.getElementById('bed-tb-width-label');
     if (tbWidth) tbWidth.textContent = (window._bedWidthCm || 160);
+
     const propsRow = document.getElementById('room-props-row');
     if (propsRow) propsRow.style.display = window._roomVisible ? '' : 'none';
+    const furnBar = document.getElementById('room-furniture-toolbar');
+    if (furnBar) furnBar.style.display = window._roomVisible ? '' : 'none';
 };
 
 // Rotate bed 90° clockwise on each call
@@ -532,13 +532,13 @@ window._rotateBed = function() {
         const maxDim = Math.max(size.x, size.z); // longest horizontal dimension
         console.log('[bed.glb] raw size:', size.x.toFixed(3), size.y.toFixed(3), size.z.toFixed(3));
         if (maxDim > 0) {
-            // Target: longest side = 200cm. If model is in meters (maxDim ~2), scale = 100.
-            // If model is already in cm (maxDim ~200), scale = 1.
             const targetCm = 200;
             window._bedAutoScale = targetCm / maxDim;
         } else {
-            window._bedAutoScale = 100; // fallback: assume meters
+            window._bedAutoScale = 100;
         }
+        // Shorter horizontal axis = bed width (for width-only scaling)
+        window._bedWidthAxis = size.x <= size.z ? 'x' : 'z';
         console.log('[bed.glb] autoScale:', window._bedAutoScale.toFixed(3));
 
         window._bedGroup = grp;
@@ -877,6 +877,7 @@ function _buildRoom() {
             : (window._bedAutoScale || 100);
         const bedRotRad = ((window._bedRotation || 0) * Math.PI) / 180;
         const widthFactor = (window._bedWidthCm || 160) / 160;
+        const wAx = window._bedWidthAxis || 'x';
 
         const bed = window._bedGroup.clone();
         bed.traverse(function(child) {
@@ -886,7 +887,11 @@ function _buildRoom() {
                 child.userData.roomProp = 'bed';
             }
         });
-        bed.scale.setScalar(bs * widthFactor);
+        bed.scale.set(
+            wAx === 'x' ? bs * widthFactor : bs,
+            bs,
+            wAx === 'z' ? bs * widthFactor : bs
+        );
         bed.rotation.y = bedRotRad;
         bed.updateMatrixWorld(true);
         const bedBox = new THREE.Box3().setFromObject(bed);
