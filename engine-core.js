@@ -233,10 +233,79 @@ window._bedVisible   = window._bedVisible  !== false;                 // show/hi
 window._BED_WIDTHS   = [160, 140, 120, 90];
 
 // ── Office Chair GLB ─────────────────────────────────────────────────────────
-window._chairGroup     = null;
-window._chairAutoScale = null;
-window._chairVisible   = window._chairVisible !== false;
-window._chairMesh      = null;
+window._CHAIR_OPTIONS = [
+    { id: 'chair1', path: 'images/office_chair.glb',  shortName: 'משרדי' },
+    { id: 'chair2', path: 'images/office_chair2.glb', shortName: 'מודרני' }
+];
+window._chairVariantIdx = window._chairVariantIdx || 0;
+window._chairModels     = {};   // id → { group, autoScale }
+window._chairGroup      = null; // active variant (backward compat)
+window._chairAutoScale  = null;
+window._chairVisible    = window._chairVisible !== false;
+window._chairMesh       = null;
+
+function _prepareChairGroup(grp) {
+    grp.traverse(function(child) {
+        if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+            if (child.material) {
+                const mats = Array.isArray(child.material) ? child.material : [child.material];
+                mats.forEach(function(mat) {
+                    if (mat.transparent && mat.opacity < 0.95) {
+                        mat.transparent = false;
+                        mat.opacity = 1;
+                    }
+                });
+            }
+        }
+    });
+    const box = new THREE.Box3().setFromObject(grp);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    const targetH = 120;
+    const autoScale = size.y > 0 ? targetH / size.y : 100;
+    return { group: grp, autoScale: autoScale };
+}
+
+function _getActiveChairModel() {
+    const opt = window._CHAIR_OPTIONS[window._chairVariantIdx || 0];
+    return opt ? window._chairModels[opt.id] : null;
+}
+
+function _syncActiveChairRefs() {
+    const m = _getActiveChairModel();
+    window._chairGroup = m ? m.group : null;
+    window._chairAutoScale = m ? m.autoScale : null;
+}
+
+window._cycleChairVariant = function() {
+    const n = window._CHAIR_OPTIONS.length;
+    if (n <= 1) return;
+    window._chairVariantIdx = ((window._chairVariantIdx || 0) + 1) % n;
+    _syncActiveChairRefs();
+    if (typeof _buildRoom === 'function') _buildRoom();
+    if (typeof window._updateRoomPropsUI === 'function') window._updateRoomPropsUI();
+};
+
+(function _loadChairs() {
+    if (typeof THREE.GLTFLoader === 'undefined') { setTimeout(_loadChairs, 200); return; }
+    const loader = new THREE.GLTFLoader();
+    let pending = window._CHAIR_OPTIONS.length;
+
+    window._CHAIR_OPTIONS.forEach(function(opt, idx) {
+        loader.load(opt.path, function(gltf) {
+            window._chairModels[opt.id] = _prepareChairGroup(gltf.scene);
+            pending--;
+            const activeOpt = window._CHAIR_OPTIONS[window._chairVariantIdx || 0];
+            if (activeOpt && activeOpt.id === opt.id) _syncActiveChairRefs();
+            if (pending === 0 && window._roomVisible && typeof _buildRoom === 'function') _buildRoom();
+        }, undefined, function(err) {
+            console.warn(opt.path + ' load error:', err);
+            pending--;
+        });
+    });
+})();
 
 // ── Laptop GLB ───────────────────────────────────────────────────────────────
 // Loaded once; placed on top of the desk surface when room is shown.
@@ -369,39 +438,6 @@ function _getLaptopPos() {
 
     return null;
 }
-
-(function _loadChair() {
-    if (typeof THREE.GLTFLoader === 'undefined') { setTimeout(_loadChair, 200); return; }
-    const loader = new THREE.GLTFLoader();
-    loader.load('images/office_chair.glb', function(gltf) {
-        const grp = gltf.scene;
-        grp.traverse(function(child) {
-            if (child.isMesh) {
-                child.castShadow = true;
-                child.receiveShadow = true;
-                // Fix transparent materials (e.g. seat cushion with opacity < 1)
-                if (child.material) {
-                    const mats = Array.isArray(child.material) ? child.material : [child.material];
-                    mats.forEach(function(mat) {
-                        if (mat.transparent && mat.opacity < 0.95) {
-                            mat.transparent = false;
-                            mat.opacity = 1;
-                        }
-                    });
-                }
-            }
-        });
-        // Auto-scale: target 60cm longest horizontal dimension (typical chair width)
-        const box = new THREE.Box3().setFromObject(grp);
-        const size = new THREE.Vector3();
-        box.getSize(size);
-        // Scale by height: target 120cm (typical office chair height)
-        const targetH = 120;
-        window._chairAutoScale = size.y > 0 ? targetH / size.y : 100;
-        window._chairGroup = grp;
-        if (window._roomVisible && typeof _buildRoom === 'function') _buildRoom();
-    }, undefined, function(err) { console.warn('office_chair.glb load error:', err); });
-})();
 
 // Compute where to place the chair (world-space X, Z, rotY) based on current desk config.
 // Returns {x, z, rotY} or null if no desk is present.
@@ -559,6 +595,12 @@ window._updateRoomPropsUI = function() {
     const chairShow = window._chairVisible !== false;
     _syncToggleBtn('room-btn-toggle-bed', bedShow, 'הסתר מיטה', 'הצג מיטה', 'bed');
     _syncToggleBtn('room-btn-toggle-chair', chairShow, 'הסתר כסא', 'הצג כסא', 'chair');
+
+    const chairVarLbl = document.getElementById('room-chair-variant-label');
+    if (chairVarLbl) {
+        const opt = window._CHAIR_OPTIONS[window._chairVariantIdx || 0];
+        chairVarLbl.textContent = opt ? opt.shortName : 'משרדי';
+    }
 
     const widthLbl = document.getElementById('bed-width-label');
     if (widthLbl) widthLbl.textContent = (window._bedWidthCm || 160) + ' ס"מ';
@@ -978,11 +1020,12 @@ function _buildRoom() {
 
     // ── Office Chair model ────────────────────────────────────────────────────
     window._chairMesh = null;
-    if (window._chairGroup && window._chairVisible !== false) {
+    const chairModel = _getActiveChairModel();
+    if (chairModel && chairModel.group && window._chairVisible !== false) {
         const cp = _getChairPos();
         if (cp) {
-            const chair = window._chairGroup.clone();
-            const cs = window._chairAutoScale || 100;
+            const chair = chairModel.group.clone();
+            const cs = chairModel.autoScale || 100;
             const rotY = cp.rotY !== undefined ? cp.rotY : -Math.PI / 2;
 
             chair.position.set(0, 0, 0);
