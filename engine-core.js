@@ -273,6 +273,11 @@ function _getActiveChairModel() {
     return opt ? window._chairModels[opt.id] : null;
 }
 
+function _isStoolVariant() {
+    const opt = window._CHAIR_OPTIONS[window._chairVariantIdx || 0];
+    return opt && opt.id === 'chair2';
+}
+
 function _syncActiveChairRefs() {
     const m = _getActiveChairModel();
     window._chairGroup = m ? m.group : null;
@@ -440,11 +445,13 @@ function _getLaptopPos() {
 }
 
 // Compute where to place the chair (world-space X, Z, rotY) based on current desk config.
-// Returns {x, z, rotY} or null if no desk is present.
+// Returns {x, z, rotY, deskFrontZ?, deskPlaneX?, corner?} or null if no desk is present.
 function _getChairPos() {
     const cabD = state.wings && state.wings.center ? (state.wings.center.depth || 54) : (state.depth || 54);
     const cabOffX = cabinetGroup.position.x || 0;
-    const chairZ = cabD / 2 + 33;
+    const isStool = _isStoolVariant();
+    const chairZ = isStool ? cabD / 2 : cabD / 2 + 33;
+    const deskFrontZ = cabD / 2;
 
     const _clampX = (x) => {
         const b = window._roomBounds;
@@ -461,7 +468,7 @@ function _getChairPos() {
         const rawX  = dSide === 'right'
             ? cabOffX + cabW / 2 + dW / 2
             : cabOffX - cabW / 2 - dW / 2;
-        return { x: _clampX(rawX), z: chairZ, rotY: -Math.PI / 2 };
+        return { x: _clampX(rawX), z: chairZ, rotY: -Math.PI / 2, deskFrontZ: deskFrontZ };
     }
 
     // 2. Internal desk column
@@ -472,22 +479,46 @@ function _getChairPos() {
             const col = cols[i];
             if (col.type === 'desk') {
                 const colCenterX = currentX + col.width / 2;
-                return { x: _clampX(colCenterX), z: chairZ, rotY: -Math.PI / 2 };
+                return { x: _clampX(colCenterX), z: chairZ, rotY: -Math.PI / 2, deskFrontZ: deskFrontZ };
             }
             currentX += col.width;
         }
     }
 
-    // 3. Corner desk — sit to the right of desk (toward cabinet), face opening + laptop
+    // 3. Corner desk — sit beside desk, face opening + laptop
     const cp = _getCornerDeskPlacement();
     if (cp) {
-        const chairOffset = 42;
+        const chairOffset = isStool ? 21 : 42;
         const rawX = cp.cabOffX + cp.cuCenterX + (-cp.sign) * chairOffset;
         const rotY = cp.sign === -1 ? 0 : Math.PI;
-        return { x: _clampX(rawX), z: cp.cuCenterZ, rotY };
+        const z = isStool ? cp.cuCenterZ + cp.cuW / 2 : cp.cuCenterZ;
+        return {
+            x: _clampX(rawX),
+            z: z,
+            rotY: rotY,
+            corner: true,
+            deskFrontZ: cp.cuCenterZ + cp.cuW / 2,
+            deskPlaneX: cp.cabOffX + cp.cuCenterX + (-cp.sign) * (cp.cuD / 2)
+        };
     }
 
     return null;
+}
+
+// Stool: align bbox center on desk front plane so half is under desk, half outside.
+function _alignStoolHalfUnderDesk(chair, cp) {
+    if (!_isStoolVariant() || !cp) return;
+    chair.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(chair);
+    const cx = (box.min.x + box.max.x) / 2;
+    const cz = (box.min.z + box.max.z) / 2;
+    if (cp.deskFrontZ != null) chair.position.z += cp.deskFrontZ - cz;
+    if (cp.corner && cp.deskPlaneX != null) {
+        chair.updateMatrixWorld(true);
+        const box2 = new THREE.Box3().setFromObject(chair);
+        const cx2 = (box2.min.x + box2.max.x) / 2;
+        chair.position.x += cp.deskPlaneX - cx2;
+    }
 }
 
 // World-space unit vector along the bed's width axis (XZ plane).
@@ -1043,6 +1074,7 @@ function _buildRoom() {
                 -box.min.y,
                 cp.z - center.z
             );
+            _alignStoolHalfUnderDesk(chair, cp);
             chair.traverse(function(child) {
                 if (child.isMesh) child.userData.roomProp = 'chair';
             });

@@ -425,7 +425,7 @@ function buildCornerUnit() {
         if (!cu.deskFloating) {
             addBoard(cuD, deskH, t, 0, deskH / 2, backWallZ, matDesk);
         }
-        // Drawers under desk — desk-colored carcass shell + external drawer inside frame
+        // Drawers under desk — desk-colored carcass shell + drawer boxes
         const numDeskDrawers = Math.min(cu.deskDrawerCount || 0, 3);
         if (numDeskDrawers > 0) {
             const drawerH = cu.deskDrawerHeight || 13;
@@ -436,7 +436,6 @@ function buildCornerUnit() {
             const zoneCenterY = (zoneTopY + zoneBotY) / 2;
             const drwRecess = 1.5;
             const openingX = sign * (-cuD / 2);
-            const frameX = sign * (-cuD / 2 + t / 2 + 0.1);
             const drwFrontX = openingX + sign * (t / 2 + drwRecess);
             const drwDeepX = sign * (cuD / 2 - t - 1);
             const drwInnerDepth = Math.max(Math.abs(drwDeepX - drwFrontX) - t, t);
@@ -444,8 +443,6 @@ function buildCornerUnit() {
             const handleStyle = _cuGetCornerDeskHandleStyle(cu);
             const useFingerGap = handleStyle === 'touch';
             const actualDrawerH = useFingerGap ? (drawerH - fingerGap) : drawerH;
-            const zLeft = innerCtrZ - innerD / 2 + t / 2;
-            const zRight = innerCtrZ + innerD / 2 - t / 2;
             const carcassW = innerD;
             const zFront = innerCtrZ - innerD / 2 + t / 2;
 
@@ -456,11 +453,6 @@ function buildCornerUnit() {
             if (cu.deskFloating) {
                 addBoard(cuD, drawerZoneH, t, 0, zoneCenterY, backWallZ, matDesk);
             }
-            // Front frame rails (desk color)
-            addBoard(t, t, carcassW, frameX, zoneTopY - t / 2, innerCtrZ, matDesk);
-            addBoard(t, t, carcassW, frameX, zoneBotY + t / 2, innerCtrZ, matDesk);
-            addBoard(t, drawerZoneH - t * 2, t, frameX, zoneCenterY, zLeft, matDesk);
-            addBoard(t, drawerZoneH - t * 2, t, frameX, zoneCenterY, zRight, matDesk);
 
             const _addFingerGap = (dY, drwW, dZ) => {
                 const backPanel = new THREE.Mesh(
