@@ -454,11 +454,80 @@ function _getChairPos() {
     return null;
 }
 
+// World-space unit vector along the bed's width axis (XZ plane).
+function _getBedWidthWorldDir() {
+    const rotRad = ((window._bedRotation || 0) * Math.PI) / 180;
+    const wAx = window._bedWidthAxis || 'x';
+    if (wAx === 'x') return { x: Math.cos(rotRad), z: -Math.sin(rotRad) };
+    return { x: Math.sin(rotRad), z: Math.cos(rotRad) };
+}
+
+// Distance from a point to the nearest wall relevant to the bed width axis.
+function _distToWallOnWidthAxis(px, pz, bounds, wDir) {
+    if (Math.abs(wDir.x) >= Math.abs(wDir.z)) {
+        return Math.min(Math.abs(px - bounds.leftX), Math.abs(px - bounds.rightX));
+    }
+    return Math.min(Math.abs(pz - bounds.backZ), Math.abs(pz - bounds.frontZ));
+}
+
+// Half bed width (cm) along the width axis, from live mesh AABB when available.
+function _getBedHalfWidthWorld(wDir) {
+    if (window._bedMesh) {
+        const box = new THREE.Box3().setFromObject(window._bedMesh);
+        const cx = (box.min.x + box.max.x) / 2;
+        const cz = (box.min.z + box.max.z) / 2;
+        const corners = [
+            [box.min.x, box.min.z], [box.min.x, box.max.z],
+            [box.max.x, box.min.z], [box.max.x, box.max.z]
+        ];
+        let maxProj = 0;
+        for (let i = 0; i < corners.length; i++) {
+            const dx = corners[i][0] - cx;
+            const dz = corners[i][1] - cz;
+            const proj = Math.abs(dx * wDir.x + dz * wDir.z);
+            if (proj > maxProj) maxProj = proj;
+        }
+        if (maxProj > 0) return maxProj;
+    }
+    return (window._bedWidthCm || 160) / 2;
+}
+
+// When bed width changes, keep the edge nearest to a wall fixed (no gap from wall).
+function _adjustBedPosForWidthChange(oldWidthCm, newWidthCm) {
+    const halfDelta = (oldWidthCm - newWidthCm) / 2;
+    if (Math.abs(halfDelta) < 0.01) return;
+
+    const bp = window._bedPos;
+    const bounds = window._roomBounds;
+    if (!bp || !bounds) return;
+
+    const wDir = _getBedWidthWorldDir();
+    const oldHalfW = _getBedHalfWidthWorld(wDir);
+
+    const plusX  = bp.x + wDir.x * oldHalfW;
+    const plusZ  = bp.z + wDir.z * oldHalfW;
+    const minusX = bp.x - wDir.x * oldHalfW;
+    const minusZ = bp.z - wDir.z * oldHalfW;
+
+    const distPlus  = _distToWallOnWidthAxis(plusX,  plusZ,  bounds, wDir);
+    const distMinus = _distToWallOnWidthAxis(minusX, minusZ, bounds, wDir);
+
+    if (distPlus <= distMinus) {
+        bp.x += wDir.x * halfDelta;
+        bp.z += wDir.z * halfDelta;
+    } else {
+        bp.x -= wDir.x * halfDelta;
+        bp.z -= wDir.z * halfDelta;
+    }
+}
+
 window._cycleBedWidth = function() {
     const opts = window._BED_WIDTHS || [160, 140, 120, 90];
     const cur = window._bedWidthCm || 160;
     const i = opts.indexOf(cur);
-    window._bedWidthCm = opts[(i + 1) % opts.length];
+    const newWidth = opts[(i + 1) % opts.length];
+    _adjustBedPosForWidthChange(cur, newWidth);
+    window._bedWidthCm = newWidth;
     if (typeof _buildRoom === 'function') _buildRoom();
     if (typeof window._updateRoomPropsUI === 'function') window._updateRoomPropsUI();
     if (typeof window._updateBedHandles === 'function') window._updateBedHandles();
