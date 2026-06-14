@@ -4103,7 +4103,7 @@ window._updateBedHandles = function() {
     const tb = document.getElementById('bed-toolbar');
     if (!tb) return;
 
-    const shouldShow = window._roomVisible && window._bedGroup &&
+    const shouldShow = window._roomVisible && window._bedGroup && window._bedVisible !== false &&
                        (window._bedHovered || window._bedDrag);
     if (!shouldShow) { tb.style.display = 'none'; return; }
 
@@ -5279,6 +5279,26 @@ function bindUI() {
         mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
         mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
+
+        // Room view: click bed/chair to toggle visibility
+        if (window._roomVisible && window._roomGroup) {
+            const roomHits = raycaster.intersectObjects(window._roomGroup.children, true);
+            for (let i = 0; i < roomHits.length; i++) {
+                let obj = roomHits[i].object;
+                while (obj) {
+                    const prop = obj.userData && obj.userData.roomProp;
+                    if (prop === 'bed' && typeof window._toggleBedVisible === 'function') {
+                        window._toggleBedVisible();
+                        return;
+                    }
+                    if (prop === 'chair' && typeof window._toggleChairVisible === 'function') {
+                        window._toggleChairVisible();
+                        return;
+                    }
+                    obj = obj.parent;
+                }
+            }
+        }
 
         // Click on corner desk → handle picker
         if (_pointerDownCornerDesk) {

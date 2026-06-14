@@ -361,6 +361,21 @@
                     <button class="slider-btn" onclick="window._setRoomSize('height', (parseInt(document.getElementById('inp-num-room-height').value)||300)-5)"><i class="fa-solid fa-minus"></i></button>
                 </div>
             </div>
+            <div id="room-props-row" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+                <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:8px;">ריהוט חדר (לחץ על פריט בחדר להסתרה)</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px;">
+                    <button type="button" id="btn-toggle-bed-visible" class="sidebar-toggle-btn active" onclick="window._toggleBedVisible()" style="padding:8px 6px;font-size:0.75rem;display:flex;align-items:center;justify-content:center;gap:6px;">
+                        <i class="fa-solid fa-bed"></i><span>הסתר מיטה</span>
+                    </button>
+                    <button type="button" id="btn-toggle-chair-visible" class="sidebar-toggle-btn active" onclick="window._toggleChairVisible()" style="padding:8px 6px;font-size:0.75rem;display:flex;align-items:center;justify-content:center;gap:6px;">
+                        <i class="fa-solid fa-chair"></i><span>הסתר כסא</span>
+                    </button>
+                </div>
+                <button type="button" id="btn-cycle-bed-width" onclick="window._cycleBedWidth()" style="width:100%;padding:8px 10px;border-radius:9px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.78rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+                    <i class="fa-solid fa-arrows-left-right"></i>
+                    <span>רוחב מיטה: <strong id="bed-width-label">160 ס"מ</strong></span>
+                </button>
+            </div>
         </div>
 
         <!-- ===== UNITS & CONTENT SECTION ===== -->
@@ -1058,6 +1073,13 @@
             <div class="bed-tb-sep"></div>
             <button class="bed-tb-btn bed-tb-rotate" id="bed-handle-rotate" title="סובב 90°" onclick="window._rotateBed()">
                 <i class="fa-solid fa-rotate-right"></i>
+            </button>
+            <div class="bed-tb-sep"></div>
+            <button class="bed-tb-btn" id="bed-handle-width" title="החלף רוחב מיטה" onclick="window._cycleBedWidth()">
+                <i class="fa-solid fa-arrows-left-right"></i><span id="bed-tb-width-label" style="font-size:0.65rem;font-weight:700;">160</span>
+            </button>
+            <button class="bed-tb-btn" id="bed-handle-hide" title="הסתר מיטה" onclick="window._toggleBedVisible()">
+                <i class="fa-solid fa-eye-slash"></i>
             </button>
         </div>
     </div>
@@ -2309,11 +2331,11 @@
 <script src="auth.js"></script>
 <script src="state.js?v=20260608z"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
-<script src="engine-core.js?v=20260608z"></script>
+<script src="engine-core.js?v=20260609a"></script>
 <script src="engine-corners.js?v=20260608j"></script>
 <script src="engine-blueprint.js?v=20260608am"></script>
 <script src="tambour-color-picker.js?v=20260608a"></script>
-<script src="ui.js?v=20260608ae"></script>
+<script src="ui.js?v=20260609a"></script>
 <script src="mobile.js?v=20260608a"></script>
 <script src="part-paint.js?v=20260520k"></script>
 <script src="index-init.js?v=20260608p"></script>

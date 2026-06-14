@@ -176,6 +176,7 @@ window._toggleRoom = function() {
     if (typeof window._updateRoomWallUI === 'function') window._updateRoomWallUI();
     // Show/hide bed handles based on room visibility
     if (typeof window._updateBedHandles === 'function') window._updateBedHandles();
+    if (typeof window._updateRoomPropsUI === 'function') window._updateRoomPropsUI();
 };
 
 // ---- Doors visibility toggle ----
@@ -227,11 +228,15 @@ window._bedPos       = window._bedPos      || { x: 150, z: 222.6 };  // default 
 window._bedScale     = window._bedScale    || null;                    // null = auto-scale to ~200cm long
 window._bedAutoScale = null;                                           // computed once after load
 window._bedRotation  = window._bedRotation || 270;                    // default rotation in degrees
+window._bedWidthCm   = window._bedWidthCm  || 160;                    // bed width preset (cm)
+window._bedVisible   = window._bedVisible  !== false;                 // show/hide bed in room view
+window._BED_WIDTHS   = [160, 140, 120, 90];
 
 // ── Office Chair GLB ─────────────────────────────────────────────────────────
-// Loaded once; placed automatically in front of any desk surface when room is shown.
 window._chairGroup     = null;
 window._chairAutoScale = null;
+window._chairVisible   = window._chairVisible !== false;
+window._chairMesh      = null;
 
 // ── Laptop GLB ───────────────────────────────────────────────────────────────
 // Loaded once; placed on top of the desk surface when room is shown.
@@ -286,11 +291,34 @@ window._laptopBaseY     = 0;     // Y position before offset is applied (set eac
     }, undefined, function(err) { console.warn('laptop.glb load error:', err); });
 })();
 
+// Returns active corner-desk config (linear state.corner or wing.corner), or null.
+function _getActiveCornerDesk() {
+    if (state.corner && state.corner.side !== 'none' && state.corner.type === 'desk') return state.corner;
+    const wing = state.wings && state.wings.center;
+    if (wing && wing.corner && wing.corner.side !== 'none' && wing.corner.type === 'desk') return wing.corner;
+    return null;
+}
+
+// World-space placement for corner desk surface (matches buildCornerUnit geometry).
+function _getCornerDeskPlacement() {
+    const corner = _getActiveCornerDesk();
+    if (!corner) return null;
+    const cabOffX = cabinetGroup.position.x || 0;
+    const wing = state.wings && state.wings.center;
+    const mainW = (wing && wing.width) || state.width || 160;
+    const bodyD = (wing && wing.depth) || state.depth || 54;
+    const sign = corner.side === 'right' ? 1 : -1;
+    const cuW = corner.width || 60;
+    const cuD = corner.depth || bodyD;
+    const deskH = corner.height || 75;
+    const cuCenterX = sign * (mainW / 2 - cuD / 2);
+    const cuCenterZ = bodyD / 2 + cuW / 2;
+    return { cabOffX, cuCenterX, cuCenterZ, deskH, sign, cuW, cuD };
+}
+
 // Returns {x, y, z} for laptop placement on desk surface, or null if no desk.
-// y = desk surface top (cm), x = desk center X, z = center of desk depth (world Z=0).
 function _getLaptopPos() {
     const cabOffX = cabinetGroup.position.x || 0;
-    // Z: center of the desk surface (cabinet is centered at Z=0)
     const laptopZ = 0;
 
     const _clampX = (x) => {
@@ -329,14 +357,9 @@ function _getLaptopPos() {
     }
 
     // 3. Corner desk
-    if (wing && wing.corner && wing.corner.side !== 'none' && wing.corner.type === 'desk') {
-        const cabW  = wing.width || state.width || 160;
-        const cW    = wing.corner.width || 60;
-        const deskH = wing.corner.deskHeight || 75;
-        const rawX  = wing.corner.side === 'right'
-            ? cabOffX + cabW / 2 + cW / 2
-            : cabOffX - cabW / 2 - cW / 2;
-        return { x: _clampX(rawX), y: deskH, z: laptopZ };
+    const cp = _getCornerDeskPlacement();
+    if (cp) {
+        return { x: _clampX(cp.cabOffX + cp.cuCenterX), y: cp.deskH, z: cp.cuCenterZ };
     }
 
     return null;
@@ -375,15 +398,13 @@ function _getLaptopPos() {
     }, undefined, function(err) { console.warn('office_chair.glb load error:', err); });
 })();
 
-// Compute where to place the chair (world-space X, Z) based on current desk config.
-// Returns {x, z} or null if no desk is present.
+// Compute where to place the chair (world-space X, Z, rotY) based on current desk config.
+// Returns {x, z, rotY} or null if no desk is present.
 function _getChairPos() {
-    const cabD = state.wings && state.wings.center ? (state.wings.center.depth || 54) : 54;
+    const cabD = state.wings && state.wings.center ? (state.wings.center.depth || 54) : (state.depth || 54);
     const cabOffX = cabinetGroup.position.x || 0;
-    // Z: 33cm in front of the cabinet face (cabinet face is at +cabD/2)
     const chairZ = cabD / 2 + 33;
 
-    // Helper: clamp X to room bounds with 40cm margin so chair stays inside room
     const _clampX = (x) => {
         const b = window._roomBounds;
         if (!b) return x;
@@ -399,10 +420,10 @@ function _getChairPos() {
         const rawX  = dSide === 'right'
             ? cabOffX + cabW / 2 + dW / 2
             : cabOffX - cabW / 2 - dW / 2;
-        return { x: _clampX(rawX), z: chairZ };
+        return { x: _clampX(rawX), z: chairZ, rotY: -Math.PI / 2 };
     }
 
-    // 2. Internal desk column (first col with type === 'desk')
+    // 2. Internal desk column
     const cols = wing ? wing.columns : (state.columns || []);
     if (cols && cols.length) {
         let currentX = cabOffX - (wing ? wing.width : (state.width || 160)) / 2;
@@ -410,24 +431,70 @@ function _getChairPos() {
             const col = cols[i];
             if (col.type === 'desk') {
                 const colCenterX = currentX + col.width / 2;
-                return { x: _clampX(colCenterX), z: chairZ };
+                return { x: _clampX(colCenterX), z: chairZ, rotY: -Math.PI / 2 };
             }
             currentX += col.width;
         }
     }
 
-    // 3. Corner desk (wing.corner.type === 'desk')
-    if (wing && wing.corner && wing.corner.side !== 'none' && wing.corner.type === 'desk') {
-        const cabW  = wing.width || state.width || 160;
-        const cW    = wing.corner.width || 60;
-        const rawX  = wing.corner.side === 'right'
-            ? cabOffX + cabW / 2 + cW / 2
-            : cabOffX - cabW / 2 - cW / 2;
-        return { x: _clampX(rawX), z: chairZ };
+    // 3. Corner desk — sit to the right of desk (toward cabinet), face opening + laptop
+    const cp = _getCornerDeskPlacement();
+    if (cp) {
+        const chairOffset = 42;
+        const rawX = cp.cabOffX + cp.cuCenterX + (-cp.sign) * chairOffset;
+        const rotY = cp.sign === -1 ? 0 : Math.PI;
+        return { x: _clampX(rawX), z: cp.cuCenterZ, rotY };
     }
 
-    return null; // no desk found
+    return null;
 }
+
+window._cycleBedWidth = function() {
+    const opts = window._BED_WIDTHS || [160, 140, 120, 90];
+    const cur = window._bedWidthCm || 160;
+    const i = opts.indexOf(cur);
+    window._bedWidthCm = opts[(i + 1) % opts.length];
+    if (typeof _buildRoom === 'function') _buildRoom();
+    if (typeof window._updateRoomPropsUI === 'function') window._updateRoomPropsUI();
+};
+
+window._toggleBedVisible = function() {
+    window._bedVisible = !window._bedVisible;
+    if (typeof _buildRoom === 'function') _buildRoom();
+    if (typeof window._updateRoomPropsUI === 'function') window._updateRoomPropsUI();
+    if (typeof window._updateBedHandles === 'function') window._updateBedHandles();
+};
+
+window._toggleChairVisible = function() {
+    window._chairVisible = !window._chairVisible;
+    if (typeof _buildRoom === 'function') _buildRoom();
+    if (typeof window._updateRoomPropsUI === 'function') window._updateRoomPropsUI();
+};
+
+window._updateRoomPropsUI = function() {
+    const bedBtn = document.getElementById('btn-toggle-bed-visible');
+    const chairBtn = document.getElementById('btn-toggle-chair-visible');
+    const widthLbl = document.getElementById('bed-width-label');
+    if (bedBtn) {
+        const show = window._bedVisible !== false;
+        bedBtn.classList.toggle('active', show);
+        bedBtn.innerHTML = show
+            ? '<i class="fa-solid fa-bed"></i><span>הסתר מיטה</span>'
+            : '<i class="fa-solid fa-bed"></i><span>הצג מיטה</span>';
+    }
+    if (chairBtn) {
+        const show = window._chairVisible !== false;
+        chairBtn.classList.toggle('active', show);
+        chairBtn.innerHTML = show
+            ? '<i class="fa-solid fa-chair"></i><span>הסתר כסא</span>'
+            : '<i class="fa-solid fa-chair"></i><span>הצג כסא</span>';
+    }
+    if (widthLbl) widthLbl.textContent = (window._bedWidthCm || 160) + ' ס"מ';
+    const tbWidth = document.getElementById('bed-tb-width-label');
+    if (tbWidth) tbWidth.textContent = (window._bedWidthCm || 160);
+    const propsRow = document.getElementById('room-props-row');
+    if (propsRow) propsRow.style.display = window._roomVisible ? '' : 'none';
+};
 
 // Rotate bed 90° clockwise on each call
 window._rotateBed = function() {
@@ -796,58 +863,64 @@ function _buildRoom() {
     }
 
     // ── Bed model ──────────────────────────────────────────────────────────────
-    // Add bed to the room group at the stored position.
-    // During drag: show a lightweight proxy box instead of the GLB for smooth performance.
-    if (window._bedGroup) {
+    window._bedMesh = null;
+    if (window._bedGroup && window._bedVisible !== false) {
         const bp = window._bedPos || { x: 100, z: 200 };
         const bs = (window._bedScale !== null && window._bedScale !== undefined)
             ? window._bedScale
             : (window._bedAutoScale || 100);
         const bedRotRad = ((window._bedRotation || 0) * Math.PI) / 180;
+        const widthFactor = (window._bedWidthCm || 160) / 160;
 
-        // ── Full GLB bed (always) ──────────────────────────────────────────
         const bed = window._bedGroup.clone();
         bed.traverse(function(child) {
-            if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+                child.userData.roomProp = 'bed';
+            }
         });
-        bed.scale.setScalar(bs);
+        bed.scale.set(bs * widthFactor, bs, bs);
         bed.rotation.y = bedRotRad;
         bed.updateMatrixWorld(true);
         const bedBox = new THREE.Box3().setFromObject(bed);
         const bedMinY = bedBox.min.y;
         bed.position.set(bp.x, -bedMinY, bp.z);
+        bed.userData.roomProp = 'bed';
         rg.add(bed);
         window._bedMesh = bed;
     }
 
     // ── Office Chair model ────────────────────────────────────────────────────
-    // Placed automatically in front of the desk surface (if any).
-    // Only shown when room is visible and a desk exists.
-    if (window._chairGroup) {
+    window._chairMesh = null;
+    if (window._chairGroup && window._chairVisible !== false) {
         const cp = _getChairPos();
         if (cp) {
             const chair = window._chairGroup.clone();
             const cs = window._chairAutoScale || 100;
+            const rotY = cp.rotY !== undefined ? cp.rotY : -Math.PI / 2;
 
-            // Step 1: reset transform, apply scale+rotation at origin
             chair.position.set(0, 0, 0);
             chair.rotation.set(0, 0, 0);
             chair.scale.setScalar(cs);
-            chair.rotation.y = -Math.PI / 2; // face toward room (rotated 90° left)
+            chair.rotation.y = rotY;
             chair.updateMatrixWorld(true);
 
-            // Step 2: measure bounding box at origin
             const box = new THREE.Box3().setFromObject(chair);
             const center = new THREE.Vector3();
             box.getCenter(center);
 
-            // Step 3: position so bbox center XZ = cp, bottom Y = 0
             chair.position.set(
                 cp.x - center.x,
                 -box.min.y,
                 cp.z - center.z
             );
+            chair.traverse(function(child) {
+                if (child.isMesh) child.userData.roomProp = 'chair';
+            });
+            chair.userData.roomProp = 'chair';
             rg.add(chair);
+            window._chairMesh = chair;
         }
     }
 
@@ -895,6 +968,7 @@ function _buildRoom() {
 
     // Notify UI to reposition bed handles
     if (typeof window._updateBedHandles === 'function') window._updateBedHandles();
+    if (typeof window._updateRoomPropsUI === 'function') window._updateRoomPropsUI();
 }
 
 const materials = {
