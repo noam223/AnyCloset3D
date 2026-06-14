@@ -234,8 +234,8 @@ window._BED_WIDTHS   = [160, 140, 120, 90];
 
 // ── Office Chair GLB ─────────────────────────────────────────────────────────
 window._CHAIR_OPTIONS = [
-    { id: 'chair1', path: 'images/office_chair.glb',  shortName: 'משרדי' },
-    { id: 'chair2', path: 'images/office_chair2.glb', shortName: 'מודרני' }
+    { id: 'chair1', path: 'images/office_chair.glb',  shortName: 'משרדי',  targetHeightCm: 120 },
+    { id: 'chair2', path: 'images/office_chair2.glb', shortName: 'שרפרף', targetHeightCm: 50 }
 ];
 window._chairVariantIdx = window._chairVariantIdx || 0;
 window._chairModels     = {};   // id → { group, autoScale }
@@ -244,7 +244,7 @@ window._chairAutoScale  = null;
 window._chairVisible    = window._chairVisible !== false;
 window._chairMesh       = null;
 
-function _prepareChairGroup(grp) {
+function _prepareChairGroup(grp, targetH) {
     grp.traverse(function(child) {
         if (child.isMesh) {
             child.castShadow = true;
@@ -263,8 +263,8 @@ function _prepareChairGroup(grp) {
     const box = new THREE.Box3().setFromObject(grp);
     const size = new THREE.Vector3();
     box.getSize(size);
-    const targetH = 120;
-    const autoScale = size.y > 0 ? targetH / size.y : 100;
+    const h = targetH || 120;
+    const autoScale = size.y > 0 ? h / size.y : 100;
     return { group: grp, autoScale: autoScale };
 }
 
@@ -295,7 +295,7 @@ window._cycleChairVariant = function() {
 
     window._CHAIR_OPTIONS.forEach(function(opt, idx) {
         loader.load(opt.path, function(gltf) {
-            window._chairModels[opt.id] = _prepareChairGroup(gltf.scene);
+            window._chairModels[opt.id] = _prepareChairGroup(gltf.scene, opt.targetHeightCm);
             pending--;
             const activeOpt = window._CHAIR_OPTIONS[window._chairVariantIdx || 0];
             if (activeOpt && activeOpt.id === opt.id) _syncActiveChairRefs();
