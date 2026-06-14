@@ -1073,9 +1073,9 @@ function _buildRoom() {
     }
 
     // ── Laptop model ─────────────────────────────────────────────────────────────
-    // Placed on top of the desk surface (if any).
+    // Placed on top of the desk surface (hidden when chair is hidden).
     window._laptopMeshRef = null;
-    if (window._laptopGroup) {
+    if (window._laptopGroup && window._chairVisible !== false) {
         const lp = _getLaptopPos();
         if (lp) {
             const laptop = window._laptopGroup.clone();
