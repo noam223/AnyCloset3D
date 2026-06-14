@@ -356,10 +356,15 @@ function _getLaptopPos() {
         }
     }
 
-    // 3. Corner desk
+    // 3. Corner desk — rotate so screen faces the user (same side as chair)
     const cp = _getCornerDeskPlacement();
     if (cp) {
-        return { x: _clampX(cp.cabOffX + cp.cuCenterX), y: cp.deskH, z: cp.cuCenterZ };
+        return {
+            x: _clampX(cp.cabOffX + cp.cuCenterX),
+            y: cp.deskH,
+            z: cp.cuCenterZ,
+            rotY: cp.sign === -1 ? Math.PI : 0
+        };
     }
 
     return null;
@@ -456,6 +461,7 @@ window._cycleBedWidth = function() {
     window._bedWidthCm = opts[(i + 1) % opts.length];
     if (typeof _buildRoom === 'function') _buildRoom();
     if (typeof window._updateRoomPropsUI === 'function') window._updateRoomPropsUI();
+    if (typeof window._updateBedHandles === 'function') window._updateBedHandles();
 };
 
 window._toggleBedVisible = function() {
@@ -880,12 +886,17 @@ function _buildRoom() {
                 child.userData.roomProp = 'bed';
             }
         });
-        bed.scale.set(bs * widthFactor, bs, bs);
+        bed.scale.setScalar(bs * widthFactor);
         bed.rotation.y = bedRotRad;
         bed.updateMatrixWorld(true);
         const bedBox = new THREE.Box3().setFromObject(bed);
-        const bedMinY = bedBox.min.y;
-        bed.position.set(bp.x, -bedMinY, bp.z);
+        const bedCenter = new THREE.Vector3();
+        bedBox.getCenter(bedCenter);
+        bed.position.set(
+            bp.x - bedCenter.x,
+            -bedBox.min.y,
+            bp.z - bedCenter.z
+        );
         bed.userData.roomProp = 'bed';
         rg.add(bed);
         window._bedMesh = bed;
@@ -932,11 +943,13 @@ function _buildRoom() {
         if (lp) {
             const laptop = window._laptopGroup.clone();
             const ls = window._laptopAutoScale || 1;
+            const rotY = lp.rotY !== undefined ? lp.rotY : 0;
 
-            // Reset transform, apply scale at origin
+            // Reset transform, apply scale + rotation at origin
             laptop.position.set(0, 0, 0);
             laptop.rotation.set(0, 0, 0);
             laptop.scale.setScalar(ls);
+            laptop.rotation.y = rotY;
             laptop.updateMatrixWorld(true);
 
             // Measure bbox to find bottom and center
