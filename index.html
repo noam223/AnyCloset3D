@@ -34,10 +34,10 @@
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="style-base.css?v=20260609a">
-    <link rel="stylesheet" href="style-mobile.css?v=20260607b">
+    <link rel="stylesheet" href="style-base.css?v=20260609c">
+    <link rel="stylesheet" href="style-mobile.css?v=20260609a">
     <link rel="stylesheet" href="style-extras.css?v=20260607b">
-    <link rel="stylesheet" href="style.css?v=20260609b">
+    <link rel="stylesheet" href="style.css?v=20260609c">
     <style>
         html.thumb-only-mode #left-sidebar,
         html.thumb-only-mode #right-sidebar,
@@ -1949,7 +1949,8 @@
         <button class="mobile-panel-close" onclick="closeMobilePanel()"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="mobile-panel-body">
-        <div class="cart-items-list" id="mobile-cart-items-list" style="max-height:40vh;overflow-y:auto;background:var(--bg-main);border-radius:10px;padding:10px;margin-bottom:15px;"></div>
+        <div class="cart-items-list mobile-cart-scroll" id="mobile-cart-items-list"></div>
+        <div class="mobile-order-summary">
         <div style="background:var(--bg-light);border:1px solid var(--border);border-radius:10px;padding:15px;margin-bottom:15px;">
             <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:0.9rem;color:var(--text-light);">
                 <span>סה"כ ארונות:</span><span id="mobile-sidebar-cab-total" style="font-weight:600;color:var(--text-dark);">&#8362;0</span>
@@ -1979,6 +1980,7 @@
                 onclick="startNewCabinet(); closeMobilePanel();">
                 <i class="fa-solid fa-plus"></i> ארון חדש
             </button>
+        </div>
         </div>
     </div>
 </div>
