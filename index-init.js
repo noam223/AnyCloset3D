@@ -585,11 +585,58 @@ function _escHtml(str) {
 
 window._currentOrderStatus = window._currentOrderStatus || 'quote';
 
+function _orderStatusLabel(status) {
+    var map = (Projects && Projects.ORDER_STATUSES) || {
+        quote: 'הצעת מחיר', ordered: 'בוצעה הזמנה', production: 'נשלח לייצור',
+        service: 'קריאת שירות', installed: 'התקנה הושלמה'
+    };
+    var keys = (Projects && Projects.ORDER_STATUS_KEYS) || ['quote', 'ordered', 'production', 'service', 'installed'];
+    return map[keys.indexOf(status) !== -1 ? status : 'quote'] || map.quote;
+}
+
+function _orderStatusIconClass(status) {
+    var icons = {
+        quote: 'fa-file-invoice-dollar',
+        ordered: 'fa-circle-check',
+        production: 'fa-industry',
+        service: 'fa-screwdriver-wrench',
+        installed: 'fa-house-circle-check'
+    };
+    var keys = (Projects && Projects.ORDER_STATUS_KEYS) || ['quote', 'ordered', 'production', 'service', 'installed'];
+    var s = keys.indexOf(status) !== -1 ? status : 'quote';
+    return icons[s] || icons.quote;
+}
+
 window._syncOrderStatusUI = function() {
     var status = window._currentOrderStatus || 'quote';
-    document.querySelectorAll('#sidebar-order-status .sidebar-status-btn').forEach(function(btn) {
-        btn.classList.toggle('active', btn.dataset.status === status);
+    var lbl = document.getElementById('sidebar-order-status-label');
+    var icon = document.getElementById('sidebar-order-status-icon');
+    var trigger = document.getElementById('sidebar-order-status-trigger');
+    if (lbl) lbl.textContent = _orderStatusLabel(status);
+    if (icon) icon.className = 'fa-solid ' + _orderStatusIconClass(status);
+    if (trigger) {
+        trigger.className = 'sidebar-status-current status-' + status;
+        trigger.dataset.status = status;
+    }
+    document.querySelectorAll('#order-status-modal-picklist .order-status-option').forEach(function(btn) {
+        btn.classList.toggle('selected', btn.dataset.status === status);
     });
+};
+
+window._openOrderStatusModal = function() {
+    window._syncOrderStatusUI();
+    var modal = document.getElementById('order-status-modal');
+    if (modal) modal.classList.add('open');
+};
+
+window._closeOrderStatusModal = function() {
+    var modal = document.getElementById('order-status-modal');
+    if (modal) modal.classList.remove('open');
+};
+
+window._pickOrderStatus = async function(status) {
+    window._closeOrderStatusModal();
+    await window._setProjectOrderStatus(status);
 };
 
 window._setProjectOrderStatus = async function(status) {
@@ -609,11 +656,7 @@ window._setProjectOrderStatus = async function(status) {
     }
 
     window._isDirty = true;
-    var labels = (Projects && Projects.ORDER_STATUSES) || {
-        quote: 'הצעת מחיר', ordered: 'בוצעה הזמנה', production: 'נשלח לייצור',
-        service: 'קריאת שירות', installed: 'התקנה הושלמה'
-    };
-    if (typeof _showToast === 'function') _showToast('סטטוס: ' + (labels[status] || status), 2500);
+    if (typeof _showToast === 'function') _showToast('סטטוס: ' + _orderStatusLabel(status), 2500);
 };
 
 window._syncOrderStatusUI();
