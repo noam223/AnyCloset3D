@@ -318,17 +318,13 @@ function _tourCurrentSteps() {
 
 // ── Bottom Sheet API ──────────────────────────────────────────────────────────
 window._openTourSheet = function() {
-    var backdrop = document.getElementById('tour-sheet-backdrop');
-    var sheet    = document.getElementById('tour-sheet');
-    if (backdrop) backdrop.style.display = 'block';
-    if (sheet)    sheet.style.display    = 'block';
+    var overlay = document.getElementById('tour-sheet-backdrop');
+    if (overlay) overlay.classList.add('open');
 };
 
 window._closeTourSheet = function() {
-    var backdrop = document.getElementById('tour-sheet-backdrop');
-    var sheet    = document.getElementById('tour-sheet');
-    if (backdrop) backdrop.style.display = 'none';
-    if (sheet)    sheet.style.display    = 'none';
+    var overlay = document.getElementById('tour-sheet-backdrop');
+    if (overlay) overlay.classList.remove('open');
 };
 
 // ── API ציבורי ────────────────────────────────────────────────────────────────
