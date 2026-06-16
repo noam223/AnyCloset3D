@@ -12,7 +12,7 @@
     var LAYOUT_GIZMO_ARROW = 48;
     var LAYOUT_GIZMO_HIT = 22;
     var LAYOUT_GIZMO_SCREEN_PX = 32;
-    var LAYOUT_VERSION = '20260609t';
+    var LAYOUT_VERSION = '20260609u';
     var _layoutPickHits = [];
     var _layoutDragBound = false;
     var _layoutCanvas = null;
@@ -658,18 +658,72 @@
     }
 
     function _layoutDragPlaneNormal(axis, origin) {
-        var camDir = _layoutTmpV3c.copy(window.camera.position).sub(origin).normalize();
+        var camDir = _layoutTmpV3c.copy(window.camera.position).sub(origin);
+        var dist = camDir.length();
+        if (dist < 1e-4) camDir.set(0, 0, 1);
+        else camDir.multiplyScalar(1 / dist);
+
         var n = _layoutTmpV3b.copy(axis).cross(camDir);
-        if (n.lengthSq() < 1e-5) n.crossVectors(axis, new THREE.Vector3(0, 1, 0));
-        if (n.lengthSq() < 1e-5) n.crossVectors(axis, new THREE.Vector3(1, 0, 0));
-        return n.normalize();
+        if (n.lengthSq() >= 1e-4) return n.normalize();
+
+        var refs = [
+            new THREE.Vector3(1, 0, 0),
+            new THREE.Vector3(0, 1, 0),
+            new THREE.Vector3(0, 0, 1)
+        ];
+        var best = null;
+        var bestFacing = 1;
+        for (var i = 0; i < refs.length; i++) {
+            var c = _layoutTmpV3a.copy(axis).cross(refs[i]);
+            if (c.lengthSq() < 1e-4) continue;
+            c.normalize();
+            var facing = Math.abs(c.dot(camDir));
+            if (facing < bestFacing) {
+                bestFacing = facing;
+                best = c.clone();
+            }
+        }
+        return best || new THREE.Vector3(0, 0, 1);
     }
 
-    function _layoutScalarOnAxisAt(origin, axis, planeNormal) {
-        _layoutSetDragPlane(planeNormal, origin);
+    function _layoutScalarOnAxisAt(origin, axis, planeNormal, planePoint) {
+        _layoutSetDragPlane(planeNormal, planePoint || origin);
         var pt = _layoutRayOnDragPlane();
         if (!pt) return null;
         return _layoutScalarOnAxis(origin, axis, pt);
+    }
+
+    function _layoutAxisDragDelta(dragState, curClient, origin) {
+        var axis = dragState.axis;
+        var planePoint = dragState.planePoint || origin;
+        var currentScalar = _layoutScalarOnAxisAt(planePoint, axis, dragState.planeNormal, planePoint);
+        if (currentScalar != null && dragState.startScalar != null) {
+            return currentScalar - dragState.startScalar;
+        }
+        var screenDelta = _layoutWorldDeltaOnAxis(planePoint, axis, dragState.startClient, curClient);
+        return screenDelta != null ? screenDelta : 0;
+    }
+
+    function _layoutPlaneXZDrag(slot, dragState, curClient, origin) {
+        if (dragState.usePlaneRay !== false) {
+            _layoutSetDragPlane(new THREE.Vector3(0, 1, 0), dragState.planePointXZ);
+            var pt = _layoutRayOnDragPlane();
+            if (pt) {
+                return {
+                    x: pt.x - dragState.planeOffsetX,
+                    z: pt.z - dragState.planeOffsetZ
+                };
+            }
+            dragState.usePlaneRay = false;
+        }
+        var xzDelta = _layoutWorldDeltaOnPlaneXZ(
+            slot, origin, slot.rotY || 0, dragState.startClient, curClient
+        );
+        if (!xzDelta) return null;
+        return {
+            x: dragState.startX + xzDelta.dx,
+            z: dragState.startZ + xzDelta.dz
+        };
     }
 
     function _layoutGizmoCenter(slot, slotIndex) {
@@ -975,7 +1029,8 @@
             if (gizmoMode === 'plane-xz') {
                 dragState.planeY = slot.y || 0;
                 dragState.startClient = _layoutPointerClient(e);
-                _layoutSetDragPlane(new THREE.Vector3(0, 1, 0), new THREE.Vector3(slot.x || 0, dragState.planeY, slot.z || 0));
+                dragState.planePointXZ = new THREE.Vector3(slot.x || 0, dragState.planeY, slot.z || 0);
+                _layoutSetDragPlane(new THREE.Vector3(0, 1, 0), dragState.planePointXZ);
                 var pt0 = _layoutRayOnDragPlane();
                 if (pt0) {
                     dragState.planeOffsetX = pt0.x - (slot.x || 0);
@@ -991,8 +1046,12 @@
                 var axis = _layoutWorldAxis(gizmoMode, slot.rotY);
                 dragState.axis = axis.clone();
                 dragState.startClient = _layoutPointerClient(e);
+                dragState.planePoint = center.clone();
                 dragState.planeNormal = _layoutDragPlaneNormal(axis, center);
-                dragState.startScalar = _layoutScalarOnAxisAt(center, axis, dragState.planeNormal);
+                dragState.startScalar = _layoutScalarOnAxisAt(
+                    center, axis, dragState.planeNormal, dragState.planePoint
+                );
+                if (dragState.startScalar == null) dragState.startScalar = 0;
             }
 
             _layoutDragState = dragState;
@@ -1044,37 +1103,15 @@
         var curClient = _layoutPointerClient(e);
 
         if (mode === 'plane-xz') {
-            if (_layoutDragState.usePlaneRay) {
-                _layoutSetDragPlane(
-                    new THREE.Vector3(0, 1, 0),
-                    new THREE.Vector3(slot.x || 0, _layoutDragState.planeY, slot.z || 0)
-                );
-                var pt = _layoutRayOnDragPlane();
-                if (pt) {
-                    slot.x = pt.x - _layoutDragState.planeOffsetX;
-                    slot.z = pt.z - _layoutDragState.planeOffsetZ;
-                } else {
-                    _layoutDragState.usePlaneRay = false;
-                }
-            }
-            if (!_layoutDragState.usePlaneRay) {
-                var xzDelta = _layoutWorldDeltaOnPlaneXZ(
-                    slot, origin, slot.rotY || 0, _layoutDragState.startClient, curClient
-                );
-                if (!xzDelta) return;
-                slot.x = _layoutDragState.startX + xzDelta.dx;
-                slot.z = _layoutDragState.startZ + xzDelta.dz;
-            }
+            var xzPos = _layoutPlaneXZDrag(slot, _layoutDragState, curClient, origin);
+            if (!xzPos) return;
+            slot.x = xzPos.x;
+            slot.z = xzPos.z;
         } else if (mode.indexOf('rotate-') === 0) {
             _layoutApplyRotateDrag(origin, slot, _layoutDragState);
         } else if (mode.indexOf('axis-') === 0) {
             var axis = _layoutDragState.axis;
-            var delta = _layoutWorldDeltaOnAxis(origin, axis, _layoutDragState.startClient, curClient);
-            if (delta == null && _layoutDragState.startScalar != null) {
-                var currentScalar = _layoutScalarOnAxisAt(origin, axis, _layoutDragState.planeNormal);
-                if (currentScalar != null) delta = currentScalar - _layoutDragState.startScalar;
-            }
-            if (delta == null) return;
+            var delta = _layoutAxisDragDelta(_layoutDragState, curClient, origin);
             slot.x = _layoutDragState.startX + axis.x * delta;
             slot.y = Math.max(0, _layoutDragState.startY + axis.y * delta);
             slot.z = _layoutDragState.startZ + axis.z * delta;
@@ -1245,14 +1282,44 @@
         _layoutGroup.updateMatrixWorld(true);
         var box = new THREE.Box3().setFromObject(_layoutGroup);
         if (box.isEmpty()) return;
+
+        if (window._roomGroup && window._roomGroup.visible) {
+            window._roomGroup.updateMatrixWorld(true);
+            box.expandByObject(window._roomGroup);
+        }
+
         var center = new THREE.Vector3();
         var size = new THREE.Vector3();
         box.getCenter(center);
         box.getSize(size);
-        var maxDim = Math.max(size.x, size.y, size.z);
-        var dist = maxDim * 1.35 + 80;
-        window.camera.position.set(center.x + dist * 0.35, center.y + dist * 0.55, center.z + dist * 0.85);
+
+        var cam = window.camera;
+        cam.fov = 45;
+        cam.near = 1;
+        cam.far = Math.max(8000, size.length() * 8);
+        cam.updateProjectionMatrix();
+
+        var fitW = Math.max(size.x, 120) + 80;
+        var fitH = Math.max(size.y, 180) + 60;
+        var fitD = Math.max(size.z, 80) + 80;
+        var aspect = Math.max(cam.aspect || 1, 0.5);
+        var vFov = cam.fov * Math.PI / 180;
+        var hFov = 2 * Math.atan(Math.tan(vFov / 2) * aspect);
+        var distV = (fitH * 0.5) / Math.tan(vFov / 2);
+        var distH = (fitW * 0.5) / Math.tan(hFov / 2);
+        var distD = (fitD * 0.5) / Math.tan(hFov / 2);
+        var dist = Math.max(distV, distH, distD) * 1.12;
+
+        var az = 0.42;
+        var el = 0.28;
+        cam.position.set(
+            center.x + dist * Math.cos(el) * Math.sin(az),
+            center.y + dist * Math.sin(el),
+            center.z + dist * Math.cos(el) * Math.cos(az)
+        );
         window.controls.target.copy(center);
+        window.controls.minDistance = Math.max(80, dist * 0.25);
+        window.controls.maxDistance = Math.max(2500, dist * 4);
         window.controls.update();
         window._orbitFree = true;
     }
