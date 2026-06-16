@@ -8,6 +8,14 @@
     var _layoutScene = null;
     var _pickSelection = [];
     var LAYOUT_MOVE_STEP = 5;
+    var _layoutPickHits = [];
+    var _layoutDragBound = false;
+    var _layoutCanvas = null;
+    var _layoutRaycaster = new THREE.Raycaster();
+    var _layoutMouse = new THREE.Vector2();
+    var _layoutDragPlane = new THREE.Plane();
+    var _layoutDragIntersect = new THREE.Vector3();
+    var _layoutDragState = null;
 
     function _slotDefaults(cartIndex) {
         return { cartIndex: cartIndex, x: 0, y: 0, z: 0, rotY: 0 };
@@ -75,8 +83,6 @@
         var rs = rawState || {};
         var preset = rs.presetId || 'linear';
         if (preset === 'sliding') return 'ארון הזזה';
-        var cw = rs.wings && rs.wings.center;
-        if (cw && cw.slidingDoor && cw.slidingDoor.enabled) return 'ארון הזזה';
         if (preset !== 'linear') return 'סוג ארון לא נתמך';
         if (rs.wings && (rs.wings.left || rs.wings.right)) return 'ארון פינה / מרחב';
         return '';
@@ -154,6 +160,178 @@
     function _clearLayoutGroup() {
         if (!_layoutGroup) return;
         while (_layoutGroup.children.length > 0) _layoutGroup.remove(_layoutGroup.children[0]);
+        _layoutPickHits = [];
+    }
+
+    function _addLayoutPickHit(slotGroup, slotIndex, rawState) {
+        var w = _linearWidth(rawState);
+        var h = _linearHeight(rawState);
+        var d = _linearDepth(rawState);
+        var geo = new THREE.BoxGeometry(w, h, d);
+        var mat = new THREE.MeshBasicMaterial({
+            visible: false,
+            transparent: true,
+            opacity: 0,
+            depthWrite: false
+        });
+        var hit = new THREE.Mesh(geo, mat);
+        hit.position.y = h / 2;
+        hit.userData.layoutSlotIndex = slotIndex;
+        hit.name = 'layout-pick-hit';
+        slotGroup.add(hit);
+        _layoutPickHits.push(hit);
+    }
+
+    function _layoutPointerNDC(e) {
+        var rect = _layoutCanvas.getBoundingClientRect();
+        _layoutMouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        _layoutMouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    }
+
+    function _layoutPickSlotIndex(e) {
+        if (!_layoutPickHits.length || !window.camera) return -1;
+        _layoutPointerNDC(e);
+        _layoutRaycaster.setFromCamera(_layoutMouse, window.camera);
+        var hits = _layoutRaycaster.intersectObjects(_layoutPickHits, false);
+        if (!hits.length) return -1;
+        return hits[0].object.userData.layoutSlotIndex;
+    }
+
+    function _layoutSetDragPlaneY(y) {
+        _layoutDragPlane.setFromNormalAndCoplanarPoint(
+            new THREE.Vector3(0, 1, 0),
+            new THREE.Vector3(0, y || 0, 0)
+        );
+    }
+
+    function _layoutRayOnDragPlane(e) {
+        _layoutPointerNDC(e);
+        _layoutRaycaster.setFromCamera(_layoutMouse, window.camera);
+        if (_layoutRaycaster.ray.intersectPlane(_layoutDragPlane, _layoutDragIntersect)) {
+            return _layoutDragIntersect.clone();
+        }
+        return null;
+    }
+
+    function _onLayoutPointerDown(e) {
+        if (!window._layoutModeActive || !_layoutScene || !_layoutScene.active) return;
+        if (e.button !== 0) return;
+        if (e.target.closest('#layout-mode-bar') || e.target.closest('#layout-picker-modal')) return;
+
+        var slotIndex = _layoutPickSlotIndex(e);
+        if (slotIndex < 0) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        var slot = _layoutScene.slots[slotIndex];
+        if (!slot) return;
+
+        _layoutScene.activeSlot = slotIndex;
+        _syncActiveLayoutChip();
+        _syncLayoutMoveButtons();
+
+        _layoutSetDragPlaneY(slot.y || 0);
+
+        if (e.shiftKey) {
+            _layoutDragState = {
+                slotIndex: slotIndex,
+                mode: 'y',
+                startY: slot.y || 0,
+                startClientY: e.clientY,
+                controlsWereEnabled: window.controls ? window.controls.enabled : true
+            };
+        } else {
+            var pt = _layoutRayOnDragPlane(e);
+            if (!pt) return;
+            _layoutDragState = {
+                slotIndex: slotIndex,
+                mode: 'xz',
+                offsetX: pt.x - (slot.x || 0),
+                offsetZ: pt.z - (slot.z || 0),
+                startY: slot.y || 0,
+                startClientY: e.clientY,
+                controlsWereEnabled: window.controls ? window.controls.enabled : true
+            };
+        }
+
+        if (window.controls) window.controls.enabled = false;
+        document.body.classList.add('layout-dragging');
+        if (_layoutCanvas) _layoutCanvas.setPointerCapture(e.pointerId);
+    }
+
+    function _onLayoutPointerMove(e) {
+        if (!window._layoutModeActive || !_layoutDragState) {
+            if (window._layoutModeActive && _layoutCanvas && !e.target.closest('#layout-mode-bar')) {
+                var hoverIdx = _layoutPickSlotIndex(e);
+                _layoutCanvas.classList.toggle('layout-slot-hover', hoverIdx >= 0);
+            }
+            return;
+        }
+
+        e.preventDefault();
+        var slot = _layoutScene.slots[_layoutDragState.slotIndex];
+        if (!slot) return;
+
+        if (_layoutDragState.mode === 'y') {
+            var dyPx = _layoutDragState.startClientY - e.clientY;
+            slot.y = Math.max(0, _layoutDragState.startY + dyPx * 0.45);
+        } else {
+            var pt = _layoutRayOnDragPlane(e);
+            if (!pt) return;
+            slot.x = pt.x - _layoutDragState.offsetX;
+            slot.z = pt.z - _layoutDragState.offsetZ;
+        }
+
+        _clampSlotToGround(slot);
+        _applySlotTransforms(false);
+        _syncLayoutToolbar();
+        _syncLayoutMoveButtons();
+    }
+
+    function _onLayoutPointerUp(e) {
+        if (!_layoutDragState) return;
+
+        if (_layoutCanvas && _layoutCanvas.hasPointerCapture(e.pointerId)) {
+            _layoutCanvas.releasePointerCapture(e.pointerId);
+        }
+
+        var slot = _layoutScene.slots[_layoutDragState.slotIndex];
+        _clampSlotToGround(slot);
+        _applySlotTransforms(true);
+        _syncLayoutToolbar();
+        _syncLayoutMoveButtons();
+
+        if (window.controls) window.controls.enabled = _layoutDragState.controlsWereEnabled !== false;
+        _layoutDragState = null;
+        document.body.classList.remove('layout-dragging');
+        if (_layoutCanvas) _layoutCanvas.classList.remove('layout-slot-hover');
+    }
+
+    function _bindLayoutDragEvents() {
+        if (_layoutDragBound) return;
+        _layoutCanvas = document.getElementById('canvas-container');
+        if (!_layoutCanvas) return;
+        _layoutCanvas.addEventListener('pointerdown', _onLayoutPointerDown, true);
+        window.addEventListener('pointermove', _onLayoutPointerMove, true);
+        window.addEventListener('pointerup', _onLayoutPointerUp, true);
+        window.addEventListener('pointercancel', _onLayoutPointerUp, true);
+        _layoutDragBound = true;
+    }
+
+    function _unbindLayoutDragEvents() {
+        if (!_layoutDragBound) return;
+        if (_layoutCanvas) {
+            _layoutCanvas.removeEventListener('pointerdown', _onLayoutPointerDown, true);
+            _layoutCanvas.classList.remove('layout-slot-hover');
+        }
+        window.removeEventListener('pointermove', _onLayoutPointerMove, true);
+        window.removeEventListener('pointerup', _onLayoutPointerUp, true);
+        window.removeEventListener('pointercancel', _onLayoutPointerUp, true);
+        _layoutDragBound = false;
+        _layoutDragState = null;
+        document.body.classList.remove('layout-dragging');
+        if (window.controls) window.controls.enabled = true;
     }
 
     function _addSlotOutline(slotGroup, color) {
@@ -294,6 +472,7 @@
 
             group.add(slotGroup);
             _addSlotOutline(slotGroup, colors[i] || 0x64748b);
+            _addLayoutPickHit(slotGroup, i, rawState);
         });
 
         if (window._restoreEditorState && _editorSnapshot) {
@@ -447,8 +626,10 @@
 
     window._confirmLayoutPicker = function() {
         if (_pickSelection.length !== 2) return;
+        var indexA = _pickSelection[0];
+        var indexB = _pickSelection[1];
         window._closeLayoutPicker();
-        window._enterLayoutMode(_pickSelection[0], _pickSelection[1]);
+        window._enterLayoutMode(indexA, indexB);
     };
 
     window._enterLayoutMode = function(indexA, indexB) {
@@ -477,6 +658,7 @@
         window._orbitFree = true;
 
         window._layoutModeActive = true;
+        _bindLayoutDragEvents();
 
         _layoutPresetSideBySide();
 
@@ -502,6 +684,7 @@
 
         _layoutScene = null;
         window._layoutModeActive = false;
+        _unbindLayoutDragEvents();
 
         if (typeof buildCabinet === 'function') buildCabinet();
         if (typeof updateCameraView === 'function') updateCameraView();

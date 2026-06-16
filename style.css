@@ -3937,17 +3937,32 @@ body.layout-mode #canvas-container {
     box-shadow: none;
     margin: 0;
     padding: 0;
-    cursor: grab;
-}
-
-body.layout-mode #canvas-container:active {
-    cursor: grabbing;
+    cursor: default;
 }
 
 body.layout-mode #canvas-container canvas {
     width: 100% !important;
     height: 100% !important;
     display: block;
+}
+
+body.layout-mode #canvas-container.layout-slot-hover {
+    cursor: grab;
+}
+
+body.layout-mode.layout-dragging #canvas-container,
+body.layout-mode.layout-dragging #canvas-container canvas {
+    cursor: grabbing !important;
+}
+
+.layout-mode-drag-hint {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
 }
 
 .layout-mode-entry-btn {
