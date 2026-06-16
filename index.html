@@ -37,7 +37,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260609c">
     <link rel="stylesheet" href="style-mobile.css?v=20260609a">
     <link rel="stylesheet" href="style-extras.css?v=20260607b">
-    <link rel="stylesheet" href="style.css?v=20260609d">
+    <link rel="stylesheet" href="style.css?v=20260609g">
     <style>
         html.thumb-only-mode #left-sidebar,
         html.thumb-only-mode #right-sidebar,
@@ -951,6 +951,11 @@
         </div>
         <div class="total-label">סה"כ פרויקט לתשלום:</div>
         <div class="total-price" id="left-sidebar-total">₪0</div>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:12px;">
+            <button type="button" id="btn-layout-mode" class="layout-mode-entry-btn" onclick="window._openLayoutPicker()" title="הצג 2 ארונות ישרים יחד במרחב (לא ארונות הזזה)">
+                <i class="fa-solid fa-object-group"></i> סידור מרחבי
+            </button>
         </div>
         <div style="display:flex; gap:8px; margin-top:15px;">
             <button class="view-btn cart-btn" style="flex:1; justify-content: center; background: var(--primary); color: white; border: none; padding: 12px; font-size: 1rem;" onclick="openOrderModal('customer')">
@@ -2328,6 +2333,75 @@
 <!-- Camera HUD — fixed to viewport, above all sidebars -->
 <div id="cam-hud" style="position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:99999;background:rgba(0,0,0,0.82);color:#7effa0;font-family:monospace;font-size:0.78rem;padding:10px 18px;border-radius:10px;pointer-events:none;line-height:1.8;display:none;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.5);"></div>
 
+<!-- ===== LAYOUT MODE BAR ===== -->
+<div id="layout-mode-bar" class="layout-mode-bar">
+    <div class="layout-mode-bar-inner">
+        <div class="layout-mode-bar-title"><i class="fa-solid fa-object-group"></i> סידור מרחבי</div>
+        <div class="layout-mode-chips">
+            <button type="button" class="layout-chip active" id="layout-chip-0" onclick="window._setActiveLayoutSlot(0)">
+                <span class="layout-chip-badge">A</span>
+                <div class="layout-chip-text">
+                    <span class="layout-chip-name">—</span>
+                    <span class="layout-chip-dims">—</span>
+                </div>
+            </button>
+            <button type="button" class="layout-chip" id="layout-chip-1" onclick="window._setActiveLayoutSlot(1)">
+                <span class="layout-chip-badge">B</span>
+                <div class="layout-chip-text">
+                    <span class="layout-chip-name">—</span>
+                    <span class="layout-chip-dims">—</span>
+                </div>
+            </button>
+        </div>
+        <div class="layout-move-controls">
+            <div class="layout-move-row">
+                <span class="layout-move-label" title="רוחב">X</span>
+                <button type="button" class="layout-move-btn" onclick="window._moveActiveLayoutSlot('x', -5)" title="שמאל"><i class="fa-solid fa-arrow-left"></i></button>
+                <button type="button" class="layout-move-btn" onclick="window._moveActiveLayoutSlot('x', 5)" title="ימין"><i class="fa-solid fa-arrow-right"></i></button>
+            </div>
+            <div class="layout-move-row">
+                <span class="layout-move-label" title="גובה">Y</span>
+                <button type="button" class="layout-move-btn" onclick="window._moveActiveLayoutSlot('y', 5)" title="למעלה"><i class="fa-solid fa-arrow-up"></i></button>
+                <button type="button" class="layout-move-btn" id="layout-move-y-down" onclick="window._moveActiveLayoutSlot('y', -5)" title="למטה"><i class="fa-solid fa-arrow-down"></i></button>
+            </div>
+            <div class="layout-move-row">
+                <span class="layout-move-label" title="עומק">Z</span>
+                <button type="button" class="layout-move-btn" onclick="window._moveActiveLayoutSlot('z', -5)" title="אחורה"><i class="fa-solid fa-minus"></i></button>
+                <button type="button" class="layout-move-btn" onclick="window._moveActiveLayoutSlot('z', 5)" title="קדימה"><i class="fa-solid fa-plus"></i></button>
+            </div>
+        </div>
+        <div class="layout-mode-actions">
+            <button type="button" class="layout-mode-action-btn" onclick="window._layoutPresetSideBySide()">
+                <i class="fa-solid fa-arrows-left-right"></i> זה ליד זה
+            </button>
+            <button type="button" class="layout-mode-exit-btn" onclick="window._exitLayoutMode()">
+                <i class="fa-solid fa-xmark"></i> יציאה
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== LAYOUT PICKER MODAL ===== -->
+<div id="layout-picker-modal" class="layout-picker-overlay" onclick="if(event.target===this)window._closeLayoutPicker()">
+    <div class="layout-picker-box" role="dialog" aria-labelledby="layout-picker-title">
+        <div class="layout-picker-header">
+            <div>
+                <div class="layout-picker-title" id="layout-picker-title"><i class="fa-solid fa-object-group"></i> סידור מרחבי</div>
+                <div class="layout-picker-subtitle">בחר 2 ארונות ישרים להצגה יחד — לא ארונות הזזה</div>
+            </div>
+            <button type="button" class="layout-picker-close" onclick="window._closeLayoutPicker()" aria-label="סגור">✕</button>
+        </div>
+        <p class="layout-picker-hint" id="layout-picker-hint">בחר 2 ארונות (0/2)</p>
+        <div class="layout-picker-list" id="layout-picker-list"></div>
+        <div class="layout-picker-footer">
+            <button type="button" class="layout-picker-cancel" onclick="window._closeLayoutPicker()">ביטול</button>
+            <button type="button" id="layout-picker-confirm" class="layout-picker-confirm" disabled onclick="window._confirmLayoutPicker()">
+                <i class="fa-solid fa-cube"></i> הצג יחד במרחב
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- ===== PRESENTATION MODE EXIT BUTTON ===== -->
 <button id="presentation-exit-btn" onclick="window._exitPresentationMode()" style="display:none;">
     <i class="fa-solid fa-xmark"></i> יציאה מתצוגה
@@ -2338,11 +2412,12 @@
 <script src="auth.js"></script>
 <script src="state.js?v=20260609e"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
-<script src="engine-core.js?v=20260609l"></script>
+<script src="engine-core.js?v=20260609f"></script>
 <script src="engine-corners.js?v=20260609a"></script>
 <script src="engine-blueprint.js?v=20260608am"></script>
 <script src="tambour-color-picker.js?v=20260608a"></script>
-<script src="ui.js?v=20260609d"></script>
+<script src="ui.js?v=20260609f"></script>
+<script src="layout-mode.js?v=20260609h"></script>
 <script src="mobile.js?v=20260609e"></script>
 <script src="part-paint.js?v=20260520k"></script>
 <script src="index-init.js?v=20260609a"></script>

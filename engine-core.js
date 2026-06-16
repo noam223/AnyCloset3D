@@ -1204,6 +1204,7 @@ let dragHandlesData = { horizontal: [], vertical: [], roofs: [], desk: [] };
 const raycaster = new THREE.Raycaster(); const mouse = new THREE.Vector2();
 
 function updateCameraView() {
+    if (window._layoutModeActive) return;
     // ---- Inline upper unit edit mode: keep camera stable (don't re-animate to lower cabinet) ----
     if (state._activeUpperUnit) {
         // Just rebuild drag handles and overlays without moving the camera
@@ -1525,6 +1526,7 @@ function updateCameraView() {
 }
 
 function buildCabinet() {
+    if (window._layoutModeActive) return;
     while(cabinetGroup.children.length > 0) cabinetGroup.remove(cabinetGroup.children[0]);
     hitBoxes = [];
     wingHitBoxes = [];
@@ -2367,6 +2369,52 @@ function buildCabinet() {
     }
 
 }
+
+// Build a single linear cabinet snapshot into an arbitrary THREE.Group (layout / compare mode).
+window.buildCabinetIntoGroup = function(targetGroup) {
+    while (targetGroup.children.length > 0) targetGroup.remove(targetGroup.children[0]);
+
+    const savedBuildGroup = _buildGroup;
+    const savedIsActive = _isActiveWingBuild;
+    const savedActiveWing = state.activeWing;
+    const savedActiveUpperUnit = state._activeUpperUnit;
+
+    state._activeUpperUnit = null;
+    state.activeWing = 'center';
+
+    const centerWing = state.wings.center;
+    if (centerWing) {
+        _buildGroup = targetGroup;
+        _isActiveWingBuild = false;
+        _ppWingId = 'center';
+        _buildWingGeometry(targetGroup, 0, 0, 0, false);
+
+        const uuKey = 'upperUnit_center';
+        const uuWing = state.wings[uuKey];
+        if (uuWing && uuWing._isUpperUnit) {
+            const mainH = centerWing.columns && centerWing.columns.length > 0
+                ? Math.max(...centerWing.columns.map(c => c.height))
+                : (centerWing.globalHeight || 240);
+            const upperGroup = new THREE.Group();
+            upperGroup.position.y = mainH + (uuWing._upperGap || 60);
+            upperGroup.position.x = (uuWing._upperOffsetX || 0);
+            state.activeWing = uuKey;
+            _buildGroup = upperGroup;
+            _isActiveWingBuild = false;
+            _ppWingId = uuKey;
+            uuWing.columns.forEach(col => { col.noPlinth = true; });
+            _buildWingGeometry(upperGroup, 0, 0, 0, false);
+            targetGroup.add(upperGroup);
+        }
+    }
+
+    state.activeWing = savedActiveWing;
+    state._activeUpperUnit = savedActiveUpperUnit;
+    _buildGroup = savedBuildGroup;
+    _isActiveWingBuild = savedIsActive;
+};
+
+window.cabinetGroup = cabinetGroup;
 
 // ==========================================
 // _drawGroovesOnPanel — bathroom door/drawer fluted rib overlay

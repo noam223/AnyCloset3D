@@ -5698,6 +5698,7 @@ function _showToast(msg, duration = 4000) {
     clearTimeout(toast._hideTimer);
     toast._hideTimer = setTimeout(() => { toast.style.opacity = '0'; }, duration);
 }
+window._showToast = _showToast;
 
 // ---- Cart preview refresh (images stripped on project save — regenerate from rawState) ----
 window._captureCabinetPreviewImages = function() {
@@ -5908,6 +5909,10 @@ function _applyRawStateForCapture(rawState) {
     state.blueprintCutouts = rs.blueprintCutouts ? JSON.parse(JSON.stringify(rs.blueprintCutouts)) : [];
     state.blueprintCellDimOffsets = rs.blueprintCellDimOffsets ? JSON.parse(JSON.stringify(rs.blueprintCellDimOffsets)) : {};
 }
+
+window._snapshotEditorState = _snapshotEditorState;
+window._restoreEditorState = _restoreEditorState;
+window._applyRawStateForCapture = _applyRawStateForCapture;
 
 window._refreshCartMediaForPrint = async function() {
     if (!state.orderCart.length || window._cartMediaRefreshRunning) return;
