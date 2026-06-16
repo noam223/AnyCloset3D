@@ -12,7 +12,7 @@
     var LAYOUT_GIZMO_ARROW = 48;
     var LAYOUT_GIZMO_HIT = 22;
     var LAYOUT_GIZMO_SCREEN_PX = 32;
-    var LAYOUT_VERSION = '20260609r';
+    var LAYOUT_VERSION = '20260609s';
     var _layoutPickHits = [];
     var _layoutDragBound = false;
     var _layoutCanvas = null;
@@ -447,7 +447,6 @@
         for (var i = 0; i < hits.length; i++) {
             var mode = _layoutGizmoModeFromHit(hits[i].object);
             if (mode && _layoutIsGizmoModeActive(mode)) {
-                _layoutDbg('pick gizmo ray', mode, 'dist', hits[i].distance.toFixed(1));
                 return mode;
             }
         }
@@ -551,6 +550,40 @@
             return bestMode;
         }
         return null;
+    }
+
+    function _layoutWorldDeltaOnAxis(origin, axis, startClient, curClient) {
+        var o = _layoutProjectWorldToClient(origin);
+        var tip = _layoutProjectWorldToClient(origin.clone().add(axis));
+        var sx = tip.x - o.x;
+        var sy = tip.y - o.y;
+        var screenLen = Math.sqrt(sx * sx + sy * sy);
+        if (screenLen < 3) return null;
+
+        var mx = curClient.x - startClient.x;
+        var my = curClient.y - startClient.y;
+        var pixelAlong = (mx * sx + my * sy) / screenLen;
+        return pixelAlong / screenLen;
+    }
+
+    function _layoutWorldDeltaOnPlaneXZ(slot, origin, rotY, startClient, curClient) {
+        var worldX = _layoutWorldAxis('axis-x', rotY);
+        var worldZ = _layoutWorldAxis('axis-z', rotY);
+        var o = _layoutProjectWorldToClient(origin);
+        var px = _layoutProjectWorldToClient(origin.clone().add(worldX));
+        var pz = _layoutProjectWorldToClient(origin.clone().add(worldZ));
+        var sx = px.x - o.x;
+        var sy = px.y - o.y;
+        var szx = pz.x - o.x;
+        var szy = pz.y - o.y;
+        var mx = curClient.x - startClient.x;
+        var my = curClient.y - startClient.y;
+        var det = sx * szy - sy * szx;
+        if (Math.abs(det) < 1e-3) return null;
+        return {
+            dx: (mx * szy - my * szx) / det,
+            dz: (my * sx - mx * sy) / det
+        };
     }
 
     function _layoutSetDragPlane(normal, point) {
@@ -880,23 +913,25 @@
 
             if (gizmoMode === 'plane-xz') {
                 dragState.planeY = slot.y || 0;
+                dragState.startClient = _layoutPointerClient(e);
                 _layoutSetDragPlane(new THREE.Vector3(0, 1, 0), new THREE.Vector3(slot.x || 0, dragState.planeY, slot.z || 0));
                 var pt0 = _layoutRayOnDragPlane();
-                if (!pt0) return;
-                dragState.planeOffsetX = pt0.x - (slot.x || 0);
-                dragState.planeOffsetZ = pt0.z - (slot.z || 0);
+                if (pt0) {
+                    dragState.planeOffsetX = pt0.x - (slot.x || 0);
+                    dragState.planeOffsetZ = pt0.z - (slot.z || 0);
+                    dragState.usePlaneRay = true;
+                } else {
+                    dragState.usePlaneRay = false;
+                }
             } else if (gizmoMode.indexOf('rotate-') === 0) {
+                dragState.startClient = _layoutPointerClient(e);
                 if (!_layoutInitRotateDrag(gizmoMode, center, slot, dragState)) return;
             } else if (gizmoMode.indexOf('axis-') === 0) {
                 var axis = _layoutWorldAxis(gizmoMode, slot.rotY);
                 dragState.axis = axis.clone();
+                dragState.startClient = _layoutPointerClient(e);
                 dragState.planeNormal = _layoutDragPlaneNormal(axis, center);
-                var startScalar = _layoutScalarOnAxisAt(center, axis, dragState.planeNormal);
-                if (startScalar == null) {
-                    _layoutDbg('axis drag start failed — no plane hit', gizmoMode);
-                    return;
-                }
-                dragState.startScalar = startScalar;
+                dragState.startScalar = _layoutScalarOnAxisAt(center, axis, dragState.planeNormal);
             }
 
             _layoutDragState = dragState;
@@ -945,28 +980,41 @@
         var mode = _layoutDragState.mode;
         var origin = _layoutDragState.gizmoOrigin;
 
+        var curClient = _layoutPointerClient(e);
+
         if (mode === 'plane-xz') {
-            _layoutSetDragPlane(
-                new THREE.Vector3(0, 1, 0),
-                new THREE.Vector3(slot.x || 0, _layoutDragState.planeY, slot.z || 0)
-            );
-            var pt = _layoutRayOnDragPlane();
-            if (!pt) {
-                _layoutDbg('drag move miss plane', mode);
-                return;
+            if (_layoutDragState.usePlaneRay) {
+                _layoutSetDragPlane(
+                    new THREE.Vector3(0, 1, 0),
+                    new THREE.Vector3(slot.x || 0, _layoutDragState.planeY, slot.z || 0)
+                );
+                var pt = _layoutRayOnDragPlane();
+                if (pt) {
+                    slot.x = pt.x - _layoutDragState.planeOffsetX;
+                    slot.z = pt.z - _layoutDragState.planeOffsetZ;
+                } else {
+                    _layoutDragState.usePlaneRay = false;
+                }
             }
-            slot.x = pt.x - _layoutDragState.planeOffsetX;
-            slot.z = pt.z - _layoutDragState.planeOffsetZ;
+            if (!_layoutDragState.usePlaneRay) {
+                var xzDelta = _layoutWorldDeltaOnPlaneXZ(
+                    slot, origin, slot.rotY || 0, _layoutDragState.startClient, curClient
+                );
+                if (!xzDelta) return;
+                slot.x = _layoutDragState.startX + xzDelta.dx;
+                slot.z = _layoutDragState.startZ + xzDelta.dz;
+            }
         } else if (mode.indexOf('rotate-') === 0) {
             _layoutApplyRotateDrag(origin, slot, _layoutDragState);
         } else if (mode.indexOf('axis-') === 0) {
             var axis = _layoutDragState.axis;
-            var currentScalar = _layoutScalarOnAxisAt(origin, axis, _layoutDragState.planeNormal);
-            if (currentScalar == null) {
-                _layoutDbg('axis drag move miss plane', mode);
-                return;
+            var delta = _layoutWorldDeltaOnAxis(origin, axis, _layoutDragState.startClient, curClient);
+            if (delta == null && _layoutDragState.startScalar != null) {
+                var currentScalar = _layoutScalarOnAxisAt(origin, axis, _layoutDragState.planeNormal);
+                if (currentScalar == null) return;
+                delta = currentScalar - _layoutDragState.startScalar;
             }
-            var delta = currentScalar - _layoutDragState.startScalar;
+            if (delta == null) return;
             slot.x = _layoutDragState.startX + axis.x * delta;
             slot.y = Math.max(0, _layoutDragState.startY + axis.y * delta);
             slot.z = _layoutDragState.startZ + axis.z * delta;
