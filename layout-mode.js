@@ -12,7 +12,7 @@
     var LAYOUT_GIZMO_ARROW = 48;
     var LAYOUT_GIZMO_HIT = 22;
     var LAYOUT_GIZMO_SCREEN_PX = 32;
-    var LAYOUT_VERSION = '20260609q';
+    var LAYOUT_VERSION = '20260609r';
     var _layoutPickHits = [];
     var _layoutDragBound = false;
     var _layoutCanvas = null;
@@ -406,6 +406,7 @@
         var rect = _layoutCanvas.getBoundingClientRect();
         _layoutMouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
         _layoutMouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        if (window.camera) _layoutRaycaster.setFromCamera(_layoutMouse, window.camera);
     }
 
     function _layoutRaycastAll(objects, recursiveRoot) {
@@ -936,6 +937,7 @@
         }
 
         e.preventDefault();
+        e.stopPropagation();
         _layoutPointerNDC(e);
         var slot = _layoutScene.slots[_layoutDragState.slotIndex];
         if (!slot) return;
