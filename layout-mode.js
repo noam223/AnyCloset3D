@@ -10,7 +10,9 @@
     var LAYOUT_MOVE_STEP = 5;
     var LAYOUT_SNAP_CM = 8;
     var LAYOUT_GIZMO_ARROW = 48;
-    var LAYOUT_GIZMO_HIT = 16;
+    var LAYOUT_GIZMO_HIT = 22;
+    var LAYOUT_GIZMO_SCREEN_PX = 32;
+    var LAYOUT_VERSION = '20260609p';
     var _layoutPickHits = [];
     var _layoutDragBound = false;
     var _layoutCanvas = null;
@@ -28,6 +30,11 @@
 
     function _layoutDbg() {
         if (!window._layoutDebug) return;
+        var args = ['[layout]'].concat(Array.prototype.slice.call(arguments));
+        console.log.apply(console, args);
+    }
+
+    function _layoutLog() {
         var args = ['[layout]'].concat(Array.prototype.slice.call(arguments));
         console.log.apply(console, args);
     }
@@ -288,7 +295,6 @@
         if (withSnap) {
             _applySnapAndResolve(slotIdx);
         } else {
-            _resolveSlotOverlap(slotIdx);
             _clampSlotToGround(_layoutScene.slots[slotIdx]);
         }
     }
@@ -432,13 +438,6 @@
         return hits[0].object.userData.layoutSlotIndex;
     }
 
-    function _layoutIsGizmoModeActive(mode) {
-        if (_layoutGizmoTool === 'move') {
-            return mode === 'axis-x' || mode === 'axis-y' || mode === 'axis-z' || mode === 'plane-xz';
-        }
-        return mode === 'rotate-x' || mode === 'rotate-y' || mode === 'rotate-z';
-    }
-
     function _layoutPickGizmo(e) {
         if (!_layoutGizmoGroup || !_layoutGizmoGroup.visible) return null;
         _layoutPointerNDC(e);
@@ -447,9 +446,108 @@
         for (var i = 0; i < hits.length; i++) {
             var mode = _layoutGizmoModeFromHit(hits[i].object);
             if (mode && _layoutIsGizmoModeActive(mode)) {
-                _layoutDbg('pick gizmo', mode, 'dist', hits[i].distance.toFixed(1));
+                _layoutDbg('pick gizmo ray', mode, 'dist', hits[i].distance.toFixed(1));
                 return mode;
             }
+        }
+        return _layoutPickGizmoScreen(e);
+    }
+
+    function _layoutPointerInCanvas(e) {
+        if (!_layoutCanvas) return false;
+        if (!_layoutCanvas.contains(e.target)) return false;
+        if (e.target.closest('#layout-mode-bar') || e.target.closest('#layout-picker-modal')) return false;
+        if (e.target.closest('#bed-toolbar') || e.target.closest('#room-furniture-toolbar')) return false;
+        return true;
+    }
+
+    function _layoutIsGizmoModeActive(mode) {
+        if (_layoutGizmoTool === 'move') {
+            return mode === 'axis-x' || mode === 'axis-y' || mode === 'axis-z' || mode === 'plane-xz';
+        }
+        return mode === 'rotate-x' || mode === 'rotate-y' || mode === 'rotate-z';
+    }
+
+    function _layoutPointerClient(e) {
+        return { x: e.clientX, y: e.clientY };
+    }
+
+    function _layoutProjectWorldToClient(v3) {
+        var rect = _layoutCanvas.getBoundingClientRect();
+        var p = v3.clone().project(window.camera);
+        return {
+            x: rect.left + (p.x * 0.5 + 0.5) * rect.width,
+            y: rect.top + (-p.y * 0.5 + 0.5) * rect.height
+        };
+    }
+
+    function _layoutDistPointToSeg(px, py, ax, ay, bx, by) {
+        var dx = bx - ax;
+        var dy = by - ay;
+        var lenSq = dx * dx + dy * dy;
+        if (lenSq < 1e-6) {
+            dx = px - ax;
+            dy = py - ay;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+        var t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
+        dx = px - (ax + t * dx);
+        dy = py - (ay + t * dy);
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    function _layoutPickGizmoScreen(e) {
+        if (!_layoutGizmoGroup || !_layoutGizmoGroup.visible || !_layoutScene) return null;
+        var slot = _layoutScene.slots[_layoutScene.activeSlot];
+        if (!slot || !window.camera) return null;
+
+        var center = _layoutGizmoCenter(slot, _layoutScene.activeSlot);
+        var c = _layoutProjectWorldToClient(center);
+        var mx = e.clientX;
+        var my = e.clientY;
+        var bestMode = null;
+        var bestDist = LAYOUT_GIZMO_SCREEN_PX;
+
+        if (_layoutGizmoTool === 'move') {
+            var axes = [
+                { mode: 'axis-x', dir: _layoutWorldAxis('axis-x', slot.rotY) },
+                { mode: 'axis-y', dir: _layoutWorldAxis('axis-y', slot.rotY) },
+                { mode: 'axis-z', dir: _layoutWorldAxis('axis-z', slot.rotY) }
+            ];
+            axes.forEach(function(a) {
+                var end = center.clone().add(a.dir.clone().multiplyScalar(LAYOUT_GIZMO_ARROW * _layoutGizmoScreenScale(center)));
+                var ep = _layoutProjectWorldToClient(end);
+                var d = _layoutDistPointToSeg(mx, my, c.x, c.y, ep.x, ep.y);
+                if (d < bestDist) {
+                    bestDist = d;
+                    bestMode = a.mode;
+                }
+            });
+            var dc = Math.sqrt((mx - c.x) * (mx - c.x) + (my - c.y) * (my - c.y));
+            if (dc < bestDist) bestMode = 'plane-xz';
+        } else {
+            var ringR = 42 * _layoutGizmoScreenScale(center);
+            var rings = [
+                { mode: 'rotate-x', dir: _layoutWorldAxis('axis-x', slot.rotY) },
+                { mode: 'rotate-y', dir: new THREE.Vector3(0, 1, 0) },
+                { mode: 'rotate-z', dir: _layoutWorldAxis('axis-z', slot.rotY) }
+            ];
+            rings.forEach(function(r) {
+                var p1 = center.clone().add(new THREE.Vector3(-r.dir.z, 0, r.dir.x).multiplyScalar(ringR));
+                var p2 = center.clone().add(new THREE.Vector3(r.dir.z, 0, -r.dir.x).multiplyScalar(ringR));
+                var s1 = _layoutProjectWorldToClient(p1);
+                var s2 = _layoutProjectWorldToClient(p2);
+                var d = _layoutDistPointToSeg(mx, my, s1.x, s1.y, s2.x, s2.y);
+                if (d < bestDist) {
+                    bestDist = d;
+                    bestMode = r.mode;
+                }
+            });
+        }
+
+        if (bestMode && _layoutIsGizmoModeActive(bestMode)) {
+            _layoutDbg('pick gizmo screen', bestMode, 'px', bestDist.toFixed(1));
+            return bestMode;
         }
         return null;
     }
@@ -1168,7 +1266,7 @@
         }
         else if (axis === 'z') slot.z = (slot.z || 0) + delta;
 
-        _applySnapAndResolve(_layoutScene.activeSlot);
+        _clampSlotToGround(slot);
         _applySlotTransforms(false);
         _syncLayoutToolbar();
         _syncLayoutMoveButtons();
