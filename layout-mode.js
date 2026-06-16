@@ -12,7 +12,7 @@
     var LAYOUT_GIZMO_ARROW = 48;
     var LAYOUT_GIZMO_HIT = 22;
     var LAYOUT_GIZMO_SCREEN_PX = 32;
-    var LAYOUT_VERSION = '20260609p';
+    var LAYOUT_VERSION = '20260609q';
     var _layoutPickHits = [];
     var _layoutDragBound = false;
     var _layoutCanvas = null;
@@ -891,7 +891,6 @@
                 dragState.axis = axis.clone();
                 dragState.planeNormal = _layoutDragPlaneNormal(axis, center);
                 var startScalar = _layoutScalarOnAxisAt(center, axis, dragState.planeNormal);
-                if (startScalar == null) return;
                 if (startScalar == null) {
                     _layoutDbg('axis drag start failed — no plane hit', gizmoMode);
                     return;
@@ -903,7 +902,10 @@
             _layoutDbg('drag start', gizmoMode, dragState);
             if (window.controls) window.controls.enabled = false;
             document.body.classList.add('layout-dragging');
-            if (_layoutCanvas) _layoutCanvas.setPointerCapture(e.pointerId);
+            var capEl = (window.renderer && window.renderer.domElement && window.renderer.domElement.contains(e.target))
+                ? window.renderer.domElement
+                : _layoutCanvas;
+            if (capEl && capEl.setPointerCapture) capEl.setPointerCapture(e.pointerId);
             return;
         }
 
@@ -934,6 +936,7 @@
         }
 
         e.preventDefault();
+        _layoutPointerNDC(e);
         var slot = _layoutScene.slots[_layoutDragState.slotIndex];
         if (!slot) return;
 
@@ -977,7 +980,10 @@
     function _onLayoutPointerUp(e) {
         if (!_layoutDragState) return;
 
-        if (_layoutCanvas && _layoutCanvas.hasPointerCapture(e.pointerId)) {
+        var capEl = (window.renderer && window.renderer.domElement) || _layoutCanvas;
+        if (capEl && capEl.hasPointerCapture && capEl.hasPointerCapture(e.pointerId)) {
+            capEl.releasePointerCapture(e.pointerId);
+        } else if (_layoutCanvas && _layoutCanvas.hasPointerCapture && _layoutCanvas.hasPointerCapture(e.pointerId)) {
             _layoutCanvas.releasePointerCapture(e.pointerId);
         }
 
@@ -1064,7 +1070,13 @@
 
     function _renderLayoutRoom(spec) {
         var rg = window._roomGroup;
+        if (!rg) return;
+        var roomVisible = !_layoutScene || _layoutScene.roomVisible !== false;
         while (rg.children.length > 0) rg.remove(rg.children[0]);
+        if (!roomVisible) {
+            rg.visible = false;
+            return;
+        }
         rg.visible = true;
 
         var centerX = (spec.leftWallX + spec.rightWallX) / 2;
@@ -1359,6 +1371,30 @@
         window._enterLayoutMode(indexA, indexB);
     };
 
+    function _syncLayoutRoomToggleBtn() {
+        var btn = document.getElementById('layout-toggle-room-btn');
+        var label = document.getElementById('layout-room-toggle-label');
+        if (!btn || !_layoutScene) return;
+        var vis = _layoutScene.roomVisible !== false;
+        if (label) label.textContent = vis ? 'הסתר חדר' : 'הצג חדר';
+        btn.classList.toggle('toggled-off', !vis);
+        btn.title = vis ? 'הסתר קירות ורצפה' : 'הצג קירות ורצפה';
+    }
+
+    window._toggleLayoutRoom = function() {
+        if (!_layoutScene || !_layoutScene.active) return;
+        _layoutScene.roomVisible = !(_layoutScene.roomVisible !== false);
+        if (window._roomGroup) {
+            if (_layoutScene.roomVisible && _layoutScene.roomSpec) {
+                if (window._roomGroup.children.length === 0) _renderLayoutRoom(_layoutScene.roomSpec);
+                else window._roomGroup.visible = true;
+            } else {
+                window._roomGroup.visible = false;
+            }
+        }
+        _syncLayoutRoomToggleBtn();
+    };
+
     window._enterLayoutMode = function(indexA, indexB) {
         if (!window._isLayoutEligibleCabinet(indexA) || !window._isLayoutEligibleCabinet(indexB)) {
             if (typeof window._showToast === 'function') window._showToast('ניתן לסדר רק ארונות ישרים (לא הזזה)', 3500);
@@ -1369,6 +1405,7 @@
         _layoutScene = {
             active: true,
             activeSlot: 0,
+            roomVisible: true,
             slots: [
                 _slotDefaults(indexA),
                 _slotDefaults(indexB)
@@ -1392,6 +1429,7 @@
         _layoutBuildGizmoVisuals();
 
         _layoutPresetSideBySide();
+        _syncLayoutRoomToggleBtn();
         _layoutDbg('enter layout mode', indexA, indexB);
 
         if (typeof updateCameraView === 'function') updateCameraView();
