@@ -9,8 +9,8 @@
     var _pickSelection = [];
     var LAYOUT_MOVE_STEP = 5;
     var LAYOUT_SNAP_CM = 8;
-    var LAYOUT_GIZMO_ARROW = 52;
-    var LAYOUT_GIZMO_HIT = 12;
+    var LAYOUT_GIZMO_ARROW = 48;
+    var LAYOUT_GIZMO_HIT = 16;
     var _layoutPickHits = [];
     var _layoutDragBound = false;
     var _layoutCanvas = null;
@@ -216,6 +216,15 @@
         _clampSlotToGround(_layoutScene.slots[slotIdx]);
     }
 
+    function _applyDragConstraints(slotIdx, withSnap) {
+        if (withSnap) {
+            _applySnapAndResolve(slotIdx);
+        } else {
+            _resolveSlotOverlap(slotIdx);
+            _clampSlotToGround(_layoutScene.slots[slotIdx]);
+        }
+    }
+
     function _layoutIneligibleReason(rawState) {
         var rs = rawState || {};
         var preset = rs.presetId || 'linear';
@@ -367,10 +376,44 @@
         return null;
     }
 
-    function _layoutGizmoCenter(slot) {
+    function _layoutDragPlaneNormal(axis, origin) {
+        var camDir = _layoutTmpV3c.copy(window.camera.position).sub(origin).normalize();
+        var n = _layoutTmpV3b.copy(axis).cross(camDir);
+        if (n.lengthSq() < 1e-5) n.crossVectors(axis, new THREE.Vector3(0, 1, 0));
+        if (n.lengthSq() < 1e-5) n.crossVectors(axis, new THREE.Vector3(1, 0, 0));
+        return n.normalize();
+    }
+
+    function _layoutScalarOnAxisAt(origin, axis, planeNormal) {
+        _layoutSetDragPlane(planeNormal, origin);
+        var pt = _layoutRayOnDragPlane();
+        if (!pt) return null;
+        return _layoutScalarOnAxis(origin, axis, pt);
+    }
+
+    function _layoutGizmoCenter(slot, slotIndex) {
+        if (_layoutGroup && slotIndex != null) {
+            var g = _layoutGroup.getObjectByName('layout-slot-' + slotIndex);
+            if (g) {
+                g.updateMatrixWorld(true);
+                var box = new THREE.Box3().setFromObject(g);
+                if (!box.isEmpty()) {
+                    var c = new THREE.Vector3();
+                    box.getCenter(c);
+                    return c;
+                }
+            }
+        }
         var rs = state.orderCart[slot.cartIndex].rawState;
         var h = _linearHeight(rs);
-        return new THREE.Vector3(slot.x || 0, (slot.y || 0) + Math.min(h * 0.42, 110), slot.z || 0);
+        return new THREE.Vector3(slot.x || 0, (slot.y || 0) + h * 0.5, slot.z || 0);
+    }
+
+    function _layoutGizmoScreenScale(worldPoint) {
+        if (!window.camera) return 1;
+        var dist = window.camera.position.distanceTo(worldPoint);
+        var fov = window.camera.fov || 45;
+        return Math.max(0.55, Math.min(1.8, dist * Math.tan(fov * Math.PI / 360) / 145));
     }
 
     function _layoutWorldAxis(mode, rotY) {
@@ -484,26 +527,41 @@
         var r = 2.4;
         var head = 11;
 
-        function makeArrow(mode, color, axis) {
+        function makeArrow(mode, color, dir) {
             var g = new THREE.Group();
             var shaft = new THREE.Mesh(
                 new THREE.CylinderGeometry(r, r, len, 10),
                 _layoutMakeGizmoMaterial(color)
             );
-            shaft.rotation.x = Math.PI / 2;
-            shaft.position[axis] = len / 2;
             var tip = new THREE.Mesh(
-                new THREE.ConeGeometry(r * 2.2, head, 12),
+                new THREE.ConeGeometry(r * 2.4, head, 12),
                 _layoutMakeGizmoMaterial(color)
             );
-            tip.rotation.x = Math.PI / 2;
-            tip.position[axis] = len + head * 0.45;
             var hit = new THREE.Mesh(
                 new THREE.CylinderGeometry(LAYOUT_GIZMO_HIT, LAYOUT_GIZMO_HIT, len + head, 8),
-                _layoutMakeGizmoMaterial(color, 0.01)
+                _layoutMakeGizmoMaterial(color, 0.015)
             );
-            hit.rotation.x = Math.PI / 2;
-            hit.position[axis] = (len + head) / 2;
+
+            if (dir === 'x') {
+                shaft.rotation.z = -Math.PI / 2;
+                tip.rotation.z = -Math.PI / 2;
+                hit.rotation.z = -Math.PI / 2;
+                shaft.position.x = len / 2;
+                tip.position.x = len + head * 0.45;
+                hit.position.x = (len + head) / 2;
+            } else if (dir === 'y') {
+                shaft.position.y = len / 2;
+                tip.position.y = len + head * 0.45;
+                hit.position.y = (len + head) / 2;
+            } else {
+                shaft.rotation.x = Math.PI / 2;
+                tip.rotation.x = Math.PI / 2;
+                hit.rotation.x = Math.PI / 2;
+                shaft.position.z = len / 2;
+                tip.position.z = len + head * 0.45;
+                hit.position.z = (len + head) / 2;
+            }
+
             g.add(shaft);
             g.add(tip);
             _layoutAddGizmoHandle(g, hit, mode);
@@ -515,11 +573,11 @@
         _layoutTranslateGroup.add(makeArrow('axis-z', 0x1e88e5, 'z'));
 
         var centerHit = new THREE.Mesh(
-            new THREE.BoxGeometry(LAYOUT_GIZMO_HIT * 1.35, LAYOUT_GIZMO_HIT * 1.35, LAYOUT_GIZMO_HIT * 1.35),
-            _layoutMakeGizmoMaterial(0xffffff, 0.01)
+            new THREE.BoxGeometry(LAYOUT_GIZMO_HIT * 1.5, LAYOUT_GIZMO_HIT * 1.5, LAYOUT_GIZMO_HIT * 1.5),
+            _layoutMakeGizmoMaterial(0xffffff, 0.015)
         );
         var centerVis = new THREE.Mesh(
-            new THREE.BoxGeometry(9, 9, 9),
+            new THREE.BoxGeometry(10, 10, 10),
             _layoutMakeGizmoMaterial(0xffffff, 0.95)
         );
         centerVis.material.color.set(0xf8fafc);
@@ -565,9 +623,11 @@
             _layoutGizmoGroup.visible = false;
             return;
         }
-        var center = _layoutGizmoCenter(slot);
+        var center = _layoutGizmoCenter(slot, _layoutScene.activeSlot);
         _layoutGizmoGroup.visible = true;
         _layoutGizmoGroup.position.copy(center);
+        var s = _layoutGizmoScreenScale(center);
+        _layoutGizmoGroup.scale.set(s, s, s);
         if (_layoutGizmoTool === 'move') {
             _layoutGizmoGroup.rotation.set(0, slot.rotY || 0, 0);
         } else {
@@ -609,20 +669,24 @@
             var slot = _layoutScene.slots[_layoutScene.activeSlot];
             if (!slot) return;
 
-            var center = _layoutGizmoCenter(slot);
+            var slotIdx = _layoutScene.activeSlot;
+            var center = _layoutGizmoCenter(slot, slotIdx);
             var dragState = {
-                slotIndex: _layoutScene.activeSlot,
+                slotIndex: slotIdx,
                 mode: gizmoMode,
                 startX: slot.x || 0,
                 startY: slot.y || 0,
                 startZ: slot.z || 0,
+                startRotX: slot.rotX || 0,
                 startRotY: slot.rotY || 0,
-                gizmoCenter: center.clone(),
+                startRotZ: slot.rotZ || 0,
+                gizmoOrigin: center.clone(),
                 controlsWereEnabled: window.controls ? window.controls.enabled : true
             };
 
             if (gizmoMode === 'plane-xz') {
-                _layoutSetDragPlane(new THREE.Vector3(0, 1, 0), center);
+                dragState.planeY = slot.y || 0;
+                _layoutSetDragPlane(new THREE.Vector3(0, 1, 0), new THREE.Vector3(slot.x || 0, dragState.planeY, slot.z || 0));
                 var pt0 = _layoutRayOnDragPlane();
                 if (!pt0) return;
                 dragState.planeOffsetX = pt0.x - (slot.x || 0);
@@ -632,14 +696,10 @@
             } else if (gizmoMode.indexOf('axis-') === 0) {
                 var axis = _layoutWorldAxis(gizmoMode, slot.rotY);
                 dragState.axis = axis.clone();
-                var camDir = _layoutTmpV3c.copy(window.camera.position).sub(center).normalize();
-                var planeNormal = _layoutTmpV3b.copy(axis).cross(camDir);
-                if (planeNormal.lengthSq() < 1e-6) planeNormal.set(0, 1, 0);
-                else planeNormal.normalize();
-                _layoutSetDragPlane(planeNormal, center);
-                var ptA = _layoutRayOnDragPlane();
-                if (!ptA) return;
-                dragState.startScalar = _layoutScalarOnAxis(center, axis, ptA);
+                dragState.planeNormal = _layoutDragPlaneNormal(axis, center);
+                var startScalar = _layoutScalarOnAxisAt(center, axis, dragState.planeNormal);
+                if (startScalar == null) return;
+                dragState.startScalar = startScalar;
             }
 
             _layoutDragState = dragState;
@@ -679,37 +739,31 @@
         if (!slot) return;
 
         var mode = _layoutDragState.mode;
-        var center = _layoutDragState.gizmoCenter;
+        var origin = _layoutDragState.gizmoOrigin;
 
         if (mode === 'plane-xz') {
-            _layoutSetDragPlane(new THREE.Vector3(0, 1, 0), center);
+            _layoutSetDragPlane(
+                new THREE.Vector3(0, 1, 0),
+                new THREE.Vector3(slot.x || 0, _layoutDragState.planeY, slot.z || 0)
+            );
             var pt = _layoutRayOnDragPlane();
             if (!pt) return;
             slot.x = pt.x - _layoutDragState.planeOffsetX;
             slot.z = pt.z - _layoutDragState.planeOffsetZ;
         } else if (mode.indexOf('rotate-') === 0) {
-            _layoutApplyRotateDrag(center, slot, _layoutDragState);
+            _layoutApplyRotateDrag(origin, slot, _layoutDragState);
         } else if (mode.indexOf('axis-') === 0) {
             var axis = _layoutDragState.axis;
-            var camDir = _layoutTmpV3c.copy(window.camera.position).sub(center).normalize();
-            var planeNormal = _layoutTmpV3b.copy(axis).cross(camDir);
-            if (planeNormal.lengthSq() < 1e-6) planeNormal.set(0, 1, 0);
-            else planeNormal.normalize();
-            _layoutSetDragPlane(planeNormal, center);
-            var ptAxis = _layoutRayOnDragPlane();
-            if (!ptAxis) return;
-            var delta = _layoutScalarOnAxis(center, axis, ptAxis) - _layoutDragState.startScalar;
-            if (mode === 'axis-x' || mode === 'axis-z') {
-                var move = axis.clone().multiplyScalar(delta);
-                slot.x = _layoutDragState.startX + move.x;
-                slot.z = _layoutDragState.startZ + move.z;
-            } else if (mode === 'axis-y') {
-                slot.y = Math.max(0, _layoutDragState.startY + delta);
-            }
+            var currentScalar = _layoutScalarOnAxisAt(origin, axis, _layoutDragState.planeNormal);
+            if (currentScalar == null) return;
+            var delta = currentScalar - _layoutDragState.startScalar;
+            slot.x = _layoutDragState.startX + axis.x * delta;
+            slot.y = Math.max(0, _layoutDragState.startY + axis.y * delta);
+            slot.z = _layoutDragState.startZ + axis.z * delta;
         }
 
-        _applySnapAndResolve(_layoutDragState.slotIndex);
-        _applySlotTransforms(mode.indexOf('rotate-') !== 0);
+        _applyDragConstraints(_layoutDragState.slotIndex, false);
+        _applySlotTransforms(false);
         _updateLayoutGizmo();
         _syncLayoutToolbar();
         _syncLayoutMoveButtons();
@@ -722,7 +776,7 @@
             _layoutCanvas.releasePointerCapture(e.pointerId);
         }
 
-        _applySnapAndResolve(_layoutDragState.slotIndex);
+        _applyDragConstraints(_layoutDragState.slotIndex, true);
         _applySlotTransforms(true);
         _updateLayoutGizmo();
         _syncLayoutToolbar();
@@ -738,6 +792,12 @@
         _layoutGizmoHover = null;
     }
 
+    function _onLayoutCameraChange() {
+        if (window._layoutModeActive && _layoutScene && _layoutScene.active) {
+            _updateLayoutGizmo();
+        }
+    }
+
     function _bindLayoutDragEvents() {
         if (_layoutDragBound) return;
         _layoutCanvas = document.getElementById('canvas-container');
@@ -746,6 +806,7 @@
         window.addEventListener('pointermove', _onLayoutPointerMove, true);
         window.addEventListener('pointerup', _onLayoutPointerUp, true);
         window.addEventListener('pointercancel', _onLayoutPointerUp, true);
+        if (window.controls) window.controls.addEventListener('change', _onLayoutCameraChange);
         _layoutDragBound = true;
     }
 
@@ -759,6 +820,7 @@
         window.removeEventListener('pointermove', _onLayoutPointerMove, true);
         window.removeEventListener('pointerup', _onLayoutPointerUp, true);
         window.removeEventListener('pointercancel', _onLayoutPointerUp, true);
+        if (window.controls) window.controls.removeEventListener('change', _onLayoutCameraChange);
         _layoutDragBound = false;
         _layoutDragState = null;
         document.body.classList.remove('layout-dragging');
