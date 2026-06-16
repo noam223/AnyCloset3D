@@ -49,7 +49,7 @@ serve(async (req) => {
     }
 
     // ── 3. Parse body ────────────────────────────────────────────────────────
-    const { image_front, image_3d, image_3d_right, extra_images, hex_color, project_id, preset_id, cabinet_spec, custom_prompt } = await req.json();
+    const { image_front, image_3d, image_3d_right, extra_images, hex_color, project_id, preset_id, cabinet_spec, custom_prompt, single_view } = await req.json();
     if (!image_front) return json({ error: 'image_front required' }, 400);
 
     // ── 4. Build prompt ───────────────────────────────────────────────────────
@@ -82,10 +82,12 @@ serve(async (req) => {
       }
     }
 
-    const numImages = image_3d_right ? 'שלוש' : 'שתי';
-    const imagesDesc = image_3d_right
-      ? 'תצוגת חזית, תצוגת זווית שמאל ותצוגת זווית ימין'
-      : 'תצוגת חזית ותצוגת זווית תלת-ממד';
+    const numImages = single_view ? 'אחת' : (image_3d_right ? 'שלוש' : 'שתי');
+    const imagesDesc = single_view
+      ? 'תצוגה מהזווית הנוכחית'
+      : (image_3d_right
+        ? 'תצוגת חזית, תצוגת זווית שמאל ותצוגת זווית ימין'
+        : 'תצוגת חזית ותצוגת זווית תלת-ממד');
 
     const basePrompt = custom_prompt || `מצורפות ${numImages} תמונות ייחוס של ארון בגדים שעוצב על ידי לקוח: ${imagesDesc}.
 צור הדמיה פוטוריאליסטית של ארון זה מותקן בחדר שינה מעוצב ומודרני.
@@ -111,14 +113,17 @@ serve(async (req) => {
     const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent?key=${GEMINI_KEY}`;
 
     const cleanFront  = image_front.replace(/^data:image\/\w+;base64,/, '');
-    const mime3d      = (image_3d || '').startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
-    const clean3d     = (image_3d || image_front).replace(/^data:image\/\w+;base64,/, '');
 
     const parts: any[] = [
       { text: basePrompt },
       { inlineData: { mimeType: 'image/jpeg', data: cleanFront } },
-      { inlineData: { mimeType: mime3d,        data: clean3d   } },
     ];
+
+    if (!single_view) {
+      const mime3d  = (image_3d || '').startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
+      const clean3d = (image_3d || image_front).replace(/^data:image\/\w+;base64,/, '');
+      parts.push({ inlineData: { mimeType: mime3d, data: clean3d } });
+    }
 
     // Add right angle image if provided
     if (image_3d_right) {

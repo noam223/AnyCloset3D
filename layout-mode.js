@@ -12,7 +12,7 @@
     var LAYOUT_GIZMO_ARROW = 48;
     var LAYOUT_GIZMO_HIT = 22;
     var LAYOUT_GIZMO_SCREEN_PX = 32;
-    var LAYOUT_VERSION = '20260609x';
+    var LAYOUT_VERSION = '20260610b';
     var _layoutPickHits = [];
     var _layoutDragBound = false;
     var _layoutCanvas = null;
@@ -466,9 +466,10 @@
 
     function _layoutSyncPickHitsVisibility() {
         if (!_layoutScene) return;
+        var active = _layoutScene.activeSlot;
         _layoutPickHits.forEach(function(hit) {
             var idx = hit.userData.layoutSlotIndex;
-            hit.visible = idx === _layoutScene.activeSlot;
+            hit.visible = active < 0 || idx === active;
         });
     }
 
@@ -927,6 +928,15 @@
         _updateLayoutGizmo();
     }
 
+    function _deselectLayoutSlot() {
+        if (!_layoutScene || _layoutScene.activeSlot < 0) return;
+        _layoutScene.activeSlot = -1;
+        _syncActiveLayoutChip();
+        _syncLayoutMoveButtons();
+        _layoutSyncPickHitsVisibility();
+        _hideLayoutGizmo();
+    }
+
     function _onLayoutPointerDown(e) {
         if (!window._layoutModeActive || !_layoutScene || !_layoutScene.active) return;
         if (e.button !== 0) return;
@@ -989,7 +999,11 @@
             e.preventDefault();
             e.stopPropagation();
             _selectLayoutSlot(slotIndex);
+            return;
         }
+
+        _layoutDbg('deselect slot');
+        _deselectLayoutSlot();
     }
 
     function _onLayoutPointerMove(e) {
@@ -1089,15 +1103,48 @@
         document.body.classList.remove('layout-dragging');
     }
 
+    function _syncOrbitControlsFromCamera() {
+        var ctrl = window.controls;
+        var cam = window.camera;
+        if (!ctrl || !cam) return;
+        ctrl.enabled = true;
+        ctrl.enableRotate = true;
+        ctrl.enablePan = true;
+        ctrl.enableZoom = true;
+        ctrl.enableDamping = false;
+        ctrl.update();
+        ctrl.enableDamping = true;
+        if (typeof ctrl.state === 'number') ctrl.state = -1;
+        if (typeof ctrl.reset === 'function' && ctrl.target) {
+            cam.lookAt(ctrl.target);
+        }
+    }
+
+    function _restoreLayoutCanvasSize() {
+        var container = document.getElementById('canvas-container');
+        var ren = window.renderer;
+        var cam = window.camera;
+        if (!container || !ren || !cam) return;
+        cam.aspect = container.clientWidth / container.clientHeight;
+        cam.updateProjectionMatrix();
+        ren.setSize(container.clientWidth, container.clientHeight);
+    }
+
     function _restoreEditorControlsAfterLayout() {
         window._camAnim = null;
-        if (window.controls) {
-            window.controls.enabled = true;
-            window.controls.enableRotate = true;
-            window.controls.enableDamping = true;
-            window.controls.update();
-        }
         window._orbitFree = true;
+        document.body.classList.remove('layout-dragging', 'layout-gizmo-rotate');
+        if (_layoutCanvas) {
+            _layoutCanvas.classList.remove('layout-gizmo-hover', 'layout-slot-hover');
+        }
+        _restoreLayoutCanvasSize();
+        _syncOrbitControlsFromCamera();
+        requestAnimationFrame(function() {
+            _syncOrbitControlsFromCamera();
+            if (window.renderer && window.scene && window.camera) {
+                window.renderer.render(window.scene, window.camera);
+            }
+        });
     }
 
     function _bindLayoutDragEvents() {
@@ -1133,7 +1180,6 @@
         _layoutDragBound = false;
         _layoutDragState = null;
         document.body.classList.remove('layout-dragging');
-        if (window.controls) window.controls.enabled = true;
     }
 
     function _addSlotOutline(slotGroup, color) {
@@ -1471,8 +1517,8 @@
         window._layoutDebug = false;
         _layoutGizmoTool = 'move';
 
-        _restoreEditorControlsAfterLayout();
         if (typeof _buildRoom === 'function') _buildRoom();
+        _restoreEditorControlsAfterLayout();
     };
 
     window._layoutPresetSideBySide = _layoutPresetSideBySide;

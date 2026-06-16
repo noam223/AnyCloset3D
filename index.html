@@ -2391,6 +2391,9 @@
             <button type="button" class="layout-mode-action-btn" onclick="window._layoutPresetSideBySide()">
                 <i class="fa-solid fa-arrows-left-right"></i> זה ליד זה
             </button>
+            <button type="button" id="btn-layout-render" class="layout-mode-action-btn layout-mode-render-btn" onclick="window._generateLayoutRender()" title="הדמיה מהזווית הנוכחית">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> הדמיה
+            </button>
             <button type="button" class="layout-mode-exit-btn" onclick="window._exitLayoutMode()">
                 <i class="fa-solid fa-xmark"></i> יציאה
             </button>
@@ -2434,7 +2437,7 @@
 <script src="engine-blueprint.js?v=20260608am"></script>
 <script src="tambour-color-picker.js?v=20260608a"></script>
 <script src="ui.js?v=20260609f"></script>
-<script src="layout-mode.js?v=20260609x"></script>
+<script src="layout-mode.js?v=20260610b"></script>
 <script src="mobile.js?v=20260609e"></script>
 <script src="part-paint.js?v=20260520k"></script>
 <script src="index-init.js?v=20260609a"></script>
@@ -2550,7 +2553,7 @@
 
 <script src="notes.js?v=20260608a"></script>
 <script src="tour.js?v=20260609d"></script>
-<script src="ai-renders.js?v=20260603k"></script>
+<script src="ai-renders.js?v=20260610a"></script>
 <script>
     // Init AI renders after auth is ready
     document.addEventListener('DOMContentLoaded', function() {

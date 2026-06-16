@@ -258,6 +258,65 @@ window._generateRender = async function() {
     _openPromptDialog(imageFront, image3dLeft, image3dRight, _getDominantColor(), _getCabinetSpec());
 };
 
+// ── Layout mode: single current-view capture + empty prompt ─────────────────
+window._generateLayoutRender = async function() {
+    if (!window._layoutModeActive) return;
+    if (!window.renderer) {
+        if (typeof window._showToast === 'function') window._showToast('לא נמצא renderer', 2500);
+        return;
+    }
+
+    var btn = document.getElementById('btn-layout-render');
+    if (btn) btn.disabled = true;
+
+    try {
+        if (window.renderer && window.scene && window.camera) {
+            window.renderer.render(window.scene, window.camera);
+        }
+        await new Promise(function(r) { setTimeout(r, 50); });
+        var image = window.renderer.domElement.toDataURL('image/jpeg', 0.85);
+        _openLayoutPromptDialog(image);
+    } catch (e) {
+        if (typeof window._showToast === 'function') window._showToast('שגיאה בצילום המסך', 2500);
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+};
+
+function _openLayoutPromptDialog(image) {
+    var existing = document.getElementById('ai-prompt-dialog');
+    if (existing) existing.remove();
+
+    var dlg = document.createElement('div');
+    dlg.id = 'ai-prompt-dialog';
+    dlg.style.cssText = 'position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;padding:16px;';
+    dlg.innerHTML =
+        '<div style="background:#fff;border-radius:16px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;direction:rtl;box-shadow:0 8px 40px rgba(0,0,0,0.25);">' +
+            '<div style="padding:20px 22px 0;display:flex;align-items:center;justify-content:space-between;">' +
+                '<div style="font-size:1rem;font-weight:800;color:#1e3a5f;display:flex;align-items:center;gap:8px;"><i class="fa-solid fa-wand-magic-sparkles" style="color:#a855f7;"></i> הדמיה מסידור מרחבי</div>' +
+                '<button onclick="document.getElementById(\'ai-prompt-dialog\').remove()" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:1.2rem;"><i class="fa-solid fa-xmark"></i></button>' +
+            '</div>' +
+            '<div style="padding:16px 22px 0;">' +
+                '<div style="font-size:0.8rem;font-weight:700;color:#64748b;margin-bottom:8px;">תמונת ייחוס — הזווית הנוכחית</div>' +
+                '<img src="' + image + '" style="width:100%;max-height:220px;object-fit:contain;border-radius:10px;border:2px solid #e2e8f0;background:#f8fafc;">' +
+            '</div>' +
+            '<div style="padding:14px 22px 0;">' +
+                '<div style="font-size:0.8rem;font-weight:700;color:#64748b;margin-bottom:6px;">פרומפט</div>' +
+                '<textarea id="ai-prompt-text" placeholder="תאר את ההדמיה שברצונך ליצור..." style="width:100%;height:140px;border:1.5px solid #e2e8f0;border-radius:10px;padding:12px;font-size:0.83rem;font-family:inherit;resize:vertical;outline:none;line-height:1.6;direction:rtl;text-align:right;" onfocus="this.style.borderColor=\'#a855f7\'" onblur="this.style.borderColor=\'#e2e8f0\'"></textarea>' +
+            '</div>' +
+            '<div style="padding:16px 22px 20px;display:flex;gap:10px;justify-content:flex-end;">' +
+                '<button onclick="document.getElementById(\'ai-prompt-dialog\').remove()" style="padding:10px 20px;border-radius:9px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#374151;font-size:0.88rem;font-weight:600;font-family:inherit;cursor:pointer;">ביטול</button>' +
+                '<button onclick="window._submitRender()" style="padding:10px 24px;border-radius:9px;border:none;background:linear-gradient(135deg,#a855f7,#7c3aed);color:white;font-size:0.88rem;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:8px;"><i class="fa-solid fa-sparkles"></i> צור הדמיה</button>' +
+            '</div>' +
+        '</div>';
+
+    dlg._imageFront = image;
+    dlg._singleView = true;
+    dlg._hexColor = null;
+    dlg._cabinetSpec = { layoutMode: true };
+    document.body.appendChild(dlg);
+};
+
 // ── Prompt dialog ─────────────────────────────────────────────────────────────
 var _extraImages = []; // extra user-uploaded images
 
@@ -378,16 +437,28 @@ window._submitRender = async function() {
     var imageFront   = dlg._imageFront;
     var image3dLeft  = dlg._image3dLeft;
     var image3dRight = dlg._image3dRight;
+    var singleView   = !!dlg._singleView;
     var hexColor     = dlg._hexColor;
     var cabinetSpec  = dlg._cabinetSpec;
     var customPrompt = document.getElementById('ai-prompt-text').value.trim();
     var extras = _extraImages.filter(Boolean);
 
+    if (singleView && !customPrompt) {
+        if (typeof window._showToast === 'function') window._showToast('נא להזין פרומפט לפני יצירת ההדמיה', 2800);
+        return;
+    }
+
     dlg.remove();
 
     var btn = document.getElementById('btn-generate-render');
+    var layoutBtn = document.getElementById('btn-layout-render');
     if (btn) btn.disabled = true;
-    _showStatus('loading', '<i class="fa-solid fa-spinner fa-spin"></i> שולח ל-AI... (15-30 שניות)');
+    if (layoutBtn) layoutBtn.disabled = true;
+    if (_panelOpen) {
+        _showStatus('loading', '<i class="fa-solid fa-spinner fa-spin"></i> שולח ל-AI... (15-30 שניות)');
+    } else if (typeof window._showToast === 'function') {
+        window._showToast('שולח ל-AI... (15-30 שניות)', 4000);
+    }
 
     try {
         var sb = window._supabase;
@@ -403,8 +474,9 @@ window._submitRender = async function() {
                 },
                 body: JSON.stringify({
                     image_front:     imageFront,
-                    image_3d:        image3dLeft,
-                    image_3d_right:  image3dRight,
+                    image_3d:        singleView ? undefined : image3dLeft,
+                    image_3d_right:  singleView ? undefined : image3dRight,
+                    single_view:     singleView || undefined,
                     extra_images:    extras.length ? extras : undefined,
                     hex_color:     hexColor,
                     project_id:    window._currentProjectId || null,
@@ -419,18 +491,29 @@ window._submitRender = async function() {
 
         if (!res.ok) {
             if (data.error === 'quota_exceeded') {
-                _showStatus('error', 'הגעת למכסה החודשית של ' + data.limit + ' הדמיות');
+                var quotaMsg = 'הגעת למכסה החודשית של ' + data.limit + ' הדמיות';
+                if (_panelOpen) _showStatus('error', quotaMsg);
+                else if (typeof window._showToast === 'function') window._showToast(quotaMsg, 3500);
             } else if (data.error === 'ai_disabled') {
-                _showStatus('error', 'פיצ\'ר ההדמיות אינו זמין עבור חשבונך');
+                var disabledMsg = 'פיצ\'ר ההדמיות אינו זמין עבור חשבונך';
+                if (_panelOpen) _showStatus('error', disabledMsg);
+                else if (typeof window._showToast === 'function') window._showToast(disabledMsg, 3500);
             } else {
-                _showStatus('error', 'שגיאה: ' + (data.error || 'תקשורת עם השרת נכשלה'));
+                var errMsg = 'שגיאה: ' + (data.error || 'תקשורת עם השרת נכשלה');
+                if (_panelOpen) _showStatus('error', errMsg);
+                else if (typeof window._showToast === 'function') window._showToast(errMsg, 3500);
             }
             if (btn) btn.disabled = false;
+            if (layoutBtn) layoutBtn.disabled = false;
             return;
         }
 
-        _showStatus('success', '<i class="fa-solid fa-check"></i> ההדמיה נוצרה בהצלחה!');
-        setTimeout(function() { _hideStatus(); }, 3000);
+        if (_panelOpen) {
+            _showStatus('success', '<i class="fa-solid fa-check"></i> ההדמיה נוצרה בהצלחה!');
+            setTimeout(function() { _hideStatus(); }, 3000);
+        } else if (typeof window._showToast === 'function') {
+            window._showToast('ההדמיה נוצרה בהצלחה!', 3000);
+        }
 
         _projectRenders.unshift({ id: data.id, image_url: data.image_url, created_at: data.created_at });
         _renderGrid();
@@ -439,9 +522,11 @@ window._submitRender = async function() {
 
     } catch(e) {
         console.error('[ai-renders] generate error:', e);
-        _showStatus('error', 'שגיאת תקשורת: ' + e.message);
+        if (_panelOpen) _showStatus('error', 'שגיאת תקשורת: ' + e.message);
+        else if (typeof window._showToast === 'function') window._showToast('שגיאת תקשורת: ' + e.message, 3500);
     } finally {
         if (btn) btn.disabled = false;
+        if (layoutBtn) layoutBtn.disabled = false;
     }
 };
 
