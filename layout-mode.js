@@ -12,7 +12,7 @@
     var LAYOUT_GIZMO_ARROW = 48;
     var LAYOUT_GIZMO_HIT = 22;
     var LAYOUT_GIZMO_SCREEN_PX = 32;
-    var LAYOUT_VERSION = '20260609s';
+    var LAYOUT_VERSION = '20260609t';
     var _layoutPickHits = [];
     var _layoutDragBound = false;
     var _layoutCanvas = null;
@@ -277,23 +277,31 @@
             a = _aabbFromSlot(active);
             var touchingX = _rangesOverlap(a.minX, a.maxX, b.minX, b.maxX, 1.5);
             var touchingZ = _rangesOverlap(a.minZ, a.maxZ, b.minZ, b.maxZ, 1.5);
-            if (touchingX && Math.abs(active.z - other.z) <= LAYOUT_SNAP_CM) active.z = other.z;
-            if (touchingZ && Math.abs(active.x - other.x) <= LAYOUT_SNAP_CM) active.x = other.x;
+            var overlapping = _obb2OverlapDepth(_obb2FromSlot(active), _obb2FromSlot(other));
+            if (!overlapping) {
+                if (touchingX && Math.abs(active.z - other.z) <= LAYOUT_SNAP_CM) active.z = other.z;
+                if (touchingZ && Math.abs(active.x - other.x) <= LAYOUT_SNAP_CM) active.x = other.x;
+            }
         }
     }
 
     function _applySnapAndResolve(slotIdx) {
+        _applyLayoutSettle(slotIdx);
+        _resolveSlotOverlap(slotIdx);
+    }
+
+    function _applyLayoutSettle(slotIdx) {
         var slot = _layoutScene && _layoutScene.slots[slotIdx];
-        if (slot && Math.abs(slot.rotX || 0) < 0.02 && Math.abs(slot.rotZ || 0) < 0.02) {
+        if (!slot) return;
+        if (Math.abs(slot.rotX || 0) < 0.02 && Math.abs(slot.rotZ || 0) < 0.02) {
             _applyFaceSnap(slotIdx);
         }
-        _resolveSlotOverlap(slotIdx);
-        _clampSlotToGround(_layoutScene.slots[slotIdx]);
+        _clampSlotToGround(slot);
     }
 
     function _applyDragConstraints(slotIdx, withSnap) {
         if (withSnap) {
-            _applySnapAndResolve(slotIdx);
+            _applyLayoutSettle(slotIdx);
         } else {
             _clampSlotToGround(_layoutScene.slots[slotIdx]);
         }
@@ -436,7 +444,24 @@
         _layoutPointerNDC(e);
         var hits = _layoutRaycastAll(_layoutPickHits);
         if (!hits.length) return -1;
+        if (_layoutScene && hits.length > 1) {
+            var closestDist = hits[0].distance;
+            for (var i = 0; i < hits.length; i++) {
+                var idx = hits[i].object.userData.layoutSlotIndex;
+                if (idx === _layoutScene.activeSlot && hits[i].distance <= closestDist + 25) {
+                    return idx;
+                }
+            }
+        }
         return hits[0].object.userData.layoutSlotIndex;
+    }
+
+    function _layoutSyncPickHitsVisibility() {
+        if (!_layoutScene) return;
+        _layoutPickHits.forEach(function(hit) {
+            var idx = hit.userData.layoutSlotIndex;
+            hit.visible = idx === _layoutScene.activeSlot;
+        });
     }
 
     function _layoutPickGizmo(e) {
@@ -552,18 +577,45 @@
         return null;
     }
 
+    function _layoutWorldUnitsPerPixel(worldPoint) {
+        if (!window.camera || !_layoutCanvas) return 0.5;
+        var dist = window.camera.position.distanceTo(worldPoint);
+        var fov = window.camera.fov || 45;
+        var h = Math.max(_layoutCanvas.clientHeight, 1);
+        return 2 * dist * Math.tan(fov * Math.PI / 360) / h;
+    }
+
+    function _layoutCameraScreenVectors(origin) {
+        var cam = window.camera;
+        var viewDir = _layoutTmpV3c.copy(cam.position).sub(origin);
+        var dist = viewDir.length();
+        if (dist < 1e-4) viewDir.set(0, 0, 1);
+        else viewDir.multiplyScalar(1 / dist);
+        var right = _layoutTmpV3a.copy(cam.up).cross(viewDir);
+        if (right.lengthSq() < 1e-5) right.set(1, 0, 0);
+        else right.normalize();
+        var up = _layoutTmpV3b.copy(viewDir).cross(right).normalize();
+        return { right: right, up: up };
+    }
+
     function _layoutWorldDeltaOnAxis(origin, axis, startClient, curClient) {
         var o = _layoutProjectWorldToClient(origin);
         var tip = _layoutProjectWorldToClient(origin.clone().add(axis));
         var sx = tip.x - o.x;
         var sy = tip.y - o.y;
         var screenLen = Math.sqrt(sx * sx + sy * sy);
-        if (screenLen < 3) return null;
-
         var mx = curClient.x - startClient.x;
         var my = curClient.y - startClient.y;
-        var pixelAlong = (mx * sx + my * sy) / screenLen;
-        return pixelAlong / screenLen;
+
+        if (screenLen >= 3) {
+            var pixelAlong = (mx * sx + my * sy) / screenLen;
+            return pixelAlong / screenLen;
+        }
+
+        var sv = _layoutCameraScreenVectors(origin);
+        var wpp = _layoutWorldUnitsPerPixel(origin);
+        var worldMove = sv.right.clone().multiplyScalar(mx * wpp).add(sv.up.clone().multiplyScalar(-my * wpp));
+        return worldMove.dot(axis);
     }
 
     function _layoutWorldDeltaOnPlaneXZ(slot, origin, rotY, startClient, curClient) {
@@ -579,7 +631,15 @@
         var mx = curClient.x - startClient.x;
         var my = curClient.y - startClient.y;
         var det = sx * szy - sy * szx;
-        if (Math.abs(det) < 1e-3) return null;
+        if (Math.abs(det) < 1e-3) {
+            var sv = _layoutCameraScreenVectors(origin);
+            var wpp = _layoutWorldUnitsPerPixel(origin);
+            var worldMove = sv.right.clone().multiplyScalar(mx * wpp).add(sv.up.clone().multiplyScalar(-my * wpp));
+            return {
+                dx: worldMove.dot(worldX),
+                dz: worldMove.dot(worldZ)
+            };
+        }
         return {
             dx: (mx * szy - my * szx) / det,
             dz: (my * sx - mx * sy) / det
@@ -874,6 +934,7 @@
         _layoutScene.activeSlot = slotIndex;
         _syncActiveLayoutChip();
         _syncLayoutMoveButtons();
+        _layoutSyncPickHitsVisibility();
         _updateLayoutGizmo();
     }
 
@@ -1011,8 +1072,7 @@
             var delta = _layoutWorldDeltaOnAxis(origin, axis, _layoutDragState.startClient, curClient);
             if (delta == null && _layoutDragState.startScalar != null) {
                 var currentScalar = _layoutScalarOnAxisAt(origin, axis, _layoutDragState.planeNormal);
-                if (currentScalar == null) return;
-                delta = currentScalar - _layoutDragState.startScalar;
+                if (currentScalar != null) delta = currentScalar - _layoutDragState.startScalar;
             }
             if (delta == null) return;
             slot.x = _layoutDragState.startX + axis.x * delta;
@@ -1259,6 +1319,7 @@
         _syncLayoutToolbar();
         _syncActiveLayoutChip();
         _syncLayoutMoveButtons();
+        _layoutSyncPickHitsVisibility();
         _updateLayoutGizmo();
     }
 
