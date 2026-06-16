@@ -37,7 +37,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260609c">
     <link rel="stylesheet" href="style-mobile.css?v=20260609a">
     <link rel="stylesheet" href="style-extras.css?v=20260607b">
-    <link rel="stylesheet" href="style.css?v=20260609i">
+    <link rel="stylesheet" href="style.css?v=20260609k">
     <style>
         html.thumb-only-mode #left-sidebar,
         html.thumb-only-mode #right-sidebar,
@@ -2337,7 +2337,15 @@
 <div id="layout-mode-bar" class="layout-mode-bar">
     <div class="layout-mode-bar-inner">
         <div class="layout-mode-bar-title"><i class="fa-solid fa-object-group"></i> סידור מרחבי</div>
-        <div class="layout-mode-drag-hint"><i class="fa-solid fa-hand-pointer"></i> גרור ארון · Shift+גרירה = גובה</div>
+        <div class="layout-mode-drag-hint"><i class="fa-solid fa-cubes"></i> Move = חיצים+קוביה · Rotate = טבעות X/Y/Z · Snap אוטומטי</div>
+        <div class="layout-gizmo-tools">
+            <button type="button" id="layout-tool-move" class="layout-gizmo-tool active" onclick="window._setLayoutGizmoTool('move')" title="הזזה (Move)">
+                <i class="fa-solid fa-up-down-left-right"></i> Move
+            </button>
+            <button type="button" id="layout-tool-rotate" class="layout-gizmo-tool" onclick="window._setLayoutGizmoTool('rotate')" title="סיבוב (Rotate)">
+                <i class="fa-solid fa-rotate"></i> Rotate
+            </button>
+        </div>
         <div class="layout-mode-chips">
             <button type="button" class="layout-chip active" id="layout-chip-0" onclick="window._setActiveLayoutSlot(0)">
                 <span class="layout-chip-badge">A</span>
@@ -2369,6 +2377,11 @@
                 <span class="layout-move-label" title="עומק">Z</span>
                 <button type="button" class="layout-move-btn" onclick="window._moveActiveLayoutSlot('z', -5)" title="אחורה"><i class="fa-solid fa-minus"></i></button>
                 <button type="button" class="layout-move-btn" onclick="window._moveActiveLayoutSlot('z', 5)" title="קדימה"><i class="fa-solid fa-plus"></i></button>
+            </div>
+            <div class="layout-move-row">
+                <span class="layout-move-label" title="סיבוב">↻</span>
+                <button type="button" class="layout-move-btn" onclick="window._rotateActiveLayoutSlot(-90)" title="סיבוב 90° שמאלה"><i class="fa-solid fa-rotate-left"></i></button>
+                <button type="button" class="layout-move-btn" onclick="window._rotateActiveLayoutSlot(90)" title="סיבוב 90° ימינה"><i class="fa-solid fa-rotate-right"></i></button>
             </div>
         </div>
         <div class="layout-mode-actions">
@@ -2418,7 +2431,7 @@
 <script src="engine-blueprint.js?v=20260608am"></script>
 <script src="tambour-color-picker.js?v=20260608a"></script>
 <script src="ui.js?v=20260609f"></script>
-<script src="layout-mode.js?v=20260609j"></script>
+<script src="layout-mode.js?v=20260609l"></script>
 <script src="mobile.js?v=20260609e"></script>
 <script src="part-paint.js?v=20260520k"></script>
 <script src="index-init.js?v=20260609a"></script>

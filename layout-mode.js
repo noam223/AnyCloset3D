@@ -8,6 +8,9 @@
     var _layoutScene = null;
     var _pickSelection = [];
     var LAYOUT_MOVE_STEP = 5;
+    var LAYOUT_SNAP_CM = 8;
+    var LAYOUT_GIZMO_ARROW = 52;
+    var LAYOUT_GIZMO_HIT = 12;
     var _layoutPickHits = [];
     var _layoutDragBound = false;
     var _layoutCanvas = null;
@@ -16,9 +19,18 @@
     var _layoutDragPlane = new THREE.Plane();
     var _layoutDragIntersect = new THREE.Vector3();
     var _layoutDragState = null;
+    var _layoutGizmoGroup = null;
+    var _layoutTranslateGroup = null;
+    var _layoutRotateGroup = null;
+    var _layoutGizmoHandles = [];
+    var _layoutGizmoHover = null;
+    var _layoutGizmoTool = 'move';
+    var _layoutTmpV3a = new THREE.Vector3();
+    var _layoutTmpV3b = new THREE.Vector3();
+    var _layoutTmpV3c = new THREE.Vector3();
 
     function _slotDefaults(cartIndex) {
-        return { cartIndex: cartIndex, x: 0, y: 0, z: 0, rotY: 0 };
+        return { cartIndex: cartIndex, x: 0, y: 0, z: 0, rotX: 0, rotY: 0, rotZ: 0 };
     }
 
     function _computeLayoutBounds() {
@@ -52,12 +64,13 @@
             var g = _layoutGroup.getObjectByName('layout-slot-' + i);
             if (!g) return;
             g.position.set(slot.x || 0, slot.y || 0, slot.z || 0);
-            g.rotation.y = slot.rotY || 0;
+            g.rotation.set(slot.rotX || 0, slot.rotY || 0, slot.rotZ || 0);
         });
         if (updateRoom) {
             var b = _computeLayoutBounds();
             _buildLayoutRoom(b.minX, b.maxX, b.maxH, b.maxD);
         }
+        _updateLayoutGizmo();
     }
 
     function _syncActiveLayoutChip() {
@@ -77,6 +90,130 @@
     function _clampAllSlotsToGround() {
         if (!_layoutScene) return;
         _layoutScene.slots.forEach(_clampSlotToGround);
+    }
+
+    function _obb2FromSlot(slot) {
+        var rs = state.orderCart[slot.cartIndex].rawState;
+        var hw = _linearWidth(rs) / 2;
+        var hd = _linearDepth(rs) / 2;
+        var rot = slot.rotY || 0;
+        var c = Math.cos(rot);
+        var s = Math.sin(rot);
+        return {
+            cx: slot.x || 0,
+            cz: slot.z || 0,
+            ux: c,
+            uz: s,
+            vx: -s,
+            vz: c,
+            hw: hw,
+            hd: hd
+        };
+    }
+
+    function _projectObbRadius(obb, ax, az) {
+        return obb.hw * Math.abs(obb.ux * ax + obb.uz * az) +
+            obb.hd * Math.abs(obb.vx * ax + obb.vz * az);
+    }
+
+    function _obb2OverlapDepth(a, b) {
+        var tests = [
+            { ax: a.ux, az: a.uz, ra: a.hw, rb: _projectObbRadius(b, a.ux, a.uz) },
+            { ax: a.vx, az: a.vz, ra: a.hd, rb: _projectObbRadius(b, a.vx, a.vz) },
+            { ax: b.ux, az: b.uz, ra: _projectObbRadius(a, b.ux, b.uz), rb: b.hw },
+            { ax: b.vx, az: b.vz, ra: _projectObbRadius(a, b.vx, b.vz), rb: b.hd }
+        ];
+        var minOverlap = Infinity;
+        var minAxis = null;
+        for (var i = 0; i < tests.length; i++) {
+            var t = tests[i];
+            var dist = Math.abs((b.cx - a.cx) * t.ax + (b.cz - a.cz) * t.az);
+            var overlap = t.ra + t.rb - dist;
+            if (overlap <= 0) return null;
+            if (overlap < minOverlap) {
+                minOverlap = overlap;
+                minAxis = t;
+            }
+        }
+        var sign = ((b.cx - a.cx) * minAxis.ax + (b.cz - a.cz) * minAxis.az) >= 0 ? 1 : -1;
+        return { depth: minOverlap, ax: minAxis.ax * sign, az: minAxis.az * sign };
+    }
+
+    function _aabbFromSlot(slot) {
+        var obb = _obb2FromSlot(slot);
+        var hx = obb.hw * Math.abs(obb.ux) + obb.hd * Math.abs(obb.vx);
+        var hz = obb.hw * Math.abs(obb.uz) + obb.hd * Math.abs(obb.vz);
+        return {
+            minX: obb.cx - hx,
+            maxX: obb.cx + hx,
+            minZ: obb.cz - hz,
+            maxZ: obb.cz + hz,
+            cx: obb.cx,
+            cz: obb.cz
+        };
+    }
+
+    function _rangesOverlap(minA, maxA, minB, maxB, pad) {
+        pad = pad || 0;
+        return (maxA + pad) >= minB && (maxB + pad) >= minA;
+    }
+
+    function _resolveSlotOverlap(slotIdx) {
+        if (!_layoutScene) return;
+        var active = _layoutScene.slots[slotIdx];
+        if (!active) return;
+        for (var pass = 0; pass < 4; pass++) {
+            var moved = false;
+            for (var i = 0; i < _layoutScene.slots.length; i++) {
+                if (i === slotIdx) continue;
+                var depth = _obb2OverlapDepth(_obb2FromSlot(active), _obb2FromSlot(_layoutScene.slots[i]));
+                if (!depth) continue;
+                active.x += depth.ax * (depth.depth + 0.25);
+                active.z += depth.az * (depth.depth + 0.25);
+                moved = true;
+            }
+            if (!moved) break;
+        }
+    }
+
+    function _applyFaceSnap(slotIdx) {
+        if (!_layoutScene) return;
+        var active = _layoutScene.slots[slotIdx];
+        if (!active) return;
+        var a = _aabbFromSlot(active);
+        for (var i = 0; i < _layoutScene.slots.length; i++) {
+            if (i === slotIdx) continue;
+            var other = _layoutScene.slots[i];
+            var b = _aabbFromSlot(other);
+
+            if (_rangesOverlap(a.minZ, a.maxZ, b.minZ, b.maxZ, LAYOUT_SNAP_CM)) {
+                var gapR = b.minX - a.maxX;
+                if (gapR >= 0 && gapR <= LAYOUT_SNAP_CM) active.x += gapR;
+                var gapL = a.minX - b.maxX;
+                if (gapL >= 0 && gapL <= LAYOUT_SNAP_CM) active.x -= gapL;
+            }
+            if (_rangesOverlap(a.minX, a.maxX, b.minX, b.maxX, LAYOUT_SNAP_CM)) {
+                var gapF = b.minZ - a.maxZ;
+                if (gapF >= 0 && gapF <= LAYOUT_SNAP_CM) active.z += gapF;
+                var gapB = a.minZ - b.maxZ;
+                if (gapB >= 0 && gapB <= LAYOUT_SNAP_CM) active.z -= gapB;
+            }
+
+            a = _aabbFromSlot(active);
+            var touchingX = _rangesOverlap(a.minX, a.maxX, b.minX, b.maxX, 1.5);
+            var touchingZ = _rangesOverlap(a.minZ, a.maxZ, b.minZ, b.maxZ, 1.5);
+            if (touchingX && Math.abs(active.z - other.z) <= LAYOUT_SNAP_CM) active.z = other.z;
+            if (touchingZ && Math.abs(active.x - other.x) <= LAYOUT_SNAP_CM) active.x = other.x;
+        }
+    }
+
+    function _applySnapAndResolve(slotIdx) {
+        var slot = _layoutScene && _layoutScene.slots[slotIdx];
+        if (slot && Math.abs(slot.rotX || 0) < 0.02 && Math.abs(slot.rotZ || 0) < 0.02) {
+            _applyFaceSnap(slotIdx);
+        }
+        _resolveSlotOverlap(slotIdx);
+        _clampSlotToGround(_layoutScene.slots[slotIdx]);
     }
 
     function _layoutIneligibleReason(rawState) {
@@ -188,29 +325,275 @@
         _layoutMouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
     }
 
-    function _layoutPickSlotIndex(e) {
-        if (!_layoutPickHits.length || !window.camera) return -1;
-        _layoutPointerNDC(e);
+    function _layoutRaycastAll(objects) {
+        if (!objects.length || !window.camera) return [];
         _layoutRaycaster.setFromCamera(_layoutMouse, window.camera);
-        var hits = _layoutRaycaster.intersectObjects(_layoutPickHits, false);
+        return _layoutRaycaster.intersectObjects(objects, false);
+    }
+
+    function _layoutPickSlotIndex(e) {
+        _layoutPointerNDC(e);
+        var hits = _layoutRaycastAll(_layoutPickHits);
         if (!hits.length) return -1;
         return hits[0].object.userData.layoutSlotIndex;
     }
 
-    function _layoutSetDragPlaneY(y) {
-        _layoutDragPlane.setFromNormalAndCoplanarPoint(
-            new THREE.Vector3(0, 1, 0),
-            new THREE.Vector3(0, y || 0, 0)
-        );
+    function _layoutIsGizmoModeActive(mode) {
+        if (_layoutGizmoTool === 'move') {
+            return mode === 'axis-x' || mode === 'axis-y' || mode === 'axis-z' || mode === 'plane-xz';
+        }
+        return mode === 'rotate-x' || mode === 'rotate-y' || mode === 'rotate-z';
     }
 
-    function _layoutRayOnDragPlane(e) {
+    function _layoutPickGizmo(e) {
+        if (!_layoutGizmoHandles.length) return null;
         _layoutPointerNDC(e);
-        _layoutRaycaster.setFromCamera(_layoutMouse, window.camera);
+        var hits = _layoutRaycastAll(_layoutGizmoHandles);
+        for (var i = 0; i < hits.length; i++) {
+            var mode = hits[i].object.userData.gizmoMode;
+            if (_layoutIsGizmoModeActive(mode)) return mode;
+        }
+        return null;
+    }
+
+    function _layoutSetDragPlane(normal, point) {
+        _layoutDragPlane.setFromNormalAndCoplanarPoint(normal, point);
+    }
+
+    function _layoutRayOnDragPlane() {
         if (_layoutRaycaster.ray.intersectPlane(_layoutDragPlane, _layoutDragIntersect)) {
             return _layoutDragIntersect.clone();
         }
         return null;
+    }
+
+    function _layoutGizmoCenter(slot) {
+        var rs = state.orderCart[slot.cartIndex].rawState;
+        var h = _linearHeight(rs);
+        return new THREE.Vector3(slot.x || 0, (slot.y || 0) + Math.min(h * 0.42, 110), slot.z || 0);
+    }
+
+    function _layoutWorldAxis(mode, rotY) {
+        var v = new THREE.Vector3();
+        if (mode === 'axis-x') v.set(1, 0, 0);
+        else if (mode === 'axis-y') v.set(0, 1, 0);
+        else if (mode === 'axis-z') v.set(0, 0, 1);
+        if (mode === 'axis-x' || mode === 'axis-z') v.applyAxisAngle(new THREE.Vector3(0, 1, 0), rotY || 0);
+        return v.normalize();
+    }
+
+    function _layoutScalarOnAxis(origin, axis, point) {
+        return _layoutTmpV3a.copy(point).sub(origin).dot(axis);
+    }
+
+    function _layoutMakeGizmoMaterial(color, opacity) {
+        return new THREE.MeshBasicMaterial({
+            color: color,
+            transparent: true,
+            opacity: opacity != null ? opacity : 0.92,
+            depthTest: false,
+            depthWrite: false
+        });
+    }
+
+    function _layoutAddGizmoHandle(group, mesh, mode) {
+        mesh.userData.gizmoMode = mode;
+        mesh.renderOrder = 9999;
+        group.add(mesh);
+        _layoutGizmoHandles.push(mesh);
+    }
+
+    function _layoutRotateAxisWorld(mode, slot) {
+        var v = new THREE.Vector3(
+            mode === 'rotate-x' ? 1 : 0,
+            mode === 'rotate-y' ? 1 : 0,
+            mode === 'rotate-z' ? 1 : 0
+        );
+        var e = new THREE.Euler(slot.rotX || 0, slot.rotY || 0, slot.rotZ || 0, 'YXZ');
+        return v.applyEuler(e).normalize();
+    }
+
+    function _layoutInitRotateDrag(mode, center, slot, dragState) {
+        var axis = _layoutRotateAxisWorld(mode, slot);
+        _layoutSetDragPlane(axis, center);
+        var pt = _layoutRayOnDragPlane();
+        if (!pt) return false;
+        var v = _layoutTmpV3a.copy(pt).sub(center);
+        v.addScaledVector(axis, -v.dot(axis));
+        if (v.lengthSq() < 1e-4) return false;
+        v.normalize();
+        dragState.rotateAxis = axis.clone();
+        dragState.startVec = v.clone();
+        dragState.startRotX = slot.rotX || 0;
+        dragState.startRotY = slot.rotY || 0;
+        dragState.startRotZ = slot.rotZ || 0;
+        dragState.rotateMode = mode;
+        return true;
+    }
+
+    function _layoutApplyRotateDrag(center, slot, dragState) {
+        var axis = dragState.rotateAxis;
+        _layoutSetDragPlane(axis, center);
+        var pt = _layoutRayOnDragPlane();
+        if (!pt) return;
+        var v = _layoutTmpV3a.copy(pt).sub(center);
+        v.addScaledVector(axis, -v.dot(axis));
+        if (v.lengthSq() < 1e-4) return;
+        v.normalize();
+        var cross = _layoutTmpV3b.crossVectors(dragState.startVec, v);
+        var delta = Math.atan2(cross.dot(axis), dragState.startVec.dot(v));
+        var mode = dragState.rotateMode;
+        if (mode === 'rotate-x') slot.rotX = dragState.startRotX + delta;
+        else if (mode === 'rotate-y') slot.rotY = dragState.startRotY + delta;
+        else slot.rotZ = dragState.startRotZ + delta;
+    }
+
+    function _layoutMakeRotateRing(mode, color, rotX, rotY, rotZ) {
+        var radius = 42;
+        var ringGroup = new THREE.Group();
+        if (rotX) ringGroup.rotation.x = rotX;
+        if (rotY) ringGroup.rotation.y = rotY;
+        if (rotZ) ringGroup.rotation.z = rotZ;
+        var ring = new THREE.Mesh(
+            new THREE.TorusGeometry(radius, 2.4, 8, 56),
+            _layoutMakeGizmoMaterial(color, 0.95)
+        );
+        var ringHit = new THREE.Mesh(
+            new THREE.TorusGeometry(radius, LAYOUT_GIZMO_HIT, 6, 44),
+            _layoutMakeGizmoMaterial(color, 0.01)
+        );
+        ringGroup.add(ring);
+        _layoutAddGizmoHandle(ringGroup, ringHit, mode);
+        return ringGroup;
+    }
+
+    function _layoutBuildGizmoVisuals() {
+        if (!_layoutGizmoGroup) {
+            _layoutGizmoGroup = new THREE.Group();
+            _layoutGizmoGroup.name = 'layoutGizmo';
+            window.scene.add(_layoutGizmoGroup);
+        }
+        while (_layoutGizmoGroup.children.length > 0) _layoutGizmoGroup.remove(_layoutGizmoGroup.children[0]);
+        _layoutGizmoHandles = [];
+        _layoutTranslateGroup = new THREE.Group();
+        _layoutTranslateGroup.name = 'layoutGizmoTranslate';
+        _layoutRotateGroup = new THREE.Group();
+        _layoutRotateGroup.name = 'layoutGizmoRotate';
+
+        var len = LAYOUT_GIZMO_ARROW;
+        var r = 2.4;
+        var head = 11;
+
+        function makeArrow(mode, color, axis) {
+            var g = new THREE.Group();
+            var shaft = new THREE.Mesh(
+                new THREE.CylinderGeometry(r, r, len, 10),
+                _layoutMakeGizmoMaterial(color)
+            );
+            shaft.rotation.x = Math.PI / 2;
+            shaft.position[axis] = len / 2;
+            var tip = new THREE.Mesh(
+                new THREE.ConeGeometry(r * 2.2, head, 12),
+                _layoutMakeGizmoMaterial(color)
+            );
+            tip.rotation.x = Math.PI / 2;
+            tip.position[axis] = len + head * 0.45;
+            var hit = new THREE.Mesh(
+                new THREE.CylinderGeometry(LAYOUT_GIZMO_HIT, LAYOUT_GIZMO_HIT, len + head, 8),
+                _layoutMakeGizmoMaterial(color, 0.01)
+            );
+            hit.rotation.x = Math.PI / 2;
+            hit.position[axis] = (len + head) / 2;
+            g.add(shaft);
+            g.add(tip);
+            _layoutAddGizmoHandle(g, hit, mode);
+            return g;
+        }
+
+        _layoutTranslateGroup.add(makeArrow('axis-x', 0xe53935, 'x'));
+        _layoutTranslateGroup.add(makeArrow('axis-y', 0x43a047, 'y'));
+        _layoutTranslateGroup.add(makeArrow('axis-z', 0x1e88e5, 'z'));
+
+        var centerHit = new THREE.Mesh(
+            new THREE.BoxGeometry(LAYOUT_GIZMO_HIT * 1.35, LAYOUT_GIZMO_HIT * 1.35, LAYOUT_GIZMO_HIT * 1.35),
+            _layoutMakeGizmoMaterial(0xffffff, 0.01)
+        );
+        var centerVis = new THREE.Mesh(
+            new THREE.BoxGeometry(9, 9, 9),
+            _layoutMakeGizmoMaterial(0xffffff, 0.95)
+        );
+        centerVis.material.color.set(0xf8fafc);
+        var centerGroup = new THREE.Group();
+        centerGroup.add(centerVis);
+        _layoutAddGizmoHandle(centerGroup, centerHit, 'plane-xz');
+        _layoutTranslateGroup.add(centerGroup);
+
+        _layoutRotateGroup.add(_layoutMakeRotateRing('rotate-x', 0xe53935, 0, Math.PI / 2, 0));
+        _layoutRotateGroup.add(_layoutMakeRotateRing('rotate-y', 0x43a047, Math.PI / 2, 0, 0));
+        _layoutRotateGroup.add(_layoutMakeRotateRing('rotate-z', 0x1e88e5, 0, 0, 0));
+
+        _layoutGizmoGroup.add(_layoutTranslateGroup);
+        _layoutGizmoGroup.add(_layoutRotateGroup);
+        _syncLayoutGizmoToolVisibility();
+    }
+
+    function _syncLayoutGizmoToolVisibility() {
+        if (_layoutTranslateGroup) _layoutTranslateGroup.visible = _layoutGizmoTool === 'move';
+        if (_layoutRotateGroup) _layoutRotateGroup.visible = _layoutGizmoTool === 'rotate';
+        document.body.classList.toggle('layout-gizmo-rotate', _layoutGizmoTool === 'rotate');
+        var moveBtn = document.getElementById('layout-tool-move');
+        var rotateBtn = document.getElementById('layout-tool-rotate');
+        if (moveBtn) moveBtn.classList.toggle('active', _layoutGizmoTool === 'move');
+        if (rotateBtn) rotateBtn.classList.toggle('active', _layoutGizmoTool === 'rotate');
+    }
+
+    window._setLayoutGizmoTool = function(tool) {
+        if (tool !== 'move' && tool !== 'rotate') return;
+        _layoutGizmoTool = tool;
+        _syncLayoutGizmoToolVisibility();
+        _updateLayoutGizmo();
+    };
+
+    function _updateLayoutGizmo() {
+        if (!_layoutScene || !_layoutScene.active || !_layoutGizmoGroup) {
+            if (_layoutGizmoGroup) _layoutGizmoGroup.visible = false;
+            return;
+        }
+        if (!_layoutGizmoHandles.length) _layoutBuildGizmoVisuals();
+        var slot = _layoutScene.slots[_layoutScene.activeSlot];
+        if (!slot) {
+            _layoutGizmoGroup.visible = false;
+            return;
+        }
+        var center = _layoutGizmoCenter(slot);
+        _layoutGizmoGroup.visible = true;
+        _layoutGizmoGroup.position.copy(center);
+        if (_layoutGizmoTool === 'move') {
+            _layoutGizmoGroup.rotation.set(0, slot.rotY || 0, 0);
+        } else {
+            _layoutGizmoGroup.rotation.set(slot.rotX || 0, slot.rotY || 0, slot.rotZ || 0);
+        }
+        _syncLayoutGizmoToolVisibility();
+    }
+
+    function _hideLayoutGizmo() {
+        if (_layoutGizmoGroup) _layoutGizmoGroup.visible = false;
+    }
+
+    function _destroyLayoutGizmo() {
+        if (_layoutGizmoGroup && window.scene) window.scene.remove(_layoutGizmoGroup);
+        _layoutGizmoGroup = null;
+        _layoutTranslateGroup = null;
+        _layoutRotateGroup = null;
+        _layoutGizmoHandles = [];
+    }
+
+    function _selectLayoutSlot(slotIndex) {
+        if (!_layoutScene || slotIndex < 0) return;
+        _layoutScene.activeSlot = slotIndex;
+        _syncActiveLayoutChip();
+        _syncLayoutMoveButtons();
+        _updateLayoutGizmo();
     }
 
     function _onLayoutPointerDown(e) {
@@ -218,53 +601,75 @@
         if (e.button !== 0) return;
         if (e.target.closest('#layout-mode-bar') || e.target.closest('#layout-picker-modal')) return;
 
-        var slotIndex = _layoutPickSlotIndex(e);
-        if (slotIndex < 0) return;
+        _layoutPointerNDC(e);
+        var gizmoMode = _layoutPickGizmo(e);
+        if (gizmoMode) {
+            e.preventDefault();
+            e.stopPropagation();
+            var slot = _layoutScene.slots[_layoutScene.activeSlot];
+            if (!slot) return;
 
-        e.preventDefault();
-        e.stopPropagation();
-
-        var slot = _layoutScene.slots[slotIndex];
-        if (!slot) return;
-
-        _layoutScene.activeSlot = slotIndex;
-        _syncActiveLayoutChip();
-        _syncLayoutMoveButtons();
-
-        _layoutSetDragPlaneY(slot.y || 0);
-
-        if (e.shiftKey) {
-            _layoutDragState = {
-                slotIndex: slotIndex,
-                mode: 'y',
+            var center = _layoutGizmoCenter(slot);
+            var dragState = {
+                slotIndex: _layoutScene.activeSlot,
+                mode: gizmoMode,
+                startX: slot.x || 0,
                 startY: slot.y || 0,
-                startClientY: e.clientY,
+                startZ: slot.z || 0,
+                startRotY: slot.rotY || 0,
+                gizmoCenter: center.clone(),
                 controlsWereEnabled: window.controls ? window.controls.enabled : true
             };
-        } else {
-            var pt = _layoutRayOnDragPlane(e);
-            if (!pt) return;
-            _layoutDragState = {
-                slotIndex: slotIndex,
-                mode: 'xz',
-                offsetX: pt.x - (slot.x || 0),
-                offsetZ: pt.z - (slot.z || 0),
-                startY: slot.y || 0,
-                startClientY: e.clientY,
-                controlsWereEnabled: window.controls ? window.controls.enabled : true
-            };
+
+            if (gizmoMode === 'plane-xz') {
+                _layoutSetDragPlane(new THREE.Vector3(0, 1, 0), center);
+                var pt0 = _layoutRayOnDragPlane();
+                if (!pt0) return;
+                dragState.planeOffsetX = pt0.x - (slot.x || 0);
+                dragState.planeOffsetZ = pt0.z - (slot.z || 0);
+            } else if (gizmoMode.indexOf('rotate-') === 0) {
+                if (!_layoutInitRotateDrag(gizmoMode, center, slot, dragState)) return;
+            } else if (gizmoMode.indexOf('axis-') === 0) {
+                var axis = _layoutWorldAxis(gizmoMode, slot.rotY);
+                dragState.axis = axis.clone();
+                var camDir = _layoutTmpV3c.copy(window.camera.position).sub(center).normalize();
+                var planeNormal = _layoutTmpV3b.copy(axis).cross(camDir);
+                if (planeNormal.lengthSq() < 1e-6) planeNormal.set(0, 1, 0);
+                else planeNormal.normalize();
+                _layoutSetDragPlane(planeNormal, center);
+                var ptA = _layoutRayOnDragPlane();
+                if (!ptA) return;
+                dragState.startScalar = _layoutScalarOnAxis(center, axis, ptA);
+            }
+
+            _layoutDragState = dragState;
+            if (window.controls) window.controls.enabled = false;
+            document.body.classList.add('layout-dragging');
+            if (_layoutCanvas) _layoutCanvas.setPointerCapture(e.pointerId);
+            return;
         }
 
-        if (window.controls) window.controls.enabled = false;
-        document.body.classList.add('layout-dragging');
-        if (_layoutCanvas) _layoutCanvas.setPointerCapture(e.pointerId);
+        var slotIndex = _layoutPickSlotIndex(e);
+        if (slotIndex >= 0) {
+            e.preventDefault();
+            e.stopPropagation();
+            _selectLayoutSlot(slotIndex);
+        }
     }
 
     function _onLayoutPointerMove(e) {
-        if (!window._layoutModeActive || !_layoutDragState) {
-            if (window._layoutModeActive && _layoutCanvas && !e.target.closest('#layout-mode-bar')) {
+        if (!window._layoutModeActive) return;
+
+        if (!_layoutDragState) {
+            if (_layoutCanvas && !e.target.closest('#layout-mode-bar')) {
+                _layoutPointerNDC(e);
+                var gizmoMode = _layoutPickGizmo(e);
+                if (gizmoMode !== _layoutGizmoHover) {
+                    _layoutGizmoHover = gizmoMode;
+                    _layoutCanvas.classList.toggle('layout-gizmo-hover', !!gizmoMode);
+                }
                 var hoverIdx = _layoutPickSlotIndex(e);
-                _layoutCanvas.classList.toggle('layout-slot-hover', hoverIdx >= 0);
+                _layoutCanvas.classList.toggle('layout-slot-hover', hoverIdx >= 0 && !gizmoMode);
             }
             return;
         }
@@ -273,18 +678,39 @@
         var slot = _layoutScene.slots[_layoutDragState.slotIndex];
         if (!slot) return;
 
-        if (_layoutDragState.mode === 'y') {
-            var dyPx = _layoutDragState.startClientY - e.clientY;
-            slot.y = Math.max(0, _layoutDragState.startY + dyPx * 0.45);
-        } else {
-            var pt = _layoutRayOnDragPlane(e);
+        var mode = _layoutDragState.mode;
+        var center = _layoutDragState.gizmoCenter;
+
+        if (mode === 'plane-xz') {
+            _layoutSetDragPlane(new THREE.Vector3(0, 1, 0), center);
+            var pt = _layoutRayOnDragPlane();
             if (!pt) return;
-            slot.x = pt.x - _layoutDragState.offsetX;
-            slot.z = pt.z - _layoutDragState.offsetZ;
+            slot.x = pt.x - _layoutDragState.planeOffsetX;
+            slot.z = pt.z - _layoutDragState.planeOffsetZ;
+        } else if (mode.indexOf('rotate-') === 0) {
+            _layoutApplyRotateDrag(center, slot, _layoutDragState);
+        } else if (mode.indexOf('axis-') === 0) {
+            var axis = _layoutDragState.axis;
+            var camDir = _layoutTmpV3c.copy(window.camera.position).sub(center).normalize();
+            var planeNormal = _layoutTmpV3b.copy(axis).cross(camDir);
+            if (planeNormal.lengthSq() < 1e-6) planeNormal.set(0, 1, 0);
+            else planeNormal.normalize();
+            _layoutSetDragPlane(planeNormal, center);
+            var ptAxis = _layoutRayOnDragPlane();
+            if (!ptAxis) return;
+            var delta = _layoutScalarOnAxis(center, axis, ptAxis) - _layoutDragState.startScalar;
+            if (mode === 'axis-x' || mode === 'axis-z') {
+                var move = axis.clone().multiplyScalar(delta);
+                slot.x = _layoutDragState.startX + move.x;
+                slot.z = _layoutDragState.startZ + move.z;
+            } else if (mode === 'axis-y') {
+                slot.y = Math.max(0, _layoutDragState.startY + delta);
+            }
         }
 
-        _clampSlotToGround(slot);
-        _applySlotTransforms(false);
+        _applySnapAndResolve(_layoutDragState.slotIndex);
+        _applySlotTransforms(mode.indexOf('rotate-') !== 0);
+        _updateLayoutGizmo();
         _syncLayoutToolbar();
         _syncLayoutMoveButtons();
     }
@@ -296,16 +722,20 @@
             _layoutCanvas.releasePointerCapture(e.pointerId);
         }
 
-        var slot = _layoutScene.slots[_layoutDragState.slotIndex];
-        _clampSlotToGround(slot);
+        _applySnapAndResolve(_layoutDragState.slotIndex);
         _applySlotTransforms(true);
+        _updateLayoutGizmo();
         _syncLayoutToolbar();
         _syncLayoutMoveButtons();
 
         if (window.controls) window.controls.enabled = _layoutDragState.controlsWereEnabled !== false;
         _layoutDragState = null;
         document.body.classList.remove('layout-dragging');
-        if (_layoutCanvas) _layoutCanvas.classList.remove('layout-slot-hover');
+        if (_layoutCanvas) {
+            _layoutCanvas.classList.remove('layout-gizmo-hover');
+            _layoutCanvas.classList.remove('layout-slot-hover');
+        }
+        _layoutGizmoHover = null;
     }
 
     function _bindLayoutDragEvents() {
@@ -324,6 +754,7 @@
         if (_layoutCanvas) {
             _layoutCanvas.removeEventListener('pointerdown', _onLayoutPointerDown, true);
             _layoutCanvas.classList.remove('layout-slot-hover');
+            _layoutCanvas.classList.remove('layout-gizmo-hover');
         }
         window.removeEventListener('pointermove', _onLayoutPointerMove, true);
         window.removeEventListener('pointerup', _onLayoutPointerUp, true);
@@ -441,11 +872,15 @@
         slots[0].x = 0;
         slots[0].y = 0;
         slots[0].z = 0;
+        slots[0].rotX = 0;
         slots[0].rotY = 0;
+        slots[0].rotZ = 0;
         slots[1].x = (wA + wB) / 2;
         slots[1].y = 0;
         slots[1].z = 0;
+        slots[1].rotX = 0;
         slots[1].rotY = 0;
+        slots[1].rotZ = 0;
         _rebuildLayoutScene();
     }
 
@@ -464,7 +899,7 @@
             var slotGroup = new THREE.Group();
             slotGroup.name = 'layout-slot-' + i;
             slotGroup.position.set(slot.x || 0, Math.max(0, slot.y || 0), slot.z || 0);
-            slotGroup.rotation.y = slot.rotY || 0;
+            slotGroup.rotation.set(slot.rotX || 0, slot.rotY || 0, slot.rotZ || 0);
 
             if (typeof window.buildCabinetIntoGroup === 'function') {
                 window.buildCabinetIntoGroup(slotGroup);
@@ -488,6 +923,7 @@
         _syncLayoutToolbar();
         _syncActiveLayoutChip();
         _syncLayoutMoveButtons();
+        _updateLayoutGizmo();
     }
 
     function _syncLayoutMoveButtons() {
@@ -507,17 +943,34 @@
             var chip = document.getElementById('layout-chip-' + i);
             if (!chip) return;
             chip.querySelector('.layout-chip-name').textContent = _cabLabel(slot.cartIndex);
+            var rotYDeg = Math.round((slot.rotY || 0) * 180 / Math.PI);
+            rotYDeg = ((rotYDeg % 360) + 360) % 360;
+            var rotExtra = '';
+            if (Math.abs(slot.rotX || 0) > 0.02 || Math.abs(slot.rotZ || 0) > 0.02) {
+                rotExtra = ' · RX ' + Math.round((slot.rotX || 0) * 180 / Math.PI) +
+                    '° · RZ ' + Math.round((slot.rotZ || 0) * 180 / Math.PI) + '°';
+            }
             chip.querySelector('.layout-chip-dims').textContent =
-                'X ' + Math.round(slot.x || 0) + ' · Y ' + Math.round(slot.y || 0) + ' · Z ' + Math.round(slot.z || 0);
+                'X ' + Math.round(slot.x || 0) + ' · Y ' + Math.round(slot.y || 0) + ' · Z ' + Math.round(slot.z || 0) +
+                ' · RY ' + rotYDeg + '°' + rotExtra;
         });
     }
 
     window._setActiveLayoutSlot = function(index) {
         if (!_layoutScene || !_layoutScene.active) return;
         if (index !== 0 && index !== 1) return;
-        _layoutScene.activeSlot = index;
-        _syncActiveLayoutChip();
-        _syncLayoutMoveButtons();
+        _selectLayoutSlot(index);
+    };
+
+    window._rotateActiveLayoutSlot = function(deltaDeg) {
+        if (!_layoutScene || !_layoutScene.active) return;
+        var slot = _layoutScene.slots[_layoutScene.activeSlot];
+        if (!slot) return;
+        window._setLayoutGizmoTool('rotate');
+        slot.rotY = (slot.rotY || 0) + (deltaDeg * Math.PI / 180);
+        _applySnapAndResolve(_layoutScene.activeSlot);
+        _applySlotTransforms(true);
+        _syncLayoutToolbar();
     };
 
     window._moveActiveLayoutSlot = function(axis, delta) {
@@ -539,7 +992,7 @@
         }
         else if (axis === 'z') slot.z = (slot.z || 0) + delta;
 
-        _clampSlotToGround(slot);
+        _applySnapAndResolve(_layoutScene.activeSlot);
         _applySlotTransforms(true);
         _syncLayoutToolbar();
         _syncLayoutMoveButtons();
@@ -658,7 +1111,9 @@
         window._orbitFree = true;
 
         window._layoutModeActive = true;
+        _layoutGizmoTool = 'move';
         _bindLayoutDragEvents();
+        _layoutBuildGizmoVisuals();
 
         _layoutPresetSideBySide();
 
@@ -684,7 +1139,9 @@
 
         _layoutScene = null;
         window._layoutModeActive = false;
+        _layoutGizmoTool = 'move';
         _unbindLayoutDragEvents();
+        _destroyLayoutGizmo();
 
         if (typeof buildCabinet === 'function') buildCabinet();
         if (typeof updateCameraView === 'function') updateCameraView();
