@@ -3,6 +3,8 @@
 // ==========================================
 const MAX_COL_WIDTH = 120;
 const MIN_COL_WIDTH = 1;
+const MIN_WARDROBE_WIDTH = 10;
+window.MIN_WARDROBE_WIDTH = MIN_WARDROBE_WIDTH;
 const MIN_SHELF_GAP = 12;
 const MAX_GLOBAL_HEIGHT = 350;
 
@@ -2640,7 +2642,7 @@ window.updateDim = function(dim, delta, absoluteValue = null) {
     if (dim === 'width') {
         // Clamp to room width if set by user
         const _maxW = (window._roomWidth && window._roomWidth > 0) ? window._roomWidth : 600;
-        val = Math.max(30, Math.min(_maxW, val));
+        val = Math.max(MIN_WARDROBE_WIDTH, Math.min(_maxW, val));
         state.width = val;
         document.getElementById('inp-width').value = val;
         document.getElementById('inp-num-width').value = val;

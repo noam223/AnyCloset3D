@@ -112,13 +112,13 @@
                 <div class="header-dim-top">
                     <label for="dim-pill-width">רוחב</label>
                     <div class="header-dim-val">
-                        <input type="number" id="dim-pill-width" min="30" max="600" value="160" onchange="updateDim('width',null,this.value);saveHistoryState();">
+                        <input type="number" id="dim-pill-width" min="10" max="600" value="160" onchange="updateDim('width',null,this.value);saveHistoryState();">
                         <span>ס"מ</span>
                     </div>
                 </div>
                 <div class="header-slider-row">
                     <button type="button" class="header-slider-btn" onclick="updateDim('width',-1);saveHistoryState();"><i class="fa-solid fa-minus"></i></button>
-                    <input type="range" id="inp-width" min="30" max="600" value="160" step="1">
+                    <input type="range" id="inp-width" min="10" max="600" value="160" step="1">
                     <button type="button" class="header-slider-btn" onclick="updateDim('width',1);saveHistoryState();"><i class="fa-solid fa-plus"></i></button>
                 </div>
             </div>
@@ -178,7 +178,7 @@
                 </div>
             </div>
         </div>
-        <input type="number" id="inp-num-width" class="visually-hidden-dim" value="160" min="30" max="600" onchange="updateDim('width',null,this.value);saveHistoryState()">
+        <input type="number" id="inp-num-width" class="visually-hidden-dim" value="160" min="10" max="600" onchange="updateDim('width',null,this.value);saveHistoryState()">
         <input type="number" id="inp-num-height" class="visually-hidden-dim" value="240" min="40" max="320" onchange="updateDim('height',null,this.value);saveHistoryState()">
         <input type="number" id="inp-num-depth" class="visually-hidden-dim" value="54" min="10" max="80" onchange="updateDim('depth',null,this.value);saveHistoryState()">
         <!-- Wing position sub-menu (shown after selecting corner/walkin preset) -->
@@ -1517,7 +1517,7 @@
                 <span class="dfm-val" id="dfm-val-width">160</span>
             </div>
             <div class="dfm-slider-row">
-                <input class="dfm-slider" id="dfm-slider-width" type="range" min="60" max="600" step="1"
+                <input class="dfm-slider" id="dfm-slider-width" type="range" min="10" max="600" step="1"
                        oninput="_applyDimSlider('width',this.value)">
                 <span class="dfm-thumb-label" id="dfm-tlbl-width">160</span>
             </div>
@@ -1712,7 +1712,7 @@
             <div class="dfm-slider-wrap" id="ep-wrap-width">
                 <div class="dfm-bubble-row"><span class="dfm-val" id="ep-val-width">160</span></div>
                 <div class="dfm-slider-row">
-                    <input class="dfm-slider" id="ep-slider-width" type="range" min="60" max="600" step="1"
+                    <input class="dfm-slider" id="ep-slider-width" type="range" min="10" max="600" step="1"
                            oninput="_epApplySlider('width',this.value)">
                     <span class="dfm-thumb-label" id="ep-tlbl-width">160</span>
                 </div>
@@ -2336,14 +2336,14 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js"></script>
-<script src="state.js?v=20260608z"></script>
+<script src="state.js?v=20260609e"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="engine-core.js?v=20260609l"></script>
 <script src="engine-corners.js?v=20260609a"></script>
 <script src="engine-blueprint.js?v=20260608am"></script>
 <script src="tambour-color-picker.js?v=20260608a"></script>
 <script src="ui.js?v=20260609d"></script>
-<script src="mobile.js?v=20260608a"></script>
+<script src="mobile.js?v=20260609e"></script>
 <script src="part-paint.js?v=20260520k"></script>
 <script src="index-init.js?v=20260609a"></script>
 

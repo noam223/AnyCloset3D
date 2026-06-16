@@ -1108,7 +1108,7 @@ function _watchPriceDisplay() {
 // ==========================================
 
 var _DIMS_CONFIG = {
-    width:  { min: 60,  max: 600, step: 1, key: 'width',       stateKey: 'globalWidth'  },
+    width:  { min: (window.MIN_WARDROBE_WIDTH || 10), max: 600, step: 1, key: 'width', stateKey: 'globalWidth'  },
     height: { min: 100, max: 280, step: 1, key: 'height',      stateKey: 'globalHeight' },
     depth:  { min: 10,  max: 80,  step: 1, key: 'depth',       stateKey: 'globalDepth'  }
 };
