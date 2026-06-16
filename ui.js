@@ -3357,6 +3357,7 @@ window.addEventListener('pointerup', () => {
 });
 
 function buildDragHandlesUI() {
+    if (window._layoutModeActive) return;
     dragLayer.innerHTML = '';
     if(state.viewMode !== 'front') return;
 
@@ -3998,6 +3999,7 @@ function createHandle(dir, x3d, y3d = null, text = 'גרירה') {
 }
 
 function updateDragHandlesPosition() {
+    if (window._layoutModeActive) return;
     if(state.viewMode !== 'front') return;
     const cw = container.clientWidth;
     const ch = container.clientHeight;
@@ -5087,6 +5089,7 @@ function bindUI() {
     }
 
     container.addEventListener('pointermove', (e) => {
+        if (window._layoutModeActive) return;
         if (e.target.closest('#column-quick-edit') || e.target.closest('#bottom-floating-toolbar') || e.target.closest('.drag-handle') || e.target.closest('.dim-container') || e.target.closest('.select-all-col-btn')) {
             if (currentHoveredDoor && !e.target.closest('.plus-btn') && !e.target.closest('.select-all-col-btn')) {
                 currentHoveredDoor.material.transparent = false;
@@ -5196,6 +5199,7 @@ function bindUI() {
     });
 
     container.addEventListener('mouseleave', () => {
+        if (window._layoutModeActive) return;
         // Remove wing highlight when mouse leaves canvas
         if (!state.wingEditMode) {
             _hoveredWingId = null;
@@ -5221,6 +5225,7 @@ function bindUI() {
     let _pointerDownCornerDesk = false;
 
     container.addEventListener('pointerdown', (e) => {
+        if (window._layoutModeActive) return;
         if (e.target.closest('#column-quick-edit') || e.target.closest('#full-corner-quick-edit') || e.target.closest('#bottom-floating-toolbar') || e.target.closest('.drag-handle') || e.target.closest('.dim-container') || e.target.closest('.plus-btn') || e.target.closest('.fc-cell-btn') || e.target.closest('.select-all-col-btn')) return;
         if (e.button !== 0) return;
 

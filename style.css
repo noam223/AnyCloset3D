@@ -3908,6 +3908,18 @@ body.presentation-mode #canvas-container canvas {
    LAYOUT MODE — compare two linear cabinets in shared space
    ============================================================ */
 
+body.layout-mode #dimensions-layer,
+body.layout-mode #buttons-layer,
+body.layout-mode #drag-handles-layer,
+body.layout-mode #col-widths-layer,
+body.layout-mode #column-quick-edit,
+body.layout-mode #bottom-floating-toolbar {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    opacity: 0 !important;
+}
+
 body.layout-mode #sidebar,
 body.layout-mode #left-sidebar,
 body.layout-mode #top-bar,
