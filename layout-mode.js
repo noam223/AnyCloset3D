@@ -12,7 +12,7 @@
     var LAYOUT_GIZMO_ARROW = 48;
     var LAYOUT_GIZMO_HIT = 22;
     var LAYOUT_GIZMO_SCREEN_PX = 32;
-    var LAYOUT_VERSION = '20260610b';
+    var LAYOUT_VERSION = '20260610c';
     var _layoutPickHits = [];
     var _layoutDragBound = false;
     var _layoutCanvas = null;
@@ -1182,27 +1182,6 @@
         document.body.classList.remove('layout-dragging');
     }
 
-    function _addSlotOutline(slotGroup, color) {
-        slotGroup.updateMatrixWorld(true);
-        var box = new THREE.Box3().setFromObject(slotGroup);
-        if (box.isEmpty()) return;
-        var size = new THREE.Vector3();
-        var center = new THREE.Vector3();
-        box.getSize(size);
-        box.getCenter(center);
-        var localCenter = slotGroup.worldToLocal(center.clone());
-        var geo = new THREE.BoxGeometry(size.x + 4, size.y + 4, size.z + 4);
-        var edges = new THREE.EdgesGeometry(geo);
-        var line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({
-            color: color,
-            transparent: true,
-            opacity: 0.85
-        }));
-        line.position.copy(localCenter);
-        line.name = 'layout-outline';
-        slotGroup.add(line);
-    }
-
     function _layoutPresetSideBySide() {
         if (!_layoutScene || !_layoutScene.slots.length) return;
         var slots = _layoutScene.slots;
@@ -1231,8 +1210,6 @@
         var group = _ensureLayoutGroup();
         group.visible = true;
 
-        var colors = [0x3b82f6, 0x10b981];
-
         _layoutScene.slots.forEach(function(slot, i) {
             var rawState = state.orderCart[slot.cartIndex].rawState;
             _applyLinearSnapshot(rawState);
@@ -1247,7 +1224,6 @@
             }
 
             group.add(slotGroup);
-            _addSlotOutline(slotGroup, colors[i] || 0x64748b);
             _addLayoutPickHit(slotGroup, i, rawState);
         });
 
