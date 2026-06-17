@@ -2546,7 +2546,7 @@ function _renderInternalDrawerBoxCell(opts) {
     } = opts;
 
     const frameT = state.thickness;
-    const sideSpacerT = 2.8; // 28mm — side clearance from cabinet stiles/hinges
+    const sideSpacerT = 2.8; // 28mm — clearance panel beside column/partition wall
     const innerGap = 0.4;
     const fingerGap = 2.5;
     const drawerH = (compH - innerGap * (count + 1)) / count;
@@ -2556,23 +2556,30 @@ function _renderInternalDrawerBoxCell(opts) {
     const carcassD = shelfFrontZ - cabinetBackZ;
     const sideCenterZ = (shelfFrontZ + cabinetBackZ) / 2;
 
-    // Outer carcass frame (internal/shelf color)
-    createBoard(cellWidth, frameT, frameT, centerX, cellBottomY + compH - frameT / 2, frameZ, matInternal);
-    createBoard(cellWidth, frameT, frameT, centerX, cellBottomY + frameT / 2, frameZ, matInternal);
-    createBoard(frameT, compH - frameT * 2, frameT, centerX - cellWidth / 2 + frameT / 2, cellCenterY, frameZ, matInternal);
-    createBoard(frameT, compH - frameT * 2, frameT, centerX + cellWidth / 2 - frameT / 2, cellCenterY, frameZ, matInternal);
+    const cellLeft = centerX - cellWidth / 2;
+    const cellRight = centerX + cellWidth / 2;
 
-    // Side spacer panels (28mm) — keep drawers away from cabinet side hinges
-    createBoard(sideSpacerT, compH, carcassD, centerX - cellWidth / 2 + sideSpacerT / 2, cellCenterY, sideCenterZ, matInternal);
-    createBoard(sideSpacerT, compH, carcassD, centerX + cellWidth / 2 - sideSpacerT / 2, cellCenterY, sideCenterZ, matInternal);
+    // 28mm side panels — flush against column/partition inner face, before drawer box
+    createBoard(sideSpacerT, compH, carcassD, cellLeft + sideSpacerT / 2, cellCenterY, sideCenterZ, matInternal);
+    createBoard(sideSpacerT, compH, carcassD, cellRight - sideSpacerT / 2, cellCenterY, sideCenterZ, matInternal);
+
+    // Drawer box envelope (17mm frame) — inset after 28mm spacers
+    const boxLeft = cellLeft + sideSpacerT;
+    const boxRight = cellRight - sideSpacerT;
+    const boxW = boxRight - boxLeft;
+    const boxCenterX = centerX;
+
+    createBoard(boxW, frameT, frameT, boxCenterX, cellBottomY + compH - frameT / 2, frameZ, matInternal);
+    createBoard(boxW, frameT, frameT, boxCenterX, cellBottomY + frameT / 2, frameZ, matInternal);
+    createBoard(frameT, compH - frameT * 2, frameT, boxLeft + frameT / 2, cellCenterY, frameZ, matInternal);
+    createBoard(frameT, compH - frameT * 2, frameT, boxRight - frameT / 2, cellCenterY, frameZ, matInternal);
 
     const drwRecess = 2.0;
     const drwFrontZ = shelfFrontZ - drwRecess;
     const drwD = carcassD - drwRecess;
     const drwBackZ = cabinetBackZ;
     const drwCenterZ = (drwFrontZ + drwBackZ) / 2;
-    // Drawer box spans full width between inner faces of side spacer panels
-    const drwW = cellWidth - sideSpacerT * 2;
+    const drwW = boxW - frameT * 2;
 
     for (let d = 0; d < count; d++) {
         const dY = cellBottomY + innerGap + drawerH / 2 + (d * (drawerH + innerGap));
@@ -2583,13 +2590,13 @@ function _renderInternalDrawerBoxCell(opts) {
         if (partIdPrefix) {
             _ppPartId = `${partIdPrefix}_d${d}`;
         }
-        createBoard(drwW, boxH, frameT, centerX, boxCenterY, drwFrontZ + frameT / 2, matInternal);
+        createBoard(drwW, boxH, frameT, boxCenterX, boxCenterY, drwFrontZ + frameT / 2, matInternal);
         if (partIdPrefix) _ppPartId = '';
 
-        createBoard(drwW, frameT, drwD, centerX, boxBottomY + frameT / 2, drwCenterZ, matInternal);
-        createBoard(frameT, boxH, drwD, centerX - drwW / 2 + frameT / 2, boxCenterY, drwCenterZ, matInternal);
-        createBoard(frameT, boxH, drwD, centerX + drwW / 2 - frameT / 2, boxCenterY, drwCenterZ, matInternal);
-        createBoard(drwW - frameT * 2, boxH, frameT, centerX, boxCenterY, drwBackZ + frameT / 2, matInternal);
+        createBoard(drwW, frameT, drwD, boxCenterX, boxBottomY + frameT / 2, drwCenterZ, matInternal);
+        createBoard(frameT, boxH, drwD, boxCenterX - drwW / 2 + frameT / 2, boxCenterY, drwCenterZ, matInternal);
+        createBoard(frameT, boxH, drwD, boxCenterX + drwW / 2 - frameT / 2, boxCenterY, drwCenterZ, matInternal);
+        createBoard(drwW - frameT * 2, boxH, frameT, boxCenterX, boxCenterY, drwBackZ + frameT / 2, matInternal);
     }
 }
 
