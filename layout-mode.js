@@ -12,7 +12,7 @@
     var LAYOUT_GIZMO_ARROW = 48;
     var LAYOUT_GIZMO_HIT = 22;
     var LAYOUT_GIZMO_SCREEN_PX = 32;
-    var LAYOUT_VERSION = '20260610h';
+    var LAYOUT_VERSION = '20260610i';
     var _layoutPickHits = [];
     var _layoutDragBound = false;
     var _layoutCanvas = null;
@@ -1246,14 +1246,17 @@
             if (!el) return;
             el.style.removeProperty('opacity');
             el.style.removeProperty('visibility');
-            el.style.removeProperty('pointer-events');
             el.style.removeProperty('transition');
+            el.style.removeProperty('pointer-events');
         });
         if (typeof state !== 'undefined' && state.viewMode === 'front') {
             if (typeof buildDimensionsAndButtonsUI === 'function') buildDimensionsAndButtonsUI();
             if (typeof buildDragHandlesUI === 'function') buildDragHandlesUI();
             if (typeof updateOverlaysPosition === 'function') updateOverlaysPosition();
             if (typeof updateQuickEditPanelUI === 'function') updateQuickEditPanelUI();
+        }
+        if (typeof window._replayCanvasPointerMove === 'function') {
+            window._replayCanvasPointerMove();
         }
     }
 

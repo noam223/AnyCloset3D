@@ -5118,6 +5118,7 @@ function bindUI() {
 
     container.addEventListener('pointermove', (e) => {
         if (window._layoutModeActive) return;
+        window._lastCanvasPointer = { x: e.clientX, y: e.clientY, valid: true };
         if (_isCanvasOverlayUiTarget(e.target)) {
             if (currentHoveredDoor && !e.target.closest('.plus-btn') && !e.target.closest('.select-all-col-btn')) {
                 currentHoveredDoor.material.transparent = false;
@@ -5217,15 +5218,28 @@ function bindUI() {
                 if (shouldShowUI) {
                     layer.style.transition = 'none'; 
                     layer.style.opacity = '1';
-                    layer.style.pointerEvents = ''; 
+                    layer.style.removeProperty('pointer-events');
                 } else {
                     layer.style.transition = 'opacity 0.3s ease-out'; 
                     layer.style.opacity = '0';
-                    layer.style.pointerEvents = 'none'; 
+                    layer.style.removeProperty('pointer-events');
                 }
             }
         });
     });
+
+    window._replayCanvasPointerMove = function() {
+        const pt = window._lastCanvasPointer;
+        if (!pt || !pt.valid) return;
+        container.dispatchEvent(new PointerEvent('pointermove', {
+            bubbles: true,
+            cancelable: true,
+            clientX: pt.x,
+            clientY: pt.y,
+            pointerId: 1,
+            pointerType: 'mouse'
+        }));
+    };
 
     container.addEventListener('mouseleave', () => {
         if (window._layoutModeActive) return;
@@ -5242,7 +5256,7 @@ function bindUI() {
             if (layer) {
                 layer.style.transition = 'opacity 0.3s ease-out';
                 layer.style.opacity = '0';
-                layer.style.pointerEvents = 'none';
+                layer.style.removeProperty('pointer-events');
             }
         });
     });
