@@ -5508,7 +5508,7 @@ function bindUI() {
         const hangingRods = contentCounts.hanging + contentCounts.sorbet;
         const intDrawers = contentCounts.drawersInt;
         const extDrawers = contentCounts.drawersExt;
-        const openCellsCount = contentCounts.openCells;
+        const openCellsCount = contentCounts.openCells + contentCounts.sideOpenCells;
 
         let modelNameText = 'מאיה';
         if(state.cabinetModel === 'c9') modelNameText = 'C9';
@@ -6437,7 +6437,7 @@ function _escPrintHtml(s) {
 }
 
 function _emptyContentCounts() {
-    return { shelves: 0, hanging: 0, sorbet: 0, drawersInt: 0, drawersExt: 0, openCells: 0 };
+    return { shelves: 0, hanging: 0, sorbet: 0, drawersInt: 0, drawersExt: 0, openCells: 0, sideOpenCells: 0 };
 }
 
 function _addContentTypeToCounts(counts, type, comp) {
@@ -6445,7 +6445,8 @@ function _addContentTypeToCounts(counts, type, comp) {
     else if (type === 'sorbet') counts.sorbet++;
     else if (type === 'internal_drawers') counts.drawersInt += (comp && comp.count) || 1;
     else if (type === 'external_drawers') counts.drawersExt += (comp && comp.count) || 1;
-    else if (type === 'open_cell' || type === 'side_open_cell') counts.openCells++;
+    else if (type === 'open_cell') counts.openCells++;
+    else if (type === 'side_open_cell') counts.sideOpenCells++;
 }
 
 function _accumulateCompContentCounts(counts, comp) {
@@ -6488,6 +6489,7 @@ function _countCabinetContentFromRawState(rawState) {
             merged.drawersInt += c.drawersInt;
             merged.drawersExt += c.drawersExt;
             merged.openCells += c.openCells;
+            merged.sideOpenCells += c.sideOpenCells;
         });
         const sc = rawState.wings.center && rawState.wings.center.sideCabinet;
         if (sc && sc.side !== 'none' && Array.isArray(sc.columns)) {
@@ -6498,6 +6500,7 @@ function _countCabinetContentFromRawState(rawState) {
             merged.drawersInt += c.drawersInt;
             merged.drawersExt += c.drawersExt;
             merged.openCells += c.openCells;
+            merged.sideOpenCells += c.sideOpenCells;
         }
         return merged;
     }
@@ -7639,6 +7642,74 @@ body { background:white; }
 // ==========================================
 // 7b. סיכום ללקוח (Customer Summary Print)
 // ==========================================
+// Helper: build customer-facing detail lines for summary print / Excel
+function _summarySpecOrRaw(item, rawState, specKey, rawKey) {
+    if (item[specKey]) return item[specKey];
+    if (!rawState || !rawState[rawKey]) return null;
+    return colorNamesHebrew[rawState[rawKey]] || rawState[rawKey];
+}
+
+function _buildCustomerSummaryDetails(itemObj) {
+    const item = itemObj.spec;
+    const rawState = itemObj.rawState || null;
+    const content = rawState ? _countCabinetContentFromRawState(rawState) : _emptyContentCounts();
+    const details = [];
+
+    if (item.dimsStr) details.push(item.dimsStr);
+    if (item.material) details.push('חומר גוף: ' + item.material);
+
+    const colorBody = _summarySpecOrRaw(item, rawState, 'colorBody', 'materialBody');
+    const colorInternal = _summarySpecOrRaw(item, rawState, 'colorInternal', 'materialInternal');
+    const colorExternal = _summarySpecOrRaw(item, rawState, 'colorExternal', 'materialExternal');
+    const colorBack = _summarySpecOrRaw(item, rawState, 'colorBack', 'materialBack');
+    const colorDesk = _summarySpecOrRaw(item, rawState, 'colorDesk', 'materialDesk');
+    const colorOpenCell = _summarySpecOrRaw(item, rawState, 'colorOpenCell', 'materialOpenCell');
+
+    if (colorBody) details.push('צבע גוף וצוקל: ' + colorBody);
+    if (colorInternal) details.push('צבע פנים (מדפים/מגירות): ' + colorInternal);
+    if (colorExternal) details.push('צבע חזיתות (דלתות): ' + colorExternal);
+    if (colorBack && colorBack !== 'undefined') details.push('צבע גב ארון: ' + colorBack);
+    if (item.desk && item.desk !== 'ללא' && colorDesk) details.push('צבע שולחן עבודה: ' + colorDesk);
+
+    if (content.openCells > 0) {
+        details.push('כוורת פתוחה: ' + content.openCells + (content.openCells === 1 ? ' תא' : ' תאים'));
+    }
+    if (content.sideOpenCells > 0) {
+        details.push('כוורת צד: ' + content.sideOpenCells + (content.sideOpenCells === 1 ? ' תא' : ' תאים'));
+    }
+    if ((content.openCells + content.sideOpenCells) > 0 && colorOpenCell) {
+        details.push('צבע כוורת: ' + colorOpenCell);
+    }
+    if (item.extraColors) details.push('צבעים נוספים: ' + item.extraColors);
+
+    if (item.slidingDoor) {
+        details.push('ארון הזזה — ' + item.slidingDoor.numDoors + ' דלתות | פרופיל: ' + item.slidingDoor.profileColor);
+        details.push(item.slidingDoor.doorColorsStr);
+        if (item.slidingDoor.hasMirror) details.push('✓ כולל דלת מראה');
+    } else if (item.handle) {
+        details.push('סוג ידיות: ' + item.handle);
+    } else if (rawState && rawState.handleStyle) {
+        const handleLabels = { pipe: 'ידית חיצונית', riding: 'ידית רוכבת', touch: "ידית טאצ'" };
+        const style = handleLabels[rawState.handleStyle] || handleLabels.pipe;
+        const model = (rawState.handleType || '').trim();
+        details.push('סוג ידיות: ' + (model ? style + ' — ' + model : style));
+    }
+
+    if (item.drawersExt > 0) details.push('מגירות חיצוניות: ' + item.drawersExt);
+    if (item.drawersInt > 0) details.push('מגירות פנימיות: ' + item.drawersInt);
+    if (item.desk && item.desk !== 'ללא') details.push(item.desk);
+    const cu = item.corner;
+    if (cu && cu.side !== 'none') {
+        const cuSide = cu.side === 'right' ? 'ימין' : 'שמאל';
+        details.push(cu.type === 'desk' ? 'יחידה פינתית שולחן (' + cuSide + ')' : 'יחידה פינתית מגירות ×' + (cu.drawerCount || 4) + ' (' + cuSide + ')');
+    }
+    if (item.cabinetNotes && item.cabinetNotes.trim()) {
+        details.push('הערות: ' + item.cabinetNotes.trim());
+    }
+
+    return details;
+}
+
 // Helper: build cart data array for reuse in HTML + Excel
 function _buildCartData() {
     const rows = [];
@@ -7652,27 +7723,16 @@ function _buildCartData() {
         const profit = totalRevenue - costPrice;
         const profitPct = costPrice > 0 ? Math.round((profit / totalRevenue) * 100) : 0;
 
-        const details = [];
-        details.push(item.dimsStr || '');
-        if (item.drawersExt > 0) details.push(`מגירות חיצוניות: ${item.drawersExt}`);
-        if (item.drawersInt > 0) details.push(`מגירות פנימיות: ${item.drawersInt}`);
-        if (item.desk && item.desk !== 'ללא') details.push(item.desk);
-        const cu = item.corner;
-        if (cu && cu.side !== 'none') {
-            const cuSide = cu.side === 'right' ? 'ימין' : 'שמאל';
-            details.push(cu.type === 'desk' ? `יחידה פינתית שולחן (${cuSide})` : `יחידה פינתית מגירות ×${cu.drawerCount || 4} (${cuSide})`);
-        }
-        // Sliding door details
-        if (item.slidingDoor) {
-            details.push(`ארון הזזה — ${item.slidingDoor.numDoors} דלתות | פרופיל: ${item.slidingDoor.profileColor}`);
-            details.push(item.slidingDoor.doorColorsStr);
-            if (item.slidingDoor.hasMirror) details.push('✓ כולל דלת מראה');
-        }
-        if (item.cabinetNotes && item.cabinetNotes.trim()) {
-            details.push('הערות: ' + item.cabinetNotes.trim());
-        }
-
-        rows.push({ title, details: details.join(' | '), cabPrice, instPrice, costPrice, totalRevenue, profit, profitPct });
+        rows.push({
+            title,
+            details: _buildCustomerSummaryDetails(itemObj).join(' | '),
+            cabPrice,
+            instPrice,
+            costPrice,
+            totalRevenue,
+            profit,
+            profitPct
+        });
     });
     return rows;
 }
