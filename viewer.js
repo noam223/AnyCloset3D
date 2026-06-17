@@ -713,26 +713,7 @@ window._viewerSelectColor = function(newKey) {
     _sendAutoColorNote(cabIdx, field, oldKey, newKey);
 };
 
-window._openMultiviewBlueprint = function() {
-    try {
-        if (typeof window._generateMultiViewBlueprintPages !== 'function') {
-            alert('שגיאה: פונקציית השרטוט אינה זמינה');
-            return;
-        }
-        window._mvbpScale = 1.0;
-        window._mvbpPages = window._generateMultiViewBlueprintPages();
-        window._mvbpIndex = 0;
-        if (typeof window._mvbpShow === 'function') {
-            window._mvbpShow(0);
-        }
-        var modal = document.getElementById('multiview-blueprint-modal');
-        if (!modal) { alert('שגיאה: מודל השרטוט לא נמצא'); return; }
-        modal.style.display = 'flex';
-    } catch(e) {
-        alert('שגיאה בשרטוט: ' + e.message);
-        console.error('[Blueprint]', e);
-    }
-};
+window._openMultiviewBlueprint = function() { /* disabled in customer viewer */ };
 
 // Get original material key for a field from cabinet data
 function _getOriginalMaterial(cabIdx, field) {
