@@ -611,6 +611,8 @@ function buildDimensionsAndButtonsUI() {
 
             // Strip dim-container's own frame — the pill IS the visual container
             dimEl.classList.add('pill-mode');
+            dimEl.addEventListener('pointerdown', (e) => { e.stopPropagation(); });
+            dimEl.addEventListener('pointerup', (e) => { e.stopPropagation(); });
 
             if (isSelectedRow) {
                 // Selected state: just the green ✓ circle — no pill wrapper needed
@@ -739,6 +741,13 @@ function buildDimensionsAndButtonsUI() {
             btn.addEventListener('mouseleave', () => { circle.style.transform = 'scale(1)'; circle.style.boxShadow = '0 2px 8px rgba(99,102,241,0.55)'; });
         }
 
+        btn.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+        btn.addEventListener('pointerup', (e) => {
+            e.stopPropagation();
+        });
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             // Clear sub-cell mode so toolbar operates on the whole cell
@@ -790,7 +799,7 @@ function buildDimensionsAndButtonsUI() {
         btn.title = zoneLabel + ' — לחץ לבחירה (ניתן לבחור כמה אזורים)';
 
         // Stop pointer events from bubbling to canvas (prevents canvas pointerup from clearing state.selection)
-        btn.addEventListener('pointerdown', e => e.stopPropagation());
+        btn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); });
         btn.addEventListener('pointerup', e => e.stopPropagation());
 
         if (isSelected) {
@@ -859,7 +868,7 @@ function buildDimensionsAndButtonsUI() {
         dragHandlesData.selectAll.forEach(item => {
             const col = state.columns[item.colIndex];
             if (!col) return;
-            const numRows = col.shelves + 1;
+            const numRows = _getColumnRowCount(col);
             const allSelected = state.selection.colIndex === item.colIndex && state.selection.rows.length === numRows;
 
             const btn = document.createElement('div');
@@ -870,7 +879,15 @@ function buildDimensionsAndButtonsUI() {
             btn.title = allSelected ? 'בטל בחירת כל התאים' : 'בחר את כל התאים בעמודה';
             btn.innerHTML = allSelected ? '<i class="fa-solid fa-check-double"></i>' : '<i class="fa-solid fa-table-cells"></i>';
 
-            btn.addEventListener('click', () => selectAllColumn(item.colIndex));
+            btn.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            });
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                selectAllColumn(item.colIndex);
+            });
             buttonsLayer.appendChild(btn);
         });
     }
@@ -1426,12 +1443,16 @@ function updateToolbarButtonHighlights() {
     }
 }
 
+function _getColumnRowCount(col) {
+    if (!col) return 0;
+    return col.compartments ? col.compartments.length : (col.shelves + 1);
+}
+
 function selectAllColumn(colIndex) {
     _activeSubCellIdxs = new Set();
     const col = state.columns[colIndex];
     if (!col) return;
-    // Use compartments.length so that the extra compartment created by splitY is included
-    const numRows = col.compartments ? col.compartments.length : (col.shelves + 1);
+    const numRows = _getColumnRowCount(col);
     // If all rows already selected → deselect
     if (state.selection.colIndex === colIndex && state.selection.rows.length === numRows) {
         state.selection = { colIndex: -1, rows: [] };
@@ -1452,8 +1473,7 @@ function _isFullColumnSelected() {
     if (state.selection.colIndex === -1 || state.selection.rows.length === 0) return false;
     const col = state.columns[state.selection.colIndex];
     if (!col) return false;
-    // Use compartments.length so that the extra compartment created by splitY is included
-    const numRows = col.compartments ? col.compartments.length : (col.shelves + 1);
+    const numRows = _getColumnRowCount(col);
     return state.selection.rows.length === numRows;
 }
 
@@ -4604,6 +4624,14 @@ window._setRangeEl = function(el, v) {
     window._syncRangeFill(el);
 };
 
+function _isCanvasOverlayUiTarget(el) {
+    if (!el || !el.closest) return false;
+    return !!el.closest(
+        '#column-quick-edit, #full-corner-quick-edit, #bottom-floating-toolbar, #bed-toolbar, #room-props-row, #room-furniture-toolbar, ' +
+        '.drag-handle, .dim-container, .plus-btn, .fc-cell-btn, .select-all-col-btn, .cell-select-btn, .sub-cell-btn'
+    );
+}
+
 function bindUI() {
     // In viewer mode the editor DOM elements don't exist — skip all bindings
     if (window._VIEWER_MODE) return;
@@ -5090,7 +5118,7 @@ function bindUI() {
 
     container.addEventListener('pointermove', (e) => {
         if (window._layoutModeActive) return;
-        if (e.target.closest('#column-quick-edit') || e.target.closest('#bottom-floating-toolbar') || e.target.closest('.drag-handle') || e.target.closest('.dim-container') || e.target.closest('.select-all-col-btn')) {
+        if (_isCanvasOverlayUiTarget(e.target)) {
             if (currentHoveredDoor && !e.target.closest('.plus-btn') && !e.target.closest('.select-all-col-btn')) {
                 currentHoveredDoor.material.transparent = false;
                 currentHoveredDoor.material.opacity = 1;
@@ -5180,7 +5208,8 @@ function bindUI() {
 
         const isOverUI = e.target.closest('#dimensions-layer, #buttons-layer, #drag-handles-layer, #column-quick-edit, #bottom-floating-toolbar');
         const isSelected = state.selection.colIndex !== -1;
-        const shouldShowUI = (hoverCol !== -1) || isOverUI || isSelected || state.hoveredDesk;
+        const layoutOverlayGrace = window._layoutOverlayRestoreUntil && Date.now() < window._layoutOverlayRestoreUntil;
+        const shouldShowUI = layoutOverlayGrace || (hoverCol !== -1) || isOverUI || isSelected || state.hoveredDesk;
 
         ['dimensions-layer', 'buttons-layer', 'drag-handles-layer'].forEach(id => {
             const layer = document.getElementById(id);
@@ -5200,6 +5229,7 @@ function bindUI() {
 
     container.addEventListener('mouseleave', () => {
         if (window._layoutModeActive) return;
+        if (window._layoutOverlayRestoreUntil && Date.now() < window._layoutOverlayRestoreUntil) return;
         // Remove wing highlight when mouse leaves canvas
         if (!state.wingEditMode) {
             _hoveredWingId = null;
@@ -5226,7 +5256,7 @@ function bindUI() {
 
     container.addEventListener('pointerdown', (e) => {
         if (window._layoutModeActive) return;
-        if (e.target.closest('#column-quick-edit') || e.target.closest('#full-corner-quick-edit') || e.target.closest('#bottom-floating-toolbar') || e.target.closest('.drag-handle') || e.target.closest('.dim-container') || e.target.closest('.plus-btn') || e.target.closest('.fc-cell-btn') || e.target.closest('.select-all-col-btn')) return;
+        if (_isCanvasOverlayUiTarget(e.target)) return;
         if (e.button !== 0) return;
 
         _pointerDownX = e.clientX;
@@ -5287,7 +5317,7 @@ function bindUI() {
     });
 
     container.addEventListener('pointerup', (e) => {
-        if (e.target.closest('#column-quick-edit') || e.target.closest('#full-corner-quick-edit') || e.target.closest('#bottom-floating-toolbar') || e.target.closest('.drag-handle') || e.target.closest('.dim-container') || e.target.closest('.plus-btn') || e.target.closest('.fc-cell-btn') || e.target.closest('.select-all-col-btn') || e.target.closest('#bed-toolbar') || e.target.closest('#room-props-row') || e.target.closest('#room-furniture-toolbar')) return;
+        if (_isCanvasOverlayUiTarget(e.target)) return;
         if (e.button !== 0) return;
 
         // Only treat as a click if pointer didn't move more than 5px (not a drag)

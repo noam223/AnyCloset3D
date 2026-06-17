@@ -12,7 +12,7 @@
     var LAYOUT_GIZMO_ARROW = 48;
     var LAYOUT_GIZMO_HIT = 22;
     var LAYOUT_GIZMO_SCREEN_PX = 32;
-    var LAYOUT_VERSION = '20260610c';
+    var LAYOUT_VERSION = '20260610g';
     var _layoutPickHits = [];
     var _layoutDragBound = false;
     var _layoutCanvas = null;
@@ -1130,6 +1130,23 @@
         ren.setSize(container.clientWidth, container.clientHeight);
     }
 
+    function _restoreEditorOverlaysAfterLayout() {
+        ['dimensions-layer', 'buttons-layer', 'drag-handles-layer', 'col-widths-layer'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            el.style.removeProperty('opacity');
+            el.style.removeProperty('visibility');
+            el.style.removeProperty('pointer-events');
+            el.style.removeProperty('transition');
+        });
+        if (typeof state !== 'undefined' && state.viewMode === 'front') {
+            if (typeof buildDimensionsAndButtonsUI === 'function') buildDimensionsAndButtonsUI();
+            if (typeof buildDragHandlesUI === 'function') buildDragHandlesUI();
+            if (typeof updateOverlaysPosition === 'function') updateOverlaysPosition();
+            if (typeof updateQuickEditPanelUI === 'function') updateQuickEditPanelUI();
+        }
+    }
+
     function _restoreEditorControlsAfterLayout() {
         window._camAnim = null;
         window._orbitFree = true;
@@ -1494,7 +1511,16 @@
         _layoutGizmoTool = 'move';
 
         if (typeof _buildRoom === 'function') _buildRoom();
+
+        window._layoutOverlayRestoreUntil = Date.now() + 1200;
+        _restoreEditorOverlaysAfterLayout();
         _restoreEditorControlsAfterLayout();
+        requestAnimationFrame(function() {
+            _restoreEditorOverlaysAfterLayout();
+            requestAnimationFrame(function() {
+                _restoreEditorOverlaysAfterLayout();
+            });
+        });
     };
 
     window._layoutPresetSideBySide = _layoutPresetSideBySide;

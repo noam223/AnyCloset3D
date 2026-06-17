@@ -1634,8 +1634,8 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); box-sha
 .btn-add-cart:active { transform: translateY(0) scale(0.97); }
 
 #dimensions-layer, #drag-handles-layer, #buttons-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-#dimensions-layer { z-index: 10; }
-#buttons-layer { z-index: 12; }
+#dimensions-layer { z-index: 17; }
+#buttons-layer { z-index: 18; }
 #drag-handles-layer { z-index: 15; }
 
 .dim-container {
@@ -1769,7 +1769,7 @@ body.dragging-v { cursor: ns-resize !important; }
     font-size: 0.75rem;
     box-shadow: 0 2px 8px rgba(0,0,0,0.22);
     transform: translate(-50%, -50%);
-    z-index: 30;
+    z-index: 40;
     transition: background 0.2s, transform 0.15s;
     pointer-events: auto;
 }
@@ -1783,6 +1783,12 @@ body.dragging-v { cursor: ns-resize !important; }
 .select-all-col-btn.all-selected:hover {
     background: rgba(5,150,105,0.95);
     transform: translate(-50%, -50%) scale(1.18);
+}
+
+.cell-select-btn,
+.sub-cell-btn {
+    z-index: 40;
+    pointer-events: auto;
 }
 
 #order-modal {
