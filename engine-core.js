@@ -2824,33 +2824,29 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         uv.needsUpdate = true;
     }
 
-    // Helper: apply shelf UV — 90° CW rotation, natural size (1 tile per shelf width),
+    // Helper: apply shelf UV — 90° CW rotation, natural size (1 tile per 100cm),
     // per-shelf offset and alternating horizontal flip for variety.
     // shelfIdx: div.idx (shelf index within column), boardW: shelf width, boardD: shelf depth
-    // NOTE: createBoard already scales UV by (w/100, d/100) for top/bottom faces, so we use raw 0/1 values directly.
     function _applyShelfUV(mesh, boardW, boardD, shelfIdx) {
         if (!mesh || !mesh.geometry || !mesh.material || !mesh.material.map) return;
+        const textureSize = 100;
         const uv = mesh.geometry.attributes.uv;
-        // Depth aspect ratio relative to shelf width (natural size = 1 tile per boardW)
-        const vScale = boardD / boardW;
-        const vOffset = (1 - vScale) / 2;
-        // Horizontal offset: shift each shelf by a pseudo-random amount
-        const uShift = ((shelfIdx * 0.37) % 1 + 1) % 1;
-        // Flip: alternate every other shelf
+        const spanW = boardW / textureSize;
+        const spanD = boardD / textureSize;
+        const uShift = (((shelfIdx * 0.37) % 1) + 1) % 1 * spanW;
         const flip = (shelfIdx % 2 === 1);
         // BoxGeometry top/bottom raw UV corners (before any scaling):
         // i=8:(0,1), i=9:(1,1), i=10:(0,0), i=11:(1,0) — top face
         // i=12:(0,1), i=13:(1,1), i=14:(0,0), i=15:(1,0) — bottom face
-        const rawU = [0,1,0,1, 0,1,0,1];
-        const rawV = [1,1,0,0, 1,1,0,0];
+        const rawU = [0, 1, 0, 1, 0, 1, 0, 1];
+        const rawV = [1, 1, 0, 0, 1, 1, 0, 0];
         for (let i = 8; i < 16; i++) {
-            const origU = rawU[i - 8]; // 0 or 1 (left/right in width)
-            const origV = rawV[i - 8]; // 0 or 1 (front/back in depth)
-            // 90° CW: newU = depth axis, newV = width axis (reversed)
-            const newU = vOffset + origV * vScale;
-            // Width axis with offset and optional flip
-            let widthT = flip ? origU : (1 - origU);
-            const newV = (widthT + uShift) % 1;
+            const origU = rawU[i - 8];
+            const origV = rawV[i - 8];
+            // 90° CW: depth → U, width (reversed) → V — physical cm, not stretched to 0..1
+            const newU = origV * spanD;
+            const widthT = flip ? origU : (1 - origU);
+            const newV = widthT * spanW + uShift;
             uv.setXY(i, newU, newV);
         }
         uv.needsUpdate = true;
