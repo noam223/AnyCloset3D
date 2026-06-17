@@ -12,7 +12,7 @@
     var LAYOUT_GIZMO_ARROW = 48;
     var LAYOUT_GIZMO_HIT = 22;
     var LAYOUT_GIZMO_SCREEN_PX = 32;
-    var LAYOUT_VERSION = '20260610g';
+    var LAYOUT_VERSION = '20260610h';
     var _layoutPickHits = [];
     var _layoutDragBound = false;
     var _layoutCanvas = null;
@@ -38,6 +38,116 @@
         var args = ['[layout]'].concat(Array.prototype.slice.call(arguments));
         console.log.apply(console, args);
     }
+
+    function _layerDebugSnapshot(id) {
+        var el = document.getElementById(id);
+        if (!el) return { id: id, missing: true };
+        var cs = window.getComputedStyle(el);
+        return {
+            id: id,
+            display: cs.display,
+            visibility: cs.visibility,
+            opacity: cs.opacity,
+            pointerEvents: cs.pointerEvents,
+            inlineOpacity: el.style.opacity || '',
+            inlineVisibility: el.style.visibility || '',
+            inlinePointerEvents: el.style.pointerEvents || '',
+            childCount: el.childElementCount
+        };
+    }
+
+    function _collectLayoutMouseDebugState() {
+        var container = document.getElementById('canvas-container');
+        var canvas = window.renderer && window.renderer.domElement;
+        var ctrl = window.controls;
+        var cs = container ? window.getComputedStyle(container) : null;
+        var rect = container ? container.getBoundingClientRect() : null;
+        var canvasRect = canvas ? canvas.getBoundingClientRect() : null;
+        return {
+            ts: new Date().toISOString(),
+            label: 'snapshot',
+            layoutModeActive: !!window._layoutModeActive,
+            layoutDragBound: _layoutDragBound,
+            layoutDragActive: !!_layoutDragState,
+            bodyClasses: document.body.className,
+            viewMode: typeof state !== 'undefined' ? state.viewMode : null,
+            selection: typeof state !== 'undefined' ? { colIndex: state.selection.colIndex, rows: state.selection.rows.length } : null,
+            orbitFree: window._orbitFree,
+            camAnim: !!window._camAnim,
+            overlayRestoreUntil: window._layoutOverlayRestoreUntil || 0,
+            overlayGraceActive: !!(window._layoutOverlayRestoreUntil && Date.now() < window._layoutOverlayRestoreUntil),
+            container: container ? {
+                classes: container.className,
+                rect: rect ? { x: rect.x, y: rect.y, w: rect.width, h: rect.height } : null,
+                clientW: container.clientWidth,
+                clientH: container.clientHeight,
+                position: cs ? cs.position : null,
+                cursor: cs ? cs.cursor : null,
+                pointerEvents: cs ? cs.pointerEvents : null
+            } : null,
+            canvas: canvas ? {
+                rect: canvasRect ? { x: canvasRect.x, y: canvasRect.y, w: canvasRect.width, h: canvasRect.height } : null,
+                bufferW: canvas.width,
+                bufferH: canvas.height,
+                styleW: canvas.style.width,
+                styleH: canvas.style.height
+            } : null,
+            controls: ctrl ? {
+                enabled: ctrl.enabled,
+                enableRotate: ctrl.enableRotate,
+                enablePan: ctrl.enablePan,
+                enableZoom: ctrl.enableZoom,
+                enableDamping: ctrl.enableDamping,
+                state: ctrl.state
+            } : null,
+            layers: ['dimensions-layer', 'buttons-layer', 'drag-handles-layer', 'col-widths-layer'].map(_layerDebugSnapshot)
+        };
+    }
+
+    function _dumpLayoutMouseDebug(label) {
+        var snap = _collectLayoutMouseDebugState();
+        snap.label = label || 'dump';
+        console.group('[layout-mouse-debug] ' + snap.label);
+        console.log(snap);
+        console.log('JSON (copy this):', JSON.stringify(snap, null, 2));
+        console.groupEnd();
+        return snap;
+    }
+
+    function _bindLayoutMouseDebugListeners() {
+        if (window._layoutMouseDebugBound) return;
+        window._layoutMouseDebugBound = true;
+        document.addEventListener('pointerdown', function(e) {
+            if (!window._layoutMouseDebug) return;
+            var t = e.target;
+            var name = t.id || (t.className && String(t.className).slice(0, 60)) || t.tagName;
+            _dumpLayoutMouseDebug('pointerdown → ' + name);
+        }, true);
+    }
+
+    function _startLayoutMouseDebugSession(reason) {
+        window._layoutMouseDebug = true;
+        _bindLayoutMouseDebugListeners();
+        _dumpLayoutMouseDebug(reason || 'session-start');
+        console.info(
+            '[layout-mouse-debug] פעיל ל-45 שניות.\n' +
+            '1. צא מסידור מרחבי (אם עדיין בפנים)\n' +
+            '2. נסה לגרור את הקנבס וללחוץ על כפתור תא\n' +
+            '3. העתק מה-console את ה-JSON מ-pointerdown ומ-exit-layout\n' +
+            'לשליחה: window._dumpLayoutMouseDebug() בכל רגע'
+        );
+        if (window._layoutMouseDebugTimer) clearTimeout(window._layoutMouseDebugTimer);
+        window._layoutMouseDebugTimer = setTimeout(function() {
+            window._layoutMouseDebug = false;
+            _dumpLayoutMouseDebug('session-end');
+            console.info('[layout-mouse-debug] כבוי אוטומטית');
+        }, 45000);
+    }
+
+    window._dumpLayoutMouseDebug = _dumpLayoutMouseDebug;
+    window._enableLayoutMouseDebug = function() {
+        _startLayoutMouseDebugSession('manual-enable');
+    };
 
     function _suppressEditorOverlays(hide) {
         ['dimensions-layer', 'buttons-layer', 'drag-handles-layer', 'col-widths-layer'].forEach(function(id) {
@@ -1519,8 +1629,15 @@
             _restoreEditorOverlaysAfterLayout();
             requestAnimationFrame(function() {
                 _restoreEditorOverlaysAfterLayout();
+                _dumpLayoutMouseDebug('exit-layout-rAF2');
             });
         });
+
+        _dumpLayoutMouseDebug('exit-layout-immediate');
+        requestAnimationFrame(function() {
+            _dumpLayoutMouseDebug('exit-layout-rAF1');
+        });
+        _startLayoutMouseDebugSession('exit-layout');
     };
 
     window._layoutPresetSideBySide = _layoutPresetSideBySide;
