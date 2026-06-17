@@ -2552,18 +2552,21 @@ function _renderInternalDrawerBoxCell(opts) {
     const drawerH = (compH - innerGap * (count + 1)) / count;
     const actualDrawerH = drawerH - fingerGap;
     const cellCenterY = cellBottomY + compH / 2;
-    const frameZ = shelfFrontZ + frameT / 2 + 0.1;
-    const carcassD = shelfFrontZ - cabinetBackZ;
-    const sideCenterZ = (shelfFrontZ + cabinetBackZ) / 2;
+    const openingFrontZ = shelfFrontZ + 0.1; // inner opening plane (back face of front frame)
+    const frameZ = openingFrontZ + frameT / 2; // 17mm frame rails — most forward
+
+    // 28mm side panels — full height, recessed behind 17mm frame in Z
+    const sideSpacerFrontZ = openingFrontZ - frameT;
+    const sideSpacerD = sideSpacerFrontZ - cabinetBackZ;
+    const sideSpacerCenterZ = cabinetBackZ + sideSpacerD / 2;
 
     const cellLeft = centerX - cellWidth / 2;
     const cellRight = centerX + cellWidth / 2;
 
-    // 28mm side panels — flush against column/partition inner face, before drawer box
-    createBoard(sideSpacerT, compH, carcassD, cellLeft + sideSpacerT / 2, cellCenterY, sideCenterZ, matInternal);
-    createBoard(sideSpacerT, compH, carcassD, cellRight - sideSpacerT / 2, cellCenterY, sideCenterZ, matInternal);
+    createBoard(sideSpacerT, compH, sideSpacerD, cellLeft + sideSpacerT / 2, cellCenterY, sideSpacerCenterZ, matInternal);
+    createBoard(sideSpacerT, compH, sideSpacerD, cellRight - sideSpacerT / 2, cellCenterY, sideSpacerCenterZ, matInternal);
 
-    // Drawer box envelope (17mm frame) — inset after 28mm spacers
+    // Drawer box envelope (17mm frame) — inset in X after 28mm spacers, forward in Z
     const boxLeft = cellLeft + sideSpacerT;
     const boxRight = cellRight - sideSpacerT;
     const boxW = boxRight - boxLeft;
@@ -2574,11 +2577,12 @@ function _renderInternalDrawerBoxCell(opts) {
     createBoard(frameT, compH - frameT * 2, frameT, boxLeft + frameT / 2, cellCenterY, frameZ, matInternal);
     createBoard(frameT, compH - frameT * 2, frameT, boxRight - frameT / 2, cellCenterY, frameZ, matInternal);
 
-    const drwRecess = 2.0;
-    const drwFrontZ = shelfFrontZ - drwRecess;
-    const drwD = carcassD - drwRecess;
+    const drawerFrontClearance = 0.3; // 3mm gap — drawer fronts not flush with frame opening
+    const drawerFrontFaceZ = openingFrontZ - drawerFrontClearance;
+    const drwFrontCenterZ = drawerFrontFaceZ - frameT / 2;
     const drwBackZ = cabinetBackZ;
-    const drwCenterZ = (drwFrontZ + drwBackZ) / 2;
+    const drwD = (drawerFrontFaceZ - frameT) - drwBackZ;
+    const drwCenterZ = drwBackZ + drwD / 2;
     const drwW = boxW - frameT * 2;
 
     for (let d = 0; d < count; d++) {
@@ -2590,7 +2594,7 @@ function _renderInternalDrawerBoxCell(opts) {
         if (partIdPrefix) {
             _ppPartId = `${partIdPrefix}_d${d}`;
         }
-        createBoard(drwW, boxH, frameT, boxCenterX, boxCenterY, drwFrontZ + frameT / 2, matInternal);
+        createBoard(drwW, boxH, frameT, boxCenterX, boxCenterY, drwFrontCenterZ, matInternal);
         if (partIdPrefix) _ppPartId = '';
 
         createBoard(drwW, frameT, drwD, boxCenterX, boxBottomY + frameT / 2, drwCenterZ, matInternal);
