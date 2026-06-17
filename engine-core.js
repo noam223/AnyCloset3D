@@ -2571,7 +2571,8 @@ function _renderInternalDrawerBoxCell(opts) {
     const drwD = carcassD - drwRecess;
     const drwBackZ = cabinetBackZ;
     const drwCenterZ = (drwFrontZ + drwBackZ) / 2;
-    const drwW = cellWidth - frameT * 2 - innerGap * 2 - sideSpacerT * 2;
+    // Drawer box spans full width between inner faces of side spacer panels
+    const drwW = cellWidth - sideSpacerT * 2;
 
     for (let d = 0; d < count; d++) {
         const dY = cellBottomY + innerGap + drawerH / 2 + (d * (drawerH + innerGap));
