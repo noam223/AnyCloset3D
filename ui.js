@@ -5609,7 +5609,8 @@ function bindUI() {
             nicheClosureWidthRight:    window._nicheClosureWidthRight || 1.8,
             nicheClosureCeilHeight:    window._nicheClosureCeilHeight || 1.8,
             blueprintCutouts: state.blueprintCutouts || [],
-            blueprintCellDimOffsets: state.blueprintCellDimOffsets || {}
+            blueprintCellDimOffsets: state.blueprintCellDimOffsets || {},
+            blueprintDimOffsets: state.blueprintDimOffsets || {}
         }));
 
         // Collect unique extra colors from per-part overrides
@@ -5849,6 +5850,7 @@ function _snapshotEditorState() {
         editingCartIndex: state.editingCartIndex,
         blueprintCutouts: JSON.parse(JSON.stringify(state.blueprintCutouts || [])),
         blueprintCellDimOffsets: JSON.parse(JSON.stringify(state.blueprintCellDimOffsets || {})),
+        blueprintDimOffsets: JSON.parse(JSON.stringify(state.blueprintDimOffsets || {})),
         partColors: JSON.parse(JSON.stringify(state.partColors || {})),
         roomWall: window._roomWall || state.roomWall || 'center',
         closureEnabled: window._closureEnabled,
@@ -5884,6 +5886,7 @@ function _restoreEditorState(snap) {
     state.editingCartIndex = snap.editingCartIndex;
     state.blueprintCutouts = snap.blueprintCutouts || [];
     state.blueprintCellDimOffsets = snap.blueprintCellDimOffsets || {};
+    state.blueprintDimOffsets = snap.blueprintDimOffsets || {};
     state.partColors = snap.partColors || {};
     window._roomWall = snap.roomWall;
     state.roomWall = snap.roomWall;
@@ -5957,11 +5960,36 @@ function _applyRawStateForCapture(rawState) {
     window._nicheClosureCeilHeight = rs.nicheClosureCeilHeight || 1.8;
     state.blueprintCutouts = rs.blueprintCutouts ? JSON.parse(JSON.stringify(rs.blueprintCutouts)) : [];
     state.blueprintCellDimOffsets = rs.blueprintCellDimOffsets ? JSON.parse(JSON.stringify(rs.blueprintCellDimOffsets)) : {};
+    state.blueprintDimOffsets = rs.blueprintDimOffsets ? JSON.parse(JSON.stringify(rs.blueprintDimOffsets)) : {};
 }
 
 window._snapshotEditorState = _snapshotEditorState;
 window._restoreEditorState = _restoreEditorState;
 window._applyRawStateForCapture = _applyRawStateForCapture;
+
+window._refreshCartBlueprintPagesForPrint = async function() {
+    if (!state.orderCart.length || window._cartBlueprintRefreshRunning) return;
+    if (typeof window._generateMultiViewBlueprintPages !== 'function') return;
+
+    window._cartBlueprintRefreshRunning = true;
+    const snap = _snapshotEditorState();
+    try {
+        for (let i = 0; i < state.orderCart.length; i++) {
+            const itemObj = state.orderCart[i];
+            if (!itemObj || !itemObj.rawState || !itemObj.spec) continue;
+            _applyRawStateForCapture(itemObj.rawState);
+            const pages = window._generateMultiViewBlueprintPages();
+            if (pages && pages.length) {
+                itemObj.spec.multiViewPages = pages.map(function(pg) { return pg.svg; });
+                itemObj.spec.multiViewSVG = pages[0].svg;
+            }
+            await new Promise(function(r) { setTimeout(r, 0); });
+        }
+    } finally {
+        _restoreEditorState(snap);
+        window._cartBlueprintRefreshRunning = false;
+    }
+};
 
 window._refreshCartMediaForPrint = async function() {
     if (!state.orderCart.length || window._cartMediaRefreshRunning) return;
@@ -6308,6 +6336,7 @@ window.editCartItem = function(index) {
 
     state.blueprintCutouts = rawState.blueprintCutouts ? JSON.parse(JSON.stringify(rawState.blueprintCutouts)) : [];
     state.blueprintCellDimOffsets = rawState.blueprintCellDimOffsets ? JSON.parse(JSON.stringify(rawState.blueprintCellDimOffsets)) : {};
+    state.blueprintDimOffsets = rawState.blueprintDimOffsets ? JSON.parse(JSON.stringify(rawState.blueprintDimOffsets)) : {};
 
     // Explicitly restore manualInstallPrice (not in old rawState saves → default null)
     state.manualInstallPrice = (rawState.manualInstallPrice != null) ? rawState.manualInstallPrice : null;
@@ -6838,6 +6867,7 @@ window.printCustomer = async function() {
     setTimeout(() => { win.document.title = _pdfTitle; win.print(); }, 600);
 };
 window.printFactory = async function() {
+    try { await window._refreshCartBlueprintPagesForPrint(); } catch (e) { console.warn('[printFactory] blueprint refresh failed:', e); }
     if (state.orderCart.some(window._cartItemNeedsMediaRefresh)) {
         _showToast('🔄 מרענן תמונות לפני הדפסה...', 3000);
         try { await window._refreshCartMediaForPrint(); } catch (e) { console.warn('[printFactory]', e); }
@@ -7005,6 +7035,40 @@ window._mvbpBindDimDrag = function() {
     const svg = content.querySelector('svg');
     if (!svg) return;
 
+    function getSVGScale() {
+        const vb = svg.viewBox.baseVal;
+        const rect = svg.getBoundingClientRect();
+        return vb.width > 0 ? rect.width / vb.width : 1;
+    }
+
+    function getTranslate(g) {
+        const t = g.getAttribute('transform') || '';
+        const m = t.match(/translate\(\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\)/);
+        return m ? { x: parseFloat(m[1]), y: parseFloat(m[2]) } : { x: 0, y: 0 };
+    }
+
+    function saveOffset(g) {
+        const viewKey = g.getAttribute('data-view-key');
+        const role = g.getAttribute('data-dim-role');
+        if (!viewKey || !role) return;
+        if (!state.blueprintDimOffsets) state.blueprintDimOffsets = {};
+        const t = getTranslate(g);
+        state.blueprintDimOffsets[viewKey + '|' + role] = { x: t.x, y: t.y };
+        if (typeof saveHistoryState === 'function') saveHistoryState();
+        if (state.editingCartIndex >= 0 && state.orderCart[state.editingCartIndex]) {
+            const item = state.orderCart[state.editingCartIndex];
+            if (item.rawState) {
+                item.rawState.blueprintDimOffsets = JSON.parse(JSON.stringify(state.blueprintDimOffsets));
+            }
+        }
+        const wrap = document.getElementById('mvbp-svg-wrap');
+        const idx = window._mvbpIndex;
+        if (wrap && window._mvbpPages[idx]) {
+            const svgEl = wrap.querySelector('svg');
+            if (svgEl) window._mvbpPages[idx].svg = svgEl.outerHTML;
+        }
+    }
+
     const dims = svg.querySelectorAll('.bp-dim-draggable');
     dims.forEach(function(g) {
         if (g._dimDragBound) return;
@@ -7015,25 +7079,12 @@ window._mvbpBindDimDrag = function() {
         let startX = 0, startY = 0;
         let curTx = 0, curTy = 0;
 
-        function getTranslate() {
-            const t = g.getAttribute('transform') || '';
-            const m = t.match(/translate\(\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\)/);
-            return m ? { x: parseFloat(m[1]), y: parseFloat(m[2]) } : { x: 0, y: 0 };
-        }
-
-        function getSVGScale() {
-            // Account for zoom: SVG viewBox vs rendered size
-            const vb = svg.viewBox.baseVal;
-            const rect = svg.getBoundingClientRect();
-            return vb.width > 0 ? rect.width / vb.width : 1;
-        }
-
         function onMouseDown(e) {
             if (e.button !== 0) return;
             dragging = true;
             startX = e.clientX;
             startY = e.clientY;
-            const t = getTranslate();
+            const t = getTranslate(g);
             curTx = t.x; curTy = t.y;
             e.preventDefault();
             e.stopPropagation();
@@ -7056,9 +7107,11 @@ window._mvbpBindDimDrag = function() {
         }
 
         function onMouseUp() {
+            if (!dragging) return;
             dragging = false;
             document.removeEventListener('mousemove', onMouseMove);
             document.removeEventListener('mouseup', onMouseUp);
+            saveOffset(g);
         }
 
         // Touch support
@@ -7067,7 +7120,7 @@ window._mvbpBindDimDrag = function() {
             dragging = true;
             startX = e.touches[0].clientX;
             startY = e.touches[0].clientY;
-            const t = getTranslate();
+            const t = getTranslate(g);
             curTx = t.x; curTy = t.y;
             e.stopPropagation();
         }
@@ -7087,7 +7140,11 @@ window._mvbpBindDimDrag = function() {
             e.preventDefault();
         }
 
-        function onTouchEnd() { dragging = false; }
+        function onTouchEnd() {
+            if (!dragging) return;
+            dragging = false;
+            saveOffset(g);
+        }
 
         g.addEventListener('mousedown', onMouseDown);
         g.addEventListener('touchstart', onTouchStart, { passive: true });

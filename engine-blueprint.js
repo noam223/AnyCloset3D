@@ -129,6 +129,26 @@ function _bpEnsureCellDimOffsets() {
     return state.blueprintCellDimOffsets;
 }
 
+function _bpEnsureDimOffsets() {
+    if (!state.blueprintDimOffsets) state.blueprintDimOffsets = {};
+    return state.blueprintDimOffsets;
+}
+
+function _bpDimStoreKey(viewKey, role) {
+    return String(viewKey || 'center') + '|' + role;
+}
+
+function _bpDimOffset(viewKey, role) {
+    const off = _bpEnsureDimOffsets()[_bpDimStoreKey(viewKey, role)];
+    return off ? { x: off.x || 0, y: off.y || 0 } : { x: 0, y: 0 };
+}
+
+function _bpDimTransform(viewKey, role) {
+    const off = _bpDimOffset(viewKey, role);
+    if (!off.x && !off.y) return '';
+    return ` transform="translate(${off.x.toFixed(1)},${off.y.toFixed(1)})"`;
+}
+
 function _bpCellDimStoreKey(viewKey, cellKey) {
     return String(viewKey || 'center') + '|' + cellKey;
 }
@@ -996,17 +1016,15 @@ window._generateMultiViewBlueprintSVG = function() {
                     const hndY = drawerSvgY + drawerSvgH * 0.5;
                     p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
                 }
-                // Dimension: drawer height (inner side of desk)
-                const dimInnerX = dSide === 'left' ? (deskX + dSvgW + 14) : (deskX - 14);
+                // Dimension: drawer height (outer side of desk)
+                const dimOuterX = dSide === 'left' ? (deskX - 14) : (deskX + dSvgW + 14);
                 const drawerSvgY0 = deskTopY + deskSurfT;
                 if (dSide === 'left') {
-                    dimV(dimInnerX, drawerSvgY0, drawerSvgY0 + drawerH * sc, `${Math.round(drawerH * 10)}`);
-                    // Dimension: floor to drawer bottom (gap below drawer)
-                    dimV(dimInnerX + 36, drawerSvgY0 + drawerH * sc, deskBotY, `${Math.round((dHeight - DESK_SURFACE_T - drawerH) * 10)}`);
+                    dimVLeft(dimOuterX, drawerSvgY0, drawerSvgY0 + drawerH * sc, `${Math.round(drawerH * 10)}`);
+                    dimVLeft(dimOuterX - 36, drawerSvgY0 + drawerH * sc, deskBotY, `${Math.round((dHeight - DESK_SURFACE_T - drawerH) * 10)}`);
                 } else {
-                    dimVLeft(dimInnerX, drawerSvgY0, drawerSvgY0 + drawerH * sc, `${Math.round(drawerH * 10)}`);
-                    // Dimension: floor to drawer bottom (gap below drawer)
-                    dimVLeft(dimInnerX - 36, drawerSvgY0 + drawerH * sc, deskBotY, `${Math.round((dHeight - DESK_SURFACE_T - drawerH) * 10)}`);
+                    dimV(dimOuterX, drawerSvgY0, drawerSvgY0 + drawerH * sc, `${Math.round(drawerH * 10)}`);
+                    dimV(dimOuterX + 36, drawerSvgY0 + drawerH * sc, deskBotY, `${Math.round((dHeight - DESK_SURFACE_T - drawerH) * 10)}`);
                 }
             }
             // Dimension: desk width (below)
@@ -1590,39 +1608,60 @@ window._generateMultiViewBlueprintPages = function() {
             else p.push(`<text x="${(x + halfT + 3).toFixed(1)}" y="${(my+3).toFixed(1)}" text-anchor="start" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(t * 10)}</text>`);
         }
     };
-    let _dimIdCounter = 0;
-    const makeDimH = (p, x1,x2,y,lbl,above=true) => {
-        const tk=8, lo=above?-10:16;
-        const id = `dim-${++_dimIdCounter}`;
-        p.push(`<g data-dim="h" data-dim-id="${id}" style="cursor:ns-resize" class="bp-dim-draggable">`);
-        p.push(`<line x1="${(+x1).toFixed(1)}" y1="${(y-tk/2).toFixed(1)}" x2="${(+x1).toFixed(1)}" y2="${(y+tk/2).toFixed(1)}" stroke="${DIM_C}" stroke-width="1.5"/>`);
-        p.push(`<line x1="${(+x2).toFixed(1)}" y1="${(y-tk/2).toFixed(1)}" x2="${(+x2).toFixed(1)}" y2="${(y+tk/2).toFixed(1)}" stroke="${DIM_C}" stroke-width="1.5"/>`);
-        p.push(`<line x1="${(+x1).toFixed(1)}" y1="${(+y).toFixed(1)}" x2="${(+x2).toFixed(1)}" y2="${(+y).toFixed(1)}" stroke="${DIM_C}" stroke-width="1.5" marker-start="url(#as)" marker-end="url(#ae)"/>`);
-        const mx=(+x1+x2)/2;
-        p.push(`<text x="${mx.toFixed(1)}" y="${(y+lo).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="${_BP_DIM_FONT}" font-weight="500" fill="${DIM_C}">${lbl}</text>`);
-        p.push(`</g>`);
+    let _bpDimBuf = [];
+    let _bpCurrentViewKey = 'top';
+    const _bpStartPage = (viewKey) => {
+        _bpDimBuf = [];
+        _bpCurrentViewKey = viewKey || 'center';
     };
-    const makeDimV = (p, x,y1,y2,lbl) => {
-        const tk=8;
-        const id = `dim-${++_dimIdCounter}`;
-        p.push(`<g data-dim="v" data-dim-id="${id}" style="cursor:ew-resize" class="bp-dim-draggable">`);
-        p.push(`<line x1="${(x-tk/2).toFixed(1)}" y1="${(+y1).toFixed(1)}" x2="${(x+tk/2).toFixed(1)}" y2="${(+y1).toFixed(1)}" stroke="${DIM_C}" stroke-width="1.5"/>`);
-        p.push(`<line x1="${(x-tk/2).toFixed(1)}" y1="${(+y2).toFixed(1)}" x2="${(x+tk/2).toFixed(1)}" y2="${(+y2).toFixed(1)}" stroke="${DIM_C}" stroke-width="1.5"/>`);
-        p.push(`<line x1="${(+x).toFixed(1)}" y1="${(+y1).toFixed(1)}" x2="${(+x).toFixed(1)}" y2="${(+y2).toFixed(1)}" stroke="${DIM_C}" stroke-width="1.5" marker-start="url(#as)" marker-end="url(#ae)"/>`);
-        const my = (+y1+y2)/2, tx = x + 18;
-        p.push(`<text x="${tx.toFixed(1)}" y="${(my+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="${_BP_DIM_FONT}" font-weight="500" fill="${DIM_C}" transform="rotate(-90,${tx.toFixed(1)},${my.toFixed(1)})">${lbl}</text>`);
-        p.push(`</g>`);
+    const _bpFlushDims = (p) => {
+        if (!_bpDimBuf.length) return;
+        p.push('<g class="bp-dim-front-layer">');
+        for (let i = 0; i < _bpDimBuf.length; i++) p.push(_bpDimBuf[i]);
+        p.push('</g>');
+        _bpDimBuf = [];
     };
-    const makeDimVLeft = (p, x,y1,y2,lbl) => {
-        const tk=8;
-        const id = `dim-${++_dimIdCounter}`;
-        p.push(`<g data-dim="v" data-dim-id="${id}" style="cursor:ew-resize" class="bp-dim-draggable">`);
-        p.push(`<line x1="${(x-tk/2).toFixed(1)}" y1="${(+y1).toFixed(1)}" x2="${(x+tk/2).toFixed(1)}" y2="${(+y1).toFixed(1)}" stroke="${DIM_C}" stroke-width="1.5"/>`);
-        p.push(`<line x1="${(x-tk/2).toFixed(1)}" y1="${(+y2).toFixed(1)}" x2="${(x+tk/2).toFixed(1)}" y2="${(+y2).toFixed(1)}" stroke="${DIM_C}" stroke-width="1.5"/>`);
-        p.push(`<line x1="${(+x).toFixed(1)}" y1="${(+y1).toFixed(1)}" x2="${(+x).toFixed(1)}" y2="${(+y2).toFixed(1)}" stroke="${DIM_C}" stroke-width="1.5" marker-start="url(#as)" marker-end="url(#ae)"/>`);
-        const my = (+y1+y2)/2, tx = x - 18;
-        p.push(`<text x="${tx.toFixed(1)}" y="${(my+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="${_BP_DIM_FONT}" font-weight="500" fill="${DIM_C}" transform="rotate(-90,${tx.toFixed(1)},${my.toFixed(1)})">${lbl}</text>`);
-        p.push(`</g>`);
+    const makeDimH = (p, x1, x2, y, lbl, above = true) => {
+        const role = `h:${Math.round(+x1)},${Math.round(+x2)},${Math.round(+y)}`;
+        const tf = _bpDimTransform(_bpCurrentViewKey, role);
+        const tk = 8, lo = above ? -10 : 16;
+        const mx = (+x1 + +x2) / 2;
+        _bpDimBuf.push(
+            `<g data-dim="h" data-dim-role="${role}" data-view-key="${_bpCurrentViewKey}" style="cursor:ns-resize" class="bp-dim-draggable"${tf}>` +
+            `<line x1="${(+x1).toFixed(1)}" y1="${(y - tk / 2).toFixed(1)}" x2="${(+x1).toFixed(1)}" y2="${(y + tk / 2).toFixed(1)}" stroke="${DIM_C}" stroke-width="1.5"/>` +
+            `<line x1="${(+x2).toFixed(1)}" y1="${(y - tk / 2).toFixed(1)}" x2="${(+x2).toFixed(1)}" y2="${(y + tk / 2).toFixed(1)}" stroke="${DIM_C}" stroke-width="1.5"/>` +
+            `<line x1="${(+x1).toFixed(1)}" y1="${(+y).toFixed(1)}" x2="${(+x2).toFixed(1)}" y2="${(+y).toFixed(1)}" stroke="${DIM_C}" stroke-width="1.5" marker-start="url(#as)" marker-end="url(#ae)"/>` +
+            `<text x="${mx.toFixed(1)}" y="${(y + lo).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="${_BP_DIM_FONT}" font-weight="500" fill="${DIM_C}">${lbl}</text>` +
+            `</g>`
+        );
+    };
+    const makeDimV = (p, x, y1, y2, lbl) => {
+        const role = `v:${Math.round(+x)},${Math.round(+y1)},${Math.round(+y2)}`;
+        const tf = _bpDimTransform(_bpCurrentViewKey, role);
+        const tk = 8;
+        const my = (+y1 + +y2) / 2, tx = x + 18;
+        _bpDimBuf.push(
+            `<g data-dim="v" data-dim-role="${role}" data-view-key="${_bpCurrentViewKey}" style="cursor:ew-resize" class="bp-dim-draggable"${tf}>` +
+            `<line x1="${(x - tk / 2).toFixed(1)}" y1="${(+y1).toFixed(1)}" x2="${(x + tk / 2).toFixed(1)}" y2="${(+y1).toFixed(1)}" stroke="${DIM_C}" stroke-width="1.5"/>` +
+            `<line x1="${(x - tk / 2).toFixed(1)}" y1="${(+y2).toFixed(1)}" x2="${(x + tk / 2).toFixed(1)}" y2="${(+y2).toFixed(1)}" stroke="${DIM_C}" stroke-width="1.5"/>` +
+            `<line x1="${(+x).toFixed(1)}" y1="${(+y1).toFixed(1)}" x2="${(+x).toFixed(1)}" y2="${(+y2).toFixed(1)}" stroke="${DIM_C}" stroke-width="1.5" marker-start="url(#as)" marker-end="url(#ae)"/>` +
+            `<text x="${tx.toFixed(1)}" y="${(my + 4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="${_BP_DIM_FONT}" font-weight="500" fill="${DIM_C}" transform="rotate(-90,${tx.toFixed(1)},${my.toFixed(1)})">${lbl}</text>` +
+            `</g>`
+        );
+    };
+    const makeDimVLeft = (p, x, y1, y2, lbl) => {
+        const role = `vl:${Math.round(+x)},${Math.round(+y1)},${Math.round(+y2)}`;
+        const tf = _bpDimTransform(_bpCurrentViewKey, role);
+        const tk = 8;
+        const my = (+y1 + +y2) / 2, tx = x - 18;
+        _bpDimBuf.push(
+            `<g data-dim="v" data-dim-role="${role}" data-view-key="${_bpCurrentViewKey}" style="cursor:ew-resize" class="bp-dim-draggable"${tf}>` +
+            `<line x1="${(x - tk / 2).toFixed(1)}" y1="${(+y1).toFixed(1)}" x2="${(x + tk / 2).toFixed(1)}" y2="${(+y1).toFixed(1)}" stroke="${DIM_C}" stroke-width="1.5"/>` +
+            `<line x1="${(x - tk / 2).toFixed(1)}" y1="${(+y2).toFixed(1)}" x2="${(x + tk / 2).toFixed(1)}" y2="${(+y2).toFixed(1)}" stroke="${DIM_C}" stroke-width="1.5"/>` +
+            `<line x1="${(+x).toFixed(1)}" y1="${(+y1).toFixed(1)}" x2="${(+x).toFixed(1)}" y2="${(+y2).toFixed(1)}" stroke="${DIM_C}" stroke-width="1.5" marker-start="url(#as)" marker-end="url(#ae)"/>` +
+            `<text x="${tx.toFixed(1)}" y="${(my + 4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="${_BP_DIM_FONT}" font-weight="500" fill="${DIM_C}" transform="rotate(-90,${tx.toFixed(1)},${my.toFixed(1)})">${lbl}</text>` +
+            `</g>`
+        );
     };
     const wrapSVG = (p, label, pageNum, totalPages) => {
         const header = [
@@ -1641,6 +1680,7 @@ window._generateMultiViewBlueprintPages = function() {
     // ---- PAGE 0: TOP VIEW ----
     {
         const p = [];
+        _bpStartPage('top');
         const drawAreaY = 65;
         const drawAreaH = PAGE_H - drawAreaY - MARGIN;
         const pw = SVG_W - MARGIN * 2;
@@ -1872,7 +1912,8 @@ window._generateMultiViewBlueprintPages = function() {
             if (lW > 0) makeDimH(p, wx(-cW/2 - fcSizeL), wx(-cW/2 - fcSizeL + lD), wz(fcSizeL + lW) + 28, `${Math.round(lD * 10)}`);
         }
 
-        pages.push({ label: 'מבט עליון — תוכנית רצפה', svgParts: p });
+        _bpFlushDims(p);
+        pages.push({ label: 'מבט עליון — תוכנית רצפה', svgParts: p, viewKey: 'top' });
     }
 
     // ---- PAGES 1..N: Per-wing front views ----
@@ -1892,6 +1933,7 @@ window._generateMultiViewBlueprintPages = function() {
     wingList.forEach((wg) => {
         const _bpViewKey = wg.wd === leftWing ? 'left' : wg.wd === rightWing ? 'right' : 'center';
         const p = [];
+        _bpStartPage(_bpViewKey);
         const drawAreaY = 65;
         const drawAreaH = PAGE_H - drawAreaY - MARGIN - 80; // reserve 80px at bottom for dim labels
         const pw = SVG_W - MARGIN * 2;
@@ -2025,17 +2067,15 @@ window._generateMultiViewBlueprintPages = function() {
                     const hndY = drawerSvgY + drawerSvgH * 0.5;
                     p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
                 }
-                // Dimension: drawer height (inner side of desk)
-                const dimInnerX = dSide === 'left' ? (deskX + dSvgW + 14) : (deskX - 14);
+                // Dimension: drawer height (outer side of desk)
+                const dimOuterX = dSide === 'left' ? (deskX - 14) : (deskX + dSvgW + 14);
                 const drawerSvgY0 = deskTopY + deskSurfT;
                 if (dSide === 'left') {
-                    makeDimV(p, dimInnerX, drawerSvgY0, drawerSvgY0 + drawerH * sc, `${Math.round(drawerH * 10)}`);
-                    // Dimension: floor to drawer bottom (gap below drawer)
-                    makeDimV(p, dimInnerX + 36, drawerSvgY0 + drawerH * sc, deskBotY, `${Math.round((dHeight - DESK_SURFACE_T - drawerH) * 10)}`);
+                    makeDimVLeft(p, dimOuterX, drawerSvgY0, drawerSvgY0 + drawerH * sc, `${Math.round(drawerH * 10)}`);
+                    makeDimVLeft(p, dimOuterX - 36, drawerSvgY0 + drawerH * sc, deskBotY, `${Math.round((dHeight - DESK_SURFACE_T - drawerH) * 10)}`);
                 } else {
-                    makeDimVLeft(p, dimInnerX, drawerSvgY0, drawerSvgY0 + drawerH * sc, `${Math.round(drawerH * 10)}`);
-                    // Dimension: floor to drawer bottom (gap below drawer)
-                    makeDimVLeft(p, dimInnerX - 36, drawerSvgY0 + drawerH * sc, deskBotY, `${Math.round((dHeight - DESK_SURFACE_T - drawerH) * 10)}`);
+                    makeDimV(p, dimOuterX, drawerSvgY0, drawerSvgY0 + drawerH * sc, `${Math.round(drawerH * 10)}`);
+                    makeDimV(p, dimOuterX + 36, drawerSvgY0 + drawerH * sc, deskBotY, `${Math.round((dHeight - DESK_SURFACE_T - drawerH) * 10)}`);
                 }
             }
             // Dimension: desk width (below)
@@ -2611,6 +2651,7 @@ window._generateMultiViewBlueprintPages = function() {
 
         const _vkWing = wg.wd === leftWing ? 'left' : wg.wd === rightWing ? 'right' : 'center';
         _bpAppendViewCutouts(p, _vkWing, ox, oy, dW, dH, sc, wg.w, wg.h);
+        _bpFlushDims(p);
         pages.push({ label: wg.label, svgParts: p, viewKey: _vkWing, cabWidthCm: wg.w, cabHeightCm: wg.h, viewMeta: { ox, oy, dW, dH, sc } });
     });
 
@@ -2625,6 +2666,7 @@ window._generateMultiViewBlueprintPages = function() {
     fcWings.forEach((fc) => {
         const _bpViewKey = fc.wd === leftWing ? 'fc-left' : 'fc-right';
         const p = [];
+        _bpStartPage(_bpViewKey);
         const drawAreaY = 65;
         const drawAreaH = PAGE_H - drawAreaY - MARGIN - 80; // reserve 80px at bottom for dim labels
         const pw = SVG_W - MARGIN * 2;
@@ -2716,6 +2758,7 @@ window._generateMultiViewBlueprintPages = function() {
 
         const _vkFC = fc.wd === leftWing ? 'fc-left' : 'fc-right';
         _bpAppendViewCutouts(p, _vkFC, ox, oy, dW, dH, sc, diagW, cH);
+        _bpFlushDims(p);
         pages.push({ label: fc.label, svgParts: p, viewKey: _vkFC, cabWidthCm: diagW, cabHeightCm: cH, viewMeta: { ox, oy, dW, dH, sc } });
     });
 
@@ -2728,6 +2771,7 @@ window._generateMultiViewBlueprintPages = function() {
     fcAdditionalWings.forEach((wg) => {
         const _bpViewKey = wg.wd === leftWing ? 'fc-left-extra' : 'fc-right-extra';
         const p = [];
+        _bpStartPage(_bpViewKey);
         const drawAreaY = 65;
         const drawAreaH = PAGE_H - drawAreaY - MARGIN - 80; // reserve 80px at bottom for dim labels
         const pw = SVG_W - MARGIN * 2;
@@ -2898,6 +2942,7 @@ window._generateMultiViewBlueprintPages = function() {
 
         const _vkFCA = wg.wd === leftWing ? 'fc-left-extra' : 'fc-right-extra';
         _bpAppendViewCutouts(p, _vkFCA, ox, oy, dW, dH, sc, wg.w, wg.h);
+        _bpFlushDims(p);
         pages.push({ label: wg.label, svgParts: p, viewKey: _vkFCA, cabWidthCm: wg.w, cabHeightCm: wg.h, viewMeta: { ox, oy, dW, dH, sc } });
     });
 
@@ -2913,6 +2958,7 @@ window._generateMultiViewBlueprintPages = function() {
         const cuFill = cu.type === 'desk' ? '#fef9c3' : '#f0fdf4';
 
         const p = [];
+        _bpStartPage(cu.side === 'right' ? 'corner-right' : 'corner-left');
         const drawAreaY = 65;
         const drawAreaH = PAGE_H - drawAreaY - MARGIN - 80; // reserve 80px at bottom for dim labels
         const pw = SVG_W - MARGIN * 2;
@@ -2981,6 +3027,7 @@ window._generateMultiViewBlueprintPages = function() {
 
         const _vkCU = cu.side === 'right' ? 'corner-right' : 'corner-left';
         _bpAppendViewCutouts(p, _vkCU, ox, oy, dW, dH, sc, cuW, cuH);
+        _bpFlushDims(p);
         pages.push({ label: cuLabel, svgParts: p, viewKey: _vkCU, cabWidthCm: cuW, cabHeightCm: cuH, viewMeta: { ox, oy, dW, dH, sc } });
     }
 
@@ -2999,6 +3046,7 @@ window._generateMultiViewBlueprintPages = function() {
                 const _bpViewKey = viewKey;
                 const scLabel = `שרטוט חזית — ארון צד ${sideLbl}`;
                 const p = [];
+                _bpStartPage(_bpViewKey);
                 const drawAreaY = 65;
                 const drawAreaH = PAGE_H - drawAreaY - MARGIN - 80; // reserve 80px at bottom for dim labels
                 const pw = SVG_W - MARGIN * 2;
@@ -3163,6 +3211,7 @@ window._generateMultiViewBlueprintPages = function() {
                 }
 
                 _bpAppendViewCutouts(p, viewKey, ox, oy, dW, dH, scScale, scW, scH);
+                _bpFlushDims(p);
                 pages.push({ label: scLabel, svgParts: p, viewKey: viewKey, cabWidthCm: scW, cabHeightCm: scH, viewMeta: { ox, oy, dW, dH, sc: scScale } });
             };
 
@@ -3177,6 +3226,7 @@ window._generateMultiViewBlueprintPages = function() {
         if (wing && wing.slidingDoor && wing.slidingDoor.enabled) {
             const sd = wing.slidingDoor;
             const p = [];
+            _bpStartPage('sliding');
             const drawAreaY = 65;
             const drawAreaH = PAGE_H - drawAreaY - MARGIN;
             const pw = SVG_W - MARGIN * 2;
@@ -3260,6 +3310,7 @@ window._generateMultiViewBlueprintPages = function() {
 
             const _sdDW = sdW * sc, _sdDH = sdH * sc;
             _bpAppendViewCutouts(p, 'sliding', ox, oy, _sdDW, _sdDH, sc, sdW, sdH);
+            _bpFlushDims(p);
             pages.push({ label: 'ארון הזזה — חזית', svgParts: p, viewKey: 'sliding', cabWidthCm: sdW, cabHeightCm: sdH, viewMeta: { ox, oy, dW: _sdDW, dH: _sdDH, sc } });
         }
     }
@@ -3284,6 +3335,7 @@ window._generateMultiViewBlueprintPages = function() {
         const _bpViewKey = 'upper-' + parentId;
 
         const p = [];
+        _bpStartPage(_bpViewKey);
         const drawAreaY = 65;
         const drawAreaH = PAGE_H - drawAreaY - MARGIN - 80; // reserve 80px at bottom for dim labels
         const pw = SVG_W - MARGIN * 2;
@@ -3383,6 +3435,7 @@ window._generateMultiViewBlueprintPages = function() {
 
         const _vkUU = 'upper-' + parentId;
         _bpAppendViewCutouts(p, _vkUU, ox, oy, dW, dH, sc, uuW, uuH);
+        _bpFlushDims(p);
         pages.push({ label: uuLabel, svgParts: p, viewKey: _vkUU, cabWidthCm: uuW, cabHeightCm: uuH, viewMeta: { ox, oy, dW, dH, sc } });
     });
 

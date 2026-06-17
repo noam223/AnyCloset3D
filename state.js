@@ -210,6 +210,7 @@ const state = {
     bpData: [],
     blueprintCutouts: [],
     blueprintCellDimOffsets: {},
+    blueprintDimOffsets: {},
     customer: { name: '', phone: '', orderNum: '', address: '' },
     orderCart: [],
     editingCartIndex: -1,

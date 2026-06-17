@@ -197,6 +197,11 @@
                     } else if (!state.blueprintCellDimOffsets) {
                         state.blueprintCellDimOffsets = {};
                     }
+                    if (snap.blueprintDimOffsets) {
+                        state.blueprintDimOffsets = snap.blueprintDimOffsets;
+                    } else if (!state.blueprintDimOffsets) {
+                        state.blueprintDimOffsets = {};
+                    }
                     // Restore room wall position
                     if (snap.roomWall) {
                         state.roomWall   = snap.roomWall;
@@ -340,7 +345,8 @@
             nicheClosureCeilHeight:    window._nicheClosureCeilHeight || 1.8,
             tambourPalette:            state.tambourPalette || {},
             blueprintCutouts:          state.blueprintCutouts || [],
-            blueprintCellDimOffsets:   state.blueprintCellDimOffsets || {}
+            blueprintCellDimOffsets:   state.blueprintCellDimOffsets || {},
+            blueprintDimOffsets:       state.blueprintDimOffsets || {}
         }));
     }
 
@@ -545,7 +551,8 @@ window._saveProjectNow = async function() {
             orderStatus:   window._currentOrderStatus || 'quote',
             tambourPalette: state.tambourPalette || {},
             blueprintCutouts: state.blueprintCutouts || [],
-            blueprintCellDimOffsets: state.blueprintCellDimOffsets || {}
+            blueprintCellDimOffsets: state.blueprintCellDimOffsets || {},
+            blueprintDimOffsets:     state.blueprintDimOffsets || {}
         }));
         console.log('[SaveNow] Saving project "' + window._currentProjectName + '", payload size:', Math.round(JSON.stringify(snap).length/1024) + 'KB, cart items:', lightCart.length);
         var thumb = null;
