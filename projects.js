@@ -1151,6 +1151,60 @@ function switchPage(page) {
 }
 
 // ── AI Renders gallery (all renders for user) ─────────────────────────────────
+var _RENDER_DELETE_URL = 'https://meqxnsjycvfgfhdepguo.supabase.co/functions/v1/delete-render';
+
+function _projectsSupabase() {
+    return supabase.createClient(
+        'https://meqxnsjycvfgfhdepguo.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lcXhuc2p5Y3ZmZ2ZoZGVwZ3VvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3MDA5NDAsImV4cCI6MjA5MjI3Njk0MH0.w63bl0-1-Rgt9Nx6sVW5ueEGMojiMaxoehlPXlPH2N0'
+    );
+}
+
+async function _deleteAiRenderFromServer(renderId) {
+    var sb = _projectsSupabase();
+    var sessionRes = await sb.auth.getSession();
+    var session = sessionRes.data && sessionRes.data.session;
+    if (!session) throw new Error('לא מחובר');
+
+    var res = await fetch(_RENDER_DELETE_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + session.access_token,
+        },
+        body: JSON.stringify({ id: renderId }),
+    });
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'מחיקה נכשלה');
+    return data;
+}
+
+window._deleteGalleryRender = async function(renderId, ev) {
+    if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+    if (!confirm('למחוק הדמיה זו לצמיתות מהשרת?')) return;
+    try {
+        await _deleteAiRenderFromServer(renderId);
+        await _loadAllRendersGallery();
+    } catch (e) {
+        alert('שגיאה במחיקה: ' + (e.message || e));
+    }
+};
+
+window._deleteGalleryLightboxRender = async function() {
+    var renders = window._galleryRenders || [];
+    var idx = window._galleryLightboxIdx || 0;
+    var r = renders[idx];
+    if (!r || !r.id) return;
+    if (!confirm('למחוק הדמיה זו לצמיתות מהשרת?')) return;
+    try {
+        await _deleteAiRenderFromServer(r.id);
+        window._closeGalleryLightbox();
+        await _loadAllRendersGallery();
+    } catch (e) {
+        alert('שגיאה במחיקה: ' + (e.message || e));
+    }
+};
+
 async function _loadAllRendersGallery() {
     var grid = document.getElementById('renders-gallery-grid');
     var quota = document.getElementById('renders-quota-text');
@@ -1159,10 +1213,7 @@ async function _loadAllRendersGallery() {
     grid.innerHTML = '<div style="text-align:center;padding:60px;color:#94a3b8;"><i class="fa-solid fa-spinner fa-spin" style="font-size:2rem;"></i></div>';
 
     try {
-        var sb = supabase.createClient(
-            'https://meqxnsjycvfgfhdepguo.supabase.co',
-            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lcXhuc2p5Y3ZmZ2ZoZGVwZ3VvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3MDA5NDAsImV4cCI6MjA5MjI3Njk0MH0.w63bl0-1-Rgt9Nx6sVW5ueEGMojiMaxoehlPXlPH2N0'
-        );
+        var sb = _projectsSupabase();
         var { data: { user } } = await sb.auth.getUser();
         if (!user) return;
 
@@ -1208,7 +1259,8 @@ async function _loadAllRendersGallery() {
                 '<div class="renders-gallery-card-info">' +
                     (projName ? '<span class="renders-gallery-proj">' + projName + '</span>' : '') +
                     '<span class="renders-gallery-date">' + date + '</span>' +
-                    '<a href="' + r.image_url + '" target="_blank" download class="renders-gallery-dl" title="הורד"><i class="fa-solid fa-download"></i></a>' +
+                    '<a href="' + r.image_url + '" target="_blank" download class="renders-gallery-dl" title="הורד" onclick="event.stopPropagation()"><i class="fa-solid fa-download"></i></a>' +
+                    '<button type="button" class="renders-gallery-del" title="מחק מהשרת" onclick="window._deleteGalleryRender(\'' + r.id + '\', event)"><i class="fa-solid fa-trash"></i></button>' +
                 '</div>';
             grid.appendChild(card);
         });
@@ -1220,7 +1272,12 @@ async function _loadAllRendersGallery() {
             window._galleryLightboxIdx = idx;
             var lb = document.getElementById('gallery-lightbox');
             var img = document.getElementById('gallery-lightbox-img');
-            if (lb && img) { img.src = renders[idx].image_url; lb.style.display = 'flex'; }
+            var dl = document.getElementById('gallery-lightbox-download');
+            if (lb && img) {
+                img.src = renders[idx].image_url;
+                if (dl) dl.href = renders[idx].image_url;
+                lb.style.display = 'flex';
+            }
         };
         window._closeGalleryLightbox = function() {
             var lb = document.getElementById('gallery-lightbox');

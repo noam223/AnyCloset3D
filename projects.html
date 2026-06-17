@@ -831,7 +831,17 @@
                 style="position:absolute;top:-14px;right:-14px;width:34px;height:34px;border-radius:50%;background:white;border:none;cursor:pointer;font-size:1rem;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">
             <i class="fa-solid fa-xmark"></i>
         </button>
-        <img id="gallery-lightbox-img" src="" alt="הדמיה" style="max-width:90vw;max-height:88vh;border-radius:12px;object-fit:contain;box-shadow:0 8px 40px rgba(0,0,0,0.5);">
+        <img id="gallery-lightbox-img" src="" alt="הדמיה" style="max-width:90vw;max-height:80vh;border-radius:12px;object-fit:contain;box-shadow:0 8px 40px rgba(0,0,0,0.5);">
+        <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-top:14px;">
+            <a id="gallery-lightbox-download" href="#" target="_blank" download
+               style="color:#e9d5ff;font-size:0.88rem;text-decoration:none;display:flex;align-items:center;gap:6px;">
+                <i class="fa-solid fa-download"></i> הורד
+            </a>
+            <button type="button" onclick="window._deleteGalleryLightboxRender()"
+                    style="background:none;border:none;cursor:pointer;color:#fca5a5;font-size:0.88rem;display:flex;align-items:center;gap:6px;">
+                <i class="fa-solid fa-trash"></i> מחק מהשרת
+            </button>
+        </div>
     </div>
 </div>
 
@@ -844,6 +854,8 @@
 .renders-gallery-date { font-size: 0.75rem; color: #94a3b8; white-space: nowrap; }
 .renders-gallery-dl { color: #a855f7; font-size: 0.82rem; text-decoration: none; padding: 2px 4px; }
 .renders-gallery-dl:hover { color: #7c3aed; }
+.renders-gallery-del { background: none; border: none; cursor: pointer; color: #ef4444; font-size: 0.82rem; padding: 2px 4px; line-height: 1; }
+.renders-gallery-del:hover { color: #dc2626; }
 </style>
 
 <!-- Modal: Order status -->
@@ -969,6 +981,6 @@
 </div>
 
 <script src="auth.js?v=20260608h"></script>
-<script src="projects.js?v=20260608o"></script>
+<script src="projects.js?v=20260617c"></script>
 </body>
 </html>

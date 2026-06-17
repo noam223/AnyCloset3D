@@ -534,14 +534,34 @@ window._submitRender = async function() {
 window._deleteCurrentRender = async function() {
     var r = _projectRenders[_lightboxIndex];
     if (!r || !r.id) return;
-    if (!confirm('למחוק הדמיה זו?')) return;
+    if (!confirm('למחוק הדמיה זו לצמיתות מהשרת?')) return;
     var id = r.id;
     window._closeAiLightbox();
-    var { error } = await _sbRenders.from('ai_renders').delete().eq('id', id);
-    if (!error) {
+    try {
+        var sessionRes = await _sbRenders.auth.getSession();
+        var session = sessionRes.data && sessionRes.data.session;
+        if (!session) throw new Error('לא מחובר');
+        var res = await fetch(
+            'https://meqxnsjycvfgfhdepguo.supabase.co/functions/v1/delete-render',
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + session.access_token,
+                },
+                body: JSON.stringify({ id: id }),
+            }
+        );
+        var data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'מחיקה נכשלה');
         _projectRenders = _projectRenders.filter(function(x) { return x.id !== id; });
         _renderGrid();
         await _updateQuota();
+    } catch (e) {
+        console.error('[ai-renders] delete error:', e);
+        if (typeof window._showToast === 'function') window._showToast('שגיאה במחיקה: ' + (e.message || e), 3500);
+        else alert('שגיאה במחיקה: ' + (e.message || e));
+        await _loadProjectRenders();
     }
 };
 
