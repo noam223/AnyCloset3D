@@ -2552,11 +2552,12 @@ function _renderInternalDrawerBoxCell(opts) {
     const drawerH = (compH - innerGap * (count + 1)) / count;
     const actualDrawerH = drawerH - fingerGap;
     const cellCenterY = cellBottomY + compH / 2;
-    const openingFrontZ = shelfFrontZ + 0.1; // inner opening plane (back face of front frame)
-    const frameZ = openingFrontZ + frameT / 2; // 17mm frame rails — most forward
+    const openingFrontZ = shelfFrontZ + 0.1; // back face of front frame rail
+    const boxFrameFrontFaceZ = openingFrontZ + frameT; // shared front line for box + 28mm sides
+    const frameZ = openingFrontZ + frameT / 2;
 
-    // 28mm side panels — full height, recessed behind 17mm frame in Z
-    const sideSpacerFrontZ = openingFrontZ - frameT;
+    // 28mm side panels — same front Z as drawer box frame
+    const sideSpacerFrontZ = boxFrameFrontFaceZ;
     const sideSpacerD = sideSpacerFrontZ - cabinetBackZ;
     const sideSpacerCenterZ = cabinetBackZ + sideSpacerD / 2;
 
