@@ -2630,6 +2630,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
     const _slidingPartD = _isSlidingWardrobe ? (bodyD - _slidingPartSetback) : bodyD;
     const _slidingPartZ = _isSlidingWardrobe ? (-_slidingPartSetback / 2) : 0; // shift back so front face is 6cm behind cabinet front
     const backT = 0.5;
+    const _shelfFrontSetback = 2; // cm — shelves stop 2cm short of cabinet front
     const isInset = (state.cabinetModel === 'ab2' || state.cabinetModel === 'ab2_nohoney');
     const _handleStyle = _getHandleStyle();
     const isTouch = (_handleStyle === 'touch');
@@ -3690,6 +3691,10 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                  (snap.neighborColIdx === c && snap.neighborShelfIdx === div.idx))) {
                 boardMat = matSnapHighlight;
             }
+            if (div.type === 'shelf') {
+                boardD = Math.max(t, boardD - _shelfFrontSetback);
+                boardZ -= _shelfFrontSetback / 2;
+            }
             _ppPartId = div.type === 'shelf' ? `shelf_c${c}_r${div.idx}` : `split_c${c}`;
             const shelfMesh = createBoard(boardW, div.thick, boardD, boardX, div.y, boardZ, boardMat);
             _ppPartId = '';
@@ -4187,11 +4192,11 @@ if (compData && compData.type === 'hanging') {
                         }
 
                         if (numShelves > 0) {
-                            const subD = bodyD - 2;
+                            const subD = Math.max(t, bodyD - 2 - _shelfFrontSetback);
                             for (let s = 0; s < subShelvesY.length; s++) {
                                 const shelfInHoneycomb = _subZoneIsHoneycomb(si, s) || _subZoneIsHoneycomb(si, s + 1);
                                 const shelfMat = shelfInHoneycomb ? matOpenCell : matInternal;
-                                const shelfZ = shelfInHoneycomb ? 1 : 0;
+                                const shelfZ = (shelfInHoneycomb ? 1 : 0) - _shelfFrontSetback / 2;
                                 createBoard(subW, t, subD, subCenterX, subShelvesY[s], shelfZ, shelfMat);
                             }
                             if (!isBP) {
