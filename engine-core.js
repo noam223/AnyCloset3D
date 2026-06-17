@@ -2536,6 +2536,56 @@ function _addPanelHandleLocal(mesh, panelW, panelH, style) {
     }
 }
 
+/** Internal drawer cell: visible carcass frame + recessed drawer boxes (sliding wardrobe style). */
+function _renderInternalDrawerBoxCell(opts) {
+    const {
+        createBoard, matBody, matInternal,
+        centerX, cellWidth, cellBottomY, compH, count,
+        shelfFrontZ, cabinetBackZ,
+        partIdPrefix,
+    } = opts;
+
+    const frameT = state.thickness;
+    const innerGap = 0.4;
+    const fingerGap = 2.5;
+    const drawerH = (compH - innerGap * (count + 1)) / count;
+    const actualDrawerH = drawerH - fingerGap;
+    const cellCenterY = cellBottomY + compH / 2;
+    const frameZ = shelfFrontZ + frameT / 2 + 0.1;
+
+    // Outer carcass frame (visible box opening)
+    createBoard(cellWidth, frameT, frameT, centerX, cellBottomY + compH - frameT / 2, frameZ, matBody);
+    createBoard(cellWidth, frameT, frameT, centerX, cellBottomY + frameT / 2, frameZ, matBody);
+    createBoard(frameT, compH - frameT * 2, frameT, centerX - cellWidth / 2 + frameT / 2, cellCenterY, frameZ, matBody);
+    createBoard(frameT, compH - frameT * 2, frameT, centerX + cellWidth / 2 - frameT / 2, cellCenterY, frameZ, matBody);
+
+    const drwRecess = 2.0;
+    const drwFrontZ = shelfFrontZ - drwRecess;
+    const carcassD = shelfFrontZ - cabinetBackZ;
+    const drwD = carcassD - drwRecess;
+    const drwBackZ = cabinetBackZ;
+    const drwCenterZ = (drwFrontZ + drwBackZ) / 2;
+    const drwW = cellWidth - frameT * 2 - innerGap * 2;
+
+    for (let d = 0; d < count; d++) {
+        const dY = cellBottomY + innerGap + drawerH / 2 + (d * (drawerH + innerGap));
+        const boxH = actualDrawerH;
+        const boxCenterY = dY - fingerGap / 2;
+        const boxBottomY = boxCenterY - boxH / 2;
+
+        if (partIdPrefix) {
+            _ppPartId = `${partIdPrefix}_d${d}`;
+        }
+        createBoard(drwW, boxH, frameT, centerX, boxCenterY, drwFrontZ + frameT / 2, matInternal);
+        if (partIdPrefix) _ppPartId = '';
+
+        createBoard(drwW, frameT, drwD, centerX, boxBottomY + frameT / 2, drwCenterZ, matInternal);
+        createBoard(frameT, boxH, drwD, centerX - drwW / 2 + frameT / 2, boxCenterY, drwCenterZ, matInternal);
+        createBoard(frameT, boxH, drwD, centerX + drwW / 2 - frameT / 2, boxCenterY, drwCenterZ, matInternal);
+        createBoard(drwW - frameT * 2, boxH, frameT, centerX, boxCenterY, drwBackZ + frameT / 2, matInternal);
+    }
+}
+
 function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveWing) {
     const isBP = state.viewMode === 'blueprint';
     const bpMat = new THREE.MeshBasicMaterial({ color: 0xffffff, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
@@ -3800,81 +3850,25 @@ if (compData && compData.type === 'hanging') {
                             _drawGroovesOnPanel(_buildGroup, _bathGrooveExt, overlayW, extDrawerH, t, overlayCenterX, dY, fZ + t / 2, matExternal);
                         }
                     }
-                } else if(!isExt) {
-                    const innerGap = 0.4;
-                    const drawerH = (compH - innerGap*(count+1)) / count;
-                    const fingerGap = 2.5;
-                    const actualDrawerH = drawerH - fingerGap;
+                } else if (!isExt) {
+                    const shelfFrontZ = _isSlidingWardrobe
+                        ? (bodyD / 2 - 10)
+                        : (bodyD / 2 - 1.5 - t);
+                    const cabinetBackZ = _isSlidingWardrobe
+                        ? (-bodyD / 2 + 1)
+                        : (-bodyD / 2 + backT);
 
-                    if (_isSlidingWardrobe && !isBP) {
-                        // ---- Sliding wardrobe: drawer box inside visible carcass frame ----
-                        // Shelf zone: depth = bodyD-10, front face at bodyD/2-10, back at -bodyD/2
-                        const shelfFrontZ = bodyD / 2 - 10;   // front face of shelf zone (+20 for bodyD=60)
-                        const cabinetBackZ = -bodyD / 2 + 1;  // near back wall
-                        const carcassD = bodyD - 10 - 1;      // carcass depth (shelf zone depth minus back gap)
-                        const carcassCenterZ = shelfFrontZ - carcassD / 2; // center Z of carcass
-
-                        // Frame border thickness (visible from front)
-                        const frameT = t; // same as board thickness
-
-                        // Outer carcass frame for the entire cell (top, bottom, left, right rails at front face)
-                        // These are thin strips at the front face of the shelf zone, forming the visible frame
-                        const cellTopY    = prevY + compH;
-                        const cellBottomY = prevY;
-                        const cellCenterY = prevY + compH / 2;
-                        const frameZ      = shelfFrontZ + frameT / 2 + 0.1; // slightly in front of shelf face
-
-                        // Top rail
-                        createBoard(col.width, frameT, frameT, colCenterX, cellTopY - frameT/2, frameZ, matBody);
-                        // Bottom rail
-                        createBoard(col.width, frameT, frameT, colCenterX, cellBottomY + frameT/2, frameZ, matBody);
-                        // Left rail
-                        createBoard(frameT, compH - frameT*2, frameT, colCenterX - col.width/2 + frameT/2, cellCenterY, frameZ, matBody);
-                        // Right rail
-                        createBoard(frameT, compH - frameT*2, frameT, colCenterX + col.width/2 - frameT/2, cellCenterY, frameZ, matBody);
-
-                        // Drawer boxes — recessed 2cm behind the frame front face
-                        const drwRecess = 2.0;
-                        const drwFrontZ = shelfFrontZ - drwRecess;
-                        const drwD      = carcassD - drwRecess;
-                        const drwBackZ  = cabinetBackZ;
-                        const drwCenterZ = (drwFrontZ + drwBackZ) / 2;
-                        const drwW = col.width - frameT * 2 - innerGap * 2;
-
-                        for(let d=0; d<count; d++) {
-                            const dY = prevY + innerGap + drawerH/2 + (d * (drawerH + innerGap));
-                            const boxH = actualDrawerH;
-                            const boxCenterY = dY - fingerGap/2;
-                            const boxBottomY = boxCenterY - boxH/2;
-
-                            // Front face (visible panel, recessed inside frame)
-                            createBoard(drwW, boxH, frameT, colCenterX, boxCenterY, drwFrontZ + frameT/2, matInternal);
-                            // Bottom board
-                            createBoard(drwW, frameT, drwD, colCenterX, boxBottomY + frameT/2, drwCenterZ, matInternal);
-                            // Left side wall
-                            createBoard(frameT, boxH, drwD, colCenterX - drwW/2 + frameT/2, boxCenterY, drwCenterZ, matInternal);
-                            // Right side wall
-                            createBoard(frameT, boxH, drwD, colCenterX + drwW/2 - frameT/2, boxCenterY, drwCenterZ, matInternal);
-                            // Back panel
-                            createBoard(drwW - frameT*2, boxH, frameT, colCenterX, boxCenterY, drwBackZ + frameT/2, matInternal);
-                        }
-                    } else {
-                        // Standard (non-sliding) drawer: flat front panel + finger gap indicator
-                        const fZ = bodyD/2 - t/2 - 1.5;
-                        const drwW = col.width - innerGap * 2 - 2;
-                        for(let d=0; d<count; d++) {
-                            const dY = prevY + innerGap + drawerH/2 + (d * (drawerH + innerGap));
-                            const actualDY = dY - fingerGap/2;
-                            _ppPartId = `drawer_c${c}_r${r}_d${d}`;
-                            createBoard(drwW, actualDrawerH, t, colCenterX, actualDY, fZ, matInternal);
-                            _ppPartId = '';
-                            if (!isBP) {
-                                const backPanel = new THREE.Mesh(new THREE.BoxGeometry(drwW - 2, fingerGap, 0.5), new THREE.MeshStandardMaterial({ color: 0x222222 }));
-                                backPanel.position.set(colCenterX, dY + drawerH/2 - fingerGap/2, fZ - t/2 - 0.25);
-                                _buildGroup.add(backPanel);
-                            }
-                        }
-                    }
+                    _renderInternalDrawerBoxCell({
+                        createBoard, matBody, matInternal,
+                        centerX: colCenterX,
+                        cellWidth: col.width,
+                        cellBottomY: prevY,
+                        compH,
+                        count,
+                        shelfFrontZ,
+                        cabinetBackZ,
+                        partIdPrefix: `drawer_c${c}_r${r}`,
+                    });
                 }
             }
             // === מחיצה אנכית בתוך תא (partition) — N boards support ===
@@ -3926,22 +3920,25 @@ if (compData && compData.type === 'hanging') {
                         _buildGroup.add(rod);
                     } else if (subType === 'internal_drawers') {
                         const count = 2;
-                        const innerGap = 0.4;
-                        const drawerH = (zoneH - innerGap*(count+1)) / count;
-                        const fZ = bodyD/2 - t/2 - 1.5;
-                        const fingerGap = 2.5;
-                        const actualDrawerH = drawerH - fingerGap;
                         const _subSide = subCenterX < colCenterX ? 'R' : 'L';
-                        for(let d=0; d<count; d++) {
-                            const dY = zoneBottomY + innerGap + drawerH/2 + (d * (drawerH + innerGap));
-                            const actualDY = dY - fingerGap/2;
-                            _ppPartId = `drawer_sub_c${c}_r${r}_${_subSide}_d${d}`;
-                            createBoard(subW - innerGap*2 - 2, actualDrawerH, t, subCenterX, actualDY, fZ, matInternal);
-                            _ppPartId = '';
-                            const backPanel = new THREE.Mesh(new THREE.BoxGeometry(subW - innerGap*2 - 4, fingerGap, 0.5), new THREE.MeshStandardMaterial({ color: 0x222222 }));
-                            backPanel.position.set(subCenterX, dY + drawerH/2 - fingerGap/2, fZ - t/2 - 0.25);
-                            _buildGroup.add(backPanel);
-                        }
+                        const shelfFrontZ = _isSlidingWardrobe
+                            ? (bodyD / 2 - 10)
+                            : (bodyD / 2 - 1.5 - t);
+                        const cabinetBackZ = _isSlidingWardrobe
+                            ? (-bodyD / 2 + 1)
+                            : (-bodyD / 2 + backT);
+
+                        _renderInternalDrawerBoxCell({
+                            createBoard, matBody, matInternal,
+                            centerX: subCenterX,
+                            cellWidth: subW,
+                            cellBottomY: zoneBottomY,
+                            compH: zoneH,
+                            count,
+                            shelfFrontZ,
+                            cabinetBackZ,
+                            partIdPrefix: `drawer_sub_c${c}_r${r}_${_subSide}`,
+                        });
                     } else if (subType === 'external_drawers') {
                         const count = 2;
                         const innerGap = 0.4;
