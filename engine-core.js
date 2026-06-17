@@ -2539,33 +2539,39 @@ function _addPanelHandleLocal(mesh, panelW, panelH, style) {
 /** Internal drawer cell: visible carcass frame + recessed drawer boxes (sliding wardrobe style). */
 function _renderInternalDrawerBoxCell(opts) {
     const {
-        createBoard, matBody, matInternal,
+        createBoard, matInternal,
         centerX, cellWidth, cellBottomY, compH, count,
         shelfFrontZ, cabinetBackZ,
         partIdPrefix,
     } = opts;
 
     const frameT = state.thickness;
+    const sideSpacerT = 2.8; // 28mm — side clearance from cabinet stiles/hinges
     const innerGap = 0.4;
     const fingerGap = 2.5;
     const drawerH = (compH - innerGap * (count + 1)) / count;
     const actualDrawerH = drawerH - fingerGap;
     const cellCenterY = cellBottomY + compH / 2;
     const frameZ = shelfFrontZ + frameT / 2 + 0.1;
+    const carcassD = shelfFrontZ - cabinetBackZ;
+    const sideCenterZ = (shelfFrontZ + cabinetBackZ) / 2;
 
-    // Outer carcass frame (visible box opening)
-    createBoard(cellWidth, frameT, frameT, centerX, cellBottomY + compH - frameT / 2, frameZ, matBody);
-    createBoard(cellWidth, frameT, frameT, centerX, cellBottomY + frameT / 2, frameZ, matBody);
-    createBoard(frameT, compH - frameT * 2, frameT, centerX - cellWidth / 2 + frameT / 2, cellCenterY, frameZ, matBody);
-    createBoard(frameT, compH - frameT * 2, frameT, centerX + cellWidth / 2 - frameT / 2, cellCenterY, frameZ, matBody);
+    // Outer carcass frame (internal/shelf color)
+    createBoard(cellWidth, frameT, frameT, centerX, cellBottomY + compH - frameT / 2, frameZ, matInternal);
+    createBoard(cellWidth, frameT, frameT, centerX, cellBottomY + frameT / 2, frameZ, matInternal);
+    createBoard(frameT, compH - frameT * 2, frameT, centerX - cellWidth / 2 + frameT / 2, cellCenterY, frameZ, matInternal);
+    createBoard(frameT, compH - frameT * 2, frameT, centerX + cellWidth / 2 - frameT / 2, cellCenterY, frameZ, matInternal);
+
+    // Side spacer panels (28mm) — keep drawers away from cabinet side hinges
+    createBoard(sideSpacerT, compH, carcassD, centerX - cellWidth / 2 + sideSpacerT / 2, cellCenterY, sideCenterZ, matInternal);
+    createBoard(sideSpacerT, compH, carcassD, centerX + cellWidth / 2 - sideSpacerT / 2, cellCenterY, sideCenterZ, matInternal);
 
     const drwRecess = 2.0;
     const drwFrontZ = shelfFrontZ - drwRecess;
-    const carcassD = shelfFrontZ - cabinetBackZ;
     const drwD = carcassD - drwRecess;
     const drwBackZ = cabinetBackZ;
     const drwCenterZ = (drwFrontZ + drwBackZ) / 2;
-    const drwW = cellWidth - frameT * 2 - innerGap * 2;
+    const drwW = cellWidth - frameT * 2 - innerGap * 2 - sideSpacerT * 2;
 
     for (let d = 0; d < count; d++) {
         const dY = cellBottomY + innerGap + drawerH / 2 + (d * (drawerH + innerGap));
@@ -3851,15 +3857,16 @@ if (compData && compData.type === 'hanging') {
                         }
                     }
                 } else if (!isExt) {
+                    const _drawerFrontGap = 8; // cm clearance from cabinet front face
                     const shelfFrontZ = _isSlidingWardrobe
                         ? (bodyD / 2 - 10)
-                        : (bodyD / 2 - 1.5 - t);
+                        : (bodyD / 2 - _drawerFrontGap);
                     const cabinetBackZ = _isSlidingWardrobe
                         ? (-bodyD / 2 + 1)
                         : (-bodyD / 2 + backT);
 
                     _renderInternalDrawerBoxCell({
-                        createBoard, matBody, matInternal,
+                        createBoard, matInternal,
                         centerX: colCenterX,
                         cellWidth: col.width,
                         cellBottomY: prevY,
@@ -3921,15 +3928,16 @@ if (compData && compData.type === 'hanging') {
                     } else if (subType === 'internal_drawers') {
                         const count = 2;
                         const _subSide = subCenterX < colCenterX ? 'R' : 'L';
+                        const _drawerFrontGap = 8;
                         const shelfFrontZ = _isSlidingWardrobe
                             ? (bodyD / 2 - 10)
-                            : (bodyD / 2 - 1.5 - t);
+                            : (bodyD / 2 - _drawerFrontGap);
                         const cabinetBackZ = _isSlidingWardrobe
                             ? (-bodyD / 2 + 1)
                             : (-bodyD / 2 + backT);
 
                         _renderInternalDrawerBoxCell({
-                            createBoard, matBody, matInternal,
+                            createBoard, matInternal,
                             centerX: subCenterX,
                             cellWidth: subW,
                             cellBottomY: zoneBottomY,
