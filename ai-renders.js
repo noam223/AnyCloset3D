@@ -597,13 +597,44 @@ function _aiRoomContext(presetId) {
     return 'חדר שינה מעוצב ואיכותי, הארון צמוד לקיר האחורי.';
 }
 
+function _computeSideOpenCellViewDir(colIdx, columns, rowIdx) {
+    // Mirrors engine-core.js openDir — from front-view / user perspective (שמאל = viewer's left)
+    var col = columns[colIdx];
+    if (!col) return null;
+    var numCols = columns.length;
+    var t = (typeof state !== 'undefined' && state.thickness) ? state.thickness : 1.7;
+    var plinthH = (typeof state !== 'undefined' && state.plinthHeight) ? state.plinthHeight : 0;
+    var baseY = (col.type === 'desk')
+        ? (col.deskHeight || 80) + (col.deskClearance || 80)
+        : plinthH;
+    var bottomY = (rowIdx === 0)
+        ? baseY + t
+        : ((col.shelvesY && col.shelvesY[rowIdx - 1]) ? col.shelvesY[rowIdx - 1] : baseY) + t / 2;
+
+    var leftNeighbor = colIdx > 0 ? columns[colIdx - 1] : null;
+    var rightNeighbor = colIdx < numCols - 1 ? columns[colIdx + 1] : null;
+    var opensLeft = colIdx === 0
+        || (leftNeighbor && leftNeighbor.height <= bottomY + 0.5)
+        || (leftNeighbor && (leftNeighbor.floorOffset || 0) > bottomY + 0.5);
+    var opensRight = colIdx === numCols - 1
+        || (rightNeighbor && rightNeighbor.height <= bottomY + 0.5)
+        || (rightNeighbor && (rightNeighbor.floorOffset || 0) > bottomY + 0.5);
+
+    if (opensLeft && opensRight) return colIdx < numCols / 2 ? 'left' : 'right';
+    if (opensLeft) return 'left';
+    if (opensRight) return 'right';
+    return null;
+}
+
 function _aiOpenCellsNote(spec) {
     if (!spec || !spec.hasOpenCells) return '';
     var cnt = spec.openCellCount || 1;
     if (spec.hasSideOpenCells) {
         var dirMap = { left: 'שמאל', right: 'ימין', both: 'שני הצדדים' };
         var dirHe = spec.sideOpenDir ? (dirMap[spec.sideOpenDir] || '') : '';
-        var sideDesc = dirHe ? ' הדופן הפתוחה בצד ' + dirHe + '.' : ' הדופן הצדדית פתוחה.';
+        var sideDesc = dirHe
+            ? ' הדופן הפתוחה בצד ' + dirHe + ' (מבט חזית — מהעמדה שלך, כפי שרואים את הארון).'
+            : ' הדופן הצדדית פתוחה (מבט חזית).';
         return cnt === 1
             ? '- תא פתוח אחד ללא דלת — פתוח מהחזית ומהצד (ללא לוח צד).' + sideDesc
             : '- ' + cnt + ' תאים פתוחים ללא דלתות, חלקם פתוחים גם מהצד.' + sideDesc;
@@ -695,7 +726,7 @@ function _getCabinetSpec() {
             var totalCols = wing.columns.length;
             wing.columns.forEach(function(col, colIdx) {
                 if (col.compartments) {
-                    col.compartments.forEach(function(comp) {
+                    col.compartments.forEach(function(comp, rowIdx) {
                         if (comp && comp.type === 'open_cell') {
                             hasOpenCells = true;
                             openCellCount++;
@@ -704,16 +735,11 @@ function _getCabinetSpec() {
                             hasOpenCells = true;
                             hasSideOpenCells = true;
                             openCellCount++;
-                            // Determine open side based on column position
-                            // (mirrors engine-core.js logic)
-                            var isLeftCol  = (colIdx === 0);
-                            var isRightCol = (colIdx === totalCols - 1);
-                            var dir;
-                            if (isLeftCol)       dir = 'right'; // leftmost col → open toward right
-                            else if (isRightCol) dir = 'left';  // rightmost col → open toward left
-                            else                 dir = colIdx < totalCols / 2 ? 'left' : 'right';
-                            if (!sideOpenDir) sideOpenDir = dir;
-                            else if (sideOpenDir !== dir) sideOpenDir = 'both';
+                            var dir = _computeSideOpenCellViewDir(colIdx, wing.columns, rowIdx);
+                            if (dir) {
+                                if (!sideOpenDir) sideOpenDir = dir;
+                                else if (sideOpenDir !== dir) sideOpenDir = 'both';
+                            }
                         }
                     });
                 }

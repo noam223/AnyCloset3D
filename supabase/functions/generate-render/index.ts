@@ -25,7 +25,9 @@ function openCellsNote(spec: Record<string, unknown>): string {
   if (spec.hasSideOpenCells) {
     const dirMap: Record<string, string> = { left: 'שמאל', right: 'ימין', both: 'שני הצדדים' };
     const dirHe = spec.sideOpenDir ? (dirMap[String(spec.sideOpenDir)] || '') : '';
-    const sideDesc = dirHe ? ` הדופן הפתוחה בצד ${dirHe}.` : ' הדופן הצדדית פתוחה.';
+    const sideDesc = dirHe
+      ? ` הדופן הפתוחה בצד ${dirHe} (מבט חזית — מהעמדה שלך, כפי שרואים את הארון).`
+      : ' הדופן הצדדית פתוחה (מבט חזית).';
     return cnt === 1
       ? `- תא פתוח אחד ללא דלת — פתוח מהחזית ומהצד (ללא לוח צד).${sideDesc}`
       : `- ${cnt} תאים פתוחים ללא דלתות, חלקם פתוחים גם מהצד.${sideDesc}`;
