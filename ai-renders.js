@@ -61,9 +61,14 @@ function _injectPanel() {
                 <div class="ai-renders-quota-fill" id="ai-renders-quota-fill" style="width:0%"></div>
             </div>
         </div>
-        <button id="btn-generate-render" class="btn-generate-render" onclick="window._generateRender()">
-            <i class="fa-solid fa-sparkles"></i> צור הדמיה חדשה
-        </button>
+        <div class="ai-renders-generate-btns">
+            <button id="btn-generate-render" class="btn-generate-render" onclick="window._generateRender(false)" title="Nano Banana — מהיר">
+                <i class="fa-solid fa-sparkles"></i> צור הדמיה חדשה
+            </button>
+            <button id="btn-generate-render-pro" class="btn-generate-render btn-generate-render-pro" onclick="window._generateRenderPro()" title="Nano Banana Pro — איכות מקסימלית">
+                <i class="fa-solid fa-crown"></i> צור הדמיה PRO
+            </button>
+        </div>
         <div id="ai-renders-status" class="ai-renders-status" style="display:none;"></div>
         <div id="ai-renders-grid" class="ai-renders-grid"></div>
     `;
@@ -154,8 +159,26 @@ async function _updateQuota() {
     if (text) text.textContent = 'השתמשת ב-' + used + ' מתוך ' + limit + ' הדמיות החודש';
     if (fill) { fill.style.width = pct + '%'; fill.style.background = pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : '#a855f7'; }
 
-    var btn = document.getElementById('btn-generate-render');
-    if (btn) { btn.disabled = used >= limit; btn.title = used >= limit ? 'הגעת למכסה החודשית' : 'צור הדמיה חדשה'; }
+    var overQuota = used >= limit;
+    ['btn-generate-render', 'btn-generate-render-pro'].forEach(function(id) {
+        var b = document.getElementById(id);
+        if (!b) return;
+        b.disabled = overQuota;
+        if (overQuota) {
+            b.title = 'הגעת למכסה החודשית';
+        } else if (id === 'btn-generate-render-pro') {
+            b.title = 'Nano Banana Pro — איכות גבוהה (45–90 שניות)';
+        } else {
+            b.title = 'Nano Banana — הדמיה מהירה (15–30 שניות)';
+        }
+    });
+}
+
+function _setRenderButtonsDisabled(disabled) {
+    ['btn-generate-render', 'btn-generate-render-pro', 'btn-layout-render'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.disabled = disabled;
+    });
 }
 
 // ── Render grid ───────────────────────────────────────────────────────────────
@@ -181,13 +204,18 @@ function _renderGrid() {
 }
 
 // ── Generate: step 1 — capture screenshots then open prompt dialog ────────────
-window._generateRender = async function() {
-    var btn = document.getElementById('btn-generate-render');
+window._generateRenderPro = function() {
+    return window._generateRender(true);
+};
+
+window._generateRender = async function(isPro) {
+    var tier = isPro ? 'pro' : 'standard';
+    var btn = document.getElementById(tier === 'pro' ? 'btn-generate-render-pro' : 'btn-generate-render');
     if (!btn || btn.disabled) return;
     if (!window.renderer) { _showStatus('error', 'לא נמצא renderer'); return; }
 
     _showStatus('loading', '<i class="fa-solid fa-spinner fa-spin"></i> מצלם חזית...');
-    btn.disabled = true;
+    _setRenderButtonsDisabled(true);
 
     // Save current camera state
     var _savedPos    = window.camera ? window.camera.position.clone() : null;
@@ -210,7 +238,7 @@ window._generateRender = async function() {
     }
     await new Promise(function(r) { setTimeout(r, 100); });
     try { imageFront = window.renderer.domElement.toDataURL('image/jpeg', 0.85); }
-    catch(e) { _showStatus('error', 'שגיאה בצילום חזית'); btn.disabled = false; return; }
+    catch(e) { _showStatus('error', 'שגיאה בצילום חזית'); _setRenderButtonsDisabled(false); await _updateQuota(); return; }
 
     // Screenshot 2: 3D angle left (-291, 185, 511)
     _showStatus('loading', '<i class="fa-solid fa-spinner fa-spin"></i> מצלם זווית שמאל...');
@@ -253,9 +281,10 @@ window._generateRender = async function() {
     var image3d = image3dLeft; // keep backward compat
 
     _hideStatus();
-    btn.disabled = false;
+    _setRenderButtonsDisabled(false);
+    await _updateQuota();
 
-    _openPromptDialog(imageFront, image3dLeft, image3dRight, _getDominantColor(), _getCabinetSpec());
+    _openPromptDialog(imageFront, image3dLeft, image3dRight, _getDominantColor(), _getCabinetSpec(), tier);
 };
 
 // ── Layout mode: single current-view capture + empty prompt ─────────────────
@@ -283,7 +312,16 @@ window._generateLayoutRender = async function() {
     }
 };
 
-function _openLayoutPromptDialog(image) {
+function _aiDialogSubmitBtnHtml(isPro) {
+    var bg = isPro ? 'linear-gradient(135deg,#f59e0b,#d97706)' : 'linear-gradient(135deg,#a855f7,#7c3aed)';
+    var icon = isPro ? 'fa-crown' : 'fa-sparkles';
+    var label = isPro ? 'צור הדמיה PRO' : 'צור הדמיה';
+    return '<button onclick="window._submitRender()" style="padding:10px 24px;border-radius:9px;border:none;background:' + bg + ';color:white;font-size:0.88rem;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:8px;"><i class="fa-solid ' + icon + '"></i> ' + label + '</button>';
+}
+
+function _openLayoutPromptDialog(image, renderTier) {
+    renderTier = renderTier || 'standard';
+    var isPro = renderTier === 'pro';
     var existing = document.getElementById('ai-prompt-dialog');
     if (existing) existing.remove();
 
@@ -293,7 +331,7 @@ function _openLayoutPromptDialog(image) {
     dlg.innerHTML =
         '<div style="background:#fff;border-radius:16px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;direction:rtl;box-shadow:0 8px 40px rgba(0,0,0,0.25);">' +
             '<div style="padding:20px 22px 0;display:flex;align-items:center;justify-content:space-between;">' +
-                '<div style="font-size:1rem;font-weight:800;color:#1e3a5f;display:flex;align-items:center;gap:8px;"><i class="fa-solid fa-wand-magic-sparkles" style="color:#a855f7;"></i> הדמיה מסידור מרחבי</div>' +
+                '<div style="font-size:1rem;font-weight:800;color:#1e3a5f;display:flex;align-items:center;gap:8px;"><i class="fa-solid fa-wand-magic-sparkles" style="color:#a855f7;"></i> הדמיה מסידור מרחבי' + (isPro ? ' <span class="ai-render-tier-badge">PRO</span>' : '') + '</div>' +
                 '<button onclick="document.getElementById(\'ai-prompt-dialog\').remove()" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:1.2rem;"><i class="fa-solid fa-xmark"></i></button>' +
             '</div>' +
             '<div style="padding:16px 22px 0;">' +
@@ -308,7 +346,7 @@ function _openLayoutPromptDialog(image) {
             '</div>' +
             '<div style="padding:16px 22px 20px;display:flex;gap:10px;justify-content:flex-end;">' +
                 '<button onclick="document.getElementById(\'ai-prompt-dialog\').remove()" style="padding:10px 20px;border-radius:9px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#374151;font-size:0.88rem;font-weight:600;font-family:inherit;cursor:pointer;">ביטול</button>' +
-                '<button onclick="window._submitRender()" style="padding:10px 24px;border-radius:9px;border:none;background:linear-gradient(135deg,#a855f7,#7c3aed);color:white;font-size:0.88rem;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:8px;"><i class="fa-solid fa-sparkles"></i> צור הדמיה</button>' +
+                _aiDialogSubmitBtnHtml(isPro) +
             '</div>' +
         '</div>';
 
@@ -316,13 +354,16 @@ function _openLayoutPromptDialog(image) {
     dlg._singleView = true;
     dlg._hexColor = null;
     dlg._cabinetSpec = { layoutMode: true };
+    dlg._renderTier = renderTier;
     document.body.appendChild(dlg);
 };
 
 // ── Prompt dialog ─────────────────────────────────────────────────────────────
 var _extraImages = []; // extra user-uploaded images
 
-function _openPromptDialog(imageFront, image3dLeft, image3dRight, hexColor, cabinetSpec) {
+function _openPromptDialog(imageFront, image3dLeft, image3dRight, hexColor, cabinetSpec, renderTier) {
+    renderTier = renderTier || 'standard';
+    var isPro = renderTier === 'pro';
     var existing = document.getElementById('ai-prompt-dialog');
     if (existing) existing.remove();
     _extraImages = [];
@@ -341,7 +382,7 @@ function _openPromptDialog(imageFront, image3dLeft, image3dRight, hexColor, cabi
     dlg.innerHTML =
         '<div style="background:#fff;border-radius:16px;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;direction:rtl;box-shadow:0 8px 40px rgba(0,0,0,0.25);">' +
             '<div style="padding:20px 22px 0;display:flex;align-items:center;justify-content:space-between;">' +
-                '<div style="font-size:1rem;font-weight:800;color:#1e3a5f;display:flex;align-items:center;gap:8px;"><i class="fa-solid fa-wand-magic-sparkles" style="color:#a855f7;"></i> הגדרות הדמיה</div>' +
+                '<div style="font-size:1rem;font-weight:800;color:#1e3a5f;display:flex;align-items:center;gap:8px;"><i class="fa-solid fa-wand-magic-sparkles" style="color:#a855f7;"></i> הגדרות הדמיה' + (isPro ? ' <span class="ai-render-tier-badge">PRO</span>' : '') + '</div>' +
                 '<button onclick="document.getElementById(\'ai-prompt-dialog\').remove()" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:1.2rem;"><i class="fa-solid fa-xmark"></i></button>' +
             '</div>' +
             // Images row
@@ -375,7 +416,7 @@ function _openPromptDialog(imageFront, image3dLeft, image3dRight, hexColor, cabi
             // Actions
             '<div style="padding:16px 22px 20px;display:flex;gap:10px;justify-content:flex-end;">' +
                 '<button onclick="document.getElementById(\'ai-prompt-dialog\').remove()" style="padding:10px 20px;border-radius:9px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#374151;font-size:0.88rem;font-weight:600;font-family:inherit;cursor:pointer;">ביטול</button>' +
-                '<button onclick="window._submitRender()" style="padding:10px 24px;border-radius:9px;border:none;background:linear-gradient(135deg,#a855f7,#7c3aed);color:white;font-size:0.88rem;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:8px;"><i class="fa-solid fa-sparkles"></i> צור הדמיה</button>' +
+                _aiDialogSubmitBtnHtml(isPro) +
             '</div>' +
         '</div>';
 
@@ -385,6 +426,7 @@ function _openPromptDialog(imageFront, image3dLeft, image3dRight, hexColor, cabi
     dlg._image3dRight = image3dRight;
     dlg._hexColor     = hexColor;
     dlg._cabinetSpec  = cabinetSpec;
+    dlg._renderTier   = renderTier;
     document.body.appendChild(dlg);
 }
 
@@ -424,6 +466,8 @@ window._submitRender = async function() {
     var singleView   = !!dlg._singleView;
     var hexColor     = dlg._hexColor;
     var cabinetSpec  = dlg._cabinetSpec;
+    var renderTier   = dlg._renderTier || 'standard';
+    var isPro        = renderTier === 'pro';
     var customPrompt = document.getElementById('ai-prompt-text').value.trim();
     var extras = _extraImages.filter(Boolean);
 
@@ -434,14 +478,12 @@ window._submitRender = async function() {
 
     dlg.remove();
 
-    var btn = document.getElementById('btn-generate-render');
-    var layoutBtn = document.getElementById('btn-layout-render');
-    if (btn) btn.disabled = true;
-    if (layoutBtn) layoutBtn.disabled = true;
+    _setRenderButtonsDisabled(true);
+    var waitMsg = isPro ? 'שולח ל-Nano Banana PRO... (45–90 שניות)' : 'שולח ל-AI... (15–30 שניות)';
     if (_panelOpen) {
-        _showStatus('loading', '<i class="fa-solid fa-spinner fa-spin"></i> שולח ל-AI... (15-30 שניות)');
+        _showStatus('loading', '<i class="fa-solid fa-spinner fa-spin"></i> ' + waitMsg);
     } else if (typeof window._showToast === 'function') {
-        window._showToast('שולח ל-AI... (15-30 שניות)', 4000);
+        window._showToast(waitMsg, isPro ? 5000 : 4000);
     }
 
     try {
@@ -467,6 +509,7 @@ window._submitRender = async function() {
                     preset_id:     (typeof state !== 'undefined') ? state.presetId : null,
                     cabinet_spec:  cabinetSpec,
                     custom_prompt: customPrompt || undefined,
+                    model_tier:    renderTier,
                 })
             }
         );
@@ -487,8 +530,8 @@ window._submitRender = async function() {
                 if (_panelOpen) _showStatus('error', errMsg);
                 else if (typeof window._showToast === 'function') window._showToast(errMsg, 3500);
             }
-            if (btn) btn.disabled = false;
-            if (layoutBtn) layoutBtn.disabled = false;
+            _setRenderButtonsDisabled(false);
+            await _updateQuota();
             return;
         }
 
@@ -509,8 +552,8 @@ window._submitRender = async function() {
         if (_panelOpen) _showStatus('error', 'שגיאת תקשורת: ' + e.message);
         else if (typeof window._showToast === 'function') window._showToast('שגיאת תקשורת: ' + e.message, 3500);
     } finally {
-        if (btn) btn.disabled = false;
-        if (layoutBtn) layoutBtn.disabled = false;
+        _setRenderButtonsDisabled(false);
+        await _updateQuota();
     }
 };
 
@@ -822,12 +865,26 @@ function _injectStyles() {
         }
         .ai-renders-quota-fill { height: 100%; border-radius: 99px; transition: width 0.4s, background 0.3s; }
 
+        .ai-renders-generate-btns {
+            display: flex; flex-direction: column; gap: 8px;
+            margin: 8px 16px 12px;
+        }
+        .ai-renders-generate-btns .btn-generate-render { margin: 0; }
+
         .btn-generate-render {
-            margin: 8px 16px 12px; padding: 12px; border-radius: 10px; border: none; cursor: pointer;
+            padding: 12px; border-radius: 10px; border: none; cursor: pointer;
             background: linear-gradient(135deg,#a855f7,#7c3aed); color: white;
             font-size: 0.92rem; font-weight: 700; font-family: inherit;
             display: flex; align-items: center; justify-content: center; gap: 8px;
             transition: opacity 0.2s, transform 0.15s;
+        }
+        .btn-generate-render-pro {
+            background: linear-gradient(135deg,#f59e0b,#d97706);
+            box-shadow: 0 2px 12px rgba(245,158,11,0.35);
+        }
+        .ai-render-tier-badge {
+            font-size: 0.72rem; background: linear-gradient(135deg,#f59e0b,#d97706);
+            color: white; padding: 2px 8px; border-radius: 6px; font-weight: 700;
         }
         .btn-generate-render:hover:not(:disabled) { opacity: 0.92; transform: translateY(-1px); }
         .btn-generate-render:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }

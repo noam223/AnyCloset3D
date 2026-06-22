@@ -6,6 +6,11 @@ const CORS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const GEMINI_MODELS = {
+  standard: 'gemini-3.1-flash-image',       // Nano Banana 2
+  pro:      'gemini-3-pro-image-preview',   // Nano Banana Pro
+} as const;
+
 const MATERIAL_HE: Record<string, string> = {
   white_matte: 'לבן מט', white_gloss: 'לבן מבריק', black_matte: 'שחור מט',
   gray_light: 'אפור בהיר', gray_dark: 'אפור כהה', beige: 'בז\'',
@@ -136,9 +141,11 @@ serve(async (req) => {
     }
 
     // ── 3. Parse body ────────────────────────────────────────────────────────
-    const { image_front, image_3d, image_3d_right, extra_images, hex_color, project_id, preset_id, cabinet_spec, custom_prompt, single_view } = await req.json();
+    const { image_front, image_3d, image_3d_right, extra_images, hex_color, project_id, preset_id, cabinet_spec, custom_prompt, single_view, model_tier } = await req.json();
     if (!image_front) return json({ error: 'image_front required' }, 400);
 
+    const tier = model_tier === 'pro' ? 'pro' : 'standard';
+    const geminiModel = GEMINI_MODELS[tier];
     const spec = (cabinet_spec || {}) as Record<string, unknown>;
     const hasRightImage = !!image_3d_right;
 
@@ -147,9 +154,6 @@ serve(async (req) => {
       : buildDefaultPrompt(spec, hex_color, !!single_view, hasRightImage);
 
     // ── 4. Build Gemini parts (interleaved image labels) ─────────────────────
-    const GEMINI_KEY = Deno.env.get('GEMINI_API_KEY')!;
-    const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent?key=${GEMINI_KEY}`;
-
     const cleanFront = image_front.replace(/^data:image\/\w+;base64,/, '');
     const parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [];
 
@@ -183,17 +187,27 @@ serve(async (req) => {
       });
     }
 
-    parts.push({ text: '\n\n' + instructions });
+    parts.push({ text: '\n\n' + instructions + (tier === 'pro'
+      ? '\n\nמצב PRO (Nano Banana Pro): איכות מקסימלית, פרטים מיקרו-ריאליסטיים בתאורה, טקסטורות ורקע — תוך שמירה מוחלטת על זהות הארון מתמונות הייחוס.'
+      : '') });
+
+    const GEMINI_KEY = Deno.env.get('GEMINI_API_KEY')!;
+    const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${GEMINI_KEY}`;
+
+    const generationConfig: Record<string, unknown> = {
+      responseModalities: ['IMAGE', 'TEXT'],
+    };
+    if (tier === 'pro') {
+      generationConfig.imageConfig = { imageSize: '2K' };
+    }
 
     const geminiRes = await fetch(GEMINI_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ role: 'user', parts }],
-        generationConfig: {
-          responseModalities: ['IMAGE', 'TEXT'],
-        }
-      })
+        generationConfig,
+      }),
     });
 
     if (!geminiRes.ok) {
@@ -259,6 +273,7 @@ serve(async (req) => {
       image_url: secure_url,
       used:      usedCount + 1,
       limit:     QUOTA,
+      model_tier: tier,
       created_at: inserted.created_at,
     });
 
