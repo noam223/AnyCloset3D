@@ -6,6 +6,91 @@ const CORS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const MATERIAL_HE: Record<string, string> = {
+  white_matte: 'לבן מט', white_gloss: 'לבן מבריק', black_matte: 'שחור מט',
+  gray_light: 'אפור בהיר', gray_dark: 'אפור כהה', beige: 'בז\'',
+  brown_light: 'חום בהיר', brown_dark: 'חום כהה', oak: 'אלון', walnut: 'אגוז', pine: 'אורן',
+};
+
+function roomContext(presetId?: string | null): string {
+  if (presetId === 'bathroom') return 'חדר אמבטיה מודרני ונקי, עם כיור ומראה ברקע (לא מסתירים את הארון).';
+  if (presetId === 'sliding' || presetId === 'walkin') return 'חדר הלבשה / חדר שינה גדול עם ארון בגדים מובנה לאורך הקיר.';
+  if (presetId === 'corner-left' || presetId === 'corner-right') return 'פינת חדר שינה מעוצבת עם הארון בפינה.';
+  return 'חדר שינה מעוצב ואיכותי, הארון צמוד לקיר האחורי.';
+}
+
+function openCellsNote(spec: Record<string, unknown>): string {
+  if (!spec.hasOpenCells) return '';
+  const cnt = (spec.openCellCount as number) || 1;
+  if (spec.hasSideOpenCells) {
+    const dirMap: Record<string, string> = { left: 'שמאל', right: 'ימין', both: 'שני הצדדים' };
+    const dirHe = spec.sideOpenDir ? (dirMap[String(spec.sideOpenDir)] || '') : '';
+    const sideDesc = dirHe ? ` הדופן הפתוחה בצד ${dirHe}.` : ' הדופן הצדדית פתוחה.';
+    return cnt === 1
+      ? `- תא פתוח אחד ללא דלת — פתוח מהחזית ומהצד (ללא לוח צד).${sideDesc}`
+      : `- ${cnt} תאים פתוחים ללא דלתות, חלקם פתוחים גם מהצד.${sideDesc}`;
+  }
+  return cnt === 1
+    ? '- תא פתוח אחד ללא דלת — הצג אותו פתוח לחלוטין.'
+    : `- ${cnt} תאים פתוחים ללא דלתות — הצג את כולם פתוחים.`;
+}
+
+function fidelityAppendix(): string {
+  return `\n---\nהגבלות חובה:\n` +
+    `- הארון חייב להיות זהה לתמונות הייחוס: מידות, פרופורציות, חלוקה לעמודות, מספר דלתות/מגירות, ידיות, צבעים, גובה צוקל ועומק.\n` +
+    `- אין לשנות את עיצוב הארון, אין להוסיף או להסיר דלתות, מגירות, מדפים או אלמנטים שלא מופיעים בייחוס.\n` +
+    `- ללא טקסט, לוגו, סימן מים או מסגרת מסך בתוצאה.`;
+}
+
+function buildDefaultPrompt(
+  spec: Record<string, unknown>,
+  hex_color: string | undefined,
+  single_view: boolean,
+  hasRightImage: boolean,
+): string {
+  const imagesIntro = single_view
+    ? 'מצורפת תמונת ייחוס אחת מהזווית הנוכחית בתוכנת התכנון.'
+    : hasRightImage
+      ? 'מצורפות 3 תמונות ייחוס של אותו ארון (סדר חשוב):\n1) חזית ישרה — פרופורציות מדויקות\n2) זווית תלת-ממד משמאל\n3) זווית תלת-ממד מימין'
+      : 'מצורפות 2 תמונות ייחוס:\n1) חזית ישרה\n2) זווית תלת-ממד';
+
+  const dims = [
+    spec.widthCm ? `רוחב ${spec.widthCm} ס"מ` : '',
+    spec.heightCm ? `גובה ${spec.heightCm} ס"מ` : '',
+    spec.depthCm ? `עומק ${spec.depthCm} ס"מ` : '',
+  ].filter(Boolean).join(', ');
+
+  const bodyKey = String(spec.materialBody || spec.materialExternal || '');
+  const colorLine = hex_color
+    ? `צבע גוף/חזית דומיננטי: ${hex_color}${MATERIAL_HE[bodyKey] ? ` (${MATERIAL_HE[bodyKey]})` : ''}.`
+    : (MATERIAL_HE[bodyKey] ? `גוון גוף: ${MATERIAL_HE[bodyKey]}.` : '');
+
+  const specLines = [
+    dims ? `מידות חיצוניות: ${dims}.` : '',
+    colorLine,
+    spec.columns ? `חלוקה: ${spec.columns} עמודות אנכיות.` : '',
+    (spec.plinthHeightCm as number) > 0 ? `צוקל בגובה ${spec.plinthHeightCm} ס"מ — שמור בדיוק.` : '',
+    spec.hasDrawers ? 'כולל מגירות בחלק התחתון — שמור על מיקום ופרופורציה.' : '',
+    spec.hasDoors === false ? 'ללא דלתות — כל התאים פתוחים מהחזית.' : '',
+    spec.hasSideDesk ? 'כולל שולחן צד משולב — שמור על מיקומו ביחס לארון.' : '',
+    spec.numSlidingDoors ? `ארון הזזה עם ${spec.numSlidingDoors} דלתות הזזה — שמור מסילות, פרופיל וחלוקת פנלים כבתמונות.` : '',
+    openCellsNote(spec),
+  ].filter(Boolean);
+
+  return imagesIntro + '\n\n' +
+    'משימה: צור תמונה פוטוריאליסטית אחת (צילום אדריכלי פנים) של אותו ארון בדיוק, מותקן בסביבה אמיתית.\n\n' +
+    'דיוק מוחלט (אל תסטה מהייחוס):\n' +
+    '- שמור זהות מלאה של הארון: צורה, חלוקה, ידיות, צבעים, עומק וגובה.\n' +
+    '- אל תוסיף דלתות לתאים פתוחים ואל תסגור תאים שפתוחים בייחוס.\n' +
+    (specLines.length ? '\nמפרט:\n' + specLines.map(l => `- ${l}`).join('\n') + '\n' : '\n') +
+    '\nסביבה וצילום:\n' +
+    `- ${roomContext(spec.presetId as string)}\n` +
+    '- הארון צמוד לקיר, לא חוסם אותו ריהוט אחר.\n' +
+    '- תאורה: אור יום רך מחלון בצד, צללים טבעיים, ללא פלאש קשה.\n' +
+    '- זווית מצלמה: 3/4 קדמית קלה, גובה עיניים, תחושת עדשת 35mm.\n' +
+    '- טקסטורות מלמינה/עץ מציאותיות, ללא מראה "רינדור מחשב" או פלסטיקי.';
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
 
@@ -52,95 +137,51 @@ serve(async (req) => {
     const { image_front, image_3d, image_3d_right, extra_images, hex_color, project_id, preset_id, cabinet_spec, custom_prompt, single_view } = await req.json();
     if (!image_front) return json({ error: 'image_front required' }, 400);
 
-    // ── 4. Build prompt ───────────────────────────────────────────────────────
-    const spec = cabinet_spec || {};
-    const dims = [
-      spec.widthCm  ? `רוחב ${spec.widthCm} ס"מ`  : '',
-      spec.heightCm ? `גובה ${spec.heightCm} ס"מ` : '',
-      spec.depthCm  ? `עומק ${spec.depthCm} ס"מ`  : '',
-    ].filter(Boolean).join(', ');
+    const spec = (cabinet_spec || {}) as Record<string, unknown>;
+    const hasRightImage = !!image_3d_right;
 
-    const colorDesc       = hex_color ? `צבע הארון הדומיננטי הוא ${hex_color}.` : '';
-    const columnsDesc     = spec.columns ? `לארון ${spec.columns} עמודות אנכיות.` : '';
-    const drawersDesc     = spec.hasDrawers ? 'הארון כולל מגירות בחלק התחתון.' : '';
-    const doorsDesc       = spec.hasDoors === false ? 'לארון אין דלתות — כל התאים פתוחים.' : '';
+    const instructions = custom_prompt?.trim()
+      ? custom_prompt.trim() + fidelityAppendix()
+      : buildDefaultPrompt(spec, hex_color, !!single_view, hasRightImage);
 
-    let openCellsDesc = '';
-    if (spec.hasOpenCells) {
-      const count = spec.openCellCount || 1;
-      if (spec.hasSideOpenCells) {
-        const dirMap: Record<string, string> = { left: 'שמאל', right: 'ימין', both: 'שני הצדדים' };
-        const dirHe = spec.sideOpenDir ? (dirMap[spec.sideOpenDir] || '') : '';
-        const sideDesc = dirHe ? ` הדופן הפתוחה נמצאת בצד ${dirHe}.` : ' הדופן הצדדית פתוחה.';
-        openCellsDesc = count === 1
-          ? `חשוב: לארון תא פתוח אחד ללא דלת — התא פתוח מהחזית ומהצד (אין לוח צד סוגר).${sideDesc} יש להציג את התא פתוח לחלוטין.`
-          : `חשוב: לארון ${count} תאים פתוחים ללא דלתות — חלקם פתוחים גם מהצד.${sideDesc} יש להציג את כל התאים הפתוחים.`;
-      } else {
-        openCellsDesc = count === 1
-          ? 'חשוב: לארון תא פתוח אחד ללא דלת — יש להציג אותו פתוח בהדמיה.'
-          : `חשוב: לארון ${count} תאים פתוחים ללא דלתות — יש להציג אותם פתוחים בהדמיה.`;
-      }
-    }
-
-    const numImages = single_view ? 'אחת' : (image_3d_right ? 'שלוש' : 'שתי');
-    const imagesDesc = single_view
-      ? 'תצוגה מהזווית הנוכחית'
-      : (image_3d_right
-        ? 'תצוגת חזית, תצוגת זווית שמאל ותצוגת זווית ימין'
-        : 'תצוגת חזית ותצוגת זווית תלת-ממד');
-
-    const basePrompt = custom_prompt || `מצורפות ${numImages} תמונות ייחוס של ארון בגדים שעוצב על ידי לקוח: ${imagesDesc}.
-צור הדמיה פוטוריאליסטית של ארון זה מותקן בחדר שינה מעוצב ומודרני.
-
-מפרט הארון:
-- מידות: ${dims || 'כפי שמוצג בתמונות הייחוס'}
-- ${colorDesc}
-- ${columnsDesc}
-- ${openCellsDesc}
-- ${drawersDesc}
-- ${doorsDesc}
-
-דרישות:
-- שמור על המידות המדויקות, הפרופורציות, הצבעים ופרטי העיצוב של הארון משתי תמונות הייחוס
-- הצג את הארון בזווית 3/4 קדמית קלה כדי שניתן לראות את העיצוב המלא
-- מקם את הארון באופן טבעי מול קיר בחדר עם ריהוט ועיצוב משלים
-- השתמש בתאורה טבעית וחמה מחלון מצד אחד
-- החדר צריך להיות מודרני ואיכותי
-- אל תוסיף דלתות לתאים פתוחים, ואל תסיר דלתות קיימות`;
-
-    // ── 5. Call Gemini API ────────────────────────────────────────────────────
+    // ── 4. Build Gemini parts (interleaved image labels) ─────────────────────
     const GEMINI_KEY = Deno.env.get('GEMINI_API_KEY')!;
     const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent?key=${GEMINI_KEY}`;
 
-    const cleanFront  = image_front.replace(/^data:image\/\w+;base64,/, '');
+    const cleanFront = image_front.replace(/^data:image\/\w+;base64,/, '');
+    const parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [];
 
-    const parts: any[] = [
-      { text: basePrompt },
-      { inlineData: { mimeType: 'image/jpeg', data: cleanFront } },
-    ];
+    if (single_view) {
+      parts.push({ text: 'תמונת ייחוס — מבט מהזווית הנוכחית:' });
+      parts.push({ inlineData: { mimeType: 'image/jpeg', data: cleanFront } });
+    } else {
+      parts.push({ text: 'תמונת ייחוס 1 — חזית ישרה (פרופורציות מדויקות):' });
+      parts.push({ inlineData: { mimeType: 'image/jpeg', data: cleanFront } });
 
-    if (!single_view) {
-      const mime3d  = (image_3d || '').startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
+      const mime3d = (image_3d || '').startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
       const clean3d = (image_3d || image_front).replace(/^data:image\/\w+;base64,/, '');
+      parts.push({ text: '\nתמונת ייחוס 2 — זווית תלת-ממד משמאל:' });
       parts.push({ inlineData: { mimeType: mime3d, data: clean3d } });
+
+      if (image_3d_right) {
+        const mime3dR = image_3d_right.startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
+        const clean3dR = image_3d_right.replace(/^data:image\/\w+;base64,/, '');
+        parts.push({ text: '\nתמונת ייחוס 3 — זווית תלת-ממד מימין:' });
+        parts.push({ inlineData: { mimeType: mime3dR, data: clean3dR } });
+      }
     }
 
-    // Add right angle image if provided
-    if (image_3d_right) {
-      const mime3dR  = image_3d_right.startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
-      const clean3dR = image_3d_right.replace(/^data:image\/\w+;base64,/, '');
-      parts.push({ inlineData: { mimeType: mime3dR, data: clean3dR } });
-    }
-
-    // Add extra user-uploaded images
     if (extra_images && Array.isArray(extra_images)) {
-      extra_images.forEach((img: string) => {
+      extra_images.forEach((img: string, i: number) => {
         if (!img) return;
         const extraMime = img.startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
         const extraData = img.replace(/^data:image\/\w+;base64,/, '');
+        parts.push({ text: `\nתמונת ייחוס נוספת ${i + 1}:` });
         parts.push({ inlineData: { mimeType: extraMime, data: extraData } });
       });
     }
+
+    parts.push({ text: '\n\n' + instructions });
 
     const geminiRes = await fetch(GEMINI_URL, {
       method: 'POST',
@@ -161,7 +202,7 @@ serve(async (req) => {
 
     const geminiData = await geminiRes.json();
     const imagePart = geminiData?.candidates?.[0]?.content?.parts?.find(
-      (p: any) => p.inlineData?.mimeType?.startsWith('image/')
+      (p: { inlineData?: { mimeType?: string } }) => p.inlineData?.mimeType?.startsWith('image/')
     );
     if (!imagePart) {
       console.error('No image part in Gemini response:', JSON.stringify(geminiData));

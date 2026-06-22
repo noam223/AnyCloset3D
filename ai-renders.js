@@ -302,7 +302,9 @@ function _openLayoutPromptDialog(image) {
             '</div>' +
             '<div style="padding:14px 22px 0;">' +
                 '<div style="font-size:0.8rem;font-weight:700;color:#64748b;margin-bottom:6px;">פרומפט</div>' +
-                '<textarea id="ai-prompt-text" placeholder="תאר את ההדמיה שברצונך ליצור..." style="width:100%;height:140px;border:1.5px solid #e2e8f0;border-radius:10px;padding:12px;font-size:0.83rem;font-family:inherit;resize:vertical;outline:none;line-height:1.6;direction:rtl;text-align:right;" onfocus="this.style.borderColor=\'#a855f7\'" onblur="this.style.borderColor=\'#e2e8f0\'"></textarea>' +
+                '<textarea id="ai-prompt-text" style="width:100%;height:200px;border:1.5px solid #e2e8f0;border-radius:10px;padding:12px;font-size:0.83rem;font-family:inherit;resize:vertical;outline:none;line-height:1.6;direction:rtl;text-align:right;" onfocus="this.style.borderColor=\'#a855f7\'" onblur="this.style.borderColor=\'#e2e8f0\'">' +
+                    _buildAiRenderPrompt({ layoutMode: true }, { singleView: true }) +
+                '</textarea>' +
             '</div>' +
             '<div style="padding:16px 22px 20px;display:flex;gap:10px;justify-content:flex-end;">' +
                 '<button onclick="document.getElementById(\'ai-prompt-dialog\').remove()" style="padding:10px 20px;border-radius:9px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#374151;font-size:0.88rem;font-weight:600;font-family:inherit;cursor:pointer;">ביטול</button>' +
@@ -325,31 +327,13 @@ function _openPromptDialog(imageFront, image3dLeft, image3dRight, hexColor, cabi
     if (existing) existing.remove();
     _extraImages = [];
 
-    // Build default prompt description for textarea
+    // Build default prompt for textarea
     var spec = cabinetSpec || {};
-    var dims = [spec.widthCm && 'רוחב '+spec.widthCm+' ס"מ', spec.heightCm && 'גובה '+spec.heightCm+' ס"מ', spec.depthCm && 'עומק '+spec.depthCm+' ס"מ'].filter(Boolean).join(', ');
-    var openNote = '';
-    if (spec.hasOpenCells) {
-        var cnt = spec.openCellCount || 1;
-        if (spec.hasSideOpenCells) {
-            var dirMap = { left: 'שמאל', right: 'ימין', both: 'שני הצדדים' };
-            var dirHe = spec.sideOpenDir ? (dirMap[spec.sideOpenDir] || '') : '';
-            var sideDesc = dirHe ? ' הדופן הפתוחה בצד ' + dirHe + '.' : ' הדופן הצדדית פתוחה.';
-            openNote = cnt === 1
-                ? '\n- חשוב: לארון תא פתוח אחד ללא דלת, פתוח מהחזית ומהצד (ללא לוח צד סוגר).' + sideDesc
-                : '\n- חשוב: לארון ' + cnt + ' תאים פתוחים ללא דלתות, חלקם פתוחים גם מהצד.' + sideDesc;
-        } else {
-            openNote = cnt === 1
-                ? '\n- חשוב: לארון תא פתוח אחד ללא דלת — יש להציג אותו פתוח.'
-                : '\n- חשוב: לארון ' + cnt + ' תאים פתוחים ללא דלתות — יש להציג אותם פתוחים.';
-        }
-    }
-    var defaultPrompt = 'צור הדמיה פוטוריאליסטית של ארון זה מותקן בחדר שינה מעוצב מול קיר.' +
-        '\nשמור על צבעים, פרופורציות ופרטי עיצוב מדויקים משלוש תמונות הייחוס (חזית, זווית שמאל, זווית ימין).' +
-        (dims ? '\nמידות: ' + dims + '.' : '') +
-        (hexColor ? '\nצבע: ' + hexColor + '.' : '') +
-        openNote +
-        '\nחדר מודרני ואיכותי, תאורה טבעית וחמה מחלון.';
+    var defaultPrompt = _buildAiRenderPrompt(spec, {
+        singleView: false,
+        hasRightImage: !!image3dRight,
+        hexColor: hexColor
+    });
 
     var dlg = document.createElement('div');
     dlg.id = 'ai-prompt-dialog';
@@ -386,7 +370,7 @@ function _openPromptDialog(imageFront, image3dLeft, image3dRight, hexColor, cabi
             // Prompt textarea
             '<div style="padding:14px 22px 0;">' +
                 '<div style="font-size:0.8rem;font-weight:700;color:#64748b;margin-bottom:6px;">פרומפט <span style="font-weight:400;color:#94a3b8;">(ניתן לערוך)</span></div>' +
-                '<textarea id="ai-prompt-text" style="width:100%;height:160px;border:1.5px solid #e2e8f0;border-radius:10px;padding:12px;font-size:0.83rem;font-family:inherit;resize:vertical;outline:none;line-height:1.6;direction:ltr;text-align:left;" onfocus="this.style.borderColor=\'#a855f7\'" onblur="this.style.borderColor=\'#e2e8f0\'">' + defaultPrompt + '</textarea>' +
+                '<textarea id="ai-prompt-text" style="width:100%;height:220px;border:1.5px solid #e2e8f0;border-radius:10px;padding:12px;font-size:0.83rem;font-family:inherit;resize:vertical;outline:none;line-height:1.6;direction:rtl;text-align:right;" onfocus="this.style.borderColor=\'#a855f7\'" onblur="this.style.borderColor=\'#e2e8f0\'">' + defaultPrompt + '</textarea>' +
             '</div>' +
             // Actions
             '<div style="padding:16px 22px 20px;display:flex;gap:10px;justify-content:flex-end;">' +
@@ -600,6 +584,85 @@ function _updateLightboxNav() {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+var _AI_MATERIAL_HE = {
+    white_matte: 'לבן מט', white_gloss: 'לבן מבריק', black_matte: 'שחור מט',
+    gray_light: 'אפור בהיר', gray_dark: 'אפור כהה', beige: 'בז\'',
+    brown_light: 'חום בהיר', brown_dark: 'חום כהה', oak: 'אלון', walnut: 'אגוז', pine: 'אורן'
+};
+
+function _aiRoomContext(presetId) {
+    if (presetId === 'bathroom') return 'חדר אמבטיה מודרני ונקי, עם כיור ומראה ברקע (לא מסתירים את הארון).';
+    if (presetId === 'sliding' || presetId === 'walkin') return 'חדר הלבשה / חדר שינה גדול עם ארון בגדים מובנה לאורך הקיר.';
+    if (presetId === 'corner-left' || presetId === 'corner-right') return 'פינת חדר שינה מעוצבת עם הארון בפינה.';
+    return 'חדר שינה מעוצב ואיכותי, הארון צמוד לקיר האחורי.';
+}
+
+function _aiOpenCellsNote(spec) {
+    if (!spec || !spec.hasOpenCells) return '';
+    var cnt = spec.openCellCount || 1;
+    if (spec.hasSideOpenCells) {
+        var dirMap = { left: 'שמאל', right: 'ימין', both: 'שני הצדדים' };
+        var dirHe = spec.sideOpenDir ? (dirMap[spec.sideOpenDir] || '') : '';
+        var sideDesc = dirHe ? ' הדופן הפתוחה בצד ' + dirHe + '.' : ' הדופן הצדדית פתוחה.';
+        return cnt === 1
+            ? '- תא פתוח אחד ללא דלת — פתוח מהחזית ומהצד (ללא לוח צד).' + sideDesc
+            : '- ' + cnt + ' תאים פתוחים ללא דלתות, חלקם פתוחים גם מהצד.' + sideDesc;
+    }
+    return cnt === 1
+        ? '- תא פתוח אחד ללא דלת — הצג אותו פתוח לחלוטין.'
+        : '- ' + cnt + ' תאים פתוחים ללא דלתות — הצג את כולם פתוחים.';
+}
+
+function _buildAiRenderPrompt(spec, opts) {
+    opts = opts || {};
+    spec = spec || {};
+    var single = !!opts.singleView;
+    var hasRight = !!opts.hasRightImage;
+    var hexColor = opts.hexColor;
+
+    var imagesIntro = single
+        ? 'מצורפת תמונת ייחוס אחת מהזווית הנוכחית בתוכנת התכנון.'
+        : hasRight
+            ? 'מצורפות 3 תמונות ייחוס של אותו ארון (סדר חשוב):\n1) חזית ישרה — פרופורציות מדויקות\n2) זווית תלת-ממד משמאל\n3) זווית תלת-ממד מימין'
+            : 'מצורפות 2 תמונות ייחוס:\n1) חזית ישרה\n2) זווית תלת-ממד';
+
+    var dims = [
+        spec.widthCm && ('רוחב ' + spec.widthCm + ' ס"מ'),
+        spec.heightCm && ('גובה ' + spec.heightCm + ' ס"מ'),
+        spec.depthCm && ('עומק ' + spec.depthCm + ' ס"מ')
+    ].filter(Boolean).join(', ');
+
+    var bodyKey = spec.materialBody || spec.materialExternal;
+    var colorLine = hexColor
+        ? ('צבע גוף/חזית דומיננטי: ' + hexColor + (bodyKey && _AI_MATERIAL_HE[bodyKey] ? ' (' + _AI_MATERIAL_HE[bodyKey] + ')' : '') + '.')
+        : (bodyKey && _AI_MATERIAL_HE[bodyKey] ? ('גוון גוף: ' + _AI_MATERIAL_HE[bodyKey] + '.') : '');
+
+    var specLines = [
+        dims ? ('מידות חיצוניות: ' + dims + '.') : '',
+        colorLine,
+        spec.columns ? ('חלוקה: ' + spec.columns + ' עמודות אנכיות.') : '',
+        spec.plinthHeightCm > 0 ? ('צוקל בגובה ' + spec.plinthHeightCm + ' ס"מ — שמור בדיוק.') : '',
+        spec.hasDrawers ? 'כולל מגירות בחלק התחתון — שמור על מיקום ופרופורציה.' : '',
+        spec.hasDoors === false ? 'ללא דלתות — כל התאים פתוחים מהחזית.' : '',
+        spec.hasSideDesk ? 'כולל שולחן צד משולב — שמור על מיקומו ביחס לארון.' : '',
+        spec.numSlidingDoors ? ('ארון הזזה עם ' + spec.numSlidingDoors + ' דלתות הזזה — שמור מסילות, פרופיל וחלוקת פנלים כבתמונות.') : '',
+        _aiOpenCellsNote(spec)
+    ].filter(Boolean);
+
+    return imagesIntro + '\n\n' +
+        'משימה: צור תמונה פוטוריאליסטית אחת (צילום אדריכלי פנים) של אותו ארון בדיוק, מותקן בסביבה אמיתית.\n\n' +
+        'דיוק מוחלט (אל תסטה מהייחוס):\n' +
+        '- שמור זהות מלאה של הארון: צורה, חלוקה, ידיות, צבעים, עומק וגובה.\n' +
+        '- אל תוסיף דלתות לתאים פתוחים ואל תסגור תאים שפתוחים בייחוס.\n' +
+        (specLines.length ? '\nמפרט:\n' + specLines.map(function(l) { return '- ' + l; }).join('\n') + '\n' : '\n') +
+        '\nסביבה וצילום:\n' +
+        '- ' + _aiRoomContext(spec.presetId) + '\n' +
+        '- הארון צמוד לקיר, לא חוסם אותו ריהוט אחר.\n' +
+        '- תאורה: אור יום רך מחלון בצד, צללים טבעיים, ללא פלאש קשה.\n' +
+        '- זווית מצלמה: 3/4 קדמית קלה, גובה עיניים, תחושת עדשת 35mm.\n' +
+        '- טקסטורות מלמינה/עץ מציאותיות, ללא מראה "רינדור מחשב" או פלסטיקי.';
+}
+
 function _getDominantColor() {
     try {
         if (typeof state === 'undefined') return null;
@@ -667,13 +730,20 @@ function _getCabinetSpec() {
             });
         }
 
+        var centerWing = (state.wings && state.wings.center) ? state.wings.center : null;
+        var slidingDoor = (state.presetId === 'sliding' && centerWing && centerWing.slidingDoor && centerWing.slidingDoor.enabled)
+            ? centerWing.slidingDoor : null;
+
         return {
             presetId:         state.presetId,
+            cabinetModel:     state.cabinetModel || null,
             widthCm:          Math.round(state.globalWidth),
             heightCm:         Math.round(state.globalHeight),
             depthCm:          Math.round(state.globalDepth || 58),
+            plinthHeightCm:   Math.round(state.plinthHeight || 0),
             material:         wing ? (wing.boardMaterial || state.boardMaterial) : state.boardMaterial,
             materialBody:     wing ? wing.materialBody : null,
+            materialExternal: wing ? wing.materialExternal : null,
             hasDoors:         wing ? wing.hasDoors : true,
             hasOpenCells:     hasOpenCells,
             hasSideOpenCells: hasSideOpenCells,
@@ -681,6 +751,9 @@ function _getCabinetSpec() {
             openCellCount:    openCellCount,
             hasDrawers:       hasDrawers,
             columns:          wing ? wing.columns.length : null,
+            hasSideDesk:      !!(state.desk && state.desk.side && state.desk.side !== 'none'),
+            numSlidingDoors:  slidingDoor ? (slidingDoor.numDoors || 2) : null,
+            slidingPanelType: slidingDoor ? (slidingDoor.doorPanelType || 'solid') : null,
         };
     } catch(e) { return null; }
 }
