@@ -430,7 +430,7 @@ var _ORDER_STATUS_KEYS = (window.Projects && Projects.ORDER_STATUS_KEYS)
 
 function _orderStatusLabel(status) {
     var map = (window.Projects && Projects.ORDER_STATUSES) || {
-        quote: 'הצעת מחיר', ordered: 'בוצעה הזמנה', production: 'נשלח לייצור',
+        quote: 'הצעת מחיר', ordered: 'נסגרה עסקה', production: 'נשלח לייצור',
         service: 'קריאת שירות', installed: 'התקנה הושלמה'
     };
     return map[status] || map.quote;
@@ -454,7 +454,7 @@ function _statusIconClass(status) {
 function _statusChipLabelHtml(status) {
     var labels = {
         quote: 'הצעת<br>מחיר',
-        ordered: 'בוצעה<br>הזמנה',
+        ordered: 'נסגרה<br>עסקה',
         production: 'נשלח<br>לייצור',
         service: 'קריאת<br>שירות',
         installed: 'התקנה<br>הושלמה'

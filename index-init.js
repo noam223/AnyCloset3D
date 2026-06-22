@@ -594,7 +594,7 @@ window._currentOrderStatus = window._currentOrderStatus || 'quote';
 
 function _orderStatusLabel(status) {
     var map = (Projects && Projects.ORDER_STATUSES) || {
-        quote: 'הצעת מחיר', ordered: 'בוצעה הזמנה', production: 'נשלח לייצור',
+        quote: 'הצעת מחיר', ordered: 'נסגרה עסקה', production: 'נשלח לייצור',
         service: 'קריאת שירות', installed: 'התקנה הושלמה'
     };
     var keys = (Projects && Projects.ORDER_STATUS_KEYS) || ['quote', 'ordered', 'production', 'service', 'installed'];

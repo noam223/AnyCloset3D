@@ -285,7 +285,9 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
 
 /* ── RESPONSIVE ── */
 @media(max-width:900px){
-  .navbar{padding:0 20px}
+  .navbar{padding:0 20px;height:60px}
+  .nav-brand{height:44px;margin-right:0}
+  .nav-brand img{height:100%;max-height:44px}
   .nav-links{display:none}
   .hero{padding:90px 20px 50px}
   .stats-inner{grid-template-columns:repeat(3,1fr)}
@@ -294,6 +296,9 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
   .ptabs{flex-wrap:wrap;justify-content:center}
 }
 @media(max-width:600px){
+  .navbar{height:56px;padding:0 16px}
+  .nav-brand{height:36px}
+  .nav-brand img{max-height:36px}
   .stats-inner{grid-template-columns:1fr;gap:30px}
   .stat-item::after{display:none}
   .footer-top{grid-template-columns:1fr}

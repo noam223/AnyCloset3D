@@ -648,7 +648,7 @@ window.Projects = {
 
     ORDER_STATUSES: {
         quote:      'הצעת מחיר',
-        ordered:    'בוצעה הזמנה',
+        ordered:    'נסגרה עסקה',
         production: 'נשלח לייצור',
         service:    'קריאת שירות',
         installed:  'התקנה הושלמה'
