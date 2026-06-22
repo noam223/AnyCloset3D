@@ -1199,6 +1199,11 @@ let wingHitBoxes = [];
 let deskHitBoxes = [];
 window.deskHitBoxes = deskHitBoxes;
 let doorMeshes = [];
+
+function _registerDoorMesh(mesh) {
+    if (!mesh || !_isActiveWingBuild) return;
+    doorMeshes.push(mesh);
+}
 let currentHoveredDoor = null;
 let dragHandlesData = { horizontal: [], vertical: [], roofs: [], desk: [] };
 const raycaster = new THREE.Raycaster(); const mouse = new THREE.Vector2();
@@ -3932,7 +3937,9 @@ if (compData && compData.type === 'hanging') {
                         return matExternal;
                     };
                     const _subCreateDoorPanel = (w, h, cx, cy, z, mat) => {
-                        createBoard(w, h, t, cx, cy, z, mat);
+                        const mesh = createBoard(w, h, t, cx, cy, z, mat);
+                        _registerDoorMesh(mesh);
+                        return mesh;
                     };
                     if (subType === 'hanging') {
                         const rod = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, subW - 2, 16), new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.9 }));
@@ -3977,6 +3984,7 @@ if (compData && compData.type === 'hanging') {
                             _buildGroup.add(backPanel);
                         }
                     } else if (subType === 'door_right' || subType === 'door_left' || subType === 'door_double') {
+                        if (!state.hasDoors) return;
                         const fZ = isInset ? (bodyD/2 - t/2) : (bodyD/2 + t/2 + 0.1);
                         const doorH = zoneH + t;
                         const doorY = zoneBottomY + zoneH / 2;
@@ -3997,9 +4005,11 @@ if (compData && compData.type === 'hanging') {
                                     const hL = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, handleH, 12), handleMatD);
                                     hL.position.set(lCX + halfW * 0.35, doorY, hz);
                                     _buildGroup.add(hL);
+                                    _registerDoorMesh(hL);
                                     const hR = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, handleH, 12), handleMatD);
                                     hR.position.set(rCX - halfW * 0.35, doorY, hz);
                                     _buildGroup.add(hR);
+                                    _registerDoorMesh(hR);
                                 }
                             }
                         } else {
@@ -4021,10 +4031,12 @@ if (compData && compData.type === 'hanging') {
                                     );
                                     handleMesh.position.set(handleX, doorY, hz);
                                     _buildGroup.add(handleMesh);
+                                    _registerDoorMesh(handleMesh);
                                 }
                             }
                         }
                     } else if (subType === 'door_flap') {
+                        if (!state.hasDoors) return;
                         const fZ = isInset ? (bodyD/2 - t/2) : (bodyD/2 + t/2 + 0.1);
                         const flapH = zoneH + t;
                         const flapY = zoneBottomY + zoneH / 2;
@@ -4038,11 +4050,13 @@ if (compData && compData.type === 'hanging') {
                                 handleMesh.rotation.z = Math.PI / 2;
                                 handleMesh.position.set(subCenterX + flapW * 0.35, zoneBottomY + 4, hz);
                                 _buildGroup.add(handleMesh);
+                                _registerDoorMesh(handleMesh);
                             } else if (_handleStyle === 'riding') {
                                 const barLen = Math.min(RIDING_HANDLE_LEN, Math.max(8, flapW - 4));
                                 const bar = new THREE.Mesh(new THREE.BoxGeometry(barLen, 0.8, 0.8), _handleMat3D());
                                 bar.position.set(subCenterX, zoneBottomY + 0.6, hz);
                                 _buildGroup.add(bar);
+                                _registerDoorMesh(bar);
                             }
                         }
                     } else if (subType === 'honeycomb') {
@@ -4225,9 +4239,14 @@ if (compData && compData.type === 'hanging') {
                                     }
                                 }
                             }
-                        } else if (!isBP && sub.type && sub.type !== 'empty' && !_keyInDoorGroup(si, 0)) {
-                            const zoneStyle = (Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[0]) ? sub.zonesDoorStyle[0] : 'solid';
-                            _renderSubContent(sub.type, subCenterX, subW, prevY, compH, si, zoneStyle);
+                        } else if (!isBP && !_keyInDoorGroup(si, 0)) {
+                            const zoneType = (Array.isArray(sub.zonesType) && sub.zonesType[0])
+                                ? sub.zonesType[0]
+                                : (sub.type || 'empty');
+                            if (zoneType && zoneType !== 'empty') {
+                                const zoneStyle = (Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[0]) ? sub.zonesDoorStyle[0] : 'solid';
+                                _renderSubContent(zoneType, subCenterX, subW, prevY, compH, si, zoneStyle);
+                            }
                         }
                     }
 
@@ -4335,6 +4354,11 @@ if (compData && compData.type === 'hanging') {
                 const dH = doorTopY - doorBottomY;
                 if(dH <= 0) return;
                 if(_doorOverlayW <= 0) return; // entire door is in hidden zone — skip
+                // Partitioned compartments use per-zone doors — skip column overlay doors there
+                for (let _pr = _safeStartRow; _pr <= _safeEndRow; _pr++) {
+                    const _pComp = col.compartments[_pr];
+                    if (_pComp && _pComp.partition) return;
+                }
 
                 // ---- Flap door (קלפה): covers entire front face of the column (wall-to-wall, floor-to-ceiling) ----
                 if (door.type === 'flap') {

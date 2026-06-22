@@ -24,6 +24,10 @@ function roomContext(presetId?: string | null): string {
   return 'חדר שינה מעוצב ואיכותי, הארון צמוד לקיר האחורי.';
 }
 
+function closureCeilingNote(): string {
+  return '- ללא סגירה לתקרה: אל תוסיף לוח אופקי, "כובע" או מסגרת מעל הארון. גובה הארון מסתיים בקו העליון של גוף הארון בלבד.';
+}
+
 function openCellsNote(spec: Record<string, unknown>): string {
   if (!spec.hasOpenCells) return '';
   const cnt = (spec.openCellCount as number) || 1;
@@ -46,7 +50,8 @@ function fidelityAppendix(): string {
   return `\n---\nהגבלות חובה:\n` +
     `- הארון חייב להיות זהה לתמונות הייחוס: מידות, פרופורציות, חלוקה לעמודות, מספר דלתות/מגירות, ידיות, צבעים, גובה צוקל ועומק.\n` +
     `- אין לשנות את עיצוב הארון, אין להוסיף או להסיר דלתות, מגירות, מדפים או אלמנטים שלא מופיעים בייחוס.\n` +
-    `- ללא טקסט, לוגו, סימן מים או מסגרת מסך בתוצאה.`;
+    `- ללא טקסט, לוגו, סימן מים או מסגרת מסך בתוצאה.\n` +
+    `- ${closureCeilingNote().replace(/^- /, '')}`;
 }
 
 function buildDefaultPrompt(
@@ -82,6 +87,7 @@ function buildDefaultPrompt(
     spec.hasSideDesk ? 'כולל שולחן צד משולב — שמור על מיקומו ביחס לארון.' : '',
     spec.numSlidingDoors ? `ארון הזזה עם ${spec.numSlidingDoors} דלתות הזזה — שמור מסילות, פרופיל וחלוקת פנלים כבתמונות.` : '',
     openCellsNote(spec),
+    closureCeilingNote(),
   ].filter(Boolean);
 
   return imagesIntro + '\n\n' +
@@ -89,7 +95,8 @@ function buildDefaultPrompt(
     'דיוק מוחלט (אל תסטה מהייחוס):\n' +
     '- שמור זהות מלאה של הארון: צורה, חלוקה, ידיות, צבעים, עומק וגובה.\n' +
     '- אל תוסיף דלתות לתאים פתוחים ואל תסגור תאים שפתוחים בייחוס.\n' +
-    (specLines.length ? '\nמפרט:\n' + specLines.map(l => `- ${l}`).join('\n') + '\n' : '\n') +
+    `- ${closureCeilingNote().replace(/^- /, '')}\n` +
+    (specLines.length ? '\nמפרט:\n' + specLines.map(l => (l.startsWith('- ') ? l : `- ${l}`)).join('\n') + '\n' : '\n') +
     '\nסביבה וצילום:\n' +
     `- ${roomContext(spec.presetId as string)}\n` +
     '- הארון צמוד לקיר, לא חוסם אותו ריהוט אחר.\n' +

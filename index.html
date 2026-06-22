@@ -1239,6 +1239,10 @@
             <span id="tb-subcell-title" style="font-size:0.72rem;font-weight:700;color:var(--secondary);white-space:nowrap;text-align:center;"></span>
             <div id="tb-subcell-select-row" style="display:none;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;">
                 <button type="button" class="slider-btn" style="height:24px;padding:0 10px;font-size:0.72rem;white-space:nowrap;" onclick="selectAllSubCellZones()"><i class="fa-solid fa-table-cells"></i> בחר הכל</button>
+                <button type="button" class="slider-btn" id="tb-select-subcell-0" style="height:24px;padding:0 8px;font-size:0.72rem;white-space:nowrap;display:none;" onclick="selectSubCellSide(0)">תא 1</button>
+                <button type="button" class="slider-btn" id="tb-select-subcell-1" style="height:24px;padding:0 8px;font-size:0.72rem;white-space:nowrap;display:none;" onclick="selectSubCellSide(1)">תא 2</button>
+                <button type="button" class="slider-btn" id="tb-select-subcell-2" style="height:24px;padding:0 8px;font-size:0.72rem;white-space:nowrap;display:none;" onclick="selectSubCellSide(2)">תא 3</button>
+                <button type="button" class="slider-btn" id="tb-select-subcell-3" style="height:24px;padding:0 8px;font-size:0.72rem;white-space:nowrap;display:none;" onclick="selectSubCellSide(3)">תא 4</button>
                 <button type="button" class="slider-btn" style="height:24px;padding:0 10px;font-size:0.72rem;white-space:nowrap;" onclick="clearActiveSubCell()"><i class="fa-solid fa-xmark"></i> נקה</button>
             </div>
             <div style="display:flex;align-items:center;justify-content:center;gap:6px;">
@@ -2432,11 +2436,11 @@
 <script src="auth.js"></script>
 <script src="state.js?v=20260609e"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
-<script src="engine-core.js?v=20260617k"></script>
+<script src="engine-core.js?v=20260617partdoors"></script>
 <script src="engine-corners.js?v=20260609a"></script>
 <script src="engine-blueprint.js?v=20260608bp"></script>
 <script src="tambour-color-picker.js?v=20260608a"></script>
-<script src="ui.js?v=20260610h"></script>
+<script src="ui.js?v=20260617partsel"></script>
 <script src="layout-mode.js?v=20260610i"></script>
 <script src="mobile.js?v=20260609e"></script>
 <script src="part-paint.js?v=20260520k"></script>
@@ -2553,7 +2557,7 @@
 
 <script src="notes.js?v=20260608a"></script>
 <script src="tour.js?v=20260609d"></script>
-<script src="ai-renders.js?v=20260608pro"></script>
+<script src="ai-renders.js?v=20260608ceil"></script>
 <script>
     // Init AI renders after auth is ready
     document.addEventListener('DOMContentLoaded', function() {

@@ -768,9 +768,7 @@ function buildDimensionsAndButtonsUI() {
         // Composite key for this zone button
         const zoneKey = _subKey(d.subCellIdx, d.zoneIdx !== undefined ? d.zoneIdx : 0);
 
-        const isSelected = _activeSubCellIdxs.has(zoneKey) &&
-                           state.selection.colIndex === d.colIndex &&
-                           state.selection.rows.includes(d.rowIndex);
+        const isSelected = _activeSubCellIdxs.has(zoneKey);
 
         // Determine zone content: use zonesType[z] if available, else sub.type
         const sub = comp.subCells && comp.subCells[d.subCellIdx];
@@ -814,17 +812,19 @@ function buildDimensionsAndButtonsUI() {
                 window.setActiveSubCell(zoneKey);
             });
         } else if (hasSubContent) {
-            // Has content: circular pill with pen + trash
-            btn.innerHTML = `<div style="display:flex;align-items:center;gap:5px;background:rgba(30,30,40,0.82);border-radius:20px;padding:4px 8px;box-shadow:0 2px 8px rgba(0,0,0,0.3);">
-                <i class="fa-solid fa-pen sub-btn-edit" style="font-size:9px;color:rgba(255,255,255,0.8);cursor:pointer;transition:color 0.15s;" title="ערוך תא"></i>
-                <div style="width:1px;height:10px;background:rgba(255,255,255,0.25);"></div>
+            // Has content: circular pill with pen + trash — whole pill adds to multi-selection
+            btn.innerHTML = `<div class="sub-cell-pill" style="display:flex;align-items:center;gap:5px;background:rgba(30,30,40,0.82);border-radius:20px;padding:4px 8px;box-shadow:0 2px 8px rgba(0,0,0,0.3);cursor:pointer;">
+                <i class="fa-solid fa-pen sub-btn-edit" style="font-size:9px;color:rgba(255,255,255,0.8);pointer-events:none;" title="הוסף לבחירה"></i>
+                <div style="width:1px;height:10px;background:rgba(255,255,255,0.25);pointer-events:none;"></div>
                 <i class="fa-solid fa-trash sub-btn-trash" style="font-size:9px;color:rgba(255,255,255,0.6);cursor:pointer;transition:color 0.15s;" title="נקה תא"></i>
             </div>`;
-            btn.querySelector('.sub-btn-edit').addEventListener('mouseenter', e => { e.target.style.color = 'white'; });
-            btn.querySelector('.sub-btn-edit').addEventListener('mouseleave', e => { e.target.style.color = 'rgba(255,255,255,0.8)'; });
+            const pill = btn.querySelector('.sub-cell-pill');
+            pill.addEventListener('mouseenter', () => { pill.style.background = 'rgba(40,40,55,0.92)'; });
+            pill.addEventListener('mouseleave', () => { pill.style.background = 'rgba(30,30,40,0.82)'; });
             btn.querySelector('.sub-btn-trash').addEventListener('mouseenter', e => { e.target.style.color = '#ef4444'; });
             btn.querySelector('.sub-btn-trash').addEventListener('mouseleave', e => { e.target.style.color = 'rgba(255,255,255,0.6)'; });
-            btn.querySelector('.sub-btn-edit').addEventListener('click', (e) => {
+            btn.addEventListener('click', (e) => {
+                if (e.target.closest('.sub-btn-trash')) return;
                 e.stopPropagation();
                 if (!(state.selection.colIndex === d.colIndex && state.selection.rows.includes(d.rowIndex))) {
                     state.selection = { colIndex: d.colIndex, rows: [d.rowIndex] };
@@ -1212,6 +1212,11 @@ function updateToolbarButtonHighlights() {
     if (hasPartition && state.selection.rows.length === 1) {
         if (shelfSection) shelfSection.style.display = 'flex';
         if (selectAllRow) selectAllRow.style.display = 'flex';
+        const nSubs = Array.isArray(firstComp.subCells) ? firstComp.subCells.length : 2;
+        for (let si = 0; si < 4; si++) {
+            const sideBtn = document.getElementById('tb-select-subcell-' + si);
+            if (sideBtn) sideBtn.style.display = si < nSubs ? '' : 'none';
+        }
     } else if (shelfSection && !_hasActiveSubCells) {
         shelfSection.style.display = 'none';
         if (selectAllRow) selectAllRow.style.display = 'none';
@@ -2376,7 +2381,6 @@ function _clearSubZoneContent(sub, z) {
 }
 
 function _finishSubCellApply(opts) {
-    _activeSubCellIdxs = new Set();
     buildCabinet();
     if (opts && opts.activateOpenCellTab && typeof window._activateColorPartTab === 'function') {
         window._activateColorPartTab('materialOpenCell');
@@ -2421,6 +2425,30 @@ window.setActiveSubCell = function(key) {
     } else {
         _activeSubCellIdxs.add(compositeKey);
     }
+    buildDimensionsAndButtonsUI();
+    updateOverlaysPosition();
+    updateToolbarState();
+    updateToolbarButtonHighlights();
+};
+
+// Select all shelf-zones within one sub-cell side (תא 1 / תא 2)
+window.selectSubCellSide = function(si) {
+    if (state.selection.colIndex === -1 || state.selection.rows.length !== 1) return;
+    const c = state.selection.colIndex;
+    const r = state.selection.rows[0];
+    const comp = state.columns[c] && state.columns[c].compartments[r];
+    if (!comp || !comp.partition || !Array.isArray(comp.subCells) || !comp.subCells[si]) return;
+    const sub = comp.subCells[si];
+    const numZones = Math.max(1, (sub.shelves || 0) + 1,
+        (Array.isArray(sub.zonesType) ? sub.zonesType.length : 0));
+    const next = new Set();
+    // Keep selections from other sub-cell sides; replace zones on this side
+    _activeSubCellIdxs.forEach(k => {
+        const { si: kSi } = _parseSubKey(k);
+        if (kSi !== si) next.add(k);
+    });
+    for (let z = 0; z < numZones; z++) next.add(_subKey(si, z));
+    _activeSubCellIdxs = next;
     buildDimensionsAndButtonsUI();
     updateOverlaysPosition();
     updateToolbarState();
@@ -2815,6 +2843,8 @@ window.applyContent = function(type) {
                 comp.partitions = [0.5];
                 // Always create subCells — all cell types support sub-cell content
                 comp.subCells = [{ type: 'empty', shelves: 0 }, { type: 'empty', shelves: 0 }];
+                // Column overlay doors conflict with per-zone partition doors
+                state.columns[c].doors = state.columns[c].doors.filter(door => r < door.startRow || r > door.endRow);
             }
         });
         buildCabinet(); calculatePrice(); saveHistoryState();
@@ -2917,6 +2947,8 @@ window.applyDoor = function(type) {
     // Route to sub-cell zones when partition sub-cells are selected
     if (_activeSubCellIdxs.size > 0) {
         const _subDoorMap = { empty: 'empty', right: 'door_right', left: 'door_left', double: 'door_double', flap: 'door_flap' };
+        const _partRow = Math.min(...state.selection.rows);
+        state.columns[c].doors = state.columns[c].doors.filter(door => _partRow < door.startRow || _partRow > door.endRow);
         setSubCellType(_subDoorMap[type] || type);
         return;
     }
@@ -5398,7 +5430,8 @@ function bindUI() {
 
         let needsRebuild = false;
 
-        if (state.selection.colIndex !== -1 || state.selection.rows.length > 0) {
+        // Keep cell + sub-zone selection when clicking the canvas while sub-zones are active
+        if ((state.selection.colIndex !== -1 || state.selection.rows.length > 0) && _activeSubCellIdxs.size === 0) {
             state.selection = { colIndex: -1, rows: [] };
             needsRebuild = true;
         }
