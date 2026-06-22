@@ -78,6 +78,7 @@ body{font-family:'Inter','Heebo',sans-serif;background:var(--w);color:var(--t);o
 .nav-cta:hover{background:#33ddff;transform:translateY(-1px);box-shadow:0 4px 20px rgba(0,212,255,.55)}
 .nav-login{color:rgba(255,255,255,.85);border:1.5px solid rgba(255,255,255,.3);padding:7px 18px;border-radius:9px;font-weight:600;transition:all .2s;text-decoration:none;font-size:.9rem}
 .nav-login:hover{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.6);color:#fff}
+.nav-cta-short{display:none}
 
 /* ── HERO ── */
 .hero{min-height:100vh;background:linear-gradient(135deg,#0f1f35 0%,#1e3a5f 40%,#2a4f80 70%,#1a3050 100%);position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:100px 40px 60px}
@@ -285,10 +286,13 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
 
 /* ── RESPONSIVE ── */
 @media(max-width:900px){
-  .navbar{padding:0 20px;height:60px}
-  .nav-brand{height:44px;margin-right:0}
-  .nav-brand img{height:100%;max-height:44px}
+  .navbar{padding:0 16px;height:60px;gap:8px}
+  .nav-brand{height:44px;margin-right:0;min-width:0}
+  .nav-brand img{height:100%;max-height:44px;max-width:min(42vw,140px)}
   .nav-links{display:none}
+  .nav-actions{gap:6px;min-width:0;flex-shrink:1}
+  .nav-login{padding:5px 10px;font-size:.76rem;border-radius:8px;border-width:1px}
+  .nav-cta{padding:5px 10px;font-size:.76rem;border-radius:8px}
   .hero{padding:90px 20px 50px}
   .stats-inner{grid-template-columns:repeat(3,1fr)}
   .sec{padding:70px 20px}
@@ -296,14 +300,23 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
   .ptabs{flex-wrap:wrap;justify-content:center}
 }
 @media(max-width:600px){
-  .navbar{height:56px;padding:0 16px}
+  .navbar{height:56px;padding:0 12px;gap:6px}
   .nav-brand{height:36px}
-  .nav-brand img{max-height:36px}
+  .nav-brand img{max-height:36px;max-width:min(38vw,110px)}
+  .nav-actions{gap:4px}
+  .nav-login{padding:4px 7px;font-size:.68rem;border-radius:7px}
+  .nav-cta{padding:4px 7px;font-size:.68rem;border-radius:7px}
   .stats-inner{grid-template-columns:1fr;gap:30px}
   .stat-item::after{display:none}
   .footer-top{grid-template-columns:1fr}
   .hero-actions{flex-direction:column;align-items:center}
   .btn-hp,.btn-ho{width:100%;justify-content:center}
+}
+@media(max-width:420px){
+  .nav-cta-long{display:none}
+  .nav-cta-short{display:inline}
+  .nav-login{padding:4px 6px;font-size:.65rem}
+  .nav-cta{padding:4px 6px;font-size:.65rem}
 }
 </style>
 </head>
@@ -323,7 +336,7 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
   </ul>
   <div class="nav-actions" id="nav-actions">
     <a href="login.html" class="nav-login">התחברות</a>
-    <a href="login.html" class="nav-cta">הצטרף עכשיו</a>
+    <a href="login.html" class="nav-cta"><span class="nav-cta-long">הצטרף עכשיו</span><span class="nav-cta-short">הצטרף</span></a>
   </div>
 </nav>
 
