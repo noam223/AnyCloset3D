@@ -723,7 +723,6 @@ function _getCabinetSpec() {
         var openCellCount = 0;
         var sideOpenDir = null; // 'left', 'right', or 'both'
         if (wing && wing.columns) {
-            var totalCols = wing.columns.length;
             wing.columns.forEach(function(col, colIdx) {
                 if (col.compartments) {
                     col.compartments.forEach(function(comp, rowIdx) {
