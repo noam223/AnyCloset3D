@@ -34,6 +34,7 @@ function createWingData(overrides) {
         columns: [],
         wingPosition: 'side',
         desk: { side: 'none', width: 100, height: 80, hasDrawers: true, drawerHeight: 12, drawerCount: null },
+        writingDesk: { height: 75, hasDrawers: true, drawerCount: 2, drawerHeight: 12 },
         corner: { side: 'none', width: 60, height: 90, depth: 54, type: 'shelves', shelves: 3, drawerCount: 4 },
         fullCorner: { size: 100, shelves: 2, shelvesY: [], compartments: [] },
         sideCabinet: null,
@@ -781,6 +782,9 @@ function _applyPresetCore(presetId, rightPos, leftPos) {
     } else if (presetId === 'bathroom') {
         // Bathroom cabinet — handled by bathroom-preset.js
         if (typeof window._applyBathroomPreset === 'function') window._applyBathroomPreset();
+    } else if (presetId === 'writing-desk') {
+        // Standalone writing desk — handled by writing-desk-preset.js
+        if (typeof window._applyWritingDeskPreset === 'function') window._applyWritingDeskPreset();
     }
 
     // If switching away from sliding, disable it
@@ -818,7 +822,7 @@ function _applyPresetCore(presetId, rightPos, leftPos) {
 
     // Linear/bathroom cabinet: go directly to front/edit view (no wings to orbit around)
     // Corner/walkin: stay in 3D so user sees the full layout
-    state.viewMode = (presetId === 'linear' || presetId === 'sliding' || presetId === 'bathroom') ? 'front' : '3d';
+    state.viewMode = (presetId === 'linear' || presetId === 'sliding' || presetId === 'bathroom' || presetId === 'writing-desk') ? 'front' : '3d';
     _setFreeTabActive(true);
     syncSidebarToWing();
     buildCabinet(); updateCameraView(); calculatePrice(); saveHistoryState();
@@ -908,7 +912,7 @@ window.applyPreset = function(presetId) {
     _pendingPresetId = presetId;
     _pendingWingPositions = { left: 'side', right: 'side' };
 
-    if (presetId === 'linear' || presetId === 'sliding') {
+    if (presetId === 'linear' || presetId === 'sliding' || presetId === 'bathroom' || presetId === 'writing-desk') {
         // No position needed — apply immediately
         _applyPresetCore(presetId, null, null);
         const ppm = document.getElementById('preset-position-menu');
@@ -1190,7 +1194,7 @@ window.syncSidebarToWing = function() {
 
     // Show/hide edit content vs placeholder based on edit mode.
     // For linear/sliding presets there are no wing tabs — always show edit content.
-    const _isSingleCabinet = (state.presetId === 'linear' || state.presetId === 'sliding' || state.presetId === 'bathroom');
+    const _isSingleCabinet = (state.presetId === 'linear' || state.presetId === 'sliding' || state.presetId === 'bathroom' || state.presetId === 'writing-desk');
     const _editContent = document.getElementById('sidebar-edit-content');
     const _placeholder = document.getElementById('sidebar-edit-placeholder');
     const _isEditing = !!state.wingEditMode || _isSingleCabinet || _isUUEdit;
@@ -2904,13 +2908,25 @@ function _calcWingCost(cfg, wing) {
     const ex  = cfg.extras || DEFAULT_PRICING_CONFIG.extras;
     const ww = wing.width, wh = wing.globalHeight, wd = wing.depth;
     const wMelamine = wing.boardMaterial === 'melamine';
+    const sandwichPct = cfg.sandwichSurcharge != null ? cfg.sandwichSurcharge : 0.15;
+
+    if (state.presetId === 'writing-desk') {
+        const wd = wing.writingDesk || {};
+        let cost = ex.deskUnit || 900;
+        if (wd.hasDrawers !== false) {
+            const n = wd.drawerCount != null ? wd.drawerCount : ((ww || 120) <= 80 ? 1 : 2);
+            cost += n * (ex.internalDrawer || 150);
+        }
+        if (SANDWICH_COLORS.has(wing.materialBody)) cost *= (1 + sandwichPct);
+        return cost;
+    }
+
     const wModel = wing.cabinetModel || 'maya';
     const wHasSideOpenCell = wModel === 'ab2_nohoney' && wing.columns && wing.columns.some(col =>
         col.compartments && col.compartments.some(comp => comp && comp.type === 'side_open_cell'));
     const wEffectiveModel = (wModel === 'ab2_nohoney' && wHasSideOpenCell) ? 'ab2' : wModel;
 
     let basePrice = _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel);
-    const sandwichPct = cfg.sandwichSurcharge != null ? cfg.sandwichSurcharge : 0.15;
     if (SANDWICH_COLORS.has(wing.materialBody)) basePrice *= (1 + sandwichPct);
     if (wEffectiveModel === 'regalim' && (cfg.pricingMode||'ranges') === 'ranges') {
         const legCount = ww<=110 ? 4 : ww<=180 ? 6 : 8;

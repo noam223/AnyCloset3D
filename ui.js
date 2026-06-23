@@ -1631,9 +1631,13 @@ function toggleSelection(c, r) {
 }
 
 function clearSelection() {
+    const hadSomething = _activeSubCellIdxs.size > 0
+        || state.selection.colIndex !== -1
+        || state.selection.rows.length > 0;
     _activeSubCellIdxs = new Set();
-    if (state.selection.colIndex !== -1 || state.selection.rows.length > 0) {
-        state.selection = { colIndex: -1, rows: [] };
+    state.selection = { colIndex: -1, rows: [] };
+    if (hadSomething) {
+        closeContentSubPanels();
         buildCabinet();
     }
 }
@@ -3452,7 +3456,9 @@ function buildDragHandlesUI() {
             dragLayer.appendChild(handle);
             let startMouseX = 0, startW = 0, isDragging = false;
             handle.addEventListener('pointerdown', e => {
-                isDragging = true; startMouseX = e.clientX; startW = state.desk.width; handle.classList.add('active'); controls.enabled = false; document.body.classList.add('dragging');
+                isDragging = true; startMouseX = e.clientX;
+                startW = (state.presetId === 'writing-desk' || d.writingDesk) ? state.width : state.desk.width;
+                handle.classList.add('active'); controls.enabled = false; document.body.classList.add('dragging');
             });
             window.addEventListener('pointermove', e => {
                 if (!isDragging) return;
@@ -3460,12 +3466,21 @@ function buildDragHandlesUI() {
                 const pxToCm = state.width / (((new THREE.Vector3(state.width/2,0,0).project(camera).x + 1)/2 * container.clientWidth) - ((new THREE.Vector3(-state.width/2,0,0).project(camera).x + 1)/2 * container.clientWidth));
                 const deltaX = (e.clientX - startMouseX) * pxToCm;
                 let delta = d.side === 'left' ? -deltaX : deltaX;
-                state.desk.width = Math.round(Math.max(40, Math.min(200, startW + delta)));
-                
-                if (document.getElementById('inp-num-desk-width')) document.getElementById('inp-num-desk-width').value = state.desk.width;
-                if (document.getElementById('inp-desk-width')) document.getElementById('inp-desk-width').value = state.desk.width;
-                
-                handle.querySelector('.drag-tooltip').innerText = `רוחב: ${state.desk.width} ס"מ`;
+                if (state.presetId === 'writing-desk' || d.writingDesk) {
+                    state.width = Math.round(Math.max(40, Math.min(200, startW + delta)));
+                    const wInp = document.getElementById('inp-width');
+                    const wNum = document.getElementById('inp-num-width');
+                    if (wInp) wInp.value = state.width;
+                    if (wNum) wNum.value = state.width;
+                    if (typeof window._syncDimPills === 'function') window._syncDimPills();
+                } else {
+                    state.desk.width = Math.round(Math.max(40, Math.min(200, startW + delta)));
+                    if (document.getElementById('inp-num-desk-width')) document.getElementById('inp-num-desk-width').value = state.desk.width;
+                    if (document.getElementById('inp-desk-width')) document.getElementById('inp-desk-width').value = state.desk.width;
+                }
+
+                const _wShow = (state.presetId === 'writing-desk' || d.writingDesk) ? state.width : state.desk.width;
+                handle.querySelector('.drag-tooltip').innerText = `רוחב: ${_wShow} ס"מ`;
                 buildCabinetDragging(); updateCameraView();
             });
             window.addEventListener('pointerup', () => { if(isDragging){ isDragging = false; handle.classList.remove('active'); controls.enabled = true; document.body.classList.remove('dragging'); _endDrag(); calculatePrice(); saveHistoryState(); }});
@@ -3475,15 +3490,33 @@ function buildDragHandlesUI() {
             dragLayer.appendChild(handle);
             let startMouseY = 0, startH = 0, isDragging = false;
             handle.addEventListener('pointerdown', e => {
-                isDragging = true; startMouseY = e.clientY; startH = state.desk.height; handle.classList.add('active'); controls.enabled = false; document.body.classList.add('dragging');
+                isDragging = true; startMouseY = e.clientY;
+                if (state.presetId === 'writing-desk' || d.writingDesk) {
+                    const cw = state.wings && state.wings.center;
+                    startH = (cw && cw.writingDesk && cw.writingDesk.height != null) ? cw.writingDesk.height : state.globalHeight;
+                } else {
+                    startH = state.desk.height;
+                }
+                handle.classList.add('active'); controls.enabled = false; document.body.classList.add('dragging');
             });
             window.addEventListener('pointermove', e => {
                 if (!isDragging) return;
                 e.preventDefault();
                 const pxToCm = 100 / (Math.abs(new THREE.Vector3(0,100,0).project(camera).y - new THREE.Vector3(0,0,0).project(camera).y) * container.clientHeight / 2);
                 const deltaCm = -(e.clientY - startMouseY) * pxToCm;
-                state.desk.height = Math.round(Math.max(50, Math.min(120, startH + deltaCm)));
-                handle.querySelector('.drag-tooltip').innerText = `גובה: ${state.desk.height} ס"מ`;
+                const newH = Math.round(Math.max(50, Math.min(120, startH + deltaCm)));
+                if (state.presetId === 'writing-desk' || d.writingDesk) {
+                    const cw = state.wings && state.wings.center;
+                    if (cw) {
+                        if (!cw.writingDesk) cw.writingDesk = {};
+                        cw.writingDesk.height = newH;
+                        cw.globalHeight = newH;
+                    }
+                    state.globalHeight = newH;
+                } else {
+                    state.desk.height = newH;
+                }
+                handle.querySelector('.drag-tooltip').innerText = `גובה: ${newH} ס"מ`;
                 buildCabinetDragging(); updateCameraView();
             });
             window.addEventListener('pointerup', () => { if(isDragging){ isDragging = false; handle.classList.remove('active'); controls.enabled = true; document.body.classList.remove('dragging'); _endDrag(); calculatePrice(); saveHistoryState(); }});
@@ -3493,15 +3526,31 @@ function buildDragHandlesUI() {
             dragLayer.appendChild(handle);
             let startMouseY = 0, startH = 0, isDragging = false;
             handle.addEventListener('pointerdown', e => {
-                isDragging = true; startMouseY = e.clientY; startH = state.desk.drawerHeight; handle.classList.add('active'); controls.enabled = false; document.body.classList.add('dragging');
+                isDragging = true; startMouseY = e.clientY;
+                if (state.presetId === 'writing-desk' || d.writingDesk) {
+                    const cw = state.wings && state.wings.center;
+                    startH = (cw && cw.writingDesk) ? cw.writingDesk.drawerHeight : 12;
+                } else {
+                    startH = state.desk.drawerHeight;
+                }
+                handle.classList.add('active'); controls.enabled = false; document.body.classList.add('dragging');
             });
             window.addEventListener('pointermove', e => {
                 if (!isDragging) return;
                 e.preventDefault();
                 const pxToCm = 100 / (Math.abs(new THREE.Vector3(0,100,0).project(camera).y - new THREE.Vector3(0,0,0).project(camera).y) * container.clientHeight / 2);
                 const deltaCm = -(e.clientY - startMouseY) * pxToCm;
-                state.desk.drawerHeight = Math.round(Math.max(12, Math.min(40, startH - deltaCm)));
-                handle.querySelector('.drag-tooltip').innerText = `מגירה: ${state.desk.drawerHeight} ס"מ`;
+                const newDH = Math.round(Math.max(12, Math.min(40, startH - deltaCm)));
+                if (state.presetId === 'writing-desk' || d.writingDesk) {
+                    const cw = state.wings && state.wings.center;
+                    if (cw) {
+                        if (!cw.writingDesk) cw.writingDesk = {};
+                        cw.writingDesk.drawerHeight = newDH;
+                    }
+                } else {
+                    state.desk.drawerHeight = newDH;
+                }
+                handle.querySelector('.drag-tooltip').innerText = `מגירה: ${newDH} ס"מ`;
                 buildCabinetDragging();
             });
             window.addEventListener('pointerup', () => { if(isDragging){ isDragging = false; handle.classList.remove('active'); controls.enabled = true; document.body.classList.remove('dragging'); _endDrag(); calculatePrice(); saveHistoryState(); }});
@@ -5430,9 +5479,11 @@ function bindUI() {
 
         let needsRebuild = false;
 
-        // Keep cell + sub-zone selection when clicking the canvas while sub-zones are active
-        if ((state.selection.colIndex !== -1 || state.selection.rows.length > 0) && _activeSubCellIdxs.size === 0) {
+        // Click outside UI — close cell/partition toolbar and clear sub-zone selection
+        if (state.selection.colIndex !== -1 || state.selection.rows.length > 0 || _activeSubCellIdxs.size > 0) {
+            _activeSubCellIdxs = new Set();
             state.selection = { colIndex: -1, rows: [] };
+            closeContentSubPanels();
             needsRebuild = true;
         }
 

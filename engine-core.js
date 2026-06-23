@@ -403,6 +403,13 @@ function _getLaptopPos() {
 
     const wing = state.wings && state.wings.center;
 
+    // 0. Standalone writing desk
+    if (state.presetId === 'writing-desk' && wing) {
+        const wd = wing.writingDesk || {};
+        const deskH = wd.height != null ? wd.height : 75;
+        return { x: _clampX(cabOffX), y: deskH, z: laptopZ };
+    }
+
     // 1. Side desk
     if (wing && wing.desk && wing.desk.side !== 'none') {
         const dSide  = wing.desk.side;
@@ -461,6 +468,12 @@ function _getChairPos() {
 
     // 1. Side desk (wing.desk.side !== 'none')
     const wing = state.wings && state.wings.center;
+
+    // 0. Standalone writing desk
+    if (state.presetId === 'writing-desk' && wing) {
+        return { x: _clampX(cabOffX), z: chairZ, rotY: -Math.PI / 2, deskFrontZ: deskFrontZ };
+    }
+
     if (wing && wing.desk && wing.desk.side !== 'none') {
         const dSide = wing.desk.side;
         const dW    = wing.desk.width || 100;
@@ -2900,6 +2913,65 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         uv.needsUpdate = true;
     }
 
+    if (state.presetId === 'writing-desk') {
+        const wd = (state.wings && state.wings.center && state.wings.center.writingDesk) || state.writingDesk || {};
+        const dWidth = state.width;
+        const dHeight = wd.height != null ? wd.height : 75;
+        const drawerH = wd.drawerHeight != null ? wd.drawerHeight : 12;
+        const hasDrawers = wd.hasDrawers !== false;
+        const legLeftX = -dWidth / 2 + t / 2;
+        const legRightX = dWidth / 2 - t / 2;
+        const legH = dHeight - deskT;
+
+        createBoard(dWidth, deskT, bodyD, 0, dHeight - deskT / 2, 0, matDesk);
+        createBoard(t, legH, bodyD, legLeftX, legH / 2, 0, matDesk);
+        createBoard(t, legH, bodyD, legRightX, legH / 2, 0, matDesk);
+
+        if (hasDrawers) {
+            const numDrawers = (wd.drawerCount != null) ? wd.drawerCount : (dWidth <= 80 ? 1 : 2);
+            const gap = 0.4;
+            const innerWidth = dWidth - 2 * t;
+            const drawerWidth = (innerWidth - gap * (numDrawers + 1)) / numDrawers;
+            const drawerBottomY = dHeight - deskT - drawerH;
+            const drawerCenterY = drawerBottomY + drawerH / 2;
+            if (!isBP) createBoard(innerWidth, deskT, bodyD - 2, 0, drawerBottomY + deskT / 2, 0, matDesk);
+            for (let i = 0; i < numDrawers; i++) {
+                const dx = -innerWidth / 2 + gap + drawerWidth / 2 + i * (drawerWidth + gap);
+                _ppPartId = `wd_drawer_d${i}`;
+                const mesh = createBoard(drawerWidth, drawerH, t, dx, drawerCenterY, _deskDrawerFZ, matExternal);
+                _ppPartId = '';
+                if (!isBP) _addPanelHandleLocal(mesh, drawerWidth, drawerH, _handleStyle);
+                if (!isBP) {
+                    const backPanel = new THREE.Mesh(new THREE.BoxGeometry(drawerWidth - 2, 2.5, 0.5), new THREE.MeshStandardMaterial({ color: 0x222222 }));
+                    backPanel.position.set(dx, drawerBottomY + drawerH - 1.25, _deskDrawerFZ - t / 2 - 0.25);
+                    _buildGroup.add(backPanel);
+                }
+            }
+        }
+
+        if (isActiveWing) {
+            state.dimData.push({ isDeskHeight: true, x: legRightX + 20, y: dHeight / 2, h: dHeight });
+            state.dimData.push({ isDeskWidth: true, x: 0, y: dHeight + 20, h: dWidth });
+            if (isBP) {
+                state.bpData.push({ type: 'width', val: Math.round(dWidth), x: 0, y: -20, halfW: dWidth / 2 });
+                state.bpData.push({ type: 'height', val: Math.round(dHeight), x: legRightX + 15, y: dHeight / 2, halfH: dHeight / 2 });
+                state.bpData.push({ type: 'width', val: Math.round(state.depth), x: 0, y: -45, halfW: state.depth / 2 });
+            }
+            if (!isBP) {
+                dragHandlesData.desk.push({ type: 'deskHeight', x: legRightX, y: dHeight, writingDesk: true });
+                dragHandlesData.desk.push({ type: 'deskWidth', side: 'right', x: legRightX, y: dHeight / 2, writingDesk: true });
+                if (hasDrawers) dragHandlesData.desk.push({ type: 'deskDrawer', x: 0, y: dHeight - deskT - drawerH, writingDesk: true });
+                const deskHitMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.0, depthWrite: false });
+                const deskHitBox = new THREE.Mesh(new THREE.BoxGeometry(dWidth, dHeight, bodyD), deskHitMat);
+                deskHitBox.position.set(0, dHeight / 2, 0);
+                deskHitBox.userData = { isDesk: true };
+                _buildGroup.add(deskHitBox);
+                deskHitBoxes.push(deskHitBox);
+            }
+        }
+        return;
+    }
+
     if (state.desk.side !== 'none') {
         const dSide = state.desk.side;
         const dWidth = state.desk.width;
@@ -2917,7 +2989,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
             const drawerWidth = (innerWidth - gap*(numDrawers+1)) / numDrawers;
             const drawerBottomY = dHeight - deskT - drawerH;
             const drawerCenterY = drawerBottomY + drawerH/2;
-            if (!isBP) createBoard(innerWidth, deskT, bodyD - 2, startX + dir * (innerWidth/2), drawerBottomY + deskT/2, 0, matDesk);
+            createBoard(innerWidth, deskT, bodyD - 2, startX + dir * (innerWidth/2), drawerBottomY + deskT/2, 0, matDesk);
             for(let i=0; i<numDrawers; i++) {
                 let dx = (dSide === 'left') ? (startX - innerWidth) + gap + drawerWidth/2 + i * (drawerWidth + gap) : startX + gap + drawerWidth/2 + i * (drawerWidth + gap);
                 _ppPartId = `desk_drawer_d${i}`;
@@ -2931,7 +3003,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                 }
             }
         }
-        if (_isActiveWingBuild) {
+        if (_isActiveWingBuild || isBP) {
             state.dimData.push({ isDeskHeight: true, x: legX + (dSide==='left'? -20 : 20), y: dHeight/2, h: dHeight });
             state.dimData.push({ isDeskWidth: true, x: surfaceCenterX, y: dHeight + 20, h: dWidth });
             if (isBP) {

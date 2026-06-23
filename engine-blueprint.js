@@ -4,6 +4,111 @@
 // ==========================================
 const DESK_SURFACE_T = 2.8; // 28mm — all desk horizontal surfaces
 
+function _bpCenterSideDesk(cw) {
+    const wing = cw || (state.wings && state.wings.center);
+    const desk = wing && wing.desk;
+    return (desk && desk.side !== 'none') ? desk : null;
+}
+
+function _bpCenterSideCabinet(cw) {
+    const wing = cw || (state.wings && state.wings.center);
+    const sc = wing && wing.sideCabinet;
+    return (sc && sc.side !== 'none') ? sc : null;
+}
+
+/** Extra width (cm) on each side of center cabinet for side desk / side cabinet in front-view layout */
+function _bpCenterHorizExtra(cw) {
+    let left = 0, right = 0;
+    const desk = _bpCenterSideDesk(cw);
+    if (desk) {
+        const dw = desk.width || 100;
+        if (desk.side === 'left') left += dw;
+        else if (desk.side === 'right') right += dw;
+    }
+    const sc = _bpCenterSideCabinet(cw);
+    if (sc) {
+        const wR = sc.widthRight || sc.width || 40;
+        const wL = sc.widthLeft || sc.width || 40;
+        if (sc.side === 'right') right += wR;
+        else if (sc.side === 'left') left += wL;
+        else if (sc.side === 'both') { left += wL; right += wR; }
+    }
+    return { left, right };
+}
+
+/** Push side-desk front-view SVG primitives into parts array (makeRect / makeDim* style) */
+function _bpDrawSideDeskFrontParts(p, desk, ox, oy, dW, dH, sc, fill, STROKE, STROKE_THIN, FONT, dimHFn, dimVFn, dimVLeftFn) {
+    if (!desk) return;
+    const dSide = desk.side;
+    const dWidth = desk.width || 100;
+    const dHeight = desk.height || 75;
+    const drawerH = desk.drawerHeight || 12;
+    const dSvgW = dWidth * sc;
+    const dSvgH = dHeight * sc;
+    const legT = (state.thickness || 1.7) * sc;
+    const deskSurfT = DESK_SURFACE_T * sc;
+    const deskX = dSide === 'left' ? (ox - dSvgW) : (ox + dW);
+    const deskBotY = oy + dH;
+    const deskTopY = deskBotY - dSvgH;
+    const legX = dSide === 'left' ? deskX : (deskX + dSvgW - legT);
+    const drawRect = (x, y, w, h, f, s, sw) => p.push(`<rect x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" width="${(+w).toFixed(1)}" height="${(+h).toFixed(1)}" fill="${f}" stroke="${s}" stroke-width="${sw || 1.5}"/>`);
+    const FILL_DESK = '#fed7aa';
+    drawRect(legX, deskTopY, legT, dSvgH, fill || FILL_DESK, STROKE, 1.5);
+    drawRect(deskX, deskTopY, dSvgW, deskSurfT, fill || FILL_DESK, STROKE, 1.5);
+    if (desk.hasDrawers !== false) {
+        const numDrawers = (desk.drawerCount != null) ? desk.drawerCount : (dWidth <= 80 ? 1 : 2);
+        const innerSvgW = dSvgW - legT;
+        const drawerSvgW = innerSvgW / numDrawers;
+        const drawerSvgH = drawerH * sc;
+        const drawerSvgY = deskTopY + deskSurfT;
+        const drawerStartX = dSide === 'left' ? deskX : (deskX + legT);
+        for (let di = 0; di < numDrawers; di++) {
+            const dx = drawerStartX + di * drawerSvgW;
+            drawRect(dx + 1, drawerSvgY + 1, drawerSvgW - 2, drawerSvgH - 2, 'rgba(255,255,255,0.7)', STROKE_THIN || STROKE, 0.8);
+            const hndW = Math.min(drawerSvgW * 0.4, 20);
+            const hndX = dx + (drawerSvgW - hndW) / 2;
+            const hndY = drawerSvgY + drawerSvgH * 0.5;
+            p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX + hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
+        }
+        const dimOuterX = dSide === 'left' ? (deskX - 14) : (deskX + dSvgW + 14);
+        const drawerSvgY0 = deskTopY + deskSurfT;
+        if (dSide === 'left') {
+            dimVLeftFn(dimOuterX, drawerSvgY0, drawerSvgY0 + drawerH * sc, `${Math.round(drawerH * 10)}`);
+            dimVLeftFn(dimOuterX - 36, drawerSvgY0 + drawerH * sc, deskBotY, `${Math.round((dHeight - DESK_SURFACE_T - drawerH) * 10)}`);
+        } else {
+            dimVFn(dimOuterX, drawerSvgY0, drawerSvgY0 + drawerH * sc, `${Math.round(drawerH * 10)}`);
+            dimVFn(dimOuterX + 36, drawerSvgY0 + drawerH * sc, deskBotY, `${Math.round((dHeight - DESK_SURFACE_T - drawerH) * 10)}`);
+        }
+    }
+    dimHFn(deskX, deskX + dSvgW, oy + dH + 36, `${Math.round(dWidth * 10)}`);
+    if (dSide === 'left') dimVLeftFn(deskX - 14, deskTopY, deskBotY, `${Math.round(dHeight * 10)}`);
+    else dimVFn(deskX + dSvgW + 14, deskTopY, deskBotY, `${Math.round(dHeight * 10)}`);
+    const midX = deskX + dSvgW / 2;
+    const midY = deskTopY + dSvgH / 2;
+    p.push(`<text x="${midX.toFixed(1)}" y="${(midY + 4).toFixed(1)}" text-anchor="middle" font-family="${FONT || 'Rubik,Tahoma,sans-serif'}" font-size="11" fill="${STROKE}" opacity="0.85">שולחן צד</text>`);
+}
+
+/** Side cabinet silhouette on center front view */
+function _bpDrawSideCabinetFrontParts(p, sc, ox, oy, dW, dH, scScale, wgH, pH, drawRectFn, dimHFn, STROKE, FONT) {
+    if (!sc) return;
+    const FILL_SC = '#e0f2fe';
+    const drawOne = (onRight, scWcm) => {
+        const scSvgW = scWcm * scScale;
+        const scHcm = sc.globalHeight || wgH;
+        const scSvgH = scHcm * scScale;
+        const scX = onRight ? (ox + dW) : (ox - scSvgW);
+        const scTopY = oy + dH - scSvgH;
+        const scPHcm = sc.plinthHeight != null ? sc.plinthHeight : pH;
+        const scPH = scPHcm * scScale;
+        drawRectFn(scX, scTopY, scSvgW, scSvgH, FILL_SC, STROKE, 1.5);
+        if (scPH > 0) drawRectFn(scX, oy + dH - scPH, scSvgW, scPH, '#cbd5e1', STROKE, 1);
+        p.push(`<text x="${(scX + scSvgW / 2).toFixed(1)}" y="${(scTopY + scSvgH / 2 + 4).toFixed(1)}" text-anchor="middle" font-family="${FONT || 'Rubik,Tahoma,sans-serif'}" font-size="11" fill="${STROKE}" opacity="0.85">ארון צד</text>`);
+        dimHFn(scX, scX + scSvgW, oy + dH + 52, `${Math.round(scWcm * 10)}`);
+    };
+    if (sc.side === 'right' || sc.side === 'both') drawOne(true, sc.widthRight || sc.width || 40);
+    if (sc.side === 'left' || sc.side === 'both') drawOne(false, sc.widthLeft || sc.width || 40);
+}
+
 const _BP_STROKE = '#1e3a5f';
 const _BP_STROKE_THIN = '#94a3b8';
 const _BP_FONT = 'Rubik,Tahoma,sans-serif';
@@ -662,16 +767,21 @@ window._generateMultiViewBlueprintSVG = function() {
         const cuD_fp = hasCU ? (state.corner.depth || cD) : 0;
         if (hasCU) maxZ = Math.max(maxZ, cD + cuW_fp);
         // Side cabinet (ארון צד הפוך) — extends in X direction
-        const scFP = state.wings.center ? state.wings.center.sideCabinet : null;
-        const hasSCFP = scFP && scFP.side !== 'none';
-        const scW_fp = hasSCFP ? (scFP.width || 40) : 0;
+        const scFP = _bpCenterSideCabinet(centerWing);
+        const hasSCFP = !!scFP;
+        const scWR = hasSCFP ? (scFP.widthRight || scFP.width || 40) : 0;
+        const scWL = hasSCFP ? (scFP.widthLeft || scFP.width || 40) : 0;
         if (hasSCFP) {
             const scSideFP = scFP.side;
-            if (scSideFP === 'right' || scSideFP === 'both') maxX = Math.max(maxX, cW/2 + scW_fp);
-            if (scSideFP === 'left'  || scSideFP === 'both') minX = Math.min(minX, -cW/2 - scW_fp);
+            if (scSideFP === 'right') maxX = Math.max(maxX, cW/2 + scWR);
+            else if (scSideFP === 'left') minX = Math.min(minX, -cW/2 - scWL);
+            else if (scSideFP === 'both') {
+                maxX = Math.max(maxX, cW/2 + scWR);
+                minX = Math.min(minX, -cW/2 - scWL);
+            }
         }
         // Side desk (שולחן צד) — extends in X direction, depth = cD
-        const deskFP = state.desk && state.desk.side !== 'none' ? state.desk : null;
+        const deskFP = _bpCenterSideDesk(centerWing);
         const hasDeskFP = !!deskFP;
         const deskFPW = hasDeskFP ? (deskFP.width || 100) : 0;
         if (hasDeskFP) {
@@ -797,11 +907,12 @@ window._generateMultiViewBlueprintSVG = function() {
             const FILL_SC = '#e0f2fe'; // light blue for side cabinet
             const scSideFP2 = scFP.side;
             const _drawSCFP = (onRight) => {
-                const scX1 = onRight ? cW/2 : -cW/2 - scW_fp;
-                const scX2 = onRight ? cW/2 + scW_fp : -cW/2;
-                rect(wx(scX1), wz(0), scW_fp*sc, cD*sc, FILL_SC, STROKE, 1.5);
+                const scWcm = onRight ? scWR : scWL;
+                const scX1 = onRight ? cW/2 : -cW/2 - scWcm;
+                const scX2 = onRight ? cW/2 + scWcm : -cW/2;
+                rect(wx(scX1), wz(0), scWcm*sc, cD*sc, FILL_SC, STROKE, 1.5);
                 p.push(`<text x="${wx((scX1+scX2)/2).toFixed(1)}" y="${(wz(cD/2)+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.8">ארון צד</text>`);
-                dimH(wx(scX1), wx(scX2), wz(cD) + 14, `${Math.round(scW_fp * 10)}`);
+                dimH(wx(scX1), wx(scX2), wz(cD) + 14, `${Math.round(scWcm * 10)}`);
             };
             if (scSideFP2 === 'right' || scSideFP2 === 'both') _drawSCFP(true);
             if (scSideFP2 === 'left'  || scSideFP2 === 'both') _drawSCFP(false);
@@ -884,9 +995,12 @@ window._generateMultiViewBlueprintSVG = function() {
         const pw = SVG_W - MARGIN * 2;
         panelBox(MARGIN, py, pw, WING_H, `שרטוט חזית — ${wg.label} | רוחב: ${Math.round(wg.w * 10)} מ"מ | גובה: ${Math.round(wg.h * 10)} מ"מ | עומק: ${Math.round(wg.d * 10)} מ"מ`);
         const drawY = py + LABEL_H;
-        const sc = Math.min((pw - PAD*2) / Math.max(wg.w,1), (WING_H - PAD*2) / Math.max(wg.h,1));
+        const _isCenterWg = wg.wd === centerWing;
+        const _horizExtra = _isCenterWg ? _bpCenterHorizExtra(centerWing) : { left: 0, right: 0 };
+        const _layoutW = wg.w + _horizExtra.left + _horizExtra.right;
+        const sc = Math.min((pw - PAD*2) / Math.max(_layoutW, 1), (WING_H - PAD*2) / Math.max(wg.h, 1));
         const dW = wg.w * sc, dH = wg.h * sc;
-        const ox = MARGIN + (pw - dW) / 2;
+        const ox = MARGIN + (pw - _layoutW * sc) / 2 + _horizExtra.left * sc;
         const oy = drawY + (WING_H - dH) / 2;
 
         // Columns, shelves, hangers & drawers
@@ -980,60 +1094,15 @@ window._generateMultiViewBlueprintSVG = function() {
             }
         }
 
-        // Side desk (שולחן צד) — only for center wing
-        if (wg.wd === centerWing && state.desk && state.desk.side !== 'none') {
-            const dSide  = state.desk.side;
-            const dWidth = state.desk.width;
-            const dHeight = state.desk.height;
-            const drawerH = state.desk.drawerHeight || 12;
-            const dSvgW  = dWidth  * sc;
-            const dSvgH  = dHeight * sc;
-            const legT   = (state.thickness || 1.7) * sc; // vertical leg board
-            const deskSurfT = DESK_SURFACE_T * sc;
-            // Desk sits to the left or right of the cabinet body
-            const deskX  = dSide === 'left' ? (ox - dSvgW) : (ox + dW);
-            const deskBotY = oy + dH; // floor level
-            const deskTopY = deskBotY - dSvgH;
-            // Outer leg (vertical board)
-            const legX = dSide === 'left' ? deskX : (deskX + dSvgW - legT);
-            rect(legX, deskTopY, legT, dSvgH, wg.fill, STROKE, 1.5);
-            // Desk surface (horizontal board at top, 28mm)
-            rect(deskX, deskTopY, dSvgW, deskSurfT, wg.fill, STROKE, 1.5);
-            // Drawers (if any) — sit just below the desk surface, inside the leg
-            if (state.desk.hasDrawers) {
-                const numDrawers = (state.desk.drawerCount != null) ? state.desk.drawerCount : (dWidth <= 80 ? 1 : 2);
-                const innerSvgW = dSvgW - legT; // width between cabinet wall and leg
-                const drawerSvgW = innerSvgW / numDrawers;
-                const drawerSvgH = drawerH * sc;
-                const drawerSvgY = deskTopY + deskSurfT; // just below desk surface
-                const drawerStartX = dSide === 'left' ? deskX : (deskX + legT);
-                for (let di = 0; di < numDrawers; di++) {
-                    const dx = drawerStartX + di * drawerSvgW;
-                    rect(dx + 1, drawerSvgY + 1, drawerSvgW - 2, drawerSvgH - 2, 'rgba(255,255,255,0.7)', STROKE_THIN, 0.8);
-                    // Handle line
-                    const hndW = Math.min(drawerSvgW * 0.4, 20);
-                    const hndX = dx + (drawerSvgW - hndW) / 2;
-                    const hndY = drawerSvgY + drawerSvgH * 0.5;
-                    p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
-                }
-                // Dimension: drawer height (outer side of desk)
-                const dimOuterX = dSide === 'left' ? (deskX - 14) : (deskX + dSvgW + 14);
-                const drawerSvgY0 = deskTopY + deskSurfT;
-                if (dSide === 'left') {
-                    dimVLeft(dimOuterX, drawerSvgY0, drawerSvgY0 + drawerH * sc, `${Math.round(drawerH * 10)}`);
-                    dimVLeft(dimOuterX - 36, drawerSvgY0 + drawerH * sc, deskBotY, `${Math.round((dHeight - DESK_SURFACE_T - drawerH) * 10)}`);
-                } else {
-                    dimV(dimOuterX, drawerSvgY0, drawerSvgY0 + drawerH * sc, `${Math.round(drawerH * 10)}`);
-                    dimV(dimOuterX + 36, drawerSvgY0 + drawerH * sc, deskBotY, `${Math.round((dHeight - DESK_SURFACE_T - drawerH) * 10)}`);
-                }
+        // Side desk + side cabinet on center front view
+        if (_isCenterWg) {
+            const _deskFP = _bpCenterSideDesk(centerWing);
+            if (_deskFP) {
+                _bpDrawSideDeskFrontParts(p, _deskFP, ox, oy, dW, dH, sc, wg.fill, STROKE, STROKE_THIN, FONT, dimH, dimV, dimVLeft);
             }
-            // Dimension: desk width (below)
-            dimH(deskX, deskX + dSvgW, oy + dH + 36, `${Math.round(dWidth * 10)}`);
-            // Dimension: desk height (to the outer side)
-            if (dSide === 'left') {
-                dimVLeft(deskX - 14, deskTopY, deskBotY, `${Math.round(dHeight * 10)}`);
-            } else {
-                dimV(deskX + dSvgW + 14, deskTopY, deskBotY, `${Math.round(dHeight * 10)}`);
+            const _scFP = _bpCenterSideCabinet(centerWing);
+            if (_scFP) {
+                _bpDrawSideCabinetFrontParts(p, _scFP, ox, oy, dW, dH, sc, wg.h, pH, (x, y, w, h, f, s, sw) => rect(x, y, w, h, f, s, sw), dimH, STROKE, FONT);
             }
         }
 
@@ -1706,16 +1775,21 @@ window._generateMultiViewBlueprintPages = function() {
         const cuD_fp = hasCU ? (state.corner.depth || cD) : 0;
         if (hasCU) maxZ = Math.max(maxZ, cD + cuW_fp);
         // Side cabinet (ארון צד הפוך) — extends in X direction
-        const scFP2 = state.wings.center ? state.wings.center.sideCabinet : null;
-        const hasSCFP2 = scFP2 && scFP2.side !== 'none';
-        const scW_fp2 = hasSCFP2 ? (scFP2.width || 40) : 0;
+        const scFP2 = _bpCenterSideCabinet(centerWing);
+        const hasSCFP2 = !!scFP2;
+        const scWR2 = hasSCFP2 ? (scFP2.widthRight || scFP2.width || 40) : 0;
+        const scWL2 = hasSCFP2 ? (scFP2.widthLeft || scFP2.width || 40) : 0;
         if (hasSCFP2) {
             const scSideFP2b = scFP2.side;
-            if (scSideFP2b === 'right' || scSideFP2b === 'both') maxX = Math.max(maxX, cW/2 + scW_fp2);
-            if (scSideFP2b === 'left'  || scSideFP2b === 'both') minX = Math.min(minX, -cW/2 - scW_fp2);
+            if (scSideFP2b === 'right') maxX = Math.max(maxX, cW/2 + scWR2);
+            else if (scSideFP2b === 'left') minX = Math.min(minX, -cW/2 - scWL2);
+            else if (scSideFP2b === 'both') {
+                maxX = Math.max(maxX, cW/2 + scWR2);
+                minX = Math.min(minX, -cW/2 - scWL2);
+            }
         }
         // Side desk (שולחן צד) — extends in X direction, depth = cD
-        const deskFP2 = state.desk && state.desk.side !== 'none' ? state.desk : null;
+        const deskFP2 = _bpCenterSideDesk(centerWing);
         const hasDeskFP2 = !!deskFP2;
         const deskFPW2 = hasDeskFP2 ? (deskFP2.width || 100) : 0;
         if (hasDeskFP2) {
@@ -1819,11 +1893,12 @@ window._generateMultiViewBlueprintPages = function() {
             const FILL_SC2 = '#e0f2fe'; // light blue for side cabinet
             const scSideFP2c = scFP2.side;
             const _drawSCFP2 = (onRight) => {
-                const scX1_2 = onRight ? cW/2 : -cW/2 - scW_fp2;
-                const scX2_2 = onRight ? cW/2 + scW_fp2 : -cW/2;
-                makeRect(p, wx(scX1_2), wz(0), scW_fp2*sc, cD*sc, FILL_SC2, STROKE, 1.5);
+                const scWcm2 = onRight ? scWR2 : scWL2;
+                const scX1_2 = onRight ? cW/2 : -cW/2 - scWcm2;
+                const scX2_2 = onRight ? cW/2 + scWcm2 : -cW/2;
+                makeRect(p, wx(scX1_2), wz(0), scWcm2*sc, cD*sc, FILL_SC2, STROKE, 1.5);
                 p.push(`<text x="${wx((scX1_2+scX2_2)/2).toFixed(1)}" y="${(wz(cD/2)+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.8">ארון צד</text>`);
-                makeDimH(p, wx(scX1_2), wx(scX2_2), wz(cD) + 14, `${Math.round(scW_fp2 * 10)}`);
+                makeDimH(p, wx(scX1_2), wx(scX2_2), wz(cD) + 14, `${Math.round(scWcm2 * 10)}`);
             };
             if (scSideFP2c === 'right' || scSideFP2c === 'both') _drawSCFP2(true);
             if (scSideFP2c === 'left'  || scSideFP2c === 'both') _drawSCFP2(false);
@@ -1938,9 +2013,12 @@ window._generateMultiViewBlueprintPages = function() {
         const drawAreaH = PAGE_H - drawAreaY - MARGIN - 80; // reserve 80px at bottom for dim labels
         const pw = SVG_W - MARGIN * 2;
 
-        const sc = Math.min((pw - PAD*2) / Math.max(wg.w,1), (drawAreaH - PAD*2) / Math.max(wg.h,1));
+        const _isCenterWg2 = wg.wd === centerWing;
+        const _horizExtra2 = _isCenterWg2 ? _bpCenterHorizExtra(centerWing) : { left: 0, right: 0 };
+        const _layoutW2 = wg.w + _horizExtra2.left + _horizExtra2.right;
+        const sc = Math.min((pw - PAD*2) / Math.max(_layoutW2, 1), (drawAreaH - PAD*2) / Math.max(wg.h, 1));
         const dW = wg.w * sc, dH = wg.h * sc;
-        const ox = MARGIN + (pw - dW) / 2;
+        const ox = MARGIN + (pw - _layoutW2 * sc) / 2 + _horizExtra2.left * sc;
         const oy = drawAreaY + (drawAreaH - dH) / 2;
 
         // Cabinet body — draw as individual column rects so shorter columns show correctly
@@ -2031,60 +2109,15 @@ window._generateMultiViewBlueprintPages = function() {
             }
         }
 
-        // Side desk (שולחן צד) — only for center wing
-        if (wg.wd === centerWing && state.desk && state.desk.side !== 'none') {
-            const dSide   = state.desk.side;
-            const dWidth  = state.desk.width;
-            const dHeight = state.desk.height;
-            const drawerH = state.desk.drawerHeight || 12;
-            const dSvgW   = dWidth  * sc;
-            const dSvgH   = dHeight * sc;
-            const legT    = (state.thickness || 1.7) * sc; // vertical leg board
-            const deskSurfT = DESK_SURFACE_T * sc;
-            // Desk sits to the left or right of the cabinet body
-            const deskX   = dSide === 'left' ? (ox - dSvgW) : (ox + dW);
-            const deskBotY = oy + dH; // floor level
-            const deskTopY = deskBotY - dSvgH;
-            // Outer leg (vertical board)
-            const legX = dSide === 'left' ? deskX : (deskX + dSvgW - legT);
-            makeRect(p, legX, deskTopY, legT, dSvgH, wg.fill, STROKE, 1.5);
-            // Desk surface (horizontal board at top, 28mm)
-            makeRect(p, deskX, deskTopY, dSvgW, deskSurfT, wg.fill, STROKE, 1.5);
-            // Drawers (if any) — sit just below the desk surface, inside the leg
-            if (state.desk.hasDrawers) {
-                const numDrawers = (state.desk.drawerCount != null) ? state.desk.drawerCount : (dWidth <= 80 ? 1 : 2);
-                const innerSvgW = dSvgW - legT; // width between cabinet wall and leg
-                const drawerSvgW = innerSvgW / numDrawers;
-                const drawerSvgH = drawerH * sc;
-                const drawerSvgY = deskTopY + deskSurfT; // just below desk surface
-                const drawerStartX = dSide === 'left' ? deskX : (deskX + legT);
-                for (let di = 0; di < numDrawers; di++) {
-                    const dx = drawerStartX + di * drawerSvgW;
-                    makeRect(p, dx + 1, drawerSvgY + 1, drawerSvgW - 2, drawerSvgH - 2, 'rgba(255,255,255,0.7)', STROKE_THIN, 0.8);
-                    // Handle line
-                    const hndW = Math.min(drawerSvgW * 0.4, 20);
-                    const hndX = dx + (drawerSvgW - hndW) / 2;
-                    const hndY = drawerSvgY + drawerSvgH * 0.5;
-                    p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
-                }
-                // Dimension: drawer height (outer side of desk)
-                const dimOuterX = dSide === 'left' ? (deskX - 14) : (deskX + dSvgW + 14);
-                const drawerSvgY0 = deskTopY + deskSurfT;
-                if (dSide === 'left') {
-                    makeDimVLeft(p, dimOuterX, drawerSvgY0, drawerSvgY0 + drawerH * sc, `${Math.round(drawerH * 10)}`);
-                    makeDimVLeft(p, dimOuterX - 36, drawerSvgY0 + drawerH * sc, deskBotY, `${Math.round((dHeight - DESK_SURFACE_T - drawerH) * 10)}`);
-                } else {
-                    makeDimV(p, dimOuterX, drawerSvgY0, drawerSvgY0 + drawerH * sc, `${Math.round(drawerH * 10)}`);
-                    makeDimV(p, dimOuterX + 36, drawerSvgY0 + drawerH * sc, deskBotY, `${Math.round((dHeight - DESK_SURFACE_T - drawerH) * 10)}`);
-                }
+        // Side desk + side cabinet on center front view
+        if (_isCenterWg2) {
+            const _deskFP2 = _bpCenterSideDesk(centerWing);
+            if (_deskFP2) {
+                _bpDrawSideDeskFrontParts(p, _deskFP2, ox, oy, dW, dH, sc, wg.fill, STROKE, STROKE_THIN, FONT, (x1, x2, y, lbl) => makeDimH(p, x1, x2, y, lbl), (x, y1, y2, lbl) => makeDimV(p, x, y1, y2, lbl), (x, y1, y2, lbl) => makeDimVLeft(p, x, y1, y2, lbl));
             }
-            // Dimension: desk width (below)
-            makeDimH(p, deskX, deskX + dSvgW, oy + dH + 36, `${Math.round(dWidth * 10)}`);
-            // Dimension: desk height (to the outer side)
-            if (dSide === 'left') {
-                makeDimVLeft(p, deskX - 14, deskTopY, deskBotY, `${Math.round(dHeight * 10)}`);
-            } else {
-                makeDimV(p, deskX + dSvgW + 14, deskTopY, deskBotY, `${Math.round(dHeight * 10)}`);
+            const _scFP2 = _bpCenterSideCabinet(centerWing);
+            if (_scFP2) {
+                _bpDrawSideCabinetFrontParts(p, _scFP2, ox, oy, dW, dH, sc, wg.h, pH, (x, y, w, h, f, s, sw) => makeRect(p, x, y, w, h, f, s, sw), (x1, x2, y, lbl) => makeDimH(p, x1, x2, y, lbl), STROKE, FONT);
             }
         }
 
@@ -3217,6 +3250,31 @@ window._generateMultiViewBlueprintPages = function() {
 
             if (scSideVal === 'right' || scSideVal === 'both') _drawSCPage('ימין',  scData.widthRight || scData.width || 40, 'side-cab-right');
             if (scSideVal === 'left'  || scSideVal === 'both') _drawSCPage('שמאל', scData.widthLeft  || scData.width || 40, 'side-cab-left');
+        }
+    }
+
+    // ---- Side desk front-view page ----
+    {
+        const deskData = _bpCenterSideDesk(centerWing);
+        if (deskData) {
+            const dWidth = deskData.width || 100;
+            const dHeight = deskData.height || 75;
+            const dSideLbl = deskData.side === 'left' ? 'שמאל' : 'ימין';
+            const p = [];
+            _bpStartPage('side-desk');
+            const drawAreaY = 65;
+            const drawAreaH = PAGE_H - drawAreaY - MARGIN - 80;
+            const pw = SVG_W - MARGIN * 2;
+            const scScale = Math.min((pw - PAD*2) / Math.max(dWidth, 1), (drawAreaH - PAD*2) / Math.max(dHeight, 1));
+            const dW = dWidth * scScale;
+            const dH = dHeight * scScale;
+            const oxDesk = MARGIN + (pw - dW) / 2;
+            const oy = drawAreaY + (drawAreaH - dH) / 2;
+            const attachOx = deskData.side === 'right' ? oxDesk : (oxDesk + dW);
+            _bpDrawSideDeskFrontParts(p, deskData, attachOx, oy, 0, dH, scScale, '#fed7aa', STROKE, STROKE_THIN, FONT, (x1, x2, y, lbl) => makeDimH(p, x1, x2, y, lbl), (x, y1, y2, lbl) => makeDimV(p, x, y1, y2, lbl), (x, y1, y2, lbl) => makeDimVLeft(p, x, y1, y2, lbl));
+            _bpAppendViewCutouts(p, 'side-desk', oxDesk, oy, dW, dH, scScale, dWidth, dHeight);
+            _bpFlushDims(p);
+            pages.push({ label: `שרטוט חזית — שולחן צד ${dSideLbl}`, svgParts: p, viewKey: 'side-desk', cabWidthCm: dWidth, cabHeightCm: dHeight, viewMeta: { ox: oxDesk, oy, dW, dH, sc: scScale } });
         }
     }
 

@@ -70,6 +70,8 @@ function showMobileCellSheet() {
     right.classList.add('open');
     left.classList.add('open');
     document.body.classList.add('mobile-cell-panels-open');
+    const overlay = document.getElementById('mobile-overlay');
+    if (overlay) overlay.classList.add('active');
     // Show column bar
     const colBar = document.getElementById('mobile-col-bar');
     if (colBar) colBar.classList.add('open');

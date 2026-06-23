@@ -93,7 +93,10 @@
                 </button>
             </div>
             <div class="presets-grid presets-grid--4">
-                <div></div>
+                <button class="preset-btn" id="preset-btn-writing-desk" onclick="applyPreset('writing-desk')" title="שולחן כתיבה">
+                    <i class="fa-solid fa-desktop" style="font-size:1.4rem;opacity:0.9;"></i>
+                    <span>שולחן כתיבה</span>
+                </button>
                 <button class="preset-btn" id="preset-btn-sliding" onclick="applyPreset('sliding')" title="ארון הזזה">
                     <i class="fa-solid fa-arrows-left-right" style="font-size:1.4rem;opacity:0.9;"></i>
                     <span>ארון הזזה</span>
@@ -102,7 +105,6 @@
                     <i class="fa-solid fa-sink" style="font-size:1.4rem;opacity:0.9;"></i>
                     <span>אמבטיה</span>
                 </button>
-                <div></div>
             </div>
         </div>
         <p class="sidebar-section-title">עריכת מידות ארון:</p>
@@ -787,6 +789,42 @@
                     <option value="v_grooves">פסים אנכיים</option>
                     <option value="waves">גלים</option>
                 </select>
+            </div>
+        </div>
+
+        <!-- ===== WRITING DESK SECTION (shown only for writing-desk preset) ===== -->
+        <div class="section" id="writing-desk-section" style="display:none;">
+            <div class="section-title"><i class="fa-solid fa-desktop"></i> הגדרות שולחן כתיבה</div>
+            <p style="font-size:0.75rem;color:var(--text-light);margin:0 0 10px;">רוחב, גובה ועומק נשלטים ממידות הארון למעלה. שתי רגליים בקצוות.</p>
+
+            <div class="control-group" style="margin-bottom:12px;">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.85rem;">
+                    <input type="checkbox" id="wd-inp-drawers" checked
+                        onchange="window._setWritingDeskDrawers(this.checked)">
+                    מגירות תחתונות
+                </label>
+            </div>
+
+            <div id="wd-drawers-block">
+                <div class="control-group" style="margin-bottom:12px;">
+                    <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:6px;">כמות מגירות</div>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <button class="slider-btn" type="button" onclick="window._setWritingDeskDrawerCount(-1)"><i class="fa-solid fa-minus"></i></button>
+                        <input type="number" id="wd-inp-drawer-count" class="editor-select" min="1" max="4" value="2" readonly style="width:48px;text-align:center;margin:0;">
+                        <span id="wd-val-drawer-count" style="display:none;">2</span>
+                        <button class="slider-btn" type="button" onclick="window._setWritingDeskDrawerCount(1)"><i class="fa-solid fa-plus"></i></button>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:6px;">גובה מגירה: <span id="wd-val-drawer-height">12 ס''מ</span></div>
+                    <div class="slider-row">
+                        <button class="slider-btn" type="button" onclick="window._setWritingDeskDrawerHeight((document.getElementById('wd-inp-drawer-height').value|0)+1)"><i class="fa-solid fa-plus"></i></button>
+                        <input type="range" id="wd-inp-drawer-height" min="8" max="40" value="12" step="1"
+                            oninput="document.getElementById('wd-val-drawer-height').innerText=this.value+' ס\'\'מ'; window._setWritingDeskDrawerHeight(this.value)">
+                        <button class="slider-btn" type="button" onclick="window._setWritingDeskDrawerHeight((document.getElementById('wd-inp-drawer-height').value|0)-1)"><i class="fa-solid fa-minus"></i></button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -1689,6 +1727,10 @@
                 style="flex:1;min-width:48px;padding:6px 4px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.72rem;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;">
                 <i class="fa-solid fa-sink" style="font-size:1rem;"></i><span>אמבטיה</span>
             </button>
+            <button class="preset-btn" id="mobile-preset-btn-writing-desk" onclick="applyPreset('writing-desk')" title="שולחן כתיבה"
+                style="flex:1;min-width:48px;padding:6px 4px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.72rem;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;">
+                <i class="fa-solid fa-desktop" style="font-size:1rem;"></i><span>שולחן</span>
+            </button>
         </div>
         <div class="mobile-section-title">דגם ומיקום</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:15px;">
@@ -2434,15 +2476,16 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js"></script>
-<script src="state.js?v=20260609e"></script>
+<script src="state.js?v=20260617wd"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
-<script src="engine-core.js?v=20260617partdoors"></script>
+<script src="writing-desk-preset.js?v=20260617wd"></script>
+<script src="engine-core.js?v=20260617sdeskbp"></script>
 <script src="engine-corners.js?v=20260609a"></script>
-<script src="engine-blueprint.js?v=20260608bp"></script>
+<script src="engine-blueprint.js?v=20260617sdeskbp"></script>
 <script src="tambour-color-picker.js?v=20260608a"></script>
-<script src="ui.js?v=20260617partsel2"></script>
+<script src="ui.js?v=20260617wd"></script>
 <script src="layout-mode.js?v=20260610i"></script>
-<script src="mobile.js?v=20260609e"></script>
+<script src="mobile.js?v=20260617partclose"></script>
 <script src="part-paint.js?v=20260520k"></script>
 <script src="index-init.js?v=20260609a"></script>
 
