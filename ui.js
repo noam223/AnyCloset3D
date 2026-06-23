@@ -2943,6 +2943,7 @@ window.applySubCellContent = function(side, type) {
 
 window.applyDoor = function(type) {
     if (state.selection.colIndex === -1 || state.selection.rows.length === 0) return;
+    const c = state.selection.colIndex;
 
     // Route to sub-cell zones when partition sub-cells are selected
     if (_activeSubCellIdxs.size > 0) {
@@ -2953,7 +2954,6 @@ window.applyDoor = function(type) {
         return;
     }
 
-    const c = state.selection.colIndex;
     const _doorPartComp = state.columns[c] && state.columns[c].compartments[Math.min(...state.selection.rows)];
     if (_doorPartComp && _doorPartComp.partition && state.selection.rows.length === 1) {
         _showToast('יש לבחור אזור אחד או יותר במחיצה (לחץ על + בכל אזור, או "בחר הכל")', 4500);
