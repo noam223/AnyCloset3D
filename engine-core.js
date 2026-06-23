@@ -2941,9 +2941,9 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         const legRightX = dWidth / 2 - t / 2;
         const legH = dHeight - deskT;
 
-        createBoard(dWidth, deskT, bodyD, 0, dHeight - deskT / 2, 0, matDesk);
-        createBoard(t, legH, bodyD, legLeftX, legH / 2, 0, matDesk);
-        createBoard(t, legH, bodyD, legRightX, legH / 2, 0, matDesk);
+        createBoard(dWidth, deskT, bodyD, 0, dHeight - deskT / 2, 0, matBody);
+        createBoard(t, legH, bodyD, legLeftX, legH / 2, 0, matBody);
+        createBoard(t, legH, bodyD, legRightX, legH / 2, 0, matBody);
 
         if (hasDrawers) {
             const numDrawers = (wd.drawerCount != null) ? wd.drawerCount : (dWidth <= 80 ? 1 : 2);
@@ -2952,7 +2952,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
             const drawerWidth = (innerWidth - gap * (numDrawers + 1)) / numDrawers;
             const drawerBottomY = dHeight - deskT - drawerH;
             const drawerCenterY = drawerBottomY + drawerH / 2;
-            if (!isBP) createBoard(innerWidth, deskT, bodyD - 2, 0, drawerBottomY + deskT / 2, 0, matDesk);
+            if (!isBP) createBoard(innerWidth, deskT, bodyD - 2, 0, drawerBottomY + deskT / 2, 0, matBody);
             for (let i = 0; i < numDrawers; i++) {
                 const dx = -innerWidth / 2 + gap + drawerWidth / 2 + i * (drawerWidth + gap);
                 _ppPartId = `wd_drawer_d${i}`;

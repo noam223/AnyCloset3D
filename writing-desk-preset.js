@@ -47,6 +47,8 @@ window._applyWritingDeskPreset = function() {
         drawerCount: 2,
         drawerHeight: 12
     };
+    cw.activeColorPart = 'materialBody';
+    cw.materialDesk = cw.materialBody || 'white_matte';
 
     if (typeof updateDim === 'function') {
         // Set dims directly — avoid updateDim here (it calls updateCameraView before debounced buildCabinet).

@@ -1532,6 +1532,50 @@ window._updateMaterialTabVisibility = function(w) {
     if (!w) w = getWing();
     if (!w) return;
 
+    const _partTabDefaultLabels = {
+        materialBody:     ['גוף וצוקל', 'גוף'],
+        materialInternal: ['מדפים ופנים', 'פנים'],
+        materialBack:     ['גב ארון', 'גב'],
+        materialExternal: ['חזיתות', 'חזיתות'],
+        materialDesk:     ['שולחן', 'שולחן'],
+        materialOpenCell: ['כוורת', 'כוורת'],
+        materialSideCabinet: ['ארון צד', 'ארון צד'],
+        materialTopPanel: ['משטח', 'משטח'],
+        materialUpperUnit: ['חלק עליון', 'חלק עליון'],
+    };
+    const _applyPartTabLabels = (labelMap) => {
+        document.querySelectorAll('.part-tab-btn[data-part]').forEach(btn => {
+            const part = btn.getAttribute('data-part');
+            const lbl = labelMap[part];
+            if (!lbl) return;
+            const isMobile = !!btn.closest('.mobile-panel-body');
+            btn.textContent = isMobile ? lbl[1] : lbl[0];
+        });
+    };
+
+    // Writing desk: only body (legs + surface) and drawers
+    if (state.presetId === 'writing-desk') {
+        _applyPartTabLabels({
+            materialBody: ['גוף', 'גוף'],
+            materialExternal: ['מגירות', 'מגירות'],
+        });
+        document.querySelectorAll('.part-tab-btn[data-part]').forEach(btn => {
+            const part = btn.getAttribute('data-part');
+            btn.style.display = (part === 'materialBody' || part === 'materialExternal') ? '' : 'none';
+        });
+        const activePart = (w.activeColorPart === 'materialExternal') ? 'materialExternal' : 'materialBody';
+        w.activeColorPart = activePart;
+        document.querySelectorAll('.part-tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll(`.part-tab-btn[data-part="${activePart}"]`).forEach(b => b.classList.add('active'));
+        document.querySelectorAll('.material-btn').forEach(b => b.classList.remove('active'));
+        const currentMat = w[activePart] || w.materialBody || 'white_matte';
+        const matBtn = document.querySelector(`.material-btn[data-mat="${currentMat}"]`);
+        if (matBtn) matBtn.classList.add('active');
+        return;
+    }
+
+    _applyPartTabLabels(_partTabDefaultLabels);
+
     // _isUUEdit: true when editing upper unit inline
     const _isUUEdit = !!state._activeUpperUnit;
     const _aw = state.activeWing;
