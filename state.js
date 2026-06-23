@@ -2316,6 +2316,7 @@ function _migratePartitions(col) {
 window._migratePartitions = _migratePartitions;
 
 function checkSplits() {
+    if (!state.columns || state.columns.length === 0) return;
     const threshold = getSplitThreshold();
     let maxColHeight = Math.max(...state.columns.map(c => c.height));
     let shouldHaveSplit = maxColHeight > threshold;

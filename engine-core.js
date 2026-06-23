@@ -390,6 +390,18 @@ function _getCornerDeskPlacement() {
     return { cabOffX, cuCenterX, cuCenterZ, deskH, sign, cuW, cuD };
 }
 
+/** Cabinet display height when columns may be empty (e.g. writing desk). */
+function _wingCabinetHeight(wing, fallback) {
+    if (!wing) return fallback != null ? fallback : 240;
+    if (wing.columns && wing.columns.length > 0) {
+        const maxH = Math.max(...wing.columns.map(c => c.height || 0));
+        if (Number.isFinite(maxH) && maxH > 0) return maxH;
+    }
+    if (wing.writingDesk && wing.writingDesk.height != null) return wing.writingDesk.height;
+    if (wing.globalHeight != null) return wing.globalHeight;
+    return fallback != null ? fallback : 240;
+}
+
 // Returns {x, y, z} for laptop placement on desk surface, or null if no desk.
 function _getLaptopPos() {
     const cabOffX = cabinetGroup.position.x || 0;
@@ -1354,7 +1366,7 @@ function updateCameraView() {
 
     const centerW = centerWing ? centerWing.width : state.width;
     const centerD = centerWing ? centerWing.depth : state.depth;
-    const centerH = centerWing ? Math.max(...centerWing.columns.map(c => c.height)) : state.globalHeight;
+    const centerH = _wingCabinetHeight(centerWing, state.globalHeight || 240);
 
     // Left wing protrudes in -Z direction by its width
     const leftProtrusion = leftWing ? leftWing.width : 0;
