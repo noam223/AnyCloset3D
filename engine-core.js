@@ -2629,7 +2629,13 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
     
     const matBody = isBP ? bpMat : materials[state.materialBody];
     const matInternal = isBP ? bpMat : materials[state.materialInternal];
-    const matExternal = isBP ? bpMat : materials[state.materialExternal];
+    const _awBuild = state.activeWing;
+    const _isSideCabWing = (_awBuild === 'sideCabinetRight' || _awBuild === 'sideCabinetLeft');
+    const _centerForDoors = state.wings && state.wings.center;
+    const _externalMatKey = (_isSideCabWing && _centerForDoors)
+        ? (_centerForDoors.materialExternal || 'white_matte')
+        : state.materialExternal;
+    const matExternal = isBP ? bpMat : materials[_externalMatKey];
     const matDesk = isBP ? bpMat : materials[state.materialDesk];
     const matOpenCell = isBP ? bpMat : materials[state.materialOpenCell];
     const matBack = isBP ? bpMat : (materials[state.materialBack] || materials[state.materialBody]);

@@ -3418,6 +3418,9 @@ function buildDragHandlesUI() {
     if(state.viewMode !== 'front') return;
 
     dragHandlesData.horizontal.forEach((x3d, index) => {
+        const colLeft = state.columns[index];
+        const colRight = state.columns[index + 1];
+        if (!colLeft || !colRight) return;
         // Tooltip convention (same for all wings):
         //   ימין = columns[index+1] (higher local X = screen right)
         //   שמאל = columns[index]   (lower  local X = screen left)
@@ -3426,7 +3429,7 @@ function buildDragHandlesUI() {
         const isActiveDrag = d && d.index === index;
         const initialText = isActiveDrag && d.tooltipText
             ? d.tooltipText
-            : `ימין: ${Math.round(state.columns[index+1].width)} ס"מ | שמאל: ${Math.round(state.columns[index].width)} ס"מ`;
+            : `ימין: ${Math.round(colRight.width)} ס"מ | שמאל: ${Math.round(colLeft.width)} ס"מ`;
         const handle = createHandle('horizontal', x3d, null, initialText);
         handle.dataset.idx = index; // used by pointermove to find handle after rebuild
         if (isActiveDrag) handle.classList.add('active'); // restore active class after rebuild
@@ -3441,8 +3444,8 @@ function buildDragHandlesUI() {
             window._hDrag = {
                 index,
                 startMouseX: e.clientX,
-                startWLeft:  state.columns[index].width,
-                startWRight: state.columns[index+1].width,
+                startWLeft:  colLeft.width,
+                startWRight: colRight.width,
                 activeWing:  state.activeWing,
                 wingEditMode: state.wingEditMode,
                 tooltipText: null
@@ -5106,15 +5109,22 @@ function bindUI() {
                 if (sc) {
                     sc.materialBody = matValue;
                     sc.materialInternal = matValue;
-                    sc.materialExternal = matValue;
                     sc.materialDesk = matValue;
                     sc.materialOpenCell = matValue;
                     sc.materialBack = matValue;
+                    if (typeof window._syncSideCabinetDoorMaterial === 'function') {
+                        window._syncSideCabinetDoorMaterial(state.wings.center);
+                    }
                     // Also update the parent wing's materialSideCabinet reference color
                     if (state.wings.center) state.wings.center.materialSideCabinet = matValue;
                 }
             } else {
                 state[state.activeColorPart] = matValue;
+                if (state.activeColorPart === 'materialExternal' && state.wings.center) {
+                    if (typeof window._syncSideCabinetDoorMaterial === 'function') {
+                        window._syncSideCabinetDoorMaterial(state.wings.center);
+                    }
+                }
             }
             if (state.activeColorPart === 'materialBody' && typeof checkSplits === 'function') checkSplits();
             buildCabinet();
@@ -5144,14 +5154,21 @@ function bindUI() {
                     if (sc) {
                         sc.materialBody = 'custom';
                         sc.materialInternal = 'custom';
-                        sc.materialExternal = 'custom';
                         sc.materialDesk = 'custom';
                         sc.materialOpenCell = 'custom';
                         sc.materialBack = 'custom';
+                        if (typeof window._syncSideCabinetDoorMaterial === 'function') {
+                            window._syncSideCabinetDoorMaterial(state.wings.center);
+                        }
                         if (state.wings.center) state.wings.center.materialSideCabinet = 'custom';
                     }
                 } else {
                     state[state.activeColorPart] = 'custom';
+                    if (state.activeColorPart === 'materialExternal' && state.wings.center) {
+                        if (typeof window._syncSideCabinetDoorMaterial === 'function') {
+                            window._syncSideCabinetDoorMaterial(state.wings.center);
+                        }
+                    }
                 }
                 buildCabinet(); saveHistoryState();
             });

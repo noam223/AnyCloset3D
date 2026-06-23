@@ -185,7 +185,7 @@ function _createSideCabinetData(mainWing) {
         boardMaterial: w.boardMaterial || 'melamine',
         materialBody: w.materialSideCabinet || 'white_matte',
         materialInternal: w.materialSideCabinet || 'white_matte',
-        materialExternal: w.materialSideCabinet || 'white_matte',
+        materialExternal: w.materialExternal || 'white_matte',
         materialDesk: w.materialSideCabinet || 'white_matte',
         materialOpenCell: w.materialSideCabinet || 'white_matte',
         materialBack: w.materialSideCabinet || 'white_matte',
@@ -1369,6 +1369,7 @@ window.syncSidebarToWing = function() {
 
     // Side Cabinet
     if (hasSC) {
+        _syncSideCabinetDoorMaterial(w);
         _syncSideCabinetUI(w.sideCabinet);
     }
 
@@ -1976,6 +1977,7 @@ window.updateSideUnitType = function(type) {
             w.sideCabinet = _createSideCabinetData(w);
             w.sideCabinet.side = 'right'; // default side
         }
+        _syncSideCabinetDoorMaterial(w);
     }
 
     // Update side-unit-btn highlights
@@ -2005,6 +2007,12 @@ window.updateSideUnitType = function(type) {
     _updateMaterialTabVisibility(w);
     buildCabinet(); updateCameraView(); calculatePrice(); saveHistoryState();
 };
+
+function _syncSideCabinetDoorMaterial(mainWing) {
+    if (!mainWing || !mainWing.sideCabinet || mainWing.sideCabinet.side === 'none') return;
+    mainWing.sideCabinet.materialExternal = mainWing.materialExternal || 'white_matte';
+}
+window._syncSideCabinetDoorMaterial = _syncSideCabinetDoorMaterial;
 
 function _syncSideCabinetUI(sc) {
     const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };

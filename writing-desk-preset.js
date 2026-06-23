@@ -49,9 +49,16 @@ window._applyWritingDeskPreset = function() {
     };
 
     if (typeof updateDim === 'function') {
-        updateDim('width', null, WD_DEFAULT_WIDTH);
-        updateDim('depth', null, WD_DEFAULT_DEPTH);
-        updateDim('height', null, WD_DEFAULT_HEIGHT);
+        // Set dims directly — avoid updateDim here (it calls updateCameraView before debounced buildCabinet).
+        cw.width = WD_DEFAULT_WIDTH;
+        cw.depth = WD_DEFAULT_DEPTH;
+        cw.globalHeight = WD_DEFAULT_HEIGHT;
+        cw.writingDesk.height = WD_DEFAULT_HEIGHT;
+        const _wdSync = (ids, val) => ids.forEach(id => { const el = document.getElementById(id); if (el) el.value = val; });
+        _wdSync(['inp-width', 'inp-num-width', 'dim-pill-width', 'inp-slider-width'], WD_DEFAULT_WIDTH);
+        _wdSync(['inp-depth', 'inp-num-depth', 'dim-pill-depth', 'inp-slider-depth'], WD_DEFAULT_DEPTH);
+        _syncWDHeightInputs(WD_DEFAULT_HEIGHT);
+        if (typeof window._syncAllRangeFills === 'function') window._syncAllRangeFills();
     } else {
         cw.width = WD_DEFAULT_WIDTH;
         cw.depth = WD_DEFAULT_DEPTH;
@@ -273,8 +280,8 @@ function _highlightWritingDeskPresetButtons(presetId) {
         const pd = document.getElementById('dim-pill-depth');
         if (pw && dim === 'width') pw.value = state.width;
         if (pd && dim === 'depth') pd.value = state.depth;
-        if (typeof buildCabinetDebounced === 'function') buildCabinetDebounced();
-        else if (typeof buildCabinet === 'function') buildCabinet();
+        if (typeof buildCabinet === 'function') buildCabinet();
+        else if (typeof buildCabinetDebounced === 'function') buildCabinetDebounced();
         if (typeof updateCameraView === 'function') updateCameraView();
         if (typeof calculatePrice === 'function') calculatePrice();
     };

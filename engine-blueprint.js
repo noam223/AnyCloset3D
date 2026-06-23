@@ -109,6 +109,22 @@ function _bpDrawSideCabinetFrontParts(p, sc, ox, oy, dW, dH, scScale, wgH, pH, d
     if (sc.side === 'left' || sc.side === 'both') drawOne(false, sc.widthLeft || sc.width || 40);
 }
 
+/** Door thickness added to side-cabinet depth when main cabinet has edge doors (matches engine-core). */
+function _bpSideCabinetDoorExtra(cw, scSide) {
+    if (!cw || !cw.hasDoors) return 0;
+    const cols = cw.columns;
+    if (!cols || !cols.length) return 0;
+    const edgeCol = (scSide === 'right') ? cols[cols.length - 1] : cols[0];
+    if (!edgeCol.doors || !edgeCol.doors.length) return 0;
+    return cw.thickness || state.thickness || 1.7;
+}
+
+/** Depth (cm) visible in side elevation — main cabinet depth + optional door overlap. */
+function _bpSideCabinetSideDepthCm(cw, scSide) {
+    const centerD = cw ? (cw.depth || 54) : 54;
+    return centerD + _bpSideCabinetDoorExtra(cw, scSide);
+}
+
 const _BP_STROKE = '#1e3a5f';
 const _BP_STROKE_THIN = '#94a3b8';
 const _BP_FONT = 'Rubik,Tahoma,sans-serif';
@@ -3250,6 +3266,139 @@ window._generateMultiViewBlueprintPages = function() {
 
             if (scSideVal === 'right' || scSideVal === 'both') _drawSCPage('ימין',  scData.widthRight || scData.width || 40, 'side-cab-right');
             if (scSideVal === 'left'  || scSideVal === 'both') _drawSCPage('שמאל', scData.widthLeft  || scData.width || 40, 'side-cab-left');
+
+            const _drawSCSideViewPage = (sideLbl, scSide, viewKey) => {
+                const sideDepthCm = _bpSideCabinetSideDepthCm(centerWing, scSide);
+                const camLbl = scSide === 'right' ? 'מימין' : 'משמאל';
+                const scLabel = `שרטוט מבט צד — ארון צד ${sideLbl} (${camLbl})`;
+                const _bpViewKey = viewKey;
+                const p = [];
+                _bpStartPage(_bpViewKey);
+                const drawAreaY = 65;
+                const drawAreaH = PAGE_H - drawAreaY - MARGIN - 80;
+                const pw = SVG_W - MARGIN * 2;
+                const scScale = Math.min((pw - PAD*2) / Math.max(sideDepthCm, 1), (drawAreaH - PAD*2) / Math.max(scH, 1));
+                const dW = sideDepthCm * scScale;
+                const dH = scH * scScale;
+                const ox = MARGIN + (pw - dW) / 2;
+                const oy = drawAreaY + (drawAreaH - dH) / 2;
+                const frontX = ox + dW;
+                const backX = ox;
+                const doorTCm = scData.thickness || state.thickness || 1.7;
+                const doorTPx = doorTCm * scScale;
+
+                makeRect(p, ox, oy, dW, dH, FILL_SC, STROKE, 2);
+                if (scPH > 0) makeRect(p, ox, oy + dH - scPH*scScale, dW, scPH*scScale, '#cbd5e1', STROKE, 1);
+
+                const cols = (scData.columns && scData.columns.length > 0) ? scData.columns : [];
+                const col = cols[0] || { shelvesY: [], compartments: [], height: scH };
+                const colPlinthH = col.noPlinth ? 0 : scPH;
+                const _splitYSC = col.splitY || 0;
+                const _splitTSC = (state.thickness || 1.7) * 2;
+
+                (col.shelvesY || []).forEach(sy => {
+                    if (_splitYSC > 0 && sy >= _splitYSC && sy <= _splitYSC + _splitTSC) return;
+                    makeShelfLine(p, ox, oy + dH - sy*scScale, ox + dW, scScale);
+                });
+
+                if (_splitYSC > 0 && _splitYSC < (col.height || scH)) {
+                    const _splitBotYSC = oy + dH - _splitYSC * scScale;
+                    const _splitBandHSC = _splitTSC * scScale;
+                    const _splitTopYSC = _splitBotYSC - _splitBandHSC;
+                    makeRect(p, ox, _splitTopYSC, dW, _splitBandHSC, '#94a3b8', STROKE, 1.5);
+                    const lowerMidSC = (_splitBotYSC + oy + dH) / 2;
+                    const upperMidSC = (oy + _splitTopYSC) / 2;
+                    p.push(`<text x="${(ox + 6).toFixed(1)}" y="${(lowerMidSC + 4).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.5">ארון תחתון</text>`);
+                    p.push(`<text x="${(ox + 6).toFixed(1)}" y="${(upperMidSC + 4).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.5">ארון עליון</text>`);
+                }
+
+                const shelvesArr = (col.shelvesY || []).slice().sort((a,b) => a-b);
+                const _splitYSCAdj = _splitYSC;
+                const _splitTopSCAdj = _splitYSC > 0 ? _splitYSC + _splitTSC : 0;
+                const _rowBaseSC = _bpRowBaseCm(col, colPlinthH);
+                let _allBoundsSC = [...shelvesArr];
+                if (_splitYSC > _rowBaseSC && _splitYSC < scH) {
+                    if (!_allBoundsSC.includes(_splitYSCAdj)) _allBoundsSC.push(_splitYSCAdj);
+                    if (_splitTopSCAdj < scH && !_allBoundsSC.includes(_splitTopSCAdj)) _allBoundsSC.push(_splitTopSCAdj);
+                    _allBoundsSC.sort((a,b) => a-b);
+                }
+                const rowBounds = [_rowBaseSC, ..._allBoundsSC.filter(sy => sy > _rowBaseSC), scH];
+                const numRows = rowBounds.length - 1;
+                const _t_shelfSC = state.thickness || 1.7;
+                const cellCX = ox + dW / 2;
+
+                for (let ri = 0; ri < numRows; ri++) {
+                    const rowBotCm = rowBounds[ri];
+                    const rowTopCm = rowBounds[ri + 1];
+                    const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _t_shelfSC);
+                    const cellY1 = oy + dH - rowTopCm * scScale;
+                    const cellY2 = oy + dH - rowBotCm * scScale;
+                    const cellH  = cellY2 - cellY1;
+                    const comp = col.compartments ? col.compartments[ri] : null;
+                    const cellType = comp ? (comp.type || 'empty') : 'empty';
+
+                    if (cellType === 'hanging') {
+                        const rodY = _bpHangRodSvgY(cellY1, scScale);
+                        p.push(`<line x1="${(ox + 4).toFixed(1)}" y1="${rodY.toFixed(1)}" x2="${(ox + dW - 4).toFixed(1)}" y2="${rodY.toFixed(1)}" stroke="${STROKE}" stroke-width="2"/>`);
+                    } else if (cellType === 'internal_drawers' || cellType === 'external_drawers') {
+                        const drawerCount = comp.count || 2;
+                        const dh = cellH / drawerCount;
+                        for (let di = 0; di < drawerCount; di++) {
+                            const dy = cellY1 + di * dh;
+                            makeRect(p, ox + 2, dy + 1, dW - 4, dh - 2, 'rgba(255,255,255,0.5)', STROKE_THIN, 0.8);
+                            const hndW = Math.min(dW * 0.35, 22);
+                            const hndX = ox + (dW - hndW) / 2;
+                            const hndY = dy + dh * 0.5;
+                            p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
+                        }
+                    } else if (cellType === 'open_cell') {
+                        const pad = 5;
+                        const fx = ox + pad, fy = cellY1 + pad, fw = dW - pad*2, fh = cellH - pad*2;
+                        if (fw > 2 && fh > 2) p.push(`<rect x="${fx.toFixed(1)}" y="${fy.toFixed(1)}" width="${fw.toFixed(1)}" height="${fh.toFixed(1)}" fill="none" stroke="${STROKE}" stroke-width="1.2"/>`);
+                        if (cellH > 18) p.push(`<text x="${cellCX.toFixed(1)}" y="${(cellY1+20).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.6">כוורת</text>`);
+                    } else if (cellType === 'side_open_cell') {
+                        const pad = 5;
+                        const fx = ox + pad, fy = cellY1 + pad, fw = dW - pad*2, fh = cellH - pad*2;
+                        if (fw > 2 && fh > 2) {
+                            p.push(`<rect x="${fx.toFixed(1)}" y="${fy.toFixed(1)}" width="${fw.toFixed(1)}" height="${fh.toFixed(1)}" fill="none" stroke="${STROKE}" stroke-width="1.2" stroke-dasharray="5,3"/>`);
+                        }
+                        if (cellH > 18) p.push(`<text x="${cellCX.toFixed(1)}" y="${(cellY1+20).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.6">כוורת צד</text>`);
+                    }
+
+                    const hasDoor = scData.hasDoors !== false && col.doors && col.doors.some(d => ri >= d.startRow && ri <= d.endRow);
+                    if (hasDoor && doorTPx > 0.5) {
+                        makeRect(p, frontX - doorTPx, cellY1 + 1, doorTPx, cellH - 2, 'rgba(255,255,255,0.65)', STROKE_THIN, 1);
+                    }
+
+                    const _isSplitBandSC = _splitYSC > 0 &&
+                        rowBotCm >= _splitYSCAdj - 0.1 && rowTopCm <= _splitTopSCAdj + 0.1;
+                    if (cellHeightLabel > 0 && cellH > 14 && !_isSplitBandSC) {
+                        _bpPushCellDimLabel(p, _bpViewKey, `svc0r${ri}`, cellCX, (cellY1 + cellY2) / 2 + 4, cellHeightLabel);
+                    }
+                }
+
+                p.push(`<text x="${frontX.toFixed(1)}" y="${(oy + dH + 18).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.55">חזית</text>`);
+                p.push(`<text x="${backX.toFixed(1)}" y="${(oy + dH + 18).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.55">קיר</text>`);
+
+                const _plinthBotYSC = oy + dH + scPH * scScale;
+                const dimY = _plinthBotYSC + 36;
+                makeDimH(p, ox, ox + dW, dimY, `${Math.round(sideDepthCm * 10)}`);
+                makeDimV(p, ox - 54, oy, oy + dH, `${Math.round(scH * 10)}`);
+                if (scPH > 0) makeDimV(p, ox + dW + 18, oy + dH - scPH*scScale, oy + dH, `${Math.round(scPH * 10)}`);
+                if (_splitYSC > 0) {
+                    const _splitBotYSC2 = oy + dH - _splitYSC * scScale;
+                    const _splitTopYSC2 = _splitBotYSC2 - _splitTSC * scScale;
+                    makeDimV(p, ox + dW + 54, oy + dH - scPH * scScale, _splitBotYSC2, `${Math.round((_splitYSC - scPH) * 10)}`);
+                    makeDimV(p, ox + dW + 54, _splitTopYSC2, oy, `${Math.round((scH - _splitYSC - _splitTSC) * 10)}`);
+                }
+
+                _bpAppendViewCutouts(p, viewKey, ox, oy, dW, dH, scScale, sideDepthCm, scH);
+                _bpFlushDims(p);
+                pages.push({ label: scLabel, svgParts: p, viewKey: viewKey, cabWidthCm: sideDepthCm, cabHeightCm: scH, viewMeta: { ox, oy, dW, dH, sc: scScale } });
+            };
+
+            if (scSideVal === 'right' || scSideVal === 'both') _drawSCSideViewPage('ימין', 'right', 'side-cab-right-profile');
+            if (scSideVal === 'left'  || scSideVal === 'both') _drawSCSideViewPage('שמאל', 'left', 'side-cab-left-profile');
         }
     }
 

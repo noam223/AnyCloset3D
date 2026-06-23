@@ -44,14 +44,21 @@
             if (sc) {
                 sc.materialBody = matKey;
                 sc.materialInternal = matKey;
-                sc.materialExternal = matKey;
                 sc.materialDesk = matKey;
                 sc.materialOpenCell = matKey;
                 sc.materialBack = matKey;
+                if (typeof window._syncSideCabinetDoorMaterial === 'function') {
+                    window._syncSideCabinetDoorMaterial(state.wings.center);
+                }
                 if (state.wings.center) state.wings.center.materialSideCabinet = matKey;
             }
         } else {
             state[state.activeColorPart || 'materialBody'] = matKey;
+            if (state.activeColorPart === 'materialExternal' && state.wings.center) {
+                if (typeof window._syncSideCabinetDoorMaterial === 'function') {
+                    window._syncSideCabinetDoorMaterial(state.wings.center);
+                }
+            }
         }
         if (typeof buildCabinet === 'function') buildCabinet();
         if (typeof saveHistoryState === 'function') saveHistoryState();
