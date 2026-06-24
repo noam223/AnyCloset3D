@@ -162,10 +162,14 @@ const floor = new Proxy({}, {
 // ---- Room visibility toggle ----
 window._roomVisible = false;
 window._toggleRoom = function() {
+    if (typeof window._toggleRoomPlanMode === 'function' && document.getElementById('btn-room-plan')) {
+        window._toggleRoomPlanMode();
+        return;
+    }
     window._roomVisible = !window._roomVisible;
     // _buildRoom respects the _roomVisible flag: clears children and returns when false
     if (typeof _buildRoom === 'function') _buildRoom();
-    const btn = document.getElementById('btn-toggle-room');
+    const btn = document.getElementById('btn-toggle-room') || document.getElementById('btn-room-plan');
     if (btn) {
         btn.innerHTML = window._roomVisible
             ? '<i class="fa-solid fa-house"></i> הסתר חדר'
@@ -291,6 +295,7 @@ window._cycleChairVariant = function() {
     _syncActiveChairRefs();
     if (typeof _buildRoom === 'function') _buildRoom();
     if (typeof window._updateRoomPropsUI === 'function') window._updateRoomPropsUI();
+    if (typeof window._renderRoomPlan2D === 'function') window._renderRoomPlan2D();
 };
 
 (function _loadChairs() {
@@ -466,6 +471,15 @@ function _getLaptopPos() {
 // Compute where to place the chair (world-space X, Z, rotY) based on current desk config.
 // Returns {x, z, rotY, deskFrontZ?, deskPlaneX?, corner?} or null if no desk is present.
 function _getChairPos() {
+    if (window._chairPosOverride) {
+        const o = window._chairPosOverride;
+        return {
+            x: o.x,
+            z: o.z,
+            rotY: o.rotY !== undefined ? o.rotY : -Math.PI / 2,
+            deskFrontZ: o.deskFrontZ
+        };
+    }
     const cabD = state.wings && state.wings.center ? (state.wings.center.depth || 54) : (state.depth || 54);
     const cabOffX = cabinetGroup.position.x || 0;
     const isStool = _isStoolVariant();
@@ -610,6 +624,7 @@ window._cycleBedWidth = function() {
     if (typeof _buildRoom === 'function') _buildRoom();
     if (typeof window._updateRoomPropsUI === 'function') window._updateRoomPropsUI();
     if (typeof window._updateBedHandles === 'function') window._updateBedHandles();
+    if (typeof window._renderRoomPlan2D === 'function') window._renderRoomPlan2D();
 };
 
 window._toggleBedVisible = function() {
@@ -617,12 +632,14 @@ window._toggleBedVisible = function() {
     if (typeof _buildRoom === 'function') _buildRoom();
     if (typeof window._updateRoomPropsUI === 'function') window._updateRoomPropsUI();
     if (typeof window._updateBedHandles === 'function') window._updateBedHandles();
+    if (typeof window._renderRoomPlan2D === 'function') window._renderRoomPlan2D();
 };
 
 window._toggleChairVisible = function() {
     window._chairVisible = !window._chairVisible;
     if (typeof _buildRoom === 'function') _buildRoom();
     if (typeof window._updateRoomPropsUI === 'function') window._updateRoomPropsUI();
+    if (typeof window._renderRoomPlan2D === 'function') window._renderRoomPlan2D();
 };
 
 window._updateRoomPropsUI = function() {
@@ -651,9 +668,9 @@ window._updateRoomPropsUI = function() {
     if (tbWidth) tbWidth.textContent = (window._bedWidthCm || 160);
 
     const propsRow = document.getElementById('room-props-row');
-    if (propsRow) propsRow.style.display = window._roomVisible ? '' : 'none';
+    if (propsRow) propsRow.style.display = (window._roomVisible || state.viewMode === 'room-plan') ? '' : 'none';
     const furnBar = document.getElementById('room-furniture-toolbar');
-    if (furnBar) furnBar.style.display = window._roomVisible ? '' : 'none';
+    if (furnBar) furnBar.style.display = (window._roomVisible || state.viewMode === 'room-plan') ? '' : 'none';
 };
 
 // Rotate bed 90° clockwise on each call
@@ -661,6 +678,7 @@ window._rotateBed = function() {
     window._bedRotation = (window._bedRotation + 90) % 360;
     if (typeof _buildRoom === 'function') _buildRoom();
     if (typeof window._updateBedHandles === 'function') window._updateBedHandles();
+    if (typeof window._renderRoomPlan2D === 'function') window._renderRoomPlan2D();
 };
 (function _loadBed() {
     if (typeof THREE.GLTFLoader === 'undefined') {
@@ -1240,6 +1258,54 @@ function updateCameraView() {
         // Just rebuild drag handles and overlays without moving the camera
         if (typeof buildDragHandlesUI === 'function') buildDragHandlesUI();
         if (typeof updateQuickEditPanelUI === 'function') updateQuickEditPanelUI();
+        return;
+    }
+
+    // ---- Room plan mode: 2D SVG overlay or top-down 3D orbit ----
+    if (state.viewMode === 'room-plan') {
+        const sub2d = window._roomPlanSubview === '2d';
+        controls.enableRotate = !sub2d;
+        container.classList.remove('front-mode');
+        scene.background = new THREE.Color(0xeceff1);
+        dirLight.intensity = 0.10;
+        ambientLight.intensity = 0.95;
+        dimLayer.style.display = 'none';
+        buttonsLayer.style.display = 'none';
+        if (typeof dragHandlesLayer !== 'undefined' && dragHandlesLayer) dragHandlesLayer.style.display = 'none';
+        floor.visible = true;
+
+        if (!sub2d) {
+            const rb = window._roomBounds;
+            if (rb && !window._camAnim && (window._forceCameraAnim || !window._roomPlan3dCamSet)) {
+                window._forceCameraAnim = false;
+                window._roomPlan3dCamSet = true;
+                const cx = (rb.leftX + rb.rightX) / 2;
+                const cz = (rb.backZ + rb.frontZ) / 2;
+                const span = Math.max(rb.rightX - rb.leftX, rb.frontZ - rb.backZ);
+                const dist = span * 1.15;
+                const oldPos = camera.position.clone();
+                const oldTarget = controls.target.clone();
+                controls.enabled = false;
+                controls.enableDamping = false;
+                window._camAnim = {
+                    fromPos: oldPos,
+                    fromTarget: oldTarget,
+                    toPos: new THREE.Vector3(cx, dist, cz + 0.01),
+                    toTarget: new THREE.Vector3(cx, 0, cz),
+                    t: 0,
+                    duration: 0.5,
+                    onDone: null
+                };
+            } else if (!window._camAnim) {
+                controls.enabled = true;
+            }
+        } else {
+            controls.enabled = false;
+        }
+        controls.update();
+        if (typeof buildDragHandlesUI === 'function') buildDragHandlesUI();
+        if (typeof updateQuickEditPanelUI === 'function') updateQuickEditPanelUI();
+        if (typeof window._renderRoomPlan2D === 'function') window._renderRoomPlan2D();
         return;
     }
 
@@ -2396,6 +2462,10 @@ function buildCabinet() {
             if (_rwSlider) _rwSlider.value = _actualRoomW2;
             if (_rwNum)    _rwNum.value    = _actualRoomW2;
         }
+    }
+
+    if (state.viewMode === 'room-plan' && typeof window._renderRoomPlan2D === 'function') {
+        window._renderRoomPlan2D();
     }
 
 }

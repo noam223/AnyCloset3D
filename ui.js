@@ -4212,7 +4212,8 @@ window._updateBedHandles = function() {
     const tb = document.getElementById('bed-toolbar');
     if (!tb) return;
 
-    const shouldShow = window._roomVisible && window._bedGroup && window._bedVisible !== false &&
+    const shouldShow = (window._roomVisible || state.viewMode === 'room-plan') && window._bedGroup && window._bedVisible !== false &&
+                       (state.viewMode !== 'room-plan' || window._roomPlanSubview === '3d') &&
                        (window._bedHovered || window._bedDrag);
     if (!shouldShow) { tb.style.display = 'none'; return; }
 
@@ -4645,6 +4646,9 @@ window._setRoomSize = function(dim, val) {
     }
 
     buildCabinet();
+    if (state.viewMode === 'room-plan' && typeof window._renderRoomPlan2D === 'function') {
+        window._renderRoomPlan2D();
+    }
 };
 
 window._updateRoomWallUI = function() {
@@ -4711,7 +4715,7 @@ window._setRangeEl = function(el, v) {
 function _isCanvasOverlayUiTarget(el) {
     if (!el || !el.closest) return false;
     return !!el.closest(
-        '#column-quick-edit, #full-corner-quick-edit, #bottom-floating-toolbar, #bed-toolbar, #room-props-row, #room-furniture-toolbar, ' +
+        '#column-quick-edit, #full-corner-quick-edit, #bottom-floating-toolbar, #bed-toolbar, #room-props-row, #room-furniture-toolbar, #room-plan-layer, ' +
         '.drag-handle, .dim-container, .plus-btn, .fc-cell-btn, .select-all-col-btn, .cell-select-btn, .sub-cell-btn'
     );
 }
@@ -4777,6 +4781,9 @@ function bindUI() {
 
     const _bfv = document.getElementById('btn-front-view');
     if (_bfv) _bfv.addEventListener('click', (e) => {
+        if (state.viewMode === 'room-plan' && typeof window._exitRoomPlanMode === 'function') {
+            window._exitRoomPlanMode();
+        }
         document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
         e.target.classList.add('active');
         window._orbitFree = false;
@@ -5660,6 +5667,10 @@ function bindUI() {
         if(state.cabinetModel === 'ab2_nohoney') modelNameText = 'חזית פנימית';
         if(state.cabinetModel === 'ab2') modelNameText = 'AB2';
         if(state.cabinetModel === 'regalim') modelNameText = 'רגלי ניקל';
+        const _isWritingDeskCart = state.presetId === 'writing-desk';
+        const _wdCart = _isWritingDeskCart && state.wings && state.wings.center
+            ? (state.wings.center.writingDesk || {}) : {};
+        if (_isWritingDeskCart) modelNameText = 'שולחן כתיבה';
         // Sliding wardrobe: override model name based on whether any door panel is a mirror
         if (state.presetId === 'sliding') {
             const _sdWing = state.wings.center;
@@ -5674,6 +5685,7 @@ function bindUI() {
         if(state.cabinetModel === 'ab2_nohoney') plinthTypeText = 'צוקל נסתר (חזית פנימית)';
         if(state.cabinetModel === 'ab2') plinthTypeText = 'צוקל נסתר (חזית פנימית טאצ\')';
         if(state.cabinetModel === 'regalim') plinthTypeText = 'רגלי ניקל גליל 5 ס"מ';
+        if (_isWritingDeskCart) plinthTypeText = 'ללא צוקל';
 
         let deskInfo = 'ללא';
         if (state.desk.side === 'left') deskInfo = 'מצורף שולחן חיצוני (משמאל)';
@@ -5767,10 +5779,17 @@ function bindUI() {
             console.warn('[add-to-cart] blueprint generation failed:', bpErr);
         }
 
+        const _wdHeightCart = _wdCart.height != null ? _wdCart.height : state.globalHeight;
+        const _wdDrawerCountCart = (_wdCart.hasDrawers === false) ? 0
+            : (_wdCart.drawerCount != null ? _wdCart.drawerCount : (state.width <= 80 ? 1 : 2));
+        const _wdDimsStr = _isWritingDeskCart
+            ? `רוחב: ${state.width} ס"מ | גובה: ${_wdHeightCart} ס"מ | עומק: ${state.depth} ס"מ`
+            : `רוחב: ${state.width} ס"מ | גובה: ${state.globalHeight} ס"מ | עומק: ${state.depth} ס"מ`;
+
         const cabinetSpec = {
             customName: state.cabinetName, cabinetNotes: (state.cabinetNotes || '').trim(), modelName: modelNameText, plinthType: plinthTypeText,
-            placement: placementHebrew[state.placement] || 'ארון קיר חופשי',
-            dimsStr: `רוחב: ${state.width} ס"מ | גובה: ${state.globalHeight} ס"מ | עומק: ${state.depth} ס"מ`,
+            placement: _isWritingDeskCart ? 'שולחן עמידה' : (placementHebrew[state.placement] || 'ארון קיר חופשי'),
+            dimsStr: _wdDimsStr,
             material: state.boardMaterial === 'melamine' ? 'מלמין' : "סנדביץ'",
             handle: (function() {
                 const labels = { pipe: 'ידית חיצונית', riding: 'ידית רוכבת', touch: "ידית טאצ'" };
@@ -5785,9 +5804,18 @@ function bindUI() {
             colorExternal: colorNamesHebrew[state.materialExternal] || 'ברירת מחדל',
             colorDesk: colorNamesHebrew[state.materialDesk] || 'ברירת מחדל',
             colorOpenCell: colorNamesHebrew[state.materialOpenCell] || 'ברירת מחדל',
+            colorDrawers: _isWritingDeskCart ? (colorNamesHebrew[state.materialExternal] || 'ברירת מחדל') : undefined,
+            isWritingDesk: _isWritingDeskCart,
+            writingDeskHasDrawers: !_isWritingDeskCart || _wdCart.hasDrawers !== false,
+            writingDeskDrawerCount: _isWritingDeskCart ? _wdDrawerCountCart : undefined,
+            writingDeskDrawerHeight: _isWritingDeskCart && _wdCart.drawerHeight != null ? _wdCart.drawerHeight : undefined,
             hasOpenCells: openCellsCount > 0,
             extraColors: extraColorsStr,
-            shelves: totalShelves, hanging: hangingRods, sorbetCount: contentCounts.sorbet, drawersInt: intDrawers, drawersExt: extDrawers,
+            shelves: _isWritingDeskCart ? 0 : totalShelves,
+            hanging: _isWritingDeskCart ? 0 : hangingRods,
+            sorbetCount: _isWritingDeskCart ? 0 : contentCounts.sorbet,
+            drawersInt: _isWritingDeskCart ? 0 : intDrawers,
+            drawersExt: _isWritingDeskCart ? _wdDrawerCountCart : extDrawers,
             price: priceStr, costPrice: '₪' + state.currentCostPrice.toLocaleString(),
             installPrice: getWing().manualInstallPrice != null ? getWing().manualInstallPrice : state.currentInstallPrice,
             imgDoors: imgWithDoors, imgOpen: imgNoDoors, imgBlueprint: imgBlueprint,
@@ -6181,7 +6209,8 @@ window.openOrderModal = async function(mode) {
 
     state.orderCart.forEach((itemObj, index) => {
         const item = itemObj.spec;
-        const titleText = item.customName ? item.customName : `ארון מס' ${index + 1}`;
+        const titleText = item.customName ? item.customName : (_cartIsWritingDesk(itemObj) ? `שולחן מס' ${index + 1}` : `ארון מס' ${index + 1}`);
+        const detailLabel = _cartIsWritingDesk(itemObj) ? 'שולחן' : 'ארון';
         const numericPrice = parseInt(item.price.replace('₪', '').replace(/,/g, ''));
         const itemInstall = item.installPrice || 0;
         const itemCost = item.costPrice ? parseInt(item.costPrice.replace('₪', '').replace(/,/g, '')) : 0;
@@ -6191,33 +6220,16 @@ window.openOrderModal = async function(mode) {
         const cabinetHTML = `
             <div class="cabinet-print-page">
                 <div class="cabinet-header-wrapper">
-                    <h3 class="cabinet-title">פרטי ארון: ${titleText}</h3>
+                    <h3 class="cabinet-title">פרטי ${detailLabel}: ${titleText}</h3>
                     <div class="cart-item-actions">
                         <button class="action-btn edit-btn" onclick="editCartItem(${index})"><i class="fa-solid fa-pen"></i> ערוך ארון</button>
                         <button class="action-btn del-btn" onclick="deleteCartItem(${index})"><i class="fa-solid fa-trash"></i> מחיקה</button>
                     </div>
                 </div>
                 <table class="spec-table">
-                    <tr><th>דגם ארון</th><td><strong>${item.modelName}</strong></td></tr>
-                    <tr><th>מיקום / התקנה</th><td>${item.placement}</td></tr>
-                    <tr><th>מידות חיצוניות</th><td dir="rtl">${item.dimsStr}</td></tr>
-                    <tr><th>חומר גוף</th><td>${item.material}</td></tr>
-                    <tr><th>סוג רגליים / צוקל</th><td>${item.plinthType}</td></tr>
-                    <tr><th>תוספת שולחן</th><td>${item.desk}</td></tr>
-                    <tr><td colspan="2" style="background:#f1f5f8; text-align:center; font-weight:bold;">גוונים וגימורים</td></tr>
-                    <tr><th>צבע גוף וצוקל</th><td>${item.colorBody}</td></tr>
-                    <tr><th>צבע פנים (מדפים/מגירות)</th><td>${item.colorInternal}</td></tr>
-                    <tr><th>צבע חזיתות (דלתות)</th><td>${item.colorExternal}</td></tr>
-                    <tr><th>צבע גב ארון</th><td>${(item.colorBack && item.colorBack !== 'undefined') ? item.colorBack : 'לבן מט'}</td></tr>
-                    ${item.desk !== 'ללא' ? `<tr><th>צבע שולחן עבודה</th><td>${item.colorDesk}</td></tr>` : ''}
-                    ${item.hasOpenCells ? `<tr><th>צבע כוורת</th><td>${item.colorOpenCell}</td></tr>` : ''}
-                    ${item.extraColors ? `<tr><th>צבעים נוספים בארון</th><td>${item.extraColors}</td></tr>` : ''}
-                    <tr><td colspan="2" style="background:#f1f5f8; text-align:center; font-weight:bold;">פרזול ותכולה</td></tr>
-                    <tr><th>סוג ידיות לחזיתות</th><td><strong>${item.handle}</strong></td></tr>
-                    <tr><th>מספר מגירות חיצוניות</th><td>${item.drawersExt} יחידות</td></tr>
-                    <tr><th>מספר מגירות פנימיות</th><td>${item.drawersInt} יחידות</td></tr>
-                    <tr><th>מדפים נשלפים</th><td>${item.shelves} יחידות</td></tr>
-                    <tr><th>מוטות תלייה לקולבים</th><td>${_formatHangingRodsDisplay(itemObj)}</td></tr>
+                    ${_printBasicSpecRows(item, itemObj, '', '')}
+                    ${_printFinishesRows(item, itemObj, '', '', '')}
+                    ${_printHardwareRows(item, itemObj, '', '', '')}
                     ${item.cabinetNotes ? `<tr><th>הערות</th><td style="white-space:pre-wrap;line-height:1.55;">${String(item.cabinetNotes).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')}</td></tr>` : ''}
 
                     ${!isFactory && window._showPricing !== false ? `
@@ -6527,7 +6539,7 @@ window.updateLeftSidebar = function() {
         const isEditing = state.editingCartIndex === index;
         const activeClass = isEditing ? 'active-editing' : '';
         const activeLabel = isEditing ? '<div style="position:absolute; top:-12px; right:15px; background:var(--accent); color:white; font-size:11px; padding:3px 10px; border-radius:12px; font-weight:bold; box-shadow:0 2px 5px rgba(0,0,0,0.15); border: 2px solid white;"><i class="fa-solid fa-pen"></i> בעריכה כעת</div>' : '';
-        const titleText = item.customName ? item.customName : `ארון מס' ${index + 1}`;
+        const titleText = item.customName ? item.customName : (_cartIsWritingDesk(itemObj) ? `שולחן מס' ${index + 1}` : `ארון מס' ${index + 1}`);
 
         // Room wall position selector (only for linear/sliding presets)
         const _itemPreset = (itemObj.rawState && itemObj.rawState.presetId) || 'linear';
@@ -6690,6 +6702,90 @@ function _formatHangingRodsDisplay(itemObj) {
     return `${total} יחידות`;
 }
 
+function _cartIsWritingDesk(itemObj) {
+    if (!itemObj) return false;
+    if (itemObj.spec && itemObj.spec.isWritingDesk) return true;
+    const rs = itemObj.rawState;
+    return !!(rs && rs.presetId === 'writing-desk');
+}
+
+function _printTr(thStyle, tdStyle, thLabel, tdHtml, tdExtra) {
+    const th = thStyle ? ` style="${thStyle}"` : '';
+    const td = tdStyle ? ` style="${tdStyle}${tdExtra || ''}"` : (tdExtra ? ` style="${tdExtra}"` : '');
+    return `<tr><th${th}>${thLabel}</th><td${td}>${tdHtml}</td></tr>`;
+}
+
+function _printSectionHeader(label, sectionStyle) {
+    return `<tr><td colspan="2" style="background:#f1f5f8;text-align:center;font-weight:bold;${sectionStyle || ''}">${label}</td></tr>`;
+}
+
+function _printBasicSpecRows(item, itemObj, thStyle, tdStyle) {
+    const isWD = _cartIsWritingDesk(itemObj);
+    const dimsExtra = ' dir="rtl"';
+    let html = '';
+    html += _printTr(thStyle, tdStyle, isWD ? 'סוג מוצר' : 'דגם ארון', `<strong>${item.modelName}</strong>`);
+    if (!isWD) html += _printTr(thStyle, tdStyle, 'מיקום / התקנה', item.placement);
+    html += _printTr(thStyle, tdStyle, 'מידות חיצוניות', item.dimsStr, dimsExtra);
+    html += _printTr(thStyle, tdStyle, 'חומר גוף', item.material);
+    html += _printTr(thStyle, tdStyle, isWD ? 'בסיס' : 'סוג רגליים / צוקל', isWD ? 'רגליים כפולות' : item.plinthType);
+    if (!isWD) html += _printTr(thStyle, tdStyle, 'תוספת שולחן', item.desk);
+    return html;
+}
+
+function _printFinishesRows(item, itemObj, thStyle, tdStyle, sectionStyle) {
+    let html = _printSectionHeader('גוונים וגימורים', sectionStyle);
+    if (_cartIsWritingDesk(itemObj)) {
+        html += _printTr(thStyle, tdStyle, 'צבע גוף (רגליים ומשטח)', item.colorBody || '—');
+        const drawerColor = item.colorDrawers || item.colorExternal;
+        if (drawerColor) html += _printTr(thStyle, tdStyle, 'צבע מגירות', drawerColor);
+        if (item.extraColors) html += _printTr(thStyle, tdStyle, 'צבעים נוספים', item.extraColors);
+        return html;
+    }
+    html += _printTr(thStyle, tdStyle, 'צבע גוף וצוקל', item.colorBody);
+    html += _printTr(thStyle, tdStyle, 'צבע פנים (מדפים/מגירות)', item.colorInternal);
+    if (item.slidingDoor) {
+        html += _printTr(thStyle, tdStyle, 'צבע חזיתות הזזה', item.slidingDoor.doorColorsStr);
+    } else {
+        html += _printTr(thStyle, tdStyle, 'צבע חזיתות (דלתות)', item.colorExternal);
+    }
+    html += _printTr(thStyle, tdStyle, 'צבע גב ארון', (item.colorBack && item.colorBack !== 'undefined') ? item.colorBack : 'לבן מט');
+    if (item.desk !== 'ללא') html += _printTr(thStyle, tdStyle, 'צבע שולחן עבודה', item.colorDesk);
+    if (item.hasOpenCells) html += _printTr(thStyle, tdStyle, 'צבע כוורת', item.colorOpenCell);
+    if (item.extraColors) html += _printTr(thStyle, tdStyle, 'צבעים נוספים בארון', item.extraColors);
+    return html;
+}
+
+function _printHardwareRows(item, itemObj, thStyle, tdStyle, sectionStyle) {
+    let html = _printSectionHeader('פרזול ותכולה', sectionStyle);
+    if (_cartIsWritingDesk(itemObj)) {
+        if (item.writingDeskHasDrawers !== false) {
+            html += _printTr(thStyle, tdStyle, 'סוג ידיות למגירות', `<strong>${item.handle}</strong>`);
+            const n = item.writingDeskDrawerCount != null ? item.writingDeskDrawerCount : (item.drawersExt || 0);
+            html += _printTr(thStyle, tdStyle, 'מספר מגירות', `${n} יחידות`);
+            if (item.writingDeskDrawerHeight) {
+                html += _printTr(thStyle, tdStyle, 'גובה מגירה', `${item.writingDeskDrawerHeight} ס"מ`);
+            }
+        } else {
+            html += _printTr(thStyle, tdStyle, 'מגירות', 'ללא');
+        }
+        return html;
+    }
+    if (item.slidingDoor) {
+        html += _printTr(thStyle, tdStyle, 'מספר דלתות הזזה', `${item.slidingDoor.numDoors} דלתות`);
+        html += _printTr(thStyle, tdStyle, 'צבע פרופיל הזזה', item.slidingDoor.profileColor);
+        if (item.slidingDoor.hasMirror) {
+            html += _printTr(thStyle, tdStyle, 'דלת מראה', '<strong style="color:#1e3a5f;">✓ כולל דלת מראה</strong>');
+        }
+    } else {
+        html += _printTr(thStyle, tdStyle, 'סוג ידיות לחזיתות', `<strong>${item.handle}</strong>`);
+    }
+    html += _printTr(thStyle, tdStyle, 'מגירות חיצוניות', `${item.drawersExt} יחידות`);
+    html += _printTr(thStyle, tdStyle, 'מגירות פנימיות', `${item.drawersInt} יחידות`);
+    html += _printTr(thStyle, tdStyle, 'מדפים נשלפים', `${item.shelves} יחידות`);
+    html += _printTr(thStyle, tdStyle, 'מוטות תלייה לקולבים', _formatHangingRodsDisplay(itemObj));
+    return html;
+}
+
 function _printCabinetNotesRow(notes, thStyle, tdStyle) {
     const n = (notes || '').trim();
     if (!n) return '';
@@ -6711,7 +6807,8 @@ function _buildPrintHTML(mode) {
 
     state.orderCart.forEach((itemObj, index) => {
         const item = itemObj.spec;
-        const titleText = item.customName ? item.customName : `ארון מס' ${index + 1}`;
+        const titleText = item.customName ? item.customName : (_cartIsWritingDesk(itemObj) ? `שולחן מס' ${index + 1}` : `ארון מס' ${index + 1}`);
+        const detailLabel = _cartIsWritingDesk(itemObj) ? 'שולחן' : 'ארון';
         const numericPrice = parseInt(item.price.replace('₪', '').replace(/,/g, '')) || 0;
         const itemInstall = item.installPrice || 0;
         const itemCost = item.costPrice ? parseInt(item.costPrice.replace('₪', '').replace(/,/g, '')) : 0;
@@ -6732,40 +6829,19 @@ function _buildPrintHTML(mode) {
             cabinetsHTML += `
             <div style="page-break-after:always;">
                 <h3 style="font-size:1.3rem;color:#1e3a5f;margin:0 0 12px;padding:10px 15px;background:#f8fafc;border-radius:8px;border-right:4px solid #1e3a5f;">
-                    פרטי ארון: ${titleText}
+                    פרטי ${detailLabel}: ${titleText}
                 </h3>
                 <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:1rem;border:1px solid #e2e8f0;">
-                    <tr><th style="${thStyle}">דגם ארון</th><td style="${tdStyle}"><strong>${item.modelName}</strong></td></tr>
-                    <tr><th style="${thStyle}">מיקום / התקנה</th><td style="${tdStyle}">${item.placement}</td></tr>
-                    <tr><th style="${thStyle}">מידות חיצוניות</th><td style="${tdStyle}" dir="rtl">${item.dimsStr}</td></tr>
-                    <tr><th style="${thStyle}">חומר גוף</th><td style="${tdStyle}">${item.material}</td></tr>
-                    <tr><th style="${thStyle}">סוג רגליים / צוקל</th><td style="${tdStyle}">${item.plinthType}</td></tr>
-                    <tr><th style="${thStyle}">תוספת שולחן</th><td style="${tdStyle}">${item.desk}</td></tr>
-                    <tr><td colspan="2" style="background:#f1f5f8;text-align:center;font-weight:bold;padding:8px;border:1px solid #e2e8f0;">גוונים וגימורים</td></tr>
-                    <tr><th style="${thStyle}">צבע גוף וצוקל</th><td style="${tdStyle}">${item.colorBody}</td></tr>
-                    <tr><th style="${thStyle}">צבע פנים (מדפים/מגירות)</th><td style="${tdStyle}">${item.colorInternal}</td></tr>
-                    ${item.slidingDoor ? `<tr><th style="${thStyle}">צבע חזיתות הזזה</th><td style="${tdStyle}">${item.slidingDoor.doorColorsStr}</td></tr>` : `<tr><th style="${thStyle}">צבע חזיתות (דלתות)</th><td style="${tdStyle}">${item.colorExternal}</td></tr>`}
-                    <tr><th style="${thStyle}">צבע גב ארון</th><td style="${tdStyle}">${(item.colorBack && item.colorBack !== 'undefined') ? item.colorBack : 'לבן מט'}</td></tr>
-                    ${item.desk !== 'ללא' ? `<tr><th style="${thStyle}">צבע שולחן עבודה</th><td style="${tdStyle}">${item.colorDesk}</td></tr>` : ''}
-                    ${item.hasOpenCells ? `<tr><th style="${thStyle}">צבע כוורת</th><td style="${tdStyle}">${item.colorOpenCell}</td></tr>` : ''}
-                    ${item.extraColors ? `<tr><th style="${thStyle}">צבעים נוספים בארון</th><td style="${tdStyle}">${item.extraColors}</td></tr>` : ''}
-                    <tr><td colspan="2" style="background:#f1f5f8;text-align:center;font-weight:bold;padding:8px;border:1px solid #e2e8f0;">פרזול ותכולה</td></tr>
-                    ${item.slidingDoor ? `
-                    <tr><th style="${thStyle}">מספר דלתות הזזה</th><td style="${tdStyle}">${item.slidingDoor.numDoors} דלתות</td></tr>
-                    <tr><th style="${thStyle}">צבע פרופיל הזזה</th><td style="${tdStyle}">${item.slidingDoor.profileColor}</td></tr>
-                    ${item.slidingDoor.hasMirror ? `<tr><th style="${thStyle}">דלת מראה</th><td style="${tdStyle}"><strong style="color:#1e3a5f;">✓ כולל דלת מראה</strong></td></tr>` : ''}
-                    ` : `<tr><th style="${thStyle}">סוג ידיות לחזיתות</th><td style="${tdStyle}"><strong>${item.handle}</strong></td></tr>`}
-                    <tr><th style="${thStyle}">מגירות חיצוניות</th><td style="${tdStyle}">${item.drawersExt} יחידות</td></tr>
-                    <tr><th style="${thStyle}">מגירות פנימיות</th><td style="${tdStyle}">${item.drawersInt} יחידות</td></tr>
-                    <tr><th style="${thStyle}">מדפים נשלפים</th><td style="${tdStyle}">${item.shelves} יחידות</td></tr>
-                    <tr><th style="${thStyle}">מוטות תלייה לקולבים</th><td style="${tdStyle}">${_formatHangingRodsDisplay(itemObj)}</td></tr>
+                    ${_printBasicSpecRows(item, itemObj, thStyle, tdStyle)}
+                    ${_printFinishesRows(item, itemObj, thStyle, tdStyle, 'padding:8px;border:1px solid #e2e8f0;')}
+                    ${_printHardwareRows(item, itemObj, thStyle, tdStyle, 'padding:8px;border:1px solid #e2e8f0;')}
                     ${_printCabinetNotesRow(item.cabinetNotes, thStyle, tdStyle)}
                     ${priceRows}
                 </table>
             </div>
             <div style="page-break-after:always;">
                 <h3 style="font-size:1.2rem;color:#1e3a5f;margin:0 0 16px;padding:10px 15px;background:#f8fafc;border-radius:8px;border-right:4px solid #1e3a5f;">
-                    תמונות ארון: ${titleText}
+                    תמונות ${detailLabel}: ${titleText}
                 </h3>
                 <div style="display:flex;flex-direction:column;gap:16px;height:calc(100vh - 120px);">
                     <div style="flex:1;display:flex;flex-direction:column;min-height:0;">
@@ -6805,40 +6881,19 @@ function _buildPrintHTML(mode) {
             cabinetsHTML += `
             <div style="page-break-after:always;">
                 <h3 style="font-size:1.3rem;color:#1e3a5f;margin:0 0 12px;padding:10px 15px;background:#f8fafc;border-radius:8px;border-right:4px solid #1e3a5f;">
-                    פרטי ארון: ${titleText}
+                    פרטי ${detailLabel}: ${titleText}
                 </h3>
                 <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:1rem;border:1px solid #e2e8f0;">
-                    <tr><th style="${thStyle}">דגם ארון</th><td style="${tdStyle}"><strong>${item.modelName}</strong></td></tr>
-                    <tr><th style="${thStyle}">מיקום / התקנה</th><td style="${tdStyle}">${item.placement}</td></tr>
-                    <tr><th style="${thStyle}">מידות חיצוניות</th><td style="${tdStyle}" dir="rtl">${item.dimsStr}</td></tr>
-                    <tr><th style="${thStyle}">חומר גוף</th><td style="${tdStyle}">${item.material}</td></tr>
-                    <tr><th style="${thStyle}">סוג רגליים / צוקל</th><td style="${tdStyle}">${item.plinthType}</td></tr>
-                    <tr><th style="${thStyle}">תוספת שולחן</th><td style="${tdStyle}">${item.desk}</td></tr>
-                    <tr><td colspan="2" style="background:#f1f5f8;text-align:center;font-weight:bold;padding:8px;border:1px solid #e2e8f0;">גוונים וגימורים</td></tr>
-                    <tr><th style="${thStyle}">צבע גוף וצוקל</th><td style="${tdStyle}">${item.colorBody}</td></tr>
-                    <tr><th style="${thStyle}">צבע פנים (מדפים/מגירות)</th><td style="${tdStyle}">${item.colorInternal}</td></tr>
-                    ${item.slidingDoor ? `<tr><th style="${thStyle}">צבע חזיתות הזזה</th><td style="${tdStyle}">${item.slidingDoor.doorColorsStr}</td></tr>` : `<tr><th style="${thStyle}">צבע חזיתות (דלתות)</th><td style="${tdStyle}">${item.colorExternal}</td></tr>`}
-                    <tr><th style="${thStyle}">צבע גב ארון</th><td style="${tdStyle}">${(item.colorBack && item.colorBack !== 'undefined') ? item.colorBack : 'לבן מט'}</td></tr>
-                    ${item.desk !== 'ללא' ? `<tr><th style="${thStyle}">צבע שולחן עבודה</th><td style="${tdStyle}">${item.colorDesk}</td></tr>` : ''}
-                    ${item.hasOpenCells ? `<tr><th style="${thStyle}">צבע כוורת</th><td style="${tdStyle}">${item.colorOpenCell}</td></tr>` : ''}
-                    ${item.extraColors ? `<tr><th style="${thStyle}">צבעים נוספים בארון</th><td style="${tdStyle}">${item.extraColors}</td></tr>` : ''}
-                    <tr><td colspan="2" style="background:#f1f5f8;text-align:center;font-weight:bold;padding:8px;border:1px solid #e2e8f0;">פרזול ותכולה</td></tr>
-                    ${item.slidingDoor ? `
-                    <tr><th style="${thStyle}">מספר דלתות הזזה</th><td style="${tdStyle}">${item.slidingDoor.numDoors} דלתות</td></tr>
-                    <tr><th style="${thStyle}">צבע פרופיל הזזה</th><td style="${tdStyle}">${item.slidingDoor.profileColor}</td></tr>
-                    ${item.slidingDoor.hasMirror ? `<tr><th style="${thStyle}">דלת מראה</th><td style="${tdStyle}"><strong style="color:#1e3a5f;">✓ כולל דלת מראה</strong></td></tr>` : ''}
-                    ` : `<tr><th style="${thStyle}">סוג ידיות לחזיתות</th><td style="${tdStyle}"><strong>${item.handle}</strong></td></tr>`}
-                    <tr><th style="${thStyle}">מגירות חיצוניות</th><td style="${tdStyle}">${item.drawersExt} יחידות</td></tr>
-                    <tr><th style="${thStyle}">מגירות פנימיות</th><td style="${tdStyle}">${item.drawersInt} יחידות</td></tr>
-                    <tr><th style="${thStyle}">מדפים נשלפים</th><td style="${tdStyle}">${item.shelves} יחידות</td></tr>
-                    <tr><th style="${thStyle}">מוטות תלייה לקולבים</th><td style="${tdStyle}">${_formatHangingRodsDisplay(itemObj)}</td></tr>
+                    ${_printBasicSpecRows(item, itemObj, thStyle, tdStyle)}
+                    ${_printFinishesRows(item, itemObj, thStyle, tdStyle, 'padding:8px;border:1px solid #e2e8f0;')}
+                    ${_printHardwareRows(item, itemObj, thStyle, tdStyle, 'padding:8px;border:1px solid #e2e8f0;')}
                     ${_printCabinetNotesRow(item.cabinetNotes, thStyle, tdStyle)}
                     ${priceRows}
                 </table>
             </div>
             <div style="page-break-after:always;">
                 <h3 style="font-size:1.2rem;color:#1e3a5f;margin:0 0 16px;padding:10px 15px;background:#f8fafc;border-radius:8px;border-right:4px solid #1e3a5f;">
-                    תמונות ארון: ${titleText}
+                    תמונות ${detailLabel}: ${titleText}
                 </h3>
                 <div style="display:flex;flex-direction:column;gap:16px;height:calc(100vh - 120px);">
                     <div style="flex:1;display:flex;flex-direction:column;min-height:0;">
@@ -7854,6 +7909,7 @@ function _summarySpecOrRaw(item, rawState, specKey, rawKey) {
 function _buildCustomerSummaryDetails(itemObj) {
     const item = itemObj.spec;
     const rawState = itemObj.rawState || null;
+    const isWD = _cartIsWritingDesk(itemObj);
     const content = rawState ? _countCabinetContentFromRawState(rawState) : _emptyContentCounts();
     const details = [];
 
@@ -7861,6 +7917,25 @@ function _buildCustomerSummaryDetails(itemObj) {
     if (item.material) details.push('חומר גוף: ' + item.material);
 
     const colorBody = _summarySpecOrRaw(item, rawState, 'colorBody', 'materialBody');
+    if (isWD) {
+        if (colorBody) details.push('צבע גוף (רגליים ומשטח): ' + colorBody);
+        const colorDrawers = item.colorDrawers || _summarySpecOrRaw(item, rawState, 'colorDrawers', 'materialExternal');
+        if (colorDrawers) details.push('צבע מגירות: ' + colorDrawers);
+        if (item.extraColors) details.push('צבעים נוספים: ' + item.extraColors);
+        if (item.writingDeskHasDrawers !== false) {
+            if (item.handle) details.push('סוג ידיות למגירות: ' + item.handle);
+            const n = item.writingDeskDrawerCount != null ? item.writingDeskDrawerCount : (item.drawersExt || 0);
+            if (n > 0) details.push('מספר מגירות: ' + n);
+            if (item.writingDeskDrawerHeight) details.push('גובה מגירה: ' + item.writingDeskDrawerHeight + ' ס"מ');
+        } else {
+            details.push('מגירות: ללא');
+        }
+        if (item.cabinetNotes && item.cabinetNotes.trim()) {
+            details.push('הערות: ' + item.cabinetNotes.trim());
+        }
+        return details;
+    }
+
     const colorInternal = _summarySpecOrRaw(item, rawState, 'colorInternal', 'materialInternal');
     const colorExternal = _summarySpecOrRaw(item, rawState, 'colorExternal', 'materialExternal');
     const colorBack = _summarySpecOrRaw(item, rawState, 'colorBack', 'materialBack');
@@ -7917,7 +7992,7 @@ function _buildCartData() {
     const rows = [];
     state.orderCart.forEach((itemObj, index) => {
         const item = itemObj.spec;
-        const title = item.customName ? item.customName : `ארון מס' ${index + 1}`;
+        const title = item.customName ? item.customName : (_cartIsWritingDesk(itemObj) ? `שולחן מס' ${index + 1}` : `ארון מס' ${index + 1}`);
         const cabPrice = parseInt((item.price || '0').replace('₪','').replace(/,/g,'')) || 0;
         const instPrice = item.installPrice || 0;
         const costPrice = item.costPrice ? (parseInt(item.costPrice.replace('₪','').replace(/,/g,'')) || 0) : 0;
@@ -8376,6 +8451,9 @@ animate();
 // Presentation Mode — תצוגה חופשית עם חדר, ללא ממשק עריכה
 // ==========================================
 window._enterPresentationMode = function() {
+    if (state.viewMode === 'room-plan' && typeof window._exitRoomPlanMode === 'function') {
+        window._exitRoomPlanMode();
+    }
     // Save current state to restore on exit
     window._presentationSaved = {
         viewMode:     state.viewMode,
@@ -8387,8 +8465,8 @@ window._enterPresentationMode = function() {
     if (!window._roomVisible) {
         window._roomVisible = true;
         if (typeof _buildRoom === 'function') _buildRoom();
-        const roomBtn = document.getElementById('btn-toggle-room');
-        if (roomBtn) roomBtn.classList.remove('toggled-off');
+        const roomBtn = document.getElementById('btn-room-plan') || document.getElementById('btn-toggle-room');
+        if (roomBtn) roomBtn.classList.add('active');
     }
 
     // Switch to free-orbit 3D view
@@ -8434,8 +8512,8 @@ window._exitPresentationMode = function() {
         if (window._roomVisible !== wasRoomVisible) {
             window._roomVisible = wasRoomVisible;
             if (typeof _buildRoom === 'function') _buildRoom();
-            const roomBtn = document.getElementById('btn-toggle-room');
-            if (roomBtn) roomBtn.classList.toggle('toggled-off', !wasRoomVisible);
+            const roomBtn = document.getElementById('btn-room-plan') || document.getElementById('btn-toggle-room');
+            if (roomBtn) roomBtn.classList.remove('active');
         }
         window._presentationSaved = null;
     }

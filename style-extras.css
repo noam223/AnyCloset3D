@@ -259,6 +259,195 @@ body.presentation-mode #canvas-container canvas {
     background: rgba(30, 58, 95, 0.9);
 }
 
+/* ============================================================
+   ROOM PLAN MODE — 2D top-down SVG planner
+   ============================================================ */
+
+body.room-plan-mode #dimensions-layer,
+body.room-plan-mode #buttons-layer,
+body.room-plan-mode #drag-handles-layer,
+body.room-plan-mode #col-widths-layer,
+body.room-plan-mode #bottom-floating-toolbar {
+    display: none !important;
+}
+
+body.room-plan-mode.room-plan-2d #canvas-container canvas {
+    visibility: hidden;
+    pointer-events: none;
+}
+
+body.room-plan-mode.room-plan-3d #room-plan-layer {
+    pointer-events: none;
+}
+
+body.room-plan-mode.room-plan-3d #room-plan-layer .room-plan-view-toggle {
+    pointer-events: auto;
+}
+
+body.room-plan-mode.room-plan-3d #room-plan-layer .room-plan-view-toggle {
+    pointer-events: auto;
+}
+
+#room-plan-layer {
+    user-select: none;
+    overflow: hidden;
+}
+
+.room-plan-view-toggle {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 25;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 16px;
+    border-radius: 30px;
+    border: 1.5px solid var(--border);
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(10px);
+    color: var(--primary);
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 18px rgba(30, 58, 95, 0.12);
+    transition: background 0.15s, border-color 0.15s, transform 0.12s;
+}
+
+.room-plan-view-toggle:hover {
+    background: white;
+    border-color: var(--accent);
+    transform: translateY(-1px);
+}
+
+.room-plan-view-toggle:active {
+    transform: scale(0.97);
+}
+
+#room-plan-svg .rp-dim-line {
+    stroke: #059669;
+    stroke-width: 1.2;
+    vector-effect: non-scaling-stroke;
+}
+
+#room-plan-svg .rp-dim-line.rp-dim-active {
+    stroke: #047857;
+    stroke-width: 1.8;
+}
+
+#room-plan-svg .rp-dim-ext {
+    stroke: #94a3b8;
+    stroke-width: 0.8;
+    vector-effect: non-scaling-stroke;
+}
+
+#room-plan-svg .rp-dim-text {
+    fill: #059669;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: 'Rubik', 'Inter', sans-serif;
+    pointer-events: none;
+}
+
+#room-plan-svg .rp-dim-text.rp-dim-active {
+    fill: #047857;
+    font-size: 12px;
+}
+
+#room-plan-svg .rp-furn-label {
+    fill: #475569;
+    font-weight: 600;
+    font-family: 'Rubik', 'Inter', sans-serif;
+    pointer-events: none;
+}
+
+#room-plan-svg .rp-draggable {
+    cursor: grab;
+}
+
+#room-plan-svg .rp-draggable.rp-active {
+    cursor: grabbing;
+}
+
+body.room-plan-dragging #room-plan-svg .rp-draggable {
+    cursor: grabbing;
+}
+
+.room-plan-sidebar-header {
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.room-plan-sidebar-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.room-plan-sidebar-sub {
+    font-size: 0.76rem;
+    color: var(--text-light);
+    margin-top: 4px;
+    line-height: 1.4;
+}
+
+#room-settings-section.room-plan-highlight {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.15);
+}
+
+.room-plan-furniture-list {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.room-plan-furn-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-light);
+    border: 1px solid var(--border);
+    font-size: 0.8rem;
+}
+
+.room-plan-furn-row i {
+    color: var(--primary);
+    width: 16px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.room-plan-furn-name {
+    flex: 1;
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+.room-plan-furn-dim {
+    font-size: 0.74rem;
+    color: var(--text-light);
+    font-weight: 600;
+    background: white;
+    padding: 2px 8px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+}
+
+#btn-room-plan.active {
+    background: rgba(5, 150, 105, 0.12);
+    color: var(--accent);
+    border-color: rgba(5, 150, 105, 0.35);
+}
+
 
 /* Hide all editor chrome in viewer mode */
 body.viewer-mode #sidebar,

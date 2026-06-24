@@ -193,9 +193,9 @@ window._TOURS = {
             scrollTo: true,
         },
         {
-            target:   '#btn-toggle-room',
-            title:    '🏠 הצג/הסתר חדר',
-            text:     'לחץ על כפתור הבית בסרגל העליון כדי להציג או להסתיר את קירות החדר בהדמייה.',
+            target:   '#btn-room-plan',
+            title:    '📐 תכנון חדר',
+            text:     'לחץ על "תכנון חדר" בסרגל העליון כדי לעבור למבט על 2D — גרור מיטה וכסא, ראה מידות בזמן אמת, והחלף ל-3D בכל רגע.',
             position: 'bottom',
             scrollTo: false,
         },

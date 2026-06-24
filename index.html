@@ -338,7 +338,11 @@
 
         <!-- ===== ROOM SETTINGS SECTION ===== -->
         <div class="section" id="room-settings-section">
-            <div class="section-title"><i class="fa-solid fa-vector-square"></i> הגדרות חדר</div>
+            <div id="room-plan-sidebar-header" class="room-plan-sidebar-header" style="display:none;">
+                <div class="room-plan-sidebar-title"><i class="fa-solid fa-compass-drafting"></i> תכנון חדר</div>
+                <div class="room-plan-sidebar-sub">גרור פריטים במבט על וראה מידות בזמן אמת</div>
+            </div>
+            <div class="section-title"><i class="fa-solid fa-vector-square"></i> מידות חדר</div>
             <div class="control-group" style="margin-bottom:10px;">
                 <div class="label-row"><span>רוחב חדר (ס"מ)</span><input type="number" id="inp-num-room-width" class="value-badge-input" value="500" min="200" max="2000" onchange="window._setRoomSize('width', parseInt(this.value))"></div>
                 <div class="slider-row">
@@ -363,6 +367,8 @@
                     <button class="slider-btn" onclick="window._setRoomSize('height', (parseInt(document.getElementById('inp-num-room-height').value)||300)-5)"><i class="fa-solid fa-minus"></i></button>
                 </div>
             </div>
+            <div class="section-title room-plan-structure-title" style="display:none;margin-top:14px;"><i class="fa-solid fa-couch"></i> ריהוט בחדר</div>
+            <div id="room-plan-furniture-list" class="room-plan-furniture-list" style="display:none;"></div>
             <div id="room-props-row" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
                 <button type="button" id="btn-cycle-bed-width" onclick="window._cycleBedWidth()" style="width:100%;padding:8px 10px;border-radius:9px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.78rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
                     <i class="fa-solid fa-arrows-left-right"></i>
@@ -1063,7 +1069,7 @@
     <button class="view-btn" id="btn-multiview-blueprint" onclick="openMultiViewBlueprint()" style="display:none;"><i class="fa-solid fa-layer-group"></i> שרטוט ייצור</button>
     <button class="view-btn" id="btn-3d-view" onclick="window._enterPresentationMode()"><i class="fa-solid fa-cube"></i> תצוגה חופשית</button>
     <button class="view-btn icon-btn" id="btn-reset-view" title="איפוס זווית מצלמה" style="display:none;" onclick="window._orbitFree=false; const b=document.getElementById('btn-reset-view'); if(b) b.style.display='none'; updateCameraView();"><i class="fa-solid fa-arrows-rotate"></i></button>
-    <button class="view-btn icon-btn toggled-off" id="btn-toggle-room" title="הצג/הסתר חדר" onclick="window._toggleRoom()" style="color:#64748b;"><i class="fa-solid fa-house"></i></button>
+    <button class="view-btn" id="btn-room-plan" title="תכנון חדר — מבט על 2D עם גרירת ריהוט" onclick="window._toggleRoomPlanMode()"><i class="fa-solid fa-compass-drafting"></i> תכנון חדר</button>
     <button class="view-btn icon-btn" id="btn-toggle-doors" title="הצג/הסתר חזיתות" onclick="(function(){var chk=document.getElementById('inp-has-doors');chk.checked=!chk.checked;chk.dispatchEvent(new Event('change'));document.getElementById('btn-toggle-doors').classList.toggle('toggled-off',!chk.checked);})()"><i class="fa-solid fa-door-closed"></i></button>
     <!-- Room wall position selector — only shown for linear/sliding presets -->
     <div id="room-wall-selector" style="display:none; align-items:center; gap:3px; margin:0 4px;" title="מיקום ארון בחדר">
@@ -1094,6 +1100,14 @@
     <div id="drag-handles-layer"></div>
     <div id="col-widths-layer" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:14;"></div>
     <div id="blueprint-layer" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:11;display:none;"></div>
+
+    <!-- Room plan 2D top-down SVG overlay -->
+    <div id="room-plan-layer" style="display:none;position:absolute;top:0;left:0;width:100%;height:100%;z-index:20;background:var(--bg-main);">
+        <svg id="room-plan-svg" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block;touch-action:none;"></svg>
+        <button type="button" id="btn-room-plan-view-toggle" class="room-plan-view-toggle" title="החלף בין מבט 2D ל-3D">
+            <i class="fa-solid fa-cube"></i> 3D
+        </button>
+    </div>
 
     <!-- Bed controls toolbar — visible only when room is shown -->
     <div id="bed-toolbar" style="display:none;position:absolute;z-index:30;transform:translate(-50%,-50%);user-select:none;">
@@ -2481,9 +2495,10 @@
 <script src="writing-desk-preset.js?v=20260617wdcolors"></script>
 <script src="engine-core.js?v=20260617wdcolors"></script>
 <script src="engine-corners.js?v=20260609a"></script>
-<script src="engine-blueprint.js?v=20260617scsideview"></script>
+<script src="engine-blueprint.js?v=20260617wdbp"></script>
+<script src="engine-room-plan.js?v=20260624a"></script>
 <script src="tambour-color-picker.js?v=20260617scdoors"></script>
-<script src="ui.js?v=20260617wdfix"></script>
+<script src="ui.js?v=20260617wdprint"></script>
 <script src="layout-mode.js?v=20260610i"></script>
 <script src="mobile.js?v=20260617partclose"></script>
 <script src="part-paint.js?v=20260520k"></script>
