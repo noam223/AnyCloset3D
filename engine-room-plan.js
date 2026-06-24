@@ -24,11 +24,40 @@
     };
 
     const FURN_COLORS = {
-        cabinet: { fill: '#e8edf3', stroke: '#1E3A5F', label: 'הארון שלך' },
-        bed:     { fill: '#f1f5f9', stroke: '#64748b', label: 'מיטה' },
-        chair:   { fill: '#f8fafc', stroke: '#94a3b8', label: 'כסא' },
-        desk:    { fill: '#fef3c7', stroke: '#d97706', label: 'שולחן עבודה' }
+        cabinet:     { fill: '#e8edf3', stroke: '#1E3A5F', label: 'הארון שלך' },
+        bed:         { fill: '#f1f5f9', stroke: '#64748b', label: 'מיטה' },
+        chair:       { fill: '#f8fafc', stroke: '#94a3b8', label: 'כסא' },
+        'cabinet-desk': { fill: '#e2e8f0', stroke: '#64748b', label: 'שולחן ארון' },
+        nightstand:  { fill: '#f5f0e8', stroke: '#92706a', label: 'שידה' },
+        'room-desk': { fill: '#fef3c7', stroke: '#d97706', label: 'שולחן עבודה' }
     };
+
+    function _rectFromCenter(cx, cz, halfW, halfD, rotDeg) {
+        const rot = ((rotDeg || 0) * Math.PI) / 180;
+        const cos = Math.cos(rot), sin = Math.sin(rot);
+        const corners = [
+            { x: -halfW, z: -halfD }, { x: halfW, z: -halfD },
+            { x: halfW, z: halfD }, { x: -halfW, z: halfD }
+        ].map(function(c) {
+            return { x: cx + c.x * cos - c.z * sin, z: cz + c.x * sin + c.z * cos };
+        });
+        const xs = corners.map(function(c) { return c.x; });
+        const zs = corners.map(function(c) { return c.z; });
+        return {
+            minX: Math.min.apply(null, xs), maxX: Math.max.apply(null, xs),
+            minZ: Math.min.apply(null, zs), maxZ: Math.max.apply(null, zs)
+        };
+    }
+
+    function _makeFurnItem(id, rect, draggable, label) {
+        return {
+            id: id,
+            minX: rect.minX, maxX: rect.maxX,
+            minZ: rect.minZ, maxZ: rect.maxZ,
+            draggable: !!draggable,
+            label: label || (FURN_COLORS[id] && FURN_COLORS[id].label) || id
+        };
+    }
 
     function _layer() { return document.getElementById('room-plan-layer'); }
     function _svg() { return document.getElementById('room-plan-svg'); }
@@ -142,7 +171,7 @@
         };
     }
 
-    function _getDeskRect() {
+    function _getCabinetDeskRect() {
         const wing = state.wings && state.wings.center;
         if (!wing) return null;
         const cabOffX = (typeof cabinetGroup !== 'undefined' && cabinetGroup) ? (cabinetGroup.position.x || 0) : 0;
@@ -154,12 +183,7 @@
             const dSide = wing.desk.side;
             const minX = dSide === 'right' ? cabOffX + cabW / 2 : cabOffX - cabW / 2 - dW;
             const maxX = dSide === 'right' ? cabOffX + cabW / 2 + dW : cabOffX - cabW / 2;
-            return {
-                id: 'desk', minX, maxX,
-                minZ: -cabD / 2, maxZ: cabD / 2 + 20,
-                draggable: false,
-                label: FURN_COLORS.desk.label
-            };
+            return _makeFurnItem('cabinet-desk', { minX, maxX, minZ: -cabD / 2, maxZ: cabD / 2 + 20 }, false);
         }
 
         const cols = wing.columns || [];
@@ -167,28 +191,47 @@
         for (let i = 0; i < cols.length; i++) {
             const col = cols[i];
             if (col.type === 'desk') {
-                return {
-                    id: 'desk',
+                return _makeFurnItem('cabinet-desk', {
                     minX: curX, maxX: curX + col.width,
-                    minZ: -cabD / 2, maxZ: cabD / 2 + 20,
-                    draggable: false,
-                    label: FURN_COLORS.desk.label
-                };
+                    minZ: -cabD / 2, maxZ: cabD / 2 + 20
+                }, false);
             }
             curX += col.width;
         }
         return null;
     }
 
+    function _getNightstandRect() {
+        if (!window._nightstandVisible) return null;
+        const np = window._nightstandPos || { x: 60, z: 280 };
+        const w = (window._NIGHTSTAND_W || 50) / 2;
+        const d = (window._NIGHTSTAND_D || 40) / 2;
+        const rect = _rectFromCenter(np.x, np.z, w, d, window._nightstandRotation || 0);
+        return _makeFurnItem('nightstand', rect, true);
+    }
+
+    function _getRoomDeskRect() {
+        if (!window._roomDeskVisible) return null;
+        const dp = window._roomDeskPos || { x: 130, z: 130 };
+        const w = (window._ROOM_DESK_W || 120) / 2;
+        const d = (window._ROOM_DESK_D || 60) / 2;
+        const rect = _rectFromCenter(dp.x, dp.z, w, d, window._roomDeskRotation || 0);
+        return _makeFurnItem('room-desk', rect, true);
+    }
+
     function _collectFurniture() {
         const items = [];
         const cab = _getCabinetRect();
-        const desk = _getDeskRect();
+        const cabDesk = _getCabinetDeskRect();
         const bed = _getBedRect();
         const chair = _getChairRect();
+        const nightstand = _getNightstandRect();
+        const roomDesk = _getRoomDeskRect();
         if (cab) items.push(cab);
-        if (desk) items.push(desk);
+        if (cabDesk) items.push(cabDesk);
         if (bed) items.push(bed);
+        if (nightstand) items.push(nightstand);
+        if (roomDesk) items.push(roomDesk);
         if (chair) items.push(chair);
         return items;
     }
@@ -210,13 +253,17 @@
         return bp;
     }
 
-    function _clampChairCenter(x, z) {
+    function _clampFurnCenter(x, z, halfW, halfD) {
         const b = _getBounds();
         if (!b) return { x, z };
         return {
-            x: Math.max(b.leftX + 30, Math.min(b.rightX - 30, x)),
-            z: Math.max(b.backZ + 30, Math.min(b.frontZ - 30, z))
+            x: Math.max(b.leftX + halfW, Math.min(b.rightX - halfW, x)),
+            z: Math.max(b.backZ + halfD, Math.min(b.frontZ - halfD, z))
         };
+    }
+
+    function _clampChairCenter(x, z) {
+        return _clampFurnCenter(x, z, 30, 30);
     }
 
     function _applyFurnitureMove(id, cx, cz) {
@@ -229,6 +276,12 @@
                 x: cp.x, z: cp.z,
                 rotY: prev.rotY !== undefined ? prev.rotY : -Math.PI / 2
             };
+        } else if (id === 'nightstand') {
+            const np = _clampFurnCenter(cx, cz, (window._NIGHTSTAND_W || 50) / 2, (window._NIGHTSTAND_D || 40) / 2);
+            window._nightstandPos = np;
+        } else if (id === 'room-desk') {
+            const dp = _clampFurnCenter(cx, cz, (window._ROOM_DESK_W || 120) / 2, (window._ROOM_DESK_D || 60) / 2);
+            window._roomDeskPos = dp;
         }
         window._roomPlanPending3D = true;
     }
@@ -455,7 +508,7 @@
 
         const itemDimsG = _svgEl('g', { class: 'rp-item-dims' });
         items.forEach(function(item) {
-            if (item.id === 'cabinet' || item.id === 'desk') return;
+            if (item.id === 'cabinet' || item.id === 'cabinet-desk') return;
             _drawItemWallDims(itemDimsG, item, tf, b, item.id === dragId);
         });
         svg.appendChild(itemDimsG);
@@ -503,7 +556,9 @@
             row.className = 'room-plan-furn-row';
             const icon = item.id === 'bed' ? 'fa-bed'
                 : item.id === 'chair' ? 'fa-chair'
-                : item.id === 'desk' ? 'fa-desktop'
+                : item.id === 'nightstand' ? 'fa-table-cells'
+                : item.id === 'room-desk' ? 'fa-desktop'
+                : item.id === 'cabinet-desk' ? 'fa-laptop'
                 : 'fa-door-closed';
             row.innerHTML =
                 '<i class="fa-solid ' + icon + '"></i>' +
@@ -522,11 +577,9 @@
         const toggleBtn = document.getElementById('btn-room-plan-view-toggle');
         if (layer) layer.style.display = (state.viewMode === 'room-plan' && is2d) ? 'block' : 'none';
         if (toggleBtn) {
-            toggleBtn.style.display = state.viewMode === 'room-plan' ? 'flex' : 'none';
-            toggleBtn.setAttribute('aria-hidden', state.viewMode === 'room-plan' ? 'false' : 'true');
             toggleBtn.innerHTML = is2d
-                ? '<i class="fa-solid fa-cube"></i> 3D'
-                : '<i class="fa-solid fa-vector-square"></i> 2D';
+                ? '<i class="fa-solid fa-cube"></i><span>3D</span>'
+                : '<i class="fa-solid fa-vector-square"></i><span>2D</span>';
         }
 
         if (is2d) {
@@ -613,8 +666,6 @@
 
         const layer = _layer();
         if (layer) layer.style.display = 'none';
-        const toggleBtn = document.getElementById('btn-room-plan-view-toggle');
-        if (toggleBtn) toggleBtn.style.display = 'none';
 
         const rsSec = document.getElementById('room-settings-section');
         if (rsSec) rsSec.classList.remove('room-plan-highlight');
@@ -735,14 +786,6 @@
                 window._renderRoomPlan2D();
             }
         });
-
-        const toggleBtn = document.getElementById('btn-room-plan-view-toggle');
-        if (toggleBtn) {
-            toggleBtn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                window._toggleRoomPlanSubview();
-            });
-        }
     }
 
     if (document.readyState === 'loading') {

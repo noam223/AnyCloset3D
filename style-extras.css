@@ -283,46 +283,17 @@ body.room-plan-mode.room-plan-2d #canvas-container canvas {
     z-index: 1;
 }
 
-body.room-plan-mode #btn-room-plan-view-toggle {
-    display: flex !important;
-    position: fixed;
-    top: 78px;
-    left: 24px;
-    z-index: 99980;
-    pointer-events: auto;
-}
-
 #room-plan-layer {
     user-select: none;
     overflow: hidden;
 }
 
-.room-plan-view-toggle {
-    display: none;
-    align-items: center;
-    gap: 7px;
-    padding: 9px 16px;
-    border-radius: 30px;
-    border: 1.5px solid var(--border);
-    background: rgba(255, 255, 255, 0.94);
-    backdrop-filter: blur(10px);
-    color: var(--primary);
-    font-family: inherit;
-    font-size: 0.82rem;
-    font-weight: 700;
-    cursor: pointer;
-    box-shadow: 0 4px 18px rgba(30, 58, 95, 0.12);
-    transition: background 0.15s, border-color 0.15s, transform 0.12s;
+.room-furn-btn.room-furn-view-toggle {
+    background: rgba(5, 150, 105, 0.22);
+    border: 1px solid rgba(5, 150, 105, 0.45);
 }
-
-.room-plan-view-toggle:hover {
-    background: white;
-    border-color: var(--accent);
-    transform: translateY(-1px);
-}
-
-.room-plan-view-toggle:active {
-    transform: scale(0.97);
+.room-furn-btn.room-furn-view-toggle:hover {
+    background: rgba(5, 150, 105, 0.45);
 }
 
 #room-plan-svg .rp-dim-line {

@@ -236,6 +236,22 @@ window._bedWidthCm   = window._bedWidthCm  || 160;                    // bed wid
 window._bedVisible   = window._bedVisible  !== false;                 // show/hide bed in room view
 window._BED_WIDTHS   = [160, 140, 120, 90];
 
+// ── Nightstand (שידה) — optional room furniture ─────────────────────────────
+window._nightstandVisible  = window._nightstandVisible  || false;
+window._nightstandPos      = window._nightstandPos      || { x: 60, z: 280 };
+window._nightstandRotation = window._nightstandRotation || 0;
+window._NIGHTSTAND_W       = 50;
+window._NIGHTSTAND_D       = 40;
+window._NIGHTSTAND_H       = 55;
+
+// ── Standalone work desk (שולחן עבודה) — optional room furniture ────────────
+window._roomDeskVisible    = window._roomDeskVisible    || false;
+window._roomDeskPos        = window._roomDeskPos        || { x: 130, z: 130 };
+window._roomDeskRotation   = window._roomDeskRotation   || 0;
+window._ROOM_DESK_W        = 120;
+window._ROOM_DESK_D        = 60;
+window._ROOM_DESK_H        = 75;
+
 // ── Office Chair GLB ─────────────────────────────────────────────────────────
 window._CHAIR_OPTIONS = [
     { id: 'chair1', path: 'images/office_chair.glb',  shortName: 'משרדי',  targetHeightCm: 120 },
@@ -654,6 +670,40 @@ window._toggleChairVisible = function() {
     if (typeof window._updateRoomPropsUI === 'function') window._updateRoomPropsUI();
 };
 
+window._toggleNightstandVisible = function() {
+    window._nightstandVisible = !window._nightstandVisible;
+    if (typeof window._roomPlanFurnitureChanged === 'function') {
+        window._roomPlanFurnitureChanged();
+    } else if (typeof _buildRoom === 'function') {
+        _buildRoom();
+    }
+    if (typeof window._updateRoomPropsUI === 'function') window._updateRoomPropsUI();
+};
+
+window._toggleRoomDeskVisible = function() {
+    window._roomDeskVisible = !window._roomDeskVisible;
+    if (typeof window._roomPlanFurnitureChanged === 'function') {
+        window._roomPlanFurnitureChanged();
+    } else if (typeof _buildRoom === 'function') {
+        _buildRoom();
+    }
+    if (typeof window._updateRoomPropsUI === 'function') window._updateRoomPropsUI();
+};
+
+function _placeRoomBoxFurniture(rg, cx, cz, w, d, h, rotDeg, color, propId) {
+    const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(w, h, d),
+        new THREE.MeshStandardMaterial({ color: color || 0xd4c4a8, roughness: 0.88, metalness: 0.02 })
+    );
+    mesh.rotation.y = ((rotDeg || 0) * Math.PI) / 180;
+    mesh.position.set(cx, h / 2, cz);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.userData.roomProp = propId;
+    rg.add(mesh);
+    return mesh;
+}
+
 window._updateRoomPropsUI = function() {
     const _syncToggleBtn = (id, show, hideLabel, showLabel, icon) => {
         const btn = document.getElementById(id);
@@ -667,6 +717,8 @@ window._updateRoomPropsUI = function() {
     const chairShow = window._chairVisible !== false;
     _syncToggleBtn('room-btn-toggle-bed', bedShow, 'הסתר מיטה', 'הצג מיטה', 'bed');
     _syncToggleBtn('room-btn-toggle-chair', chairShow, 'הסתר כסא', 'הצג כסא', 'chair');
+    _syncToggleBtn('room-btn-toggle-nightstand', !!window._nightstandVisible, 'הסתר שידה', 'הוסף שידה', 'table-cells');
+    _syncToggleBtn('room-btn-toggle-room-desk', !!window._roomDeskVisible, 'הסתר שולחן', 'הוסף שולחן', 'desktop');
 
     const chairVarLbl = document.getElementById('room-chair-variant-label');
     if (chairVarLbl) {
@@ -1172,6 +1224,28 @@ function _buildRoom() {
             window._laptopMeshRef = laptop;
             window._laptopBaseY   = laptop.position.y - (window._laptopYOffset || 0);
         }
+    }
+
+    // ── Nightstand (שידה) ───────────────────────────────────────────────────
+    window._nightstandMesh = null;
+    if (window._nightstandVisible) {
+        const np = window._nightstandPos || { x: 60, z: 280 };
+        window._nightstandMesh = _placeRoomBoxFurniture(
+            rg, np.x, np.z,
+            window._NIGHTSTAND_W, window._NIGHTSTAND_D, window._NIGHTSTAND_H,
+            window._nightstandRotation, 0xe8dfd0, 'nightstand'
+        );
+    }
+
+    // ── Standalone work desk (שולחן עבודה) ─────────────────────────────────
+    window._roomDeskMesh = null;
+    if (window._roomDeskVisible) {
+        const dp = window._roomDeskPos || { x: 130, z: 130 };
+        window._roomDeskMesh = _placeRoomBoxFurniture(
+            rg, dp.x, dp.z,
+            window._ROOM_DESK_W, window._ROOM_DESK_D, window._ROOM_DESK_H,
+            window._roomDeskRotation, 0xc9a96e, 'room-desk'
+        );
     }
 
     // Notify UI to reposition bed handles
