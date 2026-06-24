@@ -8,7 +8,20 @@
     window._roomPlanSubview = window._roomPlanSubview || '2d';
     window._roomPlanDrag = null;
     window._roomPlanSaved = null;
+    window._roomPlanPending3D = false;
     window._chairPosOverride = window._chairPosOverride || null;
+    window._roomPlanRenderQueued = false;
+
+    function _is2dPlan() {
+        return state.viewMode === 'room-plan' && window._roomPlanSubview === '2d';
+    }
+
+    /** Push 2D position changes into the Three.js room (call only when leaving 2D or exiting plan mode). */
+    window._syncRoomPlanTo3D = function() {
+        if (!window._roomPlanPending3D) return;
+        window._roomPlanPending3D = false;
+        if (typeof _buildRoom === 'function') _buildRoom();
+    };
 
     const FURN_COLORS = {
         cabinet: { fill: '#e8edf3', stroke: '#1E3A5F', label: 'הארון שלך' },
@@ -69,7 +82,8 @@
 
     function _getBedRect() {
         if (window._bedVisible === false) return null;
-        if (window._bedMesh) {
+        const usePos = _is2dPlan() || window._roomPlanDrag;
+        if (!usePos && window._bedMesh) {
             window._bedMesh.updateMatrixWorld(true);
             const box = new THREE.Box3().setFromObject(window._bedMesh);
             return {
@@ -106,7 +120,8 @@
         if (!cp && typeof _getChairPos === 'function') cp = _getChairPos();
         if (!cp) return null;
 
-        if (window._chairMesh) {
+        const usePos = _is2dPlan() || window._roomPlanDrag;
+        if (!usePos && window._chairMesh) {
             window._chairMesh.updateMatrixWorld(true);
             const box = new THREE.Box3().setFromObject(window._chairMesh);
             return {
@@ -206,9 +221,7 @@
 
     function _applyFurnitureMove(id, cx, cz) {
         if (id === 'bed') {
-            const bp = _clampBedCenter(cx, cz);
-            window._bedPos = bp;
-            if (typeof _buildRoom === 'function') _buildRoom();
+            window._bedPos = _clampBedCenter(cx, cz);
         } else if (id === 'chair') {
             const cp = _clampChairCenter(cx, cz);
             const prev = window._chairPosOverride || (typeof _getChairPos === 'function' ? _getChairPos() : {}) || {};
@@ -216,8 +229,8 @@
                 x: cp.x, z: cp.z,
                 rotY: prev.rotY !== undefined ? prev.rotY : -Math.PI / 2
             };
-            if (typeof _buildRoom === 'function') _buildRoom();
         }
+        window._roomPlanPending3D = true;
     }
 
     // ── SVG dimension helpers ───────────────────────────────────────────────
@@ -466,8 +479,17 @@
         svg.appendChild(doorG);
 
         window._roomPlanTransform = tf;
-        window._updateRoomPlanFurnitureList();
+        if (!window._roomPlanDrag) window._updateRoomPlanFurnitureList();
     };
+
+    function _queueRoomPlanRender() {
+        if (window._roomPlanRenderQueued) return;
+        window._roomPlanRenderQueued = true;
+        requestAnimationFrame(function() {
+            window._roomPlanRenderQueued = false;
+            if (_is2dPlan()) window._renderRoomPlan2D();
+        });
+    }
 
     window._updateRoomPlanFurnitureList = function() {
         const list = document.getElementById('room-plan-furniture-list');
@@ -497,10 +519,10 @@
         document.body.classList.toggle('room-plan-3d', !is2d);
 
         const layer = _layer();
-        if (layer) layer.style.display = (state.viewMode === 'room-plan' && is2d) ? 'block' : 'none';
-
         const toggleBtn = document.getElementById('btn-room-plan-view-toggle');
+        if (layer) layer.style.display = (state.viewMode === 'room-plan' && is2d) ? 'block' : 'none';
         if (toggleBtn) {
+            toggleBtn.style.display = state.viewMode === 'room-plan' ? 'flex' : 'none';
             toggleBtn.innerHTML = is2d
                 ? '<i class="fa-solid fa-cube"></i> 3D'
                 : '<i class="fa-solid fa-vector-square"></i> 2D';
@@ -508,8 +530,9 @@
 
         if (is2d) {
             window._renderRoomPlan2D();
-        } else if (typeof updateCameraView === 'function') {
-            updateCameraView();
+        } else {
+            window._syncRoomPlanTo3D();
+            if (typeof updateCameraView === 'function') updateCameraView();
         }
         if (typeof window._updateBedHandles === 'function') window._updateBedHandles();
         if (typeof window._updateRoomPropsUI === 'function') window._updateRoomPropsUI();
@@ -518,6 +541,16 @@
     window._toggleRoomPlanSubview = function() {
         window._roomPlanSubview = window._roomPlanSubview === '2d' ? '3d' : '2d';
         window._updateRoomPlanSubview();
+    };
+
+    /** Furniture property changed (width, rotation, visibility) — defer 3D while in 2D plan. */
+    window._roomPlanFurnitureChanged = function() {
+        if (_is2dPlan()) {
+            window._roomPlanPending3D = true;
+            window._renderRoomPlan2D();
+        } else if (typeof _buildRoom === 'function') {
+            _buildRoom();
+        }
     };
 
     function _updateRoomPlanBtn(active) {
@@ -571,11 +604,15 @@
     window._exitRoomPlanMode = function() {
         if (state.viewMode !== 'room-plan') return;
 
+        window._syncRoomPlanTo3D();
+
         document.body.classList.remove('room-plan-mode', 'room-plan-2d', 'room-plan-3d');
         _updateRoomPlanBtn(false);
 
         const layer = _layer();
         if (layer) layer.style.display = 'none';
+        const toggleBtn = document.getElementById('btn-room-plan-view-toggle');
+        if (toggleBtn) toggleBtn.style.display = 'none';
 
         const rsSec = document.getElementById('room-settings-section');
         if (rsSec) rsSec.classList.remove('room-plan-highlight');
@@ -666,7 +703,7 @@
             };
             svg.setPointerCapture(e.pointerId);
             document.body.classList.add('room-plan-dragging');
-            window._renderRoomPlan2D();
+            _queueRoomPlanRender();
         });
 
         svg.addEventListener('pointermove', function(e) {
@@ -680,7 +717,7 @@
             const dx = (sx - d.startX) / tf.scale;
             const dz = (sy - d.startY) / tf.scale;
             _applyFurnitureMove(d.id, d.startCx + dx, d.startCz + dz);
-            window._renderRoomPlan2D();
+            _queueRoomPlanRender();
         });
 
         function endDrag(e) {
@@ -689,8 +726,7 @@
             if (e && d.pointerId !== e.pointerId) return;
             window._roomPlanDrag = null;
             document.body.classList.remove('room-plan-dragging');
-            if (typeof buildCabinet === 'function') buildCabinet();
-            window._renderRoomPlan2D();
+            _queueRoomPlanRender();
         }
 
         svg.addEventListener('pointerup', endDrag);

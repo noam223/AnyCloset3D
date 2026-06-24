@@ -293,9 +293,12 @@ window._cycleChairVariant = function() {
     if (n <= 1) return;
     window._chairVariantIdx = ((window._chairVariantIdx || 0) + 1) % n;
     _syncActiveChairRefs();
-    if (typeof _buildRoom === 'function') _buildRoom();
+    if (typeof window._roomPlanFurnitureChanged === 'function') {
+        window._roomPlanFurnitureChanged();
+    } else {
+        if (typeof _buildRoom === 'function') _buildRoom();
+    }
     if (typeof window._updateRoomPropsUI === 'function') window._updateRoomPropsUI();
-    if (typeof window._renderRoomPlan2D === 'function') window._renderRoomPlan2D();
 };
 
 (function _loadChairs() {
@@ -621,25 +624,34 @@ window._cycleBedWidth = function() {
     const cur = window._bedWidthCm || 160;
     const i = opts.indexOf(cur);
     window._bedWidthCm = opts[(i + 1) % opts.length];
-    if (typeof _buildRoom === 'function') _buildRoom();
+    if (typeof window._roomPlanFurnitureChanged === 'function') {
+        window._roomPlanFurnitureChanged();
+    } else {
+        if (typeof _buildRoom === 'function') _buildRoom();
+    }
     if (typeof window._updateRoomPropsUI === 'function') window._updateRoomPropsUI();
     if (typeof window._updateBedHandles === 'function') window._updateBedHandles();
-    if (typeof window._renderRoomPlan2D === 'function') window._renderRoomPlan2D();
 };
 
 window._toggleBedVisible = function() {
     window._bedVisible = !window._bedVisible;
-    if (typeof _buildRoom === 'function') _buildRoom();
+    if (typeof window._roomPlanFurnitureChanged === 'function') {
+        window._roomPlanFurnitureChanged();
+    } else {
+        if (typeof _buildRoom === 'function') _buildRoom();
+    }
     if (typeof window._updateRoomPropsUI === 'function') window._updateRoomPropsUI();
     if (typeof window._updateBedHandles === 'function') window._updateBedHandles();
-    if (typeof window._renderRoomPlan2D === 'function') window._renderRoomPlan2D();
 };
 
 window._toggleChairVisible = function() {
     window._chairVisible = !window._chairVisible;
-    if (typeof _buildRoom === 'function') _buildRoom();
+    if (typeof window._roomPlanFurnitureChanged === 'function') {
+        window._roomPlanFurnitureChanged();
+    } else {
+        if (typeof _buildRoom === 'function') _buildRoom();
+    }
     if (typeof window._updateRoomPropsUI === 'function') window._updateRoomPropsUI();
-    if (typeof window._renderRoomPlan2D === 'function') window._renderRoomPlan2D();
 };
 
 window._updateRoomPropsUI = function() {
@@ -676,9 +688,12 @@ window._updateRoomPropsUI = function() {
 // Rotate bed 90° clockwise on each call
 window._rotateBed = function() {
     window._bedRotation = (window._bedRotation + 90) % 360;
-    if (typeof _buildRoom === 'function') _buildRoom();
+    if (typeof window._roomPlanFurnitureChanged === 'function') {
+        window._roomPlanFurnitureChanged();
+    } else {
+        if (typeof _buildRoom === 'function') _buildRoom();
+    }
     if (typeof window._updateBedHandles === 'function') window._updateBedHandles();
-    if (typeof window._renderRoomPlan2D === 'function') window._renderRoomPlan2D();
 };
 (function _loadBed() {
     if (typeof THREE.GLTFLoader === 'undefined') {
@@ -1305,7 +1320,6 @@ function updateCameraView() {
         controls.update();
         if (typeof buildDragHandlesUI === 'function') buildDragHandlesUI();
         if (typeof updateQuickEditPanelUI === 'function') updateQuickEditPanelUI();
-        if (typeof window._renderRoomPlan2D === 'function') window._renderRoomPlan2D();
         return;
     }
 
@@ -2464,7 +2478,7 @@ function buildCabinet() {
         }
     }
 
-    if (state.viewMode === 'room-plan' && typeof window._renderRoomPlan2D === 'function') {
+    if (state.viewMode === 'room-plan' && window._roomPlanSubview === '2d' && typeof window._renderRoomPlan2D === 'function') {
         window._renderRoomPlan2D();
     }
 

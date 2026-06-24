@@ -276,16 +276,8 @@ body.room-plan-mode.room-plan-2d #canvas-container canvas {
     pointer-events: none;
 }
 
-body.room-plan-mode.room-plan-3d #room-plan-layer {
-    pointer-events: none;
-}
-
-body.room-plan-mode.room-plan-3d #room-plan-layer .room-plan-view-toggle {
-    pointer-events: auto;
-}
-
-body.room-plan-mode.room-plan-3d #room-plan-layer .room-plan-view-toggle {
-    pointer-events: auto;
+body.room-plan-mode #btn-room-plan-view-toggle {
+    display: flex;
 }
 
 #room-plan-layer {

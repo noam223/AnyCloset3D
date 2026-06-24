@@ -4715,7 +4715,7 @@ window._setRangeEl = function(el, v) {
 function _isCanvasOverlayUiTarget(el) {
     if (!el || !el.closest) return false;
     return !!el.closest(
-        '#column-quick-edit, #full-corner-quick-edit, #bottom-floating-toolbar, #bed-toolbar, #room-props-row, #room-furniture-toolbar, #room-plan-layer, ' +
+        '#column-quick-edit, #full-corner-quick-edit, #bottom-floating-toolbar, #bed-toolbar, #room-props-row, #room-furniture-toolbar, #room-plan-layer, #btn-room-plan-view-toggle, ' +
         '.drag-handle, .dim-container, .plus-btn, .fc-cell-btn, .select-all-col-btn, .cell-select-btn, .sub-cell-btn'
     );
 }
@@ -8426,10 +8426,12 @@ function animate() {
         }
     }
 
-    if(typeof updateOverlaysPosition === 'function') updateOverlaysPosition();
-    if(typeof updateDragHandlesPosition === 'function') updateDragHandlesPosition();
-    if(typeof updateToolbarState === 'function') updateToolbarState();
-    if(typeof window._updateBedHandles === 'function') window._updateBedHandles();
+    if (!(state.viewMode === 'room-plan' && window._roomPlanSubview === '2d')) {
+        if(typeof updateOverlaysPosition === 'function') updateOverlaysPosition();
+        if(typeof updateDragHandlesPosition === 'function') updateDragHandlesPosition();
+        if(typeof updateToolbarState === 'function') updateToolbarState();
+        if(typeof window._updateBedHandles === 'function') window._updateBedHandles();
+    }
 
     // ── Ceiling closure panel visibility ──────────────────────────────────────
     // Show ceiling when camera is BELOW the ceiling (inside the room).
@@ -8443,7 +8445,9 @@ function animate() {
         });
     }
 
-    renderer.render(scene, camera);
+    if (!(state.viewMode === 'room-plan' && window._roomPlanSubview === '2d')) {
+        renderer.render(scene, camera);
+    }
 }
 animate();
 
