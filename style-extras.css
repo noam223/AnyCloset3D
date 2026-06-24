@@ -276,8 +276,20 @@ body.room-plan-mode.room-plan-2d #canvas-container canvas {
     pointer-events: none;
 }
 
+#canvas-container canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+}
+
 body.room-plan-mode #btn-room-plan-view-toggle {
-    display: flex;
+    display: flex !important;
+    position: fixed;
+    top: 78px;
+    left: 24px;
+    z-index: 99980;
+    pointer-events: auto;
 }
 
 #room-plan-layer {
@@ -286,11 +298,7 @@ body.room-plan-mode #btn-room-plan-view-toggle {
 }
 
 .room-plan-view-toggle {
-    position: absolute;
-    top: 16px;
-    left: 16px;
-    z-index: 25;
-    display: flex;
+    display: none;
     align-items: center;
     gap: 7px;
     padding: 9px 16px;

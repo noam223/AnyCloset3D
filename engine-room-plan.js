@@ -523,6 +523,7 @@
         if (layer) layer.style.display = (state.viewMode === 'room-plan' && is2d) ? 'block' : 'none';
         if (toggleBtn) {
             toggleBtn.style.display = state.viewMode === 'room-plan' ? 'flex' : 'none';
+            toggleBtn.setAttribute('aria-hidden', state.viewMode === 'room-plan' ? 'false' : 'true');
             toggleBtn.innerHTML = is2d
                 ? '<i class="fa-solid fa-cube"></i> 3D'
                 : '<i class="fa-solid fa-vector-square"></i> 2D';
@@ -569,7 +570,8 @@
         };
 
         window._roomVisible = true;
-        window._roomPlanSubview = window._roomPlanSubview || '2d';
+        window._roomPlanSubview = '2d';
+        window._roomPlanPending3D = false;
         state.viewMode = 'room-plan';
         window._orbitFree = false;
         window._forceCameraAnim = true;
