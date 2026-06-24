@@ -632,17 +632,13 @@
         if (window._roomPlanSaved) {
             state.viewMode = window._roomPlanSaved.viewMode || 'front';
             window._orbitFree = window._roomPlanSaved.orbitFree || false;
-            const wasVisible = window._roomPlanSaved.roomVisible;
-            if (window._roomVisible !== wasVisible) {
-                window._roomVisible = wasVisible;
-                if (typeof _buildRoom === 'function') _buildRoom();
-            }
             window._roomPlanSaved = null;
         } else {
             state.viewMode = 'front';
-            window._roomVisible = false;
-            if (typeof _buildRoom === 'function') _buildRoom();
         }
+
+        window._roomVisible = false;
+        if (typeof _buildRoom === 'function') _buildRoom();
 
         const furnBar = document.getElementById('room-furniture-toolbar');
         if (furnBar && !window._roomVisible) furnBar.style.display = 'none';

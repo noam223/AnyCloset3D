@@ -1637,6 +1637,12 @@ function updateCameraView() {
 
 function buildCabinet() {
     if (window._layoutModeActive) return;
+
+    // Room shell is only for תכנון חדר or תצוגה חופשית — never in עריכת חזית / שרטוט
+    if (state.viewMode !== 'room-plan' && !document.body.classList.contains('presentation-mode')) {
+        window._roomVisible = false;
+    }
+
     while(cabinetGroup.children.length > 0) cabinetGroup.remove(cabinetGroup.children[0]);
     hitBoxes = [];
     wingHitBoxes = [];

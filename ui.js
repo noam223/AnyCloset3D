@@ -4784,6 +4784,7 @@ function bindUI() {
         if (state.viewMode === 'room-plan' && typeof window._exitRoomPlanMode === 'function') {
             window._exitRoomPlanMode();
         }
+        window._roomVisible = false;
         document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
         e.target.classList.add('active');
         window._orbitFree = false;
