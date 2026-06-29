@@ -339,6 +339,8 @@ body.room-plan-dragging #room-plan-svg {
     font-size: 11px;
     font-weight: 700;
     font-family: 'Rubik', 'Inter', sans-serif;
+    direction: ltr;
+    unicode-bidi: isolate;
     pointer-events: none;
 }
 

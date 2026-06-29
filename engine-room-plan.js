@@ -348,8 +348,6 @@
     }
 
     function _dimLabelBgRect(x, y, text, opts) {
-        const anchor = opts.anchor || 'middle';
-        const valign = opts.valign || 'above';
         const fs = opts.active ? 12 : 11;
         const padX = 6;
         const padY = 4;
@@ -357,10 +355,8 @@
         const textH = fs + 2;
         const w = textW + padX * 2;
         const h = textH + padY * 2;
-        let bx;
-        if (anchor === 'middle') bx = x - w / 2;
-        else if (anchor === 'end') bx = x - w;
-        else bx = x;
+        const valign = opts.valign || 'above';
+        const bx = x - w / 2;
         let by;
         if (valign === 'middle') by = y - h / 2;
         else if (valign === 'above') by = y - h - 1;
@@ -368,11 +364,20 @@
         return { x: bx, y: by, w: w, h: h };
     }
 
+    function _dimLabelHalfW(text, active) {
+        const fs = active ? 12 : 11;
+        const padX = 6;
+        const textW = Math.max(String(text).length * fs * 0.62, fs * 1.5);
+        return (textW + padX * 2) / 2 + 4;
+    }
+
     function _drawDimLabel(g, x, y, text, opts) {
         opts = opts || {};
         const active = !!opts.active;
-        const bg = _dimLabelBgRect(x, y, text, opts);
-        g.appendChild(_svgEl('rect', {
+        const valign = opts.valign || 'above';
+        const bg = _dimLabelBgRect(x, y, text, { valign: valign, active: active });
+        const wrap = _svgEl('g', { class: 'rp-dim-label' });
+        wrap.appendChild(_svgEl('rect', {
             x: bg.x, y: bg.y, width: bg.w, height: bg.h,
             rx: 6, ry: 6,
             class: 'rp-dim-bg' + (active ? ' rp-dim-bg-active' : '')
@@ -380,10 +385,12 @@
         const textAttrs = {
             x: x, y: y,
             class: active ? 'rp-dim-text rp-dim-active' : 'rp-dim-text',
-            'text-anchor': opts.anchor || 'middle'
+            'text-anchor': 'middle',
+            direction: 'ltr'
         };
         if (opts.baseline) textAttrs['dominant-baseline'] = opts.baseline;
-        g.appendChild(_svgEl('text', textAttrs, String(text)));
+        wrap.appendChild(_svgEl('text', textAttrs, String(text)));
+        g.appendChild(wrap);
     }
 
     function _drawDimH(g, x1, x2, y, label, above) {
@@ -403,7 +410,7 @@
         }));
         const mid = (x1 + x2) / 2;
         _drawDimLabel(g, mid, ly + (above ? -4 : 14), String(Math.round(Math.abs(x2 - x1) / (_calcTransform(1, 1) ? 1 : 1))), {
-            anchor: 'middle', valign: above ? 'above' : 'below'
+            valign: above ? 'above' : 'below'
         });
     }
 
@@ -417,7 +424,7 @@
         g.appendChild(_svgEl('line', { x1: p2.x, y1: p2.y, x2: p2.x, y2: ly, class: 'rp-dim-ext' }));
         g.appendChild(_svgEl('line', { x1: p1.x, y1: ly, x2: p2.x, y2: ly, class: 'rp-dim-line' }));
         _drawDimLabel(g, (p1.x + p2.x) / 2, ly + (above ? -4 : 14), dist, {
-            anchor: 'middle', valign: above ? 'above' : 'below'
+            valign: above ? 'above' : 'below'
         });
     }
 
@@ -430,8 +437,8 @@
         g.appendChild(_svgEl('line', { x1: p1.x, y1: p1.y, x2: lx, y2: p1.y, class: 'rp-dim-ext' }));
         g.appendChild(_svgEl('line', { x1: p2.x, y1: p2.y, x2: lx, y2: p2.y, class: 'rp-dim-ext' }));
         g.appendChild(_svgEl('line', { x1: lx, y1: p1.y, x2: lx, y2: p2.y, class: 'rp-dim-line' }));
-        _drawDimLabel(g, lx + (left ? -6 : 6), (p1.y + p2.y) / 2, dist, {
-            anchor: left ? 'end' : 'start',
+        const labelX = lx + (left ? -1 : 1) * _dimLabelHalfW(dist, false);
+        _drawDimLabel(g, labelX, (p1.y + p2.y) / 2, dist, {
             valign: 'middle',
             baseline: 'middle'
         });
@@ -452,7 +459,7 @@
             const p2 = _w2s(rect.minX, dimZ, tf);
             g.appendChild(_svgEl('line', { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, class: cls }));
             _drawDimLabel(g, (p1.x + p2.x) / 2, p1.y - 5, Math.round(leftDist), {
-                anchor: 'middle', valign: 'above', active: active
+                valign: 'above', active: active
             });
         }
         if (rightDist > 5) {
@@ -460,7 +467,7 @@
             const p2 = _w2s(b.rightX, dimZ, tf);
             g.appendChild(_svgEl('line', { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, class: cls }));
             _drawDimLabel(g, (p1.x + p2.x) / 2, p1.y - 5, Math.round(rightDist), {
-                anchor: 'middle', valign: 'above', active: active
+                valign: 'above', active: active
             });
         }
 
@@ -469,16 +476,18 @@
             const p1 = _w2s(dimX, b.backZ, tf);
             const p2 = _w2s(dimX, rect.minZ, tf);
             g.appendChild(_svgEl('line', { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, class: cls }));
-            _drawDimLabel(g, p1.x + 6, (p1.y + p2.y) / 2, Math.round(backDist), {
-                anchor: 'start', valign: 'middle', baseline: 'middle', active: active
+            const backLabel = Math.round(backDist);
+            _drawDimLabel(g, p1.x + _dimLabelHalfW(backLabel, active), (p1.y + p2.y) / 2, backLabel, {
+                valign: 'middle', baseline: 'middle', active: active
             });
         }
         if (frontDist > 5) {
             const p1 = _w2s(dimX, rect.maxZ, tf);
             const p2 = _w2s(dimX, b.frontZ, tf);
             g.appendChild(_svgEl('line', { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, class: cls }));
-            _drawDimLabel(g, p1.x + 6, (p1.y + p2.y) / 2, Math.round(frontDist), {
-                anchor: 'start', valign: 'middle', baseline: 'middle', active: active
+            const frontLabel = Math.round(frontDist);
+            _drawDimLabel(g, p1.x + _dimLabelHalfW(frontLabel, active), (p1.y + p2.y) / 2, frontLabel, {
+                valign: 'middle', baseline: 'middle', active: active
             });
         }
     }
