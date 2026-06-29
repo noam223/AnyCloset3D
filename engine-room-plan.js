@@ -49,14 +49,28 @@
         };
     }
 
-    function _makeFurnItem(id, rect, draggable, label) {
-        return {
+    function _makeFurnItem(id, rect, draggable, label, extra) {
+        const item = {
             id: id,
             minX: rect.minX, maxX: rect.maxX,
             minZ: rect.minZ, maxZ: rect.maxZ,
             draggable: !!draggable,
             label: label || (FURN_COLORS[id] && FURN_COLORS[id].label) || id
         };
+        if (extra) Object.keys(extra).forEach(function(k) { item[k] = extra[k]; });
+        return item;
+    }
+
+    function _colorToSvg(hex) {
+        const n = (hex >>> 0) & 0xffffff;
+        return '#' + n.toString(16).padStart(6, '0');
+    }
+
+    function _furnColors(item) {
+        if (item.customColor != null) {
+            return { fill: _colorToSvg(item.customColor), stroke: '#64748b' };
+        }
+        return FURN_COLORS[item.id] || FURN_COLORS.chair;
     }
 
     function _layer() { return document.getElementById('room-plan-layer'); }
@@ -271,6 +285,17 @@
         return _makeFurnItem('room-desk', rect, true);
     }
 
+    function _getCustomItemRects() {
+        return (window._customRoomItems || []).map(function(item) {
+            const rect = _rectFromCenter(item.x, item.z, item.w / 2, item.d / 2, item.rotation || 0);
+            return _makeFurnItem(item.id, rect, true, item.name, { customColor: item.color });
+        });
+    }
+
+    function _findCustomItem(id) {
+        return (window._customRoomItems || []).find(function(item) { return item.id === id; }) || null;
+    }
+
     function _collectFurniture() {
         const items = [];
         const cab = _getCabinetRect();
@@ -285,6 +310,7 @@
         if (nightstand) items.push(nightstand);
         if (roomDesk) items.push(roomDesk);
         if (chair) items.push(chair);
+        _getCustomItemRects().forEach(function(item) { items.push(item); });
         return items;
     }
 
@@ -334,6 +360,13 @@
         } else if (id === 'room-desk') {
             const dp = _clampFurnCenter(cx, cz, (window._ROOM_DESK_W || 120) / 2, (window._ROOM_DESK_D || 60) / 2);
             window._roomDeskPos = dp;
+        } else if (String(id).indexOf('custom-') === 0) {
+            const custom = _findCustomItem(id);
+            if (custom) {
+                const cp = _clampFurnCenter(cx, cz, custom.w / 2, custom.d / 2);
+                custom.x = cp.x;
+                custom.z = cp.z;
+            }
         }
         window._roomPlanPending3D = true;
     }
@@ -585,7 +618,7 @@
             const fy = Math.min(p1.y, p2.y);
             const fw = Math.abs(p2.x - p1.x);
             const fh = Math.abs(p2.y - p1.y);
-            const colors = FURN_COLORS[item.id] || FURN_COLORS.chair;
+            const colors = _furnColors(item);
             const isActive = item.id === dragId;
 
             const g = _svgEl('g', {
@@ -674,6 +707,7 @@
                 : item.id === 'nightstand' ? 'fa-table-cells'
                 : item.id === 'room-desk' ? 'fa-desktop'
                 : item.id === 'cabinet-desk' ? 'fa-laptop'
+                : String(item.id).indexOf('custom-') === 0 ? 'fa-cube'
                 : 'fa-door-closed';
             row.innerHTML =
                 '<i class="fa-solid ' + icon + '"></i>' +
@@ -832,6 +866,40 @@
         }
     };
 
+    window._openCustomRoomItemModal = function() {
+        const modal = document.getElementById('custom-room-item-modal');
+        if (!modal) return;
+        const nameEl = document.getElementById('cri-name');
+        const wEl = document.getElementById('cri-width');
+        const dEl = document.getElementById('cri-depth');
+        const hEl = document.getElementById('cri-height');
+        if (nameEl) nameEl.value = '';
+        if (wEl) wEl.value = '80';
+        if (dEl) dEl.value = '60';
+        if (hEl) hEl.value = '75';
+        modal.classList.add('open');
+        if (nameEl) setTimeout(function() { nameEl.focus(); }, 50);
+    };
+
+    window._closeCustomRoomItemModal = function() {
+        const modal = document.getElementById('custom-room-item-modal');
+        if (modal) modal.classList.remove('open');
+    };
+
+    window._submitCustomRoomItem = function() {
+        const nameEl = document.getElementById('cri-name');
+        const wEl = document.getElementById('cri-width');
+        const dEl = document.getElementById('cri-depth');
+        const hEl = document.getElementById('cri-height');
+        if (typeof window._addCustomRoomItem !== 'function') return;
+        window._addCustomRoomItem({
+            name: nameEl ? nameEl.value : 'פריט',
+            w: wEl ? wEl.value : 80,
+            d: dEl ? dEl.value : 60,
+            h: hEl ? hEl.value : 75
+        });
+    };
+
     // ── Drag interaction ────────────────────────────────────────────────────
 
     function _hitTestFurn(sx, sy) {
@@ -918,6 +986,16 @@
             if (state.viewMode === 'room-plan' && window._roomPlanSubview === '2d') {
                 window._renderRoomPlan2D();
             }
+        });
+
+        const customModal = document.getElementById('custom-room-item-modal');
+        if (customModal) {
+            customModal.addEventListener('click', function(e) {
+                if (e.target === customModal) window._closeCustomRoomItemModal();
+            });
+        }
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') window._closeCustomRoomItemModal();
         });
     }
 

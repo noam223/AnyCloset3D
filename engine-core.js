@@ -252,6 +252,43 @@ window._ROOM_DESK_W        = 120;
 window._ROOM_DESK_D        = 60;
 window._ROOM_DESK_H        = 75;
 
+// ── Custom room items (user-added boxes) ─────────────────────────────────────
+window._customRoomItems    = window._customRoomItems    || [];
+window._customRoomItemSeq  = window._customRoomItemSeq  || 0;
+window._CUSTOM_ITEM_COLORS = [0xdce4ef, 0xe8e0f0, 0xe0f0e8, 0xf0e8dc, 0xe4ecf4];
+
+window._addCustomRoomItem = function(opts) {
+    opts = opts || {};
+    const b = window._roomBounds;
+    const name = String(opts.name || 'פריט').trim() || 'פריט';
+    const w = Math.max(10, Math.min(400, parseInt(opts.w, 10) || 80));
+    const d = Math.max(10, Math.min(400, parseInt(opts.d, 10) || 60));
+    const h = Math.max(10, Math.min(300, parseInt(opts.h, 10) || 75));
+    window._customRoomItemSeq = (window._customRoomItemSeq || 0) + 1;
+    const id = 'custom-' + window._customRoomItemSeq;
+    const colors = window._CUSTOM_ITEM_COLORS || [0xdce4ef];
+    const color = colors[(window._customRoomItemSeq - 1) % colors.length];
+    let cx = b ? (b.leftX + b.rightX) / 2 : 250;
+    let cz = b ? (b.backZ + b.frontZ) / 2 : 250;
+    if (b) {
+        cx = Math.max(b.leftX + w / 2, Math.min(b.rightX - w / 2, cx));
+        cz = Math.max(b.backZ + d / 2, Math.min(b.frontZ - d / 2, cz));
+    }
+    window._customRoomItems.push({
+        id: id, name: name, w: w, d: d, h: h,
+        x: cx, z: cz, rotation: 0, color: color
+    });
+    if (typeof window._closeCustomRoomItemModal === 'function') {
+        window._closeCustomRoomItemModal();
+    }
+    if (typeof window._roomPlanFurnitureChanged === 'function') {
+        window._roomPlanFurnitureChanged();
+    } else if (typeof _buildRoom === 'function') {
+        _buildRoom();
+    }
+    if (typeof window._updateRoomPropsUI === 'function') window._updateRoomPropsUI();
+};
+
 // ── Office Chair GLB ─────────────────────────────────────────────────────────
 window._CHAIR_OPTIONS = [
     { id: 'chair1', path: 'images/office_chair.glb',  shortName: 'משרדי',  targetHeightCm: 120 },
@@ -1247,6 +1284,17 @@ function _buildRoom() {
             window._roomDeskRotation, 0xc9a96e, 'room-desk'
         );
     }
+
+    // ── Custom room items ─────────────────────────────────────────────────────
+    window._customRoomMeshes = [];
+    (window._customRoomItems || []).forEach(function(item) {
+        const mesh = _placeRoomBoxFurniture(
+            rg, item.x, item.z,
+            item.w, item.d, item.h,
+            item.rotation || 0, item.color || 0xdce4ef, item.id
+        );
+        window._customRoomMeshes.push(mesh);
+    });
 
     // Notify UI to reposition bed handles
     if (typeof window._updateBedHandles === 'function') window._updateBedHandles();
