@@ -382,14 +382,14 @@
             rx: 6, ry: 6,
             class: 'rp-dim-bg' + (active ? ' rp-dim-bg-active' : '')
         }));
-        const textAttrs = {
-            x: x, y: y,
+        wrap.appendChild(_svgEl('text', {
+            x: x,
+            y: bg.y + bg.h / 2,
             class: active ? 'rp-dim-text rp-dim-active' : 'rp-dim-text',
             'text-anchor': 'middle',
+            'dominant-baseline': 'middle',
             direction: 'ltr'
-        };
-        if (opts.baseline) textAttrs['dominant-baseline'] = opts.baseline;
-        wrap.appendChild(_svgEl('text', textAttrs, String(text)));
+        }, String(text)));
         g.appendChild(wrap);
     }
 
