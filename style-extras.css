@@ -322,6 +322,18 @@ body.room-plan-dragging #room-plan-svg {
     vector-effect: non-scaling-stroke;
 }
 
+#room-plan-svg .rp-dim-bg {
+    fill: rgba(255, 255, 255, 0.5);
+    stroke: rgba(226, 232, 240, 0.85);
+    stroke-width: 0.6;
+    pointer-events: none;
+}
+
+#room-plan-svg .rp-dim-bg.rp-dim-bg-active {
+    fill: rgba(255, 255, 255, 0.65);
+    stroke: rgba(5, 150, 105, 0.35);
+}
+
 #room-plan-svg .rp-dim-text {
     fill: #059669;
     font-size: 11px;
