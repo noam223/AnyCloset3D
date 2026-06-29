@@ -393,6 +393,27 @@
         g.appendChild(wrap);
     }
 
+    function _drawBedWidthBtn(parentG, fx, fy, fw, fh) {
+        if (fw < 48 || fh < 28) return;
+        const widthCm = window._bedWidthCm || 160;
+        const btnW = Math.min(58, Math.max(48, fw * 0.34));
+        const btnH = 24;
+        const bx = fx + fw - btnW - 5;
+        const by = fy + 5;
+        const fo = _svgEl('foreignObject', {
+            x: bx, y: by, width: btnW, height: btnH,
+            class: 'rp-bed-width-btn-fo'
+        });
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'rp-bed-width-btn';
+        btn.title = 'החלף רוחב מיטה';
+        btn.setAttribute('data-rp-action', 'cycle-bed-width');
+        btn.innerHTML = '<i class="fa-solid fa-arrows-left-right"></i><span>' + widthCm + '</span>';
+        fo.appendChild(btn);
+        parentG.appendChild(fo);
+    }
+
     function _drawDimH(g, x1, x2, y, label, above) {
         const dy = above ? -8 : 8;
         const ly = y + dy;
@@ -587,6 +608,10 @@
                     'dominant-baseline': 'middle',
                     'font-size': labelSize
                 }, item.label));
+            }
+
+            if (item.id === 'bed') {
+                _drawBedWidthBtn(g, fx, fy, fw, fh);
             }
 
             if (item.draggable) {
@@ -831,6 +856,16 @@
 
         svg.addEventListener('pointerdown', function(e) {
             if (state.viewMode !== 'room-plan' || window._roomPlanSubview !== '2d') return;
+            const actionBtn = e.target.closest('[data-rp-action]');
+            if (actionBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (actionBtn.getAttribute('data-rp-action') === 'cycle-bed-width' &&
+                    typeof window._cycleBedWidth === 'function') {
+                    window._cycleBedWidth();
+                }
+                return;
+            }
             const rect = svg.getBoundingClientRect();
             const sx = e.clientX - rect.left;
             const sy = e.clientY - rect.top;
