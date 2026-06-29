@@ -339,7 +339,7 @@
         <!-- ===== ROOM SETTINGS SECTION ===== -->
         <div class="section" id="room-settings-section">
             <div id="room-plan-sidebar-header" class="room-plan-sidebar-header" style="display:none;">
-                <div class="room-plan-sidebar-title"><i class="fa-solid fa-compass-drafting"></i> תכנון חדר</div>
+                <div class="room-plan-sidebar-title"><i class="fa-solid fa-compass-drafting"></i> תצוגת חדר</div>
                 <div class="room-plan-sidebar-sub">גרור פריטים במבט על וראה מידות בזמן אמת</div>
             </div>
             <div class="section-title"><i class="fa-solid fa-vector-square"></i> מידות חדר</div>
@@ -1068,7 +1068,7 @@
     <button class="view-btn" id="btn-blueprint-view" style="display:none;"><i class="fa-solid fa-drafting-compass"></i> שרטוט ייצור</button>
     <button class="view-btn" id="btn-multiview-blueprint" onclick="openMultiViewBlueprint()" style="display:none;"><i class="fa-solid fa-layer-group"></i> שרטוט ייצור</button>
     <button class="view-btn icon-btn" id="btn-reset-view" title="איפוס זווית מצלמה" style="display:none;" onclick="window._orbitFree=false; const b=document.getElementById('btn-reset-view'); if(b) b.style.display='none'; updateCameraView();"><i class="fa-solid fa-arrows-rotate"></i></button>
-    <button class="view-btn" id="btn-room-plan" title="תכנון חדר — מבט על 2D עם גרירת ריהוט" onclick="window._toggleRoomPlanMode()"><i class="fa-solid fa-compass-drafting"></i> תכנון חדר</button>
+    <button class="view-btn" id="btn-room-plan" title="תצוגת חדר — מבט על 2D עם גרירת ריהוט" onclick="window._toggleRoomPlanMode()"><i class="fa-solid fa-compass-drafting"></i> תצוגת חדר</button>
     <button class="view-btn icon-btn" id="btn-toggle-doors" title="הצג/הסתר חזיתות" onclick="(function(){var chk=document.getElementById('inp-has-doors');chk.checked=!chk.checked;chk.dispatchEvent(new Event('change'));document.getElementById('btn-toggle-doors').classList.toggle('toggled-off',!chk.checked);})()"><i class="fa-solid fa-door-closed"></i></button>
     <!-- Room wall position selector — only shown for linear/sliding presets -->
     <div id="room-wall-selector" style="display:none; align-items:center; gap:3px; margin:0 4px;" title="מיקום ארון בחדר">
@@ -2498,7 +2498,7 @@
 <script src="engine-core.js?v=20260617wdcolors"></script>
 <script src="engine-corners.js?v=20260609a"></script>
 <script src="engine-blueprint.js?v=20260617wdbp"></script>
-<script src="engine-room-plan.js?v=20260624f"></script>
+<script src="engine-room-plan.js?v=20260624g"></script>
 <script src="tambour-color-picker.js?v=20260617scdoors"></script>
 <script src="ui.js?v=20260617wdprint"></script>
 <script src="layout-mode.js?v=20260610i"></script>

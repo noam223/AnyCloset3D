@@ -868,8 +868,7 @@
         svg.addEventListener('pointercancel', endDrag);
 
         svg.addEventListener('wheel', _applyRoomPlanWheel, { passive: false });
-        const layer = _layer();
-        if (layer) layer.addEventListener('wheel', _applyRoomPlanWheel, { passive: false });
+        layer.addEventListener('wheel', _applyRoomPlanWheel, { passive: false });
 
         window.addEventListener('resize', function() {
             if (state.viewMode === 'room-plan' && window._roomPlanSubview === '2d') {
