@@ -72,28 +72,80 @@
         return { w: b.rightX - b.leftX, d: b.frontZ - b.backZ };
     }
 
+    window._roomPlanZoom = window._roomPlanZoom || 1;
+    window._roomPlanPanX = window._roomPlanPanX || 0;
+    window._roomPlanPanY = window._roomPlanPanY || 0;
+
+    const ZOOM_MIN = 0.25;
+    const ZOOM_MAX = 5;
+
+    function _resetRoomPlanView() {
+        window._roomPlanZoom = 1;
+        window._roomPlanPanX = 0;
+        window._roomPlanPanY = 0;
+    }
+
     function _calcTransform(svgW, svgH) {
         const b = _getBounds();
         if (!b) return null;
         const pad = 72;
         const roomW = b.rightX - b.leftX;
         const roomD = b.frontZ - b.backZ;
-        const scale = Math.min((svgW - pad * 2) / roomW, (svgH - pad * 2) / roomD);
-        return { b, pad, scale, svgW, svgH, roomW, roomD };
+        const baseScale = Math.min((svgW - pad * 2) / roomW, (svgH - pad * 2) / roomD);
+        const zoom = window._roomPlanZoom || 1;
+        const scale = baseScale * zoom;
+        return {
+            b, pad, scale, baseScale, zoom, svgW, svgH, roomW, roomD,
+            panX: window._roomPlanPanX || 0,
+            panY: window._roomPlanPanY || 0,
+            cx: svgW / 2,
+            cy: svgH / 2
+        };
     }
 
     function _w2s(x, z, tf) {
+        const bx = tf.pad + (x - tf.b.leftX) * tf.baseScale;
+        const by = tf.pad + (z - tf.b.backZ) * tf.baseScale;
+        const zoom = tf.zoom || 1;
         return {
-            x: tf.pad + (x - tf.b.leftX) * tf.scale,
-            y: tf.pad + (z - tf.b.backZ) * tf.scale
+            x: tf.cx + (bx - tf.cx) * zoom + tf.panX,
+            y: tf.cy + (by - tf.cy) * zoom + tf.panY
         };
     }
 
     function _s2w(sx, sy, tf) {
+        const zoom = tf.zoom || 1;
+        const bx = tf.cx + (sx - tf.cx - tf.panX) / zoom;
+        const by = tf.cy + (sy - tf.cy - tf.panY) / zoom;
         return {
-            x: tf.b.leftX + (sx - tf.pad) / tf.scale,
-            z: tf.b.backZ + (sy - tf.pad) / tf.scale
+            x: tf.b.leftX + (bx - tf.pad) / tf.baseScale,
+            z: tf.b.backZ + (by - tf.pad) / tf.baseScale
         };
+    }
+
+    function _applyRoomPlanWheel(e) {
+        if (!_is2dPlan()) return;
+        e.preventDefault();
+        const tf = window._roomPlanTransform;
+        if (!tf) return;
+
+        const svg = _svg();
+        const rect = svg ? svg.getBoundingClientRect() : null;
+        const mx = rect ? e.clientX - rect.left : tf.cx;
+        const my = rect ? e.clientY - rect.top : tf.cy;
+
+        const factor = e.deltaY > 0 ? 0.9 : 1.1;
+        const oldZoom = window._roomPlanZoom || 1;
+        const newZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, oldZoom * factor));
+        if (newZoom === oldZoom) return;
+
+        const ratio = newZoom / oldZoom;
+        const panX = window._roomPlanPanX || 0;
+        const panY = window._roomPlanPanY || 0;
+        window._roomPlanZoom = newZoom;
+        window._roomPlanPanX = mx - tf.cx - (mx - tf.cx - panX) * ratio;
+        window._roomPlanPanY = my - tf.cy - (my - tf.cy - panY) * ratio;
+        _queueRoomPlanRender();
     }
 
     function _getCabinetRect() {
@@ -625,6 +677,7 @@
         window._roomVisible = true;
         window._roomPlanSubview = '2d';
         window._roomPlanPending3D = false;
+        _resetRoomPlanView();
         state.viewMode = 'room-plan';
         window._orbitFree = false;
         window._forceCameraAnim = true;
@@ -695,7 +748,11 @@
         if (furnBar && !window._roomVisible) furnBar.style.display = 'none';
 
         document.querySelectorAll('.view-btn').forEach(function(b) { b.classList.remove('active'); });
-        const activeBtn = document.getElementById(state.viewMode === 'front' ? 'btn-front-view' : 'btn-3d-view');
+        const activeBtn = document.getElementById(
+            state.viewMode === 'room-plan' ? 'btn-room-plan'
+            : state.viewMode === 'front' ? 'btn-front-view'
+            : 'btn-blueprint-view'
+        );
         if (activeBtn) activeBtn.classList.add('active');
 
         if (typeof buildCabinet === 'function') buildCabinet();
@@ -780,6 +837,10 @@
 
         svg.addEventListener('pointerup', endDrag);
         svg.addEventListener('pointercancel', endDrag);
+
+        svg.addEventListener('wheel', _applyRoomPlanWheel, { passive: false });
+        const layer = _layer();
+        if (layer) layer.addEventListener('wheel', _applyRoomPlanWheel, { passive: false });
 
         window.addEventListener('resize', function() {
             if (state.viewMode === 'room-plan' && window._roomPlanSubview === '2d') {

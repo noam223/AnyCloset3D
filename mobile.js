@@ -454,12 +454,7 @@ function updateMobileCartBadge() {
 }
 
 function setMobileView(mode) {
-    // '3d' mode → enter presentation mode (full-screen free-orbit with room, no UI chrome)
-    if (mode === '3d') {
-        closeMobilePanel();
-        if (typeof window._enterPresentationMode === 'function') window._enterPresentationMode();
-        return;
-    }
+    if (mode === '3d') mode = 'front';
     state.viewMode = mode;
     if (typeof updateCameraView === 'function') updateCameraView();
     if (typeof buildCabinet === 'function') buildCabinet();
@@ -468,7 +463,7 @@ function setMobileView(mode) {
     const desktopBtn = document.getElementById('btn-' + mode + '-view');
     if (desktopBtn) desktopBtn.classList.add('active');
     // Sync mobile top bar view tabs
-    ['front', 'blueprint', '3d'].forEach(m => {
+    ['front', 'blueprint'].forEach(m => {
         const mBtn = document.getElementById('mbtn-' + m + '-view');
         if (mBtn) mBtn.classList.toggle('active', m === mode);
     });
@@ -727,7 +722,7 @@ function bindMobileUI() {
     });
 
     // View panel: close panel after view switch
-    ['mbtn-front-view', 'mbtn-blueprint-view', 'mbtn-3d-view'].forEach(id => {
+    ['mbtn-front-view', 'mbtn-blueprint-view'].forEach(id => {
         const btn = document.getElementById(id);
         if (btn) btn.addEventListener('click', () => closeMobilePanel());
     });
@@ -1088,7 +1083,7 @@ function _syncMobileInputsFromState() {
         b.classList.toggle('active', b.dataset.style === _hs);
     });
 
-    ['front', 'blueprint', '3d'].forEach(m => {
+    ['front', 'blueprint'].forEach(m => {
         const btn = document.getElementById('mbtn-' + m + '-view');
         if (btn) btn.classList.toggle('active', (state.viewMode || 'front') === m);
     });

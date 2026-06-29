@@ -286,6 +286,15 @@ body.room-plan-mode.room-plan-2d #canvas-container canvas {
 #room-plan-layer {
     user-select: none;
     overflow: hidden;
+    cursor: default;
+}
+
+#room-plan-svg {
+    cursor: grab;
+}
+
+body.room-plan-dragging #room-plan-svg {
+    cursor: grabbing;
 }
 
 .room-furn-btn.room-furn-view-toggle {

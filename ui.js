@@ -4794,10 +4794,6 @@ function bindUI() {
         const rb = document.getElementById('btn-reset-view'); if (rb) rb.style.display = 'none';
         state.viewMode = 'front'; updateCameraView(); buildCabinet();
     });
-    const _b3v = document.getElementById('btn-3d-view');
-    if (_b3v) _b3v.addEventListener('click', () => {
-        window._enterPresentationMode();
-    });
     const _bbv = document.getElementById('btn-blueprint-view');
     if (_bbv) _bbv.addEventListener('click', (e) => {
         document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
@@ -6421,7 +6417,7 @@ window.editCartItem = function(index) {
     }
     // Sync view button highlights
     document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
-    const _activeViewBtn = document.getElementById(_isLinearPreset ? 'btn-front-view' : 'btn-3d-view');
+    const _activeViewBtn = document.getElementById('btn-front-view');
     if (_activeViewBtn) _activeViewBtn.classList.add('active');
     const _resetViewBtn = document.getElementById('btn-reset-view');
     if (_resetViewBtn) _resetViewBtn.style.display = 'none';
@@ -8525,7 +8521,9 @@ window._exitPresentationMode = function() {
 
     // Restore active view button highlight
     document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
-    const activeBtn = document.getElementById(state.viewMode === 'front' ? 'btn-front-view' : 'btn-3d-view');
+    const activeBtn = document.getElementById(
+        state.viewMode === 'front' ? 'btn-front-view' : 'btn-blueprint-view'
+    );
     if (activeBtn) activeBtn.classList.add('active');
 
     // Wait one frame for CSS layout to settle, then fix camera aspect + renderer size

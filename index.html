@@ -1067,7 +1067,6 @@
     <button class="view-btn active" id="btn-front-view"><i class="fa-solid fa-pen-ruler"></i> עריכת חזית</button>
     <button class="view-btn" id="btn-blueprint-view" style="display:none;"><i class="fa-solid fa-drafting-compass"></i> שרטוט ייצור</button>
     <button class="view-btn" id="btn-multiview-blueprint" onclick="openMultiViewBlueprint()" style="display:none;"><i class="fa-solid fa-layer-group"></i> שרטוט ייצור</button>
-    <button class="view-btn" id="btn-3d-view" onclick="window._enterPresentationMode()"><i class="fa-solid fa-cube"></i> תצוגה חופשית</button>
     <button class="view-btn icon-btn" id="btn-reset-view" title="איפוס זווית מצלמה" style="display:none;" onclick="window._orbitFree=false; const b=document.getElementById('btn-reset-view'); if(b) b.style.display='none'; updateCameraView();"><i class="fa-solid fa-arrows-rotate"></i></button>
     <button class="view-btn" id="btn-room-plan" title="תכנון חדר — מבט על 2D עם גרירת ריהוט" onclick="window._toggleRoomPlanMode()"><i class="fa-solid fa-compass-drafting"></i> תכנון חדר</button>
     <button class="view-btn icon-btn" id="btn-toggle-doors" title="הצג/הסתר חזיתות" onclick="(function(){var chk=document.getElementById('inp-has-doors');chk.checked=!chk.checked;chk.dispatchEvent(new Event('change'));document.getElementById('btn-toggle-doors').classList.toggle('toggled-off',!chk.checked);})()"><i class="fa-solid fa-door-closed"></i></button>
@@ -1524,9 +1523,6 @@
         <button class="mobile-view-tab" id="mbtn-blueprint-view" onclick="setMobileView('blueprint')">
             <i class="fa-solid fa-ruler-combined"></i> תוכנית
         </button>
-        <button class="mobile-view-tab" id="mbtn-3d-view" onclick="setMobileView('3d')">
-            <i class="fa-solid fa-cube"></i> תלת מימד
-        </button>
     </div>
     <!-- Row 2: actions + dimensions -->
     <div id="mobile-top-row2">
@@ -1678,9 +1674,6 @@
             </button>
             <button class="mobile-view-mode-btn" id="mbtn-blueprint-view" onclick="setMobileView('blueprint')">
                 <i class="fa-solid fa-drafting-compass"></i><span>שרטוט ייצור</span>
-            </button>
-            <button class="mobile-view-mode-btn" id="mbtn-3d-view" onclick="setMobileView('3d')">
-                <i class="fa-solid fa-cube"></i><span>תצוגה חופשית</span>
             </button>
         </div>
         <div class="mobile-panel-divider"></div>
@@ -2505,7 +2498,7 @@
 <script src="engine-core.js?v=20260617wdcolors"></script>
 <script src="engine-corners.js?v=20260609a"></script>
 <script src="engine-blueprint.js?v=20260617wdbp"></script>
-<script src="engine-room-plan.js?v=20260624d"></script>
+<script src="engine-room-plan.js?v=20260624e"></script>
 <script src="tambour-color-picker.js?v=20260617scdoors"></script>
 <script src="ui.js?v=20260617wdprint"></script>
 <script src="layout-mode.js?v=20260610i"></script>

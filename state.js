@@ -1973,7 +1973,7 @@ function restoreHistoryState() {
     window._wingEditCamInit = false;
     // Sync view button highlights
     document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
-    const _snapViewBtn = document.getElementById(_snapIsLinear ? 'btn-front-view' : 'btn-3d-view');
+    const _snapViewBtn = document.getElementById('btn-front-view');
     if (_snapViewBtn) _snapViewBtn.classList.add('active');
     const _snapResetBtn = document.getElementById('btn-reset-view');
     if (_snapResetBtn) _snapResetBtn.style.display = 'none';
