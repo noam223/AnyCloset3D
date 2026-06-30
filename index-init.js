@@ -228,6 +228,15 @@
                     // Restore non-wing global fields
                     if (snap.viewMode)   state.viewMode   = snap.viewMode;
                     if (snap.partColors) state.partColors = snap.partColors;
+                    // Restore per-cabinet part colors from cart items (backward compat)
+                    if (snap.orderCart && typeof window._importLocalPartColors === 'function') {
+                        snap.orderCart.forEach(function(item, i) {
+                            if (item && item.rawState && item.rawState.partColors) {
+                                window._importLocalPartColors('cart' + i, item.rawState.partColors);
+                            }
+                        });
+                    }
+                    if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
                     // Restore cart (multiple cabinets) and customer info
                     if (snap.orderCart) {
                         state.orderCart = snap.orderCart;
@@ -346,7 +355,8 @@
             tambourPalette:            state.tambourPalette || {},
             blueprintCutouts:          state.blueprintCutouts || [],
             blueprintCellDimOffsets:   state.blueprintCellDimOffsets || {},
-            blueprintDimOffsets:       state.blueprintDimOffsets || {}
+            blueprintDimOffsets:       state.blueprintDimOffsets || {},
+            partColors:                state.partColors || {}
         }));
     }
 
@@ -552,7 +562,8 @@ window._saveProjectNow = async function() {
             tambourPalette: state.tambourPalette || {},
             blueprintCutouts: state.blueprintCutouts || [],
             blueprintCellDimOffsets: state.blueprintCellDimOffsets || {},
-            blueprintDimOffsets:     state.blueprintDimOffsets || {}
+            blueprintDimOffsets:     state.blueprintDimOffsets || {},
+            partColors:              state.partColors || {}
         }));
         console.log('[SaveNow] Saving project "' + window._currentProjectName + '", payload size:', Math.round(JSON.stringify(snap).length/1024) + 'KB, cart items:', lightCart.length);
         var thumb = null;

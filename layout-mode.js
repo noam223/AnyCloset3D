@@ -1343,6 +1343,10 @@
         _layoutScene.slots.forEach(function(slot, i) {
             var rawState = state.orderCart[slot.cartIndex].rawState;
             _applyLinearSnapshot(rawState);
+            window._ppColorScope = 'cart' + slot.cartIndex;
+            if (rawState.partColors && typeof window._importLocalPartColors === 'function') {
+                window._importLocalPartColors('cart' + slot.cartIndex, rawState.partColors);
+            }
 
             var slotGroup = new THREE.Group();
             slotGroup.name = 'layout-slot-' + i;

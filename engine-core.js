@@ -1374,6 +1374,61 @@ let _ppWingId = 'center';
 // Current part ID being built (set before each createBoard call in part-paint mode)
 let _ppPartId = '';
 
+/** Scope prefix so per-part colors apply to one cabinet only (draft / cart0 / cart1 …). */
+window._ppColorScope = window._ppColorScope || 'draft';
+
+window._syncPartColorScope = function() {
+    window._ppColorScope = (typeof state !== 'undefined' && state.editingCartIndex >= 0)
+        ? ('cart' + state.editingCartIndex)
+        : 'draft';
+};
+
+window._scopedPartColorId = function(wingId, partSuffix) {
+    const scope = window._ppColorScope || 'draft';
+    return scope + '::' + wingId + '_' + partSuffix;
+};
+
+window._getPartColorOverride = function(wingId, partSuffix) {
+    const pc = state.partColors || {};
+    const scoped = window._scopedPartColorId(wingId, partSuffix);
+    if (pc[scoped]) return pc[scoped];
+    const legacy = wingId + '_' + partSuffix;
+    if (pc[legacy]) return pc[legacy];
+    return null;
+};
+
+window._exportLocalPartColors = function(scope) {
+    const prefix = (scope || window._ppColorScope || 'draft') + '::';
+    const local = {};
+    Object.keys(state.partColors || {}).forEach(function(k) {
+        if (k.indexOf(prefix) === 0) local[k.slice(prefix.length)] = state.partColors[k];
+    });
+    return local;
+};
+
+window._importLocalPartColors = function(scope, localColors) {
+    if (!localColors || typeof localColors !== 'object') return;
+    if (!state.partColors) state.partColors = {};
+    const prefix = (scope || 'draft') + '::';
+    Object.keys(localColors).forEach(function(k) {
+        if (localColors[k]) state.partColors[prefix + k] = localColors[k];
+    });
+};
+
+window._migrateDraftPartColorsToCart = function(cartIndex) {
+    const fromPrefix = 'draft::';
+    const toPrefix = 'cart' + cartIndex + '::';
+    if (!state.partColors) return;
+    Object.keys(state.partColors).forEach(function(k) {
+        if (k.indexOf(fromPrefix) === 0) {
+            const newKey = toPrefix + k.slice(fromPrefix.length);
+            if (!state.partColors[newKey]) state.partColors[newKey] = state.partColors[k];
+            delete state.partColors[k];
+        }
+    });
+    window._ppColorScope = 'cart' + cartIndex;
+};
+
 let hitBoxes = [];
 let wingHitBoxes = [];
 let deskHitBoxes = [];
@@ -1759,6 +1814,7 @@ function updateCameraView() {
 
 function buildCabinet() {
     if (window._layoutModeActive) return;
+    if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
 
     // Room shell is only for תכנון חדר or תצוגה חופשית — never in עריכת חזית / שרטוט
     if (state.viewMode !== 'room-plan' && !document.body.classList.contains('presentation-mode')) {
@@ -2992,22 +3048,21 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
 
     function _ppResolveMat(baseMat, partIdSuffix) {
         if (isBP || !partIdSuffix) return baseMat;
-        const overrideKey = (state.partColors || {})[_ppWingId + '_' + partIdSuffix];
+        const overrideKey = window._getPartColorOverride(_ppWingId, partIdSuffix);
         if (overrideKey && materials[overrideKey]) return materials[overrideKey];
         return baseMat;
     }
 
     function _ppRegisterMesh(mesh, partIdSuffix) {
         if (isBP || !partIdSuffix || !mesh) return;
-        mesh.userData.partId = _ppWingId + '_' + partIdSuffix;
+        mesh.userData.partId = window._scopedPartColorId(_ppWingId, partIdSuffix);
         window.partMeshes.push(mesh);
     }
 
     function createBoard(w, h, d, x, y, z, specificMat = matBody) {
         // Part-paint mode: apply per-part color override if one exists
         if (!isBP && _ppPartId) {
-            const partColors = state.partColors || {};
-            const overrideKey = partColors[_ppWingId + '_' + _ppPartId];
+            const overrideKey = window._getPartColorOverride(_ppWingId, _ppPartId);
             if (overrideKey && materials[overrideKey]) {
                 specificMat = materials[overrideKey];
             }
@@ -3049,8 +3104,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         _buildGroup.add(mesh);
         // Tag mesh for part-paint mode
         if (!isBP && _ppPartId) {
-            const fullPartId = _ppWingId + '_' + _ppPartId;
-            mesh.userData.partId = fullPartId;
+            mesh.userData.partId = window._scopedPartColorId(_ppWingId, _ppPartId);
             window.partMeshes.push(mesh);
         }
         return mesh;

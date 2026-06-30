@@ -5720,7 +5720,10 @@ function bindUI() {
             nicheClosureCeilHeight:    window._nicheClosureCeilHeight || 1.8,
             blueprintCutouts: state.blueprintCutouts || [],
             blueprintCellDimOffsets: state.blueprintCellDimOffsets || {},
-            blueprintDimOffsets: state.blueprintDimOffsets || {}
+            blueprintDimOffsets: state.blueprintDimOffsets || {},
+            partColors: (typeof window._exportLocalPartColors === 'function')
+                ? window._exportLocalPartColors()
+                : JSON.parse(JSON.stringify(state.partColors || {}))
         }));
 
         // Collect unique extra colors from per-part overrides
@@ -5829,9 +5832,17 @@ function bindUI() {
         if (state.editingCartIndex > -1) {
             state.orderCart[state.editingCartIndex] = cartItem;
             state.editingCartIndex = -1;
+            if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
             btn.innerHTML = `<i class="fa-solid fa-check"></i> הארון עודכן בהצלחה!`;
             setTimeout(() => { btn.innerHTML = `<i class="fa-solid fa-plus"></i> הוסף ארון להזמנה`; btn.style.background = ""; }, 2000);
         } else {
+            const newIdx = state.orderCart.length;
+            if (typeof window._migrateDraftPartColorsToCart === 'function') {
+                window._migrateDraftPartColorsToCart(newIdx);
+            }
+            cartItem.rawState.partColors = (typeof window._exportLocalPartColors === 'function')
+                ? window._exportLocalPartColors('cart' + newIdx)
+                : (rawState.partColors || {});
             state.orderCart.push(cartItem);
             btn.innerHTML = `<i class="fa-solid fa-check"></i> נשמר בעגלה!`;
             setTimeout(() => { btn.innerHTML = originalText; btn.style.background = ""; }, 2000);
@@ -6448,9 +6459,13 @@ window.editCartItem = function(index) {
     state.blueprintCellDimOffsets = rawState.blueprintCellDimOffsets ? JSON.parse(JSON.stringify(rawState.blueprintCellDimOffsets)) : {};
     state.blueprintDimOffsets = rawState.blueprintDimOffsets ? JSON.parse(JSON.stringify(rawState.blueprintDimOffsets)) : {};
 
-    // Explicitly restore manualInstallPrice (not in old rawState saves → default null)
-    state.manualInstallPrice = (rawState.manualInstallPrice != null) ? rawState.manualInstallPrice : null;
     state.editingCartIndex = index;
+    if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
+    if (typeof window._importLocalPartColors === 'function') {
+        window._importLocalPartColors('cart' + index, rawState.partColors);
+    }
+
+    // Explicitly restore manualInstallPrice (not in old rawState saves → default null)
 
     document.getElementById('order-modal').style.display = 'none';
     document.getElementById('btn-add-to-cart').innerHTML = `<i class="fa-solid fa-save"></i> שמור שינויים לארון`;
@@ -6462,6 +6477,7 @@ window.editCartItem = function(index) {
 
 window.startNewCabinet = function() {
     state.editingCartIndex = -1; state.cabinetName = ''; state.manualPrice = null; state.manualInstallPrice = null;
+    if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
     const cabNameInp = document.getElementById('inp-cabinet-name'); if (cabNameInp) cabNameInp.value = '';
     document.getElementById('btn-add-to-cart').innerHTML = `<i class="fa-solid fa-plus"></i> הוסף ארון להזמנה`;
     updateLeftSidebar(); alert('הקנבס פנוי לעיצוב ארון חדש! (המידות נשארו לטובת נוחות, אך הארון הקודם שמור בעגלה ולא ייפגע)');
