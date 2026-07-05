@@ -389,7 +389,9 @@ function _bpRowBaseCm(col, plinthH) {
     const t = _bpShelfTCm();
     const fo = col.floorOffset || 0;
     if (col.type === 'desk') return (col.deskHeight || 80) + (col.deskClearance || 80);
-    if (fo > 0) return fo + t;
+    // Blueprint front-view row coords are relative to column bottom (colBotSvgY).
+    // floorOffset is already applied there — do NOT add fo again to row bounds.
+    if (fo > 0) return t;
     if (col.noPlinth) return t;
     const isBathroomRegalim = state.presetId === 'bathroom' && state.cabinetModel === 'regalim';
     if (isBathroomRegalim) return plinthH;
@@ -1538,6 +1540,22 @@ window._generateMultiViewBlueprintSVG = function() {
         });
         _bpHoneycombSepFlush(p);
 
+        if (cols.length > 0) {
+            _bpDrawOuterSideWalls(p, (pp, x, y1, y2, scc, tCm, labelSide) => {
+                const t = tCm != null ? tCm : (state.thickness || 1.7);
+                const tPx = t * scc;
+                if (tPx < 0.4 || y2 - y1 < 2) return;
+                const halfT = tPx / 2;
+                rect(x - halfT, y1, tPx, y2 - y1, '#94a3b8', STROKE_THIN, 1);
+                if (y2 - y1 > 14) {
+                    const my = (y1 + y2) / 2;
+                    const tx = labelSide === 'left' ? (x - halfT - 3) : (x + halfT + 3);
+                    const anchor = labelSide === 'left' ? 'end' : 'start';
+                    p.push(`<text x="${tx.toFixed(1)}" y="${(my+3).toFixed(1)}" text-anchor="${anchor}" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(t * 10)}</text>`);
+                }
+            }, ox, dW, colXPositions, sc);
+        }
+
         // ---- Side-open-cell wall gap overlay ----
         {
             const _wallOverlayOld = (colIdx, isLeft) => {
@@ -1673,18 +1691,27 @@ window._generateMultiViewBlueprintSVG = function() {
                     dimV(ox + dW + 54, _splitBotYOld2, _lowerStartYOld2, `${_lowerHOld2}`);
                 }
             }
-            // floorOffset dimension: for each floating column, show the gap from floor to column bottom
+            // floorOffset + body height for hanging cabinets (regular preset)
             {
-                let _foDimX = ox + dW + (_hasFloorPlinthOld ? 38 : 18);
-                colXPositions.forEach((cp, ci) => {
-                    const _col = cols[ci];
-                    const _fo = (_col && _col.floorOffset) ? _col.floorOffset : 0;
-                    if (_fo > 0) {
-                        // gap from floor (oy+dH) to column bottom (cp.colBotY)
-                        dimV(_foDimX, cp.colBotY, oy + dH, `${Math.round(_fo * 10)}`);
-                        _foDimX += 36;
-                    }
-                });
+                const _hangColOld = cols.find(c => (c.floorOffset || 0) > 0);
+                if (_hangColOld) {
+                    const _foH = _hangColOld.floorOffset || 0;
+                    const _bodyH = (_hangColOld.height || wg.h) - _foH;
+                    const _colBotH = oy + dH - _foH * sc;
+                    const _colTopH = _colBotH - _bodyH * sc;
+                    dimVLeft(ox + dW + 38, _colTopH, _colBotH, `${Math.round(_bodyH * 10)}`);
+                    dimV(ox + dW + 76, _colBotH, oy + dH, `${Math.round(_foH * 10)}`);
+                } else {
+                    let _foDimX = ox + dW + (_hasFloorPlinthOld ? 38 : 18);
+                    colXPositions.forEach((cp, ci) => {
+                        const _col = cols[ci];
+                        const _fo = (_col && _col.floorOffset) ? _col.floorOffset : 0;
+                        if (_fo > 0) {
+                            dimV(_foDimX, cp.colBotY, oy + dH, `${Math.round(_fo * 10)}`);
+                            _foDimX += 36;
+                        }
+                    });
+                }
             }
         }
 
@@ -2770,18 +2797,27 @@ window._generateMultiViewBlueprintPages = function() {
                     p.push(`<text x="${(ox + dW + 54 + 22).toFixed(1)}" y="${(_bandMidY + 3).toFixed(1)}" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(_t2 * 10)}</text>`);
                 }
             }
-            // floorOffset dimension: for each floating column, show the gap below it (floor to column bottom)
+            // floorOffset + body height for hanging cabinets (regular preset)
             {
-                let _foDimX2 = ox + dW + (_hasFloorPlinth2 ? 38 : 18);
-                colXPositions.forEach((cp, ci) => {
-                    const _col = cols[ci];
-                    const _fo = (_col && _col.floorOffset) ? _col.floorOffset : 0;
-                    if (_fo > 0) {
-                        // gap from floor (oy+dH) to column bottom (cp.colBotY)
-                        makeDimV(p, _foDimX2, cp.colBotY, oy + dH, `${Math.round(_fo * 10)}`);
-                        _foDimX2 += 36;
-                    }
-                });
+                const _hangCol = cols.find(c => (c.floorOffset || 0) > 0);
+                if (_hangCol) {
+                    const _foH = _hangCol.floorOffset || 0;
+                    const _bodyH = (_hangCol.height || wg.h) - _foH;
+                    const _colBotH = oy + dH - _foH * sc;
+                    const _colTopH = _colBotH - _bodyH * sc;
+                    makeDimVLeft(p, ox + dW + 38, _colTopH, _colBotH, `${Math.round(_bodyH * 10)}`);
+                    makeDimV(p, ox + dW + 76, _colBotH, oy + dH, `${Math.round(_foH * 10)}`);
+                } else {
+                    let _foDimX2 = ox + dW + (_hasFloorPlinth2 ? 38 : 18);
+                    colXPositions.forEach((cp, ci) => {
+                        const _col = cols[ci];
+                        const _fo = (_col && _col.floorOffset) ? _col.floorOffset : 0;
+                        if (_fo > 0) {
+                            makeDimV(p, _foDimX2, cp.colBotY, oy + dH, `${Math.round(_fo * 10)}`);
+                            _foDimX2 += 36;
+                        }
+                    });
+                }
             }
         }
 
