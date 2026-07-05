@@ -248,6 +248,7 @@
                         var custFields = [['cust-name','name'],['cust-phone','phone'],['cust-order-num','orderNum'],['cust-address','address']];
                         custFields.forEach(function(f) { var el = document.getElementById(f[0]); if (el) el.value = state.customer[f[1]] || ''; });
                     }
+                    if (snap.orderForm) state.orderForm = snap.orderForm;
                     buildCabinet();
                     window._cabinetBuiltOnce = true;
                     if (typeof window._restorePresetUI === 'function') window._restorePresetUI();
@@ -337,6 +338,7 @@
             presetId:      state.presetId,
             orderCart:         lightCart,
             customer:          state.customer,
+            orderForm:         state.orderForm || { factory: { title: '', notes: '' }, customer: { title: '', notes: '' } },
             orderStatus:       window._currentOrderStatus || 'quote',
             roomWall:          window._roomWall || state.roomWall || 'center',
             closureEnabled:    (window._closureEnabled !== undefined) ? window._closureEnabled : true,
@@ -558,6 +560,7 @@ window._saveProjectNow = async function() {
             presetId:      state.presetId,
             orderCart:     lightCart,
             customer:      state.customer,
+            orderForm:     state.orderForm || { factory: { title: '', notes: '' }, customer: { title: '', notes: '' } },
             orderStatus:   window._currentOrderStatus || 'quote',
             tambourPalette: state.tambourPalette || {},
             blueprintCutouts: state.blueprintCutouts || [],

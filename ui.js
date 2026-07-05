@@ -5043,6 +5043,8 @@ function bindUI() {
         });
     });
 
+    _bindOrderFormEditor();
+
     document.getElementById('inp-columns').addEventListener('input', (e) => {
         const val = parseInt(e.target.value);
         const valEl = document.getElementById('val-columns');
@@ -5591,6 +5593,7 @@ function bindUI() {
 
         const projectData = {
             customer: state.customer,
+            orderForm: state.orderForm,
             cart: state.orderCart,
             activeCabinet: activeCabinet,
             wings: state.wings,
@@ -5628,6 +5631,7 @@ function bindUI() {
                     document.getElementById('cust-order-num').value = state.customer.orderNum || '';
                     document.getElementById('cust-address').value = state.customer.address || '';
                 }
+                if (data.orderForm) state.orderForm = data.orderForm;
                 if(data.cart) {
                     state.orderCart = data.cart;
                     const cc1 = document.getElementById('cart-count');
@@ -6242,12 +6246,24 @@ window.openOrderModal = async function(mode) {
     modal.dataset.mode = mode;
     const isFactory = mode === 'factory';
 
+    const formText = _getOrderFormText(mode);
+    const formDefaults = _getOrderFormDefaults(mode);
+    const titleInp = document.getElementById('order-form-title');
+    const notesInp = document.getElementById('order-form-notes');
+    const notesPrint = document.getElementById('order-form-notes-print');
+    if (titleInp) {
+        titleInp.value = formText.title;
+        titleInp.placeholder = formDefaults.title;
+    }
+    if (notesInp) notesInp.value = formText.notes;
+    _syncOrderFormNotesPrint(formText.notes);
+
     // Update title
     const titleEl = document.getElementById('order-modal-title');
     if (titleEl) {
         titleEl.innerHTML = isFactory
-            ? '<i class="fa-solid fa-industry"></i> שליחה לייצור — עלויות רכש'
-            : '<i class="fa-solid fa-file-invoice-dollar"></i> הצעת מחיר ללקוח';
+            ? '<i class="fa-solid fa-industry"></i> ' + _escPrintHtml(formText.title || formDefaults.title)
+            : '<i class="fa-solid fa-file-invoice-dollar"></i> ' + _escPrintHtml(formText.title || formDefaults.title);
     }
 
     // Update print buttons
@@ -6859,6 +6875,74 @@ function _printHardwareRows(item, itemObj, thStyle, tdStyle, sectionStyle) {
     return html;
 }
 
+function _getOrderFormDefaults(mode) {
+    const isFactory = mode === 'factory';
+    return {
+        title: isFactory
+            ? 'שרטוט ייצור והתקנה'
+            : (window._showPricing !== false ? 'הצעת מחיר ללקוח' : 'סיכום פרויקט ללקוח'),
+        notes: ''
+    };
+}
+
+function _getOrderFormText(mode) {
+    if (!state.orderForm) state.orderForm = { factory: { title: '', notes: '' }, customer: { title: '', notes: '' } };
+    const key = mode === 'factory' ? 'factory' : 'customer';
+    const defaults = _getOrderFormDefaults(mode);
+    const stored = state.orderForm[key] || {};
+    return {
+        title: (stored.title || '').trim() || defaults.title,
+        notes: (stored.notes || '').trim()
+    };
+}
+
+function _saveOrderFormText(mode, title, notes) {
+    if (!state.orderForm) state.orderForm = { factory: { title: '', notes: '' }, customer: { title: '', notes: '' } };
+    const key = mode === 'factory' ? 'factory' : 'customer';
+    const defaults = _getOrderFormDefaults(mode);
+    state.orderForm[key] = {
+        title: (title || '').trim() || defaults.title,
+        notes: (notes || '').trim()
+    };
+}
+
+function _syncOrderFormNotesPrint(notes) {
+    const notesPrint = document.getElementById('order-form-notes-print');
+    if (!notesPrint) return;
+    const trimmed = (notes || '').trim();
+    if (trimmed) {
+        notesPrint.textContent = trimmed;
+        notesPrint.style.display = '';
+    } else {
+        notesPrint.textContent = '';
+        notesPrint.style.display = 'none';
+    }
+}
+
+function _bindOrderFormEditor() {
+    const titleInp = document.getElementById('order-form-title');
+    const notesInp = document.getElementById('order-form-notes');
+    if (!titleInp || titleInp.dataset.bound) return;
+    titleInp.dataset.bound = '1';
+    notesInp && (notesInp.dataset.bound = '1');
+
+    const persist = () => {
+        const modal = document.getElementById('order-modal');
+        const mode = modal?.dataset.mode || 'customer';
+        _saveOrderFormText(mode, titleInp.value, notesInp?.value || '');
+        _syncOrderFormNotesPrint(notesInp?.value || '');
+        const titleEl = document.getElementById('order-modal-title');
+        const formText = _getOrderFormText(mode);
+        if (titleEl) {
+            titleEl.innerHTML = mode === 'factory'
+                ? '<i class="fa-solid fa-industry"></i> ' + _escPrintHtml(formText.title)
+                : '<i class="fa-solid fa-file-invoice-dollar"></i> ' + _escPrintHtml(formText.title);
+        }
+    };
+    titleInp.addEventListener('input', persist);
+    if (notesInp) notesInp.addEventListener('input', persist);
+}
+
 function _printCabinetNotesRow(notes, thStyle, tdStyle) {
     const n = (notes || '').trim();
     if (!n) return '';
@@ -7018,7 +7102,11 @@ function _buildPrintHTML(mode) {
                </div>
            </div>`;
 
-    const title = isFactory ? 'שרטוט ייצור והתקנה' : (_hidePrices ? 'סיכום פרויקט ללקוח' : 'הצעת מחיר ללקוח');
+    const formText = _getOrderFormText(mode);
+    const title = formText.title;
+    const introHTML = formText.notes
+        ? `<div style="white-space:pre-wrap;line-height:1.55;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px 14px;margin-bottom:20px;font-size:0.95rem;color:#78350f;">${_escPrintHtml(formText.notes)}</div>`
+        : '';
     const custName = state.customer.name || 'לא צוין';
     const custPhone = state.customer.phone || 'לא צוין';
     const custOrder = state.customer.orderNum || 'לא צוין';
@@ -7063,6 +7151,7 @@ function _buildPrintHTML(mode) {
   </div>
   ${_logoHtml}
 </div>
+${introHTML}
 <div class="cust-grid">
   <div><strong>שם פרויקט/לקוח:</strong> ${custName}</div>
   <div><strong>טלפון:</strong> ${custPhone}</div>

@@ -1524,6 +1524,20 @@
                 <div><strong>כתובת:</strong> <span id="print-c-address"></span></div>
             </div>
         </div>
+        <div id="order-form-editor" class="order-form-editor hide-on-print">
+            <div class="order-form-editor-label"><i class="fa-solid fa-pen-to-square"></i> עריכת טקסט מסמך</div>
+            <div class="order-form-editor-fields">
+                <div>
+                    <label for="order-form-title" class="order-form-field-label">כותרת מסמך</label>
+                    <input type="text" id="order-form-title" class="editor-select order-form-input" placeholder="כותרת שתופיע בהדפסה">
+                </div>
+                <div>
+                    <label for="order-form-notes" class="order-form-field-label">הערות / טקסט נוסף</label>
+                    <textarea id="order-form-notes" class="editor-select order-form-input" rows="3" placeholder="הערות לייצור, הוראות התקנה, פרטים נוספים — יופיעו בראש המסמך המודפס"></textarea>
+                </div>
+            </div>
+        </div>
+        <div id="order-form-notes-print" class="show-on-print order-form-notes-print" style="display:none;"></div>
         <div id="order-items-container"></div>
         <div class="modal-footer-price" id="modal-footer-summary"></div>
         <div class="print-actions" id="modal-print-actions" style="display:flex;gap:15px;margin-top:15px;">

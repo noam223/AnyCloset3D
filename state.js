@@ -213,6 +213,8 @@ const state = {
     blueprintCellDimOffsets: {},
     blueprintDimOffsets: {},
     customer: { name: '', phone: '', orderNum: '', address: '' },
+    // Editable title + intro text on order/factory print forms
+    orderForm: { factory: { title: '', notes: '' }, customer: { title: '', notes: '' } },
     orderCart: [],
     editingCartIndex: -1,
     currentInstallPrice: 0,
