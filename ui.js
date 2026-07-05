@@ -5894,6 +5894,11 @@ function bindUI() {
         const originalText = btn.innerHTML;
 
         if (state.editingCartIndex > -1) {
+            const oldItem = state.orderCart[state.editingCartIndex];
+            const newHash = _hashPrintSpecSource(_collectPrintSpecRows(cabinetSpec, cartItem));
+            if (oldItem && oldItem.printSpecEdits && oldItem.printSpecEdits.sourceHash === newHash) {
+                cartItem.printSpecEdits = oldItem.printSpecEdits;
+            }
             state.orderCart[state.editingCartIndex] = cartItem;
             state.editingCartIndex = -1;
             if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
@@ -6311,10 +6316,7 @@ window.openOrderModal = async function(mode) {
                     </div>
                 </div>
                 <table class="spec-table">
-                    ${_printBasicSpecRows(item, itemObj, '', '')}
-                    ${_printFinishesRows(item, itemObj, '', '', '')}
-                    ${_printHardwareRows(item, itemObj, '', '', '')}
-                    ${item.cabinetNotes ? `<tr><th>הערות</th><td style="white-space:pre-wrap;line-height:1.55;">${String(item.cabinetNotes).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')}</td></tr>` : ''}
+                    ${_printSpecRowsHtmlEditable(_resolvePrintSpecRows(itemObj), index)}
 
                     ${!isFactory && window._showPricing !== false ? `
                     <tr class="view-customer">
@@ -6374,6 +6376,8 @@ window.openOrderModal = async function(mode) {
         `;
         container.insertAdjacentHTML('beforeend', cabinetHTML);
     });
+
+    _bindPrintSpecRowInputs(container);
 
     // Wire up editable inputs
     container.querySelectorAll('.modal-price-input').forEach(input => {
@@ -6808,6 +6812,150 @@ function _printSectionHeader(label, sectionStyle) {
     return `<tr><td colspan="2" style="background:#f1f5f8;text-align:center;font-weight:bold;${sectionStyle || ''}">${label}</td></tr>`;
 }
 
+function _plainSpecValue(v) {
+    if (v == null) return '';
+    return String(v)
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<[^>]*>/g, '')
+        .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+        .trim();
+}
+
+function _collectPrintSpecRows(item, itemObj) {
+    const isWD = _cartIsWritingDesk(itemObj);
+    const rows = [];
+
+    rows.push({ id: 'modelName', label: isWD ? 'סוג מוצר' : 'דגם ארון', value: _plainSpecValue(item.modelName) });
+    if (!isWD) rows.push({ id: 'placement', label: 'מיקום / התקנה', value: _plainSpecValue(item.placement) });
+    rows.push({ id: 'dimsStr', label: 'מידות חיצוניות', value: _plainSpecValue(item.dimsStr), rtl: true });
+    rows.push({ id: 'material', label: 'חומר גוף', value: _plainSpecValue(item.material) });
+    rows.push({ id: 'plinthType', label: isWD ? 'בסיס' : 'סוג רגליים / צוקל', value: _plainSpecValue(isWD ? 'רגליים כפולות' : item.plinthType) });
+    if (!isWD) rows.push({ id: 'desk', label: 'תוספת שולחן', value: _plainSpecValue(item.desk) });
+
+    rows.push({ id: '_sec_finishes', section: true, label: 'גוונים וגימורים' });
+    if (isWD) {
+        rows.push({ id: 'colorBody', label: 'צבע גוף (רגליים ומשטח)', value: _plainSpecValue(item.colorBody || '—') });
+        const drawerColor = item.colorDrawers || item.colorExternal;
+        if (drawerColor) rows.push({ id: 'colorDrawers', label: 'צבע מגירות', value: _plainSpecValue(drawerColor) });
+        if (item.extraColors) rows.push({ id: 'extraColors', label: 'צבעים נוספים', value: _plainSpecValue(item.extraColors) });
+    } else {
+        rows.push({ id: 'colorBody', label: 'צבע גוף וצוקל', value: _plainSpecValue(item.colorBody) });
+        rows.push({ id: 'colorInternal', label: 'צבע פנים (מדפים/מגירות)', value: _plainSpecValue(item.colorInternal) });
+        if (item.slidingDoor) {
+            rows.push({ id: 'slidingDoorColors', label: 'צבע חזיתות הזזה', value: _plainSpecValue(item.slidingDoor.doorColorsStr) });
+        } else {
+            rows.push({ id: 'colorExternal', label: 'צבע חזיתות (דלתות)', value: _plainSpecValue(item.colorExternal) });
+        }
+        rows.push({ id: 'colorBack', label: 'צבע גב ארון', value: _plainSpecValue((item.colorBack && item.colorBack !== 'undefined') ? item.colorBack : 'לבן מט') });
+        if (item.desk !== 'ללא') rows.push({ id: 'colorDesk', label: 'צבע שולחן עבודה', value: _plainSpecValue(item.colorDesk) });
+        if (item.hasOpenCells) rows.push({ id: 'colorOpenCell', label: 'צבע כוורת', value: _plainSpecValue(item.colorOpenCell) });
+        if (item.extraColors) rows.push({ id: 'extraColors', label: 'צבעים נוספים בארון', value: _plainSpecValue(item.extraColors) });
+    }
+
+    rows.push({ id: '_sec_hardware', section: true, label: 'פרזול ותכולה' });
+    if (isWD) {
+        if (item.writingDeskHasDrawers !== false) {
+            rows.push({ id: 'handle', label: 'סוג ידיות למגירות', value: _plainSpecValue(item.handle) });
+            const n = item.writingDeskDrawerCount != null ? item.writingDeskDrawerCount : (item.drawersExt || 0);
+            rows.push({ id: 'writingDeskDrawerCount', label: 'מספר מגירות', value: `${n} יחידות` });
+            if (item.writingDeskDrawerHeight) {
+                rows.push({ id: 'writingDeskDrawerHeight', label: 'גובה מגירה', value: `${item.writingDeskDrawerHeight} ס"מ` });
+            }
+        } else {
+            rows.push({ id: 'writingDeskDrawers', label: 'מגירות', value: 'ללא' });
+        }
+    } else if (item.slidingDoor) {
+        rows.push({ id: 'slidingNumDoors', label: 'מספר דלתות הזזה', value: `${item.slidingDoor.numDoors} דלתות` });
+        rows.push({ id: 'slidingProfileColor', label: 'צבע פרופיל הזזה', value: _plainSpecValue(item.slidingDoor.profileColor) });
+        if (item.slidingDoor.hasMirror) {
+            rows.push({ id: 'slidingMirror', label: 'דלת מראה', value: '✓ כולל דלת מראה' });
+        }
+    } else {
+        rows.push({ id: 'handle', label: 'סוג ידיות לחזיתות', value: _plainSpecValue(item.handle) });
+    }
+    if (!isWD) {
+        rows.push({ id: 'drawersExt', label: 'מגירות חיצוניות', value: `${item.drawersExt} יחידות` });
+        rows.push({ id: 'drawersInt', label: 'מגירות פנימיות', value: `${item.drawersInt} יחידות` });
+        rows.push({ id: 'shelves', label: 'מדפים נשלפים', value: `${item.shelves} יחידות` });
+        rows.push({ id: 'hangingRods', label: 'מוטות תלייה לקולבים', value: _plainSpecValue(_formatHangingRodsDisplay(itemObj)) });
+    }
+
+    const notes = (item.cabinetNotes || '').trim();
+    if (notes) rows.push({ id: 'cabinetNotes', label: 'הערות', value: notes, multiline: true });
+
+    return rows;
+}
+
+function _hashPrintSpecSource(rows) {
+    const payload = rows.filter(r => !r.section).map(r => `${r.id}:${r.value}`).join('\n');
+    let h = 5381;
+    for (let i = 0; i < payload.length; i++) h = ((h << 5) + h) ^ payload.charCodeAt(i);
+    return (h >>> 0).toString(36);
+}
+
+function _resolvePrintSpecRows(itemObj) {
+    const auto = _collectPrintSpecRows(itemObj.spec, itemObj);
+    const hash = _hashPrintSpecSource(auto);
+    const prev = itemObj.printSpecEdits;
+    if (!prev || prev.sourceHash !== hash) {
+        itemObj.printSpecEdits = { sourceHash: hash, rows: auto.map(r => ({ ...r })) };
+        return itemObj.printSpecEdits.rows;
+    }
+    const merged = auto.map(autoRow => {
+        if (autoRow.section) return { ...autoRow };
+        const prevRow = prev.rows.find(r => r.id === autoRow.id);
+        return prevRow ? { ...autoRow, value: prevRow.value } : { ...autoRow };
+    });
+    itemObj.printSpecEdits.rows = merged;
+    return merged;
+}
+
+function _updatePrintSpecRow(itemObj, rowId, newValue) {
+    _resolvePrintSpecRows(itemObj);
+    const row = itemObj.printSpecEdits.rows.find(r => r.id === rowId);
+    if (row && !row.section) row.value = newValue;
+}
+
+function _printSpecRowsHtml(rows, thStyle, tdStyle, sectionStyle) {
+    return rows.map(r => {
+        if (r.section) return _printSectionHeader(r.label, sectionStyle);
+        const tdExtra = r.rtl ? ' dir="rtl"' : '';
+        const val = _escPrintHtml(r.value).replace(/\n/g, '<br>');
+        return _printTr(thStyle, tdStyle, r.label, val, tdExtra);
+    }).join('');
+}
+
+function _printSpecRowsHtmlEditable(rows, cartIndex) {
+    return rows.map(r => {
+        if (r.section) return _printSectionHeader(r.label, '');
+        const esc = _escPrintHtml(r.value);
+        const tdExtra = r.rtl ? ' dir="rtl"' : '';
+        const inputStyle = 'width:100%;margin:0;border:1px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-family:inherit;font-size:inherit;box-sizing:border-box;background:white;';
+        const cell = r.multiline
+            ? `<textarea class="spec-row-input" data-cart-index="${cartIndex}" data-row-id="${r.id}" rows="2" style="${inputStyle}resize:vertical;min-height:52px;">${esc}</textarea>`
+            : `<input type="text" class="spec-row-input" data-cart-index="${cartIndex}" data-row-id="${r.id}" value="${esc}" style="${inputStyle}">`;
+        return `<tr class="spec-row-editable"><th>${r.label}</th><td${tdExtra ? ` style="${tdExtra.trim()}"` : ''}>${cell}</td></tr>`;
+    }).join('');
+}
+
+function _bindPrintSpecRowInputs(container) {
+    if (!container) return;
+    container.querySelectorAll('.spec-row-input').forEach(inp => {
+        if (inp.dataset.bound) return;
+        inp.dataset.bound = '1';
+        const persist = (e) => {
+            const idx = parseInt(e.target.getAttribute('data-cart-index'), 10);
+            const rowId = e.target.getAttribute('data-row-id');
+            const itemObj = state.orderCart[idx];
+            if (!itemObj || !rowId) return;
+            _updatePrintSpecRow(itemObj, rowId, e.target.value);
+            if (typeof saveHistoryState === 'function') saveHistoryState();
+        };
+        inp.addEventListener('change', persist);
+        inp.addEventListener('input', persist);
+    });
+}
+
 function _printBasicSpecRows(item, itemObj, thStyle, tdStyle) {
     const isWD = _cartIsWritingDesk(itemObj);
     const dimsExtra = ' dir="rtl"';
@@ -6970,8 +7118,8 @@ function _buildPrintHTML(mode) {
         const itemInstall = item.installPrice || 0;
         const itemCost = item.costPrice ? parseInt(item.costPrice.replace('₪', '').replace(/,/g, '')) : 0;
         totalOrderPrice += numericPrice;
-        totalInstallPrice += itemInstall;
-        totalCostPrice += itemCost;
+        totalInstallPrice += itemInstall; totalCostPrice += itemCost;
+        const specRows = _resolvePrintSpecRows(itemObj);
         const priceRows = _hidePrices ? '' : isFactory
             ? `<tr><th style="background:#fef9c3;">מחיר התקנה ללקוח</th><td style="font-weight:bold;color:#713f12;font-size:1.1rem;text-align:right;">₪${(item.installPrice || 0).toLocaleString()}</td></tr>`
             : `<tr><th style="background:#eff6ff;">מחיר ארון ללקוח</th><td style="font-weight:bold;color:#1e3a5f;font-size:1.1rem;text-align:right;">₪${numericPrice.toLocaleString()}</td></tr>
@@ -6989,10 +7137,7 @@ function _buildPrintHTML(mode) {
                     פרטי ${detailLabel}: ${titleText}
                 </h3>
                 <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:1rem;border:1px solid #e2e8f0;">
-                    ${_printBasicSpecRows(item, itemObj, thStyle, tdStyle)}
-                    ${_printFinishesRows(item, itemObj, thStyle, tdStyle, 'padding:8px;border:1px solid #e2e8f0;')}
-                    ${_printHardwareRows(item, itemObj, thStyle, tdStyle, 'padding:8px;border:1px solid #e2e8f0;')}
-                    ${_printCabinetNotesRow(item.cabinetNotes, thStyle, tdStyle)}
+                    ${_printSpecRowsHtml(specRows, thStyle, tdStyle, 'padding:8px;border:1px solid #e2e8f0;')}
                     ${priceRows}
                 </table>
             </div>
@@ -7041,10 +7186,7 @@ function _buildPrintHTML(mode) {
                     פרטי ${detailLabel}: ${titleText}
                 </h3>
                 <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:1rem;border:1px solid #e2e8f0;">
-                    ${_printBasicSpecRows(item, itemObj, thStyle, tdStyle)}
-                    ${_printFinishesRows(item, itemObj, thStyle, tdStyle, 'padding:8px;border:1px solid #e2e8f0;')}
-                    ${_printHardwareRows(item, itemObj, thStyle, tdStyle, 'padding:8px;border:1px solid #e2e8f0;')}
-                    ${_printCabinetNotesRow(item.cabinetNotes, thStyle, tdStyle)}
+                    ${_printSpecRowsHtml(specRows, thStyle, tdStyle, 'padding:8px;border:1px solid #e2e8f0;')}
                     ${priceRows}
                 </table>
             </div>

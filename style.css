@@ -1839,6 +1839,12 @@ body.dragging-v { cursor: ns-resize !important; }
     color: #78350f;
 }
 
+.spec-table td .spec-row-input:focus {
+    outline: none;
+    border-color: var(--secondary) !important;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
 .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-light); padding-bottom: 14px; }
 .modal-header h2 { margin: 0; color: var(--primary); font-size: 1.4rem; display: flex; align-items: center; gap: 10px; letter-spacing: -0.02em;}
 .close-modal { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-light); transition: color var(--transition); }
@@ -2174,6 +2180,7 @@ body.dragging-v { cursor: ns-resize !important; }
     .modal-content { position: static !important; display: block !important; width: 100% !important; max-width: 100% !important; height: auto !important; max-height: none !important; box-shadow: none !important; overflow: visible !important; padding: 0 !important; border-radius: 0 !important; }
     
     .close-modal, .print-btn-large, .cart-item-actions, .order-form-editor { display: none !important; }
+    .spec-row-input { border: none !important; background: transparent !important; padding: 0 !important; resize: none !important; }
     #print-customer-details { display: block !important; }
     .order-form-notes-print { display: block !important; }
     

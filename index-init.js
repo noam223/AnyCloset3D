@@ -321,7 +321,7 @@
             var lightSpec = Object.assign({}, item.spec);
             delete lightSpec.imgDoors; delete lightSpec.imgOpen;
             delete lightSpec.imgBlueprint; delete lightSpec.multiViewSVG; delete lightSpec.multiViewPages;
-            return { spec: lightSpec, rawState: item.rawState };
+            return { spec: lightSpec, rawState: item.rawState, printSpecEdits: item.printSpecEdits || null };
         });
         return JSON.parse(JSON.stringify({
             globalWidth:   state.globalWidth,
@@ -543,7 +543,7 @@ window._saveProjectNow = async function() {
             delete lightSpec.imgBlueprint;
             delete lightSpec.multiViewSVG;
             delete lightSpec.multiViewPages;
-            return { spec: lightSpec, rawState: item.rawState };
+            return { spec: lightSpec, rawState: item.rawState, printSpecEdits: item.printSpecEdits || null };
         });
         var snap = JSON.parse(JSON.stringify({
             globalWidth:   state.globalWidth,
