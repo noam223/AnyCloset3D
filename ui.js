@@ -104,10 +104,14 @@ function updateQuickEditPanelUI() {
     }
 
     if (state.activeEditCol === -1 || state.viewMode !== 'front' || !state.columns[state.activeEditCol]) {
-        // Even when panel is hidden, still update copy/paste group if selection is full-column
-        const copyPasteGroup = document.getElementById('qe-copypaste-group');
-        if (copyPasteGroup) copyPasteGroup.style.display = 'none';
-        panel.classList.remove('visible'); return;
+        // Full-column select-all should still open quick-edit (incl. split columns >270)
+        if (state.viewMode === 'front' && _isFullColumnSelected()) {
+            state.activeEditCol = state.selection.colIndex;
+        } else {
+            _updateCopyPasteGroupVisibility();
+            panel.classList.remove('visible');
+            return;
+        }
     }
     const col = state.columns[state.activeEditCol];
 
@@ -158,19 +162,7 @@ function updateQuickEditPanelUI() {
         }
     }
 
-    // Copy/Paste group — show only when the entire column is selected
-    // Use selection.colIndex (may differ from activeEditCol when user clicks select-all)
-    const copyPasteGroup = document.getElementById('qe-copypaste-group');
-    if (copyPasteGroup) {
-        const selCol = state.selection.colIndex;
-        const selColData = selCol !== -1 ? state.columns[selCol] : null;
-        const isFullColSelected = selColData &&
-            state.selection.rows.length === (selColData.shelves + 1);
-        copyPasteGroup.style.display = isFullColSelected ? '' : 'none';
-        // Show paste button only when clipboard has data
-        const pasteBtn = document.getElementById('qe-btn-paste');
-        if (pasteBtn) pasteBtn.style.display = (_copiedColumn && isFullColSelected) ? '' : 'none';
-    }
+    _updateCopyPasteGroupVisibility();
 
     panel.classList.add('visible');
 }
@@ -1466,12 +1458,26 @@ function selectAllColumn(colIndex) {
     }
     // Allow selection always — height check moved to applyDoor
     state.selection = { colIndex, rows: Array.from({ length: numRows }, (_, i) => i) };
+    state.activeEditCol = colIndex;
     buildCabinet();
 }
 
 // ── Column Copy / Paste ──────────────────────────────────────────────────────
 // Clipboard: stores a deep-copy of the last copied column structure
 let _copiedColumn = null;
+let _copiedUpperColumn = null; // matching upper-unit wing column (if any)
+
+function _updateCopyPasteGroupVisibility() {
+    const copyPasteGroup = document.getElementById('qe-copypaste-group');
+    if (!copyPasteGroup) return;
+    const selCol = state.selection.colIndex;
+    const selColData = selCol !== -1 ? state.columns[selCol] : null;
+    const isFullColSelected = state.viewMode === 'front' && selColData &&
+        state.selection.rows.length === _getColumnRowCount(selColData);
+    copyPasteGroup.style.display = isFullColSelected ? '' : 'none';
+    const pasteBtn = document.getElementById('qe-btn-paste');
+    if (pasteBtn) pasteBtn.style.display = (_copiedColumn && isFullColSelected) ? '' : 'none';
+}
 
 // Helper: check if the entire column is currently selected
 function _isFullColumnSelected() {
@@ -1482,13 +1488,23 @@ function _isFullColumnSelected() {
     return state.selection.rows.length === numRows;
 }
 
-window.copyColumn = function() {
-    if (!_isFullColumnSelected()) return;
-    const col = state.columns[state.selection.colIndex];
-    if (!col) return;
-    // Deep-copy the column structure (shelves, compartments, doors, type, etc.)
-    // _height is stored so pasteColumn can scale shelf positions proportionally
-    _copiedColumn = JSON.parse(JSON.stringify({
+function _parentWingIdForColumnCopy() {
+    if (state._activeUpperUnitParent) return state._activeUpperUnitParent;
+    const aw = state.activeWing;
+    if (aw === 'full_corner_right') return 'right';
+    if (aw === 'full_corner_left') return 'left';
+    return aw || 'center';
+}
+
+function _upperUnitColumnIndex(colIdx, parentColumns, uuColumns) {
+    if (!uuColumns || !uuColumns.length) return null;
+    if (uuColumns.length === parentColumns.length) return colIdx;
+    if (uuColumns.length === 1) return 0;
+    return null;
+}
+
+function _serializeColumnForClipboard(col) {
+    return {
         shelves:      col.shelves,
         shelvesY:     col.shelvesY,
         compartments: col.compartments,
@@ -1499,36 +1515,22 @@ window.copyColumn = function() {
         noPlinth:     col.noPlinth || false,
         topPanel:     col.topPanel || false,
         sinkPanel:    col.sinkPanel || false,
-        _height:      col.height,   // source height — used for proportional scaling on paste
-        // desk-type extras
+        _height:      col.height,
         deskHeight:    col.deskHeight,
         deskClearance: col.deskClearance,
         hasDrawers:    col.hasDrawers,
         drawerHeight:  col.drawerHeight,
-    }));
-    // Show paste button now that clipboard has data
-    const pasteBtn = document.getElementById('qe-btn-paste');
-    if (pasteBtn) pasteBtn.style.display = '';
-    // Visual feedback toast
-    _showToast('עמודה הועתקה ✓', 1800);
-};
+        deskDrawerCount: col.deskDrawerCount,
+    };
+}
 
-window.pasteColumn = function() {
-    if (!_copiedColumn) return;
-    if (!_isFullColumnSelected()) return;
-    const targetIdx = state.selection.colIndex;
-    const target = state.columns[targetIdx];
-    if (!target) return;
-
-    // Preserve the target column's width and height — only copy internal structure
+function _applyColumnClipboard(target, src) {
     const savedWidth  = target.width;
     const savedHeight = target.height;
+    const srcCopy = JSON.parse(JSON.stringify(src));
 
-    // Apply copied structure (deep copy)
-    const src = JSON.parse(JSON.stringify(_copiedColumn));
-    target.shelves      = src.shelves;
-    target.compartments = src.compartments;
-    // Migrate any legacy partitionX → partitions[] in pasted compartments
+    target.shelves      = srcCopy.shelves;
+    target.compartments = srcCopy.compartments;
     if (Array.isArray(target.compartments)) {
         target.compartments.forEach(comp => {
             if (comp && comp.partition && !Array.isArray(comp.partitions)) {
@@ -1540,40 +1542,41 @@ window.pasteColumn = function() {
             }
         });
     }
-    target.doors        = src.doors;
-    target.type         = src.type;
-    target.floorOffset  = src.floorOffset;
-    target.noPlinth     = src.noPlinth;
-    target.topPanel     = src.topPanel || false;
-    target.sinkPanel    = src.sinkPanel || false;
-    if (src.type === 'desk') {
-        target.deskHeight    = src.deskHeight;
-        target.deskClearance = src.deskClearance;
-        target.hasDrawers    = src.hasDrawers;
-        target.drawerHeight  = src.drawerHeight;
+    target.doors        = srcCopy.doors;
+    target.type         = srcCopy.type;
+    target.floorOffset  = srcCopy.floorOffset;
+    target.noPlinth     = srcCopy.noPlinth;
+    target.topPanel     = srcCopy.topPanel || false;
+    target.sinkPanel    = srcCopy.sinkPanel || false;
+    if (srcCopy.type === 'desk') {
+        target.deskHeight     = srcCopy.deskHeight;
+        target.deskClearance  = srcCopy.deskClearance;
+        target.hasDrawers     = srcCopy.hasDrawers;
+        target.drawerHeight   = srcCopy.drawerHeight;
+        target.deskDrawerCount = srcCopy.deskDrawerCount;
+    } else {
+        delete target.deskHeight;
+        delete target.deskClearance;
+        delete target.hasDrawers;
+        delete target.drawerHeight;
+        delete target.deskDrawerCount;
     }
 
-    // Restore geometry
     target.width  = savedWidth;
     target.height = savedHeight;
 
-    // Scale shelf positions proportionally from source height to target height.
-    // This preserves the relative cell proportions instead of re-distributing evenly.
-    const srcHeight = src._height || savedHeight; // fallback: same height → no scaling
-    if (src.shelvesY && src.shelvesY.length > 0 && srcHeight > 0) {
+    const srcHeight = srcCopy._height || savedHeight;
+    if (srcCopy.shelvesY && srcCopy.shelvesY.length > 0 && srcHeight > 0) {
         const scale = savedHeight / srcHeight;
-        target.shelvesY = src.shelvesY.map(y => Math.round(y * scale * 10) / 10);
+        target.shelvesY = srcCopy.shelvesY.map(y => Math.round(y * scale * 10) / 10);
     } else {
-        target.shelvesY = src.shelvesY ? src.shelvesY.slice() : [];
+        target.shelvesY = srcCopy.shelvesY ? srcCopy.shelvesY.slice() : [];
     }
 
-    // Scale splitY proportionally too
-    target.splitY = src.splitY ? Math.round(src.splitY * (savedHeight / srcHeight) * 10) / 10 : null;
+    target.splitY = srcCopy.splitY
+        ? Math.round(srcCopy.splitY * (savedHeight / srcHeight) * 10) / 10
+        : null;
 
-    // Validate drawer counts for each compartment based on new cell heights.
-    // Preserve the original count from the copied column — only clamp to the
-    // minimum required by the new cell height (no single drawer > 60 cm).
-    // If the cell is too short for any drawer, reset to empty.
     const t = state.thickness;
     const baseY = (target.type === 'desk')
         ? (target.deskHeight + target.deskClearance)
@@ -1585,19 +1588,76 @@ window.pasteColumn = function() {
         const topY    = (r >= target.shelvesY.length) ? savedHeight - t : target.shelvesY[r] - t / 2;
         const cellH   = Math.max(0, Math.round(topY - bottomY));
         if (cellH < 12) {
-            // Cell too short for any drawer — reset
             comp.type = 'empty';
         } else {
-            // Keep the original copied count, but enforce the minimum
-            // (no single drawer may exceed 60 cm → minCount = ceil(cellH/60))
             const minCount = calcMinDrawerCount(cellH);
             comp.count = Math.max(minCount, comp.count || 1);
+        }
+    }
+}
+
+window.copyColumn = function() {
+    if (!_isFullColumnSelected()) return;
+    const srcIdx = state.selection.colIndex;
+    const col = state.columns[srcIdx];
+    if (!col) return;
+
+    _copiedColumn = JSON.parse(JSON.stringify(_serializeColumnForClipboard(col)));
+    _copiedUpperColumn = null;
+
+    // When copying from the main wing, also snapshot the floating upper-unit column above
+    if (!state._activeUpperUnit) {
+        const parentId = _parentWingIdForColumnCopy();
+        const uuWing = state.wings['upperUnit_' + parentId];
+        if (uuWing && uuWing.columns) {
+            const uuIdx = _upperUnitColumnIndex(srcIdx, state.columns, uuWing.columns);
+            if (uuIdx !== null && uuWing.columns[uuIdx]) {
+                _copiedUpperColumn = JSON.parse(JSON.stringify(
+                    _serializeColumnForClipboard(uuWing.columns[uuIdx])
+                ));
+            }
+        }
+    }
+
+    const pasteBtn = document.getElementById('qe-btn-paste');
+    if (pasteBtn) pasteBtn.style.display = '';
+    const hasSplit = !!(col.splitY && col.height > getSplitThreshold());
+    const hasUpper = !!_copiedUpperColumn;
+    let msg = 'עמודה הועתקה ✓';
+    if (hasSplit && hasUpper) msg = 'עמודה מפוצלת + יחידה עליונה הועתקו ✓';
+    else if (hasSplit) msg = 'עמודה מפוצלת הועתקה ✓';
+    else if (hasUpper) msg = 'עמודה + יחידה עליונה הועתקו ✓';
+    _showToast(msg, 1800);
+};
+
+window.pasteColumn = function() {
+    if (!_copiedColumn) return;
+    if (!_isFullColumnSelected()) return;
+    const targetIdx = state.selection.colIndex;
+    const target = state.columns[targetIdx];
+    if (!target) return;
+
+    _applyColumnClipboard(target, _copiedColumn);
+
+    if (_copiedUpperColumn && !state._activeUpperUnit) {
+        const parentId = _parentWingIdForColumnCopy();
+        const uuWing = state.wings['upperUnit_' + parentId];
+        if (uuWing && uuWing.columns) {
+            const uuIdx = _upperUnitColumnIndex(targetIdx, state.columns, uuWing.columns);
+            const uuTarget = uuIdx !== null ? uuWing.columns[uuIdx] : null;
+            if (uuTarget) _applyColumnClipboard(uuTarget, _copiedUpperColumn);
         }
     }
 
     checkSplits();
     buildCabinet(); calculatePrice(); saveHistoryState();
-    _showToast('עמודה הודבקה ✓', 1800);
+    const hasSplit = !!(_copiedColumn.splitY);
+    const hasUpper = !!_copiedUpperColumn;
+    let msg = 'עמודה הודבקה ✓';
+    if (hasSplit && hasUpper) msg = 'עמודה מפוצלת + יחידה עליונה הודבקו ✓';
+    else if (hasSplit) msg = 'עמודה מפוצלת הודבקה ✓';
+    else if (hasUpper) msg = 'עמודה + יחידה עליונה הודבקו ✓';
+    _showToast(msg, 1800);
 };
 
 // Keyboard shortcut: Ctrl+C / Ctrl+V when full column is selected
