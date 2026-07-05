@@ -88,6 +88,97 @@ function _bpDrawSideDeskFrontParts(p, desk, ox, oy, dW, dH, sc, fill, STROKE, ST
     p.push(`<text x="${midX.toFixed(1)}" y="${(midY + 4).toFixed(1)}" text-anchor="middle" font-family="${FONT || 'Rubik,Tahoma,sans-serif'}" font-size="11" fill="${STROKE}" opacity="0.85">שולחן צד</text>`);
 }
 
+function _bpCenterWritingDesk(cw) {
+    if (state.presetId !== 'writing-desk') return null;
+    const wing = cw || (state.wings && state.wings.center);
+    if (!wing || !wing.writingDesk) return null;
+    return {
+        width: wing.width || state.width || 120,
+        depth: wing.depth || state.depth || 60,
+        height: wing.writingDesk.height != null ? wing.writingDesk.height : (wing.globalHeight || 75),
+        hasDrawers: wing.writingDesk.hasDrawers !== false,
+        drawerCount: wing.writingDesk.drawerCount,
+        drawerHeight: wing.writingDesk.drawerHeight != null ? wing.writingDesk.drawerHeight : 12
+    };
+}
+
+/** Standalone writing desk — front view (two legs + surface + optional drawers) */
+function _bpDrawWritingDeskFrontParts(p, wd, ox, oy, dW, dH, sc, fill, STROKE, STROKE_THIN, FONT, dimHFn, dimVFn, dimVLeftFn) {
+    if (!wd) return;
+    const dWidth = wd.width || 120;
+    const dHeight = wd.height || 75;
+    const drawerHcm = wd.drawerHeight || 12;
+    const legTCm = state.thickness || 1.7;
+    const legT = legTCm * sc;
+    const deskSurfT = DESK_SURFACE_T * sc;
+    const deskBotY = oy + dH;
+    const deskTopY = oy;
+    const FILL_WD = fill || '#e8f0fe';
+    const drawRect = (x, y, w, h, f, s, sw) => p.push(`<rect x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" width="${(+w).toFixed(1)}" height="${(+h).toFixed(1)}" fill="${f}" stroke="${s}" stroke-width="${sw || 1.5}"/>`);
+
+    drawRect(ox, deskTopY + deskSurfT, legT, dH - deskSurfT, FILL_WD, STROKE, 1.5);
+    drawRect(ox + dW - legT, deskTopY + deskSurfT, legT, dH - deskSurfT, FILL_WD, STROKE, 1.5);
+    drawRect(ox, deskTopY, dW, deskSurfT, FILL_WD, STROKE, 1.5);
+
+    if (wd.hasDrawers !== false) {
+        const numDrawers = wd.drawerCount != null ? wd.drawerCount : (dWidth <= 80 ? 1 : 2);
+        const innerSvgW = dW - 2 * legT;
+        const drawerSvgW = innerSvgW / numDrawers;
+        const drawerSvgH = drawerHcm * sc;
+        const drawerSvgY = deskTopY + deskSurfT;
+        const drawerStartX = ox + legT;
+        for (let di = 0; di < numDrawers; di++) {
+            const dx = drawerStartX + di * drawerSvgW;
+            drawRect(dx + 1, drawerSvgY + 1, drawerSvgW - 2, drawerSvgH - 2, 'rgba(255,255,255,0.7)', STROKE_THIN || STROKE, 0.8);
+            const hndW = Math.min(drawerSvgW * 0.4, 20);
+            const hndX = dx + (drawerSvgW - hndW) / 2;
+            const hndY = drawerSvgY + drawerSvgH * 0.5;
+            p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX + hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
+        }
+        dimVFn(ox + dW + 14, drawerSvgY, drawerSvgY + drawerSvgH, `${Math.round(drawerHcm * 10)}`);
+        dimVFn(ox + dW + 48, drawerSvgY + drawerSvgH, deskBotY, `${Math.round((dHeight - DESK_SURFACE_T - drawerHcm) * 10)}`);
+    } else {
+        drawRect(ox + legT, deskTopY + deskSurfT, dW - 2 * legT, dH - deskSurfT, 'white', STROKE_THIN || STROKE, 0.5);
+    }
+
+    dimHFn(ox, ox + dW, deskBotY + 36, `${Math.round(dWidth * 10)}`);
+    dimVLeftFn(ox - 14, deskTopY, deskBotY, `${Math.round(dHeight * 10)}`);
+    if (dW - 2 * legT > 20) {
+        dimHFn(ox + legT, ox + dW - legT, deskBotY + 18, `${Math.round((dWidth - 2 * legTCm) * 10)}`, false);
+    }
+    const midX = ox + dW / 2;
+    const midY = deskTopY + dH / 2;
+    p.push(`<text x="${midX.toFixed(1)}" y="${(midY + 4).toFixed(1)}" text-anchor="middle" font-family="${FONT || 'Rubik,Tahoma,sans-serif'}" font-size="12" fill="${STROKE}" opacity="0.85">שולחן כתיבה</text>`);
+}
+
+/** Writing desk — side profile (depth × height) */
+function _bpDrawWritingDeskSideParts(p, wd, ox, oy, dW, dH, sc, fill, STROKE, STROKE_THIN, FONT, dimHFn, dimVFn, dimVLeftFn) {
+    if (!wd) return;
+    const dDepth = wd.depth || 60;
+    const dHeight = wd.height || 75;
+    const drawerHcm = wd.drawerHeight || 12;
+    const legTCm = state.thickness || 1.7;
+    const legT = legTCm * sc;
+    const deskSurfT = DESK_SURFACE_T * sc;
+    const deskBotY = oy + dH;
+    const deskTopY = oy;
+    const FILL_WD = fill || '#e8f0fe';
+    const drawRect = (x, y, w, h, f, s, sw) => p.push(`<rect x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" width="${(+w).toFixed(1)}" height="${(+h).toFixed(1)}" fill="${f}" stroke="${s}" stroke-width="${sw || 1.5}"/>`);
+
+    drawRect(ox, deskTopY, dW, deskSurfT, FILL_WD, STROKE, 1.5);
+    drawRect(ox + dW - legT, deskTopY + deskSurfT, legT, dH - deskSurfT, FILL_WD, STROKE, 1.5);
+    if (wd.hasDrawers !== false) {
+        const drawerSvgH = drawerHcm * sc;
+        const drawerSvgY = deskTopY + deskSurfT;
+        const drawerFrontW = legT;
+        drawRect(ox, drawerSvgY + 1, drawerFrontW, drawerSvgH - 2, 'rgba(255,255,255,0.7)', STROKE_THIN || STROKE, 0.8);
+        dimVLeftFn(ox - 14, drawerSvgY, drawerSvgY + drawerSvgH, `${Math.round(drawerHcm * 10)}`);
+    }
+    dimHFn(ox, ox + dW, deskBotY + 36, `${Math.round(dDepth * 10)}`);
+    dimVLeftFn(ox - 14, deskTopY, deskBotY, `${Math.round(dHeight * 10)}`);
+    p.push(`<text x="${(ox + dW / 2).toFixed(1)}" y="${(deskTopY + dH / 2 + 4).toFixed(1)}" text-anchor="middle" font-family="${FONT || 'Rubik,Tahoma,sans-serif'}" font-size="11" fill="${STROKE}" opacity="0.7">מבט צד</text>`);
+}
+
 /** Side cabinet silhouette on center front view */
 function _bpDrawSideCabinetFrontParts(p, sc, ox, oy, dW, dH, scScale, wgH, pH, drawRectFn, dimHFn, STROKE, FONT) {
     if (!sc) return;
@@ -303,6 +394,29 @@ function _bpRowBaseCm(col, plinthH) {
     const isBathroomRegalim = state.presetId === 'bathroom' && state.cabinetModel === 'regalim';
     if (isBathroomRegalim) return plinthH;
     return plinthH + t;
+}
+
+function _bpColumnSitsOnFloor(col) {
+    if (!col || col.type === 'desk') return false;
+    if (col.floorOffset > 0) return false;
+    if (col.noPlinth) return false;
+    return true;
+}
+
+function _bpAnyColumnOnFloor(cols) {
+    return (cols || []).some(_bpColumnSitsOnFloor);
+}
+
+function _bpWidthDimBaseY(oy, dH, pH, sc, cols) {
+    return _bpAnyColumnOnFloor(cols) ? oy + dH + pH * sc : oy + dH;
+}
+
+function _bpDrawOuterSideWalls(p, drawVline, ox, dW, colXPositions, sc) {
+    if (!colXPositions || !colXPositions.length) return;
+    const first = colXPositions[0];
+    const last = colXPositions[colXPositions.length - 1];
+    drawVline(p, ox, first.colTopY, first.colBotY, sc, null, 'left');
+    drawVline(p, ox + dW, last.colTopY, last.colBotY, sc, null, 'right');
 }
 
 function _bpClearCellHeightCm(rowBotCm, rowTopCm, shelfT) {
@@ -1455,10 +1569,9 @@ window._generateMultiViewBlueprintSVG = function() {
         }
 
         // Overall dimensions
-        // All width dims placed BELOW the plinth (oy+dH is cabinet bottom, plinth extends down pH*sc more)
-        // Per-column dims at plinth-bottom + 18px, total-width dim 18px further below
+        const _hasFloorPlinthOld = pH > 0 && _bpAnyColumnOnFloor(cols);
+        const _plinthBottomY = _bpWidthDimBaseY(oy, dH, pH, sc, cols);
         const _hasMultiCols = colXPositions.length > 1;
-        const _plinthBottomY = oy + dH + pH * sc;
         const dimY = _plinthBottomY + (_hasMultiCols ? 54 : 36);
         // Total width (below plinth)
         dimH(ox, ox + dW, dimY, `${Math.round(wg.w * 10)}`);
@@ -1551,15 +1664,18 @@ window._generateMultiViewBlueprintSVG = function() {
                     const _splitBotYOld2 = oy + dH - _syOld2 * sc;
                     const _splitTopYOld2 = _splitBotYOld2 - _tOld2 * sc;
                     const _colTopYOld2   = oy + dH - (_splitColOld2.height || wg.h) * sc;
-                    const _lowerHOld2 = Math.round((_syOld2 - pH) * 10);
+                    const _colBotYOld2   = oy + dH - _foOld2 * sc;
+                    const _lowerStartYOld2 = _foOld2 > 0 ? _colBotYOld2 : oy + dH - pH * sc;
+                    const _lowerBaseCmOld2 = _foOld2 > 0 ? _foOld2 : pH;
+                    const _lowerHOld2 = Math.round((_syOld2 - _lowerBaseCmOld2) * 10);
                     const _upperHOld2 = Math.round(((_splitColOld2.height || wg.h) - _syOld2 - _tOld2) * 10);
-                    dimV(ox + dW + 54, oy + dH - pH * sc, _splitBotYOld2, `${_lowerHOld2}`);
                     dimV(ox + dW + 54, _splitTopYOld2, _colTopYOld2, `${_upperHOld2}`);
+                    dimV(ox + dW + 54, _splitBotYOld2, _lowerStartYOld2, `${_lowerHOld2}`);
                 }
             }
             // floorOffset dimension: for each floating column, show the gap from floor to column bottom
             {
-                let _foDimX = ox + dW + 38;
+                let _foDimX = ox + dW + (_hasFloorPlinthOld ? 38 : 18);
                 colXPositions.forEach((cp, ci) => {
                     const _col = cols[ci];
                     const _fo = (_col && _col.floorOffset) ? _col.floorOffset : 0;
@@ -1609,8 +1725,8 @@ window._generateMultiViewBlueprintSVG = function() {
                 }
             }
         }
-        // Plinth height dim — rendered AFTER closure panels so it appears on top
-        if (pH > 0) {
+        // Plinth height dim — only when at least one column has a visible plinth on the floor
+        if (_hasFloorPlinthOld) {
             const plinthDimX = ox + dW + 18;
             dimV(plinthDimX, oy + dH - pH*sc, oy + dH, `${Math.round(pH * 10)}`);
         }
@@ -1661,7 +1777,7 @@ window._generateMultiViewBlueprintPages = function() {
     const MARGIN = 60, PAD = 80, LABEL_H = 30;
     const SVG_W = 1200;
     const PAGE_H = 800;  // height of each page SVG
-    const presetLabel = pid === 'walkin' ? 'חדר ארונות' : (pid.startsWith('corner')) ? 'ארון פינתי' : pid === 'sliding' ? 'ארון הזזה' : 'ארון';
+    const presetLabel = pid === 'writing-desk' ? 'שולחן כתיבה' : pid === 'walkin' ? 'חדר ארונות' : (pid.startsWith('corner')) ? 'ארון פינתי' : pid === 'sliding' ? 'ארון הזזה' : 'ארון';
 
     // Shared SVG helpers — operate on a local array `p`
     const makeDefs = (p) => {
@@ -1819,9 +1935,21 @@ window._generateMultiViewBlueprintPages = function() {
         const wx = xc => ox + xc*sc;
         const wz = zc => oz + zc*sc;
 
-        // Center cabinet
+        // Center cabinet / writing desk
         makeRect(p, wx(-cW/2), wz(0), cW*sc, cD*sc, FILL_CAB, STROKE, 2);
-        p.push(`<text x="${wx(0).toFixed(1)}" y="${(wz(cD)+13).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="13" fill="${STROKE}" opacity="0.6">חזית</text>`);
+        if (pid === 'writing-desk') {
+            const _wdTV = _bpCenterWritingDesk(centerWing);
+            if (_wdTV) {
+                const _legTCm = state.thickness || 1.7;
+                const _legTW = _legTCm * sc;
+                const _legTD = cD * sc;
+                makeRect(p, wx(-cW/2), wz(0), _legTW, _legTD, '#cbd5e1', STROKE_THIN, 1);
+                makeRect(p, wx(cW/2) - _legTW, wz(0), _legTW, _legTD, '#cbd5e1', STROKE_THIN, 1);
+            }
+            p.push(`<text x="${wx(0).toFixed(1)}" y="${(wz(cD)+13).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="13" fill="${STROKE}" opacity="0.6">משטח</text>`);
+        } else {
+            p.push(`<text x="${wx(0).toFixed(1)}" y="${(wz(cD)+13).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="13" fill="${STROKE}" opacity="0.6">חזית</text>`);
+        }
 
         // ---- Bathroom sink — top view ----
         if (pid === 'bathroom' && centerWing) {
@@ -2448,10 +2576,9 @@ window._generateMultiViewBlueprintPages = function() {
             colX += colW;
         });
 
-        // Outer side wall board thickness (left & right cabinet faces)
+        // Outer side wall board thickness (left & right) — span actual column body, not floor gap
         if (cols.length > 0) {
-            makeVline(p, ox, oy, oy + dH, sc, null, 'left');
-            makeVline(p, ox + dW, oy, oy + dH, sc, null, 'right');
+            _bpDrawOuterSideWalls(p, makeVline, ox, dW, colXPositions, sc);
         }
         _bpHoneycombSepFlush(p);
 
@@ -2524,9 +2651,10 @@ window._generateMultiViewBlueprintPages = function() {
         }
 
         // Dimension lines
-        // Per-column dims at oy+dH+18, total-width dim at oy+dH+54 (with columns) or oy+dH+36 (single)
+        const _hasFloorPlinth2 = pH > 0 && _bpAnyColumnOnFloor(cols);
+        const _widthDimBaseY = _bpWidthDimBaseY(oy, dH, pH, sc, cols);
         const _hasMultiCols2 = colXPositions.length > 1;
-        const dimY = oy + dH + (_hasMultiCols2 ? 54 : 36);
+        const dimY = _widthDimBaseY + (_hasMultiCols2 ? 54 : 36);
         makeDimH(p, ox, ox + dW, dimY, `${Math.round(wg.w * 10)}`);
         {
             const _tCmHC2 = state.thickness || 1.7;
@@ -2534,12 +2662,12 @@ window._generateMultiViewBlueprintPages = function() {
                 const col = cols[ci];
                 if (_bpColumnHasHoneycomb(col)) {
                     const inner = _bpHoneycombInnerSvgSpan(cp, sc, _tCmHC2);
-                    if (inner) makeDimH(p, inner.x1, inner.x2, oy + dH + 6, inner.lbl, false);
+                    if (inner) makeDimH(p, inner.x1, inner.x2, _widthDimBaseY + 6, inner.lbl, false);
                 }
                 if (_hasMultiCols2) {
-                    makeDimH(p, cp.x1, cp.x2, oy + dH + 18, `${Math.round(cp.wCm * 10)}`, false);
+                    makeDimH(p, cp.x1, cp.x2, _widthDimBaseY + 18, `${Math.round(cp.wCm * 10)}`, false);
                 } else if (_bpColumnHasHoneycomb(col)) {
-                    makeDimH(p, cp.x1, cp.x2, oy + dH + 18, `${Math.round(cp.wCm * 10)}`, false);
+                    makeDimH(p, cp.x1, cp.x2, _widthDimBaseY + 18, `${Math.round(cp.wCm * 10)}`, false);
                 }
             });
         }
@@ -2627,15 +2755,16 @@ window._generateMultiViewBlueprintPages = function() {
                     const _sy = _splitCol.splitY;
                     const _t2 = (state.thickness || 1.7) * 2;
                     const _fo3 = _splitCol.floorOffset || 0;
-                    const _splitBotY = oy + dH - _fo3 * sc - _sy * sc + _fo3 * sc; // = oy + dH - _sy * sc
+                    const _splitBotY = oy + dH - _sy * sc;
                     const _splitTopY = _splitBotY - _t2 * sc;
                     const _colTopY3  = oy + dH - (_splitCol.height || wg.h) * sc;
-                    // Lower section: floor → bottom of split band
-                    const _lowerH = Math.round((_sy - pH) * 10);
-                    makeDimV(p, ox + dW + 54, oy + dH - pH * sc, _splitBotY, `${_lowerH}`);
-                    // Upper section: top of split band → top of column
+                    const _colBotY3  = oy + dH - _fo3 * sc;
+                    const _lowerStartY = _fo3 > 0 ? _colBotY3 : oy + dH - pH * sc;
+                    const _lowerBaseCm = _fo3 > 0 ? _fo3 : pH;
+                    const _lowerH = Math.round((_sy - _lowerBaseCm) * 10);
                     const _upperH = Math.round(((_splitCol.height || wg.h) - _sy - _t2) * 10);
                     makeDimV(p, ox + dW + 54, _splitTopY, _colTopY3, `${_upperH}`);
+                    makeDimV(p, ox + dW + 54, _splitBotY, _lowerStartY, `${_lowerH}`);
                     // Split band thickness label (small, centered on band)
                     const _bandMidY = (_splitBotY + _splitTopY) / 2;
                     p.push(`<text x="${(ox + dW + 54 + 22).toFixed(1)}" y="${(_bandMidY + 3).toFixed(1)}" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(_t2 * 10)}</text>`);
@@ -2643,7 +2772,7 @@ window._generateMultiViewBlueprintPages = function() {
             }
             // floorOffset dimension: for each floating column, show the gap below it (floor to column bottom)
             {
-                let _foDimX2 = ox + dW + 38;
+                let _foDimX2 = ox + dW + (_hasFloorPlinth2 ? 38 : 18);
                 colXPositions.forEach((cp, ci) => {
                     const _col = cols[ci];
                     const _fo = (_col && _col.floorOffset) ? _col.floorOffset : 0;
@@ -2693,8 +2822,8 @@ window._generateMultiViewBlueprintPages = function() {
                 }
             }
         }
-        // Plinth height dim — rendered AFTER closure panels so it appears on top
-        if (pH > 0) {
+        // Plinth height dim — only when at least one column has a visible plinth on the floor
+        if (_hasFloorPlinth2) {
             makeDimV(p, ox + dW + 18, oy + dH - pH*sc, oy + dH, `${Math.round(pH * 10)}`);
         }
 
@@ -3645,6 +3774,59 @@ window._generateMultiViewBlueprintPages = function() {
         _bpFlushDims(p);
         pages.push({ label: uuLabel, svgParts: p, viewKey: _vkUU, cabWidthCm: uuW, cabHeightCm: uuH, viewMeta: { ox, oy, dW, dH, sc } });
     });
+
+    // ---- WRITING DESK BLUEPRINT PAGES ----
+    if (pid === 'writing-desk') {
+        const wdData = _bpCenterWritingDesk(centerWing);
+        if (wdData) {
+            const dWidth = wdData.width;
+            const dDepth = wdData.depth;
+            const dHeight = wdData.height;
+            const FILL_WD = '#e8f0fe';
+
+            // Front view
+            {
+                const p = [];
+                _bpStartPage('writing-desk-front');
+                const drawAreaY = 65;
+                const drawAreaH = PAGE_H - drawAreaY - MARGIN - 80;
+                const pw = SVG_W - MARGIN * 2;
+                const scScale = Math.min((pw - PAD*2) / Math.max(dWidth, 1), (drawAreaH - PAD*2) / Math.max(dHeight, 1));
+                const dW = dWidth * scScale;
+                const dH = dHeight * scScale;
+                const oxDesk = MARGIN + (pw - dW) / 2;
+                const oy = drawAreaY + (drawAreaH - dH) / 2;
+                p.push(`<rect x="${MARGIN}" y="${drawAreaY}" width="${pw}" height="${drawAreaH}" rx="4" fill="white" stroke="${STROKE_THIN}" stroke-width="1"/>`);
+                _bpDrawWritingDeskFrontParts(p, wdData, oxDesk, oy, dW, dH, scScale, FILL_WD, STROKE, STROKE_THIN, FONT, (x1, x2, y, lbl, above) => makeDimH(p, x1, x2, y, lbl, above), (x, y1, y2, lbl) => makeDimV(p, x, y1, y2, lbl), (x, y1, y2, lbl) => makeDimVLeft(p, x, y1, y2, lbl));
+                _bpAppendViewCutouts(p, 'writing-desk-front', oxDesk, oy, dW, dH, scScale, dWidth, dHeight);
+                _bpFlushDims(p);
+                pages.push({ label: 'שרטוט חזית — שולחן כתיבה', svgParts: p, viewKey: 'writing-desk-front', cabWidthCm: dWidth, cabHeightCm: dHeight, viewMeta: { ox: oxDesk, oy, dW, dH, sc: scScale } });
+            }
+
+            // Side profile
+            {
+                const p = [];
+                _bpStartPage('writing-desk-side');
+                const drawAreaY = 65;
+                const drawAreaH = PAGE_H - drawAreaY - MARGIN - 80;
+                const pw = SVG_W - MARGIN * 2;
+                const scScale = Math.min((pw - PAD*2) / Math.max(dDepth, 1), (drawAreaH - PAD*2) / Math.max(dHeight, 1));
+                const dW = dDepth * scScale;
+                const dH = dHeight * scScale;
+                const oxDesk = MARGIN + (pw - dW) / 2;
+                const oy = drawAreaY + (drawAreaH - dH) / 2;
+                p.push(`<rect x="${MARGIN}" y="${drawAreaY}" width="${pw}" height="${drawAreaH}" rx="4" fill="white" stroke="${STROKE_THIN}" stroke-width="1"/>`);
+                _bpDrawWritingDeskSideParts(p, wdData, oxDesk, oy, dW, dH, scScale, FILL_WD, STROKE, STROKE_THIN, FONT, (x1, x2, y, lbl, above) => makeDimH(p, x1, x2, y, lbl, above), (x, y1, y2, lbl) => makeDimV(p, x, y1, y2, lbl), (x, y1, y2, lbl) => makeDimVLeft(p, x, y1, y2, lbl));
+                _bpAppendViewCutouts(p, 'writing-desk-side', oxDesk, oy, dW, dH, scScale, dDepth, dHeight);
+                _bpFlushDims(p);
+                pages.push({ label: 'שרטוט מבט צד — שולחן כתיבה', svgParts: p, viewKey: 'writing-desk-side', cabWidthCm: dDepth, cabHeightCm: dHeight, viewMeta: { ox: oxDesk, oy, dW, dH, sc: scScale } });
+            }
+
+            // Remove empty generic center-cabinet front page (no columns on writing desk)
+            const _emptyCenterIdx = pages.findIndex(pg => pg.label && pg.label.includes('ארון מרכזי'));
+            if (_emptyCenterIdx >= 0) pages.splice(_emptyCenterIdx, 1);
+        }
+    }
 
     // Reorder: front views first, top view (מבט עליון) last
     const topViewIdx = pages.findIndex(pg => pg.label && pg.label.includes('מבט עליון'));
