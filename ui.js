@@ -5714,6 +5714,7 @@ function bindUI() {
         const preview = window._captureCabinetPreviewImages();
         const imgWithDoors = preview.imgDoors;
         const imgNoDoors = preview.imgOpen;
+        const wingPreviews = preview.wingPreviews || [];
         const imgBlueprint = null;
 
         const contentCounts = _countCabinetContentFromRawState({ wings: state.wings, columns: state.columns });
@@ -5883,6 +5884,7 @@ function bindUI() {
             price: priceStr, costPrice: '₪' + state.currentCostPrice.toLocaleString(),
             installPrice: getWing().manualInstallPrice != null ? getWing().manualInstallPrice : state.currentInstallPrice,
             imgDoors: imgWithDoors, imgOpen: imgNoDoors, imgBlueprint: imgBlueprint,
+            wingPreviews: wingPreviews,
             corner: state.corner ? JSON.parse(JSON.stringify(state.corner)) : null,
             slidingDoor: slidingDoorSpec,
             multiViewSVG: multiViewSVG,
@@ -5957,13 +5959,178 @@ function _showToast(msg, duration = 4000) {
 window._showToast = _showToast;
 
 // ---- Cart preview refresh (images stripped on project save — regenerate from rawState) ----
+function _wingHeightFromData(wing, fallback) {
+    if (!wing) return fallback || 240;
+    if (wing.columns && wing.columns.length) {
+        return Math.max(...wing.columns.map(c => c.height || fallback || 240));
+    }
+    return wing.globalHeight || fallback || 240;
+}
+
+function _cartHasMultiFrontViews(rawState) {
+    if (!rawState) return false;
+    const pid = rawState.presetId || '';
+    if (pid === 'corner-left') return !!(rawState.wings && rawState.wings.left);
+    if (pid === 'corner-right') return !!(rawState.wings && rawState.wings.right);
+    if (pid === 'walkin') {
+        return !!((rawState.wings && rawState.wings.left) || (rawState.wings && rawState.wings.right));
+    }
+    return false;
+}
+
+function _expectedWingCaptureCount(rawState) {
+    if (!rawState || !rawState.wings) return 0;
+    const pid = rawState.presetId || '';
+    if (pid === 'corner-left') return rawState.wings.left ? 1 : 0;
+    if (pid === 'corner-right') return rawState.wings.right ? 1 : 0;
+    if (pid === 'walkin') {
+        let n = 0;
+        if (rawState.wings.left) n++;
+        if (rawState.wings.right) n++;
+        return n;
+    }
+    return 0;
+}
+
+function _getSideWingCaptureViews() {
+    const pid = state.presetId || '';
+    const centerWing = state.wings && state.wings.center;
+    const centerW = centerWing ? centerWing.width : state.width;
+    const centerD = centerWing ? centerWing.depth : state.depth;
+    const views = [];
+
+    const addWing = (side, wing) => {
+        if (!wing) return;
+        const wingW = wing.width || 80;
+        const wingD = wing.depth || 54;
+        const wingH = _wingHeightFromData(wing, state.globalHeight);
+        const wingPos = wing.wingPosition || 'side';
+        const fcSize = (wing.fullCorner && wing.fullCorner.size) || 100;
+        let wx, wz;
+        if (side === 'left') {
+            const leftEdgeX = -centerW / 2;
+            if (wingPos === 'side') {
+                wx = leftEdgeX - wingD / 2;
+                wz = -centerD / 2 + wingW / 2;
+            } else if (wingPos === 'full_corner') {
+                wx = leftEdgeX - fcSize + wingD / 2;
+                wz = -centerD / 2 + fcSize + wingW / 2;
+            } else {
+                wx = leftEdgeX + wingD / 2;
+                wz = centerD / 2 + wingW / 2;
+            }
+        } else {
+            const rightEdgeX = centerW / 2;
+            if (wingPos === 'side') {
+                wx = rightEdgeX + wingD / 2;
+                wz = -centerD / 2 + wingW / 2;
+            } else if (wingPos === 'full_corner') {
+                wx = rightEdgeX + fcSize - wingD / 2;
+                wz = -centerD / 2 + fcSize + wingW / 2;
+            } else {
+                wx = rightEdgeX - wingD / 2;
+                wz = centerD / 2 + wingW / 2;
+            }
+        }
+        const fitH = wingH + 120;
+        const fitW = wingW + 150;
+        const midY = wingH / 2;
+        const camX = side === 'left' ? wx + 1 : wx - 1;
+        views.push({
+            id: side,
+            label: side === 'left' ? 'חזית צד שמאל' : 'חזית צד ימין',
+            camPos: [camX, midY, wz],
+            camTarget: [wx, midY, wz],
+            fitH,
+            fitW
+        });
+    };
+
+    if (pid === 'corner-left') addWing('left', state.wings.left);
+    else if (pid === 'corner-right') addWing('right', state.wings.right);
+    else if (pid === 'walkin') {
+        addWing('left', state.wings.left);
+        addWing('right', state.wings.right);
+    }
+    return views;
+}
+
+function _captureFrameAtView(cam, ctrl, ren, scn, view, hasDoors) {
+    const fitH = view.fitH || 360;
+    const fitW = view.fitW || 350;
+    cam.fov = 45;
+    cam.updateProjectionMatrix();
+    const distY = (fitH / 2) / Math.tan(Math.PI * cam.fov / 360);
+    const distX = (fitW / 2) / Math.tan(Math.PI * cam.fov / 360) / cam.aspect;
+    const dist = Math.max(distY, distX);
+    const dx = view.camPos[0] - view.camTarget[0];
+    const dz = view.camPos[2] - view.camTarget[2];
+    const len = Math.hypot(dx, dz) || 1;
+    const camX = view.camTarget[0] + (dx / len) * dist;
+    const camZ = view.camTarget[2] + (dz / len) * dist;
+    window._camAnim = null;
+    cam.position.set(camX, view.camPos[1], camZ);
+    ctrl.target.set(view.camTarget[0], view.camTarget[1], view.camTarget[2]);
+    ctrl.update();
+    state.viewMode = 'front';
+    state.hasDoors = hasDoors;
+    buildCabinet();
+    ren.render(scn, cam);
+    return ren.domElement.toDataURL('image/png');
+}
+
+function _orderPreviewImagesHtml(item, rawState) {
+    const multiFront = _cartHasMultiFrontViews(rawState);
+    const centerOutLabel = multiFront ? 'תצוגת חוץ (חזית מרכזית)' : 'תצוגת חוץ (חזיתות)';
+    const centerInLabel = multiFront ? 'תצוגת פנים (חזית מרכזית)' : 'תצוגת פנים (חלוקה טכנית)';
+    let html = `
+                    <div class="print-img-wrapper"><div class="img-label">${centerOutLabel}</div><img src="${item.imgDoors}" alt="ארון סגור"></div>
+                    <div class="print-img-wrapper"><div class="img-label">${centerInLabel}</div><img src="${item.imgOpen}" alt="ארון פתוח"></div>`;
+    (item.wingPreviews || []).forEach(w => {
+        html += `
+                    <div class="print-img-wrapper"><div class="img-label">תצוגת חוץ (${_escPrintHtml(w.label)})</div><img src="${w.imgDoors}" alt="חזית סגורה"></div>
+                    <div class="print-img-wrapper"><div class="img-label">תצוגת פנים (${_escPrintHtml(w.label)})</div><img src="${w.imgOpen}" alt="חזית פנימית"></div>`;
+    });
+    return html;
+}
+
+function _orderPrintPreviewImagesHtml(item, rawState) {
+    const multiFront = _cartHasMultiFrontViews(rawState);
+    const centerOutLabel = multiFront ? 'תצוגת חוץ (חזית מרכזית)' : 'תצוגת חוץ (חזיתות)';
+    const centerInLabel = multiFront ? 'תצוגת פנים (חזית מרכזית)' : 'תצוגת פנים (חלוקה טכנית)';
+    const imgStyle = 'flex:1;min-height:0;width:100%;object-fit:contain;border:1px solid #e2e8f0;border-radius:4px;';
+    const lblStyle = 'font-size:0.85rem;font-weight:600;color:#475569;margin-bottom:4px;padding:4px 8px;background:#f1f5f8;border-radius:4px;';
+    const wrapStyle = 'flex:1;display:flex;flex-direction:column;min-height:0;';
+    let html = `
+                    <div style="${wrapStyle}">
+                        <div style="${lblStyle}">${centerOutLabel}</div>
+                        <img src="${item.imgDoors}" style="${imgStyle}" alt="ארון סגור">
+                    </div>
+                    <div style="${wrapStyle}">
+                        <div style="${lblStyle}">${centerInLabel}</div>
+                        <img src="${item.imgOpen}" style="${imgStyle}" alt="ארון פתוח">
+                    </div>`;
+    (item.wingPreviews || []).forEach(w => {
+        html += `
+                    <div style="${wrapStyle}">
+                        <div style="${lblStyle}">תצוגת חוץ (${_escPrintHtml(w.label)})</div>
+                        <img src="${w.imgDoors}" style="${imgStyle}" alt="חזית סגורה">
+                    </div>
+                    <div style="${wrapStyle}">
+                        <div style="${lblStyle}">תצוגת פנים (${_escPrintHtml(w.label)})</div>
+                        <img src="${w.imgOpen}" style="${imgStyle}" alt="חזית פנימית">
+                    </div>`;
+    });
+    return html;
+}
+
 window._captureCabinetPreviewImages = function() {
     const cam = window.camera;
     const ctrl = window.controls;
     const ren = window.renderer;
     const scn = window.scene;
     if (!cam || !ctrl || !ren || !scn) {
-        return { imgDoors: null, imgOpen: null, multiViewPages: [], multiViewSVG: null };
+        return { imgDoors: null, imgOpen: null, wingPreviews: [], multiViewPages: [], multiViewSVG: null };
     }
 
     const originalDoorsState = state.hasDoors;
@@ -5978,29 +6145,21 @@ window._captureCabinetPreviewImages = function() {
         ? snapCenterWing.columns : null;
     const snapW = snapCenterWing ? snapCenterWing.width : state.width;
     const snapH = snapCols ? Math.max(...snapCols.map(c => c.height)) : state.globalHeight;
-    const snapFitH = snapH + 120;
-    const snapFitW = snapW + 150;
-    cam.fov = 45;
-    cam.updateProjectionMatrix();
-    const snapDistY = (snapFitH / 2) / Math.tan(Math.PI * 45 / 360);
-    const snapDistX = (snapFitW / 2) / Math.tan(Math.PI * 45 / 360) / cam.aspect;
-    const snapDist = Math.max(snapDistY, snapDistX);
-    const snapMidY = snapH / 2;
-    window._camAnim = null;
-    cam.position.set(0, snapMidY, snapDist);
-    ctrl.target.set(0, snapMidY, 0);
-    ctrl.update();
+    const centerView = {
+        camPos: [0, snapH / 2, 1],
+        camTarget: [0, snapH / 2, 0],
+        fitH: snapH + 120,
+        fitW: snapW + 150
+    };
+    const imgWithDoors = _captureFrameAtView(cam, ctrl, ren, scn, centerView, true);
+    const imgNoDoors = _captureFrameAtView(cam, ctrl, ren, scn, centerView, false);
 
-    state.viewMode = 'front';
-    state.hasDoors = true;
-    buildCabinet();
-    ren.render(scn, cam);
-    const imgWithDoors = ren.domElement.toDataURL('image/png');
-
-    state.hasDoors = false;
-    buildCabinet();
-    ren.render(scn, cam);
-    const imgNoDoors = ren.domElement.toDataURL('image/png');
+    const wingPreviews = _getSideWingCaptureViews().map(view => ({
+        id: view.id,
+        label: view.label,
+        imgDoors: _captureFrameAtView(cam, ctrl, ren, scn, view, true),
+        imgOpen: _captureFrameAtView(cam, ctrl, ren, scn, view, false)
+    }));
 
     let multiViewPages = [];
     let multiViewSVG = null;
@@ -6027,7 +6186,7 @@ window._captureCabinetPreviewImages = function() {
     buildCabinet();
     ren.render(scn, cam);
 
-    return { imgDoors: imgWithDoors, imgOpen: imgNoDoors, multiViewPages, multiViewSVG };
+    return { imgDoors: imgWithDoors, imgOpen: imgNoDoors, wingPreviews, multiViewPages, multiViewSVG };
 };
 
 function _cartImageValid(src) {
@@ -6038,6 +6197,12 @@ window._cartItemNeedsMediaRefresh = function(itemObj) {
     if (!itemObj || !itemObj.rawState || !itemObj.spec) return false;
     const spec = itemObj.spec;
     if (!_cartImageValid(spec.imgDoors) || !_cartImageValid(spec.imgOpen)) return true;
+    if (_cartHasMultiFrontViews(itemObj.rawState)) {
+        const expected = _expectedWingCaptureCount(itemObj.rawState);
+        const previews = spec.wingPreviews || [];
+        if (previews.length < expected) return true;
+        if (previews.some(w => !_cartImageValid(w.imgDoors) || !_cartImageValid(w.imgOpen))) return true;
+    }
     if (!spec.multiViewPages || !spec.multiViewPages.length) return true;
     return false;
 };
@@ -6212,6 +6377,13 @@ window._refreshCartMediaForPrint = async function() {
             const media = window._captureCabinetPreviewImages();
             if (media.imgDoors) itemObj.spec.imgDoors = media.imgDoors;
             if (media.imgOpen) itemObj.spec.imgOpen = media.imgOpen;
+            if (media.wingPreviews && media.wingPreviews.length) {
+                itemObj.spec.wingPreviews = media.wingPreviews;
+            } else if (_cartHasMultiFrontViews(itemObj.rawState)) {
+                itemObj.spec.wingPreviews = media.wingPreviews || [];
+            } else {
+                itemObj.spec.wingPreviews = [];
+            }
             if (media.multiViewPages && media.multiViewPages.length) {
                 itemObj.spec.multiViewPages = media.multiViewPages;
             }
@@ -6359,8 +6531,7 @@ window.openOrderModal = async function(mode) {
                     `}
                 </table>
                 <div class="print-images-container">
-                    <div class="print-img-wrapper"><div class="img-label">תצוגת חוץ (חזיתות)</div><img src="${item.imgDoors}" alt="ארון סגור"></div>
-                    <div class="print-img-wrapper"><div class="img-label">תצוגת פנים (חלוקה טכנית)</div><img src="${item.imgOpen}" alt="ארון פתוח"></div>
+                    ${_orderPreviewImagesHtml(item, itemObj.rawState)}
                 </div>
                 ${(item.multiViewPages && item.multiViewPages.length > 0) ? `
                 <div style="margin-top:12px;">
@@ -7145,15 +7316,8 @@ function _buildPrintHTML(mode) {
                 <h3 style="font-size:1.2rem;color:#1e3a5f;margin:0 0 16px;padding:10px 15px;background:#f8fafc;border-radius:8px;border-right:4px solid #1e3a5f;">
                     תמונות ${detailLabel}: ${titleText}
                 </h3>
-                <div style="display:flex;flex-direction:column;gap:16px;height:calc(100vh - 120px);">
-                    <div style="flex:1;display:flex;flex-direction:column;min-height:0;">
-                        <div style="font-size:0.85rem;font-weight:600;color:#475569;margin-bottom:4px;padding:4px 8px;background:#f1f5f8;border-radius:4px;">תצוגת חוץ (חזיתות)</div>
-                        <img src="${item.imgDoors}" style="flex:1;min-height:0;width:100%;object-fit:contain;border:1px solid #e2e8f0;border-radius:4px;" alt="ארון סגור">
-                    </div>
-                    <div style="flex:1;display:flex;flex-direction:column;min-height:0;">
-                        <div style="font-size:0.85rem;font-weight:600;color:#475569;margin-bottom:4px;padding:4px 8px;background:#f1f5f8;border-radius:4px;">תצוגת פנים (חלוקה טכנית)</div>
-                        <img src="${item.imgOpen}" style="flex:1;min-height:0;width:100%;object-fit:contain;border:1px solid #e2e8f0;border-radius:4px;" alt="ארון פתוח">
-                    </div>
+                <div style="display:flex;flex-direction:column;gap:16px;">
+                    ${_orderPrintPreviewImagesHtml(item, itemObj.rawState)}
                 </div>
             </div>
             ${(() => {
@@ -7194,15 +7358,8 @@ function _buildPrintHTML(mode) {
                 <h3 style="font-size:1.2rem;color:#1e3a5f;margin:0 0 16px;padding:10px 15px;background:#f8fafc;border-radius:8px;border-right:4px solid #1e3a5f;">
                     תמונות ${detailLabel}: ${titleText}
                 </h3>
-                <div style="display:flex;flex-direction:column;gap:16px;height:calc(100vh - 120px);">
-                    <div style="flex:1;display:flex;flex-direction:column;min-height:0;">
-                        <div style="font-size:0.85rem;font-weight:600;color:#475569;margin-bottom:4px;padding:4px 8px;background:#f1f5f8;border-radius:4px;">תצוגת חוץ (חזיתות)</div>
-                        <img src="${item.imgDoors}" style="flex:1;min-height:0;width:100%;object-fit:contain;border:1px solid #e2e8f0;border-radius:4px;" alt="ארון סגור">
-                    </div>
-                    <div style="flex:1;display:flex;flex-direction:column;min-height:0;">
-                        <div style="font-size:0.85rem;font-weight:600;color:#475569;margin-bottom:4px;padding:4px 8px;background:#f1f5f8;border-radius:4px;">תצוגת פנים (חלוקה טכנית)</div>
-                        <img src="${item.imgOpen}" style="flex:1;min-height:0;width:100%;object-fit:contain;border:1px solid #e2e8f0;border-radius:4px;" alt="ארון פתוח">
-                    </div>
+                <div style="display:flex;flex-direction:column;gap:16px;">
+                    ${_orderPrintPreviewImagesHtml(item, itemObj.rawState)}
                 </div>
             </div>
             ${(() => {
