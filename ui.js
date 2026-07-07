@@ -2907,8 +2907,12 @@ window.applyContent = function(type) {
                 comp.partitions = [0.5];
                 // Always create subCells — all cell types support sub-cell content
                 comp.subCells = [{ type: 'empty', shelves: 0 }, { type: 'empty', shelves: 0 }];
-                // Column overlay doors conflict with per-zone partition doors
-                state.columns[c].doors = state.columns[c].doors.filter(door => r < door.startRow || r > door.endRow);
+                // In inset-front models, a full-column door over a partitioned opening is valid.
+                // Other models still route partition doors through per-zone sub-cells only.
+                const _allowPartitionOverlayDoors = (state.cabinetModel === 'ab2' || state.cabinetModel === 'ab2_nohoney');
+                if (!_allowPartitionOverlayDoors) {
+                    state.columns[c].doors = state.columns[c].doors.filter(door => r < door.startRow || r > door.endRow);
+                }
             }
         });
         buildCabinet(); calculatePrice(); saveHistoryState();
@@ -3019,7 +3023,8 @@ window.applyDoor = function(type) {
     }
 
     const _doorPartComp = state.columns[c] && state.columns[c].compartments[Math.min(...state.selection.rows)];
-    if (_doorPartComp && _doorPartComp.partition && state.selection.rows.length === 1) {
+    const _allowPartitionOverlayDoors = (state.cabinetModel === 'ab2' || state.cabinetModel === 'ab2_nohoney');
+    if (_doorPartComp && _doorPartComp.partition && state.selection.rows.length === 1 && !_allowPartitionOverlayDoors) {
         _showToast('יש לבחור אזור אחד או יותר במחיצה (לחץ על + בכל אזור, או "בחר הכל")', 4500);
         return;
     }

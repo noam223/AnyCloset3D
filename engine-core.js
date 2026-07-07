@@ -4710,10 +4710,13 @@ if (compData && compData.type === 'hanging') {
                 const dH = doorTopY - doorBottomY;
                 if(dH <= 0) return;
                 if(_doorOverlayW <= 0) return; // entire door is in hidden zone — skip
-                // Partitioned compartments use per-zone doors — skip column overlay doors there
-                for (let _pr = _safeStartRow; _pr <= _safeEndRow; _pr++) {
-                    const _pComp = col.compartments[_pr];
-                    if (_pComp && _pComp.partition) return;
+                // Partitioned compartments usually use per-zone doors, but inset-front models
+                // also allow a regular full-column door over a partitioned opening.
+                if (!isInset) {
+                    for (let _pr = _safeStartRow; _pr <= _safeEndRow; _pr++) {
+                        const _pComp = col.compartments[_pr];
+                        if (_pComp && _pComp.partition) return;
+                    }
                 }
 
                 // ---- Flap door (קלפה): covers entire front face of the column (wall-to-wall, floor-to-ceiling) ----
