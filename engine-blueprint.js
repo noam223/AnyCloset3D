@@ -775,9 +775,11 @@ window._generateMultiViewBlueprintSVG = function() {
     //     → rect at X=[cW/2 .. cW/2+rD], Z=[0 .. rW]
     //   left 'side':  depth lD extends LEFT along X, width lW extends FORWARD along Z
     //     → rect at X=[-cW/2-lD .. -cW/2], Z=[0 .. lW]
-    // 'front' wing is PARALLEL (extends the front face):
-    //   right 'front': X=[cW/2 .. cW/2+rW], Z=[0 .. cD]
-    //   left 'front':  X=[-cW/2-lW .. -cW/2], Z=[0 .. cD]
+    // 'front' wing (פנימי) is still PERPENDICULAR, but starts from the FRONT face:
+    //   right 'front': depth rD sits at the right end of center, width rW protrudes FORWARD
+    //     → rect at X=[cW/2-rD .. cW/2], Z=[cD .. cD+rW]
+    //   left 'front':  depth lD sits at the left end of center, width lW protrudes FORWARD
+    //     → rect at X=[-cW/2 .. -cW/2+lD], Z=[cD .. cD+lW]
 
     // ---- constants & helpers ----
     const STROKE = '#1e3a5f', STROKE_THIN = '#94a3b8';
@@ -885,12 +887,12 @@ window._generateMultiViewBlueprintSVG = function() {
         let minX = -cW/2, maxX = cW/2, minZ = 0, maxZ = cD;
         if (hasLeft) {
             if (lPos==='side')             { minX = Math.min(minX, -cW/2 - lD); maxZ = Math.max(maxZ, lW); }
-            else if (lPos==='front')       { minX = Math.min(minX, -cW/2 - lW); }
+            else if (lPos==='front')       { maxZ = Math.max(maxZ, cD + lW); }
             else if (lPos==='full_corner') { minX = Math.min(minX, -cW/2 - fcSizeL); maxZ = Math.max(maxZ, fcSizeL + lW); }
         }
         if (hasRight) {
             if (rPos==='side')             { maxX = Math.max(maxX, cW/2 + rD); maxZ = Math.max(maxZ, rW); }
-            else if (rPos==='front')       { maxX = Math.max(maxX, cW/2 + rW); }
+            else if (rPos==='front')       { maxZ = Math.max(maxZ, cD + rW); }
             else if (rPos==='full_corner') { maxX = Math.max(maxX, cW/2 + fcSizeR); maxZ = Math.max(maxZ, fcSizeR + rW); }
         }
         // Corner unit (שידה/שולחן פינתית) protrudes forward from front face
@@ -985,7 +987,9 @@ window._generateMultiViewBlueprintSVG = function() {
                 rect(wx(-cW/2 - lD), wz(0), lD*sc, lW*sc, FILL_WING_L, STROKE);
                 p.push(`<text x="${wx(-cW/2 - lD/2).toFixed(1)}" y="${(wz(lW/2)+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.7">${Math.round(lD)}</text>`);
             } else if (lPos==='front') {
-                rect(wx(-cW/2 - lW), wz(0), lW*sc, cD*sc, FILL_WING_L, STROKE);
+                // Inner corner: wing flush with left end of center, protruding forward from front face
+                rect(wx(-cW/2), wz(cD), lD*sc, lW*sc, FILL_WING_L, STROKE);
+                p.push(`<text x="${wx(-cW/2 + lD/2).toFixed(1)}" y="${(wz(cD + lW/2)+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.7">${Math.round(lD)}</text>`);
             } else if (lPos==='full_corner') {
                 const x1 = wx(-cW/2), y1 = wz(0);
                 const x2 = wx(-cW/2 - fcSizeL), y2 = wz(0);
@@ -1002,7 +1006,9 @@ window._generateMultiViewBlueprintSVG = function() {
                 rect(wx(cW/2), wz(0), rD*sc, rW*sc, FILL_WING_R, STROKE);
                 p.push(`<text x="${wx(cW/2 + rD/2).toFixed(1)}" y="${(wz(rW/2)+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.7">${Math.round(rD)}</text>`);
             } else if (rPos==='front') {
-                rect(wx(cW/2), wz(0), rW*sc, cD*sc, FILL_WING_R, STROKE);
+                // Inner corner: wing flush with right end of center, protruding forward from front face
+                rect(wx(cW/2 - rD), wz(cD), rD*sc, rW*sc, FILL_WING_R, STROKE);
+                p.push(`<text x="${wx(cW/2 - rD/2).toFixed(1)}" y="${(wz(cD + rW/2)+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.7">${Math.round(rD)}</text>`);
             } else if (rPos==='full_corner') {
                 const x1 = wx(cW/2), y1 = wz(0);
                 const x2 = wx(cW/2 + fcSizeR), y2 = wz(0);
@@ -1102,6 +1108,15 @@ window._generateMultiViewBlueprintSVG = function() {
         if (hasRight && rPos === 'side') dimVLeft(wx(cW/2) - 14, wz(0), wz(rW), `${Math.round(rW * 10)}`);
         // Left wing depth (side position)
         if (hasLeft && lPos === 'side') dimVLeft(wx(-cW/2 - lD) - 14, wz(0), wz(lW), `${Math.round(lW * 10)}`);
+        // Front (פנימי) wings — protrusion beyond center front face
+        if (hasRight && rPos === 'front') {
+            dimV(wx(cW/2) + 14, wz(cD), wz(cD + rW), `${Math.round(rW * 10)}`);
+            dimH(wx(cW/2 - rD), wx(cW/2), wz(cD + rW) + 14, `${Math.round(rD * 10)}`);
+        }
+        if (hasLeft && lPos === 'front') {
+            dimVLeft(wx(-cW/2) - 14, wz(cD), wz(cD + lW), `${Math.round(lW * 10)}`);
+            dimH(wx(-cW/2), wx(-cW/2 + lD), wz(cD + lW) + 14, `${Math.round(lD * 10)}`);
+        }
 
         // full_corner dims
         if (hasRightFC) {
@@ -1920,12 +1935,12 @@ window._generateMultiViewBlueprintPages = function() {
         let minX = -cW/2, maxX = cW/2, minZ = 0, maxZ = cD;
         if (hasLeft) {
             if (lPos==='side')             { minX = Math.min(minX, -cW/2 - lD); maxZ = Math.max(maxZ, lW); }
-            else if (lPos==='front')       { minX = Math.min(minX, -cW/2 - lW); }
+            else if (lPos==='front')       { maxZ = Math.max(maxZ, cD + lW); }
             else if (lPos==='full_corner') { minX = Math.min(minX, -cW/2 - fcSizeL); maxZ = Math.max(maxZ, fcSizeL + lW); }
         }
         if (hasRight) {
             if (rPos==='side')             { maxX = Math.max(maxX, cW/2 + rD); maxZ = Math.max(maxZ, rW); }
-            else if (rPos==='front')       { maxX = Math.max(maxX, cW/2 + rW); }
+            else if (rPos==='front')       { maxZ = Math.max(maxZ, cD + rW); }
             else if (rPos==='full_corner') { maxX = Math.max(maxX, cW/2 + fcSizeR); maxZ = Math.max(maxZ, fcSizeR + rW); }
         }
         // Corner unit (שידה/שולחן פינתית) protrudes forward from front face
@@ -2029,7 +2044,9 @@ window._generateMultiViewBlueprintPages = function() {
                 makeRect(p, wx(-cW/2 - lD), wz(0), lD*sc, lW*sc, FILL_WING_L, STROKE);
                 p.push(`<text x="${wx(-cW/2 - lD/2).toFixed(1)}" y="${(wz(lW/2)+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.7">${Math.round(lD)}</text>`);
             } else if (lPos==='front') {
-                makeRect(p, wx(-cW/2 - lW), wz(0), lW*sc, cD*sc, FILL_WING_L, STROKE);
+                // Inner corner: wing flush with left end of center, protruding forward from front face
+                makeRect(p, wx(-cW/2), wz(cD), lD*sc, lW*sc, FILL_WING_L, STROKE);
+                p.push(`<text x="${wx(-cW/2 + lD/2).toFixed(1)}" y="${(wz(cD + lW/2)+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.7">${Math.round(lD)}</text>`);
             } else if (lPos==='full_corner') {
                 const x1 = wx(-cW/2), y1 = wz(0);
                 const x2 = wx(-cW/2 - fcSizeL), y2 = wz(0);
@@ -2046,7 +2063,9 @@ window._generateMultiViewBlueprintPages = function() {
                 makeRect(p, wx(cW/2), wz(0), rD*sc, rW*sc, FILL_WING_R, STROKE);
                 p.push(`<text x="${wx(cW/2 + rD/2).toFixed(1)}" y="${(wz(rW/2)+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.7">${Math.round(rD)}</text>`);
             } else if (rPos==='front') {
-                makeRect(p, wx(cW/2), wz(0), rW*sc, cD*sc, FILL_WING_R, STROKE);
+                // Inner corner: wing flush with right end of center, protruding forward from front face
+                makeRect(p, wx(cW/2 - rD), wz(cD), rD*sc, rW*sc, FILL_WING_R, STROKE);
+                p.push(`<text x="${wx(cW/2 - rD/2).toFixed(1)}" y="${(wz(cD + rW/2)+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.7">${Math.round(rD)}</text>`);
             } else if (rPos==='full_corner') {
                 const x1 = wx(cW/2), y1 = wz(0);
                 const x2 = wx(cW/2 + fcSizeR), y2 = wz(0);
@@ -2142,6 +2161,15 @@ window._generateMultiViewBlueprintPages = function() {
         // Right wing depth (side position) — label on LEFT side of the right wing
         if (hasRight && rPos === 'side') makeDimVLeft(p, wx(cW/2) - 14, wz(0), wz(rW), `${Math.round(rW * 10)}`);
         if (hasLeft && lPos === 'side') makeDimVLeft(p, wx(-cW/2 - lD) - 14, wz(0), wz(lW), `${Math.round(lW * 10)}`);
+        // Front (פנימי) wings — protrusion beyond center front face
+        if (hasRight && rPos === 'front') {
+            makeDimV(p, wx(cW/2) + 14, wz(cD), wz(cD + rW), `${Math.round(rW * 10)}`);
+            makeDimH(p, wx(cW/2 - rD), wx(cW/2), wz(cD + rW) + 14, `${Math.round(rD * 10)}`);
+        }
+        if (hasLeft && lPos === 'front') {
+            makeDimVLeft(p, wx(-cW/2) - 14, wz(cD), wz(cD + lW), `${Math.round(lW * 10)}`);
+            makeDimH(p, wx(-cW/2), wx(-cW/2 + lD), wz(cD + lW) + 14, `${Math.round(lD * 10)}`);
+        }
 
         // full_corner dims
         if (hasRightFC) {
