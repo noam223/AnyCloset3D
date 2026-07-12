@@ -910,6 +910,113 @@ window._restorePresetUI = function() {
     if (typeof window.syncSidebarToWing === 'function') window.syncSidebarToWing();
 };
 
+/** Fully reset the editor to a fresh default linear cabinet (dims, materials, columns, notes). */
+window._resetEditorToDefaultLinearCabinet = function() {
+    state.wingEditMode = false;
+    state.wingEditSnapshot = null;
+    state._activeUpperUnit = null;
+    state._activeUpperUnitParent = null;
+    window._orbitFree = false;
+    window._forceCameraAnim = true;
+    window._corner3dCamPositioned = false;
+    window._frontCamPositioned = false;
+    window._wingEditCamInit = false;
+
+    // Drop any upper-unit / extra wing keys
+    Object.keys(state.wings || {}).forEach(function(k) {
+        if (k !== 'center' && k !== 'left' && k !== 'right') {
+            delete state.wings[k];
+        }
+    });
+
+    const w = createWingData();
+    const innerWidth = w.width - (w.thickness * 2) - w.thickness;
+    const colWidth = innerWidth / 2;
+    w.columns = [0, 1].map(function() {
+        const col = {
+            type: 'normal', width: colWidth, height: w.globalHeight,
+            shelves: 0, splitY: null, shelvesY: [], compartments: [], doors: [], floorOffset: 0
+        };
+        _distributeShelves(col, w);
+        return col;
+    });
+    state.wings.center = w;
+    state.wings.left = null;
+    state.wings.right = null;
+    state.activeWing = 'center';
+    state.presetId = 'linear';
+    state.viewMode = 'front';
+    state.selection = { colIndex: -1, rows: [] };
+    state.hoveredColIndex = -1;
+    state.activeEditCol = -1;
+    state.blueprintCutouts = [];
+    state.blueprintCellDimOffsets = {};
+    state.blueprintDimOffsets = {};
+    state.roomWall = 'center';
+    window._roomWall = 'center';
+
+    window._closureEnabled = true;
+    window._closureWidth = 1.8;
+    window._closureWidthRight = 1.8;
+    window._closureCeilWidth = 1.8;
+    window._closureDepthWidth = 1.8;
+    window._closureFrontLine = 'cabinet';
+    window._nicheEnabled = false;
+    window._nicheWidth = 200;
+    window._nicheDepth = 30;
+    window._nicheClosureEnabled = false;
+    window._nicheClosureWidthLeft = 1.8;
+    window._nicheClosureWidthRight = 1.8;
+    window._nicheClosureCeilHeight = 1.8;
+
+    // Clear draft part-color overrides (cart scopes are kept per other cabinets)
+    if (state.partColors) {
+        Object.keys(state.partColors).forEach(function(k) {
+            if (k.indexOf('draft::') === 0) delete state.partColors[k];
+        });
+    }
+
+    if (typeof _hideWingTab === 'function') {
+        _hideWingTab('left');
+        _hideWingTab('right');
+    }
+
+    const cabNameInp = document.getElementById('inp-cabinet-name');
+    if (cabNameInp) cabNameInp.value = '';
+    const cabNotesInp = document.getElementById('inp-cabinet-notes');
+    if (cabNotesInp) cabNotesInp.value = '';
+    const mNotes = document.getElementById('mobile-inp-cabinet-notes');
+    if (mNotes) mNotes.value = '';
+    const mName = document.getElementById('mobile-inp-cabinet-name');
+    if (mName) mName.value = '';
+
+    // Highlight linear preset + sync sidebar sections like applyPreset('linear')
+    document.querySelectorAll('.preset-btn').forEach(function(btn) { btn.classList.remove('active'); });
+    const linearBtn = document.querySelector('.preset-btn[onclick="applyPreset(\'linear\')"]');
+    if (linearBtn) linearBtn.classList.add('active');
+    const slidingBtn = document.getElementById('preset-btn-sliding');
+    if (slidingBtn) slidingBtn.classList.remove('active');
+    const ppm = document.getElementById('preset-position-menu');
+    if (ppm) ppm.style.display = 'none';
+    const sdSection = document.getElementById('sliding-door-section');
+    const sideUnitSection = document.getElementById('side-unit-section');
+    const cornerSection = document.getElementById('corner-unit-section');
+    const plinthModelRow = document.getElementById('plinth-model-row');
+    const mobilePlinthModelRow = document.getElementById('mobile-plinth-model-row');
+    if (sdSection) sdSection.style.display = 'none';
+    if (sideUnitSection) sideUnitSection.style.display = '';
+    if (cornerSection) cornerSection.style.display = '';
+    if (plinthModelRow) plinthModelRow.style.display = '';
+    if (mobilePlinthModelRow) mobilePlinthModelRow.style.display = '';
+
+    if (typeof _setFreeTabActive === 'function') _setFreeTabActive(true);
+    if (typeof window._updateRoomWallUI === 'function') window._updateRoomWallUI();
+    if (typeof syncSidebarToWing === 'function') syncSidebarToWing();
+    if (typeof buildCabinet === 'function') buildCabinet();
+    if (typeof updateCameraView === 'function') updateCameraView();
+    if (typeof calculatePrice === 'function') calculatePrice();
+};
+
 window.applyPreset = function(presetId) {
     _pendingPresetId = presetId;
     _pendingWingPositions = { left: 'side', right: 'side' };

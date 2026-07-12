@@ -6765,21 +6765,20 @@ window._selectCartCabinet = function(index, opts) {
 };
 
 window._bootstrapDefaultCabinet = function() {
-    state.cabinetName = '';
-    state.manualPrice = null;
-    state.manualInstallPrice = null;
-    const cabNameInp = document.getElementById('inp-cabinet-name');
-    if (cabNameInp) cabNameInp.value = '';
-    if (typeof applyPreset === 'function') applyPreset('linear');
+    if (typeof window._resetEditorToDefaultLinearCabinet === 'function') {
+        window._resetEditorToDefaultLinearCabinet();
+    } else {
+        state.cabinetName = '';
+        state.manualPrice = null;
+        state.manualInstallPrice = null;
+        const cabNameInp = document.getElementById('inp-cabinet-name');
+        if (cabNameInp) cabNameInp.value = '';
+        if (typeof applyPreset === 'function') applyPreset('linear');
+    }
     const item = window._snapshotCurrentCabinetToCartItem();
+    item.rawState.partColors = {};
     state.orderCart = [item];
     state.editingCartIndex = 0;
-    if (typeof window._migrateDraftPartColorsToCart === 'function') {
-        window._migrateDraftPartColorsToCart(0);
-    }
-    item.rawState.partColors = (typeof window._exportLocalPartColors === 'function')
-        ? window._exportLocalPartColors('cart0')
-        : (item.rawState.partColors || {});
     if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
     _setSaveCabinetButtonLabel();
     const cc = document.getElementById('cart-count');
@@ -6971,31 +6970,26 @@ window._editCartItemNow = function(index) {
 }
 
 window.startNewCabinet = function() {
-    // Auto-save current cabinet, then create & select a new one
+    // Auto-save current cabinet, then create a fully reset new one
     if (state.orderCart && state.orderCart.length > 0) {
         window._commitCurrentCabinetToCart({ flash: false });
     }
-    state.cabinetName = '';
-    state.manualPrice = null;
-    state.manualInstallPrice = null;
-    const cabNameInp = document.getElementById('inp-cabinet-name');
-    if (cabNameInp) cabNameInp.value = '';
-    if (typeof applyPreset === 'function') applyPreset('linear');
+    if (typeof window._resetEditorToDefaultLinearCabinet === 'function') {
+        window._resetEditorToDefaultLinearCabinet();
+    } else if (typeof applyPreset === 'function') {
+        applyPreset('linear');
+    }
     const item = window._snapshotCurrentCabinetToCartItem();
     state.orderCart.push(item);
     const newIdx = state.orderCart.length - 1;
-    item.rawState.partColors = (typeof window._exportLocalPartColors === 'function')
-        ? window._exportLocalPartColors('cart' + newIdx)
-        : (item.rawState.partColors || {});
+    // Fresh cabinet — no inherited part colors
+    item.rawState.partColors = {};
     state.editingCartIndex = newIdx;
     if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
     _setSaveCabinetButtonLabel();
     const cc = document.getElementById('cart-count');
     if (cc) cc.innerText = state.orderCart.length;
     if (typeof window._restorePresetUI === 'function') window._restorePresetUI();
-    buildCabinet();
-    updateCameraView();
-    calculatePrice();
     updateLeftSidebar();
     if (typeof saveHistoryState === 'function') saveHistoryState();
     if (typeof window._markCurrentCabinetClean === 'function') window._markCurrentCabinetClean();
