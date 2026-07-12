@@ -6413,6 +6413,123 @@ function _setSaveCabinetButtonLabel(tempHtml, flashMs) {
     }
 }
 
+/** Lightweight design fingerprint of the live editor (no preview images). */
+window._buildCurrentCabinetCompareRaw = function() {
+    let manualInstall = null;
+    try {
+        if (typeof getWing === 'function' && getWing()) {
+            manualInstall = getWing().manualInstallPrice != null ? getWing().manualInstallPrice : null;
+        }
+    } catch (e) { /* ignore */ }
+    const partColors = (typeof window._exportLocalPartColors === 'function')
+        ? window._exportLocalPartColors(
+            (state.editingCartIndex >= 0) ? ('cart' + state.editingCartIndex) : undefined
+        )
+        : JSON.parse(JSON.stringify(state.partColors || {}));
+    return JSON.parse(JSON.stringify({
+        cabinetModel: state.cabinetModel,
+        placement: state.placement,
+        width: state.width,
+        globalHeight: state.globalHeight,
+        depth: state.depth,
+        thickness: state.thickness,
+        plinthHeight: state.plinthHeight,
+        hasDoors: state.hasDoors,
+        handleType: state.handleType,
+        handleStyle: state.handleStyle,
+        cabinetName: state.cabinetName || '',
+        cabinetNotes: state.cabinetNotes || '',
+        manualPrice: state.manualPrice,
+        manualInstallPrice: manualInstall,
+        boardMaterial: state.boardMaterial,
+        materialBody: state.materialBody,
+        materialInternal: state.materialInternal,
+        materialExternal: state.materialExternal,
+        materialDesk: state.materialDesk,
+        materialOpenCell: state.materialOpenCell,
+        materialBack: state.materialBack,
+        columns: state.columns,
+        desk: state.desk,
+        wings: state.wings,
+        activeWing: state.activeWing,
+        presetId: state.presetId,
+        roomWall: window._roomWall || state.roomWall || 'center',
+        closureEnabled: (window._closureEnabled !== undefined) ? window._closureEnabled : true,
+        closureWidth: window._closureWidth || 1.8,
+        closureWidthRight: window._closureWidthRight || 1.8,
+        closureCeilWidth: window._closureCeilWidth || 1.8,
+        closureDepthWidth: window._closureDepthWidth || 1.8,
+        closureFrontLine: window._closureFrontLine || 'cabinet',
+        nicheEnabled: (window._nicheEnabled !== undefined) ? window._nicheEnabled : false,
+        nicheWidth: window._nicheWidth || 200,
+        nicheDepth: window._nicheDepth || 30,
+        nicheClosureEnabled: (window._nicheClosureEnabled !== undefined) ? window._nicheClosureEnabled : false,
+        nicheClosureWidthLeft: window._nicheClosureWidthLeft || 1.8,
+        nicheClosureWidthRight: window._nicheClosureWidthRight || 1.8,
+        nicheClosureCeilHeight: window._nicheClosureCeilHeight || 1.8,
+        blueprintCutouts: state.blueprintCutouts || [],
+        blueprintCellDimOffsets: state.blueprintCellDimOffsets || {},
+        blueprintDimOffsets: state.blueprintDimOffsets || {},
+        partColors: partColors || {}
+    }));
+};
+
+window._getCabinetLiveFingerprint = function() {
+    try {
+        return JSON.stringify(window._buildCurrentCabinetCompareRaw());
+    } catch (e) {
+        return '';
+    }
+};
+
+window._markCurrentCabinetClean = function() {
+    window._cabinetCleanFingerprint = window._getCabinetLiveFingerprint();
+};
+
+window._isCurrentCabinetDirty = function() {
+    if (state.editingCartIndex < 0 || !state.orderCart || !state.orderCart[state.editingCartIndex]) {
+        return false;
+    }
+    if (window._cabinetCleanFingerprint == null || window._cabinetCleanFingerprint === '') {
+        return false;
+    }
+    return window._getCabinetLiveFingerprint() !== window._cabinetCleanFingerprint;
+};
+
+window._promptSaveCabinetBeforeSwitch = function(targetIndex) {
+    const existing = document.getElementById('_unsaved-cabinet-toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.id = '_unsaved-cabinet-toast';
+    toast.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);';
+    toast.innerHTML = `
+        <div style="background:#1e2840;color:white;padding:32px 36px;border-radius:20px;font-size:1.1rem;font-weight:600;box-shadow:0 8px 48px rgba(0,0,0,0.55);display:flex;flex-direction:column;align-items:center;gap:20px;min-width:300px;max-width:92vw;text-align:center;">
+            <div style="font-size:2rem;"><i class="fa-solid fa-floppy-disk"></i></div>
+            <div style="font-size:1.15rem;font-weight:700;line-height:1.45;">יש שינויים שלא נשמרו בארון הנוכחי.<br>לשמור לפני המעבר?</div>
+            <div style="display:flex;flex-direction:column;gap:10px;width:100%;">
+                <button type="button" id="_unsaved-cab-save" style="width:100%;background:#22c55e;color:white;border:none;border-radius:10px;padding:12px 0;font-size:1.05rem;font-weight:700;cursor:pointer;">שמור ועבור</button>
+                <button type="button" id="_unsaved-cab-discard" style="width:100%;background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.25);border-radius:10px;padding:12px 0;font-size:1rem;font-weight:600;cursor:pointer;">עבור בלי לשמור</button>
+                <button type="button" id="_unsaved-cab-cancel" style="width:100%;background:transparent;color:rgba(255,255,255,0.75);border:none;border-radius:10px;padding:10px 0;font-size:0.95rem;font-weight:600;cursor:pointer;">ביטול</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(toast);
+
+    const close = () => { const t = document.getElementById('_unsaved-cabinet-toast'); if (t) t.remove(); };
+    toast.querySelector('#_unsaved-cab-cancel').onclick = close;
+    toast.querySelector('#_unsaved-cab-discard').onclick = () => {
+        close();
+        window._editCartItemNow(targetIndex);
+    };
+    toast.querySelector('#_unsaved-cab-save').onclick = () => {
+        close();
+        window._commitCurrentCabinetToCart({ flash: false });
+        window._editCartItemNow(targetIndex);
+    };
+    toast.addEventListener('click', (e) => { if (e.target === toast) close(); });
+};
+
 window._snapshotCurrentCabinetToCartItem = function() {
 const preview = (typeof window._captureCabinetPreviewImages === 'function')
         ? window._captureCabinetPreviewImages()
@@ -6638,12 +6755,13 @@ window._commitCurrentCabinetToCart = function(opts) {
     if (cc2) cc2.innerText = state.orderCart.length;
     updateLeftSidebar();
     if (typeof saveHistoryState === 'function') saveHistoryState();
+    if (typeof window._markCurrentCabinetClean === 'function') window._markCurrentCabinetClean();
     return state.editingCartIndex;
 };
 
-window._selectCartCabinet = function(index) {
+window._selectCartCabinet = function(index, opts) {
     if (index < 0 || !state.orderCart[index]) return;
-    window.editCartItem(index);
+    window.editCartItem(index, opts || { force: true });
 };
 
 window._bootstrapDefaultCabinet = function() {
@@ -6668,6 +6786,7 @@ window._bootstrapDefaultCabinet = function() {
     if (cc) cc.innerText = '1';
     updateLeftSidebar();
     if (typeof saveHistoryState === 'function') saveHistoryState();
+    if (typeof window._markCurrentCabinetClean === 'function') window._markCurrentCabinetClean();
 };
 
 window._ensureCabinetSelected = function(preferredIndex) {
@@ -6686,15 +6805,17 @@ window._ensureCabinetSelected = function(preferredIndex) {
         const cc = document.getElementById('cart-count');
         if (cc) cc.innerText = '1';
         updateLeftSidebar();
+        if (typeof window._markCurrentCabinetClean === 'function') window._markCurrentCabinetClean();
         return;
     }
     let idx = (typeof preferredIndex === 'number') ? preferredIndex : state.editingCartIndex;
     if (idx < 0 || idx >= state.orderCart.length) idx = 0;
     if (state.editingCartIndex !== idx) {
-        window.editCartItem(idx);
+        window.editCartItem(idx, { force: true });
     } else {
         _setSaveCabinetButtonLabel();
         updateLeftSidebar();
+        if (typeof window._markCurrentCabinetClean === 'function') window._markCurrentCabinetClean();
     }
 };
 
@@ -6708,7 +6829,7 @@ window.deleteCartItem = function(index) {
             window._bootstrapDefaultCabinet();
         } else if (wasEditing) {
             const nextIdx = Math.min(index, state.orderCart.length - 1);
-            window.editCartItem(nextIdx);
+            window.editCartItem(nextIdx, { force: true });
         } else if (state.editingCartIndex > index) {
             state.editingCartIndex--;
             updateLeftSidebar();
@@ -6748,7 +6869,18 @@ window.deleteCartItem = function(index) {
     setTimeout(() => { const t = document.getElementById('_delete-confirm-toast'); if (t) t.remove(); }, 10000);
 }
 
-window.editCartItem = function(index) {
+window.editCartItem = function(index, opts) {
+    opts = opts || {};
+    if (!state.orderCart || !state.orderCart[index]) return;
+    if (index === state.editingCartIndex) return;
+    if (!opts.force && window._isCurrentCabinetDirty && window._isCurrentCabinetDirty()) {
+        window._promptSaveCabinetBeforeSwitch(index);
+        return;
+    }
+    window._editCartItemNow(index);
+};
+
+window._editCartItemNow = function(index) {
     const rawState = state.orderCart[index].rawState;
     const rs = JSON.parse(JSON.stringify(rawState));
 
@@ -6835,6 +6967,7 @@ window.editCartItem = function(index) {
     // Restore preset UI (button highlights, wing tabs, section visibility)
     if (typeof window._restorePresetUI === 'function') window._restorePresetUI();
     buildCabinet(); updateCameraView(); calculatePrice(); updateLeftSidebar(); saveHistoryState();
+    if (typeof window._markCurrentCabinetClean === 'function') window._markCurrentCabinetClean();
 }
 
 window.startNewCabinet = function() {
@@ -6865,6 +6998,7 @@ window.startNewCabinet = function() {
     calculatePrice();
     updateLeftSidebar();
     if (typeof saveHistoryState === 'function') saveHistoryState();
+    if (typeof window._markCurrentCabinetClean === 'function') window._markCurrentCabinetClean();
 }
 
 window.duplicateCartItem = function(index) {
@@ -6905,7 +7039,7 @@ window.duplicateCartItem = function(index) {
             }
         });
     }
-    window.editCartItem(newIdx);
+    window.editCartItem(newIdx, { force: true });
     const cc = document.getElementById('cart-count');
     if (cc) cc.innerText = state.orderCart.length;
     if (typeof saveHistoryState === 'function') saveHistoryState();
