@@ -6965,7 +6965,7 @@ window._editCartItemNow = function(index) {
 
     // Restore preset UI (button highlights, wing tabs, section visibility)
     if (typeof window._restorePresetUI === 'function') window._restorePresetUI();
-    buildCabinet(); updateCameraView(); calculatePrice(); updateLeftSidebar(); saveHistoryState();
+    buildCabinet(); updateCameraView(); calculatePrice(); updateLeftSidebar({ scrollToActive: true }); saveHistoryState();
     if (typeof window._markCurrentCabinetClean === 'function') window._markCurrentCabinetClean();
 }
 
@@ -6990,7 +6990,7 @@ window.startNewCabinet = function() {
     const cc = document.getElementById('cart-count');
     if (cc) cc.innerText = state.orderCart.length;
     if (typeof window._restorePresetUI === 'function') window._restorePresetUI();
-    updateLeftSidebar();
+    updateLeftSidebar({ scrollToActive: true });
     if (typeof saveHistoryState === 'function') saveHistoryState();
     if (typeof window._markCurrentCabinetClean === 'function') window._markCurrentCabinetClean();
 }
@@ -7055,7 +7055,8 @@ window.newProject = function() {
     window._bootstrapDefaultCabinet();
 }
 
-window.updateLeftSidebar = function() {
+window.updateLeftSidebar = function(opts) {
+    opts = opts || {};
     const listContainer = document.getElementById('cart-items-list');
     const totalEl = document.getElementById('left-sidebar-total');
     const cabTotalEl = document.getElementById('sidebar-cab-total');
@@ -7126,6 +7127,7 @@ window.updateLeftSidebar = function() {
 
         const card = document.createElement('div');
         card.className = `cart-mini-card ${activeClass}`;
+        card.dataset.cartIndex = String(index);
         card.onclick = () => { if(!isEditing) editCartItem(index); };
         
         card.innerHTML = `
@@ -7158,6 +7160,33 @@ window.updateLeftSidebar = function() {
     if (typeof window._updateCartNotesBadges === 'function' && window._currentShareToken) {
         window._updateCartNotesBadges(window._currentShareToken);
     }
+    if (opts.scrollToActive) {
+        // Defer so patched wrappers (mobile list clone) finish first
+        requestAnimationFrame(function() {
+            requestAnimationFrame(function() {
+                window._scrollActiveCartCardIntoView();
+            });
+        });
+    }
+};
+
+window._scrollActiveCartCardIntoView = function(index) {
+    const idx = (typeof index === 'number') ? index : state.editingCartIndex;
+    if (idx < 0) return;
+    const scrollCardIn = function(listId) {
+        const list = document.getElementById(listId);
+        if (!list) return;
+        const card = list.querySelector('.cart-mini-card[data-cart-index="' + idx + '"]')
+            || list.querySelector('.cart-mini-card.active-editing');
+        if (!card) return;
+        try {
+            card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+        } catch (e) {
+            card.scrollIntoView(true);
+        }
+    };
+    scrollCardIn('cart-items-list');
+    scrollCardIn('mobile-cart-items-list');
 };
 
 // Set room wall position for a specific cart item

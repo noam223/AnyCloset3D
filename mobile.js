@@ -596,11 +596,16 @@ window.updateOverlaysPosition = function() {
 
 // Patch updateLeftSidebar
 const _origUpdateLeftSidebar = window.updateLeftSidebar;
-window.updateLeftSidebar = function() {
-    if (_origUpdateLeftSidebar) _origUpdateLeftSidebar();
+window.updateLeftSidebar = function(opts) {
+    if (_origUpdateLeftSidebar) _origUpdateLeftSidebar(opts);
     _updateMobileOrderPanel();
     updateMobileCartBadge();
     updateMobilePriceDisplay();
+    if (opts && opts.scrollToActive && typeof window._scrollActiveCartCardIntoView === 'function') {
+        requestAnimationFrame(function() {
+            window._scrollActiveCartCardIntoView();
+        });
+    }
 };
 
 function _updateMobileOrderPanel() {
