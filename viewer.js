@@ -38,6 +38,7 @@ var MATERIAL_LIST = [
     { key: 'black_matte', bg: '#000007',  label: 'שחור מט' },
     // ── Textures ──
     { key: '2020',  img: 'textures/2020.jpg',  label: '2020' },
+    { key: '2024',  img: 'textures/2024.jpg',  label: '2024' },
     { key: 'H1367', img: 'textures/H1367.jpg', label: 'H1367' },
     { key: 'H1307', img: 'textures/H1307.jpg', label: 'H1307' },
     { key: 'H1227', img: 'textures/H1227.jpg', label: 'H1227' },

@@ -37,7 +37,7 @@ const colorNamesHebrew = {
     white_matte: 'לבן מט 2100', c3110: '3110', c795: '759', u727: 'U727',
     w1200: 'W1200', u232: 'U232', u604: 'U604', u638: 'U638',
     c3207: '3207', black_matte: 'שחור מט', custom: 'מותאם אישית',
-    '2020': 'גוון 2020', 'H1367': 'H1367', 'H1307': 'H1307', 'H1227': 'H1227',
+    '2020': 'גוון 2020', '2024': 'גוון 2024', 'H1367': 'H1367', 'H1307': 'H1307', 'H1227': 'H1227',
     '2025': 'גוון 2025', '2040': 'גוון 2040', '2041': 'גוון 2041', '2044': 'גוון 2044',
     '2047': 'גוון 2047', '2049': 'גוון 2049', '2062': 'גוון 2062', '5600': 'גוון 5600',
     '7180': 'גוון 7180', '456': 'גוון 456', '462': 'גוון 462', '463': 'גוון 463',
@@ -316,6 +316,7 @@ window._rebuildDoorPanelTabs = function() {
         { key: 'black_matte', bg: '#000007',  border: '#444', label: 'שחור מט' },
         // Wood / texture colors
         { key: '2020',  img: 'textures/2020.jpg',  border: '#bbb', label: '2020' },
+        { key: '2024',  img: 'textures/2024.jpg',  border: '#bbb', label: '2024' },
         { key: 'H1367', img: 'textures/H1367.jpg', border: '#bbb', label: 'H1367' },
         { key: 'H1307', img: 'textures/H1307.jpg', border: '#bbb', label: 'H1307' },
         { key: 'H1227', img: 'textures/H1227.jpg', border: '#bbb', label: 'H1227' },
