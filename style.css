@@ -881,9 +881,9 @@ body {
 .btn-new-cabinet-sidebar {
     margin-inline-start: auto;
     padding: 7px 14px;
+    font-family: inherit;
     font-size: 0.84rem;
-    font-weight: 800;
-    letter-spacing: 0.01em;
+    font-weight: 600;
     border-radius: 10px;
     border: none;
     background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);
@@ -893,7 +893,8 @@ body {
     align-items: center;
     gap: 6px;
     box-shadow: 0 2px 8px rgba(5, 150, 105, 0.35);
-    transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+    transition: box-shadow 0.15s ease, filter 0.15s ease;
+    -webkit-font-smoothing: antialiased;
 }
 .btn-new-cabinet-sidebar i {
     font-size: 0.78rem;
@@ -902,11 +903,9 @@ body {
 }
 .btn-new-cabinet-sidebar:hover {
     filter: brightness(1.06);
-    transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(5, 150, 105, 0.45);
 }
 .btn-new-cabinet-sidebar:active {
-    transform: translateY(0);
     filter: brightness(0.97);
 }
 .sidebar-header h1, .left-sidebar-header h2 {
