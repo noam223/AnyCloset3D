@@ -187,22 +187,7 @@ async function _loadProject() {
 
         _setLoadingText('בונה הדמייה...');
         _projectData = project.project_data;
-        _buildCabinetList(_projectData);
-
-        // Restore first cabinet
-        if (_cabinetList.length > 0 && _cabinetList[0].label !== 'ארון נוכחי') {
-            var firstCab = _cabinetList[0];
-            _restoreState({
-                wings: firstCab.wings,
-                activeCabinet: firstCab.activeCabinet,
-                presetId: firstCab.presetId,
-                activeWing: firstCab.activeWing,
-                orderCart: _projectData.orderCart || _projectData.cart,
-                customer: _projectData.customer
-            });
-        } else {
-            _restoreState(_projectData);
-        }
+        _applyLiveProjectData(_projectData, { followLive: true, captureThumb: true });
 
         _initViewerView();
         _setupRealtime();
@@ -212,17 +197,111 @@ async function _loadProject() {
             _loadNotesForCabinet(_activeCabIdx);
         });
 
-        // Capture thumbnail for first cabinet after render
-        setTimeout(function() { _captureSnapshot(0); }, 400);
-
     } catch(e) {
         console.error('[Viewer] Load error:', e);
         _showError('שגיאה בטעינה', 'אירעה שגיאה. נסה לרענן את הדף.');
     }
 }
 
+/** Active cabinet index the designer is editing (from snap). */
+function _resolveLiveCabIndex(projectData) {
+    var cart = (projectData && (projectData.orderCart || projectData.cart)) || [];
+    var len = cart.length || (_cabinetList ? _cabinetList.length : 0);
+    var idx = (projectData && typeof projectData.editingCartIndex === 'number')
+        ? projectData.editingCartIndex
+        : 0;
+    if (idx < 0) idx = 0;
+    if (len > 0 && idx >= len) idx = len - 1;
+    return idx;
+}
+
+/**
+ * Apply project data to the viewer.
+ * followLive: restore designer's live canvas (top-level wings) and highlight editingCartIndex.
+ */
+function _applyLiveProjectData(projectData, opts) {
+    opts = opts || {};
+    if (!projectData) return;
+
+    _buildCabinetList(projectData);
+
+    if (opts.followLive || _liveMode) {
+        _liveMode = true;
+        _activeCabIdx = _resolveLiveCabIndex(projectData);
+        _updateLiveBadge();
+        _renderCabinetNav();
+        _scrollActiveCabIntoView();
+
+        // Live canvas = top-level wings from designer; fall back to cart item rawState
+        var liveIdx = _activeCabIdx;
+        var cab = _cabinetList[liveIdx];
+        if (projectData.wings) {
+            _restoreState({
+                wings: projectData.wings,
+                activeWing: projectData.activeWing || (cab && cab.activeWing) || 'center',
+                presetId: projectData.presetId || (cab && cab.presetId) || 'linear',
+                orderCart: projectData.orderCart || projectData.cart,
+                customer: projectData.customer
+            });
+        } else if (cab) {
+            _restoreState({
+                wings: cab.wings,
+                activeCabinet: cab.activeCabinet,
+                presetId: cab.presetId,
+                activeWing: cab.activeWing,
+                orderCart: projectData.orderCart || projectData.cart,
+                customer: projectData.customer
+            });
+        } else {
+            _restoreState(projectData);
+        }
+
+        // Keep list metadata (dims/swatches) in sync with live wings for the active card
+        if (cab && projectData.wings) {
+            var center = projectData.wings.center || {};
+            cab.wings = projectData.wings;
+            cab.presetId = projectData.presetId || cab.presetId;
+            cab.activeWing = projectData.activeWing || cab.activeWing;
+            cab.dims = {
+                w: center.width || cab.dims.w || 0,
+                h: center.globalHeight || cab.dims.h || 0,
+                d: center.depth || cab.dims.d || 0
+            };
+            cab.materialBody = center.materialBody || cab.materialBody;
+            cab.materialDoors = center.materialExternal || cab.materialDoors;
+            cab.materialInternal = center.materialInternal || cab.materialInternal;
+            _renderCabinetNav();
+            _scrollActiveCabIntoView();
+        }
+
+        _updateInfoStrip();
+        if (opts.captureThumb) {
+            setTimeout(function() { _captureSnapshot(_activeCabIdx); }, 400);
+        }
+        // Keep notes panel aligned with the designer’s active cabinet while LIVE
+        if (_notesOpen) {
+            _notesCabIdx = _activeCabIdx;
+            _loadNotesForCabinet(_activeCabIdx);
+            if (typeof _renderNotesCabTabs === 'function') _renderNotesCabTabs();
+        }
+    } else {
+        // Browse mode: refresh list only; keep current 3D until client switches
+        _renderCabinetNav();
+    }
+}
+
+function _scrollActiveCabIntoView() {
+    try {
+        var card = document.querySelector('.viewer-cab-card[data-idx="' + _activeCabIdx + '"]');
+        if (card && typeof card.scrollIntoView === 'function') {
+            card.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        }
+    } catch (e) { /* ignore */ }
+}
+
 // ── Build cabinet list from project data ─────────────────────────────────────
 function _buildCabinetList(projectData) {
+    var prevThumbs = (_cabinetList || []).map(function(c) { return c && c.thumbnail; });
     _cabinetList = [];
 
     var cart = projectData.orderCart || projectData.cart || [];
@@ -246,7 +325,7 @@ function _buildCabinetList(projectData) {
             activeCabinet: hasWings ? null : rawState,
             presetId: rawState.presetId || item.presetId || 'linear',
             activeWing: rawState.activeWing || item.activeWing || 'center',
-            thumbnail: null,
+            thumbnail: prevThumbs[idx] || null,
             dims: { w: w, h: h, d: d },
             materialBody: matBody,
             materialDoors: matDoors,
@@ -272,7 +351,11 @@ function _buildCabinetList(projectData) {
         }];
     }
 
-    if (_liveMode) _activeCabIdx = 0;
+    if (_liveMode) {
+        _activeCabIdx = _resolveLiveCabIndex(projectData);
+    } else if (_activeCabIdx >= _cabinetList.length) {
+        _activeCabIdx = Math.max(0, _cabinetList.length - 1);
+    }
     _renderCabinetNav();
 }
 
@@ -358,8 +441,8 @@ function _renderCabinetNav() {
         if (cab.materialBody && MATERIAL_COLORS[cab.materialBody]) {
             swatchColors.push({ color: MATERIAL_COLORS[cab.materialBody], title: MATERIAL_NAMES[cab.materialBody] || cab.materialBody });
         }
-        if (cab.materialDoor && cab.materialDoor !== cab.materialBody && MATERIAL_COLORS[cab.materialDoor]) {
-            swatchColors.push({ color: MATERIAL_COLORS[cab.materialDoor], title: MATERIAL_NAMES[cab.materialDoor] || cab.materialDoor });
+        if (cab.materialDoors && cab.materialDoors !== cab.materialBody && MATERIAL_COLORS[cab.materialDoors]) {
+            swatchColors.push({ color: MATERIAL_COLORS[cab.materialDoors], title: MATERIAL_NAMES[cab.materialDoors] || cab.materialDoors });
         }
         // Fallback swatch
         if (swatchColors.length === 0) swatchColors.push({ color: '#c8a87a', title: '' });
@@ -491,23 +574,12 @@ function _switchCabinet(idx) {
 // ── Return to live mode ───────────────────────────────────────────────────────
 window._returnToLive = function() {
     _liveMode = true;
-    _activeCabIdx = 0;
     _updateLiveBadge();
-    _renderCabinetNav();
-    if (_cabinetList.length > 0) {
-        var firstCab = _cabinetList[0];
-        _restoreState({
-            wings: firstCab.wings,
-            activeCabinet: firstCab.activeCabinet,
-            presetId: firstCab.presetId,
-            activeWing: firstCab.activeWing,
-            orderCart: _projectData ? (_projectData.orderCart || _projectData.cart) : null,
-            customer: _projectData ? _projectData.customer : null
-        });
-    } else if (_projectData) {
-        _restoreState(_projectData);
+    if (_projectData) {
+        _applyLiveProjectData(_projectData, { followLive: true, captureThumb: true });
+    } else {
+        _renderCabinetNav();
     }
-    _updateInfoStrip();
     var currentMode = (state && state.viewMode) ? state.viewMode : '3d';
     window._setViewerView(currentMode);
 };
@@ -890,10 +962,9 @@ function _setupRealtime() {
             if (!payload.new) return;
             _lastUpdatedAt = payload.new.updated_at;
             _projectData   = payload.new.project_data;
-            _buildCabinetList(_projectData);
+            _applyLiveProjectData(_projectData, { followLive: _liveMode });
             if (_liveMode) {
-                _restoreState(_projectData);
-                _updateInfoStrip();
+                setTimeout(function() { _captureSnapshot(_activeCabIdx); }, 350);
             }
             _flashLiveBadge();
         })
@@ -928,10 +999,9 @@ function _startPolling() {
             if (result.data && result.data.updated_at !== _lastUpdatedAt) {
                 _lastUpdatedAt = result.data.updated_at;
                 _projectData   = result.data.project_data;
-                _buildCabinetList(_projectData);
+                _applyLiveProjectData(_projectData, { followLive: _liveMode });
                 if (_liveMode) {
-                    _restoreState(_projectData);
-                    _updateInfoStrip();
+                    setTimeout(function() { _captureSnapshot(_activeCabIdx); }, 350);
                 }
                 _flashLiveBadge();
             }

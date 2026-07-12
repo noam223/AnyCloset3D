@@ -328,6 +328,24 @@
             delete lightSpec.imgBlueprint; delete lightSpec.multiViewSVG; delete lightSpec.multiViewPages;
             return { spec: lightSpec, rawState: item.rawState, printSpecEdits: item.printSpecEdits || null };
         });
+        // Keep the actively edited cabinet's rawState in sync for LIVE viewer follow/browse
+        var editIdx = (typeof state.editingCartIndex === 'number' && state.editingCartIndex >= 0)
+            ? state.editingCartIndex : -1;
+        if (editIdx >= 0 && lightCart[editIdx] && typeof window._buildCurrentCabinetCompareRaw === 'function') {
+            try {
+                var liveRaw = window._buildCurrentCabinetCompareRaw();
+                lightCart[editIdx] = Object.assign({}, lightCart[editIdx], { rawState: liveRaw });
+                if (lightCart[editIdx].spec) {
+                    if (state.cabinetName) lightCart[editIdx].spec.customName = state.cabinetName;
+                    var _cw = state.width, _ch = state.globalHeight, _cd = state.depth;
+                    if (_cw || _ch || _cd) {
+                        lightCart[editIdx].spec.dimsStr = 'רוחב: ' + _cw + ' ס"מ | גובה: ' + _ch + ' ס"מ | עומק: ' + _cd + ' ס"מ';
+                    }
+                }
+            } catch (e) {
+                console.warn('[Save] live cart sync failed:', e);
+            }
+        }
         return JSON.parse(JSON.stringify({
             globalWidth:   state.globalWidth,
             globalHeight:  state.globalHeight,
@@ -367,6 +385,7 @@
             partColors:                state.partColors || {}
         }));
     }
+    window._buildProjectSnap = _buildSnap;
 
     async function _doSave(label) {
         if (!window._currentProjectId) return;
@@ -541,41 +560,46 @@ window._saveProjectNow = async function() {
     if (btn) { btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> שומר...'; btn.disabled = true; }
 
     try {
-        var lightCart = (state.orderCart || []).map(function(item) {
-            if (!item || !item.spec) return item;
-            var lightSpec = Object.assign({}, item.spec);
-            delete lightSpec.imgDoors;
-            delete lightSpec.imgOpen;
-            delete lightSpec.imgBlueprint;
-            delete lightSpec.multiViewSVG;
-            delete lightSpec.multiViewPages;
-            return { spec: lightSpec, rawState: item.rawState, printSpecEdits: item.printSpecEdits || null };
-        });
-        var snap = JSON.parse(JSON.stringify({
-            globalWidth:   state.globalWidth,
-            globalHeight:  state.globalHeight,
-            globalDepth:   state.globalDepth,
-            plinthHeight:  state.plinthHeight,
-            thickness:     state.thickness,
-            boardMaterial: state.boardMaterial,
-            doorMaterial:  state.doorMaterial,
-            placement:     state.placement,
-            columns:       state.columns,
-            wings:         state.wings,
-            activeWing:    state.activeWing,
-            presetId:      state.presetId,
-            orderCart:     lightCart,
-            editingCartIndex: (typeof state.editingCartIndex === 'number' && state.editingCartIndex >= 0) ? state.editingCartIndex : 0,
-            customer:      state.customer,
-            orderForm:     state.orderForm || { factory: { title: '', notes: '' }, customer: { title: '', notes: '' } },
-            orderStatus:   window._currentOrderStatus || 'quote',
-            tambourPalette: state.tambourPalette || {},
-            blueprintCutouts: state.blueprintCutouts || [],
-            blueprintCellDimOffsets: state.blueprintCellDimOffsets || {},
-            blueprintDimOffsets:     state.blueprintDimOffsets || {},
-            partColors:              state.partColors || {}
-        }));
-        console.log('[SaveNow] Saving project "' + window._currentProjectName + '", payload size:', Math.round(JSON.stringify(snap).length/1024) + 'KB, cart items:', lightCart.length);
+        var snap;
+        if (typeof window._buildProjectSnap === 'function') {
+            snap = window._buildProjectSnap();
+        } else {
+            var lightCart = (state.orderCart || []).map(function(item) {
+                if (!item || !item.spec) return item;
+                var lightSpec = Object.assign({}, item.spec);
+                delete lightSpec.imgDoors;
+                delete lightSpec.imgOpen;
+                delete lightSpec.imgBlueprint;
+                delete lightSpec.multiViewSVG;
+                delete lightSpec.multiViewPages;
+                return { spec: lightSpec, rawState: item.rawState, printSpecEdits: item.printSpecEdits || null };
+            });
+            snap = JSON.parse(JSON.stringify({
+                globalWidth:   state.globalWidth,
+                globalHeight:  state.globalHeight,
+                globalDepth:   state.globalDepth,
+                plinthHeight:  state.plinthHeight,
+                thickness:     state.thickness,
+                boardMaterial: state.boardMaterial,
+                doorMaterial:  state.doorMaterial,
+                placement:     state.placement,
+                columns:       state.columns,
+                wings:         state.wings,
+                activeWing:    state.activeWing,
+                presetId:      state.presetId,
+                orderCart:     lightCart,
+                editingCartIndex: (typeof state.editingCartIndex === 'number' && state.editingCartIndex >= 0) ? state.editingCartIndex : 0,
+                customer:      state.customer,
+                orderForm:     state.orderForm || { factory: { title: '', notes: '' }, customer: { title: '', notes: '' } },
+                orderStatus:   window._currentOrderStatus || 'quote',
+                tambourPalette: state.tambourPalette || {},
+                blueprintCutouts: state.blueprintCutouts || [],
+                blueprintCellDimOffsets: state.blueprintCellDimOffsets || {},
+                blueprintDimOffsets:     state.blueprintDimOffsets || {},
+                partColors:              state.partColors || {}
+            }));
+        }
+        console.log('[SaveNow] Saving project "' + window._currentProjectName + '", payload size:', Math.round(JSON.stringify(snap).length/1024) + 'KB, cart items:', (snap.orderCart || []).length);
         var thumb = null;
         try {
             if (typeof window.captureProjectThumbnail === 'function') thumb = window.captureProjectThumbnail();

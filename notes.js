@@ -162,7 +162,8 @@ function _dnGetCabLabel(idx) {
     var cart = (typeof state !== 'undefined' && state.orderCart) ? state.orderCart : [];
     var item = cart[idx];
     if (!item) return 'ארון ' + (idx + 1);
-    return item.customName ? item.customName : ('ארון ' + (idx + 1));
+    var custom = (item.spec && item.spec.customName) || item.customName;
+    return custom ? custom : ('ארון ' + (idx + 1));
 }
 
 function _dnGetCabCount() {

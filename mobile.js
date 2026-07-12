@@ -656,8 +656,8 @@ window._toggleMobileDoors = _toggleMobileDoors;
 
 // Patch editCartItem to sync mobile inputs after loading
 const _origEditCartItem = window.editCartItem;
-window.editCartItem = function(index) {
-    if (_origEditCartItem) _origEditCartItem(index);
+window.editCartItem = function(index, opts) {
+    if (_origEditCartItem) _origEditCartItem(index, opts);
     if (isMobile()) setTimeout(() => _syncMobileInputsFromState(), 80);
 };
 
