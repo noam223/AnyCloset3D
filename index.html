@@ -939,7 +939,7 @@
                     </div>
                 </div>
             </div>
-            <button id="btn-add-to-cart" class="btn-add-cart" style="width:100%;"><i class="fa-solid fa-plus"></i> הוסף להזמנה</button>
+            <button id="btn-add-to-cart" class="btn-add-cart" style="width:100%;"><i class="fa-solid fa-save"></i> שמור שינויים לארון</button>
         </div>
     </div>
 </div>
@@ -981,10 +981,14 @@
                 </span>
             </button>
         </div>
-        <div id="sidebar-cabinets-label" class="sidebar-cabinets-label">
+        <div id="sidebar-cabinets-label" class="sidebar-cabinets-label" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             <i class="fa-solid fa-list-check"></i>
             <span>ארונות בפרויקט</span>
             <span id="sidebar-cabinets-count" class="sidebar-cabinets-count"></span>
+            <button type="button" id="btn-new-cabinet-sidebar" onclick="startNewCabinet()" title="שמור את הארון הנוכחי והוסף ארון חדש"
+                style="margin-inline-start:auto;padding:4px 10px;font-size:0.78rem;font-weight:700;border-radius:8px;border:1.5px solid var(--accent);background:rgba(var(--accent-rgb,99,102,241),0.1);color:var(--accent);cursor:pointer;display:inline-flex;align-items:center;gap:5px;">
+                <i class="fa-solid fa-plus"></i> ארון חדש
+            </button>
         </div>
     </div>
     <div class="cart-items-list" id="cart-items-list"></div>
@@ -2548,11 +2552,11 @@
 <script src="engine-blueprint.js?v=20260710cornerfront"></script>
 <script src="engine-room-plan.js?v=20260624k"></script>
 <script src="tambour-color-picker.js?v=20260617scdoors"></script>
-<script src="ui.js?v=20260712c2024"></script>
+<script src="ui.js?v=20260712alwaysSelected"></script>
 <script src="layout-mode.js?v=20260610i"></script>
 <script src="mobile.js?v=20260617partclose"></script>
-<script src="part-paint.js?v=20260520k"></script>
-<script src="index-init.js?v=20260609a"></script>
+<script src="part-paint.js?v=20260712c2024"></script>
+<script src="index-init.js?v=20260712alwaysSelected"></script>
 
 <!-- ===== TAMBOUR FULL PALETTE MODAL ===== -->
 <div id="tambour-palette-modal" class="tambour-palette-overlay">

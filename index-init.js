@@ -251,6 +251,11 @@
                     if (snap.orderForm) state.orderForm = snap.orderForm;
                     buildCabinet();
                     window._cabinetBuiltOnce = true;
+                    if (typeof window._ensureCabinetSelected === 'function') {
+                        window._ensureCabinetSelected(
+                            (typeof snap.editingCartIndex === 'number') ? snap.editingCartIndex : 0
+                        );
+                    }
                     if (typeof window._restorePresetUI === 'function') window._restorePresetUI();
                     if (typeof updateLeftSidebar === 'function') updateLeftSidebar();
                     saveHistoryState();
@@ -337,6 +342,7 @@
             activeWing:    state.activeWing,
             presetId:      state.presetId,
             orderCart:         lightCart,
+            editingCartIndex:  (typeof state.editingCartIndex === 'number' && state.editingCartIndex >= 0) ? state.editingCartIndex : 0,
             customer:          state.customer,
             orderForm:         state.orderForm || { factory: { title: '', notes: '' }, customer: { title: '', notes: '' } },
             orderStatus:       window._currentOrderStatus || 'quote',
@@ -559,6 +565,7 @@ window._saveProjectNow = async function() {
             activeWing:    state.activeWing,
             presetId:      state.presetId,
             orderCart:     lightCart,
+            editingCartIndex: (typeof state.editingCartIndex === 'number' && state.editingCartIndex >= 0) ? state.editingCartIndex : 0,
             customer:      state.customer,
             orderForm:     state.orderForm || { factory: { title: '', notes: '' }, customer: { title: '', notes: '' } },
             orderStatus:   window._currentOrderStatus || 'quote',

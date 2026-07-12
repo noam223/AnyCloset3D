@@ -5642,7 +5642,13 @@ function bindUI() {
                     state.orderCart = data.cart;
                     const cc1 = document.getElementById('cart-count');
                     if (cc1) cc1.innerText = state.orderCart.length;
-                    updateLeftSidebar();
+                    if (typeof window._ensureCabinetSelected === 'function') {
+                        window._ensureCabinetSelected(
+                            (typeof data.editingCartIndex === 'number') ? data.editingCartIndex : 0
+                        );
+                    } else {
+                        updateLeftSidebar();
+                    }
                 }
                 
                 if(data.wings) {
@@ -5717,220 +5723,7 @@ function bindUI() {
         if (state.wingEditMode && typeof window.confirmWingEdit === 'function') {
             window.confirmWingEdit();
         }
-        const preview = window._captureCabinetPreviewImages();
-        const imgWithDoors = preview.imgDoors;
-        const imgNoDoors = preview.imgOpen;
-        const wingPreviews = preview.wingPreviews || [];
-        const imgBlueprint = null;
-
-        const contentCounts = _countCabinetContentFromRawState({ wings: state.wings, columns: state.columns });
-        const totalShelves = contentCounts.shelves;
-        const hangingRods = contentCounts.hanging + contentCounts.sorbet;
-        const intDrawers = contentCounts.drawersInt;
-        const extDrawers = contentCounts.drawersExt;
-        const openCellsCount = contentCounts.openCells + contentCounts.sideOpenCells;
-
-        let modelNameText = 'מאיה';
-        if(state.cabinetModel === 'c9') modelNameText = 'C9';
-        if(state.cabinetModel === 'ab2_nohoney') modelNameText = 'חזית פנימית';
-        if(state.cabinetModel === 'ab2') modelNameText = 'AB2';
-        if(state.cabinetModel === 'regalim') modelNameText = 'רגלי ניקל';
-        const _isWritingDeskCart = state.presetId === 'writing-desk';
-        const _wdCart = _isWritingDeskCart && state.wings && state.wings.center
-            ? (state.wings.center.writingDesk || {}) : {};
-        if (_isWritingDeskCart) modelNameText = 'שולחן כתיבה';
-        // Sliding wardrobe: override model name based on whether any door panel is a mirror
-        if (state.presetId === 'sliding') {
-            const _sdWing = state.wings.center;
-            const _sdData = _sdWing && _sdWing.slidingDoor;
-            const _sdPanels = (_sdData && _sdData.doorPanels) || [];
-            const _hasMirrorPanel = _sdPanels.some(p => p === 'mirror' || p === 'mirror_dark');
-            modelNameText = _hasMirrorPanel ? 'HRM2100' : 'HR2300';
-        }
-
-        let plinthTypeText = 'צוקל נסתר';
-        if(state.cabinetModel === 'c9') plinthTypeText = 'צוקל רגיל';
-        if(state.cabinetModel === 'ab2_nohoney') plinthTypeText = 'צוקל נסתר (חזית פנימית)';
-        if(state.cabinetModel === 'ab2') plinthTypeText = 'צוקל נסתר (חזית פנימית טאצ\')';
-        if(state.cabinetModel === 'regalim') plinthTypeText = 'רגלי ניקל גליל 5 ס"מ';
-        if (_isWritingDeskCart) plinthTypeText = 'ללא צוקל';
-
-        let deskInfo = 'ללא';
-        if (state.desk.side === 'left') deskInfo = 'מצורף שולחן חיצוני (משמאל)';
-        else if (state.desk.side === 'right') deskInfo = 'מצורף שולחן חיצוני (מימין)';
-        else if (state.columns.some(c => c.type === 'desk')) deskInfo = 'שולחן עבודה פנימי משולב';
-
-        const currentDisplayPrice = parseInt(document.getElementById('price-display').value) || 0;
-        const priceStr = '₪' + currentDisplayPrice.toLocaleString();
-
-        const rawState = JSON.parse(JSON.stringify({
-            cabinetModel: state.cabinetModel,
-            placement: state.placement,
-            width: state.width, globalHeight: state.globalHeight, depth: state.depth, thickness: state.thickness,
-            plinthHeight: state.plinthHeight, hasDoors: state.hasDoors, handleType: state.handleType, handleStyle: state.handleStyle,
-            cabinetName: state.cabinetName, cabinetNotes: state.cabinetNotes, manualPrice: state.manualPrice,
-            manualInstallPrice: getWing().manualInstallPrice != null ? getWing().manualInstallPrice : null,
-            boardMaterial: state.boardMaterial, materialBody: state.materialBody, materialInternal: state.materialInternal,
-            materialExternal: state.materialExternal, materialDesk: state.materialDesk, materialOpenCell: state.materialOpenCell, materialBack: state.materialBack, columns: state.columns, desk: state.desk,
-            // Wing system — needed to restore corner/walkin/sliding cabinets correctly
-            wings: state.wings, activeWing: state.activeWing, presetId: state.presetId,
-            // Room wall position (closure panel)
-            roomWall: window._roomWall || state.roomWall || 'center',
-            closureEnabled:    (window._closureEnabled !== undefined) ? window._closureEnabled : true,
-            closureWidth:      window._closureWidth      || 1.8,
-            closureWidthRight: window._closureWidthRight || 1.8,
-            closureCeilWidth:  window._closureCeilWidth  || 1.8,
-            closureDepthWidth: window._closureDepthWidth || 1.8,
-            closureFrontLine:       window._closureFrontLine  || 'cabinet',
-            nicheEnabled:           (window._nicheEnabled !== undefined) ? window._nicheEnabled : false,
-            nicheWidth:                window._nicheWidth || 200,
-            nicheDepth:                window._nicheDepth || 30,
-            nicheClosureEnabled:       (window._nicheClosureEnabled !== undefined) ? window._nicheClosureEnabled : false,
-            nicheClosureWidthLeft:     window._nicheClosureWidthLeft  || 1.8,
-            nicheClosureWidthRight:    window._nicheClosureWidthRight || 1.8,
-            nicheClosureCeilHeight:    window._nicheClosureCeilHeight || 1.8,
-            blueprintCutouts: state.blueprintCutouts || [],
-            blueprintCellDimOffsets: state.blueprintCellDimOffsets || {},
-            blueprintDimOffsets: state.blueprintDimOffsets || {},
-            partColors: (typeof window._exportLocalPartColors === 'function')
-                ? window._exportLocalPartColors()
-                : JSON.parse(JSON.stringify(state.partColors || {}))
-        }));
-
-        // Collect unique extra colors from per-part overrides
-        const _extraColorsSet = new Set();
-        if (state.partColors && typeof state.partColors === 'object') {
-            Object.values(state.partColors).forEach(key => {
-                if (key) _extraColorsSet.add(colorNamesHebrew[key] || key);
-            });
-        }
-        const extraColorsStr = _extraColorsSet.size > 0 ? Array.from(_extraColorsSet).join(', ') : null;
-
-        // Build sliding door summary for spec sheet
-        const _sd = state.presetId === 'sliding' && state.slidingDoor && state.slidingDoor.enabled ? state.slidingDoor : null;
-        let slidingDoorSpec = null;
-        if (_sd) {
-            const _panelTypeLabel = { solid: 'אטום', glass: 'זכוכית', mirror: 'מראה רגילה', mirror_dark: 'מראה כהה' };
-            const _profileColorLabel = { nickel: 'ניקל', black: 'שחור', white: 'לבן', cream: 'קרם', gold_matte: 'זהב מט' };
-            const numDoors = _sd.numDoors || 2;
-            const doorPanels = _sd.doorPanels || [];
-            const doorColors = _sd.doorColors || [];
-            const bodyMatKey = state.materialExternal || state.materialBody;
-
-            // Check if any door is mirror
-            const hasMirror = doorPanels.some(p => p === 'mirror' || p === 'mirror_dark');
-
-            // Build per-door color list — use per-door override or fall back to external/body color
-            const doorColorsList = Array.from({ length: numDoors }, (_, i) => {
-                const panel = doorPanels[i] || 'solid';
-                const isMirrorDoor = panel === 'mirror' || panel === 'mirror_dark';
-                if (isMirrorDoor) return _panelTypeLabel[panel] || 'מראה';
-                const colorKey = doorColors[i] || bodyMatKey;
-                return colorNamesHebrew[colorKey] || colorKey || 'ברירת מחדל';
-            });
-
-            slidingDoorSpec = {
-                numDoors,
-                profileColor: _profileColorLabel[_sd.profileColor] || _sd.profileColor || 'ניקל',
-                hasMirror,
-                doorColorsList,   // array of per-door color/type strings
-                doorColorsStr: doorColorsList.map((c, i) => `דלת ${i + 1}: ${c}`).join(' | ')
-            };
-        }
-
-        let multiViewPages = [];
-        let multiViewSVG = null;
-        try {
-            multiViewSVG = preview.multiViewSVG || ((typeof window._generateMultiViewBlueprintSVG === 'function')
-                ? window._generateMultiViewBlueprintSVG() : null);
-            multiViewPages = preview.multiViewPages.length ? preview.multiViewPages
-                : ((typeof window._generateMultiViewBlueprintPages === 'function')
-                ? window._generateMultiViewBlueprintPages().map(pg => pg.svg) : []);
-        } catch (bpErr) {
-            console.warn('[add-to-cart] blueprint generation failed:', bpErr);
-        }
-
-        const _wdHeightCart = _wdCart.height != null ? _wdCart.height : state.globalHeight;
-        const _wdDrawerCountCart = (_wdCart.hasDrawers === false) ? 0
-            : (_wdCart.drawerCount != null ? _wdCart.drawerCount : (state.width <= 80 ? 1 : 2));
-        const _wdDimsStr = _isWritingDeskCart
-            ? `רוחב: ${state.width} ס"מ | גובה: ${_wdHeightCart} ס"מ | עומק: ${state.depth} ס"מ`
-            : `רוחב: ${state.width} ס"מ | גובה: ${state.globalHeight} ס"מ | עומק: ${state.depth} ס"מ`;
-
-        const cabinetSpec = {
-            customName: state.cabinetName, cabinetNotes: (state.cabinetNotes || '').trim(), modelName: modelNameText, plinthType: plinthTypeText,
-            placement: _isWritingDeskCart ? 'שולחן עמידה' : (placementHebrew[state.placement] || 'ארון קיר חופשי'),
-            dimsStr: _wdDimsStr,
-            material: state.boardMaterial === 'melamine' ? 'מלמין' : "סנדביץ'",
-            handle: (function() {
-                const labels = { pipe: 'ידית חיצונית', riding: 'ידית רוכבת', touch: "ידית טאצ'" };
-                const style = labels[state.handleStyle] || labels.pipe;
-                const model = (state.handleType || '').trim();
-                return model ? style + ' — ' + model : style;
-            })(),
-            desk: deskInfo,
-            colorBody: colorNamesHebrew[state.materialBody] || 'ברירת מחדל',
-            colorInternal: colorNamesHebrew[state.materialInternal] || 'ברירת מחדל',
-            colorBack: colorNamesHebrew[state.materialBack] || 'ברירת מחדל',
-            colorExternal: colorNamesHebrew[state.materialExternal] || 'ברירת מחדל',
-            colorDesk: colorNamesHebrew[state.materialDesk] || 'ברירת מחדל',
-            colorOpenCell: colorNamesHebrew[state.materialOpenCell] || 'ברירת מחדל',
-            colorDrawers: _isWritingDeskCart ? (colorNamesHebrew[state.materialExternal] || 'ברירת מחדל') : undefined,
-            isWritingDesk: _isWritingDeskCart,
-            writingDeskHasDrawers: !_isWritingDeskCart || _wdCart.hasDrawers !== false,
-            writingDeskDrawerCount: _isWritingDeskCart ? _wdDrawerCountCart : undefined,
-            writingDeskDrawerHeight: _isWritingDeskCart && _wdCart.drawerHeight != null ? _wdCart.drawerHeight : undefined,
-            hasOpenCells: openCellsCount > 0,
-            extraColors: extraColorsStr,
-            shelves: _isWritingDeskCart ? 0 : totalShelves,
-            hanging: _isWritingDeskCart ? 0 : hangingRods,
-            sorbetCount: _isWritingDeskCart ? 0 : contentCounts.sorbet,
-            drawersInt: _isWritingDeskCart ? 0 : intDrawers,
-            drawersExt: _isWritingDeskCart ? _wdDrawerCountCart : extDrawers,
-            price: priceStr, costPrice: '₪' + state.currentCostPrice.toLocaleString(),
-            installPrice: getWing().manualInstallPrice != null ? getWing().manualInstallPrice : state.currentInstallPrice,
-            imgDoors: imgWithDoors, imgOpen: imgNoDoors, imgBlueprint: imgBlueprint,
-            wingPreviews: wingPreviews,
-            corner: state.corner ? JSON.parse(JSON.stringify(state.corner)) : null,
-            slidingDoor: slidingDoorSpec,
-            multiViewSVG: multiViewSVG,
-            multiViewPages: multiViewPages
-        };
-
-        const cartItem = { spec: cabinetSpec, rawState: rawState };
-        const btn = document.getElementById('btn-add-to-cart');
-        const originalText = btn.innerHTML;
-
-        if (state.editingCartIndex > -1) {
-            const oldItem = state.orderCart[state.editingCartIndex];
-            const newHash = _hashPrintSpecSource(_collectPrintSpecRows(cabinetSpec, cartItem));
-            if (oldItem && oldItem.printSpecEdits && oldItem.printSpecEdits.sourceHash === newHash) {
-                cartItem.printSpecEdits = oldItem.printSpecEdits;
-            }
-            state.orderCart[state.editingCartIndex] = cartItem;
-            state.editingCartIndex = -1;
-            if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
-            btn.innerHTML = `<i class="fa-solid fa-check"></i> הארון עודכן בהצלחה!`;
-            setTimeout(() => { btn.innerHTML = `<i class="fa-solid fa-plus"></i> הוסף ארון להזמנה`; btn.style.background = ""; }, 2000);
-        } else {
-            const newIdx = state.orderCart.length;
-            if (typeof window._migrateDraftPartColorsToCart === 'function') {
-                window._migrateDraftPartColorsToCart(newIdx);
-            }
-            cartItem.rawState.partColors = (typeof window._exportLocalPartColors === 'function')
-                ? window._exportLocalPartColors('cart' + newIdx)
-                : (rawState.partColors || {});
-            state.orderCart.push(cartItem);
-            btn.innerHTML = `<i class="fa-solid fa-check"></i> נשמר בעגלה!`;
-            setTimeout(() => { btn.innerHTML = originalText; btn.style.background = ""; }, 2000);
-        }
-
-        btn.style.background = "var(--success)";
-        const cc2 = document.getElementById('cart-count');
-        if (cc2) cc2.innerText = state.orderCart.length;
-        updateLeftSidebar();
-        // Trigger auto-save so the updated cart is persisted to the project
-        if (typeof saveHistoryState === 'function') saveHistoryState();
+        window._commitCurrentCabinetToCart({ flash: true });
     });
 
     // Legacy click handler — delegates to openOrderModal
@@ -6601,19 +6394,331 @@ window.openOrderModal = async function(mode) {
     modal.style.display = 'flex';
 };
 
+
+// ---- Always-selected cabinet helpers ----
+function _setSaveCabinetButtonLabel(tempHtml, flashMs) {
+    const btn = document.getElementById('btn-add-to-cart');
+    if (!btn) return;
+    const steady = `<i class="fa-solid fa-save"></i> שמור שינויים לארון`;
+    if (tempHtml) {
+        btn.innerHTML = tempHtml;
+        btn.style.background = 'var(--success)';
+        setTimeout(() => {
+            btn.innerHTML = steady;
+            btn.style.background = '';
+        }, flashMs || 1800);
+    } else {
+        btn.innerHTML = steady;
+        btn.style.background = '';
+    }
+}
+
+window._snapshotCurrentCabinetToCartItem = function() {
+const preview = (typeof window._captureCabinetPreviewImages === 'function')
+        ? window._captureCabinetPreviewImages()
+        : { imgDoors: null, imgOpen: null, wingPreviews: [], multiViewPages: [], multiViewSVG: null };
+        const imgWithDoors = preview.imgDoors;
+        const imgNoDoors = preview.imgOpen;
+        const wingPreviews = preview.wingPreviews || [];
+        const imgBlueprint = null;
+
+        const contentCounts = _countCabinetContentFromRawState({ wings: state.wings, columns: state.columns });
+        const totalShelves = contentCounts.shelves;
+        const hangingRods = contentCounts.hanging + contentCounts.sorbet;
+        const intDrawers = contentCounts.drawersInt;
+        const extDrawers = contentCounts.drawersExt;
+        const openCellsCount = contentCounts.openCells + contentCounts.sideOpenCells;
+
+        let modelNameText = 'מאיה';
+        if(state.cabinetModel === 'c9') modelNameText = 'C9';
+        if(state.cabinetModel === 'ab2_nohoney') modelNameText = 'חזית פנימית';
+        if(state.cabinetModel === 'ab2') modelNameText = 'AB2';
+        if(state.cabinetModel === 'regalim') modelNameText = 'רגלי ניקל';
+        const _isWritingDeskCart = state.presetId === 'writing-desk';
+        const _wdCart = _isWritingDeskCart && state.wings && state.wings.center
+            ? (state.wings.center.writingDesk || {}) : {};
+        if (_isWritingDeskCart) modelNameText = 'שולחן כתיבה';
+        // Sliding wardrobe: override model name based on whether any door panel is a mirror
+        if (state.presetId === 'sliding') {
+            const _sdWing = state.wings.center;
+            const _sdData = _sdWing && _sdWing.slidingDoor;
+            const _sdPanels = (_sdData && _sdData.doorPanels) || [];
+            const _hasMirrorPanel = _sdPanels.some(p => p === 'mirror' || p === 'mirror_dark');
+            modelNameText = _hasMirrorPanel ? 'HRM2100' : 'HR2300';
+        }
+
+        let plinthTypeText = 'צוקל נסתר';
+        if(state.cabinetModel === 'c9') plinthTypeText = 'צוקל רגיל';
+        if(state.cabinetModel === 'ab2_nohoney') plinthTypeText = 'צוקל נסתר (חזית פנימית)';
+        if(state.cabinetModel === 'ab2') plinthTypeText = 'צוקל נסתר (חזית פנימית טאצ\')';
+        if(state.cabinetModel === 'regalim') plinthTypeText = 'רגלי ניקל גליל 5 ס"מ';
+        if (_isWritingDeskCart) plinthTypeText = 'ללא צוקל';
+
+        let deskInfo = 'ללא';
+        if (state.desk.side === 'left') deskInfo = 'מצורף שולחן חיצוני (משמאל)';
+        else if (state.desk.side === 'right') deskInfo = 'מצורף שולחן חיצוני (מימין)';
+        else if (state.columns.some(c => c.type === 'desk')) deskInfo = 'שולחן עבודה פנימי משולב';
+
+        const priceEl = document.getElementById('price-display');
+        const currentDisplayPrice = priceEl ? (parseInt(priceEl.value) || 0) : 0;
+        const priceStr = '₪' + currentDisplayPrice.toLocaleString();
+
+        const rawState = JSON.parse(JSON.stringify({
+            cabinetModel: state.cabinetModel,
+            placement: state.placement,
+            width: state.width, globalHeight: state.globalHeight, depth: state.depth, thickness: state.thickness,
+            plinthHeight: state.plinthHeight, hasDoors: state.hasDoors, handleType: state.handleType, handleStyle: state.handleStyle,
+            cabinetName: state.cabinetName, cabinetNotes: state.cabinetNotes, manualPrice: state.manualPrice,
+            manualInstallPrice: getWing().manualInstallPrice != null ? getWing().manualInstallPrice : null,
+            boardMaterial: state.boardMaterial, materialBody: state.materialBody, materialInternal: state.materialInternal,
+            materialExternal: state.materialExternal, materialDesk: state.materialDesk, materialOpenCell: state.materialOpenCell, materialBack: state.materialBack, columns: state.columns, desk: state.desk,
+            // Wing system — needed to restore corner/walkin/sliding cabinets correctly
+            wings: state.wings, activeWing: state.activeWing, presetId: state.presetId,
+            // Room wall position (closure panel)
+            roomWall: window._roomWall || state.roomWall || 'center',
+            closureEnabled:    (window._closureEnabled !== undefined) ? window._closureEnabled : true,
+            closureWidth:      window._closureWidth      || 1.8,
+            closureWidthRight: window._closureWidthRight || 1.8,
+            closureCeilWidth:  window._closureCeilWidth  || 1.8,
+            closureDepthWidth: window._closureDepthWidth || 1.8,
+            closureFrontLine:       window._closureFrontLine  || 'cabinet',
+            nicheEnabled:           (window._nicheEnabled !== undefined) ? window._nicheEnabled : false,
+            nicheWidth:                window._nicheWidth || 200,
+            nicheDepth:                window._nicheDepth || 30,
+            nicheClosureEnabled:       (window._nicheClosureEnabled !== undefined) ? window._nicheClosureEnabled : false,
+            nicheClosureWidthLeft:     window._nicheClosureWidthLeft  || 1.8,
+            nicheClosureWidthRight:    window._nicheClosureWidthRight || 1.8,
+            nicheClosureCeilHeight:    window._nicheClosureCeilHeight || 1.8,
+            blueprintCutouts: state.blueprintCutouts || [],
+            blueprintCellDimOffsets: state.blueprintCellDimOffsets || {},
+            blueprintDimOffsets: state.blueprintDimOffsets || {},
+            partColors: (typeof window._exportLocalPartColors === 'function')
+                ? window._exportLocalPartColors()
+                : JSON.parse(JSON.stringify(state.partColors || {}))
+        }));
+
+        // Collect unique extra colors from per-part overrides
+        const _extraColorsSet = new Set();
+        if (state.partColors && typeof state.partColors === 'object') {
+            Object.values(state.partColors).forEach(key => {
+                if (key) _extraColorsSet.add(colorNamesHebrew[key] || key);
+            });
+        }
+        const extraColorsStr = _extraColorsSet.size > 0 ? Array.from(_extraColorsSet).join(', ') : null;
+
+        // Build sliding door summary for spec sheet
+        const _sd = state.presetId === 'sliding' && state.slidingDoor && state.slidingDoor.enabled ? state.slidingDoor : null;
+        let slidingDoorSpec = null;
+        if (_sd) {
+            const _panelTypeLabel = { solid: 'אטום', glass: 'זכוכית', mirror: 'מראה רגילה', mirror_dark: 'מראה כהה' };
+            const _profileColorLabel = { nickel: 'ניקל', black: 'שחור', white: 'לבן', cream: 'קרם', gold_matte: 'זהב מט' };
+            const numDoors = _sd.numDoors || 2;
+            const doorPanels = _sd.doorPanels || [];
+            const doorColors = _sd.doorColors || [];
+            const bodyMatKey = state.materialExternal || state.materialBody;
+
+            // Check if any door is mirror
+            const hasMirror = doorPanels.some(p => p === 'mirror' || p === 'mirror_dark');
+
+            // Build per-door color list — use per-door override or fall back to external/body color
+            const doorColorsList = Array.from({ length: numDoors }, (_, i) => {
+                const panel = doorPanels[i] || 'solid';
+                const isMirrorDoor = panel === 'mirror' || panel === 'mirror_dark';
+                if (isMirrorDoor) return _panelTypeLabel[panel] || 'מראה';
+                const colorKey = doorColors[i] || bodyMatKey;
+                return colorNamesHebrew[colorKey] || colorKey || 'ברירת מחדל';
+            });
+
+            slidingDoorSpec = {
+                numDoors,
+                profileColor: _profileColorLabel[_sd.profileColor] || _sd.profileColor || 'ניקל',
+                hasMirror,
+                doorColorsList,   // array of per-door color/type strings
+                doorColorsStr: doorColorsList.map((c, i) => `דלת ${i + 1}: ${c}`).join(' | ')
+            };
+        }
+
+        let multiViewPages = [];
+        let multiViewSVG = null;
+        try {
+            multiViewSVG = preview.multiViewSVG || ((typeof window._generateMultiViewBlueprintSVG === 'function')
+                ? window._generateMultiViewBlueprintSVG() : null);
+            multiViewPages = (preview.multiViewPages && preview.multiViewPages.length) ? preview.multiViewPages
+                : ((typeof window._generateMultiViewBlueprintPages === 'function')
+                ? window._generateMultiViewBlueprintPages().map(pg => pg.svg) : []);
+        } catch (bpErr) {
+            console.warn('[cart-snapshot] blueprint generation failed:', bpErr);
+        }
+
+        const _wdHeightCart = _wdCart.height != null ? _wdCart.height : state.globalHeight;
+        const _wdDrawerCountCart = (_wdCart.hasDrawers === false) ? 0
+            : (_wdCart.drawerCount != null ? _wdCart.drawerCount : (state.width <= 80 ? 1 : 2));
+        const _wdDimsStr = _isWritingDeskCart
+            ? `רוחב: ${state.width} ס"מ | גובה: ${_wdHeightCart} ס"מ | עומק: ${state.depth} ס"מ`
+            : `רוחב: ${state.width} ס"מ | גובה: ${state.globalHeight} ס"מ | עומק: ${state.depth} ס"מ`;
+
+        const cabinetSpec = {
+            customName: state.cabinetName, cabinetNotes: (state.cabinetNotes || '').trim(), modelName: modelNameText, plinthType: plinthTypeText,
+            placement: _isWritingDeskCart ? 'שולחן עמידה' : (placementHebrew[state.placement] || 'ארון קיר חופשי'),
+            dimsStr: _wdDimsStr,
+            material: state.boardMaterial === 'melamine' ? 'מלמין' : "סנדביץ'",
+            handle: (function() {
+                const labels = { pipe: 'ידית חיצונית', riding: 'ידית רוכבת', touch: "ידית טאצ'" };
+                const style = labels[state.handleStyle] || labels.pipe;
+                const model = (state.handleType || '').trim();
+                return model ? style + ' — ' + model : style;
+            })(),
+            desk: deskInfo,
+            colorBody: colorNamesHebrew[state.materialBody] || 'ברירת מחדל',
+            colorInternal: colorNamesHebrew[state.materialInternal] || 'ברירת מחדל',
+            colorBack: colorNamesHebrew[state.materialBack] || 'ברירת מחדל',
+            colorExternal: colorNamesHebrew[state.materialExternal] || 'ברירת מחדל',
+            colorDesk: colorNamesHebrew[state.materialDesk] || 'ברירת מחדל',
+            colorOpenCell: colorNamesHebrew[state.materialOpenCell] || 'ברירת מחדל',
+            colorDrawers: _isWritingDeskCart ? (colorNamesHebrew[state.materialExternal] || 'ברירת מחדל') : undefined,
+            isWritingDesk: _isWritingDeskCart,
+            writingDeskHasDrawers: !_isWritingDeskCart || _wdCart.hasDrawers !== false,
+            writingDeskDrawerCount: _isWritingDeskCart ? _wdDrawerCountCart : undefined,
+            writingDeskDrawerHeight: _isWritingDeskCart && _wdCart.drawerHeight != null ? _wdCart.drawerHeight : undefined,
+            hasOpenCells: openCellsCount > 0,
+            extraColors: extraColorsStr,
+            shelves: _isWritingDeskCart ? 0 : totalShelves,
+            hanging: _isWritingDeskCart ? 0 : hangingRods,
+            sorbetCount: _isWritingDeskCart ? 0 : contentCounts.sorbet,
+            drawersInt: _isWritingDeskCart ? 0 : intDrawers,
+            drawersExt: _isWritingDeskCart ? _wdDrawerCountCart : extDrawers,
+            price: priceStr, costPrice: '₪' + (state.currentCostPrice || 0).toLocaleString(),
+            installPrice: getWing().manualInstallPrice != null ? getWing().manualInstallPrice : state.currentInstallPrice,
+            imgDoors: imgWithDoors, imgOpen: imgNoDoors, imgBlueprint: imgBlueprint,
+            wingPreviews: wingPreviews,
+            corner: state.corner ? JSON.parse(JSON.stringify(state.corner)) : null,
+            slidingDoor: slidingDoorSpec,
+            multiViewSVG: multiViewSVG,
+            multiViewPages: multiViewPages
+        };
+    return { spec: cabinetSpec, rawState: rawState };
+};
+
+window._commitCurrentCabinetToCart = function(opts) {
+    opts = opts || {};
+    const cartItem = window._snapshotCurrentCabinetToCartItem();
+    const cabinetSpec = cartItem.spec;
+
+    if (state.editingCartIndex > -1 && state.orderCart[state.editingCartIndex]) {
+        const oldItem = state.orderCart[state.editingCartIndex];
+        const newHash = _hashPrintSpecSource(_collectPrintSpecRows(cabinetSpec, cartItem));
+        if (oldItem && oldItem.printSpecEdits && oldItem.printSpecEdits.sourceHash === newHash) {
+            cartItem.printSpecEdits = oldItem.printSpecEdits;
+        }
+        const idx = state.editingCartIndex;
+        cartItem.rawState.partColors = (typeof window._exportLocalPartColors === 'function')
+            ? window._exportLocalPartColors('cart' + idx)
+            : (cartItem.rawState.partColors || {});
+        state.orderCart[idx] = cartItem;
+        state.editingCartIndex = idx; // keep selection
+        if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
+        if (opts.flash) _setSaveCabinetButtonLabel(`<i class="fa-solid fa-check"></i> הארון עודכן בהצלחה!`);
+        else _setSaveCabinetButtonLabel();
+    } else {
+        const newIdx = state.orderCart.length;
+        if (typeof window._migrateDraftPartColorsToCart === 'function') {
+            window._migrateDraftPartColorsToCart(newIdx);
+        }
+        cartItem.rawState.partColors = (typeof window._exportLocalPartColors === 'function')
+            ? window._exportLocalPartColors('cart' + newIdx)
+            : (cartItem.rawState.partColors || {});
+        state.orderCart.push(cartItem);
+        state.editingCartIndex = newIdx;
+        if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
+        if (opts.flash) _setSaveCabinetButtonLabel(`<i class="fa-solid fa-check"></i> נשמר בעגלה!`);
+        else _setSaveCabinetButtonLabel();
+    }
+
+    const cc2 = document.getElementById('cart-count');
+    if (cc2) cc2.innerText = state.orderCart.length;
+    updateLeftSidebar();
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+    return state.editingCartIndex;
+};
+
+window._selectCartCabinet = function(index) {
+    if (index < 0 || !state.orderCart[index]) return;
+    window.editCartItem(index);
+};
+
+window._bootstrapDefaultCabinet = function() {
+    state.cabinetName = '';
+    state.manualPrice = null;
+    state.manualInstallPrice = null;
+    const cabNameInp = document.getElementById('inp-cabinet-name');
+    if (cabNameInp) cabNameInp.value = '';
+    if (typeof applyPreset === 'function') applyPreset('linear');
+    const item = window._snapshotCurrentCabinetToCartItem();
+    state.orderCart = [item];
+    state.editingCartIndex = 0;
+    if (typeof window._migrateDraftPartColorsToCart === 'function') {
+        window._migrateDraftPartColorsToCart(0);
+    }
+    item.rawState.partColors = (typeof window._exportLocalPartColors === 'function')
+        ? window._exportLocalPartColors('cart0')
+        : (item.rawState.partColors || {});
+    if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
+    _setSaveCabinetButtonLabel();
+    const cc = document.getElementById('cart-count');
+    if (cc) cc.innerText = '1';
+    updateLeftSidebar();
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+};
+
+window._ensureCabinetSelected = function(preferredIndex) {
+    if (!state.orderCart || state.orderCart.length === 0) {
+        const item = window._snapshotCurrentCabinetToCartItem();
+        state.orderCart = [item];
+        state.editingCartIndex = 0;
+        if (typeof window._migrateDraftPartColorsToCart === 'function') {
+            window._migrateDraftPartColorsToCart(0);
+        }
+        item.rawState.partColors = (typeof window._exportLocalPartColors === 'function')
+            ? window._exportLocalPartColors('cart0')
+            : (item.rawState.partColors || {});
+        if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
+        _setSaveCabinetButtonLabel();
+        const cc = document.getElementById('cart-count');
+        if (cc) cc.innerText = '1';
+        updateLeftSidebar();
+        return;
+    }
+    let idx = (typeof preferredIndex === 'number') ? preferredIndex : state.editingCartIndex;
+    if (idx < 0 || idx >= state.orderCart.length) idx = 0;
+    if (state.editingCartIndex !== idx) {
+        window.editCartItem(idx);
+    } else {
+        _setSaveCabinetButtonLabel();
+        updateLeftSidebar();
+    }
+};
+
 window.deleteCartItem = function(index) {
     // Use a toast-style inline confirm to avoid browser confirm() suppression issues
     const _doDelete = function() {
+        const wasEditing = state.editingCartIndex === index;
         state.orderCart.splice(index, 1);
-        if(state.editingCartIndex === index) {
-            state.editingCartIndex = -1;
-            const addBtn = document.getElementById('btn-add-to-cart');
-            if (addBtn) addBtn.innerHTML = `<i class="fa-solid fa-plus"></i> הוסף ארון להזמנה`;
-        } else if (state.editingCartIndex > index) { state.editingCartIndex--; }
+
+        if (state.orderCart.length === 0) {
+            window._bootstrapDefaultCabinet();
+        } else if (wasEditing) {
+            const nextIdx = Math.min(index, state.orderCart.length - 1);
+            window.editCartItem(nextIdx);
+        } else if (state.editingCartIndex > index) {
+            state.editingCartIndex--;
+            updateLeftSidebar();
+        } else {
+            updateLeftSidebar();
+        }
+
         const cc3 = document.getElementById('cart-count');
         if (cc3) cc3.innerText = state.orderCart.length;
-        updateLeftSidebar();
-        if(document.getElementById('order-modal').style.display === 'flex') {
+        if (document.getElementById('order-modal').style.display === 'flex') {
             const currentMode = document.getElementById('order-modal').dataset.mode || 'customer';
             openOrderModal(currentMode);
         }
@@ -6733,39 +6838,93 @@ window.editCartItem = function(index) {
 }
 
 window.startNewCabinet = function() {
-    state.editingCartIndex = -1; state.cabinetName = ''; state.manualPrice = null; state.manualInstallPrice = null;
+    // Auto-save current cabinet, then create & select a new one
+    if (state.orderCart && state.orderCart.length > 0) {
+        window._commitCurrentCabinetToCart({ flash: false });
+    }
+    state.cabinetName = '';
+    state.manualPrice = null;
+    state.manualInstallPrice = null;
+    const cabNameInp = document.getElementById('inp-cabinet-name');
+    if (cabNameInp) cabNameInp.value = '';
+    if (typeof applyPreset === 'function') applyPreset('linear');
+    const item = window._snapshotCurrentCabinetToCartItem();
+    state.orderCart.push(item);
+    const newIdx = state.orderCart.length - 1;
+    item.rawState.partColors = (typeof window._exportLocalPartColors === 'function')
+        ? window._exportLocalPartColors('cart' + newIdx)
+        : (item.rawState.partColors || {});
+    state.editingCartIndex = newIdx;
     if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
-    const cabNameInp = document.getElementById('inp-cabinet-name'); if (cabNameInp) cabNameInp.value = '';
-    document.getElementById('btn-add-to-cart').innerHTML = `<i class="fa-solid fa-plus"></i> הוסף ארון להזמנה`;
-    updateLeftSidebar(); alert('הקנבס פנוי לעיצוב ארון חדש! (המידות נשארו לטובת נוחות, אך הארון הקודם שמור בעגלה ולא ייפגע)');
+    _setSaveCabinetButtonLabel();
+    const cc = document.getElementById('cart-count');
+    if (cc) cc.innerText = state.orderCart.length;
+    if (typeof window._restorePresetUI === 'function') window._restorePresetUI();
+    buildCabinet();
+    updateCameraView();
+    calculatePrice();
+    updateLeftSidebar();
+    if (typeof saveHistoryState === 'function') saveHistoryState();
 }
+
+window.duplicateCartItem = function(index) {
+    if (!state.orderCart[index]) return;
+    // Save current edits first if editing another (or same) cabinet
+    if (state.editingCartIndex >= 0 && state.orderCart[state.editingCartIndex]) {
+        window._commitCurrentCabinetToCart({ flash: false });
+    }
+    const src = state.orderCart[index];
+    const clone = {
+        spec: JSON.parse(JSON.stringify(src.spec)),
+        rawState: JSON.parse(JSON.stringify(src.rawState))
+        // intentionally omit printSpecEdits
+    };
+    // Clear heavy preview images so they refresh on next save
+    if (clone.spec) {
+        clone.spec.imgDoors = null;
+        clone.spec.imgOpen = null;
+        clone.spec.imgBlueprint = null;
+        clone.spec.multiViewSVG = null;
+        clone.spec.multiViewPages = [];
+        clone.spec.wingPreviews = [];
+    }
+    if (clone.spec && clone.spec.customName) {
+        clone.spec.customName = 'העתק של ' + clone.spec.customName;
+        if (clone.rawState) clone.rawState.cabinetName = clone.spec.customName;
+    }
+    state.orderCart.splice(index + 1, 0, clone);
+    const newIdx = index + 1;
+    // Re-bind all cart scopes after index shift (clone inserted in the middle)
+    if (typeof window._importLocalPartColors === 'function') {
+        Object.keys(state.partColors || {}).forEach(function(k) {
+            if (k.indexOf('cart') === 0) delete state.partColors[k];
+        });
+        state.orderCart.forEach(function(it, i) {
+            if (it && it.rawState && it.rawState.partColors) {
+                window._importLocalPartColors('cart' + i, it.rawState.partColors);
+            }
+        });
+    }
+    window.editCartItem(newIdx);
+    const cc = document.getElementById('cart-count');
+    if (cc) cc.innerText = state.orderCart.length;
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+};
 
 window.newProject = function() {
     if (!confirm('האם אתה בטוח שברצונך להתחיל פרויקט חדש?\nכל הארונות בפרויקט הנוכחי יימחקו לצמיתות.')) return;
-    // Clear the entire cart / project
     state.orderCart = [];
     state.editingCartIndex = -1;
     state.cabinetName = '';
     state.manualPrice = null;
     state.manualInstallPrice = null;
-    // Clear project ID so auto-save does NOT save to Supabase until user explicitly saves
     window._currentProjectId   = null;
     window._currentProjectName = null;
-    // Reset cart-count badge
-    const cc = document.getElementById('cart-count');
-    if (cc) cc.innerText = '0';
-    // Reset add-to-cart button label
-    const addBtn = document.getElementById('btn-add-to-cart');
-    if (addBtn) addBtn.innerHTML = `<i class="fa-solid fa-plus"></i> הוסף ארון להזמנה`;
-    // Reset cabinet name input
     const cabNameInp = document.getElementById('inp-cabinet-name');
     if (cabNameInp) cabNameInp.value = '';
-    // Close order modal if open
     const orderModal = document.getElementById('order-modal');
     if (orderModal) orderModal.style.display = 'none';
-    // Apply fresh linear preset (resets all state + rebuilds)
-    if (typeof applyPreset === 'function') applyPreset('linear');
-    updateLeftSidebar();
+    window._bootstrapDefaultCabinet();
 }
 
 window.updateLeftSidebar = function() {
@@ -6791,11 +6950,14 @@ window.updateLeftSidebar = function() {
     let totalCabinetsPrice = 0; let totalInstallPrice = 0;
 
     if (state.orderCart.length === 0) {
-        listContainer.innerHTML = '<div style="text-align:center; padding: 40px 10px; color:var(--text-light);"><i class="fa-solid fa-box-open" style="font-size:3.5rem; margin-bottom:15px; opacity:0.4;"></i><br><b style="font-size:1.1rem;">הפרויקט ריק</b><br>עצב את הארון הראשון שלך ולחץ על הוספה.</div>';
-        totalEl.innerText = '₪0';
-        if (cabTotalEl) cabTotalEl.innerText = '₪0';
-        if (instTotalEl) instTotalEl.innerText = '₪0';
-        return;
+        // Should not happen — always keep at least one selected cabinet
+        if (typeof window._ensureCabinetSelected === 'function') window._ensureCabinetSelected();
+        if (state.orderCart.length === 0) {
+            totalEl.innerText = '₪0';
+            if (cabTotalEl) cabTotalEl.innerText = '₪0';
+            if (instTotalEl) instTotalEl.innerText = '₪0';
+            return;
+        }
     }
 
     state.orderCart.forEach((itemObj, index) => {
@@ -6846,6 +7008,7 @@ window.updateLeftSidebar = function() {
             ${_wallSelectorHTML}
             <div class="cart-mini-actions">
                 <button class="cart-mini-btn btn-edit-mini" onclick="event.stopPropagation(); editCartItem(${index});"><i class="fa-solid fa-pen"></i> ערוך</button>
+                <button class="cart-mini-btn" onclick="event.stopPropagation(); duplicateCartItem(${index});"><i class="fa-solid fa-copy"></i> שכפל</button>
                 <button class="cart-mini-btn btn-del-mini" onclick="event.stopPropagation(); deleteCartItem(${index});"><i class="fa-solid fa-trash"></i> מחק</button>
                 <div style="position:relative;display:inline-flex;">
                     <button class="cart-mini-btn" id="notes-btn-cart-${index}" onclick="event.stopPropagation(); window._openDesignerNotesForCabinet(${index});" style="color:#2563eb;border-color:rgba(37,99,235,0.35);background:rgba(37,99,235,0.07);">
@@ -8695,6 +8858,7 @@ window._runDeferredDefaultInit = function() {
     window._cabinetBuiltOnce = true;
     buildCabinet();
     calculatePrice();
+    if (typeof window._ensureCabinetSelected === 'function') window._ensureCabinetSelected();
     updateLeftSidebar();
     saveHistoryState();
     if (typeof window._restorePresetUI === 'function') window._restorePresetUI();
@@ -8715,6 +8879,7 @@ if (!window._VIEWER_MODE) {
         const savedAt = window._restoreFromLocalStorage && window._restoreFromLocalStorage();
         if (savedAt) {
             window._cabinetBuiltOnce = true;
+            if (typeof window._ensureCabinetSelected === 'function') window._ensureCabinetSelected();
             const date = new Date(savedAt);
             const timeStr = date.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
             const dateStr = date.toLocaleDateString('he-IL');
