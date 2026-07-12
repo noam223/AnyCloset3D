@@ -37,7 +37,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260610i">
     <link rel="stylesheet" href="style-mobile.css?v=20260609a">
     <link rel="stylesheet" href="style-extras.css?v=20260607b">
-    <link rel="stylesheet" href="style.css?v=20260610i">
+    <link rel="stylesheet" href="style.css?v=20260712newCabBtn">
     <style>
         html.thumb-only-mode #left-sidebar,
         html.thumb-only-mode #right-sidebar,
@@ -981,12 +981,11 @@
                 </span>
             </button>
         </div>
-        <div id="sidebar-cabinets-label" class="sidebar-cabinets-label" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div id="sidebar-cabinets-label" class="sidebar-cabinets-label">
             <i class="fa-solid fa-list-check"></i>
             <span>ארונות בפרויקט</span>
             <span id="sidebar-cabinets-count" class="sidebar-cabinets-count"></span>
-            <button type="button" id="btn-new-cabinet-sidebar" onclick="startNewCabinet()" title="שמור את הארון הנוכחי והוסף ארון חדש"
-                style="margin-inline-start:auto;padding:4px 10px;font-size:0.78rem;font-weight:700;border-radius:8px;border:1.5px solid var(--accent);background:rgba(var(--accent-rgb,99,102,241),0.1);color:var(--accent);cursor:pointer;display:inline-flex;align-items:center;gap:5px;">
+            <button type="button" id="btn-new-cabinet-sidebar" class="btn-new-cabinet-sidebar" onclick="startNewCabinet()" title="שמור את הארון הנוכחי והוסף ארון חדש">
                 <i class="fa-solid fa-plus"></i> ארון חדש
             </button>
         </div>
