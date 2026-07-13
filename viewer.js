@@ -162,7 +162,7 @@ async function _loadProject() {
     try {
         var result = await _sb
             .from('projects')
-            .select('id, name, project_data, share_token, share_token_expires_at, updated_at')
+            .select('id, name, project_data, share_token, share_token_expires_at, updated_at, order_status')
             .eq('share_token', _token)
             .single();
 
@@ -187,6 +187,12 @@ async function _loadProject() {
 
         _setLoadingText('בונה הדמייה...');
         _projectData = project.project_data;
+        if (project.order_status && _projectData && !_projectData.orderStatus) {
+            _projectData.orderStatus = project.order_status;
+        }
+        window._viewerOrderStatus = project.order_status
+            || (_projectData && _projectData.orderStatus)
+            || 'quote';
         _applyLiveProjectData(_projectData, { followLive: true, captureThumb: true });
 
         _initViewerView();
@@ -195,6 +201,9 @@ async function _loadProject() {
         // Load notes counts for all cabinets, then load notes for current
         _loadAllNotesCounts().then(function() {
             _loadNotesForCabinet(_activeCabIdx);
+            if (typeof window._viewerExtrasOnReady === 'function') {
+                window._viewerExtrasOnReady();
+            }
         });
 
     } catch(e) {
@@ -283,6 +292,9 @@ function _applyLiveProjectData(projectData, opts) {
             _notesCabIdx = _activeCabIdx;
             _loadNotesForCabinet(_activeCabIdx);
             if (typeof _renderNotesCabTabs === 'function') _renderNotesCabTabs();
+        }
+        if (typeof window._viewerExtrasOnLiveFollow === 'function') {
+            window._viewerExtrasOnLiveFollow(_activeCabIdx, projectData);
         }
     } else {
         // Browse mode: refresh list only; keep current 3D until client switches
@@ -509,12 +521,21 @@ function _renderCabinetNav() {
             };
         }
 
+        // Approval / extras hooks on card
+        if (typeof window._viewerExtrasDecorateCard === 'function') {
+            window._viewerExtrasDecorateCard(card, idx, cab);
+        }
+
         nav.appendChild(card);
     });
 
     // Show/hide "חזור ללייב" button
     var liveBtn = document.getElementById('viewer-return-live-btn');
     if (liveBtn) liveBtn.style.display = _liveMode ? 'none' : 'flex';
+
+    if (typeof window._viewerExtrasAfterNavRender === 'function') {
+        window._viewerExtrasAfterNavRender();
+    }
 }
 
 // ── Switch to a different cabinet ─────────────────────────────────────────────
@@ -568,6 +589,10 @@ function _switchCabinet(idx) {
         _notesCabIdx = idx;
         _loadNotesForCabinet(idx);
         _renderNotesCabTabs();
+    }
+
+    if (typeof window._viewerExtrasOnCabinetSwitch === 'function') {
+        window._viewerExtrasOnCabinetSwitch(idx);
     }
 }
 
@@ -919,9 +944,15 @@ function _updateDetailsBar() {
 
 // ── View switching ────────────────────────────────────────────────────────────
 window._setViewerView = function(mode) {
-    state.viewMode = mode;
+    var viewMode = mode;
+    if (mode === 'doors-open' || mode === 'doors-closed') {
+        window._viewerDoorsMode = mode;
+        viewMode = '3d';
+    } else if (mode === '3d' || mode === 'front' || mode === 'blueprint') {
+        window._viewerDoorsMode = null;
+    }
+    state.viewMode = viewMode;
 
-    // Update vd-tab buttons in details bar row 2
     document.querySelectorAll('.vd-tab').forEach(function(btn) {
         btn.classList.toggle('active', btn.dataset.view === mode);
     });
@@ -930,21 +961,29 @@ window._setViewerView = function(mode) {
     var canvas   = document.getElementById('canvas-container');
     var dimLayer = document.getElementById('dimensions-layer');
 
-    if (mode === 'front') {
-        if (canvas)  canvas.classList.add('front-mode');
-        if (canvas)  canvas.classList.remove('blueprint-mode', 'mode-3d');
-        if (bpLayer) { bpLayer.style.display = 'none'; bpLayer.innerHTML = ''; }
-        if (typeof buildCabinet === 'function') buildCabinet();
-        if (typeof updateCameraView === 'function') updateCameraView();
-        if (dimLayer) { dimLayer.style.display = 'block'; dimLayer.style.opacity = '1'; }
-    } else {
-        // 3D mode (default)
-        if (canvas)  canvas.classList.add('mode-3d');
-        if (canvas)  canvas.classList.remove('front-mode', 'blueprint-mode');
-        if (bpLayer) { bpLayer.style.display = 'none'; bpLayer.innerHTML = ''; }
-        if (typeof buildCabinet === 'function') buildCabinet();
-        if (typeof updateCameraView === 'function') updateCameraView();
+    if (viewMode === 'blueprint') {
+        if (canvas) { canvas.classList.add('blueprint-mode'); canvas.classList.remove('front-mode', 'mode-3d'); }
+        if (bpLayer) bpLayer.style.display = 'block';
         if (dimLayer) { dimLayer.style.display = 'none'; dimLayer.style.opacity = '0'; }
+        if (typeof buildCabinet === 'function') buildCabinet();
+        if (typeof updateCameraView === 'function') updateCameraView();
+    } else if (viewMode === 'front') {
+        if (canvas) { canvas.classList.add('front-mode'); canvas.classList.remove('blueprint-mode', 'mode-3d'); }
+        if (bpLayer) { bpLayer.style.display = 'none'; bpLayer.innerHTML = ''; }
+        if (dimLayer) { dimLayer.style.display = 'block'; dimLayer.style.opacity = '1'; }
+        if (typeof buildCabinet === 'function') buildCabinet();
+        if (typeof updateCameraView === 'function') updateCameraView();
+    } else {
+        if (canvas) { canvas.classList.add('mode-3d'); canvas.classList.remove('front-mode', 'blueprint-mode'); }
+        if (bpLayer) { bpLayer.style.display = 'none'; bpLayer.innerHTML = ''; }
+        if (dimLayer) { dimLayer.style.display = 'none'; dimLayer.style.opacity = '0'; }
+        if (typeof buildCabinet === 'function') buildCabinet();
+        if (typeof updateCameraView === 'function') updateCameraView();
+        setTimeout(function() {
+            if (typeof window._viewerExtrasApplyDoorsMode === 'function') {
+                window._viewerExtrasApplyDoorsMode(window._viewerDoorsMode || 'doors-closed');
+            }
+        }, 40);
     }
 };
 
@@ -962,11 +1001,20 @@ function _setupRealtime() {
             if (!payload.new) return;
             _lastUpdatedAt = payload.new.updated_at;
             _projectData   = payload.new.project_data;
+            if (payload.new.order_status) {
+                window._viewerOrderStatus = payload.new.order_status;
+                if (_projectData) _projectData.orderStatus = payload.new.order_status;
+            } else if (_projectData && _projectData.orderStatus) {
+                window._viewerOrderStatus = _projectData.orderStatus;
+            }
             _applyLiveProjectData(_projectData, { followLive: _liveMode });
             if (_liveMode) {
                 setTimeout(function() { _captureSnapshot(_activeCabIdx); }, 350);
             }
             _flashLiveBadge();
+            if (typeof window._viewerExtrasOnProjectUpdate === 'function') {
+                window._viewerExtrasOnProjectUpdate(_projectData, payload.new);
+            }
         })
         .subscribe(function(status) {
             if (status === 'SUBSCRIBED') {
@@ -993,17 +1041,24 @@ function _startPolling() {
         try {
             var result = await _sb
                 .from('projects')
-                .select('updated_at, project_data')
+                .select('updated_at, project_data, order_status')
                 .eq('share_token', _token)
                 .single();
             if (result.data && result.data.updated_at !== _lastUpdatedAt) {
                 _lastUpdatedAt = result.data.updated_at;
                 _projectData   = result.data.project_data;
+                if (result.data.order_status) {
+                    window._viewerOrderStatus = result.data.order_status;
+                    if (_projectData) _projectData.orderStatus = result.data.order_status;
+                }
                 _applyLiveProjectData(_projectData, { followLive: _liveMode });
                 if (_liveMode) {
                     setTimeout(function() { _captureSnapshot(_activeCabIdx); }, 350);
                 }
                 _flashLiveBadge();
+                if (typeof window._viewerExtrasOnProjectUpdate === 'function') {
+                    window._viewerExtrasOnProjectUpdate(_projectData, result.data);
+                }
             }
         } catch(e) {
             console.warn('[Viewer] Poll error:', e);
@@ -1247,6 +1302,14 @@ function _subscribeNotesRealtime(cabIdx) {
 function _appendNote(note) {
     var list = document.getElementById('viewer-notes-list');
     if (!list) return;
+
+    if (typeof window._viewerExtrasRenderNoteBubble === 'function') {
+        var custom = window._viewerExtrasRenderNoteBubble(note, list);
+        if (custom) {
+            list.scrollTop = list.scrollHeight;
+            return;
+        }
+    }
 
     var isClient   = note.sender_role === 'client';
     var isDesigner = note.sender_role === 'designer';
@@ -1509,6 +1572,36 @@ window._viewerNavScroll = function(direction) {
         // Fallback: scroll the nav container
         nav.scrollBy({ left: direction * 160, behavior: 'smooth' });
     }
+};
+
+// Public API for viewer-extras.js
+window._viewerApi = {
+    getSb: function() { return _sb; },
+    getToken: function() { return _token; },
+    getProjectId: function() { return _projectId; },
+    getClientName: function() { return _clientName || 'לקוח'; },
+    setClientName: function(n) { _clientName = n; },
+    getActiveCabIdx: function() { return _activeCabIdx; },
+    setActiveCabIdx: function(i) { _activeCabIdx = i; },
+    getNotesCabIdx: function() { return _notesCabIdx; },
+    getCabinetList: function() { return _cabinetList; },
+    getProjectData: function() { return _projectData; },
+    isLiveMode: function() { return !!_liveMode; },
+    setLiveMode: function(v) { _liveMode = !!v; },
+    switchCabinet: function(i) { return _switchCabinet(i); },
+    restoreState: function(d) { return _restoreState(d); },
+    renderCabinetNav: function() { return _renderCabinetNav(); },
+    appendNote: function(n) { return _appendNote(n); },
+    escHtml: function(s) { return _escHtml(s); },
+    materialNames: MATERIAL_NAMES,
+    materialColors: MATERIAL_COLORS,
+    getColorOverrides: function() { return _viewerColorOverrides; },
+    cabIndexColExists: function() { return _cabIndexColExists; },
+    setCabIndexColExists: function(v) { _cabIndexColExists = v; },
+    applyLiveProjectData: function(d, o) { return _applyLiveProjectData(d, o); },
+    resolveLiveCabIndex: function(d) { return _resolveLiveCabIndex(d); },
+    updateLiveBadge: function() { return _updateLiveBadge(); },
+    updateInfoStrip: function() { return _updateInfoStrip(); }
 };
 
 })(); // end IIFE

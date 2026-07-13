@@ -246,10 +246,49 @@ function _dnAppendBubble(note, container) {
 
     var wrap = document.createElement('div');
     wrap.className = 'designer-note-wrap ' + (isClient ? 'client' : 'designer');
+
+    var type = note.message_type || 'note';
+    var payload = null;
+    if (note.message && String(note.message).trim().charAt(0) === '{') {
+        try { payload = JSON.parse(note.message); } catch (e) { payload = null; }
+    }
+
+    var bubbleHtml = '';
+    if (type === 'cabinet_approval' || (payload && payload.type === 'approval')) {
+        var ok = !payload || payload.approved !== false;
+        bubbleHtml =
+            '<div class="designer-note-bubble special approval ' + (isClient ? 'client' : 'designer') + '">' +
+                (ok ? '❤️ אישור בחירת ארון' : 'בוטל אישור ארון') +
+                (payload && payload.cabLabel ? (' — ' + _dnEsc(payload.cabLabel)) : '') +
+            '</div>';
+    } else if (type === 'pin_note' || (payload && payload.type === 'pin')) {
+        bubbleHtml =
+            '<div class="designer-note-bubble special pin ' + (isClient ? 'client' : 'designer') + '">' +
+                '<i class="fa-solid fa-location-dot"></i> סימון על הארון<br>' +
+                _dnEsc(payload && payload.text ? payload.text : note.message) +
+            '</div>';
+    } else if (type === 'voice_note' || (payload && payload.type === 'voice')) {
+        var src = payload && payload.dataUrl ? payload.dataUrl : '';
+        bubbleHtml =
+            '<div class="designer-note-bubble special voice ' + (isClient ? 'client' : 'designer') + '">' +
+                '<i class="fa-solid fa-microphone"></i> הודעה קולית' +
+                (payload && payload.duration ? (' (' + payload.duration + ' שנ׳)') : '') +
+                (src ? ('<audio controls src="' + src + '" style="width:100%;margin-top:8px;max-width:240px;"></audio>') : '') +
+            '</div>';
+    } else if (type === 'color_change') {
+        bubbleHtml =
+            '<div class="designer-note-bubble special color ' + (isClient ? 'client' : 'designer') + '">' +
+                _dnEsc(note.message).replace(/\n/g, '<br>') +
+            '</div>';
+    } else {
+        bubbleHtml =
+            '<div class="designer-note-bubble ' + (isClient ? 'client' : 'designer') + '">' +
+                _dnEsc(note.message) +
+            '</div>';
+    }
+
     wrap.innerHTML =
-        '<div class="designer-note-bubble ' + (isClient ? 'client' : 'designer') + '">' +
-            _dnEsc(note.message) +
-        '</div>' +
+        bubbleHtml +
         '<div class="designer-note-meta">' + _dnEsc(senderLabel) + (time ? (' · ' + time) : '') + '</div>';
     container.appendChild(wrap);
 }

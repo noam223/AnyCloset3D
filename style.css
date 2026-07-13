@@ -748,6 +748,22 @@ body {
     color: #1e293b;
     border-radius: 4px 16px 16px 16px;
 }
+.designer-note-bubble.special.approval {
+    background: #ffe4e6;
+    border: 1px solid #fecdd3;
+}
+.designer-note-bubble.special.pin {
+    background: #fef3c7;
+    border: 1px solid #fde68a;
+}
+.designer-note-bubble.special.voice {
+    background: #ede9fe;
+    border: 1px solid #ddd6fe;
+}
+.designer-note-bubble.special.color {
+    background: #ecfeff;
+    border: 1px solid #a5f3fc;
+}
 .designer-note-meta {
     font-size: 0.68rem;
     color: #94a3b8;

@@ -163,12 +163,15 @@
     #viewer-details-btns {
         display: flex;
         align-items: center;
-        gap: 4px;
-        padding: 0 8px;
+        gap: 3px;
+        padding: 0 6px;
         height: 40px;
         flex-shrink: 0;
-        overflow: hidden;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
     }
+    #viewer-details-btns::-webkit-scrollbar { display: none; }
     /* View tabs inside details bar row 2 */
     .vd-tab {
         flex: 1;
@@ -1058,6 +1061,385 @@
     #viewer-notes-panel.keyboard-open #viewer-notes-list,
     #viewer-notes-panel.keyboard-open #viewer-notes-header { display: none !important; }
 
+    /* ================================================================
+       VIEWER EXTRAS — status, live focus, summary, compare, pin, voice
+       ================================================================ */
+    #viewer-order-status-badge {
+        display: none;
+        align-items: center;
+        flex-shrink: 0;
+        max-width: 110px;
+        padding: 3px 8px;
+        border-radius: 20px;
+        font-size: 0.62rem;
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        color: #1d4ed8;
+    }
+    #viewer-order-status-badge[data-status="ordered"] { background:#ecfdf5; border-color:#a7f3d0; color:#047857; }
+    #viewer-order-status-badge[data-status="production"] { background:#fff7ed; border-color:#fed7aa; color:#c2410c; }
+    #viewer-order-status-badge[data-status="service"] { background:#fef2f2; border-color:#fecaca; color:#b91c1c; }
+    #viewer-order-status-badge[data-status="installed"] { background:#f0fdf4; border-color:#bbf7d0; color:#166534; }
+
+    #viewer-summary-btn,
+    #viewer-compare-btn {
+        width: 34px; height: 34px;
+        border-radius: 50%;
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+        color: #334155;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        flex-shrink: 0;
+        font-size: 0.85rem;
+        font-family: inherit;
+        -webkit-tap-highlight-color: transparent;
+    }
+    #viewer-summary-btn:active,
+    #viewer-compare-btn:active { transform: scale(0.94); }
+
+    #viewer-designer-focus {
+        position: fixed;
+        top: 48px; left: 50%;
+        transform: translateX(-50%) translateY(-8px);
+        z-index: 620;
+        max-width: min(92vw, 420px);
+        padding: 8px 14px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #1e3a5f, #2563eb);
+        color: #fff;
+        font-size: 0.78rem;
+        font-weight: 600;
+        text-align: center;
+        box-shadow: 0 6px 20px rgba(37,99,235,0.35);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity .25s, transform .25s;
+    }
+    #viewer-designer-focus.visible {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+    #viewer-designer-focus.flash {
+        animation: viewer-focus-pulse 1.1s ease;
+    }
+    @keyframes viewer-focus-pulse {
+        0%, 100% { box-shadow: 0 6px 20px rgba(37,99,235,0.35); }
+        40% { box-shadow: 0 0 0 4px rgba(251,191,36,0.55), 0 8px 28px rgba(37,99,235,0.45); }
+    }
+    #viewer-designer-focus i { margin-left: 6px; opacity: 0.9; }
+
+    #vd-sheet-actions {
+        padding: 10px 14px 4px;
+        border-top: 1px solid rgba(255,255,255,0.08);
+    }
+    #vd-send-colors-btn {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 12px 14px;
+        border: none;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #2563eb, #1d4ed8);
+        color: #fff;
+        font-size: 0.88rem;
+        font-weight: 700;
+        font-family: inherit;
+        cursor: pointer;
+    }
+    #vd-send-colors-btn:active { transform: scale(0.98); }
+
+    #viewer-voice-btn {
+        width: 42px; height: 42px;
+        border-radius: 50%;
+        border: 1.5px solid #e2e8f0;
+        background: #f8fafc;
+        color: #475569;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        cursor: pointer;
+        font-size: 1rem;
+        -webkit-tap-highlight-color: transparent;
+    }
+    #viewer-voice-btn.recording {
+        background: #fef2f2;
+        border-color: #fecaca;
+        color: #dc2626;
+        animation: viewer-pulse 1s infinite;
+    }
+
+    .viewer-cab-approve-btn {
+        flex-shrink: 0;
+        width: 24px; height: 24px;
+        border-radius: 50%;
+        background: #fff1f2;
+        border: 1.5px solid #fecdd3;
+        color: #e11d48;
+        font-size: 0.65rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        padding: 0;
+    }
+    .viewer-cab-approve-btn.active {
+        background: #e11d48;
+        border-color: #be123c;
+        color: #fff;
+    }
+
+    .viewer-note-bubble.special { border: 1px solid transparent; }
+    .viewer-note-bubble.approval { background: #ffe4e6; border-color: #fecdd3; }
+    .viewer-note-bubble.pin { background: #fef3c7; border-color: #fde68a; }
+    .viewer-note-bubble.voice { background: #ede9fe; border-color: #ddd6fe; }
+    .viewer-note-bubble.color { background: #ecfeff; border-color: #a5f3fc; white-space: pre-wrap; }
+
+    .vd-tab { font-size: 0.58rem; gap: 2px; padding: 0 2px; }
+    .vd-tab i { font-size: 0.7rem; }
+    .vd-toggle-btn.active {
+        background: rgba(251,191,36,0.95);
+        color: #78350f;
+        border-color: #fbbf24;
+    }
+    body.viewer-pin-mode #canvas-container { cursor: crosshair; }
+
+    #viewer-summary-panel {
+        position: fixed; inset: 0;
+        z-index: 900;
+        background: rgba(15,23,42,0.45);
+        display: none;
+        align-items: flex-end;
+        justify-content: center;
+        -webkit-backdrop-filter: blur(3px);
+        backdrop-filter: blur(3px);
+    }
+    #viewer-summary-panel .vs-card {
+        width: 100%;
+        max-width: 520px;
+        max-height: 88vh;
+        background: #fff;
+        border-radius: 18px 18px 0 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: 0 -8px 40px rgba(0,0,0,0.2);
+    }
+    .vs-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 16px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .vs-header h2 {
+        margin: 0;
+        font-size: 1rem;
+        color: #1e3a5f;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .vs-header button, .vs-footer button {
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+        border-radius: 10px;
+        padding: 8px 12px;
+        font-family: inherit;
+        font-weight: 600;
+        cursor: pointer;
+        color: #334155;
+    }
+    #viewer-summary-body {
+        padding: 14px 16px;
+        overflow-y: auto;
+        flex: 1;
+    }
+    .vs-status {
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: #eff6ff;
+        color: #1e3a5f;
+        font-size: 0.88rem;
+        margin-bottom: 12px;
+    }
+    .vs-cust {
+        display: grid;
+        gap: 6px;
+        font-size: 0.84rem;
+        color: #475569;
+        margin-bottom: 14px;
+    }
+    .vs-cabs { display: grid; gap: 10px; }
+    .vs-cab {
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 12px;
+        background: #f8fafc;
+    }
+    .vs-cab.approved { border-color: #fda4af; background: #fff1f2; }
+    .vs-cab-title { font-weight: 700; color: #1e3a5f; margin-bottom: 4px; }
+    .vs-cab-dims, .vs-cab-mats { font-size: 0.78rem; color: #64748b; }
+    .vs-cab-price { margin-top: 6px; font-weight: 700; color: #0f766e; }
+    .vs-footer {
+        display: flex;
+        gap: 8px;
+        padding: 12px 16px max(12px, env(safe-area-inset-bottom));
+        border-top: 1px solid #e2e8f0;
+    }
+    .vs-footer .vs-primary {
+        flex: 1;
+        background: linear-gradient(135deg, #e11d48, #be123c);
+        color: #fff;
+        border-color: transparent;
+    }
+
+    #viewer-compare-sheet {
+        position: fixed; inset: 0;
+        z-index: 910;
+        background: rgba(15,23,42,0.5);
+        display: none;
+        align-items: flex-end;
+        justify-content: center;
+    }
+    #viewer-compare-sheet.open { display: flex; }
+    #viewer-compare-sheet .vc-inner {
+        width: 100%;
+        max-width: 480px;
+        background: #fff;
+        border-radius: 18px 18px 0 0;
+        padding: 16px 16px max(16px, env(safe-area-inset-bottom));
+    }
+    .vc-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+    .vc-head button {
+        border: none; background: #f1f5f9; border-radius: 8px;
+        width: 32px; height: 32px; cursor: pointer; font-size: 1rem;
+    }
+    .vc-hint { font-size: 0.82rem; color: #64748b; margin: 0 0 12px; }
+    #viewer-compare-options { display: grid; gap: 8px; margin-bottom: 14px; max-height: 40vh; overflow: auto; }
+    .vc-opt {
+        display: flex; align-items: center; gap: 10px;
+        padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 10px;
+        background: #f8fafc; font-weight: 600; color: #1e3a5f;
+    }
+    .vc-go {
+        width: 100%;
+        padding: 12px;
+        border: none;
+        border-radius: 12px;
+        background: #2563eb;
+        color: #fff;
+        font-weight: 700;
+        font-family: inherit;
+        cursor: pointer;
+    }
+    #viewer-compare-bar {
+        position: fixed;
+        top: 52px; left: 50%;
+        transform: translateX(-50%);
+        z-index: 630;
+        display: none;
+        gap: 8px;
+        padding: 6px;
+        background: rgba(255,255,255,0.96);
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    }
+    #viewer-compare-bar button {
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+        border-radius: 10px;
+        padding: 8px 12px;
+        font-family: inherit;
+        font-weight: 700;
+        font-size: 0.78rem;
+        cursor: pointer;
+        color: #1e3a5f;
+    }
+    #viewer-compare-bar .vc-exit {
+        background: #1e3a5f;
+        color: #fff;
+        border-color: #1e3a5f;
+    }
+
+    #viewer-pin-modal {
+        position: fixed; inset: 0;
+        z-index: 920;
+        background: rgba(15,23,42,0.45);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+    }
+    #viewer-pin-modal .vp-card {
+        width: 100%;
+        max-width: 380px;
+        background: #fff;
+        border-radius: 16px;
+        padding: 16px;
+        box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+    }
+    #viewer-pin-modal h3 {
+        margin: 0 0 10px;
+        font-size: 1rem;
+        color: #1e3a5f;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    #viewer-pin-text {
+        width: 100%;
+        box-sizing: border-box;
+        border: 1.5px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 10px 12px;
+        font-family: inherit;
+        font-size: 0.9rem;
+        resize: vertical;
+        min-height: 72px;
+    }
+    .vp-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+    }
+    .vp-actions button {
+        flex: 1;
+        padding: 10px;
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+        font-family: inherit;
+        font-weight: 700;
+        cursor: pointer;
+    }
+    .vp-actions .vp-send {
+        background: #2563eb;
+        color: #fff;
+        border-color: #2563eb;
+    }
+
+    @media (max-width: 420px) {
+        #viewer-project-name { font-size: 0.78rem; }
+        #viewer-notes-btn span:first-of-type { display: none; }
+        #viewer-order-status-badge { max-width: 72px; }
+    }
+
     </style>
 
     <!-- Three.js + controls (same as editor) -->
@@ -1085,10 +1467,17 @@
             <span id="viewer-live-dot"></span>
             LIVE
         </div>
+        <div id="viewer-order-status-badge" title="סטטוס הזמנה" style="display:none;">הצעת מחיר</div>
         <div id="viewer-project-name">טוען...</div>
         <button id="viewer-return-live-btn" onclick="window._returnToLive()">
             <i class="fa-solid fa-rotate-left"></i>
             חזור ללייב
+        </button>
+        <button id="viewer-summary-btn" onclick="window._viewerOpenSummary()" title="תקציר הזמנה">
+            <i class="fa-solid fa-file-lines"></i>
+        </button>
+        <button id="viewer-compare-btn" onclick="window._viewerOpenCompare()" title="השוואת ארונות">
+            <i class="fa-solid fa-columns"></i>
         </button>
         <button id="viewer-notes-btn" onclick="window._viewerOpenNotes()">
             <i class="fa-solid fa-comment-dots"></i>
@@ -1096,7 +1485,7 @@
             <span id="viewer-notes-unread"></span>
         </button>
         <!-- Hidden version badge kept for JS compatibility -->
-        <span id="viewer-version-badge" style="display:none;" onclick="window._hardReload()">v2.6.1</span>
+        <span id="viewer-version-badge" style="display:none;" onclick="window._hardReload()">v2.7.0</span>
     </div>
     <!-- Row 2 hidden — view tabs moved to details bar -->
     <div id="viewer-top-row2" style="display:none;"></div>
@@ -1119,20 +1508,31 @@
     <!-- Row 2: view tabs + icon toggle buttons -->
     <div id="viewer-details-btns">
         <button class="vd-tab active" id="vdtab-3d" data-view="3d" onclick="window._setViewerView('3d')">
-            <i class="fa-solid fa-cube"></i> תלת מימד
+            <i class="fa-solid fa-cube"></i> 3D
+        </button>
+        <button class="vd-tab" id="vdtab-doors-closed" data-view="doors-closed" onclick="window._setViewerView('doors-closed')">
+            <i class="fa-solid fa-door-closed"></i> סגור
+        </button>
+        <button class="vd-tab" id="vdtab-doors-open" data-view="doors-open" onclick="window._setViewerView('doors-open')">
+            <i class="fa-solid fa-door-open"></i> פתוח
         </button>
         <button class="vd-tab" id="vdtab-front" data-view="front" onclick="window._setViewerView('front')">
             <i class="fa-solid fa-square"></i> קדמי
         </button>
+        <button class="vd-tab" id="vdtab-blueprint" data-view="blueprint" onclick="window._setViewerView('blueprint')">
+            <i class="fa-solid fa-drafting-compass"></i> תוכנית
+        </button>
         <div class="vd-row2-sep"></div>
-        <button id="btn-toggle-doors" class="vd-toggle-btn" onclick="window._toggleDoors && window._toggleDoors()" title="הסתר/הצג חזיתות">
-            <i class="fa-solid fa-door-closed"></i>
+        <button id="btn-viewer-pin" class="vd-toggle-btn" onclick="window._viewerTogglePinMode()" title="סמן נקודה על הארון">
+            <i class="fa-solid fa-location-dot"></i>
         </button>
         <button id="btn-toggle-room" class="vd-toggle-btn" onclick="window._toggleRoom && window._toggleRoom()" title="הסתר/הצג חדר">
             <i class="fa-solid fa-house"></i>
         </button>
     </div>
 </div>
+
+<div id="viewer-designer-focus" aria-live="polite"></div>
 
 <!-- ===== COLOR PICKER BOTTOM SHEET ===== -->
 <div id="vd-color-sheet-overlay" onclick="window._closeColorSheet()"></div>
@@ -1147,6 +1547,11 @@
     <!-- Color grid -->
     <div id="vd-sheet-grid-wrap">
         <div class="vd-color-grid" id="vd-color-grid"></div>
+    </div>
+    <div id="vd-sheet-actions">
+        <button type="button" id="vd-send-colors-btn" onclick="window._viewerSendColorTryouts()">
+            <i class="fa-solid fa-paper-plane"></i> שלח ניסוי צבעים למעצב
+        </button>
     </div>
 </div>
 
@@ -1240,11 +1645,62 @@
         </div>
     </div>
     <div id="viewer-notes-input-row">
+        <button type="button" id="viewer-voice-btn" onclick="window._viewerToggleVoice()" title="הקלטת קול">
+            <i class="fa-solid fa-microphone"></i>
+        </button>
         <textarea id="viewer-notes-input" placeholder="כתוב תיקון לארון זה..." rows="2"
             onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();window._viewerSendNote();}"></textarea>
         <button id="viewer-notes-send" onclick="window._viewerSendNote()">
             <i class="fa-solid fa-paper-plane"></i>
         </button>
+    </div>
+</div>
+
+<!-- Summary panel -->
+<div id="viewer-summary-panel" style="display:none;">
+    <div class="vs-card">
+        <div class="vs-header">
+            <h2><i class="fa-solid fa-file-lines"></i> תקציר הזמנה</h2>
+            <button type="button" onclick="window._viewerCloseSummary()">✕</button>
+        </div>
+        <div id="viewer-summary-body"></div>
+        <div class="vs-footer">
+            <button type="button" class="vs-primary" onclick="window._viewerToggleApprovalActive()">
+                <i class="fa-solid fa-heart"></i> אשר את הארון הנוכחי
+            </button>
+            <button type="button" onclick="window._viewerCloseSummary()">סגור</button>
+        </div>
+    </div>
+</div>
+
+<!-- Compare sheet -->
+<div id="viewer-compare-sheet">
+    <div class="vc-inner">
+        <div class="vc-head">
+            <strong>השוואת ארונות</strong>
+            <button type="button" onclick="window._viewerCloseCompare()">✕</button>
+        </div>
+        <p class="vc-hint">בחר בדיוק שני ארונות להשוואה זה-לצד-זה</p>
+        <div id="viewer-compare-options"></div>
+        <button type="button" class="vc-go" onclick="window._viewerStartCompare()">התחל השוואה</button>
+    </div>
+</div>
+
+<div id="viewer-compare-bar" style="display:none;">
+    <button type="button" onclick="window._viewerCompareShow('a')"><span id="viewer-compare-label-a">ארון א</span></button>
+    <button type="button" class="vc-exit" onclick="window._viewerExitCompare()">סיים השוואה</button>
+    <button type="button" onclick="window._viewerCompareShow('b')"><span id="viewer-compare-label-b">ארון ב</span></button>
+</div>
+
+<!-- Pin note modal -->
+<div id="viewer-pin-modal" style="display:none;">
+    <div class="vp-card">
+        <h3><i class="fa-solid fa-location-dot"></i> סימון על הארון</h3>
+        <textarea id="viewer-pin-text" rows="3" placeholder="מה לשנות בנקודה הזו?"></textarea>
+        <div class="vp-actions">
+            <button type="button" class="vp-send" onclick="window._viewerSubmitPin()">שלח למעצב</button>
+            <button type="button" onclick="window._viewerClosePinModal()">ביטול</button>
+        </div>
     </div>
 </div>
 
@@ -1261,7 +1717,8 @@
 <script src="part-paint.js?v=20260520k"></script>
 
 <!-- ===== VIEWER LOGIC ===== -->
-<script src="viewer.js?v=20260712viewerCab"></script>
+<script src="viewer.js?v=20260713extras"></script>
+<script src="viewer-extras.js?v=20260713extras"></script>
 
 </body>
 </html>
