@@ -380,6 +380,40 @@ function _bpPushCellDimLabel(p, viewKey, cellKey, x, y, heightVal) {
     );
 }
 
+/**
+ * Extra overall-height dimension for every column shorter than the wing max.
+ * dimVFn(x, yTop, yBot, labelMm) — same convention as the main overall height (floor → column top).
+ */
+function _bpDrawShorterColumnOverallHeights(dimVFn, cols, colXPositions, oy, dH, sc, wgH, ox, dW) {
+    if (!dimVFn || !cols || !colXPositions || cols.length < 2) return;
+    const heights = cols.map(c => (c && c.height) || wgH);
+    const maxH = Math.max.apply(null, heights);
+    let leftSlot = 0;
+    let rightSlot = 0;
+    const cabMid = ox + dW / 2;
+    cols.forEach((col, ci) => {
+        const h = heights[ci];
+        if (!(h < maxH - 0.05)) return;
+        const cp = colXPositions[ci];
+        if (!cp) return;
+        const topY = (cp.colTopY != null) ? cp.colTopY : (oy + dH - h * sc);
+        const botY = oy + dH;
+        if (botY - topY < 8) return;
+        const colMid = (cp.x1 + cp.x2) / 2;
+        let dimX;
+        if (colMid <= cabMid) {
+            dimX = cp.x1 - 18 - leftSlot * 22;
+            // Keep clear of the main overall-height line at ox-54
+            if (dimX < ox - 48) dimX = Math.min(cp.x1 - 18, ox - 28);
+            leftSlot++;
+        } else {
+            dimX = cp.x2 + 18 + rightSlot * 22;
+            rightSlot++;
+        }
+        dimVFn(dimX, topY, botY, `${Math.round(h * 10)}`);
+    });
+}
+
 function _bpShelfTCm() {
     return state.thickness || 1.7;
 }
@@ -1630,6 +1664,7 @@ window._generateMultiViewBlueprintSVG = function() {
         const _wgMaxTopY = cols.length > 0 ? Math.min(...cols.map(c => oy + dH - (c.height || wg.h) * sc)) : oy;
         const _wgTotalHcm = cols.length > 0 ? Math.round(Math.max(...cols.map(c => (c.height || wg.h))) * 10) : Math.round(wg.h * 10);
         dimV(ox - 54, _wgMaxTopY, oy + dH, `${_wgTotalHcm}`);
+        _bpDrawShorterColumnOverallHeights(dimV, cols, colXPositions, oy, dH, sc, wg.h, ox, dW);
         // ---- Bathroom preset: right-side external dims (body height + floor offset + drawer heights) ----
         // ---- Regular preset: split section dims + floorOffset dims ----
         if (pid === 'bathroom') {
@@ -2735,6 +2770,10 @@ window._generateMultiViewBlueprintPages = function() {
             const _maxTopY2 = cols.length > 0 ? Math.min(...cols.map(c => oy + dH - (c.height || wg.h) * sc)) : oy;
             const _totalHcm2 = cols.length > 0 ? Math.round(Math.max(...cols.map(c => (c.height || wg.h))) * 10) : Math.round(wg.h * 10);
             makeDimV(p, ox - 54, _maxTopY2, oy + dH, `${_totalHcm2}`);
+            _bpDrawShorterColumnOverallHeights(
+                (x, y1, y2, lbl) => makeDimV(p, x, y1, y2, lbl),
+                cols, colXPositions, oy, dH, sc, wg.h, ox, dW
+            );
         }
         // ---- Bathroom preset: right-side external dims (body height + floor offset + drawer heights) ----
         // ---- Regular preset: split section dims + floorOffset dims ----
