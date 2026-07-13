@@ -5776,7 +5776,7 @@ function bindUI() {
 
         // Click outside UI — close cell/partition toolbar and clear sub-zone selection
         if (state.selection.colIndex !== -1 || state.selection.rows.length > 0 || _activeSubCellIdxs.size > 0) {
-            _activeSubCellIdxs = new Set();
+            _clearSubCellSelection();
             state.selection = { colIndex: -1, rows: [] };
             closeContentSubPanels();
             needsRebuild = true;
