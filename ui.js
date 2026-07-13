@@ -2355,14 +2355,18 @@ window.toggleContentSubPanel = function(panelKey, triggerBtn) {
     const targetId = panels[panelKey];
     if (!targetId) return;
 
-    // When a partitioned cell / zone is selected, apply the default type immediately
-    // (previously only opening the sub-panel left users thinking תלייה did nothing)
+    // When opening a content panel on a partitioned cell / zone, apply default type once.
+    // (Skip when panel is already open — that click only closes it.)
     if (defaultTypes[panelKey] && state.selection.colIndex >= 0 && state.selection.rows.length > 0) {
-        const _comp = state.columns[state.selection.colIndex] &&
-            state.columns[state.selection.colIndex].compartments[state.selection.rows[0]];
-        if (_activeSubCellIdxs.size > 0 || (_comp && _comp.partition)) {
-            _dbgHang('toggleContentSubPanel auto-apply', panelKey, defaultTypes[panelKey]);
-            window.applyContentForce(defaultTypes[panelKey]);
+        const target = document.getElementById(targetId);
+        const alreadyOpen = target && target.style.display !== 'none';
+        if (!alreadyOpen) {
+            const _comp = state.columns[state.selection.colIndex] &&
+                state.columns[state.selection.colIndex].compartments[state.selection.rows[0]];
+            if (_activeSubCellIdxs.size > 0 || (_comp && _comp.partition)) {
+                _dbgHang('toggleContentSubPanel auto-apply', panelKey, defaultTypes[panelKey]);
+                window.applyContentForce(defaultTypes[panelKey]);
+            }
         }
     }
 
@@ -2422,14 +2426,16 @@ function _dbgHangSnapshot(label) {
             };
         })
         : null;
-    _dbgHang(label, {
+    const payload = {
         selection: { col: c, rows: rows.slice() },
         owner: { col: _activeSubCellOwner.col, row: _activeSubCellOwner.row },
         activeZones: [..._activeSubCellIdxs],
         partition: !!(comp && comp.partition),
         parentType: comp && comp.type,
+        zoneDoorGroups: (comp && comp.zoneDoorGroups) ? JSON.parse(JSON.stringify(comp.zoneDoorGroups)) : null,
         subCells: subs
-    });
+    };
+    console.log('[HANG/PARTITION]', label, JSON.stringify(payload, null, 2));
 }
 
 Object.defineProperty(window, '_activeSubCellIdx', {
@@ -2796,10 +2802,9 @@ window.setSubCellType = function(type, opts) {
         return;
     }
 
-    // Single-zone door/honeycomb: remove merged group if this zone belonged to one
-    if (_MERGE_ZONE_TYPES.has(subType) && selectedKeys.length === 1) {
-        _removeZoneDoorGroupsForKeys(comp, selectedKeys);
-    }
+    // Always clear any merged door/honeycomb group covering these zones.
+    // Otherwise hanging/drawers get SKIPPED in the renderer (_keyInDoorGroup).
+    _removeZoneDoorGroupsForKeys(comp, selectedKeys);
 
     selectedKeys.forEach(key => {
         const { si, z } = _parseSubKey(key);
@@ -2831,7 +2836,7 @@ window.setSubCellType = function(type, opts) {
         } else {
             newType = (current === subType) ? 'empty' : subType;
         }
-        _dbgHang('zone apply', { key: key, current: current, subType: subType, newType: newType, force: force });
+        _dbgHang('zone apply', JSON.stringify({ key: key, current: current, subType: subType, newType: newType, force: force }));
         if (subType === 'honeycomb' && newType === 'honeycomb') activateOpenCellTab = true;
         sub.zonesType[z] = newType;
         if (newType === 'empty' && Array.isArray(sub.zonesDoorStyle)) {

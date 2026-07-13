@@ -4298,17 +4298,33 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         return mesh;
                     };
                     if (subType === 'hanging' || subType === 'sorbet') {
+                        // Place near the front face so the rod is obvious in front-edit view
+                        const rodZ = Math.max(0, bodyD / 2 - 10);
                         const rodLen = Math.max(4, subW - 2);
-                        const rod = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, rodLen, 16), new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.9 }));
+                        const rodY = zoneBottomY + Math.max(zoneH - 6, zoneH * 0.85);
+                        const rodMat = new THREE.MeshStandardMaterial({
+                            color: 0xc0c0c0, metalness: 0.55, roughness: 0.35,
+                            emissive: 0x333333, emissiveIntensity: 0.15
+                        });
+                        const rod = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 2.0, rodLen, 16), rodMat);
                         rod.rotation.z = Math.PI / 2;
-                        rod.position.set(subCenterX, zoneBottomY + zoneH - 6, 0);
+                        rod.position.set(subCenterX, rodY, rodZ);
+                        rod.name = 'subHangRod';
                         _buildGroup.add(rod);
+                        if (window._DEBUG_HANG) {
+                            console.log('[HANG/PARTITION] RENDER rod', {
+                                subType: subType, subIdx: subIdx,
+                                subCenterX: subCenterX, subW: subW,
+                                zoneBottomY: zoneBottomY, zoneH: zoneH,
+                                rodY: rodY, rodZ: rodZ, rodLen: rodLen
+                            });
+                        }
                         if (subType === 'sorbet' && zoneH > 40) {
                             // Simplified pull-down housing for sub-cell sorbet
                             const darkMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.4, roughness: 0.6 });
                             const houseW = Math.min(subW - 4, 18);
                             const house = new THREE.Mesh(new THREE.BoxGeometry(houseW, 4, 6), darkMat);
-                            house.position.set(subCenterX, zoneBottomY + zoneH - 3, 0);
+                            house.position.set(subCenterX, zoneBottomY + zoneH - 3, rodZ);
                             _buildGroup.add(house);
                         }
                     } else if (subType === 'internal_drawers') {
@@ -4602,7 +4618,10 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                         ? rawBounds[z + 1] - t / 2
                                         : compTopY;
                                     const zoneH = zoneTopY - zoneBottomY;
-                                    if (zoneH <= 0) continue;
+                                    if (zoneH <= 0) {
+                                        if (window._DEBUG_HANG) console.warn('[HANG/PARTITION] SKIP zoneH<=0', { si: si, z: z, zoneBottomY: zoneBottomY, zoneTopY: zoneTopY });
+                                        continue;
+                                    }
                                     // Per-zone type: use zonesType[z] if available, else fall back to sub.type
                                     let zoneType = (Array.isArray(sub.zonesType) && sub.zonesType[z] != null && sub.zonesType[z] !== '')
                                         ? sub.zonesType[z]
@@ -4611,6 +4630,8 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                     if (zoneType && zoneType !== 'empty' && !_keyInDoorGroup(si, z)) {
                                         const zoneStyle = (Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[z]) ? sub.zonesDoorStyle[z] : 'solid';
                                         _renderSubContent(zoneType, subCenterX, subW, zoneBottomY, zoneH, si, zoneStyle);
+                                    } else if (window._DEBUG_HANG && zoneType && zoneType !== 'empty' && _keyInDoorGroup(si, z)) {
+                                        console.warn('[HANG/PARTITION] SKIP render — zone still in door group', { si: si, z: z, zoneType: zoneType });
                                     }
                                 }
                             }
@@ -4623,6 +4644,10 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                 const zoneStyle = (Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[0]) ? sub.zonesDoorStyle[0] : 'solid';
                                 _renderSubContent(zoneType, subCenterX, subW, prevY, compH, si, zoneStyle);
                             }
+                        } else if (window._DEBUG_HANG && _keyInDoorGroup(si, 0)) {
+                            console.warn('[HANG/PARTITION] SKIP render (no shelves) — zone in door group', {
+                                si: si, type: sub.type, zonesType: sub.zonesType
+                            });
                         }
                     }
 
