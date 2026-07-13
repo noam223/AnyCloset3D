@@ -6395,25 +6395,52 @@ function _captureFrameAtView(cam, ctrl, ren, scn, view, hasDoors) {
     const distY = (fitH / 2) / Math.tan(Math.PI * cam.fov / 360);
     const distX = (fitW / 2) / Math.tan(Math.PI * cam.fov / 360) / cam.aspect;
     const dist = Math.max(distY, distX);
-    const dx = view.camPos[0] - view.camTarget[0];
-    const dz = view.camPos[2] - view.camTarget[2];
-    const len = Math.hypot(dx, dz) || 1;
-    const camX = view.camTarget[0] + (dx / len) * dist;
-    const camZ = view.camTarget[2] + (dz / len) * dist;
+    const midY = view.camPos[1];
+
+    const savedWingEdit = state.wingEditMode;
+    const savedActiveWing = state.activeWing;
+    const isSideWingShot = (view.id === 'left' || view.id === 'right');
+
     window._camAnim = null;
-    cam.position.set(camX, view.camPos[1], camZ);
-    ctrl.target.set(view.camTarget[0], view.camTarget[1], view.camTarget[2]);
-    ctrl.update();
     state.viewMode = 'front';
     // Must set ALL wings — state.hasDoors only writes the active wing via proxy
     _setAllWingsHasDoors(hasDoors);
-    buildCabinet();
+
+    if (isSideWingShot) {
+        // Isolate the wing (same as edit mode) so the opposite U-leg doesn't block the camera
+        state.wingEditMode = true;
+        state.activeWing = view.id;
+        buildCabinet();
+        if (view.id === 'left') {
+            cam.position.set(dist, midY, 0);
+            ctrl.target.set(0, midY, 0);
+        } else {
+            cam.position.set(-dist, midY, 0);
+            ctrl.target.set(0, midY, 0);
+        }
+    } else {
+        state.wingEditMode = false;
+        const dx = view.camPos[0] - view.camTarget[0];
+        const dz = view.camPos[2] - view.camTarget[2];
+        const len = Math.hypot(dx, dz) || 1;
+        const camX = view.camTarget[0] + (dx / len) * dist;
+        const camZ = view.camTarget[2] + (dz / len) * dist;
+        cam.position.set(camX, midY, camZ);
+        ctrl.target.set(view.camTarget[0], view.camTarget[1], view.camTarget[2]);
+        buildCabinet();
+    }
+    ctrl.update();
+
     // Ensure door meshes aren't hidden by the editor "הסתר חזיתות" toggle
     if (typeof doorMeshes !== 'undefined' && doorMeshes) {
         doorMeshes.forEach(function(m) { m.visible = !!hasDoors; });
     }
     ren.render(scn, cam);
-    return ren.domElement.toDataURL('image/png');
+    const dataUrl = ren.domElement.toDataURL('image/png');
+
+    state.wingEditMode = savedWingEdit;
+    state.activeWing = savedActiveWing;
+    return dataUrl;
 }
 
 function _orderPreviewImagesHtml(item, rawState) {
@@ -6526,7 +6553,7 @@ window._captureCabinetPreviewImages = function() {
     buildCabinet();
     ren.render(scn, cam);
 
-    return { imgDoors: imgWithDoors, imgOpen: imgNoDoors, wingPreviews, multiViewPages, multiViewSVG, captureVer: 2 };
+    return { imgDoors: imgWithDoors, imgOpen: imgNoDoors, wingPreviews, multiViewPages, multiViewSVG, captureVer: 3 };
 };
 
 function _cartImageValid(src) {
@@ -6537,8 +6564,8 @@ window._cartItemNeedsMediaRefresh = function(itemObj) {
     if (!itemObj || !itemObj.rawState || !itemObj.spec) return false;
     const spec = itemObj.spec;
     if (!_cartImageValid(spec.imgDoors) || !_cartImageValid(spec.imgOpen)) return true;
-    // v2: corner/walk-in must set hasDoors on ALL wings during capture
-    if (_cartHasMultiFrontViews(itemObj.rawState) && (!spec.captureVer || spec.captureVer < 2)) return true;
+    // v3: walk-in side shots isolate the wing so the opposite U-leg doesn't occlude
+    if (_cartHasMultiFrontViews(itemObj.rawState) && (!spec.captureVer || spec.captureVer < 3)) return true;
     if (_cartHasMultiFrontViews(itemObj.rawState)) {
         const expected = _expectedWingCaptureCount(itemObj.rawState);
         const previews = spec.wingPreviews || [];
@@ -7252,7 +7279,7 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
             installPrice: getWing().manualInstallPrice != null ? getWing().manualInstallPrice : state.currentInstallPrice,
             imgDoors: imgWithDoors, imgOpen: imgNoDoors, imgBlueprint: imgBlueprint,
             wingPreviews: wingPreviews,
-            captureVer: (preview && preview.captureVer) || 2,
+            captureVer: (preview && preview.captureVer) || 3,
             corner: state.corner ? JSON.parse(JSON.stringify(state.corner)) : null,
             slidingDoor: slidingDoorSpec,
             multiViewSVG: multiViewSVG,
