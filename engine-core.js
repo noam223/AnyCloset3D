@@ -4276,7 +4276,19 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
 
                 // Helper: render one content type in a sub-compartment zone (3D only)
                 // subIdx: index of this sub-cell within compData.subCells (for adjacency checks)
-                const _renderSubContent = (subType, subCenterX, subW, zoneBottomY, zoneH, subIdx = -1, doorStyle = 'solid') => {
+                const _subDrawerCount = (subIdx, zoneIdx, zoneH) => {
+                    const sub = (subIdx >= 0 && compData.subCells) ? compData.subCells[subIdx] : null;
+                    if (sub && Array.isArray(sub.zonesDrawerCount) && zoneIdx >= 0 && sub.zonesDrawerCount[zoneIdx] > 0) {
+                        return Math.max(1, Math.min(8, sub.zonesDrawerCount[zoneIdx] | 0));
+                    }
+                    if (sub && sub.count > 0) return Math.max(1, Math.min(8, sub.count | 0));
+                    if (zoneH < 12) return 1;
+                    return Math.max(1, Math.min(8, Math.floor((zoneH - 11) / 20) + 1));
+                };
+                // Helper: render one content type in a sub-compartment zone (3D only)
+                // subIdx: index of this sub-cell within compData.subCells (for adjacency checks)
+                // zoneIdx: shelf-zone index within that sub-cell (for per-zone drawer counts)
+                const _renderSubContent = (subType, subCenterX, subW, zoneBottomY, zoneH, subIdx = -1, doorStyle = 'solid', zoneIdx = 0) => {
                     if (!subType || subType === 'empty' || subType === 'partition') return;
                     doorStyle = doorStyle || 'solid';
                     const _subDoorMat = () => {
@@ -4328,7 +4340,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             _buildGroup.add(house);
                         }
                     } else if (subType === 'internal_drawers') {
-                        const count = 2;
+                        const count = _subDrawerCount(subIdx, zoneIdx, zoneH);
                         const _subSide = subCenterX < colCenterX ? 'R' : 'L';
                         const _drawerFrontGap = 8;
                         const shelfFrontZ = _isSlidingWardrobe
@@ -4350,19 +4362,22 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             partIdPrefix: `drawer_sub_c${c}_r${r}_${_subSide}`,
                         });
                     } else if (subType === 'external_drawers') {
-                        const count = 2;
-                        const innerGap = 0.4;
-                        const drawerH = (zoneH - innerGap*(count+1)) / count;
-                        const fZ = bodyD/2 - t/2 - 1.5;
-                        const fingerGap = 2.5;
-                        const actualDrawerH = drawerH - fingerGap;
-                        for(let d=0; d<count; d++) {
-                            const dY = zoneBottomY + innerGap + drawerH/2 + (d * (drawerH + innerGap));
-                            const actualDY = dY - fingerGap/2;
-                            createBoard(subW - innerGap*2 - 2, actualDrawerH, t, subCenterX, actualDY, fZ, matExternal);
-                            const backPanel = new THREE.Mesh(new THREE.BoxGeometry(subW - innerGap*2 - 4, fingerGap, 0.5), new THREE.MeshStandardMaterial({ color: 0x222222 }));
-                            backPanel.position.set(subCenterX, dY + drawerH/2 - fingerGap/2, fZ - t/2 - 0.25);
-                            _buildGroup.add(backPanel);
+                        // Match full-cell external drawers: overlay fronts + handles (not recessed internal look)
+                        const count = _subDrawerCount(subIdx, zoneIdx, zoneH);
+                        const sub = (subIdx >= 0 && compData.subCells) ? compData.subCells[subIdx] : null;
+                        const extBottomY = zoneBottomY + doorGap / 2;
+                        const extTopY = zoneBottomY + zoneH - doorGap / 2;
+                        const totalExtH = Math.max(2, extTopY - extBottomY);
+                        const extDrawerH = (totalExtH - doorGap * (count - 1)) / count;
+                        const fZ = isInset ? (bodyD / 2 - t / 2) : (bodyD / 2 + t / 2 + 0.1);
+                        const drawerW = Math.max(4, subW - doorGap);
+                        const handleStyle = (sub && sub.handleStyle) || _handleStyle;
+                        for (let d = 0; d < count; d++) {
+                            const dY = extBottomY + extDrawerH / 2 + d * (extDrawerH + doorGap);
+                            _ppPartId = `drawer_ext_sub_c${c}_r${r}_s${subIdx}_z${zoneIdx}_d${d}`;
+                            const mesh = createBoard(drawerW, extDrawerH, t, subCenterX, dY, fZ, matExternal);
+                            _ppPartId = '';
+                            if (!isBP) _addPanelHandleLocal(mesh, drawerW, extDrawerH, handleStyle);
                         }
                     } else if (subType === 'door_right' || subType === 'door_left' || subType === 'door_double') {
                         if (!state.hasDoors) return;
@@ -4661,14 +4676,14 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                     // Interior (hanging/drawers/…) always — even when a door covers the front
                                     const interiorType = _interiorAtEng(sub, z);
                                     if (interiorType && interiorType !== 'empty') {
-                                        _renderSubContent(interiorType, subCenterX, subW, zoneBottomY, zoneH, si, 'solid');
+                                        _renderSubContent(interiorType, subCenterX, subW, zoneBottomY, zoneH, si, 'solid', z);
                                     }
                                     // Per-zone door only if not part of a merged door group
                                     if (!_keyInDoorGroup(si, z)) {
                                         const doorType = _doorAtEng(sub, z);
                                         if (doorType && doorType !== 'empty') {
                                             const zoneStyle = (Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[z]) ? sub.zonesDoorStyle[z] : 'solid';
-                                            _renderSubContent(doorType, subCenterX, subW, zoneBottomY, zoneH, si, zoneStyle);
+                                            _renderSubContent(doorType, subCenterX, subW, zoneBottomY, zoneH, si, zoneStyle, z);
                                         }
                                     }
                                 }
@@ -4676,13 +4691,13 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         } else if (!isBP) {
                             const interiorType = _interiorAtEng(sub, 0);
                             if (interiorType && interiorType !== 'empty') {
-                                _renderSubContent(interiorType, subCenterX, subW, prevY, compH, si, 'solid');
+                                _renderSubContent(interiorType, subCenterX, subW, prevY, compH, si, 'solid', 0);
                             }
                             if (!_keyInDoorGroup(si, 0)) {
                                 const doorType = _doorAtEng(sub, 0);
                                 if (doorType && doorType !== 'empty') {
                                     const zoneStyle = (Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[0]) ? sub.zonesDoorStyle[0] : 'solid';
-                                    _renderSubContent(doorType, subCenterX, subW, prevY, compH, si, zoneStyle);
+                                    _renderSubContent(doorType, subCenterX, subW, prevY, compH, si, zoneStyle, 0);
                                 }
                             }
                         }

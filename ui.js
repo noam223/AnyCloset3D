@@ -1009,6 +1009,22 @@ window.applyHandleStyleToCell = function(style) {
     if (!col || state.selection.rows.length === 0) return;
 
     let changed = false;
+    // Partition zone external drawers
+    if (_activeSubCellIdxs.size > 0) {
+        const r = state.selection.rows[0];
+        const comp = col.compartments[r];
+        if (comp && comp.partition && Array.isArray(comp.subCells)) {
+            _activeSubCellIdxs.forEach(key => {
+                const { si, z } = _parseSubKey(key);
+                const sub = comp.subCells[si];
+                if (!sub) return;
+                if (_zoneInteriorAt(sub, z) === 'external_drawers') {
+                    sub.handleStyle = style;
+                    changed = true;
+                }
+            });
+        }
+    }
     // Apply to external_drawers compartments in selected rows
     state.selection.rows.forEach(r => {
         const comp = col.compartments[r];
@@ -1285,9 +1301,42 @@ function updateToolbarButtonHighlights() {
         } else {
             Object.values(_doorStylePanels).forEach(p => { if (p) p.style.display = 'none'; });
         }
-        // Hide drawer count section in sub-cell mode
+        // Drawer count + handle picker for selected partition zones
         const drawerSection = document.getElementById('drawer-count-section');
-        if (drawerSection) drawerSection.style.display = 'none';
+        const drawerDisplay = document.getElementById('floating-drawer-count');
+        const drawerMinLabel = document.getElementById('floating-drawer-min');
+        let isZoneDrawer = interiorType === 'internal_drawers' || interiorType === 'external_drawers';
+        let zoneDrawerCount = 2;
+        let zoneMinCount = 1;
+        if (isZoneDrawer && activeSub) {
+            const zoneH = _getSubZoneHeightCm(col, state.selection.rows[0], activeSub, _activeZ);
+            zoneMinCount = calcMinDrawerCount(zoneH);
+            zoneDrawerCount = _zoneDrawerCountAt(activeSub, _activeZ, zoneH);
+        }
+        if (drawerSection && drawerDisplay) {
+            if (isZoneDrawer) {
+                drawerSection.style.display = 'flex';
+                drawerDisplay.innerText = zoneDrawerCount;
+                if (drawerMinLabel) drawerMinLabel.innerText = `מינ׳ ${zoneMinCount}`;
+            } else {
+                drawerSection.style.display = 'none';
+            }
+        }
+        const tbHandlePickerRow = document.getElementById('tb-handle-picker-row');
+        const tbHandlePickerDoorRow = document.getElementById('tb-handle-picker-door-row');
+        const _handleLabelsSub = { pipe: 'חיצונית', riding: 'רוכבת', touch: 'ללא ידית' };
+        const showHandleExt = interiorType === 'external_drawers' && !_isSliding;
+        if (tbHandlePickerRow) tbHandlePickerRow.style.display = showHandleExt ? '' : 'none';
+        if (tbHandlePickerDoorRow) {
+            tbHandlePickerDoorRow.style.display = (_subDoorParam && !_isSliding) ? '' : 'none';
+        }
+        if (showHandleExt && activeSub) {
+            const resolvedCell = activeSub.handleStyle || state.handleStyle || 'pipe';
+            const labelEl = document.getElementById('tb-handle-picker-label');
+            if (labelEl) labelEl.textContent = 'ידית: ' + (_handleLabelsSub[resolvedCell] || 'חיצונית');
+            const tbHandleBtn = document.getElementById('tb-btn-handle-picker');
+            if (tbHandleBtn) tbHandleBtn.classList.toggle('active', !!activeSub.handleStyle);
+        }
         return;
     }
 
@@ -2642,8 +2691,51 @@ function _clearSubZoneContent(sub, z) {
     sub.zonesType[z] = 'empty';
     sub.zonesDoor[z] = 'empty';
     if (Array.isArray(sub.zonesDoorStyle)) sub.zonesDoorStyle[z] = 'solid';
+    if (Array.isArray(sub.zonesDrawerCount) && z < sub.zonesDrawerCount.length) sub.zonesDrawerCount[z] = 0;
     const nonEmpty = sub.zonesType.filter(t => _normalizeZoneType(t) !== 'empty' && !_isDoorZoneType(t));
     sub.type = nonEmpty.length ? _normalizeZoneType(nonEmpty[0]) : 'empty';
+}
+
+/** Zone clear-height (cm) inside a partitioned sub-cell, matching engine-core zone bounds. */
+function _getSubZoneHeightCm(col, r, sub, z) {
+    const t = state.thickness;
+    const { prevY, compH } = _getSubCellCompBounds(col, r);
+    const numShelves = (sub && sub.shelves) || 0;
+    if (numShelves <= 0) return Math.round(Math.max(0, compH));
+    let subShelvesY;
+    if (Array.isArray(sub.shelvesY) && sub.shelvesY.length === numShelves) {
+        subShelvesY = sub.shelvesY;
+    } else {
+        subShelvesY = [];
+        const zoneH = compH / (numShelves + 1);
+        for (let s = 1; s <= numShelves; s++) subShelvesY.push(prevY + zoneH * s);
+    }
+    const compTopY = prevY + compH;
+    const rawBounds = [prevY, ...subShelvesY, compTopY];
+    if (z < 0 || z >= rawBounds.length - 1) return Math.round(Math.max(0, compH));
+    const zoneBottomY = (z === 0) ? rawBounds[0] : (rawBounds[z] + t / 2);
+    const zoneTopY = (z < subShelvesY.length) ? (rawBounds[z + 1] - t / 2) : compTopY;
+    return Math.round(Math.max(0, zoneTopY - zoneBottomY));
+}
+
+function _zoneDrawerCountAt(sub, z, zoneH) {
+    if (sub && Array.isArray(sub.zonesDrawerCount) && z >= 0 && sub.zonesDrawerCount[z] > 0) {
+        return sub.zonesDrawerCount[z];
+    }
+    if (zoneH != null) {
+        const auto = calcAutoDrawerCount(zoneH);
+        const min = calcMinDrawerCount(zoneH);
+        return Math.max(min, auto || 1);
+    }
+    return (sub && sub.count) || 2;
+}
+
+function _setZoneDrawerCount(sub, z, count) {
+    if (!sub) return;
+    if (!Array.isArray(sub.zonesDrawerCount)) sub.zonesDrawerCount = [];
+    while (sub.zonesDrawerCount.length <= z) sub.zonesDrawerCount.push(0);
+    sub.zonesDrawerCount[z] = count;
+    sub.count = count;
 }
 
 function _syncSubTypeFromInterior(sub) {
@@ -2966,6 +3058,14 @@ window.setSubCellType = function(type, opts) {
             }));
             if (subType === 'honeycomb' && newType === 'honeycomb') activateOpenCellTab = true;
             sub.zonesType[z] = newType;
+            if (newType === 'internal_drawers' || newType === 'external_drawers') {
+                const zoneH = _getSubZoneHeightCm(state.columns[c], r, sub, z);
+                const auto = calcAutoDrawerCount(zoneH);
+                const min = calcMinDrawerCount(zoneH);
+                _setZoneDrawerCount(sub, z, Math.max(min, auto || 1));
+            } else if (Array.isArray(sub.zonesDrawerCount) && z < sub.zonesDrawerCount.length) {
+                sub.zonesDrawerCount[z] = 0;
+            }
             _syncSubTypeFromInterior(sub);
         });
         _dbgHangSnapshot('setSubCellType OUT (interior)');
@@ -3023,8 +3123,11 @@ window.updateSubCellShelves = function(delta) {
     const newZones = newCount + 1;
     while (sub.zonesType.length < newZones) sub.zonesType.push('empty');
     while (sub.zonesDoor.length < newZones) sub.zonesDoor.push('empty');
+    if (!Array.isArray(sub.zonesDrawerCount)) sub.zonesDrawerCount = [];
+    while (sub.zonesDrawerCount.length < newZones) sub.zonesDrawerCount.push(0);
     if (sub.zonesType.length > newZones) sub.zonesType.length = newZones;
     if (sub.zonesDoor.length > newZones) sub.zonesDoor.length = newZones;
+    if (sub.zonesDrawerCount.length > newZones) sub.zonesDrawerCount.length = newZones;
     // Update active key to zone 0 of same sub-cell (shelf zones reset)
     _activeSubCellIdxs = new Set([_subKey(activeSi, 0)]);
     buildCabinet(); calculatePrice(); saveHistoryState();
@@ -3595,6 +3698,34 @@ window.updateDrawerCount = function(delta) {
     const c = state.selection.colIndex;
     const col = state.columns[c];
     let changed = false;
+
+    // Partition zone drawers
+    if (_activeSubCellIdxs.size > 0) {
+        const r = state.selection.rows[0];
+        const comp = col && col.compartments[r];
+        if (comp && comp.partition && Array.isArray(comp.subCells)) {
+            _activeSubCellIdxs.forEach(key => {
+                const { si, z } = _parseSubKey(key);
+                const sub = comp.subCells[si];
+                if (!sub) return;
+                const interior = _zoneInteriorAt(sub, z);
+                if (interior !== 'internal_drawers' && interior !== 'external_drawers') return;
+                const zoneH = _getSubZoneHeightCm(col, r, sub, z);
+                const minCount = calcMinDrawerCount(zoneH);
+                const cur = _zoneDrawerCountAt(sub, z, zoneH);
+                const newCount = Math.max(minCount, Math.min(8, cur + delta));
+                if (newCount !== cur) {
+                    _setZoneDrawerCount(sub, z, newCount);
+                    changed = true;
+                }
+            });
+            if (changed) {
+                buildCabinet(); calculatePrice(); saveHistoryState();
+                updateToolbarButtonHighlights();
+            }
+            return;
+        }
+    }
 
     state.selection.rows.forEach(r => {
         const comp = col.compartments[r];
@@ -7577,11 +7708,20 @@ function _emptyContentCounts() {
     return { shelves: 0, hanging: 0, sorbet: 0, drawersInt: 0, drawersExt: 0, openCells: 0, sideOpenCells: 0 };
 }
 
-function _addContentTypeToCounts(counts, type, comp) {
+function _addContentTypeToCounts(counts, type, comp, zoneIdx) {
     if (type === 'hanging' || type === 'cross_hanging') counts.hanging++;
     else if (type === 'sorbet') counts.sorbet++;
-    else if (type === 'internal_drawers') counts.drawersInt += (comp && comp.count) || 1;
-    else if (type === 'external_drawers') counts.drawersExt += (comp && comp.count) || 1;
+    else if (type === 'internal_drawers') {
+        const n = (comp && Array.isArray(comp.zonesDrawerCount) && zoneIdx != null && comp.zonesDrawerCount[zoneIdx] > 0)
+            ? comp.zonesDrawerCount[zoneIdx]
+            : ((comp && comp.count) || 1);
+        counts.drawersInt += n;
+    } else if (type === 'external_drawers') {
+        const n = (comp && Array.isArray(comp.zonesDrawerCount) && zoneIdx != null && comp.zonesDrawerCount[zoneIdx] > 0)
+            ? comp.zonesDrawerCount[zoneIdx]
+            : ((comp && comp.count) || 1);
+        counts.drawersExt += n;
+    }
     else if (type === 'open_cell') counts.openCells++;
     else if (type === 'side_open_cell') counts.sideOpenCells++;
 }
@@ -7593,7 +7733,7 @@ function _accumulateCompContentCounts(counts, comp) {
             if (!sub) return;
             if (typeof _ensureZoneDoorSplit === 'function') _ensureZoneDoorSplit(sub);
             if (Array.isArray(sub.zonesType) && sub.zonesType.length) {
-                sub.zonesType.forEach(function(zt) { _addContentTypeToCounts(counts, zt, sub); });
+                sub.zonesType.forEach(function(zt, z) { _addContentTypeToCounts(counts, zt, sub, z); });
             } else {
                 _addContentTypeToCounts(counts, sub.type, sub);
             }

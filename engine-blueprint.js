@@ -621,7 +621,7 @@ function _bpDrawHoneycombBlock(p, ctx) {
     }
 }
 
-function _bpDrawPartitionZoneContent(p, zoneType, zoneStyle, x1, x2, zSvgTop, zSvgH, subZoneCX, subZoneW, openDir, sc) {
+function _bpDrawPartitionZoneContent(p, zoneType, zoneStyle, x1, x2, zSvgTop, zSvgH, subZoneCX, subZoneW, openDir, sc, drawerCount) {
     zoneStyle = zoneStyle || 'solid';
     const styleSuffix = _BP_DOOR_STYLE_SUFFIX[zoneStyle] || '';
     if (zoneType === 'hanging') {
@@ -647,7 +647,7 @@ function _bpDrawPartitionZoneContent(p, zoneType, zoneStyle, x1, x2, zSvgTop, zS
     } else if (zoneType === 'side_open_cell') {
         if (zSvgH > 18) p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 14).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="10" fill="${_BP_STROKE}" opacity="0.6">כוורת צד</text>`);
     } else if (zoneType === 'internal_drawers' || zoneType === 'external_drawers') {
-        const dCount = 2;
+        const dCount = (drawerCount > 0) ? drawerCount : 2;
         const dh = zSvgH / dCount;
         for (let di = 0; di < dCount; di++) {
             const dy = zSvgTop + di * dh;
@@ -1518,7 +1518,8 @@ window._generateMultiViewBlueprintSVG = function() {
                                     if (_opensLeft && _opensRight) openDir = (ci < cols.length / 2) ? 'left' : 'right';
                                     else if (_opensLeft) openDir = 'left';
                                     else if (_opensRight) openDir = 'right';
-                                    _bpDrawPartitionZoneContent(p,zoneType, zoneStyle, x1, x2, zSvgTop, zSvgH, subZoneCX, subZoneW, openDir, sc);
+                                    _bpDrawPartitionZoneContent(p,zoneType, zoneStyle, x1, x2, zSvgTop, zSvgH, subZoneCX, subZoneW, openDir, sc,
+                                        (sub && Array.isArray(sub.zonesDrawerCount) && sub.zonesDrawerCount[z] > 0) ? sub.zonesDrawerCount[z] : ((sub && sub.count) || 0));
                                 }
 
                                 // Zone height label
@@ -2588,7 +2589,8 @@ window._generateMultiViewBlueprintPages = function() {
                                     if (_opensLeft && _opensRight) openDir = (ci < cols.length / 2) ? 'left' : 'right';
                                     else if (_opensLeft) openDir = 'left';
                                     else if (_opensRight) openDir = 'right';
-                                    _bpDrawPartitionZoneContent(p,zoneType, zoneStyle, x1, x2, zSvgTop, zSvgH, subZoneCX, subZoneW, openDir, sc);
+                                    _bpDrawPartitionZoneContent(p,zoneType, zoneStyle, x1, x2, zSvgTop, zSvgH, subZoneCX, subZoneW, openDir, sc,
+                                        (sub && Array.isArray(sub.zonesDrawerCount) && sub.zonesDrawerCount[z] > 0) ? sub.zonesDrawerCount[z] : ((sub && sub.count) || 0));
                                 } else if ((zoneType === 'honeycomb' || zoneType === 'open_cell') && !inMergeGroup) {
                                     if (zSvgH > 18) p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 14).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="10" fill="${STROKE}" opacity="0.6">כוורת</text>`);
                                     _bpDrawHoneycombBlock(p, {

@@ -239,13 +239,32 @@ function updateMobileCellSheetState() {
     // Drawer count section (right panel — in main view)
     let isDrawerSelected = false;
     let currentCount = 2;
-    state.selection.rows.forEach(r => {
-        const comp = col.compartments[r];
-        if (comp && (comp.type === 'internal_drawers' || comp.type === 'external_drawers')) {
-            isDrawerSelected = true;
-            currentCount = comp.count;
+    if (typeof _activeSubCellIdxs !== 'undefined' && _activeSubCellIdxs.size > 0) {
+        const r0 = state.selection.rows[0];
+        const comp0 = col.compartments[r0];
+        if (comp0 && comp0.partition && Array.isArray(comp0.subCells)) {
+            const firstKey = _activeSubCellIdxs.values().next().value;
+            const { si, z } = _parseSubKey(firstKey);
+            const sub = comp0.subCells[si];
+            if (sub) {
+                const interior = _zoneInteriorAt(sub, z);
+                if (interior === 'internal_drawers' || interior === 'external_drawers') {
+                    isDrawerSelected = true;
+                    const zoneH = _getSubZoneHeightCm(col, r0, sub, z);
+                    currentCount = _zoneDrawerCountAt(sub, z, zoneH);
+                }
+            }
         }
-    });
+    }
+    if (!isDrawerSelected) {
+        state.selection.rows.forEach(r => {
+            const comp = col.compartments[r];
+            if (comp && (comp.type === 'internal_drawers' || comp.type === 'external_drawers')) {
+                isDrawerSelected = true;
+                currentCount = comp.count;
+            }
+        });
+    }
     const drawerSection = document.getElementById('mcp-drawer-count');
     const drawerDisplay = document.getElementById('mcp-drawer-count-val');
     if (drawerSection) drawerSection.style.display = isDrawerSelected ? 'flex' : 'none';
@@ -254,13 +273,29 @@ function updateMobileCellSheetState() {
     // ── Handle picker button visibility ──
     let _showHandleR = false;
     let _cellHandleOverride = null;
-    state.selection.rows.forEach(r => {
-        const comp = col.compartments[r];
-        if (comp && comp.type === 'external_drawers') {
-            _showHandleR = true;
-            _cellHandleOverride = comp.handleStyle || null;
+    if (typeof _activeSubCellIdxs !== 'undefined' && _activeSubCellIdxs.size > 0) {
+        const r0 = state.selection.rows[0];
+        const comp0 = col.compartments[r0];
+        if (comp0 && comp0.partition && Array.isArray(comp0.subCells)) {
+            _activeSubCellIdxs.forEach(key => {
+                const { si, z } = _parseSubKey(key);
+                const sub = comp0.subCells[si];
+                if (sub && _zoneInteriorAt(sub, z) === 'external_drawers') {
+                    _showHandleR = true;
+                    _cellHandleOverride = sub.handleStyle || null;
+                }
+            });
         }
-    });
+    }
+    if (!_showHandleR) {
+        state.selection.rows.forEach(r => {
+            const comp = col.compartments[r];
+            if (comp && comp.type === 'external_drawers') {
+                _showHandleR = true;
+                _cellHandleOverride = comp.handleStyle || null;
+            }
+        });
+    }
     const _showHandleL = !!(existingDoor && existingDoor.type !== 'empty');
 
     const mcpHandleSepR = document.getElementById('mcp-handle-sep-r');

@@ -3112,6 +3112,18 @@ function _calcWingCost(cfg, wing) {
         col.compartments.forEach(comp => {
             if (comp.type === 'internal_drawers') finalCost += comp.count*(ex.internalDrawer||150);
             else if (comp.type === 'external_drawers') finalCost += comp.count*(ex.externalDrawer||200);
+            if (comp && comp.partition && Array.isArray(comp.subCells)) {
+                comp.subCells.forEach(sub => {
+                    if (!sub || !Array.isArray(sub.zonesType)) return;
+                    sub.zonesType.forEach((zt, z) => {
+                        const n = (Array.isArray(sub.zonesDrawerCount) && sub.zonesDrawerCount[z] > 0)
+                            ? sub.zonesDrawerCount[z]
+                            : (sub.count || 1);
+                        if (zt === 'internal_drawers') finalCost += n * (ex.internalDrawer || 150);
+                        else if (zt === 'external_drawers') finalCost += n * (ex.externalDrawer || 200);
+                    });
+                });
+            }
             if (comp && (comp.type==='open_cell'||comp.type==='side_open_cell')) { if(!inBlock){openCellBlocks++;inBlock=true;} } else { inBlock=false; }
             if (comp && comp.partition) { partitionBlocks += Array.isArray(comp.partitions)?comp.partitions.length:1; }
         });
