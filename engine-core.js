@@ -4362,20 +4362,51 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             partIdPrefix: `drawer_sub_c${c}_r${r}_${_subSide}`,
                         });
                     } else if (subType === 'external_drawers') {
-                        // Match full-cell external drawers: overlay fronts + handles (not recessed internal look)
+                        // Match full-cell external drawers: overlay fronts + handles + MAYA plinth cover
                         const count = _subDrawerCount(subIdx, zoneIdx, zoneH);
                         const sub = (subIdx >= 0 && compData.subCells) ? compData.subCells[subIdx] : null;
-                        const extBottomY = zoneBottomY + doorGap / 2;
-                        const extTopY = zoneBottomY + zoneH - doorGap / 2;
+
+                        // Bottom/top of overlay fronts — same rules as full-cell external_drawers
+                        let extBottomY = zoneBottomY;
+                        let extTopY = zoneBottomY + zoneH;
+                        const isBottomZone = (zoneIdx === 0 && r === 0);
+                        if (isBottomZone && col.type !== 'desk') {
+                            if (isInset) {
+                                const baseForInset = Math.max(state.plinthHeight, fo);
+                                extBottomY = baseForInset + t;
+                            } else {
+                                const _bathRegalimBase = (state.presetId === 'bathroom' && isRegalim && fo === 0);
+                                extBottomY = _bathRegalimBase
+                                    ? (state.plinthHeight - t)
+                                    : Math.max(state.plinthHeight, fo);
+                                // MAYA hidden plinth (7cm): drop fronts to ~floor to cover צוקל
+                                if (state.plinthHeight === 7 && fo === 0 && !_bathRegalimBase) extBottomY = 1.5;
+                            }
+                        }
+                        extBottomY += doorGap / 2;
+                        extTopY -= doorGap / 2;
+
                         const totalExtH = Math.max(2, extTopY - extBottomY);
                         const extDrawerH = (totalExtH - doorGap * (count - 1)) / count;
                         const fZ = isInset ? (bodyD / 2 - t / 2) : (bodyD / 2 + t / 2 + 0.1);
-                        const drawerW = Math.max(4, subW - doorGap);
+
+                        // Width: outer sub-cells use column overlay edges; inner edges cover half partition
+                        let drawerLeft = subCenterX - subW / 2;
+                        let drawerRight = subCenterX + subW / 2;
+                        if (!isInset && typeof boundaryXs !== 'undefined') {
+                            const numSubs = boundaryXs.length - 1;
+                            if (subIdx === 0) drawerLeft = overlayLeftX;
+                            else drawerLeft -= t / 2;
+                            if (subIdx === numSubs - 1) drawerRight = overlayRightX;
+                            else drawerRight += t / 2;
+                        }
+                        const drawerW = Math.max(4, drawerRight - drawerLeft - doorGap);
+                        const drawerCX = (drawerLeft + drawerRight) / 2;
                         const handleStyle = (sub && sub.handleStyle) || _handleStyle;
                         for (let d = 0; d < count; d++) {
                             const dY = extBottomY + extDrawerH / 2 + d * (extDrawerH + doorGap);
                             _ppPartId = `drawer_ext_sub_c${c}_r${r}_s${subIdx}_z${zoneIdx}_d${d}`;
-                            const mesh = createBoard(drawerW, extDrawerH, t, subCenterX, dY, fZ, matExternal);
+                            const mesh = createBoard(drawerW, extDrawerH, t, drawerCX, dY, fZ, matExternal);
                             _ppPartId = '';
                             if (!isBP) _addPanelHandleLocal(mesh, drawerW, extDrawerH, handleStyle);
                         }
