@@ -638,7 +638,7 @@ function buildDimensionsAndButtonsUI() {
                             delete state.columns[d.colIndex].compartments[d.rowIndex].partition;
                             delete state.columns[d.colIndex].compartments[d.rowIndex].partitions;
                             delete state.columns[d.colIndex].compartments[d.rowIndex].subCells;
-                            _activeSubCellIdxs = new Set();
+                            _clearSubCellSelection();
                         }
                         buildCabinet(); calculatePrice(); saveHistoryState();
                     });
@@ -744,7 +744,7 @@ function buildDimensionsAndButtonsUI() {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             // Clear sub-cell mode so toolbar operates on the whole cell
-            _activeSubCellIdxs = new Set();
+            _clearSubCellSelection();
             toggleSelection(d.colIndex, d.rowIndex);
         });
 
@@ -761,7 +761,7 @@ function buildDimensionsAndButtonsUI() {
         // Composite key for this zone button
         const zoneKey = _subKey(d.subCellIdx, d.zoneIdx !== undefined ? d.zoneIdx : 0);
 
-        const isSelected = _activeSubCellIdxs.has(zoneKey);
+        const isSelected = _subCellUiSelected(d.colIndex, d.rowIndex, zoneKey);
 
         // Determine zone content: merged door group, zonesType[z], or sub.type
         const sub = comp.subCells && comp.subCells[d.subCellIdx];
@@ -795,10 +795,11 @@ function buildDimensionsAndButtonsUI() {
             btn.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#10b981,#059669);box-shadow:0 0 0 2px rgba(16,185,129,0.35),0 2px 8px rgba(16,185,129,0.55);cursor:pointer;"><i class="fa-solid fa-check" style="font-size:0.75rem;color:white;pointer-events:none;"></i></div>`;
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                // Select the cell first if not selected
+                // Select the cell first if not selected — clear zones when switching column/row
                 if (!(state.selection.colIndex === d.colIndex && state.selection.rows.includes(d.rowIndex))) {
                     state.selection = { colIndex: d.colIndex, rows: [d.rowIndex] };
                 }
+                _setSubCellOwner(d.colIndex, d.rowIndex);
                 window.setActiveSubCell(zoneKey);
             });
         } else if (hasSubContent) {
@@ -819,11 +820,14 @@ function buildDimensionsAndButtonsUI() {
                 if (!(state.selection.colIndex === d.colIndex && state.selection.rows.includes(d.rowIndex))) {
                     state.selection = { colIndex: d.colIndex, rows: [d.rowIndex] };
                 }
+                _setSubCellOwner(d.colIndex, d.rowIndex);
                 window.setActiveSubCell(zoneKey);
             });
             btn.querySelector('.sub-btn-trash').addEventListener('click', (e) => {
                 e.stopPropagation();
-                const keysToClear = _activeSubCellIdxs.size > 0 ? new Set(_activeSubCellIdxs) : new Set([zoneKey]);
+                const keysToClear = (_activeSubCellOwner.col === d.colIndex && _activeSubCellOwner.row === d.rowIndex && _activeSubCellIdxs.size > 0)
+                    ? new Set(_activeSubCellIdxs)
+                    : new Set([zoneKey]);
                 keysToClear.forEach(key => {
                     const { si, z } = _parseSubKey(key);
                     const sub = comp.subCells && comp.subCells[si];
@@ -831,7 +835,7 @@ function buildDimensionsAndButtonsUI() {
                     _clearSubZoneContent(sub, z);
                 });
                 _removeZoneDoorGroupsForKeys(comp, [...keysToClear]);
-                _activeSubCellIdxs = new Set();
+                _clearSubCellSelection();
                 buildCabinet(); calculatePrice(); saveHistoryState();
                 updateToolbarButtonHighlights();
             });
@@ -846,6 +850,7 @@ function buildDimensionsAndButtonsUI() {
                 if (!(state.selection.colIndex === d.colIndex && state.selection.rows.includes(d.rowIndex))) {
                     state.selection = { colIndex: d.colIndex, rows: [d.rowIndex] };
                 }
+                _setSubCellOwner(d.colIndex, d.rowIndex);
                 window.setActiveSubCell(zoneKey);
             });
         }
@@ -1444,7 +1449,7 @@ function _getColumnRowCount(col) {
 }
 
 function selectAllColumn(colIndex) {
-    _activeSubCellIdxs = new Set();
+    _clearSubCellSelection();
     const col = state.columns[colIndex];
     if (!col) return;
     const numRows = _getColumnRowCount(col);
@@ -1674,7 +1679,7 @@ document.addEventListener('keydown', function(e) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function toggleSelection(c, r) {
-    _activeSubCellIdxs = new Set();
+    _clearSubCellSelection();
     if (state.selection.colIndex !== c) {
         state.selection = { colIndex: c, rows: [r] };
     } else {
@@ -1692,7 +1697,7 @@ function clearSelection() {
     const hadSomething = _activeSubCellIdxs.size > 0
         || state.selection.colIndex !== -1
         || state.selection.rows.length > 0;
-    _activeSubCellIdxs = new Set();
+    _clearSubCellSelection();
     state.selection = { colIndex: -1, rows: [] };
     if (hadSomething) {
         closeContentSubPanels();
@@ -2346,8 +2351,20 @@ function updateOverlaysPosition() {
 window.toggleContentSubPanel = function(panelKey, triggerBtn) {
     const panels = { hanging: 'hanging-sub-panel', drawer: 'drawer-sub-panel', honeycomb: 'honeycomb-sub-panel' };
     const triggerBtnIds = { hanging: 'tb-btn-hanging', drawer: 'tb-btn-drawer', honeycomb: 'tb-btn-honeycomb' };
+    const defaultTypes = { hanging: 'hanging', drawer: 'internal_drawers', honeycomb: 'open_cell' };
     const targetId = panels[panelKey];
     if (!targetId) return;
+
+    // When a partitioned cell / zone is selected, apply the default type immediately
+    // (previously only opening the sub-panel left users thinking תלייה did nothing)
+    if (defaultTypes[panelKey] && state.selection.colIndex >= 0 && state.selection.rows.length > 0) {
+        const _comp = state.columns[state.selection.colIndex] &&
+            state.columns[state.selection.colIndex].compartments[state.selection.rows[0]];
+        if (_activeSubCellIdxs.size > 0 || (_comp && _comp.partition)) {
+            _dbgHang('toggleContentSubPanel auto-apply', panelKey, defaultTypes[panelKey]);
+            window.applyContentForce(defaultTypes[panelKey]);
+        }
+    }
 
     // Check if this panel is already open
     const target = document.getElementById(targetId);
@@ -2375,8 +2392,46 @@ const _SUBCELL_SKIP_IDS = new Set(['drawer-count-section']);
 
 // ── Sub-cell editing state ──
 // _activeSubCellIdxs: Set of selected composite keys "si:z" (sub-cell index : zone index)
+// Scoped to one compartment via _activeSubCellOwner { col, row } — prevents parallel-column ghost selection
 // _activeSubCellIdx: convenience getter — first selected sub-cell index (integer), or -1 if none
 let _activeSubCellIdxs = new Set();
+let _activeSubCellOwner = { col: -1, row: -1 };
+
+/** Debug flag — set window._DEBUG_HANG = false to silence */
+window._DEBUG_HANG = true;
+function _dbgHang() {
+    if (!window._DEBUG_HANG) return;
+    const args = Array.prototype.slice.call(arguments);
+    args.unshift('[HANG/PARTITION]');
+    console.log.apply(console, args);
+}
+function _dbgHangSnapshot(label) {
+    if (!window._DEBUG_HANG) return;
+    const c = state.selection.colIndex;
+    const rows = state.selection.rows || [];
+    const r = rows.length ? rows[0] : -1;
+    const col = (c >= 0 && state.columns[c]) ? state.columns[c] : null;
+    const comp = (col && r >= 0) ? col.compartments[r] : null;
+    const subs = (comp && Array.isArray(comp.subCells))
+        ? comp.subCells.map(function (s, i) {
+            return {
+                i: i,
+                type: s && s.type,
+                shelves: s && s.shelves,
+                zonesType: s && s.zonesType ? s.zonesType.slice() : null
+            };
+        })
+        : null;
+    _dbgHang(label, {
+        selection: { col: c, rows: rows.slice() },
+        owner: { col: _activeSubCellOwner.col, row: _activeSubCellOwner.row },
+        activeZones: [..._activeSubCellIdxs],
+        partition: !!(comp && comp.partition),
+        parentType: comp && comp.type,
+        subCells: subs
+    });
+}
+
 Object.defineProperty(window, '_activeSubCellIdx', {
     get() {
         const v = _activeSubCellIdxs.values().next();
@@ -2386,8 +2441,34 @@ Object.defineProperty(window, '_activeSubCellIdx', {
         if (typeof key === 'string' && key.includes(':')) return parseInt(key.split(':')[0], 10);
         return typeof key === 'number' ? key : parseInt(key, 10);
     },
-    set(v) { _activeSubCellIdxs = v >= 0 ? new Set([String(v) + ':0']) : new Set(); }
+    set(v) {
+        _activeSubCellIdxs = v >= 0 ? new Set([String(v) + ':0']) : new Set();
+        if (v < 0) _activeSubCellOwner = { col: -1, row: -1 };
+    }
 });
+
+function _setSubCellOwner(col, row) {
+    if (_activeSubCellOwner.col !== col || _activeSubCellOwner.row !== row) {
+        _dbgHang('owner switch', { from: { ..._activeSubCellOwner }, to: { col: col, row: row } });
+        _activeSubCellIdxs = new Set();
+        _activeSubCellOwner = { col: col, row: row };
+    } else {
+        _activeSubCellOwner = { col: col, row: row };
+    }
+}
+
+function _clearSubCellSelection() {
+    _activeSubCellIdxs = new Set();
+    _activeSubCellOwner = { col: -1, row: -1 };
+}
+
+function _subCellUiSelected(colIndex, rowIndex, zoneKey) {
+    return _activeSubCellOwner.col === colIndex &&
+        _activeSubCellOwner.row === rowIndex &&
+        state.selection.colIndex === colIndex &&
+        state.selection.rows.includes(rowIndex) &&
+        _activeSubCellIdxs.has(zoneKey);
+}
 
 // Helper: parse composite key "si:z" → { si, z }
 function _parseSubKey(key) {
@@ -2453,6 +2534,9 @@ function _zoneTypeAt(sub, z) {
 /** Select every shelf-zone in a partitioned compartment (returns true if any) */
 function _selectAllZonesInComp(comp) {
     if (!comp || !comp.partition || !Array.isArray(comp.subCells)) return false;
+    const c = state.selection.colIndex;
+    const r = state.selection.rows[0];
+    _setSubCellOwner(c, r);
     const keys = new Set();
     comp.subCells.forEach((sub, si) => {
         const numZones = Math.max(
@@ -2463,6 +2547,7 @@ function _selectAllZonesInComp(comp) {
         for (let z = 0; z < numZones; z++) keys.add(_subKey(si, z));
     });
     _activeSubCellIdxs = keys;
+    _dbgHangSnapshot('_selectAllZonesInComp');
     return keys.size > 0;
 }
 
@@ -2515,12 +2600,19 @@ function _applyMergedZoneGroup(comp, selectedKeys, subType) {
 window.setActiveSubCell = function(key) {
     // key is a composite string "si:z" or legacy integer si
     const compositeKey = (typeof key === 'number') ? _subKey(key, 0) : String(key);
+    // Ensure owner matches current selection
+    if (state.selection.colIndex >= 0 && state.selection.rows.length === 1) {
+        _setSubCellOwner(state.selection.colIndex, state.selection.rows[0]);
+    }
     // Every click toggles the zone in/out of the selection (multi-select by default)
     if (_activeSubCellIdxs.has(compositeKey)) {
         _activeSubCellIdxs.delete(compositeKey);
+        _dbgHang('deselect zone', compositeKey);
     } else {
         _activeSubCellIdxs.add(compositeKey);
+        _dbgHang('select zone', compositeKey);
     }
+    _dbgHangSnapshot('after setActiveSubCell');
     buildDimensionsAndButtonsUI();
     updateOverlaysPosition();
     updateToolbarState();
@@ -2534,6 +2626,7 @@ window.selectSubCellSide = function(si) {
     const r = state.selection.rows[0];
     const comp = state.columns[c] && state.columns[c].compartments[r];
     if (!comp || !comp.partition || !Array.isArray(comp.subCells) || !comp.subCells[si]) return;
+    _setSubCellOwner(c, r);
     const sub = comp.subCells[si];
     const numZones = Math.max(1, (sub.shelves || 0) + 1,
         (Array.isArray(sub.zonesType) ? sub.zonesType.length : 0));
@@ -2545,6 +2638,7 @@ window.selectSubCellSide = function(si) {
     });
     for (let z = 0; z < numZones; z++) next.add(_subKey(si, z));
     _activeSubCellIdxs = next;
+    _dbgHangSnapshot('selectSubCellSide ' + si);
     buildDimensionsAndButtonsUI();
     updateOverlaysPosition();
     updateToolbarState();
@@ -2558,6 +2652,7 @@ window.selectAllSubCellZones = function() {
     const r = state.selection.rows[0];
     const comp = state.columns[c] && state.columns[c].compartments[r];
     if (!comp || !comp.partition || !Array.isArray(comp.subCells)) return;
+    _setSubCellOwner(c, r);
     const keys = new Set();
     comp.subCells.forEach((sub, si) => {
         const numZones = Math.max(1, (sub && sub.shelves ? sub.shelves + 1 : 0),
@@ -2565,6 +2660,7 @@ window.selectAllSubCellZones = function() {
         for (let z = 0; z < numZones; z++) keys.add(_subKey(si, z));
     });
     _activeSubCellIdxs = keys;
+    _dbgHangSnapshot('selectAllSubCellZones');
     buildDimensionsAndButtonsUI();
     updateOverlaysPosition();
     updateToolbarState();
@@ -2572,7 +2668,7 @@ window.selectAllSubCellZones = function() {
 };
 
 window.clearActiveSubCell = function() {
-    _activeSubCellIdxs = new Set();
+    _clearSubCellSelection();
     buildDimensionsAndButtonsUI();
     updateOverlaysPosition();
     updateToolbarState();
@@ -2615,7 +2711,7 @@ window.removePartition = function() {
         delete comp.partitions;
         delete comp.subCells;
         delete comp.zoneDoorGroups;
-        _activeSubCellIdxs = new Set();
+        _clearSubCellSelection();
         buildCabinet(); calculatePrice(); saveHistoryState();
         updateToolbarButtonHighlights();
         return;
@@ -2638,14 +2734,34 @@ window.removePartition = function() {
 // Maps open_cell/side_open_cell → honeycomb for sub-cell context
 // opts.force: set type without toggle (used by applyContentForce)
 window.setSubCellType = function(type, opts) {
-    if (state.selection.colIndex === -1 || state.selection.rows.length === 0) return;
-    if (_activeSubCellIdxs.size === 0) return;
+    _dbgHangSnapshot('setSubCellType IN type=' + type + ' force=' + !!(opts && opts.force));
+    if (state.selection.colIndex === -1 || state.selection.rows.length === 0) {
+        _dbgHang('setSubCellType ABORT: no selection');
+        return;
+    }
+    if (_activeSubCellIdxs.size === 0) {
+        _dbgHang('setSubCellType ABORT: no active zones');
+        return;
+    }
     // 'partition' is a cell-level flag — never store it as zone content
-    if (type === 'partition') return;
+    if (type === 'partition') {
+        _dbgHang('setSubCellType ABORT: partition is cell-level only');
+        return;
+    }
     const c = state.selection.colIndex;
     const r = state.selection.rows[0];
+    if (_activeSubCellOwner.col >= 0 && (_activeSubCellOwner.col !== c || _activeSubCellOwner.row !== r)) {
+        _dbgHang('setSubCellType WARN: owner≠selection (applying to selection anyway)', {
+            owner: { ..._activeSubCellOwner }, selection: { c, r }, zones: [..._activeSubCellIdxs]
+        });
+    }
+    // Keep owner in sync with the cell we actually mutate
+    _activeSubCellOwner = { col: c, row: r };
     const comp = state.columns[c] && state.columns[c].compartments[r];
-    if (!comp || !comp.partition) return;
+    if (!comp || !comp.partition) {
+        _dbgHang('setSubCellType ABORT: no partition on target cell', { c, r, hasComp: !!comp });
+        return;
+    }
     // Auto-create subCells if missing (e.g. legacy open_cell partitions)
     if (!Array.isArray(comp.subCells)) {
         const nSubs = Array.isArray(comp.partitions) ? comp.partitions.length + 1 : 2;
@@ -2715,6 +2831,7 @@ window.setSubCellType = function(type, opts) {
         } else {
             newType = (current === subType) ? 'empty' : subType;
         }
+        _dbgHang('zone apply', { key: key, current: current, subType: subType, newType: newType, force: force });
         if (subType === 'honeycomb' && newType === 'honeycomb') activateOpenCellTab = true;
         sub.zonesType[z] = newType;
         if (newType === 'empty' && Array.isArray(sub.zonesDoorStyle)) {
@@ -2736,6 +2853,7 @@ window.setSubCellType = function(type, opts) {
             sub.type = _normalizeZoneType(nonEmpty[0]);
         }
     });
+    _dbgHangSnapshot('setSubCellType OUT');
     _finishSubCellApply({ activateOpenCellTab });
 };
 
@@ -2791,7 +2909,7 @@ window.updateSubCellShelves = function(delta) {
 
 // Legacy stubs — kept for backward compatibility with any saved HTML onclick references
 window.closeSubcellToolbarUser = function() {
-    _activeSubCellIdxs = new Set();
+    _clearSubCellSelection();
     updateToolbarButtonHighlights();
 };
 window.openSubcellToolbar = function() {};
@@ -2815,7 +2933,11 @@ window.closeContentSubPanels = function() {
 // applyContentForce: always sets the type (no toggle) — used by sub-panel buttons
 // When _activeSubCellIdx is set, routes to setSubCellType instead
 window.applyContentForce = function(type) {
-    if (state.selection.colIndex === -1 || state.selection.rows.length === 0) return;
+    _dbgHangSnapshot('applyContentForce IN type=' + type);
+    if (state.selection.colIndex === -1 || state.selection.rows.length === 0) {
+        _dbgHang('applyContentForce ABORT: no selection');
+        return;
+    }
 
     // Partition is cell-level only — never apply as zone content
     if (type === 'partition') {
@@ -2825,7 +2947,9 @@ window.applyContentForce = function(type) {
 
     // Route to sub-cell if a sub-cell is active
     if (_activeSubCellIdxs.size > 0) {
+        _dbgHang('applyContentForce → setSubCellType (active zones)');
         setSubCellType(type, { force: true });
+        _dbgHangSnapshot('applyContentForce OUT after setSubCellType');
         return;
     }
 
@@ -2834,8 +2958,10 @@ window.applyContentForce = function(type) {
                        state.columns[state.selection.colIndex].compartments[state.selection.rows[0]];
     const _isHoneycombType = (type === 'open_cell' || type === 'side_open_cell');
     if (_guardComp && _guardComp.partition && !_isHoneycombType) {
+        _dbgHang('applyContentForce: partitioned cell, auto-select all zones');
         if (_selectAllZonesInComp(_guardComp)) {
             setSubCellType(type, { force: true });
+            _dbgHangSnapshot('applyContentForce OUT after auto-all zones');
             return;
         }
         _showToast('יש לבחור אזור אחד או יותר במחיצה (לחץ על + בכל אזור, או "בחר הכל")', 4500);
@@ -2920,12 +3046,17 @@ window.applyContentForce = function(type) {
 };
 
 window.applyContent = function(type) {
-    if (state.selection.colIndex === -1 || state.selection.rows.length === 0) return;
+    _dbgHangSnapshot('applyContent IN type=' + type);
+    if (state.selection.colIndex === -1 || state.selection.rows.length === 0) {
+        _dbgHang('applyContent ABORT: no selection');
+        return;
+    }
 
     const c = state.selection.colIndex;
 
     // Partition is always cell-level — never store as zone content via setSubCellType
     if (type === 'partition') {
+        _dbgHang('applyContent partition toggle on col', c, 'rows', state.selection.rows.slice());
         state.selection.rows.forEach(r => {
             const comp = state.columns[c].compartments[r];
             if (!comp) return;
@@ -2934,7 +3065,8 @@ window.applyContent = function(type) {
                 delete comp.partitions;
                 delete comp.subCells;
                 delete comp.zoneDoorGroups;
-                _activeSubCellIdxs = new Set();
+                _clearSubCellSelection();
+                _dbgHang('partition OFF', { c, r });
             } else {
                 const prevType = comp.type || 'empty';
                 const migratable = (prevType === 'hanging' || prevType === 'sorbet' ||
@@ -2954,7 +3086,14 @@ window.applyContent = function(type) {
                 if (!_allowPartitionOverlayDoors) {
                     state.columns[c].doors = state.columns[c].doors.filter(door => r < door.startRow || r > door.endRow);
                 }
+                _dbgHang('partition ON', { c, r, prevType, migratable, onlyThisCol: true });
             }
+        });
+        // Sanity: log neighboring columns' partition flags (detect accidental multi-col apply)
+        state.columns.forEach(function (col, ci) {
+            (col.compartments || []).forEach(function (comp, ri) {
+                if (comp && comp.partition) _dbgHang('partition present at', { col: ci, row: ri });
+            });
         });
         buildCabinet(); calculatePrice(); saveHistoryState();
         updateToolbarButtonHighlights();
@@ -2963,6 +3102,7 @@ window.applyContent = function(type) {
 
     // Route to sub-cell if a sub-cell is active
     if (_activeSubCellIdxs.size > 0) {
+        _dbgHang('applyContent → setSubCellType (active zones)');
         setSubCellType(type);
         return;
     }
@@ -2971,6 +3111,7 @@ window.applyContent = function(type) {
     if (type !== 'open_cell' && type !== 'side_open_cell') {
         const _guardComp2 = state.columns[c] && state.columns[c].compartments[state.selection.rows[0]];
         if (_guardComp2 && _guardComp2.partition) {
+            _dbgHang('applyContent: partitioned cell, auto-select all zones');
             if (_selectAllZonesInComp(_guardComp2)) {
                 setSubCellType(type);
                 return;
