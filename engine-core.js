@@ -4120,7 +4120,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                 if (_isActiveWingBuild && !isLast) dragHandlesData.vertical.push({ colIndex: c, shelfIdx: div.idx, x: colCenterX, y: div.y, isSplit: (div.type === 'split') });
             }
 
-if (compData && compData.type === 'hanging') {
+if (compData && compData.type === 'hanging' && !(compData.partition)) {
                 if (!isBP) {
                     const rod = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, col.width - 2, 16), new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.9 }));
                     rod.rotation.z = Math.PI / 2; rod.position.set(colCenterX, prevY + compH - 6, 0);
@@ -4128,7 +4128,7 @@ if (compData && compData.type === 'hanging') {
                 }
             }
             // === סורבטו — מנגנון תלייה מתרומם ===
-            else if (compData && compData.type === 'sorbet') {
+            else if (compData && compData.type === 'sorbet' && !(compData.partition)) {
                 if (!isBP) {
                     const darkMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.4, roughness: 0.6 });
 
@@ -4277,7 +4277,7 @@ if (compData && compData.type === 'hanging') {
                 // Helper: render one content type in a sub-compartment zone (3D only)
                 // subIdx: index of this sub-cell within compData.subCells (for adjacency checks)
                 const _renderSubContent = (subType, subCenterX, subW, zoneBottomY, zoneH, subIdx = -1, doorStyle = 'solid') => {
-                    if (!subType || subType === 'empty') return;
+                    if (!subType || subType === 'empty' || subType === 'partition') return;
                     doorStyle = doorStyle || 'solid';
                     const _subDoorMat = () => {
                         if (doorStyle === 'glass_mirror') {
@@ -4297,11 +4297,20 @@ if (compData && compData.type === 'hanging') {
                         _registerDoorMesh(mesh);
                         return mesh;
                     };
-                    if (subType === 'hanging') {
-                        const rod = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, subW - 2, 16), new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.9 }));
+                    if (subType === 'hanging' || subType === 'sorbet') {
+                        const rodLen = Math.max(4, subW - 2);
+                        const rod = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, rodLen, 16), new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.9 }));
                         rod.rotation.z = Math.PI / 2;
                         rod.position.set(subCenterX, zoneBottomY + zoneH - 6, 0);
                         _buildGroup.add(rod);
+                        if (subType === 'sorbet' && zoneH > 40) {
+                            // Simplified pull-down housing for sub-cell sorbet
+                            const darkMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.4, roughness: 0.6 });
+                            const houseW = Math.min(subW - 4, 18);
+                            const house = new THREE.Mesh(new THREE.BoxGeometry(houseW, 4, 6), darkMat);
+                            house.position.set(subCenterX, zoneBottomY + zoneH - 3, 0);
+                            _buildGroup.add(house);
+                        }
                     } else if (subType === 'internal_drawers') {
                         const count = 2;
                         const _subSide = subCenterX < colCenterX ? 'R' : 'L';
@@ -4501,8 +4510,8 @@ if (compData && compData.type === 'hanging') {
                         const zoneKey = `${si}:${z}`;
                         const grp = (compData.zoneDoorGroups || []).find(g => g.keys.includes(zoneKey));
                         if (grp) return grp.type === 'honeycomb';
-                        const zoneType = (Array.isArray(sub.zonesType) && sub.zonesType[z])
-                            ? sub.zonesType[z]
+                        const zoneType = (Array.isArray(sub.zonesType) && sub.zonesType[z] != null && sub.zonesType[z] !== '')
+                            ? ((sub.zonesType[z] === 'partition') ? 'empty' : sub.zonesType[z])
                             : ((sub.shelves || 0) <= 0 ? (sub.type || 'empty') : 'empty');
                         return zoneType === 'honeycomb' || zoneType === 'open_cell' || zoneType === 'side_open_cell';
                     };
@@ -4510,6 +4519,13 @@ if (compData && compData.type === 'hanging') {
                     for (let si = 0; si < boundaryXs.length - 1; si++) {
                         const sub = compData.subCells[si];
                         if (!sub) continue;
+                        // Sanitize accidental invalid zone types (e.g. 'partition' stored as content)
+                        if (Array.isArray(sub.zonesType)) {
+                            for (let zi = 0; zi < sub.zonesType.length; zi++) {
+                                if (sub.zonesType[zi] === 'partition') sub.zonesType[zi] = 'empty';
+                            }
+                        }
+                        if (sub.type === 'partition') sub.type = 'empty';
                         const x1 = boundaryXs[si] + (si === 0 ? 0 : t/2);
                         const x2 = boundaryXs[si+1] - (si === boundaryXs.length - 2 ? 0 : t/2);
                         const subW = x2 - x1;
@@ -4588,7 +4604,10 @@ if (compData && compData.type === 'hanging') {
                                     const zoneH = zoneTopY - zoneBottomY;
                                     if (zoneH <= 0) continue;
                                     // Per-zone type: use zonesType[z] if available, else fall back to sub.type
-                                    const zoneType = (Array.isArray(sub.zonesType) && sub.zonesType[z]) ? sub.zonesType[z] : (sub.type || 'empty');
+                                    let zoneType = (Array.isArray(sub.zonesType) && sub.zonesType[z] != null && sub.zonesType[z] !== '')
+                                        ? sub.zonesType[z]
+                                        : (sub.type || 'empty');
+                                    if (zoneType === 'partition') zoneType = 'empty';
                                     if (zoneType && zoneType !== 'empty' && !_keyInDoorGroup(si, z)) {
                                         const zoneStyle = (Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[z]) ? sub.zonesDoorStyle[z] : 'solid';
                                         _renderSubContent(zoneType, subCenterX, subW, zoneBottomY, zoneH, si, zoneStyle);
@@ -4596,9 +4615,10 @@ if (compData && compData.type === 'hanging') {
                                 }
                             }
                         } else if (!isBP && !_keyInDoorGroup(si, 0)) {
-                            const zoneType = (Array.isArray(sub.zonesType) && sub.zonesType[0])
+                            let zoneType = (Array.isArray(sub.zonesType) && sub.zonesType[0] != null && sub.zonesType[0] !== '')
                                 ? sub.zonesType[0]
                                 : (sub.type || 'empty');
+                            if (zoneType === 'partition') zoneType = 'empty';
                             if (zoneType && zoneType !== 'empty') {
                                 const zoneStyle = (Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[0]) ? sub.zonesDoorStyle[0] : 'solid';
                                 _renderSubContent(zoneType, subCenterX, subW, prevY, compH, si, zoneStyle);

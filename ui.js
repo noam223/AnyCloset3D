@@ -763,19 +763,16 @@ function buildDimensionsAndButtonsUI() {
 
         const isSelected = _activeSubCellIdxs.has(zoneKey);
 
-        // Determine zone content: use zonesType[z] if available, else sub.type
+        // Determine zone content: merged door group, zonesType[z], or sub.type
         const sub = comp.subCells && comp.subCells[d.subCellIdx];
         const zoneIdx = d.zoneIdx !== undefined ? d.zoneIdx : 0;
         let zoneType = 'empty';
         if (sub) {
-            const zoneKey = _subKey(d.subCellIdx, zoneIdx);
             const mergeGrp = _zoneDoorGroupForKey(comp, zoneKey);
             if (mergeGrp) {
-                zoneType = mergeGrp.type;
-            } else if (Array.isArray(sub.zonesType) && sub.zonesType[zoneIdx]) {
-                zoneType = sub.zonesType[zoneIdx];
-            } else if (sub.type && sub.type !== 'empty') {
-                zoneType = sub.type;
+                zoneType = _normalizeZoneType(mergeGrp.type);
+            } else {
+                zoneType = _zoneTypeAt(sub, zoneIdx);
             }
         }
         const hasSubContent = zoneType !== 'empty';
@@ -1230,10 +1227,10 @@ function updateToolbarButtonHighlights() {
             const firstKey = selectedKeysArr[0];
             const partialGroup = _zoneDoorGroupForKey(firstComp, firstKey);
             if (partialGroup) subType = partialGroup.type;
-            else if (Array.isArray(activeSub.zonesType) && activeSub.zonesType[_activeZ]) {
-                subType = activeSub.zonesType[_activeZ];
+            else if (Array.isArray(activeSub.zonesType) && activeSub.zonesType[_activeZ] != null && activeSub.zonesType[_activeZ] !== '') {
+                subType = _normalizeZoneType(activeSub.zonesType[_activeZ]);
             } else {
-                subType = activeSub.type || 'empty';
+                subType = _normalizeZoneType(activeSub.type || 'empty');
             }
         }
         if (subType === 'hanging' || subType === 'sorbet') {
@@ -2435,6 +2432,40 @@ function _zoneDoorGroupForKey(comp, key) {
     return comp.zoneDoorGroups.find(g => g.keys.includes(key)) || null;
 }
 
+/** Normalize a sub-zone content type; invalid values (e.g. accidental 'partition') → empty */
+function _normalizeZoneType(t) {
+    if (!t || t === 'empty' || t === 'partition') return 'empty';
+    return t;
+}
+
+/** Resolve content type for sub-cell zone index z */
+function _zoneTypeAt(sub, z) {
+    if (!sub) return 'empty';
+    if (Array.isArray(sub.zonesType) && z >= 0 && z < sub.zonesType.length &&
+        sub.zonesType[z] != null && sub.zonesType[z] !== '') {
+        return _normalizeZoneType(sub.zonesType[z]);
+    }
+    // Only fall back to sub.type when there is a single zone (no shelf split)
+    if ((sub.shelves || 0) <= 0) return _normalizeZoneType(sub.type || 'empty');
+    return 'empty';
+}
+
+/** Select every shelf-zone in a partitioned compartment (returns true if any) */
+function _selectAllZonesInComp(comp) {
+    if (!comp || !comp.partition || !Array.isArray(comp.subCells)) return false;
+    const keys = new Set();
+    comp.subCells.forEach((sub, si) => {
+        const numZones = Math.max(
+            1,
+            (sub && sub.shelves ? sub.shelves + 1 : 0),
+            (sub && Array.isArray(sub.zonesType) ? sub.zonesType.length : 0)
+        );
+        for (let z = 0; z < numZones; z++) keys.add(_subKey(si, z));
+    });
+    _activeSubCellIdxs = keys;
+    return keys.size > 0;
+}
+
 function _clearSubZoneContent(sub, z) {
     if (!sub) return;
     if (Array.isArray(sub.zonesType)) {
@@ -2605,9 +2636,12 @@ window.removePartition = function() {
 
 // Set content type for all active sub-cell zones (per-zone composite key "si:z" support)
 // Maps open_cell/side_open_cell → honeycomb for sub-cell context
-window.setSubCellType = function(type) {
+// opts.force: set type without toggle (used by applyContentForce)
+window.setSubCellType = function(type, opts) {
     if (state.selection.colIndex === -1 || state.selection.rows.length === 0) return;
     if (_activeSubCellIdxs.size === 0) return;
+    // 'partition' is a cell-level flag — never store it as zone content
+    if (type === 'partition') return;
     const c = state.selection.colIndex;
     const r = state.selection.rows[0];
     const comp = state.columns[c] && state.columns[c].compartments[r];
@@ -2620,6 +2654,7 @@ window.setSubCellType = function(type) {
 
     // Map open_cell / side_open_cell → honeycomb for sub-cell context
     const subType = (type === 'open_cell' || type === 'side_open_cell') ? 'honeycomb' : type;
+    const force = !!(opts && opts.force);
     const selectedKeys = _sortedSubKeys(_activeSubCellIdxs);
 
     let activateOpenCellTab = false;
@@ -2638,7 +2673,7 @@ window.setSubCellType = function(type) {
     // Multiple zones + door/honeycomb → one merged unit spanning the combined area
     if (_MERGE_ZONE_TYPES.has(subType) && selectedKeys.length > 1) {
         const existingMerged = _findZoneDoorGroup(comp, selectedKeys);
-        const togglingOff = existingMerged && existingMerged.type === subType;
+        const togglingOff = !force && existingMerged && existingMerged.type === subType;
         _applyMergedZoneGroup(comp, selectedKeys, subType);
         activateOpenCellTab = subType === 'honeycomb' && !togglingOff;
         _finishSubCellApply({ activateOpenCellTab });
@@ -2656,17 +2691,22 @@ window.setSubCellType = function(type) {
         if (!sub) return;
 
         // Ensure zonesType array exists and is sized correctly
-        const numZones = Array.isArray(sub.zonesType) ? sub.zonesType.length : 1;
         if (!Array.isArray(sub.zonesType) || sub.zonesType.length < 1) {
-            sub.zonesType = [sub.type || 'empty'];
+            sub.zonesType = [_normalizeZoneType(sub.type || 'empty')];
         }
         // Expand zonesType if needed (e.g. shelves were added after selection)
         while (sub.zonesType.length <= z) sub.zonesType.push('empty');
+        // Sanitize accidental invalid types
+        for (let i = 0; i < sub.zonesType.length; i++) {
+            sub.zonesType[i] = _normalizeZoneType(sub.zonesType[i]);
+        }
 
-        // Toggle: clicking same type → empty
-        const current = sub.zonesType[z] || 'empty';
+        // Toggle: clicking same type → empty (unless force)
+        const current = _normalizeZoneType(sub.zonesType[z] || 'empty');
         let newType;
-        if (subType === 'door_right' && current === 'door_left') {
+        if (force) {
+            newType = subType;
+        } else if (subType === 'door_right' && current === 'door_left') {
             newType = 'door_double';
         } else if (subType === 'door_left' && current === 'door_right') {
             newType = 'door_double';
@@ -2686,14 +2726,14 @@ window.setSubCellType = function(type) {
 
         // Keep sub.type in sync:
         // otherwise set sub.type to the most common non-empty type (for backward compat)
-        const nonEmpty = sub.zonesType.filter(t => t && t !== 'empty');
+        const nonEmpty = sub.zonesType.filter(t => _normalizeZoneType(t) !== 'empty');
         if (nonEmpty.length === 0) {
             sub.type = 'empty';
-        } else if (sub.zonesType.every(t => t === nonEmpty[0])) {
-            sub.type = nonEmpty[0];
+        } else if (sub.zonesType.every(t => _normalizeZoneType(t) === _normalizeZoneType(nonEmpty[0]))) {
+            sub.type = _normalizeZoneType(nonEmpty[0]);
         } else {
             // Mixed zones — keep sub.type as the first non-empty zone type
-            sub.type = nonEmpty[0];
+            sub.type = _normalizeZoneType(nonEmpty[0]);
         }
     });
     _finishSubCellApply({ activateOpenCellTab });
@@ -2777,19 +2817,27 @@ window.closeContentSubPanels = function() {
 window.applyContentForce = function(type) {
     if (state.selection.colIndex === -1 || state.selection.rows.length === 0) return;
 
-    // Route to sub-cell if a sub-cell is active
-    if (_activeSubCellIdxs.size > 0) {
-        setSubCellType(type);
+    // Partition is cell-level only — never apply as zone content
+    if (type === 'partition') {
+        window.applyContent('partition');
         return;
     }
 
-    // Guard: if the selected compartment has a partition and no sub-cell is selected,
-    // do NOT apply the type to the whole compartment (would destroy the partition),
-    // UNLESS the type is open_cell/side_open_cell (honeycomb) — those clear the partition.
+    // Route to sub-cell if a sub-cell is active
+    if (_activeSubCellIdxs.size > 0) {
+        setSubCellType(type, { force: true });
+        return;
+    }
+
+    // Guard: partitioned cell without zone selection → apply to all zones (don't destroy partition)
     const _guardComp = state.columns[state.selection.colIndex] &&
                        state.columns[state.selection.colIndex].compartments[state.selection.rows[0]];
     const _isHoneycombType = (type === 'open_cell' || type === 'side_open_cell');
     if (_guardComp && _guardComp.partition && !_isHoneycombType) {
+        if (_selectAllZonesInComp(_guardComp)) {
+            setSubCellType(type, { force: true });
+            return;
+        }
         _showToast('יש לבחור אזור אחד או יותר במחיצה (לחץ על + בכל אזור, או "בחר הכל")', 4500);
         return;
     }
@@ -2874,42 +2922,34 @@ window.applyContentForce = function(type) {
 window.applyContent = function(type) {
     if (state.selection.colIndex === -1 || state.selection.rows.length === 0) return;
 
-    // Route to sub-cell if a sub-cell is active
-    if (_activeSubCellIdxs.size > 0) {
-        setSubCellType(type);
-        return;
-    }
-
     const c = state.selection.colIndex;
 
-    // Guard: partitioned cell requires at least one zone selected
-    if (type !== 'partition') {
-        const _guardComp2 = state.columns[c] && state.columns[c].compartments[state.selection.rows[0]];
-        if (_guardComp2 && _guardComp2.partition) {
-            _showToast('יש לבחור אזור אחד או יותר במחיצה (לחץ על + בכל אזור, או "בחר הכל")', 4500);
-            return;
-        }
-    }
-    
-    // Special handling: 'partition' now toggles partition flag on the cell
+    // Partition is always cell-level — never store as zone content via setSubCellType
     if (type === 'partition') {
         state.selection.rows.forEach(r => {
             const comp = state.columns[c].compartments[r];
             if (!comp) return;
             if (comp.partition) {
-                // Turn off partition
                 delete comp.partition;
                 delete comp.partitions;
                 delete comp.subCells;
+                delete comp.zoneDoorGroups;
                 _activeSubCellIdxs = new Set();
             } else {
-                // Turn on partition with new partitions[] array
+                const prevType = comp.type || 'empty';
+                const migratable = (prevType === 'hanging' || prevType === 'sorbet' ||
+                    prevType === 'internal_drawers' || prevType === 'external_drawers');
                 comp.partition = true;
                 comp.partitions = [0.5];
-                // Always create subCells — all cell types support sub-cell content
-                comp.subCells = [{ type: 'empty', shelves: 0 }, { type: 'empty', shelves: 0 }];
-                // In inset-front models, a full-column door over a partitioned opening is valid.
-                // Other models still route partition doors through per-zone sub-cells only.
+                if (migratable) {
+                    comp.subCells = [
+                        { type: prevType, shelves: 0, zonesType: [prevType] },
+                        { type: prevType, shelves: 0, zonesType: [prevType] }
+                    ];
+                    comp.type = 'empty';
+                } else {
+                    comp.subCells = [{ type: 'empty', shelves: 0 }, { type: 'empty', shelves: 0 }];
+                }
                 const _allowPartitionOverlayDoors = (state.cabinetModel === 'ab2' || state.cabinetModel === 'ab2_nohoney');
                 if (!_allowPartitionOverlayDoors) {
                     state.columns[c].doors = state.columns[c].doors.filter(door => r < door.startRow || r > door.endRow);
@@ -2919,6 +2959,25 @@ window.applyContent = function(type) {
         buildCabinet(); calculatePrice(); saveHistoryState();
         updateToolbarButtonHighlights();
         return;
+    }
+
+    // Route to sub-cell if a sub-cell is active
+    if (_activeSubCellIdxs.size > 0) {
+        setSubCellType(type);
+        return;
+    }
+
+    // Partitioned cell without zone selection → apply to all zones (keep partition)
+    if (type !== 'open_cell' && type !== 'side_open_cell') {
+        const _guardComp2 = state.columns[c] && state.columns[c].compartments[state.selection.rows[0]];
+        if (_guardComp2 && _guardComp2.partition) {
+            if (_selectAllZonesInComp(_guardComp2)) {
+                setSubCellType(type);
+                return;
+            }
+            _showToast('יש לבחור אזור אחד או יותר במחיצה (לחץ על + בכל אזור, או "בחר הכל")', 4500);
+            return;
+        }
     }
 
     if (type === 'side_open_cell') {
@@ -3026,6 +3085,12 @@ window.applyDoor = function(type) {
     const _doorPartComp = state.columns[c] && state.columns[c].compartments[Math.min(...state.selection.rows)];
     const _allowPartitionOverlayDoors = (state.cabinetModel === 'ab2' || state.cabinetModel === 'ab2_nohoney');
     if (_doorPartComp && _doorPartComp.partition && state.selection.rows.length === 1 && !_allowPartitionOverlayDoors) {
+        if (_selectAllZonesInComp(_doorPartComp)) {
+            const _subDoorMap = { empty: 'empty', right: 'door_right', left: 'door_left', double: 'door_double', flap: 'door_flap' };
+            state.columns[c].doors = state.columns[c].doors.filter(door => Math.min(...state.selection.rows) < door.startRow || Math.min(...state.selection.rows) > door.endRow);
+            setSubCellType(_subDoorMap[type] || type);
+            return;
+        }
         _showToast('יש לבחור אזור אחד או יותר במחיצה (לחץ על + בכל אזור, או "בחר הכל")', 4500);
         return;
     }
