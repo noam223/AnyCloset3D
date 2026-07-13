@@ -4492,6 +4492,42 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
 
                 // Draw sub-cell shelves and content (N+1 sub-cells)
                 if (compData.subCells && (compData.type !== 'open_cell' && compData.type !== 'side_open_cell')) {
+                    const _isDoorTypeEng = (t) => !!(t && (t === 'door_right' || t === 'door_left' || t === 'door_double' || t === 'door_flap'));
+                    const _ensureZoneDoorSplitEng = (sub) => {
+                        if (!sub) return;
+                        if (!Array.isArray(sub.zonesType)) sub.zonesType = [sub.type || 'empty'];
+                        if (!Array.isArray(sub.zonesDoor)) sub.zonesDoor = [];
+                        const n = Math.max(sub.zonesType.length, sub.zonesDoor.length, 1);
+                        while (sub.zonesType.length < n) sub.zonesType.push('empty');
+                        while (sub.zonesDoor.length < n) sub.zonesDoor.push('empty');
+                        for (let zi = 0; zi < n; zi++) {
+                            const t = sub.zonesType[zi];
+                            if (_isDoorTypeEng(t)) {
+                                if (!_isDoorTypeEng(sub.zonesDoor[zi])) sub.zonesDoor[zi] = t;
+                                sub.zonesType[zi] = 'empty';
+                            }
+                            if (sub.zonesType[zi] === 'partition') sub.zonesType[zi] = 'empty';
+                        }
+                        if (_isDoorTypeEng(sub.type)) {
+                            if (!_isDoorTypeEng(sub.zonesDoor[0])) sub.zonesDoor[0] = sub.type;
+                            sub.type = 'empty';
+                        }
+                    };
+                    const _interiorAtEng = (sub, z) => {
+                        _ensureZoneDoorSplitEng(sub);
+                        if (!sub) return 'empty';
+                        let t = (Array.isArray(sub.zonesType) && sub.zonesType[z] != null && sub.zonesType[z] !== '')
+                            ? sub.zonesType[z]
+                            : ((sub.shelves || 0) <= 0 ? (sub.type || 'empty') : 'empty');
+                        if (t === 'partition' || _isDoorTypeEng(t)) t = 'empty';
+                        return t || 'empty';
+                    };
+                    const _doorAtEng = (sub, z) => {
+                        _ensureZoneDoorSplitEng(sub);
+                        if (!sub || !Array.isArray(sub.zonesDoor)) return 'empty';
+                        const t = sub.zonesDoor[z];
+                        return _isDoorTypeEng(t) ? t : 'empty';
+                    };
                     const _parseSubKeyEng = (key) => {
                         const parts = String(key).split(':');
                         return { si: parseInt(parts[0], 10), z: parseInt(parts[1] || '0', 10) };
@@ -4525,23 +4561,15 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         if (!sub) return false;
                         const zoneKey = `${si}:${z}`;
                         const grp = (compData.zoneDoorGroups || []).find(g => g.keys.includes(zoneKey));
-                        if (grp) return grp.type === 'honeycomb';
-                        const zoneType = (Array.isArray(sub.zonesType) && sub.zonesType[z] != null && sub.zonesType[z] !== '')
-                            ? ((sub.zonesType[z] === 'partition') ? 'empty' : sub.zonesType[z])
-                            : ((sub.shelves || 0) <= 0 ? (sub.type || 'empty') : 'empty');
+                        if (grp) return grp.type === 'honeycomb' || grp.type === 'open_cell' || grp.type === 'side_open_cell';
+                        const zoneType = _interiorAtEng(sub, z);
                         return zoneType === 'honeycomb' || zoneType === 'open_cell' || zoneType === 'side_open_cell';
                     };
 
                     for (let si = 0; si < boundaryXs.length - 1; si++) {
                         const sub = compData.subCells[si];
                         if (!sub) continue;
-                        // Sanitize accidental invalid zone types (e.g. 'partition' stored as content)
-                        if (Array.isArray(sub.zonesType)) {
-                            for (let zi = 0; zi < sub.zonesType.length; zi++) {
-                                if (sub.zonesType[zi] === 'partition') sub.zonesType[zi] = 'empty';
-                            }
-                        }
-                        if (sub.type === 'partition') sub.type = 'empty';
+                        _ensureZoneDoorSplitEng(sub);
                         const x1 = boundaryXs[si] + (si === 0 ? 0 : t/2);
                         const x2 = boundaryXs[si+1] - (si === boundaryXs.length - 2 ? 0 : t/2);
                         const subW = x2 - x1;
@@ -4563,17 +4591,26 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             const compTopY = prevY + compH;
                             const zoneBounds = [prevY, ...subShelvesY, compTopY];
                             const numZones = zoneBounds.length - 1;
-                            // Ensure zonesType array is sized correctly
+                            // Ensure zonesType / zonesDoor arrays are sized correctly
                             if (!Array.isArray(sub.zonesType) || sub.zonesType.length !== numZones) {
-                                sub.zonesType = Array.from({ length: numZones }, (_, z) =>
-                                    (sub.zonesType && sub.zonesType[z]) ? sub.zonesType[z] : (sub.type || 'empty')
+                                const prev = Array.isArray(sub.zonesType) ? sub.zonesType.slice() : [];
+                                sub.zonesType = Array.from({ length: numZones }, (_, z) => {
+                                    const t = prev[z] != null && prev[z] !== '' ? prev[z] : (sub.type || 'empty');
+                                    return _isDoorTypeEng(t) || t === 'partition' ? 'empty' : t;
+                                });
+                            }
+                            if (!Array.isArray(sub.zonesDoor) || sub.zonesDoor.length !== numZones) {
+                                const prevD = Array.isArray(sub.zonesDoor) ? sub.zonesDoor.slice() : [];
+                                sub.zonesDoor = Array.from({ length: numZones }, (_, z) =>
+                                    _isDoorTypeEng(prevD[z]) ? prevD[z] : 'empty'
                                 );
                             }
                             for (let z = 0; z < numZones; z++) {
                                 const zoneCenterY = (zoneBounds[z] + zoneBounds[z + 1]) / 2;
                                 const zoneKey = `${si}:${z}`;
                                 const doorGrp = (compData.zoneDoorGroups || []).find(g => g.keys.includes(zoneKey));
-                                let btnSubType = sub.zonesType[z] || 'empty';
+                                let btnSubType = _interiorAtEng(sub, z);
+                                if (btnSubType === 'empty') btnSubType = _doorAtEng(sub, z);
                                 if (doorGrp) btnSubType = doorGrp.type;
                                 state.dimData.push({
                                     isSubCellBtn: true,
@@ -4613,7 +4650,6 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                 });
                                 for (let z = 0; z < clearBounds.length - 1; z++) {
                                     const zoneBottomY = clearBounds[z];
-                                    // top of zone = bottom of next shelf board (next rawBound - t/2), or compTopY
                                     const zoneTopY = (z < subShelvesY.length)
                                         ? rawBounds[z + 1] - t / 2
                                         : compTopY;
@@ -4622,32 +4658,33 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                         if (window._DEBUG_HANG) console.warn('[HANG/PARTITION] SKIP zoneH<=0', { si: si, z: z, zoneBottomY: zoneBottomY, zoneTopY: zoneTopY });
                                         continue;
                                     }
-                                    // Per-zone type: use zonesType[z] if available, else fall back to sub.type
-                                    let zoneType = (Array.isArray(sub.zonesType) && sub.zonesType[z] != null && sub.zonesType[z] !== '')
-                                        ? sub.zonesType[z]
-                                        : (sub.type || 'empty');
-                                    if (zoneType === 'partition') zoneType = 'empty';
-                                    if (zoneType && zoneType !== 'empty' && !_keyInDoorGroup(si, z)) {
-                                        const zoneStyle = (Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[z]) ? sub.zonesDoorStyle[z] : 'solid';
-                                        _renderSubContent(zoneType, subCenterX, subW, zoneBottomY, zoneH, si, zoneStyle);
-                                    } else if (window._DEBUG_HANG && zoneType && zoneType !== 'empty' && _keyInDoorGroup(si, z)) {
-                                        console.warn('[HANG/PARTITION] SKIP render — zone still in door group', { si: si, z: z, zoneType: zoneType });
+                                    // Interior (hanging/drawers/…) always — even when a door covers the front
+                                    const interiorType = _interiorAtEng(sub, z);
+                                    if (interiorType && interiorType !== 'empty') {
+                                        _renderSubContent(interiorType, subCenterX, subW, zoneBottomY, zoneH, si, 'solid');
+                                    }
+                                    // Per-zone door only if not part of a merged door group
+                                    if (!_keyInDoorGroup(si, z)) {
+                                        const doorType = _doorAtEng(sub, z);
+                                        if (doorType && doorType !== 'empty') {
+                                            const zoneStyle = (Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[z]) ? sub.zonesDoorStyle[z] : 'solid';
+                                            _renderSubContent(doorType, subCenterX, subW, zoneBottomY, zoneH, si, zoneStyle);
+                                        }
                                     }
                                 }
                             }
-                        } else if (!isBP && !_keyInDoorGroup(si, 0)) {
-                            let zoneType = (Array.isArray(sub.zonesType) && sub.zonesType[0] != null && sub.zonesType[0] !== '')
-                                ? sub.zonesType[0]
-                                : (sub.type || 'empty');
-                            if (zoneType === 'partition') zoneType = 'empty';
-                            if (zoneType && zoneType !== 'empty') {
-                                const zoneStyle = (Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[0]) ? sub.zonesDoorStyle[0] : 'solid';
-                                _renderSubContent(zoneType, subCenterX, subW, prevY, compH, si, zoneStyle);
+                        } else if (!isBP) {
+                            const interiorType = _interiorAtEng(sub, 0);
+                            if (interiorType && interiorType !== 'empty') {
+                                _renderSubContent(interiorType, subCenterX, subW, prevY, compH, si, 'solid');
                             }
-                        } else if (window._DEBUG_HANG && _keyInDoorGroup(si, 0)) {
-                            console.warn('[HANG/PARTITION] SKIP render (no shelves) — zone in door group', {
-                                si: si, type: sub.type, zonesType: sub.zonesType
-                            });
+                            if (!_keyInDoorGroup(si, 0)) {
+                                const doorType = _doorAtEng(sub, 0);
+                                if (doorType && doorType !== 'empty') {
+                                    const zoneStyle = (Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[0]) ? sub.zonesDoorStyle[0] : 'solid';
+                                    _renderSubContent(doorType, subCenterX, subW, prevY, compH, si, zoneStyle);
+                                }
+                            }
                         }
                     }
 
