@@ -6283,6 +6283,47 @@ function _expectedWingCaptureCount(rawState) {
     return 0;
 }
 
+/** Snapshot hasDoors for every wing (proxy writes only touch activeWing). */
+function _snapshotAllWingsHasDoors() {
+    const snap = {};
+    Object.keys(state.wings || {}).forEach(k => {
+        const w = state.wings[k];
+        if (!w) return;
+        if (Object.prototype.hasOwnProperty.call(w, 'hasDoors')) snap[k] = w.hasDoors;
+        if (w.sideCabinet && Object.prototype.hasOwnProperty.call(w.sideCabinet, 'hasDoors')) {
+            snap[k + '::sideCabinet'] = w.sideCabinet.hasDoors;
+        }
+    });
+    return snap;
+}
+
+function _restoreAllWingsHasDoors(snap) {
+    if (!snap) return;
+    Object.keys(snap).forEach(k => {
+        if (k.endsWith('::sideCabinet')) {
+            const wingKey = k.slice(0, -'::sideCabinet'.length);
+            if (state.wings[wingKey] && state.wings[wingKey].sideCabinet) {
+                state.wings[wingKey].sideCabinet.hasDoors = snap[k];
+            }
+            return;
+        }
+        if (state.wings[k]) state.wings[k].hasDoors = snap[k];
+    });
+}
+
+/** Apply hasDoors to all wings — required for corner/walk-in print captures. */
+function _setAllWingsHasDoors(val) {
+    const v = !!val;
+    ['center', 'left', 'right'].forEach(side => {
+        if (state.wings[side]) state.wings[side].hasDoors = v;
+    });
+    Object.keys(state.wings || {}).forEach(k => {
+        if (k.startsWith('upperUnit_') && state.wings[k]) state.wings[k].hasDoors = v;
+    });
+    const sc = state.wings.center && state.wings.center.sideCabinet;
+    if (sc && sc.side && sc.side !== 'none') sc.hasDoors = v;
+}
+
 function _getSideWingCaptureViews() {
     const pid = state.presetId || '';
     const centerWing = state.wings && state.wings.center;
@@ -6364,8 +6405,13 @@ function _captureFrameAtView(cam, ctrl, ren, scn, view, hasDoors) {
     ctrl.target.set(view.camTarget[0], view.camTarget[1], view.camTarget[2]);
     ctrl.update();
     state.viewMode = 'front';
-    state.hasDoors = hasDoors;
+    // Must set ALL wings — state.hasDoors only writes the active wing via proxy
+    _setAllWingsHasDoors(hasDoors);
     buildCabinet();
+    // Ensure door meshes aren't hidden by the editor "הסתר חזיתות" toggle
+    if (typeof doorMeshes !== 'undefined' && doorMeshes) {
+        doorMeshes.forEach(function(m) { m.visible = !!hasDoors; });
+    }
     ren.render(scn, cam);
     return ren.domElement.toDataURL('image/png');
 }
@@ -6424,12 +6470,14 @@ window._captureCabinetPreviewImages = function() {
         return { imgDoors: null, imgOpen: null, wingPreviews: [], multiViewPages: [], multiViewSVG: null };
     }
 
-    const originalDoorsState = state.hasDoors;
+    const originalDoorsSnap = _snapshotAllWingsHasDoors();
+    const originalDoorsVisible = window._doorsVisible;
     const originalViewMode = state.viewMode;
     const savedCamPos = cam.position.clone();
     const savedTarget = ctrl.target.clone();
     const savedCamAnim = window._camAnim;
     const savedCamFov = cam.fov;
+    window._doorsVisible = true;
 
     const snapCenterWing = state.wings.center;
     const snapCols = snapCenterWing && snapCenterWing.columns && snapCenterWing.columns.length > 0
@@ -6473,11 +6521,12 @@ window._captureCabinetPreviewImages = function() {
     window._camAnim = savedCamAnim;
     state.viewMode = originalViewMode;
     updateCameraView();
-    state.hasDoors = originalDoorsState;
+    _restoreAllWingsHasDoors(originalDoorsSnap);
+    window._doorsVisible = originalDoorsVisible;
     buildCabinet();
     ren.render(scn, cam);
 
-    return { imgDoors: imgWithDoors, imgOpen: imgNoDoors, wingPreviews, multiViewPages, multiViewSVG };
+    return { imgDoors: imgWithDoors, imgOpen: imgNoDoors, wingPreviews, multiViewPages, multiViewSVG, captureVer: 2 };
 };
 
 function _cartImageValid(src) {
@@ -6488,6 +6537,8 @@ window._cartItemNeedsMediaRefresh = function(itemObj) {
     if (!itemObj || !itemObj.rawState || !itemObj.spec) return false;
     const spec = itemObj.spec;
     if (!_cartImageValid(spec.imgDoors) || !_cartImageValid(spec.imgOpen)) return true;
+    // v2: corner/walk-in must set hasDoors on ALL wings during capture
+    if (_cartHasMultiFrontViews(itemObj.rawState) && (!spec.captureVer || spec.captureVer < 2)) return true;
     if (_cartHasMultiFrontViews(itemObj.rawState)) {
         const expected = _expectedWingCaptureCount(itemObj.rawState);
         const previews = spec.wingPreviews || [];
@@ -6679,6 +6730,7 @@ window._refreshCartMediaForPrint = async function() {
                 itemObj.spec.multiViewPages = media.multiViewPages;
             }
             if (media.multiViewSVG) itemObj.spec.multiViewSVG = media.multiViewSVG;
+            if (media.captureVer) itemObj.spec.captureVer = media.captureVer;
             await new Promise(r => setTimeout(r, 0));
         }
     } finally {
@@ -7200,6 +7252,7 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
             installPrice: getWing().manualInstallPrice != null ? getWing().manualInstallPrice : state.currentInstallPrice,
             imgDoors: imgWithDoors, imgOpen: imgNoDoors, imgBlueprint: imgBlueprint,
             wingPreviews: wingPreviews,
+            captureVer: (preview && preview.captureVer) || 2,
             corner: state.corner ? JSON.parse(JSON.stringify(state.corner)) : null,
             slidingDoor: slidingDoorSpec,
             multiViewSVG: multiViewSVG,

@@ -5416,12 +5416,27 @@ window.captureProjectThumbnail = function() {
         var savedFov = camera.fov;
         var savedCamAnim = window._camAnim;
         var savedViewMode = state.viewMode;
-        var savedHasDoors = state.hasDoors;
+        var savedHasDoorsSnap = {};
+        Object.keys(state.wings || {}).forEach(function(k) {
+            var w = state.wings[k];
+            if (!w) return;
+            if (Object.prototype.hasOwnProperty.call(w, 'hasDoors')) savedHasDoorsSnap[k] = w.hasDoors;
+            if (w.sideCabinet && Object.prototype.hasOwnProperty.call(w.sideCabinet, 'hasDoors')) {
+                savedHasDoorsSnap[k + '::sideCabinet'] = w.sideCabinet.hasDoors;
+            }
+        });
+        var savedDoorsVisible = window._doorsVisible;
         var savedDimDisplay = dimLayer ? dimLayer.style.display : '';
         var savedBtnDisplay = buttonsLayer ? buttonsLayer.style.display : '';
 
         state.viewMode = 'front';
-        state.hasDoors = true;
+        window._doorsVisible = true;
+        ['center', 'left', 'right'].forEach(function(side) {
+            if (state.wings[side]) state.wings[side].hasDoors = true;
+        });
+        Object.keys(state.wings || {}).forEach(function(k) {
+            if (k.indexOf('upperUnit_') === 0 && state.wings[k]) state.wings[k].hasDoors = true;
+        });
         buildCabinet();
         updateCameraView();
         if (window._camAnim) {
@@ -5451,7 +5466,17 @@ window.captureProjectThumbnail = function() {
         controls.update();
         window._camAnim = savedCamAnim;
         state.viewMode = savedViewMode;
-        state.hasDoors = savedHasDoors;
+        Object.keys(savedHasDoorsSnap).forEach(function(k) {
+            if (k.indexOf('::sideCabinet') !== -1) {
+                var wk = k.replace('::sideCabinet', '');
+                if (state.wings[wk] && state.wings[wk].sideCabinet) {
+                    state.wings[wk].sideCabinet.hasDoors = savedHasDoorsSnap[k];
+                }
+                return;
+            }
+            if (state.wings[k]) state.wings[k].hasDoors = savedHasDoorsSnap[k];
+        });
+        window._doorsVisible = savedDoorsVisible;
         if (dimLayer) dimLayer.style.display = savedDimDisplay;
         if (buttonsLayer) buttonsLayer.style.display = savedBtnDisplay;
         buildCabinet();
