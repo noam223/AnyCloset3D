@@ -2666,6 +2666,10 @@ function buildCabinet() {
         window._renderRoomPlan2D();
     }
 
+    if (typeof window._dnRefreshClientPins === 'function') {
+        try { window._dnRefreshClientPins(); } catch (e) { /* ignore */ }
+    }
+
 }
 
 // Build a single linear cabinet snapshot into an arbitrary THREE.Group (layout / compare mode).

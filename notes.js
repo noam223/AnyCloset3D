@@ -147,6 +147,8 @@ var _dnCabIndexColExists = null;
 var _dnDesignerName = null;
 var _dnKnownIds = {};
 var _dnCabIdxLocked = false;
+var _dnPinMarkers = []; // THREE meshes on scene
+var _dnPendingPinFocus = null; // {x,y,z} after jump-to-cabinet
 
 function _dnEsc(str) {
     return String(str || '')
@@ -262,10 +264,17 @@ function _dnAppendBubble(note, container) {
                 (payload && payload.cabLabel ? (' — ' + _dnEsc(payload.cabLabel)) : '') +
             '</div>';
     } else if (type === 'pin_note' || (payload && payload.type === 'pin')) {
+        var pinText = _dnEsc(payload && payload.text ? payload.text : note.message);
+        var px = payload && typeof payload.x === 'number' ? payload.x : '';
+        var py = payload && typeof payload.y === 'number' ? payload.y : '';
+        var pz = payload && typeof payload.z === 'number' ? payload.z : '';
         bubbleHtml =
-            '<div class="designer-note-bubble special pin ' + (isClient ? 'client' : 'designer') + '">' +
+            '<div class="designer-note-bubble special pin ' + (isClient ? 'client' : 'designer') + '" ' +
+                'data-pin-x="' + px + '" data-pin-y="' + py + '" data-pin-z="' + pz + '" ' +
+                'style="cursor:pointer;" title="לחץ כדי להציג את הסימון על הארון">' +
                 '<i class="fa-solid fa-location-dot"></i> סימון על הארון<br>' +
-                _dnEsc(payload && payload.text ? payload.text : note.message) +
+                pinText +
+                '<div style="margin-top:6px;font-size:0.72rem;opacity:0.75;">לחץ להצגה על הארון ↗</div>' +
             '</div>';
     } else if (type === 'voice_note' || (payload && payload.type === 'voice')) {
         var src = payload && payload.dataUrl ? payload.dataUrl : '';
@@ -290,7 +299,152 @@ function _dnAppendBubble(note, container) {
     wrap.innerHTML =
         bubbleHtml +
         '<div class="designer-note-meta">' + _dnEsc(senderLabel) + (time ? (' · ' + time) : '') + '</div>';
+
+    // Click pin note → show markers + focus camera on that point
+    if (type === 'pin_note' || (payload && payload.type === 'pin')) {
+        wrap.addEventListener('click', function() {
+            var bubble = wrap.querySelector('[data-pin-x]');
+            if (!bubble) return;
+            var x = parseFloat(bubble.getAttribute('data-pin-x'));
+            var y = parseFloat(bubble.getAttribute('data-pin-y'));
+            var z = parseFloat(bubble.getAttribute('data-pin-z'));
+            if (!isFinite(x) || !isFinite(y) || !isFinite(z)) {
+                if (typeof _showToast === 'function') _showToast('לסימון זה אין מיקום תלת־ממדי', 3000);
+                return;
+            }
+            _dnShowPinsAndFocus(x, y, z);
+        });
+    }
+
     container.appendChild(wrap);
+}
+
+function _dnClearPinMarkers() {
+    _dnPinMarkers.forEach(function(m) {
+        if (m && m.parent) m.parent.remove(m);
+        if (m && m.geometry) m.geometry.dispose();
+        if (m && m.material) m.material.dispose();
+    });
+    _dnPinMarkers = [];
+}
+
+function _dnAddPinMarker(x, y, z, highlight) {
+    if (typeof THREE === 'undefined' || !window.scene) return null;
+    var geo = new THREE.SphereGeometry(highlight ? 4.2 : 3.4, 14, 14);
+    var mat = new THREE.MeshBasicMaterial({
+        color: highlight ? 0xf59e0b : 0xef4444,
+        depthTest: false,
+        transparent: true,
+        opacity: 0.95
+    });
+    var mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x, y, z);
+    mesh.renderOrder = 9999;
+    mesh.userData.designerClientPin = true;
+    // Soft outer ring for visibility
+    var ring = new THREE.Mesh(
+        new THREE.SphereGeometry(highlight ? 7 : 5.5, 14, 14),
+        new THREE.MeshBasicMaterial({
+            color: highlight ? 0xfbbf24 : 0xfca5a5,
+            transparent: true,
+            opacity: 0.28,
+            depthTest: false
+        })
+    );
+    ring.renderOrder = 9998;
+    mesh.add(ring);
+    window.scene.add(mesh);
+    _dnPinMarkers.push(mesh);
+    return mesh;
+}
+
+function _dnParsePinPayload(row) {
+    if (!row || !row.message) return null;
+    var type = row.message_type || 'note';
+    var payload = null;
+    if (String(row.message).trim().charAt(0) === '{') {
+        try { payload = JSON.parse(row.message); } catch (e) { payload = null; }
+    }
+    if (type !== 'pin_note' && !(payload && payload.type === 'pin')) return null;
+    if (!payload || typeof payload.x !== 'number') return null;
+    return payload;
+}
+
+/** Draw all client pins for active notes-cabinet (and optional highlight focus). */
+window._dnRefreshClientPins = function(focusPos) {
+    _dnClearPinMarkers();
+    if (typeof THREE === 'undefined' || !window.scene) return;
+    // Only paint pins when the 3D scene is showing the same cart item the pins belong to
+    if (typeof state !== 'undefined' && state.editingCartIndex >= 0 &&
+        Number(state.editingCartIndex) !== Number(_dnActiveCabIdx)) {
+        return;
+    }
+    var pins = _dnMessages.filter(function(row) {
+        if (_dnCabIdxFromRow(row) !== Number(_dnActiveCabIdx)) return false;
+        return !!_dnParsePinPayload(row);
+    });
+    pins.forEach(function(row) {
+        var p = _dnParsePinPayload(row);
+        if (!p) return;
+        var isFocus = !!(focusPos &&
+            Math.abs(p.x - focusPos.x) < 0.5 &&
+            Math.abs(p.y - focusPos.y) < 0.5 &&
+            Math.abs(p.z - focusPos.z) < 0.5);
+        // If only one pin and no explicit focus — highlight it
+        if (!focusPos && pins.length === 1) isFocus = true;
+        _dnAddPinMarker(p.x, p.y, p.z, isFocus);
+    });
+};
+
+function _dnFocusCameraOnPin(x, y, z) {
+    if (!window.camera || !window.controls) return;
+    var cam = window.camera;
+    var ctrl = window.controls;
+    var target = new THREE.Vector3(x, y, z);
+    var dist = 110;
+    var toPos = new THREE.Vector3(x + dist * 0.55, y + dist * 0.35, z + dist * 0.75);
+    window._camAnim = null;
+    if (typeof THREE !== 'undefined') {
+        window._camAnim = {
+            fromPos: cam.position.clone(),
+            fromTarget: ctrl.target.clone(),
+            toPos: toPos,
+            toTarget: target,
+            t: 0,
+            duration: 0.55,
+            onDone: null
+        };
+        ctrl.enabled = false;
+    } else {
+        cam.position.copy(toPos);
+        ctrl.target.copy(target);
+        ctrl.update();
+    }
+    if (typeof state !== 'undefined') state.viewMode = '3d';
+    if (typeof updateCameraView === 'function') {
+        // keep 3d orbit free after focus
+        window._orbitFree = true;
+    }
+}
+
+function _dnShowPinsAndFocus(x, y, z) {
+    var needJump = (typeof state !== 'undefined' && state.editingCartIndex !== _dnActiveCabIdx);
+    if (needJump && typeof editCartItem === 'function') {
+        _dnPendingPinFocus = { x: x, y: y, z: z };
+        editCartItem(_dnActiveCabIdx);
+        if (typeof _showToast === 'function') _showToast('טוען ארון ומציג את הסימון...', 2500);
+        setTimeout(function() {
+            if (!_dnPendingPinFocus) return;
+            var p = _dnPendingPinFocus;
+            _dnPendingPinFocus = null;
+            window._dnRefreshClientPins(p);
+            _dnFocusCameraOnPin(p.x, p.y, p.z);
+        }, 700);
+        return;
+    }
+    window._dnRefreshClientPins({ x: x, y: y, z: z });
+    _dnFocusCameraOnPin(x, y, z);
+    if (typeof _showToast === 'function') _showToast('הסימון מסומן בכתום על הארון', 2500);
 }
 
 function _dnRenderCabTabs() {
@@ -314,6 +468,7 @@ function _dnRenderCabTabs() {
                 _dnRenderCabTabs();
                 _dnRenderThread(cabIdx);
                 _dnMarkCabRead(cabIdx);
+                window._dnRefreshClientPins();
             };
             tabsEl.appendChild(tab);
         })(idx);
@@ -351,6 +506,7 @@ function _dnRenderThread(cabIdx) {
 function _dnRenderPanel() {
     _dnRenderCabTabs();
     _dnRenderThread(_dnActiveCabIdx);
+    window._dnRefreshClientPins();
 }
 
 window._updateNotesBadges = function() {
@@ -586,8 +742,14 @@ function _dnOnNewMessage(note) {
         _dnUpdateAllBadges();
 
         var cabLabel = _dnGetCabLabel(idx);
+        var pinPay = _dnParsePinPayload(note);
         if (typeof _showToast === 'function') {
-            _showToast('תיקון חדש מלקוח — ' + cabLabel, 5000);
+            _showToast(pinPay
+                ? ('סימון חדש על הארון — ' + cabLabel + ' (פתח תיקונים ולחץ על ההערה)')
+                : ('תיקון חדש מלקוח — ' + cabLabel), 5000);
+        }
+        if (pinPay && idx === _dnActiveCabIdx) {
+            window._dnRefreshClientPins({ x: pinPay.x, y: pinPay.y, z: pinPay.z });
         }
     }
 
@@ -599,6 +761,7 @@ function _dnOnNewMessage(note) {
             if (empty) empty.remove();
             _dnAppendBubble(note, body);
             if (body) body.scrollTop = body.scrollHeight;
+            window._dnRefreshClientPins();
         }
     }
 }
@@ -612,6 +775,7 @@ window._startDesignerNotesListener = async function(token) {
 
     await _dnFetchAllMessages();
     _dnUpdateAllBadges();
+    window._dnRefreshClientPins();
 
     var sb = _dnGetSb();
     if (!sb) return;
@@ -658,6 +822,7 @@ window._stopDesignerNotesListener = function() {
     _dnKnownIds = {};
     _dnUnreadPerCab = {};
     _dnTotalUnread = 0;
+    _dnClearPinMarkers();
     _dnUpdateAllBadges();
 };
 
