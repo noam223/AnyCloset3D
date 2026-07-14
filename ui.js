@@ -34,7 +34,7 @@ function _endDrag() {
 // ────────────────────────────────────────────────────────────────────────────
 
 const colorNamesHebrew = {
-    white_matte: 'לבן מט 2100', c3110: '3110', c795: '759', u727: 'U727',
+    white_matte: 'לבן מט 2100', c3110: '3110', c795: '759', c705: '705', u727: 'U727',
     w1200: 'W1200', u232: 'U232', u604: 'U604', u638: 'U638',
     c3207: '3207', black_matte: 'שחור מט', custom: 'מותאם אישית',
     '2020': 'גוון 2020', '2024': 'גוון 2024', 'H1367': 'H1367', 'H1307': 'H1307', 'H1227': 'H1227',
@@ -43,6 +43,66 @@ const colorNamesHebrew = {
     '7180': 'גוון 7180', '456': 'גוון 456', '462': 'גוון 462', '463': 'גוון 463',
     '464': 'גוון 464', '480': 'גוון 480'
 };
+
+/** Human label for a material color key — never collapses unknown codes to "ברירת מחדל". */
+function _colorKeyLabel(key) {
+    if (key == null || key === '') return 'ברירת מחדל';
+    if (colorNamesHebrew[key]) return colorNamesHebrew[key];
+    const s = String(key);
+    if (/^c\d+$/i.test(s)) return s.slice(1);
+    if (/^[uw]\d+$/i.test(s)) return s.toUpperCase();
+    return s;
+}
+
+function _compHasOpenCellContent(comp) {
+    if (!comp) return false;
+    if (comp.type === 'open_cell' || comp.type === 'side_open_cell') return true;
+    if (comp.partition && Array.isArray(comp.subCells)) {
+        return comp.subCells.some(function(sub) {
+            if (!sub) return false;
+            if (sub.type === 'honeycomb' || sub.type === 'open_cell' || sub.type === 'side_open_cell') return true;
+            if (Array.isArray(sub.zonesType)) {
+                return sub.zonesType.some(function(zt) {
+                    return zt === 'honeycomb' || zt === 'open_cell' || zt === 'side_open_cell';
+                });
+            }
+            return false;
+        });
+    }
+    return false;
+}
+
+function _wingHasOpenCellContent(wing) {
+    if (!wing || !Array.isArray(wing.columns)) return false;
+    return wing.columns.some(function(col) {
+        return col && Array.isArray(col.compartments) && col.compartments.some(_compHasOpenCellContent);
+    });
+}
+
+/** Open-cell / honeycomb color from every wing that actually has that content (corner/walk-in safe). */
+function _resolveOpenCellColorLabel(wings, fallbackKey) {
+    const labels = [];
+    const seen = new Set();
+    const addWing = function(wing) {
+        if (!_wingHasOpenCellContent(wing)) return;
+        const label = _colorKeyLabel(wing.materialOpenCell || fallbackKey);
+        if (!seen.has(label)) {
+            seen.add(label);
+            labels.push(label);
+        }
+    };
+    if (wings && typeof wings === 'object') {
+        ['center', 'left', 'right'].forEach(function(side) { addWing(wings[side]); });
+        Object.keys(wings).forEach(function(k) {
+            if (k.indexOf('upperUnit_') === 0) addWing(wings[k]);
+        });
+        if (wings.center && wings.center.sideCabinet && wings.center.sideCabinet.side && wings.center.sideCabinet.side !== 'none') {
+            addWing(wings.center.sideCabinet);
+        }
+    }
+    if (labels.length) return labels.join(', ');
+    return _colorKeyLabel(fallbackKey);
+}
 
 const placementHebrew = {
     'wall': 'ארון קיר חופשי',
@@ -7189,7 +7249,7 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
         const _extraColorsSet = new Set();
         if (state.partColors && typeof state.partColors === 'object') {
             Object.values(state.partColors).forEach(key => {
-                if (key) _extraColorsSet.add(colorNamesHebrew[key] || key);
+                if (key) _extraColorsSet.add(_colorKeyLabel(key));
             });
         }
         const extraColorsStr = _extraColorsSet.size > 0 ? Array.from(_extraColorsSet).join(', ') : null;
@@ -7214,7 +7274,7 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
                 const isMirrorDoor = panel === 'mirror' || panel === 'mirror_dark';
                 if (isMirrorDoor) return _panelTypeLabel[panel] || 'מראה';
                 const colorKey = doorColors[i] || bodyMatKey;
-                return colorNamesHebrew[colorKey] || colorKey || 'ברירת מחדל';
+                return _colorKeyLabel(colorKey);
             });
 
             slidingDoorSpec = {
@@ -7257,13 +7317,13 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
                 return model ? style + ' — ' + model : style;
             })(),
             desk: deskInfo,
-            colorBody: colorNamesHebrew[state.materialBody] || 'ברירת מחדל',
-            colorInternal: colorNamesHebrew[state.materialInternal] || 'ברירת מחדל',
-            colorBack: colorNamesHebrew[state.materialBack] || 'ברירת מחדל',
-            colorExternal: colorNamesHebrew[state.materialExternal] || 'ברירת מחדל',
-            colorDesk: colorNamesHebrew[state.materialDesk] || 'ברירת מחדל',
-            colorOpenCell: colorNamesHebrew[state.materialOpenCell] || 'ברירת מחדל',
-            colorDrawers: _isWritingDeskCart ? (colorNamesHebrew[state.materialExternal] || 'ברירת מחדל') : undefined,
+            colorBody: _colorKeyLabel(state.materialBody),
+            colorInternal: _colorKeyLabel(state.materialInternal),
+            colorBack: _colorKeyLabel(state.materialBack),
+            colorExternal: _colorKeyLabel(state.materialExternal),
+            colorDesk: _colorKeyLabel(state.materialDesk),
+            colorOpenCell: _resolveOpenCellColorLabel(state.wings, state.materialOpenCell),
+            colorDrawers: _isWritingDeskCart ? _colorKeyLabel(state.materialExternal) : undefined,
             isWritingDesk: _isWritingDeskCart,
             writingDeskHasDrawers: !_isWritingDeskCart || _wdCart.hasDrawers !== false,
             writingDeskDrawerCount: _isWritingDeskCart ? _wdDrawerCountCart : undefined,
@@ -7900,8 +7960,30 @@ function _plainSpecValue(v) {
         .trim();
 }
 
+/** Refresh display color fields from rawState (fixes stale / wrong-wing labels on reprint). */
+function _enrichSpecColorsFromRaw(item, rawState) {
+    if (!item || !rawState) return item;
+    const wing = (rawState.wings && (rawState.wings[rawState.activeWing || 'center'] || rawState.wings.center)) || null;
+    const mat = function(key) {
+        if (wing && wing[key]) return wing[key];
+        return rawState[key];
+    };
+    if (mat('materialBody')) item.colorBody = _colorKeyLabel(mat('materialBody'));
+    if (mat('materialInternal')) item.colorInternal = _colorKeyLabel(mat('materialInternal'));
+    if (mat('materialExternal')) item.colorExternal = _colorKeyLabel(mat('materialExternal'));
+    if (mat('materialBack')) item.colorBack = _colorKeyLabel(mat('materialBack'));
+    if (mat('materialDesk')) item.colorDesk = _colorKeyLabel(mat('materialDesk'));
+    if (rawState.wings) {
+        item.colorOpenCell = _resolveOpenCellColorLabel(rawState.wings, mat('materialOpenCell') || rawState.materialOpenCell);
+    } else if (mat('materialOpenCell')) {
+        item.colorOpenCell = _colorKeyLabel(mat('materialOpenCell'));
+    }
+    return item;
+}
+
 function _collectPrintSpecRows(item, itemObj) {
     const isWD = _cartIsWritingDesk(itemObj);
+    if (itemObj && itemObj.rawState) _enrichSpecColorsFromRaw(item, itemObj.rawState);
     const rows = [];
 
     rows.push({ id: 'modelName', label: isWD ? 'סוג מוצר' : 'דגם ארון', value: _plainSpecValue(item.modelName) });
@@ -9270,9 +9352,17 @@ body { background:white; }
 // ==========================================
 // Helper: build customer-facing detail lines for summary print / Excel
 function _summarySpecOrRaw(item, rawState, specKey, rawKey) {
-    if (item[specKey]) return item[specKey];
-    if (!rawState || !rawState[rawKey]) return null;
-    return colorNamesHebrew[rawState[rawKey]] || rawState[rawKey];
+    if (rawKey === 'materialOpenCell' && rawState && rawState.wings) {
+        return _resolveOpenCellColorLabel(rawState.wings, rawState.materialOpenCell);
+    }
+    if (item[specKey] && item[specKey] !== 'ברירת מחדל') return item[specKey];
+    if (!rawState) return (item[specKey] && item[specKey] !== 'ברירת מחדל') ? item[specKey] : null;
+    if (rawState.wings) {
+        const wing = rawState.wings[rawState.activeWing || 'center'] || rawState.wings.center;
+        if (wing && wing[rawKey]) return _colorKeyLabel(wing[rawKey]);
+    }
+    if (!rawState[rawKey]) return (item[specKey] && item[specKey] !== 'ברירת מחדל') ? item[specKey] : null;
+    return _colorKeyLabel(rawState[rawKey]);
 }
 
 function _buildCustomerSummaryDetails(itemObj) {
