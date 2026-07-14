@@ -161,6 +161,7 @@ function buildSlidingDoorCabinet() {
     cabinetGroup.add(frameGroup);
     if (state.hasDoors !== false) {
         cabinetGroup.add(doorsGroup);
+        if (typeof _registerDoorMesh === 'function') _registerDoorMesh(doorsGroup);
     }
 
     // Helper: add a box mesh to a target group
@@ -1006,6 +1007,7 @@ function buildFullCornerUnit(side, wingData) {
                     }
                     doorGroup.add(handle);
                 }
+                if (typeof _registerDoorMesh === 'function') _registerDoorMesh(doorGroup);
             };
 
             // Door 1: front face of horizontal arm

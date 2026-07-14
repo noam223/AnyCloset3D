@@ -1436,7 +1436,10 @@ window.deskHitBoxes = deskHitBoxes;
 let doorMeshes = [];
 
 function _registerDoorMesh(mesh) {
-    if (!mesh || !_isActiveWingBuild) return;
+    if (!mesh) return;
+    // In wing-edit mode only the active wing's doors should be tracked (picking/tools).
+    // Outside edit mode register every rendered door — needed for corner/multi-wing open↔close.
+    if (state.wingEditMode && !_isActiveWingBuild) return;
     doorMeshes.push(mesh);
 }
 let currentHoveredDoor = null;
@@ -4876,6 +4879,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                     if (isBP) flapMesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(flapGeo), new THREE.LineBasicMaterial({ color: 0x000000 })));
                     _buildGroup.add(flapMesh);
                     _ppRegisterMesh(flapMesh, doorPartId);
+                    _registerDoorMesh(flapMesh);
                     const _flapHandleStyle = door.handleStyle || _handleStyle;
                     if (!isBP && _flapHandleStyle === 'pipe') {
                         const handleH = Math.min(flapH * 0.25, 12);
@@ -4932,7 +4936,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         mirrorMesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(mirrorGeo), edgeMat));
                         doorGroup.add(mirrorMesh);
                         _ppRegisterMesh(mirrorMesh, partIdSuffix);
-                        if (_isActiveWingBuild) doorMeshes.push(mirrorMesh);
+                        _registerDoorMesh(doorGroup);
                         return; // no handle, no frame
                     }
 
@@ -4991,8 +4995,6 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         }
                         doorGroup.add(mesh);
                         _ppRegisterMesh(mesh, partIdSuffix);
-                        if (_isActiveWingBuild) doorMeshes.push(mesh);
-
                         if (_bathGroove !== 'plain') {
                             _drawGroovesOnPanel(doorGroup, _bathGroove, w, dH, t, doorLocalX, 0, t / 2 + 0.05, matExternal);
                         }
@@ -5078,6 +5080,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             }
                         }
                     }
+                    _registerDoorMesh(doorGroup);
                 };
 
                 const doorStyle = door.style || 'solid';
