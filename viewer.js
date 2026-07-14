@@ -1295,6 +1295,16 @@ function _subscribeNotesRealtime(cabIdx) {
             var list = document.getElementById('viewer-notes-list');
             if (list) list.scrollTop = list.scrollHeight;
         })
+        .on('postgres_changes', {
+            event:  'DELETE',
+            schema: 'public',
+            table:  'project_messages',
+            filter: 'share_token=eq.' + _token
+        }, function(payload) {
+            if (typeof window._viewerExtrasOnNoteDeleted === 'function') {
+                window._viewerExtrasOnNoteDeleted(payload.old);
+            }
+        })
         .subscribe();
 }
 

@@ -268,10 +268,17 @@ function _dnAppendBubble(note, container) {
         var px = payload && typeof payload.x === 'number' ? payload.x : '';
         var py = payload && typeof payload.y === 'number' ? payload.y : '';
         var pz = payload && typeof payload.z === 'number' ? payload.z : '';
+        var delBtn = note.id
+            ? ('<button type="button" class="designer-pin-delete-btn" data-pin-id="' + _dnEsc(String(note.id)) + '" ' +
+                'title="מחק סימון" style="position:absolute;top:6px;left:6px;width:26px;height:26px;border:none;border-radius:8px;' +
+                'background:rgba(239,68,68,0.12);color:#dc2626;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:0.75rem;">' +
+                '<i class="fa-solid fa-trash"></i></button>')
+            : '';
         bubbleHtml =
             '<div class="designer-note-bubble special pin ' + (isClient ? 'client' : 'designer') + '" ' +
                 'data-pin-x="' + px + '" data-pin-y="' + py + '" data-pin-z="' + pz + '" ' +
-                'style="cursor:pointer;" title="לחץ כדי להציג את הסימון על הארון">' +
+                'style="cursor:pointer;position:relative;padding-left:34px;" title="לחץ כדי להציג את הסימון על הארון">' +
+                delBtn +
                 '<i class="fa-solid fa-location-dot"></i> סימון על הארון<br>' +
                 pinText +
                 '<div style="margin-top:6px;font-size:0.72rem;opacity:0.75;">לחץ להצגה על הארון ↗</div>' +
@@ -302,6 +309,15 @@ function _dnAppendBubble(note, container) {
 
     // Click pin note → show markers + focus camera on that point
     if (type === 'pin_note' || (payload && payload.type === 'pin')) {
+        var delEl = wrap.querySelector('.designer-pin-delete-btn');
+        if (delEl) {
+            delEl.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                var pid = delEl.getAttribute('data-pin-id');
+                if (pid) window._dnDeletePinNote(pid, wrap);
+            });
+        }
         wrap.addEventListener('click', function() {
             var bubble = wrap.querySelector('[data-pin-x]');
             if (!bubble) return;
@@ -317,6 +333,74 @@ function _dnAppendBubble(note, container) {
     }
 
     container.appendChild(wrap);
+}
+
+/** Remove a pin note from DB + UI + 3D markers (designer). */
+window._dnDeletePinNote = async function(noteId, wrapEl) {
+    if (!noteId) return;
+    if (!confirm('למחוק את הסימון מהארון ומהתיקונים?')) return;
+    var sb = _dnGetSb();
+    if (!sb) {
+        if (typeof _showToast === 'function') _showToast('אין חיבור למסד הנתונים', 3000);
+        return;
+    }
+    try {
+        var result = await sb.from('project_messages').delete().eq('id', noteId);
+        if (result.error) {
+            console.error('[designer-notes] delete pin error:', result.error);
+            if (typeof _showToast === 'function') _showToast('שגיאה במחיקת הסימון', 3500);
+            return;
+        }
+        _dnRemoveMessageLocally(noteId);
+        if (wrapEl && wrapEl.parentNode) wrapEl.parentNode.removeChild(wrapEl);
+        window._dnRefreshClientPins();
+        if (typeof _showToast === 'function') _showToast('הסימון נמחק', 2200);
+    } catch (e) {
+        console.error('[designer-notes] delete pin exception:', e);
+        if (typeof _showToast === 'function') _showToast('שגיאה במחיקת הסימון', 3500);
+    }
+};
+
+function _dnRemoveMessageLocally(noteId) {
+    if (!noteId) return;
+    var wasUnread = false;
+    var cabIdx = null;
+    _dnMessages = _dnMessages.filter(function(row) {
+        if (String(row.id) !== String(noteId)) return true;
+        if (row.sender_role === 'client' && !row.is_read) {
+            wasUnread = true;
+            cabIdx = _dnCabIdxFromRow(row);
+        }
+        return false;
+    });
+    if (_dnKnownIds[noteId]) delete _dnKnownIds[noteId];
+    if (wasUnread && cabIdx !== null) {
+        _dnUnreadPerCab[cabIdx] = Math.max(0, (_dnUnreadPerCab[cabIdx] || 0) - 1);
+        _dnTotalUnread = Math.max(0, _dnTotalUnread - 1);
+        _dnUpdateAllBadges();
+    }
+}
+
+function _dnOnDeletedMessage(oldRow) {
+    if (!oldRow || !oldRow.id) return;
+    if (!_dnKnownIds[oldRow.id] && !_dnMessages.some(function(r) { return String(r.id) === String(oldRow.id); })) {
+        return;
+    }
+    _dnRemoveMessageLocally(oldRow.id);
+    if (_dnPanelOpen) {
+        var body = document.getElementById('designer-notes-body');
+        if (body) {
+            var btn = body.querySelector('.designer-pin-delete-btn[data-pin-id="' + oldRow.id + '"]');
+            if (btn) {
+                var wrap = btn.closest('.designer-note-wrap');
+                if (wrap && wrap.parentNode) wrap.parentNode.removeChild(wrap);
+            }
+        }
+        _dnRenderCabTabs();
+    }
+    if (_dnParsePinPayload(oldRow)) {
+        window._dnRefreshClientPins();
+    }
 }
 
 function _dnClearPinMarkers() {
@@ -788,6 +872,14 @@ window._startDesignerNotesListener = async function(token) {
             filter: 'share_token=eq.' + token
         }, function(payload) {
             _dnOnNewMessage(payload.new);
+        })
+        .on('postgres_changes', {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'project_messages',
+            filter: 'share_token=eq.' + token
+        }, function(payload) {
+            _dnOnDeletedMessage(payload.old);
         })
         .subscribe(function(status) {
             if (status === 'SUBSCRIBED') {

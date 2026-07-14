@@ -65,11 +65,11 @@ async function insertMessage(messageType, message, cabIdx) {
     if (a.cabIndexColExists() !== false && typeof cabIdx === 'number') {
         payload.cabinet_index = cabIdx;
     }
-    var res = await a.getSb().from('project_messages').insert(payload);
+    var res = await a.getSb().from('project_messages').insert(payload).select('id').single();
     if (res.error && res.error.code === '42703') {
         a.setCabIndexColExists(false);
         delete payload.cabinet_index;
-        res = await a.getSb().from('project_messages').insert(payload);
+        res = await a.getSb().from('project_messages').insert(payload).select('id').single();
     }
     return res;
 }
@@ -558,6 +558,7 @@ async function submitPinNote() {
     toast('הסימון נשלח למעצב');
     if (a.appendNote) {
         a.appendNote({
+            id: res.data && res.data.id ? res.data.id : undefined,
             sender_role: 'client',
             sender_name: a.getClientName(),
             message: payload,
@@ -666,7 +667,16 @@ window._viewerExtrasRenderNoteBubble = function (note, list) {
             (payload && payload.cabLabel ? (' — ' + esc(payload.cabLabel)) : '') +
             '</div>';
     } else if (type === 'pin_note' || (payload && payload.type === 'pin')) {
-        inner = '<div class="viewer-note-bubble special pin"><i class="fa-solid fa-location-dot"></i> סימון על הארון<br>' +
+        var canDelete = !!(note.id && note.sender_role === 'client');
+        var delBtn = canDelete
+            ? ('<button type="button" class="viewer-pin-delete-btn" data-pin-id="' + esc(String(note.id)) + '" ' +
+                'title="מחק סימון" style="position:absolute;top:6px;left:6px;width:26px;height:26px;border:none;border-radius:8px;' +
+                'background:rgba(239,68,68,0.12);color:#dc2626;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:0.75rem;">' +
+                '<i class="fa-solid fa-trash"></i></button>')
+            : '';
+        inner = '<div class="viewer-note-bubble special pin" style="position:relative;' + (canDelete ? 'padding-left:34px;' : '') + '">' +
+            delBtn +
+            '<i class="fa-solid fa-location-dot"></i> סימון על הארון<br>' +
             esc(payload && payload.text ? payload.text : note.message) + '</div>';
     } else if (type === 'voice_note' || (payload && payload.type === 'voice')) {
         var src = payload && payload.dataUrl ? payload.dataUrl : '';
@@ -680,8 +690,58 @@ window._viewerExtrasRenderNoteBubble = function (note, list) {
         return false;
     }
     wrap.innerHTML = inner + '<div class="viewer-note-meta">' + esc(senderLabel) + (time ? (' · ' + time) : '') + '</div>';
+    if (note.id) wrap.dataset.noteId = String(note.id);
+    var delBtnEl = wrap.querySelector('.viewer-pin-delete-btn');
+    if (delBtnEl) {
+        delBtnEl.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            deletePinNote(delBtnEl.getAttribute('data-pin-id'), wrap);
+        });
+    }
     list.appendChild(wrap);
     return true;
+};
+
+async function deletePinNote(noteId, wrapEl) {
+    if (!noteId) return;
+    if (!confirm('למחוק את הסימון מהארון?')) return;
+    var a = api();
+    if (!a || !a.getSb()) {
+        toast('אין חיבור');
+        return;
+    }
+    try {
+        var res = await a.getSb().from('project_messages')
+            .delete()
+            .eq('id', noteId)
+            .eq('share_token', a.getToken())
+            .eq('message_type', 'pin_note');
+        if (res.error) {
+            console.error('[viewer] delete pin', res.error);
+            toast('שגיאה במחיקת הסימון');
+            return;
+        }
+        if (wrapEl && wrapEl.parentNode) wrapEl.parentNode.removeChild(wrapEl);
+        loadPinsForCabinet(a.getActiveCabIdx());
+        toast('הסימון נמחק');
+    } catch (e) {
+        console.error('[viewer] delete pin exception', e);
+        toast('שגיאה במחיקת הסימון');
+    }
+}
+
+window._viewerExtrasOnNoteDeleted = function (oldRow) {
+    if (!oldRow || !oldRow.id) return;
+    var list = document.getElementById('viewer-notes-list');
+    if (list) {
+        var wrap = list.querySelector('.viewer-note-wrap[data-note-id="' + oldRow.id + '"]');
+        if (wrap && wrap.parentNode) wrap.parentNode.removeChild(wrap);
+    }
+    if (oldRow.message_type === 'pin_note' || (oldRow.message && String(oldRow.message).indexOf('"type":"pin"') !== -1)) {
+        var a = api();
+        if (a) loadPinsForCabinet(a.getActiveCabIdx());
+    }
 };
 
 // ── Card decoration (approval heart) ─────────────────────────────────────────
