@@ -3214,9 +3214,13 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         const legRightX = dWidth / 2 - t / 2;
         const legH = dHeight - deskT;
 
+        _ppPartId = 'wd_surface';
         createBoard(dWidth, deskT, bodyD, 0, dHeight - deskT / 2, 0, matBody);
+        _ppPartId = 'wd_leg_left';
         createBoard(t, legH, bodyD, legLeftX, legH / 2, 0, matBody);
+        _ppPartId = 'wd_leg_right';
         createBoard(t, legH, bodyD, legRightX, legH / 2, 0, matBody);
+        _ppPartId = '';
 
         if (hasDrawers) {
             const numDrawers = (wd.drawerCount != null) ? wd.drawerCount : (dWidth <= 80 ? 1 : 2);
@@ -3225,7 +3229,9 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
             const drawerWidth = (innerWidth - gap * (numDrawers + 1)) / numDrawers;
             const drawerBottomY = dHeight - deskT - drawerH;
             const drawerCenterY = drawerBottomY + drawerH / 2;
+            _ppPartId = 'wd_drawer_bottom';
             if (!isBP) createBoard(innerWidth, deskT, bodyD - 2, 0, drawerBottomY + deskT / 2, 0, matBody);
+            _ppPartId = '';
             for (let i = 0; i < numDrawers; i++) {
                 const dx = -innerWidth / 2 + gap + drawerWidth / 2 + i * (drawerWidth + gap);
                 _ppPartId = `wd_drawer_d${i}`;
@@ -3271,16 +3277,21 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         let startX = (dSide === 'left') ? (-state.width/2) : (state.width/2);
         let dir = (dSide === 'left') ? -1 : 1;
         const surfaceCenterX = startX + dir * (dWidth / 2);
-        createBoard(dWidth, deskT, bodyD, surfaceCenterX, dHeight - deskT/2, 0, matDesk); 
+        _ppPartId = 'side_desk_surface';
+        createBoard(dWidth, deskT, bodyD, surfaceCenterX, dHeight - deskT/2, 0, matDesk);
+        _ppPartId = 'side_desk_leg';
         const legX = startX + dir * (dWidth - t/2);
-        createBoard(t, dHeight - deskT, bodyD, legX, (dHeight - deskT)/2, 0, matDesk); 
+        createBoard(t, dHeight - deskT, bodyD, legX, (dHeight - deskT)/2, 0, matDesk);
+        _ppPartId = '';
         if (state.desk.hasDrawers) {
             const numDrawers = (state.desk.drawerCount != null) ? state.desk.drawerCount : (dWidth <= 80 ? 1 : 2);
             const gap = 0.4; const innerWidth = dWidth - t;
             const drawerWidth = (innerWidth - gap*(numDrawers+1)) / numDrawers;
             const drawerBottomY = dHeight - deskT - drawerH;
             const drawerCenterY = drawerBottomY + drawerH/2;
+            _ppPartId = 'side_desk_drawer_bottom';
             createBoard(innerWidth, deskT, bodyD - 2, startX + dir * (innerWidth/2), drawerBottomY + deskT/2, 0, matDesk);
+            _ppPartId = '';
             for(let i=0; i<numDrawers; i++) {
                 let dx = (dSide === 'left') ? (startX - innerWidth) + gap + drawerWidth/2 + i * (drawerWidth + gap) : startX + gap + drawerWidth/2 + i * (drawerWidth + gap);
                 _ppPartId = `desk_drawer_d${i}`;
@@ -3886,7 +3897,9 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         if (isDesk) {
             // Desk surface protrudes deskT forward to align with door-face line
             const deskProtrude = deskT;
+            _ppPartId = `desk_surface_c${c}`;
             createBoard(col.width, deskT, bodyD + deskProtrude, colCenterX, col.deskHeight - deskT/2, deskProtrude / 2, matDesk);
+            _ppPartId = '';
             if(!isBP && _isActiveWingBuild) {
                 state.dimData.push({ isInternalDeskSurface: true, colIndex: c, x: colCenterX, y: col.deskHeight/2, h: col.deskHeight });
                 dragHandlesData.vertical.push({ isInternalDeskSurface: true, colIndex: c, x: colCenterX, y: col.deskHeight });
@@ -3897,11 +3910,15 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                 const drawerWidth = (col.width - gap*(numDrawers+1)) / numDrawers;
                 const drawerBottomY = col.deskHeight - deskT - col.drawerHeight;
                 const drawerCenterY = drawerBottomY + col.drawerHeight/2;
+                _ppPartId = `desk_drawer_bottom_c${c}`;
                 createBoard(col.width, deskT, bodyD - 2, colCenterX, drawerBottomY + deskT/2, 0, matDesk);
+                _ppPartId = '';
                 for(let i=0; i<numDrawers; i++) {
                     let innerStartX = colCenterX - col.width/2;
                     let dx = innerStartX + gap + drawerWidth/2 + i * (drawerWidth + gap);
+                    _ppPartId = `desk_int_drawer_c${c}_d${i}`;
                     let mesh = createBoard(drawerWidth, col.drawerHeight, t, dx, drawerCenterY, _deskDrawerFZ, matExternal);
+                    _ppPartId = '';
                     if (!isBP) _addPanelHandleLocal(mesh, drawerWidth, col.drawerHeight, _handleStyle);
                     const backPanel = new THREE.Mesh(new THREE.BoxGeometry(drawerWidth - 2, 2.5, 0.5), new THREE.MeshStandardMaterial({ color: 0x222222 }));
                     backPanel.position.set(dx, drawerBottomY + col.drawerHeight - 1.25, _deskDrawerFZ - t/2 - 0.25);
@@ -3913,11 +3930,18 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                 }
             }
             startShelvesY = col.deskHeight + col.deskClearance;
-            createBoard(col.width, deskT, bodyD, colCenterX, startShelvesY + deskT/2, 0, matDesk); 
+            // Floor board above knee clearance (acts as first shelf of the upper desk section)
+            _ppPartId = `desk_shelf_c${c}`;
+            createBoard(col.width, deskT, bodyD, colCenterX, startShelvesY + deskT/2, 0, matDesk);
+            _ppPartId = '';
             if(!isBP) dragHandlesData.vertical.push({ isInternalDeskClearance: true, colIndex: c, x: colCenterX, y: startShelvesY });
             startShelvesY += deskT; 
             const backH = col.height - col.deskHeight;
-            if (!isBP) createBoard(col.width, backH, backT, colCenterX, col.deskHeight + backH/2, -bodyD/2 + backT/2, matDesk); 
+            if (!isBP) {
+                _ppPartId = `back_c${c}`;
+                createBoard(col.width, backH, backT, colCenterX, col.deskHeight + backH/2, -bodyD/2 + backT/2, matDesk);
+                _ppPartId = '';
+            }
             if (!isBP && _isActiveWingBuild) {
                 const hitH = startShelvesY - (state.plinthHeight + t);
                 const hitY = (state.plinthHeight + t) + hitH/2;

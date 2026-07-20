@@ -398,12 +398,21 @@ function buildCornerUnit() {
         return;
     }
 
-    const addBoard = (w, h, d, x, y, z, mat) => {
+    const addBoard = (w, h, d, x, y, z, mat, partIdSuffix) => {
+        let useMat = mat;
+        if (!isBP && partIdSuffix && typeof window._getPartColorOverride === 'function') {
+            const overrideKey = window._getPartColorOverride(_ppWingId, partIdSuffix);
+            if (overrideKey && materials[overrideKey]) useMat = materials[overrideKey];
+        }
         const geo = new THREE.BoxGeometry(w, h, d);
-        const mesh = new THREE.Mesh(geo, mat.clone());
+        const mesh = new THREE.Mesh(geo, useMat.clone ? useMat.clone() : useMat);
         mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeM));
         mesh.position.set(x, y, z);
         cuGroup.add(mesh);
+        if (!isBP && partIdSuffix && typeof window._scopedPartColorId === 'function') {
+            mesh.userData.partId = window._scopedPartColorId(_ppWingId, partIdSuffix);
+            if (window.partMeshes) window.partMeshes.push(mesh);
+        }
         return mesh;
     };
 
@@ -421,10 +430,10 @@ function buildCornerUnit() {
         const fingerGap = 2.5;
         const innerGap = 0.4;
         // Surface: full width × full depth (28mm thick)
-        addBoard(cuD, deskT, cuW, 0, deskH - deskT / 2, 0, matDesk);
+        addBoard(cuD, deskT, cuW, 0, deskH - deskT / 2, 0, matDesk, 'corner_desk_surface');
         // Back leg at far Z (outer end) — omitted when deskFloating
         if (!cu.deskFloating) {
-            addBoard(cuD, deskH, t, 0, deskH / 2, backWallZ, matDesk);
+            addBoard(cuD, deskH, t, 0, deskH / 2, backWallZ, matDesk, 'corner_desk_leg');
         }
         // Drawers under desk — desk-colored carcass shell + drawer boxes
         const numDeskDrawers = Math.min(cu.deskDrawerCount || 0, 3);
