@@ -4633,6 +4633,10 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         const k = `${si}:${z}`;
                         return (compData.zoneDoorGroups || []).some(g => g.keys.includes(k));
                     };
+                    // Column overlay door already covers this compartment — skip per-zone doors
+                    const _coveredByColumnDoor = !!(col.doors && col.doors.some(function(d) {
+                        return r >= d.startRow && r <= d.endRow && d.type && d.type !== 'empty';
+                    }));
                     const _subZoneIsHoneycomb = (si, z) => {
                         const sub = compData.subCells[si];
                         if (!sub) return false;
@@ -4741,7 +4745,8 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                         _renderSubContent(interiorType, subCenterX, subW, zoneBottomY, zoneH, si, 'solid', z);
                                     }
                                     // Per-zone door only if not part of a merged door group
-                                    if (!_keyInDoorGroup(si, z)) {
+                                    // and not already covered by a column-level overlay door
+                                    if (!_coveredByColumnDoor && !_keyInDoorGroup(si, z)) {
                                         const doorType = _doorAtEng(sub, z);
                                         if (doorType && doorType !== 'empty') {
                                             const zoneStyle = (Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[z]) ? sub.zonesDoorStyle[z] : 'solid';
@@ -4755,7 +4760,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             if (interiorType && interiorType !== 'empty') {
                                 _renderSubContent(interiorType, subCenterX, subW, prevY, compH, si, 'solid', 0);
                             }
-                            if (!_keyInDoorGroup(si, 0)) {
+                            if (!_coveredByColumnDoor && !_keyInDoorGroup(si, 0)) {
                                 const doorType = _doorAtEng(sub, 0);
                                 if (doorType && doorType !== 'empty') {
                                     const zoneStyle = (Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[0]) ? sub.zonesDoorStyle[0] : 'solid';
@@ -4766,7 +4771,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                     }
 
                     // Merged doors / honeycomb spanning multiple sub-cell zones
-                    if (!isBP && Array.isArray(compData.zoneDoorGroups)) {
+                    if (!isBP && !_coveredByColumnDoor && Array.isArray(compData.zoneDoorGroups)) {
                         compData.zoneDoorGroups.forEach(group => {
                             if (!group || !group.keys || !group.keys.length || !group.type) return;
                             let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -4869,14 +4874,8 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                 const dH = doorTopY - doorBottomY;
                 if(dH <= 0) return;
                 if(_doorOverlayW <= 0) return; // entire door is in hidden zone — skip
-                // Partitioned compartments usually use per-zone doors, but inset-front models
-                // also allow a regular full-column door over a partitioned opening.
-                if (!isInset) {
-                    for (let _pr = _safeStartRow; _pr <= _safeEndRow; _pr++) {
-                        const _pComp = col.compartments[_pr];
-                        if (_pComp && _pComp.partition) return;
-                    }
-                }
+                // Column-level doors may span partitioned cells — the door covers the
+                // whole opening (including the internal partition boards behind it).
 
                 // ---- Flap door (קלפה): covers entire front face of the column (wall-to-wall, floor-to-ceiling) ----
                 if (door.type === 'flap') {

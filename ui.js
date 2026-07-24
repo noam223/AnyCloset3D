@@ -3353,27 +3353,24 @@ window.applyContent = function(type) {
                 delete comp.zoneDoorGroups;
                 _clearSubCellSelection();
                 _dbgHang('partition OFF', { c, r });
-            } else {
-                const prevType = comp.type || 'empty';
-                const migratable = (prevType === 'hanging' || prevType === 'sorbet' ||
-                    prevType === 'internal_drawers' || prevType === 'external_drawers');
-                comp.partition = true;
-                comp.partitions = [0.5];
-                if (migratable) {
-                    comp.subCells = [
-                        { type: prevType, shelves: 0, zonesType: [prevType] },
-                        { type: prevType, shelves: 0, zonesType: [prevType] }
-                    ];
-                    comp.type = 'empty';
                 } else {
-                    comp.subCells = [{ type: 'empty', shelves: 0 }, { type: 'empty', shelves: 0 }];
+                    const prevType = comp.type || 'empty';
+                    const migratable = (prevType === 'hanging' || prevType === 'sorbet' ||
+                        prevType === 'internal_drawers' || prevType === 'external_drawers');
+                    comp.partition = true;
+                    comp.partitions = [0.5];
+                    if (migratable) {
+                        comp.subCells = [
+                            { type: prevType, shelves: 0, zonesType: [prevType] },
+                            { type: prevType, shelves: 0, zonesType: [prevType] }
+                        ];
+                        comp.type = 'empty';
+                    } else {
+                        comp.subCells = [{ type: 'empty', shelves: 0 }, { type: 'empty', shelves: 0 }];
+                    }
+                    // Keep existing column overlay doors — they cover the partition from outside.
+                    _dbgHang('partition ON', { c, r, prevType, migratable, onlyThisCol: true });
                 }
-                const _allowPartitionOverlayDoors = (state.cabinetModel === 'ab2' || state.cabinetModel === 'ab2_nohoney');
-                if (!_allowPartitionOverlayDoors) {
-                    state.columns[c].doors = state.columns[c].doors.filter(door => r < door.startRow || r > door.endRow);
-                }
-                _dbgHang('partition ON', { c, r, prevType, migratable, onlyThisCol: true });
-            }
         });
         // Sanity: log neighboring columns' partition flags (detect accidental multi-col apply)
         state.columns.forEach(function (col, ci) {
@@ -3526,32 +3523,9 @@ window.applyDoor = function(type) {
         return;
     }
 
-    const _doorPartComp = state.columns[c] && state.columns[c].compartments[Math.min(...state.selection.rows)];
-    const _allowPartitionOverlayDoors = (state.cabinetModel === 'ab2' || state.cabinetModel === 'ab2_nohoney');
-    if (_doorPartComp && _doorPartComp.partition && state.selection.rows.length === 1 && !_allowPartitionOverlayDoors) {
-        if (_selectAllZonesInComp(_doorPartComp)) {
-            const _subDoorMap = { empty: 'empty', right: 'door_right', left: 'door_left', double: 'door_double', flap: 'door_flap' };
-            state.columns[c].doors = state.columns[c].doors.filter(door => Math.min(...state.selection.rows) < door.startRow || Math.min(...state.selection.rows) > door.endRow);
-            if (type === 'empty') {
-                const keys = _sortedSubKeys(_activeSubCellIdxs);
-                keys.forEach(key => {
-                    const { si, z } = _parseSubKey(key);
-                    const sub = _doorPartComp.subCells && _doorPartComp.subCells[si];
-                    if (!sub) return;
-                    _ensureZoneDoorSplit(sub);
-                    while (sub.zonesDoor.length <= z) sub.zonesDoor.push('empty');
-                    sub.zonesDoor[z] = 'empty';
-                });
-                _removeZoneDoorGroupsForKeys(_doorPartComp, keys);
-                _finishSubCellApply();
-                return;
-            }
-            setSubCellType(_subDoorMap[type] || type);
-            return;
-        }
-        _showToast('יש לבחור אזור אחד או יותר במחיצה (לחץ על + בכל אזור, או "בחר הכל")', 4500);
-        return;
-    }
+    // When a whole partitioned cell is selected (no specific zones), apply a normal
+    // column overlay door that covers the partition — same as multi-cell spans.
+    // Per-zone doors are only used when the user explicitly selected partition zones (+).
 
     let startR = Math.min(...state.selection.rows);
     let endR = Math.max(...state.selection.rows);
@@ -3615,6 +3589,20 @@ window.applyDoor = function(type) {
         state.selection.rows.forEach(r => {
             if (state.columns[c].compartments[r] && state.columns[c].compartments[r].type === 'external_drawers') {
                 state.columns[c].compartments[r].type = 'empty';
+            }
+            // Clear per-zone doors inside partitioned cells covered by this overlay door
+            const _pComp = state.columns[c].compartments[r];
+            if (_pComp && _pComp.partition && Array.isArray(_pComp.subCells)) {
+                _pComp.subCells.forEach(function(sub) {
+                    if (!sub) return;
+                    if (Array.isArray(sub.zonesDoor)) {
+                        for (let zi = 0; zi < sub.zonesDoor.length; zi++) sub.zonesDoor[zi] = 'empty';
+                    }
+                    if (Array.isArray(sub.zonesDoorStyle)) {
+                        for (let zi = 0; zi < sub.zonesDoorStyle.length; zi++) sub.zonesDoorStyle[zi] = 'solid';
+                    }
+                });
+                _pComp.zoneDoorGroups = [];
             }
         });
     }
