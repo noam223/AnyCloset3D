@@ -9055,11 +9055,12 @@ window._mvbpAddCutout = function() {
     const wInp = document.getElementById('mvbp-cut-w');
     const hInp = document.getElementById('mvbp-cut-h');
     const lblInp = document.getElementById('mvbp-cut-label');
-    const widthMm = Math.max(10, Math.min(500, parseInt(wInp && wInp.value, 10) || 80));
-    const heightMm = Math.max(10, Math.min(500, parseInt(hInp && hInp.value, 10) || 120));
-    const label = lblInp ? String(lblInp.value || '').trim().slice(0, 24) : '';
     const cabWMm = Math.round((pg.cabWidthCm || 160) * 10);
     const cabHMm = Math.round((pg.cabHeightCm || 240) * 10);
+    // No artificial max — only keep a small minimum and fit within the cabinet face
+    const widthMm = Math.max(10, Math.min(cabWMm, parseInt(wInp && wInp.value, 10) || 80));
+    const heightMm = Math.max(10, Math.min(cabHMm, parseInt(hInp && hInp.value, 10) || 120));
+    const label = lblInp ? String(lblInp.value || '').trim().slice(0, 24) : '';
     if (!state.blueprintCutouts) state.blueprintCutouts = [];
     const co = {
         id: 'bc-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
@@ -9067,7 +9068,7 @@ window._mvbpAddCutout = function() {
         widthMm: widthMm,
         heightMm: heightMm,
         leftMm: Math.max(0, Math.round((cabWMm - widthMm) / 2)),
-        bottomMm: Math.min(1000, Math.max(0, cabHMm - heightMm)),
+        bottomMm: Math.max(0, cabHMm - heightMm),
         label: label
     };
     state.blueprintCutouts.push(co);
