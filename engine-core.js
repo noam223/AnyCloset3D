@@ -1442,6 +1442,62 @@ function _registerDoorMesh(mesh) {
     if (state.wingEditMode && !_isActiveWingBuild) return;
     doorMeshes.push(mesh);
 }
+
+/** True if mat is one of the shared library materials (must not mutate opacity on hover). */
+function _isSharedLibraryMaterial(mat) {
+    if (!mat || typeof materials !== 'object') return false;
+    for (const key in materials) {
+        if (materials[key] === mat) return true;
+    }
+    return false;
+}
+
+/** Restore a door mesh after hover preview — never leave shared materials translucent. */
+function _clearDoorHoverOpacity(mesh) {
+    if (!mesh) return;
+    if (mesh.userData && mesh.userData._doorHoverCloned) {
+        const orig = mesh.userData._doorHoverOrigMat;
+        if (orig) mesh.material = orig;
+        mesh.userData._doorHoverCloned = false;
+        mesh.userData._doorHoverOrigMat = null;
+        return;
+    }
+    const mat = mesh.material;
+    if (!mat) return;
+    mat.transparent = false;
+    mat.opacity = 1;
+}
+
+/** Hover preview: clone shared library materials first so c795/759 etc. are never polluted. */
+function _applyDoorHoverOpacity(mesh) {
+    if (!mesh || !mesh.material) return;
+    if (_isSharedLibraryMaterial(mesh.material)) {
+        mesh.userData._doorHoverOrigMat = mesh.material;
+        mesh.material = mesh.material.clone();
+        mesh.userData._doorHoverCloned = true;
+    }
+    mesh.material.transparent = true;
+    mesh.material.opacity = 0.15;
+}
+
+/** Reset shared library materials that were left translucent (e.g. after rebuild mid-hover). */
+function _resetSharedMaterialOpacity() {
+    if (typeof materials !== 'object') return;
+    Object.keys(materials).forEach(function(key) {
+        const mat = materials[key];
+        if (!mat) return;
+        if (mat.transparent || (mat.opacity != null && mat.opacity < 0.99)) {
+            mat.transparent = false;
+            mat.opacity = 1;
+            mat.needsUpdate = true;
+        }
+    });
+}
+
+window._clearDoorHoverOpacity = _clearDoorHoverOpacity;
+window._applyDoorHoverOpacity = _applyDoorHoverOpacity;
+window._resetSharedMaterialOpacity = _resetSharedMaterialOpacity;
+
 let currentHoveredDoor = null;
 let dragHandlesData = { horizontal: [], vertical: [], roofs: [], desk: [] };
 const raycaster = new THREE.Raycaster(); const mouse = new THREE.Vector2();
@@ -1830,7 +1886,15 @@ function buildCabinet() {
     deskHitBoxes = [];
     window.deskHitBoxes = deskHitBoxes;
     doorMeshes = [];
+    if (currentHoveredDoor) {
+        if (typeof _clearDoorHoverOpacity === 'function') _clearDoorHoverOpacity(currentHoveredDoor);
+        else if (currentHoveredDoor.material) {
+            currentHoveredDoor.material.transparent = false;
+            currentHoveredDoor.material.opacity = 1;
+        }
+    }
     currentHoveredDoor = null;
+    if (typeof _resetSharedMaterialOpacity === 'function') _resetSharedMaterialOpacity();
     state.dimData = []; state.bpData = [];
     dragHandlesData = { horizontal: [], vertical: [], roofs: [], desk: [], partitions: [], floors: [], selectAll: [], upperUnit: [] };
     // Reset part-paint mesh list
@@ -2922,7 +2986,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
     const _externalMatKey = (_isSideCabWing && _centerForDoors)
         ? (_centerForDoors.materialExternal || 'white_matte')
         : state.materialExternal;
-    const matExternal = isBP ? bpMat : materials[_externalMatKey];
+    const matExternal = isBP ? bpMat : (materials[_externalMatKey] || materials['white_matte']);
     const matDesk = isBP ? bpMat : materials[state.materialDesk];
     const matOpenCell = isBP ? bpMat : materials[state.materialOpenCell];
     const matBack = isBP ? bpMat : (materials[state.materialBack] || materials[state.materialBody]);
@@ -4333,7 +4397,12 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             if (_mirrorMap) { mirrorMat.envMap = _mirrorMap; mirrorMat.needsUpdate = true; }
                             return mirrorMat;
                         }
-                        return matExternal;
+                        // Clone so hover / part edits never mutate the shared library material (e.g. c795/759).
+                        const base = matExternal || materials['white_matte'];
+                        const cloned = base.clone();
+                        cloned.transparent = false;
+                        cloned.opacity = 1;
+                        return cloned;
                     };
                     const _subCreateDoorPanel = (w, h, cx, cy, z, mat) => {
                         const mesh = createBoard(w, h, t, cx, cy, z, mat);
@@ -4895,7 +4964,9 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                     const flapZ = isInset ? (bodyD / 2 - t / 2) : (bodyD / 2 + t / 2 + 0.1);
                     const flapY = flapBaseY + flapH / 2;
                     const flapMatBase = isBP ? new THREE.MeshBasicMaterial({ color: 0xffffff, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }) : matExternal;
-                    const flapMat = isBP ? flapMatBase : _ppResolveMat(flapMatBase, doorPartId);
+                    const flapMatResolved = isBP ? flapMatBase : _ppResolveMat(flapMatBase, doorPartId);
+                    const flapMat = isBP ? flapMatResolved : flapMatResolved.clone();
+                    if (!isBP) { flapMat.transparent = false; flapMat.opacity = 1; }
                     const flapGeo = new THREE.BoxGeometry(flapW, flapH, t);
                     const flapMesh = new THREE.Mesh(flapGeo, flapMat);
                     flapMesh.position.set(flapCenterX, flapY, flapZ);
@@ -4994,6 +5065,8 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             uv.needsUpdate = true;
                         }
                         const doorMat = _ppResolveMat(matExternal, partIdSuffix).clone();
+                        doorMat.transparent = false;
+                        doorMat.opacity = 1;
 
                         // ---- Bathroom groove style: slightly darken base panel for all groove styles ----
                         const _bathGroove = state.presetId === 'bathroom'

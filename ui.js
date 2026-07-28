@@ -5831,8 +5831,11 @@ function bindUI() {
         window._lastCanvasPointer = { x: e.clientX, y: e.clientY, valid: true };
         if (_isCanvasOverlayUiTarget(e.target)) {
             if (currentHoveredDoor && !e.target.closest('.plus-btn') && !e.target.closest('.select-all-col-btn')) {
-                currentHoveredDoor.material.transparent = false;
-                currentHoveredDoor.material.opacity = 1;
+                if (typeof window._clearDoorHoverOpacity === 'function') window._clearDoorHoverOpacity(currentHoveredDoor);
+                else if (currentHoveredDoor.material) {
+                    currentHoveredDoor.material.transparent = false;
+                    currentHoveredDoor.material.opacity = 1;
+                }
                 currentHoveredDoor = null;
             }
         }
@@ -5865,22 +5868,31 @@ function bindUI() {
             _hoveredWingId = null;
         }
         
-        const doorIntersects = raycaster.intersectObjects(doorMeshes);
+        const doorIntersects = raycaster.intersectObjects(doorMeshes, true);
         if (doorIntersects.length > 0) {
             const hoveredDoor = doorIntersects[0].object;
             if (currentHoveredDoor !== hoveredDoor) {
                 if (currentHoveredDoor) {
-                    currentHoveredDoor.material.transparent = false;
-                    currentHoveredDoor.material.opacity = 1;
+                    if (typeof window._clearDoorHoverOpacity === 'function') window._clearDoorHoverOpacity(currentHoveredDoor);
+                    else if (currentHoveredDoor.material) {
+                        currentHoveredDoor.material.transparent = false;
+                        currentHoveredDoor.material.opacity = 1;
+                    }
                 }
                 currentHoveredDoor = hoveredDoor;
-                currentHoveredDoor.material.transparent = true;
-                currentHoveredDoor.material.opacity = 0.15;
+                if (typeof window._applyDoorHoverOpacity === 'function') window._applyDoorHoverOpacity(currentHoveredDoor);
+                else if (currentHoveredDoor.material) {
+                    currentHoveredDoor.material.transparent = true;
+                    currentHoveredDoor.material.opacity = 0.15;
+                }
             }
         } else {
             if (currentHoveredDoor) {
-                currentHoveredDoor.material.transparent = false;
-                currentHoveredDoor.material.opacity = 1;
+                if (typeof window._clearDoorHoverOpacity === 'function') window._clearDoorHoverOpacity(currentHoveredDoor);
+                else if (currentHoveredDoor.material) {
+                    currentHoveredDoor.material.transparent = false;
+                    currentHoveredDoor.material.opacity = 1;
+                }
                 currentHoveredDoor = null;
             }
         }
