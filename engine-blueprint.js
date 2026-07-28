@@ -1371,7 +1371,7 @@ window._generateMultiViewBlueprintSVG = function() {
                 // Drawers below desk surface
                 if (col.hasDrawers) {
                     const drawerH = col.drawerHeight || 12;
-                    const numDrawers = (col.width || wg.w) <= 80 ? 1 : 2;
+                    const numDrawers = col.deskDrawerCount != null ? col.deskDrawerCount : ((col.width || wg.w) <= 80 ? 1 : 2);
                     const drawerW = colW / numDrawers;
                     const drawerPxH = drawerH * sc;
                     const drawerY = openTop + deskSurfPx;
@@ -2444,7 +2444,7 @@ window._generateMultiViewBlueprintPages = function() {
                 // Drawers below desk surface
                 if (col.hasDrawers) {
                     const drawerH = col.drawerHeight || 12;
-                    const numDrawers = (col.width || wg.w) <= 80 ? 1 : 2;
+                    const numDrawers = col.deskDrawerCount != null ? col.deskDrawerCount : ((col.width || wg.w) <= 80 ? 1 : 2);
                     const drawerW = colW / numDrawers;
                     const drawerPxH = drawerH * sc;
                     const drawerY = openTop + deskSurfPx;
