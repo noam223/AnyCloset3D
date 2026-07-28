@@ -375,7 +375,7 @@ function _bpPushCellDimLabel(p, viewKey, cellKey, x, y, heightVal) {
     const tf = (off.x || off.y) ? ` transform="translate(${off.x.toFixed(1)},${off.y.toFixed(1)})"` : '';
     p.push(
         `<g class="bp-cell-dim-draggable" data-dim="v" data-cell-dim-key="${cellKey}" data-view-key="${viewKey || 'center'}"${tf} style="cursor:ew-resize">` +
-        `<rect class="bp-cell-dim-hit" x="${(x - 26).toFixed(1)}" y="${(y - 10).toFixed(1)}" width="52" height="12" fill="transparent"/>` +
+        `<rect class="bp-cell-dim-hit" x="${(x - 32).toFixed(1)}" y="${(y - 10).toFixed(1)}" width="64" height="12" fill="transparent"/>` +
         `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="${_BP_CELL_DIM_FONT}" fill="${_BP_STROKE}" opacity="0.75" pointer-events="none">↕ ${heightVal}</text></g>`
     );
 }
@@ -465,7 +465,7 @@ function _bpClearCellHeightMm(rowBotCm, rowTopCm, shelfT) {
 }
 
 function _bpClearCellHeightLabel(rowBotCm, rowTopCm, shelfT) {
-    return Math.round(_bpClearCellHeightCm(rowBotCm, rowTopCm, shelfT));
+    return _bpClearCellHeightMm(rowBotCm, rowTopCm, shelfT);
 }
 
 function _bpAppendViewCutouts(p, viewKey, ox, oy, dW, dH, sc, cabWidthCm, cabHeightCm) {
