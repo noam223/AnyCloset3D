@@ -1445,16 +1445,33 @@ function _registerDoorMesh(mesh) {
 
 /** True if mat is one of the shared library materials (must not mutate opacity on hover). */
 function _isSharedLibraryMaterial(mat) {
-    if (!mat || typeof materials !== 'object') return false;
+    if (!mat) return false;
+    if (typeof edgeMat !== 'undefined' && mat === edgeMat) return true;
+    if (typeof materials !== 'object') return false;
     for (const key in materials) {
         if (materials[key] === mat) return true;
     }
     return false;
 }
 
+/** Door hover must only target solid panel meshes — never edge LineSegments (shared edgeMat). */
+function _isDoorHoverTarget(obj) {
+    return !!(obj && obj.isMesh && obj.material && !obj.isLine && !obj.isLineSegments);
+}
+
+/** Pick the first raycast hit that is a door panel mesh (skip edges/handles lines). */
+function _pickDoorHoverMesh(intersects) {
+    if (!intersects || !intersects.length) return null;
+    for (let i = 0; i < intersects.length; i++) {
+        const obj = intersects[i] && intersects[i].object;
+        if (_isDoorHoverTarget(obj)) return obj;
+    }
+    return null;
+}
+
 /** Restore a door mesh after hover preview — never leave shared materials translucent. */
 function _clearDoorHoverOpacity(mesh) {
-    if (!mesh) return;
+    if (!_isDoorHoverTarget(mesh)) return;
     if (mesh.userData && mesh.userData._doorHoverCloned) {
         const orig = mesh.userData._doorHoverOrigMat;
         if (orig) mesh.material = orig;
@@ -1463,14 +1480,14 @@ function _clearDoorHoverOpacity(mesh) {
         return;
     }
     const mat = mesh.material;
-    if (!mat) return;
+    if (!mat || _isSharedLibraryMaterial(mat)) return;
     mat.transparent = false;
     mat.opacity = 1;
 }
 
 /** Hover preview: clone shared library materials first so c795/759 etc. are never polluted. */
 function _applyDoorHoverOpacity(mesh) {
-    if (!mesh || !mesh.material) return;
+    if (!_isDoorHoverTarget(mesh)) return;
     if (_isSharedLibraryMaterial(mesh.material)) {
         mesh.userData._doorHoverOrigMat = mesh.material;
         mesh.material = mesh.material.clone();
@@ -1482,21 +1499,31 @@ function _applyDoorHoverOpacity(mesh) {
 
 /** Reset shared library materials that were left translucent (e.g. after rebuild mid-hover). */
 function _resetSharedMaterialOpacity() {
-    if (typeof materials !== 'object') return;
-    Object.keys(materials).forEach(function(key) {
-        const mat = materials[key];
-        if (!mat) return;
-        if (mat.transparent || (mat.opacity != null && mat.opacity < 0.99)) {
-            mat.transparent = false;
-            mat.opacity = 1;
-            mat.needsUpdate = true;
-        }
-    });
+    if (typeof materials === 'object') {
+        Object.keys(materials).forEach(function(key) {
+            const mat = materials[key];
+            if (!mat) return;
+            if (mat.transparent || (mat.opacity != null && mat.opacity < 0.99)) {
+                mat.transparent = false;
+                mat.opacity = 1;
+                mat.needsUpdate = true;
+            }
+        });
+    }
+    // Edge outlines use a shared LineBasicMaterial (opacity 0.15). Door-hover used to
+    // accidentally set it to opacity 1, making the whole cabinet look "illustrated".
+    if (typeof edgeMat !== 'undefined' && edgeMat) {
+        edgeMat.transparent = true;
+        edgeMat.opacity = 0.15;
+        edgeMat.needsUpdate = true;
+    }
 }
 
 window._clearDoorHoverOpacity = _clearDoorHoverOpacity;
 window._applyDoorHoverOpacity = _applyDoorHoverOpacity;
 window._resetSharedMaterialOpacity = _resetSharedMaterialOpacity;
+window._pickDoorHoverMesh = _pickDoorHoverMesh;
+window._isDoorHoverTarget = _isDoorHoverTarget;
 
 let currentHoveredDoor = null;
 let dragHandlesData = { horizontal: [], vertical: [], roofs: [], desk: [] };

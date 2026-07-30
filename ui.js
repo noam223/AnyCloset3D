@@ -5869,8 +5869,10 @@ function bindUI() {
         }
         
         const doorIntersects = raycaster.intersectObjects(doorMeshes, true);
-        if (doorIntersects.length > 0) {
-            const hoveredDoor = doorIntersects[0].object;
+        const hoveredDoor = (typeof window._pickDoorHoverMesh === 'function')
+            ? window._pickDoorHoverMesh(doorIntersects)
+            : (doorIntersects.length > 0 ? doorIntersects[0].object : null);
+        if (hoveredDoor) {
             if (currentHoveredDoor !== hoveredDoor) {
                 if (currentHoveredDoor) {
                     if (typeof window._clearDoorHoverOpacity === 'function') window._clearDoorHoverOpacity(currentHoveredDoor);
