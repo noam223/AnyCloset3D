@@ -542,6 +542,10 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.15); box-sh
 .dim-container.sub-cell-btn { background: transparent !important; border: none !important; box-shadow: none !important; padding: 0 !important; }
 .dim-container.sub-cell-btn:hover, .dim-container.sub-cell-btn:focus-within { background: transparent !important; border: none !important; box-shadow: none !important; }
 .dim-input { width: 39px; border: none; background: transparent; font-size: 12px; font-weight: 700; color: var(--primary); text-align: center; outline: none; padding: 0; margin: 0; font-family: inherit; -moz-appearance: textfield; }
+.dim-input::-webkit-outer-spin-button,
+.dim-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.dim-container.pill-mode input[type="number"]::-webkit-outer-spin-button,
+.dim-container.pill-mode input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .dim-suffix { font-size: 11px; font-weight: 600; color: var(--text-light); margin-right: 3px; }
 /* Column width labels: always visible above each column (editable) */
 .col-width-label {

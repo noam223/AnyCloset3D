@@ -633,6 +633,13 @@ function buildDimensionsAndButtonsUI() {
             input.style.fontSize = '0.78rem';
             input.style.width = '3.3em';
             input.style.minWidth = '2.5em';
+            input.title = input.title || 'לחץ לעריכת המידה';
+            input.addEventListener('mousedown', (e) => e.stopPropagation());
+            input.addEventListener('click', (e) => { e.stopPropagation(); input.select(); });
+            input.addEventListener('keydown', (e) => {
+                e.stopPropagation();
+                if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+            });
             dimEl.appendChild(input);
         }
 
@@ -733,7 +740,7 @@ function buildDimensionsAndButtonsUI() {
                     pill.appendChild(div1);
                 }
 
-                // Height display with ▲▼ arrows — middle
+                // Height editable input with ▲▼ arrows — middle
                 // Use d.h (from state.dimData, computed by engine-core with noPlinth-aware startShelvesY)
                 // instead of _cellHeight() which ignores col.noPlinth.
                 const cellH = Math.round(d.h);
@@ -747,9 +754,30 @@ function buildDimensionsAndButtonsUI() {
                 upBtn.addEventListener('mouseleave', () => upBtn.style.color = 'rgba(255,255,255,0.7)');
                 upBtn.addEventListener('click', (e) => { e.stopPropagation(); _adjustCellHeight(1); });
 
-                const heightLabel = document.createElement('span');
-                heightLabel.textContent = cellH;
-                heightLabel.style.cssText = 'font-size:0.72rem;font-weight:700;color:rgba(255,255,255,0.9);line-height:1.1;min-width:1.8em;text-align:center;';
+                const heightInput = document.createElement('input');
+                heightInput.type = 'number';
+                heightInput.step = '1';
+                heightInput.value = String(cellH);
+                heightInput.title = 'לחץ לעריכת גובה התא';
+                heightInput.setAttribute('aria-label', 'גובה תא בס״מ');
+                heightInput.style.cssText = 'width:2.6em;min-width:2em;border:none;background:transparent;font-size:0.72rem;font-weight:700;color:rgba(255,255,255,0.95);line-height:1.1;text-align:center;outline:none;padding:0;margin:0;font-family:inherit;-moz-appearance:textfield;cursor:text;';
+                heightInput.addEventListener('mousedown', (e) => { e.stopPropagation(); });
+                heightInput.addEventListener('click', (e) => { e.stopPropagation(); heightInput.select(); });
+                heightInput.addEventListener('keydown', (e) => {
+                    e.stopPropagation();
+                    if (e.key === 'Enter') { e.preventDefault(); heightInput.blur(); }
+                });
+                heightInput.addEventListener('change', (e) => {
+                    e.stopPropagation();
+                    const desired = parseInt(e.target.value, 10);
+                    if (isNaN(desired)) {
+                        e.target.value = String(cellH);
+                        return;
+                    }
+                    const delta = desired - cellH;
+                    if (delta === 0) return;
+                    _adjustCellHeight(delta);
+                });
 
                 const downBtn = document.createElement('div');
                 downBtn.innerHTML = '▼';
@@ -759,7 +787,7 @@ function buildDimensionsAndButtonsUI() {
                 downBtn.addEventListener('click', (e) => { e.stopPropagation(); _adjustCellHeight(-1); });
 
                 heightGroup.appendChild(upBtn);
-                heightGroup.appendChild(heightLabel);
+                heightGroup.appendChild(heightInput);
                 heightGroup.appendChild(downBtn);
                 pill.appendChild(heightGroup);
 
