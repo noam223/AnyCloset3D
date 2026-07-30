@@ -257,6 +257,163 @@ window._customRoomItems    = window._customRoomItems    || [];
 window._customRoomItemSeq  = window._customRoomItemSeq  || 0;
 window._CUSTOM_ITEM_COLORS = [0xdce4ef, 0xe8e0f0, 0xe0f0e8, 0xf0e8dc, 0xe4ecf4];
 
+// ── Room entrance door (movable on wall frame in 2D plan) ───────────────────
+window._ROOM_DOOR_W = window._ROOM_DOOR_W || 90;
+window._ROOM_DOOR_H = window._ROOM_DOOR_H || 210;
+window._roomDoor = window._roomDoor || {
+    wall: 'front', // front | back | left | right
+    t: 0.5,        // 0..1 along wall
+    width: 90,
+    height: 210,
+    visible: true
+};
+
+/** World pose for the room door on the current room bounds. */
+window._getRoomDoorPose = function(bounds) {
+    const b = bounds || window._roomBounds;
+    if (!b) return null;
+    const door = window._roomDoor || {};
+    if (door.visible === false) return null;
+    const width = Math.max(60, Math.min(120, parseFloat(door.width) || window._ROOM_DOOR_W || 90));
+    const height = Math.max(180, Math.min(240, parseFloat(door.height) || window._ROOM_DOOR_H || 210));
+    const half = width / 2;
+    let wall = door.wall || 'front';
+    if (['front', 'back', 'left', 'right'].indexOf(wall) < 0) wall = 'front';
+    const t = Math.max(0, Math.min(1, door.t != null ? Number(door.t) : 0.5));
+    let cx, cz;
+    if (wall === 'front' || wall === 'back') {
+        const minC = b.leftX + half;
+        const maxC = b.rightX - half;
+        cx = (maxC <= minC) ? (b.leftX + b.rightX) / 2 : minC + (maxC - minC) * t;
+        cz = wall === 'front' ? b.frontZ : b.backZ;
+    } else {
+        const minC = b.backZ + half;
+        const maxC = b.frontZ - half;
+        cz = (maxC <= minC) ? (b.backZ + b.frontZ) / 2 : minC + (maxC - minC) * t;
+        cx = wall === 'left' ? b.leftX : b.rightX;
+    }
+    return { wall: wall, cx: cx, cz: cz, width: width, height: height, t: t };
+};
+
+/** Snap a world point onto the room perimeter and update `_roomDoor`. */
+window._setRoomDoorFromPoint = function(x, z, bounds) {
+    const b = bounds || window._roomBounds;
+    if (!b) return null;
+    const door = window._roomDoor || (window._roomDoor = {
+        wall: 'front', t: 0.5, width: 90, height: 210, visible: true
+    });
+    const width = Math.max(60, Math.min(120, parseFloat(door.width) || 90));
+    const half = width / 2;
+    const left = b.leftX, right = b.rightX, back = b.backZ, front = b.frontZ;
+
+    function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+    const candidates = [
+        { wall: 'front', x: clamp(x, left + half, right - half), z: front,
+          dist: Math.abs(z - front) + (x < left || x > right ? Math.min(Math.abs(x - left), Math.abs(x - right)) : 0) },
+        { wall: 'back', x: clamp(x, left + half, right - half), z: back,
+          dist: Math.abs(z - back) + (x < left || x > right ? Math.min(Math.abs(x - left), Math.abs(x - right)) : 0) },
+        { wall: 'left', x: left, z: clamp(z, back + half, front - half),
+          dist: Math.abs(x - left) + (z < back || z > front ? Math.min(Math.abs(z - back), Math.abs(z - front)) : 0) },
+        { wall: 'right', x: right, z: clamp(z, back + half, front - half),
+          dist: Math.abs(x - right) + (z < back || z > front ? Math.min(Math.abs(z - back), Math.abs(z - front)) : 0) }
+    ];
+    candidates.sort(function(a, c) { return a.dist - c.dist; });
+    const best = candidates[0];
+    door.wall = best.wall;
+    if (best.wall === 'front' || best.wall === 'back') {
+        const minC = left + half, maxC = right - half;
+        door.t = (maxC <= minC) ? 0.5 : (best.x - minC) / (maxC - minC);
+    } else {
+        const minC = back + half, maxC = front - half;
+        door.t = (maxC <= minC) ? 0.5 : (best.z - minC) / (maxC - minC);
+    }
+    door.t = Math.max(0, Math.min(1, door.t));
+    door.width = width;
+    return window._getRoomDoorPose(b);
+};
+
+function _buildRoomDoorMesh(rg) {
+    const pose = typeof window._getRoomDoorPose === 'function' ? window._getRoomDoorPose() : null;
+    if (!pose || !rg) {
+        window._roomDoorMesh = null;
+        return null;
+    }
+    const doorW = pose.width;
+    const doorH = pose.height;
+    const frameT = 5;
+    const leafT = 4;
+    const openAngle = Math.PI * 0.28;
+
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.72, metalness: 0.05 });
+    const leafMat = new THREE.MeshStandardMaterial({ color: 0xc4a574, roughness: 0.55, metalness: 0.02 });
+    const glassMat = new THREE.MeshStandardMaterial({
+        color: 0xb8d4e8, roughness: 0.25, metalness: 0.1,
+        transparent: true, opacity: 0.35
+    });
+
+    const group = new THREE.Group();
+    group.userData.roomProp = 'room-door';
+
+    // Frame: two jambs + head
+    const jambH = doorH;
+    const headW = doorW + frameT * 2;
+    const leftJamb = new THREE.Mesh(new THREE.BoxGeometry(frameT, jambH, frameT), frameMat);
+    const rightJamb = new THREE.Mesh(new THREE.BoxGeometry(frameT, jambH, frameT), frameMat);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(headW, frameT, frameT), frameMat);
+    leftJamb.position.set(-doorW / 2 - frameT / 2, jambH / 2, 0);
+    rightJamb.position.set(doorW / 2 + frameT / 2, jambH / 2, 0);
+    head.position.set(0, doorH + frameT / 2, 0);
+    group.add(leftJamb);
+    group.add(rightJamb);
+    group.add(head);
+
+    // Leaf on hinge group (hinge at left side of opening)
+    const hinge = new THREE.Group();
+    hinge.position.set(-doorW / 2, 0, 0);
+    hinge.rotation.y = -openAngle;
+    const leaf = new THREE.Mesh(new THREE.BoxGeometry(doorW - 1, doorH - 2, leafT), leafMat);
+    leaf.position.set((doorW - 1) / 2, doorH / 2, 0);
+    leaf.castShadow = true;
+    hinge.add(leaf);
+    // Small upper panel "window"
+    const pane = new THREE.Mesh(new THREE.BoxGeometry(doorW * 0.35, doorH * 0.22, leafT + 0.3), glassMat);
+    pane.position.set((doorW - 1) / 2, doorH * 0.68, 0);
+    hinge.add(pane);
+    // Handle
+    const handle = new THREE.Mesh(
+        new THREE.BoxGeometry(2.2, 8, 3),
+        new THREE.MeshStandardMaterial({ color: 0xb0b0b0, metalness: 0.7, roughness: 0.3 })
+    );
+    handle.position.set(doorW - 10, doorH * 0.45, leafT / 2 + 1.2);
+    hinge.add(handle);
+    group.add(hinge);
+
+    // Orient + place on wall (local +X = along wall, local +Z = out of room).
+    // Inset a bit into the room to avoid z-fighting with the wall plane.
+    const inset = 3;
+    if (pose.wall === 'front') {
+        group.position.set(pose.cx, 0, pose.cz - inset);
+        group.rotation.y = 0;
+    } else if (pose.wall === 'back') {
+        group.position.set(pose.cx, 0, pose.cz + inset);
+        group.rotation.y = Math.PI;
+    } else if (pose.wall === 'left') {
+        group.position.set(pose.cx + inset, 0, pose.cz);
+        group.rotation.y = Math.PI / 2;
+    } else {
+        group.position.set(pose.cx - inset, 0, pose.cz);
+        group.rotation.y = -Math.PI / 2;
+    }
+
+    group.traverse(function(child) {
+        if (child.isMesh) child.userData.roomProp = 'room-door';
+    });
+    rg.add(group);
+    window._roomDoorMesh = group;
+    return group;
+}
+
 window._addCustomRoomItem = function(opts) {
     opts = opts || {};
     const b = window._roomBounds;
@@ -1200,6 +1357,10 @@ function _buildRoom() {
         );
         window._customRoomMeshes.push(mesh);
     });
+
+    // ── Entrance door (movable on walls via 2D plan) ──────────────────────────
+    window._roomDoorMesh = null;
+    _buildRoomDoorMesh(rg);
 
     // Notify UI to reposition bed handles
     if (typeof window._updateBedHandles === 'function') window._updateBedHandles();

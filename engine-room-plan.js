@@ -73,7 +73,8 @@
         chair:       { fill: '#f8fafc', stroke: '#94a3b8', label: 'כסא' },
         'cabinet-desk': { fill: '#e2e8f0', stroke: '#64748b', label: 'שולחן ארון' },
         nightstand:  { fill: '#f5f0e8', stroke: '#92706a', label: 'שידה' },
-        'room-desk': { fill: '#fef3c7', stroke: '#d97706', label: 'שולחן עבודה' }
+        'room-desk': { fill: '#fef3c7', stroke: '#d97706', label: 'שולחן עבודה' },
+        'room-door': { fill: '#dbeafe', stroke: '#0284c7', label: 'דלת' }
     };
 
     function _rectFromCenter(cx, cz, halfW, halfD, rotDeg) {
@@ -341,6 +342,117 @@
         return (window._customRoomItems || []).find(function(item) { return item.id === id; }) || null;
     }
 
+    function _getRoomDoorRect() {
+        const b = _getBounds();
+        if (!b || typeof window._getRoomDoorPose !== 'function') return null;
+        const pose = window._getRoomDoorPose(b);
+        if (!pose) return null;
+        const half = pose.width / 2;
+        const pad = 16; // grab thickness into the room
+        let minX, maxX, minZ, maxZ;
+        if (pose.wall === 'front') {
+            minX = pose.cx - half; maxX = pose.cx + half;
+            minZ = pose.cz - pad; maxZ = pose.cz + 5;
+        } else if (pose.wall === 'back') {
+            minX = pose.cx - half; maxX = pose.cx + half;
+            minZ = pose.cz - 5; maxZ = pose.cz + pad;
+        } else if (pose.wall === 'left') {
+            minX = pose.cx - 5; maxX = pose.cx + pad;
+            minZ = pose.cz - half; maxZ = pose.cz + half;
+        } else {
+            minX = pose.cx - pad; maxX = pose.cx + 5;
+            minZ = pose.cz - half; maxZ = pose.cz + half;
+        }
+        return _makeFurnItem('room-door', { minX: minX, maxX: maxX, minZ: minZ, maxZ: maxZ }, true, 'דלת', {
+            doorWall: pose.wall, doorCx: pose.cx, doorCz: pose.cz, doorW: pose.width
+        });
+    }
+
+    function _drawRoomDoor2D(g, item, tf, isActive) {
+        const wall = item.doorWall || 'front';
+        const cx = item.doorCx;
+        const cz = item.doorCz;
+        const w = item.doorW || 90;
+        const half = w / 2;
+        const stroke = isActive ? '#0369a1' : '#0284c7';
+        const fill = isActive ? '#bfdbfe' : '#dbeafe';
+
+        let a, bpt, hinge, sweep;
+        if (wall === 'front') {
+            a = _w2s(cx - half, cz, tf);
+            bpt = _w2s(cx + half, cz, tf);
+            hinge = a;
+            sweep = '0 0 0'; // arc into room (up on screen = -Z)
+        } else if (wall === 'back') {
+            a = _w2s(cx - half, cz, tf);
+            bpt = _w2s(cx + half, cz, tf);
+            hinge = a;
+            sweep = '0 0 1';
+        } else if (wall === 'left') {
+            a = _w2s(cx, cz - half, tf);
+            bpt = _w2s(cx, cz + half, tf);
+            hinge = a;
+            sweep = '0 0 1';
+        } else {
+            a = _w2s(cx, cz - half, tf);
+            bpt = _w2s(cx, cz + half, tf);
+            hinge = bpt;
+            sweep = '0 0 0';
+        }
+
+        const opening = _svgEl('line', {
+            x1: a.x, y1: a.y, x2: bpt.x, y2: bpt.y,
+            stroke: stroke, 'stroke-width': isActive ? '5' : '4',
+            'stroke-linecap': 'square'
+        });
+        g.appendChild(opening);
+
+        // Door leaf line (slightly open)
+        const leafLen = Math.hypot(bpt.x - a.x, bpt.y - a.y);
+        let leafEnd;
+        if (wall === 'front') leafEnd = { x: hinge.x, y: hinge.y - leafLen * 0.85 };
+        else if (wall === 'back') leafEnd = { x: hinge.x, y: hinge.y + leafLen * 0.85 };
+        else if (wall === 'left') leafEnd = { x: hinge.x + leafLen * 0.85, y: hinge.y };
+        else leafEnd = { x: hinge.x - leafLen * 0.85, y: hinge.y };
+
+        g.appendChild(_svgEl('line', {
+            x1: hinge.x, y1: hinge.y, x2: leafEnd.x, y2: leafEnd.y,
+            stroke: '#1d4ed8', 'stroke-width': '2.2'
+        }));
+
+        const r = leafLen * 0.9;
+        let arcEnd;
+        if (wall === 'front') arcEnd = { x: hinge.x + r, y: hinge.y };
+        else if (wall === 'back') arcEnd = { x: hinge.x + r, y: hinge.y };
+        else if (wall === 'left') arcEnd = { x: hinge.x, y: hinge.y + r };
+        else arcEnd = { x: hinge.x, y: hinge.y - r };
+
+        // Quarter-circle swing arc
+        g.appendChild(_svgEl('path', {
+            d: 'M ' + leafEnd.x + ' ' + leafEnd.y +
+               ' A ' + r + ' ' + r + ' 0 ' + sweep + ' ' + arcEnd.x + ' ' + arcEnd.y,
+            fill: 'none', stroke: '#ef4444', 'stroke-width': '1.2',
+            'stroke-dasharray': '4 3'
+        }));
+
+        // Hit/fill plate for easier grabbing
+        const p1 = _w2s(item.minX, item.minZ, tf);
+        const p2 = _w2s(item.maxX, item.maxZ, tf);
+        const fx = Math.min(p1.x, p2.x), fy = Math.min(p1.y, p2.y);
+        const fw = Math.abs(p2.x - p1.x), fh = Math.abs(p2.y - p1.y);
+        g.appendChild(_svgEl('rect', {
+            x: fx, y: fy, width: Math.max(fw, 1), height: Math.max(fh, 1),
+            fill: fill, stroke: 'none', opacity: '0.25', rx: '3'
+        }));
+
+        g.appendChild(_svgEl('text', {
+            x: (a.x + bpt.x) / 2,
+            y: (a.y + bpt.y) / 2 - (wall === 'front' || wall === 'back' ? 12 : 0),
+            class: 'rp-furn-label', 'text-anchor': 'middle',
+            'dominant-baseline': 'middle', 'font-size': '11', fill: '#0369a1'
+        }, 'דלת'));
+    }
+
     function _collectFurniture() {
         const items = [];
         const cab = _getCabinetRect();
@@ -349,6 +461,7 @@
         const chair = _getChairRect();
         const nightstand = _getNightstandRect();
         const roomDesk = _getRoomDeskRect();
+        const roomDoor = _getRoomDoorRect();
         if (cab) items.push(cab);
         if (cabDesk) items.push(cabDesk);
         if (bed) items.push(bed);
@@ -356,6 +469,8 @@
         if (roomDesk) items.push(roomDesk);
         if (chair) items.push(chair);
         _getCustomItemRects().forEach(function(item) { items.push(item); });
+        // Door last → topmost in reverse hit-test
+        if (roomDoor) items.push(roomDoor);
         return items;
     }
 
@@ -420,6 +535,10 @@
                 const cp = _clampFurnCenter(cx, cz, custom.w / 2, custom.d / 2);
                 custom.x = cp.x;
                 custom.z = cp.z;
+            }
+        } else if (id === 'room-door') {
+            if (typeof window._setRoomDoorFromPoint === 'function') {
+                window._setRoomDoorFromPoint(cx, cz, _getBounds());
             }
         }
         window._roomPlanPending3D = true;
@@ -691,25 +810,29 @@
                 'data-id': item.id
             });
 
-            g.appendChild(_svgEl('rect', {
-                x: fx, y: fy, width: fw, height: fh,
-                fill: colors.fill, stroke: colors.stroke,
-                'stroke-width': isActive ? '2.5' : '1.5',
-                rx: '4'
-            }));
+            if (item.id === 'room-door') {
+                _drawRoomDoor2D(g, item, tf, isActive);
+            } else {
+                g.appendChild(_svgEl('rect', {
+                    x: fx, y: fy, width: fw, height: fh,
+                    fill: colors.fill, stroke: colors.stroke,
+                    'stroke-width': isActive ? '2.5' : '1.5',
+                    rx: '4'
+                }));
 
-            const labelSize = Math.max(9, Math.min(12, fw / 8));
-            if (fw > 36 && fh > 20) {
-                g.appendChild(_svgEl('text', {
-                    x: fx + fw / 2, y: fy + fh / 2,
-                    class: 'rp-furn-label', 'text-anchor': 'middle',
-                    'dominant-baseline': 'middle',
-                    'font-size': labelSize
-                }, item.label));
-            }
+                const labelSize = Math.max(9, Math.min(12, fw / 8));
+                if (fw > 36 && fh > 20) {
+                    g.appendChild(_svgEl('text', {
+                        x: fx + fw / 2, y: fy + fh / 2,
+                        class: 'rp-furn-label', 'text-anchor': 'middle',
+                        'dominant-baseline': 'middle',
+                        'font-size': labelSize
+                    }, item.label));
+                }
 
-            if (item.id === 'bed') {
-                _drawBedWidthBtn(g, fx, fy, fw, fh);
+                if (item.id === 'bed') {
+                    _drawBedWidthBtn(g, fx, fy, fw, fh);
+                }
             }
 
             if (item.draggable) {
@@ -754,28 +877,10 @@
 
         const itemDimsG = _svgEl('g', { class: 'rp-item-dims' });
         items.forEach(function(item) {
-            if (item.id === 'cabinet' || item.id === 'cabinet-desk') return;
+            if (item.id === 'cabinet' || item.id === 'cabinet-desk' || item.id === 'room-door') return;
             _drawItemWallDims(itemDimsG, item, tf, b, item.id === dragId);
         });
         svg.appendChild(itemDimsG);
-
-        const doorG = _svgEl('g', { class: 'rp-door' });
-        const doorW = 90;
-        const doorCx = (b.leftX + b.rightX) / 2;
-        const doorZ = b.frontZ;
-        const dp1 = _w2s(doorCx - doorW / 2, doorZ, tf);
-        const dp2 = _w2s(doorCx + doorW / 2, doorZ, tf);
-        doorG.appendChild(_svgEl('rect', {
-            x: dp1.x, y: dp1.y - 4, width: dp2.x - dp1.x, height: 8,
-            fill: '#bae6fd', stroke: '#0284c7', 'stroke-width': '1'
-        }));
-        const arcR = (dp2.x - dp1.x) * 0.9;
-        doorG.appendChild(_svgEl('path', {
-            d: 'M ' + dp1.x + ' ' + dp1.y + ' A ' + arcR + ' ' + arcR + ' 0 0 0 ' + (dp1.x + arcR) + ' ' + (dp1.y - arcR),
-            fill: 'none', stroke: '#ef4444', 'stroke-width': '1.2',
-            'stroke-dasharray': '4 3'
-        }));
-        svg.appendChild(doorG);
 
         window._roomPlanTransform = tf;
         if (!window._roomPlanDrag) window._updateRoomPlanFurnitureList();
@@ -805,8 +910,10 @@
                 : item.id === 'nightstand' ? 'fa-table-cells'
                 : item.id === 'room-desk' ? 'fa-desktop'
                 : item.id === 'cabinet-desk' ? 'fa-laptop'
+                : item.id === 'room-door' ? 'fa-door-open'
                 : String(item.id).indexOf('custom-') === 0 ? 'fa-cube'
-                : 'fa-door-closed';
+                : item.id === 'cabinet' ? 'fa-door-closed'
+                : 'fa-cube';
             row.innerHTML =
                 '<i class="fa-solid ' + icon + '"></i>' +
                 '<span class="room-plan-furn-name">' + (item.label || item.id) + '</span>' +
@@ -1090,10 +1197,14 @@
             if (!d) return;
             if (e && d.pointerId !== e.pointerId) return;
             const wasCabinet = d.id === 'cabinet';
+            const wasDoor = d.id === 'room-door';
             window._roomPlanDrag = null;
             document.body.classList.remove('room-plan-dragging');
             if (wasCabinet) {
                 _finishCabinetWallSnap();
+            }
+            if (wasDoor && window._roomPlanPending3D && typeof window._syncRoomPlanTo3D === 'function') {
+                window._syncRoomPlanTo3D();
             }
             _queueRoomPlanRender();
         }
