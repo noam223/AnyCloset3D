@@ -475,22 +475,45 @@ function buildDimensionsAndButtonsUI() {
         if (d.isSubCellBtn) return;
         if (d.isCellSelectBtn) return;
 
-        // ---- Column width label above each column ----
+        // ---- Column width label above each column (editable) ----
         if (d.isColWidth) {
             if (!colWidthsLayer) return;
             const colWidthEl = document.createElement('div');
             colWidthEl.className = 'col-width-label';
             colWidthEl.dataset.x3d = d.x;
             colWidthEl.dataset.y3d = d.y;
-            colWidthEl.style.cssText = 'position:absolute;transform:translate(-50%,-50%);background:rgba(16,185,129,0.13);border:1.5px solid rgba(16,185,129,0.5);border-radius:8px;padding:3px 8px;display:flex;align-items:baseline;gap:3px;pointer-events:none;white-space:nowrap;';
-            const valSpan = document.createElement('span');
-            valSpan.style.cssText = 'font-size:0.82rem;font-weight:700;color:#059669;';
-            valSpan.innerText = Math.round(d.h);
+            colWidthEl.title = 'לחץ לעריכת רוחב העמודה';
+            const input = document.createElement('input');
+            input.className = 'col-width-input';
+            input.type = 'number';
+            input.step = '1';
+            input.min = String(typeof MIN_COL_WIDTH !== 'undefined' ? MIN_COL_WIDTH : 20);
+            input.value = Math.round(d.h);
+            input.setAttribute('aria-label', 'רוחב עמודה בס״מ');
             const unitSpan = document.createElement('span');
-            unitSpan.style.cssText = 'font-size:0.72rem;color:#059669;font-weight:600;';
+            unitSpan.className = 'col-width-unit';
             unitSpan.innerText = 'ס"מ';
-            colWidthEl.appendChild(valSpan);
+            colWidthEl.appendChild(input);
             colWidthEl.appendChild(unitSpan);
+
+            input.addEventListener('mousedown', function(e) { e.stopPropagation(); });
+            input.addEventListener('click', function(e) { e.stopPropagation(); input.select(); });
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+                e.stopPropagation();
+            });
+            input.addEventListener('change', function(e) {
+                const desired = parseInt(e.target.value, 10);
+                if (isNaN(desired)) {
+                    e.target.value = Math.round(d.h);
+                    return;
+                }
+                if (typeof window._setColumnWidthCm === 'function') {
+                    const applied = window._setColumnWidthCm(d.colIndex, desired);
+                    e.target.value = applied != null ? applied : Math.round(d.h);
+                }
+            });
+
             colWidthsLayer.appendChild(colWidthEl);
             return;
         }

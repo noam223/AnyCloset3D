@@ -543,8 +543,51 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.15); box-sh
 .dim-container.sub-cell-btn:hover, .dim-container.sub-cell-btn:focus-within { background: transparent !important; border: none !important; box-shadow: none !important; }
 .dim-input { width: 39px; border: none; background: transparent; font-size: 12px; font-weight: 700; color: var(--primary); text-align: center; outline: none; padding: 0; margin: 0; font-family: inherit; -moz-appearance: textfield; }
 .dim-suffix { font-size: 11px; font-weight: 600; color: var(--text-light); margin-right: 3px; }
-/* Column width labels: always visible above each column (in col-widths-layer, not dimensions-layer) */
-.col-width-label { pointer-events: none !important; box-shadow: none !important; }
+/* Column width labels: always visible above each column (editable) */
+.col-width-label {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    pointer-events: auto !important;
+    box-shadow: none !important;
+    background: rgba(16,185,129,0.13);
+    border: 1.5px solid rgba(16,185,129,0.5);
+    border-radius: 8px;
+    padding: 2px 6px;
+    display: flex;
+    align-items: baseline;
+    gap: 3px;
+    white-space: nowrap;
+    cursor: text;
+}
+.col-width-label:hover, .col-width-label:focus-within {
+    background: rgba(16,185,129,0.22);
+    border-color: #059669;
+    box-shadow: 0 2px 8px rgba(5,150,105,0.18) !important;
+}
+.col-width-input {
+    width: 3.2em;
+    min-width: 2.4em;
+    border: none;
+    background: transparent;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #059669;
+    text-align: center;
+    outline: none;
+    padding: 0;
+    margin: 0;
+    font-family: inherit;
+    -moz-appearance: textfield;
+    pointer-events: auto;
+}
+.col-width-input::-webkit-outer-spin-button,
+.col-width-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.col-width-unit {
+    font-size: 0.72rem;
+    color: #059669;
+    font-weight: 600;
+    pointer-events: none;
+}
 
 /* Upper unit horizontal move handle */
 .drag-handle.uu-move-handle { background: rgba(16,185,129,0.13); border-color: rgba(16,185,129,0.6); }

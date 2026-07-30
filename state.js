@@ -2711,6 +2711,57 @@ window.updateQEInput = function(field, value) {
     else if (field === 'shelves') updateQE('shelves', val - col.shelves);
 }
 
+/** Set column width in cm from the green label above the column. Returns applied width. */
+window._setColumnWidthCm = function(cIndex, desiredCm) {
+    const cols = state.columns;
+    if (!cols || cIndex < 0 || cIndex >= cols.length) return null;
+    const col = cols[cIndex];
+    if (!col) return null;
+    const minW = (typeof MIN_COL_WIDTH !== 'undefined') ? MIN_COL_WIDTH : 20;
+    let desired = Math.round(desiredCm);
+    if (isNaN(desired)) return Math.round(col.width);
+
+    if (cols.length === 1) {
+        // Single column: changing width changes total cabinet width
+        const t = state.thickness || 1.7;
+        const newTotal = Math.max(40, Math.min(600, desired + t * 2));
+        desired = Math.max(minW, Math.round(newTotal - t * 2));
+        state.width = desired + t * 2;
+        col.width = desired;
+        const pill = document.getElementById('dim-pill-width');
+        if (pill) pill.value = Math.round(state.width);
+        const inp = document.getElementById('inp-num-width');
+        if (inp) inp.value = Math.round(state.width);
+    } else {
+        // Multi-column: keep total width — steal/give from neighbor (same as updateQE width)
+        let neighborIndex = (cIndex === cols.length - 1) ? cIndex - 1 : cIndex + 1;
+        const neighbor = cols[neighborIndex];
+        if (!neighbor) return Math.round(col.width);
+        const delta = desired - Math.round(col.width);
+        let newW = Math.round(col.width + delta);
+        let newNeighborW = Math.round(neighbor.width - delta);
+        if (newW < minW) {
+            newNeighborW -= (minW - newW);
+            newW = minW;
+        }
+        if (newNeighborW < minW) {
+            newW -= (minW - newNeighborW);
+            newNeighborW = minW;
+        }
+        if (newW < minW || newNeighborW < minW) return Math.round(col.width);
+        col.width = newW;
+        neighbor.width = newNeighborW;
+        desired = newW;
+    }
+
+    checkSplits();
+    if (typeof buildCabinet === 'function') buildCabinet();
+    if (typeof updateCameraView === 'function') updateCameraView();
+    if (typeof calculatePrice === 'function') calculatePrice();
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+    return desired;
+};
+
 window.updateColumns = function(delta) {
     const inp = document.getElementById('inp-columns');
     let currentVal = parseInt(inp.value);
