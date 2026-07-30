@@ -448,6 +448,7 @@ window.toggleUpperUnit = function(wingId) {
             materialBack: parentWing.materialBack || 'white_matte',
             cabinetModel: parentWing.cabinetModel || 'c9',
             hasDoors: true,
+            wingPosition: 'front', // not a side wing — prevents door/side clipping treating UU as side
             _isUpperUnit: true,
             _upperGap: 60,
             _upperOffsetX: 0,
@@ -2519,7 +2520,11 @@ function _distributeShelves(col, wingData) {
     const t = wingData ? wingData.thickness : state.thickness;
     
     const fo = col.floorOffset || 0;
-    const baseY = (col.type === 'desk') ? col.deskHeight + col.deskClearance : Math.max(plinthH, fo);
+    // noPlinth (upper unit / ביטול צוקל): shelf math starts at floor/fo so it matches
+    // engine startShelvesY = t (not plinthHeight + t).
+    const baseY = (col.type === 'desk')
+        ? col.deskHeight + col.deskClearance
+        : (col.noPlinth ? fo : Math.max(plinthH, fo));
 
     if (col.splitY && col.splitY > baseY + t + MIN_SHELF_GAP) {
         const h1 = col.splitY - t - (baseY + t);

@@ -2022,6 +2022,11 @@ function buildCabinet() {
         // Upper units never have a decorative plinth — force noPlinth on all columns
         // (handles both newly created and existing saved upper units)
         uuWing.columns.forEach(col => { col.noPlinth = true; });
+        // Legacy upper units defaulted to wingPosition:'side' via createWingData — that made
+        // door clipping treat them as side wings. Normalize to front (not a lateral wing).
+        if (!uuWing.wingPosition || uuWing.wingPosition === 'side') {
+            uuWing.wingPosition = 'front';
+        }
         _buildWingGeometry(upperGroup, 0, 0, 0, _isUUActive);
 
         // Restore
@@ -2772,6 +2777,9 @@ window.buildCabinetIntoGroup = function(targetGroup) {
             _isActiveWingBuild = false;
             _ppWingId = uuKey;
             uuWing.columns.forEach(col => { col.noPlinth = true; });
+            if (!uuWing.wingPosition || uuWing.wingPosition === 'side') {
+                uuWing.wingPosition = 'front';
+            }
             _buildWingGeometry(upperGroup, 0, 0, 0, false);
             targetGroup.add(upperGroup);
         }
@@ -4878,15 +4886,23 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
             //                 right wing → lineX = -wingW/2 + centerD (clip left edge)
             let _doorOverlayLeftX = overlayLeftX;
             let _doorOverlayRightX = overlayRightX;
-            // Determine if this wing is a side wing (has hidden zone)
+            // Determine if this wing is a side wing (has hidden zone).
+            // Upper units use wingId like "upperUnit_center" / "upperUnit_left" — clip against the
+            // PARENT wing, otherwise center upper units are wrongly treated as side wings and
+            // doors get clipped (partial coverage or invisible on some cells).
             const _thisWingId = _buildGroup && _buildGroup.userData ? _buildGroup.userData.wingId : null;
             const _thisWingData = _thisWingId ? state.wings[_thisWingId] : null;
-            const _thisWingPos = _thisWingData ? (_thisWingData.wingPosition || 'side') : null;
-            if (_thisWingId && _thisWingId !== 'center' && _thisWingPos === 'side') {
+            const _isUpperUnitWing = !!( _thisWingId && String(_thisWingId).startsWith('upperUnit_') );
+            const _clipWingId = _isUpperUnitWing
+                ? ((_thisWingData && _thisWingData._parentWingId) || String(_thisWingId).replace(/^upperUnit_/, '') || 'center')
+                : _thisWingId;
+            const _clipWingData = _clipWingId ? state.wings[_clipWingId] : null;
+            const _clipWingPos = _clipWingData ? (_clipWingData.wingPosition || 'side') : null;
+            if (_clipWingId && _clipWingId !== 'center' && _clipWingPos === 'side') {
                 const _cwData = state.wings.center;
                 const _centerD = _cwData ? _cwData.depth : state.depth;
                 const _wingW = state.width;
-                const _isLeftWing = (_thisWingId === 'left');
+                const _isLeftWing = (_clipWingId === 'left');
                 const _lineX = _isLeftWing ? (_wingW / 2 - _centerD) : (-_wingW / 2 + _centerD);
                 if (_isLeftWing) {
                     // Hidden zone is to the RIGHT of _lineX — clip door's right edge
@@ -4895,7 +4911,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                     // Hidden zone is to the LEFT of _lineX — clip door's left edge
                     _doorOverlayLeftX = Math.max(_doorOverlayLeftX, _lineX);
                 }
-            } else if (_thisWingId === 'center') {
+            } else if (_clipWingId === 'center') {
                 // Center cabinet with a front wing: clip doors on the corner column
                 // Right front wing covers the RIGHT edge → clip rightmost column's door right edge
                 // Left front wing covers the LEFT edge → clip leftmost column's door left edge
@@ -4926,7 +4942,9 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                 const _safeEndRow   = Math.max(0, Math.min(door.endRow,   dividersAsc.length));
                 // Use dividersAsc (ascending by Y) — dividers was re-sorted descending at line 729
                 if (isInset) {
-                    let baseForInset = col.type === 'desk' ? col.deskHeight + col.deskClearance : Math.max(state.plinthHeight, fo);
+                    let baseForInset = col.type === 'desk'
+                        ? col.deskHeight + col.deskClearance
+                        : (col.noPlinth ? (fo > 0 ? fo : 0) : Math.max(state.plinthHeight, fo));
                     doorBottomY = (_safeStartRow === 0) ? (baseForInset + t) : (dividersAsc[_safeStartRow - 1].y + dividersAsc[_safeStartRow - 1].thick/2);
                     doorTopY = (_safeEndRow === dividersAsc.length) ? (col.height - t) : (dividersAsc[_safeEndRow].y - dividersAsc[_safeEndRow].thick/2);
                     doorBottomY += doorGap/2;
@@ -4934,8 +4952,12 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                 } else {
                     // For bathroom regalim: extend door fronts down by t to cover the bottom plate face.
                     const _bathRegalimDoor = (state.presetId === 'bathroom' && isRegalim && door.startRow === 0 && fo === 0 && col.type !== 'desk');
-                    let baseY = col.type === 'desk' ? col.deskHeight + col.deskClearance : (_bathRegalimDoor ? state.plinthHeight - t : Math.max(state.plinthHeight, fo));
-                    if (_safeStartRow === 0 && col.type !== 'desk' && state.plinthHeight === 7 && fo === 0 && !_bathRegalimDoor) baseY = 1.5;
+                    let baseY = col.type === 'desk'
+                        ? col.deskHeight + col.deskClearance
+                        : (_bathRegalimDoor
+                            ? state.plinthHeight - t
+                            : (col.noPlinth ? (fo > 0 ? fo : 0) : Math.max(state.plinthHeight, fo)));
+                    if (_safeStartRow === 0 && col.type !== 'desk' && !col.noPlinth && state.plinthHeight === 7 && fo === 0 && !_bathRegalimDoor) baseY = 1.5;
                     doorBottomY = (_safeStartRow === 0) ? (baseY + doorGap/2) : (dividersAsc[_safeStartRow - 1].y + doorGap/2);
                     doorTopY = (_safeEndRow === dividersAsc.length) ? (col.height - doorGap/2) : (dividersAsc[_safeEndRow].y - doorGap/2);
                 }
