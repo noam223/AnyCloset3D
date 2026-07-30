@@ -106,8 +106,7 @@ function _resolveOpenCellColorLabel(wings, fallbackKey) {
 
 const placementHebrew = {
     'wall': 'ארון קיר חופשי',
-    'between_walls': 'ארון בין קירות',
-    'niche': 'ארון בנישה'
+    'between_walls': 'ארון בין קירות'
 };
 
 // ── Drawer count helpers ──────────────────────────────────────────────────────
@@ -5049,15 +5048,6 @@ window._closureFrontLine  = window._closureFrontLine  || 'cabinet';
 // Array of ceiling closure meshes — populated by buildCabinet, used by animate() for camera-based visibility
 window._closureCeilMeshes = window._closureCeilMeshes || [];
 
-// ── Niche (ארון בנישה) globals ──────────────────────────────────────────────
-window._nicheEnabled             = window._nicheEnabled             || false;
-window._nicheWidth               = window._nicheWidth               || 200;
-window._nicheDepth               = window._nicheDepth               || 30;
-window._nicheClosureEnabled      = window._nicheClosureEnabled      || false;
-window._nicheClosureWidthLeft    = window._nicheClosureWidthLeft    || 1.8;
-window._nicheClosureWidthRight   = window._nicheClosureWidthRight   || 1.8;
-window._nicheClosureCeilHeight   = window._nicheClosureCeilHeight   || 1.8;
-
 window._setRoomWall = function(wall) {
     window._roomWall = wall;
     state.roomWall   = wall;
@@ -5069,138 +5059,6 @@ window._setRoomWall = function(wall) {
     window._updateRoomWallUI();
     buildCabinet();
     updateLeftSidebar();
-};
-
-window._setNicheEnabled = function(enabled) {
-    window._nicheEnabled = !!enabled;
-    const tog = document.getElementById('inp-niche-enabled');
-    if (tog) tog.checked = window._nicheEnabled;
-    // sync toggle-wrap and button
-    const wrap = document.getElementById('wrap-niche');
-    const btn  = document.getElementById('btn-niche-toggle');
-    if (wrap) wrap.classList.toggle('open', !!enabled);
-    if (btn)  btn.classList.toggle('active', !!enabled);
-    const sw = btn && btn.querySelector('.toggle-switch');
-    window._updateNicheUI();
-    buildCabinet();
-};
-
-window._setNicheWidth = function(val) {
-    const v = Math.max(50, Math.min(600, parseFloat(val) || 200));
-    window._nicheWidth = v;
-    const numEl = document.getElementById('inp-num-niche-width');
-    const slEl  = document.getElementById('inp-niche-width');
-    if (numEl) numEl.value = v;
-    window._setRangeEl(slEl, v);
-    window._updateNicheUI(); // update closure slider max when niche width changes
-    buildCabinet();
-};
-
-window._setNicheDepth = function(val) {
-    const v = Math.max(10, Math.min(200, parseFloat(val) || 30));
-    window._nicheDepth = v;
-    const numEl = document.getElementById('inp-num-niche-depth');
-    const slEl  = document.getElementById('inp-niche-depth');
-    if (numEl) numEl.value = v;
-    window._setRangeEl(slEl, v);
-    buildCabinet();
-};
-
-window._setNicheClosureEnabled = function(enabled) {
-    window._nicheClosureEnabled = !!enabled;
-    const tog = document.getElementById('inp-niche-closure-enabled');
-    if (tog) tog.checked = window._nicheClosureEnabled;
-    window._updateNicheUI();
-    buildCabinet();
-};
-
-window._setNicheClosureWidthLeft = function(val) {
-    const _nW   = Math.max(50, parseFloat(window._nicheWidth) || 200);
-    const _cabW = (state.wings && state.wings.center) ? (state.wings.center.width || 160) : (state.width || 160);
-    const _maxS = Math.max(1.8, (_nW - _cabW) / 2);
-    const v = Math.max(1.8, Math.min(_maxS, parseFloat(val) || 1.8));
-    window._nicheClosureWidthLeft = v;
-    const numEl = document.getElementById('inp-num-niche-closure-left');
-    const slEl  = document.getElementById('inp-niche-closure-left');
-    if (numEl) numEl.value = v;
-    window._setRangeEl(slEl, v);
-    buildCabinet();
-};
-
-window._setNicheClosureWidthRight = function(val) {
-    const _nW   = Math.max(50, parseFloat(window._nicheWidth) || 200);
-    const _cabW = (state.wings && state.wings.center) ? (state.wings.center.width || 160) : (state.width || 160);
-    const _maxS = Math.max(1.8, (_nW - _cabW) / 2);
-    const v = Math.max(1.8, Math.min(_maxS, parseFloat(val) || 1.8));
-    window._nicheClosureWidthRight = v;
-    const numEl = document.getElementById('inp-num-niche-closure-right');
-    const slEl  = document.getElementById('inp-niche-closure-right');
-    if (numEl) numEl.value = v;
-    window._setRangeEl(slEl, v);
-    buildCabinet();
-};
-
-window._setNicheClosureCeilHeight = function(val) {
-    const v = Math.max(1.8, Math.min(30, parseFloat(val) || 1.8));
-    window._nicheClosureCeilHeight = v;
-    const numEl = document.getElementById('inp-num-niche-closure-ceil');
-    const slEl  = document.getElementById('inp-niche-closure-ceil');
-    if (numEl) numEl.value = v;
-    window._setRangeEl(slEl, v);
-    buildCabinet();
-};
-
-window._updateNicheUI = function() {
-    const wrapNiche = document.getElementById('wrap-niche');
-    const btnNiche  = document.getElementById('btn-niche-toggle');
-    const tog       = document.getElementById('inp-niche-enabled');
-    const _preset   = state.presetId || 'linear';
-    const _isLS     = (_preset === 'linear' || _preset === 'sliding');
-    if (wrapNiche) wrapNiche.style.display = _isLS ? '' : 'none';
-    if (tog) tog.checked = !!window._nicheEnabled;
-    if (wrapNiche) wrapNiche.classList.toggle('open', !!(window._nicheEnabled && _isLS));
-    if (btnNiche) btnNiche.classList.toggle('active', !!window._nicheEnabled);
-    // Sync slider values
-    const nwNum = document.getElementById('inp-num-niche-width');
-    const nwSl  = document.getElementById('inp-niche-width');
-    const ndNum = document.getElementById('inp-num-niche-depth');
-    const ndSl  = document.getElementById('inp-niche-depth');
-    if (nwNum) nwNum.value = window._nicheWidth  || 200;
-    if (nwSl)  nwSl.value  = window._nicheWidth  || 200;
-    if (ndNum) ndNum.value = window._nicheDepth   || 30;
-    if (ndSl)  ndSl.value  = window._nicheDepth   || 30;
-    // Show/hide niche closure toggle: whenever niche is enabled (for linear/sliding)
-    const nicheClosureRow = document.getElementById('niche-closure-row');
-    if (nicheClosureRow) {
-        const _showClosure = (window._nicheEnabled && _isLS);
-        nicheClosureRow.style.display = _showClosure ? '' : 'none';
-        if (!_showClosure) window._nicheClosureEnabled = false;
-    }
-    // Sync closure toggle checkbox
-    const closureTog = document.getElementById('inp-niche-closure-enabled');
-    if (closureTog) closureTog.checked = !!window._nicheClosureEnabled;
-    // Show/hide niche closure sliders
-    const nicheClosureSliders = document.getElementById('niche-closure-sliders');
-    if (nicheClosureSliders) {
-        nicheClosureSliders.style.display = (window._nicheEnabled && _isLS && window._nicheClosureEnabled) ? '' : 'none';
-    }
-    // Compute max side panel thickness = (nicheWidth - cabinetWidth) / 2
-    const _ncNW   = Math.max(50, parseFloat(window._nicheWidth) || 200);
-    const _ncCabW = state.wings && state.wings.center ? (state.wings.center.width || 160) : (state.width || 160);
-    const _ncMaxSide = Math.max(1.8, (_ncNW - _ncCabW) / 2);
-    // Sync niche closure slider values and max
-    const _ncL = document.getElementById('inp-niche-closure-left');
-    const _ncLn = document.getElementById('inp-num-niche-closure-left');
-    const _ncR = document.getElementById('inp-niche-closure-right');
-    const _ncRn = document.getElementById('inp-num-niche-closure-right');
-    const _ncC = document.getElementById('inp-niche-closure-ceil');
-    const _ncCn = document.getElementById('inp-num-niche-closure-ceil');
-    if (_ncL)  { _ncL.max  = _ncMaxSide; _ncL.value  = Math.min(window._nicheClosureWidthLeft  || 1.8, _ncMaxSide); }
-    if (_ncLn) { _ncLn.max = _ncMaxSide; _ncLn.value = Math.min(window._nicheClosureWidthLeft  || 1.8, _ncMaxSide); }
-    if (_ncR)  { _ncR.max  = _ncMaxSide; _ncR.value  = Math.min(window._nicheClosureWidthRight || 1.8, _ncMaxSide); }
-    if (_ncRn) { _ncRn.max = _ncMaxSide; _ncRn.value = Math.min(window._nicheClosureWidthRight || 1.8, _ncMaxSide); }
-    if (_ncC)  _ncC.value  = window._nicheClosureCeilHeight || 1.8;
-    if (_ncCn) _ncCn.value = window._nicheClosureCeilHeight || 1.8;
 };
 
 window._setClosureEnabled = function(_enabled) {
@@ -5321,7 +5179,6 @@ window._updateRoomWallUI = function() {
 
     if (!_isLinearOrSliding) {
         if (posRow) posRow.style.display = 'none';
-        if (typeof window._updateNicheUI === 'function') window._updateNicheUI();
         return;
     }
 
@@ -5339,9 +5196,6 @@ window._updateRoomWallUI = function() {
     });
 
     window._closureEnabled = true;
-
-    // Sync niche UI
-    if (typeof window._updateNicheUI === 'function') window._updateNicheUI();
 };
 
 window._syncRangeFill = function(slider) {
@@ -5538,7 +5392,7 @@ function bindUI() {
     const placementEl = document.getElementById('inp-placement');
     if (placementEl) {
         placementEl.addEventListener('change', (e) => {
-            state.placement = e.target.value;
+            state.placement = (e.target.value === 'niche') ? 'wall' : e.target.value;
             buildCabinet(); calculatePrice(); saveHistoryState();
         });
     }
@@ -6713,13 +6567,6 @@ function _snapshotEditorState() {
         closureCeilWidth: window._closureCeilWidth,
         closureDepthWidth: window._closureDepthWidth,
         closureFrontLine: window._closureFrontLine,
-        nicheEnabled: window._nicheEnabled,
-        nicheWidth: window._nicheWidth,
-        nicheDepth: window._nicheDepth,
-        nicheClosureEnabled: window._nicheClosureEnabled,
-        nicheClosureWidthLeft: window._nicheClosureWidthLeft,
-        nicheClosureWidthRight: window._nicheClosureWidthRight,
-        nicheClosureCeilHeight: window._nicheClosureCeilHeight,
         camFov: cam ? cam.fov : 45,
         camPos: cam ? cam.position.clone() : null,
         camTarget: ctrl ? ctrl.target.clone() : null,
@@ -6754,13 +6601,6 @@ function _restoreEditorState(snap) {
     window._closureCeilWidth = snap.closureCeilWidth;
     window._closureDepthWidth = snap.closureDepthWidth;
     window._closureFrontLine = snap.closureFrontLine;
-    window._nicheEnabled = snap.nicheEnabled;
-    window._nicheWidth = snap.nicheWidth;
-    window._nicheDepth = snap.nicheDepth;
-    window._nicheClosureEnabled = snap.nicheClosureEnabled;
-    window._nicheClosureWidthLeft = snap.nicheClosureWidthLeft;
-    window._nicheClosureWidthRight = snap.nicheClosureWidthRight;
-    window._nicheClosureCeilHeight = snap.nicheClosureCeilHeight;
     const cam = window.camera;
     const ctrl = window.controls;
     const ren = window.renderer;
@@ -6809,13 +6649,10 @@ function _applyRawStateForCapture(rawState) {
     window._closureCeilWidth = rs.closureCeilWidth || 1.8;
     window._closureDepthWidth = rs.closureDepthWidth || 1.8;
     window._closureFrontLine = rs.closureFrontLine || 'cabinet';
-    window._nicheEnabled = (rs.nicheEnabled !== undefined) ? rs.nicheEnabled : false;
-    window._nicheWidth = rs.nicheWidth || 200;
-    window._nicheDepth = rs.nicheDepth || 30;
-    window._nicheClosureEnabled = (rs.nicheClosureEnabled !== undefined) ? rs.nicheClosureEnabled : false;
-    window._nicheClosureWidthLeft = rs.nicheClosureWidthLeft || 1.8;
-    window._nicheClosureWidthRight = rs.nicheClosureWidthRight || 1.8;
-    window._nicheClosureCeilHeight = rs.nicheClosureCeilHeight || 1.8;
+    if (rs.placement === 'niche') {
+        rs.placement = 'wall';
+        state.placement = 'wall';
+    }
     state.blueprintCutouts = rs.blueprintCutouts ? JSON.parse(JSON.stringify(rs.blueprintCutouts)) : [];
     state.blueprintCellDimOffsets = rs.blueprintCellDimOffsets ? JSON.parse(JSON.stringify(rs.blueprintCellDimOffsets)) : {};
     state.blueprintDimOffsets = rs.blueprintDimOffsets ? JSON.parse(JSON.stringify(rs.blueprintDimOffsets)) : {};
@@ -7153,13 +6990,6 @@ window._buildCurrentCabinetCompareRaw = function() {
         closureCeilWidth: window._closureCeilWidth || 1.8,
         closureDepthWidth: window._closureDepthWidth || 1.8,
         closureFrontLine: window._closureFrontLine || 'cabinet',
-        nicheEnabled: (window._nicheEnabled !== undefined) ? window._nicheEnabled : false,
-        nicheWidth: window._nicheWidth || 200,
-        nicheDepth: window._nicheDepth || 30,
-        nicheClosureEnabled: (window._nicheClosureEnabled !== undefined) ? window._nicheClosureEnabled : false,
-        nicheClosureWidthLeft: window._nicheClosureWidthLeft || 1.8,
-        nicheClosureWidthRight: window._nicheClosureWidthRight || 1.8,
-        nicheClosureCeilHeight: window._nicheClosureCeilHeight || 1.8,
         blueprintCutouts: state.blueprintCutouts || [],
         blueprintCellDimOffsets: state.blueprintCellDimOffsets || {},
         blueprintDimOffsets: state.blueprintDimOffsets || {},
@@ -7296,13 +7126,6 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
             closureCeilWidth:  window._closureCeilWidth  || 1.8,
             closureDepthWidth: window._closureDepthWidth || 1.8,
             closureFrontLine:       window._closureFrontLine  || 'cabinet',
-            nicheEnabled:           (window._nicheEnabled !== undefined) ? window._nicheEnabled : false,
-            nicheWidth:                window._nicheWidth || 200,
-            nicheDepth:                window._nicheDepth || 30,
-            nicheClosureEnabled:       (window._nicheClosureEnabled !== undefined) ? window._nicheClosureEnabled : false,
-            nicheClosureWidthLeft:     window._nicheClosureWidthLeft  || 1.8,
-            nicheClosureWidthRight:    window._nicheClosureWidthRight || 1.8,
-            nicheClosureCeilHeight:    window._nicheClosureCeilHeight || 1.8,
             blueprintCutouts: state.blueprintCutouts || [],
             blueprintCellDimOffsets: state.blueprintCellDimOffsets || {},
             blueprintDimOffsets: state.blueprintDimOffsets || {},
@@ -7646,15 +7469,10 @@ window._editCartItemNow = function(index) {
     window._closureCeilWidth  = rawState.closureCeilWidth  || 1.8;
     window._closureDepthWidth = rawState.closureDepthWidth || 1.8;
     window._closureFrontLine  = rawState.closureFrontLine  || 'cabinet';
-    // Restore niche settings
-    window._nicheEnabled             = (rawState.nicheEnabled !== undefined) ? rawState.nicheEnabled : false;
-    window._nicheWidth               = rawState.nicheWidth || 200;
-    window._nicheDepth               = rawState.nicheDepth || 30;
-    window._nicheClosureEnabled      = (rawState.nicheClosureEnabled !== undefined) ? rawState.nicheClosureEnabled : false;
-    window._nicheClosureWidthLeft    = rawState.nicheClosureWidthLeft  || 1.8;
-    window._nicheClosureWidthRight   = rawState.nicheClosureWidthRight || 1.8;
-    window._nicheClosureCeilHeight   = rawState.nicheClosureCeilHeight || 1.8;
-    // Sync closure + niche UI
+    if (rawState.placement === 'niche' || state.placement === 'niche') {
+        state.placement = 'wall';
+    }
+    // Sync closure UI
     if (typeof window._updateRoomWallUI === 'function') window._updateRoomWallUI();
 
     state.blueprintCutouts = rawState.blueprintCutouts ? JSON.parse(JSON.stringify(rawState.blueprintCutouts)) : [];

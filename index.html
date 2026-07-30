@@ -37,7 +37,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260731cellHEdit">
     <link rel="stylesheet" href="style-mobile.css?v=20260609a">
     <link rel="stylesheet" href="style-extras.css?v=20260607b">
-    <link rel="stylesheet" href="style.css?v=20260731noLayout">
+    <link rel="stylesheet" href="style.css?v=20260731noNiche">
     <style>
         html.thumb-only-mode #left-sidebar,
         html.thumb-only-mode #right-sidebar,
@@ -312,7 +312,6 @@
                     <select id="inp-placement" class="editor-select" style="margin:0;">
                         <option value="wall" selected>קיר חופשי</option>
                         <option value="between_walls">בין קירות</option>
-                        <option value="niche">בנישה</option>
                     </select>
                 </div>
             </div>
@@ -403,66 +402,6 @@
                 </div>
             </div>
 
-            <div class="toggle-wrap" id="wrap-niche" style="display:none;">
-                <input type="checkbox" id="inp-niche-enabled" onchange="window._setNicheEnabled(this.checked)" style="display:none;">
-                <button class="sidebar-toggle-btn" id="btn-niche-toggle" onclick="var c=document.getElementById('inp-niche-enabled');c.checked=!c.checked;c.dispatchEvent(new Event('change'));this.classList.toggle('active',c.checked);">
-                    <i class="fa-solid fa-border-all"></i>
-                    <span class="toggle-label">ארון בנישה</span>
-                    <span class="toggle-pill"></span>
-                </button>
-                <div class="toggle-submenu" id="niche-controls">
-                    <div class="control-group" style="margin-bottom:8px;">
-                        <div class="label-row"><span>רוחב נישה (ס"מ)</span><input type="number" id="inp-num-niche-width" class="value-badge-input" value="200" min="50" max="600" step="1" onchange="window._setNicheWidth(this.value)"></div>
-                        <div class="slider-row">
-                            <button class="slider-btn" onclick="window._setNicheWidth((parseFloat(document.getElementById('inp-num-niche-width').value)||200)+5)"><i class="fa-solid fa-plus"></i></button>
-                            <input type="range" id="inp-niche-width" min="50" max="600" value="200" step="1" oninput="window._setNicheWidth(this.value)">
-                            <button class="slider-btn" onclick="window._setNicheWidth((parseFloat(document.getElementById('inp-num-niche-width').value)||200)-5)"><i class="fa-solid fa-minus"></i></button>
-                        </div>
-                    </div>
-                    <div class="control-group" style="margin-bottom:8px;">
-                        <div class="label-row"><span>עומק נישה (ס"מ)</span><input type="number" id="inp-num-niche-depth" class="value-badge-input" value="30" min="10" max="200" step="1" onchange="window._setNicheDepth(this.value)"></div>
-                        <div class="slider-row">
-                            <button class="slider-btn" onclick="window._setNicheDepth((parseFloat(document.getElementById('inp-num-niche-depth').value)||30)+5)"><i class="fa-solid fa-plus"></i></button>
-                            <input type="range" id="inp-niche-depth" min="10" max="200" value="30" step="1" oninput="window._setNicheDepth(this.value)">
-                            <button class="slider-btn" onclick="window._setNicheDepth((parseFloat(document.getElementById('inp-num-niche-depth').value)||30)-5)"><i class="fa-solid fa-minus"></i></button>
-                        </div>
-                    </div>
-                    <div id="niche-closure-row" style="display:none;padding-top:4px;border-top:1px solid var(--border);margin-top:4px;">
-                        <input type="checkbox" id="inp-niche-closure-enabled" onchange="window._setNicheClosureEnabled(this.checked)" style="display:none;">
-                        <button class="sidebar-toggle-btn sidebar-toggle-btn--sm" id="btn-niche-closure-toggle" onclick="var c=document.getElementById('inp-niche-closure-enabled');c.checked=!c.checked;c.dispatchEvent(new Event('change'));this.classList.toggle('active',c.checked);">
-                            <i class="fa-solid fa-table-columns"></i>
-                            <span class="toggle-label">סגירות בנישה</span>
-                            <span class="toggle-pill"></span>
-                        </button>
-                        <div id="niche-closure-sliders" style="display:none;margin-top:4px;">
-                            <div class="control-group" style="margin-bottom:8px;">
-                                <div class="label-row"><span>סגירה שמאל (ס"מ)</span><input type="number" id="inp-num-niche-closure-left" class="value-badge-input" value="1.8" min="1.8" max="30" step="0.1" onchange="window._setNicheClosureWidthLeft(this.value)"></div>
-                                <div class="slider-row">
-                                    <button class="slider-btn" onclick="window._setNicheClosureWidthLeft((parseFloat(document.getElementById('inp-num-niche-closure-left').value)||1.8)+0.5)"><i class="fa-solid fa-plus"></i></button>
-                                    <input type="range" id="inp-niche-closure-left" min="1.8" max="30" value="1.8" step="0.1" oninput="window._setNicheClosureWidthLeft(this.value)">
-                                    <button class="slider-btn" onclick="window._setNicheClosureWidthLeft((parseFloat(document.getElementById('inp-num-niche-closure-left').value)||1.8)-0.5)"><i class="fa-solid fa-minus"></i></button>
-                                </div>
-                            </div>
-                            <div class="control-group" style="margin-bottom:8px;">
-                                <div class="label-row"><span>סגירה ימין (ס"מ)</span><input type="number" id="inp-num-niche-closure-right" class="value-badge-input" value="1.8" min="1.8" max="30" step="0.1" onchange="window._setNicheClosureWidthRight(this.value)"></div>
-                                <div class="slider-row">
-                                    <button class="slider-btn" onclick="window._setNicheClosureWidthRight((parseFloat(document.getElementById('inp-num-niche-closure-right').value)||1.8)+0.5)"><i class="fa-solid fa-plus"></i></button>
-                                    <input type="range" id="inp-niche-closure-right" min="1.8" max="30" value="1.8" step="0.1" oninput="window._setNicheClosureWidthRight(this.value)">
-                                    <button class="slider-btn" onclick="window._setNicheClosureWidthRight((parseFloat(document.getElementById('inp-num-niche-closure-right').value)||1.8)-0.5)"><i class="fa-solid fa-minus"></i></button>
-                                </div>
-                            </div>
-                            <div class="control-group" style="margin-bottom:0;">
-                                <div class="label-row"><span>סגירה עליונה (ס"מ)</span><input type="number" id="inp-num-niche-closure-ceil" class="value-badge-input" value="1.8" min="1.8" max="30" step="0.1" onchange="window._setNicheClosureCeilHeight(this.value)"></div>
-                                <div class="slider-row">
-                                    <button class="slider-btn" onclick="window._setNicheClosureCeilHeight((parseFloat(document.getElementById('inp-num-niche-closure-ceil').value)||1.8)+0.5)"><i class="fa-solid fa-plus"></i></button>
-                                    <input type="range" id="inp-niche-closure-ceil" min="1.8" max="30" value="1.8" step="0.1" oninput="window._setNicheClosureCeilHeight(this.value)">
-                                    <button class="slider-btn" onclick="window._setNicheClosureCeilHeight((parseFloat(document.getElementById('inp-num-niche-closure-ceil').value)||1.8)-0.5)"><i class="fa-solid fa-minus"></i></button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
 
         <!-- ===== SLIDING WARDROBE SECTION (shown only for 'sliding' preset) ===== -->
@@ -1819,7 +1758,6 @@
                     onchange="document.getElementById('inp-placement').value=this.value; document.getElementById('inp-placement').dispatchEvent(new Event('change'))">
                     <option value="wall">קיר חופשי</option>
                     <option value="between_walls">בין קירות</option>
-                    <option value="niche">בנישה</option>
                 </select>
             </div>
         </div>
@@ -2456,18 +2394,18 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js"></script>
-<script src="state.js?v=20260731colWEdit"></script>
+<script src="state.js?v=20260731noNiche"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="writing-desk-preset.js?v=20260617wdcolors"></script>
-<script src="engine-core.js?v=20260731noLayout"></script>
+<script src="engine-core.js?v=20260731noNiche"></script>
 <script src="engine-corners.js?v=20260720deskPartPaint"></script>
 <script src="engine-blueprint.js?v=20260731topBotBoard"></script>
 <script src="engine-room-plan.js?v=20260624k"></script>
 <script src="tambour-color-picker.js?v=20260617scdoors"></script>
-<script src="ui.js?v=20260731noLayout"></script>
+<script src="ui.js?v=20260731noNiche"></script>
 <script src="mobile.js?v=20260713extDrawerPart"></script>
 <script src="part-paint.js?v=20260712c2024"></script>
-<script src="index-init.js?v=20260731bpDimToggle"></script>
+<script src="index-init.js?v=20260731noNiche"></script>
 
 <!-- ===== TAMBOUR FULL PALETTE MODAL ===== -->
 <div id="tambour-palette-modal" class="tambour-palette-overlay">
@@ -2579,7 +2517,7 @@
 </button>
 
 <script src="notes.js?v=20260714pinDelete"></script>
-<script src="tour.js?v=20260609d"></script>
+<script src="tour.js?v=20260731noNiche"></script>
 <script src="ai-renders.js?v=20260731noLayout"></script>
 <script>
     // Init AI renders after auth is ready

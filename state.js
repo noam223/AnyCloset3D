@@ -998,13 +998,6 @@ window._resetEditorToDefaultLinearCabinet = function() {
     window._closureCeilWidth = 1.8;
     window._closureDepthWidth = 1.8;
     window._closureFrontLine = 'cabinet';
-    window._nicheEnabled = false;
-    window._nicheWidth = 200;
-    window._nicheDepth = 30;
-    window._nicheClosureEnabled = false;
-    window._nicheClosureWidthLeft = 1.8;
-    window._nicheClosureWidthRight = 1.8;
-    window._nicheClosureCeilHeight = 1.8;
 
     // Clear draft part-color overrides (cart scopes are kept per other cabinets)
     if (state.partColors) {
@@ -1393,7 +1386,6 @@ window.syncSidebarToWing = function() {
                 }
             }
     }
-    if (typeof window._updateNicheUI === 'function') window._updateNicheUI();
     if (typeof window._updateRoomWallUI === 'function') window._updateRoomWallUI();
 
     // Hide drawer-related UI when editing upper unit inline (no drawers for upper unit)
@@ -1431,7 +1423,7 @@ window.syncSidebarToWing = function() {
     setVal('inp-num-height', w.globalHeight); setVal('inp-height', w.globalHeight);
     setVal('inp-num-depth', w.depth); setVal('inp-depth', w.depth);
     setVal('inp-plinth', w.cabinetModel || 'maya');
-    setVal('inp-placement', w.placement || 'wall');
+    setVal('inp-placement', (w.placement === 'niche' ? 'wall' : (w.placement || 'wall')));
     setVal('inp-board-mat', w.boardMaterial);
     setVal('inp-columns', w.columns.length);
     const valCols = document.getElementById('val-columns'); if (valCols) valCols.innerText = w.columns.length;

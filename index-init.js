@@ -225,14 +225,6 @@
                     window._closureCeilWidth  = snap.closureCeilWidth  || 1.8;
                     window._closureDepthWidth = snap.closureDepthWidth || 1.8;
                     window._closureFrontLine  = snap.closureFrontLine  || 'cabinet';
-                    // Restore niche settings
-                    window._nicheEnabled             = (snap.nicheEnabled !== undefined) ? snap.nicheEnabled : false;
-                    window._nicheWidth               = snap.nicheWidth || 200;
-                    window._nicheDepth               = snap.nicheDepth || 30;
-                    window._nicheClosureEnabled      = (snap.nicheClosureEnabled !== undefined) ? snap.nicheClosureEnabled : false;
-                    window._nicheClosureWidthLeft    = snap.nicheClosureWidthLeft  || 1.8;
-                    window._nicheClosureWidthRight   = snap.nicheClosureWidthRight || 1.8;
-                    window._nicheClosureCeilHeight   = snap.nicheClosureCeilHeight || 1.8;
                     // Restore non-wing global fields
                     if (snap.viewMode)   state.viewMode   = snap.viewMode;
                     if (snap.partColors) state.partColors = snap.partColors;
@@ -379,13 +371,6 @@
             closureCeilWidth:  window._closureCeilWidth  || 1.8,
             closureDepthWidth: window._closureDepthWidth || 1.8,
             closureFrontLine:  window._closureFrontLine  || 'cabinet',
-            nicheEnabled:           (window._nicheEnabled !== undefined) ? window._nicheEnabled : false,
-            nicheWidth:                window._nicheWidth || 200,
-            nicheDepth:                window._nicheDepth || 30,
-            nicheClosureEnabled:       (window._nicheClosureEnabled !== undefined) ? window._nicheClosureEnabled : false,
-            nicheClosureWidthLeft:     window._nicheClosureWidthLeft  || 1.8,
-            nicheClosureWidthRight:    window._nicheClosureWidthRight || 1.8,
-            nicheClosureCeilHeight:    window._nicheClosureCeilHeight || 1.8,
             tambourPalette:            state.tambourPalette || {},
             blueprintCutouts:          state.blueprintCutouts || [],
             blueprintCellDimOffsets:   state.blueprintCellDimOffsets || {},

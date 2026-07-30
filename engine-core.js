@@ -940,12 +940,7 @@ function _buildRoom() {
     const roomCenterX = (leftWallX + rightWallX) / 2;
 
     // Back wall sits just behind the cabinet back face.
-    // When niche is enabled, shift the room forward by niche depth so the cabinet
-    // appears recessed into the niche (niche back wall aligns with cabinet back face).
-    const _nicheD = (window._nicheEnabled && _isLinearOrSliding)
-        ? Math.max(10, parseFloat(window._nicheDepth) || 30)
-        : 0;
-    const backZ = -(cabD / 2) - wallT / 2 + _nicheD;
+    const backZ = -(cabD / 2) - wallT / 2;
 
     // Expose room bounds for bed collision clamping (in world-space cm)
     window._roomBounds = {
@@ -1011,61 +1006,10 @@ function _buildRoom() {
     floorMesh.userData.roomPart = 'floor';
     rg.add(floorMesh);
 
-    // ── Niche floor (extends floor into the alcove) ────────────────────────
-    // Added separately so it covers the niche area behind the main back wall.
-    // Only rendered when niche is active; uses same floor material.
-    if (window._nicheEnabled && _isLinearOrSliding) {
-        const _nWf = Math.max(50, parseFloat(window._nicheWidth) || 200);
-        const _nDf = Math.max(10, parseFloat(window._nicheDepth) || 30);
-        // Niche is always centered on the cabinet (X=0), regardless of wall position
-        const _nicheCXf = 0;
-
-        const nicheFloorMat = new THREE.MeshStandardMaterial({ color: 0xd4a96a, roughness: 0.8, metalness: 0.0 });
-        if (!_skipTex && window._woodFloorTex) {
-            const nft = window._woodFloorTex.clone();
-            nft.needsUpdate = true;
-            nft.repeat.set(_nWf / tileSizeCm, _nDf / tileSizeCm);
-            nicheFloorMat.map = nft;
-            nicheFloorMat.color.set(0xffffff);
-        }
-        const nicheFloorMesh = new THREE.Mesh(new THREE.PlaneGeometry(_nWf, _nDf), nicheFloorMat);
-        nicheFloorMesh.rotation.x = -Math.PI / 2;
-        // Niche floor sits at Z range: from (backZ - _nDf) to backZ
-        nicheFloorMesh.position.set(_nicheCXf, 0, backZ - _nDf / 2);
-        nicheFloorMesh.receiveShadow = true;
-        rg.add(nicheFloorMesh);
-    }
-
     // ── Back wall ──────────────────────────────────────────────────────────
-    // When niche is active, split the back wall into left + right segments around the niche opening.
-    // Otherwise render a single full-width back wall.
-    if (window._nicheEnabled && _isLinearOrSliding) {
-        const _nW2 = Math.max(50, parseFloat(window._nicheWidth) || 200);
-        // Niche is always centered on the cabinet (X=0), regardless of wall position
-        const _nicheCX2 = 0;
-
-        const nicheLeft  = _nicheCX2 - _nW2 / 2;  // X of left edge of niche opening
-        const nicheRight = _nicheCX2 + _nW2 / 2;  // X of right edge of niche opening
-
-        // Left segment: from leftWallX to nicheLeft
-        const leftSegW = nicheLeft - leftWallX;
-        if (leftSegW > 0.1) {
-            const bwL = new THREE.Mesh(new THREE.PlaneGeometry(leftSegW, roomH), makeWallMat(leftSegW, roomH));
-            bwL.position.set(leftWallX + leftSegW / 2, roomH / 2, backZ);
-            rg.add(bwL);
-        }
-        // Right segment: from nicheRight to rightWallX
-        const rightSegW = rightWallX - nicheRight;
-        if (rightSegW > 0.1) {
-            const bwR = new THREE.Mesh(new THREE.PlaneGeometry(rightSegW, roomH), makeWallMat(rightSegW, roomH));
-            bwR.position.set(nicheRight + rightSegW / 2, roomH / 2, backZ);
-            rg.add(bwR);
-        }
-    } else {
-        const backWall = new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomH), makeWallMat(roomW, roomH));
-        backWall.position.set(roomCenterX, roomH / 2, backZ);
-        rg.add(backWall);
-    }
+    const backWall = new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomH), makeWallMat(roomW, roomH));
+    backWall.position.set(roomCenterX, roomH / 2, backZ);
+    rg.add(backWall);
 
     // ── Left wall ──────────────────────────────────────────────────────────
     // Always brick texture
@@ -1103,45 +1047,6 @@ function _buildRoom() {
         ceilMesh.rotation.x = Math.PI / 2;
         ceilMesh.position.set(roomCenterX, _ceilPlaneY, backZ + roomD / 2 - wallT);
         rg.add(ceilMesh);
-    }
-
-    // ── Niche (ארון בנישה) ─────────────────────────────────────────────────
-    // Creates a rectangular alcove in the back wall: 3 wall planes (back, left, right).
-    // Niche height = full room height. Width and depth controlled by sliders.
-    // Niche X position shifts based on _roomWall:
-    //   'left'  → niche left edge aligns with leftWallX (niche hugs left wall)
-    //   'right' → niche right edge aligns with rightWallX (niche hugs right wall)
-    //   'both'  → niche centered between both walls
-    //   'center'→ niche centered at X=0 (cabinet center)
-    if (window._nicheEnabled && _isLinearOrSliding) {
-        const _nW = Math.max(50, parseFloat(window._nicheWidth)  || 200);
-        const _nD = Math.max(10, parseFloat(window._nicheDepth)  || 30);
-
-        // Niche is always centered on the cabinet (X=0), regardless of wall position
-        const _nicheCX = 0;
-
-        const nicheBackZ = backZ - _nD;
-        const nicheMidZ  = backZ - _nD / 2;
-
-        // Back niche wall (faces forward, perpendicular to Z)
-        const nicheBackMat = makeBrickMat(_nW, roomH);
-        const nicheBackWall = new THREE.Mesh(new THREE.PlaneGeometry(_nW, roomH), nicheBackMat);
-        nicheBackWall.position.set(_nicheCX, roomH / 2, nicheBackZ);
-        rg.add(nicheBackWall);
-
-        // Left niche wall (faces right, perpendicular to X)
-        const nicheLeftMat = makeBrickMat(_nD, roomH);
-        const nicheLeftWall = new THREE.Mesh(new THREE.PlaneGeometry(_nD, roomH), nicheLeftMat);
-        nicheLeftWall.rotation.y = Math.PI / 2;
-        nicheLeftWall.position.set(_nicheCX - _nW / 2, roomH / 2, nicheMidZ);
-        rg.add(nicheLeftWall);
-
-        // Right niche wall (faces left, perpendicular to X)
-        const nicheRightMat = makeBrickMat(_nD, roomH);
-        const nicheRightWall = new THREE.Mesh(new THREE.PlaneGeometry(_nD, roomH), nicheRightMat);
-        nicheRightWall.rotation.y = -Math.PI / 2;
-        nicheRightWall.position.set(_nicheCX + _nW / 2, roomH / 2, nicheMidZ);
-        rg.add(nicheRightWall);
     }
 
     // ── Bed model ──────────────────────────────────────────────────────────────
@@ -2605,70 +2510,7 @@ function buildCabinet() {
             cabinetGroup.position.x = 0;
         }
 
-        // ── Niche closure panels (inside the niche alcove) ────────────────
-        // Rendered whenever niche + niche-closure are enabled, regardless of room wall position.
-        if (_isLinearOrSliding && window._nicheEnabled && window._nicheClosureEnabled) {
-            const _nD2  = Math.max(10, parseFloat(window._nicheDepth) || 30);
-            const _nW2  = Math.max(50, parseFloat(window._nicheWidth) || 200);
-            const _nc_cwFull = state.wings && state.wings.center ? state.wings.center.width : (state.width || 160);
-            const _nc_cabD   = state.wings && state.wings.center ? (state.wings.center.depth || 54) : 54;
-            const _nc_cabH   = state.columns && state.columns.length > 0
-                ? Math.max(...state.columns.map(c => c.height))
-                : (state.globalHeight || 240);
-            const _nc_bodyMatKey = (state.wings && state.wings.center)
-                ? (state.wings.center.materialBody || state.wings.center.boardMaterial)
-                : (state.materialBody || state.boardMaterial);
-            const _nc_mat = (materials && materials[_nc_bodyMatKey])
-                ? materials[_nc_bodyMatKey]
-                : new THREE.MeshStandardMaterial({ color: 0xd4c5b0, roughness: 0.7, metalness: 0.0 });
-            // Max side panel thickness = half the gap between niche width and cabinet width
-            // (panel can't extend beyond the niche wall)
-            const _ncMaxSide = Math.max(1.8, (_nW2 - _nc_cwFull) / 2);
-            // Panel thicknesses from user sliders, clamped to niche wall
-            const _ncThickL = Math.min(Math.max(1.8, parseFloat(window._nicheClosureWidthLeft)  || 1.8), _ncMaxSide);
-            const _ncThickR = Math.min(Math.max(1.8, parseFloat(window._nicheClosureWidthRight) || 1.8), _ncMaxSide);
-            const _ncThickC = Math.max(1.8, parseFloat(window._nicheClosureCeilHeight) || 1.8);
 
-            // Panels span from cabinet front face (+_nc_cabD/2) to niche back wall (-_nc_cabD/2 - _nD2)
-            // Total panel depth = _nc_cabD + _nD2
-            // Panel Z center = (_nc_cabD/2 + (-_nc_cabD/2 - _nD2)) / 2 = -_nD2/2
-            const _nichePanelTotalD = _nc_cabD + _nD2;
-            const _nichePanelZ      = -_nD2 / 2;
-
-            // Left side panel: placed just to the left of the cabinet left edge
-            const _ncLeft = new THREE.Mesh(
-                new THREE.BoxGeometry(_ncThickL, _nc_cabH, _nichePanelTotalD),
-                _nc_mat
-            );
-            _ncLeft.position.set(-_nc_cwFull / 2 - _ncThickL / 2, _nc_cabH / 2, _nichePanelZ);
-            _ncLeft.castShadow = false;
-            _ncLeft.userData = { isClosurePanel: true, side: 'niche-left' };
-            cabinetGroup.add(_ncLeft);
-
-            // Right side panel: placed just to the right of the cabinet right edge
-            const _ncRight = new THREE.Mesh(
-                new THREE.BoxGeometry(_ncThickR, _nc_cabH, _nichePanelTotalD),
-                _nc_mat
-            );
-            _ncRight.position.set(_nc_cwFull / 2 + _ncThickR / 2, _nc_cabH / 2, _nichePanelZ);
-            _ncRight.castShadow = false;
-            _ncRight.userData = { isClosurePanel: true, side: 'niche-right' };
-            cabinetGroup.add(_ncRight);
-
-            // Ceiling panel: spans full niche width, placed above cabinet top
-            const _roomH3 = (window._roomHeight && window._roomHeight > 0) ? window._roomHeight : 300;
-            const _nicheCeilH = _roomH3 - _nc_cabH;
-            if (_nicheCeilH > 0.1) {
-                const _ncCeil = new THREE.Mesh(
-                    new THREE.BoxGeometry(_nW2, _ncThickC, _nichePanelTotalD),
-                    _nc_mat
-                );
-                _ncCeil.position.set(0, _nc_cabH + _ncThickC / 2, _nichePanelZ);
-                _ncCeil.castShadow = false;
-                _ncCeil.userData = { isClosurePanel: true, side: 'niche-ceiling' };
-                cabinetGroup.add(_ncCeil);
-            }
-        }
     }
 
     // Sliding wardrobe overlay (aluminum frame + doors)
