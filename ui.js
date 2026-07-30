@@ -8584,9 +8584,18 @@ window._mvbpApplyZoom = function() {
     }
 };
 
-// Override _mvbpShow to wrap SVG and reset zoom on page change
+// Override _mvbpShow to wrap SVG and reset zoom on page change.
+// opts.preserveView — keep scroll + zoom (used when toggling a single dim label).
 const _origMvbpShow = window._mvbpShow;
-window._mvbpShow = function(idx) {
+window._mvbpShow = function(idx, opts) {
+    opts = opts || {};
+    const preserveView = !!opts.preserveView;
+    const contentPre = document.getElementById('multiview-blueprint-content');
+    const savedScroll = (preserveView && contentPre)
+        ? { top: contentPre.scrollTop, left: contentPre.scrollLeft }
+        : null;
+    const savedScale = preserveView ? (window._mvbpScale || 1) : 1;
+
     _origMvbpShow(idx);
     const content = document.getElementById('multiview-blueprint-content');
     if (content) {
@@ -8608,16 +8617,22 @@ window._mvbpShow = function(idx) {
             wrap.appendChild(svg);
         }
     }
-    // Capture natural width and reset scale
-    window._mvbpScale = 1.0;
-    requestAnimationFrame(function() {
+    if (!preserveView) window._mvbpScale = 1.0;
+    else window._mvbpScale = savedScale;
+
+    function _mvbpFinishShow() {
         const content2 = document.getElementById('multiview-blueprint-content');
         if (content2) {
             window._mvbpBaseW = content2.clientWidth || content2.offsetWidth || 360;
             const wrap = document.getElementById('mvbp-svg-wrap');
             if (wrap) {
-                wrap.style.width = window._mvbpBaseW + 'px';
+                const w = Math.round(window._mvbpBaseW * (window._mvbpScale || 1));
+                wrap.style.width = w + 'px';
                 wrap.style.flexShrink = '0';
+            }
+            if (savedScroll) {
+                content2.scrollTop = savedScroll.top;
+                content2.scrollLeft = savedScroll.left;
             }
         }
         window._mvbpBindGestures();
@@ -8635,7 +8650,15 @@ window._mvbpShow = function(idx) {
                 if (sel) sel.classList.add('bp-cutout-selected');
             }
         }
-    });
+        // Second frame: layout may still shift wrap width after zoom restore
+        if (savedScroll && content2) {
+            requestAnimationFrame(function() {
+                content2.scrollTop = savedScroll.top;
+                content2.scrollLeft = savedScroll.left;
+            });
+        }
+    }
+    requestAnimationFrame(_mvbpFinishShow);
 };
 
 // Bind pinch-to-zoom — native scroll handles pan automatically (overflow:auto)
@@ -8933,12 +8956,18 @@ window._mvbpSyncDimToggleButtons = function() {
 };
 
 function _mvbpRegenAfterDimToggle() {
+    // Blur before DOM swap — removing a focused/clicked node scrolls the container to top
+    try {
+        if (document.activeElement && typeof document.activeElement.blur === 'function') {
+            document.activeElement.blur();
+        }
+    } catch (e) { /* ignore */ }
     if (typeof saveHistoryState === 'function') saveHistoryState();
     const idx = window._mvbpIndex || 0;
     if (typeof window._generateMultiViewBlueprintPages === 'function') {
         window._mvbpPages = window._generateMultiViewBlueprintPages();
     }
-    if (typeof window._mvbpShow === 'function') window._mvbpShow(idx);
+    if (typeof window._mvbpShow === 'function') window._mvbpShow(idx, { preserveView: true });
     else if (typeof window._mvbpSyncDimToggleButtons === 'function') window._mvbpSyncDimToggleButtons();
 }
 
@@ -8964,12 +8993,24 @@ window._mvbpBindDimVisibilityClicks = function() {
         return defaultFlag !== false;
     }
 
-    svg.querySelectorAll('.bp-cell-dim-toggle-hit').forEach(function(el) {
+    function _bindToggleHit(el, onToggle) {
         if (el._bpDimToggleBound) return;
         el._bpDimToggleBound = true;
+        // mousedown: stop browser scroll-into-view when the hit node is about to be removed
+        el.addEventListener('mousedown', function(e) {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            e.stopPropagation();
+        });
         el.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
+            onToggle();
+        });
+    }
+
+    svg.querySelectorAll('.bp-cell-dim-toggle-hit').forEach(function(el) {
+        _bindToggleHit(el, function() {
             const viewKey = el.getAttribute('data-view-key') || 'center';
             const cellKey = el.getAttribute('data-cell-dim-key');
             if (!cellKey) return;
@@ -8982,11 +9023,7 @@ window._mvbpBindDimVisibilityClicks = function() {
     });
 
     svg.querySelectorAll('.bp-col-width-toggle-hit').forEach(function(el) {
-        if (el._bpDimToggleBound) return;
-        el._bpDimToggleBound = true;
-        el.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
+        _bindToggleHit(el, function() {
             const viewKey = el.getAttribute('data-view-key') || 'center';
             const colKey = el.getAttribute('data-col-dim-key');
             if (!colKey) return;
