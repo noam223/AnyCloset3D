@@ -287,76 +287,12 @@ window._generateRender = async function(isPro) {
     _openPromptDialog(imageFront, image3dLeft, image3dRight, _getDominantColor(), _getCabinetSpec(), tier);
 };
 
-// ── Layout mode: single current-view capture + empty prompt ─────────────────
-window._generateLayoutRender = async function() {
-    if (!window._layoutModeActive) return;
-    if (!window.renderer) {
-        if (typeof window._showToast === 'function') window._showToast('לא נמצא renderer', 2500);
-        return;
-    }
-
-    var btn = document.getElementById('btn-layout-render');
-    if (btn) btn.disabled = true;
-
-    try {
-        if (window.renderer && window.scene && window.camera) {
-            window.renderer.render(window.scene, window.camera);
-        }
-        await new Promise(function(r) { setTimeout(r, 50); });
-        var image = window.renderer.domElement.toDataURL('image/jpeg', 0.85);
-        _openLayoutPromptDialog(image);
-    } catch (e) {
-        if (typeof window._showToast === 'function') window._showToast('שגיאה בצילום המסך', 2500);
-    } finally {
-        if (btn) btn.disabled = false;
-    }
-};
-
 function _aiDialogSubmitBtnHtml(isPro) {
     var bg = isPro ? 'linear-gradient(135deg,#f59e0b,#d97706)' : 'linear-gradient(135deg,#a855f7,#7c3aed)';
     var icon = isPro ? 'fa-crown' : 'fa-sparkles';
     var label = isPro ? 'צור הדמיה PRO' : 'צור הדמיה';
     return '<button onclick="window._submitRender()" style="padding:10px 24px;border-radius:9px;border:none;background:' + bg + ';color:white;font-size:0.88rem;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:8px;"><i class="fa-solid ' + icon + '"></i> ' + label + '</button>';
 }
-
-function _openLayoutPromptDialog(image, renderTier) {
-    renderTier = renderTier || 'standard';
-    var isPro = renderTier === 'pro';
-    var existing = document.getElementById('ai-prompt-dialog');
-    if (existing) existing.remove();
-
-    var dlg = document.createElement('div');
-    dlg.id = 'ai-prompt-dialog';
-    dlg.style.cssText = 'position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;padding:16px;';
-    dlg.innerHTML =
-        '<div style="background:#fff;border-radius:16px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;direction:rtl;box-shadow:0 8px 40px rgba(0,0,0,0.25);">' +
-            '<div style="padding:20px 22px 0;display:flex;align-items:center;justify-content:space-between;">' +
-                '<div style="font-size:1rem;font-weight:800;color:#1e3a5f;display:flex;align-items:center;gap:8px;"><i class="fa-solid fa-wand-magic-sparkles" style="color:#a855f7;"></i> הדמיה מסידור מרחבי' + (isPro ? ' <span class="ai-render-tier-badge">PRO</span>' : '') + '</div>' +
-                '<button onclick="document.getElementById(\'ai-prompt-dialog\').remove()" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:1.2rem;"><i class="fa-solid fa-xmark"></i></button>' +
-            '</div>' +
-            '<div style="padding:16px 22px 0;">' +
-                '<div style="font-size:0.8rem;font-weight:700;color:#64748b;margin-bottom:8px;">תמונת ייחוס — הזווית הנוכחית</div>' +
-                '<img src="' + image + '" style="width:100%;max-height:220px;object-fit:contain;border-radius:10px;border:2px solid #e2e8f0;background:#f8fafc;">' +
-            '</div>' +
-            '<div style="padding:14px 22px 0;">' +
-                '<div style="font-size:0.8rem;font-weight:700;color:#64748b;margin-bottom:6px;">פרומפט</div>' +
-                '<textarea id="ai-prompt-text" style="width:100%;height:200px;border:1.5px solid #e2e8f0;border-radius:10px;padding:12px;font-size:0.83rem;font-family:inherit;resize:vertical;outline:none;line-height:1.6;direction:rtl;text-align:right;" onfocus="this.style.borderColor=\'#a855f7\'" onblur="this.style.borderColor=\'#e2e8f0\'">' +
-                    _buildAiRenderPrompt({ layoutMode: true }, { singleView: true }) +
-                '</textarea>' +
-            '</div>' +
-            '<div style="padding:16px 22px 20px;display:flex;gap:10px;justify-content:flex-end;">' +
-                '<button onclick="document.getElementById(\'ai-prompt-dialog\').remove()" style="padding:10px 20px;border-radius:9px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#374151;font-size:0.88rem;font-weight:600;font-family:inherit;cursor:pointer;">ביטול</button>' +
-                _aiDialogSubmitBtnHtml(isPro) +
-            '</div>' +
-        '</div>';
-
-    dlg._imageFront = image;
-    dlg._singleView = true;
-    dlg._hexColor = null;
-    dlg._cabinetSpec = { layoutMode: true };
-    dlg._renderTier = renderTier;
-    document.body.appendChild(dlg);
-};
 
 // ── Prompt dialog ─────────────────────────────────────────────────────────────
 var _extraImages = []; // extra user-uploaded images

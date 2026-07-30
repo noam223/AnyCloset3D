@@ -1530,7 +1530,6 @@ let dragHandlesData = { horizontal: [], vertical: [], roofs: [], desk: [] };
 const raycaster = new THREE.Raycaster(); const mouse = new THREE.Vector2();
 
 function updateCameraView() {
-    if (window._layoutModeActive) return;
     // ---- Inline upper unit edit mode: keep camera stable (don't re-animate to lower cabinet) ----
     if (state._activeUpperUnit) {
         // Just rebuild drag handles and overlays without moving the camera
@@ -1899,7 +1898,6 @@ function updateCameraView() {
 }
 
 function buildCabinet() {
-    if (window._layoutModeActive) return;
     if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
 
     // Room shell is only for תכנון חדר or תצוגה חופשית — never in עריכת חזית / שרטוט

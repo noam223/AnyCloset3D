@@ -37,7 +37,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260731cellHEdit">
     <link rel="stylesheet" href="style-mobile.css?v=20260609a">
     <link rel="stylesheet" href="style-extras.css?v=20260607b">
-    <link rel="stylesheet" href="style.css?v=20260731cellHEdit">
+    <link rel="stylesheet" href="style.css?v=20260731noLayout">
     <style>
         html.thumb-only-mode #left-sidebar,
         html.thumb-only-mode #right-sidebar,
@@ -999,11 +999,6 @@
         </div>
         <div class="total-label">סה"כ פרויקט לתשלום:</div>
         <div class="total-price" id="left-sidebar-total">₪0</div>
-        </div>
-        <div style="display:flex; gap:8px; margin-top:12px;">
-            <button type="button" id="btn-layout-mode" class="layout-mode-entry-btn" onclick="window._openLayoutPicker()" title="הצג 2 ארונות ישרים יחד במרחב (לא ארונות הזזה)">
-                <i class="fa-solid fa-object-group"></i> סידור מרחבי
-            </button>
         </div>
         <div style="display:flex; gap:8px; margin-top:15px;">
             <button class="view-btn cart-btn" style="flex:1; justify-content: center; background: var(--primary); color: white; border: none; padding: 12px; font-size: 1rem;" onclick="openOrderModal('customer')">
@@ -2453,95 +2448,6 @@
 <!-- Camera HUD — fixed to viewport, above all sidebars -->
 <div id="cam-hud" style="position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:99999;background:rgba(0,0,0,0.82);color:#7effa0;font-family:monospace;font-size:0.78rem;padding:10px 18px;border-radius:10px;pointer-events:none;line-height:1.8;display:none;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.5);"></div>
 
-<!-- ===== LAYOUT MODE BAR ===== -->
-<div id="layout-mode-bar" class="layout-mode-bar">
-    <div class="layout-mode-bar-inner">
-        <div class="layout-mode-bar-title"><i class="fa-solid fa-object-group"></i> סידור מרחבי</div>
-        <div class="layout-mode-drag-hint"><i class="fa-solid fa-cubes"></i> Move = חיצים+קוביה · Rotate = טבעות X/Y/Z · Snap אוטומטי</div>
-        <div class="layout-gizmo-tools">
-            <button type="button" id="layout-tool-move" class="layout-gizmo-tool active" onclick="window._setLayoutGizmoTool('move')" title="הזזה (Move)">
-                <i class="fa-solid fa-up-down-left-right"></i> Move
-            </button>
-            <button type="button" id="layout-tool-rotate" class="layout-gizmo-tool" onclick="window._setLayoutGizmoTool('rotate')" title="סיבוב (Rotate)">
-                <i class="fa-solid fa-rotate"></i> Rotate
-            </button>
-        </div>
-        <div class="layout-mode-chips">
-            <button type="button" class="layout-chip active" id="layout-chip-0" onclick="window._setActiveLayoutSlot(0)">
-                <span class="layout-chip-badge">A</span>
-                <div class="layout-chip-text">
-                    <span class="layout-chip-name">—</span>
-                    <span class="layout-chip-dims">—</span>
-                </div>
-            </button>
-            <button type="button" class="layout-chip" id="layout-chip-1" onclick="window._setActiveLayoutSlot(1)">
-                <span class="layout-chip-badge">B</span>
-                <div class="layout-chip-text">
-                    <span class="layout-chip-name">—</span>
-                    <span class="layout-chip-dims">—</span>
-                </div>
-            </button>
-        </div>
-        <div class="layout-move-controls">
-            <div class="layout-move-row">
-                <span class="layout-move-label" title="רוחב">X</span>
-                <button type="button" class="layout-move-btn" onclick="window._moveActiveLayoutSlot('x', -5)" title="שמאל"><i class="fa-solid fa-arrow-left"></i></button>
-                <button type="button" class="layout-move-btn" onclick="window._moveActiveLayoutSlot('x', 5)" title="ימין"><i class="fa-solid fa-arrow-right"></i></button>
-            </div>
-            <div class="layout-move-row">
-                <span class="layout-move-label" title="גובה">Y</span>
-                <button type="button" class="layout-move-btn" onclick="window._moveActiveLayoutSlot('y', 5)" title="למעלה"><i class="fa-solid fa-arrow-up"></i></button>
-                <button type="button" class="layout-move-btn" id="layout-move-y-down" onclick="window._moveActiveLayoutSlot('y', -5)" title="למטה"><i class="fa-solid fa-arrow-down"></i></button>
-            </div>
-            <div class="layout-move-row">
-                <span class="layout-move-label" title="עומק">Z</span>
-                <button type="button" class="layout-move-btn" onclick="window._moveActiveLayoutSlot('z', -5)" title="אחורה"><i class="fa-solid fa-minus"></i></button>
-                <button type="button" class="layout-move-btn" onclick="window._moveActiveLayoutSlot('z', 5)" title="קדימה"><i class="fa-solid fa-plus"></i></button>
-            </div>
-            <div class="layout-move-row">
-                <span class="layout-move-label" title="סיבוב">↻</span>
-                <button type="button" class="layout-move-btn" onclick="window._rotateActiveLayoutSlot(-90)" title="סיבוב 90° שמאלה"><i class="fa-solid fa-rotate-left"></i></button>
-                <button type="button" class="layout-move-btn" onclick="window._rotateActiveLayoutSlot(90)" title="סיבוב 90° ימינה"><i class="fa-solid fa-rotate-right"></i></button>
-            </div>
-        </div>
-        <div class="layout-mode-actions">
-            <button type="button" id="layout-toggle-room-btn" class="layout-mode-action-btn" onclick="window._toggleLayoutRoom()" title="הסתר קירות ורצפה">
-                <i class="fa-solid fa-house"></i> <span id="layout-room-toggle-label">הסתר חדר</span>
-            </button>
-            <button type="button" class="layout-mode-action-btn" onclick="window._layoutPresetSideBySide()">
-                <i class="fa-solid fa-arrows-left-right"></i> זה ליד זה
-            </button>
-            <button type="button" id="btn-layout-render" class="layout-mode-action-btn layout-mode-render-btn" onclick="window._generateLayoutRender()" title="הדמיה מהזווית הנוכחית">
-                <i class="fa-solid fa-wand-magic-sparkles"></i> הדמיה
-            </button>
-            <button type="button" class="layout-mode-exit-btn" onclick="window._exitLayoutMode()">
-                <i class="fa-solid fa-xmark"></i> יציאה
-            </button>
-        </div>
-    </div>
-</div>
-
-<!-- ===== LAYOUT PICKER MODAL ===== -->
-<div id="layout-picker-modal" class="layout-picker-overlay" onclick="if(event.target===this)window._closeLayoutPicker()">
-    <div class="layout-picker-box" role="dialog" aria-labelledby="layout-picker-title">
-        <div class="layout-picker-header">
-            <div>
-                <div class="layout-picker-title" id="layout-picker-title"><i class="fa-solid fa-object-group"></i> סידור מרחבי</div>
-                <div class="layout-picker-subtitle">בחר 2 ארונות ישרים להצגה יחד — לא ארונות הזזה</div>
-            </div>
-            <button type="button" class="layout-picker-close" onclick="window._closeLayoutPicker()" aria-label="סגור">✕</button>
-        </div>
-        <p class="layout-picker-hint" id="layout-picker-hint">בחר 2 ארונות (0/2)</p>
-        <div class="layout-picker-list" id="layout-picker-list"></div>
-        <div class="layout-picker-footer">
-            <button type="button" class="layout-picker-cancel" onclick="window._closeLayoutPicker()">ביטול</button>
-            <button type="button" id="layout-picker-confirm" class="layout-picker-confirm" disabled onclick="window._confirmLayoutPicker()">
-                <i class="fa-solid fa-cube"></i> הצג יחד במרחב
-            </button>
-        </div>
-    </div>
-</div>
-
 <!-- ===== PRESENTATION MODE EXIT BUTTON ===== -->
 <button id="presentation-exit-btn" onclick="window._exitPresentationMode()" style="display:none;">
     <i class="fa-solid fa-xmark"></i> יציאה מתצוגה
@@ -2553,13 +2459,12 @@
 <script src="state.js?v=20260731colWEdit"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="writing-desk-preset.js?v=20260617wdcolors"></script>
-<script src="engine-core.js?v=20260730edgeHover"></script>
+<script src="engine-core.js?v=20260731noLayout"></script>
 <script src="engine-corners.js?v=20260720deskPartPaint"></script>
 <script src="engine-blueprint.js?v=20260731topBotBoard"></script>
 <script src="engine-room-plan.js?v=20260624k"></script>
 <script src="tambour-color-picker.js?v=20260617scdoors"></script>
-<script src="ui.js?v=20260731cellHEdit"></script>
-<script src="layout-mode.js?v=20260610i"></script>
+<script src="ui.js?v=20260731noLayout"></script>
 <script src="mobile.js?v=20260713extDrawerPart"></script>
 <script src="part-paint.js?v=20260712c2024"></script>
 <script src="index-init.js?v=20260731bpDimToggle"></script>
@@ -2675,7 +2580,7 @@
 
 <script src="notes.js?v=20260714pinDelete"></script>
 <script src="tour.js?v=20260609d"></script>
-<script src="ai-renders.js?v=20260608ceil"></script>
+<script src="ai-renders.js?v=20260731noLayout"></script>
 <script>
     // Init AI renders after auth is ready
     document.addEventListener('DOMContentLoaded', function() {

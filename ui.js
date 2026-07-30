@@ -4070,7 +4070,6 @@ window.addEventListener('pointerup', () => {
 });
 
 function buildDragHandlesUI() {
-    if (window._layoutModeActive) return;
     dragLayer.innerHTML = '';
     if(state.viewMode !== 'front') return;
 
@@ -4760,7 +4759,6 @@ function createHandle(dir, x3d, y3d = null, text = 'גרירה') {
 }
 
 function updateDragHandlesPosition() {
-    if (window._layoutModeActive) return;
     if(state.viewMode !== 'front') return;
     const cw = container.clientWidth;
     const ch = container.clientHeight;
@@ -5878,7 +5876,6 @@ function bindUI() {
     }
 
     container.addEventListener('pointermove', (e) => {
-        if (window._layoutModeActive) return;
         window._lastCanvasPointer = { x: e.clientX, y: e.clientY, valid: true };
         if (_isCanvasOverlayUiTarget(e.target)) {
             if (currentHoveredDoor && !e.target.closest('.plus-btn') && !e.target.closest('.select-all-col-btn')) {
@@ -5984,8 +5981,7 @@ function bindUI() {
 
         const isOverUI = e.target.closest('#dimensions-layer, #buttons-layer, #drag-handles-layer, #column-quick-edit, #bottom-floating-toolbar');
         const isSelected = state.selection.colIndex !== -1;
-        const layoutOverlayGrace = window._layoutOverlayRestoreUntil && Date.now() < window._layoutOverlayRestoreUntil;
-        const shouldShowUI = layoutOverlayGrace || (hoverCol !== -1) || isOverUI || isSelected || state.hoveredDesk;
+        const shouldShowUI = (hoverCol !== -1) || isOverUI || isSelected || state.hoveredDesk;
 
         ['dimensions-layer', 'buttons-layer', 'drag-handles-layer'].forEach(id => {
             const layer = document.getElementById(id);
@@ -6017,8 +6013,6 @@ function bindUI() {
     };
 
     container.addEventListener('mouseleave', () => {
-        if (window._layoutModeActive) return;
-        if (window._layoutOverlayRestoreUntil && Date.now() < window._layoutOverlayRestoreUntil) return;
         // Remove wing highlight when mouse leaves canvas
         if (!state.wingEditMode) {
             _hoveredWingId = null;
@@ -6044,7 +6038,6 @@ function bindUI() {
     let _pointerDownCornerDesk = false;
 
     container.addEventListener('pointerdown', (e) => {
-        if (window._layoutModeActive) return;
         if (_isCanvasOverlayUiTarget(e.target)) return;
         if (e.button !== 0) return;
 
