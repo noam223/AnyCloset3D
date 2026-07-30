@@ -36,7 +36,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style-base.css?v=20260731cellHEdit">
     <link rel="stylesheet" href="style-mobile.css?v=20260609a">
-    <link rel="stylesheet" href="style-extras.css?v=20260607b">
+    <link rel="stylesheet" href="style-extras.css?v=20260731rpcab">
     <link rel="stylesheet" href="style.css?v=20260731noNiche">
     <style>
         html.thumb-only-mode #left-sidebar,
@@ -1091,6 +1091,10 @@
                 <i class="fa-solid fa-plus"></i><span>הוסף פריט</span>
             </button>
             <div class="bed-tb-sep"></div>
+            <button type="button" class="room-furn-btn" id="room-btn-add-project-cab" onclick="window._openRoomProjectCabinetPicker()" title="הוסף ארון אחר מהפרויקט לחדר">
+                <i class="fa-solid fa-warehouse"></i><span>הוסף ארון מהפרויקט</span>
+            </button>
+            <div class="bed-tb-sep"></div>
             <button type="button" class="room-furn-btn" id="room-btn-cycle-chair" onclick="window._cycleChairVariant()" title="החלף סוג כסא">
                 <i class="fa-solid fa-right-left"></i><span>כסא: <strong id="room-chair-variant-label">משרדי</strong></span>
             </button>
@@ -1122,6 +1126,19 @@
                 </div>
             </div>
             <button type="button" class="cri-submit" onclick="window._submitCustomRoomItem()"><i class="fa-solid fa-plus"></i> הוסף פריט</button>
+        </div>
+    </div>
+
+    <!-- Project cabinet picker for room plan -->
+    <div id="room-project-cab-modal" class="custom-room-item-modal" aria-hidden="true" onclick="if(event.target===this)window._closeRoomProjectCabinetPicker()">
+        <div class="cri-card rpc-card" role="dialog" aria-labelledby="rpc-title">
+            <div class="cri-header">
+                <h3 id="rpc-title"><i class="fa-solid fa-warehouse"></i> הוסף ארון מהפרויקט</h3>
+                <button type="button" class="cri-close" onclick="window._closeRoomProjectCabinetPicker()" title="סגור"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <p class="cri-desc">בחר ארון מהעגלה להצגה בחדר — אפשר לגרור ולסובב אותו בנפרד מהארון הראשי.</p>
+            <div id="room-project-cab-list" class="rpc-list"></div>
+            <p id="room-project-cab-empty" class="rpc-empty" style="display:none;">אין ארונות נוספים בפרויקט. הוסף ארון לעגלה ואז חזור לכאן.</p>
         </div>
     </div>
 
@@ -2398,15 +2415,15 @@
 <script src="state.js?v=20260731noNiche"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="writing-desk-preset.js?v=20260617wdcolors"></script>
-<script src="engine-core.js?v=20260731roomDoor"></script>
+<script src="engine-core.js?v=20260731rpcab"></script>
 <script src="engine-corners.js?v=20260720deskPartPaint"></script>
 <script src="engine-blueprint.js?v=20260731topBotBoard"></script>
-<script src="engine-room-plan.js?v=20260731doorArc"></script>
+<script src="engine-room-plan.js?v=20260731rpcab"></script>
 <script src="tambour-color-picker.js?v=20260617scdoors"></script>
-<script src="ui.js?v=20260731noNiche"></script>
+<script src="ui.js?v=20260731rpcab"></script>
 <script src="mobile.js?v=20260713extDrawerPart"></script>
 <script src="part-paint.js?v=20260712c2024"></script>
-<script src="index-init.js?v=20260731noNiche"></script>
+<script src="index-init.js?v=20260731rpcab"></script>
 
 <!-- ===== TAMBOUR FULL PALETTE MODAL ===== -->
 <div id="tambour-palette-modal" class="tambour-palette-overlay">

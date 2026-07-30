@@ -544,6 +544,150 @@ body.room-plan-dragging #room-plan-svg {
     background: #047857;
 }
 
+.rpc-card {
+    max-width: 440px;
+    max-height: min(86vh, 640px);
+    display: flex;
+    flex-direction: column;
+}
+
+.rpc-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-y: auto;
+    min-height: 0;
+    max-height: 420px;
+    margin-bottom: 4px;
+}
+
+.rpc-empty {
+    margin: 8px 0 0;
+    font-size: 0.85rem;
+    color: var(--text-light, #64748b);
+    text-align: center;
+}
+
+.rpc-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 12px;
+    border: 1.5px solid var(--border, #e2e8f0);
+    border-radius: 12px;
+    background: #f8fafc;
+    cursor: pointer;
+    text-align: right;
+    font-family: inherit;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.rpc-item:hover:not(:disabled) {
+    border-color: #93c5fd;
+    background: #eff6ff;
+}
+
+.rpc-item:disabled,
+.rpc-item.added {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.rpc-item-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: #dbeafe;
+    color: #1d4ed8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.rpc-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.rpc-item-title {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.rpc-item-dims {
+    font-size: 0.78rem;
+    color: #64748b;
+    margin-top: 2px;
+}
+
+.rpc-item-badge {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #059669;
+    flex-shrink: 0;
+}
+
+.room-plan-furn-row .rpc-remove-btn {
+    margin-right: auto;
+    border: none;
+    background: #fee2e2;
+    color: #b91c1c;
+    border-radius: 8px;
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.room-plan-furn-row .rpc-remove-btn:hover {
+    background: #fecaca;
+}
+
+#room-plan-svg .rp-room-cab-btn-fo {
+    overflow: visible;
+    pointer-events: all;
+}
+
+#room-plan-svg .rp-room-cab-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border-radius: 8px;
+    border: 1px solid rgba(5, 150, 105, 0.4);
+    background: rgba(255, 255, 255, 0.95);
+    color: #047857;
+    font-size: 11px;
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
+    pointer-events: all;
+}
+
+#room-plan-svg .rp-room-cab-btn:hover {
+    background: rgba(16, 185, 129, 0.12);
+}
+
+#room-plan-svg .rp-room-cab-btn-remove {
+    border-color: rgba(185, 28, 28, 0.4);
+    color: #b91c1c;
+}
+
+#room-plan-svg .rp-room-cab-btn-remove:hover {
+    background: rgba(254, 226, 226, 0.95);
+}
+
+#room-plan-svg .rp-room-cab-btn i {
+    pointer-events: none;
+}
+
 body.room-plan-dragging #room-plan-svg .rp-draggable {
     cursor: grabbing;
 }

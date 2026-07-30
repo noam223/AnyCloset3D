@@ -7348,6 +7348,9 @@ window.deleteCartItem = function(index) {
     const _doDelete = function() {
         const wasEditing = state.editingCartIndex === index;
         state.orderCart.splice(index, 1);
+        if (typeof window._onCartItemDeletedForRoomProps === 'function') {
+            window._onCartItemDeletedForRoomProps(index);
+        }
 
         if (state.orderCart.length === 0) {
             window._bootstrapDefaultCabinet();

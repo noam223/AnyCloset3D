@@ -257,6 +257,214 @@ window._customRoomItems    = window._customRoomItems    || [];
 window._customRoomItemSeq  = window._customRoomItemSeq  || 0;
 window._CUSTOM_ITEM_COLORS = [0xdce4ef, 0xe8e0f0, 0xe0f0e8, 0xf0e8dc, 0xe4ecf4];
 
+// ── Extra project cabinets placed as room props (not the active editor cabinet) ─
+window._roomExtraCabinets   = window._roomExtraCabinets   || [];
+window._roomExtraCabinetSeq = window._roomExtraCabinetSeq || 0;
+
+window._getCartCabinetDims = function(item) {
+    const rs = (item && item.rawState) || {};
+    const wing = rs.wings && rs.wings.center;
+    const w = rs.width || (wing && wing.width) || 160;
+    const d = rs.depth || (wing && wing.depth) || 54;
+    const h = rs.globalHeight || (wing && wing.globalHeight) ||
+        (wing && wing.columns && wing.columns.length
+            ? Math.max.apply(null, wing.columns.map(function(c) { return c.height || 0; }))
+            : 240);
+    return { w: w, d: d, h: h };
+};
+
+window._getCartCabinetLabel = function(item, index) {
+    if (!item) return 'ארון ' + ((index || 0) + 1);
+    const rs = item.rawState || {};
+    return (item.spec && item.spec.customName) || rs.cabinetName ||
+        (item.spec && item.spec.modelName) || ('ארון ' + ((index || 0) + 1));
+};
+
+window._pruneRoomExtraCabinets = function() {
+    const cartLen = (state.orderCart || []).length;
+    window._roomExtraCabinets = (window._roomExtraCabinets || []).filter(function(p) {
+        return p && typeof p.cartIndex === 'number' && p.cartIndex >= 0 && p.cartIndex < cartLen;
+    });
+};
+
+/** After a cart item is deleted at `deletedIndex`, drop/reindex room props. */
+window._onCartItemDeletedForRoomProps = function(deletedIndex) {
+    if (typeof deletedIndex !== 'number') return;
+    window._roomExtraCabinets = (window._roomExtraCabinets || []).filter(function(p) {
+        return p && p.cartIndex !== deletedIndex;
+    }).map(function(p) {
+        if (p.cartIndex > deletedIndex) p.cartIndex -= 1;
+        return p;
+    });
+    if (typeof window._roomPlanFurnitureChanged === 'function') {
+        window._roomPlanFurnitureChanged();
+    } else if (typeof _buildRoom === 'function' && window._roomVisible) {
+        _buildRoom();
+    }
+};
+
+window._findRoomExtraCabinet = function(id) {
+    return (window._roomExtraCabinets || []).find(function(p) { return p && p.id === id; }) || null;
+};
+
+window._addRoomExtraCabinetFromCart = function(cartIndex) {
+    const cart = state.orderCart || [];
+    if (typeof cartIndex !== 'number' || cartIndex < 0 || cartIndex >= cart.length) return null;
+    if ((window._roomExtraCabinets || []).some(function(p) { return p.cartIndex === cartIndex; })) return null;
+
+    const item = cart[cartIndex];
+    const dims = window._getCartCabinetDims(item);
+    const b = window._roomBounds;
+    let cx = b ? (b.leftX + b.rightX) / 2 : 250;
+    let cz = b ? (b.backZ + b.frontZ) * 0.55 : 280;
+    if (b) {
+        cx = Math.max(b.leftX + dims.w / 2, Math.min(b.rightX - dims.w / 2, cx));
+        cz = Math.max(b.backZ + dims.d / 2, Math.min(b.frontZ - dims.d / 2, cz));
+    }
+    window._roomExtraCabinetSeq = (window._roomExtraCabinetSeq || 0) + 1;
+    const prop = {
+        id: 'room-cab-' + window._roomExtraCabinetSeq,
+        cartIndex: cartIndex,
+        x: cx,
+        z: cz,
+        rotation: 0
+    };
+    window._roomExtraCabinets.push(prop);
+    if (typeof window._roomPlanFurnitureChanged === 'function') {
+        window._roomPlanFurnitureChanged();
+    } else if (typeof _buildRoom === 'function') {
+        _buildRoom();
+    }
+    return prop;
+};
+
+window._removeRoomExtraCabinet = function(id) {
+    const before = (window._roomExtraCabinets || []).length;
+    window._roomExtraCabinets = (window._roomExtraCabinets || []).filter(function(p) {
+        return !p || p.id !== id;
+    });
+    if (window._roomExtraCabinets.length === before) return;
+    if (typeof window._roomPlanFurnitureChanged === 'function') {
+        window._roomPlanFurnitureChanged();
+    } else if (typeof _buildRoom === 'function') {
+        _buildRoom();
+    }
+};
+
+window._rotateRoomExtraCabinet = function(id) {
+    const prop = window._findRoomExtraCabinet(id);
+    if (!prop) return;
+    prop.rotation = ((prop.rotation || 0) + 90) % 360;
+    if (typeof window._roomPlanFurnitureChanged === 'function') {
+        window._roomPlanFurnitureChanged();
+    } else if (typeof _buildRoom === 'function') {
+        _buildRoom();
+    }
+};
+
+window._rebuildRoomExtraCabinets = function(rg) {
+    window._pruneRoomExtraCabinets();
+    const root = new THREE.Group();
+    root.name = 'roomExtraCabinets';
+    window._roomExtraCabinetGroup = root;
+    if (!rg) return root;
+
+    const props = window._roomExtraCabinets || [];
+    if (!props.length || typeof window.buildCabinetIntoGroup !== 'function') {
+        rg.add(root);
+        return root;
+    }
+
+    // Deep-clone active editor state so prop builds cannot mutate it
+    const saved = {
+        wings: JSON.parse(JSON.stringify(state.wings || {})),
+        activeWing: state.activeWing,
+        presetId: state.presetId,
+        materialBody: state.materialBody,
+        materialDoors: state.materialDoors,
+        materialInternal: state.materialInternal,
+        materialExternal: state.materialExternal,
+        materialOpenCell: state.materialOpenCell,
+        materialBack: state.materialBack,
+        boardMaterial: state.boardMaterial,
+        width: state.width,
+        globalHeight: state.globalHeight,
+        depth: state.depth,
+        thickness: state.thickness,
+        plinthHeight: state.plinthHeight,
+        hasDoors: state.hasDoors,
+        columns: state.columns ? JSON.parse(JSON.stringify(state.columns)) : state.columns,
+        desk: state.desk ? JSON.parse(JSON.stringify(state.desk)) : state.desk,
+        partColors: state.partColors,
+        _activeUpperUnit: state._activeUpperUnit
+    };
+
+    props.forEach(function(prop) {
+        const item = state.orderCart && state.orderCart[prop.cartIndex];
+        if (!item || !item.rawState) return;
+        const rs = item.rawState;
+        try {
+            if (rs.wings) {
+                const wingsCopy = JSON.parse(JSON.stringify(rs.wings));
+                if (typeof window._restoreWingsFromSaved === 'function') {
+                    window._restoreWingsFromSaved(wingsCopy);
+                } else {
+                    state.wings = { center: wingsCopy.center || null, left: wingsCopy.left || null, right: wingsCopy.right || null };
+                }
+            }
+            state.activeWing = rs.activeWing || 'center';
+            state.presetId = rs.presetId || 'linear';
+            state._activeUpperUnit = null;
+            ['materialBody', 'materialDoors', 'materialInternal', 'materialExternal',
+             'materialOpenCell', 'materialBack', 'boardMaterial', 'width', 'globalHeight',
+             'depth', 'thickness', 'plinthHeight', 'hasDoors', 'columns', 'desk'].forEach(function(k) {
+                if (rs[k] !== undefined) state[k] = rs[k];
+            });
+
+            const g = new THREE.Group();
+            g.name = prop.id || ('room-cab-' + prop.cartIndex);
+            g.userData.roomProp = prop.id;
+            g.userData.roomExtraCabinet = true;
+            g.userData.cartIndex = prop.cartIndex;
+            window.buildCabinetIntoGroup(g);
+            g.position.set(prop.x || 0, 0, prop.z || 0);
+            g.rotation.y = ((prop.rotation || 0) * Math.PI) / 180;
+            root.add(g);
+        } catch (e) {
+            console.warn('[roomExtraCabinets] failed to build cartIndex', prop.cartIndex, e);
+        }
+    });
+
+    // Restore active editor cabinet
+    if (typeof window._restoreWingsFromSaved === 'function') {
+        window._restoreWingsFromSaved(saved.wings);
+    } else {
+        state.wings = saved.wings;
+    }
+    state.activeWing = saved.activeWing;
+    state.presetId = saved.presetId;
+    state.materialBody = saved.materialBody;
+    state.materialDoors = saved.materialDoors;
+    state.materialInternal = saved.materialInternal;
+    state.materialExternal = saved.materialExternal;
+    state.materialOpenCell = saved.materialOpenCell;
+    state.materialBack = saved.materialBack;
+    state.boardMaterial = saved.boardMaterial;
+    state.width = saved.width;
+    state.globalHeight = saved.globalHeight;
+    state.depth = saved.depth;
+    state.thickness = saved.thickness;
+    state.plinthHeight = saved.plinthHeight;
+    state.hasDoors = saved.hasDoors;
+    state.columns = saved.columns;
+    state.desk = saved.desk;
+    state.partColors = saved.partColors;
+    state._activeUpperUnit = saved._activeUpperUnit;
+
+    rg.add(root);
+    return root;
+};
+
 // ── Room entrance door (movable on wall frame in 2D plan) ───────────────────
 window._ROOM_DOOR_W = window._ROOM_DOOR_W || 90;
 window._ROOM_DOOR_H = window._ROOM_DOOR_H || 210;
@@ -1361,6 +1569,9 @@ function _buildRoom() {
     // ── Entrance door (movable on walls via 2D plan) ──────────────────────────
     window._roomDoorMesh = null;
     _buildRoomDoorMesh(rg);
+
+    // ── Extra project cabinets as room props ─────────────────────────────────
+    window._rebuildRoomExtraCabinets(rg);
 
     // Notify UI to reposition bed handles
     if (typeof window._updateBedHandles === 'function') window._updateBedHandles();

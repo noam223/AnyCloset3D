@@ -218,6 +218,26 @@
                         state.roomWall   = 'center';
                         window._roomWall = 'center';
                     }
+                    // Restore extra project cabinets placed in the room
+                    if (Array.isArray(snap.roomExtraCabinets)) {
+                        window._roomExtraCabinets = snap.roomExtraCabinets.map(function(p, i) {
+                            return {
+                                id: p.id || ('room-cab-' + (i + 1)),
+                                cartIndex: typeof p.cartIndex === 'number' ? p.cartIndex : -1,
+                                x: typeof p.x === 'number' ? p.x : 250,
+                                z: typeof p.z === 'number' ? p.z : 280,
+                                rotation: typeof p.rotation === 'number' ? p.rotation : 0
+                            };
+                        }).filter(function(p) { return p.cartIndex >= 0; });
+                        var _maxCabSeq = 0;
+                        window._roomExtraCabinets.forEach(function(p) {
+                            var m = String(p.id || '').match(/^room-cab-(\d+)$/);
+                            if (m) _maxCabSeq = Math.max(_maxCabSeq, parseInt(m[1], 10) || 0);
+                        });
+                        window._roomExtraCabinetSeq = Math.max(window._roomExtraCabinetSeq || 0, _maxCabSeq);
+                    } else {
+                        window._roomExtraCabinets = [];
+                    }
                     // Restore closure panel settings
                     window._closureEnabled    = true;
                     window._closureWidth      = snap.closureWidth      || 1.8;
@@ -242,6 +262,9 @@
                         state.orderCart = snap.orderCart;
                         var cc = document.getElementById('cart-count');
                         if (cc) cc.innerText = state.orderCart.length;
+                    }
+                    if (typeof window._pruneRoomExtraCabinets === 'function') {
+                        window._pruneRoomExtraCabinets();
                     }
                     if (snap.customer) {
                         state.customer = snap.customer;
@@ -365,6 +388,15 @@
             orderForm:         state.orderForm || { factory: { title: '', notes: '' }, customer: { title: '', notes: '' } },
             orderStatus:       window._currentOrderStatus || 'quote',
             roomWall:          window._roomWall || state.roomWall || 'center',
+            roomExtraCabinets: (window._roomExtraCabinets || []).map(function(p) {
+                return {
+                    id: p.id,
+                    cartIndex: p.cartIndex,
+                    x: p.x,
+                    z: p.z,
+                    rotation: p.rotation || 0
+                };
+            }),
             closureEnabled:    (window._closureEnabled !== undefined) ? window._closureEnabled : true,
             closureWidth:      window._closureWidth      || 1.8,
             closureWidthRight: window._closureWidthRight || 1.8,

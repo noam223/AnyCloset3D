@@ -74,7 +74,8 @@
         'cabinet-desk': { fill: '#e2e8f0', stroke: '#64748b', label: 'שולחן ארון' },
         nightstand:  { fill: '#f5f0e8', stroke: '#92706a', label: 'שידה' },
         'room-desk': { fill: '#fef3c7', stroke: '#d97706', label: 'שולחן עבודה' },
-        'room-door': { fill: '#dbeafe', stroke: '#0284c7', label: 'דלת' }
+        'room-door': { fill: '#dbeafe', stroke: '#0284c7', label: 'דלת' },
+        'room-cab':  { fill: '#dcfce7', stroke: '#059669', label: 'ארון מהפרויקט' }
     };
 
     function _rectFromCenter(cx, cz, halfW, halfD, rotDeg) {
@@ -111,10 +112,15 @@
         return '#' + n.toString(16).padStart(6, '0');
     }
 
+    function _isRoomExtraCabId(id) {
+        return String(id || '').indexOf('room-cab-') === 0;
+    }
+
     function _furnColors(item) {
         if (item.customColor != null) {
             return { fill: _colorToSvg(item.customColor), stroke: '#64748b' };
         }
+        if (_isRoomExtraCabId(item.id)) return FURN_COLORS['room-cab'];
         return FURN_COLORS[item.id] || FURN_COLORS.chair;
     }
 
@@ -342,6 +348,26 @@
         return (window._customRoomItems || []).find(function(item) { return item.id === id; }) || null;
     }
 
+    function _getRoomExtraCabinetRects() {
+        if (typeof window._pruneRoomExtraCabinets === 'function') window._pruneRoomExtraCabinets();
+        return (window._roomExtraCabinets || []).map(function(prop) {
+            const item = state.orderCart && state.orderCart[prop.cartIndex];
+            const dims = typeof window._getCartCabinetDims === 'function'
+                ? window._getCartCabinetDims(item)
+                : { w: 160, d: 54 };
+            const rect = _rectFromCenter(prop.x || 0, prop.z || 0, dims.w / 2, dims.d / 2, prop.rotation || 0);
+            const label = typeof window._getCartCabinetLabel === 'function'
+                ? window._getCartCabinetLabel(item, prop.cartIndex)
+                : ('ארון ' + ((prop.cartIndex || 0) + 1));
+            return _makeFurnItem(prop.id, rect, true, label, {
+                isRoomExtraCab: true,
+                cartIndex: prop.cartIndex,
+                halfW: dims.w / 2,
+                halfD: dims.d / 2
+            });
+        });
+    }
+
     function _getRoomDoorRect() {
         const b = _getBounds();
         if (!b || typeof window._getRoomDoorPose !== 'function') return null;
@@ -465,6 +491,7 @@
         if (roomDesk) items.push(roomDesk);
         if (chair) items.push(chair);
         _getCustomItemRects().forEach(function(item) { items.push(item); });
+        _getRoomExtraCabinetRects().forEach(function(item) { items.push(item); });
         // Door last → topmost in reverse hit-test
         if (roomDoor) items.push(roomDoor);
         return items;
@@ -531,6 +558,23 @@
                 const cp = _clampFurnCenter(cx, cz, custom.w / 2, custom.d / 2);
                 custom.x = cp.x;
                 custom.z = cp.z;
+            }
+        } else if (_isRoomExtraCabId(id)) {
+            const prop = typeof window._findRoomExtraCabinet === 'function'
+                ? window._findRoomExtraCabinet(id)
+                : null;
+            if (prop) {
+                const item = state.orderCart && state.orderCart[prop.cartIndex];
+                const dims = typeof window._getCartCabinetDims === 'function'
+                    ? window._getCartCabinetDims(item)
+                    : { w: 160, d: 54 };
+                const rot = prop.rotation || 0;
+                const swapped = (rot % 180) !== 0;
+                const halfW = (swapped ? dims.d : dims.w) / 2;
+                const halfD = (swapped ? dims.w : dims.d) / 2;
+                const cp = _clampFurnCenter(cx, cz, halfW, halfD);
+                prop.x = cp.x;
+                prop.z = cp.z;
             }
         } else if (id === 'room-door') {
             if (typeof window._setRoomDoorFromPoint === 'function') {
@@ -625,6 +669,33 @@
         btn.innerHTML = '<i class="fa-solid fa-arrows-left-right"></i><span>' + widthCm + '</span>';
         fo.appendChild(btn);
         parentG.appendChild(fo);
+    }
+
+    function _drawRoomExtraCabBtns(parentG, item, fx, fy, fw, fh) {
+        if (fw < 40 || fh < 28) return;
+        const btnSize = 22;
+        const gap = 4;
+        const by = fy + 4;
+        const rotateX = fx + fw - btnSize * 2 - gap - 4;
+        const removeX = fx + fw - btnSize - 4;
+
+        function _addBtn(x, action, title, icon, cls) {
+            const fo = _svgEl('foreignObject', {
+                x: x, y: by, width: btnSize, height: btnSize,
+                class: 'rp-room-cab-btn-fo'
+            });
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'rp-room-cab-btn ' + (cls || '');
+            btn.title = title;
+            btn.setAttribute('data-rp-action', action);
+            btn.setAttribute('data-rp-cab-id', item.id);
+            btn.innerHTML = '<i class="fa-solid ' + icon + '"></i>';
+            fo.appendChild(btn);
+            parentG.appendChild(fo);
+        }
+        _addBtn(rotateX, 'rotate-room-cab', 'סובב 90°', 'fa-rotate-right', '');
+        _addBtn(removeX, 'remove-room-cab', 'הסר מהחדר', 'fa-xmark', 'rp-room-cab-btn-remove');
     }
 
     function _drawDimH(g, x1, x2, y, label, above) {
@@ -829,6 +900,9 @@
                 if (item.id === 'bed') {
                     _drawBedWidthBtn(g, fx, fy, fw, fh);
                 }
+                if (item.isRoomExtraCab || _isRoomExtraCabId(item.id)) {
+                    _drawRoomExtraCabBtns(g, item, fx, fy, fw, fh);
+                }
             }
 
             if (item.draggable) {
@@ -901,6 +975,7 @@
             const d = Math.round(item.maxZ - item.minZ);
             const row = document.createElement('div');
             row.className = 'room-plan-furn-row';
+            const isExtraCab = item.isRoomExtraCab || _isRoomExtraCabId(item.id);
             const icon = item.id === 'bed' ? 'fa-bed'
                 : item.id === 'chair' ? 'fa-chair'
                 : item.id === 'nightstand' ? 'fa-table-cells'
@@ -908,12 +983,28 @@
                 : item.id === 'cabinet-desk' ? 'fa-laptop'
                 : item.id === 'room-door' ? 'fa-door-open'
                 : String(item.id).indexOf('custom-') === 0 ? 'fa-cube'
+                : isExtraCab ? 'fa-warehouse'
                 : item.id === 'cabinet' ? 'fa-door-closed'
                 : 'fa-cube';
             row.innerHTML =
                 '<i class="fa-solid ' + icon + '"></i>' +
                 '<span class="room-plan-furn-name">' + (item.label || item.id) + '</span>' +
                 '<span class="room-plan-furn-dim">' + w + '×' + d + '</span>';
+            if (isExtraCab) {
+                const rm = document.createElement('button');
+                rm.type = 'button';
+                rm.className = 'rpc-remove-btn';
+                rm.title = 'הסר מהחדר';
+                rm.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+                rm.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (typeof window._removeRoomExtraCabinet === 'function') {
+                        window._removeRoomExtraCabinet(item.id);
+                    }
+                });
+                row.appendChild(rm);
+            }
             list.appendChild(row);
         });
     };
@@ -1101,6 +1192,74 @@
         });
     };
 
+    window._closeRoomProjectCabinetPicker = function() {
+        const modal = document.getElementById('room-project-cab-modal');
+        if (modal) {
+            modal.classList.remove('open');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+    };
+
+    window._populateRoomProjectCabinetPicker = function() {
+        const list = document.getElementById('room-project-cab-list');
+        const empty = document.getElementById('room-project-cab-empty');
+        if (!list) return;
+        list.innerHTML = '';
+        const cart = state.orderCart || [];
+        const added = {};
+        (window._roomExtraCabinets || []).forEach(function(p) {
+            if (p && typeof p.cartIndex === 'number') added[p.cartIndex] = true;
+        });
+        const activeIdx = (typeof state.editingCartIndex === 'number') ? state.editingCartIndex : -1;
+        let shown = 0;
+        cart.forEach(function(item, index) {
+            if (!item) return;
+            shown++;
+            const dims = typeof window._getCartCabinetDims === 'function'
+                ? window._getCartCabinetDims(item)
+                : { w: 160, d: 54, h: 240 };
+            const label = typeof window._getCartCabinetLabel === 'function'
+                ? window._getCartCabinetLabel(item, index)
+                : ('ארון ' + (index + 1));
+            const isActive = index === activeIdx;
+            const isAdded = !!added[index];
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'rpc-item' + (isAdded ? ' added' : '');
+            btn.disabled = isAdded || isActive;
+            let badge = '';
+            if (isActive) badge = '<span class="rpc-item-badge">ארון פעיל</span>';
+            else if (isAdded) badge = '<span class="rpc-item-badge">כבר בחדר</span>';
+            btn.innerHTML =
+                '<span class="rpc-item-icon"><i class="fa-solid fa-warehouse"></i></span>' +
+                '<span class="rpc-item-info">' +
+                    '<span class="rpc-item-title">' + label + '</span>' +
+                    '<span class="rpc-item-dims">' +
+                        Math.round(dims.w) + '×' + Math.round(dims.d) + '×' + Math.round(dims.h) + ' ס״מ' +
+                    '</span>' +
+                '</span>' + badge;
+            if (!btn.disabled) {
+                btn.addEventListener('click', function() {
+                    if (typeof window._addRoomExtraCabinetFromCart === 'function') {
+                        window._addRoomExtraCabinetFromCart(index);
+                    }
+                    window._populateRoomProjectCabinetPicker();
+                    window._closeRoomProjectCabinetPicker();
+                });
+            }
+            list.appendChild(btn);
+        });
+        if (empty) empty.style.display = shown ? 'none' : '';
+    };
+
+    window._openRoomProjectCabinetPicker = function() {
+        const modal = document.getElementById('room-project-cab-modal');
+        if (!modal) return;
+        window._populateRoomProjectCabinetPicker();
+        modal.classList.add('open');
+        modal.setAttribute('aria-hidden', 'false');
+    };
+
     // ── Drag interaction ────────────────────────────────────────────────────
 
     function _hitTestFurn(sx, sy) {
@@ -1129,9 +1288,19 @@
             if (actionBtn) {
                 e.preventDefault();
                 e.stopPropagation();
-                if (actionBtn.getAttribute('data-rp-action') === 'cycle-bed-width' &&
-                    typeof window._cycleBedWidth === 'function') {
+                const action = actionBtn.getAttribute('data-rp-action');
+                if (action === 'cycle-bed-width' && typeof window._cycleBedWidth === 'function') {
                     window._cycleBedWidth();
+                } else if (action === 'rotate-room-cab') {
+                    const cabId = actionBtn.getAttribute('data-rp-cab-id');
+                    if (cabId && typeof window._rotateRoomExtraCabinet === 'function') {
+                        window._rotateRoomExtraCabinet(cabId);
+                    }
+                } else if (action === 'remove-room-cab') {
+                    const cabId = actionBtn.getAttribute('data-rp-cab-id');
+                    if (cabId && typeof window._removeRoomExtraCabinet === 'function') {
+                        window._removeRoomExtraCabinet(cabId);
+                    }
                 }
                 return;
             }
@@ -1224,7 +1393,11 @@
             });
         }
         document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') window._closeCustomRoomItemModal();
+            if (e.key !== 'Escape') return;
+            window._closeCustomRoomItemModal();
+            if (typeof window._closeRoomProjectCabinetPicker === 'function') {
+                window._closeRoomProjectCabinetPicker();
+            }
         });
     }
 
