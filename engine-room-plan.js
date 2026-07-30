@@ -377,60 +377,55 @@
         const stroke = isActive ? '#0369a1' : '#0284c7';
         const fill = isActive ? '#bfdbfe' : '#dbeafe';
 
-        let a, bpt, hinge, sweep;
-        if (wall === 'front') {
-            a = _w2s(cx - half, cz, tf);
-            bpt = _w2s(cx + half, cz, tf);
-            hinge = a;
-            sweep = '0 0 0'; // arc into room (up on screen = -Z)
-        } else if (wall === 'back') {
-            a = _w2s(cx - half, cz, tf);
-            bpt = _w2s(cx + half, cz, tf);
-            hinge = a;
-            sweep = '0 0 1';
-        } else if (wall === 'left') {
-            a = _w2s(cx, cz - half, tf);
-            bpt = _w2s(cx, cz + half, tf);
-            hinge = a;
-            sweep = '0 0 1';
-        } else {
-            a = _w2s(cx, cz - half, tf);
-            bpt = _w2s(cx, cz + half, tf);
-            hinge = bpt;
-            sweep = '0 0 0';
-        }
+        // Opening endpoints on the wall (left→right / back→front)
+        const a = (wall === 'front' || wall === 'back')
+            ? _w2s(cx - half, cz, tf)
+            : _w2s(cx, cz - half, tf);
+        const bpt = (wall === 'front' || wall === 'back')
+            ? _w2s(cx + half, cz, tf)
+            : _w2s(cx, cz + half, tf);
 
-        const opening = _svgEl('line', {
+        // Hinge at the "start" side of the opening
+        const hinge = a;
+        const r = Math.hypot(bpt.x - a.x, bpt.y - a.y);
+        if (!(r > 1)) return;
+
+        // Closed tip = other end of opening; open tip = 90° into the room
+        // Screen: +Y is down, room interior from front wall is up (−Y)
+        let openTip, sweepFlag;
+        if (wall === 'front') {
+            openTip = { x: hinge.x, y: hinge.y - r };       // into room (up)
+            sweepFlag = 1; // clockwise: open → closed along wall
+        } else if (wall === 'back') {
+            openTip = { x: hinge.x, y: hinge.y + r };       // into room (down)
+            sweepFlag = 0;
+        } else if (wall === 'left') {
+            openTip = { x: hinge.x + r, y: hinge.y };       // into room (right)
+            sweepFlag = 0;
+        } else {
+            openTip = { x: hinge.x - r, y: hinge.y };       // into room (left)
+            sweepFlag = 1;
+        }
+        const closedTip = bpt;
+
+        g.appendChild(_svgEl('line', {
             x1: a.x, y1: a.y, x2: bpt.x, y2: bpt.y,
             stroke: stroke, 'stroke-width': isActive ? '5' : '4',
             'stroke-linecap': 'square'
-        });
-        g.appendChild(opening);
+        }));
 
-        // Door leaf line (slightly open)
-        const leafLen = Math.hypot(bpt.x - a.x, bpt.y - a.y);
-        let leafEnd;
-        if (wall === 'front') leafEnd = { x: hinge.x, y: hinge.y - leafLen * 0.85 };
-        else if (wall === 'back') leafEnd = { x: hinge.x, y: hinge.y + leafLen * 0.85 };
-        else if (wall === 'left') leafEnd = { x: hinge.x + leafLen * 0.85, y: hinge.y };
-        else leafEnd = { x: hinge.x - leafLen * 0.85, y: hinge.y };
-
+        // Door leaf (drawn open)
         g.appendChild(_svgEl('line', {
-            x1: hinge.x, y1: hinge.y, x2: leafEnd.x, y2: leafEnd.y,
+            x1: hinge.x, y1: hinge.y, x2: openTip.x, y2: openTip.y,
             stroke: '#1d4ed8', 'stroke-width': '2.2'
         }));
 
-        const r = leafLen * 0.9;
-        let arcEnd;
-        if (wall === 'front') arcEnd = { x: hinge.x + r, y: hinge.y };
-        else if (wall === 'back') arcEnd = { x: hinge.x + r, y: hinge.y };
-        else if (wall === 'left') arcEnd = { x: hinge.x, y: hinge.y + r };
-        else arcEnd = { x: hinge.x, y: hinge.y - r };
-
-        // Quarter-circle swing arc
+        // Quarter-circle swing: open tip → closed tip (same radius from hinge)
         g.appendChild(_svgEl('path', {
-            d: 'M ' + leafEnd.x + ' ' + leafEnd.y +
-               ' A ' + r + ' ' + r + ' 0 ' + sweep + ' ' + arcEnd.x + ' ' + arcEnd.y,
+            d: 'M ' + openTip.x.toFixed(2) + ' ' + openTip.y.toFixed(2) +
+               ' A ' + r.toFixed(2) + ' ' + r.toFixed(2) +
+               ' 0 0 ' + sweepFlag + ' ' +
+               closedTip.x.toFixed(2) + ' ' + closedTip.y.toFixed(2),
             fill: 'none', stroke: '#ef4444', 'stroke-width': '1.2',
             'stroke-dasharray': '4 3'
         }));
@@ -445,9 +440,10 @@
             fill: fill, stroke: 'none', opacity: '0.25', rx: '3'
         }));
 
+        const labelOff = wall === 'front' ? -14 : (wall === 'back' ? 14 : 0);
         g.appendChild(_svgEl('text', {
             x: (a.x + bpt.x) / 2,
-            y: (a.y + bpt.y) / 2 - (wall === 'front' || wall === 'back' ? 12 : 0),
+            y: (a.y + bpt.y) / 2 + labelOff,
             class: 'rp-furn-label', 'text-anchor': 'middle',
             'dominant-baseline': 'middle', 'font-size': '11', fill: '#0369a1'
         }, 'דלת'));
