@@ -11,6 +11,50 @@
     window._roomPlanPending3D = false;
     window._chairPosOverride = window._chairPosOverride || null;
     window._roomPlanRenderQueued = false;
+    window._roomPlanCabDragPreviewX = 0;
+    window._roomPlanCabSnapTarget = null;
+
+    const CAB_SNAP_MAGNET_CM = 40;
+
+    function _canDragCabinet() {
+        const preset = (typeof state !== 'undefined' && state.presetId) ? state.presetId : 'linear';
+        return preset === 'linear' || preset === 'sliding';
+    }
+
+    function _getCabinetSnapTargets(bounds, cabW) {
+        if (!bounds || !(cabW > 0)) return null;
+        const leftFlush = bounds.leftX + cabW / 2;
+        const rightFlush = bounds.rightX - cabW / 2;
+        const centerX = (bounds.leftX + bounds.rightX) / 2;
+        if (rightFlush < leftFlush + 0.5) {
+            return [{ wall: 'center', x: centerX }];
+        }
+        return [
+            { wall: 'left', x: leftFlush },
+            { wall: 'center', x: centerX },
+            { wall: 'right', x: rightFlush }
+        ];
+    }
+
+    function _resolveCabinetSnap(cx, bounds, cabW) {
+        const targets = _getCabinetSnapTargets(bounds, cabW);
+        if (!targets || !targets.length) return null;
+        if (targets.length === 1) return { wall: targets[0].wall, x: targets[0].x, followX: targets[0].x };
+
+        const leftFlush = targets[0].x;
+        const rightFlush = targets[2].x;
+        const roomW = bounds.rightX - bounds.leftX;
+        const t = roomW > 0.1 ? (cx - bounds.leftX) / roomW : 0.5;
+        let wall;
+        if (t < 1 / 3) wall = 'left';
+        else if (t > 2 / 3) wall = 'right';
+        else wall = 'center';
+
+        const snap = targets.find(function(tg) { return tg.wall === wall; }) || targets[1];
+        const followX = Math.max(leftFlush, Math.min(rightFlush, cx));
+        const magnet = Math.abs(followX - snap.x) <= CAB_SNAP_MAGNET_CM;
+        return { wall: snap.wall, x: magnet ? snap.x : followX, followX: followX, snapped: magnet };
+    }
 
     function _is2dPlan() {
         return state.viewMode === 'room-plan' && window._roomPlanSubview === '2d';
@@ -166,11 +210,12 @@
         if (typeof cabinetGroup === 'undefined' || !cabinetGroup) return null;
         cabinetGroup.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(cabinetGroup);
+        const previewX = window._roomPlanCabDragPreviewX || 0;
         return {
             id: 'cabinet',
-            minX: box.min.x, maxX: box.max.x,
+            minX: box.min.x + previewX, maxX: box.max.x + previewX,
             minZ: box.min.z, maxZ: box.max.z,
-            draggable: false,
+            draggable: _canDragCabinet(),
             label: FURN_COLORS.cabinet.label
         };
     }
@@ -345,6 +390,15 @@
     }
 
     function _applyFurnitureMove(id, cx, cz) {
+        if (id === 'cabinet') {
+            const d = window._roomPlanDrag;
+            if (!d || !d.bounds || !(d.cabW > 0)) return;
+            const resolved = _resolveCabinetSnap(cx, d.bounds, d.cabW);
+            if (!resolved) return;
+            window._roomPlanCabSnapTarget = resolved.wall;
+            window._roomPlanCabDragPreviewX = resolved.x - d.restCx;
+            return; // wall mode applied on pointerup — no 3D sync while dragging
+        }
         if (id === 'bed') {
             window._bedPos = _clampBedCenter(cx, cz);
         } else if (id === 'chair') {
@@ -369,6 +423,17 @@
             }
         }
         window._roomPlanPending3D = true;
+    }
+
+    function _finishCabinetWallSnap() {
+        const wall = window._roomPlanCabSnapTarget;
+        window._roomPlanCabDragPreviewX = 0;
+        window._roomPlanCabSnapTarget = null;
+        if (!wall || typeof window._setRoomWall !== 'function') return;
+        const cur = window._roomWall || state.roomWall || 'center';
+        if (wall !== cur) {
+            window._setRoomWall(wall);
+        }
     }
 
     // ── SVG dimension helpers ───────────────────────────────────────────────
@@ -648,11 +713,44 @@
             }
 
             if (item.draggable) {
-                g.style.cursor = 'grab';
+                g.style.cursor = isActive ? 'grabbing' : 'grab';
             }
             furnG.appendChild(g);
         });
         svg.appendChild(furnG);
+
+        // Snap guides while dragging the cabinet (left / center / right)
+        if (dragId === 'cabinet' && window._roomPlanDrag && window._roomPlanDrag.bounds) {
+            const snapBounds = window._roomPlanDrag.bounds;
+            const cabW = window._roomPlanDrag.cabW || 160;
+            const targets = _getCabinetSnapTargets(snapBounds, cabW) || [];
+            const activeWall = window._roomPlanCabSnapTarget;
+            const guideG = _svgEl('g', { class: 'rp-cab-snap-guides' });
+            const labelMap = { left: 'צמוד שמאל', center: 'מרכז', right: 'צמוד ימין' };
+            targets.forEach(function(tg) {
+                const top = _w2s(tg.x, snapBounds.backZ, tf);
+                const bot = _w2s(tg.x, snapBounds.frontZ, tf);
+                const isActiveSnap = tg.wall === activeWall;
+                guideG.appendChild(_svgEl('line', {
+                    x1: top.x, y1: top.y, x2: bot.x, y2: bot.y,
+                    stroke: isActiveSnap ? '#10b981' : '#94a3b8',
+                    'stroke-width': isActiveSnap ? '2' : '1',
+                    'stroke-dasharray': isActiveSnap ? '0' : '5 4',
+                    opacity: isActiveSnap ? '0.95' : '0.45'
+                }));
+                if (isActiveSnap) {
+                    guideG.appendChild(_svgEl('text', {
+                        x: top.x, y: top.y - 8,
+                        class: 'rp-cab-snap-label',
+                        'text-anchor': 'middle',
+                        fill: '#059669',
+                        'font-size': '11',
+                        'font-weight': '700'
+                    }, labelMap[tg.wall] || tg.wall));
+                }
+            });
+            svg.appendChild(guideG);
+        }
 
         const itemDimsG = _svgEl('g', { class: 'rp-item-dims' });
         items.forEach(function(item) {
@@ -942,12 +1040,27 @@
             e.preventDefault();
             e.stopPropagation();
             const center = _rectCenter(hit);
-            window._roomPlanDrag = {
+            const drag = {
                 id: hit.id,
                 startX: sx, startY: sy,
                 startCx: center.x, startCz: center.z,
                 pointerId: e.pointerId
             };
+            if (hit.id === 'cabinet') {
+                const b = _getBounds();
+                if (!b || !_canDragCabinet()) return;
+                const previewX = window._roomPlanCabDragPreviewX || 0;
+                drag.restCx = center.x - previewX;
+                drag.cabW = hit.maxX - hit.minX;
+                drag.bounds = {
+                    leftX: b.leftX, rightX: b.rightX,
+                    backZ: b.backZ, frontZ: b.frontZ
+                };
+                window._roomPlanCabDragPreviewX = 0;
+                window._roomPlanCabSnapTarget = window._roomWall || state.roomWall || 'center';
+                drag.startCx = drag.restCx;
+            }
+            window._roomPlanDrag = drag;
             svg.setPointerCapture(e.pointerId);
             document.body.classList.add('room-plan-dragging');
             _queueRoomPlanRender();
@@ -963,7 +1076,12 @@
             const sy = e.clientY - rect.top;
             const dx = (sx - d.startX) / tf.scale;
             const dz = (sy - d.startY) / tf.scale;
-            _applyFurnitureMove(d.id, d.startCx + dx, d.startCz + dz);
+            // Cabinet snaps only on X (stays against the back wall)
+            if (d.id === 'cabinet') {
+                _applyFurnitureMove(d.id, d.startCx + dx, d.startCz);
+            } else {
+                _applyFurnitureMove(d.id, d.startCx + dx, d.startCz + dz);
+            }
             _queueRoomPlanRender();
         });
 
@@ -971,8 +1089,12 @@
             const d = window._roomPlanDrag;
             if (!d) return;
             if (e && d.pointerId !== e.pointerId) return;
+            const wasCabinet = d.id === 'cabinet';
             window._roomPlanDrag = null;
             document.body.classList.remove('room-plan-dragging');
+            if (wasCabinet) {
+                _finishCabinetWallSnap();
+            }
             _queueRoomPlanRender();
         }
 
