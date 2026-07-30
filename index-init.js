@@ -175,9 +175,13 @@
                     // Restore wings FIRST (before proxy fields) to avoid writing flat fields
                     // to the wrong wing via the proxy setters
                     if (snap.wings) {
-                        state.wings.center = snap.wings.center || state.wings.center;
-                        state.wings.left   = snap.wings.left   || null;
-                        state.wings.right  = snap.wings.right  || null;
+                        if (typeof window._restoreWingsFromSaved === 'function') {
+                            window._restoreWingsFromSaved(snap.wings);
+                        } else {
+                            state.wings.center = snap.wings.center || state.wings.center;
+                            state.wings.left   = snap.wings.left   || null;
+                            state.wings.right  = snap.wings.right  || null;
+                        }
                     }
                     if (snap.activeWing) state.activeWing = snap.activeWing;
                     if (snap.presetId)   state.presetId   = snap.presetId;

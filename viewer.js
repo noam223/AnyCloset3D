@@ -638,9 +638,13 @@ function _restoreState(projectData) {
     if (!projectData) return;
     try {
         if (projectData.wings) {
-            state.wings.center = projectData.wings.center || state.wings.center;
-            state.wings.left   = projectData.wings.left   || null;
-            state.wings.right  = projectData.wings.right  || null;
+            if (typeof window._restoreWingsFromSaved === 'function') {
+                window._restoreWingsFromSaved(projectData.wings);
+            } else {
+                state.wings.center = projectData.wings.center || state.wings.center;
+                state.wings.left   = projectData.wings.left   || null;
+                state.wings.right  = projectData.wings.right  || null;
+            }
         } else if (projectData.activeCabinet) {
             var ac = projectData.activeCabinet;
             if (ac.columns)   state.wings.center.columns      = ac.columns;

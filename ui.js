@@ -6206,10 +6206,14 @@ function bindUI() {
                 }
                 
                 if(data.wings) {
-                    // New format: restore full wings structure
-                    state.wings.center = data.wings.center || state.wings.center;
-                    state.wings.left = data.wings.left || null;
-                    state.wings.right = data.wings.right || null;
+                    // New format: restore full wings structure (incl. upperUnit_*)
+                    if (typeof window._restoreWingsFromSaved === 'function') {
+                        window._restoreWingsFromSaved(data.wings);
+                    } else {
+                        state.wings.center = data.wings.center || state.wings.center;
+                        state.wings.left = data.wings.left || null;
+                        state.wings.right = data.wings.right || null;
+                    }
                     state.activeWing = data.activeWing || 'center';
                     // Restore presetId if present
                     if (data.presetId) {
@@ -7519,9 +7523,13 @@ window._editCartItemNow = function(index) {
 
     // Restore wing system if saved (new format), otherwise fall back to flat fields
     if (rs.wings) {
-        state.wings.center = rs.wings.center || state.wings.center;
-        state.wings.left   = rs.wings.left   || null;
-        state.wings.right  = rs.wings.right  || null;
+        if (typeof window._restoreWingsFromSaved === 'function') {
+            window._restoreWingsFromSaved(rs.wings);
+        } else {
+            state.wings.center = rs.wings.center || state.wings.center;
+            state.wings.left   = rs.wings.left   || null;
+            state.wings.right  = rs.wings.right  || null;
+        }
         state.activeWing   = rs.activeWing   || 'center';
         state.presetId     = rs.presetId     || 'linear';
     } else {
@@ -7530,6 +7538,9 @@ window._editCartItemNow = function(index) {
         state.activeWing = 'center';
         state.wings.left  = null;
         state.wings.right = null;
+        Object.keys(state.wings || {}).forEach(function(k) {
+            if (k !== 'center' && k !== 'left' && k !== 'right') delete state.wings[k];
+        });
         // Apply flat fields to center wing via proxy setters
         const flatFields = ['cabinetModel','placement','width','globalHeight','depth','thickness',
             'plinthHeight','hasDoors','handleType','handleStyle','cabinetName','cabinetNotes','manualPrice','boardMaterial',

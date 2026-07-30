@@ -326,13 +326,22 @@ function _loadCabWingsIntoState(cabIdx) {
     if (item && item.rawState && item.rawState.wings) {
         var rs = item.rawState;
         try {
-            state.wings.center = JSON.parse(JSON.stringify(rs.wings.center || state.wings.center));
-            state.wings.left = rs.wings.left ? JSON.parse(JSON.stringify(rs.wings.left)) : null;
-            state.wings.right = rs.wings.right ? JSON.parse(JSON.stringify(rs.wings.right)) : null;
+            var wingsCopy = JSON.parse(JSON.stringify(rs.wings));
+            if (typeof window._restoreWingsFromSaved === 'function') {
+                window._restoreWingsFromSaved(wingsCopy);
+            } else {
+                state.wings.center = wingsCopy.center || state.wings.center;
+                state.wings.left = wingsCopy.left || null;
+                state.wings.right = wingsCopy.right || null;
+            }
         } catch (e) {
-            state.wings.center = rs.wings.center || state.wings.center;
-            state.wings.left = rs.wings.left || null;
-            state.wings.right = rs.wings.right || null;
+            if (typeof window._restoreWingsFromSaved === 'function') {
+                window._restoreWingsFromSaved(rs.wings);
+            } else {
+                state.wings.center = rs.wings.center || state.wings.center;
+                state.wings.left = rs.wings.left || null;
+                state.wings.right = rs.wings.right || null;
+            }
         }
         state.activeWing = rs.activeWing || 'center';
         state.presetId = rs.presetId || 'linear';
@@ -341,9 +350,13 @@ function _loadCabWingsIntoState(cabIdx) {
         return true;
     }
     if (cab && cab.wings) {
-        state.wings.center = cab.wings.center || state.wings.center;
-        state.wings.left = cab.wings.left || null;
-        state.wings.right = cab.wings.right || null;
+        if (typeof window._restoreWingsFromSaved === 'function') {
+            window._restoreWingsFromSaved(cab.wings);
+        } else {
+            state.wings.center = cab.wings.center || state.wings.center;
+            state.wings.left = cab.wings.left || null;
+            state.wings.right = cab.wings.right || null;
+        }
         state.presetId = cab.presetId || 'linear';
         return true;
     }

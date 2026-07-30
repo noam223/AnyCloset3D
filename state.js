@@ -911,6 +911,33 @@ window._restorePresetUI = function() {
     if (typeof window.syncSidebarToWing === 'function') window.syncSidebarToWing();
 };
 
+/** Restore center/left/right AND upperUnit_* (and any other extra wing keys) from saved data.
+ *  Older loaders only restored center/left/right, so upper units vanished on project reload. */
+window._restoreWingsFromSaved = function(savedWings, options) {
+    if (!savedWings || typeof savedWings !== 'object' || typeof state === 'undefined' || !state.wings) return;
+    options = options || {};
+
+    // Drop existing extra wing keys (upperUnit_*, etc.) so stale UUs don't survive a load
+    Object.keys(state.wings).forEach(function(k) {
+        if (k !== 'center' && k !== 'left' && k !== 'right') delete state.wings[k];
+    });
+
+    if (savedWings.center) state.wings.center = savedWings.center;
+    state.wings.left = savedWings.left || null;
+    state.wings.right = savedWings.right || null;
+
+    Object.keys(savedWings).forEach(function(k) {
+        if (k === 'center' || k === 'left' || k === 'right') return;
+        if (savedWings[k]) state.wings[k] = savedWings[k];
+    });
+
+    // Exit inline upper-unit edit — loaded cabinet should show the parent view
+    state._activeUpperUnit = null;
+    state._activeUpperUnitParent = null;
+    const banner = document.getElementById('upper-unit-edit-banner');
+    if (banner) banner.style.display = 'none';
+};
+
 /** Fully reset the editor to a fresh default linear cabinet (dims, materials, columns, notes). */
 window._resetEditorToDefaultLinearCabinet = function() {
     state.wingEditMode = false;
