@@ -502,6 +502,35 @@ function _bpRowBaseCm(col, plinthH) {
     return plinthH + t;
 }
 
+/**
+ * Draw structural top + bottom boards (already in clear-cell math via _bpRowBaseCm / top t).
+ * shelfLineFn(x1, syCenter, x2) — same convention as makeShelfLine / shelfLine.
+ * Coordinates: sy measured up from colBotSvgY in SVG (syCm from column bottom).
+ */
+function _bpDrawTopBottomBoards(shelfLineFn, col, colX, colW, colBotSvgY, visibleHCm, plinthH, sc) {
+    if (!shelfLineFn || !col || !(visibleHCm > 0) || !(colW > 2)) return;
+    if (col.type === 'desk') return; // desk columns use their own floor/desk geometry
+    const t = _bpShelfTCm();
+    const fo = col.floorOffset || 0;
+    const isBathroomRegalim = state.presetId === 'bathroom' && state.cabinetModel === 'regalim';
+
+    // Bottom board center (cm from column bottom) — matches engine-core plinthTop / floor board
+    let botCenterCm = null;
+    if (fo > 0 || col.noPlinth) botCenterCm = t / 2;
+    else if (isBathroomRegalim) botCenterCm = null; // regalim bathroom: plinth plate is the only floor
+    else botCenterCm = (plinthH || 0) + t / 2;
+
+    if (botCenterCm != null && botCenterCm > 0 && botCenterCm < visibleHCm) {
+        shelfLineFn(colX, colBotSvgY - botCenterCm * sc, colX + colW);
+    }
+
+    // Top board center — matches engine-core createBoard at col.height - t/2
+    const topCenterCm = visibleHCm - t / 2;
+    if (topCenterCm > 0 && (botCenterCm == null || topCenterCm > botCenterCm + t * 0.5)) {
+        shelfLineFn(colX, colBotSvgY - topCenterCm * sc, colX + colW);
+    }
+}
+
 function _bpColumnSitsOnFloor(col) {
     if (!col || col.type === 'desk') return false;
     if (col.floorOffset > 0) return false;
@@ -1409,6 +1438,11 @@ window._generateMultiViewBlueprintSVG = function() {
                 if (_bpIsHoneycombInternalShelf(_hcBlocksOld, rowBoundsEarly, syAdjusted)) return;
                 if (syAdjusted > 0 && syAdjusted < _visibleH) shelfLine(colX, _colBotY - syAdjusted*sc, colX + colW, sc);
             });
+            // Structural top + bottom boards (17mm) — already in cell math, now visible
+            _bpDrawTopBottomBoards(
+                function(x1, sy, x2) { shelfLine(x1, sy, x2, sc); },
+                col, colX, colW, _colBotY, _visibleH, colPlinthH, sc
+            );
 
             // Split band (ארון עליון / ארון תחתון divider) — double board drawn as filled rect
             if (_splitYOld > 0 && _splitYOld > _fo && _splitYOld < (col.height || wg.h)) {
@@ -2484,6 +2518,11 @@ window._generateMultiViewBlueprintPages = function() {
                 if (_bpIsHoneycombInternalShelf(_hcBlocks, rowBounds, syAdj)) return;
                 if (syAdj > 0 && syAdj < _visibleH2) makeShelfLine(p, colX, _colBotSvgY - syAdj*sc, colX + colW, sc);
             });
+            // Structural top + bottom boards (17mm) — already in cell math, now visible
+            _bpDrawTopBottomBoards(
+                function(x1, sy, x2) { makeShelfLine(p, x1, sy, x2, sc); },
+                col, colX, colW, _colBotSvgY, _visibleH2, colPlinthH, sc
+            );
 
             // Split band (ארון עליון / ארון תחתון divider) — double board drawn as filled rect
             if (_splitY2 > 0 && _splitY2 > _fo2 && _splitY2 < _colActualH2) {
@@ -3061,6 +3100,11 @@ window._generateMultiViewBlueprintPages = function() {
             const sy_px = oy + dH - sy * sc;
             makeShelfLine(p, ox, sy_px, ox + dW, sc);
         });
+        _bpDrawTopBottomBoards(
+            function(x1, sy, x2) { makeShelfLine(p, x1, sy, x2, sc); },
+            { noPlinth: false, floorOffset: 0 },
+            ox, dW, oy + dH, cH, pH, sc
+        );
 
         // Split band for full-corner face
         if (fcSplitY > 0 && fcSplitY < cH) {
@@ -3165,6 +3209,10 @@ window._generateMultiViewBlueprintPages = function() {
                 if (_splitYFC > 0 && sy >= _splitYFC && sy <= _splitYFC + _splitTFC) return;
                 makeShelfLine(p, colX, oy + dH - sy*sc, colX + colW, sc);
             });
+            _bpDrawTopBottomBoards(
+                function(x1, sy, x2) { makeShelfLine(p, x1, sy, x2, sc); },
+                col, colX, colW, oy + dH, col.height || wg.h, colPlinthH, sc
+            );
 
             // Split band for additional wing
             if (_splitYFC > 0 && _splitYFC < (col.height || wg.h)) {
@@ -3438,6 +3486,10 @@ window._generateMultiViewBlueprintPages = function() {
                         if (_splitYSC > 0 && sy >= _splitYSC && sy <= _splitYSC + _splitTSC) return;
                         makeShelfLine(p, colX, oy + dH - sy*scScale, colX + colW, scScale);
                     });
+                    _bpDrawTopBottomBoards(
+                        function(x1, sy, x2) { makeShelfLine(p, x1, sy, x2, scScale); },
+                        col, colX, colW, oy + dH, col.height || scH, colPlinthH, scScale
+                    );
 
                     // Split band for side cabinet
                     if (_splitYSC > 0 && _splitYSC < (col.height || scH)) {
@@ -3614,6 +3666,10 @@ window._generateMultiViewBlueprintPages = function() {
                     if (_splitYSC > 0 && sy >= _splitYSC && sy <= _splitYSC + _splitTSC) return;
                     makeShelfLine(p, ox, oy + dH - sy*scScale, ox + dW, scScale);
                 });
+                _bpDrawTopBottomBoards(
+                    function(x1, sy, x2) { makeShelfLine(p, x1, sy, x2, scScale); },
+                    col, ox, dW, oy + dH, col.height || scH, colPlinthH, scScale
+                );
 
                 if (_splitYSC > 0 && _splitYSC < (col.height || scH)) {
                     const _splitBotYSC = oy + dH - _splitYSC * scScale;
@@ -3883,6 +3939,12 @@ window._generateMultiViewBlueprintPages = function() {
             (col.shelvesY || []).forEach(sy => {
                 makeShelfLine(p, colX, oy + dH - sy*sc, colX + colW, sc);
             });
+            // Upper unit: no plinth — bottom + top boards (17mm)
+            _bpDrawTopBottomBoards(
+                function(x1, sy, x2) { makeShelfLine(p, x1, sy, x2, sc); },
+                Object.assign({}, col, { noPlinth: true }),
+                colX, colW, oy + dH, col.height || uuH, 0, sc
+            );
 
             // Cell height labels
             const shelvesArr = (col.shelvesY || []).slice().sort((a,b) => a-b);
