@@ -206,6 +206,10 @@
                     } else if (!state.blueprintDimOffsets) {
                         state.blueprintDimOffsets = {};
                     }
+                    state.blueprintInternalDimsDefault = snap.blueprintInternalDimsDefault !== false;
+                    state.blueprintCellDimShown = snap.blueprintCellDimShown || {};
+                    state.blueprintColWidthDimsDefault = snap.blueprintColWidthDimsDefault !== false;
+                    state.blueprintColWidthDimShown = snap.blueprintColWidthDimShown || {};
                     // Restore room wall position
                     if (snap.roomWall) {
                         state.roomWall   = snap.roomWall;
@@ -386,6 +390,10 @@
             blueprintCutouts:          state.blueprintCutouts || [],
             blueprintCellDimOffsets:   state.blueprintCellDimOffsets || {},
             blueprintDimOffsets:       state.blueprintDimOffsets || {},
+            blueprintInternalDimsDefault: state.blueprintInternalDimsDefault !== false,
+            blueprintCellDimShown:     state.blueprintCellDimShown || {},
+            blueprintColWidthDimsDefault: state.blueprintColWidthDimsDefault !== false,
+            blueprintColWidthDimShown: state.blueprintColWidthDimShown || {},
             partColors:                state.partColors || {}
         }));
     }
@@ -600,6 +608,10 @@ window._saveProjectNow = async function() {
                 blueprintCutouts: state.blueprintCutouts || [],
                 blueprintCellDimOffsets: state.blueprintCellDimOffsets || {},
                 blueprintDimOffsets:     state.blueprintDimOffsets || {},
+                blueprintInternalDimsDefault: state.blueprintInternalDimsDefault !== false,
+                blueprintCellDimShown:   state.blueprintCellDimShown || {},
+                blueprintColWidthDimsDefault: state.blueprintColWidthDimsDefault !== false,
+                blueprintColWidthDimShown: state.blueprintColWidthDimShown || {},
                 partColors:              state.partColors || {}
             }));
         }

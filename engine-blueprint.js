@@ -370,7 +370,53 @@ function _bpCellDimOffset(viewKey, cellKey) {
     return off ? { x: off.x || 0, y: off.y || 0 } : { x: 0, y: 0 };
 }
 
-function _bpPushCellDimLabel(p, viewKey, cellKey, x, y, heightVal) {
+/** Per-item override map, else defaultFlag (true = show). */
+function _bpDimIsShown(map, defaultFlag, viewKey, itemKey) {
+    const k = String(viewKey || 'center') + '|' + itemKey;
+    if (Object.prototype.hasOwnProperty.call(map || {}, k)) return !!map[k];
+    return defaultFlag !== false;
+}
+
+function _bpCellDimIsShown(viewKey, cellKey) {
+    return _bpDimIsShown(state.blueprintCellDimShown, state.blueprintInternalDimsDefault, viewKey, cellKey);
+}
+
+function _bpColWidthDimIsShown(viewKey, colKey) {
+    return _bpDimIsShown(state.blueprintColWidthDimShown, state.blueprintColWidthDimsDefault, viewKey, colKey);
+}
+
+function _bpPushCellDimToggleHit(p, viewKey, cellKey, hx, hy, hw, hh) {
+    if (!p || !(hw > 2) || !(hh > 2)) return;
+    p.push(
+        `<rect class="bp-cell-dim-toggle-hit" data-view-key="${viewKey || 'center'}" data-cell-dim-key="${cellKey}"` +
+        ` x="${(+hx).toFixed(1)}" y="${(+hy).toFixed(1)}" width="${(+hw).toFixed(1)}" height="${(+hh).toFixed(1)}"` +
+        ` fill="transparent" style="cursor:pointer" pointer-events="all"/>`
+    );
+}
+
+function _bpPushColWidthToggleHit(p, viewKey, colKey, x1, x2, y) {
+    if (!p) return;
+    const w = (+x2) - (+x1);
+    if (!(w > 2)) return;
+    const hy = (+y) - 10;
+    p.push(
+        `<rect class="bp-col-width-toggle-hit" data-view-key="${viewKey || 'center'}" data-col-dim-key="${colKey}"` +
+        ` x="${(+x1).toFixed(1)}" y="${hy.toFixed(1)}" width="${w.toFixed(1)}" height="22"` +
+        ` fill="transparent" style="cursor:pointer" pointer-events="all"/>`
+    );
+}
+
+/**
+ * Push internal cell height label when visible; always emit a click hit (hitBox or small label area).
+ * hitBox: optional { x, y, w, h } covering the cell/zone for click-to-toggle.
+ */
+function _bpPushCellDimLabel(p, viewKey, cellKey, x, y, heightVal, hitBox) {
+    if (hitBox && hitBox.w > 2 && hitBox.h > 2) {
+        _bpPushCellDimToggleHit(p, viewKey, cellKey, hitBox.x, hitBox.y, hitBox.w, hitBox.h);
+    } else {
+        _bpPushCellDimToggleHit(p, viewKey, cellKey, x - 28, y - 18, 56, 28);
+    }
+    if (!_bpCellDimIsShown(viewKey, cellKey)) return;
     const off = _bpCellDimOffset(viewKey, cellKey);
     const tf = (off.x || off.y) ? ` transform="translate(${off.x.toFixed(1)},${off.y.toFixed(1)})"` : '';
     p.push(
@@ -378,6 +424,30 @@ function _bpPushCellDimLabel(p, viewKey, cellKey, x, y, heightVal) {
         `<rect class="bp-cell-dim-hit" x="${(x - 32).toFixed(1)}" y="${(y - 10).toFixed(1)}" width="64" height="12" fill="transparent"/>` +
         `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="${_BP_CELL_DIM_FONT}" fill="${_BP_STROKE}" opacity="0.75" pointer-events="none">↕ ${heightVal}</text></g>`
     );
+}
+
+/**
+ * Per-column width dim — gated by visibility; always emits click hits.
+ * makeDimHFn(x1,x2,y,lbl,above). Optional faceY/faceH: only a bottom strip of the
+ * column is clickable (avoids stealing clicks from cell-height hits).
+ */
+function _bpMaybePushColWidthDim(p, viewKey, ci, x1, x2, y, lbl, makeDimHFn, above, faceY, faceH) {
+    const colKey = 'colW:c' + ci;
+    if (faceY != null && faceH > 2) {
+        const w = (+x2) - (+x1);
+        if (w > 2) {
+            const stripH = Math.min(28, +faceH);
+            const stripY = (+faceY) + (+faceH) - stripH;
+            p.push(
+                `<rect class="bp-col-width-toggle-hit" data-view-key="${viewKey || 'center'}" data-col-dim-key="${colKey}"` +
+                ` x="${(+x1).toFixed(1)}" y="${stripY.toFixed(1)}" width="${w.toFixed(1)}" height="${stripH.toFixed(1)}"` +
+                ` fill="transparent" style="cursor:pointer" pointer-events="all"/>`
+            );
+        }
+    }
+    _bpPushColWidthToggleHit(p, viewKey, colKey, x1, x2, y);
+    if (!_bpColWidthDimIsShown(viewKey, colKey)) return;
+    if (typeof makeDimHFn === 'function') makeDimHFn(x1, x2, y, lbl, above === undefined ? false : above);
 }
 
 /**
@@ -1559,7 +1629,8 @@ window._generateMultiViewBlueprintSVG = function() {
                                 // Zone height label
                                 const zHcmRound = _bpClearCellHeightLabel(zBotCm, zTopCm, _t_shelf);
                                 if (zSvgH > 14 && zHcmRound > 0) {
-                                    _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}p${zi}z${z}`, subZoneCX, zSvgCY + 4, zHcmRound);
+                                    _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}p${zi}z${z}`, subZoneCX, zSvgCY + 4, zHcmRound,
+                                        { x: x1, y: zSvgTop, w: x2 - x1, h: zSvgH });
                                 }
                             }
                         }
@@ -1575,7 +1646,8 @@ window._generateMultiViewBlueprintSVG = function() {
                 if (pid !== 'bathroom' && cellHeightLabel > 0 && cellH > 14 && !_isSplitBandOld) {
                     const lblCX = colX + colW / 2;
                     const lblCY = (cellY1 + cellY2) / 2 + 4;
-                    _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, lblCX, lblCY, cellHeightLabel);
+                    _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, lblCX, lblCY, cellHeightLabel,
+                        { x: colX, y: cellY1, w: colW, h: cellH });
                 }
             }
             _hcBlocksOld.forEach(block => {
@@ -1652,10 +1724,11 @@ window._generateMultiViewBlueprintSVG = function() {
                     const inner = _bpHoneycombInnerSvgSpan(cp, sc, _tCmHC);
                     if (inner) dimH(inner.x1, inner.x2, _plinthBottomY + 6, inner.lbl, false);
                 }
-                if (_hasMultiCols) {
-                    dimH(cp.x1, cp.x2, _plinthBottomY + 18, `${Math.round(cp.wCm * 10)}`, false);
-                } else if (_bpColumnHasHoneycomb(col)) {
-                    dimH(cp.x1, cp.x2, _plinthBottomY + 18, `${Math.round(cp.wCm * 10)}`, false);
+                if (_hasMultiCols || _bpColumnHasHoneycomb(col)) {
+                    const faceY = (cp.colTopY != null) ? cp.colTopY : oy;
+                    const faceH = (cp.colBotY != null && cp.colTopY != null) ? (cp.colBotY - cp.colTopY) : dH;
+                    _bpMaybePushColWidthDim(p, _bpViewKey, ci, cp.x1, cp.x2, _plinthBottomY + 18,
+                        `${Math.round(cp.wCm * 10)}`, dimH, false, faceY, faceH);
                 }
             });
         }
@@ -2639,7 +2712,8 @@ window._generateMultiViewBlueprintPages = function() {
                                 // Zone height label
                                 const zHcmRound = _bpClearCellHeightLabel(zBotCm, zTopCm, _t_shelf2);
                                 if (zSvgH > 14 && zHcmRound > 0) {
-                                    _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}p${zi}z${z}`, subZoneCX, zSvgCY + 4, zHcmRound);
+                                    _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}p${zi}z${z}`, subZoneCX, zSvgCY + 4, zHcmRound,
+                                        { x: x1, y: zSvgTop, w: x2 - x1, h: zSvgH });
                                 }
                             }
                         }
@@ -2655,7 +2729,8 @@ window._generateMultiViewBlueprintPages = function() {
                 if (!_isBathroomBP && cellHeightLabel > 0 && cellH > 14 && !_isSplitBandCell) {
                     const lblCX = colX + colW / 2;
                     const lblCY = (cellY1 + cellY2) / 2 + 4;
-                    _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, lblCX, lblCY, cellHeightLabel);
+                    _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, lblCX, lblCY, cellHeightLabel,
+                        { x: colX, y: cellY1, w: colW, h: cellH });
                 }
             }
             _hcBlocks.forEach(block => {
@@ -2756,10 +2831,12 @@ window._generateMultiViewBlueprintPages = function() {
                     const inner = _bpHoneycombInnerSvgSpan(cp, sc, _tCmHC2);
                     if (inner) makeDimH(p, inner.x1, inner.x2, _widthDimBaseY + 6, inner.lbl, false);
                 }
-                if (_hasMultiCols2) {
-                    makeDimH(p, cp.x1, cp.x2, _widthDimBaseY + 18, `${Math.round(cp.wCm * 10)}`, false);
-                } else if (_bpColumnHasHoneycomb(col)) {
-                    makeDimH(p, cp.x1, cp.x2, _widthDimBaseY + 18, `${Math.round(cp.wCm * 10)}`, false);
+                if (_hasMultiCols2 || _bpColumnHasHoneycomb(col)) {
+                    const faceY = (cp.colTopY != null) ? cp.colTopY : oy;
+                    const faceH = (cp.colBotY != null && cp.colTopY != null) ? (cp.colBotY - cp.colTopY) : dH;
+                    _bpMaybePushColWidthDim(p, _bpViewKey, ci, cp.x1, cp.x2, _widthDimBaseY + 18,
+                        `${Math.round(cp.wCm * 10)}`,
+                        (x1, x2, y, lbl, above) => makeDimH(p, x1, x2, y, lbl, above), false, faceY, faceH);
                 }
             });
         }
@@ -3019,7 +3096,8 @@ window._generateMultiViewBlueprintPages = function() {
             // Skip label for split band cell
             const isFCSplitBand = fcSplitY > 0 && rowBotCm >= fcSplitY - 0.1 && rowTopCm <= fcSplitY + fcSplitT + 0.1;
             if (cellHeightLabel > 0 && cellH > 14 && !isFCSplitBand) {
-                _bpPushCellDimLabel(p, _bpViewKey, `r${ri}`, ox + dW / 2, (cellY1 + cellY2) / 2 + 4, cellHeightLabel);
+                _bpPushCellDimLabel(p, _bpViewKey, `r${ri}`, ox + dW / 2, (cellY1 + cellY2) / 2 + 4, cellHeightLabel,
+                    { x: ox, y: cellY1, w: dW, h: cellH });
             }
         }
 
@@ -3180,7 +3258,8 @@ window._generateMultiViewBlueprintPages = function() {
                 if (cellHeightLabel > 0 && cellH > 14 && !_isSplitBandFC) {
                     const lblCX = colX + colW / 2;
                     const lblCY = (cellY1 + cellY2) / 2 + 4;
-                    _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, lblCX, lblCY, cellHeightLabel);
+                    _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, lblCX, lblCY, cellHeightLabel,
+                        { x: colX, y: cellY1, w: colW, h: cellH });
                 }
             }
             colX += colW;
@@ -3198,10 +3277,10 @@ window._generateMultiViewBlueprintPages = function() {
                     const inner = _bpHoneycombInnerSvgSpan(cp, sc, _tCmHCFc);
                     if (inner) makeDimH(p, inner.x1, inner.x2, oy + dH + 6, inner.lbl, false);
                 }
-                if (_hasMultiCols2) {
-                    makeDimH(p, cp.x1, cp.x2, oy + dH + 18, `${Math.round(cp.wCm * 10)}`, false);
-                } else if (_bpColumnHasHoneycomb(col)) {
-                    makeDimH(p, cp.x1, cp.x2, oy + dH + 18, `${Math.round(cp.wCm * 10)}`, false);
+                if (_hasMultiCols2 || _bpColumnHasHoneycomb(col)) {
+                    _bpMaybePushColWidthDim(p, _bpViewKey, ci, cp.x1, cp.x2, oy + dH + 18,
+                        `${Math.round(cp.wCm * 10)}`,
+                        (x1, x2, y, lbl, above) => makeDimH(p, x1, x2, y, lbl, above), false, oy, dH);
                 }
             });
         }
@@ -3452,7 +3531,8 @@ window._generateMultiViewBlueprintPages = function() {
                         const _isSplitBandSC = _splitYSC > 0 &&
                             rowBotCm >= _splitYSCAdj - 0.1 && rowTopCm <= _splitTopSCAdj + 0.1;
                         if (cellHeightLabel > 0 && cellH > 14 && !_isSplitBandSC) {
-                            _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, cellCX, (cellY1 + cellY2) / 2 + 4, cellHeightLabel);
+                            _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, cellCX, (cellY1 + cellY2) / 2 + 4, cellHeightLabel,
+                                { x: colX, y: cellY1, w: colW, h: cellH });
                         }
                     }
                     colX += colW;
@@ -3471,10 +3551,10 @@ window._generateMultiViewBlueprintPages = function() {
                             const inner = _bpHoneycombInnerSvgSpan(cp, scScale, _tCmHCSc);
                             if (inner) makeDimH(p, inner.x1, inner.x2, _plinthBotYSC + 6, inner.lbl, false);
                         }
-                        if (_hasMultiColsSC) {
-                            makeDimH(p, cp.x1, cp.x2, _plinthBotYSC + 18, `${Math.round(cp.wCm * 10)}`, false);
-                        } else if (_bpColumnHasHoneycomb(col)) {
-                            makeDimH(p, cp.x1, cp.x2, _plinthBotYSC + 18, `${Math.round(cp.wCm * 10)}`, false);
+                        if (_hasMultiColsSC || _bpColumnHasHoneycomb(col)) {
+                            _bpMaybePushColWidthDim(p, _bpViewKey, ci, cp.x1, cp.x2, _plinthBotYSC + 18,
+                                `${Math.round(cp.wCm * 10)}`,
+                                (x1, x2, y, lbl, above) => makeDimH(p, x1, x2, y, lbl, above), false, oy, dH);
                         }
                     });
                 }
@@ -3607,7 +3687,8 @@ window._generateMultiViewBlueprintPages = function() {
                     const _isSplitBandSC = _splitYSC > 0 &&
                         rowBotCm >= _splitYSCAdj - 0.1 && rowTopCm <= _splitTopSCAdj + 0.1;
                     if (cellHeightLabel > 0 && cellH > 14 && !_isSplitBandSC) {
-                        _bpPushCellDimLabel(p, _bpViewKey, `svc0r${ri}`, cellCX, (cellY1 + cellY2) / 2 + 4, cellHeightLabel);
+                        _bpPushCellDimLabel(p, _bpViewKey, `svc0r${ri}`, cellCX, (cellY1 + cellY2) / 2 + 4, cellHeightLabel,
+                            { x: ox, y: cellY1, w: dW, h: cellH });
                     }
                 }
 
@@ -3844,7 +3925,8 @@ window._generateMultiViewBlueprintPages = function() {
                 }
 
                 if (cellHeightLabel > 0 && cellH > 14) {
-                    _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, cellCX, (cellY1 + cellY2) / 2 + 4, cellHeightLabel);
+                    _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, cellCX, (cellY1 + cellY2) / 2 + 4, cellHeightLabel,
+                        { x: colX, y: cellY1, w: colW, h: cellH });
                 }
             }
             colX += colW;
@@ -3857,15 +3939,15 @@ window._generateMultiViewBlueprintPages = function() {
         {
             const _tCmHCUu = state.thickness || 1.7;
             colXPositions.forEach((cp, ci) => {
-                const col = cols[ci];
+                const col = uuCols[ci];
                 if (_bpColumnHasHoneycomb(col)) {
                     const inner = _bpHoneycombInnerSvgSpan(cp, sc, _tCmHCUu);
                     if (inner) makeDimH(p, inner.x1, inner.x2, oy + dH + 6, inner.lbl, false);
                 }
-                if (_hasMultiColsUU) {
-                    makeDimH(p, cp.x1, cp.x2, oy + dH + 18, `${Math.round(cp.wCm * 10)}`, false);
-                } else if (_bpColumnHasHoneycomb(col)) {
-                    makeDimH(p, cp.x1, cp.x2, oy + dH + 18, `${Math.round(cp.wCm * 10)}`, false);
+                if (_hasMultiColsUU || _bpColumnHasHoneycomb(col)) {
+                    _bpMaybePushColWidthDim(p, _bpViewKey, ci, cp.x1, cp.x2, oy + dH + 18,
+                        `${Math.round(cp.wCm * 10)}`,
+                        (x1, x2, y, lbl, above) => makeDimH(p, x1, x2, y, lbl, above), false, oy, dH);
                 }
             });
         }

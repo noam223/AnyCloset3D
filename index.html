@@ -1477,13 +1477,20 @@
             </div>
         </div>
         <!-- Page navigation bar -->
-        <div id="mvbp-nav" style="display:flex;align-items:center;justify-content:center;gap:14px;padding:8px 18px;border-bottom:1px solid #e2e8f0;background:#f8fafc;flex-shrink:0;">
+        <div id="mvbp-nav" style="display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:10px 14px;padding:8px 18px;border-bottom:1px solid #e2e8f0;background:#f8fafc;flex-shrink:0;">
             <button id="mvbp-prev" onclick="window._mvbpNav(-1)" style="display:flex;align-items:center;gap:5px;padding:6px 14px;background:#e2e8f0;color:#1e3a5f;border:none;border-radius:8px;cursor:pointer;font-size:0.9rem;font-family:inherit;font-weight:600;">
                 <i class="fa-solid fa-chevron-right"></i> הקודם
             </button>
             <span id="mvbp-page-label" style="font-size:0.95rem;color:#1e3a5f;font-weight:600;min-width:160px;text-align:center;">—</span>
             <button id="mvbp-next" onclick="window._mvbpNav(1)" style="display:flex;align-items:center;gap:5px;padding:6px 14px;background:#e2e8f0;color:#1e3a5f;border:none;border-radius:8px;cursor:pointer;font-size:0.9rem;font-family:inherit;font-weight:600;">
                 הבא <i class="fa-solid fa-chevron-left"></i>
+            </button>
+            <span style="width:1px;height:22px;background:#cbd5e1;flex-shrink:0;"></span>
+            <button type="button" id="mvbp-toggle-cell-dims" onclick="window._mvbpToggleInternalDims()" title="הסתר/הצג את כל מידות הגובה הפנימיות של התאים. לחיצה על תא בשרטוט מציגה/מסתירה מידה בודדת." style="display:flex;align-items:center;gap:5px;padding:6px 12px;background:#fff;color:#1e3a5f;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;font-size:0.82rem;font-family:inherit;font-weight:600;">
+                <i class="fa-solid fa-eye-slash"></i> הסתר מידות פנימיות
+            </button>
+            <button type="button" id="mvbp-toggle-col-widths" onclick="window._mvbpToggleColWidthDims()" title="הסתר/הצג רוחב כל עמודה. לחיצה על עמודה בשרטוט מציגה/מסתירה רוחב בודד." style="display:flex;align-items:center;gap:5px;padding:6px 12px;background:#fff;color:#1e3a5f;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;font-size:0.82rem;font-family:inherit;font-weight:600;">
+                <i class="fa-solid fa-eye-slash"></i> הסתר רוחב עמודות
             </button>
         </div>
         <!-- Cutout toolbar (front views only) -->
@@ -2543,19 +2550,19 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js"></script>
-<script src="state.js?v=20260730uuPersist"></script>
+<script src="state.js?v=20260731bpDimToggle"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="writing-desk-preset.js?v=20260617wdcolors"></script>
 <script src="engine-core.js?v=20260730edgeHover"></script>
 <script src="engine-corners.js?v=20260720deskPartPaint"></script>
-<script src="engine-blueprint.js?v=20260728cellMm"></script>
+<script src="engine-blueprint.js?v=20260731bpDimToggle"></script>
 <script src="engine-room-plan.js?v=20260624k"></script>
 <script src="tambour-color-picker.js?v=20260617scdoors"></script>
-<script src="ui.js?v=20260730uuPersist"></script>
+<script src="ui.js?v=20260731bpDimToggle"></script>
 <script src="layout-mode.js?v=20260610i"></script>
 <script src="mobile.js?v=20260713extDrawerPart"></script>
 <script src="part-paint.js?v=20260712c2024"></script>
-<script src="index-init.js?v=20260730uuPersist"></script>
+<script src="index-init.js?v=20260731bpDimToggle"></script>
 
 <!-- ===== TAMBOUR FULL PALETTE MODAL ===== -->
 <div id="tambour-palette-modal" class="tambour-palette-overlay">

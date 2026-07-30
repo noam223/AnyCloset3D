@@ -6657,6 +6657,10 @@ function _snapshotEditorState() {
         blueprintCutouts: JSON.parse(JSON.stringify(state.blueprintCutouts || [])),
         blueprintCellDimOffsets: JSON.parse(JSON.stringify(state.blueprintCellDimOffsets || {})),
         blueprintDimOffsets: JSON.parse(JSON.stringify(state.blueprintDimOffsets || {})),
+        blueprintInternalDimsDefault: state.blueprintInternalDimsDefault !== false,
+        blueprintCellDimShown: JSON.parse(JSON.stringify(state.blueprintCellDimShown || {})),
+        blueprintColWidthDimsDefault: state.blueprintColWidthDimsDefault !== false,
+        blueprintColWidthDimShown: JSON.parse(JSON.stringify(state.blueprintColWidthDimShown || {})),
         partColors: JSON.parse(JSON.stringify(state.partColors || {})),
         roomWall: window._roomWall || state.roomWall || 'center',
         closureEnabled: window._closureEnabled,
@@ -6693,6 +6697,10 @@ function _restoreEditorState(snap) {
     state.blueprintCutouts = snap.blueprintCutouts || [];
     state.blueprintCellDimOffsets = snap.blueprintCellDimOffsets || {};
     state.blueprintDimOffsets = snap.blueprintDimOffsets || {};
+    state.blueprintInternalDimsDefault = snap.blueprintInternalDimsDefault !== false;
+    state.blueprintCellDimShown = snap.blueprintCellDimShown || {};
+    state.blueprintColWidthDimsDefault = snap.blueprintColWidthDimsDefault !== false;
+    state.blueprintColWidthDimShown = snap.blueprintColWidthDimShown || {};
     state.partColors = snap.partColors || {};
     window._roomWall = snap.roomWall;
     state.roomWall = snap.roomWall;
@@ -6767,6 +6775,10 @@ function _applyRawStateForCapture(rawState) {
     state.blueprintCutouts = rs.blueprintCutouts ? JSON.parse(JSON.stringify(rs.blueprintCutouts)) : [];
     state.blueprintCellDimOffsets = rs.blueprintCellDimOffsets ? JSON.parse(JSON.stringify(rs.blueprintCellDimOffsets)) : {};
     state.blueprintDimOffsets = rs.blueprintDimOffsets ? JSON.parse(JSON.stringify(rs.blueprintDimOffsets)) : {};
+    state.blueprintInternalDimsDefault = rs.blueprintInternalDimsDefault !== false;
+    state.blueprintCellDimShown = rs.blueprintCellDimShown ? JSON.parse(JSON.stringify(rs.blueprintCellDimShown)) : {};
+    state.blueprintColWidthDimsDefault = rs.blueprintColWidthDimsDefault !== false;
+    state.blueprintColWidthDimShown = rs.blueprintColWidthDimShown ? JSON.parse(JSON.stringify(rs.blueprintColWidthDimShown)) : {};
 }
 
 window._snapshotEditorState = _snapshotEditorState;
@@ -7107,6 +7119,10 @@ window._buildCurrentCabinetCompareRaw = function() {
         blueprintCutouts: state.blueprintCutouts || [],
         blueprintCellDimOffsets: state.blueprintCellDimOffsets || {},
         blueprintDimOffsets: state.blueprintDimOffsets || {},
+        blueprintInternalDimsDefault: state.blueprintInternalDimsDefault !== false,
+        blueprintCellDimShown: state.blueprintCellDimShown || {},
+        blueprintColWidthDimsDefault: state.blueprintColWidthDimsDefault !== false,
+        blueprintColWidthDimShown: state.blueprintColWidthDimShown || {},
         partColors: partColors || {}
     }));
 };
@@ -7246,6 +7262,10 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
             blueprintCutouts: state.blueprintCutouts || [],
             blueprintCellDimOffsets: state.blueprintCellDimOffsets || {},
             blueprintDimOffsets: state.blueprintDimOffsets || {},
+            blueprintInternalDimsDefault: state.blueprintInternalDimsDefault !== false,
+            blueprintCellDimShown: state.blueprintCellDimShown || {},
+            blueprintColWidthDimsDefault: state.blueprintColWidthDimsDefault !== false,
+            blueprintColWidthDimShown: state.blueprintColWidthDimShown || {},
             partColors: (typeof window._exportLocalPartColors === 'function')
                 ? window._exportLocalPartColors()
                 : JSON.parse(JSON.stringify(state.partColors || {}))
@@ -7596,6 +7616,10 @@ window._editCartItemNow = function(index) {
     state.blueprintCutouts = rawState.blueprintCutouts ? JSON.parse(JSON.stringify(rawState.blueprintCutouts)) : [];
     state.blueprintCellDimOffsets = rawState.blueprintCellDimOffsets ? JSON.parse(JSON.stringify(rawState.blueprintCellDimOffsets)) : {};
     state.blueprintDimOffsets = rawState.blueprintDimOffsets ? JSON.parse(JSON.stringify(rawState.blueprintDimOffsets)) : {};
+    state.blueprintInternalDimsDefault = rawState.blueprintInternalDimsDefault !== false;
+    state.blueprintCellDimShown = rawState.blueprintCellDimShown ? JSON.parse(JSON.stringify(rawState.blueprintCellDimShown)) : {};
+    state.blueprintColWidthDimsDefault = rawState.blueprintColWidthDimsDefault !== false;
+    state.blueprintColWidthDimShown = rawState.blueprintColWidthDimShown ? JSON.parse(JSON.stringify(rawState.blueprintColWidthDimShown)) : {};
 
     state.editingCartIndex = index;
     if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
@@ -8601,6 +8625,8 @@ window._mvbpShow = function(idx) {
         if (typeof window._mvbpBindCutoutDrag === 'function') window._mvbpBindCutoutDrag();
         if (typeof window._mvbpBindCutoutDimDrag === 'function') window._mvbpBindCutoutDimDrag();
         if (typeof window._mvbpBindCellDimDrag === 'function') window._mvbpBindCellDimDrag();
+        if (typeof window._mvbpBindDimVisibilityClicks === 'function') window._mvbpBindDimVisibilityClicks();
+        if (typeof window._mvbpSyncDimToggleButtons === 'function') window._mvbpSyncDimToggleButtons();
         if (typeof window._mvbpUpdateCutoutToolbar === 'function') window._mvbpUpdateCutoutToolbar();
         if (window._mvbpSelectedCutoutId && content2) {
             const svgSel = content2.querySelector('svg');
@@ -8887,6 +8913,92 @@ window._mvbpBindCutoutDimDrag = function() {
 };
 
 // ---- Blueprint in-cell height label drag ----
+window._mvbpSyncDimToggleButtons = function() {
+    const cellBtn = document.getElementById('mvbp-toggle-cell-dims');
+    const colBtn = document.getElementById('mvbp-toggle-col-widths');
+    const cellShow = state.blueprintInternalDimsDefault !== false;
+    const colShow = state.blueprintColWidthDimsDefault !== false;
+    if (cellBtn) {
+        cellBtn.innerHTML = cellShow
+            ? '<i class="fa-solid fa-eye-slash"></i> הסתר מידות פנימיות'
+            : '<i class="fa-solid fa-eye"></i> הצג מידות פנימיות';
+        cellBtn.style.background = cellShow ? '#fff' : '#e0f2fe';
+    }
+    if (colBtn) {
+        colBtn.innerHTML = colShow
+            ? '<i class="fa-solid fa-eye-slash"></i> הסתר רוחב עמודות'
+            : '<i class="fa-solid fa-eye"></i> הצג רוחב עמודות';
+        colBtn.style.background = colShow ? '#fff' : '#e0f2fe';
+    }
+};
+
+function _mvbpRegenAfterDimToggle() {
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+    const idx = window._mvbpIndex || 0;
+    if (typeof window._generateMultiViewBlueprintPages === 'function') {
+        window._mvbpPages = window._generateMultiViewBlueprintPages();
+    }
+    if (typeof window._mvbpShow === 'function') window._mvbpShow(idx);
+    else if (typeof window._mvbpSyncDimToggleButtons === 'function') window._mvbpSyncDimToggleButtons();
+}
+
+window._mvbpToggleInternalDims = function() {
+    state.blueprintInternalDimsDefault = !(state.blueprintInternalDimsDefault !== false);
+    state.blueprintCellDimShown = {};
+    _mvbpRegenAfterDimToggle();
+};
+
+window._mvbpToggleColWidthDims = function() {
+    state.blueprintColWidthDimsDefault = !(state.blueprintColWidthDimsDefault !== false);
+    state.blueprintColWidthDimShown = {};
+    _mvbpRegenAfterDimToggle();
+};
+
+window._mvbpBindDimVisibilityClicks = function() {
+    const content = document.getElementById('multiview-blueprint-content');
+    const svg = content && content.querySelector('svg');
+    if (!svg) return;
+
+    function _isShown(map, defaultFlag, key) {
+        if (Object.prototype.hasOwnProperty.call(map || {}, key)) return !!map[key];
+        return defaultFlag !== false;
+    }
+
+    svg.querySelectorAll('.bp-cell-dim-toggle-hit').forEach(function(el) {
+        if (el._bpDimToggleBound) return;
+        el._bpDimToggleBound = true;
+        el.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const viewKey = el.getAttribute('data-view-key') || 'center';
+            const cellKey = el.getAttribute('data-cell-dim-key');
+            if (!cellKey) return;
+            const k = viewKey + '|' + cellKey;
+            if (!state.blueprintCellDimShown) state.blueprintCellDimShown = {};
+            const currently = _isShown(state.blueprintCellDimShown, state.blueprintInternalDimsDefault, k);
+            state.blueprintCellDimShown[k] = !currently;
+            _mvbpRegenAfterDimToggle();
+        });
+    });
+
+    svg.querySelectorAll('.bp-col-width-toggle-hit').forEach(function(el) {
+        if (el._bpDimToggleBound) return;
+        el._bpDimToggleBound = true;
+        el.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const viewKey = el.getAttribute('data-view-key') || 'center';
+            const colKey = el.getAttribute('data-col-dim-key');
+            if (!colKey) return;
+            const k = viewKey + '|' + colKey;
+            if (!state.blueprintColWidthDimShown) state.blueprintColWidthDimShown = {};
+            const currently = _isShown(state.blueprintColWidthDimShown, state.blueprintColWidthDimsDefault, k);
+            state.blueprintColWidthDimShown[k] = !currently;
+            _mvbpRegenAfterDimToggle();
+        });
+    });
+};
+
 window._mvbpBindCellDimDrag = function() {
     const content = document.getElementById('multiview-blueprint-content');
     if (!content) return;

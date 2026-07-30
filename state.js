@@ -212,6 +212,11 @@ const state = {
     blueprintCutouts: [],
     blueprintCellDimOffsets: {},
     blueprintDimOffsets: {},
+    // Selective blueprint dims: default show all; per-item overrides + hide-all toggles
+    blueprintInternalDimsDefault: true,
+    blueprintCellDimShown: {},
+    blueprintColWidthDimsDefault: true,
+    blueprintColWidthDimShown: {},
     customer: { name: '', phone: '', orderNum: '', address: '' },
     // Editable title + intro text on order/factory print forms
     orderForm: { factory: { title: '', notes: '' }, customer: { title: '', notes: '' } },
@@ -980,6 +985,10 @@ window._resetEditorToDefaultLinearCabinet = function() {
     state.blueprintCutouts = [];
     state.blueprintCellDimOffsets = {};
     state.blueprintDimOffsets = {};
+    state.blueprintInternalDimsDefault = true;
+    state.blueprintCellDimShown = {};
+    state.blueprintColWidthDimsDefault = true;
+    state.blueprintColWidthDimShown = {};
     state.roomWall = 'center';
     window._roomWall = 'center';
 
