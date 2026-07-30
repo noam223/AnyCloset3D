@@ -252,21 +252,22 @@
             <div class="section-title"><i class="fa-solid fa-border-all"></i> מיקום ארון בחדר</div>
             <div id="room-wall-pos-row">
                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px;">
+                    <!-- RTL grid: first cell is rightmost → ימין | מרכז | בין קירות | שמאל -->
+                    <button id="rw-btn-right" onclick="window._setRoomWall('right')" style="padding:7px 2px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.72rem;font-weight:600;cursor:pointer;transition:all 0.15s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:2px;">
+                        <i class="fa-solid fa-arrow-right-to-bracket" style="font-size:0.9rem;"></i>
+                        <span>צמוד ימין</span>
+                    </button>
                     <button id="rw-btn-center" onclick="window._setRoomWall('center')" style="padding:7px 2px;border-radius:8px;border:1.5px solid var(--border);background:var(--accent);color:white;font-size:0.72rem;font-weight:600;cursor:pointer;transition:all 0.15s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:2px;">
                         <i class="fa-solid fa-minus" style="font-size:0.9rem;"></i>
                         <span>מרכז</span>
-                    </button>
-                    <button id="rw-btn-left" onclick="window._setRoomWall('left')" style="padding:7px 2px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.72rem;font-weight:600;cursor:pointer;transition:all 0.15s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:2px;">
-                        <i class="fa-solid fa-arrow-right-to-bracket" style="transform:scaleX(-1);font-size:0.9rem;"></i>
-                        <span>צמוד שמאל</span>
                     </button>
                     <button id="rw-btn-both" onclick="window._setRoomWall('both')" style="padding:7px 2px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.72rem;font-weight:600;cursor:pointer;transition:all 0.15s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:2px;">
                         <i class="fa-solid fa-arrows-left-right" style="font-size:0.9rem;"></i>
                         <span>בין קירות</span>
                     </button>
-                    <button id="rw-btn-right" onclick="window._setRoomWall('right')" style="padding:7px 2px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.72rem;font-weight:600;cursor:pointer;transition:all 0.15s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:2px;">
-                        <i class="fa-solid fa-arrow-right-to-bracket" style="font-size:0.9rem;"></i>
-                        <span>צמוד ימין</span>
+                    <button id="rw-btn-left" onclick="window._setRoomWall('left')" style="padding:7px 2px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.72rem;font-weight:600;cursor:pointer;transition:all 0.15s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:2px;">
+                        <i class="fa-solid fa-arrow-right-to-bracket" style="transform:scaleX(-1);font-size:0.9rem;"></i>
+                        <span>צמוד שמאל</span>
                     </button>
                 </div>
             </div>
