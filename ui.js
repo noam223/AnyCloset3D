@@ -1062,6 +1062,33 @@ function _openHandlePickerSheet(currentStyle, descText, onSelect) {
     document.body.style.overflow = 'hidden';
 }
 
+function _getZoneDoorHandleStyle(comp, sub, z, zoneKey) {
+    if (comp && zoneKey) {
+        const grp = _zoneDoorGroupForKey(comp, zoneKey);
+        if (grp && _isDoorZoneType(grp.type) && grp.handleStyle) return grp.handleStyle;
+    }
+    if (sub && Array.isArray(sub.zonesDoorHandleStyle) && sub.zonesDoorHandleStyle[z]) {
+        return sub.zonesDoorHandleStyle[z];
+    }
+    return null;
+}
+
+function _setZoneDoorHandleStyle(comp, sub, z, zoneKey, style) {
+    if (comp && zoneKey) {
+        const grp = _zoneDoorGroupForKey(comp, zoneKey);
+        if (grp && _isDoorZoneType(grp.type)) {
+            grp.handleStyle = style;
+            return true;
+        }
+    }
+    if (!sub) return false;
+    if (!_isDoorZoneType(_zoneDoorAt(sub, z))) return false;
+    if (!Array.isArray(sub.zonesDoorHandleStyle)) sub.zonesDoorHandleStyle = [];
+    while (sub.zonesDoorHandleStyle.length <= z) sub.zonesDoorHandleStyle.push(null);
+    sub.zonesDoorHandleStyle[z] = style;
+    return true;
+}
+
 window.openHandlePicker = function() {
     const selCol = state.selection.colIndex;
     const col = selCol >= 0 ? state.columns[selCol] : null;
@@ -1076,12 +1103,39 @@ window.openHandlePicker = function() {
 
     // Resolve current style for this cell (override or wing default)
     let currentStyle = state.handleStyle || 'pipe';
-    if (isExtDrawer && firstComp.handleStyle) currentStyle = firstComp.handleStyle;
-    else if (existingDoor && existingDoor.handleStyle) currentStyle = existingDoor.handleStyle;
-
     let descText = 'ידית לדלת';
-    if (isExtDrawer && existingDoor) descText = 'ידית למגירות החיצוניות ולדלת';
-    else if (isExtDrawer) descText = 'ידית למגירות החיצוניות בתא';
+
+    // Partition zone doors / external drawers take priority when zones are selected
+    if (_activeSubCellIdxs.size > 0 && firstComp && firstComp.partition && Array.isArray(firstComp.subCells)) {
+        let foundDoor = false;
+        let foundExt = false;
+        _activeSubCellIdxs.forEach(key => {
+            const { si, z } = _parseSubKey(key);
+            const sub = firstComp.subCells[si];
+            if (!sub) return;
+            if (_zoneInteriorAt(sub, z) === 'external_drawers') {
+                foundExt = true;
+                if (sub.handleStyle) currentStyle = sub.handleStyle;
+            }
+            const hs = _getZoneDoorHandleStyle(firstComp, sub, z, key);
+            const grp = _zoneDoorGroupForKey(firstComp, key);
+            const hasDoor = (grp && _isDoorZoneType(grp.type)) || _isDoorZoneType(_zoneDoorAt(sub, z));
+            if (hasDoor) {
+                foundDoor = true;
+                if (hs) currentStyle = hs;
+            }
+        });
+        if (foundExt && foundDoor) descText = 'ידית למגירות החיצוניות ולדלת במחיצה';
+        else if (foundExt) descText = 'ידית למגירות החיצוניות במחיצה';
+        else if (foundDoor) descText = 'ידית לדלת במחיצה';
+        else if (isExtDrawer && firstComp.handleStyle) currentStyle = firstComp.handleStyle;
+        else if (existingDoor && existingDoor.handleStyle) currentStyle = existingDoor.handleStyle;
+    } else {
+        if (isExtDrawer && firstComp.handleStyle) currentStyle = firstComp.handleStyle;
+        else if (existingDoor && existingDoor.handleStyle) currentStyle = existingDoor.handleStyle;
+        if (isExtDrawer && existingDoor) descText = 'ידית למגירות החיצוניות ולדלת';
+        else if (isExtDrawer) descText = 'ידית למגירות החיצוניות בתא';
+    }
 
     _openHandlePickerSheet(currentStyle, descText, applyHandleStyleToCell);
 };
@@ -1119,7 +1173,7 @@ window.applyHandleStyleToCell = function(style) {
     if (!col || state.selection.rows.length === 0) return;
 
     let changed = false;
-    // Partition zone external drawers
+    // Partition zone external drawers + partition doors
     if (_activeSubCellIdxs.size > 0) {
         const r = state.selection.rows[0];
         const comp = col.compartments[r];
@@ -1130,6 +1184,9 @@ window.applyHandleStyleToCell = function(style) {
                 if (!sub) return;
                 if (_zoneInteriorAt(sub, z) === 'external_drawers') {
                     sub.handleStyle = style;
+                    changed = true;
+                }
+                if (_setZoneDoorHandleStyle(comp, sub, z, key, style)) {
                     changed = true;
                 }
             });
@@ -1143,7 +1200,7 @@ window.applyHandleStyleToCell = function(style) {
             changed = true;
         }
     });
-    // Apply to doors that cover any selected row
+    // Apply to column overlay doors that cover any selected row
     col.doors.forEach(door => {
         if (door.type === 'empty') return;
         if (state.selection.rows.some(r => r >= door.startRow && r <= door.endRow)) {
@@ -1446,6 +1503,25 @@ function updateToolbarButtonHighlights() {
             if (labelEl) labelEl.textContent = 'ידית: ' + (_handleLabelsSub[resolvedCell] || 'חיצונית');
             const tbHandleBtn = document.getElementById('tb-btn-handle-picker');
             if (tbHandleBtn) tbHandleBtn.classList.toggle('active', !!activeSub.handleStyle);
+        }
+        if (_subDoorParam && !_isSliding) {
+            let resolvedDoor = state.handleStyle || 'pipe';
+            let hasDoorOverride = false;
+            if (mergedGroup && _subKeysEqual(mergedGroup.keys, selectedKeysArr) && _isDoorZoneType(mergedGroup.type) && mergedGroup.handleStyle) {
+                resolvedDoor = mergedGroup.handleStyle;
+                hasDoorOverride = true;
+            } else if (activeSub) {
+                const zoneKey = selectedKeysArr[0];
+                const hs = _getZoneDoorHandleStyle(firstComp, activeSub, _activeZ, zoneKey);
+                if (hs) {
+                    resolvedDoor = hs;
+                    hasDoorOverride = true;
+                }
+            }
+            const doorLabelEl = document.getElementById('tb-handle-picker-door-label');
+            if (doorLabelEl) doorLabelEl.textContent = 'ידית: ' + (_handleLabelsSub[resolvedDoor] || 'חיצונית');
+            const tbHandleDoorBtn = document.getElementById('tb-btn-handle-picker-door');
+            if (tbHandleDoorBtn) tbHandleDoorBtn.classList.toggle('active', hasDoorOverride);
         }
         return;
     }
@@ -2801,6 +2877,9 @@ function _clearSubZoneContent(sub, z) {
     sub.zonesType[z] = 'empty';
     sub.zonesDoor[z] = 'empty';
     if (Array.isArray(sub.zonesDoorStyle)) sub.zonesDoorStyle[z] = 'solid';
+    if (Array.isArray(sub.zonesDoorHandleStyle) && z < sub.zonesDoorHandleStyle.length) {
+        sub.zonesDoorHandleStyle[z] = null;
+    }
     if (Array.isArray(sub.zonesDrawerCount) && z < sub.zonesDrawerCount.length) sub.zonesDrawerCount[z] = 0;
     const nonEmpty = sub.zonesType.filter(t => _normalizeZoneType(t) !== 'empty' && !_isDoorZoneType(t));
     sub.type = nonEmpty.length ? _normalizeZoneType(nonEmpty[0]) : 'empty';

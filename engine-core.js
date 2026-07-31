@@ -4630,9 +4630,10 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                 // Helper: render one content type in a sub-compartment zone (3D only)
                 // subIdx: index of this sub-cell within compData.subCells (for adjacency checks)
                 // zoneIdx: shelf-zone index within that sub-cell (for per-zone drawer counts)
-                const _renderSubContent = (subType, subCenterX, subW, zoneBottomY, zoneH, subIdx = -1, doorStyle = 'solid', zoneIdx = 0) => {
+                const _renderSubContent = (subType, subCenterX, subW, zoneBottomY, zoneH, subIdx = -1, doorStyle = 'solid', zoneIdx = 0, doorHandleStyle = null) => {
                     if (!subType || subType === 'empty' || subType === 'partition') return;
                     doorStyle = doorStyle || 'solid';
+                    const hs = doorHandleStyle || _handleStyle;
                     const _subDoorMat = () => {
                         if (doorStyle === 'glass_mirror') {
                             const _mirrorIntensity = (window._hdrIntensity && window._hdrIntensity.mirror != null) ? window._hdrIntensity.mirror : 2.8;
@@ -4771,9 +4772,9 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             _subCreateDoorPanel(halfW, doorH, rCX, doorY, fZ, doorMat);
                             if (!isBP) {
                                 const hz = fZ + t / 2 + 1.5;
-                                if (_handleStyle === 'riding') {
+                                if (hs === 'riding') {
                                     _addRidingDoorHandle(_buildGroup, subCenterX, doorY, hz, doorH);
-                                } else if (_handleStyle === 'pipe') {
+                                } else if (hs === 'pipe') {
                                     const handleH = Math.min(doorH * 0.35, 12);
                                     const handleMatD = _handleMat3D();
                                     const hL = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, handleH, 12), handleMatD);
@@ -4791,12 +4792,12 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             _subCreateDoorPanel(doorW, doorH, subCenterX, doorY, fZ, doorMat);
                             if (!isBP) {
                                 const hz = fZ + t / 2 + 1.5;
-                                if (_handleStyle === 'riding') {
+                                if (hs === 'riding') {
                                     const seamX = subType === 'door_right'
                                         ? subCenterX - doorW / 2
                                         : subCenterX + doorW / 2;
                                     _addRidingDoorHandle(_buildGroup, seamX, doorY, hz, doorH);
-                                } else if (_handleStyle === 'pipe' && doorStyle !== 'glass_mirror') {
+                                } else if (hs === 'pipe' && doorStyle !== 'glass_mirror') {
                                     const isRight = subType === 'door_right';
                                     const handleX = isRight ? subCenterX - subW * 0.35 : subCenterX + subW * 0.35;
                                     const handleMesh = new THREE.Mesh(
@@ -4818,14 +4819,14 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         _subCreateDoorPanel(flapW, flapH, subCenterX, flapY, fZ, _subDoorMat());
                         if (!isBP && doorStyle !== 'glass_mirror') {
                             const hz = fZ + t / 2 + 1.5;
-                            if (_handleStyle === 'pipe') {
+                            if (hs === 'pipe') {
                                 const handleH = Math.min(flapH * 0.25, 12);
                                 const handleMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, handleH, 12), _handleMat3D());
                                 handleMesh.rotation.z = Math.PI / 2;
                                 handleMesh.position.set(subCenterX + flapW * 0.35, zoneBottomY + 4, hz);
                                 _buildGroup.add(handleMesh);
                                 _registerDoorMesh(handleMesh);
-                            } else if (_handleStyle === 'riding') {
+                            } else if (hs === 'riding') {
                                 const barLen = Math.min(RIDING_HANDLE_LEN, Math.max(8, flapW - 4));
                                 const bar = new THREE.Mesh(new THREE.BoxGeometry(barLen, 0.8, 0.8), _handleMat3D());
                                 bar.position.set(subCenterX, zoneBottomY + 0.6, hz);
@@ -5066,7 +5067,8 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                         const doorType = _doorAtEng(sub, z);
                                         if (doorType && doorType !== 'empty') {
                                             const zoneStyle = (Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[z]) ? sub.zonesDoorStyle[z] : 'solid';
-                                            _renderSubContent(doorType, subCenterX, subW, zoneBottomY, zoneH, si, zoneStyle, z);
+                                            const zoneHandle = (Array.isArray(sub.zonesDoorHandleStyle) && sub.zonesDoorHandleStyle[z]) || null;
+                                            _renderSubContent(doorType, subCenterX, subW, zoneBottomY, zoneH, si, zoneStyle, z, zoneHandle);
                                         }
                                     }
                                 }
@@ -5080,7 +5082,8 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                 const doorType = _doorAtEng(sub, 0);
                                 if (doorType && doorType !== 'empty') {
                                     const zoneStyle = (Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[0]) ? sub.zonesDoorStyle[0] : 'solid';
-                                    _renderSubContent(doorType, subCenterX, subW, prevY, compH, si, zoneStyle, 0);
+                                    const zoneHandle = (Array.isArray(sub.zonesDoorHandleStyle) && sub.zonesDoorHandleStyle[0]) || null;
+                                    _renderSubContent(doorType, subCenterX, subW, prevY, compH, si, zoneStyle, 0, zoneHandle);
                                 }
                             }
                         }
@@ -5108,7 +5111,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             const spanW = maxX - minX;
                             const spanH = maxY - minY;
                             const centerX = (minX + maxX) / 2;
-                            _renderSubContent(group.type, centerX, spanW, minY, spanH, -1, group.style || 'solid');
+                            _renderSubContent(group.type, centerX, spanW, minY, spanH, -1, group.style || 'solid', 0, group.handleStyle || null);
                         });
                     }
                 }
