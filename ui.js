@@ -6399,6 +6399,8 @@ function _captureFrameAtView(cam, ctrl, ren, scn, view, hasDoors) {
     if (typeof doorMeshes !== 'undefined' && doorMeshes) {
         doorMeshes.forEach(function(m) { m.visible = !!hasDoors; });
     }
+    // Double-render so materials/textures settle (avoids blank/white captures)
+    ren.render(scn, cam);
     ren.render(scn, cam);
     const dataUrl = ren.domElement.toDataURL('image/png');
 
@@ -6624,9 +6626,17 @@ function _restoreEditorState(snap) {
 function _applyRawStateForCapture(rawState) {
     const rs = JSON.parse(JSON.stringify(rawState));
     if (rs.wings) {
-        state.wings = JSON.parse(JSON.stringify(rs.wings));
+        if (typeof window._restoreWingsFromSaved === 'function') {
+            window._restoreWingsFromSaved(JSON.parse(JSON.stringify(rs.wings)));
+        } else {
+            state.wings = JSON.parse(JSON.stringify(rs.wings));
+        }
         state.activeWing = rs.activeWing || 'center';
         state.presetId = rs.presetId || 'linear';
+        const flatFromWing = ['cabinetModel', 'placement', 'boardMaterial', 'handleType', 'handleStyle',
+            'cabinetName', 'cabinetNotes', 'manualPrice', 'materialBody', 'materialInternal',
+            'materialExternal', 'materialDesk', 'materialOpenCell', 'materialBack'];
+        flatFromWing.forEach(f => { if (rs[f] !== undefined) state[f] = rs[f]; });
     } else {
         state.presetId = 'linear';
         state.activeWing = 'center';
@@ -6660,6 +6670,12 @@ function _applyRawStateForCapture(rawState) {
     state.blueprintCellDimShown = rs.blueprintCellDimShown ? JSON.parse(JSON.stringify(rs.blueprintCellDimShown)) : {};
     state.blueprintColWidthDimsDefault = rs.blueprintColWidthDimsDefault !== false;
     state.blueprintColWidthDimShown = rs.blueprintColWidthDimShown ? JSON.parse(JSON.stringify(rs.blueprintColWidthDimShown)) : {};
+    if (rs.partColors && typeof window._importLocalPartColors === 'function') {
+        window._importLocalPartColors('draft', rs.partColors);
+        if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
+    } else if (rs.partColors) {
+        state.partColors = JSON.parse(JSON.stringify(rs.partColors));
+    }
 }
 
 window._snapshotEditorState = _snapshotEditorState;
@@ -6690,18 +6706,25 @@ window._refreshCartBlueprintPagesForPrint = async function() {
     }
 };
 
-window._refreshCartMediaForPrint = async function() {
+window._refreshCartMediaForPrint = async function(opts) {
+    opts = opts || {};
+    const force = !!opts.force;
     if (!state.orderCart.length || window._cartMediaRefreshRunning) return;
-    const needsRefresh = state.orderCart.some(window._cartItemNeedsMediaRefresh);
-    if (!needsRefresh) return;
+    if (!force && !state.orderCart.some(window._cartItemNeedsMediaRefresh)) return;
 
     window._cartMediaRefreshRunning = true;
     const snap = _snapshotEditorState();
     try {
         for (let i = 0; i < state.orderCart.length; i++) {
             const itemObj = state.orderCart[i];
-            if (!window._cartItemNeedsMediaRefresh(itemObj)) continue;
+            if (!itemObj || !itemObj.rawState || !itemObj.spec) continue;
+            if (!force && !window._cartItemNeedsMediaRefresh(itemObj)) continue;
             _applyRawStateForCapture(itemObj.rawState);
+            buildCabinet();
+            // Let the renderer settle before capturing (reduces blank frames)
+            await new Promise(function(r) {
+                requestAnimationFrame(function() { requestAnimationFrame(r); });
+            });
             const media = window._captureCabinetPreviewImages();
             if (media.imgDoors) itemObj.spec.imgDoors = media.imgDoors;
             if (media.imgOpen) itemObj.spec.imgOpen = media.imgOpen;
@@ -6725,8 +6748,9 @@ window._refreshCartMediaForPrint = async function() {
     }
 };
 
-window.openOrderModal = async function(mode) {
+window.openOrderModal = async function(mode, opts) {
     // mode: 'customer' or 'factory'
+    opts = opts || {};
 
     // Feature gate: factory mode requires canExportCarpenter
     if (mode === 'factory' && window._features && !window._features.canExportCarpenter) {
@@ -6734,10 +6758,14 @@ window.openOrderModal = async function(mode) {
         return;
     }
 
-    if (state.orderCart.length > 0 && state.orderCart.some(window._cartItemNeedsMediaRefresh)) {
+    // Fresh captures on open (quote / production). Skip when only rebuilding after price edits.
+    if (state.orderCart.length > 0 && !opts.skipMediaRefresh) {
         _showToast('🔄 מרענן תמונות ארונות...', 3500);
         try {
-            await window._refreshCartMediaForPrint();
+            await window._refreshCartMediaForPrint({ force: true });
+            if (mode === 'factory') {
+                await window._refreshCartBlueprintPagesForPrint();
+            }
         } catch (e) {
             console.warn('[openOrderModal] media refresh failed:', e);
             _showToast('⚠️ חלק מהתמונות לא עודכנו — נסה שוב', 4000);
@@ -6862,16 +6890,22 @@ window.openOrderModal = async function(mode) {
                 <div class="print-images-container">
                     ${_orderPreviewImagesHtml(item, itemObj.rawState)}
                 </div>
-                ${(item.multiViewPages && item.multiViewPages.length > 0) ? `
+                ${(() => {
+                    const bpPages = (item.multiViewPages && item.multiViewPages.length)
+                        ? item.multiViewPages
+                        : (item.multiViewSVG ? [item.multiViewSVG] : []);
+                    if (!bpPages.length) return '';
+                    return bpPages.map(function(svg, pi) {
+                        const label = bpPages.length > 1
+                            ? ('שרטוט ייצור (' + (pi + 1) + '/' + bpPages.length + ')')
+                            : 'שרטוט ייצור';
+                        return `
                 <div style="margin-top:12px;">
-                    <div class="img-label" style="background:#e8f0fe;color:#1e3a5f;border:1px solid #93c5fd;padding:6px 10px;font-weight:bold;margin-bottom:6px;">שרטוט ייצור</div>
-                    <div style="border:1px solid #bfdbfe;border-radius:4px;overflow:hidden;">${item.multiViewPages[0]}</div>
-                    ${item.multiViewPages.length > 1 ? `<div style="font-size:0.8rem;color:#64748b;margin-top:4px;text-align:center;">+ ${item.multiViewPages.length - 1} דפים נוספים (ראה הדפסה)</div>` : ''}
-                </div>` : (item.multiViewSVG ? `
-                <div style="margin-top:12px;">
-                    <div class="img-label" style="background:#e8f0fe;color:#1e3a5f;border:1px solid #93c5fd;padding:6px 10px;font-weight:bold;margin-bottom:6px;">שרטוט ייצור</div>
-                    <div style="border:1px solid #bfdbfe;border-radius:4px;overflow:hidden;">${item.multiViewSVG}</div>
-                </div>` : '')}
+                    <div class="img-label" style="background:#e8f0fe;color:#1e3a5f;border:1px solid #93c5fd;padding:6px 10px;font-weight:bold;margin-bottom:6px;">${label}</div>
+                    <div style="border:1px solid #bfdbfe;border-radius:4px;overflow:hidden;">${svg}</div>
+                </div>`;
+                    }).join('');
+                })()}
             </div>
         `;
         container.insertAdjacentHTML('beforeend', cabinetHTML);
@@ -6886,7 +6920,7 @@ window.openOrderModal = async function(mode) {
             const newPrice = parseInt(e.target.value) || 0;
             state.orderCart[idx].spec.price = '₪' + newPrice.toLocaleString();
             state.orderCart[idx].rawState.manualPrice = newPrice;
-            openOrderModal(mode); updateLeftSidebar();
+            openOrderModal(mode, { skipMediaRefresh: true }); updateLeftSidebar();
         });
     });
     container.querySelectorAll('.modal-cost-input').forEach(input => {
@@ -6894,7 +6928,7 @@ window.openOrderModal = async function(mode) {
             const idx = parseInt(e.target.getAttribute('data-index'));
             const newCost = parseInt(e.target.value) || 0;
             state.orderCart[idx].spec.costPrice = '₪' + newCost.toLocaleString();
-            openOrderModal(mode); updateLeftSidebar();
+            openOrderModal(mode, { skipMediaRefresh: true }); updateLeftSidebar();
         });
     });
     container.querySelectorAll('.modal-install-input').forEach(input => {
@@ -6902,7 +6936,7 @@ window.openOrderModal = async function(mode) {
             const idx = parseInt(e.target.getAttribute('data-index'));
             const newInstall = parseInt(e.target.value) || 0;
             state.orderCart[idx].spec.installPrice = newInstall;
-            openOrderModal(mode); updateLeftSidebar();
+            openOrderModal(mode, { skipMediaRefresh: true }); updateLeftSidebar();
         });
     });
 
@@ -7883,13 +7917,165 @@ function _enrichSpecColorsFromRaw(item, rawState) {
     return item;
 }
 
+/** Corner / walk-in wings as separate numbered cabinets in the order form. */
+function _enumeratePrintCabinetUnits(rawState) {
+    if (!rawState || !rawState.wings) return null;
+    const pid = rawState.presetId || '';
+    if (pid !== 'corner-left' && pid !== 'corner-right' && pid !== 'walkin') return null;
+
+    const units = [];
+    function add(side, label, wing) {
+        if (!wing) return;
+        const hasCols = Array.isArray(wing.columns) && wing.columns.length > 0;
+        const hasSize = (wing.width > 0) || (wing.depth > 0);
+        if (!hasCols && !hasSize) return;
+        // Skip empty full_corner shells with no columns (they have a dedicated blueprint page)
+        if (!hasCols && (wing.wingPosition === 'full_corner')) return;
+        units.push({ side: side, label: label, wing: wing, index: units.length + 1 });
+    }
+
+    // Match blueprint order: left → center → right
+    add('left', 'כנף שמאל', rawState.wings.left);
+    add('center', 'ארון מרכזי', rawState.wings.center);
+    add('right', 'כנף ימין', rawState.wings.right);
+
+    const sc = rawState.wings.center && rawState.wings.center.sideCabinet;
+    if (sc && sc.side && sc.side !== 'none') {
+        add('sideCabinet', 'ארון צד', sc);
+    }
+
+    return units.length > 1 ? units : null;
+}
+
+function _wingDimsStr(wing, rawState) {
+    const w = (wing && wing.width) || (rawState && rawState.width) || 160;
+    const h = _wingHeightFromData(wing, (rawState && rawState.globalHeight) || 240);
+    const d = (wing && wing.depth) || (rawState && rawState.depth) || 54;
+    return 'רוחב: ' + w + ' ס"מ | גובה: ' + h + ' ס"מ | עומק: ' + d + ' ס"מ';
+}
+
+function _formatHangingFromCounts(counts) {
+    const total = (counts.hanging || 0) + (counts.sorbet || 0);
+    if (counts.sorbet > 0) return total + ' יחידות (' + counts.sorbet + ' סורבטו)';
+    return total + ' יחידות';
+}
+
+function _collectWingPrintSpecRows(item, itemObj, unit) {
+    const wing = unit.wing || {};
+    const rs = itemObj.rawState || {};
+    const prefix = 'w_' + unit.side + '_';
+    const counts = _countCabinetContent(wing.columns || []);
+    const openCells = (counts.openCells || 0) + (counts.sideOpenCells || 0);
+    const mat = function(key) {
+        if (wing[key]) return wing[key];
+        return rs[key];
+    };
+    const rows = [];
+
+    rows.push({
+        id: prefix + '_sec',
+        section: true,
+        label: 'מפרט ארון ' + unit.index + ' — ' + unit.label
+    });
+    rows.push({
+        id: prefix + 'dimsStr',
+        label: 'מידות חיצוניות',
+        value: _plainSpecValue(_wingDimsStr(wing, rs)),
+        rtl: true
+    });
+    rows.push({
+        id: prefix + 'material',
+        label: 'חומר גוף',
+        value: _plainSpecValue(item.material)
+    });
+    rows.push({
+        id: prefix + 'plinthType',
+        label: 'סוג רגליים / צוקל',
+        value: _plainSpecValue(item.plinthType)
+    });
+
+    rows.push({ id: prefix + '_sec_finishes', section: true, label: 'גוונים וגימורים — ארון ' + unit.index });
+    rows.push({
+        id: prefix + 'colorBody',
+        label: 'צבע גוף וצוקל',
+        value: _plainSpecValue(_colorKeyLabel(mat('materialBody') || 'white_matte'))
+    });
+    rows.push({
+        id: prefix + 'colorInternal',
+        label: 'צבע פנים (מדפים/מגירות)',
+        value: _plainSpecValue(_colorKeyLabel(mat('materialInternal') || mat('materialBody') || 'white_matte'))
+    });
+    rows.push({
+        id: prefix + 'colorExternal',
+        label: 'צבע חזיתות (דלתות)',
+        value: _plainSpecValue(_colorKeyLabel(mat('materialExternal') || mat('materialBody') || 'white_matte'))
+    });
+    rows.push({
+        id: prefix + 'colorBack',
+        label: 'צבע גב ארון',
+        value: _plainSpecValue(_colorKeyLabel(mat('materialBack') || 'white_matte'))
+    });
+    if (openCells > 0) {
+        rows.push({
+            id: prefix + 'colorOpenCell',
+            label: 'צבע כוורת',
+            value: _plainSpecValue(_colorKeyLabel(mat('materialOpenCell') || mat('materialBody') || 'white_matte'))
+        });
+    }
+
+    rows.push({ id: prefix + '_sec_hardware', section: true, label: 'פרזול ותכולה — ארון ' + unit.index });
+    rows.push({
+        id: prefix + 'handle',
+        label: 'סוג ידיות לחזיתות',
+        value: _plainSpecValue(item.handle)
+    });
+    rows.push({
+        id: prefix + 'drawersExt',
+        label: 'מגירות חיצוניות',
+        value: (counts.drawersExt || 0) + ' יחידות'
+    });
+    rows.push({
+        id: prefix + 'drawersInt',
+        label: 'מגירות פנימיות',
+        value: (counts.drawersInt || 0) + ' יחידות'
+    });
+    rows.push({
+        id: prefix + 'shelves',
+        label: 'מדפים נשלפים',
+        value: (counts.shelves || 0) + ' יחידות'
+    });
+    rows.push({
+        id: prefix + 'hangingRods',
+        label: 'מוטות תלייה לקולבים',
+        value: _plainSpecValue(_formatHangingFromCounts(counts))
+    });
+
+    return rows;
+}
+
 function _collectPrintSpecRows(item, itemObj) {
     const isWD = _cartIsWritingDesk(itemObj);
     if (itemObj && itemObj.rawState) _enrichSpecColorsFromRaw(item, itemObj.rawState);
     const rows = [];
+    const multiUnits = (!isWD && itemObj) ? _enumeratePrintCabinetUnits(itemObj.rawState) : null;
 
     rows.push({ id: 'modelName', label: isWD ? 'סוג מוצר' : 'דגם ארון', value: _plainSpecValue(item.modelName) });
     if (!isWD) rows.push({ id: 'placement', label: 'מיקום / התקנה', value: _plainSpecValue(item.placement) });
+
+    // Multi-wing corner / walk-in: separate spec block per cabinet/wing
+    if (multiUnits) {
+        multiUnits.forEach(function(unit) {
+            _collectWingPrintSpecRows(item, itemObj, unit).forEach(function(r) { rows.push(r); });
+        });
+        if (item.extraColors) {
+            rows.push({ id: '_sec_extra', section: true, label: 'צבעים נוספים' });
+            rows.push({ id: 'extraColors', label: 'צבעים נוספים בארון', value: _plainSpecValue(item.extraColors) });
+        }
+        const notesMulti = (item.cabinetNotes || '').trim();
+        if (notesMulti) rows.push({ id: 'cabinetNotes', label: 'הערות', value: notesMulti, multiline: true });
+        return rows;
+    }
+
     rows.push({ id: 'dimsStr', label: 'מידות חיצוניות', value: _plainSpecValue(item.dimsStr), rtl: true });
     rows.push({ id: 'material', label: 'חומר גוף', value: _plainSpecValue(item.material) });
     rows.push({ id: 'plinthType', label: isWD ? 'בסיס' : 'סוג רגליים / צוקל', value: _plainSpecValue(isWD ? 'רגליים כפולות' : item.plinthType) });
@@ -8356,10 +8542,8 @@ ${summaryHTML}
 }
 
 window.printCustomer = async function() {
-    if (state.orderCart.some(window._cartItemNeedsMediaRefresh)) {
-        _showToast('🔄 מרענן תמונות לפני הדפסה...', 3000);
-        try { await window._refreshCartMediaForPrint(); } catch (e) { console.warn('[printCustomer]', e); }
-    }
+    _showToast('🔄 מרענן תמונות לפני הדפסה...', 3000);
+    try { await window._refreshCartMediaForPrint({ force: true }); } catch (e) { console.warn('[printCustomer]', e); }
     const html = _buildPrintHTML('customer');
     const win = window.open('', '_blank', 'width=900,height=700');
     win.document.write(html);
@@ -8376,11 +8560,9 @@ window.printCustomer = async function() {
     setTimeout(() => { win.document.title = _pdfTitle; win.print(); }, 600);
 };
 window.printFactory = async function() {
+    _showToast('🔄 מרענן תמונות לפני הדפסה...', 3000);
+    try { await window._refreshCartMediaForPrint({ force: true }); } catch (e) { console.warn('[printFactory]', e); }
     try { await window._refreshCartBlueprintPagesForPrint(); } catch (e) { console.warn('[printFactory] blueprint refresh failed:', e); }
-    if (state.orderCart.some(window._cartItemNeedsMediaRefresh)) {
-        _showToast('🔄 מרענן תמונות לפני הדפסה...', 3000);
-        try { await window._refreshCartMediaForPrint(); } catch (e) { console.warn('[printFactory]', e); }
-    }
     const html = _buildPrintHTML('factory');
     const win = window.open('', '_blank', 'width=900,height=700');
     win.document.write(html);
