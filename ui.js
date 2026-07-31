@@ -7171,7 +7171,7 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
         if(state.cabinetModel === 'c9') plinthTypeText = 'צוקל רגיל';
         if(state.cabinetModel === 'ab2_nohoney') plinthTypeText = 'צוקל נסתר (חזית פנימית)';
         if(state.cabinetModel === 'ab2') plinthTypeText = 'צוקל נסתר (חזית פנימית טאצ\')';
-        if(state.cabinetModel === 'regalim') plinthTypeText = 'רגלי ניקל גליל 5 ס"מ';
+        if(state.cabinetModel === 'regalim') plinthTypeText = 'רגלי ניקל 10 ס"מ';
         if (_isWritingDeskCart) plinthTypeText = 'ללא צוקל';
 
         let deskInfo = 'ללא';
