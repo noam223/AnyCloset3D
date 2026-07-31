@@ -12,6 +12,10 @@ var _statusFilter        = 'active'; // main view: quote + measured + ordered
 var _selectedUpgradePlan = null;
 var _toastTimer          = null;
 var _devicesList         = [];
+var _measurementInbox    = [];
+var _measurementUnread   = 0;
+var _linkMeasurementId   = null;
+var _measurementChannel  = null;
 
 // ── Plan catalog for upgrade modal ────────────────────────────────────────────
 // Organized by user type, shown in upgrade modal
@@ -140,6 +144,20 @@ var _USER_TYPE_LABELS = {
         projects.length === 0
             ? 'אין פרויקטים עדיין'
             : projects.length + ' פרויקט' + (projects.length !== 1 ? 'ים' : '');
+
+    // WhatsApp measurement inbox badge + realtime
+    try {
+        await refreshMeasurementUnread();
+        if (window.MeasurementInbox && MeasurementInbox.subscribe) {
+            _measurementChannel = MeasurementInbox.subscribe(function() {
+                refreshMeasurementUnread();
+                var modal = document.getElementById('modal-measurements');
+                if (modal && modal.classList.contains('open')) refreshMeasurementsInbox();
+            });
+        }
+    } catch (eInbox) {
+        console.warn('[init] measurement inbox', eInbox);
+    }
 })();
 
 // ── Trial banner helpers ───────────────────────────────────────────────────────
@@ -1097,6 +1115,243 @@ document.addEventListener('click', function(e) {
     }
 });
 
+// ── WhatsApp measurement inbox ────────────────────────────────────────────────
+function _escHtml(s) {
+    return String(s || '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function _escAttr(s) {
+    return _escHtml(s);
+}
+
+function _isImageMime(mime) {
+    return !!(mime && String(mime).indexOf('image/') === 0);
+}
+
+function _formatInboxDate(iso) {
+    if (!iso) return '';
+    try {
+        return new Date(iso).toLocaleString('he-IL', {
+            day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+        });
+    } catch (e) { return ''; }
+}
+
+function _syncMeasurementBadge() {
+    var n = _measurementUnread || 0;
+    var badge = document.getElementById('nav-measurements-badge');
+    if (badge) {
+        badge.textContent = String(n);
+        badge.classList.toggle('show', n > 0);
+    }
+    var banner = document.getElementById('inbox-banner');
+    var bannerText = document.getElementById('inbox-banner-text');
+    if (banner) banner.classList.toggle('show', n > 0);
+    if (bannerText) {
+        bannerText.textContent = n === 1
+            ? 'מדידה חדשה אחת ממתינה לקישור לפרויקט'
+            : (n + ' מדידות חדשות ממתינות לקישור לפרויקט');
+    }
+}
+
+async function refreshMeasurementUnread() {
+    if (!window.MeasurementInbox) return;
+    _measurementUnread = await MeasurementInbox.countUnread();
+    _syncMeasurementBadge();
+}
+
+async function openMeasurementsInbox() {
+    openModal('modal-measurements');
+    await refreshMeasurementsInbox();
+}
+
+async function refreshMeasurementsInbox() {
+    var listEl = document.getElementById('measurements-inbox-list');
+    if (!listEl || !window.MeasurementInbox) return;
+    listEl.innerHTML = '<div style="text-align:center;color:var(--muted);padding:24px 0;">טוען...</div>';
+    _measurementInbox = await MeasurementInbox.list({ limit: 80 });
+    await refreshMeasurementUnread();
+
+    if (!_measurementInbox.length) {
+        listEl.innerHTML =
+            '<div style="text-align:center;color:var(--muted);padding:28px 12px;line-height:1.6;">' +
+                '<i class="fa-solid fa-inbox" style="font-size:1.6rem;display:block;margin-bottom:10px;"></i>' +
+                'אין מדידות בתיבה עדיין.<br>חבר Webhook בפרופיל ← חיבור מדידות מוואטסאפ.' +
+            '</div>';
+        return;
+    }
+
+    // Prefer unread first
+    var sorted = _measurementInbox.slice().sort(function(a, b) {
+        var au = a.status === 'unread' ? 0 : 1;
+        var bu = b.status === 'unread' ? 0 : 1;
+        if (au !== bu) return au - bu;
+        return new Date(b.created_at) - new Date(a.created_at);
+    });
+
+    listEl.innerHTML = '';
+    for (var i = 0; i < sorted.length; i++) {
+        listEl.appendChild(await _buildInboxItem(sorted[i]));
+    }
+}
+
+async function _buildInboxItem(m) {
+    var row = document.createElement('div');
+    row.className = 'inbox-item' + (m.status === 'unread' ? ' unread' : '');
+    row.dataset.id = m.id;
+
+    var thumbHtml = '<i class="fa-solid fa-file"></i>';
+    if (_isImageMime(m.mime_type) && m.storage_path) {
+        var signed = await MeasurementInbox.getSignedUrl(m.storage_path, 3600);
+        if (signed && signed.url) {
+            thumbHtml = '<img src="' + _escAttr(signed.url) + '" alt="">';
+        } else {
+            thumbHtml = '<i class="fa-solid fa-image"></i>';
+        }
+    } else if (m.mime_type && m.mime_type.indexOf('pdf') !== -1) {
+        thumbHtml = '<i class="fa-solid fa-file-pdf"></i>';
+    }
+
+    var statusHe = m.status === 'unread' ? 'חדש' : (m.status === 'linked' ? 'קושר' : 'טופל');
+    var sender = m.sender_name || m.source_phone || 'שולח לא ידוע';
+    var caption = m.caption ? ('<div class="inbox-caption">' + _escHtml(m.caption) + '</div>') : '';
+    var linkedHint = '';
+    if (m.linked_project_id) {
+        var lp = _projects.find(function(p) { return p.id === m.linked_project_id; });
+        linkedHint = '<div class="inbox-sub">מקושר ל: ' + _escHtml((lp && lp.name) || 'פרויקט') + '</div>';
+    }
+
+    row.innerHTML =
+        '<div class="inbox-thumb">' + thumbHtml + '</div>' +
+        '<div class="inbox-meta">' +
+            '<div class="inbox-title">' + _escHtml(m.file_name || 'קובץ מדידה') + '</div>' +
+            '<div class="inbox-sub">' + _escHtml(sender) + ' · ' + _escHtml(_formatInboxDate(m.created_at)) + ' · ' + statusHe + '</div>' +
+            caption + linkedHint +
+            '<div class="inbox-actions">' +
+                (m.storage_path
+                    ? '<button type="button" onclick="openMeasurementFile(\'' + m.id + '\')"><i class="fa-solid fa-eye"></i> צפייה</button>'
+                    : '') +
+                (m.status !== 'linked'
+                    ? '<button type="button" class="primary" onclick="openLinkMeasurement(\'' + m.id + '\')"><i class="fa-solid fa-link"></i> קשר לפרויקט</button>'
+                    : '') +
+                (m.status === 'unread'
+                    ? '<button type="button" class="danger" onclick="dismissMeasurement(\'' + m.id + '\')"><i class="fa-solid fa-xmark"></i> התעלם</button>'
+                    : '') +
+            '</div>' +
+        '</div>';
+    return row;
+}
+
+async function openMeasurementFile(id) {
+    var m = _measurementInbox.find(function(x) { return x.id === id; });
+    if (!m || !m.storage_path) return;
+    var signed = await MeasurementInbox.getSignedUrl(m.storage_path, 3600);
+    if (signed.error || !signed.url) {
+        showToast(signed.error || 'לא ניתן לפתוח את הקובץ', 'error');
+        return;
+    }
+    window.open(signed.url, '_blank', 'noopener');
+}
+
+async function dismissMeasurement(id) {
+    var result = await MeasurementInbox.dismiss(id);
+    if (result.error) {
+        showToast(result.error, 'error');
+        return;
+    }
+    showToast('המדידה סומנה כטופלה', 'success');
+    await refreshMeasurementsInbox();
+}
+
+function openLinkMeasurement(id) {
+    var m = _measurementInbox.find(function(x) { return x.id === id; });
+    if (!m) return;
+    _linkMeasurementId = id;
+    var nameEl = document.getElementById('link-measurement-name');
+    if (nameEl) nameEl.textContent = m.file_name || 'קובץ מדידה';
+    var search = document.getElementById('link-project-search');
+    if (search) search.value = '';
+    var chk = document.getElementById('link-set-measured');
+    if (chk) chk.checked = true;
+    filterLinkProjectList('');
+    openModal('modal-link-measurement');
+}
+
+function filterLinkProjectList(q) {
+    var list = document.getElementById('link-project-list');
+    if (!list) return;
+    q = (q || '').trim().toLowerCase();
+    var items = (_projects || []).filter(function(p) {
+        if (!q) return true;
+        var fields = [p.name, p.customer_name, p.customer_order_num];
+        return fields.some(function(f) { return f && String(f).toLowerCase().indexOf(q) !== -1; });
+    });
+    if (!items.length) {
+        list.innerHTML = '<div style="text-align:center;color:var(--muted);padding:16px 0;">לא נמצאו פרויקטים</div>';
+        return;
+    }
+    list.innerHTML = items.map(function(p) {
+        var cust = p.customer_name
+            ? (' · ' + _escHtml(p.customer_name) + (p.customer_order_num ? (' #' + _escHtml(p.customer_order_num)) : ''))
+            : '';
+        return '<button type="button" class="link-project-option" onclick="confirmLinkMeasurement(\'' + p.id + '\')">' +
+            '<strong>' + _escHtml(p.name || 'ללא שם') + '</strong>' +
+            '<span>' + _escHtml(_orderStatusLabel(p.order_status)) + cust + '</span>' +
+            '</button>';
+    }).join('');
+}
+
+async function confirmLinkMeasurement(projectId) {
+    if (!_linkMeasurementId) return;
+    var setMeasured = !!(document.getElementById('link-set-measured') || {}).checked;
+    var result = await MeasurementInbox.linkToProject(_linkMeasurementId, projectId, {
+        setMeasured: setMeasured
+    });
+    if (result.error) {
+        showToast(result.error, 'error');
+        return;
+    }
+    closeModal('modal-link-measurement');
+    showToast('המדידה קושרה לפרויקט', 'success');
+    // Refresh projects list (status may have changed)
+    try { _projects = await Projects.list(); } catch (e) {}
+    _renderProjects();
+    await refreshMeasurementsInbox();
+}
+
+async function ensureWhatsappIngestToken(rotate) {
+    if (!window.MeasurementInbox) return;
+    var result = await MeasurementInbox.ensureIngestToken(!!rotate);
+    if (result.error) {
+        showToast(result.error, 'error');
+        return;
+    }
+    var urlEl = document.getElementById('wa-webhook-url');
+    if (urlEl) urlEl.textContent = MeasurementInbox.webhookUrlForToken(result.token);
+    showToast(rotate ? 'נוצר טוקן חדש' : 'טוקן מוכן', 'success');
+}
+
+async function copyWhatsappWebhookUrl() {
+    var urlEl = document.getElementById('wa-webhook-url');
+    var text = urlEl ? urlEl.textContent.trim() : '';
+    if (!text || text.indexOf('http') !== 0) {
+        await ensureWhatsappIngestToken(false);
+        urlEl = document.getElementById('wa-webhook-url');
+        text = urlEl ? urlEl.textContent.trim() : '';
+    }
+    if (!text || text.indexOf('http') !== 0) {
+        showToast('אין כתובת להעתקה', 'error');
+        return;
+    }
+    try {
+        await navigator.clipboard.writeText(text);
+        showToast('הכתובת הועתקה', 'success');
+    } catch (e) {
+        showToast('העתקה נכשלה — העתק ידנית מהשדה', 'error');
+    }
+}
+
 // ── Toast ─────────────────────────────────────────────────────────────────────
 function showToast(msg, type) {
     type = type || 'success';
@@ -1374,6 +1629,14 @@ async function _loadProfileForm() {
         // Load profile row
         var { data: profile } = await sb.from('profiles').select('*').eq('id', user.id).single();
         _userProfile = profile || {};
+
+        // Prefill WhatsApp webhook URL if token already exists
+        if (_userProfile.whatsapp_ingest_token && window.MeasurementInbox) {
+            var waUrl = document.getElementById('wa-webhook-url');
+            if (waUrl) {
+                waUrl.textContent = MeasurementInbox.webhookUrlForToken(_userProfile.whatsapp_ingest_token);
+            }
+        }
 
         // Fill personal info
         var fullName = (_userProfile.full_name) || (user.user_metadata && user.user_metadata.full_name) || '';

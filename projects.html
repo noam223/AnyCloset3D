@@ -53,6 +53,63 @@
         .sidebar-nav-item:hover { background: rgba(255,255,255,.09); color: white; }
         .sidebar-nav-item.active { background: rgba(37,99,235,.18); border: 1px solid rgba(37,99,235,.28); color: #93c5fd; font-weight: 600; }
         .sidebar-nav-item i { width: 18px; text-align: center; font-size: .88rem; }
+        .sidebar-nav-item { position: relative; }
+        .nav-unread-badge {
+            margin-right: auto;
+            min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px;
+            background: #14b8a6; color: #fff; font-size: .68rem; font-weight: 800;
+            display: none; align-items: center; justify-content: center; line-height: 1;
+        }
+        .nav-unread-badge.show { display: inline-flex; }
+        .inbox-banner {
+            display: none; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+            margin: 0 0 18px; padding: 14px 18px; border-radius: 14px;
+            background: linear-gradient(135deg, #eefaf8, #f0fdfa);
+            border: 1px solid rgba(20,184,166,.35); color: #0f766e;
+        }
+        .inbox-banner.show { display: flex; }
+        .inbox-banner-text { font-size: .9rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        .inbox-banner-btn {
+            border: none; border-radius: 10px; padding: 8px 14px; cursor: pointer; font-family: inherit;
+            font-size: .8rem; font-weight: 800; background: #14b8a6; color: #fff;
+        }
+        .inbox-banner-btn:hover { background: #0f766e; }
+        .inbox-list { display: flex; flex-direction: column; gap: 12px; max-height: min(62vh, 520px); overflow-y: auto; margin-bottom: 16px; }
+        .inbox-item {
+            display: grid; grid-template-columns: 72px 1fr; gap: 12px; padding: 12px;
+            border: 1.5px solid var(--border); border-radius: 14px; background: #f8fafc;
+        }
+        .inbox-item.unread { border-color: rgba(20,184,166,.45); background: #f0fdfa; }
+        .inbox-thumb {
+            width: 72px; height: 72px; border-radius: 10px; overflow: hidden;
+            background: #e2e8f0; display: flex; align-items: center; justify-content: center;
+            color: #64748b; font-size: 1.4rem;
+        }
+        .inbox-thumb img { width: 100%; height: 100%; object-fit: cover; }
+        .inbox-meta { min-width: 0; }
+        .inbox-title { font-size: .9rem; font-weight: 800; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .inbox-sub { font-size: .75rem; color: var(--muted); margin-top: 3px; line-height: 1.4; }
+        .inbox-caption { font-size: .78rem; color: var(--text-2); margin-top: 4px; }
+        .inbox-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+        .inbox-actions button {
+            border: 1.5px solid var(--border); background: #fff; border-radius: 9px;
+            padding: 6px 10px; font-size: .75rem; font-weight: 700; font-family: inherit; cursor: pointer; color: var(--text-2);
+        }
+        .inbox-actions button.primary { background: #14b8a6; border-color: #14b8a6; color: #fff; }
+        .inbox-actions button.danger { color: #dc2626; border-color: #fecaca; }
+        .link-project-list { display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow-y: auto; margin: 12px 0 16px; }
+        .link-project-option {
+            width: 100%; text-align: right; border: 1.5px solid var(--border); background: #f8fafc;
+            border-radius: 12px; padding: 12px 14px; cursor: pointer; font-family: inherit;
+        }
+        .link-project-option:hover { border-color: #14b8a6; background: #eefaf8; }
+        .link-project-option strong { display: block; font-size: .9rem; color: var(--text); }
+        .link-project-option span { font-size: .75rem; color: var(--muted); }
+        .webhook-box {
+            background: #f8fafc; border: 1px solid var(--border); border-radius: 12px;
+            padding: 12px 14px; font-size: .78rem; word-break: break-all; direction: ltr; text-align: left;
+            color: var(--text-2); margin: 8px 0 12px;
+        }
         .sidebar-footer { padding: 14px; border-top: 1px solid rgba(255,255,255,.07); position: relative; z-index: 1; }
         .btn-logout { width: 100%; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12); color: rgba(255,255,255,.7); border-radius: 9px; padding: 9px 16px; font-size: .83rem; font-family: inherit; font-weight: 500; cursor: pointer; transition: all var(--transition); display: flex; align-items: center; justify-content: center; gap: 8px; }
         .btn-logout:hover { background: rgba(255,255,255,.14); color: white; }
@@ -463,6 +520,10 @@
         <a class="sidebar-nav-item active" id="nav-projects" href="#" onclick="switchPage('projects');return false;">
             <i class="fa-solid fa-folder-open"></i> הפרויקטים שלי
         </a>
+        <a class="sidebar-nav-item" id="nav-measurements" href="#" onclick="openMeasurementsInbox();return false;">
+            <i class="fa-solid fa-ruler-combined"></i> מדידות חדשות
+            <span class="nav-unread-badge" id="nav-measurements-badge">0</span>
+        </a>
         <a class="sidebar-nav-item" href="index.html">
             <i class="fa-solid fa-plus-circle"></i> פרויקט חדש
         </a>
@@ -531,6 +592,15 @@
 
         <!-- TAB: PROJECTS -->
         <div class="page-tab active" id="tab-projects">
+            <div class="inbox-banner" id="inbox-banner">
+                <div class="inbox-banner-text">
+                    <i class="fa-solid fa-bell"></i>
+                    <span id="inbox-banner-text">יש מדידות חדשות מוואטסאפ</span>
+                </div>
+                <button type="button" class="inbox-banner-btn" onclick="openMeasurementsInbox()">
+                    פתח תיבת מדידות
+                </button>
+            </div>
             <div class="content-header">
                 <div class="content-title">כל הפרויקטים</div>
                 <form class="projects-search-wrap" role="search" autocomplete="off" onsubmit="return false;">
@@ -655,6 +725,30 @@
                         <div class="profile-field full"><label class="profile-label">תיאור עסק</label><textarea class="profile-input" id="prof-bio" rows="3" placeholder="תיאור קצר של העסק..." maxlength="400" style="height:auto;padding:10px 14px;resize:vertical;"></textarea></div>
                     </div>
                     <div style="margin-top:18px;"><button class="profile-save-btn" onclick="saveBusinessInfo()"><i class="fa-solid fa-floppy-disk"></i> שמור פרטי עסק</button></div>
+                </div>
+
+                <div class="profile-section">
+                    <div class="profile-section-title"><i class="fa-brands fa-whatsapp" style="color:#25d366;"></i> חיבור מדידות מוואטסאפ</div>
+                    <p style="font-size:.85rem;color:var(--muted);line-height:1.6;margin-bottom:10px;">
+                        צור טוקן ייחודי והדבק את כתובת ה-Webhook ב-Green API (או גשר דומה).
+                        קבצים מהמספר שהגדרת יופיעו אוטומטית בתיבת <strong>מדידות חדשות</strong>.
+                    </p>
+                    <label class="profile-label">כתובת Webhook</label>
+                    <div class="webhook-box" id="wa-webhook-url">לחץ על "צור / הצג טוקן" כדי לקבל כתובת</div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        <button type="button" class="profile-save-btn" onclick="ensureWhatsappIngestToken(false)">
+                            <i class="fa-solid fa-key"></i> צור / הצג טוקן
+                        </button>
+                        <button type="button" class="profile-save-btn" style="background:#64748b;" onclick="ensureWhatsappIngestToken(true)">
+                            <i class="fa-solid fa-rotate"></i> החלף טוקן
+                        </button>
+                        <button type="button" class="profile-save-btn" style="background:#0f766e;" onclick="copyWhatsappWebhookUrl()">
+                            <i class="fa-solid fa-copy"></i> העתק כתובת
+                        </button>
+                    </div>
+                    <p style="font-size:.78rem;color:var(--muted);margin-top:12px;line-height:1.5;">
+                        מדריך מפורט: <a href="docs/whatsapp-measurement-inbox.md" target="_blank" rel="noopener" style="color:var(--secondary);font-weight:700;">docs/whatsapp-measurement-inbox.md</a>
+                    </p>
                 </div>
 
                 <!-- Subscription management section -->
@@ -1018,12 +1112,55 @@
     </div>
 </div>
 
+<!-- Modal: Measurements inbox -->
+<div class="modal-overlay" id="modal-measurements">
+    <div class="modal-box wide">
+        <div class="modal-title">
+            <i class="fa-solid fa-ruler-combined"></i> מדידות חדשות
+        </div>
+        <p style="font-size:.82rem;color:var(--muted);margin-bottom:14px;line-height:1.5;">
+            קבצים שהגיעו מוואטסאפ. קשר כל מדידה לפרויקט/לקוח מהרשימה שלך.
+        </p>
+        <div class="inbox-list" id="measurements-inbox-list">
+            <div style="text-align:center;color:var(--muted);padding:24px 0;">טוען...</div>
+        </div>
+        <div class="modal-actions">
+            <button class="btn-modal ghost" onclick="closeModal('modal-measurements')">סגור</button>
+            <button class="btn-modal primary" onclick="refreshMeasurementsInbox()">
+                <i class="fa-solid fa-rotate"></i> רענן
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Link measurement to project -->
+<div class="modal-overlay" id="modal-link-measurement">
+    <div class="modal-box">
+        <div class="modal-title">
+            <i class="fa-solid fa-link"></i> קשר מדידה לפרויקט
+        </div>
+        <p style="font-size:.82rem;color:var(--muted);margin-bottom:8px;line-height:1.5;">
+            בחר פרויקט עבור <strong id="link-measurement-name"></strong>
+        </p>
+        <input class="modal-input" id="link-project-search" type="search" placeholder="חיפוש לפי שם פרויקט / לקוח / מספר הזמנה..."
+               oninput="filterLinkProjectList(this.value)" style="margin-bottom:8px;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:.8rem;font-weight:600;color:var(--text-2);margin-bottom:4px;">
+            <input type="checkbox" id="link-set-measured" checked>
+            עדכן סטטוס ל־"נשלחה מדידה" (אם עדיין הצעת מחיר)
+        </label>
+        <div class="link-project-list" id="link-project-list"></div>
+        <div class="modal-actions">
+            <button class="btn-modal ghost" onclick="closeModal('modal-link-measurement')">ביטול</button>
+        </div>
+    </div>
+</div>
+
 <div class="toast" id="toast">
     <i id="toast-icon" class="fa-solid fa-circle-check"></i>
     <span id="toast-text"></span>
 </div>
 
-<script src="auth.js?v=20260731measured"></script>
-<script src="projects.js?v=20260731measured"></script>
+<script src="auth.js?v=20260731waInbox"></script>
+<script src="projects.js?v=20260731waInbox"></script>
 </body>
 </html>

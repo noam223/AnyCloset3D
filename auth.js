@@ -1014,6 +1014,171 @@ window.GrowPayments = {
 };
 
 // ==========================================
+// Measurement Inbox API (WhatsApp → AnyCloset)
+// ==========================================
+
+window.MeasurementInbox = {
+    INGEST_URL: SUPABASE_URL + '/functions/v1/ingest-whatsapp-media',
+
+    _randomToken: function() {
+        const bytes = new Uint8Array(24);
+        crypto.getRandomValues(bytes);
+        return Array.from(bytes, function(b) {
+            return b.toString(16).padStart(2, '0');
+        }).join('');
+    },
+
+    getIngestToken: async function() {
+        const sb = _getClient(); if (!sb) return { error: 'SDK not loaded' };
+        const user = await Auth.getUser();
+        if (!user) return { error: 'לא מחובר' };
+        const { data, error } = await sb
+            .from('profiles')
+            .select('whatsapp_ingest_token')
+            .eq('id', user.id)
+            .single();
+        if (error) return { error: error.message };
+        return { token: data && data.whatsapp_ingest_token || null };
+    },
+
+    ensureIngestToken: async function(rotate) {
+        const sb = _getClient(); if (!sb) return { error: 'SDK not loaded' };
+        const user = await Auth.getUser();
+        if (!user) return { error: 'לא מחובר' };
+        if (!rotate) {
+            const cur = await this.getIngestToken();
+            if (cur.error) return cur;
+            if (cur.token) return { token: cur.token };
+        }
+        const token = this._randomToken();
+        const { data, error } = await sb
+            .from('profiles')
+            .update({ whatsapp_ingest_token: token, updated_at: new Date().toISOString() })
+            .eq('id', user.id)
+            .select('whatsapp_ingest_token')
+            .single();
+        if (error) return { error: error.message };
+        return { token: data.whatsapp_ingest_token };
+    },
+
+    webhookUrlForToken: function(token) {
+        if (!token) return '';
+        return this.INGEST_URL + '?token=' + encodeURIComponent(token);
+    },
+
+    list: async function(opts) {
+        const sb = _getClient(); if (!sb) return [];
+        opts = opts || {};
+        let q = sb
+            .from('measurement_inbox')
+            .select('id, source_phone, sender_name, caption, file_name, mime_type, file_size, storage_path, public_url, status, linked_project_id, external_message_id, created_at, linked_at')
+            .order('created_at', { ascending: false })
+            .limit(opts.limit || 100);
+        if (opts.status) q = q.eq('status', opts.status);
+        const { data, error } = await q;
+        if (error) {
+            console.warn('MeasurementInbox.list', error.message);
+            return [];
+        }
+        return data || [];
+    },
+
+    countUnread: async function() {
+        const sb = _getClient(); if (!sb) return 0;
+        const { count, error } = await sb
+            .from('measurement_inbox')
+            .select('id', { count: 'exact', head: true })
+            .eq('status', 'unread');
+        if (error) return 0;
+        return count || 0;
+    },
+
+    getSignedUrl: async function(storagePath, expiresSec) {
+        const sb = _getClient(); if (!sb) return { error: 'SDK not loaded' };
+        const { data, error } = await sb.storage
+            .from('measurements')
+            .createSignedUrl(storagePath, expiresSec || 3600);
+        if (error) return { error: error.message };
+        return { url: data && data.signedUrl };
+    },
+
+    dismiss: async function(id) {
+        const sb = _getClient(); if (!sb) return { error: 'SDK not loaded' };
+        const { error } = await sb
+            .from('measurement_inbox')
+            .update({ status: 'dismissed' })
+            .eq('id', id);
+        if (error) return { error: error.message };
+        return { success: true };
+    },
+
+    linkToProject: async function(measurementId, projectId, opts) {
+        const sb = _getClient(); if (!sb) return { error: 'SDK not loaded' };
+        opts = opts || {};
+        const user = await Auth.getUser();
+        if (!user) return { error: 'לא מחובר' };
+
+        const { data: m, error: mErr } = await sb
+            .from('measurement_inbox')
+            .select('*')
+            .eq('id', measurementId)
+            .single();
+        if (mErr || !m) return { error: (mErr && mErr.message) || 'מדידה לא נמצאה' };
+
+        const { data: proj, error: pErr } = await sb
+            .from('projects')
+            .select('id, name, order_status')
+            .eq('id', projectId)
+            .single();
+        if (pErr || !proj) return { error: (pErr && pErr.message) || 'פרויקט לא נמצא' };
+
+        const { error: aErr } = await sb.from('project_attachments').insert({
+            project_id: projectId,
+            user_id: user.id,
+            measurement_id: measurementId,
+            label: opts.label || 'מדידה מוואטסאפ',
+            file_name: m.file_name,
+            mime_type: m.mime_type,
+            storage_path: m.storage_path,
+            public_url: m.public_url
+        });
+        if (aErr) return { error: aErr.message };
+
+        const { error: uErr } = await sb
+            .from('measurement_inbox')
+            .update({
+                status: 'linked',
+                linked_project_id: projectId,
+                linked_at: new Date().toISOString()
+            })
+            .eq('id', measurementId);
+        if (uErr) return { error: uErr.message };
+
+        if (opts.setMeasured !== false) {
+            const st = proj.order_status || 'quote';
+            if (st === 'quote' || !st) {
+                await Projects.updateOrderStatus(projectId, 'measured');
+            }
+        }
+
+        return { success: true, projectId: projectId };
+    },
+
+    subscribe: function(onChange) {
+        const sb = _getClient(); if (!sb || typeof onChange !== 'function') return null;
+        const channel = sb
+            .channel('measurement_inbox_live')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'measurement_inbox' },
+                function(payload) { onChange(payload); }
+            )
+            .subscribe();
+        return channel;
+    }
+};
+
+// ==========================================
 // Feature Gate Helper — use in UI code
 // ==========================================
 
