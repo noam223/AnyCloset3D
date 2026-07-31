@@ -732,15 +732,33 @@ function _bpDrawHoneycombBlock(p, ctx) {
     const shelfX2 = rightWallX1;
     if (shelfX2 - shelfX1 < 4) return;
 
+    // Inner face of the double top/bottom boards (matches 3D: boards of thickness t inside the cell)
+    const sideTopSvg = blockTopSvg + tPx;
+    const sideBotSvg = blockBotSvg - tPx;
+    const sideH = sideBotSvg - sideTopSvg;
+    if (sideH < 1) return;
+
     const drawSepLine = (x) => {
         _bpHoneycombSepQueueLine(x, blockTopSvg, blockBotSvg, stroke);
     };
 
+    // Top + bottom double boards (full frame width, like 3D open-cell lining)
+    const frameX1 = leftWallX1;
+    const frameX2 = rightWallX2;
+    const frameW = frameX2 - frameX1;
+    if (frameW > 2) {
+        makeRectFn(p, frameX1, blockTopSvg, frameW, tPx, boardFill, strokeThin, 1);
+        makeRectFn(p, frameX1, blockBotSvg - tPx, frameW, tPx, boardFill, strokeThin, 1);
+        if (frameW > 16) {
+            p.push(`<text x="${((frameX1 + frameX2) / 2).toFixed(1)}" y="${(blockTopSvg + tPx / 2 + 3).toFixed(1)}" text-anchor="middle" font-family="${font}" font-size="8" fill="${stroke}" opacity="0.62">${tMm}</text>`);
+        }
+    }
+
     const drawSideWall = (x1, x2, showLabel, sepX) => {
-        makeRectFn(p, x1, blockTopSvg, x2 - x1, wallH, boardFill, strokeThin, 1);
+        makeRectFn(p, x1, sideTopSvg, x2 - x1, sideH, boardFill, strokeThin, 1);
         if (sepX != null) drawSepLine(sepX);
         if (showLabel) {
-            p.push(`<text x="${(x2 + 3).toFixed(1)}" y="${((blockTopSvg + blockBotSvg) / 2 + 3).toFixed(1)}" text-anchor="start" font-family="${font}" font-size="8" fill="${stroke}" opacity="0.62">${tMm}</text>`);
+            p.push(`<text x="${(x2 + 3).toFixed(1)}" y="${((sideTopSvg + sideBotSvg) / 2 + 3).toFixed(1)}" text-anchor="start" font-family="${font}" font-size="8" fill="${stroke}" opacity="0.62">${tMm}</text>`);
         }
     };
 
