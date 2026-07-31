@@ -516,6 +516,12 @@ body {
     color: #1d4ed8;
 }
 .sidebar-status-current.status-quote .sidebar-status-current-value { color: #1d4ed8; }
+.sidebar-status-current.status-measured {
+    background: #eefaf8;
+    border-color: #14b8a6;
+    color: #0f766e;
+}
+.sidebar-status-current.status-measured .sidebar-status-current-value { color: #0f766e; }
 .sidebar-status-current.status-ordered {
     background: #e8faf0;
     border-color: #4db882;
@@ -615,11 +621,13 @@ body {
     flex-shrink: 0;
 }
 .order-status-option.status-quote .order-status-option-dot { background: #3b82f6; }
+.order-status-option.status-measured .order-status-option-dot { background: #14b8a6; }
 .order-status-option.status-ordered .order-status-option-dot { background: #4db882; }
 .order-status-option.status-production .order-status-option-dot { background: #f97316; }
 .order-status-option.status-service .order-status-option-dot { background: #8b5cf6; }
 .order-status-option.status-installed .order-status-option-dot { background: #e2bc58; }
 .order-status-option.status-quote.selected { border-color: #3b82f6; background: #eff6ff; color: #1d4ed8; }
+.order-status-option.status-measured.selected { border-color: #14b8a6; background: #eefaf8; color: #0f766e; }
 .order-status-option.status-ordered.selected { border-color: #4db882; background: #e8faf0; color: #1f6640; }
 .order-status-option.status-production.selected { border-color: #f97316; background: #fff7ed; color: #c2410c; }
 .order-status-option.status-service.selected { border-color: #8b5cf6; background: #f5f3ff; color: #6d28d9; }

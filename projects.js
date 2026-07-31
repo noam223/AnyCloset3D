@@ -8,7 +8,7 @@ var _renameId            = null;
 var _deleteId            = null;
 var _statusChangeId      = null;
 var _searchQuery         = '';
-var _statusFilter        = 'active'; // main view: quote + ordered (hides production etc.)
+var _statusFilter        = 'active'; // main view: quote + measured + ordered
 var _selectedUpgradePlan = null;
 var _toastTimer          = null;
 var _devicesList         = [];
@@ -426,12 +426,16 @@ function _renderPlanBar() {
 
 // ── Order status helpers ──────────────────────────────────────────────────────
 var _ORDER_STATUS_KEYS = (window.Projects && Projects.ORDER_STATUS_KEYS)
-    || ['quote', 'ordered', 'production', 'service', 'installed'];
+    || ['quote', 'measured', 'ordered', 'production', 'service', 'installed'];
+
+function _isActiveOrderStatus(status) {
+    return status === 'quote' || status === 'measured' || status === 'ordered';
+}
 
 function _orderStatusLabel(status) {
     var map = (window.Projects && Projects.ORDER_STATUSES) || {
-        quote: 'הצעת מחיר', ordered: 'נסגרה עסקה', production: 'נשלח לייצור',
-        service: 'קריאת שירות', installed: 'התקנה הושלמה'
+        quote: 'הצעת מחיר', measured: 'נשלחה מדידה', ordered: 'נסגרה עסקה',
+        production: 'נשלח לייצור', service: 'קריאת שירות', installed: 'התקנה הושלמה'
     };
     return map[status] || map.quote;
 }
@@ -443,6 +447,7 @@ function _normalizeOrderStatus(status) {
 function _statusIconClass(status) {
     var icons = {
         quote: 'fa-file-invoice-dollar',
+        measured: 'fa-ruler-combined',
         ordered: 'fa-circle-check',
         production: 'fa-industry',
         service: 'fa-screwdriver-wrench',
@@ -454,6 +459,7 @@ function _statusIconClass(status) {
 function _statusChipLabelHtml(status) {
     var labels = {
         quote: 'הצעת<br>מחיר',
+        measured: 'נשלחה<br>מדידה',
         ordered: 'נסגרה<br>עסקה',
         production: 'נשלח<br>לייצור',
         service: 'קריאת<br>שירות',
@@ -471,7 +477,7 @@ function _projectMatchesSearch(p) {
 
 function _projectMatchesStatusFilter(p) {
     var st = _normalizeOrderStatus(p.order_status);
-    if (_statusFilter === 'active') return st === 'quote' || st === 'ordered';
+    if (_statusFilter === 'active') return _isActiveOrderStatus(st);
     if (_statusFilter === 'all') return true;
     return st === _statusFilter;
 }
@@ -568,8 +574,7 @@ function _renderProjects() {
     if (countEl) {
         var filtered = _statusFilter !== 'active' || _searchQuery;
         var activeCount = _projects.filter(function(p) {
-            var st = _normalizeOrderStatus(p.order_status);
-            return st === 'quote' || st === 'ordered';
+            return _isActiveOrderStatus(_normalizeOrderStatus(p.order_status));
         }).length;
         if (_statusFilter === 'active' && !_searchQuery) {
             countEl.textContent = activeCount + ' פרויקטים פעילים';
@@ -599,7 +604,7 @@ function _renderProjects() {
             : (_statusFilter === 'production'
                 ? 'אין הזמנות שנשלחו לייצור'
                 : (_statusFilter === 'active'
-                    ? 'אין הצעות מחיר או עסקאות פתוחות — בדוק בתווית "נשלח לייצור"'
+                    ? 'אין פרויקטים פעילים — בדוק בתוויות "נשלח לייצור" / שירות / התקנה'
                     : 'אין פרויקטים בסטטוס זה'));
         grid.innerHTML =
             '<div class="empty-state">' +

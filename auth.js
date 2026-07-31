@@ -644,10 +644,11 @@ window.Auth = {
 
 window.Projects = {
 
-    ORDER_STATUS_KEYS: ['quote', 'ordered', 'production', 'service', 'installed'],
+    ORDER_STATUS_KEYS: ['quote', 'measured', 'ordered', 'production', 'service', 'installed'],
 
     ORDER_STATUSES: {
         quote:      'הצעת מחיר',
+        measured:   'נשלחה מדידה',
         ordered:    'נסגרה עסקה',
         production: 'נשלח לייצור',
         service:    'קריאת שירות',

@@ -167,7 +167,7 @@
                 var snap = typeof proj.project_data === 'string'
                     ? JSON.parse(proj.project_data)
                     : proj.project_data;
-                var _validStatuses = (Projects && Projects.ORDER_STATUS_KEYS) || ['quote', 'ordered', 'production', 'service', 'installed'];
+                var _validStatuses = (Projects && Projects.ORDER_STATUS_KEYS) || ['quote', 'measured', 'ordered', 'production', 'service', 'installed'];
                 var _loadedStatus = proj.order_status || (snap && snap.orderStatus) || 'quote';
                 window._currentOrderStatus = _validStatuses.indexOf(_loadedStatus) !== -1 ? _loadedStatus : 'quote';
                 if (typeof window._syncOrderStatusUI === 'function') window._syncOrderStatusUI();
@@ -672,22 +672,23 @@ window._currentOrderStatus = window._currentOrderStatus || 'quote';
 
 function _orderStatusLabel(status) {
     var map = (Projects && Projects.ORDER_STATUSES) || {
-        quote: 'הצעת מחיר', ordered: 'נסגרה עסקה', production: 'נשלח לייצור',
-        service: 'קריאת שירות', installed: 'התקנה הושלמה'
+        quote: 'הצעת מחיר', measured: 'נשלחה מדידה', ordered: 'נסגרה עסקה',
+        production: 'נשלח לייצור', service: 'קריאת שירות', installed: 'התקנה הושלמה'
     };
-    var keys = (Projects && Projects.ORDER_STATUS_KEYS) || ['quote', 'ordered', 'production', 'service', 'installed'];
+    var keys = (Projects && Projects.ORDER_STATUS_KEYS) || ['quote', 'measured', 'ordered', 'production', 'service', 'installed'];
     return map[keys.indexOf(status) !== -1 ? status : 'quote'] || map.quote;
 }
 
 function _orderStatusIconClass(status) {
     var icons = {
         quote: 'fa-file-invoice-dollar',
+        measured: 'fa-ruler-combined',
         ordered: 'fa-circle-check',
         production: 'fa-industry',
         service: 'fa-screwdriver-wrench',
         installed: 'fa-house-circle-check'
     };
-    var keys = (Projects && Projects.ORDER_STATUS_KEYS) || ['quote', 'ordered', 'production', 'service', 'installed'];
+    var keys = (Projects && Projects.ORDER_STATUS_KEYS) || ['quote', 'measured', 'ordered', 'production', 'service', 'installed'];
     var s = keys.indexOf(status) !== -1 ? status : 'quote';
     return icons[s] || icons.quote;
 }
@@ -703,7 +704,7 @@ window._syncOrderStatusUI = function() {
         trigger.className = 'sidebar-status-current status-' + status;
         trigger.dataset.status = status;
     }
-    document.querySelectorAll('#order-status-modal-picklist .order-status-option').forEach(function(btn) {
+    document.querySelectorAll('#order-status-modal-options .order-status-option, #order-status-modal-picklist .order-status-option').forEach(function(btn) {
         btn.classList.toggle('selected', btn.dataset.status === status);
     });
 };
@@ -725,7 +726,7 @@ window._pickOrderStatus = async function(status) {
 };
 
 window._setProjectOrderStatus = async function(status) {
-    var valid = (Projects && Projects.ORDER_STATUS_KEYS) || ['quote', 'ordered', 'production', 'service', 'installed'];
+    var valid = (Projects && Projects.ORDER_STATUS_KEYS) || ['quote', 'measured', 'ordered', 'production', 'service', 'installed'];
     if (valid.indexOf(status) === -1) return;
     if (status === window._currentOrderStatus) return;
 

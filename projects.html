@@ -28,6 +28,7 @@
             --transition: 200ms cubic-bezier(0.4,0,0.2,1);
             --sidebar-w: 280px;
             --pastel-quote: #b8d4f5; --pastel-quote-deep: #7eb3e8; --pastel-quote-bg: #eef5fd; --pastel-quote-text: #3d6a9e;
+            --pastel-measured: #9ad9d4; --pastel-measured-deep: #2db8ad; --pastel-measured-bg: #eefaf8; --pastel-measured-text: #0f766e;
             --pastel-ordered: #98ddb8; --pastel-ordered-deep: #4db882; --pastel-ordered-bg: #e8faf0; --pastel-ordered-text: #1f6640;
             --pastel-production: #ffd4b0; --pastel-production-deep: #f5b07a; --pastel-production-bg: #fff7ef; --pastel-production-text: #b86a2e;
             --pastel-service: #d4c4f0; --pastel-service-deep: #b8a0e0; --pastel-service-bg: #f5f0fc; --pastel-service-text: #6b4fa8;
@@ -104,17 +105,20 @@
         .project-card:nth-child(5) { animation-delay: 220ms; }
         .project-card:nth-child(6) { animation-delay: 260ms; }
         .project-card.status-quote::before { background: linear-gradient(145deg, var(--pastel-quote-bg) 0%, #fff 55%, var(--pastel-quote) 100%); }
+        .project-card.status-measured::before { background: linear-gradient(145deg, var(--pastel-measured-bg) 0%, #fff 55%, var(--pastel-measured) 100%); }
         .project-card.status-ordered::before { background: linear-gradient(145deg, var(--pastel-ordered-bg) 0%, #fff 55%, var(--pastel-ordered) 100%); }
         .project-card.status-production::before { background: linear-gradient(145deg, var(--pastel-production-bg) 0%, #fff 55%, var(--pastel-production) 100%); }
         .project-card.status-service::before { background: linear-gradient(145deg, var(--pastel-service-bg) 0%, #fff 55%, var(--pastel-service) 100%); }
         .project-card.status-installed::before { background: linear-gradient(145deg, var(--pastel-installed-bg) 0%, #fff 55%, var(--pastel-installed) 100%); }
         .project-card.status-quote { box-shadow: 0 4px 24px rgba(126,179,232,.22); }
+        .project-card.status-measured { box-shadow: 0 4px 24px rgba(45,184,173,.22); }
         .project-card.status-ordered { box-shadow: 0 4px 24px rgba(77,184,130,.22); }
         .project-card.status-production { box-shadow: 0 4px 24px rgba(245,176,122,.22); }
         .project-card.status-service { box-shadow: 0 4px 24px rgba(184,160,224,.22); }
         .project-card.status-installed { box-shadow: 0 4px 24px rgba(226,188,88,.22); }
         .project-card:hover { transform: translateY(-7px); }
         .project-card.status-quote:hover { box-shadow: 0 16px 48px rgba(126,179,232,.32); }
+        .project-card.status-measured:hover { box-shadow: 0 16px 48px rgba(45,184,173,.32); }
         .project-card.status-ordered:hover { box-shadow: 0 16px 48px rgba(77,184,130,.32); }
         .project-card.status-production:hover { box-shadow: 0 16px 48px rgba(245,176,122,.32); }
         .project-card.status-service:hover { box-shadow: 0 16px 48px rgba(184,160,224,.32); }
@@ -122,6 +126,7 @@
         .project-card.is-locked { border-color: #fca5a5; }
         .project-thumb { width: 100%; height: 200px; background: linear-gradient(135deg,#e8e2d8 0%,#d4cdc3 100%); display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; cursor: pointer; flex-shrink: 0; }
         .project-card.status-quote .project-thumb::before { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(180deg, rgba(184,212,245,.15) 0%, rgba(184,212,245,.45) 100%); }
+        .project-card.status-measured .project-thumb::before { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(180deg, rgba(154,217,212,.15) 0%, rgba(154,217,212,.45) 100%); }
         .project-card.status-ordered .project-thumb::before { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(180deg, rgba(152,221,184,.15) 0%, rgba(152,221,184,.45) 100%); }
         .project-card.status-production .project-thumb::before { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(180deg, rgba(255,212,176,.15) 0%, rgba(255,212,176,.45) 100%); }
         .project-card.status-service .project-thumb::before { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(180deg, rgba(212,196,240,.15) 0%, rgba(212,196,240,.45) 100%); }
@@ -144,6 +149,7 @@
         }
         .project-status-chip i { font-size: 1.3rem; }
         .project-status-chip.status-quote { background: rgba(184,212,245,.72); color: var(--pastel-quote-text); }
+        .project-status-chip.status-measured { background: rgba(154,217,212,.72); color: var(--pastel-measured-text); }
         .project-status-chip.status-ordered { background: rgba(152,221,184,.72); color: var(--pastel-ordered-text); }
         .project-status-chip.status-production { background: rgba(255,212,176,.72); color: var(--pastel-production-text); }
         .project-status-chip.status-service { background: rgba(212,196,240,.72); color: var(--pastel-service-text); }
@@ -157,6 +163,7 @@
         .project-card:hover .project-open-btn { transform: translateY(0); }
         .project-body { padding: 18px 20px 14px; flex: 1; cursor: pointer; transition: background var(--transition); }
         .project-body.status-quote { background: linear-gradient(180deg, rgba(184,212,245,.35) 0%, transparent 100%); }
+        .project-body.status-measured { background: linear-gradient(180deg, rgba(154,217,212,.35) 0%, transparent 100%); }
         .project-body.status-ordered { background: linear-gradient(180deg, rgba(152,221,184,.35) 0%, transparent 100%); }
         .project-body.status-production { background: linear-gradient(180deg, rgba(255,212,176,.38) 0%, transparent 100%); }
         .project-body.status-service { background: linear-gradient(180deg, rgba(212,196,240,.35) 0%, transparent 100%); }
@@ -173,6 +180,7 @@
         }
         .project-status-foot:hover { transform: translateY(-1px); }
         .project-status-foot.status-quote { background: linear-gradient(135deg, var(--pastel-quote-bg), var(--pastel-quote)); color: var(--pastel-quote-text); box-shadow: 0 2px 8px rgba(126,179,232,.15); }
+        .project-status-foot.status-measured { background: linear-gradient(135deg, var(--pastel-measured-bg), var(--pastel-measured)); color: var(--pastel-measured-text); box-shadow: 0 2px 8px rgba(45,184,173,.15); }
         .project-status-foot.status-ordered { background: linear-gradient(135deg, var(--pastel-ordered-bg), var(--pastel-ordered)); color: var(--pastel-ordered-text); box-shadow: 0 2px 8px rgba(77,184,130,.15); }
         .project-status-foot.status-production { background: linear-gradient(135deg, var(--pastel-production-bg), var(--pastel-production)); color: var(--pastel-production-text); box-shadow: 0 2px 8px rgba(245,176,122,.15); }
         .project-status-foot.status-service { background: linear-gradient(135deg, var(--pastel-service-bg), var(--pastel-service)); color: var(--pastel-service-text); box-shadow: 0 2px 8px rgba(184,160,224,.15); }
@@ -214,6 +222,7 @@
         .status-filter-btn.active[data-status="active"],
         .status-filter-btn.active[data-status="all"] { background: var(--primary); }
         .status-filter-btn.active.status-quote { background: var(--pastel-quote-deep); }
+        .status-filter-btn.active.status-measured { background: var(--pastel-measured-deep); }
         .status-filter-btn.active.status-ordered { background: var(--pastel-ordered-deep); }
         .status-filter-btn.active.status-production { background: var(--pastel-production-deep); }
         .status-filter-btn.active.status-service { background: var(--pastel-service-deep); }
@@ -248,12 +257,14 @@
         .status-option:hover { border-color: #c8d4e4; background: white; }
         .status-option.selected { border-color: var(--secondary); background: #eff6ff; color: var(--primary); }
         .status-option.status-quote.selected { border-color: #3b82f6; background: #eff6ff; color: #1d4ed8; }
+        .status-option.status-measured.selected { border-color: #14b8a6; background: #eefaf8; color: #0f766e; }
         .status-option.status-ordered.selected { border-color: #4db882; background: #e8faf0; color: #1f6640; }
         .status-option.status-production.selected { border-color: #f97316; background: #fff7ed; color: #c2410c; }
         .status-option.status-service.selected { border-color: #8b5cf6; background: #f5f3ff; color: #6d28d9; }
         .status-option.status-installed.selected { border-color: #e2bc58; background: #fff9ed; color: #8a6520; }
         .status-option-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
         .status-option.status-quote .status-option-dot { background: #3b82f6; }
+        .status-option.status-measured .status-option-dot { background: #14b8a6; }
         .status-option.status-ordered .status-option-dot { background: #4db882; }
         .status-option.status-production .status-option-dot { background: #f97316; }
         .status-option.status-service .status-option-dot { background: #8b5cf6; }
@@ -547,6 +558,9 @@
                     </button>
                     <button type="button" class="status-filter-btn status-quote" data-status="quote" onclick="setStatusFilter('quote')">
                         <i class="fa-solid fa-file-invoice-dollar"></i> הצעת מחיר
+                    </button>
+                    <button type="button" class="status-filter-btn status-measured" data-status="measured" onclick="setStatusFilter('measured')">
+                        <i class="fa-solid fa-ruler-combined"></i> נשלחה מדידה
                     </button>
                     <button type="button" class="status-filter-btn status-ordered" data-status="ordered" onclick="setStatusFilter('ordered')">
                         <i class="fa-solid fa-circle-check"></i> נסגרה עסקה
@@ -895,6 +909,10 @@
                 <span class="status-option-dot"></span>
                 <span>הצעת מחיר</span>
             </button>
+            <button type="button" class="status-option status-measured" data-status="measured" onclick="confirmStatusChange('measured')">
+                <span class="status-option-dot"></span>
+                <span>נשלחה מדידה</span>
+            </button>
             <button type="button" class="status-option status-ordered" data-status="ordered" onclick="confirmStatusChange('ordered')">
                 <span class="status-option-dot"></span>
                 <span>נסגרה עסקה</span>
@@ -1005,7 +1023,7 @@
     <span id="toast-text"></span>
 </div>
 
-<script src="auth.js?v=20260731pin"></script>
-<script src="projects.js?v=20260731pin"></script>
+<script src="auth.js?v=20260731measured"></script>
+<script src="projects.js?v=20260731measured"></script>
 </body>
 </html>

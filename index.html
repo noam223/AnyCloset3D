@@ -37,7 +37,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260731cellHEdit">
     <link rel="stylesheet" href="style-mobile.css?v=20260609a">
     <link rel="stylesheet" href="style-extras.css?v=20260731rpcab">
-    <link rel="stylesheet" href="style.css?v=20260731noNiche">
+    <link rel="stylesheet" href="style.css?v=20260731measured">
     <style>
         html.thumb-only-mode #left-sidebar,
         html.thumb-only-mode #right-sidebar,
@@ -2423,7 +2423,7 @@
 <script src="ui.js?v=20260731partHandle"></script>
 <script src="mobile.js?v=20260713extDrawerPart"></script>
 <script src="part-paint.js?v=20260712c2024"></script>
-<script src="index-init.js?v=20260731rpcab"></script>
+<script src="index-init.js?v=20260731measured"></script>
 
 <!-- ===== TAMBOUR FULL PALETTE MODAL ===== -->
 <div id="tambour-palette-modal" class="tambour-palette-overlay">
@@ -2628,6 +2628,9 @@
         <div class="order-status-modal-options" id="order-status-modal-options">
             <button type="button" class="order-status-option status-quote" data-status="quote" onclick="window._pickOrderStatus('quote')">
                 <span class="order-status-option-dot"></span><span>הצעת מחיר</span>
+            </button>
+            <button type="button" class="order-status-option status-measured" data-status="measured" onclick="window._pickOrderStatus('measured')">
+                <span class="order-status-option-dot"></span><span>נשלחה מדידה</span>
             </button>
             <button type="button" class="order-status-option status-ordered" data-status="ordered" onclick="window._pickOrderStatus('ordered')">
                 <span class="order-status-option-dot"></span><span>נסגרה עסקה</span>

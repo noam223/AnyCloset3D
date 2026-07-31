@@ -8,6 +8,7 @@
 
 var STATUS_LABELS = {
     quote: 'הצעת מחיר',
+    measured: 'נשלחה מדידה',
     ordered: 'נסגרה עסקה',
     production: 'נשלח לייצור',
     service: 'קריאת שירות',
