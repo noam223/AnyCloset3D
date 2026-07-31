@@ -8,7 +8,7 @@ var _renameId            = null;
 var _deleteId            = null;
 var _statusChangeId      = null;
 var _searchQuery         = '';
-var _statusFilter        = 'all';
+var _statusFilter        = 'active'; // main view: quote + ordered (hides production etc.)
 var _selectedUpgradePlan = null;
 var _toastTimer          = null;
 var _devicesList         = [];
@@ -470,8 +470,16 @@ function _projectMatchesSearch(p) {
 }
 
 function _projectMatchesStatusFilter(p) {
+    var st = _normalizeOrderStatus(p.order_status);
+    if (_statusFilter === 'active') return st === 'quote' || st === 'ordered';
     if (_statusFilter === 'all') return true;
-    return _normalizeOrderStatus(p.order_status) === _statusFilter;
+    return st === _statusFilter;
+}
+
+function _countByStatus(status) {
+    return _projects.filter(function(p) {
+        return _normalizeOrderStatus(p.order_status) === status;
+    }).length;
 }
 
 function _syncStatusFilterUI() {
@@ -479,12 +487,23 @@ function _syncStatusFilterUI() {
         var key = btn.dataset.status;
         btn.classList.toggle('active', key === _statusFilter);
     });
+    var prodCountEl = document.getElementById('filter-count-production');
+    if (prodCountEl) {
+        var n = _countByStatus('production');
+        prodCountEl.textContent = String(n);
+        prodCountEl.style.display = n > 0 ? '' : 'none';
+    }
 }
 
-function setStatusFilterAll() {
-    _statusFilter = 'all';
+function setStatusFilterActive() {
+    _statusFilter = 'active';
     _syncStatusFilterUI();
     _renderProjects();
+}
+
+/** @deprecated use setStatusFilterActive — kept for any leftover onclick */
+function setStatusFilterAll() {
+    setStatusFilterActive();
 }
 
 function setStatusFilter(status) {
@@ -492,6 +511,22 @@ function setStatusFilter(status) {
     _statusFilter = status;
     _syncStatusFilterUI();
     _renderProjects();
+}
+
+async function toggleProjectPin(projectId) {
+    var p = _projects.find(function(x) { return x.id === projectId; });
+    if (!p) return;
+    var next = !p.is_pinned;
+    p.is_pinned = next;
+    _renderProjects();
+    var result = await Projects.setPinned(projectId, next);
+    if (result && result.error) {
+        p.is_pinned = !next;
+        _renderProjects();
+        showToast('לא הצלחנו לעדכן נעיצה: ' + result.error, 'error');
+        return;
+    }
+    showToast(next ? 'הפרויקט ננעץ בראש הרשימה' : 'הנעיצה בוטלה', 'success');
 }
 
 function onProjectsSearch(value, fromUser) {
@@ -516,17 +551,33 @@ function _resetProjectsSearchIfAutofilled() {
 function _renderProjects() {
     var grid = document.getElementById('projects-grid');
     grid.innerHTML = '';
+    _syncStatusFilterUI();
 
     var visible = _projects.filter(function(p) {
         return _projectMatchesSearch(p) && _projectMatchesStatusFilter(p);
     });
+    // Pinned first, then most recently updated
+    visible.sort(function(a, b) {
+        var ap = a.is_pinned ? 1 : 0;
+        var bp = b.is_pinned ? 1 : 0;
+        if (ap !== bp) return bp - ap;
+        return new Date(b.updated_at || 0) - new Date(a.updated_at || 0);
+    });
 
     var countEl = document.getElementById('content-count');
     if (countEl) {
-        var filtered = _statusFilter !== 'all' || _searchQuery;
-        countEl.textContent = filtered
-            ? (visible.length + ' מתוך ' + _projects.length + ' פרויקטים')
-            : (_projects.length + ' פרויקטים');
+        var filtered = _statusFilter !== 'active' || _searchQuery;
+        var activeCount = _projects.filter(function(p) {
+            var st = _normalizeOrderStatus(p.order_status);
+            return st === 'quote' || st === 'ordered';
+        }).length;
+        if (_statusFilter === 'active' && !_searchQuery) {
+            countEl.textContent = activeCount + ' פרויקטים פעילים';
+        } else if (filtered) {
+            countEl.textContent = visible.length + ' מתוך ' + _projects.length + ' פרויקטים';
+        } else {
+            countEl.textContent = _projects.length + ' פרויקטים';
+        }
     }
 
     if (_projects.length === 0) {
@@ -543,9 +594,13 @@ function _renderProjects() {
     }
 
     if (visible.length === 0) {
-        var emptyHint = _searchQuery && _statusFilter !== 'all'
-            ? 'נסה חיפוש אחר או שנה את סינון הסטטוס'
-            : (_searchQuery ? 'נסה חיפוש אחר או נקה את שדה החיפוש' : 'אין פרויקטים בסטטוס זה — נסה לבחור "הכל"');
+        var emptyHint = _searchQuery
+            ? 'נסה חיפוש אחר או נקה את שדה החיפוש'
+            : (_statusFilter === 'production'
+                ? 'אין הזמנות שנשלחו לייצור'
+                : (_statusFilter === 'active'
+                    ? 'אין הצעות מחיר או עסקאות פתוחות — בדוק בתווית "נשלח לייצור"'
+                    : 'אין פרויקטים בסטטוס זה'));
         grid.innerHTML =
             '<div class="empty-state">' +
                 '<div class="empty-state-icon"><i class="fa-solid fa-magnifying-glass"></i></div>' +
@@ -557,7 +612,7 @@ function _renderProjects() {
 
     visible.forEach(function(p) {
         var card     = document.createElement('div');
-        card.className  = 'project-card status-' + _normalizeOrderStatus(p.order_status);
+        card.className  = 'project-card status-' + _normalizeOrderStatus(p.order_status) + (p.is_pinned ? ' is-pinned' : '');
         card.dataset.id = p.id;
 
         // Check lock status for designer_single
@@ -621,17 +676,27 @@ function _renderProjects() {
         }
 
         var openFn = isLocked ? 'openLockedProject' : 'openProject';
+        var pinned = !!p.is_pinned;
+        var pinBtnHtml =
+            '<button type="button" class="project-pin-btn' + (pinned ? ' pinned' : '') + '" ' +
+            'onclick="event.stopPropagation(); toggleProjectPin(\'' + p.id + '\')" ' +
+            'title="' + (pinned ? 'בטל נעיצה' : 'נעץ בראש הרשימה') + '">' +
+            '<i class="fa-' + (pinned ? 'solid' : 'regular') + ' fa-bookmark"></i></button>';
         card.innerHTML =
             '<div class="project-thumb" onclick="' + openFn + '(\'' + p.id + '\')">' +
                 thumbHtml +
                 statusChipHtml +
+                pinBtnHtml +
                 '<div class="project-thumb-date"><i class="fa-regular fa-clock" style="margin-left:4px"></i>' + dateStr + '</div>' +
                 cabinetBadge +
                 (!isLocked ? '<div class="project-open-overlay"><button class="project-open-btn" onclick="openProject(\'' + p.id + '\')"><i class="fa-solid fa-pencil-ruler"></i> פתח לעריכה</button></div>' : '') +
             '</div>' +
             lockBadgeHtml +
             '<div class="project-body status-' + orderStatus + '" onclick="' + openFn + '(\'' + p.id + '\')">' +
-                '<div class="project-name" title="' + safeName + '">' + safeName + '</div>' +
+                '<div class="project-name" title="' + safeName + '">' +
+                    (pinned ? '<i class="fa-solid fa-bookmark project-pinned-mark" title="נעוץ"></i> ' : '') +
+                    safeName +
+                '</div>' +
                 customerLine +
                 '<div class="project-meta">' +
                     '<span class="project-meta-item"><i class="fa-regular fa-calendar"></i> ' + dateStr + '</span>' +

@@ -211,6 +211,7 @@
         }
         .status-filter-btn:hover { border-color: #c8d4e4; transform: translateY(-1px); }
         .status-filter-btn.active { color: #fff; border-color: transparent; box-shadow: 0 3px 10px rgba(15,23,42,.12); }
+        .status-filter-btn.active[data-status="active"],
         .status-filter-btn.active[data-status="all"] { background: var(--primary); }
         .status-filter-btn.active.status-quote { background: var(--pastel-quote-deep); }
         .status-filter-btn.active.status-ordered { background: var(--pastel-ordered-deep); }
@@ -219,6 +220,29 @@
         .status-filter-btn.active.status-installed { background: var(--pastel-installed-deep); }
         .status-filter-btn:not(.active) { opacity: .65; }
         .status-filter-btn i { font-size: .82rem; }
+        .status-filter-count {
+            display: inline-flex; align-items: center; justify-content: center;
+            min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+            background: rgba(255,255,255,.35); color: inherit;
+            font-size: .68rem; font-weight: 800; line-height: 1;
+        }
+        .status-filter-btn:not(.active) .status-filter-count {
+            background: rgba(249,115,22,.15); color: #c2410c;
+        }
+        .project-pin-btn {
+            position: absolute; top: 10px; left: 10px; z-index: 6;
+            width: 34px; height: 34px; border-radius: 10px;
+            border: 1px solid rgba(255,255,255,.75);
+            background: rgba(255,255,255,.7); color: #64748b;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; font-size: .95rem;
+            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+            transition: all var(--transition);
+        }
+        .project-pin-btn:hover { background: #fff; color: #0f172a; transform: scale(1.06); }
+        .project-pin-btn.pinned { background: #fef3c7; color: #b45309; border-color: #fcd34d; }
+        .project-card.is-pinned { outline: 2px solid rgba(245,158,11,.35); outline-offset: 0; }
+        .project-pinned-mark { color: #d97706; font-size: .85rem; margin-left: 4px; }
         .status-options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; max-height: 360px; overflow-y: auto; }
         .status-option { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 2px solid var(--border); border-radius: 14px; background: var(--border-l); cursor: pointer; font-family: inherit; font-size: .92rem; font-weight: 700; color: var(--text-2); transition: all var(--transition); text-align: right; width: 100%; }
         .status-option:hover { border-color: #c8d4e4; background: white; }
@@ -518,8 +542,8 @@
             <div class="projects-toolbar">
                 <div class="projects-status-filters" id="projects-status-filters">
                     <span class="projects-filter-label"><i class="fa-solid fa-filter"></i> הצג:</span>
-                    <button type="button" class="status-filter-btn active" data-status="all" onclick="setStatusFilterAll()">
-                        <i class="fa-solid fa-layer-group"></i> הכל
+                    <button type="button" class="status-filter-btn active" data-status="active" onclick="setStatusFilterActive()">
+                        <i class="fa-solid fa-briefcase"></i> פעילים
                     </button>
                     <button type="button" class="status-filter-btn status-quote" data-status="quote" onclick="setStatusFilter('quote')">
                         <i class="fa-solid fa-file-invoice-dollar"></i> הצעת מחיר
@@ -529,6 +553,7 @@
                     </button>
                     <button type="button" class="status-filter-btn status-production" data-status="production" onclick="setStatusFilter('production')">
                         <i class="fa-solid fa-industry"></i> נשלח לייצור
+                        <span class="status-filter-count" id="filter-count-production" style="display:none;">0</span>
                     </button>
                     <button type="button" class="status-filter-btn status-service" data-status="service" onclick="setStatusFilter('service')">
                         <i class="fa-solid fa-screwdriver-wrench"></i> קריאת שירות
@@ -980,7 +1005,7 @@
     <span id="toast-text"></span>
 </div>
 
-<script src="auth.js?v=20260608h"></script>
-<script src="projects.js?v=20260617c"></script>
+<script src="auth.js?v=20260731pin"></script>
+<script src="projects.js?v=20260731pin"></script>
 </body>
 </html>

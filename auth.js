@@ -672,19 +672,33 @@ window.Projects = {
         // Try full column list first; fall back to minimal columns if schema migration hasn't run yet
         let { data, error } = await sb
             .from('projects')
-            .select('id, name, thumbnail, created_at, updated_at, locked_at, extension_expires_at, lock_extensions, cabinet_count, order_status, customer_name, customer_order_num')
+            .select('id, name, thumbnail, created_at, updated_at, locked_at, extension_expires_at, lock_extensions, cabinet_count, order_status, customer_name, customer_order_num, is_pinned')
+            .order('is_pinned', { ascending: false })
             .order('updated_at', { ascending: false });
         if (error) {
-            console.warn('Projects.list full select failed (' + (error.message || error) + '), retrying with minimal columns');
+            console.warn('Projects.list full select failed (' + (error.message || error) + '), retrying without is_pinned');
             const res2 = await sb
                 .from('projects')
-                .select('id, name, thumbnail, created_at, updated_at')
+                .select('id, name, thumbnail, created_at, updated_at, locked_at, extension_expires_at, lock_extensions, cabinet_count, order_status, customer_name, customer_order_num')
                 .order('updated_at', { ascending: false });
-            data  = res2.data;
-            error = res2.error;
+            if (!res2.error) {
+                data = res2.data;
+                error = null;
+            } else {
+                console.warn('Projects.list meta select failed, retrying with minimal columns');
+                const res3 = await sb
+                    .from('projects')
+                    .select('id, name, thumbnail, created_at, updated_at')
+                    .order('updated_at', { ascending: false });
+                data  = res3.data;
+                error = res3.error;
+            }
         }
         if (error) { console.error('Projects.list:', error); return []; }
-        return data || [];
+        return (data || []).map(function(p) {
+            if (p.is_pinned == null) p.is_pinned = false;
+            return p;
+        });
     },
 
     // ── Load a single project ────────────────────────────────────────────────
@@ -846,6 +860,19 @@ window.Projects = {
             .update({ name: newName, updated_at: new Date().toISOString() })
             .eq('id', projectId)
             .select()
+            .single();
+        if (error) return { error: error.message };
+        return { data };
+    },
+
+    // ── Pin / unpin project (shows at top of projects list) ─────────────────
+    setPinned: async function(projectId, pinned) {
+        const sb = _getClient(); if (!sb) return { error: 'SDK not loaded' };
+        const { data, error } = await sb
+            .from('projects')
+            .update({ is_pinned: !!pinned })
+            .eq('id', projectId)
+            .select('id, is_pinned')
             .single();
         if (error) return { error: error.message };
         return { data };
