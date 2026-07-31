@@ -6835,19 +6835,7 @@ window.openOrderModal = async function(mode, opts) {
         if (!isNaN(numericPrice)) totalOrderPrice += numericPrice;
         totalInstallPrice += itemInstall; totalCostPrice += itemCost;
 
-        const cabinetHTML = `
-            <div class="cabinet-print-page">
-                <div class="cabinet-header-wrapper">
-                    <h3 class="cabinet-title">פרטי ${detailLabel}: ${titleText}</h3>
-                    <div class="cart-item-actions">
-                        <button class="action-btn edit-btn" onclick="editCartItem(${index})"><i class="fa-solid fa-pen"></i> ערוך ארון</button>
-                        <button class="action-btn del-btn" onclick="deleteCartItem(${index})"><i class="fa-solid fa-trash"></i> מחיקה</button>
-                    </div>
-                </div>
-                <table class="spec-table">
-                    ${_printSpecRowsHtmlEditable(_resolvePrintSpecRows(itemObj), index)}
-
-                    ${!isFactory && window._showPricing !== false ? `
+        const priceRowsModal = !isFactory && window._showPricing !== false ? `
                     <tr class="view-customer">
                         <th style="background:var(--highlight); vertical-align:middle;">מחיר ארון ללקוח</th>
                         <td style="font-weight:bold; color:var(--primary); font-size:1.15rem; text-align:right;">
@@ -6885,8 +6873,62 @@ window.openOrderModal = async function(mode, opts) {
                             </div>
                         </td>
                     </tr>
-                    `}
+                    `;
+
+        const specRows = _resolvePrintSpecRows(itemObj);
+        const split = _splitPrintSpecRowsByCabinet(specRows);
+        let cabinetHTML = '';
+
+        if (!split.units.length) {
+            cabinetHTML += `
+            <div class="cabinet-print-page">
+                <div class="cabinet-header-wrapper">
+                    <h3 class="cabinet-title">פרטי ${detailLabel}: ${titleText}</h3>
+                    <div class="cart-item-actions">
+                        <button class="action-btn edit-btn" onclick="editCartItem(${index})"><i class="fa-solid fa-pen"></i> ערוך ארון</button>
+                        <button class="action-btn del-btn" onclick="deleteCartItem(${index})"><i class="fa-solid fa-trash"></i> מחיקה</button>
+                    </div>
+                </div>
+                <table class="spec-table">
+                    ${_printSpecRowsHtmlEditable(specRows, index)}
+                    ${priceRowsModal}
                 </table>
+            </div>`;
+        } else {
+            split.units.forEach(function(unit, ui) {
+                const isFirst = ui === 0;
+                const isLast = ui === split.units.length - 1;
+                const pageRows = isFirst
+                    ? split.shared.concat(unit.rows)
+                    : unit.rows.slice();
+                if (isLast && split.trailing.length) {
+                    pageRows.push.apply(pageRows, split.trailing);
+                }
+                const heading = isFirst
+                    ? ('פרטי ' + detailLabel + ': ' + titleText)
+                    : unit.title;
+                cabinetHTML += `
+            <div class="cabinet-print-page">
+                <div class="cabinet-header-wrapper">
+                    <h3 class="cabinet-title">${heading}</h3>
+                    ${isFirst ? `<div class="cart-item-actions">
+                        <button class="action-btn edit-btn" onclick="editCartItem(${index})"><i class="fa-solid fa-pen"></i> ערוך ארון</button>
+                        <button class="action-btn del-btn" onclick="deleteCartItem(${index})"><i class="fa-solid fa-trash"></i> מחיקה</button>
+                    </div>` : ''}
+                </div>
+                <table class="spec-table">
+                    ${_printSpecRowsHtmlEditable(pageRows, index)}
+                    ${isFirst ? priceRowsModal : ''}
+                </table>
+            </div>`;
+            });
+        }
+
+        cabinetHTML += `
+            <div class="cabinet-print-page">
+                <div class="cabinet-header-wrapper">
+                    <h3 class="cabinet-title">תמונות ${detailLabel}: ${titleText}</h3>
+                </div>
                 <div class="print-images-container">
                     ${_orderPreviewImagesHtml(item, itemObj.rawState)}
                 </div>
@@ -8174,6 +8216,106 @@ function _printSpecRowsHtml(rows, thStyle, tdStyle, sectionStyle) {
     }).join('');
 }
 
+/**
+ * Split multi-wing print rows into pages:
+ * - shared: model/placement before first "מפרט ארון N"
+ * - units: one group per cabinet (starts at its "מפרט ארון N" section)
+ * - trailing: notes / extra colors after the last unit
+ */
+function _splitPrintSpecRowsByCabinet(rows) {
+    const list = rows || [];
+    const isUnitSec = function(r) {
+        return !!(r && r.section && /^מפרט ארון\s+\d+/.test(r.label || ''));
+    };
+    const shared = [];
+    const units = [];
+    const trailing = [];
+    let current = null;
+    let pastUnits = false;
+
+    list.forEach(function(r) {
+        if (isUnitSec(r)) {
+            pastUnits = true;
+            current = { title: r.label, rows: [r] };
+            units.push(current);
+            return;
+        }
+        if (!pastUnits) {
+            shared.push(r);
+            return;
+        }
+        if (current) {
+            // Keep wing-internal sections with the unit; start trailing only on global extras
+            if (r.section && (r.id === '_sec_extra' || (r.label || '').indexOf('צבעים נוספים') === 0)) {
+                current = null;
+                trailing.push(r);
+                return;
+            }
+            if (!r.section && (r.id === 'extraColors' || r.id === 'cabinetNotes')) {
+                current = null;
+                trailing.push(r);
+                return;
+            }
+            current.rows.push(r);
+            return;
+        }
+        trailing.push(r);
+    });
+
+    return { shared: shared, units: units, trailing: trailing };
+}
+
+/** Print-page HTML for multi-cabinet specs: first unit shares the main title page. */
+function _buildPagedCabinetSpecHtml(opts) {
+    const titleText = opts.titleText;
+    const detailLabel = opts.detailLabel;
+    const specRows = opts.specRows || [];
+    const priceRows = opts.priceRows || '';
+    const thStyle = opts.thStyle;
+    const tdStyle = opts.tdStyle;
+    const sectionStyle = opts.sectionStyle || 'padding:8px;border:1px solid #e2e8f0;';
+    const split = _splitPrintSpecRowsByCabinet(specRows);
+
+    if (!split.units.length) {
+        return `
+            <div style="page-break-after:always;">
+                <h3 style="font-size:1.3rem;color:#1e3a5f;margin:0 0 12px;padding:10px 15px;background:#f8fafc;border-radius:8px;border-right:4px solid #1e3a5f;">
+                    פרטי ${detailLabel}: ${titleText}
+                </h3>
+                <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:1rem;border:1px solid #e2e8f0;">
+                    ${_printSpecRowsHtml(specRows, thStyle, tdStyle, sectionStyle)}
+                    ${priceRows}
+                </table>
+            </div>`;
+    }
+
+    let html = '';
+    split.units.forEach(function(unit, ui) {
+        const isFirst = ui === 0;
+        const isLast = ui === split.units.length - 1;
+        const pageRows = isFirst
+            ? split.shared.concat(unit.rows)
+            : unit.rows.slice();
+        if (isLast && split.trailing.length) {
+            pageRows.push.apply(pageRows, split.trailing);
+        }
+        const heading = isFirst
+            ? ('פרטי ' + detailLabel + ': ' + titleText)
+            : unit.title;
+        html += `
+            <div style="page-break-after:always;">
+                <h3 style="font-size:1.3rem;color:#1e3a5f;margin:0 0 12px;padding:10px 15px;background:#f8fafc;border-radius:8px;border-right:4px solid #1e3a5f;">
+                    ${heading}
+                </h3>
+                <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:1rem;border:1px solid #e2e8f0;">
+                    ${_printSpecRowsHtml(pageRows, thStyle, tdStyle, sectionStyle)}
+                    ${isFirst ? priceRows : ''}
+                </table>
+            </div>`;
+    });
+    return html;
+}
+
 function _printSpecRowsHtmlEditable(rows, cartIndex) {
     return rows.map(r => {
         if (r.section) return _printSectionHeader(r.label, '');
@@ -8374,22 +8516,21 @@ function _buildPrintHTML(mode) {
             : `<tr><th style="background:#eff6ff;">מחיר ארון ללקוח</th><td style="font-weight:bold;color:#1e3a5f;font-size:1.1rem;text-align:right;">₪${numericPrice.toLocaleString()}</td></tr>
                <tr><th style="background:#eff6ff;">הובלה והתקנה</th><td style="font-weight:bold;color:#1e3a5f;font-size:1.1rem;text-align:right;">₪${itemInstall.toLocaleString()}</td></tr>`;
 
-        if (isFactory) {
-            // Factory: page 1 = spec table; page 2 = 3D images (paired); then blueprint pages paired (2 per print page)
-            const bpPages = item.multiViewPages && item.multiViewPages.length > 0
-                ? item.multiViewPages
-                : (item.multiViewSVG ? [item.multiViewSVG] : []);
+        const bpPages = item.multiViewPages && item.multiViewPages.length > 0
+            ? item.multiViewPages
+            : (item.multiViewSVG ? [item.multiViewSVG] : []);
 
-            cabinetsHTML += `
-            <div style="page-break-after:always;">
-                <h3 style="font-size:1.3rem;color:#1e3a5f;margin:0 0 12px;padding:10px 15px;background:#f8fafc;border-radius:8px;border-right:4px solid #1e3a5f;">
-                    פרטי ${detailLabel}: ${titleText}
-                </h3>
-                <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:1rem;border:1px solid #e2e8f0;">
-                    ${_printSpecRowsHtml(specRows, thStyle, tdStyle, 'padding:8px;border:1px solid #e2e8f0;')}
-                    ${priceRows}
-                </table>
-            </div>
+        // Spec pages: each wing/cabinet on its own page; first shares the main title
+        cabinetsHTML += _buildPagedCabinetSpecHtml({
+            titleText: titleText,
+            detailLabel: detailLabel,
+            specRows: specRows,
+            priceRows: priceRows,
+            thStyle: thStyle,
+            tdStyle: tdStyle
+        });
+
+        cabinetsHTML += `
             <div style="page-break-after:always;">
                 <h3 style="font-size:1.2rem;color:#1e3a5f;margin:0 0 16px;padding:10px 15px;background:#f8fafc;border-radius:8px;border-right:4px solid #1e3a5f;">
                     תמונות ${detailLabel}: ${titleText}
@@ -8416,49 +8557,6 @@ function _buildPrintHTML(mode) {
                 }).join('')}
             </div>`).join('');
             })()}`;
-        } else {
-            // Customer: page 1 = spec table; page 2 = 3D images; then blueprint pages paired (2 per print page)
-            const bpPages = item.multiViewPages && item.multiViewPages.length > 0
-                ? item.multiViewPages
-                : (item.multiViewSVG ? [item.multiViewSVG] : []);
-
-            cabinetsHTML += `
-            <div style="page-break-after:always;">
-                <h3 style="font-size:1.3rem;color:#1e3a5f;margin:0 0 12px;padding:10px 15px;background:#f8fafc;border-radius:8px;border-right:4px solid #1e3a5f;">
-                    פרטי ${detailLabel}: ${titleText}
-                </h3>
-                <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:1rem;border:1px solid #e2e8f0;">
-                    ${_printSpecRowsHtml(specRows, thStyle, tdStyle, 'padding:8px;border:1px solid #e2e8f0;')}
-                    ${priceRows}
-                </table>
-            </div>
-            <div style="page-break-after:always;">
-                <h3 style="font-size:1.2rem;color:#1e3a5f;margin:0 0 16px;padding:10px 15px;background:#f8fafc;border-radius:8px;border-right:4px solid #1e3a5f;">
-                    תמונות ${detailLabel}: ${titleText}
-                </h3>
-                <div style="display:flex;flex-direction:column;gap:16px;">
-                    ${_orderPrintPreviewImagesHtml(item, itemObj.rawState)}
-                </div>
-            </div>
-            ${(() => {
-                const pairs = [];
-                for (let pi = 0; pi < bpPages.length; pi += 2) {
-                    pairs.push(bpPages.slice(pi, pi + 2));
-                }
-                return pairs.map((pair, pairIdx) => `
-            <div class="bp-page" style="page-break-after:always;page-break-inside:avoid;">
-                ${pair.map((svg, si) => {
-                    const globalIdx = pairIdx * 2 + si;
-                    return `<div style="margin-bottom:${si === 0 && pair.length > 1 ? '16px' : '0'};">
-                    <div style="font-size:1rem;font-weight:bold;margin-bottom:6px;background:#e8f0fe;padding:6px;text-align:center;border:1px solid #93c5fd;border-bottom:none;">
-                        שרטוט טכני — ${titleText}${bpPages.length > 1 ? ` (עמוד ${globalIdx + 1}/${bpPages.length})` : ''}
-                    </div>
-                    <div style="border:2px solid #93c5fd;display:block;overflow:hidden;width:100%;">${svg}</div>
-                </div>`;
-                }).join('')}
-            </div>`).join('');
-            })()}`;
-        }
     });
 
     const summaryHTML = _hidePrices ? '' : isFactory
