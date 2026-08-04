@@ -574,11 +574,18 @@ function _switchCabinet(idx) {
     };
 
     _restoreState(syntheticData);
+    // Keep part-color / paint scope on the cabinet the customer is viewing
+    try {
+        state.editingCartIndex = idx;
+        if (typeof _syncPartColorScope === 'function') _syncPartColorScope();
+    } catch (eScope) {}
     // Apply any viewer color overrides for this cabinet
     _applyViewerColorOverride(idx);
     _updateInfoStrip();
 
-    var currentMode = (state && state.viewMode) ? state.viewMode : '3d';
+    // Preserve סגור/פתוח across cabinet switch (state.viewMode alone is always '3d')
+    var currentMode = window._viewerDoorsMode
+        || ((state && state.viewMode) ? state.viewMode : '3d');
     window._setViewerView(currentMode);
 
     // Capture snapshot after render
@@ -605,7 +612,8 @@ window._returnToLive = function() {
     } else {
         _renderCabinetNav();
     }
-    var currentMode = (state && state.viewMode) ? state.viewMode : '3d';
+    var currentMode = window._viewerDoorsMode
+        || ((state && state.viewMode) ? state.viewMode : '3d');
     window._setViewerView(currentMode);
 };
 
@@ -947,6 +955,7 @@ function _updateDetailsBar() {
 }
 
 // ── View switching ────────────────────────────────────────────────────────────
+window._viewerDoorsModeTimer = null;
 window._setViewerView = function(mode) {
     var viewMode = mode;
     if (mode === 'doors-open' || mode === 'doors-closed') {
@@ -964,6 +973,11 @@ window._setViewerView = function(mode) {
     var bpLayer  = document.getElementById('blueprint-layer');
     var canvas   = document.getElementById('canvas-container');
     var dimLayer = document.getElementById('dimensions-layer');
+
+    if (window._viewerDoorsModeTimer) {
+        clearTimeout(window._viewerDoorsModeTimer);
+        window._viewerDoorsModeTimer = null;
+    }
 
     if (viewMode === 'blueprint') {
         if (canvas) { canvas.classList.add('blueprint-mode'); canvas.classList.remove('front-mode', 'mode-3d'); }
@@ -983,7 +997,9 @@ window._setViewerView = function(mode) {
         if (dimLayer) { dimLayer.style.display = 'none'; dimLayer.style.opacity = '0'; }
         if (typeof buildCabinet === 'function') buildCabinet();
         if (typeof updateCameraView === 'function') updateCameraView();
-        setTimeout(function() {
+        // Absolute re-apply after meshes exist (also handled in buildCabinet for doors-open)
+        window._viewerDoorsModeTimer = setTimeout(function() {
+            window._viewerDoorsModeTimer = null;
             if (typeof window._viewerExtrasApplyDoorsMode === 'function') {
                 window._viewerExtrasApplyDoorsMode(window._viewerDoorsMode || 'doors-closed');
             }

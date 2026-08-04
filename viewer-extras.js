@@ -263,16 +263,17 @@ function closeSummary() {
 
 // ── 6. Doors mode ────────────────────────────────────────────────────────────
 window._viewerExtrasApplyDoorsMode = function (mode) {
-    var wantVisible = mode !== 'doors-open'; // open interior => hide door meshes
-    if (typeof window._doorsVisible === 'undefined') return;
-    if (window._doorsVisible !== wantVisible && typeof window._toggleDoors === 'function') {
-        window._toggleDoors();
-    } else if (window.doorMeshes || (typeof doorMeshes !== 'undefined')) {
-        var meshes = window.doorMeshes || (typeof doorMeshes !== 'undefined' ? doorMeshes : []);
-        if (meshes && meshes.forEach) {
-            window._doorsVisible = wantVisible;
-            meshes.forEach(function (m) { m.visible = wantVisible; });
-        }
+    // doors-open = show interior (hide door meshes); doors-closed / null = show doors
+    var wantVisible = mode !== 'doors-open';
+    if (typeof window._setDoorsVisible === 'function') {
+        window._setDoorsVisible(wantVisible);
+        return;
+    }
+    // Fallback if engine-core not loaded yet
+    var meshes = window.doorMeshes || [];
+    window._doorsVisible = wantVisible;
+    if (meshes && meshes.forEach) {
+        meshes.forEach(function (m) { if (m) m.visible = wantVisible; });
     }
 };
 

@@ -185,9 +185,10 @@ window._toggleRoom = function() {
 
 // ---- Doors visibility toggle ----
 window._doorsVisible = true;
-window._toggleDoors = function() {
-    window._doorsVisible = !window._doorsVisible;
-    doorMeshes.forEach(function(m) { m.visible = window._doorsVisible; });
+window._setDoorsVisible = function(wantVisible) {
+    window._doorsVisible = !!wantVisible;
+    var meshes = (typeof doorMeshes !== 'undefined' && doorMeshes) ? doorMeshes : (window.doorMeshes || []);
+    meshes.forEach(function(m) { if (m) m.visible = window._doorsVisible; });
     const btn = document.getElementById('btn-toggle-doors');
     if (btn) {
         btn.innerHTML = window._doorsVisible
@@ -195,6 +196,9 @@ window._toggleDoors = function() {
             : '<i class="fa-solid fa-door-open"></i> הצג חזיתות';
         btn.classList.toggle('toggled-off', !window._doorsVisible);
     }
+};
+window._toggleDoors = function() {
+    window._setDoorsVisible(!window._doorsVisible);
 };
 
 // Load room textures once
@@ -1711,6 +1715,7 @@ let wingHitBoxes = [];
 let deskHitBoxes = [];
 window.deskHitBoxes = deskHitBoxes;
 let doorMeshes = [];
+window.doorMeshes = doorMeshes;
 
 function _registerDoorMesh(mesh) {
     if (!mesh) return;
@@ -1718,6 +1723,7 @@ function _registerDoorMesh(mesh) {
     // Outside edit mode register every rendered door — needed for corner/multi-wing open↔close.
     if (state.wingEditMode && !_isActiveWingBuild) return;
     doorMeshes.push(mesh);
+    window.doorMeshes = doorMeshes;
 }
 
 /** True if mat is one of the shared library materials (must not mutate opacity on hover). */
@@ -2188,6 +2194,7 @@ function buildCabinet() {
     deskHitBoxes = [];
     window.deskHitBoxes = deskHitBoxes;
     doorMeshes = [];
+    window.doorMeshes = doorMeshes;
     if (currentHoveredDoor) {
         if (typeof _clearDoorHoverOpacity === 'function') _clearDoorHoverOpacity(currentHoveredDoor);
         else if (currentHoveredDoor.material) {
@@ -2912,9 +2919,12 @@ function buildCabinet() {
         if (_hMobileNum) _hMobileNum.value = _maxH;
     }
 
-    // Apply doors visibility state (in case user toggled doors off before rebuild)
+    // Apply doors visibility after rebuild (viewer סגור/פתוח + designer toggle)
+    window.doorMeshes = doorMeshes;
     if (window._doorsVisible === false) {
-        doorMeshes.forEach(function(m) { m.visible = false; });
+        doorMeshes.forEach(function(m) { if (m) m.visible = false; });
+    } else if (typeof window._setDoorsVisible === 'function' && window._viewerDoorsMode === 'doors-open') {
+        window._setDoorsVisible(false);
     }
 
     // When closure panels are active, auto-set room height = cabinet height + ceiling panel thickness
