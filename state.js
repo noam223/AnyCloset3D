@@ -1412,10 +1412,17 @@ window.syncSidebarToWing = function() {
     const setChecked = (id, v) => {
         const el = document.getElementById(id);
         if (el) el.checked = v;
-        // Sync the doors toggle button visual state
+        // Visual doors toggle is independent of hasDoors (saved design flag)
         if (id === 'inp-has-doors') {
+            const mobileChk = document.getElementById('mobile-inp-has-doors');
+            // Keep mobile "הצג חזיתות" aligned with display visibility, not hasDoors
+            if (mobileChk && typeof window._doorsVisible === 'boolean') {
+                mobileChk.checked = window._doorsVisible;
+            }
             const doorsBtn = document.getElementById('btn-toggle-doors');
-            if (doorsBtn) doorsBtn.classList.toggle('toggled-off', !v);
+            if (doorsBtn && typeof window._doorsVisible === 'boolean') {
+                doorsBtn.classList.toggle('toggled-off', !window._doorsVisible);
+            }
         }
     };
 
@@ -1431,7 +1438,13 @@ window.syncSidebarToWing = function() {
     const _isSlidingWard = state.presetId === 'sliding' && w.slidingDoor && w.slidingDoor.enabled;
     const colGroup = document.getElementById('header-columns-card');
     if (colGroup) colGroup.style.display = _isSlidingWard ? 'none' : '';
-    setChecked('inp-has-doors', w.hasDoors);
+    setChecked('inp-has-doors', w.hasDoors !== false);
+    // Soft-repair projects saved with visual-hide wrongly stored as hasDoors=false
+    if (w.hasDoors === false && Array.isArray(w.columns) &&
+        w.columns.some(function(c) { return c && c.doors && c.doors.length > 0; })) {
+        w.hasDoors = true;
+        setChecked('inp-has-doors', true);
+    }
     setVal('inp-handle-type', w.handleType || '');
     const _hs = w.handleStyle || 'pipe';
     document.querySelectorAll('.handle-style-btn:not(.corner-desk-handle-btn)').forEach(b => {

@@ -642,6 +642,19 @@ function _updateLiveBadge() {
 }
 
 // ── Restore state from project_data ──────────────────────────────────────────
+/** Viewer must be able to show/hide fronts even if designer saved with hasDoors=false (old toggle bug). */
+function _viewerForceHasDoorsOn() {
+    if (!state || !state.wings) return;
+    Object.keys(state.wings).forEach(function(k) {
+        var w = state.wings[k];
+        if (!w) return;
+        w.hasDoors = true;
+        if (w.sideCabinet && w.sideCabinet.side && w.sideCabinet.side !== 'none') {
+            w.sideCabinet.hasDoors = true;
+        }
+    });
+}
+
 function _restoreState(projectData) {
     if (!projectData) return;
     try {
@@ -678,6 +691,11 @@ function _restoreState(projectData) {
         if (projectData.customer) state.customer = projectData.customer;
         if (projectData.orderCart) state.orderCart = projectData.orderCart;
         else if (projectData.cart) state.orderCart = projectData.cart;
+
+        // Old designer "הסתר חזיתות" wrongly saved hasDoors=false — door layout still exists.
+        // Force doors on so customer סגור/פתוח can show fronts.
+        _viewerForceHasDoorsOn();
+        if (typeof window._doorsVisible !== 'undefined') window._doorsVisible = true;
 
         if (typeof syncSidebarToWing === 'function') syncSidebarToWing();
         if (typeof buildCabinet === 'function') buildCabinet();
@@ -965,6 +983,11 @@ window._setViewerView = function(mode) {
         window._viewerDoorsMode = null;
     }
     state.viewMode = viewMode;
+
+    // Ensure door meshes are built (not skipped by saved hasDoors=false)
+    if (viewMode === '3d' || mode === 'doors-open' || mode === 'doors-closed') {
+        _viewerForceHasDoorsOn();
+    }
 
     document.querySelectorAll('.vd-tab').forEach(function(btn) {
         btn.classList.toggle('active', btn.dataset.view === mode);

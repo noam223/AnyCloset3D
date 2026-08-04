@@ -1008,7 +1008,7 @@
     <button class="view-btn" id="btn-multiview-blueprint" onclick="openMultiViewBlueprint()" style="display:none;"><i class="fa-solid fa-layer-group"></i> שרטוט ייצור</button>
     <button class="view-btn icon-btn" id="btn-reset-view" title="איפוס זווית מצלמה" style="display:none;" onclick="window._orbitFree=false; const b=document.getElementById('btn-reset-view'); if(b) b.style.display='none'; updateCameraView();"><i class="fa-solid fa-arrows-rotate"></i></button>
     <button class="view-btn" id="btn-room-plan" title="תצוגת חדר — מבט על 2D עם גרירת ריהוט" onclick="window._toggleRoomPlanMode()"><i class="fa-solid fa-compass-drafting"></i> תצוגת חדר</button>
-    <button class="view-btn icon-btn" id="btn-toggle-doors" title="הצג/הסתר חזיתות" onclick="(function(){var chk=document.getElementById('inp-has-doors');chk.checked=!chk.checked;chk.dispatchEvent(new Event('change'));document.getElementById('btn-toggle-doors').classList.toggle('toggled-off',!chk.checked);})()"><i class="fa-solid fa-door-closed"></i></button>
+    <button class="view-btn icon-btn" id="btn-toggle-doors" title="הצג/הסתר חזיתות (תצוגה בלבד — לא משנה את השמירה)" onclick="window._toggleDoors && window._toggleDoors()"><i class="fa-solid fa-door-closed"></i></button>
     <!-- Room wall position selector — only shown for linear/sliding presets -->
     <div id="room-wall-selector" style="display:none; align-items:center; gap:3px; margin:0 4px;" title="מיקום ארון בחדר">
         <button id="btn-wall-left"   class="view-btn icon-btn" style="font-size:0.72rem;padding:4px 7px;" title="צמוד לקיר שמאל"  onclick="window._setRoomWall('left')">← שמאל</button>
@@ -1703,7 +1703,7 @@
         <div class="mobile-panel-divider"></div>
         <label class="mobile-checkbox-row">
             <input type="checkbox" id="mobile-inp-has-doors" checked
-                onchange="document.getElementById('inp-has-doors').checked=this.checked; document.getElementById('inp-has-doors').dispatchEvent(new Event('change'))">
+                onchange="if(window._setDoorsVisible){window._setDoorsVisible(this.checked);}else{document.getElementById('inp-has-doors').checked=this.checked;document.getElementById('inp-has-doors').dispatchEvent(new Event('change'));}">
             <span><i class="fa-solid fa-door-closed"></i> הצג חזיתות</span>
         </label>
     </div>
@@ -2412,10 +2412,10 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js"></script>
-<script src="state.js?v=20260731noNiche"></script>
+<script src="state.js?v=20260804doorsVis"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="writing-desk-preset.js?v=20260617wdcolors"></script>
-<script src="engine-core.js?v=20260804doorsFix"></script>
+<script src="engine-core.js?v=20260804doorsVis"></script>
 <script src="engine-corners.js?v=20260720deskPartPaint"></script>
 <script src="engine-blueprint.js?v=20260731openCellTB"></script>
 <script src="engine-room-plan.js?v=20260731rpcab"></script>

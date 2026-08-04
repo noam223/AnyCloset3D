@@ -191,11 +191,21 @@ window._setDoorsVisible = function(wantVisible) {
     meshes.forEach(function(m) { if (m) m.visible = window._doorsVisible; });
     const btn = document.getElementById('btn-toggle-doors');
     if (btn) {
-        btn.innerHTML = window._doorsVisible
-            ? '<i class="fa-solid fa-door-closed"></i> הסתר חזיתות'
-            : '<i class="fa-solid fa-door-open"></i> הצג חזיתות';
+        // Designer top-bar is icon-only; keep label short if text mode exists
+        if (btn.classList.contains('icon-btn')) {
+            btn.innerHTML = window._doorsVisible
+                ? '<i class="fa-solid fa-door-closed"></i>'
+                : '<i class="fa-solid fa-door-open"></i>';
+        } else {
+            btn.innerHTML = window._doorsVisible
+                ? '<i class="fa-solid fa-door-closed"></i> הסתר חזיתות'
+                : '<i class="fa-solid fa-door-open"></i> הצג חזיתות';
+        }
         btn.classList.toggle('toggled-off', !window._doorsVisible);
+        btn.title = window._doorsVisible ? 'הסתר חזיתות (תצוגה בלבד)' : 'הצג חזיתות (תצוגה בלבד)';
     }
+    const mobileChk = document.getElementById('mobile-inp-has-doors');
+    if (mobileChk) mobileChk.checked = window._doorsVisible;
 };
 window._toggleDoors = function() {
     window._setDoorsVisible(!window._doorsVisible);
