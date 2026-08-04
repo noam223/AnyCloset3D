@@ -3142,6 +3142,9 @@ function _addRidingDoorHandle(group, x, y, zFace, doorH) {
     const handle = new THREE.Mesh(new THREE.BoxGeometry(profileW, handleH, profileD), mat);
     handle.position.set(x, y, zFace + profileD / 2);
     group.add(handle);
+    // Must track handles separately when parent is cabinet root (not a door group)
+    if (typeof _registerDoorMesh === 'function') _registerDoorMesh(handle);
+    return handle;
 }
 
 /** Riding handle on drawers: slim horizontal profile on the top edge of the front. */
@@ -4584,6 +4587,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         _ppPartId = `drawer_ext_c${c}_r${r}_d${d}`;
                         const mesh = createBoard(overlayW, extDrawerH, t, overlayCenterX, dY, fZ, matExternal);
                         _ppPartId = '';
+                        if (typeof _registerDoorMesh === 'function') _registerDoorMesh(mesh);
                         if (!isBP) _addPanelHandleLocal(mesh, overlayW, extDrawerH, compData.handleStyle || _handleStyle);
                         // ---- Bathroom groove overlay on external drawer ----
                         const _bathGrooveExt = state.presetId === 'bathroom'
@@ -4776,6 +4780,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             _ppPartId = `drawer_ext_sub_c${c}_r${r}_s${subIdx}_z${zoneIdx}_d${d}`;
                             const mesh = createBoard(drawerW, extDrawerH, t, drawerCX, dY, fZ, matExternal);
                             _ppPartId = '';
+                            if (typeof _registerDoorMesh === 'function') _registerDoorMesh(mesh);
                             if (!isBP) _addPanelHandleLocal(mesh, drawerW, extDrawerH, handleStyle);
                         }
                     } else if (subType === 'door_right' || subType === 'door_left' || subType === 'door_double') {
@@ -5267,12 +5272,14 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         );
                         handleMesh.position.set(flapCenterX + flapW * 0.35, flapBaseY + 4, flapZ + t / 2 + 1.5);
                         _buildGroup.add(handleMesh);
+                        _registerDoorMesh(handleMesh);
                     } else if (!isBP && _flapHandleStyle === 'riding') {
                         const barLen = Math.min(RIDING_HANDLE_LEN, Math.max(8, flapW - 4));
                         const mat = _ridingHandleMat();
                         const bar = new THREE.Mesh(new THREE.BoxGeometry(barLen, 0.75, 0.9), mat);
                         bar.position.set(flapCenterX, flapBaseY + 0.6, flapZ + t / 2 + 0.85);
                         _buildGroup.add(bar);
+                        _registerDoorMesh(bar);
                     }
                     return; // flap door rendered — skip regular door logic
                 }
