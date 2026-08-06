@@ -1427,7 +1427,7 @@ var _PP_DEFAULTS = {
         cornerDrawers3:832,cornerDrawers4:907,cornerDrawerExtra:200,cornerDesk:900,
         fullCornerBase:2800,fullCornerShelf:120,wingConnection:400,sideCabMel:12,sideCabNonMel:15,
         sideCabDoors:300,slidingBase:800,slidingDoor:350,slidingGlass:200,slidingMirror:350,
-        slidingGold:80,slidingBlack:50,slidingHeightSurcharge:0.15,nickelLegPrice:100}
+        slidingGold:80,slidingBlack:50,slidingHeightSurcharge:0.15,nickelLegPrice:100,ledPair:650}
 };
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
@@ -2035,6 +2035,7 @@ function _fillPricingPanel(cfg) {
     _ppSet('pp-doorGlassMel', ex.doorGlassMel || 400);
     _ppSet('pp-doorGlassBlack', ex.doorGlassBlack || 600);
     _ppSet('pp-doorMirror', ex.doorMirror || 350);
+    _ppSet('pp-ledPair', ex.ledPair || 650);
     _ppSet('pp-upperUnit160', ex.upperUnit160 || 600);
     _ppSet('pp-upperUnit240', ex.upperUnit240 || 900);
     _ppSet('pp-upperUnitPerCm', ex.upperUnitPerCm || 3.75);
@@ -2117,7 +2118,8 @@ function _readPricingPanel() {
             slidingGold: parseInt(_ppVal('pp-slidingGold')) || 80,
             slidingBlack: parseInt(_ppVal('pp-slidingBlack')) || 50,
             slidingHeightSurcharge: _ppFrac(_ppVal('pp-slidingHeightSurcharge')),
-            nickelLegPrice: parseInt(_ppVal('pp-nickelLegPrice')) || 100
+            nickelLegPrice: parseInt(_ppVal('pp-nickelLegPrice')) || 100,
+            ledPair: parseInt(_ppVal('pp-ledPair')) || 650
         }
     };
 }

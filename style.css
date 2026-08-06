@@ -2412,7 +2412,8 @@ body.dragging-v { cursor: ns-resize !important; }
 }
 .qc-content {
     background: white; padding: 25px; border-radius: 16px;
-    width: 90%; max-width: 500px; box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    width: 92%; max-width: 620px; max-height: 92vh; overflow-y: auto;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.2);
 }
 .qc-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border); padding-bottom: 15px; margin-bottom: 20px; }
 .qc-header h2 { margin: 0; color: var(--primary); font-size: 1.4rem; display: flex; align-items: center; gap: 10px;}
@@ -2427,6 +2428,29 @@ body.dragging-v { cursor: ns-resize !important; }
 .qc-result-row { display: flex; justify-content: space-between; align-items: center; font-size: 1.1rem; color: var(--text-dark); font-weight: 500; }
 .qc-factory { color: #854d0e; font-weight: 700; }
 .qc-result-row.qc-final { margin-top: 10px; padding-top: 15px; border-top: 1px solid var(--border); font-size: 1.6rem; font-weight: 800; color: var(--primary); }
+.qc-quote-section {
+    margin-top: 22px; padding-top: 18px; border-top: 2px solid var(--border);
+}
+.qc-quote-title {
+    font-size: 1rem; font-weight: 800; color: var(--primary); margin-bottom: 12px;
+    display: flex; align-items: center; gap: 8px;
+}
+.qc-quote-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; max-height: 180px; overflow-y: auto; }
+.qc-quote-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 10px 12px; border-radius: 10px; background: #f8fafc; border: 1px solid var(--border);
+    font-size: .85rem; text-align: right;
+}
+.qc-quote-item strong { color: var(--text-dark); }
+.qc-quote-item button {
+    border: 1px solid #fecaca; background: #fff; color: #dc2626; border-radius: 8px;
+    padding: 4px 8px; cursor: pointer; font-family: inherit; flex-shrink: 0;
+}
+.qc-quote-text {
+    width: 100%; min-height: 120px; border: 1.5px solid var(--border); border-radius: 12px;
+    padding: 12px; font-family: inherit; font-size: .88rem; direction: rtl; resize: vertical;
+    background: #f8fafc; color: var(--text-dark); box-sizing: border-box;
+}
 
 
 /* --- עיצוב תפריט צף למדפים --- */

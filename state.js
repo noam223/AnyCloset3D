@@ -3081,7 +3081,8 @@ var DEFAULT_PRICING_CONFIG = {
         sideCabMel: 12, sideCabNonMel: 15, sideCabDoors: 300,
         slidingBase: 800, slidingDoor: 350, slidingGlass: 200, slidingMirror: 350,
         slidingGold: 80, slidingBlack: 50, slidingHeightSurcharge: 0.15,
-        nickelLegPrice: 100
+        nickelLegPrice: 100,
+        ledPair: 650
     }
 };
 window.DEFAULT_PRICING_CONFIG = DEFAULT_PRICING_CONFIG;
@@ -3413,6 +3414,10 @@ window.calcQuickPrice = function(autoUpdateShelves = false) {
     const intDrawers = parseInt(document.getElementById('qc-int-d').value) || 0;
     const extDrawers = parseInt(document.getElementById('qc-ext-d').value) || 0;
     const openCells = parseInt(document.getElementById('qc-open-cells').value) || 0;
+    const partitions = parseInt((document.getElementById('qc-partitions') || {}).value) || 0;
+    const glassWoodDoors = parseInt((document.getElementById('qc-door-glass-wood') || {}).value) || 0;
+    const alumDoors = parseInt((document.getElementById('qc-door-alum') || {}).value) || 0;
+    const ledPairs = parseInt((document.getElementById('qc-led-pairs') || {}).value) || 0;
     const hasDesk = document.getElementById('qc-desk').checked;
 
     const allowedShelves = _calcIncludedShelves(w, h, model);
@@ -3428,11 +3433,29 @@ window.calcQuickPrice = function(autoUpdateShelves = false) {
     const shelves = shelvesEl ? (parseInt(shelvesEl.value) || 0) : 0;
 
     const cfg = _getPricingCfg();
+    const ex = cfg.extras || DEFAULT_PRICING_CONFIG.extras;
     const wing = _buildQuickCalcWing(w, h, d, model, isMelamine, shelves, intDrawers, extDrawers, openCells, hasDesk);
-    const finalCost = _calcWingCost(cfg, wing);
+    let finalCost = _calcWingCost(cfg, wing);
+    finalCost += partitions * (ex.partition || 150);
+    finalCost += glassWoodDoors * (ex.doorGlassMel || 400);
+    finalCost += alumDoors * (ex.doorGlassBlack || 600);
+    finalCost += ledPairs * (ex.ledPair || 650);
+
     const installPrice = _calcWingInstallPrice(cfg, w, h);
     const profitMult = cfg.profitMultiplier != null ? cfg.profitMultiplier : 1.7;
     const priceToCustomer = finalCost * profitMult;
+
+    window._qcLastResult = {
+        w: w, h: h, d: d, model: model,
+        cost: Math.round(finalCost),
+        install: Math.round(installPrice),
+        customer: Math.round(priceToCustomer),
+        extras: {
+            intDrawers: intDrawers, extDrawers: extDrawers, openCells: openCells,
+            partitions: partitions, glassWoodDoors: glassWoodDoors,
+            alumDoors: alumDoors, ledPairs: ledPairs, hasDesk: !!hasDesk
+        }
+    };
 
     const costEl = document.getElementById('qc-total-cost');
     const installEl = document.getElementById('qc-install');
@@ -3441,3 +3464,135 @@ window.calcQuickPrice = function(autoUpdateShelves = false) {
     if (installEl) installEl.innerText = '₪' + Math.round(installPrice).toLocaleString();
     if (custEl) custEl.innerText = '₪' + Math.round(priceToCustomer).toLocaleString();
 };
+
+window._qcQuoteList = window._qcQuoteList || [];
+
+function _qcMoney(n) {
+    return '₪' + Math.round(n || 0).toLocaleString('he-IL');
+}
+
+function _qcCabinetLabel(item) {
+    if (item.name && String(item.name).trim()) return String(item.name).trim();
+    return 'ארון ' + item.w + '×' + item.h + '×' + item.d + ' ס״מ';
+}
+
+function _qcExtrasSummary(ex) {
+    if (!ex) return '';
+    const parts = [];
+    if (ex.intDrawers) parts.push(ex.intDrawers + ' מגירות פנים');
+    if (ex.extDrawers) parts.push(ex.extDrawers + ' מגירות חוץ');
+    if (ex.openCells) parts.push(ex.openCells + ' כוורת');
+    if (ex.partitions) parts.push(ex.partitions + ' מחיצות');
+    if (ex.glassWoodDoors) parts.push(ex.glassWoodDoors + ' דלת זכוכית פרופיל עץ');
+    if (ex.alumDoors) parts.push(ex.alumDoors + ' דלת פרופיל אלומיניום');
+    if (ex.ledPairs) parts.push(ex.ledPairs + ' זוג לדים');
+    if (ex.hasDesk) parts.push('שולחן עבודה');
+    return parts.join(', ');
+}
+
+window._renderQcQuoteList = function() {
+    const listEl = document.getElementById('qc-quote-list');
+    const textEl = document.getElementById('qc-quote-text');
+    if (!listEl) return;
+    const items = window._qcQuoteList || [];
+    if (!items.length) {
+        listEl.innerHTML = '<div style="color:#94a3b8;font-size:.85rem;text-align:center;padding:8px 0;">אין ארונות ברשימה עדיין</div>';
+    } else {
+        listEl.innerHTML = items.map(function(it, i) {
+            const extra = _qcExtrasSummary(it.extras);
+            return '<div class="qc-quote-item">' +
+                '<div><strong>' + (i + 1) + '. ' + _qcCabinetLabel(it) + '</strong>' +
+                (extra ? ('<div style="color:#64748b;margin-top:3px;">' + extra + '</div>') : '') +
+                '<div style="margin-top:4px;">מחיר: ' + _qcMoney(it.customer) +
+                ' · התקנה: ' + _qcMoney(it.install) + '</div></div>' +
+                '<button type="button" title="הסר" onclick="qcRemoveQuoteItem(' + i + ')"><i class="fa-solid fa-xmark"></i></button>' +
+                '</div>';
+        }).join('');
+    }
+    if (textEl) textEl.value = window._buildQcCustomerQuoteText();
+};
+
+window._buildQcCustomerQuoteText = function() {
+    const items = window._qcQuoteList || [];
+    if (!items.length) return '';
+    const nameEl = document.getElementById('qc-customer-name');
+    const customerName = (nameEl && nameEl.value.trim()) ? nameEl.value.trim() : 'לקוח/ה יקר/ה';
+    let totalCust = 0;
+    let totalInstall = 0;
+    const lines = [];
+    lines.push('שלום ' + customerName + ',');
+    lines.push('להלן הצעת מחיר לארונות:');
+    lines.push('');
+    items.forEach(function(it, i) {
+        totalCust += it.customer || 0;
+        totalInstall += it.install || 0;
+        const extra = _qcExtrasSummary(it.extras);
+        lines.push((i + 1) + '. ' + _qcCabinetLabel(it) + ' — ' + _qcMoney(it.customer));
+        if (extra) lines.push('   תוספות: ' + extra);
+        lines.push('   הובלה והתקנה: ' + _qcMoney(it.install));
+        lines.push('');
+    });
+    lines.push('סה״כ ארונות: ' + _qcMoney(totalCust));
+    lines.push('סה״כ הובלה והתקנה: ' + _qcMoney(totalInstall));
+    lines.push('סה״כ לתשלום: ' + _qcMoney(totalCust + totalInstall));
+    lines.push('');
+    lines.push('אשמח לעמוד לרשותך לכל שאלה 🙂');
+    return lines.join('\n');
+};
+
+window.qcAddToQuoteList = function() {
+    if (typeof calcQuickPrice === 'function') calcQuickPrice(false);
+    const last = window._qcLastResult;
+    if (!last || !last.customer) {
+        alert('חשב קודם ארון במחשבון');
+        return;
+    }
+    const nameEl = document.getElementById('qc-cab-name');
+    window._qcQuoteList.push({
+        name: nameEl ? nameEl.value.trim() : '',
+        w: last.w, h: last.h, d: last.d, model: last.model,
+        customer: last.customer, install: last.install, cost: last.cost,
+        extras: Object.assign({}, last.extras || {})
+    });
+    if (nameEl) nameEl.value = '';
+    window._renderQcQuoteList();
+};
+
+window.qcRemoveQuoteItem = function(idx) {
+    if (!window._qcQuoteList) return;
+    window._qcQuoteList.splice(idx, 1);
+    window._renderQcQuoteList();
+};
+
+window.qcClearQuoteList = function() {
+    window._qcQuoteList = [];
+    window._renderQcQuoteList();
+};
+
+window.qcCopyCustomerQuote = function() {
+    window._renderQcQuoteList();
+    const text = window._buildQcCustomerQuoteText();
+    if (!text) {
+        alert('הוסף לפחות ארון אחד לרשימה');
+        return;
+    }
+    const done = function() {
+        alert('הטקסט הועתק — אפשר להדביק בוואטסאפ / הודעה ללקוח');
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(function() {
+            const ta = document.getElementById('qc-quote-text');
+            if (ta) { ta.focus(); ta.select(); document.execCommand('copy'); }
+            done();
+        });
+    } else {
+        const ta = document.getElementById('qc-quote-text');
+        if (ta) { ta.focus(); ta.select(); document.execCommand('copy'); }
+        done();
+    }
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+    const nameEl = document.getElementById('qc-customer-name');
+    if (nameEl) nameEl.addEventListener('input', function() { window._renderQcQuoteList(); });
+});

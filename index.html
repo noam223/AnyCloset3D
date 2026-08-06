@@ -37,7 +37,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260731cellHEdit">
     <link rel="stylesheet" href="style-mobile.css?v=20260609a">
     <link rel="stylesheet" href="style-extras.css?v=20260731rpcab">
-    <link rel="stylesheet" href="style.css?v=20260731measured">
+    <link rel="stylesheet" href="style.css?v=20260806qcQuote">
     <style>
         html.thumb-only-mode #left-sidebar,
         html.thumb-only-mode #right-sidebar,
@@ -986,17 +986,42 @@
                 </select>
             </div>
             <div class="control-group"><label>מספר מדפים נשלפים <span id="qc-allowed-shelves-label" style="color:var(--primary); font-weight:bold;">(כלול: 8)</span></label><input type="number" id="qc-shelves" class="editor-select" value="8" oninput="calcQuickPrice(false)"></div>
-            <div class="control-group"><label>מגירות פנים (150₪ ליח')</label><input type="number" id="qc-int-d" class="editor-select" value="0" oninput="calcQuickPrice()"></div>
-            <div class="control-group"><label>מגירות חוץ (200₪ ליח')</label><input type="number" id="qc-ext-d" class="editor-select" value="0" oninput="calcQuickPrice()"></div>
-            <div class="control-group"><label>יחידות כוורת (400₪ ליח')</label><input type="number" id="qc-open-cells" class="editor-select" value="0" min="0" oninput="calcQuickPrice()"></div>
+            <div class="control-group"><label>מגירות פנים</label><input type="number" id="qc-int-d" class="editor-select" value="0" min="0" oninput="calcQuickPrice()"></div>
+            <div class="control-group"><label>מגירות חוץ</label><input type="number" id="qc-ext-d" class="editor-select" value="0" min="0" oninput="calcQuickPrice()"></div>
+            <div class="control-group"><label>יחידות כוורת</label><input type="number" id="qc-open-cells" class="editor-select" value="0" min="0" oninput="calcQuickPrice()"></div>
+            <div class="control-group"><label>מחיצות</label><input type="number" id="qc-partitions" class="editor-select" value="0" min="0" oninput="calcQuickPrice()"></div>
+            <div class="control-group"><label>דלת זכוכית פרופיל עץ</label><input type="number" id="qc-door-glass-wood" class="editor-select" value="0" min="0" oninput="calcQuickPrice()"></div>
+            <div class="control-group"><label>דלת פרופיל אלומיניום</label><input type="number" id="qc-door-alum" class="editor-select" value="0" min="0" oninput="calcQuickPrice()"></div>
+            <div class="control-group"><label>תוספת זוג לדים</label><input type="number" id="qc-led-pairs" class="editor-select" value="0" min="0" oninput="calcQuickPrice()"></div>
         </div>
         <div class="control-group" style="margin-top: 15px; text-align: right;">
-            <label class="checkbox-container"><input type="checkbox" id="qc-desk" onchange="calcQuickPrice()"> <span>תוספת שולחן עבודה (+900₪)</span></label>
+            <label class="checkbox-container"><input type="checkbox" id="qc-desk" onchange="calcQuickPrice()"> <span>תוספת שולחן עבודה</span></label>
         </div>
         <div class="qc-results">
-            <div class="qc-result-row"><span>עלות ייצור (רכש):</span><span id="qc-total-cost" class="qc-factory">₪0</span></div>
+            <div class="qc-result-row" id="qc-cost-row" style="display:none;"><span>עלות ייצור (רכש):</span><span id="qc-total-cost" class="qc-factory">₪0</span></div>
             <div class="qc-result-row"><span>הובלה והתקנה:</span><span id="qc-install">₪0</span></div>
             <div class="qc-result-row qc-final"><span>מחיר ללקוח:</span><span id="qc-total-cust">₪0</span></div>
+        </div>
+
+        <div class="qc-quote-section">
+            <div class="qc-quote-title"><i class="fa-solid fa-file-lines"></i> הצעת מחיר ללקוח</div>
+            <div class="qc-grid" style="margin-bottom:10px;">
+                <div class="control-group"><label>שם לקוח</label><input type="text" id="qc-customer-name" class="editor-select" placeholder="שם הלקוח" maxlength="80"></div>
+                <div class="control-group"><label>שם הארון (אופציונלי)</label><input type="text" id="qc-cab-name" class="editor-select" placeholder="למשל: ארון חדר שינה" maxlength="80"></div>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+                <button type="button" class="view-btn" style="background:var(--primary);color:#fff;border:none;padding:9px 14px;" onclick="qcAddToQuoteList()">
+                    <i class="fa-solid fa-plus"></i> הוסף לרשימה
+                </button>
+                <button type="button" class="view-btn" style="border:1px solid var(--border);background:#fff;padding:9px 14px;" onclick="qcClearQuoteList()">
+                    <i class="fa-solid fa-trash"></i> נקה רשימה
+                </button>
+                <button type="button" class="view-btn" style="background:#059669;color:#fff;border:none;padding:9px 14px;" onclick="qcCopyCustomerQuote()">
+                    <i class="fa-solid fa-copy"></i> העתק טקסט מוכן
+                </button>
+            </div>
+            <div id="qc-quote-list" class="qc-quote-list"></div>
+            <textarea id="qc-quote-text" class="qc-quote-text" readonly placeholder="לאחר הוספת ארונות — יופיע כאן טקסט מוכן לשליחה ללקוח"></textarea>
         </div>
     </div>
 </div>
@@ -2412,7 +2437,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js"></script>
-<script src="state.js?v=20260804doorsVis"></script>
+<script src="state.js?v=20260806qcQuote"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="writing-desk-preset.js?v=20260617wdcolors"></script>
 <script src="engine-core.js?v=20260804hideHandles"></script>
