@@ -4786,8 +4786,26 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                     } else if (subType === 'door_right' || subType === 'door_left' || subType === 'door_double') {
                         if (!state.hasDoors) return;
                         const fZ = isInset ? (bodyD/2 - t/2) : (bodyD/2 + t/2 + 0.1);
-                        const doorH = zoneH + t;
-                        const doorY = zoneBottomY + zoneH / 2;
+                        // Default: extend ±t/2 over zone edges (same as before)
+                        let doorBottomY = zoneBottomY - t / 2;
+                        let doorTopY = zoneBottomY + zoneH + t / 2;
+                        // Bottom zone: cover צוקל like column doors / sub external_drawers (MAYA floor doors)
+                        const isBottomZone = (zoneIdx === 0 && r === 0);
+                        if (isBottomZone && col.type !== 'desk') {
+                            if (isInset) {
+                                const baseForInset = Math.max(state.plinthHeight, fo);
+                                doorBottomY = baseForInset + t + doorGap / 2;
+                            } else {
+                                const _bathRegalimBase = (state.presetId === 'bathroom' && isRegalim && fo === 0);
+                                let baseY = _bathRegalimBase
+                                    ? (state.plinthHeight - t)
+                                    : Math.max(state.plinthHeight, fo);
+                                if (state.plinthHeight === 7 && fo === 0 && !_bathRegalimBase) baseY = 1.5;
+                                doorBottomY = baseY + doorGap / 2;
+                            }
+                        }
+                        const doorH = Math.max(2, doorTopY - doorBottomY);
+                        const doorY = (doorBottomY + doorTopY) / 2;
                         const doorMat = _subDoorMat();
                         if (subType === 'door_double') {
                             const halfW = (subW + t) / 2;
@@ -4838,8 +4856,24 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                     } else if (subType === 'door_flap') {
                         if (!state.hasDoors) return;
                         const fZ = isInset ? (bodyD/2 - t/2) : (bodyD/2 + t/2 + 0.1);
-                        const flapH = zoneH + t;
-                        const flapY = zoneBottomY + zoneH / 2;
+                        let flapBottomY = zoneBottomY - t / 2;
+                        let flapTopY = zoneBottomY + zoneH + t / 2;
+                        const isBottomZoneFlap = (zoneIdx === 0 && r === 0);
+                        if (isBottomZoneFlap && col.type !== 'desk') {
+                            if (isInset) {
+                                const baseForInset = Math.max(state.plinthHeight, fo);
+                                flapBottomY = baseForInset + t + doorGap / 2;
+                            } else {
+                                const _bathRegalimBase = (state.presetId === 'bathroom' && isRegalim && fo === 0);
+                                let baseY = _bathRegalimBase
+                                    ? (state.plinthHeight - t)
+                                    : Math.max(state.plinthHeight, fo);
+                                if (state.plinthHeight === 7 && fo === 0 && !_bathRegalimBase) baseY = 1.5;
+                                flapBottomY = baseY + doorGap / 2;
+                            }
+                        }
+                        const flapH = Math.max(2, flapTopY - flapBottomY);
+                        const flapY = (flapBottomY + flapTopY) / 2;
                         const flapW = subW + t;
                         _subCreateDoorPanel(flapW, flapH, subCenterX, flapY, fZ, _subDoorMat());
                         if (!isBP && doorStyle !== 'glass_mirror') {
@@ -4848,13 +4882,13 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                 const handleH = Math.min(flapH * 0.25, 12);
                                 const handleMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, handleH, 12), _handleMat3D());
                                 handleMesh.rotation.z = Math.PI / 2;
-                                handleMesh.position.set(subCenterX + flapW * 0.35, zoneBottomY + 4, hz);
+                                handleMesh.position.set(subCenterX + flapW * 0.35, flapBottomY + 4, hz);
                                 _buildGroup.add(handleMesh);
                                 _registerDoorMesh(handleMesh);
                             } else if (hs === 'riding') {
                                 const barLen = Math.min(RIDING_HANDLE_LEN, Math.max(8, flapW - 4));
                                 const bar = new THREE.Mesh(new THREE.BoxGeometry(barLen, 0.8, 0.8), _handleMat3D());
-                                bar.position.set(subCenterX, zoneBottomY + 0.6, hz);
+                                bar.position.set(subCenterX, flapBottomY + 0.6, hz);
                                 _buildGroup.add(bar);
                                 _registerDoorMesh(bar);
                             }
