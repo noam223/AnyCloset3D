@@ -73,16 +73,16 @@ function _bpDrawSideDeskFrontParts(p, desk, ox, oy, dW, dH, sc, fill, STROKE, ST
         const dimOuterX = dSide === 'left' ? (deskX - 14) : (deskX + dSvgW + 14);
         const drawerSvgY0 = deskTopY + deskSurfT;
         if (dSide === 'left') {
-            dimVLeftFn(dimOuterX, drawerSvgY0, drawerSvgY0 + drawerH * sc, `${Math.round(drawerH * 10)}`);
-            dimVLeftFn(dimOuterX - 36, drawerSvgY0 + drawerH * sc, deskBotY, `${Math.round((dHeight - DESK_SURFACE_T - drawerH) * 10)}`);
+            dimVLeftFn(dimOuterX, drawerSvgY0, drawerSvgY0 + drawerH * sc, `${_bpMm(drawerH)}`);
+            dimVLeftFn(dimOuterX - 36, drawerSvgY0 + drawerH * sc, deskBotY, `${_bpMm((dHeight - DESK_SURFACE_T - drawerH))}`);
         } else {
-            dimVFn(dimOuterX, drawerSvgY0, drawerSvgY0 + drawerH * sc, `${Math.round(drawerH * 10)}`);
-            dimVFn(dimOuterX + 36, drawerSvgY0 + drawerH * sc, deskBotY, `${Math.round((dHeight - DESK_SURFACE_T - drawerH) * 10)}`);
+            dimVFn(dimOuterX, drawerSvgY0, drawerSvgY0 + drawerH * sc, `${_bpMm(drawerH)}`);
+            dimVFn(dimOuterX + 36, drawerSvgY0 + drawerH * sc, deskBotY, `${_bpMm((dHeight - DESK_SURFACE_T - drawerH))}`);
         }
     }
-    dimHFn(deskX, deskX + dSvgW, oy + dH + 36, `${Math.round(dWidth * 10)}`);
-    if (dSide === 'left') dimVLeftFn(deskX - 14, deskTopY, deskBotY, `${Math.round(dHeight * 10)}`);
-    else dimVFn(deskX + dSvgW + 14, deskTopY, deskBotY, `${Math.round(dHeight * 10)}`);
+    dimHFn(deskX, deskX + dSvgW, oy + dH + 36, `${_bpMm(dWidth)}`);
+    if (dSide === 'left') dimVLeftFn(deskX - 14, deskTopY, deskBotY, `${_bpMm(dHeight)}`);
+    else dimVFn(deskX + dSvgW + 14, deskTopY, deskBotY, `${_bpMm(dHeight)}`);
     const midX = deskX + dSvgW / 2;
     const midY = deskTopY + dSvgH / 2;
     p.push(`<text x="${midX.toFixed(1)}" y="${(midY + 4).toFixed(1)}" text-anchor="middle" font-family="${FONT || 'Rubik,Tahoma,sans-serif'}" font-size="11" fill="${STROKE}" opacity="0.85">שולחן צד</text>`);
@@ -135,16 +135,16 @@ function _bpDrawWritingDeskFrontParts(p, wd, ox, oy, dW, dH, sc, fill, STROKE, S
             const hndY = drawerSvgY + drawerSvgH * 0.5;
             p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX + hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
         }
-        dimVFn(ox + dW + 14, drawerSvgY, drawerSvgY + drawerSvgH, `${Math.round(drawerHcm * 10)}`);
-        dimVFn(ox + dW + 48, drawerSvgY + drawerSvgH, deskBotY, `${Math.round((dHeight - DESK_SURFACE_T - drawerHcm) * 10)}`);
+        dimVFn(ox + dW + 14, drawerSvgY, drawerSvgY + drawerSvgH, `${_bpMm(drawerHcm)}`);
+        dimVFn(ox + dW + 48, drawerSvgY + drawerSvgH, deskBotY, `${_bpMm((dHeight - DESK_SURFACE_T - drawerHcm))}`);
     } else {
         drawRect(ox + legT, deskTopY + deskSurfT, dW - 2 * legT, dH - deskSurfT, 'white', STROKE_THIN || STROKE, 0.5);
     }
 
-    dimHFn(ox, ox + dW, deskBotY + 36, `${Math.round(dWidth * 10)}`);
-    dimVLeftFn(ox - 14, deskTopY, deskBotY, `${Math.round(dHeight * 10)}`);
+    dimHFn(ox, ox + dW, deskBotY + 36, `${_bpMm(dWidth)}`);
+    dimVLeftFn(ox - 14, deskTopY, deskBotY, `${_bpMm(dHeight)}`);
     if (dW - 2 * legT > 20) {
-        dimHFn(ox + legT, ox + dW - legT, deskBotY + 18, `${Math.round((dWidth - 2 * legTCm) * 10)}`, false);
+        dimHFn(ox + legT, ox + dW - legT, deskBotY + 18, `${_bpMm((dWidth - 2 * legTCm))}`, false);
     }
     const midX = ox + dW / 2;
     const midY = deskTopY + dH / 2;
@@ -172,10 +172,10 @@ function _bpDrawWritingDeskSideParts(p, wd, ox, oy, dW, dH, sc, fill, STROKE, ST
         const drawerSvgY = deskTopY + deskSurfT;
         const drawerFrontW = legT;
         drawRect(ox, drawerSvgY + 1, drawerFrontW, drawerSvgH - 2, 'rgba(255,255,255,0.7)', STROKE_THIN || STROKE, 0.8);
-        dimVLeftFn(ox - 14, drawerSvgY, drawerSvgY + drawerSvgH, `${Math.round(drawerHcm * 10)}`);
+        dimVLeftFn(ox - 14, drawerSvgY, drawerSvgY + drawerSvgH, `${_bpMm(drawerHcm)}`);
     }
-    dimHFn(ox, ox + dW, deskBotY + 36, `${Math.round(dDepth * 10)}`);
-    dimVLeftFn(ox - 14, deskTopY, deskBotY, `${Math.round(dHeight * 10)}`);
+    dimHFn(ox, ox + dW, deskBotY + 36, `${_bpMm(dDepth)}`);
+    dimVLeftFn(ox - 14, deskTopY, deskBotY, `${_bpMm(dHeight)}`);
     p.push(`<text x="${(ox + dW / 2).toFixed(1)}" y="${(deskTopY + dH / 2 + 4).toFixed(1)}" text-anchor="middle" font-family="${FONT || 'Rubik,Tahoma,sans-serif'}" font-size="11" fill="${STROKE}" opacity="0.7">מבט צד</text>`);
 }
 
@@ -194,7 +194,7 @@ function _bpDrawSideCabinetFrontParts(p, sc, ox, oy, dW, dH, scScale, wgH, pH, d
         drawRectFn(scX, scTopY, scSvgW, scSvgH, FILL_SC, STROKE, 1.5);
         if (scPH > 0) drawRectFn(scX, oy + dH - scPH, scSvgW, scPH, '#cbd5e1', STROKE, 1);
         p.push(`<text x="${(scX + scSvgW / 2).toFixed(1)}" y="${(scTopY + scSvgH / 2 + 4).toFixed(1)}" text-anchor="middle" font-family="${FONT || 'Rubik,Tahoma,sans-serif'}" font-size="11" fill="${STROKE}" opacity="0.85">ארון צד</text>`);
-        dimHFn(scX, scX + scSvgW, oy + dH + 52, `${Math.round(scWcm * 10)}`);
+        dimHFn(scX, scX + scSvgW, oy + dH + 52, `${_bpMm(scWcm)}`);
     };
     if (sc.side === 'right' || sc.side === 'both') drawOne(true, sc.widthRight || sc.width || 40);
     if (sc.side === 'left' || sc.side === 'both') drawOne(false, sc.widthLeft || sc.width || 40);
@@ -480,7 +480,7 @@ function _bpDrawShorterColumnOverallHeights(dimVFn, cols, colXPositions, oy, dH,
             dimX = cp.x2 + 18 + rightSlot * 22;
             rightSlot++;
         }
-        dimVFn(dimX, topY, botY, `${Math.round(h * 10)}`);
+        dimVFn(dimX, topY, botY, `${_bpMm(h)}`);
     });
 }
 
@@ -560,7 +560,7 @@ function _bpClearCellHeightCm(rowBotCm, rowTopCm, shelfT) {
 }
 
 function _bpClearCellHeightMm(rowBotCm, rowTopCm, shelfT) {
-    return Math.round(_bpClearCellHeightCm(rowBotCm, rowTopCm, shelfT) * 10);
+    return _bpMm(_bpClearCellHeightCm(rowBotCm, rowTopCm, shelfT));
 }
 
 function _bpClearCellHeightLabel(rowBotCm, rowTopCm, shelfT) {
@@ -628,8 +628,14 @@ function _bpColumnHasHoneycomb(col) {
     return false;
 }
 
+/** cm → mm label with 1 decimal (e.g. 72.45 → "724.5"). */
+function _bpMm(cm) {
+    const n = Math.round((Number(cm) || 0) * 100) / 10;
+    return n.toFixed(1);
+}
+
 function _bpHoneycombInnerWidthMm(wCm, tCm) {
-    return Math.round((wCm - 2 * tCm) * 10);
+    return _bpMm((+wCm) - 2 * (+tCm));
 }
 
 /** Clear opening width (mm) of a partition sub-zone — matches engine-core half-board trim. */
@@ -637,7 +643,7 @@ function _bpPartitionZoneClearWidthMm(colWcm, zoneStartRatio, zoneEndRatio, part
     const spanCm = (+colWcm) * ((+zoneEndRatio) - (+zoneStartRatio));
     const leftTrim = (zi === 0) ? 0 : (+partTcm) / 2;
     const rightTrim = (zi === numZones - 1) ? 0 : (+partTcm) / 2;
-    return Math.max(1, Math.round((spanCm - leftTrim - rightTrim) * 10));
+    return _bpMm(Math.max(0.1, spanCm - leftTrim - rightTrim));
 }
 
 function _bpHoneycombInnerSvgSpan(cp, sc, tCm) {
@@ -722,7 +728,7 @@ function _bpDrawHoneycombBlock(p, ctx) {
     } = ctx;
     const tCm = state.thickness || 1.7;
     const tPx = tCm * sc;
-    const tMm = Math.round(tCm * 10);
+    const tMm = _bpMm(tCm);
     const botCm = rowBounds[block.startR];
     const topCm = rowBounds[block.endR + 1];
     const blockTopSvg = colBotSvgY - topCm * sc;
@@ -983,7 +989,7 @@ window._generateMultiViewBlueprintSVG = function() {
         if (tPx < 0.4) return;
         const halfT = tPx / 2;
         rect(x1, sy - halfT, x2 - x1, tPx, '#94a3b8', STROKE_THIN, 1);
-        if (showLabel !== false && x2 - x1 > 16) p.push(`<text x="${((x1+x2)/2).toFixed(1)}" y="${(sy+3).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(t * 10)}</text>`);
+        if (showLabel !== false && x2 - x1 > 16) p.push(`<text x="${((x1+x2)/2).toFixed(1)}" y="${(sy+3).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${_bpMm(t)}</text>`);
     };
     const vline = (x, y1, y2, sc) => {
         const t = state.thickness || 1.7;
@@ -993,7 +999,7 @@ window._generateMultiViewBlueprintSVG = function() {
         rect(x - halfT, y1, tPx, y2 - y1, '#94a3b8', STROKE_THIN, 1);
         if (y2 - y1 > 14) {
             const my = (y1 + y2) / 2;
-            p.push(`<text x="${(x + halfT + 3).toFixed(1)}" y="${(my+3).toFixed(1)}" text-anchor="start" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(t * 10)}</text>`);
+            p.push(`<text x="${(x + halfT + 3).toFixed(1)}" y="${(my+3).toFixed(1)}" text-anchor="start" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${_bpMm(t)}</text>`);
         }
     };
     const panelBox = (px,py,pw,ph,lbl) => {
@@ -1191,11 +1197,11 @@ window._generateMultiViewBlueprintSVG = function() {
             const cuLabel = state.corner.type === 'desk' ? 'שולחן פינתי' : 'שידה פינתית';
             p.push(`<text x="${wx((cuX1+cuX2)/2).toFixed(1)}" y="${(wz(cD + cuW_fp/2)+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.8">${cuLabel}</text>`);
             // Dimensions: width (horizontal, below the unit) and depth (vertical, on the outer side)
-            dimH(wx(cuX1), wx(cuX2), wz(cD + cuW_fp) + 14, `${Math.round(cuD_fp * 10)}`);
+            dimH(wx(cuX1), wx(cuX2), wz(cD + cuW_fp) + 14, `${_bpMm(cuD_fp)}`);
             if (cuSide === 'right') {
-                dimV(wx(cuX2) + 14, wz(cD), wz(cD + cuW_fp), `${Math.round(cuW_fp * 10)}`);
+                dimV(wx(cuX2) + 14, wz(cD), wz(cD + cuW_fp), `${_bpMm(cuW_fp)}`);
             } else {
-                dimVLeft(wx(cuX1) - 14, wz(cD), wz(cD + cuW_fp), `${Math.round(cuW_fp * 10)}`);
+                dimVLeft(wx(cuX1) - 14, wz(cD), wz(cD + cuW_fp), `${_bpMm(cuW_fp)}`);
             }
         }
 
@@ -1209,7 +1215,7 @@ window._generateMultiViewBlueprintSVG = function() {
                 const scX2 = onRight ? cW/2 + scWcm : -cW/2;
                 rect(wx(scX1), wz(0), scWcm*sc, cD*sc, FILL_SC, STROKE, 1.5);
                 p.push(`<text x="${wx((scX1+scX2)/2).toFixed(1)}" y="${(wz(cD/2)+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.8">ארון צד</text>`);
-                dimH(wx(scX1), wx(scX2), wz(cD) + 14, `${Math.round(scWcm * 10)}`);
+                dimH(wx(scX1), wx(scX2), wz(cD) + 14, `${_bpMm(scWcm)}`);
             };
             if (scSideFP2 === 'right' || scSideFP2 === 'both') _drawSCFP(true);
             if (scSideFP2 === 'left'  || scSideFP2 === 'both') _drawSCFP(false);
@@ -1223,15 +1229,15 @@ window._generateMultiViewBlueprintSVG = function() {
             const deskX2 = deskOnRight ? cW/2 + deskFPW : -cW/2;
             rect(wx(deskX1), wz(0), deskFPW*sc, cD*sc, FILL_DESK_FP, STROKE, 1.5);
             p.push(`<text x="${wx((deskX1+deskX2)/2).toFixed(1)}" y="${(wz(cD/2)+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.85">שולחן צד</text>`);
-            dimH(wx(deskX1), wx(deskX2), wz(cD) + 24, `${Math.round(deskFPW * 10)}`);
+            dimH(wx(deskX1), wx(deskX2), wz(cD) + 24, `${_bpMm(deskFPW)}`);
         }
 
         // Dimension lines
         // Total width at TOP — above all other horizontal dims (above 100/311 lines)
         const dimRowTop = wz(0) - 28; // above cabinet top edge, above the sub-dims at wz(0)-14
-        dimH(wx(minX), wx(maxX), dimRowTop, `${Math.round(tW * 10)}`);
+        dimH(wx(minX), wx(maxX), dimRowTop, `${_bpMm(tW)}`);
         // Center cabinet width: just above the cabinet top edge (not at bottom)
-        if (hasLeft || hasRight) dimH(wx(-cW/2), wx(cW/2), wz(0) - 14, `${Math.round(cW * 10)}`);
+        if (hasLeft || hasRight) dimH(wx(-cW/2), wx(cW/2), wz(0) - 14, `${_bpMm(cW)}`);
 
         const hasRightFC = hasRight && rPos === 'full_corner';
         const hasLeftFC  = hasLeft  && lPos === 'full_corner';
@@ -1244,53 +1250,53 @@ window._generateMultiViewBlueprintSVG = function() {
             // U-shape / walk-in: left depth on LEFT, right depth on RIGHT
             const leftTotalD = fcSizeL + lW;
             const rightTotalD = fcSizeR + rW;
-            dimVLeft(wx(minX) - 54, wz(0), wz(leftTotalD), `${Math.round(leftTotalD * 10)}`);
-            dimV(wx(maxX) + 74, wz(0), wz(rightTotalD), `${Math.round(rightTotalD * 10)}`);
+            dimVLeft(wx(minX) - 54, wz(0), wz(leftTotalD), `${_bpMm(leftTotalD)}`);
+            dimV(wx(maxX) + 74, wz(0), wz(rightTotalD), `${_bpMm(rightTotalD)}`);
         } else if (hasLeftFC && !hasRightFC) {
             // Left corner only: total depth on RIGHT side
-            dimV(wx(maxX) + 74, wz(minZ), wz(maxZ), `${Math.round(tD * 10)}`);
+            dimV(wx(maxX) + 74, wz(minZ), wz(maxZ), `${_bpMm(tD)}`);
         } else {
             // Right corner or no corner: total depth on LEFT side
-            dimVLeft(wx(minX) - 54, wz(minZ), wz(maxZ), `${Math.round(tD * 10)}`);
+            dimVLeft(wx(minX) - 54, wz(minZ), wz(maxZ), `${_bpMm(tD)}`);
         }
 
         // Center cabinet depth — only show if center is shorter than total depth
         if (cD < tD && !(hasLeftFC && hasRightFC)) {
             if (hasRightFC) {
-                dimVLeft(wx(-cW/2) - 14, wz(0), wz(cD), `${Math.round(cD * 10)}`);
+                dimVLeft(wx(-cW/2) - 14, wz(0), wz(cD), `${_bpMm(cD)}`);
             } else {
-                dimVLeft(wx(cW/2) + 34, wz(0), wz(cD), `${Math.round(cD * 10)}`);
+                dimVLeft(wx(cW/2) + 34, wz(0), wz(cD), `${_bpMm(cD)}`);
             }
         }
 
         // Right wing depth (side position) — label on LEFT side of the right wing
-        if (hasRight && rPos === 'side') dimVLeft(wx(cW/2) - 14, wz(0), wz(rW), `${Math.round(rW * 10)}`);
+        if (hasRight && rPos === 'side') dimVLeft(wx(cW/2) - 14, wz(0), wz(rW), `${_bpMm(rW)}`);
         // Left wing depth (side position)
-        if (hasLeft && lPos === 'side') dimVLeft(wx(-cW/2 - lD) - 14, wz(0), wz(lW), `${Math.round(lW * 10)}`);
+        if (hasLeft && lPos === 'side') dimVLeft(wx(-cW/2 - lD) - 14, wz(0), wz(lW), `${_bpMm(lW)}`);
         // Front (פנימי) wings — protrusion beyond center front face
         if (hasRight && rPos === 'front') {
-            dimV(wx(cW/2) + 14, wz(cD), wz(cD + rW), `${Math.round(rW * 10)}`);
-            dimH(wx(cW/2 - rD), wx(cW/2), wz(cD + rW) + 14, `${Math.round(rD * 10)}`);
+            dimV(wx(cW/2) + 14, wz(cD), wz(cD + rW), `${_bpMm(rW)}`);
+            dimH(wx(cW/2 - rD), wx(cW/2), wz(cD + rW) + 14, `${_bpMm(rD)}`);
         }
         if (hasLeft && lPos === 'front') {
-            dimVLeft(wx(-cW/2) - 14, wz(cD), wz(cD + lW), `${Math.round(lW * 10)}`);
-            dimH(wx(-cW/2), wx(-cW/2 + lD), wz(cD + lW) + 14, `${Math.round(lD * 10)}`);
+            dimVLeft(wx(-cW/2) - 14, wz(cD), wz(cD + lW), `${_bpMm(lW)}`);
+            dimH(wx(-cW/2), wx(-cW/2 + lD), wz(cD + lW) + 14, `${_bpMm(lD)}`);
         }
 
         // full_corner dims
         if (hasRightFC) {
-            dimH(wx(cW/2), wx(cW/2 + fcSizeR), wz(0) - 14, `${Math.round(fcSizeR * 10)}`);
+            dimH(wx(cW/2), wx(cW/2 + fcSizeR), wz(0) - 14, `${_bpMm(fcSizeR)}`);
             // Corner depth + wing width on RIGHT side, label right — use +54 to match total depth line spacing
-            dimV(wx(cW/2 + fcSizeR) + 54, wz(0), wz(fcSizeR), `${Math.round(fcSizeR * 10)}`);
-            if (rW > 0) dimV(wx(cW/2 + fcSizeR) + 54, wz(fcSizeR), wz(fcSizeR + rW), `${Math.round(rW * 10)}`);
-            if (rW > 0) dimH(wx(cW/2 + fcSizeR - rD), wx(cW/2 + fcSizeR), wz(fcSizeR + rW) + 28, `${Math.round(rD * 10)}`);
+            dimV(wx(cW/2 + fcSizeR) + 54, wz(0), wz(fcSizeR), `${_bpMm(fcSizeR)}`);
+            if (rW > 0) dimV(wx(cW/2 + fcSizeR) + 54, wz(fcSizeR), wz(fcSizeR + rW), `${_bpMm(rW)}`);
+            if (rW > 0) dimH(wx(cW/2 + fcSizeR - rD), wx(cW/2 + fcSizeR), wz(fcSizeR + rW) + 28, `${_bpMm(rD)}`);
         }
         if (hasLeftFC) {
-            dimH(wx(-cW/2 - fcSizeL), wx(-cW/2), wz(0) - 14, `${Math.round(fcSizeL * 10)}`);
+            dimH(wx(-cW/2 - fcSizeL), wx(-cW/2), wz(0) - 14, `${_bpMm(fcSizeL)}`);
             // Corner depth + wing width on LEFT side, label left
-            dimVLeft(wx(-cW/2 - fcSizeL) - 14, wz(0), wz(fcSizeL), `${Math.round(fcSizeL * 10)}`);
-            if (lW > 0) dimVLeft(wx(-cW/2 - fcSizeL) - 14, wz(fcSizeL), wz(fcSizeL + lW), `${Math.round(lW * 10)}`);
-            if (lW > 0) dimH(wx(-cW/2 - fcSizeL), wx(-cW/2 - fcSizeL + lD), wz(fcSizeL + lW) + 28, `${Math.round(lD * 10)}`);
+            dimVLeft(wx(-cW/2 - fcSizeL) - 14, wz(0), wz(fcSizeL), `${_bpMm(fcSizeL)}`);
+            if (lW > 0) dimVLeft(wx(-cW/2 - fcSizeL) - 14, wz(fcSizeL), wz(fcSizeL + lW), `${_bpMm(lW)}`);
+            if (lW > 0) dimH(wx(-cW/2 - fcSizeL), wx(-cW/2 - fcSizeL + lD), wz(fcSizeL + lW) + 28, `${_bpMm(lD)}`);
         }
     }
 
@@ -1299,7 +1305,7 @@ window._generateMultiViewBlueprintSVG = function() {
         const _bpViewKey = wg.wd === leftWing ? 'left' : wg.wd === rightWing ? 'right' : 'center';
         const py = MARGIN + 22 + GAP + (TOP_H + LABEL_H) + GAP + wi * (WING_H + LABEL_H + GAP);
         const pw = SVG_W - MARGIN * 2;
-        panelBox(MARGIN, py, pw, WING_H, `שרטוט חזית — ${wg.label} | רוחב: ${Math.round(wg.w * 10)} מ"מ | גובה: ${Math.round(wg.h * 10)} מ"מ | עומק: ${Math.round(wg.d * 10)} מ"מ`);
+        panelBox(MARGIN, py, pw, WING_H, `שרטוט חזית — ${wg.label} | רוחב: ${_bpMm(wg.w)} מ"מ | גובה: ${_bpMm(wg.h)} מ"מ | עומק: ${_bpMm(wg.d)} מ"מ`);
         const drawY = py + LABEL_H;
         const _isCenterWg = wg.wd === centerWing;
         const _horizExtra = _isCenterWg ? _bpCenterHorizExtra(centerWing) : { left: 0, right: 0 };
@@ -1482,7 +1488,7 @@ window._generateMultiViewBlueprintSVG = function() {
                     const upperMidOld = (_colTopY + _splitBandTopOld) / 2;
                     p.push(`<text x="${(colX + 6).toFixed(1)}" y="${(lowerMidOld + 4).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.5">ארון תחתון</text>`);
                     p.push(`<text x="${(colX + 6).toFixed(1)}" y="${(upperMidOld + 4).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.5">ארון עליון</text>`);
-                    p.push(`<text x="${(colX + colW / 2).toFixed(1)}" y="${(_splitBandTopOld + _splitBandHOld / 2 + 3).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(_splitTOld * 10)}</text>`);
+                    p.push(`<text x="${(colX + colW / 2).toFixed(1)}" y="${(_splitBandTopOld + _splitBandHOld / 2 + 3).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${_bpMm(_splitTOld)}</text>`);
                 }
             }
 
@@ -1514,9 +1520,9 @@ window._generateMultiViewBlueprintSVG = function() {
                         p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
                     }
                     // Dimension: drawer height (right side of column)
-                    dimV(colX + colW + 14, drawerY, drawerY + drawerPxH, `${Math.round(drawerH * 10)}`);
+                    dimV(colX + colW + 14, drawerY, drawerY + drawerPxH, `${_bpMm(drawerH)}`);
                     // Dimension: floor to drawer bottom (gap from floor to bottom of drawer)
-                    dimV(colX + colW + 50, drawerY + drawerPxH, _colBotY, `${Math.round((deskH - DESK_SURFACE_T - drawerH) * 10)}`);
+                    dimV(colX + colW + 50, drawerY + drawerPxH, _colBotY, `${_bpMm((deskH - DESK_SURFACE_T - drawerH))}`);
                 }
                 // Clearance board (shelf above clearance zone) — measured from column bottom
                 const clrBoardY = _colBotY - (deskH + deskClr) * sc;
@@ -1737,7 +1743,7 @@ window._generateMultiViewBlueprintSVG = function() {
                     const my = (y1 + y2) / 2;
                     const tx = labelSide === 'left' ? (x - halfT - 3) : (x + halfT + 3);
                     const anchor = labelSide === 'left' ? 'end' : 'start';
-                    p.push(`<text x="${tx.toFixed(1)}" y="${(my+3).toFixed(1)}" text-anchor="${anchor}" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(t * 10)}</text>`);
+                    p.push(`<text x="${tx.toFixed(1)}" y="${(my+3).toFixed(1)}" text-anchor="${anchor}" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${_bpMm(t)}</text>`);
                 }
             }, ox, dW, colXPositions, sc);
         }
@@ -1778,7 +1784,7 @@ window._generateMultiViewBlueprintSVG = function() {
         const _hasMultiCols = colXPositions.length > 1;
         const dimY = _plinthBottomY + (_hasMultiCols ? 54 : 36);
         // Total width (below plinth)
-        dimH(ox, ox + dW, dimY, `${Math.round(wg.w * 10)}`);
+        dimH(ox, ox + dW, dimY, `${_bpMm(wg.w)}`);
         // Per-column width dims — placed just below the plinth bottom
         {
             const _tCmHC = state.thickness || 1.7;
@@ -1792,14 +1798,14 @@ window._generateMultiViewBlueprintSVG = function() {
                     const faceY = (cp.colTopY != null) ? cp.colTopY : oy;
                     const faceH = (cp.colBotY != null && cp.colTopY != null) ? (cp.colBotY - cp.colTopY) : dH;
                     _bpMaybePushColWidthDim(p, _bpViewKey, ci, cp.x1, cp.x2, _plinthBottomY + 18,
-                        `${Math.round(cp.wCm * 10)}`, dimH, false, faceY, faceH);
+                        `${_bpMm(cp.wCm)}`, dimH, false, faceY, faceH);
                 }
             });
         }
         // Total height (left side) — from floor (oy+dH) to highest column top
         // box is raised by floorOffset; top = oy+dH - fo*sc - visibleH*sc = oy+dH - (fo + visibleH)*sc = oy+dH - height*sc
         const _wgMaxTopY = cols.length > 0 ? Math.min(...cols.map(c => oy + dH - (c.height || wg.h) * sc)) : oy;
-        const _wgTotalHcm = cols.length > 0 ? Math.round(Math.max(...cols.map(c => (c.height || wg.h))) * 10) : Math.round(wg.h * 10);
+        const _wgTotalHcm = cols.length > 0 ? _bpMm(Math.max(...cols.map(c => (c.height || wg.h)))) : _bpMm(wg.h);
         dimV(ox - 54, _wgMaxTopY, oy + dH, `${_wgTotalHcm}`);
         _bpDrawShorterColumnOverallHeights(dimV, cols, colXPositions, oy, dH, sc, wg.h, ox, dW);
         // ---- Bathroom preset: right-side external dims (body height + floor offset + drawer heights) ----
@@ -1816,10 +1822,10 @@ window._generateMultiViewBlueprintSVG = function() {
                 const _colBotY5o = oy + dH - _fo5o * sc;
                 const _colTopY5o = _colBotY5o - _bodyH5o * sc;
                 // Body height on right side
-                dimVLeft(ox + dW + 38, _colTopY5o, _colBotY5o, `${Math.round(_bodyH5o * 10)}`);
+                dimVLeft(ox + dW + 38, _colTopY5o, _colBotY5o, `${_bpMm(_bodyH5o)}`);
                 // Floor offset (only for hanging cabinet)
                 if (_fo5o > 0) {
-                    dimV(ox + dW + 76, _colBotY5o, oy + dH, `${Math.round(_fo5o * 10)}`);
+                    dimV(ox + dW + 76, _colBotY5o, oy + dH, `${_bpMm(_fo5o)}`);
                 }
             }
             // External drawer row heights on right side.
@@ -1848,12 +1854,12 @@ window._generateMultiViewBlueprintSVG = function() {
                                 const dSvgTop4o = rowSvgTop4o + di4o * singleDrawerSvgH4o;
                                 const dSvgBot4o = dSvgTop4o + singleDrawerSvgH4o;
                                 if (dSvgBot4o - dSvgTop4o > 8) {
-                                    dimVLeft(ox + dW + 38, dSvgTop4o, dSvgBot4o, `${Math.round(singleDrawerHcm4o * 10)}`);
+                                    dimVLeft(ox + dW + 38, dSvgTop4o, dSvgBot4o, `${_bpMm(singleDrawerHcm4o)}`);
                                 }
                             }
                         } else {
                             if (rowSvgBot4o - rowSvgTop4o > 8) {
-                                dimVLeft(ox + dW + 38, rowSvgTop4o, rowSvgBot4o, `${Math.round(rowHcm4o * 10)}`);
+                                dimVLeft(ox + dW + 38, rowSvgTop4o, rowSvgBot4o, `${_bpMm(rowHcm4o)}`);
                             }
                         }
                     }
@@ -1887,15 +1893,15 @@ window._generateMultiViewBlueprintSVG = function() {
                     const _bodyH = (_hangColOld.height || wg.h) - _foH;
                     const _colBotH = oy + dH - _foH * sc;
                     const _colTopH = _colBotH - _bodyH * sc;
-                    dimVLeft(ox + dW + 38, _colTopH, _colBotH, `${Math.round(_bodyH * 10)}`);
-                    dimV(ox + dW + 76, _colBotH, oy + dH, `${Math.round(_foH * 10)}`);
+                    dimVLeft(ox + dW + 38, _colTopH, _colBotH, `${_bpMm(_bodyH)}`);
+                    dimV(ox + dW + 76, _colBotH, oy + dH, `${_bpMm(_foH)}`);
                 } else {
                     let _foDimX = ox + dW + (_hasFloorPlinthOld ? 38 : 18);
                     colXPositions.forEach((cp, ci) => {
                         const _col = cols[ci];
                         const _fo = (_col && _col.floorOffset) ? _col.floorOffset : 0;
                         if (_fo > 0) {
-                            dimV(_foDimX, cp.colBotY, oy + dH, `${Math.round(_fo * 10)}`);
+                            dimV(_foDimX, cp.colBotY, oy + dH, `${_bpMm(_fo)}`);
                             _foDimX += 36;
                         }
                     });
@@ -1920,14 +1926,14 @@ window._generateMultiViewBlueprintSVG = function() {
                     const _sideSvgWL = _cWBP * sc;
                     const _sideXL = ox - _sideSvgWL;
                     rect(_sideXL, oy, _sideSvgWL, wg.h * sc, FILL_CL, STROKE_CL, 1.5);
-                    dimH(_sideXL, ox, oy + dH + 20, `${Math.round(_cWBP * 10)}`);
+                    dimH(_sideXL, ox, oy + dH + 20, `${_bpMm(_cWBP)}`);
                 }
                 // Right side panel
                 if (_rwBP === 'right' || _rwBP === 'both') {
                     const _sideSvgWR = _cWRBP * sc;
                     const _sideXR = ox + dW;
                     rect(_sideXR, oy, _sideSvgWR, wg.h * sc, FILL_CL, STROKE_CL, 1.5);
-                    dimH(_sideXR, _sideXR + _sideSvgWR, oy + dH + 20, `${Math.round(_cWRBP * 10)}`);
+                    dimH(_sideXR, _sideXR + _sideSvgWR, oy + dH + 20, `${_bpMm(_cWRBP)}`);
                 }
                 // Ceiling panel: spans from leftmost edge to rightmost edge
                 {
@@ -1936,14 +1942,14 @@ window._generateMultiViewBlueprintSVG = function() {
                     const _ceilXBP    = ox - _leftExtra;
                     const _ceilWBP    = _leftExtra + dW + _rightExtra;
                     rect(_ceilXBP, oy - _ceilSvgHBP, _ceilWBP, _ceilSvgHBP, FILL_CL, STROKE_CL, 1.5);
-                    dimV(_ceilXBP - 18, oy - _ceilSvgHBP, oy, `${Math.round(_cCWBP * 10)}`);
+                    dimV(_ceilXBP - 18, oy - _ceilSvgHBP, oy, `${_bpMm(_cCWBP)}`);
                 }
             }
         }
         // Plinth height dim — only when at least one column has a visible plinth on the floor
         if (_hasFloorPlinthOld) {
             const plinthDimX = ox + dW + 18;
-            dimV(plinthDimX, oy + dH - pH*sc, oy + dH, `${Math.round(pH * 10)}`);
+            dimV(plinthDimX, oy + dH - pH*sc, oy + dH, `${_bpMm(pH)}`);
         }
     });
 
@@ -2009,7 +2015,7 @@ window._generateMultiViewBlueprintPages = function() {
         if (tPx < 0.4) return;
         const halfT = tPx / 2;
         makeRect(p, x1, sy - halfT, x2 - x1, tPx, '#94a3b8', STROKE_THIN, 1);
-        if (showLabel !== false && x2 - x1 > 16) p.push(`<text x="${((x1+x2)/2).toFixed(1)}" y="${(sy+3).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(t * 10)}</text>`);
+        if (showLabel !== false && x2 - x1 > 16) p.push(`<text x="${((x1+x2)/2).toFixed(1)}" y="${(sy+3).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${_bpMm(t)}</text>`);
     };
     const makeVline = (p, x, y1, y2, sc, tCm, labelSide) => {
         const t = tCm != null ? tCm : (state.thickness || 1.7);
@@ -2020,8 +2026,8 @@ window._generateMultiViewBlueprintPages = function() {
         if (y2 - y1 > 14) {
             const my = (y1 + y2) / 2;
             const side = labelSide || 'right';
-            if (side === 'left') p.push(`<text x="${(x - halfT - 3).toFixed(1)}" y="${(my+3).toFixed(1)}" text-anchor="end" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(t * 10)}</text>`);
-            else p.push(`<text x="${(x + halfT + 3).toFixed(1)}" y="${(my+3).toFixed(1)}" text-anchor="start" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(t * 10)}</text>`);
+            if (side === 'left') p.push(`<text x="${(x - halfT - 3).toFixed(1)}" y="${(my+3).toFixed(1)}" text-anchor="end" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${_bpMm(t)}</text>`);
+            else p.push(`<text x="${(x + halfT + 3).toFixed(1)}" y="${(my+3).toFixed(1)}" text-anchor="start" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${_bpMm(t)}</text>`);
         }
     };
     let _bpDimBuf = [];
@@ -2261,7 +2267,7 @@ window._generateMultiViewBlueprintPages = function() {
                 const scX2_2 = onRight ? cW/2 + scWcm2 : -cW/2;
                 makeRect(p, wx(scX1_2), wz(0), scWcm2*sc, cD*sc, FILL_SC2, STROKE, 1.5);
                 p.push(`<text x="${wx((scX1_2+scX2_2)/2).toFixed(1)}" y="${(wz(cD/2)+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.8">ארון צד</text>`);
-                makeDimH(p, wx(scX1_2), wx(scX2_2), wz(cD) + 14, `${Math.round(scWcm2 * 10)}`);
+                makeDimH(p, wx(scX1_2), wx(scX2_2), wz(cD) + 14, `${_bpMm(scWcm2)}`);
             };
             if (scSideFP2c === 'right' || scSideFP2c === 'both') _drawSCFP2(true);
             if (scSideFP2c === 'left'  || scSideFP2c === 'both') _drawSCFP2(false);
@@ -2275,7 +2281,7 @@ window._generateMultiViewBlueprintPages = function() {
             const deskX2_2 = deskOnRight2 ? cW/2 + deskFPW2 : -cW/2;
             makeRect(p, wx(deskX1_2), wz(0), deskFPW2*sc, cD*sc, FILL_DESK_FP2, STROKE, 1.5);
             p.push(`<text x="${wx((deskX1_2+deskX2_2)/2).toFixed(1)}" y="${(wz(cD/2)+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.85">שולחן צד</text>`);
-            makeDimH(p, wx(deskX1_2), wx(deskX2_2), wz(cD) + 24, `${Math.round(deskFPW2 * 10)}`);
+            makeDimH(p, wx(deskX1_2), wx(deskX2_2), wz(cD) + 24, `${_bpMm(deskFPW2)}`);
         }
 
         // Corner unit (שידה/שולחן פינתית) — protrudes forward from front face
@@ -2289,20 +2295,20 @@ window._generateMultiViewBlueprintPages = function() {
             const cuLabel = state.corner.type === 'desk' ? 'שולחן פינתי' : 'שידה פינתית';
             p.push(`<text x="${wx((cuX1+cuX2)/2).toFixed(1)}" y="${(wz(cD + cuW_fp/2)+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="13" fill="${STROKE}" opacity="0.8">${cuLabel}</text>`);
             // Dimensions: width (horizontal, below the unit) and depth (vertical, on the outer side)
-            makeDimH(p, wx(cuX1), wx(cuX2), wz(cD + cuW_fp) + 14, `${Math.round(cuD_fp * 10)}`);
+            makeDimH(p, wx(cuX1), wx(cuX2), wz(cD + cuW_fp) + 14, `${_bpMm(cuD_fp)}`);
             if (cuSide === 'right') {
-                makeDimV(p, wx(cuX2) + 14, wz(cD), wz(cD + cuW_fp), `${Math.round(cuW_fp * 10)}`);
+                makeDimV(p, wx(cuX2) + 14, wz(cD), wz(cD + cuW_fp), `${_bpMm(cuW_fp)}`);
             } else {
-                makeDimVLeft(p, wx(cuX1) - 14, wz(cD), wz(cD + cuW_fp), `${Math.round(cuW_fp * 10)}`);
+                makeDimVLeft(p, wx(cuX1) - 14, wz(cD), wz(cD + cuW_fp), `${_bpMm(cuW_fp)}`);
             }
         }
 
         // Dimension lines
         // Total width at TOP — above all other horizontal dims (above 100/311 lines at wz(0)-14)
         const dimRowTop = wz(0) - 28;
-        makeDimH(p, wx(minX), wx(maxX), dimRowTop, `${Math.round(tW * 10)}`);
+        makeDimH(p, wx(minX), wx(maxX), dimRowTop, `${_bpMm(tW)}`);
         // Center cabinet width: just above the cabinet top edge
-        if (hasLeft || hasRight) makeDimH(p, wx(-cW/2), wx(cW/2), wz(0) - 14, `${Math.round(cW * 10)}`);
+        if (hasLeft || hasRight) makeDimH(p, wx(-cW/2), wx(cW/2), wz(0) - 14, `${_bpMm(cW)}`);
 
         const hasRightFC = hasRight && rPos === 'full_corner';
         const hasLeftFC  = hasLeft  && lPos === 'full_corner';
@@ -2314,49 +2320,49 @@ window._generateMultiViewBlueprintPages = function() {
         if (hasLeftFC && hasRightFC) {
             const leftTotalD = fcSizeL + lW;
             const rightTotalD = fcSizeR + rW;
-            makeDimVLeft(p, wx(minX) - 54, wz(0), wz(leftTotalD), `${Math.round(leftTotalD * 10)}`);
-            makeDimV(p, wx(maxX) + 74, wz(0), wz(rightTotalD), `${Math.round(rightTotalD * 10)}`);
+            makeDimVLeft(p, wx(minX) - 54, wz(0), wz(leftTotalD), `${_bpMm(leftTotalD)}`);
+            makeDimV(p, wx(maxX) + 74, wz(0), wz(rightTotalD), `${_bpMm(rightTotalD)}`);
         } else if (hasLeftFC && !hasRightFC) {
-            makeDimV(p, wx(maxX) + 74, wz(minZ), wz(maxZ), `${Math.round(tD * 10)}`);
+            makeDimV(p, wx(maxX) + 74, wz(minZ), wz(maxZ), `${_bpMm(tD)}`);
         } else {
-            makeDimVLeft(p, wx(minX) - 54, wz(minZ), wz(maxZ), `${Math.round(tD * 10)}`);
+            makeDimVLeft(p, wx(minX) - 54, wz(minZ), wz(maxZ), `${_bpMm(tD)}`);
         }
 
         // Center cabinet depth — only show if shorter than total depth (not in U-shape)
         if (cD < tD && !(hasLeftFC && hasRightFC)) {
             if (hasRightFC) {
-                makeDimVLeft(p, wx(-cW/2) - 14, wz(0), wz(cD), `${Math.round(cD * 10)}`);
+                makeDimVLeft(p, wx(-cW/2) - 14, wz(0), wz(cD), `${_bpMm(cD)}`);
             } else {
-                makeDimVLeft(p, wx(cW/2) + 34, wz(0), wz(cD), `${Math.round(cD * 10)}`);
+                makeDimVLeft(p, wx(cW/2) + 34, wz(0), wz(cD), `${_bpMm(cD)}`);
             }
         }
 
         // Right wing depth (side position) — label on LEFT side of the right wing
-        if (hasRight && rPos === 'side') makeDimVLeft(p, wx(cW/2) - 14, wz(0), wz(rW), `${Math.round(rW * 10)}`);
-        if (hasLeft && lPos === 'side') makeDimVLeft(p, wx(-cW/2 - lD) - 14, wz(0), wz(lW), `${Math.round(lW * 10)}`);
+        if (hasRight && rPos === 'side') makeDimVLeft(p, wx(cW/2) - 14, wz(0), wz(rW), `${_bpMm(rW)}`);
+        if (hasLeft && lPos === 'side') makeDimVLeft(p, wx(-cW/2 - lD) - 14, wz(0), wz(lW), `${_bpMm(lW)}`);
         // Front (פנימי) wings — protrusion beyond center front face
         if (hasRight && rPos === 'front') {
-            makeDimV(p, wx(cW/2) + 14, wz(cD), wz(cD + rW), `${Math.round(rW * 10)}`);
-            makeDimH(p, wx(cW/2 - rD), wx(cW/2), wz(cD + rW) + 14, `${Math.round(rD * 10)}`);
+            makeDimV(p, wx(cW/2) + 14, wz(cD), wz(cD + rW), `${_bpMm(rW)}`);
+            makeDimH(p, wx(cW/2 - rD), wx(cW/2), wz(cD + rW) + 14, `${_bpMm(rD)}`);
         }
         if (hasLeft && lPos === 'front') {
-            makeDimVLeft(p, wx(-cW/2) - 14, wz(cD), wz(cD + lW), `${Math.round(lW * 10)}`);
-            makeDimH(p, wx(-cW/2), wx(-cW/2 + lD), wz(cD + lW) + 14, `${Math.round(lD * 10)}`);
+            makeDimVLeft(p, wx(-cW/2) - 14, wz(cD), wz(cD + lW), `${_bpMm(lW)}`);
+            makeDimH(p, wx(-cW/2), wx(-cW/2 + lD), wz(cD + lW) + 14, `${_bpMm(lD)}`);
         }
 
         // full_corner dims
         if (hasRightFC) {
-            makeDimH(p, wx(cW/2), wx(cW/2 + fcSizeR), wz(0) - 14, `${Math.round(fcSizeR * 10)}`);
+            makeDimH(p, wx(cW/2), wx(cW/2 + fcSizeR), wz(0) - 14, `${_bpMm(fcSizeR)}`);
             // Corner depth + wing width on RIGHT side — use +54 to match total depth line spacing
-            makeDimV(p, wx(cW/2 + fcSizeR) + 54, wz(0), wz(fcSizeR), `${Math.round(fcSizeR * 10)}`);
-            if (rW > 0) makeDimV(p, wx(cW/2 + fcSizeR) + 54, wz(fcSizeR), wz(fcSizeR + rW), `${Math.round(rW * 10)}`);
-            if (rW > 0) makeDimH(p, wx(cW/2 + fcSizeR - rD), wx(cW/2 + fcSizeR), wz(fcSizeR + rW) + 28, `${Math.round(rD * 10)}`);
+            makeDimV(p, wx(cW/2 + fcSizeR) + 54, wz(0), wz(fcSizeR), `${_bpMm(fcSizeR)}`);
+            if (rW > 0) makeDimV(p, wx(cW/2 + fcSizeR) + 54, wz(fcSizeR), wz(fcSizeR + rW), `${_bpMm(rW)}`);
+            if (rW > 0) makeDimH(p, wx(cW/2 + fcSizeR - rD), wx(cW/2 + fcSizeR), wz(fcSizeR + rW) + 28, `${_bpMm(rD)}`);
         }
         if (hasLeftFC) {
-            makeDimH(p, wx(-cW/2 - fcSizeL), wx(-cW/2), wz(0) - 14, `${Math.round(fcSizeL * 10)}`);
-            makeDimVLeft(p, wx(-cW/2 - fcSizeL) - 14, wz(0), wz(fcSizeL), `${Math.round(fcSizeL * 10)}`);
-            if (lW > 0) makeDimVLeft(p, wx(-cW/2 - fcSizeL) - 14, wz(fcSizeL), wz(fcSizeL + lW), `${Math.round(lW * 10)}`);
-            if (lW > 0) makeDimH(p, wx(-cW/2 - fcSizeL), wx(-cW/2 - fcSizeL + lD), wz(fcSizeL + lW) + 28, `${Math.round(lD * 10)}`);
+            makeDimH(p, wx(-cW/2 - fcSizeL), wx(-cW/2), wz(0) - 14, `${_bpMm(fcSizeL)}`);
+            makeDimVLeft(p, wx(-cW/2 - fcSizeL) - 14, wz(0), wz(fcSizeL), `${_bpMm(fcSizeL)}`);
+            if (lW > 0) makeDimVLeft(p, wx(-cW/2 - fcSizeL) - 14, wz(fcSizeL), wz(fcSizeL + lW), `${_bpMm(lW)}`);
+            if (lW > 0) makeDimH(p, wx(-cW/2 - fcSizeL), wx(-cW/2 - fcSizeL + lD), wz(fcSizeL + lW) + 28, `${_bpMm(lD)}`);
         }
 
         _bpFlushDims(p);
@@ -2568,7 +2574,7 @@ window._generateMultiViewBlueprintPages = function() {
                     const upperMidY = (_colTopSvgY + splitBandTopY) / 2;
                     p.push(`<text x="${(colX + 6).toFixed(1)}" y="${(lowerMidY + 4).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.5">ארון תחתון</text>`);
                     p.push(`<text x="${(colX + 6).toFixed(1)}" y="${(upperMidY + 4).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.5">ארון עליון</text>`);
-                    p.push(`<text x="${(colX + colW / 2).toFixed(1)}" y="${(splitBandTopY + splitBandH / 2 + 3).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(_splitT2 * 10)}</text>`);
+                    p.push(`<text x="${(colX + colW / 2).toFixed(1)}" y="${(splitBandTopY + splitBandH / 2 + 3).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${_bpMm(_splitT2)}</text>`);
                 }
             }
 
@@ -2599,9 +2605,9 @@ window._generateMultiViewBlueprintPages = function() {
                         p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
                     }
                     // Dimension: drawer height (right side of column)
-                    makeDimV(p, colX + colW + 14, drawerY, drawerY + drawerPxH, `${Math.round(drawerH * 10)}`);
+                    makeDimV(p, colX + colW + 14, drawerY, drawerY + drawerPxH, `${_bpMm(drawerH)}`);
                     // Dimension: floor to drawer bottom (gap from floor to bottom of drawer)
-                    makeDimV(p, colX + colW + 50, drawerY + drawerPxH, _colBotSvgY, `${Math.round((deskH - DESK_SURFACE_T - drawerH) * 10)}`);
+                    makeDimV(p, colX + colW + 50, drawerY + drawerPxH, _colBotSvgY, `${_bpMm((deskH - DESK_SURFACE_T - drawerH))}`);
                 }
                 // Clearance board (shelf above clearance zone)
                 const clrBoardY = _colBotSvgY - (deskH + deskClr) * sc;
@@ -2880,12 +2886,12 @@ window._generateMultiViewBlueprintPages = function() {
                 p.push(`<text x="${cuLblX.toFixed(1)}" y="${(cuLblY + 1).toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-family="${FONT}" font-size="14" font-weight="bold" fill="#92400e">${cuLabelfv}</text>`);
                 // Width dimension (below the overlay — placed below the total-width dim line at oy+dH+22)
                 const cuDimY = oy + dH + 38;
-                makeDimH(p, cuSvgX, cuSvgX + cuSvgW, cuDimY, `${Math.round(cuDfv * 10)}`);
+                makeDimH(p, cuSvgX, cuSvgX + cuSvgW, cuDimY, `${_bpMm(cuDfv)}`);
                 // Height dimension (on the outer side — use far-right/far-left to avoid overlap with plinth dim)
                 if (cuSidefv === 'right') {
-                    makeDimV(p, ox + dW + 40, cuSvgY, oy + dH, `${Math.round(cuHfv * 10)}`);
+                    makeDimV(p, ox + dW + 40, cuSvgY, oy + dH, `${_bpMm(cuHfv)}`);
                 } else {
-                    makeDimVLeft(p, ox - 36, cuSvgY, oy + dH, `${Math.round(cuHfv * 10)}`);
+                    makeDimVLeft(p, ox - 36, cuSvgY, oy + dH, `${_bpMm(cuHfv)}`);
                 }
             }
         }
@@ -2895,7 +2901,7 @@ window._generateMultiViewBlueprintPages = function() {
         const _widthDimBaseY = _bpWidthDimBaseY(oy, dH, pH, sc, cols);
         const _hasMultiCols2 = colXPositions.length > 1;
         const dimY = _widthDimBaseY + (_hasMultiCols2 ? 54 : 36);
-        makeDimH(p, ox, ox + dW, dimY, `${Math.round(wg.w * 10)}`);
+        makeDimH(p, ox, ox + dW, dimY, `${_bpMm(wg.w)}`);
         {
             const _tCmHC2 = state.thickness || 1.7;
             colXPositions.forEach((cp, ci) => {
@@ -2908,7 +2914,7 @@ window._generateMultiViewBlueprintPages = function() {
                     const faceY = (cp.colTopY != null) ? cp.colTopY : oy;
                     const faceH = (cp.colBotY != null && cp.colTopY != null) ? (cp.colBotY - cp.colTopY) : dH;
                     _bpMaybePushColWidthDim(p, _bpViewKey, ci, cp.x1, cp.x2, _widthDimBaseY + 18,
-                        `${Math.round(cp.wCm * 10)}`,
+                        `${_bpMm(cp.wCm)}`,
                         (x1, x2, y, lbl, above) => makeDimH(p, x1, x2, y, lbl, above), false, faceY, faceH);
                 }
             });
@@ -2918,7 +2924,7 @@ window._generateMultiViewBlueprintPages = function() {
             // Overall height: from floor (oy+dH) to highest column top
             // top = oy+dH - fo*sc - visibleH*sc = oy+dH - (fo + visibleH)*sc = oy+dH - height*sc
             const _maxTopY2 = cols.length > 0 ? Math.min(...cols.map(c => oy + dH - (c.height || wg.h) * sc)) : oy;
-            const _totalHcm2 = cols.length > 0 ? Math.round(Math.max(...cols.map(c => (c.height || wg.h))) * 10) : Math.round(wg.h * 10);
+            const _totalHcm2 = cols.length > 0 ? _bpMm(Math.max(...cols.map(c => (c.height || wg.h)))) : _bpMm(wg.h);
             makeDimV(p, ox - 54, _maxTopY2, oy + dH, `${_totalHcm2}`);
             _bpDrawShorterColumnOverallHeights(
                 (x, y1, y2, lbl) => makeDimV(p, x, y1, y2, lbl),
@@ -2945,11 +2951,11 @@ window._generateMultiViewBlueprintPages = function() {
                 const _colTopY5 = _colBotY5 - _bodyH5 * sc; // SVG Y of cabinet top
 
                 // 1. Body height on right side
-                makeDimVLeft(p, ox + dW + 38, _colTopY5, _colBotY5, `${Math.round(_bodyH5 * 10)}`);
+                makeDimVLeft(p, ox + dW + 38, _colTopY5, _colBotY5, `${_bpMm(_bodyH5)}`);
 
                 // 2. Floor offset (only for hanging cabinet where floorOffset > 0)
                 if (_fo5 > 0) {
-                    makeDimV(p, ox + dW + 76, _colBotY5, oy + dH, `${Math.round(_fo5 * 10)}`);
+                    makeDimV(p, ox + dW + 76, _colBotY5, oy + dH, `${_bpMm(_fo5)}`);
                 }
             }
 
@@ -2980,13 +2986,13 @@ window._generateMultiViewBlueprintPages = function() {
                                 const dSvgTop = rowSvgTop4 + di4 * singleDrawerSvgH;
                                 const dSvgBot = dSvgTop + singleDrawerSvgH;
                                 if (dSvgBot - dSvgTop > 8) {
-                                    makeDimVLeft(p, ox + dW + 38, dSvgTop, dSvgBot, `${Math.round(singleDrawerHcm * 10)}`);
+                                    makeDimVLeft(p, ox + dW + 38, dSvgTop, dSvgBot, `${_bpMm(singleDrawerHcm)}`);
                                 }
                             }
                         } else {
                             // Single drawer in this row — show the whole row height
                             if (rowSvgBot4 - rowSvgTop4 > 8) {
-                                makeDimVLeft(p, ox + dW + 38, rowSvgTop4, rowSvgBot4, `${Math.round(rowHcm4 * 10)}`);
+                                makeDimVLeft(p, ox + dW + 38, rowSvgTop4, rowSvgBot4, `${_bpMm(rowHcm4)}`);
                             }
                         }
                     }
@@ -3013,7 +3019,7 @@ window._generateMultiViewBlueprintPages = function() {
                     makeDimV(p, ox + dW + 54, _splitBotY, _lowerStartY, `${_lowerH}`);
                     // Split band thickness label (small, centered on band)
                     const _bandMidY = (_splitBotY + _splitTopY) / 2;
-                    p.push(`<text x="${(ox + dW + 54 + 22).toFixed(1)}" y="${(_bandMidY + 3).toFixed(1)}" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(_t2 * 10)}</text>`);
+                    p.push(`<text x="${(ox + dW + 54 + 22).toFixed(1)}" y="${(_bandMidY + 3).toFixed(1)}" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${_bpMm(_t2)}</text>`);
                 }
             }
             // floorOffset + body height for hanging cabinets (regular preset)
@@ -3024,15 +3030,15 @@ window._generateMultiViewBlueprintPages = function() {
                     const _bodyH = (_hangCol.height || wg.h) - _foH;
                     const _colBotH = oy + dH - _foH * sc;
                     const _colTopH = _colBotH - _bodyH * sc;
-                    makeDimVLeft(p, ox + dW + 38, _colTopH, _colBotH, `${Math.round(_bodyH * 10)}`);
-                    makeDimV(p, ox + dW + 76, _colBotH, oy + dH, `${Math.round(_foH * 10)}`);
+                    makeDimVLeft(p, ox + dW + 38, _colTopH, _colBotH, `${_bpMm(_bodyH)}`);
+                    makeDimV(p, ox + dW + 76, _colBotH, oy + dH, `${_bpMm(_foH)}`);
                 } else {
                     let _foDimX2 = ox + dW + (_hasFloorPlinth2 ? 38 : 18);
                     colXPositions.forEach((cp, ci) => {
                         const _col = cols[ci];
                         const _fo = (_col && _col.floorOffset) ? _col.floorOffset : 0;
                         if (_fo > 0) {
-                            makeDimV(p, _foDimX2, cp.colBotY, oy + dH, `${Math.round(_fo * 10)}`);
+                            makeDimV(p, _foDimX2, cp.colBotY, oy + dH, `${_bpMm(_fo)}`);
                             _foDimX2 += 36;
                         }
                     });
@@ -3057,14 +3063,14 @@ window._generateMultiViewBlueprintPages = function() {
                     const _sideSvgWL2 = _cWBP2 * sc;
                     const _sideXL2 = ox - _sideSvgWL2;
                     makeRect(p, _sideXL2, oy, _sideSvgWL2, wg.h * sc, FILL_CL2, STROKE_CL2, 1.5);
-                    makeDimH(p, _sideXL2, ox, oy + dH + 22, `${Math.round(_cWBP2 * 10)}`);
+                    makeDimH(p, _sideXL2, ox, oy + dH + 22, `${_bpMm(_cWBP2)}`);
                 }
                 // Right side panel
                 if (_rwBP2 === 'right' || _rwBP2 === 'both') {
                     const _sideSvgWR2 = _cWRBP2 * sc;
                     const _sideXR2 = ox + dW;
                     makeRect(p, _sideXR2, oy, _sideSvgWR2, wg.h * sc, FILL_CL2, STROKE_CL2, 1.5);
-                    makeDimH(p, _sideXR2, _sideXR2 + _sideSvgWR2, oy + dH + 22, `${Math.round(_cWRBP2 * 10)}`);
+                    makeDimH(p, _sideXR2, _sideXR2 + _sideSvgWR2, oy + dH + 22, `${_bpMm(_cWRBP2)}`);
                 }
                 // Ceiling panel: spans from leftmost edge to rightmost edge
                 {
@@ -3073,13 +3079,13 @@ window._generateMultiViewBlueprintPages = function() {
                     const _ceilXBP2    = ox - _leftExtra2;
                     const _ceilWBP2    = _leftExtra2 + dW + _rightExtra2;
                     makeRect(p, _ceilXBP2, oy - _ceilSvgHBP2, _ceilWBP2, _ceilSvgHBP2, FILL_CL2, STROKE_CL2, 1.5);
-                    makeDimV(p, _ceilXBP2 - 18, oy - _ceilSvgHBP2, oy, `${Math.round(_cCWBP2 * 10)}`);
+                    makeDimV(p, _ceilXBP2 - 18, oy - _ceilSvgHBP2, oy, `${_bpMm(_cCWBP2)}`);
                 }
             }
         }
         // Plinth height dim — only when at least one column has a visible plinth on the floor
         if (_hasFloorPlinth2) {
-            makeDimV(p, ox + dW + 18, oy + dH - pH*sc, oy + dH, `${Math.round(pH * 10)}`);
+            makeDimV(p, ox + dW + 18, oy + dH - pH*sc, oy + dH, `${_bpMm(pH)}`);
         }
 
         const _vkWing = wg.wd === leftWing ? 'left' : wg.wd === rightWing ? 'right' : 'center';
@@ -3149,7 +3155,7 @@ window._generateMultiViewBlueprintPages = function() {
             // Labels
             p.push(`<text x="${(ox + 6).toFixed(1)}" y="${((oy + dH + fcSplitBotY) / 2 + 4).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.5">ארון תחתון</text>`);
             p.push(`<text x="${(ox + 6).toFixed(1)}" y="${((oy + fcSplitTopY) / 2 + 4).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.5">ארון עליון</text>`);
-            p.push(`<text x="${(ox + dW / 2).toFixed(1)}" y="${(fcSplitTopY + fcSplitBandH / 2 + 3).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(fcSplitT * 10)}</text>`);
+            p.push(`<text x="${(ox + dW / 2).toFixed(1)}" y="${(fcSplitTopY + fcSplitBandH / 2 + 3).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${_bpMm(fcSplitT)}</text>`);
         }
 
         // Cell height labels inside each cell
@@ -3181,19 +3187,19 @@ window._generateMultiViewBlueprintPages = function() {
 
         // Dimension lines
         const dimY = oy + dH + 36;
-        makeDimH(p, ox, ox + dW, dimY, `${Math.round(diagW * 10)}`);
-        makeDimV(p, ox - 54, oy, oy + dH, `${Math.round(cH * 10)}`);
-        if (pH > 0) makeDimV(p, ox + dW + 18, oy + dH - pH*sc, oy + dH, `${Math.round(pH * 10)}`);
+        makeDimH(p, ox, ox + dW, dimY, `${_bpMm(diagW)}`);
+        makeDimV(p, ox - 54, oy, oy + dH, `${_bpMm(cH)}`);
+        if (pH > 0) makeDimV(p, ox + dW + 18, oy + dH - pH*sc, oy + dH, `${_bpMm(pH)}`);
         // Split section dims for full-corner
         if (fcSplitY > 0 && fcSplitY < cH) {
             const fcSplitBotY2 = oy + dH - fcSplitY * sc;
             const fcSplitTopY2 = fcSplitBotY2 - fcSplitT * sc;
             const fcColTopY2 = oy;
-            makeDimV(p, ox + dW + 54, oy + dH - pH * sc, fcSplitBotY2, `${Math.round((fcSplitY - pH) * 10)}`);
-            makeDimV(p, ox + dW + 54, fcSplitTopY2, fcColTopY2, `${Math.round((cH - fcSplitY - fcSplitT) * 10)}`);
+            makeDimV(p, ox + dW + 54, oy + dH - pH * sc, fcSplitBotY2, `${_bpMm((fcSplitY - pH))}`);
+            makeDimV(p, ox + dW + 54, fcSplitTopY2, fcColTopY2, `${_bpMm((cH - fcSplitY - fcSplitT))}`);
         }
         // Also show the actual corner size
-        makeDimH(p, ox, ox + dW, oy - 16, `${Math.round(fc.fcSize * 10)} × ${Math.round(fc.fcSize * 10)}`);
+        makeDimH(p, ox, ox + dW, oy - 16, `${_bpMm(fc.fcSize)} × ${_bpMm(fc.fcSize)}`);
 
         const _vkFC = fc.wd === leftWing ? 'fc-left' : 'fc-right';
         _bpAppendViewCutouts(p, _vkFC, ox, oy, dW, dH, sc, diagW, cH);
@@ -3259,7 +3265,7 @@ window._generateMultiViewBlueprintPages = function() {
                     const upperMidFC = (oy + _splitTopYFC) / 2;
                     p.push(`<text x="${(colX + 6).toFixed(1)}" y="${(lowerMidFC + 4).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.5">ארון תחתון</text>`);
                     p.push(`<text x="${(colX + 6).toFixed(1)}" y="${(upperMidFC + 4).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.5">ארון עליון</text>`);
-                    p.push(`<text x="${(colX + colW / 2).toFixed(1)}" y="${(_splitTopYFC + _splitBandHFC / 2 + 3).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(_splitTFC * 10)}</text>`);
+                    p.push(`<text x="${(colX + colW / 2).toFixed(1)}" y="${(_splitTopYFC + _splitBandHFC / 2 + 3).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${_bpMm(_splitTFC)}</text>`);
                 }
             }
 
@@ -3350,7 +3356,7 @@ window._generateMultiViewBlueprintPages = function() {
         // Dimension lines — in multi-view dH = wg.h*sc = full height, oy+dH IS the floor/plinth bottom
         const _hasMultiCols2 = colXPositions.length > 1;
         const dimY = oy + dH + (_hasMultiCols2 ? 54 : 36);
-        makeDimH(p, ox, ox + dW, dimY, `${Math.round(wg.w * 10)}`);
+        makeDimH(p, ox, ox + dW, dimY, `${_bpMm(wg.w)}`);
         {
             const _tCmHCFc = state.thickness || 1.7;
             colXPositions.forEach((cp, ci) => {
@@ -3361,14 +3367,14 @@ window._generateMultiViewBlueprintPages = function() {
                 }
                 if (_hasMultiCols2 || _bpColumnHasHoneycomb(col)) {
                     _bpMaybePushColWidthDim(p, _bpViewKey, ci, cp.x1, cp.x2, oy + dH + 18,
-                        `${Math.round(cp.wCm * 10)}`,
+                        `${_bpMm(cp.wCm)}`,
                         (x1, x2, y, lbl, above) => makeDimH(p, x1, x2, y, lbl, above), false, oy, dH);
                 }
             });
         }
-        makeDimV(p, ox - 54, oy, oy + dH, `${Math.round(wg.h * 10)}`);
+        makeDimV(p, ox - 54, oy, oy + dH, `${_bpMm(wg.h)}`);
         if (pH > 0) {
-            makeDimV(p, ox + dW + 18, oy + dH - pH*sc, oy + dH, `${Math.round(pH * 10)}`);
+            makeDimV(p, ox + dW + 18, oy + dH - pH*sc, oy + dH, `${_bpMm(pH)}`);
         }
         // Split section dims for additional wing
         {
@@ -3379,8 +3385,8 @@ window._generateMultiViewBlueprintPages = function() {
                 const _splitBotYFC2 = oy + dH - _syFC2 * sc;
                 const _splitTopYFC2 = _splitBotYFC2 - _tFC2 * sc;
                 const _colTopYFC2   = oy;
-                makeDimV(p, ox + dW + 54, oy + dH - pH * sc, _splitBotYFC2, `${Math.round((_syFC2 - pH) * 10)}`);
-                makeDimV(p, ox + dW + 54, _splitTopYFC2, _colTopYFC2, `${Math.round((wg.h - _syFC2 - _tFC2) * 10)}`);
+                makeDimV(p, ox + dW + 54, oy + dH - pH * sc, _splitBotYFC2, `${_bpMm((_syFC2 - pH))}`);
+                makeDimV(p, ox + dW + 54, _splitTopYFC2, _colTopYFC2, `${_bpMm((wg.h - _syFC2 - _tFC2))}`);
             }
         }
 
@@ -3465,9 +3471,9 @@ window._generateMultiViewBlueprintPages = function() {
 
         // Dimensions
         const dimY = oy + dH + 36;
-        makeDimH(p, ox, ox + dW, dimY, `${Math.round(cuW * 10)}`);
-        makeDimV(p, ox - 34, oy, oy + dH, `${Math.round(cuH * 10)}`);
-        if (pH > 0) makeDimV(p, ox + dW + 18, oy + dH - pH*sc, oy + dH, `${Math.round(pH * 10)}`);
+        makeDimH(p, ox, ox + dW, dimY, `${_bpMm(cuW)}`);
+        makeDimV(p, ox - 34, oy, oy + dH, `${_bpMm(cuH)}`);
+        if (pH > 0) makeDimV(p, ox + dW + 18, oy + dH - pH*sc, oy + dH, `${_bpMm(pH)}`);
 
         const _vkCU = cu.side === 'right' ? 'corner-right' : 'corner-left';
         _bpAppendViewCutouts(p, _vkCU, ox, oy, dW, dH, sc, cuW, cuH);
@@ -3536,7 +3542,7 @@ window._generateMultiViewBlueprintPages = function() {
                             const upperMidSC = (oy + _splitTopYSC) / 2;
                             p.push(`<text x="${(colX + 6).toFixed(1)}" y="${(lowerMidSC + 4).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.5">ארון תחתון</text>`);
                             p.push(`<text x="${(colX + 6).toFixed(1)}" y="${(upperMidSC + 4).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.5">ארון עליון</text>`);
-                            p.push(`<text x="${(colX + colW / 2).toFixed(1)}" y="${(_splitTopYSC + _splitBandHSC / 2 + 3).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${Math.round(_splitTSC * 10)}</text>`);
+                            p.push(`<text x="${(colX + colW / 2).toFixed(1)}" y="${(_splitTopYSC + _splitBandHSC / 2 + 3).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${_bpMm(_splitTSC)}</text>`);
                         }
                     }
 
@@ -3628,7 +3634,7 @@ window._generateMultiViewBlueprintPages = function() {
                 const _hasMultiColsSC = colXPositions.length > 1;
                 const _plinthBotYSC = oy + dH + scPH * scScale;
                 const dimY = _plinthBotYSC + (_hasMultiColsSC ? 54 : 36);
-                makeDimH(p, ox, ox + dW, dimY, `${Math.round(scW * 10)}`);
+                makeDimH(p, ox, ox + dW, dimY, `${_bpMm(scW)}`);
                 {
                     const _tCmHCSc = state.thickness || 1.7;
                     colXPositions.forEach((cp, ci) => {
@@ -3639,13 +3645,13 @@ window._generateMultiViewBlueprintPages = function() {
                         }
                         if (_hasMultiColsSC || _bpColumnHasHoneycomb(col)) {
                             _bpMaybePushColWidthDim(p, _bpViewKey, ci, cp.x1, cp.x2, _plinthBotYSC + 18,
-                                `${Math.round(cp.wCm * 10)}`,
+                                `${_bpMm(cp.wCm)}`,
                                 (x1, x2, y, lbl, above) => makeDimH(p, x1, x2, y, lbl, above), false, oy, dH);
                         }
                     });
                 }
-                makeDimV(p, ox - 54, oy, oy + dH, `${Math.round(scH * 10)}`);
-                if (scPH > 0) makeDimV(p, ox + dW + 18, oy + dH - scPH*scScale, oy + dH, `${Math.round(scPH * 10)}`);
+                makeDimV(p, ox - 54, oy, oy + dH, `${_bpMm(scH)}`);
+                if (scPH > 0) makeDimV(p, ox + dW + 18, oy + dH - scPH*scScale, oy + dH, `${_bpMm(scPH)}`);
                 // Split section dims for side cabinet
                 {
                     const _splitColSC2 = cols.find(c => c.splitY && c.splitY > 0);
@@ -3654,8 +3660,8 @@ window._generateMultiViewBlueprintPages = function() {
                         const _tSC2  = (state.thickness || 1.7) * 2;
                         const _splitBotYSC2 = oy + dH - _sySC2 * scScale;
                         const _splitTopYSC2 = _splitBotYSC2 - _tSC2 * scScale;
-                        makeDimV(p, ox + dW + 54, oy + dH - scPH * scScale, _splitBotYSC2, `${Math.round((_sySC2 - scPH) * 10)}`);
-                        makeDimV(p, ox + dW + 54, _splitTopYSC2, oy, `${Math.round((scH - _sySC2 - _tSC2) * 10)}`);
+                        makeDimV(p, ox + dW + 54, oy + dH - scPH * scScale, _splitBotYSC2, `${_bpMm((_sySC2 - scPH))}`);
+                        makeDimV(p, ox + dW + 54, _splitTopYSC2, oy, `${_bpMm((scH - _sySC2 - _tSC2))}`);
                     }
                 }
 
@@ -3787,14 +3793,14 @@ window._generateMultiViewBlueprintPages = function() {
 
                 const _plinthBotYSC = oy + dH + scPH * scScale;
                 const dimY = _plinthBotYSC + 36;
-                makeDimH(p, ox, ox + dW, dimY, `${Math.round(sideDepthCm * 10)}`);
-                makeDimV(p, ox - 54, oy, oy + dH, `${Math.round(scH * 10)}`);
-                if (scPH > 0) makeDimV(p, ox + dW + 18, oy + dH - scPH*scScale, oy + dH, `${Math.round(scPH * 10)}`);
+                makeDimH(p, ox, ox + dW, dimY, `${_bpMm(sideDepthCm)}`);
+                makeDimV(p, ox - 54, oy, oy + dH, `${_bpMm(scH)}`);
+                if (scPH > 0) makeDimV(p, ox + dW + 18, oy + dH - scPH*scScale, oy + dH, `${_bpMm(scPH)}`);
                 if (_splitYSC > 0) {
                     const _splitBotYSC2 = oy + dH - _splitYSC * scScale;
                     const _splitTopYSC2 = _splitBotYSC2 - _splitTSC * scScale;
-                    makeDimV(p, ox + dW + 54, oy + dH - scPH * scScale, _splitBotYSC2, `${Math.round((_splitYSC - scPH) * 10)}`);
-                    makeDimV(p, ox + dW + 54, _splitTopYSC2, oy, `${Math.round((scH - _splitYSC - _splitTSC) * 10)}`);
+                    makeDimV(p, ox + dW + 54, oy + dH - scPH * scScale, _splitBotYSC2, `${_bpMm((_splitYSC - scPH))}`);
+                    makeDimV(p, ox + dW + 54, _splitTopYSC2, oy, `${_bpMm((scH - _splitYSC - _splitTSC))}`);
                 }
 
                 _bpAppendViewCutouts(p, viewKey, ox, oy, dW, dH, scScale, sideDepthCm, scH);
@@ -3865,7 +3871,7 @@ window._generateMultiViewBlueprintPages = function() {
 
             // Plinth (bottom rail)
             makeRect(p, ox, oy + (sdH - sdPlinth) * sc, sdW * sc, sdPlinth * sc, '#c8c8c8', STROKE, 1.5);
-            p.push(`<text x="${(ox + sdW * sc / 2).toFixed(1)}" y="${(oy + (sdH - sdPlinth / 2) * sc + 4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="13" fill="${STROKE}">צוקל ${Math.round(sdPlinth * 10)} מ"מ</text>`);
+            p.push(`<text x="${(ox + sdW * sc / 2).toFixed(1)}" y="${(oy + (sdH - sdPlinth / 2) * sc + 4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="13" fill="${STROKE}">צוקל ${_bpMm(sdPlinth)} מ"מ</text>`);
 
             // Top rail
             makeRect(p, ox, oy, sdW * sc, profileT * sc, '#c8c8c8', STROKE, 1.5);
@@ -3903,16 +3909,16 @@ window._generateMultiViewBlueprintPages = function() {
 
             // Dimension lines
             // Total width
-            makeDimH(p, ox, ox + sdW * sc, oy + sdH * sc + 36, `${Math.round(sdW * 10)} מ"מ`);
+            makeDimH(p, ox, ox + sdW * sc, oy + sdH * sc + 36, `${_bpMm(sdW)} מ"מ`);
             // Total height
-            makeDimV(p, ox - 40, oy, oy + sdH * sc, `${Math.round(sdH * 10)} מ"מ`);
+            makeDimV(p, ox - 40, oy, oy + sdH * sc, `${_bpMm(sdH)} מ"מ`);
             // Plinth height
-            makeDimV(p, ox + sdW * sc + 18, oy + (sdH - sdPlinth) * sc, oy + sdH * sc, `${Math.round(sdPlinth * 10)} מ"מ`);
+            makeDimV(p, ox + sdW * sc + 18, oy + (sdH - sdPlinth) * sc, oy + sdH * sc, `${_bpMm(sdPlinth)} מ"מ`);
             // Door widths
             for (let i = 0; i < sdNumDoors; i++) {
                 const dx1 = ox + (profileT + doorW * i) * sc;
                 const dx2 = dx1 + doorW * sc;
-                makeDimH(p, dx1, dx2, oy - 16, `${Math.round(doorW * 10)}`);
+                makeDimH(p, dx1, dx2, oy - 16, `${_bpMm(doorW)}`);
             }
 
             // Info text: profile color + panel type
@@ -4031,7 +4037,7 @@ window._generateMultiViewBlueprintPages = function() {
         // Dimension lines — upper unit has no plinth, so just use oy+dH as base
         const _hasMultiColsUU = colXPositions.length > 1;
         const dimY = oy + dH + (_hasMultiColsUU ? 54 : 36);
-        makeDimH(p, ox, ox + dW, dimY, `${Math.round(uuW * 10)}`);
+        makeDimH(p, ox, ox + dW, dimY, `${_bpMm(uuW)}`);
         {
             const _tCmHCUu = state.thickness || 1.7;
             colXPositions.forEach((cp, ci) => {
@@ -4042,15 +4048,15 @@ window._generateMultiViewBlueprintPages = function() {
                 }
                 if (_hasMultiColsUU || _bpColumnHasHoneycomb(col)) {
                     _bpMaybePushColWidthDim(p, _bpViewKey, ci, cp.x1, cp.x2, oy + dH + 18,
-                        `${Math.round(cp.wCm * 10)}`,
+                        `${_bpMm(cp.wCm)}`,
                         (x1, x2, y, lbl, above) => makeDimH(p, x1, x2, y, lbl, above), false, oy, dH);
                 }
             });
         }
-        makeDimV(p, ox - 54, oy, oy + dH, `${Math.round(uuH * 10)}`);
+        makeDimV(p, ox - 54, oy, oy + dH, `${_bpMm(uuH)}`);
         // Gap label (distance between upper unit and main cabinet)
         const uuGap = uuWing._upperGap || 60;
-        p.push(`<text x="${(ox + dW + 14).toFixed(1)}" y="${(oy + dH + 14).toFixed(1)}" font-family="${FONT}" font-size="13" fill="${STROKE}" opacity="0.7">מרווח מהארון: ${Math.round(uuGap * 10)} מ"מ</text>`);
+        p.push(`<text x="${(ox + dW + 14).toFixed(1)}" y="${(oy + dH + 14).toFixed(1)}" font-family="${FONT}" font-size="13" fill="${STROKE}" opacity="0.7">מרווח מהארון: ${_bpMm(uuGap)} מ"מ</text>`);
 
         const _vkUU = 'upper-' + parentId;
         _bpAppendViewCutouts(p, _vkUU, ox, oy, dW, dH, sc, uuW, uuH);
