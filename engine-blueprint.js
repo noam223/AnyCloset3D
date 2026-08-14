@@ -1693,9 +1693,12 @@ window._generateMultiViewBlueprintSVG = function() {
                 // Per-cell height: small text label INSIDE the cell (centered)
                 // Skip label for cells that fall within the split band
                 // For bathroom preset: skip all internal cell height labels
+                // Partitioned cells already have per-sub-zone dims — skip full-cell
+                // label/hit so clicks toggle the sub-zone dim instead of a covering parent.
                 const _isSplitBandOld = _splitYOldAdj > 0 &&
                     rowBotCm >= _splitYOldAdj - 0.1 && rowTopCm <= _splitTopOldAdj + 0.1;
-                if (pid !== 'bathroom' && cellHeightLabel > 0 && cellH > 14 && !_isSplitBandOld) {
+                const _hasPartitionZonesOld = !!(comp && comp.partition && Array.isArray(comp.subCells) && comp.subCells.length);
+                if (pid !== 'bathroom' && cellHeightLabel > 0 && cellH > 14 && !_isSplitBandOld && !_hasPartitionZonesOld) {
                     const lblCX = colX + colW / 2;
                     const lblCY = (cellY1 + cellY2) / 2 + 4;
                     _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, lblCX, lblCY, cellHeightLabel,
@@ -2780,10 +2783,13 @@ window._generateMultiViewBlueprintPages = function() {
 
                 // Skip height label for cells that fall within the split band
                 // For bathroom preset: skip all internal cell height labels
+                // Partitioned cells already have per-sub-zone dims — skip full-cell
+                // label/hit so clicks toggle the sub-zone dim instead of a covering parent.
                 const _isSplitBandCell = _splitYAdj > 0 &&
                     rowBotCm >= _splitYAdj - 0.1 && rowTopCm <= _splitTopAdj + 0.1;
                 const _isBathroomBP = (pid === 'bathroom');
-                if (!_isBathroomBP && cellHeightLabel > 0 && cellH > 14 && !_isSplitBandCell) {
+                const _hasPartitionZones = !!(comp && comp.partition && Array.isArray(comp.subCells) && comp.subCells.length);
+                if (!_isBathroomBP && cellHeightLabel > 0 && cellH > 14 && !_isSplitBandCell && !_hasPartitionZones) {
                     const lblCX = colX + colW / 2;
                     const lblCY = (cellY1 + cellY2) / 2 + 4;
                     _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, lblCX, lblCY, cellHeightLabel,
