@@ -632,6 +632,14 @@ function _bpHoneycombInnerWidthMm(wCm, tCm) {
     return Math.round((wCm - 2 * tCm) * 10);
 }
 
+/** Clear opening width (mm) of a partition sub-zone — matches engine-core half-board trim. */
+function _bpPartitionZoneClearWidthMm(colWcm, zoneStartRatio, zoneEndRatio, partTcm, zi, numZones) {
+    const spanCm = (+colWcm) * ((+zoneEndRatio) - (+zoneStartRatio));
+    const leftTrim = (zi === 0) ? 0 : (+partTcm) / 2;
+    const rightTrim = (zi === numZones - 1) ? 0 : (+partTcm) / 2;
+    return Math.max(1, Math.round((spanCm - leftTrim - rightTrim) * 10));
+}
+
 function _bpHoneycombInnerSvgSpan(cp, sc, tCm) {
     const tPx = tCm * sc;
     const x1 = cp.x1 + tPx * 1.5;
@@ -1419,7 +1427,7 @@ window._generateMultiViewBlueprintSVG = function() {
             // box is raised by floorOffset: bottom = oy+dH - fo*sc, top = bottom - visibleH*sc
             const _colBotY = oy + dH - _fo * sc;
             const _colTopY = _colBotY - _visibleH * sc;
-            colXPositions.push({ x1: colX, x2: colX + colW, wCm: Math.round(col.width || wg.w), colTopY: _colTopY, colBotY: _colBotY });
+            colXPositions.push({ x1: colX, x2: colX + colW, wCm: (col.width != null ? col.width : wg.w), colTopY: _colTopY, colBotY: _colBotY });
 
             // Column divider line (not first) — spans from the higher top to the lower bottom of adjacent columns
             if (ci > 0) {
@@ -1610,14 +1618,15 @@ window._generateMultiViewBlueprintSVG = function() {
                         const partSvgX = colX + colW * px;
                         vline(partSvgX, cellY1, cellY2, sc);
                     });
-                    // Width dim for each sub-zone
-                    for (let zi = 0; zi < boundaryXs.length - 1; zi++) {
+                    // Width dim for each sub-zone (mm — clear opening, half partition on each inner edge)
+                    const _numPartZonesOld = boundaryXs.length - 1;
+                    for (let zi = 0; zi < _numPartZonesOld; zi++) {
                         const x1 = boundaryXs[zi];
                         const x2 = boundaryXs[zi + 1];
-                        const zonePx = (zi === 0 ? 0 : partitions[zi - 1]) ;
+                        const zonePx = (zi === 0 ? 0 : partitions[zi - 1]);
                         const zoneEndPx = (zi === partitions.length ? 1 : partitions[zi]);
-                        const zoneWcm = Math.round(colWcm * (zoneEndPx - zonePx) - partT);
-                        if (x2 - x1 > 20) dimH(x1, x2, dimRowY, `${Math.max(1, zoneWcm)}`);
+                        const zoneWmm = _bpPartitionZoneClearWidthMm(colWcm, zonePx, zoneEndPx, partT, zi, _numPartZonesOld);
+                        if (x2 - x1 > 20) dimH(x1, x2, dimRowY, `${zoneWmm}`);
                     }
                     // Sub-cell shelves + content labels + zone heights
                     if (comp.subCells) {
@@ -2499,7 +2508,7 @@ window._generateMultiViewBlueprintPages = function() {
             // box is raised by floorOffset: bottom = oy+dH - fo*sc, top = bottom - visibleH*sc
             const _colBotSvgY  = oy + dH - _fo2 * sc;
             const _colTopSvgY  = _colBotSvgY - _visibleH2 * sc;
-            colXPositions.push({ x1: colX, x2: colX + colW, wCm: Math.round(col.width || wg.w), colTopY: _colTopSvgY, colBotY: _colBotSvgY });
+            colXPositions.push({ x1: colX, x2: colX + colW, wCm: (col.width != null ? col.width : wg.w), colTopY: _colTopSvgY, colBotY: _colBotSvgY });
 
             // Column separator: spans between the overlapping vertical extents of adjacent columns
             if (ci > 0) {
@@ -2682,14 +2691,15 @@ window._generateMultiViewBlueprintPages = function() {
                         const partSvgX = colX + colW * px;
                         makeVline(p, partSvgX, cellY1, cellY2, sc);
                     });
-                    // Width dim for each sub-zone
-                    for (let zi = 0; zi < boundaryXs.length - 1; zi++) {
+                    // Width dim for each sub-zone (mm — clear opening, half partition on each inner edge)
+                    const _numPartZones = boundaryXs.length - 1;
+                    for (let zi = 0; zi < _numPartZones; zi++) {
                         const x1 = boundaryXs[zi];
                         const x2 = boundaryXs[zi + 1];
                         const zonePx = (zi === 0 ? 0 : partitions[zi - 1]);
                         const zoneEndPx = (zi === partitions.length ? 1 : partitions[zi]);
-                        const zoneWcm = Math.round(colWcm * (zoneEndPx - zonePx) - partT);
-                        if (x2 - x1 > 20) makeDimH(p, x1, x2, dimRowY, `${Math.max(1, zoneWcm)}`);
+                        const zoneWmm = _bpPartitionZoneClearWidthMm(colWcm, zonePx, zoneEndPx, partT, zi, _numPartZones);
+                        if (x2 - x1 > 20) makeDimH(p, x1, x2, dimRowY, `${zoneWmm}`);
                     }
                     // Sub-cell shelves + content labels + zone heights
                     if (comp.subCells) {
@@ -3222,7 +3232,7 @@ window._generateMultiViewBlueprintPages = function() {
         cols.forEach((col, ci) => {
             const colW = (col.width || wg.w) * sc;
             const colPlinthH = col.noPlinth ? 0 : pH;
-            colXPositions.push({ x1: colX, x2: colX + colW, wCm: Math.round(col.width || wg.w) });
+            colXPositions.push({ x1: colX, x2: colX + colW, wCm: (col.width != null ? col.width : wg.w) });
 
             if (ci > 0) makeVline(p, colX, oy, oy + dH, sc);
 
@@ -3501,7 +3511,7 @@ window._generateMultiViewBlueprintPages = function() {
                 cols.forEach((col, ci) => {
                     const colW = (col.width || scW) * scScale;
                     const colPlinthH = col.noPlinth ? 0 : scPH;
-                    colXPositions.push({ x1: colX, x2: colX + colW, wCm: Math.round(col.width || scW) });
+                    colXPositions.push({ x1: colX, x2: colX + colW, wCm: (col.width != null ? col.width : scW) });
 
                     if (ci > 0) makeVline(p, colX, oy, oy + dH, scScale);
                     const _splitYSC = col.splitY || 0;
@@ -3955,7 +3965,7 @@ window._generateMultiViewBlueprintPages = function() {
         uuCols.forEach((col, ci) => {
             const isLastCol = (ci === uuCols.length - 1);
             const colW = isLastCol ? (ox + dW - colX) : (col.width || uuW) * sc;
-            colXPositions.push({ x1: colX, x2: colX + colW, wCm: Math.round(col.width || uuW) });
+            colXPositions.push({ x1: colX, x2: colX + colW, wCm: (col.width != null ? col.width : uuW) });
 
             if (ci > 0) makeVline(p, colX, oy, oy + dH, sc);
 
