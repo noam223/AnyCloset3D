@@ -966,6 +966,20 @@
             <h2><i class="fa-solid fa-calculator"></i> מחשבון תמחור מהיר</h2>
             <button class="close-modal" onclick="document.getElementById('quick-calc-modal').style.display='none'"><i class="fa-solid fa-xmark"></i></button>
         </div>
+        <div id="qc-edit-banner" class="qc-edit-banner" style="display:none;" role="status">
+            <div class="qc-edit-banner-text">
+                <i class="fa-solid fa-pen-to-square"></i>
+                <span id="qc-edit-banner-label">עורך ארון</span>
+            </div>
+            <div class="qc-edit-banner-actions">
+                <button type="button" id="qc-btn-save" class="view-btn" style="background:var(--primary);color:#fff;border:none;padding:7px 12px;" onclick="qcSaveEditedQuoteItem()">
+                    <i class="fa-solid fa-check"></i> שמור שינויים
+                </button>
+                <button type="button" id="qc-btn-cancel-edit" class="view-btn" style="border:1px solid var(--border);background:#fff;padding:7px 12px;" onclick="qcCancelQuoteEdit()">
+                    ביטול
+                </button>
+            </div>
+        </div>
         <div class="qc-grid">
             <div class="control-group"><label>רוחב (ס"מ)</label><input type="number" id="qc-w" class="editor-select" value="160" oninput="calcQuickPrice(true)"></div>
             <div class="control-group"><label>גובה (ס"מ)</label><input type="number" id="qc-h" class="editor-select" value="240" oninput="calcQuickPrice(true)"></div>
@@ -1010,8 +1024,14 @@
                 <div class="control-group"><label>שם הארון (אופציונלי)</label><input type="text" id="qc-cab-name" class="editor-select" placeholder="למשל: ארון חדר שינה" maxlength="80"></div>
             </div>
             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
-                <button type="button" class="view-btn" style="background:var(--primary);color:#fff;border:none;padding:9px 14px;" onclick="qcAddToQuoteList()">
+                <button type="button" id="qc-btn-add" class="view-btn" style="background:var(--primary);color:#fff;border:none;padding:9px 14px;" onclick="qcAddToQuoteList()">
                     <i class="fa-solid fa-plus"></i> הוסף לרשימה
+                </button>
+                <button type="button" id="qc-btn-save-list" class="view-btn" style="display:none;background:var(--primary);color:#fff;border:none;padding:9px 14px;" onclick="qcSaveEditedQuoteItem()">
+                    <i class="fa-solid fa-check"></i> שמור שינויים
+                </button>
+                <button type="button" id="qc-btn-cancel-list" class="view-btn" style="display:none;border:1px solid var(--border);background:#fff;padding:9px 14px;" onclick="qcCancelQuoteEdit()">
+                    ביטול עריכה
                 </button>
                 <button type="button" class="view-btn" style="border:1px solid var(--border);background:#fff;padding:9px 14px;" onclick="qcClearQuoteList()">
                     <i class="fa-solid fa-trash"></i> נקה רשימה

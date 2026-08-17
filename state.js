@@ -3410,7 +3410,9 @@ window.calcQuickPrice = function(autoUpdateShelves = false) {
     const d = parseFloat(document.getElementById('qc-d').value) || 0;
     const modelEl = document.getElementById('qc-plinth');
     const model = modelEl ? modelEl.value : 'maya';
-    const isMelamine = document.getElementById('qc-mat').value === 'melamine';
+    const matEl = document.getElementById('qc-mat');
+    const mat = matEl ? matEl.value : 'melamine';
+    const isMelamine = mat === 'melamine';
     const intDrawers = parseInt(document.getElementById('qc-int-d').value) || 0;
     const extDrawers = parseInt(document.getElementById('qc-ext-d').value) || 0;
     const openCells = parseInt(document.getElementById('qc-open-cells').value) || 0;
@@ -3447,6 +3449,7 @@ window.calcQuickPrice = function(autoUpdateShelves = false) {
 
     window._qcLastResult = {
         w: w, h: h, d: d, model: model,
+        mat: mat, shelves: shelves,
         cost: Math.round(finalCost),
         install: Math.round(installPrice),
         customer: Math.round(priceToCustomer),
@@ -3466,6 +3469,7 @@ window.calcQuickPrice = function(autoUpdateShelves = false) {
 };
 
 window._qcQuoteList = window._qcQuoteList || [];
+window._qcEditIndex = null;
 
 function _qcMoney(n) {
     return '₪' + Math.round(n || 0).toLocaleString('he-IL');
@@ -3497,29 +3501,138 @@ function _qcExtrasSummary(ex) {
     return parts.join(', ');
 }
 
+function _qcSetVal(id, value) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (el.type === 'checkbox') el.checked = !!value;
+    else el.value = value != null ? value : '';
+}
+
+function _qcBuildItemFromLastResult(name) {
+    const last = window._qcLastResult;
+    if (!last) return null;
+    return {
+        name: name || '',
+        w: last.w, h: last.h, d: last.d, model: last.model,
+        mat: last.mat || 'melamine',
+        shelves: last.shelves != null ? last.shelves : 0,
+        customer: last.customer, install: last.install, cost: last.cost,
+        extras: Object.assign({}, last.extras || {})
+    };
+}
+
+window.qcLoadFormFromItem = function(item) {
+    if (!item) return;
+    const ex = item.extras || {};
+    _qcSetVal('qc-w', item.w);
+    _qcSetVal('qc-h', item.h);
+    _qcSetVal('qc-d', item.d);
+    _qcSetVal('qc-plinth', item.model || 'maya');
+    _qcSetVal('qc-mat', item.mat || 'melamine');
+    _qcSetVal('qc-shelves', item.shelves != null ? item.shelves : 0);
+    _qcSetVal('qc-int-d', ex.intDrawers || 0);
+    _qcSetVal('qc-ext-d', ex.extDrawers || 0);
+    _qcSetVal('qc-open-cells', ex.openCells || 0);
+    _qcSetVal('qc-partitions', ex.partitions || 0);
+    _qcSetVal('qc-door-glass-wood', ex.glassWoodDoors || 0);
+    _qcSetVal('qc-door-alum', ex.alumDoors || 0);
+    _qcSetVal('qc-led-pairs', ex.ledPairs || 0);
+    _qcSetVal('qc-desk', !!ex.hasDesk);
+    _qcSetVal('qc-cab-name', item.name || '');
+};
+
+window._qcSetEditUi = function() {
+    const editing = window._qcEditIndex != null && window._qcEditIndex >= 0;
+    const banner = document.getElementById('qc-edit-banner');
+    const bannerLabel = document.getElementById('qc-edit-banner-label');
+    const btnAdd = document.getElementById('qc-btn-add');
+    const btnSaveList = document.getElementById('qc-btn-save-list');
+    const btnCancelList = document.getElementById('qc-btn-cancel-list');
+
+    if (banner) banner.style.display = editing ? 'flex' : 'none';
+    if (btnAdd) btnAdd.style.display = editing ? 'none' : '';
+    if (btnSaveList) btnSaveList.style.display = editing ? '' : 'none';
+    if (btnCancelList) btnCancelList.style.display = editing ? '' : 'none';
+
+    if (editing && bannerLabel) {
+        const item = (window._qcQuoteList || [])[window._qcEditIndex];
+        const title = item ? _qcCabinetLabel(item) : 'ארון';
+        bannerLabel.textContent = 'עורך ארון #' + (window._qcEditIndex + 1) + ' — ' + title;
+    }
+};
+
+window.qcEditQuoteItem = function(idx) {
+    const items = window._qcQuoteList || [];
+    const item = items[idx];
+    if (!item) return;
+    window._qcEditIndex = idx;
+    window.qcLoadFormFromItem(item);
+    if (typeof calcQuickPrice === 'function') calcQuickPrice(false);
+    window._qcSetEditUi();
+    window._renderQcQuoteList();
+
+    const banner = document.getElementById('qc-edit-banner');
+    const modal = document.getElementById('quick-calc-modal');
+    const content = modal && modal.querySelector('.qc-content');
+    if (banner && typeof banner.scrollIntoView === 'function') {
+        banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } else if (content && typeof content.scrollIntoView === 'function') {
+        content.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+};
+
+window.qcCancelQuoteEdit = function() {
+    window._qcEditIndex = null;
+    const nameEl = document.getElementById('qc-cab-name');
+    if (nameEl) nameEl.value = '';
+    window._qcSetEditUi();
+    window._renderQcQuoteList();
+};
+
+window.qcSaveEditedQuoteItem = function() {
+    const idx = window._qcEditIndex;
+    if (idx == null || idx < 0) return;
+    if (typeof calcQuickPrice === 'function') calcQuickPrice(false);
+    const nameEl = document.getElementById('qc-cab-name');
+    const updated = _qcBuildItemFromLastResult(nameEl ? nameEl.value.trim() : '');
+    if (!updated || !updated.customer) {
+        alert('לא ניתן לשמור — בדוק את נתוני הארון');
+        return;
+    }
+    if (!window._qcQuoteList[idx]) return;
+    window._qcQuoteList[idx] = updated;
+    window._qcEditIndex = null;
+    if (nameEl) nameEl.value = '';
+    window._qcSetEditUi();
+    window._renderQcQuoteList();
+};
+
 window._renderQcQuoteList = function() {
     const listEl = document.getElementById('qc-quote-list');
     const textEl = document.getElementById('qc-quote-text');
     if (!listEl) return;
     const items = window._qcQuoteList || [];
+    const editIdx = window._qcEditIndex;
     if (!items.length) {
         listEl.innerHTML = '<div style="color:#94a3b8;font-size:.85rem;text-align:center;padding:8px 0;">אין ארונות ברשימה עדיין</div>';
     } else {
         listEl.innerHTML = items.map(function(it, i) {
             const extra = _qcExtrasSummary(it.extras);
             const dims = _qcDimsLabel(it);
-            return '<div class="qc-quote-item">' +
+            const isEditing = editIdx === i;
+            return '<div class="qc-quote-item' + (isEditing ? ' is-editing' : '') + '" onclick="qcEditQuoteItem(' + i + ')">' +
                 '<div class="qc-quote-item-body">' +
                 '<strong>' + (i + 1) + '. ' + _qcCabinetLabel(it) + '</strong>' +
                 '<div class="qc-quote-dims">מידות: ' + dims + '</div>' +
                 (extra ? ('<div style="color:#64748b;margin-top:3px;">' + extra + '</div>') : '') +
-                '<div class="qc-quote-price-row">' +
+                '<div class="qc-quote-hint">' + (isEditing ? 'בעריכה כעת' : 'לחץ לעריכת מידות / תוספות') + '</div>' +
+                '<div class="qc-quote-price-row" onclick="event.stopPropagation()">' +
                 '<label>מחיר ללקוח</label>' +
                 '<input type="number" min="0" step="1" class="qc-quote-price-input" value="' + Math.round(it.customer || 0) + '" ' +
                 'oninput="qcUpdateQuotePrice(' + i + ', this.value)">' +
                 '<span class="qc-quote-install">התקנה: ' + _qcMoney(it.install) + '</span>' +
                 '</div></div>' +
-                '<button type="button" title="הסר" onclick="qcRemoveQuoteItem(' + i + ')"><i class="fa-solid fa-xmark"></i></button>' +
+                '<button type="button" title="הסר" onclick="event.stopPropagation(); qcRemoveQuoteItem(' + i + ')"><i class="fa-solid fa-xmark"></i></button>' +
                 '</div>';
         }).join('');
     }
@@ -3565,19 +3678,18 @@ window.qcUpdateQuotePrice = function(idx, value) {
 };
 
 window.qcAddToQuoteList = function() {
+    if (window._qcEditIndex != null) {
+        window.qcSaveEditedQuoteItem();
+        return;
+    }
     if (typeof calcQuickPrice === 'function') calcQuickPrice(false);
-    const last = window._qcLastResult;
-    if (!last || !last.customer) {
+    const nameEl = document.getElementById('qc-cab-name');
+    const item = _qcBuildItemFromLastResult(nameEl ? nameEl.value.trim() : '');
+    if (!item || !item.customer) {
         alert('חשב קודם ארון במחשבון');
         return;
     }
-    const nameEl = document.getElementById('qc-cab-name');
-    window._qcQuoteList.push({
-        name: nameEl ? nameEl.value.trim() : '',
-        w: last.w, h: last.h, d: last.d, model: last.model,
-        customer: last.customer, install: last.install, cost: last.cost,
-        extras: Object.assign({}, last.extras || {})
-    });
+    window._qcQuoteList.push(item);
     if (nameEl) nameEl.value = '';
     window._renderQcQuoteList();
 };
@@ -3585,11 +3697,25 @@ window.qcAddToQuoteList = function() {
 window.qcRemoveQuoteItem = function(idx) {
     if (!window._qcQuoteList) return;
     window._qcQuoteList.splice(idx, 1);
+    if (window._qcEditIndex != null) {
+        if (window._qcEditIndex === idx) {
+            window._qcEditIndex = null;
+            const nameEl = document.getElementById('qc-cab-name');
+            if (nameEl) nameEl.value = '';
+        } else if (window._qcEditIndex > idx) {
+            window._qcEditIndex -= 1;
+        }
+    }
+    window._qcSetEditUi();
     window._renderQcQuoteList();
 };
 
 window.qcClearQuoteList = function() {
     window._qcQuoteList = [];
+    window._qcEditIndex = null;
+    const nameEl = document.getElementById('qc-cab-name');
+    if (nameEl) nameEl.value = '';
+    window._qcSetEditUi();
     window._renderQcQuoteList();
 };
 
@@ -3619,4 +3745,7 @@ window.qcCopyCustomerQuote = function() {
 document.addEventListener('DOMContentLoaded', function() {
     const nameEl = document.getElementById('qc-customer-name');
     if (nameEl) nameEl.addEventListener('input', function() { window._renderQcQuoteList(); });
+    if (typeof window._qcSetEditUi === 'function') window._qcSetEditUi();
+});
+
 });
