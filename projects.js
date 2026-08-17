@@ -1915,6 +1915,7 @@ async function _loadPricingForm() {
         if (!user) return;
         var { data: row } = await sb.from('pricing_configs').select('config').eq('user_id', user.id).single();
         _pricingCfg = (row && row.config && Object.keys(row.config).length > 0) ? row.config : null;
+        window._pricingConfig = _pricingCfg;
         _fillPricingPanel(_pricingCfg || _PP_DEFAULTS);
     } catch(e) {
         _fillPricingPanel(_PP_DEFAULTS);
@@ -2139,6 +2140,7 @@ async function savePricingSettings() {
         );
         if (error) throw error;
         _pricingCfg = cfg;
+        window._pricingConfig = cfg;
         showToast('הגדרות התמחור נשמרו ✓', 'success');
     } catch(e) {
         showToast('שגיאה בשמירה: ' + e.message, 'error');

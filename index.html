@@ -949,7 +949,7 @@
             </button>
         </div>
         <div style="display: flex; gap: 8px; margin-top: 10px;">
-            <button id="btn-quick-calc-open" class="view-btn" style="display:none; flex: 1; justify-content: center; background: var(--accent); color: white; border: none; padding: 10px; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);" onclick="document.getElementById('quick-calc-modal').style.display='flex'">
+            <button id="btn-quick-calc-open" class="view-btn" style="display:none; flex: 1; justify-content: center; background: var(--accent); color: white; border: none; padding: 10px; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);" onclick="openQuickCalcModal()">
                 <i class="fa-solid fa-calculator"></i> מחשבון מהיר
             </button>
             <button id="btn-customer-report" class="view-btn" style="display:none; flex: 1; justify-content: center; border: 1px solid var(--border); background: white; padding: 10px;" onclick="printCustomerSummary()">
@@ -964,7 +964,7 @@
     <div class="qc-content">
         <div class="qc-header">
             <h2><i class="fa-solid fa-calculator"></i> מחשבון תמחור מהיר</h2>
-            <button class="close-modal" onclick="document.getElementById('quick-calc-modal').style.display='none'"><i class="fa-solid fa-xmark"></i></button>
+            <button class="close-modal" onclick="closeQuickCalcModal()"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div id="qc-edit-banner" class="qc-edit-banner" style="display:none;" role="status">
             <div class="qc-edit-banner-text">
@@ -1021,6 +1021,7 @@
             <div class="qc-quote-title"><i class="fa-solid fa-file-lines"></i> הצעת מחיר ללקוח</div>
             <div class="qc-grid" style="margin-bottom:10px;">
                 <div class="control-group"><label>שם לקוח</label><input type="text" id="qc-customer-name" class="editor-select" placeholder="שם הלקוח" maxlength="80"></div>
+                <div class="control-group"><label>טלפון (למעקב בלבד)</label><input type="tel" id="qc-customer-phone" class="editor-select" placeholder="050-0000000" maxlength="20" dir="ltr"></div>
                 <div class="control-group"><label>שם הארון (אופציונלי)</label><input type="text" id="qc-cab-name" class="editor-select" placeholder="למשל: ארון חדר שינה" maxlength="80"></div>
             </div>
             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
@@ -1039,9 +1040,20 @@
                 <button type="button" class="view-btn" style="background:#059669;color:#fff;border:none;padding:9px 14px;" onclick="qcCopyCustomerQuote()">
                     <i class="fa-solid fa-copy"></i> העתק טקסט מוכן
                 </button>
+                <button type="button" class="view-btn" style="background:#0f766e;color:#fff;border:none;padding:9px 14px;" onclick="qcSaveQuoteToHistory()">
+                    <i class="fa-solid fa-floppy-disk"></i> שמור להיסטוריה
+                </button>
+                <button type="button" class="view-btn" style="border:1px solid var(--border);background:#fff;padding:9px 14px;" onclick="qcNewQuote()">
+                    <i class="fa-solid fa-file-circle-plus"></i> הצעה חדשה
+                </button>
             </div>
             <div id="qc-quote-list" class="qc-quote-list"></div>
             <textarea id="qc-quote-text" class="qc-quote-text" readonly placeholder="לאחר הוספת ארונות — יופיע כאן טקסט מוכן לשליחה ללקוח"></textarea>
+            <div class="qc-history-section">
+                <div class="qc-quote-title"><i class="fa-solid fa-clock-rotate-left"></i> היסטוריית הצעות מחיר</div>
+                <input type="search" id="qc-history-search" class="editor-select" placeholder="חיפוש לפי שם / טלפון..." style="margin-bottom:10px;">
+                <div id="qc-history-list" class="qc-history-list"></div>
+            </div>
         </div>
     </div>
 </div>
@@ -2094,7 +2106,7 @@
         </div>
         <div style="display:flex;gap:8px;">
             <button class="view-btn" style="flex:1;justify-content:center;background:var(--accent);color:white;border:none;padding:12px;border-radius:10px;font-weight:600;"
-                onclick="document.getElementById('quick-calc-modal').style.display='flex'; closeMobilePanel();">
+                onclick="openQuickCalcModal(); closeMobilePanel();">
                 <i class="fa-solid fa-calculator"></i> מחשבון מהיר
             </button>
             <button class="view-btn" style="flex:1;justify-content:center;border:1px solid var(--border);background:white;padding:12px;border-radius:10px;font-weight:600;"
@@ -2125,7 +2137,7 @@
         </div>
         <div class="mobile-panel-divider"></div>
         <div class="mobile-section-title">מחשבון תמחור מהיר</div>
-        <button class="mobile-action-btn" style="width:100%;" onclick="document.getElementById('quick-calc-modal').style.display='flex'; closeMobilePanel();">
+        <button class="mobile-action-btn" style="width:100%;" onclick="openQuickCalcModal(); closeMobilePanel();">
             <i class="fa-solid fa-calculator"></i> פתח מחשבון מהיר
         </button>
         <div class="mobile-panel-divider"></div>
@@ -2457,7 +2469,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js"></script>
-<script src="state.js?v=20260806qcQuote"></script>
+<script src="state.js?v=20260817qcStandalone"></script>
+<script src="quick-calc.js?v=20260817qcHist"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="writing-desk-preset.js?v=20260617wdcolors"></script>
 <script src="engine-core.js?v=20260804hideHandles"></script>

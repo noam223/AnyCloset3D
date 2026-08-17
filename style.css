@@ -2479,6 +2479,23 @@ body.dragging-v { cursor: ns-resize !important; }
     padding: 12px; font-family: inherit; font-size: .88rem; direction: rtl; resize: vertical;
     background: #f8fafc; color: var(--text-dark); box-sizing: border-box;
 }
+.qc-history-section {
+    margin-top: 18px; padding-top: 16px; border-top: 1.5px dashed var(--border);
+}
+.qc-history-list { display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; }
+.qc-history-item {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
+    padding: 10px 12px; border-radius: 10px; background: #f8fafc; border: 1px solid var(--border);
+    font-size: .84rem; text-align: right;
+}
+.qc-history-item.is-active { border-color: #0d9488; background: #f0fdfa; box-shadow: 0 0 0 2px rgba(13,148,136,.15); }
+.qc-history-item-body { flex: 1; min-width: 0; cursor: pointer; }
+.qc-history-item-body:hover strong { color: #0f766e; }
+.qc-history-meta { color: #64748b; font-size: .76rem; margin-top: 3px; }
+.qc-history-item button {
+    border: 1px solid #fecaca; background: #fff; color: #dc2626; border-radius: 8px;
+    padding: 4px 8px; cursor: pointer; font-family: inherit; flex-shrink: 0;
+}
 
 
 /* --- עיצוב תפריט צף למדפים --- */

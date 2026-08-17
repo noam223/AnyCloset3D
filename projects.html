@@ -497,6 +497,66 @@
             .profile-section { padding: 20px 18px; }
             .pp-section { padding: 18px 16px; }
         }
+
+        /* Quick calc modal (shared with designer) */
+        #quick-calc-modal {
+            position: fixed; inset: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.6); z-index: 5000;
+            display: none; justify-content: center; align-items: center;
+            backdrop-filter: blur(4px); padding: 16px;
+        }
+        #quick-calc-modal .qc-content {
+            background: white; padding: 25px; border-radius: 16px;
+            width: 100%; max-width: 620px; max-height: 92vh; overflow-y: auto;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2); font-family: inherit;
+        }
+        #quick-calc-modal .qc-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border); padding-bottom: 15px; margin-bottom: 20px; }
+        #quick-calc-modal .qc-header h2 { margin: 0; color: var(--primary); font-size: 1.25rem; display: flex; align-items: center; gap: 10px;}
+        #quick-calc-modal .close-modal { background: none; border: none; font-size: 1.4rem; cursor: pointer; color: var(--muted); }
+        #quick-calc-modal .close-modal:hover { color: var(--error); }
+        #quick-calc-modal .qc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        #quick-calc-modal .control-group { margin-bottom: 0; }
+        #quick-calc-modal .qc-grid label { font-size: 0.82rem; font-weight: 600; color: var(--muted); margin-bottom: 5px; display: block; text-align: right;}
+        #quick-calc-modal .editor-select {
+            width: 100%; padding: 8px 10px; font-size: .95rem; margin: 0; box-sizing: border-box;
+            border: 1.5px solid var(--border); border-radius: 10px; font-family: inherit; background: #f8fafc; color: var(--text);
+        }
+        #quick-calc-modal .checkbox-container { display: flex; align-items: center; cursor: pointer; font-size: 0.9rem; font-weight: 500; gap: 8px; }
+        #quick-calc-modal .qc-results { margin-top: 22px; padding-top: 18px; border-top: 2px dashed var(--border); display: flex; flex-direction: column; gap: 10px; }
+        #quick-calc-modal .qc-result-row { display: flex; justify-content: space-between; align-items: center; font-size: 1.05rem; color: var(--text); font-weight: 500; }
+        #quick-calc-modal .qc-result-row.qc-final { margin-top: 8px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 1.45rem; font-weight: 800; color: var(--primary); }
+        #quick-calc-modal .qc-quote-section { margin-top: 22px; padding-top: 18px; border-top: 2px solid var(--border); }
+        #quick-calc-modal .qc-quote-title { font-size: 1rem; font-weight: 800; color: var(--primary); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        #quick-calc-modal .qc-edit-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 0 16px; padding: 10px 14px; border-radius: 12px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a5f; }
+        #quick-calc-modal .qc-edit-banner-text { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: .92rem; }
+        #quick-calc-modal .qc-edit-banner-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        #quick-calc-modal .view-btn { border-radius: 10px; font-family: inherit; font-weight: 700; cursor: pointer; font-size: .85rem; display: inline-flex; align-items: center; gap: 6px; }
+        #quick-calc-modal .qc-quote-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; max-height: 260px; overflow-y: auto; }
+        #quick-calc-modal .qc-quote-item { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 10px 12px; border-radius: 10px; background: #f8fafc; border: 1px solid var(--border); font-size: .85rem; text-align: right; cursor: pointer; }
+        #quick-calc-modal .qc-quote-item.is-editing { border-color: #3b82f6; background: #eff6ff; }
+        #quick-calc-modal .qc-quote-item-body { flex: 1; min-width: 0; }
+        #quick-calc-modal .qc-quote-dims { color: #475569; margin-top: 3px; font-size: .82rem; }
+        #quick-calc-modal .qc-quote-hint { color: #94a3b8; font-size: .72rem; margin-top: 4px; }
+        #quick-calc-modal .qc-quote-price-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+        #quick-calc-modal .qc-quote-price-row label { font-size: .78rem; color: #64748b; font-weight: 600; }
+        #quick-calc-modal .qc-quote-price-input { width: 110px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: .85rem; direction: ltr; text-align: right; background: #fff; }
+        #quick-calc-modal .qc-quote-install { font-size: .8rem; color: #64748b; }
+        #quick-calc-modal .qc-quote-item button, #quick-calc-modal .qc-history-item button { border: 1px solid #fecaca; background: #fff; color: #dc2626; border-radius: 8px; padding: 4px 8px; cursor: pointer; font-family: inherit; flex-shrink: 0; }
+        #quick-calc-modal .qc-quote-text { width: 100%; min-height: 120px; border: 1.5px solid var(--border); border-radius: 12px; padding: 12px; font-family: inherit; font-size: .88rem; direction: rtl; resize: vertical; background: #f8fafc; color: var(--text); box-sizing: border-box; }
+        #quick-calc-modal .qc-history-section { margin-top: 18px; padding-top: 16px; border-top: 1.5px dashed var(--border); }
+        #quick-calc-modal .qc-history-list { display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; }
+        #quick-calc-modal .qc-history-item { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 10px 12px; border-radius: 10px; background: #f8fafc; border: 1px solid var(--border); font-size: .84rem; text-align: right; }
+        #quick-calc-modal .qc-history-item.is-active { border-color: #0d9488; background: #f0fdfa; }
+        #quick-calc-modal .qc-history-item-body { flex: 1; min-width: 0; cursor: pointer; }
+        #quick-calc-modal .qc-history-meta { color: #64748b; font-size: .76rem; margin-top: 3px; }
+        .btn-qc { background: linear-gradient(135deg,#0d9488,#0f766e); color: white; border: none; border-radius: 12px; padding: 13px 22px; font-size: .9rem; font-weight: 700; font-family: inherit; cursor: pointer; display: flex; align-items: center; gap: 9px; box-shadow: 0 4px 18px rgba(13,148,136,.35); white-space: nowrap; }
+        .btn-qc:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(13,148,136,.45); }
+        .hero-right { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+        @media (max-width: 600px) {
+            #quick-calc-modal .qc-grid { grid-template-columns: 1fr; }
+            #quick-calc-modal .qc-content { max-height: 100%; border-radius: 16px; }
+        }
+
     </style>
 </head>
 <body>
@@ -531,6 +591,9 @@
         <a class="sidebar-nav-item" id="nav-profile" href="#" onclick="switchPage('profile');return false;">
             <i class="fa-solid fa-user-circle"></i> הפרופיל שלי
         </a>
+        <a class="sidebar-nav-item" id="nav-quick-calc" href="#" onclick="openQuickCalcModal();return false;">
+            <i class="fa-solid fa-calculator"></i> מחשבון הצעות מחיר
+        </a>
         <a class="sidebar-nav-item" id="nav-pricing" href="#" onclick="switchPage('pricing');return false;">
             <i class="fa-solid fa-tags"></i> הגדרות תמחור
         </a>
@@ -564,6 +627,9 @@
                 </div>
             </div>
             <div class="hero-right" id="hero-right">
+                <button class="btn-qc" id="btn-quick-calc" type="button" onclick="openQuickCalcModal()">
+                    <i class="fa-solid fa-calculator"></i> הצעת מחיר
+                </button>
                 <button class="btn-new" id="btn-new-project" onclick="newProject()">
                     <i class="fa-solid fa-plus"></i> פרויקט חדש
                 </button>
@@ -1156,12 +1222,112 @@
     </div>
 </div>
 
+<!-- ===== QUICK CALC MODAL ===== -->
+<div id="quick-calc-modal" style="display:none;">
+    <div class="qc-content">
+        <div class="qc-header">
+            <h2><i class="fa-solid fa-calculator"></i> מחשבון תמחור מהיר</h2>
+            <button class="close-modal" onclick="closeQuickCalcModal()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div id="qc-edit-banner" class="qc-edit-banner" style="display:none;" role="status">
+            <div class="qc-edit-banner-text">
+                <i class="fa-solid fa-pen-to-square"></i>
+                <span id="qc-edit-banner-label">עורך ארון</span>
+            </div>
+            <div class="qc-edit-banner-actions">
+                <button type="button" id="qc-btn-save" class="view-btn" style="background:var(--primary);color:#fff;border:none;padding:7px 12px;" onclick="qcSaveEditedQuoteItem()">
+                    <i class="fa-solid fa-check"></i> שמור שינויים
+                </button>
+                <button type="button" id="qc-btn-cancel-edit" class="view-btn" style="border:1px solid var(--border);background:#fff;padding:7px 12px;" onclick="qcCancelQuoteEdit()">
+                    ביטול
+                </button>
+            </div>
+        </div>
+        <div class="qc-grid">
+            <div class="control-group"><label>רוחב (ס"מ)</label><input type="number" id="qc-w" class="editor-select" value="160" oninput="calcQuickPrice(true)"></div>
+            <div class="control-group"><label>גובה (ס"מ)</label><input type="number" id="qc-h" class="editor-select" value="240" oninput="calcQuickPrice(true)"></div>
+            <div class="control-group"><label>עומק (ס"מ)</label><input type="number" id="qc-d" class="editor-select" value="54" oninput="calcQuickPrice()"></div>
+            <div class="control-group"><label>דגם ארון (צוקל)</label>
+                <select id="qc-plinth" class="editor-select" onchange="calcQuickPrice(true)">
+                    <option value="maya">מאיה (נסתר - 7 ס"מ)</option>
+                    <option value="c9">C9 (רגיל - 8.75 ס"מ)</option>
+                    <option value="ab2_nohoney">חזית פנימית (טאצ' פנימי)</option>
+                    <option value="ab2">AB2 (טאצ' פנימי + כוורת)</option>
+                    <option value="regalim">רגלי ניקל (10 ס"מ)</option>
+                </select>
+            </div>
+            <div class="control-group"><label>חומר גוף</label>
+                <select id="qc-mat" class="editor-select" onchange="calcQuickPrice()">
+                    <option value="melamine">מלמין</option>
+                    <option value="sandwich">סנדביץ'</option>
+                </select>
+            </div>
+            <div class="control-group"><label>מספר מדפים נשלפים <span id="qc-allowed-shelves-label" style="color:var(--primary); font-weight:bold;">(כלול: 8)</span></label><input type="number" id="qc-shelves" class="editor-select" value="8" oninput="calcQuickPrice(false)"></div>
+            <div class="control-group"><label>מגירות פנים</label><input type="number" id="qc-int-d" class="editor-select" value="0" min="0" oninput="calcQuickPrice()"></div>
+            <div class="control-group"><label>מגירות חוץ</label><input type="number" id="qc-ext-d" class="editor-select" value="0" min="0" oninput="calcQuickPrice()"></div>
+            <div class="control-group"><label>יחידות כוורת</label><input type="number" id="qc-open-cells" class="editor-select" value="0" min="0" oninput="calcQuickPrice()"></div>
+            <div class="control-group"><label>מחיצות</label><input type="number" id="qc-partitions" class="editor-select" value="0" min="0" oninput="calcQuickPrice()"></div>
+            <div class="control-group"><label>דלת זכוכית פרופיל עץ</label><input type="number" id="qc-door-glass-wood" class="editor-select" value="0" min="0" oninput="calcQuickPrice()"></div>
+            <div class="control-group"><label>דלת פרופיל אלומיניום</label><input type="number" id="qc-door-alum" class="editor-select" value="0" min="0" oninput="calcQuickPrice()"></div>
+            <div class="control-group"><label>תוספת זוג לדים</label><input type="number" id="qc-led-pairs" class="editor-select" value="0" min="0" oninput="calcQuickPrice()"></div>
+        </div>
+        <div class="control-group" style="margin-top: 15px; text-align: right;">
+            <label class="checkbox-container"><input type="checkbox" id="qc-desk" onchange="calcQuickPrice()"> <span>תוספת שולחן עבודה</span></label>
+        </div>
+        <div class="qc-results">
+            <div class="qc-result-row" id="qc-cost-row" style="display:none;"><span>עלות ייצור (רכש):</span><span id="qc-total-cost" class="qc-factory">₪0</span></div>
+            <div class="qc-result-row"><span>הובלה והתקנה:</span><span id="qc-install">₪0</span></div>
+            <div class="qc-result-row qc-final"><span>מחיר ללקוח:</span><span id="qc-total-cust">₪0</span></div>
+        </div>
+
+        <div class="qc-quote-section">
+            <div class="qc-quote-title"><i class="fa-solid fa-file-lines"></i> הצעת מחיר ללקוח</div>
+            <div class="qc-grid" style="margin-bottom:10px;">
+                <div class="control-group"><label>שם לקוח</label><input type="text" id="qc-customer-name" class="editor-select" placeholder="שם הלקוח" maxlength="80"></div>
+                <div class="control-group"><label>טלפון (למעקב בלבד)</label><input type="tel" id="qc-customer-phone" class="editor-select" placeholder="050-0000000" maxlength="20" dir="ltr"></div>
+                <div class="control-group"><label>שם הארון (אופציונלי)</label><input type="text" id="qc-cab-name" class="editor-select" placeholder="למשל: ארון חדר שינה" maxlength="80"></div>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+                <button type="button" id="qc-btn-add" class="view-btn" style="background:var(--primary);color:#fff;border:none;padding:9px 14px;" onclick="qcAddToQuoteList()">
+                    <i class="fa-solid fa-plus"></i> הוסף לרשימה
+                </button>
+                <button type="button" id="qc-btn-save-list" class="view-btn" style="display:none;background:var(--primary);color:#fff;border:none;padding:9px 14px;" onclick="qcSaveEditedQuoteItem()">
+                    <i class="fa-solid fa-check"></i> שמור שינויים
+                </button>
+                <button type="button" id="qc-btn-cancel-list" class="view-btn" style="display:none;border:1px solid var(--border);background:#fff;padding:9px 14px;" onclick="qcCancelQuoteEdit()">
+                    ביטול עריכה
+                </button>
+                <button type="button" class="view-btn" style="border:1px solid var(--border);background:#fff;padding:9px 14px;" onclick="qcClearQuoteList()">
+                    <i class="fa-solid fa-trash"></i> נקה רשימה
+                </button>
+                <button type="button" class="view-btn" style="background:#059669;color:#fff;border:none;padding:9px 14px;" onclick="qcCopyCustomerQuote()">
+                    <i class="fa-solid fa-copy"></i> העתק טקסט מוכן
+                </button>
+                <button type="button" class="view-btn" style="background:#0f766e;color:#fff;border:none;padding:9px 14px;" onclick="qcSaveQuoteToHistory()">
+                    <i class="fa-solid fa-floppy-disk"></i> שמור להיסטוריה
+                </button>
+                <button type="button" class="view-btn" style="border:1px solid var(--border);background:#fff;padding:9px 14px;" onclick="qcNewQuote()">
+                    <i class="fa-solid fa-file-circle-plus"></i> הצעה חדשה
+                </button>
+            </div>
+            <div id="qc-quote-list" class="qc-quote-list"></div>
+            <textarea id="qc-quote-text" class="qc-quote-text" readonly placeholder="לאחר הוספת ארונות — יופיע כאן טקסט מוכן לשליחה ללקוח"></textarea>
+            <div class="qc-history-section">
+                <div class="qc-quote-title"><i class="fa-solid fa-clock-rotate-left"></i> היסטוריית הצעות מחיר</div>
+                <input type="search" id="qc-history-search" class="editor-select" placeholder="חיפוש לפי שם / טלפון..." style="margin-bottom:10px;">
+                <div id="qc-history-list" class="qc-history-list"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="toast" id="toast">
     <i id="toast-icon" class="fa-solid fa-circle-check"></i>
     <span id="toast-text"></span>
 </div>
 
 <script src="auth.js?v=20260731waInbox"></script>
-<script src="projects.js?v=20260806qcQuote"></script>
+<script src="projects.js?v=20260817qcHist"></script>
+<script src="quick-calc.js?v=20260817qcHist"></script>
 </body>
 </html>
