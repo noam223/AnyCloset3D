@@ -16,6 +16,8 @@ var _measurementInbox    = [];
 var _measurementUnread   = 0;
 var _linkMeasurementId   = null;
 var _measurementChannel  = null;
+var _projectMeasCounts   = {};
+var _measNotifyTimer     = null;
 
 // ── Plan catalog for upgrade modal ────────────────────────────────────────────
 // Organized by user type, shown in upgrade modal
@@ -122,6 +124,7 @@ var _USER_TYPE_LABELS = {
 
     _renderPlanBar();
     _syncStatusFilterUI();
+    try { await refreshProjectMeasCounts(); } catch (eMeas) {}
     _renderProjects();
     _resetProjectsSearchIfAutofilled();
     setTimeout(_resetProjectsSearchIfAutofilled, 150);
@@ -148,11 +151,10 @@ var _USER_TYPE_LABELS = {
     // WhatsApp measurement inbox badge + realtime
     try {
         await refreshMeasurementUnread();
+        await refreshProjectMeasCounts();
         if (window.MeasurementInbox && MeasurementInbox.subscribe) {
-            _measurementChannel = MeasurementInbox.subscribe(function() {
-                refreshMeasurementUnread();
-                var modal = document.getElementById('modal-measurements');
-                if (modal && modal.classList.contains('open')) refreshMeasurementsInbox();
+            _measurementChannel = MeasurementInbox.subscribe(function(payload) {
+                onMeasurementInboxChange(payload);
             });
         }
     } catch (eInbox) {
@@ -684,6 +686,12 @@ function _renderProjects() {
         var cabinetBadge = (p.cabinet_count != null && p.cabinet_count > 0)
             ? '<div class="cabinet-count-badge"><i class="fa-solid fa-layer-group"></i> ' + p.cabinet_count + '</div>'
             : '';
+        var measCount = _projectMeasCounts[p.id] || 0;
+        var measBadge = measCount
+            ? '<button type="button" class="project-meas-badge" title="פתח מדידות" onclick="event.stopPropagation(); openProjectMeasurements(\'' + p.id + '\')">' +
+                '<i class="fa-solid fa-ruler-combined"></i> מדידה · ' + measCount +
+              '</button>'
+            : '';
 
         // Open button — disabled if locked
         var isLocked = lockInfo && lockInfo.locked;
@@ -714,6 +722,7 @@ function _renderProjects() {
                 pinBtnHtml +
                 '<div class="project-thumb-date"><i class="fa-regular fa-clock" style="margin-left:4px"></i>' + dateStr + '</div>' +
                 cabinetBadge +
+                measBadge +
                 (!isLocked ? '<div class="project-open-overlay"><button class="project-open-btn" onclick="openProject(\'' + p.id + '\')"><i class="fa-solid fa-pencil-ruler"></i> פתח לעריכה</button></div>' : '') +
             '</div>' +
             lockBadgeHtml +
@@ -1163,6 +1172,124 @@ async function refreshMeasurementUnread() {
     _syncMeasurementBadge();
 }
 
+async function refreshProjectMeasCounts() {
+    if (!window.MeasurementInbox || !MeasurementInbox.countsByProject) {
+        _projectMeasCounts = {};
+        return;
+    }
+    _projectMeasCounts = await MeasurementInbox.countsByProject() || {};
+}
+
+function _applyMeasurementBadges(pulseProjectId) {
+    document.querySelectorAll('.project-card').forEach(function(card) {
+        var id = card.dataset.id;
+        var thumb = card.querySelector('.project-thumb');
+        if (!thumb) return;
+        var n = _projectMeasCounts[id] || 0;
+        var existing = thumb.querySelector('.project-meas-badge');
+        if (!n) {
+            if (existing) existing.remove();
+            return;
+        }
+        var pulse = pulseProjectId && pulseProjectId === id;
+        if (existing) {
+            existing.innerHTML = '<i class="fa-solid fa-ruler-combined"></i> מדידה · ' + n;
+            existing.classList.toggle('is-new', !!pulse);
+            return;
+        }
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'project-meas-badge' + (pulse ? ' is-new' : '');
+        btn.title = 'פתח מדידות';
+        btn.innerHTML = '<i class="fa-solid fa-ruler-combined"></i> מדידה · ' + n;
+        btn.onclick = function(e) {
+            e.stopPropagation();
+            openProjectMeasurements(id);
+        };
+        thumb.appendChild(btn);
+    });
+}
+
+function onMeasurementInboxChange(payload) {
+    refreshMeasurementUnread();
+    var modal = document.getElementById('modal-measurements');
+    if (modal && modal.classList.contains('open')) refreshMeasurementsInbox();
+    var ev = payload && (payload.eventType || payload.event);
+    var row = payload && payload.new;
+    refreshProjectMeasCounts().then(function() {
+        var linkedId = row && row.linked_project_id;
+        _applyMeasurementBadges(linkedId);
+        if (linkedId && (ev === 'INSERT' || ev === 'UPDATE')) {
+            var p = _projects.find(function(x) { return x.id === linkedId; });
+            if (p && (p.order_status === 'quote' || !p.order_status)) {
+                p.order_status = 'measured';
+                var card = document.querySelector('.project-card[data-id="' + linkedId + '"]');
+                if (card) {
+                    card.className = card.className.replace(/status-\w+/g, 'status-measured');
+                }
+            }
+        }
+    });
+    if (ev === 'INSERT') {
+        clearTimeout(_measNotifyTimer);
+        _measNotifyTimer = setTimeout(function() {
+            var linked = row && row.linked_project_id;
+            showToast(linked ? 'הגיעה מדידה חדשה לפרויקט' : 'הגיעה מדידה חדשה — ממתינה לקישור', 'success');
+        }, 700);
+    }
+}
+
+async function openProjectMeasurements(projectId) {
+    var proj = _projects.find(function(p) { return p.id === projectId; });
+    var title = document.getElementById('project-meas-title');
+    if (title) title.textContent = 'מדידות — ' + ((proj && (proj.customer_name || proj.name)) || 'פרויקט');
+    var sub = document.getElementById('project-meas-sub');
+    var listEl = document.getElementById('project-meas-files');
+    if (listEl) listEl.innerHTML = '<div class="empty" style="grid-column:1/-1;text-align:center;color:var(--muted);padding:24px;">טוען...</div>';
+    openModal('modal-project-measurements');
+    if (!window.MeasurementInbox) return;
+    var files = await MeasurementInbox.listForProject(projectId);
+    if (sub) sub.textContent = files.length ? (files.length + ' קבצים בפרויקט זה') : 'אין קבצים עדיין';
+    if (!listEl) return;
+    if (!files.length) {
+        listEl.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:28px 12px;">אין מדידות מקושרות לפרויקט זה.</div>';
+        return;
+    }
+    listEl.innerHTML = '';
+    for (var i = 0; i < files.length; i++) {
+        listEl.appendChild(await _buildProjectMeasFileCard(files[i]));
+    }
+}
+
+async function _buildProjectMeasFileCard(f) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'meas-file-card';
+    var thumb = '<i class="fa-solid fa-file"></i>';
+    if (f.mime_type && f.mime_type.indexOf('image/') === 0 && f.storage_path) {
+        var signed = await MeasurementInbox.getSignedUrl(f.storage_path, 3600);
+        if (signed && signed.url) thumb = '<img src="' + _escAttr(signed.url) + '" alt="">';
+        else thumb = '<i class="fa-solid fa-image"></i>';
+    } else if (f.mime_type && f.mime_type.indexOf('pdf') !== -1) {
+        thumb = '<i class="fa-solid fa-file-pdf"></i>';
+    }
+    btn.innerHTML =
+        '<div class="meas-file-thumb">' + thumb + '</div>' +
+        '<div class="meas-file-name">' + _escHtml(f.file_name || 'קובץ') + '</div>';
+    btn.onclick = function() { openProjectMeasFile(f); };
+    return btn;
+}
+
+async function openProjectMeasFile(f) {
+    if (!f || !f.storage_path) return;
+    var signed = await MeasurementInbox.getSignedUrl(f.storage_path, 3600);
+    if (signed.error || !signed.url) {
+        showToast(signed.error || 'לא ניתן לפתוח את הקובץ', 'error');
+        return;
+    }
+    window.open(signed.url, '_blank', 'noopener');
+}
+
 async function openMeasurementsInbox() {
     openModal('modal-measurements');
     await refreshMeasurementsInbox();
@@ -1316,8 +1443,8 @@ async function confirmLinkMeasurement(projectId) {
     }
     closeModal('modal-link-measurement');
     showToast('המדידה קושרה לפרויקט', 'success');
-    // Refresh projects list (status may have changed)
     try { _projects = await Projects.list(); } catch (e) {}
+    await refreshProjectMeasCounts();
     _renderProjects();
     await refreshMeasurementsInbox();
 }

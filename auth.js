@@ -1096,6 +1096,44 @@ window.MeasurementInbox = {
         return count || 0;
     },
 
+    countsByProject: async function() {
+        const sb = _getClient(); if (!sb) return {};
+        const { data, error } = await sb
+            .from('project_attachments')
+            .select('project_id');
+        if (error) {
+            console.warn('MeasurementInbox.countsByProject', error.message);
+            return {};
+        }
+        const map = {};
+        (data || []).forEach(function(row) {
+            if (!row.project_id) return;
+            map[row.project_id] = (map[row.project_id] || 0) + 1;
+        });
+        return map;
+    },
+
+    listForProject: async function(projectId) {
+        const sb = _getClient(); if (!sb) return [];
+        const { data, error } = await sb
+            .from('project_attachments')
+            .select('id, file_name, mime_type, storage_path, public_url, label, created_at')
+            .eq('project_id', projectId)
+            .order('created_at', { ascending: false });
+        if (error) {
+            const res2 = await sb
+                .from('project_attachments')
+                .select('id, file_name, mime_type, storage_path, public_url, label')
+                .eq('project_id', projectId);
+            if (res2.error) {
+                console.warn('MeasurementInbox.listForProject', res2.error.message);
+                return [];
+            }
+            return res2.data || [];
+        }
+        return data || [];
+    },
+
     getSignedUrl: async function(storagePath, expiresSec) {
         const sb = _getClient(); if (!sb) return { error: 'SDK not loaded' };
         const { data, error } = await sb.storage
