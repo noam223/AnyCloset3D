@@ -131,12 +131,35 @@
 <script>
 (function () {
     var FN = 'https://meqxnsjycvfgfhdepguo.supabase.co/functions/v1/upload-measurement';
+    var ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lcXhuc2p5Y3ZmZ2ZoZGVwZ3VvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3MDA5NDAsImV4cCI6MjA5MjI3Njk0MH0.w63bl0-1-Rgt9Nx6sVW5ueEGMojiMaxoehlPXlPH2N0';
     var params = new URLSearchParams(location.search);
-    var token = params.get('t') || params.get('token') || '';
+    var token = sanitizeToken(params.get('t') || params.get('token') || '');
     var projects = [];
     var selectedId = '';
     var files = [];
     var manual = false;
+
+    function sanitizeToken(raw) {
+        var t = String(raw || '').trim().replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '');
+        if (/https?:\/\//i.test(t) || /[?&](?:t|token)=/i.test(t)) {
+            try {
+                var u = new URL(t.indexOf('http') === 0 ? t : ('https://local.invalid/' + t.replace(/^[?&]/, '?')));
+                t = u.searchParams.get('t') || u.searchParams.get('token') || t;
+            } catch (e) {}
+        }
+        var hex = String(t || '').replace(/[^a-f0-9]/gi, '');
+        return hex.length >= 16 ? hex : t;
+    }
+
+    function fnHeaders(extra) {
+        var h = {
+            apikey: ANON,
+            Authorization: 'Bearer ' + ANON,
+            'x-ingest-token': token
+        };
+        if (extra) Object.keys(extra).forEach(function (k) { h[k] = extra[k]; });
+        return h;
+    }
 
     function $(id) { return document.getElementById(id); }
     function setMsg(text, ok) {
@@ -155,7 +178,9 @@
             });
         });
         if (!shown.length) {
-            list.innerHTML = '<div class="empty">לא נמצא. אפשר לעבור לשם ידני.</div>';
+            list.innerHTML = projects.length
+                ? '<div class="empty">לא נמצא. אפשר לעבור לשם ידני.</div>'
+                : '<div class="empty">אין פרויקטים ברשימה. אפשר לשלוח עם שם ידני.</div>';
             return;
         }
         list.innerHTML = shown.map(function (p) {
@@ -229,12 +254,22 @@
             return;
         }
         try {
-            var res = await fetch(FN + '?token=' + encodeURIComponent(token));
-            var data = await res.json();
-            if (!res.ok || !data.ok) throw new Error(data.error || 'קישור לא תקין');
+            var res = await fetch(FN, { headers: fnHeaders() });
+            var data = {};
+            try { data = await res.json(); } catch (e) { data = {}; }
+            if (!res.ok || !data.ok) {
+                var raw = data.error || data.message || data.msg || '';
+                if (/invalid token|invalid jwt|missing authorization/i.test(raw) || res.status === 401) {
+                    throw new Error('הקישור לא תקין. בקשו קישור חדש מבעל החנות.');
+                }
+                throw new Error(raw || 'לא ניתן לטעון את רשימת הלקוחות');
+            }
             $('biz-name').textContent = data.business_name || 'AnyCloset';
             projects = data.projects || [];
             renderList();
+            if (!projects.length) {
+                setMsg('אין פרויקטים ברשימה. אפשר לשלוח עם שם ידני.');
+            }
         } catch (err) {
             setMsg(err.message || 'לא ניתן לטעון את רשימת הלקוחות');
             $('submit').disabled = true;
@@ -262,14 +297,14 @@
         try {
             var initBody = {
                 action: 'init',
-                token: token,
+                t: token,
                 customer_name: manual ? customerName : (project.customer_name || project.name),
                 project_id: manual ? '' : project.id,
                 files: files.map(function (f) { return { name: f.name, type: f.type, size: f.size }; })
             };
             var initRes = await fetch(FN, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: fnHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify(initBody)
             });
             var initData = await initRes.json();
@@ -290,10 +325,10 @@
 
             var commitRes = await fetch(FN, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: fnHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify({
                     action: 'commit',
-                    token: token,
+                    t: token,
                     customer_name: initBody.customer_name,
                     project_id: initBody.project_id,
                     files: committed

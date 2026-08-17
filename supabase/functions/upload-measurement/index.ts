@@ -27,12 +27,46 @@ function json(data: unknown, status = 200) {
 
 function pickToken(req: Request, body: Record<string, unknown>): string {
   const header = req.headers.get('x-ingest-token') || '';
-  if (header.trim()) return header.trim();
   const url = new URL(req.url);
-  const q = url.searchParams.get('token') || url.searchParams.get('t') || '';
-  if (q.trim()) return q.trim();
-  const fromBody = body.token || body.ingest_token;
-  return typeof fromBody === 'string' ? fromBody.trim() : '';
+  const q = url.searchParams.get('t') || url.searchParams.get('token') || '';
+  const fromBody = body.token || body.ingest_token || body.t;
+  const raw = header || q || (typeof fromBody === 'string' ? fromBody : '');
+  return normalizeToken(String(raw || ''));
+}
+
+function normalizeToken(raw: string): string {
+  let t = String(raw || '').trim();
+  if (!t) return '';
+  try {
+    if (/https?:\/\//i.test(t) || t.indexOf('t=') !== -1 || t.indexOf('token=') !== -1) {
+      const u = new URL(t.startsWith('http') ? t : ('https://local.invalid/' + t.replace(/^[?&]/, '?')));
+      t = u.searchParams.get('t') || u.searchParams.get('token') || t;
+    }
+  } catch {
+    const m = t.match(/[?&](?:t|token)=([^&\s]+)/i);
+    if (m) t = decodeURIComponent(m[1]);
+  }
+  t = t.trim();
+  const hex = t.replace(/[^a-f0-9]/gi, '');
+  return hex.length >= 16 ? hex : t;
+}
+
+async function profileByToken(sb: ReturnType<typeof createClient>, token: string) {
+  if (!token) return { profile: null, error: 'Missing token' };
+  const { data, error } = await sb
+    .from('profiles')
+    .select('id, business_name, full_name, whatsapp_ingest_token')
+    .eq('whatsapp_ingest_token', token)
+    .limit(1);
+  if (error) {
+    // maybeSingle() treats 0 rows as PGRST116 — treat as not found, not a server crash
+    if (error.code === 'PGRST116') return { profile: null, error: null };
+    console.error('profileByToken', error.code, error.message);
+    return { profile: null, error: error.message };
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return { profile: null, error: null };
+  return { profile: row, error: null };
 }
 
 function guessExt(mime: string, fileName: string): string {
@@ -66,22 +100,14 @@ function isAllowedFile(name: string, mime: string, size: number): string | null 
 function serviceClient() {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-  return createClient(supabaseUrl, serviceKey);
+  return createClient(supabaseUrl, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${serviceKey}` } },
+  });
 }
 
-async function profileByToken(sb: ReturnType<typeof createClient>, token: string) {
-  const { data, error } = await sb
-    .from('profiles')
-    .select('id, business_info, full_name, whatsapp_ingest_token')
-    .eq('whatsapp_ingest_token', token)
-    .maybeSingle();
-  if (error || !data) return null;
-  return data;
-}
-
-function businessName(profile: { business_info?: unknown; full_name?: string | null }): string {
-  const biz = (profile.business_info || {}) as { name?: string };
-  return (biz && biz.name) || profile.full_name || 'AnyCloset';
+function businessName(profile: { business_name?: string | null; full_name?: string | null }): string {
+  return (profile.business_name || '').trim() || profile.full_name || 'AnyCloset';
 }
 
 serve(async (req) => {
@@ -92,16 +118,22 @@ serve(async (req) => {
 
     if (req.method === 'GET') {
       const token = pickToken(req, {});
-      if (!token) return json({ error: 'Missing token' }, 401);
-      const profile = await profileByToken(sb, token);
-      if (!profile) return json({ error: 'Invalid token' }, 401);
+      if (!token) return json({ error: 'חסר קישור. בקשו קישור חדש מבעל החנות.' }, 401);
+      const found = await profileByToken(sb, token);
+      if (found.error) return json({ error: 'שגיאת שרת בטעינת הקישור' }, 500);
+      if (!found.profile) return json({ error: 'הקישור לא תקין. בקשו קישור חדש מבעל החנות.' }, 401);
+      const profile = found.profile;
 
-      const { data: projects } = await sb
+      const { data: projects, error: projectsError } = await sb
         .from('projects')
         .select('id, name, customer_name, customer_order_num, order_status, updated_at')
         .eq('user_id', profile.id)
         .order('updated_at', { ascending: false })
         .limit(200);
+
+      if (projectsError) {
+        return json({ error: 'לא ניתן לטעון את רשימת הפרויקטים' }, 500);
+      }
 
       return json({
         ok: true,
@@ -120,9 +152,11 @@ serve(async (req) => {
 
     const body = (await req.json()) as Record<string, unknown>;
     const token = pickToken(req, body);
-    if (!token) return json({ error: 'Missing token' }, 401);
-    const profile = await profileByToken(sb, token);
-    if (!profile) return json({ error: 'Invalid token' }, 401);
+    if (!token) return json({ error: 'חסר קישור. בקשו קישור חדש מבעל החנות.' }, 401);
+    const found = await profileByToken(sb, token);
+    if (found.error) return json({ error: 'שגיאת שרת בטעינת הקישור' }, 500);
+    if (!found.profile) return json({ error: 'הקישור לא תקין. בקשו קישור חדש מבעל החנות.' }, 401);
+    const profile = found.profile;
 
     const action = String(body.action || 'init');
     const customerName = String(body.customer_name || '').trim().slice(0, 80);

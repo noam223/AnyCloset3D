@@ -1457,17 +1457,17 @@ async function ensureWhatsappIngestToken(rotate) {
         return;
     }
     var urlEl = document.getElementById('wa-webhook-url');
-    if (urlEl) urlEl.textContent = MeasurementInbox.webhookUrlForToken(result.token);
+    if (urlEl) urlEl.value = MeasurementInbox.webhookUrlForToken(result.token);
     showToast(rotate ? 'נוצר קישור חדש' : 'הקישור מוכן', 'success');
 }
 
 async function copyWhatsappWebhookUrl() {
     var urlEl = document.getElementById('wa-webhook-url');
-    var text = urlEl ? urlEl.textContent.trim() : '';
+    var text = urlEl ? String(urlEl.value || '').trim() : '';
     if (!text || text.indexOf('http') !== 0) {
         await ensureWhatsappIngestToken(false);
         urlEl = document.getElementById('wa-webhook-url');
-        text = urlEl ? urlEl.textContent.trim() : '';
+        text = urlEl ? String(urlEl.value || '').trim() : '';
     }
     if (!text || text.indexOf('http') !== 0) {
         showToast('אין קישור להעתקה', 'error');
@@ -1831,7 +1831,7 @@ async function _loadProfileForm() {
         if (_userProfile.whatsapp_ingest_token && window.MeasurementInbox) {
             var waUrl = document.getElementById('wa-webhook-url');
             if (waUrl) {
-                waUrl.textContent = MeasurementInbox.webhookUrlForToken(_userProfile.whatsapp_ingest_token);
+                waUrl.value = MeasurementInbox.webhookUrlForToken(_userProfile.whatsapp_ingest_token);
             }
         }
 
