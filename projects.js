@@ -158,6 +158,8 @@ var _USER_TYPE_LABELS = {
     } catch (eInbox) {
         console.warn('[init] measurement inbox', eInbox);
     }
+
+    try { await _loadPricingForm(); } catch (ePrice) { console.warn('[init] pricing', ePrice); }
 })();
 
 // ── Trial banner helpers ───────────────────────────────────────────────────────
@@ -1409,14 +1411,37 @@ var _currentUser = null;
 var _userProfile = null;
 var _pricingCfg  = null;
 
+var _PP_ENGINE_OPTS = [
+    { id: 'maya', label: 'צוקל נסתר' },
+    { id: 'c9', label: 'צוקל רגיל' },
+    { id: 'regalim', label: 'ארון על רגליים' },
+    { id: 'sliding', label: 'ארון הזזה' },
+    { id: 'ab2', label: 'AB2 (חזית פנימית + כוורת)' },
+    { id: 'ab2_nohoney', label: 'חזית פנימית' }
+];
+
+var _PP_DEFAULT_CABINET_TYPES = [
+    { id: 'maya', label: 'צוקל נסתר', engine: 'maya' },
+    { id: 'c9', label: 'צוקל רגיל', engine: 'c9' },
+    { id: 'regalim', label: 'ארון על רגליים', engine: 'regalim' },
+    { id: 'sliding', label: 'ארון הזזה', engine: 'sliding' }
+];
+
+var _PP_LEGACY_TYPE_LABELS = {
+    maya: 'מאיה', c9: 'C9', regalim: 'רגלים', ab2: 'AB2',
+    ab2_nohoney: 'חזית פנימית', other: 'אחר', sliding: 'ארון הזזה'
+};
+
+var _PP_EMPTY_WIDTHS = [80, 120, 160, 200, 240];
+
 var _PP_DEFAULTS = {
     pricingMode:'ranges',sqmPrice:800,sqmPriceNonMel:1040,lmPrice:1200,lmPriceNonMel:1560,
     lmHeightBase:1200,lmHeightBaseNonMel:1560,lmHeightThresholdCm:240,lmHeightStepCm:30,lmHeightStepPct:0.10,
     materialsBoardPrice:180,materialsBoardsPerSqm:1.4,materialsMultiplier:2.5,profitMultiplier:1.7,
     heightSurcharge:0.20,depthSurcharge:0.20,sandwichSurcharge:0.15,
     installPricePerUnit:110,installUnitCm:42.5,installHeightSurcharge:0.20,
+    cabinetTypes: _PP_DEFAULT_CABINET_TYPES.map(function(t) { return Object.assign({}, t); }),
     ranges:{
-        ab2:     {melamine:{80:1004,120:1507,160:2009,200:2511,240:3013},nonMelamine:{80:1305,120:1959,160:2612,200:3265,240:3918}},
         c9:      {melamine:{80:970, 120:1340,160:1500,200:1870,240:2250},nonMelamine:{80:1250,120:1600,160:1945,200:2433,240:2920}},
         regalim: {melamine:{80:1050,120:1462,160:1658,200:2073,240:2487},nonMelamine:{80:1360,120:1900,160:2155,200:2700,240:3233}},
         maya:    {melamine:{80:1050,120:1462,160:1658,200:2073,240:2487},nonMelamine:{80:1360,120:1900,160:2155,200:2700,240:3233}}
@@ -1429,6 +1454,51 @@ var _PP_DEFAULTS = {
         sideCabDoors:300,slidingBase:800,slidingDoor:350,slidingGlass:200,slidingMirror:350,
         slidingGold:80,slidingBlack:50,slidingHeightSurcharge:0.15,nickelLegPrice:100,ledPair:650}
 };
+
+var _ppCabinetTypes = _PP_DEFAULT_CABINET_TYPES.map(function(t) { return Object.assign({}, t); });
+
+function _ppCloneTypes(list) {
+    return (list || []).map(function(t) { return { id: t.id, label: t.label, engine: t.engine }; });
+}
+
+function _ppNormalizeCabinetTypes(cfg) {
+    var list = (cfg && Array.isArray(cfg.cabinetTypes) && cfg.cabinetTypes.length) ? cfg.cabinetTypes : null;
+    if (!list) {
+        var ranges = (cfg && cfg.ranges) || {};
+        var keys = Object.keys(ranges).filter(function(k) { return k !== 'melamine' && k !== 'nonMelamine'; });
+        list = keys.map(function(id) {
+            return { id: id, label: _PP_LEGACY_TYPE_LABELS[id] || id, engine: id === 'other' ? 'maya' : id };
+        });
+        if (!list.length) list = _ppCloneTypes(_PP_DEFAULT_CABINET_TYPES);
+    }
+    var seen = {};
+    list = list.filter(function(t) {
+        if (!t || !t.id || seen[t.id]) return false;
+        seen[t.id] = true;
+        t.engine = t.engine || t.id;
+        t.label = (t.label && String(t.label).trim()) ? String(t.label).trim() : String(t.id);
+        return true;
+    });
+    if (!list.some(function(t) { return t.engine === 'sliding'; })) {
+        list.push({ id: 'sliding', label: 'ארון הזזה', engine: 'sliding' });
+    }
+    if (!list.length) list = _ppCloneTypes(_PP_DEFAULT_CABINET_TYPES);
+    return _ppCloneTypes(list);
+}
+
+function _ppRangeTypes() {
+    return (_ppCabinetTypes || []).filter(function(t) { return t.engine !== 'sliding'; });
+}
+
+function _ppEscAttr(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+function _ppNum(v, fallback) {
+    if (v === '' || v == null) return fallback;
+    var n = Number(v);
+    return isFinite(n) ? n : fallback;
+}
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
 function switchPage(page) {
@@ -1909,6 +1979,112 @@ function _ppFrac(v) { return (parseFloat(v) || 0) / 100; }
 function _ppVal(id) { var el = document.getElementById(id); return el ? el.value : ''; }
 function _ppSet(id, v) { var el = document.getElementById(id); if (el) el.value = v; }
 
+function _ppSyncTypesFromDom() {
+    var wrap = document.getElementById('pp-cabinet-types');
+    if (!wrap) return _ppCabinetTypes;
+    var rows = wrap.querySelectorAll('.pp-type-row');
+    var next = [];
+    rows.forEach(function(row) {
+        var id = row.getAttribute('data-id');
+        var labelInp = row.querySelector('.pp-type-label');
+        var engSel = row.querySelector('.pp-type-engine');
+        if (!id) return;
+        next.push({
+            id: id,
+            label: labelInp ? String(labelInp.value || '').trim() || id : id,
+            engine: engSel ? engSel.value : 'maya'
+        });
+    });
+    if (next.length) _ppCabinetTypes = next;
+    return _ppCabinetTypes;
+}
+
+function _ppRenderCabinetTypes() {
+    var wrap = document.getElementById('pp-cabinet-types');
+    if (!wrap) return;
+    wrap.innerHTML = (_ppCabinetTypes || []).map(function(t) {
+        var opts = _PP_ENGINE_OPTS.map(function(o) {
+            return '<option value="' + o.id + '"' + (t.engine === o.id ? ' selected' : '') + '>' + o.label + '</option>';
+        }).join('');
+        return '<div class="pp-type-row" data-id="' + _ppEscAttr(t.id) + '">' +
+            '<input class="pp-input pp-type-label" type="text" maxlength="60" value="' + _ppEscAttr(t.label) + '" oninput="ppOnCabinetTypeChange()">' +
+            '<select class="pp-input pp-type-engine" onchange="ppOnCabinetTypeEngineChange(this)">' + opts + '</select>' +
+            '<button type="button" class="pp-type-del" title="מחק סוג" onclick="ppDeleteCabinetType(this.closest(\'.pp-type-row\').getAttribute(\'data-id\'))"><i class="fa-solid fa-trash"></i></button>' +
+            '</div>';
+    }).join('');
+}
+
+function ppOnCabinetTypeChange() {
+    _ppSyncTypesFromDom();
+    _ppRefreshRangeModelSelects();
+    if (typeof window.applyCabinetTypeSelects === 'function') window.applyCabinetTypeSelects({ cabinetTypes: _ppCabinetTypes, ranges: _ppReadRangesTable() });
+}
+
+function ppOnCabinetTypeEngineChange(sel) {
+    var row = sel && sel.closest('.pp-type-row');
+    var prevEngine = null;
+    var id = row ? row.getAttribute('data-id') : '';
+    var existing = (_ppCabinetTypes || []).find(function(t) { return t.id === id; });
+    if (existing) prevEngine = existing.engine;
+    _ppSyncTypesFromDom();
+    var t = (_ppCabinetTypes || []).find(function(x) { return x.id === id; });
+    if (t && prevEngine === 'sliding' && t.engine !== 'sliding') {
+        _PP_EMPTY_WIDTHS.forEach(function(w) { _ppAddRangeRowData(t.id, w, 0, 0); });
+    }
+    if (t && t.engine === 'sliding' && prevEngine !== 'sliding') {
+        _ppRemoveRangeRowsForType(t.id);
+    }
+    _ppRefreshRangeModelSelects();
+    if (typeof window.applyCabinetTypeSelects === 'function') window.applyCabinetTypeSelects({ cabinetTypes: _ppCabinetTypes, ranges: _ppReadRangesTable() });
+}
+
+function ppAddCabinetType() {
+    _ppSyncTypesFromDom();
+    var id = 'custom_' + Date.now().toString(36);
+    _ppCabinetTypes.push({ id: id, label: 'סוג חדש', engine: 'maya' });
+    _ppRenderCabinetTypes();
+    _PP_EMPTY_WIDTHS.forEach(function(w) { _ppAddRangeRowData(id, w, 0, 0); });
+    _ppRefreshRangeModelSelects();
+    if (typeof window.applyCabinetTypeSelects === 'function') window.applyCabinetTypeSelects({ cabinetTypes: _ppCabinetTypes, ranges: _ppReadRangesTable() });
+}
+
+function ppDeleteCabinetType(id) {
+    _ppSyncTypesFromDom();
+    if ((_ppCabinetTypes || []).length <= 1) {
+        showToast('חייב להישאר לפחות סוג ארון אחד', 'error');
+        return;
+    }
+    _ppCabinetTypes = _ppCabinetTypes.filter(function(t) { return t.id !== id; });
+    _ppRemoveRangeRowsForType(id);
+    _ppRenderCabinetTypes();
+    _ppRefreshRangeModelSelects();
+    if (typeof window.applyCabinetTypeSelects === 'function') window.applyCabinetTypeSelects({ cabinetTypes: _ppCabinetTypes, ranges: _ppReadRangesTable() });
+}
+
+function _ppRemoveRangeRowsForType(id) {
+    var tbody = document.getElementById('pp-ranges-tbody');
+    if (!tbody) return;
+    Array.prototype.slice.call(tbody.querySelectorAll('tr')).forEach(function(tr) {
+        var sel = tr.querySelector('select');
+        if (sel && sel.value === id) tr.remove();
+    });
+}
+
+function _ppRefreshRangeModelSelects() {
+    var types = _ppRangeTypes();
+    var tbody = document.getElementById('pp-ranges-tbody');
+    if (!tbody) return;
+    tbody.querySelectorAll('tr').forEach(function(tr) {
+        var sel = tr.querySelector('select');
+        if (!sel) return;
+        var cur = sel.value;
+        sel.innerHTML = types.map(function(t) {
+            return '<option value="' + _ppEscAttr(t.id) + '"' + (t.id === cur ? ' selected' : '') + '>' + _ppEscAttr(t.label) + '</option>';
+        }).join('');
+        if (types.some(function(t) { return t.id === cur; })) sel.value = cur;
+    });
+}
+
 async function _loadPricingForm() {
     try {
         var sb = supabase.createClient(
@@ -1919,8 +2095,12 @@ async function _loadPricingForm() {
         if (!user) return;
         var { data: row } = await sb.from('pricing_configs').select('config').eq('user_id', user.id).single();
         _pricingCfg = (row && row.config && Object.keys(row.config).length > 0) ? row.config : null;
+        if (_pricingCfg) {
+            _pricingCfg.cabinetTypes = _ppNormalizeCabinetTypes(_pricingCfg);
+        }
         window._pricingConfig = _pricingCfg;
         _fillPricingPanel(_pricingCfg || _PP_DEFAULTS);
+        if (typeof window.applyCabinetTypeSelects === 'function') window.applyCabinetTypeSelects(window._pricingConfig || _PP_DEFAULTS);
     } catch(e) {
         _fillPricingPanel(_PP_DEFAULTS);
     }
@@ -1940,17 +2120,24 @@ function _ppBuildRangesTable(ranges) {
     if (!tbody) return;
     tbody.innerHTML = '';
     var r = ranges || _PP_DEFAULTS.ranges;
-    var keys = Object.keys(r);
-    if (!keys.length) { _ppAddRangeRowData('maya', 80, 0, 0); return; }
+    var typeIds = _ppRangeTypes().map(function(t) { return t.id; });
+    var keys = Object.keys(r).filter(function(k) {
+        return k !== 'melamine' && k !== 'nonMelamine' && k !== 'sliding' && (typeIds.length ? typeIds.indexOf(k) !== -1 : true);
+    });
+    if (!keys.length) {
+        var first = typeIds[0] || 'maya';
+        _ppAddRangeRowData(first, 80, 0, 0);
+        return;
+    }
     keys.forEach(function(model) {
-        var entry = r[model];
-        // Real format: { melamine: {80:price,...}, nonMelamine: {80:price,...} }
+        var entry = r[model] || {};
         var mel = entry.melamine || {};
         var nonMel = entry.nonMelamine || {};
         var widths = Object.keys(mel).length ? Object.keys(mel) : Object.keys(nonMel);
+        widths.sort(function(a, b) { return parseInt(a, 10) - parseInt(b, 10); });
         if (!widths.length) { _ppAddRangeRowData(model, 80, 0, 0); return; }
         widths.forEach(function(w) {
-            _ppAddRangeRowData(model, parseInt(w), mel[w] || 0, nonMel[w] || 0);
+            _ppAddRangeRowData(model, parseInt(w, 10), _ppNum(mel[w], 0), _ppNum(nonMel[w], 0));
         });
     });
 }
@@ -1958,25 +2145,27 @@ function _ppBuildRangesTable(ranges) {
 function _ppAddRangeRowData(model, width, melVal, nonMelVal) {
     var tbody = document.getElementById('pp-ranges-tbody');
     if (!tbody) return;
+    var types = _ppRangeTypes();
+    if (!types.length) return;
+    if (!types.some(function(t) { return t.id === model; })) model = types[0].id;
     var tr = document.createElement('tr');
-    var modelOpts = ['ab2','c9','regalim','maya','other'];
-    var modelLabels = {ab2:'AB2',c9:'C9',regalim:'רגלים',maya:'מאיה',other:'אחר'};
     var selectHtml = '<select class="pp-input" style="width:100%;padding:4px 6px;font-size:.82rem;">';
-    modelOpts.forEach(function(m) {
-        selectHtml += '<option value="' + m + '"' + (model===m?' selected':'') + '>' + modelLabels[m] + '</option>';
+    types.forEach(function(t) {
+        selectHtml += '<option value="' + _ppEscAttr(t.id) + '"' + (model === t.id ? ' selected' : '') + '>' + _ppEscAttr(t.label) + '</option>';
     });
     selectHtml += '</select>';
     tr.innerHTML =
         '<td style="padding:4px 6px;">' + selectHtml + '</td>' +
-        '<td style="padding:4px 6px;"><input type="number" class="pp-input" style="width:100%;padding:4px 6px;font-size:.82rem;" value="' + (width||80) + '" placeholder="רוחב (ס״מ)"></td>' +
-        '<td style="padding:4px 6px;"><input type="number" class="pp-input" style="width:100%;padding:4px 6px;font-size:.82rem;" value="' + (melVal||0) + '" placeholder="מחיר מלמין"></td>' +
-        '<td style="padding:4px 6px;"><input type="number" class="pp-input" style="width:100%;padding:4px 6px;font-size:.82rem;" value="' + (nonMelVal||0) + '" placeholder="מחיר לא מלמין"></td>' +
+        '<td style="padding:4px 6px;"><input type="number" class="pp-input" style="width:100%;padding:4px 6px;font-size:.82rem;" value="' + (width != null ? width : 80) + '"></td>' +
+        '<td style="padding:4px 6px;"><input type="number" class="pp-input" style="width:100%;padding:4px 6px;font-size:.82rem;" value="' + (melVal != null ? melVal : 0) + '"></td>' +
+        '<td style="padding:4px 6px;"><input type="number" class="pp-input" style="width:100%;padding:4px 6px;font-size:.82rem;" value="' + (nonMelVal != null ? nonMelVal : 0) + '"></td>' +
         '<td style="padding:4px 6px;text-align:center;"><button onclick="ppDeleteRangeRow(this)" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:1rem;padding:2px 6px;" title="מחק שורה">&#x2715;</button></td>';
     tbody.appendChild(tr);
 }
 
 function ppAddRangeRow() {
-    _ppAddRangeRowData('maya', 80, 0, 0);
+    var types = _ppRangeTypes();
+    _ppAddRangeRowData(types[0] ? types[0].id : 'maya', 80, 0, 0);
 }
 
 function ppDeleteRangeRow(btn) {
@@ -1994,9 +2183,9 @@ function _ppReadRangesTable() {
         if (cells.length < 4) return;
         var sel = cells[0].querySelector('select');
         var model = sel ? sel.value : 'maya';
-        var width = parseInt(cells[1].querySelector('input').value) || 80;
-        var mel = parseInt(cells[2].querySelector('input').value) || 0;
-        var nonMel = parseInt(cells[3].querySelector('input').value) || 0;
+        var width = parseInt(cells[1].querySelector('input').value, 10) || 80;
+        var mel = _ppNum(cells[2].querySelector('input').value, 0);
+        var nonMel = _ppNum(cells[3].querySelector('input').value, 0);
         if (!result[model]) result[model] = { melamine: {}, nonMelamine: {} };
         result[model].melamine[width] = mel;
         result[model].nonMelamine[width] = nonMel;
@@ -2006,126 +2195,132 @@ function _ppReadRangesTable() {
 
 function _fillPricingPanel(cfg) {
     var c = cfg || _PP_DEFAULTS;
+    _ppCabinetTypes = _ppNormalizeCabinetTypes(c);
     ppSetMode(c.pricingMode || 'ranges');
+    _ppRenderCabinetTypes();
     _ppBuildRangesTable(c.ranges);
-    _ppSet('pp-sqmPrice', c.sqmPrice || 800);
-    _ppSet('pp-sqmPriceNonMel', c.sqmPriceNonMel || 1040);
-    _ppSet('pp-lmPrice', c.lmPrice || 1200);
-    _ppSet('pp-lmPriceNonMel', c.lmPriceNonMel || 1560);
-    _ppSet('pp-lmHeightBase', c.lmHeightBase || 1200);
-    _ppSet('pp-lmHeightBaseNonMel', c.lmHeightBaseNonMel || 1560);
-    _ppSet('pp-lmHeightThresholdCm', c.lmHeightThresholdCm || 240);
-    _ppSet('pp-lmHeightStepCm', c.lmHeightStepCm || 30);
-    _ppSet('pp-lmHeightStepPct', _ppPct(c.lmHeightStepPct || 0.10));
-    _ppSet('pp-materialsBoardPrice', c.materialsBoardPrice || 180);
-    _ppSet('pp-materialsBoardsPerSqm', c.materialsBoardsPerSqm || 1.4);
-    _ppSet('pp-materialsMultiplier', c.materialsMultiplier || 2.5);
-    _ppSet('pp-profitMultiplier', c.profitMultiplier || 1.7);
-    _ppSet('pp-heightSurcharge', _ppPct(c.heightSurcharge || 0.20));
-    _ppSet('pp-depthSurcharge', _ppPct(c.depthSurcharge || 0.20));
-    _ppSet('pp-sandwichSurcharge', _ppPct(c.sandwichSurcharge || 0.15));
-    _ppSet('pp-installPricePerUnit', c.installPricePerUnit || 110);
-    _ppSet('pp-installUnitCm', c.installUnitCm || 42.5);
-    _ppSet('pp-installHeightSurcharge', _ppPct(c.installHeightSurcharge || 0.20));
+    _ppSet('pp-sqmPrice', _ppNum(c.sqmPrice, 800));
+    _ppSet('pp-sqmPriceNonMel', _ppNum(c.sqmPriceNonMel, 1040));
+    _ppSet('pp-lmPrice', _ppNum(c.lmPrice, 1200));
+    _ppSet('pp-lmPriceNonMel', _ppNum(c.lmPriceNonMel, 1560));
+    _ppSet('pp-lmHeightBase', _ppNum(c.lmHeightBase, 1200));
+    _ppSet('pp-lmHeightBaseNonMel', _ppNum(c.lmHeightBaseNonMel, 1560));
+    _ppSet('pp-lmHeightThresholdCm', _ppNum(c.lmHeightThresholdCm, 240));
+    _ppSet('pp-lmHeightStepCm', _ppNum(c.lmHeightStepCm, 30));
+    _ppSet('pp-lmHeightStepPct', _ppPct(_ppNum(c.lmHeightStepPct, 0.10)));
+    _ppSet('pp-materialsBoardPrice', _ppNum(c.materialsBoardPrice, 180));
+    _ppSet('pp-materialsBoardsPerSqm', _ppNum(c.materialsBoardsPerSqm, 1.4));
+    _ppSet('pp-materialsMultiplier', _ppNum(c.materialsMultiplier, 2.5));
+    _ppSet('pp-profitMultiplier', _ppNum(c.profitMultiplier, 1.7));
+    _ppSet('pp-heightSurcharge', _ppPct(_ppNum(c.heightSurcharge, 0.20)));
+    _ppSet('pp-depthSurcharge', _ppPct(_ppNum(c.depthSurcharge, 0.20)));
+    _ppSet('pp-sandwichSurcharge', _ppPct(_ppNum(c.sandwichSurcharge, 0.15)));
+    _ppSet('pp-installPricePerUnit', _ppNum(c.installPricePerUnit, 110));
+    _ppSet('pp-installUnitCm', _ppNum(c.installUnitCm, 42.5));
+    _ppSet('pp-installHeightSurcharge', _ppPct(_ppNum(c.installHeightSurcharge, 0.20)));
     var ex = c.extras || _PP_DEFAULTS.extras;
-    _ppSet('pp-internalDrawer', ex.internalDrawer || 150);
-    _ppSet('pp-externalDrawer', ex.externalDrawer || 200);
-    _ppSet('pp-openCell', ex.openCell || 400);
-    _ppSet('pp-partition', ex.partition || 150);
-    _ppSet('pp-shelfFreePerMeter', ex.shelfFreePerMeter || 3);
-    _ppSet('pp-extraShelfMel', ex.extraShelfMel || 60);
-    _ppSet('pp-extraShelfNonMel', ex.extraShelfNonMel || 80);
-    _ppSet('pp-deskUnit', ex.deskUnit || 900);
-    _ppSet('pp-doorFramedMel', ex.doorFramedMel || 80);
-    _ppSet('pp-doorGlassMel', ex.doorGlassMel || 400);
-    _ppSet('pp-doorGlassBlack', ex.doorGlassBlack || 600);
-    _ppSet('pp-doorMirror', ex.doorMirror || 350);
-    _ppSet('pp-ledPair', ex.ledPair || 650);
-    _ppSet('pp-upperUnit160', ex.upperUnit160 || 600);
-    _ppSet('pp-upperUnit240', ex.upperUnit240 || 900);
-    _ppSet('pp-upperUnitPerCm', ex.upperUnitPerCm || 3.75);
-    _ppSet('pp-cornerDrawers3', ex.cornerDrawers3 || 832);
-    _ppSet('pp-cornerDrawers4', ex.cornerDrawers4 || 907);
-    _ppSet('pp-cornerDrawerExtra', ex.cornerDrawerExtra || 200);
-    _ppSet('pp-cornerDesk', ex.cornerDesk || 900);
-    _ppSet('pp-fullCornerBase', ex.fullCornerBase || 2800);
-    _ppSet('pp-fullCornerShelf', ex.fullCornerShelf || 120);
-    _ppSet('pp-wingConnection', ex.wingConnection || 400);
-    _ppSet('pp-sideCabMel', ex.sideCabMel || 12);
-    _ppSet('pp-sideCabNonMel', ex.sideCabNonMel || 15);
-    _ppSet('pp-sideCabDoors', ex.sideCabDoors || 300);
-    _ppSet('pp-slidingBase', ex.slidingBase || 800);
-    _ppSet('pp-slidingDoor', ex.slidingDoor || 350);
-    _ppSet('pp-slidingGlass', ex.slidingGlass || 200);
-    _ppSet('pp-slidingMirror', ex.slidingMirror || 350);
-    _ppSet('pp-slidingGold', ex.slidingGold || 80);
-    _ppSet('pp-slidingBlack', ex.slidingBlack || 50);
-    _ppSet('pp-slidingHeightSurcharge', _ppPct(ex.slidingHeightSurcharge || 0.15));
-    _ppSet('pp-nickelLegPrice', ex.nickelLegPrice || 100);
+    var dx = _PP_DEFAULTS.extras;
+    _ppSet('pp-internalDrawer', _ppNum(ex.internalDrawer, dx.internalDrawer));
+    _ppSet('pp-externalDrawer', _ppNum(ex.externalDrawer, dx.externalDrawer));
+    _ppSet('pp-openCell', _ppNum(ex.openCell, dx.openCell));
+    _ppSet('pp-partition', _ppNum(ex.partition, dx.partition));
+    _ppSet('pp-shelfFreePerMeter', _ppNum(ex.shelfFreePerMeter, dx.shelfFreePerMeter));
+    _ppSet('pp-extraShelfMel', _ppNum(ex.extraShelfMel, dx.extraShelfMel));
+    _ppSet('pp-extraShelfNonMel', _ppNum(ex.extraShelfNonMel, dx.extraShelfNonMel));
+    _ppSet('pp-deskUnit', _ppNum(ex.deskUnit, dx.deskUnit));
+    _ppSet('pp-doorFramedMel', _ppNum(ex.doorFramedMel, dx.doorFramedMel));
+    _ppSet('pp-doorGlassMel', _ppNum(ex.doorGlassMel, dx.doorGlassMel));
+    _ppSet('pp-doorGlassBlack', _ppNum(ex.doorGlassBlack, dx.doorGlassBlack));
+    _ppSet('pp-doorMirror', _ppNum(ex.doorMirror, dx.doorMirror));
+    _ppSet('pp-ledPair', _ppNum(ex.ledPair, dx.ledPair));
+    _ppSet('pp-upperUnit160', _ppNum(ex.upperUnit160, dx.upperUnit160));
+    _ppSet('pp-upperUnit240', _ppNum(ex.upperUnit240, dx.upperUnit240));
+    _ppSet('pp-upperUnitPerCm', _ppNum(ex.upperUnitPerCm, dx.upperUnitPerCm));
+    _ppSet('pp-cornerDrawers3', _ppNum(ex.cornerDrawers3, dx.cornerDrawers3));
+    _ppSet('pp-cornerDrawers4', _ppNum(ex.cornerDrawers4, dx.cornerDrawers4));
+    _ppSet('pp-cornerDrawerExtra', _ppNum(ex.cornerDrawerExtra, dx.cornerDrawerExtra));
+    _ppSet('pp-cornerDesk', _ppNum(ex.cornerDesk, dx.cornerDesk));
+    _ppSet('pp-fullCornerBase', _ppNum(ex.fullCornerBase, dx.fullCornerBase));
+    _ppSet('pp-fullCornerShelf', _ppNum(ex.fullCornerShelf, dx.fullCornerShelf));
+    _ppSet('pp-wingConnection', _ppNum(ex.wingConnection, dx.wingConnection));
+    _ppSet('pp-sideCabMel', _ppNum(ex.sideCabMel, dx.sideCabMel));
+    _ppSet('pp-sideCabNonMel', _ppNum(ex.sideCabNonMel, dx.sideCabNonMel));
+    _ppSet('pp-sideCabDoors', _ppNum(ex.sideCabDoors, dx.sideCabDoors));
+    _ppSet('pp-slidingBase', _ppNum(ex.slidingBase, dx.slidingBase));
+    _ppSet('pp-slidingDoor', _ppNum(ex.slidingDoor, dx.slidingDoor));
+    _ppSet('pp-slidingGlass', _ppNum(ex.slidingGlass, dx.slidingGlass));
+    _ppSet('pp-slidingMirror', _ppNum(ex.slidingMirror, dx.slidingMirror));
+    _ppSet('pp-slidingGold', _ppNum(ex.slidingGold, dx.slidingGold));
+    _ppSet('pp-slidingBlack', _ppNum(ex.slidingBlack, dx.slidingBlack));
+    _ppSet('pp-slidingHeightSurcharge', _ppPct(_ppNum(ex.slidingHeightSurcharge, dx.slidingHeightSurcharge)));
+    _ppSet('pp-nickelLegPrice', _ppNum(ex.nickelLegPrice, dx.nickelLegPrice));
 }
 
 function _readPricingPanel() {
     var activeBtn = document.querySelector('.pp-mode-btn.active');
     var mode = activeBtn ? activeBtn.getAttribute('data-mode') : 'ranges';
     var existing = _pricingCfg || _PP_DEFAULTS;
+    var dx = _PP_DEFAULTS.extras || {};
+    _ppSyncTypesFromDom();
     return {
         pricingMode: mode,
-        sqmPrice: parseInt(_ppVal('pp-sqmPrice')) || 800,
-        sqmPriceNonMel: parseInt(_ppVal('pp-sqmPriceNonMel')) || 1040,
-        lmPrice: parseInt(_ppVal('pp-lmPrice')) || 1200,
-        lmPriceNonMel: parseInt(_ppVal('pp-lmPriceNonMel')) || 1560,
-        lmHeightBase: parseInt(_ppVal('pp-lmHeightBase')) || 1200,
-        lmHeightBaseNonMel: parseInt(_ppVal('pp-lmHeightBaseNonMel')) || 1560,
-        lmHeightThresholdCm: parseInt(_ppVal('pp-lmHeightThresholdCm')) || 240,
-        lmHeightStepCm: parseInt(_ppVal('pp-lmHeightStepCm')) || 30,
+        sqmPrice: _ppNum(_ppVal('pp-sqmPrice'), 800),
+        sqmPriceNonMel: _ppNum(_ppVal('pp-sqmPriceNonMel'), 1040),
+        lmPrice: _ppNum(_ppVal('pp-lmPrice'), 1200),
+        lmPriceNonMel: _ppNum(_ppVal('pp-lmPriceNonMel'), 1560),
+        lmHeightBase: _ppNum(_ppVal('pp-lmHeightBase'), 1200),
+        lmHeightBaseNonMel: _ppNum(_ppVal('pp-lmHeightBaseNonMel'), 1560),
+        lmHeightThresholdCm: _ppNum(_ppVal('pp-lmHeightThresholdCm'), 240),
+        lmHeightStepCm: _ppNum(_ppVal('pp-lmHeightStepCm'), 30),
         lmHeightStepPct: _ppFrac(_ppVal('pp-lmHeightStepPct')),
-        materialsBoardPrice: parseInt(_ppVal('pp-materialsBoardPrice')) || 180,
-        materialsBoardsPerSqm: parseFloat(_ppVal('pp-materialsBoardsPerSqm')) || 1.4,
-        materialsMultiplier: parseFloat(_ppVal('pp-materialsMultiplier')) || 2.5,
-        profitMultiplier: parseFloat(_ppVal('pp-profitMultiplier')) || 1.7,
+        materialsBoardPrice: _ppNum(_ppVal('pp-materialsBoardPrice'), 180),
+        materialsBoardsPerSqm: _ppNum(_ppVal('pp-materialsBoardsPerSqm'), 1.4),
+        materialsMultiplier: _ppNum(_ppVal('pp-materialsMultiplier'), 2.5),
+        profitMultiplier: _ppNum(_ppVal('pp-profitMultiplier'), 1.7),
         heightSurcharge: _ppFrac(_ppVal('pp-heightSurcharge')),
         depthSurcharge: _ppFrac(_ppVal('pp-depthSurcharge')),
         sandwichSurcharge: _ppFrac(_ppVal('pp-sandwichSurcharge')),
-        installPricePerUnit: parseInt(_ppVal('pp-installPricePerUnit')) || 110,
-        installUnitCm: parseFloat(_ppVal('pp-installUnitCm')) || 42.5,
+        installPricePerUnit: _ppNum(_ppVal('pp-installPricePerUnit'), 110),
+        installUnitCm: _ppNum(_ppVal('pp-installUnitCm'), 42.5),
         installHeightSurcharge: _ppFrac(_ppVal('pp-installHeightSurcharge')),
+        cabinetTypes: _ppCloneTypes(_ppCabinetTypes),
         ranges: _ppReadRangesTable(),
-        extras: {
-            internalDrawer: parseInt(_ppVal('pp-internalDrawer')) || 150,
-            externalDrawer: parseInt(_ppVal('pp-externalDrawer')) || 200,
-            openCell: parseInt(_ppVal('pp-openCell')) || 400,
-            partition: parseInt(_ppVal('pp-partition')) || 150,
-            shelfFreePerMeter: parseFloat(_ppVal('pp-shelfFreePerMeter')) || 3,
-            extraShelfMel: parseInt(_ppVal('pp-extraShelfMel')) || 60,
-            extraShelfNonMel: parseInt(_ppVal('pp-extraShelfNonMel')) || 80,
-            deskUnit: parseInt(_ppVal('pp-deskUnit')) || 900,
-            doorFramedMel: parseInt(_ppVal('pp-doorFramedMel')) || 80,
-            doorGlassMel: parseInt(_ppVal('pp-doorGlassMel')) || 400,
-            doorGlassBlack: parseInt(_ppVal('pp-doorGlassBlack')) || 600,
-            doorMirror: parseInt(_ppVal('pp-doorMirror')) || 350,
-            upperUnit160: parseInt(_ppVal('pp-upperUnit160')) || 600,
-            upperUnit240: parseInt(_ppVal('pp-upperUnit240')) || 900,
-            upperUnitPerCm: parseFloat(_ppVal('pp-upperUnitPerCm')) || 3.75,
-            cornerDrawers3: parseInt(_ppVal('pp-cornerDrawers3')) || 832,
-            cornerDrawers4: parseInt(_ppVal('pp-cornerDrawers4')) || 907,
-            cornerDrawerExtra: parseInt(_ppVal('pp-cornerDrawerExtra')) || 200,
-            cornerDesk: parseInt(_ppVal('pp-cornerDesk')) || 900,
-            fullCornerBase: parseInt(_ppVal('pp-fullCornerBase')) || 2800,
-            fullCornerShelf: parseInt(_ppVal('pp-fullCornerShelf')) || 120,
-            wingConnection: parseInt(_ppVal('pp-wingConnection')) || 400,
-            sideCabMel: parseInt(_ppVal('pp-sideCabMel')) || 12,
-            sideCabNonMel: parseInt(_ppVal('pp-sideCabNonMel')) || 15,
-            sideCabDoors: parseInt(_ppVal('pp-sideCabDoors')) || 300,
-            slidingBase: parseInt(_ppVal('pp-slidingBase')) || 800,
-            slidingDoor: parseInt(_ppVal('pp-slidingDoor')) || 350,
-            slidingGlass: parseInt(_ppVal('pp-slidingGlass')) || 200,
-            slidingMirror: parseInt(_ppVal('pp-slidingMirror')) || 350,
-            slidingGold: parseInt(_ppVal('pp-slidingGold')) || 80,
-            slidingBlack: parseInt(_ppVal('pp-slidingBlack')) || 50,
+        extras: Object.assign({}, existing.extras || {}, {
+            internalDrawer: _ppNum(_ppVal('pp-internalDrawer'), dx.internalDrawer),
+            externalDrawer: _ppNum(_ppVal('pp-externalDrawer'), dx.externalDrawer),
+            openCell: _ppNum(_ppVal('pp-openCell'), dx.openCell),
+            partition: _ppNum(_ppVal('pp-partition'), dx.partition),
+            shelfFreePerMeter: _ppNum(_ppVal('pp-shelfFreePerMeter'), dx.shelfFreePerMeter),
+            extraShelfMel: _ppNum(_ppVal('pp-extraShelfMel'), dx.extraShelfMel),
+            extraShelfNonMel: _ppNum(_ppVal('pp-extraShelfNonMel'), dx.extraShelfNonMel),
+            deskUnit: _ppNum(_ppVal('pp-deskUnit'), dx.deskUnit),
+            doorFramedMel: _ppNum(_ppVal('pp-doorFramedMel'), dx.doorFramedMel),
+            doorGlassMel: _ppNum(_ppVal('pp-doorGlassMel'), dx.doorGlassMel),
+            doorGlassBlack: _ppNum(_ppVal('pp-doorGlassBlack'), dx.doorGlassBlack),
+            doorMirror: _ppNum(_ppVal('pp-doorMirror'), dx.doorMirror),
+            upperUnit160: _ppNum(_ppVal('pp-upperUnit160'), dx.upperUnit160),
+            upperUnit240: _ppNum(_ppVal('pp-upperUnit240'), dx.upperUnit240),
+            upperUnitPerCm: _ppNum(_ppVal('pp-upperUnitPerCm'), dx.upperUnitPerCm),
+            cornerDrawers3: _ppNum(_ppVal('pp-cornerDrawers3'), dx.cornerDrawers3),
+            cornerDrawers4: _ppNum(_ppVal('pp-cornerDrawers4'), dx.cornerDrawers4),
+            cornerDrawerExtra: _ppNum(_ppVal('pp-cornerDrawerExtra'), dx.cornerDrawerExtra),
+            cornerDesk: _ppNum(_ppVal('pp-cornerDesk'), dx.cornerDesk),
+            fullCornerBase: _ppNum(_ppVal('pp-fullCornerBase'), dx.fullCornerBase),
+            fullCornerShelf: _ppNum(_ppVal('pp-fullCornerShelf'), dx.fullCornerShelf),
+            wingConnection: _ppNum(_ppVal('pp-wingConnection'), dx.wingConnection),
+            sideCabMel: _ppNum(_ppVal('pp-sideCabMel'), dx.sideCabMel),
+            sideCabNonMel: _ppNum(_ppVal('pp-sideCabNonMel'), dx.sideCabNonMel),
+            sideCabDoors: _ppNum(_ppVal('pp-sideCabDoors'), dx.sideCabDoors),
+            slidingBase: _ppNum(_ppVal('pp-slidingBase'), dx.slidingBase),
+            slidingDoor: _ppNum(_ppVal('pp-slidingDoor'), dx.slidingDoor),
+            slidingGlass: _ppNum(_ppVal('pp-slidingGlass'), dx.slidingGlass),
+            slidingMirror: _ppNum(_ppVal('pp-slidingMirror'), dx.slidingMirror),
+            slidingGold: _ppNum(_ppVal('pp-slidingGold'), dx.slidingGold),
+            slidingBlack: _ppNum(_ppVal('pp-slidingBlack'), dx.slidingBlack),
             slidingHeightSurcharge: _ppFrac(_ppVal('pp-slidingHeightSurcharge')),
-            nickelLegPrice: parseInt(_ppVal('pp-nickelLegPrice')) || 100,
-            ledPair: parseInt(_ppVal('pp-ledPair')) || 650
-        }
+            nickelLegPrice: _ppNum(_ppVal('pp-nickelLegPrice'), dx.nickelLegPrice),
+            ledPair: _ppNum(_ppVal('pp-ledPair'), dx.ledPair)
+        })
     };
 }
 
@@ -2145,6 +2340,7 @@ async function savePricingSettings() {
         if (error) throw error;
         _pricingCfg = cfg;
         window._pricingConfig = cfg;
+        if (typeof window.applyCabinetTypeSelects === 'function') window.applyCabinetTypeSelects(cfg);
         showToast('הגדרות התמחור נשמרו ✓', 'success');
     } catch(e) {
         showToast('שגיאה בשמירה: ' + e.message, 'error');
@@ -2153,6 +2349,7 @@ async function savePricingSettings() {
 
 function resetPricingToDefaults() {
     _fillPricingPanel(_PP_DEFAULTS);
+    if (typeof window.applyCabinetTypeSelects === 'function') window.applyCabinetTypeSelects(_PP_DEFAULTS);
     showToast('הוחזר לברירת מחדל', 'success');
 }
 

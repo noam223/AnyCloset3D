@@ -487,6 +487,11 @@
         .pp-input:focus { border-color: var(--secondary); box-shadow: 0 0 0 3px rgba(37,99,235,.1); background: white; }
         .pp-mode-section { display: none; }
         .pp-mode-section.visible { display: block; }
+        .pp-types-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+        .pp-type-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: center; }
+        .pp-type-row .pp-type-label { direction: rtl; text-align: right; }
+        .pp-type-del { background: none; border: none; color: #ef4444; cursor: pointer; font-size: 1rem; padding: 8px 10px; border-radius: 8px; }
+        .pp-type-del:hover { background: rgba(239,68,68,.08); }
         @media (max-width: 900px) {
             .profile-grid { grid-template-columns: 1fr; }
             .pp-grid { grid-template-columns: 1fr 1fr; }
@@ -496,6 +501,7 @@
             .pp-grid { grid-template-columns: 1fr 1fr; }
             .profile-section { padding: 20px 18px; }
             .pp-section { padding: 18px 16px; }
+            .pp-type-row { grid-template-columns: 1fr; }
         }
 
         /* Quick calc modal — landscape polished */
@@ -929,15 +935,23 @@
                         <button class="pp-mode-btn" data-mode="materials" onclick="ppSetMode('materials')">חומרים</button>
                     </div>
                 </div>
+                <div class="pp-section" id="pp-section-cabinet-types">
+                    <div class="pp-section-title"><i class="fa-solid fa-layer-group"></i> סוגי ארונות</div>
+                    <p style="font-size:.78rem;color:var(--muted);margin-bottom:12px;line-height:1.5;">שם התצוגה במחשבון ובמעצב, וסוג הבנייה במערכת. לארון הזזה אין טבלת רוחב — המחיר מוגדר בסקשן ארון הזזה.</p>
+                    <div class="pp-types-list" id="pp-cabinet-types"></div>
+                    <button type="button" onclick="ppAddCabinetType()" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:rgba(37,99,235,.08);border:1.5px solid rgba(37,99,235,.25);color:var(--secondary);border-radius:10px;font-size:.82rem;font-weight:600;cursor:pointer;font-family:inherit;">
+                        <i class="fa-solid fa-plus"></i> הוסף סוג
+                    </button>
+                </div>
                 <!-- RANGES section -->
                 <div class="pp-section pp-mode-section" id="pp-mode-ranges">
                     <div class="pp-section-title"><i class="fa-solid fa-table-list"></i> טבלת טווחים לפי רוחב</div>
-                    <p style="font-size:.78rem;color:var(--muted);margin-bottom:12px;line-height:1.5;">הגדר מחיר לכל רוחב ארון (ס"מ) לפי דגם. המחיר הוא לארון שלם (מלמין / לא מלמין).</p>
+                    <p style="font-size:.78rem;color:var(--muted);margin-bottom:12px;line-height:1.5;">הגדר מחיר לכל רוחב ארון (ס"מ) לפי סוג. המחיר הוא לארון שלם (מלמין / לא מלמין). ארון הזזה מתומחר בסקשן הנפרד, לא כאן.</p>
                     <div style="overflow-x:auto;margin-bottom:12px;">
                         <table style="width:100%;border-collapse:collapse;font-size:.83rem;" id="pp-ranges-table">
                             <thead>
                                 <tr style="background:var(--border-l);">
-                                    <th style="padding:8px 10px;text-align:right;font-weight:700;color:var(--primary);border:1px solid var(--border);">דגם</th>
+                                    <th style="padding:8px 10px;text-align:right;font-weight:700;color:var(--primary);border:1px solid var(--border);">סוג ארון</th>
                                     <th style="padding:8px 10px;text-align:center;font-weight:700;color:var(--primary);border:1px solid var(--border);">רוחב (ס"מ)</th>
                                     <th style="padding:8px 10px;text-align:center;font-weight:700;color:var(--primary);border:1px solid var(--border);">מלמין ₪</th>
                                     <th style="padding:8px 10px;text-align:center;font-weight:700;color:var(--primary);border:1px solid var(--border);">לא מלמין ₪</th>
@@ -1326,13 +1340,12 @@
                         <div class="control-group"><label>רוחב (ס"מ)</label><input type="number" id="qc-w" class="editor-select" value="160" oninput="calcQuickPrice(true)"></div>
                         <div class="control-group"><label>גובה (ס"מ)</label><input type="number" id="qc-h" class="editor-select" value="240" oninput="calcQuickPrice(true)"></div>
                         <div class="control-group"><label>עומק (ס"מ)</label><input type="number" id="qc-d" class="editor-select" value="54" oninput="calcQuickPrice()"></div>
-                        <div class="control-group"><label>דגם ארון (צוקל)</label>
+                        <div class="control-group"><label>סוג ארון</label>
                             <select id="qc-plinth" class="editor-select" onchange="calcQuickPrice(true)">
-                                <option value="maya">מאיה (נסתר - 7 ס"מ)</option>
-                                <option value="c9">C9 (רגיל - 8.75 ס"מ)</option>
-                                <option value="ab2_nohoney">חזית פנימית (טאצ' פנימי)</option>
-                                <option value="ab2">AB2 (טאצ' פנימי + כוורת)</option>
-                                <option value="regalim">רגלי ניקל (10 ס"מ)</option>
+                                <option value="maya">צוקל נסתר</option>
+                                <option value="c9">צוקל רגיל</option>
+                                <option value="regalim">ארון על רגליים</option>
+                                <option value="sliding">ארון הזזה</option>
                             </select>
                         </div>
                         <div class="control-group"><label>חומר גוף</label>
@@ -1422,7 +1435,7 @@
 </div>
 
 <script src="auth.js?v=20260731waInbox"></script>
-<script src="projects.js?v=20260817qcHist"></script>
-<script src="quick-calc.js?v=20260817qcPdf"></script>
+<script src="projects.js?v=20260817cabTypes"></script>
+<script src="quick-calc.js?v=20260817cabTypes"></script>
 </body>
 </html>

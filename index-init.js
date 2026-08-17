@@ -92,6 +92,9 @@
                     .single();
                 if (_pricingRow && _pricingRow.config && Object.keys(_pricingRow.config).length > 0) {
                     window._pricingConfig = _pricingRow.config;
+                    if (typeof window.normalizeCabinetTypes === 'function') {
+                        window._pricingConfig.cabinetTypes = window.normalizeCabinetTypes(window._pricingConfig);
+                    }
                     console.log('[pricing] Loaded user pricing config from Supabase');
                 } else {
                     window._pricingConfig = null;
@@ -102,6 +105,10 @@
             console.warn('[pricing] Could not load pricing config:', e);
             window._pricingConfig = null;
         }
+    }
+
+    if (typeof window.applyCabinetTypeSelects === 'function') {
+        window.applyCabinetTypeSelects(window._pricingConfig || window.DEFAULT_PRICING_CONFIG);
     }
 
     // 3b. Load user logo

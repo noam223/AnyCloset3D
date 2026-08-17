@@ -3062,8 +3062,13 @@ var DEFAULT_PRICING_CONFIG = {
     profitMultiplier: 1.7,
     installPricePerUnit: 110, installUnitCm: 42.5, installHeightSurcharge: 0.20,
     heightSurcharge: 0.20, depthSurcharge: 0.20, sandwichSurcharge: 0.15,
+    cabinetTypes: [
+        { id: 'maya', label: 'צוקל נסתר', engine: 'maya' },
+        { id: 'c9', label: 'צוקל רגיל', engine: 'c9' },
+        { id: 'regalim', label: 'ארון על רגליים', engine: 'regalim' },
+        { id: 'sliding', label: 'ארון הזזה', engine: 'sliding' }
+    ],
     ranges: {
-        ab2:     { melamine: {80:1004,120:1507,160:2009,200:2511,240:3013}, nonMelamine: {80:1305,120:1959,160:2612,200:3265,240:3918} },
         c9:      { melamine: {80:970, 120:1340,160:1500,200:1870,240:2250}, nonMelamine: {80:1250,120:1600,160:1945,200:2433,240:2920} },
         regalim: { melamine: {80:1050,120:1462,160:1658,200:2073,240:2487}, nonMelamine: {80:1360,120:1900,160:2155,200:2700,240:3233} },
         maya:    { melamine: {80:1050,120:1462,160:1658,200:2073,240:2487}, nonMelamine: {80:1360,120:1900,160:2155,200:2700,240:3233} }
@@ -3088,6 +3093,34 @@ var DEFAULT_PRICING_CONFIG = {
 window.DEFAULT_PRICING_CONFIG = DEFAULT_PRICING_CONFIG;
 
 function _getPricingCfg() { return window._pricingConfig || DEFAULT_PRICING_CONFIG; }
+
+function _priceNum(v, fb) {
+    if (v === '' || v == null) return fb;
+    var n = Number(v);
+    return isFinite(n) ? n : fb;
+}
+
+function _pricingRangeKey(cfg, engine) {
+    const cfgR = (cfg && cfg.ranges) || DEFAULT_PRICING_CONFIG.ranges;
+    const types = (cfg && Array.isArray(cfg.cabinetTypes)) ? cfg.cabinetTypes : [];
+    const hit = types.find(function(t) {
+        return t && t.engine !== 'sliding' && (t.engine === engine || t.id === engine) && cfgR[t.id];
+    });
+    if (hit) return hit.id;
+    if (cfgR[engine]) return engine;
+    if (engine === 'ab2_nohoney') {
+        const c9t = types.find(function(t) { return t && t.engine === 'c9' && cfgR[t.id]; });
+        if (c9t) return c9t.id;
+        if (cfgR.c9) return 'c9';
+    }
+    const first = types.find(function(t) { return t && t.engine !== 'sliding' && cfgR[t.id]; });
+    if (first) return first.id;
+    if (cfgR.maya) return 'maya';
+    const keys = Object.keys(cfgR).filter(function(k) {
+        return k !== 'melamine' && k !== 'nonMelamine' && k !== 'sliding';
+    });
+    return keys[0] || 'maya';
+}
 
 function _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel) {
     const mode  = cfg.pricingMode || 'ranges';
@@ -3115,21 +3148,25 @@ function _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel) {
     // ranges
     const cfgR = cfg.ranges || DEFAULT_PRICING_CONFIG.ranges;
     let rt;
-    if (cfgR.melamine && !cfgR.maya) {
+    if (cfgR.melamine && !cfgR.maya && !cfgR.c9) {
         rt = wMelamine ? cfgR.melamine : (cfgR.nonMelamine||cfgR.melamine);
     } else {
-        let pricingModel = wEffectiveModel;
-        if (!cfgR[pricingModel] && pricingModel === 'ab2_nohoney') pricingModel = 'c9';
-        const mk = cfgR[pricingModel] ? pricingModel : 'maya';
-        const mr = cfgR[mk] || DEFAULT_PRICING_CONFIG.ranges.maya;
+        const mk = _pricingRangeKey(cfg, wEffectiveModel);
+        const mr = cfgR[mk] || DEFAULT_PRICING_CONFIG.ranges.maya || DEFAULT_PRICING_CONFIG.ranges.c9;
         rt = wMelamine ? mr.melamine : (mr.nonMelamine||mr.melamine);
     }
-    const p240 = rt['240']||2487;
+    rt = rt || {};
+    const p240 = _priceNum(rt['240'], 2487);
     let bp;
-    if(ww<=80) bp=rt['80']||1050; else if(ww<=120) bp=rt['120']||1462;
-    else if(ww<=160) bp=rt['160']||1658; else if(ww<=200) bp=rt['200']||2073;
-    else if(ww<=240) bp=p240; else bp=(p240/240)*ww;
-    if(wh>=241) bp*=(1+hS); if(wd>54) bp*=(1+dS); return bp;
+    if (ww <= 80) bp = _priceNum(rt['80'], 1050);
+    else if (ww <= 120) bp = _priceNum(rt['120'], 1462);
+    else if (ww <= 160) bp = _priceNum(rt['160'], 1658);
+    else if (ww <= 200) bp = _priceNum(rt['200'], 2073);
+    else if (ww <= 240) bp = p240;
+    else bp = (p240 / 240) * ww;
+    if (wh >= 241) bp *= (1 + hS);
+    if (wd > 54) bp *= (1 + dS);
+    return bp;
 }
 
 var SANDWICH_COLORS = new Set(['2025','2044','2041','456','2024','2049','2062','2047','7180','c3110','2040','2020']);
@@ -3295,12 +3332,12 @@ function _calcWingCost(cfg, wing) {
     if (wing.slidingDoor && wing.slidingDoor.enabled) {
         const sd       = wing.slidingDoor;
         const numDoors = sd.numDoors || _calcSlidingDoorCount(ww);
-        let sdBase     = (ex.slidingBase||800) + numDoors*(ex.slidingDoor||350);
-        if (sd.doorPanelType === 'glass')  sdBase += numDoors*(ex.slidingGlass  || 200);
-        else if (sd.doorPanelType === 'mirror') sdBase += numDoors*(ex.slidingMirror || 350);
-        if (sd.profileColor === 'gold_matte') sdBase += numDoors*(ex.slidingGold || 80);
-        else if (sd.profileColor === 'black') sdBase += numDoors*(ex.slidingBlack || 50);
-        if (wh > 240) sdBase *= (1 + (ex.slidingHeightSurcharge || 0.15));
+        let sdBase     = _priceNum(ex.slidingBase, 800) + numDoors * _priceNum(ex.slidingDoor, 350);
+        if (sd.doorPanelType === 'glass')  sdBase += numDoors * _priceNum(ex.slidingGlass, 200);
+        else if (sd.doorPanelType === 'mirror') sdBase += numDoors * _priceNum(ex.slidingMirror, 350);
+        if (sd.profileColor === 'gold_matte') sdBase += numDoors * _priceNum(ex.slidingGold, 80);
+        else if (sd.profileColor === 'black') sdBase += numDoors * _priceNum(ex.slidingBlack, 50);
+        if (wh > 240) sdBase *= (1 + _priceNum(ex.slidingHeightSurcharge, 0.15));
         finalCost += Math.round(sdBase);
     }
 

@@ -301,11 +301,9 @@
                 <div id="plinth-model-row">
                     <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:3px;">דגם בסיס</div>
                     <select id="inp-plinth" class="editor-select" style="margin:0;">
-                        <option value="maya">מאיה</option>
-                        <option value="c9" selected>C9</option>
-                        <option value="ab2_nohoney">חזית פנימית</option>
-                        <option value="ab2">AB2</option>
-                        <option value="regalim">רגלי ניקל</option>
+                        <option value="maya">צוקל נסתר</option>
+                        <option value="c9" selected>צוקל רגיל</option>
+                        <option value="regalim">ארון על רגליים</option>
                     </select>
                 </div>
                 <div>
@@ -1001,13 +999,12 @@
                         <div class="control-group"><label>רוחב (ס"מ)</label><input type="number" id="qc-w" class="editor-select" value="160" oninput="calcQuickPrice(true)"></div>
                         <div class="control-group"><label>גובה (ס"מ)</label><input type="number" id="qc-h" class="editor-select" value="240" oninput="calcQuickPrice(true)"></div>
                         <div class="control-group"><label>עומק (ס"מ)</label><input type="number" id="qc-d" class="editor-select" value="54" oninput="calcQuickPrice()"></div>
-                        <div class="control-group"><label>דגם ארון (צוקל)</label>
+                        <div class="control-group"><label>סוג ארון</label>
                             <select id="qc-plinth" class="editor-select" onchange="calcQuickPrice(true)">
-                                <option value="maya">מאיה (נסתר - 7 ס"מ)</option>
-                                <option value="c9">C9 (רגיל - 8.75 ס"מ)</option>
-                                <option value="ab2_nohoney">חזית פנימית (טאצ' פנימי)</option>
-                                <option value="ab2">AB2 (טאצ' פנימי + כוורת)</option>
-                                <option value="regalim">רגלי ניקל (10 ס"מ)</option>
+                                <option value="maya">צוקל נסתר</option>
+                                <option value="c9">צוקל רגיל</option>
+                                <option value="regalim">ארון על רגליים</option>
+                                <option value="sliding">ארון הזזה</option>
                             </select>
                         </div>
                         <div class="control-group"><label>חומר גוף</label>
@@ -1853,11 +1850,9 @@
                 <label class="mobile-label">דגם ארון:</label>
                 <select id="mobile-inp-plinth" class="editor-select" style="margin:0;"
                     onchange="document.getElementById('inp-plinth').value=this.value; document.getElementById('inp-plinth').dispatchEvent(new Event('change'))">
-                    <option value="maya">מאיה</option>
-                    <option value="c9" selected>C9</option>
-                    <option value="ab2_nohoney">חזית פנימית</option>
-                    <option value="ab2">AB2</option>
-                    <option value="regalim">רגלי ניקל</option>
+                    <option value="maya">צוקל נסתר</option>
+                    <option value="c9" selected>צוקל רגיל</option>
+                    <option value="regalim">ארון על רגליים</option>
                 </select>
             </div>
             <div>
@@ -2502,8 +2497,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js"></script>
-<script src="state.js?v=20260817qcStandalone"></script>
-<script src="quick-calc.js?v=20260817qcPdf"></script>
+<script src="state.js?v=20260817cabTypes"></script>
+<script src="quick-calc.js?v=20260817cabTypes"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="writing-desk-preset.js?v=20260617wdcolors"></script>
 <script src="engine-core.js?v=20260817ocMerge"></script>
@@ -2514,7 +2509,7 @@
 <script src="ui.js?v=20260731partHandle"></script>
 <script src="mobile.js?v=20260713extDrawerPart"></script>
 <script src="part-paint.js?v=20260712c2024"></script>
-<script src="index-init.js?v=20260817qcPdf"></script>
+<script src="index-init.js?v=20260817cabTypes"></script>
 
 <!-- ===== TAMBOUR FULL PALETTE MODAL ===== -->
 <div id="tambour-palette-modal" class="tambour-palette-overlay">

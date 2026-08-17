@@ -4,13 +4,25 @@
 (function (global) {
 'use strict';
 
+var _QC_DEFAULT_TYPES = [
+    { id: 'maya', label: 'צוקל נסתר', engine: 'maya' },
+    { id: 'c9', label: 'צוקל רגיל', engine: 'c9' },
+    { id: 'regalim', label: 'ארון על רגליים', engine: 'regalim' },
+    { id: 'sliding', label: 'ארון הזזה', engine: 'sliding' }
+];
+
+var _QC_LEGACY_LABELS = {
+    maya: 'צוקל נסתר', c9: 'צוקל רגיל', regalim: 'ארון על רגליים',
+    ab2: 'AB2', ab2_nohoney: 'חזית פנימית', sliding: 'ארון הזזה', other: 'אחר'
+};
+
 var _QC_DEFAULT_PRICING = {
     pricingMode: 'ranges',
     profitMultiplier: 1.7,
     installPricePerUnit: 110, installUnitCm: 42.5, installHeightSurcharge: 0.20,
     heightSurcharge: 0.20, depthSurcharge: 0.20, sandwichSurcharge: 0.15,
+    cabinetTypes: _QC_DEFAULT_TYPES.map(function(t) { return Object.assign({}, t); }),
     ranges: {
-        ab2:     { melamine: {80:1004,120:1507,160:2009,200:2511,240:3013}, nonMelamine: {80:1305,120:1959,160:2612,200:3265,240:3918} },
         c9:      { melamine: {80:970, 120:1340,160:1500,200:1870,240:2250}, nonMelamine: {80:1250,120:1600,160:1945,200:2433,240:2920} },
         regalim: { melamine: {80:1050,120:1462,160:1658,200:2073,240:2487}, nonMelamine: {80:1360,120:1900,160:2155,200:2700,240:3233} },
         maya:    { melamine: {80:1050,120:1462,160:1658,200:2073,240:2487}, nonMelamine: {80:1360,120:1900,160:2155,200:2700,240:3233} }
@@ -18,13 +30,103 @@ var _QC_DEFAULT_PRICING = {
     extras: {
         internalDrawer: 150, externalDrawer: 200, openCell: 400, partition: 150,
         shelfFreePerMeter: 3, extraShelfMel: 60, extraShelfNonMel: 80, deskUnit: 900,
-        doorGlassMel: 400, doorGlassBlack: 600, nickelLegPrice: 100, ledPair: 650
+        doorGlassMel: 400, doorGlassBlack: 600, nickelLegPrice: 100, ledPair: 650,
+        slidingBase: 800, slidingDoor: 350, slidingGlass: 200, slidingMirror: 350,
+        slidingGold: 80, slidingBlack: 50, slidingHeightSurcharge: 0.15
     }
 };
+
+function _qcNum(v, fb) {
+    if (v === '' || v == null) return fb;
+    var n = Number(v);
+    return isFinite(n) ? n : fb;
+}
 
 function _qcCfg() {
     return global._pricingConfig || global.DEFAULT_PRICING_CONFIG || _QC_DEFAULT_PRICING;
 }
+
+function _qcNormalizeTypes(cfg) {
+    var list = (cfg && Array.isArray(cfg.cabinetTypes) && cfg.cabinetTypes.length) ? cfg.cabinetTypes.slice() : null;
+    if (!list) {
+        var ranges = (cfg && cfg.ranges) || {};
+        var keys = Object.keys(ranges).filter(function(k) { return k !== 'melamine' && k !== 'nonMelamine'; });
+        list = keys.map(function(id) {
+            return { id: id, label: _QC_LEGACY_LABELS[id] || id, engine: id === 'other' ? 'maya' : id };
+        });
+        if (!list.length) list = _QC_DEFAULT_TYPES.map(function(t) { return Object.assign({}, t); });
+    }
+    var seen = {};
+    list = list.filter(function(t) {
+        if (!t || !t.id || seen[t.id]) return false;
+        seen[t.id] = true;
+        t.engine = t.engine || t.id;
+        t.label = (t.label && String(t.label).trim()) ? String(t.label).trim() : String(t.id);
+        return true;
+    });
+    if (!list.some(function(t) { return t.engine === 'sliding'; })) {
+        list.push({ id: 'sliding', label: 'ארון הזזה', engine: 'sliding' });
+    }
+    if (!list.length) list = _QC_DEFAULT_TYPES.map(function(t) { return Object.assign({}, t); });
+    return list.map(function(t) { return { id: t.id, label: t.label, engine: t.engine }; });
+}
+
+function _qcTypes(cfg) {
+    return _qcNormalizeTypes(cfg || _qcCfg());
+}
+
+function _qcFindType(cfg, idOrEngine) {
+    var types = _qcTypes(cfg);
+    return types.find(function(t) { return t.id === idOrEngine; })
+        || types.find(function(t) { return t.engine === idOrEngine; })
+        || null;
+}
+
+global.normalizeCabinetTypes = _qcNormalizeTypes;
+
+global.applyCabinetTypeSelects = function(cfg) {
+    cfg = cfg || _qcCfg();
+    var types = _qcTypes(cfg);
+    var qcSel = document.getElementById('qc-plinth');
+    if (qcSel) {
+        var cur = qcSel.value;
+        qcSel.innerHTML = types.map(function(t) {
+            return '<option value="' + _qcEsc(t.id) + '" data-engine="' + _qcEsc(t.engine) + '">' + _qcEsc(t.label) + '</option>';
+        }).join('');
+        if (cur && [].some.call(qcSel.options, function(o) { return o.value === cur; })) {
+            qcSel.value = cur;
+        } else if (cur) {
+            var byEng = [].find.call(qcSel.options, function(o) { return o.getAttribute('data-engine') === cur; });
+            if (byEng) qcSel.value = byEng.value;
+        }
+    }
+
+    var designerTypes = [];
+    var seenEng = {};
+    types.forEach(function(t) {
+        if (t.engine === 'sliding') return;
+        if (seenEng[t.engine]) return;
+        seenEng[t.engine] = true;
+        designerTypes.push({ engine: t.engine, label: t.label });
+    });
+    ['inp-plinth', 'mobile-inp-plinth'].forEach(function(id) {
+        var sel = document.getElementById(id);
+        if (!sel || !designerTypes.length) return;
+        var curD = sel.value;
+        sel.innerHTML = designerTypes.map(function(t) {
+            return '<option value="' + _qcEsc(t.engine) + '">' + _qcEsc(t.label) + '</option>';
+        }).join('');
+        if (curD && [].some.call(sel.options, function(o) { return o.value === curD; })) {
+            sel.value = curD;
+        } else if (curD) {
+            var o = document.createElement('option');
+            o.value = curD;
+            o.textContent = _QC_LEGACY_LABELS[curD] || curD;
+            sel.appendChild(o);
+            sel.value = curD;
+        }
+    });
+};
 
 function _qcIncludedShelves(ww, wh, wModel) {
     var isC9Like = (wModel === 'c9' || wModel === 'ab2_nohoney');
@@ -39,21 +141,44 @@ function _qcIncludedShelves(ww, wh, wModel) {
     return allowed;
 }
 
-function _qcBasePrice(cfg, ww, wh, wd, wMelamine, model) {
+function _qcRangeKey(cfg, engine, typeId) {
+    var cfgR = cfg.ranges || _QC_DEFAULT_PRICING.ranges;
+    if (typeId && cfgR[typeId]) return typeId;
+    if (engine && cfgR[engine]) return engine;
+    if (engine === 'ab2_nohoney' && cfgR.c9) return 'c9';
+    var types = _qcTypes(cfg);
+    var hit = types.find(function(t) { return t.engine === engine && t.engine !== 'sliding' && cfgR[t.id]; });
+    if (hit) return hit.id;
+    var first = types.find(function(t) { return t.engine !== 'sliding' && cfgR[t.id]; });
+    if (first) return first.id;
+    if (cfgR.maya) return 'maya';
+    var keys = Object.keys(cfgR).filter(function(k) {
+        return k !== 'melamine' && k !== 'nonMelamine' && k !== 'sliding';
+    });
+    return keys[0] || 'maya';
+}
+
+function _qcRtPrice(rt, key, fb) {
+    if (!rt) return fb;
+    var v = rt[key];
+    if (v == null) v = rt[String(key)];
+    return _qcNum(v, fb);
+}
+
+function _qcBasePrice(cfg, ww, wh, wd, wMelamine, engine, typeId) {
     var hS = cfg.heightSurcharge != null ? cfg.heightSurcharge : 0.20;
     var dS = cfg.depthSurcharge != null ? cfg.depthSurcharge : 0.20;
     var cfgR = cfg.ranges || _QC_DEFAULT_PRICING.ranges;
-    var pricingModel = model;
-    if (!cfgR[pricingModel] && pricingModel === 'ab2_nohoney') pricingModel = 'c9';
-    var mk = cfgR[pricingModel] ? pricingModel : 'maya';
-    var mr = cfgR[mk] || _QC_DEFAULT_PRICING.ranges.maya;
+    var mk = _qcRangeKey(cfg, engine, typeId);
+    var mr = cfgR[mk] || _QC_DEFAULT_PRICING.ranges.maya || {};
     var rt = wMelamine ? mr.melamine : (mr.nonMelamine || mr.melamine);
-    var p240 = rt['240'] || 2487;
+    rt = rt || {};
+    var p240 = _qcRtPrice(rt, 240, 2487);
     var bp;
-    if (ww <= 80) bp = rt['80'] || 1050;
-    else if (ww <= 120) bp = rt['120'] || 1462;
-    else if (ww <= 160) bp = rt['160'] || 1658;
-    else if (ww <= 200) bp = rt['200'] || 2073;
+    if (ww <= 80) bp = _qcRtPrice(rt, 80, 1050);
+    else if (ww <= 120) bp = _qcRtPrice(rt, 120, 1462);
+    else if (ww <= 160) bp = _qcRtPrice(rt, 160, 1658);
+    else if (ww <= 200) bp = _qcRtPrice(rt, 200, 2073);
     else if (ww <= 240) bp = p240;
     else bp = (p240 / 240) * ww;
     if (wh >= 241) bp *= (1 + hS);
@@ -70,29 +195,39 @@ function _qcInstall(cfg, ww, wh) {
     return Math.round(inst);
 }
 
-function _qcWingCost(cfg, w, h, d, model, isMelamine, shelves, intDrawers, extDrawers, openCells, hasDesk) {
+function _qcSlidingCost(cfg, w, h) {
     var ex = cfg.extras || _QC_DEFAULT_PRICING.extras;
-    var cost = _qcBasePrice(cfg, w, h, d, isMelamine, model);
-    if (!isMelamine) {
+    var numDoors = Math.max(2, Math.ceil((w || 0) / 110));
+    var base = _qcNum(ex.slidingBase, 800) + numDoors * _qcNum(ex.slidingDoor, 350);
+    if (h > 240) base *= (1 + _qcNum(ex.slidingHeightSurcharge, 0.15));
+    return base;
+}
+
+function _qcWingCost(cfg, w, h, d, model, isMelamine, shelves, intDrawers, extDrawers, openCells, hasDesk, typeId) {
+    var ex = cfg.extras || _QC_DEFAULT_PRICING.extras;
+    var cost = (model === 'sliding')
+        ? _qcSlidingCost(cfg, w, h)
+        : _qcBasePrice(cfg, w, h, d, isMelamine, model, typeId);
+    if (!isMelamine && model !== 'sliding') {
         var sandwichPct = cfg.sandwichSurcharge != null ? cfg.sandwichSurcharge : 0.15;
         cost *= (1 + sandwichPct);
     }
     if (model === 'regalim' && (cfg.pricingMode || 'ranges') === 'ranges') {
         var legCount = w <= 110 ? 4 : w <= 180 ? 6 : 8;
-        cost += legCount * (ex.nickelLegPrice != null ? ex.nickelLegPrice : 100);
+        cost += legCount * _qcNum(ex.nickelLegPrice, 100);
     }
     var allowed = _qcIncludedShelves(w, h, model);
     if (shelves > allowed) {
-        cost += (shelves - allowed) * (isMelamine ? (ex.extraShelfMel || 60) : (ex.extraShelfNonMel || 80));
+        cost += (shelves - allowed) * (isMelamine ? _qcNum(ex.extraShelfMel, 60) : _qcNum(ex.extraShelfNonMel, 80));
     }
-    if (hasDesk) cost += (ex.deskUnit || 900);
-    if (intDrawers > 0) cost += intDrawers * (ex.internalDrawer || 150);
-    if (extDrawers > 0) cost += extDrawers * (ex.externalDrawer || 200);
+    if (hasDesk) cost += _qcNum(ex.deskUnit, 900);
+    if (intDrawers > 0) cost += intDrawers * _qcNum(ex.internalDrawer, 150);
+    if (extDrawers > 0) cost += extDrawers * _qcNum(ex.externalDrawer, 200);
     var openBlocks = openCells;
     var wEffective = model;
     if (model === 'ab2_nohoney' && openCells > 0) wEffective = 'ab2';
     if ((model === 'ab2' || wEffective === 'ab2') && openBlocks > 0) openBlocks--;
-    cost += openBlocks * (ex.openCell || 400);
+    cost += openBlocks * _qcNum(ex.openCell, 400);
     return cost;
 }
 
@@ -102,7 +237,10 @@ window.calcQuickPrice = function(autoUpdateShelves = false) {
     const h = parseFloat(document.getElementById('qc-h').value) || 0;
     const d = parseFloat(document.getElementById('qc-d').value) || 0;
     const modelEl = document.getElementById('qc-plinth');
-    const model = modelEl ? modelEl.value : 'maya';
+    const typeId = modelEl ? modelEl.value : 'maya';
+    const cfg = _qcCfg();
+    const type = _qcFindType(cfg, typeId);
+    const model = type ? type.engine : typeId;
     const matEl = document.getElementById('qc-mat');
     const mat = matEl ? matEl.value : 'melamine';
     const isMelamine = mat === 'melamine';
@@ -127,20 +265,19 @@ window.calcQuickPrice = function(autoUpdateShelves = false) {
     const shelvesEl = document.getElementById('qc-shelves');
     const shelves = shelvesEl ? (parseInt(shelvesEl.value) || 0) : 0;
 
-    const cfg = _qcCfg();
     const ex = cfg.extras || _QC_DEFAULT_PRICING.extras;
-    let finalCost = _qcWingCost(cfg, w, h, d, model, isMelamine, shelves, intDrawers, extDrawers, openCells, hasDesk);
-    finalCost += partitions * (ex.partition || 150);
-    finalCost += glassWoodDoors * (ex.doorGlassMel || 400);
-    finalCost += alumDoors * (ex.doorGlassBlack || 600);
-    finalCost += ledPairs * (ex.ledPair || 650);
+    let finalCost = _qcWingCost(cfg, w, h, d, model, isMelamine, shelves, intDrawers, extDrawers, openCells, hasDesk, type ? type.id : typeId);
+    finalCost += partitions * _qcNum(ex.partition, 150);
+    finalCost += glassWoodDoors * _qcNum(ex.doorGlassMel, 400);
+    finalCost += alumDoors * _qcNum(ex.doorGlassBlack, 600);
+    finalCost += ledPairs * _qcNum(ex.ledPair, 650);
 
     const installPrice = _qcInstall(cfg, w, h);
     const profitMult = cfg.profitMultiplier != null ? cfg.profitMultiplier : 1.7;
     const priceToCustomer = finalCost * profitMult;
 
     window._qcLastResult = {
-        w: w, h: h, d: d, model: model,
+        w: w, h: h, d: d, model: type ? type.id : typeId,
         mat: mat, shelves: shelves,
         cost: Math.round(finalCost),
         install: Math.round(installPrice),
@@ -219,7 +356,17 @@ window.qcLoadFormFromItem = function(item) {
     _qcSetVal('qc-w', item.w);
     _qcSetVal('qc-h', item.h);
     _qcSetVal('qc-d', item.d);
-    _qcSetVal('qc-plinth', item.model || 'maya');
+    var plinth = document.getElementById('qc-plinth');
+    if (plinth) {
+        var want = item.model || 'maya';
+        if ([].some.call(plinth.options, function(o) { return o.value === want; })) {
+            plinth.value = want;
+        } else {
+            var byEng = [].find.call(plinth.options, function(o) { return o.getAttribute('data-engine') === want; });
+            if (byEng) plinth.value = byEng.value;
+            else _qcSetVal('qc-plinth', want);
+        }
+    }
     _qcSetVal('qc-mat', item.mat || 'melamine');
     _qcSetVal('qc-shelves', item.shelves != null ? item.shelves : 0);
     _qcSetVal('qc-int-d', ex.intDrawers || 0);
@@ -435,14 +582,9 @@ window.qcCopyCustomerQuote = function() {
 };
 
 function _qcModelLabel(model) {
-    var map = {
-        maya: 'מאיה',
-        c9: 'C9',
-        ab2_nohoney: 'חזית פנימית',
-        ab2: 'AB2',
-        regalim: 'רגלי ניקל'
-    };
-    return map[model] || model || '—';
+    var type = _qcFindType(_qcCfg(), model);
+    if (type) return type.label;
+    return _QC_LEGACY_LABELS[model] || model || '—';
 }
 
 function _qcMatLabel(mat) {
@@ -724,6 +866,9 @@ window.openQuickCalcModal = async function() {
     if (typeof _pricingCfg !== 'undefined' && _pricingCfg) {
         global._pricingConfig = _pricingCfg;
     }
+    if (typeof global.applyCabinetTypeSelects === 'function') {
+        global.applyCabinetTypeSelects(global._pricingConfig || global.DEFAULT_PRICING_CONFIG || _QC_DEFAULT_PRICING);
+    }
     modal.style.display = 'flex';
     if (typeof calcQuickPrice === 'function') calcQuickPrice(true);
     window._qcSetEditUi();
@@ -741,6 +886,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (nameEl) nameEl.addEventListener('input', function() { window._renderQcQuoteList(); });
     var histSearch = document.getElementById('qc-history-search');
     if (histSearch) histSearch.addEventListener('input', function() { window._renderQcHistory(); });
+    if (typeof global.applyCabinetTypeSelects === 'function') {
+        global.applyCabinetTypeSelects(global._pricingConfig || global.DEFAULT_PRICING_CONFIG || _QC_DEFAULT_PRICING);
+    }
     if (typeof window._qcSetEditUi === 'function') window._qcSetEditUi();
     if (typeof window._renderQcHistory === 'function') window._renderQcHistory();
 });
