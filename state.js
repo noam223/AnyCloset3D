@@ -3471,9 +3471,16 @@ function _qcMoney(n) {
     return '₪' + Math.round(n || 0).toLocaleString('he-IL');
 }
 
+function _qcDimsLabel(item) {
+    const w = item && item.w != null ? item.w : '?';
+    const h = item && item.h != null ? item.h : '?';
+    const d = item && item.d != null ? item.d : '?';
+    return w + '×' + h + '×' + d + ' ס״מ';
+}
+
 function _qcCabinetLabel(item) {
     if (item.name && String(item.name).trim()) return String(item.name).trim();
-    return 'ארון ' + item.w + '×' + item.h + '×' + item.d + ' ס״מ';
+    return 'ארון';
 }
 
 function _qcExtrasSummary(ex) {
@@ -3500,11 +3507,18 @@ window._renderQcQuoteList = function() {
     } else {
         listEl.innerHTML = items.map(function(it, i) {
             const extra = _qcExtrasSummary(it.extras);
+            const dims = _qcDimsLabel(it);
             return '<div class="qc-quote-item">' +
-                '<div><strong>' + (i + 1) + '. ' + _qcCabinetLabel(it) + '</strong>' +
+                '<div class="qc-quote-item-body">' +
+                '<strong>' + (i + 1) + '. ' + _qcCabinetLabel(it) + '</strong>' +
+                '<div class="qc-quote-dims">מידות: ' + dims + '</div>' +
                 (extra ? ('<div style="color:#64748b;margin-top:3px;">' + extra + '</div>') : '') +
-                '<div style="margin-top:4px;">מחיר: ' + _qcMoney(it.customer) +
-                ' · התקנה: ' + _qcMoney(it.install) + '</div></div>' +
+                '<div class="qc-quote-price-row">' +
+                '<label>מחיר ללקוח</label>' +
+                '<input type="number" min="0" step="1" class="qc-quote-price-input" value="' + Math.round(it.customer || 0) + '" ' +
+                'oninput="qcUpdateQuotePrice(' + i + ', this.value)">' +
+                '<span class="qc-quote-install">התקנה: ' + _qcMoney(it.install) + '</span>' +
+                '</div></div>' +
                 '<button type="button" title="הסר" onclick="qcRemoveQuoteItem(' + i + ')"><i class="fa-solid fa-xmark"></i></button>' +
                 '</div>';
         }).join('');
@@ -3528,6 +3542,7 @@ window._buildQcCustomerQuoteText = function() {
         totalInstall += it.install || 0;
         const extra = _qcExtrasSummary(it.extras);
         lines.push((i + 1) + '. ' + _qcCabinetLabel(it) + ' — ' + _qcMoney(it.customer));
+        lines.push('   מידות: ' + _qcDimsLabel(it));
         if (extra) lines.push('   תוספות: ' + extra);
         lines.push('   הובלה והתקנה: ' + _qcMoney(it.install));
         lines.push('');
@@ -3538,6 +3553,15 @@ window._buildQcCustomerQuoteText = function() {
     lines.push('');
     lines.push('אשמח לעמוד לרשותך לכל שאלה 🙂');
     return lines.join('\n');
+};
+
+window.qcUpdateQuotePrice = function(idx, value) {
+    const items = window._qcQuoteList || [];
+    if (!items[idx]) return;
+    const n = parseFloat(value);
+    items[idx].customer = (isFinite(n) && n >= 0) ? Math.round(n) : 0;
+    const textEl = document.getElementById('qc-quote-text');
+    if (textEl) textEl.value = window._buildQcCustomerQuoteText();
 };
 
 window.qcAddToQuoteList = function() {
