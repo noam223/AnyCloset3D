@@ -1179,7 +1179,7 @@ async function refreshMeasurementsInbox() {
         listEl.innerHTML =
             '<div style="text-align:center;color:var(--muted);padding:28px 12px;line-height:1.6;">' +
                 '<i class="fa-solid fa-inbox" style="font-size:1.6rem;display:block;margin-bottom:10px;"></i>' +
-                'אין מדידות בתיבה עדיין.<br>חבר Webhook בפרופיל ← חיבור מדידות מוואטסאפ.' +
+                'אין מדידות בתיבה עדיין.<br>שלחו למודד את קישור ההעלאה מהפרופיל.' +
             '</div>';
         return;
     }
@@ -1331,7 +1331,7 @@ async function ensureWhatsappIngestToken(rotate) {
     }
     var urlEl = document.getElementById('wa-webhook-url');
     if (urlEl) urlEl.textContent = MeasurementInbox.webhookUrlForToken(result.token);
-    showToast(rotate ? 'נוצר טוקן חדש' : 'טוקן מוכן', 'success');
+    showToast(rotate ? 'נוצר קישור חדש' : 'הקישור מוכן', 'success');
 }
 
 async function copyWhatsappWebhookUrl() {
@@ -1343,12 +1343,12 @@ async function copyWhatsappWebhookUrl() {
         text = urlEl ? urlEl.textContent.trim() : '';
     }
     if (!text || text.indexOf('http') !== 0) {
-        showToast('אין כתובת להעתקה', 'error');
+        showToast('אין קישור להעתקה', 'error');
         return;
     }
     try {
         await navigator.clipboard.writeText(text);
-        showToast('הכתובת הועתקה', 'success');
+        showToast('הקישור הועתק', 'success');
     } catch (e) {
         showToast('העתקה נכשלה — העתק ידנית מהשדה', 'error');
     }

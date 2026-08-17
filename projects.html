@@ -730,7 +730,7 @@
             <div class="inbox-banner" id="inbox-banner">
                 <div class="inbox-banner-text">
                     <i class="fa-solid fa-bell"></i>
-                    <span id="inbox-banner-text">יש מדידות חדשות מוואטסאפ</span>
+                    <span id="inbox-banner-text">יש מדידות חדשות מהשטח</span>
                 </div>
                 <button type="button" class="inbox-banner-btn" onclick="openMeasurementsInbox()">
                     פתח תיבת מדידות
@@ -863,27 +863,24 @@
                 </div>
 
                 <div class="profile-section">
-                    <div class="profile-section-title"><i class="fa-brands fa-whatsapp" style="color:#25d366;"></i> חיבור מדידות מוואטסאפ</div>
+                    <div class="profile-section-title"><i class="fa-solid fa-cloud-arrow-up"></i> קישור העלאה למודד</div>
                     <p style="font-size:.85rem;color:var(--muted);line-height:1.6;margin-bottom:10px;">
-                        צור טוקן ייחודי והדבק את כתובת ה-Webhook ב-Green API (או גשר דומה).
-                        קבצים מהמספר שהגדרת יופיעו אוטומטית בתיבת <strong>מדידות חדשות</strong>.
+                        שלחו למודד את הקישור. הוא בוחר לקוח מהפרויקטים שלכם (או כותב שם ידנית) ומעלה PDF/תמונות.
+                        אם בחר מהרשימה — המדידה מתחברת ישר לפרויקט.
                     </p>
-                    <label class="profile-label">כתובת Webhook</label>
-                    <div class="webhook-box" id="wa-webhook-url">לחץ על "צור / הצג טוקן" כדי לקבל כתובת</div>
+                    <label class="profile-label">קישור למודד</label>
+                    <div class="webhook-box" id="wa-webhook-url">לחץ על "צור / הצג קישור" כדי לקבל כתובת</div>
                     <div style="display:flex;gap:8px;flex-wrap:wrap;">
                         <button type="button" class="profile-save-btn" onclick="ensureWhatsappIngestToken(false)">
-                            <i class="fa-solid fa-key"></i> צור / הצג טוקן
+                            <i class="fa-solid fa-link"></i> צור / הצג קישור
                         </button>
                         <button type="button" class="profile-save-btn" style="background:#64748b;" onclick="ensureWhatsappIngestToken(true)">
-                            <i class="fa-solid fa-rotate"></i> החלף טוקן
+                            <i class="fa-solid fa-rotate"></i> החלף קישור
                         </button>
                         <button type="button" class="profile-save-btn" style="background:#0f766e;" onclick="copyWhatsappWebhookUrl()">
-                            <i class="fa-solid fa-copy"></i> העתק כתובת
+                            <i class="fa-solid fa-copy"></i> העתק קישור
                         </button>
                     </div>
-                    <p style="font-size:.78rem;color:var(--muted);margin-top:12px;line-height:1.5;">
-                        מדריך מפורט: <a href="docs/whatsapp-measurement-inbox.md" target="_blank" rel="noopener" style="color:var(--secondary);font-weight:700;">docs/whatsapp-measurement-inbox.md</a>
-                    </p>
                 </div>
 
                 <!-- Subscription management section -->
@@ -1263,7 +1260,7 @@
             <i class="fa-solid fa-ruler-combined"></i> מדידות חדשות
         </div>
         <p style="font-size:.82rem;color:var(--muted);margin-bottom:14px;line-height:1.5;">
-            קבצים שהגיעו מוואטסאפ. קשר כל מדידה לפרויקט/לקוח מהרשימה שלך.
+            קבצים שהמודד העלה. אם לא נבחרו מהרשימה — קשרו ידנית לפרויקט.
         </p>
         <div class="inbox-list" id="measurements-inbox-list">
             <div style="text-align:center;color:var(--muted);padding:24px 0;">טוען...</div>
@@ -1435,8 +1432,8 @@
     <span id="toast-text"></span>
 </div>
 
-<script src="auth.js?v=20260731waInbox"></script>
-<script src="projects.js?v=20260817cabTypes2"></script>
+<script src="auth.js?v=20260817measurerUpload"></script>
+<script src="projects.js?v=20260817measurerUpload"></script>
 <script src="quick-calc.js?v=20260817cabTypes2"></script>
 </body>
 </html>

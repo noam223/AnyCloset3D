@@ -1018,7 +1018,7 @@ window.GrowPayments = {
 // ==========================================
 
 window.MeasurementInbox = {
-    INGEST_URL: SUPABASE_URL + '/functions/v1/ingest-whatsapp-media',
+    INGEST_URL: SUPABASE_URL + '/functions/v1/upload-measurement',
 
     _randomToken: function() {
         const bytes = new Uint8Array(24);
@@ -1063,7 +1063,10 @@ window.MeasurementInbox = {
 
     webhookUrlForToken: function(token) {
         if (!token) return '';
-        return this.INGEST_URL + '?token=' + encodeURIComponent(token);
+        var origin = '';
+        try { origin = (window.location && window.location.origin) ? window.location.origin : ''; } catch (e) {}
+        if (!origin) origin = 'https://anycloset3d.vercel.app';
+        return origin + '/upload-measurement.html?t=' + encodeURIComponent(token);
     },
 
     list: async function(opts) {
@@ -1136,7 +1139,7 @@ window.MeasurementInbox = {
             project_id: projectId,
             user_id: user.id,
             measurement_id: measurementId,
-            label: opts.label || 'מדידה מוואטסאפ',
+            label: opts.label || 'מדידה מהשטח',
             file_name: m.file_name,
             mime_type: m.mime_type,
             storage_path: m.storage_path,

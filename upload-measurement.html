@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>העלאת מדידה | AnyCloset</title>
+    <link rel="icon" type="image/png" href="images/icon-logo.png">
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --navy: #1e3a5f; --navy-d: #0f1f38; --blue: #2563eb;
+            --ok: #059669; --bg: #eef2f7; --card: #fff; --line: #e2e8f0;
+            --text: #0f172a; --muted: #64748b; --err: #dc2626;
+        }
+        body {
+            font-family: Rubik, sans-serif; background: var(--bg); color: var(--text);
+            min-height: 100dvh; padding: 20px 16px 40px;
+        }
+        .wrap { max-width: 520px; margin: 0 auto; }
+        .brand {
+            display: flex; align-items: center; gap: 10px; margin-bottom: 18px;
+        }
+        .brand-mark {
+            width: 40px; height: 40px; border-radius: 12px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: #fff; display: flex; align-items: center; justify-content: center;
+            font-weight: 800;
+        }
+        .brand strong { display: block; font-size: 1rem; }
+        .brand span { font-size: .78rem; color: var(--muted); }
+        .card {
+            background: var(--card); border: 1px solid var(--line); border-radius: 20px;
+            padding: 22px 20px 24px; box-shadow: 0 8px 28px rgba(15, 23, 42, .06);
+        }
+        h1 { font-size: 1.25rem; font-weight: 800; color: var(--navy); margin-bottom: 6px; }
+        .lead { font-size: .88rem; color: var(--muted); line-height: 1.55; margin-bottom: 18px; }
+        label { display: block; font-size: .75rem; font-weight: 700; color: var(--muted); margin-bottom: 6px; }
+        .search, input[type="text"] {
+            width: 100%; height: 48px; border: 1.5px solid var(--line); border-radius: 12px;
+            padding: 0 14px; font: inherit; font-size: .95rem; background: #f8fafc; outline: none;
+        }
+        .search:focus, input[type="text"]:focus { border-color: var(--blue); background: #fff; }
+        .mode {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px;
+        }
+        .mode button {
+            height: 44px; border-radius: 12px; border: 1.5px solid var(--line);
+            background: #f8fafc; font: inherit; font-weight: 700; cursor: pointer; color: var(--text);
+        }
+        .mode button.on { background: var(--navy); color: #fff; border-color: var(--navy); }
+        .list {
+            max-height: 240px; overflow: auto; border: 1px solid var(--line);
+            border-radius: 12px; margin-top: 8px; background: #fff;
+        }
+        .opt {
+            width: 100%; text-align: right; padding: 10px 12px; border: 0; border-bottom: 1px solid var(--line);
+            background: #fff; font: inherit; cursor: pointer;
+        }
+        .opt:last-child { border-bottom: 0; }
+        .opt.on { background: #ecfdf5; }
+        .opt strong { display: block; font-size: .9rem; }
+        .opt span { font-size: .75rem; color: var(--muted); }
+        .drop {
+            margin-top: 16px; border: 1.5px dashed #94a3b8; border-radius: 14px;
+            padding: 18px 12px; text-align: center; background: #f8fafc; cursor: pointer;
+        }
+        .drop strong { display: block; margin: 6px 0 2px; }
+        .drop span { font-size: .78rem; color: var(--muted); }
+        .files { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+        .file {
+            display: flex; align-items: center; gap: 8px; background: #f1f5f9;
+            border-radius: 10px; padding: 8px 10px; font-size: .82rem;
+        }
+        .file button { margin-right: auto; border: 0; background: none; color: var(--err); cursor: pointer; font: inherit; }
+        .submit {
+            width: 100%; height: 50px; margin-top: 18px; border: 0; border-radius: 14px;
+            background: linear-gradient(135deg, #059669, #047857); color: #fff;
+            font: inherit; font-weight: 800; cursor: pointer;
+        }
+        .submit:disabled { opacity: .5; cursor: not-allowed; }
+        .msg { margin-top: 12px; font-size: .85rem; line-height: 1.5; }
+        .msg.err { color: var(--err); }
+        .msg.ok { color: var(--ok); font-weight: 700; }
+        .hidden { display: none !important; }
+        .empty { padding: 16px; text-align: center; color: var(--muted); font-size: .85rem; }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <div class="brand">
+        <div class="brand-mark">A</div>
+        <div>
+            <strong id="biz-name">AnyCloset</strong>
+            <span>העלאת מדידה מהשטח</span>
+        </div>
+    </div>
+    <div class="card" id="panel">
+        <h1>שליחת מדידה</h1>
+        <p class="lead">בחרו לקוח מהרשימה — והקבצים יקושרו ישר לפרויקט. אם אין אותו ברשימה, כתבו את השם ידנית.</p>
+
+        <div class="mode">
+            <button type="button" id="mode-list" class="on">מהרשימה</button>
+            <button type="button" id="mode-manual">שם ידני</button>
+        </div>
+
+        <div id="list-wrap">
+            <label>חיפוש לקוח / פרויקט</label>
+            <input class="search" id="search" type="search" placeholder="שם לקוח או פרויקט...">
+            <div class="list" id="project-list"></div>
+        </div>
+
+        <div id="manual-wrap" class="hidden">
+            <label>שם הלקוח</label>
+            <input id="customer-name" type="text" maxlength="80" placeholder="למשל: כהן, רחוב הרצל 12">
+        </div>
+
+        <div class="drop" id="drop" onclick="document.getElementById('file-input').click()">
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+            <strong>הוספת קבצים</strong>
+            <span>PDF או תמונות JPG/PNG · עד 12 קבצים</span>
+        </div>
+        <input id="file-input" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" multiple hidden>
+        <div class="files" id="file-list"></div>
+
+        <button type="button" class="submit" id="submit">שלח מדידה</button>
+        <div class="msg" id="msg"></div>
+    </div>
+</div>
+<script>
+(function () {
+    var FN = 'https://meqxnsjycvfgfhdepguo.supabase.co/functions/v1/upload-measurement';
+    var params = new URLSearchParams(location.search);
+    var token = params.get('t') || params.get('token') || '';
+    var projects = [];
+    var selectedId = '';
+    var files = [];
+    var manual = false;
+
+    function $(id) { return document.getElementById(id); }
+    function setMsg(text, ok) {
+        var el = $('msg');
+        el.className = 'msg ' + (ok ? 'ok' : (text ? 'err' : ''));
+        el.textContent = text || '';
+    }
+
+    function renderList() {
+        var q = ($('search').value || '').trim().toLowerCase();
+        var list = $('project-list');
+        var shown = projects.filter(function (p) {
+            if (!q) return true;
+            return [p.name, p.customer_name, p.customer_order_num].some(function (v) {
+                return v && String(v).toLowerCase().indexOf(q) !== -1;
+            });
+        });
+        if (!shown.length) {
+            list.innerHTML = '<div class="empty">לא נמצא. אפשר לעבור לשם ידני.</div>';
+            return;
+        }
+        list.innerHTML = shown.map(function (p) {
+            var sub = p.customer_name || p.customer_order_num || 'בלי שם לקוח';
+            var on = p.id === selectedId ? ' on' : '';
+            return '<button type="button" class="opt' + on + '" data-id="' + p.id + '">' +
+                '<strong>' + esc(p.customer_name || p.name) + '</strong>' +
+                '<span>' + esc(p.name) + (p.customer_order_num ? ' · #' + esc(p.customer_order_num) : '') + '</span></button>';
+        }).join('');
+        list.querySelectorAll('.opt').forEach(function (btn) {
+            btn.onclick = function () {
+                selectedId = btn.getAttribute('data-id');
+                renderList();
+            };
+        });
+    }
+
+    function esc(s) {
+        return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+    }
+
+    function renderFiles() {
+        $('file-list').innerHTML = files.map(function (f, i) {
+            return '<div class="file"><span>' + esc(f.name) + '</span><button type="button" data-i="' + i + '">הסר</button></div>';
+        }).join('');
+        $('file-list').querySelectorAll('button').forEach(function (b) {
+            b.onclick = function () {
+                files.splice(parseInt(b.getAttribute('data-i'), 10), 1);
+                renderFiles();
+            };
+        });
+    }
+
+    function addFiles(list) {
+        var arr = Array.prototype.slice.call(list || []);
+        arr.forEach(function (f) {
+            var ok = /pdf|jpe?g|png$/i.test(f.name) || /pdf|jpeg|jpg|png/i.test(f.type);
+            if (!ok) return;
+            if (files.length >= 12) return;
+            files.push(f);
+        });
+        renderFiles();
+    }
+
+    $('mode-list').onclick = function () {
+        manual = false;
+        $('mode-list').classList.add('on');
+        $('mode-manual').classList.remove('on');
+        $('list-wrap').classList.remove('hidden');
+        $('manual-wrap').classList.add('hidden');
+    };
+    $('mode-manual').onclick = function () {
+        manual = true;
+        selectedId = '';
+        $('mode-manual').classList.add('on');
+        $('mode-list').classList.remove('on');
+        $('manual-wrap').classList.remove('hidden');
+        $('list-wrap').classList.add('hidden');
+        renderList();
+    };
+    $('search').oninput = renderList;
+    $('file-input').onchange = function (e) { addFiles(e.target.files); e.target.value = ''; };
+    var drop = $('drop');
+    drop.ondragover = function (e) { e.preventDefault(); };
+    drop.ondrop = function (e) { e.preventDefault(); addFiles(e.dataTransfer.files); };
+
+    async function boot() {
+        if (!token) {
+            setMsg('קישור לא תקין. בקשו קישור חדש מבעל החנות.');
+            $('submit').disabled = true;
+            return;
+        }
+        try {
+            var res = await fetch(FN + '?token=' + encodeURIComponent(token));
+            var data = await res.json();
+            if (!res.ok || !data.ok) throw new Error(data.error || 'קישור לא תקין');
+            $('biz-name').textContent = data.business_name || 'AnyCloset';
+            projects = data.projects || [];
+            renderList();
+        } catch (err) {
+            setMsg(err.message || 'לא ניתן לטעון את רשימת הלקוחות');
+            $('submit').disabled = true;
+        }
+    }
+
+    $('submit').onclick = async function () {
+        setMsg('');
+        var customerName = ($('customer-name').value || '').trim();
+        var project = projects.find(function (p) { return p.id === selectedId; });
+        if (!manual && !project) {
+            setMsg('בחרו לקוח מהרשימה, או עברו לשם ידני');
+            return;
+        }
+        if (manual && customerName.length < 2) {
+            setMsg('כתבו את שם הלקוח');
+            return;
+        }
+        if (!files.length) {
+            setMsg('הוסיפו לפחות קובץ אחד');
+            return;
+        }
+        $('submit').disabled = true;
+        $('submit').textContent = 'מעלה...';
+        try {
+            var initBody = {
+                action: 'init',
+                token: token,
+                customer_name: manual ? customerName : (project.customer_name || project.name),
+                project_id: manual ? '' : project.id,
+                files: files.map(function (f) { return { name: f.name, type: f.type, size: f.size }; })
+            };
+            var initRes = await fetch(FN, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(initBody)
+            });
+            var initData = await initRes.json();
+            if (!initRes.ok || !initData.ok) throw new Error(initData.error || 'ההעלאה נכשלה');
+
+            var committed = [];
+            for (var i = 0; i < initData.uploads.length; i++) {
+                var u = initData.uploads[i];
+                var put = await fetch(u.signedUrl, { method: 'PUT', body: files[u.index], headers: { 'Content-Type': files[u.index].type || 'application/octet-stream' } });
+                if (!put.ok) throw new Error('העלאת הקובץ נכשלה: ' + files[u.index].name);
+                committed.push({
+                    path: u.path,
+                    file_name: u.file_name,
+                    mime_type: u.mime_type,
+                    file_size: u.file_size
+                });
+            }
+
+            var commitRes = await fetch(FN, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'commit',
+                    token: token,
+                    customer_name: initBody.customer_name,
+                    project_id: initBody.project_id,
+                    files: committed
+                })
+            });
+            var commitData = await commitRes.json();
+            if (!commitRes.ok || !commitData.ok) throw new Error(commitData.error || 'שמירה נכשלה');
+
+            files = [];
+            renderFiles();
+            $('customer-name').value = '';
+            selectedId = '';
+            renderList();
+            setMsg(commitData.linked
+                ? 'המדידה נשלחה וקושרה לפרויקט ✓'
+                : 'המדידה נשלחה. בעל החנות יקשר אותה לפרויקט.', true);
+        } catch (err) {
+            setMsg(err.message || 'שגיאה בשליחה');
+        }
+        $('submit').disabled = false;
+        $('submit').textContent = 'שלח מדידה';
+    };
+
+    boot();
+})();
+</script>
+</body>
+</html>
