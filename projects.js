@@ -1665,6 +1665,9 @@ async function _loadProfileForm() {
         var logoUrl = (_userProfile.logo_url) || biz.logoUrl || '';
         document.getElementById('prof-logo-url').value = logoUrl;
         _updateLogoPreview(logoUrl);
+        window._userLogoUrl = logoUrl || null;
+        window._userBusinessName = biz.name || '';
+        window._userBusinessPhone = _userProfile.phone || '';
 
         // Subscription section
         _loadSubscriptionSection(profile);
@@ -1848,6 +1851,7 @@ async function saveBusinessInfo() {
         var { error } = await sb.from('profiles').update({ business_info: biz, logo_url: logoUrl || null }).eq('id', user.id);
         if (error) throw error;
         window._userLogoUrl = logoUrl || null; // update global for print functions
+        window._userBusinessName = biz.name || '';
         showToast('פרטי העסק נשמרו ✓', 'success');
     } catch(e) {
         showToast('שגיאה: ' + e.message, 'error');

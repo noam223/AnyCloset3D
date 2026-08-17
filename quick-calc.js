@@ -434,6 +434,128 @@ window.qcCopyCustomerQuote = function() {
     }
 };
 
+function _qcModelLabel(model) {
+    var map = {
+        maya: 'מאיה',
+        c9: 'C9',
+        ab2_nohoney: 'חזית פנימית',
+        ab2: 'AB2',
+        regalim: 'רגלי ניקל'
+    };
+    return map[model] || model || '—';
+}
+
+function _qcMatLabel(mat) {
+    return mat === 'sandwich' ? "סנדביץ'" : 'מלמין';
+}
+
+window._buildQcPrintHtml = function() {
+    var items = window._qcQuoteList || [];
+    var customerName = _qcCustomerNameVal() || 'לקוח/ה יקר/ה';
+    var businessName = (window._userBusinessName && String(window._userBusinessName).trim())
+        ? String(window._userBusinessName).trim()
+        : '';
+    var businessPhone = (window._userBusinessPhone && String(window._userBusinessPhone).trim())
+        ? String(window._userBusinessPhone).trim()
+        : '';
+    var logoUrl = window._userLogoUrl || '';
+    var dateStr = new Date().toLocaleDateString('he-IL');
+    var totalCust = 0, totalInstall = 0;
+    items.forEach(function(it) {
+        totalCust += it.customer || 0;
+        totalInstall += it.install || 0;
+    });
+    var grand = totalCust + totalInstall;
+    var logoHtml = logoUrl
+        ? '<img src="' + logoUrl.replace(/"/g, '') + '" alt="לוגו" class="qc-print-logo">'
+        : '';
+    var rows = items.map(function(it, i) {
+        var extra = _qcExtrasSummary(it.extras);
+        return '<tr>' +
+            '<td class="num">' + (i + 1) + '</td>' +
+            '<td><strong>' + _qcEsc(_qcCabinetLabel(it)) + '</strong>' +
+            '<div class="meta">' + _qcEsc(_qcModelLabel(it.model)) + ' · ' + _qcEsc(_qcMatLabel(it.mat)) + '</div></td>' +
+            '<td>' + _qcEsc(_qcDimsLabel(it)) + '</td>' +
+            '<td>' + (extra ? _qcEsc(extra) : '—') + '</td>' +
+            '<td class="money">' + _qcMoney(it.customer) + '</td>' +
+            '<td class="money">' + _qcMoney(it.install) + '</td>' +
+            '</tr>';
+    }).join('');
+
+    var pdfTitle = 'הצעת מחיר' + (customerName && customerName !== 'לקוח/ה יקר/ה' ? (' — ' + customerName) : '');
+
+    return '<!DOCTYPE html><html lang="he" dir="rtl"><head><meta charset="UTF-8"><title>' + _qcEsc(pdfTitle) + '</title>' +
+'<style>' +
+'*{box-sizing:border-box;margin:0;padding:0}' +
+'body{font-family:"Segoe UI",Tahoma,Arial,sans-serif;direction:rtl;background:#fff;color:#0f172a;padding:28px;font-size:14px;line-height:1.45}' +
+'.sheet{max-width:900px;margin:0 auto}' +
+'.top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:3px solid #1e3a5f;padding-bottom:16px;margin-bottom:22px}' +
+'.top h1{font-size:1.7rem;color:#1e3a5f;margin:0 0 4px}' +
+'.top .sub{color:#64748b;font-size:.9rem}' +
+'.biz{font-weight:700;color:#0f766e;margin-bottom:4px}' +
+'.qc-print-logo{max-height:64px;max-width:180px;object-fit:contain;display:block}' +
+'.cust{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;margin-bottom:20px;display:grid;grid-template-columns:1fr 1fr;gap:8px 20px}' +
+'.cust strong{color:#334155}' +
+'table{width:100%;border-collapse:collapse;margin-bottom:18px}' +
+'th{background:#1e3a5f;color:#fff;font-weight:700;padding:10px 12px;text-align:right;font-size:.82rem}' +
+'td{padding:11px 12px;border-bottom:1px solid #e2e8f0;vertical-align:top;font-size:.9rem}' +
+'tr:nth-child(even) td{background:#f8fafc}' +
+'td.num{width:36px;color:#64748b;font-weight:700}' +
+'td.money{white-space:nowrap;font-weight:700;direction:ltr;text-align:left}' +
+'.meta{color:#64748b;font-size:.78rem;margin-top:3px}' +
+'.totals{margin-top:8px;border:1.5px solid #e2e8f0;border-radius:12px;overflow:hidden;max-width:360px;margin-right:auto}' +
+'.totals .row{display:flex;justify-content:space-between;padding:10px 14px;border-bottom:1px solid #e2e8f0}' +
+'.totals .row:last-child{border-bottom:none;background:#eff6ff;font-size:1.15rem;font-weight:800;color:#1e3a5f}' +
+'.note{margin-top:22px;color:#475569;font-size:.88rem;line-height:1.6}' +
+'.footer{margin-top:28px;padding-top:12px;border-top:1px dashed #cbd5e1;color:#94a3b8;font-size:.78rem;display:flex;justify-content:space-between;gap:12px}' +
+'@media print{body{padding:10px}@page{margin:12mm;size:A4}thead{display:table-header-group}tr{page-break-inside:avoid}}' +
+'</style></head><body><div class="sheet">' +
+'<div class="top"><div>' +
+(businessName ? '<div class="biz">' + _qcEsc(businessName) + '</div>' : '') +
+'<h1>הצעת מחיר</h1>' +
+'<div class="sub">תאריך: ' + _qcEsc(dateStr) + '</div>' +
+'</div>' + logoHtml + '</div>' +
+'<div class="cust">' +
+'<div><strong>לכבוד:</strong> ' + _qcEsc(customerName) + '</div>' +
+'<div><strong>מספר פריטים:</strong> ' + items.length + '</div>' +
+'</div>' +
+'<table><thead><tr>' +
+'<th>#</th><th>ארון</th><th>מידות</th><th>תוספות</th><th>מחיר</th><th>הובלה והתקנה</th>' +
+'</tr></thead><tbody>' + rows + '</tbody></table>' +
+'<div class="totals">' +
+'<div class="row"><span>סה״כ ארונות</span><span>' + _qcMoney(totalCust) + '</span></div>' +
+'<div class="row"><span>סה״כ הובלה והתקנה</span><span>' + _qcMoney(totalInstall) + '</span></div>' +
+'<div class="row"><span>סה״כ לתשלום</span><span>' + _qcMoney(grand) + '</span></div>' +
+'</div>' +
+'<div class="note">הצעה זו תקפה ל־14 יום ממועד ההנפקה, אלא אם צוין אחרת.<br>המחירים כוללים את המפורט לעיל. שינויים במידות / חומרים / תוספות עשויים לשנות את המחיר הסופי.</div>' +
+'<div class="footer"><span>' + _qcEsc(businessName || 'AnyCloset 3D') + (businessPhone ? (' · ' + _qcEsc(businessPhone)) : '') + '</span><span>נוצר במערכת AnyCloset</span></div>' +
+'</div></body></html>';
+};
+
+window.qcPrintQuotePdf = function() {
+    var items = window._qcQuoteList || [];
+    if (!items.length) {
+        alert('הוסף לפחות ארון אחד לפני הדפסה');
+        return;
+    }
+    window._renderQcQuoteList();
+    var html = window._buildQcPrintHtml();
+    var customerName = _qcCustomerNameVal();
+    var pdfTitle = 'הצעת מחיר' + (customerName ? (' — ' + customerName) : '');
+    var win = window.open('', '_blank', 'width=960,height=720');
+    if (!win) {
+        alert('הדפדפן חסם חלון חדש — אפשר חלונות קופצים להדפסה');
+        return;
+    }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(function() {
+        try { win.document.title = pdfTitle; } catch (e) {}
+        win.print();
+    }, 450);
+};
+
 window._qcHistoryId = null;
 window._qcHistoryCache = null;
 

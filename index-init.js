@@ -109,11 +109,18 @@
         try {
             var { data: _profileRow } = await _sb_init
                 .from('profiles')
-                .select('logo_url')
+                .select('logo_url, phone, business_info')
                 .eq('id', user.id)
                 .single();
             window._userLogoUrl = (_profileRow && _profileRow.logo_url) ? _profileRow.logo_url : null;
-        } catch(e) { window._userLogoUrl = null; }
+            var _biz = (_profileRow && _profileRow.business_info) ? _profileRow.business_info : {};
+            window._userBusinessName = (_biz && _biz.name) ? _biz.name : '';
+            window._userBusinessPhone = (_profileRow && _profileRow.phone) ? _profileRow.phone : '';
+        } catch(e) {
+            window._userLogoUrl = null;
+            window._userBusinessName = '';
+            window._userBusinessPhone = '';
+        }
     }
 
     // 4. Load features and apply UI gates based on plan  (was §3 before pricing block)
