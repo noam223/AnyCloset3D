@@ -675,6 +675,98 @@ function _bpHoneycombBlocksFromCompartments(compartments, numRows) {
     return blocks;
 }
 
+/** Absolute Y ranges (cm from floor) for open-cell blocks in a column — used for adjacent merge. */
+function _bpOpenCellAbsRanges(col, wg, pH) {
+    if (!col) return [];
+    const fo = col.floorOffset || 0;
+    const colActualH = col.height || (wg && wg.h) || 240;
+    const visibleH = colActualH - fo;
+    const colPlinthH = col.noPlinth ? 0 : (pH || 0);
+    const shelvesArr = (col.shelvesY || []).slice().sort((a, b) => a - b);
+    const deskBase = (col.type === 'desk')
+        ? (col.deskHeight || 80) + (col.deskClearance || 80)
+        : _bpRowBaseCm(col, colPlinthH);
+    const adjShelves = shelvesArr.map(sy => sy - fo).filter(sy => sy > 0 && sy < visibleH);
+    const splitY = col.splitY || 0;
+    const splitT = (state.thickness || 1.7) * 2;
+    const splitAdj = splitY > 0 ? (splitY - fo) : 0;
+    const splitTopAdj = splitAdj > 0 ? splitAdj + splitT : 0;
+    let allBounds = [...adjShelves];
+    if (splitAdj > deskBase && splitAdj < visibleH) {
+        if (!allBounds.includes(splitAdj)) allBounds.push(splitAdj);
+        if (splitTopAdj < visibleH && !allBounds.includes(splitTopAdj)) allBounds.push(splitTopAdj);
+        allBounds.sort((a, b) => a - b);
+    }
+    const rowBounds = [deskBase, ...allBounds.filter(sy => sy > deskBase), visibleH];
+    const blocks = _bpHoneycombBlocksFromCompartments(col.compartments, rowBounds.length - 1);
+    return blocks.map(b => ({
+        type: b.type,
+        bot: fo + rowBounds[b.startR],
+        top: fo + rowBounds[b.endR + 1]
+    }));
+}
+
+function _bpOpenCellRangesMatch(ranges, type, bot, top) {
+    const EPS = 0.5;
+    return (ranges || []).some(r =>
+        r.type === type &&
+        Math.abs(r.bot - bot) <= EPS &&
+        Math.abs(r.top - top) <= EPS
+    );
+}
+
+function _bpMarkBlockAdjacentMerges(block, rowBounds, fo, cols, ci, wg, pH) {
+    if (!block || !rowBounds) return block;
+    const bot = fo + rowBounds[block.startR];
+    const top = fo + rowBounds[block.endR + 1];
+    block.mergeLeft = false;
+    block.mergeRight = false;
+    if (ci > 0) {
+        const leftRanges = _bpOpenCellAbsRanges(cols[ci - 1], wg, pH);
+        block.mergeLeft = _bpOpenCellRangesMatch(leftRanges, block.type, bot, top);
+    }
+    if (ci < cols.length - 1) {
+        const rightRanges = _bpOpenCellAbsRanges(cols[ci + 1], wg, pH);
+        block.mergeRight = _bpOpenCellRangesMatch(rightRanges, block.type, bot, top);
+    }
+    return block;
+}
+
+/** SVG Y holes to punch in the separator between two adjacent columns (merged כוורת). */
+function _bpOpenCellSepHolesSvg(leftCol, rightCol, wg, pH, oy, dH, sc) {
+    const leftRanges = _bpOpenCellAbsRanges(leftCol, wg, pH);
+    const rightRanges = _bpOpenCellAbsRanges(rightCol, wg, pH);
+    const EPS = 0.5;
+    const holes = [];
+    leftRanges.forEach(L => {
+        rightRanges.forEach(R => {
+            if (L.type !== R.type) return;
+            if (Math.abs(L.bot - R.bot) > EPS || Math.abs(L.top - R.top) > EPS) return;
+            const botSvg = oy + dH - L.bot * sc;
+            const topSvg = oy + dH - L.top * sc;
+            holes.push({ topSvg: Math.min(botSvg, topSvg), botSvg: Math.max(botSvg, topSvg) });
+        });
+    });
+    holes.sort((a, b) => a.topSvg - b.topSvg);
+    return holes;
+}
+
+function _bpVlineWithHoles(drawVline, x, sepTopY, sepBotY, holes) {
+    if (!holes || !holes.length) {
+        drawVline(x, sepTopY, sepBotY);
+        return;
+    }
+    let y = sepTopY;
+    holes.forEach(h => {
+        const holeTop = Math.max(sepTopY, h.topSvg);
+        const holeBot = Math.min(sepBotY, h.botSvg);
+        if (holeBot <= holeTop) return;
+        if (holeTop - y > 1) drawVline(x, y, holeTop);
+        y = Math.max(y, holeBot);
+    });
+    if (sepBotY - y > 1) drawVline(x, y, sepBotY);
+}
+
 function _bpIsHoneycombInternalShelf(blocks, rowBounds, syAdj) {
     for (let bi = 0; bi < blocks.length; bi++) {
         const b = blocks[bi];
@@ -777,8 +869,11 @@ function _bpDrawHoneycombBlock(p, ctx) {
     };
 
     const openDir = block.type === 'side_open_cell' ? _bpSideOpenCellOpenDir(ci, numCols) : null;
-    if (block.type === 'open_cell' || openDir !== 'left') drawSideWall(leftWallX1, leftWallX2, true, leftCabInner);
-    if (block.type === 'open_cell' || openDir !== 'right') drawSideWall(rightWallX1, rightWallX2, false, rightCabInner);
+    const mergeLeft = !!block.mergeLeft;
+    const mergeRight = !!block.mergeRight;
+    // Skip shared walls when adjacent columns merge into one כוורת
+    if (!mergeLeft && (block.type === 'open_cell' || openDir !== 'left')) drawSideWall(leftWallX1, leftWallX2, true, leftCabInner);
+    if (!mergeRight && (block.type === 'open_cell' || openDir !== 'right')) drawSideWall(rightWallX1, rightWallX2, false, rightCabInner);
 
     for (let ri = block.startR; ri < block.endR; ri++) {
         const shelfY = colBotSvgY - rowBounds[ri + 1] * sc;
@@ -1445,7 +1540,8 @@ window._generateMultiViewBlueprintSVG = function() {
                 const prevTopY = prevBotY - prevVisibleH * sc;
                 const sepTopY = Math.min(_colTopY, prevTopY);
                 const sepBotY = Math.max(_colBotY, prevBotY);
-                vline(colX, sepTopY, sepBotY, sc);
+                const _sepHoles = _bpOpenCellSepHolesSvg(prevCol, col, wg, pH, oy, dH, sc);
+                _bpVlineWithHoles((x, y1, y2) => vline(x, y1, y2, sc), colX, sepTopY, sepBotY, _sepHoles);
             }
 
             const _splitYOld = col.splitY || 0;
@@ -1721,8 +1817,9 @@ window._generateMultiViewBlueprintSVG = function() {
                 }
             }
             _hcBlocksOld.forEach(block => {
+                _bpMarkBlockAdjacentMerges(block, rowBoundsEarly, _fo, cols, ci, wg, colPlinthH);
                 _bpDrawHoneycombBlock(p, {
-                    block, colX, colW, sc, colBotSvgY: _colBotY, rowBounds, ci, numCols: cols.length,
+                    block, colX, colW, sc, colBotSvgY: _colBotY, rowBounds: rowBoundsEarly, ci, numCols: cols.length,
                     boardFill: '#94a3b8', strokeThin: STROKE_THIN, stroke: STROKE, font: FONT,
                     makeRectFn: (pp, x, y, w, h, fill, stroke, sw) => rect(x, y, w, h, fill, stroke, sw),
                     makeShelfFn: (pp, x1, sy, x2, scc, tCm, showLabel) => shelfLine(x1, sy, x2, scc, tCm, showLabel)
@@ -2526,7 +2623,8 @@ window._generateMultiViewBlueprintPages = function() {
                 const prevTopY2 = prevBotY2 - prevVisibleH2 * sc;
                 const sepTopY = Math.min(_colTopSvgY, prevTopY2);
                 const sepBotY = Math.max(_colBotSvgY, prevBotY2);
-                makeVline(p, colX, sepTopY, sepBotY, sc);
+                const _sepHoles2 = _bpOpenCellSepHolesSvg(prevCol, col, wg, pH, oy, dH, sc);
+                _bpVlineWithHoles((x, y1, y2) => makeVline(p, x, y1, y2, sc), colX, sepTopY, sepBotY, _sepHoles2);
             }
 
             const shelvesArr = (col.shelvesY || []).slice().sort((a,b) => a-b);
@@ -2813,6 +2911,7 @@ window._generateMultiViewBlueprintPages = function() {
                 }
             }
             _hcBlocks.forEach(block => {
+                _bpMarkBlockAdjacentMerges(block, rowBounds, _fo2, cols, ci, wg, colPlinthH);
                 _bpDrawHoneycombBlock(p, {
                     block, colX, colW, sc, colBotSvgY: _colBotSvgY, rowBounds, ci, numCols: cols.length,
                     boardFill: '#94a3b8', strokeThin: STROKE_THIN, stroke: STROKE, font: FONT,

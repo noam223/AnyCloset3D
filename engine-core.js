@@ -3738,6 +3738,28 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         columnBlocks.push(blocks);
     }
 
+    // Adjacent כוורת columns at the same height → one continuous open frame
+    // (skip shared side walls + punch carcass divider in that Y band).
+    const _OC_Y_EPS = 0.5;
+    const _isOpenLikeBlk = (tp) => tp === 'open_cell' || tp === 'side_open_cell';
+    for (let c = 0; c < columnBlocks.length - 1; c++) {
+        (columnBlocks[c] || []).forEach(leftB => {
+            if (!_isOpenLikeBlk(leftB.type)) return;
+            (columnBlocks[c + 1] || []).forEach(rightB => {
+                if (rightB.type !== leftB.type) return;
+                if (Math.abs(leftB.bottomY - rightB.bottomY) > _OC_Y_EPS) return;
+                if (Math.abs(leftB.topY - rightB.topY) > _OC_Y_EPS) return;
+                leftB.mergeRight = true;
+                rightB.mergeLeft = true;
+                const holeBot = Math.max(leftB.bottomY, rightB.bottomY);
+                const holeTop = Math.min(leftB.topY, rightB.topY);
+                if (holeTop - holeBot > 0.5) {
+                    internalHoles[c].push({ bottom: holeBot, top: holeTop });
+                }
+            });
+        });
+    }
+
     let currentX = -state.width/2 + t + _ox;
     let compCounter = 1;
     // True when rendering an upper unit wing (noPlinth is forced on all columns, and a bottom board is needed)
@@ -4337,30 +4359,47 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
 
         if (!isBP) {
             myBlocks.forEach(block => {
+                // Merged spans are drawn once from the leftmost column
+                if (block.mergeLeft) return;
+
                 const innerT = t;
-                let cellW = col.width;
-                let cellX = colCenterX;
-                
-                if (block.type === 'side_open_cell') {
-                    if (block.openDir === 'left') { cellW += t; cellX -= t/2; } 
-                    else if (block.openDir === 'right') { cellW += t; cellX += t/2; }
+                let spanW = col.width;
+                let walkBlk = block;
+                let endC = c;
+                while (walkBlk.mergeRight && endC < _cols.length - 1) {
+                    const nextBlk = (columnBlocks[endC + 1] || []).find(b =>
+                        b.type === block.type &&
+                        b.mergeLeft &&
+                        Math.abs(b.bottomY - block.bottomY) < _OC_Y_EPS &&
+                        Math.abs(b.topY - block.topY) < _OC_Y_EPS
+                    );
+                    if (!nextBlk) break;
+                    endC++;
+                    spanW += t + _cols[endC].width;
+                    walkBlk = nextBlk;
                 }
 
-                createBoard(cellW, innerT, bodyD - 2, cellX, block.topY - innerT/2, 1, matOpenCell); 
-                createBoard(cellW, innerT, bodyD - 2, cellX, block.bottomY + innerT/2, 1, matOpenCell); 
+                let cellW = spanW;
+                let cellX = currentX + spanW / 2;
+
+                if (block.type === 'side_open_cell') {
+                    if (block.openDir === 'left') { cellW += t; cellX -= t / 2; }
+                    if (walkBlk.openDir === 'right') { cellW += t; cellX += t / 2; }
+                }
+
+                createBoard(cellW, innerT, bodyD - 2, cellX, block.topY - innerT/2, 1, matOpenCell);
+                createBoard(cellW, innerT, bodyD - 2, cellX, block.bottomY + innerT/2, 1, matOpenCell);
                 createBoard(cellW, block.h - 2*innerT, t, cellX, block.centerY, -bodyD/2 + t/2 + 0.6, matOpenCell);
-                
+
                 if (block.type === 'open_cell') {
-                    createBoard(innerT, block.h - 2*innerT, bodyD - 2, cellX - cellW/2 + innerT/2, block.centerY, 1, matOpenCell); 
-                    createBoard(innerT, block.h - 2*innerT, bodyD - 2, cellX + cellW/2 - innerT/2, block.centerY, 1, matOpenCell); 
+                    createBoard(innerT, block.h - 2*innerT, bodyD - 2, cellX - cellW/2 + innerT/2, block.centerY, 1, matOpenCell);
+                    createBoard(innerT, block.h - 2*innerT, bodyD - 2, cellX + cellW/2 - innerT/2, block.centerY, 1, matOpenCell);
                 } else if (block.type === 'side_open_cell') {
-                    if (block.openDir === 'left') {
-                        createBoard(innerT, block.h - 2*innerT, bodyD - 2, cellX + cellW/2 - innerT/2, block.centerY, 1, matOpenCell); 
-                    } else if (block.openDir === 'right') {
-                        createBoard(innerT, block.h - 2*innerT, bodyD - 2, cellX - cellW/2 + innerT/2, block.centerY, 1, matOpenCell); 
-                    } else {
-                        createBoard(innerT, block.h - 2*innerT, bodyD - 2, cellX - cellW/2 + innerT/2, block.centerY, 1, matOpenCell); 
-                        createBoard(innerT, block.h - 2*innerT, bodyD - 2, cellX + cellW/2 - innerT/2, block.centerY, 1, matOpenCell); 
+                    if (block.openDir !== 'left') {
+                        createBoard(innerT, block.h - 2*innerT, bodyD - 2, cellX - cellW/2 + innerT/2, block.centerY, 1, matOpenCell);
+                    }
+                    if (walkBlk.openDir !== 'right') {
+                        createBoard(innerT, block.h - 2*innerT, bodyD - 2, cellX + cellW/2 - innerT/2, block.centerY, 1, matOpenCell);
                     }
                 }
             });
