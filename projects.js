@@ -1999,7 +1999,30 @@ function _ppSyncTypesFromDom() {
     return _ppCabinetTypes;
 }
 
+function _ppEnsureCabinetTypesSection() {
+    if (document.getElementById('pp-cabinet-types')) return;
+    var panel = document.querySelector('#tab-pricing .pricing-panel-wrap');
+    if (!panel) return;
+    var sec = document.createElement('div');
+    sec.className = 'pp-section';
+    sec.id = 'pp-section-cabinet-types';
+    sec.innerHTML =
+        '<div class="pp-section-title"><i class="fa-solid fa-layer-group"></i> סוגי ארונות</div>' +
+        '<p style="font-size:.78rem;color:var(--muted);margin-bottom:12px;line-height:1.5;">שם התצוגה במחשבון ובמעצב, וסוג הבנייה במערכת. לארון הזזה אין טבלת רוחב — המחיר מוגדר בסקשן ארון הזזה.</p>' +
+        '<div class="pp-types-list" id="pp-cabinet-types"></div>' +
+        '<button type="button" onclick="ppAddCabinetType()" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:rgba(37,99,235,.08);border:1.5px solid rgba(37,99,235,.25);color:var(--secondary);border-radius:10px;font-size:.82rem;font-weight:600;cursor:pointer;font-family:inherit;">' +
+        '<i class="fa-solid fa-plus"></i> הוסף סוג</button>';
+    var ranges = document.getElementById('pp-mode-ranges');
+    if (ranges && ranges.parentNode === panel) panel.insertBefore(sec, ranges);
+    else {
+        var first = panel.querySelector('.pp-section');
+        if (first && first.nextSibling) panel.insertBefore(sec, first.nextSibling);
+        else panel.insertBefore(sec, panel.firstChild);
+    }
+}
+
 function _ppRenderCabinetTypes() {
+    _ppEnsureCabinetTypesSection();
     var wrap = document.getElementById('pp-cabinet-types');
     if (!wrap) return;
     wrap.innerHTML = (_ppCabinetTypes || []).map(function(t) {
@@ -2092,7 +2115,10 @@ async function _loadPricingForm() {
             'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lcXhuc2p5Y3ZmZ2ZoZGVwZ3VvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3MDA5NDAsImV4cCI6MjA5MjI3Njk0MH0.w63bl0-1-Rgt9Nx6sVW5ueEGMojiMaxoehlPXlPH2N0'
         );
         var { data: { user } } = await sb.auth.getUser();
-        if (!user) return;
+        if (!user) {
+            _fillPricingPanel(_PP_DEFAULTS);
+            return;
+        }
         var { data: row } = await sb.from('pricing_configs').select('config').eq('user_id', user.id).single();
         _pricingCfg = (row && row.config && Object.keys(row.config).length > 0) ? row.config : null;
         if (_pricingCfg) {
