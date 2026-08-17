@@ -3747,5 +3747,3 @@ document.addEventListener('DOMContentLoaded', function() {
     if (nameEl) nameEl.addEventListener('input', function() { window._renderQcQuoteList(); });
     if (typeof window._qcSetEditUi === 'function') window._qcSetEditUi();
 });
-
-});
