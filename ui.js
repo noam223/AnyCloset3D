@@ -106,7 +106,8 @@ function _resolveOpenCellColorLabel(wings, fallbackKey) {
 
 const placementHebrew = {
     'wall': 'ארון קיר חופשי',
-    'between_walls': 'ארון בין קירות'
+    'between_walls': 'ארון בין קירות',
+    'niche': 'ארון בנישה'
 };
 
 // ── Drawer count helpers ──────────────────────────────────────────────────────
@@ -5471,7 +5472,7 @@ function bindUI() {
     const placementEl = document.getElementById('inp-placement');
     if (placementEl) {
         placementEl.addEventListener('change', (e) => {
-            state.placement = (e.target.value === 'niche') ? 'wall' : e.target.value;
+            state.placement = e.target.value;
             buildCabinet(); calculatePrice(); saveHistoryState();
         });
     }
@@ -6738,10 +6739,6 @@ function _applyRawStateForCapture(rawState) {
     window._closureCeilWidth = rs.closureCeilWidth || 1.8;
     window._closureDepthWidth = rs.closureDepthWidth || 1.8;
     window._closureFrontLine = rs.closureFrontLine || 'cabinet';
-    if (rs.placement === 'niche') {
-        rs.placement = 'wall';
-        state.placement = 'wall';
-    }
     state.blueprintCutouts = rs.blueprintCutouts ? JSON.parse(JSON.stringify(rs.blueprintCutouts)) : [];
     state.blueprintCellDimOffsets = rs.blueprintCellDimOffsets ? JSON.parse(JSON.stringify(rs.blueprintCellDimOffsets)) : {};
     state.blueprintDimOffsets = rs.blueprintDimOffsets ? JSON.parse(JSON.stringify(rs.blueprintDimOffsets)) : {};
@@ -7627,9 +7624,6 @@ window._editCartItemNow = function(index) {
     window._closureCeilWidth  = rawState.closureCeilWidth  || 1.8;
     window._closureDepthWidth = rawState.closureDepthWidth || 1.8;
     window._closureFrontLine  = rawState.closureFrontLine  || 'cabinet';
-    if (rawState.placement === 'niche' || state.placement === 'niche') {
-        state.placement = 'wall';
-    }
     // Sync closure UI
     if (typeof window._updateRoomWallUI === 'function') window._updateRoomWallUI();
 

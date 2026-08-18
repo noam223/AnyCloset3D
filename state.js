@@ -1430,7 +1430,7 @@ window.syncSidebarToWing = function() {
     setVal('inp-num-height', w.globalHeight); setVal('inp-height', w.globalHeight);
     setVal('inp-num-depth', w.depth); setVal('inp-depth', w.depth);
     setVal('inp-plinth', w.cabinetModel || 'maya');
-    setVal('inp-placement', (w.placement === 'niche' ? 'wall' : (w.placement || 'wall')));
+    setVal('inp-placement', w.placement || 'wall');
     setVal('inp-board-mat', w.boardMaterial);
     setVal('inp-columns', w.columns.length);
     const valCols = document.getElementById('val-columns'); if (valCols) valCols.innerText = w.columns.length;
