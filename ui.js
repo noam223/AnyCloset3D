@@ -6490,17 +6490,53 @@ function _captureFrameAtView(cam, ctrl, ren, scn, view, hasDoors) {
     return dataUrl;
 }
 
-function _orderPreviewImagesHtml(item, rawState) {
+function _previewSlotManual(item, slot) {
+    if (slot === 'imgDoors' || slot === 'imgOpen') return !!(item && item[slot + 'Manual']);
+    const m = /^wing:(\d+):(imgDoors|imgOpen)$/.exec(slot || '');
+    if (!m || !item || !item.wingPreviews) return false;
+    const w = item.wingPreviews[parseInt(m[1], 10)];
+    return !!(w && w[m[2] + 'Manual']);
+}
+
+function _orderPreviewImageCardHtml(label, src, alt, opts, slot) {
+    const canReplace = !!(opts && opts.replaceable);
+    const cartIndex = opts && opts.cartIndex;
+    const manual = canReplace && _previewSlotManual(opts.item, slot);
+    const actions = canReplace
+        ? `<div class="print-img-actions hide-on-print">
+                <button type="button" class="print-img-replace" data-cart-index="${cartIndex}" data-slot="${slot}">
+                    <i class="fa-solid fa-image"></i> החלף תמונה
+                </button>
+                <button type="button" class="print-img-restore" data-cart-index="${cartIndex}" data-slot="${slot}" style="display:${manual ? 'inline-flex' : 'none'}">
+                    <i class="fa-solid fa-rotate-left"></i> שחזר הדמיה
+                </button>
+            </div>`
+        : '';
+    return `
+                    <div class="print-img-wrapper${manual ? ' is-replaced' : ''}" data-preview-slot="${slot}">
+                        <div class="print-img-head">
+                            <div class="img-label">${label}${manual ? ' <span class="print-img-replaced-tag">הוחלף</span>' : ''}</div>
+                            ${actions}
+                        </div>
+                        <img src="${src || ''}" alt="${alt}">
+                    </div>`;
+}
+
+function _orderPreviewImagesHtml(item, rawState, opts) {
+    opts = opts || {};
+    opts.item = item;
     const multiFront = _cartHasMultiFrontViews(rawState);
     const centerOutLabel = multiFront ? 'תצוגת חוץ (חזית מרכזית)' : 'תצוגת חוץ (חזיתות)';
     const centerInLabel = multiFront ? 'תצוגת פנים (חזית מרכזית)' : 'תצוגת פנים (חלוקה טכנית)';
-    let html = `
-                    <div class="print-img-wrapper"><div class="img-label">${centerOutLabel}</div><img src="${item.imgDoors}" alt="ארון סגור"></div>
-                    <div class="print-img-wrapper"><div class="img-label">${centerInLabel}</div><img src="${item.imgOpen}" alt="ארון פתוח"></div>`;
-    (item.wingPreviews || []).forEach(w => {
-        html += `
-                    <div class="print-img-wrapper"><div class="img-label">תצוגת חוץ (${_escPrintHtml(w.label)})</div><img src="${w.imgDoors}" alt="חזית סגורה"></div>
-                    <div class="print-img-wrapper"><div class="img-label">תצוגת פנים (${_escPrintHtml(w.label)})</div><img src="${w.imgOpen}" alt="חזית פנימית"></div>`;
+    let html = _orderPreviewImageCardHtml(centerOutLabel, item.imgDoors, 'ארון סגור', opts, 'imgDoors')
+        + _orderPreviewImageCardHtml(centerInLabel, item.imgOpen, 'ארון פתוח', opts, 'imgOpen');
+    (item.wingPreviews || []).forEach((w, wi) => {
+        html += _orderPreviewImageCardHtml(
+            'תצוגת חוץ (' + _escPrintHtml(w.label) + ')', w.imgDoors, 'חזית סגורה', opts, 'wing:' + wi + ':imgDoors'
+        );
+        html += _orderPreviewImageCardHtml(
+            'תצוגת פנים (' + _escPrintHtml(w.label) + ')', w.imgOpen, 'חזית פנימית', opts, 'wing:' + wi + ':imgOpen'
+        );
     });
     return html;
 }
@@ -6803,13 +6839,27 @@ window._refreshCartMediaForPrint = async function(opts) {
                 requestAnimationFrame(function() { requestAnimationFrame(r); });
             });
             const media = window._captureCabinetPreviewImages();
-            if (media.imgDoors) itemObj.spec.imgDoors = media.imgDoors;
-            if (media.imgOpen) itemObj.spec.imgOpen = media.imgOpen;
+            if (media.imgDoors && !itemObj.spec.imgDoorsManual) itemObj.spec.imgDoors = media.imgDoors;
+            if (media.imgOpen && !itemObj.spec.imgOpenManual) itemObj.spec.imgOpen = media.imgOpen;
             if (media.wingPreviews && media.wingPreviews.length) {
-                itemObj.spec.wingPreviews = media.wingPreviews;
+                const prevWings = itemObj.spec.wingPreviews || [];
+                itemObj.spec.wingPreviews = media.wingPreviews.map(function(w, wi) {
+                    const old = prevWings.find(function(p) { return p && p.id === w.id; }) || prevWings[wi];
+                    if (old && old.imgDoorsManual) {
+                        w.imgDoors = old.imgDoors;
+                        w.imgDoorsManual = true;
+                        if (old.imgDoorsAuto) w.imgDoorsAuto = old.imgDoorsAuto;
+                    }
+                    if (old && old.imgOpenManual) {
+                        w.imgOpen = old.imgOpen;
+                        w.imgOpenManual = true;
+                        if (old.imgOpenAuto) w.imgOpenAuto = old.imgOpenAuto;
+                    }
+                    return w;
+                });
             } else if (_cartHasMultiFrontViews(itemObj.rawState)) {
                 itemObj.spec.wingPreviews = media.wingPreviews || [];
-            } else {
+            } else if (!(itemObj.spec.wingPreviews || []).some(function(w) { return w && (w.imgDoorsManual || w.imgOpenManual); })) {
                 itemObj.spec.wingPreviews = [];
             }
             if (media.multiViewPages && media.multiViewPages.length) {
@@ -7007,7 +7057,7 @@ window.openOrderModal = async function(mode, opts) {
                     <h3 class="cabinet-title">תמונות ${detailLabel}: ${titleText}</h3>
                 </div>
                 <div class="print-images-container">
-                    ${_orderPreviewImagesHtml(item, itemObj.rawState)}
+                    ${_orderPreviewImagesHtml(item, itemObj.rawState, { cartIndex: index, replaceable: isFactory })}
                 </div>
                 ${(() => {
                     const bpPages = (item.multiViewPages && item.multiViewPages.length)
@@ -7031,6 +7081,7 @@ window.openOrderModal = async function(mode, opts) {
     });
 
     _bindPrintSpecRowInputs(container);
+    _bindOrderPreviewImageReplace(container);
 
     // Wire up editable inputs
     container.querySelectorAll('.modal-price-input').forEach(input => {
@@ -8427,6 +8478,149 @@ function _bindPrintSpecRowInputs(container) {
         };
         inp.addEventListener('change', persist);
         inp.addEventListener('input', persist);
+    });
+}
+
+function _getOrderReplaceImageInput() {
+    let el = document.getElementById('order-replace-image-input');
+    if (el) return el;
+    el = document.createElement('input');
+    el.type = 'file';
+    el.id = 'order-replace-image-input';
+    el.accept = 'image/jpeg,image/png,image/webp,image/jpg,.jpg,.jpeg,.png,.webp';
+    el.setAttribute('hidden', '');
+    document.body.appendChild(el);
+    return el;
+}
+
+function _readLocalImageAsDataUrl(file) {
+    return new Promise(function(resolve, reject) {
+        if (!file || !file.type || file.type.indexOf('image/') !== 0) {
+            reject(new Error('יש לבחור קובץ תמונה (JPG / PNG)'));
+            return;
+        }
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = function() {
+            URL.revokeObjectURL(url);
+            const max = 1600;
+            let w = img.naturalWidth || img.width;
+            let h = img.naturalHeight || img.height;
+            if (!w || !h) { reject(new Error('לא ניתן לקרוא את התמונה')); return; }
+            if (w > max || h > max) {
+                const s = max / Math.max(w, h);
+                w = Math.round(w * s);
+                h = Math.round(h * s);
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL('image/jpeg', 0.88));
+        };
+        img.onerror = function() {
+            URL.revokeObjectURL(url);
+            reject(new Error('לא ניתן לקרוא את התמונה'));
+        };
+        img.src = url;
+    });
+}
+
+function _getCartPreviewSlotTarget(spec, slot) {
+    if (!spec || !slot) return null;
+    if (slot === 'imgDoors' || slot === 'imgOpen') return { obj: spec, key: slot };
+    const m = /^wing:(\d+):(imgDoors|imgOpen)$/.exec(slot);
+    if (!m || !spec.wingPreviews) return null;
+    const w = spec.wingPreviews[parseInt(m[1], 10)];
+    return w ? { obj: w, key: m[2] } : null;
+}
+
+function _applyCartPreviewImage(spec, slot, dataUrl, manual) {
+    const t = _getCartPreviewSlotTarget(spec, slot);
+    if (!t) return false;
+    if (manual && !t.obj[t.key + 'Manual'] && t.obj[t.key]) {
+        t.obj[t.key + 'Auto'] = t.obj[t.key];
+    }
+    t.obj[t.key] = dataUrl;
+    t.obj[t.key + 'Manual'] = !!manual;
+    if (!manual) delete t.obj[t.key + 'Manual'];
+    return true;
+}
+
+function _syncOrderPreviewCard(container, slot, dataUrl, manual) {
+    if (!container) return;
+    const wrap = container.querySelector('.print-img-wrapper[data-preview-slot="' + slot + '"]');
+    if (!wrap) return;
+    const img = wrap.querySelector('img');
+    if (img) img.src = dataUrl || '';
+    wrap.classList.toggle('is-replaced', !!manual);
+    const restore = wrap.querySelector('.print-img-restore');
+    if (restore) restore.style.display = manual ? 'inline-flex' : 'none';
+    const label = wrap.querySelector('.img-label');
+    if (label) {
+        const tag = label.querySelector('.print-img-replaced-tag');
+        if (manual && !tag) {
+            const span = document.createElement('span');
+            span.className = 'print-img-replaced-tag';
+            span.textContent = 'הוחלף';
+            label.appendChild(document.createTextNode(' '));
+            label.appendChild(span);
+        } else if (!manual && tag) {
+            if (tag.previousSibling && tag.previousSibling.nodeType === 3) tag.previousSibling.remove();
+            tag.remove();
+        }
+    }
+}
+
+function _bindOrderPreviewImageReplace(container) {
+    if (!container) return;
+    container.querySelectorAll('.print-img-replace').forEach(function(btn) {
+        if (btn.dataset.bound) return;
+        btn.dataset.bound = '1';
+        btn.addEventListener('click', function() {
+            const idx = parseInt(btn.getAttribute('data-cart-index'), 10);
+            const slot = btn.getAttribute('data-slot');
+            const itemObj = state.orderCart[idx];
+            if (!itemObj || !itemObj.spec || !slot) return;
+            const input = _getOrderReplaceImageInput();
+            input.value = '';
+            input.onchange = async function() {
+                const file = input.files && input.files[0];
+                input.onchange = null;
+                if (!file) return;
+                try {
+                    const dataUrl = await _readLocalImageAsDataUrl(file);
+                    _applyCartPreviewImage(itemObj.spec, slot, dataUrl, true);
+                    _syncOrderPreviewCard(container, slot, dataUrl, true);
+                    if (typeof saveHistoryState === 'function') saveHistoryState();
+                    if (typeof _showToast === 'function') _showToast('התמונה הוחלפה — תופיע ב-PDF', 2500);
+                } catch (e) {
+                    if (typeof _showToast === 'function') _showToast('⚠️ ' + (e.message || 'החלפת התמונה נכשלה'), 4000);
+                }
+            };
+            input.click();
+        });
+    });
+    container.querySelectorAll('.print-img-restore').forEach(function(btn) {
+        if (btn.dataset.bound) return;
+        btn.dataset.bound = '1';
+        btn.addEventListener('click', function() {
+            const idx = parseInt(btn.getAttribute('data-cart-index'), 10);
+            const slot = btn.getAttribute('data-slot');
+            const itemObj = state.orderCart[idx];
+            if (!itemObj || !itemObj.spec || !slot) return;
+            const t = _getCartPreviewSlotTarget(itemObj.spec, slot);
+            if (!t) return;
+            const restored = t.obj[t.key + 'Auto'] || t.obj[t.key];
+            _applyCartPreviewImage(itemObj.spec, slot, restored, false);
+            delete t.obj[t.key + 'Auto'];
+            _syncOrderPreviewCard(container, slot, restored, false);
+            if (typeof saveHistoryState === 'function') saveHistoryState();
+            if (typeof _showToast === 'function') _showToast('ההדמיה שוחזרה', 2000);
+        });
     });
 }
 

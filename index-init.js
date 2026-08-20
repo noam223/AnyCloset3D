@@ -360,13 +360,34 @@
     var _livePushTimer  = null;
 
     // Helper: build a lightweight snapshot of current state
+    function _lightCartSpecForSave(spec) {
+        if (!spec) return spec;
+        var lightSpec = Object.assign({}, spec);
+        if (!lightSpec.imgDoorsManual) delete lightSpec.imgDoors;
+        if (!lightSpec.imgOpenManual) delete lightSpec.imgOpen;
+        delete lightSpec.imgDoorsAuto;
+        delete lightSpec.imgOpenAuto;
+        delete lightSpec.imgBlueprint;
+        delete lightSpec.multiViewSVG;
+        delete lightSpec.multiViewPages;
+        if (Array.isArray(lightSpec.wingPreviews)) {
+            lightSpec.wingPreviews = lightSpec.wingPreviews.map(function(w) {
+                if (!w) return w;
+                var nw = Object.assign({}, w);
+                if (!nw.imgDoorsManual) delete nw.imgDoors;
+                if (!nw.imgOpenManual) delete nw.imgOpen;
+                delete nw.imgDoorsAuto;
+                delete nw.imgOpenAuto;
+                return nw;
+            });
+        }
+        return lightSpec;
+    }
+
     function _buildSnap() {
         var lightCart = (state.orderCart || []).map(function(item) {
             if (!item || !item.spec) return item;
-            var lightSpec = Object.assign({}, item.spec);
-            delete lightSpec.imgDoors; delete lightSpec.imgOpen;
-            delete lightSpec.imgBlueprint; delete lightSpec.multiViewSVG; delete lightSpec.multiViewPages;
-            return { spec: lightSpec, rawState: item.rawState, printSpecEdits: item.printSpecEdits || null };
+            return { spec: _lightCartSpecForSave(item.spec), rawState: item.rawState, printSpecEdits: item.printSpecEdits || null };
         });
         // Keep the actively edited cabinet's rawState in sync for LIVE viewer follow/browse
         var editIdx = (typeof state.editingCartIndex === 'number' && state.editingCartIndex >= 0)
@@ -431,6 +452,7 @@
             partColors:                state.partColors || {}
         }));
     }
+    window._lightCartSpecForSave = _lightCartSpecForSave;
     window._buildProjectSnap = _buildSnap;
 
     async function _doSave(label) {
@@ -613,13 +635,7 @@ window._saveProjectNow = async function() {
         } else {
             var lightCart = (state.orderCart || []).map(function(item) {
                 if (!item || !item.spec) return item;
-                var lightSpec = Object.assign({}, item.spec);
-                delete lightSpec.imgDoors;
-                delete lightSpec.imgOpen;
-                delete lightSpec.imgBlueprint;
-                delete lightSpec.multiViewSVG;
-                delete lightSpec.multiViewPages;
-                return { spec: lightSpec, rawState: item.rawState, printSpecEdits: item.printSpecEdits || null };
+                return { spec: (typeof window._lightCartSpecForSave === 'function' ? window._lightCartSpecForSave(item.spec) : item.spec), rawState: item.rawState, printSpecEdits: item.printSpecEdits || null };
             });
             snap = JSON.parse(JSON.stringify({
                 globalWidth:   state.globalWidth,
