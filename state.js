@@ -3115,10 +3115,10 @@ function _pricingRangeKey(cfg, engine) {
     }
     const first = types.find(function(t) { return t && t.engine !== 'sliding' && cfgR[t.id]; });
     if (first) return first.id;
-    if (cfgR.maya) return 'maya';
     const keys = Object.keys(cfgR).filter(function(k) {
-        return k !== 'melamine' && k !== 'nonMelamine' && k !== 'sliding';
+        return k !== 'melamine' && k !== 'nonMelamine' && k !== 'sliding' && k !== 'other';
     });
+    if (cfgR.maya && (!keys.length || keys.indexOf('maya') !== -1)) return 'maya';
     return keys[0] || 'maya';
 }
 
@@ -3127,22 +3127,22 @@ function _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel) {
     const hS    = cfg.heightSurcharge != null ? cfg.heightSurcharge : 0.20;
     const dS    = cfg.depthSurcharge  != null ? cfg.depthSurcharge  : 0.20;
     if (mode === 'sqm') {
-        const p = wMelamine ? (cfg.sqmPrice||800) : (cfg.sqmPriceNonMel||(cfg.sqmPrice||800)*1.3);
+        const p = wMelamine ? _priceNum(cfg.sqmPrice, 800) : _priceNum(cfg.sqmPriceNonMel, _priceNum(cfg.sqmPrice, 800) * 1.3);
         let bp = p*(ww/100)*(wh/100); if(wd>54) bp*=(1+dS); return bp;
     }
     if (mode === 'lm') {
-        const p = wMelamine ? (cfg.lmPrice||1200) : (cfg.lmPriceNonMel||(cfg.lmPrice||1200)*1.3);
+        const p = wMelamine ? _priceNum(cfg.lmPrice, 1200) : _priceNum(cfg.lmPriceNonMel, _priceNum(cfg.lmPrice, 1200) * 1.3);
         let bp = p*(ww/100); if(wh>=241) bp*=(1+hS); if(wd>54) bp*=(1+dS); return bp;
     }
     if (mode === 'lm_height') {
-        const base  = wMelamine ? (cfg.lmHeightBase||1200) : (cfg.lmHeightBaseNonMel||(cfg.lmHeightBase||1200)*1.3);
-        const steps = Math.max(0, Math.floor((wh-(cfg.lmHeightThresholdCm||240))/(cfg.lmHeightStepCm||30)));
-        let bp = base*(ww/100)*(1+steps*(cfg.lmHeightStepPct||0.10));
+        const base  = wMelamine ? _priceNum(cfg.lmHeightBase, 1200) : _priceNum(cfg.lmHeightBaseNonMel, _priceNum(cfg.lmHeightBase, 1200) * 1.3);
+        const steps = Math.max(0, Math.floor((wh-_priceNum(cfg.lmHeightThresholdCm, 240))/_priceNum(cfg.lmHeightStepCm, 30)));
+        let bp = base*(ww/100)*(1+steps*_priceNum(cfg.lmHeightStepPct, 0.10));
         if(wd>54) bp*=(1+dS); return bp;
     }
     if (mode === 'materials') {
         const sqm = (ww/100)*(wh/100);
-        let bp = sqm*(cfg.materialsBoardsPerSqm||1.4)*(cfg.materialsBoardPrice||180)*(cfg.materialsMultiplier||2.5);
+        let bp = sqm*_priceNum(cfg.materialsBoardsPerSqm, 1.4)*_priceNum(cfg.materialsBoardPrice, 180)*_priceNum(cfg.materialsMultiplier, 2.5);
         if(wd>54) bp*=(1+dS); return bp;
     }
     // ranges
@@ -3193,8 +3193,8 @@ function _calcAllowedShelves(cfg, ww, wh, wModel) {
 }
 
 function _calcWingInstallPrice(cfg, ww, wh) {
-    const instUnit = cfg.installUnitCm || 42.5;
-    const instPer  = cfg.installPricePerUnit || 110;
+    const instUnit = _priceNum(cfg.installUnitCm, 42.5);
+    const instPer  = _priceNum(cfg.installPricePerUnit, 110);
     const instHS   = cfg.installHeightSurcharge != null ? cfg.installHeightSurcharge : 0.20;
     let inst = Math.ceil(ww / instUnit) * instPer;
     if (wh > 240) inst *= (1 + instHS);
@@ -3209,10 +3209,10 @@ function _calcWingCost(cfg, wing) {
 
     if (state.presetId === 'writing-desk') {
         const wd = wing.writingDesk || {};
-        let cost = ex.deskUnit || 900;
+        let cost = _priceNum(ex.deskUnit, 900);
         if (wd.hasDrawers !== false) {
             const n = wd.drawerCount != null ? wd.drawerCount : ((ww || 120) <= 80 ? 1 : 2);
-            cost += n * (ex.internalDrawer || 150);
+            cost += n * _priceNum(ex.internalDrawer, 150);
         }
         if (SANDWICH_COLORS.has(wing.materialBody)) cost *= (1 + sandwichPct);
         return cost;
@@ -3236,17 +3236,17 @@ function _calcWingCost(cfg, wing) {
     let actualShelves = 0;
     wing.columns.forEach(col => { actualShelves += (col.shelves||0); });
     if (actualShelves > allowedShelves)
-        finalCost += (actualShelves-allowedShelves) * (wMelamine ? (ex.extraShelfMel||60) : (ex.extraShelfNonMel||80));
+        finalCost += (actualShelves-allowedShelves) * (wMelamine ? _priceNum(ex.extraShelfMel, 60) : _priceNum(ex.extraShelfNonMel, 80));
 
     let hasAnyDesk = (wing.desk && wing.desk.side !== 'none') || wing.columns.some(col => col.type === 'desk');
-    if (hasAnyDesk) finalCost += (ex.deskUnit||900);
+    if (hasAnyDesk) finalCost += _priceNum(ex.deskUnit, 900);
 
     let openCellBlocks = 0, partitionBlocks = 0;
     wing.columns.forEach(col => {
         let inBlock = false;
         col.compartments.forEach(comp => {
-            if (comp.type === 'internal_drawers') finalCost += comp.count*(ex.internalDrawer||150);
-            else if (comp.type === 'external_drawers') finalCost += comp.count*(ex.externalDrawer||200);
+            if (comp.type === 'internal_drawers') finalCost += comp.count*_priceNum(ex.internalDrawer, 150);
+            else if (comp.type === 'external_drawers') finalCost += comp.count*_priceNum(ex.externalDrawer, 200);
             if (comp && comp.partition && Array.isArray(comp.subCells)) {
                 comp.subCells.forEach(sub => {
                     if (!sub || !Array.isArray(sub.zonesType)) return;
@@ -3254,8 +3254,8 @@ function _calcWingCost(cfg, wing) {
                         const n = (Array.isArray(sub.zonesDrawerCount) && sub.zonesDrawerCount[z] > 0)
                             ? sub.zonesDrawerCount[z]
                             : (sub.count || 1);
-                        if (zt === 'internal_drawers') finalCost += n * (ex.internalDrawer || 150);
-                        else if (zt === 'external_drawers') finalCost += n * (ex.externalDrawer || 200);
+                        if (zt === 'internal_drawers') finalCost += n * _priceNum(ex.internalDrawer, 150);
+                        else if (zt === 'external_drawers') finalCost += n * _priceNum(ex.externalDrawer, 200);
                     });
                 });
             }
@@ -3264,8 +3264,8 @@ function _calcWingCost(cfg, wing) {
         });
     });
     if ((wModel==='ab2'||wEffectiveModel==='ab2') && openCellBlocks>0) openCellBlocks--;
-    finalCost += openCellBlocks*(ex.openCell||400);
-    finalCost += partitionBlocks*(ex.partition||150);
+    finalCost += openCellBlocks*_priceNum(ex.openCell, 400);
+    finalCost += partitionBlocks*_priceNum(ex.partition, 150);
 
     if (wing.hasDoors) {
         wing.columns.forEach(col => {
@@ -3274,10 +3274,10 @@ function _calcWingCost(cfg, wing) {
                 const style  = door.style || 'solid';
                 const leaves = (door.type === 'double') ? 2 : 1;
                 let styleExtra = 0;
-                if      (style === 'framed_melamine')                       styleExtra = ex.doorFramedMel  || 80;
-                else if (style === 'glass_melamine')                        styleExtra = ex.doorGlassMel   || 400;
-                else if (style === 'glass_black' || style === 'glass_gold') styleExtra = ex.doorGlassBlack || 600;
-                else if (style === 'glass_mirror')                          styleExtra = ex.doorMirror     || 350;
+                if      (style === 'framed_melamine')                       styleExtra = _priceNum(ex.doorFramedMel, 80);
+                else if (style === 'glass_melamine')                        styleExtra = _priceNum(ex.doorGlassMel, 400);
+                else if (style === 'glass_black' || style === 'glass_gold') styleExtra = _priceNum(ex.doorGlassBlack, 600);
+                else if (style === 'glass_mirror')                          styleExtra = _priceNum(ex.doorMirror, 350);
                 finalCost += styleExtra * leaves;
             });
         });
@@ -3286,9 +3286,9 @@ function _calcWingCost(cfg, wing) {
     const splitThreshold = getSplitThreshold(wing);
     if (wh > splitThreshold) {
         let topUnitCost = 0;
-        if      (ww <= 160) topUnitCost = ex.upperUnit160   || 600;
-        else if (ww <= 240) topUnitCost = ex.upperUnit240   || 900;
-        else                topUnitCost = ww * (ex.upperUnitPerCm || 3.75);
+        if      (ww <= 160) topUnitCost = _priceNum(ex.upperUnit160, 600);
+        else if (ww <= 240) topUnitCost = _priceNum(ex.upperUnit240, 900);
+        else                topUnitCost = ww * _priceNum(ex.upperUnitPerCm, 3.75);
         finalCost += topUnitCost;
     }
 
@@ -3296,20 +3296,20 @@ function _calcWingCost(cfg, wing) {
         const cu = wing.corner;
         let cuCost = 0;
         if (cu.type === 'desk') {
-            cuCost = ex.cornerDesk || 900;
+            cuCost = _priceNum(ex.cornerDesk, 900);
         } else {
             const n = cu.drawerCount || 4;
-            if      (n <= 3)  cuCost = ex.cornerDrawers3 || 832;
-            else if (n === 4) cuCost = ex.cornerDrawers4 || 907;
-            else              cuCost = (ex.cornerDrawers4||907) + (n-4)*(ex.cornerDrawerExtra||200);
+            if      (n <= 3)  cuCost = _priceNum(ex.cornerDrawers3, 832);
+            else if (n === 4) cuCost = _priceNum(ex.cornerDrawers4, 907);
+            else              cuCost = _priceNum(ex.cornerDrawers4, 907) + (n-4)*_priceNum(ex.cornerDrawerExtra, 200);
         }
         finalCost += cuCost;
     }
 
     if (wing.wingPosition === 'full_corner') {
         const fc = wing.fullCorner || {};
-        finalCost += (ex.fullCornerBase  || 2800);
-        finalCost += (fc.shelves || 0) * (ex.fullCornerShelf || 120);
+        finalCost += _priceNum(ex.fullCornerBase, 2800);
+        finalCost += (fc.shelves || 0) * _priceNum(ex.fullCornerShelf, 120);
     }
 
     if (wing.sideCabinet && wing.sideCabinet.side !== 'none') {
@@ -3319,10 +3319,10 @@ function _calcWingCost(cfg, wing) {
         let scShelves = 0;
         if (sc.columns) sc.columns.forEach(col => { scShelves += (col.shelves||0); });
         const _calcOneSC = (scW) => {
-            let base = scMel ? scW*(ex.sideCabMel||12) : scW*(ex.sideCabNonMel||15);
+            let base = scMel ? scW*_priceNum(ex.sideCabMel, 12) : scW*_priceNum(ex.sideCabNonMel, 15);
             if (scH > 240) base *= 1.2;
-            base += scShelves * (scMel ? (ex.extraShelfMel||60) : (ex.extraShelfNonMel||80));
-            if (sc.hasDoors) base += (ex.sideCabDoors || 300);
+            base += scShelves * (scMel ? _priceNum(ex.extraShelfMel, 60) : _priceNum(ex.extraShelfNonMel, 80));
+            if (sc.hasDoors) base += _priceNum(ex.sideCabDoors, 300);
             return Math.round(base);
         };
         if (sc.side === 'right' || sc.side === 'both') finalCost += _calcOneSC(sc.widthRight || sc.width || 40);
@@ -3418,7 +3418,7 @@ function calculatePrice() {
     const hasLeftWing  = state.wings.left  && state.wings.left.wingPosition  !== 'full_corner';
     const hasRightWing = state.wings.right && state.wings.right.wingPosition !== 'full_corner';
     const numRegularWings = (hasLeftWing ? 1 : 0) + (hasRightWing ? 1 : 0);
-    if (numRegularWings >= 1) totalCost += numRegularWings * (ex.wingConnection || 400);
+    if (numRegularWings >= 1) totalCost += numRegularWings * _priceNum(ex.wingConnection, 400);
 
     state.currentCostPrice    = Math.round(totalCost);
     state.currentInstallPrice = Math.round(totalInstall);

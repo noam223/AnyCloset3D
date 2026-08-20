@@ -46,21 +46,44 @@ function _qcCfg() {
     return global._pricingConfig || global.DEFAULT_PRICING_CONFIG || _QC_DEFAULT_PRICING;
 }
 
+function _qcMergeOtherRanges(ranges) {
+    if (!ranges || !ranges.other) return ranges;
+    var out = {};
+    Object.keys(ranges).forEach(function(k) {
+        if (k !== 'other') out[k] = ranges[k];
+    });
+    var src = ranges.other || {};
+    var dest = out.maya || { melamine: {}, nonMelamine: {} };
+    out.maya = {
+        melamine: Object.assign({}, dest.melamine || {}),
+        nonMelamine: Object.assign({}, dest.nonMelamine || {})
+    };
+    ['melamine', 'nonMelamine'].forEach(function(k) {
+        var map = src[k] || {};
+        Object.keys(map).forEach(function(w) {
+            if (out.maya[k][w] == null) out.maya[k][w] = map[w];
+        });
+    });
+    return out;
+}
+
 function _qcNormalizeTypes(cfg) {
     var list = (cfg && Array.isArray(cfg.cabinetTypes) && cfg.cabinetTypes.length) ? cfg.cabinetTypes.slice() : null;
     if (!list) {
         var ranges = (cfg && cfg.ranges) || {};
-        var keys = Object.keys(ranges).filter(function(k) { return k !== 'melamine' && k !== 'nonMelamine'; });
+        var keys = Object.keys(ranges).filter(function(k) {
+            return k !== 'melamine' && k !== 'nonMelamine' && k !== 'other' && k !== 'sliding';
+        });
         list = keys.map(function(id) {
-            return { id: id, label: _QC_LEGACY_LABELS[id] || id, engine: id === 'other' ? 'maya' : id };
+            return { id: id, label: _QC_LEGACY_LABELS[id] || id, engine: id };
         });
         if (!list.length) list = _QC_DEFAULT_TYPES.map(function(t) { return Object.assign({}, t); });
     }
     var seen = {};
     list = list.filter(function(t) {
-        if (!t || !t.id || seen[t.id]) return false;
+        if (!t || !t.id || t.id === 'other' || seen[t.id]) return false;
         seen[t.id] = true;
-        t.engine = t.engine || t.id;
+        t.engine = (t.engine && t.engine !== 'other') ? t.engine : t.id;
         t.label = (t.label && String(t.label).trim()) ? String(t.label).trim() : String(t.id);
         return true;
     });
@@ -69,6 +92,13 @@ function _qcNormalizeTypes(cfg) {
     }
     if (!list.length) list = _QC_DEFAULT_TYPES.map(function(t) { return Object.assign({}, t); });
     return list.map(function(t) { return { id: t.id, label: t.label, engine: t.engine }; });
+}
+
+function _qcNormalizePricingConfig(cfg) {
+    if (!cfg || typeof cfg !== 'object') return cfg;
+    cfg.cabinetTypes = _qcNormalizeTypes(cfg);
+    if (cfg.ranges) cfg.ranges = _qcMergeOtherRanges(cfg.ranges);
+    return cfg;
 }
 
 function _qcTypes(cfg) {
@@ -83,6 +113,7 @@ function _qcFindType(cfg, idOrEngine) {
 }
 
 global.normalizeCabinetTypes = _qcNormalizeTypes;
+global.normalizePricingConfig = _qcNormalizePricingConfig;
 
 global.applyCabinetTypeSelects = function(cfg) {
     cfg = cfg || _qcCfg();
@@ -109,12 +140,6 @@ global.applyCabinetTypeSelects = function(cfg) {
         seenEng[t.engine] = true;
         designerTypes.push({ engine: t.engine, label: t.label });
     });
-    if (!seenEng.ab2_nohoney) {
-        var insetType = { engine: 'ab2_nohoney', label: 'ארון עם חזיתות פנימיות' };
-        var c9Idx = designerTypes.findIndex(function(t) { return t.engine === 'c9'; });
-        if (c9Idx >= 0) designerTypes.splice(c9Idx + 1, 0, insetType);
-        else designerTypes.push(insetType);
-    }
     ['inp-plinth', 'mobile-inp-plinth'].forEach(function(id) {
         var sel = document.getElementById(id);
         if (!sel || !designerTypes.length) return;
@@ -159,7 +184,7 @@ function _qcRangeKey(cfg, engine, typeId) {
     if (first) return first.id;
     if (cfgR.maya) return 'maya';
     var keys = Object.keys(cfgR).filter(function(k) {
-        return k !== 'melamine' && k !== 'nonMelamine' && k !== 'sliding';
+        return k !== 'melamine' && k !== 'nonMelamine' && k !== 'sliding' && k !== 'other';
     });
     return keys[0] || 'maya';
 }
@@ -193,8 +218,8 @@ function _qcBasePrice(cfg, ww, wh, wd, wMelamine, engine, typeId) {
 }
 
 function _qcInstall(cfg, ww, wh) {
-    var instUnit = cfg.installUnitCm || 42.5;
-    var instPer = cfg.installPricePerUnit || 110;
+    var instUnit = _qcNum(cfg.installUnitCm, 42.5);
+    var instPer = _qcNum(cfg.installPricePerUnit, 110);
     var instHS = cfg.installHeightSurcharge != null ? cfg.installHeightSurcharge : 0.20;
     var inst = Math.ceil(ww / instUnit) * instPer;
     if (wh > 240) inst *= (1 + instHS);

@@ -10418,42 +10418,49 @@ function closePricingSettings() {
     if (modal) modal.style.display = 'none';
 }
 
+function _upsNum(v, fallback) {
+    if (v === '' || v == null) return fallback;
+    var n = Number(v);
+    return isFinite(n) ? n : fallback;
+}
+
 function _fillUserPricingForm(cfg) {
     const c = cfg || {};
     upsSetMode(c.pricingMode || 'ranges');
     const _sv = function(id, val) { const el = document.getElementById(id); if (el) el.value = val; };
-    _sv('ups-sqmPrice', c.sqmPrice || 800);
-    _sv('ups-sqmPriceNonMel', c.sqmPriceNonMel || 1040);
-    _sv('ups-lmPrice', c.lmPrice || 1200);
-    _sv('ups-lmPriceNonMel', c.lmPriceNonMel || 1560);
-    _sv('ups-lmHeightBase', c.lmHeightBase || 1200);
-    _sv('ups-lmHeightBaseNonMel', c.lmHeightBaseNonMel || 1560);
-    _sv('ups-lmHeightThresholdCm', c.lmHeightThresholdCm || 240);
-    _sv('ups-lmHeightStepCm', c.lmHeightStepCm || 30);
-    _sv('ups-lmHeightStepPct', _upsPct(c.lmHeightStepPct || 0.10));
-    _sv('ups-materialsBoardPrice', c.materialsBoardPrice || 180);
-    _sv('ups-materialsBoardsPerSqm', c.materialsBoardsPerSqm || 1.4);
-    _sv('ups-materialsMultiplier', c.materialsMultiplier || 2.5);
-    _sv('ups-profitMultiplier', c.profitMultiplier || 1.7);
-    _sv('ups-heightSurcharge', _upsPct(c.heightSurcharge || 0.20));
-    _sv('ups-depthSurcharge', _upsPct(c.depthSurcharge || 0.20));
-    _sv('ups-sandwichSurcharge', _upsPct(c.sandwichSurcharge || 0.15));
-    _sv('ups-installPricePerUnit', c.installPricePerUnit || 110);
-    _sv('ups-installUnitCm', c.installUnitCm || 42.5);
-    _sv('ups-installHeightSurcharge', _upsPct(c.installHeightSurcharge || 0.20));
+    _sv('ups-sqmPrice', _upsNum(c.sqmPrice, 800));
+    _sv('ups-sqmPriceNonMel', _upsNum(c.sqmPriceNonMel, 1040));
+    _sv('ups-lmPrice', _upsNum(c.lmPrice, 1200));
+    _sv('ups-lmPriceNonMel', _upsNum(c.lmPriceNonMel, 1560));
+    _sv('ups-lmHeightBase', _upsNum(c.lmHeightBase, 1200));
+    _sv('ups-lmHeightBaseNonMel', _upsNum(c.lmHeightBaseNonMel, 1560));
+    _sv('ups-lmHeightThresholdCm', _upsNum(c.lmHeightThresholdCm, 240));
+    _sv('ups-lmHeightStepCm', _upsNum(c.lmHeightStepCm, 30));
+    _sv('ups-lmHeightStepPct', _upsPct(_upsNum(c.lmHeightStepPct, 0.10)));
+    _sv('ups-materialsBoardPrice', _upsNum(c.materialsBoardPrice, 180));
+    _sv('ups-materialsBoardsPerSqm', _upsNum(c.materialsBoardsPerSqm, 1.4));
+    _sv('ups-materialsMultiplier', _upsNum(c.materialsMultiplier, 2.5));
+    _sv('ups-profitMultiplier', _upsNum(c.profitMultiplier, 1.7));
+    _sv('ups-heightSurcharge', _upsPct(_upsNum(c.heightSurcharge, 0.20)));
+    _sv('ups-depthSurcharge', _upsPct(_upsNum(c.depthSurcharge, 0.20)));
+    _sv('ups-sandwichSurcharge', _upsPct(_upsNum(c.sandwichSurcharge, 0.15)));
+    _sv('ups-installPricePerUnit', _upsNum(c.installPricePerUnit, 110));
+    _sv('ups-installUnitCm', _upsNum(c.installUnitCm, 42.5));
+    _sv('ups-installHeightSurcharge', _upsPct(_upsNum(c.installHeightSurcharge, 0.20)));
     const ex = c.extras || {};
-    _sv('ups-internalDrawer', ex.internalDrawer || 150);
-    _sv('ups-externalDrawer', ex.externalDrawer || 200);
-    _sv('ups-openCell', ex.openCell || 400);
-    _sv('ups-partition', ex.partition || 150);
-    _sv('ups-shelfFreePerMeter', ex.shelfFreePerMeter || 3);
-    _sv('ups-extraShelfMel', ex.extraShelfMel || 60);
-    _sv('ups-extraShelfNonMel', ex.extraShelfNonMel || 80);
-    _sv('ups-deskUnit', ex.deskUnit || 900);
-    _sv('ups-doorFramedMel', ex.doorFramedMel || 80);
-    _sv('ups-doorGlassMel', ex.doorGlassMel || 400);
-    _sv('ups-doorGlassBlack', ex.doorGlassBlack || 600);
-    _sv('ups-doorMirror', ex.doorMirror || 350);
+    const dx = (typeof DEFAULT_PRICING_CONFIG !== 'undefined' && DEFAULT_PRICING_CONFIG.extras) ? DEFAULT_PRICING_CONFIG.extras : {};
+    _sv('ups-internalDrawer', _upsNum(ex.internalDrawer, dx.internalDrawer != null ? dx.internalDrawer : 150));
+    _sv('ups-externalDrawer', _upsNum(ex.externalDrawer, dx.externalDrawer != null ? dx.externalDrawer : 200));
+    _sv('ups-openCell', _upsNum(ex.openCell, dx.openCell != null ? dx.openCell : 400));
+    _sv('ups-partition', _upsNum(ex.partition, dx.partition != null ? dx.partition : 150));
+    _sv('ups-shelfFreePerMeter', _upsNum(ex.shelfFreePerMeter, dx.shelfFreePerMeter != null ? dx.shelfFreePerMeter : 3));
+    _sv('ups-extraShelfMel', _upsNum(ex.extraShelfMel, dx.extraShelfMel != null ? dx.extraShelfMel : 60));
+    _sv('ups-extraShelfNonMel', _upsNum(ex.extraShelfNonMel, dx.extraShelfNonMel != null ? dx.extraShelfNonMel : 80));
+    _sv('ups-deskUnit', _upsNum(ex.deskUnit, dx.deskUnit != null ? dx.deskUnit : 900));
+    _sv('ups-doorFramedMel', _upsNum(ex.doorFramedMel, dx.doorFramedMel != null ? dx.doorFramedMel : 80));
+    _sv('ups-doorGlassMel', _upsNum(ex.doorGlassMel, dx.doorGlassMel != null ? dx.doorGlassMel : 400));
+    _sv('ups-doorGlassBlack', _upsNum(ex.doorGlassBlack, dx.doorGlassBlack != null ? dx.doorGlassBlack : 600));
+    _sv('ups-doorMirror', _upsNum(ex.doorMirror, dx.doorMirror != null ? dx.doorMirror : 350));
 }
 
 function _readUserPricingForm() {
@@ -10469,41 +10476,43 @@ function _readUserPricingForm() {
     // Get existing config to preserve ranges and other fields not shown
     const existing = window._pricingConfig || (typeof DEFAULT_PRICING_CONFIG !== 'undefined' ? DEFAULT_PRICING_CONFIG : {});
     const existingExtras = (existing.extras) || {};
+    const dx = (typeof DEFAULT_PRICING_CONFIG !== 'undefined' && DEFAULT_PRICING_CONFIG.extras) ? DEFAULT_PRICING_CONFIG.extras : {};
     return {
         pricingMode: mode,
-        sqmPrice: parseInt(_gv('ups-sqmPrice')) || 800,
-        sqmPriceNonMel: parseInt(_gv('ups-sqmPriceNonMel')) || 1040,
-        lmPrice: parseInt(_gv('ups-lmPrice')) || 1200,
-        lmPriceNonMel: parseInt(_gv('ups-lmPriceNonMel')) || 1560,
-        lmHeightBase: parseInt(_gv('ups-lmHeightBase')) || 1200,
-        lmHeightBaseNonMel: parseInt(_gv('ups-lmHeightBaseNonMel')) || 1560,
-        lmHeightThresholdCm: parseInt(_gv('ups-lmHeightThresholdCm')) || 240,
-        lmHeightStepCm: parseInt(_gv('ups-lmHeightStepCm')) || 30,
+        sqmPrice: _upsNum(_gv('ups-sqmPrice'), 800),
+        sqmPriceNonMel: _upsNum(_gv('ups-sqmPriceNonMel'), 1040),
+        lmPrice: _upsNum(_gv('ups-lmPrice'), 1200),
+        lmPriceNonMel: _upsNum(_gv('ups-lmPriceNonMel'), 1560),
+        lmHeightBase: _upsNum(_gv('ups-lmHeightBase'), 1200),
+        lmHeightBaseNonMel: _upsNum(_gv('ups-lmHeightBaseNonMel'), 1560),
+        lmHeightThresholdCm: _upsNum(_gv('ups-lmHeightThresholdCm'), 240),
+        lmHeightStepCm: _upsNum(_gv('ups-lmHeightStepCm'), 30),
         lmHeightStepPct: _upsFrac(_gv('ups-lmHeightStepPct')),
-        materialsBoardPrice: parseInt(_gv('ups-materialsBoardPrice')) || 180,
-        materialsBoardsPerSqm: parseFloat(_gv('ups-materialsBoardsPerSqm')) || 1.4,
-        materialsMultiplier: parseFloat(_gv('ups-materialsMultiplier')) || 2.5,
-        profitMultiplier: parseFloat(_gv('ups-profitMultiplier')) || 1.7,
+        materialsBoardPrice: _upsNum(_gv('ups-materialsBoardPrice'), 180),
+        materialsBoardsPerSqm: _upsNum(_gv('ups-materialsBoardsPerSqm'), 1.4),
+        materialsMultiplier: _upsNum(_gv('ups-materialsMultiplier'), 2.5),
+        profitMultiplier: _upsNum(_gv('ups-profitMultiplier'), 1.7),
         heightSurcharge: _upsFrac(_gv('ups-heightSurcharge')),
         depthSurcharge: _upsFrac(_gv('ups-depthSurcharge')),
         sandwichSurcharge: _upsFrac(_gv('ups-sandwichSurcharge')),
-        installPricePerUnit: parseInt(_gv('ups-installPricePerUnit')) || 110,
-        installUnitCm: parseFloat(_gv('ups-installUnitCm')) || 42.5,
+        installPricePerUnit: _upsNum(_gv('ups-installPricePerUnit'), 110),
+        installUnitCm: _upsNum(_gv('ups-installUnitCm'), 42.5),
         installHeightSurcharge: _upsFrac(_gv('ups-installHeightSurcharge')),
+        cabinetTypes: existing.cabinetTypes || (typeof DEFAULT_PRICING_CONFIG !== 'undefined' ? DEFAULT_PRICING_CONFIG.cabinetTypes : undefined),
         ranges: existing.ranges || {},
         extras: Object.assign({}, existingExtras, {
-            internalDrawer: parseInt(_gv('ups-internalDrawer')) || 150,
-            externalDrawer: parseInt(_gv('ups-externalDrawer')) || 200,
-            openCell: parseInt(_gv('ups-openCell')) || 400,
-            partition: parseInt(_gv('ups-partition')) || 150,
-            shelfFreePerMeter: parseFloat(_gv('ups-shelfFreePerMeter')) || 3,
-            extraShelfMel: parseInt(_gv('ups-extraShelfMel')) || 60,
-            extraShelfNonMel: parseInt(_gv('ups-extraShelfNonMel')) || 80,
-            deskUnit: parseInt(_gv('ups-deskUnit')) || 900,
-            doorFramedMel: parseInt(_gv('ups-doorFramedMel')) || 80,
-            doorGlassMel: parseInt(_gv('ups-doorGlassMel')) || 400,
-            doorGlassBlack: parseInt(_gv('ups-doorGlassBlack')) || 600,
-            doorMirror: parseInt(_gv('ups-doorMirror')) || 350,
+            internalDrawer: _upsNum(_gv('ups-internalDrawer'), dx.internalDrawer != null ? dx.internalDrawer : 150),
+            externalDrawer: _upsNum(_gv('ups-externalDrawer'), dx.externalDrawer != null ? dx.externalDrawer : 200),
+            openCell: _upsNum(_gv('ups-openCell'), dx.openCell != null ? dx.openCell : 400),
+            partition: _upsNum(_gv('ups-partition'), dx.partition != null ? dx.partition : 150),
+            shelfFreePerMeter: _upsNum(_gv('ups-shelfFreePerMeter'), dx.shelfFreePerMeter != null ? dx.shelfFreePerMeter : 3),
+            extraShelfMel: _upsNum(_gv('ups-extraShelfMel'), dx.extraShelfMel != null ? dx.extraShelfMel : 60),
+            extraShelfNonMel: _upsNum(_gv('ups-extraShelfNonMel'), dx.extraShelfNonMel != null ? dx.extraShelfNonMel : 80),
+            deskUnit: _upsNum(_gv('ups-deskUnit'), dx.deskUnit != null ? dx.deskUnit : 900),
+            doorFramedMel: _upsNum(_gv('ups-doorFramedMel'), dx.doorFramedMel != null ? dx.doorFramedMel : 80),
+            doorGlassMel: _upsNum(_gv('ups-doorGlassMel'), dx.doorGlassMel != null ? dx.doorGlassMel : 400),
+            doorGlassBlack: _upsNum(_gv('ups-doorGlassBlack'), dx.doorGlassBlack != null ? dx.doorGlassBlack : 600),
+            doorMirror: _upsNum(_gv('ups-doorMirror'), dx.doorMirror != null ? dx.doorMirror : 350),
         })
     };
 }
@@ -10521,6 +10530,7 @@ async function saveUserPricingConfig() {
         );
         if (error) throw error;
         window._pricingConfig = cfg;
+        if (typeof window.applyCabinetTypeSelects === 'function') window.applyCabinetTypeSelects(cfg);
         closePricingSettings();
         if (typeof _showToast === 'function') _showToast('הגדרות התמחור נשמרו ✓', 3000);
         // Recalculate price with new config

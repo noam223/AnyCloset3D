@@ -92,7 +92,9 @@
                     .single();
                 if (_pricingRow && _pricingRow.config && Object.keys(_pricingRow.config).length > 0) {
                     window._pricingConfig = _pricingRow.config;
-                    if (typeof window.normalizeCabinetTypes === 'function') {
+                    if (typeof window.normalizePricingConfig === 'function') {
+                        window.normalizePricingConfig(window._pricingConfig);
+                    } else if (typeof window.normalizeCabinetTypes === 'function') {
                         window._pricingConfig.cabinetTypes = window.normalizeCabinetTypes(window._pricingConfig);
                     }
                     console.log('[pricing] Loaded user pricing config from Supabase');

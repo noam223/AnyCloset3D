@@ -1588,21 +1588,44 @@ function _ppCloneTypes(list) {
     return (list || []).map(function(t) { return { id: t.id, label: t.label, engine: t.engine }; });
 }
 
+function _ppMergeOtherRanges(ranges) {
+    if (!ranges || !ranges.other) return ranges || {};
+    var out = {};
+    Object.keys(ranges).forEach(function(k) {
+        if (k !== 'other') out[k] = ranges[k];
+    });
+    var src = ranges.other || {};
+    var dest = out.maya || { melamine: {}, nonMelamine: {} };
+    out.maya = {
+        melamine: Object.assign({}, dest.melamine || {}),
+        nonMelamine: Object.assign({}, dest.nonMelamine || {})
+    };
+    ['melamine', 'nonMelamine'].forEach(function(k) {
+        var map = src[k] || {};
+        Object.keys(map).forEach(function(w) {
+            if (out.maya[k][w] == null) out.maya[k][w] = map[w];
+        });
+    });
+    return out;
+}
+
 function _ppNormalizeCabinetTypes(cfg) {
     var list = (cfg && Array.isArray(cfg.cabinetTypes) && cfg.cabinetTypes.length) ? cfg.cabinetTypes : null;
     if (!list) {
         var ranges = (cfg && cfg.ranges) || {};
-        var keys = Object.keys(ranges).filter(function(k) { return k !== 'melamine' && k !== 'nonMelamine'; });
+        var keys = Object.keys(ranges).filter(function(k) {
+            return k !== 'melamine' && k !== 'nonMelamine' && k !== 'other' && k !== 'sliding';
+        });
         list = keys.map(function(id) {
-            return { id: id, label: _PP_LEGACY_TYPE_LABELS[id] || id, engine: id === 'other' ? 'maya' : id };
+            return { id: id, label: _PP_LEGACY_TYPE_LABELS[id] || id, engine: id };
         });
         if (!list.length) list = _ppCloneTypes(_PP_DEFAULT_CABINET_TYPES);
     }
     var seen = {};
     list = list.filter(function(t) {
-        if (!t || !t.id || seen[t.id]) return false;
+        if (!t || !t.id || t.id === 'other' || seen[t.id]) return false;
         seen[t.id] = true;
-        t.engine = t.engine || t.id;
+        t.engine = (t.engine && t.engine !== 'other') ? t.engine : (t.id === 'other' ? 'maya' : t.id);
         t.label = (t.label && String(t.label).trim()) ? String(t.label).trim() : String(t.id);
         return true;
     });
@@ -1611,6 +1634,13 @@ function _ppNormalizeCabinetTypes(cfg) {
     }
     if (!list.length) list = _ppCloneTypes(_PP_DEFAULT_CABINET_TYPES);
     return _ppCloneTypes(list);
+}
+
+function _ppNormalizePricingConfig(cfg) {
+    if (!cfg || typeof cfg !== 'object') return cfg;
+    cfg.cabinetTypes = _ppNormalizeCabinetTypes(cfg);
+    if (cfg.ranges) cfg.ranges = _ppMergeOtherRanges(cfg.ranges);
+    return cfg;
 }
 
 function _ppRangeTypes() {
@@ -2152,14 +2182,19 @@ function _ppRenderCabinetTypes() {
     _ppEnsureCabinetTypesSection();
     var wrap = document.getElementById('pp-cabinet-types');
     if (!wrap) return;
-    wrap.innerHTML = (_ppCabinetTypes || []).map(function(t) {
+    var head = '<div class="pp-types-head"><span>שם תצוגה</span><span>סוג בנייה</span><span></span></div>';
+    wrap.innerHTML = head + (_ppCabinetTypes || []).map(function(t) {
         var opts = _PP_ENGINE_OPTS.map(function(o) {
             return '<option value="' + o.id + '"' + (t.engine === o.id ? ' selected' : '') + '>' + o.label + '</option>';
         }).join('');
+        var hint = t.engine === 'sliding'
+            ? '<div class="pp-type-hint">התמחור בסקשן ארון הזזה, לא בטבלת רוחב</div>'
+            : '';
         return '<div class="pp-type-row" data-id="' + _ppEscAttr(t.id) + '">' +
             '<input class="pp-input pp-type-label" type="text" maxlength="60" value="' + _ppEscAttr(t.label) + '" oninput="ppOnCabinetTypeChange()">' +
             '<select class="pp-input pp-type-engine" onchange="ppOnCabinetTypeEngineChange(this)">' + opts + '</select>' +
             '<button type="button" class="pp-type-del" title="מחק סוג" onclick="ppDeleteCabinetType(this.closest(\'.pp-type-row\').getAttribute(\'data-id\'))"><i class="fa-solid fa-trash"></i></button>' +
+            hint +
             '</div>';
     }).join('');
 }
@@ -2195,6 +2230,13 @@ function ppAddCabinetType() {
     _ppRenderCabinetTypes();
     _PP_EMPTY_WIDTHS.forEach(function(w) { _ppAddRangeRowData(id, w, 0, 0); });
     _ppRefreshRangeModelSelects();
+    var wrap = document.getElementById('pp-cabinet-types');
+    var labels = wrap ? wrap.querySelectorAll('.pp-type-label') : [];
+    if (labels.length) {
+        var last = labels[labels.length - 1];
+        last.focus();
+        last.select();
+    }
     if (typeof window.applyCabinetTypeSelects === 'function') window.applyCabinetTypeSelects({ cabinetTypes: _ppCabinetTypes, ranges: _ppReadRangesTable() });
 }
 
@@ -2248,9 +2290,7 @@ async function _loadPricingForm() {
         }
         var { data: row } = await sb.from('pricing_configs').select('config').eq('user_id', user.id).single();
         _pricingCfg = (row && row.config && Object.keys(row.config).length > 0) ? row.config : null;
-        if (_pricingCfg) {
-            _pricingCfg.cabinetTypes = _ppNormalizeCabinetTypes(_pricingCfg);
-        }
+        if (_pricingCfg) _ppNormalizePricingConfig(_pricingCfg);
         window._pricingConfig = _pricingCfg;
         _fillPricingPanel(_pricingCfg || _PP_DEFAULTS);
         if (typeof window.applyCabinetTypeSelects === 'function') window.applyCabinetTypeSelects(window._pricingConfig || _PP_DEFAULTS);
@@ -2273,26 +2313,24 @@ function _ppBuildRangesTable(ranges) {
     if (!tbody) return;
     tbody.innerHTML = '';
     var r = ranges || _PP_DEFAULTS.ranges;
-    var typeIds = _ppRangeTypes().map(function(t) { return t.id; });
-    var keys = Object.keys(r).filter(function(k) {
-        return k !== 'melamine' && k !== 'nonMelamine' && k !== 'sliding' && (typeIds.length ? typeIds.indexOf(k) !== -1 : true);
-    });
-    if (!keys.length) {
-        var first = typeIds[0] || 'maya';
-        _ppAddRangeRowData(first, 80, 0, 0);
-        return;
-    }
-    keys.forEach(function(model) {
-        var entry = r[model] || {};
+    var types = _ppRangeTypes();
+    var added = 0;
+    types.forEach(function(t) {
+        var entry = r[t.id] || {};
         var mel = entry.melamine || {};
         var nonMel = entry.nonMelamine || {};
         var widths = Object.keys(mel).length ? Object.keys(mel) : Object.keys(nonMel);
         widths.sort(function(a, b) { return parseInt(a, 10) - parseInt(b, 10); });
-        if (!widths.length) { _ppAddRangeRowData(model, 80, 0, 0); return; }
+        if (!widths.length) return;
         widths.forEach(function(w) {
-            _ppAddRangeRowData(model, parseInt(w, 10), _ppNum(mel[w], 0), _ppNum(nonMel[w], 0));
+            _ppAddRangeRowData(t.id, parseInt(w, 10), _ppNum(mel[w], 0), _ppNum(nonMel[w], 0));
+            added++;
         });
     });
+    if (!added) {
+        var first = types[0] ? types[0].id : 'maya';
+        _ppAddRangeRowData(first, 80, 0, 0);
+    }
 }
 
 function _ppAddRangeRowData(model, width, melVal, nonMelVal) {
@@ -2348,6 +2386,7 @@ function _ppReadRangesTable() {
 
 function _fillPricingPanel(cfg) {
     var c = cfg || _PP_DEFAULTS;
+    _ppNormalizePricingConfig(c);
     _ppCabinetTypes = _ppNormalizeCabinetTypes(c);
     ppSetMode(c.pricingMode || 'ranges');
     _ppRenderCabinetTypes();
