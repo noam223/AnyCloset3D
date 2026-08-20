@@ -1544,7 +1544,7 @@ var _PP_ENGINE_OPTS = [
     { id: 'regalim', label: 'ארון על רגליים' },
     { id: 'sliding', label: 'ארון הזזה' },
     { id: 'ab2', label: 'AB2 (חזית פנימית + כוורת)' },
-    { id: 'ab2_nohoney', label: 'חזית פנימית' }
+    { id: 'ab2_nohoney', label: 'ארון עם חזיתות פנימיות' }
 ];
 
 var _PP_DEFAULT_CABINET_TYPES = [
@@ -1556,7 +1556,7 @@ var _PP_DEFAULT_CABINET_TYPES = [
 
 var _PP_LEGACY_TYPE_LABELS = {
     maya: 'מאיה', c9: 'C9', regalim: 'רגלים', ab2: 'AB2',
-    ab2_nohoney: 'חזית פנימית', other: 'אחר', sliding: 'ארון הזזה'
+    ab2_nohoney: 'ארון עם חזיתות פנימיות', other: 'אחר', sliding: 'ארון הזזה'
 };
 
 var _PP_EMPTY_WIDTHS = [80, 120, 160, 200, 240];

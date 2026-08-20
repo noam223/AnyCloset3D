@@ -5430,8 +5430,8 @@ function bindUI() {
         
         if (val === 'maya') state.plinthHeight = 7;
         else if (val === 'c9') state.plinthHeight = 8.75;
-        else if (val === 'ab2') state.plinthHeight = 8.75;
-        else         if (val === 'regalim') state.plinthHeight = 10;
+        else if (val === 'ab2' || val === 'ab2_nohoney') state.plinthHeight = 8.75;
+        else if (val === 'regalim') state.plinthHeight = 10;
 
         if (typeof window._setPlinthHeight === 'function') {
             window._setPlinthHeight(state.plinthHeight || 8.75);
@@ -7227,7 +7227,7 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
 
         let modelNameText = 'מאיה';
         if(state.cabinetModel === 'c9') modelNameText = 'C9';
-        if(state.cabinetModel === 'ab2_nohoney') modelNameText = 'חזית פנימית';
+        if(state.cabinetModel === 'ab2_nohoney') modelNameText = 'ארון עם חזיתות פנימיות';
         if(state.cabinetModel === 'ab2') modelNameText = 'AB2';
         if(state.cabinetModel === 'regalim') modelNameText = 'רגלי ניקל';
         const _isWritingDeskCart = state.presetId === 'writing-desk';
@@ -7245,7 +7245,7 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
 
         let plinthTypeText = 'צוקל נסתר';
         if(state.cabinetModel === 'c9') plinthTypeText = 'צוקל רגיל';
-        if(state.cabinetModel === 'ab2_nohoney') plinthTypeText = 'צוקל נסתר (חזית פנימית)';
+        if(state.cabinetModel === 'ab2_nohoney') plinthTypeText = 'ארון עם חזיתות פנימיות';
         if(state.cabinetModel === 'ab2') plinthTypeText = 'צוקל נסתר (חזית פנימית טאצ\')';
         if(state.cabinetModel === 'regalim') plinthTypeText = 'רגלי ניקל 10 ס"מ';
         if (_isWritingDeskCart) plinthTypeText = 'ללא צוקל';

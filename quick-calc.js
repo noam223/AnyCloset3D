@@ -13,7 +13,7 @@ var _QC_DEFAULT_TYPES = [
 
 var _QC_LEGACY_LABELS = {
     maya: 'צוקל נסתר', c9: 'צוקל רגיל', regalim: 'ארון על רגליים',
-    ab2: 'AB2', ab2_nohoney: 'חזית פנימית', sliding: 'ארון הזזה', other: 'אחר'
+    ab2: 'AB2', ab2_nohoney: 'ארון עם חזיתות פנימיות', sliding: 'ארון הזזה', other: 'אחר'
 };
 
 var _QC_DEFAULT_PRICING = {
@@ -109,6 +109,12 @@ global.applyCabinetTypeSelects = function(cfg) {
         seenEng[t.engine] = true;
         designerTypes.push({ engine: t.engine, label: t.label });
     });
+    if (!seenEng.ab2_nohoney) {
+        var insetType = { engine: 'ab2_nohoney', label: 'ארון עם חזיתות פנימיות' };
+        var c9Idx = designerTypes.findIndex(function(t) { return t.engine === 'c9'; });
+        if (c9Idx >= 0) designerTypes.splice(c9Idx + 1, 0, insetType);
+        else designerTypes.push(insetType);
+    }
     ['inp-plinth', 'mobile-inp-plinth'].forEach(function(id) {
         var sel = document.getElementById(id);
         if (!sel || !designerTypes.length) return;
