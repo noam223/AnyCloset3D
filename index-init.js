@@ -178,6 +178,7 @@
         if (proj && proj.project_data) {
             window._currentProjectId   = proj.id;
             window._currentProjectName = proj.name;
+            if (typeof window._syncBrowserTabTitle === 'function') window._syncBrowserTabTitle(proj.name);
             window._needsThumbnailBackfill = !proj.thumbnail && !_thumbOnly;
             try {
                 var snap = typeof proj.project_data === 'string'
@@ -596,6 +597,7 @@ window._saveProjectNow = async function() {
         }
         projectName = projectName.trim() || 'פרויקט חדש';
         window._currentProjectName = projectName;
+        if (typeof window._syncBrowserTabTitle === 'function') window._syncBrowserTabTitle(projectName);
         if (el) { el.textContent = projectName; el.title = projectName + ' — לחץ לעריכה'; }
         // Will be assigned after first save below (projectId = null → insert)
     }
@@ -774,6 +776,7 @@ window._commitProjectNameEdit = async function() {
     el.textContent = name;
     el.title = name + ' — לחץ לעריכה';
     window._currentProjectName = name;
+    if (typeof window._syncBrowserTabTitle === 'function') window._syncBrowserTabTitle(name);
     if (name === prev) return;
     window._isDirty = true;
     if (window._currentProjectId && typeof Projects !== 'undefined' && Projects.rename) {
@@ -782,6 +785,7 @@ window._commitProjectNameEdit = async function() {
             window._currentProjectName = prev;
             el.textContent = prev;
             el.title = prev + ' — לחץ לעריכה';
+            if (typeof window._syncBrowserTabTitle === 'function') window._syncBrowserTabTitle(prev);
             if (typeof _showToast === 'function') _showToast('לא ניתן לעדכן שם: ' + result.error, 4000);
         }
     }
@@ -798,6 +802,12 @@ window._commitProjectNameEdit = async function() {
 
     el.addEventListener('blur', function() {
         window._commitProjectNameEdit();
+    });
+
+    el.addEventListener('input', function() {
+        if (typeof window._syncBrowserTabTitle === 'function') {
+            window._syncBrowserTabTitle(el.textContent);
+        }
     });
 
     el.addEventListener('keydown', function(e) {

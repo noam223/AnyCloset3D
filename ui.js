@@ -6160,6 +6160,7 @@ function bindUI() {
                     window._currentProjectId   = null;
                     window._currentProjectName = null;
                     window._isDirty            = false;
+                    if (typeof window._syncBrowserTabTitle === 'function') window._syncBrowserTabTitle();
                     // Clear ?project= param so refresh opens a blank editor (not old project)
                     if (history.replaceState) history.replaceState(null, '', 'index.html');
                 if(data.customer) {
@@ -7731,12 +7732,20 @@ window.newProject = function() {
     state.manualInstallPrice = null;
     window._currentProjectId   = null;
     window._currentProjectName = null;
+    if (typeof window._syncBrowserTabTitle === 'function') window._syncBrowserTabTitle();
     const cabNameInp = document.getElementById('inp-cabinet-name');
     if (cabNameInp) cabNameInp.value = '';
     const orderModal = document.getElementById('order-modal');
     if (orderModal) orderModal.style.display = 'none';
     window._bootstrapDefaultCabinet();
 }
+
+window._syncBrowserTabTitle = function(name) {
+    if (window._VIEWER_MODE) return;
+    var n = (arguments.length ? name : window._currentProjectName);
+    n = String(n == null ? '' : n).replace(/\s+/g, ' ').trim() || 'פרויקט חדש';
+    if (document.title !== n) document.title = n;
+};
 
 window.updateLeftSidebar = function(opts) {
     opts = opts || {};
@@ -7752,6 +7761,7 @@ window.updateLeftSidebar = function(opts) {
         if (nameEl.textContent !== projName) nameEl.textContent = projName;
         nameEl.title = projName + ' — לחץ לעריכה';
     }
+    if (typeof window._syncBrowserTabTitle === 'function') window._syncBrowserTabTitle();
     if (countEl) {
         const n = (state.orderCart && state.orderCart.length) || 0;
         countEl.textContent = n > 0 ? '(' + n + ')' : '';

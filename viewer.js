@@ -181,7 +181,7 @@ async function _loadProject() {
         _projectId     = project.id;
         _lastUpdatedAt = project.updated_at;
 
-        document.title = (project.name || 'הדמיית ארון') + ' — צפייה חיה';
+        document.title = project.name || 'פרויקט חדש';
 
         _showViewerUI(project.name);
 
