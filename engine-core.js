@@ -3407,6 +3407,10 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
             if (overrideKey && materials[overrideKey]) {
                 specificMat = materials[overrideKey];
             }
+            if (document.body.classList.contains('part-paint-active') &&
+                specificMat && _isSharedLibraryMaterial(specificMat)) {
+                specificMat = specificMat.clone();
+            }
         }
 
         let geometry;
@@ -3757,6 +3761,28 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                     internalHoles[c].push({ bottom: holeBot, top: holeTop });
                 }
             });
+        });
+    }
+
+    // Shared part-paint ID per honeycomb unit (merged columns keep one color).
+    for (let c = 0; c < columnBlocks.length; c++) {
+        (columnBlocks[c] || []).forEach(b => {
+            if (!b || !_isOpenLikeBlk(b.type) || b.mergeLeft) return;
+            const paintId = `opencell_c${c}_b${b.startR}`;
+            b.paintId = paintId;
+            let endC = c;
+            let walk = b;
+            while (walk.mergeRight && endC < columnBlocks.length - 1) {
+                const nextBlk = (columnBlocks[endC + 1] || []).find(nb =>
+                    nb.type === b.type && nb.mergeLeft &&
+                    Math.abs(nb.bottomY - b.bottomY) < _OC_Y_EPS &&
+                    Math.abs(nb.topY - b.topY) < _OC_Y_EPS
+                );
+                if (!nextBlk) break;
+                nextBlk.paintId = paintId;
+                endC++;
+                walk = nextBlk;
+            }
         });
     }
 
@@ -4387,6 +4413,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                     if (walkBlk.openDir === 'right') { cellW += t; cellX += t / 2; }
                 }
 
+                _ppPartId = block.paintId || `opencell_c${c}_b${block.startR}`;
                 createBoard(cellW, innerT, bodyD - 2, cellX, block.topY - innerT/2, 1, matOpenCell);
                 createBoard(cellW, innerT, bodyD - 2, cellX, block.bottomY + innerT/2, 1, matOpenCell);
                 createBoard(cellW, block.h - 2*innerT, t, cellX, block.centerY, -bodyD/2 + t/2 + 0.6, matOpenCell);
@@ -4402,6 +4429,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                         createBoard(innerT, block.h - 2*innerT, bodyD - 2, cellX + cellW/2 - innerT/2, block.centerY, 1, matOpenCell);
                     }
                 }
+                _ppPartId = '';
             });
         }
 
@@ -4460,7 +4488,9 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                 boardD = Math.max(t, boardD - _shelfFrontSetback);
                 boardZ -= _shelfFrontSetback / 2;
             }
-            _ppPartId = div.type === 'shelf' ? `shelf_c${c}_r${div.idx}` : `split_c${c}`;
+            _ppPartId = (insideBlock && insideBlock.paintId)
+                ? insideBlock.paintId
+                : (div.type === 'shelf' ? `shelf_c${c}_r${div.idx}` : `split_c${c}`);
             const shelfMesh = createBoard(boardW, div.thick, boardD, boardX, div.y, boardZ, boardMat);
             _ppPartId = '';
             _applyShelfUV(shelfMesh, boardW, boardD, div.idx + c * 100);
@@ -4935,6 +4965,20 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                     } else if (subType === 'honeycomb') {
                         // Rendered like open_cell: use matOpenCell, proper frame
                         // Skip shared inner side wall when adjacent sub-cell is also honeycomb (merge into one unit)
+                        let honeyPaintIdx = Math.max(0, subIdx);
+                        if (subIdx >= 0 && compData.subCells) {
+                            while (honeyPaintIdx > 0) {
+                                const prevSub = compData.subCells[honeyPaintIdx - 1];
+                                const prevType = prevSub && ((Array.isArray(prevSub.zonesType) && prevSub.zonesType[zoneIdx]) || prevSub.type);
+                                if (prevType !== 'honeycomb' && prevType !== 'open_cell' && prevType !== 'side_open_cell') break;
+                                honeyPaintIdx--;
+                            }
+                        }
+                        if (!_ppPartId) {
+                            _ppPartId = subIdx < 0
+                                ? `opencell_sub_c${c}_r${r}_merged`
+                                : `opencell_sub_c${c}_r${r}_s${honeyPaintIdx}`;
+                        }
                         const innerT = t;
                         const frameY = zoneBottomY + zoneH / 2;
                         // Top board
@@ -4952,6 +4996,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         if (!_rightNeighborIsHoney) {
                             createBoard(innerT, zoneH - 2 * innerT, bodyD - 2, subCenterX + subW / 2 - innerT / 2, frameY, 1, matOpenCell);
                         }
+                        _ppPartId = '';
                     }
                 };
 
@@ -4961,11 +5006,14 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                 // Draw N partition boards + push drag handles
                 partitions.forEach((px, pi) => {
                     const partX = colLeft + col.width * px;
+                    const ocBlk = (myBlocks || []).find(b => r >= b.startR && r <= b.endR);
+                    if (ocBlk && ocBlk.paintId) _ppPartId = ocBlk.paintId;
                     if (isBP) {
                         createBoard(t, compH, 0, partX, compCenterY, 0);
                     } else {
                         createBoard(t, compH, partD, partX, compCenterY, partZ, partMat);
                     }
+                    _ppPartId = '';
                     if (!isBP) {
                         dragHandlesData.partitions.push({ colIndex: c, rowIndex: r, partIdx: pi, x: partX, y: compCenterY, comp: compData });
                     }
@@ -5132,7 +5180,16 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                 const shelfInHoneycomb = _subZoneIsHoneycomb(si, s) || _subZoneIsHoneycomb(si, s + 1);
                                 const shelfMat = shelfInHoneycomb ? matOpenCell : matInternal;
                                 const shelfZ = (shelfInHoneycomb ? 1 : 0) - _shelfFrontSetback / 2;
+                                if (shelfInHoneycomb) {
+                                    let honeyPaintIdx = si;
+                                    while (honeyPaintIdx > 0 && (
+                                        _subZoneIsHoneycomb(honeyPaintIdx - 1, s) ||
+                                        _subZoneIsHoneycomb(honeyPaintIdx - 1, s + 1)
+                                    )) honeyPaintIdx--;
+                                    _ppPartId = `opencell_sub_c${c}_r${r}_s${honeyPaintIdx}`;
+                                }
                                 createBoard(subW, t, subD, subCenterX, subShelvesY[s], shelfZ, shelfMat);
+                                _ppPartId = '';
                             }
                             if (!isBP) {
                                 const compTopY = prevY + compH;
@@ -5209,7 +5266,11 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             const spanW = maxX - minX;
                             const spanH = maxY - minY;
                             const centerX = (minX + maxX) / 2;
+                            if (group.type === 'honeycomb' || group.type === 'open_cell' || group.type === 'side_open_cell') {
+                                _ppPartId = `opencell_sub_c${c}_r${r}_g${String(group.keys[0]).replace(/[^a-zA-Z0-9_]/g, '_')}`;
+                            }
                             _renderSubContent(group.type, centerX, spanW, minY, spanH, -1, group.style || 'solid', 0, group.handleStyle || null);
+                            _ppPartId = '';
                         });
                     }
                 }
