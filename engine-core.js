@@ -4640,12 +4640,22 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         compBottomY += doorGap/2;
                         compTopY -= doorGap/2;
                     } else {
-                        // For bathroom regalim: extend drawer fronts down by t to cover the bottom plate face.
+                        // Overlay fronts must cover the shelf like doors. Using the inner cell
+                        // (prevY / topY) left a hole of ~t/2 above and below; two drawer stacks
+                        // meeting at a shelf stacked both holes (~t + gap).
                         const _bathRegalimBase = (state.presetId === 'bathroom' && isRegalim && r === 0 && fo === 0 && col.type !== 'desk');
-                        compBottomY = (r === 0) ? (col.type === 'desk' ? col.deskHeight + col.deskClearance : (_bathRegalimBase ? state.plinthHeight - t : Math.max(state.plinthHeight, fo))) : prevY;
-                        compTopY = isLast ? col.height : topY;
-                        if (r === 0 && col.type !== 'desk' && state.plinthHeight === 7 && fo === 0 && !_bathRegalimBase) compBottomY = 1.5;
-                        compBottomY += doorGap/2; compTopY -= doorGap/2;
+                        let baseY = col.type === 'desk'
+                            ? col.deskHeight + col.deskClearance
+                            : (_bathRegalimBase
+                                ? state.plinthHeight - t
+                                : Math.max(state.plinthHeight, fo));
+                        if (r === 0 && col.type !== 'desk' && state.plinthHeight === 7 && fo === 0 && !_bathRegalimBase) baseY = 1.5;
+                        compBottomY = (r === 0)
+                            ? (baseY + doorGap / 2)
+                            : (dividersAsc[r - 1].y + doorGap / 2);
+                        compTopY = isLast
+                            ? (col.height - doorGap / 2)
+                            : (dividersAsc[r].y - doorGap / 2);
                     }
                     
                     const totalExtH = compTopY - compBottomY;
@@ -4807,21 +4817,30 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         const count = _subDrawerCount(subIdx, zoneIdx, zoneH);
                         const sub = (subIdx >= 0 && compData.subCells) ? compData.subCells[subIdx] : null;
 
-                        // Bottom/top of overlay fronts — same rules as full-cell external_drawers
-                        let extBottomY = zoneBottomY;
-                        let extTopY = zoneBottomY + zoneH;
+                        // Overlay fronts cover the shelf like doors (±t/2), then a small reveal.
+                        let extBottomY;
+                        let extTopY;
+                        const zoneTop = zoneBottomY + zoneH;
                         const isBottomZone = (zoneIdx === 0 && r === 0);
-                        if (isBottomZone && col.type !== 'desk') {
-                            if (isInset) {
+                        if (isInset) {
+                            extBottomY = zoneBottomY;
+                            extTopY = zoneTop;
+                            if (isBottomZone && col.type !== 'desk') {
                                 const baseForInset = Math.max(state.plinthHeight, fo);
                                 extBottomY = baseForInset + t;
-                            } else {
+                            }
+                        } else {
+                            extBottomY = zoneBottomY - t / 2;
+                            extTopY = zoneTop + t / 2;
+                            if (isBottomZone && col.type !== 'desk') {
                                 const _bathRegalimBase = (state.presetId === 'bathroom' && isRegalim && fo === 0);
                                 extBottomY = _bathRegalimBase
                                     ? (state.plinthHeight - t)
                                     : Math.max(state.plinthHeight, fo);
-                                // MAYA hidden plinth (7cm): drop fronts to ~floor to cover צוקל
                                 if (state.plinthHeight === 7 && fo === 0 && !_bathRegalimBase) extBottomY = 1.5;
+                            }
+                            if (isLast && zoneTop >= col.height - t - 0.6) {
+                                extTopY = col.height;
                             }
                         }
                         extBottomY += doorGap / 2;
