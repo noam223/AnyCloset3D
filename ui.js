@@ -5426,47 +5426,50 @@ function bindUI() {
 
     document.getElementById('inp-plinth').addEventListener('change', (e) => {
         const val = e.target.value;
+        const prevModel = state.cabinetModel;
+        if (val === prevModel) return;
+
+        const prevPlinth = state.plinthHeight || 0;
         state.cabinetModel = val;
-        
-        if (val === 'maya') state.plinthHeight = 7;
-        else if (val === 'c9') state.plinthHeight = 8.75;
-        else if (val === 'ab2' || val === 'ab2_nohoney') state.plinthHeight = 8.75;
-        else if (val === 'regalim') state.plinthHeight = 10;
+
+        let nextPlinth = prevPlinth;
+        if (val === 'maya') nextPlinth = 7;
+        else if (val === 'c9' || val === 'ab2' || val === 'ab2_nohoney') nextPlinth = 8.75;
+        else if (val === 'regalim') nextPlinth = 10;
+
+        // Keep existing columns/cells/doors. Only nudge shelf Y so the first cell
+        // still sits on the new plinth instead of rebuilding the interior.
+        const delta = nextPlinth - prevPlinth;
+        if (delta) {
+            (state.columns || []).forEach(col => {
+                if (!col || col.type === 'desk' || col.noPlinth) return;
+                if (Array.isArray(col.shelvesY)) {
+                    col.shelvesY = col.shelvesY.map(y => Math.round((y + delta) * 10) / 10);
+                }
+            });
+        }
 
         if (typeof window._setPlinthHeight === 'function') {
-            window._setPlinthHeight(state.plinthHeight || 8.75);
-        }
-        
-        state.manualPrice = null;
-        
-        if (val === 'ab2') {
-            state.width = 160;
-            state.globalHeight = 240;
-            document.getElementById('inp-width').value = 160;
-            document.getElementById('inp-num-width').value = 160;
-            document.getElementById('inp-height').value = 240;
-            document.getElementById('inp-num-height').value = 240;
-            document.getElementById('inp-columns').value = 2;
-            document.getElementById('val-columns').innerText = 2;
-            
-            distributeColumns(2);
-            
-            const rightCol = state.columns[1];
-            if(rightCol) {
-                rightCol.shelves = 5; 
-                distributeShelves(rightCol); 
-                
-                if(rightCol.compartments.length > 0) {
-                    const targetRow = 2; 
-                    rightCol.compartments[targetRow].type = 'side_open_cell';
-                    rightCol.doors = []; 
-                }
-            }
+            window._setPlinthHeight(nextPlinth, true);
         } else {
-            state.columns.forEach(col => distributeShelves(col)); 
+            state.plinthHeight = nextPlinth;
+            const w = typeof getWing === 'function' ? getWing() : null;
+            if (w) w.plinthHeight = nextPlinth;
         }
-        
-        checkSplits(); buildCabinet(); calculatePrice(); saveHistoryState();
+
+        if (val === 'ab2') {
+            state.handleStyle = 'touch';
+            document.querySelectorAll('.handle-style-btn:not(.corner-desk-handle-btn), .mobile-handle-style-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.style === 'touch');
+            });
+            if (typeof window._syncCornerDeskHandleUI === 'function') window._syncCornerDeskHandleUI();
+        }
+
+        const mPlinth = document.getElementById('mobile-inp-plinth');
+        if (mPlinth && mPlinth.value !== val) mPlinth.value = val;
+
+        state.manualPrice = null;
+        buildCabinet(); calculatePrice(); saveHistoryState();
     });
 
     const placementEl = document.getElementById('inp-placement');
