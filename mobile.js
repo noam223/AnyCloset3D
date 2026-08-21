@@ -1179,7 +1179,7 @@ function openDimsModal(focusDim) {
         _applyDimSlider('width',  w);
         _applyDimSlider('height', h);
         _applyDimSlider('depth',  d);
-        _applyColumnsSlider(cols);
+        _previewColumnsSlider(cols);
     }, 50);
 }
 
@@ -1370,24 +1370,32 @@ function _setColumnsSlider(val) {
     if (tlbl)   tlbl.textContent  = val;
 }
 
-function _applyColumnsSlider(val) {
+function _previewColumnsSlider(val) {
     val = parseInt(val);
     var slider = document.getElementById('dfm-slider-columns');
     var valEl  = document.getElementById('dfm-val-columns');
     var tlbl   = document.getElementById('dfm-tlbl-columns');
     if (slider) {
+        slider.value = val;
         var leftPx = _thumbLeftPx(slider, val);
         if (valEl) { valEl.textContent = val; valEl.style.left = leftPx + 'px'; }
         if (tlbl)  { tlbl.textContent  = val; tlbl.style.left  = leftPx + 'px'; }
     }
-    // Sync desktop inp-columns
     var inpCols = document.getElementById('inp-columns');
     if (inpCols) inpCols.value = val;
     var valCols = document.getElementById('val-columns');
     if (valCols) valCols.innerText = val;
     var mobileValCols = document.getElementById('mobile-val-columns');
     if (mobileValCols) mobileValCols.textContent = val;
-    // Distribute + rebuild (same as updateColumns)
+}
+
+function _applyColumnsSlider(val) {
+    val = parseInt(val);
+    _previewColumnsSlider(val);
+    if (typeof window._requestColumnCountChange === 'function') {
+        window._requestColumnCountChange(val);
+        return;
+    }
     if (typeof distributeColumns === 'function') distributeColumns(val);
     if (typeof buildCabinet      === 'function') buildCabinet();
     if (typeof calculatePrice    === 'function') calculatePrice();
@@ -1412,6 +1420,7 @@ function _bindColumnsSliderDrag() {
     slider.addEventListener('pointercancel', function() { wrap.classList.remove('dragging'); });
 }
 
+window._previewColumnsSlider = _previewColumnsSlider;
 window._applyColumnsSlider = _applyColumnsSlider;
 window._stepColumns        = _stepColumns;
 

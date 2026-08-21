@@ -2767,17 +2767,203 @@ window._setColumnWidthCm = function(cIndex, desiredCm) {
     return desired;
 };
 
+function _columnHasInterior(col) {
+    if (!col) return false;
+    if ((col.shelves || 0) > 0) return true;
+    if (col.type && col.type !== 'normal') return true;
+    if (col.floorOffset) return true;
+    if (col.topPanel || col.sinkPanel) return true;
+    if (col.doors && col.doors.length) return true;
+    const comps = col.compartments || [];
+    for (let i = 0; i < comps.length; i++) {
+        const c = comps[i];
+        if (!c) continue;
+        if (c.type && c.type !== 'empty') return true;
+        if (c.mergeLeft || c.mergeRight) return true;
+        if (c.partition || (c.partitions && c.partitions.length)) return true;
+    }
+    return false;
+}
+
+function _cabinetHasColumnInterior() {
+    return (state.columns || []).some(_columnHasInterior);
+}
+
+function _blankColumn(width, template) {
+    const col = {
+        type: 'normal',
+        width: width,
+        height: (template && template.height) || state.globalHeight,
+        shelves: 0,
+        splitY: (template && template.splitY) || null,
+        shelvesY: [],
+        compartments: [],
+        doors: [],
+        floorOffset: 0,
+        topPanel: false,
+        sinkPanel: false,
+        noPlinth: !!(template && template.noPlinth)
+    };
+    distributeShelves(col);
+    return col;
+}
+
+function _fixEdgeColumnMerges() {
+    const cols = state.columns || [];
+    if (!cols.length) return;
+    const strip = (col, key) => {
+        (col.compartments || []).forEach(c => { if (c) c[key] = false; });
+        (col.doors || []).forEach(d => { if (d) d[key] = false; });
+    };
+    strip(cols[0], 'mergeLeft');
+    strip(cols[cols.length - 1], 'mergeRight');
+}
+
+function _syncColumnCountInputs(n) {
+    n = parseInt(n, 10);
+    if (isNaN(n)) return;
+    const inp = document.getElementById('inp-columns');
+    if (inp) inp.value = n;
+    const valEl = document.getElementById('val-columns');
+    if (valEl) valEl.innerText = n;
+    const mobileVal = document.getElementById('mobile-val-columns');
+    if (mobileVal) mobileVal.textContent = n;
+    if (typeof window._previewColumnsSlider === 'function') {
+        window._previewColumnsSlider(n);
+    } else {
+        const slider = document.getElementById('dfm-slider-columns');
+        if (slider) slider.value = n;
+        const dfmVal = document.getElementById('dfm-val-columns');
+        if (dfmVal) dfmVal.textContent = n;
+        const dfmTlbl = document.getElementById('dfm-tlbl-columns');
+        if (dfmTlbl) dfmTlbl.textContent = n;
+    }
+}
+
+function _applyColumnCountChange(newCount, side, skipSave) {
+    newCount = parseInt(newCount, 10);
+    const cols = state.columns || [];
+    const n = cols.length;
+    if (!newCount || newCount === n) {
+        _syncColumnCountInputs(n);
+        return;
+    }
+
+    state.manualPrice = null;
+    state.activeEditCol = -1;
+    state.hoveredColIndex = -1;
+
+    if (n === 0) {
+        distributeColumns(newCount);
+    } else if (newCount > n) {
+        const add = newCount - n;
+        const template = side === 'left' ? cols[0] : cols[n - 1];
+        const seedW = (template && template.width) || 40;
+        const extras = [];
+        for (let i = 0; i < add; i++) extras.push(_blankColumn(seedW, template));
+        state.columns = side === 'left' ? extras.concat(cols) : cols.concat(extras);
+        _rescaleColumnWidths(state.width);
+    } else {
+        const remove = Math.min(n - newCount, n - 1);
+        state.columns = side === 'left' ? cols.slice(remove) : cols.slice(0, n - remove);
+        _rescaleColumnWidths(state.width);
+    }
+
+    _fixEdgeColumnMerges();
+    _syncColumnCountInputs(state.columns.length);
+    if (skipSave) return;
+    if (typeof buildCabinet === 'function') buildCabinet();
+    if (typeof calculatePrice === 'function') calculatePrice();
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+}
+
+function _closeColumnSideDialog() {
+    const el = document.getElementById('_col-side-dialog');
+    if (el) el.remove();
+}
+
+window._onColumnSidePick = function(side) {
+    const pending = window._pendingColumnCount;
+    _closeColumnSideDialog();
+    window._pendingColumnCount = null;
+    if (!pending) return;
+    _applyColumnCountChange(pending.newCount, side);
+};
+
+window._cancelColumnSideDialog = function() {
+    _closeColumnSideDialog();
+    window._pendingColumnCount = null;
+    _syncColumnCountInputs((state.columns || []).length);
+};
+
+function _askColumnSide(newCount) {
+    const current = (state.columns || []).length;
+    const isAdd = newCount > current;
+    const delta = Math.abs(newCount - current);
+    window._pendingColumnCount = { newCount: newCount };
+
+    _closeColumnSideDialog();
+    const toast = document.createElement('div');
+    toast.id = '_col-side-dialog';
+    toast.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);';
+
+    let title, leftLbl, rightLbl;
+    if (isAdd) {
+        title = delta === 1 ? 'איפה להוסיף את העמודה?' : `איפה להוסיף ${delta} עמודות?`;
+        leftLbl = 'בצד שמאל';
+        rightLbl = 'בצד ימין';
+    } else {
+        title = delta === 1 ? 'איזו עמודה למחוק?' : `מאיזה צד למחוק ${delta} עמודות?`;
+        leftLbl = delta === 1 ? 'העמודה השמאלית' : 'מצד שמאל';
+        rightLbl = delta === 1 ? 'העמודה הימנית' : 'מצד ימין';
+    }
+
+    toast.innerHTML = `
+        <div style="background:#1e2840;color:white;padding:32px 36px;border-radius:20px;font-size:1.1rem;font-weight:600;box-shadow:0 8px 48px rgba(0,0,0,0.55);display:flex;flex-direction:column;align-items:center;gap:22px;min-width:300px;max-width:92vw;text-align:center;" onclick="event.stopPropagation()">
+            <div style="font-size:1.2rem;font-weight:700;line-height:1.45;">${title}</div>
+            <div style="display:flex;gap:12px;width:100%;direction:ltr;">
+                <button type="button" onclick="window._onColumnSidePick('left')" style="flex:1;background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.22);border-radius:10px;padding:14px 8px;font-size:1.02rem;font-weight:700;cursor:pointer;">${leftLbl}</button>
+                <button type="button" onclick="window._onColumnSidePick('right')" style="flex:1;background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.22);border-radius:10px;padding:14px 8px;font-size:1.02rem;font-weight:700;cursor:pointer;">${rightLbl}</button>
+            </div>
+            <button type="button" onclick="window._cancelColumnSideDialog()" style="width:100%;background:transparent;color:rgba(255,255,255,0.75);border:none;padding:6px 0;font-size:0.95rem;font-weight:600;cursor:pointer;">ביטול</button>
+        </div>
+    `;
+    toast.addEventListener('click', () => window._cancelColumnSideDialog());
+    document.body.appendChild(toast);
+}
+
+window._requestColumnCountChange = function(newCount) {
+    newCount = parseInt(newCount, 10);
+    if (isNaN(newCount)) return;
+    newCount = Math.max(1, Math.min(8, newCount));
+
+    const current = (state.columns || []).length;
+    if (newCount === current) {
+        _syncColumnCountInputs(current);
+        return;
+    }
+
+    if (window._pendingColumnCount) {
+        _syncColumnCountInputs(current);
+        return;
+    }
+
+    if (_cabinetHasColumnInterior()) {
+        _askColumnSide(newCount);
+        return;
+    }
+
+    _applyColumnCountChange(newCount, 'right');
+};
+
 window.updateColumns = function(delta) {
     const inp = document.getElementById('inp-columns');
-    let currentVal = parseInt(inp.value);
-    let minVal = parseInt(inp.min) || 2;
-    let maxVal = parseInt(inp.max) || 6;
-    let newVal = currentVal + delta;
+    const currentVal = inp ? parseInt(inp.value) : (state.columns || []).length;
+    const minVal = inp ? (parseInt(inp.min) || 2) : 2;
+    const maxVal = inp ? (parseInt(inp.max) || 6) : 6;
+    const newVal = currentVal + delta;
     if (newVal >= minVal && newVal <= maxVal) {
-        inp.value = newVal;
-        document.getElementById('val-columns').innerText = newVal;
-        distributeColumns(newVal); 
-        buildCabinet(); calculatePrice(); saveHistoryState();
+        window._requestColumnCountChange(newVal);
     }
 };
 
@@ -2938,10 +3124,8 @@ window.updateDim = function(dim, delta, absoluteValue = null) {
             const colInput = document.getElementById('inp-columns');
             if(colInput) colInput.min = minCols;
             if(state.columns.length < minCols) {
-                // Must add columns — full redistribute (unavoidable reset)
-                if(colInput) colInput.value = minCols;
-                document.getElementById('val-columns').innerText = minCols;
-                distributeColumns(minCols);
+                // Add extra columns on the right without wiping existing interiors
+                _applyColumnCountChange(minCols, 'right', true);
             } else {
                 // Same number of columns — rescale widths proportionally, preserve structure
                 _rescaleColumnWidths(val);

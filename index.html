@@ -1731,7 +1731,8 @@
             </div>
             <div class="dfm-slider-row">
                 <input class="dfm-slider" id="dfm-slider-columns" type="range" min="1" max="8" step="1"
-                       oninput="_applyColumnsSlider(this.value)">
+                       oninput="_previewColumnsSlider(this.value)"
+                       onchange="_applyColumnsSlider(this.value)">
                 <span class="dfm-thumb-label" id="dfm-tlbl-columns">2</span>
             </div>
         </div>

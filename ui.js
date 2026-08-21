@@ -5583,9 +5583,10 @@ function bindUI() {
         if (valEl && !isNaN(val)) valEl.innerText = val;
     });
     document.getElementById('inp-columns').addEventListener('change', (e) => {
-        const val = parseInt(e.target.value); state.manualPrice = null;
-        document.getElementById('val-columns').innerText = val;
-        distributeColumns(val); buildCabinet(); calculatePrice(); saveHistoryState();
+        const val = parseInt(e.target.value);
+        if (typeof window._requestColumnCountChange === 'function') {
+            window._requestColumnCountChange(val);
+        }
     });
 
     // Show/hide colors not available in sandwich board material
