@@ -285,8 +285,17 @@
                     }
                     if (snap.customer) {
                         state.customer = snap.customer;
-                        var custFields = [['cust-name','name'],['cust-phone','phone'],['cust-order-num','orderNum'],['cust-address','address']];
-                        custFields.forEach(function(f) { var el = document.getElementById(f[0]); if (el) el.value = state.customer[f[1]] || ''; });
+                    }
+                    if (proj.delivery_estimate && !state.customer.deliveryDate) {
+                        state.customer.deliveryDate = String(proj.delivery_estimate).slice(0, 10);
+                    }
+                    if (snap.customer || proj.delivery_estimate) {
+                        if (typeof window._fillCustomerForm === 'function') {
+                            window._fillCustomerForm();
+                        } else {
+                            var custFields = [['cust-name','name'],['cust-phone','phone'],['cust-order-num','orderNum'],['cust-address','address'],['cust-delivery','deliveryDate']];
+                            custFields.forEach(function(f) { var el = document.getElementById(f[0]); if (el) el.value = state.customer[f[1]] || ''; });
+                        }
                     }
                     if (snap.orderForm) state.orderForm = snap.orderForm;
                     buildCabinet();

@@ -1424,6 +1424,7 @@ body {
 }
 .editor-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(181,129,58,0.12); background-color: white; }
 input[type="tel"].editor-select, input[type="number"].editor-select { direction: rtl; }
+input[type="date"].editor-select { direction: rtl; min-height: 38px; }
 textarea.editor-select.cabinet-notes-input {
     min-height: 72px;
     resize: vertical;

@@ -660,9 +660,11 @@ window.Projects = {
         const cust = projectData.customer || {};
         const status = projectData.orderStatus || 'quote';
         const valid = this.ORDER_STATUS_KEYS;
+        const rawDate = String(cust.deliveryDate || '').trim().slice(0, 10);
         return {
             customer_name:       (cust.name || '').trim() || null,
             customer_order_num:  (cust.orderNum || '').trim() || null,
+            delivery_estimate:   /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : null,
             order_status:        valid.indexOf(status) !== -1 ? status : 'quote'
         };
     },
@@ -673,11 +675,23 @@ window.Projects = {
         // Try full column list first; fall back to minimal columns if schema migration hasn't run yet
         let { data, error } = await sb
             .from('projects')
-            .select('id, name, thumbnail, created_at, updated_at, locked_at, extension_expires_at, lock_extensions, cabinet_count, order_status, customer_name, customer_order_num, is_pinned')
+            .select('id, name, thumbnail, created_at, updated_at, locked_at, extension_expires_at, lock_extensions, cabinet_count, order_status, customer_name, customer_order_num, is_pinned, delivery_estimate')
             .order('is_pinned', { ascending: false })
             .order('updated_at', { ascending: false });
         if (error) {
-            console.warn('Projects.list full select failed (' + (error.message || error) + '), retrying without is_pinned');
+            console.warn('Projects.list full select failed (' + (error.message || error) + '), retrying without delivery_estimate');
+            const res1b = await sb
+                .from('projects')
+                .select('id, name, thumbnail, created_at, updated_at, locked_at, extension_expires_at, lock_extensions, cabinet_count, order_status, customer_name, customer_order_num, is_pinned')
+                .order('is_pinned', { ascending: false })
+                .order('updated_at', { ascending: false });
+            if (!res1b.error) {
+                data = res1b.data;
+                error = null;
+            }
+        }
+        if (error) {
+            console.warn('Projects.list pin select failed (' + (error.message || error) + '), retrying without is_pinned');
             const res2 = await sb
                 .from('projects')
                 .select('id, name, thumbnail, created_at, updated_at, locked_at, extension_expires_at, lock_extensions, cabinet_count, order_status, customer_name, customer_order_num')
@@ -741,6 +755,7 @@ window.Projects = {
             ...(projectData != null && {
                 customer_name: meta.customer_name || null,
                 customer_order_num: meta.customer_order_num || null,
+                delivery_estimate: meta.delivery_estimate,
                 order_status: meta.order_status
             })
         };
@@ -749,6 +764,7 @@ window.Projects = {
             var copy = Object.assign({}, obj);
             delete copy.customer_name;
             delete copy.customer_order_num;
+            delete copy.delivery_estimate;
             delete copy.order_status;
             return copy;
         };

@@ -490,10 +490,22 @@ function _statusChipLabelHtml(status) {
     return labels[_normalizeOrderStatus(status)] || labels.quote;
 }
 
+function _formatDeliveryDate(iso) {
+    if (!iso) return '';
+    var s = String(iso).slice(0, 10);
+    var parts = s.split('-');
+    if (parts.length !== 3) return s;
+    var y = parseInt(parts[0], 10);
+    var m = parseInt(parts[1], 10) - 1;
+    var d = parseInt(parts[2], 10);
+    if (!y || m < 0 || !d) return s;
+    return new Date(y, m, d).toLocaleDateString('he-IL', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 function _projectMatchesSearch(p) {
     if (!_searchQuery) return true;
     var q = _searchQuery.toLowerCase();
-    var fields = [p.name, p.customer_name, p.customer_order_num];
+    var fields = [p.name, p.customer_name, p.customer_order_num, p.delivery_estimate, _formatDeliveryDate(p.delivery_estimate)];
     return fields.some(function(f) { return f && String(f).toLowerCase().indexOf(q) !== -1; });
 }
 
@@ -669,6 +681,9 @@ function _renderProjects() {
             if (p.customer_order_num) parts.push('<span class="project-order-num"><i class="fa-solid fa-hashtag"></i> ' + _esc(p.customer_order_num) + '</span>');
             customerLine = '<div class="project-customer">' + parts.join('<span class="project-customer-sep">·</span>') + '</div>';
         }
+        var deliveryLine = p.delivery_estimate
+            ? '<div class="project-delivery"><i class="fa-solid fa-truck"></i> צפי אספקה · ' + _esc(_formatDeliveryDate(p.delivery_estimate)) + '</div>'
+            : '';
         var statusChipHtml =
             '<div class="project-status-chip status-' + orderStatus + '">' +
             '<i class="fa-solid ' + _statusIconClass(orderStatus) + '"></i>' +
@@ -732,6 +747,7 @@ function _renderProjects() {
                     safeName +
                 '</div>' +
                 customerLine +
+                deliveryLine +
                 '<div class="project-meta">' +
                     '<span class="project-meta-item"><i class="fa-regular fa-calendar"></i> ' + dateStr + '</span>' +
                     (p.cabinet_count ? '<span class="project-meta-item"><i class="fa-solid fa-layer-group"></i> ' + p.cabinet_count + ' ארונות</span>' : '') +

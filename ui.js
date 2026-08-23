@@ -5568,11 +5568,49 @@ function bindUI() {
         cabNotesInp.addEventListener('change', () => saveHistoryState());
     }
 
-    ['name', 'phone', 'order-num', 'address'].forEach(field => {
-        const el = document.getElementById(`cust-${field}`);
-        if(el) el.addEventListener('input', (e) => { 
-            let key = field === 'order-num' ? 'orderNum' : field; state.customer[key] = e.target.value; 
+    window._formatCustomerDeliveryDate = function(iso) {
+        if (!iso) return '';
+        const s = String(iso).slice(0, 10);
+        const parts = s.split('-');
+        if (parts.length !== 3) return s;
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        const d = parseInt(parts[2], 10);
+        if (!y || m < 0 || !d) return s;
+        return new Date(y, m, d).toLocaleDateString('he-IL', { day: 'numeric', month: 'short', year: 'numeric' });
+    };
+
+    window._fillCustomerForm = function() {
+        const c = (state && state.customer) || {};
+        const pairs = [
+            ['cust-name', c.name],
+            ['cust-phone', c.phone],
+            ['cust-order-num', c.orderNum],
+            ['cust-address', c.address],
+            ['cust-delivery', c.deliveryDate],
+            ['mobile-cust-name', c.name],
+            ['mobile-cust-phone', c.phone],
+            ['mobile-cust-order-num', c.orderNum],
+            ['mobile-cust-address', c.address],
+            ['mobile-cust-delivery', c.deliveryDate]
+        ];
+        pairs.forEach(function(p) {
+            const el = document.getElementById(p[0]);
+            if (el) el.value = p[1] || '';
         });
+    };
+
+    ['name', 'phone', 'order-num', 'address', 'delivery'].forEach(field => {
+        const el = document.getElementById(`cust-${field}`);
+        if (!el) return;
+        const onCustChange = (e) => {
+            const key = field === 'order-num' ? 'orderNum' : (field === 'delivery' ? 'deliveryDate' : field);
+            state.customer[key] = e.target.value;
+            const mobile = document.getElementById('mobile-cust-' + field);
+            if (mobile && mobile.value !== e.target.value) mobile.value = e.target.value;
+        };
+        el.addEventListener('input', onCustChange);
+        el.addEventListener('change', onCustChange);
     });
 
     _bindOrderFormEditor();
@@ -6169,10 +6207,15 @@ function bindUI() {
                     if (history.replaceState) history.replaceState(null, '', 'index.html');
                 if(data.customer) {
                     state.customer = data.customer;
-                    document.getElementById('cust-name').value = state.customer.name || '';
-                    document.getElementById('cust-phone').value = state.customer.phone || '';
-                    document.getElementById('cust-order-num').value = state.customer.orderNum || '';
-                    document.getElementById('cust-address').value = state.customer.address || '';
+                    if (typeof window._fillCustomerForm === 'function') window._fillCustomerForm();
+                    else {
+                        document.getElementById('cust-name').value = state.customer.name || '';
+                        document.getElementById('cust-phone').value = state.customer.phone || '';
+                        document.getElementById('cust-order-num').value = state.customer.orderNum || '';
+                        document.getElementById('cust-address').value = state.customer.address || '';
+                        const delEl = document.getElementById('cust-delivery');
+                        if (delEl) delEl.value = state.customer.deliveryDate || '';
+                    }
                 }
                 if (data.orderForm) state.orderForm = data.orderForm;
                 if(data.cart) {
@@ -6948,6 +6991,10 @@ window.openOrderModal = async function(mode, opts) {
     document.getElementById('print-c-phone').innerText = state.customer.phone || 'לא צוין';
     document.getElementById('print-c-order').innerText = state.customer.orderNum || 'לא צוין';
     document.getElementById('print-c-address').innerText = state.customer.address || 'לא צוין';
+    const printDel = document.getElementById('print-c-delivery');
+    if (printDel) printDel.innerText = window._formatCustomerDeliveryDate
+        ? (window._formatCustomerDeliveryDate(state.customer.deliveryDate) || 'לא צוין')
+        : (state.customer.deliveryDate || 'לא צוין');
 
     if (state.orderCart.length === 0) {
         container.innerHTML = '<p style="text-align:center; color:var(--text-light); font-size: 1.2rem;">ההזמנה ריקה. הוסף ארונות קודם.</p>';
@@ -8867,6 +8914,9 @@ function _buildPrintHTML(mode) {
     const custPhone = state.customer.phone || 'לא צוין';
     const custOrder = state.customer.orderNum || 'לא צוין';
     const custAddr = state.customer.address || 'לא צוין';
+    const custDelivery = window._formatCustomerDeliveryDate
+        ? (window._formatCustomerDeliveryDate(state.customer.deliveryDate) || 'לא צוין')
+        : (state.customer.deliveryDate || 'לא צוין');
 
     // Build PDF filename: סוגרים הכל לדירה (orderNum) (custName)
     const _pdfOrderPart = (state.customer && state.customer.orderNum) ? state.customer.orderNum : '';
@@ -8913,6 +8963,7 @@ ${introHTML}
   <div><strong>טלפון:</strong> ${custPhone}</div>
   <div><strong>מספר הזמנה:</strong> ${custOrder}</div>
   <div><strong>כתובת:</strong> ${custAddr}</div>
+  <div><strong>צפי אספקה:</strong> ${custDelivery}</div>
 </div>
 ${cabinetsHTML}
 ${summaryHTML}

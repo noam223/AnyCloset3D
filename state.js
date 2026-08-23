@@ -217,7 +217,7 @@ const state = {
     blueprintCellDimShown: {},
     blueprintColWidthDimsDefault: true,
     blueprintColWidthDimShown: {},
-    customer: { name: '', phone: '', orderNum: '', address: '' },
+    customer: { name: '', phone: '', orderNum: '', address: '', deliveryDate: '' },
     // Editable title + intro text on order/factory print forms
     orderForm: { factory: { title: '', notes: '' }, customer: { title: '', notes: '' } },
     orderCart: [],

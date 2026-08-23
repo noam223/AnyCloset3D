@@ -36,10 +36,10 @@
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="style-base.css?v=20260820replaceImg">
+    <link rel="stylesheet" href="style-base.css?v=20260823delivery">
     <link rel="stylesheet" href="style-mobile.css?v=20260609a">
     <link rel="stylesheet" href="style-extras.css?v=20260731rpcab">
-    <link rel="stylesheet" href="style.css?v=20260820replaceImg">
+    <link rel="stylesheet" href="style.css?v=20260823delivery">
     <style>
         html.thumb-only-mode #left-sidebar,
         html.thumb-only-mode #right-sidebar,
@@ -284,6 +284,10 @@
                     <div class="input-icon-wrap" style="flex:1;"><i class="fa-solid fa-hashtag"></i><input type="text" id="cust-order-num" class="editor-select" placeholder="מס' הזמנה" style="margin:0;"></div>
                 </div>
                 <div class="input-icon-wrap"><i class="fa-solid fa-map-location-dot"></i><input type="text" id="cust-address" class="editor-select" placeholder="עיר / כתובת לאספקה" style="margin:0;"></div>
+                <div>
+                    <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:3px;">צפי אספקה</div>
+                    <div class="input-icon-wrap"><i class="fa-solid fa-truck"></i><input type="date" id="cust-delivery" class="editor-select" style="margin:0;"></div>
+                </div>
                 <div class="input-icon-wrap"><i class="fa-solid fa-pen"></i><input type="text" id="inp-cabinet-name" class="editor-select" placeholder="שם הארון (אופציונלי)" style="margin:0;"></div>
             </div>
         </div>
@@ -1575,6 +1579,7 @@
                 <div><strong>טלפון:</strong> <span id="print-c-phone"></span></div>
                 <div><strong>מספר הזמנה:</strong> <span id="print-c-order"></span></div>
                 <div><strong>כתובת:</strong> <span id="print-c-address"></span></div>
+                <div><strong>צפי אספקה:</strong> <span id="print-c-delivery"></span></div>
             </div>
         </div>
         <div id="order-form-editor" class="order-form-editor hide-on-print">
@@ -2218,6 +2223,15 @@
                 <input type="text" id="mobile-cust-address" class="editor-select" placeholder="עיר / כתובת לאספקה" style="margin:0;"
                     oninput="document.getElementById('cust-address').value=this.value; state.customer.address=this.value;">
             </div>
+            <div>
+                <div class="mobile-section-title" style="margin-bottom:6px;">צפי אספקה</div>
+                <div class="input-icon-wrap">
+                    <i class="fa-solid fa-truck"></i>
+                    <input type="date" id="mobile-cust-delivery" class="editor-select" style="margin:0;"
+                        oninput="document.getElementById('cust-delivery').value=this.value; state.customer.deliveryDate=this.value;"
+                        onchange="document.getElementById('cust-delivery').value=this.value; state.customer.deliveryDate=this.value;">
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -2501,8 +2515,8 @@
 
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="auth.js?v=20260817measBadge"></script>
-<script src="state.js?v=20260820cabTypes"></script>
+<script src="auth.js?v=20260823delivery"></script>
+<script src="state.js?v=20260823delivery"></script>
 <script src="quick-calc.js?v=20260820cabTypes"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="writing-desk-preset.js?v=20260617wdcolors"></script>
@@ -2511,10 +2525,10 @@
 <script src="engine-blueprint.js?v=20260817ocMerge"></script>
 <script src="engine-room-plan.js?v=20260731rpcab"></script>
 <script src="tambour-color-picker.js?v=20260617scdoors"></script>
-<script src="ui.js?v=20260821keepInterior"></script>
+<script src="ui.js?v=20260823delivery"></script>
 <script src="mobile.js?v=20260713extDrawerPart"></script>
 <script src="part-paint.js?v=20260712c2024"></script>
-<script src="index-init.js?v=20260820replaceImg"></script>
+<script src="index-init.js?v=20260823delivery"></script>
 
 <!-- ===== TAMBOUR FULL PALETTE MODAL ===== -->
 <div id="tambour-palette-modal" class="tambour-palette-overlay">
