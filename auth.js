@@ -124,6 +124,7 @@ const PLAN_LIMITS = {
         maxProjects:            null,
         maxCabinetsPerProject:  null,
         maxDevices:             10,
+        maxAgents:              5,
         projectLockDays:        null,
         extensionDays:          null,
         features: {
@@ -134,6 +135,7 @@ const PLAN_LIMITS = {
             canViewCustomerReport: true,
             canExtendProject:   false,
             canManageDevices:   true,        // ניהול מכשירים ✓
+            canManageAgents:    true,
             isCompany:          true,
         }
     },
@@ -144,6 +146,7 @@ const PLAN_LIMITS = {
         maxProjects:            null,
         maxCabinetsPerProject:  null,
         maxDevices:             30,
+        maxAgents:              15,
         projectLockDays:        null,
         extensionDays:          null,
         features: {
@@ -154,6 +157,7 @@ const PLAN_LIMITS = {
             canViewCustomerReport: true,
             canExtendProject:   false,
             canManageDevices:   true,
+            canManageAgents:    true,
             isCompany:          true,
         }
     },
@@ -293,6 +297,62 @@ window.Auth = {
         return { data };
     },
 
+    companyLogin: async function(companyCode, username, password) {
+        try {
+            const res = await fetch(SUPABASE_URL + '/functions/v1/company-login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON },
+                body: JSON.stringify({
+                    company_code: companyCode,
+                    username: username,
+                    password: password
+                })
+            });
+            const json = await res.json().catch(function() { return {}; });
+            if (!res.ok || !json.session) return { error: json.error || 'ההתחברות נכשלה' };
+            const sb = _getClient(); if (!sb) return { error: 'SDK not loaded' };
+            const { error } = await sb.auth.setSession({
+                access_token: json.session.access_token,
+                refresh_token: json.session.refresh_token
+            });
+            if (error) return { error: error.message };
+            return { data: json };
+        } catch (e) {
+            return { error: e.message || 'ההתחברות נכשלה' };
+        }
+    },
+
+    ensureCompany: async function() {
+        const sb = _getClient(); if (!sb) return { error: 'SDK not loaded' };
+        const { data, error } = await sb.rpc('ensure_my_company');
+        if (error) return { error: error.message };
+        this._profileCache = null;
+        return { data: Array.isArray(data) ? data[0] : data };
+    },
+
+    _invokeCompanyFn: async function(body) {
+        const sb = _getClient(); if (!sb) return { error: 'SDK not loaded' };
+        const { data: sessWrap } = await sb.auth.getSession();
+        const token = sessWrap && sessWrap.session && sessWrap.session.access_token;
+        if (!token) return { error: 'Not logged in' };
+        try {
+            const res = await fetch(SUPABASE_URL + '/functions/v1/company-manage-agent', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    apikey: SUPABASE_ANON,
+                    Authorization: 'Bearer ' + token
+                },
+                body: JSON.stringify(body || {})
+            });
+            const json = await res.json().catch(function() { return {}; });
+            if (!res.ok) return { error: json.error || 'הפעולה נכשלה' };
+            return json;
+        } catch (e) {
+            return { error: e.message || 'הפעולה נכשלה' };
+        }
+    },
+
     // ── Logout ───────────────────────────────────────────────────────────────
     logout: async function() {
         const sb = _getClient(); if (!sb) return;
@@ -338,27 +398,89 @@ window.Auth = {
     requireAuth: async function() {
         const loggedIn = await this.isLoggedIn();
         if (!loggedIn) { window.location.href = 'login.html'; return false; }
+        const profile = await this.getProfile();
+        if (profile && profile.is_active === false) {
+            await this.logout();
+            return false;
+        }
         return true;
+    },
+
+    getBillingUserId: async function() {
+        const profile = await this.getProfile();
+        if (!profile) return null;
+        if (profile.company_role === 'agent' && profile.company_id) {
+            const resolved = await this._resolveBillingProfile(profile);
+            if (resolved.company && resolved.company.admin_user_id) {
+                return resolved.company.admin_user_id;
+            }
+        }
+        return profile.id;
+    },
+
+    listCompanyMembers: async function() {
+        const profile = await this.getProfile();
+        if (!profile || !profile.company_id) return [];
+        const sb = _getClient(); if (!sb) return [];
+        const { data, error } = await sb
+            .from('profiles')
+            .select('id, full_name, first_name, last_name, agent_username, company_role, is_active')
+            .eq('company_id', profile.company_id)
+            .order('company_role', { ascending: true });
+        if (error) { console.warn('listCompanyMembers', error.message); return []; }
+        return data || [];
+    },
+
+    _resolveBillingProfile: async function(profile) {
+        if (!profile || !profile.company_id) return { billing: profile, company: null };
+        const sb = _getClient();
+        const { data: company } = await sb
+            .from('companies')
+            .select('id, code, name, admin_user_id, max_agents, default_visibility')
+            .eq('id', profile.company_id)
+            .maybeSingle();
+        if (!company) return { billing: profile, company: null };
+        if (profile.company_role === 'agent' && company.admin_user_id) {
+            const { data: adminProf } = await sb
+                .from('profiles')
+                .select('*')
+                .eq('id', company.admin_user_id)
+                .maybeSingle();
+            if (adminProf) return { billing: adminProf, company: company };
+        }
+        return { billing: profile, company: company };
     },
 
     // ── Get plan info + feature flags ────────────────────────────────────────
     getPlan: async function() {
         const profile = await this.getProfile();
-        const planKey = (profile && profile.plan) ? profile.plan : 'free';
+        const resolved = await this._resolveBillingProfile(profile);
+        const billing = resolved.billing || profile;
+        const company = resolved.company;
+        const planKey = (billing && billing.plan) ? billing.plan : 'free';
         const planDef = PLAN_LIMITS[planKey] || PLAN_LIMITS['free'];
 
-        // Allow profile to override maxDevices (for company plans with custom device count)
-        const maxDevices = (profile && profile.max_devices != null)
-            ? profile.max_devices
+        const maxDevices = (billing && billing.max_devices != null)
+            ? billing.max_devices
             : planDef.maxDevices;
+        const maxAgents = (company && company.max_agents != null)
+            ? company.max_agents
+            : (planDef.maxAgents || null);
 
         return {
             key: planKey,
             ...planDef,
             maxDevices,
-            subscriptionStatus: (profile && profile.subscription_status) || 'active',
-            subscriptionEndsAt: (profile && profile.subscription_ends_at) || null,
-            trialEndsAt: (profile && profile.trial_ends_at) || null,
+            maxAgents,
+            subscriptionStatus: (billing && billing.subscription_status) || 'active',
+            subscriptionEndsAt: (billing && billing.subscription_ends_at) || null,
+            trialEndsAt: (billing && billing.trial_ends_at) || null,
+            companyId: profile && profile.company_id,
+            companyRole: profile && profile.company_role,
+            companyCode: company && company.code,
+            companyName: company && company.name,
+            defaultVisibility: (company && company.default_visibility) || 'private',
+            isCompanyAdmin: !!(profile && profile.company_role === 'admin'),
         };
     },
 
@@ -372,8 +494,10 @@ window.Auth = {
     // Returns: { active: bool, reason: 'active'|'cancelled'|'trial'|'trial_expired'|'subscription_expired'|'inactive'|'free',
     //            trialEndsAt?, subscriptionEndsAt? }
     isSubscriptionActive: async function() {
-        const profile = await this.getProfile();
-        if (!profile) return { active: false, reason: 'no_profile' };
+        const raw = await this.getProfile();
+        if (!raw) return { active: false, reason: 'no_profile' };
+        const resolved = await this._resolveBillingProfile(raw);
+        const profile = resolved.billing || raw;
 
         const status = profile.subscription_status;
 
@@ -453,7 +577,15 @@ window.Auth = {
         }).eq('id', user.id);
 
         if (error) return { error: error.message };
-        return { success: true, trialEndsAt };
+        this._profileCache = null;
+        let company = null;
+        if (plan && String(plan).indexOf('company_') === 0) {
+            const ensured = await this.ensureCompany();
+            company = ensured && !ensured.error ? (ensured.data || null) : null;
+            const profile = await this.getProfile();
+            if (company && profile) company.agent_username = profile.agent_username;
+        }
+        return { success: true, trialEndsAt, company };
     },
 
     // ── Listen to auth state changes ─────────────────────────────────────────
@@ -675,9 +807,21 @@ window.Projects = {
         // Try full column list first; fall back to minimal columns if schema migration hasn't run yet
         let { data, error } = await sb
             .from('projects')
-            .select('id, name, thumbnail, created_at, updated_at, locked_at, extension_expires_at, lock_extensions, cabinet_count, order_status, customer_name, customer_order_num, is_pinned, delivery_estimate')
+            .select('id, name, thumbnail, created_at, updated_at, locked_at, extension_expires_at, lock_extensions, cabinet_count, order_status, customer_name, customer_order_num, is_pinned, delivery_estimate, user_id, company_id, visibility')
             .order('is_pinned', { ascending: false })
             .order('updated_at', { ascending: false });
+        if (error) {
+            console.warn('Projects.list company select failed (' + (error.message || error) + '), retrying without company columns');
+            const res0 = await sb
+                .from('projects')
+                .select('id, name, thumbnail, created_at, updated_at, locked_at, extension_expires_at, lock_extensions, cabinet_count, order_status, customer_name, customer_order_num, is_pinned, delivery_estimate')
+                .order('is_pinned', { ascending: false })
+                .order('updated_at', { ascending: false });
+            if (!res0.error) {
+                data = res0.data;
+                error = null;
+            }
+        }
         if (error) {
             console.warn('Projects.list full select failed (' + (error.message || error) + '), retrying without delivery_estimate');
             const res1b = await sb
@@ -760,12 +904,23 @@ window.Projects = {
             })
         };
 
+        if (!projectId) {
+            const profile = await Auth.getProfile();
+            if (profile && profile.company_id) {
+                payload.company_id = profile.company_id;
+                const plan = await Auth.getPlan();
+                payload.visibility = (plan && plan.defaultVisibility) || 'private';
+            }
+        }
+
         const _stripMetaFields = function(obj) {
             var copy = Object.assign({}, obj);
             delete copy.customer_name;
             delete copy.customer_order_num;
             delete copy.delivery_estimate;
             delete copy.order_status;
+            delete copy.company_id;
+            delete copy.visibility;
             return copy;
         };
 
@@ -820,6 +975,36 @@ window.Projects = {
             .single();
         if (error) return { error: error.message };
         return { data };
+    },
+
+    setVisibility: async function(projectId, visibility, userIds) {
+        const sb = _getClient(); if (!sb) return { error: 'SDK not loaded' };
+        const vis = (visibility === 'company' || visibility === 'shared') ? visibility : 'private';
+        const { error } = await sb
+            .from('projects')
+            .update({ visibility: vis, updated_at: new Date().toISOString() })
+            .eq('id', projectId);
+        if (error) return { error: error.message };
+
+        await sb.from('project_agent_access').delete().eq('project_id', projectId);
+        if (vis === 'shared' && userIds && userIds.length) {
+            const rows = userIds.map(function(uid) {
+                return { project_id: projectId, user_id: uid };
+            });
+            const { error: aErr } = await sb.from('project_agent_access').insert(rows);
+            if (aErr) return { error: aErr.message };
+        }
+        return { success: true, visibility: vis };
+    },
+
+    getSharedAgentIds: async function(projectId) {
+        const sb = _getClient(); if (!sb) return [];
+        const { data, error } = await sb
+            .from('project_agent_access')
+            .select('user_id')
+            .eq('project_id', projectId);
+        if (error) return [];
+        return (data || []).map(function(r) { return r.user_id; });
     },
 
     // ── Delete project ───────────────────────────────────────────────────────
@@ -1046,12 +1231,12 @@ window.MeasurementInbox = {
 
     getIngestToken: async function() {
         const sb = _getClient(); if (!sb) return { error: 'SDK not loaded' };
-        const user = await Auth.getUser();
-        if (!user) return { error: 'לא מחובר' };
+        const billingId = await Auth.getBillingUserId();
+        if (!billingId) return { error: 'לא מחובר' };
         const { data, error } = await sb
             .from('profiles')
             .select('whatsapp_ingest_token')
-            .eq('id', user.id)
+            .eq('id', billingId)
             .single();
         if (error) return { error: error.message };
         return { token: data && data.whatsapp_ingest_token || null };
@@ -1059,6 +1244,11 @@ window.MeasurementInbox = {
 
     ensureIngestToken: async function(rotate) {
         const sb = _getClient(); if (!sb) return { error: 'SDK not loaded' };
+        const profile = await Auth.getProfile();
+        if (!profile) return { error: 'לא מחובר' };
+        if (profile.company_role === 'agent') {
+            return this.getIngestToken();
+        }
         const user = await Auth.getUser();
         if (!user) return { error: 'לא מחובר' };
         if (!rotate) {
@@ -1232,6 +1422,35 @@ window.MeasurementInbox = {
             )
             .subscribe();
         return channel;
+    }
+};
+
+window.CompanyAgents = {
+    list: function() {
+        return Auth._invokeCompanyFn({ action: 'list' });
+    },
+    create: function(fullName, username, password) {
+        return Auth._invokeCompanyFn({
+            action: 'create',
+            full_name: fullName,
+            username: username,
+            password: password
+        });
+    },
+    disable: function(userId) {
+        return Auth._invokeCompanyFn({ action: 'disable', user_id: userId });
+    },
+    enable: function(userId) {
+        return Auth._invokeCompanyFn({ action: 'enable', user_id: userId });
+    },
+    resetPassword: function(userId, password) {
+        return Auth._invokeCompanyFn({ action: 'reset_password', user_id: userId, password: password });
+    },
+    setDefaultVisibility: function(visibility) {
+        return Auth._invokeCompanyFn({ action: 'set_default_visibility', default_visibility: visibility });
+    },
+    transferProject: function(projectId, toUserId) {
+        return Auth._invokeCompanyFn({ action: 'transfer_project', project_id: projectId, to_user_id: toUserId });
     }
 };
 

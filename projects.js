@@ -18,6 +18,10 @@ var _linkMeasurementId   = null;
 var _measurementChannel  = null;
 var _projectMeasCounts   = {};
 var _measNotifyTimer     = null;
+var _companyMembers      = [];
+var _agentFilter         = 'all';
+var _currentUserId       = null;
+var _companyMeta         = null;
 
 // ── Plan catalog for upgrade modal ────────────────────────────────────────────
 // Organized by user type, shown in upgrade modal
@@ -29,8 +33,8 @@ var _UPGRADE_PLANS = [
     { key: 'carpenter_basic',   label: 'נגר — בסיסי',           price: '₪X/חודש',    userType: 'carpenter', maxProjects: 30,   maxDevices: 1,  desc: 'תמחור + הדמיה, עד 30 פרויקטים' },
     { key: 'carpenter_pro',     label: 'נגר — מקצועי',          price: '₪X/חודש',    userType: 'carpenter', maxProjects: null, maxDevices: 2,  desc: 'הכל כולל דוח לקוח + ייצוא לנגר' },
     // חברות
-    { key: 'company_standard',  label: 'חברה — סטנדרט',         price: '₪X/חודש',    userType: 'company',   maxProjects: null, maxDevices: 10, desc: 'עד 10 מכשירים, כל הפיצ\'רים' },
-    { key: 'company_enterprise',label: 'חברה — ארגוני',          price: 'צור קשר',    userType: 'company',   maxProjects: null, maxDevices: 30, desc: 'עד 30 מכשירים, תמיכה מלאה' },
+    { key: 'company_standard',  label: 'חברה — סטנדרט',         price: '₪X/חודש',    userType: 'company',   maxProjects: null, maxDevices: 10, desc: 'עד 5 סוכנים, 10 מכשירים, כל הפיצ\'רים' },
+    { key: 'company_enterprise',label: 'חברה — ארגוני',          price: 'צור קשר',    userType: 'company',   maxProjects: null, maxDevices: 30, desc: 'עד 15 סוכנים, 30 מכשירים, תמיכה מלאה' },
 ];
 
 var _USER_TYPE_LABELS = {
@@ -73,15 +77,40 @@ var _USER_TYPE_LABELS = {
     _projects = projects;
 
     if (user) {
+        _currentUserId = user.id;
         var name = (user.user_metadata && user.user_metadata.full_name)
             ? user.user_metadata.full_name
             : user.email;
         document.getElementById('user-avatar').textContent = _initials(name);
         document.getElementById('user-name').textContent   = name;
         document.getElementById('plan-badge').textContent  = plan.label;
-        // populate new sidebar email + hero stats
         var emailEl = document.getElementById('user-email');
-        if (emailEl) emailEl.textContent = user.email || '';
+        if (emailEl) {
+            var profileHint = (plan.companyRole === 'agent' && plan.companyCode)
+                ? (name + ' · חברה ' + plan.companyCode)
+                : (user.email || '');
+            emailEl.textContent = profileHint;
+        }
+    }
+
+    try {
+        if (plan.features && plan.features.isCompany && !plan.companyId) {
+            await Auth.ensureCompany();
+            plan = await Auth.getPlan();
+            _plan = plan;
+        }
+        if (plan.companyId) {
+            _companyMembers = await Auth.listCompanyMembers();
+            _setupAgentFilter();
+            if (plan.isCompanyAdmin) {
+                var navAgents = document.getElementById('nav-agents');
+                if (navAgents) navAgents.style.display = '';
+                _showCompanyCodeBanner(plan);
+                loadAgentsTab();
+            }
+        }
+    } catch (eCo) {
+        console.warn('[init] company setup', eCo);
     }
 
     // ── Welcome toasts for new trial / payment success ────────────────────────
@@ -89,7 +118,8 @@ var _USER_TYPE_LABELS = {
     if (_urlStatus === 'trial_started') {
         history.replaceState(null, '', 'projects.html');
         setTimeout(function() {
-            showToast('🎉 ברוך הבא! 7 ימי ניסיון חינמיים הופעלו. תהנה!', 'success');
+            var extra = (_plan && _plan.companyCode) ? (' מספר החברה: ' + _plan.companyCode) : '';
+            showToast('🎉 ברוך הבא! 7 ימי ניסיון חינמיים הופעלו.' + extra, 'success');
         }, 600);
     } else if (_urlStatus === 'payment_success') {
         history.replaceState(null, '', 'projects.html');
@@ -135,10 +165,12 @@ var _USER_TYPE_LABELS = {
     var countEl = document.getElementById('content-count');
     if (countEl) countEl.textContent = projects.length + ' פרויקטים';
 
-    // Show device management section for company plans
-    if (_plan.features && _plan.features.canManageDevices) {
-        document.getElementById('devices-section').style.display = 'block';
-        _loadDevices();
+    // Show device management section for company admins
+    if (_plan.features && _plan.features.canManageDevices && _plan.isCompanyAdmin !== false) {
+        if (!_plan.companyId || _plan.isCompanyAdmin) {
+            document.getElementById('devices-section').style.display = 'block';
+            _loadDevices();
+        }
     }
 
     // Button starts enabled in HTML — only disabled above for expired/inactive subscriptions
@@ -197,8 +229,8 @@ function _buildPaywallPlansHTML(userType) {
         designer_annual:    ['עד 30 פרויקטים', '12 ארונות לפרויקט', 'הדמיה תלת-ממדית', 'ייצוא PDF', 'חיסכון 10% לעומת חודשי'],
         carpenter_basic:    ['עד 30 פרויקטים', 'תמחור אוטומטי', 'הדמיה תלת-ממדית'],
         carpenter_pro:      ['פרויקטים ללא הגבלה', 'תמחור + דוח לקוח', 'ייצוא לנגר', '2 מכשירים'],
-        company_standard:   ['פרויקטים ללא הגבלה', 'עד 10 מכשירים', 'כל הפיצ\'רים', 'ניהול צוות'],
-        company_enterprise: ['פרויקטים ללא הגבלה', 'עד 30 מכשירים', 'תמיכה מלאה', 'SLA מובטח'],
+        company_standard:   ['פרויקטים ללא הגבלה', 'עד 5 סוכנים', 'עד 10 מכשירים', 'ניהול צוות'],
+        company_enterprise: ['פרויקטים ללא הגבלה', 'עד 15 סוכנים', 'עד 30 מכשירים', 'תמיכה מלאה'],
     };
 
     // "Popular" = annual plans (best value) or pro/enterprise for other types
@@ -432,17 +464,18 @@ function _renderPlanBar() {
         fill.className   = 'plan-bar-fill' + (pct >= 100 ? ' full' : pct >= 75 ? ' warn' : '');
     }
 
-    // Show upgrade button unless on top-tier plans
+    // Show upgrade button unless on top-tier plans or company agent
     var topTierPlans = ['carpenter_pro', 'company_enterprise'];
-    if (topTierPlans.indexOf(_plan.key) === -1) {
+    if (_plan.companyRole !== 'agent' && topTierPlans.indexOf(_plan.key) === -1) {
         document.getElementById('btn-upgrade').style.display = 'flex';
     }
 
-    // Show device count for company plans
+    // Show device/agent count for company plans
     if (_plan.features && _plan.features.isCompany) {
         document.getElementById('plan-bar-devices').style.display = 'block';
+        var extra = _plan.maxAgents ? (' · עד ' + _plan.maxAgents + ' סוכנים') : '';
         document.getElementById('plan-bar-devices-text').textContent =
-            'מכשירים מורשים: עד ' + _plan.maxDevices;
+            'מכשירים מורשים: עד ' + _plan.maxDevices + extra;
     }
 }
 
@@ -594,7 +627,7 @@ function _renderProjects() {
     _syncStatusFilterUI();
 
     var visible = _projects.filter(function(p) {
-        return _projectMatchesSearch(p) && _projectMatchesStatusFilter(p);
+        return _projectMatchesSearch(p) && _projectMatchesStatusFilter(p) && _projectMatchesAgent(p);
     });
     // Pinned first, then most recently updated
     visible.sort(function(a, b) {
@@ -684,6 +717,18 @@ function _renderProjects() {
         var deliveryLine = p.delivery_estimate
             ? '<div class="project-delivery"><i class="fa-solid fa-truck"></i> צפי אספקה · ' + _esc(_formatDeliveryDate(p.delivery_estimate)) + '</div>'
             : '';
+        var ownerLine = '';
+        if (_plan && _plan.companyId && p.user_id) {
+            var vis = p.visibility || 'private';
+            var visLabel = vis === 'company' ? 'כל הצוות' : (vis === 'shared' ? 'משותף' : 'פרטי');
+            ownerLine =
+                '<div class="project-owner-badge"><i class="fa-solid fa-user"></i> ' + _esc(_memberLabel(p.user_id)) +
+                ' <span class="project-vis-badge ' + vis + '">' + visLabel + '</span></div>';
+        }
+        var shareBtnHtml = (_plan && _plan.isCompanyAdmin)
+            ? '<button class="btn-card" onclick="event.stopPropagation(); openShareProject(\'' + p.id + '\')">' +
+                '<i class="fa-solid fa-share-nodes"></i> שיתוף</button>'
+            : '';
         var statusChipHtml =
             '<div class="project-status-chip status-' + orderStatus + '">' +
             '<i class="fa-solid ' + _statusIconClass(orderStatus) + '"></i>' +
@@ -748,6 +793,7 @@ function _renderProjects() {
                 '</div>' +
                 customerLine +
                 deliveryLine +
+                ownerLine +
                 '<div class="project-meta">' +
                     '<span class="project-meta-item"><i class="fa-regular fa-calendar"></i> ' + dateStr + '</span>' +
                     (p.cabinet_count ? '<span class="project-meta-item"><i class="fa-solid fa-layer-group"></i> ' + p.cabinet_count + ' ארונות</span>' : '') +
@@ -757,6 +803,7 @@ function _renderProjects() {
             '<div class="project-actions">' +
                 openBtnHtml +
                 extendBtnHtml +
+                shareBtnHtml +
                 '<button class="btn-card" onclick="event.stopPropagation(); startRename(\'' + p.id + '\')">' +
                     '<i class="fa-solid fa-pen"></i> שנה שם</button>' +
                 '<button class="btn-card danger icon-only" title="מחק" onclick="event.stopPropagation(); startDelete(\'' + p.id + '\')">' +
@@ -1676,12 +1723,12 @@ function _ppNum(v, fallback) {
 // ── Tab switching ─────────────────────────────────────────────────────────────
 function switchPage(page) {
     // Update sidebar nav
-    ['projects','profile','pricing','renders'].forEach(function(p) {
+    ['projects','profile','pricing','renders','agents'].forEach(function(p) {
         var el = document.getElementById('nav-' + p);
         if (el) el.classList.toggle('active', p === page);
     });
     // Show/hide tabs
-    ['projects','profile','pricing','renders'].forEach(function(p) {
+    ['projects','profile','pricing','renders','agents'].forEach(function(p) {
         var tab = document.getElementById('tab-' + p);
         if (tab) tab.classList.toggle('active', p === page);
     });
@@ -1713,6 +1760,12 @@ function switchPage(page) {
         if (heroStats) heroStats.style.display = 'none';
         if (planBar)   planBar.style.display = 'none';
         _loadAllRendersGallery();
+    } else if (page === 'agents') {
+        if (heroTitle) heroTitle.textContent = 'ניהול סוכנים';
+        if (heroRight) heroRight.style.display = 'none';
+        if (heroStats) heroStats.style.display = 'none';
+        if (planBar)   planBar.style.display = 'none';
+        loadAgentsTab();
     }
     // Check URL hash
     if (history.replaceState) history.replaceState(null, '', page === 'projects' ? 'projects.html' : 'projects.html#' + page);
@@ -1873,6 +1926,9 @@ async function _loadProfileForm() {
         var { data: profile } = await sb.from('profiles').select('*').eq('id', user.id).single();
         _userProfile = profile || {};
 
+        var rotateBtn = document.getElementById('wa-rotate-btn');
+        if (rotateBtn) rotateBtn.style.display = (_plan && _plan.companyRole === 'agent') ? 'none' : '';
+
         // Prefill WhatsApp webhook URL if token already exists
         if (_userProfile.whatsapp_ingest_token && window.MeasurementInbox) {
             var waUrl = document.getElementById('wa-webhook-url');
@@ -1885,7 +1941,25 @@ async function _loadProfileForm() {
         var fullName = (_userProfile.full_name) || (user.user_metadata && user.user_metadata.full_name) || '';
         document.getElementById('prof-full-name').value  = fullName;
         document.getElementById('prof-phone').value      = _userProfile.phone || '';
-        document.getElementById('prof-email').value      = user.email || '';
+        var emailField = document.getElementById('prof-email');
+        if (_plan && _plan.companyRole === 'agent') {
+            emailField.value = (_userProfile.agent_username || '') + (_plan.companyCode ? ' · חברה ' + _plan.companyCode : '');
+            var emailLabel = emailField.previousElementSibling;
+            if (emailLabel) emailLabel.textContent = 'שם משתמש / מספר חברה';
+        } else {
+            emailField.value = user.email || '';
+        }
+        if (_plan && _plan.companyRole === 'agent') {
+            var billingId = await Auth.getBillingUserId();
+            if (billingId && billingId !== user.id) {
+                var { data: adminProf } = await sb.from('profiles').select('logo_url, phone, business_info').eq('id', billingId).maybeSingle();
+                if (adminProf) {
+                    if (!_userProfile.logo_url && adminProf.logo_url) _userProfile.logo_url = adminProf.logo_url;
+                    if (!_userProfile.business_info && adminProf.business_info) _userProfile.business_info = adminProf.business_info;
+                    if (!_userProfile.phone && adminProf.phone) _userProfile.phone = adminProf.phone;
+                }
+            }
+        }
 
         // Avatar
         var avatarBig  = document.getElementById('profile-avatar-big');
@@ -1923,6 +1997,10 @@ async function _loadProfileForm() {
 function _loadSubscriptionSection(profile) {
     var section = document.getElementById('subscription-section');
     if (!section || !profile) return;
+    if (_plan && _plan.companyRole === 'agent') {
+        section.style.display = 'none';
+        return;
+    }
 
     var status = profile.subscription_status || '';
     var plan   = profile.plan || '';
@@ -2304,7 +2382,13 @@ async function _loadPricingForm() {
             _fillPricingPanel(_PP_DEFAULTS);
             return;
         }
-        var { data: row } = await sb.from('pricing_configs').select('config').eq('user_id', user.id).single();
+        var billingId = user.id;
+        if (_plan && _plan.companyRole === 'agent') {
+            billingId = await Auth.getBillingUserId() || user.id;
+        }
+        var { data: row } = await sb.from('pricing_configs').select('config').eq('user_id', billingId).single();
+        var saveBar = document.getElementById('pp-save-bar');
+        if (saveBar) saveBar.style.display = (_plan && _plan.companyRole === 'agent') ? 'none' : 'flex';
         _pricingCfg = (row && row.config && Object.keys(row.config).length > 0) ? row.config : null;
         if (_pricingCfg) _ppNormalizePricingConfig(_pricingCfg);
         window._pricingConfig = _pricingCfg;
@@ -2540,6 +2624,10 @@ async function savePricingSettings() {
         );
         var { data: { user } } = await sb.auth.getUser();
         if (!user) { showToast('לא מחובר', 'error'); return; }
+        if (_plan && _plan.companyRole === 'agent') {
+            showToast('רק אדמין החברה יכול לערוך תמחור', 'error');
+            return;
+        }
         var cfg = _readPricingPanel();
         var { error } = await sb.from('pricing_configs').upsert(
             { user_id: user.id, config: cfg, updated_at: new Date().toISOString() },
@@ -2561,10 +2649,234 @@ function resetPricingToDefaults() {
     showToast('הוחזר לברירת מחדל', 'success');
 }
 
+function _memberLabel(userId) {
+    var m = _companyMembers.find(function(x) { return x.id === userId; });
+    if (!m) return userId === _currentUserId ? 'אני' : 'סוכן';
+    return m.full_name || m.agent_username || 'סוכן';
+}
+
+function _projectMatchesAgent(p) {
+    if (_agentFilter === 'all' || !_agentFilter) return true;
+    return p.user_id === _agentFilter;
+}
+
+function setAgentFilter(value) {
+    _agentFilter = value || 'all';
+    _renderProjects();
+}
+
+function _setupAgentFilter() {
+    var wrap = document.getElementById('agent-filter-wrap');
+    var sel = document.getElementById('agent-filter');
+    if (!wrap || !sel) return;
+    if (!_plan || !_plan.isCompanyAdmin || !_companyMembers.length) {
+        wrap.classList.remove('show');
+        return;
+    }
+    wrap.classList.add('show');
+    sel.innerHTML = '<option value="all">כל הסוכנים</option>' + _companyMembers.map(function(m) {
+        return '<option value="' + m.id + '">' + _esc(m.full_name || m.agent_username || 'סוכן') + '</option>';
+    }).join('');
+    sel.value = _agentFilter || 'all';
+}
+
+function _showCompanyCodeBanner(plan) {
+    var banner = document.getElementById('company-code-banner');
+    var val = document.getElementById('company-code-banner-value');
+    if (!banner || !plan || !plan.companyCode) return;
+    if (val) val.textContent = plan.companyCode;
+    banner.classList.add('show');
+    try {
+        var stored = sessionStorage.getItem('anycloset_new_company');
+        if (stored) sessionStorage.removeItem('anycloset_new_company');
+    } catch (e) {}
+}
+
+function copyCompanyCode() {
+    var code = (_plan && _plan.companyCode) || '';
+    if (!code) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code).then(function() {
+            showToast('מספר החברה הועתק', 'success');
+        });
+    }
+}
+
+async function loadAgentsTab() {
+    if (!_plan || !_plan.isCompanyAdmin) return;
+    var res = await CompanyAgents.list();
+    if (res.error) {
+        document.getElementById('agents-list').innerHTML = '<div class="devices-empty">' + _esc(res.error) + '</div>';
+        return;
+    }
+    _companyMeta = res.company || null;
+    _companyMembers = res.members || _companyMembers;
+    _setupAgentFilter();
+    if (_companyMeta && _companyMeta.code) {
+        var val = document.getElementById('company-code-banner-value');
+        if (val) val.textContent = _companyMeta.code;
+        var banner = document.getElementById('company-code-banner');
+        if (banner) banner.classList.add('show');
+    }
+    var seats = document.getElementById('agents-seats-text');
+    if (seats && _companyMeta) {
+        seats.textContent = (_companyMeta.active_count || 0) + ' / ' + (_companyMeta.max_agents || 0) + ' מושבים פעילים · מספר חברה ' + (_companyMeta.code || '');
+    }
+    var vis = (_companyMeta && _companyMeta.default_visibility) || 'private';
+    var priv = document.querySelector('input[name="default-vis"][value="private"]');
+    var comp = document.querySelector('input[name="default-vis"][value="company"]');
+    if (priv) priv.checked = vis !== 'company';
+    if (comp) comp.checked = vis === 'company';
+    document.getElementById('vis-opt-private').classList.toggle('selected', vis !== 'company');
+    document.getElementById('vis-opt-company').classList.toggle('selected', vis === 'company');
+
+    var list = document.getElementById('agents-list');
+    if (!list) return;
+    if (!_companyMembers.length) {
+        list.innerHTML = '<div class="devices-empty">אין סוכנים עדיין</div>';
+        return;
+    }
+    list.innerHTML = _companyMembers.map(function(m) {
+        var role = m.company_role === 'admin' ? 'אדמין' : 'סוכן';
+        var inactive = m.is_active === false;
+        var actions = '';
+        if (m.company_role !== 'admin') {
+            actions += inactive
+                ? '<button class="btn-agent ok" onclick="toggleAgent(\'' + m.id + '\', true)">הפעל</button>'
+                : '<button class="btn-agent danger" onclick="toggleAgent(\'' + m.id + '\', false)">השבת</button>';
+            actions += '<button class="btn-agent" onclick="openResetAgent(\'' + m.id + '\')">איפוס סיסמה</button>';
+        }
+        return '<div class="agent-row' + (inactive ? ' inactive' : '') + '">' +
+            '<div class="agent-info"><div class="agent-name">' + _esc(m.full_name || '—') + '</div>' +
+            '<div class="agent-user">' + _esc(m.agent_username || '') + (inactive ? ' · מושבת' : '') + '</div></div>' +
+            '<span class="agent-role' + (m.company_role === 'admin' ? ' admin' : '') + '">' + role + '</span>' +
+            '<div class="agent-actions">' + actions + '</div></div>';
+    }).join('');
+}
+
+function openAddAgentModal() {
+    document.getElementById('add-agent-name').value = '';
+    document.getElementById('add-agent-username').value = '';
+    document.getElementById('add-agent-password').value = '';
+    openModal('modal-add-agent');
+}
+
+async function submitAddAgent() {
+    var name = document.getElementById('add-agent-name').value.trim();
+    var username = document.getElementById('add-agent-username').value.trim();
+    var password = document.getElementById('add-agent-password').value;
+    if (!username || password.length < 6) {
+        showToast('יש למלא שם משתמש וסיסמה (6 תווים לפחות)', 'error');
+        return;
+    }
+    var res = await CompanyAgents.create(name || username, username, password);
+    if (res.error) { showToast(res.error, 'error'); return; }
+    closeModal('modal-add-agent');
+    showToast('הסוכן נוסף', 'success');
+    await loadAgentsTab();
+}
+
+async function toggleAgent(userId, enable) {
+    var res = enable ? await CompanyAgents.enable(userId) : await CompanyAgents.disable(userId);
+    if (res.error) { showToast(res.error, 'error'); return; }
+    showToast(enable ? 'הסוכן הופעל' : 'הסוכן הושבת', 'success');
+    await loadAgentsTab();
+}
+
+function openResetAgent(userId) {
+    var m = _companyMembers.find(function(x) { return x.id === userId; });
+    document.getElementById('reset-agent-id').value = userId;
+    document.getElementById('reset-agent-info').textContent = 'סיסמה חדשה עבור ' + ((m && (m.full_name || m.agent_username)) || 'הסוכן');
+    document.getElementById('reset-agent-password').value = '';
+    openModal('modal-reset-agent');
+}
+
+async function submitResetAgentPassword() {
+    var id = document.getElementById('reset-agent-id').value;
+    var password = document.getElementById('reset-agent-password').value;
+    if (password.length < 6) { showToast('הסיסמה חייבת לפחות 6 תווים', 'error'); return; }
+    var res = await CompanyAgents.resetPassword(id, password);
+    if (res.error) { showToast(res.error, 'error'); return; }
+    closeModal('modal-reset-agent');
+    showToast('הסיסמה עודכנה', 'success');
+}
+
+async function saveDefaultVisibility(vis) {
+    var res = await CompanyAgents.setDefaultVisibility(vis);
+    if (res.error) { showToast(res.error, 'error'); return; }
+    if (_plan) _plan.defaultVisibility = vis;
+    document.getElementById('vis-opt-private').classList.toggle('selected', vis !== 'company');
+    document.getElementById('vis-opt-company').classList.toggle('selected', vis === 'company');
+    showToast('ברירת המחדל עודכנה', 'success');
+}
+
+async function openShareProject(projectId) {
+    var p = _projects.find(function(x) { return x.id === projectId; });
+    if (!p) return;
+    document.getElementById('share-project-id').value = projectId;
+    document.getElementById('share-project-name').textContent = p.name || '';
+    var vis = p.visibility || 'private';
+    document.querySelectorAll('input[name="share-vis"]').forEach(function(r) {
+        r.checked = r.value === vis;
+    });
+    ['private', 'company', 'shared'].forEach(function(k) {
+        var el = document.getElementById('share-opt-' + k);
+        if (el) el.classList.toggle('selected', k === vis);
+    });
+    var sharedIds = vis === 'shared' ? await Projects.getSharedAgentIds(projectId) : [];
+    var box = document.getElementById('share-agents-list');
+    box.innerHTML = _companyMembers.filter(function(m) { return m.id !== p.user_id; }).map(function(m) {
+        var checked = sharedIds.indexOf(m.id) !== -1 ? ' checked' : '';
+        return '<label class="share-agent-item"><input type="checkbox" value="' + m.id + '"' + checked + '> ' +
+            _esc(m.full_name || m.agent_username || 'סוכן') + '</label>';
+    }).join('') || '<div class="agents-meta">אין סוכנים נוספים</div>';
+    box.style.display = vis === 'shared' ? '' : 'none';
+    var transfer = document.getElementById('share-transfer-select');
+    transfer.innerHTML = '<option value="">ללא שינוי בעלות</option>' + _companyMembers.filter(function(m) {
+        return m.id !== p.user_id && m.is_active !== false;
+    }).map(function(m) {
+        return '<option value="' + m.id + '">' + _esc(m.full_name || m.agent_username) + '</option>';
+    }).join('');
+    openModal('modal-share-project');
+}
+
+function onShareVisChange() {
+    var vis = (document.querySelector('input[name="share-vis"]:checked') || {}).value || 'private';
+    ['private', 'company', 'shared'].forEach(function(k) {
+        var el = document.getElementById('share-opt-' + k);
+        if (el) el.classList.toggle('selected', k === vis);
+    });
+    document.getElementById('share-agents-list').style.display = vis === 'shared' ? '' : 'none';
+}
+
+async function submitShareProject() {
+    var projectId = document.getElementById('share-project-id').value;
+    var vis = (document.querySelector('input[name="share-vis"]:checked') || {}).value || 'private';
+    var ids = [];
+    document.querySelectorAll('#share-agents-list input[type="checkbox"]:checked').forEach(function(c) {
+        ids.push(c.value);
+    });
+    var res = await Projects.setVisibility(projectId, vis, ids);
+    if (res.error) { showToast(res.error, 'error'); return; }
+    var toUser = document.getElementById('share-transfer-select').value;
+    if (toUser) {
+        var tRes = await CompanyAgents.transferProject(projectId, toUser);
+        if (tRes.error) { showToast(tRes.error, 'error'); return; }
+    }
+    var p = _projects.find(function(x) { return x.id === projectId; });
+    if (p) {
+        p.visibility = vis;
+        if (toUser) p.user_id = toUser;
+    }
+    closeModal('modal-share-project');
+    showToast('השיתוף עודכן', 'success');
+    _renderProjects();
+}
+
 // ── Handle URL hash on load ───────────────────────────────────────────────────
 (function() {
     var hash = window.location.hash.replace('#', '');
-    if (hash === 'profile' || hash === 'pricing' || hash === 'renders') {
+    if (hash === 'profile' || hash === 'pricing' || hash === 'renders' || hash === 'agents') {
         // Delay to let init() finish
         setTimeout(function() { switchPage(hash); }, 300);
     }

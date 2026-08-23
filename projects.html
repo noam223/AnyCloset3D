@@ -400,6 +400,65 @@
         .btn-device-deactivate { background: none; border: 1.5px solid #fecaca; color: var(--error); border-radius: 8px; padding: 6px 10px; font-size: .78rem; font-weight: 600; cursor: pointer; transition: all var(--transition); }
         .btn-device-deactivate:hover { background: #fee2e2; transform: translateY(-1px); }
         .devices-empty { text-align: center; color: var(--muted); font-size: .9rem; padding: 24px 0; }
+        #nav-agents { display: none; }
+        .agents-wrap { max-width: 820px; }
+        .agents-hero-card {
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 18px;
+            padding: 20px 22px; margin-bottom: 18px; box-shadow: var(--shadow-sm);
+            display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between;
+        }
+        .agents-code { font-size: 1.6rem; font-weight: 800; letter-spacing: .12em; color: var(--primary); font-variant-numeric: tabular-nums; }
+        .agents-meta { font-size: .82rem; color: var(--muted); margin-top: 4px; }
+        .agent-row {
+            display: flex; align-items: center; gap: 14px; padding: 14px 0;
+            border-bottom: 1px solid var(--border-l);
+        }
+        .agent-row:last-child { border-bottom: none; }
+        .agent-row.inactive { opacity: .55; }
+        .agent-info { flex: 1; min-width: 0; }
+        .agent-name { font-size: .92rem; font-weight: 700; color: var(--text); }
+        .agent-user { font-size: .75rem; color: var(--muted); margin-top: 2px; }
+        .agent-role { font-size: .7rem; font-weight: 800; padding: 3px 10px; border-radius: 20px; background: #e0e7ff; color: #3730a3; }
+        .agent-role.admin { background: #fef3c7; color: #92400e; }
+        .agent-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+        .btn-agent {
+            background: none; border: 1.5px solid var(--border); color: var(--text);
+            border-radius: 8px; padding: 6px 10px; font-size: .75rem; font-weight: 700;
+            font-family: inherit; cursor: pointer;
+        }
+        .btn-agent.danger { border-color: #fecaca; color: var(--error); }
+        .btn-agent.ok { border-color: #bbf7d0; color: #166534; }
+        .project-owner-badge {
+            display: inline-flex; align-items: center; gap: 5px;
+            font-size: .72rem; font-weight: 700; color: #334155;
+            background: #f1f5f9; border-radius: 999px; padding: 3px 9px; margin-top: 6px;
+        }
+        .project-vis-badge {
+            font-size: .68rem; font-weight: 800; padding: 2px 8px; border-radius: 999px;
+            background: #e2e8f0; color: #475569;
+        }
+        .project-vis-badge.company { background: #dbeafe; color: #1d4ed8; }
+        .project-vis-badge.shared { background: #fce7f3; color: #9d174d; }
+        .agent-filter-wrap { display: none; align-items: center; gap: 8px; margin-top: 10px; }
+        .agent-filter-wrap.show { display: flex; }
+        .agent-filter-select {
+            height: 34px; border: 1.5px solid var(--border); border-radius: 9px;
+            padding: 0 10px; font-family: inherit; font-size: .8rem; background: white;
+        }
+        .share-option {
+            display: flex; align-items: flex-start; gap: 10px;
+            border: 1.5px solid var(--border); border-radius: 12px;
+            padding: 10px 12px; margin-bottom: 8px; cursor: pointer;
+        }
+        .share-option.selected { border-color: var(--secondary); background: #eff6ff; }
+        .share-agents-list { max-height: 180px; overflow-y: auto; margin: 8px 0 14px; }
+        .share-agent-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: .85rem; }
+        .company-code-banner {
+            background: linear-gradient(135deg,#0f2040,#1a3a6b); color: #fff;
+            padding: 12px 18px; border-radius: 14px; margin-bottom: 16px;
+            display: none; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+        }
+        .company-code-banner.show { display: flex; }
         .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15,23,42,.6); z-index: 200; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(8px); }
         .modal-overlay.open { display: flex; }
         .modal-box { background: white; border-radius: 24px; padding: 34px 36px; width: 100%; max-width: 460px; box-shadow: var(--shadow-xl); animation: popIn .24s cubic-bezier(.34,1.56,.64,1); position: relative; overflow: hidden; }
@@ -687,6 +746,9 @@
             <i class="fa-solid fa-plus-circle"></i> פרויקט חדש
         </a>
         <div class="sidebar-nav-label">חשבון</div>
+        <a class="sidebar-nav-item" id="nav-agents" href="#" onclick="switchPage('agents');return false;">
+            <i class="fa-solid fa-users"></i> סוכנים
+        </a>
         <a class="sidebar-nav-item" id="nav-profile" href="#" onclick="switchPage('profile');return false;">
             <i class="fa-solid fa-user-circle"></i> הפרופיל שלי
         </a>
@@ -811,6 +873,12 @@
                         <i class="fa-solid fa-house-circle-check"></i> התקנה הושלמה
                     </button>
                 </div>
+                <div class="agent-filter-wrap" id="agent-filter-wrap">
+                    <span class="projects-filter-label"><i class="fa-solid fa-user-tie"></i> סוכן:</span>
+                    <select class="agent-filter-select" id="agent-filter" onchange="setAgentFilter(this.value)">
+                        <option value="all">כל הסוכנים</option>
+                    </select>
+                </div>
             </div>
             <div class="projects-grid" id="projects-grid">
                 <div class="skeleton-card"><div class="skeleton-thumb"></div><div class="skeleton-body"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>
@@ -828,6 +896,45 @@
                     </button>
                 </div>
                 <div id="devices-list"></div>
+            </div>
+        </div>
+
+        <!-- TAB: AGENTS -->
+        <div class="page-tab" id="tab-agents">
+            <div class="agents-wrap">
+                <div class="company-code-banner" id="company-code-banner">
+                    <div>
+                        <div style="font-size:.78rem;opacity:.75;">מספר החברה לכניסת סוכנים</div>
+                        <div class="agents-code" id="company-code-banner-value">------</div>
+                    </div>
+                    <button type="button" class="btn-manage-devices" onclick="copyCompanyCode()">
+                        <i class="fa-regular fa-copy"></i> העתק מספר
+                    </button>
+                </div>
+                <div class="agents-hero-card">
+                    <div>
+                        <div class="profile-section-title" style="margin-bottom:6px;"><i class="fa-solid fa-users"></i> צוות החברה</div>
+                        <div class="agents-meta" id="agents-seats-text">טוען מושבים...</div>
+                    </div>
+                    <button type="button" class="btn-manage-devices" onclick="openAddAgentModal()">
+                        <i class="fa-solid fa-user-plus"></i> הוסף סוכן
+                    </button>
+                </div>
+                <div class="profile-section">
+                    <div class="profile-section-title"><i class="fa-solid fa-eye"></i> ברירת מחדל לפרויקט חדש</div>
+                    <label class="share-option" id="vis-opt-private">
+                        <input type="radio" name="default-vis" value="private" onchange="saveDefaultVisibility('private')">
+                        <div><strong>רק הסוכן</strong><div class="agents-meta">פרויקט חדש נשאר פרטי עד שתשתף</div></div>
+                    </label>
+                    <label class="share-option" id="vis-opt-company">
+                        <input type="radio" name="default-vis" value="company" onchange="saveDefaultVisibility('company')">
+                        <div><strong>כל הסוכנים</strong><div class="agents-meta">כל הצוות רואה פרויקטים חדשים</div></div>
+                    </label>
+                </div>
+                <div class="profile-section" style="margin-top:16px;">
+                    <div class="profile-section-title"><i class="fa-solid fa-id-badge"></i> סוכנים</div>
+                    <div id="agents-list"><div class="devices-empty">טוען...</div></div>
+                </div>
             </div>
         </div>
 
@@ -904,7 +1011,7 @@
                         <button type="button" class="profile-save-btn" onclick="ensureWhatsappIngestToken(false)">
                             <i class="fa-solid fa-link"></i> צור / הצג קישור
                         </button>
-                        <button type="button" class="profile-save-btn" style="background:#64748b;" onclick="ensureWhatsappIngestToken(true)">
+                        <button type="button" class="profile-save-btn" id="wa-rotate-btn" style="background:#64748b;" onclick="ensureWhatsappIngestToken(true)">
                             <i class="fa-solid fa-rotate"></i> החלף קישור
                         </button>
                         <button type="button" class="profile-save-btn" style="background:#0f766e;" onclick="copyWhatsappWebhookUrl()">
@@ -1097,7 +1204,7 @@
                         <div class="pp-field"><label class="pp-label">רגל ניקל ₪</label><input class="pp-input" id="pp-nickelLegPrice" type="number" min="0"></div>
                     </div>
                 </div>
-                <div style="display:flex;gap:12px;align-items:center;padding:8px 0 24px;">
+                <div id="pp-save-bar" style="display:flex;gap:12px;align-items:center;padding:8px 0 24px;">
                     <button class="profile-save-btn accent" onclick="savePricingSettings()">
                         <i class="fa-solid fa-floppy-disk"></i> שמור הגדרות תמחור
                     </button>
@@ -1279,6 +1386,68 @@
         <div class="modal-devices-list" id="modal-devices-list"></div>
         <div class="modal-actions">
             <button class="btn-modal ghost" onclick="closeModal('modal-devices')">סגור</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Add agent -->
+<div class="modal-overlay" id="modal-add-agent">
+    <div class="modal-box">
+        <div class="modal-title"><i class="fa-solid fa-user-plus"></i> סוכן חדש</div>
+        <label class="profile-label">שם מלא</label>
+        <input class="modal-input" id="add-agent-name" type="text" placeholder="שם הסוכן">
+        <label class="profile-label">שם משתמש</label>
+        <input class="modal-input" id="add-agent-username" type="text" placeholder="agent1" dir="ltr" autocomplete="off">
+        <label class="profile-label">סיסמה</label>
+        <input class="modal-input" id="add-agent-password" type="password" placeholder="לפחות 6 תווים" autocomplete="new-password">
+        <div class="modal-actions">
+            <button class="btn-modal ghost" onclick="closeModal('modal-add-agent')">ביטול</button>
+            <button class="btn-modal primary" onclick="submitAddAgent()"><i class="fa-solid fa-plus"></i> צור סוכן</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Reset agent password -->
+<div class="modal-overlay" id="modal-reset-agent">
+    <div class="modal-box">
+        <div class="modal-title"><i class="fa-solid fa-key"></i> איפוס סיסמה</div>
+        <input type="hidden" id="reset-agent-id">
+        <p class="agents-meta" id="reset-agent-info" style="margin-bottom:12px;"></p>
+        <label class="profile-label">סיסמה חדשה</label>
+        <input class="modal-input" id="reset-agent-password" type="password" placeholder="לפחות 6 תווים" autocomplete="new-password">
+        <div class="modal-actions">
+            <button class="btn-modal ghost" onclick="closeModal('modal-reset-agent')">ביטול</button>
+            <button class="btn-modal primary" onclick="submitResetAgentPassword()">שמור סיסמה</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Share project -->
+<div class="modal-overlay" id="modal-share-project">
+    <div class="modal-box">
+        <div class="modal-title"><i class="fa-solid fa-share-nodes"></i> שיתוף פרויקט</div>
+        <input type="hidden" id="share-project-id">
+        <p class="agents-meta" id="share-project-name" style="margin-bottom:12px;"></p>
+        <label class="share-option" id="share-opt-private">
+            <input type="radio" name="share-vis" value="private" onchange="onShareVisChange()">
+            <div><strong>רק הסוכן</strong><div class="agents-meta">רק בעל הפרויקט והאדמין</div></div>
+        </label>
+        <label class="share-option" id="share-opt-company">
+            <input type="radio" name="share-vis" value="company" onchange="onShareVisChange()">
+            <div><strong>כל הסוכנים</strong><div class="agents-meta">כל הצוות רואה את הפרויקט</div></div>
+        </label>
+        <label class="share-option" id="share-opt-shared">
+            <input type="radio" name="share-vis" value="shared" onchange="onShareVisChange()">
+            <div><strong>סוכנים נבחרים</strong><div class="agents-meta">בחרו מי יראה את הפרויקט</div></div>
+        </label>
+        <div class="share-agents-list" id="share-agents-list" style="display:none;"></div>
+        <label class="profile-label" style="margin-top:8px;">העבר בעלות לסוכן</label>
+        <select class="agent-filter-select" id="share-transfer-select" style="width:100%;height:42px;margin-bottom:14px;">
+            <option value="">ללא שינוי</option>
+        </select>
+        <div class="modal-actions">
+            <button class="btn-modal ghost" onclick="closeModal('modal-share-project')">ביטול</button>
+            <button class="btn-modal primary" onclick="submitShareProject()">שמור</button>
         </div>
     </div>
 </div>
@@ -1477,8 +1646,8 @@
     <span id="toast-text"></span>
 </div>
 
-<script src="auth.js?v=20260823delivery"></script>
-<script src="projects.js?v=20260823delivery"></script>
+<script src="auth.js?v=20260823agents"></script>
+<script src="projects.js?v=20260823agents"></script>
 <script src="quick-calc.js?v=20260820cabTypes"></script>
 </body>
 </html>

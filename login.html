@@ -117,6 +117,21 @@
         }
         .forgot-link:hover { text-decoration: underline; }
 
+        .login-mode-toggle {
+            display: flex; background: #f1f5f9; border-radius: 10px;
+            padding: 3px; margin-bottom: 18px; gap: 3px;
+        }
+        .login-mode-btn {
+            flex: 1; border: none; background: transparent;
+            padding: 8px 6px; border-radius: 8px;
+            font-family: inherit; font-size: 0.78rem; font-weight: 700;
+            color: var(--muted); cursor: pointer; transition: all 0.15s;
+        }
+        .login-mode-btn.active {
+            background: white; color: var(--primary);
+            box-shadow: 0 1px 4px rgba(15,23,42,.08);
+        }
+
         /* ── User type selector ── */
         .user-type-grid {
             display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
@@ -270,11 +285,29 @@
 
         <!-- ── LOGIN FORM ── -->
         <form id="form-login" onsubmit="handleLogin(event)">
-            <div class="form-group">
+            <div class="login-mode-toggle" role="tablist">
+                <button type="button" class="login-mode-btn active" id="login-mode-email" onclick="setLoginMode('email')">כניסה רגילה</button>
+                <button type="button" class="login-mode-btn" id="login-mode-company" onclick="setLoginMode('company')">כניסה כחברה</button>
+            </div>
+            <div class="form-group" id="login-email-group">
                 <label class="form-label">אימייל</label>
                 <div class="input-wrap">
                     <i class="fa-regular fa-envelope"></i>
                     <input type="email" id="login-email" class="form-input" placeholder="your@email.com" required autocomplete="email">
+                </div>
+            </div>
+            <div class="form-group" id="login-code-group" style="display:none;">
+                <label class="form-label">מספר חברה</label>
+                <div class="input-wrap">
+                    <i class="fa-solid fa-building"></i>
+                    <input type="text" id="login-company-code" class="form-input" placeholder="000000" inputmode="numeric" maxlength="6" autocomplete="off" dir="ltr">
+                </div>
+            </div>
+            <div class="form-group" id="login-username-group" style="display:none;">
+                <label class="form-label">שם משתמש</label>
+                <div class="input-wrap">
+                    <i class="fa-regular fa-user"></i>
+                    <input type="text" id="login-username" class="form-input" placeholder="שם משתמש" autocomplete="username" dir="ltr">
                 </div>
             </div>
             <div class="form-group">
@@ -286,7 +319,7 @@
                         <i class="fa-regular fa-eye"></i>
                     </button>
                 </div>
-                <a class="forgot-link" onclick="handleForgotPassword()">שכחתי סיסמה</a>
+                <a class="forgot-link" id="login-forgot-link" onclick="handleForgotPassword()">שכחתי סיסמה</a>
             </div>
             <button type="submit" class="btn-submit" id="btn-login">
                 <i class="fa-solid fa-right-to-bracket"></i> כניסה
@@ -486,7 +519,7 @@
 
 </div>
 
-<script src="auth.js"></script>
+<script src="auth.js?v=20260823agents"></script>
 <script>
 // ── State ────────────────────────────────────────────────────────────────────
 var _selectedUserType = null;
@@ -503,8 +536,8 @@ var _PLANS_BY_TYPE = {
         { key: 'carpenter_pro',    name: 'מקצועי',        price: '₪X/חודש',  desc: 'הכל כולל דוח לקוח + ייצוא לנגר' }
     ],
     company: [
-        { key: 'company_standard',   name: 'סטנדרט',     price: '₪X/חודש',  desc: 'עד 10 מכשירים, כל הפיצ\'רים' },
-        { key: 'company_enterprise', name: 'ארגוני',      price: 'צור קשר',  desc: 'עד 30 מכשירים, תמיכה מלאה' }
+        { key: 'company_standard',   name: 'סטנדרט',     price: '₪X/חודש',  desc: 'עד 5 סוכנים, 10 מכשירים, כל הפיצ\'רים' },
+        { key: 'company_enterprise', name: 'ארגוני',      price: 'צור קשר',  desc: 'עד 15 סוכנים, 30 מכשירים, תמיכה מלאה' }
     ]
 };
 
@@ -835,6 +868,14 @@ async function goToStep4() {
     try {
         var result = await Auth.startFreeTrial(_selectedPlanKey);
         if (result && result.error) throw new Error(result.error);
+        if (result && result.company && result.company.code) {
+            try {
+                sessionStorage.setItem('anycloset_new_company', JSON.stringify({
+                    code: result.company.code,
+                    username: result.company.agent_username || result.company.username || ''
+                }));
+            } catch (eStore) {}
+        }
         document.getElementById('step4-desc').textContent = '✅ תקופת הניסיון הופעלה! מעביר אותך למערכת...';
         document.getElementById('step4-spinner').style.display = 'none';
         setTimeout(function() {
@@ -849,13 +890,41 @@ async function goToStep4() {
 }
 
 // ── Login ─────────────────────────────────────────────────────────────────────
+var _loginMode = 'email';
+
+function setLoginMode(mode) {
+    _loginMode = mode === 'company' ? 'company' : 'email';
+    var isCompany = _loginMode === 'company';
+    document.getElementById('login-mode-email').classList.toggle('active', !isCompany);
+    document.getElementById('login-mode-company').classList.toggle('active', isCompany);
+    document.getElementById('login-email-group').style.display = isCompany ? 'none' : '';
+    document.getElementById('login-code-group').style.display = isCompany ? '' : 'none';
+    document.getElementById('login-username-group').style.display = isCompany ? '' : 'none';
+    document.getElementById('login-forgot-link').style.display = isCompany ? 'none' : '';
+    document.getElementById('login-email').required = !isCompany;
+    document.getElementById('login-company-code').required = isCompany;
+    document.getElementById('login-username').required = isCompany;
+}
+
 async function handleLogin(e) {
     e.preventDefault();
     clearMessage();
-    var email    = document.getElementById('login-email').value.trim();
     var password = document.getElementById('login-password').value;
     setLoading('btn-login', true);
-    var result = await Auth.login(email, password);
+    var result;
+    if (_loginMode === 'company') {
+        var code = document.getElementById('login-company-code').value.trim();
+        var username = document.getElementById('login-username').value.trim();
+        if (!code || !username) {
+            setLoading('btn-login', false);
+            showMessage('יש למלא מספר חברה, שם משתמש וסיסמה', 'error');
+            return;
+        }
+        result = await Auth.companyLogin(code, username, password);
+    } else {
+        var email = document.getElementById('login-email').value.trim();
+        result = await Auth.login(email, password);
+    }
     setLoading('btn-login', false);
     if (result.error) {
         showMessage(_translateError(result.error), 'error');
@@ -928,6 +997,7 @@ function setLoading(btnId, loading) {
 function _translateError(msg) {
     if (!msg) return 'שגיאה לא ידועה';
     if (msg.includes('Invalid login credentials'))  return 'אימייל או סיסמה שגויים';
+    if (msg.includes('שם משתמש או סיסמה') || msg.includes('מספר חברה')) return msg;
     if (msg.includes('Email not confirmed'))        return 'יש לאשר את האימייל לפני הכניסה';
     if (msg.includes('User already registered'))    return 'כתובת האימייל כבר רשומה במערכת';
     if (msg.includes('Password should be'))         return 'הסיסמה חייבת להכיל לפחות 6 תווים';

@@ -3,3 +3,9 @@
 
 [functions.upload-measurement]
 verify_jwt = false
+
+[functions.company-login]
+verify_jwt = false
+
+[functions.company-manage-agent]
+verify_jwt = true

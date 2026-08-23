@@ -85,10 +85,16 @@
                   )
                 : null);
             if (_sb_init) {
+                var _pricingUserId = user.id;
+                try {
+                    if (window.Auth && Auth.getBillingUserId) {
+                        _pricingUserId = await Auth.getBillingUserId() || user.id;
+                    }
+                } catch (eBill) {}
                 var { data: _pricingRow } = await _sb_init
                     .from('pricing_configs')
                     .select('config')
-                    .eq('user_id', user.id)
+                    .eq('user_id', _pricingUserId)
                     .single();
                 if (_pricingRow && _pricingRow.config && Object.keys(_pricingRow.config).length > 0) {
                     window._pricingConfig = _pricingRow.config;
@@ -116,10 +122,16 @@
     // 3b. Load user logo
     if (user && _sb_init) {
         try {
+            var _logoUserId = user.id;
+            try {
+                if (window.Auth && Auth.getBillingUserId) {
+                    _logoUserId = await Auth.getBillingUserId() || user.id;
+                }
+            } catch (eLogo) {}
             var { data: _profileRow } = await _sb_init
                 .from('profiles')
                 .select('logo_url, phone, business_info')
-                .eq('id', user.id)
+                .eq('id', _logoUserId)
                 .single();
             window._userLogoUrl = (_profileRow && _profileRow.logo_url) ? _profileRow.logo_url : null;
             var _biz = (_profileRow && _profileRow.business_info) ? _profileRow.business_info : {};
