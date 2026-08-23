@@ -177,8 +177,8 @@ window._updateWritingDeskSectionVisibility = function() {
     } else {
         const ph = document.getElementById('dim-pill-height');
         const sh = document.getElementById('inp-height');
-        if (ph) ph.max = 320;
-        if (sh) sh.max = 320;
+        if (ph) ph.max = (window.MAX_GLOBAL_HEIGHT || 370);
+        if (sh) sh.max = (window.MAX_GLOBAL_HEIGHT || 370);
     }
 };
 
@@ -258,7 +258,7 @@ function _highlightWritingDeskPresetButtons(presetId) {
             const pw = document.getElementById('dim-pill-width');
             if (pw) pw.value = val;
         } else if (dim === 'height') {
-            const _maxH = (window._roomHeight && window._roomHeight > 0) ? window._roomHeight : 320;
+            const _maxH = (window._roomHeight && window._roomHeight > 0) ? window._roomHeight : (window.MAX_GLOBAL_HEIGHT || 370);
             val = Math.max(50, Math.min(120, val));
             cw.writingDesk.height = val;
             cw.globalHeight = val;

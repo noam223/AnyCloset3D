@@ -5117,7 +5117,7 @@ window._updateBedHandles = function() {
 window._roomWall          = window._roomWall          || 'center';
 window._roomWidth         = window._roomWidth         || 0;   // 0 = auto (based on cabinet)
 window._roomDepth         = window._roomDepth         || 0;   // 0 = auto
-window._roomHeight        = window._roomHeight        || 0;   // 0 = auto (300cm default)
+window._roomHeight        = window._roomHeight        || 0;   // 0 = auto (370cm default)
 window._closureEnabled    = true;
 window._closureWidth      = window._closureWidth      || 1.8; // cm — left side panel width
 window._closureWidthRight = window._closureWidthRight || 1.8; // cm — right side panel width (for 'both' mode)
@@ -5231,8 +5231,10 @@ window._setRoomSize = function(dim, val) {
     if (dim === 'height') {
         const cabHeightSlider = document.getElementById('inp-height');
         const cabHeightNum    = document.getElementById('inp-num-height');
+        const cabHeightPill   = document.getElementById('dim-pill-height');
         if (cabHeightSlider) cabHeightSlider.max = v;
         if (cabHeightNum)    cabHeightNum.max    = v;
+        if (cabHeightPill)   cabHeightPill.max   = v;
         // Clamp current cabinet height if it exceeds new room height
         const _ch = state.globalHeight || 240;
         if (_ch > v && typeof updateDim === 'function') updateDim('height', 0, v);

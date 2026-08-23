@@ -1218,7 +1218,7 @@ function _buildRoom() {
     rg.visible = true;
 
     const roomD = (window._roomDepth  && window._roomDepth  > 0) ? window._roomDepth  : 500;
-    const roomH = (window._roomHeight && window._roomHeight > 0) ? window._roomHeight : 300;
+    const roomH = (window._roomHeight && window._roomHeight > 0) ? window._roomHeight : (window.MAX_GLOBAL_HEIGHT || 370);
     const wallT = 1;     // wall thickness (thin plane)
 
     // Cabinet dimensions

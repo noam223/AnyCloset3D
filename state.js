@@ -6,7 +6,8 @@ const MIN_COL_WIDTH = 1;
 const MIN_WARDROBE_WIDTH = 10;
 window.MIN_WARDROBE_WIDTH = MIN_WARDROBE_WIDTH;
 const MIN_SHELF_GAP = 12;
-const MAX_GLOBAL_HEIGHT = 350;
+const MAX_GLOBAL_HEIGHT = 370;
+window.MAX_GLOBAL_HEIGHT = MAX_GLOBAL_HEIGHT;
 
 // ---- Wing factory ----
 function createWingData(overrides) {
@@ -3134,7 +3135,7 @@ window.updateDim = function(dim, delta, absoluteValue = null) {
     }
     else if (dim === 'height') {
         // Clamp to room height (ceiling) if set by user
-        const _maxH = (window._roomHeight && window._roomHeight > 0) ? window._roomHeight : 320;
+        const _maxH = (window._roomHeight && window._roomHeight > 0) ? window._roomHeight : MAX_GLOBAL_HEIGHT;
         val = Math.max(40, Math.min(_maxH, val));
         const oldHeight = state.globalHeight;
         state.globalHeight = val;
