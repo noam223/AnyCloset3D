@@ -8,6 +8,8 @@ window.MIN_WARDROBE_WIDTH = MIN_WARDROBE_WIDTH;
 const MIN_SHELF_GAP = 12;
 const MAX_GLOBAL_HEIGHT = 370;
 window.MAX_GLOBAL_HEIGHT = MAX_GLOBAL_HEIGHT;
+const MAX_COLUMNS = 10;
+window.MAX_COLUMNS = MAX_COLUMNS;
 
 // ---- Wing factory ----
 function createWingData(overrides) {
@@ -2936,7 +2938,7 @@ function _askColumnSide(newCount) {
 window._requestColumnCountChange = function(newCount) {
     newCount = parseInt(newCount, 10);
     if (isNaN(newCount)) return;
-    newCount = Math.max(1, Math.min(8, newCount));
+    newCount = Math.max(1, Math.min(MAX_COLUMNS, newCount));
 
     const current = (state.columns || []).length;
     if (newCount === current) {
@@ -2961,7 +2963,7 @@ window.updateColumns = function(delta) {
     const inp = document.getElementById('inp-columns');
     const currentVal = inp ? parseInt(inp.value) : (state.columns || []).length;
     const minVal = inp ? (parseInt(inp.min) || 2) : 2;
-    const maxVal = inp ? (parseInt(inp.max) || 6) : 6;
+    const maxVal = inp ? (parseInt(inp.max) || MAX_COLUMNS) : MAX_COLUMNS;
     const newVal = currentVal + delta;
     if (newVal >= minVal && newVal <= maxVal) {
         window._requestColumnCountChange(newVal);

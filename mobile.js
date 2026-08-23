@@ -1406,7 +1406,7 @@ function _stepColumns(delta) {
     var slider = document.getElementById('dfm-slider-columns');
     if (!slider) return;
     var cur = parseInt(slider.value) || 2;
-    var nv  = Math.max(1, Math.min(8, cur + delta));
+    var nv  = Math.max(1, Math.min((window.MAX_COLUMNS || 10), cur + delta));
     slider.value = nv;
     _applyColumnsSlider(nv);
 }
