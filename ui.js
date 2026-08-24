@@ -8133,7 +8133,8 @@ function _enrichSpecColorsFromRaw(item, rawState) {
 function _enumeratePrintCabinetUnits(rawState) {
     if (!rawState || !rawState.wings) return null;
     const pid = rawState.presetId || '';
-    if (pid !== 'corner-left' && pid !== 'corner-right' && pid !== 'walkin') return null;
+    const hasSideWings = !!(rawState.wings.left || rawState.wings.right);
+    if (pid !== 'corner-left' && pid !== 'corner-right' && pid !== 'walkin' && !hasSideWings) return null;
 
     const units = [];
     function add(side, label, wing) {
