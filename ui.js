@@ -123,16 +123,15 @@ function calcMinDrawerCount(cellHeightCm) {
 // Returns the displayed cell height (cm) of compartment row r in column col.
 // Returns a rounded integer to match what the dimension label shows (Math.round).
 function _cellHeight(col, r, wingData) {
+    if (typeof _compartmentBounds === 'function') {
+        return Math.round(_compartmentBounds(col, r, wingData).h);
+    }
     const plinthH = wingData ? wingData.plinthHeight : state.plinthHeight;
     const t       = wingData ? wingData.thickness    : state.thickness;
     const fo      = col.floorOffset || 0;
-    // startShelvesY mirrors engine-core.js logic: noPlinth columns start at t (not plinthH+t)
     const startY  = fo > 0 ? fo + t : ((col.type === 'desk') ? col.deskHeight + col.deskClearance + t : (col.noPlinth ? t : plinthH + t));
-    // prevY: bottom of cell r
     const bottomY = (r === 0) ? startY : col.shelvesY[r - 1] + t / 2;
-    // topY: top of cell r
     const topY    = (r >= col.shelvesY.length) ? col.height - t : col.shelvesY[r] - t / 2;
-    // Round to match the displayed dimension label (engine.js uses Math.round)
     return Math.round(Math.max(0, topY - bottomY));
 }
 // ─────────────────────────────────────────────────────────────────────────────
@@ -614,7 +613,7 @@ function buildDimensionsAndButtonsUI() {
                         let newSplitY = col.splitY + diff;
                         let maxAllowable = Math.min(getSplitThreshold(), ...state.columns.filter(c => c.splitY).map(c => c.height - 2*state.thickness - MIN_SHELF_GAP));
                         if (newSplitY > maxAllowable) newSplitY = maxAllowable;
-                        state.columns.forEach(c => { if (c.splitY) c.splitY = newSplitY; });
+                        _setActiveWingSplitY(newSplitY);
                     } else {
                         const shelfIdx = div.idx;
                         const currentY = col.shelvesY[shelfIdx];
@@ -684,7 +683,7 @@ function buildDimensionsAndButtonsUI() {
                         let newSplitY = col.splitY + delta;
                         let maxAllowable = Math.min(getSplitThreshold(), ...state.columns.filter(c => c.splitY).map(c => c.height - 2*state.thickness - MIN_SHELF_GAP));
                         if (newSplitY > maxAllowable) newSplitY = maxAllowable;
-                        state.columns.forEach(c => { if (c.splitY) c.splitY = newSplitY; });
+                        _setActiveWingSplitY(newSplitY);
                     } else {
                         const shelfIdx = div.idx;
                         const currentY = col.shelvesY[shelfIdx];
@@ -1822,16 +1821,10 @@ function _applyColumnClipboard(target, src) {
         ? Math.round(srcCopy.splitY * (savedHeight / srcHeight) * 10) / 10
         : null;
 
-    const t = state.thickness;
-    const baseY = (target.type === 'desk')
-        ? (target.deskHeight + target.deskClearance)
-        : Math.max(state.plinthHeight, target.floorOffset || 0);
     for (let r = 0; r < target.compartments.length; r++) {
         const comp = target.compartments[r];
         if (!comp || (comp.type !== 'internal_drawers' && comp.type !== 'external_drawers')) continue;
-        const bottomY = (r === 0) ? baseY + t : (target.shelvesY[r - 1] || baseY) + t / 2;
-        const topY    = (r >= target.shelvesY.length) ? savedHeight - t : target.shelvesY[r] - t / 2;
-        const cellH   = Math.max(0, Math.round(topY - bottomY));
+        const cellH = _cellHeight(target, r);
         if (cellH < 12) {
             comp.type = 'empty';
         } else {
@@ -2170,7 +2163,15 @@ window.applyFCDoorStyle = function(style) {
 // The קושרת is independent per wing. Columns inside the same wing stay aligned
 // (one cabinet body). Other wings and the full-corner L-unit are never copied.
 function _setActiveWingSplitY(newSplitY) {
-    state.columns.forEach(c => { if (c.splitY) c.splitY = newSplitY; });
+    const t = state.thickness;
+    state.columns.forEach(c => {
+        if (!c.splitY) return;
+        c.splitY = newSplitY;
+        if (typeof _clampDrawerCompartments === 'function') {
+            const baseY = c.type === 'desk' ? c.deskHeight + c.deskClearance : state.plinthHeight;
+            _clampDrawerCompartments(c, baseY, t);
+        }
+    });
 }
 
 // ── FC Split (קושרת) drag handle ────────────────────────────────────────────
@@ -3278,12 +3279,11 @@ function _distributeSubCellShelves(sub, prevY, compH, numShelves) {
 
 // Helper: get prevY and compH for a compartment row
 function _getSubCellCompBounds(col, r) {
+    if (typeof _compartmentBounds === 'function') {
+        const b = _compartmentBounds(col, r);
+        return { prevY: b.bottomY, compH: b.h };
+    }
     const t = state.thickness;
-    const divs = col.compartments.map((comp, i) => {
-        if (i === 0) return null;
-        // shelvesY[i-1] is the Y of the shelf between row i-1 and row i
-        return col.shelvesY && col.shelvesY[i - 1] !== undefined ? col.shelvesY[i - 1] : null;
-    });
     const baseY = col.type === 'desk' ? col.deskHeight + col.deskClearance : state.plinthHeight;
     const prevY = r === 0 ? baseY + t/2 : (col.shelvesY[r - 1] + t/2);
     const nextY = r >= col.compartments.length - 1 ? col.height - t/2 : (col.shelvesY[r] - t/2);

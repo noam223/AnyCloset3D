@@ -2613,6 +2613,27 @@ function _splitDividerYs(col, baseY, t) {
     return ys.filter(y => y < col.splitY).concat([col.splitY], ys.filter(y => y > col.splitY));
 }
 
+/** Inner bounds of compartment row r, including the קושרת as a 2t divider (matches engine-core). */
+function _compartmentBounds(col, r, wingData) {
+    const plinthH = wingData ? wingData.plinthHeight : state.plinthHeight;
+    const t = wingData ? wingData.thickness : state.thickness;
+    const fo = (col && col.floorOffset) || 0;
+    const startY = fo > 0 ? fo + t
+        : ((col && col.type === 'desk') ? col.deskHeight + col.deskClearance + t
+            : ((col && col.noPlinth) ? t : plinthH + t));
+    const dividers = [];
+    ((col && col.shelvesY) || []).forEach(y => dividers.push({ y: y, thick: t }));
+    if (col && col.splitY && col.splitY > startY) dividers.push({ y: col.splitY, thick: 2 * t });
+    dividers.sort((a, b) => a.y - b.y);
+    const bottomY = (r <= 0) ? startY
+        : (dividers[r - 1] ? dividers[r - 1].y + dividers[r - 1].thick / 2 : startY);
+    const topY = (r >= dividers.length || !dividers[r])
+        ? ((col && col.height) || 0) - t
+        : dividers[r].y - dividers[r].thick / 2;
+    return { bottomY, topY, h: Math.max(0, topY - bottomY) };
+}
+window._compartmentBounds = _compartmentBounds;
+
 function _spaceShelvesInSpan(innerBottom, innerH, count) {
     const ys = [];
     const space = innerH / (count + 1);
@@ -2655,18 +2676,16 @@ function _syncCompartmentCount(col, baseY, t) {
 }
 
 function _clampDrawerCompartments(col, baseY, t) {
-    const divs = _splitDividerYs(col, baseY, t);
+    if (!col || !col.compartments) return;
     for (let r = 0; r < col.compartments.length; r++) {
         const comp = col.compartments[r];
         if (comp && (comp.type === 'internal_drawers' || comp.type === 'external_drawers')) {
-            const bottomY = (r === 0) ? baseY + t : divs[r - 1] + t;
-            const topY    = (r >= divs.length) ? col.height - t : divs[r] - t;
-            const cellH   = Math.max(0, topY - bottomY);
-            if (cellH < 23) {
+            const cellH = Math.round(_compartmentBounds(col, r).h);
+            if (cellH < 12) {
                 comp.type = 'empty';
             } else {
                 const minCount = Math.ceil(cellH / 60);
-                const autoCount = Math.floor((cellH - 22) / 20) + 1; // 23→1, 42→2, 62→3
+                const autoCount = Math.floor((cellH - 11) / 20) + 1;
                 if (comp.count < minCount) comp.count = minCount;
                 if (comp.count > autoCount) comp.count = autoCount;
                 if (comp.count < 1) comp.count = 1;
