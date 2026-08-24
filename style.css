@@ -1832,8 +1832,8 @@ body.dragging-v { cursor: ns-resize !important; }
 .qe-shelves-split-title { justify-content: flex-start; }
 .qe-shelves-split-rows {
     display: grid;
-    grid-template-columns: 5.6em auto;
-    column-gap: 10px;
+    grid-template-columns: max-content max-content;
+    column-gap: 6px;
     row-gap: 6px;
     align-items: center;
 }
