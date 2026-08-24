@@ -1647,29 +1647,30 @@ textureNames.forEach(name => {
 });
 
 const edgeMat = new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.15 });
-const splitEdgeMat = new THREE.LineBasicMaterial({ color: 0x3a322c, transparent: true, opacity: 0.62 });
 const matSnapHighlight = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.4, emissive: 0x16a34a, emissiveIntensity: 0.25 });
+const SPLIT_JOINT_SEAM_H = 0.34;
+const splitJointSeamMat = new THREE.MeshBasicMaterial({ color: 0x1c1712 });
 
-/** Darken a board material so the קושרת reads as a joint, not the same as a regular shelf. */
-function _makeSplitSeparatorMat(srcMat, shade) {
-    if (!srcMat || typeof srcMat.clone !== 'function') return srcMat;
-    const m = srcMat.clone();
-    const k = shade == null ? 0.80 : shade;
-    if (m.color) {
-        m.color = m.color.clone().multiplyScalar(k);
-        if (typeof m.color.offsetHSL === 'function') m.color.offsetHSL(0.02, 0.07, -0.025);
-    }
-    if (typeof m.roughness === 'number') m.roughness = Math.min(1, m.roughness + 0.06);
-    return m;
+/** Dark outline only at the meeting plane of the two קושרת boards. */
+function _addSplitJointSeam(parent, boardW, boardD, boardX, y, boardZ) {
+    if (!parent) return;
+    const seamH = SPLIT_JOINT_SEAM_H;
+    const seamFrontD = 0.42;
+    const seamSideW = 0.34;
+    const frontZ = boardZ + boardD / 2 - seamFrontD / 2 + 0.05;
+    const front = new THREE.Mesh(new THREE.BoxGeometry(boardW, seamH, seamFrontD), splitJointSeamMat);
+    front.position.set(boardX, y, frontZ);
+    parent.add(front);
+    const left = new THREE.Mesh(new THREE.BoxGeometry(seamSideW, seamH, boardD), splitJointSeamMat);
+    left.position.set(boardX - boardW / 2 + seamSideW / 2, y, boardZ);
+    parent.add(left);
+    const right = new THREE.Mesh(new THREE.BoxGeometry(seamSideW, seamH, boardD), splitJointSeamMat);
+    right.position.set(boardX + boardW / 2 - seamSideW / 2, y, boardZ);
+    parent.add(right);
 }
-window._makeSplitSeparatorMat = _makeSplitSeparatorMat;
-
-function _markSplitBoardEdges(mesh) {
-    if (!mesh || !mesh.children) return;
-    mesh.children.forEach(ch => {
-        if (ch.isLineSegments) ch.material = splitEdgeMat;
-    });
-}
+window._addSplitJointSeam = _addSplitJointSeam;
+window.SPLIT_JOINT_SEAM_H = SPLIT_JOINT_SEAM_H;
+window.splitJointSeamMat = splitJointSeamMat;
 
 const cabinetGroup = new THREE.Group();
 scene.add(cabinetGroup);
@@ -4514,22 +4515,13 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                 ? insideBlock.paintId
                 : (div.type === 'shelf' ? `shelf_c${c}_r${div.idx}` : `split_c${c}`);
             if (div.type === 'split') {
-                // Visual: two adjacent boards of thickness t (not one 2t slab). Layout still uses thick: 2t.
+                // Visual: two adjacent boards of thickness t (cabinet color). Layout still uses thick: 2t.
                 const boardT = t;
-                const splitMatLower = _makeSplitSeparatorMat(boardMat, 0.84);
-                const splitMatUpper = _makeSplitSeparatorMat(boardMat, 0.74);
-                const lowerMesh = createBoard(boardW, boardT, boardD, boardX, div.y - boardT / 2, boardZ, splitMatLower);
-                const upperMesh = createBoard(boardW, boardT, boardD, boardX, div.y + boardT / 2, boardZ, splitMatUpper);
-                _markSplitBoardEdges(lowerMesh);
-                _markSplitBoardEdges(upperMesh);
+                const lowerMesh = createBoard(boardW, boardT, boardD, boardX, div.y - boardT / 2, boardZ, boardMat);
+                const upperMesh = createBoard(boardW, boardT, boardD, boardX, div.y + boardT / 2, boardZ, boardMat);
                 _applyShelfUV(lowerMesh, boardW, boardD, c * 100 + 40);
                 _applyShelfUV(upperMesh, boardW, boardD, c * 100 + 41);
-                if (!isBP) {
-                    const seamMat = new THREE.MeshBasicMaterial({ color: 0x4a4038 });
-                    const seamD = 0.14;
-                    const frontZ = boardZ + boardD / 2 - seamD / 2 + 0.03;
-                    createBoard(boardW, 0.09, seamD, boardX, div.y, frontZ, seamMat);
-                }
+                if (!isBP) _addSplitJointSeam(_buildGroup, boardW, boardD, boardX, div.y, boardZ);
             } else {
                 const shelfMesh = createBoard(boardW, div.thick, boardD, boardX, div.y, boardZ, boardMat);
                 _applyShelfUV(shelfMesh, boardW, boardD, div.idx + c * 100);

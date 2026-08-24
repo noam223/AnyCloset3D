@@ -733,11 +733,11 @@ function buildFullCornerUnit(side, wingData) {
     // ---- Split board (קושרת) — two adjacent L-boards of thickness t, still occupying splitY-t .. splitY+t ----
     // addLBoard(yTop, mat, 0, 0, thick): board occupies yTop-thick .. yTop
     if (fc.splitY) {
-        const _splitTint = (typeof window._makeSplitSeparatorMat === 'function')
-            ? window._makeSplitSeparatorMat
-            : (m => m);
-        addLBoard(fc.splitY, _splitTint(matBody, 0.84), 0, 0, t);       // lower: splitY-t .. splitY
-        addLBoard(fc.splitY + t, _splitTint(matBody, 0.74), 0, 0, t);   // upper: splitY .. splitY+t
+        addLBoard(fc.splitY, matBody, 0, 0, t);       // lower: splitY-t .. splitY
+        addLBoard(fc.splitY + t, matBody, 0, 0, t);   // upper: splitY .. splitY+t
+        const seamH = window.SPLIT_JOINT_SEAM_H || 0.34;
+        const seamMat = window.splitJointSeamMat || new THREE.MeshBasicMaterial({ color: 0x1c1712 });
+        addLBoard(fc.splitY + seamH / 2, seamMat, 0, 0, seamH);
     }
 
     // ---- Compartment content ----
