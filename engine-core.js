@@ -1647,7 +1647,29 @@ textureNames.forEach(name => {
 });
 
 const edgeMat = new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.15 });
+const splitEdgeMat = new THREE.LineBasicMaterial({ color: 0x3a322c, transparent: true, opacity: 0.62 });
 const matSnapHighlight = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.4, emissive: 0x16a34a, emissiveIntensity: 0.25 });
+
+/** Darken a board material so the קושרת reads as a joint, not the same as a regular shelf. */
+function _makeSplitSeparatorMat(srcMat, shade) {
+    if (!srcMat || typeof srcMat.clone !== 'function') return srcMat;
+    const m = srcMat.clone();
+    const k = shade == null ? 0.80 : shade;
+    if (m.color) {
+        m.color = m.color.clone().multiplyScalar(k);
+        if (typeof m.color.offsetHSL === 'function') m.color.offsetHSL(0.02, 0.07, -0.025);
+    }
+    if (typeof m.roughness === 'number') m.roughness = Math.min(1, m.roughness + 0.06);
+    return m;
+}
+window._makeSplitSeparatorMat = _makeSplitSeparatorMat;
+
+function _markSplitBoardEdges(mesh) {
+    if (!mesh || !mesh.children) return;
+    mesh.children.forEach(ch => {
+        if (ch.isLineSegments) ch.material = splitEdgeMat;
+    });
+}
 
 const cabinetGroup = new THREE.Group();
 scene.add(cabinetGroup);
@@ -4491,9 +4513,28 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
             _ppPartId = (insideBlock && insideBlock.paintId)
                 ? insideBlock.paintId
                 : (div.type === 'shelf' ? `shelf_c${c}_r${div.idx}` : `split_c${c}`);
-            const shelfMesh = createBoard(boardW, div.thick, boardD, boardX, div.y, boardZ, boardMat);
+            if (div.type === 'split') {
+                // Visual: two adjacent boards of thickness t (not one 2t slab). Layout still uses thick: 2t.
+                const boardT = t;
+                const splitMatLower = _makeSplitSeparatorMat(boardMat, 0.84);
+                const splitMatUpper = _makeSplitSeparatorMat(boardMat, 0.74);
+                const lowerMesh = createBoard(boardW, boardT, boardD, boardX, div.y - boardT / 2, boardZ, splitMatLower);
+                const upperMesh = createBoard(boardW, boardT, boardD, boardX, div.y + boardT / 2, boardZ, splitMatUpper);
+                _markSplitBoardEdges(lowerMesh);
+                _markSplitBoardEdges(upperMesh);
+                _applyShelfUV(lowerMesh, boardW, boardD, c * 100 + 40);
+                _applyShelfUV(upperMesh, boardW, boardD, c * 100 + 41);
+                if (!isBP) {
+                    const seamMat = new THREE.MeshBasicMaterial({ color: 0x4a4038 });
+                    const seamD = 0.14;
+                    const frontZ = boardZ + boardD / 2 - seamD / 2 + 0.03;
+                    createBoard(boardW, 0.09, seamD, boardX, div.y, frontZ, seamMat);
+                }
+            } else {
+                const shelfMesh = createBoard(boardW, div.thick, boardD, boardX, div.y, boardZ, boardMat);
+                _applyShelfUV(shelfMesh, boardW, boardD, div.idx + c * 100);
+            }
             _ppPartId = '';
-            _applyShelfUV(shelfMesh, boardW, boardD, div.idx + c * 100);
             prevYTopDown = div.y - div.thick/2;
         });
 

@@ -224,6 +224,14 @@ const _BP_CUT_DIM_OPACITY = 0.72;
 const _BP_DIM_FONT = 11;
 const _BP_CELL_DIM_FONT = 10;
 const _BP_DOOR_STYLE_SUFFIX = { solid: '', framed_melamine: ' מסגרת', glass_melamine: ' זכוכית', glass_black: ' זכ.שחורה', glass_gold: ' זכ.זהב', glass_mirror: ' מראה' };
+const _BP_SPLIT_FILL = '#6e675c';
+
+/** Draw the קושרת as two stacked boards (not one thick slab). */
+function _bpDrawSplitDoubleBand(rectFn, x, yTop, w, totalH, stroke) {
+    const half = totalH / 2;
+    rectFn(x, yTop, w, half, _BP_SPLIT_FILL, stroke, 1.4);
+    rectFn(x, yTop + half, w, half, _BP_SPLIT_FILL, stroke, 1.4);
+}
 
 function _bpEscSvgText(str) {
     return String(str || '')
@@ -1578,7 +1586,7 @@ window._generateMultiViewBlueprintSVG = function() {
                 const _splitBandBotOld = _colBotY - _splitAdjOld * sc;
                 const _splitBandHOld   = _splitTOld * sc;
                 const _splitBandTopOld = _splitBandBotOld - _splitBandHOld;
-                rect(colX, _splitBandTopOld, colW, _splitBandHOld, '#94a3b8', STROKE, 1.5);
+                _bpDrawSplitDoubleBand(rect, colX, _splitBandTopOld, colW, _splitBandHOld, STROKE);
                 if (ci === 0) {
                     const lowerMidOld = (_colBotY + _splitBandBotOld) / 2;
                     const upperMidOld = (_colTopY + _splitBandTopOld) / 2;
@@ -2665,7 +2673,7 @@ window._generateMultiViewBlueprintPages = function() {
                 const splitBandH    = _splitT2 * sc;
                 const splitBandTopY = splitBandBotY - splitBandH;
                 // Draw the double-board band as a filled rectangle
-                makeRect(p, colX, splitBandTopY, colW, splitBandH, '#94a3b8', STROKE, 1.5);
+                _bpDrawSplitDoubleBand(function(x, y, w, h, f, s, sw) { makeRect(p, x, y, w, h, f, s, sw); }, colX, splitBandTopY, colW, splitBandH, STROKE);
                 // Labels: "ארון תחתון" below split, "ארון עליון" above split (only on first column)
                 if (ci === 0) {
                     const lowerMidY = (_colBotSvgY + splitBandBotY) / 2;
@@ -3250,7 +3258,7 @@ window._generateMultiViewBlueprintPages = function() {
             const fcSplitBotY = oy + dH - fcSplitY * sc;
             const fcSplitBandH = fcSplitT * sc;
             const fcSplitTopY = fcSplitBotY - fcSplitBandH;
-            makeRect(p, ox, fcSplitTopY, dW, fcSplitBandH, '#94a3b8', STROKE, 1.5);
+            _bpDrawSplitDoubleBand(function(x, y, w, h, f, s, sw) { makeRect(p, x, y, w, h, f, s, sw); }, ox, fcSplitTopY, dW, fcSplitBandH, STROKE);
             // Labels
             p.push(`<text x="${(ox + 6).toFixed(1)}" y="${((oy + dH + fcSplitBotY) / 2 + 4).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.5">ארון תחתון</text>`);
             p.push(`<text x="${(ox + 6).toFixed(1)}" y="${((oy + fcSplitTopY) / 2 + 4).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.5">ארון עליון</text>`);
@@ -3358,7 +3366,7 @@ window._generateMultiViewBlueprintPages = function() {
                 const _splitBotYFC = oy + dH - _splitYFC * sc;
                 const _splitBandHFC = _splitTFC * sc;
                 const _splitTopYFC = _splitBotYFC - _splitBandHFC;
-                makeRect(p, colX, _splitTopYFC, colW, _splitBandHFC, '#94a3b8', STROKE, 1.5);
+                _bpDrawSplitDoubleBand(function(x, y, w, h, f, s, sw) { makeRect(p, x, y, w, h, f, s, sw); }, colX, _splitTopYFC, colW, _splitBandHFC, STROKE);
                 if (ci === 0) {
                     const lowerMidFC = (oy + dH + _splitBotYFC) / 2;
                     const upperMidFC = (oy + _splitTopYFC) / 2;
@@ -3635,7 +3643,7 @@ window._generateMultiViewBlueprintPages = function() {
                         const _splitBotYSC = oy + dH - _splitYSC * scScale;
                         const _splitBandHSC = _splitTSC * scScale;
                         const _splitTopYSC = _splitBotYSC - _splitBandHSC;
-                        makeRect(p, colX, _splitTopYSC, colW, _splitBandHSC, '#94a3b8', STROKE, 1.5);
+                        _bpDrawSplitDoubleBand(function(x, y, w, h, f, s, sw) { makeRect(p, x, y, w, h, f, s, sw); }, colX, _splitTopYSC, colW, _splitBandHSC, STROKE);
                         if (ci === 0) {
                             const lowerMidSC = (_splitBotYSC + oy + dH) / 2;
                             const upperMidSC = (oy + _splitTopYSC) / 2;
@@ -3814,7 +3822,7 @@ window._generateMultiViewBlueprintPages = function() {
                     const _splitBotYSC = oy + dH - _splitYSC * scScale;
                     const _splitBandHSC = _splitTSC * scScale;
                     const _splitTopYSC = _splitBotYSC - _splitBandHSC;
-                    makeRect(p, ox, _splitTopYSC, dW, _splitBandHSC, '#94a3b8', STROKE, 1.5);
+                    _bpDrawSplitDoubleBand(function(x, y, w, h, f, s, sw) { makeRect(p, x, y, w, h, f, s, sw); }, ox, _splitTopYSC, dW, _splitBandHSC, STROKE);
                     const lowerMidSC = (_splitBotYSC + oy + dH) / 2;
                     const upperMidSC = (oy + _splitTopYSC) / 2;
                     p.push(`<text x="${(ox + 6).toFixed(1)}" y="${(lowerMidSC + 4).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.5">ארון תחתון</text>`);

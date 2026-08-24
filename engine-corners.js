@@ -730,12 +730,14 @@ function buildFullCornerUnit(side, wingData) {
     const shelvesY = fc.shelvesY || [];
     shelvesY.forEach(sy => addLBoard(sy + t / 2, matInternal, t, t));
 
-    // ---- Split board (קושרת) — single L-shaped board of double thickness, centered at fc.splitY ----
-    // Double thickness (2t) as one board, centered at fc.splitY to align with the adjacent wing's split board.
+    // ---- Split board (קושרת) — two adjacent L-boards of thickness t, still occupying splitY-t .. splitY+t ----
     // addLBoard(yTop, mat, 0, 0, thick): board occupies yTop-thick .. yTop
-    // To center at fc.splitY with thick=2t: yTop = fc.splitY + t → occupies fc.splitY-t .. fc.splitY+t
     if (fc.splitY) {
-        addLBoard(fc.splitY + t, matBody, 0, 0, 2 * t); // occupies fc.splitY-t .. fc.splitY+t
+        const _splitTint = (typeof window._makeSplitSeparatorMat === 'function')
+            ? window._makeSplitSeparatorMat
+            : (m => m);
+        addLBoard(fc.splitY, _splitTint(matBody, 0.84), 0, 0, t);       // lower: splitY-t .. splitY
+        addLBoard(fc.splitY + t, _splitTint(matBody, 0.74), 0, 0, t);   // upper: splitY .. splitY+t
     }
 
     // ---- Compartment content ----
