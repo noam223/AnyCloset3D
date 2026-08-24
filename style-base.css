@@ -652,7 +652,7 @@ body.dragging-v { cursor: ns-resize !important; }
     position: absolute; transform: translate(-50%, 12px);
     background: rgba(255, 255, 255, 0.97); backdrop-filter: blur(12px);
     border-radius: var(--radius-md); box-shadow: var(--shadow-lg), 0 0 0 1px rgba(0,0,0,0.04);
-    display: flex; align-items: center; padding: 8px 12px; gap: 10px;
+    display: flex; align-items: stretch; padding: 10px 14px; gap: 12px;
     pointer-events: auto; opacity: 0; visibility: hidden; transition: opacity var(--transition), transform var(--transition); z-index: 30;
 }
 .quick-edit-panel.visible { opacity: 1; visibility: visible; transform: translate(-50%, 12px); }
@@ -660,7 +660,19 @@ body.dragging-v { cursor: ns-resize !important; }
 .qe-group { display: flex; align-items: center; gap: 10px; }
 .qe-label { font-size: 0.84rem; color: var(--text-dark); font-weight: 600; display: flex; align-items: center; gap: 5px;}
 .qe-shelves-split { flex-direction: column; align-items: stretch; gap: 6px; }
-.qe-shelves-split-title { justify-content: center; margin-bottom: 1px; }
+.qe-shelves-split-title { justify-content: flex-start; }
+.qe-shelves-split-rows {
+    display: grid;
+    grid-template-columns: 5.6em auto;
+    column-gap: 10px;
+    row-gap: 6px;
+    align-items: center;
+}
+.qe-shelves-split-rows .qe-label {
+    justify-self: stretch;
+    min-width: 0;
+}
+.qe-stepper { display: flex; align-items: center; gap: 6px; }
 .qe-btn { width: 28px; height: 28px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: white; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-dark); transition: all var(--transition); }
 .qe-btn:hover { border-color: var(--secondary); color: var(--secondary); background: var(--highlight); }
 .qe-btn-text { background: transparent; border: 1px solid var(--border); padding: 7px 12px; border-radius: 20px; font-weight: 600; cursor: pointer; transition: all var(--transition); white-space: nowrap; display: flex; align-items: center; gap: 5px; font-size: 0.84rem; }
@@ -671,7 +683,7 @@ body.dragging-v { cursor: ns-resize !important; }
 .qe-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .qe-input-wrap span { font-size: 0.84rem; color: var(--text-light); margin-right: 3px; font-weight: 500;}
 .qe-input-sm { width: 20px !important; }
-.qe-divider { width: 1px; height: 28px; background: var(--border); flex-shrink: 0; }
+.qe-divider { width: 1px; align-self: stretch; min-height: 28px; background: var(--border); flex-shrink: 0; }
 /* Content sub-panels (hanging/drawer/honeycomb) ג€” same style as door-style-panel */
 .content-sub-panel {
     position: absolute;
@@ -687,7 +699,8 @@ body.dragging-v { cursor: ns-resize !important; }
     width: fit-content;
     pointer-events: auto;
 }
-.qe-toggle-btn { background: white; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 5px 10px; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 5px; color: var(--text-dark); transition: all var(--transition); white-space: nowrap; }
+.qe-toggle-btn { background: white; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 0.88rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--text-dark); transition: all var(--transition); white-space: nowrap; align-self: stretch; }
+.qe-toggle-btn i { font-size: 1.15rem; }
 .qe-toggle-btn:hover { border-color: var(--secondary); color: var(--secondary); background: var(--highlight); }
 .qe-toggle-btn.active { background: var(--secondary); color: white; border-color: var(--secondary); }
 .qe-checkbox-row { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 500; color: var(--text-dark); cursor: pointer; white-space: nowrap; }

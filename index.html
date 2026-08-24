@@ -36,10 +36,10 @@
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="style-base.css?v=20260823delivery">
+    <link rel="stylesheet" href="style-base.css?v=20260824qe">
     <link rel="stylesheet" href="style-mobile.css?v=20260609a">
     <link rel="stylesheet" href="style-extras.css?v=20260731rpcab">
-    <link rel="stylesheet" href="style.css?v=20260823delivery">
+    <link rel="stylesheet" href="style.css?v=20260824qe">
     <style>
         html.thumb-only-mode #left-sidebar,
         html.thumb-only-mode #right-sidebar,
@@ -1408,17 +1408,19 @@
         </div>
         <div class="qe-group qe-shelves-split" id="qe-shelves-split-group" style="display:none;">
             <span class="qe-label qe-shelves-split-title"><i class="fa-solid fa-layer-group"></i> מדפים</span>
-            <div class="qe-group">
+            <div class="qe-shelves-split-rows">
                 <span class="qe-label">עליונה</span>
-                <button class="qe-btn" onclick="updateQE('shelves',1,'upper')"><i class="fa-solid fa-plus"></i></button>
-                <div class="qe-input-wrap"><input class="qe-input qe-input-sm" id="qe-s-val-upper" type="number" step="1" onchange="updateQEInput('shelves',this.value,'upper')"/></div>
-                <button class="qe-btn" onclick="updateQE('shelves',-1,'upper')"><i class="fa-solid fa-minus"></i></button>
-            </div>
-            <div class="qe-group">
+                <div class="qe-stepper">
+                    <button class="qe-btn" onclick="updateQE('shelves',1,'upper')"><i class="fa-solid fa-plus"></i></button>
+                    <div class="qe-input-wrap"><input class="qe-input qe-input-sm" id="qe-s-val-upper" type="number" step="1" onchange="updateQEInput('shelves',this.value,'upper')"/></div>
+                    <button class="qe-btn" onclick="updateQE('shelves',-1,'upper')"><i class="fa-solid fa-minus"></i></button>
+                </div>
                 <span class="qe-label">תחתונה</span>
-                <button class="qe-btn" onclick="updateQE('shelves',1,'lower')"><i class="fa-solid fa-plus"></i></button>
-                <div class="qe-input-wrap"><input class="qe-input qe-input-sm" id="qe-s-val-lower" type="number" step="1" onchange="updateQEInput('shelves',this.value,'lower')"/></div>
-                <button class="qe-btn" onclick="updateQE('shelves',-1,'lower')"><i class="fa-solid fa-minus"></i></button>
+                <div class="qe-stepper">
+                    <button class="qe-btn" onclick="updateQE('shelves',1,'lower')"><i class="fa-solid fa-plus"></i></button>
+                    <div class="qe-input-wrap"><input class="qe-input qe-input-sm" id="qe-s-val-lower" type="number" step="1" onchange="updateQEInput('shelves',this.value,'lower')"/></div>
+                    <button class="qe-btn" onclick="updateQE('shelves',-1,'lower')"><i class="fa-solid fa-minus"></i></button>
+                </div>
             </div>
         </div>
         <div class="qe-divider"></div>

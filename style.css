@@ -1819,7 +1819,7 @@ body.dragging-v { cursor: ns-resize !important; }
     background: rgba(255,255,255,0.97); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-lg), 0 0 0 1px rgba(37,99,235,0.1), 0 0 24px rgba(37,99,235,0.12);
-    display: flex; align-items: center; padding: 8px 12px; gap: 8px;
+    display: flex; align-items: stretch; padding: 10px 14px; gap: 12px;
     pointer-events: auto; opacity: 0; visibility: hidden;
     transition: opacity 0.22s ease, transform 0.28s cubic-bezier(0.34,1.56,0.64,1); z-index: 30;
     border: 1px solid rgba(37,99,235,0.12);
@@ -1829,18 +1829,30 @@ body.dragging-v { cursor: ns-resize !important; }
 .qe-group { display: flex; align-items: center; gap: 8px; }
 .qe-label { font-size: 0.72rem; color: var(--text-light); font-weight: 700; display: flex; align-items: center; gap: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
 .qe-shelves-split { flex-direction: column; align-items: stretch; gap: 6px; }
-.qe-shelves-split-title { justify-content: center; margin-bottom: 1px; }
-.qe-btn { width: 27px; height: 27px; border-radius: var(--radius-xs); border: 1px solid var(--border); background: var(--bg-card); font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-mid); transition: all var(--transition); }
+.qe-shelves-split-title { justify-content: flex-start; }
+.qe-shelves-split-rows {
+    display: grid;
+    grid-template-columns: 5.6em auto;
+    column-gap: 10px;
+    row-gap: 6px;
+    align-items: center;
+}
+.qe-shelves-split-rows .qe-label {
+    justify-self: stretch;
+    min-width: 0;
+}
+.qe-stepper { display: flex; align-items: center; gap: 6px; }
+.qe-btn { width: 30px; height: 30px; border-radius: var(--radius-xs); border: 1px solid var(--border); background: var(--bg-card); font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-mid); transition: all var(--transition); flex-shrink: 0; }
 .qe-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-pale); }
 .qe-btn-text { background: transparent; border: 1px solid var(--border); padding: 6px 11px; border-radius: 20px; font-weight: 600; cursor: pointer; transition: all var(--transition); white-space: nowrap; display: flex; align-items: center; gap: 5px; font-size: 0.78rem; color: var(--text-mid); }
 .qe-btn-text:hover { background: var(--accent-pale); border-color: var(--accent); color: var(--accent); }
-.qe-input-wrap { display: flex; align-items: center; border: 1px solid var(--border); border-radius: var(--radius-xs); padding: 4px 8px; background: var(--bg-card); }
+.qe-input-wrap { display: flex; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: var(--radius-xs); padding: 4px 8px; background: var(--bg-card); min-width: 36px; }
 .qe-input { width: 45px; border: none; background: transparent; text-align: center; font-size: 0.95rem; font-weight: 700; color: var(--primary); outline: none; -moz-appearance: textfield; font-family: inherit;}
 .qe-input::-webkit-outer-spin-button,
 .qe-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .qe-input-wrap span { font-size: 0.78rem; color: var(--text-light); margin-right: 3px; font-weight: 500;}
-.qe-input-sm { width: 20px !important; }
-.qe-divider { width: 1px; height: 24px; background: var(--border-light); flex-shrink: 0; }
+.qe-input-sm { width: 22px !important; }
+.qe-divider { width: 1px; align-self: stretch; min-height: 28px; background: var(--border-light); flex-shrink: 0; }
 /* Content sub-panels (hanging/drawer/honeycomb) — same style as door-style-panel */
 .content-sub-panel {
     position: absolute;
@@ -1856,7 +1868,8 @@ body.dragging-v { cursor: ns-resize !important; }
     width: fit-content;
     pointer-events: auto;
 }
-.qe-toggle-btn { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-xs); padding: 5px 10px; font-size: 0.78rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 5px; color: var(--text-mid); transition: all var(--transition); white-space: nowrap; }
+.qe-toggle-btn { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-xs); padding: 10px 14px; font-size: 0.86rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--text-mid); transition: all var(--transition); white-space: nowrap; align-self: stretch; }
+.qe-toggle-btn i { font-size: 1.15rem; }
 .qe-toggle-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-pale); }
 .qe-toggle-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
 .qe-checkbox-row { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; font-weight: 500; color: var(--text-mid); cursor: pointer; white-space: nowrap; }
