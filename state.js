@@ -2544,22 +2544,11 @@ function checkSplits() {
         });
     }
 
-    // Also update splitY for full corner units on all wings — sync to the same newSplitY as columns
+    // Full-corner L-units keep their own splitY; only add/remove based on that unit's height.
     ['left', 'right'].forEach(side => {
         const fw = state.wings[side];
-        if (!fw || !fw.fullCorner) return;
-        if (fw.wingPosition === 'full_corner') {
-            const fcColH = fw.globalHeight || state.globalHeight;
-            const fcThreshold = getSplitThreshold(fw);
-            if (fcColH > fcThreshold) {
-                // Use the same splitY as the columns (if any column has one), otherwise use default
-                const colSplitY = shouldHaveSplit
-                    ? (state.columns.find(c => c.splitY)?.splitY || (threshold === 240 ? 200 : 240))
-                    : null;
-                fw.fullCorner.splitY = colSplitY;
-            } else {
-                fw.fullCorner.splitY = null;
-            }
+        if (fw && fw.fullCorner && fw.wingPosition === 'full_corner') {
+            _checkFCSplit(fw);
         }
     });
 }

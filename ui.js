@@ -2166,22 +2166,11 @@ window.applyFCDoorStyle = function(style) {
     _clearFCSelection(); // close toolbar after applying
 };
 
-// ── Global splitY sync helper ────────────────────────────────────────────────
-// Updates splitY on ALL columns across ALL wings AND all full corner units.
-// This ensures the קושרת is always at the same height throughout the entire wardrobe.
-function _syncAllSplitY(newSplitY) {
-    // 1. Update all columns in the active wing (state.columns proxy)
+// ── Per-unit splitY ──────────────────────────────────────────────────────────
+// The קושרת is independent per wing. Columns inside the same wing stay aligned
+// (one cabinet body). Other wings and the full-corner L-unit are never copied.
+function _setActiveWingSplitY(newSplitY) {
     state.columns.forEach(c => { if (c.splitY) c.splitY = newSplitY; });
-    // 2. Update columns in all other wings
-    ['center', 'left', 'right'].forEach(side => {
-        const w = state.wings[side];
-        if (!w || !w.columns) return;
-        w.columns.forEach(c => { if (c.splitY) c.splitY = newSplitY; });
-        // 3. Update full corner unit splitY if present
-        if (w.fullCorner && w.fullCorner.splitY) {
-            w.fullCorner.splitY = newSplitY;
-        }
-    });
 }
 
 // ── FC Split (קושרת) drag handle ────────────────────────────────────────────
@@ -2252,7 +2241,7 @@ function _rebuildFCSplitDragHandle(fcRealSide, wingData, fc) {
         newSplitY = Math.max(minSplitY, Math.min(maxSplitY, newSplitY));
         newSplitY = Math.round(newSplitY * 10) / 10;
 
-        _syncAllSplitY(newSplitY);
+        fc2.splitY = newSplitY;
         buildCabinetDragging();
     });
 
@@ -4428,7 +4417,7 @@ function buildDragHandlesUI() {
                     const limitMin = Math.max(...minLimits);
                     const limitMax = Math.min(getSplitThreshold(), ...maxLimits); 
                     const newSplitY = Math.round(Math.max(limitMin, Math.min(limitMax, startY + deltaCm)));
-                    _syncAllSplitY(newSplitY);
+                    _setActiveWingSplitY(newSplitY);
                 } 
                 else if (v.isInternalDeskSurface) {
                     col.deskHeight = Math.round(Math.max(50, Math.min(col.deskHeight + col.deskClearance - MIN_SHELF_GAP, startY + deltaCm)));
