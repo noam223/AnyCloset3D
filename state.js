@@ -2806,7 +2806,7 @@ function distributeColumns(numCols) {
     if(typeof clearSelection === 'function') clearSelection();
 }
 
-window.updateQE = function(field, delta) {
+window.updateQE = function(field, delta, unit) {
     const cIndex = state.activeEditCol;
     if (cIndex === -1 || !state.columns[cIndex]) return;
     const col = state.columns[cIndex];
@@ -2838,8 +2838,8 @@ window.updateQE = function(field, delta) {
         }
     }
     if (field === 'shelves') {
-        const unit = (arguments[2] === 'upper') ? 'upper' : 'lower';
-        if (_adjustUnitShelves(col, unit, delta)) {
+        const target = (unit === 'upper') ? 'upper' : 'lower';
+        if (_adjustUnitShelves(col, target, delta)) {
             if (typeof clearSelection === 'function') clearSelection();
         }
     }

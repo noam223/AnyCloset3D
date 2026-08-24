@@ -606,8 +606,8 @@ window.toggleNoPlinth = function() {
 
 // Patch updateQE — refresh col bar after any QE change
 const _origUpdateQE = window.updateQE;
-window.updateQE = function(dim, delta) {
-    if (_origUpdateQE) _origUpdateQE(dim, delta);
+window.updateQE = function(dim, delta, unit) {
+    if (_origUpdateQE) _origUpdateQE(dim, delta, unit);
     if (isMobile()) updateMobileColBarUI();
 };
 
