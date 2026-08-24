@@ -10113,15 +10113,18 @@ function _buildCustomerSummaryHTML(logoDataUrl) {
         totalCabPrice    += r.cabPrice;
         totalInstallPrice += r.instPrice;
         rowsHTML += `
-        <tr>
-            <td style="padding:10px 14px;border:1px solid #e2e8f0;font-weight:600;color:#1e3a5f;">${r.title}</td>
-            <td style="padding:10px 14px;border:1px solid #e2e8f0;font-size:0.9rem;color:#334155;line-height:1.6;">${r.details.replace(/ \| /g,'<br>')}</td>
-            ${_hidePrices ? '' : `<td style="padding:10px 14px;border:1px solid #e2e8f0;text-align:center;font-weight:700;color:#1e3a5f;white-space:nowrap;">₪${r.cabPrice.toLocaleString()}</td>
-            <td style="padding:10px 14px;border:1px solid #e2e8f0;text-align:center;color:#475569;white-space:nowrap;">₪${r.instPrice.toLocaleString()}</td>`}
-        </tr>`;
+        <div class="cab-card">
+          <div class="cab-card-inner">
+            <div class="cab-name">${r.title}</div>
+            <div class="cab-details">${r.details.replace(/ \| /g,'<br>')}</div>
+            ${_hidePrices ? '' : `<div class="cab-price">₪${r.cabPrice.toLocaleString()}</div>
+            <div class="cab-install">₪${r.instPrice.toLocaleString()}</div>`}
+          </div>
+        </div>`;
     });
 
     const grandTotal = totalCabPrice + totalInstallPrice;
+    const cols = _hidePrices ? '18% 1fr' : '18% 1fr 14% 14%';
 
     return `<!DOCTYPE html>
 <html lang="he" dir="rtl">
@@ -10133,15 +10136,46 @@ function _buildCustomerSummaryHTML(logoDataUrl) {
   h1 { font-size: 1.6rem; color: #1e3a5f; margin: 0 0 4px; }
   .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; border-bottom: 2px solid #1e3a5f; padding-bottom: 14px; }
   .cust-info { font-size: 0.95rem; color: #475569; line-height: 1.7; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.97rem; }
-  th { background: #1e3a5f; color: white; padding: 10px 14px; text-align: right; font-weight: 600; border: 1px solid #1e3a5f; }
-  .totals-row td { background: #f8fafc; font-weight: 600; border-top: 2px solid #1e3a5f; }
+  .cab-list { width: 100%; margin-bottom: 20px; font-size: 0.97rem; border: 1px solid #1e3a5f; }
+  .cab-head, .cab-card-inner, .totals-row {
+    display: grid;
+    grid-template-columns: ${cols};
+    align-items: start;
+  }
+  .cab-head {
+    background: #1e3a5f; color: white; font-weight: 600;
+  }
+  .cab-head > div { padding: 10px 14px; }
+  .cab-head .col-price, .cab-head .col-install { text-align: center; }
+  .cab-card {
+    display: block;
+    border-top: 1px solid #e2e8f0;
+    page-break-inside: avoid;
+    break-inside: avoid-page;
+  }
+  .cab-name { padding:10px 14px;font-weight:600;color:#1e3a5f; }
+  .cab-details { padding:10px 14px;font-size:0.9rem;color:#334155;line-height:1.6; }
+  .cab-price { padding:10px 14px;text-align:center;font-weight:700;color:#1e3a5f;white-space:nowrap; }
+  .cab-install { padding:10px 14px;text-align:center;color:#475569;white-space:nowrap; }
+  .totals-row { background: #f8fafc; font-weight: 600; border-top: 2px solid #1e3a5f; }
+  .totals-row > div { padding: 10px 14px; }
+  .totals-label { grid-column: 1 / span 2; text-align: right; }
+  .totals-val { text-align: center; color: #1e3a5f; }
   .grand-total { margin-top: 10px; font-size: 1.2rem; font-weight: 800; color: #1e3a5f; }
   .action-bar { display: flex; gap: 10px; margin-bottom: 22px; flex-wrap: wrap; }
   .action-btn { padding: 9px 20px; border-radius: 8px; border: none; font-size: 0.95rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 7px; font-family: inherit; }
   .btn-print  { background: #1e3a5f; color: white; }
   .btn-excel  { background: #16a34a; color: white; }
-  @media print { .action-bar { display: none !important; } body { padding: 15px; } }
+  @media print {
+    .action-bar { display: none !important; }
+    body { padding: 0; }
+    @page { size: A4; margin: 12mm; }
+    .cab-card, .totals-row, .grand-total {
+      page-break-inside: avoid !important;
+      break-inside: avoid-page !important;
+    }
+    .cab-details { orphans: 999; widows: 999; }
+  }
 </style>
 </head>
 <body>
@@ -10167,24 +10201,20 @@ function _buildCustomerSummaryHTML(logoDataUrl) {
   </div>
 </div>
 
-<table>
-  <thead>
-    <tr>
-      <th style="width:18%;">ארון</th>
-      <th>פירוט</th>
-      ${_hidePrices ? '' : `<th style="width:14%;text-align:center;">מחיר ארון</th>
-      <th style="width:14%;text-align:center;">התקנה</th>`}
-    </tr>
-  </thead>
-  <tbody>
-    ${rowsHTML}
-    ${_hidePrices ? '' : `<tr class="totals-row">
-      <td colspan="2" style="padding:10px 14px;border:1px solid #e2e8f0;text-align:right;">סה"כ</td>
-      <td style="padding:10px 14px;border:1px solid #e2e8f0;text-align:center;color:#1e3a5f;">₪${totalCabPrice.toLocaleString()}</td>
-      <td style="padding:10px 14px;border:1px solid #e2e8f0;text-align:center;color:#1e3a5f;">₪${totalInstallPrice.toLocaleString()}</td>
-    </tr>`}
-  </tbody>
-</table>
+<div class="cab-list">
+  <div class="cab-head">
+    <div>ארון</div>
+    <div>פירוט</div>
+    ${_hidePrices ? '' : `<div class="col-price">מחיר ארון</div>
+    <div class="col-install">התקנה</div>`}
+  </div>
+  ${rowsHTML}
+  ${_hidePrices ? '' : `<div class="totals-row">
+    <div class="totals-label">סה"כ</div>
+    <div class="totals-val">₪${totalCabPrice.toLocaleString()}</div>
+    <div class="totals-val">₪${totalInstallPrice.toLocaleString()}</div>
+  </div>`}
+</div>
 
 ${_hidePrices ? '' : `<div class="grand-total">סה"כ לתשלום (כולל התקנה): ₪${grandTotal.toLocaleString()}</div>`}
 </body>
@@ -10288,6 +10318,28 @@ window.printCustomerSummary = async function() {
     // Inject functions directly into child window — avoids </script> parsing issues
     win._excelData = excelData;
     win._buildExcelXML = _buildExcelXML;
+
+    win._keepCabinetBlocksTogether = function() {
+        var mm = 3.78;
+        var pageInner = (297 - 24) * mm;
+        var header = win.document.querySelector('.header');
+        var used = header ? header.getBoundingClientRect().height + 12 : 0;
+        var nodes = win.document.querySelectorAll('.cab-card, .totals-row, .grand-total');
+        for (var i = 0; i < nodes.length; i++) {
+            var el = nodes[i];
+            el.style.breakBefore = 'auto';
+            el.style.pageBreakBefore = 'auto';
+            var h = el.getBoundingClientRect().height;
+            if (used > 48 && (used + h) > (pageInner - 10)) {
+                el.style.breakBefore = 'page';
+                el.style.pageBreakBefore = 'always';
+                used = h;
+            } else {
+                used += h;
+            }
+        }
+    };
+    win.addEventListener('beforeprint', win._keepCabinetBlocksTogether);
 
     win._downloadExcel = function() {
         var xml = win._buildExcelXML(win._excelData);
