@@ -3678,29 +3678,17 @@ window.applyDoor = function(type) {
         return;
     }
 
-    // Height > threshold: prevent a door from spanning across the split board boundary.
-    // Doors are allowed on either the lower unit OR the upper unit independently.
+    // Overlay doors are independent of the internal קושרת — they may span upper and
+    // lower units together. The only limit is a 270 cm maximum door height.
     if (type !== 'empty') {
         const col = state.columns[c];
-        if (col.height > getSplitThreshold() && col.splitY) {
-            // Number of shelves that are below the split board = lower-unit row count - 1
-            // shelvesY entries below splitY belong to the lower unit
-            const bottomShelves = col.shelvesY.filter(y => y < col.splitY).length;
-            const splitRowBoundary = (typeof getSplitRowBoundary === 'function')
-                ? getSplitRowBoundary(col)
-                : (bottomShelves + 1);
-            const selectionCrossesplit = startR < splitRowBoundary && endR >= splitRowBoundary;
-            if (selectionCrossesplit) {
-                // Clip to whichever unit contains the majority of the selection
-                const belowCount = splitRowBoundary - startR;
-                const aboveCount = endR - splitRowBoundary + 1;
-                if (belowCount >= aboveCount) {
-                    endR = splitRowBoundary - 1;
-                } else {
-                    startR = splitRowBoundary;
-                }
-                _showToast('לא ניתן להחיל דלת על שתי היחידות יחד — הדלת הוחלה על יחידה אחת בלבד', 3500);
-            }
+        const doorH = (typeof overlayDoorHeightCm === 'function')
+            ? overlayDoorHeightCm(col, startR, endR)
+            : (endR - startR + 1) * 30;
+        const maxDoorH = (typeof MAX_OVERLAY_DOOR_HEIGHT !== 'undefined') ? MAX_OVERLAY_DOOR_HEIGHT : 270;
+        if (doorH > maxDoorH + 0.05) {
+            alert(`לא ניתן להתקין דלת מעל ${maxDoorH} ס"מ (גובה נוכחי: ${Math.round(doorH)} ס"מ).`);
+            return;
         }
     }
 

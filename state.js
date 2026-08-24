@@ -8,6 +8,8 @@ window.MIN_WARDROBE_WIDTH = MIN_WARDROBE_WIDTH;
 const MIN_SHELF_GAP = 12;
 const MAX_GLOBAL_HEIGHT = 370;
 window.MAX_GLOBAL_HEIGHT = MAX_GLOBAL_HEIGHT;
+const MAX_OVERLAY_DOOR_HEIGHT = 270;
+window.MAX_OVERLAY_DOOR_HEIGHT = MAX_OVERLAY_DOOR_HEIGHT;
 const MAX_COLUMNS = 10;
 window.MAX_COLUMNS = MAX_COLUMNS;
 
@@ -2588,6 +2590,33 @@ function getSplitRowBoundary(col) {
     return ((col.shelvesY || []).filter(y => y < col.splitY).length) + 1;
 }
 window.getSplitRowBoundary = getSplitRowBoundary;
+
+/** Overlay door height in cm for a column row span (matches engine-core overlay formula). */
+function overlayDoorHeightCm(col, startR, endR) {
+    if (!col) return 0;
+    const t = (typeof state !== 'undefined' && state.thickness) ? state.thickness : 1.7;
+    const doorGap = 0.3;
+    const fo = col.floorOffset || 0;
+    const dividers = [];
+    (col.shelvesY || []).forEach(y => dividers.push({ y: y, thick: t }));
+    if (col.splitY) dividers.push({ y: col.splitY, thick: 2 * t });
+    const dividersAsc = dividers.sort((a, b) => a.y - b.y);
+    const n = dividersAsc.length;
+    const start = Math.max(0, Math.min(startR, n));
+    const end = Math.max(0, Math.min(endR, n));
+    let baseY;
+    if (col.type === 'desk') {
+        baseY = (col.deskHeight || 0) + (col.deskClearance || 0);
+    } else if (col.noPlinth) {
+        baseY = fo > 0 ? fo : 0;
+    } else {
+        baseY = Math.max(state.plinthHeight || 0, fo);
+    }
+    const bottom = (start === 0) ? (baseY + doorGap / 2) : (dividersAsc[start - 1].y + doorGap / 2);
+    const top = (end >= n) ? (col.height - doorGap / 2) : (dividersAsc[end].y - doorGap / 2);
+    return Math.max(0, top - bottom);
+}
+window.overlayDoorHeightCm = overlayDoorHeightCm;
 
 function _splitDividerYs(col, baseY, t) {
     const ys = col.shelvesY || [];
