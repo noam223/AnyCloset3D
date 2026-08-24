@@ -8166,6 +8166,21 @@ function _wingDimsStr(wing, rawState) {
     return 'רוחב: ' + w + ' ס"מ | גובה: ' + h + ' ס"מ | עומק: ' + d + ' ס"מ';
 }
 
+/** Per-wing outer dims for customer summary (walk-in / corner). Avoids "|" so print keeps one line per wing. */
+function _customerSummaryDimsLines(item, rawState) {
+    const units = _enumeratePrintCabinetUnits(rawState);
+    if (units && units.length) {
+        return units.map(function(unit) {
+            const wing = unit.wing || {};
+            const w = wing.width || (rawState && rawState.width) || 160;
+            const h = _wingHeightFromData(wing, (rawState && rawState.globalHeight) || 240);
+            const d = wing.depth || (rawState && rawState.depth) || 54;
+            return unit.label + ': רוחב ' + w + ' ס"מ, גובה ' + h + ' ס"מ, עומק ' + d + ' ס"מ';
+        });
+    }
+    return item && item.dimsStr ? [item.dimsStr] : [];
+}
+
 function _formatHangingFromCounts(counts) {
     const total = (counts.hanging || 0) + (counts.sorbet || 0);
     if (counts.sorbet > 0) return total + ' יחידות (' + counts.sorbet + ' סורבטו)';
@@ -9997,7 +10012,7 @@ function _buildCustomerSummaryDetails(itemObj) {
     const content = rawState ? _countCabinetContentFromRawState(rawState) : _emptyContentCounts();
     const details = [];
 
-    if (item.dimsStr) details.push(item.dimsStr);
+    _customerSummaryDimsLines(item, rawState).forEach(function(line) { details.push(line); });
     if (item.material) details.push('חומר גוף: ' + item.material);
 
     const colorBody = _summarySpecOrRaw(item, rawState, 'colorBody', 'materialBody');
