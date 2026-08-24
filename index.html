@@ -1406,6 +1406,20 @@
             <div class="qe-input-wrap"><input class="qe-input qe-input-sm" id="qe-s-val" type="number" step="1" onchange="updateQEInput('shelves',this.value)"/></div>
             <button class="qe-btn" onclick="updateQE('shelves',-1)"><i class="fa-solid fa-minus"></i></button>
         </div>
+        <div class="qe-group qe-shelves-split" id="qe-shelves-split-group" style="display:none;">
+            <div class="qe-group">
+                <span class="qe-label"><i class="fa-solid fa-layer-group"></i> תחתונה</span>
+                <button class="qe-btn" onclick="updateQE('shelves',1,'lower')"><i class="fa-solid fa-plus"></i></button>
+                <div class="qe-input-wrap"><input class="qe-input qe-input-sm" id="qe-s-val-lower" type="number" step="1" onchange="updateQEInput('shelves',this.value,'lower')"/></div>
+                <button class="qe-btn" onclick="updateQE('shelves',-1,'lower')"><i class="fa-solid fa-minus"></i></button>
+            </div>
+            <div class="qe-group">
+                <span class="qe-label"><i class="fa-solid fa-layer-group"></i> עליונה</span>
+                <button class="qe-btn" onclick="updateQE('shelves',1,'upper')"><i class="fa-solid fa-plus"></i></button>
+                <div class="qe-input-wrap"><input class="qe-input qe-input-sm" id="qe-s-val-upper" type="number" step="1" onchange="updateQEInput('shelves',this.value,'upper')"/></div>
+                <button class="qe-btn" onclick="updateQE('shelves',-1,'upper')"><i class="fa-solid fa-minus"></i></button>
+            </div>
+        </div>
         <div class="qe-divider"></div>
         <div class="qe-group" id="qe-noplinth-group">
             <button id="qe-btn-noplinth" class="qe-toggle-btn" onclick="toggleNoPlinth(); updateQuickEditPanelUI();">
@@ -2241,7 +2255,7 @@
 <div id="mobile-col-bar">
     <!-- Row 1: always visible -->
     <div class="mcb-row">
-        <div class="mcb-group">
+        <div class="mcb-group" id="mcb-shelves-group">
             <span class="mcb-label"><i class="fa-solid fa-layer-group"></i> מדפים</span>
             <div class="mcb-stepper">
                 <button class="mcb-btn" onclick="updateQE('shelves',-1); updateMobileColBarUI()"><i class="fa-solid fa-minus"></i></button>
@@ -2249,7 +2263,7 @@
                 <button class="mcb-btn" onclick="updateQE('shelves',1); updateMobileColBarUI()"><i class="fa-solid fa-plus"></i></button>
             </div>
         </div>
-        <div class="mcb-divider"></div>
+        <div class="mcb-divider" id="mcb-shelves-divider"></div>
         <div class="mcb-group">
             <span class="mcb-label"><i class="fa-solid fa-arrows-left-right"></i> רוחב</span>
             <div class="mcb-stepper">
@@ -2271,6 +2285,26 @@
         <button id="mcb-btn-noplinth" class="mcb-toggle" onclick="toggleNoPlinth(); updateMobileColBarUI()">
             <i class="fa-solid fa-border-bottom-right"></i><span>צוקל</span>
         </button>
+    </div>
+    <!-- Split-height shelves: independent lower / upper counters -->
+    <div class="mcb-row mcb-row2" id="mcb-split-shelves-row" style="display:none;">
+        <div class="mcb-group">
+            <span class="mcb-label"><i class="fa-solid fa-layer-group"></i> תחתונה</span>
+            <div class="mcb-stepper">
+                <button class="mcb-btn" onclick="updateQE('shelves',-1,'lower'); updateMobileColBarUI()"><i class="fa-solid fa-minus"></i></button>
+                <input type="number" id="mcb-shelves-val-lower" class="mcb-val" value="0" min="0" max="8" onchange="updateQEInput('shelves',this.value,'lower'); updateMobileColBarUI()">
+                <button class="mcb-btn" onclick="updateQE('shelves',1,'lower'); updateMobileColBarUI()"><i class="fa-solid fa-plus"></i></button>
+            </div>
+        </div>
+        <div class="mcb-divider"></div>
+        <div class="mcb-group">
+            <span class="mcb-label"><i class="fa-solid fa-layer-group"></i> עליונה</span>
+            <div class="mcb-stepper">
+                <button class="mcb-btn" onclick="updateQE('shelves',-1,'upper'); updateMobileColBarUI()"><i class="fa-solid fa-minus"></i></button>
+                <input type="number" id="mcb-shelves-val-upper" class="mcb-val" value="0" min="0" max="8" onchange="updateQEInput('shelves',this.value,'upper'); updateMobileColBarUI()">
+                <button class="mcb-btn" onclick="updateQE('shelves',1,'upper'); updateMobileColBarUI()"><i class="fa-solid fa-plus"></i></button>
+            </div>
+        </div>
     </div>
     <!-- Row 2: desk controls — shown only when column type is desk -->
     <div class="mcb-row mcb-row2" id="mcb-desk-row" style="display:none;">
@@ -2451,12 +2485,28 @@
         <button class="mobile-panel-close" onclick="hideMobileColSheet()"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div style="padding:0 15px 20px;">
-        <div class="mobile-dim-row">
+        <div class="mobile-dim-row" id="mobile-qe-shelves-row">
             <span class="mobile-dim-label"><i class="fa-solid fa-layer-group"></i> מדפים</span>
             <div class="mobile-stepper">
                 <button class="mobile-stepper-btn" onclick="updateQE('shelves',-1)"><i class="fa-solid fa-minus"></i></button>
                 <input type="number" id="mobile-qe-s-val" class="mobile-stepper-val" value="0" min="0" max="8" onchange="updateQEInput('shelves',this.value)">
                 <button class="mobile-stepper-btn" onclick="updateQE('shelves',1)"><i class="fa-solid fa-plus"></i></button>
+            </div>
+        </div>
+        <div class="mobile-dim-row" id="mobile-qe-shelves-lower-row" style="display:none;">
+            <span class="mobile-dim-label"><i class="fa-solid fa-layer-group"></i> מדפים תחתונה</span>
+            <div class="mobile-stepper">
+                <button class="mobile-stepper-btn" onclick="updateQE('shelves',-1,'lower')"><i class="fa-solid fa-minus"></i></button>
+                <input type="number" id="mobile-qe-s-val-lower" class="mobile-stepper-val" value="0" min="0" max="8" onchange="updateQEInput('shelves',this.value,'lower')">
+                <button class="mobile-stepper-btn" onclick="updateQE('shelves',1,'lower')"><i class="fa-solid fa-plus"></i></button>
+            </div>
+        </div>
+        <div class="mobile-dim-row" id="mobile-qe-shelves-upper-row" style="display:none;">
+            <span class="mobile-dim-label"><i class="fa-solid fa-layer-group"></i> מדפים עליונה</span>
+            <div class="mobile-stepper">
+                <button class="mobile-stepper-btn" onclick="updateQE('shelves',-1,'upper')"><i class="fa-solid fa-minus"></i></button>
+                <input type="number" id="mobile-qe-s-val-upper" class="mobile-stepper-val" value="0" min="0" max="8" onchange="updateQEInput('shelves',this.value,'upper')">
+                <button class="mobile-stepper-btn" onclick="updateQE('shelves',1,'upper')"><i class="fa-solid fa-plus"></i></button>
             </div>
         </div>
         <div class="mobile-dim-row">

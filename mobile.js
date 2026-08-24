@@ -120,8 +120,19 @@ function updateMobileColBarUI() {
     const widthVal    = document.getElementById('mcb-width-val');
     const heightVal   = document.getElementById('mcb-height-val');
     const noplinthBtn = document.getElementById('mcb-btn-noplinth');
-
+    const counts = (typeof getSplitUnitCounts === 'function') ? getSplitUnitCounts(col) : { lower: col.shelves || 0, upper: 0 };
+    const hasSplit = !!col.splitY;
+    const shelvesGroup = document.getElementById('mcb-shelves-group');
+    const splitRow = document.getElementById('mcb-split-shelves-row');
+    if (shelvesGroup) shelvesGroup.style.display = hasSplit ? 'none' : '';
+    const shelvesDivider = document.getElementById('mcb-shelves-divider');
+    if (shelvesDivider) shelvesDivider.style.display = hasSplit ? 'none' : '';
+    if (splitRow) splitRow.style.display = hasSplit ? 'flex' : 'none';
     if (shelvesVal)  shelvesVal.value  = col.shelves || 0;
+    const shelvesLower = document.getElementById('mcb-shelves-val-lower');
+    const shelvesUpper = document.getElementById('mcb-shelves-val-upper');
+    if (shelvesLower) shelvesLower.value = counts.lower;
+    if (shelvesUpper) shelvesUpper.value = counts.upper;
     if (widthVal)    widthVal.value    = Math.round(col.width || 0);
     if (heightVal)   heightVal.value   = Math.round(col.height || 0);
     if (noplinthBtn) noplinthBtn.classList.toggle('active', !!col.noPlinth);
@@ -418,7 +429,19 @@ function updateMobileColSheetUI() {
     const sVal = document.getElementById('mobile-qe-s-val');
     const wVal = document.getElementById('mobile-qe-w-val');
     const hVal = document.getElementById('mobile-qe-h-val');
+    const counts = (typeof getSplitUnitCounts === 'function') ? getSplitUnitCounts(col) : { lower: col.shelves || 0, upper: 0 };
+    const hasSplit = !!col.splitY;
+    const singleRow = document.getElementById('mobile-qe-shelves-row');
+    const lowerRow = document.getElementById('mobile-qe-shelves-lower-row');
+    const upperRow = document.getElementById('mobile-qe-shelves-upper-row');
+    if (singleRow) singleRow.style.display = hasSplit ? 'none' : 'flex';
+    if (lowerRow) lowerRow.style.display = hasSplit ? 'flex' : 'none';
+    if (upperRow) upperRow.style.display = hasSplit ? 'flex' : 'none';
     if (sVal) sVal.value = col.shelves;
+    const sLower = document.getElementById('mobile-qe-s-val-lower');
+    const sUpper = document.getElementById('mobile-qe-s-val-upper');
+    if (sLower) sLower.value = counts.lower;
+    if (sUpper) sUpper.value = counts.upper;
     if (wVal) wVal.value = Math.round(col.width);
     if (hVal) hVal.value = Math.round(col.height);
 

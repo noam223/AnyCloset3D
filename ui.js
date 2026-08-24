@@ -175,7 +175,18 @@ function updateQuickEditPanelUI() {
     }
     const col = state.columns[state.activeEditCol];
 
-    document.getElementById('qe-s-val').value = col.shelves;
+    const counts = (typeof getSplitUnitCounts === 'function') ? getSplitUnitCounts(col) : { lower: col.shelves || 0, upper: 0 };
+    const hasSplit = !!col.splitY;
+    const shelvesGroup = document.getElementById('qe-shelves-group');
+    const shelvesSplitGroup = document.getElementById('qe-shelves-split-group');
+    if (shelvesGroup) shelvesGroup.style.display = hasSplit ? 'none' : '';
+    if (shelvesSplitGroup) shelvesSplitGroup.style.display = hasSplit ? 'flex' : 'none';
+    const sVal = document.getElementById('qe-s-val');
+    if (sVal) sVal.value = col.shelves;
+    const sLower = document.getElementById('qe-s-val-lower');
+    const sUpper = document.getElementById('qe-s-val-upper');
+    if (sLower) sLower.value = counts.lower;
+    if (sUpper) sUpper.value = counts.upper;
 
     // No-plinth toggle button
     const btnNoplinth = document.getElementById('qe-btn-noplinth');
@@ -3675,10 +3686,9 @@ window.applyDoor = function(type) {
             // Number of shelves that are below the split board = lower-unit row count - 1
             // shelvesY entries below splitY belong to the lower unit
             const bottomShelves = col.shelvesY.filter(y => y < col.splitY).length;
-            // splitRowBoundary: first row index of the upper unit
-            // rows 0 .. bottomShelves  → lower unit  (bottomShelves+1 compartments)
-            // rows bottomShelves+1 .. end → upper unit
-            const splitRowBoundary = bottomShelves + 1;
+            const splitRowBoundary = (typeof getSplitRowBoundary === 'function')
+                ? getSplitRowBoundary(col)
+                : (bottomShelves + 1);
             const selectionCrossesplit = startR < splitRowBoundary && endR >= splitRowBoundary;
             if (selectionCrossesplit) {
                 // Clip to whichever unit contains the majority of the selection
@@ -3799,73 +3809,68 @@ window.applyEqualCells = function() {
 
     const t = state.thickness;
     const baseY = (col.type === 'desk') ? col.deskHeight + col.deskClearance : state.plinthHeight;
-
-    // If there is a splitY crossing the span, equalize each sub-span independently
     const splitY = col.splitY;
-    const splitCrossed = splitY && splitY > baseY + t && splitY < col.height - t;
+    const hasSplit = splitY && splitY > baseY + t && splitY < col.height - t;
+    const bottomShelves = hasSplit
+        ? (col.shelvesY || []).filter(y => y < splitY).length
+        : ((col.shelvesY || []).length);
+    const splitRowBoundary = hasSplit ? bottomShelves + 1 : -1;
+    const lastRow = (col.compartments && col.compartments.length)
+        ? col.compartments.length - 1
+        : ((col.shelves || 0) + (hasSplit ? 1 : 0));
 
-    const _equalizeSubSpan = (subStart, subEnd) => {
-        if (subEnd <= subStart) return;
-
-        // Blueprint cell height formula: cellHeight = shelvesY[k] - prevBound - t
-        // where prevBound is the previous shelf's bottom edge (or baseY for the first cell)
-        // rowBounds = [baseY, shelvesY[subStart], ..., shelvesY[subEnd-1], topBound]
-        // So: shelvesY[k] = prevBound + cellHeight + t
-
-        // Bottom bound: baseY (top of plinth / desk base) — NOT baseY+t
-        const bottomBound = (subStart === 0) ? baseY
-            : (col.shelvesY[subStart - 1] !== undefined ? col.shelvesY[subStart - 1] : baseY);
-        // Top bound: col.height (or bottom of next shelf above span)
-        const topBound = (subEnd >= col.shelvesY.length) ? col.height
-            : (col.shelvesY[subEnd] !== undefined ? col.shelvesY[subEnd] : col.height);
-
-        const numCells = subEnd - subStart + 1;
-        const tMM = Math.round(t * 10); // shelf thickness in whole mm
-
-        // Total span = bottomBound..topBound
-        // Each cell contributes: cellMM + tMM (cell height + shelf board above it)
-        // So: pureCellSpaceMM = totalSpanMM - numCells * tMM
+    const _equalizeBetween = (bottomBound, topBound, shelfIndices) => {
+        if (!shelfIndices.length) return;
+        const numCells = shelfIndices.length + 1;
+        const tMM = Math.round(t * 10);
         const totalSpanMM = Math.round((topBound - bottomBound) * 10);
         const pureCellSpaceMM = totalSpanMM - numCells * tMM;
-
-        // Distribute in whole mm: bottom N cells get (floor+1), rest get floor
-        // e.g. 803mm / 3 = 267.666 → numLargerCells=2, bottom 2 cells=268mm, top cell=267mm
-        // e.g. 900mm / 3 = 300 exactly → numLargerCells=0, all cells=300mm
+        if (pureCellSpaceMM <= 0) return;
         const floorCellMM = Math.floor(pureCellSpaceMM / numCells);
         const numLargerCells = pureCellSpaceMM % numCells;
-
-        // Place internal shelves (indices subStart..subEnd-1)
-        // shelvesY[i] = bottomBound + sum of (cellMM + tMM) for cells 0..k
         let curPosMM = Math.round(bottomBound * 10);
-        for (let i = subStart; i < subEnd; i++) {
-            const k = i - subStart; // 0-based index of this shelf
+        for (let k = 0; k < shelfIndices.length; k++) {
             const thisCellMM = (k < numLargerCells) ? (floorCellMM + 1) : floorCellMM;
-            curPosMM += thisCellMM + tMM; // cell height + shelf board thickness
-            col.shelvesY[i] = curPosMM / 10;
+            curPosMM += thisCellMM + tMM;
+            col.shelvesY[shelfIndices[k]] = curPosMM / 10;
         }
     };
 
-    if (splitCrossed) {
-        // Find which rows are below split and which are above
-        // splitY is between shelvesY entries; find the split shelf index
-        // The split board sits at splitY; rows below it end at the row whose top is splitY
-        // shelvesY is sorted; find first shelf >= splitY
-        const splitShelfIdx = col.shelvesY.findIndex(y => y >= splitY);
-        // splitShelfIdx is the index of the first shelf in the upper section
-        // rows 0..splitShelfIdx-1 are below split, rows splitShelfIdx..numRows-1 are above
-        const splitRowBoundary = (splitShelfIdx === -1) ? col.shelvesY.length : splitShelfIdx;
+    const _equalizeLower = (rowStart, rowEnd) => {
+        if (rowEnd <= rowStart) return;
+        const bottomBound = (rowStart === 0) ? baseY
+            : (col.shelvesY[rowStart - 1] !== undefined ? col.shelvesY[rowStart - 1] : baseY);
+        const topBound = (hasSplit && rowEnd >= bottomShelves) ? splitY
+            : (col.shelvesY[rowEnd] !== undefined ? col.shelvesY[rowEnd] : col.height);
+        const idxs = [];
+        const shelfTo = Math.min(rowEnd, bottomShelves) - 1;
+        for (let i = rowStart; i <= shelfTo; i++) idxs.push(i);
+        _equalizeBetween(bottomBound, topBound, idxs);
+    };
 
-        // Equalize below-split sub-span (clamped to selected range)
-        const belowStart = startR;
-        const belowEnd = Math.min(endR, splitRowBoundary - 1);
-        if (belowEnd >= belowStart + 1) _equalizeSubSpan(belowStart, belowEnd);
+    const _equalizeUpper = (rowStart, rowEnd) => {
+        if (!hasSplit || rowEnd <= rowStart) return;
+        const bottomBound = (rowStart === splitRowBoundary) ? splitY
+            : (col.shelvesY[rowStart - 2] !== undefined ? col.shelvesY[rowStart - 2] : splitY);
+        const topBound = (rowEnd >= lastRow) ? col.height
+            : (col.shelvesY[rowEnd - 1] !== undefined ? col.shelvesY[rowEnd - 1] : col.height);
+        const idxs = [];
+        for (let r = rowStart; r < rowEnd; r++) {
+            const shelfIdx = r - 1;
+            if (shelfIdx >= bottomShelves && shelfIdx < col.shelvesY.length) idxs.push(shelfIdx);
+        }
+        _equalizeBetween(bottomBound, topBound, idxs);
+    };
 
-        // Equalize above-split sub-span (clamped to selected range)
-        const aboveStart = Math.max(startR, splitRowBoundary);
-        const aboveEnd = endR;
-        if (aboveEnd >= aboveStart + 1) _equalizeSubSpan(aboveStart, aboveEnd);
+    if (!hasSplit) {
+        _equalizeLower(startR, endR);
+    } else if (endR < splitRowBoundary) {
+        _equalizeLower(startR, endR);
+    } else if (startR >= splitRowBoundary) {
+        _equalizeUpper(startR, endR);
     } else {
-        _equalizeSubSpan(startR, endR);
+        _equalizeLower(startR, splitRowBoundary - 1);
+        _equalizeUpper(splitRowBoundary, endR);
     }
 
     buildCabinet(); calculatePrice(); saveHistoryState();
@@ -4454,7 +4459,8 @@ function buildDragHandlesUI() {
                 else {
                     const cBaseY = col.type === 'desk' ? col.deskHeight + col.deskClearance : state.plinthHeight;
                     let obs = [cBaseY + t/2, col.height - t/2];
-                    // splitY is intentionally NOT added as an obstacle — shelves can cross the split crossbar
+                    // קושרת is a hard wall — shelves cannot cross the split board
+                    if (col.splitY) { obs.push(col.splitY - t); obs.push(col.splitY + t); }
                     col.shelvesY.forEach((y, i) => { if (i !== v.shelfIdx) obs.push(y); });
 
                     const limitMin = Math.max(...obs.filter(y => y < startY)) + MIN_SHELF_GAP + t;

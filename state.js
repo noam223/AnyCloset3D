@@ -2525,7 +2525,13 @@ function checkSplits() {
         
         state.columns.forEach(col => {
             if (col.height > newSplitY + state.thickness) {
-                if (col.splitY !== newSplitY) { col.splitY = newSplitY; distributeShelves(col); }
+                if (col.splitY !== newSplitY) {
+                    const wasUnsplit = !col.splitY;
+                    col.splitY = newSplitY;
+                    // First split: keep every existing shelf in the lower unit; upper starts empty
+                    if (wasUnsplit) col.shelvesY = [];
+                    distributeShelves(col);
+                }
             } else {
                 if (col.splitY) { col.splitY = null; distributeShelves(col); }
             }
@@ -2556,53 +2562,89 @@ function checkSplits() {
     });
 }
 
-// Internal helper that works on any wing's data (not just active)
-function _distributeShelves(col, wingData) {
-    col.shelvesY = [];
-    let numShelves = col.shelves;
+function _columnBaseY(col, wingData) {
     const plinthH = wingData ? wingData.plinthHeight : state.plinthHeight;
-    const t = wingData ? wingData.thickness : state.thickness;
-    
     const fo = col.floorOffset || 0;
-    // noPlinth (upper unit / ביטול צוקל): shelf math starts at floor/fo so it matches
-    // engine startShelvesY = t (not plinthHeight + t).
-    const baseY = (col.type === 'desk')
-        ? col.deskHeight + col.deskClearance
-        : (col.noPlinth ? fo : Math.max(plinthH, fo));
+    if (col.type === 'desk') return col.deskHeight + col.deskClearance;
+    return col.noPlinth ? fo : Math.max(plinthH, fo);
+}
 
-    if (col.splitY && col.splitY > baseY + t + MIN_SHELF_GAP) {
-        const h1 = col.splitY - t - (baseY + t);
-        const h2 = col.height - t - (col.splitY + t);
-        const totalH = h1 + h2;
-        
-        const bottomShelves = Math.round(numShelves * (h1 / totalH));
-        const topShelves = numShelves - bottomShelves;
+function _hasActiveSplit(col, baseY, t) {
+    return !!(col && col.splitY && col.splitY > baseY + t + MIN_SHELF_GAP);
+}
 
-        const space1 = h1 / (bottomShelves + 1);
-        for (let i = 1; i <= bottomShelves; i++) col.shelvesY.push(Math.round((baseY + t + space1 * i) * 10) / 10);
-        
-        const space2 = h2 / (topShelves + 1);
-        for (let i = 1; i <= topShelves; i++) col.shelvesY.push(Math.round((col.splitY + t + space2 * i) * 10) / 10);
-        
-    } else {
-        const innerH = col.height - baseY - (t * 2);
-        const spacing = innerH / (numShelves + 1);
-        for (let i = 1; i <= numShelves; i++) col.shelvesY.push(Math.round((baseY + t + (spacing * i)) * 10) / 10);
-    }
-    
-    const numComps = col.shelves + ((col.splitY && col.splitY > baseY + t + MIN_SHELF_GAP) ? 2 : 1);
-    while(col.compartments.length < numComps) col.compartments.push({ type: 'empty', count: 2 });
-    while(col.compartments.length > numComps) col.compartments.pop();
+function getSplitUnitCounts(col) {
+    const ys = (col && col.shelvesY) || [];
+    if (!col || !col.splitY) return { lower: (col && col.shelves) || ys.length || 0, upper: 0 };
+    return {
+        lower: ys.filter(y => y < col.splitY).length,
+        upper: ys.filter(y => y > col.splitY).length
+    };
+}
+window.getSplitUnitCounts = getSplitUnitCounts;
 
-    // Clamp drawer count for each compartment based on its new cell height
+function getSplitRowBoundary(col) {
+    if (!col || !col.splitY) return -1;
+    return ((col.shelvesY || []).filter(y => y < col.splitY).length) + 1;
+}
+window.getSplitRowBoundary = getSplitRowBoundary;
+
+function _splitDividerYs(col, baseY, t) {
+    const ys = col.shelvesY || [];
+    if (!_hasActiveSplit(col, baseY, t)) return ys.slice();
+    return ys.filter(y => y < col.splitY).concat([col.splitY], ys.filter(y => y > col.splitY));
+}
+
+function _spaceShelvesInSpan(innerBottom, innerH, count) {
+    const ys = [];
+    const space = innerH / (count + 1);
+    for (let i = 1; i <= count; i++) ys.push(Math.round((innerBottom + space * i) * 10) / 10);
+    return ys;
+}
+
+function _maxShelvesInSpan(innerH) {
+    return Math.max(0, Math.min(8, Math.floor(innerH / MIN_SHELF_GAP) - 1));
+}
+
+function _emptyCompartment() {
+    return { type: 'empty', count: 2 };
+}
+
+function _shiftDoorsInsert(col, at) {
+    if (!col.doors) return;
+    col.doors.forEach(d => {
+        if (d.startRow >= at) d.startRow++;
+        if (d.endRow >= at) d.endRow++;
+    });
+}
+
+function _shiftDoorsRemove(col, at) {
+    if (!col.doors) return;
+    col.doors = col.doors.filter(d => !(d.startRow >= at && d.endRow <= at));
+    col.doors.forEach(d => {
+        if (d.startRow > at) d.startRow--;
+        if (d.endRow >= at) d.endRow--;
+        if (d.endRow < d.startRow) d.endRow = d.startRow;
+    });
+}
+
+function _syncCompartmentCount(col, baseY, t) {
+    if (!col.compartments) col.compartments = [];
+    const numComps = col.shelves + (_hasActiveSplit(col, baseY, t) ? 2 : 1);
+    while (col.compartments.length < numComps) col.compartments.push(_emptyCompartment());
+    while (col.compartments.length > numComps) col.compartments.pop();
+    if (col.doors) col.doors = col.doors.filter(d => d.endRow <= numComps);
+}
+
+function _clampDrawerCompartments(col, baseY, t) {
+    const divs = _splitDividerYs(col, baseY, t);
     for (let r = 0; r < col.compartments.length; r++) {
         const comp = col.compartments[r];
         if (comp && (comp.type === 'internal_drawers' || comp.type === 'external_drawers')) {
-            const bottomY = (r === 0) ? baseY + t : col.shelvesY[r - 1] + t;
-            const topY    = (r >= col.shelvesY.length) ? col.height - t : col.shelvesY[r] - t;
+            const bottomY = (r === 0) ? baseY + t : divs[r - 1] + t;
+            const topY    = (r >= divs.length) ? col.height - t : divs[r] - t;
             const cellH   = Math.max(0, topY - bottomY);
             if (cellH < 23) {
-                // Cell too short for drawers — reset to empty
                 comp.type = 'empty';
             } else {
                 const minCount = Math.ceil(cellH / 60);
@@ -2613,8 +2655,103 @@ function _distributeShelves(col, wingData) {
             }
         }
     }
+}
 
-    if (col.doors) col.doors = col.doors.filter(d => d.endRow <= numComps);
+function _adjustUnitShelves(col, unit, delta, wingData) {
+    if (!col || !delta) return false;
+    if (!col.compartments) col.compartments = [];
+    const t = wingData ? wingData.thickness : state.thickness;
+    const baseY = _columnBaseY(col, wingData);
+    const hasSplit = _hasActiveSplit(col, baseY, t);
+
+    if (!hasSplit) {
+        const innerH = col.height - baseY - (t * 2);
+        const newS = (col.shelves || 0) + delta;
+        if (newS < 0 || newS > _maxShelvesInSpan(innerH)) return false;
+        col.shelves = newS;
+        _distributeShelves(col, wingData);
+        return true;
+    }
+
+    const ys = col.shelvesY || [];
+    const lowerYs = ys.filter(y => y < col.splitY);
+    const upperYs = ys.filter(y => y > col.splitY);
+    const lower = lowerYs.length;
+    const upper = upperYs.length;
+    const h1 = col.splitY - t - (baseY + t);
+    const h2 = col.height - t - (col.splitY + t);
+
+    if (unit === 'upper') {
+        const next = upper + delta;
+        if (next < 0 || next > _maxShelvesInSpan(h2)) return false;
+        col.shelvesY = lowerYs.concat(_spaceShelvesInSpan(col.splitY + t, h2, next));
+        if (delta > 0) {
+            for (let i = 0; i < delta; i++) col.compartments.push(_emptyCompartment());
+        } else {
+            const removeAt = (col.compartments || []).length - 1;
+            for (let i = 0; i < -delta; i++) {
+                col.compartments.pop();
+                _shiftDoorsRemove(col, removeAt - i);
+            }
+        }
+    } else {
+        const next = lower + delta;
+        if (next < 0 || next > _maxShelvesInSpan(h1)) return false;
+        col.shelvesY = _spaceShelvesInSpan(baseY + t, h1, next).concat(upperYs);
+        const insertAt = lower + 1; // first upper row — new cell sits against the קושרת
+        if (delta > 0) {
+            for (let i = 0; i < delta; i++) {
+                col.compartments.splice(insertAt, 0, _emptyCompartment());
+                _shiftDoorsInsert(col, insertAt);
+            }
+        } else {
+            for (let i = 0; i < -delta; i++) {
+                const removeAt = Math.max(0, lower - i);
+                col.compartments.splice(removeAt, 1);
+                _shiftDoorsRemove(col, removeAt);
+            }
+        }
+    }
+
+    col.shelves = (col.shelvesY || []).length;
+    _syncCompartmentCount(col, baseY, t);
+    _clampDrawerCompartments(col, baseY, t);
+    return true;
+}
+
+// Internal helper that works on any wing's data (not just active)
+function _distributeShelves(col, wingData) {
+    const t = wingData ? wingData.thickness : state.thickness;
+    const baseY = _columnBaseY(col, wingData);
+    const prevY = Array.isArray(col.shelvesY) ? col.shelvesY.slice() : [];
+    const hasSplit = _hasActiveSplit(col, baseY, t);
+    let numShelves = col.shelves || 0;
+
+    col.shelvesY = [];
+
+    if (hasSplit) {
+        let lower = prevY.filter(y => y < col.splitY).length;
+        let upper = prevY.filter(y => y > col.splitY).length;
+        if (lower + upper === 0) {
+            lower = numShelves;
+            upper = 0;
+        }
+        const h1 = col.splitY - t - (baseY + t);
+        const h2 = col.height - t - (col.splitY + t);
+        lower = Math.max(0, Math.min(_maxShelvesInSpan(h1), lower));
+        upper = Math.max(0, Math.min(_maxShelvesInSpan(h2), upper));
+        col.shelvesY = _spaceShelvesInSpan(baseY + t, h1, lower)
+            .concat(_spaceShelvesInSpan(col.splitY + t, h2, upper));
+        col.shelves = lower + upper;
+    } else {
+        const innerH = col.height - baseY - (t * 2);
+        numShelves = Math.max(0, Math.min(_maxShelvesInSpan(innerH), numShelves));
+        col.shelves = numShelves;
+        col.shelvesY = _spaceShelvesInSpan(baseY + t, innerH, numShelves);
+    }
+
+    _syncCompartmentCount(col, baseY, t);
+    _clampDrawerCompartments(col, baseY, t);
 }
 
 function distributeShelves(col) {
@@ -2701,22 +2838,27 @@ window.updateQE = function(field, delta) {
         }
     }
     if (field === 'shelves') {
-        let newS = col.shelves + delta;
-        if (newS >= 0 && newS <= 8) {
-            col.shelves = newS; distributeShelves(col); clearSelection();
+        const unit = (arguments[2] === 'upper') ? 'upper' : 'lower';
+        if (_adjustUnitShelves(col, unit, delta)) {
+            if (typeof clearSelection === 'function') clearSelection();
         }
     }
     checkSplits(); buildCabinet(); calculatePrice(); saveHistoryState();
 }
 
-window.updateQEInput = function(field, value) {
+window.updateQEInput = function(field, value, unit) {
     const col = state.columns[state.activeEditCol];
     if (!col) return;
     let val = parseInt(value);
     if(isNaN(val) || state.activeEditCol === -1) return;
     if (field === 'height') updateQE('height', val - col.height);
     else if (field === 'width') updateQE('width', val - col.width);
-    else if (field === 'shelves') updateQE('shelves', val - col.shelves);
+    else if (field === 'shelves') {
+        const counts = getSplitUnitCounts(col);
+        if (unit === 'upper' && col.splitY) updateQE('shelves', val - counts.upper, 'upper');
+        else if (unit === 'lower' && col.splitY) updateQE('shelves', val - counts.lower, 'lower');
+        else updateQE('shelves', val - col.shelves);
+    }
 }
 
 /** Set column width in cm from the green label above the column. Returns applied width. */
