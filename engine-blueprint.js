@@ -646,6 +646,36 @@ function _bpHoneycombInnerWidthMm(wCm, tCm) {
     return _bpMm((+wCm) - 2 * (+tCm));
 }
 
+/** Clear inner height (cm) of a honeycomb cubby after lining boards. */
+function _bpHoneycombCubbyInnerCm(botCm, topCm, tCm, isBlockStart, isBlockEnd) {
+    const t = tCm != null ? tCm : _bpShelfTCm();
+    let h = (+topCm) - (+botCm);
+    if (isBlockStart) h -= t;
+    if (isBlockEnd) h -= t;
+    if (!isBlockStart) h -= t / 2;
+    if (!isBlockEnd) h -= t / 2;
+    return Math.max(0, h);
+}
+
+function _bpPushVertInnerDim(p, x, y1, y2, lbl) {
+    if (!p || !(y2 - y1 > 16) || lbl == null) return;
+    const tk = 7;
+    p.push(`<line x1="${(x - tk / 2).toFixed(1)}" y1="${(+y1).toFixed(1)}" x2="${(x + tk / 2).toFixed(1)}" y2="${(+y1).toFixed(1)}" stroke="${_BP_STROKE}" stroke-width="1"/>`);
+    p.push(`<line x1="${(x - tk / 2).toFixed(1)}" y1="${(+y2).toFixed(1)}" x2="${(x + tk / 2).toFixed(1)}" y2="${(+y2).toFixed(1)}" stroke="${_BP_STROKE}" stroke-width="1"/>`);
+    p.push(`<line x1="${(+x).toFixed(1)}" y1="${(+y1).toFixed(1)}" x2="${(+x).toFixed(1)}" y2="${(+y2).toFixed(1)}" stroke="${_BP_STROKE}" stroke-width="1" marker-start="url(#as)" marker-end="url(#ae)"/>`);
+    const my = (+y1 + +y2) / 2;
+    const tx = +x + 12;
+    p.push(`<text x="${tx.toFixed(1)}" y="${(my + 4).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="11" fill="${_BP_STROKE}" transform="rotate(-90,${tx.toFixed(1)},${my.toFixed(1)})">${lbl}</text>`);
+}
+
+function _bpMaybePushHoneycombInnerHeight(p, xLeft, yTop, yBot, botCm, topCm, sc, tCm) {
+    const t = tCm != null ? tCm : _bpShelfTCm();
+    const innerCm = _bpHoneycombCubbyInnerCm(botCm, topCm, t, true, true);
+    if (innerCm <= 0) return;
+    const tPx = t * sc;
+    _bpPushVertInnerDim(p, xLeft + tPx * 1.5 + 8, yTop + tPx, yBot - tPx, _bpMm(innerCm));
+}
+
 /** Clear opening width (mm) of a partition sub-zone — matches engine-core half-board trim. */
 function _bpPartitionZoneClearWidthMm(colWcm, zoneStartRatio, zoneEndRatio, partTcm, zi, numZones) {
     const spanCm = (+colWcm) * ((+zoneEndRatio) - (+zoneStartRatio));
@@ -886,6 +916,27 @@ function _bpDrawHoneycombBlock(p, ctx) {
     for (let ri = block.startR; ri < block.endR; ri++) {
         const shelfY = colBotSvgY - rowBounds[ri + 1] * sc;
         makeShelfFn(p, shelfX1, shelfY, shelfX2, sc, tCm, false);
+    }
+
+    // Inner height of each cubby — always-on dim, matching inner width
+    for (let ri = block.startR; ri <= block.endR; ri++) {
+        const botCm = rowBounds[ri];
+        const topCm = rowBounds[ri + 1];
+        if (botCm == null || topCm == null) continue;
+        const isStart = ri === block.startR;
+        const isEnd = ri === block.endR;
+        const innerCm = _bpHoneycombCubbyInnerCm(botCm, topCm, tCm, isStart, isEnd);
+        if (innerCm <= 0) continue;
+        let yTop = colBotSvgY - topCm * sc;
+        let yBot = colBotSvgY - botCm * sc;
+        if (isEnd) yTop += tPx;
+        if (isStart) yBot -= tPx;
+        if (!isEnd) yTop += tPx / 2;
+        if (!isStart) yBot -= tPx / 2;
+        const dimX = shelfX1 + 10;
+        if (yBot - yTop > 18 && shelfX2 - shelfX1 > 30) {
+            _bpPushVertInnerDim(p, dimX, yTop, yBot, _bpMm(innerCm));
+        }
     }
 }
 
@@ -1799,7 +1850,9 @@ window._generateMultiViewBlueprintSVG = function() {
 
                                 // Zone height label
                                 const zHcmRound = _bpClearCellHeightLabel(zBotCm, zTopCm, _t_shelf);
-                                if (zSvgH > 14 && zHcmRound > 0) {
+                                if (_bpIsHoneycombType(zoneType)) {
+                                    _bpMaybePushHoneycombInnerHeight(p, x1, zSvgTop, zSvgBot, zBotCm, zTopCm, sc, _t_shelf);
+                                } else if (zSvgH > 14 && zHcmRound > 0) {
                                     _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}p${zi}z${z}`, subZoneCX, zSvgCY + 4, zHcmRound,
                                         { x: x1, y: zSvgTop, w: x2 - x1, h: zSvgH });
                                 }
@@ -1817,7 +1870,7 @@ window._generateMultiViewBlueprintSVG = function() {
                 const _isSplitBandOld = _splitYOldAdj > 0 &&
                     rowBotCm >= _splitYOldAdj - 0.1 && rowTopCm <= _splitTopOldAdj + 0.1;
                 const _hasPartitionZonesOld = !!(comp && comp.partition && Array.isArray(comp.subCells) && comp.subCells.length);
-                if (pid !== 'bathroom' && cellHeightLabel > 0 && cellH > 14 && !_isSplitBandOld && !_hasPartitionZonesOld) {
+                if (pid !== 'bathroom' && cellHeightLabel > 0 && cellH > 14 && !_isSplitBandOld && !_hasPartitionZonesOld && !_bpIsHoneycombType(comp && comp.type)) {
                     const lblCX = colX + colW / 2;
                     const lblCY = (cellY1 + cellY2) / 2 + 4;
                     _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, lblCX, lblCY, cellHeightLabel,
@@ -2893,7 +2946,7 @@ window._generateMultiViewBlueprintPages = function() {
 
                                 // Zone height label
                                 const zHcmRound = _bpClearCellHeightLabel(zBotCm, zTopCm, _t_shelf2);
-                                if (zSvgH > 14 && zHcmRound > 0) {
+                                if (zSvgH > 14 && zHcmRound > 0 && !_bpIsHoneycombType(zoneType)) {
                                     _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}p${zi}z${z}`, subZoneCX, zSvgCY + 4, zHcmRound,
                                         { x: x1, y: zSvgTop, w: x2 - x1, h: zSvgH });
                                 }
@@ -2911,7 +2964,7 @@ window._generateMultiViewBlueprintPages = function() {
                     rowBotCm >= _splitYAdj - 0.1 && rowTopCm <= _splitTopAdj + 0.1;
                 const _isBathroomBP = (pid === 'bathroom');
                 const _hasPartitionZones = !!(comp && comp.partition && Array.isArray(comp.subCells) && comp.subCells.length);
-                if (!_isBathroomBP && cellHeightLabel > 0 && cellH > 14 && !_isSplitBandCell && !_hasPartitionZones) {
+                if (!_isBathroomBP && cellHeightLabel > 0 && cellH > 14 && !_isSplitBandCell && !_hasPartitionZones && !_bpIsHoneycombType(comp && comp.type)) {
                     const lblCX = colX + colW / 2;
                     const lblCY = (cellY1 + cellY2) / 2 + 4;
                     _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, lblCX, lblCY, cellHeightLabel,
@@ -3450,7 +3503,9 @@ window._generateMultiViewBlueprintPages = function() {
                 // Skip height label for split band cells
                 const _isSplitBandFC = _splitYFC > 0 &&
                     rowBotCm >= _splitYFCAdj - 0.1 && rowTopCm <= _splitTopFCAdj + 0.1;
-                if (cellHeightLabel > 0 && cellH > 14 && !_isSplitBandFC) {
+                if (_bpIsHoneycombType(cellType)) {
+                    _bpMaybePushHoneycombInnerHeight(p, colX, cellY1, cellY2, rowBotCm, rowTopCm, sc, _t_shelfFCW);
+                } else if (cellHeightLabel > 0 && cellH > 14 && !_isSplitBandFC) {
                     const lblCX = colX + colW / 2;
                     const lblCY = (cellY1 + cellY2) / 2 + 4;
                     _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, lblCX, lblCY, cellHeightLabel,
@@ -3729,7 +3784,9 @@ window._generateMultiViewBlueprintPages = function() {
 
                         const _isSplitBandSC = _splitYSC > 0 &&
                             rowBotCm >= _splitYSCAdj - 0.1 && rowTopCm <= _splitTopSCAdj + 0.1;
-                        if (cellHeightLabel > 0 && cellH > 14 && !_isSplitBandSC) {
+                        if (_bpIsHoneycombType(cellType)) {
+                            _bpMaybePushHoneycombInnerHeight(p, colX, cellY1, cellY2, rowBotCm, rowTopCm, scScale, _t_shelfSC);
+                        } else if (cellHeightLabel > 0 && cellH > 14 && !_isSplitBandSC) {
                             _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, cellCX, (cellY1 + cellY2) / 2 + 4, cellHeightLabel,
                                 { x: colX, y: cellY1, w: colW, h: cellH });
                         }
@@ -3889,7 +3946,9 @@ window._generateMultiViewBlueprintPages = function() {
 
                     const _isSplitBandSC = _splitYSC > 0 &&
                         rowBotCm >= _splitYSCAdj - 0.1 && rowTopCm <= _splitTopSCAdj + 0.1;
-                    if (cellHeightLabel > 0 && cellH > 14 && !_isSplitBandSC) {
+                    if (_bpIsHoneycombType(cellType)) {
+                        _bpMaybePushHoneycombInnerHeight(p, ox, cellY1, cellY2, rowBotCm, rowTopCm, scScale, _t_shelfSC);
+                    } else if (cellHeightLabel > 0 && cellH > 14 && !_isSplitBandSC) {
                         _bpPushCellDimLabel(p, _bpViewKey, `svc0r${ri}`, cellCX, (cellY1 + cellY2) / 2 + 4, cellHeightLabel,
                             { x: ox, y: cellY1, w: dW, h: cellH });
                     }
@@ -4133,7 +4192,9 @@ window._generateMultiViewBlueprintPages = function() {
                     if (cellH > 18) p.push(`<text x="${cellCX.toFixed(1)}" y="${(cellY1+20).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.6">כוורת</text>`);
                 }
 
-                if (cellHeightLabel > 0 && cellH > 14) {
+                if (_bpIsHoneycombType(cellType)) {
+                    _bpMaybePushHoneycombInnerHeight(p, colX, cellY1, cellY2, rowBotCm, rowTopCm, sc, _t_shelfUU);
+                } else if (cellHeightLabel > 0 && cellH > 14) {
                     _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, cellCX, (cellY1 + cellY2) / 2 + 4, cellHeightLabel,
                         { x: colX, y: cellY1, w: colW, h: cellH });
                 }
