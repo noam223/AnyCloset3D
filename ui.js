@@ -7744,6 +7744,92 @@ window._syncSpaceOffsetUI = function() {
     });
 };
 
+window._cartItemCanShareSpace = function(item) {
+    if (!item || window._spacePairIdOf(item)) return false;
+    const p = (item.rawState && item.rawState.presetId) || 'linear';
+    return p === 'linear' || p === 'sliding';
+};
+
+window._joinableSpaceCabinets = function() {
+    const cart = state.orderCart || [];
+    const cur = state.editingCartIndex;
+    const out = [];
+    cart.forEach(function(it, i) {
+        if (i === cur) return;
+        if (window._cartItemCanShareSpace(it)) out.push(i);
+    });
+    return out;
+};
+
+window._fillSpaceJoinList = function(el, indices) {
+    if (!el) return;
+    el.innerHTML = '';
+    if (!indices.length) {
+        el.style.display = 'none';
+        return;
+    }
+    indices.forEach(function(i) {
+        const it = state.orderCart[i];
+        const name = ((it && it.spec && it.spec.customName) ||
+            (it && it.rawState && it.rawState.cabinetName) || '').trim();
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'space-cab-join-item';
+        btn.onclick = function() { window.joinExistingSpaceCabinet(i); };
+        const icon = document.createElement('i');
+        icon.className = 'fa-solid fa-link';
+        icon.style.marginLeft = '6px';
+        icon.style.opacity = '0.7';
+        btn.appendChild(icon);
+        btn.appendChild(document.createTextNode(name || ('ארון מס\' ' + (i + 1))));
+        el.appendChild(btn);
+    });
+};
+
+window.toggleJoinSpacePicker = function() {
+    if (!window._spacePairCanUse() || window._getSpacePairInfo()) return;
+    const indices = window._joinableSpaceCabinets();
+    if (!indices.length) return;
+    ['space-cab-join-list', 'mobile-space-cab-join-list'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        window._fillSpaceJoinList(el, indices);
+        el.style.display = (el.style.display === 'flex') ? 'none' : 'flex';
+    });
+};
+
+window.joinExistingSpaceCabinet = function(otherIndex) {
+    otherIndex = parseInt(otherIndex, 10);
+    if (!window._spacePairCanUse()) return;
+    if (window._getSpacePairInfo()) return;
+    if (typeof window._commitCurrentCabinetToCart === 'function') {
+        window._commitCurrentCabinetToCart({ flash: false });
+    }
+    const cart = state.orderCart || [];
+    const idx0 = state.editingCartIndex;
+    if (idx0 < 0 || otherIndex === idx0 || !cart[idx0] || !cart[otherIndex]) return;
+    if (window._spacePairIdOf(cart[idx0]) || !window._cartItemCanShareSpace(cart[otherIndex])) return;
+
+    const pairId = 'sp_' + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36);
+    const w1 = Math.round(state.width || (cart[idx0].rawState && cart[idx0].rawState.width) || 160);
+    const w2 = Math.round((cart[otherIndex].rawState && cart[otherIndex].rawState.width) || 160);
+    const offsetX = Math.round((w1 + w2) / 2 + 10);
+    window._attachSpacePairToItem(cart[idx0], pairId, 0, { x: 0, y: 0 });
+    window._attachSpacePairToItem(cart[otherIndex], pairId, 1, { x: offsetX, y: 0 });
+
+    ['space-cab-join-list', 'mobile-space-cab-join-list'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) { el.innerHTML = ''; el.style.display = 'none'; }
+    });
+    window._syncSpacePairTabs();
+    if (typeof buildCabinet === 'function') buildCabinet();
+    if (typeof updateCameraView === 'function') updateCameraView();
+    if (typeof calculatePrice === 'function') calculatePrice();
+    if (typeof updateLeftSidebar === 'function') updateLeftSidebar();
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+    if (typeof window._markCurrentCabinetClean === 'function') window._markCurrentCabinetClean();
+};
+
 window._syncSpacePairTabs = function() {
     const canUse = window._spacePairCanUse();
     const info = window._getSpacePairInfo();
@@ -7751,15 +7837,24 @@ window._syncSpacePairTabs = function() {
     const mRow = document.getElementById('mobile-space-cab-tabs');
     const addBtn = document.getElementById('btn-add-space-cab');
     const mAddBtn = document.getElementById('mobile-btn-add-space-cab');
+    const joinBtn = document.getElementById('btn-join-space-cab');
+    const mJoinBtn = document.getElementById('mobile-btn-join-space-cab');
+    const joinList = document.getElementById('space-cab-join-list');
+    const mJoinList = document.getElementById('mobile-space-cab-join-list');
     const tabsWrap = document.getElementById('space-cab-tabs-btns');
     const mTabsWrap = document.getElementById('mobile-space-cab-tabs-btns');
     const offsetRow = document.getElementById('space-cab-offset-row');
     const mOffsetRow = document.getElementById('mobile-space-cab-offset-row');
+    const joinable = (canUse && !info) ? window._joinableSpaceCabinets() : [];
 
     if (row) row.style.display = canUse ? '' : 'none';
     if (mRow) mRow.style.display = canUse ? '' : 'none';
     if (addBtn) addBtn.style.display = (canUse && !info) ? '' : 'none';
     if (mAddBtn) mAddBtn.style.display = (canUse && !info) ? '' : 'none';
+    if (joinBtn) joinBtn.style.display = (joinable.length > 0) ? '' : 'none';
+    if (mJoinBtn) mJoinBtn.style.display = (joinable.length > 0) ? '' : 'none';
+    if (joinList) window._fillSpaceJoinList(joinList, joinList.style.display === 'flex' ? joinable : []);
+    if (mJoinList) window._fillSpaceJoinList(mJoinList, mJoinList.style.display === 'flex' ? joinable : []);
     if (tabsWrap) tabsWrap.style.display = info ? 'flex' : 'none';
     if (mTabsWrap) mTabsWrap.style.display = info ? 'flex' : 'none';
     if (offsetRow) offsetRow.style.display = info ? '' : 'none';
