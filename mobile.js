@@ -1329,6 +1329,7 @@ function _epSyncFromState() {
         _epApplySlider('height', h);
         _epApplySlider('depth',  d);
     }, 50);
+    if (typeof window._syncSpacePairTabs === 'function') window._syncSpacePairTabs();
 }
 
 var _epDragBound = false;

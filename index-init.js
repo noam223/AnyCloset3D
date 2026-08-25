@@ -289,6 +289,14 @@
                     // Restore cart (multiple cabinets) and customer info
                     if (snap.orderCart) {
                         state.orderCart = snap.orderCart;
+                        state.orderCart.forEach(function(it) {
+                            if (!it) return;
+                            if (!it.spacePairId && it.rawState && it.rawState.spacePairId) {
+                                it.spacePairId = it.rawState.spacePairId;
+                                it.spaceSlot = it.rawState.spaceSlot;
+                                it.spaceOffset = it.rawState.spaceOffset;
+                            }
+                        });
                         var cc = document.getElementById('cart-count');
                         if (cc) cc.innerText = state.orderCart.length;
                     }
@@ -416,7 +424,14 @@
     function _buildSnap() {
         var lightCart = (state.orderCart || []).map(function(item) {
             if (!item || !item.spec) return item;
-            return { spec: _lightCartSpecForSave(item.spec), rawState: item.rawState, printSpecEdits: item.printSpecEdits || null };
+            return {
+                spec: _lightCartSpecForSave(item.spec),
+                rawState: item.rawState,
+                printSpecEdits: item.printSpecEdits || null,
+                spacePairId: item.spacePairId || (item.rawState && item.rawState.spacePairId) || undefined,
+                spaceSlot: (item.spaceSlot != null) ? item.spaceSlot : (item.rawState && item.rawState.spaceSlot),
+                spaceOffset: item.spaceOffset || (item.rawState && item.rawState.spaceOffset) || undefined
+            };
         });
         // Keep the actively edited cabinet's rawState in sync for LIVE viewer follow/browse
         var editIdx = (typeof state.editingCartIndex === 'number' && state.editingCartIndex >= 0)
@@ -675,7 +690,14 @@ window._saveProjectNow = async function() {
         } else {
             var lightCart = (state.orderCart || []).map(function(item) {
                 if (!item || !item.spec) return item;
-                return { spec: (typeof window._lightCartSpecForSave === 'function' ? window._lightCartSpecForSave(item.spec) : item.spec), rawState: item.rawState, printSpecEdits: item.printSpecEdits || null };
+                return {
+                    spec: (typeof window._lightCartSpecForSave === 'function' ? window._lightCartSpecForSave(item.spec) : item.spec),
+                    rawState: item.rawState,
+                    printSpecEdits: item.printSpecEdits || null,
+                    spacePairId: item.spacePairId || (item.rawState && item.rawState.spacePairId) || undefined,
+                    spaceSlot: (item.spaceSlot != null) ? item.spaceSlot : (item.rawState && item.rawState.spaceSlot),
+                    spaceOffset: item.spaceOffset || (item.rawState && item.rawState.spaceOffset) || undefined
+                };
             });
             snap = JSON.parse(JSON.stringify({
                 globalWidth:   state.globalWidth,

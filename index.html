@@ -39,7 +39,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260824qe2">
     <link rel="stylesheet" href="style-mobile.css?v=20260609a">
     <link rel="stylesheet" href="style-extras.css?v=20260731rpcab">
-    <link rel="stylesheet" href="style.css?v=20260824qe2">
+    <link rel="stylesheet" href="style.css?v=20260825spaceCab">
     <style>
         html.thumb-only-mode #left-sidebar,
         html.thumb-only-mode #right-sidebar,
@@ -292,6 +292,26 @@
             </div>
         </div>
     
+        <!-- Dual-cabinet in same 3D space (linear / sliding) -->
+        <div id="space-cab-tabs" style="display:none;padding:0 16px 12px;">
+            <button type="button" id="btn-add-space-cab" class="space-cab-add-btn" onclick="addSpaceCabinet()">
+                <i class="fa-solid fa-plus"></i> הוסף ארון במרחב
+            </button>
+            <div id="space-cab-tabs-btns" class="space-cab-tabs-row" style="display:none;">
+                <button type="button" id="space-cab-tab-0" class="space-cab-tab" onclick="switchSpaceCabinet(0)">ארון 1</button>
+                <button type="button" id="space-cab-tab-1" class="space-cab-tab" onclick="switchSpaceCabinet(1)">ארון 2</button>
+            </div>
+            <div id="space-cab-offset-row" style="display:none;margin-top:10px;">
+                <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:6px;"><i class="fa-solid fa-up-down-left-right" style="margin-left:4px;opacity:0.7;"></i> מיקום ארון 2 במרחב</div>
+                <div class="control-group" style="margin-bottom:8px;">
+                    <div class="label-row"><span>הזזה אופקית X (ס"מ)</span><input type="number" id="inp-num-space-x" class="value-badge-input" value="0" step="1" onchange="window._setSpaceOffsetFromUI('x', this.value)"></div>
+                </div>
+                <div class="control-group" style="margin-bottom:0;">
+                    <div class="label-row"><span>הזזה אנכית Y (ס"מ)</span><input type="number" id="inp-num-space-y" class="value-badge-input" value="0" min="0" step="1" onchange="window._setSpaceOffsetFromUI('y', this.value)"></div>
+                </div>
+            </div>
+        </div>
+
             <!-- Placeholder shown in free mode (no cabinet selected for editing) -->
             <div id="sidebar-edit-placeholder" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 20px 32px;gap:14px;color:var(--text-light);text-align:center;">
                 <i class="fa-solid fa-hand-pointer" style="font-size:2.8rem;opacity:0.28;"></i>
@@ -1834,6 +1854,22 @@
         <button class="mobile-panel-close" onclick="closeMobilePanel()"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="mobile-panel-body">
+        <div id="mobile-space-cab-tabs" style="display:none;margin-bottom:14px;">
+            <button type="button" id="mobile-btn-add-space-cab" class="space-cab-add-btn" onclick="addSpaceCabinet()">
+                <i class="fa-solid fa-plus"></i> הוסף ארון במרחב
+            </button>
+            <div id="mobile-space-cab-tabs-btns" class="space-cab-tabs-row" style="display:none;">
+                <button type="button" id="mobile-space-cab-tab-0" class="space-cab-tab" onclick="switchSpaceCabinet(0)">ארון 1</button>
+                <button type="button" id="mobile-space-cab-tab-1" class="space-cab-tab" onclick="switchSpaceCabinet(1)">ארון 2</button>
+            </div>
+            <div id="mobile-space-cab-offset-row" style="display:none;margin-top:10px;">
+                <div class="mobile-section-title" style="margin-bottom:8px;">מיקום ארון 2 במרחב</div>
+                <label class="mobile-label">הזזה אופקית X (ס"מ)</label>
+                <input type="number" id="mobile-inp-num-space-x" class="editor-select" value="0" step="1" style="margin:0 0 8px;width:100%;box-sizing:border-box;" onchange="window._setSpaceOffsetFromUI('x', this.value)">
+                <label class="mobile-label">הזזה אנכית Y (ס"מ)</label>
+                <input type="number" id="mobile-inp-num-space-y" class="editor-select" value="0" min="0" step="1" style="margin:0;width:100%;box-sizing:border-box;" onchange="window._setSpaceOffsetFromUI('y', this.value)">
+            </div>
+        </div>
         <div class="mobile-section-title">שם הארון</div>
         <div class="input-icon-wrap" style="margin-bottom:15px;">
             <i class="fa-solid fa-pen"></i>
@@ -2573,19 +2609,19 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js?v=20260825dmyDate"></script>
-<script src="state.js?v=20260825modelLbl"></script>
+<script src="state.js?v=20260825spaceCab"></script>
 <script src="quick-calc.js?v=20260825backdrop"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
-<script src="engine-core.js?v=20260824splitSeam"></script>
-<script src="engine-corners.js?v=20260824splitSeam"></script>
+<script src="engine-core.js?v=20260825spaceCab"></script>
+<script src="engine-corners.js?v=20260825spaceCab"></script>
 <script src="engine-blueprint.js?v=20260824hcInnerH"></script>
 <script src="engine-room-plan.js?v=20260731rpcab"></script>
 <script src="tambour-color-picker.js?v=20260617scdoors"></script>
-<script src="ui.js?v=20260825hangH"></script>
-<script src="mobile.js?v=20260823cols10"></script>
+<script src="ui.js?v=20260825spaceCab"></script>
+<script src="mobile.js?v=20260825spaceCab"></script>
 <script src="part-paint.js?v=20260712c2024"></script>
-<script src="index-init.js?v=20260825hangH"></script>
+<script src="index-init.js?v=20260825spaceCab"></script>
 
 <!-- ===== TAMBOUR FULL PALETTE MODAL ===== -->
 <div id="tambour-palette-modal" class="tambour-palette-overlay">

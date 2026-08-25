@@ -751,6 +751,10 @@ function _applyPresetCore(presetId, rightPos, leftPos) {
 
     state.presetId = presetId;
 
+    if (presetId !== 'linear' && presetId !== 'sliding' && typeof window._unlinkSpacePair === 'function') {
+        window._unlinkSpacePair();
+    }
+
     if (presetId === 'corner-right') {
         const w = _makeWing(160, 'right');
         w.wingPosition = rightPos || 'side';
@@ -1346,6 +1350,7 @@ window.syncSidebarToWing = function() {
     const _isSingleCabinet = (state.presetId === 'linear' || state.presetId === 'sliding' || state.presetId === 'bathroom' || state.presetId === 'writing-desk');
     const _editContent = document.getElementById('sidebar-edit-content');
     const _placeholder = document.getElementById('sidebar-edit-placeholder');
+    if (typeof window._syncSpacePairTabs === 'function') window._syncSpacePairTabs();
     const _isEditing = !!state.wingEditMode || _isSingleCabinet || _isUUEdit;
     if (_editContent) _editContent.style.display = _isEditing ? '' : 'none';
     if (_placeholder) _placeholder.style.display = _isEditing ? 'none' : 'flex';

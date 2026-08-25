@@ -1257,6 +1257,9 @@ function updateToolbarState() {
             if (window._activeWingGroup) {
                 window._activeWingGroup.updateMatrixWorld(true);
                 vector.applyMatrix4(window._activeWingGroup.matrixWorld);
+            } else if (window.cabinetGroup) {
+                window.cabinetGroup.updateMatrixWorld(true);
+                vector.applyMatrix4(window.cabinetGroup.matrixWorld);
             }
             vector.project(camera);
 
@@ -2486,9 +2489,11 @@ function updateOverlaysPosition() {
     const projectWingPoint = (localX, localY) => {
         const localPt = new THREE.Vector3(localX, localY, state.depth / 2);
         if (window._activeWingGroup) {
-            // Transform from wing local space to world space
             window._activeWingGroup.updateMatrixWorld(true);
             localPt.applyMatrix4(window._activeWingGroup.matrixWorld);
+        } else if (window.cabinetGroup) {
+            window.cabinetGroup.updateMatrixWorld(true);
+            localPt.applyMatrix4(window.cabinetGroup.matrixWorld);
         }
         return localPt.project(camera);
     };
@@ -4805,9 +4810,91 @@ function buildDragHandlesUI() {
         window.addEventListener('pointerup',   window._uuUpHandler);
     }
 
+    if (typeof window._buildSpaceCabMoveHandle === 'function') window._buildSpaceCabMoveHandle();
+
     updateOverlaysPosition();
     updateDragHandlesPosition();
 }
+
+window._spaceSlot1Height = function() {
+    const info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
+    if (!info) return 240;
+    if (info.activeSlot === 1) {
+        if (state.columns && state.columns.length) {
+            return Math.max.apply(null, state.columns.map(function(c) { return c.height || 0; }));
+        }
+        return state.globalHeight || 240;
+    }
+    const rs = state.orderCart[info.slot1Index] && state.orderCart[info.slot1Index].rawState;
+    if (rs && rs.columns && rs.columns.length) {
+        return Math.max.apply(null, rs.columns.map(function(c) { return c.height || rs.globalHeight || 240; }));
+    }
+    return (rs && rs.globalHeight) || 240;
+};
+
+window._buildSpaceCabMoveHandle = function() {
+    const info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
+    if (!info || state.viewMode !== 'front') return;
+    const item = window._getSpaceSlot1Item();
+    const off = window._getSpaceOffset(item);
+    const h = window._spaceSlot1Height();
+    const handle = document.createElement('div');
+    handle.className = 'drag-handle space-move-handle';
+    handle.dataset.worldY = String(h);
+    handle.innerHTML = `<div class="drag-tooltip">הזז ארון 2: ${off.x}, ${off.y} ס"מ</div>`;
+    handle.style.display = 'flex';
+    if (window._spaceCabDrag) handle.classList.add('active');
+    dragLayer.appendChild(handle);
+
+    handle.addEventListener('pointerdown', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        handle.setPointerCapture(e.pointerId);
+        controls.enabled = false;
+        document.body.classList.add('dragging');
+        window._spaceCabDrag = {
+            startMouseX: e.clientX,
+            startMouseY: e.clientY,
+            startX: off.x,
+            startY: off.y
+        };
+        handle.classList.add('active');
+    });
+
+    if (window._spaceCabMoveHandler) window.removeEventListener('pointermove', window._spaceCabMoveHandler);
+    if (window._spaceCabUpHandler) window.removeEventListener('pointerup', window._spaceCabUpHandler);
+
+    window._spaceCabMoveHandler = function(e) {
+        const d = window._spaceCabDrag;
+        if (!d) return;
+        const v0 = new THREE.Vector3(0, 0, 0).project(camera);
+        const vx = new THREE.Vector3(100, 0, 0).project(camera);
+        const vy = new THREE.Vector3(0, 100, 0).project(camera);
+        const cw = container.clientWidth;
+        const ch = container.clientHeight;
+        const dxPx = ((vx.x - v0.x) * 0.5) * cw;
+        const dyPx = ((v0.y - vy.y) * 0.5) * ch;
+        const xPerPx = dxPx !== 0 ? 100 / dxPx : 1;
+        const yPerPx = dyPx !== 0 ? 100 / dyPx : 1;
+        const nx = d.startX + (e.clientX - d.startMouseX) * xPerPx;
+        const ny = d.startY - (e.clientY - d.startMouseY) * yPerPx;
+        window._setSpaceOffset(nx, ny, { dragging: true });
+        const cur = window._getSpaceOffset(window._getSpaceSlot1Item());
+        const tip = handle.querySelector('.drag-tooltip');
+        if (tip) tip.innerText = `הזז ארון 2: ${cur.x}, ${cur.y} ס"מ`;
+        if (typeof updateDragHandlesPosition === 'function') updateDragHandlesPosition();
+    };
+    window._spaceCabUpHandler = function() {
+        if (!window._spaceCabDrag) return;
+        window._spaceCabDrag = null;
+        controls.enabled = true;
+        document.body.classList.remove('dragging');
+        handle.classList.remove('active');
+        if (typeof saveHistoryState === 'function') saveHistoryState();
+    };
+    window.addEventListener('pointermove', window._spaceCabMoveHandler);
+    window.addEventListener('pointerup', window._spaceCabUpHandler);
+};
 
 function createHandle(dir, x3d, y3d = null, text = 'גרירה') {
     const el = document.createElement('div');
@@ -4854,6 +4941,11 @@ function updateDragHandlesPosition() {
                 }
             }
             worldPt = new THREE.Vector3(currentWX, wy, state.depth / 2);
+        } else if (handle.classList.contains('space-move-handle')) {
+            const item = typeof window._getSpaceSlot1Item === 'function' ? window._getSpaceSlot1Item() : null;
+            const off = typeof window._getSpaceOffset === 'function' ? window._getSpaceOffset(item) : { x: 0, y: 0 };
+            const hy = parseFloat(handle.dataset.worldY) || 0;
+            worldPt = new THREE.Vector3(off.x, off.y + hy, (state.depth || 54) / 2);
         } else {
             const x3d = parseFloat(handle.dataset.x3d);
             const y3d = handle.dataset.y3d ? parseFloat(handle.dataset.y3d) : Math.max(...state.columns.map(c => c.height));
@@ -4861,6 +4953,9 @@ function updateDragHandlesPosition() {
             if (window._activeWingGroup) {
                 window._activeWingGroup.updateMatrixWorld(true);
                 worldPt.applyMatrix4(window._activeWingGroup.matrixWorld);
+            } else if (window.cabinetGroup) {
+                window.cabinetGroup.updateMatrixWorld(true);
+                worldPt.applyMatrix4(window.cabinetGroup.matrixWorld);
             }
         }
         const pos = worldPt.project(camera);
@@ -6150,6 +6245,17 @@ function bindUI() {
         mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
 
+        if (window._spaceCompanionHit) {
+            const compHits = raycaster.intersectObject(window._spaceCompanionHit, false);
+            if (compHits.length > 0 && typeof window.switchSpaceCabinet === 'function') {
+                const slot = window._spaceCompanionHit.userData.spaceSlot;
+                if (slot === 0 || slot === 1) {
+                    window.switchSpaceCabinet(slot);
+                    return;
+                }
+            }
+        }
+
         // Click on corner desk → handle picker
         if (_pointerDownCornerDesk) {
             const deskUpHits = (window.deskHitBoxes && window.deskHitBoxes.length > 0)
@@ -7305,7 +7411,7 @@ window._buildCurrentCabinetCompareRaw = function() {
             (state.editingCartIndex >= 0) ? ('cart' + state.editingCartIndex) : undefined
         )
         : JSON.parse(JSON.stringify(state.partColors || {}));
-    return JSON.parse(JSON.stringify({
+    const raw = JSON.parse(JSON.stringify({
         cabinetModel: state.cabinetModel,
         placement: state.placement,
         width: state.width,
@@ -7349,6 +7455,9 @@ window._buildCurrentCabinetCompareRaw = function() {
         blueprintColWidthDimShown: state.blueprintColWidthDimShown || {},
         partColors: partColors || {}
     }));
+    const _pairLive = typeof window._spacePairFieldsForRaw === 'function' ? window._spacePairFieldsForRaw() : {};
+    if (_pairLive && _pairLive.spacePairId) Object.assign(raw, _pairLive);
+    return raw;
 };
 
 window._getCabinetLiveFingerprint = function() {
@@ -7405,6 +7514,258 @@ window._promptSaveCabinetBeforeSwitch = function(targetIndex) {
         window._editCartItemNow(targetIndex);
     };
     toast.addEventListener('click', (e) => { if (e.target === toast) close(); });
+};
+
+// ==========================================
+// Dual cabinet in the same 3D space (linear / sliding)
+// ==========================================
+window._spacePairCanUse = function() {
+    const p = (state.presetId || 'linear');
+    return p === 'linear' || p === 'sliding';
+};
+
+window._spacePairSlotOf = function(item) {
+    if (!item) return 0;
+    const s = (item.spaceSlot != null) ? item.spaceSlot
+        : (item.rawState && item.rawState.spaceSlot);
+    return s === 1 ? 1 : 0;
+};
+
+window._spacePairIdOf = function(item) {
+    if (!item) return null;
+    return item.spacePairId || (item.rawState && item.rawState.spacePairId) || null;
+};
+
+window._getSpaceOffset = function(item) {
+    const o = (item && (item.spaceOffset || (item.rawState && item.rawState.spaceOffset))) || { x: 0, y: 0 };
+    return { x: Math.round(Number(o.x) || 0), y: Math.round(Number(o.y) || 0) };
+};
+
+window._spacePairFieldsForRaw = function() {
+    const item = state.orderCart && state.orderCart[state.editingCartIndex];
+    const pairId = window._spacePairIdOf(item);
+    if (!pairId) return {};
+    return {
+        spacePairId: pairId,
+        spaceSlot: window._spacePairSlotOf(item),
+        spaceOffset: window._getSpaceOffset(item)
+    };
+};
+
+window._attachSpacePairToItem = function(item, pairId, slot, offset) {
+    if (!item) return;
+    item.spacePairId = pairId;
+    item.spaceSlot = slot;
+    item.spaceOffset = offset || { x: 0, y: 0 };
+    if (!item.rawState) item.rawState = {};
+    item.rawState.spacePairId = pairId;
+    item.rawState.spaceSlot = slot;
+    item.rawState.spaceOffset = item.spaceOffset;
+};
+
+window._stripSpacePairFromItem = function(item) {
+    if (!item) return;
+    delete item.spacePairId;
+    delete item.spaceSlot;
+    delete item.spaceOffset;
+    if (item.rawState) {
+        delete item.rawState.spacePairId;
+        delete item.rawState.spaceSlot;
+        delete item.rawState.spaceOffset;
+    }
+};
+
+window._spaceTabLabel = function(item, slot) {
+    const name = ((item && item.spec && item.spec.customName) ||
+        (item && item.rawState && item.rawState.cabinetName) || '').trim();
+    return name || ('ארון ' + (slot + 1));
+};
+
+window._getSpacePairInfo = function() {
+    const cart = state.orderCart || [];
+    const idx = state.editingCartIndex;
+    if (idx < 0 || !cart[idx]) return null;
+    const pairId = window._spacePairIdOf(cart[idx]);
+    if (!pairId) return null;
+    let otherIdx = -1;
+    for (let i = 0; i < cart.length; i++) {
+        if (i !== idx && window._spacePairIdOf(cart[i]) === pairId) {
+            otherIdx = i;
+            break;
+        }
+    }
+    if (otherIdx < 0) return null;
+    const activeSlot = window._spacePairSlotOf(cart[idx]);
+    return {
+        pairId: pairId,
+        activeIndex: idx,
+        otherIndex: otherIdx,
+        activeSlot: activeSlot,
+        otherSlot: activeSlot === 1 ? 0 : 1,
+        slot1Index: activeSlot === 1 ? idx : otherIdx,
+        slot0Index: activeSlot === 1 ? otherIdx : idx
+    };
+};
+
+window._getSpaceSlot1Item = function() {
+    const info = window._getSpacePairInfo();
+    if (!info) return null;
+    return state.orderCart[info.slot1Index] || null;
+};
+
+window._setSpaceOffset = function(x, y, opts) {
+    opts = opts || {};
+    const info = window._getSpacePairInfo();
+    if (!info) return;
+    const item = state.orderCart[info.slot1Index];
+    if (!item) return;
+    const offset = {
+        x: Math.round(Math.max(-500, Math.min(500, Number(x) || 0))),
+        y: Math.round(Math.max(0, Math.min(400, Number(y) || 0)))
+    };
+    item.spaceOffset = offset;
+    if (!item.rawState) item.rawState = {};
+    item.rawState.spaceOffset = offset;
+    if (typeof window._applySpacePairPositions === 'function') window._applySpacePairPositions();
+    window._syncSpaceOffsetUI();
+    if (typeof updateOverlaysPosition === 'function') updateOverlaysPosition();
+    if (typeof updateDragHandlesPosition === 'function') updateDragHandlesPosition();
+    if (!opts.silent && typeof saveHistoryState === 'function' && !opts.dragging) saveHistoryState();
+};
+
+window._setSpaceOffsetFromUI = function(axis, val) {
+    const item = window._getSpaceSlot1Item();
+    const cur = window._getSpaceOffset(item);
+    if (axis === 'x') window._setSpaceOffset(val, cur.y);
+    else window._setSpaceOffset(cur.x, val);
+};
+
+window._syncSpaceOffsetUI = function() {
+    const item = window._getSpaceSlot1Item();
+    const off = window._getSpaceOffset(item);
+    const ids = ['inp-num-space-x', 'mobile-inp-num-space-x'];
+    const yids = ['inp-num-space-y', 'mobile-inp-num-space-y'];
+    ids.forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el && document.activeElement !== el) el.value = off.x;
+    });
+    yids.forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el && document.activeElement !== el) el.value = off.y;
+    });
+};
+
+window._syncSpacePairTabs = function() {
+    const canUse = window._spacePairCanUse();
+    const info = window._getSpacePairInfo();
+    const row = document.getElementById('space-cab-tabs');
+    const mRow = document.getElementById('mobile-space-cab-tabs');
+    const addBtn = document.getElementById('btn-add-space-cab');
+    const mAddBtn = document.getElementById('mobile-btn-add-space-cab');
+    const tabsWrap = document.getElementById('space-cab-tabs-btns');
+    const mTabsWrap = document.getElementById('mobile-space-cab-tabs-btns');
+    const offsetRow = document.getElementById('space-cab-offset-row');
+    const mOffsetRow = document.getElementById('mobile-space-cab-offset-row');
+
+    if (row) row.style.display = canUse ? '' : 'none';
+    if (mRow) mRow.style.display = canUse ? '' : 'none';
+    if (addBtn) addBtn.style.display = (canUse && !info) ? '' : 'none';
+    if (mAddBtn) mAddBtn.style.display = (canUse && !info) ? '' : 'none';
+    if (tabsWrap) tabsWrap.style.display = info ? 'flex' : 'none';
+    if (mTabsWrap) mTabsWrap.style.display = info ? 'flex' : 'none';
+    if (offsetRow) offsetRow.style.display = info ? '' : 'none';
+    if (mOffsetRow) mOffsetRow.style.display = info ? '' : 'none';
+
+    if (info) {
+        const cart = state.orderCart;
+        const item0 = cart[info.slot0Index];
+        const item1 = cart[info.slot1Index];
+        [
+            ['space-cab-tab-0', 'mobile-space-cab-tab-0', item0, 0],
+            ['space-cab-tab-1', 'mobile-space-cab-tab-1', item1, 1]
+        ].forEach(function(t) {
+            const label = window._spaceTabLabel(t[2], t[3]);
+            const a = document.getElementById(t[0]);
+            const b = document.getElementById(t[1]);
+            if (a) {
+                a.textContent = label;
+                a.classList.toggle('active', info.activeSlot === t[3]);
+            }
+            if (b) {
+                b.textContent = label;
+                b.classList.toggle('active', info.activeSlot === t[3]);
+            }
+        });
+        window._syncSpaceOffsetUI();
+    }
+};
+
+window._unlinkSpacePair = function(opts) {
+    opts = opts || {};
+    const cart = state.orderCart || [];
+    let pairId = opts.pairId || null;
+    if (!pairId && typeof opts.index === 'number' && cart[opts.index]) {
+        pairId = window._spacePairIdOf(cart[opts.index]);
+    }
+    if (!pairId && state.editingCartIndex >= 0 && cart[state.editingCartIndex]) {
+        pairId = window._spacePairIdOf(cart[state.editingCartIndex]);
+    }
+    if (!pairId) return;
+    cart.forEach(function(it) {
+        if (window._spacePairIdOf(it) === pairId) window._stripSpacePairFromItem(it);
+    });
+    if (typeof window._clearSpaceCompanion === 'function') window._clearSpaceCompanion();
+    window._syncSpacePairTabs();
+};
+
+window.addSpaceCabinet = function() {
+    if (!window._spacePairCanUse()) return;
+    if (window._getSpacePairInfo()) return;
+    if (typeof window._commitCurrentCabinetToCart === 'function') {
+        window._commitCurrentCabinetToCart({ flash: false });
+    }
+    const idx0 = state.editingCartIndex;
+    if (idx0 < 0 || !state.orderCart[idx0]) return;
+    if (window._spacePairIdOf(state.orderCart[idx0])) return;
+
+    const w1 = Math.round(state.width || 160);
+    const pairId = 'sp_' + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36);
+    window._attachSpacePairToItem(state.orderCart[idx0], pairId, 0, { x: 0, y: 0 });
+
+    if (typeof window._resetEditorToDefaultLinearCabinet === 'function') {
+        window._resetEditorToDefaultLinearCabinet();
+    }
+    const item1 = window._snapshotCurrentCabinetToCartItem();
+    item1.rawState.partColors = {};
+    const w2 = Math.round((item1.rawState && item1.rawState.width) || 160);
+    const offsetX = Math.round((w1 + w2) / 2 + 10);
+    window._attachSpacePairToItem(item1, pairId, 1, { x: offsetX, y: 0 });
+    state.orderCart.push(item1);
+    const newIdx = state.orderCart.length - 1;
+    state.editingCartIndex = newIdx;
+    if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
+    if (typeof _setSaveCabinetButtonLabel === 'function') _setSaveCabinetButtonLabel();
+    const cc = document.getElementById('cart-count');
+    if (cc) cc.innerText = state.orderCart.length;
+    if (typeof window._restorePresetUI === 'function') window._restorePresetUI();
+    if (typeof updateLeftSidebar === 'function') updateLeftSidebar({ scrollToActive: true });
+    window._syncSpacePairTabs();
+    if (typeof buildCabinet === 'function') buildCabinet();
+    if (typeof updateCameraView === 'function') updateCameraView();
+    if (typeof calculatePrice === 'function') calculatePrice();
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+    if (typeof window._markCurrentCabinetClean === 'function') window._markCurrentCabinetClean();
+};
+
+window.switchSpaceCabinet = function(slot) {
+    const info = window._getSpacePairInfo();
+    if (!info) return;
+    const targetIdx = (slot === 1) ? info.slot1Index : info.slot0Index;
+    if (targetIdx === state.editingCartIndex) return;
+    if (typeof window._commitCurrentCabinetToCart === 'function') {
+        window._commitCurrentCabinetToCart({ flash: false });
+    }
+    if (typeof window._editCartItemNow === 'function') window._editCartItemNow(targetIdx);
 };
 
 window._snapshotCurrentCabinetToCartItem = function() {
@@ -7607,6 +7968,15 @@ window._commitCurrentCabinetToCart = function(opts) {
         if (oldItem && oldItem.printSpecEdits && oldItem.printSpecEdits.sourceHash === newHash) {
             cartItem.printSpecEdits = oldItem.printSpecEdits;
         }
+        const _pid = typeof window._spacePairIdOf === 'function' ? window._spacePairIdOf(oldItem) : null;
+        if (_pid && typeof window._attachSpacePairToItem === 'function') {
+            window._attachSpacePairToItem(
+                cartItem,
+                _pid,
+                window._spacePairSlotOf(oldItem),
+                window._getSpaceOffset(oldItem)
+            );
+        }
         const idx = state.editingCartIndex;
         cartItem.rawState.partColors = (typeof window._exportLocalPartColors === 'function')
             ? window._exportLocalPartColors('cart' + idx)
@@ -7616,6 +7986,7 @@ window._commitCurrentCabinetToCart = function(opts) {
         if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
         if (opts.flash) _setSaveCabinetButtonLabel(`<i class="fa-solid fa-check"></i> הארון עודכן בהצלחה!`);
         else _setSaveCabinetButtonLabel();
+        if (typeof window._syncSpacePairTabs === 'function') window._syncSpacePairTabs();
     } else {
         const newIdx = state.orderCart.length;
         if (typeof window._migrateDraftPartColorsToCart === 'function') {
@@ -7706,7 +8077,11 @@ window.deleteCartItem = function(index) {
     // Use a toast-style inline confirm to avoid browser confirm() suppression issues
     const _doDelete = function() {
         const wasEditing = state.editingCartIndex === index;
+        const _deletedPairId = window._spacePairIdOf(state.orderCart[index]);
         state.orderCart.splice(index, 1);
+        if (_deletedPairId && typeof window._unlinkSpacePair === 'function') {
+            window._unlinkSpacePair({ pairId: _deletedPairId });
+        }
         if (typeof window._onCartItemDeletedForRoomProps === 'function') {
             window._onCartItemDeletedForRoomProps(index);
         }
@@ -7843,6 +8218,15 @@ window._editCartItemNow = function(index) {
     state.blueprintColWidthDimShown = rawState.blueprintColWidthDimShown ? JSON.parse(JSON.stringify(rawState.blueprintColWidthDimShown)) : {};
 
     state.editingCartIndex = index;
+    const _loadedItem = state.orderCart[index];
+    if (_loadedItem && rawState && rawState.spacePairId && typeof window._attachSpacePairToItem === 'function') {
+        window._attachSpacePairToItem(
+            _loadedItem,
+            rawState.spacePairId,
+            rawState.spaceSlot === 1 ? 1 : 0,
+            rawState.spaceOffset || { x: 0, y: 0 }
+        );
+    }
     if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
     if (typeof window._importLocalPartColors === 'function') {
         window._importLocalPartColors('cart' + index, rawState.partColors);
@@ -7855,6 +8239,7 @@ window._editCartItemNow = function(index) {
 
     // Restore preset UI (button highlights, wing tabs, section visibility)
     if (typeof window._restorePresetUI === 'function') window._restorePresetUI();
+    if (typeof window._syncSpacePairTabs === 'function') window._syncSpacePairTabs();
     buildCabinet(); updateCameraView(); calculatePrice(); updateLeftSidebar({ scrollToActive: true }); saveHistoryState();
     if (typeof window._markCurrentCabinetClean === 'function') window._markCurrentCabinetClean();
 }
@@ -7881,6 +8266,7 @@ window.startNewCabinet = function() {
     if (cc) cc.innerText = state.orderCart.length;
     if (typeof window._restorePresetUI === 'function') window._restorePresetUI();
     updateLeftSidebar({ scrollToActive: true });
+    if (typeof window._syncSpacePairTabs === 'function') window._syncSpacePairTabs();
     if (typeof saveHistoryState === 'function') saveHistoryState();
     if (typeof window._markCurrentCabinetClean === 'function') window._markCurrentCabinetClean();
 }
@@ -7910,6 +8296,7 @@ window.duplicateCartItem = function(index) {
         clone.spec.customName = 'העתק של ' + clone.spec.customName;
         if (clone.rawState) clone.rawState.cabinetName = clone.spec.customName;
     }
+    if (typeof window._stripSpacePairFromItem === 'function') window._stripSpacePairFromItem(clone);
     state.orderCart.splice(index + 1, 0, clone);
     const newIdx = index + 1;
     // Re-bind all cart scopes after index shift (clone inserted in the middle)

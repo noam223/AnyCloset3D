@@ -2,7 +2,8 @@
 // ==========================================
 // SLIDING WARDROBE 3D RENDERER
 // ==========================================
-function buildSlidingDoorCabinet() {
+function buildSlidingDoorCabinet(targetGroup) {
+    const dest = targetGroup || cabinetGroup;
     const wing = state.wings.center;
     if (!wing || !wing.slidingDoor || !wing.slidingDoor.enabled) return;
 
@@ -158,9 +159,9 @@ function buildSlidingDoorCabinet() {
     // Door panels + door frames are hidden when state.hasDoors === false.
     const frameGroup = new THREE.Group();
     const doorsGroup = new THREE.Group();
-    cabinetGroup.add(frameGroup);
+    dest.add(frameGroup);
     if (state.hasDoors !== false) {
-        cabinetGroup.add(doorsGroup);
+        dest.add(doorsGroup);
         if (typeof _registerDoorMesh === 'function') _registerDoorMesh(doorsGroup);
     }
 

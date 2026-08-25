@@ -2777,7 +2777,9 @@ function buildCabinet() {
     {
         const _preset = state.presetId || 'linear';
         const _isLinearOrSliding = (_preset === 'linear' || _preset === 'sliding');
-        const _rw = _isLinearOrSliding ? (window._roomWall || state.roomWall || 'center') : 'center';
+        const _spaceInfoRW = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
+        const _skipRoomWallForCompanion = !!(!_spaceInfoRW ? false : _spaceInfoRW.activeSlot === 1);
+        const _rw = (_isLinearOrSliding && !_skipRoomWallForCompanion) ? (window._roomWall || state.roomWall || 'center') : 'center';
 
         // Reset ceiling mesh tracking
         window._closureCeilMeshes = [];
@@ -2930,6 +2932,9 @@ function buildCabinet() {
         buildSlidingDoorCabinet();
     }
 
+    if (typeof window._rebuildSpaceCompanion === 'function') window._rebuildSpaceCompanion();
+    if (typeof window._applySpacePairPositions === 'function') window._applySpacePairPositions();
+
     if (typeof addBlueprintSprites === 'function') addBlueprintSprites();
     if(typeof buildDimensionsAndButtonsUI === 'function') buildDimensionsAndButtonsUI();
     if(typeof buildDragHandlesUI === 'function') buildDragHandlesUI();
@@ -3067,10 +3072,181 @@ window.buildCabinetIntoGroup = function(targetGroup) {
         }
     }
 
+    if (state.presetId === 'sliding' && typeof buildSlidingDoorCabinet === 'function') {
+        buildSlidingDoorCabinet(targetGroup);
+    }
+
     state.activeWing = savedActiveWing;
     state._activeUpperUnit = savedActiveUpperUnit;
     _buildGroup = savedBuildGroup;
     _isActiveWingBuild = savedIsActive;
+};
+
+window._clearSpaceCompanion = function() {
+    const g = window._spaceCompanionGroup;
+    if (g && g.parent) g.parent.remove(g);
+    window._spaceCompanionGroup = null;
+    window._spaceCompanionHit = null;
+    if (cabinetGroup && (!window._getSpacePairInfo || !window._getSpacePairInfo() || window._getSpacePairInfo().activeSlot !== 1)) {
+        cabinetGroup.position.y = 0;
+    }
+};
+
+window._applySpacePairPositions = function() {
+    if (state.viewMode === 'blueprint') {
+        if (cabinetGroup) cabinetGroup.position.y = 0;
+        return;
+    }
+    const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
+    if (!info) {
+        if (cabinetGroup) cabinetGroup.position.y = 0;
+        return;
+    }
+    const slot1Item = state.orderCart[info.slot1Index];
+    const off = (typeof window._getSpaceOffset === 'function')
+        ? window._getSpaceOffset(slot1Item)
+        : { x: 0, y: 0 };
+    if (info.activeSlot === 1) {
+        cabinetGroup.position.x = off.x;
+        cabinetGroup.position.y = off.y;
+        if (window._spaceCompanionGroup) window._spaceCompanionGroup.position.set(0, 0, 0);
+    } else {
+        cabinetGroup.position.y = 0;
+        if (window._spaceCompanionGroup) {
+            window._spaceCompanionGroup.position.set(off.x, off.y, 0);
+        }
+    }
+};
+
+window._rebuildSpaceCompanion = function() {
+    if (window._spaceCompanionBuilding) return;
+    const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
+    if (!info || state.viewMode === 'blueprint') {
+        window._clearSpaceCompanion();
+        return;
+    }
+    const otherItem = state.orderCart && state.orderCart[info.otherIndex];
+    if (!otherItem || !otherItem.rawState || typeof window.buildCabinetIntoGroup !== 'function') {
+        window._clearSpaceCompanion();
+        return;
+    }
+
+    window._spaceCompanionBuilding = true;
+    const saved = {
+        wings: JSON.parse(JSON.stringify(state.wings || {})),
+        activeWing: state.activeWing,
+        presetId: state.presetId,
+        materialBody: state.materialBody,
+        materialDoors: state.materialDoors,
+        materialInternal: state.materialInternal,
+        materialExternal: state.materialExternal,
+        materialOpenCell: state.materialOpenCell,
+        materialBack: state.materialBack,
+        boardMaterial: state.boardMaterial,
+        width: state.width,
+        globalHeight: state.globalHeight,
+        depth: state.depth,
+        thickness: state.thickness,
+        plinthHeight: state.plinthHeight,
+        hasDoors: state.hasDoors,
+        columns: state.columns ? JSON.parse(JSON.stringify(state.columns)) : state.columns,
+        desk: state.desk ? JSON.parse(JSON.stringify(state.desk)) : state.desk,
+        partColors: state.partColors,
+        _activeUpperUnit: state._activeUpperUnit,
+        ppScope: window._ppColorScope,
+        dimData: state.dimData ? state.dimData.slice() : [],
+        bpData: state.bpData ? state.bpData.slice() : [],
+        hitBoxes: hitBoxes.slice(),
+        doorMeshes: doorMeshes.slice(),
+        dragHandlesData: {
+            horizontal: (dragHandlesData.horizontal || []).slice(),
+            vertical: (dragHandlesData.vertical || []).slice(),
+            roofs: (dragHandlesData.roofs || []).slice(),
+            desk: (dragHandlesData.desk || []).slice(),
+            partitions: (dragHandlesData.partitions || []).slice(),
+            floors: (dragHandlesData.floors || []).slice(),
+            selectAll: (dragHandlesData.selectAll || []).slice(),
+            upperUnit: (dragHandlesData.upperUnit || []).slice()
+        }
+    };
+
+    try {
+        const rs = otherItem.rawState;
+        if (rs.wings) {
+            const wingsCopy = JSON.parse(JSON.stringify(rs.wings));
+            if (typeof window._restoreWingsFromSaved === 'function') {
+                window._restoreWingsFromSaved(wingsCopy);
+            } else {
+                state.wings = { center: wingsCopy.center || null, left: wingsCopy.left || null, right: wingsCopy.right || null };
+            }
+        }
+        state.activeWing = rs.activeWing || 'center';
+        state.presetId = rs.presetId || 'linear';
+        state._activeUpperUnit = null;
+        ['materialBody', 'materialDoors', 'materialInternal', 'materialExternal',
+         'materialOpenCell', 'materialBack', 'boardMaterial', 'width', 'globalHeight',
+         'depth', 'thickness', 'plinthHeight', 'hasDoors', 'columns', 'desk'].forEach(function(k) {
+            if (rs[k] !== undefined) state[k] = rs[k];
+        });
+        window._ppColorScope = 'cart' + info.otherIndex;
+
+        let g = window._spaceCompanionGroup;
+        if (!g) {
+            g = new THREE.Group();
+            g.name = 'spaceCompanion';
+            scene.add(g);
+            window._spaceCompanionGroup = g;
+        }
+        window.buildCabinetIntoGroup(g);
+
+        const cw = state.wings && state.wings.center;
+        const hitW = (cw && cw.width) || state.width || 160;
+        const hitH = (cw && cw.globalHeight) || state.globalHeight || 240;
+        const hitD = (cw && cw.depth) || state.depth || 54;
+        const hitMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+        const hit = new THREE.Mesh(new THREE.BoxGeometry(hitW, hitH, hitD), hitMat);
+        hit.position.set(0, hitH / 2, 0);
+        hit.userData.spaceCompanion = true;
+        hit.userData.spaceSlot = info.otherSlot;
+        hit.userData.cartIndex = info.otherIndex;
+        g.add(hit);
+        window._spaceCompanionHit = hit;
+    } catch (e) {
+        console.warn('[spaceCompanion] failed to build', e);
+        window._clearSpaceCompanion();
+    } finally {
+    if (saved && typeof window._restoreWingsFromSaved === 'function') {
+        window._restoreWingsFromSaved(saved.wings);
+    } else if (saved) {
+        state.wings = saved.wings;
+    }
+    if (saved) {
+    state.activeWing = saved.activeWing;
+    state.presetId = saved.presetId;
+    state._activeUpperUnit = saved._activeUpperUnit;
+    ['materialBody', 'materialDoors', 'materialInternal', 'materialExternal',
+     'materialOpenCell', 'materialBack', 'boardMaterial', 'width', 'globalHeight',
+     'depth', 'thickness', 'plinthHeight', 'hasDoors', 'columns', 'desk'].forEach(function(k) {
+        if (saved[k] !== undefined) state[k] = saved[k];
+    });
+    window._ppColorScope = saved.ppScope;
+    state.dimData = saved.dimData;
+    state.bpData = saved.bpData;
+    hitBoxes.length = 0;
+    saved.hitBoxes.forEach(function(h) { hitBoxes.push(h); });
+    doorMeshes.length = 0;
+    saved.doorMeshes.forEach(function(m) { doorMeshes.push(m); });
+    dragHandlesData.horizontal = saved.dragHandlesData.horizontal;
+    dragHandlesData.vertical = saved.dragHandlesData.vertical;
+    dragHandlesData.roofs = saved.dragHandlesData.roofs;
+    dragHandlesData.desk = saved.dragHandlesData.desk;
+    dragHandlesData.partitions = saved.dragHandlesData.partitions;
+    dragHandlesData.floors = saved.dragHandlesData.floors;
+    dragHandlesData.selectAll = saved.dragHandlesData.selectAll;
+    dragHandlesData.upperUnit = saved.dragHandlesData.upperUnit;
+    }
+    window._spaceCompanionBuilding = false;
+    }
 };
 
 window.cabinetGroup = cabinetGroup;
