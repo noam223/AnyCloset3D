@@ -296,6 +296,7 @@
                                 it.spaceSlot = it.rawState.spaceSlot;
                                 it.spaceOffset = it.rawState.spaceOffset;
                             }
+                            if (!it.onHold && it.rawState && it.rawState.onHold) it.onHold = true;
                         });
                         var cc = document.getElementById('cart-count');
                         if (cc) cc.innerText = state.orderCart.length;
@@ -430,7 +431,8 @@
                 printSpecEdits: item.printSpecEdits || null,
                 spacePairId: item.spacePairId || (item.rawState && item.rawState.spacePairId) || undefined,
                 spaceSlot: (item.spaceSlot != null) ? item.spaceSlot : (item.rawState && item.rawState.spaceSlot),
-                spaceOffset: item.spaceOffset || (item.rawState && item.rawState.spaceOffset) || undefined
+                spaceOffset: item.spaceOffset || (item.rawState && item.rawState.spaceOffset) || undefined,
+                onHold: !!(item.onHold || (item.rawState && item.rawState.onHold)) || undefined
             };
         });
         // Keep the actively edited cabinet's rawState in sync for LIVE viewer follow/browse
@@ -440,6 +442,7 @@
             try {
                 var liveRaw = window._buildCurrentCabinetCompareRaw();
                 lightCart[editIdx] = Object.assign({}, lightCart[editIdx], { rawState: liveRaw });
+                if (liveRaw && liveRaw.onHold) lightCart[editIdx].onHold = true;
                 if (lightCart[editIdx].spec) {
                     if (state.cabinetName) lightCart[editIdx].spec.customName = state.cabinetName;
                     var _cw = state.width, _cd = state.depth;
@@ -696,7 +699,8 @@ window._saveProjectNow = async function() {
                     printSpecEdits: item.printSpecEdits || null,
                     spacePairId: item.spacePairId || (item.rawState && item.rawState.spacePairId) || undefined,
                     spaceSlot: (item.spaceSlot != null) ? item.spaceSlot : (item.rawState && item.rawState.spaceSlot),
-                    spaceOffset: item.spaceOffset || (item.rawState && item.rawState.spaceOffset) || undefined
+                    spaceOffset: item.spaceOffset || (item.rawState && item.rawState.spaceOffset) || undefined,
+                    onHold: !!(item.onHold || (item.rawState && item.rawState.onHold)) || undefined
                 };
             });
             snap = JSON.parse(JSON.stringify({

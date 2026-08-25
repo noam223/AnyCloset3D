@@ -7053,6 +7053,7 @@ window._refreshCartBlueprintPagesForPrint = async function() {
         for (let i = 0; i < state.orderCart.length; i++) {
             const itemObj = state.orderCart[i];
             if (!itemObj || !itemObj.rawState || !itemObj.spec) continue;
+            if (typeof window._cartItemOnHold === 'function' && window._cartItemOnHold(itemObj)) continue;
             _applyRawStateForCapture(itemObj.rawState);
             const pages = window._generateMultiViewBlueprintPages();
             if (pages && pages.length) {
@@ -7079,6 +7080,7 @@ window._refreshCartMediaForPrint = async function(opts) {
         for (let i = 0; i < state.orderCart.length; i++) {
             const itemObj = state.orderCart[i];
             if (!itemObj || !itemObj.rawState || !itemObj.spec) continue;
+            if (typeof window._cartItemOnHold === 'function' && window._cartItemOnHold(itemObj)) continue;
             if (!force && !window._cartItemNeedsMediaRefresh(itemObj)) continue;
             _applyRawStateForCapture(itemObj.rawState);
             buildCabinet();
@@ -7205,6 +7207,7 @@ window.openOrderModal = async function(mode, opts) {
     }
 
     state.orderCart.forEach((itemObj, index) => {
+        if (typeof window._cartItemOnHold === 'function' && window._cartItemOnHold(itemObj)) return;
         const item = itemObj.spec;
         const titleText = item.customName ? item.customName : (_cartIsWritingDesk(itemObj) ? `שולחן מס' ${index + 1}` : `ארון מס' ${index + 1}`);
         const detailLabel = _cartIsWritingDesk(itemObj) ? 'שולחן' : 'ארון';
@@ -7332,6 +7335,16 @@ window.openOrderModal = async function(mode, opts) {
         container.insertAdjacentHTML('beforeend', cabinetHTML);
     });
 
+    if (!container.innerHTML.trim()) {
+        container.innerHTML = '<div style="padding:28px 18px;text-align:center;color:#64748b;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:12px;">' +
+            '<div style="font-size:1.05rem;font-weight:700;color:#475569;margin-bottom:6px;"><i class="fa-solid fa-pause"></i> אין ארונות לייצוא</div>' +
+            'כל הארונות בפרויקט מושהים. לחצו «הפעל» ברשימת הארונות כדי לכלול אותם בהצעת המחיר ובקבצי הייצוא.' +
+            '</div>';
+        if (actionsEl) {
+            actionsEl.querySelectorAll('button').forEach(function(btn) { btn.disabled = true; btn.style.opacity = '0.45'; btn.style.pointerEvents = 'none'; });
+        }
+    }
+
     _bindPrintSpecRowInputs(container);
     _bindOrderPreviewImageReplace(container);
 
@@ -7458,6 +7471,10 @@ window._buildCurrentCabinetCompareRaw = function() {
     }));
     const _pairLive = typeof window._spacePairFieldsForRaw === 'function' ? window._spacePairFieldsForRaw() : {};
     if (_pairLive && _pairLive.spacePairId) Object.assign(raw, _pairLive);
+    if (typeof window._cartItemOnHold === 'function' && state.orderCart && state.orderCart[state.editingCartIndex] &&
+        window._cartItemOnHold(state.orderCart[state.editingCartIndex])) {
+        raw.onHold = true;
+    }
     return raw;
 };
 
@@ -8049,6 +8066,9 @@ window._commitCurrentCabinetToCart = function(opts) {
                 window._getSpaceOffset(oldItem)
             );
         }
+        if (typeof window._cartItemOnHold === 'function' && window._cartItemOnHold(oldItem)) {
+            window._setCartItemHold(cartItem, true);
+        }
         const idx = state.editingCartIndex;
         cartItem.rawState.partColors = (typeof window._exportLocalPartColors === 'function')
             ? window._exportLocalPartColors('cart' + idx)
@@ -8080,6 +8100,36 @@ window._commitCurrentCabinetToCart = function(opts) {
     if (typeof saveHistoryState === 'function') saveHistoryState();
     if (typeof window._markCurrentCabinetClean === 'function') window._markCurrentCabinetClean();
     return state.editingCartIndex;
+};
+
+window._cartItemOnHold = function(item) {
+    return !!(item && (item.onHold || (item.rawState && item.rawState.onHold)));
+};
+
+window._cartHasExportableItems = function() {
+    return (state.orderCart || []).some(function(it) {
+        return it && !window._cartItemOnHold(it);
+    });
+};
+
+window._setCartItemHold = function(item, held) {
+    if (!item) return;
+    if (held) {
+        item.onHold = true;
+        if (!item.rawState) item.rawState = {};
+        item.rawState.onHold = true;
+    } else {
+        delete item.onHold;
+        if (item.rawState) delete item.rawState.onHold;
+    }
+};
+
+window.toggleCartItemHold = function(index) {
+    const item = state.orderCart && state.orderCart[index];
+    if (!item) return;
+    window._setCartItemHold(item, !window._cartItemOnHold(item));
+    if (typeof updateLeftSidebar === 'function') updateLeftSidebar();
+    if (typeof saveHistoryState === 'function') saveHistoryState();
 };
 
 window._selectCartCabinet = function(index, opts) {
@@ -8369,6 +8419,7 @@ window.duplicateCartItem = function(index) {
         if (clone.rawState) clone.rawState.cabinetName = clone.spec.customName;
     }
     if (typeof window._stripSpacePairFromItem === 'function') window._stripSpacePairFromItem(clone);
+    if (typeof window._setCartItemHold === 'function') window._setCartItemHold(clone, false);
     state.orderCart.splice(index + 1, 0, clone);
     const newIdx = index + 1;
     // Re-bind all cart scopes after index shift (clone inserted in the middle)
@@ -8455,13 +8506,18 @@ window.updateLeftSidebar = function(opts) {
         const item = itemObj.spec;
         const numericPrice = parseInt(item.price.replace('₪', '').replace(/,/g, ''));
         const itemInstall = item.installPrice || 0;
+        const held = typeof window._cartItemOnHold === 'function' && window._cartItemOnHold(itemObj);
         
-        if (!isNaN(numericPrice)) totalCabinetsPrice += numericPrice;
-        totalInstallPrice += itemInstall;
+        if (!held) {
+            if (!isNaN(numericPrice)) totalCabinetsPrice += numericPrice;
+            totalInstallPrice += itemInstall;
+        }
 
         const isEditing = state.editingCartIndex === index;
         const activeClass = isEditing ? 'active-editing' : '';
+        const heldClass = held ? ' on-hold' : '';
         const activeLabel = isEditing ? '<div style="position:absolute; top:-12px; right:15px; background:var(--accent); color:white; font-size:11px; padding:3px 10px; border-radius:12px; font-weight:bold; box-shadow:0 2px 5px rgba(0,0,0,0.15); border: 2px solid white;"><i class="fa-solid fa-pen"></i> בעריכה כעת</div>' : '';
+        const holdBadge = held ? '<span class="cart-hold-badge"><i class="fa-solid fa-pause"></i> מושהה</span>' : '';
         const titleText = item.customName ? item.customName : (_cartIsWritingDesk(itemObj) ? `שולחן מס' ${index + 1}` : `ארון מס' ${index + 1}`);
 
         // Room wall position selector (only for linear/sliding presets)
@@ -8488,18 +8544,19 @@ window.updateLeftSidebar = function(opts) {
             </div>` : '';
 
         const card = document.createElement('div');
-        card.className = `cart-mini-card ${activeClass}`;
+        card.className = `cart-mini-card ${activeClass}${heldClass}`;
         card.dataset.cartIndex = String(index);
         card.onclick = () => { if(!isEditing) editCartItem(index); };
         
         card.innerHTML = `
             ${activeLabel}
-            <div class="cart-mini-card-title">${titleText}</div>
+            <div class="cart-mini-card-title">${holdBadge}${titleText}</div>
             <div class="cart-mini-card-desc" dir="rtl">${item.dimsStr}</div>
             ${window._showPricing !== false ? `<div class="cart-mini-card-price"><span dir="ltr">${item.price}</span> <span style="font-size:0.85rem; font-weight:normal; color:var(--text-light);">+ <span dir="ltr">₪${itemInstall.toLocaleString()}</span> התקנה</span></div>` : ''}
             ${_wallSelectorHTML}
             <div class="cart-mini-actions">
                 <button class="cart-mini-btn btn-edit-mini" onclick="event.stopPropagation(); editCartItem(${index});"><i class="fa-solid fa-pen"></i> ערוך</button>
+                <button class="cart-mini-btn btn-hold-mini" onclick="event.stopPropagation(); toggleCartItemHold(${index});"><i class="fa-solid fa-${held ? 'play' : 'pause'}"></i> ${held ? 'הפעל' : 'השהה'}</button>
                 <button class="cart-mini-btn" onclick="event.stopPropagation(); duplicateCartItem(${index});"><i class="fa-solid fa-copy"></i> שכפל</button>
                 <button class="cart-mini-btn btn-del-mini" onclick="event.stopPropagation(); deleteCartItem(${index});"><i class="fa-solid fa-trash"></i> מחק</button>
                 <div style="position:relative;display:inline-flex;">
@@ -9449,6 +9506,7 @@ function _buildPrintHTML(mode) {
     let cabinetsHTML = '';
 
     state.orderCart.forEach((itemObj, index) => {
+        if (typeof window._cartItemOnHold === 'function' && window._cartItemOnHold(itemObj)) return;
         const item = itemObj.spec;
         const titleText = item.customName ? item.customName : (_cartIsWritingDesk(itemObj) ? `שולחן מס' ${index + 1}` : `ארון מס' ${index + 1}`);
         const detailLabel = _cartIsWritingDesk(itemObj) ? 'שולחן' : 'ארון';
@@ -9591,6 +9649,10 @@ ${summaryHTML}
 }
 
 window.printCustomer = async function() {
+    if (typeof window._cartHasExportableItems === 'function' && !window._cartHasExportableItems()) {
+        _showToast('אין ארונות לייצוא — כל הארונות מושהים. הפעילו ארון כדי לכלול אותו.', 5000);
+        return;
+    }
     _showToast('🔄 מרענן תמונות לפני הדפסה...', 3000);
     try { await window._refreshCartMediaForPrint({ force: true }); } catch (e) { console.warn('[printCustomer]', e); }
     const html = _buildPrintHTML('customer');
@@ -9609,6 +9671,10 @@ window.printCustomer = async function() {
     setTimeout(() => { win.document.title = _pdfTitle; win.print(); }, 600);
 };
 window.printFactory = async function() {
+    if (typeof window._cartHasExportableItems === 'function' && !window._cartHasExportableItems()) {
+        _showToast('אין ארונות לייצוא — כל הארונות מושהים. הפעילו ארון כדי לכלול אותו.', 5000);
+        return;
+    }
     _showToast('🔄 מרענן תמונות לפני הדפסה...', 3000);
     try { await window._refreshCartMediaForPrint({ force: true }); } catch (e) { console.warn('[printFactory]', e); }
     try { await window._refreshCartBlueprintPagesForPrint(); } catch (e) { console.warn('[printFactory] blueprint refresh failed:', e); }
@@ -10711,6 +10777,7 @@ function _buildCustomerSummaryDetails(itemObj) {
 function _buildCartData() {
     const rows = [];
     state.orderCart.forEach((itemObj, index) => {
+        if (typeof window._cartItemOnHold === 'function' && window._cartItemOnHold(itemObj)) return;
         const item = itemObj.spec;
         const title = item.customName ? item.customName : (_cartIsWritingDesk(itemObj) ? `שולחן מס' ${index + 1}` : `ארון מס' ${index + 1}`);
         const cabPrice = parseInt((item.price || '0').replace('₪','').replace(/,/g,'')) || 0;
@@ -10926,8 +10993,9 @@ window.printCustomerSummary = async function() {
         return;
     }
 
-    if (!state.orderCart || state.orderCart.length === 0) {
-        alert('אין ארונות בהזמנה. הוסף ארונות קודם.');
+    if (!state.orderCart || state.orderCart.length === 0 ||
+        (typeof window._cartHasExportableItems === 'function' && !window._cartHasExportableItems())) {
+        alert('אין ארונות לייצוא. הפעילו ארון מושהה או הוסיפו ארון לפרויקט.');
         return;
     }
     // Load logo: prefer user's uploaded logo, fallback to system logo.webp
