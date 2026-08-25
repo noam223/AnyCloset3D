@@ -104,7 +104,7 @@ var _USER_TYPE_LABELS = {
             _setupAgentFilter();
             if (plan.isCompanyAdmin) {
                 var navAgents = document.getElementById('nav-agents');
-                if (navAgents) navAgents.style.display = '';
+                if (navAgents) navAgents.style.display = 'flex';
                 _showCompanyCodeBanner(plan);
                 loadAgentsTab();
             }
