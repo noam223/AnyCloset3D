@@ -303,6 +303,10 @@
     
             <div class="section">
                 <div class="section-title"><i class="fa-solid fa-cubes"></i> הגדרות ארון</div>
+            <div id="cabinet-model-label-row" style="margin-bottom:12px;">
+                <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:3px;">דגם ארון</div>
+                <input type="text" id="inp-cabinet-model-label" class="editor-select" placeholder="ריק = דגם הבסיס" style="margin:0;" autocomplete="off">
+            </div>
             <div id="plinth-placement-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
                 <div id="plinth-model-row">
                     <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:3px;">דגם בסיס</div>
@@ -1870,10 +1874,12 @@
                 <i class="fa-solid fa-desktop" style="font-size:1rem;"></i><span>שולחן</span>
             </button>
         </div>
+        <div class="mobile-section-title">דגם ארון</div>
+        <input type="text" id="mobile-inp-cabinet-model-label" class="editor-select" placeholder="ריק = דגם הבסיס" style="margin:0 0 12px;width:100%;box-sizing:border-box;" autocomplete="off">
         <div class="mobile-section-title">דגם ומיקום</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:15px;">
             <div id="mobile-plinth-model-row">
-                <label class="mobile-label">דגם ארון:</label>
+                <label class="mobile-label">דגם בסיס:</label>
                 <select id="mobile-inp-plinth" class="editor-select" style="margin:0;"
                     onchange="document.getElementById('inp-plinth').value=this.value; document.getElementById('inp-plinth').dispatchEvent(new Event('change'))">
                     <option value="maya">צוקל נסתר</option>
@@ -2567,7 +2573,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js?v=20260825dmyDate"></script>
-<script src="state.js?v=20260824drawersplit"></script>
+<script src="state.js?v=20260825modelLbl"></script>
 <script src="quick-calc.js?v=20260825backdrop"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>

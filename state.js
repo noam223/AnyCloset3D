@@ -25,6 +25,7 @@ function createWingData(overrides) {
         handleType: '',
         handleStyle: 'pipe',
         cabinetName: '',
+        cabinetModelLabel: '',
         cabinetNotes: '',
         boardMaterial: 'melamine',
         materialBody: 'white_matte',
@@ -280,7 +281,7 @@ window.getWing = function() {
 // These getters/setters make existing code like state.width work transparently
 const _wingFields = [
     'cabinetModel','placement','width','globalHeight','depth','thickness','plinthHeight',
-    'hasDoors','handleType','handleStyle','cabinetName','cabinetNotes','boardMaterial',
+    'hasDoors','handleType','handleStyle','cabinetName','cabinetModelLabel','cabinetNotes','boardMaterial',
     'materialBody','materialInternal','materialExternal','materialDesk','materialOpenCell','materialBack',
     'materialSideCabinet','materialTopPanel',
     'activeColorPart','columns','desk','corner','fullCorner','sideCabinet','manualPrice','manualInstallPrice',
@@ -1018,12 +1019,16 @@ window._resetEditorToDefaultLinearCabinet = function() {
 
     const cabNameInp = document.getElementById('inp-cabinet-name');
     if (cabNameInp) cabNameInp.value = '';
+    const modelLabelInp = document.getElementById('inp-cabinet-model-label');
+    if (modelLabelInp) modelLabelInp.value = '';
     const cabNotesInp = document.getElementById('inp-cabinet-notes');
     if (cabNotesInp) cabNotesInp.value = '';
     const mNotes = document.getElementById('mobile-inp-cabinet-notes');
     if (mNotes) mNotes.value = '';
     const mName = document.getElementById('mobile-inp-cabinet-name');
     if (mName) mName.value = '';
+    const mModelLabel = document.getElementById('mobile-inp-cabinet-model-label');
+    if (mModelLabel) mModelLabel.value = '';
 
     // Highlight linear preset + sync sidebar sections like applyPreset('linear')
     document.querySelectorAll('.preset-btn').forEach(function(btn) { btn.classList.remove('active'); });
@@ -1408,6 +1413,8 @@ window.syncSidebarToWing = function() {
     // Hide plinth/placement/board-mat/handle-type rows when editing upper unit (not relevant)
     const _ppGrid = document.getElementById('plinth-placement-grid');
     if (_ppGrid) _ppGrid.style.display = _isUUEdit ? 'none' : '';
+    const _modelLabelRow = document.getElementById('cabinet-model-label-row');
+    if (_modelLabelRow) _modelLabelRow.style.display = _isUUEdit ? 'none' : '';
     const _boardMatRow = document.getElementById('board-mat-row');
     if (_boardMatRow) _boardMatRow.style.display = _isUUEdit ? 'none' : '';
     const _handleTypeRow = document.getElementById('handle-type-row');
@@ -1459,6 +1466,9 @@ window.syncSidebarToWing = function() {
         b.classList.toggle('active', b.dataset.style === _hs);
     });
     setVal('inp-cabinet-name', w.cabinetName || '');
+    const _modelLabel = (state.wings.center && state.wings.center.cabinetModelLabel) || w.cabinetModelLabel || '';
+    setVal('inp-cabinet-model-label', _modelLabel);
+    setVal('mobile-inp-cabinet-model-label', _modelLabel);
     setVal('inp-cabinet-notes', w.cabinetNotes || '');
     setVal('inp-wing-position', w.wingPosition || 'side');
     // Show/hide wing position selector only for left/right wings (not for upper unit edit)
@@ -2046,7 +2056,7 @@ window.resetCurrentCabinet = function() {
     w.cabinetModel = 'c9';
     w.placement = 'wall';
     w.width = 160; w.globalHeight = 240; w.depth = 54;
-    w.plinthHeight = 8.75; w.hasDoors = true; w.handleType = ''; w.handleStyle = 'pipe'; w.cabinetName = ''; w.cabinetNotes = '';
+    w.plinthHeight = 8.75; w.hasDoors = true; w.handleType = ''; w.handleStyle = 'pipe'; w.cabinetName = ''; w.cabinetModelLabel = ''; w.cabinetNotes = '';
     w.boardMaterial = 'melamine'; w.materialBody = 'white_matte'; w.materialInternal = 'white_matte';
     w.materialExternal = 'white_matte'; w.materialDesk = 'white_matte'; w.materialOpenCell = 'white_matte'; w.materialBack = 'white_matte';
     w.materialSideCabinet = 'white_matte';

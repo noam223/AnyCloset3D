@@ -5543,6 +5543,26 @@ function bindUI() {
     const cabNameInp = document.getElementById('inp-cabinet-name');
     if (cabNameInp) cabNameInp.addEventListener('change', (e) => { state.cabinetName = e.target.value; saveHistoryState(); });
 
+    function _syncCabinetModelLabel(val) {
+        const v = val || '';
+        if (state.wings && state.wings.center) state.wings.center.cabinetModelLabel = v;
+        if (typeof getWing === 'function' && getWing()) getWing().cabinetModelLabel = v;
+        const desk = document.getElementById('inp-cabinet-model-label');
+        const mobile = document.getElementById('mobile-inp-cabinet-model-label');
+        if (desk && desk.value !== v) desk.value = v;
+        if (mobile && mobile.value !== v) mobile.value = v;
+    }
+    const modelLabelInp = document.getElementById('inp-cabinet-model-label');
+    if (modelLabelInp) {
+        modelLabelInp.addEventListener('input', (e) => { _syncCabinetModelLabel(e.target.value); });
+        modelLabelInp.addEventListener('change', () => saveHistoryState());
+    }
+    const mModelLabelInp = document.getElementById('mobile-inp-cabinet-model-label');
+    if (mModelLabelInp) {
+        mModelLabelInp.addEventListener('input', (e) => { _syncCabinetModelLabel(e.target.value); });
+        mModelLabelInp.addEventListener('change', () => saveHistoryState());
+    }
+
     const cabNotesInp = document.getElementById('inp-cabinet-notes');
     if (cabNotesInp) {
         cabNotesInp.addEventListener('input', (e) => {
@@ -6206,7 +6226,7 @@ function bindUI() {
             placement: state.placement,
             width: state.width, globalHeight: state.globalHeight, depth: state.depth, thickness: state.thickness,
             plinthHeight: state.plinthHeight, hasDoors: state.hasDoors, handleType: state.handleType, handleStyle: state.handleStyle,
-            cabinetName: state.cabinetName, cabinetNotes: state.cabinetNotes, manualPrice: state.manualPrice,
+            cabinetName: state.cabinetName, cabinetModelLabel: (state.wings && state.wings.center && state.wings.center.cabinetModelLabel) || state.cabinetModelLabel || '', cabinetNotes: state.cabinetNotes, manualPrice: state.manualPrice,
             boardMaterial: state.boardMaterial, materialBody: state.materialBody, materialInternal: state.materialInternal,
             materialExternal: state.materialExternal, materialDesk: state.materialDesk, materialOpenCell: state.materialOpenCell, materialBack: state.materialBack, columns: state.columns, desk: state.desk
         }));
@@ -6872,7 +6892,7 @@ function _applyRawStateForCapture(rawState) {
         state.activeWing = rs.activeWing || 'center';
         state.presetId = rs.presetId || 'linear';
         const flatFromWing = ['cabinetModel', 'placement', 'boardMaterial', 'handleType', 'handleStyle',
-            'cabinetName', 'cabinetNotes', 'manualPrice', 'materialBody', 'materialInternal',
+            'cabinetName', 'cabinetModelLabel', 'cabinetNotes', 'manualPrice', 'materialBody', 'materialInternal',
             'materialExternal', 'materialDesk', 'materialOpenCell', 'materialBack'];
         flatFromWing.forEach(f => { if (rs[f] !== undefined) state[f] = rs[f]; });
     } else {
@@ -6881,7 +6901,7 @@ function _applyRawStateForCapture(rawState) {
         state.wings.left = null;
         state.wings.right = null;
         const flatFields = ['cabinetModel', 'placement', 'width', 'globalHeight', 'depth', 'thickness',
-            'plinthHeight', 'hasDoors', 'handleType', 'handleStyle', 'cabinetName', 'cabinetNotes', 'manualPrice', 'boardMaterial',
+            'plinthHeight', 'hasDoors', 'handleType', 'handleStyle', 'cabinetName', 'cabinetModelLabel', 'cabinetNotes', 'manualPrice', 'boardMaterial',
             'materialBody', 'materialInternal', 'materialExternal', 'materialDesk', 'materialOpenCell',
             'materialBack', 'columns', 'desk'];
         flatFields.forEach(f => { if (rs[f] !== undefined) state[f] = rs[f]; });
@@ -7297,6 +7317,7 @@ window._buildCurrentCabinetCompareRaw = function() {
         handleType: state.handleType,
         handleStyle: state.handleStyle,
         cabinetName: state.cabinetName || '',
+        cabinetModelLabel: (state.wings && state.wings.center && state.wings.center.cabinetModelLabel) || state.cabinetModelLabel || '',
         cabinetNotes: state.cabinetNotes || '',
         manualPrice: state.manualPrice,
         manualInstallPrice: manualInstall,
@@ -7419,6 +7440,11 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
             const _hasMirrorPanel = _sdPanels.some(p => p === 'mirror' || p === 'mirror_dark');
             modelNameText = _hasMirrorPanel ? 'HRM2100' : 'HR2300';
         }
+        const _customModelLabel = String(
+            (state.wings && state.wings.center && state.wings.center.cabinetModelLabel) ||
+            state.cabinetModelLabel || ''
+        ).trim();
+        if (_customModelLabel) modelNameText = _customModelLabel;
 
         let plinthTypeText = 'צוקל נסתר';
         if(state.cabinetModel === 'c9') plinthTypeText = 'צוקל רגיל';
@@ -7441,7 +7467,7 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
             placement: state.placement,
             width: state.width, globalHeight: state.globalHeight, depth: state.depth, thickness: state.thickness,
             plinthHeight: state.plinthHeight, hasDoors: state.hasDoors, handleType: state.handleType, handleStyle: state.handleStyle,
-            cabinetName: state.cabinetName, cabinetNotes: state.cabinetNotes, manualPrice: state.manualPrice,
+            cabinetName: state.cabinetName, cabinetModelLabel: (state.wings && state.wings.center && state.wings.center.cabinetModelLabel) || state.cabinetModelLabel || '', cabinetNotes: state.cabinetNotes, manualPrice: state.manualPrice,
             manualInstallPrice: getWing().manualInstallPrice != null ? getWing().manualInstallPrice : null,
             boardMaterial: state.boardMaterial, materialBody: state.materialBody, materialInternal: state.materialInternal,
             materialExternal: state.materialExternal, materialDesk: state.materialDesk, materialOpenCell: state.materialOpenCell, materialBack: state.materialBack, columns: state.columns, desk: state.desk,
@@ -7528,7 +7554,7 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
             : `רוחב: ${state.width} ס"מ | גובה: ${_wingBodyHeightFromData(typeof getWing === 'function' ? getWing() : { columns: state.columns, globalHeight: state.globalHeight }, state.globalHeight)} ס"מ | עומק: ${state.depth} ס"מ`;
 
         const cabinetSpec = {
-            customName: state.cabinetName, cabinetNotes: (state.cabinetNotes || '').trim(), modelName: modelNameText, plinthType: plinthTypeText,
+            customName: state.cabinetName, cabinetNotes: (state.cabinetNotes || '').trim(), modelName: modelNameText, cabinetModelLabel: _customModelLabel, plinthType: plinthTypeText,
             placement: _isWritingDeskCart ? 'שולחן עמידה' : (placementHebrew[state.placement] || 'ארון קיר חופשי'),
             dimsStr: _wdDimsStr,
             material: state.boardMaterial === 'melamine' ? 'מלמין' : "סנדביץ'",
@@ -7627,6 +7653,10 @@ window._bootstrapDefaultCabinet = function() {
         state.manualInstallPrice = null;
         const cabNameInp = document.getElementById('inp-cabinet-name');
         if (cabNameInp) cabNameInp.value = '';
+        const modelLabelInp = document.getElementById('inp-cabinet-model-label');
+        if (modelLabelInp) modelLabelInp.value = '';
+        const mModelLabelInp = document.getElementById('mobile-inp-cabinet-model-label');
+        if (mModelLabelInp) mModelLabelInp.value = '';
         if (typeof applyPreset === 'function') applyPreset('linear');
     }
     const item = window._snapshotCurrentCabinetToCartItem();
@@ -7762,7 +7792,7 @@ window._editCartItemNow = function(index) {
         });
         // Apply flat fields to center wing via proxy setters
         const flatFields = ['cabinetModel','placement','width','globalHeight','depth','thickness',
-            'plinthHeight','hasDoors','handleType','handleStyle','cabinetName','cabinetNotes','manualPrice','boardMaterial',
+            'plinthHeight','hasDoors','handleType','handleStyle','cabinetName','cabinetModelLabel','cabinetNotes','manualPrice','boardMaterial',
             'materialBody','materialInternal','materialExternal','materialDesk','materialOpenCell',
             'materialBack','columns','desk'];
         flatFields.forEach(function(f) { if (rs[f] !== undefined) state[f] = rs[f]; });
@@ -7911,6 +7941,10 @@ window.newProject = function() {
     if (typeof window._syncBrowserTabTitle === 'function') window._syncBrowserTabTitle();
     const cabNameInp = document.getElementById('inp-cabinet-name');
     if (cabNameInp) cabNameInp.value = '';
+    const modelLabelInp = document.getElementById('inp-cabinet-model-label');
+    if (modelLabelInp) modelLabelInp.value = '';
+    const mModelLabelInp = document.getElementById('mobile-inp-cabinet-model-label');
+    if (mModelLabelInp) mModelLabelInp.value = '';
     const orderModal = document.getElementById('order-modal');
     if (orderModal) orderModal.style.display = 'none';
     window._bootstrapDefaultCabinet();
@@ -8374,13 +8408,45 @@ function _collectWingPrintSpecRows(item, itemObj, unit) {
     return rows;
 }
 
+function _defaultModelNameFromRaw(rawState) {
+    if (!rawState) return 'מאיה';
+    if (rawState.presetId === 'writing-desk') return 'שולחן כתיבה';
+    if (rawState.presetId === 'sliding') {
+        const wing = rawState.wings && rawState.wings.center;
+        const panels = (wing && wing.slidingDoor && wing.slidingDoor.doorPanels) || [];
+        const hasMirror = panels.some(function(p) { return p === 'mirror' || p === 'mirror_dark'; });
+        return hasMirror ? 'HRM2100' : 'HR2300';
+    }
+    const m = rawState.cabinetModel
+        || (rawState.wings && rawState.wings.center && rawState.wings.center.cabinetModel)
+        || 'maya';
+    if (m === 'c9') return 'C9';
+    if (m === 'ab2_nohoney') return 'ארון עם חזיתות פנימיות';
+    if (m === 'ab2') return 'AB2';
+    if (m === 'regalim') return 'רגלי ניקל';
+    return 'מאיה';
+}
+
+function _resolvePrintModelName(item, itemObj) {
+    const rs = itemObj && itemObj.rawState;
+    const custom = String(
+        (rs && rs.wings && rs.wings.center && rs.wings.center.cabinetModelLabel) ||
+        (rs && rs.cabinetModelLabel) ||
+        (item && item.cabinetModelLabel) ||
+        ''
+    ).trim();
+    if (custom) return custom;
+    if (rs) return _defaultModelNameFromRaw(rs);
+    return (item && item.modelName) || 'מאיה';
+}
+
 function _collectPrintSpecRows(item, itemObj) {
     const isWD = _cartIsWritingDesk(itemObj);
     if (itemObj && itemObj.rawState) _enrichSpecColorsFromRaw(item, itemObj.rawState);
     const rows = [];
     const multiUnits = (!isWD && itemObj) ? _enumeratePrintCabinetUnits(itemObj.rawState) : null;
 
-    rows.push({ id: 'modelName', label: isWD ? 'סוג מוצר' : 'דגם ארון', value: _plainSpecValue(item.modelName) });
+    rows.push({ id: 'modelName', label: isWD ? 'סוג מוצר' : 'דגם ארון', value: _plainSpecValue(_resolvePrintModelName(item, itemObj)) });
     if (!isWD) rows.push({ id: 'placement', label: 'מיקום / התקנה', value: _plainSpecValue(item.placement) });
 
     // Multi-wing corner / walk-in: separate spec block per cabinet/wing
@@ -8773,7 +8839,7 @@ function _printBasicSpecRows(item, itemObj, thStyle, tdStyle) {
     const isWD = _cartIsWritingDesk(itemObj);
     const dimsExtra = ' dir="rtl"';
     let html = '';
-    html += _printTr(thStyle, tdStyle, isWD ? 'סוג מוצר' : 'דגם ארון', `<strong>${item.modelName}</strong>`);
+    html += _printTr(thStyle, tdStyle, isWD ? 'סוג מוצר' : 'דגם ארון', `<strong>${_escPrintHtml(_resolvePrintModelName(item, itemObj))}</strong>`);
     if (!isWD) html += _printTr(thStyle, tdStyle, 'מיקום / התקנה', item.placement);
     html += _printTr(thStyle, tdStyle, 'מידות חיצוניות', _resolveCabinetDimsStr(item, itemObj) || item.dimsStr, dimsExtra);
     html += _printTr(thStyle, tdStyle, 'חומר גוף', item.material);
@@ -10106,6 +10172,8 @@ function _buildCustomerSummaryDetails(itemObj) {
     const content = rawState ? _countCabinetContentFromRawState(rawState) : _emptyContentCounts();
     const details = [];
 
+    const modelName = _resolvePrintModelName(item, itemObj);
+    if (modelName) details.push((isWD ? 'סוג מוצר: ' : 'דגם ארון: ') + modelName);
     _customerSummaryDimsLines(item, rawState).forEach(function(line) { details.push(line); });
     if (item.material) details.push('חומר גוף: ' + item.material);
 

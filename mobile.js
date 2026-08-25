@@ -1136,6 +1136,11 @@ function _syncMobileInputsFromState() {
     const mCabName = document.getElementById('mobile-inp-cabinet-name');
     if (mCabName) mCabName.value = state.cabinetName || '';
 
+    const mModelLabel = document.getElementById('mobile-inp-cabinet-model-label');
+    if (mModelLabel) {
+        mModelLabel.value = (state.wings && state.wings.center && state.wings.center.cabinetModelLabel) || state.cabinetModelLabel || '';
+    }
+
     const mCabNotes = document.getElementById('mobile-inp-cabinet-notes');
     if (mCabNotes) mCabNotes.value = state.cabinetNotes || '';
 
