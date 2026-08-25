@@ -1284,19 +1284,35 @@ body {
 }
 .cart-mini-card.on-hold { background: #f1f5f9; border-color: #cbd5e1; }
 .cart-mini-card.on-hold:hover { transform: none; box-shadow: var(--shadow-sm); border-color: #cbd5e1; }
-.cart-mini-card.on-hold > *:not(.cart-mini-actions) { filter: grayscale(1); opacity: 0.72; }
-.cart-mini-card.on-hold .cart-mini-actions .cart-mini-btn:not(.btn-hold-mini) { filter: grayscale(1); opacity: 0.62; }
+.cart-mini-card.on-hold > *:not(.cart-mini-actions):not(.btn-hold-mini) { filter: grayscale(1); opacity: 0.72; }
+.cart-mini-card.on-hold .cart-mini-actions .cart-mini-btn { filter: grayscale(1); opacity: 0.62; }
 .cart-mini-card.on-hold .cart-mini-card-price { color: #94a3b8; text-decoration: line-through; }
 .cart-hold-badge { display:inline-block; margin-right:6px; font-size:0.68rem; font-weight:700; color:#64748b; background:#e2e8f0; border-radius:999px; padding:2px 8px; vertical-align:middle; }
 .cart-mini-card.active-editing.on-hold { background: #e8edf3; border-color: #94a3b8; box-shadow: 0 0 0 2px rgba(100,116,139,0.22), var(--shadow-md); }
-.cart-mini-btn.btn-hold-mini { color:#64748b; border: 1.5px solid #cbd5e1; background: #f8fafc; }
+.cart-mini-btn.btn-hold-mini {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    z-index: 3;
+    flex: none;
+    min-width: 0;
+    width: auto;
+    padding: 3px 7px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    gap: 4px;
+    border-radius: 999px;
+    color: #64748b;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(15,23,42,0.12);
+}
 .cart-mini-card.on-hold .cart-mini-btn.btn-hold-mini {
     filter: none;
     opacity: 1;
     color: #059669;
     border-color: rgba(5,150,105,0.5);
-    background: rgba(5,150,105,0.14);
-    font-weight: 800;
+    background: #ecfdf5;
 }
 .cart-mini-card:hover { border-color: var(--secondary); transform: translateY(-3px) scale(1.01); box-shadow: 0 8px 24px rgba(37,99,235,0.14); }
 .cart-mini-card.active-editing { border-color: var(--secondary); box-shadow: 0 0 0 2px rgba(37,99,235,0.2), var(--shadow-md); background: #f0f6ff; }

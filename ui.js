@@ -8645,13 +8645,13 @@ window.updateLeftSidebar = function(opts) {
         
         card.innerHTML = `
             ${activeLabel}
+            <button type="button" class="cart-mini-btn btn-hold-mini" title="${held ? 'הפעל ארון' : 'השהה ארון'}" onclick="event.stopPropagation(); toggleCartItemHold(${index});"><i class="fa-solid fa-${held ? 'play' : 'pause'}"></i> ${held ? 'הפעל' : 'השהה'}</button>
             <div class="cart-mini-card-title">${holdBadge}${titleText}</div>
             <div class="cart-mini-card-desc" dir="rtl">${item.dimsStr}</div>
             ${window._showPricing !== false ? `<div class="cart-mini-card-price"><span dir="ltr">${item.price}</span> <span style="font-size:0.85rem; font-weight:normal; color:var(--text-light);">+ <span dir="ltr">₪${itemInstall.toLocaleString()}</span> התקנה</span></div>` : ''}
             ${_wallSelectorHTML}
             <div class="cart-mini-actions">
                 <button class="cart-mini-btn btn-edit-mini" onclick="event.stopPropagation(); editCartItem(${index});"><i class="fa-solid fa-pen"></i> ערוך</button>
-                <button class="cart-mini-btn btn-hold-mini" onclick="event.stopPropagation(); toggleCartItemHold(${index});"><i class="fa-solid fa-${held ? 'play' : 'pause'}"></i> ${held ? 'הפעל' : 'השהה'}</button>
                 <button class="cart-mini-btn" onclick="event.stopPropagation(); duplicateCartItem(${index});"><i class="fa-solid fa-copy"></i> שכפל</button>
                 <button class="cart-mini-btn btn-del-mini" onclick="event.stopPropagation(); deleteCartItem(${index});"><i class="fa-solid fa-trash"></i> מחק</button>
                 <div style="position:relative;display:inline-flex;">
