@@ -10128,13 +10128,14 @@ function _buildCustomerSummaryHTML(logoDataUrl) {
     rows.forEach(r => {
         totalCabPrice    += r.cabPrice;
         totalInstallPrice += r.instPrice;
+        const detailsHtml = _escPrintHtml(r.details).replace(/ \| /g, '<br>');
         rowsHTML += `
         <div class="cab-card">
           <div class="cab-card-inner">
-            <div class="cab-name">${r.title}</div>
-            <div class="cab-details">${r.details.replace(/ \| /g,'<br>')}</div>
-            ${_hidePrices ? '' : `<div class="cab-price">₪${r.cabPrice.toLocaleString()}</div>
-            <div class="cab-install">₪${r.instPrice.toLocaleString()}</div>`}
+            <div class="cab-name editable" contenteditable="true">${_escPrintHtml(r.title)}</div>
+            <div class="cab-details editable" contenteditable="true">${detailsHtml}</div>
+            ${_hidePrices ? '' : `<div class="cab-price editable" contenteditable="true">₪${r.cabPrice.toLocaleString()}</div>
+            <div class="cab-install editable" contenteditable="true">₪${r.instPrice.toLocaleString()}</div>`}
           </div>
         </div>`;
     });
@@ -10178,10 +10179,16 @@ function _buildCustomerSummaryHTML(logoDataUrl) {
   .totals-label { grid-column: 1 / span 2; text-align: right; }
   .totals-val { text-align: center; color: #1e3a5f; }
   .grand-total { margin-top: 10px; font-size: 1.2rem; font-weight: 800; color: #1e3a5f; }
-  .action-bar { display: flex; gap: 10px; margin-bottom: 22px; flex-wrap: wrap; }
+  .action-bar { display: flex; gap: 10px; margin-bottom: 22px; flex-wrap: wrap; align-items: center; }
   .action-btn { padding: 9px 20px; border-radius: 8px; border: none; font-size: 0.95rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 7px; font-family: inherit; }
   .btn-print  { background: #1e3a5f; color: white; }
   .btn-excel  { background: #16a34a; color: white; }
+  .edit-hint { font-size: 0.88rem; color: #64748b; margin-right: auto; }
+  .editable { outline: none; border-radius: 4px; min-height: 1.15em; }
+  .editable:hover { background: #f8fafc; box-shadow: inset 0 0 0 1px #cbd5e1; }
+  .editable:focus { background: #fffbeb; box-shadow: inset 0 0 0 2px #f59e0b; }
+  .cab-head .editable:hover { background: rgba(255,255,255,0.12); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.35); }
+  .cab-head .editable:focus { background: rgba(255,255,255,0.18); box-shadow: inset 0 0 0 2px #fbbf24; }
   @media print {
     .action-bar { display: none !important; }
     body { padding: 0; }
@@ -10191,6 +10198,11 @@ function _buildCustomerSummaryHTML(logoDataUrl) {
       break-inside: avoid-page !important;
     }
     .cab-details { orphans: 999; widows: 999; }
+    .editable, .editable:hover, .editable:focus {
+      background: transparent !important;
+      box-shadow: none !important;
+      outline: none !important;
+    }
   }
 </style>
 </head>
@@ -10199,40 +10211,41 @@ function _buildCustomerSummaryHTML(logoDataUrl) {
 <div class="action-bar">
   <button class="action-btn btn-print"  onclick="window.print()">🖨️ הדפסה / PDF</button>
   <button class="action-btn btn-excel"  onclick="_downloadExcel()">📊 הורדת Excel</button>
+  <span class="edit-hint">לחצו על הטקסט בדף כדי לערוך אותו לפני ההדפסה</span>
 </div>
 
 <div class="header">
   <div>
-    <h1>סיכום הזמנה ללקוח</h1>
-    <div style="font-size:0.85rem;color:#64748b;margin-top:4px;">תאריך: ${new Date().toLocaleDateString('he-IL')}</div>
+    <h1 class="editable" contenteditable="true">סיכום הזמנה ללקוח</h1>
+    <div class="editable" contenteditable="true" style="font-size:0.85rem;color:#64748b;margin-top:4px;">תאריך: ${new Date().toLocaleDateString('he-IL')}</div>
   </div>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
     ${logoDataUrl ? `<img src="${logoDataUrl}" style="max-height:60px;max-width:180px;object-fit:contain;" alt="לוגו">` : ''}
-    <div class="cust-info" style="text-align:right;">
-      ${custName ? `<div><strong>לקוח:</strong> ${custName}</div>` : ''}
-      ${custPhone ? `<div><strong>טלפון:</strong> ${custPhone}</div>` : ''}
-      ${custOrder ? `<div><strong>מס' הזמנה:</strong> ${custOrder}</div>` : ''}
-      ${custAddr  ? `<div><strong>כתובת:</strong> ${custAddr}</div>` : ''}
+    <div class="cust-info editable" contenteditable="true" style="text-align:right;">
+      <div><strong>לקוח:</strong> ${_escPrintHtml(custName)}</div>
+      <div><strong>טלפון:</strong> ${_escPrintHtml(custPhone)}</div>
+      <div><strong>מס' הזמנה:</strong> ${_escPrintHtml(custOrder)}</div>
+      <div><strong>כתובת:</strong> ${_escPrintHtml(custAddr)}</div>
     </div>
   </div>
 </div>
 
 <div class="cab-list">
   <div class="cab-head">
-    <div>ארון</div>
-    <div>פירוט</div>
-    ${_hidePrices ? '' : `<div class="col-price">מחיר ארון</div>
-    <div class="col-install">התקנה</div>`}
+    <div class="editable" contenteditable="true">ארון</div>
+    <div class="editable" contenteditable="true">פירוט</div>
+    ${_hidePrices ? '' : `<div class="col-price editable" contenteditable="true">מחיר ארון</div>
+    <div class="col-install editable" contenteditable="true">התקנה</div>`}
   </div>
   ${rowsHTML}
   ${_hidePrices ? '' : `<div class="totals-row">
-    <div class="totals-label">סה"כ</div>
-    <div class="totals-val">₪${totalCabPrice.toLocaleString()}</div>
-    <div class="totals-val">₪${totalInstallPrice.toLocaleString()}</div>
+    <div class="totals-label editable" contenteditable="true">סה"כ</div>
+    <div class="totals-val editable" contenteditable="true">₪${totalCabPrice.toLocaleString()}</div>
+    <div class="totals-val editable" contenteditable="true">₪${totalInstallPrice.toLocaleString()}</div>
   </div>`}
 </div>
 
-${_hidePrices ? '' : `<div class="grand-total">סה"כ לתשלום (כולל התקנה): ₪${grandTotal.toLocaleString()}</div>`}
+${_hidePrices ? '' : `<div class="grand-total editable" contenteditable="true">סה"כ לתשלום (כולל התקנה): ₪${grandTotal.toLocaleString()}</div>`}
 </body>
 </html>`;
 }
