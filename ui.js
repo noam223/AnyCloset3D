@@ -4856,7 +4856,8 @@ window._buildSpaceCabMoveHandle = function() {
             startMouseX: e.clientX,
             startMouseY: e.clientY,
             startX: off.x,
-            startY: off.y
+            startY: off.y,
+            prevX: off.x
         };
         handle.classList.add('active');
     });
@@ -4878,7 +4879,7 @@ window._buildSpaceCabMoveHandle = function() {
         const yPerPx = dyPx !== 0 ? 100 / dyPx : 1;
         const nx = d.startX + (e.clientX - d.startMouseX) * xPerPx;
         const ny = d.startY + (e.clientY - d.startMouseY) * yPerPx;
-        window._setSpaceOffset(nx, ny, { dragging: true });
+        window._setSpaceOffset(nx, ny, { dragging: true, preferAxis: undefined });
         const cur = window._getSpaceOffset(window._getSpaceSlot1Item());
         const tip = handle.querySelector('.drag-tooltip');
         if (tip) tip.innerText = `הזז ארון 2: ${cur.x}, ${cur.y} ס"מ`;
@@ -7613,16 +7614,69 @@ window._getSpaceSlot1Item = function() {
     return state.orderCart[info.slot1Index] || null;
 };
 
+window._spaceWingsForSlot = function(slot) {
+    const info = window._getSpacePairInfo();
+    if (!info) return null;
+    const idx = slot === 1 ? info.slot1Index : info.slot0Index;
+    if (state.editingCartIndex === idx) return state.wings;
+    const item = state.orderCart[idx];
+    return (item && item.rawState && item.rawState.wings) || null;
+};
+
+window._spaceCabinetFootprint = function(slot) {
+    const wings = window._spaceWingsForSlot(slot);
+    const c = wings && wings.center;
+    const w = (c && c.width) || 160;
+    let h = (c && c.globalHeight) || 240;
+    if (c && c.columns && c.columns.length) {
+        h = Math.max.apply(null, c.columns.map(function(col) { return col.height || h; }));
+    }
+    const uu = wings && wings.upperUnit_center;
+    if (uu && uu._isUpperUnit) {
+        let uuH = uu.globalHeight || 40;
+        if (uu.columns && uu.columns.length) {
+            uuH = Math.max.apply(null, uu.columns.map(function(col) { return col.height || uuH; }));
+        }
+        h += (uu._upperGap || 0) + uuH;
+    }
+    return { w: w, h: h };
+};
+
+window._clampSpaceOffsetAgainstPrimary = function(x, y, opts) {
+    opts = opts || {};
+    const d0 = window._spaceCabinetFootprint(0);
+    const d1 = window._spaceCabinetFootprint(1);
+    x = Math.max(-500, Math.min(500, Number(x) || 0));
+    y = Math.max(0, Math.min(400, Number(y) || 0));
+    const half = (d0.w + d1.w) / 2;
+    const overlapX = half - Math.abs(x);
+    const overlapY = d0.h - y;
+    if (overlapX > 0 && overlapY > 0) {
+        const prefer = opts.preferAxis;
+        const pushX = prefer === 'x' ? true : prefer === 'y' ? false : (overlapX <= overlapY);
+        if (pushX) {
+            let sign = x < 0 ? -1 : (x > 0 ? 1 : 0);
+            if (!sign && opts.prevX) sign = opts.prevX < 0 ? -1 : 1;
+            if (!sign) sign = 1;
+            x = sign * Math.ceil(half - 1e-9);
+        } else {
+            y = Math.ceil(d0.h - 1e-9);
+        }
+    }
+    return { x: Math.round(x), y: Math.round(y) };
+};
+
 window._setSpaceOffset = function(x, y, opts) {
     opts = opts || {};
     const info = window._getSpacePairInfo();
     if (!info) return;
     const item = state.orderCart[info.slot1Index];
     if (!item) return;
-    const offset = {
-        x: Math.round(Math.max(-500, Math.min(500, Number(x) || 0))),
-        y: Math.round(Math.max(0, Math.min(400, Number(y) || 0)))
-    };
+    const prev = window._getSpaceOffset(item);
+    const offset = window._clampSpaceOffsetAgainstPrimary(x, y, {
+        preferAxis: opts.preferAxis,
+        prevX: prev.x
+    });
     item.spaceOffset = offset;
     if (!item.rawState) item.rawState = {};
     item.rawState.spaceOffset = offset;
@@ -7636,8 +7690,8 @@ window._setSpaceOffset = function(x, y, opts) {
 window._setSpaceOffsetFromUI = function(axis, val) {
     const item = window._getSpaceSlot1Item();
     const cur = window._getSpaceOffset(item);
-    if (axis === 'x') window._setSpaceOffset(val, cur.y);
-    else window._setSpaceOffset(cur.x, val);
+    if (axis === 'x') window._setSpaceOffset(val, cur.y, { preferAxis: 'x' });
+    else window._setSpaceOffset(cur.x, val, { preferAxis: 'y' });
 };
 
 window._syncSpaceOffsetUI = function() {
