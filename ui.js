@@ -4877,7 +4877,7 @@ window._buildSpaceCabMoveHandle = function() {
         const xPerPx = dxPx !== 0 ? 100 / dxPx : 1;
         const yPerPx = dyPx !== 0 ? 100 / dyPx : 1;
         const nx = d.startX + (e.clientX - d.startMouseX) * xPerPx;
-        const ny = d.startY - (e.clientY - d.startMouseY) * yPerPx;
+        const ny = d.startY + (e.clientY - d.startMouseY) * yPerPx;
         window._setSpaceOffset(nx, ny, { dragging: true });
         const cur = window._getSpaceOffset(window._getSpaceSlot1Item());
         const tip = handle.querySelector('.drag-tooltip');
