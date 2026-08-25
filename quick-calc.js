@@ -901,6 +901,7 @@ window.openQuickCalcModal = async function() {
         global.applyCabinetTypeSelects(global._pricingConfig || global.DEFAULT_PRICING_CONFIG || _QC_DEFAULT_PRICING);
     }
     modal.style.display = 'flex';
+    _qcBindBackdropClose();
     if (typeof calcQuickPrice === 'function') calcQuickPrice(true);
     window._qcSetEditUi();
     window._renderQcQuoteList();
@@ -912,7 +913,25 @@ window.closeQuickCalcModal = function() {
     if (modal) modal.style.display = 'none';
 };
 
+function _qcBindBackdropClose() {
+    var modal = document.getElementById('quick-calc-modal');
+    if (!modal || modal._qcBackdropBound) return;
+    modal._qcBackdropBound = true;
+    var downOnBackdrop = false;
+    modal.addEventListener('pointerdown', function(e) {
+        downOnBackdrop = (e.target === modal);
+    });
+    modal.addEventListener('pointerup', function(e) {
+        if (downOnBackdrop && e.target === modal) closeQuickCalcModal();
+        downOnBackdrop = false;
+    });
+    modal.addEventListener('pointercancel', function() {
+        downOnBackdrop = false;
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    _qcBindBackdropClose();
     var nameEl = document.getElementById('qc-customer-name');
     if (nameEl) nameEl.addEventListener('input', function() { window._renderQcQuoteList(); });
     var histSearch = document.getElementById('qc-history-search');
