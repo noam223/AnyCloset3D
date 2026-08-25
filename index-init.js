@@ -427,7 +427,18 @@
                 lightCart[editIdx] = Object.assign({}, lightCart[editIdx], { rawState: liveRaw });
                 if (lightCart[editIdx].spec) {
                     if (state.cabinetName) lightCart[editIdx].spec.customName = state.cabinetName;
-                    var _cw = state.width, _ch = state.globalHeight, _cd = state.depth;
+                    var _cw = state.width, _cd = state.depth;
+                    var _ch = state.globalHeight;
+                    if (typeof window._wingBodyHeightFromData === 'function') {
+                        _ch = window._wingBodyHeightFromData(
+                            { columns: state.columns, globalHeight: state.globalHeight },
+                            state.globalHeight
+                        );
+                    } else if (state.columns && state.columns.length) {
+                        _ch = Math.max.apply(null, state.columns.map(function(c) {
+                            return Math.max(0, Math.round((c.height || state.globalHeight) - (c.floorOffset || 0)));
+                        }));
+                    }
                     if (_cw || _ch || _cd) {
                         lightCart[editIdx].spec.dimsStr = 'רוחב: ' + _cw + ' ס"מ | גובה: ' + _ch + ' ס"מ | עומק: ' + _cd + ' ס"מ';
                     }

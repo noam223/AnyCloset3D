@@ -6384,6 +6384,12 @@ function _showToast(msg, duration = 4000) {
 window._showToast = _showToast;
 
 // ---- Cart preview refresh (images stripped on project save — regenerate from rawState) ----
+function _columnBodyHeight(col, fallback) {
+    const h = (col && col.height != null) ? col.height : (fallback || 240);
+    const fo = (col && col.floorOffset) || 0;
+    return Math.max(0, Math.round(h - fo));
+}
+
 function _wingHeightFromData(wing, fallback) {
     if (!wing) return fallback || 240;
     if (wing.columns && wing.columns.length) {
@@ -6391,6 +6397,32 @@ function _wingHeightFromData(wing, fallback) {
     }
     return wing.globalHeight || fallback || 240;
 }
+
+/** Outer cabinet body height: from the bottom panel, not from the floor (hanging units). */
+function _wingBodyHeightFromData(wing, fallback) {
+    if (!wing) return fallback || 240;
+    if (wing.columns && wing.columns.length) {
+        return Math.max(...wing.columns.map(c => _columnBodyHeight(c, fallback || wing.globalHeight)));
+    }
+    return Math.round(wing.globalHeight || fallback || 240);
+}
+
+function _specWingFromRaw(rawState) {
+    if (!rawState) return null;
+    if (rawState.wings) {
+        return rawState.wings[rawState.activeWing || 'center'] || rawState.wings.center || null;
+    }
+    return rawState;
+}
+
+function _resolveCabinetDimsStr(item, itemObj) {
+    if (itemObj && _cartIsWritingDesk(itemObj)) return (item && item.dimsStr) || '';
+    const rs = itemObj && itemObj.rawState;
+    const wing = _specWingFromRaw(rs);
+    if (wing) return _wingDimsStr(wing, rs);
+    return (item && item.dimsStr) || '';
+}
+window._wingBodyHeightFromData = _wingBodyHeightFromData;
 
 function _cartHasMultiFrontViews(rawState) {
     if (!rawState) return false;
@@ -7493,7 +7525,7 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
             : (_wdCart.drawerCount != null ? _wdCart.drawerCount : (state.width <= 80 ? 1 : 2));
         const _wdDimsStr = _isWritingDeskCart
             ? `רוחב: ${state.width} ס"מ | גובה: ${_wdHeightCart} ס"מ | עומק: ${state.depth} ס"מ`
-            : `רוחב: ${state.width} ס"מ | גובה: ${state.globalHeight} ס"מ | עומק: ${state.depth} ס"מ`;
+            : `רוחב: ${state.width} ס"מ | גובה: ${_wingBodyHeightFromData(typeof getWing === 'function' ? getWing() : { columns: state.columns, globalHeight: state.globalHeight }, state.globalHeight)} ס"מ | עומק: ${state.depth} ס"מ`;
 
         const cabinetSpec = {
             customName: state.cabinetName, cabinetNotes: (state.cabinetNotes || '').trim(), modelName: modelNameText, plinthType: plinthTypeText,
@@ -8219,7 +8251,7 @@ function _enumeratePrintCabinetUnits(rawState) {
 
 function _wingDimsStr(wing, rawState) {
     const w = (wing && wing.width) || (rawState && rawState.width) || 160;
-    const h = _wingHeightFromData(wing, (rawState && rawState.globalHeight) || 240);
+    const h = _wingBodyHeightFromData(wing, (rawState && rawState.globalHeight) || 240);
     const d = (wing && wing.depth) || (rawState && rawState.depth) || 54;
     return 'רוחב: ' + w + ' ס"מ | גובה: ' + h + ' ס"מ | עומק: ' + d + ' ס"מ';
 }
@@ -8231,10 +8263,14 @@ function _customerSummaryDimsLines(item, rawState) {
         return units.map(function(unit) {
             const wing = unit.wing || {};
             const w = wing.width || (rawState && rawState.width) || 160;
-            const h = _wingHeightFromData(wing, (rawState && rawState.globalHeight) || 240);
+            const h = _wingBodyHeightFromData(wing, (rawState && rawState.globalHeight) || 240);
             const d = wing.depth || (rawState && rawState.depth) || 54;
             return unit.label + ': רוחב ' + w + ' ס"מ, גובה ' + h + ' ס"מ, עומק ' + d + ' ס"מ';
         });
+    }
+    if (rawState) {
+        const fromRaw = _resolveCabinetDimsStr(item, { rawState: rawState, spec: item });
+        if (fromRaw) return [fromRaw];
     }
     return item && item.dimsStr ? [item.dimsStr] : [];
 }
@@ -8361,7 +8397,7 @@ function _collectPrintSpecRows(item, itemObj) {
         return rows;
     }
 
-    rows.push({ id: 'dimsStr', label: 'מידות חיצוניות', value: _plainSpecValue(item.dimsStr), rtl: true });
+    rows.push({ id: 'dimsStr', label: 'מידות חיצוניות', value: _plainSpecValue(_resolveCabinetDimsStr(item, itemObj)), rtl: true });
     rows.push({ id: 'material', label: 'חומר גוף', value: _plainSpecValue(item.material) });
     rows.push({ id: 'plinthType', label: isWD ? 'בסיס' : 'סוג רגליים / צוקל', value: _plainSpecValue(isWD ? 'רגליים כפולות' : item.plinthType) });
     if (!isWD) rows.push({ id: 'desk', label: 'תוספת שולחן', value: _plainSpecValue(item.desk) });
@@ -8739,7 +8775,7 @@ function _printBasicSpecRows(item, itemObj, thStyle, tdStyle) {
     let html = '';
     html += _printTr(thStyle, tdStyle, isWD ? 'סוג מוצר' : 'דגם ארון', `<strong>${item.modelName}</strong>`);
     if (!isWD) html += _printTr(thStyle, tdStyle, 'מיקום / התקנה', item.placement);
-    html += _printTr(thStyle, tdStyle, 'מידות חיצוניות', item.dimsStr, dimsExtra);
+    html += _printTr(thStyle, tdStyle, 'מידות חיצוניות', _resolveCabinetDimsStr(item, itemObj) || item.dimsStr, dimsExtra);
     html += _printTr(thStyle, tdStyle, 'חומר גוף', item.material);
     html += _printTr(thStyle, tdStyle, isWD ? 'בסיס' : 'סוג רגליים / צוקל', isWD ? 'רגליים כפולות' : item.plinthType);
     if (!isWD) html += _printTr(thStyle, tdStyle, 'תוספת שולחן', item.desk);
