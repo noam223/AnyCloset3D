@@ -792,11 +792,26 @@ window.Projects = {
         const cust = projectData.customer || {};
         const status = projectData.orderStatus || 'quote';
         const valid = this.ORDER_STATUS_KEYS;
-        const rawDate = String(cust.deliveryDate || '').trim().slice(0, 10);
+        const rawDate = String(cust.deliveryDate || '').trim();
+        let deliveryIso = null;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(rawDate.slice(0, 10))) {
+            deliveryIso = rawDate.slice(0, 10);
+        } else {
+            const dmy = rawDate.match(/^(\d{1,2})[/.](\d{1,2})[/.](\d{4})$/);
+            if (dmy) {
+                const d = String(dmy[1]).padStart(2, '0');
+                const mo = String(dmy[2]).padStart(2, '0');
+                const y = dmy[3];
+                const dt = new Date(parseInt(y, 10), parseInt(mo, 10) - 1, parseInt(d, 10));
+                if (dt.getFullYear() === parseInt(y, 10) && dt.getMonth() === parseInt(mo, 10) - 1 && dt.getDate() === parseInt(d, 10)) {
+                    deliveryIso = y + '-' + mo + '-' + d;
+                }
+            }
+        }
         return {
             customer_name:       (cust.name || '').trim() || null,
             customer_order_num:  (cust.orderNum || '').trim() || null,
-            delivery_estimate:   /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : null,
+            delivery_estimate:   deliveryIso,
             order_status:        valid.indexOf(status) !== -1 ? status : 'quote'
         };
     },

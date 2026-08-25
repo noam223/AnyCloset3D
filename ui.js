@@ -5553,17 +5553,45 @@ function bindUI() {
         cabNotesInp.addEventListener('change', () => saveHistoryState());
     }
 
-    window._formatCustomerDeliveryDate = function(iso) {
+    window._isoToDisplayDate = function(iso) {
         if (!iso) return '';
-        const s = String(iso).slice(0, 10);
-        const parts = s.split('-');
-        if (parts.length !== 3) return s;
-        const y = parseInt(parts[0], 10);
-        const m = parseInt(parts[1], 10) - 1;
-        const d = parseInt(parts[2], 10);
-        if (!y || m < 0 || !d) return s;
-        return new Date(y, m, d).toLocaleDateString('he-IL', { day: 'numeric', month: 'short', year: 'numeric' });
+        const s = String(iso).trim();
+        const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (isoMatch) return isoMatch[3] + '/' + isoMatch[2] + '/' + isoMatch[1];
+        const dmy = s.match(/^(\d{1,2})[/.](\d{1,2})[/.](\d{4})$/);
+        if (!dmy) return s;
+        return String(dmy[1]).padStart(2, '0') + '/' + String(dmy[2]).padStart(2, '0') + '/' + dmy[3];
     };
+
+    window._displayDateToIso = function(display) {
+        const s = String(display || '').trim();
+        if (!s) return '';
+        let y, m, d;
+        const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (isoMatch) {
+            y = isoMatch[1]; m = isoMatch[2]; d = isoMatch[3];
+        } else {
+            const dmy = s.match(/^(\d{1,2})[/.](\d{1,2})[/.](\d{4})$/);
+            if (!dmy) return '';
+            d = String(dmy[1]).padStart(2, '0');
+            m = String(dmy[2]).padStart(2, '0');
+            y = dmy[3];
+        }
+        const dt = new Date(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10));
+        if (dt.getFullYear() !== parseInt(y, 10) || dt.getMonth() !== parseInt(m, 10) - 1 || dt.getDate() !== parseInt(d, 10)) return '';
+        return y + '-' + m + '-' + d;
+    };
+
+    window._formatCustomerDeliveryDate = function(iso) {
+        return window._isoToDisplayDate(iso);
+    };
+
+    function _syncDeliveryDisplay(shown) {
+        ['cust-delivery', 'mobile-cust-delivery'].forEach(function(id) {
+            const el = document.getElementById(id);
+            if (el && el.value !== shown) el.value = shown;
+        });
+    }
 
     window._fillCustomerForm = function() {
         const c = (state && state.customer) || {};
@@ -5572,12 +5600,12 @@ function bindUI() {
             ['cust-phone', c.phone],
             ['cust-order-num', c.orderNum],
             ['cust-address', c.address],
-            ['cust-delivery', c.deliveryDate],
+            ['cust-delivery', window._isoToDisplayDate(c.deliveryDate)],
             ['mobile-cust-name', c.name],
             ['mobile-cust-phone', c.phone],
             ['mobile-cust-order-num', c.orderNum],
             ['mobile-cust-address', c.address],
-            ['mobile-cust-delivery', c.deliveryDate]
+            ['mobile-cust-delivery', window._isoToDisplayDate(c.deliveryDate)]
         ];
         pairs.forEach(function(p) {
             const el = document.getElementById(p[0]);
@@ -5588,8 +5616,35 @@ function bindUI() {
     ['name', 'phone', 'order-num', 'address', 'delivery'].forEach(field => {
         const el = document.getElementById(`cust-${field}`);
         if (!el) return;
+        if (field === 'delivery') {
+            const onDeliveryInput = (e) => {
+                const iso = window._displayDateToIso(e.target.value);
+                if (iso || !String(e.target.value).trim()) state.customer.deliveryDate = iso;
+                const otherId = e.target.id === 'cust-delivery' ? 'mobile-cust-delivery' : 'cust-delivery';
+                const other = document.getElementById(otherId);
+                if (other && other.value !== e.target.value) other.value = e.target.value;
+            };
+            const onDeliveryBlur = (e) => {
+                const iso = window._displayDateToIso(e.target.value);
+                if (iso) {
+                    state.customer.deliveryDate = iso;
+                    _syncDeliveryDisplay(window._isoToDisplayDate(iso));
+                } else if (!String(e.target.value).trim()) {
+                    state.customer.deliveryDate = '';
+                    _syncDeliveryDisplay('');
+                }
+            };
+            [el, document.getElementById('mobile-cust-delivery')].forEach(function(inp) {
+                if (!inp || inp.dataset.deliveryBound) return;
+                inp.dataset.deliveryBound = '1';
+                inp.addEventListener('input', onDeliveryInput);
+                inp.addEventListener('change', onDeliveryInput);
+                inp.addEventListener('blur', onDeliveryBlur);
+            });
+            return;
+        }
         const onCustChange = (e) => {
-            const key = field === 'order-num' ? 'orderNum' : (field === 'delivery' ? 'deliveryDate' : field);
+            const key = field === 'order-num' ? 'orderNum' : field;
             state.customer[key] = e.target.value;
             const mobile = document.getElementById('mobile-cust-' + field);
             if (mobile && mobile.value !== e.target.value) mobile.value = e.target.value;
@@ -6199,7 +6254,9 @@ function bindUI() {
                         document.getElementById('cust-order-num').value = state.customer.orderNum || '';
                         document.getElementById('cust-address').value = state.customer.address || '';
                         const delEl = document.getElementById('cust-delivery');
-                        if (delEl) delEl.value = state.customer.deliveryDate || '';
+                        if (delEl) delEl.value = window._isoToDisplayDate
+                            ? window._isoToDisplayDate(state.customer.deliveryDate)
+                            : (state.customer.deliveryDate || '');
                     }
                 }
                 if (data.orderForm) state.orderForm = data.orderForm;

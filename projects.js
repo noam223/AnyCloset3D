@@ -525,14 +525,12 @@ function _statusChipLabelHtml(status) {
 
 function _formatDeliveryDate(iso) {
     if (!iso) return '';
-    var s = String(iso).slice(0, 10);
-    var parts = s.split('-');
-    if (parts.length !== 3) return s;
-    var y = parseInt(parts[0], 10);
-    var m = parseInt(parts[1], 10) - 1;
-    var d = parseInt(parts[2], 10);
-    if (!y || m < 0 || !d) return s;
-    return new Date(y, m, d).toLocaleDateString('he-IL', { day: 'numeric', month: 'short', year: 'numeric' });
+    var s = String(iso).trim();
+    var isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) return isoMatch[3] + '/' + isoMatch[2] + '/' + isoMatch[1];
+    var dmy = s.match(/^(\d{1,2})[/.](\d{1,2})[/.](\d{4})$/);
+    if (dmy) return String(dmy[1]).padStart(2, '0') + '/' + String(dmy[2]).padStart(2, '0') + '/' + dmy[3];
+    return s;
 }
 
 function _projectMatchesSearch(p) {

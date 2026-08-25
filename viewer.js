@@ -965,7 +965,12 @@ function _updateDetailsBar() {
             if (cust.name)    custHtml += '<span class="viewer-cust-item"><i class="fa-regular fa-user"></i><strong>' + _escHtml(cust.name) + '</strong></span>';
             if (cust.phone)   custHtml += '<span class="viewer-cust-item"><i class="fa-solid fa-phone"></i>' + _escHtml(cust.phone) + '</span>';
             if (cust.address) custHtml += '<span class="viewer-cust-item"><i class="fa-solid fa-map-location-dot"></i>' + _escHtml(cust.address) + '</span>';
-            if (cust.deliveryDate) custHtml += '<span class="viewer-cust-item"><i class="fa-solid fa-truck"></i>צפי אספקה ' + _escHtml(cust.deliveryDate) + '</span>';
+            if (cust.deliveryDate) {
+                var delShown = String(cust.deliveryDate);
+                var isoM = delShown.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                if (isoM) delShown = isoM[3] + '/' + isoM[2] + '/' + isoM[1];
+                custHtml += '<span class="viewer-cust-item"><i class="fa-solid fa-truck"></i>צפי אספקה ' + _escHtml(delShown) + '</span>';
+            }
             if (cust.notes)   custHtml += '<span class="viewer-cust-item"><i class="fa-solid fa-note-sticky"></i>' + _escHtml(cust.notes) + '</span>';
             custStrip.innerHTML = custHtml || '<span class="viewer-cust-item" style="color:#94a3b8;">אין פרטי לקוח</span>';
         }

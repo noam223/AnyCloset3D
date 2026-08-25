@@ -306,7 +306,15 @@
                             window._fillCustomerForm();
                         } else {
                             var custFields = [['cust-name','name'],['cust-phone','phone'],['cust-order-num','orderNum'],['cust-address','address'],['cust-delivery','deliveryDate']];
-                            custFields.forEach(function(f) { var el = document.getElementById(f[0]); if (el) el.value = state.customer[f[1]] || ''; });
+                            custFields.forEach(function(f) {
+                                var el = document.getElementById(f[0]);
+                                if (!el) return;
+                                var val = state.customer[f[1]] || '';
+                                if (f[0] === 'cust-delivery' && typeof window._isoToDisplayDate === 'function') {
+                                    val = window._isoToDisplayDate(val);
+                                }
+                                el.value = val;
+                            });
                         }
                     }
                     if (snap.orderForm) state.orderForm = snap.orderForm;
