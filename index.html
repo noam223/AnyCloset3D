@@ -39,7 +39,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260824qe2">
     <link rel="stylesheet" href="style-mobile.css?v=20260609a">
     <link rel="stylesheet" href="style-extras.css?v=20260731rpcab">
-    <link rel="stylesheet" href="style.css?v=20260825holdCorner">
+    <link rel="stylesheet" href="style.css?v=20260825spaceHead">
     <style>
         html.thumb-only-mode #left-sidebar,
         html.thumb-only-mode #right-sidebar,
@@ -107,6 +107,42 @@
                     <i class="fa-solid fa-sink" style="font-size:1.4rem;opacity:0.9;"></i>
                     <span>אמבטיה</span>
                 </button>
+            </div>
+        </div>
+        <div id="space-cab-tabs" style="display:none;">
+            <button type="button" id="btn-add-space-cab" class="space-cab-add-btn" onclick="addSpaceCabinet()">
+                <i class="fa-solid fa-plus"></i> הוסף ארון במרחב
+            </button>
+            <button type="button" id="btn-join-space-cab" class="space-cab-join-btn" onclick="toggleJoinSpacePicker()" style="display:none;" title="חברו ארון רגיל או הזזה שכבר קיים בפרויקט לאותו מרחב תלת-ממד">
+                <i class="fa-solid fa-link"></i> הוסף ארון קיים למרחב
+            </button>
+            <div id="space-cab-join-list" class="space-cab-join-list" style="display:none;"></div>
+            <div id="space-cab-tabs-btns" class="space-cab-tabs-row" style="display:none;">
+                <button type="button" id="space-cab-tab-0" class="space-cab-tab" onclick="switchSpaceCabinet(0)">ארון 1</button>
+                <button type="button" id="space-cab-tab-1" class="space-cab-tab" onclick="switchSpaceCabinet(1)">ארון 2</button>
+            </div>
+            <div id="space-cab-offset-row" style="display:none;">
+                <div class="space-cab-offset-label"><i class="fa-solid fa-up-down-left-right"></i> מיקום ארון 2 במרחב</div>
+                <div class="header-dims-grid space-cab-offset-grid">
+                    <div class="header-dim-card">
+                        <div class="header-dim-top">
+                            <label for="inp-num-space-x">הזזה X</label>
+                            <div class="header-dim-val">
+                                <input type="number" id="inp-num-space-x" value="0" step="1" onchange="window._setSpaceOffsetFromUI('x', this.value)">
+                                <span>ס"מ</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="header-dim-card">
+                        <div class="header-dim-top">
+                            <label for="inp-num-space-y">הזזה Y</label>
+                            <div class="header-dim-val">
+                                <input type="number" id="inp-num-space-y" value="0" min="0" step="1" onchange="window._setSpaceOffsetFromUI('y', this.value)">
+                                <span>ס"מ</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
         <p class="sidebar-section-title">עריכת מידות ארון:</p>
@@ -292,30 +328,6 @@
             </div>
         </div>
     
-        <!-- Dual-cabinet in same 3D space (linear / sliding) -->
-        <div id="space-cab-tabs" style="display:none;padding:0 16px 12px;">
-            <button type="button" id="btn-add-space-cab" class="space-cab-add-btn" onclick="addSpaceCabinet()">
-                <i class="fa-solid fa-plus"></i> הוסף ארון במרחב
-            </button>
-            <button type="button" id="btn-join-space-cab" class="space-cab-join-btn" onclick="toggleJoinSpacePicker()" style="display:none;" title="חברו ארון רגיל או הזזה שכבר קיים בפרויקט לאותו מרחב תלת-ממד">
-                <i class="fa-solid fa-link"></i> צרף ארון קיים
-            </button>
-            <div id="space-cab-join-list" class="space-cab-join-list" style="display:none;"></div>
-            <div id="space-cab-tabs-btns" class="space-cab-tabs-row" style="display:none;">
-                <button type="button" id="space-cab-tab-0" class="space-cab-tab" onclick="switchSpaceCabinet(0)">ארון 1</button>
-                <button type="button" id="space-cab-tab-1" class="space-cab-tab" onclick="switchSpaceCabinet(1)">ארון 2</button>
-            </div>
-            <div id="space-cab-offset-row" style="display:none;margin-top:10px;">
-                <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:6px;"><i class="fa-solid fa-up-down-left-right" style="margin-left:4px;opacity:0.7;"></i> מיקום ארון 2 במרחב</div>
-                <div class="control-group" style="margin-bottom:8px;">
-                    <div class="label-row"><span>הזזה אופקית X (ס"מ)</span><input type="number" id="inp-num-space-x" class="value-badge-input" value="0" step="1" onchange="window._setSpaceOffsetFromUI('x', this.value)"></div>
-                </div>
-                <div class="control-group" style="margin-bottom:0;">
-                    <div class="label-row"><span>הזזה אנכית Y (ס"מ)</span><input type="number" id="inp-num-space-y" class="value-badge-input" value="0" min="0" step="1" onchange="window._setSpaceOffsetFromUI('y', this.value)"></div>
-                </div>
-            </div>
-        </div>
-
             <!-- Placeholder shown in free mode (no cabinet selected for editing) -->
             <div id="sidebar-edit-placeholder" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 20px 32px;gap:14px;color:var(--text-light);text-align:center;">
                 <i class="fa-solid fa-hand-pointer" style="font-size:2.8rem;opacity:0.28;"></i>
@@ -1855,26 +1867,6 @@
         <button class="mobile-panel-close" onclick="closeMobilePanel()"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="mobile-panel-body">
-        <div id="mobile-space-cab-tabs" style="display:none;margin-bottom:14px;">
-            <button type="button" id="mobile-btn-add-space-cab" class="space-cab-add-btn" onclick="addSpaceCabinet()">
-                <i class="fa-solid fa-plus"></i> הוסף ארון במרחב
-            </button>
-            <button type="button" id="mobile-btn-join-space-cab" class="space-cab-join-btn" onclick="toggleJoinSpacePicker()" style="display:none;" title="חברו ארון רגיל או הזזה שכבר קיים בפרויקט לאותו מרחב תלת-ממד">
-                <i class="fa-solid fa-link"></i> צרף ארון קיים
-            </button>
-            <div id="mobile-space-cab-join-list" class="space-cab-join-list" style="display:none;"></div>
-            <div id="mobile-space-cab-tabs-btns" class="space-cab-tabs-row" style="display:none;">
-                <button type="button" id="mobile-space-cab-tab-0" class="space-cab-tab" onclick="switchSpaceCabinet(0)">ארון 1</button>
-                <button type="button" id="mobile-space-cab-tab-1" class="space-cab-tab" onclick="switchSpaceCabinet(1)">ארון 2</button>
-            </div>
-            <div id="mobile-space-cab-offset-row" style="display:none;margin-top:10px;">
-                <div class="mobile-section-title" style="margin-bottom:8px;">מיקום ארון 2 במרחב</div>
-                <label class="mobile-label">הזזה אופקית X (ס"מ)</label>
-                <input type="number" id="mobile-inp-num-space-x" class="editor-select" value="0" step="1" style="margin:0 0 8px;width:100%;box-sizing:border-box;" onchange="window._setSpaceOffsetFromUI('x', this.value)">
-                <label class="mobile-label">הזזה אנכית Y (ס"מ)</label>
-                <input type="number" id="mobile-inp-num-space-y" class="editor-select" value="0" min="0" step="1" style="margin:0;width:100%;box-sizing:border-box;" onchange="window._setSpaceOffsetFromUI('y', this.value)">
-            </div>
-        </div>
         <div class="mobile-section-title">שם הארון</div>
         <div class="input-icon-wrap" style="margin-bottom:15px;">
             <i class="fa-solid fa-pen"></i>
@@ -1914,6 +1906,26 @@
                 style="flex:1;min-width:48px;padding:6px 4px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.72rem;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;">
                 <i class="fa-solid fa-desktop" style="font-size:1rem;"></i><span>שולחן</span>
             </button>
+        </div>
+        <div id="mobile-space-cab-tabs" style="display:none;margin:0 0 14px;">
+            <button type="button" id="mobile-btn-add-space-cab" class="space-cab-add-btn" onclick="addSpaceCabinet()">
+                <i class="fa-solid fa-plus"></i> הוסף ארון במרחב
+            </button>
+            <button type="button" id="mobile-btn-join-space-cab" class="space-cab-join-btn" onclick="toggleJoinSpacePicker()" style="display:none;" title="חברו ארון רגיל או הזזה שכבר קיים בפרויקט לאותו מרחב תלת-ממד">
+                <i class="fa-solid fa-link"></i> הוסף ארון קיים למרחב
+            </button>
+            <div id="mobile-space-cab-join-list" class="space-cab-join-list" style="display:none;"></div>
+            <div id="mobile-space-cab-tabs-btns" class="space-cab-tabs-row" style="display:none;margin-top:8px;">
+                <button type="button" id="mobile-space-cab-tab-0" class="space-cab-tab" onclick="switchSpaceCabinet(0)">ארון 1</button>
+                <button type="button" id="mobile-space-cab-tab-1" class="space-cab-tab" onclick="switchSpaceCabinet(1)">ארון 2</button>
+            </div>
+            <div id="mobile-space-cab-offset-row" style="display:none;margin-top:10px;">
+                <div class="mobile-section-title" style="margin-bottom:8px;">מיקום ארון 2 במרחב</div>
+                <label class="mobile-label">הזזה אופקית X (ס"מ)</label>
+                <input type="number" id="mobile-inp-num-space-x" class="editor-select" value="0" step="1" style="margin:0 0 8px;width:100%;box-sizing:border-box;" onchange="window._setSpaceOffsetFromUI('x', this.value)">
+                <label class="mobile-label">הזזה אנכית Y (ס"מ)</label>
+                <input type="number" id="mobile-inp-num-space-y" class="editor-select" value="0" min="0" step="1" style="margin:0;width:100%;box-sizing:border-box;" onchange="window._setSpaceOffsetFromUI('y', this.value)">
+            </div>
         </div>
         <div class="mobile-section-title">דגם ארון</div>
         <input type="text" id="mobile-inp-cabinet-model-label" class="editor-select" placeholder="ריק = דגם הבסיס" style="margin:0 0 12px;width:100%;box-sizing:border-box;" autocomplete="off">

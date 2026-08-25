@@ -1818,6 +1818,62 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); box-sha
     cursor:pointer; font-family:inherit; text-align:right;
 }
 .space-cab-join-item:hover { background: #ccfbf1; border-color: #2dd4bf; }
+
+#space-cab-tabs {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 0 0;
+}
+.sidebar-header .space-cab-add-btn,
+.sidebar-header .space-cab-join-btn {
+    margin: 0;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.9);
+    font-size: 0.75rem;
+    font-weight: 600;
+    box-shadow: none;
+}
+.sidebar-header .space-cab-add-btn:hover,
+.sidebar-header .space-cab-join-btn:hover {
+    background: rgba(255,255,255,0.16);
+    border-color: rgba(99,179,237,0.5);
+    color: #fff;
+}
+.sidebar-header .space-cab-join-list { margin-top: 0; }
+.sidebar-header .space-cab-join-item {
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.92);
+}
+.sidebar-header .space-cab-join-item:hover {
+    background: rgba(255,255,255,0.14);
+    border-color: rgba(99,179,237,0.45);
+}
+.sidebar-header .space-cab-tab {
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.07);
+    color: rgba(255,255,255,0.75);
+}
+.sidebar-header .space-cab-tab.active {
+    background: rgba(37,99,235,0.35);
+    border-color: rgba(99,179,237,0.8);
+    color: #93c5fd;
+}
+.space-cab-offset-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: rgba(255,255,255,0.72);
+    text-align: right;
+    margin: 4px 0 0;
+}
+.space-cab-offset-label i { margin-left: 5px; opacity: 0.8; }
+.space-cab-offset-grid { padding: 8px 0 0 !important; }
 .drag-handle.space-move-handle { cursor: move; background: rgba(37,99,235,0.13); border-color: rgba(37,99,235,0.55); width: 28px; height: 28px; }
 .drag-handle.space-move-handle::before { content: '\f047'; font-family: 'FontAwesome'; font-size: 11px; color: var(--accent); margin: 0; }
 .drag-handle.space-move-handle::after { content: none; }
