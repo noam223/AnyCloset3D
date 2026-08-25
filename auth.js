@@ -1458,6 +1458,9 @@ window.CompanyAgents = {
     enable: function(userId) {
         return Auth._invokeCompanyFn({ action: 'enable', user_id: userId });
     },
+    remove: function(userId) {
+        return Auth._invokeCompanyFn({ action: 'delete', user_id: userId });
+    },
     resetPassword: function(userId, password) {
         return Auth._invokeCompanyFn({ action: 'reset_password', user_id: userId, password: password });
     },

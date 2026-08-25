@@ -2743,6 +2743,7 @@ async function loadAgentsTab() {
                 ? '<button class="btn-agent ok" onclick="toggleAgent(\'' + m.id + '\', true)">הפעל</button>'
                 : '<button class="btn-agent danger" onclick="toggleAgent(\'' + m.id + '\', false)">השבת</button>';
             actions += '<button class="btn-agent" onclick="openResetAgent(\'' + m.id + '\')">איפוס סיסמה</button>';
+            actions += '<button class="btn-agent danger" onclick="deleteAgent(\'' + m.id + '\')">מחק</button>';
         }
         return '<div class="agent-row' + (inactive ? ' inactive' : '') + '">' +
             '<div class="agent-info"><div class="agent-name">' + _esc(m.full_name || '—') + '</div>' +
@@ -2778,6 +2779,16 @@ async function toggleAgent(userId, enable) {
     var res = enable ? await CompanyAgents.enable(userId) : await CompanyAgents.disable(userId);
     if (res.error) { showToast(res.error, 'error'); return; }
     showToast(enable ? 'הסוכן הופעל' : 'הסוכן הושבת', 'success');
+    await loadAgentsTab();
+}
+
+async function deleteAgent(userId) {
+    var m = _companyMembers.find(function(x) { return x.id === userId; });
+    var label = (m && (m.full_name || m.agent_username)) || 'הסוכן';
+    if (!confirm('למחוק את "' + label + '" לצמיתות?\n\nהפרויקטים שלו יועברו אליך, ושם המשתמש יתפנה לסוכן חדש.\nלא ניתן לשחזר.')) return;
+    var res = await CompanyAgents.remove(userId);
+    if (res.error) { showToast(res.error, 'error'); return; }
+    showToast('הסוכן נמחק', 'success');
     await loadAgentsTab();
 }
 

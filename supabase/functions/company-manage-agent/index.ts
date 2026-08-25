@@ -196,6 +196,38 @@ serve(async (req: Request) => {
     return json({ ok: true });
   }
 
+  if (action === 'delete') {
+    const targetId = String(body.user_id || '');
+    if (!targetId) return json({ error: 'חסר מזהה משתמש' }, 400);
+    if (targetId === callerId) return json({ error: 'לא ניתן למחוק את האדמין המחובר' }, 400);
+
+    const { data: target } = await admin
+      .from('profiles')
+      .select('id, company_id, company_role')
+      .eq('id', targetId)
+      .maybeSingle();
+    if (!target || target.company_id !== company.id) return json({ error: 'המשתמש לא שייך לחברה' }, 404);
+    if (target.company_role === 'admin' || targetId === company.admin_user_id) {
+      return json({ error: 'לא ניתן למחוק את אדמין החברה' }, 400);
+    }
+
+    const destId = company.admin_user_id || callerId;
+    const { error: pErr } = await admin
+      .from('projects')
+      .update({ user_id: destId, company_id: company.id })
+      .eq('user_id', targetId)
+      .eq('company_id', company.id);
+    if (pErr) return json({ error: 'לא ניתן להעביר את הפרויקטים: ' + pErr.message }, 400);
+
+    await admin.from('measurement_inbox').update({ user_id: destId }).eq('user_id', targetId);
+    await admin.from('project_agent_access').delete().eq('user_id', targetId);
+    await admin.auth.admin.signOut(targetId, 'global').catch(() => null);
+
+    const { error: dErr } = await admin.auth.admin.deleteUser(targetId);
+    if (dErr) return json({ error: dErr.message }, 400);
+    return json({ ok: true });
+  }
+
   if (action === 'transfer_project') {
     const projectId = String(body.project_id || '');
     const toUserId = String(body.to_user_id || '');
