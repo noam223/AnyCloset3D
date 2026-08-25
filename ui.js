@@ -7628,8 +7628,10 @@ window._spaceCabinetFootprint = function(slot) {
     const c = wings && wings.center;
     const w = (c && c.width) || 160;
     let h = (c && c.globalHeight) || 240;
+    let fo = 0;
     if (c && c.columns && c.columns.length) {
         h = Math.max.apply(null, c.columns.map(function(col) { return col.height || h; }));
+        fo = Math.min.apply(null, c.columns.map(function(col) { return col.floorOffset || 0; }));
     }
     const uu = wings && wings.upperUnit_center;
     if (uu && uu._isUpperUnit) {
@@ -7639,7 +7641,7 @@ window._spaceCabinetFootprint = function(slot) {
         }
         h += (uu._upperGap || 0) + uuH;
     }
-    return { w: w, h: h };
+    return { w: w, h: h, floorOffset: fo };
 };
 
 window._clampSpaceOffsetAgainstPrimary = function(x, y, opts) {
@@ -7649,8 +7651,17 @@ window._clampSpaceOffsetAgainstPrimary = function(x, y, opts) {
     x = Math.max(-500, Math.min(500, Number(x) || 0));
     y = Math.max(0, Math.min(400, Number(y) || 0));
     const half = (d0.w + d1.w) / 2;
+    const fo0 = d0.floorOffset || 0;
+    const fo1 = d1.floorOffset || 0;
+    function overlapYAt(yy) {
+        const b0 = fo0;
+        const t0 = d0.h;
+        const b1 = yy + fo1;
+        const t1 = yy + d1.h;
+        return Math.min(t0, t1) - Math.max(b0, b1);
+    }
     const overlapX = half - Math.abs(x);
-    const overlapY = d0.h - y;
+    const overlapY = overlapYAt(y);
     if (overlapX > 0 && overlapY > 0) {
         const prefer = opts.preferAxis;
         const pushX = prefer === 'x' ? true : prefer === 'y' ? false : (overlapX <= overlapY);
@@ -7660,7 +7671,14 @@ window._clampSpaceOffsetAgainstPrimary = function(x, y, opts) {
             if (!sign) sign = 1;
             x = sign * Math.ceil(half - 1e-9);
         } else {
-            y = Math.ceil(d0.h - 1e-9);
+            // Sit the real bottom panel (not the empty floor gap) flush on the other cabinet
+            y = Math.max(0, Math.ceil(d0.h - fo1 - 1e-9));
+            if (overlapX > 0 && overlapYAt(y) > 0) {
+                let sign = x < 0 ? -1 : (x > 0 ? 1 : 0);
+                if (!sign && opts.prevX) sign = opts.prevX < 0 ? -1 : 1;
+                if (!sign) sign = 1;
+                x = sign * Math.ceil(half - 1e-9);
+            }
         }
     }
     return { x: Math.round(x), y: Math.round(y) };
