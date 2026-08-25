@@ -519,7 +519,7 @@
 
 </div>
 
-<script src="auth.js?v=20260825dmyDate"></script>
+<script src="auth.js?v=20260826singlePc"></script>
 <script>
 // ── State ────────────────────────────────────────────────────────────────────
 var _selectedUserType = null;
@@ -1038,6 +1038,11 @@ function _translateError(msg) {
     // Wait briefly for PASSWORD_RECOVERY event before redirecting
     await new Promise(function(r) { setTimeout(r, 400); });
     if (window._recoveryMode) return; // event fired during wait
+
+    var kickReason = new URLSearchParams(window.location.search).get('reason');
+    if (kickReason === 'session_replaced') {
+        showMessage('החשבון התחבר ממחשב אחר, ולכן המחשב הזה נותק.', 'info');
+    }
 
     if (await Auth.isLoggedIn()) {
         // Check if this session came from a recovery link (amr contains otp)

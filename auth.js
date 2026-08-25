@@ -244,6 +244,24 @@ window._getDeviceName = function() {
     return `${browser} / ${os}`;
 };
 
+function _sessionIdFromAccessToken(token) {
+    if (!token || typeof token !== 'string') return null;
+    try {
+        var part = token.split('.')[1];
+        if (!part) return null;
+        var b64 = part.replace(/-/g, '+').replace(/_/g, '/');
+        while (b64.length % 4) b64 += '=';
+        var payload = JSON.parse(atob(b64));
+        return payload.session_id || null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function _needsExclusiveSession(profile) {
+    return !!(profile && (profile.company_role === 'admin' || profile.company_role === 'agent'));
+}
+
 // ==========================================
 // Auth API
 // ==========================================
@@ -294,6 +312,8 @@ window.Auth = {
         const sb = _getClient(); if (!sb) return { error: 'SDK not loaded' };
         const { data, error } = await sb.auth.signInWithPassword({ email, password });
         if (error) return { error: error.message };
+        this._profileCache = null;
+        await this.claimExclusiveSession();
         return { data };
     },
 
@@ -316,6 +336,8 @@ window.Auth = {
                 refresh_token: json.session.refresh_token
             });
             if (error) return { error: error.message };
+            this._profileCache = null;
+            await this.claimExclusiveSession();
             return { data: json };
         } catch (e) {
             return { error: e.message || 'ההתחברות נכשלה' };
@@ -354,10 +376,20 @@ window.Auth = {
     },
 
     // ── Logout ───────────────────────────────────────────────────────────────
-    logout: async function() {
-        const sb = _getClient(); if (!sb) return;
-        await sb.auth.signOut();
-        window.location.href = 'login.html';
+    logout: async function(options) {
+        options = options || {};
+        this.stopSessionWatch();
+        const sb = _getClient();
+        if (sb) {
+            try {
+                await sb.auth.signOut({ scope: 'local' });
+            } catch (e) {
+                try { await sb.auth.signOut(); } catch (e2) { /* ignore */ }
+            }
+        }
+        if (options.redirect === false) return;
+        var q = options.reason ? ('?reason=' + encodeURIComponent(options.reason)) : '';
+        window.location.href = 'login.html' + q;
     },
 
     // ── Get current session ──────────────────────────────────────────────────
@@ -403,6 +435,12 @@ window.Auth = {
             await this.logout();
             return false;
         }
+        const exclusive = await this.checkExclusiveSession();
+        if (!exclusive.allowed) {
+            await this.logout({ reason: exclusive.reason || 'session_replaced' });
+            return false;
+        }
+        this.startSessionWatch();
         return true;
     },
 
@@ -597,6 +635,154 @@ window.Auth = {
     // ==========================================
     // Device Management (for company plans)
     // ==========================================
+
+    _getCurrentAuthSessionId: async function() {
+        const sb = _getClient(); if (!sb) return null;
+        const { data } = await sb.auth.getSession();
+        const token = data && data.session && data.session.access_token;
+        return _sessionIdFromAccessToken(token);
+    },
+
+    /**
+     * Company admin/agent: only one computer at a time.
+     * Login on a new computer deactivates the previous one and revokes its refresh tokens.
+     */
+    claimExclusiveSession: async function() {
+        try {
+            const profile = await this.getProfile();
+            if (!_needsExclusiveSession(profile)) return { success: true, skipped: true };
+
+            const sb = _getClient(); if (!sb) return { error: 'SDK not loaded' };
+            const user = await this.getUser();
+            if (!user) return { error: 'not_logged_in' };
+
+            const fingerprint = await window._getDeviceFingerprint();
+            const deviceName = window._getDeviceName();
+            const sessionId = await this._getCurrentAuthSessionId();
+            const now = new Date().toISOString();
+
+            await sb.from('devices')
+                .update({ is_active: false })
+                .eq('user_id', user.id)
+                .neq('fingerprint', fingerprint);
+
+            const { error: upsertError } = await sb.from('devices').upsert({
+                user_id: user.id,
+                fingerprint,
+                device_name: deviceName,
+                last_seen: now,
+                is_active: true,
+                auth_session_id: sessionId
+            }, { onConflict: 'user_id,fingerprint' });
+
+            if (upsertError) {
+                console.warn('[auth] claimExclusiveSession upsert failed:', upsertError.message);
+            }
+
+            try {
+                await sb.auth.signOut({ scope: 'others' });
+            } catch (e) {
+                console.warn('[auth] signOut others failed:', e);
+            }
+
+            return { success: true };
+        } catch (e) {
+            console.warn('[auth] claimExclusiveSession failed:', e);
+            return { error: e.message || 'claim_failed' };
+        }
+    },
+
+    /**
+     * Heartbeat / page-load check. Does not reclaim the slot — a kicked
+     * computer must not steal the session back on refresh.
+     */
+    checkExclusiveSession: async function() {
+        try {
+            const profile = await this.getProfile();
+            if (!_needsExclusiveSession(profile)) return { allowed: true, reason: 'ok' };
+
+            const sb = _getClient(); if (!sb) return { allowed: true, reason: 'no_sdk' };
+            const user = await this.getUser();
+            if (!user) return { allowed: false, reason: 'not_logged_in' };
+
+            const fingerprint = await window._getDeviceFingerprint();
+            const sessionId = await this._getCurrentAuthSessionId();
+
+            const { data: existing } = await sb
+                .from('devices')
+                .select('id, is_active, auth_session_id')
+                .eq('user_id', user.id)
+                .eq('fingerprint', fingerprint)
+                .maybeSingle();
+
+            if (existing) {
+                if (!existing.is_active) {
+                    return { allowed: false, reason: 'session_replaced' };
+                }
+                if (sessionId && existing.auth_session_id && existing.auth_session_id !== sessionId) {
+                    return { allowed: false, reason: 'session_replaced' };
+                }
+                var patch = { last_seen: new Date().toISOString() };
+                if (sessionId && !existing.auth_session_id) patch.auth_session_id = sessionId;
+                await sb.from('devices').update(patch).eq('id', existing.id);
+                return { allowed: true, reason: 'ok', deviceId: existing.id };
+            }
+
+            const { data: others } = await sb
+                .from('devices')
+                .select('id')
+                .eq('user_id', user.id)
+                .eq('is_active', true)
+                .limit(1);
+
+            if (others && others.length) {
+                return { allowed: false, reason: 'session_replaced' };
+            }
+
+            // First load after deploy / no device row yet — occupy this computer.
+            await this.claimExclusiveSession();
+            return { allowed: true, reason: 'bootstrapped' };
+        } catch (e) {
+            console.warn('[auth] checkExclusiveSession failed:', e);
+            return { allowed: true, reason: 'check_error' };
+        }
+    },
+
+    startSessionWatch: function() {
+        if (this._sessionWatchTimer) return;
+        var self = this;
+        var tick = async function() {
+            if (self._sessionWatchBusy) return;
+            self._sessionWatchBusy = true;
+            try {
+                var result = await self.checkExclusiveSession();
+                if (!result.allowed) {
+                    self.stopSessionWatch();
+                    await self.logout({ reason: result.reason || 'session_replaced' });
+                }
+            } catch (e) {
+                console.warn('[auth] session watch failed:', e);
+            } finally {
+                self._sessionWatchBusy = false;
+            }
+        };
+        this._sessionWatchOnVisible = function() {
+            if (document.visibilityState === 'visible') tick();
+        };
+        document.addEventListener('visibilitychange', this._sessionWatchOnVisible);
+        this._sessionWatchTimer = setInterval(tick, 20000);
+    },
+
+    stopSessionWatch: function() {
+        if (this._sessionWatchTimer) {
+            clearInterval(this._sessionWatchTimer);
+            this._sessionWatchTimer = null;
+        }
+        if (this._sessionWatchOnVisible) {
+            document.removeEventListener('visibilitychange', this._sessionWatchOnVisible);
+            this._sessionWatchOnVisible = null;
+        }
+    },
 
     /**
      * Check if this device is allowed to access the app.
