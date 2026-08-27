@@ -7952,6 +7952,113 @@ window.switchSpaceCabinet = function(slot) {
     if (typeof window._editCartItemNow === 'function') window._editCartItemNow(targetIdx);
 };
 
+function _wingsFromSource(src) {
+    if (!src || !src.wings) return [];
+    const w = src.wings;
+    return [w.center, w.left, w.right].filter(Boolean);
+}
+
+function _collectCornerCandidates(item, itemObj, liveState) {
+    const list = [];
+    function add(cu) { if (cu) list.push(cu); }
+    if (liveState) {
+        add(liveState.corner);
+        _wingsFromSource(liveState).forEach(function(w) { add(w.corner); });
+    }
+    if (item) add(item.corner);
+    const rs = itemObj && itemObj.rawState;
+    if (rs) {
+        add(rs.corner);
+        _wingsFromSource(rs).forEach(function(w) { add(w.corner); });
+    }
+    return list;
+}
+
+function _cornerUnitFromSources(item, itemObj, liveState) {
+    const corners = _collectCornerCandidates(item, itemObj, liveState);
+    const active = corners.filter(function(cu) { return cu.side && cu.side !== 'none'; });
+    return active.find(function(cu) { return cu.type === 'desk'; }) || active[0] || null;
+}
+
+function _sideDeskFromSources(itemObj, liveState) {
+    function pick(d) { return d && d.side && d.side !== 'none' ? d : null; }
+    const fromLive = pick(liveState && liveState.desk);
+    if (fromLive) return fromLive;
+    if (liveState) {
+        const wl = _wingsFromSource(liveState);
+        for (let i = 0; i < wl.length; i++) {
+            const d = pick(wl[i].desk);
+            if (d) return d;
+        }
+    }
+    const rs = itemObj && itemObj.rawState;
+    if (!rs) return null;
+    const fromRs = pick(rs.desk);
+    if (fromRs) return fromRs;
+    const wr = _wingsFromSource(rs);
+    for (let j = 0; j < wr.length; j++) {
+        const d2 = pick(wr[j].desk);
+        if (d2) return d2;
+    }
+    return null;
+}
+
+function _hasInternalDeskFromSources(itemObj, liveState) {
+    function colsHaveDesk(cols) {
+        return (cols || []).some(function(c) { return c && c.type === 'desk'; });
+    }
+    if (liveState) {
+        if (colsHaveDesk(liveState.columns)) return true;
+        if (_wingsFromSource(liveState).some(function(w) { return colsHaveDesk(w.columns); })) return true;
+    }
+    const rs = itemObj && itemObj.rawState;
+    if (!rs) return false;
+    if (colsHaveDesk(rs.columns)) return true;
+    return _wingsFromSource(rs).some(function(w) { return colsHaveDesk(w.columns); });
+}
+
+/** Factory/quote label for extra desks, including corner-desk dimensions. */
+function _formatDeskAddition(item, itemObj, liveState) {
+    const labels = [];
+    const dimLines = [];
+    const cu = _cornerUnitFromSources(item, itemObj, liveState);
+    if (cu && cu.type === 'desk') {
+        const sideHe = cu.side === 'right' ? 'ימין' : 'שמאל';
+        let lab = 'שולחן פינתי (' + sideHe + ')';
+        if (cu.deskFloating) lab += ' — מרחף';
+        labels.push(lab);
+        let dims = 'רוחב: ' + Math.round(cu.width || 60) + ' ס"מ | גובה: ' +
+            Math.round(cu.height || 90) + ' ס"מ | עומק: ' + Math.round(cu.depth || 54) + ' ס"מ';
+        const n = cu.deskDrawerCount || 0;
+        if (n > 0) {
+            dims += ' | מגירות: ' + n;
+            if (cu.deskDrawerHeight) dims += ' × ' + cu.deskDrawerHeight + ' ס"מ';
+        }
+        dimLines.push(dims);
+    }
+    const sd = _sideDeskFromSources(itemObj, liveState);
+    if (sd) {
+        labels.push(sd.side === 'left' ? 'מצורף שולחן חיצוני (משמאל)' : 'מצורף שולחן חיצוני (מימין)');
+        dimLines.push('רוחב: ' + Math.round(sd.width || 100) + ' ס"מ | גובה: ' + Math.round(sd.height || 80) + ' ס"מ');
+    }
+    if (_hasInternalDeskFromSources(itemObj, liveState)) {
+        labels.push('שולחן עבודה פנימי משולב');
+    }
+    return {
+        desk: labels.length ? labels.join(' · ') : 'ללא',
+        deskDims: dimLines.join(' · ')
+    };
+}
+
+function _appendDeskPrintRows(rows, item, itemObj) {
+    const ds = _formatDeskAddition(item, itemObj);
+    rows.push({ id: 'desk', label: 'תוספת שולחן', value: _plainSpecValue(ds.desk) });
+    if (ds.deskDims) {
+        rows.push({ id: 'deskDims', label: 'מידות שולחן', value: _plainSpecValue(ds.deskDims), rtl: true });
+    }
+    return ds;
+}
+
 window._snapshotCurrentCabinetToCartItem = function() {
 const preview = (typeof window._captureCabinetPreviewImages === 'function')
         ? window._captureCabinetPreviewImages()
@@ -7998,10 +8105,9 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
         if(state.cabinetModel === 'regalim') plinthTypeText = 'רגלי ניקל 10 ס"מ';
         if (_isWritingDeskCart) plinthTypeText = 'ללא צוקל';
 
-        let deskInfo = 'ללא';
-        if (state.desk.side === 'left') deskInfo = 'מצורף שולחן חיצוני (משמאל)';
-        else if (state.desk.side === 'right') deskInfo = 'מצורף שולחן חיצוני (מימין)';
-        else if (state.columns.some(c => c.type === 'desk')) deskInfo = 'שולחן עבודה פנימי משולב';
+        const _deskPack = _formatDeskAddition(null, null, state);
+        let deskInfo = _deskPack.desk;
+        const deskDimsInfo = _deskPack.deskDims;
 
         const priceEl = document.getElementById('price-display');
         const currentDisplayPrice = priceEl ? (parseInt(priceEl.value) || 0) : 0;
@@ -8110,6 +8216,7 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
                 return model ? style + ' — ' + model : style;
             })(),
             desk: deskInfo,
+            deskDims: deskDimsInfo,
             colorBody: _colorKeyLabel(state.materialBody),
             colorInternal: _colorKeyLabel(state.materialInternal),
             colorBack: _colorKeyLabel(state.materialBack),
@@ -8133,7 +8240,11 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
             imgDoors: imgWithDoors, imgOpen: imgNoDoors, imgBlueprint: imgBlueprint,
             wingPreviews: wingPreviews,
             captureVer: (preview && preview.captureVer) || 3,
-            corner: state.corner ? JSON.parse(JSON.stringify(state.corner)) : null,
+            corner: (function() {
+                const cu = _cornerUnitFromSources(null, null, state);
+                if (cu) return JSON.parse(JSON.stringify(cu));
+                return state.corner ? JSON.parse(JSON.stringify(state.corner)) : null;
+            })(),
             slidingDoor: slidingDoorSpec,
             multiViewSVG: multiViewSVG,
             multiViewPages: multiViewPages
@@ -9062,6 +9173,10 @@ function _collectPrintSpecRows(item, itemObj) {
 
     // Multi-wing corner / walk-in: separate spec block per cabinet/wing
     if (multiUnits) {
+        const dsMulti = _appendDeskPrintRows(rows, item, itemObj);
+        if (dsMulti.desk !== 'ללא' && item.colorDesk) {
+            rows.push({ id: 'colorDesk', label: 'צבע שולחן עבודה', value: _plainSpecValue(item.colorDesk) });
+        }
         multiUnits.forEach(function(unit) {
             _collectWingPrintSpecRows(item, itemObj, unit).forEach(function(r) { rows.push(r); });
         });
@@ -9077,7 +9192,7 @@ function _collectPrintSpecRows(item, itemObj) {
     rows.push({ id: 'dimsStr', label: 'מידות חיצוניות', value: _plainSpecValue(_resolveCabinetDimsStr(item, itemObj)), rtl: true });
     rows.push({ id: 'material', label: 'חומר גוף', value: _plainSpecValue(item.material) });
     rows.push({ id: 'plinthType', label: isWD ? 'בסיס' : 'סוג רגליים / צוקל', value: _plainSpecValue(isWD ? 'רגליים כפולות' : item.plinthType) });
-    if (!isWD) rows.push({ id: 'desk', label: 'תוספת שולחן', value: _plainSpecValue(item.desk) });
+    if (!isWD) _appendDeskPrintRows(rows, item, itemObj);
 
     rows.push({ id: '_sec_finishes', section: true, label: 'גוונים וגימורים' });
     if (isWD) {
@@ -9094,7 +9209,7 @@ function _collectPrintSpecRows(item, itemObj) {
             rows.push({ id: 'colorExternal', label: 'צבע חזיתות (דלתות)', value: _plainSpecValue(item.colorExternal) });
         }
         rows.push({ id: 'colorBack', label: 'צבע גב ארון', value: _plainSpecValue((item.colorBack && item.colorBack !== 'undefined') ? item.colorBack : 'לבן מט') });
-        if (item.desk !== 'ללא') rows.push({ id: 'colorDesk', label: 'צבע שולחן עבודה', value: _plainSpecValue(item.colorDesk) });
+        if (_formatDeskAddition(item, itemObj).desk !== 'ללא') rows.push({ id: 'colorDesk', label: 'צבע שולחן עבודה', value: _plainSpecValue(item.colorDesk) });
         if (item.hasOpenCells) rows.push({ id: 'colorOpenCell', label: 'צבע כוורת', value: _plainSpecValue(item.colorOpenCell) });
         if (item.extraColors) rows.push({ id: 'extraColors', label: 'צבעים נוספים בארון', value: _plainSpecValue(item.extraColors) });
     }
@@ -9455,7 +9570,11 @@ function _printBasicSpecRows(item, itemObj, thStyle, tdStyle) {
     html += _printTr(thStyle, tdStyle, 'מידות חיצוניות', _resolveCabinetDimsStr(item, itemObj) || item.dimsStr, dimsExtra);
     html += _printTr(thStyle, tdStyle, 'חומר גוף', item.material);
     html += _printTr(thStyle, tdStyle, isWD ? 'בסיס' : 'סוג רגליים / צוקל', isWD ? 'רגליים כפולות' : item.plinthType);
-    if (!isWD) html += _printTr(thStyle, tdStyle, 'תוספת שולחן', item.desk);
+    if (!isWD) {
+        const ds = _formatDeskAddition(item, itemObj);
+        html += _printTr(thStyle, tdStyle, 'תוספת שולחן', ds.desk);
+        if (ds.deskDims) html += _printTr(thStyle, tdStyle, 'מידות שולחן', ds.deskDims, dimsExtra);
+    }
     return html;
 }
 
@@ -9476,7 +9595,7 @@ function _printFinishesRows(item, itemObj, thStyle, tdStyle, sectionStyle) {
         html += _printTr(thStyle, tdStyle, 'צבע חזיתות (דלתות)', item.colorExternal);
     }
     html += _printTr(thStyle, tdStyle, 'צבע גב ארון', (item.colorBack && item.colorBack !== 'undefined') ? item.colorBack : 'לבן מט');
-    if (item.desk !== 'ללא') html += _printTr(thStyle, tdStyle, 'צבע שולחן עבודה', item.colorDesk);
+    if (_formatDeskAddition(item, itemObj).desk !== 'ללא') html += _printTr(thStyle, tdStyle, 'צבע שולחן עבודה', item.colorDesk);
     if (item.hasOpenCells) html += _printTr(thStyle, tdStyle, 'צבע כוורת', item.colorOpenCell);
     if (item.extraColors) html += _printTr(thStyle, tdStyle, 'צבעים נוספים בארון', item.extraColors);
     return html;
@@ -10827,7 +10946,8 @@ function _buildCustomerSummaryDetails(itemObj) {
     if (colorInternal) details.push('צבע פנים (מדפים/מגירות): ' + colorInternal);
     if (colorExternal) details.push('צבע חזיתות (דלתות): ' + colorExternal);
     if (colorBack && colorBack !== 'undefined') details.push('צבע גב ארון: ' + colorBack);
-    if (item.desk && item.desk !== 'ללא' && colorDesk) details.push('צבע שולחן עבודה: ' + colorDesk);
+    const deskSummary = _formatDeskAddition(item, itemObj);
+    if (deskSummary.desk !== 'ללא' && colorDesk) details.push('צבע שולחן עבודה: ' + colorDesk);
 
     if (content.openCells > 0) {
         details.push('כוורת פתוחה: ' + content.openCells + (content.openCells === 1 ? ' תא' : ' תאים'));
@@ -10855,11 +10975,14 @@ function _buildCustomerSummaryDetails(itemObj) {
 
     if (item.drawersExt > 0) details.push('מגירות חיצוניות: ' + item.drawersExt);
     if (item.drawersInt > 0) details.push('מגירות פנימיות: ' + item.drawersInt);
-    if (item.desk && item.desk !== 'ללא') details.push(item.desk);
-    const cu = item.corner;
-    if (cu && cu.side !== 'none') {
+    if (deskSummary.desk !== 'ללא') {
+        details.push(deskSummary.desk);
+        if (deskSummary.deskDims) details.push('מידות שולחן: ' + deskSummary.deskDims);
+    }
+    const cu = _cornerUnitFromSources(item, itemObj);
+    if (cu && cu.side !== 'none' && cu.type !== 'desk') {
         const cuSide = cu.side === 'right' ? 'ימין' : 'שמאל';
-        details.push(cu.type === 'desk' ? 'יחידה פינתית שולחן (' + cuSide + ')' : 'יחידה פינתית מגירות ×' + (cu.drawerCount || 4) + ' (' + cuSide + ')');
+        details.push('יחידה פינתית מגירות ×' + (cu.drawerCount || 4) + ' (' + cuSide + ')');
     }
     if (item.cabinetNotes && item.cabinetNotes.trim()) {
         details.push('הערות: ' + item.cabinetNotes.trim());
