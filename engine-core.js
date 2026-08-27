@@ -1603,7 +1603,7 @@ const materials = {
     u604:  new THREE.MeshStandardMaterial({ color: 0x8f8e76, roughness: 0.6 }),
     u638:  new THREE.MeshStandardMaterial({ color: 0xc0b598, roughness: 0.6 }),
     c3207: new THREE.MeshStandardMaterial({ color: 0xF7ECD9, roughness: 0.6 }),
-    black_matte: new THREE.MeshStandardMaterial({ color: 0x000007, roughness: 0.6 }),
+    black_matte: new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.6 }),
     custom: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 })
 };
 

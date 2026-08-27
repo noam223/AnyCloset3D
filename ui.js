@@ -383,7 +383,7 @@ window._rebuildDoorPanelTabs = function() {
         { key: 'u604',        bg: '#8f8e76',  border: '#bbb', label: 'U604' },
         { key: 'u638',        bg: '#c0b598',  border: '#bbb', label: 'U638' },
         { key: 'c3207',       bg: '#F7ECD9',  border: '#bbb', label: '3207' },
-        { key: 'black_matte', bg: '#000007',  border: '#444', label: 'שחור מט' },
+        { key: 'black_matte', bg: '#2a2a2a',  border: '#444', label: 'שחור מט' },
         // Wood / texture colors
         { key: '2020',  img: 'textures/2020.jpg',  border: '#bbb', label: '2020' },
         { key: '2024',  img: 'textures/2024.jpg',  border: '#bbb', label: '2024' },

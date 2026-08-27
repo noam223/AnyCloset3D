@@ -688,7 +688,7 @@ function _getDominantColor() {
         if (!mat) return null;
         // Map material name to approximate hex (basic mapping)
         var colorMap = {
-            'white_matte':'#F5F5F5', 'white_gloss':'#FFFFFF', 'black_matte':'#1a1a1a',
+            'white_matte':'#F5F5F5', 'white_gloss':'#FFFFFF', 'black_matte':'#2a2a2a',
             'gray_light':'#D1D5DB', 'gray_dark':'#4B5563', 'beige':'#E8DCC8',
             'brown_light':'#C4A882', 'brown_dark':'#7C5C3E', 'oak':'#B8935A',
             'walnut':'#6B4C2A', 'pine':'#D4A86A'
