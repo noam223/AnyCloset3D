@@ -179,6 +179,82 @@ function _bpDrawWritingDeskSideParts(p, wd, ox, oy, dW, dH, sc, fill, STROKE, ST
     p.push(`<text x="${(ox + dW / 2).toFixed(1)}" y="${(deskTopY + dH / 2 + 4).toFixed(1)}" text-anchor="middle" font-family="${FONT || 'Rubik,Tahoma,sans-serif'}" font-size="11" fill="${STROKE}" opacity="0.7">מבט צד</text>`);
 }
 
+/** Corner desk — front elevation of the protruding unit (desktop + outer leg + knee space + drawers). */
+function _bpDrawCornerDeskFrontParts(p, cu, ox, oy, dW, dH, sc, STROKE, STROKE_THIN, FONT, dimHFn, dimVFn, dimVLeftFn) {
+    if (!cu) return;
+    const cuW = cu.width || 60;
+    const cuH = cu.height || 90;
+    const cuD = cu.depth || 54;
+    const tCm = state.thickness || 1.7;
+    const legT = tCm * sc;
+    const deskSurfT = DESK_SURFACE_T * sc;
+    const deskBotY = oy + dH;
+    const deskTopY = oy;
+    const isLeft = cu.side !== 'right';
+    const floating = !!cu.deskFloating;
+    const FILL = '#fef9c3';
+    const drawRect = (x, y, w, h, f, s, sw) => p.push(`<rect x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" width="${(+w).toFixed(1)}" height="${(+h).toFixed(1)}" fill="${f}" stroke="${s}" stroke-width="${sw || 1.5}"/>`);
+
+    const hasLeg = !floating;
+    const legX = isLeft ? ox : (ox + dW - legT);
+    const innerX = hasLeg ? (isLeft ? ox + legT : ox) : ox;
+    const innerW = hasLeg ? Math.max(dW - legT, 2) : dW;
+
+    // Outer support panel (omitted when floating)
+    if (hasLeg) {
+        drawRect(legX, deskTopY + deskSurfT, legT, dH - deskSurfT, FILL, STROKE, 1.5);
+    }
+
+    // Floor line under the open knee space
+    p.push(`<line x1="${innerX.toFixed(1)}" y1="${deskBotY.toFixed(1)}" x2="${(innerX + innerW).toFixed(1)}" y2="${deskBotY.toFixed(1)}" stroke="${STROKE_THIN || STROKE}" stroke-width="1" stroke-dasharray="4,3"/>`);
+
+    // Desktop board
+    drawRect(ox, deskTopY, dW, deskSurfT, FILL, STROKE, 1.5);
+
+    const numDrawers = Math.max(0, Math.min(cu.deskDrawerCount || 0, 3));
+    const drawerHcm = cu.deskDrawerHeight || 13;
+    const gapCm = 0.4;
+    if (numDrawers > 0) {
+        for (let i = 0; i < numDrawers; i++) {
+            const topOffsetCm = DESK_SURFACE_T + i * (drawerHcm + gapCm);
+            const dy = deskTopY + topOffsetCm * sc;
+            const dh = drawerHcm * sc;
+            drawRect(innerX + 1.5, dy + 1, innerW - 3, dh - 2, 'rgba(255,255,255,0.85)', STROKE, 1);
+            const hndW = Math.min(innerW * 0.4, 28);
+            const hndX = innerX + (innerW - hndW) / 2;
+            const hndY = dy + dh * 0.5;
+            p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX + hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="2"/>`);
+        }
+        const drawersZoneH = numDrawers * drawerHcm + gapCm * Math.max(numDrawers - 1, 0);
+        const kneeH = Math.max(cuH - DESK_SURFACE_T - drawersZoneH, 0);
+        const dimX = isLeft ? (ox + dW + 18) : (ox - 18);
+        const drawerTopY = deskTopY + deskSurfT;
+        const drawerBotY = drawerTopY + drawersZoneH * sc;
+        if (isLeft) {
+            dimVFn(dimX, drawerTopY, drawerBotY, `${_bpMm(drawersZoneH)}`);
+            if (kneeH > 1) dimVFn(dimX + 36, drawerBotY, deskBotY, `${_bpMm(kneeH)}`);
+        } else {
+            dimVLeftFn(dimX, drawerTopY, drawerBotY, `${_bpMm(drawersZoneH)}`);
+            if (kneeH > 1) dimVLeftFn(dimX - 36, drawerBotY, deskBotY, `${_bpMm(kneeH)}`);
+        }
+    }
+
+    // Cabinet-connection side
+    const cabX = isLeft ? (ox + dW) : ox;
+    p.push(`<line x1="${cabX.toFixed(1)}" y1="${deskTopY.toFixed(1)}" x2="${cabX.toFixed(1)}" y2="${deskBotY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.4" stroke-dasharray="5,4"/>`);
+    const cabLblX = isLeft ? (cabX - 8) : (cabX + 8);
+    p.push(`<text x="${cabLblX.toFixed(1)}" y="${(deskTopY + deskSurfT + 14).toFixed(1)}" text-anchor="${isLeft ? 'end' : 'start'}" font-family="${FONT || 'Rubik,Tahoma,sans-serif'}" font-size="11" fill="${STROKE}" opacity="0.7">חיבור לארון</text>`);
+
+    const midX = ox + dW / 2;
+    const midY = deskTopY + dH * 0.62;
+    p.push(`<text x="${midX.toFixed(1)}" y="${midY.toFixed(1)}" text-anchor="middle" font-family="${FONT || 'Rubik,Tahoma,sans-serif'}" font-size="13" fill="${STROKE}" opacity="0.55">שולחן פינתי${floating ? ' (מרחף)' : ''}</text>`);
+
+    dimHFn(ox, ox + dW, deskBotY + 36, `${_bpMm(cuW)}`);
+    if (isLeft) dimVLeftFn(ox - 14, deskTopY, deskBotY, `${_bpMm(cuH)}`);
+    else dimVFn(ox + dW + 14, deskTopY, deskBotY, `${_bpMm(cuH)}`);
+    p.push(`<text x="${midX.toFixed(1)}" y="${(deskBotY + 56).toFixed(1)}" text-anchor="middle" font-family="${FONT || 'Rubik,Tahoma,sans-serif'}" font-size="12" fill="${STROKE}" opacity="0.75">עומק (לאורך הארון): ${_bpMm(cuD)} מ"מ</text>`);
+}
+
 /** Side cabinet silhouette on center front view */
 function _bpDrawSideCabinetFrontParts(p, sc, ox, oy, dW, dH, scScale, wgH, pH, drawRectFn, dimHFn, STROKE, FONT) {
     if (!sc) return;
@@ -3612,39 +3688,19 @@ window._generateMultiViewBlueprintPages = function() {
         const ox = MARGIN + (pw - dW) / 2;
         const oy = drawAreaY + (drawAreaH - dH) / 2;
 
-        // Cabinet body
-        makeRect(p, ox, oy, dW, dH, cuFill, STROKE, 2);
-        // Plinth
-        if (pH > 0) makeRect(p, ox, oy + dH - pH*sc, dW, pH*sc, '#cbd5e1', STROKE, 1);
-
         if (cu.type === 'desk') {
-            // Desk surface at cu.height (full height = desk surface height)
-            // Open area below desk surface (the whole unit is open workspace)
-            makeRect(p, ox, oy, dW, dH - pH*sc, 'white', STROKE_THIN, 0.5);
-            // Desk surface line (top board)
-            p.push(`<line x1="${ox.toFixed(1)}" y1="${oy.toFixed(1)}" x2="${(ox+dW).toFixed(1)}" y2="${oy.toFixed(1)}" stroke="${STROKE}" stroke-width="2"/>`);
-            // Label
-            p.push(`<text x="${(ox+dW/2).toFixed(1)}" y="${(oy+dH/2+4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="14" fill="${STROKE}" opacity="0.5">שולחן פינתי${cu.deskFloating ? ' (מרחף)' : ''}</text>`);
-            // Optional drawers under desk
-            const numDeskDrawers = cu.deskDrawerCount || 0;
-            if (numDeskDrawers > 0) {
-                const drawerUnitW = Math.min(dW * 0.45, 60); // drawer unit width in SVG px
-                const innerH_cm = cuH - pH - DESK_SURFACE_T;
-                const drawerH_cm = (innerH_cm - 0.4 * (numDeskDrawers - 1)) / numDeskDrawers;
-                for (let di = 0; di < numDeskDrawers; di++) {
-                    const drawerBotCm = pH + DESK_SURFACE_T + di * (drawerH_cm + 0.4);
-                    const drawerTopCm = drawerBotCm + drawerH_cm;
-                    const dy1 = oy + dH - drawerTopCm * sc;
-                    const dy2 = oy + dH - drawerBotCm * sc;
-                    const dh = dy2 - dy1;
-                    makeRect(p, ox + 2, dy1 + 1, drawerUnitW - 4, dh - 2, 'rgba(255,255,255,0.7)', STROKE_THIN, 0.9);
-                    const hndW = Math.min(drawerUnitW * 0.4, 20);
-                    const hndX = ox + (drawerUnitW - hndW) / 2;
-                    const hndY = dy1 + dh * 0.5;
-                    p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="2"/>`);
-                }
-            }
+            _bpDrawCornerDeskFrontParts(
+                p, cu, ox, oy, dW, dH, sc, STROKE, STROKE_THIN, FONT,
+                function(x1, x2, y, lbl, above) { makeDimH(p, x1, x2, y, lbl, above); },
+                function(x, y1, y2, lbl) { makeDimV(p, x, y1, y2, lbl); },
+                function(x, y1, y2, lbl) { makeDimVLeft(p, x, y1, y2, lbl); }
+            );
         } else {
+            // Cabinet body
+            makeRect(p, ox, oy, dW, dH, cuFill, STROKE, 2);
+            // Plinth
+            if (pH > 0) makeRect(p, ox, oy + dH - pH*sc, dW, pH*sc, '#cbd5e1', STROKE, 1);
+
             // Drawer unit: show drawers stacked
             const numDrawers = cu.drawerCount || 4;
             const innerH = cuH - pH - (state.thickness || 1.7) * 2; // subtract plinth and top/bottom boards
@@ -3662,13 +3718,13 @@ window._generateMultiViewBlueprintPages = function() {
                 const hndY = dy1 + dh * 0.5;
                 p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="2"/>`);
             }
-        }
 
-        // Dimensions
-        const dimY = oy + dH + 36;
-        makeDimH(p, ox, ox + dW, dimY, `${_bpMm(cuW)}`);
-        makeDimV(p, ox - 34, oy, oy + dH, `${_bpMm(cuH)}`);
-        if (pH > 0) makeDimV(p, ox + dW + 18, oy + dH - pH*sc, oy + dH, `${_bpMm(pH)}`);
+            // Dimensions
+            const dimY = oy + dH + 36;
+            makeDimH(p, ox, ox + dW, dimY, `${_bpMm(cuW)}`);
+            makeDimV(p, ox - 34, oy, oy + dH, `${_bpMm(cuH)}`);
+            if (pH > 0) makeDimV(p, ox + dW + 18, oy + dH - pH*sc, oy + dH, `${_bpMm(pH)}`);
+        }
 
         const _vkCU = cu.side === 'right' ? 'corner-right' : 'corner-left';
         _bpAppendViewCutouts(p, _vkCU, ox, oy, dW, dH, sc, cuW, cuH);
