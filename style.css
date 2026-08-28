@@ -1456,6 +1456,40 @@ body {
 .editor-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(181,129,58,0.12); background-color: white; }
 input[type="tel"].editor-select, input[type="number"].editor-select { direction: rtl; }
 input[type="date"].editor-select { direction: rtl; min-height: 38px; }
+
+.date-field-wrap .date-mask-input {
+    padding-left: 38px;
+    direction: ltr;
+    text-align: right;
+    letter-spacing: 0.08em;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+}
+.date-field-wrap .date-mask-input::placeholder {
+    color: #94a3b8;
+    letter-spacing: 0.12em;
+    opacity: 1;
+}
+.date-field-wrap .date-picker-icon {
+    right: auto;
+    left: 10px;
+    pointer-events: none;
+}
+.date-field-wrap .date-native-picker {
+    position: absolute;
+    left: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
+    opacity: 0;
+    cursor: pointer;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    z-index: 2;
+}
 textarea.editor-select.cabinet-notes-input {
     min-height: 72px;
     resize: vertical;

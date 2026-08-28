@@ -5680,7 +5680,7 @@ function bindUI() {
     };
 
     window._displayDateToIso = function(display) {
-        const s = String(display || '').trim();
+        const s = String(display || '').replace(/_/g, '').trim();
         if (!s) return '';
         let y, m, d;
         const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -5702,11 +5702,55 @@ function bindUI() {
         return window._isoToDisplayDate(iso);
     };
 
+    function _maskDeliveryDigits(raw) {
+        const digits = String(raw || '').replace(/\D/g, '').slice(0, 8);
+        if (digits.length <= 2) return digits;
+        if (digits.length <= 4) return digits.slice(0, 2) + '/' + digits.slice(2);
+        return digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4);
+    }
+
+    function _applyDeliveryMask(inp) {
+        if (!inp) return;
+        const start = inp.selectionStart;
+        const old = inp.value;
+        const masked = _maskDeliveryDigits(old);
+        if (masked === old) return;
+        const digitsBefore = old.slice(0, start).replace(/\D/g, '').length;
+        inp.value = masked;
+        let pos = 0, seen = 0;
+        while (pos < masked.length && seen < digitsBefore) {
+            if (/\d/.test(masked.charAt(pos))) seen++;
+            pos++;
+        }
+        if (masked.charAt(pos) === '/') pos++;
+        try { inp.setSelectionRange(pos, pos); } catch (e) {}
+    }
+
+    function _syncDeliveryPickers(iso) {
+        const val = iso || '';
+        ['cust-delivery-picker', 'mobile-cust-delivery-picker'].forEach(function(id) {
+            const el = document.getElementById(id);
+            if (el && el.value !== val) el.value = val;
+        });
+    }
+
     function _syncDeliveryDisplay(shown) {
         ['cust-delivery', 'mobile-cust-delivery'].forEach(function(id) {
             const el = document.getElementById(id);
             if (el && el.value !== shown) el.value = shown;
         });
+        _syncDeliveryPickers(window._displayDateToIso(shown));
+    }
+
+    function _openDeliveryPicker(textInp) {
+        const wrap = textInp && textInp.closest ? textInp.closest('.date-field-wrap') : null;
+        const picker = wrap ? wrap.querySelector('input[type="date"]') : null;
+        if (!picker) return;
+        const iso = window._displayDateToIso(textInp.value);
+        if (iso) picker.value = iso;
+        if (typeof picker.showPicker === 'function') {
+            try { picker.showPicker(); } catch (e) {}
+        }
     }
 
     window._fillCustomerForm = function() {
@@ -5727,6 +5771,7 @@ function bindUI() {
             const el = document.getElementById(p[0]);
             if (el) el.value = p[1] || '';
         });
+        _syncDeliveryPickers(c.deliveryDate ? window._displayDateToIso(c.deliveryDate) || String(c.deliveryDate).slice(0, 10) : '');
     };
 
     ['name', 'phone', 'order-num', 'address', 'delivery'].forEach(field => {
@@ -5734,8 +5779,10 @@ function bindUI() {
         if (!el) return;
         if (field === 'delivery') {
             const onDeliveryInput = (e) => {
+                _applyDeliveryMask(e.target);
                 const iso = window._displayDateToIso(e.target.value);
                 if (iso || !String(e.target.value).trim()) state.customer.deliveryDate = iso;
+                _syncDeliveryPickers(iso);
                 const otherId = e.target.id === 'cust-delivery' ? 'mobile-cust-delivery' : 'cust-delivery';
                 const other = document.getElementById(otherId);
                 if (other && other.value !== e.target.value) other.value = e.target.value;
@@ -5753,9 +5800,35 @@ function bindUI() {
             [el, document.getElementById('mobile-cust-delivery')].forEach(function(inp) {
                 if (!inp || inp.dataset.deliveryBound) return;
                 inp.dataset.deliveryBound = '1';
+                if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) {
+                    inp.setAttribute('readonly', 'readonly');
+                    inp.setAttribute('inputmode', 'none');
+                }
                 inp.addEventListener('input', onDeliveryInput);
                 inp.addEventListener('change', onDeliveryInput);
                 inp.addEventListener('blur', onDeliveryBlur);
+                inp.addEventListener('click', function() { _openDeliveryPicker(inp); });
+                inp.addEventListener('keydown', function(ev) {
+                    if (ev.key === 'ArrowDown' || ev.key === 'Enter') {
+                        ev.preventDefault();
+                        _openDeliveryPicker(inp);
+                    }
+                });
+                const wrap = inp.closest('.date-field-wrap');
+                const picker = wrap ? wrap.querySelector('input[type="date"]') : null;
+                if (picker && !picker.dataset.deliveryBound) {
+                    picker.dataset.deliveryBound = '1';
+                    picker.addEventListener('change', function() {
+                        const iso = picker.value || '';
+                        state.customer.deliveryDate = iso;
+                        _syncDeliveryDisplay(iso ? window._isoToDisplayDate(iso) : '');
+                    });
+                    picker.addEventListener('input', function() {
+                        const iso = picker.value || '';
+                        state.customer.deliveryDate = iso;
+                        _syncDeliveryDisplay(iso ? window._isoToDisplayDate(iso) : '');
+                    });
+                }
             });
             return;
         }

@@ -880,6 +880,9 @@
         padding: 12px 35px 12px 12px !important;
         font-size: 1rem !important;
     }
+    .date-field-wrap .date-mask-input.editor-select {
+        padding-left: 40px !important;
+    }
 
     /* --- Hide desktop-only elements on mobile --- */
     .hide-on-mobile { display: none !important; }
