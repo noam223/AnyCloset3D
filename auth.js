@@ -506,17 +506,38 @@ window.Auth = {
         const maxDevices = (billing && billing.max_devices != null)
             ? billing.max_devices
             : planDef.maxDevices;
+        const maxProjects = (billing && billing.max_projects === 0)
+            ? null
+            : (billing && billing.max_projects != null)
+                ? billing.max_projects
+                : planDef.maxProjects;
+        const maxCabinetsPerProject = (billing && billing.max_cabinets_per_project === 0)
+            ? null
+            : (billing && billing.max_cabinets_per_project != null)
+                ? billing.max_cabinets_per_project
+                : planDef.maxCabinetsPerProject;
         const maxAgents = (company && company.max_agents === 0)
             ? null
             : (company && company.max_agents != null)
                 ? company.max_agents
                 : (planDef.maxAgents || null);
 
+        var features = Object.assign({}, planDef.features || {});
+        var overrides = (billing && billing.feature_overrides) || {};
+        Object.keys(overrides).forEach(function(key) {
+            if (overrides[key] === true || overrides[key] === false) {
+                features[key] = overrides[key];
+            }
+        });
+
         return {
             key: planKey,
             ...planDef,
             maxDevices,
+            maxProjects,
+            maxCabinetsPerProject,
             maxAgents,
+            features,
             subscriptionStatus: (billing && billing.subscription_status) || 'active',
             subscriptionEndsAt: (billing && billing.subscription_ends_at) || null,
             trialEndsAt: (billing && billing.trial_ends_at) || null,
