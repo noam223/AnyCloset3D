@@ -946,6 +946,7 @@ function closeModal(id){document.getElementById(id).classList.remove('open');}
 document.addEventListener('click',function(e){if(e.target.classList.contains('modal-overlay'))e.target.classList.remove('open');});
 function showToast(msg,type){type=type||'success';var toast=document.getElementById('toast');document.getElementById('toast-text').textContent=msg;document.getElementById('toast-icon').className=type==='error'?'fa-solid fa-circle-exclamation':'fa-solid fa-circle-check';toast.className='toast '+type+' show';clearTimeout(_toastTimer);_toastTimer=setTimeout(function(){toast.className='toast '+type;},3500);}
 function _initials(name){if(!name)return '?';var parts=name.trim().split(/\s+/);if(parts.length>=2)return(parts[0][0]+parts[1][0]).toUpperCase();return name.slice(0,2).toUpperCase();}
+function _esc(str){return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function _phoneDigits(s){return String(s||'').replace(/\D/g,'');}
 function _phoneCell(u){if(!u||!u.phone)return '—';return '<a href="tel:'+_esc(u.phone)+'" style="color:var(--primary);text-decoration:none;font-weight:600;direction:ltr;display:inline-block;">'+_esc(u.phone)+'</a>';}
 function _formatDate(iso){if(!iso)return '—';var d=new Date(iso);return d.toLocaleDateString('he-IL',{day:'numeric',month:'short',year:'numeric'});}
