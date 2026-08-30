@@ -258,8 +258,13 @@ function _sessionIdFromAccessToken(token) {
     }
 }
 
-function _needsExclusiveSession(profile) {
-    return !!(profile && (profile.company_role === 'admin' || profile.company_role === 'agent'));
+function _needsExclusiveSession(profile, billingProfile) {
+    if (!profile || (profile.company_role !== 'admin' && profile.company_role !== 'agent')) {
+        return false;
+    }
+    var billing = billingProfile || profile;
+    // Default ON: several computers may stay signed in. OFF restores the single-PC kick.
+    return billing.allow_multi_session === false;
 }
 
 // ==========================================
@@ -501,9 +506,11 @@ window.Auth = {
         const maxDevices = (billing && billing.max_devices != null)
             ? billing.max_devices
             : planDef.maxDevices;
-        const maxAgents = (company && company.max_agents != null)
-            ? company.max_agents
-            : (planDef.maxAgents || null);
+        const maxAgents = (company && company.max_agents === 0)
+            ? null
+            : (company && company.max_agents != null)
+                ? company.max_agents
+                : (planDef.maxAgents || null);
 
         return {
             key: planKey,
@@ -643,14 +650,24 @@ window.Auth = {
         return _sessionIdFromAccessToken(token);
     },
 
+    _resolveExclusiveBilling: async function(profile) {
+        if (!profile) return profile;
+        if (profile.company_role === 'agent' && profile.company_id) {
+            const resolved = await this._resolveBillingProfile(profile);
+            return (resolved && resolved.billing) || profile;
+        }
+        return profile;
+    },
+
     /**
-     * Company admin/agent: only one computer at a time.
+     * Company admin/agent with allow_multi_session=false: only one computer at a time.
      * Login on a new computer deactivates the previous one and revokes its refresh tokens.
      */
     claimExclusiveSession: async function() {
         try {
             const profile = await this.getProfile();
-            if (!_needsExclusiveSession(profile)) return { success: true, skipped: true };
+            const billing = await this._resolveExclusiveBilling(profile);
+            if (!_needsExclusiveSession(profile, billing)) return { success: true, skipped: true };
 
             const sb = _getClient(); if (!sb) return { error: 'SDK not loaded' };
             const user = await this.getUser();
@@ -699,7 +716,8 @@ window.Auth = {
     checkExclusiveSession: async function() {
         try {
             const profile = await this.getProfile();
-            if (!_needsExclusiveSession(profile)) return { allowed: true, reason: 'ok' };
+            const billing = await this._resolveExclusiveBilling(profile);
+            if (!_needsExclusiveSession(profile, billing)) return { allowed: true, reason: 'ok' };
 
             const sb = _getClient(); if (!sb) return { allowed: true, reason: 'no_sdk' };
             const user = await this.getUser();

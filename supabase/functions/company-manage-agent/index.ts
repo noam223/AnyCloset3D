@@ -72,9 +72,12 @@ serve(async (req: Request) => {
     .eq('company_id', company.id)
     .eq('is_active', true);
 
-  const maxAgents = company.max_agents != null
-    ? Number(company.max_agents)
-    : (PLAN_MAX_AGENTS[me.plan || ''] || 5);
+  const unlimitedAgents = company.max_agents === 0;
+  const maxAgents = unlimitedAgents
+    ? 0
+    : (company.max_agents != null
+      ? Number(company.max_agents)
+      : (PLAN_MAX_AGENTS[me.plan || ''] || 5));
 
   const action = String(body.action || 'list');
 
@@ -114,7 +117,7 @@ serve(async (req: Request) => {
     const fullName = String(body.full_name || username).trim();
     if (username.length < 2) return json({ error: 'שם משתמש קצר מדי' }, 400);
     if (password.length < 6) return json({ error: 'הסיסמה חייבת לפחות 6 תווים' }, 400);
-    if ((activeCount || 0) >= maxAgents) {
+    if (!unlimitedAgents && (activeCount || 0) >= maxAgents) {
       return json({ error: `הגעתם למכסת ${maxAgents} סוכנים` }, 400);
     }
 

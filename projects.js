@@ -2718,7 +2718,12 @@ async function loadAgentsTab() {
     }
     var seats = document.getElementById('agents-seats-text');
     if (seats && _companyMeta) {
-        seats.textContent = (_companyMeta.active_count || 0) + ' / ' + (_companyMeta.max_agents || 0) + ' מושבים פעילים · מספר חברה ' + (_companyMeta.code || '');
+        var seatCap = (_companyMeta.max_agents === 0)
+            ? 'ללא הגבלה'
+            : (_companyMeta.max_agents != null
+                ? _companyMeta.max_agents
+                : ((_plan && _plan.maxAgents) || '—'));
+        seats.textContent = (_companyMeta.active_count || 0) + ' / ' + seatCap + ' מושבים פעילים · מספר חברה ' + (_companyMeta.code || '');
     }
     var vis = (_companyMeta && _companyMeta.default_visibility) || 'private';
     var priv = document.querySelector('input[name="default-vis"][value="private"]');
