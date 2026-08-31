@@ -554,22 +554,33 @@ function _bpMaybePushColWidthDim(p, viewKey, ci, x1, x2, y, lbl, makeDimHFn, abo
 
 /**
  * Extra overall-height dimension for every column shorter than the wing max.
- * dimVFn(x, yTop, yBot, labelMm) — same convention as the main overall height (floor → column top).
+ * Standing: floor → column top. Hanging: cabinet body only (install height is chosen on site).
  */
 function _bpDrawShorterColumnOverallHeights(dimVFn, cols, colXPositions, oy, dH, sc, wgH, ox, dW) {
     if (!dimVFn || !cols || !colXPositions || cols.length < 2) return;
-    const heights = cols.map(c => (c && c.height) || wgH);
-    const maxH = Math.max.apply(null, heights);
+    const hanging = cols.map(_bpColIsHanging);
+    const allHanging = hanging.every(Boolean);
+    const values = cols.map((c, i) => hanging[i] ? _bpColBodyHCm(c, wgH) : ((c && c.height) || wgH));
+    // Mixed standing+hanging: only extra-dim standing columns (hanging body is on the right).
+    const indices = [];
+    hanging.forEach((isHang, i) => {
+        if (allHanging || !isHang) indices.push(i);
+    });
+    if (indices.length < 2) return;
+    const maxH = Math.max.apply(null, indices.map(i => values[i]));
     let leftSlot = 0;
     let rightSlot = 0;
     const cabMid = ox + dW / 2;
-    cols.forEach((col, ci) => {
-        const h = heights[ci];
+    indices.forEach(ci => {
+        const h = values[ci];
         if (!(h < maxH - 0.05)) return;
         const cp = colXPositions[ci];
-        if (!cp) return;
-        const topY = (cp.colTopY != null) ? cp.colTopY : (oy + dH - h * sc);
-        const botY = oy + dH;
+        const col = cols[ci];
+        if (!cp || !col) return;
+        const topY = (cp.colTopY != null) ? cp.colTopY : (oy + dH - (col.height || wgH) * sc);
+        const botY = hanging[ci]
+            ? ((cp.colBotY != null) ? cp.colBotY : (oy + dH - (col.floorOffset || 0) * sc))
+            : (oy + dH);
         if (botY - topY < 8) return;
         const colMid = (cp.x1 + cp.x2) / 2;
         let dimX;
@@ -631,6 +642,47 @@ function _bpDrawTopBottomBoards(shelfLineFn, col, colX, colW, colBotSvgY, visibl
     if (topCenterCm > 0 && (botCenterCm == null || topCenterCm > botCenterCm + t * 0.5)) {
         shelfLineFn(colX, colBotSvgY - topCenterCm * sc, colX + colW);
     }
+}
+
+function _bpColIsHanging(col) {
+    return !!(col && (col.floorOffset || 0) > 0.05);
+}
+
+function _bpColBodyHCm(col, wgH) {
+    return Math.max(0, ((col && col.height) || wgH || 0) - ((col && col.floorOffset) || 0));
+}
+
+/** Overall height from the floor is only meaningful for standing columns. Hanging units are installed at a site-chosen height — dimension the cabinet body instead. */
+function _bpPushWingOverallHeight(dimVFn, cols, oy, dH, sc, wgH, ox) {
+    if (!dimVFn) return;
+    const list = cols || [];
+    if (!list.length) {
+        dimVFn(ox - 54, oy, oy + dH, `${_bpMm(wgH)}`);
+        return;
+    }
+    const standing = list.filter(c => !_bpColIsHanging(c));
+    if (standing.length) {
+        const maxH = Math.max.apply(null, standing.map(c => (c.height || wgH)));
+        const maxTopY = Math.min.apply(null, standing.map(c => oy + dH - (c.height || wgH) * sc));
+        dimVFn(ox - 54, maxTopY, oy + dH, `${_bpMm(maxH)}`);
+        return;
+    }
+    let maxBody = -1, ref = list[0];
+    list.forEach(c => {
+        const b = _bpColBodyHCm(c, wgH);
+        if (b >= maxBody) { maxBody = b; ref = c; }
+    });
+    const fo = ref.floorOffset || 0;
+    const colBot = oy + dH - fo * sc;
+    dimVFn(ox - 54, colBot - maxBody * sc, colBot, `${_bpMm(maxBody)}`);
+}
+
+function _bpWingDimHeightCm(cols, wgH) {
+    const list = cols || [];
+    if (!list.length) return wgH;
+    const standing = list.filter(c => !_bpColIsHanging(c));
+    if (standing.length) return Math.max.apply(null, standing.map(c => c.height || wgH));
+    return Math.max.apply(null, list.map(c => _bpColBodyHCm(c, wgH)));
 }
 
 function _bpColumnSitsOnFloor(col) {
@@ -1754,15 +1806,13 @@ window._generateMultiViewBlueprintSVG = function() {
         const _isCenterWg = wg.wd === centerWing;
         const _horizExtra = _isCenterWg ? _bpCenterHorizExtra(centerWing) : { left: 0, right: 0 };
         const _layoutW = wg.w + _horizExtra.left + _horizExtra.right;
-        panelBox(MARGIN, py, pw, WING_H, `שרטוט חזית — ${wg.label} | רוחב: ${_bpMm(_layoutW)} מ"מ | גובה: ${_bpMm(wg.h)} מ"מ | עומק: ${_bpMm(wg.d)} מ"מ`);
+        const cols = (wg.wd && wg.wd.columns) ? wg.wd.columns : (state.columns || []);
+        panelBox(MARGIN, py, pw, WING_H, `שרטוט חזית — ${wg.label} | רוחב: ${_bpMm(_layoutW)} מ"מ | גובה: ${_bpMm(_bpWingDimHeightCm(cols, wg.h))} מ"מ | עומק: ${_bpMm(wg.d)} מ"מ`);
         const drawY = py + LABEL_H;
         const sc = Math.min((pw - PAD*2) / Math.max(_layoutW, 1), (WING_H - PAD*2) / Math.max(wg.h, 1));
         const dW = wg.w * sc, dH = wg.h * sc;
         const ox = MARGIN + (pw - _layoutW * sc) / 2 + _horizExtra.left * sc;
         const oy = drawY + (WING_H - dH) / 2;
-
-        // Columns, shelves, hangers & drawers
-        const cols = (wg.wd && wg.wd.columns) ? wg.wd.columns : (state.columns || []);
 
         // Cabinet body — draw per-column rects at actual heights, respecting floorOffset
         // floorOffset = how much is cut from the BOTTOM of the column
@@ -2165,11 +2215,8 @@ window._generateMultiViewBlueprintSVG = function() {
                 }
             });
         }
-        // Total height (left side) — from floor (oy+dH) to highest column top
-        // box is raised by floorOffset; top = oy+dH - fo*sc - visibleH*sc = oy+dH - (fo + visibleH)*sc = oy+dH - height*sc
-        const _wgMaxTopY = cols.length > 0 ? Math.min(...cols.map(c => oy + dH - (c.height || wg.h) * sc)) : oy;
-        const _wgTotalHcm = cols.length > 0 ? _bpMm(Math.max(...cols.map(c => (c.height || wg.h)))) : _bpMm(wg.h);
-        dimV(ox - 54, _wgMaxTopY, oy + dH, `${_wgTotalHcm}`);
+        // Overall height: standing columns floor→top; hanging cabinets show body height only
+        _bpPushWingOverallHeight(dimV, cols, oy, dH, sc, wg.h, ox);
         _bpDrawShorterColumnOverallHeights(dimV, cols, colXPositions, oy, dH, sc, wg.h, ox, dW);
         // ---- Bathroom preset: right-side external dims (body height + floor offset + drawer heights) ----
         // ---- Regular preset: split section dims + floorOffset dims ----
@@ -2186,10 +2233,7 @@ window._generateMultiViewBlueprintSVG = function() {
                 const _colTopY5o = _colBotY5o - _bodyH5o * sc;
                 // Body height on right side
                 dimVLeft(ox + dW + 38, _colTopY5o, _colBotY5o, `${_bpMm(_bodyH5o)}`);
-                // Floor offset (only for hanging cabinet)
-                if (_fo5o > 0) {
-                    dimV(ox + dW + 76, _colBotY5o, oy + dH, `${_bpMm(_fo5o)}`);
-                }
+                // Hanging install height is chosen on site — do not dimension floorOffset
             }
             // External drawer row heights on right side.
             // For each external_drawers row: if count>1, show each individual drawer height.
@@ -2248,26 +2292,17 @@ window._generateMultiViewBlueprintSVG = function() {
                     dimV(ox + dW + 54, _splitBotYOld2, _lowerStartYOld2, `${_lowerHOld2}`);
                 }
             }
-            // floorOffset + body height for hanging cabinets (regular preset)
+            // Body height for hanging cabinets (regular preset). Floor gap is not dimensioned — site chooses hang height.
             {
                 const _hangColOld = cols.find(c => (c.floorOffset || 0) > 0);
-                if (_hangColOld) {
+                const _hasStandingOld = cols.some(c => !_bpColIsHanging(c));
+                // When the whole wing is hanging, left overall already shows body height.
+                if (_hangColOld && _hasStandingOld) {
                     const _foH = _hangColOld.floorOffset || 0;
                     const _bodyH = (_hangColOld.height || wg.h) - _foH;
                     const _colBotH = oy + dH - _foH * sc;
                     const _colTopH = _colBotH - _bodyH * sc;
                     dimVLeft(ox + dW + 38, _colTopH, _colBotH, `${_bpMm(_bodyH)}`);
-                    dimV(ox + dW + 76, _colBotH, oy + dH, `${_bpMm(_foH)}`);
-                } else {
-                    let _foDimX = ox + dW + (_hasFloorPlinthOld ? 38 : 18);
-                    colXPositions.forEach((cp, ci) => {
-                        const _col = cols[ci];
-                        const _fo = (_col && _col.floorOffset) ? _col.floorOffset : 0;
-                        if (_fo > 0) {
-                            dimV(_foDimX, cp.colBotY, oy + dH, `${_bpMm(_fo)}`);
-                            _foDimX += 36;
-                        }
-                    });
                 }
             }
         }
@@ -3185,13 +3220,9 @@ window._generateMultiViewBlueprintPages = function() {
                 }
             });
         }
-        // Overall height dimension: from lowest bottom to highest top across all columns
+        // Overall height: standing columns floor→top; hanging cabinets show body height only
         {
-            // Overall height: from floor (oy+dH) to highest column top
-            // top = oy+dH - fo*sc - visibleH*sc = oy+dH - (fo + visibleH)*sc = oy+dH - height*sc
-            const _maxTopY2 = cols.length > 0 ? Math.min(...cols.map(c => oy + dH - (c.height || wg.h) * sc)) : oy;
-            const _totalHcm2 = cols.length > 0 ? _bpMm(Math.max(...cols.map(c => (c.height || wg.h)))) : _bpMm(wg.h);
-            makeDimV(p, ox - 54, _maxTopY2, oy + dH, `${_totalHcm2}`);
+            _bpPushWingOverallHeight((x, y1, y2, lbl) => makeDimV(p, x, y1, y2, lbl), cols, oy, dH, sc, wg.h, ox);
             _bpDrawShorterColumnOverallHeights(
                 (x, y1, y2, lbl) => makeDimV(p, x, y1, y2, lbl),
                 cols, colXPositions, oy, dH, sc, wg.h, ox, dW
@@ -3202,9 +3233,8 @@ window._generateMultiViewBlueprintPages = function() {
         if (pid === 'bathroom') {
             // Right side dims for bathroom:
             // 1. Body height (cabinet top to cabinet bottom, without floor gap) at ox+dW+38
-            // 2. Floor offset (gap from floor to cabinet bottom) at ox+dW+76 (only if hanging)
-            // 3. Individual drawer heights at ox+dW+38 (overlaid on body height span)
-            // NOTE: total height (floor to top) is already on the LEFT side — do NOT repeat on right
+            // 2. Individual drawer heights at ox+dW+38 (overlaid on body height span)
+            // Hanging floor gap is not dimensioned — install height is chosen on site.
 
             // Find the reference column (first with floorOffset, or first column)
             const _bathRefColIdx = cols.findIndex(c => (c.floorOffset || 0) > 0);
@@ -3218,11 +3248,7 @@ window._generateMultiViewBlueprintPages = function() {
 
                 // 1. Body height on right side
                 makeDimVLeft(p, ox + dW + 38, _colTopY5, _colBotY5, `${_bpMm(_bodyH5)}`);
-
-                // 2. Floor offset (only for hanging cabinet where floorOffset > 0)
-                if (_fo5 > 0) {
-                    makeDimV(p, ox + dW + 76, _colBotY5, oy + dH, `${_bpMm(_fo5)}`);
-                }
+                // Hanging install height is chosen on site — do not dimension floorOffset
             }
 
             // 3. Individual drawer heights — scan first column with external_drawers compartments
@@ -3288,26 +3314,17 @@ window._generateMultiViewBlueprintPages = function() {
                     p.push(`<text x="${(ox + dW + 54 + 22).toFixed(1)}" y="${(_bandMidY + 3).toFixed(1)}" font-family="${FONT}" font-size="8" fill="${STROKE}" opacity="0.62">${_bpMm(_t2)}</text>`);
                 }
             }
-            // floorOffset + body height for hanging cabinets (regular preset)
+            // Body height for hanging cabinets (regular preset). Floor gap is not dimensioned — site chooses hang height.
             {
                 const _hangCol = cols.find(c => (c.floorOffset || 0) > 0);
-                if (_hangCol) {
+                const _hasStanding = cols.some(c => !_bpColIsHanging(c));
+                // When the whole wing is hanging, left overall already shows body height.
+                if (_hangCol && _hasStanding) {
                     const _foH = _hangCol.floorOffset || 0;
                     const _bodyH = (_hangCol.height || wg.h) - _foH;
                     const _colBotH = oy + dH - _foH * sc;
                     const _colTopH = _colBotH - _bodyH * sc;
                     makeDimVLeft(p, ox + dW + 38, _colTopH, _colBotH, `${_bpMm(_bodyH)}`);
-                    makeDimV(p, ox + dW + 76, _colBotH, oy + dH, `${_bpMm(_foH)}`);
-                } else {
-                    let _foDimX2 = ox + dW + (_hasFloorPlinth2 ? 38 : 18);
-                    colXPositions.forEach((cp, ci) => {
-                        const _col = cols[ci];
-                        const _fo = (_col && _col.floorOffset) ? _col.floorOffset : 0;
-                        if (_fo > 0) {
-                            makeDimV(p, _foDimX2, cp.colBotY, oy + dH, `${_bpMm(_fo)}`);
-                            _foDimX2 += 36;
-                        }
-                    });
                 }
             }
         }
