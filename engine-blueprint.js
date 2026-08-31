@@ -36,6 +36,18 @@ function _bpCenterHorizExtra(cw) {
     return { left, right };
 }
 
+/** Overall front-view width dim: cabinet body, plus a spanning total when side desk / side cabinet exist. */
+function _bpPushOverallWidthWithExtras(dimHFn, ox, dW, sc, extra, cabinetWcm, dimY) {
+    if (typeof dimHFn !== 'function') return;
+    extra = extra || { left: 0, right: 0 };
+    const left = extra.left || 0;
+    const right = extra.right || 0;
+    dimHFn(ox, ox + dW, dimY, `${_bpMm(cabinetWcm)}`);
+    if (left > 0.05 || right > 0.05) {
+        dimHFn(ox - left * sc, ox + dW + right * sc, dimY + 20, `${_bpMm(cabinetWcm + left + right)}`);
+    }
+}
+
 /** Push side-desk front-view SVG primitives into parts array (makeRect / makeDim* style) */
 function _bpDrawSideDeskFrontParts(p, desk, ox, oy, dW, dH, sc, fill, STROKE, STROKE_THIN, FONT, dimHFn, dimVFn, dimVLeftFn) {
     if (!desk) return;
@@ -80,7 +92,7 @@ function _bpDrawSideDeskFrontParts(p, desk, ox, oy, dW, dH, sc, fill, STROKE, ST
             dimVFn(dimOuterX + 36, drawerSvgY0 + drawerH * sc, deskBotY, `${_bpMm((dHeight - DESK_SURFACE_T - drawerH))}`);
         }
     }
-    dimHFn(deskX, deskX + dSvgW, oy + dH + 36, `${_bpMm(dWidth)}`);
+    dimHFn(deskX, deskX + dSvgW, oy + dH + 16, `${_bpMm(dWidth)}`);
     if (dSide === 'left') dimVLeftFn(deskX - 14, deskTopY, deskBotY, `${_bpMm(dHeight)}`);
     else dimVFn(deskX + dSvgW + 14, deskTopY, deskBotY, `${_bpMm(dHeight)}`);
     const midX = deskX + dSvgW / 2;
@@ -1660,7 +1672,7 @@ window._generateMultiViewBlueprintSVG = function() {
         const dimRowTop = wz(0) - 28; // above cabinet top edge, above the sub-dims at wz(0)-14
         dimH(wx(minX), wx(maxX), dimRowTop, `${_bpMm(tW)}`);
         // Center cabinet width: just above the cabinet top edge (not at bottom)
-        if (hasLeft || hasRight) dimH(wx(-cW/2), wx(cW/2), wz(0) - 14, `${_bpMm(cW)}`);
+        if (hasLeft || hasRight || hasDeskFP || hasSCFP) dimH(wx(-cW/2), wx(cW/2), wz(0) - 14, `${_bpMm(cW)}`);
 
         const hasRightFC = hasRight && rPos === 'full_corner';
         const hasLeftFC  = hasLeft  && lPos === 'full_corner';
@@ -1728,11 +1740,11 @@ window._generateMultiViewBlueprintSVG = function() {
         const _bpViewKey = wg.wd === leftWing ? 'left' : wg.wd === rightWing ? 'right' : 'center';
         const py = MARGIN + 22 + GAP + (TOP_H + LABEL_H) + GAP + wi * (WING_H + LABEL_H + GAP);
         const pw = SVG_W - MARGIN * 2;
-        panelBox(MARGIN, py, pw, WING_H, `שרטוט חזית — ${wg.label} | רוחב: ${_bpMm(wg.w)} מ"מ | גובה: ${_bpMm(wg.h)} מ"מ | עומק: ${_bpMm(wg.d)} מ"מ`);
-        const drawY = py + LABEL_H;
         const _isCenterWg = wg.wd === centerWing;
         const _horizExtra = _isCenterWg ? _bpCenterHorizExtra(centerWing) : { left: 0, right: 0 };
         const _layoutW = wg.w + _horizExtra.left + _horizExtra.right;
+        panelBox(MARGIN, py, pw, WING_H, `שרטוט חזית — ${wg.label} | רוחב: ${_bpMm(_layoutW)} מ"מ | גובה: ${_bpMm(wg.h)} מ"מ | עומק: ${_bpMm(wg.d)} מ"מ`);
+        const drawY = py + LABEL_H;
         const sc = Math.min((pw - PAD*2) / Math.max(_layoutW, 1), (WING_H - PAD*2) / Math.max(wg.h, 1));
         const dW = wg.w * sc, dH = wg.h * sc;
         const ox = MARGIN + (pw - _layoutW * sc) / 2 + _horizExtra.left * sc;
@@ -2123,8 +2135,8 @@ window._generateMultiViewBlueprintSVG = function() {
         const _plinthBottomY = _bpWidthDimBaseY(oy, dH, pH, sc, cols);
         const _hasMultiCols = colXPositions.length > 1;
         const dimY = _plinthBottomY + (_hasMultiCols ? 54 : 36);
-        // Total width (below plinth)
-        dimH(ox, ox + dW, dimY, `${_bpMm(wg.w)}`);
+        // Total width (below plinth) — includes side desk / side cabinet when present
+        _bpPushOverallWidthWithExtras(dimH, ox, dW, sc, _isCenterWg ? _horizExtra : { left: 0, right: 0 }, wg.w, dimY);
         // Per-column width dims — placed just below the plinth bottom
         {
             const _tCmHC = state.thickness || 1.7;
@@ -2648,7 +2660,7 @@ window._generateMultiViewBlueprintPages = function() {
         const dimRowTop = wz(0) - 28;
         makeDimH(p, wx(minX), wx(maxX), dimRowTop, `${_bpMm(tW)}`);
         // Center cabinet width: just above the cabinet top edge
-        if (hasLeft || hasRight) makeDimH(p, wx(-cW/2), wx(cW/2), wz(0) - 14, `${_bpMm(cW)}`);
+        if (hasLeft || hasRight || hasDeskFP2 || hasSCFP2) makeDimH(p, wx(-cW/2), wx(cW/2), wz(0) - 14, `${_bpMm(cW)}`);
 
         const hasRightFC = hasRight && rPos === 'full_corner';
         const hasLeftFC  = hasLeft  && lPos === 'full_corner';
@@ -3139,7 +3151,10 @@ window._generateMultiViewBlueprintPages = function() {
         const _widthDimBaseY = _bpWidthDimBaseY(oy, dH, pH, sc, cols);
         const _hasMultiCols2 = colXPositions.length > 1;
         const dimY = _widthDimBaseY + (_hasMultiCols2 ? 54 : 36);
-        makeDimH(p, ox, ox + dW, dimY, `${_bpMm(wg.w)}`);
+        _bpPushOverallWidthWithExtras(
+            function(x1, x2, y, lbl) { makeDimH(p, x1, x2, y, lbl); },
+            ox, dW, sc, _isCenterWg2 ? _horizExtra2 : { left: 0, right: 0 }, wg.w, dimY
+        );
         {
             const _tCmHC2 = state.thickness || 1.7;
             colXPositions.forEach((cp, ci) => {
