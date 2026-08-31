@@ -1597,6 +1597,9 @@
             <button type="button" id="mvbp-toggle-col-widths" onclick="window._mvbpToggleColWidthDims()" title="הסתר/הצג רוחב עמודות, כולל רוחב פנים של כוורות ומידות מחיצות. לחיצה על עמודה בשרטוט מציגה/מסתירה רוחב בודד." style="display:flex;align-items:center;gap:5px;padding:6px 12px;background:#fff;color:#1e3a5f;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;font-size:0.82rem;font-family:inherit;font-weight:600;">
                 <i class="fa-solid fa-eye-slash"></i> הסתר רוחב עמודות
             </button>
+            <button type="button" id="mvbp-toggle-height-dims" onclick="window._mvbpToggleHeightDims()" title="הסתר/הצג מידות גובה חיצוניות (גובה ארון, בסיס, פיצול, שולחן, תלייה מהרצפה). מידות פנימיות של תאים נשארות בכפתור הנפרד. מבט עליון לא מושפע." style="display:flex;align-items:center;gap:5px;padding:6px 12px;background:#fff;color:#1e3a5f;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;font-size:0.82rem;font-family:inherit;font-weight:600;">
+                <i class="fa-solid fa-eye-slash"></i> הסתר מידות גובה
+            </button>
         </div>
         <!-- Cutout toolbar (front views only) -->
         <div id="mvbp-cutout-toolbar" style="display:none;align-items:center;justify-content:center;flex-wrap:wrap;gap:10px;padding:8px 18px;border-bottom:1px solid #e2e8f0;background:#fff7ed;flex-shrink:0;font-size:0.85rem;color:#1e3a5f;">
@@ -2633,19 +2636,19 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js?v=20260830adminOps"></script>
-<script src="state.js?v=20260825spaceCab"></script>
+<script src="state.js?v=20260831hDim"></script>
 <script src="quick-calc.js?v=20260825backdrop"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
 <script src="engine-core.js?v=20260827blackLt"></script>
 <script src="engine-corners.js?v=20260825spaceCab"></script>
-<script src="engine-blueprint.js?v=20260831deskW"></script>
+<script src="engine-blueprint.js?v=20260831hDim"></script>
 <script src="engine-room-plan.js?v=20260731rpcab"></script>
 <script src="tambour-color-picker.js?v=20260617scdoors"></script>
-<script src="ui.js?v=20260828delDate"></script>
+<script src="ui.js?v=20260831hDim"></script>
 <script src="mobile.js?v=20260825spaceCab"></script>
 <script src="part-paint.js?v=20260827blackLt"></script>
-<script src="index-init.js?v=20260825holdCab"></script>
+<script src="index-init.js?v=20260831hDim"></script>
 
 <!-- ===== TAMBOUR FULL PALETTE MODAL ===== -->
 <div id="tambour-palette-modal" class="tambour-palette-overlay">

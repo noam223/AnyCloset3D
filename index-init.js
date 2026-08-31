@@ -239,6 +239,7 @@
                     state.blueprintCellDimShown = snap.blueprintCellDimShown || {};
                     state.blueprintColWidthDimsDefault = snap.blueprintColWidthDimsDefault !== false;
                     state.blueprintColWidthDimShown = snap.blueprintColWidthDimShown || {};
+                    state.blueprintHeightDimsDefault = snap.blueprintHeightDimsDefault !== false;
                     // Restore room wall position
                     if (snap.roomWall) {
                         state.roomWall   = snap.roomWall;
@@ -507,6 +508,7 @@
             blueprintCellDimShown:     state.blueprintCellDimShown || {},
             blueprintColWidthDimsDefault: state.blueprintColWidthDimsDefault !== false,
             blueprintColWidthDimShown: state.blueprintColWidthDimShown || {},
+            blueprintHeightDimsDefault: state.blueprintHeightDimsDefault !== false,
             partColors:                state.partColors || {}
         }));
     }
@@ -729,6 +731,7 @@ window._saveProjectNow = async function() {
                 blueprintCellDimShown:   state.blueprintCellDimShown || {},
                 blueprintColWidthDimsDefault: state.blueprintColWidthDimsDefault !== false,
                 blueprintColWidthDimShown: state.blueprintColWidthDimShown || {},
+                blueprintHeightDimsDefault: state.blueprintHeightDimsDefault !== false,
                 partColors:              state.partColors || {}
             }));
         }

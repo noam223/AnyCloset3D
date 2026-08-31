@@ -481,6 +481,12 @@ function _bpColWidthDimIsShown(viewKey, colKey) {
     return _bpDimIsShown(state.blueprintColWidthDimShown, state.blueprintColWidthDimsDefault, viewKey, colKey);
 }
 
+/** External height arrows on elevations. Top view uses makeDimV for depth — always shown. */
+function _bpHeightDimIsShown(viewKey) {
+    if (String(viewKey || '') === 'top') return true;
+    return state.blueprintHeightDimsDefault !== false;
+}
+
 function _bpPushCellDimToggleHit(p, viewKey, cellKey, hx, hy, hw, hh) {
     if (!p || !(hw > 2) || !(hh > 2)) return;
     p.push(
@@ -1454,7 +1460,10 @@ window._generateMultiViewBlueprintSVG = function() {
     };
     // dimV: vertical dimension line — label placed to the RIGHT of the line
     // Use for lines on the LEFT side of cabinet (label goes right = toward cabinet)
+    // Compact SVG: top panel uses these for depth; front panels set _compactVertIsHeight.
+    let _compactVertIsHeight = false;
     const dimV = (x,y1,y2,lbl) => {
+        if (_compactVertIsHeight && !_bpHeightDimIsShown('front')) return;
         const tk=7;
         p.push(`<line x1="${(x-tk/2).toFixed(1)}" y1="${(+y1).toFixed(1)}" x2="${(x+tk/2).toFixed(1)}" y2="${(+y1).toFixed(1)}" stroke="${DIM_C}" stroke-width="1"/>`);
         p.push(`<line x1="${(x-tk/2).toFixed(1)}" y1="${(+y2).toFixed(1)}" x2="${(x+tk/2).toFixed(1)}" y2="${(+y2).toFixed(1)}" stroke="${DIM_C}" stroke-width="1"/>`);
@@ -1466,6 +1475,7 @@ window._generateMultiViewBlueprintSVG = function() {
     // dimVLeft: vertical dimension line — label placed to the LEFT of the line
     // Use for lines on the RIGHT side of cabinet (label goes left = toward cabinet)
     const dimVLeft = (x,y1,y2,lbl) => {
+        if (_compactVertIsHeight && !_bpHeightDimIsShown('front')) return;
         const tk=7;
         p.push(`<line x1="${(x-tk/2).toFixed(1)}" y1="${(+y1).toFixed(1)}" x2="${(x+tk/2).toFixed(1)}" y2="${(+y1).toFixed(1)}" stroke="${DIM_C}" stroke-width="1"/>`);
         p.push(`<line x1="${(x-tk/2).toFixed(1)}" y1="${(+y2).toFixed(1)}" x2="${(x+tk/2).toFixed(1)}" y2="${(+y2).toFixed(1)}" stroke="${DIM_C}" stroke-width="1"/>`);
@@ -1736,6 +1746,7 @@ window._generateMultiViewBlueprintSVG = function() {
     }
 
     // ---- PANELS 1..N: Per-wing front views with hangers & drawers ----
+    _compactVertIsHeight = true;
     wingList.forEach((wg, wi) => {
         const _bpViewKey = wg.wd === leftWing ? 'left' : wg.wd === rightWing ? 'right' : 'center';
         const py = MARGIN + 22 + GAP + (TOP_H + LABEL_H) + GAP + wi * (WING_H + LABEL_H + GAP);
@@ -2410,6 +2421,7 @@ window._generateMultiViewBlueprintPages = function() {
         );
     };
     const makeDimV = (p, x, y1, y2, lbl) => {
+        if (!_bpHeightDimIsShown(_bpCurrentViewKey)) return;
         const role = `v:${Math.round(+x)},${Math.round(+y1)},${Math.round(+y2)}`;
         const tf = _bpDimTransform(_bpCurrentViewKey, role);
         const tk = 8;
@@ -2424,6 +2436,7 @@ window._generateMultiViewBlueprintPages = function() {
         );
     };
     const makeDimVLeft = (p, x, y1, y2, lbl) => {
+        if (!_bpHeightDimIsShown(_bpCurrentViewKey)) return;
         const role = `vl:${Math.round(+x)},${Math.round(+y1)},${Math.round(+y2)}`;
         const tf = _bpDimTransform(_bpCurrentViewKey, role);
         const tk = 8;

@@ -6999,6 +6999,7 @@ function _snapshotEditorState() {
         blueprintCellDimShown: JSON.parse(JSON.stringify(state.blueprintCellDimShown || {})),
         blueprintColWidthDimsDefault: state.blueprintColWidthDimsDefault !== false,
         blueprintColWidthDimShown: JSON.parse(JSON.stringify(state.blueprintColWidthDimShown || {})),
+        blueprintHeightDimsDefault: state.blueprintHeightDimsDefault !== false,
         partColors: JSON.parse(JSON.stringify(state.partColors || {})),
         roomWall: window._roomWall || state.roomWall || 'center',
         closureEnabled: window._closureEnabled,
@@ -7032,6 +7033,7 @@ function _restoreEditorState(snap) {
     state.blueprintCellDimShown = snap.blueprintCellDimShown || {};
     state.blueprintColWidthDimsDefault = snap.blueprintColWidthDimsDefault !== false;
     state.blueprintColWidthDimShown = snap.blueprintColWidthDimShown || {};
+    state.blueprintHeightDimsDefault = snap.blueprintHeightDimsDefault !== false;
     state.partColors = snap.partColors || {};
     window._roomWall = snap.roomWall;
     state.roomWall = snap.roomWall;
@@ -7104,6 +7106,7 @@ function _applyRawStateForCapture(rawState) {
     state.blueprintCellDimShown = rs.blueprintCellDimShown ? JSON.parse(JSON.stringify(rs.blueprintCellDimShown)) : {};
     state.blueprintColWidthDimsDefault = rs.blueprintColWidthDimsDefault !== false;
     state.blueprintColWidthDimShown = rs.blueprintColWidthDimShown ? JSON.parse(JSON.stringify(rs.blueprintColWidthDimShown)) : {};
+    state.blueprintHeightDimsDefault = rs.blueprintHeightDimsDefault !== false;
     if (rs.partColors && typeof window._importLocalPartColors === 'function') {
         window._importLocalPartColors('draft', rs.partColors);
         if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
@@ -7540,6 +7543,7 @@ window._buildCurrentCabinetCompareRaw = function() {
         blueprintCellDimShown: state.blueprintCellDimShown || {},
         blueprintColWidthDimsDefault: state.blueprintColWidthDimsDefault !== false,
         blueprintColWidthDimShown: state.blueprintColWidthDimShown || {},
+        blueprintHeightDimsDefault: state.blueprintHeightDimsDefault !== false,
         partColors: partColors || {}
     }));
     const _pairLive = typeof window._spacePairFieldsForRaw === 'function' ? window._spacePairFieldsForRaw() : {};
@@ -8212,6 +8216,7 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
             blueprintCellDimShown: state.blueprintCellDimShown || {},
             blueprintColWidthDimsDefault: state.blueprintColWidthDimsDefault !== false,
             blueprintColWidthDimShown: state.blueprintColWidthDimShown || {},
+            blueprintHeightDimsDefault: state.blueprintHeightDimsDefault !== false,
             partColors: (typeof window._exportLocalPartColors === 'function')
                 ? window._exportLocalPartColors()
                 : JSON.parse(JSON.stringify(state.partColors || {}))
@@ -8617,6 +8622,7 @@ window._editCartItemNow = function(index) {
     state.blueprintCellDimShown = rawState.blueprintCellDimShown ? JSON.parse(JSON.stringify(rawState.blueprintCellDimShown)) : {};
     state.blueprintColWidthDimsDefault = rawState.blueprintColWidthDimsDefault !== false;
     state.blueprintColWidthDimShown = rawState.blueprintColWidthDimShown ? JSON.parse(JSON.stringify(rawState.blueprintColWidthDimShown)) : {};
+    state.blueprintHeightDimsDefault = rawState.blueprintHeightDimsDefault !== false;
 
     state.editingCartIndex = index;
     const _loadedItem = state.orderCart[index];
@@ -10388,8 +10394,10 @@ window._mvbpBindCutoutDimDrag = function() {
 window._mvbpSyncDimToggleButtons = function() {
     const cellBtn = document.getElementById('mvbp-toggle-cell-dims');
     const colBtn = document.getElementById('mvbp-toggle-col-widths');
+    const heightBtn = document.getElementById('mvbp-toggle-height-dims');
     const cellShow = state.blueprintInternalDimsDefault !== false;
     const colShow = state.blueprintColWidthDimsDefault !== false;
+    const heightShow = state.blueprintHeightDimsDefault !== false;
     if (cellBtn) {
         cellBtn.innerHTML = cellShow
             ? '<i class="fa-solid fa-eye-slash"></i> הסתר מידות פנימיות'
@@ -10401,6 +10409,12 @@ window._mvbpSyncDimToggleButtons = function() {
             ? '<i class="fa-solid fa-eye-slash"></i> הסתר רוחב עמודות'
             : '<i class="fa-solid fa-eye"></i> הצג רוחב עמודות';
         colBtn.style.background = colShow ? '#fff' : '#e0f2fe';
+    }
+    if (heightBtn) {
+        heightBtn.innerHTML = heightShow
+            ? '<i class="fa-solid fa-eye-slash"></i> הסתר מידות גובה'
+            : '<i class="fa-solid fa-eye"></i> הצג מידות גובה';
+        heightBtn.style.background = heightShow ? '#fff' : '#e0f2fe';
     }
 };
 
@@ -10429,6 +10443,11 @@ window._mvbpToggleInternalDims = function() {
 window._mvbpToggleColWidthDims = function() {
     state.blueprintColWidthDimsDefault = !(state.blueprintColWidthDimsDefault !== false);
     state.blueprintColWidthDimShown = {};
+    _mvbpRegenAfterDimToggle();
+};
+
+window._mvbpToggleHeightDims = function() {
+    state.blueprintHeightDimsDefault = !(state.blueprintHeightDimsDefault !== false);
     _mvbpRegenAfterDimToggle();
 };
 

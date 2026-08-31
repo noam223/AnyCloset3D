@@ -223,6 +223,7 @@ const state = {
     blueprintCellDimShown: {},
     blueprintColWidthDimsDefault: true,
     blueprintColWidthDimShown: {},
+    blueprintHeightDimsDefault: true,
     customer: { name: '', phone: '', orderNum: '', address: '', deliveryDate: '' },
     // Editable title + intro text on order/factory print forms
     orderForm: { factory: { title: '', notes: '' }, customer: { title: '', notes: '' } },
@@ -999,6 +1000,7 @@ window._resetEditorToDefaultLinearCabinet = function() {
     state.blueprintCellDimShown = {};
     state.blueprintColWidthDimsDefault = true;
     state.blueprintColWidthDimShown = {};
+    state.blueprintHeightDimsDefault = true;
     state.roomWall = 'center';
     window._roomWall = 'center';
 
