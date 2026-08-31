@@ -927,6 +927,41 @@ function _bpHangRodSvgY(cellTopSvgY, sc) {
     return cellTopSvgY + _BP_HANG_ROD_BELOW_SHELF_CM * sc;
 }
 
+function _bpIsDoorZoneType(t) {
+    return t === 'door_right' || t === 'door_left' || t === 'door_double' || t === 'door_flap';
+}
+
+/** Interior type of a partition sub-zone — matches engine-core `_interiorAtEng`. */
+function _bpPartitionInteriorType(sub, z) {
+    if (!sub) return 'empty';
+    const raw = (Array.isArray(sub.zonesType) && z >= 0 && z < sub.zonesType.length)
+        ? sub.zonesType[z]
+        : null;
+    let t = (raw != null && raw !== '') ? raw : null;
+    if (!t || t === 'empty' || t === 'partition' || _bpIsDoorZoneType(t)) {
+        if ((sub.shelves || 0) <= 0 && sub.type && sub.type !== 'empty' && sub.type !== 'partition' && !_bpIsDoorZoneType(sub.type)) {
+            t = sub.type;
+        } else {
+            t = (!t || t === 'partition' || _bpIsDoorZoneType(t)) ? 'empty' : t;
+        }
+    }
+    return t || 'empty';
+}
+
+function _bpPartitionIsInteriorContent(t) {
+    return t === 'hanging' || t === 'sorbet' || t === 'internal_drawers' || t === 'external_drawers';
+}
+
+/**
+ * Hanging rod Y inside a partition zone. Paged blueprints flush inner width-dims
+ * (line at cellTop+22) on top of cell content — keep the rod below that layer.
+ */
+function _bpPartitionHangRodSvgY(zSvgTop, zSvgH, sc) {
+    const preferred = Math.max(_BP_HANG_ROD_BELOW_SHELF_CM * (sc || 1), 36);
+    const maxOff = Math.max(8, (zSvgH || 0) - 8);
+    return zSvgTop + Math.min(preferred, maxOff);
+}
+
 let _bpHoneycombSepQueue = null;
 
 function _bpHoneycombSepBegin() {
@@ -1049,14 +1084,14 @@ function _bpDrawPartitionZoneContent(p, zoneType, zoneStyle, x1, x2, zSvgTop, zS
     zoneStyle = zoneStyle || 'solid';
     const styleSuffix = _BP_DOOR_STYLE_SUFFIX[zoneStyle] || '';
     if (zoneType === 'hanging') {
-        const rodY = _bpHangRodSvgY(zSvgTop, sc);
+        const rodY = _bpPartitionHangRodSvgY(zSvgTop, zSvgH, sc);
         const rX1 = x1 + 4, rX2 = x2 - 4;
         if (rX2 > rX1) {
-            p.push(`<line x1="${rX1.toFixed(1)}" y1="${rodY.toFixed(1)}" x2="${rX2.toFixed(1)}" y2="${rodY.toFixed(1)}" stroke="${_BP_STROKE}" stroke-width="1.5"/>`);
-            p.push(`<circle cx="${rX1.toFixed(1)}" cy="${rodY.toFixed(1)}" r="1.5" fill="${_BP_STROKE}"/>`);
-            p.push(`<circle cx="${rX2.toFixed(1)}" cy="${rodY.toFixed(1)}" r="1.5" fill="${_BP_STROKE}"/>`);
+            p.push(`<line x1="${rX1.toFixed(1)}" y1="${rodY.toFixed(1)}" x2="${rX2.toFixed(1)}" y2="${rodY.toFixed(1)}" stroke="${_BP_STROKE}" stroke-width="2"/>`);
+            p.push(`<circle cx="${rX1.toFixed(1)}" cy="${rodY.toFixed(1)}" r="2" fill="${_BP_STROKE}"/>`);
+            p.push(`<circle cx="${rX2.toFixed(1)}" cy="${rodY.toFixed(1)}" r="2" fill="${_BP_STROKE}"/>`);
         }
-        if (zSvgH > 18) p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 20).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="10" fill="${_BP_STROKE}" opacity="0.6">תלייה</text>`);
+        if (zSvgH > 28) p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(rodY + 14).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="10" fill="${_BP_STROKE}" opacity="0.6">תלייה</text>`);
     } else if (zoneType === 'sorbet') {
         const rodY = zSvgTop + zSvgH * 0.25;
         const rX1 = x1 + 4, rX2 = x2 - 4;
@@ -1164,6 +1199,135 @@ function _bpDrawPartitionMergedDoors(p, comp, boundaryXs, rowBotCm, rowTopCm, co
         else if (_opensRight) openDir = 'right';
         _bpDrawPartitionZoneContent(p, group.type, group.style || 'solid', minX, maxX, minSvgTop, zSvgH, subZoneCX, subZoneW, openDir, sc);
     });
+}
+
+/**
+ * Front-elevation partition: walls, inner width dims, sub-cell shelves, hanging rods, drawers.
+ * vlineFn(x,y1,y2) / shelfLineFn(x1,y,x2) / dimHFn(x1,x2,y,lbl,above) / optional makeRectFn.
+ */
+function _bpDrawPartitionCell(p, ctx) {
+    const {
+        comp, col, wgW, colX, colW, cellY1, cellY2,
+        rowBotCm, rowTopCm, colBotSvgY, sc, ci, cols, viewKey, ri,
+        vlineFn, shelfLineFn, dimHFn, makeRectP, makeShelfP, font, stroke, strokeThin
+    } = ctx || {};
+    if (!p || !comp || !comp.partition || typeof vlineFn !== 'function') return;
+    const FONT = font || _BP_FONT;
+    const STROKE = stroke || _BP_STROKE;
+    const STROKE_THIN = strokeThin || _BP_STROKE_THIN;
+    const colList = cols || [];
+    const partitions = Array.isArray(comp.partitions) && comp.partitions.length > 0
+        ? comp.partitions
+        : [typeof comp.partitionX === 'number' ? comp.partitionX : 0.5];
+    const partT = state.thickness || 1.7;
+    const colWcm = (col && col.width) || wgW || 0;
+    const dimRowY = cellY1 + 22;
+    const cellHcm = rowTopCm - rowBotCm;
+    const boundaryXs = [colX, ...partitions.map(px => colX + colW * px), colX + colW];
+    partitions.forEach(px => {
+        vlineFn(colX + colW * px, cellY1, cellY2);
+    });
+    const numPartZones = boundaryXs.length - 1;
+    if (typeof dimHFn === 'function') {
+        for (let zi = 0; zi < numPartZones; zi++) {
+            const x1 = boundaryXs[zi];
+            const x2 = boundaryXs[zi + 1];
+            const zonePx = (zi === 0 ? 0 : partitions[zi - 1]);
+            const zoneEndPx = (zi === partitions.length ? 1 : partitions[zi]);
+            const zoneWmm = _bpPartitionZoneClearWidthMm(colWcm, zonePx, zoneEndPx, partT, zi, numPartZones);
+            if (x2 - x1 > 20) {
+                _bpMaybePushInnerWidthDim(p, viewKey, `partW:c${ci}r${ri}z${zi}`, x1, x2, dimRowY, `${zoneWmm}`, dimHFn, true);
+            }
+        }
+    }
+    if (!comp.subCells) return;
+    const tShelf = state.thickness || 1.7;
+    for (let zi = 0; zi < boundaryXs.length - 1; zi++) {
+        const x1 = boundaryXs[zi];
+        const x2 = boundaryXs[zi + 1];
+        const subZoneW = x2 - x1;
+        const subZoneCX = (x1 + x2) / 2;
+        const sub = comp.subCells[zi];
+        const numShelves = (sub && sub.shelves) || 0;
+        let shelfYcms = [];
+        if (numShelves > 0) {
+            if (Array.isArray(sub.shelvesY) && sub.shelvesY.length === numShelves) {
+                shelfYcms = sub.shelvesY.slice();
+            } else {
+                const zoneHcm = cellHcm / (numShelves + 1);
+                for (let s = 1; s <= numShelves; s++) shelfYcms.push(rowBotCm + zoneHcm * s);
+            }
+        }
+        const zoneBoundsCm = [rowBotCm, ...shelfYcms, rowTopCm];
+        const isSubHoney = sub && (sub.type === 'honeycomb' || sub.type === 'open_cell');
+        if (isSubHoney && typeof makeRectP === 'function' && typeof makeShelfP === 'function') {
+            const subNumRows = zoneBoundsCm.length - 1;
+            if (subNumRows > 0) {
+                _bpDrawHoneycombBlock(p, {
+                    block: { type: 'open_cell', startR: 0, endR: subNumRows - 1 },
+                    colX: x1, colW: x2 - x1, sc, colBotSvgY, rowBounds: zoneBoundsCm,
+                    ci, numCols: colList.length, boardFill: '#94a3b8', strokeThin: STROKE_THIN, stroke: STROKE, font: FONT,
+                    viewKey, dimKeyPrefix: `c${ci}r${ri}p${zi}`,
+                    makeRectFn: makeRectP, makeShelfFn: makeShelfP
+                });
+            }
+        } else if (numShelves > 0 && typeof shelfLineFn === 'function') {
+            for (const shelfYcm of shelfYcms) {
+                shelfLineFn(x1, colBotSvgY - shelfYcm * sc, x2);
+            }
+        }
+        for (let z = 0; z < zoneBoundsCm.length - 1; z++) {
+            const zBotCm = zoneBoundsCm[z];
+            const zTopCm = zoneBoundsCm[z + 1];
+            const zSvgBot = colBotSvgY - zBotCm * sc;
+            const zSvgTop = colBotSvgY - zTopCm * sc;
+            const zSvgH = zSvgBot - zSvgTop;
+            const zSvgCY = (zSvgBot + zSvgTop) / 2;
+            const zoneType = _bpPartitionInteriorType(sub, z);
+            const zoneStyle = (sub && Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[z])
+                ? sub.zonesDoorStyle[z] : 'solid';
+            const zoneKey = `${zi}:${z}`;
+            const inMergeGroup = (comp.zoneDoorGroups || []).some(g => g.keys.includes(zoneKey));
+            const isHoney = zoneType === 'honeycomb' || zoneType === 'open_cell' || zoneType === 'side_open_cell';
+            // Interior (hanging / drawers) always — same as 3D, even under a merged door
+            if (_bpPartitionIsInteriorContent(zoneType)) {
+                const _opensLeft = ci === 0;
+                const _opensRight = ci === colList.length - 1;
+                let openDir = 'left';
+                if (_opensLeft && _opensRight) openDir = (ci < colList.length / 2) ? 'left' : 'right';
+                else if (_opensLeft) openDir = 'left';
+                else if (_opensRight) openDir = 'right';
+                _bpDrawPartitionZoneContent(p, zoneType, zoneStyle, x1, x2, zSvgTop, zSvgH, subZoneCX, subZoneW, openDir, sc,
+                    (sub && Array.isArray(sub.zonesDrawerCount) && sub.zonesDrawerCount[z] > 0) ? sub.zonesDrawerCount[z] : ((sub && sub.count) || 0));
+            } else if (zoneType && zoneType !== 'empty' && !inMergeGroup && !isHoney) {
+                const _opensLeft = ci === 0;
+                const _opensRight = ci === colList.length - 1;
+                let openDir = 'left';
+                if (_opensLeft && _opensRight) openDir = (ci < colList.length / 2) ? 'left' : 'right';
+                else if (_opensLeft) openDir = 'left';
+                else if (_opensRight) openDir = 'right';
+                _bpDrawPartitionZoneContent(p, zoneType, zoneStyle, x1, x2, zSvgTop, zSvgH, subZoneCX, subZoneW, openDir, sc,
+                    (sub && Array.isArray(sub.zonesDrawerCount) && sub.zonesDrawerCount[z] > 0) ? sub.zonesDrawerCount[z] : ((sub && sub.count) || 0));
+            } else if (isHoney && !inMergeGroup && !isSubHoney && typeof makeRectP === 'function') {
+                if (zSvgH > 18) p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 14).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="10" fill="${STROKE}" opacity="0.6">כוורת</text>`);
+                _bpDrawHoneycombBlock(p, {
+                    block: { type: 'open_cell', startR: 0, endR: 0 },
+                    colX: x1, colW: x2 - x1, sc, colBotSvgY, rowBounds: [zBotCm, zTopCm],
+                    ci, numCols: colList.length, boardFill: '#94a3b8', strokeThin: STROKE_THIN, stroke: STROKE, font: FONT,
+                    viewKey, dimKeyPrefix: `c${ci}r${ri}p${zi}z${z}`,
+                    makeRectFn: makeRectP, makeShelfFn: makeShelfP
+                });
+            }
+            const zHcmRound = _bpClearCellHeightLabel(zBotCm, zTopCm, tShelf);
+            if (_bpIsHoneycombType(zoneType)) {
+                _bpMaybePushHoneycombInnerHeight(p, x1, zSvgTop, zSvgBot, zBotCm, zTopCm, sc, tShelf, viewKey, `c${ci}r${ri}p${zi}z${z}hcH`);
+            } else if (zSvgH > 14 && zHcmRound > 0) {
+                _bpPushCellDimLabel(p, viewKey, `c${ci}r${ri}p${zi}z${z}`, subZoneCX, zSvgCY + 4, zHcmRound,
+                    { x: x1, y: zSvgTop, w: x2 - x1, h: zSvgH });
+            }
+        }
+    }
+    _bpDrawPartitionMergedDoors(p, comp, boundaryXs, rowBotCm, rowTopCm, colBotSvgY, sc, ci, colList);
 }
 
 window._generateMultiViewBlueprintSVG = function() {
@@ -1867,105 +2031,17 @@ window._generateMultiViewBlueprintSVG = function() {
                     if (cellH > 18) p.push(`<text x="${cellCX.toFixed(1)}" y="${(cellY1 + 20).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.6">כוורת צד</text>`);
                 }
 
-                // Partition(s) (מחיצה) — dashed vertical lines + sub-cell width dims + sub-cell shelves
-                if (comp && comp.partition) {
-                    // Migrate legacy single partitionX → partitions array
-                    const partitions = Array.isArray(comp.partitions) && comp.partitions.length > 0
-                        ? comp.partitions
-                        : [typeof comp.partitionX === 'number' ? comp.partitionX : 0.5];
-                    const partT = state.thickness || 1.7;
-                    const colWcm = col.width || wg.w;
-                    const dimRowY = cellY1 + 22;
-                    const cellHcm = rowTopCm - rowBotCm;
-                    // Build boundary SVG X positions: [colX, partX0, partX1, ..., colX+colW]
-                    const boundaryXs = [colX, ...partitions.map(px => colX + colW * px), colX + colW];
-                    // Draw partition wall(s) with board thickness
-                    partitions.forEach(px => {
-                        const partSvgX = colX + colW * px;
-                        vline(partSvgX, cellY1, cellY2, sc);
-                    });
-                    // Width dim for each sub-zone (mm — clear opening, half partition on each inner edge)
-                    const _numPartZonesOld = boundaryXs.length - 1;
-                    for (let zi = 0; zi < _numPartZonesOld; zi++) {
-                        const x1 = boundaryXs[zi];
-                        const x2 = boundaryXs[zi + 1];
-                        const zonePx = (zi === 0 ? 0 : partitions[zi - 1]);
-                        const zoneEndPx = (zi === partitions.length ? 1 : partitions[zi]);
-                        const zoneWmm = _bpPartitionZoneClearWidthMm(colWcm, zonePx, zoneEndPx, partT, zi, _numPartZonesOld);
-                        if (x2 - x1 > 20) _bpMaybePushInnerWidthDim(p, _bpViewKey, `partW:c${ci}r${ri}z${zi}`, x1, x2, dimRowY, `${zoneWmm}`, dimH, true);
-                    }
-                    // Sub-cell shelves + content labels + zone heights
-                    if (comp.subCells) {
-                        for (let zi = 0; zi < boundaryXs.length - 1; zi++) {
-                            const x1 = boundaryXs[zi];
-                            const x2 = boundaryXs[zi + 1];
-                            const subZoneW = x2 - x1;
-                            const subZoneCX = (x1 + x2) / 2;
-                            const sub = comp.subCells[zi];
-                            const numShelves = (sub && sub.shelves) || 0;
-
-                            // Build shelf Y positions in cm (relative to rowBotCm)
-                            let shelfYcms = [];
-                            if (numShelves > 0) {
-                                if (Array.isArray(sub.shelvesY) && sub.shelvesY.length === numShelves) {
-                                    // Use stored positions (in 3D units = cm)
-                                    const baseY3d = rowBotCm; // prevY in 3D ≈ rowBotCm
-                                    shelfYcms = sub.shelvesY.map(sy => sy);
-                                } else {
-                                    const zoneHcm = cellHcm / (numShelves + 1);
-                                    for (let s = 1; s <= numShelves; s++) shelfYcms.push(rowBotCm + zoneHcm * s);
-                                }
-                                // Draw shelf lines
-                                for (const shelfYcm of shelfYcms) {
-                                    const shelfSvgY = _colBotY - shelfYcm * sc;
-                                    shelfLine(x1, shelfSvgY, x2, sc);
-                                }
-                            }
-
-                            // Zone bounds in SVG Y (top = smaller Y, bottom = larger Y in SVG)
-                            const zoneBoundsCm = [rowBotCm, ...shelfYcms, rowTopCm];
-                            for (let z = 0; z < zoneBoundsCm.length - 1; z++) {
-                                const zBotCm = zoneBoundsCm[z];
-                                const zTopCm = zoneBoundsCm[z + 1];
-                                const zHcm = zTopCm - zBotCm;
-                                const zSvgBot = _colBotY - zBotCm * sc;
-                                const zSvgTop = _colBotY - zTopCm * sc;
-                                const zSvgH = zSvgBot - zSvgTop;
-                                const zSvgCY = (zSvgBot + zSvgTop) / 2;
-
-                                // Zone content type
-                                const zoneType = (sub && Array.isArray(sub.zonesType) && sub.zonesType[z])
-                                    ? sub.zonesType[z]
-                                    : (sub && sub.type ? sub.type : 'empty');
-                                const zoneStyle = (sub && Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[z])
-                                    ? sub.zonesDoorStyle[z] : 'solid';
-                                const zoneKey = `${zi}:${z}`;
-                                const inMergeGroup = (comp.zoneDoorGroups || []).some(g => g.keys.includes(zoneKey));
-
-                                if (zoneType && zoneType !== 'empty' && !inMergeGroup) {
-                                    const _opensLeft = ci === 0;
-                                    const _opensRight = ci === cols.length - 1;
-                                    let openDir = 'left';
-                                    if (_opensLeft && _opensRight) openDir = (ci < cols.length / 2) ? 'left' : 'right';
-                                    else if (_opensLeft) openDir = 'left';
-                                    else if (_opensRight) openDir = 'right';
-                                    _bpDrawPartitionZoneContent(p,zoneType, zoneStyle, x1, x2, zSvgTop, zSvgH, subZoneCX, subZoneW, openDir, sc,
-                                        (sub && Array.isArray(sub.zonesDrawerCount) && sub.zonesDrawerCount[z] > 0) ? sub.zonesDrawerCount[z] : ((sub && sub.count) || 0));
-                                }
-
-                                // Zone height label
-                                const zHcmRound = _bpClearCellHeightLabel(zBotCm, zTopCm, _t_shelf);
-                                if (_bpIsHoneycombType(zoneType)) {
-                                    _bpMaybePushHoneycombInnerHeight(p, x1, zSvgTop, zSvgBot, zBotCm, zTopCm, sc, _t_shelf, _bpViewKey, `c${ci}r${ri}p${zi}z${z}hcH`);
-                                } else if (zSvgH > 14 && zHcmRound > 0) {
-                                    _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}p${zi}z${z}`, subZoneCX, zSvgCY + 4, zHcmRound,
-                                        { x: x1, y: zSvgTop, w: x2 - x1, h: zSvgH });
-                                }
-                            }
-                        }
-                        _bpDrawPartitionMergedDoors(p,comp, boundaryXs, rowBotCm, rowTopCm, _colBotY, sc, ci, cols);
-                    }
-                }
+                // Partition(s) (מחיצה) — walls + hanging rods + drawers in each sub-cell
+                _bpDrawPartitionCell(p, {
+                    comp, col, wgW: wg.w, colX, colW, cellY1, cellY2,
+                    rowBotCm, rowTopCm, colBotSvgY: _colBotY, sc, ci, cols,
+                    viewKey: _bpViewKey, ri, font: FONT, stroke: STROKE, strokeThin: STROKE_THIN,
+                    vlineFn: function(x, y1, y2) { vline(x, y1, y2, sc); },
+                    shelfLineFn: function(x1, y, x2) { shelfLine(x1, y, x2, sc); },
+                    dimHFn: dimH,
+                    makeRectP: function(pp, x, y, w, h, fill, stroke, sw) { rect(x, y, w, h, fill, stroke, sw); },
+                    makeShelfP: function(pp, x1, sy, x2, scc, tCm, showLabel) { shelfLine(x1, sy, x2, scc, tCm, showLabel); }
+                });
 
                 // Per-cell height: small text label INSIDE the cell (centered)
                 // Skip label for cells that fall within the split band
@@ -2945,124 +3021,17 @@ window._generateMultiViewBlueprintPages = function() {
                     if (cellH > 18) p.push(`<text x="${cellCX.toFixed(1)}" y="${(cellY1 + 20).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.6">כוורת צד</text>`);
                 }
 
-                // Partition(s) (מחיצה) — dashed vertical lines + sub-cell width dims + sub-cell shelves
-                if (comp && comp.partition) {
-                    // Migrate legacy single partitionX → partitions array
-                    const partitions = Array.isArray(comp.partitions) && comp.partitions.length > 0
-                        ? comp.partitions
-                        : [typeof comp.partitionX === 'number' ? comp.partitionX : 0.5];
-                    const partT = state.thickness || 1.7;
-                    const colWcm = col.width || wg.w;
-                    const dimRowY = cellY1 + 22;
-                    const cellHcm = rowTopCm - rowBotCm;
-                    // Build boundary SVG X positions: [colX, partX0, partX1, ..., colX+colW]
-                    const boundaryXs = [colX, ...partitions.map(px => colX + colW * px), colX + colW];
-                    // Draw partition wall(s) with board thickness
-                    partitions.forEach(px => {
-                        const partSvgX = colX + colW * px;
-                        makeVline(p, partSvgX, cellY1, cellY2, sc);
-                    });
-                    // Width dim for each sub-zone (mm — clear opening, half partition on each inner edge)
-                    const _numPartZones = boundaryXs.length - 1;
-                    for (let zi = 0; zi < _numPartZones; zi++) {
-                        const x1 = boundaryXs[zi];
-                        const x2 = boundaryXs[zi + 1];
-                        const zonePx = (zi === 0 ? 0 : partitions[zi - 1]);
-                        const zoneEndPx = (zi === partitions.length ? 1 : partitions[zi]);
-                        const zoneWmm = _bpPartitionZoneClearWidthMm(colWcm, zonePx, zoneEndPx, partT, zi, _numPartZones);
-                        if (x2 - x1 > 20) _bpMaybePushInnerWidthDim(p, _bpViewKey, `partW:c${ci}r${ri}z${zi}`, x1, x2, dimRowY, `${zoneWmm}`, (ax1, ax2, ay, albl, aabove) => makeDimH(p, ax1, ax2, ay, albl, aabove), true);
-                    }
-                    // Sub-cell shelves + content labels + zone heights
-                    if (comp.subCells) {
-                        for (let zi = 0; zi < boundaryXs.length - 1; zi++) {
-                            const x1 = boundaryXs[zi];
-                            const x2 = boundaryXs[zi + 1];
-                            const subZoneW = x2 - x1;
-                            const subZoneCX = (x1 + x2) / 2;
-                            const sub = comp.subCells[zi];
-                            const numShelves = (sub && sub.shelves) || 0;
-
-                            // Build shelf Y positions in cm
-                            let shelfYcms = [];
-                            if (numShelves > 0) {
-                                if (Array.isArray(sub.shelvesY) && sub.shelvesY.length === numShelves) {
-                                    shelfYcms = sub.shelvesY.slice();
-                                } else {
-                                    const zoneHcm = cellHcm / (numShelves + 1);
-                                    for (let s = 1; s <= numShelves; s++) shelfYcms.push(rowBotCm + zoneHcm * s);
-                                }
-                            }
-                            const zoneBoundsCm = [rowBotCm, ...shelfYcms, rowTopCm];
-                            const isSubHoney = sub && (sub.type === 'honeycomb' || sub.type === 'open_cell');
-                            if (isSubHoney) {
-                                const subNumRows = zoneBoundsCm.length - 1;
-                                if (subNumRows > 0) {
-                                    _bpDrawHoneycombBlock(p, {
-                                        block: { type: 'open_cell', startR: 0, endR: subNumRows - 1 },
-                                        colX: x1, colW: x2 - x1, sc, colBotSvgY: _colBotSvgY, rowBounds: zoneBoundsCm,
-                                        ci, numCols: cols.length, boardFill: '#94a3b8', strokeThin: STROKE_THIN, stroke: STROKE, font: FONT,
-                                        viewKey: _bpViewKey, dimKeyPrefix: `c${ci}r${ri}p${zi}`,
-                                        makeRectFn: makeRect, makeShelfFn: makeShelfLine
-                                    });
-                                }
-                            } else if (numShelves > 0) {
-                                for (const shelfYcm of shelfYcms) {
-                                    const shelfSvgY = _colBotSvgY - shelfYcm * sc;
-                                    makeShelfLine(p, x1, shelfSvgY, x2, sc);
-                                }
-                            }
-
-                            // Zone bounds in SVG Y
-                            for (let z = 0; z < zoneBoundsCm.length - 1; z++) {
-                                const zBotCm = zoneBoundsCm[z];
-                                const zTopCm = zoneBoundsCm[z + 1];
-                                const zHcm = zTopCm - zBotCm;
-                                const zSvgBot = _colBotSvgY - zBotCm * sc;
-                                const zSvgTop = _colBotSvgY - zTopCm * sc;
-                                const zSvgH = zSvgBot - zSvgTop;
-                                const zSvgCY = (zSvgBot + zSvgTop) / 2;
-
-                                // Zone content type
-                                const zoneType = (sub && Array.isArray(sub.zonesType) && sub.zonesType[z])
-                                    ? sub.zonesType[z]
-                                    : (sub && sub.type ? sub.type : 'empty');
-                                const zoneStyle = (sub && Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[z])
-                                    ? sub.zonesDoorStyle[z] : 'solid';
-                                const zoneKey = `${zi}:${z}`;
-                                const inMergeGroup = (comp.zoneDoorGroups || []).some(g => g.keys.includes(zoneKey));
-
-                                if (zoneType && zoneType !== 'empty' && !inMergeGroup
-                                    && zoneType !== 'honeycomb' && zoneType !== 'open_cell' && zoneType !== 'side_open_cell') {
-                                    const _opensLeft = ci === 0;
-                                    const _opensRight = ci === cols.length - 1;
-                                    let openDir = 'left';
-                                    if (_opensLeft && _opensRight) openDir = (ci < cols.length / 2) ? 'left' : 'right';
-                                    else if (_opensLeft) openDir = 'left';
-                                    else if (_opensRight) openDir = 'right';
-                                    _bpDrawPartitionZoneContent(p,zoneType, zoneStyle, x1, x2, zSvgTop, zSvgH, subZoneCX, subZoneW, openDir, sc,
-                                        (sub && Array.isArray(sub.zonesDrawerCount) && sub.zonesDrawerCount[z] > 0) ? sub.zonesDrawerCount[z] : ((sub && sub.count) || 0));
-                                } else if ((zoneType === 'honeycomb' || zoneType === 'open_cell') && !inMergeGroup) {
-                                    if (zSvgH > 18) p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 14).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="10" fill="${STROKE}" opacity="0.6">כוורת</text>`);
-                                    _bpDrawHoneycombBlock(p, {
-                                        block: { type: 'open_cell', startR: 0, endR: 0 },
-                                        colX: x1, colW: x2 - x1, sc, colBotSvgY: _colBotSvgY, rowBounds: [zBotCm, zTopCm],
-                                        ci, numCols: cols.length, boardFill: '#94a3b8', strokeThin: STROKE_THIN, stroke: STROKE, font: FONT,
-                                        viewKey: _bpViewKey, dimKeyPrefix: `c${ci}r${ri}p${zi}z${z}`,
-                                        makeRectFn: makeRect, makeShelfFn: makeShelfLine
-                                    });
-                                }
-
-                                // Zone height label
-                                const zHcmRound = _bpClearCellHeightLabel(zBotCm, zTopCm, _t_shelf2);
-                                if (zSvgH > 14 && zHcmRound > 0 && !_bpIsHoneycombType(zoneType)) {
-                                    _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}p${zi}z${z}`, subZoneCX, zSvgCY + 4, zHcmRound,
-                                        { x: x1, y: zSvgTop, w: x2 - x1, h: zSvgH });
-                                }
-                            }
-                        }
-                        _bpDrawPartitionMergedDoors(p,comp, boundaryXs, rowBotCm, rowTopCm, _colBotSvgY, sc, ci, cols);
-                    }
-                }
+                // Partition(s) (מחיצה) — walls + hanging rods + drawers in each sub-cell
+                _bpDrawPartitionCell(p, {
+                    comp, col, wgW: wg.w, colX, colW, cellY1, cellY2,
+                    rowBotCm, rowTopCm, colBotSvgY: _colBotSvgY, sc, ci, cols,
+                    viewKey: _bpViewKey, ri, font: FONT, stroke: STROKE, strokeThin: STROKE_THIN,
+                    vlineFn: function(x, y1, y2) { makeVline(p, x, y1, y2, sc); },
+                    shelfLineFn: function(x1, y, x2) { makeShelfLine(p, x1, y, x2, sc); },
+                    dimHFn: function(ax1, ax2, ay, albl, aabove) { makeDimH(p, ax1, ax2, ay, albl, aabove); },
+                    makeRectP: makeRect,
+                    makeShelfP: makeShelfLine
+                });
 
                 // Skip height label for cells that fall within the split band
                 // For bathroom preset: skip all internal cell height labels
@@ -3609,12 +3578,24 @@ window._generateMultiViewBlueprintPages = function() {
                     }
                 }
 
+                _bpDrawPartitionCell(p, {
+                    comp, col, wgW: wg.w, colX, colW, cellY1, cellY2,
+                    rowBotCm, rowTopCm, colBotSvgY: oy + dH, sc, ci, cols,
+                    viewKey: _bpViewKey, ri, font: FONT, stroke: STROKE, strokeThin: STROKE_THIN,
+                    vlineFn: function(x, y1, y2) { makeVline(p, x, y1, y2, sc); },
+                    shelfLineFn: function(x1, y, x2) { makeShelfLine(p, x1, y, x2, sc); },
+                    dimHFn: function(ax1, ax2, ay, albl, aabove) { makeDimH(p, ax1, ax2, ay, albl, aabove); },
+                    makeRectP: makeRect,
+                    makeShelfP: makeShelfLine
+                });
+
                 // Skip height label for split band cells
                 const _isSplitBandFC = _splitYFC > 0 &&
                     rowBotCm >= _splitYFCAdj - 0.1 && rowTopCm <= _splitTopFCAdj + 0.1;
+                const _hasPartFC = !!(comp && comp.partition && Array.isArray(comp.subCells) && comp.subCells.length);
                 if (_bpIsHoneycombType(cellType)) {
                     _bpMaybePushHoneycombInnerHeight(p, colX, cellY1, cellY2, rowBotCm, rowTopCm, sc, _t_shelfFCW, _bpViewKey, `c${ci}r${ri}hcH`);
-                } else if (cellHeightLabel > 0 && cellH > 14 && !_isSplitBandFC) {
+                } else if (cellHeightLabel > 0 && cellH > 14 && !_isSplitBandFC && !_hasPartFC) {
                     const lblCX = colX + colW / 2;
                     const lblCY = (cellY1 + cellY2) / 2 + 4;
                     _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, lblCX, lblCY, cellHeightLabel,
@@ -3871,11 +3852,23 @@ window._generateMultiViewBlueprintPages = function() {
                             if (cellH > 18) p.push(`<text x="${cellCX.toFixed(1)}" y="${(cellY1+20).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.6">כוורת</text>`);
                         }
 
+                        _bpDrawPartitionCell(p, {
+                            comp, col, wgW: scW, colX, colW, cellY1, cellY2,
+                            rowBotCm, rowTopCm, colBotSvgY: oy + dH, sc: scScale, ci, cols,
+                            viewKey: _bpViewKey, ri, font: FONT, stroke: STROKE, strokeThin: STROKE_THIN,
+                            vlineFn: function(x, y1, y2) { makeVline(p, x, y1, y2, scScale); },
+                            shelfLineFn: function(x1, y, x2) { makeShelfLine(p, x1, y, x2, scScale); },
+                            dimHFn: function(ax1, ax2, ay, albl, aabove) { makeDimH(p, ax1, ax2, ay, albl, aabove); },
+                            makeRectP: makeRect,
+                            makeShelfP: makeShelfLine
+                        });
+
                         const _isSplitBandSC = _splitYSC > 0 &&
                             rowBotCm >= _splitYSCAdj - 0.1 && rowTopCm <= _splitTopSCAdj + 0.1;
+                        const _hasPartSC = !!(comp && comp.partition && Array.isArray(comp.subCells) && comp.subCells.length);
                         if (_bpIsHoneycombType(cellType)) {
                             _bpMaybePushHoneycombInnerHeight(p, colX, cellY1, cellY2, rowBotCm, rowTopCm, scScale, _t_shelfSC, _bpViewKey, `c${ci}r${ri}hcH`);
-                        } else if (cellHeightLabel > 0 && cellH > 14 && !_isSplitBandSC) {
+                        } else if (cellHeightLabel > 0 && cellH > 14 && !_isSplitBandSC && !_hasPartSC) {
                             _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, cellCX, (cellY1 + cellY2) / 2 + 4, cellHeightLabel,
                                 { x: colX, y: cellY1, w: colW, h: cellH });
                         }
@@ -4281,9 +4274,20 @@ window._generateMultiViewBlueprintPages = function() {
                     if (cellH > 18) p.push(`<text x="${cellCX.toFixed(1)}" y="${(cellY1+20).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.6">כוורת</text>`);
                 }
 
+                _bpDrawPartitionCell(p, {
+                    comp, col, wgW: uuW, colX, colW, cellY1, cellY2,
+                    rowBotCm, rowTopCm, colBotSvgY: oy + dH, sc, ci, cols: uuCols,
+                    viewKey: _bpViewKey, ri, font: FONT, stroke: STROKE, strokeThin: STROKE_THIN,
+                    vlineFn: function(x, y1, y2) { makeVline(p, x, y1, y2, sc); },
+                    shelfLineFn: function(x1, y, x2) { makeShelfLine(p, x1, y, x2, sc); },
+                    dimHFn: function(ax1, ax2, ay, albl, aabove) { makeDimH(p, ax1, ax2, ay, albl, aabove); },
+                    makeRectP: makeRect,
+                    makeShelfP: makeShelfLine
+                });
+
                 if (_bpIsHoneycombType(cellType)) {
                     _bpMaybePushHoneycombInnerHeight(p, colX, cellY1, cellY2, rowBotCm, rowTopCm, sc, _t_shelfUU, _bpViewKey, `c${ci}r${ri}hcH`);
-                } else if (cellHeightLabel > 0 && cellH > 14) {
+                } else if (cellHeightLabel > 0 && cellH > 14 && !(comp && comp.partition && Array.isArray(comp.subCells) && comp.subCells.length)) {
                     _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, cellCX, (cellY1 + cellY2) / 2 + 4, cellHeightLabel,
                         { x: colX, y: cellY1, w: colW, h: cellH });
                 }
