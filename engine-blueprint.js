@@ -267,6 +267,26 @@ function _bpDrawCornerDeskFrontParts(p, cu, ox, oy, dW, dH, sc, STROKE, STROKE_T
     p.push(`<text x="${midX.toFixed(1)}" y="${(deskBotY + 56).toFixed(1)}" text-anchor="middle" font-family="${FONT || 'Rubik,Tahoma,sans-serif'}" font-size="12" fill="${STROKE}" opacity="0.75">עומק (לאורך הארון): ${_bpMm(cuD)} מ"מ</text>`);
 }
 
+/**
+ * Front-elevation span of the corner unit (desk/drawers) on the main cabinet face.
+ * Last-column SVG width is leftover-to-outer-wall (wg.w vs sum of col.widths), so
+ * `depth * sc` from ox+dW looks narrower than the column even when both are 55cm.
+ * Map along-cabinet depth onto that column's actual slot instead.
+ */
+function _bpCornerFrontOverlaySpan(colXPositions, ox, dW, sc, cuSide, cuDcm) {
+    const n = colXPositions && colXPositions.length;
+    const cp = n ? (cuSide === 'right' ? colXPositions[n - 1] : colXPositions[0]) : null;
+    const fallbackW = Math.max(+cuDcm || 0, 0) * sc;
+    if (!cp || !(cp.x2 > cp.x1)) {
+        return { x: cuSide === 'right' ? (ox + dW - fallbackW) : ox, w: fallbackW };
+    }
+    const slotW = cp.x2 - cp.x1;
+    const colCm = (cp.wCm > 0.05) ? cp.wCm : (slotW / Math.max(sc, 0.001));
+    const frac = colCm > 0.05 ? Math.min(Math.max((+cuDcm || 0) / colCm, 0), 1) : 1;
+    const w = Math.max(slotW * frac, 0);
+    return { x: cuSide === 'right' ? (cp.x2 - w) : cp.x1, w };
+}
+
 /** Side cabinet silhouette on center front view */
 function _bpDrawSideCabinetFrontParts(p, sc, ox, oy, dW, dH, scScale, wgH, pH, drawRectFn, dimHFn, STROKE, FONT) {
     if (!sc) return;
@@ -3169,10 +3189,11 @@ window._generateMultiViewBlueprintPages = function() {
                 const cuHfv = state.corner.height || 90;
                 const cuDfv = state.corner.depth || cD;
                 const cuLabelfv = state.corner.type === 'desk' ? 'שולחן פינתי' : 'שידה פינתית';
-                // SVG coordinates: bottom-aligned, flush against left or right wall
-                const cuSvgW = cuDfv * sc;
+                // SVG coordinates: bottom-aligned to the end column slot (not depth*sc from ox+dW)
+                const cuSpan = _bpCornerFrontOverlaySpan(colXPositions, ox, dW, sc, cuSidefv, cuDfv);
+                const cuSvgW = cuSpan.w;
                 const cuSvgH = cuHfv * sc;
-                const cuSvgX = cuSidefv === 'right' ? (ox + dW - cuSvgW) : ox;
+                const cuSvgX = cuSpan.x;
                 const cuSvgY = oy + dH - cuSvgH;
                 // Semi-transparent yellow fill with amber dashed border
                 p.push(`<rect x="${cuSvgX.toFixed(1)}" y="${cuSvgY.toFixed(1)}" width="${cuSvgW.toFixed(1)}" height="${cuSvgH.toFixed(1)}" fill="#fef08a" fill-opacity="0.55" stroke="#b45309" stroke-width="1.5" stroke-dasharray="5,3"/>`);
