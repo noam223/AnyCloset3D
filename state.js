@@ -2666,6 +2666,18 @@ function _emptyCompartment() {
     return { type: 'empty', count: 2 };
 }
 
+function _honeycombBlockNoMergeRight(col, startR, endR) {
+    if (!col || !col.compartments) return false;
+    const s = Math.max(0, startR | 0);
+    const e = Math.max(s, endR | 0);
+    for (let r = s; r <= e; r++) {
+        const comp = col.compartments[r];
+        if (comp && (comp.type === 'open_cell' || comp.type === 'side_open_cell') && comp.honeycombNoMergeRight) return true;
+    }
+    return false;
+}
+window._honeycombBlockNoMergeRight = _honeycombBlockNoMergeRight;
+
 function _shiftDoorsInsert(col, at) {
     if (!col.doors) return;
     col.doors.forEach(d => {

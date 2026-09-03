@@ -472,6 +472,31 @@ window._rebuildDoorPanelTabs = function() {
     container.innerHTML = html;
 };
 
+window._toggleHoneycombColumnMerge = function(leftColIdx, startR, endR) {
+    const col = state.columns && state.columns[leftColIdx];
+    if (!col || !col.compartments) return;
+    const s = Math.max(0, startR | 0);
+    const e = Math.max(s, endR | 0);
+    let currentlySplit = false;
+    for (let r = s; r <= e; r++) {
+        const comp = col.compartments[r];
+        if (comp && (comp.type === 'open_cell' || comp.type === 'side_open_cell') && comp.honeycombNoMergeRight) {
+            currentlySplit = true;
+            break;
+        }
+    }
+    const nextSplit = !currentlySplit;
+    for (let r = s; r <= e; r++) {
+        const comp = col.compartments[r];
+        if (!comp || (comp.type !== 'open_cell' && comp.type !== 'side_open_cell')) continue;
+        if (nextSplit) comp.honeycombNoMergeRight = true;
+        else delete comp.honeycombNoMergeRight;
+    }
+    if (typeof buildCabinet === 'function') buildCabinet();
+    if (typeof calculatePrice === 'function') calculatePrice();
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+};
+
 function buildDimensionsAndButtonsUI() {
     dimLayer.innerHTML = '';
     buttonsLayer.innerHTML = '';
@@ -484,6 +509,7 @@ function buildDimensionsAndButtonsUI() {
         // isSubCellBtn and isCellSelectBtn entries are handled separately below — skip here
         if (d.isSubCellBtn) return;
         if (d.isCellSelectBtn) return;
+        if (d.isHoneycombMergeBtn) return;
 
         // ---- Column width label above each column (editable) ----
         if (d.isColWidth) {
@@ -871,6 +897,38 @@ function buildDimensionsAndButtonsUI() {
 
         dimLayer.appendChild(btn);
     });
+
+    if (!window._VIEWER_MODE) {
+        state.dimData.filter(d => d.isHoneycombMergeBtn).forEach(d => {
+            const btn = document.createElement('div');
+            btn.className = 'honeycomb-merge-btn';
+            btn.style.cssText = 'position:absolute;transform:translate(-50%,-50%);pointer-events:auto;z-index:6;';
+            btn.dataset.x3d = d.x;
+            btn.dataset.y3d = d.y;
+            const merged = !!d.merged;
+            btn.title = merged ? 'בטל איחוד כוורות' : 'אחד כוורות';
+            const bg = merged
+                ? 'linear-gradient(135deg,#f59e0b,#d97706)'
+                : 'linear-gradient(135deg,#0ea5e9,#0284c7)';
+            const shadow = merged
+                ? '0 2px 8px rgba(245,158,11,0.5)'
+                : '0 2px 8px rgba(14,165,233,0.5)';
+            const icon = merged ? 'fa-link-slash' : 'fa-link';
+            btn.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:' + bg + ';box-shadow:' + shadow + ';cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;"><i class="fa-solid ' + icon + '" style="font-size:0.78rem;color:white;pointer-events:none;"></i></div>';
+            const circle = btn.querySelector('div');
+            btn.addEventListener('mouseenter', function() { circle.style.transform = 'scale(1.16)'; });
+            btn.addEventListener('mouseleave', function() { circle.style.transform = 'scale(1)'; });
+            btn.addEventListener('pointerdown', function(e) { e.preventDefault(); e.stopPropagation(); });
+            btn.addEventListener('pointerup', function(e) { e.stopPropagation(); });
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (typeof window._toggleHoneycombColumnMerge === 'function') {
+                    window._toggleHoneycombColumnMerge(d.leftCol, d.startR, d.endR);
+                }
+            });
+            dimLayer.appendChild(btn);
+        });
+    }
 
     // Sub-cell + buttons: one per zone in partitioned cells (per-zone composite key "si:z")
     state.dimData.filter(d => d.isSubCellBtn).forEach(d => {
@@ -2498,7 +2556,7 @@ function updateOverlaysPosition() {
         return localPt.project(camera);
     };
 
-    document.querySelectorAll('.dim-container, .select-all-col-btn, .sub-cell-btn, .cell-select-btn').forEach(el => {
+    document.querySelectorAll('.dim-container, .select-all-col-btn, .sub-cell-btn, .cell-select-btn, .honeycomb-merge-btn').forEach(el => {
         const pos = projectWingPoint(parseFloat(el.dataset.x3d), parseFloat(el.dataset.y3d));
         let x = (pos.x * .5 + .5) * cw;
         let y = (-(pos.y * .5) + .5) * ch;
@@ -5386,7 +5444,7 @@ function _isCanvasOverlayUiTarget(el) {
     if (!el || !el.closest) return false;
     return !!el.closest(
         '#column-quick-edit, #full-corner-quick-edit, #bottom-floating-toolbar, #bed-toolbar, #room-props-row, #room-furniture-toolbar, #room-plan-layer, #btn-room-plan-view-toggle, ' +
-        '.drag-handle, .dim-container, .plus-btn, .fc-cell-btn, .select-all-col-btn, .cell-select-btn, .sub-cell-btn'
+        '.drag-handle, .dim-container, .plus-btn, .fc-cell-btn, .select-all-col-btn, .cell-select-btn, .sub-cell-btn, .honeycomb-merge-btn'
     );
 }
 

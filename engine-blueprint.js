@@ -928,7 +928,10 @@ function _bpOpenCellAbsRanges(col, wg, pH) {
     return blocks.map(b => ({
         type: b.type,
         bot: fo + rowBounds[b.startR],
-        top: fo + rowBounds[b.endR + 1]
+        top: fo + rowBounds[b.endR + 1],
+        noMergeRight: (typeof window._honeycombBlockNoMergeRight === 'function')
+            ? window._honeycombBlockNoMergeRight(col, b.startR, b.endR)
+            : false
     }));
 }
 
@@ -949,11 +952,19 @@ function _bpMarkBlockAdjacentMerges(block, rowBounds, fo, cols, ci, wg, pH) {
     block.mergeRight = false;
     if (ci > 0) {
         const leftRanges = _bpOpenCellAbsRanges(cols[ci - 1], wg, pH);
-        block.mergeLeft = _bpOpenCellRangesMatch(leftRanges, block.type, bot, top);
+        const leftMatch = (leftRanges || []).find(r =>
+            r.type === block.type &&
+            Math.abs(r.bot - bot) <= 0.5 &&
+            Math.abs(r.top - top) <= 0.5
+        );
+        block.mergeLeft = !!(leftMatch && !leftMatch.noMergeRight);
     }
     if (ci < cols.length - 1) {
         const rightRanges = _bpOpenCellAbsRanges(cols[ci + 1], wg, pH);
-        block.mergeRight = _bpOpenCellRangesMatch(rightRanges, block.type, bot, top);
+        const can = _bpOpenCellRangesMatch(rightRanges, block.type, bot, top);
+        const selfNo = (typeof window._honeycombBlockNoMergeRight === 'function') &&
+            window._honeycombBlockNoMergeRight(cols[ci], block.startR, block.endR);
+        block.mergeRight = can && !selfNo;
     }
     return block;
 }
@@ -965,6 +976,7 @@ function _bpOpenCellSepHolesSvg(leftCol, rightCol, wg, pH, oy, dH, sc) {
     const EPS = 0.5;
     const holes = [];
     leftRanges.forEach(L => {
+        if (L.noMergeRight) return;
         rightRanges.forEach(R => {
             if (L.type !== R.type) return;
             if (Math.abs(L.bot - R.bot) > EPS || Math.abs(L.top - R.top) > EPS) return;

@@ -3952,6 +3952,8 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                 if (rightB.type !== leftB.type) return;
                 if (Math.abs(leftB.bottomY - rightB.bottomY) > _OC_Y_EPS) return;
                 if (Math.abs(leftB.topY - rightB.topY) > _OC_Y_EPS) return;
+                if (typeof window._honeycombBlockNoMergeRight === 'function' &&
+                    window._honeycombBlockNoMergeRight(state.columns[c], leftB.startR, leftB.endR)) return;
                 leftB.mergeRight = true;
                 rightB.mergeLeft = true;
                 const holeBot = Math.max(leftB.bottomY, rightB.bottomY);
@@ -4629,6 +4631,29 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                     }
                 }
                 _ppPartId = '';
+            });
+        }
+
+        if (_isActiveWingBuild && !isBP && c < _cols.length - 1) {
+            (myBlocks || []).forEach(function(block) {
+                if (!block || (block.type !== 'open_cell' && block.type !== 'side_open_cell')) return;
+                const rightB = (columnBlocks[c + 1] || []).find(function(nb) {
+                    return nb.type === block.type &&
+                        Math.abs(nb.bottomY - block.bottomY) < _OC_Y_EPS &&
+                        Math.abs(nb.topY - block.topY) < _OC_Y_EPS;
+                });
+                if (!rightB) return;
+                const nextCol = _cols[c + 1];
+                const pairW = col.width + t + (nextCol ? nextCol.width : 0);
+                state.dimData.push({
+                    isHoneycombMergeBtn: true,
+                    leftCol: c,
+                    startR: block.startR,
+                    endR: block.endR,
+                    merged: !!block.mergeRight,
+                    x: currentX + pairW / 2,
+                    y: (block.bottomY + block.topY) / 2
+                });
             });
         }
 
