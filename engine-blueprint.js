@@ -880,6 +880,94 @@ function _bpHoneycombInnerSvgSpan(cp, sc, tCm) {
     return { x1, x2, lbl: `${_bpHoneycombInnerWidthMm(cp.wCm, tCm)}` };
 }
 
+/** Two lining boards (2 × thickness) — 3.4cm when t=1.7. Deducted from each outer side of a merged כוורת. */
+function _bpHoneycombOuterSideDeductionCm(tCm) {
+    return 2 * (tCm != null ? +tCm : (state.thickness || 1.7));
+}
+
+function _bpHoneycombMergesWithNext(cols, ci, wg, pH) {
+    if (!cols || ci < 0 || ci >= cols.length - 1) return false;
+    const left = _bpOpenCellAbsRanges(cols[ci], wg, pH);
+    const right = _bpOpenCellAbsRanges(cols[ci + 1], wg, pH);
+    return (left || []).some(L => !L.noMergeRight && _bpOpenCellRangesMatch(right, L.type, L.bot, L.top));
+}
+
+/** Last column index of a merged honeycomb run starting at `ci` for this block. */
+function _bpHoneycombMergedEndCi(cols, ci, block, rowBounds, fo, wg, pH) {
+    if (!cols || !block || ci == null) return ci;
+    let endCi = ci;
+    const bot = (+fo || 0) + rowBounds[block.startR];
+    const top = (+fo || 0) + rowBounds[block.endR + 1];
+    while (endCi < cols.length - 1) {
+        const leftRanges = _bpOpenCellAbsRanges(cols[endCi], wg, pH);
+        const leftMatch = (leftRanges || []).find(r =>
+            r.type === block.type &&
+            Math.abs(r.bot - bot) <= 0.5 &&
+            Math.abs(r.top - top) <= 0.5
+        );
+        if (!leftMatch || leftMatch.noMergeRight) break;
+        const rightRanges = _bpOpenCellAbsRanges(cols[endCi + 1], wg, pH);
+        if (!_bpOpenCellRangesMatch(rightRanges, block.type, bot, top)) break;
+        endCi++;
+    }
+    return endCi;
+}
+
+function _bpHoneycombMergedSvgWidth(cols, startCi, endCi, startX, sc, ox, dW, wgW) {
+    let x = startX;
+    let spanW = 0;
+    for (let k = startCi; k <= endCi; k++) {
+        const isLast = k === cols.length - 1;
+        const w = (isLast && ox != null && dW != null)
+            ? (ox + dW - x)
+            : (((cols[k] && cols[k].width != null) ? cols[k].width : wgW) || 0) * sc;
+        spanW += w;
+        x += w;
+    }
+    return spanW;
+}
+
+function _bpHoneycombBlockAtRow(blocks, ri) {
+    if (!blocks) return null;
+    for (let i = 0; i < blocks.length; i++) {
+        const b = blocks[i];
+        if (b && ri >= b.startR && ri <= b.endR) return b;
+    }
+    return null;
+}
+
+/** One inner-width dim per honeycomb run. Merged columns: (sum of widths) − 3.4cm from each outer side. */
+function _bpPushHoneycombInnerWidthDims(p, viewKey, cols, colXPositions, sc, tCm, y, makeDimHFn, wg, pH) {
+    const t = tCm != null ? +tCm : (state.thickness || 1.7);
+    const sideCm = _bpHoneycombOuterSideDeductionCm(t);
+    const tPx = t * sc;
+    const n = (cols || []).length;
+    const used = [];
+    for (let ci = 0; ci < n; ci++) {
+        if (used[ci] || !_bpColumnHasHoneycomb(cols[ci])) continue;
+        let end = ci;
+        while (end < n - 1 && _bpHoneycombMergesWithNext(cols, end, wg, pH)) end++;
+        for (let k = ci; k <= end; k++) used[k] = true;
+        const left = colXPositions[ci];
+        const right = colXPositions[end];
+        if (!left || !right) continue;
+        if (end === ci) {
+            const inner = _bpHoneycombInnerSvgSpan(left, sc, t);
+            if (inner) _bpMaybePushInnerWidthDim(p, viewKey, 'hcInnerW:c' + ci, inner.x1, inner.x2, y, inner.lbl, makeDimHFn, false);
+            continue;
+        }
+        let sumW = 0;
+        for (let k = ci; k <= end; k++) sumW += (colXPositions[k].wCm || 0);
+        const x1 = left.x1 + sideCm * sc;
+        const x2 = right.x2 - sideCm * sc;
+        if (x2 - x1 < 8) continue;
+        _bpMaybePushInnerWidthDim(
+            p, viewKey, 'hcInnerW:c' + ci + '-' + end,
+            x1, x2, y, `${_bpMm(sumW - 2 * sideCm)}`, makeDimHFn, false
+        );
+    }
+}
+
 function _bpHoneycombBlocksFromCompartments(compartments, numRows) {
     const blocks = [];
     let cur = null;
@@ -1005,6 +1093,18 @@ function _bpVlineWithHoles(drawVline, x, sepTopY, sepBotY, holes) {
     if (sepBotY - y > 1) drawVline(x, y, sepBotY);
 }
 
+/** Cover punched separator gaps so no residual mid-wall shows inside a merged כוורת. */
+function _bpCoverOpenCellSepHoles(p, x, holes, sc, fill) {
+    if (!p || !holes || !holes.length) return;
+    const tPx = (state.thickness || 1.7) * (sc || 1);
+    const pad = 1;
+    holes.forEach(h => {
+        const hgt = (+h.botSvg) - (+h.topSvg);
+        if (hgt < 1) return;
+        p.push(`<rect x="${(x - tPx / 2 - pad).toFixed(1)}" y="${(+h.topSvg).toFixed(1)}" width="${(tPx + pad * 2).toFixed(1)}" height="${hgt.toFixed(1)}" fill="${fill || '#ffffff'}" stroke="none"/>`);
+    });
+}
+
 function _bpIsHoneycombInternalShelf(blocks, rowBounds, syAdj) {
     for (let bi = 0; bi < blocks.length; bi++) {
         const b = blocks[bi];
@@ -1065,9 +1165,16 @@ function _bpPartitionHangRodSvgY(zSvgTop, zSvgH, sc) {
 }
 
 let _bpHoneycombSepQueue = null;
+let _bpHoneycombSepHolesClip = null;
 
 function _bpHoneycombSepBegin() {
     _bpHoneycombSepQueue = [];
+    _bpHoneycombSepHolesClip = [];
+}
+
+function _bpHoneycombSepAddHoles(x, holes) {
+    if (!_bpHoneycombSepHolesClip || !holes || !holes.length) return;
+    _bpHoneycombSepHolesClip.push({ x, holes });
 }
 
 function _bpHoneycombSepQueueLine(x, y1, y2, stroke) {
@@ -1075,23 +1182,53 @@ function _bpHoneycombSepQueueLine(x, y1, y2, stroke) {
     _bpHoneycombSepQueue.push({ x, y1, y2, stroke: stroke || _BP_STROKE });
 }
 
+function _bpHoneycombSepLineClipped(ln, clipEntries) {
+    if (!clipEntries || !clipEntries.length) return [{ y1: ln.y1, y2: ln.y2 }];
+    const xTol = 24; // SVG px — joint sep lines sit within half board of column X
+    let segs = [{ y1: ln.y1, y2: ln.y2 }];
+    clipEntries.forEach(entry => {
+        if (Math.abs(entry.x - ln.x) > xTol) return;
+        (entry.holes || []).forEach(h => {
+            const ht = Math.min(h.topSvg, h.botSvg);
+            const hb = Math.max(h.topSvg, h.botSvg);
+            const next = [];
+            segs.forEach(s => {
+                if (hb <= s.y1 || ht >= s.y2) { next.push(s); return; }
+                if (s.y1 < ht - 0.5) next.push({ y1: s.y1, y2: Math.min(s.y2, ht) });
+                if (s.y2 > hb + 0.5) next.push({ y1: Math.max(s.y1, hb), y2: s.y2 });
+            });
+            segs = next;
+        });
+    });
+    return segs.filter(s => s.y2 - s.y1 > 1);
+}
+
 function _bpHoneycombSepFlush(p) {
     if (!_bpHoneycombSepQueue || !_bpHoneycombSepQueue.length) {
         _bpHoneycombSepQueue = null;
+        _bpHoneycombSepHolesClip = null;
         return;
     }
+    const clips = _bpHoneycombSepHolesClip || [];
     _bpHoneycombSepQueue.forEach(ln => {
-        p.push(`<line x1="${ln.x.toFixed(1)}" y1="${ln.y1.toFixed(1)}" x2="${ln.x.toFixed(1)}" y2="${ln.y2.toFixed(1)}" stroke="${ln.stroke}" stroke-width="1" opacity="0.9"/>`);
+        _bpHoneycombSepLineClipped(ln, clips).forEach(seg => {
+            p.push(`<line x1="${ln.x.toFixed(1)}" y1="${seg.y1.toFixed(1)}" x2="${ln.x.toFixed(1)}" y2="${seg.y2.toFixed(1)}" stroke="${ln.stroke}" stroke-width="1" opacity="0.9"/>`);
+        });
     });
     _bpHoneycombSepQueue = null;
+    _bpHoneycombSepHolesClip = null;
 }
 
 function _bpDrawHoneycombBlock(p, ctx) {
     const {
         block, colX, colW, sc, colBotSvgY, rowBounds, ci, numCols,
         boardFill, strokeThin, stroke, font, makeRectFn, makeShelfFn,
-        viewKey, dimKeyPrefix
+        viewKey, dimKeyPrefix,
+        cols, wg, pH, fo, ox, dW, wgW
     } = ctx;
+    // Merged runs are drawn once from the leftmost column (same as 3D)
+    if (block && block.mergeLeft) return;
+
     const _hcViewKey = viewKey || 'center';
     const _hcKeyPrefix = dimKeyPrefix || ('c' + ci);
     const tCm = state.thickness || 1.7;
@@ -1104,8 +1241,22 @@ function _bpDrawHoneycombBlock(p, ctx) {
     const wallH = blockBotSvg - blockTopSvg;
     if (wallH < 2 || tPx < 0.4) return;
 
-    const leftCabInner = colX + tPx / 2;
-    const rightCabInner = colX + colW - tPx / 2;
+    let drawX = colX;
+    let drawW = colW;
+    let endCi = ci;
+    if (cols && block.mergeRight) {
+        endCi = _bpHoneycombMergedEndCi(cols, ci, block, rowBounds, fo || 0, wg, pH);
+        if (endCi > ci) {
+            const spanW = _bpHoneycombMergedSvgWidth(
+                cols, ci, endCi, colX, sc, ox, dW,
+                wgW != null ? wgW : (wg && wg.w)
+            );
+            if (spanW > drawW) drawW = spanW;
+        }
+    }
+
+    const leftCabInner = drawX + tPx / 2;
+    const rightCabInner = drawX + drawW - tPx / 2;
     const leftWallX1 = leftCabInner;
     const leftWallX2 = leftCabInner + tPx;
     const rightWallX1 = rightCabInner - tPx;
@@ -1124,7 +1275,7 @@ function _bpDrawHoneycombBlock(p, ctx) {
         _bpHoneycombSepQueueLine(x, blockTopSvg, blockBotSvg, stroke);
     };
 
-    // Top + bottom double boards (full frame width, like 3D open-cell lining)
+    // Top + bottom double boards (full merged frame width)
     const frameX1 = leftWallX1;
     const frameX2 = rightWallX2;
     const frameW = frameX2 - frameX1;
@@ -1144,12 +1295,11 @@ function _bpDrawHoneycombBlock(p, ctx) {
         }
     };
 
-    const openDir = block.type === 'side_open_cell' ? _bpSideOpenCellOpenDir(ci, numCols) : null;
-    const mergeLeft = !!block.mergeLeft;
-    const mergeRight = !!block.mergeRight;
-    // Skip shared walls when adjacent columns merge into one כוורת
-    if (!mergeLeft && (block.type === 'open_cell' || openDir !== 'left')) drawSideWall(leftWallX1, leftWallX2, true, leftCabInner);
-    if (!mergeRight && (block.type === 'open_cell' || openDir !== 'right')) drawSideWall(rightWallX1, rightWallX2, false, rightCabInner);
+    const openDirLeft = block.type === 'side_open_cell' ? _bpSideOpenCellOpenDir(ci, numCols) : null;
+    const openDirRight = block.type === 'side_open_cell' ? _bpSideOpenCellOpenDir(endCi, numCols) : null;
+    // Span already covers all merged columns — draw only outer lining walls
+    if (block.type === 'open_cell' || openDirLeft !== 'left') drawSideWall(leftWallX1, leftWallX2, true, leftCabInner);
+    if (block.type === 'open_cell' || openDirRight !== 'right') drawSideWall(rightWallX1, rightWallX2, false, rightCabInner);
 
     for (let ri = block.startR; ri < block.endR; ri++) {
         const shelfY = colBotSvgY - rowBounds[ri + 1] * sc;
@@ -1158,15 +1308,15 @@ function _bpDrawHoneycombBlock(p, ctx) {
 
     // Inner height of each cubby — gated by "הסתר מידות פנימיות"
     for (let ri = block.startR; ri <= block.endR; ri++) {
-        const botCm = rowBounds[ri];
-        const topCm = rowBounds[ri + 1];
-        if (botCm == null || topCm == null) continue;
+        const botCmR = rowBounds[ri];
+        const topCmR = rowBounds[ri + 1];
+        if (botCmR == null || topCmR == null) continue;
         const isStart = ri === block.startR;
         const isEnd = ri === block.endR;
-        const innerCm = _bpHoneycombCubbyInnerCm(botCm, topCm, tCm, isStart, isEnd);
+        const innerCm = _bpHoneycombCubbyInnerCm(botCmR, topCmR, tCm, isStart, isEnd);
         if (innerCm <= 0) continue;
-        let yTop = colBotSvgY - topCm * sc;
-        let yBot = colBotSvgY - botCm * sc;
+        let yTop = colBotSvgY - topCmR * sc;
+        let yBot = colBotSvgY - botCmR * sc;
         if (isEnd) yTop += tPx;
         if (isStart) yBot -= tPx;
         if (!isEnd) yTop += tPx / 2;
@@ -1975,6 +2125,7 @@ window._generateMultiViewBlueprintSVG = function() {
                 const sepBotY = Math.max(_colBotY, prevBotY);
                 const _sepHoles = _bpOpenCellSepHolesSvg(prevCol, col, wg, pH, oy, dH, sc);
                 _bpVlineWithHoles((x, y1, y2) => vline(x, y1, y2, sc), colX, sepTopY, sepBotY, _sepHoles);
+                if (_sepHoles && _sepHoles.length) _bpHoneycombSepAddHoles(colX, _sepHoles);
             }
 
             const _splitYOld = col.splitY || 0;
@@ -2131,9 +2282,13 @@ window._generateMultiViewBlueprintSVG = function() {
                         p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
                     }
                 } else if (cellType === 'open_cell') {
-                    if (cellH > 18) p.push(`<text x="${cellCX.toFixed(1)}" y="${(cellY1 + 20).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.6">כוורת</text>`);
+                    const _hcBlkLbl = _bpHoneycombBlockAtRow(_hcBlocksOld, ri);
+                    if (_hcBlkLbl) _bpMarkBlockAdjacentMerges(_hcBlkLbl, rowBoundsEarly, _fo, cols, ci, wg, colPlinthH);
+                    if (!(_hcBlkLbl && _hcBlkLbl.mergeLeft) && cellH > 18) p.push(`<text x="${cellCX.toFixed(1)}" y="${(cellY1 + 20).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.6">כוורת</text>`);
                 } else if (cellType === 'side_open_cell') {
-                    if (cellH > 18) p.push(`<text x="${cellCX.toFixed(1)}" y="${(cellY1 + 20).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.6">כוורת צד</text>`);
+                    const _hcBlkLbl2 = _bpHoneycombBlockAtRow(_hcBlocksOld, ri);
+                    if (_hcBlkLbl2) _bpMarkBlockAdjacentMerges(_hcBlkLbl2, rowBoundsEarly, _fo, cols, ci, wg, colPlinthH);
+                    if (!(_hcBlkLbl2 && _hcBlkLbl2.mergeLeft) && cellH > 18) p.push(`<text x="${cellCX.toFixed(1)}" y="${(cellY1 + 20).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.6">כוורת צד</text>`);
                 }
 
                 // Partition(s) (מחיצה) — walls + hanging rods + drawers in each sub-cell
@@ -2169,6 +2324,7 @@ window._generateMultiViewBlueprintSVG = function() {
                     block, colX, colW, sc, colBotSvgY: _colBotY, rowBounds: rowBoundsEarly, ci, numCols: cols.length,
                     boardFill: '#94a3b8', strokeThin: STROKE_THIN, stroke: STROKE, font: FONT,
                     viewKey: _bpViewKey,
+                    cols, wg, pH: colPlinthH, fo: _fo, ox, dW, wgW: wg.w,
                     makeRectFn: (pp, x, y, w, h, fill, stroke, sw) => rect(x, y, w, h, fill, stroke, sw),
                     makeShelfFn: (pp, x1, sy, x2, scc, tCm, showLabel) => shelfLine(x1, sy, x2, scc, tCm, showLabel)
                 });
@@ -2233,12 +2389,9 @@ window._generateMultiViewBlueprintSVG = function() {
         // Per-column width dims — placed just below the plinth bottom
         {
             const _tCmHC = state.thickness || 1.7;
+            _bpPushHoneycombInnerWidthDims(p, _bpViewKey, cols, colXPositions, sc, _tCmHC, _plinthBottomY + 6, dimH, wg, pH);
             colXPositions.forEach((cp, ci) => {
                 const col = cols[ci];
-                if (_bpColumnHasHoneycomb(col)) {
-                    const inner = _bpHoneycombInnerSvgSpan(cp, sc, _tCmHC);
-                    if (inner) _bpMaybePushInnerWidthDim(p, _bpViewKey, 'hcInnerW:c' + ci, inner.x1, inner.x2, _plinthBottomY + 6, inner.lbl, dimH, false);
-                }
                 if (_hasMultiCols || _bpColumnHasHoneycomb(col)) {
                     const faceY = (cp.colTopY != null) ? cp.colTopY : oy;
                     const faceH = (cp.colBotY != null && cp.colTopY != null) ? (cp.colBotY - cp.colTopY) : dH;
@@ -2960,6 +3113,7 @@ window._generateMultiViewBlueprintPages = function() {
                 const sepBotY = Math.max(_colBotSvgY, prevBotY2);
                 const _sepHoles2 = _bpOpenCellSepHolesSvg(prevCol, col, wg, pH, oy, dH, sc);
                 _bpVlineWithHoles((x, y1, y2) => makeVline(p, x, y1, y2, sc), colX, sepTopY, sepBotY, _sepHoles2);
+                if (_sepHoles2 && _sepHoles2.length) _bpHoneycombSepAddHoles(colX, _sepHoles2);
             }
 
             const shelvesArr = (col.shelvesY || []).slice().sort((a,b) => a-b);
@@ -3108,9 +3262,13 @@ window._generateMultiViewBlueprintPages = function() {
                         p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
                     }
                 } else if (cellType === 'open_cell') {
-                    if (cellH > 18) p.push(`<text x="${cellCX.toFixed(1)}" y="${(cellY1 + 20).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.6">כוורת</text>`);
+                    const _hcBlkLblP = _bpHoneycombBlockAtRow(_hcBlocks, ri);
+                    if (_hcBlkLblP) _bpMarkBlockAdjacentMerges(_hcBlkLblP, rowBounds, _fo2, cols, ci, wg, colPlinthH);
+                    if (!(_hcBlkLblP && _hcBlkLblP.mergeLeft) && cellH > 18) p.push(`<text x="${cellCX.toFixed(1)}" y="${(cellY1 + 20).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.6">כוורת</text>`);
                 } else if (cellType === 'side_open_cell') {
-                    if (cellH > 18) p.push(`<text x="${cellCX.toFixed(1)}" y="${(cellY1 + 20).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.6">כוורת צד</text>`);
+                    const _hcBlkLblP2 = _bpHoneycombBlockAtRow(_hcBlocks, ri);
+                    if (_hcBlkLblP2) _bpMarkBlockAdjacentMerges(_hcBlkLblP2, rowBounds, _fo2, cols, ci, wg, colPlinthH);
+                    if (!(_hcBlkLblP2 && _hcBlkLblP2.mergeLeft) && cellH > 18) p.push(`<text x="${cellCX.toFixed(1)}" y="${(cellY1 + 20).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.6">כוורת צד</text>`);
                 }
 
                 // Partition(s) (מחיצה) — walls + hanging rods + drawers in each sub-cell
@@ -3146,6 +3304,7 @@ window._generateMultiViewBlueprintPages = function() {
                     block, colX, colW, sc, colBotSvgY: _colBotSvgY, rowBounds, ci, numCols: cols.length,
                     boardFill: '#94a3b8', strokeThin: STROKE_THIN, stroke: STROKE, font: FONT,
                     viewKey: _bpViewKey,
+                    cols, wg, pH: colPlinthH, fo: _fo2, ox, dW, wgW: wg.w,
                     makeRectFn: makeRect, makeShelfFn: makeShelfLine
                 });
             });
@@ -3238,12 +3397,12 @@ window._generateMultiViewBlueprintPages = function() {
         );
         {
             const _tCmHC2 = state.thickness || 1.7;
+            _bpPushHoneycombInnerWidthDims(
+                p, _bpViewKey, cols, colXPositions, sc, _tCmHC2, _widthDimBaseY + 6,
+                (ax1, ax2, ay, albl, aabove) => makeDimH(p, ax1, ax2, ay, albl, aabove), wg, pH
+            );
             colXPositions.forEach((cp, ci) => {
                 const col = cols[ci];
-                if (_bpColumnHasHoneycomb(col)) {
-                    const inner = _bpHoneycombInnerSvgSpan(cp, sc, _tCmHC2);
-                    if (inner) _bpMaybePushInnerWidthDim(p, _bpViewKey, 'hcInnerW:c' + ci, inner.x1, inner.x2, _widthDimBaseY + 6, inner.lbl, (ax1, ax2, ay, albl, aabove) => makeDimH(p, ax1, ax2, ay, albl, aabove), false);
-                }
                 if (_hasMultiCols2 || _bpColumnHasHoneycomb(col)) {
                     const faceY = (cp.colTopY != null) ? cp.colTopY : oy;
                     const faceH = (cp.colBotY != null && cp.colTopY != null) ? (cp.colBotY - cp.colTopY) : dH;
@@ -3689,12 +3848,12 @@ window._generateMultiViewBlueprintPages = function() {
         makeDimH(p, ox, ox + dW, dimY, `${_bpMm(wg.w)}`);
         {
             const _tCmHCFc = state.thickness || 1.7;
+            _bpPushHoneycombInnerWidthDims(
+                p, _bpViewKey, cols, colXPositions, sc, _tCmHCFc, oy + dH + 6,
+                (ax1, ax2, ay, albl, aabove) => makeDimH(p, ax1, ax2, ay, albl, aabove), wg, pH
+            );
             colXPositions.forEach((cp, ci) => {
                 const col = cols[ci];
-                if (_bpColumnHasHoneycomb(col)) {
-                    const inner = _bpHoneycombInnerSvgSpan(cp, sc, _tCmHCFc);
-                    if (inner) _bpMaybePushInnerWidthDim(p, _bpViewKey, 'hcInnerW:c' + ci, inner.x1, inner.x2, oy + dH + 6, inner.lbl, (ax1, ax2, ay, albl, aabove) => makeDimH(p, ax1, ax2, ay, albl, aabove), false);
-                }
                 if (_hasMultiCols2 || _bpColumnHasHoneycomb(col)) {
                     _bpMaybePushColWidthDim(p, _bpViewKey, ci, cp.x1, cp.x2, oy + dH + 18,
                         `${_bpMm(cp.wCm)}`,
@@ -3961,12 +4120,13 @@ window._generateMultiViewBlueprintPages = function() {
                 makeDimH(p, ox, ox + dW, dimY, `${_bpMm(scW)}`);
                 {
                     const _tCmHCSc = state.thickness || 1.7;
+                    _bpPushHoneycombInnerWidthDims(
+                        p, _bpViewKey, cols, colXPositions, scScale, _tCmHCSc, _plinthBotYSC + 6,
+                        (ax1, ax2, ay, albl, aabove) => makeDimH(p, ax1, ax2, ay, albl, aabove),
+                        { w: scW }, scPH
+                    );
                     colXPositions.forEach((cp, ci) => {
                         const col = cols[ci];
-                        if (_bpColumnHasHoneycomb(col)) {
-                            const inner = _bpHoneycombInnerSvgSpan(cp, scScale, _tCmHCSc);
-                            if (inner) _bpMaybePushInnerWidthDim(p, _bpViewKey, 'hcInnerW:c' + ci, inner.x1, inner.x2, _plinthBotYSC + 6, inner.lbl, (ax1, ax2, ay, albl, aabove) => makeDimH(p, ax1, ax2, ay, albl, aabove), false);
-                        }
                         if (_hasMultiColsSC || _bpColumnHasHoneycomb(col)) {
                             _bpMaybePushColWidthDim(p, _bpViewKey, ci, cp.x1, cp.x2, _plinthBotYSC + 18,
                                 `${_bpMm(cp.wCm)}`,
@@ -4379,12 +4539,13 @@ window._generateMultiViewBlueprintPages = function() {
         makeDimH(p, ox, ox + dW, dimY, `${_bpMm(uuW)}`);
         {
             const _tCmHCUu = state.thickness || 1.7;
+            _bpPushHoneycombInnerWidthDims(
+                p, _bpViewKey, uuCols, colXPositions, sc, _tCmHCUu, oy + dH + 6,
+                (ax1, ax2, ay, albl, aabove) => makeDimH(p, ax1, ax2, ay, albl, aabove),
+                { w: uuW }, 0
+            );
             colXPositions.forEach((cp, ci) => {
                 const col = uuCols[ci];
-                if (_bpColumnHasHoneycomb(col)) {
-                    const inner = _bpHoneycombInnerSvgSpan(cp, sc, _tCmHCUu);
-                    if (inner) _bpMaybePushInnerWidthDim(p, _bpViewKey, 'hcInnerW:c' + ci, inner.x1, inner.x2, oy + dH + 6, inner.lbl, (ax1, ax2, ay, albl, aabove) => makeDimH(p, ax1, ax2, ay, albl, aabove), false);
-                }
                 if (_hasMultiColsUU || _bpColumnHasHoneycomb(col)) {
                     _bpMaybePushColWidthDim(p, _bpViewKey, ci, cp.x1, cp.x2, oy + dH + 18,
                         `${_bpMm(cp.wCm)}`,
