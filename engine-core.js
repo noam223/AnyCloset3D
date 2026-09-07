@@ -410,7 +410,8 @@ window._rebuildRoomExtraCabinets = function(rg) {
         columns: state.columns ? JSON.parse(JSON.stringify(state.columns)) : state.columns,
         desk: state.desk ? JSON.parse(JSON.stringify(state.desk)) : state.desk,
         partColors: state.partColors,
-        _activeUpperUnit: state._activeUpperUnit
+        _activeUpperUnit: state._activeUpperUnit,
+        ppScope: window._ppColorScope
     };
 
     props.forEach(function(prop) {
@@ -434,6 +435,9 @@ window._rebuildRoomExtraCabinets = function(rg) {
              'depth', 'thickness', 'plinthHeight', 'hasDoors', 'columns', 'desk'].forEach(function(k) {
                 if (rs[k] !== undefined) state[k] = rs[k];
             });
+
+            // Scope part-paint IDs to this cart item so shelves/boards don't share colors across cabinets
+            window._ppColorScope = 'cart' + prop.cartIndex;
 
             const g = new THREE.Group();
             g.name = prop.id || ('room-cab-' + prop.cartIndex);
@@ -474,6 +478,7 @@ window._rebuildRoomExtraCabinets = function(rg) {
     state.desk = saved.desk;
     state.partColors = saved.partColors;
     state._activeUpperUnit = saved._activeUpperUnit;
+    window._ppColorScope = saved.ppScope;
 
     rg.add(root);
     return root;

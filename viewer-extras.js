@@ -386,10 +386,14 @@ function enterCompare(idxA, idxB) {
 
     var groupA = new THREE.Group();
     var groupB = new THREE.Group();
+    var _cmpScope = window._ppColorScope;
     _loadCabWingsIntoState(idxA);
+    window._ppColorScope = 'cart' + idxA;
     if (typeof window.buildCabinetIntoGroup === 'function') window.buildCabinetIntoGroup(groupA);
     _loadCabWingsIntoState(idxB);
+    window._ppColorScope = 'cart' + idxB;
     if (typeof window.buildCabinetIntoGroup === 'function') window.buildCabinetIntoGroup(groupB);
+    window._ppColorScope = _cmpScope;
 
     var wA = (state.wings && state.wings.center && state.wings.center.width) || 160;
     // estimate widths from cart
