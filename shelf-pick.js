@@ -14,8 +14,8 @@
     const _raycaster = new THREE.Raycaster();
     const _mouse = new THREE.Vector2();
     const _worldPos = new THREE.Vector3();
-    const _hoverColor = new THREE.Color(0xfb923c);  // כתום (ריחוף)
-    const _selectColor = new THREE.Color(0xea580c); // כתום חזק יותר (בחירה)
+    const _hoverColor = new THREE.Color(0xc084fc);  // סגול בהיר (ריחוף)
+    const _selectColor = new THREE.Color(0xa855f7); // סגול (בחירה)
     const _HOVER_BLEND = 0.55;
     const _SELECT_BLEND = 0.72;
     const _HOVER_EMISSIVE = 0.4;
@@ -90,7 +90,7 @@
         return hitMesh;
     }
 
-    /** Orange tint + emissive glow (strong enough to read on wood textures). */
+    /** Purple tint + emissive glow (strong enough to read on wood textures). */
     function _applyHighlight(visual, color, blend, emissiveIntensity) {
         if (!visual || !visual.material) return;
         if (!_savedLooks.has(visual)) {
