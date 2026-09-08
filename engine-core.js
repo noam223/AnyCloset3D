@@ -2797,7 +2797,7 @@ function buildCabinet() {
         const _preset = state.presetId || 'linear';
         const _isLinearOrSliding = (_preset === 'linear' || _preset === 'sliding');
         const _spaceInfoRW = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
-        const _skipRoomWallForCompanion = !!(!_spaceInfoRW ? false : _spaceInfoRW.activeSlot === 1);
+        const _skipRoomWallForCompanion = !!(!_spaceInfoRW ? false : _spaceInfoRW.activeSlot !== 0);
         const _rw = (_isLinearOrSliding && !_skipRoomWallForCompanion) ? (window._roomWall || state.roomWall || 'center') : 'center';
 
         // Reset ceiling mesh tracking
@@ -3105,38 +3105,55 @@ window.buildCabinetIntoGroup = function(targetGroup) {
 };
 
 window._clearSpaceCompanion = function() {
-    const g = window._spaceCompanionGroup;
-    if (g && g.parent) g.parent.remove(g);
+    const groups = (window._spaceCompanionGroups && window._spaceCompanionGroups.length)
+        ? window._spaceCompanionGroups.slice()
+        : (window._spaceCompanionGroup ? [window._spaceCompanionGroup] : []);
+    groups.forEach(function(g) {
+        if (g && g.parent) g.parent.remove(g);
+    });
+    window._spaceCompanionGroups = [];
+    window._spaceCompanionHits = [];
     window._spaceCompanionGroup = null;
     window._spaceCompanionHit = null;
-    if (cabinetGroup && (!window._getSpacePairInfo || !window._getSpacePairInfo() || window._getSpacePairInfo().activeSlot !== 1)) {
+    const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
+    if (cabinetGroup && (!info || info.activeSlot === 0)) {
         cabinetGroup.position.y = 0;
+        if (info && info.activeSlot === 0) cabinetGroup.position.x = 0;
     }
 };
 
 window._applySpacePairPositions = function() {
     if (state.viewMode === 'blueprint') {
-        if (cabinetGroup) cabinetGroup.position.y = 0;
+        if (cabinetGroup) cabinetGroup.position.set(0, 0, 0);
         return;
     }
     const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
     if (!info) {
-        if (cabinetGroup) cabinetGroup.position.y = 0;
+        if (cabinetGroup) cabinetGroup.position.set(0, 0, 0);
         return;
     }
-    const slot1Item = state.orderCart[info.slot1Index];
-    const off = (typeof window._getSpaceOffset === 'function')
-        ? window._getSpaceOffset(slot1Item)
+    const activeOff = (typeof window._spaceOffsetForSlot === 'function')
+        ? window._spaceOffsetForSlot(info.activeSlot)
         : { x: 0, y: 0 };
-    if (info.activeSlot === 1) {
-        cabinetGroup.position.x = off.x;
-        cabinetGroup.position.y = off.y;
-        if (window._spaceCompanionGroup) window._spaceCompanionGroup.position.set(0, 0, 0);
-    } else {
-        cabinetGroup.position.y = 0;
-        if (window._spaceCompanionGroup) {
-            window._spaceCompanionGroup.position.set(off.x, off.y, 0);
-        }
+    if (cabinetGroup) {
+        cabinetGroup.position.x = activeOff.x;
+        cabinetGroup.position.y = activeOff.y;
+    }
+    const groups = window._spaceCompanionGroups || [];
+    groups.forEach(function(g) {
+        if (!g || g.userData.spaceSlot == null) return;
+        const off = (typeof window._spaceOffsetForSlot === 'function')
+            ? window._spaceOffsetForSlot(g.userData.spaceSlot)
+            : { x: 0, y: 0 };
+        g.position.set(off.x, off.y, 0);
+    });
+    // Legacy single-group fallback
+    if ((!groups.length) && window._spaceCompanionGroup) {
+        const otherSlot = info.otherSlot;
+        const off = (typeof window._spaceOffsetForSlot === 'function')
+            ? window._spaceOffsetForSlot(otherSlot)
+            : { x: 0, y: 0 };
+        window._spaceCompanionGroup.position.set(off.x, off.y, 0);
     }
 };
 
@@ -3147,8 +3164,7 @@ window._rebuildSpaceCompanion = function() {
         window._clearSpaceCompanion();
         return;
     }
-    const otherItem = state.orderCart && state.orderCart[info.otherIndex];
-    if (!otherItem || !otherItem.rawState || typeof window.buildCabinetIntoGroup !== 'function') {
+    if (!info.others || !info.others.length || typeof window.buildCabinetIntoGroup !== 'function') {
         window._clearSpaceCompanion();
         return;
     }
@@ -3192,47 +3208,59 @@ window._rebuildSpaceCompanion = function() {
         }
     };
 
+    window._clearSpaceCompanion();
+    window._spaceCompanionGroups = [];
+    window._spaceCompanionHits = [];
+
     try {
-        const rs = otherItem.rawState;
-        if (rs.wings) {
-            const wingsCopy = JSON.parse(JSON.stringify(rs.wings));
-            if (typeof window._restoreWingsFromSaved === 'function') {
-                window._restoreWingsFromSaved(wingsCopy);
-            } else {
-                state.wings = { center: wingsCopy.center || null, left: wingsCopy.left || null, right: wingsCopy.right || null };
+        info.others.forEach(function(member) {
+            const otherItem = state.orderCart && state.orderCart[member.index];
+            if (!otherItem || !otherItem.rawState) return;
+            const rs = otherItem.rawState;
+            if (rs.wings) {
+                const wingsCopy = JSON.parse(JSON.stringify(rs.wings));
+                if (typeof window._restoreWingsFromSaved === 'function') {
+                    window._restoreWingsFromSaved(wingsCopy);
+                } else {
+                    state.wings = { center: wingsCopy.center || null, left: wingsCopy.left || null, right: wingsCopy.right || null };
+                }
             }
-        }
-        state.activeWing = rs.activeWing || 'center';
-        state.presetId = rs.presetId || 'linear';
-        state._activeUpperUnit = null;
-        ['materialBody', 'materialDoors', 'materialInternal', 'materialExternal',
-         'materialOpenCell', 'materialBack', 'boardMaterial', 'width', 'globalHeight',
-         'depth', 'thickness', 'plinthHeight', 'hasDoors', 'columns', 'desk'].forEach(function(k) {
-            if (rs[k] !== undefined) state[k] = rs[k];
-        });
-        window._ppColorScope = 'cart' + info.otherIndex;
+            state.activeWing = rs.activeWing || 'center';
+            state.presetId = rs.presetId || 'linear';
+            state._activeUpperUnit = null;
+            ['materialBody', 'materialDoors', 'materialInternal', 'materialExternal',
+             'materialOpenCell', 'materialBack', 'boardMaterial', 'width', 'globalHeight',
+             'depth', 'thickness', 'plinthHeight', 'hasDoors', 'columns', 'desk'].forEach(function(k) {
+                if (rs[k] !== undefined) state[k] = rs[k];
+            });
+            window._ppColorScope = 'cart' + member.index;
 
-        let g = window._spaceCompanionGroup;
-        if (!g) {
-            g = new THREE.Group();
-            g.name = 'spaceCompanion';
+            const g = new THREE.Group();
+            g.name = 'spaceCompanion_' + member.slot;
+            g.userData.spaceSlot = member.slot;
+            g.userData.cartIndex = member.index;
             scene.add(g);
-            window._spaceCompanionGroup = g;
-        }
-        window.buildCabinetIntoGroup(g);
+            window.buildCabinetIntoGroup(g);
 
-        const cw = state.wings && state.wings.center;
-        const hitW = (cw && cw.width) || state.width || 160;
-        const hitH = (cw && cw.globalHeight) || state.globalHeight || 240;
-        const hitD = (cw && cw.depth) || state.depth || 54;
-        const hitMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
-        const hit = new THREE.Mesh(new THREE.BoxGeometry(hitW, hitH, hitD), hitMat);
-        hit.position.set(0, hitH / 2, 0);
-        hit.userData.spaceCompanion = true;
-        hit.userData.spaceSlot = info.otherSlot;
-        hit.userData.cartIndex = info.otherIndex;
-        g.add(hit);
-        window._spaceCompanionHit = hit;
+            const cw = state.wings && state.wings.center;
+            const hitW = (cw && cw.width) || state.width || 160;
+            const hitH = (cw && cw.globalHeight) || state.globalHeight || 240;
+            const hitD = (cw && cw.depth) || state.depth || 54;
+            const hitMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+            const hit = new THREE.Mesh(new THREE.BoxGeometry(hitW, hitH, hitD), hitMat);
+            hit.position.set(0, hitH / 2, 0);
+            hit.userData.spaceCompanion = true;
+            hit.userData.spaceSlot = member.slot;
+            hit.userData.cartIndex = member.index;
+            g.add(hit);
+
+            window._spaceCompanionGroups.push(g);
+            window._spaceCompanionHits.push(hit);
+        });
+        // Legacy pointers → first companion (older click paths)
+        window._spaceCompanionGroup = window._spaceCompanionGroups[0] || null;
+        window._spaceCompanionHit = window._spaceCompanionHits[0] || null;
+        if (typeof window._applySpacePairPositions === 'function') window._applySpacePairPositions();
     } catch (e) {
         console.warn('[spaceCompanion] failed to build', e);
         window._clearSpaceCompanion();

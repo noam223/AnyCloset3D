@@ -5153,13 +5153,15 @@ function buildDragHandlesUI() {
 window._spaceSlot1Height = function() {
     const info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
     if (!info) return 240;
-    if (info.activeSlot === 1) {
+    const slot = info.activeSlot > 0 ? info.activeSlot : 1;
+    if (info.activeSlot === slot) {
         if (state.columns && state.columns.length) {
             return Math.max.apply(null, state.columns.map(function(c) { return c.height || 0; }));
         }
         return state.globalHeight || 240;
     }
-    const rs = state.orderCart[info.slot1Index] && state.orderCart[info.slot1Index].rawState;
+    const item = state.orderCart[info.slotIndices[slot]];
+    const rs = item && item.rawState;
     if (rs && rs.columns && rs.columns.length) {
         return Math.max.apply(null, rs.columns.map(function(c) { return c.height || rs.globalHeight || 240; }));
     }
@@ -5168,14 +5170,15 @@ window._spaceSlot1Height = function() {
 
 window._buildSpaceCabMoveHandle = function() {
     const info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
-    if (!info || state.viewMode !== 'front') return;
-    const item = window._getSpaceSlot1Item();
+    if (!info || info.activeSlot <= 0 || state.viewMode !== 'front') return;
+    const item = window._getSpaceMovableItem();
     const off = window._getSpaceOffset(item);
     const h = window._spaceSlot1Height();
+    const n = info.activeSlot + 1;
     const handle = document.createElement('div');
     handle.className = 'drag-handle space-move-handle';
     handle.dataset.worldY = String(h);
-    handle.innerHTML = `<div class="drag-tooltip">הזז ארון 2: ${off.x}, ${off.y} ס"מ</div>`;
+    handle.innerHTML = `<div class="drag-tooltip">הזז ארון ${n}: ${off.x}, ${off.y} ס"מ</div>`;
     handle.style.display = 'flex';
     if (window._spaceCabDrag) handle.classList.add('active');
     dragLayer.appendChild(handle);
@@ -5191,7 +5194,8 @@ window._buildSpaceCabMoveHandle = function() {
             startMouseY: e.clientY,
             startX: off.x,
             startY: off.y,
-            prevX: off.x
+            prevX: off.x,
+            slot: info.activeSlot
         };
         handle.classList.add('active');
     });
@@ -5213,10 +5217,10 @@ window._buildSpaceCabMoveHandle = function() {
         const yPerPx = dyPx !== 0 ? 100 / dyPx : 1;
         const nx = d.startX + (e.clientX - d.startMouseX) * xPerPx;
         const ny = d.startY + (e.clientY - d.startMouseY) * yPerPx;
-        window._setSpaceOffset(nx, ny, { dragging: true, preferAxis: undefined });
-        const cur = window._getSpaceOffset(window._getSpaceSlot1Item());
+        window._setSpaceOffset(nx, ny, { dragging: true, preferAxis: undefined, slot: d.slot });
+        const cur = window._getSpaceOffset(window._getSpaceMovableItem());
         const tip = handle.querySelector('.drag-tooltip');
-        if (tip) tip.innerText = `הזז ארון 2: ${cur.x}, ${cur.y} ס"מ`;
+        if (tip) tip.innerText = `הזז ארון ${n}: ${cur.x}, ${cur.y} ס"מ`;
         if (typeof updateDragHandlesPosition === 'function') updateDragHandlesPosition();
     };
     window._spaceCabUpHandler = function() {
@@ -5277,7 +5281,8 @@ function updateDragHandlesPosition() {
             }
             worldPt = new THREE.Vector3(currentWX, wy, state.depth / 2);
         } else if (handle.classList.contains('space-move-handle')) {
-            const item = typeof window._getSpaceSlot1Item === 'function' ? window._getSpaceSlot1Item() : null;
+            const item = typeof window._getSpaceMovableItem === 'function' ? window._getSpaceMovableItem()
+                : (typeof window._getSpaceSlot1Item === 'function' ? window._getSpaceSlot1Item() : null);
             const off = typeof window._getSpaceOffset === 'function' ? window._getSpaceOffset(item) : { x: 0, y: 0 };
             const hy = parseFloat(handle.dataset.worldY) || 0;
             worldPt = new THREE.Vector3(off.x, off.y + hy, (state.depth || 54) / 2);
@@ -6670,11 +6675,14 @@ function bindUI() {
         mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
 
-        if (window._spaceCompanionHit) {
-            const compHits = raycaster.intersectObject(window._spaceCompanionHit, false);
+        const _spaceHits = (window._spaceCompanionHits && window._spaceCompanionHits.length)
+            ? window._spaceCompanionHits
+            : (window._spaceCompanionHit ? [window._spaceCompanionHit] : []);
+        if (_spaceHits.length) {
+            const compHits = raycaster.intersectObjects(_spaceHits, false);
             if (compHits.length > 0 && typeof window.switchSpaceCabinet === 'function') {
-                const slot = window._spaceCompanionHit.userData.spaceSlot;
-                if (slot === 0 || slot === 1) {
+                const slot = compHits[0].object.userData.spaceSlot;
+                if (slot != null && slot >= 0) {
                     window.switchSpaceCabinet(slot);
                     return;
                 }
@@ -7963,9 +7971,11 @@ window._promptSaveCabinetBeforeSwitch = function(targetIndex) {
 };
 
 // ==========================================
-// Dual cabinet in the same 3D space (linear / sliding / writing-desk)
+// Multi cabinet in the same 3D space (up to 4: linear / sliding / writing-desk)
+// Slot 0 is the world anchor; slots 1..n each store spaceOffset relative to it.
 // ==========================================
 window._SPACE_COMPATIBLE_PRESETS = ['linear', 'sliding', 'writing-desk'];
+window._SPACE_MAX_CABINETS = 4;
 
 window._isSpaceCompatiblePreset = function(presetId) {
     const p = presetId || 'linear';
@@ -7973,8 +7983,7 @@ window._isSpaceCompatiblePreset = function(presetId) {
 };
 
 window._spacePairCanUse = function() {
-    // Allow while on a compatible type, or while already editing either side of a pair
-    // (so switching ארון 2 to שולחן כתיבה doesn't hide the tabs)
+    // Allow while on a compatible type, or while already editing any member of a space
     if (window._isSpaceCompatiblePreset(state.presetId)) return true;
     const cart = state.orderCart || [];
     const idx = state.editingCartIndex;
@@ -7985,7 +7994,9 @@ window._spacePairSlotOf = function(item) {
     if (!item) return 0;
     const s = (item.spaceSlot != null) ? item.spaceSlot
         : (item.rawState && item.rawState.spaceSlot);
-    return s === 1 ? 1 : 0;
+    const n = Math.round(Number(s) || 0);
+    const max = (window._SPACE_MAX_CABINETS || 4) - 1;
+    return Math.max(0, Math.min(max, n));
 };
 
 window._spacePairIdOf = function(item) {
@@ -8044,36 +8055,58 @@ window._getSpacePairInfo = function() {
     if (idx < 0 || !cart[idx]) return null;
     const pairId = window._spacePairIdOf(cart[idx]);
     if (!pairId) return null;
-    let otherIdx = -1;
+    const members = [];
     for (let i = 0; i < cart.length; i++) {
-        if (i !== idx && window._spacePairIdOf(cart[i]) === pairId) {
-            otherIdx = i;
-            break;
+        if (window._spacePairIdOf(cart[i]) === pairId) {
+            members.push({ index: i, slot: window._spacePairSlotOf(cart[i]) });
         }
     }
-    if (otherIdx < 0) return null;
+    if (members.length < 2) return null;
+    members.sort(function(a, b) { return a.slot - b.slot; });
+    const slotIndices = [];
+    members.forEach(function(m) { slotIndices[m.slot] = m.index; });
     const activeSlot = window._spacePairSlotOf(cart[idx]);
+    const others = members.filter(function(m) { return m.index !== idx; });
     return {
         pairId: pairId,
         activeIndex: idx,
-        otherIndex: otherIdx,
         activeSlot: activeSlot,
-        otherSlot: activeSlot === 1 ? 0 : 1,
-        slot1Index: activeSlot === 1 ? idx : otherIdx,
-        slot0Index: activeSlot === 1 ? otherIdx : idx
+        members: members,
+        others: others,
+        count: members.length,
+        canAddMore: members.length < (window._SPACE_MAX_CABINETS || 4),
+        slotIndices: slotIndices,
+        // Legacy 2-cab fields (kept for older call sites)
+        otherIndex: others.length ? others[0].index : -1,
+        otherSlot: others.length ? others[0].slot : 0,
+        slot0Index: slotIndices[0],
+        slot1Index: slotIndices[1]
     };
 };
 
-window._getSpaceSlot1Item = function() {
+window._getSpaceSlotItem = function(slot) {
     const info = window._getSpacePairInfo();
-    if (!info) return null;
-    return state.orderCart[info.slot1Index] || null;
+    if (!info || info.slotIndices[slot] == null) return null;
+    return state.orderCart[info.slotIndices[slot]] || null;
+};
+
+window._getSpaceMovableItem = function() {
+    const info = window._getSpacePairInfo();
+    if (!info || info.activeSlot <= 0) return null;
+    return state.orderCart[info.activeIndex] || null;
+};
+
+// Back-compat: previously always edited slot 1
+window._getSpaceSlot1Item = function() {
+    const movable = window._getSpaceMovableItem();
+    if (movable) return movable;
+    return window._getSpaceSlotItem(1);
 };
 
 window._spaceWingsForSlot = function(slot) {
     const info = window._getSpacePairInfo();
-    if (!info) return null;
-    const idx = slot === 1 ? info.slot1Index : info.slot0Index;
+    if (!info || info.slotIndices[slot] == null) return null;
+    const idx = info.slotIndices[slot];
     if (state.editingCartIndex === idx) return state.wings;
     const item = state.orderCart[idx];
     return (item && item.rawState && item.rawState.wings) || null;
@@ -8100,54 +8133,102 @@ window._spaceCabinetFootprint = function(slot) {
     return { w: w, h: h, floorOffset: fo };
 };
 
-window._clampSpaceOffsetAgainstPrimary = function(x, y, opts) {
+window._spaceOffsetForSlot = function(slot) {
+    if (slot === 0) return { x: 0, y: 0 };
+    const item = window._getSpaceSlotItem(slot);
+    return window._getSpaceOffset(item);
+};
+
+window._suggestNextSpaceOffset = function(newWidth) {
+    const info = window._getSpacePairInfo();
+    let maxRight = 0;
+    if (info) {
+        info.members.forEach(function(m) {
+            const fp = window._spaceCabinetFootprint(m.slot);
+            const off = window._spaceOffsetForSlot(m.slot);
+            maxRight = Math.max(maxRight, off.x + fp.w / 2);
+        });
+    } else {
+        const w0 = Math.round(state.width || 160);
+        maxRight = w0 / 2;
+    }
+    const nw = Math.round(newWidth || 160);
+    return { x: Math.round(maxRight + nw / 2 + 10), y: 0 };
+};
+
+window._clampSpaceOffsetAgainstOthers = function(x, y, movingSlot, opts) {
     opts = opts || {};
-    const d0 = window._spaceCabinetFootprint(0);
-    const d1 = window._spaceCabinetFootprint(1);
-    x = Math.max(-500, Math.min(500, Number(x) || 0));
+    const info = window._getSpacePairInfo();
+    x = Math.max(-800, Math.min(800, Number(x) || 0));
     y = Math.max(0, Math.min(400, Number(y) || 0));
-    const half = (d0.w + d1.w) / 2;
-    const fo0 = d0.floorOffset || 0;
-    const fo1 = d1.floorOffset || 0;
-    function overlapYAt(yy) {
-        const b0 = fo0;
-        const t0 = d0.h;
-        const b1 = yy + fo1;
-        const t1 = yy + d1.h;
+    if (!info || movingSlot == null) return { x: Math.round(x), y: Math.round(y) };
+
+    const dM = window._spaceCabinetFootprint(movingSlot);
+    const foM = dM.floorOffset || 0;
+
+    function overlapYAt(yy, oOffY, dO, foO) {
+        const b0 = oOffY + foO;
+        const t0 = oOffY + dO.h;
+        const b1 = yy + foM;
+        const t1 = yy + dM.h;
         return Math.min(t0, t1) - Math.max(b0, b1);
     }
-    const overlapX = half - Math.abs(x);
-    const overlapY = overlapYAt(y);
-    if (overlapX > 0 && overlapY > 0) {
-        const prefer = opts.preferAxis;
-        const pushX = prefer === 'x' ? true : prefer === 'y' ? false : (overlapX <= overlapY);
-        if (pushX) {
-            let sign = x < 0 ? -1 : (x > 0 ? 1 : 0);
-            if (!sign && opts.prevX) sign = opts.prevX < 0 ? -1 : 1;
-            if (!sign) sign = 1;
-            x = sign * Math.ceil(half - 1e-9);
-        } else {
-            // Sit the real bottom panel (not the empty floor gap) flush on the other cabinet
-            y = Math.max(0, Math.ceil(d0.h - fo1 - 1e-9));
-            if (overlapX > 0 && overlapYAt(y) > 0) {
-                let sign = x < 0 ? -1 : (x > 0 ? 1 : 0);
-                if (!sign && opts.prevX) sign = opts.prevX < 0 ? -1 : 1;
+
+    info.members.forEach(function(m) {
+        if (m.slot === movingSlot) return;
+        const dO = window._spaceCabinetFootprint(m.slot);
+        const oOff = window._spaceOffsetForSlot(m.slot);
+        const foO = dO.floorOffset || 0;
+        const half = (dO.w + dM.w) / 2;
+        const dx = x - oOff.x;
+        const overlapX = half - Math.abs(dx);
+        const overlapY = overlapYAt(y, oOff.y, dO, foO);
+        if (overlapX > 0 && overlapY > 0) {
+            const prefer = opts.preferAxis;
+            const pushX = prefer === 'x' ? true : prefer === 'y' ? false : (overlapX <= overlapY);
+            if (pushX) {
+                let sign = dx < 0 ? -1 : (dx > 0 ? 1 : 0);
+                if (!sign && opts.prevX != null) {
+                    const prevDx = (opts.prevX || 0) - oOff.x;
+                    sign = prevDx < 0 ? -1 : 1;
+                }
                 if (!sign) sign = 1;
-                x = sign * Math.ceil(half - 1e-9);
+                x = oOff.x + sign * Math.ceil(half - 1e-9);
+            } else {
+                y = Math.max(0, Math.ceil(oOff.y + dO.h - foM - 1e-9));
+                if (overlapX > 0 && overlapYAt(y, oOff.y, dO, foO) > 0) {
+                    let sign = dx < 0 ? -1 : (dx > 0 ? 1 : 0);
+                    if (!sign && opts.prevX != null) {
+                        const prevDx = (opts.prevX || 0) - oOff.x;
+                        sign = prevDx < 0 ? -1 : 1;
+                    }
+                    if (!sign) sign = 1;
+                    x = oOff.x + sign * Math.ceil(half - 1e-9);
+                }
             }
         }
-    }
+    });
     return { x: Math.round(x), y: Math.round(y) };
+};
+
+// Back-compat alias
+window._clampSpaceOffsetAgainstPrimary = function(x, y, opts) {
+    const info = window._getSpacePairInfo();
+    const movingSlot = (info && info.activeSlot > 0) ? info.activeSlot : 1;
+    return window._clampSpaceOffsetAgainstOthers(x, y, movingSlot, opts);
 };
 
 window._setSpaceOffset = function(x, y, opts) {
     opts = opts || {};
     const info = window._getSpacePairInfo();
     if (!info) return;
-    const item = state.orderCart[info.slot1Index];
+    const movingSlot = (opts.slot != null) ? opts.slot
+        : (info.activeSlot > 0 ? info.activeSlot : 1);
+    if (movingSlot <= 0 || info.slotIndices[movingSlot] == null) return;
+    const item = state.orderCart[info.slotIndices[movingSlot]];
     if (!item) return;
     const prev = window._getSpaceOffset(item);
-    const offset = window._clampSpaceOffsetAgainstPrimary(x, y, {
+    const offset = window._clampSpaceOffsetAgainstOthers(x, y, movingSlot, {
         preferAxis: opts.preferAxis,
         prevX: prev.x
     });
@@ -8162,14 +8243,15 @@ window._setSpaceOffset = function(x, y, opts) {
 };
 
 window._setSpaceOffsetFromUI = function(axis, val) {
-    const item = window._getSpaceSlot1Item();
+    const item = window._getSpaceMovableItem() || window._getSpaceSlot1Item();
     const cur = window._getSpaceOffset(item);
     if (axis === 'x') window._setSpaceOffset(val, cur.y, { preferAxis: 'x' });
     else window._setSpaceOffset(cur.x, val, { preferAxis: 'y' });
 };
 
 window._syncSpaceOffsetUI = function() {
-    const item = window._getSpaceSlot1Item();
+    const info = window._getSpacePairInfo();
+    const item = window._getSpaceMovableItem();
     const off = window._getSpaceOffset(item);
     const ids = ['inp-num-space-x', 'mobile-inp-num-space-x'];
     const yids = ['inp-num-space-y', 'mobile-inp-num-space-y'];
@@ -8181,6 +8263,12 @@ window._syncSpaceOffsetUI = function() {
         const el = document.getElementById(id);
         if (el && document.activeElement !== el) el.value = off.y;
     });
+    const label = document.getElementById('space-cab-offset-label');
+    const mLabel = document.getElementById('mobile-space-cab-offset-label');
+    const n = info && info.activeSlot > 0 ? (info.activeSlot + 1) : 2;
+    const text = 'מיקום ארון ' + n + ' במרחב';
+    if (label) label.innerHTML = '<i class="fa-solid fa-up-down-left-right"></i> ' + text;
+    if (mLabel) mLabel.textContent = text;
 };
 
 window._cartItemCanShareSpace = function(item) {
@@ -8226,7 +8314,9 @@ window._fillSpaceJoinList = function(el, indices) {
 };
 
 window.toggleJoinSpacePicker = function() {
-    if (!window._spacePairCanUse() || window._getSpacePairInfo()) return;
+    if (!window._spacePairCanUse()) return;
+    const info = window._getSpacePairInfo();
+    if (info && !info.canAddMore) return;
     const indices = window._joinableSpaceCabinets();
     if (!indices.length) return;
     ['space-cab-join-list', 'mobile-space-cab-join-list'].forEach(function(id) {
@@ -8240,21 +8330,29 @@ window.toggleJoinSpacePicker = function() {
 window.joinExistingSpaceCabinet = function(otherIndex) {
     otherIndex = parseInt(otherIndex, 10);
     if (!window._spacePairCanUse()) return;
-    if (window._getSpacePairInfo()) return;
     if (typeof window._commitCurrentCabinetToCart === 'function') {
         window._commitCurrentCabinetToCart({ flash: false });
     }
     const cart = state.orderCart || [];
     const idx0 = state.editingCartIndex;
     if (idx0 < 0 || otherIndex === idx0 || !cart[idx0] || !cart[otherIndex]) return;
-    if (window._spacePairIdOf(cart[idx0]) || !window._cartItemCanShareSpace(cart[otherIndex])) return;
+    if (!window._cartItemCanShareSpace(cart[otherIndex])) return;
 
-    const pairId = 'sp_' + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36);
-    const w1 = Math.round(state.width || (cart[idx0].rawState && cart[idx0].rawState.width) || 160);
-    const w2 = Math.round((cart[otherIndex].rawState && cart[otherIndex].rawState.width) || 160);
-    const offsetX = Math.round((w1 + w2) / 2 + 10);
-    window._attachSpacePairToItem(cart[idx0], pairId, 0, { x: 0, y: 0 });
-    window._attachSpacePairToItem(cart[otherIndex], pairId, 1, { x: offsetX, y: 0 });
+    const info = window._getSpacePairInfo();
+    if (info) {
+        if (!info.canAddMore) return;
+        const wNew = Math.round((cart[otherIndex].rawState && cart[otherIndex].rawState.width) || 160);
+        const offset = window._suggestNextSpaceOffset(wNew);
+        window._attachSpacePairToItem(cart[otherIndex], info.pairId, info.count, offset);
+    } else {
+        if (window._spacePairIdOf(cart[idx0])) return;
+        const pairId = 'sp_' + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36);
+        const w1 = Math.round(state.width || (cart[idx0].rawState && cart[idx0].rawState.width) || 160);
+        const w2 = Math.round((cart[otherIndex].rawState && cart[otherIndex].rawState.width) || 160);
+        const offsetX = Math.round((w1 + w2) / 2 + 10);
+        window._attachSpacePairToItem(cart[idx0], pairId, 0, { x: 0, y: 0 });
+        window._attachSpacePairToItem(cart[otherIndex], pairId, 1, { x: offsetX, y: 0 });
+    }
 
     ['space-cab-join-list', 'mobile-space-cab-join-list'].forEach(function(id) {
         const el = document.getElementById(id);
@@ -8272,6 +8370,7 @@ window.joinExistingSpaceCabinet = function(otherIndex) {
 window._syncSpacePairTabs = function() {
     const canUse = window._spacePairCanUse();
     const info = window._getSpacePairInfo();
+    const maxCab = window._SPACE_MAX_CABINETS || 4;
     const row = document.getElementById('space-cab-tabs');
     const mRow = document.getElementById('mobile-space-cab-tabs');
     const addBtn = document.getElementById('btn-add-space-cab');
@@ -8284,43 +8383,37 @@ window._syncSpacePairTabs = function() {
     const mTabsWrap = document.getElementById('mobile-space-cab-tabs-btns');
     const offsetRow = document.getElementById('space-cab-offset-row');
     const mOffsetRow = document.getElementById('mobile-space-cab-offset-row');
-    const joinable = (canUse && !info) ? window._joinableSpaceCabinets() : [];
+    const canAdd = canUse && (!info || info.canAddMore);
+    const joinable = canAdd ? window._joinableSpaceCabinets() : [];
+    const showOffset = !!(info && info.activeSlot > 0);
 
     if (row) row.style.display = canUse ? '' : 'none';
     if (mRow) mRow.style.display = canUse ? '' : 'none';
-    if (addBtn) addBtn.style.display = (canUse && !info) ? '' : 'none';
-    if (mAddBtn) mAddBtn.style.display = (canUse && !info) ? '' : 'none';
+    if (addBtn) addBtn.style.display = canAdd ? '' : 'none';
+    if (mAddBtn) mAddBtn.style.display = canAdd ? '' : 'none';
     if (joinBtn) joinBtn.style.display = (joinable.length > 0) ? '' : 'none';
     if (mJoinBtn) mJoinBtn.style.display = (joinable.length > 0) ? '' : 'none';
     if (joinList) window._fillSpaceJoinList(joinList, joinList.style.display === 'flex' ? joinable : []);
     if (mJoinList) window._fillSpaceJoinList(mJoinList, mJoinList.style.display === 'flex' ? joinable : []);
     if (tabsWrap) tabsWrap.style.display = info ? 'flex' : 'none';
     if (mTabsWrap) mTabsWrap.style.display = info ? 'flex' : 'none';
-    if (offsetRow) offsetRow.style.display = info ? '' : 'none';
-    if (mOffsetRow) mOffsetRow.style.display = info ? '' : 'none';
+    if (offsetRow) offsetRow.style.display = showOffset ? '' : 'none';
+    if (mOffsetRow) mOffsetRow.style.display = showOffset ? '' : 'none';
 
-    if (info) {
-        const cart = state.orderCart;
-        const item0 = cart[info.slot0Index];
-        const item1 = cart[info.slot1Index];
-        [
-            ['space-cab-tab-0', 'mobile-space-cab-tab-0', item0, 0],
-            ['space-cab-tab-1', 'mobile-space-cab-tab-1', item1, 1]
-        ].forEach(function(t) {
-            const label = window._spaceTabLabel(t[2], t[3]);
-            const a = document.getElementById(t[0]);
-            const b = document.getElementById(t[1]);
-            if (a) {
-                a.textContent = label;
-                a.classList.toggle('active', info.activeSlot === t[3]);
-            }
-            if (b) {
-                b.textContent = label;
-                b.classList.toggle('active', info.activeSlot === t[3]);
-            }
+    for (let s = 0; s < maxCab; s++) {
+        const a = document.getElementById('space-cab-tab-' + s);
+        const b = document.getElementById('mobile-space-cab-tab-' + s);
+        const visible = !!(info && info.slotIndices[s] != null);
+        const item = visible ? state.orderCart[info.slotIndices[s]] : null;
+        const label = visible ? window._spaceTabLabel(item, s) : ('ארון ' + (s + 1));
+        [a, b].forEach(function(btn) {
+            if (!btn) return;
+            btn.style.display = visible ? '' : 'none';
+            btn.textContent = label;
+            btn.classList.toggle('active', !!(info && info.activeSlot === s));
         });
-        window._syncSpaceOffsetUI();
     }
+    if (info) window._syncSpaceOffsetUI();
 };
 
 window._unlinkSpacePair = function(opts) {
@@ -8343,27 +8436,52 @@ window._unlinkSpacePair = function(opts) {
 
 window.addSpaceCabinet = function() {
     if (!window._spacePairCanUse()) return;
-    if (window._getSpacePairInfo()) return;
+    const existing = window._getSpacePairInfo();
+    if (existing && !existing.canAddMore) return;
     if (typeof window._commitCurrentCabinetToCart === 'function') {
         window._commitCurrentCabinetToCart({ flash: false });
     }
     const idx0 = state.editingCartIndex;
     if (idx0 < 0 || !state.orderCart[idx0]) return;
-    if (window._spacePairIdOf(state.orderCart[idx0])) return;
 
-    const w1 = Math.round(state.width || 160);
-    const pairId = 'sp_' + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36);
-    window._attachSpacePairToItem(state.orderCart[idx0], pairId, 0, { x: 0, y: 0 });
+    let pairId;
+    let nextSlot;
+    let offset;
 
-    if (typeof window._resetEditorToDefaultLinearCabinet === 'function') {
-        window._resetEditorToDefaultLinearCabinet();
+    if (existing) {
+        pairId = existing.pairId;
+        nextSlot = existing.count;
+        let maxRight = 0;
+        existing.members.forEach(function(m) {
+            const fp = window._spaceCabinetFootprint(m.slot);
+            const off = window._spaceOffsetForSlot(m.slot);
+            maxRight = Math.max(maxRight, off.x + fp.w / 2);
+        });
+        if (typeof window._resetEditorToDefaultLinearCabinet === 'function') {
+            window._resetEditorToDefaultLinearCabinet();
+        }
+        const itemN = window._snapshotCurrentCabinetToCartItem();
+        itemN.rawState.partColors = {};
+        const wN = Math.round((itemN.rawState && itemN.rawState.width) || 160);
+        offset = { x: Math.round(maxRight + wN / 2 + 10), y: 0 };
+        window._attachSpacePairToItem(itemN, pairId, nextSlot, offset);
+        state.orderCart.push(itemN);
+    } else {
+        if (window._spacePairIdOf(state.orderCart[idx0])) return;
+        const w0 = Math.round(state.width || 160);
+        pairId = 'sp_' + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36);
+        window._attachSpacePairToItem(state.orderCart[idx0], pairId, 0, { x: 0, y: 0 });
+        if (typeof window._resetEditorToDefaultLinearCabinet === 'function') {
+            window._resetEditorToDefaultLinearCabinet();
+        }
+        const itemN = window._snapshotCurrentCabinetToCartItem();
+        itemN.rawState.partColors = {};
+        const wN = Math.round((itemN.rawState && itemN.rawState.width) || 160);
+        offset = { x: Math.round((w0 + wN) / 2 + 10), y: 0 };
+        window._attachSpacePairToItem(itemN, pairId, 1, offset);
+        state.orderCart.push(itemN);
     }
-    const item1 = window._snapshotCurrentCabinetToCartItem();
-    item1.rawState.partColors = {};
-    const w2 = Math.round((item1.rawState && item1.rawState.width) || 160);
-    const offsetX = Math.round((w1 + w2) / 2 + 10);
-    window._attachSpacePairToItem(item1, pairId, 1, { x: offsetX, y: 0 });
-    state.orderCart.push(item1);
+
     const newIdx = state.orderCart.length - 1;
     state.editingCartIndex = newIdx;
     if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
@@ -8382,8 +8500,8 @@ window.addSpaceCabinet = function() {
 
 window.switchSpaceCabinet = function(slot) {
     const info = window._getSpacePairInfo();
-    if (!info) return;
-    const targetIdx = (slot === 1) ? info.slot1Index : info.slot0Index;
+    if (!info || info.slotIndices[slot] == null) return;
+    const targetIdx = info.slotIndices[slot];
     if (targetIdx === state.editingCartIndex) return;
     if (typeof window._commitCurrentCabinetToCart === 'function') {
         window._commitCurrentCabinetToCart({ flash: false });
@@ -8992,7 +9110,9 @@ window._editCartItemNow = function(index) {
         window._attachSpacePairToItem(
             _loadedItem,
             rawState.spacePairId,
-            rawState.spaceSlot === 1 ? 1 : 0,
+            (typeof window._spacePairSlotOf === 'function')
+                ? window._spacePairSlotOf({ spaceSlot: rawState.spaceSlot })
+                : (Math.round(Number(rawState.spaceSlot) || 0)),
             rawState.spaceOffset || { x: 0, y: 0 }
         );
     }

@@ -39,7 +39,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260824qe2">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
     <link rel="stylesheet" href="style-extras.css?v=20260731rpcab">
-    <link rel="stylesheet" href="style.css?v=20260908shelfOrange">
+    <link rel="stylesheet" href="style.css?v=20260909space4">
     <style>
         html.thumb-only-mode #left-sidebar,
         html.thumb-only-mode #right-sidebar,
@@ -120,9 +120,11 @@
             <div id="space-cab-tabs-btns" class="space-cab-tabs-row" style="display:none;">
                 <button type="button" id="space-cab-tab-0" class="space-cab-tab" onclick="switchSpaceCabinet(0)">ארון 1</button>
                 <button type="button" id="space-cab-tab-1" class="space-cab-tab" onclick="switchSpaceCabinet(1)">ארון 2</button>
+                <button type="button" id="space-cab-tab-2" class="space-cab-tab" onclick="switchSpaceCabinet(2)" style="display:none;">ארון 3</button>
+                <button type="button" id="space-cab-tab-3" class="space-cab-tab" onclick="switchSpaceCabinet(3)" style="display:none;">ארון 4</button>
             </div>
             <div id="space-cab-offset-row" style="display:none;">
-                <div class="space-cab-offset-label"><i class="fa-solid fa-up-down-left-right"></i> מיקום ארון 2 במרחב</div>
+                <div class="space-cab-offset-label" id="space-cab-offset-label"><i class="fa-solid fa-up-down-left-right"></i> מיקום הארון במרחב</div>
                 <div class="header-dims-grid space-cab-offset-grid">
                     <div class="header-dim-card">
                         <div class="header-dim-top">
@@ -1919,16 +1921,18 @@
             <button type="button" id="mobile-btn-add-space-cab" class="space-cab-add-btn" onclick="addSpaceCabinet()">
                 <i class="fa-solid fa-plus"></i> הוסף ארון במרחב
             </button>
-            <button type="button" id="mobile-btn-join-space-cab" class="space-cab-join-btn" onclick="toggleJoinSpacePicker()" style="display:none;" title="חברו ארון רגיל או הזזה שכבר קיים בפרויקט לאותו מרחב תלת-ממד">
+            <button type="button" id="mobile-btn-join-space-cab" class="space-cab-join-btn" onclick="toggleJoinSpacePicker()" style="display:none;" title="חברו ארון רגיל, הזזה או שולחן כתיבה שכבר קיים בפרויקט לאותו מרחב תלת-ממד">
                 <i class="fa-solid fa-link"></i> הוסף ארון קיים למרחב
             </button>
             <div id="mobile-space-cab-join-list" class="space-cab-join-list" style="display:none;"></div>
             <div id="mobile-space-cab-tabs-btns" class="space-cab-tabs-row" style="display:none;margin-top:8px;">
                 <button type="button" id="mobile-space-cab-tab-0" class="space-cab-tab" onclick="switchSpaceCabinet(0)">ארון 1</button>
                 <button type="button" id="mobile-space-cab-tab-1" class="space-cab-tab" onclick="switchSpaceCabinet(1)">ארון 2</button>
+                <button type="button" id="mobile-space-cab-tab-2" class="space-cab-tab" onclick="switchSpaceCabinet(2)" style="display:none;">ארון 3</button>
+                <button type="button" id="mobile-space-cab-tab-3" class="space-cab-tab" onclick="switchSpaceCabinet(3)" style="display:none;">ארון 4</button>
             </div>
             <div id="mobile-space-cab-offset-row" style="display:none;margin-top:10px;">
-                <div class="mobile-section-title" style="margin-bottom:8px;">מיקום ארון 2 במרחב</div>
+                <div class="mobile-section-title" id="mobile-space-cab-offset-label" style="margin-bottom:8px;">מיקום הארון במרחב</div>
                 <label class="mobile-label">הזזה אופקית X (ס"מ)</label>
                 <input type="number" id="mobile-inp-num-space-x" class="editor-select" value="0" step="1" style="margin:0 0 8px;width:100%;box-sizing:border-box;" onchange="window._setSpaceOffsetFromUI('x', this.value)">
                 <label class="mobile-label">הזזה אנכית Y (ס"מ)</label>
@@ -2640,12 +2644,12 @@
 <script src="quick-calc.js?v=20260825backdrop"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
-<script src="engine-core.js?v=20260908shelfHL"></script>
+<script src="engine-core.js?v=20260909space4"></script>
 <script src="engine-corners.js?v=20260825spaceCab"></script>
 <script src="engine-blueprint.js?v=20260903hcMergeBp"></script>
 <script src="engine-room-plan.js?v=20260731rpcab"></script>
 <script src="tambour-color-picker.js?v=20260617scdoors"></script>
-<script src="ui.js?v=20260909spaceWd"></script>
+<script src="ui.js?v=20260909space4"></script>
 <script src="mobile.js?v=20260825spaceCab"></script>
 <script src="part-paint.js?v=20260908shelfDel"></script>
 <script src="shelf-pick.js?v=20260909shelfPurple"></script>
