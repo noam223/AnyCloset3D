@@ -5647,11 +5647,16 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                 // Clamp door row indices to valid range (guard against stale saved state)
                 const _safeStartRow = Math.max(0, Math.min(door.startRow, dividersAsc.length));
                 const _safeEndRow   = Math.max(0, Math.min(door.endRow,   dividersAsc.length));
+                // Door floor reference: ביטול צוקל keeps doors aligned with other columns
+                // (gap under the door for robot vacuum). Upper units still flush to y=0.
+                const _doorAlignBaseY = (fo > 0)
+                    ? fo
+                    : (_isUpperUnitBuild ? 0 : state.plinthHeight);
                 // Use dividersAsc (ascending by Y) — dividers was re-sorted descending at line 729
                 if (isInset) {
                     let baseForInset = col.type === 'desk'
                         ? col.deskHeight + col.deskClearance
-                        : (col.noPlinth ? (fo > 0 ? fo : 0) : Math.max(state.plinthHeight, fo));
+                        : _doorAlignBaseY;
                     doorBottomY = (_safeStartRow === 0) ? (baseForInset + t) : (dividersAsc[_safeStartRow - 1].y + dividersAsc[_safeStartRow - 1].thick/2);
                     doorTopY = (_safeEndRow === dividersAsc.length) ? (col.height - t) : (dividersAsc[_safeEndRow].y - dividersAsc[_safeEndRow].thick/2);
                     doorBottomY += doorGap/2;
@@ -5663,8 +5668,9 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         ? col.deskHeight + col.deskClearance
                         : (_bathRegalimDoor
                             ? state.plinthHeight - t
-                            : (col.noPlinth ? (fo > 0 ? fo : 0) : Math.max(state.plinthHeight, fo)));
-                    if (_safeStartRow === 0 && col.type !== 'desk' && !col.noPlinth && state.plinthHeight === 7 && fo === 0 && !_bathRegalimDoor) baseY = 1.5;
+                            : _doorAlignBaseY);
+                    // Maya (plinth 7): overlay doors stop at 1.5cm — same with ביטול צוקל
+                    if (_safeStartRow === 0 && col.type !== 'desk' && state.plinthHeight === 7 && fo === 0 && !_bathRegalimDoor && !_isUpperUnitBuild) baseY = 1.5;
                     doorBottomY = (_safeStartRow === 0) ? (baseY + doorGap/2) : (dividersAsc[_safeStartRow - 1].y + doorGap/2);
                     doorTopY = (_safeEndRow === dividersAsc.length) ? (col.height - doorGap/2) : (dividersAsc[_safeEndRow].y - doorGap/2);
                 }
@@ -5682,10 +5688,10 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                     const flapRightX = isInset ? currentX + col.width : (isRightmost ? currentX + col.width + t : currentX + col.width + t / 2);
                     const flapW = flapRightX - flapLeftX;
                     const flapCenterX = (flapLeftX + flapRightX) / 2;
-                    // Full outer height: from very bottom of cabinet to very top (col.height)
-                    // For noPlinth columns (upper unit): start at y=0 (bottom of cabinet body)
-                    // For normal columns with plinth: start at state.plinthHeight (top of plinth solid)
-                    const flapBaseY = fo > 0 ? fo : (col.noPlinth ? 0 : state.plinthHeight);
+                    // Align flap bottom with other doors; gap under flap when ביטול צוקל
+                    const flapBaseY = col.type === 'desk'
+                        ? (col.deskHeight + col.deskClearance)
+                        : _doorAlignBaseY;
                     const flapTopY = col.height;
                     const flapH = flapTopY - flapBaseY;
                     if (flapH <= 0) return;
