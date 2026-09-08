@@ -4166,6 +4166,34 @@ body.part-paint-active #canvas-container {
     cursor: crosshair;
 }
 
+body.shelf-pick-active #canvas-container {
+    cursor: crosshair;
+}
+
+.sp-shelf-trash {
+    position: fixed;
+    z-index: 9100;
+    width: 40px;
+    height: 40px;
+    margin-left: -20px;
+    margin-top: -48px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 50%;
+    background: #ef4444;
+    color: #fff;
+    font-size: 1rem;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(239, 68, 68, 0.45);
+    transition: transform 0.15s, background 0.15s;
+}
+.sp-shelf-trash:hover {
+    background: #dc2626;
+    transform: scale(1.08);
+}
+
 /* Mode banner */
 .pp-mode-banner {
     position: fixed;

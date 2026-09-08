@@ -4746,6 +4746,9 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
             } else {
                 const shelfMesh = createBoard(boardW, div.thick, boardD, boardX, div.y, boardZ, boardMat);
                 _applyShelfUV(shelfMesh, boardW, boardD, div.idx + c * 100);
+                if (!isBP && shelfMesh) {
+                    shelfMesh.userData.shelfRef = { colIndex: c, shelfIdx: div.idx };
+                }
             }
             _ppPartId = '';
             prevYTopDown = div.y - div.thick/2;

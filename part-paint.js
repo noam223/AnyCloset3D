@@ -316,6 +316,9 @@
     // ── Public API ───────────────────────────────────────────
     window.enterPartPaintMode = function () {
         if (_active) return;
+        if (typeof window.exitShelfPickMode === 'function') {
+            try { window.exitShelfPickMode(); } catch (err) { /* ignore */ }
+        }
         _active = true;
 
         document.body.classList.add('part-paint-active');

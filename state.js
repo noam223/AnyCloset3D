@@ -2696,6 +2696,76 @@ function _shiftDoorsRemove(col, at) {
     });
 }
 
+/**
+ * Delete one physical shelf by shelvesY index, merging the two cells it separated.
+ * Keeps remaining shelf Y positions (does not re-distribute).
+ * @returns {boolean}
+ */
+window.deleteShelfAt = function(colIndex, shelfIdx) {
+    const cols = (typeof state !== 'undefined' && state.columns) ? state.columns : null;
+    if (!cols || colIndex < 0 || colIndex >= cols.length) return false;
+    const col = cols[colIndex];
+    if (!col || !Array.isArray(col.shelvesY)) return false;
+    const si = shelfIdx | 0;
+    if (si < 0 || si >= col.shelvesY.length) return false;
+
+    const t = state.thickness || 1.7;
+    const baseY = (typeof _columnBaseY === 'function') ? _columnBaseY(col) : (state.plinthHeight || 0);
+
+    // Dividers in compartment order (shelves + optional קושרת)
+    const dividers = [];
+    col.shelvesY.forEach((y, shelfI) => dividers.push({ y: y, kind: 'shelf', shelfIdx: shelfI }));
+    if (typeof _hasActiveSplit === 'function' ? _hasActiveSplit(col, baseY, t) : !!(col && col.splitY)) {
+        dividers.push({ y: col.splitY, kind: 'split', shelfIdx: -1 });
+    }
+    dividers.sort((a, b) => a.y - b.y);
+
+    let di = -1;
+    for (let i = 0; i < dividers.length; i++) {
+        if (dividers[i].kind === 'shelf' && dividers[i].shelfIdx === si) {
+            di = i;
+            break;
+        }
+    }
+    if (di < 0) return false;
+
+    if (!Array.isArray(col.compartments)) col.compartments = [];
+    while (col.compartments.length <= di + 1) {
+        col.compartments.push((typeof _emptyCompartment === 'function') ? _emptyCompartment() : { type: 'empty', count: 2 });
+    }
+
+    const _MIG = new Set(['hanging', 'sorbet', 'internal_drawers', 'external_drawers']);
+    const a = col.compartments[di];
+    const b = col.compartments[di + 1];
+    let keep = a;
+    if (b) {
+        const aEmpty = !a || (a.type === 'empty' && !a.partition);
+        if (aEmpty && (_MIG.has(b.type) || b.partition || b.type !== 'empty')) keep = b;
+    }
+    const keepClone = JSON.parse(JSON.stringify(keep || { type: 'empty', count: 2 }));
+
+    if (Array.isArray(col.doors)) {
+        col.doors.forEach(d => {
+            if (!d) return;
+            if (d.endRow < di || d.startRow > di + 1) return;
+            d.startRow = Math.min(d.startRow, di);
+            d.endRow = Math.max(d.endRow, di + 1);
+        });
+    }
+
+    col.compartments[di] = keepClone;
+    col.compartments.splice(di + 1, 1);
+    _shiftDoorsRemove(col, di + 1);
+
+    col.shelvesY.splice(si, 1);
+    col.shelves = col.shelvesY.length;
+
+    if (typeof _syncCompartmentCount === 'function') _syncCompartmentCount(col, baseY, t);
+    if (typeof _clampDrawerCompartments === 'function') _clampDrawerCompartments(col, baseY, t);
+    if (typeof _migratePartitions === 'function') _migratePartitions(col);
+    return true;
+};
+
 function _syncCompartmentCount(col, baseY, t) {
     if (!col.compartments) col.compartments = [];
     const numComps = col.shelves + (_hasActiveSplit(col, baseY, t) ? 2 : 1);
