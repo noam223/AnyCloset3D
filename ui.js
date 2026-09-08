@@ -788,15 +788,15 @@ function buildDimensionsAndButtonsUI() {
             } else {
                 // Build pill container — direction:ltr so internal order is predictable
                 const pill = document.createElement('div');
-                pill.style.cssText = 'display:flex;align-items:center;gap:0;direction:ltr;background:rgba(30,30,40,0.82);border-radius:14px;padding:1px 5px 1px 4px;box-shadow:0 1px 6px rgba(0,0,0,0.3);flex-shrink:0;line-height:1;';
+                pill.style.cssText = 'display:flex;align-items:center;gap:0;direction:ltr;background:rgba(30,30,40,0.82);border-radius:15px;padding:2px 6px 2px 5px;box-shadow:0 1px 6px rgba(0,0,0,0.3);flex-shrink:0;line-height:1;';
                 // Pill layout (LTR inside pill): [(trash | divider)? | height text | divider | +]
                 // In RTL context: + on visual LEFT, height in middle, trash on visual RIGHT
 
                 if (hasContent) {
                     // Trash — first in DOM = visual left in LTR (= visual right in RTL page)
                     const trashBtn = document.createElement('div');
-                    trashBtn.innerHTML = '<i class="fa-solid fa-trash" style="font-size:0.58rem;pointer-events:none;"></i>';
-                    trashBtn.style.cssText = 'display:flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;color:rgba(255,255,255,0.55);cursor:pointer;transition:color 0.15s,background 0.15s;flex-shrink:0;';
+                    trashBtn.innerHTML = '<i class="fa-solid fa-trash" style="font-size:0.6rem;pointer-events:none;"></i>';
+                    trashBtn.style.cssText = 'display:flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;color:rgba(255,255,255,0.55);cursor:pointer;transition:color 0.15s,background 0.15s;flex-shrink:0;';
                     trashBtn.title = 'מחק תכולה מאיזור זה';
                     trashBtn.addEventListener('mouseenter', () => { trashBtn.style.color = '#ef4444'; trashBtn.style.background = 'rgba(239,68,68,0.15)'; });
                     trashBtn.addEventListener('mouseleave', () => { trashBtn.style.color = 'rgba(255,255,255,0.55)'; trashBtn.style.background = 'transparent'; });
@@ -815,7 +815,7 @@ function buildDimensionsAndButtonsUI() {
 
                     // Divider after trash
                     const div1 = document.createElement('div');
-                    div1.style.cssText = 'width:1px;height:10px;background:rgba(255,255,255,0.2);margin:0 3px;flex-shrink:0;';
+                    div1.style.cssText = 'width:1px;height:11px;background:rgba(255,255,255,0.2);margin:0 4px;flex-shrink:0;';
                     pill.appendChild(div1);
                 }
 
@@ -827,7 +827,7 @@ function buildDimensionsAndButtonsUI() {
                 heightInput.value = String(cellH);
                 heightInput.title = 'לחץ לעריכת גובה התא';
                 heightInput.setAttribute('aria-label', 'גובה תא בס״מ');
-                heightInput.style.cssText = 'width:2.2em;min-width:1.8em;height:16px;border:none;background:transparent;font-size:0.68rem;font-weight:700;color:rgba(255,255,255,0.95);line-height:16px;text-align:center;outline:none;padding:0;margin:0;font-family:inherit;-moz-appearance:textfield;cursor:text;';
+                heightInput.style.cssText = 'width:2.3em;min-width:1.9em;height:17px;border:none;background:transparent;font-size:0.7rem;font-weight:700;color:rgba(255,255,255,0.95);line-height:17px;text-align:center;outline:none;padding:0;margin:0;font-family:inherit;-moz-appearance:textfield;cursor:text;';
                 heightInput.addEventListener('mousedown', (e) => { e.stopPropagation(); });
                 heightInput.addEventListener('click', (e) => { e.stopPropagation(); heightInput.select(); });
                 heightInput.addEventListener('keydown', (e) => {
@@ -849,13 +849,13 @@ function buildDimensionsAndButtonsUI() {
 
                 // Divider between height and +
                 const div2 = document.createElement('div');
-                div2.style.cssText = 'width:1px;height:10px;background:rgba(255,255,255,0.2);margin:0 3px;flex-shrink:0;';
+                div2.style.cssText = 'width:1px;height:11px;background:rgba(255,255,255,0.2);margin:0 4px;flex-shrink:0;';
                 pill.appendChild(div2);
 
                 // + button — last in DOM = visual right in LTR (= visual left in RTL page)
                 const plusBtn = document.createElement('div');
-                plusBtn.innerHTML = '<i class="fa-solid fa-plus" style="font-size:0.65rem;pointer-events:none;"></i>';
-                plusBtn.style.cssText = 'display:flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;cursor:pointer;flex-shrink:0;transition:transform 0.15s,box-shadow 0.15s;box-shadow:0 1px 4px rgba(99,102,241,0.45);';
+                plusBtn.innerHTML = '<i class="fa-solid fa-plus" style="font-size:0.68rem;pointer-events:none;"></i>';
+                plusBtn.style.cssText = 'display:flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;cursor:pointer;flex-shrink:0;transition:transform 0.15s,box-shadow 0.15s;box-shadow:0 1px 4px rgba(99,102,241,0.45);';
                 plusBtn.addEventListener('mouseenter', () => { plusBtn.style.transform = 'scale(1.12)'; plusBtn.style.boxShadow = '0 2px 8px rgba(99,102,241,0.65)'; });
                 plusBtn.addEventListener('mouseleave', () => { plusBtn.style.transform = 'scale(1)'; plusBtn.style.boxShadow = '0 1px 4px rgba(99,102,241,0.45)'; });
                 plusBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleSelection(d.colIndex, d.rowIndex); });
