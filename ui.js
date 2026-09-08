@@ -6578,6 +6578,22 @@ function bindUI() {
 
         if (!isClick) return;
 
+        // Shelf pick (always-on): clicking a shelf selects it for delete — skip cell-clear logic
+        if (typeof window.handleShelfPickPointerUp === 'function') {
+            const shelfResult = window.handleShelfPickPointerUp(e);
+            if (shelfResult === 'handled') {
+                if (state.selection.colIndex !== -1 || state.selection.rows.length > 0 ||
+                    (typeof _activeSubCellIdxs !== 'undefined' && _activeSubCellIdxs.size > 0)) {
+                    _clearSubCellSelection();
+                    state.selection = { colIndex: -1, rows: [] };
+                    closeContentSubPanels();
+                    if (typeof buildDimensionsAndButtonsUI === 'function') buildDimensionsAndButtonsUI();
+                    if (typeof updateToolbarButtonHighlights === 'function') updateToolbarButtonHighlights();
+                }
+                return;
+            }
+        }
+
         const rect = container.getBoundingClientRect();
         mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
         mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;

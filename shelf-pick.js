@@ -1,23 +1,26 @@
 // ============================================================
-// shelf-pick.js — Select a shelf in 3D and delete it
-// ============================================================
-// Public API:
-//   window.enterShelfPickMode()
-//   window.exitShelfPickMode()
-//   window.deleteSelectedShelf()
+// shelf-pick.js — Select shelves in the regular editor and delete
+// Always available (no separate mode). Disabled in viewer / part-paint.
 // ============================================================
 
 (function () {
     'use strict';
 
-    let _active = false;
     let _hoveredMesh = null;
     let _selectedMesh = null;
-    let _selectedRef = null; // { colIndex, shelfIdx }
-    let _originalEmissive = new Map();
+    let _selectedRef = null; // { colIndex, shelfIdx } | { colIndex, rowIndex, subCellIdx, subShelfIdx, isSub }
+    let _originalMats = new Map(); // mesh → original material (shared)
     const _raycaster = new THREE.Raycaster();
     const _mouse = new THREE.Vector2();
     const _worldPos = new THREE.Vector3();
+    let _listenersBound = false;
+
+    function _enabled() {
+        if (window._VIEWER_MODE) return false;
+        if (typeof window.isPartPaintMode === 'function' && window.isPartPaintMode()) return false;
+        if (document.body.classList.contains('part-paint-active')) return false;
+        return true;
+    }
 
     function _getCanvas() {
         if (window.renderer && window.renderer.domElement) return window.renderer.domElement;
@@ -30,63 +33,87 @@
 
     function _parseShelfRef(mesh) {
         if (!mesh || !mesh.userData) return null;
-        if (mesh.userData.shelfRef &&
-            mesh.userData.shelfRef.colIndex != null &&
-            mesh.userData.shelfRef.shelfIdx != null) {
-            return {
-                colIndex: mesh.userData.shelfRef.colIndex | 0,
-                shelfIdx: mesh.userData.shelfRef.shelfIdx | 0
-            };
+        const ref = mesh.userData.shelfRef;
+        if (ref) {
+            if (ref.isSub || (ref.subCellIdx != null && ref.subShelfIdx != null)) {
+                return {
+                    isSub: true,
+                    colIndex: ref.colIndex | 0,
+                    rowIndex: ref.rowIndex | 0,
+                    subCellIdx: ref.subCellIdx | 0,
+                    subShelfIdx: ref.subShelfIdx | 0
+                };
+            }
+            if (ref.colIndex != null && ref.shelfIdx != null) {
+                return { colIndex: ref.colIndex | 0, shelfIdx: ref.shelfIdx | 0, isSub: false };
+            }
         }
         const id = mesh.userData.partId || '';
-        const m = String(id).match(/shelf_c(\d+)_r(\d+)$/);
+        let m = String(id).match(/shelf_sub_c(\d+)_r(\d+)_s(\d+)_(\d+)$/);
+        if (m) {
+            return {
+                isSub: true,
+                colIndex: +m[1],
+                rowIndex: +m[2],
+                subCellIdx: +m[3],
+                subShelfIdx: +m[4]
+            };
+        }
+        m = String(id).match(/shelf_c(\d+)_r(\d+)$/);
         if (!m) return null;
-        return { colIndex: +m[1], shelfIdx: +m[2] };
+        return { colIndex: +m[1], shelfIdx: +m[2], isSub: false };
     }
 
     function _isShelfMesh(mesh) {
         return !!_parseShelfRef(mesh);
     }
 
-    function _saveAndSetEmissive(mesh, color, intensity) {
-        if (!mesh || !mesh.material) return;
-        const mat = mesh.material;
-        if (!_originalEmissive.has(mesh)) {
-            _originalEmissive.set(mesh, {
-                color: mat.emissive ? mat.emissive.getHex() : 0x000000,
-                intensity: mat.emissiveIntensity !== undefined ? mat.emissiveIntensity : 0
-            });
+    function _refsEqual(a, b) {
+        if (!a || !b) return false;
+        if (!!a.isSub !== !!b.isSub) return false;
+        if (a.isSub) {
+            return a.colIndex === b.colIndex && a.rowIndex === b.rowIndex &&
+                a.subCellIdx === b.subCellIdx && a.subShelfIdx === b.subShelfIdx;
         }
+        return a.colIndex === b.colIndex && a.shelfIdx === b.shelfIdx;
+    }
+
+    function _cloneHighlight(mesh, color, intensity) {
+        if (!mesh || !mesh.material) return;
+        if (!_originalMats.has(mesh)) {
+            _originalMats.set(mesh, mesh.material);
+            mesh.material = mesh.material.clone();
+        }
+        const mat = mesh.material;
         if (mat.emissive) {
             mat.emissive.setHex(color);
             mat.emissiveIntensity = intensity;
         }
     }
 
-    function _restoreEmissive(mesh) {
-        if (!mesh || !mesh.material) return;
-        const saved = _originalEmissive.get(mesh);
-        if (saved && mesh.material.emissive) {
-            mesh.material.emissive.setHex(saved.color);
-            mesh.material.emissiveIntensity = saved.intensity;
+    function _restoreMat(mesh) {
+        if (!mesh) return;
+        const orig = _originalMats.get(mesh);
+        if (orig) {
+            mesh.material = orig;
+            _originalMats.delete(mesh);
         }
-        _originalEmissive.delete(mesh);
     }
 
     function _setHover(mesh) {
         if (_hoveredMesh === mesh) return;
         if (_hoveredMesh && _hoveredMesh !== _selectedMesh) {
-            _restoreEmissive(_hoveredMesh);
+            _restoreMat(_hoveredMesh);
         }
         _hoveredMesh = mesh;
         if (mesh && mesh !== _selectedMesh) {
-            _saveAndSetEmissive(mesh, 0x4488ff, 0.35);
+            _cloneHighlight(mesh, 0x38bdf8, 0.4);
         }
     }
 
     function _clearSelectionVisual() {
         if (_selectedMesh) {
-            _restoreEmissive(_selectedMesh);
+            _restoreMat(_selectedMesh);
             _selectedMesh = null;
         }
         _selectedRef = null;
@@ -97,13 +124,25 @@
         const ref = _parseShelfRef(mesh);
         if (!ref) return;
         if (_selectedMesh && _selectedMesh !== mesh) {
-            _restoreEmissive(_selectedMesh);
+            _restoreMat(_selectedMesh);
         }
         _selectedMesh = mesh;
         _selectedRef = ref;
-        _saveAndSetEmissive(mesh, 0xef4444, 0.45);
+        // Strong amber/red highlight on the selected shelf only
+        _cloneHighlight(mesh, 0xf97316, 0.65);
         _showTrash();
         _updateTrashPos();
+    }
+
+    function _findMeshByRef(ref) {
+        if (!ref || !window.partMeshes) return null;
+        for (let i = 0; i < window.partMeshes.length; i++) {
+            const m = window.partMeshes[i];
+            if (!m || m.visible === false) continue;
+            const r = _parseShelfRef(m);
+            if (_refsEqual(r, ref)) return m;
+        }
+        return null;
     }
 
     function _raycast(event) {
@@ -119,27 +158,6 @@
         });
         const hits = _raycaster.intersectObjects(meshes, false);
         return hits.length ? hits[0].object : null;
-    }
-
-    function _showBanner() {
-        let banner = document.getElementById('sp-mode-banner');
-        if (!banner) {
-            banner = document.createElement('div');
-            banner.id = 'sp-mode-banner';
-            banner.className = 'pp-mode-banner';
-            banner.innerHTML =
-                '<i class="fa-solid fa-layer-group" style="color:#f87171;"></i>' +
-                '<span>מחיקת מדף — לחץ על מדף לסימון, Delete או הפח למחיקה</span>' +
-                '<button type="button" onclick="exitShelfPickMode()" class="pp-exit-btn">' +
-                '<i class="fa-solid fa-xmark"></i> יציאה</button>';
-            document.body.appendChild(banner);
-        }
-        banner.style.display = 'flex';
-    }
-
-    function _hideBanner() {
-        const banner = document.getElementById('sp-mode-banner');
-        if (banner) banner.style.display = 'none';
     }
 
     function _showTrash() {
@@ -181,33 +199,28 @@
     }
 
     function _onMouseMove(e) {
-        if (!_active) return;
+        if (!_enabled()) {
+            if (_hoveredMesh && _hoveredMesh !== _selectedMesh) {
+                _restoreMat(_hoveredMesh);
+                _hoveredMesh = null;
+            }
+            return;
+        }
         const mesh = _raycast(e);
         _setHover(mesh);
         if (_selectedMesh) _updateTrashPos();
     }
 
-    function _onClick(e) {
-        if (!_active) return;
-        if (e.target && e.target.closest && e.target.closest('#sp-shelf-trash')) return;
-        const mesh = _raycast(e);
-        if (!mesh) {
-            _clearSelectionVisual();
-            return;
-        }
-        e.stopPropagation();
-        _selectMesh(mesh);
-    }
-
     function _onKeyDown(e) {
-        if (!_active) return;
-        if (e.key === 'Escape') {
-            if (_selectedMesh) _clearSelectionVisual();
-            else exitShelfPickMode();
+        if (!_enabled()) return;
+        if (e.key === 'Escape' && _selectedMesh) {
+            _clearSelectionVisual();
             e.preventDefault();
             return;
         }
         if ((e.key === 'Delete' || e.key === 'Backspace') && _selectedRef) {
+            const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+            if (tag === 'input' || tag === 'textarea' || (e.target && e.target.isContentEditable)) return;
             e.preventDefault();
             e.stopPropagation();
             window.deleteSelectedShelf();
@@ -215,17 +228,60 @@
     }
 
     function _onResize() {
-        if (_active && _selectedMesh) _updateTrashPos();
+        if (_selectedMesh) _updateTrashPos();
     }
+
+    /**
+     * Called from ui.js pointerup when a click is detected.
+     * @returns {'handled'|'none'}
+     */
+    window.handleShelfPickPointerUp = function (e) {
+        if (!_enabled()) return 'none';
+        if (e.target && e.target.closest && e.target.closest('#sp-shelf-trash')) return 'handled';
+        const mesh = _raycast(e);
+        if (!mesh) {
+            if (_selectedRef) _clearSelectionVisual();
+            return 'none';
+        }
+        _selectMesh(mesh);
+        return 'handled';
+    };
+
+    window.reapplyShelfSelectionAfterBuild = function () {
+        if (!_selectedRef) return;
+        const mesh = _findMeshByRef(_selectedRef);
+        if (!mesh) {
+            _selectedMesh = null;
+            _hideTrash();
+            return;
+        }
+        _selectedMesh = mesh;
+        _cloneHighlight(mesh, 0xf97316, 0.65);
+        _showTrash();
+        _updateTrashPos();
+    };
+
+    window.clearShelfSelection = function () {
+        if (_hoveredMesh && _hoveredMesh !== _selectedMesh) _restoreMat(_hoveredMesh);
+        _hoveredMesh = null;
+        _clearSelectionVisual();
+        _originalMats.clear();
+    };
 
     window.deleteSelectedShelf = function () {
         if (!_selectedRef) return false;
-        const { colIndex, shelfIdx } = _selectedRef;
-        const ok = typeof window.deleteShelfAt === 'function' &&
-            window.deleteShelfAt(colIndex, shelfIdx);
+        const ref = _selectedRef;
+        let ok = false;
+        if (ref.isSub) {
+            ok = typeof window.deleteSubShelfAt === 'function' &&
+                window.deleteSubShelfAt(ref.colIndex, ref.rowIndex, ref.subCellIdx, ref.subShelfIdx);
+        } else {
+            ok = typeof window.deleteShelfAt === 'function' &&
+                window.deleteShelfAt(ref.colIndex, ref.shelfIdx);
+        }
         _clearSelectionVisual();
         if (_hoveredMesh) {
-            _restoreEmissive(_hoveredMesh);
+            _restoreMat(_hoveredMesh);
             _hoveredMesh = null;
         }
         if (!ok) {
@@ -241,51 +297,31 @@
         return true;
     };
 
-    window.enterShelfPickMode = function () {
-        if (_active) return;
-        if (typeof window.exitPartPaintMode === 'function') {
-            try { window.exitPartPaintMode(); } catch (err) { /* ignore */ }
-        }
-        _active = true;
-        document.body.classList.add('shelf-pick-active');
-        _showBanner();
+    // Legacy stubs — mode buttons removed; keep no-op for old onclick / part-paint
+    window.enterShelfPickMode = function () { /* always-on */ };
+    window.exitShelfPickMode = function () { window.clearShelfSelection(); };
+    window.isShelfPickMode = function () { return false; };
 
+    function _bindListeners() {
+        if (_listenersBound || window._VIEWER_MODE) return;
         const canvas = _getCanvas();
-        if (canvas) {
-            canvas.addEventListener('mousemove', _onMouseMove, { passive: true });
-            canvas.addEventListener('click', _onClick, true);
-        }
+        if (!canvas) return;
+        _listenersBound = true;
+        canvas.addEventListener('mousemove', _onMouseMove, { passive: true });
         document.addEventListener('keydown', _onKeyDown, true);
         window.addEventListener('resize', _onResize);
+        window.addEventListener('scroll', _onResize, true);
+    }
 
-        if (typeof buildCabinet === 'function') buildCabinet();
-    };
+    function _tryBind() {
+        if (window._VIEWER_MODE) return;
+        _bindListeners();
+        if (!_listenersBound) setTimeout(_tryBind, 200);
+    }
 
-    window.exitShelfPickMode = function () {
-        if (!_active) return;
-        _active = false;
-
-        if (_hoveredMesh && _hoveredMesh !== _selectedMesh) {
-            _restoreEmissive(_hoveredMesh);
-        }
-        _hoveredMesh = null;
-        _clearSelectionVisual();
-        _originalEmissive.clear();
-
-        document.body.classList.remove('shelf-pick-active');
-        _hideBanner();
-        _hideTrash();
-
-        const canvas = _getCanvas();
-        if (canvas) {
-            canvas.removeEventListener('mousemove', _onMouseMove);
-            canvas.removeEventListener('click', _onClick, true);
-        }
-        document.removeEventListener('keydown', _onKeyDown, true);
-        window.removeEventListener('resize', _onResize);
-    };
-
-    window.isShelfPickMode = function () {
-        return _active;
-    };
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _tryBind);
+    } else {
+        _tryBind();
+    }
 })();

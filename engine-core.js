@@ -2959,6 +2959,7 @@ function buildCabinet() {
     if(typeof updateQuickEditPanelUI === 'function') updateQuickEditPanelUI();
     if(typeof updateToolbarState === 'function') updateToolbarState();
     if(typeof window._updateMaterialTabVisibility === 'function') window._updateMaterialTabVisibility();
+    if (typeof window.reapplyShelfSelectionAfterBuild === 'function') window.reapplyShelfSelectionAfterBuild();
 
     // Sync height inputs in right sidebar to the tallest column of the active wing
     {
@@ -5476,8 +5477,24 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                         _subZoneIsHoneycomb(honeyPaintIdx - 1, s + 1)
                                     )) honeyPaintIdx--;
                                     _ppPartId = `opencell_sub_c${c}_r${r}_s${honeyPaintIdx}`;
+                                } else {
+                                    _ppPartId = `shelf_sub_c${c}_r${r}_s${si}_${s}`;
                                 }
-                                createBoard(subW, t, subD, subCenterX, subShelvesY[s], shelfZ, shelfMat);
+                                const subShelfMesh = createBoard(subW, t, subD, subCenterX, subShelvesY[s], shelfZ, shelfMat);
+                                if (!isBP && subShelfMesh) {
+                                    subShelfMesh.userData.shelfRef = {
+                                        colIndex: c,
+                                        rowIndex: r,
+                                        subCellIdx: si,
+                                        subShelfIdx: s,
+                                        isSub: true
+                                    };
+                                    // Ensure pickable even if partId path skipped
+                                    if (!subShelfMesh.userData.partId) {
+                                        subShelfMesh.userData.partId = _ppPartId;
+                                        window.partMeshes.push(subShelfMesh);
+                                    }
+                                }
                                 _ppPartId = '';
                             }
                             if (!isBP) {

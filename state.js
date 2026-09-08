@@ -2766,6 +2766,89 @@ window.deleteShelfAt = function(colIndex, shelfIdx) {
     return true;
 };
 
+/**
+ * Delete one shelf inside a partition sub-cell, merging the two zones it separated.
+ * @returns {boolean}
+ */
+window.deleteSubShelfAt = function(colIndex, rowIndex, subCellIdx, subShelfIdx) {
+    const cols = (typeof state !== 'undefined' && state.columns) ? state.columns : null;
+    if (!cols || colIndex < 0 || colIndex >= cols.length) return false;
+    const col = cols[colIndex];
+    if (!col || !Array.isArray(col.compartments)) return false;
+    const comp = col.compartments[rowIndex];
+    if (!comp || !comp.partition || !Array.isArray(comp.subCells)) return false;
+    const sub = comp.subCells[subCellIdx];
+    if (!sub) return false;
+
+    const si = subShelfIdx | 0;
+    if (!Array.isArray(sub.shelvesY) || si < 0 || si >= sub.shelvesY.length) return false;
+
+    const _isDoor = (t) => !!(t && (t === 'door_right' || t === 'door_left' || t === 'door_double' || t === 'door_flap'));
+    const _prefer = (a, b) => {
+        const aEmpty = !a || a === 'empty';
+        const bEmpty = !b || b === 'empty';
+        if (aEmpty && !bEmpty) return b;
+        return a || 'empty';
+    };
+    const _mergeArr = (arr, keepDoorPrefer) => {
+        if (!Array.isArray(arr)) return;
+        while (arr.length < si + 2) arr.push(keepDoorPrefer ? 'empty' : (typeof arr[0] === 'number' ? 0 : 'empty'));
+        const kept = keepDoorPrefer
+            ? (_isDoor(arr[si + 1]) && !_isDoor(arr[si]) ? arr[si + 1] : _prefer(arr[si], arr[si + 1]))
+            : _prefer(arr[si], arr[si + 1]);
+        arr[si] = kept;
+        arr.splice(si + 1, 1);
+    };
+
+    _mergeArr(sub.zonesType, false);
+    _mergeArr(sub.zonesDoor, true);
+    if (Array.isArray(sub.zonesDrawerCount)) {
+        while (sub.zonesDrawerCount.length < si + 2) sub.zonesDrawerCount.push(0);
+        const a = sub.zonesDrawerCount[si] || 0;
+        const b = sub.zonesDrawerCount[si + 1] || 0;
+        sub.zonesDrawerCount[si] = Math.max(a, b);
+        sub.zonesDrawerCount.splice(si + 1, 1);
+    }
+
+    // Remap / prune zoneDoorGroups keys for this sub-cell
+    if (Array.isArray(comp.zoneDoorGroups)) {
+        comp.zoneDoorGroups = comp.zoneDoorGroups.map(g => {
+            if (!g || !Array.isArray(g.keys)) return g;
+            const nextKeys = [];
+            const seen = new Set();
+            g.keys.forEach(key => {
+                const parts = String(key).split(':');
+                const kSi = parseInt(parts[0], 10);
+                let kZ = parseInt(parts[1] || '0', 10);
+                if (kSi !== subCellIdx) {
+                    nextKeys.push(key);
+                    return;
+                }
+                if (kZ === si + 1) kZ = si;
+                else if (kZ > si + 1) kZ -= 1;
+                const nk = kSi + ':' + kZ;
+                if (!seen.has(nk)) {
+                    seen.add(nk);
+                    nextKeys.push(nk);
+                }
+            });
+            return Object.assign({}, g, { keys: nextKeys });
+        }).filter(g => g && g.keys && g.keys.length);
+    }
+
+    sub.shelvesY.splice(si, 1);
+    sub.shelves = sub.shelvesY.length;
+
+    // Sync primary type from zone 0 interior if useful
+    if (Array.isArray(sub.zonesType) && sub.zonesType[0] && sub.zonesType[0] !== 'empty') {
+        sub.type = sub.zonesType[0];
+    } else if ((sub.shelves || 0) === 0 && (!sub.zonesType || !sub.zonesType.some(t => t && t !== 'empty'))) {
+        if (!_isDoor(sub.type)) sub.type = sub.type || 'empty';
+    }
+
+    return true;
+};
+
 function _syncCompartmentCount(col, baseY, t) {
     if (!col.compartments) col.compartments = [];
     const numComps = col.shelves + (_hasActiveSplit(col, baseY, t) ? 2 : 1);
