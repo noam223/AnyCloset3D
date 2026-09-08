@@ -14,12 +14,12 @@
     const _raycaster = new THREE.Raycaster();
     const _mouse = new THREE.Vector2();
     const _worldPos = new THREE.Vector3();
-    const _hoverColor = new THREE.Color(0xfed7aa);  // כתום בהיר בהיר (ריחוף)
-    const _selectColor = new THREE.Color(0xfb923c); // כתום (בחירה)
-    const _HOVER_BLEND = 0.2;
-    const _SELECT_BLEND = 0.35;
-    const _HOVER_EMISSIVE = 0.12;
-    const _SELECT_EMISSIVE = 0.22;
+    const _hoverColor = new THREE.Color(0xfb923c);  // כתום (ריחוף)
+    const _selectColor = new THREE.Color(0xea580c); // כתום חזק יותר (בחירה)
+    const _HOVER_BLEND = 0.55;
+    const _SELECT_BLEND = 0.72;
+    const _HOVER_EMISSIVE = 0.4;
+    const _SELECT_EMISSIVE = 0.55;
     let _listenersBound = false;
 
     function _enabled() {
@@ -90,7 +90,7 @@
         return hitMesh;
     }
 
-    /** Soft translucent tint toward light blue + gentle emissive. */
+    /** Orange tint + emissive glow (strong enough to read on wood textures). */
     function _applyHighlight(visual, color, blend, emissiveIntensity) {
         if (!visual || !visual.material) return;
         if (!_savedLooks.has(visual)) {
@@ -112,6 +112,7 @@
         }
         const saved = _savedLooks.get(visual);
         const mat = visual.material;
+        // With texture maps, color is a multiplier — lerp strongly so orange reads clearly
         if (mat.color && saved.baseColor) {
             mat.color.copy(saved.baseColor).lerp(color, blend);
         } else if (mat.color) {
@@ -121,13 +122,13 @@
             mat.emissive.copy(color);
             mat.emissiveIntensity = emissiveIntensity;
         }
-        // Slight transparency so the tint feels softer / more see-through
-        mat.transparent = true;
-        mat.opacity = Math.max(0.72, (saved.baseOpacity != null ? saved.baseOpacity : 1) * (1 - blend * 0.35));
+        // Keep nearly opaque — transparency washed out the orange on wood
+        mat.transparent = saved.baseTransparent;
+        mat.opacity = saved.baseOpacity != null ? saved.baseOpacity : 1;
         mat.needsUpdate = true;
         visual.children.forEach(function (ch) {
             if (ch.isLineSegments && ch.material && ch.material.color) {
-                ch.material.color.copy(saved.baseColor || color).lerp(color, Math.min(1, blend + 0.15));
+                ch.material.color.copy(color);
                 ch.material.needsUpdate = true;
             }
         });
