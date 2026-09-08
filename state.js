@@ -1823,7 +1823,7 @@ window.applyUpperUnitMaterial = function(matKey) {
 // ==========================================
 // History
 // ==========================================
-const MAX_HISTORY = 20;
+const MAX_HISTORY = 40;
 
 const _COMP_TYPE_LABELS = {
     empty: 'ריק',
