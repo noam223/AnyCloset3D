@@ -14,8 +14,8 @@
     const _raycaster = new THREE.Raycaster();
     const _mouse = new THREE.Vector2();
     const _worldPos = new THREE.Vector3();
-    const _hoverColor = new THREE.Color(0xd1fae5);  // ירוק בהיר בהיר
-    const _selectColor = new THREE.Color(0x86efac); // ירוק בהיר
+    const _hoverColor = new THREE.Color(0xdbeafe);  // כחול בהיר בהיר
+    const _selectColor = new THREE.Color(0x93c5fd); // כחול בהיר
     const _HOVER_BLEND = 0.2;
     const _SELECT_BLEND = 0.35;
     const _HOVER_EMISSIVE = 0.12;
@@ -90,7 +90,7 @@
         return hitMesh;
     }
 
-    /** Soft translucent tint toward light green + gentle emissive. */
+    /** Soft translucent tint toward light blue + gentle emissive. */
     function _applyHighlight(visual, color, blend, emissiveIntensity) {
         if (!visual || !visual.material) return;
         if (!_savedLooks.has(visual)) {
