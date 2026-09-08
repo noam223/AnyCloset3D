@@ -4627,10 +4627,17 @@ function buildDragHandlesUI() {
             if(v.isSplit) { sHandle.style.borderColor = '#e74c3c'; sHandle.style.boxShadow = '0 2px 10px rgba(231, 76, 60, 0.4)'; }
             if(v.isInternalDeskSurface || v.isInternalDeskClearance) sHandle.style.borderColor = '#f1c40f';
             if(v.isSubCellShelf) { sHandle.style.borderColor = '#06b6d4'; sHandle.style.boxShadow = '0 2px 10px rgba(6,182,212,0.4)'; }
-            // Store colIndex + shelfIdx for snap highlight lookup
-            if (!v.isSplit && !v.isInternalDeskSurface && !v.isInternalDeskClearance && !v.isInternalDeskDrawer && !v.isSubCellShelf) {
+            // Store identity so shelf-delete trash can sit next to this handle
+            if (!v.isSplit && !v.isInternalDeskSurface && !v.isInternalDeskClearance && !v.isInternalDeskDrawer) {
                 sHandle.dataset.colIndex = v.colIndex;
-                sHandle.dataset.shelfIdx = v.shelfIdx;
+                if (v.isSubCellShelf) {
+                    sHandle.dataset.subShelf = '1';
+                    sHandle.dataset.rowIndex = v.rowIndex;
+                    sHandle.dataset.subCellIdx = v.subCellIdx;
+                    sHandle.dataset.subShelfIdx = v.subShelfIdx;
+                } else {
+                    sHandle.dataset.shelfIdx = v.shelfIdx;
+                }
             }
             dragLayer.appendChild(sHandle);
             
@@ -5238,6 +5245,7 @@ function updateDragHandlesPosition() {
         // Upper unit move handle: raise 20px above projected position
         handle.style.top = `${handle.classList.contains('uu-move-handle') ? y - 20 : y}px`;
     });
+    if (typeof window._updateShelfTrashPos === 'function') window._updateShelfTrashPos();
 }
 
 // ── Bed controls toolbar ──────────────────────────────────────────────────────

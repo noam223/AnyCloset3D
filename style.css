@@ -4186,8 +4186,7 @@ body.part-paint-active #canvas-container {
     z-index: 9100;
     width: 22px;
     height: 22px;
-    margin-left: -11px;
-    margin-top: -28px;
+    margin: 0;
     display: none;
     align-items: center;
     justify-content: center;
@@ -4198,11 +4197,12 @@ body.part-paint-active #canvas-container {
     font-size: 0.65rem;
     cursor: pointer;
     box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+    transform: translate(0, -50%);
     transition: transform 0.15s, background 0.15s;
 }
 .sp-shelf-trash:hover {
     background: #dc2626;
-    transform: scale(1.1);
+    transform: translate(0, -50%) scale(1.1);
 }
 
 /* Mode banner */

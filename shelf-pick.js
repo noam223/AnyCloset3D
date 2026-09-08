@@ -14,8 +14,8 @@
     const _raycaster = new THREE.Raycaster();
     const _mouse = new THREE.Vector2();
     const _worldPos = new THREE.Vector3();
-    const _hoverColor = new THREE.Color(0xdbeafe);  // כחול בהיר בהיר
-    const _selectColor = new THREE.Color(0x93c5fd); // כחול בהיר
+    const _hoverColor = new THREE.Color(0xdbeafe);  // כחול בהיר בהיר (ריחוף)
+    const _selectColor = new THREE.Color(0xfb923c); // כתום (בחירה)
     const _HOVER_BLEND = 0.2;
     const _SELECT_BLEND = 0.35;
     const _HOVER_EMISSIVE = 0.12;
@@ -241,19 +241,53 @@
         if (btn) btn.style.display = 'none';
     }
 
+    function _findShelfDragHandle() {
+        if (!_selectedRef) return null;
+        const handles = document.querySelectorAll('#drag-handles-layer .drag-handle.vertical');
+        for (let i = 0; i < handles.length; i++) {
+            const h = handles[i];
+            if (_selectedRef.isSub) {
+                if (h.dataset.subShelf === '1' &&
+                    (+h.dataset.colIndex === _selectedRef.colIndex) &&
+                    (+h.dataset.rowIndex === _selectedRef.rowIndex) &&
+                    (+h.dataset.subCellIdx === _selectedRef.subCellIdx) &&
+                    (+h.dataset.subShelfIdx === _selectedRef.subShelfIdx)) {
+                    return h;
+                }
+            } else if (h.dataset.shelfIdx != null && h.dataset.subShelf !== '1' &&
+                (+h.dataset.colIndex === _selectedRef.colIndex) &&
+                (+h.dataset.shelfIdx === _selectedRef.shelfIdx)) {
+                return h;
+            }
+        }
+        return null;
+    }
+
     function _updateTrashPos() {
         const btn = document.getElementById('sp-shelf-trash');
         const canvas = _getCanvas();
         const camera = _getCamera();
         if (!btn || !canvas || !camera || !_selectedMesh) return;
+
+        const handle = _findShelfDragHandle();
+        if (handle) {
+            const hr = handle.getBoundingClientRect();
+            // Visual right of the up/down drag arrows
+            btn.style.left = Math.round(hr.right + 6) + 'px';
+            btn.style.top = Math.round(hr.top + hr.height / 2) + 'px';
+            return;
+        }
+
+        // Fallback: shelf mesh center
         _selectedMesh.getWorldPosition(_worldPos);
         _worldPos.project(camera);
         const rect = canvas.getBoundingClientRect();
         const x = (_worldPos.x * 0.5 + 0.5) * rect.width + rect.left;
         const y = (-_worldPos.y * 0.5 + 0.5) * rect.height + rect.top;
-        btn.style.left = Math.round(x) + 'px';
+        btn.style.left = Math.round(x + 18) + 'px';
         btn.style.top = Math.round(y) + 'px';
     }
+    window._updateShelfTrashPos = _updateTrashPos;
 
     function _onPointerMove(e) {
         if (!_enabled()) {
