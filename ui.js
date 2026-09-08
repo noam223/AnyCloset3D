@@ -3524,6 +3524,141 @@ window.applyContentForce = function(type) {
     buildCabinet(); calculatePrice(); saveHistoryState();
 };
 
+/** Enable partition on a compartment (migrate hanging/drawers into both sides when possible). */
+function _enablePartitionOnComp(comp) {
+    if (!comp) return;
+    if (comp.partition) {
+        if (!Array.isArray(comp.partitions) || !comp.partitions.length) comp.partitions = [0.5];
+        if (!Array.isArray(comp.subCells) || comp.subCells.length < comp.partitions.length + 1) {
+            const n = comp.partitions.length + 1;
+            if (!Array.isArray(comp.subCells)) comp.subCells = [];
+            while (comp.subCells.length < n) comp.subCells.push({ type: 'empty', shelves: 0 });
+        }
+        return;
+    }
+    const prevType = comp.type || 'empty';
+    const migratable = (prevType === 'hanging' || prevType === 'sorbet' ||
+        prevType === 'internal_drawers' || prevType === 'external_drawers');
+    comp.partition = true;
+    comp.partitions = [0.5];
+    if (migratable) {
+        const left = { type: prevType, shelves: 0, zonesType: [prevType] };
+        const right = { type: prevType, shelves: 0, zonesType: [prevType] };
+        if (typeof comp.count === 'number' && comp.count > 0 &&
+            (prevType === 'internal_drawers' || prevType === 'external_drawers')) {
+            left.count = comp.count;
+            right.count = comp.count;
+        }
+        if (comp.handleStyle) {
+            left.handleStyle = comp.handleStyle;
+            right.handleStyle = comp.handleStyle;
+        }
+        comp.subCells = [left, right];
+        comp.type = 'empty';
+    } else {
+        comp.subCells = [{ type: 'empty', shelves: 0 }, { type: 'empty', shelves: 0 }];
+    }
+}
+
+/** Dividers in compartment order (shelves + optional קושרת), matching _compartmentBounds. */
+function _partitionDividerMeta(col) {
+    const t = state.thickness || 1.7;
+    const baseY = (typeof _columnBaseY === 'function') ? _columnBaseY(col) : (state.plinthHeight || 0);
+    const items = [];
+    (col.shelvesY || []).forEach((y, shelfIdx) => {
+        items.push({ y: y, kind: 'shelf', shelfIdx: shelfIdx });
+    });
+    if (typeof _hasActiveSplit === 'function' ? _hasActiveSplit(col, baseY, t) : !!(col.splitY)) {
+        items.push({ y: col.splitY, kind: 'split', shelfIdx: -1 });
+    }
+    items.sort((a, b) => a.y - b.y);
+    return items;
+}
+
+/**
+ * Merge consecutive selected rows into one cell, delete shelves between them, apply partition.
+ * @returns {{ ok: true, row: number } | { ok: false, reason: string }}
+ */
+function _mergeAdjacentRowsIntoPartition(col, rows) {
+    if (!col || !rows || rows.length < 2) return { ok: false, reason: 'too-few' };
+    const sel = rows.slice().sort((a, b) => a - b);
+    const startR = sel[0];
+    const endR = sel[sel.length - 1];
+    if (endR - startR + 1 !== sel.length) return { ok: false, reason: 'not-consecutive' };
+
+    if (!Array.isArray(col.compartments)) col.compartments = [];
+    while (col.compartments.length <= endR) col.compartments.push(
+        (typeof _emptyCompartment === 'function') ? _emptyCompartment() : { type: 'empty' }
+    );
+
+    const dividers = _partitionDividerMeta(col);
+    for (let i = startR; i < endR; i++) {
+        if (!dividers[i]) return { ok: false, reason: 'missing-divider' };
+        if (dividers[i].kind === 'split') return { ok: false, reason: 'crosses-split' };
+    }
+
+    // Prefer migratable / already-partitioned content from the selection (clone before splice)
+    const _MIG = new Set(['hanging', 'sorbet', 'internal_drawers', 'external_drawers']);
+    let seedComp = col.compartments[startR];
+    for (let r = startR; r <= endR; r++) {
+        const comp = col.compartments[r];
+        if (comp && comp.partition && Array.isArray(comp.subCells)) {
+            seedComp = comp;
+            break;
+        }
+    }
+    if (!(seedComp && seedComp.partition)) {
+        for (let r = startR; r <= endR; r++) {
+            const comp = col.compartments[r];
+            if (comp && _MIG.has(comp.type)) {
+                seedComp = comp;
+                break;
+            }
+        }
+    }
+    const seedClone = JSON.parse(JSON.stringify(seedComp || { type: 'empty' }));
+
+    // Expand doors that touch the span so they shrink onto the merged row
+    if (Array.isArray(col.doors)) {
+        col.doors.forEach(d => {
+            if (!d) return;
+            if (d.endRow < startR || d.startRow > endR) return;
+            d.startRow = Math.min(d.startRow, startR);
+            d.endRow = Math.max(d.endRow, endR);
+        });
+    }
+
+    // Remove compartments from top of span down (keep startR)
+    for (let r = endR; r > startR; r--) {
+        col.compartments.splice(r, 1);
+        if (typeof _shiftDoorsRemove === 'function') _shiftDoorsRemove(col, r);
+    }
+
+    // Remove shelves between the cells (high shelf index first)
+    const shelfIdxs = [];
+    for (let i = startR; i < endR; i++) {
+        if (dividers[i] && dividers[i].kind === 'shelf') shelfIdxs.push(dividers[i].shelfIdx);
+    }
+    shelfIdxs.sort((a, b) => b - a);
+    if (!Array.isArray(col.shelvesY)) col.shelvesY = [];
+    shelfIdxs.forEach(si => {
+        if (si >= 0 && si < col.shelvesY.length) col.shelvesY.splice(si, 1);
+    });
+    col.shelves = col.shelvesY.length;
+
+    col.compartments[startR] = seedClone;
+    _enablePartitionOnComp(seedClone);
+
+    const t = state.thickness || 1.7;
+    const baseY = (typeof _columnBaseY === 'function') ? _columnBaseY(col) : (state.plinthHeight || 0);
+    if (typeof _syncCompartmentCount === 'function') _syncCompartmentCount(col, baseY, t);
+    if (typeof _clampDrawerCompartments === 'function') _clampDrawerCompartments(col, baseY, t);
+    if (typeof _migratePartitions === 'function') _migratePartitions(col);
+
+    _dbgHang('partition MERGE rows', { startR, endR, shelvesLeft: col.shelves });
+    return { ok: true, row: startR };
+}
+
 window.applyContent = function(type) {
     _dbgHangSnapshot('applyContent IN type=' + type);
     if (state.selection.colIndex === -1 || state.selection.rows.length === 0) {
@@ -3536,6 +3671,27 @@ window.applyContent = function(type) {
     // Partition is always cell-level — never store as zone content via setSubCellType
     if (type === 'partition') {
         _dbgHang('applyContent partition toggle on col', c, 'rows', state.selection.rows.slice());
+        const col = state.columns[c];
+        if (!col) return;
+
+        // 2+ adjacent cells → remove shelves between them and make ONE partitioned cell
+        if (state.selection.rows.length >= 2) {
+            const merged = _mergeAdjacentRowsIntoPartition(col, state.selection.rows);
+            if (!merged.ok) {
+                if (merged.reason === 'not-consecutive') {
+                    _showToast('יש לבחור תאים רצופים באותה עמודה כדי לאחד למחיצה', 4000);
+                } else if (merged.reason === 'crosses-split') {
+                    _showToast('לא ניתן לאחד תאים מעל ומתחת לקושרת', 4000);
+                }
+                return;
+            }
+            state.selection.rows = [merged.row];
+            _clearSubCellSelection();
+            buildCabinet(); calculatePrice(); saveHistoryState();
+            updateToolbarButtonHighlights();
+            return;
+        }
+
         state.selection.rows.forEach(r => {
             const comp = state.columns[c].compartments[r];
             if (!comp) return;
@@ -3547,27 +3703,13 @@ window.applyContent = function(type) {
                 _clearSubCellSelection();
                 _dbgHang('partition OFF', { c, r });
                 } else {
-                    const prevType = comp.type || 'empty';
-                    const migratable = (prevType === 'hanging' || prevType === 'sorbet' ||
-                        prevType === 'internal_drawers' || prevType === 'external_drawers');
-                    comp.partition = true;
-                    comp.partitions = [0.5];
-                    if (migratable) {
-                        comp.subCells = [
-                            { type: prevType, shelves: 0, zonesType: [prevType] },
-                            { type: prevType, shelves: 0, zonesType: [prevType] }
-                        ];
-                        comp.type = 'empty';
-                    } else {
-                        comp.subCells = [{ type: 'empty', shelves: 0 }, { type: 'empty', shelves: 0 }];
-                    }
-                    // Keep existing column overlay doors — they cover the partition from outside.
-                    _dbgHang('partition ON', { c, r, prevType, migratable, onlyThisCol: true });
+                    _enablePartitionOnComp(comp);
+                    _dbgHang('partition ON', { c, r, prevType: comp.type, onlyThisCol: true });
                 }
         });
         // Sanity: log neighboring columns' partition flags (detect accidental multi-col apply)
-        state.columns.forEach(function (col, ci) {
-            (col.compartments || []).forEach(function (comp, ri) {
+        state.columns.forEach(function (colScan, ci) {
+            (colScan.compartments || []).forEach(function (comp, ri) {
                 if (comp && comp.partition) _dbgHang('partition present at', { col: ci, row: ri });
             });
         });
