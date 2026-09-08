@@ -185,10 +185,16 @@ window._toggleRoom = function() {
 
 // ---- Doors visibility toggle ----
 window._doorsVisible = true;
+window._isHideableDoorFront = function(m) {
+    return !!(m && !m.userData.keepVisibleWhenDoorsHidden);
+};
 window._setDoorsVisible = function(wantVisible) {
     window._doorsVisible = !!wantVisible;
     var meshes = (typeof doorMeshes !== 'undefined' && doorMeshes) ? doorMeshes : (window.doorMeshes || []);
-    meshes.forEach(function(m) { if (m) m.visible = window._doorsVisible; });
+    meshes.forEach(function(m) {
+        if (!m || !window._isHideableDoorFront(m)) return;
+        m.visible = window._doorsVisible;
+    });
     const btn = document.getElementById('btn-toggle-doors');
     if (btn) {
         // Designer top-bar is icon-only; keep label short if text mode exists
@@ -1764,6 +1770,13 @@ function _registerDoorMesh(mesh) {
     window.doorMeshes = doorMeshes;
 }
 
+/** External drawer fronts stay visible when "הסתר חזיתות" hides door panels. */
+function _registerExternalDrawerFront(mesh) {
+    if (!mesh) return;
+    mesh.userData.keepVisibleWhenDoorsHidden = true;
+    if (typeof _registerDoorMesh === 'function') _registerDoorMesh(mesh);
+}
+
 /** True if mat is one of the shared library materials (must not mutate opacity on hover). */
 function _isSharedLibraryMaterial(mat) {
     if (!mat) return false;
@@ -2965,7 +2978,9 @@ function buildCabinet() {
     // Apply doors visibility after rebuild (viewer סגור/פתוח + designer toggle)
     window.doorMeshes = doorMeshes;
     if (window._doorsVisible === false) {
-        doorMeshes.forEach(function(m) { if (m) m.visible = false; });
+        doorMeshes.forEach(function(m) {
+            if (m && window._isHideableDoorFront(m)) m.visible = false;
+        });
     } else if (typeof window._setDoorsVisible === 'function' && window._viewerDoorsMode === 'doors-open') {
         window._setDoorsVisible(false);
     }
@@ -4905,7 +4920,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         _ppPartId = `drawer_ext_c${c}_r${r}_d${d}`;
                         const mesh = createBoard(overlayW, extDrawerH, t, overlayCenterX, dY, fZ, matExternal);
                         _ppPartId = '';
-                        if (typeof _registerDoorMesh === 'function') _registerDoorMesh(mesh);
+                        if (typeof _registerExternalDrawerFront === 'function') _registerExternalDrawerFront(mesh);
                         if (!isBP) _addPanelHandleLocal(mesh, overlayW, extDrawerH, compData.handleStyle || _handleStyle);
                         // ---- Bathroom groove overlay on external drawer ----
                         const _bathGrooveExt = state.presetId === 'bathroom'
@@ -5107,7 +5122,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             _ppPartId = `drawer_ext_sub_c${c}_r${r}_s${subIdx}_z${zoneIdx}_d${d}`;
                             const mesh = createBoard(drawerW, extDrawerH, t, drawerCX, dY, fZ, matExternal);
                             _ppPartId = '';
-                            if (typeof _registerDoorMesh === 'function') _registerDoorMesh(mesh);
+                            if (typeof _registerExternalDrawerFront === 'function') _registerExternalDrawerFront(mesh);
                             if (!isBP) _addPanelHandleLocal(mesh, drawerW, extDrawerH, handleStyle);
                         }
                     } else if (subType === 'door_right' || subType === 'door_left' || subType === 'door_double') {

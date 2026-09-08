@@ -273,7 +273,11 @@ window._viewerExtrasApplyDoorsMode = function (mode) {
     var meshes = window.doorMeshes || [];
     window._doorsVisible = wantVisible;
     if (meshes && meshes.forEach) {
-        meshes.forEach(function (m) { if (m) m.visible = wantVisible; });
+        meshes.forEach(function (m) {
+            if (!m) return;
+            if (window._isHideableDoorFront && !window._isHideableDoorFront(m)) return;
+            m.visible = wantVisible;
+        });
     }
 };
 
