@@ -827,7 +827,7 @@ function buildDimensionsAndButtonsUI() {
                 heightInput.value = String(cellH);
                 heightInput.title = 'לחץ לעריכת גובה התא';
                 heightInput.setAttribute('aria-label', 'גובה תא בס״מ');
-                heightInput.style.cssText = 'width:2.3em;min-width:1.9em;height:17px;border:none;background:transparent;font-size:0.7rem;font-weight:700;color:rgba(255,255,255,0.95);line-height:17px;text-align:center;outline:none;padding:0;margin:0;font-family:inherit;-moz-appearance:textfield;cursor:text;';
+                heightInput.style.cssText = 'width:2.3em;min-width:1.9em;height:17px;border:none;background:transparent;font-size:calc(0.7rem + 2pt);font-weight:700;color:rgba(255,255,255,0.95);line-height:17px;text-align:center;outline:none;padding:0;margin:0;font-family:inherit;-moz-appearance:textfield;cursor:text;';
                 heightInput.addEventListener('mousedown', (e) => { e.stopPropagation(); });
                 heightInput.addEventListener('click', (e) => { e.stopPropagation(); heightInput.select(); });
                 heightInput.addEventListener('keydown', (e) => {
