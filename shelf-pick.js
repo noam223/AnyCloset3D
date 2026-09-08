@@ -14,7 +14,7 @@
     const _raycaster = new THREE.Raycaster();
     const _mouse = new THREE.Vector2();
     const _worldPos = new THREE.Vector3();
-    const _hoverColor = new THREE.Color(0xdbeafe);  // כחול בהיר בהיר (ריחוף)
+    const _hoverColor = new THREE.Color(0xfed7aa);  // כתום בהיר בהיר (ריחוף)
     const _selectColor = new THREE.Color(0xfb923c); // כתום (בחירה)
     const _HOVER_BLEND = 0.2;
     const _SELECT_BLEND = 0.35;
