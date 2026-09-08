@@ -554,6 +554,49 @@ function buildDimensionsAndButtonsUI() {
             return;
         }
 
+        // ---- Partition sub-cell widths (left / right) — same band as column widths ----
+        if (d.isPartSubWidth) {
+            if (!colWidthsLayer) return;
+            const partWidthEl = document.createElement('div');
+            partWidthEl.className = 'col-width-label part-sub-width-label';
+            partWidthEl.dataset.x3d = d.x;
+            partWidthEl.dataset.y3d = d.y;
+            partWidthEl.title = 'לחץ לעריכת רוחב המחיצה';
+            const input = document.createElement('input');
+            input.className = 'col-width-input part-sub-width-input';
+            input.type = 'number';
+            input.step = '1';
+            input.min = '8';
+            input.value = Math.round(d.h);
+            input.setAttribute('aria-label', 'רוחב תא מחיצה בס״מ');
+            const unitSpan = document.createElement('span');
+            unitSpan.className = 'col-width-unit part-sub-width-unit';
+            unitSpan.innerText = 'ס"מ';
+            partWidthEl.appendChild(input);
+            partWidthEl.appendChild(unitSpan);
+
+            input.addEventListener('mousedown', function(e) { e.stopPropagation(); });
+            input.addEventListener('click', function(e) { e.stopPropagation(); input.select(); });
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+                e.stopPropagation();
+            });
+            input.addEventListener('change', function(e) {
+                const desired = parseInt(e.target.value, 10);
+                if (isNaN(desired)) {
+                    e.target.value = Math.round(d.h);
+                    return;
+                }
+                if (typeof window._setPartSubWidthCm === 'function') {
+                    const applied = window._setPartSubWidthCm(d.colIndex, d.rowIndex, d.subCellIdx, desired);
+                    e.target.value = applied != null ? applied : Math.round(d.h);
+                }
+            });
+
+            colWidthsLayer.appendChild(partWidthEl);
+            return;
+        }
+
         const dimEl = document.createElement('div');
         dimEl.className = 'dim-container';
         dimEl.dataset.x3d = d.x; dimEl.dataset.y3d = d.y;
@@ -961,6 +1004,12 @@ function buildDimensionsAndButtonsUI() {
         btn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); });
         btn.addEventListener('pointerup', e => e.stopPropagation());
 
+        const zoneH = Math.round(d.h || 0);
+        const heightHtml = zoneH > 0
+            ? `<span class="sub-zone-h" style="font-size:0.72rem;font-weight:700;color:rgba(255,255,255,0.95);line-height:1;min-width:1.6em;text-align:center;pointer-events:none;">${zoneH}</span>
+               <div style="width:1px;height:12px;background:rgba(255,255,255,0.2);margin:0 2px;flex-shrink:0;pointer-events:none;"></div>`
+            : '';
+
         if (isSelected) {
             // Selected: green check — click again to remove from multi-selection
             btn.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#10b981,#059669);box-shadow:0 0 0 2px rgba(16,185,129,0.35),0 2px 8px rgba(16,185,129,0.55);cursor:pointer;"><i class="fa-solid fa-check" style="font-size:0.75rem;color:white;pointer-events:none;"></i></div>`;
@@ -974,8 +1023,9 @@ function buildDimensionsAndButtonsUI() {
                 window.setActiveSubCell(zoneKey);
             });
         } else if (hasSubContent) {
-            // Has content: circular pill with pen + trash — whole pill adds to multi-selection
-            btn.innerHTML = `<div class="sub-cell-pill" style="display:flex;align-items:center;gap:5px;background:rgba(30,30,40,0.82);border-radius:20px;padding:4px 8px;box-shadow:0 2px 8px rgba(0,0,0,0.3);cursor:pointer;">
+            // Has content: pill with height + pen + trash
+            btn.innerHTML = `<div class="sub-cell-pill" style="display:flex;align-items:center;gap:4px;direction:ltr;background:rgba(30,30,40,0.82);border-radius:20px;padding:3px 8px 3px 6px;box-shadow:0 2px 8px rgba(0,0,0,0.3);cursor:pointer;">
+                ${heightHtml}
                 <i class="fa-solid fa-pen sub-btn-edit" style="font-size:9px;color:rgba(255,255,255,0.8);pointer-events:none;" title="הוסף לבחירה"></i>
                 <div style="width:1px;height:10px;background:rgba(255,255,255,0.25);pointer-events:none;"></div>
                 <i class="fa-solid fa-trash sub-btn-trash" style="font-size:9px;color:rgba(255,255,255,0.6);cursor:pointer;transition:color 0.15s;" title="נקה תא"></i>
@@ -1011,11 +1061,25 @@ function buildDimensionsAndButtonsUI() {
                 updateToolbarButtonHighlights();
             });
         } else {
-            // Empty zone: circular + button in teal/cyan
-            btn.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#06b6d4,#0891b2);transition:all 0.18s cubic-bezier(.4,0,.2,1);box-shadow:0 2px 6px rgba(6,182,212,0.5);cursor:pointer;"><i class="fa-solid fa-plus" style="font-size:10px;color:white;pointer-events:none;font-weight:700;"></i></div>`;
-            const circle = btn.querySelector('div');
-            btn.addEventListener('mouseenter', () => { circle.style.background = 'linear-gradient(135deg,#0891b2,#0e7490)'; circle.style.transform = 'scale(1.2)'; circle.style.boxShadow = '0 3px 10px rgba(6,182,212,0.7)'; });
-            btn.addEventListener('mouseleave', () => { circle.style.background = 'linear-gradient(135deg,#06b6d4,#0891b2)'; circle.style.transform = 'scale(1)'; circle.style.boxShadow = '0 2px 6px rgba(6,182,212,0.5)'; });
+            // Empty zone: height + teal + (same idea as purple cell pill)
+            btn.innerHTML = `<div class="sub-cell-pill" style="display:flex;align-items:center;gap:0;direction:ltr;background:rgba(30,30,40,0.82);border-radius:20px;padding:3px 6px 3px 6px;box-shadow:0 2px 10px rgba(0,0,0,0.35);cursor:pointer;">
+                ${heightHtml}
+                <div class="sub-plus-circle" style="display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#06b6d4,#0891b2);transition:all 0.18s cubic-bezier(.4,0,.2,1);box-shadow:0 2px 6px rgba(6,182,212,0.5);"><i class="fa-solid fa-plus" style="font-size:10px;color:white;pointer-events:none;font-weight:700;"></i></div>
+            </div>`;
+            const pill = btn.querySelector('.sub-cell-pill');
+            const circle = btn.querySelector('.sub-plus-circle');
+            btn.addEventListener('mouseenter', () => {
+                circle.style.background = 'linear-gradient(135deg,#0891b2,#0e7490)';
+                circle.style.transform = 'scale(1.15)';
+                circle.style.boxShadow = '0 3px 10px rgba(6,182,212,0.7)';
+                pill.style.background = 'rgba(40,40,55,0.92)';
+            });
+            btn.addEventListener('mouseleave', () => {
+                circle.style.background = 'linear-gradient(135deg,#06b6d4,#0891b2)';
+                circle.style.transform = 'scale(1)';
+                circle.style.boxShadow = '0 2px 6px rgba(6,182,212,0.5)';
+                pill.style.background = 'rgba(30,30,40,0.82)';
+            });
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (!(state.selection.colIndex === d.colIndex && state.selection.rows.includes(d.rowIndex))) {

@@ -1825,6 +1825,21 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); box-sha
     pointer-events: none;
 }
 
+/* Partition left/right sub-cell widths (same layer as column widths) */
+.part-sub-width-label {
+    background: rgba(6,182,212,0.12);
+    border-color: rgba(6,182,212,0.5);
+}
+.part-sub-width-label:hover, .part-sub-width-label:focus-within {
+    background: rgba(6,182,212,0.22);
+    border-color: #0891b2;
+    box-shadow: 0 2px 8px rgba(8,145,178,0.2) !important;
+}
+.part-sub-width-input,
+.part-sub-width-unit {
+    color: #0e7490;
+}
+
 /* Upper unit horizontal move handle */
 .space-cab-tabs-row { display:flex; gap:6px; }
 .space-cab-tab {

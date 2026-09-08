@@ -3048,6 +3048,78 @@ window._setColumnWidthCm = function(cIndex, desiredCm) {
     return desired;
 };
 
+/** Set clear width (cm) of a partition sub-cell. Returns applied clear width. */
+window._setPartSubWidthCm = function(colIndex, rowIndex, subIdx, desiredCm) {
+    const col = state.columns[colIndex];
+    if (!col) return null;
+    const comp = col.compartments && col.compartments[rowIndex];
+    if (!comp || !comp.partition || !Array.isArray(comp.partitions) || !comp.partitions.length) return null;
+
+    const t = state.thickness || 1.7;
+    const minW = 8;
+    const colW = col.width;
+    const n = comp.partitions.length + 1;
+    if (subIdx < 0 || subIdx >= n) return null;
+
+    let desired = Math.round(desiredCm);
+    if (isNaN(desired)) return null;
+    desired = Math.max(minW, desired);
+
+    const clearWidths = () => {
+        const b = [0, ...comp.partitions.map(px => colW * px), colW];
+        const ws = [];
+        for (let si = 0; si < n; si++) {
+            const x1 = b[si] + (si === 0 ? 0 : t / 2);
+            const x2 = b[si + 1] - (si === n - 1 ? 0 : t / 2);
+            ws.push(Math.max(0, x2 - x1));
+        }
+        return ws;
+    };
+
+    if (n === 2) {
+        if (subIdx === 0) {
+            let partX = desired + t / 2;
+            const minPart = minW + t / 2;
+            const maxPart = colW - minW - t / 2;
+            partX = Math.max(minPart, Math.min(maxPart, partX));
+            comp.partitions[0] = partX / colW;
+        } else {
+            let partX = colW - desired - t / 2;
+            const minPart = minW + t / 2;
+            const maxPart = colW - minW - t / 2;
+            partX = Math.max(minPart, Math.min(maxPart, partX));
+            comp.partitions[0] = partX / colW;
+        }
+    } else if (subIdx < n - 1) {
+        const b = [0, ...comp.partitions.map(px => colW * px), colW];
+        const x1 = b[subIdx] + (subIdx === 0 ? 0 : t / 2);
+        let newB = x1 + desired + t / 2;
+        const nextIsLast = (subIdx + 1 === n - 1);
+        const rightBound = b[subIdx + 2];
+        const maxB = rightBound - (nextIsLast ? 0 : t / 2) - minW - t / 2;
+        const minB = x1 + minW + t / 2;
+        newB = Math.max(minB, Math.min(maxB, newB));
+        comp.partitions[subIdx] = newB / colW;
+    } else {
+        const b = [0, ...comp.partitions.map(px => colW * px), colW];
+        const pi = n - 2;
+        let newB = colW - desired - t / 2;
+        const farLeft = b[n - 3];
+        const x1prev = farLeft + ((n - 3) === 0 ? 0 : t / 2);
+        const minB = x1prev + minW + t / 2;
+        const maxB = colW - minW - t / 2;
+        newB = Math.max(minB, Math.min(maxB, newB));
+        comp.partitions[pi] = newB / colW;
+    }
+
+    if (typeof checkSplits === 'function') checkSplits();
+    if (typeof buildCabinet === 'function') buildCabinet();
+    if (typeof updateCameraView === 'function') updateCameraView();
+    if (typeof calculatePrice === 'function') calculatePrice();
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+    return Math.round(clearWidths()[subIdx]);
+};
+
 function _columnHasInterior(col) {
     if (!col) return false;
     if ((col.shelves || 0) > 0) return true;

@@ -5432,14 +5432,27 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                 let btnSubType = _interiorAtEng(sub, z);
                                 if (btnSubType === 'empty') btnSubType = _doorAtEng(sub, z);
                                 if (doorGrp) btnSubType = doorGrp.type;
+                                // Clear inner height of this cubby (matches shelf half-board trim)
+                                const zBot = (z === 0) ? zoneBounds[0] : (zoneBounds[z] + t / 2);
+                                const zTop = (z === numZones - 1) ? zoneBounds[numZones] : (zoneBounds[z + 1] - t / 2);
+                                const zoneClearH = Math.max(0, zTop - zBot);
                                 state.dimData.push({
                                     isSubCellBtn: true,
                                     colIndex: c, rowIndex: r, subCellIdx: si,
                                     zoneIdx: z, numZones,
                                     x: subCenterX, y: zoneCenterY,
+                                    h: Math.round(zoneClearH),
                                     subType: btnSubType
                                 });
                             }
+                            // Partition sub-cell widths — top of cabinet (like column widths) for top cell
+                            state.dimData.push({
+                                isPartSubWidth: true,
+                                colIndex: c, rowIndex: r, subCellIdx: si,
+                                x: subCenterX,
+                                y: isLast ? (col.height + 8) : (compTopY + 6),
+                                h: Math.round(subW)
+                            });
                             // Push drag handles for each sub-cell shelf
                             for (let s = 0; s < subShelvesY.length; s++) {
                                 dragHandlesData.vertical.push({
