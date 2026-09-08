@@ -2257,8 +2257,9 @@ function buildCabinet() {
     if (typeof _resetSharedMaterialOpacity === 'function') _resetSharedMaterialOpacity();
     state.dimData = []; state.bpData = [];
     dragHandlesData = { horizontal: [], vertical: [], roofs: [], desk: [], partitions: [], floors: [], selectAll: [], upperUnit: [] };
-    // Reset part-paint mesh list
+    // Reset part-paint / shelf-pick mesh lists
     window.partMeshes = [];
+    window.shelfPickMeshes = [];
     // Remove wing hover highlight (it lives on scene, not cabinetGroup)
     if (typeof window._removeWingHighlight === 'function') window._removeWingHighlight();
 
@@ -3675,6 +3676,32 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         return mesh;
     }
 
+    /** Invisible taller proxy so thin shelf boards are easy to hover/click from front view. */
+    function _registerShelfPickMesh(visualMesh, boardW, boardH, boardD) {
+        if (isBP || !visualMesh || !visualMesh.userData || !visualMesh.userData.shelfRef) return;
+        if (!window.shelfPickMeshes) window.shelfPickMeshes = [];
+        // Always include the visual itself
+        window.shelfPickMeshes.push(visualMesh);
+        // Fat proxy (~5cm tall) centered on the shelf for easier picking
+        const pickH = Math.max(boardH * 3.5, 5);
+        const pickMat = new THREE.MeshBasicMaterial({
+            transparent: true,
+            opacity: 0,
+            depthWrite: false,
+            colorWrite: false
+        });
+        const proxy = new THREE.Mesh(
+            new THREE.BoxGeometry(Math.max(boardW, 1), pickH, Math.max(boardD, 1)),
+            pickMat
+        );
+        proxy.position.copy(visualMesh.position);
+        proxy.userData.shelfRef = visualMesh.userData.shelfRef;
+        proxy.userData.shelfVisual = visualMesh;
+        proxy.userData.isShelfPickProxy = true;
+        _buildGroup.add(proxy);
+        window.shelfPickMeshes.push(proxy);
+    }
+
     // Helper: apply continuous aspect-ratio UV to top/bottom faces (indices 8-15) of a horizontal board
     // colLeftX = left edge X of this board in cabinet space; totalW = full cabinet width
     // boardW = width of this board; boardD = depth of this board
@@ -4749,6 +4776,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                 _applyShelfUV(shelfMesh, boardW, boardD, div.idx + c * 100);
                 if (!isBP && shelfMesh) {
                     shelfMesh.userData.shelfRef = { colIndex: c, shelfIdx: div.idx };
+                    _registerShelfPickMesh(shelfMesh, boardW, div.thick, boardD);
                 }
             }
             _ppPartId = '';
@@ -5494,6 +5522,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                         subShelfMesh.userData.partId = _ppPartId;
                                         window.partMeshes.push(subShelfMesh);
                                     }
+                                    _registerShelfPickMesh(subShelfMesh, subW, t, subD);
                                 }
                                 _ppPartId = '';
                             }

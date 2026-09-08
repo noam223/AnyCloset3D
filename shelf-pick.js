@@ -6,18 +6,20 @@
 (function () {
     'use strict';
 
-    let _hoveredMesh = null;
-    let _selectedMesh = null;
-    let _selectedRef = null; // { colIndex, shelfIdx } | { colIndex, rowIndex, subCellIdx, subShelfIdx, isSub }
-    let _originalMats = new Map(); // mesh → original material (shared)
+    let _hoveredMesh = null;   // visual mesh currently hovered
+    let _selectedMesh = null;  // visual mesh currently selected
+    let _selectedRef = null;
+    // visual → { mat, edgeMats: Map(lineSegments → originalMat) }
+    let _savedLooks = new Map();
     const _raycaster = new THREE.Raycaster();
     const _mouse = new THREE.Vector2();
     const _worldPos = new THREE.Vector3();
+    const _hoverColor = new THREE.Color(0x38bdf8);
+    const _selectColor = new THREE.Color(0xf97316);
     let _listenersBound = false;
 
     function _enabled() {
         if (window._VIEWER_MODE) return false;
-        if (typeof window.isPartPaintMode === 'function' && window.isPartPaintMode()) return false;
         if (document.body.classList.contains('part-paint-active')) return false;
         return true;
     }
@@ -25,6 +27,10 @@
     function _getCanvas() {
         if (window.renderer && window.renderer.domElement) return window.renderer.domElement;
         return document.querySelector('#canvas-container canvas');
+    }
+
+    function _getContainer() {
+        return document.getElementById('canvas-container') || _getCanvas();
     }
 
     function _getCamera() {
@@ -64,10 +70,6 @@
         return { colIndex: +m[1], shelfIdx: +m[2], isSub: false };
     }
 
-    function _isShelfMesh(mesh) {
-        return !!_parseShelfRef(mesh);
-    }
-
     function _refsEqual(a, b) {
         if (!a || !b) return false;
         if (!!a.isSub !== !!b.isSub) return false;
@@ -78,69 +80,108 @@
         return a.colIndex === b.colIndex && a.shelfIdx === b.shelfIdx;
     }
 
-    function _cloneHighlight(mesh, color, intensity) {
-        if (!mesh || !mesh.material) return;
-        if (!_originalMats.has(mesh)) {
-            _originalMats.set(mesh, mesh.material);
-            mesh.material = mesh.material.clone();
+    function _visualFromHit(hitMesh) {
+        if (!hitMesh) return null;
+        if (hitMesh.userData && hitMesh.userData.shelfVisual) return hitMesh.userData.shelfVisual;
+        return hitMesh;
+    }
+
+    /** Strong tint: blend board color toward highlight + emissive glow + orange/cyan edges. */
+    function _applyHighlight(visual, color, blend) {
+        if (!visual || !visual.material) return;
+        if (!_savedLooks.has(visual)) {
+            const edgeMats = new Map();
+            visual.children.forEach(function (ch) {
+                if (ch.isLineSegments && ch.material) {
+                    edgeMats.set(ch, ch.material);
+                    ch.material = ch.material.clone();
+                }
+            });
+            _savedLooks.set(visual, {
+                mat: visual.material,
+                edgeMats: edgeMats,
+                baseColor: visual.material.color ? visual.material.color.clone() : null
+            });
+            visual.material = visual.material.clone();
         }
-        const mat = mesh.material;
+        const saved = _savedLooks.get(visual);
+        const mat = visual.material;
+        if (mat.color && saved.baseColor) {
+            mat.color.copy(saved.baseColor).lerp(color, blend);
+        } else if (mat.color) {
+            mat.color.copy(color);
+        }
         if (mat.emissive) {
-            mat.emissive.setHex(color);
-            mat.emissiveIntensity = intensity;
+            mat.emissive.copy(color);
+            mat.emissiveIntensity = 0.45 + blend * 0.55;
         }
+        mat.needsUpdate = true;
+        visual.children.forEach(function (ch) {
+            if (ch.isLineSegments && ch.material && ch.material.color) {
+                ch.material.color.copy(color);
+                ch.material.needsUpdate = true;
+            }
+        });
     }
 
-    function _restoreMat(mesh) {
-        if (!mesh) return;
-        const orig = _originalMats.get(mesh);
-        if (orig) {
-            mesh.material = orig;
-            _originalMats.delete(mesh);
-        }
+    function _restoreLook(visual) {
+        if (!visual) return;
+        const saved = _savedLooks.get(visual);
+        if (!saved) return;
+        visual.material = saved.mat;
+        saved.edgeMats.forEach(function (origMat, ch) {
+            if (ch) ch.material = origMat;
+        });
+        _savedLooks.delete(visual);
     }
 
-    function _setHover(mesh) {
-        if (_hoveredMesh === mesh) return;
+    function _setHover(visual) {
+        if (_hoveredMesh === visual) return;
         if (_hoveredMesh && _hoveredMesh !== _selectedMesh) {
-            _restoreMat(_hoveredMesh);
+            _restoreLook(_hoveredMesh);
         }
-        _hoveredMesh = mesh;
-        if (mesh && mesh !== _selectedMesh) {
-            _cloneHighlight(mesh, 0x38bdf8, 0.4);
+        _hoveredMesh = visual;
+        if (visual && visual !== _selectedMesh) {
+            _applyHighlight(visual, _hoverColor, 0.55);
         }
     }
 
     function _clearSelectionVisual() {
         if (_selectedMesh) {
-            _restoreMat(_selectedMesh);
+            _restoreLook(_selectedMesh);
             _selectedMesh = null;
         }
         _selectedRef = null;
         _hideTrash();
     }
 
-    function _selectMesh(mesh) {
-        const ref = _parseShelfRef(mesh);
-        if (!ref) return;
-        if (_selectedMesh && _selectedMesh !== mesh) {
-            _restoreMat(_selectedMesh);
+    function _selectVisual(visual, ref) {
+        if (!visual || !ref) return;
+        if (_selectedMesh && _selectedMesh !== visual) {
+            _restoreLook(_selectedMesh);
         }
-        _selectedMesh = mesh;
+        if (_hoveredMesh && _hoveredMesh !== visual) {
+            _restoreLook(_hoveredMesh);
+            _hoveredMesh = null;
+        }
+        _selectedMesh = visual;
         _selectedRef = ref;
-        // Strong amber/red highlight on the selected shelf only
-        _cloneHighlight(mesh, 0xf97316, 0.65);
+        _applyHighlight(visual, _selectColor, 0.7);
         _showTrash();
         _updateTrashPos();
     }
 
-    function _findMeshByRef(ref) {
-        if (!ref || !window.partMeshes) return null;
-        for (let i = 0; i < window.partMeshes.length; i++) {
-            const m = window.partMeshes[i];
-            if (!m || m.visible === false) continue;
-            const r = _parseShelfRef(m);
-            if (_refsEqual(r, ref)) return m;
+    function _findVisualByRef(ref) {
+        if (!ref) return null;
+        const lists = [window.shelfPickMeshes || [], window.partMeshes || []];
+        for (let li = 0; li < lists.length; li++) {
+            const list = lists[li];
+            for (let i = 0; i < list.length; i++) {
+                const m = list[i];
+                if (!m || m.userData && m.userData.isShelfPickProxy) continue;
+                const r = _parseShelfRef(m);
+                if (_refsEqual(r, ref)) return m;
+            }
         }
         return null;
     }
@@ -150,12 +191,19 @@
         const camera = _getCamera();
         if (!canvas || !camera) return null;
         const rect = canvas.getBoundingClientRect();
+        if (rect.width < 1 || rect.height < 1) return null;
         _mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
         _mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
         _raycaster.setFromCamera(_mouse, camera);
-        const meshes = (window.partMeshes || []).filter(function (m) {
-            return m && m.visible !== false && _isShelfMesh(m);
+
+        let meshes = (window.shelfPickMeshes || []).filter(function (m) {
+            return m && m.visible !== false;
         });
+        if (!meshes.length) {
+            meshes = (window.partMeshes || []).filter(function (m) {
+                return m && m.visible !== false && _parseShelfRef(m);
+            });
+        }
         const hits = _raycaster.intersectObjects(meshes, false);
         return hits.length ? hits[0].object : null;
     }
@@ -198,17 +246,27 @@
         btn.style.top = Math.round(y) + 'px';
     }
 
-    function _onMouseMove(e) {
+    function _onPointerMove(e) {
         if (!_enabled()) {
             if (_hoveredMesh && _hoveredMesh !== _selectedMesh) {
-                _restoreMat(_hoveredMesh);
+                _restoreLook(_hoveredMesh);
                 _hoveredMesh = null;
             }
             return;
         }
-        const mesh = _raycast(e);
-        _setHover(mesh);
+        const hit = _raycast(e);
+        const visual = hit ? _visualFromHit(hit) : null;
+        _setHover(visual);
         if (_selectedMesh) _updateTrashPos();
+        // Cursor hint when over a shelf
+        const container = _getContainer();
+        if (container && container.style) {
+            if (visual) container.style.cursor = 'pointer';
+            else if (!document.body.classList.contains('part-paint-active')) {
+                // let CSS / orbit restore default — only clear if we set pointer
+                if (container.style.cursor === 'pointer') container.style.cursor = '';
+            }
+        }
     }
 
     function _onKeyDown(e) {
@@ -238,34 +296,40 @@
     window.handleShelfPickPointerUp = function (e) {
         if (!_enabled()) return 'none';
         if (e.target && e.target.closest && e.target.closest('#sp-shelf-trash')) return 'handled';
-        const mesh = _raycast(e);
-        if (!mesh) {
+        const hit = _raycast(e);
+        if (!hit) {
             if (_selectedRef) _clearSelectionVisual();
             return 'none';
         }
-        _selectMesh(mesh);
+        const visual = _visualFromHit(hit);
+        const ref = _parseShelfRef(hit) || _parseShelfRef(visual);
+        if (!visual || !ref) return 'none';
+        _selectVisual(visual, ref);
         return 'handled';
     };
 
     window.reapplyShelfSelectionAfterBuild = function () {
         if (!_selectedRef) return;
-        const mesh = _findMeshByRef(_selectedRef);
-        if (!mesh) {
+        // Materials were rebuilt — drop stale clones
+        _savedLooks.clear();
+        _hoveredMesh = null;
+        const visual = _findVisualByRef(_selectedRef);
+        if (!visual) {
             _selectedMesh = null;
             _hideTrash();
             return;
         }
-        _selectedMesh = mesh;
-        _cloneHighlight(mesh, 0xf97316, 0.65);
+        _selectedMesh = visual;
+        _applyHighlight(visual, _selectColor, 0.7);
         _showTrash();
         _updateTrashPos();
     };
 
     window.clearShelfSelection = function () {
-        if (_hoveredMesh && _hoveredMesh !== _selectedMesh) _restoreMat(_hoveredMesh);
+        if (_hoveredMesh && _hoveredMesh !== _selectedMesh) _restoreLook(_hoveredMesh);
         _hoveredMesh = null;
         _clearSelectionVisual();
-        _originalMats.clear();
+        _savedLooks.clear();
     };
 
     window.deleteSelectedShelf = function () {
@@ -281,9 +345,10 @@
         }
         _clearSelectionVisual();
         if (_hoveredMesh) {
-            _restoreMat(_hoveredMesh);
+            _restoreLook(_hoveredMesh);
             _hoveredMesh = null;
         }
+        _savedLooks.clear();
         if (!ok) {
             if (typeof window._showToast === 'function') {
                 window._showToast('לא ניתן למחוק את המדף', 2500);
@@ -297,17 +362,18 @@
         return true;
     };
 
-    // Legacy stubs — mode buttons removed; keep no-op for old onclick / part-paint
     window.enterShelfPickMode = function () { /* always-on */ };
     window.exitShelfPickMode = function () { window.clearShelfSelection(); };
     window.isShelfPickMode = function () { return false; };
 
     function _bindListeners() {
         if (_listenersBound || window._VIEWER_MODE) return;
-        const canvas = _getCanvas();
-        if (!canvas) return;
+        const container = _getContainer();
+        if (!container) return;
         _listenersBound = true;
-        canvas.addEventListener('mousemove', _onMouseMove, { passive: true });
+        // Listen on container so overlays with pointer-events:none still get moves via canvas,
+        // and also when pointer is over the container generally.
+        container.addEventListener('pointermove', _onPointerMove, { passive: true });
         document.addEventListener('keydown', _onKeyDown, true);
         window.addEventListener('resize', _onResize);
         window.addEventListener('scroll', _onResize, true);
