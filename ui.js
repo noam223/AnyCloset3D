@@ -7963,11 +7963,22 @@ window._promptSaveCabinetBeforeSwitch = function(targetIndex) {
 };
 
 // ==========================================
-// Dual cabinet in the same 3D space (linear / sliding)
+// Dual cabinet in the same 3D space (linear / sliding / writing-desk)
 // ==========================================
+window._SPACE_COMPATIBLE_PRESETS = ['linear', 'sliding', 'writing-desk'];
+
+window._isSpaceCompatiblePreset = function(presetId) {
+    const p = presetId || 'linear';
+    return window._SPACE_COMPATIBLE_PRESETS.indexOf(p) !== -1;
+};
+
 window._spacePairCanUse = function() {
-    const p = (state.presetId || 'linear');
-    return p === 'linear' || p === 'sliding';
+    // Allow while on a compatible type, or while already editing either side of a pair
+    // (so switching ארון 2 to שולחן כתיבה doesn't hide the tabs)
+    if (window._isSpaceCompatiblePreset(state.presetId)) return true;
+    const cart = state.orderCart || [];
+    const idx = state.editingCartIndex;
+    return !!(idx >= 0 && cart[idx] && window._spacePairIdOf(cart[idx]));
 };
 
 window._spacePairSlotOf = function(item) {
@@ -8175,7 +8186,7 @@ window._syncSpaceOffsetUI = function() {
 window._cartItemCanShareSpace = function(item) {
     if (!item || window._spacePairIdOf(item)) return false;
     const p = (item.rawState && item.rawState.presetId) || 'linear';
-    return p === 'linear' || p === 'sliding';
+    return window._isSpaceCompatiblePreset(p);
 };
 
 window._joinableSpaceCabinets = function() {

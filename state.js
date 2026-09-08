@@ -741,10 +741,17 @@ function _applyPresetCore(presetId, rightPos, leftPos) {
     _hideWingTab('right');
     state.activeWing = 'center';
     window._orbitFree = false;
-    window._forceCameraAnim = true;
-    window._corner3dCamPositioned = false;
-    window._frontCamPositioned = false;
-    window._wingEditCamInit = false;
+    // Keep space-pair view stable when converting the active cabinet to another
+    // front-view type (linear / sliding / writing-desk) — don't feel like a full reset.
+    const _keepingSpacePair = typeof window._getSpacePairInfo === 'function' &&
+        !!window._getSpacePairInfo() &&
+        (typeof window._isSpaceCompatiblePreset !== 'function' || window._isSpaceCompatiblePreset(presetId));
+    if (!_keepingSpacePair) {
+        window._forceCameraAnim = true;
+        window._corner3dCamPositioned = false;
+        window._frontCamPositioned = false;
+        window._wingEditCamInit = false;
+    }
 
     // Reset room wall position when switching presets
     state.roomWall = 'center';
@@ -752,7 +759,12 @@ function _applyPresetCore(presetId, rightPos, leftPos) {
 
     state.presetId = presetId;
 
-    if (presetId !== 'linear' && presetId !== 'sliding' && typeof window._unlinkSpacePair === 'function') {
+    // Only unlink when switching to layouts that cannot share a front-view space
+    // (corners / walk-in / bathroom). Allow writing-desk + sliding + linear together.
+    if ((typeof window._isSpaceCompatiblePreset !== 'function'
+            ? (presetId !== 'linear' && presetId !== 'sliding')
+            : !window._isSpaceCompatiblePreset(presetId)) &&
+        typeof window._unlinkSpacePair === 'function') {
         window._unlinkSpacePair();
     }
 
@@ -844,6 +856,7 @@ function _applyPresetCore(presetId, rightPos, leftPos) {
     state.viewMode = (presetId === 'linear' || presetId === 'sliding' || presetId === 'bathroom' || presetId === 'writing-desk') ? 'front' : '3d';
     _setFreeTabActive(true);
     syncSidebarToWing();
+    if (typeof window._syncSpacePairTabs === 'function') window._syncSpacePairTabs();
     buildCabinet(); updateCameraView(); calculatePrice(); saveHistoryState();
 }
 
