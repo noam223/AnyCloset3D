@@ -4176,6 +4176,213 @@ window.updateDrawerCount = function(delta) {
     }
 };
 
+// Global vertical shelf / split / desk-surface drag — survives buildDragHandlesUI rebuilds
+window._vShelfDrag = null;
+
+function _endVShelfDrag() {
+    if (!window._vShelfDrag) return;
+    window._vShelfDrag = null;
+    window._snapHighlight = null;
+    controls.enabled = true;
+    document.body.classList.remove('dragging');
+    document.querySelectorAll('.drag-handle.vertical.active').forEach(h => h.classList.remove('active', 'snapped'));
+    _endDrag();
+    saveHistoryState();
+}
+
+window.addEventListener('pointermove', e => {
+    const d = window._vShelfDrag;
+    if (!d) return;
+    e.preventDefault();
+
+    const col = state.columns[d.colIndex];
+    if (!col) return;
+
+    const pxToCm = 100 / (Math.abs(new THREE.Vector3(0, 100, 0).project(camera).y - new THREE.Vector3(0, 0, 0).project(camera).y) * container.clientHeight / 2);
+    const deltaCm = -(e.clientY - d.startMouseY) * pxToCm;
+    const t = state.thickness;
+    const startY = d.startY;
+
+    const _findLiveHandleTooltip = () => {
+        const handles = document.querySelectorAll('#drag-handles-layer .drag-handle.vertical');
+        for (let i = 0; i < handles.length; i++) {
+            const h = handles[i];
+            if (d.isSubCellShelf && h.dataset.subShelf === '1' &&
+                +h.dataset.colIndex === d.colIndex &&
+                +h.dataset.rowIndex === d.rowIndex &&
+                +h.dataset.subCellIdx === d.subCellIdx &&
+                +h.dataset.subShelfIdx === d.subShelfIdx) {
+                return h.querySelector('.drag-tooltip');
+            }
+            if (!d.isSubCellShelf && !d.isSplit && h.dataset.shelfIdx != null &&
+                +h.dataset.colIndex === d.colIndex && +h.dataset.shelfIdx === d.shelfIdx) {
+                return h.querySelector('.drag-tooltip');
+            }
+        }
+        return null;
+    };
+
+    if (d.isSubCellShelf) {
+        const _comp = col.compartments[d.rowIndex];
+        const _sub = _comp && _comp.subCells && _comp.subCells[d.subCellIdx];
+        if (!_sub || !Array.isArray(_sub.shelvesY)) return;
+        const { prevY: compPrevY, compH } = _getSubCellCompBounds(col, d.rowIndex);
+        const compTopY = compPrevY + compH;
+        const obs = [compPrevY + t / 2, compTopY - t / 2];
+        _sub.shelvesY.forEach((y, i) => { if (i !== d.subShelfIdx) obs.push(y); });
+        const limitMin = Math.max(...obs.filter(y => y < startY)) + MIN_SHELF_GAP + t;
+        const limitMax = Math.min(...obs.filter(y => y > startY)) - MIN_SHELF_GAP - t;
+        const newY = Math.round(Math.max(limitMin, Math.min(limitMax, startY + deltaCm)) * 10) / 10;
+        _sub.shelvesY[d.subShelfIdx] = newY;
+        const aboveH = newY - (d.subShelfIdx > 0 ? _sub.shelvesY[d.subShelfIdx - 1] : compPrevY);
+        const belowH = (d.subShelfIdx < _sub.shelvesY.length - 1 ? _sub.shelvesY[d.subShelfIdx + 1] : compTopY) - newY;
+        const tip = _findLiveHandleTooltip();
+        if (tip) tip.innerText = `מעל: ${Math.round(aboveH)} ס"מ | מתחת: ${Math.round(belowH)} ס"מ`;
+        buildCabinetDragging();
+        return;
+    }
+
+    if (d.isSplit) {
+        let minLimits = [], maxLimits = [];
+        state.columns.forEach(c => {
+            if (c.splitY) {
+                const cBaseY = c.type === 'desk' ? c.deskHeight + c.deskClearance : state.plinthHeight;
+                minLimits.push(Math.max(...c.shelvesY.filter(y => y < startY), cBaseY + t) + t + MIN_SHELF_GAP + t);
+                maxLimits.push(Math.min(...c.shelvesY.filter(y => y > startY), c.height - t) - t - MIN_SHELF_GAP - t);
+            }
+        });
+        const limitMin = Math.max(...minLimits);
+        const limitMax = Math.min(getSplitThreshold(), ...maxLimits);
+        const newSplitY = Math.round(Math.max(limitMin, Math.min(limitMax, startY + deltaCm)));
+        _setActiveWingSplitY(newSplitY);
+        buildCabinetDragging();
+        return;
+    }
+
+    if (d.isInternalDeskSurface) {
+        col.deskHeight = Math.round(Math.max(50, Math.min(col.deskHeight + col.deskClearance - MIN_SHELF_GAP, startY + deltaCm)));
+        distributeShelves(col);
+        buildCabinetDragging();
+        return;
+    }
+
+    if (d.isInternalDeskClearance) {
+        let maxLimits = col.shelvesY.length > 0 ? col.shelvesY[0] - MIN_SHELF_GAP : col.height - MIN_SHELF_GAP;
+        if (col.splitY) maxLimits = Math.min(maxLimits, col.splitY - MIN_SHELF_GAP);
+        let desiredY = Math.round(Math.max(col.deskHeight + 30, Math.min(maxLimits, startY + deltaCm)));
+        col.deskClearance = desiredY - col.deskHeight;
+        distributeShelves(col);
+        buildCabinetDragging();
+        return;
+    }
+
+    if (d.isInternalDeskDrawer) {
+        col.drawerHeight = Math.round(Math.max(8, Math.min(40, startY - deltaCm)));
+        buildCabinetDragging();
+        return;
+    }
+
+    // Regular column shelf
+    const cBaseY = col.type === 'desk' ? col.deskHeight + col.deskClearance : state.plinthHeight;
+    let obs = [cBaseY + t / 2, col.height - t / 2];
+    if (col.splitY) { obs.push(col.splitY - t); obs.push(col.splitY + t); }
+    col.shelvesY.forEach((y, i) => { if (i !== d.shelfIdx) obs.push(y); });
+
+    const limitMin = Math.max(...obs.filter(y => y < startY)) + MIN_SHELF_GAP + t;
+    const limitMax = Math.min(...obs.filter(y => y > startY)) - MIN_SHELF_GAP - t;
+    let newY = Math.round(Math.max(limitMin, Math.min(limitMax, startY + deltaCm)) * 10) / 10;
+
+    const SNAP_THRESHOLD = 0.5;
+    let highlightNeighborColIdx = -1;
+    let highlightNeighborShelfIdx = -1;
+    let bestDist = SNAP_THRESHOLD + 1;
+    [-1, 1].forEach(offset => {
+        const nc = d.colIndex + offset;
+        if (nc < 0 || nc >= state.columns.length) return;
+        const neighbor = state.columns[nc];
+        if (!neighbor || !neighbor.shelvesY) return;
+        neighbor.shelvesY.forEach((ny, ni) => {
+            const dist = Math.abs(ny - newY);
+            if (dist <= SNAP_THRESHOLD && dist < bestDist) {
+                if (ny >= limitMin && ny <= limitMax) {
+                    bestDist = dist;
+                    highlightNeighborColIdx = nc;
+                    highlightNeighborShelfIdx = ni;
+                    newY = ny;
+                }
+            }
+        });
+    });
+
+    col.shelvesY[d.shelfIdx] = newY;
+
+    if (highlightNeighborColIdx !== -1) {
+        window._snapHighlight = {
+            colIdx: d.colIndex,
+            shelfIdx: d.shelfIdx,
+            neighborColIdx: highlightNeighborColIdx,
+            neighborShelfIdx: highlightNeighborShelfIdx
+        };
+    } else {
+        window._snapHighlight = null;
+    }
+
+    const _checkSorbetRow = (r) => {
+        const comp = col.compartments[r];
+        if (!comp || comp.type !== 'sorbet') return false;
+        return _cellHeight(col, r) < 110;
+    };
+    if (_checkSorbetRow(d.shelfIdx) || _checkSorbetRow(d.shelfIdx + 1)) {
+        col.shelvesY[d.shelfIdx] = startY;
+        window._snapHighlight = null;
+        const blockedR = (_checkSorbetRow(d.shelfIdx)) ? d.shelfIdx : d.shelfIdx + 1;
+        // End drag before modal (confirm steals pointer events)
+        window._vShelfDrag = null;
+        controls.enabled = true;
+        document.body.classList.remove('dragging');
+        if (confirm('הסורבטו דורש גובה תא מינימלי של 110 ס"מ.\nלמחוק את הסורבטו ולהמשיך?')) {
+            col.compartments[blockedR].type = 'empty';
+            col.shelvesY[d.shelfIdx] = Math.round(Math.max(limitMin, Math.min(limitMax, startY + deltaCm)) * 10) / 10;
+        }
+        _endDrag();
+        buildCabinet();
+        saveHistoryState();
+        return;
+    }
+
+    const _autoDrawerRow = (r) => {
+        const comp = col.compartments[r];
+        if (!comp || (comp.type !== 'internal_drawers' && comp.type !== 'external_drawers')) return;
+        const cellH = _cellHeight(col, r);
+        if (cellH < 12) { comp.type = 'empty'; return; }
+        comp.count = calcAutoDrawerCount(cellH);
+    };
+    _autoDrawerRow(d.shelfIdx);
+    _autoDrawerRow(d.shelfIdx + 1);
+
+    buildCabinetDragging();
+    {
+        const snap = window._snapHighlight;
+        document.querySelectorAll('.drag-handle.vertical').forEach(h => {
+            const hCol = parseInt(h.dataset.colIndex);
+            const hShelf = parseInt(h.dataset.shelfIdx);
+            h.classList.remove('snapped');
+            if (snap) {
+                if (hCol === snap.colIdx && hShelf === snap.shelfIdx) {
+                    h.classList.add('snapped', 'active');
+                }
+                if (hCol === snap.neighborColIdx && hShelf === snap.neighborShelfIdx) {
+                    h.classList.add('snapped');
+                }
+            }
+        });
+    }
+    updateToolbarButtonHighlights();
+});
+
+window.addEventListener('pointerup', _endVShelfDrag);
+window.addEventListener('pointercancel', _endVShelfDrag);
+
 // Global horizontal drag state — survives buildDragHandlesUI() rebuilds
 // tooltipText: kept in sync so newly-rebuilt handles show current value
 window._hDrag = null; // { index, startMouseX, startWLeft, startWRight, activeWing, wingEditMode, tooltipText }
@@ -4546,12 +4753,15 @@ function buildDragHandlesUI() {
         }
     });
 
-    // Determine which column to show roof/floor handle for:
-    // During an active roof or floor drag, always show the dragged column's handle (even if hover moved away)
+    // Determine which column to show roof/floor/shelf handles for:
+    // During an active roof, floor, or vertical-shelf drag, always show that column's handles
+    // (even if hover moved away) so pointerup / rebuild cannot strand the drag.
     const _roofDragActive = window._roofDrag;
     const _floorDragActiveGlobal = window._floorDrag;
+    const _vShelfDragActive = window._vShelfDrag;
     const _roofColIndex = _roofDragActive ? _roofDragActive.colIndex
         : _floorDragActiveGlobal ? _floorDragActiveGlobal.colIndex
+        : _vShelfDragActive ? _vShelfDragActive.colIndex
         : state.hoveredColIndex;
 
     if (_roofColIndex !== -1 && state.columns[_roofColIndex]) {
@@ -4640,188 +4850,64 @@ function buildDragHandlesUI() {
                 }
             }
             dragLayer.appendChild(sHandle);
-            
-            let startMouseY = 0, startY = 0, isDragging = false;
+
+            // Restore active class if this shelf is the one currently being dragged
+            if (_vShelfDragActive &&
+                _vShelfDragActive.colIndex === v.colIndex &&
+                ((_vShelfDragActive.isSubCellShelf && v.isSubCellShelf &&
+                    _vShelfDragActive.rowIndex === v.rowIndex &&
+                    _vShelfDragActive.subCellIdx === v.subCellIdx &&
+                    _vShelfDragActive.subShelfIdx === v.subShelfIdx) ||
+                 (!_vShelfDragActive.isSubCellShelf && !v.isSubCellShelf &&
+                    !_vShelfDragActive.isSplit && !v.isSplit &&
+                    !_vShelfDragActive.isInternalDeskSurface && !v.isInternalDeskSurface &&
+                    !_vShelfDragActive.isInternalDeskClearance && !v.isInternalDeskClearance &&
+                    !_vShelfDragActive.isInternalDeskDrawer && !v.isInternalDeskDrawer &&
+                    _vShelfDragActive.shelfIdx === v.shelfIdx) ||
+                 (_vShelfDragActive.isSplit && v.isSplit) ||
+                 (_vShelfDragActive.isInternalDeskSurface && v.isInternalDeskSurface) ||
+                 (_vShelfDragActive.isInternalDeskClearance && v.isInternalDeskClearance) ||
+                 (_vShelfDragActive.isInternalDeskDrawer && v.isInternalDeskDrawer))) {
+                sHandle.classList.add('active');
+            }
+
             sHandle.addEventListener('pointerdown', e => {
-                isDragging = true; startMouseY = e.clientY;
-                if(v.isSplit) startY = col.splitY;
-                else if(v.isInternalDeskSurface) startY = col.deskHeight;
-                else if(v.isInternalDeskClearance) startY = col.deskHeight + col.deskClearance;
-                else if(v.isInternalDeskDrawer) startY = col.drawerHeight;
-                else if(v.isSubCellShelf) {
+                e.preventDefault();
+                e.stopPropagation();
+                try { sHandle.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+
+                let startY = 0;
+                if (v.isSplit) startY = col.splitY;
+                else if (v.isInternalDeskSurface) startY = col.deskHeight;
+                else if (v.isInternalDeskClearance) startY = col.deskHeight + col.deskClearance;
+                else if (v.isInternalDeskDrawer) startY = col.drawerHeight;
+                else if (v.isSubCellShelf) {
                     const _comp = col.compartments[v.rowIndex];
                     const _sub = _comp && _comp.subCells && _comp.subCells[v.subCellIdx];
                     startY = _sub && _sub.shelvesY ? _sub.shelvesY[v.subShelfIdx] : v.y;
+                } else {
+                    startY = col.shelvesY[v.shelfIdx];
                 }
-                else startY = col.shelvesY[v.shelfIdx];
-                sHandle.classList.add('active'); controls.enabled = false; document.body.classList.add('dragging');
+
+                window._vShelfDrag = {
+                    colIndex: v.colIndex,
+                    shelfIdx: v.shelfIdx,
+                    rowIndex: v.rowIndex,
+                    subCellIdx: v.subCellIdx,
+                    subShelfIdx: v.subShelfIdx,
+                    isSplit: !!v.isSplit,
+                    isSubCellShelf: !!v.isSubCellShelf,
+                    isInternalDeskSurface: !!v.isInternalDeskSurface,
+                    isInternalDeskClearance: !!v.isInternalDeskClearance,
+                    isInternalDeskDrawer: !!v.isInternalDeskDrawer,
+                    startMouseY: e.clientY,
+                    startY: startY,
+                    pointerId: e.pointerId
+                };
+                sHandle.classList.add('active');
+                controls.enabled = false;
+                document.body.classList.add('dragging');
             });
-            window.addEventListener('pointermove', e => {
-                if (!isDragging) return;
-                e.preventDefault();
-                const pxToCm = 100 / (Math.abs(new THREE.Vector3(0,100,0).project(camera).y - new THREE.Vector3(0,0,0).project(camera).y) * container.clientHeight / 2);
-                const deltaCm = -(e.clientY - startMouseY) * pxToCm;
-                const t = state.thickness;
-
-                if (v.isSubCellShelf) {
-                    const _comp = col.compartments[v.rowIndex];
-                    const _sub = _comp && _comp.subCells && _comp.subCells[v.subCellIdx];
-                    if (!_sub || !Array.isArray(_sub.shelvesY)) return;
-                    const { prevY: compPrevY, compH } = _getSubCellCompBounds(col, v.rowIndex);
-                    const compTopY = compPrevY + compH;
-                    // Obstacles: comp boundaries + other shelves in same sub-cell
-                    const obs = [compPrevY + t/2, compTopY - t/2];
-                    _sub.shelvesY.forEach((y, i) => { if (i !== v.subShelfIdx) obs.push(y); });
-                    const limitMin = Math.max(...obs.filter(y => y < startY)) + MIN_SHELF_GAP + t;
-                    const limitMax = Math.min(...obs.filter(y => y > startY)) - MIN_SHELF_GAP - t;
-                    const newY = Math.round(Math.max(limitMin, Math.min(limitMax, startY + deltaCm)) * 10) / 10;
-                    _sub.shelvesY[v.subShelfIdx] = newY;
-                    const aboveH = newY - (v.subShelfIdx > 0 ? _sub.shelvesY[v.subShelfIdx - 1] : compPrevY);
-                    const belowH = (v.subShelfIdx < _sub.shelvesY.length - 1 ? _sub.shelvesY[v.subShelfIdx + 1] : compTopY) - newY;
-                    sHandle.querySelector('.drag-tooltip').innerText = `מעל: ${Math.round(aboveH)} ס"מ | מתחת: ${Math.round(belowH)} ס"מ`;
-                    buildCabinetDragging();
-                }
-                else if (v.isSplit) {
-                    let minLimits = [], maxLimits = [];
-                    state.columns.forEach(c => {
-                        if (c.splitY) {
-                            const cBaseY = c.type === 'desk' ? c.deskHeight + c.deskClearance : state.plinthHeight;
-                            minLimits.push(Math.max(...c.shelvesY.filter(y => y < startY), cBaseY + t) + t + MIN_SHELF_GAP + t);
-                            maxLimits.push(Math.min(...c.shelvesY.filter(y => y > startY), c.height - t) - t - MIN_SHELF_GAP - t);
-                        }
-                    });
-                    const limitMin = Math.max(...minLimits);
-                    const limitMax = Math.min(getSplitThreshold(), ...maxLimits); 
-                    const newSplitY = Math.round(Math.max(limitMin, Math.min(limitMax, startY + deltaCm)));
-                    _setActiveWingSplitY(newSplitY);
-                } 
-                else if (v.isInternalDeskSurface) {
-                    col.deskHeight = Math.round(Math.max(50, Math.min(col.deskHeight + col.deskClearance - MIN_SHELF_GAP, startY + deltaCm)));
-                    distributeShelves(col);
-                }
-                else if (v.isInternalDeskClearance) {
-                    let maxLimits = col.shelvesY.length > 0 ? col.shelvesY[0] - MIN_SHELF_GAP : col.height - MIN_SHELF_GAP;
-                    if (col.splitY) maxLimits = Math.min(maxLimits, col.splitY - MIN_SHELF_GAP);
-                    let desiredY = Math.round(Math.max(col.deskHeight + 30, Math.min(maxLimits, startY + deltaCm)));
-                    col.deskClearance = desiredY - col.deskHeight;
-                    distributeShelves(col);
-                }
-                else if (v.isInternalDeskDrawer) {
-                    col.drawerHeight = Math.round(Math.max(8, Math.min(40, startY - deltaCm)));
-                }
-                else {
-                    const cBaseY = col.type === 'desk' ? col.deskHeight + col.deskClearance : state.plinthHeight;
-                    let obs = [cBaseY + t/2, col.height - t/2];
-                    // קושרת is a hard wall — shelves cannot cross the split board
-                    if (col.splitY) { obs.push(col.splitY - t); obs.push(col.splitY + t); }
-                    col.shelvesY.forEach((y, i) => { if (i !== v.shelfIdx) obs.push(y); });
-
-                    const limitMin = Math.max(...obs.filter(y => y < startY)) + MIN_SHELF_GAP + t;
-                    const limitMax = Math.min(...obs.filter(y => y > startY)) - MIN_SHELF_GAP - t;
-                    // Round to 0.1cm (1mm) — same resolution as _distributeShelves
-                    let newY = Math.round(Math.max(limitMin, Math.min(limitMax, startY + deltaCm)) * 10) / 10;
-
-                    // ── Snap + highlight: if within 5mm of a neighbor shelf, snap to it ──
-                    const SNAP_THRESHOLD = 0.5; // 5mm in cm
-                    let highlightNeighborColIdx = -1;
-                    let highlightNeighborShelfIdx = -1;
-                    let bestDist = SNAP_THRESHOLD + 1;
-                    [-1, 1].forEach(offset => {
-                        const nc = v.colIndex + offset;
-                        if (nc < 0 || nc >= state.columns.length) return;
-                        const neighbor = state.columns[nc];
-                        if (!neighbor || !neighbor.shelvesY) return;
-                        neighbor.shelvesY.forEach((ny, ni) => {
-                            const dist = Math.abs(ny - newY);
-                            if (dist <= SNAP_THRESHOLD && dist < bestDist) {
-                                // Only snap if the snapped position is within limits
-                                if (ny >= limitMin && ny <= limitMax) {
-                                    bestDist = dist;
-                                    highlightNeighborColIdx = nc;
-                                    highlightNeighborShelfIdx = ni;
-                                    newY = ny; // snap to neighbor's exact position
-                                }
-                            }
-                        });
-                    });
-
-                    col.shelvesY[v.shelfIdx] = newY; // apply position to state
-
-                    // Store snap info for engine.js shelf material highlight + handle highlight
-                    if (highlightNeighborColIdx !== -1) {
-                        window._snapHighlight = {
-                            colIdx: v.colIndex,
-                            shelfIdx: v.shelfIdx,
-                            neighborColIdx: highlightNeighborColIdx,
-                            neighborShelfIdx: highlightNeighborShelfIdx
-                        };
-                    } else {
-                        window._snapHighlight = null;
-                    }
-                    sHandle._highlightNeighborColIdx = highlightNeighborColIdx;
-                    sHandle._highlightNeighborShelfIdx = highlightNeighborShelfIdx;
-                    // ─────────────────────────────────────────────────────────────────
-
-                    // Auto-update drawer counts for the two cells adjacent to the moved shelf
-                    // Also check sorbet minimum height — if violated, snap shelf back and ask user
-                    let _sorbetBlocked = false;
-                    const _checkSorbetRow = (r) => {
-                        const comp = col.compartments[r];
-                        if (!comp || comp.type !== 'sorbet') return false;
-                        return _cellHeight(col, r) < 110;
-                    };
-                    if (_checkSorbetRow(v.shelfIdx) || _checkSorbetRow(v.shelfIdx + 1)) {
-                        // Revert shelf to original position
-                        col.shelvesY[v.shelfIdx] = startY;
-                        newY = startY;
-                        _sorbetBlocked = true;
-                        // Stop drag immediately before showing dialog (dialog blocks pointer events)
-                        isDragging = false;
-                        sHandle.classList.remove('active');
-                        controls.enabled = true;
-                        window._snapHighlight = null;
-                        // Ask user: delete sorbet or cancel
-                        const blockedR = (_checkSorbetRow(v.shelfIdx)) ? v.shelfIdx : v.shelfIdx + 1;
-                        if (confirm('הסורבטו דורש גובה תא מינימלי של 110 ס"מ.\nלמחוק את הסורבטו ולהמשיך?')) {
-                            col.compartments[blockedR].type = 'empty';
-                            col.shelvesY[v.shelfIdx] = Math.round(Math.max(limitMin, Math.min(limitMax, startY + deltaCm)) * 10) / 10;
-                        }
-                        buildCabinet(); saveHistoryState();
-                        return;
-                    }
-                    if (!_sorbetBlocked) {
-                        const _autoDrawerRow = (r) => {
-                            const comp = col.compartments[r];
-                            if (!comp || (comp.type !== 'internal_drawers' && comp.type !== 'external_drawers')) return;
-                            const cellH = _cellHeight(col, r);
-                            if (cellH < 12) { comp.type = 'empty'; return; }
-                            comp.count = calcAutoDrawerCount(cellH);
-                        };
-                        _autoDrawerRow(v.shelfIdx);
-                        _autoDrawerRow(v.shelfIdx + 1);
-                    }
-                }
-                buildCabinetDragging();
-                // Apply proximity highlight AFTER buildCabinetDragging (which rebuilds all handles)
-                // Use the module-level _snapHighlight (survives handle rebuild)
-                {
-                    const snap = window._snapHighlight;
-                    document.querySelectorAll('.drag-handle.vertical').forEach(h => {
-                        const hCol = parseInt(h.dataset.colIndex);
-                        const hShelf = parseInt(h.dataset.shelfIdx);
-                        if (snap) {
-                            if (hCol === snap.colIdx && hShelf === snap.shelfIdx) {
-                                h.classList.add('snapped', 'active');
-                            }
-                            if (hCol === snap.neighborColIdx && hShelf === snap.neighborShelfIdx) {
-                                h.classList.add('snapped');
-                            }
-                        }
-                    });
-                }
-                updateToolbarButtonHighlights();
-            });
-            window.addEventListener('pointerup', () => { if(isDragging){ isDragging = false; sHandle.classList.remove('active'); controls.enabled = true; document.body.classList.remove('dragging'); window._snapHighlight = null; _endDrag(); saveHistoryState(); }});
         });
     }
 
