@@ -14,8 +14,12 @@
     const _raycaster = new THREE.Raycaster();
     const _mouse = new THREE.Vector2();
     const _worldPos = new THREE.Vector3();
-    const _hoverColor = new THREE.Color(0x38bdf8);
-    const _selectColor = new THREE.Color(0xf97316);
+    const _hoverColor = new THREE.Color(0xd1fae5);  // ירוק בהיר בהיר
+    const _selectColor = new THREE.Color(0x86efac); // ירוק בהיר
+    const _HOVER_BLEND = 0.2;
+    const _SELECT_BLEND = 0.35;
+    const _HOVER_EMISSIVE = 0.12;
+    const _SELECT_EMISSIVE = 0.22;
     let _listenersBound = false;
 
     function _enabled() {
@@ -86,8 +90,8 @@
         return hitMesh;
     }
 
-    /** Strong tint: blend board color toward highlight + emissive glow + orange/cyan edges. */
-    function _applyHighlight(visual, color, blend) {
+    /** Soft translucent tint toward light green + gentle emissive. */
+    function _applyHighlight(visual, color, blend, emissiveIntensity) {
         if (!visual || !visual.material) return;
         if (!_savedLooks.has(visual)) {
             const edgeMats = new Map();
@@ -100,7 +104,9 @@
             _savedLooks.set(visual, {
                 mat: visual.material,
                 edgeMats: edgeMats,
-                baseColor: visual.material.color ? visual.material.color.clone() : null
+                baseColor: visual.material.color ? visual.material.color.clone() : null,
+                baseOpacity: visual.material.opacity,
+                baseTransparent: !!visual.material.transparent
             });
             visual.material = visual.material.clone();
         }
@@ -113,12 +119,15 @@
         }
         if (mat.emissive) {
             mat.emissive.copy(color);
-            mat.emissiveIntensity = 0.45 + blend * 0.55;
+            mat.emissiveIntensity = emissiveIntensity;
         }
+        // Slight transparency so the tint feels softer / more see-through
+        mat.transparent = true;
+        mat.opacity = Math.max(0.72, (saved.baseOpacity != null ? saved.baseOpacity : 1) * (1 - blend * 0.35));
         mat.needsUpdate = true;
         visual.children.forEach(function (ch) {
             if (ch.isLineSegments && ch.material && ch.material.color) {
-                ch.material.color.copy(color);
+                ch.material.color.copy(saved.baseColor || color).lerp(color, Math.min(1, blend + 0.15));
                 ch.material.needsUpdate = true;
             }
         });
@@ -142,7 +151,7 @@
         }
         _hoveredMesh = visual;
         if (visual && visual !== _selectedMesh) {
-            _applyHighlight(visual, _hoverColor, 0.55);
+            _applyHighlight(visual, _hoverColor, _HOVER_BLEND, _HOVER_EMISSIVE);
         }
     }
 
@@ -166,7 +175,7 @@
         }
         _selectedMesh = visual;
         _selectedRef = ref;
-        _applyHighlight(visual, _selectColor, 0.7);
+        _applyHighlight(visual, _selectColor, _SELECT_BLEND, _SELECT_EMISSIVE);
         _showTrash();
         _updateTrashPos();
     }
@@ -304,6 +313,12 @@
         const visual = _visualFromHit(hit);
         const ref = _parseShelfRef(hit) || _parseShelfRef(visual);
         if (!visual || !ref) return 'none';
+        // Second click on the same shelf clears selection
+        if (_selectedRef && _refsEqual(_selectedRef, ref)) {
+            _clearSelectionVisual();
+            _setHover(visual);
+            return 'handled';
+        }
         _selectVisual(visual, ref);
         return 'handled';
     };
@@ -320,7 +335,7 @@
             return;
         }
         _selectedMesh = visual;
-        _applyHighlight(visual, _selectColor, 0.7);
+        _applyHighlight(visual, _selectColor, _SELECT_BLEND, _SELECT_EMISSIVE);
         _showTrash();
         _updateTrashPos();
     };
