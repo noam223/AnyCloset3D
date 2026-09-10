@@ -3477,22 +3477,16 @@ function _renderMergedDeskDrawerBand(opts) {
     createBoard(t, sideInnerH, t, frameRight - t / 2, sideCenterY, frameZ, matDesk);
     _ppPartId = '';
 
-    // Vertical divider at desk ↔ cabinet junction
-    const junctionX = deskInnerX;
-    if (junctionX > frameLeft + t + 1 && junctionX < frameRight - t - 1) {
-        _ppPartId = 'desk_merge_frame_junction';
-        createBoard(t, sideInnerH, t, junctionX, sideCenterY, frameZ, matDesk);
-        _ppPartId = '';
-    }
+    // No vertical junction stile — outer wall is holed so desk+wardrobe share one opening
 
     const openingBottom = bandBottomY + botRailH + gap;
     const openingTop = bandTopY - topRailH - gap;
     const openingH = Math.max(4, openingTop - openingBottom);
     const drawerCenterY = openingBottom + openingH / 2;
 
-    // Desk-side drawers (horizontal split)
-    const deskSpanLeft = (dSide === 'left') ? deskOuterX + t : deskInnerX + t / 2;
-    const deskSpanRight = (dSide === 'left') ? deskInnerX - t / 2 : deskOuterX - t;
+    // Desk-side drawers (horizontal split) — flush to cabinet face (no middle partition)
+    const deskSpanLeft = (dSide === 'left') ? deskOuterX + t : deskInnerX;
+    const deskSpanRight = (dSide === 'left') ? deskInnerX : deskOuterX - t;
     const deskInnerW = Math.max(0, deskSpanRight - deskSpanLeft);
     if (deskInnerW > 4) {
         const numDrawers = (desk.drawerCount != null) ? desk.drawerCount : (dWidth <= 80 ? 1 : 2);
@@ -3506,10 +3500,10 @@ function _renderMergedDeskDrawerBand(opts) {
         }
     }
 
-    // Wardrobe-side drawers (one row; count stacked vertically if >1)
-    const wardLeft = (dSide === 'left') ? Math.max(wardrobeLeftX, junctionX + t / 2) : wardrobeLeftX;
-    const wardRight = (dSide === 'left') ? wardrobeRightX : Math.min(wardrobeRightX, junctionX - t / 2);
-    const wardW = Math.max(0, wardRight - wardLeft - t);
+    // Wardrobe-side drawer(s) — flush to desk side (no double wall / stile at junction)
+    const wardLeft = wardrobeLeftX;
+    const wardRight = wardrobeRightX;
+    const wardW = Math.max(0, wardRight - wardLeft);
     const wardCenterX = (wardLeft + wardRight) / 2;
     const wCount = Math.max(1, wardrobeDrawerCount || 1);
     if (wardW > 4) {
@@ -3518,21 +3512,14 @@ function _renderMergedDeskDrawerBand(opts) {
         for (let d = 0; d < wCount; d++) {
             const dY = openingBottom + eachH / 2 + d * (eachH + stackGap);
             _ppPartId = `desk_merge_ward_d${d}`;
-            const mesh = createBoard(wardW - gap * 2, eachH, t, wardCenterX, dY, drawerFZ, matDesk);
+            const mesh = createBoard(Math.max(2, wardW - gap * 2), eachH, t, wardCenterX, dY, drawerFZ, matDesk);
             _ppPartId = '';
             if (!isBP) {
-                _addPanelHandleLocal(mesh, wardW - gap * 2, eachH, handleStyle);
+                _addPanelHandleLocal(mesh, Math.max(2, wardW - gap * 2), eachH, handleStyle);
                 if (typeof _registerExternalDrawerFront === 'function') _registerExternalDrawerFront(mesh);
             }
         }
-        // Side stiles inside wardrobe opening for a framed "window" look
-        if (wardW > t * 4) {
-            _ppPartId = 'desk_merge_ward_stile_l';
-            createBoard(t, sideInnerH, t, wardLeft + t / 2, sideCenterY, frameZ, matDesk);
-            _ppPartId = 'desk_merge_ward_stile_r';
-            createBoard(t, sideInnerH, t, wardRight - t / 2, sideCenterY, frameZ, matDesk);
-            _ppPartId = '';
-        }
+        // Outer frame left/right rails already close the opening — no extra wardrobe stiles
     }
 
     if (!isBP && opts.dragHandlesData && opts.dragHandlesData.desk) {
@@ -4178,6 +4165,32 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                 endC++;
                 walk = nextBlk;
             }
+        });
+    }
+
+    // When desk drawers are merged: cut a hole in the outer cabinet wall at the band
+    // so there is no double partition between wardrobe drawer and desk drawer.
+    if (state.desk && state.desk.mergeDrawers && state.desk.side !== 'none' && state.desk.hasDrawers) {
+        const _mergeBandTop = state.desk.height;
+        const _mergeBandBot = state.desk.height - deskT - (state.desk.drawerHeight || 12);
+        const _mergeHole = {
+            bottom: _mergeBandBot - t * 0.5,
+            top: _mergeBandTop + t * 0.25
+        };
+        if (state.desk.side === 'left') leftWallHoles.push(_mergeHole);
+        else rightWallHoles.push(_mergeHole);
+    }
+
+    // 3D overlay: connect/merge icon at desk ↔ wardrobe junction
+    if (_isActiveWingBuild && !isBP && state.desk && state.desk.side !== 'none' && state.desk.hasDrawers) {
+        const _bTop = state.desk.height;
+        const _bBot = state.desk.height - deskT - (state.desk.drawerHeight || 12);
+        const _jx = (state.desk.side === 'left') ? (-state.width / 2) : (state.width / 2);
+        state.dimData.push({
+            isDeskDrawerMergeBtn: true,
+            merged: !!state.desk.mergeDrawers,
+            x: _jx,
+            y: (_bTop + _bBot) / 2
         });
     }
 
@@ -4852,6 +4865,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         }
 
         let prevYTopDown = col.height - t;
+        const _dividersAscForMerge = [...dividers].sort((a, b) => a.y - b.y);
         
         dividers.forEach((div) => {
             const compH = prevYTopDown - (div.y + div.thick/2);
@@ -4867,6 +4881,22 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                 Math.abs((div.y + div.thick/2) - b.bottomY) < 0.01 || 
                 Math.abs((div.y - div.thick/2) - b.topY) < 0.01
             );
+
+            // Skip visual shelf boards that bound a desk-merged drawer cell —
+            // the continuous desk frame replaces those horizontal walls.
+            let _skipMergeBoundaryShelf = false;
+            if (!isBP && div.type === 'shelf' && state.desk && state.desk.mergeDrawers) {
+                const ascIdx = _dividersAscForMerge.findIndex(d =>
+                    d.type === 'shelf' && d.idx === div.idx && Math.abs(d.y - div.y) < 0.05
+                );
+                if (ascIdx >= 0) {
+                    const compTopOf = col.compartments[ascIdx];
+                    const compBotOf = col.compartments[ascIdx + 1];
+                    if ((compTopOf && compTopOf.mergeWithDesk) || (compBotOf && compBotOf.mergeWithDesk)) {
+                        _skipMergeBoundaryShelf = true;
+                    }
+                }
+            }
 
             let boardW = col.width;
             let boardX = colCenterX;
@@ -4909,6 +4939,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
             _ppPartId = (insideBlock && insideBlock.paintId)
                 ? insideBlock.paintId
                 : (div.type === 'shelf' ? `shelf_c${c}_r${div.idx}` : `split_c${c}`);
+            if (!_skipMergeBoundaryShelf) {
             if (div.type === 'split') {
                 // Visual: two adjacent boards of thickness t (cabinet color). Layout still uses thick: 2t.
                 const boardT = t;
@@ -4924,6 +4955,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                     shelfMesh.userData.shelfRef = { colIndex: c, shelfIdx: div.idx };
                     _registerShelfPickMesh(shelfMesh, boardW, div.thick, boardD);
                 }
+            }
             }
             _ppPartId = '';
             prevYTopDown = div.y - div.thick/2;

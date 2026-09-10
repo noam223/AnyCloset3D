@@ -589,6 +589,7 @@ function buildDimensionsAndButtonsUI() {
         if (d.isSubCellBtn) return;
         if (d.isCellSelectBtn) return;
         if (d.isHoneycombMergeBtn) return;
+        if (d.isDeskDrawerMergeBtn) return;
 
         // ---- Column width label above each column (editable) ----
         if (d.isColWidth) {
@@ -1030,6 +1031,34 @@ function buildDimensionsAndButtonsUI() {
                 if (typeof window._toggleHoneycombColumnMerge === 'function') {
                     window._toggleHoneycombColumnMerge(d.leftCol, d.startR, d.endR);
                 }
+            });
+            dimLayer.appendChild(btn);
+        });
+
+        state.dimData.filter(d => d.isDeskDrawerMergeBtn).forEach(d => {
+            const btn = document.createElement('div');
+            btn.className = 'desk-drawer-merge-btn';
+            btn.style.cssText = 'position:absolute;transform:translate(-50%,-50%);pointer-events:auto;z-index:6;';
+            btn.dataset.x3d = d.x;
+            btn.dataset.y3d = d.y;
+            const merged = !!d.merged;
+            btn.title = merged ? 'בטל מיזוג מגירות' : 'מזג מגירה עם הארון';
+            const bg = merged
+                ? 'linear-gradient(135deg,#f59e0b,#d97706)'
+                : 'linear-gradient(135deg,#10b981,#059669)';
+            const shadow = merged
+                ? '0 2px 8px rgba(245,158,11,0.5)'
+                : '0 2px 8px rgba(16,185,129,0.5)';
+            const icon = merged ? 'fa-link-slash' : 'fa-link';
+            btn.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:' + bg + ';box-shadow:' + shadow + ';cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;"><i class="fa-solid ' + icon + '" style="font-size:0.78rem;color:white;pointer-events:none;"></i></div>';
+            const circle = btn.querySelector('div');
+            btn.addEventListener('mouseenter', function() { circle.style.transform = 'scale(1.16)'; });
+            btn.addEventListener('mouseleave', function() { circle.style.transform = 'scale(1)'; });
+            btn.addEventListener('pointerdown', function(e) { e.preventDefault(); e.stopPropagation(); });
+            btn.addEventListener('pointerup', function(e) { e.stopPropagation(); });
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (typeof window.toggleDeskDrawerMerge === 'function') window.toggleDeskDrawerMerge();
             });
             dimLayer.appendChild(btn);
         });
@@ -2684,7 +2713,7 @@ function updateOverlaysPosition() {
         return localPt.project(camera);
     };
 
-    document.querySelectorAll('.dim-container, .select-all-col-btn, .sub-cell-btn, .cell-select-btn, .honeycomb-merge-btn').forEach(el => {
+    document.querySelectorAll('.dim-container, .select-all-col-btn, .sub-cell-btn, .cell-select-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn').forEach(el => {
         const pos = projectWingPoint(parseFloat(el.dataset.x3d), parseFloat(el.dataset.y3d));
         let x = (pos.x * .5 + .5) * cw;
         let y = (-(pos.y * .5) + .5) * ch;
@@ -5833,7 +5862,7 @@ function _isCanvasOverlayUiTarget(el) {
     if (!el || !el.closest) return false;
     return !!el.closest(
         '#column-quick-edit, #full-corner-quick-edit, #bottom-floating-toolbar, #bed-toolbar, #room-props-row, #room-furniture-toolbar, #room-plan-layer, #btn-room-plan-view-toggle, ' +
-        '.drag-handle, .dim-container, .plus-btn, .fc-cell-btn, .select-all-col-btn, .cell-select-btn, .sub-cell-btn, .honeycomb-merge-btn'
+        '.drag-handle, .dim-container, .plus-btn, .fc-cell-btn, .select-all-col-btn, .cell-select-btn, .sub-cell-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn'
     );
 }
 
