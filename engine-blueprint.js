@@ -6,8 +6,8 @@ const DESK_SURFACE_T = 2.8; // 28mm — all desk horizontal surfaces
 
 function _bpCenterSideDesk(cw) {
     const wing = cw || (state.wings && state.wings.center);
-    const desk = wing && wing.desk;
-    return (desk && desk.side !== 'none') ? desk : null;
+    const desk = (wing && wing.desk) || state.desk;
+    return (desk && desk.side && desk.side !== 'none') ? desk : null;
 }
 
 function _bpCenterSideCabinet(cw) {
@@ -17,8 +17,16 @@ function _bpCenterSideCabinet(cw) {
 }
 
 /** Put overall cabinet height on the side opposite a side desk / side cabinet. */
-function _bpPreferOverallHeightSide(cw) {
-    const desk = _bpCenterSideDesk(cw);
+function _bpPreferOverallHeightSide(cw, horizExtra) {
+    // Layout extras are the most reliable signal (same data that shifts the cabinet in SVG)
+    if (horizExtra) {
+        const L = Number(horizExtra.left) || 0;
+        const R = Number(horizExtra.right) || 0;
+        if (L > 0.5 && L >= R) return 'right';
+        if (R > 0.5 && R > L) return 'left';
+    }
+    const desk = _bpCenterSideDesk(cw) ||
+        ((state.desk && state.desk.side && state.desk.side !== 'none') ? state.desk : null);
     if (desk) {
         if (desk.side === 'left') return 'right';
         if (desk.side === 'right') return 'left';
@@ -714,7 +722,14 @@ function _bpColBodyHCm(col, wgH) {
 function _bpPushWingOverallHeight(dimVFn, cols, oy, dH, sc, wgH, ox, opts) {
     if (!dimVFn) return;
     opts = opts || {};
-    const side = opts.side || 'left';
+    // Re-resolve from horizExtra inside the helper so left-desk can never keep ox-54
+    let side = opts.side || 'left';
+    if (opts.horizExtra) {
+        const L = Number(opts.horizExtra.left) || 0;
+        const R = Number(opts.horizExtra.right) || 0;
+        if (L > 0.5 && L >= R) side = 'right';
+        else if (R > 0.5 && R > L) side = 'left';
+    }
     const dW = opts.dW || 0;
     const dimVLeftFn = opts.dimVLeftFn || dimVFn;
     const place = function(y1, y2, lbl) {
@@ -2449,9 +2464,9 @@ window._generateMultiViewBlueprintSVG = function() {
         // Overall height: standing columns floor→top; hanging cabinets show body height only
         // Place opposite a side desk so the dim does not sit on top of the desk
         {
-            const _hSideOld = _isCenterWg ? _bpPreferOverallHeightSide(centerWing) : 'left';
+            const _hSideOld = _bpPreferOverallHeightSide(_isCenterWg ? centerWing : null, _horizExtra);
             _bpPushWingOverallHeight(dimV, cols, oy, dH, sc, wg.h, ox, {
-                side: _hSideOld, dW: dW, dimVLeftFn: dimVLeft
+                side: _hSideOld, dW: dW, dimVLeftFn: dimVLeft, horizExtra: _horizExtra
             });
             _bpDrawShorterColumnOverallHeights(dimV, cols, colXPositions, oy, dH, sc, wg.h, ox, dW, {
                 overallSide: _hSideOld, dimVLeftFn: dimVLeft
@@ -3468,9 +3483,10 @@ window._generateMultiViewBlueprintPages = function() {
         }
         // Overall height: standing columns floor→top; hanging cabinets show body height only
         {
-            const _hSide2 = _isCenterWg2 ? _bpPreferOverallHeightSide(centerWing) : 'left';
+            const _hSide2 = _bpPreferOverallHeightSide(_isCenterWg2 ? centerWing : null, _horizExtra2);
             _bpPushWingOverallHeight((x, y1, y2, lbl) => makeDimV(p, x, y1, y2, lbl), cols, oy, dH, sc, wg.h, ox, {
-                side: _hSide2, dW: dW, dimVLeftFn: (x, y1, y2, lbl) => makeDimVLeft(p, x, y1, y2, lbl)
+                side: _hSide2, dW: dW, dimVLeftFn: (x, y1, y2, lbl) => makeDimVLeft(p, x, y1, y2, lbl),
+                horizExtra: _horizExtra2
             });
             _bpDrawShorterColumnOverallHeights(
                 (x, y1, y2, lbl) => makeDimV(p, x, y1, y2, lbl),
