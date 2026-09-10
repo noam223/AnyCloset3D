@@ -174,9 +174,8 @@ function _syncDrawerCompAfterHeight(col, r) {
     const cellH = _cellHeight(col, r);
     const { minH } = _drawerHeightRules(comp.type);
     if (cellH < minH) {
-        if (comp.mergeWithDesk && typeof window._clearDeskMergeFlags === 'function') {
-            window._clearDeskMergeFlags();
-        }
+        // Keep desk-merged drawer pinned — height is owned by merge shelves
+        if (comp.mergeWithDesk) return false;
         comp.type = 'empty';
         return true;
     }
@@ -4401,37 +4400,147 @@ window.addEventListener('pointermove', e => {
 
     // Regular column shelf
     const cBaseY = col.type === 'desk' ? col.deskHeight + col.deskClearance : state.plinthHeight;
-    let obs = [cBaseY + t / 2, col.height - t / 2];
-    if (col.splitY) { obs.push(col.splitY - t); obs.push(col.splitY + t); }
-    col.shelvesY.forEach((y, i) => { if (i !== d.shelfIdx) obs.push(y); });
+    const pin = (typeof window._getDeskMergePinInfo === 'function')
+        ? window._getDeskMergePinInfo(col) : null;
+    const EPS = 0.15;
 
-    const limitMin = Math.max(...obs.filter(y => y < startY)) + MIN_SHELF_GAP + t;
-    const limitMax = Math.min(...obs.filter(y => y > startY)) - MIN_SHELF_GAP - t;
-    let newY = Math.round(Math.max(limitMin, Math.min(limitMax, startY + deltaCm)) * 10) / 10;
+    // Desk-merge bounding shelves stay pinned
+    if (pin && (d.shelfIdx === pin.botShelfIdx || d.shelfIdx === pin.topShelfIdx)) {
+        return;
+    }
+
+    const desired = startY + deltaCm;
+    const bandLo = (pin && pin.pinBottomY != null) ? pin.pinBottomY : null;
+    const bandHi = (pin && pin.pinTopY != null) ? pin.pinTopY : null;
+    const canJump = !!(bandLo != null && bandHi != null && bandHi > bandLo + EPS);
+    const curY = (col.shelvesY && col.shelvesY[d.shelfIdx] != null) ? col.shelvesY[d.shelfIdx] : startY;
+
+    let newY;
+    let relocated = false;
+
+    if (canJump) {
+        const wasAbove = curY > bandHi + EPS;
+        const wasBelow = curY < bandLo - EPS;
+
+        const zoneLimits = (floorY, ceilY, refY, zoneShelves) => {
+            const obs = [floorY, ceilY];
+            if (col.splitY) {
+                if (col.splitY > floorY + EPS && col.splitY < ceilY - EPS) {
+                    obs.push(col.splitY - t);
+                    obs.push(col.splitY + t);
+                }
+            }
+            zoneShelves.forEach(y => obs.push(y));
+            const below = obs.filter(y => y < refY - 0.01);
+            const above = obs.filter(y => y > refY + 0.01);
+            const zMin = (below.length ? Math.max(...below) : floorY) + MIN_SHELF_GAP + t;
+            const zMax = (above.length ? Math.min(...above) : ceilY) - MIN_SHELF_GAP - t;
+            return { limitMin: zMin, limitMax: zMax };
+        };
+
+        if (wasAbove) {
+            const aboveShelves = col.shelvesY.filter((y, i) => i !== d.shelfIdx && y > bandHi + EPS);
+            const a = zoneLimits(bandHi, col.height - t / 2, curY, aboveShelves);
+            if (desired >= a.limitMin - 0.01) {
+                newY = Math.round(Math.max(a.limitMin, Math.min(a.limitMax, desired)) * 10) / 10;
+            } else {
+                // Jump below the merged drawer (once)
+                const belowShelves = col.shelvesY.filter((y, i) => i !== d.shelfIdx && y < bandLo - EPS);
+                const b = zoneLimits(cBaseY + t / 2, bandLo, bandLo - MIN_SHELF_GAP - t, belowShelves);
+                if (b.limitMax >= b.limitMin) {
+                    const target = Math.min(b.limitMax, Math.max(b.limitMin, desired < bandLo ? desired : b.limitMax));
+                    newY = Math.round(target * 10) / 10;
+                    relocated = true;
+                } else {
+                    newY = Math.round(Math.max(a.limitMin, Math.min(a.limitMax, desired)) * 10) / 10;
+                }
+            }
+        } else if (wasBelow) {
+            const belowShelves = col.shelvesY.filter((y, i) => i !== d.shelfIdx && y < bandLo - EPS);
+            const b = zoneLimits(cBaseY + t / 2, bandLo, curY, belowShelves);
+            if (desired <= b.limitMax + 0.01) {
+                newY = Math.round(Math.max(b.limitMin, Math.min(b.limitMax, desired)) * 10) / 10;
+            } else {
+                // Jump above the merged drawer (once)
+                const aboveShelves = col.shelvesY.filter((y, i) => i !== d.shelfIdx && y > bandHi + EPS);
+                const a = zoneLimits(bandHi, col.height - t / 2, bandHi + MIN_SHELF_GAP + t, aboveShelves);
+                if (a.limitMax >= a.limitMin) {
+                    const target = Math.max(a.limitMin, Math.min(a.limitMax, desired > bandHi ? desired : a.limitMin));
+                    newY = Math.round(target * 10) / 10;
+                    relocated = true;
+                } else {
+                    newY = Math.round(Math.max(b.limitMin, Math.min(b.limitMax, desired)) * 10) / 10;
+                }
+            }
+        } else {
+            // Between pins — push back out
+            newY = curY;
+        }
+    } else {
+        let obs = [cBaseY + t / 2, col.height - t / 2];
+        if (col.splitY) { obs.push(col.splitY - t); obs.push(col.splitY + t); }
+        col.shelvesY.forEach((y, i) => { if (i !== d.shelfIdx) obs.push(y); });
+
+        const zMin = Math.max(...obs.filter(y => y < startY)) + MIN_SHELF_GAP + t;
+        const zMax = Math.min(...obs.filter(y => y > startY)) - MIN_SHELF_GAP - t;
+        newY = Math.round(Math.max(zMin, Math.min(zMax, desired)) * 10) / 10;
+    }
+
+    // Keep limitMin/limitMax for sorbet confirm path
+    let limitMin = newY;
+    let limitMax = newY;
+    {
+        let obs = [cBaseY + t / 2, col.height - t / 2];
+        if (col.splitY) { obs.push(col.splitY - t); obs.push(col.splitY + t); }
+        col.shelvesY.forEach((y, i) => { if (i !== d.shelfIdx) obs.push(y); });
+        if (canJump && bandLo != null && bandHi != null) {
+            if (curY > bandHi + EPS) {
+                obs = obs.filter(y => y >= bandHi - EPS);
+                obs.push(bandHi);
+            } else if (curY < bandLo - EPS) {
+                obs = obs.filter(y => y <= bandLo + EPS);
+                obs.push(bandLo);
+            }
+        }
+        const below = obs.filter(y => y < curY);
+        const above = obs.filter(y => y > curY);
+        if (below.length) limitMin = Math.max(...below) + MIN_SHELF_GAP + t;
+        if (above.length) limitMax = Math.min(...above) - MIN_SHELF_GAP - t;
+    }
 
     const SNAP_THRESHOLD = 0.5;
     let highlightNeighborColIdx = -1;
     let highlightNeighborShelfIdx = -1;
     let bestDist = SNAP_THRESHOLD + 1;
-    [-1, 1].forEach(offset => {
-        const nc = d.colIndex + offset;
-        if (nc < 0 || nc >= state.columns.length) return;
-        const neighbor = state.columns[nc];
-        if (!neighbor || !neighbor.shelvesY) return;
-        neighbor.shelvesY.forEach((ny, ni) => {
-            const dist = Math.abs(ny - newY);
-            if (dist <= SNAP_THRESHOLD && dist < bestDist) {
-                if (ny >= limitMin && ny <= limitMax) {
-                    bestDist = dist;
-                    highlightNeighborColIdx = nc;
-                    highlightNeighborShelfIdx = ni;
-                    newY = ny;
+    if (!relocated) {
+        [-1, 1].forEach(offset => {
+            const nc = d.colIndex + offset;
+            if (nc < 0 || nc >= state.columns.length) return;
+            const neighbor = state.columns[nc];
+            if (!neighbor || !neighbor.shelvesY) return;
+            neighbor.shelvesY.forEach((ny, ni) => {
+                const dist = Math.abs(ny - newY);
+                if (dist <= SNAP_THRESHOLD && dist < bestDist) {
+                    if (ny >= limitMin && ny <= limitMax) {
+                        bestDist = dist;
+                        highlightNeighborColIdx = nc;
+                        highlightNeighborShelfIdx = ni;
+                        newY = ny;
+                    }
                 }
-            }
+            });
         });
-    });
+    }
 
-    col.shelvesY[d.shelfIdx] = newY;
+    if (relocated && typeof window._relocatePhysicalShelf === 'function') {
+        const newIdx = window._relocatePhysicalShelf(col, d.shelfIdx, newY);
+        if (newIdx >= 0) d.shelfIdx = newIdx;
+        // Reset drag baseline so the next frames stay in the new zone
+        d.startY = (col.shelvesY[d.shelfIdx] != null) ? col.shelvesY[d.shelfIdx] : newY;
+        d.startMouseY = e.clientY;
+    } else {
+        col.shelvesY[d.shelfIdx] = newY;
+    }
 
     if (highlightNeighborColIdx !== -1) {
         window._snapHighlight = {
@@ -4450,21 +4559,26 @@ window.addEventListener('pointermove', e => {
         return _cellHeight(col, r) < 110;
     };
     if (_checkSorbetRow(d.shelfIdx) || _checkSorbetRow(d.shelfIdx + 1)) {
-        col.shelvesY[d.shelfIdx] = startY;
-        window._snapHighlight = null;
-        const blockedR = (_checkSorbetRow(d.shelfIdx)) ? d.shelfIdx : d.shelfIdx + 1;
-        // End drag before modal (confirm steals pointer events)
-        window._vShelfDrag = null;
-        controls.enabled = true;
-        document.body.classList.remove('dragging');
-        if (confirm('הסורבטו דורש גובה תא מינימלי של 110 ס"מ.\nלמחוק את הסורבטו ולהמשיך?')) {
-            col.compartments[blockedR].type = 'empty';
-            col.shelvesY[d.shelfIdx] = Math.round(Math.max(limitMin, Math.min(limitMax, startY + deltaCm)) * 10) / 10;
+        if (relocated) {
+            // Undo is hard after relocate — skip sorbet auto-delete mid-jump
+            window._snapHighlight = null;
+        } else {
+            col.shelvesY[d.shelfIdx] = startY;
+            window._snapHighlight = null;
+            const blockedR = (_checkSorbetRow(d.shelfIdx)) ? d.shelfIdx : d.shelfIdx + 1;
+            // End drag before modal (confirm steals pointer events)
+            window._vShelfDrag = null;
+            controls.enabled = true;
+            document.body.classList.remove('dragging');
+            if (confirm('הסורבטו דורש גובה תא מינימלי של 110 ס"מ.\nלמחוק את הסורבטו ולהמשיך?')) {
+                col.compartments[blockedR].type = 'empty';
+                col.shelvesY[d.shelfIdx] = Math.round(Math.max(limitMin, Math.min(limitMax, startY + deltaCm)) * 10) / 10;
+            }
+            _endDrag();
+            buildCabinet();
+            saveHistoryState();
+            return;
         }
-        _endDrag();
-        buildCabinet();
-        saveHistoryState();
-        return;
     }
 
     const _autoDrawerRow = (r) => {

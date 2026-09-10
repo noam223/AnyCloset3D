@@ -2676,6 +2676,266 @@ function _maxShelvesInSpan(innerH) {
     return Math.max(0, Math.min(8, Math.floor(innerH / MIN_SHELF_GAP) - 1));
 }
 
+/**
+ * Pinned shelves that bound a mergeWithDesk cell — must stay put when
+ * adding/redistributing other shelves in the column.
+ */
+function _getDeskMergePinInfo(col, wingData) {
+    if (!col || !Array.isArray(col.compartments)) return null;
+    const desk = (typeof state !== 'undefined') ? state.desk : null;
+    if (!desk || !desk.mergeDrawers) return null;
+
+    let mergeRow = -1;
+    for (let r = 0; r < col.compartments.length; r++) {
+        if (col.compartments[r] && col.compartments[r].mergeWithDesk) {
+            mergeRow = r;
+            break;
+        }
+    }
+    if (mergeRow < 0) return null;
+
+    const t = wingData ? wingData.thickness : state.thickness;
+    const baseY = _columnBaseY(col, wingData);
+    const startY = baseY + t;
+    const dividers = [];
+    (col.shelvesY || []).forEach((y, idx) => dividers.push({ y: y, type: 'shelf', idx: idx, thick: t }));
+    if (_hasActiveSplit(col, baseY, t)) {
+        dividers.push({ y: col.splitY, type: 'split', idx: -1, thick: 2 * t });
+    }
+    dividers.sort((a, b) => a.y - b.y);
+
+    let botShelfIdx = -1;
+    let topShelfIdx = -1;
+    let pinBottomY = null;
+    let pinTopY = null;
+
+    if (mergeRow > 0) {
+        const botDiv = dividers[mergeRow - 1];
+        if (botDiv && botDiv.type === 'shelf' && botDiv.idx >= 0) {
+            botShelfIdx = botDiv.idx;
+            pinBottomY = col.shelvesY[botShelfIdx];
+        }
+    }
+    if (mergeRow < dividers.length) {
+        const topDiv = dividers[mergeRow];
+        if (topDiv && topDiv.type === 'shelf' && topDiv.idx >= 0) {
+            topShelfIdx = topDiv.idx;
+            pinTopY = col.shelvesY[topShelfIdx];
+        }
+    }
+    if (pinBottomY == null && pinTopY == null) return null;
+
+    const bounds = _compartmentBounds(col, mergeRow, wingData);
+    return {
+        row: mergeRow,
+        botShelfIdx,
+        topShelfIdx,
+        pinBottomY,
+        pinTopY,
+        cellBottom: bounds.bottomY,
+        cellTop: bounds.topY,
+        startY
+    };
+}
+window._getDeskMergePinInfo = _getDeskMergePinInfo;
+
+/**
+ * Rebuild shelvesY keeping merge-band shelves fixed.
+ * New free shelves go into the span ABOVE the merge top pin (below-pin count stays stable).
+ */
+function _distributeShelvesAroundMergePin(col, wingData, pin, prevY, targetCount, spanBottom, spanTop) {
+    const t = wingData ? wingData.thickness : state.thickness;
+    const EPS = 0.15;
+    const pinBot = pin.pinBottomY;
+    const pinTop = pin.pinTopY;
+    const pinnedYs = [];
+    if (pinBot != null) pinnedYs.push(pinBot);
+    if (pinTop != null && (pinBot == null || Math.abs(pinTop - pinBot) > EPS)) pinnedYs.push(pinTop);
+    pinnedYs.sort((a, b) => a - b);
+    const pinnedCount = pinnedYs.length;
+
+    const prev = (prevY || []).slice().sort((a, b) => a - b);
+    const prevBelow = (pinBot != null) ? prev.filter(y => y < pinBot - EPS && y > spanBottom + EPS && y < spanTop - EPS) : [];
+    const prevAbove = (pinTop != null) ? prev.filter(y => y > pinTop + EPS && y > spanBottom + EPS && y < spanTop - EPS) : [];
+
+    const belowH = (pinBot != null) ? (pinBot - spanBottom) : 0;
+    const aboveH = (pinTop != null) ? (spanTop - pinTop) : 0;
+    const maxBelow = (pinBot != null) ? _maxShelvesInSpan(belowH) : 0;
+    const maxAbove = (pinTop != null) ? _maxShelvesInSpan(aboveH) : 0;
+
+    let freeTarget = Math.max(0, (targetCount | 0) - pinnedCount);
+    freeTarget = Math.min(freeTarget, maxBelow + maxAbove);
+
+    let belowCount = Math.min(maxBelow, prevBelow.length);
+    let aboveCount = Math.min(maxAbove, Math.max(0, freeTarget - belowCount));
+    const prevFree = prevBelow.length + prevAbove.length;
+
+    if (freeTarget > prevFree) {
+        const add = freeTarget - prevFree;
+        aboveCount = Math.min(maxAbove, prevAbove.length + add);
+        belowCount = Math.min(maxBelow, Math.max(0, freeTarget - aboveCount));
+        if (aboveCount + belowCount < freeTarget) {
+            belowCount = Math.min(maxBelow, freeTarget - aboveCount);
+        }
+    } else if (freeTarget < prevFree) {
+        let remove = prevFree - freeTarget;
+        const remAbove = Math.min(remove, prevAbove.length);
+        aboveCount = prevAbove.length - remAbove;
+        remove -= remAbove;
+        belowCount = Math.max(0, prevBelow.length - remove);
+        aboveCount = Math.min(maxAbove, aboveCount);
+        belowCount = Math.min(maxBelow, belowCount);
+    } else {
+        aboveCount = Math.min(maxAbove, prevAbove.length);
+        belowCount = Math.min(maxBelow, prevBelow.length);
+        while (aboveCount + belowCount > freeTarget && aboveCount > 0) aboveCount--;
+        while (aboveCount + belowCount > freeTarget && belowCount > 0) belowCount--;
+        while (aboveCount + belowCount < freeTarget && aboveCount < maxAbove) aboveCount++;
+        while (aboveCount + belowCount < freeTarget && belowCount < maxBelow) belowCount++;
+    }
+
+    const belowYs = (belowCount > 0 && pinBot != null)
+        ? (belowCount === prevBelow.length
+            ? prevBelow.slice().sort((a, b) => a - b)
+            : _spaceShelvesInSpan(spanBottom, belowH, belowCount))
+        : [];
+    const aboveYs = (aboveCount > 0 && pinTop != null)
+        ? (aboveCount === prevAbove.length && freeTarget === prevFree
+            ? prevAbove.slice().sort((a, b) => a - b)
+            : _spaceShelvesInSpan(pinTop, aboveH, aboveCount))
+        : [];
+
+    // Preserve mergeWithDesk if below-count change shifts row index
+    const belowDelta = belowCount - prevBelow.length;
+    if (belowDelta !== 0 && Array.isArray(col.compartments) && pin.row >= 0) {
+        const oldRow = pin.row;
+        const comp = col.compartments[oldRow];
+        if (comp && comp.mergeWithDesk) {
+            const nextRow = oldRow + belowDelta;
+            if (nextRow !== oldRow && nextRow >= 0) {
+                // sync will resize array later; stash flag to reapply
+                col._pendingMergePinRow = nextRow;
+                col._pendingMergePinComp = JSON.parse(JSON.stringify(comp));
+            }
+        }
+    }
+
+    return belowYs.concat(pinnedYs).concat(aboveYs);
+}
+
+/**
+ * Remove shelf at index (merge two cells). Returns true on success.
+ * Does not redistribute remaining shelves.
+ */
+function _removePhysicalShelfByIndex(col, si, wingData) {
+    if (!col || !Array.isArray(col.shelvesY)) return false;
+    si = si | 0;
+    if (si < 0 || si >= col.shelvesY.length) return false;
+
+    const t = wingData ? wingData.thickness : state.thickness;
+    const baseY = _columnBaseY(col, wingData);
+
+    const dividers = [];
+    col.shelvesY.forEach((y, shelfI) => dividers.push({ y: y, kind: 'shelf', shelfIdx: shelfI }));
+    if (_hasActiveSplit(col, baseY, t)) {
+        dividers.push({ y: col.splitY, kind: 'split', shelfIdx: -1 });
+    }
+    dividers.sort((a, b) => a.y - b.y);
+
+    let di = -1;
+    for (let i = 0; i < dividers.length; i++) {
+        if (dividers[i].kind === 'shelf' && dividers[i].shelfIdx === si) {
+            di = i;
+            break;
+        }
+    }
+    if (di < 0) return false;
+
+    if (!Array.isArray(col.compartments)) col.compartments = [];
+    while (col.compartments.length <= di + 1) col.compartments.push(_emptyCompartment());
+
+    const _MIG = new Set(['hanging', 'sorbet', 'internal_drawers', 'external_drawers']);
+    const a = col.compartments[di];
+    const b = col.compartments[di + 1];
+    let keep = a;
+    if (b) {
+        const aEmpty = !a || (a.type === 'empty' && !a.partition);
+        if (aEmpty && (_MIG.has(b.type) || b.partition || b.type !== 'empty')) keep = b;
+    }
+    const keepClone = JSON.parse(JSON.stringify(keep || { type: 'empty', count: 2 }));
+    if (a && a.mergeWithDesk) keepClone.mergeWithDesk = true;
+    if (b && b.mergeWithDesk) keepClone.mergeWithDesk = true;
+
+    if (Array.isArray(col.doors)) {
+        col.doors.forEach(d => {
+            if (!d) return;
+            if (d.endRow < di || d.startRow > di + 1) return;
+            d.startRow = Math.min(d.startRow, di);
+            d.endRow = Math.max(d.endRow, di + 1);
+        });
+    }
+
+    col.compartments[di] = keepClone;
+    col.compartments.splice(di + 1, 1);
+    _shiftDoorsRemove(col, di + 1);
+
+    col.shelvesY.splice(si, 1);
+    col.shelves = col.shelvesY.length;
+    return true;
+}
+
+/**
+ * Insert a shelf at absolute Y, splitting the cell that contains it.
+ * @returns {number} new shelf index, or -1
+ */
+function _insertPhysicalShelfAtY(col, newY, wingData) {
+    if (!col) return -1;
+    const t = wingData ? wingData.thickness : state.thickness;
+    const baseY = _columnBaseY(col, wingData);
+    if (!Array.isArray(col.shelvesY)) col.shelvesY = [];
+    if (!Array.isArray(col.compartments)) col.compartments = [];
+
+    const y = Math.round(newY * 10) / 10;
+    let hostRow = 0;
+    for (let r = 0; r < Math.max(1, col.compartments.length); r++) {
+        const b = _compartmentBounds(col, r, wingData);
+        if (y > b.bottomY + 0.05 && y < b.topY - 0.05) {
+            hostRow = r;
+            break;
+        }
+        if (r === col.compartments.length - 1 || col.compartments.length === 0) hostRow = r;
+    }
+
+    let insertAt = col.shelvesY.findIndex(sy => sy > y);
+    if (insertAt < 0) insertAt = col.shelvesY.length;
+    col.shelvesY.splice(insertAt, 0, y);
+    col.shelves = col.shelvesY.length;
+
+    while (col.compartments.length <= hostRow) col.compartments.push(_emptyCompartment());
+    col.compartments.splice(hostRow + 1, 0, _emptyCompartment());
+    _shiftDoorsInsert(col, hostRow + 1);
+
+    _syncCompartmentCount(col, baseY, t);
+    return insertAt;
+}
+
+/**
+ * Move a free shelf across the merge band (or any long jump) without
+ * trapping it inside the pinned drawer cell.
+ * @returns {number} new shelf index
+ */
+function _relocatePhysicalShelf(col, shelfIdx, newY, wingData) {
+    const pin = _getDeskMergePinInfo(col, wingData);
+    if (pin && (shelfIdx === pin.botShelfIdx || shelfIdx === pin.topShelfIdx)) {
+        return shelfIdx;
+    }
+    if (!_removePhysicalShelfByIndex(col, shelfIdx, wingData)) return shelfIdx;
+    return _insertPhysicalShelfAtY(col, newY, wingData);
+}
+window._relocatePhysicalShelf = _relocatePhysicalShelf;
+window._removePhysicalShelfByIndex = _removePhysicalShelfByIndex;
+window._insertPhysicalShelfAtY = _insertPhysicalShelfAtY;
+
 function _emptyCompartment() {
     return { type: 'empty', count: 2 };
 }
@@ -2722,6 +2982,15 @@ window.deleteShelfAt = function(colIndex, shelfIdx) {
     if (!col || !Array.isArray(col.shelvesY)) return false;
     const si = shelfIdx | 0;
     if (si < 0 || si >= col.shelvesY.length) return false;
+
+    // Protect shelves that bound a desk-merged drawer
+    const pin = (typeof _getDeskMergePinInfo === 'function') ? _getDeskMergePinInfo(col) : null;
+    if (pin && (si === pin.botShelfIdx || si === pin.topShelfIdx)) {
+        if (typeof _showToast === 'function') {
+            _showToast('לא ניתן למחוק מדף שמחזיק את המגירה הממוזגת', 2800);
+        }
+        return false;
+    }
 
     const t = state.thickness || 1.7;
     const baseY = (typeof _columnBaseY === 'function') ? _columnBaseY(col) : (state.plinthHeight || 0);
@@ -2881,7 +3150,8 @@ function _clampDrawerCompartments(col, baseY, t) {
                 ? window._drawerHeightRules(comp.type)
                 : { minH: (comp.type === 'external_drawers' ? 10 : 22), extraH: (comp.type === 'external_drawers' ? 10 : 20) };
             if (cellH < rules.minH) {
-                comp.type = 'empty';
+                // Never dissolve a desk-merged drawer — its height is pinned by merge shelves
+                if (!comp.mergeWithDesk) comp.type = 'empty';
             } else {
                 const minCount = (typeof window.calcMinDrawerCount === 'function')
                     ? window.calcMinDrawerCount(cellH, comp.type)
@@ -2897,17 +3167,41 @@ function _clampDrawerCompartments(col, baseY, t) {
     }
 }
 
+function _mergePinMaxShelves(col, wingData, pin, spanBottom, spanTop) {
+    if (!pin) return null;
+    const belowH = (pin.pinBottomY != null) ? (pin.pinBottomY - spanBottom) : 0;
+    const aboveH = (pin.pinTopY != null) ? (spanTop - pin.pinTopY) : 0;
+    const pinned = (pin.pinBottomY != null ? 1 : 0) +
+        (pin.pinTopY != null && (pin.pinBottomY == null || Math.abs(pin.pinTopY - pin.pinBottomY) > 0.15) ? 1 : 0);
+    return pinned +
+        (pin.pinBottomY != null ? _maxShelvesInSpan(belowH) : 0) +
+        (pin.pinTopY != null ? _maxShelvesInSpan(aboveH) : 0);
+}
+
 function _adjustUnitShelves(col, unit, delta, wingData) {
     if (!col || !delta) return false;
     if (!col.compartments) col.compartments = [];
     const t = wingData ? wingData.thickness : state.thickness;
     const baseY = _columnBaseY(col, wingData);
     const hasSplit = _hasActiveSplit(col, baseY, t);
+    const pin = _getDeskMergePinInfo(col, wingData);
 
     if (!hasSplit) {
         const innerH = col.height - baseY - (t * 2);
         const newS = (col.shelves || 0) + delta;
-        if (newS < 0 || newS > _maxShelvesInSpan(innerH)) return false;
+        if (newS < 0) return false;
+        if (pin && pin.pinTopY != null) {
+            const maxS = _mergePinMaxShelves(col, wingData, pin, baseY + t, col.height - t);
+            if (newS > maxS) return false;
+            if (delta > 0) {
+                const EPS = 0.15;
+                const curAbove = (col.shelvesY || []).filter(y => y > pin.pinTopY + EPS).length;
+                const maxAbove = _maxShelvesInSpan((col.height - t) - pin.pinTopY);
+                if (curAbove + delta > maxAbove) return false;
+            }
+        } else if (newS > _maxShelvesInSpan(innerH)) {
+            return false;
+        }
         col.shelves = newS;
         _distributeShelves(col, wingData);
         return true;
@@ -2920,11 +3214,28 @@ function _adjustUnitShelves(col, unit, delta, wingData) {
     const upper = upperYs.length;
     const h1 = col.splitY - t - (baseY + t);
     const h2 = col.height - t - (col.splitY + t);
+    const pinInLower = !!(pin && pin.pinTopY != null && pin.pinTopY < col.splitY);
+    const pinInUpper = !!(pin && pin.pinBottomY != null && pin.pinBottomY > col.splitY);
 
     if (unit === 'upper') {
         const next = upper + delta;
-        if (next < 0 || next > _maxShelvesInSpan(h2)) return false;
-        col.shelvesY = lowerYs.concat(_spaceShelvesInSpan(col.splitY + t, h2, next));
+        if (next < 0) return false;
+        if (pinInUpper) {
+            const maxS = _mergePinMaxShelves(col, wingData, pin, col.splitY + t, col.height - t);
+            if (next > maxS) return false;
+            if (delta > 0) {
+                const EPS = 0.15;
+                const curAbove = upperYs.filter(y => y > pin.pinTopY + EPS).length;
+                const maxAbove = _maxShelvesInSpan((col.height - t) - pin.pinTopY);
+                if (curAbove + delta > maxAbove) return false;
+            }
+            col.shelvesY = lowerYs.concat(
+                _distributeShelvesAroundMergePin(col, wingData, pin, upperYs, next, col.splitY + t, col.height - t)
+            );
+        } else {
+            if (next > _maxShelvesInSpan(h2)) return false;
+            col.shelvesY = lowerYs.concat(_spaceShelvesInSpan(col.splitY + t, h2, next));
+        }
         if (delta > 0) {
             for (let i = 0; i < delta; i++) col.compartments.push(_emptyCompartment());
         } else {
@@ -2936,8 +3247,23 @@ function _adjustUnitShelves(col, unit, delta, wingData) {
         }
     } else {
         const next = lower + delta;
-        if (next < 0 || next > _maxShelvesInSpan(h1)) return false;
-        col.shelvesY = _spaceShelvesInSpan(baseY + t, h1, next).concat(upperYs);
+        if (next < 0) return false;
+        if (pinInLower) {
+            const maxS = _mergePinMaxShelves(col, wingData, pin, baseY + t, col.splitY - t);
+            if (next > maxS) return false;
+            if (delta > 0) {
+                const EPS = 0.15;
+                const curAbove = lowerYs.filter(y => y > pin.pinTopY + EPS).length;
+                const maxAbove = _maxShelvesInSpan((col.splitY - t) - pin.pinTopY);
+                if (curAbove + delta > maxAbove) return false;
+            }
+            col.shelvesY = _distributeShelvesAroundMergePin(
+                col, wingData, pin, lowerYs, next, baseY + t, col.splitY - t
+            ).concat(upperYs);
+        } else {
+            if (next > _maxShelvesInSpan(h1)) return false;
+            col.shelvesY = _spaceShelvesInSpan(baseY + t, h1, next).concat(upperYs);
+        }
         const insertAt = lower + 1; // first upper row — new cell sits against the קושרת
         if (delta > 0) {
             for (let i = 0; i < delta; i++) {
@@ -2955,6 +3281,13 @@ function _adjustUnitShelves(col, unit, delta, wingData) {
 
     col.shelves = (col.shelvesY || []).length;
     _syncCompartmentCount(col, baseY, t);
+    if (col._pendingMergePinComp && col._pendingMergePinRow >= 0) {
+        const pr = col._pendingMergePinRow;
+        while (col.compartments.length <= pr) col.compartments.push(_emptyCompartment());
+        col.compartments[pr] = col._pendingMergePinComp;
+        delete col._pendingMergePinRow;
+        delete col._pendingMergePinComp;
+    }
     _clampDrawerCompartments(col, baseY, t);
     return true;
 }
@@ -2966,6 +3299,7 @@ function _distributeShelves(col, wingData) {
     const prevY = Array.isArray(col.shelvesY) ? col.shelvesY.slice() : [];
     const hasSplit = _hasActiveSplit(col, baseY, t);
     let numShelves = col.shelves || 0;
+    const pin = _getDeskMergePinInfo(col, wingData);
 
     col.shelvesY = [];
 
@@ -2978,11 +3312,41 @@ function _distributeShelves(col, wingData) {
         }
         const h1 = col.splitY - t - (baseY + t);
         const h2 = col.height - t - (col.splitY + t);
-        lower = Math.max(0, Math.min(_maxShelvesInSpan(h1), lower));
-        upper = Math.max(0, Math.min(_maxShelvesInSpan(h2), upper));
-        col.shelvesY = _spaceShelvesInSpan(baseY + t, h1, lower)
-            .concat(_spaceShelvesInSpan(col.splitY + t, h2, upper));
-        col.shelves = lower + upper;
+        const pinInLower = !!(pin && pin.pinTopY != null && pin.pinTopY < col.splitY);
+        const pinInUpper = !!(pin && pin.pinBottomY != null && pin.pinBottomY > col.splitY);
+
+        if (pinInLower) {
+            lower = Math.max(0, Math.min(_mergePinMaxShelves(col, wingData, pin, baseY + t, col.splitY - t), lower));
+            upper = Math.max(0, Math.min(_maxShelvesInSpan(h2), upper));
+            const lowerPrev = prevY.filter(y => y < col.splitY);
+            col.shelvesY = _distributeShelvesAroundMergePin(
+                col, wingData, pin, lowerPrev, lower, baseY + t, col.splitY - t
+            ).concat(_spaceShelvesInSpan(col.splitY + t, h2, upper));
+        } else if (pinInUpper) {
+            lower = Math.max(0, Math.min(_maxShelvesInSpan(h1), lower));
+            upper = Math.max(0, Math.min(_mergePinMaxShelves(col, wingData, pin, col.splitY + t, col.height - t), upper));
+            const upperPrev = prevY.filter(y => y > col.splitY);
+            col.shelvesY = _spaceShelvesInSpan(baseY + t, h1, lower).concat(
+                _distributeShelvesAroundMergePin(
+                    col, wingData, pin, upperPrev, upper, col.splitY + t, col.height - t
+                )
+            );
+        } else {
+            lower = Math.max(0, Math.min(_maxShelvesInSpan(h1), lower));
+            upper = Math.max(0, Math.min(_maxShelvesInSpan(h2), upper));
+            col.shelvesY = _spaceShelvesInSpan(baseY + t, h1, lower)
+                .concat(_spaceShelvesInSpan(col.splitY + t, h2, upper));
+        }
+        col.shelves = col.shelvesY.length;
+    } else if (pin && (pin.pinBottomY != null || pin.pinTopY != null)) {
+        const spanBottom = baseY + t;
+        const spanTop = col.height - t;
+        const maxS = _mergePinMaxShelves(col, wingData, pin, spanBottom, spanTop);
+        numShelves = Math.max(0, Math.min(maxS, numShelves));
+        col.shelvesY = _distributeShelvesAroundMergePin(
+            col, wingData, pin, prevY, numShelves, spanBottom, spanTop
+        );
+        col.shelves = col.shelvesY.length;
     } else {
         const innerH = col.height - baseY - (t * 2);
         numShelves = Math.max(0, Math.min(_maxShelvesInSpan(innerH), numShelves));
@@ -2991,6 +3355,13 @@ function _distributeShelves(col, wingData) {
     }
 
     _syncCompartmentCount(col, baseY, t);
+    if (col._pendingMergePinComp && col._pendingMergePinRow >= 0) {
+        const pr = col._pendingMergePinRow;
+        while (col.compartments.length <= pr) col.compartments.push(_emptyCompartment());
+        col.compartments[pr] = col._pendingMergePinComp;
+        delete col._pendingMergePinRow;
+        delete col._pendingMergePinComp;
+    }
     _clampDrawerCompartments(col, baseY, t);
 }
 
