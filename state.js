@@ -3752,115 +3752,107 @@ function _deskMergeColumnStartY(col) {
     return state.plinthHeight + t;
 }
 
-function _captureCompartmentSnapshots(col) {
-    const snaps = [];
-    const comps = (col && col.compartments) || [];
-    for (let r = 0; r < comps.length; r++) {
-        const b = _compartmentBounds(col, r);
-        snaps.push({
-            bottomY: b.bottomY,
-            topY: b.topY,
-            mid: (b.bottomY + b.topY) / 2,
-            comp: JSON.parse(JSON.stringify(comps[r] || { type: 'empty', count: 2 }))
-        });
-    }
-    return snaps;
-}
+/** Pick an existing compartment to shrink into the desk drawer band (no new shelves). */
+function _pickDeskMergeRow(col, band, preferredRows) {
+    if (!col || !band || !col.compartments || !col.compartments.length) return -1;
+    const bandMid = (band.top + band.bottom) / 2;
+    const pref = Array.isArray(preferredRows) ? preferredRows : [];
 
-function _reassignCompartmentsFromSnapshots(col, snaps) {
-    const t = state.thickness;
-    const fo = (col && col.floorOffset) || 0;
-    const baseY = fo > 0 ? fo : ((col && col.noPlinth) ? 0 : state.plinthHeight);
-    _syncCompartmentCount(col, baseY, t);
-    const used = new Set();
+    let best = -1;
+    let bestScore = -Infinity;
     for (let r = 0; r < col.compartments.length; r++) {
         const b = _compartmentBounds(col, r);
-        const mid = (b.bottomY + b.topY) / 2;
-        let best = -1;
-        let bestScore = -Infinity;
-        for (let i = 0; i < snaps.length; i++) {
-            if (used.has(i)) continue;
-            const overlap = Math.min(b.topY, snaps[i].topY) - Math.max(b.bottomY, snaps[i].bottomY);
-            const score = overlap > 0 ? overlap : (-Math.abs(mid - snaps[i].mid));
-            if (score > bestScore) {
-                bestScore = score;
-                best = i;
-            }
-        }
-        if (best >= 0 && bestScore > -40) {
-            used.add(best);
-            col.compartments[r] = snaps[best].comp;
-            delete col.compartments[r].mergeWithDesk;
-        } else {
-            col.compartments[r] = _emptyCompartment();
+        if (b.h < 8) continue;
+        const overlap = Math.min(band.top, b.topY) - Math.max(band.bottom, b.bottomY);
+        const dist = Math.abs((b.topY + b.bottomY) / 2 - bandMid);
+        const comp = col.compartments[r];
+        const isDrawer = !!(comp && (comp.type === 'internal_drawers' || comp.type === 'external_drawers'));
+        let score = (overlap > 0 ? overlap * 2 : -dist);
+        if (b.bottomY <= bandMid && b.topY >= bandMid) score += 80;
+        if (isDrawer) score += 25;
+        if (pref.indexOf(r) >= 0) score += 100;
+        if (score > bestScore) {
+            bestScore = score;
+            best = r;
         }
     }
+    return best;
 }
 
 /**
- * Insert/move shelves so the edge column has a cell matching the desk drawer band.
- * Returns the row index of that cell. Does NOT change desk height/drawerHeight.
+ * Shrink an EXISTING cell to the desk drawer band by moving its current
+ * bounding shelves only. Never inserts/deletes shelves (avoids column conflicts).
+ * Returns the row index, or -1.
  */
-function _ensureDeskBandCell(col, band) {
+function _ensureDeskBandCell(col, band, preferredRows) {
     if (!col || !band) return -1;
     const t = state.thickness;
+    const deskT = (band.deskT != null) ? band.deskT : DESK_SURFACE_T;
     const startY = _deskMergeColumnStartY(col);
     const roofY = (col.height || state.globalHeight || 240) - t;
+    const minH = (typeof window.MIN_EXTERNAL_DRAWER_CELL_H === 'number')
+        ? window.MIN_EXTERNAL_DRAWER_CELL_H : 10;
+
     let targetBottom = Math.round(band.bottom * 10) / 10;
     let targetTop = Math.round(band.top * 10) / 10;
-    const minH = 10;
     targetBottom = Math.max(startY, Math.min(targetBottom, roofY - minH));
     targetTop = Math.max(targetBottom + minH, Math.min(targetTop, roofY));
 
-    const snaps = _captureCompartmentSnapshots(col);
+    const row = _pickDeskMergeRow(col, band, preferredRows);
+    if (row < 0) return -1;
+
     if (!Array.isArray(col.shelvesY)) col.shelvesY = [];
 
-    const needBottomShelf = targetBottom > startY + 0.6;
-    const needTopShelf = targetTop < roofY - 0.6;
-    // Shelves sit IN the drawer-frame rails (not outside above/below), so they close
-    // the carcass at the same height as the visible frame.
-    const deskT = (band.deskT != null) ? band.deskT : DESK_SURFACE_T;
-    const bottomShelfY = needBottomShelf ? Math.round((targetBottom + t / 2) * 10) / 10 : null;
-    const topShelfY = needTopShelf ? Math.round((targetTop - deskT / 2) * 10) / 10 : null;
-
-    const near = (a, b) => Math.abs(a - b) < 1.2;
-    let ys = col.shelvesY.slice();
-
-    // Drop shelves that sit inside the drawer opening (between the frame rails)
-    const innerLo = needBottomShelf ? (bottomShelfY + t / 2 + 0.05) : startY;
-    const innerHi = needTopShelf ? (topShelfY - deskT / 2 - 0.05) : roofY;
-    ys = ys.filter(y => y < innerLo - 0.01 || y > innerHi + 0.01);
-
-    if (bottomShelfY != null) ys = ys.filter(y => !near(y, bottomShelfY));
-    if (topShelfY != null) ys = ys.filter(y => !near(y, topShelfY));
-    if (bottomShelfY != null) ys.push(bottomShelfY);
-    if (topShelfY != null) ys.push(topShelfY);
-
-    // Keep clear of splitY if present
-    if (col.splitY) {
-        ys = ys.filter(y => Math.abs(y - col.splitY) > t + 1);
+    // Divider list matching _compartmentBounds (shelves + optional קושרת)
+    const dividers = [];
+    col.shelvesY.forEach((y, idx) => dividers.push({ y: y, type: 'shelf', idx: idx, thick: t }));
+    if (col.splitY && col.splitY > startY) {
+        dividers.push({ y: col.splitY, type: 'split', thick: 2 * t, idx: -1 });
     }
+    dividers.sort((a, b) => a.y - b.y);
 
-    ys.sort((a, b) => a - b);
-    col.shelvesY = ys;
-    col.shelves = ys.length;
+    const wantBotShelfY = Math.round((targetBottom + t / 2) * 10) / 10;
+    const wantTopShelfY = Math.round((targetTop - deskT / 2) * 10) / 10;
+    const gap = (typeof MIN_SHELF_GAP === 'number') ? MIN_SHELF_GAP : 5;
 
-    _reassignCompartmentsFromSnapshots(col, snaps);
+    const clampShelf = (shelfIdx, desiredY) => {
+        if (shelfIdx < 0 || shelfIdx >= col.shelvesY.length) return;
+        const cur = col.shelvesY[shelfIdx];
+        const obs = [startY + t / 2, roofY - t / 2];
+        if (col.splitY) {
+            obs.push(col.splitY - t);
+            obs.push(col.splitY + t);
+        }
+        col.shelvesY.forEach((y, i) => {
+            if (i !== shelfIdx) obs.push(y);
+        });
+        const below = Math.max.apply(null, obs.filter(y => y < cur - 0.01).concat([startY]));
+        const above = Math.min.apply(null, obs.filter(y => y > cur + 0.01).concat([roofY]));
+        const limitMin = below + gap + t;
+        const limitMax = above - gap - t;
+        if (limitMax < limitMin) return;
+        col.shelvesY[shelfIdx] = Math.round(Math.max(limitMin, Math.min(limitMax, desiredY)) * 10) / 10;
+    };
 
-    const bandMid = (targetTop + targetBottom) / 2;
-    let bestRow = 0;
-    let bestDist = Infinity;
-    for (let r = 0; r < col.compartments.length; r++) {
-        const b = _compartmentBounds(col, r);
-        const dist = Math.abs((b.topY + b.bottomY) / 2 - bandMid);
-        if (dist < bestDist) {
-            bestDist = dist;
-            bestRow = r;
+    // Move only the shelves that already bound this cell — never add new ones
+    if (row > 0) {
+        const botDiv = dividers[row - 1];
+        if (botDiv && botDiv.type === 'shelf' && botDiv.idx >= 0) {
+            clampShelf(botDiv.idx, wantBotShelfY);
         }
     }
-    return bestRow;
+    if (row < dividers.length) {
+        const topDiv = dividers[row];
+        if (topDiv && topDiv.type === 'shelf' && topDiv.idx >= 0) {
+            clampShelf(topDiv.idx, wantTopShelfY);
+        }
+    }
+
+    col.shelves = col.shelvesY.length;
+    return row;
 }
 window._ensureDeskBandCell = _ensureDeskBandCell;
+window._pickDeskMergeRow = _pickDeskMergeRow;
 
 function _syncDeskMergeUI() {
     const rowEl = document.getElementById('side-desk-merge-row');
@@ -3897,13 +3889,18 @@ function toggleDeskDrawerMerge() {
         return;
     }
 
-    // Keep desk height / drawerHeight as-is — reshape the edge wardrobe column to match
+    // Keep desk height / drawerHeight as-is — shrink an existing edge cell to match
     const band = _getDeskDrawerBand(desk);
     const edgeIdx = desk.side === 'left' ? 0 : cols.length - 1;
     const edgeCol = cols[edgeIdx];
-    const mergeRow = _ensureDeskBandCell(edgeCol, band);
+    const preferred = (state.selection && state.selection.colIndex === edgeIdx)
+        ? (state.selection.rows || []).slice()
+        : [];
+    const mergeRow = _ensureDeskBandCell(edgeCol, band, preferred);
     if (mergeRow < 0 || !edgeCol.compartments[mergeRow]) {
-        if (typeof _showToast === 'function') _showToast('לא ניתן ליישר תא בארון לגובה מגירת השולחן', 4000);
+        if (typeof _showToast === 'function') {
+            _showToast('בחר תא בעמודת הקצה הצמודה לשולחן (עם מדפים קיימים) למיזוג', 4000);
+        }
         return;
     }
 
@@ -3912,7 +3909,6 @@ function toggleDeskDrawerMerge() {
     let next = edgeIdx + dir;
     while (next >= 0 && next < cols.length && colIndices.length < 3) {
         const ncol = cols[next];
-        // Only extend if that column already has a drawer near the desk band
         let nearDrawer = false;
         for (let r = 0; r < (ncol.compartments || []).length; r++) {
             const c = ncol.compartments[r];
@@ -3922,46 +3918,42 @@ function toggleDeskDrawerMerge() {
             if (overlap > 4) { nearDrawer = true; break; }
         }
         if (!nearDrawer) break;
-        _ensureDeskBandCell(ncol, band);
+        _ensureDeskBandCell(ncol, band, [mergeRow]);
         colIndices.push(next);
         next += dir;
     }
     colIndices.sort((a, b) => a - b);
 
-    const bandMid = (band.top + band.bottom) / 2;
-    let canonicalRow = mergeRow;
     colIndices.forEach(ci => {
         const col = cols[ci];
-        let row = 0;
-        let bestD = Infinity;
-        for (let r = 0; r < (col.compartments || []).length; r++) {
-            const b = _compartmentBounds(col, r);
-            const d = Math.abs((b.topY + b.bottomY) / 2 - bandMid);
-            if (d < bestD) { bestD = d; row = r; }
+        // Prefer same row index after shrink (row count unchanged — we only moved shelves)
+        let row = (ci === edgeIdx) ? mergeRow : mergeRow;
+        if (!col.compartments[row] || row >= col.compartments.length) {
+            row = _pickDeskMergeRow(col, band, [mergeRow]);
         }
+        if (row < 0) return;
         const comp = col.compartments[row];
         if (!comp) return;
         comp.type = 'external_drawers';
         comp.count = 1;
         comp.mergeWithDesk = true;
         _splitDoorsAroundRow(col, row);
-        if (ci === edgeIdx) canonicalRow = row;
     });
 
     desk.mergeDrawers = true;
     desk.mergeColIndex = edgeIdx;
-    desk.mergeRow = canonicalRow;
+    desk.mergeRow = mergeRow;
     desk.mergeColIndices = colIndices.slice();
 
     _syncDeskMergeUI();
     buildCabinet(); calculatePrice(); saveHistoryState();
     if (typeof _showToast === 'function') {
-        _showToast('מוזג לפי גובה מגירת השולחן — מסגרת רציפה', 2800);
+        _showToast('התא הקיים כווץ לגובה מגירת השולחן ומוזג', 2800);
     }
 }
 window.toggleDeskDrawerMerge = toggleDeskDrawerMerge;
 
-/** Soft check — realign shelves to desk frame rails; clear merge if no merged cells remain. */
+/** Soft check only — never rewrite shelves on rebuild (that fought manual shelf edits). */
 function _revalidateDeskMerge() {
     const desk = state.desk;
     if (!desk || !desk.mergeDrawers) return false;
@@ -3978,32 +3970,6 @@ function _revalidateDeskMerge() {
         _clearDeskMergeFlags();
         return true;
     }
-
-    // Keep carcass shelves locked to the visible frame rails (fixes hole above/below frame)
-    const band = _getDeskDrawerBand(desk);
-    const indices = desk.mergeColIndices || (desk.mergeColIndex != null ? [desk.mergeColIndex] : []);
-    const bandMid = (band.top + band.bottom) / 2;
-    const freshIndices = [];
-    indices.forEach(ci => {
-        const col = state.columns[ci];
-        if (!col) return;
-        _ensureDeskBandCell(col, band);
-        let row = 0;
-        let bestD = Infinity;
-        for (let r = 0; r < (col.compartments || []).length; r++) {
-            const b = _compartmentBounds(col, r);
-            const d = Math.abs((b.topY + b.bottomY) / 2 - bandMid);
-            if (d < bestD) { bestD = d; row = r; }
-        }
-        const comp = col.compartments[row];
-        if (!comp) return;
-        comp.type = 'external_drawers';
-        if (!comp.count || comp.count < 1) comp.count = 1;
-        comp.mergeWithDesk = true;
-        freshIndices.push(ci);
-        if (ci === desk.mergeColIndex) desk.mergeRow = row;
-    });
-    if (freshIndices.length) desk.mergeColIndices = freshIndices;
     return false;
 }
 window._revalidateDeskMerge = _revalidateDeskMerge;
