@@ -360,7 +360,10 @@ function buildCornerUnit() {
     const cuD = cu.depth || bodyD; // width in X (default = main cabinet depth)
     const plinthH = state.plinthHeight;
     const sign = (cu.side === 'right') ? 1 : -1;
-    const deskT = 2.8; // 28mm — desk horizontal surfaces
+    const _hasCornerDeskDrawers = Math.min(cu.deskDrawerCount || 0, 3) > 0;
+    const deskT = (typeof window._deskSurfaceThickness === 'function')
+        ? window._deskSurfaceThickness(_hasCornerDeskDrawers, t)
+        : (_hasCornerDeskDrawers ? t : 2.8);
 
     // Group center in world space:
     // X center: sign * (mainW/2 - cuD/2)  — inside cabinet

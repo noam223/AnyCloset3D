@@ -2,7 +2,16 @@
 // ==========================================
 // Multi-view blueprint SVG generator
 // ==========================================
-const DESK_SURFACE_T = 2.8; // 28mm — all desk horizontal surfaces
+const DESK_SURFACE_T_NO_DRAWERS = 2.8; // 28mm — desk without drawers
+function _bpDeskSurfaceT(hasDrawers) {
+    if (typeof window._deskSurfaceThickness === 'function') {
+        return window._deskSurfaceThickness(!!hasDrawers);
+    }
+    const t = (typeof state !== 'undefined' && state.thickness) ? state.thickness : 1.7;
+    return hasDrawers ? t : DESK_SURFACE_T_NO_DRAWERS;
+}
+/** @deprecated — use _bpDeskSurfaceT(hasDrawers) */
+const DESK_SURFACE_T = DESK_SURFACE_T_NO_DRAWERS;
 
 function _bpCenterSideDesk(cw) {
     const wing = cw || (state.wings && state.wings.center);
@@ -81,7 +90,9 @@ function _bpDrawSideDeskFrontParts(p, desk, ox, oy, dW, dH, sc, fill, STROKE, ST
     const dSvgW = dWidth * sc;
     const dSvgH = dHeight * sc;
     const legT = (state.thickness || 1.7) * sc;
-    const deskSurfT = DESK_SURFACE_T * sc;
+    const hasDrawers = desk.hasDrawers !== false;
+    const deskSurfCm = _bpDeskSurfaceT(hasDrawers);
+    const deskSurfT = deskSurfCm * sc;
     const deskX = dSide === 'left' ? (ox - dSvgW) : (ox + dW);
     const deskBotY = oy + dH;
     const deskTopY = deskBotY - dSvgH;
@@ -91,7 +102,6 @@ function _bpDrawSideDeskFrontParts(p, desk, ox, oy, dW, dH, sc, fill, STROKE, ST
     drawRect(legX, deskTopY, legT, dSvgH, fill || FILL_DESK, STROKE, 1.5);
     drawRect(deskX, deskTopY, dSvgW, deskSurfT, fill || FILL_DESK, STROKE, 1.5);
     const dimOuterX = dSide === 'left' ? (deskX - 14) : (deskX + dSvgW + 14);
-    const hasDrawers = desk.hasDrawers !== false;
     if (hasDrawers) {
         const numDrawers = (desk.drawerCount != null) ? desk.drawerCount : (dWidth <= 80 ? 1 : 2);
         const innerSvgW = dSvgW - legT;
@@ -110,10 +120,10 @@ function _bpDrawSideDeskFrontParts(p, desk, ox, oy, dW, dH, sc, fill, STROKE, ST
         const drawerSvgY0 = deskTopY + deskSurfT;
         if (dSide === 'left') {
             dimVLeftFn(dimOuterX, drawerSvgY0, drawerSvgY0 + drawerH * sc, `${_bpMm(drawerH)}`);
-            dimVLeftFn(dimOuterX - 36, drawerSvgY0 + drawerH * sc, deskBotY, `${_bpMm((dHeight - DESK_SURFACE_T - drawerH))}`);
+            dimVLeftFn(dimOuterX - 36, drawerSvgY0 + drawerH * sc, deskBotY, `${_bpMm((dHeight - deskSurfCm - drawerH))}`);
         } else {
             dimVFn(dimOuterX, drawerSvgY0, drawerSvgY0 + drawerH * sc, `${_bpMm(drawerH)}`);
-            dimVFn(dimOuterX + 36, drawerSvgY0 + drawerH * sc, deskBotY, `${_bpMm((dHeight - DESK_SURFACE_T - drawerH))}`);
+            dimVFn(dimOuterX + 36, drawerSvgY0 + drawerH * sc, deskBotY, `${_bpMm((dHeight - deskSurfCm - drawerH))}`);
         }
     }
     dimHFn(deskX, deskX + dSvgW, oy + dH + 16, `${_bpMm(dWidth)}`);
@@ -152,7 +162,8 @@ function _bpDrawWritingDeskFrontParts(p, wd, ox, oy, dW, dH, sc, fill, STROKE, S
     const drawerHcm = wd.drawerHeight || 12;
     const legTCm = state.thickness || 1.7;
     const legT = legTCm * sc;
-    const deskSurfT = DESK_SURFACE_T * sc;
+    const deskSurfCm = _bpDeskSurfaceT(wd.hasDrawers !== false);
+    const deskSurfT = deskSurfCm * sc;
     const deskBotY = oy + dH;
     const deskTopY = oy;
     const FILL_WD = fill || '#e8f0fe';
@@ -178,7 +189,7 @@ function _bpDrawWritingDeskFrontParts(p, wd, ox, oy, dW, dH, sc, fill, STROKE, S
             p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX + hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
         }
         dimVFn(ox + dW + 14, drawerSvgY, drawerSvgY + drawerSvgH, `${_bpMm(drawerHcm)}`);
-        dimVFn(ox + dW + 48, drawerSvgY + drawerSvgH, deskBotY, `${_bpMm((dHeight - DESK_SURFACE_T - drawerHcm))}`);
+        dimVFn(ox + dW + 48, drawerSvgY + drawerSvgH, deskBotY, `${_bpMm((dHeight - deskSurfCm - drawerHcm))}`);
     } else {
         drawRect(ox + legT, deskTopY + deskSurfT, dW - 2 * legT, dH - deskSurfT, 'white', STROKE_THIN || STROKE, 0.5);
     }
@@ -201,7 +212,8 @@ function _bpDrawWritingDeskSideParts(p, wd, ox, oy, dW, dH, sc, fill, STROKE, ST
     const drawerHcm = wd.drawerHeight || 12;
     const legTCm = state.thickness || 1.7;
     const legT = legTCm * sc;
-    const deskSurfT = DESK_SURFACE_T * sc;
+    const deskSurfCm = _bpDeskSurfaceT(wd.hasDrawers !== false);
+    const deskSurfT = deskSurfCm * sc;
     const deskBotY = oy + dH;
     const deskTopY = oy;
     const FILL_WD = fill || '#e8f0fe';
@@ -229,7 +241,8 @@ function _bpDrawCornerDeskFrontParts(p, cu, ox, oy, dW, dH, sc, STROKE, STROKE_T
     const cuD = cu.depth || 54;
     const tCm = state.thickness || 1.7;
     const legT = tCm * sc;
-    const deskSurfT = DESK_SURFACE_T * sc;
+    const deskSurfCm = _bpDeskSurfaceT(Math.min(cu.deskDrawerCount || 0, 3) > 0);
+    const deskSurfT = deskSurfCm * sc;
     const deskBotY = oy + dH;
     const deskTopY = oy;
     const isLeft = cu.side !== 'right';
@@ -258,7 +271,7 @@ function _bpDrawCornerDeskFrontParts(p, cu, ox, oy, dW, dH, sc, STROKE, STROKE_T
     const gapCm = 0.4;
     if (numDrawers > 0) {
         for (let i = 0; i < numDrawers; i++) {
-            const topOffsetCm = DESK_SURFACE_T + i * (drawerHcm + gapCm);
+            const topOffsetCm = deskSurfCm + i * (drawerHcm + gapCm);
             const dy = deskTopY + topOffsetCm * sc;
             const dh = drawerHcm * sc;
             drawRect(innerX + 1.5, dy + 1, innerW - 3, dh - 2, 'rgba(255,255,255,0.85)', STROKE, 1);
@@ -268,7 +281,7 @@ function _bpDrawCornerDeskFrontParts(p, cu, ox, oy, dW, dH, sc, STROKE, STROKE_T
             p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX + hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="2"/>`);
         }
         const drawersZoneH = numDrawers * drawerHcm + gapCm * Math.max(numDrawers - 1, 0);
-        const kneeH = Math.max(cuH - DESK_SURFACE_T - drawersZoneH, 0);
+        const kneeH = Math.max(cuH - deskSurfCm - drawersZoneH, 0);
         const dimX = isLeft ? (ox + dW + 18) : (ox - 18);
         const drawerTopY = deskTopY + deskSurfT;
         const drawerBotY = drawerTopY + drawersZoneH * sc;
@@ -2244,7 +2257,8 @@ window._generateMultiViewBlueprintSVG = function() {
                 rect(colX, openTop, colW, openBot - openTop, 'white', STROKE_THIN, 0.5);
                 // Desk surface line
                 p.push(`<line x1="${colX.toFixed(1)}" y1="${openTop.toFixed(1)}" x2="${(colX+colW).toFixed(1)}" y2="${openTop.toFixed(1)}" stroke="${STROKE}" stroke-width="1.5"/>`);
-                const deskSurfPx = DESK_SURFACE_T * sc;
+                const deskSurfCm = _bpDeskSurfaceT(!!col.hasDrawers);
+                const deskSurfPx = deskSurfCm * sc;
                 // Drawers below desk surface
                 if (col.hasDrawers) {
                     const drawerH = col.drawerHeight || 12;
@@ -2263,7 +2277,7 @@ window._generateMultiViewBlueprintSVG = function() {
                     // Dimension: drawer height (right side of column)
                     dimV(colX + colW + 14, drawerY, drawerY + drawerPxH, `${_bpMm(drawerH)}`);
                     // Dimension: floor to drawer bottom (gap from floor to bottom of drawer)
-                    dimV(colX + colW + 50, drawerY + drawerPxH, _colBotY, `${_bpMm((deskH - DESK_SURFACE_T - drawerH))}`);
+                    dimV(colX + colW + 50, drawerY + drawerPxH, _colBotY, `${_bpMm((deskH - deskSurfCm - drawerH))}`);
                 }
                 // Clearance board (shelf above clearance zone) — measured from column bottom
                 const clrBoardY = _colBotY - (deskH + deskClr) * sc;
@@ -3244,7 +3258,8 @@ window._generateMultiViewBlueprintPages = function() {
                 makeRect(p, colX, openTop, colW, openBot - openTop, 'white', STROKE_THIN, 0.5);
                 // Desk surface line
                 p.push(`<line x1="${colX.toFixed(1)}" y1="${openTop.toFixed(1)}" x2="${(colX+colW).toFixed(1)}" y2="${openTop.toFixed(1)}" stroke="${STROKE}" stroke-width="1.5"/>`);
-                const deskSurfPx = DESK_SURFACE_T * sc;
+                const deskSurfCm = _bpDeskSurfaceT(!!col.hasDrawers);
+                const deskSurfPx = deskSurfCm * sc;
                 // Drawers below desk surface
                 if (col.hasDrawers) {
                     const drawerH = col.drawerHeight || 12;
@@ -3263,7 +3278,7 @@ window._generateMultiViewBlueprintPages = function() {
                     // Dimension: drawer height (right side of column)
                     makeDimV(p, colX + colW + 14, drawerY, drawerY + drawerPxH, `${_bpMm(drawerH)}`);
                     // Dimension: floor to drawer bottom (gap from floor to bottom of drawer)
-                    makeDimV(p, colX + colW + 50, drawerY + drawerPxH, _colBotSvgY, `${_bpMm((deskH - DESK_SURFACE_T - drawerH))}`);
+                    makeDimV(p, colX + colW + 50, drawerY + drawerPxH, _colBotSvgY, `${_bpMm((deskH - deskSurfCm - drawerH))}`);
                 }
                 // Clearance board (shelf above clearance zone)
                 const clrBoardY = _colBotSvgY - (deskH + deskClr) * sc;

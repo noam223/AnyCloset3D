@@ -4064,18 +4064,29 @@ function updateSideDeskDrawerCountInput(val) {
 }
 
 // ── Side desk ↔ wardrobe drawer merge ─────────────────────────────────────────
-const DESK_SURFACE_T = 2.8;
+/** 28mm when desk has no drawers; 17mm (cabinet thickness) when it has drawers. */
+const DESK_SURFACE_T_NO_DRAWERS = 2.8;
+function _deskSurfaceThickness(hasDrawers, thicknessCm) {
+    const t = (thicknessCm != null)
+        ? thicknessCm
+        : ((typeof state !== 'undefined' && state.thickness) ? state.thickness : 1.7);
+    return hasDrawers ? t : DESK_SURFACE_T_NO_DRAWERS;
+}
+window._deskSurfaceThickness = _deskSurfaceThickness;
+/** @deprecated use _deskSurfaceThickness — kept as 28mm fallback for no-drawer desks */
+const DESK_SURFACE_T = DESK_SURFACE_T_NO_DRAWERS;
 
 function _getDeskDrawerBand(desk) {
     if (!desk) return null;
     const h = Number(desk.height) || 80;
     const dh = Number(desk.drawerHeight) || 12;
+    const deskT = _deskSurfaceThickness(!!desk.hasDrawers);
     return {
         top: h,
-        surfaceBottom: h - DESK_SURFACE_T,
-        bottom: h - DESK_SURFACE_T - dh,
+        surfaceBottom: h - deskT,
+        bottom: h - deskT - dh,
         drawerH: dh,
-        deskT: DESK_SURFACE_T
+        deskT: deskT
     };
 }
 window._getDeskDrawerBand = _getDeskDrawerBand;
@@ -4158,7 +4169,7 @@ function _pickDeskMergeRow(col, band, preferredRows) {
 function _ensureDeskBandCell(col, band, preferredRows) {
     if (!col || !band) return -1;
     const t = state.thickness;
-    const deskT = (band.deskT != null) ? band.deskT : DESK_SURFACE_T;
+    const deskT = (band.deskT != null) ? band.deskT : _deskSurfaceThickness(true);
     const startY = _deskMergeColumnStartY(col);
     const roofY = (col.height || state.globalHeight || 240) - t;
     const minH = (typeof window.MIN_EXTERNAL_DRAWER_CELL_H === 'number')

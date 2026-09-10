@@ -3437,7 +3437,8 @@ function _clearDoorsFromDeskMergeFrame(col, door, doorBottomY, doorTopY, doorGap
     }
     const comps = col.compartments || [];
     const gap = (doorGap != null) ? doorGap : 0.3;
-    const dT = (deskT != null) ? deskT : 2.8;
+    const dT = (deskT != null) ? deskT : ((typeof window._deskSurfaceThickness === 'function')
+        ? window._deskSurfaceThickness(true) : 1.7);
     const bandTop = state.desk.height;
     const bandBot = state.desk.height - dT - (state.desk.drawerHeight || 12);
 
@@ -3487,7 +3488,7 @@ function _renderMergedDeskDrawerBand(opts) {
     const frameZ = isInset ? (bodyD / 2 - t / 2) : (bodyD / 2 + t / 2 + 0.1);
     const frameW = frameRight - frameLeft;
     const frameCenterX = (frameLeft + frameRight) / 2;
-    const topRailH = deskT;
+    const topRailH = t; // merge frame always 17mm (same as cabinet thickness)
     const botRailH = t;
     const sideInnerH = Math.max(0.5, bandH - topRailH - botRailH);
     const sideCenterY = bandBottomY + botRailH + sideInnerH / 2;
@@ -3657,7 +3658,13 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
 
     const t = state.thickness;
     const bodyD = state.depth;
-    const deskT = 2.8; // 28mm — all desk horizontal surfaces
+    // Desk surface: 17mm with drawers, 28mm without (see _deskSurfaceThickness)
+    const _deskT = (hasDrawers) => (typeof window._deskSurfaceThickness === 'function')
+        ? window._deskSurfaceThickness(!!hasDrawers, t)
+        : (hasDrawers ? t : 2.8);
+    const deskTSide = _deskT(state.desk && state.desk.hasDrawers);
+    // Default deskT used for merge band / side-desk-with-drawers geometry (17mm when drawers on)
+    const deskT = deskTSide;
     const _deskDrawerFZ = bodyD / 2 - t / 2 - 1.5; // recessed inside frame (like internal drawers)
     // For sliding wardrobes: internal column partitions are set back 6cm from the front face
     const _isSlidingWardrobe = state.presetId === 'sliding' && state.slidingDoor && state.slidingDoor.enabled;
@@ -3964,6 +3971,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         const dHeight = wd.height != null ? wd.height : 75;
         const drawerH = wd.drawerHeight != null ? wd.drawerHeight : 12;
         const hasDrawers = wd.hasDrawers !== false;
+        const deskT = _deskT(hasDrawers);
         const legLeftX = -dWidth / 2 + t / 2;
         const legRightX = dWidth / 2 - t / 2;
         const legH = dHeight - deskT;
@@ -4090,7 +4098,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         const col = state.columns[c];
         const _fo = col.floorOffset || 0;
         let startShelvesY = _fo > 0 ? _fo + t : state.plinthHeight + t;
-        if (col.type === 'desk') startShelvesY = col.deskHeight + col.deskClearance + deskT;
+        if (col.type === 'desk') startShelvesY = col.deskHeight + col.deskClearance + _deskT(!!col.hasDrawers);
         let dividers = [];
         col.shelvesY.forEach((y, idx) => dividers.push({ y: y, type: 'shelf', thick: t, idx: idx }));
         if (col.splitY && col.splitY > startShelvesY) dividers.push({ y: col.splitY, type: 'split', thick: 2*t, idx: -1 });
@@ -4720,10 +4728,11 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         let startShelvesY = fo > 0 ? fo + t : (col.noPlinth ? t : (_isBathroomRegalim ? state.plinthHeight : state.plinthHeight + t));
 
         if (isDesk) {
-            // Desk surface protrudes deskT forward to align with door-face line
-            const deskProtrude = deskT;
-            _ppPartId = `desk_surface_c${c}`;
-            createBoard(col.width, deskT, bodyD + deskProtrude, colCenterX, col.deskHeight - deskT/2, deskProtrude / 2, matDesk);
+            const colDeskT = _deskT(!!col.hasDrawers);
+            // Desk surface protrudes forward to align with door-face line (17mm w/ drawers, 28mm without)
+            const deskProtrude = colDeskT;
+            _ppPartId = desk_surface_c;
+            createBoard(col.width, colDeskT, bodyD + deskProtrude, colCenterX, col.deskHeight - colDeskT/2, deskProtrude / 2, matDesk);
             _ppPartId = '';
             if(!isBP && _isActiveWingBuild) {
                 state.dimData.push({ isInternalDeskSurface: true, colIndex: c, x: colCenterX, y: col.deskHeight/2, h: col.deskHeight });
@@ -4733,18 +4742,18 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                 const numDrawers = col.deskDrawerCount != null ? col.deskDrawerCount : (col.width <= 80 ? 1 : 2);
                 const gap = 0.4;
                 const drawerWidth = (col.width - gap*(numDrawers+1)) / numDrawers;
-                const drawerBottomY = col.deskHeight - deskT - col.drawerHeight;
+                const drawerBottomY = col.deskHeight - colDeskT - col.drawerHeight;
                 const drawerCenterY = drawerBottomY + col.drawerHeight/2;
-                _ppPartId = `desk_drawer_bottom_c${c}`;
-                createBoard(col.width, deskT, bodyD - 2, colCenterX, drawerBottomY + deskT/2, 0, matDesk);
+                _ppPartId = desk_drawer_bottom_c;
+                createBoard(col.width, colDeskT, bodyD - 2, colCenterX, drawerBottomY + colDeskT/2, 0, matDesk);
                 _ppPartId = '';
                 for(let i=0; i<numDrawers; i++) {
                     let innerStartX = colCenterX - col.width/2;
                     let dx = innerStartX + gap + drawerWidth/2 + i * (drawerWidth + gap);
-                    _ppPartId = `desk_int_drawer_c${c}_d${i}`;
+                    _ppPartId = desk_int_drawer_c_d;
                     let mesh = createBoard(drawerWidth, col.drawerHeight, t, dx, drawerCenterY, _deskDrawerFZ, matExternal);
                     _ppPartId = '';
-                    if (!isBP) _addPanelHandleLocal(mesh, drawerWidth, col.drawerHeight, _handleStyle);
+                    if (!isBP) _addDrawerHandleLocal(mesh, drawerWidth, col.drawerHeight, _handleStyle);
                     const backPanel = new THREE.Mesh(new THREE.BoxGeometry(drawerWidth - 2, 2.5, 0.5), new THREE.MeshStandardMaterial({ color: 0x222222 }));
                     backPanel.position.set(dx, drawerBottomY + col.drawerHeight - 1.25, _deskDrawerFZ - t/2 - 0.25);
                     _buildGroup.add(backPanel);
@@ -4756,11 +4765,11 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
             }
             startShelvesY = col.deskHeight + col.deskClearance;
             // Floor board above knee clearance (acts as first shelf of the upper desk section)
-            _ppPartId = `desk_shelf_c${c}`;
-            createBoard(col.width, deskT, bodyD, colCenterX, startShelvesY + deskT/2, 0, matDesk);
+            _ppPartId = desk_shelf_c;
+            createBoard(col.width, t, bodyD, colCenterX, startShelvesY + t/2, 0, matDesk);
             _ppPartId = '';
             if(!isBP) dragHandlesData.vertical.push({ isInternalDeskClearance: true, colIndex: c, x: colCenterX, y: startShelvesY });
-            startShelvesY += deskT; 
+            startShelvesY += t; 
             const backH = col.height - col.deskHeight;
             if (!isBP) {
                 _ppPartId = `back_c${c}`;
@@ -4927,7 +4936,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                 if (ascIdx >= 0) {
                     const compTopOf = col.compartments[ascIdx]; // shelf is top of this row
                     const compBotOf = col.compartments[ascIdx + 1]; // shelf is bottom of this row
-                    if (compTopOf && compTopOf.mergeWithDesk) _mergeShelfThick = deskT; // top rail
+                    if (compTopOf && compTopOf.mergeWithDesk) _mergeShelfThick = t; // top rail 17mm
                     else if (compBotOf && compBotOf.mergeWithDesk) _mergeShelfThick = t; // bottom rail
                 }
             }
