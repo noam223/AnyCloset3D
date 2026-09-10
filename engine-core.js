@@ -3426,6 +3426,35 @@ function _addPanelHandleLocal(mesh, panelW, panelH, style) {
 
 /** Internal drawer cell: visible carcass frame + recessed drawer boxes (sliding wardrobe style). */
 /** Continuous framed drawer band joining a side desk with adjacent wardrobe drawers. */
+/**
+ * Merged desk-drawer frame rails are thicker than a normal shelf and sit at the
+ * same Z as overlay doors. Pull adjacent door edges clear of those rails to
+ * avoid z-fighting at the seam.
+ */
+function _clearDoorsFromDeskMergeFrame(col, door, doorBottomY, doorTopY, doorGap, deskT) {
+    if (!col || !door || !state.desk || !state.desk.mergeDrawers) {
+        return { doorBottomY, doorTopY };
+    }
+    const comps = col.compartments || [];
+    const gap = (doorGap != null) ? doorGap : 0.3;
+    const dT = (deskT != null) ? deskT : 2.8;
+    const bandTop = state.desk.height;
+    const bandBot = state.desk.height - dT - (state.desk.drawerHeight || 12);
+
+    const startR = Math.max(0, door.startRow | 0);
+    const endR = Math.max(0, door.endRow | 0);
+
+    // Door sits directly above a merge cell → clear the thick top rail
+    if (startR > 0 && comps[startR - 1] && comps[startR - 1].mergeWithDesk) {
+        doorBottomY = Math.max(doorBottomY, bandTop + gap / 2);
+    }
+    // Door sits directly below a merge cell → clear the bottom rail
+    if (endR + 1 < comps.length && comps[endR + 1] && comps[endR + 1].mergeWithDesk) {
+        doorTopY = Math.min(doorTopY, bandBot - gap / 2);
+    }
+    return { doorBottomY, doorTopY };
+}
+
 function _renderMergedDeskDrawerBand(opts) {
     const {
         createBoard, matDesk, matExternal,
@@ -5931,6 +5960,11 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                     doorBottomY = (_safeStartRow === 0) ? (baseY + doorGap/2) : (dividersAsc[_safeStartRow - 1].y + doorGap/2);
                     doorTopY = (_safeEndRow === dividersAsc.length) ? (col.height - doorGap/2) : (dividersAsc[_safeEndRow].y - doorGap/2);
                 }
+
+                // Pull door edges clear of the thicker merged desk-drawer frame
+                ({ doorBottomY, doorTopY } = _clearDoorsFromDeskMergeFrame(
+                    col, door, doorBottomY, doorTopY, doorGap, deskT
+                ));
                 
                 const dH = doorTopY - doorBottomY;
                 if(dH <= 0) return;
