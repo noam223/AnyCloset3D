@@ -4373,24 +4373,6 @@ window.addEventListener('pointermove', e => {
         window._snapHighlight = null;
     }
 
-    // Keep drawer cells at least at min height for their current count (22 / 42 / 62...)
-    [d.shelfIdx, d.shelfIdx + 1].forEach(function(r) {
-        const comp = col.compartments && col.compartments[r];
-        if (!comp || (comp.type !== 'internal_drawers' && comp.type !== 'external_drawers')) return;
-        const need = minHeightForDrawerCount(comp.count || 1);
-        const h = _cellHeight(col, r);
-        if (h >= need) return;
-        const deficit = need - h;
-        if (r === d.shelfIdx) {
-            // Cell below the shelf is too short → raise shelf
-            newY = Math.min(limitMax, col.shelvesY[d.shelfIdx] + deficit);
-        } else {
-            // Cell above the shelf is too short → lower shelf
-            newY = Math.max(limitMin, col.shelvesY[d.shelfIdx] - deficit);
-        }
-        col.shelvesY[d.shelfIdx] = Math.round(newY * 10) / 10;
-    });
-
     const _checkSorbetRow = (r) => {
         const comp = col.compartments[r];
         if (!comp || comp.type !== 'sorbet') return false;

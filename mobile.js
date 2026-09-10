@@ -380,25 +380,14 @@ function _applyMobileCellHeight(delta) {
     const prevY = (r === 0) ? baseY : col.shelvesY[r - 1];
     const nextY = (r < col.shelvesY.length) ? col.shelvesY[r] : topY;
     const currentH = nextY - prevY - state.thickness;
-    const comp = col.compartments && col.compartments[r];
-    const isDrawer = comp && (comp.type === 'internal_drawers' || comp.type === 'external_drawers');
-    const minH = isDrawer
-        ? ((typeof window.minHeightForDrawerCount === 'function')
-            ? window.minHeightForDrawerCount(comp.count || 1)
-            : (window.MIN_DRAWER_CELL_H || 22))
-        : 10;
-    const newH = Math.max(minH, currentH + delta);
-    if (isDrawer && delta < 0 && currentH + delta < minH) {
-        if (typeof window._toastDrawerHeightBlocked === 'function') {
-            window._toastDrawerHeightBlocked(minH, comp.count || 1);
-        }
-    }
+    // Allow shrink freely — drawer count auto-drops (and clears below 22cm)
+    const newH = Math.max(10, currentH + delta);
     const diff = newH - currentH;
 
     if (r < col.shelvesY.length) {
         col.shelvesY[r] = Math.min(topY - state.thickness, col.shelvesY[r] + diff);
     } else {
-        col.height = Math.max(col.height + diff, baseY + minH + state.thickness);
+        col.height = Math.max(col.height + diff, baseY + 10 + state.thickness);
     }
 
     if (typeof window._syncDrawerCompAfterHeight === 'function') {
