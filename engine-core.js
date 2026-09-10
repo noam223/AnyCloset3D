@@ -3477,16 +3477,23 @@ function _renderMergedDeskDrawerBand(opts) {
     createBoard(t, sideInnerH, t, frameRight - t / 2, sideCenterY, frameZ, matDesk);
     _ppPartId = '';
 
-    // No vertical junction stile — outer wall is holed so desk+wardrobe share one opening
+    // Single vertical stile between desk drawer and wardrobe drawer (not a double wall —
+    // the outer carcass wall is holed at this band so only this frame stile remains).
+    const junctionX = deskInnerX;
+    if (junctionX > frameLeft + t + 1 && junctionX < frameRight - t - 1) {
+        _ppPartId = 'desk_merge_frame_junction';
+        createBoard(t, sideInnerH, t, junctionX, sideCenterY, frameZ, matDesk);
+        _ppPartId = '';
+    }
 
     const openingBottom = bandBottomY + botRailH + gap;
     const openingTop = bandTopY - topRailH - gap;
     const openingH = Math.max(4, openingTop - openingBottom);
     const drawerCenterY = openingBottom + openingH / 2;
 
-    // Desk-side drawers (horizontal split) — flush to cabinet face (no middle partition)
-    const deskSpanLeft = (dSide === 'left') ? deskOuterX + t : deskInnerX;
-    const deskSpanRight = (dSide === 'left') ? deskInnerX : deskOuterX - t;
+    // Desk-side drawers — stop at the single junction stile
+    const deskSpanLeft = (dSide === 'left') ? deskOuterX + t : junctionX + t / 2;
+    const deskSpanRight = (dSide === 'left') ? junctionX - t / 2 : deskOuterX - t;
     const deskInnerW = Math.max(0, deskSpanRight - deskSpanLeft);
     if (deskInnerW > 4) {
         const numDrawers = (desk.drawerCount != null) ? desk.drawerCount : (dWidth <= 80 ? 1 : 2);
@@ -3500,9 +3507,9 @@ function _renderMergedDeskDrawerBand(opts) {
         }
     }
 
-    // Wardrobe-side drawer(s) — flush to desk side (no double wall / stile at junction)
-    const wardLeft = wardrobeLeftX;
-    const wardRight = wardrobeRightX;
+    // Wardrobe-side drawer(s) — start after the single junction stile
+    const wardLeft = (dSide === 'left') ? junctionX + t / 2 : wardrobeLeftX;
+    const wardRight = (dSide === 'left') ? wardrobeRightX : junctionX - t / 2;
     const wardW = Math.max(0, wardRight - wardLeft);
     const wardCenterX = (wardLeft + wardRight) / 2;
     const wCount = Math.max(1, wardrobeDrawerCount || 1);
@@ -3519,7 +3526,6 @@ function _renderMergedDeskDrawerBand(opts) {
                 if (typeof _registerExternalDrawerFront === 'function') _registerExternalDrawerFront(mesh);
             }
         }
-        // Outer frame left/right rails already close the opening — no extra wardrobe stiles
     }
 
     if (!isBP && opts.dragHandlesData && opts.dragHandlesData.desk) {

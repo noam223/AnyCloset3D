@@ -112,11 +112,11 @@ const placementHebrew = {
 
 // ── Drawer count helpers ──────────────────────────────────────────────────────
 // Internal: 22cm for 1 drawer, +20cm per extra → 1→22, 2→42, 3→62, ...
-// External: 12cm for 1 drawer, +12cm per extra → 1→12, 2→24, 3→36, ...
+// External: 10cm for 1 drawer, +10cm per extra → 1→10, 2→20, 3→30, ...
 window.MIN_DRAWER_CELL_H = 22;
 window.DRAWER_EXTRA_H = 20;
-window.MIN_EXTERNAL_DRAWER_CELL_H = 12;
-window.EXTERNAL_DRAWER_EXTRA_H = 12;
+window.MIN_EXTERNAL_DRAWER_CELL_H = 10;
+window.EXTERNAL_DRAWER_EXTRA_H = 10;
 
 function _drawerHeightRules(drawerType) {
     const isExt = drawerType === 'external_drawers';

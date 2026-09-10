@@ -2879,7 +2879,7 @@ function _clampDrawerCompartments(col, baseY, t) {
             const cellH = Math.round(_compartmentBounds(col, r).h);
             const rules = (typeof window._drawerHeightRules === 'function')
                 ? window._drawerHeightRules(comp.type)
-                : { minH: (comp.type === 'external_drawers' ? 12 : 22), extraH: (comp.type === 'external_drawers' ? 12 : 20) };
+                : { minH: (comp.type === 'external_drawers' ? 10 : 22), extraH: (comp.type === 'external_drawers' ? 10 : 20) };
             if (cellH < rules.minH) {
                 comp.type = 'empty';
             } else {
@@ -3808,7 +3808,7 @@ function _ensureDeskBandCell(col, band) {
     const roofY = (col.height || state.globalHeight || 240) - t;
     let targetBottom = Math.round(band.bottom * 10) / 10;
     let targetTop = Math.round(band.top * 10) / 10;
-    const minH = 12;
+    const minH = 10;
     targetBottom = Math.max(startY, Math.min(targetBottom, roofY - minH));
     targetTop = Math.max(targetBottom + minH, Math.min(targetTop, roofY));
 
