@@ -3425,6 +3425,122 @@ function _addPanelHandleLocal(mesh, panelW, panelH, style) {
 }
 
 /** Internal drawer cell: visible carcass frame + recessed drawer boxes (sliding wardrobe style). */
+/** Continuous framed drawer band joining a side desk with adjacent wardrobe drawers. */
+function _renderMergedDeskDrawerBand(opts) {
+    const {
+        createBoard, matDesk, matExternal,
+        deskT, t, bodyD, isInset, isBP,
+        bandBottomY, bandTopY,
+        wardrobeLeftX, wardrobeRightX,
+        handleStyle,
+        wardrobeDrawerCount
+    } = opts;
+    const desk = state.desk;
+    if (!desk || desk.side === 'none') return;
+
+    const dSide = desk.side;
+    const dWidth = desk.width;
+    const startX = (dSide === 'left') ? (-state.width / 2) : (state.width / 2);
+    const dir = (dSide === 'left') ? -1 : 1;
+    const deskOuterX = startX + dir * dWidth;
+    const deskInnerX = startX;
+
+    const frameLeft = (dSide === 'left')
+        ? Math.min(deskOuterX, wardrobeLeftX)
+        : Math.min(wardrobeLeftX, deskOuterX);
+    const frameRight = (dSide === 'left')
+        ? Math.max(wardrobeRightX, deskInnerX)
+        : Math.max(deskOuterX, wardrobeRightX);
+
+    const bandH = bandTopY - bandBottomY;
+    if (bandH < 6 || frameRight - frameLeft < 10) return;
+
+    const frameZ = isInset ? (bodyD / 2 - t / 2) : (bodyD / 2 + t / 2 + 0.1);
+    const frameW = frameRight - frameLeft;
+    const frameCenterX = (frameLeft + frameRight) / 2;
+    const topRailH = deskT;
+    const botRailH = t;
+    const sideInnerH = Math.max(0.5, bandH - topRailH - botRailH);
+    const sideCenterY = bandBottomY + botRailH + sideInnerH / 2;
+    const gap = 0.4;
+    const insetClear = 0.35;
+    const drawerFZ = frameZ - t / 2 - insetClear - t / 2; // recessed inside frame opening
+
+    // Outer frame rails (desk material) — continuous across desk + wardrobe
+    _ppPartId = 'desk_merge_frame_top';
+    createBoard(frameW, topRailH, t, frameCenterX, bandTopY - topRailH / 2, frameZ, matDesk);
+    _ppPartId = 'desk_merge_frame_bot';
+    createBoard(frameW, botRailH, t, frameCenterX, bandBottomY + botRailH / 2, frameZ, matDesk);
+    _ppPartId = 'desk_merge_frame_side_l';
+    createBoard(t, sideInnerH, t, frameLeft + t / 2, sideCenterY, frameZ, matDesk);
+    _ppPartId = 'desk_merge_frame_side_r';
+    createBoard(t, sideInnerH, t, frameRight - t / 2, sideCenterY, frameZ, matDesk);
+    _ppPartId = '';
+
+    // Vertical divider at desk ↔ cabinet junction
+    const junctionX = deskInnerX;
+    if (junctionX > frameLeft + t + 1 && junctionX < frameRight - t - 1) {
+        _ppPartId = 'desk_merge_frame_junction';
+        createBoard(t, sideInnerH, t, junctionX, sideCenterY, frameZ, matDesk);
+        _ppPartId = '';
+    }
+
+    const openingBottom = bandBottomY + botRailH + gap;
+    const openingTop = bandTopY - topRailH - gap;
+    const openingH = Math.max(4, openingTop - openingBottom);
+    const drawerCenterY = openingBottom + openingH / 2;
+
+    // Desk-side drawers (horizontal split)
+    const deskSpanLeft = (dSide === 'left') ? deskOuterX + t : deskInnerX + t / 2;
+    const deskSpanRight = (dSide === 'left') ? deskInnerX - t / 2 : deskOuterX - t;
+    const deskInnerW = Math.max(0, deskSpanRight - deskSpanLeft);
+    if (deskInnerW > 4) {
+        const numDrawers = (desk.drawerCount != null) ? desk.drawerCount : (dWidth <= 80 ? 1 : 2);
+        const drawerWidth = (deskInnerW - gap * (numDrawers + 1)) / numDrawers;
+        for (let i = 0; i < numDrawers; i++) {
+            const dx = deskSpanLeft + gap + drawerWidth / 2 + i * (drawerWidth + gap);
+            _ppPartId = `desk_merge_desk_d${i}`;
+            const mesh = createBoard(drawerWidth, openingH, t, dx, drawerCenterY, drawerFZ, matDesk);
+            _ppPartId = '';
+            if (!isBP) _addPanelHandleLocal(mesh, drawerWidth, openingH, handleStyle);
+        }
+    }
+
+    // Wardrobe-side drawers (one row; count stacked vertically if >1)
+    const wardLeft = (dSide === 'left') ? Math.max(wardrobeLeftX, junctionX + t / 2) : wardrobeLeftX;
+    const wardRight = (dSide === 'left') ? wardrobeRightX : Math.min(wardrobeRightX, junctionX - t / 2);
+    const wardW = Math.max(0, wardRight - wardLeft - t);
+    const wardCenterX = (wardLeft + wardRight) / 2;
+    const wCount = Math.max(1, wardrobeDrawerCount || 1);
+    if (wardW > 4) {
+        const stackGap = gap;
+        const eachH = (openingH - stackGap * (wCount - 1)) / wCount;
+        for (let d = 0; d < wCount; d++) {
+            const dY = openingBottom + eachH / 2 + d * (eachH + stackGap);
+            _ppPartId = `desk_merge_ward_d${d}`;
+            const mesh = createBoard(wardW - gap * 2, eachH, t, wardCenterX, dY, drawerFZ, matDesk);
+            _ppPartId = '';
+            if (!isBP) {
+                _addPanelHandleLocal(mesh, wardW - gap * 2, eachH, handleStyle);
+                if (typeof _registerExternalDrawerFront === 'function') _registerExternalDrawerFront(mesh);
+            }
+        }
+        // Side stiles inside wardrobe opening for a framed "window" look
+        if (wardW > t * 4) {
+            _ppPartId = 'desk_merge_ward_stile_l';
+            createBoard(t, sideInnerH, t, wardLeft + t / 2, sideCenterY, frameZ, matDesk);
+            _ppPartId = 'desk_merge_ward_stile_r';
+            createBoard(t, sideInnerH, t, wardRight - t / 2, sideCenterY, frameZ, matDesk);
+            _ppPartId = '';
+        }
+    }
+
+    if (!isBP && opts.dragHandlesData && opts.dragHandlesData.desk) {
+        const surfaceCenterX = startX + dir * (dWidth / 2);
+        opts.dragHandlesData.desk.push({ type: 'deskDrawer', x: surfaceCenterX, y: bandBottomY });
+    }
+}
+
 function _renderInternalDrawerBoxCell(opts) {
     const {
         createBoard, matInternal,
@@ -3497,6 +3613,9 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
     const isBP = state.viewMode === 'blueprint';
     const bpMat = new THREE.MeshBasicMaterial({ color: 0xffffff, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
     
+    if (isActiveWing && typeof window._revalidateDeskMerge === 'function') {
+        window._revalidateDeskMerge();
+    }
     const matBody = isBP ? bpMat : materials[state.materialBody];
     const matInternal = isBP ? bpMat : materials[state.materialInternal];
     const _awBuild = state.activeWing;
@@ -3896,7 +4015,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         const legX = startX + dir * (dWidth - t/2);
         createBoard(t, dHeight - deskT, bodyD, legX, (dHeight - deskT)/2, 0, matDesk);
         _ppPartId = '';
-        if (state.desk.hasDrawers) {
+        if (state.desk.hasDrawers && !state.desk.mergeDrawers) {
             const numDrawers = (state.desk.drawerCount != null) ? state.desk.drawerCount : (dWidth <= 80 ? 1 : 2);
             const gap = 0.4; const innerWidth = dWidth - t;
             const drawerWidth = (innerWidth - gap*(numDrawers+1)) / numDrawers;
@@ -3926,7 +4045,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
             }
             if(!isBP) dragHandlesData.desk.push({ type: 'deskHeight', x: legX, y: dHeight });
             if(!isBP) dragHandlesData.desk.push({ type: 'deskWidth', side: dSide, x: legX, y: dHeight/2 });
-            if(!isBP && state.desk.hasDrawers) dragHandlesData.desk.push({ type: 'deskDrawer', x: surfaceCenterX, y: dHeight - deskT - drawerH });
+            if(!isBP && state.desk.hasDrawers && !state.desk.mergeDrawers) dragHandlesData.desk.push({ type: 'deskDrawer', x: surfaceCenterX, y: dHeight - deskT - drawerH });
             // Invisible hitbox covering the full desk area for hover detection
             if (!isBP) {
                 const deskHitMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.0, depthWrite: false });
@@ -3939,6 +4058,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         }
     }
 
+    let _deskMergeBandInfo = null;
     let leftWallHoles = [];
     let rightWallHoles = [];
     let internalHoles = Array(state.columns.length).fill().map(() => []); 
@@ -4942,8 +5062,49 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
             else if (compData && (compData.type === 'internal_drawers' || compData.type === 'external_drawers')) {
                 const isExt = compData.type === 'external_drawers';
                 const count = compData.count;
+                const isDeskMergeCell = !!(compData.mergeWithDesk && state.desk && state.desk.mergeDrawers
+                    && state.desk.side !== 'none' && state.desk.hasDrawers);
                 
-                if (isExt && !isBP) {
+                if (isExt && !isBP && isDeskMergeCell) {
+                    // Collect overlay span for continuous desk↔wardrobe frame (rendered after columns)
+                    let mergeCompBottomY, mergeCompTopY;
+                    if (isInset) {
+                        let baseForInset = col.type === 'desk' ? col.deskHeight + col.deskClearance : Math.max(state.plinthHeight, fo);
+                        mergeCompBottomY = (r === 0) ? (baseForInset + t) : (dividersAsc[r-1].y + dividersAsc[r-1].thick/2);
+                        mergeCompTopY = isLast ? (col.height - t) : (dividersAsc[r].y - dividersAsc[r].thick/2);
+                        mergeCompBottomY += doorGap/2;
+                        mergeCompTopY -= doorGap/2;
+                    } else {
+                        const _bathRegalimBase = (state.presetId === 'bathroom' && isRegalim && r === 0 && fo === 0 && col.type !== 'desk');
+                        let baseY = col.type === 'desk'
+                            ? col.deskHeight + col.deskClearance
+                            : (_bathRegalimBase
+                                ? state.plinthHeight - t
+                                : Math.max(state.plinthHeight, fo));
+                        if (r === 0 && col.type !== 'desk' && state.plinthHeight === 7 && fo === 0 && !_bathRegalimBase) baseY = 1.5;
+                        mergeCompBottomY = (r === 0)
+                            ? (baseY + doorGap / 2)
+                            : (dividersAsc[r - 1].y + doorGap / 2);
+                        mergeCompTopY = isLast
+                            ? (col.height - doorGap / 2)
+                            : (dividersAsc[r].y - doorGap / 2);
+                    }
+                    if (!_deskMergeBandInfo) {
+                        _deskMergeBandInfo = {
+                            bottomY: mergeCompBottomY,
+                            topY: mergeCompTopY,
+                            leftX: overlayLeftX,
+                            rightX: overlayRightX,
+                            count: count || 1,
+                            handleStyle: compData.handleStyle || _handleStyle
+                        };
+                    } else {
+                        _deskMergeBandInfo.leftX = Math.min(_deskMergeBandInfo.leftX, overlayLeftX);
+                        _deskMergeBandInfo.rightX = Math.max(_deskMergeBandInfo.rightX, overlayRightX);
+                        _deskMergeBandInfo.bottomY = Math.min(_deskMergeBandInfo.bottomY, mergeCompBottomY);
+                        _deskMergeBandInfo.topY = Math.max(_deskMergeBandInfo.topY, mergeCompTopY);
+                    }
+                } else if (isExt && !isBP) {
                     let compBottomY, compTopY;
                     if (isInset) {
                         let baseForInset = col.type === 'desk' ? col.deskHeight + col.deskClearance : Math.max(state.plinthHeight, fo);
@@ -5994,6 +6155,38 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
             });
         }
         currentX += col.width + t;
+    }
+
+    // Continuous side-desk ↔ wardrobe drawer frame (merged unit)
+    if (_deskMergeBandInfo && state.desk && state.desk.mergeDrawers && state.desk.side !== 'none' && !isBP) {
+        const bandTop = state.desk.height;
+        const bandBot = state.desk.height - deskT - (state.desk.drawerHeight || 12);
+        _renderMergedDeskDrawerBand({
+            createBoard, matDesk, matExternal,
+            deskT, t, bodyD, isInset, isBP,
+            bandBottomY: Math.min(_deskMergeBandInfo.bottomY, bandBot),
+            bandTopY: Math.max(_deskMergeBandInfo.topY, bandTop),
+            wardrobeLeftX: _deskMergeBandInfo.leftX,
+            wardrobeRightX: _deskMergeBandInfo.rightX,
+            handleStyle: _deskMergeBandInfo.handleStyle || _handleStyle,
+            wardrobeDrawerCount: _deskMergeBandInfo.count || 1,
+            dragHandlesData
+        });
+    } else if (_deskMergeBandInfo && state.desk && state.desk.mergeDrawers && isBP) {
+        // Blueprint: simple outline of the merged band
+        const bandTop = state.desk.height;
+        const bandBot = state.desk.height - deskT - (state.desk.drawerHeight || 12);
+        _renderMergedDeskDrawerBand({
+            createBoard, matDesk: bpMat, matExternal: bpMat,
+            deskT, t, bodyD, isInset, isBP,
+            bandBottomY: Math.min(_deskMergeBandInfo.bottomY, bandBot),
+            bandTopY: Math.max(_deskMergeBandInfo.topY, bandTop),
+            wardrobeLeftX: _deskMergeBandInfo.leftX,
+            wardrobeRightX: _deskMergeBandInfo.rightX,
+            handleStyle: 'pipe',
+            wardrobeDrawerCount: 1,
+            dragHandlesData: null
+        });
     }
 
     // ---- Top panels: 28mm boards sitting on top of columns ----

@@ -302,7 +302,7 @@ body {
 }
 
 /* Side selector buttons (׳™׳׳™׳/׳©׳׳׳) for desk and side cabinet, and desk drawers toggle */
-.sc-side-btn.active, .desk-side-btn.active, .desk-drawers-btn.active {
+.sc-side-btn.active, .desk-side-btn.active, .desk-drawers-btn.active, .desk-merge-btn.active {
     background: var(--secondary) !important;
     border-color: var(--secondary) !important;
     color: #fff !important;

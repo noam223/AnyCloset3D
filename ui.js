@@ -159,6 +159,9 @@ function _syncDrawerCompAfterHeight(col, r) {
     if (!comp || (comp.type !== 'internal_drawers' && comp.type !== 'external_drawers')) return false;
     const cellH = _cellHeight(col, r);
     if (cellH < window.MIN_DRAWER_CELL_H) {
+        if (comp.mergeWithDesk && typeof window._clearDeskMergeFlags === 'function') {
+            window._clearDeskMergeFlags();
+        }
         comp.type = 'empty';
         return true;
     }
@@ -169,6 +172,17 @@ function _syncDrawerCompAfterHeight(col, r) {
     return false;
 }
 window._syncDrawerCompAfterHeight = _syncDrawerCompAfterHeight;
+
+function _onCompartmentTypeChangedForDeskMerge(comp, row, colIndex) {
+    if (!state.desk || !state.desk.mergeDrawers) return;
+    const indices = state.desk.mergeColIndices || (state.desk.mergeColIndex != null ? [state.desk.mergeColIndex] : []);
+    if (state.desk.mergeRow !== row || indices.indexOf(colIndex) < 0) return;
+    const stillDrawer = comp && (comp.type === 'external_drawers' || comp.type === 'internal_drawers');
+    if (!stillDrawer || !comp.mergeWithDesk) {
+        if (typeof _clearDeskMergeFlags === 'function') _clearDeskMergeFlags();
+    }
+}
+window._onCompartmentTypeChangedForDeskMerge = _onCompartmentTypeChangedForDeskMerge;
 
 // Returns the displayed cell height (cm) of compartment row r in column col.
 // Returns a rounded integer to match what the dimension label shows (Math.round).
@@ -3607,6 +3621,9 @@ window.applyContentForce = function(type) {
         if (finalType === 'external_drawers' || finalType === 'open_cell' || finalType === 'side_open_cell') {
             col.doors = col.doors.filter(door => (r < door.startRow || r > door.endRow));
         }
+        if (typeof _onCompartmentTypeChangedForDeskMerge === 'function') {
+            _onCompartmentTypeChangedForDeskMerge(col.compartments[r], r, state.selection.colIndex);
+        }
     });
 
     if (blockedCount > 0) {
@@ -3895,6 +3912,9 @@ window.applyContent = function(type) {
         const finalType = col.compartments[r].type;
         if (finalType === 'external_drawers' || finalType === 'open_cell' || finalType === 'side_open_cell') {
             col.doors = col.doors.filter(door => (r < door.startRow || r > door.endRow));
+        }
+        if (typeof _onCompartmentTypeChangedForDeskMerge === 'function') {
+            _onCompartmentTypeChangedForDeskMerge(col.compartments[r], r, state.selection.colIndex);
         }
     });
 
@@ -5968,17 +5988,23 @@ function bindUI() {
 
     document.getElementById('inp-desk-side').addEventListener('change', (e) => {
         state.desk.side = e.target.value; state.manualPrice = null;
+        if (state.desk.side === 'none' || typeof _clearDeskMergeFlags === 'function') {
+            if (typeof _clearDeskMergeFlags === 'function') _clearDeskMergeFlags();
+        }
         document.getElementById('desk-controls').style.display = (state.desk.side === 'none') ? 'none' : 'block';
+        if (typeof window._syncDeskMergeUI === 'function') window._syncDeskMergeUI();
         buildCabinet(); updateCameraView(); calculatePrice(); saveHistoryState();
     });
     
     document.getElementById('inp-desk-drawers').addEventListener('change', (e) => {
         state.desk.hasDrawers = e.target.checked; state.manualPrice = null;
+        if (!state.desk.hasDrawers && typeof _clearDeskMergeFlags === 'function') _clearDeskMergeFlags();
         // Sync button-style UI (CSS handles styling via .active class)
         const hasD = e.target.checked;
         document.querySelectorAll('.desk-drawers-btn').forEach(function(b) {
             b.classList.toggle('active', (b.dataset.drawers === 'true') === hasD);
         });
+        if (typeof window._syncDeskMergeUI === 'function') window._syncDeskMergeUI();
         buildCabinet(); calculatePrice(); saveHistoryState();
     });
 

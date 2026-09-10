@@ -36,10 +36,10 @@
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="style-base.css?v=20260824qe2">
+    <link rel="stylesheet" href="style-base.css?v=20260910deskMerge">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
     <link rel="stylesheet" href="style-extras.css?v=20260731rpcab">
-    <link rel="stylesheet" href="style.css?v=20260909space4">
+    <link rel="stylesheet" href="style.css?v=20260910deskMerge">
     <style>
         html.thumb-only-mode #left-sidebar,
         html.thumb-only-mode #right-sidebar,
@@ -569,6 +569,15 @@
                             <button class="slider-btn" onclick="updateSideDeskDrawerCount(1)"><i class="fa-solid fa-plus"></i></button>
                             <input type="range" id="inp-side-desk-drawer-count" min="1" max="4" value="2" step="1" oninput="document.getElementById('val-side-desk-drawer-count').textContent=this.value; updateSideDeskDrawerCountInput(this.value)">
                             <button class="slider-btn" onclick="updateSideDeskDrawerCount(-1)"><i class="fa-solid fa-minus"></i></button>
+                        </div>
+                    </div>
+                    <div id="side-desk-merge-row" class="control-group" style="display:none;margin-bottom:10px;">
+                        <button type="button" id="btn-desk-merge-drawers" class="desk-merge-btn" onclick="toggleDeskDrawerMerge()" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.8rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+                            <i class="fa-solid fa-link"></i>
+                            <span id="btn-desk-merge-drawers-label">מזג מגירה עם הארון</span>
+                        </button>
+                        <div style="font-size:0.72rem;color:var(--text-light);margin-top:5px;text-align:center;line-height:1.35;">
+                            יוצר מסגרת רציפה בין מגירת השולחן למגירה מקבילה בארון
                         </div>
                     </div>
                     <div class="control-group" style="margin-bottom:0;">
@@ -2640,20 +2649,20 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js?v=20260830adminOps"></script>
-<script src="state.js?v=20260910drawerMin"></script>
+<script src="state.js?v=20260910deskMerge"></script>
 <script src="quick-calc.js?v=20260825backdrop"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
-<script src="engine-core.js?v=20260910deskNoBot"></script>
+<script src="engine-core.js?v=20260910deskMerge"></script>
 <script src="engine-corners.js?v=20260825spaceCab"></script>
 <script src="engine-blueprint.js?v=20260910deskHRight"></script>
 <script src="engine-room-plan.js?v=20260731rpcab"></script>
 <script src="tambour-color-picker.js?v=20260617scdoors"></script>
-<script src="ui.js?v=20260910drawerAuto"></script>
+<script src="ui.js?v=20260910deskMerge"></script>
 <script src="mobile.js?v=20260910drawerAuto"></script>
 <script src="part-paint.js?v=20260908shelfDel"></script>
 <script src="shelf-pick.js?v=20260909shelfPurple"></script>
-<script src="index-init.js?v=20260831hDim"></script>
+<script src="index-init.js?v=20260910deskMerge"></script>
 
 <!-- ===== TAMBOUR FULL PALETTE MODAL ===== -->
 <div id="tambour-palette-modal" class="tambour-palette-overlay">

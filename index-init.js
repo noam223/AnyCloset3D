@@ -632,6 +632,10 @@ window._setDeskDrawers = function(hasDrawers) {
         var hasSide = w && w.desk && w.desk.side !== 'none';
         dcRow.style.display = (hasDrawers && hasSide) ? 'block' : 'none';
     }
+    if (!hasDrawers && typeof window._clearDeskMergeFlags === 'function') {
+        window._clearDeskMergeFlags();
+    }
+    if (typeof window._syncDeskMergeUI === 'function') window._syncDeskMergeUI();
 };
 
 // ── Side cabinet side toggle buttons ─────────────────────────────────────────

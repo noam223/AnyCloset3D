@@ -39,7 +39,7 @@ function createWingData(overrides) {
         activeColorPart: 'materialBody',
         columns: [],
         wingPosition: 'side',
-        desk: { side: 'none', width: 100, height: 80, hasDrawers: true, drawerHeight: 12, drawerCount: null },
+        desk: { side: 'none', width: 100, height: 80, hasDrawers: true, drawerHeight: 12, drawerCount: null, mergeDrawers: false },
         writingDesk: { height: 75, hasDrawers: true, drawerCount: 2, drawerHeight: 12 },
         corner: { side: 'none', width: 60, height: 90, depth: 54, type: 'shelves', shelves: 3, drawerCount: 4 },
         fullCorner: { size: 100, shelves: 2, shelvesY: [], compartments: [] },
@@ -198,7 +198,7 @@ function _createSideCabinetData(mainWing) {
         activeColorPart: 'materialBody',
         columns: [col],
         wingPosition: 'side',
-        desk: { side: 'none', width: 100, height: 80, hasDrawers: false, drawerHeight: 12, drawerCount: null },
+        desk: { side: 'none', width: 100, height: 80, hasDrawers: false, drawerHeight: 12, drawerCount: null, mergeDrawers: false },
         corner: { side: 'none', width: 60, height: 90, depth: 54, type: 'shelves', shelves: 3, drawerCount: 4 },
         fullCorner: { size: 100, shelves: 2, shelvesY: [], compartments: [] },
         manualPrice: null,
@@ -1550,6 +1550,7 @@ window.syncSidebarToWing = function() {
         const dcRow = document.getElementById('side-desk-drawer-count-row');
         if (dcRow) dcRow.style.display = (w.desk && w.desk.hasDrawers && w.desk.side !== 'none') ? 'block' : 'none';
     })();
+    if (typeof window._syncDeskMergeUI === 'function') window._syncDeskMergeUI();
     const deskControls = document.getElementById('desk-controls');
     if (deskControls) deskControls.style.display = (w.desk && w.desk.side !== 'none') ? 'block' : 'none';
 
@@ -2080,7 +2081,7 @@ window.resetCurrentCabinet = function() {
     w.boardMaterial = 'melamine'; w.materialBody = 'white_matte'; w.materialInternal = 'white_matte';
     w.materialExternal = 'white_matte'; w.materialDesk = 'white_matte'; w.materialOpenCell = 'white_matte'; w.materialBack = 'white_matte';
     w.materialSideCabinet = 'white_matte';
-    w.desk = { side: 'none', width: 100, height: 80, hasDrawers: true, drawerHeight: 12, drawerCount: null };
+    w.desk = { side: 'none', width: 100, height: 80, hasDrawers: true, drawerHeight: 12, drawerCount: null, mergeDrawers: false };
     w.corner = { side: 'none', width: 60, height: 90, depth: 54, type: 'shelves', shelves: 3, drawerCount: 4 };
     w.sideCabinet = null;
     w.manualPrice = null;
@@ -2197,7 +2198,7 @@ window.updateSideUnitType = function(type) {
     } else if (type === 'desk') {
         // Enable desk, disable side cabinet
         w.sideCabinet = null;
-        if (!w.desk) w.desk = { side: 'none', width: 100, height: 80, hasDrawers: true, drawerHeight: 12, drawerCount: null };
+        if (!w.desk) w.desk = { side: 'none', width: 100, height: 80, hasDrawers: true, drawerHeight: 12, drawerCount: null, mergeDrawers: false };
         // Default desk side to right if currently none
         if (w.desk.side === 'none') w.desk.side = 'right';
     } else if (type === 'side_cabinet') {
@@ -3689,6 +3690,222 @@ function updateSideDeskDrawerCountInput(val) {
     if (valEl) valEl.textContent = next;
     buildCabinetDebounced();
 }
+
+// ── Side desk ↔ wardrobe drawer merge ─────────────────────────────────────────
+const DESK_SURFACE_T = 2.8;
+
+function _getDeskDrawerBand(desk) {
+    if (!desk) return null;
+    const h = Number(desk.height) || 80;
+    const dh = Number(desk.drawerHeight) || 12;
+    return {
+        top: h,
+        surfaceBottom: h - DESK_SURFACE_T,
+        bottom: h - DESK_SURFACE_T - dh,
+        drawerH: dh,
+        deskT: DESK_SURFACE_T
+    };
+}
+window._getDeskDrawerBand = _getDeskDrawerBand;
+
+function _splitDoorsAroundRow(col, row) {
+    if (!col || !Array.isArray(col.doors)) return;
+    const out = [];
+    col.doors.forEach(door => {
+        if (!door) return;
+        if (door.type === 'empty') { out.push(door); return; }
+        if (row < door.startRow || row > door.endRow) { out.push(door); return; }
+        if (door.startRow < row) {
+            out.push(Object.assign({}, door, { endRow: row - 1 }));
+        }
+        if (door.endRow > row) {
+            out.push(Object.assign({}, door, { startRow: row + 1 }));
+        }
+    });
+    col.doors = out;
+}
+window._splitDoorsAroundRow = _splitDoorsAroundRow;
+
+function _clearDeskMergeFlags() {
+    const desk = state.desk;
+    (state.columns || []).forEach(col => {
+        (col.compartments || []).forEach(comp => {
+            if (comp) delete comp.mergeWithDesk;
+        });
+    });
+    if (desk) {
+        desk.mergeDrawers = false;
+        desk.mergeColIndex = null;
+        desk.mergeRow = null;
+        desk.mergeColIndices = null;
+    }
+}
+window._clearDeskMergeFlags = _clearDeskMergeFlags;
+
+/** Find edge-column drawer (or strong Y-overlap) to merge with the side desk. */
+function _findDeskMergeCandidate(opts) {
+    const allowNearest = !!(opts && opts.allowNearest);
+    const desk = state.desk;
+    if (!desk || desk.side === 'none' || desk.hasDrawers === false) return null;
+    const cols = state.columns;
+    if (!cols || !cols.length) return null;
+    const edgeIdx = desk.side === 'left' ? 0 : cols.length - 1;
+    const col = cols[edgeIdx];
+    if (!col || !col.compartments || !col.compartments.length) return null;
+    const band = _getDeskDrawerBand(desk);
+    const bandH = Math.max(1, band.top - band.bottom);
+    const bandMid = (band.top + band.bottom) / 2;
+
+    let bestOverlap = null;
+    let bestOverlapScore = -1;
+    let bestNear = null;
+    let bestNearDist = Infinity;
+
+    for (let r = 0; r < col.compartments.length; r++) {
+        const comp = col.compartments[r];
+        if (!comp) continue;
+        const b = _compartmentBounds(col, r);
+        if (b.h < 8) continue;
+        const isDrawer = comp.type === 'internal_drawers' || comp.type === 'external_drawers';
+        const overlap = Math.min(band.top, b.topY) - Math.max(band.bottom, b.bottomY);
+        const cellMid = (b.topY + b.bottomY) / 2;
+        const dist = Math.abs(cellMid - bandMid);
+
+        if (isDrawer && dist < bestNearDist) {
+            bestNearDist = dist;
+            bestNear = { colIndex: edgeIdx, row: r, bounds: b, isDrawer: true, col };
+        }
+        if (overlap > 0) {
+            const score = (overlap / bandH) + (isDrawer ? 0.55 : 0) + (overlap / Math.max(b.h, 1)) * 0.25;
+            const ok = isDrawer
+                ? (overlap >= Math.min(bandH, b.h) * 0.25)
+                : (overlap >= bandH * 0.55);
+            if (ok && score > bestOverlapScore) {
+                bestOverlapScore = score;
+                bestOverlap = { colIndex: edgeIdx, row: r, bounds: b, isDrawer, col };
+            }
+        }
+    }
+
+    let best = bestOverlap;
+    if (!best && allowNearest && bestNear && bestNearDist <= 55) best = bestNear;
+    if (!best) return null;
+
+    // Extend into adjacent columns that already have matching-height drawers
+    const span = [best.colIndex];
+    const dir = desk.side === 'left' ? 1 : -1;
+    let next = best.colIndex + dir;
+    while (next >= 0 && next < cols.length && span.length < 3) {
+        const ncol = cols[next];
+        const ncomp = ncol && ncol.compartments && ncol.compartments[best.row];
+        if (!ncomp || (ncomp.type !== 'internal_drawers' && ncomp.type !== 'external_drawers')) break;
+        const nb = _compartmentBounds(ncol, best.row);
+        if (Math.abs(nb.bottomY - best.bounds.bottomY) > 3.5 || Math.abs(nb.topY - best.bounds.topY) > 3.5) break;
+        span.push(next);
+        next += dir;
+    }
+    span.sort((a, b) => a - b);
+    return Object.assign({}, best, { colIndices: span });
+}
+window._findDeskMergeCandidate = _findDeskMergeCandidate;
+
+function _syncDeskMergeUI() {
+    const rowEl = document.getElementById('side-desk-merge-row');
+    const btn = document.getElementById('btn-desk-merge-drawers');
+    const label = document.getElementById('btn-desk-merge-drawers-label');
+    const desk = state.desk;
+    if (!rowEl) return;
+    const baseShow = !!(desk && desk.side !== 'none' && desk.hasDrawers);
+    if (!baseShow) {
+        rowEl.style.display = 'none';
+        return;
+    }
+    const merged = !!desk.mergeDrawers;
+    const cand = merged ? true : _findDeskMergeCandidate({ allowNearest: true });
+    rowEl.style.display = cand ? 'block' : 'none';
+    if (btn) btn.classList.toggle('active', merged);
+    if (label) label.textContent = merged ? 'בטל מיזוג מגירות' : 'מזג מגירה עם הארון';
+}
+window._syncDeskMergeUI = _syncDeskMergeUI;
+
+function toggleDeskDrawerMerge() {
+    const desk = state.desk;
+    if (!desk || desk.side === 'none') return;
+    if (!desk.hasDrawers) {
+        if (typeof _showToast === 'function') _showToast('יש להפעיל מגירות בשולחן לפני המיזוג', 3000);
+        return;
+    }
+    if (desk.mergeDrawers) {
+        _clearDeskMergeFlags();
+        _syncDeskMergeUI();
+        buildCabinet(); calculatePrice(); saveHistoryState();
+        return;
+    }
+    const cand = _findDeskMergeCandidate({ allowNearest: true });
+    if (!cand) {
+        if (typeof _showToast === 'function') {
+            _showToast('לא נמצאה מגירה מקבילה בעמודת הקצה הצמודה לשולחן', 4000);
+        }
+        return;
+    }
+
+    const b = cand.bounds;
+    desk.height = Math.round(b.topY * 10) / 10;
+    desk.drawerHeight = Math.max(8, Math.round((b.h - DESK_SURFACE_T) * 10) / 10);
+
+    cand.colIndices.forEach(ci => {
+        const col = state.columns[ci];
+        if (!col || !col.compartments || !col.compartments[cand.row]) return;
+        const comp = col.compartments[cand.row];
+        if (comp.type !== 'internal_drawers' && comp.type !== 'external_drawers') {
+            const cellH = Math.round(b.h);
+            comp.type = 'external_drawers';
+            comp.count = (typeof calcAutoDrawerCount === 'function')
+                ? Math.max(1, calcAutoDrawerCount(cellH) || 1)
+                : 1;
+        } else if (comp.type === 'internal_drawers') {
+            comp.type = 'external_drawers';
+        }
+        if (!comp.count || comp.count < 1) comp.count = 1;
+        comp.mergeWithDesk = true;
+        _splitDoorsAroundRow(col, cand.row);
+    });
+
+    desk.mergeDrawers = true;
+    desk.mergeColIndex = cand.colIndex;
+    desk.mergeRow = cand.row;
+    desk.mergeColIndices = cand.colIndices.slice();
+
+    _syncDeskMergeUI();
+    buildCabinet(); calculatePrice(); saveHistoryState();
+    if (typeof _showToast === 'function') _showToast('המגירות מוזגו ליחידה אחת עם מסגרת רציפה', 2800);
+}
+window.toggleDeskDrawerMerge = toggleDeskDrawerMerge;
+
+/** Keep merge valid after shelf / desk edits; clear if the target cell is gone. */
+function _revalidateDeskMerge() {
+    const desk = state.desk;
+    if (!desk || !desk.mergeDrawers) return false;
+    const indices = desk.mergeColIndices || (desk.mergeColIndex != null ? [desk.mergeColIndex] : []);
+    const row = desk.mergeRow;
+    if (row == null || !indices.length) {
+        _clearDeskMergeFlags();
+        return true;
+    }
+    let ok = true;
+    for (let i = 0; i < indices.length; i++) {
+        const col = state.columns[indices[i]];
+        const comp = col && col.compartments && col.compartments[row];
+        if (!comp || !comp.mergeWithDesk) { ok = false; break; }
+        if (comp.type !== 'external_drawers' && comp.type !== 'internal_drawers') { ok = false; break; }
+    }
+    if (!ok) {
+        _clearDeskMergeFlags();
+        return true;
+    }
+    return false;
+}
+window._revalidateDeskMerge = _revalidateDeskMerge;
 
 // ── Default pricing config ────────────────────────────────────────────────────
 var DEFAULT_PRICING_CONFIG = {
