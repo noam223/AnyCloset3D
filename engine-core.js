@@ -6158,29 +6158,29 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
     }
 
     // Continuous side-desk ↔ wardrobe drawer frame (merged unit)
+    // Band Y follows the desk drawer height exactly (wardrobe cell was aligned on merge click)
     if (_deskMergeBandInfo && state.desk && state.desk.mergeDrawers && state.desk.side !== 'none' && !isBP) {
         const bandTop = state.desk.height;
         const bandBot = state.desk.height - deskT - (state.desk.drawerHeight || 12);
         _renderMergedDeskDrawerBand({
             createBoard, matDesk, matExternal,
             deskT, t, bodyD, isInset, isBP,
-            bandBottomY: Math.min(_deskMergeBandInfo.bottomY, bandBot),
-            bandTopY: Math.max(_deskMergeBandInfo.topY, bandTop),
+            bandBottomY: bandBot,
+            bandTopY: bandTop,
             wardrobeLeftX: _deskMergeBandInfo.leftX,
             wardrobeRightX: _deskMergeBandInfo.rightX,
             handleStyle: _deskMergeBandInfo.handleStyle || _handleStyle,
-            wardrobeDrawerCount: _deskMergeBandInfo.count || 1,
+            wardrobeDrawerCount: 1,
             dragHandlesData
         });
     } else if (_deskMergeBandInfo && state.desk && state.desk.mergeDrawers && isBP) {
-        // Blueprint: simple outline of the merged band
         const bandTop = state.desk.height;
         const bandBot = state.desk.height - deskT - (state.desk.drawerHeight || 12);
         _renderMergedDeskDrawerBand({
             createBoard, matDesk: bpMat, matExternal: bpMat,
             deskT, t, bodyD, isInset, isBP,
-            bandBottomY: Math.min(_deskMergeBandInfo.bottomY, bandBot),
-            bandTopY: Math.max(_deskMergeBandInfo.topY, bandTop),
+            bandBottomY: bandBot,
+            bandTopY: bandTop,
             wardrobeLeftX: _deskMergeBandInfo.leftX,
             wardrobeRightX: _deskMergeBandInfo.rightX,
             handleStyle: 'pipe',
