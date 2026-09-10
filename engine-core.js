@@ -3902,9 +3902,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
             const drawerWidth = (innerWidth - gap*(numDrawers+1)) / numDrawers;
             const drawerBottomY = dHeight - deskT - drawerH;
             const drawerCenterY = drawerBottomY + drawerH/2;
-            _ppPartId = 'side_desk_drawer_bottom';
-            createBoard(innerWidth, deskT, bodyD - 2, startX + dir * (innerWidth/2), drawerBottomY + deskT/2, 0, matDesk);
-            _ppPartId = '';
+            // No bottom rail under drawers — fronts hang from the desk surface frame only
             for(let i=0; i<numDrawers; i++) {
                 let dx = (dSide === 'left') ? (startX - innerWidth) + gap + drawerWidth/2 + i * (drawerWidth + gap) : startX + gap + drawerWidth/2 + i * (drawerWidth + gap);
                 _ppPartId = `desk_drawer_d${i}`;
