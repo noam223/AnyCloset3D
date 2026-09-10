@@ -380,7 +380,7 @@ function _applyMobileCellHeight(delta) {
     const prevY = (r === 0) ? baseY : col.shelvesY[r - 1];
     const nextY = (r < col.shelvesY.length) ? col.shelvesY[r] : topY;
     const currentH = nextY - prevY - state.thickness;
-    // Allow shrink freely — drawer count auto-drops (and clears below 22cm)
+    // Allow shrink freely — drawer count auto-drops (and clears below type min)
     const newH = Math.max(10, currentH + delta);
     const diff = newH - currentH;
 

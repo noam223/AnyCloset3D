@@ -2873,21 +2873,22 @@ function _syncCompartmentCount(col, baseY, t) {
 
 function _clampDrawerCompartments(col, baseY, t) {
     if (!col || !col.compartments) return;
-    const minH = (typeof window.MIN_DRAWER_CELL_H === 'number') ? window.MIN_DRAWER_CELL_H : 22;
-    const extraH = (typeof window.DRAWER_EXTRA_H === 'number') ? window.DRAWER_EXTRA_H : 20;
     for (let r = 0; r < col.compartments.length; r++) {
         const comp = col.compartments[r];
         if (comp && (comp.type === 'internal_drawers' || comp.type === 'external_drawers')) {
             const cellH = Math.round(_compartmentBounds(col, r).h);
-            if (cellH < minH) {
+            const rules = (typeof window._drawerHeightRules === 'function')
+                ? window._drawerHeightRules(comp.type)
+                : { minH: (comp.type === 'external_drawers' ? 12 : 22), extraH: (comp.type === 'external_drawers' ? 12 : 20) };
+            if (cellH < rules.minH) {
                 comp.type = 'empty';
             } else {
                 const minCount = (typeof window.calcMinDrawerCount === 'function')
-                    ? window.calcMinDrawerCount(cellH)
-                    : (cellH >= minH ? 1 : 0);
+                    ? window.calcMinDrawerCount(cellH, comp.type)
+                    : (cellH >= rules.minH ? 1 : 0);
                 const autoCount = (typeof window.calcAutoDrawerCount === 'function')
-                    ? window.calcAutoDrawerCount(cellH)
-                    : (Math.floor((cellH - minH) / extraH) + 1);
+                    ? window.calcAutoDrawerCount(cellH, comp.type)
+                    : (Math.floor((cellH - rules.minH) / rules.extraH) + 1);
                 if (comp.count < minCount) comp.count = minCount;
                 if (comp.count > autoCount) comp.count = autoCount;
                 if (comp.count < 1) comp.count = 1;
@@ -3861,7 +3862,7 @@ function toggleDeskDrawerMerge() {
             const cellH = Math.round(b.h);
             comp.type = 'external_drawers';
             comp.count = (typeof calcAutoDrawerCount === 'function')
-                ? Math.max(1, calcAutoDrawerCount(cellH) || 1)
+                ? Math.max(1, calcAutoDrawerCount(cellH, 'external_drawers') || 1)
                 : 1;
         } else if (comp.type === 'internal_drawers') {
             comp.type = 'external_drawers';
