@@ -16,6 +16,21 @@ function _bpCenterSideCabinet(cw) {
     return (sc && sc.side !== 'none') ? sc : null;
 }
 
+/** Put overall cabinet height on the side opposite a side desk / side cabinet. */
+function _bpPreferOverallHeightSide(cw) {
+    const desk = _bpCenterSideDesk(cw);
+    if (desk) {
+        if (desk.side === 'left') return 'right';
+        if (desk.side === 'right') return 'left';
+    }
+    const scab = _bpCenterSideCabinet(cw);
+    if (scab) {
+        if (scab.side === 'left') return 'right';
+        if (scab.side === 'right') return 'left';
+    }
+    return 'left';
+}
+
 /** Extra width (cm) on each side of center cabinet for side desk / side cabinet in front-view layout */
 function _bpCenterHorizExtra(cw) {
     let left = 0, right = 0;
@@ -67,7 +82,9 @@ function _bpDrawSideDeskFrontParts(p, desk, ox, oy, dW, dH, sc, fill, STROKE, ST
     const FILL_DESK = '#fed7aa';
     drawRect(legX, deskTopY, legT, dSvgH, fill || FILL_DESK, STROKE, 1.5);
     drawRect(deskX, deskTopY, dSvgW, deskSurfT, fill || FILL_DESK, STROKE, 1.5);
-    if (desk.hasDrawers !== false) {
+    const dimOuterX = dSide === 'left' ? (deskX - 14) : (deskX + dSvgW + 14);
+    const hasDrawers = desk.hasDrawers !== false;
+    if (hasDrawers) {
         const numDrawers = (desk.drawerCount != null) ? desk.drawerCount : (dWidth <= 80 ? 1 : 2);
         const innerSvgW = dSvgW - legT;
         const drawerSvgW = innerSvgW / numDrawers;
@@ -82,7 +99,6 @@ function _bpDrawSideDeskFrontParts(p, desk, ox, oy, dW, dH, sc, fill, STROKE, ST
             const hndY = drawerSvgY + drawerSvgH * 0.5;
             p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX + hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
         }
-        const dimOuterX = dSide === 'left' ? (deskX - 14) : (deskX + dSvgW + 14);
         const drawerSvgY0 = deskTopY + deskSurfT;
         if (dSide === 'left') {
             dimVLeftFn(dimOuterX, drawerSvgY0, drawerSvgY0 + drawerH * sc, `${_bpMm(drawerH)}`);
@@ -93,8 +109,14 @@ function _bpDrawSideDeskFrontParts(p, desk, ox, oy, dW, dH, sc, fill, STROKE, ST
         }
     }
     dimHFn(deskX, deskX + dSvgW, oy + dH + 16, `${_bpMm(dWidth)}`);
-    if (dSide === 'left') dimVLeftFn(deskX - 14, deskTopY, deskBotY, `${_bpMm(dHeight)}`);
-    else dimVFn(deskX + dSvgW + 14, deskTopY, deskBotY, `${_bpMm(dHeight)}`);
+    // Total desk height outermost — clear of drawer/clearance stack
+    if (dSide === 'left') {
+        const totalX = hasDrawers ? (dimOuterX - 72) : dimOuterX;
+        dimVLeftFn(totalX, deskTopY, deskBotY, `${_bpMm(dHeight)}`);
+    } else {
+        const totalX = hasDrawers ? (dimOuterX + 72) : dimOuterX;
+        dimVFn(totalX, deskTopY, deskBotY, `${_bpMm(dHeight)}`);
+    }
     const midX = deskX + dSvgW / 2;
     const midY = deskTopY + dSvgH / 2;
     p.push(`<text x="${midX.toFixed(1)}" y="${(midY + 4).toFixed(1)}" text-anchor="middle" font-family="${FONT || 'Rubik,Tahoma,sans-serif'}" font-size="11" fill="${STROKE}" opacity="0.85">שולחן צד</text>`);
@@ -576,8 +598,11 @@ function _bpMaybePushColWidthDim(p, viewKey, ci, x1, x2, y, lbl, makeDimHFn, abo
  * Extra overall-height dimension for every column shorter than the wing max.
  * Standing: floor → column top. Hanging: cabinet body only (install height is chosen on site).
  */
-function _bpDrawShorterColumnOverallHeights(dimVFn, cols, colXPositions, oy, dH, sc, wgH, ox, dW) {
+function _bpDrawShorterColumnOverallHeights(dimVFn, cols, colXPositions, oy, dH, sc, wgH, ox, dW, opts) {
     if (!dimVFn || !cols || !colXPositions || cols.length < 2) return;
+    opts = opts || {};
+    const overallSide = opts.overallSide || 'left';
+    const dimVLeftFn = opts.dimVLeftFn || dimVFn;
     const hanging = cols.map(_bpColIsHanging);
     const allHanging = hanging.every(Boolean);
     const values = cols.map((c, i) => hanging[i] ? _bpColBodyHCm(c, wgH) : ((c && c.height) || wgH));
@@ -591,6 +616,7 @@ function _bpDrawShorterColumnOverallHeights(dimVFn, cols, colXPositions, oy, dH,
     let leftSlot = 0;
     let rightSlot = 0;
     const cabMid = ox + dW / 2;
+    const mainHLineX = overallSide === 'right' ? (ox + dW + 54) : (ox - 54);
     indices.forEach(ci => {
         const h = values[ci];
         if (!(h < maxH - 0.05)) return;
@@ -604,16 +630,25 @@ function _bpDrawShorterColumnOverallHeights(dimVFn, cols, colXPositions, oy, dH,
         if (botY - topY < 8) return;
         const colMid = (cp.x1 + cp.x2) / 2;
         let dimX;
+        let useLeftLabel = false;
         if (colMid <= cabMid) {
             dimX = cp.x1 - 18 - leftSlot * 22;
-            // Keep clear of the main overall-height line at ox-54
-            if (dimX < ox - 48) dimX = Math.min(cp.x1 - 18, ox - 28);
+            // Keep clear of the main overall-height line
+            if (overallSide === 'left' && dimX < ox - 48) dimX = Math.min(cp.x1 - 18, ox - 28);
             leftSlot++;
         } else {
             dimX = cp.x2 + 18 + rightSlot * 22;
+            if (overallSide === 'right' && dimX > ox + dW + 48) {
+                dimX = Math.max(cp.x2 + 18, ox + dW + 28);
+            }
+            useLeftLabel = true;
             rightSlot++;
         }
-        dimVFn(dimX, topY, botY, `${_bpMm(h)}`);
+        if (Math.abs(dimX - mainHLineX) < 12) {
+            dimX = (overallSide === 'right') ? (mainHLineX - 22) : (mainHLineX + 22);
+        }
+        if (useLeftLabel) dimVLeftFn(dimX, topY, botY, `${_bpMm(h)}`);
+        else dimVFn(dimX, topY, botY, `${_bpMm(h)}`);
     });
 }
 
@@ -672,19 +707,30 @@ function _bpColBodyHCm(col, wgH) {
     return Math.max(0, ((col && col.height) || wgH || 0) - ((col && col.floorOffset) || 0));
 }
 
-/** Overall height from the floor is only meaningful for standing columns. Hanging units are installed at a site-chosen height — dimension the cabinet body instead. */
-function _bpPushWingOverallHeight(dimVFn, cols, oy, dH, sc, wgH, ox) {
+/** Overall height from the floor is only meaningful for standing columns. Hanging units are installed at a site-chosen height — dimension the cabinet body instead.
+ * opts.side: 'left'|'right' — place opposite a side desk when present.
+ * opts.dW + opts.dimVLeftFn required when side === 'right'.
+ */
+function _bpPushWingOverallHeight(dimVFn, cols, oy, dH, sc, wgH, ox, opts) {
     if (!dimVFn) return;
+    opts = opts || {};
+    const side = opts.side || 'left';
+    const dW = opts.dW || 0;
+    const dimVLeftFn = opts.dimVLeftFn || dimVFn;
+    const place = function(y1, y2, lbl) {
+        if (side === 'right') dimVLeftFn(ox + dW + 54, y1, y2, lbl);
+        else dimVFn(ox - 54, y1, y2, lbl);
+    };
     const list = cols || [];
     if (!list.length) {
-        dimVFn(ox - 54, oy, oy + dH, `${_bpMm(wgH)}`);
+        place(oy, oy + dH, `${_bpMm(wgH)}`);
         return;
     }
     const standing = list.filter(c => !_bpColIsHanging(c));
     if (standing.length) {
         const maxH = Math.max.apply(null, standing.map(c => (c.height || wgH)));
         const maxTopY = Math.min.apply(null, standing.map(c => oy + dH - (c.height || wgH) * sc));
-        dimVFn(ox - 54, maxTopY, oy + dH, `${_bpMm(maxH)}`);
+        place(maxTopY, oy + dH, `${_bpMm(maxH)}`);
         return;
     }
     let maxBody = -1, ref = list[0];
@@ -694,7 +740,7 @@ function _bpPushWingOverallHeight(dimVFn, cols, oy, dH, sc, wgH, ox) {
     });
     const fo = ref.floorOffset || 0;
     const colBot = oy + dH - fo * sc;
-    dimVFn(ox - 54, colBot - maxBody * sc, colBot, `${_bpMm(maxBody)}`);
+    place(colBot - maxBody * sc, colBot, `${_bpMm(maxBody)}`);
 }
 
 function _bpWingDimHeightCm(cols, wgH) {
@@ -2401,8 +2447,16 @@ window._generateMultiViewBlueprintSVG = function() {
             });
         }
         // Overall height: standing columns floor→top; hanging cabinets show body height only
-        _bpPushWingOverallHeight(dimV, cols, oy, dH, sc, wg.h, ox);
-        _bpDrawShorterColumnOverallHeights(dimV, cols, colXPositions, oy, dH, sc, wg.h, ox, dW);
+        // Place opposite a side desk so the dim does not sit on top of the desk
+        {
+            const _hSideOld = _isCenterWg ? _bpPreferOverallHeightSide(centerWing) : 'left';
+            _bpPushWingOverallHeight(dimV, cols, oy, dH, sc, wg.h, ox, {
+                side: _hSideOld, dW: dW, dimVLeftFn: dimVLeft
+            });
+            _bpDrawShorterColumnOverallHeights(dimV, cols, colXPositions, oy, dH, sc, wg.h, ox, dW, {
+                overallSide: _hSideOld, dimVLeftFn: dimVLeft
+            });
+        }
         // ---- Bathroom preset: right-side external dims (body height + floor offset + drawer heights) ----
         // ---- Regular preset: split section dims + floorOffset dims ----
         if (pid === 'bathroom') {
@@ -3414,10 +3468,17 @@ window._generateMultiViewBlueprintPages = function() {
         }
         // Overall height: standing columns floor→top; hanging cabinets show body height only
         {
-            _bpPushWingOverallHeight((x, y1, y2, lbl) => makeDimV(p, x, y1, y2, lbl), cols, oy, dH, sc, wg.h, ox);
+            const _hSide2 = _isCenterWg2 ? _bpPreferOverallHeightSide(centerWing) : 'left';
+            _bpPushWingOverallHeight((x, y1, y2, lbl) => makeDimV(p, x, y1, y2, lbl), cols, oy, dH, sc, wg.h, ox, {
+                side: _hSide2, dW: dW, dimVLeftFn: (x, y1, y2, lbl) => makeDimVLeft(p, x, y1, y2, lbl)
+            });
             _bpDrawShorterColumnOverallHeights(
                 (x, y1, y2, lbl) => makeDimV(p, x, y1, y2, lbl),
-                cols, colXPositions, oy, dH, sc, wg.h, ox, dW
+                cols, colXPositions, oy, dH, sc, wg.h, ox, dW,
+                {
+                    overallSide: _hSide2,
+                    dimVLeftFn: (x, y1, y2, lbl) => makeDimVLeft(p, x, y1, y2, lbl)
+                }
             );
         }
         // ---- Bathroom preset: right-side external dims (body height + floor offset + drawer heights) ----
