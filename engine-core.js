@@ -4865,7 +4865,6 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         }
 
         let prevYTopDown = col.height - t;
-        const _dividersAscForMerge = [...dividers].sort((a, b) => a.y - b.y);
         
         dividers.forEach((div) => {
             const compH = prevYTopDown - (div.y + div.thick/2);
@@ -4882,19 +4881,19 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                 Math.abs((div.y - div.thick/2) - b.topY) < 0.01
             );
 
-            // Skip visual shelf boards that bound a desk-merged drawer cell —
-            // the continuous desk frame replaces those horizontal walls.
-            let _skipMergeBoundaryShelf = false;
+            // Merge-boundary shelves: render at frame-rail thickness so they fill the
+            // carcass at the same Y as the continuous desk drawer frame (no hole).
+            let _mergeShelfThick = null;
             if (!isBP && div.type === 'shelf' && state.desk && state.desk.mergeDrawers) {
-                const ascIdx = _dividersAscForMerge.findIndex(d =>
+                const _ascDivs = [...dividers].sort((a, b) => a.y - b.y);
+                const ascIdx = _ascDivs.findIndex(d =>
                     d.type === 'shelf' && d.idx === div.idx && Math.abs(d.y - div.y) < 0.05
                 );
                 if (ascIdx >= 0) {
-                    const compTopOf = col.compartments[ascIdx];
-                    const compBotOf = col.compartments[ascIdx + 1];
-                    if ((compTopOf && compTopOf.mergeWithDesk) || (compBotOf && compBotOf.mergeWithDesk)) {
-                        _skipMergeBoundaryShelf = true;
-                    }
+                    const compTopOf = col.compartments[ascIdx]; // shelf is top of this row
+                    const compBotOf = col.compartments[ascIdx + 1]; // shelf is bottom of this row
+                    if (compTopOf && compTopOf.mergeWithDesk) _mergeShelfThick = deskT; // top rail
+                    else if (compBotOf && compBotOf.mergeWithDesk) _mergeShelfThick = t; // bottom rail
                 }
             }
 
@@ -4924,6 +4923,11 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                     boardMat = matBody;
                 }
             }
+
+            // Merged desk-drawer rails use desk material (same as the continuous frame)
+            if (_mergeShelfThick != null) {
+                boardMat = matDesk;
+            }
             
             // Snap highlight: override material to green if this shelf is snapped
             const snap = window._snapHighlight;
@@ -4939,7 +4943,6 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
             _ppPartId = (insideBlock && insideBlock.paintId)
                 ? insideBlock.paintId
                 : (div.type === 'shelf' ? `shelf_c${c}_r${div.idx}` : `split_c${c}`);
-            if (!_skipMergeBoundaryShelf) {
             if (div.type === 'split') {
                 // Visual: two adjacent boards of thickness t (cabinet color). Layout still uses thick: 2t.
                 const boardT = t;
@@ -4949,13 +4952,13 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                 _applyShelfUV(upperMesh, boardW, boardD, c * 100 + 41);
                 if (!isBP) _addSplitJointSeam(_buildGroup, boardW, boardD, boardX, div.y, boardZ);
             } else {
-                const shelfMesh = createBoard(boardW, div.thick, boardD, boardX, div.y, boardZ, boardMat);
+                const shelfThick = (_mergeShelfThick != null) ? _mergeShelfThick : div.thick;
+                const shelfMesh = createBoard(boardW, shelfThick, boardD, boardX, div.y, boardZ, boardMat);
                 _applyShelfUV(shelfMesh, boardW, boardD, div.idx + c * 100);
                 if (!isBP && shelfMesh) {
                     shelfMesh.userData.shelfRef = { colIndex: c, shelfIdx: div.idx };
-                    _registerShelfPickMesh(shelfMesh, boardW, div.thick, boardD);
+                    _registerShelfPickMesh(shelfMesh, boardW, shelfThick, boardD);
                 }
-            }
             }
             _ppPartId = '';
             prevYTopDown = div.y - div.thick/2;

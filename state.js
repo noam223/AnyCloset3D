@@ -3817,15 +3817,18 @@ function _ensureDeskBandCell(col, band) {
 
     const needBottomShelf = targetBottom > startY + 0.6;
     const needTopShelf = targetTop < roofY - 0.6;
-    const bottomShelfY = needBottomShelf ? Math.round((targetBottom - t / 2) * 10) / 10 : null;
-    const topShelfY = needTopShelf ? Math.round((targetTop + t / 2) * 10) / 10 : null;
+    // Shelves sit IN the drawer-frame rails (not outside above/below), so they close
+    // the carcass at the same height as the visible frame.
+    const deskT = (band.deskT != null) ? band.deskT : DESK_SURFACE_T;
+    const bottomShelfY = needBottomShelf ? Math.round((targetBottom + t / 2) * 10) / 10 : null;
+    const topShelfY = needTopShelf ? Math.round((targetTop - deskT / 2) * 10) / 10 : null;
 
     const near = (a, b) => Math.abs(a - b) < 1.2;
     let ys = col.shelvesY.slice();
 
-    // Drop shelves that sit inside the target band opening
-    const innerLo = needBottomShelf ? bottomShelfY + 0.05 : startY;
-    const innerHi = needTopShelf ? topShelfY - 0.05 : roofY;
+    // Drop shelves that sit inside the drawer opening (between the frame rails)
+    const innerLo = needBottomShelf ? (bottomShelfY + t / 2 + 0.05) : startY;
+    const innerHi = needTopShelf ? (topShelfY - deskT / 2 - 0.05) : roofY;
     ys = ys.filter(y => y < innerLo - 0.01 || y > innerHi + 0.01);
 
     if (bottomShelfY != null) ys = ys.filter(y => !near(y, bottomShelfY));
@@ -3958,7 +3961,7 @@ function toggleDeskDrawerMerge() {
 }
 window.toggleDeskDrawerMerge = toggleDeskDrawerMerge;
 
-/** Soft check only — never auto-resize; clear merge if no merged cells remain. */
+/** Soft check — realign shelves to desk frame rails; clear merge if no merged cells remain. */
 function _revalidateDeskMerge() {
     const desk = state.desk;
     if (!desk || !desk.mergeDrawers) return false;
@@ -3975,6 +3978,32 @@ function _revalidateDeskMerge() {
         _clearDeskMergeFlags();
         return true;
     }
+
+    // Keep carcass shelves locked to the visible frame rails (fixes hole above/below frame)
+    const band = _getDeskDrawerBand(desk);
+    const indices = desk.mergeColIndices || (desk.mergeColIndex != null ? [desk.mergeColIndex] : []);
+    const bandMid = (band.top + band.bottom) / 2;
+    const freshIndices = [];
+    indices.forEach(ci => {
+        const col = state.columns[ci];
+        if (!col) return;
+        _ensureDeskBandCell(col, band);
+        let row = 0;
+        let bestD = Infinity;
+        for (let r = 0; r < (col.compartments || []).length; r++) {
+            const b = _compartmentBounds(col, r);
+            const d = Math.abs((b.topY + b.bottomY) / 2 - bandMid);
+            if (d < bestD) { bestD = d; row = r; }
+        }
+        const comp = col.compartments[row];
+        if (!comp) return;
+        comp.type = 'external_drawers';
+        if (!comp.count || comp.count < 1) comp.count = 1;
+        comp.mergeWithDesk = true;
+        freshIndices.push(ci);
+        if (ci === desk.mergeColIndex) desk.mergeRow = row;
+    });
+    if (freshIndices.length) desk.mergeColIndices = freshIndices;
     return false;
 }
 window._revalidateDeskMerge = _revalidateDeskMerge;
