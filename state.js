@@ -2872,15 +2872,21 @@ function _syncCompartmentCount(col, baseY, t) {
 
 function _clampDrawerCompartments(col, baseY, t) {
     if (!col || !col.compartments) return;
+    const minH = (typeof window.MIN_DRAWER_CELL_H === 'number') ? window.MIN_DRAWER_CELL_H : 22;
+    const extraH = (typeof window.DRAWER_EXTRA_H === 'number') ? window.DRAWER_EXTRA_H : 20;
     for (let r = 0; r < col.compartments.length; r++) {
         const comp = col.compartments[r];
         if (comp && (comp.type === 'internal_drawers' || comp.type === 'external_drawers')) {
             const cellH = Math.round(_compartmentBounds(col, r).h);
-            if (cellH < 12) {
+            if (cellH < minH) {
                 comp.type = 'empty';
             } else {
-                const minCount = Math.ceil(cellH / 60);
-                const autoCount = Math.floor((cellH - 11) / 20) + 1;
+                const minCount = (typeof window.calcMinDrawerCount === 'function')
+                    ? window.calcMinDrawerCount(cellH)
+                    : (cellH >= minH ? 1 : 0);
+                const autoCount = (typeof window.calcAutoDrawerCount === 'function')
+                    ? window.calcAutoDrawerCount(cellH)
+                    : (Math.floor((cellH - minH) / extraH) + 1);
                 if (comp.count < minCount) comp.count = minCount;
                 if (comp.count > autoCount) comp.count = autoCount;
                 if (comp.count < 1) comp.count = 1;

@@ -111,15 +111,65 @@ const placementHebrew = {
 };
 
 // ── Drawer count helpers ──────────────────────────────────────────────────────
-// Auto-count: 1 drawer per 20cm; thresholds: ≥12cm=1, ≥32cm=2, ≥52cm=3, ...
+// Min cell height: 22cm for 1 drawer, +20cm for each additional drawer
+// → 1→22, 2→42, 3→62, 4→82, ...
+window.MIN_DRAWER_CELL_H = 22;
+window.DRAWER_EXTRA_H = 20;
+
+function minHeightForDrawerCount(n) {
+    const count = Math.max(0, Math.round(Number(n) || 0));
+    if (count < 1) return 0;
+    return window.MIN_DRAWER_CELL_H + window.DRAWER_EXTRA_H * (count - 1);
+}
+window.minHeightForDrawerCount = minHeightForDrawerCount;
+
 function calcAutoDrawerCount(cellHeightCm) {
-    if (cellHeightCm < 12) return 0; // cell too short for any drawer
-    return Math.floor((cellHeightCm - 11) / 20) + 1;
+    const h = Number(cellHeightCm) || 0;
+    if (h < window.MIN_DRAWER_CELL_H) return 0;
+    return Math.floor((h - window.MIN_DRAWER_CELL_H) / window.DRAWER_EXTRA_H) + 1;
 }
-// Min-count: no single drawer may exceed 60cm
+window.calcAutoDrawerCount = calcAutoDrawerCount;
+
+// Minimum drawers for a cell: always allow 1 when the cell is tall enough
 function calcMinDrawerCount(cellHeightCm) {
-    return Math.ceil(cellHeightCm / 60);
+    return (Number(cellHeightCm) || 0) >= window.MIN_DRAWER_CELL_H ? 1 : 0;
 }
+window.calcMinDrawerCount = calcMinDrawerCount;
+
+function _toastDrawerHeightBlocked(neededCm, forCount) {
+    const n = forCount || 1;
+    const msg = n > 1
+        ? `ל-${n} מגירות נדרש גובה תא מינימלי של ${neededCm} ס"מ`
+        : `גובה התא קטן מ-${neededCm} ס"מ — לא ניתן להוסיף מגירה`;
+    if (typeof _showToast === 'function') _showToast(msg, 4000);
+    else if (typeof window._showToast === 'function') window._showToast(msg, 4000);
+    else {
+        const toast = document.createElement('div');
+        toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(239,68,68,0.95);color:white;padding:10px 20px;border-radius:12px;font-weight:600;font-size:0.9rem;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.2);pointer-events:none;';
+        toast.innerText = msg;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
+}
+window._toastDrawerHeightBlocked = _toastDrawerHeightBlocked;
+
+/** Sync drawer count (or clear) after a cell height change. Returns true if cleared. */
+function _syncDrawerCompAfterHeight(col, r) {
+    const comp = col && col.compartments && col.compartments[r];
+    if (!comp || (comp.type !== 'internal_drawers' && comp.type !== 'external_drawers')) return false;
+    const cellH = _cellHeight(col, r);
+    if (cellH < window.MIN_DRAWER_CELL_H) {
+        comp.type = 'empty';
+        return true;
+    }
+    // Auto-fit drawer count to cell height (enlarge → more drawers, shrink → fewer)
+    const auto = calcAutoDrawerCount(cellH);
+    const minCount = calcMinDrawerCount(cellH);
+    comp.count = Math.max(minCount, Math.min(8, auto));
+    return false;
+}
+window._syncDrawerCompAfterHeight = _syncDrawerCompAfterHeight;
+
 // Returns the displayed cell height (cm) of compartment row r in column col.
 // Returns a rounded integer to match what the dimension label shows (Math.round).
 function _cellHeight(col, r, wingData) {
@@ -762,6 +812,12 @@ function buildDimensionsAndButtonsUI() {
                         const limitMin = Math.max(...obs.filter(y => y < currentY)) + MIN_SHELF_GAP + t;
                         const limitMax = Math.min(...obs.filter(y => y > currentY)) - MIN_SHELF_GAP - t;
                         col.shelvesY[shelfIdx] = Math.round(Math.max(limitMin, Math.min(limitMax, currentY + delta)) * 10) / 10;
+                    }
+                }
+                // Keep drawer counts in sync with the new cell heights (and clear below 22cm)
+                if (col.compartments) {
+                    for (let ri = 0; ri < col.compartments.length; ri++) {
+                        _syncDrawerCompAfterHeight(col, ri);
                     }
                 }
                 checkSplits();
@@ -1927,11 +1983,12 @@ function _applyColumnClipboard(target, src) {
         const comp = target.compartments[r];
         if (!comp || (comp.type !== 'internal_drawers' && comp.type !== 'external_drawers')) continue;
         const cellH = _cellHeight(target, r);
-        if (cellH < 12) {
+        if (cellH < window.MIN_DRAWER_CELL_H) {
             comp.type = 'empty';
         } else {
             const minCount = calcMinDrawerCount(cellH);
-            comp.count = Math.max(minCount, comp.count || 1);
+            const maxCount = calcAutoDrawerCount(cellH);
+            comp.count = Math.max(minCount, Math.min(maxCount, comp.count || 1));
         }
     }
 }
@@ -3355,9 +3412,14 @@ window.setSubCellType = function(type, opts) {
             sub.zonesType[z] = newType;
             if (newType === 'internal_drawers' || newType === 'external_drawers') {
                 const zoneH = _getSubZoneHeightCm(state.columns[c], r, sub, z);
-                const auto = calcAutoDrawerCount(zoneH);
-                const min = calcMinDrawerCount(zoneH);
-                _setZoneDrawerCount(sub, z, Math.max(min, auto || 1));
+                if (zoneH < window.MIN_DRAWER_CELL_H) {
+                    sub.zonesType[z] = current;
+                    _toastDrawerHeightBlocked(window.MIN_DRAWER_CELL_H, 1);
+                } else {
+                    const auto = calcAutoDrawerCount(zoneH);
+                    const min = calcMinDrawerCount(zoneH);
+                    _setZoneDrawerCount(sub, z, Math.max(min, auto || 1));
+                }
             } else if (Array.isArray(sub.zonesDrawerCount) && z < sub.zonesDrawerCount.length) {
                 sub.zonesDrawerCount[z] = 0;
             }
@@ -3523,7 +3585,7 @@ window.applyContentForce = function(type) {
 
         if ((newType === 'internal_drawers' || newType === 'external_drawers')) {
             const cellH = _cellHeight(col, r);
-            if (cellH < 12) {
+            if (cellH < window.MIN_DRAWER_CELL_H) {
                 blockedCount++;
                 return;
             }
@@ -3548,11 +3610,7 @@ window.applyContentForce = function(type) {
     });
 
     if (blockedCount > 0) {
-        const toast = document.createElement('div');
-        toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(239,68,68,0.95);color:white;padding:10px 20px;border-radius:12px;font-weight:600;font-size:0.9rem;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.2);pointer-events:none;';
-        toast.innerText = 'גובה התא קטן מ-12 ס"מ — לא ניתן להוסיף מגירה';
-        document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 3000);
+        _toastDrawerHeightBlocked(window.MIN_DRAWER_CELL_H, 1);
     }
 
     // Clear selection BEFORE buildCabinet so the render has no highlight
@@ -3816,7 +3874,7 @@ window.applyContent = function(type) {
         // Block drawer assignment if cell is too short
         if ((newType === 'internal_drawers' || newType === 'external_drawers') && newType !== 'empty') {
             const cellH = _cellHeight(col, r);
-            if (cellH < 12) {
+            if (cellH < window.MIN_DRAWER_CELL_H) {
                 blockedCount++;
                 return; // skip this row
             }
@@ -3841,11 +3899,7 @@ window.applyContent = function(type) {
     });
 
     if (blockedCount > 0) {
-        const toast = document.createElement('div');
-        toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(239,68,68,0.95);color:white;padding:10px 20px;border-radius:12px;font-weight:600;font-size:0.9rem;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.2);pointer-events:none;';
-        toast.innerText = 'גובה התא קטן מ-23 ס"מ — לא ניתן להוסיף מגירה';
-        document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 3000);
+        _toastDrawerHeightBlocked(window.MIN_DRAWER_CELL_H, 1);
     }
 
     // Clear selection BEFORE buildCabinet for simple types; keep for types that open sub-panels
@@ -4104,6 +4158,8 @@ window.updateDrawerCount = function(delta) {
     const c = state.selection.colIndex;
     const col = state.columns[c];
     let changed = false;
+    let blockedWant = 0;
+    let blockedNeed = 0;
 
     // Partition zone drawers
     if (_activeSubCellIdxs.size > 0) {
@@ -4118,13 +4174,21 @@ window.updateDrawerCount = function(delta) {
                 if (interior !== 'internal_drawers' && interior !== 'external_drawers') return;
                 const zoneH = _getSubZoneHeightCm(col, r, sub, z);
                 const minCount = calcMinDrawerCount(zoneH);
+                const maxCount = calcAutoDrawerCount(zoneH);
                 const cur = _zoneDrawerCountAt(sub, z, zoneH);
-                const newCount = Math.max(minCount, Math.min(8, cur + delta));
+                const want = cur + delta;
+                if (delta > 0 && want > maxCount) {
+                    blockedWant = want;
+                    blockedNeed = minHeightForDrawerCount(want);
+                    return;
+                }
+                const newCount = Math.max(minCount, Math.min(8, Math.min(maxCount, want)));
                 if (newCount !== cur) {
                     _setZoneDrawerCount(sub, z, newCount);
                     changed = true;
                 }
             });
+            if (blockedNeed > 0) _toastDrawerHeightBlocked(blockedNeed, blockedWant);
             if (changed) {
                 buildCabinet(); calculatePrice(); saveHistoryState();
                 updateToolbarButtonHighlights();
@@ -4138,19 +4202,24 @@ window.updateDrawerCount = function(delta) {
         if (comp && (comp.type === 'internal_drawers' || comp.type === 'external_drawers')) {
             const cellH = _cellHeight(col, r);
             const minCount = calcMinDrawerCount(cellH);
-            let newCount = comp.count + delta;
-            // Clamp: minimum enforced by cell height, maximum 8
-            newCount = Math.max(minCount, Math.min(8, newCount));
+            const maxCount = calcAutoDrawerCount(cellH);
+            const want = (comp.count || 1) + delta;
+            if (delta > 0 && want > maxCount) {
+                blockedWant = want;
+                blockedNeed = minHeightForDrawerCount(want);
+                return;
+            }
+            let newCount = Math.max(minCount, Math.min(8, Math.min(maxCount, want)));
             if (newCount !== comp.count) {
                 comp.count = newCount;
                 changed = true;
             }
         }
     });
-
-    if (changed) {
-        buildCabinet(); calculatePrice(); saveHistoryState();
-    }
+    if (blockedNeed > 0) _toastDrawerHeightBlocked(blockedNeed, blockedWant);
+    if (!changed) return;
+    buildCabinet(); calculatePrice(); saveHistoryState();
+    updateToolbarButtonHighlights();
 };
 
 // Global vertical shelf / split / desk-surface drag — survives buildDragHandlesUI rebuilds
@@ -4304,6 +4373,24 @@ window.addEventListener('pointermove', e => {
         window._snapHighlight = null;
     }
 
+    // Keep drawer cells at least at min height for their current count (22 / 42 / 62...)
+    [d.shelfIdx, d.shelfIdx + 1].forEach(function(r) {
+        const comp = col.compartments && col.compartments[r];
+        if (!comp || (comp.type !== 'internal_drawers' && comp.type !== 'external_drawers')) return;
+        const need = minHeightForDrawerCount(comp.count || 1);
+        const h = _cellHeight(col, r);
+        if (h >= need) return;
+        const deficit = need - h;
+        if (r === d.shelfIdx) {
+            // Cell below the shelf is too short → raise shelf
+            newY = Math.min(limitMax, col.shelvesY[d.shelfIdx] + deficit);
+        } else {
+            // Cell above the shelf is too short → lower shelf
+            newY = Math.max(limitMin, col.shelvesY[d.shelfIdx] - deficit);
+        }
+        col.shelvesY[d.shelfIdx] = Math.round(newY * 10) / 10;
+    });
+
     const _checkSorbetRow = (r) => {
         const comp = col.compartments[r];
         if (!comp || comp.type !== 'sorbet') return false;
@@ -4328,11 +4415,7 @@ window.addEventListener('pointermove', e => {
     }
 
     const _autoDrawerRow = (r) => {
-        const comp = col.compartments[r];
-        if (!comp || (comp.type !== 'internal_drawers' && comp.type !== 'external_drawers')) return;
-        const cellH = _cellHeight(col, r);
-        if (cellH < 12) { comp.type = 'empty'; return; }
-        comp.count = calcAutoDrawerCount(cellH);
+        _syncDrawerCompAfterHeight(col, r);
     };
     _autoDrawerRow(d.shelfIdx);
     _autoDrawerRow(d.shelfIdx + 1);
