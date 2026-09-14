@@ -534,7 +534,16 @@ window._buildQcCustomerQuoteText = function() {
     lines.push('סה״כ הובלה והתקנה: ' + _qcMoney(totalInstall));
     lines.push('סה״כ לתשלום: ' + _qcMoney(totalCust + totalInstall));
     lines.push('');
-    lines.push('אשמח לעמוד לרשותך לכל שאלה 🙂');
+    lines.push('ניתן לבחור צבעים וידיות מהמגוון בקטלוג');
+    lines.push('מבנה פנימי בהתאמה אישית');
+    lines.push('');
+    lines.push('ניתן לשלם באשראי ללא ריבית עד 12 תשלומים');
+    lines.push('או בהעברה בנקאית ולקבל עד 3% הנחה');
+    lines.push('');
+    lines.push('אני פה לכל שאלה,');
+    lines.push('אשמח להתקדם,');
+    lines.push('');
+    lines.push('נועם, סוגרים הכל לדירה');
     return lines.join('\n');
 };
 
