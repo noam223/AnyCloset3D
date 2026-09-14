@@ -37,7 +37,7 @@ const colorNamesHebrew = {
     white_matte: 'לבן מט 2100', c3110: '3110', c795: '759', c705: '705', u727: 'U727',
     w1200: 'W1200', u232: 'U232', u604: 'U604', u638: 'U638',
     c3207: '3207', black_matte: 'שחור מט', custom: 'מותאם אישית',
-    '2020': 'גוון 2020', '2024': 'גוון 2024', 'H1367': 'H1367', 'H1307': 'H1307', 'H1227': 'H1227',
+    '2020': 'גוון 2020', '2024': 'גוון 2024', 'H1367': 'H1367', 'H1307': 'H1307', 'H1227': 'H1227', 'A427': 'A427',
     '2025': 'גוון 2025', '2040': 'גוון 2040', '2041': 'גוון 2041', '2044': 'גוון 2044',
     '2047': 'גוון 2047', '2049': 'גוון 2049', '2062': 'גוון 2062', '5600': 'גוון 5600',
     '7180': 'גוון 7180', '456': 'גוון 456', '462': 'גוון 462', '463': 'גוון 463',
@@ -468,6 +468,7 @@ window._rebuildDoorPanelTabs = function() {
         { key: 'H1367', img: 'textures/H1367.jpg', border: '#bbb', label: 'H1367' },
         { key: 'H1307', img: 'textures/H1307.jpg', border: '#bbb', label: 'H1307' },
         { key: 'H1227', img: 'textures/H1227.jpg', border: '#bbb', label: 'H1227' },
+        { key: 'A427',  img: 'textures/A427.jpg',  border: '#bbb', label: 'A427' },
         { key: '2025',  img: 'textures/2025.jpg',  border: '#bbb', label: '2025' },
         { key: '2040',  img: 'textures/2040.jpg',  border: '#bbb', label: '2040' },
         { key: '2041',  img: 'textures/2041.jpg',  border: '#bbb', label: '2041' },
@@ -6468,7 +6469,7 @@ function bindUI() {
         // If sandwich is active and a no-sandwich color is currently selected on any part, reset it
         // Exception: materialExternal is allowed to keep any color (fronts are melamine in sandwich)
         if (isSandwich) {
-            const NO_SANDWICH = new Set(['c705','u727','w1200','u232','u604','u638','H1367','H1307','H1227']);
+            const NO_SANDWICH = new Set(['c705','u727','w1200','u232','u604','u638','H1367','H1307','H1227','A427']);
             ['materialBody','materialInternal','materialDesk','materialOpenCell','materialBack'].forEach(part => {
                 if (NO_SANDWICH.has(state[part])) {
                     state[part] = 'white_matte';

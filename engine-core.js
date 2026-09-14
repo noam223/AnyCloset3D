@@ -1647,7 +1647,7 @@ window._syncTambourPalette = function(palette) {
 };
 
 const textureLoader = new THREE.TextureLoader();
-const textureNames = ['2020', '2024', 'H1367', 'H1307', 'H1227', '2025', '2040', '2041', '2044', '2047', '2049', '2062', '5600', '7180', '456', '462', '463', '464', '480'];
+const textureNames = ['2020', '2024', 'H1367', 'H1307', 'H1227', 'A427', '2025', '2040', '2041', '2044', '2047', '2049', '2062', '5600', '7180', '456', '462', '463', '464', '480'];
 
 textureNames.forEach(name => {
     const tex = textureLoader.load(`textures/${name}.jpg`);

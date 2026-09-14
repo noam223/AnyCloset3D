@@ -55,6 +55,7 @@
             { key: 'H1367', img: 'textures/H1367.jpg', label: 'H1367' },
             { key: 'H1307', img: 'textures/H1307.jpg', label: 'H1307' },
             { key: 'H1227', img: 'textures/H1227.jpg', label: 'H1227' },
+            { key: 'A427',  img: 'textures/A427.jpg',  label: 'A427' },
             { key: '2025',  img: 'textures/2025.jpg',  label: '2025' },
             { key: '2040',  img: 'textures/2040.jpg',  label: '2040' },
             { key: '2041',  img: 'textures/2041.jpg',  label: '2041' },
