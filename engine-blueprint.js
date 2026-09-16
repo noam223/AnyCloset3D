@@ -2,16 +2,15 @@
 // ==========================================
 // Multi-view blueprint SVG generator
 // ==========================================
-const DESK_SURFACE_T_NO_DRAWERS = 2.8; // 28mm — desk without drawers
+// Desk surface thickness lives in state.js (_deskSurfaceThickness).
+// Do not redeclare DESK_SURFACE_T* here — classic scripts share one lexical scope.
 function _bpDeskSurfaceT(hasDrawers) {
     if (typeof window._deskSurfaceThickness === 'function') {
         return window._deskSurfaceThickness(!!hasDrawers);
     }
     const t = (typeof state !== 'undefined' && state.thickness) ? state.thickness : 1.7;
-    return hasDrawers ? t : DESK_SURFACE_T_NO_DRAWERS;
+    return hasDrawers ? t : 2.8;
 }
-/** @deprecated — use _bpDeskSurfaceT(hasDrawers) */
-const DESK_SURFACE_T = DESK_SURFACE_T_NO_DRAWERS;
 
 function _bpCenterSideDesk(cw) {
     const wing = cw || (state.wings && state.wings.center);
