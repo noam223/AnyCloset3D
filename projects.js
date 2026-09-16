@@ -21,6 +21,7 @@ var _projectMeasFiles    = [];
 var _measViewerFiles     = [];
 var _measViewerIndex     = 0;
 var _measViewerToken     = 0;
+var _measZoom = { scale: 1, x: 0, y: 0, min: 1, max: 8, dragging: false, lastX: 0, lastY: 0, bound: false, pinchDist: 0 };
 var _measNotifyTimer     = null;
 var _companyMembers      = [];
 var _agentFilter         = 'all';
@@ -1382,23 +1383,151 @@ function measViewerNav(delta) {
     _renderMeasViewer();
 }
 
+function measViewerResetZoom() {
+    _measZoom.scale = 1;
+    _measZoom.x = 0;
+    _measZoom.y = 0;
+    _applyMeasZoom();
+}
+
+function measViewerZoomStep(dir) {
+    var body = document.getElementById('meas-viewer-body');
+    if (!body || body.classList.contains('is-pdf')) return;
+    var rect = body.getBoundingClientRect();
+    _measZoomAt(dir > 0 ? 1.25 : 1 / 1.25, rect.width / 2, rect.height / 2);
+}
+
+function _applyMeasZoom() {
+    var pan = document.getElementById('meas-viewer-pan');
+    var label = document.getElementById('meas-viewer-zoom-label');
+    var body = document.getElementById('meas-viewer-body');
+    if (pan) {
+        pan.style.transform = 'translate(' + _measZoom.x + 'px,' + _measZoom.y + 'px) scale(' + _measZoom.scale + ')';
+    }
+    if (label) label.textContent = Math.round(_measZoom.scale * 100) + '%';
+    if (body) body.classList.toggle('is-zoomed', _measZoom.scale > 1.01);
+}
+
+function _measZoomAt(factor, mx, my) {
+    var oldScale = _measZoom.scale;
+    var newScale = Math.max(_measZoom.min, Math.min(_measZoom.max, oldScale * factor));
+    if (Math.abs(newScale - oldScale) < 0.001) return;
+    _measZoom.x = mx - (mx - _measZoom.x) * (newScale / oldScale);
+    _measZoom.y = my - (my - _measZoom.y) * (newScale / oldScale);
+    _measZoom.scale = newScale;
+    if (_measZoom.scale <= 1.001) {
+        _measZoom.scale = 1;
+        _measZoom.x = 0;
+        _measZoom.y = 0;
+    }
+    _applyMeasZoom();
+}
+
+function _bindMeasZoomHandlers(body) {
+    if (!body || body.dataset.zoomBound === '1') return;
+    body.dataset.zoomBound = '1';
+
+    body.addEventListener('wheel', function(e) {
+        if (body.classList.contains('is-pdf')) return;
+        e.preventDefault();
+        var rect = body.getBoundingClientRect();
+        var mx = e.clientX - rect.left;
+        var my = e.clientY - rect.top;
+        _measZoomAt(e.deltaY < 0 ? 1.12 : 1 / 1.12, mx, my);
+    }, { passive: false });
+
+    body.addEventListener('pointerdown', function(e) {
+        if (body.classList.contains('is-pdf')) return;
+        if (e.button !== 0 && e.pointerType === 'mouse') return;
+        if (e.target.closest && e.target.closest('.meas-viewer-arrow')) return;
+        _measZoom.dragging = true;
+        _measZoom.lastX = e.clientX;
+        _measZoom.lastY = e.clientY;
+        body.classList.add('is-dragging');
+        try { body.setPointerCapture(e.pointerId); } catch (err) {}
+    });
+
+    body.addEventListener('pointermove', function(e) {
+        if (!_measZoom.dragging || body.classList.contains('is-pdf')) return;
+        var dx = e.clientX - _measZoom.lastX;
+        var dy = e.clientY - _measZoom.lastY;
+        _measZoom.lastX = e.clientX;
+        _measZoom.lastY = e.clientY;
+        _measZoom.x += dx;
+        _measZoom.y += dy;
+        _applyMeasZoom();
+    });
+
+    function endDrag(e) {
+        if (!_measZoom.dragging) return;
+        _measZoom.dragging = false;
+        body.classList.remove('is-dragging');
+        if (e && e.pointerId != null) {
+            try { body.releasePointerCapture(e.pointerId); } catch (err) {}
+        }
+    }
+    body.addEventListener('pointerup', endDrag);
+    body.addEventListener('pointercancel', endDrag);
+    body.addEventListener('lostpointercapture', function() {
+        _measZoom.dragging = false;
+        body.classList.remove('is-dragging');
+    });
+
+    body.addEventListener('dblclick', function(e) {
+        if (body.classList.contains('is-pdf')) return;
+        e.preventDefault();
+        var rect = body.getBoundingClientRect();
+        var mx = e.clientX - rect.left;
+        var my = e.clientY - rect.top;
+        if (_measZoom.scale > 1.05) measViewerResetZoom();
+        else _measZoomAt(2.5 / Math.max(_measZoom.scale, 0.001), mx, my);
+    });
+
+    body.addEventListener('touchstart', function(e) {
+        if (body.classList.contains('is-pdf') || e.touches.length !== 2) {
+            _measZoom.pinchDist = 0;
+            return;
+        }
+        var a = e.touches[0], b = e.touches[1];
+        _measZoom.pinchDist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    }, { passive: true });
+
+    body.addEventListener('touchmove', function(e) {
+        if (body.classList.contains('is-pdf') || e.touches.length !== 2 || !_measZoom.pinchDist) return;
+        e.preventDefault();
+        var a = e.touches[0], b = e.touches[1];
+        var dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+        var rect = body.getBoundingClientRect();
+        var mx = ((a.clientX + b.clientX) / 2) - rect.left;
+        var my = ((a.clientY + b.clientY) / 2) - rect.top;
+        var factor = dist / _measZoom.pinchDist;
+        _measZoom.pinchDist = dist;
+        _measZoomAt(factor, mx, my);
+    }, { passive: false });
+}
+
 async function _renderMeasViewer() {
     var body = document.getElementById('meas-viewer-body');
     var title = document.getElementById('meas-viewer-title');
     var counter = document.getElementById('meas-viewer-counter');
     var prevBtn = document.getElementById('meas-viewer-prev');
     var nextBtn = document.getElementById('meas-viewer-next');
+    var tools = document.getElementById('meas-viewer-tools');
     var f = _measViewerFiles[_measViewerIndex];
     var multi = _measViewerFiles.length > 1;
     if (prevBtn) prevBtn.classList.toggle('show', multi);
     if (nextBtn) nextBtn.classList.toggle('show', multi);
+    measViewerResetZoom();
     if (!f) {
         if (body) body.innerHTML = '<div class="meas-viewer-empty">אין קובץ להצגה</div>';
         return;
     }
     if (title) title.textContent = f.file_name || 'קובץ מדידה';
     if (counter) counter.textContent = (_measViewerIndex + 1) + ' / ' + _measViewerFiles.length;
-    if (body) body.innerHTML = '<div class="meas-viewer-empty"><i class="fa-solid fa-spinner fa-spin"></i> טוען...</div>';
+    if (body) {
+        body.classList.remove('is-pdf', 'is-dragging', 'is-zoomed');
+        body.innerHTML = '<div class="meas-viewer-empty"><i class="fa-solid fa-spinner fa-spin"></i> טוען...</div>';
+    }
 
     var token = ++_measViewerToken;
     if (!window.MeasurementInbox) {
@@ -1414,10 +1543,23 @@ async function _renderMeasViewer() {
     }
 
     if (_isImageMime(f.mime_type)) {
-        if (body) body.innerHTML = '<img src="' + _escAttr(signed.url) + '" alt="' + _escAttr(f.file_name || 'מדידה') + '">';
+        if (tools) tools.classList.remove('hidden');
+        if (body) {
+            body.innerHTML =
+                '<div class="meas-viewer-pan" id="meas-viewer-pan">' +
+                    '<img id="meas-viewer-img" src="' + _escAttr(signed.url) + '" alt="' + _escAttr(f.file_name || 'מדידה') + '">' +
+                '</div>';
+            _bindMeasZoomHandlers(body);
+            _applyMeasZoom();
+        }
     } else if (_isPdfMime(f.mime_type, f.file_name)) {
-        if (body) body.innerHTML = '<iframe src="' + _escAttr(signed.url) + '#toolbar=1" title="' + _escAttr(f.file_name || 'PDF') + '"></iframe>';
+        if (tools) tools.classList.add('hidden');
+        if (body) {
+            body.classList.add('is-pdf');
+            body.innerHTML = '<iframe src="' + _escAttr(signed.url) + '#toolbar=1" title="' + _escAttr(f.file_name || 'PDF') + '"></iframe>';
+        }
     } else {
+        if (tools) tools.classList.add('hidden');
         if (body) body.innerHTML =
             '<div class="meas-viewer-empty">' +
                 '<p style="margin-bottom:12px;">סוג הקובץ אינו נתמך לתצוגה מוטמעת.</p>' +
@@ -1431,6 +1573,21 @@ document.addEventListener('keydown', function(e) {
     if (!viewer || !viewer.classList.contains('open')) return;
     if (e.key === 'Escape') {
         closeModal('modal-meas-viewer');
+        return;
+    }
+    if (e.key === '+' || e.key === '=') {
+        e.preventDefault();
+        measViewerZoomStep(1);
+        return;
+    }
+    if (e.key === '-' || e.key === '_') {
+        e.preventDefault();
+        measViewerZoomStep(-1);
+        return;
+    }
+    if (e.key === '0') {
+        e.preventDefault();
+        measViewerResetZoom();
         return;
     }
     if (e.key === 'ArrowRight') {

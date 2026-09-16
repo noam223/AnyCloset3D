@@ -334,53 +334,81 @@
         .meas-file-thumb img { width: 100%; height: 100%; object-fit: cover; }
         .meas-file-thumb i { font-size: 1.8rem; color: #64748b; }
         .meas-file-name { padding: 8px 10px; font-size: .78rem; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .modal-overlay.meas-viewer-overlay { z-index: 320; padding: 12px; background: rgba(15,23,42,.82); }
-        .meas-viewer-box {
-            background: #0f172a; border-radius: 18px; width: min(96vw, 1100px); max-height: 94vh;
-            display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--shadow-xl);
-            position: relative; color: #f8fafc;
+        .modal-overlay.meas-viewer-overlay {
+            z-index: 320; padding: 0; background: #000; align-items: stretch; justify-content: stretch;
         }
-        .meas-viewer-box::before { display: none; }
-        .meas-viewer-header {
-            display: flex; align-items: center; justify-content: space-between; gap: 12px;
-            padding: 12px 16px; border-bottom: 1px solid rgba(148,163,184,.25); flex-shrink: 0;
+        .meas-viewer-shell {
+            width: 100%; height: 100%; position: relative; color: #f8fafc;
+            display: flex; flex-direction: column; overflow: hidden;
         }
-        .meas-viewer-title { font-size: .92rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-        .meas-viewer-meta { font-size: .78rem; color: #94a3b8; flex-shrink: 0; }
-        .meas-viewer-close {
-            width: 36px; height: 36px; border: none; border-radius: 10px; background: rgba(148,163,184,.18);
-            color: #e2e8f0; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+        .meas-viewer-topbar {
+            position: absolute; top: 0; left: 0; right: 0; z-index: 5;
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 12px; pointer-events: none;
+            background: linear-gradient(180deg, rgba(0,0,0,.72) 0%, rgba(0,0,0,.28) 70%, transparent 100%);
         }
-        .meas-viewer-close:hover { background: rgba(248,113,113,.25); color: #fecaca; }
+        .meas-viewer-topbar > * { pointer-events: auto; }
+        .meas-viewer-title {
+            font-size: .88rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            min-width: 0; flex: 1; text-shadow: 0 1px 4px rgba(0,0,0,.6);
+        }
+        .meas-viewer-meta { font-size: .78rem; color: #cbd5e1; flex-shrink: 0; }
+        .meas-viewer-tools { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+        .meas-viewer-tools.hidden { display: none; }
+        .meas-viewer-tool-btn, .meas-viewer-close {
+            width: 38px; height: 38px; border: none; border-radius: 10px;
+            background: rgba(15,23,42,.55); color: #f1f5f9; cursor: pointer;
+            display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+            backdrop-filter: blur(8px);
+        }
+        .meas-viewer-tool-btn:hover { background: rgba(20,184,166,.85); }
+        .meas-viewer-close:hover { background: rgba(248,113,113,.35); color: #fecaca; }
+        .meas-viewer-zoom-label {
+            min-width: 48px; text-align: center; font-size: .75rem; font-weight: 700; color: #e2e8f0;
+        }
         .meas-viewer-stage {
-            position: relative; flex: 1; min-height: min(70vh, 720px); display: flex; align-items: center; justify-content: center;
-            background: #020617; overflow: hidden;
+            position: relative; flex: 1; width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+            background: #000; overflow: hidden;
         }
-        .meas-viewer-body { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 8px; }
-        .meas-viewer-body img {
-            max-width: 100%; max-height: min(78vh, 760px); object-fit: contain; border-radius: 8px;
-            user-select: none; -webkit-user-drag: none;
+        .meas-viewer-body {
+            position: absolute; inset: 0; overflow: hidden;
+            display: flex; align-items: center; justify-content: center;
+            touch-action: none; cursor: grab;
+        }
+        .meas-viewer-body.is-dragging { cursor: grabbing; }
+        .meas-viewer-body.is-pdf { cursor: default; touch-action: auto; }
+        .meas-viewer-pan {
+            width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+            transform-origin: 0 0; will-change: transform;
+        }
+        .meas-viewer-pan img {
+            max-width: 100vw; max-height: 100vh; width: auto; height: auto;
+            object-fit: contain; user-select: none; -webkit-user-drag: none;
+            pointer-events: none; display: block;
         }
         .meas-viewer-body iframe {
-            width: 100%; height: min(78vh, 760px); border: 0; border-radius: 8px; background: #fff;
+            width: 100%; height: 100%; border: 0; background: #fff;
         }
         .meas-viewer-empty { color: #94a3b8; font-size: .9rem; padding: 40px 16px; text-align: center; }
         .meas-viewer-arrow {
-            position: absolute; top: 50%; transform: translateY(-50%); z-index: 2;
-            width: 46px; height: 46px; border: none; border-radius: 50%;
-            background: rgba(15,23,42,.72); color: #f8fafc; cursor: pointer;
-            display: none; align-items: center; justify-content: center; font-size: 1.1rem;
-            box-shadow: 0 8px 24px rgba(0,0,0,.35);
+            position: absolute; top: 50%; transform: translateY(-50%); z-index: 4;
+            width: 48px; height: 48px; border: none; border-radius: 50%;
+            background: rgba(15,23,42,.55); color: #f8fafc; cursor: pointer;
+            display: none; align-items: center; justify-content: center; font-size: 1.15rem;
+            backdrop-filter: blur(8px);
         }
         .meas-viewer-arrow.show { display: inline-flex; }
         .meas-viewer-arrow:hover { background: rgba(20,184,166,.9); }
-        .meas-viewer-arrow.prev { right: 12px; }
-        .meas-viewer-arrow.next { left: 12px; }
+        .meas-viewer-arrow.prev { right: 14px; }
+        .meas-viewer-arrow.next { left: 14px; }
         @media (max-width: 640px) {
-            .meas-viewer-stage { min-height: 58vh; }
-            .meas-viewer-arrow { width: 40px; height: 40px; }
-            .meas-viewer-arrow.prev { right: 6px; }
-            .meas-viewer-arrow.next { left: 6px; }
+            .meas-viewer-title { font-size: .78rem; max-width: 38vw; flex: 0 1 auto; }
+            .meas-viewer-arrow { width: 42px; height: 42px; }
+            .meas-viewer-arrow.prev { right: 8px; }
+            .meas-viewer-arrow.next { left: 8px; }
+            .meas-viewer-tool-btn, .meas-viewer-close { width: 34px; height: 34px; }
         }
         .project-card.is-pinned { outline: 2px solid rgba(245,158,11,.35); outline-offset: 0; }
         .project-pinned-mark { color: #d97706; font-size: .85rem; margin-left: 4px; }
@@ -1560,10 +1588,22 @@
 
 <!-- Modal: Measurement file lightbox viewer -->
 <div class="modal-overlay meas-viewer-overlay" id="modal-meas-viewer" role="dialog" aria-modal="true" aria-label="צפייה במדידה">
-    <div class="modal-box meas-viewer-box" onclick="event.stopPropagation()">
-        <div class="meas-viewer-header">
+    <div class="meas-viewer-shell" onclick="event.stopPropagation()">
+        <div class="meas-viewer-topbar">
             <div class="meas-viewer-title" id="meas-viewer-title">קובץ מדידה</div>
             <div class="meas-viewer-meta" id="meas-viewer-counter">1 / 1</div>
+            <div class="meas-viewer-tools" id="meas-viewer-tools">
+                <button type="button" class="meas-viewer-tool-btn" onclick="measViewerZoomStep(-1)" title="הקטן" aria-label="זום אאוט">
+                    <i class="fa-solid fa-minus"></i>
+                </button>
+                <span class="meas-viewer-zoom-label" id="meas-viewer-zoom-label">100%</span>
+                <button type="button" class="meas-viewer-tool-btn" onclick="measViewerZoomStep(1)" title="הגדל" aria-label="זום אין">
+                    <i class="fa-solid fa-plus"></i>
+                </button>
+                <button type="button" class="meas-viewer-tool-btn" onclick="measViewerResetZoom()" title="איפוס זום" aria-label="איפוס זום">
+                    <i class="fa-solid fa-compress"></i>
+                </button>
+            </div>
             <button type="button" class="meas-viewer-close" onclick="closeModal('modal-meas-viewer')" aria-label="סגור">
                 <i class="fa-solid fa-xmark"></i>
             </button>
@@ -1719,7 +1759,7 @@
 </div>
 
 <script src="auth.js?v=20260830adminOps"></script>
-<script src="projects.js?v=20260916measViewer"></script>
+<script src="projects.js?v=20260916measZoom"></script>
 <script src="quick-calc.js?v=20260825backdrop"></script>
 </body>
 </html>
