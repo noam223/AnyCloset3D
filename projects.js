@@ -17,6 +17,10 @@ var _measurementUnread   = 0;
 var _linkMeasurementId   = null;
 var _measurementChannel  = null;
 var _projectMeasCounts   = {};
+var _projectMeasFiles    = [];
+var _measViewerFiles     = [];
+var _measViewerIndex     = 0;
+var _measViewerToken     = 0;
 var _measNotifyTimer     = null;
 var _companyMembers      = [];
 var _agentFilter         = 'all';
@@ -1201,6 +1205,13 @@ function _isImageMime(mime) {
     return !!(mime && String(mime).indexOf('image/') === 0);
 }
 
+function _isPdfMime(mime, fileName) {
+    var m = String(mime || '').toLowerCase();
+    if (m.indexOf('pdf') !== -1) return true;
+    var n = String(fileName || '').toLowerCase();
+    return /\.pdf($|\?)/.test(n);
+}
+
 function _formatInboxDate(iso) {
     if (!iso) return '';
     try {
@@ -1310,6 +1321,7 @@ async function openProjectMeasurements(projectId) {
     openModal('modal-project-measurements');
     if (!window.MeasurementInbox) return;
     var files = await MeasurementInbox.listForProject(projectId);
+    _projectMeasFiles = files || [];
     if (sub) sub.textContent = files.length ? (files.length + ' קבצים בפרויקט זה') : 'אין קבצים עדיין';
     if (!listEl) return;
     if (!files.length) {
@@ -1318,11 +1330,11 @@ async function openProjectMeasurements(projectId) {
     }
     listEl.innerHTML = '';
     for (var i = 0; i < files.length; i++) {
-        listEl.appendChild(await _buildProjectMeasFileCard(files[i]));
+        listEl.appendChild(await _buildProjectMeasFileCard(files[i], i));
     }
 }
 
-async function _buildProjectMeasFileCard(f) {
+async function _buildProjectMeasFileCard(f, index) {
     var btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'meas-file-card';
@@ -1331,25 +1343,104 @@ async function _buildProjectMeasFileCard(f) {
         var signed = await MeasurementInbox.getSignedUrl(f.storage_path, 3600);
         if (signed && signed.url) thumb = '<img src="' + _escAttr(signed.url) + '" alt="">';
         else thumb = '<i class="fa-solid fa-image"></i>';
-    } else if (f.mime_type && f.mime_type.indexOf('pdf') !== -1) {
+    } else if (_isPdfMime(f.mime_type, f.file_name)) {
         thumb = '<i class="fa-solid fa-file-pdf"></i>';
     }
     btn.innerHTML =
         '<div class="meas-file-thumb">' + thumb + '</div>' +
         '<div class="meas-file-name">' + _escHtml(f.file_name || 'קובץ') + '</div>';
-    btn.onclick = function() { openProjectMeasFile(f); };
+    btn.onclick = function() { openMeasViewer(_projectMeasFiles, index); };
     return btn;
 }
 
 async function openProjectMeasFile(f) {
-    if (!f || !f.storage_path) return;
+    if (!f) return;
+    var idx = -1;
+    for (var i = 0; i < _projectMeasFiles.length; i++) {
+        if (_projectMeasFiles[i] && _projectMeasFiles[i].id === f.id) { idx = i; break; }
+    }
+    if (idx < 0) idx = 0;
+    await openMeasViewer(idx >= 0 && _projectMeasFiles.length ? _projectMeasFiles : [f], Math.max(0, idx));
+}
+
+async function openMeasViewer(files, startIndex) {
+    var list = (files || []).filter(function(f) { return f && f.storage_path; });
+    if (!list.length) {
+        showToast('לא ניתן לפתוח את הקובץ', 'error');
+        return;
+    }
+    _measViewerFiles = list;
+    _measViewerIndex = Math.max(0, Math.min(startIndex || 0, list.length - 1));
+    openModal('modal-meas-viewer');
+    await _renderMeasViewer();
+}
+
+function measViewerNav(delta) {
+    if (!_measViewerFiles.length) return;
+    var n = _measViewerFiles.length;
+    _measViewerIndex = (_measViewerIndex + delta + n) % n;
+    _renderMeasViewer();
+}
+
+async function _renderMeasViewer() {
+    var body = document.getElementById('meas-viewer-body');
+    var title = document.getElementById('meas-viewer-title');
+    var counter = document.getElementById('meas-viewer-counter');
+    var prevBtn = document.getElementById('meas-viewer-prev');
+    var nextBtn = document.getElementById('meas-viewer-next');
+    var f = _measViewerFiles[_measViewerIndex];
+    var multi = _measViewerFiles.length > 1;
+    if (prevBtn) prevBtn.classList.toggle('show', multi);
+    if (nextBtn) nextBtn.classList.toggle('show', multi);
+    if (!f) {
+        if (body) body.innerHTML = '<div class="meas-viewer-empty">אין קובץ להצגה</div>';
+        return;
+    }
+    if (title) title.textContent = f.file_name || 'קובץ מדידה';
+    if (counter) counter.textContent = (_measViewerIndex + 1) + ' / ' + _measViewerFiles.length;
+    if (body) body.innerHTML = '<div class="meas-viewer-empty"><i class="fa-solid fa-spinner fa-spin"></i> טוען...</div>';
+
+    var token = ++_measViewerToken;
+    if (!window.MeasurementInbox) {
+        if (body) body.innerHTML = '<div class="meas-viewer-empty">שירות הקבצים אינו זמין</div>';
+        return;
+    }
     var signed = await MeasurementInbox.getSignedUrl(f.storage_path, 3600);
+    if (token !== _measViewerToken) return;
     if (signed.error || !signed.url) {
+        if (body) body.innerHTML = '<div class="meas-viewer-empty">' + _escHtml(signed.error || 'לא ניתן לפתוח את הקובץ') + '</div>';
         showToast(signed.error || 'לא ניתן לפתוח את הקובץ', 'error');
         return;
     }
-    window.open(signed.url, '_blank', 'noopener');
+
+    if (_isImageMime(f.mime_type)) {
+        if (body) body.innerHTML = '<img src="' + _escAttr(signed.url) + '" alt="' + _escAttr(f.file_name || 'מדידה') + '">';
+    } else if (_isPdfMime(f.mime_type, f.file_name)) {
+        if (body) body.innerHTML = '<iframe src="' + _escAttr(signed.url) + '#toolbar=1" title="' + _escAttr(f.file_name || 'PDF') + '"></iframe>';
+    } else {
+        if (body) body.innerHTML =
+            '<div class="meas-viewer-empty">' +
+                '<p style="margin-bottom:12px;">סוג הקובץ אינו נתמך לתצוגה מוטמעת.</p>' +
+                '<a href="' + _escAttr(signed.url) + '" target="_blank" rel="noopener" style="color:#5eead4;font-weight:700;">פתח בקובץ חיצוני</a>' +
+            '</div>';
+    }
 }
+
+document.addEventListener('keydown', function(e) {
+    var viewer = document.getElementById('modal-meas-viewer');
+    if (!viewer || !viewer.classList.contains('open')) return;
+    if (e.key === 'Escape') {
+        closeModal('modal-meas-viewer');
+        return;
+    }
+    if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        measViewerNav(-1);
+    } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        measViewerNav(1);
+    }
+});
 
 async function openMeasurementsInbox() {
     openModal('modal-measurements');
@@ -1434,14 +1525,12 @@ async function _buildInboxItem(m) {
 }
 
 async function openMeasurementFile(id) {
-    var m = _measurementInbox.find(function(x) { return x.id === id; });
-    if (!m || !m.storage_path) return;
-    var signed = await MeasurementInbox.getSignedUrl(m.storage_path, 3600);
-    if (signed.error || !signed.url) {
-        showToast(signed.error || 'לא ניתן לפתוח את הקובץ', 'error');
-        return;
+    var idx = -1;
+    for (var i = 0; i < _measurementInbox.length; i++) {
+        if (_measurementInbox[i] && _measurementInbox[i].id === id) { idx = i; break; }
     }
-    window.open(signed.url, '_blank', 'noopener');
+    if (idx < 0) return;
+    await openMeasViewer(_measurementInbox, idx);
 }
 
 async function dismissMeasurement(id) {
