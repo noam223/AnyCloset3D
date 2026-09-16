@@ -1485,7 +1485,21 @@ window.syncSidebarToWing = function() {
     document.querySelectorAll('.mobile-handle-style-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.style === _hs);
     });
-    setVal('inp-cabinet-name', w.cabinetName || '');
+    setVal('inp-cabinet-name', (function() {
+        const n = w.cabinetName || '';
+        const pairInfo = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
+        if (pairInfo && pairInfo.count >= 2 && typeof window._stripSpacePartSuffix === 'function') {
+            return window._stripSpacePartSuffix(n);
+        }
+        return n;
+    })());
+    const _cabNameDisp = document.getElementById('inp-cabinet-name');
+    const _mCab1 = document.getElementById('mobile-inp-cabinet-name');
+    const _mCab2 = document.getElementById('mobile-inp-cabinet-name2');
+    if (_cabNameDisp) {
+        if (_mCab1) _mCab1.value = _cabNameDisp.value;
+        if (_mCab2) _mCab2.value = _cabNameDisp.value;
+    }
     const _modelLabel = (state.wings.center && state.wings.center.cabinetModelLabel) || w.cabinetModelLabel || '';
     setVal('inp-cabinet-model-label', _modelLabel);
     setVal('mobile-inp-cabinet-model-label', _modelLabel);

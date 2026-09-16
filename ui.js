@@ -6246,7 +6246,14 @@ function bindUI() {
     if (handleInp) handleInp.addEventListener('change', (e) => { state.handleType = e.target.value; saveHistoryState(); });
 
     const cabNameInp = document.getElementById('inp-cabinet-name');
-    if (cabNameInp) cabNameInp.addEventListener('change', (e) => { state.cabinetName = e.target.value; saveHistoryState(); });
+    if (cabNameInp) {
+        cabNameInp.addEventListener('input', (e) => {
+            window._onCabinetNameInput(e.target.value, { save: false, updateSidebar: true });
+        });
+        cabNameInp.addEventListener('change', (e) => {
+            window._onCabinetNameInput(e.target.value, { save: true, updateSidebar: true });
+        });
+    }
 
     function _syncCabinetModelLabel(val) {
         const v = val || '';
@@ -8398,6 +8405,95 @@ window._spaceTabLabel = function(item, slot) {
     return name || ('ארון ' + (slot + 1));
 };
 
+/** Strip trailing " חלק N" so the shared base name can be edited. */
+window._stripSpacePartSuffix = function(name) {
+    return String(name || '').replace(/\s*חלק\s*\d+\s*$/u, '').trim();
+};
+
+window._spacePartSuffix = function(slot) {
+    return 'חלק ' + (Math.max(0, Math.round(Number(slot) || 0)) + 1);
+};
+
+window._formatSpacePairCabinetName = function(baseName, slot) {
+    const base = window._stripSpacePartSuffix(baseName);
+    if (!base) return '';
+    return base + ' ' + window._spacePartSuffix(slot);
+};
+
+window._spacePairBaseNameFromItem = function(item) {
+    if (!item) return '';
+    const n = ((item.spec && item.spec.customName) ||
+        (item.rawState && item.rawState.cabinetName) || '').trim();
+    return window._stripSpacePartSuffix(n);
+};
+
+/** Apply "Base חלק N" to every cabinet in the shared space. */
+window._applySpacePairCabinetNames = function(pairId, baseName) {
+    if (!pairId) return;
+    const base = window._stripSpacePartSuffix(baseName);
+    const members = [];
+    (state.orderCart || []).forEach(function(it, i) {
+        if (window._spacePairIdOf(it) === pairId) {
+            members.push({ it: it, index: i, slot: window._spacePairSlotOf(it) });
+        }
+    });
+    if (members.length < 2) return;
+    members.sort(function(a, b) { return a.slot - b.slot; });
+    members.forEach(function(m) {
+        const full = base ? window._formatSpacePairCabinetName(base, m.slot) : '';
+        if (!m.it.spec) m.it.spec = {};
+        if (!m.it.rawState) m.it.rawState = {};
+        m.it.spec.customName = full;
+        m.it.rawState.cabinetName = full;
+    });
+    const editIdx = state.editingCartIndex;
+    const editItem = (editIdx >= 0) ? state.orderCart[editIdx] : null;
+    if (editItem && window._spacePairIdOf(editItem) === pairId) {
+        const full = (editItem.spec && editItem.spec.customName) || '';
+        state.cabinetName = full;
+        if (state.wings && state.wings.center) state.wings.center.cabinetName = full;
+        const display = base;
+        const desk = document.getElementById('inp-cabinet-name');
+        const m1 = document.getElementById('mobile-inp-cabinet-name');
+        const m2 = document.getElementById('mobile-inp-cabinet-name2');
+        if (desk && document.activeElement !== desk) desk.value = display;
+        if (m1 && document.activeElement !== m1) m1.value = display;
+        if (m2 && document.activeElement !== m2) m2.value = display;
+    }
+};
+
+/** Name input handler — when in a shared space, rename all parts together. */
+window._onCabinetNameInput = function(rawValue, opts) {
+    opts = opts || {};
+    const typed = String(rawValue || '');
+    const pairInfo = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
+    if (pairInfo && pairInfo.count >= 2) {
+        const base = window._stripSpacePartSuffix(typed);
+        window._applySpacePairCabinetNames(pairInfo.pairId, base);
+        const full = window._formatSpacePairCabinetName(base, pairInfo.activeSlot);
+        state.cabinetName = full;
+        if (state.wings && state.wings.center) state.wings.center.cabinetName = full;
+        // Keep inputs showing the shared base while typing
+        const desk = document.getElementById('inp-cabinet-name');
+        const m1 = document.getElementById('mobile-inp-cabinet-name');
+        const m2 = document.getElementById('mobile-inp-cabinet-name2');
+        if (desk && document.activeElement !== desk) desk.value = base;
+        if (m1 && document.activeElement !== m1) m1.value = base;
+        if (m2 && document.activeElement !== m2) m2.value = base;
+        if (opts.updateSidebar !== false && typeof updateLeftSidebar === 'function') updateLeftSidebar();
+    } else {
+        state.cabinetName = typed;
+        if (state.wings && state.wings.center) state.wings.center.cabinetName = typed;
+        const desk = document.getElementById('inp-cabinet-name');
+        const m1 = document.getElementById('mobile-inp-cabinet-name');
+        const m2 = document.getElementById('mobile-inp-cabinet-name2');
+        if (desk && desk !== document.activeElement && desk.value !== typed) desk.value = typed;
+        if (m1 && m1 !== document.activeElement && m1.value !== typed) m1.value = typed;
+        if (m2 && m2 !== document.activeElement && m2.value !== typed) m2.value = typed;
+    }
+    if (opts.save !== false && typeof saveHistoryState === 'function') saveHistoryState();
+};
+
 window._getSpacePairInfoAt = function(cartIndex) {
     const cart = state.orderCart || [];
     const idx = (cartIndex != null) ? cartIndex : state.editingCartIndex;
@@ -8772,6 +8868,14 @@ window.joinExistingSpaceCabinet = function(otherIndex) {
         const pid = window._spacePairIdOf(cart[idx0]);
         if (pid) window._invalidateSpacePairPreviewImages(pid);
     }
+    if (typeof window._applySpacePairCabinetNames === 'function') {
+        const pid = window._spacePairIdOf(cart[idx0]);
+        if (pid) {
+            const base = window._spacePairBaseNameFromItem(cart[idx0]) ||
+                window._stripSpacePartSuffix(state.cabinetName || '');
+            if (base) window._applySpacePairCabinetNames(pid, base);
+        }
+    }
 
     ['space-cab-join-list', 'mobile-space-cab-join-list'].forEach(function(id) {
         const el = document.getElementById(id);
@@ -8905,6 +9009,14 @@ window.addSpaceCabinet = function() {
     state.editingCartIndex = newIdx;
     if (typeof window._invalidateSpacePairPreviewImages === 'function' && pairId) {
         window._invalidateSpacePairPreviewImages(pairId);
+    }
+    if (typeof window._applySpacePairCabinetNames === 'function' && pairId) {
+        const anchor = state.orderCart.find(function(it) {
+            return window._spacePairIdOf(it) === pairId && window._spacePairSlotOf(it) === 0;
+        }) || state.orderCart[idx0];
+        const base = window._spacePairBaseNameFromItem(anchor) ||
+            window._stripSpacePartSuffix(state.cabinetName || '');
+        if (base) window._applySpacePairCabinetNames(pairId, base);
     }
     if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
     if (typeof _setSaveCabinetButtonLabel === 'function') _setSaveCabinetButtonLabel();
@@ -9254,6 +9366,28 @@ window._commitCurrentCabinetToCart = function(opts) {
                 window._getSpaceOffset(oldItem)
             );
         }
+        if (oldItem.spec) {
+            if (oldItem.spec.imgSpaceDoorsManual) {
+                cartItem.spec.imgSpaceDoors = oldItem.spec.imgSpaceDoors;
+                cartItem.spec.imgSpaceDoorsManual = true;
+                if (oldItem.spec.imgSpaceDoorsAuto) cartItem.spec.imgSpaceDoorsAuto = oldItem.spec.imgSpaceDoorsAuto;
+            }
+            if (oldItem.spec.imgSpaceOpenManual) {
+                cartItem.spec.imgSpaceOpen = oldItem.spec.imgSpaceOpen;
+                cartItem.spec.imgSpaceOpenManual = true;
+                if (oldItem.spec.imgSpaceOpenAuto) cartItem.spec.imgSpaceOpenAuto = oldItem.spec.imgSpaceOpenAuto;
+            }
+            if (oldItem.spec.imgDoorsManual) {
+                cartItem.spec.imgDoors = oldItem.spec.imgDoors;
+                cartItem.spec.imgDoorsManual = true;
+                if (oldItem.spec.imgDoorsAuto) cartItem.spec.imgDoorsAuto = oldItem.spec.imgDoorsAuto;
+            }
+            if (oldItem.spec.imgOpenManual) {
+                cartItem.spec.imgOpen = oldItem.spec.imgOpen;
+                cartItem.spec.imgOpenManual = true;
+                if (oldItem.spec.imgOpenAuto) cartItem.spec.imgOpenAuto = oldItem.spec.imgOpenAuto;
+            }
+        }
         if (typeof window._cartItemOnHold === 'function' && window._cartItemOnHold(oldItem)) {
             window._setCartItemHold(cartItem, true);
         }
@@ -9286,6 +9420,15 @@ window._commitCurrentCabinetToCart = function(opts) {
     if (cc2) cc2.innerText = state.orderCart.length;
     if (typeof window._syncSpacePairPreviewImages === 'function') {
         window._syncSpacePairPreviewImages(state.orderCart[state.editingCartIndex]);
+    }
+    if (typeof window._applySpacePairCabinetNames === 'function') {
+        const _saved = state.orderCart[state.editingCartIndex];
+        const _pid = window._spacePairIdOf(_saved);
+        if (_pid) {
+            const base = window._spacePairBaseNameFromItem(_saved) ||
+                window._stripSpacePartSuffix(state.cabinetName || '');
+            if (base) window._applySpacePairCabinetNames(_pid, base);
+        }
     }
     updateLeftSidebar();
     if (typeof saveHistoryState === 'function') saveHistoryState();
@@ -9699,12 +9842,17 @@ window.updateLeftSidebar = function(opts) {
         }
     }
 
-    state.orderCart.forEach((itemObj, index) => {
+    function _cartItemTitle(itemObj, index) {
+        const item = itemObj.spec || {};
+        if (item.customName) return item.customName;
+        return _cartIsWritingDesk(itemObj) ? (`שולחן מס' ${index + 1}`) : (`ארון מס' ${index + 1}`);
+    }
+
+    function _buildCartMiniCard(itemObj, index, nested) {
         const item = itemObj.spec;
-        const numericPrice = parseInt(item.price.replace('₪', '').replace(/,/g, ''));
+        const numericPrice = parseInt(String(item.price || '').replace('₪', '').replace(/,/g, ''), 10);
         const itemInstall = item.installPrice || 0;
         const held = typeof window._cartItemOnHold === 'function' && window._cartItemOnHold(itemObj);
-        
         if (!held) {
             if (!isNaN(numericPrice)) totalCabinetsPrice += numericPrice;
             totalInstallPrice += itemInstall;
@@ -9713,15 +9861,20 @@ window.updateLeftSidebar = function(opts) {
         const isEditing = state.editingCartIndex === index;
         const activeClass = isEditing ? 'active-editing' : '';
         const heldClass = held ? ' on-hold' : '';
+        const nestedClass = nested ? ' cart-mini-card-nested' : '';
         const activeLabel = isEditing ? '<div style="position:absolute; top:-12px; right:15px; background:var(--accent); color:white; font-size:11px; padding:3px 10px; border-radius:12px; font-weight:bold; box-shadow:0 2px 5px rgba(0,0,0,0.15); border: 2px solid white;"><i class="fa-solid fa-pen"></i> בעריכה כעת</div>' : '';
         const holdBadge = held ? '<span class="cart-hold-badge"><i class="fa-solid fa-pause"></i> מושהה</span>' : '';
-        const titleText = item.customName ? item.customName : (_cartIsWritingDesk(itemObj) ? `שולחן מס' ${index + 1}` : `ארון מס' ${index + 1}`);
+        const titleText = _cartItemTitle(itemObj, index);
+        const partSlot = (typeof window._spacePairIdOf === 'function' && window._spacePairIdOf(itemObj) != null)
+            ? window._spacePairSlotOf(itemObj) : null;
+        const partChip = (nested && partSlot != null)
+            ? `<span class="cart-space-part-chip">${window._spacePartSuffix(partSlot)}</span>`
+            : '';
 
-        // Room wall position selector (only for linear/sliding presets)
         const _itemPreset = (itemObj.rawState && itemObj.rawState.presetId) || 'linear';
         const _isLinearOrSliding = (_itemPreset === 'linear' || _itemPreset === 'sliding');
         const _curRoomWall = (itemObj.rawState && itemObj.rawState.roomWall) || 'center';
-        const _wallSelectorHTML = _isLinearOrSliding ? `
+        const _wallSelectorHTML = (!nested && _isLinearOrSliding) ? `
             <div style="display:flex;align-items:center;gap:4px;margin-top:6px;padding-top:6px;border-top:1px solid var(--border);">
                 <span style="font-size:0.78rem;color:var(--text-light);flex-shrink:0;">מיקום בחדר:</span>
                 <div style="display:flex;gap:3px;flex:1;">
@@ -9741,15 +9894,15 @@ window.updateLeftSidebar = function(opts) {
             </div>` : '';
 
         const card = document.createElement('div');
-        card.className = `cart-mini-card ${activeClass}${heldClass}`;
+        card.className = `cart-mini-card ${activeClass}${heldClass}${nestedClass}`;
         card.dataset.cartIndex = String(index);
-        card.onclick = () => { if(!isEditing) editCartItem(index); };
-        
+        card.onclick = () => { if (!isEditing) editCartItem(index); };
+
         card.innerHTML = `
             ${activeLabel}
             <button type="button" class="cart-mini-btn btn-hold-mini" title="${held ? 'הפעל ארון' : 'השהה ארון'}" onclick="event.stopPropagation(); toggleCartItemHold(${index});"><i class="fa-solid fa-${held ? 'play' : 'pause'}"></i> ${held ? 'הפעל' : 'השהה'}</button>
-            <div class="cart-mini-card-title">${holdBadge}${titleText}</div>
-            <div class="cart-mini-card-desc" dir="rtl">${item.dimsStr}</div>
+            <div class="cart-mini-card-title">${holdBadge}${partChip}${titleText}</div>
+            <div class="cart-mini-card-desc" dir="rtl">${item.dimsStr || ''}</div>
             ${window._showPricing !== false ? `<div class="cart-mini-card-price"><span dir="ltr">${item.price}</span> <span style="font-size:0.85rem; font-weight:normal; color:var(--text-light);">+ <span dir="ltr">₪${itemInstall.toLocaleString()}</span> התקנה</span></div>` : ''}
             ${_wallSelectorHTML}
             <div class="cart-mini-actions">
@@ -9764,7 +9917,65 @@ window.updateLeftSidebar = function(opts) {
                 </div>
             </div>
         `;
-        listContainer.appendChild(card);
+        return card;
+    }
+
+    // Group shared-space cabinets under one parent card
+    const seenPairs = {};
+    const renderEntries = [];
+    state.orderCart.forEach(function(itemObj, index) {
+        const pairId = (typeof window._spacePairIdOf === 'function') ? window._spacePairIdOf(itemObj) : null;
+        if (pairId) {
+            if (seenPairs[pairId]) return;
+            seenPairs[pairId] = true;
+            const members = [];
+            state.orderCart.forEach(function(it, i) {
+                if (window._spacePairIdOf(it) === pairId) {
+                    members.push({ it: it, index: i, slot: window._spacePairSlotOf(it) });
+                }
+            });
+            members.sort(function(a, b) { return a.slot - b.slot; });
+            if (members.length >= 2) {
+                renderEntries.push({ type: 'group', pairId: pairId, members: members });
+                return;
+            }
+        }
+        renderEntries.push({ type: 'single', index: index, it: itemObj });
+    });
+
+    renderEntries.forEach(function(entry) {
+        if (entry.type === 'single') {
+            listContainer.appendChild(_buildCartMiniCard(entry.it, entry.index, false));
+            return;
+        }
+        const group = document.createElement('div');
+        group.className = 'cart-space-group';
+        const anyEditing = entry.members.some(function(m) { return state.editingCartIndex === m.index; });
+        if (anyEditing) group.classList.add('has-editing');
+        const baseName = window._spacePairBaseNameFromItem(entry.members[0].it) ||
+            _cartItemTitle(entry.members[0].it, entry.members[0].index);
+        const groupTitle = window._stripSpacePartSuffix(baseName) || baseName;
+        let groupPrice = 0;
+        let groupInstall = 0;
+        entry.members.forEach(function(m) {
+            if (typeof window._cartItemOnHold === 'function' && window._cartItemOnHold(m.it)) return;
+            const p = parseInt(String((m.it.spec && m.it.spec.price) || '').replace('₪', '').replace(/,/g, ''), 10);
+            if (!isNaN(p)) groupPrice += p;
+            groupInstall += (m.it.spec && m.it.spec.installPrice) || 0;
+        });
+        group.innerHTML = `
+            <div class="cart-space-group-header">
+                <div class="cart-space-group-title"><i class="fa-solid fa-layer-group"></i> ${groupTitle}</div>
+                <div class="cart-space-group-meta">${entry.members.length} חלקים במרחב</div>
+                ${window._showPricing !== false ? `<div class="cart-space-group-price"><span dir="ltr">₪${groupPrice.toLocaleString()}</span> <span class="cart-space-group-install">+ <span dir="ltr">₪${groupInstall.toLocaleString()}</span> התקנה</span></div>` : ''}
+            </div>
+            <div class="cart-space-group-body"></div>
+        `;
+        const body = group.querySelector('.cart-space-group-body');
+        entry.members.forEach(function(m) {
+            body.appendChild(_buildCartMiniCard(m.it, m.index, true));
+        });
+        listContainer.appendChild(group);
     });
 
     const grandTotal = totalCabinetsPrice + totalInstallPrice;

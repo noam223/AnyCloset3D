@@ -1891,7 +1891,8 @@
         <div class="input-icon-wrap" style="margin-bottom:15px;">
             <i class="fa-solid fa-pen"></i>
             <input type="text" id="mobile-inp-cabinet-name" class="editor-select" placeholder="למשל: ארון חדר הורים..." style="margin:0;"
-                oninput="document.getElementById('inp-cabinet-name').value=this.value; state.cabinetName=this.value; saveHistoryState();">
+                oninput="window._onCabinetNameInput(this.value, { save: false, updateSidebar: true });"
+                onchange="window._onCabinetNameInput(this.value, { save: true, updateSidebar: true });">
         </div>
         <div class="mobile-section-title">הערות לארון</div>
         <textarea id="mobile-inp-cabinet-notes" class="editor-select cabinet-notes-input" rows="3" placeholder="הערות לייצור, התקנה או לקוח — יופיעו בהדפסות" style="margin:0 0 15px;"
@@ -2301,7 +2302,8 @@
         <div class="input-icon-wrap" style="margin-bottom:15px;">
             <i class="fa-solid fa-pen"></i>
             <input type="text" id="mobile-inp-cabinet-name2" class="editor-select" placeholder="למשל: ארון חדר הורים..." style="margin:0;"
-                oninput="document.getElementById('inp-cabinet-name').value=this.value; state.cabinetName=this.value; saveHistoryState(); const el2=document.getElementById('mobile-inp-cabinet-name'); if(el2) el2.value=this.value;">
+                oninput="window._onCabinetNameInput(this.value, { save: false, updateSidebar: true });"
+                onchange="window._onCabinetNameInput(this.value, { save: true, updateSidebar: true });">
         </div>
         <div class="mobile-panel-divider"></div>
         <div class="mobile-section-title">פרטי לקוח</div>
@@ -2660,11 +2662,11 @@
 <script src="engine-blueprint.js?v=20260916cellHFix"></script>
 <script src="engine-room-plan.js?v=20260731rpcab"></script>
 <script src="tambour-color-picker.js?v=20260617scdoors"></script>
-<script src="ui.js?v=20260916cellHDec"></script>
+<script src="ui.js?v=20260916spacePreview"></script>
 <script src="mobile.js?v=20260916cellHDec"></script>
 <script src="part-paint.js?v=20260914A427fix"></script>
 <script src="shelf-pick.js?v=20260909shelfPurple"></script>
-<script src="index-init.js?v=20260910deskMerge"></script>
+<script src="index-init.js?v=20260916spacePreview"></script>
 
 <!-- ===== TAMBOUR FULL PALETTE MODAL ===== -->
 <div id="tambour-palette-modal" class="tambour-palette-overlay">
