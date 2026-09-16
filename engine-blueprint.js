@@ -801,17 +801,26 @@ function _bpDrawOuterSideWalls(p, drawVline, ox, dW, colXPositions, sc) {
     drawVline(p, ox + dW, last.colTopY, last.colBotY, sc, null, 'right');
 }
 
-function _bpClearCellHeightCm(rowBotCm, rowTopCm, shelfT) {
+/**
+ * Clear opening height (cm) — face-to-face between boards, matching engine-core displayH.
+ * Blueprint rowBounds use:
+ *   - first-row bottom = startShelvesY (TOP face of floor board), via _bpRowBaseCm
+ *   - intermediate = shelf centers (shelvesY)
+ *   - last-row top = column outer height (top board sits at height - t/2)
+ */
+function _bpClearCellHeightCm(rowBotCm, rowTopCm, shelfT, isBottomRow, isTopRow) {
     const t = shelfT != null ? shelfT : _bpShelfTCm();
-    return Math.max(0, rowTopCm - rowBotCm - t);
+    const botFace = isBottomRow ? (+rowBotCm) : (+rowBotCm) + t / 2;
+    const topFace = isTopRow ? (+rowTopCm) - t : (+rowTopCm) - t / 2;
+    return Math.max(0, topFace - botFace);
 }
 
-function _bpClearCellHeightMm(rowBotCm, rowTopCm, shelfT) {
-    return _bpMm(_bpClearCellHeightCm(rowBotCm, rowTopCm, shelfT));
+function _bpClearCellHeightMm(rowBotCm, rowTopCm, shelfT, isBottomRow, isTopRow) {
+    return _bpMm(_bpClearCellHeightCm(rowBotCm, rowTopCm, shelfT, isBottomRow, isTopRow));
 }
 
-function _bpClearCellHeightLabel(rowBotCm, rowTopCm, shelfT) {
-    return _bpClearCellHeightMm(rowBotCm, rowTopCm, shelfT);
+function _bpClearCellHeightLabel(rowBotCm, rowTopCm, shelfT, isBottomRow, isTopRow) {
+    return _bpClearCellHeightMm(rowBotCm, rowTopCm, shelfT, isBottomRow, isTopRow);
 }
 
 function _bpAppendViewCutouts(p, viewKey, ox, oy, dW, dH, sc, cabWidthCm, cabHeightCm) {
@@ -1534,6 +1543,7 @@ function _bpDrawPartitionCell(p, ctx) {
     const {
         comp, col, wgW, colX, colW, cellY1, cellY2,
         rowBotCm, rowTopCm, colBotSvgY, sc, ci, cols, viewKey, ri,
+        cellIsBottom, cellIsTop,
         vlineFn, shelfLineFn, dimHFn, makeRectP, makeShelfP, font, stroke, strokeThin
     } = ctx || {};
     if (!p || !comp || !comp.partition || typeof vlineFn !== 'function') return;
@@ -1643,7 +1653,12 @@ function _bpDrawPartitionCell(p, ctx) {
                     makeRectFn: makeRectP, makeShelfFn: makeShelfP
                 });
             }
-            const zHcmRound = _bpClearCellHeightLabel(zBotCm, zTopCm, tShelf);
+            const zLast = z === zoneBoundsCm.length - 2;
+            const zHcmRound = _bpClearCellHeightLabel(
+                zBotCm, zTopCm, tShelf,
+                z === 0 && !!cellIsBottom,
+                zLast && !!cellIsTop
+            );
             if (_bpIsHoneycombType(zoneType)) {
                 _bpMaybePushHoneycombInnerHeight(p, x1, zSvgTop, zSvgBot, zBotCm, zTopCm, sc, tShelf, viewKey, `c${ci}r${ri}p${zi}z${z}hcH`);
             } else if (zSvgH > 14 && zHcmRound > 0) {
@@ -2295,7 +2310,7 @@ window._generateMultiViewBlueprintSVG = function() {
             for (let ri = 0; ri < numRows; ri++) {
                 const rowBotCm = rowBounds[ri];
                 const rowTopCm = rowBounds[ri + 1];
-                const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _t_shelf);
+                const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _t_shelf, ri === 0, ri === numRows - 1);
                 const cellY1 = _colBotY - rowTopCm * sc; // SVG top of cell
                 const cellY2 = _colBotY - rowBotCm * sc; // SVG bottom of cell
                 const cellH = cellY2 - cellY1;
@@ -2369,7 +2384,8 @@ window._generateMultiViewBlueprintSVG = function() {
                 _bpDrawPartitionCell(p, {
                     comp, col, wgW: wg.w, colX, colW, cellY1, cellY2,
                     rowBotCm, rowTopCm, colBotSvgY: _colBotY, sc, ci, cols,
-                    viewKey: _bpViewKey, ri, font: FONT, stroke: STROKE, strokeThin: STROKE_THIN,
+                    viewKey: _bpViewKey, ri, cellIsBottom: ri === 0, cellIsTop: ri === numRows - 1,
+                    font: FONT, stroke: STROKE, strokeThin: STROKE_THIN,
                     vlineFn: function(x, y1, y2) { vline(x, y1, y2, sc); },
                     shelfLineFn: function(x1, y, x2) { shelfLine(x1, y, x2, sc); },
                     dimHFn: dimH,
@@ -3291,7 +3307,7 @@ window._generateMultiViewBlueprintPages = function() {
             for (let ri = 0; ri < numRows; ri++) {
                 const rowBotCm = rowBounds[ri];
                 const rowTopCm = rowBounds[ri + 1];
-                const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _t_shelf2);
+                const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _t_shelf2, ri === 0, ri === numRows - 1);
                 const cellY1 = _colBotSvgY - rowTopCm * sc;
                 const cellY2 = _colBotSvgY - rowBotCm * sc;
                 const cellH = cellY2 - cellY1;
@@ -3358,7 +3374,8 @@ window._generateMultiViewBlueprintPages = function() {
                 _bpDrawPartitionCell(p, {
                     comp, col, wgW: wg.w, colX, colW, cellY1, cellY2,
                     rowBotCm, rowTopCm, colBotSvgY: _colBotSvgY, sc, ci, cols,
-                    viewKey: _bpViewKey, ri, font: FONT, stroke: STROKE, strokeThin: STROKE_THIN,
+                    viewKey: _bpViewKey, ri, cellIsBottom: ri === 0, cellIsTop: ri === numRows - 1,
+                    font: FONT, stroke: STROKE, strokeThin: STROKE_THIN,
                     vlineFn: function(x, y1, y2) { makeVline(p, x, y1, y2, sc); },
                     shelfLineFn: function(x1, y, x2) { makeShelfLine(p, x1, y, x2, sc); },
                     dimHFn: function(ax1, ax2, ay, albl, aabove) { makeDimH(p, ax1, ax2, ay, albl, aabove); },
@@ -3734,12 +3751,14 @@ window._generateMultiViewBlueprintPages = function() {
             if (fcSplitTop < cH && !fcAllBounds.includes(fcSplitTop)) fcAllBounds.push(fcSplitTop);
             fcAllBounds.sort((a,b) => a-b);
         }
-        const rowBounds = [pH, ...fcAllBounds.filter(sy => sy > pH), cH];
+        const _fcRowBase = _bpRowBaseCm({ noPlinth: false, floorOffset: 0 }, pH);
+        const rowBounds = [_fcRowBase, ...fcAllBounds.filter(sy => sy > _fcRowBase), cH];
         const _t_shelfFC = state.thickness || 1.7;
-        for (let ri = 0; ri < rowBounds.length - 1; ri++) {
+        const _fcNumRows = rowBounds.length - 1;
+        for (let ri = 0; ri < _fcNumRows; ri++) {
             const rowBotCm = rowBounds[ri];
             const rowTopCm = rowBounds[ri + 1];
-            const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _t_shelfFC);
+            const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _t_shelfFC, ri === 0, ri === _fcNumRows - 1);
             const cellY1 = oy + dH - rowTopCm * sc;
             const cellY2 = oy + dH - rowBotCm * sc;
             const cellH = cellY2 - cellY1;
@@ -3852,7 +3871,7 @@ window._generateMultiViewBlueprintPages = function() {
             for (let ri = 0; ri < numRows; ri++) {
                 const rowBotCm = rowBounds[ri];
                 const rowTopCm = rowBounds[ri + 1];
-                const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _t_shelfFCW);
+                const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _t_shelfFCW, ri === 0, ri === numRows - 1);
                 const cellY1 = oy + dH - rowTopCm * sc;
                 const cellY2 = oy + dH - rowBotCm * sc;
                 const cellH = cellY2 - cellY1;
@@ -3909,7 +3928,8 @@ window._generateMultiViewBlueprintPages = function() {
                 _bpDrawPartitionCell(p, {
                     comp, col, wgW: wg.w, colX, colW, cellY1, cellY2,
                     rowBotCm, rowTopCm, colBotSvgY: oy + dH, sc, ci, cols,
-                    viewKey: _bpViewKey, ri, font: FONT, stroke: STROKE, strokeThin: STROKE_THIN,
+                    viewKey: _bpViewKey, ri, cellIsBottom: ri === 0, cellIsTop: ri === numRows - 1,
+                    font: FONT, stroke: STROKE, strokeThin: STROKE_THIN,
                     vlineFn: function(x, y1, y2) { makeVline(p, x, y1, y2, sc); },
                     shelfLineFn: function(x1, y, x2) { makeShelfLine(p, x1, y, x2, sc); },
                     dimHFn: function(ax1, ax2, ay, albl, aabove) { makeDimH(p, ax1, ax2, ay, albl, aabove); },
@@ -4122,7 +4142,7 @@ window._generateMultiViewBlueprintPages = function() {
                     for (let ri = 0; ri < numRows; ri++) {
                         const rowBotCm = rowBounds[ri];
                         const rowTopCm = rowBounds[ri + 1];
-                        const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _t_shelfSC);
+                        const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _t_shelfSC, ri === 0, ri === numRows - 1);
                         const cellY1 = oy + dH - rowTopCm * scScale;
                         const cellY2 = oy + dH - rowBotCm * scScale;
                         const cellH  = cellY2 - cellY1;
@@ -4183,7 +4203,8 @@ window._generateMultiViewBlueprintPages = function() {
                         _bpDrawPartitionCell(p, {
                             comp, col, wgW: scW, colX, colW, cellY1, cellY2,
                             rowBotCm, rowTopCm, colBotSvgY: oy + dH, sc: scScale, ci, cols,
-                            viewKey: _bpViewKey, ri, font: FONT, stroke: STROKE, strokeThin: STROKE_THIN,
+                            viewKey: _bpViewKey, ri, cellIsBottom: ri === 0, cellIsTop: ri === numRows - 1,
+                            font: FONT, stroke: STROKE, strokeThin: STROKE_THIN,
                             vlineFn: function(x, y1, y2) { makeVline(p, x, y1, y2, scScale); },
                             shelfLineFn: function(x1, y, x2) { makeShelfLine(p, x1, y, x2, scScale); },
                             dimHFn: function(ax1, ax2, ay, albl, aabove) { makeDimH(p, ax1, ax2, ay, albl, aabove); },
@@ -4315,7 +4336,7 @@ window._generateMultiViewBlueprintPages = function() {
                 for (let ri = 0; ri < numRows; ri++) {
                     const rowBotCm = rowBounds[ri];
                     const rowTopCm = rowBounds[ri + 1];
-                    const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _t_shelfSC);
+                    const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _t_shelfSC, ri === 0, ri === numRows - 1);
                     const cellY1 = oy + dH - rowTopCm * scScale;
                     const cellY2 = oy + dH - rowBotCm * scScale;
                     const cellH  = cellY2 - cellY1;
@@ -4565,12 +4586,14 @@ window._generateMultiViewBlueprintPages = function() {
 
             // Cell height labels
             const shelvesArr = (col.shelvesY || []).slice().sort((a,b) => a-b);
-            const rowBounds = [0, ...shelvesArr.filter(sy => sy > 0 && sy < uuH), uuH];
+            const _uuRowBase = _bpRowBaseCm(Object.assign({}, col, { noPlinth: true }), 0);
+            const rowBounds = [_uuRowBase, ...shelvesArr.filter(sy => sy > _uuRowBase && sy < uuH), uuH];
             const _t_shelfUU = state.thickness || 1.7;
-            for (let ri = 0; ri < rowBounds.length - 1; ri++) {
+            const _uuNumRows = rowBounds.length - 1;
+            for (let ri = 0; ri < _uuNumRows; ri++) {
                 const rowBotCm = rowBounds[ri];
                 const rowTopCm = rowBounds[ri + 1];
-                const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _t_shelfUU);
+                const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _t_shelfUU, ri === 0, ri === _uuNumRows - 1);
                 const cellY1 = oy + dH - rowTopCm * sc;
                 const cellY2 = oy + dH - rowBotCm * sc;
                 const cellH = cellY2 - cellY1;
@@ -4606,7 +4629,8 @@ window._generateMultiViewBlueprintPages = function() {
                 _bpDrawPartitionCell(p, {
                     comp, col, wgW: uuW, colX, colW, cellY1, cellY2,
                     rowBotCm, rowTopCm, colBotSvgY: oy + dH, sc, ci, cols: uuCols,
-                    viewKey: _bpViewKey, ri, font: FONT, stroke: STROKE, strokeThin: STROKE_THIN,
+                    viewKey: _bpViewKey, ri, cellIsBottom: ri === 0, cellIsTop: ri === _uuNumRows - 1,
+                    font: FONT, stroke: STROKE, strokeThin: STROKE_THIN,
                     vlineFn: function(x, y1, y2) { makeVline(p, x, y1, y2, sc); },
                     shelfLineFn: function(x1, y, x2) { makeShelfLine(p, x1, y, x2, sc); },
                     dimHFn: function(ax1, ax2, ay, albl, aabove) { makeDimH(p, ax1, ax2, ay, albl, aabove); },
