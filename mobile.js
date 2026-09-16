@@ -354,11 +354,14 @@ function updateMobileCellSheetState() {
                 const topY  = col.height;
                 const prevY = (r === 0) ? baseY : col.shelvesY[r - 1];
                 const nextY = (r < col.shelvesY.length) ? col.shelvesY[r] : topY;
-                cellH = Math.round(nextY - prevY - state.thickness);
+                cellH = Math.round((nextY - prevY - state.thickness) * 10) / 10;
             } else {
-                cellH = Math.round(col.height - state.plinthHeight);
+                cellH = Math.round((col.height - state.plinthHeight) * 10) / 10;
             }
-            heightInput.value = Math.max(1, cellH);
+            heightInput.step = '0.1';
+            heightInput.value = (typeof window._fmtCellHeightCm === 'function')
+                ? window._fmtCellHeightCm(Math.max(0.1, cellH))
+                : String(Math.max(0.1, cellH));
             heightInput.dataset.colIndex = c;
             heightInput.dataset.rowIndex = state.selection.rows[0];
         }
