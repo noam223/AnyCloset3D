@@ -3233,6 +3233,13 @@ window._rebuildSpaceCompanion = function() {
              'depth', 'thickness', 'plinthHeight', 'hasDoors', 'columns', 'desk'].forEach(function(k) {
                 if (rs[k] !== undefined) state[k] = rs[k];
             });
+            // During open/closed preview capture, force companion doors to match the shot
+            if (window._spaceCaptureForceDoors != null) {
+                state.hasDoors = !!window._spaceCaptureForceDoors;
+                if (state.wings && state.wings.center) state.wings.center.hasDoors = !!window._spaceCaptureForceDoors;
+                if (state.wings && state.wings.left) state.wings.left.hasDoors = !!window._spaceCaptureForceDoors;
+                if (state.wings && state.wings.right) state.wings.right.hasDoors = !!window._spaceCaptureForceDoors;
+            }
             window._ppColorScope = 'cart' + member.index;
 
             const g = new THREE.Group();

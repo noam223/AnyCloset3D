@@ -7394,12 +7394,15 @@ function _captureFrameAtView(cam, ctrl, ren, scn, view, hasDoors) {
     const savedWingEdit = state.wingEditMode;
     const savedActiveWing = state.activeWing;
     const isSideWingShot = (view.id === 'left' || view.id === 'right');
+    const prevForceDoors = window._spaceCaptureForceDoors;
 
     window._camAnim = null;
     state.viewMode = 'front';
     // Must set ALL wings — state.hasDoors only writes the active wing via proxy
+    window._spaceCaptureForceDoors = !!hasDoors;
     _setAllWingsHasDoors(hasDoors);
 
+    try {
     if (isSideWingShot) {
         // Isolate the wing (same as edit mode) so the opposite U-leg doesn't block the camera
         state.wingEditMode = true;
@@ -7437,10 +7440,15 @@ function _captureFrameAtView(cam, ctrl, ren, scn, view, hasDoors) {
     state.wingEditMode = savedWingEdit;
     state.activeWing = savedActiveWing;
     return dataUrl;
+    } finally {
+        window._spaceCaptureForceDoors = prevForceDoors;
+    }
 }
 
 function _previewSlotManual(item, slot) {
-    if (slot === 'imgDoors' || slot === 'imgOpen') return !!(item && item[slot + 'Manual']);
+    if (slot === 'imgDoors' || slot === 'imgOpen' || slot === 'imgSpaceDoors' || slot === 'imgSpaceOpen') {
+        return !!(item && item[slot + 'Manual']);
+    }
     const m = /^wing:(\d+):(imgDoors|imgOpen)$/.exec(slot || '');
     if (!m || !item || !item.wingPreviews) return false;
     const w = item.wingPreviews[parseInt(m[1], 10)];
@@ -7479,6 +7487,14 @@ function _orderPreviewImagesHtml(item, rawState, opts) {
     const centerInLabel = multiFront ? 'תצוגת פנים (חזית מרכזית)' : 'תצוגת פנים (חלוקה טכנית)';
     let html = _orderPreviewImageCardHtml(centerOutLabel, item.imgDoors, 'ארון סגור', opts, 'imgDoors')
         + _orderPreviewImageCardHtml(centerInLabel, item.imgOpen, 'ארון פתוח', opts, 'imgOpen');
+    if (item.imgSpaceDoors || item.imgSpaceOpen) {
+        html += _orderPreviewImageCardHtml(
+            'תצוגת חוץ (כל הארונות במרחב)', item.imgSpaceDoors, 'מרחב סגור', opts, 'imgSpaceDoors'
+        );
+        html += _orderPreviewImageCardHtml(
+            'תצוגת פנים (כל הארונות במרחב)', item.imgSpaceOpen, 'מרחב פתוח', opts, 'imgSpaceOpen'
+        );
+    }
     (item.wingPreviews || []).forEach((w, wi) => {
         html += _orderPreviewImageCardHtml(
             'תצוגת חוץ (' + _escPrintHtml(w.label) + ')', w.imgDoors, 'חזית סגורה', opts, 'wing:' + wi + ':imgDoors'
@@ -7506,6 +7522,17 @@ function _orderPrintPreviewImagesHtml(item, rawState) {
                         <div style="${lblStyle}">${centerInLabel}</div>
                         <img src="${item.imgOpen}" style="${imgStyle}" alt="ארון פתוח">
                     </div>`;
+    if (item.imgSpaceDoors || item.imgSpaceOpen) {
+        html += `
+                    <div style="${wrapStyle}">
+                        <div style="${lblStyle}">תצוגת חוץ (כל הארונות במרחב)</div>
+                        <img src="${item.imgSpaceDoors || ''}" style="${imgStyle}" alt="מרחב סגור">
+                    </div>
+                    <div style="${wrapStyle}">
+                        <div style="${lblStyle}">תצוגת פנים (כל הארונות במרחב)</div>
+                        <img src="${item.imgSpaceOpen || ''}" style="${imgStyle}" alt="מרחב פתוח">
+                    </div>`;
+    }
     (item.wingPreviews || []).forEach(w => {
         html += `
                     <div style="${wrapStyle}">
@@ -7526,7 +7553,7 @@ window._captureCabinetPreviewImages = function() {
     const ren = window.renderer;
     const scn = window.scene;
     if (!cam || !ctrl || !ren || !scn) {
-        return { imgDoors: null, imgOpen: null, wingPreviews: [], multiViewPages: [], multiViewSVG: null };
+        return { imgDoors: null, imgOpen: null, wingPreviews: [], multiViewPages: [], multiViewSVG: null, imgSpaceDoors: null, imgSpaceOpen: null };
     }
 
     const originalDoorsSnap = _snapshotAllWingsHasDoors();
@@ -7559,6 +7586,22 @@ window._captureCabinetPreviewImages = function() {
         imgOpen: _captureFrameAtView(cam, ctrl, ren, scn, view, false)
     }));
 
+    // Shared-space shot: all cabinets in the pair framed together (open + closed)
+    let imgSpaceDoors = null;
+    let imgSpaceOpen = null;
+    try {
+        const pairInfo = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
+        const spaceView = (pairInfo && typeof window._computeSpacePairCaptureView === 'function')
+            ? window._computeSpacePairCaptureView(pairInfo)
+            : null;
+        if (spaceView) {
+            imgSpaceDoors = _captureFrameAtView(cam, ctrl, ren, scn, spaceView, true);
+            imgSpaceOpen = _captureFrameAtView(cam, ctrl, ren, scn, spaceView, false);
+        }
+    } catch (e) {
+        console.warn('[capture] space pair preview failed:', e);
+    }
+
     let multiViewPages = [];
     let multiViewSVG = null;
     try {
@@ -7585,7 +7628,16 @@ window._captureCabinetPreviewImages = function() {
     buildCabinet();
     ren.render(scn, cam);
 
-    return { imgDoors: imgWithDoors, imgOpen: imgNoDoors, wingPreviews, multiViewPages, multiViewSVG, captureVer: 3 };
+    return {
+        imgDoors: imgWithDoors,
+        imgOpen: imgNoDoors,
+        wingPreviews,
+        multiViewPages,
+        multiViewSVG,
+        imgSpaceDoors,
+        imgSpaceOpen,
+        captureVer: 4
+    };
 };
 
 function _cartImageValid(src) {
@@ -7603,6 +7655,18 @@ window._cartItemNeedsMediaRefresh = function(itemObj) {
         const previews = spec.wingPreviews || [];
         if (previews.length < expected) return true;
         if (previews.some(w => !_cartImageValid(w.imgDoors) || !_cartImageValid(w.imgOpen))) return true;
+    }
+    // v4: shared-space open/closed shots when multiple cabinets share a room
+    const pairId = (typeof window._spacePairIdOf === 'function') ? window._spacePairIdOf(itemObj) : null;
+    if (pairId) {
+        let pairCount = 0;
+        (state.orderCart || []).forEach(function(it) {
+            if (window._spacePairIdOf(it) === pairId) pairCount++;
+        });
+        if (pairCount >= 2) {
+            if (!spec.captureVer || spec.captureVer < 4) return true;
+            if (!_cartImageValid(spec.imgSpaceDoors) || !_cartImageValid(spec.imgSpaceOpen)) return true;
+        }
     }
     if (!spec.multiViewPages || !spec.multiViewPages.length) return true;
     return false;
@@ -7780,12 +7844,14 @@ window._refreshCartMediaForPrint = async function(opts) {
 
     window._cartMediaRefreshRunning = true;
     const snap = _snapshotEditorState();
+    const prevEditIdx = state.editingCartIndex;
     try {
         for (let i = 0; i < state.orderCart.length; i++) {
             const itemObj = state.orderCart[i];
             if (!itemObj || !itemObj.rawState || !itemObj.spec) continue;
             if (typeof window._cartItemOnHold === 'function' && window._cartItemOnHold(itemObj)) continue;
             if (!force && !window._cartItemNeedsMediaRefresh(itemObj)) continue;
+            state.editingCartIndex = i;
             _applyRawStateForCapture(itemObj.rawState);
             buildCabinet();
             // Let the renderer settle before capturing (reduces blank frames)
@@ -7821,9 +7887,23 @@ window._refreshCartMediaForPrint = async function(opts) {
             }
             if (media.multiViewSVG) itemObj.spec.multiViewSVG = media.multiViewSVG;
             if (media.captureVer) itemObj.spec.captureVer = media.captureVer;
+
+            // Shared-space shots — copy to every member of the same pair
+            if (media.imgSpaceDoors || media.imgSpaceOpen) {
+                const pairId = (typeof window._spacePairIdOf === 'function') ? window._spacePairIdOf(itemObj) : null;
+                (state.orderCart || []).forEach(function(it) {
+                    if (!it || !it.spec) return;
+                    if (pairId && window._spacePairIdOf(it) !== pairId) return;
+                    if (!pairId && it !== itemObj) return;
+                    if (media.imgSpaceDoors && !it.spec.imgSpaceDoorsManual) it.spec.imgSpaceDoors = media.imgSpaceDoors;
+                    if (media.imgSpaceOpen && !it.spec.imgSpaceOpenManual) it.spec.imgSpaceOpen = media.imgSpaceOpen;
+                    if (media.captureVer) it.spec.captureVer = Math.max(it.spec.captureVer || 0, media.captureVer);
+                });
+            }
             await new Promise(r => setTimeout(r, 0));
         }
     } finally {
+        state.editingCartIndex = prevEditIdx;
         _restoreEditorState(snap);
         window._cartMediaRefreshRunning = false;
     }
@@ -8318,9 +8398,9 @@ window._spaceTabLabel = function(item, slot) {
     return name || ('ארון ' + (slot + 1));
 };
 
-window._getSpacePairInfo = function() {
+window._getSpacePairInfoAt = function(cartIndex) {
     const cart = state.orderCart || [];
-    const idx = state.editingCartIndex;
+    const idx = (cartIndex != null) ? cartIndex : state.editingCartIndex;
     if (idx < 0 || !cart[idx]) return null;
     const pairId = window._spacePairIdOf(cart[idx]);
     if (!pairId) return null;
@@ -8351,6 +8431,71 @@ window._getSpacePairInfo = function() {
         slot0Index: slotIndices[0],
         slot1Index: slotIndices[1]
     };
+};
+
+window._getSpacePairInfo = function() {
+    return window._getSpacePairInfoAt(state.editingCartIndex);
+};
+
+/** Front-view camera framing that fits every cabinet in the shared space. */
+window._computeSpacePairCaptureView = function(info) {
+    info = info || window._getSpacePairInfo();
+    if (!info || info.count < 2) return null;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    info.members.forEach(function(m) {
+        const fp = window._spaceCabinetFootprint(m.slot);
+        const off = window._spaceOffsetForSlot(m.slot);
+        const fo = fp.floorOffset || 0;
+        minX = Math.min(minX, off.x - fp.w / 2);
+        maxX = Math.max(maxX, off.x + fp.w / 2);
+        minY = Math.min(minY, off.y + fo);
+        maxY = Math.max(maxY, off.y + fp.h);
+    });
+    if (!(maxX > minX) || !(maxY > minY)) return null;
+    const midX = (minX + maxX) / 2;
+    const midY = (minY + maxY) / 2;
+    return {
+        id: 'space',
+        label: 'מרחב משותף',
+        camPos: [midX, midY, 1],
+        camTarget: [midX, midY, 0],
+        fitH: (maxY - minY) + 140,
+        fitW: (maxX - minX) + 180
+    };
+};
+
+/** Copy shared-space open/closed previews onto every member of the pair. */
+window._syncSpacePairPreviewImages = function(fromItem) {
+    const pairId = window._spacePairIdOf(fromItem);
+    if (!pairId || !fromItem || !fromItem.spec) return;
+    const doors = fromItem.spec.imgSpaceDoors;
+    const open = fromItem.spec.imgSpaceOpen;
+    if (!doors && !open) return;
+    (state.orderCart || []).forEach(function(it) {
+        if (!it || !it.spec || window._spacePairIdOf(it) !== pairId) return;
+        if (doors && !it.spec.imgSpaceDoorsManual) it.spec.imgSpaceDoors = doors;
+        if (open && !it.spec.imgSpaceOpenManual) it.spec.imgSpaceOpen = open;
+        if (fromItem.spec.captureVer) {
+            it.spec.captureVer = Math.max(it.spec.captureVer || 0, fromItem.spec.captureVer);
+        }
+    });
+};
+
+/** Drop auto space previews so the next order/PDF refresh re-captures them. */
+window._invalidateSpacePairPreviewImages = function(pairId) {
+    if (!pairId) return;
+    (state.orderCart || []).forEach(function(it) {
+        if (!it || !it.spec || window._spacePairIdOf(it) !== pairId) return;
+        if (!it.spec.imgSpaceDoorsManual) {
+            delete it.spec.imgSpaceDoors;
+            delete it.spec.imgSpaceDoorsAuto;
+        }
+        if (!it.spec.imgSpaceOpenManual) {
+            delete it.spec.imgSpaceOpen;
+            delete it.spec.imgSpaceOpenAuto;
+        }
+        if (it.spec.captureVer && it.spec.captureVer >= 4) it.spec.captureVer = 3;
+    });
 };
 
 window._getSpaceSlotItem = function(slot) {
@@ -8623,6 +8768,11 @@ window.joinExistingSpaceCabinet = function(otherIndex) {
         window._attachSpacePairToItem(cart[otherIndex], pairId, 1, { x: offsetX, y: 0 });
     }
 
+    if (typeof window._invalidateSpacePairPreviewImages === 'function') {
+        const pid = window._spacePairIdOf(cart[idx0]);
+        if (pid) window._invalidateSpacePairPreviewImages(pid);
+    }
+
     ['space-cab-join-list', 'mobile-space-cab-join-list'].forEach(function(id) {
         const el = document.getElementById(id);
         if (el) { el.innerHTML = ''; el.style.display = 'none'; }
@@ -8753,6 +8903,9 @@ window.addSpaceCabinet = function() {
 
     const newIdx = state.orderCart.length - 1;
     state.editingCartIndex = newIdx;
+    if (typeof window._invalidateSpacePairPreviewImages === 'function' && pairId) {
+        window._invalidateSpacePairPreviewImages(pairId);
+    }
     if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
     if (typeof _setSaveCabinetButtonLabel === 'function') _setSaveCabinetButtonLabel();
     const cc = document.getElementById('cart-count');
@@ -9065,8 +9218,10 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
             price: priceStr, costPrice: '₪' + (state.currentCostPrice || 0).toLocaleString(),
             installPrice: getWing().manualInstallPrice != null ? getWing().manualInstallPrice : state.currentInstallPrice,
             imgDoors: imgWithDoors, imgOpen: imgNoDoors, imgBlueprint: imgBlueprint,
+            imgSpaceDoors: (preview && preview.imgSpaceDoors) || null,
+            imgSpaceOpen: (preview && preview.imgSpaceOpen) || null,
             wingPreviews: wingPreviews,
-            captureVer: (preview && preview.captureVer) || 3,
+            captureVer: (preview && preview.captureVer) || 4,
             corner: (function() {
                 const cu = _cornerUnitFromSources(null, null, state);
                 if (cu) return JSON.parse(JSON.stringify(cu));
@@ -9129,6 +9284,9 @@ window._commitCurrentCabinetToCart = function(opts) {
 
     const cc2 = document.getElementById('cart-count');
     if (cc2) cc2.innerText = state.orderCart.length;
+    if (typeof window._syncSpacePairPreviewImages === 'function') {
+        window._syncSpacePairPreviewImages(state.orderCart[state.editingCartIndex]);
+    }
     updateLeftSidebar();
     if (typeof saveHistoryState === 'function') saveHistoryState();
     if (typeof window._markCurrentCabinetClean === 'function') window._markCurrentCabinetClean();
@@ -9446,9 +9604,12 @@ window.duplicateCartItem = function(index) {
         clone.spec.imgDoors = null;
         clone.spec.imgOpen = null;
         clone.spec.imgBlueprint = null;
+        clone.spec.imgSpaceDoors = null;
+        clone.spec.imgSpaceOpen = null;
         clone.spec.multiViewSVG = null;
         clone.spec.multiViewPages = [];
         clone.spec.wingPreviews = [];
+        delete clone.spec.captureVer;
     }
     if (clone.spec && clone.spec.customName) {
         clone.spec.customName = 'העתק של ' + clone.spec.customName;
@@ -10298,7 +10459,9 @@ function _readLocalImageAsDataUrl(file) {
 
 function _getCartPreviewSlotTarget(spec, slot) {
     if (!spec || !slot) return null;
-    if (slot === 'imgDoors' || slot === 'imgOpen') return { obj: spec, key: slot };
+    if (slot === 'imgDoors' || slot === 'imgOpen' || slot === 'imgSpaceDoors' || slot === 'imgSpaceOpen') {
+        return { obj: spec, key: slot };
+    }
     const m = /^wing:(\d+):(imgDoors|imgOpen)$/.exec(slot);
     if (!m || !spec.wingPreviews) return null;
     const w = spec.wingPreviews[parseInt(m[1], 10)];

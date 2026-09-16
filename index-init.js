@@ -404,8 +404,12 @@
         var lightSpec = Object.assign({}, spec);
         if (!lightSpec.imgDoorsManual) delete lightSpec.imgDoors;
         if (!lightSpec.imgOpenManual) delete lightSpec.imgOpen;
+        if (!lightSpec.imgSpaceDoorsManual) delete lightSpec.imgSpaceDoors;
+        if (!lightSpec.imgSpaceOpenManual) delete lightSpec.imgSpaceOpen;
         delete lightSpec.imgDoorsAuto;
         delete lightSpec.imgOpenAuto;
+        delete lightSpec.imgSpaceDoorsAuto;
+        delete lightSpec.imgSpaceOpenAuto;
         delete lightSpec.imgBlueprint;
         delete lightSpec.multiViewSVG;
         delete lightSpec.multiViewPages;
