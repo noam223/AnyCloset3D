@@ -2261,7 +2261,7 @@ function _rebuildFCCellButtons(fcRealSide, wingData, fc, allY, comps, fcGroup, l
         const btn = document.createElement('button');
         btn.className = 'fc-cell-btn plus-btn';
         btn.dataset.fcRow = r;
-        btn.dataset.fcHeight = Math.round(allY[r + 1] - allY[r]);
+        btn.dataset.fcHeight = _fmtCellHeightCm(allY[r + 1] - allY[r]);
         btn.style.cssText = 'position:absolute;left:0;top:0;transform:translate(-50%,-50%);z-index:40;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1rem;transition:background 0.15s;min-width:26px;height:26px;';
 
         _applyFCBtnState(btn, r);
