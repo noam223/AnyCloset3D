@@ -8800,11 +8800,60 @@ window._setSpaceOffset = function(x, y, opts) {
     item.spaceOffset = offset;
     if (!item.rawState) item.rawState = {};
     item.rawState.spaceOffset = offset;
+
+    // Lifting a cabinet in shared space → cancel plinth and use a bottom panel
+    const wasLifted = (prev.y || 0) > 0;
+    const isLifted = (offset.y || 0) > 0;
+    if (wasLifted !== isLifted) {
+        window._syncSpaceLiftBottomPanel(item, isLifted);
+        if (typeof buildCabinet === 'function') buildCabinet();
+        if (typeof calculatePrice === 'function') calculatePrice();
+        if (typeof updateQuickEditPanelUI === 'function') updateQuickEditPanelUI();
+        if (typeof window._invalidateSpacePairPreviewImages === 'function') {
+            window._invalidateSpacePairPreviewImages(info.pairId);
+        }
+    }
+
     if (typeof window._applySpacePairPositions === 'function') window._applySpacePairPositions();
     window._syncSpaceOffsetUI();
     if (typeof updateOverlaysPosition === 'function') updateOverlaysPosition();
     if (typeof updateDragHandlesPosition === 'function') updateDragHandlesPosition();
     if (!opts.silent && typeof saveHistoryState === 'function' && !opts.dragging) saveHistoryState();
+};
+
+/** When a shared-space cabinet is raised off the floor, convert plinth → bottom panel. */
+window._syncSpaceLiftBottomPanel = function(item, lifted) {
+    if (!item) return;
+    function applyToCols(cols) {
+        if (!Array.isArray(cols)) return;
+        cols.forEach(function(col) {
+            if (!col || col.type === 'desk') return;
+            if (lifted) {
+                col.noPlinth = true;
+            } else if (!(col.floorOffset > 0)) {
+                col.noPlinth = false;
+            }
+        });
+    }
+    function applyToWings(wings) {
+        if (!wings) return;
+        ['center', 'left', 'right'].forEach(function(k) {
+            if (wings[k] && wings[k].columns) applyToCols(wings[k].columns);
+        });
+    }
+    if (!item.rawState) item.rawState = {};
+    applyToWings(item.rawState.wings);
+    applyToCols(item.rawState.columns);
+
+    const cart = state.orderCart || [];
+    let itemIndex = -1;
+    for (let i = 0; i < cart.length; i++) {
+        if (cart[i] === item) { itemIndex = i; break; }
+    }
+    if (itemIndex >= 0 && state.editingCartIndex === itemIndex) {
+        applyToCols(state.columns);
+        applyToWings(state.wings);
+    }
 };
 
 window._setSpaceOffsetFromUI = function(axis, val) {
@@ -9740,6 +9789,10 @@ window._editCartItemNow = function(index) {
                 : (Math.round(Number(rawState.spaceSlot) || 0)),
             rawState.spaceOffset || { x: 0, y: 0 }
         );
+        if (typeof window._syncSpaceLiftBottomPanel === 'function') {
+            const off = window._getSpaceOffset(_loadedItem);
+            if ((off.y || 0) > 0) window._syncSpaceLiftBottomPanel(_loadedItem, true);
+        }
     }
     if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
     if (typeof window._importLocalPartColors === 'function') {
