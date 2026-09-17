@@ -7435,6 +7435,11 @@ function _captureFrameAtView(cam, ctrl, ren, scn, view, hasDoors) {
     }
     ctrl.update();
 
+    if (typeof window._fadeSpaceCompanionsForCapture === 'function' &&
+        window._spaceCaptureCompanionOpacity != null) {
+        window._fadeSpaceCompanionsForCapture(window._spaceCaptureCompanionOpacity);
+    }
+
     // Ensure door meshes aren't hidden by the editor "הסתר חזיתות" toggle
     if (typeof doorMeshes !== 'undefined' && doorMeshes) {
         doorMeshes.forEach(function(m) { m.visible = !!hasDoors; });
@@ -7513,7 +7518,9 @@ function _orderPreviewImagesHtml(item, rawState, opts) {
     return html;
 }
 
-function _orderPrintPreviewImagesHtml(item, rawState) {
+function _orderPrintPreviewImagesHtml(item, rawState, opts) {
+    opts = opts || {};
+    const omitSpace = !!opts.omitSpace;
     const multiFront = _cartHasMultiFrontViews(rawState);
     const centerOutLabel = multiFront ? 'תצוגת חוץ (חזית מרכזית)' : 'תצוגת חוץ (חזיתות)';
     const centerInLabel = multiFront ? 'תצוגת פנים (חזית מרכזית)' : 'תצוגת פנים (חלוקה טכנית)';
@@ -7529,7 +7536,7 @@ function _orderPrintPreviewImagesHtml(item, rawState) {
                         <div style="${lblStyle}">${centerInLabel}</div>
                         <img src="${item.imgOpen}" style="${imgStyle}" alt="ארון פתוח">
                     </div>`;
-    if (item.imgSpaceDoors || item.imgSpaceOpen) {
+    if (!omitSpace && (item.imgSpaceDoors || item.imgSpaceOpen)) {
         html += `
                     <div style="${wrapStyle}">
                         <div style="${lblStyle}">תצוגת חוץ (כל הארונות במרחב)</div>
@@ -7554,6 +7561,38 @@ function _orderPrintPreviewImagesHtml(item, rawState) {
     return html;
 }
 
+/** Soften companion cabinets during per-part capture so the focus part stands out. */
+window._fadeSpaceCompanionsForCapture = function(opacity) {
+    const groups = window._spaceCompanionGroups || [];
+    if (!groups.length) return;
+    const op = Math.max(0.04, Math.min(1, Number(opacity)));
+    groups.forEach(function(g) {
+        if (!g) return;
+        g.traverse(function(obj) {
+            if (!obj || !obj.material) return;
+            if (!(obj.isMesh || obj.isLine || obj.isLineSegments)) return;
+            if (obj.userData && obj.userData.spaceCompanion) return;
+            if (!obj.userData) obj.userData = {};
+            if (!obj.userData._fadeMatReady) {
+                if (Array.isArray(obj.material)) {
+                    obj.material = obj.material.map(function(m) { return m ? m.clone() : m; });
+                } else if (obj.material.clone) {
+                    obj.material = obj.material.clone();
+                }
+                obj.userData._fadeMatReady = true;
+            }
+            const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+            mats.forEach(function(m) {
+                if (!m) return;
+                m.transparent = true;
+                m.opacity = op;
+                if ('depthWrite' in m) m.depthWrite = op > 0.85;
+                m.needsUpdate = true;
+            });
+        });
+    });
+};
+
 window._captureCabinetPreviewImages = function() {
     const cam = window.camera;
     const ctrl = window.controls;
@@ -7577,12 +7616,25 @@ window._captureCabinetPreviewImages = function() {
         ? snapCenterWing.columns : null;
     const snapW = snapCenterWing ? snapCenterWing.width : state.width;
     const snapH = snapCols ? Math.max(...snapCols.map(c => c.height)) : state.globalHeight;
+    let focusX = 0;
+    let focusY = snapH / 2;
+    try {
+        const pairInfoFocus = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
+        if (pairInfoFocus && pairInfoFocus.count >= 2 && typeof window._spaceOffsetForSlot === 'function') {
+            const off = window._spaceOffsetForSlot(pairInfoFocus.activeSlot) || { x: 0, y: 0 };
+            focusX = off.x || 0;
+            focusY = (snapH / 2) + (off.y || 0);
+        }
+    } catch (e) { /* keep origin focus */ }
     const centerView = {
-        camPos: [0, snapH / 2, 1],
-        camTarget: [0, snapH / 2, 0],
+        camPos: [focusX, focusY, 1],
+        camTarget: [focusX, focusY, 0],
         fitH: snapH + 120,
         fitW: snapW + 150
     };
+
+    // Per-part shots: keep companions faintly visible in the background
+    window._spaceCaptureCompanionOpacity = 0.12;
     const imgWithDoors = _captureFrameAtView(cam, ctrl, ren, scn, centerView, true);
     const imgNoDoors = _captureFrameAtView(cam, ctrl, ren, scn, centerView, false);
 
@@ -7592,6 +7644,7 @@ window._captureCabinetPreviewImages = function() {
         imgDoors: _captureFrameAtView(cam, ctrl, ren, scn, view, true),
         imgOpen: _captureFrameAtView(cam, ctrl, ren, scn, view, false)
     }));
+    window._spaceCaptureCompanionOpacity = null;
 
     // Shared-space shot: all cabinets in the pair framed together (open + closed)
     let imgSpaceDoors = null;
@@ -7643,7 +7696,7 @@ window._captureCabinetPreviewImages = function() {
         multiViewSVG,
         imgSpaceDoors,
         imgSpaceOpen,
-        captureVer: 4
+        captureVer: 5
     };
 };
 
@@ -7663,7 +7716,7 @@ window._cartItemNeedsMediaRefresh = function(itemObj) {
         if (previews.length < expected) return true;
         if (previews.some(w => !_cartImageValid(w.imgDoors) || !_cartImageValid(w.imgOpen))) return true;
     }
-    // v4: shared-space open/closed shots when multiple cabinets share a room
+    // v5: shared-space group export — faded companion on per-part shots + closed overview
     const pairId = (typeof window._spacePairIdOf === 'function') ? window._spacePairIdOf(itemObj) : null;
     if (pairId) {
         let pairCount = 0;
@@ -7671,7 +7724,7 @@ window._cartItemNeedsMediaRefresh = function(itemObj) {
             if (window._spacePairIdOf(it) === pairId) pairCount++;
         });
         if (pairCount >= 2) {
-            if (!spec.captureVer || spec.captureVer < 4) return true;
+            if (!spec.captureVer || spec.captureVer < 5) return true;
             if (!_cartImageValid(spec.imgSpaceDoors) || !_cartImageValid(spec.imgSpaceOpen)) return true;
         }
     }
@@ -8590,7 +8643,7 @@ window._invalidateSpacePairPreviewImages = function(pairId) {
             delete it.spec.imgSpaceOpen;
             delete it.spec.imgSpaceOpenAuto;
         }
-        if (it.spec.captureVer && it.spec.captureVer >= 4) it.spec.captureVer = 3;
+        if (it.spec.captureVer && it.spec.captureVer >= 5) it.spec.captureVer = 3;
     });
 };
 
@@ -10910,6 +10963,167 @@ function _printCabinetNotesRow(notes, thStyle, tdStyle) {
     return `<tr><th style="${thStyle}">הערות</th><td style="${tdStyle}white-space:pre-wrap;line-height:1.55;">${_escPrintHtml(n)}</td></tr>`;
 }
 
+function _printCabinetBlueprintPagesHtml(item, titleText) {
+    const bpPages = item.multiViewPages && item.multiViewPages.length > 0
+        ? item.multiViewPages
+        : (item.multiViewSVG ? [item.multiViewSVG] : []);
+    if (!bpPages.length) return '';
+    const pairs = [];
+    for (let pi = 0; pi < bpPages.length; pi += 2) {
+        pairs.push(bpPages.slice(pi, pi + 2));
+    }
+    return pairs.map((pair, pairIdx) => `
+            <div class="bp-page" style="page-break-after:always;page-break-inside:avoid;">
+                ${pair.map((svg, si) => {
+                    const globalIdx = pairIdx * 2 + si;
+                    return `<div style="margin-bottom:${si === 0 && pair.length > 1 ? '16px' : '0'};">
+                    <div style="font-size:1rem;font-weight:bold;margin-bottom:6px;background:#e8f0fe;padding:6px;text-align:center;border:1px solid #93c5fd;border-bottom:none;">
+                        שרטוט טכני — ${titleText}${bpPages.length > 1 ? ` (עמוד ${globalIdx + 1}/${bpPages.length})` : ''}
+                    </div>
+                    <div style="border:2px solid #93c5fd;display:block;overflow:hidden;width:100%;">${svg}</div>
+                </div>`;
+                }).join('')}
+            </div>`).join('');
+}
+
+/** Group cart items so shared-space cabinets print as one room block. */
+function _groupCartItemsForPrint() {
+    const cart = state.orderCart || [];
+    const seenPairs = {};
+    const groups = [];
+    cart.forEach(function(itemObj, index) {
+        if (typeof window._cartItemOnHold === 'function' && window._cartItemOnHold(itemObj)) return;
+        const pairId = (typeof window._spacePairIdOf === 'function') ? window._spacePairIdOf(itemObj) : null;
+        if (pairId) {
+            if (seenPairs[pairId]) return;
+            const members = [];
+            cart.forEach(function(it, i) {
+                if (typeof window._cartItemOnHold === 'function' && window._cartItemOnHold(it)) return;
+                if (window._spacePairIdOf(it) === pairId) {
+                    members.push({
+                        itemObj: it,
+                        index: i,
+                        slot: window._spacePairSlotOf(it)
+                    });
+                }
+            });
+            seenPairs[pairId] = true;
+            if (members.length < 2) {
+                groups.push({ type: 'single', itemObj: itemObj, index: index });
+                return;
+            }
+            members.sort(function(a, b) { return a.slot - b.slot; });
+            const baseName = (typeof window._spacePairBaseNameFromItem === 'function')
+                ? (window._spacePairBaseNameFromItem(members[0].itemObj) || '')
+                : '';
+            groups.push({
+                type: 'space',
+                pairId: pairId,
+                baseName: baseName || 'ארון במרחב משותף',
+                members: members
+            });
+            return;
+        }
+        groups.push({ type: 'single', itemObj: itemObj, index: index });
+    });
+    return groups;
+}
+
+function _printSingleCabinetBlockHtml(itemObj, index, opts) {
+    opts = opts || {};
+    const isFactory = !!opts.isFactory;
+    const hidePrices = !!opts.hidePrices;
+    const thStyle = opts.thStyle;
+    const tdStyle = opts.tdStyle;
+    const omitSpaceImages = !!opts.omitSpaceImages;
+    const titleOverride = opts.titleOverride;
+    const item = itemObj.spec;
+    const titleText = titleOverride || (item.customName
+        ? item.customName
+        : (_cartIsWritingDesk(itemObj) ? `שולחן מס' ${index + 1}` : `ארון מס' ${index + 1}`));
+    const detailLabel = _cartIsWritingDesk(itemObj) ? 'שולחן' : 'ארון';
+    const numericPrice = parseInt(String(item.price || '').replace('₪', '').replace(/,/g, ''), 10) || 0;
+    const itemInstall = item.installPrice || 0;
+    const specRows = _resolvePrintSpecRows(itemObj);
+    const priceRows = hidePrices ? '' : isFactory
+        ? `<tr><th style="background:#fef9c3;">מחיר התקנה ללקוח</th><td style="font-weight:bold;color:#713f12;font-size:1.1rem;text-align:right;">₪${(item.installPrice || 0).toLocaleString()}</td></tr>`
+        : `<tr><th style="background:#eff6ff;">מחיר ארון ללקוח</th><td style="font-weight:bold;color:#1e3a5f;font-size:1.1rem;text-align:right;">₪${numericPrice.toLocaleString()}</td></tr>
+               <tr><th style="background:#eff6ff;">הובלה והתקנה</th><td style="font-weight:bold;color:#1e3a5f;font-size:1.1rem;text-align:right;">₪${itemInstall.toLocaleString()}</td></tr>`;
+
+    let html = _buildPagedCabinetSpecHtml({
+        titleText: titleText,
+        detailLabel: detailLabel,
+        specRows: specRows,
+        priceRows: priceRows,
+        thStyle: thStyle,
+        tdStyle: tdStyle
+    });
+    html += `
+            <div style="page-break-after:always;">
+                <h3 style="font-size:1.2rem;color:#1e3a5f;margin:0 0 16px;padding:10px 15px;background:#f8fafc;border-radius:8px;border-right:4px solid #1e3a5f;">
+                    תמונות ${detailLabel}: ${titleText}
+                </h3>
+                <div style="display:flex;flex-direction:column;gap:16px;">
+                    ${_orderPrintPreviewImagesHtml(item, itemObj.rawState, { omitSpace: omitSpaceImages })}
+                </div>
+            </div>
+            ${_printCabinetBlueprintPagesHtml(item, titleText)}`;
+    return {
+        html: html,
+        numericPrice: numericPrice,
+        itemInstall: itemInstall,
+        itemCost: item.costPrice ? (parseInt(String(item.costPrice).replace('₪', '').replace(/,/g, ''), 10) || 0) : 0
+    };
+}
+
+function _printSpaceGroupBlockHtml(group, opts) {
+    opts = opts || {};
+    const thStyle = opts.thStyle;
+    const tdStyle = opts.tdStyle;
+    const baseName = _escPrintHtml(group.baseName || 'ארון במרחב משותף');
+    let spaceImg = '';
+    for (let i = 0; i < group.members.length; i++) {
+        const spec = group.members[i].itemObj && group.members[i].itemObj.spec;
+        if (spec && _cartImageValid(spec.imgSpaceDoors)) {
+            spaceImg = spec.imgSpaceDoors;
+            break;
+        }
+    }
+    let html = `
+            <div style="page-break-after:always;">
+                <h2 style="font-size:1.45rem;color:#0f172a;margin:0 0 14px;padding:14px 16px;background:#ecfeff;border-radius:10px;border-right:5px solid #0f766e;">
+                    ${baseName}
+                </h2>
+                <div style="font-size:0.9rem;font-weight:700;color:#475569;margin-bottom:8px;padding:4px 8px;background:#f1f5f8;border-radius:4px;">
+                    תצוגת חוץ — כל החלקים במרחב (דלתות סגורות)
+                </div>
+                ${spaceImg
+                    ? `<img src="${spaceImg}" alt="מרחב סגור" style="width:100%;max-height:78vh;object-fit:contain;border:1px solid #e2e8f0;border-radius:6px;background:#fff;">`
+                    : `<div style="padding:28px;text-align:center;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:8px;">אין תמונת מרחב זמינה</div>`}
+            </div>`;
+
+    let totalPrice = 0, totalInstall = 0, totalCost = 0;
+    group.members.forEach(function(m) {
+        const partTitle = (m.itemObj.spec && m.itemObj.spec.customName)
+            || ((typeof window._spacePartSuffix === 'function')
+                ? ((group.baseName ? (group.baseName + ' ') : '') + window._spacePartSuffix(m.slot))
+                : ('חלק ' + (m.slot + 1)));
+        const block = _printSingleCabinetBlockHtml(m.itemObj, m.index, {
+            isFactory: opts.isFactory,
+            hidePrices: opts.hidePrices,
+            thStyle: thStyle,
+            tdStyle: tdStyle,
+            omitSpaceImages: true,
+            titleOverride: partTitle
+        });
+        html += block.html;
+        totalPrice += block.numericPrice;
+        totalInstall += block.itemInstall;
+        totalCost += block.itemCost;
+    });
+    return { html: html, numericPrice: totalPrice, itemInstall: totalInstall, itemCost: totalCost };
+}
+
 function _buildPrintHTML(mode) {
     // mode: 'customer' or 'factory'
     const isFactory = mode === 'factory';
@@ -10923,63 +11137,31 @@ function _buildPrintHTML(mode) {
     let totalOrderPrice = 0, totalInstallPrice = 0, totalCostPrice = 0;
     let cabinetsHTML = '';
 
-    state.orderCart.forEach((itemObj, index) => {
-        if (typeof window._cartItemOnHold === 'function' && window._cartItemOnHold(itemObj)) return;
-        const item = itemObj.spec;
-        const titleText = item.customName ? item.customName : (_cartIsWritingDesk(itemObj) ? `שולחן מס' ${index + 1}` : `ארון מס' ${index + 1}`);
-        const detailLabel = _cartIsWritingDesk(itemObj) ? 'שולחן' : 'ארון';
-        const numericPrice = parseInt(item.price.replace('₪', '').replace(/,/g, '')) || 0;
-        const itemInstall = item.installPrice || 0;
-        const itemCost = item.costPrice ? parseInt(item.costPrice.replace('₪', '').replace(/,/g, '')) : 0;
-        totalOrderPrice += numericPrice;
-        totalInstallPrice += itemInstall; totalCostPrice += itemCost;
-        const specRows = _resolvePrintSpecRows(itemObj);
-        const priceRows = _hidePrices ? '' : isFactory
-            ? `<tr><th style="background:#fef9c3;">מחיר התקנה ללקוח</th><td style="font-weight:bold;color:#713f12;font-size:1.1rem;text-align:right;">₪${(item.installPrice || 0).toLocaleString()}</td></tr>`
-            : `<tr><th style="background:#eff6ff;">מחיר ארון ללקוח</th><td style="font-weight:bold;color:#1e3a5f;font-size:1.1rem;text-align:right;">₪${numericPrice.toLocaleString()}</td></tr>
-               <tr><th style="background:#eff6ff;">הובלה והתקנה</th><td style="font-weight:bold;color:#1e3a5f;font-size:1.1rem;text-align:right;">₪${itemInstall.toLocaleString()}</td></tr>`;
-
-        const bpPages = item.multiViewPages && item.multiViewPages.length > 0
-            ? item.multiViewPages
-            : (item.multiViewSVG ? [item.multiViewSVG] : []);
-
-        // Spec pages: each wing/cabinet on its own page; first shares the main title
-        cabinetsHTML += _buildPagedCabinetSpecHtml({
-            titleText: titleText,
-            detailLabel: detailLabel,
-            specRows: specRows,
-            priceRows: priceRows,
+    _groupCartItemsForPrint().forEach(function(group) {
+        if (group.type === 'space') {
+            const block = _printSpaceGroupBlockHtml(group, {
+                isFactory: isFactory,
+                hidePrices: _hidePrices,
+                thStyle: thStyle,
+                tdStyle: tdStyle
+            });
+            cabinetsHTML += block.html;
+            totalOrderPrice += block.numericPrice;
+            totalInstallPrice += block.itemInstall;
+            totalCostPrice += block.itemCost;
+            return;
+        }
+        const block = _printSingleCabinetBlockHtml(group.itemObj, group.index, {
+            isFactory: isFactory,
+            hidePrices: _hidePrices,
             thStyle: thStyle,
-            tdStyle: tdStyle
+            tdStyle: tdStyle,
+            omitSpaceImages: false
         });
-
-        cabinetsHTML += `
-            <div style="page-break-after:always;">
-                <h3 style="font-size:1.2rem;color:#1e3a5f;margin:0 0 16px;padding:10px 15px;background:#f8fafc;border-radius:8px;border-right:4px solid #1e3a5f;">
-                    תמונות ${detailLabel}: ${titleText}
-                </h3>
-                <div style="display:flex;flex-direction:column;gap:16px;">
-                    ${_orderPrintPreviewImagesHtml(item, itemObj.rawState)}
-                </div>
-            </div>
-            ${(() => {
-                const pairs = [];
-                for (let pi = 0; pi < bpPages.length; pi += 2) {
-                    pairs.push(bpPages.slice(pi, pi + 2));
-                }
-                return pairs.map((pair, pairIdx) => `
-            <div class="bp-page" style="page-break-after:always;page-break-inside:avoid;">
-                ${pair.map((svg, si) => {
-                    const globalIdx = pairIdx * 2 + si;
-                    return `<div style="margin-bottom:${si === 0 && pair.length > 1 ? '16px' : '0'};">
-                    <div style="font-size:1rem;font-weight:bold;margin-bottom:6px;background:#e8f0fe;padding:6px;text-align:center;border:1px solid #93c5fd;border-bottom:none;">
-                        שרטוט טכני — ${titleText}${bpPages.length > 1 ? ` (עמוד ${globalIdx + 1}/${bpPages.length})` : ''}
-                    </div>
-                    <div style="border:2px solid #93c5fd;display:block;overflow:hidden;width:100%;">${svg}</div>
-                </div>`;
-                }).join('')}
-            </div>`).join('');
-            })()}`;
+        cabinetsHTML += block.html;
+        totalOrderPrice += block.numericPrice;
+        totalInstallPrice += block.itemInstall;
+        totalCostPrice += block.itemCost;
     });
 
     const summaryHTML = _hidePrices ? '' : isFactory
