@@ -7521,6 +7521,7 @@ function _orderPreviewImagesHtml(item, rawState, opts) {
 function _orderPrintPreviewImagesHtml(item, rawState, opts) {
     opts = opts || {};
     const omitSpace = !!opts.omitSpace;
+    const centerOnly = !!opts.centerOnly;
     const multiFront = _cartHasMultiFrontViews(rawState);
     const centerOutLabel = multiFront ? 'תצוגת חוץ (חזית מרכזית)' : 'תצוגת חוץ (חזיתות)';
     const centerInLabel = multiFront ? 'תצוגת פנים (חזית מרכזית)' : 'תצוגת פנים (חלוקה טכנית)';
@@ -7536,6 +7537,7 @@ function _orderPrintPreviewImagesHtml(item, rawState, opts) {
                         <div style="${lblStyle}">${centerInLabel}</div>
                         <img src="${item.imgOpen}" style="${imgStyle}" alt="ארון פתוח">
                     </div>`;
+    if (centerOnly) return html;
     if (!omitSpace && (item.imgSpaceDoors || item.imgSpaceOpen)) {
         html += `
                     <div style="${wrapStyle}">
@@ -11036,6 +11038,7 @@ function _printSingleCabinetBlockHtml(itemObj, index, opts) {
     const thStyle = opts.thStyle;
     const tdStyle = opts.tdStyle;
     const omitSpaceImages = !!opts.omitSpaceImages;
+    const centerOnlyImages = !!opts.centerOnlyImages;
     const titleOverride = opts.titleOverride;
     const item = itemObj.spec;
     const titleText = titleOverride || (item.customName
@@ -11058,13 +11061,19 @@ function _printSingleCabinetBlockHtml(itemObj, index, opts) {
         thStyle: thStyle,
         tdStyle: tdStyle
     });
+    const photosLayout = centerOnlyImages
+        ? 'display:flex;flex-direction:row;flex-wrap:wrap;gap:16px;align-items:stretch;'
+        : 'display:flex;flex-direction:column;gap:16px;';
     html += `
             <div style="page-break-after:always;">
                 <h3 style="font-size:1.2rem;color:#1e3a5f;margin:0 0 16px;padding:10px 15px;background:#f8fafc;border-radius:8px;border-right:4px solid #1e3a5f;">
                     תמונות ${detailLabel}: ${titleText}
                 </h3>
-                <div style="display:flex;flex-direction:column;gap:16px;">
-                    ${_orderPrintPreviewImagesHtml(item, itemObj.rawState, { omitSpace: omitSpaceImages })}
+                <div style="${photosLayout}">
+                    ${_orderPrintPreviewImagesHtml(item, itemObj.rawState, {
+                        omitSpace: omitSpaceImages || centerOnlyImages,
+                        centerOnly: centerOnlyImages
+                    })}
                 </div>
             </div>
             ${_printCabinetBlueprintPagesHtml(item, titleText)}`;
@@ -11081,25 +11090,38 @@ function _printSpaceGroupBlockHtml(group, opts) {
     const thStyle = opts.thStyle;
     const tdStyle = opts.tdStyle;
     const baseName = _escPrintHtml(group.baseName || 'ארון במרחב משותף');
-    let spaceImg = '';
+    let spaceDoors = '';
+    let spaceOpen = '';
     for (let i = 0; i < group.members.length; i++) {
         const spec = group.members[i].itemObj && group.members[i].itemObj.spec;
-        if (spec && _cartImageValid(spec.imgSpaceDoors)) {
-            spaceImg = spec.imgSpaceDoors;
-            break;
-        }
+        if (!spec) continue;
+        if (!spaceDoors && _cartImageValid(spec.imgSpaceDoors)) spaceDoors = spec.imgSpaceDoors;
+        if (!spaceOpen && _cartImageValid(spec.imgSpaceOpen)) spaceOpen = spec.imgSpaceOpen;
+        if (spaceDoors && spaceOpen) break;
     }
+    const cellStyle = 'flex:1;min-width:260px;display:flex;flex-direction:column;min-height:0;';
+    const lblStyle = 'font-size:0.9rem;font-weight:700;color:#475569;margin-bottom:8px;padding:4px 8px;background:#f1f5f8;border-radius:4px;';
+    const imgStyle = 'width:100%;max-height:68vh;object-fit:contain;border:1px solid #e2e8f0;border-radius:6px;background:#fff;';
+    const emptyStyle = 'padding:28px;text-align:center;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:8px;';
     let html = `
             <div style="page-break-after:always;">
-                <h2 style="font-size:1.45rem;color:#0f172a;margin:0 0 14px;padding:14px 16px;background:#ecfeff;border-radius:10px;border-right:5px solid #0f766e;">
+                <h2 style="font-size:1.45rem;color:#0f172a;margin:0 0 16px;padding:14px 16px;background:#ecfeff;border-radius:10px;border-right:5px solid #0f766e;">
                     ${baseName}
                 </h2>
-                <div style="font-size:0.9rem;font-weight:700;color:#475569;margin-bottom:8px;padding:4px 8px;background:#f1f5f8;border-radius:4px;">
-                    תצוגת חוץ — כל החלקים במרחב (דלתות סגורות)
+                <div style="display:flex;flex-direction:row;flex-wrap:wrap;gap:16px;align-items:stretch;">
+                    <div style="${cellStyle}">
+                        <div style="${lblStyle}">תצוגת חוץ — כל החלקים (סגור)</div>
+                        ${spaceDoors
+                            ? `<img src="${spaceDoors}" alt="מרחב סגור" style="${imgStyle}">`
+                            : `<div style="${emptyStyle}">אין תמונת מרחב סגור</div>`}
+                    </div>
+                    <div style="${cellStyle}">
+                        <div style="${lblStyle}">תצוגת פנים — כל החלקים (פתוח)</div>
+                        ${spaceOpen
+                            ? `<img src="${spaceOpen}" alt="מרחב פתוח" style="${imgStyle}">`
+                            : `<div style="${emptyStyle}">אין תמונת מרחב פתוח</div>`}
+                    </div>
                 </div>
-                ${spaceImg
-                    ? `<img src="${spaceImg}" alt="מרחב סגור" style="width:100%;max-height:78vh;object-fit:contain;border:1px solid #e2e8f0;border-radius:6px;background:#fff;">`
-                    : `<div style="padding:28px;text-align:center;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:8px;">אין תמונת מרחב זמינה</div>`}
             </div>`;
 
     let totalPrice = 0, totalInstall = 0, totalCost = 0;
@@ -11114,6 +11136,7 @@ function _printSpaceGroupBlockHtml(group, opts) {
             thStyle: thStyle,
             tdStyle: tdStyle,
             omitSpaceImages: true,
+            centerOnlyImages: true,
             titleOverride: partTitle
         });
         html += block.html;
