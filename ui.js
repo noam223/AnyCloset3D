@@ -329,8 +329,10 @@ window.toggleNoPlinth = function() {
     if (isActive) {
         col.noPlinth = false;
         col.floorOffset = 0;
+        col.spaceBottomPanel = false;
     } else {
         col.noPlinth = true;
+        col.spaceBottomPanel = false;
     }
     buildCabinet(); calculatePrice(); updateQuickEditPanelUI();
     saveHistoryState();
@@ -1985,6 +1987,7 @@ function _serializeColumnForClipboard(col) {
         splitY:       col.splitY,
         floorOffset:  col.floorOffset || 0,
         noPlinth:     col.noPlinth || false,
+        spaceBottomPanel: col.spaceBottomPanel || false,
         topPanel:     col.topPanel || false,
         sinkPanel:    col.sinkPanel || false,
         _height:      col.height,
@@ -2018,6 +2021,7 @@ function _applyColumnClipboard(target, src) {
     target.type         = srcCopy.type;
     target.floorOffset  = srcCopy.floorOffset;
     target.noPlinth     = srcCopy.noPlinth;
+    target.spaceBottomPanel = !!srcCopy.spaceBottomPanel;
     target.topPanel     = srcCopy.topPanel || false;
     target.sinkPanel    = srcCopy.sinkPanel || false;
     if (srcCopy.type === 'desk') {
@@ -8830,8 +8834,10 @@ window._syncSpaceLiftBottomPanel = function(item, lifted) {
             if (!col || col.type === 'desk') return;
             if (lifted) {
                 col.noPlinth = true;
-            } else if (!(col.floorOffset > 0)) {
-                col.noPlinth = false;
+                col.spaceBottomPanel = true;
+            } else {
+                col.spaceBottomPanel = false;
+                if (!(col.floorOffset > 0)) col.noPlinth = false;
             }
         });
     }

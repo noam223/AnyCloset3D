@@ -704,7 +704,9 @@ function _bpDrawTopBottomBoards(shelfLineFn, col, colX, colW, colBotSvgY, visibl
 
     // Bottom board center (cm from column bottom) — matches engine-core plinthTop / floor board
     let botCenterCm = null;
-    if (fo > 0 || col.noPlinth) botCenterCm = t / 2;
+    if (fo > 0 || col.spaceBottomPanel) botCenterCm = t / 2;
+    else if (col.noPlinth && !(plinthH > 0)) botCenterCm = t / 2; // upper unit
+    else if (col.noPlinth) botCenterCm = null; // ביטול צוקל: no floor board
     else if (isBathroomRegalim) botCenterCm = null; // regalim bathroom: plinth plate is the only floor
     else botCenterCm = (plinthH || 0) + t / 2;
 

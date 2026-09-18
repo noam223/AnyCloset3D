@@ -4272,8 +4272,8 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                 const floorMesh = createBoard(col.width, t, bodyD, colCenterX, fo + t/2, 0);
                 _ppPartId = '';
                 _applyHorizBoardUV(floorMesh, currentX, col.width, bodyD, state.width);
-            } else if (col.noPlinth && !_isSlidingWardrobe && !isRegalim) {
-                // ביטול צוקל / יחידה מורמת: דופן תחתונה בעובי לוח בתחתית הארון
+            } else if (col.noPlinth && !_isSlidingWardrobe && !isRegalim && (_isUpperUnitBuild || col.spaceBottomPanel)) {
+                // יחידה עליונה / ארון מורם במרחב: דופן תחתונה בעובי לוח (בלי צוקל)
                 _ppPartId = `plinth_c${c}`;
                 const plinthTopMesh = createBoard(col.width, t, bodyD, colCenterX, t/2, 0);
                 _ppPartId = '';
@@ -4726,7 +4726,9 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         }
 
         // When noPlinth=true and no floorOffset:
-        //   Bottom board at y=0 (thickness t), startShelvesY = t (above the board).
+        //   Upper unit / space-lifted (spaceBottomPanel): bottom board at y=0, startShelvesY = t.
+        //   Regular ביטול צוקל: no bottom board drawn; startShelvesY = t so the bottom cell
+        //   grows by plinthHeight compared to the normal (plinth) state.
         // For bathroom regalim: the full-width plate (top face at plinthHeight) is the only bottom board —
         //   no extra plinthTopMesh is drawn, so startShelvesY = plinthHeight (not plinthHeight + t).
         const _isBathroomRegalim = (state.presetId === 'bathroom' && isRegalim);
