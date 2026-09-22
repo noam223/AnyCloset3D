@@ -225,40 +225,22 @@
         if (ud.wingId != null || ud.spaceCompanion || ud.spaceSlot != null) return true;
         if (ud.noHighlight) return true;
         if (ud.isCornerDesk) return true;
+        // Cell-selection hit volumes (often translucent on hover) — never block shelf pick
+        if (ud.colIndex != null && ud.rowIndex != null && !ud.partId && !ud.shelfRef) return true;
         const mats = Array.isArray(obj.material) ? obj.material : (obj.material ? [obj.material] : []);
         if (!mats.length) return true;
+        // Invisible helper meshes (colorWrite false / fully transparent)
         let invisible = true;
         for (let i = 0; i < mats.length; i++) {
             const m = mats[i];
             if (!m) continue;
+            if (m.colorWrite === false) continue;
             const op = (m.opacity != null) ? m.opacity : 1;
-            if (m.colorWrite === false || op <= 0.001) continue;
+            if (op <= 0.001) continue;
             invisible = false;
             break;
         }
         return invisible;
-    }
-
-    /**
-     * When facades are shown, shelves in a column that has doors are not pickable —
-     * even if door hover makes the door translucent and reveals the interior.
-     */
-    function _shelfBlockedByColumnDoor(ref) {
-        if (!ref) return false;
-        if (window._doorsVisible === false) return false;
-        try {
-            if (typeof state === 'undefined' || !state) return false;
-            const aw = state.activeWing || 'center';
-            const wing = state.wings && state.wings[aw];
-            const hasDoors = wing ? (wing.hasDoors !== false) : (state.hasDoors !== false);
-            if (!hasDoors) return false;
-            const cols = (wing && wing.columns && wing.columns.length) ? wing.columns : state.columns;
-            const col = cols && cols[ref.colIndex];
-            if (!col || !Array.isArray(col.doors) || !col.doors.length) return false;
-            return true;
-        } catch (e) {
-            return false;
-        }
     }
 
     function _pickRoots() {
@@ -288,13 +270,8 @@
         for (let i = 0; i < hits.length; i++) {
             const obj = hits[i].object;
             if (_isIgnorableSceneMesh(obj)) continue;
-            if (_isShelfPickTarget(obj)) {
-                const visual = _visualFromHit(obj);
-                const ref = _parseShelfRef(obj) || _parseShelfRef(visual);
-                if (ref && _shelfBlockedByColumnDoor(ref)) return null;
-                return obj;
-            }
-            // First real mesh (door — even when peek-transparent — wall, top, drawer…) blocks
+            // First real mesh: shelf → pick; door (incl. peek-hover) / wall / board → block
+            if (_isShelfPickTarget(obj)) return obj;
             return null;
         }
         return null;
