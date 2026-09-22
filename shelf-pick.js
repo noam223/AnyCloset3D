@@ -196,6 +196,39 @@
         return null;
     }
 
+    function _partIdOf(mesh) {
+        return String((mesh && mesh.userData && mesh.userData.partId) || '');
+    }
+
+    /** Walls / dividers / back that can hide a shelf from the camera. */
+    function _isBodyOccluder(mesh) {
+        if (!mesh || mesh.visible === false) return false;
+        if (mesh.userData && (mesh.userData.isShelfPickProxy || mesh.userData.shelfRef)) return false;
+        const id = _partIdOf(mesh);
+        // Scoped ids look like "center:wall_left" / "cart1:divider_c0"
+        return /(?:^|:)(wall_left|wall_right|divider_|back_)/.test(id);
+    }
+
+    function _collectShelfOccluders() {
+        const out = [];
+        const seen = new Set();
+        function add(m) {
+            if (!m || seen.has(m) || m.visible === false) return;
+            seen.add(m);
+            out.push(m);
+        }
+        // Closed doors block shelves; hidden-facades view does not
+        if (window._doorsVisible !== false) {
+            const doors = window.doorMeshes || [];
+            for (let i = 0; i < doors.length; i++) add(doors[i]);
+        }
+        const parts = window.partMeshes || [];
+        for (let i = 0; i < parts.length; i++) {
+            if (_isBodyOccluder(parts[i])) add(parts[i]);
+        }
+        return out;
+    }
+
     function _raycast(event) {
         const canvas = _getCanvas();
         const camera = _getCamera();
@@ -214,8 +247,24 @@
                 return m && m.visible !== false && _parseShelfRef(m);
             });
         }
-        const hits = _raycaster.intersectObjects(meshes, false);
-        return hits.length ? hits[0].object : null;
+        const shelfHits = _raycaster.intersectObjects(meshes, false);
+        if (!shelfHits.length) return null;
+
+        // Only pick a shelf if it is the first solid thing along the ray
+        // (not behind closed doors or side/partition/back walls).
+        const occluders = _collectShelfOccluders();
+        let nearestOcc = Infinity;
+        if (occluders.length) {
+            const occHits = _raycaster.intersectObjects(occluders, false);
+            if (occHits.length) nearestOcc = occHits[0].distance;
+        }
+        const EPS = 0.05; // cm — tiny bias so coplanar edges don't flicker
+        for (let i = 0; i < shelfHits.length; i++) {
+            if (shelfHits[i].distance < nearestOcc - EPS) {
+                return shelfHits[i].object;
+            }
+        }
+        return null;
     }
 
     function _showTrash() {
