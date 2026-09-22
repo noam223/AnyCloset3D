@@ -3860,14 +3860,16 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         return mesh;
     }
 
-    /** Invisible taller proxy so thin shelf boards are easy to hover/click from front view. */
+    /** Invisible taller proxy so thin shelf boards are easy to hover/click from front view.
+     *  Depth is inset toward the back so the proxy stays behind closed door faces. */
     function _registerShelfPickMesh(visualMesh, boardW, boardH, boardD) {
         if (isBP || !visualMesh || !visualMesh.userData || !visualMesh.userData.shelfRef) return;
         if (!window.shelfPickMeshes) window.shelfPickMeshes = [];
         // Always include the visual itself
         window.shelfPickMeshes.push(visualMesh);
-        // Fat proxy (~5cm tall) centered on the shelf for easier picking
+        // Fat in Y for easier picking; keep Z shorter + pulled back so doors win the ray
         const pickH = Math.max(boardH * 3.5, 5);
+        const pickD = Math.max(Math.min(boardD * 0.5, boardD - 6), 8);
         const pickMat = new THREE.MeshBasicMaterial({
             transparent: true,
             opacity: 0,
@@ -3875,10 +3877,12 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
             colorWrite: false
         });
         const proxy = new THREE.Mesh(
-            new THREE.BoxGeometry(Math.max(boardW, 1), pickH, Math.max(boardD, 1)),
+            new THREE.BoxGeometry(Math.max(boardW, 1), pickH, pickD),
             pickMat
         );
         proxy.position.copy(visualMesh.position);
+        // Cabinet front is +Z; pull proxy toward the back so it cannot outrank door panels
+        proxy.position.z -= Math.max(0, (boardD - pickD) * 0.5);
         proxy.userData.shelfRef = visualMesh.userData.shelfRef;
         proxy.userData.shelfVisual = visualMesh;
         proxy.userData.isShelfPickProxy = true;

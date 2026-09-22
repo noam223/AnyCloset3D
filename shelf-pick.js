@@ -258,25 +258,14 @@
         return invisible;
     }
 
-    function _pickRoots() {
-        const roots = [];
-        if (window.cabinetGroup) roots.push(window.cabinetGroup);
-        const groups = window._spaceCompanionGroups || [];
-        for (let i = 0; i < groups.length; i++) {
-            if (groups[i]) roots.push(groups[i]);
-        }
-        if (!roots.length && window.scene) roots.push(window.scene);
-        return roots;
-    }
-
     function _debugEnabled() {
-        if (window._SHELF_PICK_DEBUG === false) return false;
         if (window._SHELF_PICK_DEBUG === true) return true;
+        if (window._SHELF_PICK_DEBUG === false) return false;
         try {
             if (localStorage.getItem('shelfPickDebug') === '1') return true;
             if (/[?&]shelfDebug=1(?:&|$)/.test(location.search)) return true;
         } catch (e) { /* ignore */ }
-        return true; // on by default while we diagnose
+        return false;
     }
 
     function _describeHit(obj, dist) {
@@ -300,7 +289,11 @@
     }
 
     function _showDebugPanel(info) {
-        if (!_debugEnabled()) return;
+        if (!_debugEnabled()) {
+            const old = document.getElementById('sp-shelf-debug');
+            if (old) old.remove();
+            return;
+        }
         let el = document.getElementById('sp-shelf-debug');
         if (!el) {
             el = document.createElement('div');
@@ -323,12 +316,12 @@
         if (info.enabledReason) lines.push(' <span style="color:#94a3b8">(' + info.enabledReason + ')</span>');
         lines.push('</div>');
         lines.push('<div>doorsVisible: ' + info.doorsVisible + ' | hasDoors: ' + info.hasDoors + ' | preset: ' + info.preset + ' | wingEdit: ' + info.wingEdit + '</div>');
-        lines.push('<div>shelfMeshes: ' + info.shelfMeshCount + ' | shelfHits: ' + info.shelfHitCount + ' | result: <b style="color:#fde68a">' + (info.result || 'null') + '</b></div>');
+        lines.push('<div>shelfMeshes: ' + info.shelfMeshCount + ' | shelfHits: ' + info.shelfHitCount + ' | occludeDist: ' + info.occludeDist + ' | result: <b style="color:#fde68a">' + (info.result || 'null') + '</b></div>');
         if (info.blockedBy) {
             lines.push('<div style="color:#fca5a5">blockedBy: ' + info.blockedBy + '</div>');
         }
         if (info.hits && info.hits.length) {
-            lines.push('<div style="margin-top:6px;color:#94a3b8">first hits:</div>');
+            lines.push('<div style="margin-top:6px;color:#94a3b8">blocker/shelf hits:</div>');
             info.hits.forEach(function (h, i) {
                 lines.push('<div style="white-space:pre-wrap">#' + i + ' ' + JSON.stringify(h) + '</div>');
             });
@@ -351,6 +344,46 @@
         return '';
     }
 
+    function _collectDoorOccluders() {
+        const out = [];
+        if (window._doorsVisible === false) return out;
+        const doors = window.doorMeshes || [];
+        for (let i = 0; i < doors.length; i++) {
+            const d = doors[i];
+            if (d && d.visible !== false) out.push(d);
+        }
+        return out;
+    }
+
+    function _collectWallOccluders() {
+        const out = [];
+        const parts = window.partMeshes || [];
+        for (let i = 0; i < parts.length; i++) {
+            const m = parts[i];
+            if (m && m.visible !== false && _isSideWallOccluder(m)) out.push(m);
+        }
+        return out;
+    }
+
+    /** Distance used for occlusion — prefer real shelf board over fat proxy. */
+    function _occlusionDistanceForShelfHits(shelfHits) {
+        for (let i = 0; i < shelfHits.length; i++) {
+            const o = shelfHits[i].object;
+            if (o && !(o.userData && o.userData.isShelfPickProxy)) {
+                return shelfHits[i].distance;
+            }
+        }
+        // Proxy-only: raycast the visual board if possible
+        const proxyHit = shelfHits[0];
+        const visual = _visualFromHit(proxyHit.object);
+        if (visual && visual !== proxyHit.object) {
+            const vh = _raycaster.intersectObject(visual, true);
+            if (vh.length) return vh[0].distance;
+        }
+        // Fallback: treat proxy as farther so doors/walls in front still win
+        return proxyHit.distance + 8;
+    }
+
     function _raycast(event) {
         const canvas = _getCanvas();
         const camera = _getCamera();
@@ -363,6 +396,7 @@
             wingEdit: (typeof state !== 'undefined' && state) ? !!state.wingEditMode : false,
             shelfMeshCount: 0,
             shelfHitCount: 0,
+            occludeDist: '-',
             hits: [],
             result: null,
             blockedBy: ''
@@ -380,7 +414,6 @@
         _mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
         _raycaster.setFromCamera(_mouse, camera);
 
-        // 1) Prefer dedicated shelf pick meshes (incl. fat proxies)
         const shelfMeshes = (window.shelfPickMeshes || []).filter(function (m) {
             return m && m.visible !== false && m.parent;
         });
@@ -390,37 +423,52 @@
             : [];
         debug.shelfHitCount = shelfHits.length;
 
-        // Scene hits for debug + occlusion
-        const roots = _pickRoots();
-        const sceneHits = roots.length ? _raycaster.intersectObjects(roots, true) : [];
-        for (let i = 0; i < Math.min(sceneHits.length, 8); i++) {
-            debug.hits.push(_describeHit(sceneHits[i].object, sceneHits[i].distance));
-        }
-
         if (!shelfHits.length) {
             debug.result = 'no-shelf-hit';
             _showDebugPanel(debug);
             return null;
         }
 
-        const shelfDist = shelfHits[0].distance;
-        // 2) Only doors + side walls/dividers that are CLOSER than the shelf can block
-        for (let i = 0; i < sceneHits.length; i++) {
-            const h = sceneHits[i];
-            if (h.distance >= shelfDist - 0.05) break;
-            const obj = h.object;
-            if (_isIgnorableSceneMesh(obj)) continue;
-            if (_isShelfPickTarget(obj)) continue;
-            if (_isDoorMesh(obj) || _isSideWallOccluder(obj)) {
-                const d = _describeHit(obj, h.distance);
-                debug.blockedBy = (d.door ? 'DOOR ' : 'WALL ') + (d.partId || '') + ' @' + d.d;
-                debug.result = 'blocked';
-                _showDebugPanel(debug);
-                return null;
+        const occludeDist = _occlusionDistanceForShelfHits(shelfHits);
+        debug.occludeDist = Math.round(occludeDist * 10) / 10;
+
+        // Doors (including peek-hover translucent ones) — recursive for handles/children
+        const doors = _collectDoorOccluders();
+        if (doors.length) {
+            const doorHits = _raycaster.intersectObjects(doors, true);
+            for (let i = 0; i < doorHits.length; i++) {
+                const obj = doorHits[i].object;
+                if (obj.isLine || obj.isLineSegments) continue;
+                if (doorHits[i].distance < occludeDist - 0.02) {
+                    debug.blockedBy = 'DOOR @' + (Math.round(doorHits[i].distance * 10) / 10);
+                    debug.hits.push(_describeHit(obj, doorHits[i].distance));
+                    debug.result = 'blocked';
+                    _showDebugPanel(debug);
+                    return null;
+                }
+            }
+        }
+
+        // Side walls / dividers
+        const walls = _collectWallOccluders();
+        if (walls.length) {
+            const wallHits = _raycaster.intersectObjects(walls, true);
+            for (let i = 0; i < wallHits.length; i++) {
+                const obj = wallHits[i].object;
+                if (obj.isLine || obj.isLineSegments) continue;
+                if (wallHits[i].distance < occludeDist - 0.02) {
+                    debug.blockedBy = 'WALL ' + ((obj.userData && obj.userData.partId) || '') +
+                        ' @' + (Math.round(wallHits[i].distance * 10) / 10);
+                    debug.hits.push(_describeHit(obj, wallHits[i].distance));
+                    debug.result = 'blocked';
+                    _showDebugPanel(debug);
+                    return null;
+                }
             }
         }
 
         debug.result = 'shelf';
+        debug.hits.push(_describeHit(shelfHits[0].object, shelfHits[0].distance));
         _showDebugPanel(debug);
         return shelfHits[0].object;
     }
