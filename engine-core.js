@@ -5913,7 +5913,11 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
             // Upper units use wingId like "upperUnit_center" / "upperUnit_left" — clip against the
             // PARENT wing, otherwise center upper units are wrongly treated as side wings and
             // doors get clipped (partial coverage or invisible on some cells).
-            const _thisWingId = _buildGroup && _buildGroup.userData ? _buildGroup.userData.wingId : null;
+            // Center builds into cabinetGroup without userData.wingId — fall back to _ppWingId
+            // so front-wing corner clipping still runs on the center cabinet.
+            const _thisWingId = (_buildGroup && _buildGroup.userData && _buildGroup.userData.wingId)
+                || _ppWingId
+                || null;
             const _thisWingData = _thisWingId ? state.wings[_thisWingId] : null;
             const _isUpperUnitWing = !!( _thisWingId && String(_thisWingId).startsWith('upperUnit_') );
             const _clipWingId = _isUpperUnitWing
