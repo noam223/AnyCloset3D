@@ -227,9 +227,10 @@
 
     function _isSideWallOccluder(obj) {
         if (!obj || !obj.userData) return false;
+        if (obj.userData.isShelfSideWall) return true;
         const id = String(obj.userData.partId || '');
-        // Only outer side walls + vertical dividers (not back / tops / shelves)
-        return /(?:^|:)(wall_left|wall_right|divider_)/.test(id);
+        // partIds look like "draft::center_wall_left" / "cart0::center_divider_c0"
+        return /wall_left|wall_right|divider_c/.test(id);
     }
 
     /** Helpers / ghost hitboxes that must not steal the pick ray. */
@@ -357,10 +358,17 @@
 
     function _collectWallOccluders() {
         const out = [];
+        const seen = new Set();
+        function add(m) {
+            if (!m || m.visible === false || seen.has(m)) return;
+            seen.add(m);
+            out.push(m);
+        }
+        const tagged = window.shelfWallOccluders || [];
+        for (let i = 0; i < tagged.length; i++) add(tagged[i]);
         const parts = window.partMeshes || [];
         for (let i = 0; i < parts.length; i++) {
-            const m = parts[i];
-            if (m && m.visible !== false && _isSideWallOccluder(m)) out.push(m);
+            if (_isSideWallOccluder(parts[i])) add(parts[i]);
         }
         return out;
     }

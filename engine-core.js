@@ -2261,6 +2261,7 @@ function buildCabinet() {
     // Reset part-paint / shelf-pick mesh lists
     window.partMeshes = [];
     window.shelfPickMeshes = [];
+    window.shelfWallOccluders = [];
     // Remove wing hover highlight (it lives on scene, not cabinetGroup)
     if (typeof window._removeWingHighlight === 'function') window._removeWingHighlight();
 
@@ -3856,6 +3857,12 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         if (!isBP && _ppPartId) {
             mesh.userData.partId = window._scopedPartColorId(_ppWingId, _ppPartId);
             window.partMeshes.push(mesh);
+            // Side walls / dividers used to block shelf picking through the cabinet side
+            if (/^(wall_left|wall_right|divider_c)/.test(String(_ppPartId))) {
+                mesh.userData.isShelfSideWall = true;
+                if (!window.shelfWallOccluders) window.shelfWallOccluders = [];
+                window.shelfWallOccluders.push(mesh);
+            }
         }
         return mesh;
     }
@@ -3867,9 +3874,11 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         if (!window.shelfPickMeshes) window.shelfPickMeshes = [];
         // Always include the visual itself
         window.shelfPickMeshes.push(visualMesh);
-        // Fat in Y for easier picking; keep Z shorter + pulled back so doors win the ray
+        // Fat in Y for easier picking; keep Z shorter + pulled back so doors win the ray.
+        // Slightly narrower than the board so side-wall rays hit the wall first.
         const pickH = Math.max(boardH * 3.5, 5);
         const pickD = Math.max(Math.min(boardD * 0.5, boardD - 6), 8);
+        const pickW = Math.max(boardW - 3.5, boardW * 0.88, 1);
         const pickMat = new THREE.MeshBasicMaterial({
             transparent: true,
             opacity: 0,
@@ -3877,7 +3886,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
             colorWrite: false
         });
         const proxy = new THREE.Mesh(
-            new THREE.BoxGeometry(Math.max(boardW, 1), pickH, pickD),
+            new THREE.BoxGeometry(pickW, pickH, pickD),
             pickMat
         );
         proxy.position.copy(visualMesh.position);
