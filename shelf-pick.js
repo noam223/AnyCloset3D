@@ -215,21 +215,36 @@
         return !!_parseShelfRef(obj);
     }
 
+    function _isDoorMesh(obj) {
+        if (!obj) return false;
+        if (obj.userData && obj.userData.isCabinetDoor) return true;
+        const doors = window.doorMeshes || [];
+        for (let i = 0; i < doors.length; i++) {
+            if (doors[i] === obj) return true;
+        }
+        return false;
+    }
+
+    function _isSideWallOccluder(obj) {
+        if (!obj || !obj.userData) return false;
+        const id = String(obj.userData.partId || '');
+        // Only outer side walls + vertical dividers (not back / tops / shelves)
+        return /(?:^|:)(wall_left|wall_right|divider_)/.test(id);
+    }
+
     /** Helpers / ghost hitboxes that must not steal the pick ray. */
     function _isIgnorableSceneMesh(obj) {
         if (!obj || obj.visible === false) return true;
         if (obj.isLine || obj.isLineSegments || obj.isPoints) return true;
         const ud = obj.userData || {};
         if (_isShelfPickTarget(obj)) return false;
-        // Wing / companion / dead-zone hit boxes
         if (ud.wingId != null || ud.spaceCompanion || ud.spaceSlot != null) return true;
         if (ud.noHighlight) return true;
         if (ud.isCornerDesk) return true;
-        // Cell-selection hit volumes (often translucent on hover) — never block shelf pick
+        // Cell-selection hit volumes
         if (ud.colIndex != null && ud.rowIndex != null && !ud.partId && !ud.shelfRef) return true;
         const mats = Array.isArray(obj.material) ? obj.material : (obj.material ? [obj.material] : []);
         if (!mats.length) return true;
-        // Invisible helper meshes (colorWrite false / fully transparent)
         let invisible = true;
         for (let i = 0; i < mats.length; i++) {
             const m = mats[i];
@@ -254,27 +269,160 @@
         return roots;
     }
 
+    function _debugEnabled() {
+        if (window._SHELF_PICK_DEBUG === false) return false;
+        if (window._SHELF_PICK_DEBUG === true) return true;
+        try {
+            if (localStorage.getItem('shelfPickDebug') === '1') return true;
+            if (/[?&]shelfDebug=1(?:&|$)/.test(location.search)) return true;
+        } catch (e) { /* ignore */ }
+        return true; // on by default while we diagnose
+    }
+
+    function _describeHit(obj, dist) {
+        if (!obj) return null;
+        const ud = obj.userData || {};
+        const mat = Array.isArray(obj.material) ? obj.material[0] : obj.material;
+        return {
+            d: Math.round((dist || 0) * 10) / 10,
+            partId: ud.partId || '',
+            proxy: !!ud.isShelfPickProxy,
+            shelf: _isShelfPickTarget(obj),
+            door: _isDoorMesh(obj),
+            wall: _isSideWallOccluder(obj),
+            ignore: _isIgnorableSceneMesh(obj),
+            op: mat && mat.opacity != null ? mat.opacity : 1,
+            vis: obj.visible !== false,
+            col: ud.colIndex,
+            row: ud.rowIndex,
+            wingId: ud.wingId
+        };
+    }
+
+    function _showDebugPanel(info) {
+        if (!_debugEnabled()) return;
+        let el = document.getElementById('sp-shelf-debug');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'sp-shelf-debug';
+            el.style.cssText = [
+                'position:fixed', 'bottom:12px', 'left:12px', 'z-index:999999',
+                'max-width:min(520px,92vw)', 'max-height:42vh', 'overflow:auto',
+                'background:rgba(15,23,42,.92)', 'color:#e2e8f0', 'font:12px/1.45 Consolas,monospace',
+                'padding:10px 12px', 'border-radius:10px', 'border:1px solid #334155',
+                'box-shadow:0 8px 28px rgba(0,0,0,.35)', 'direction:ltr', 'text-align:left'
+            ].join(';');
+            document.body.appendChild(el);
+        }
+        const lines = [];
+        lines.push('<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:6px;">');
+        lines.push('<strong style="color:#a78bfa">shelf-pick DEBUG</strong>');
+        lines.push('<button type="button" id="sp-shelf-debug-off" style="cursor:pointer;background:#334155;color:#fff;border:0;border-radius:6px;padding:2px 8px;">כבה</button>');
+        lines.push('</div>');
+        lines.push('<div>enabled: <b style="color:' + (info.enabled ? '#4ade80' : '#f87171') + '">' + info.enabled + '</b>');
+        if (info.enabledReason) lines.push(' <span style="color:#94a3b8">(' + info.enabledReason + ')</span>');
+        lines.push('</div>');
+        lines.push('<div>doorsVisible: ' + info.doorsVisible + ' | hasDoors: ' + info.hasDoors + ' | preset: ' + info.preset + ' | wingEdit: ' + info.wingEdit + '</div>');
+        lines.push('<div>shelfMeshes: ' + info.shelfMeshCount + ' | shelfHits: ' + info.shelfHitCount + ' | result: <b style="color:#fde68a">' + (info.result || 'null') + '</b></div>');
+        if (info.blockedBy) {
+            lines.push('<div style="color:#fca5a5">blockedBy: ' + info.blockedBy + '</div>');
+        }
+        if (info.hits && info.hits.length) {
+            lines.push('<div style="margin-top:6px;color:#94a3b8">first hits:</div>');
+            info.hits.forEach(function (h, i) {
+                lines.push('<div style="white-space:pre-wrap">#' + i + ' ' + JSON.stringify(h) + '</div>');
+            });
+        }
+        el.innerHTML = lines.join('');
+        const off = document.getElementById('sp-shelf-debug-off');
+        if (off) {
+            off.onclick = function () {
+                window._SHELF_PICK_DEBUG = false;
+                try { localStorage.setItem('shelfPickDebug', '0'); } catch (e) { /* ignore */ }
+                el.remove();
+            };
+        }
+    }
+
+    function _enabledReason() {
+        if (window._VIEWER_MODE) return 'viewer';
+        if (document.body.classList.contains('part-paint-active')) return 'part-paint';
+        if (_isMultiWingFreeOverview()) return 'multi-wing free overview';
+        return '';
+    }
+
     function _raycast(event) {
         const canvas = _getCanvas();
         const camera = _getCamera();
-        if (!canvas || !camera) return null;
+        const debug = {
+            enabled: _enabled(),
+            enabledReason: _enabledReason(),
+            doorsVisible: window._doorsVisible !== false,
+            hasDoors: (typeof state !== 'undefined' && state) ? (state.hasDoors !== false) : '?',
+            preset: (typeof state !== 'undefined' && state) ? (state.presetId || '') : '',
+            wingEdit: (typeof state !== 'undefined' && state) ? !!state.wingEditMode : false,
+            shelfMeshCount: 0,
+            shelfHitCount: 0,
+            hits: [],
+            result: null,
+            blockedBy: ''
+        };
+        if (!canvas || !camera) {
+            _showDebugPanel(debug);
+            return null;
+        }
         const rect = canvas.getBoundingClientRect();
-        if (rect.width < 1 || rect.height < 1) return null;
+        if (rect.width < 1 || rect.height < 1) {
+            _showDebugPanel(debug);
+            return null;
+        }
         _mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
         _mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
         _raycaster.setFromCamera(_mouse, camera);
 
+        // 1) Prefer dedicated shelf pick meshes (incl. fat proxies)
+        const shelfMeshes = (window.shelfPickMeshes || []).filter(function (m) {
+            return m && m.visible !== false && m.parent;
+        });
+        debug.shelfMeshCount = shelfMeshes.length;
+        const shelfHits = shelfMeshes.length
+            ? _raycaster.intersectObjects(shelfMeshes, false)
+            : [];
+        debug.shelfHitCount = shelfHits.length;
+
+        // Scene hits for debug + occlusion
         const roots = _pickRoots();
-        if (!roots.length) return null;
-        const hits = _raycaster.intersectObjects(roots, true);
-        for (let i = 0; i < hits.length; i++) {
-            const obj = hits[i].object;
-            if (_isIgnorableSceneMesh(obj)) continue;
-            // First real mesh: shelf → pick; door (incl. peek-hover) / wall / board → block
-            if (_isShelfPickTarget(obj)) return obj;
+        const sceneHits = roots.length ? _raycaster.intersectObjects(roots, true) : [];
+        for (let i = 0; i < Math.min(sceneHits.length, 8); i++) {
+            debug.hits.push(_describeHit(sceneHits[i].object, sceneHits[i].distance));
+        }
+
+        if (!shelfHits.length) {
+            debug.result = 'no-shelf-hit';
+            _showDebugPanel(debug);
             return null;
         }
-        return null;
+
+        const shelfDist = shelfHits[0].distance;
+        // 2) Only doors + side walls/dividers that are CLOSER than the shelf can block
+        for (let i = 0; i < sceneHits.length; i++) {
+            const h = sceneHits[i];
+            if (h.distance >= shelfDist - 0.05) break;
+            const obj = h.object;
+            if (_isIgnorableSceneMesh(obj)) continue;
+            if (_isShelfPickTarget(obj)) continue;
+            if (_isDoorMesh(obj) || _isSideWallOccluder(obj)) {
+                const d = _describeHit(obj, h.distance);
+                debug.blockedBy = (d.door ? 'DOOR ' : 'WALL ') + (d.partId || '') + ' @' + d.d;
+                debug.result = 'blocked';
+                _showDebugPanel(debug);
+                return null;
+            }
+        }
+
+        debug.result = 'shelf';
+        _showDebugPanel(debug);
+        return shelfHits[0].object;
     }
 
     function _showTrash() {
@@ -404,6 +552,21 @@
     window.handleShelfPickPointerUp = function (e) {
         if (!_enabled()) {
             if (_selectedMesh) _clearSelectionVisual();
+            if (_debugEnabled()) {
+                _showDebugPanel({
+                    enabled: false,
+                    enabledReason: _enabledReason(),
+                    doorsVisible: window._doorsVisible !== false,
+                    hasDoors: (typeof state !== 'undefined' && state) ? (state.hasDoors !== false) : '?',
+                    preset: (typeof state !== 'undefined' && state) ? (state.presetId || '') : '',
+                    wingEdit: (typeof state !== 'undefined' && state) ? !!state.wingEditMode : false,
+                    shelfMeshCount: (window.shelfPickMeshes || []).length,
+                    shelfHitCount: 0,
+                    hits: [],
+                    result: 'disabled',
+                    blockedBy: ''
+                });
+            }
             return 'none';
         }
         if (e.target && e.target.closest && e.target.closest('#sp-shelf-trash')) return 'handled';

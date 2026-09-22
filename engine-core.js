@@ -1766,6 +1766,7 @@ function _registerDoorMesh(mesh) {
     // In wing-edit mode only the active wing's doors should be tracked (picking/tools).
     // Outside edit mode register every rendered door — needed for corner/multi-wing open↔close.
     if (state.wingEditMode && !_isActiveWingBuild) return;
+    mesh.userData.isCabinetDoor = true;
     doorMeshes.push(mesh);
     window.doorMeshes = doorMeshes;
 }
