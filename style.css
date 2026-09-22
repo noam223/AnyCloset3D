@@ -1824,7 +1824,9 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); box-sha
 #dimensions-layer { z-index: 17; }
 #buttons-layer { z-index: 18; }
 #drag-handles-layer { z-index: 15; }
-#col-widths-layer { z-index: 14; }
+#col-widths-layer { z-index: 14; opacity: 0; }
+#col-widths-layer.hover-ui-hidden,
+#col-widths-layer.hover-ui-hidden .col-width-label { pointer-events: none !important; }
 
 .dim-container {
     position: absolute; transform: translate(-50%, -50%); pointer-events: auto;
@@ -1846,7 +1848,7 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); box-sha
 .dim-container.pill-mode input[type="number"]::-webkit-outer-spin-button,
 .dim-container.pill-mode input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .dim-suffix { font-size: 11px; font-weight: 600; color: var(--text-light); margin-right: 3px; }
-/* Column width labels: always visible above each column (in col-widths-layer, not dimensions-layer) */
+/* Column and partition widths: hidden until the pointer is on the cabinet, same as cell dims */
 .col-width-label {
     position: absolute;
     transform: translate(-50%, -50%);

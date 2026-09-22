@@ -588,7 +588,7 @@ window._toggleHoneycombColumnMerge = function(leftColIdx, startR, endR) {
 function buildDimensionsAndButtonsUI() {
     dimLayer.innerHTML = '';
     buttonsLayer.innerHTML = '';
-    // ---- Column width labels (always-visible layer, separate from hover-fade dimensions-layer) ----
+    // ---- Column and partition widths (same hover fade as cell dimensions) ----
     const colWidthsLayer = document.getElementById('col-widths-layer');
     if (colWidthsLayer) colWidthsLayer.innerHTML = '';
     if (state.viewMode !== 'front') return;
@@ -5989,11 +5989,27 @@ window._setRangeEl = function(el, v) {
     window._syncRangeFill(el);
 };
 
+function _setCanvasHoverLayersVisible(show) {
+    ['dimensions-layer', 'buttons-layer', 'drag-handles-layer', 'col-widths-layer'].forEach(function(id) {
+        var layer = document.getElementById(id);
+        if (!layer) return;
+        if (show) {
+            layer.style.transition = 'none';
+            layer.style.opacity = '1';
+            layer.classList.remove('hover-ui-hidden');
+        } else {
+            layer.style.transition = 'opacity 0.3s ease-out';
+            layer.style.opacity = '0';
+            layer.classList.add('hover-ui-hidden');
+        }
+    });
+}
+
 function _isCanvasOverlayUiTarget(el) {
     if (!el || !el.closest) return false;
     return !!el.closest(
         '#column-quick-edit, #full-corner-quick-edit, #bottom-floating-toolbar, #bed-toolbar, #room-props-row, #room-furniture-toolbar, #room-plan-layer, #btn-room-plan-view-toggle, ' +
-        '.drag-handle, .dim-container, .plus-btn, .fc-cell-btn, .select-all-col-btn, .cell-select-btn, .sub-cell-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn'
+        '.drag-handle, .dim-container, .col-width-label, .plus-btn, .fc-cell-btn, .select-all-col-btn, .cell-select-btn, .sub-cell-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn'
     );
 }
 
@@ -6804,24 +6820,11 @@ function bindUI() {
             buildDragHandlesUI();
         }
 
-        const isOverUI = e.target.closest('#dimensions-layer, #buttons-layer, #drag-handles-layer, #column-quick-edit, #bottom-floating-toolbar');
+        const isOverUI = e.target.closest('#dimensions-layer, #buttons-layer, #drag-handles-layer, #col-widths-layer, #column-quick-edit, #bottom-floating-toolbar');
         const isSelected = state.selection.colIndex !== -1;
-        const shouldShowUI = (hoverCol !== -1) || isOverUI || isSelected || state.hoveredDesk;
-
-        ['dimensions-layer', 'buttons-layer', 'drag-handles-layer'].forEach(id => {
-            const layer = document.getElementById(id);
-            if (layer) {
-                if (shouldShowUI) {
-                    layer.style.transition = 'none'; 
-                    layer.style.opacity = '1';
-                    layer.style.removeProperty('pointer-events');
-                } else {
-                    layer.style.transition = 'opacity 0.3s ease-out'; 
-                    layer.style.opacity = '0';
-                    layer.style.removeProperty('pointer-events');
-                }
-            }
-        });
+        const widthFocused = document.activeElement && document.activeElement.closest && document.activeElement.closest('#col-widths-layer');
+        const shouldShowUI = (hoverCol !== -1) || isOverUI || isSelected || state.hoveredDesk || widthFocused;
+        _setCanvasHoverLayersVisible(shouldShowUI);
     });
 
     window._replayCanvasPointerMove = function() {
@@ -6845,14 +6848,8 @@ function bindUI() {
         }
         state.hoveredDesk = false;
         if (state.selection.colIndex !== -1) return;
-        ['dimensions-layer', 'buttons-layer', 'drag-handles-layer'].forEach(id => {
-            const layer = document.getElementById(id);
-            if (layer) {
-                layer.style.transition = 'opacity 0.3s ease-out';
-                layer.style.opacity = '0';
-                layer.style.removeProperty('pointer-events');
-            }
-        });
+        if (document.activeElement && document.activeElement.closest && document.activeElement.closest('#col-widths-layer')) return;
+        _setCanvasHoverLayersVisible(false);
     });
 
     // Track pointerdown position to distinguish click vs drag
