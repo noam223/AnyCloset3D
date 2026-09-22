@@ -209,37 +209,67 @@
         return null;
     }
 
-    function _partIdOf(mesh) {
-        return String((mesh && mesh.userData && mesh.userData.partId) || '');
+    function _isShelfPickTarget(obj) {
+        if (!obj || !obj.userData) return false;
+        if (obj.userData.isShelfPickProxy || obj.userData.shelfRef || obj.userData.shelfVisual) return true;
+        return !!_parseShelfRef(obj);
     }
 
-    /** Walls / dividers / back that can hide a shelf from the camera. */
-    function _isBodyOccluder(mesh) {
-        if (!mesh || mesh.visible === false) return false;
-        if (mesh.userData && (mesh.userData.isShelfPickProxy || mesh.userData.shelfRef)) return false;
-        const id = _partIdOf(mesh);
-        // Scoped ids look like "center:wall_left" / "cart1:divider_c0"
-        return /(?:^|:)(wall_left|wall_right|divider_|back_)/.test(id);
+    /** Helpers / ghost hitboxes that must not steal the pick ray. */
+    function _isIgnorableSceneMesh(obj) {
+        if (!obj || obj.visible === false) return true;
+        if (obj.isLine || obj.isLineSegments || obj.isPoints) return true;
+        const ud = obj.userData || {};
+        if (_isShelfPickTarget(obj)) return false;
+        // Wing / companion / dead-zone hit boxes
+        if (ud.wingId != null || ud.spaceCompanion || ud.spaceSlot != null) return true;
+        if (ud.noHighlight) return true;
+        if (ud.isCornerDesk) return true;
+        const mats = Array.isArray(obj.material) ? obj.material : (obj.material ? [obj.material] : []);
+        if (!mats.length) return true;
+        let invisible = true;
+        for (let i = 0; i < mats.length; i++) {
+            const m = mats[i];
+            if (!m) continue;
+            const op = (m.opacity != null) ? m.opacity : 1;
+            if (m.colorWrite === false || op <= 0.001) continue;
+            invisible = false;
+            break;
+        }
+        return invisible;
     }
 
-    function _collectShelfOccluders() {
-        const out = [];
-        const seen = new Set();
-        function add(m) {
-            if (!m || seen.has(m) || m.visible === false) return;
-            seen.add(m);
-            out.push(m);
+    /**
+     * When facades are shown, shelves in a column that has doors are not pickable —
+     * even if door hover makes the door translucent and reveals the interior.
+     */
+    function _shelfBlockedByColumnDoor(ref) {
+        if (!ref) return false;
+        if (window._doorsVisible === false) return false;
+        try {
+            if (typeof state === 'undefined' || !state) return false;
+            const aw = state.activeWing || 'center';
+            const wing = state.wings && state.wings[aw];
+            const hasDoors = wing ? (wing.hasDoors !== false) : (state.hasDoors !== false);
+            if (!hasDoors) return false;
+            const cols = (wing && wing.columns && wing.columns.length) ? wing.columns : state.columns;
+            const col = cols && cols[ref.colIndex];
+            if (!col || !Array.isArray(col.doors) || !col.doors.length) return false;
+            return true;
+        } catch (e) {
+            return false;
         }
-        // Closed doors block shelves; hidden-facades view does not
-        if (window._doorsVisible !== false) {
-            const doors = window.doorMeshes || [];
-            for (let i = 0; i < doors.length; i++) add(doors[i]);
+    }
+
+    function _pickRoots() {
+        const roots = [];
+        if (window.cabinetGroup) roots.push(window.cabinetGroup);
+        const groups = window._spaceCompanionGroups || [];
+        for (let i = 0; i < groups.length; i++) {
+            if (groups[i]) roots.push(groups[i]);
         }
-        const parts = window.partMeshes || [];
-        for (let i = 0; i < parts.length; i++) {
-            if (_isBodyOccluder(parts[i])) add(parts[i]);
-        }
-        return out;
+        if (!roots.length && window.scene) roots.push(window.scene);
+        return roots;
     }
 
     function _raycast(event) {
@@ -252,30 +282,20 @@
         _mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
         _raycaster.setFromCamera(_mouse, camera);
 
-        let meshes = (window.shelfPickMeshes || []).filter(function (m) {
-            return m && m.visible !== false;
-        });
-        if (!meshes.length) {
-            meshes = (window.partMeshes || []).filter(function (m) {
-                return m && m.visible !== false && _parseShelfRef(m);
-            });
-        }
-        const shelfHits = _raycaster.intersectObjects(meshes, false);
-        if (!shelfHits.length) return null;
-
-        // Only pick a shelf if it is the first solid thing along the ray
-        // (not behind closed doors or side/partition/back walls).
-        const occluders = _collectShelfOccluders();
-        let nearestOcc = Infinity;
-        if (occluders.length) {
-            const occHits = _raycaster.intersectObjects(occluders, false);
-            if (occHits.length) nearestOcc = occHits[0].distance;
-        }
-        const EPS = 0.05; // cm — tiny bias so coplanar edges don't flicker
-        for (let i = 0; i < shelfHits.length; i++) {
-            if (shelfHits[i].distance < nearestOcc - EPS) {
-                return shelfHits[i].object;
+        const roots = _pickRoots();
+        if (!roots.length) return null;
+        const hits = _raycaster.intersectObjects(roots, true);
+        for (let i = 0; i < hits.length; i++) {
+            const obj = hits[i].object;
+            if (_isIgnorableSceneMesh(obj)) continue;
+            if (_isShelfPickTarget(obj)) {
+                const visual = _visualFromHit(obj);
+                const ref = _parseShelfRef(obj) || _parseShelfRef(visual);
+                if (ref && _shelfBlockedByColumnDoor(ref)) return null;
+                return obj;
             }
+            // First real mesh (door — even when peek-transparent — wall, top, drawer…) blocks
+            return null;
         }
         return null;
     }
