@@ -22,9 +22,22 @@
     const _SELECT_EMISSIVE = 0.55;
     let _listenersBound = false;
 
+    /** Corner / walk-in overview (no wing selected) — clicks must enter wing edit, not pick shelves. */
+    function _isMultiWingFreeOverview() {
+        try {
+            if (typeof state === 'undefined' || !state) return false;
+            if (state.wingEditMode) return false;
+            const p = state.presetId || '';
+            return p === 'corner-left' || p === 'corner-right' || p === 'walkin';
+        } catch (e) {
+            return false;
+        }
+    }
+
     function _enabled() {
         if (window._VIEWER_MODE) return false;
         if (document.body.classList.contains('part-paint-active')) return false;
+        if (_isMultiWingFreeOverview()) return false;
         return true;
     }
 
@@ -345,6 +358,11 @@
                 _restoreLook(_hoveredMesh);
                 _hoveredMesh = null;
             }
+            if (_selectedMesh) _clearSelectionVisual();
+            const container = _getContainer();
+            if (container && container.style && container.style.cursor === 'pointer') {
+                container.style.cursor = '';
+            }
             return;
         }
         const hit = _raycast(e);
@@ -387,7 +405,10 @@
      * @returns {'handled'|'none'}
      */
     window.handleShelfPickPointerUp = function (e) {
-        if (!_enabled()) return 'none';
+        if (!_enabled()) {
+            if (_selectedMesh) _clearSelectionVisual();
+            return 'none';
+        }
         if (e.target && e.target.closest && e.target.closest('#sp-shelf-trash')) return 'handled';
         const hit = _raycast(e);
         if (!hit) {
