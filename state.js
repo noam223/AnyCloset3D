@@ -1051,7 +1051,8 @@ window._resetEditorToDefaultLinearCabinet = function() {
 
     // Highlight linear preset + sync sidebar sections like applyPreset('linear')
     document.querySelectorAll('.preset-btn').forEach(function(btn) { btn.classList.remove('active'); });
-    const linearBtn = document.querySelector('.preset-btn[onclick="applyPreset(\'linear\')"]');
+    const linearBtn = document.getElementById('preset-btn-linear')
+        || document.querySelector('.preset-btn[onclick="applyPreset(\'linear\')"]');
     if (linearBtn) linearBtn.classList.add('active');
     const slidingBtn = document.getElementById('preset-btn-sliding');
     if (slidingBtn) slidingBtn.classList.remove('active');

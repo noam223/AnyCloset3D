@@ -1076,6 +1076,38 @@ body {
     box-shadow: 0 0 16px rgba(37,99,235,0.4);
 }
 
+/* Magic-wand badge on linear preset — cabinet templates */
+.preset-btn--with-wand {
+    overflow: visible;
+}
+.preset-btn-wand {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    z-index: 3;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255,255,255,0.35);
+    background: linear-gradient(145deg, #8b5cf6, #6d28d9);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.62rem;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(109,40,217,0.45);
+    transition: transform 0.15s, box-shadow 0.15s;
+    pointer-events: auto;
+}
+.preset-btn-wand:hover {
+    transform: scale(1.12);
+    box-shadow: 0 3px 12px rgba(109,40,217,0.6);
+}
+.preset-btn-wand:active {
+    transform: scale(0.95);
+}
+
 /* Header dimension cards (label + value + slider) */
 .header-dims-grid {
     display: grid;

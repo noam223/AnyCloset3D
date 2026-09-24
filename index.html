@@ -39,7 +39,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260910deskMerge">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
     <link rel="stylesheet" href="style-extras.css?v=20260731rpcab">
-    <link rel="stylesheet" href="style.css?v=20260924colTplCard">
+    <link rel="stylesheet" href="style.css?v=20260924cabTpl">
     <style>
         html.thumb-only-mode #left-sidebar,
         html.thumb-only-mode #right-sidebar,
@@ -77,7 +77,10 @@
         <!-- Cabinet preset buttons -->
         <div id="cabinet-presets-row" style="margin-top:10px;">
             <div class="presets-grid presets-grid--4">
-                <button class="preset-btn" onclick="applyPreset('linear')" title="ארון רגיל">
+                <button class="preset-btn preset-btn--with-wand" id="preset-btn-linear" onclick="applyPreset('linear')" title="ארון רגיל">
+                    <span class="preset-btn-wand" role="button" tabindex="0" title="תבניות ארון" onclick="event.preventDefault();event.stopPropagation();if(typeof openCabinetTemplatesSheet==='function')openCabinetTemplatesSheet();">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    </span>
                     <img src="images/linear_closet.png" alt="ארון רגיל" style="width:36px;height:36px;object-fit:contain;opacity:0.9;">
                     <span>ארון רגיל</span>
                 </button>
@@ -2668,7 +2671,7 @@
 <script src="engine-blueprint.js?v=20260918noPlinthFix"></script>
 <script src="engine-room-plan.js?v=20260731rpcab"></script>
 <script src="tambour-color-picker.js?v=20260617scdoors"></script>
-<script src="ui.js?v=20260924extDrawerCount"></script>
+<script src="ui.js?v=20260924cabTpl"></script>
 <script src="mobile.js?v=20260916cellHDec"></script>
 <script src="part-paint.js?v=20260914A427fix"></script>
 <script src="shelf-pick.js?v=20260922sideWall"></script>
@@ -2955,6 +2958,37 @@
     </div>
 </div>
 <!-- ===== END COLUMN TEMPLATES POPUP ===== -->
+
+<!-- ===== CABINET TEMPLATES POPUP ===== -->
+<div id="cab-templates-overlay" onclick="if(event.target===this)closeCabinetTemplatesSheet()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.52);z-index:99997;flex-direction:column;justify-content:flex-end;align-items:stretch;">
+    <div id="cab-templates-sheet" style="background:#fff;border-radius:22px 22px 0 0;padding:0 0 env(safe-area-inset-bottom,0) 0;max-height:82vh;overflow-y:auto;box-shadow:0 -8px 40px rgba(0,0,0,0.22);transform:translateY(110%);transition:transform 0.28s cubic-bezier(0.32,0.72,0,1);direction:rtl;font-family:inherit;">
+        <div style="display:flex;justify-content:center;padding:12px 0 0;">
+            <div style="width:38px;height:4px;background:#e2e8f0;border-radius:2px;"></div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px 10px;">
+            <h3 style="margin:0;font-size:1.08rem;font-weight:800;color:#1e293b;display:flex;align-items:center;gap:8px;">
+                <i class="fa-solid fa-wand-magic-sparkles" style="color:#7c3aed;font-size:1rem;"></i>
+                תבניות ארון
+            </h3>
+            <button type="button" onclick="closeCabinetTemplatesSheet()" style="border:none;background:rgba(0,0,0,0.06);border-radius:50%;width:30px;height:30px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#64748b;font-size:0.85rem;">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <p style="margin:0 20px 12px;font-size:0.8rem;color:#64748b;line-height:1.45;">בחרו תבנית מוכנה להחלה על הארון הנוכחי, או שמרו את הארון שבמרחב כתבנית חדשה.</p>
+        <div style="padding:0 16px 12px;">
+            <button type="button" id="cab-templates-add-btn" onclick="addCurrentCabinetAsTemplate()" style="width:100%;padding:12px 14px;border-radius:12px;border:1.5px dashed #7c3aed;background:rgba(124,58,237,0.06);color:#6d28d9;font-size:0.9rem;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;">
+                <i class="fa-solid fa-plus"></i> הוסף את הארון הנוכחי לתבניות
+            </button>
+        </div>
+        <div id="cab-templates-empty" style="padding:28px 20px 36px;text-align:center;color:#94a3b8;">
+            <div style="font-size:2rem;margin-bottom:8px;opacity:0.7;"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+            <div style="font-weight:700;color:#64748b;margin-bottom:4px;">אין תבניות ארון עדיין</div>
+            <div style="font-size:0.82rem;line-height:1.45;">עצבו ארון ולחצו על הכפתור למעלה כדי לשמור אותו כתבנית שלמה.</div>
+        </div>
+        <div id="cab-templates-grid" class="col-tpl-grid"></div>
+    </div>
+</div>
+<!-- ===== END CABINET TEMPLATES POPUP ===== -->
 
 <!-- ===== HISTORY PANEL ===== -->
 <div id="history-panel" class="history-panel" role="menu" aria-label="היסטוריית פעולות">

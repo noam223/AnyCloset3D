@@ -2675,6 +2675,371 @@ window.applyColumnTemplate = function(id) {
     window.closeColumnTemplatesSheet();
     if (typeof _showToast === 'function') _showToast('התבנית הוחלה על העמודה ✓', 2500);
 };
+
+// ── Cabinet templates (full wardrobe) ───────────────────────────────────────
+const _CAB_TPL_STORAGE_KEY = 'anycloset_cabinet_templates_v1';
+
+window._loadCabinetTemplates = function() {
+    try {
+        const raw = localStorage.getItem(_CAB_TPL_STORAGE_KEY);
+        const list = raw ? JSON.parse(raw) : [];
+        return Array.isArray(list) ? list : [];
+    } catch (e) {
+        return [];
+    }
+};
+
+window._saveCabinetTemplates = function(list) {
+    try {
+        localStorage.setItem(_CAB_TPL_STORAGE_KEY, JSON.stringify(list || []));
+    } catch (e) {
+        console.warn('[cab-templates] save failed', e);
+        if (typeof _showToast === 'function') _showToast('⚠️ לא ניתן לשמור תבניות (אחסון מלא?)', 4000);
+    }
+};
+
+/** Serialize current editor cabinet (rawState shape) — no space-pair / no heavy blueprints. */
+window._serializeCabinetForTemplate = function() {
+    return JSON.parse(JSON.stringify({
+        cabinetModel: state.cabinetModel,
+        placement: state.placement,
+        width: state.width,
+        globalHeight: state.globalHeight,
+        depth: state.depth,
+        thickness: state.thickness,
+        plinthHeight: state.plinthHeight,
+        hasDoors: state.hasDoors,
+        handleType: state.handleType,
+        handleStyle: state.handleStyle,
+        cabinetName: '',
+        cabinetModelLabel: (state.wings && state.wings.center && state.wings.center.cabinetModelLabel) || state.cabinetModelLabel || '',
+        cabinetNotes: '',
+        manualPrice: state.manualPrice,
+        manualInstallPrice: (typeof getWing === 'function' && getWing() && getWing().manualInstallPrice != null)
+            ? getWing().manualInstallPrice : null,
+        boardMaterial: state.boardMaterial,
+        materialBody: state.materialBody,
+        materialInternal: state.materialInternal,
+        materialExternal: state.materialExternal,
+        materialDesk: state.materialDesk,
+        materialOpenCell: state.materialOpenCell,
+        materialBack: state.materialBack,
+        columns: state.columns,
+        desk: state.desk,
+        wings: state.wings,
+        activeWing: state.activeWing,
+        presetId: state.presetId || 'linear',
+        roomWall: window._roomWall || state.roomWall || 'center',
+        closureEnabled: (window._closureEnabled !== undefined) ? window._closureEnabled : true,
+        closureWidth: window._closureWidth || 1.8,
+        closureWidthRight: window._closureWidthRight || 1.8,
+        closureCeilWidth: window._closureCeilWidth || 1.8,
+        closureDepthWidth: window._closureDepthWidth || 1.8,
+        closureFrontLine: window._closureFrontLine || 'cabinet',
+        blueprintCutouts: state.blueprintCutouts || [],
+        blueprintCellDimOffsets: state.blueprintCellDimOffsets || {},
+        blueprintDimOffsets: state.blueprintDimOffsets || {},
+        blueprintInternalDimsDefault: state.blueprintInternalDimsDefault !== false,
+        blueprintCellDimShown: state.blueprintCellDimShown || {},
+        blueprintColWidthDimsDefault: state.blueprintColWidthDimsDefault !== false,
+        blueprintColWidthDimShown: state.blueprintColWidthDimShown || {},
+        blueprintHeightDimsDefault: state.blueprintHeightDimsDefault !== false,
+        partColors: (typeof window._exportLocalPartColors === 'function')
+            ? window._exportLocalPartColors()
+            : JSON.parse(JSON.stringify(state.partColors || {}))
+    }));
+};
+
+window._captureCabinetTemplateThumbnail = function() {
+    const cam = window.camera;
+    const ctrl = window.controls;
+    const ren = window.renderer;
+    const scn = window.scene;
+    if (!cam || !ctrl || !ren || !scn || typeof _captureFrameAtView !== 'function') return null;
+
+    const savedCamPos = cam.position.clone();
+    const savedTarget = ctrl.target.clone();
+    const savedCamAnim = window._camAnim;
+    const savedCamFov = cam.fov;
+    const originalViewMode = state.viewMode;
+    const originalDoorsVisible = window._doorsVisible;
+    window._doorsVisible = true;
+
+    const snapCenterWing = state.wings && state.wings.center;
+    const snapCols = snapCenterWing && snapCenterWing.columns && snapCenterWing.columns.length > 0
+        ? snapCenterWing.columns : null;
+    const snapW = snapCenterWing ? snapCenterWing.width : state.width;
+    const snapH = snapCols ? Math.max.apply(null, snapCols.map(function(c) { return c.height || 0; })) : state.globalHeight;
+    let focusX = 0;
+    let focusY = snapH / 2;
+    try {
+        const pairInfoFocus = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
+        if (pairInfoFocus && pairInfoFocus.count >= 2 && typeof window._spaceOffsetForSlot === 'function') {
+            const off = window._spaceOffsetForSlot(pairInfoFocus.activeSlot) || { x: 0, y: 0 };
+            focusX = off.x || 0;
+            focusY = (snapH / 2) + (off.y || 0);
+        }
+    } catch (e) { /* keep origin */ }
+
+    const view = {
+        camPos: [focusX, focusY, 1],
+        camTarget: [focusX, focusY, 0],
+        fitH: snapH + 120,
+        fitW: snapW + 150
+    };
+
+    // Hide selection highlights during capture
+    const _hlSaved = [];
+    try {
+        const lists = [];
+        if (typeof hitBoxes !== 'undefined' && hitBoxes) lists.push(hitBoxes);
+        if (window.hitBoxes && window.hitBoxes !== hitBoxes) lists.push(window.hitBoxes);
+        lists.forEach(function(arr) {
+            arr.forEach(function(hb) {
+                if (!hb || !hb.material) return;
+                _hlSaved.push({ mesh: hb, opacity: hb.material.opacity, visible: hb.visible !== false });
+                hb.material.opacity = 0;
+                hb.visible = false;
+            });
+        });
+    } catch (e) { /* ignore */ }
+
+    let thumb = null;
+    try {
+        window._spaceCaptureCompanionOpacity = 0.08;
+        thumb = _captureFrameAtView(cam, ctrl, ren, scn, view, true);
+    } catch (e) {
+        console.warn('[cab-templates] thumb capture failed', e);
+    } finally {
+        window._spaceCaptureCompanionOpacity = null;
+        _hlSaved.forEach(function(s) {
+            if (!s.mesh) return;
+            if (s.mesh.material) s.mesh.material.opacity = s.opacity;
+            s.mesh.visible = s.visible;
+        });
+        cam.fov = savedCamFov;
+        cam.updateProjectionMatrix();
+        cam.position.copy(savedCamPos);
+        ctrl.target.copy(savedTarget);
+        ctrl.update();
+        window._camAnim = savedCamAnim;
+        state.viewMode = originalViewMode;
+        window._doorsVisible = originalDoorsVisible;
+        if (typeof updateCameraView === 'function') updateCameraView();
+        if (typeof buildCabinet === 'function') buildCabinet();
+        ren.render(scn, cam);
+    }
+    return thumb;
+};
+
+/** Apply template rawState into the current editor without changing cart index / space pair. */
+window._applyCabinetTemplateRawState = function(rawState) {
+    if (!rawState) return false;
+    const rs = JSON.parse(JSON.stringify(rawState));
+    const savedName = state.cabinetName;
+    const savedNotes = state.cabinetNotes;
+    const savedEditIdx = state.editingCartIndex;
+
+    if (rs.wings) {
+        if (typeof window._restoreWingsFromSaved === 'function') {
+            window._restoreWingsFromSaved(rs.wings);
+        } else {
+            state.wings.center = rs.wings.center || state.wings.center;
+            state.wings.left = rs.wings.left || null;
+            state.wings.right = rs.wings.right || null;
+        }
+        state.activeWing = rs.activeWing || 'center';
+        state.presetId = rs.presetId || 'linear';
+    } else {
+        state.presetId = rs.presetId || 'linear';
+        state.activeWing = 'center';
+        state.wings.left = null;
+        state.wings.right = null;
+        const flatFields = ['cabinetModel','placement','width','globalHeight','depth','thickness',
+            'plinthHeight','hasDoors','handleType','handleStyle','cabinetModelLabel','manualPrice','boardMaterial',
+            'materialBody','materialInternal','materialExternal','materialDesk','materialOpenCell',
+            'materialBack','columns','desk'];
+        flatFields.forEach(function(f) { if (rs[f] !== undefined) state[f] = rs[f]; });
+    }
+
+    // Keep the cabinet name / notes / cart slot of the project item being edited
+    state.cabinetName = savedName;
+    if (state.wings && state.wings.center) state.wings.center.cabinetName = savedName;
+    state.cabinetNotes = savedNotes;
+    state.editingCartIndex = savedEditIdx;
+
+    state.wingEditMode = false;
+    state.wingEditSnapshot = null;
+
+    const loadedPreset = state.presetId || 'linear';
+    const isLinearPreset = (loadedPreset === 'linear' || loadedPreset === 'sliding');
+    if (isLinearPreset) {
+        state.viewMode = 'front';
+        window._orbitFree = false;
+    } else {
+        state.viewMode = '3d';
+        window._orbitFree = false;
+    }
+    document.querySelectorAll('.view-btn').forEach(function(b) { b.classList.remove('active'); });
+    const activeViewBtn = document.getElementById('btn-front-view');
+    if (activeViewBtn) activeViewBtn.classList.add('active');
+
+    window._roomWall = rs.roomWall || 'center';
+    state.roomWall = window._roomWall;
+    window._closureEnabled = true;
+    window._closureWidth = rs.closureWidth || 1.8;
+    window._closureWidthRight = rs.closureWidthRight || 1.8;
+    window._closureCeilWidth = rs.closureCeilWidth || 1.8;
+    window._closureDepthWidth = rs.closureDepthWidth || 1.8;
+    window._closureFrontLine = rs.closureFrontLine || 'cabinet';
+    if (typeof window._updateRoomWallUI === 'function') window._updateRoomWallUI();
+
+    state.blueprintCutouts = rs.blueprintCutouts ? JSON.parse(JSON.stringify(rs.blueprintCutouts)) : [];
+    state.blueprintCellDimOffsets = rs.blueprintCellDimOffsets ? JSON.parse(JSON.stringify(rs.blueprintCellDimOffsets)) : {};
+    state.blueprintDimOffsets = rs.blueprintDimOffsets ? JSON.parse(JSON.stringify(rs.blueprintDimOffsets)) : {};
+    state.blueprintInternalDimsDefault = rs.blueprintInternalDimsDefault !== false;
+    state.blueprintCellDimShown = rs.blueprintCellDimShown ? JSON.parse(JSON.stringify(rs.blueprintCellDimShown)) : {};
+    state.blueprintColWidthDimsDefault = rs.blueprintColWidthDimsDefault !== false;
+    state.blueprintColWidthDimShown = rs.blueprintColWidthDimShown ? JSON.parse(JSON.stringify(rs.blueprintColWidthDimShown)) : {};
+    state.blueprintHeightDimsDefault = rs.blueprintHeightDimsDefault !== false;
+
+    if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
+    if (typeof window._importLocalPartColors === 'function' && savedEditIdx >= 0) {
+        window._importLocalPartColors('cart' + savedEditIdx, rs.partColors);
+    } else if (rs.partColors) {
+        state.partColors = JSON.parse(JSON.stringify(rs.partColors));
+    }
+
+    if (typeof window._restorePresetUI === 'function') window._restorePresetUI();
+    if (typeof window._syncSpacePairTabs === 'function') window._syncSpacePairTabs();
+    if (typeof clearSelection === 'function') clearSelection();
+    if (typeof buildCabinet === 'function') buildCabinet();
+    if (typeof updateCameraView === 'function') updateCameraView();
+    if (typeof calculatePrice === 'function') calculatePrice();
+    if (typeof updateLeftSidebar === 'function') updateLeftSidebar({ scrollToActive: true });
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+    return true;
+};
+
+window.openCabinetTemplatesSheet = function() {
+    if (window._VIEWER_MODE) return;
+    const overlay = document.getElementById('cab-templates-overlay');
+    if (!overlay) return;
+    overlay.style.display = 'flex';
+    requestAnimationFrame(function() {
+        const sheet = document.getElementById('cab-templates-sheet');
+        if (sheet) sheet.style.transform = 'translateY(0)';
+    });
+    window._renderCabinetTemplatesSheet();
+};
+
+window.closeCabinetTemplatesSheet = function() {
+    const overlay = document.getElementById('cab-templates-overlay');
+    const sheet = document.getElementById('cab-templates-sheet');
+    if (sheet) sheet.style.transform = 'translateY(110%)';
+    setTimeout(function() {
+        if (overlay) overlay.style.display = 'none';
+    }, 220);
+};
+
+window._renderCabinetTemplatesSheet = function() {
+    const grid = document.getElementById('cab-templates-grid');
+    const emptyEl = document.getElementById('cab-templates-empty');
+    if (!grid) return;
+    const list = window._loadCabinetTemplates();
+    grid.innerHTML = '';
+
+    if (!list.length) {
+        if (emptyEl) emptyEl.style.display = '';
+    } else if (emptyEl) {
+        emptyEl.style.display = 'none';
+    }
+
+    list.forEach(function(tpl, idx) {
+        const card = document.createElement('div');
+        card.className = 'col-tpl-card';
+        card.title = 'החל על הארון הנוכחי';
+        const name = String(tpl.name || ('תבנית ארון ' + (idx + 1))).trim() || ('תבנית ארון ' + (idx + 1));
+        const safeName = name
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+        const dims = (tpl.sourceWidth && tpl.sourceHeight)
+            ? (Math.round(tpl.sourceWidth) + '×' + Math.round(tpl.sourceHeight) + ' ס״מ')
+            : '';
+        const thumb = tpl.thumbnail
+            ? '<div class="col-tpl-thumb-wrap"><img class="col-tpl-thumb" src="' + tpl.thumbnail + '" alt=""></div>'
+            : '<div class="col-tpl-thumb-wrap"><div class="col-tpl-thumb col-tpl-thumb--empty"><i class="fa-solid fa-warehouse"></i></div></div>';
+        card.innerHTML =
+            thumb +
+            '<div class="col-tpl-card-meta">' +
+                '<div class="col-tpl-card-name">' + safeName + '</div>' +
+                (dims ? '<div style="font-size:0.72rem;color:#94a3b8;margin-top:2px;">' + dims + '</div>' : '') +
+            '</div>' +
+            '<button type="button" class="col-tpl-del" title="מחק תבנית"><i class="fa-solid fa-trash"></i></button>';
+        card.addEventListener('click', function(e) {
+            if (e.target.closest('.col-tpl-del')) return;
+            window.applyCabinetTemplate(tpl.id);
+        });
+        const delBtn = card.querySelector('.col-tpl-del');
+        if (delBtn) {
+            delBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                window.deleteCabinetTemplate(tpl.id);
+            });
+        }
+        grid.appendChild(card);
+    });
+};
+
+window.addCurrentCabinetAsTemplate = function() {
+    if (!state || !state.wings) {
+        if (typeof _showToast === 'function') _showToast('אין ארון לשמירה', 2500);
+        return;
+    }
+
+    const list = window._loadCabinetTemplates();
+    const defaultName = 'תבנית ארון ' + (list.length + 1);
+    const typed = window.prompt('שם תבנית הארון:', defaultName);
+    if (typed === null) return;
+    const name = String(typed).trim() || defaultName;
+
+    const rawState = window._serializeCabinetForTemplate();
+    const thumb = window._captureCabinetTemplateThumbnail();
+    const tpl = {
+        id: 'cab_' + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36),
+        name: name,
+        createdAt: Date.now(),
+        sourceWidth: Math.round(state.width || 0),
+        sourceHeight: Math.round(state.globalHeight || 0),
+        sourceDepth: Math.round(state.depth || 0),
+        presetId: state.presetId || 'linear',
+        thumbnail: thumb,
+        rawState: rawState
+    };
+    list.push(tpl);
+    window._saveCabinetTemplates(list);
+    window._renderCabinetTemplatesSheet();
+    if (typeof _showToast === 'function') _showToast('תבנית הארון "' + name + '" נשמרה ✓', 2800);
+};
+
+window.deleteCabinetTemplate = function(id) {
+    let list = window._loadCabinetTemplates();
+    list = list.filter(function(t) { return t.id !== id; });
+    window._saveCabinetTemplates(list);
+    window._renderCabinetTemplatesSheet();
+    if (typeof _showToast === 'function') _showToast('התבנית נמחקה', 2000);
+};
+
+window.applyCabinetTemplate = function(id) {
+    const list = window._loadCabinetTemplates();
+    const tpl = list.find(function(t) { return t.id === id; });
+    if (!tpl || !tpl.rawState) return;
+    window._applyCabinetTemplateRawState(tpl.rawState);
+    window.closeCabinetTemplatesSheet();
+    if (typeof _showToast === 'function') _showToast('תבנית הארון הוחלה ✓', 2500);
+};
 // ─────────────────────────────────────────────────────────────────────────────
 
 function toggleSelection(c, r) {
