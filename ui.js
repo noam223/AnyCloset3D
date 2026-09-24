@@ -2253,7 +2253,23 @@ function _colTplMeasureCells(srcCol) {
     return cells;
 }
 
-/** Apply template to target column with >240 top-shelf / empty-cell rules. */
+function _colTplCompHasSorbet(comp) {
+    if (!comp) return false;
+    if (comp.type === 'sorbet') return true;
+    if (comp.type === 'partition' && Array.isArray(comp.subCells)) {
+        return comp.subCells.some(function(sub) {
+            if (!sub) return false;
+            if (sub.type === 'sorbet') return true;
+            const zones = sub.zones || [];
+            return zones.some(function(z) { return z && z.type === 'sorbet'; });
+        });
+    }
+    const zones = comp.zones || [];
+    return zones.some(function(z) { return z && z.type === 'sorbet'; });
+}
+
+/** Apply template to target column with >240 extra-shelf / empty-cell rules.
+ *  Default: add empty cell at top. If top cell is sorbet — add empty cell at bottom so sorbet stays upper. */
 window._applyColumnTemplateToCol = function(target, tplData) {
     if (!target || !tplData || !tplData.column) return;
     const src = JSON.parse(JSON.stringify(tplData.column));
@@ -2298,9 +2314,13 @@ window._applyColumnTemplateToCol = function(target, tplData) {
     measureCol.noPlinth = savedNoPlinth;
     let cells = _colTplMeasureCells(measureCol);
 
-    const addTopShelf = Ht > Hs;
-    if (addTopShelf) {
-        cells.push({ h: 0, locked: false, comp: { type: 'empty' } });
+    const addExtraShelf = Ht > Hs;
+    // cells[0] = bottom, cells[n-1] = top
+    const topHasSorbet = cells.length > 0 && _colTplCompHasSorbet(cells[cells.length - 1].comp);
+    if (addExtraShelf) {
+        const extra = { h: 0, locked: false, comp: { type: 'empty' } };
+        if (topHasSorbet) cells.unshift(extra); // grow from bottom — keep sorbet at top
+        else cells.push(extra); // default: grow from top
     }
 
     const t = state.thickness;
@@ -2321,7 +2341,7 @@ window._applyColumnTemplateToCol = function(target, tplData) {
     });
 
     // If exact design height and no extra shelf — prefer original shelvesY
-    if (!addTopShelf && Math.abs(Ht - Hs) < 0.5 && Array.isArray(src.shelvesY)) {
+    if (!addExtraShelf && Math.abs(Ht - Hs) < 0.5 && Array.isArray(src.shelvesY)) {
         target.compartments = cells.map(function(c) { return c.comp; });
         target.shelvesY = src.shelvesY.slice();
         target.shelves = target.shelvesY.length;
@@ -2648,7 +2668,6 @@ window.applyColumnTemplate = function(id) {
 
     window._applyColumnTemplateToCol(target, tpl);
     if (typeof checkSplits === 'function') checkSplits();
-    if (typeof selectAllColumn === 'function') selectAllColumn(idx);
     if (typeof buildCabinet === 'function') buildCabinet();
     if (typeof calculatePrice === 'function') calculatePrice();
     if (typeof saveHistoryState === 'function') saveHistoryState();
