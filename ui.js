@@ -207,10 +207,10 @@ function _onCompartmentTypeChangedForDeskMerge(comp, row, colIndex) {
 window._onCompartmentTypeChangedForDeskMerge = _onCompartmentTypeChangedForDeskMerge;
 
 // Returns the displayed cell height (cm) of compartment row r in column col.
-// Returns a rounded integer to match what the dimension label shows (Math.round).
+// Rounded to 0.1 cm to match the on-screen dimension label.
 function _cellHeight(col, r, wingData) {
     if (typeof _compartmentBounds === 'function') {
-        return Math.round(_compartmentBounds(col, r, wingData).h);
+        return Math.round(_compartmentBounds(col, r, wingData).h * 10) / 10;
     }
     const plinthH = wingData ? wingData.plinthHeight : state.plinthHeight;
     const t       = wingData ? wingData.thickness    : state.thickness;
@@ -218,7 +218,7 @@ function _cellHeight(col, r, wingData) {
     const startY  = fo > 0 ? fo + t : ((col.type === 'desk') ? col.deskHeight + col.deskClearance + t : (col.noPlinth ? t : plinthH + t));
     const bottomY = (r === 0) ? startY : col.shelvesY[r - 1] + t / 2;
     const topY    = (r >= col.shelvesY.length) ? col.height - t : col.shelvesY[r] - t / 2;
-    return Math.round(Math.max(0, topY - bottomY));
+    return Math.round(Math.max(0, topY - bottomY) * 10) / 10;
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -5069,7 +5069,10 @@ window.applyEqualCells = function() {
     if (endR - startR + 1 !== selRows.length) return; // not consecutive — do nothing
 
     const t = state.thickness;
-    const baseY = (col.type === 'desk') ? col.deskHeight + col.deskClearance : state.plinthHeight;
+    const fo = col.floorOffset || 0;
+    const baseY = (col.type === 'desk')
+        ? ((col.deskHeight || 0) + (col.deskClearance || 0))
+        : (col.noPlinth ? 0 : state.plinthHeight);
     const splitY = col.splitY;
     const hasSplit = splitY && splitY > baseY + t && splitY < col.height - t;
     const bottomShelves = hasSplit
@@ -5080,47 +5083,77 @@ window.applyEqualCells = function() {
         ? col.compartments.length - 1
         : ((col.shelves || 0) + (hasSplit ? 1 : 0));
 
-    const _equalizeBetween = (bottomBound, topBound, shelfIndices) => {
+    /** Equalize CLEAR cell heights (0.1 cm) between interior spanBottom..spanTop. */
+    const _equalizeBetween = (spanBottom, spanTop, shelfIndices) => {
         if (!shelfIndices.length) return;
         const numCells = shelfIndices.length + 1;
-        const tMM = Math.round(t * 10);
-        const totalSpanMM = Math.round((topBound - bottomBound) * 10);
-        const pureCellSpaceMM = totalSpanMM - numCells * tMM;
-        if (pureCellSpaceMM <= 0) return;
-        const floorCellMM = Math.floor(pureCellSpaceMM / numCells);
-        const numLargerCells = pureCellSpaceMM % numCells;
-        let curPosMM = Math.round(bottomBound * 10);
-        for (let k = 0; k < shelfIndices.length; k++) {
-            const thisCellMM = (k < numLargerCells) ? (floorCellMM + 1) : floorCellMM;
-            curPosMM += thisCellMM + tMM;
-            col.shelvesY[shelfIndices[k]] = curPosMM / 10;
+        const numShelves = shelfIndices.length;
+        const botT = Math.round(spanBottom * 10);
+        const topT = Math.round(spanTop * 10);
+        const tT = Math.round(t * 10);
+        const pureT = topT - botT - numShelves * tT;
+        if (pureT <= 0) return;
+        const floorCellT = Math.floor(pureT / numCells);
+        const rem = pureT % numCells;
+        let cursor = botT; // interior bottom of current cell (tenths of cm)
+        for (let k = 0; k < numShelves; k++) {
+            const cellT = floorCellT + (k < rem ? 1 : 0);
+            cursor += cellT; // underside of shelf
+            // Shelf center = underside + t/2, snapped to 0.1 cm
+            col.shelvesY[shelfIndices[k]] = Math.round(cursor + tT / 2) / 10;
+            cursor += tT; // top of shelf = next cell bottom
         }
+    };
+
+    const _interiorBottom = (rowStart) => {
+        if (rowStart === 0) {
+            if (fo > 0) return fo + t;
+            if (col.type === 'desk') return baseY + t;
+            if (col.noPlinth) return t;
+            return baseY + t;
+        }
+        if (hasSplit && rowStart === splitRowBoundary) return splitY + t;
+        if (hasSplit && rowStart > splitRowBoundary) {
+            const shelfIdx = rowStart - 2;
+            if (col.shelvesY[shelfIdx] !== undefined) return col.shelvesY[shelfIdx] + t / 2;
+            return splitY + t;
+        }
+        if (col.shelvesY[rowStart - 1] !== undefined) return col.shelvesY[rowStart - 1] + t / 2;
+        return baseY + t;
+    };
+
+    const _interiorTop = (rowEnd) => {
+        if (hasSplit && rowEnd >= bottomShelves && rowEnd < splitRowBoundary) {
+            return splitY - t; // underside of קושרת (2t)
+        }
+        if (rowEnd >= lastRow) return col.height - t;
+        if (hasSplit && rowEnd >= splitRowBoundary) {
+            if (rowEnd >= lastRow) return col.height - t;
+            if (col.shelvesY[rowEnd - 1] !== undefined) return col.shelvesY[rowEnd - 1] - t / 2;
+            return col.height - t;
+        }
+        if (col.shelvesY[rowEnd] !== undefined) return col.shelvesY[rowEnd] - t / 2;
+        return col.height - t;
     };
 
     const _equalizeLower = (rowStart, rowEnd) => {
         if (rowEnd <= rowStart) return;
-        const bottomBound = (rowStart === 0) ? baseY
-            : (col.shelvesY[rowStart - 1] !== undefined ? col.shelvesY[rowStart - 1] : baseY);
-        const topBound = (hasSplit && rowEnd >= bottomShelves) ? splitY
-            : (col.shelvesY[rowEnd] !== undefined ? col.shelvesY[rowEnd] : col.height);
         const idxs = [];
         const shelfTo = Math.min(rowEnd, bottomShelves) - 1;
         for (let i = rowStart; i <= shelfTo; i++) idxs.push(i);
-        _equalizeBetween(bottomBound, topBound, idxs);
+        if (!idxs.length) return;
+        _equalizeBetween(_interiorBottom(rowStart), _interiorTop(rowEnd), idxs);
     };
 
     const _equalizeUpper = (rowStart, rowEnd) => {
         if (!hasSplit || rowEnd <= rowStart) return;
-        const bottomBound = (rowStart === splitRowBoundary) ? splitY
-            : (col.shelvesY[rowStart - 2] !== undefined ? col.shelvesY[rowStart - 2] : splitY);
-        const topBound = (rowEnd >= lastRow) ? col.height
-            : (col.shelvesY[rowEnd - 1] !== undefined ? col.shelvesY[rowEnd - 1] : col.height);
         const idxs = [];
         for (let r = rowStart; r < rowEnd; r++) {
             const shelfIdx = r - 1;
             if (shelfIdx >= bottomShelves && shelfIdx < col.shelvesY.length) idxs.push(shelfIdx);
         }
-        _equalizeBetween(bottomBound, topBound, idxs);
+        if (!idxs.length) return;
+        _equalizeBetween(_interiorBottom(rowStart), _interiorTop(rowEnd), idxs);
     };
 
     if (!hasSplit) {
