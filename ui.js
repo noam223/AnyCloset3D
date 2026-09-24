@@ -2365,17 +2365,16 @@ window._captureColumnThumbnail = function(colIndex) {
         const ren = (typeof renderer !== 'undefined') ? renderer : null;
         const cam = (typeof camera !== 'undefined') ? camera : null;
         const scn = (typeof scene !== 'undefined') ? scene : null;
+        const ctrl = (typeof controls !== 'undefined') ? controls : (window.controls || null);
         const col = state.columns && state.columns[colIndex];
         if (!ren || !cam || !scn || !col) return null;
 
-        // Column center X from selectAll handle if available
         let centerX = 0;
         const sel = (typeof dragHandlesData !== 'undefined' && dragHandlesData && dragHandlesData.selectAll)
             ? dragHandlesData.selectAll.find(function(s) { return s.colIndex === colIndex; })
             : null;
         if (sel) centerX = sel.x - 5;
         else {
-            // Fallback: walk columns
             const t = state.thickness;
             let x = -state.width / 2 + t;
             for (let i = 0; i < colIndex; i++) {
@@ -2384,16 +2383,22 @@ window._captureColumnThumbnail = function(colIndex) {
             centerX = x + col.width / 2;
         }
 
-        const halfW = (col.width || 40) / 2 + 3;
-        const y0 = 0;
-        const y1 = col.height || 240;
-        const z = (state.depth || 54) / 2;
+        const halfW = (col.width || 40) / 2 + 6;
+        const fo = col.floorOffset || 0;
+        const y0 = Math.min(0, fo) - 4;
+        const y1 = (col.height || 240) + 8;
+        const zFront = (state.depth || 54) / 2 + 2;
+        const zBack = -(state.depth || 54) / 2 - 2;
 
         const corners = [
-            new THREE.Vector3(centerX - halfW, y0, z),
-            new THREE.Vector3(centerX + halfW, y0, z),
-            new THREE.Vector3(centerX - halfW, y1, z),
-            new THREE.Vector3(centerX + halfW, y1, z)
+            new THREE.Vector3(centerX - halfW, y0, zFront),
+            new THREE.Vector3(centerX + halfW, y0, zFront),
+            new THREE.Vector3(centerX - halfW, y1, zFront),
+            new THREE.Vector3(centerX + halfW, y1, zFront),
+            new THREE.Vector3(centerX - halfW, y0, zBack),
+            new THREE.Vector3(centerX + halfW, y0, zBack),
+            new THREE.Vector3(centerX - halfW, y1, zBack),
+            new THREE.Vector3(centerX + halfW, y1, zBack)
         ];
         const group = window._activeWingGroup || window.cabinetGroup;
         if (group) {
@@ -2401,6 +2406,34 @@ window._captureColumnThumbnail = function(colIndex) {
             corners.forEach(function(p) { p.applyMatrix4(group.matrixWorld); });
         }
 
+        const savedCamPos = cam.position.clone();
+        const savedTarget = ctrl && ctrl.target ? ctrl.target.clone() : null;
+        const savedFov = cam.fov;
+        const box = new THREE.Box3().setFromPoints(corners);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        const fitH = Math.max(size.y, 40) * 1.18;
+        const fitW = Math.max(size.x, 20) * 1.35;
+        cam.fov = 40;
+        cam.updateProjectionMatrix();
+        const distY = (fitH / 2) / Math.tan(Math.PI * cam.fov / 360);
+        const distX = (fitW / 2) / Math.tan(Math.PI * cam.fov / 360) / Math.max(cam.aspect, 0.1);
+        const dist = Math.max(distY, distX, 80);
+        let camOffset = new THREE.Vector3(0, 0, dist);
+        if (group) {
+            const front = new THREE.Vector3(0, 0, 1).transformDirection(group.matrixWorld).normalize();
+            camOffset = front.multiplyScalar(dist);
+        }
+        cam.position.copy(center).add(camOffset);
+        cam.position.y = center.y;
+        if (ctrl) {
+            ctrl.target.copy(center);
+            ctrl.update();
+        } else {
+            cam.lookAt(center);
+        }
+
+        ren.render(scn, cam);
         ren.render(scn, cam);
         const canvas = ren.domElement;
         const cw = canvas.width;
@@ -2415,30 +2448,41 @@ window._captureColumnThumbnail = function(colIndex) {
             minY = Math.min(minY, sy);
             maxY = Math.max(maxY, sy);
         });
-        const pad = 8;
-        minX = Math.max(0, Math.floor(minX - pad));
-        maxX = Math.min(cw, Math.ceil(maxX + pad));
-        minY = Math.max(0, Math.floor(minY - pad));
-        maxY = Math.min(ch, Math.ceil(maxY + pad));
+        const padX = Math.max(12, (maxX - minX) * 0.08);
+        const padY = Math.max(16, (maxY - minY) * 0.06);
+        minX = Math.max(0, Math.floor(minX - padX));
+        maxX = Math.min(cw, Math.ceil(maxX + padX));
+        minY = Math.max(0, Math.floor(minY - padY));
+        maxY = Math.min(ch, Math.ceil(maxY + padY));
         const w = Math.max(8, maxX - minX);
         const h = Math.max(8, maxY - minY);
 
         const out = document.createElement('canvas');
-        // Portrait thumbnail
-        const tw = 120;
-        const th = 200;
+        const tw = 140;
+        const th = 260;
         out.width = tw;
         out.height = th;
         const ctx = out.getContext('2d');
         ctx.fillStyle = '#f1f5f9';
         ctx.fillRect(0, 0, tw, th);
-        const scale = Math.min(tw / w, th / h);
+        const scale = Math.min(tw / w, th / h) * 0.92;
         const dw = w * scale;
         const dh = h * scale;
         const dx = (tw - dw) / 2;
         const dy = (th - dh) / 2;
         ctx.drawImage(canvas, minX, minY, w, h, dx, dy, dw, dh);
-        return out.toDataURL('image/jpeg', 0.72);
+        const dataUrl = out.toDataURL('image/jpeg', 0.78);
+
+        cam.fov = savedFov;
+        cam.updateProjectionMatrix();
+        cam.position.copy(savedCamPos);
+        if (ctrl && savedTarget) {
+            ctrl.target.copy(savedTarget);
+            ctrl.update();
+        }
+        ren.render(scn, cam);
+
+        return dataUrl;
     } catch (e) {
         console.warn('[col-templates] thumbnail failed', e);
         return null;
