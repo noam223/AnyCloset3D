@@ -2533,14 +2533,19 @@ window._renderColumnTemplatesSheet = function() {
         const card = document.createElement('div');
         card.className = 'col-tpl-card';
         card.title = 'החל על העמודה';
+        const name = String(tpl.name || ('תבנית ' + (idx + 1))).trim() || ('תבנית ' + (idx + 1));
+        const safeName = name
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
         const thumb = tpl.thumbnail
-            ? '<img class="col-tpl-thumb" src="' + tpl.thumbnail + '" alt="">'
-            : '<div class="col-tpl-thumb col-tpl-thumb--empty"><i class="fa-solid fa-table-columns"></i></div>';
+            ? '<div class="col-tpl-thumb-wrap"><img class="col-tpl-thumb" src="' + tpl.thumbnail + '" alt=""></div>'
+            : '<div class="col-tpl-thumb-wrap"><div class="col-tpl-thumb col-tpl-thumb--empty"><i class="fa-solid fa-table-columns"></i></div></div>';
         card.innerHTML =
             thumb +
             '<div class="col-tpl-card-meta">' +
-                '<div class="col-tpl-card-name">' + (tpl.name || ('תבנית ' + (idx + 1))) + '</div>' +
-                '<div class="col-tpl-card-sub">' + Math.round(tpl.sourceHeight || 240) + ' ס״מ</div>' +
+                '<div class="col-tpl-card-name">' + safeName + '</div>' +
             '</div>' +
             '<button type="button" class="col-tpl-del" title="מחק תבנית"><i class="fa-solid fa-trash"></i></button>';
         card.addEventListener('click', function(e) {
@@ -2568,13 +2573,18 @@ window.addCurrentColumnAsTemplate = function() {
         return;
     }
 
+    const list = window._loadColumnTemplates();
+    const defaultName = 'תבנית ' + (list.length + 1);
+    const typed = window.prompt('שם סוג העמודה לתבנית:', defaultName);
+    if (typed === null) return; // cancelled
+    const name = String(typed).trim() || defaultName;
+
     const serialized = _serializeColumnForClipboard(col);
     serialized._height = col.height;
     const thumb = window._captureColumnThumbnail(idx);
-    const list = window._loadColumnTemplates();
     const tpl = {
         id: 'ct_' + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36),
-        name: 'תבנית ' + (list.length + 1),
+        name: name,
         createdAt: Date.now(),
         sourceHeight: Math.round(col.height),
         thumbnail: thumb,
@@ -2583,11 +2593,7 @@ window.addCurrentColumnAsTemplate = function() {
     list.push(tpl);
     window._saveColumnTemplates(list);
     window._renderColumnTemplatesSheet();
-    if (typeof _showToast === 'function') {
-        _showToast(col.height !== _COL_TPL_DESIGN_HEIGHT
-            ? ('תבנית נשמרה (גובה ' + Math.round(col.height) + ') ✓')
-            : 'תבנית עמודה נשמרה ✓', 2800);
-    }
+    if (typeof _showToast === 'function') _showToast('התבנית "' + name + '" נשמרה ✓', 2800);
 };
 
 window.deleteColumnTemplate = function(id) {
