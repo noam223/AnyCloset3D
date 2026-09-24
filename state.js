@@ -3162,7 +3162,7 @@ function _clampDrawerCompartments(col, baseY, t) {
             const cellH = Math.round(_compartmentBounds(col, r).h);
             const rules = (typeof window._drawerHeightRules === 'function')
                 ? window._drawerHeightRules(comp.type)
-                : { minH: (comp.type === 'external_drawers' ? 10 : 22), extraH: (comp.type === 'external_drawers' ? 10 : 20) };
+                : { minH: 22, extraH: 20 };
             if (cellH < rules.minH) {
                 // Never dissolve a desk-merged drawer — its height is pinned by merge shelves
                 if (!comp.mergeWithDesk) comp.type = 'empty';
