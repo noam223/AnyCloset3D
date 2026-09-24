@@ -359,9 +359,13 @@ function updateMobileCellSheetState() {
                 cellH = Math.round((col.height - state.plinthHeight) * 10) / 10;
             }
             heightInput.step = '0.1';
-            heightInput.value = (typeof window._fmtCellHeightCm === 'function')
-                ? window._fmtCellHeightCm(Math.max(0.1, cellH))
-                : String(Math.max(0.1, cellH));
+            heightInput.value = (typeof window._fmtCellHeightMm === 'function')
+                ? window._fmtCellHeightMm(Math.max(0.1, cellH))
+                : ((typeof window._fmtCellHeightCm === 'function')
+                    ? window._fmtCellHeightCm(Math.max(0.1, cellH))
+                    : String(Math.max(0.1, cellH)));
+            heightInput.title = 'גובה תא במ״מ';
+            heightInput.dataset.unit = 'mm';
             heightInput.dataset.colIndex = c;
             heightInput.dataset.rowIndex = state.selection.rows[0];
         }
@@ -824,8 +828,8 @@ function bindMobileUI() {
     const cellHeightMinus = document.getElementById('mcp-height-minus');
     const cellHeightPlus  = document.getElementById('mcp-height-plus');
     const cellHeightInput = document.getElementById('mcp-height-val');
-    if (cellHeightMinus) cellHeightMinus.addEventListener('click', () => _applyMobileCellHeight(-1));
-    if (cellHeightPlus)  cellHeightPlus.addEventListener('click',  () => _applyMobileCellHeight(1));
+    if (cellHeightMinus) cellHeightMinus.addEventListener('click', () => _applyMobileCellHeight(-0.1));
+    if (cellHeightPlus)  cellHeightPlus.addEventListener('click',  () => _applyMobileCellHeight(0.1));
     if (cellHeightInput) {
         cellHeightInput.addEventListener('change', () => {
             const c = state.selection.colIndex;
@@ -833,8 +837,11 @@ function bindMobileUI() {
             if (c === -1 || r === undefined) return;
             const col = state.columns[c];
             if (!col) return;
-            const desiredH = parseInt(cellHeightInput.value);
-            if (isNaN(desiredH) || desiredH < 10) return;
+            // Input shows mm (blueprint style) — convert to cm
+            const desiredH = (typeof window._parseCellHeightMm === 'function')
+                ? window._parseCellHeightMm(cellHeightInput.value)
+                : (parseFloat(cellHeightInput.value) / 10);
+            if (isNaN(desiredH) || desiredH < 1) return;
             const baseY = (col.type === 'desk') ? (col.deskHeight + col.deskClearance) : state.plinthHeight;
             const topY  = col.height;
             const prevY = (r === 0) ? baseY : col.shelvesY[r - 1];

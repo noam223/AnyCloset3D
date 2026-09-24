@@ -33,12 +33,23 @@ function _endDrag() {
 }
 // ────────────────────────────────────────────────────────────────────────────
 
-/** Format clear cell height (cm) with one decimal — matches shelf snap (0.1 cm). */
-function _fmtCellHeightCm(h) {
-    const n = Math.round((Number(h) || 0) * 10) / 10;
+/** Format clear cell height like blueprint: mm with 1 decimal (36.65 cm → "366.5"). */
+function _fmtCellHeightMm(hCm) {
+    const n = Math.round((Number(hCm) || 0) * 100) / 10;
     return n.toFixed(1);
 }
+window._fmtCellHeightMm = _fmtCellHeightMm;
+/** @deprecated use _fmtCellHeightMm — kept as alias for older callers */
+function _fmtCellHeightCm(h) { return _fmtCellHeightMm(h); }
 window._fmtCellHeightCm = _fmtCellHeightCm;
+
+/** Parse a blueprint-style mm label back to cm. */
+function _parseCellHeightMm(mmVal) {
+    const mm = parseFloat(mmVal);
+    if (isNaN(mm)) return NaN;
+    return Math.round(mm * 10) / 100; // mm → cm at 0.01 cm
+}
+window._parseCellHeightMm = _parseCellHeightMm;
 
 const colorNamesHebrew = {
     white_matte: 'לבן מט 2100', c3110: '3110', c795: '759', c705: '705', u727: 'U727',
@@ -207,10 +218,10 @@ function _onCompartmentTypeChangedForDeskMerge(comp, row, colIndex) {
 window._onCompartmentTypeChangedForDeskMerge = _onCompartmentTypeChangedForDeskMerge;
 
 // Returns the displayed cell height (cm) of compartment row r in column col.
-// Rounded to 0.1 cm to match the on-screen dimension label.
+// Rounded to 0.01 cm (= 0.1 mm) to match blueprint mm labels.
 function _cellHeight(col, r, wingData) {
     if (typeof _compartmentBounds === 'function') {
-        return Math.round(_compartmentBounds(col, r, wingData).h * 10) / 10;
+        return Math.round(_compartmentBounds(col, r, wingData).h * 100) / 100;
     }
     const plinthH = wingData ? wingData.plinthHeight : state.plinthHeight;
     const t       = wingData ? wingData.thickness    : state.thickness;
@@ -218,7 +229,7 @@ function _cellHeight(col, r, wingData) {
     const startY  = fo > 0 ? fo + t : ((col.type === 'desk') ? col.deskHeight + col.deskClearance + t : (col.noPlinth ? t : plinthH + t));
     const bottomY = (r === 0) ? startY : col.shelvesY[r - 1] + t / 2;
     const topY    = (r >= col.shelvesY.length) ? col.height - t : col.shelvesY[r] - t / 2;
-    return Math.round(Math.max(0, topY - bottomY) * 10) / 10;
+    return Math.round(Math.max(0, topY - bottomY) * 100) / 100;
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -694,7 +705,15 @@ function buildDimensionsAndButtonsUI() {
         const input = document.createElement('input');
         input.className = 'dim-input';
         input.type = 'number'; input.step = '0.1';
-        input.value = _fmtCellHeightCm(d.h);
+        // Cell heights show mm (like blueprint); other dims stay in cm
+        const _isCellHDim = !d.isDeskWidth && !d.isDeskHeight && !d.isDeskDrawer &&
+            !d.isInternalDeskSurface && !d.isInternalDeskClearance && !d.isInternalDeskDrawer &&
+            !d.isWingOpenWidth && !d.isColWidth;
+        input.value = _isCellHDim ? _fmtCellHeightMm(d.h) : String(Math.round((Number(d.h) || 0) * 10) / 10);
+        if (_isCellHDim) {
+            input.title = 'גובה תא במ״מ (כמו בשרטוט)';
+            input.dataset.unit = 'mm';
+        }
 
         // Wing open-width label: two-line layout — "פתח גלוי" on top, "30 ס"מ" below
         if (d.isWingOpenWidth) {
@@ -730,6 +749,8 @@ function buildDimensionsAndButtonsUI() {
         input.addEventListener('change', (e) => {
             let desiredH = parseFloat(e.target.value);
             if(isNaN(desiredH)) return;
+            // Cell-height inputs are shown in mm — convert back to cm
+            if (e.target.dataset.unit === 'mm') desiredH = desiredH / 10;
             
             if (d.isDeskWidth) {
                 state.desk.width = Math.max(40, Math.min(200, desiredH));
@@ -752,7 +773,7 @@ function buildDimensionsAndButtonsUI() {
             } else if (d.isInternalDeskDrawer) {
                 if(state.columns[d.colIndex]) state.columns[d.colIndex].drawerHeight = Math.max(8, Math.min(40, desiredH));
             } else {
-                const diff = Math.round((desiredH - d.h) * 10) / 10;
+                const diff = Math.round((desiredH - d.h) * 100) / 100;
                 const col = state.columns[d.colIndex];
                 if(!col) return;
                 const t = state.thickness;
@@ -766,8 +787,8 @@ function buildDimensionsAndButtonsUI() {
                         col.shelvesY.forEach((y, i) => { if (i !== shelfIdx) obs.push(y); });
                         const limitMin = Math.max(...obs.filter(y => y < currentY)) + MIN_SHELF_GAP + t;
                         const limitMax = Math.min(...obs.filter(y => y > currentY)) - MIN_SHELF_GAP - t;
-                        col.shelvesY[shelfIdx] = Math.round(Math.max(limitMin, Math.min(limitMax, currentY - diff)) * 10) / 10;
-                        e.target.value = _fmtCellHeightCm(col.height - t - col.shelvesY[shelfIdx] - t / 2);
+                        col.shelvesY[shelfIdx] = Math.round(Math.max(limitMin, Math.min(limitMax, currentY - diff)) * 100) / 100;
+                        e.target.value = _fmtCellHeightMm(col.height - t - col.shelvesY[shelfIdx] - t / 2);
                     }
                 } else {
                     const div = d.divAbove;
@@ -785,8 +806,8 @@ function buildDimensionsAndButtonsUI() {
                         col.shelvesY.forEach((y, i) => { if (i !== shelfIdx) obs.push(y); });
                         const limitMin = Math.max(...obs.filter(y => y < currentY)) + MIN_SHELF_GAP + t;
                         const limitMax = Math.min(...obs.filter(y => y > currentY)) - MIN_SHELF_GAP - t;
-                        col.shelvesY[shelfIdx] = Math.round(Math.max(limitMin, Math.min(limitMax, currentY + diff)) * 10) / 10;
-                        e.target.value = _fmtCellHeightCm(col.shelvesY[shelfIdx] - (shelfIdx === 0 ? cBaseY + t : col.shelvesY[shelfIdx - 1] + t / 2) - t / 2);
+                        col.shelvesY[shelfIdx] = Math.round(Math.max(limitMin, Math.min(limitMax, currentY + diff)) * 100) / 100;
+                        e.target.value = _fmtCellHeightMm(col.shelvesY[shelfIdx] - (shelfIdx === 0 ? cBaseY + t : col.shelvesY[shelfIdx - 1] + t / 2) - t / 2);
                     }
                 }
                 checkSplits();
@@ -837,7 +858,7 @@ function buildDimensionsAndButtonsUI() {
                         col.shelvesY.forEach((y, i) => { if (i !== shelfIdx) obs.push(y); });
                         const limitMin = Math.max(...obs.filter(y => y < currentY)) + MIN_SHELF_GAP + t;
                         const limitMax = Math.min(...obs.filter(y => y > currentY)) - MIN_SHELF_GAP - t;
-                        col.shelvesY[shelfIdx] = Math.round(Math.max(limitMin, Math.min(limitMax, currentY - delta)) * 10) / 10;
+                        col.shelvesY[shelfIdx] = Math.round(Math.max(limitMin, Math.min(limitMax, currentY - delta)) * 100) / 100;
                     }
                 } else {
                     const div = d.divAbove;
@@ -855,7 +876,7 @@ function buildDimensionsAndButtonsUI() {
                         col.shelvesY.forEach((y, i) => { if (i !== shelfIdx) obs.push(y); });
                         const limitMin = Math.max(...obs.filter(y => y < currentY)) + MIN_SHELF_GAP + t;
                         const limitMax = Math.min(...obs.filter(y => y > currentY)) - MIN_SHELF_GAP - t;
-                        col.shelvesY[shelfIdx] = Math.round(Math.max(limitMin, Math.min(limitMax, currentY + delta)) * 10) / 10;
+                        col.shelvesY[shelfIdx] = Math.round(Math.max(limitMin, Math.min(limitMax, currentY + delta)) * 100) / 100;
                     }
                 }
                 // Keep drawer counts in sync with the new cell heights (and clear below type min)
@@ -920,14 +941,16 @@ function buildDimensionsAndButtonsUI() {
                 }
 
                 // Height editable text only (no ▲▼) — keeps pill short so it doesn't cover shelf drag handles
-                const cellHDisp = Math.round((Number(d.h) || 0) * 10) / 10;
+                // Shown in mm (1 decimal) to match blueprint, e.g. 366.5
+                const cellHDisp = Math.round((Number(d.h) || 0) * 100) / 100;
                 const heightInput = document.createElement('input');
                 heightInput.type = 'number';
                 heightInput.step = '0.1';
-                heightInput.value = _fmtCellHeightCm(cellHDisp);
-                heightInput.title = 'לחץ לעריכת גובה התא';
-                heightInput.setAttribute('aria-label', 'גובה תא בס״מ');
-                heightInput.style.cssText = 'width:2.8em;min-width:2.4em;height:17px;border:none;background:transparent;font-size:calc(0.7rem + 2pt);font-weight:700;color:rgba(255,255,255,0.95);line-height:17px;text-align:center;outline:none;padding:0;margin:0;font-family:inherit;-moz-appearance:textfield;cursor:text;';
+                heightInput.value = _fmtCellHeightMm(cellHDisp);
+                heightInput.title = 'גובה תא במ״מ (כמו בשרטוט)';
+                heightInput.setAttribute('aria-label', 'גובה תא במ״מ');
+                heightInput.dataset.unit = 'mm';
+                heightInput.style.cssText = 'width:3.4em;min-width:2.8em;height:17px;border:none;background:transparent;font-size:calc(0.7rem + 2pt);font-weight:700;color:rgba(255,255,255,0.95);line-height:17px;text-align:center;outline:none;padding:0;margin:0;font-family:inherit;-moz-appearance:textfield;cursor:text;';
                 heightInput.addEventListener('mousedown', (e) => { e.stopPropagation(); });
                 heightInput.addEventListener('click', (e) => { e.stopPropagation(); heightInput.select(); });
                 heightInput.addEventListener('keydown', (e) => {
@@ -936,14 +959,14 @@ function buildDimensionsAndButtonsUI() {
                 });
                 heightInput.addEventListener('change', (e) => {
                     e.stopPropagation();
-                    const desired = parseFloat(e.target.value);
-                    if (isNaN(desired)) {
-                        e.target.value = _fmtCellHeightCm(cellHDisp);
+                    const desiredCm = _parseCellHeightMm(e.target.value);
+                    if (isNaN(desiredCm)) {
+                        e.target.value = _fmtCellHeightMm(cellHDisp);
                         return;
                     }
-                    const delta = Math.round((desired - d.h) * 10) / 10;
+                    const delta = Math.round((desiredCm - d.h) * 100) / 100;
                     if (delta === 0) {
-                        e.target.value = _fmtCellHeightCm(cellHDisp);
+                        e.target.value = _fmtCellHeightMm(cellHDisp);
                         return;
                     }
                     _adjustCellHeight(delta);
@@ -1112,9 +1135,9 @@ function buildDimensionsAndButtonsUI() {
         btn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); });
         btn.addEventListener('pointerup', e => e.stopPropagation());
 
-        const zoneHDisp = Math.round((Number(d.h) || 0) * 10) / 10;
+        const zoneHDisp = Math.round((Number(d.h) || 0) * 100) / 100;
         const heightHtml = zoneHDisp > 0
-            ? `<span class="sub-zone-h" style="font-size:0.72rem;font-weight:700;color:rgba(255,255,255,0.95);line-height:1;min-width:2.2em;text-align:center;pointer-events:none;">${_fmtCellHeightCm(zoneHDisp)}</span>
+            ? `<span class="sub-zone-h" style="font-size:0.72rem;font-weight:700;color:rgba(255,255,255,0.95);line-height:1;min-width:2.8em;text-align:center;pointer-events:none;">${_fmtCellHeightMm(zoneHDisp)}</span>
                <div style="width:1px;height:12px;background:rgba(255,255,255,0.2);margin:0 2px;flex-shrink:0;pointer-events:none;"></div>`
             : '';
 
@@ -3162,7 +3185,7 @@ function _rebuildFCCellButtons(fcRealSide, wingData, fc, allY, comps, fcGroup, l
         const btn = document.createElement('button');
         btn.className = 'fc-cell-btn plus-btn';
         btn.dataset.fcRow = r;
-        btn.dataset.fcHeight = _fmtCellHeightCm(allY[r + 1] - allY[r]);
+        btn.dataset.fcHeight = _fmtCellHeightMm(allY[r + 1] - allY[r]);
         btn.style.cssText = 'position:absolute;left:0;top:0;transform:translate(-50%,-50%);z-index:40;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1rem;transition:background 0.15s;min-width:26px;height:26px;';
 
         _applyFCBtnState(btn, r);
@@ -5083,27 +5106,27 @@ window.applyEqualCells = function() {
         ? col.compartments.length - 1
         : ((col.shelves || 0) + (hasSplit ? 1 : 0));
 
-    /** Equalize CLEAR cell heights (0.1 cm) between interior spanBottom..spanTop.
-     *  Shelf centers are placed at underside + t/2 WITHOUT snapping to 0.1 —
-     *  snapping centers with t=1.7 (t/2=0.85) drifts clear heights (e.g. 38.2/38.3/38.4). */
+    /** Equalize CLEAR cell heights at 0.01 cm (= 0.1 mm, blueprint precision)
+     *  between interior spanBottom..spanTop.
+     *  Shelf centers stay at underside + t/2 (no 0.1 snap) so clear heights stay exact. */
     const _equalizeBetween = (spanBottom, spanTop, shelfIndices) => {
         if (!shelfIndices.length) return;
         const numCells = shelfIndices.length + 1;
         const numShelves = shelfIndices.length;
-        const botT = Math.round(spanBottom * 10);
-        const topT = Math.round(spanTop * 10);
-        const tT = Math.round(t * 10);
-        const pureT = topT - botT - numShelves * tT;
-        if (pureT <= 0) return;
-        const floorCellT = Math.floor(pureT / numCells);
-        const rem = pureT % numCells;
-        let cursor = botT; // interior bottom of current cell (tenths of cm)
+        // Work in 0.01 cm units (= 0.1 mm)
+        const botU = Math.round(spanBottom * 100);
+        const topU = Math.round(spanTop * 100);
+        const tU = Math.round(t * 100);
+        const pureU = topU - botU - numShelves * tU;
+        if (pureU <= 0) return;
+        const floorCellU = Math.floor(pureU / numCells);
+        const rem = pureU % numCells;
+        let cursor = botU; // interior bottom of current cell
         for (let k = 0; k < numShelves; k++) {
-            const cellT = floorCellT + (k < rem ? 1 : 0);
-            cursor += cellT; // underside of shelf (exact tenth)
-            // Keep full precision so shelf − t/2 === underside exactly
-            col.shelvesY[shelfIndices[k]] = cursor / 10 + t / 2;
-            cursor += tT; // top of shelf = next cell bottom
+            const cellU = floorCellU + (k < rem ? 1 : 0);
+            cursor += cellU; // underside of shelf
+            col.shelvesY[shelfIndices[k]] = cursor / 100 + t / 2;
+            cursor += tU; // top of shelf = next cell bottom
         }
     };
 

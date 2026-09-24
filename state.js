@@ -3160,7 +3160,7 @@ function _clampDrawerCompartments(col, baseY, t) {
     for (let r = 0; r < col.compartments.length; r++) {
         const comp = col.compartments[r];
         if (comp && (comp.type === 'internal_drawers' || comp.type === 'external_drawers')) {
-            const cellH = Math.round(_compartmentBounds(col, r).h * 10) / 10;
+            const cellH = Math.round(_compartmentBounds(col, r).h * 100) / 100;
             const rules = (typeof window._drawerHeightRules === 'function')
                 ? window._drawerHeightRules(comp.type)
                 : { minH: (comp.type === 'external_drawers' ? 12 : 22), extraH: 20 };
