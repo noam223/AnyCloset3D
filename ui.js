@@ -33,23 +33,15 @@ function _endDrag() {
 }
 // ────────────────────────────────────────────────────────────────────────────
 
-/** Format clear cell height like blueprint: mm with 1 decimal (36.65 cm → "366.5"). */
-function _fmtCellHeightMm(hCm) {
-    const n = Math.round((Number(hCm) || 0) * 100) / 10;
+/** Format clear cell height for on-screen labels: cm with 1 decimal (36.65 → "36.7"). */
+function _fmtCellHeightCm(h) {
+    const n = Math.round((Number(h) || 0) * 10) / 10;
     return n.toFixed(1);
 }
-window._fmtCellHeightMm = _fmtCellHeightMm;
-/** @deprecated use _fmtCellHeightMm — kept as alias for older callers */
-function _fmtCellHeightCm(h) { return _fmtCellHeightMm(h); }
 window._fmtCellHeightCm = _fmtCellHeightCm;
-
-/** Parse a blueprint-style mm label back to cm. */
-function _parseCellHeightMm(mmVal) {
-    const mm = parseFloat(mmVal);
-    if (isNaN(mm)) return NaN;
-    return Math.round(mm * 10) / 100; // mm → cm at 0.01 cm
-}
-window._parseCellHeightMm = _parseCellHeightMm;
+/** @deprecated alias — display is cm, not mm */
+function _fmtCellHeightMm(hCm) { return _fmtCellHeightCm(hCm); }
+window._fmtCellHeightMm = _fmtCellHeightMm;
 
 const colorNamesHebrew = {
     white_matte: 'לבן מט 2100', c3110: '3110', c795: '759', c705: '705', u727: 'U727',
@@ -705,15 +697,7 @@ function buildDimensionsAndButtonsUI() {
         const input = document.createElement('input');
         input.className = 'dim-input';
         input.type = 'number'; input.step = '0.1';
-        // Cell heights show mm (like blueprint); other dims stay in cm
-        const _isCellHDim = !d.isDeskWidth && !d.isDeskHeight && !d.isDeskDrawer &&
-            !d.isInternalDeskSurface && !d.isInternalDeskClearance && !d.isInternalDeskDrawer &&
-            !d.isWingOpenWidth && !d.isColWidth;
-        input.value = _isCellHDim ? _fmtCellHeightMm(d.h) : String(Math.round((Number(d.h) || 0) * 10) / 10);
-        if (_isCellHDim) {
-            input.title = 'גובה תא במ״מ (כמו בשרטוט)';
-            input.dataset.unit = 'mm';
-        }
+        input.value = _fmtCellHeightCm(d.h);
 
         // Wing open-width label: two-line layout — "פתח גלוי" on top, "30 ס"מ" below
         if (d.isWingOpenWidth) {
@@ -749,8 +733,6 @@ function buildDimensionsAndButtonsUI() {
         input.addEventListener('change', (e) => {
             let desiredH = parseFloat(e.target.value);
             if(isNaN(desiredH)) return;
-            // Cell-height inputs are shown in mm — convert back to cm
-            if (e.target.dataset.unit === 'mm') desiredH = desiredH / 10;
             
             if (d.isDeskWidth) {
                 state.desk.width = Math.max(40, Math.min(200, desiredH));
@@ -788,7 +770,7 @@ function buildDimensionsAndButtonsUI() {
                         const limitMin = Math.max(...obs.filter(y => y < currentY)) + MIN_SHELF_GAP + t;
                         const limitMax = Math.min(...obs.filter(y => y > currentY)) - MIN_SHELF_GAP - t;
                         col.shelvesY[shelfIdx] = Math.round(Math.max(limitMin, Math.min(limitMax, currentY - diff)) * 100) / 100;
-                        e.target.value = _fmtCellHeightMm(col.height - t - col.shelvesY[shelfIdx] - t / 2);
+                        e.target.value = _fmtCellHeightCm(col.height - t - col.shelvesY[shelfIdx] - t / 2);
                     }
                 } else {
                     const div = d.divAbove;
@@ -807,7 +789,7 @@ function buildDimensionsAndButtonsUI() {
                         const limitMin = Math.max(...obs.filter(y => y < currentY)) + MIN_SHELF_GAP + t;
                         const limitMax = Math.min(...obs.filter(y => y > currentY)) - MIN_SHELF_GAP - t;
                         col.shelvesY[shelfIdx] = Math.round(Math.max(limitMin, Math.min(limitMax, currentY + diff)) * 100) / 100;
-                        e.target.value = _fmtCellHeightMm(col.shelvesY[shelfIdx] - (shelfIdx === 0 ? cBaseY + t : col.shelvesY[shelfIdx - 1] + t / 2) - t / 2);
+                        e.target.value = _fmtCellHeightCm(col.shelvesY[shelfIdx] - (shelfIdx === 0 ? cBaseY + t : col.shelvesY[shelfIdx - 1] + t / 2) - t / 2);
                     }
                 }
                 checkSplits();
@@ -941,16 +923,14 @@ function buildDimensionsAndButtonsUI() {
                 }
 
                 // Height editable text only (no ▲▼) — keeps pill short so it doesn't cover shelf drag handles
-                // Shown in mm (1 decimal) to match blueprint, e.g. 366.5
-                const cellHDisp = Math.round((Number(d.h) || 0) * 100) / 100;
+                const cellHDisp = Math.round((Number(d.h) || 0) * 10) / 10;
                 const heightInput = document.createElement('input');
                 heightInput.type = 'number';
                 heightInput.step = '0.1';
-                heightInput.value = _fmtCellHeightMm(cellHDisp);
-                heightInput.title = 'גובה תא במ״מ (כמו בשרטוט)';
-                heightInput.setAttribute('aria-label', 'גובה תא במ״מ');
-                heightInput.dataset.unit = 'mm';
-                heightInput.style.cssText = 'width:3.4em;min-width:2.8em;height:17px;border:none;background:transparent;font-size:calc(0.7rem + 2pt);font-weight:700;color:rgba(255,255,255,0.95);line-height:17px;text-align:center;outline:none;padding:0;margin:0;font-family:inherit;-moz-appearance:textfield;cursor:text;';
+                heightInput.value = _fmtCellHeightCm(cellHDisp);
+                heightInput.title = 'לחץ לעריכת גובה התא';
+                heightInput.setAttribute('aria-label', 'גובה תא בס״מ');
+                heightInput.style.cssText = 'width:2.8em;min-width:2.4em;height:17px;border:none;background:transparent;font-size:calc(0.7rem + 2pt);font-weight:700;color:rgba(255,255,255,0.95);line-height:17px;text-align:center;outline:none;padding:0;margin:0;font-family:inherit;-moz-appearance:textfield;cursor:text;';
                 heightInput.addEventListener('mousedown', (e) => { e.stopPropagation(); });
                 heightInput.addEventListener('click', (e) => { e.stopPropagation(); heightInput.select(); });
                 heightInput.addEventListener('keydown', (e) => {
@@ -959,14 +939,14 @@ function buildDimensionsAndButtonsUI() {
                 });
                 heightInput.addEventListener('change', (e) => {
                     e.stopPropagation();
-                    const desiredCm = _parseCellHeightMm(e.target.value);
-                    if (isNaN(desiredCm)) {
-                        e.target.value = _fmtCellHeightMm(cellHDisp);
+                    const desired = parseFloat(e.target.value);
+                    if (isNaN(desired)) {
+                        e.target.value = _fmtCellHeightCm(cellHDisp);
                         return;
                     }
-                    const delta = Math.round((desiredCm - d.h) * 100) / 100;
-                    if (delta === 0) {
-                        e.target.value = _fmtCellHeightMm(cellHDisp);
+                    const delta = Math.round((desired - d.h) * 100) / 100;
+                    if (Math.abs(delta) < 0.001) {
+                        e.target.value = _fmtCellHeightCm(cellHDisp);
                         return;
                     }
                     _adjustCellHeight(delta);
@@ -1135,9 +1115,9 @@ function buildDimensionsAndButtonsUI() {
         btn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); });
         btn.addEventListener('pointerup', e => e.stopPropagation());
 
-        const zoneHDisp = Math.round((Number(d.h) || 0) * 100) / 100;
+        const zoneHDisp = Math.round((Number(d.h) || 0) * 10) / 10;
         const heightHtml = zoneHDisp > 0
-            ? `<span class="sub-zone-h" style="font-size:0.72rem;font-weight:700;color:rgba(255,255,255,0.95);line-height:1;min-width:2.8em;text-align:center;pointer-events:none;">${_fmtCellHeightMm(zoneHDisp)}</span>
+            ? `<span class="sub-zone-h" style="font-size:0.72rem;font-weight:700;color:rgba(255,255,255,0.95);line-height:1;min-width:2.2em;text-align:center;pointer-events:none;">${_fmtCellHeightCm(zoneHDisp)}</span>
                <div style="width:1px;height:12px;background:rgba(255,255,255,0.2);margin:0 2px;flex-shrink:0;pointer-events:none;"></div>`
             : '';
 
@@ -3185,7 +3165,7 @@ function _rebuildFCCellButtons(fcRealSide, wingData, fc, allY, comps, fcGroup, l
         const btn = document.createElement('button');
         btn.className = 'fc-cell-btn plus-btn';
         btn.dataset.fcRow = r;
-        btn.dataset.fcHeight = _fmtCellHeightMm(allY[r + 1] - allY[r]);
+        btn.dataset.fcHeight = _fmtCellHeightCm(allY[r + 1] - allY[r]);
         btn.style.cssText = 'position:absolute;left:0;top:0;transform:translate(-50%,-50%);z-index:40;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1rem;transition:background 0.15s;min-width:26px;height:26px;';
 
         _applyFCBtnState(btn, r);
