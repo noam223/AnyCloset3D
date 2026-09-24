@@ -118,6 +118,15 @@ img{max-width:100%;display:block}
   box-shadow:0 40px 100px rgba(0,0,0,.45);background:#1a2a3c;
 }
 .shot img{width:100%;height:auto;object-fit:cover;aspect-ratio:16/10}
+.hero-fade{
+  position:relative;aspect-ratio:16/10;border-radius:18px;overflow:hidden;
+  border:1px solid rgba(255,255,255,.14);box-shadow:0 40px 100px rgba(0,0,0,.45);background:#1a2a3c;
+}
+.hero-fade img{
+  position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  opacity:0;transition:opacity 1.1s ease;
+}
+.hero-fade img.on{opacity:1}
 .shot-cap{
   display:flex;justify-content:space-between;align-items:center;gap:10px;
   margin-top:10px;color:var(--muted);font-size:.82rem;
@@ -348,11 +357,16 @@ footer{
       </div>
     </div>
     <div class="hero-visual">
-      <div class="shot">
-        <img src="pitch-assets/landing-gallery/sim/01-anat-shelf-3d.jpg" alt="הדמיה תלת־ממדית מהמערכת — ארונות במרחב" width="960" height="540" loading="eager">
+      <div class="hero-fade" id="hero-fade">
+        <img class="on" src="pitch-assets/landing-gallery/sim/01-anat-shelf-3d.jpg" alt="הדמיה מפרויקט אמיתי במערכת" width="960" height="540" loading="eager">
+        <img src="pitch-assets/landing-gallery/sim/02-gali-dor-3d.jpg" alt="הדמיה מפרויקט אמיתי במערכת" width="960" height="540" loading="lazy">
+        <img src="pitch-assets/landing-gallery/sim/03-idan-corner-3d.jpg" alt="הדמיה מפרויקט אמיתי במערכת" width="960" height="540" loading="lazy">
+        <img src="pitch-assets/landing-gallery/best/12-shasha-a.jpg" alt="הדמיה מפרויקט אמיתי במערכת" width="960" height="540" loading="lazy">
+        <img src="pitch-assets/landing-gallery/best/08-shir-elimi.jpg" alt="הדמיה מפרויקט אמיתי במערכת" width="960" height="540" loading="lazy">
+        <img src="pitch-assets/landing-gallery/best/15-kaskas.jpg" alt="הדמיה מפרויקט אמיתי במערכת" width="960" height="540" loading="lazy">
       </div>
       <div class="shot-cap">
-        <span>צולם מתוך המרחב התלת־ממדי במערכת</span>
+        <span>הדמיה מפרויקט אמיתי במערכת</span>
         <span class="ok">AnyCloset 3D</span>
       </div>
     </div>
@@ -602,22 +616,33 @@ footer{
 <script>
 (function(){
   var els = document.querySelectorAll('[data-reveal]');
-  if (!('IntersectionObserver' in window)) {
-    els.forEach(function(el){ el.classList.add('in'); });
-    return;
-  }
-  var io = new IntersectionObserver(function(entries){
-    entries.forEach(function(e){
-      if (e.isIntersecting) {
-        e.target.classList.add('in');
-        io.unobserve(e.target);
-      }
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if (e.isIntersecting) {
+          e.target.classList.add('in');
+          io.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.2 });
+    els.forEach(function(el, i){
+      el.style.transitionDelay = (i * 0.1) + 's';
+      io.observe(el);
     });
-  }, { threshold: 0.2 });
-  els.forEach(function(el, i){
-    el.style.transitionDelay = (i * 0.1) + 's';
-    io.observe(el);
-  });
+  } else {
+    els.forEach(function(el){ el.classList.add('in'); });
+  }
+
+  var fade = document.getElementById('hero-fade');
+  if (!fade) return;
+  var slides = fade.querySelectorAll('img');
+  if (slides.length < 2) return;
+  var i = 0;
+  setInterval(function(){
+    slides[i].classList.remove('on');
+    i = (i + 1) % slides.length;
+    slides[i].classList.add('on');
+  }, 4000);
 })();
 </script>
 </body>
