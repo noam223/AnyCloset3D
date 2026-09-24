@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AnyCloset 3D | בונים ארון בהתאמה אישית תוך רגעים</title>
+<meta name="description" content="סוף לעידן השרטוטים ותוכנות האדריכלות המסובכות. תכנון, תמחור ושיתוף בלייב עם הלקוח — במקום אחד. ניסיון חינמי ל־7 ימים.">
+<link rel="icon" type="image/png" href="images/icon-logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@360;480;600;700;800;900&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07111c;
+  --bg2:#0d1b2e;
+  --bg3:#112438;
+  --ink:#f4f7fb;
+  --muted:#9aafc4;
+  --line:rgba(255,255,255,.1);
+  --cyan:#3ee0ff;
+  --cyan-dim:rgba(62,224,255,.14);
+  --gold:#ffc76d;
+  --gold-glow:rgba(255,199,109,.28);
+  --ok:#3dd68c;
+  --card:rgba(255,255,255,.045);
+  --r:16px;
+  --rl:24px;
+}
+html{scroll-behavior:smooth}
+body{
+  font-family:'Heebo','Inter',sans-serif;
+  background:var(--bg);
+  color:var(--ink);
+  line-height:1.6;
+  overflow-x:hidden;
+}
+a{color:inherit;text-decoration:none}
+img{max-width:100%;display:block}
+.wrap{width:min(1120px,100% - 48px);margin-inline:auto}
+@media(max-width:600px){.wrap{width:min(1120px,100% - 28px)}}
+
+/* ── NAV ── */
+.nav{
+  position:fixed;inset-inline:0;top:0;z-index:100;
+  height:64px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 28px;gap:12px;
+  background:rgba(7,17,28,.82);backdrop-filter:blur(14px);
+  border-bottom:1px solid rgba(255,255,255,.06);
+}
+.nav-brand{display:flex;align-items:center;flex:0 1 auto;min-width:0;max-width:min(240px,36vw)}
+.nav-brand img{height:41px;width:auto;max-width:100%;object-fit:contain;mix-blend-mode:screen}
+.nav-cta{
+  flex-shrink:0;background:var(--cyan);color:#062033;font-weight:800;font-size:.9rem;
+  padding:10px 18px;border-radius:12px;transition:transform .2s,box-shadow .2s;
+  box-shadow:0 4px 20px rgba(62,224,255,.3);
+}
+.nav-cta:hover{transform:translateY(-1px);box-shadow:0 8px 28px rgba(62,224,255,.45)}
+@media(max-width:600px){
+  .nav{height:56px;padding:0 12px;gap:8px}
+  .nav-brand{max-width:min(132px,38vw)}
+  .nav-brand img{height:26px}
+  .nav-cta{padding:7px 12px;font-size:.78rem;border-radius:10px}
+}
+
+/* ── HERO ── */
+.hero{
+  position:relative;padding:120px 0 72px;
+  background:
+    radial-gradient(900px 420px at 100% -10%, rgba(62,224,255,.14), transparent 55%),
+    radial-gradient(700px 380px at 0% 100%, rgba(255,199,109,.08), transparent 50%),
+    linear-gradient(165deg,#081421 0%,#0b1828 55%,#07111c 100%);
+  overflow:hidden;
+}
+.hero-grid{
+  display:grid;grid-template-columns:1.05fr .95fr;gap:48px;align-items:center;
+}
+.hero-kicker{
+  display:inline-flex;align-items:center;gap:8px;
+  color:var(--cyan);font-weight:700;font-size:.82rem;letter-spacing:.06em;
+  margin-bottom:16px;animation:rise .7s ease both;
+}
+.hero-kicker i{width:7px;height:7px;border-radius:50%;background:var(--cyan);box-shadow:0 0 0 4px rgba(62,224,255,.18);animation:livePulse 2s ease-in-out infinite}
+@keyframes livePulse{0%,100%{box-shadow:0 0 0 4px rgba(62,224,255,.18)}50%{box-shadow:0 0 0 8px rgba(62,224,255,0)}}
+.hero h1{
+  font-size:clamp(2rem,4.6vw,3.4rem);font-weight:900;line-height:1.15;
+  letter-spacing:-.03em;margin-bottom:18px;animation:rise .7s ease .08s both;
+}
+.hero h1 em{font-style:normal;color:var(--cyan)}
+.hero-punch{
+  display:block;font-size:clamp(1.15rem,2.4vw,1.45rem);font-weight:800;
+  color:var(--gold);line-height:1.35;margin-bottom:14px;
+  text-shadow:0 0 24px var(--gold-glow);animation:rise .7s ease .16s both;
+}
+.hero-sub{
+  color:var(--muted);font-size:clamp(1rem,1.5vw,1.15rem);max-width:34rem;
+  margin-bottom:28px;animation:rise .7s ease .22s both;
+}
+.hero-actions{display:flex;flex-wrap:wrap;gap:12px;animation:rise .7s ease .3s both}
+.btn-primary{
+  display:inline-flex;align-items:center;gap:8px;
+  background:linear-gradient(135deg,#3ee0ff,#1ab8d4);color:#062033;
+  font-weight:800;padding:14px 26px;border-radius:14px;font-size:1rem;
+  box-shadow:0 6px 28px rgba(62,224,255,.35);transition:transform .2s,box-shadow .2s;
+}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 10px 36px rgba(62,224,255,.5)}
+.btn-ghost{
+  display:inline-flex;align-items:center;gap:8px;
+  border:1.5px solid rgba(255,255,255,.28);color:#fff;font-weight:700;
+  padding:13px 22px;border-radius:14px;font-size:.95rem;transition:background .2s,border-color .2s;
+}
+.btn-ghost:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.5)}
+.btn-wa{border-color:rgba(37,211,102,.45);color:#7dffb0}
+.btn-wa:hover{background:rgba(37,211,102,.1);border-color:#25d366}
+.hero-visual{animation:rise .85s ease .2s both}
+.shot{
+  border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.14);
+  box-shadow:0 40px 100px rgba(0,0,0,.45);background:#1a2a3c;
+}
+.shot img{width:100%;height:auto;object-fit:cover;aspect-ratio:16/10}
+.shot-cap{
+  display:flex;justify-content:space-between;align-items:center;gap:10px;
+  margin-top:10px;color:var(--muted);font-size:.82rem;
+}
+.shot-cap .ok{color:var(--ok);font-weight:700}
+@keyframes rise{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+@media(max-width:900px){
+  .hero{padding:96px 0 56px}
+  .hero-grid{grid-template-columns:1fr;gap:32px}
+  .hero-visual{order:2}
+  .hero-copy{order:1}
+}
+
+/* ── PROOF ── */
+.proof{
+  padding:28px 0;border-block:1px solid var(--line);
+  background:rgba(255,255,255,.02);
+}
+.proof-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.proof-item{
+  display:flex;align-items:flex-start;gap:14px;padding:8px 4px;
+  opacity:0;transform:translateY(16px);transition:opacity .55s,transform .55s;
+}
+.proof-item.in{opacity:1;transform:none}
+.proof-icon{
+  width:44px;height:44px;border-radius:12px;flex-shrink:0;
+  display:grid;place-items:center;background:var(--cyan-dim);
+  color:var(--cyan);border:1px solid rgba(62,224,255,.25);font-size:1.1rem;
+}
+.proof-item h3{font-size:1rem;font-weight:800;margin-bottom:4px}
+.proof-item p{color:var(--muted);font-size:.88rem;line-height:1.5}
+@media(max-width:700px){.proof-grid{grid-template-columns:1fr}}
+
+/* ── SECTIONS ── */
+.sec{padding:88px 0}
+.sec-tag{
+  display:inline-flex;align-items:center;gap:8px;color:var(--cyan);
+  font-size:.78rem;font-weight:700;letter-spacing:.06em;margin-bottom:12px;
+}
+.sec-title{font-size:clamp(1.7rem,3.2vw,2.5rem);font-weight:900;letter-spacing:-.02em;margin-bottom:12px;line-height:1.2}
+.sec-sub{color:var(--muted);font-size:1.05rem;max-width:36rem;margin-bottom:40px;line-height:1.65}
+.sec-hd{margin-bottom:8px}
+
+/* ── SHOWCASE ── */
+.showcase{background:var(--bg2)}
+.show-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.show-card .shot img{aspect-ratio:16/11}
+.show-card h3{font-size:1.1rem;font-weight:800;margin:14px 0 6px}
+.show-card p{color:var(--muted);font-size:.9rem}
+@media(max-width:750px){.show-grid{grid-template-columns:1fr}}
+
+/* ── LIVE ── */
+.live{
+  position:relative;padding:72px 0;
+  background:
+    radial-gradient(ellipse at 80% 40%, rgba(62,224,255,.16), transparent 50%),
+    linear-gradient(135deg,#0a1628 0%,#122a44 50%,#0a1a2e 100%);
+  border-block:1px solid rgba(62,224,255,.2);
+}
+.live-inner{
+  display:grid;grid-template-columns:auto 1fr;gap:28px;align-items:center;
+}
+.live-icon{
+  width:80px;height:80px;border-radius:22px;
+  display:grid;place-items:center;font-size:2rem;color:var(--cyan);
+  background:rgba(62,224,255,.12);border:1px solid rgba(62,224,255,.35);
+  animation:livePulse 2.2s ease-in-out infinite;
+}
+.live-badge{
+  display:inline-flex;align-items:center;gap:8px;
+  background:rgba(61,214,140,.12);border:1px solid rgba(61,214,140,.35);
+  color:var(--ok);font-size:.72rem;font-weight:800;padding:4px 12px;
+  border-radius:99px;margin-bottom:12px;text-transform:uppercase;letter-spacing:.04em;
+}
+.live-badge .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:livePulse 1.4s ease-in-out infinite}
+.live h2{font-size:clamp(1.4rem,2.8vw,2rem);font-weight:900;margin-bottom:10px}
+.live p{color:rgba(255,255,255,.72);font-size:1.02rem;max-width:40rem;line-height:1.7}
+@media(max-width:640px){
+  .live-inner{grid-template-columns:1fr;text-align:center}
+  .live-icon{margin-inline:auto}
+  .live p{margin-inline:auto}
+}
+
+/* ── AUDIENCE ── */
+.aud-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.aud-card{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--rl);
+  padding:28px 24px;transition:transform .25s,border-color .25s,background .25s;
+}
+.aud-card:hover{transform:translateY(-4px);border-color:rgba(62,224,255,.35);background:rgba(255,255,255,.06)}
+.aud-card .ico{
+  width:48px;height:48px;border-radius:14px;display:grid;place-items:center;
+  background:var(--cyan-dim);color:var(--cyan);font-size:1.2rem;margin-bottom:16px;
+}
+.aud-card h3{font-size:1.2rem;font-weight:800;margin-bottom:6px}
+.aud-card .role{color:var(--gold);font-size:.82rem;font-weight:700;margin-bottom:12px}
+.aud-card p{color:var(--muted);font-size:.9rem;line-height:1.6;margin-bottom:18px}
+.aud-card a{color:var(--cyan);font-weight:700;font-size:.9rem;display:inline-flex;align-items:center;gap:6px}
+.aud-card a:hover{text-decoration:underline}
+@media(max-width:800px){.aud-grid{grid-template-columns:1fr}}
+
+/* ── FEATURES ── */
+.feat{background:var(--bg2)}
+.feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.feat-card{
+  background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:var(--r);
+  padding:24px 20px;transition:border-color .25s,transform .25s;
+}
+.feat-card:hover{border-color:rgba(62,224,255,.3);transform:translateY(-3px)}
+.feat-card .ico{
+  width:42px;height:42px;border-radius:12px;display:grid;place-items:center;
+  margin-bottom:14px;font-size:1.05rem;
+}
+.fi-c{background:var(--cyan-dim);color:var(--cyan)}
+.fi-g{background:rgba(61,214,140,.12);color:var(--ok)}
+.fi-o{background:rgba(255,199,109,.12);color:var(--gold)}
+.fi-v{background:rgba(167,139,250,.12);color:#c4b5fd}
+.feat-card h3{font-size:1.02rem;font-weight:800;margin-bottom:8px}
+.feat-card p{color:var(--muted);font-size:.86rem;line-height:1.55}
+@media(max-width:800px){.feat-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:520px){.feat-grid{grid-template-columns:1fr}}
+
+/* ── OFFER ── */
+.offer{
+  padding:88px 0;
+  background:
+    radial-gradient(600px 300px at 50% 0%, rgba(62,224,255,.12), transparent 60%),
+    var(--bg);
+}
+.offer-box{
+  text-align:center;max-width:640px;margin:0 auto;
+  background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(255,255,255,.02));
+  border:1px solid rgba(62,224,255,.28);border-radius:28px;padding:48px 36px;
+  box-shadow:0 30px 80px rgba(0,0,0,.35);
+}
+.offer-box .tag{
+  display:inline-flex;gap:6px;align-items:center;
+  background:rgba(255,199,109,.12);color:var(--gold);border:1px solid rgba(255,199,109,.3);
+  font-size:.78rem;font-weight:800;padding:5px 14px;border-radius:99px;margin-bottom:16px;
+}
+.offer-box h2{font-size:clamp(1.6rem,3vw,2.2rem);font-weight:900;margin-bottom:12px}
+.offer-box p{color:var(--muted);margin-bottom:26px;font-size:1.05rem}
+.offer-box .btn-primary{font-size:1.05rem;padding:15px 32px}
+.offer-note{margin-top:14px;font-size:.85rem;color:var(--muted)}
+
+/* ── FAQ ── */
+.faq{background:var(--bg2);padding:80px 0}
+.faq-list{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+.faq-item{
+  background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;
+}
+.faq-item summary{
+  list-style:none;cursor:pointer;padding:18px 20px;font-weight:700;font-size:1rem;
+  display:flex;justify-content:space-between;align-items:center;gap:12px;
+}
+.faq-item summary::-webkit-details-marker{display:none}
+.faq-item summary::after{content:'+';color:var(--cyan);font-size:1.3rem;font-weight:400;line-height:1}
+.faq-item[open] summary::after{content:'−'}
+.faq-item .ans{padding:0 20px 18px;color:var(--muted);font-size:.92rem;line-height:1.65}
+
+/* ── FINAL CTA ── */
+.final{
+  padding:72px 0;text-align:center;
+  background:linear-gradient(180deg,var(--bg2),var(--bg));
+}
+.final h2{font-size:clamp(1.5rem,3vw,2.1rem);font-weight:900;margin-bottom:10px}
+.final p{color:var(--muted);margin-bottom:24px}
+.final-actions{display:flex;justify-content:center;flex-wrap:wrap;gap:12px}
+
+/* ── FOOTER ── */
+footer{
+  padding:36px 0 28px;border-top:1px solid var(--line);
+  background:#050d16;
+}
+.foot-row{
+  display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px;
+}
+.foot-brand img{height:36px;width:auto;object-fit:contain;mix-blend-mode:screen}
+.foot-links{display:flex;flex-wrap:wrap;gap:18px;color:var(--muted);font-size:.9rem}
+.foot-links a:hover{color:#fff}
+.foot-copy{margin-top:20px;color:rgba(154,175,196,.6);font-size:.8rem;text-align:center}
+
+/* ── WA FAB ── */
+.wa-fab{
+  position:fixed;bottom:22px;left:22px;z-index:90;
+  width:56px;height:56px;border-radius:50%;
+  background:#25d366;color:#fff;display:grid;place-items:center;font-size:1.6rem;
+  box-shadow:0 6px 24px rgba(37,211,102,.45);transition:transform .2s;
+}
+.wa-fab:hover{transform:scale(1.08)}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <a href="landing-alt.html" class="nav-brand">
+    <img src="images/logo%20small.png" alt="AnyCloset 3D">
+  </a>
+  <a href="login.html" class="nav-cta">התחל ניסיון חינמי</a>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <div class="hero-kicker"><i></i> שיתוף בלייב עם הלקוח</div>
+      <h1>סוף לעידן השרטוטים<br><em>ותוכנות האדריכלות המסובכות</em></h1>
+      <span class="hero-punch">בונים ארון בהתאמה אישית — תוך רגעים בודדים.</span>
+      <p class="hero-sub">
+        תכנון תלת־ממד, תמחור על המסך ושיתוף חי עם הלקוח — הכל במקום אחד.
+        בלי קבצים, בלי המתנה לשבוע, בלי תוכנות כבדות.
+      </p>
+      <div class="hero-actions">
+        <a href="login.html" class="btn-primary">
+          <i class="fa-solid fa-rocket"></i> התחל ניסיון חינמי
+        </a>
+        <a href="https://wa.me/972546659798?text=%D7%A9%D7%9C%D7%95%D7%9D%2C%20%D7%90%D7%A0%D7%99%20%D7%9E%D7%A2%D7%95%D7%A0%D7%99%D7%99%D7%9F%20%D7%9C%D7%A9%D7%9E%D7%95%D7%A2%20%D7%A2%D7%95%D7%93%20%D7%A2%D7%9C%20AnyCloset%203D"
+           class="btn-ghost btn-wa" target="_blank" rel="noopener">
+          <i class="fa-brands fa-whatsapp"></i> דברו איתנו
+        </a>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="shot">
+        <img src="pitch-assets/pitch-editor.png" alt="מסך העורך של AnyCloset 3D עם תמחור חי" width="960" height="600" loading="eager">
+      </div>
+      <div class="shot-cap">
+        <span>העורך עם מחיר חי על המסך</span>
+        <span class="ok">צולם מהמערכת</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PROOF STRIP -->
+<section class="proof">
+  <div class="wrap proof-grid">
+    <div class="proof-item" data-reveal>
+      <div class="proof-icon"><i class="fa-solid fa-broadcast-tower"></i></div>
+      <div>
+        <h3>שיתוף בלייב</h3>
+        <p>הלקוח רואה את הארון מתעדכן בזמן אמת — מכל מכשיר, בלי חשבון.</p>
+      </div>
+    </div>
+    <div class="proof-item" data-reveal>
+      <div class="proof-icon"><i class="fa-solid fa-shekel-sign"></i></div>
+      <div>
+        <h3>תמחור על המסך</h3>
+        <p>המחיר מתעדכן עם כל שינוי — סוגרים עסקה כשהלקוח עדיין בחדר.</p>
+      </div>
+    </div>
+    <div class="proof-item" data-reveal>
+      <div class="proof-icon"><i class="fa-solid fa-house"></i></div>
+      <div>
+        <h3>בית שלם בפרויקט אחד</h3>
+        <p>כל הארונות בפרויקט אחד — תכנון, תמחור ושיתוף בלי לקפוץ בין קבצים.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRODUCT SHOWCASE -->
+<section class="sec showcase" id="product">
+  <div class="wrap">
+    <div class="sec-hd">
+      <div class="sec-tag"><i class="fa-solid fa-camera"></i> המוצר עצמו</div>
+      <h2 class="sec-title">לא מצגות — צילומי מסך אמיתיים</h2>
+      <p class="sec-sub">כך נראית העבודה מול הלקוח: הדמיה חיה, מחיר חי, וחדר שלם בהקשר.</p>
+    </div>
+    <div class="show-grid">
+      <article class="show-card">
+        <div class="shot">
+          <img src="pitch-assets/pitch-editor.png" alt="עורך AnyCloset עם תמחור" loading="lazy">
+        </div>
+        <div class="shot-cap"><span>עיצוב + מחיר באותו מסך</span><span class="ok">צולם מהמערכת</span></div>
+        <h3>הארון מתומחר בזמן שהלקוח עדיין בחדר</h3>
+        <p>משנים מידה או חומר — והמחיר מתעדכן מיד. בלי להעביר לקובץ אחר ובלי לחכות לנגר.</p>
+      </article>
+      <article class="show-card">
+        <div class="shot">
+          <img src="pitch-assets/pitch-3d.png" alt="הדמיה תלת־ממדית של ארון בחדר" loading="lazy">
+        </div>
+        <div class="shot-cap"><span>הדמיה בהקשר של חדר</span><span class="ok">צולם מהמערכת</span></div>
+        <h3>רואים לפני שמייצרים</h3>
+        <p>הלקוח מבין את התוצאה מיד — פחות תיקונים, פחות ויכוחים, יותר סגירות.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- LIVE SHARE SPOTLIGHT -->
+<section class="live" id="live">
+  <div class="wrap live-inner">
+    <div class="live-icon"><i class="fa-solid fa-broadcast-tower"></i></div>
+    <div>
+      <div class="live-badge"><span class="dot"></span> הפיצ׳ר שסוגר עסקאות</div>
+      <h2>שיתוף בלייב עם הלקוח</h2>
+      <p>
+        שולחים קישור אחד — והלקוח רואה את הארון מתעדכן בזמן אמת, מכל מכשיר,
+        בלי התקנה ובלי חשבון. סיבוב, זוויות ושינויים — הכל חי מולכם בפגישה או מרחוק.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- AUDIENCE -->
+<section class="sec" id="audience">
+  <div class="wrap">
+    <div class="sec-hd">
+      <div class="sec-tag"><i class="fa-solid fa-users"></i> למי זה</div>
+      <h2 class="sec-title">תוצאה אחרת לכל מי שמוכר ארונות</h2>
+      <p class="sec-sub">לא עוד רשימת פיצ׳רים — מה משתנה אצלכם בעבודה מול הלקוח.</p>
+    </div>
+    <div class="aud-grid">
+      <article class="aud-card">
+        <div class="ico"><i class="fa-solid fa-pencil-ruler"></i></div>
+        <h3>מעצבות פנים</h3>
+        <div class="role">להרשים ולסגור מהר יותר</div>
+        <p>הדמיה חיה, שיתוף לייב והדמיות AI — הלקוח רואה ומרגיש לפני הייצור. PDF מקצועי בשביל ההצעה.</p>
+        <a href="login.html">התחילי ניסיון <i class="fa-solid fa-arrow-left"></i></a>
+      </article>
+      <article class="aud-card">
+        <div class="ico"><i class="fa-solid fa-hammer"></i></div>
+        <h3>נגרים</h3>
+        <div class="role">לתמחר נכון ולצאת לייצור</div>
+        <p>מחיר אוטומטי לפי המפרט שלכם, שרטוט טכני לייצור, ופחות טעויות ידניות בין מדידה להזמנה.</p>
+        <a href="login.html">התחל ניסיון <i class="fa-solid fa-arrow-left"></i></a>
+      </article>
+      <article class="aud-card">
+        <div class="ico"><i class="fa-solid fa-store"></i></div>
+        <h3>חברות ריהוט</h3>
+        <div class="role">למכור על רצפת החנות</div>
+        <p>מספר סוכנים ומכשירים, פרויקטים משותפים, ושיתוף חי עם הלקוח — בלי לחכות למשרד התכנון.</p>
+        <a href="login.html">התחל ניסיון <i class="fa-solid fa-arrow-left"></i></a>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- MORE POWER -->
+<section class="sec feat" id="features">
+  <div class="wrap">
+    <div class="sec-hd">
+      <div class="sec-tag"><i class="fa-solid fa-bolt"></i> עוד כוח</div>
+      <h2 class="sec-title">כל מה שצריך אחרי הרגע הראשון</h2>
+      <p class="sec-sub">מהדמיה ועד שרטוט לייצור — בלי לעבור בין חמש מערכות.</p>
+    </div>
+    <div class="feat-grid">
+      <article class="feat-card">
+        <div class="ico fi-v"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+        <h3>הדמיות AI פוטוריאליסטיות</h3>
+        <p>תמונה ריאליסטית בלחיצה — מושלם להצגה ולסגירת עסקה.</p>
+      </article>
+      <article class="feat-card">
+        <div class="ico fi-c"><i class="fa-solid fa-layer-group"></i></div>
+        <h3>מרחב משותף למספר ארונות</h3>
+        <p>כמה ארונות באותו חדר תלת־ממד — תכנון מלא במבט אחד.</p>
+      </article>
+      <article class="feat-card">
+        <div class="ico fi-o"><i class="fa-solid fa-house"></i></div>
+        <h3>פרויקט נגרות לבית שלם</h3>
+        <p>כל הארונות בפרויקט אחד — חוסך שעות ומפשט את הדרך להזמנה.</p>
+      </article>
+      <article class="feat-card">
+        <div class="ico fi-c"><i class="fa-solid fa-sliders"></i></div>
+        <h3>סוגי ארונות מתקדמים</h3>
+        <p>רגיל, פינתי, חדר ארונות, הזזה, שולחן כתיבה ואמבטיה.</p>
+      </article>
+      <article class="feat-card">
+        <div class="ico fi-g"><i class="fa-solid fa-drafting-compass"></i></div>
+        <h3>שרטוט טכני לנגר</h3>
+        <p>מידות, תאים ומפרט חומרים — מוכן לייצור.</p>
+      </article>
+      <article class="feat-card">
+        <div class="ico fi-o"><i class="fa-solid fa-file-pdf"></i></div>
+        <h3>דוח מקצועי ללקוח</h3>
+        <p>PDF מעוצב עם הדמיה, מידות ומחיר — לשיתוף מיידי.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- OFFER -->
+<section class="offer" id="trial">
+  <div class="wrap">
+    <div class="offer-box">
+      <div class="tag"><i class="fa-solid fa-gift"></i> 7 ימים חינם</div>
+      <h2>נסו את המערכת בלי התחייבות</h2>
+      <p>שבוע ניסיון מלא — בלי כרטיס אשראי. תכננו ארון, שתפו עם לקוח, ותראו אם זה משנה את המכירה.</p>
+      <a href="login.html" class="btn-primary">
+        <i class="fa-solid fa-rocket"></i> התחל עכשיו בחינם
+      </a>
+      <div class="offer-note">ביטול בכל רגע · החשבון מוכן תוך דקה</div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="faq" id="faq">
+  <div class="wrap">
+    <div class="sec-hd" style="text-align:center;margin-bottom:28px">
+      <div class="sec-tag" style="justify-content:center"><i class="fa-solid fa-circle-question"></i> שאלות נפוצות</div>
+      <h2 class="sec-title">תשובות קצרות</h2>
+    </div>
+    <div class="faq-list">
+      <details class="faq-item">
+        <summary>יש ניסיון חינמי?</summary>
+        <div class="ans">כן. כל מנוי מגיע עם <strong>שבוע ניסיון חינמי</strong> ללא כרטיס אשראי. מתנסים בכל הפיצ׳רים ומחליטים בסוף השבוע אם להמשיך.</div>
+      </details>
+      <details class="faq-item">
+        <summary>למי המערכת מתאימה?</summary>
+        <div class="ans">למעצבות פנים, נגרים וחברות ריהוט שרוצים לתכנן, לתמחר ולשתף ארונות מול הלקוח — בפגישה או מרחוק.</div>
+      </details>
+      <details class="faq-item">
+        <summary>אפשר לבטל מתי שרוצים?</summary>
+        <div class="ans">כן. אפשר לבטל בכל רגע. בפרויקטים שכבר נשמרו — הם נשארים בחשבון שלכם.</div>
+      </details>
+      <details class="faq-item">
+        <summary>עובד על טאבלט ונייד?</summary>
+        <div class="ans">כן. העורך מותאם גם לטאבלט, וקישור השיתוף החי נפתח אצל הלקוח בכל מכשיר עם דפדפן.</div>
+      </details>
+      <details class="faq-item">
+        <summary>המידע שלי מאובטח?</summary>
+        <div class="ans">הפרויקטים נשמרים בענן עם גישה מוגנת לחשבון שלכם. קישורי שיתוף ניתנים לביטול בכל רגע.</div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section class="final">
+  <div class="wrap">
+    <h2>מוכנים לבנות ארון ברגעים — לא בשעות?</h2>
+    <p>הצטרפו לניסיון החינמי וראו איך נראית מכירה כשהלקוח רואה הכל בלייב.</p>
+    <div class="final-actions">
+      <a href="login.html" class="btn-primary"><i class="fa-solid fa-rocket"></i> התחל ניסיון חינמי</a>
+      <a href="https://wa.me/972546659798" class="btn-ghost btn-wa" target="_blank" rel="noopener">
+        <i class="fa-brands fa-whatsapp"></i> WhatsApp
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="wrap">
+    <div class="foot-row">
+      <a href="landing-alt.html" class="foot-brand">
+        <img src="images/logo%20small.png" alt="AnyCloset 3D">
+      </a>
+      <div class="foot-links">
+        <a href="landing.html">דף הבית הרגיל</a>
+        <a href="privacy.html">פרטיות</a>
+        <a href="login.html">כניסה</a>
+        <a href="https://wa.me/972546659798" target="_blank" rel="noopener">WhatsApp</a>
+      </div>
+    </div>
+    <div class="foot-copy">© AnyCloset 3D · מערכת הדמיה לארונות</div>
+  </div>
+</footer>
+
+<a class="wa-fab" href="https://wa.me/972546659798?text=%D7%A9%D7%9C%D7%95%D7%9D%2C%20%D7%90%D7%A0%D7%99%20%D7%9E%D7%A2%D7%95%D7%A0%D7%99%D7%99%D7%9F%20%D7%9C%D7%A9%D7%9E%D7%95%D7%A2%20%D7%A2%D7%95%D7%93%20%D7%A2%D7%9C%20AnyCloset%203D"
+   target="_blank" rel="noopener" aria-label="WhatsApp">
+  <i class="fa-brands fa-whatsapp"></i>
+</a>
+
+<script>
+(function(){
+  var els = document.querySelectorAll('[data-reveal]');
+  if (!('IntersectionObserver' in window)) {
+    els.forEach(function(el){ el.classList.add('in'); });
+    return;
+  }
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if (e.isIntersecting) {
+        e.target.classList.add('in');
+        io.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.2 });
+  els.forEach(function(el, i){
+    el.style.transitionDelay = (i * 0.1) + 's';
+    io.observe(el);
+  });
+})();
+</script>
+</body>
+</html>
