@@ -2160,6 +2160,97 @@ body.dragging-v { cursor: ns-resize !important; }
     transform: translate(-50%, -50%) scale(1.18);
 }
 
+.col-template-btn {
+    position: absolute;
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #8b5cf6, #6366f1);
+    color: white;
+    border: 2px solid white;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    font-size: 0.68rem;
+    box-shadow: 0 2px 8px rgba(99,102,241,0.35);
+    transform: translate(-50%, -50%);
+    z-index: 40;
+    transition: background 0.2s, transform 0.15s;
+    pointer-events: auto;
+}
+.col-template-btn:hover {
+    transform: translate(-50%, -50%) scale(1.16);
+    box-shadow: 0 3px 12px rgba(99,102,241,0.5);
+}
+
+.col-tpl-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 12px;
+    padding: 4px 16px 24px;
+}
+.col-tpl-card {
+    position: relative;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 14px;
+    background: #fff;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+    display: flex;
+    flex-direction: column;
+}
+.col-tpl-card:hover {
+    border-color: #a78bfa;
+    box-shadow: 0 6px 18px rgba(99,102,241,0.18);
+    transform: translateY(-2px);
+}
+.col-tpl-thumb {
+    width: 100%;
+    height: 150px;
+    object-fit: cover;
+    background: #f1f5f9;
+    display: block;
+}
+.col-tpl-thumb--empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    font-size: 1.6rem;
+}
+.col-tpl-card-meta {
+    padding: 8px 10px 10px;
+}
+.col-tpl-card-name {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+.col-tpl-card-sub {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    margin-top: 2px;
+}
+.col-tpl-del {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    width: 26px;
+    height: 26px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(15,23,42,0.55);
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    opacity: 0;
+    transition: opacity 0.15s, background 0.15s;
+}
+.col-tpl-card:hover .col-tpl-del { opacity: 1; }
+.col-tpl-del:hover { background: #ef4444; }
+
 .cell-select-btn,
 .sub-cell-btn {
     z-index: 40;

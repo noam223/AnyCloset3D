@@ -1224,6 +1224,29 @@ function buildDimensionsAndButtonsUI() {
                 selectAllColumn(item.colIndex);
             });
             buttonsLayer.appendChild(btn);
+
+            // Magic-wand: column templates (skip in viewer)
+            if (!window._VIEWER_MODE) {
+                const wand = document.createElement('div');
+                wand.className = 'col-template-btn';
+                wand.dataset.x3d = item.x + 10;
+                wand.dataset.y3d = item.y;
+                wand.dataset.colIndex = String(item.colIndex);
+                wand.title = 'תבניות עמודה';
+                wand.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i>';
+                wand.addEventListener('pointerdown', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                });
+                wand.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (typeof window.openColumnTemplatesSheet === 'function') {
+                        window.openColumnTemplatesSheet(item.colIndex);
+                    }
+                });
+                buttonsLayer.appendChild(wand);
+            }
         });
     }
 
@@ -2145,6 +2168,410 @@ document.addEventListener('keydown', function(e) {
         window.pasteColumn();
     }
 });
+
+// ==========================================
+// Column templates (magic wand)
+// ==========================================
+const _COL_TPL_STORAGE_KEY = 'anycloset_column_templates_v1';
+const _COL_TPL_DESIGN_HEIGHT = 240;
+
+window._loadColumnTemplates = function() {
+    try {
+        const raw = localStorage.getItem(_COL_TPL_STORAGE_KEY);
+        const list = raw ? JSON.parse(raw) : [];
+        return Array.isArray(list) ? list : [];
+    } catch (e) {
+        return [];
+    }
+};
+
+window._saveColumnTemplates = function(list) {
+    try {
+        localStorage.setItem(_COL_TPL_STORAGE_KEY, JSON.stringify(list || []));
+    } catch (e) {
+        console.warn('[col-templates] save failed', e);
+        if (typeof _showToast === 'function') _showToast('⚠️ לא ניתן לשמור תבניות (אחסון מלא?)', 4000);
+    }
+};
+
+function _colTplIsLockedComp(comp) {
+    if (!comp) return false;
+    const t = comp.type;
+    if (t === 'internal_drawers' || t === 'external_drawers' || t === 'hanging' ||
+        t === 'sorbet' || t === 'cross_hanging') return true;
+    if (t === 'partition' && Array.isArray(comp.subCells)) {
+        return comp.subCells.some(function(sub) {
+            if (!sub) return false;
+            if (_colTplIsLockedComp(sub)) return true;
+            const zones = sub.zones || [];
+            return zones.some(function(z) {
+                return z && (z.type === 'hanging' || z.type === 'sorbet' || z.type === 'internal_drawers' ||
+                    z.type === 'external_drawers' || z.type === 'cross_hanging');
+            });
+        });
+    }
+    return false;
+}
+
+function _colTplStartY(col) {
+    const fo = col.floorOffset || 0;
+    const t = state.thickness;
+    if (fo > 0) return fo + t;
+    if (col.type === 'desk') return (col.deskHeight || 0) + (col.deskClearance || 0) + t;
+    if (col.noPlinth) return t;
+    return state.plinthHeight + t;
+}
+
+function _colTplBuildShelvesY(col, cells) {
+    const t = state.thickness;
+    const startY = _colTplStartY(col);
+    const n = cells.length;
+    const shelvesY = [];
+    if (n <= 1) return shelvesY;
+    let bottom = startY;
+    for (let i = 0; i < n - 1; i++) {
+        const h = Math.max(1, cells[i].h || 1);
+        const top = bottom + h;
+        shelvesY.push(Math.round((top + t / 2) * 10) / 10);
+        bottom = shelvesY[i] + t / 2;
+    }
+    return shelvesY;
+}
+
+function _colTplMeasureCells(srcCol) {
+    const col = JSON.parse(JSON.stringify(srcCol));
+    const comps = col.compartments || [];
+    const cells = [];
+    for (let r = 0; r < comps.length; r++) {
+        cells.push({
+            h: Math.max(1, _cellHeight(col, r)),
+            locked: _colTplIsLockedComp(comps[r]),
+            comp: JSON.parse(JSON.stringify(comps[r] || { type: 'empty' }))
+        });
+    }
+    if (!cells.length) cells.push({ h: 50, locked: false, comp: { type: 'empty' } });
+    return cells;
+}
+
+/** Apply template to target column with >240 top-shelf / empty-cell rules. */
+window._applyColumnTemplateToCol = function(target, tplData) {
+    if (!target || !tplData || !tplData.column) return;
+    const src = JSON.parse(JSON.stringify(tplData.column));
+    const Hs = Math.round(Number(src._height || tplData.sourceHeight || _COL_TPL_DESIGN_HEIGHT) || _COL_TPL_DESIGN_HEIGHT);
+    const Ht = target.height;
+    const savedWidth = target.width;
+    const savedFo = target.floorOffset || 0;
+    const savedNoPlinth = !!target.noPlinth;
+    const savedSpaceBottom = !!target.spaceBottomPanel;
+
+    // Base structural copy (doors, type flags) without height scaling
+    target.doors = src.doors ? JSON.parse(JSON.stringify(src.doors)) : [];
+    target.type = src.type || 'normal';
+    target.topPanel = !!src.topPanel;
+    target.sinkPanel = !!src.sinkPanel;
+    target.splitY = null; // templates are single-span for now
+    if (src.type === 'desk') {
+        target.deskHeight = src.deskHeight;
+        target.deskClearance = src.deskClearance;
+        target.hasDrawers = src.hasDrawers;
+        target.drawerHeight = src.drawerHeight;
+        target.deskDrawerCount = src.deskDrawerCount;
+    } else {
+        delete target.deskHeight;
+        delete target.deskClearance;
+        delete target.hasDrawers;
+        delete target.drawerHeight;
+        delete target.deskDrawerCount;
+    }
+    // Keep target floor/plinth behaviour
+    target.floorOffset = savedFo;
+    target.noPlinth = savedNoPlinth;
+    target.spaceBottomPanel = savedSpaceBottom;
+    target.width = savedWidth;
+    target.height = Ht;
+
+    // Measure cells from template at its design height
+    const measureCol = JSON.parse(JSON.stringify(src));
+    measureCol.height = Hs;
+    measureCol.width = savedWidth;
+    measureCol.floorOffset = savedFo;
+    measureCol.noPlinth = savedNoPlinth;
+    let cells = _colTplMeasureCells(measureCol);
+
+    const addTopShelf = Ht > Hs;
+    if (addTopShelf) {
+        cells.push({ h: 0, locked: false, comp: { type: 'empty' } });
+    }
+
+    const t = state.thickness;
+    const startY = _colTplStartY(target);
+    const spanTop = Ht - t;
+    const spanH = Math.max(0, spanTop - startY);
+    const n = cells.length;
+    const nShelves = Math.max(0, n - 1);
+    const lockedSum = cells.reduce(function(s, c) { return s + (c.locked ? c.h : 0); }, 0);
+    const emptyCount = cells.filter(function(c) { return !c.locked; }).length || 1;
+    // spanH = sum(cellH) + nShelves * t  (approx from _compartmentBounds geometry)
+    let emptyBudget = spanH - (nShelves * t) - lockedSum;
+    if (emptyBudget < emptyCount * 12) emptyBudget = emptyCount * 12;
+    const emptyEach = Math.round((emptyBudget / emptyCount) * 10) / 10;
+
+    cells.forEach(function(c) {
+        if (!c.locked) c.h = emptyEach;
+    });
+
+    // If exact design height and no extra shelf — prefer original shelvesY
+    if (!addTopShelf && Math.abs(Ht - Hs) < 0.5 && Array.isArray(src.shelvesY)) {
+        target.compartments = cells.map(function(c) { return c.comp; });
+        target.shelvesY = src.shelvesY.slice();
+        target.shelves = target.shelvesY.length;
+    } else {
+        target.compartments = cells.map(function(c) { return c.comp; });
+        target.shelvesY = _colTplBuildShelvesY(target, cells);
+        target.shelves = target.shelvesY.length;
+    }
+
+    // Normalize partition shape (same as paste)
+    if (Array.isArray(target.compartments)) {
+        target.compartments.forEach(function(comp) {
+            if (comp && comp.partition && !Array.isArray(comp.partitions)) {
+                comp.partitions = [typeof comp.partitionX === 'number' ? comp.partitionX : 0.5];
+                delete comp.partitionX;
+                if (!Array.isArray(comp.subCells)) {
+                    comp.subCells = [{ type: 'empty', shelves: 0 }, { type: 'empty', shelves: 0 }];
+                }
+            }
+        });
+    }
+
+    // Clamp drawer counts to new cell heights
+    for (let r = 0; r < target.compartments.length; r++) {
+        const comp = target.compartments[r];
+        if (!comp || (comp.type !== 'internal_drawers' && comp.type !== 'external_drawers')) continue;
+        const cellH = _cellHeight(target, r);
+        const rules = (typeof _drawerHeightRules === 'function') ? _drawerHeightRules(comp.type) : { minH: 20 };
+        if (cellH < (rules.minH || 20)) {
+            comp.type = 'empty';
+        } else if (typeof calcMinDrawerCount === 'function' && typeof calcAutoDrawerCount === 'function') {
+            const minCount = calcMinDrawerCount(cellH, comp.type);
+            const maxCount = calcAutoDrawerCount(cellH, comp.type);
+            comp.count = Math.max(minCount, Math.min(maxCount, comp.count || 1));
+        }
+    }
+};
+
+window._captureColumnThumbnail = function(colIndex) {
+    try {
+        const ren = (typeof renderer !== 'undefined') ? renderer : null;
+        const cam = (typeof camera !== 'undefined') ? camera : null;
+        const scn = (typeof scene !== 'undefined') ? scene : null;
+        const col = state.columns && state.columns[colIndex];
+        if (!ren || !cam || !scn || !col) return null;
+
+        // Column center X from selectAll handle if available
+        let centerX = 0;
+        const sel = (typeof dragHandlesData !== 'undefined' && dragHandlesData && dragHandlesData.selectAll)
+            ? dragHandlesData.selectAll.find(function(s) { return s.colIndex === colIndex; })
+            : null;
+        if (sel) centerX = sel.x - 5;
+        else {
+            // Fallback: walk columns
+            const t = state.thickness;
+            let x = -state.width / 2 + t;
+            for (let i = 0; i < colIndex; i++) {
+                x += (state.columns[i].width || 0) + t;
+            }
+            centerX = x + col.width / 2;
+        }
+
+        const halfW = (col.width || 40) / 2 + 3;
+        const y0 = 0;
+        const y1 = col.height || 240;
+        const z = (state.depth || 54) / 2;
+
+        const corners = [
+            new THREE.Vector3(centerX - halfW, y0, z),
+            new THREE.Vector3(centerX + halfW, y0, z),
+            new THREE.Vector3(centerX - halfW, y1, z),
+            new THREE.Vector3(centerX + halfW, y1, z)
+        ];
+        const group = window._activeWingGroup || window.cabinetGroup;
+        if (group) {
+            group.updateMatrixWorld(true);
+            corners.forEach(function(p) { p.applyMatrix4(group.matrixWorld); });
+        }
+
+        ren.render(scn, cam);
+        const canvas = ren.domElement;
+        const cw = canvas.width;
+        const ch = canvas.height;
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        corners.forEach(function(p) {
+            const ndc = p.clone().project(cam);
+            const sx = (ndc.x * 0.5 + 0.5) * cw;
+            const sy = (-ndc.y * 0.5 + 0.5) * ch;
+            minX = Math.min(minX, sx);
+            maxX = Math.max(maxX, sx);
+            minY = Math.min(minY, sy);
+            maxY = Math.max(maxY, sy);
+        });
+        const pad = 8;
+        minX = Math.max(0, Math.floor(minX - pad));
+        maxX = Math.min(cw, Math.ceil(maxX + pad));
+        minY = Math.max(0, Math.floor(minY - pad));
+        maxY = Math.min(ch, Math.ceil(maxY + pad));
+        const w = Math.max(8, maxX - minX);
+        const h = Math.max(8, maxY - minY);
+
+        const out = document.createElement('canvas');
+        // Portrait thumbnail
+        const tw = 120;
+        const th = 200;
+        out.width = tw;
+        out.height = th;
+        const ctx = out.getContext('2d');
+        ctx.fillStyle = '#f1f5f9';
+        ctx.fillRect(0, 0, tw, th);
+        const scale = Math.min(tw / w, th / h);
+        const dw = w * scale;
+        const dh = h * scale;
+        const dx = (tw - dw) / 2;
+        const dy = (th - dh) / 2;
+        ctx.drawImage(canvas, minX, minY, w, h, dx, dy, dw, dh);
+        return out.toDataURL('image/jpeg', 0.72);
+    } catch (e) {
+        console.warn('[col-templates] thumbnail failed', e);
+        return null;
+    }
+};
+
+window.openColumnTemplatesSheet = function(colIndex) {
+    if (window._VIEWER_MODE) return;
+    const col = state.columns && state.columns[colIndex];
+    if (!col) return;
+    window._colTplTargetIndex = colIndex;
+    // Soft-select the column for context
+    if (typeof selectAllColumn === 'function') selectAllColumn(colIndex);
+
+    const overlay = document.getElementById('col-templates-overlay');
+    if (!overlay) return;
+    overlay.style.display = 'flex';
+    requestAnimationFrame(function() {
+        const sheet = document.getElementById('col-templates-sheet');
+        if (sheet) sheet.style.transform = 'translateY(0)';
+    });
+    window._renderColumnTemplatesSheet();
+};
+
+window.closeColumnTemplatesSheet = function() {
+    const overlay = document.getElementById('col-templates-overlay');
+    const sheet = document.getElementById('col-templates-sheet');
+    if (sheet) sheet.style.transform = 'translateY(110%)';
+    setTimeout(function() {
+        if (overlay) overlay.style.display = 'none';
+    }, 220);
+};
+
+window._renderColumnTemplatesSheet = function() {
+    const grid = document.getElementById('col-templates-grid');
+    const emptyEl = document.getElementById('col-templates-empty');
+    if (!grid) return;
+    const list = window._loadColumnTemplates();
+    grid.innerHTML = '';
+
+    if (!list.length) {
+        if (emptyEl) emptyEl.style.display = '';
+    } else if (emptyEl) {
+        emptyEl.style.display = 'none';
+    }
+
+    list.forEach(function(tpl, idx) {
+        const card = document.createElement('div');
+        card.className = 'col-tpl-card';
+        card.title = 'החל על העמודה';
+        const thumb = tpl.thumbnail
+            ? '<img class="col-tpl-thumb" src="' + tpl.thumbnail + '" alt="">'
+            : '<div class="col-tpl-thumb col-tpl-thumb--empty"><i class="fa-solid fa-table-columns"></i></div>';
+        card.innerHTML =
+            thumb +
+            '<div class="col-tpl-card-meta">' +
+                '<div class="col-tpl-card-name">' + (tpl.name || ('תבנית ' + (idx + 1))) + '</div>' +
+                '<div class="col-tpl-card-sub">' + Math.round(tpl.sourceHeight || 240) + ' ס״מ</div>' +
+            '</div>' +
+            '<button type="button" class="col-tpl-del" title="מחק תבנית"><i class="fa-solid fa-trash"></i></button>';
+        card.addEventListener('click', function(e) {
+            if (e.target.closest('.col-tpl-del')) return;
+            window.applyColumnTemplate(tpl.id);
+        });
+        const delBtn = card.querySelector('.col-tpl-del');
+        if (delBtn) {
+            delBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                window.deleteColumnTemplate(tpl.id);
+            });
+        }
+        grid.appendChild(card);
+    });
+};
+
+window.addCurrentColumnAsTemplate = function() {
+    const idx = (typeof window._colTplTargetIndex === 'number')
+        ? window._colTplTargetIndex
+        : state.selection.colIndex;
+    const col = state.columns && state.columns[idx];
+    if (!col) {
+        if (typeof _showToast === 'function') _showToast('לא נבחרה עמודה', 2500);
+        return;
+    }
+
+    const serialized = _serializeColumnForClipboard(col);
+    serialized._height = col.height;
+    const thumb = window._captureColumnThumbnail(idx);
+    const list = window._loadColumnTemplates();
+    const tpl = {
+        id: 'ct_' + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36),
+        name: 'תבנית ' + (list.length + 1),
+        createdAt: Date.now(),
+        sourceHeight: Math.round(col.height),
+        thumbnail: thumb,
+        column: serialized
+    };
+    list.push(tpl);
+    window._saveColumnTemplates(list);
+    window._renderColumnTemplatesSheet();
+    if (typeof _showToast === 'function') {
+        _showToast(col.height !== _COL_TPL_DESIGN_HEIGHT
+            ? ('תבנית נשמרה (גובה ' + Math.round(col.height) + ') ✓')
+            : 'תבנית עמודה נשמרה ✓', 2800);
+    }
+};
+
+window.deleteColumnTemplate = function(id) {
+    let list = window._loadColumnTemplates();
+    list = list.filter(function(t) { return t.id !== id; });
+    window._saveColumnTemplates(list);
+    window._renderColumnTemplatesSheet();
+    if (typeof _showToast === 'function') _showToast('התבנית נמחקה', 2000);
+};
+
+window.applyColumnTemplate = function(id) {
+    const list = window._loadColumnTemplates();
+    const tpl = list.find(function(t) { return t.id === id; });
+    const idx = (typeof window._colTplTargetIndex === 'number')
+        ? window._colTplTargetIndex
+        : state.selection.colIndex;
+    const target = state.columns && state.columns[idx];
+    if (!tpl || !target) return;
+
+    window._applyColumnTemplateToCol(target, tpl);
+    if (typeof checkSplits === 'function') checkSplits();
+    if (typeof selectAllColumn === 'function') selectAllColumn(idx);
+    if (typeof buildCabinet === 'function') buildCabinet();
+    if (typeof calculatePrice === 'function') calculatePrice();
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+    window.closeColumnTemplatesSheet();
+    if (typeof _showToast === 'function') _showToast('התבנית הוחלה על העמודה ✓', 2500);
+};
 // ─────────────────────────────────────────────────────────────────────────────
 
 function toggleSelection(c, r) {
@@ -2729,7 +3156,7 @@ function updateOverlaysPosition() {
         return localPt.project(camera);
     };
 
-    document.querySelectorAll('.dim-container, .select-all-col-btn, .sub-cell-btn, .cell-select-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn').forEach(el => {
+    document.querySelectorAll('.dim-container, .select-all-col-btn, .col-template-btn, .sub-cell-btn, .cell-select-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn').forEach(el => {
         const pos = projectWingPoint(parseFloat(el.dataset.x3d), parseFloat(el.dataset.y3d));
         let x = (pos.x * .5 + .5) * cw;
         let y = (-(pos.y * .5) + .5) * ch;
@@ -6009,7 +6436,7 @@ function _isCanvasOverlayUiTarget(el) {
     if (!el || !el.closest) return false;
     return !!el.closest(
         '#column-quick-edit, #full-corner-quick-edit, #bottom-floating-toolbar, #bed-toolbar, #room-props-row, #room-furniture-toolbar, #room-plan-layer, #btn-room-plan-view-toggle, ' +
-        '.drag-handle, .dim-container, .col-width-label, .plus-btn, .fc-cell-btn, .select-all-col-btn, .cell-select-btn, .sub-cell-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn'
+        '.drag-handle, .dim-container, .col-width-label, .plus-btn, .fc-cell-btn, .select-all-col-btn, .col-template-btn, .cell-select-btn, .sub-cell-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn'
     );
 }
 

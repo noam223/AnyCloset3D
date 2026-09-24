@@ -39,7 +39,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260910deskMerge">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
     <link rel="stylesheet" href="style-extras.css?v=20260731rpcab">
-    <link rel="stylesheet" href="style.css?v=20260924spaceLeave">
+    <link rel="stylesheet" href="style.css?v=20260924colTpl">
     <style>
         html.thumb-only-mode #left-sidebar,
         html.thumb-only-mode #right-sidebar,
@@ -2668,7 +2668,7 @@
 <script src="engine-blueprint.js?v=20260918noPlinthFix"></script>
 <script src="engine-room-plan.js?v=20260731rpcab"></script>
 <script src="tambour-color-picker.js?v=20260617scdoors"></script>
-<script src="ui.js?v=20260924jsonMerge"></script>
+<script src="ui.js?v=20260924colTpl"></script>
 <script src="mobile.js?v=20260916cellHDec"></script>
 <script src="part-paint.js?v=20260914A427fix"></script>
 <script src="shelf-pick.js?v=20260922sideWall"></script>
@@ -2924,6 +2924,37 @@
     </div>
 </div>
 <!-- ===== END HANDLE PICKER POPUP ===== -->
+
+<!-- ===== COLUMN TEMPLATES POPUP ===== -->
+<div id="col-templates-overlay" onclick="if(event.target===this)closeColumnTemplatesSheet()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.52);z-index:99997;flex-direction:column;justify-content:flex-end;align-items:stretch;">
+    <div id="col-templates-sheet" style="background:#fff;border-radius:22px 22px 0 0;padding:0 0 env(safe-area-inset-bottom,0) 0;max-height:82vh;overflow-y:auto;box-shadow:0 -8px 40px rgba(0,0,0,0.22);transform:translateY(110%);transition:transform 0.28s cubic-bezier(0.32,0.72,0,1);direction:rtl;font-family:inherit;">
+        <div style="display:flex;justify-content:center;padding:12px 0 0;">
+            <div style="width:38px;height:4px;background:#e2e8f0;border-radius:2px;"></div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px 10px;">
+            <h3 style="margin:0;font-size:1.08rem;font-weight:800;color:#1e293b;display:flex;align-items:center;gap:8px;">
+                <i class="fa-solid fa-wand-magic-sparkles" style="color:#7c3aed;font-size:1rem;"></i>
+                תבניות עמודה
+            </h3>
+            <button type="button" onclick="closeColumnTemplatesSheet()" style="border:none;background:rgba(0,0,0,0.06);border-radius:50%;width:30px;height:30px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#64748b;font-size:0.85rem;">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <p style="margin:0 20px 12px;font-size:0.8rem;color:#64748b;line-height:1.45;">בחרו תבנית מוכנה להחלה על העמודה, או שמרו את סידור העמודה הנוכחית כתבנית חדשה.</p>
+        <div style="padding:0 16px 12px;">
+            <button type="button" id="col-templates-add-btn" onclick="addCurrentColumnAsTemplate()" style="width:100%;padding:12px 14px;border-radius:12px;border:1.5px dashed #7c3aed;background:rgba(124,58,237,0.06);color:#6d28d9;font-size:0.9rem;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;">
+                <i class="fa-solid fa-plus"></i> הוסף את העמודה הנוכחית לתבניות
+            </button>
+        </div>
+        <div id="col-templates-empty" style="padding:28px 20px 36px;text-align:center;color:#94a3b8;">
+            <div style="font-size:2rem;margin-bottom:8px;opacity:0.7;"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+            <div style="font-weight:700;color:#64748b;margin-bottom:4px;">אין תבניות עדיין</div>
+            <div style="font-size:0.82rem;line-height:1.45;">סדרו עמודה (מדפים, מגירות, תלייה) ולחצו על הכפתור למעלה כדי לשמור אותה כתבנית.</div>
+        </div>
+        <div id="col-templates-grid" class="col-tpl-grid"></div>
+    </div>
+</div>
+<!-- ===== END COLUMN TEMPLATES POPUP ===== -->
 
 <!-- ===== HISTORY PANEL ===== -->
 <div id="history-panel" class="history-panel" role="menu" aria-label="היסטוריית פעולות">
