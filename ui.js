@@ -7037,6 +7037,9 @@ function bindUI() {
     });
 
     document.getElementById('btn-save-json').addEventListener('click', () => {
+        if (typeof window._commitCurrentCabinetToCart === 'function') {
+            window._commitCurrentCabinetToCart({ flash: false });
+        }
         const activeCabinet = JSON.parse(JSON.stringify({
             cabinetModel: state.cabinetModel,
             placement: state.placement,
@@ -7051,6 +7054,7 @@ function bindUI() {
             customer: state.customer,
             orderForm: state.orderForm,
             cart: state.orderCart,
+            editingCartIndex: state.editingCartIndex,
             activeCabinet: activeCabinet,
             wings: state.wings,
             activeWing: state.activeWing,
@@ -7060,125 +7064,45 @@ function bindUI() {
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(projectData));
         const dlAnchorElem = document.createElement('a');
         dlAnchorElem.setAttribute("href", dataStr);
-        let fileName = state.customer.name ? `hazmana_${state.customer.name}.json` : "hazmana_hadasha.json";
+        const projName = (window._currentProjectName || state.customer.name || '').trim();
+        let fileName = projName
+            ? ('project_' + projName.replace(/[\\/:*?"<>|]+/g, '_').slice(0, 60) + '.json')
+            : (state.customer.name ? `hazmana_${state.customer.name}.json` : "hazmana_hadasha.json");
         dlAnchorElem.setAttribute("download", fileName);
         dlAnchorElem.click();
     });
 
     document.getElementById('inp-load-json').addEventListener('change', (e) => {
         const file = e.target.files[0];
+        e.target.value = '';
         if (!file) return;
 
-        const _doLoad = () => {
-            const reader = new FileReader();
-            reader.onload = function(ev) {
-                try {
-                    const data = JSON.parse(ev.target.result);
-                    // Disconnect from cloud project — loading JSON creates a standalone session
-                    window._currentProjectId   = null;
-                    window._currentProjectName = null;
-                    window._isDirty            = false;
-                    if (typeof window._syncBrowserTabTitle === 'function') window._syncBrowserTabTitle();
-                    // Clear ?project= param so refresh opens a blank editor (not old project)
-                    if (history.replaceState) history.replaceState(null, '', 'index.html');
-                if(data.customer) {
-                    state.customer = data.customer;
-                    if (typeof window._fillCustomerForm === 'function') window._fillCustomerForm();
-                    else {
-                        document.getElementById('cust-name').value = state.customer.name || '';
-                        document.getElementById('cust-phone').value = state.customer.phone || '';
-                        document.getElementById('cust-order-num').value = state.customer.orderNum || '';
-                        document.getElementById('cust-address').value = state.customer.address || '';
-                        const delEl = document.getElementById('cust-delivery');
-                        if (delEl) delEl.value = window._isoToDisplayDate
-                            ? window._isoToDisplayDate(state.customer.deliveryDate)
-                            : (state.customer.deliveryDate || '');
-                    }
-                }
-                if (data.orderForm) state.orderForm = data.orderForm;
-                if(data.cart) {
-                    state.orderCart = data.cart;
-                    const cc1 = document.getElementById('cart-count');
-                    if (cc1) cc1.innerText = state.orderCart.length;
-                    if (typeof window._ensureCabinetSelected === 'function') {
-                        window._ensureCabinetSelected(
-                            (typeof data.editingCartIndex === 'number') ? data.editingCartIndex : 0
-                        );
-                    } else {
-                        updateLeftSidebar();
-                    }
-                }
-                
-                if(data.wings) {
-                    // New format: restore full wings structure (incl. upperUnit_*)
-                    if (typeof window._restoreWingsFromSaved === 'function') {
-                        window._restoreWingsFromSaved(data.wings);
-                    } else {
-                        state.wings.center = data.wings.center || state.wings.center;
-                        state.wings.left = data.wings.left || null;
-                        state.wings.right = data.wings.right || null;
-                    }
-                    state.activeWing = data.activeWing || 'center';
-                    // Restore presetId if present
-                    if (data.presetId) {
-                        state.presetId = data.presetId;
-                        // Show/hide sliding door section based on preset
-                        const sdSection = document.getElementById('sliding-door-section');
-                        const suSection = document.getElementById('side-unit-section');
-                        const cuSection = document.getElementById('corner-unit-section');
-                        const plinthRow = document.getElementById('plinth-model-row');
-                        const mobilePlinthRow = document.getElementById('mobile-plinth-model-row');
-                        const isSliding = data.presetId === 'sliding';
-                        if (sdSection) sdSection.style.display = isSliding ? '' : 'none';
-                        if (suSection) suSection.style.display = isSliding ? 'none' : '';
-                        if (cuSection) cuSection.style.display = isSliding ? 'none' : '';
-                        if (plinthRow) plinthRow.style.display = isSliding ? 'none' : '';
-                        if (mobilePlinthRow) mobilePlinthRow.style.display = isSliding ? 'none' : '';
-                        // Update preset button highlights
-                        document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-                        const activePresetBtn = document.getElementById(`preset-btn-${data.presetId}`);
-                        if (activePresetBtn) activePresetBtn.classList.add('active');
-                        const mobileActivePresetBtn = document.getElementById(`mobile-preset-btn-${data.presetId}`);
-                        if (mobileActivePresetBtn) mobileActivePresetBtn.classList.add('active');
-                    }
-                    // Show/hide wing tabs
-                    ['left','right'].forEach(side => {
-                        const tab = document.getElementById(`wing-tab-${side}`);
-                        if (tab) tab.style.display = state.wings[side] ? '' : 'none';
-                    });
-                    document.querySelectorAll('.wing-tab-btn').forEach(b => {
-                        b.classList.toggle('active', b.dataset.wing === state.activeWing);
-                        b.style.background = b.dataset.wing === state.activeWing ? 'var(--accent)' : 'var(--bg-light)';
-                        b.style.color = b.dataset.wing === state.activeWing ? 'white' : 'var(--text)';
-                    });
-                    syncSidebarToWing();
-                    buildCabinet(); updateCameraView(); calculatePrice(); saveHistoryState();
-                } else if(data.activeCabinet) {
-                    // Legacy format: restore flat cabinet data into center wing
-                    Object.assign(state, data.activeCabinet);
-                    syncSidebarToWing();
-                    buildCabinet(); updateCameraView(); calculatePrice(); saveHistoryState();
-                }
-                
-                if (typeof _showToast === 'function') _showToast('הקובץ נטען בהצלחה ✓', 3000);
-                else alert('הפרויקט נטען בהצלחה!');
-            } catch(err) { alert('שגיאה בטעינת הקובץ.'); }
-            };
-            reader.readAsText(file);
-        }; // end _doLoad
-
-        // If a cloud project is open — warn before overwriting
-        if (window._currentProjectId) {
-            if (typeof window._confirmLeave === 'function') {
-                window._confirmLeave(null, _doLoad);
-            } else if (confirm('פרויקט ענן פתוח כעת. טעינת קובץ תנתק אותך ממנו (השינויים לא יישמרו). להמשיך?')) {
-                _doLoad();
+        const reader = new FileReader();
+        reader.onload = function(ev) {
+            let data;
+            try {
+                data = JSON.parse(ev.target.result);
+            } catch (err) {
+                alert('שגיאה בטעינת הקובץ.');
+                return;
             }
-        } else {
-            _doLoad();
-        }
-        // Reset input so same file can be loaded again
-        e.target.value = '';
+            if (!data || typeof data !== 'object') {
+                alert('שגיאה בטעינת הקובץ.');
+                return;
+            }
+
+            const hasExisting = typeof window._hasExistingProjectSession === 'function'
+                ? window._hasExistingProjectSession()
+                : !!(window._currentProjectId || (state.orderCart && state.orderCart.length > 1) || window._isDirty);
+
+            if (!hasExisting) {
+                window._applyLoadedJsonProject(data, { mode: 'open' });
+                return;
+            }
+
+            window._promptJsonLoadChoice(data);
+        };
+        reader.readAsText(file);
     });
 
     document.getElementById('btn-add-to-cart').addEventListener('click', () => {
@@ -7197,6 +7121,251 @@ function bindUI() {
         if (e.target === document.getElementById('order-modal')) { document.getElementById('order-modal').style.display = 'none'; }
     });
 }
+
+/** True when the editor already has a real project/session worth protecting. */
+window._hasExistingProjectSession = function() {
+    if (window._currentProjectId) return true;
+    if (window._isDirty) return true;
+    const name = String(window._currentProjectName || '').trim();
+    if (name && name !== 'פרויקט חדש') return true;
+    const cart = state.orderCart || [];
+    if (cart.length > 1) return true;
+    if (cart.length === 1) {
+        const it = cart[0];
+        const n = ((it && it.spec && it.spec.customName) || (it && it.rawState && it.rawState.cabinetName) || '').trim();
+        if (n) return true;
+        if (typeof window._spacePairIdOf === 'function' && window._spacePairIdOf(it)) return true;
+    }
+    return false;
+};
+
+/** Modal: open JSON as new session, or merge its cabinets into the current project. */
+window._promptJsonLoadChoice = function(data) {
+    const existing = document.getElementById('_json-load-choice-toast');
+    if (existing) existing.remove();
+
+    const incoming = (data && (data.cart || data.orderCart)) || [];
+    const n = incoming.length;
+    const cabLabel = n === 1 ? 'ארון אחד' : (n + ' ארונות');
+
+    const toast = document.createElement('div');
+    toast.id = '_json-load-choice-toast';
+    toast.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);';
+    toast.innerHTML =
+        '<div style="background:#1e2840;color:white;padding:32px 36px;border-radius:20px;font-size:1.05rem;font-weight:600;box-shadow:0 8px 48px rgba(0,0,0,0.55);display:flex;flex-direction:column;align-items:center;gap:18px;min-width:300px;max-width:92vw;text-align:center;direction:rtl;">' +
+            '<div style="font-size:2rem;"><i class="fa-solid fa-file-import"></i></div>' +
+            '<div style="font-size:1.15rem;font-weight:700;line-height:1.45;">נטען קובץ JSON עם ' + cabLabel + '</div>' +
+            '<div style="font-size:0.92rem;font-weight:500;opacity:0.85;line-height:1.5;">מה לעשות עם הפרויקט הפתוח כרגע?</div>' +
+            '<div style="display:flex;flex-direction:column;gap:10px;width:100%;">' +
+                '<button type="button" id="_json-load-open" style="width:100%;background:#6366f1;color:white;border:none;border-radius:10px;padding:12px 0;font-size:1.02rem;font-weight:700;cursor:pointer;">' +
+                    '<i class="fa-solid fa-folder-open"></i> פתח את הקובץ (החלף)' +
+                '</button>' +
+                '<div style="font-size:0.78rem;font-weight:500;opacity:0.7;margin-top:-4px;line-height:1.4;">הפרויקט הנוכחי יישמר אוטומטית ואז ייפתח הקובץ</div>' +
+                '<button type="button" id="_json-load-merge" style="width:100%;background:#0d9488;color:white;border:none;border-radius:10px;padding:12px 0;font-size:1.02rem;font-weight:700;cursor:pointer;">' +
+                    '<i class="fa-solid fa-object-group"></i> מזג ארונות לפרויקט הקיים' +
+                '</button>' +
+                '<div style="font-size:0.78rem;font-weight:500;opacity:0.7;margin-top:-4px;line-height:1.4;">הארונות מהקובץ יתווספו לפרויקט הפתוח</div>' +
+                '<button type="button" id="_json-load-cancel" style="width:100%;background:transparent;color:rgba(255,255,255,0.75);border:none;border-radius:10px;padding:10px 0;font-size:0.95rem;font-weight:600;cursor:pointer;">ביטול</button>' +
+            '</div>' +
+        '</div>';
+    document.body.appendChild(toast);
+
+    const close = () => { const t = document.getElementById('_json-load-choice-toast'); if (t) t.remove(); };
+    toast.querySelector('#_json-load-cancel').onclick = close;
+    toast.addEventListener('click', (e) => { if (e.target === toast) close(); });
+
+    toast.querySelector('#_json-load-merge').onclick = function() {
+        close();
+        window._applyLoadedJsonProject(data, { mode: 'merge' });
+    };
+
+    toast.querySelector('#_json-load-open').onclick = async function() {
+        const btn = toast.querySelector('#_json-load-open');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> שומר לפני פתיחה...';
+        }
+        try {
+            if (typeof window._commitCurrentCabinetToCart === 'function') {
+                window._commitCurrentCabinetToCart({ flash: false });
+            }
+            if (typeof window._saveProjectNow === 'function') {
+                await window._saveProjectNow();
+            }
+        } catch (err) {
+            console.warn('[JSON load] auto-save before open failed:', err);
+        }
+        close();
+        window._applyLoadedJsonProject(data, { mode: 'open' });
+    };
+};
+
+/** Apply a parsed JSON project: replace session (open) or append cabinets (merge). */
+window._applyLoadedJsonProject = function(data, opts) {
+    opts = opts || {};
+    const mode = opts.mode === 'merge' ? 'merge' : 'open';
+
+    if (mode === 'merge') {
+        window._mergeJsonCartIntoCurrentProject(data);
+        return;
+    }
+
+    // ---- Open / replace ----
+    window._currentProjectId   = null;
+    window._currentProjectName = null;
+    window._isDirty            = false;
+    if (typeof window._syncBrowserTabTitle === 'function') window._syncBrowserTabTitle();
+    if (history.replaceState) history.replaceState(null, '', 'index.html');
+
+    if (data.customer) {
+        state.customer = data.customer;
+        if (typeof window._fillCustomerForm === 'function') window._fillCustomerForm();
+        else {
+            const nameEl = document.getElementById('cust-name');
+            const phoneEl = document.getElementById('cust-phone');
+            const orderEl = document.getElementById('cust-order-num');
+            const addrEl = document.getElementById('cust-address');
+            if (nameEl) nameEl.value = state.customer.name || '';
+            if (phoneEl) phoneEl.value = state.customer.phone || '';
+            if (orderEl) orderEl.value = state.customer.orderNum || '';
+            if (addrEl) addrEl.value = state.customer.address || '';
+            const delEl = document.getElementById('cust-delivery');
+            if (delEl) delEl.value = window._isoToDisplayDate
+                ? window._isoToDisplayDate(state.customer.deliveryDate)
+                : (state.customer.deliveryDate || '');
+        }
+    }
+    if (data.orderForm) state.orderForm = data.orderForm;
+
+    const cart = data.cart || data.orderCart;
+    if (cart) {
+        state.orderCart = cart;
+        const cc1 = document.getElementById('cart-count');
+        if (cc1) cc1.innerText = state.orderCart.length;
+        if (typeof window._ensureCabinetSelected === 'function') {
+            window._ensureCabinetSelected(
+                (typeof data.editingCartIndex === 'number') ? data.editingCartIndex : 0
+            );
+        } else if (typeof updateLeftSidebar === 'function') {
+            updateLeftSidebar();
+        }
+    }
+
+    if (data.wings) {
+        if (typeof window._restoreWingsFromSaved === 'function') {
+            window._restoreWingsFromSaved(data.wings);
+        } else {
+            state.wings.center = data.wings.center || state.wings.center;
+            state.wings.left = data.wings.left || null;
+            state.wings.right = data.wings.right || null;
+        }
+        state.activeWing = data.activeWing || 'center';
+        if (data.presetId) {
+            state.presetId = data.presetId;
+            const sdSection = document.getElementById('sliding-door-section');
+            const suSection = document.getElementById('side-unit-section');
+            const cuSection = document.getElementById('corner-unit-section');
+            const plinthRow = document.getElementById('plinth-model-row');
+            const mobilePlinthRow = document.getElementById('mobile-plinth-model-row');
+            const isSliding = data.presetId === 'sliding';
+            if (sdSection) sdSection.style.display = isSliding ? '' : 'none';
+            if (suSection) suSection.style.display = isSliding ? 'none' : '';
+            if (cuSection) cuSection.style.display = isSliding ? 'none' : '';
+            if (plinthRow) plinthRow.style.display = isSliding ? 'none' : '';
+            if (mobilePlinthRow) mobilePlinthRow.style.display = isSliding ? 'none' : '';
+            document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+            const activePresetBtn = document.getElementById(`preset-btn-${data.presetId}`);
+            if (activePresetBtn) activePresetBtn.classList.add('active');
+            const mobileActivePresetBtn = document.getElementById(`mobile-preset-btn-${data.presetId}`);
+            if (mobileActivePresetBtn) mobileActivePresetBtn.classList.add('active');
+        }
+        ['left', 'right'].forEach(side => {
+            const tab = document.getElementById(`wing-tab-${side}`);
+            if (tab) tab.style.display = state.wings[side] ? '' : 'none';
+        });
+        document.querySelectorAll('.wing-tab-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.wing === state.activeWing);
+            b.style.background = b.dataset.wing === state.activeWing ? 'var(--accent)' : 'var(--bg-light)';
+            b.style.color = b.dataset.wing === state.activeWing ? 'white' : 'var(--text)';
+        });
+        if (typeof syncSidebarToWing === 'function') syncSidebarToWing();
+        if (typeof buildCabinet === 'function') buildCabinet();
+        if (typeof updateCameraView === 'function') updateCameraView();
+        if (typeof calculatePrice === 'function') calculatePrice();
+        if (typeof saveHistoryState === 'function') saveHistoryState();
+    } else if (data.activeCabinet) {
+        Object.assign(state, data.activeCabinet);
+        if (typeof syncSidebarToWing === 'function') syncSidebarToWing();
+        if (typeof buildCabinet === 'function') buildCabinet();
+        if (typeof updateCameraView === 'function') updateCameraView();
+        if (typeof calculatePrice === 'function') calculatePrice();
+        if (typeof saveHistoryState === 'function') saveHistoryState();
+    }
+
+    if (typeof window._syncSpacePairTabs === 'function') window._syncSpacePairTabs();
+    if (typeof _showToast === 'function') _showToast('הקובץ נטען בהצלחה ✓', 3000);
+    else alert('הפרויקט נטען בהצלחה!');
+};
+
+/** Append cabinets from a JSON file into the currently open project. */
+window._mergeJsonCartIntoCurrentProject = function(data) {
+    const incoming = (data && (data.cart || data.orderCart)) || [];
+    if (!incoming.length) {
+        if (typeof _showToast === 'function') _showToast('אין ארונות בקובץ למיזוג', 3000);
+        else alert('אין ארונות בקובץ למיזוג');
+        return;
+    }
+
+    if (typeof window._commitCurrentCabinetToCart === 'function') {
+        window._commitCurrentCabinetToCart({ flash: false });
+    }
+
+    const pairMap = {};
+    function remapItem(src) {
+        const clone = JSON.parse(JSON.stringify(src));
+        const oldId = clone.spacePairId || (clone.rawState && clone.rawState.spacePairId) || null;
+        if (oldId) {
+            if (!pairMap[oldId]) {
+                pairMap[oldId] = 'sp_m' + Date.now().toString(36) + Math.floor(Math.random() * 10000).toString(36)
+                    + '_' + Object.keys(pairMap).length;
+            }
+            const newId = pairMap[oldId];
+            clone.spacePairId = newId;
+            if (!clone.rawState) clone.rawState = {};
+            clone.rawState.spacePairId = newId;
+        }
+        return clone;
+    }
+
+    const startIdx = state.orderCart.length;
+    incoming.forEach(function(it) {
+        if (!it) return;
+        state.orderCart.push(remapItem(it));
+    });
+
+    if (typeof window._importLocalPartColors === 'function') {
+        for (let i = startIdx; i < state.orderCart.length; i++) {
+            const it = state.orderCart[i];
+            if (it && it.rawState && it.rawState.partColors) {
+                window._importLocalPartColors('cart' + i, it.rawState.partColors);
+            }
+        }
+    }
+
+    const cc = document.getElementById('cart-count');
+    if (cc) cc.innerText = state.orderCart.length;
+    window._isDirty = true;
+    if (typeof updateLeftSidebar === 'function') updateLeftSidebar({ scrollToActive: true });
+    if (typeof window._syncSpacePairTabs === 'function') window._syncSpacePairTabs();
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+
+    const added = state.orderCart.length - startIdx;
+    const msg = added === 1
+        ? 'ארון אחד מוזג לפרויקט הקיים ✓'
+        : (added + ' ארונות מוזגו לפרויקט הקיים ✓');
+    if (typeof _showToast === 'function') _showToast(msg, 3500);
+    else alert(msg);
+};
 
 function _showToast(msg, duration = 4000) {
     let toast = document.getElementById('autosave-toast');
