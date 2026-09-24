@@ -5083,7 +5083,9 @@ window.applyEqualCells = function() {
         ? col.compartments.length - 1
         : ((col.shelves || 0) + (hasSplit ? 1 : 0));
 
-    /** Equalize CLEAR cell heights (0.1 cm) between interior spanBottom..spanTop. */
+    /** Equalize CLEAR cell heights (0.1 cm) between interior spanBottom..spanTop.
+     *  Shelf centers are placed at underside + t/2 WITHOUT snapping to 0.1 —
+     *  snapping centers with t=1.7 (t/2=0.85) drifts clear heights (e.g. 38.2/38.3/38.4). */
     const _equalizeBetween = (spanBottom, spanTop, shelfIndices) => {
         if (!shelfIndices.length) return;
         const numCells = shelfIndices.length + 1;
@@ -5098,9 +5100,9 @@ window.applyEqualCells = function() {
         let cursor = botT; // interior bottom of current cell (tenths of cm)
         for (let k = 0; k < numShelves; k++) {
             const cellT = floorCellT + (k < rem ? 1 : 0);
-            cursor += cellT; // underside of shelf
-            // Shelf center = underside + t/2, snapped to 0.1 cm
-            col.shelvesY[shelfIndices[k]] = Math.round(cursor + tT / 2) / 10;
+            cursor += cellT; // underside of shelf (exact tenth)
+            // Keep full precision so shelf − t/2 === underside exactly
+            col.shelvesY[shelfIndices[k]] = cursor / 10 + t / 2;
             cursor += tT; // top of shelf = next cell bottom
         }
     };
