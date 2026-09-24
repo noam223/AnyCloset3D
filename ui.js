@@ -7189,11 +7189,36 @@ window._promptJsonLoadChoice = function(data) {
             if (typeof window._commitCurrentCabinetToCart === 'function') {
                 window._commitCurrentCabinetToCart({ flash: false });
             }
+            const idBefore = window._currentProjectId;
+            const dirtyBefore = !!window._isDirty;
             if (typeof window._saveProjectNow === 'function') {
                 await window._saveProjectNow();
             }
+            // Name prompt cancelled or save failed — keep current project open
+            if ((dirtyBefore || idBefore) && window._isDirty && !window._currentProjectId && !idBefore) {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-folder-open"></i> פתח את הקובץ (החלף)';
+                }
+                if (typeof _showToast === 'function') _showToast('השמירה בוטלה — הקובץ לא נפתח', 3500);
+                return;
+            }
+            if (idBefore && window._isDirty) {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-folder-open"></i> פתח את הקובץ (החלף)';
+                }
+                if (typeof _showToast === 'function') _showToast('השמירה נכשלה — הקובץ לא נפתח', 4000);
+                return;
+            }
         } catch (err) {
             console.warn('[JSON load] auto-save before open failed:', err);
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-folder-open"></i> פתח את הקובץ (החלף)';
+            }
+            if (typeof _showToast === 'function') _showToast('השמירה נכשלה — הקובץ לא נפתח', 4000);
+            return;
         }
         close();
         window._applyLoadedJsonProject(data, { mode: 'open' });
