@@ -119,18 +119,18 @@ const placementHebrew = {
 
 // ── Drawer count helpers ──────────────────────────────────────────────────────
 // Internal: 22cm for 1 drawer, +20cm per extra → 1→22, 2→42, 3→62, ...
-// External: 10cm for 1 drawer, +10cm per extra → 1→10, 2→20, 3→30, ...
+// External: 12cm for 1 drawer, +20cm per extra (same proportion as internal, shorter first drawer)
 window.MIN_DRAWER_CELL_H = 22;
 window.DRAWER_EXTRA_H = 20;
-// Desk-merge band sizing only — auto drawer *count* uses the same rules as internal.
-window.MIN_EXTERNAL_DRAWER_CELL_H = 10;
+window.MIN_EXTERNAL_DRAWER_CELL_H = 12;
 window.EXTERNAL_DRAWER_EXTRA_H = 20;
 
 function _drawerHeightRules(drawerType) {
-    // Same proportion for internal and external so tall cells don't pack tiny fronts.
+    const isExt = drawerType === 'external_drawers';
     return {
-        minH: window.MIN_DRAWER_CELL_H,
-        extraH: window.DRAWER_EXTRA_H
+        minH: isExt ? window.MIN_EXTERNAL_DRAWER_CELL_H : window.MIN_DRAWER_CELL_H,
+        // Same step size so tall cells don't pack many tiny external fronts
+        extraH: isExt ? window.EXTERNAL_DRAWER_EXTRA_H : window.DRAWER_EXTRA_H
     };
 }
 window._drawerHeightRules = _drawerHeightRules;

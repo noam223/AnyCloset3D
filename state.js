@@ -3163,7 +3163,7 @@ function _clampDrawerCompartments(col, baseY, t) {
             const cellH = Math.round(_compartmentBounds(col, r).h);
             const rules = (typeof window._drawerHeightRules === 'function')
                 ? window._drawerHeightRules(comp.type)
-                : { minH: 22, extraH: 20 };
+                : { minH: (comp.type === 'external_drawers' ? 12 : 22), extraH: 20 };
             if (cellH < rules.minH) {
                 // Never dissolve a desk-merged drawer — its height is pinned by merge shelves
                 if (!comp.mergeWithDesk) comp.type = 'empty';
@@ -4188,7 +4188,7 @@ function _ensureDeskBandCell(col, band, preferredRows) {
     const startY = _deskMergeColumnStartY(col);
     const roofY = (col.height || state.globalHeight || 240) - t;
     const minH = (typeof window.MIN_EXTERNAL_DRAWER_CELL_H === 'number')
-        ? window.MIN_EXTERNAL_DRAWER_CELL_H : 10;
+        ? window.MIN_EXTERNAL_DRAWER_CELL_H : 12;
 
     let targetBottom = Math.round(band.bottom * 10) / 10;
     let targetTop = Math.round(band.top * 10) / 10;
