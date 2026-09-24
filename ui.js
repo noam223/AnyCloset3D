@@ -2361,13 +2361,45 @@ window._applyColumnTemplateToCol = function(target, tplData) {
 };
 
 window._captureColumnThumbnail = function(colIndex) {
+    const ren = (typeof renderer !== 'undefined') ? renderer : null;
+    const cam = (typeof camera !== 'undefined') ? camera : null;
+    const scn = (typeof scene !== 'undefined') ? scene : null;
+    const ctrl = (typeof controls !== 'undefined') ? controls : (window.controls || null);
+    const col = state.columns && state.columns[colIndex];
+    if (!ren || !cam || !scn || !col) return null;
+
+    const _hlSaved = [];
+    let savedCamPos = null;
+    let savedTarget = null;
+    let savedFov = null;
+
+    function _hideCaptureHighlights() {
+        const lists = [];
+        if (typeof hitBoxes !== 'undefined' && hitBoxes) lists.push(hitBoxes);
+        if (window.hitBoxes && window.hitBoxes !== hitBoxes) lists.push(window.hitBoxes);
+        lists.forEach(function(arr) {
+            arr.forEach(function(hb) {
+                if (!hb || !hb.material) return;
+                _hlSaved.push({
+                    mesh: hb,
+                    opacity: hb.material.opacity,
+                    visible: hb.visible !== false
+                });
+                hb.material.opacity = 0;
+                hb.visible = false;
+            });
+        });
+    }
+    function _restoreCaptureHighlights() {
+        _hlSaved.forEach(function(s) {
+            if (!s.mesh) return;
+            if (s.mesh.material) s.mesh.material.opacity = s.opacity;
+            s.mesh.visible = s.visible;
+        });
+    }
+
     try {
-        const ren = (typeof renderer !== 'undefined') ? renderer : null;
-        const cam = (typeof camera !== 'undefined') ? camera : null;
-        const scn = (typeof scene !== 'undefined') ? scene : null;
-        const ctrl = (typeof controls !== 'undefined') ? controls : (window.controls || null);
-        const col = state.columns && state.columns[colIndex];
-        if (!ren || !cam || !scn || !col) return null;
+        _hideCaptureHighlights();
 
         let centerX = 0;
         const sel = (typeof dragHandlesData !== 'undefined' && dragHandlesData && dragHandlesData.selectAll)
@@ -2406,9 +2438,9 @@ window._captureColumnThumbnail = function(colIndex) {
             corners.forEach(function(p) { p.applyMatrix4(group.matrixWorld); });
         }
 
-        const savedCamPos = cam.position.clone();
-        const savedTarget = ctrl && ctrl.target ? ctrl.target.clone() : null;
-        const savedFov = cam.fov;
+        savedCamPos = cam.position.clone();
+        savedTarget = ctrl && ctrl.target ? ctrl.target.clone() : null;
+        savedFov = cam.fov;
         const box = new THREE.Box3().setFromPoints(corners);
         const center = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
@@ -2471,21 +2503,24 @@ window._captureColumnThumbnail = function(colIndex) {
         const dx = (tw - dw) / 2;
         const dy = (th - dh) / 2;
         ctx.drawImage(canvas, minX, minY, w, h, dx, dy, dw, dh);
-        const dataUrl = out.toDataURL('image/jpeg', 0.78);
-
-        cam.fov = savedFov;
-        cam.updateProjectionMatrix();
-        cam.position.copy(savedCamPos);
-        if (ctrl && savedTarget) {
-            ctrl.target.copy(savedTarget);
-            ctrl.update();
-        }
-        ren.render(scn, cam);
-
-        return dataUrl;
+        return out.toDataURL('image/jpeg', 0.78);
     } catch (e) {
         console.warn('[col-templates] thumbnail failed', e);
         return null;
+    } finally {
+        try {
+            if (savedFov != null) {
+                cam.fov = savedFov;
+                cam.updateProjectionMatrix();
+            }
+            if (savedCamPos) cam.position.copy(savedCamPos);
+            if (ctrl && savedTarget) {
+                ctrl.target.copy(savedTarget);
+                ctrl.update();
+            }
+            _restoreCaptureHighlights();
+            ren.render(scn, cam);
+        } catch (_e) { /* ignore restore errors */ }
     }
 };
 
