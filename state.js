@@ -4212,6 +4212,17 @@ function _ensureDeskBandCell(col, band, preferredRows) {
     const wantTopShelfY = Math.round((targetTop - deskT / 2) * 10) / 10;
     const gap = (typeof MIN_SHELF_GAP === 'number') ? MIN_SHELF_GAP : 5;
 
+    // Bounding shelves of this merge cell must move together — don't block each other.
+    const ignoreShelfSet = {};
+    if (row > 0) {
+        const botDiv0 = dividers[row - 1];
+        if (botDiv0 && botDiv0.type === 'shelf' && botDiv0.idx >= 0) ignoreShelfSet[botDiv0.idx] = true;
+    }
+    if (row < dividers.length) {
+        const topDiv0 = dividers[row];
+        if (topDiv0 && topDiv0.type === 'shelf' && topDiv0.idx >= 0) ignoreShelfSet[topDiv0.idx] = true;
+    }
+
     const clampShelf = (shelfIdx, desiredY) => {
         if (shelfIdx < 0 || shelfIdx >= col.shelvesY.length) return;
         const cur = col.shelvesY[shelfIdx];
@@ -4221,7 +4232,7 @@ function _ensureDeskBandCell(col, band, preferredRows) {
             obs.push(col.splitY + t);
         }
         col.shelvesY.forEach((y, i) => {
-            if (i !== shelfIdx) obs.push(y);
+            if (i !== shelfIdx && !ignoreShelfSet[i]) obs.push(y);
         });
         const below = Math.max.apply(null, obs.filter(y => y < cur - 0.01).concat([startY]));
         const above = Math.min.apply(null, obs.filter(y => y > cur + 0.01).concat([roofY]));
@@ -4244,12 +4255,70 @@ function _ensureDeskBandCell(col, band, preferredRows) {
             clampShelf(topDiv.idx, wantTopShelfY);
         }
     }
+    // Re-clamp bottom after top moved (large drawer growth)
+    if (row > 0) {
+        const botDiv = dividers[row - 1];
+        if (botDiv && botDiv.type === 'shelf' && botDiv.idx >= 0) {
+            clampShelf(botDiv.idx, wantBotShelfY);
+        }
+    }
 
     col.shelves = col.shelvesY.length;
     return row;
 }
 window._ensureDeskBandCell = _ensureDeskBandCell;
 window._pickDeskMergeRow = _pickDeskMergeRow;
+
+/**
+ * After desk height / drawerHeight changes while merged: re-align the
+ * wardrobe cells that carry mergeWithDesk to the current desk drawer band.
+ */
+function _resyncDeskMergeBandCells() {
+    const desk = state.desk;
+    if (!desk || !desk.mergeDrawers || desk.side === 'none' || !desk.hasDrawers) return false;
+    const band = _getDeskDrawerBand(desk);
+    if (!band) return false;
+    const cols = state.columns || [];
+    let indices = Array.isArray(desk.mergeColIndices) && desk.mergeColIndices.length
+        ? desk.mergeColIndices.slice()
+        : (desk.mergeColIndex != null ? [desk.mergeColIndex] : []);
+    if (!indices.length) {
+        cols.forEach(function(col, i) {
+            if ((col.compartments || []).some(function(c) { return c && c.mergeWithDesk; })) {
+                indices.push(i);
+            }
+        });
+    }
+    if (!indices.length) return false;
+
+    let any = false;
+    // Two passes: moving one bounding shelf first frees room for the other
+    for (let pass = 0; pass < 2; pass++) {
+        indices.forEach(function(ci) {
+            const col = cols[ci];
+            if (!col) return;
+            const preferred = [];
+            (col.compartments || []).forEach(function(comp, r) {
+                if (comp && comp.mergeWithDesk) preferred.push(r);
+            });
+            if (!preferred.length && desk.mergeRow != null) preferred.push(desk.mergeRow);
+            const row = _ensureDeskBandCell(col, band, preferred);
+            if (row < 0 || !col.compartments[row]) return;
+            any = true;
+            const comp = col.compartments[row];
+            comp.mergeWithDesk = true;
+            if (comp.type !== 'external_drawers' && comp.type !== 'internal_drawers') {
+                comp.type = 'external_drawers';
+                comp.count = 1;
+            }
+            if (ci === (desk.mergeColIndex != null ? desk.mergeColIndex : indices[0])) {
+                desk.mergeRow = row;
+            }
+        });
+    }
+    return any;
+}
+window._resyncDeskMergeBandCells = _resyncDeskMergeBandCells;
 
 function _syncDeskMergeUI() {
     const rowEl = document.getElementById('side-desk-merge-row');

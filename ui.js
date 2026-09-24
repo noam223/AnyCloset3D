@@ -737,8 +737,10 @@ function buildDimensionsAndButtonsUI() {
                 if (document.getElementById('inp-desk-width')) document.getElementById('inp-desk-width').value = state.desk.width;
             } else if (d.isDeskHeight) {
                 state.desk.height = Math.max(50, Math.min(120, desiredH));
+                if (typeof window._resyncDeskMergeBandCells === 'function') window._resyncDeskMergeBandCells();
             } else if (d.isDeskDrawer) {
                 state.desk.drawerHeight = Math.max(12, Math.min(40, desiredH));
+                if (typeof window._resyncDeskMergeBandCells === 'function') window._resyncDeskMergeBandCells();
             } else if (d.isInternalDeskSurface) {
                 const col = state.columns[d.colIndex];
                 if(col) col.deskHeight = Math.max(50, Math.min(col.deskHeight + col.deskClearance - MIN_SHELF_GAP, desiredH));
@@ -5850,6 +5852,7 @@ function buildDragHandlesUI() {
                     state.globalHeight = newH;
                 } else {
                     state.desk.height = newH;
+                    if (typeof window._resyncDeskMergeBandCells === 'function') window._resyncDeskMergeBandCells();
                 }
                 handle.querySelector('.drag-tooltip').innerText = `גובה: ${newH} ס"מ`;
                 buildCabinetDragging(); updateCameraView();
@@ -5884,6 +5887,7 @@ function buildDragHandlesUI() {
                     }
                 } else {
                     state.desk.drawerHeight = newDH;
+                    if (typeof window._resyncDeskMergeBandCells === 'function') window._resyncDeskMergeBandCells();
                 }
                 handle.querySelector('.drag-tooltip').innerText = `מגירה: ${newDH} ס"מ`;
                 buildCabinetDragging();
