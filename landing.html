@@ -145,6 +145,16 @@ body{font-family:'Inter','Heebo',sans-serif;background:var(--w);color:var(--t);o
 
 /* ── FEATURES ── */
 .feat-sec{background:var(--bg)}
+.feat-highlight{display:grid;grid-template-columns:auto 1fr;gap:28px;align-items:center;background:linear-gradient(135deg,#0f1f35 0%,#1e3a5f 55%,#0d2d4a 100%);border:1px solid rgba(0,212,255,.35);border-radius:var(--rl);padding:36px 40px;margin-bottom:32px;position:relative;overflow:hidden;box-shadow:0 20px 60px rgba(15,31,53,.25),0 0 0 1px rgba(0,212,255,.08)}
+.feat-highlight::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 20% 50%,rgba(0,212,255,.18),transparent 55%);pointer-events:none}
+.feat-highlight-icon{width:72px;height:72px;border-radius:20px;background:rgba(0,212,255,.15);border:1px solid rgba(0,212,255,.4);display:flex;align-items:center;justify-content:center;font-size:1.8rem;color:var(--a);flex-shrink:0;position:relative;z-index:1;animation:livePulse 2.2s ease-in-out infinite}
+@keyframes livePulse{0%,100%{box-shadow:0 0 0 0 rgba(0,212,255,.45)}50%{box-shadow:0 0 0 12px rgba(0,212,255,0)}}
+.feat-highlight-body{position:relative;z-index:1}
+.feat-highlight-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(0,212,255,.18);border:1px solid rgba(0,212,255,.4);color:var(--al);font-size:.72rem;font-weight:800;padding:4px 12px;border-radius:99px;margin-bottom:10px;letter-spacing:.04em;text-transform:uppercase}
+.feat-highlight-badge .live-dot{width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 0 rgba(34,197,94,.6);animation:liveDot 1.4s ease-in-out infinite}
+@keyframes liveDot{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.55)}50%{box-shadow:0 0 0 6px rgba(34,197,94,0)}}
+.feat-highlight-title{font-size:clamp(1.25rem,2.5vw,1.65rem);font-weight:900;color:#fff;margin-bottom:8px;line-height:1.25}
+.feat-highlight-desc{font-size:.95rem;color:rgba(255,255,255,.72);line-height:1.7;max-width:640px}
 .feat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px}
 .feat-card{background:var(--w);border:1px solid var(--bd);border-radius:var(--rl);padding:32px 28px;transition:all .3s;position:relative;overflow:hidden}
 .feat-card::before{content:'';position:absolute;top:0;right:0;left:0;height:3px;background:linear-gradient(90deg,var(--p),var(--a));transform:scaleX(0);transform-origin:right;transition:transform .3s}
@@ -157,8 +167,14 @@ body{font-family:'Inter','Heebo',sans-serif;background:var(--w);color:var(--t);o
 .fi-g{background:rgba(34,197,94,.1);color:#16a34a}
 .fi-v{background:rgba(139,92,246,.1);color:#7c3aed}
 .fi-r{background:rgba(239,68,68,.1);color:#dc2626}
+.fi-o{background:rgba(245,158,11,.12);color:#d97706}
 .feat-title{font-size:1.05rem;font-weight:700;color:var(--t);margin-bottom:10px}
 .feat-desc{font-size:.88rem;color:var(--tl);line-height:1.7}
+@media(max-width:640px){
+  .feat-highlight{grid-template-columns:1fr;padding:28px 22px;gap:18px;text-align:center}
+  .feat-highlight-icon{margin:0 auto}
+  .feat-highlight-desc{margin:0 auto}
+}
 
 /* ── AUDIENCE ── */
 .aud-sec{background:linear-gradient(160deg,#0f1f35 0%,#1e3a5f 50%,#152b47 100%);position:relative;overflow:hidden}
@@ -233,7 +249,7 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
 .footer-inner{max-width:1100px;margin:0 auto}
 .footer-top{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px;margin-bottom:48px}
 .footer-brand{display:flex;align-items:center;gap:10px;color:#fff;font-size:1.1rem;font-weight:800;margin-bottom:14px;text-decoration:none}
-.footer-brand-icon{width:36px;height:36px;background:var(--a);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1rem;color:var(--p)}
+.footer-brand img{height:44px;width:auto;max-width:220px;object-fit:contain;mix-blend-mode:screen;display:block}
 .footer-tagline{font-size:.85rem;line-height:1.7;max-width:260px}
 .footer-col-title{font-size:.82rem;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.08em;margin-bottom:16px}
 .footer-links{list-style:none;display:flex;flex-direction:column;gap:10px}
@@ -327,7 +343,7 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
 ════════════════════════════════════════════════════════════ -->
 <nav class="navbar" id="navbar">
   <a href="landing.html" class="nav-brand">
-    <img src="images/logo.png" alt="AnyCloset 3D">
+    <img src="images/logo%20small.png" alt="AnyCloset 3D">
   </a>
   <ul class="nav-links">
     <li><a href="#features">פיצ'רים</a></li>
@@ -350,8 +366,8 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
 
   <div class="hero-content">
     <div class="hero-badge">
-      <i class="fa-solid fa-star"></i>
-      מערכת הדמיה מקצועית לארונות
+      <i class="fa-solid fa-broadcast-tower"></i>
+      שיתוף בלייב עם הלקוח — ועוד
     </div>
     <h1 class="hero-title">
       הדמיה תלת-מימדית לארונות<br>
@@ -391,9 +407,9 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
         </div>
         <div class="gslide gs2" data-slide="1">
           <div class="gslide-inner">
-            <div class="gslide-icon"><i class="fa-solid fa-calculator"></i></div>
-            <div class="gslide-title">תמחור אוטומטי מדויק</div>
-            <div class="gslide-sub">חישוב עלויות חומרים ועבודה בלחיצה אחת</div>
+            <div class="gslide-icon"><i class="fa-solid fa-broadcast-tower"></i></div>
+            <div class="gslide-title">שיתוף בלייב עם הלקוח</div>
+            <div class="gslide-sub">הלקוח רואה את הארון מתעדכן בזמן אמת — מכל מכשיר</div>
           </div>
         </div>
         <div class="gslide gs3" data-slide="2">
@@ -426,8 +442,19 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
     <div class="sec-hd rv">
       <div class="sec-tag"><i class="fa-solid fa-bolt"></i> יכולות המערכת</div>
       <h2 class="sec-title">כל מה שצריך — במקום אחד</h2>
-      <p class="sec-sub">מהדמיה ראשונית ועד דוח מקצועי ללקוח, המערכת מכסה את כל שלבי העבודה.</p>
+      <p class="sec-sub">מהדמיה ראשונית ועד שיתוף חי עם הלקוח — המערכת מכסה את כל שלבי העבודה.</p>
     </div>
+
+    <!-- Featured: Live share -->
+    <div class="feat-highlight rv">
+      <div class="feat-highlight-icon"><i class="fa-solid fa-broadcast-tower"></i></div>
+      <div class="feat-highlight-body">
+        <div class="feat-highlight-badge"><span class="live-dot"></span> הפיצ'ר המוביל</div>
+        <div class="feat-highlight-title">שיתוף בלייב עם הלקוח</div>
+        <div class="feat-highlight-desc">שלחו קישור אחד — והלקוח רואה את הארון מתעדכן בזמן אמת, מכל מכשיר, בלי התקנה ובלי חשבון. סיבוב, זוויות ושינויים — הכל חי מולכם בפגישה או מרחוק.</div>
+      </div>
+    </div>
+
     <div class="feat-grid">
       <div class="feat-card rv d1">
         <div class="feat-icon fi-b"><i class="fa-solid fa-cube"></i></div>
@@ -435,29 +462,44 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
         <div class="feat-desc">ראה את הארון מתעדכן בזמן אמת תוך כדי עריכה — מכל זווית, עם חומרים ומרקמים אמיתיים.</div>
       </div>
       <div class="feat-card rv d2">
+        <div class="feat-icon fi-v"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+        <div class="feat-title">הדמיות AI פוטוריאליסטיות</div>
+        <div class="feat-desc">הפכו את התכנון לתמונה ריאליסטית בלחיצה — מושלם להצגה ללקוח ולסגירת עסקה מהירה יותר.</div>
+      </div>
+      <div class="feat-card rv d3">
         <div class="feat-icon fi-a"><i class="fa-solid fa-calculator"></i></div>
         <div class="feat-title">תמחור אוטומטי מדויק</div>
         <div class="feat-desc">חישוב עלויות חומרים, עבודה ורווח — אוטומטי לפי מידות ומפרט הארון. ללא טעויות ידניות.</div>
       </div>
-      <div class="feat-card rv d3">
+      <div class="feat-card rv d4">
+        <div class="feat-icon fi-g"><i class="fa-solid fa-layer-group"></i></div>
+        <div class="feat-title">מרחב משותף למספר ארונות</div>
+        <div class="feat-desc">תכננו כמה ארונות באותו מרחב תלת-ממד — הוספה, חיבור והזזה — לתכנון חדר שלם במבט אחד.</div>
+      </div>
+      <div class="feat-card rv d5">
+        <div class="feat-icon fi-o"><i class="fa-solid fa-bookmark"></i></div>
+        <div class="feat-title">תבניות עמודות ושימוש חוזר</div>
+        <div class="feat-desc">שמרו חלוקת תאים כמועדפת והחילו אותה על עמודות חדשות — עבודה מהירה ועקבית בכל פרויקט.</div>
+      </div>
+      <div class="feat-card rv d6">
+        <div class="feat-icon fi-b"><i class="fa-solid fa-sliders"></i></div>
+        <div class="feat-title">סוגי ארונות מתקדמים</div>
+        <div class="feat-desc">ארון רגיל, פינתי, חדר ארונות, הזזה, שולחן כתיבה ואמבטיה — עם מגירות, שולחנות משולבים ומידות מדויקות.</div>
+      </div>
+      <div class="feat-card rv d1">
         <div class="feat-icon fi-v"><i class="fa-solid fa-drafting-compass"></i></div>
         <div class="feat-title">שרטוט טכני לנגר</div>
         <div class="feat-desc">ייצוא שרטוט מפורט עם כל המידות, חלוקת תאים ומפרט חומרים — מוכן לייצור.</div>
       </div>
-      <div class="feat-card rv d4">
+      <div class="feat-card rv d2">
         <div class="feat-icon fi-g"><i class="fa-solid fa-file-pdf"></i></div>
         <div class="feat-title">דוח מקצועי ללקוח</div>
         <div class="feat-desc">PDF מעוצב עם הדמיה, מידות, חומרים ומחיר — מרשים ומקצועי לשיתוף עם הלקוח.</div>
       </div>
-      <div class="feat-card rv d5">
+      <div class="feat-card rv d3">
         <div class="feat-icon fi-r"><i class="fa-solid fa-cloud"></i></div>
         <div class="feat-title">שמירה בענן אוטומטית</div>
         <div class="feat-desc">כל הפרויקטים שמורים בענן ומסונכרנים בין המכשירים שלך — לעולם לא תאבד עבודה.</div>
-      </div>
-      <div class="feat-card rv d6">
-        <div class="feat-icon fi-b"><i class="fa-solid fa-sliders"></i></div>
-        <div class="feat-title">גמישות מלאה בעיצוב</div>
-        <div class="feat-desc">ארון רגיל, פינתי, חדר ארונות או הזזה — עם בחירת חומרים, צבעים ומידות מותאמות אישית.</div>
       </div>
     </div>
   </div>
@@ -792,8 +834,7 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
     <div class="footer-top">
       <div>
         <a href="landing.html" class="footer-brand">
-          <div class="footer-brand-icon"><i class="fa-solid fa-cabinet-filing"></i></div>
-          הדמיית ארונות
+          <img src="images/logo%20small.png" alt="AnyCloset 3D">
         </a>
         <p class="footer-tagline">מערכת הדמיה תלת-מימדית מקצועית לנגרים, מעצבות פנים וחברות ריהוט.</p>
       </div>

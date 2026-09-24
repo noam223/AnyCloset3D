@@ -52,11 +52,7 @@
   .topbar { top: 0; height: 58px; }
   .bottombar { bottom: 0; height: 64px; }
   .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: -0.02em; }
-  .mark {
-    width: 28px; height: 28px; border-radius: 8px;
-    background: linear-gradient(145deg, var(--cyan), #1aa8c7);
-    color: #062033; display: grid; place-items: center; font-weight: 900; font-size: 14px;
-  }
+  .brand img { height: 36px; width: auto; object-fit: contain; mix-blend-mode: screen; display: block; }
   .brand span { color: var(--muted); font-weight: 480; font-size: 13px; }
   .count { color: var(--muted); font-variant-numeric: tabular-nums; font-weight: 640; font-size: 13px; }
   .progress { position: fixed; top: 0; right: 0; left: 0; height: 3px; background: rgba(255,255,255,.06); z-index: 6; }
@@ -142,7 +138,7 @@
 <body>
 <div class="progress"><b id="bar"></b></div>
 <header class="topbar">
-  <div class="brand"><div class="mark">A</div> AnyCloset 3D <span>תוכנית לשותפות</span></div>
+  <div class="brand"><img src="images/logo%20small.png" alt="AnyCloset 3D"> <span>תוכנית לשותפות</span></div>
   <div class="count" id="count" dir="ltr">01 / 13</div>
 </header>
 

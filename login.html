@@ -49,14 +49,18 @@
             color: white;
         }
         .auth-logo {
-            width: 56px; height: 56px;
-            background: rgba(255,255,255,0.15);
-            border-radius: 16px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 1.6rem; color: var(--accent);
-            margin: 0 auto 12px;
+            width: auto;
+            height: auto;
+            max-width: min(260px, 80vw);
+            max-height: 72px;
+            background: transparent;
+            border-radius: 0;
+            display: block;
+            margin: 0 auto 14px;
+            object-fit: contain;
+            mix-blend-mode: screen;
         }
-        .auth-title { font-size: 1.3rem; font-weight: 800; margin-bottom: 4px; }
+        .auth-title { display: none; }
         .auth-subtitle { font-size: 0.82rem; opacity: 0.75; }
 
         /* ── Tabs ── */
@@ -259,7 +263,7 @@
 
     <!-- Header -->
     <div class="auth-header">
-        <div class="auth-logo"><i class="fa-solid fa-cabinet-filing"></i></div>
+        <img class="auth-logo" src="images/logo%20small.png" alt="AnyCloset 3D">
         <div class="auth-title">הדמיית ארונות</div>
         <div class="auth-subtitle">מערכת עיצוב ארונות מקצועית</div>
     </div>

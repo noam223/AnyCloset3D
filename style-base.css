@@ -50,13 +50,14 @@
     gap: 20px;
 }
 .auth-gate-logo {
-    width: min(560px, 92vw);
+    width: min(420px, 88vw);
     height: auto;
-    min-height: 140px;
-    max-height: 220px;
+    min-height: 80px;
+    max-height: 140px;
     object-fit: contain;
     flex-shrink: 0;
-    opacity: 0.95;
+    opacity: 0.98;
+    mix-blend-mode: screen;
     display: block;
 }
 @keyframes _agSpin { to { transform: rotate(360deg); } }

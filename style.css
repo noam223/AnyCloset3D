@@ -959,13 +959,13 @@ body {
     padding: 0;
 }
 .sidebar-logo-img {
-    height: 120px;
+    height: 72px;
     width: auto;
-    max-width: min(320px, 100%);
+    max-width: min(280px, 100%);
     object-fit: contain;
     object-position: right center;
     flex-shrink: 0;
-    filter: brightness(0) invert(1);
+    mix-blend-mode: screen;
     display: block;
     margin: 0;
 }
