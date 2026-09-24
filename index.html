@@ -39,7 +39,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260910deskMerge">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
     <link rel="stylesheet" href="style-extras.css?v=20260731rpcab">
-    <link rel="stylesheet" href="style.css?v=20260922hoverWidths">
+    <link rel="stylesheet" href="style.css?v=20260924spaceLeave">
     <style>
         html.thumb-only-mode #left-sidebar,
         html.thumb-only-mode #right-sidebar,
@@ -115,6 +115,9 @@
             </button>
             <button type="button" id="btn-join-space-cab" class="space-cab-join-btn" onclick="toggleJoinSpacePicker()" style="display:none;" title="חברו ארון רגיל, הזזה או שולחן כתיבה שכבר קיים בפרויקט לאותו מרחב תלת-ממד">
                 <i class="fa-solid fa-link"></i> הוסף ארון קיים למרחב
+            </button>
+            <button type="button" id="btn-leave-space-cab" class="space-cab-leave-btn" onclick="removeCabinetFromSpace()" style="display:none;" title="הוצא את הארון הנוכחי מהמרחב המשותף — הארון יישאר בפרויקט כארון נפרד">
+                <i class="fa-solid fa-link-slash"></i> הוצא מהמרחב
             </button>
             <div id="space-cab-join-list" class="space-cab-join-list" style="display:none;"></div>
             <div id="space-cab-tabs-btns" class="space-cab-tabs-row" style="display:none;">
@@ -1935,6 +1938,9 @@
             <button type="button" id="mobile-btn-join-space-cab" class="space-cab-join-btn" onclick="toggleJoinSpacePicker()" style="display:none;" title="חברו ארון רגיל, הזזה או שולחן כתיבה שכבר קיים בפרויקט לאותו מרחב תלת-ממד">
                 <i class="fa-solid fa-link"></i> הוסף ארון קיים למרחב
             </button>
+            <button type="button" id="mobile-btn-leave-space-cab" class="space-cab-leave-btn" onclick="removeCabinetFromSpace()" style="display:none;" title="הוצא את הארון הנוכחי מהמרחב המשותף — הארון יישאר בפרויקט כארון נפרד">
+                <i class="fa-solid fa-link-slash"></i> הוצא מהמרחב
+            </button>
             <div id="mobile-space-cab-join-list" class="space-cab-join-list" style="display:none;"></div>
             <div id="mobile-space-cab-tabs-btns" class="space-cab-tabs-row" style="display:none;margin-top:8px;">
                 <button type="button" id="mobile-space-cab-tab-0" class="space-cab-tab" onclick="switchSpaceCabinet(0)">ארון 1</button>
@@ -2662,7 +2668,7 @@
 <script src="engine-blueprint.js?v=20260918noPlinthFix"></script>
 <script src="engine-room-plan.js?v=20260731rpcab"></script>
 <script src="tambour-color-picker.js?v=20260617scdoors"></script>
-<script src="ui.js?v=20260922hoverWidths"></script>
+<script src="ui.js?v=20260924spaceLeave"></script>
 <script src="mobile.js?v=20260916cellHDec"></script>
 <script src="part-paint.js?v=20260914A427fix"></script>
 <script src="shelf-pick.js?v=20260922sideWall"></script>

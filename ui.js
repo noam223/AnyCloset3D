@@ -9007,6 +9007,8 @@ window._syncSpacePairTabs = function() {
     const mAddBtn = document.getElementById('mobile-btn-add-space-cab');
     const joinBtn = document.getElementById('btn-join-space-cab');
     const mJoinBtn = document.getElementById('mobile-btn-join-space-cab');
+    const leaveBtn = document.getElementById('btn-leave-space-cab');
+    const mLeaveBtn = document.getElementById('mobile-btn-leave-space-cab');
     const joinList = document.getElementById('space-cab-join-list');
     const mJoinList = document.getElementById('mobile-space-cab-join-list');
     const tabsWrap = document.getElementById('space-cab-tabs-btns');
@@ -9016,6 +9018,7 @@ window._syncSpacePairTabs = function() {
     const canAdd = canUse && (!info || info.canAddMore);
     const joinable = canAdd ? window._joinableSpaceCabinets() : [];
     const showOffset = !!(info && info.activeSlot > 0);
+    const showLeave = !!(info && info.count >= 2);
 
     if (row) row.style.display = canUse ? '' : 'none';
     if (mRow) mRow.style.display = canUse ? '' : 'none';
@@ -9023,6 +9026,8 @@ window._syncSpacePairTabs = function() {
     if (mAddBtn) mAddBtn.style.display = canAdd ? '' : 'none';
     if (joinBtn) joinBtn.style.display = (joinable.length > 0) ? '' : 'none';
     if (mJoinBtn) mJoinBtn.style.display = (joinable.length > 0) ? '' : 'none';
+    if (leaveBtn) leaveBtn.style.display = showLeave ? '' : 'none';
+    if (mLeaveBtn) mLeaveBtn.style.display = showLeave ? '' : 'none';
     if (joinList) window._fillSpaceJoinList(joinList, joinList.style.display === 'flex' ? joinable : []);
     if (mJoinList) window._fillSpaceJoinList(mJoinList, mJoinList.style.display === 'flex' ? joinable : []);
     if (tabsWrap) tabsWrap.style.display = info ? 'flex' : 'none';
@@ -9062,6 +9067,84 @@ window._unlinkSpacePair = function(opts) {
     });
     if (typeof window._clearSpaceCompanion === 'function') window._clearSpaceCompanion();
     window._syncSpacePairTabs();
+};
+
+/** After removing a member, keep slots contiguous (0..n-1) and rebase offsets if slot 0 left. */
+window._renumberSpacePairSlots = function(pairId) {
+    if (!pairId) return;
+    const members = [];
+    (state.orderCart || []).forEach(function(it, i) {
+        if (window._spacePairIdOf(it) === pairId) {
+            members.push({
+                it: it,
+                index: i,
+                slot: window._spacePairSlotOf(it),
+                offset: window._getSpaceOffset(it)
+            });
+        }
+    });
+    if (members.length < 2) {
+        members.forEach(function(m) { window._stripSpacePairFromItem(m.it); });
+        return;
+    }
+    members.sort(function(a, b) { return a.slot - b.slot; });
+    const anchorOff = members[0].offset || { x: 0, y: 0 };
+    members.forEach(function(m, newSlot) {
+        const rebased = newSlot === 0
+            ? { x: 0, y: 0 }
+            : {
+                x: Math.round((m.offset.x || 0) - (anchorOff.x || 0)),
+                y: Math.round((m.offset.y || 0) - (anchorOff.y || 0))
+            };
+        window._attachSpacePairToItem(m.it, pairId, newSlot, rebased);
+    });
+    const base = window._spacePairBaseNameFromItem(members[0].it) ||
+        window._stripSpacePartSuffix((members[0].it.spec && members[0].it.spec.customName) || '');
+    if (base && typeof window._applySpacePairCabinetNames === 'function') {
+        window._applySpacePairCabinetNames(pairId, base);
+    }
+};
+
+/** Remove one cabinet from a shared space (keeps the cabinet in the project). */
+window.removeCabinetFromSpace = function(index) {
+    const cart = state.orderCart || [];
+    const idx = (typeof index === 'number') ? index : state.editingCartIndex;
+    if (idx < 0 || !cart[idx]) return;
+    const item = cart[idx];
+    const pairId = window._spacePairIdOf(item);
+    if (!pairId) return;
+
+    const baseName = window._spacePairBaseNameFromItem(item) ||
+        window._stripSpacePartSuffix((item.spec && item.spec.customName) || state.cabinetName || '');
+    window._stripSpacePairFromItem(item);
+    if (baseName) {
+        if (!item.spec) item.spec = {};
+        if (!item.rawState) item.rawState = {};
+        item.spec.customName = baseName;
+        item.rawState.cabinetName = baseName;
+    }
+    if (typeof window._invalidateSpacePairPreviewImages === 'function') {
+        window._invalidateSpacePairPreviewImages(pairId);
+    }
+    window._renumberSpacePairSlots(pairId);
+
+    if (state.editingCartIndex === idx) {
+        state.cabinetName = baseName || '';
+        if (state.wings && state.wings.center) state.wings.center.cabinetName = state.cabinetName;
+        const desk = document.getElementById('inp-cabinet-name');
+        const m1 = document.getElementById('mobile-inp-cabinet-name');
+        const m2 = document.getElementById('mobile-inp-cabinet-name2');
+        if (desk && document.activeElement !== desk) desk.value = state.cabinetName;
+        if (m1 && document.activeElement !== m1) m1.value = state.cabinetName;
+        if (m2 && document.activeElement !== m2) m2.value = state.cabinetName;
+        if (typeof window._clearSpaceCompanion === 'function') window._clearSpaceCompanion();
+        if (typeof buildCabinet === 'function') buildCabinet();
+        if (typeof updateCameraView === 'function') updateCameraView();
+    }
+    if (typeof window._syncSpacePairTabs === 'function') window._syncSpacePairTabs();
+    if (typeof updateLeftSidebar === 'function') updateLeftSidebar();
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+    if (typeof window._markCurrentCabinetClean === 'function') window._markCurrentCabinetClean();
 };
 
 window.addSpaceCabinet = function() {
@@ -9642,8 +9725,12 @@ window.deleteCartItem = function(index) {
         const wasEditing = state.editingCartIndex === index;
         const _deletedPairId = window._spacePairIdOf(state.orderCart[index]);
         state.orderCart.splice(index, 1);
-        if (_deletedPairId && typeof window._unlinkSpacePair === 'function') {
-            window._unlinkSpacePair({ pairId: _deletedPairId });
+        if (_deletedPairId && typeof window._renumberSpacePairSlots === 'function') {
+            window._renumberSpacePairSlots(_deletedPairId);
+            if (typeof window._invalidateSpacePairPreviewImages === 'function') {
+                window._invalidateSpacePairPreviewImages(_deletedPairId);
+            }
+            if (typeof window._clearSpaceCompanion === 'function') window._clearSpaceCompanion();
         }
         if (typeof window._onCartItemDeletedForRoomProps === 'function') {
             window._onCartItemDeletedForRoomProps(index);
@@ -9663,6 +9750,7 @@ window.deleteCartItem = function(index) {
 
         const cc3 = document.getElementById('cart-count');
         if (cc3) cc3.innerText = state.orderCart.length;
+        if (typeof window._syncSpacePairTabs === 'function') window._syncSpacePairTabs();
         if (document.getElementById('order-modal').style.display === 'flex') {
             const currentMode = document.getElementById('order-modal').dataset.mode || 'customer';
             openOrderModal(currentMode);
@@ -9815,16 +9903,32 @@ window._editCartItemNow = function(index) {
 }
 
 window.startNewCabinet = function() {
-    // Auto-save current cabinet, then create a fully reset new one
+    // Auto-save current cabinet, then create a fully reset new one OUTSIDE any shared space
     if (state.orderCart && state.orderCart.length > 0) {
         window._commitCurrentCabinetToCart({ flash: false });
     }
+    // Detach from space-pair context before snapshot so the new cabinet is never joined
+    if (typeof window._clearSpaceCompanion === 'function') window._clearSpaceCompanion();
+    state.editingCartIndex = -1;
     if (typeof window._resetEditorToDefaultLinearCabinet === 'function') {
         window._resetEditorToDefaultLinearCabinet();
     } else if (typeof applyPreset === 'function') {
         applyPreset('linear');
     }
+    state.cabinetName = '';
+    if (state.wings && state.wings.center) state.wings.center.cabinetName = '';
     const item = window._snapshotCurrentCabinetToCartItem();
+    if (typeof window._stripSpacePairFromItem === 'function') {
+        window._stripSpacePairFromItem(item);
+    }
+    if (item.spec) {
+        item.spec.customName = '';
+        delete item.spec.imgSpaceDoors;
+        delete item.spec.imgSpaceOpen;
+        delete item.spec.imgSpaceDoorsAuto;
+        delete item.spec.imgSpaceOpenAuto;
+    }
+    if (item.rawState) item.rawState.cabinetName = '';
     state.orderCart.push(item);
     const newIdx = state.orderCart.length - 1;
     // Fresh cabinet — no inherited part colors
@@ -9837,6 +9941,9 @@ window.startNewCabinet = function() {
     if (typeof window._restorePresetUI === 'function') window._restorePresetUI();
     updateLeftSidebar({ scrollToActive: true });
     if (typeof window._syncSpacePairTabs === 'function') window._syncSpacePairTabs();
+    if (typeof buildCabinet === 'function') buildCabinet();
+    if (typeof updateCameraView === 'function') updateCameraView();
+    if (typeof calculatePrice === 'function') calculatePrice();
     if (typeof saveHistoryState === 'function') saveHistoryState();
     if (typeof window._markCurrentCabinetClean === 'function') window._markCurrentCabinetClean();
 }
@@ -10018,6 +10125,7 @@ window.updateLeftSidebar = function(opts) {
             ${_wallSelectorHTML}
             <div class="cart-mini-actions">
                 <button class="cart-mini-btn btn-edit-mini" onclick="event.stopPropagation(); editCartItem(${index});"><i class="fa-solid fa-pen"></i> ערוך</button>
+                ${nested ? `<button class="cart-mini-btn btn-leave-space-mini" onclick="event.stopPropagation(); removeCabinetFromSpace(${index});" title="הוצא את הארון מהמרחב המשותף — הארון יישאר בפרויקט"><i class="fa-solid fa-link-slash"></i> הוצא מהקבוצה</button>` : ''}
                 <button class="cart-mini-btn" onclick="event.stopPropagation(); duplicateCartItem(${index});"><i class="fa-solid fa-copy"></i> שכפל</button>
                 <button class="cart-mini-btn btn-del-mini" onclick="event.stopPropagation(); deleteCartItem(${index});"><i class="fa-solid fa-trash"></i> מחק</button>
                 <div style="position:relative;display:inline-flex;">
