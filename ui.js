@@ -2529,8 +2529,6 @@ window.openColumnTemplatesSheet = function(colIndex) {
     const col = state.columns && state.columns[colIndex];
     if (!col) return;
     window._colTplTargetIndex = colIndex;
-    // Soft-select the column for context
-    if (typeof selectAllColumn === 'function') selectAllColumn(colIndex);
 
     const overlay = document.getElementById('col-templates-overlay');
     if (!overlay) return;
