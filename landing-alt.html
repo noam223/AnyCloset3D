@@ -123,6 +123,12 @@ img{max-width:100%;display:block}
   margin-top:10px;color:var(--muted);font-size:.82rem;
 }
 .shot-cap .ok{color:var(--ok);font-weight:700}
+.gallery-strip{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:28px;
+}
+.gallery-strip .shot img{aspect-ratio:4/3}
+@media(max-width:750px){.gallery-strip{grid-template-columns:1fr 1fr}}
+@media(max-width:480px){.gallery-strip{grid-template-columns:1fr}}
 @keyframes rise{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
 @media(max-width:900px){
   .hero{padding:96px 0 56px}
@@ -343,11 +349,11 @@ footer{
     </div>
     <div class="hero-visual">
       <div class="shot">
-        <img src="pitch-assets/pitch-editor.png" alt="מסך העורך של AnyCloset 3D עם תמחור חי" width="960" height="600" loading="eager">
+        <img src="pitch-assets/landing-gallery/best/18-adi-tamsut.jpg" alt="ארון בהתאמה אישית עם נישת טלוויזיה מוארת" width="960" height="720" loading="eager">
       </div>
       <div class="shot-cap">
-        <span>העורך עם מחיר חי על המסך</span>
-        <span class="ok">צולם מהמערכת</span>
+        <span>הדמיה מפרויקט אמיתי במערכת</span>
+        <span class="ok">AnyCloset 3D</span>
       </div>
     </div>
   </div>
@@ -384,11 +390,19 @@ footer{
 <section class="sec showcase" id="product">
   <div class="wrap">
     <div class="sec-hd">
-      <div class="sec-tag"><i class="fa-solid fa-camera"></i> המוצר עצמו</div>
-      <h2 class="sec-title">לא מצגות — צילומי מסך אמיתיים</h2>
-      <p class="sec-sub">כך נראית העבודה מול הלקוח: הדמיה חיה, מחיר חי, וחדר שלם בהקשר.</p>
+      <div class="sec-tag"><i class="fa-solid fa-camera"></i> מהיוצרים שלנו</div>
+      <h2 class="sec-title">ארונות שנבנו במערכת — לא מוקאפים</h2>
+      <p class="sec-sub">הדמיות מפרויקטים אמיתיים של לקוחות, לצד מסך העורך עם תמחור חי.</p>
     </div>
     <div class="show-grid">
+      <article class="show-card">
+        <div class="shot">
+          <img src="pitch-assets/landing-gallery/best/04-yossi-carmit.jpg" alt="ארון ירוק מרווה עם נישת עץ ומגירות" loading="lazy">
+        </div>
+        <div class="shot-cap"><span>עיצוב מותאם אישית</span><span class="ok">הדמיה מהמערכת</span></div>
+        <h3>נראה יוקרתי — נבנה בדקות</h3>
+        <p>צבעים, נישות, מגירות וידיות — הכל משתנה חי מול הלקוח בלי תוכנת אדריכלות.</p>
+      </article>
       <article class="show-card">
         <div class="shot">
           <img src="pitch-assets/pitch-editor.png" alt="עורך AnyCloset עם תמחור" loading="lazy">
@@ -397,14 +411,14 @@ footer{
         <h3>הארון מתומחר בזמן שהלקוח עדיין בחדר</h3>
         <p>משנים מידה או חומר — והמחיר מתעדכן מיד. בלי להעביר לקובץ אחר ובלי לחכות לנגר.</p>
       </article>
-      <article class="show-card">
-        <div class="shot">
-          <img src="pitch-assets/pitch-3d.png" alt="הדמיה תלת־ממדית של ארון בחדר" loading="lazy">
-        </div>
-        <div class="shot-cap"><span>הדמיה בהקשר של חדר</span><span class="ok">צולם מהמערכת</span></div>
-        <h3>רואים לפני שמייצרים</h3>
-        <p>הלקוח מבין את התוצאה מיד — פחות תיקונים, פחות ויכוחים, יותר סגירות.</p>
-      </article>
+    </div>
+    <div class="gallery-strip">
+      <div class="shot"><img src="pitch-assets/landing-gallery/best/12-shasha-a.jpg" alt="ארון שמנת עם פאנלים ומגירות" loading="lazy"></div>
+      <div class="shot"><img src="pitch-assets/landing-gallery/best/08-shir-elimi.jpg" alt="ארון משולב שולחן כתיבה" loading="lazy"></div>
+      <div class="shot"><img src="pitch-assets/landing-gallery/best/15-kaskas.jpg" alt="ארון הזזה עם דלתות זכוכית" loading="lazy"></div>
+      <div class="shot"><img src="pitch-assets/landing-gallery/best/14-dana-tzadik.jpg" alt="חדר ארונות פתוח עץ ושחור" loading="lazy"></div>
+      <div class="shot"><img src="pitch-assets/landing-gallery/best/03-gali-dor.jpg" alt="ארון קיר עם מדפים פתוחים" loading="lazy"></div>
+      <div class="shot"><img src="pitch-assets/landing-gallery/best/21-sliding.jpg" alt="ארון הזזה" loading="lazy"></div>
     </div>
   </div>
 </section>
