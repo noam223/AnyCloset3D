@@ -1199,9 +1199,17 @@ function _bpIsHoneycombInternalShelf(blocks, rowBounds, syAdj) {
     return false;
 }
 
-function _bpSideOpenCellOpenDir(ci, numCols) {
-    const opensLeft = ci === 0;
-    const opensRight = ci === numCols - 1;
+function _bpSideOpenCellOpenDir(ci, numCols, bottomY) {
+    const cols = (typeof state !== 'undefined' && state.columns) ? state.columns : null;
+    const leftNeighbor = cols && cols[ci - 1];
+    const rightNeighbor = cols && cols[ci + 1];
+    const y = (typeof bottomY === 'number') ? bottomY : 0;
+    const opensLeft = ci === 0
+        || (leftNeighbor && leftNeighbor.height <= y + 0.5)
+        || (leftNeighbor && (leftNeighbor.floorOffset || 0) > y + 0.5);
+    const opensRight = ci === numCols - 1
+        || (rightNeighbor && rightNeighbor.height <= y + 0.5)
+        || (rightNeighbor && (rightNeighbor.floorOffset || 0) > y + 0.5);
     if (opensLeft && opensRight) return ci < numCols / 2 ? 'left' : 'right';
     if (opensLeft) return 'left';
     if (opensRight) return 'right';
@@ -1527,12 +1535,7 @@ function _bpDrawPartitionMergedDoors(p, comp, boundaryXs, rowBotCm, rowTopCm, co
         const subZoneW = maxX - minX;
         const zSvgH = maxSvgBot - minSvgTop;
         const subZoneCX = (minX + maxX) / 2;
-        const _opensLeft = ci === 0;
-        const _opensRight = ci === cols.length - 1;
-        let openDir = 'left';
-        if (_opensLeft && _opensRight) openDir = (ci < cols.length / 2) ? 'left' : 'right';
-        else if (_opensLeft) openDir = 'left';
-        else if (_opensRight) openDir = 'right';
+        const openDir = _bpSideOpenCellOpenDir(ci, cols.length, rowBotCm);
         _bpDrawPartitionZoneContent(p, group.type, group.style || 'solid', minX, maxX, minSvgTop, zSvgH, subZoneCX, subZoneW, openDir, sc);
     });
 }
@@ -1596,12 +1599,13 @@ function _bpDrawPartitionCell(p, ctx) {
             }
         }
         const zoneBoundsCm = [rowBotCm, ...shelfYcms, rowTopCm];
-        const isSubHoney = sub && (sub.type === 'honeycomb' || sub.type === 'open_cell');
+        const isSubHoney = sub && (sub.type === 'honeycomb' || sub.type === 'open_cell' || sub.type === 'side_open_cell');
         if (isSubHoney && typeof makeRectP === 'function' && typeof makeShelfP === 'function') {
             const subNumRows = zoneBoundsCm.length - 1;
             if (subNumRows > 0) {
+                const _bpBlkType = (sub.type === 'side_open_cell') ? 'side_open_cell' : 'open_cell';
                 _bpDrawHoneycombBlock(p, {
-                    block: { type: 'open_cell', startR: 0, endR: subNumRows - 1 },
+                    block: { type: _bpBlkType, startR: 0, endR: subNumRows - 1 },
                     colX: x1, colW: x2 - x1, sc, colBotSvgY, rowBounds: zoneBoundsCm,
                     ci, numCols: colList.length, boardFill: '#94a3b8', strokeThin: STROKE_THIN, stroke: STROKE, font: FONT,
                     viewKey, dimKeyPrefix: `c${ci}r${ri}p${zi}`,
@@ -1628,27 +1632,18 @@ function _bpDrawPartitionCell(p, ctx) {
             const isHoney = zoneType === 'honeycomb' || zoneType === 'open_cell' || zoneType === 'side_open_cell';
             // Interior (hanging / drawers) always — same as 3D, even under a merged door
             if (_bpPartitionIsInteriorContent(zoneType)) {
-                const _opensLeft = ci === 0;
-                const _opensRight = ci === colList.length - 1;
-                let openDir = 'left';
-                if (_opensLeft && _opensRight) openDir = (ci < colList.length / 2) ? 'left' : 'right';
-                else if (_opensLeft) openDir = 'left';
-                else if (_opensRight) openDir = 'right';
+                const openDir = _bpSideOpenCellOpenDir(ci, colList.length, zBotCm);
                 _bpDrawPartitionZoneContent(p, zoneType, zoneStyle, x1, x2, zSvgTop, zSvgH, subZoneCX, subZoneW, openDir, sc,
                     (sub && Array.isArray(sub.zonesDrawerCount) && sub.zonesDrawerCount[z] > 0) ? sub.zonesDrawerCount[z] : ((sub && sub.count) || 0));
             } else if (zoneType && zoneType !== 'empty' && !inMergeGroup && !isHoney) {
-                const _opensLeft = ci === 0;
-                const _opensRight = ci === colList.length - 1;
-                let openDir = 'left';
-                if (_opensLeft && _opensRight) openDir = (ci < colList.length / 2) ? 'left' : 'right';
-                else if (_opensLeft) openDir = 'left';
-                else if (_opensRight) openDir = 'right';
+                const openDir = _bpSideOpenCellOpenDir(ci, colList.length, zBotCm);
                 _bpDrawPartitionZoneContent(p, zoneType, zoneStyle, x1, x2, zSvgTop, zSvgH, subZoneCX, subZoneW, openDir, sc,
                     (sub && Array.isArray(sub.zonesDrawerCount) && sub.zonesDrawerCount[z] > 0) ? sub.zonesDrawerCount[z] : ((sub && sub.count) || 0));
             } else if (isHoney && !inMergeGroup && !isSubHoney && typeof makeRectP === 'function') {
-                if (zSvgH > 18) p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 14).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="10" fill="${STROKE}" opacity="0.6">כוורת</text>`);
+                const honeyLabel = zoneType === 'side_open_cell' ? 'כוורת צד' : 'כוורת';
+                if (zSvgH > 18) p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 14).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="10" fill="${STROKE}" opacity="0.6">${honeyLabel}</text>`);
                 _bpDrawHoneycombBlock(p, {
-                    block: { type: 'open_cell', startR: 0, endR: 0 },
+                    block: { type: zoneType === 'side_open_cell' ? 'side_open_cell' : 'open_cell', startR: 0, endR: 0 },
                     colX: x1, colW: x2 - x1, sc, colBotSvgY, rowBounds: [zBotCm, zTopCm],
                     ci, numCols: colList.length, boardFill: '#94a3b8', strokeThin: STROKE_THIN, stroke: STROKE, font: FONT,
                     viewKey, dimKeyPrefix: `c${ci}r${ri}p${zi}z${z}`,

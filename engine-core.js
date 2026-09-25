@@ -4182,6 +4182,64 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                 }
             }
         });
+
+        // Partition sub-zones with side_open_cell: punch carcass wall on the exposed outer sub-cell
+        for (let r = 0; r <= dividers.length; r++) {
+            const compData = col.compartments[r];
+            if (!compData || !compData.partition || !Array.isArray(compData.subCells) || !compData.subCells.length) continue;
+            const bottomY = (r === 0) ? startShelvesY : dividers[r - 1].y + dividers[r - 1].thick / 2;
+            const topY = (r === dividers.length) ? col.height - t : dividers[r].y - dividers[r].thick / 2;
+            if (topY - bottomY <= 0) continue;
+            const nSubs = compData.subCells.length;
+            const leftNeighbor = state.columns[c - 1];
+            const rightNeighbor = state.columns[c + 1];
+            const _zoneIsSideOpen = (si, z) => {
+                const zoneKey = `${si}:${z}`;
+                const grp = (compData.zoneDoorGroups || []).find(g => g.keys && g.keys.includes(zoneKey));
+                if (grp) return grp.type === 'side_open_cell';
+                const sub = compData.subCells[si];
+                if (!sub) return false;
+                if (Array.isArray(sub.zonesType) && z < sub.zonesType.length && sub.zonesType[z] != null && sub.zonesType[z] !== '') {
+                    return sub.zonesType[z] === 'side_open_cell';
+                }
+                return sub.type === 'side_open_cell';
+            };
+            for (let si = 0; si < nSubs; si++) {
+                const sub = compData.subCells[si];
+                if (!sub) continue;
+                const numShelves = sub.shelves || 0;
+                let subShelvesY = [];
+                if (Array.isArray(sub.shelvesY) && sub.shelvesY.length === numShelves) {
+                    subShelvesY = sub.shelvesY;
+                } else if (numShelves > 0) {
+                    const zoneH = (topY - bottomY) / (numShelves + 1);
+                    for (let s = 1; s <= numShelves; s++) subShelvesY.push(bottomY + zoneH * s);
+                }
+                const zoneBounds = [bottomY, ...subShelvesY, topY];
+                for (let z = 0; z < zoneBounds.length - 1; z++) {
+                    if (!_zoneIsSideOpen(si, z)) continue;
+                    const zBot = zoneBounds[z];
+                    const zTop = zoneBounds[z + 1];
+                    const opensLeft = c === 0
+                        || (leftNeighbor && leftNeighbor.height <= zBot + 0.5)
+                        || (leftNeighbor && (leftNeighbor.floorOffset || 0) > zBot + 0.5);
+                    const opensRight = c === state.columns.length - 1
+                        || (rightNeighbor && rightNeighbor.height <= zBot + 0.5)
+                        || (rightNeighbor && (rightNeighbor.floorOffset || 0) > zBot + 0.5);
+                    let openDir = 'none';
+                    if (opensLeft && opensRight) openDir = (c < state.columns.length / 2) ? 'left' : 'right';
+                    else if (opensLeft) openDir = 'left';
+                    else if (opensRight) openDir = 'right';
+                    if (openDir === 'left' && si === 0) {
+                        if (c === 0) leftWallHoles.push({ bottom: zBot, top: zTop });
+                        else internalHoles[c - 1].push({ bottom: zBot, top: zTop });
+                    } else if (openDir === 'right' && si === nSubs - 1) {
+                        if (c === state.columns.length - 1) rightWallHoles.push({ bottom: zBot, top: zTop });
+                        else internalHoles[c].push({ bottom: zBot, top: zTop });
+                    }
+                }
+            }
+        }
         
         columnBlocks.push(blocks);
     }
@@ -5554,15 +5612,22 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                 _registerDoorMesh(bar);
                             }
                         }
-                    } else if (subType === 'honeycomb') {
+                    } else if (subType === 'honeycomb' || subType === 'open_cell' || subType === 'side_open_cell') {
                         // Rendered like open_cell: use matOpenCell, proper frame
                         // Skip shared inner side wall when adjacent sub-cell is also honeycomb (merge into one unit)
+                        const _isHoneyZoneType = (tp) => tp === 'honeycomb' || tp === 'open_cell' || tp === 'side_open_cell';
+                        const _subZoneTypeAt = (sIdx, zIdx) => {
+                            const s = compData.subCells && compData.subCells[sIdx];
+                            if (!s) return '';
+                            if (Array.isArray(s.zonesType) && zIdx >= 0 && zIdx < s.zonesType.length && s.zonesType[zIdx] != null && s.zonesType[zIdx] !== '') {
+                                return s.zonesType[zIdx];
+                            }
+                            return s.type || '';
+                        };
                         let honeyPaintIdx = Math.max(0, subIdx);
                         if (subIdx >= 0 && compData.subCells) {
                             while (honeyPaintIdx > 0) {
-                                const prevSub = compData.subCells[honeyPaintIdx - 1];
-                                const prevType = prevSub && ((Array.isArray(prevSub.zonesType) && prevSub.zonesType[zoneIdx]) || prevSub.type);
-                                if (prevType !== 'honeycomb' && prevType !== 'open_cell' && prevType !== 'side_open_cell') break;
+                                if (!_isHoneyZoneType(_subZoneTypeAt(honeyPaintIdx - 1, zoneIdx))) break;
                                 honeyPaintIdx--;
                             }
                         }
@@ -5580,12 +5645,36 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         // Back panel
                         createBoard(subW - 2 * innerT, zoneH - 2 * innerT, 0.5, subCenterX, frameY, -bodyD / 2 + 0.6, matOpenCell);
                         // Side walls — skip shared wall when adjacent sub-cell is also honeycomb (merge)
-                        const _leftNeighborIsHoney = (subIdx > 0) && compData.subCells[subIdx - 1] && compData.subCells[subIdx - 1].type === 'honeycomb';
-                        const _rightNeighborIsHoney = (subIdx >= 0) && (subIdx < boundaryXs.length - 2) && compData.subCells[subIdx + 1] && compData.subCells[subIdx + 1].type === 'honeycomb';
-                        if (!_leftNeighborIsHoney) {
+                        const lastSi = boundaryXs.length - 2;
+                        const _leftNeighborIsHoney = (subIdx > 0) && _isHoneyZoneType(_subZoneTypeAt(subIdx - 1, zoneIdx));
+                        const _rightNeighborIsHoney = (subIdx >= 0) && (subIdx < lastSi) && _isHoneyZoneType(_subZoneTypeAt(subIdx + 1, zoneIdx));
+                        let skipLeft = _leftNeighborIsHoney;
+                        let skipRight = _rightNeighborIsHoney;
+                        // side_open_cell: omit the outer frame wall where the carcass is punched open
+                        if (subType === 'side_open_cell') {
+                            const leftNeighbor = state.columns[c - 1];
+                            const rightNeighbor = state.columns[c + 1];
+                            const opensLeft = c === 0
+                                || (leftNeighbor && leftNeighbor.height <= zoneBottomY + 0.5)
+                                || (leftNeighbor && (leftNeighbor.floorOffset || 0) > zoneBottomY + 0.5);
+                            const opensRight = c === state.columns.length - 1
+                                || (rightNeighbor && rightNeighbor.height <= zoneBottomY + 0.5)
+                                || (rightNeighbor && (rightNeighbor.floorOffset || 0) > zoneBottomY + 0.5);
+                            const colLeftEdge = colCenterX - col.width / 2;
+                            const colRightEdge = colCenterX + col.width / 2;
+                            const touchesLeft = subIdx === 0 || (subIdx < 0 && (subCenterX - subW / 2) <= colLeftEdge + t);
+                            const touchesRight = subIdx === lastSi || (subIdx < 0 && (subCenterX + subW / 2) >= colRightEdge - t);
+                            let openDir = 'none';
+                            if (opensLeft && opensRight) openDir = (c < state.columns.length / 2) ? 'left' : 'right';
+                            else if (opensLeft) openDir = 'left';
+                            else if (opensRight) openDir = 'right';
+                            if (openDir === 'left' && touchesLeft) skipLeft = true;
+                            if (openDir === 'right' && touchesRight) skipRight = true;
+                        }
+                        if (!skipLeft) {
                             createBoard(innerT, zoneH - 2 * innerT, bodyD - 2, subCenterX - subW / 2 + innerT / 2, frameY, 1, matOpenCell);
                         }
-                        if (!_rightNeighborIsHoney) {
+                        if (!skipRight) {
                             createBoard(innerT, zoneH - 2 * innerT, bodyD - 2, subCenterX + subW / 2 - innerT / 2, frameY, 1, matOpenCell);
                         }
                         _ppPartId = '';

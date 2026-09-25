@@ -1673,9 +1673,9 @@ function updateToolbarButtonHighlights() {
         // Interior highlight
         let interiorType = 'empty';
         if (activeSub) {
-            const honeyGrp = mergedGroup && (mergedGroup.type === 'honeycomb' || mergedGroup.type === 'open_cell');
+            const honeyGrp = mergedGroup && (mergedGroup.type === 'honeycomb' || mergedGroup.type === 'open_cell' || mergedGroup.type === 'side_open_cell');
             if (honeyGrp && _subKeysEqual(mergedGroup.keys, selectedKeysArr)) {
-                interiorType = 'honeycomb';
+                interiorType = mergedGroup.type === 'side_open_cell' ? 'side_open_cell' : 'honeycomb';
             } else {
                 interiorType = _zoneInteriorAt(activeSub, _activeZ);
             }
@@ -1690,9 +1690,11 @@ function updateToolbarButtonHighlights() {
             if (btn) btn.classList.add('active');
             const subBtn = document.querySelector(`#drawer-sub-panel button[data-drawer-type="${interiorType}"]`);
             if (subBtn) subBtn.classList.add('active');
-        } else if (interiorType === 'honeycomb' || interiorType === 'open_cell') {
+        } else if (interiorType === 'honeycomb' || interiorType === 'open_cell' || interiorType === 'side_open_cell') {
             const btn = document.getElementById('tb-btn-honeycomb');
             if (btn) btn.classList.add('active');
+            const subBtn = document.querySelector(`#honeycomb-sub-panel button[data-honeycomb-type="${interiorType === 'honeycomb' ? 'open_cell' : interiorType}"]`);
+            if (subBtn) subBtn.classList.add('active');
         }
 
         // Door highlight (merged group or per-zone zonesDoor)
@@ -3858,8 +3860,21 @@ function _parseSubKey(key) {
 function _subKey(si, z) { return `${si}:${z}`; }
 
 const _DOOR_ZONE_TYPES = new Set(['door_right', 'door_left', 'door_double', 'door_flap']);
-const _MERGE_ZONE_TYPES = new Set([..._DOOR_ZONE_TYPES, 'honeycomb']);
+const _MERGE_ZONE_TYPES = new Set([..._DOOR_ZONE_TYPES, 'honeycomb', 'side_open_cell']);
 const _INTERIOR_ZONE_TYPES = new Set(['hanging', 'sorbet', 'internal_drawers', 'external_drawers', 'honeycomb', 'open_cell', 'side_open_cell']);
+
+/** Whether a column can open its left/right carcass wall at a given Y (air / short neighbor / floating). */
+function _sideOpenExposure(c, bottomY) {
+    const leftNeighbor = state.columns[c - 1];
+    const rightNeighbor = state.columns[c + 1];
+    const opensLeft = c === 0
+        || (leftNeighbor && leftNeighbor.height <= bottomY + 0.5)
+        || (leftNeighbor && (leftNeighbor.floorOffset || 0) > bottomY + 0.5);
+    const opensRight = c === state.columns.length - 1
+        || (rightNeighbor && rightNeighbor.height <= bottomY + 0.5)
+        || (rightNeighbor && (rightNeighbor.floorOffset || 0) > bottomY + 0.5);
+    return { opensLeft, opensRight };
+}
 
 function _sortedSubKeys(keys) {
     return [...keys].sort((a, b) => {
@@ -4260,7 +4275,7 @@ window.removePartition = function() {
 };
 
 // Set content type for all active sub-cell zones (per-zone composite key "si:z" support)
-// Maps open_cell/side_open_cell → honeycomb for sub-cell context
+// Maps open_cell → honeycomb for sub-cell context; keeps side_open_cell so the side wall can open
 // opts.force: set type without toggle (used by applyContentForce)
 window.setSubCellType = function(type, opts) {
     _dbgHangSnapshot('setSubCellType IN type=' + type + ' force=' + !!(opts && opts.force));
@@ -4297,12 +4312,28 @@ window.setSubCellType = function(type, opts) {
         comp.subCells = Array.from({ length: nSubs }, () => ({ type: 'empty', shelves: 0 }));
     }
 
-    // Map open_cell / side_open_cell → honeycomb for sub-cell context
-    const subType = (type === 'open_cell' || type === 'side_open_cell') ? 'honeycomb' : type;
+    // Regular כוורת → honeycomb frame inside partition (no carcass wall punch).
+    // כוורת צד stays side_open_cell so the engine opens the exposed side wall.
+    const subType = (type === 'open_cell') ? 'honeycomb' : type;
     const force = !!(opts && opts.force);
     const selectedKeys = _sortedSubKeys(_activeSubCellIdxs);
     const isDoorType = _isDoorZoneType(subType);
     const isInteriorType = _INTERIOR_ZONE_TYPES.has(subType) || subType === 'empty';
+
+    if (subType === 'side_open_cell') {
+        const col = state.columns[c];
+        const { prevY } = _getSubCellCompBounds(col, r);
+        const { opensLeft, opensRight } = _sideOpenExposure(c, prevY);
+        const nSubs = comp.subCells.length;
+        const selectedSis = [...new Set(selectedKeys.map(k => _parseSubKey(k).si))];
+        const canPlace = selectedSis.every(si =>
+            (opensLeft && si === 0) || (opensRight && si === nSubs - 1)
+        );
+        if ((!opensLeft && !opensRight) || !canPlace) {
+            alert('לא ניתן למקם כוורת צד כאן. הכוורת חייבת להיות בתא החיצוני של המחיצה, חשופה לאוויר (בקצה הארון או מעל גובה העמודה הסמוכה).');
+            return;
+        }
+    }
 
     let activateOpenCellTab = false;
 
@@ -4322,7 +4353,7 @@ window.setSubCellType = function(type, opts) {
         const existingMerged = _findZoneDoorGroup(comp, selectedKeys);
         const togglingOff = !force && existingMerged && existingMerged.type === subType;
         _applyMergedZoneGroup(comp, selectedKeys, subType);
-        activateOpenCellTab = subType === 'honeycomb' && !togglingOff;
+        activateOpenCellTab = (subType === 'honeycomb' || subType === 'side_open_cell') && !togglingOff;
         _finishSubCellApply({ activateOpenCellTab });
         return;
     }
@@ -4384,7 +4415,10 @@ window.setSubCellType = function(type, opts) {
                 key: key, current: current, subType: subType, newType: newType,
                 doorKept: _zoneDoorAt(sub, z), force: force
             }));
-            if (subType === 'honeycomb' && newType === 'honeycomb') activateOpenCellTab = true;
+            if ((subType === 'honeycomb' || subType === 'side_open_cell') &&
+                (newType === 'honeycomb' || newType === 'side_open_cell')) {
+                activateOpenCellTab = true;
+            }
             sub.zonesType[z] = newType;
             if (newType === 'internal_drawers' || newType === 'external_drawers') {
                 const zoneH = _getSubZoneHeightCm(state.columns[c], r, sub, z);
