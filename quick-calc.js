@@ -628,7 +628,7 @@ function _qcModelLabel(model) {
 }
 
 function _qcMatLabel(mat) {
-    return mat === 'sandwich' ? "סנדביץ'" : 'מלמין';
+    return mat === 'mdf' ? 'MDF' : mat === 'sandwich' ? "סנדביץ'" : 'מלמין';
 }
 
 window._buildQcPrintHtml = function() {

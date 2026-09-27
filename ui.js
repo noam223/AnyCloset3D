@@ -7510,8 +7510,12 @@ function bindUI() {
 
         // Colors marked data-no-sandwich: hide on non-external tabs when sandwich is active;
         // show on ALL tabs when melamine is active, and also show on external tab even in sandwich mode
-        document.querySelectorAll('.mat-item[data-no-sandwich="true"]').forEach(el => {
-            el.style.display = (isSandwich && !isExternalTab) ? 'none' : '';
+        // MDF: Egger melamine-only colors (data-no-mdf) are hidden on every tab
+        const isMdf = state.boardMaterial === 'mdf';
+        document.querySelectorAll('.mat-item[data-no-sandwich="true"], .mat-item[data-no-mdf="true"]').forEach(el => {
+            const hideSandwich = isSandwich && !isExternalTab && el.getAttribute('data-no-sandwich') === 'true';
+            const hideMdf = isMdf && el.getAttribute('data-no-mdf') === 'true';
+            el.style.display = (hideSandwich || hideMdf) ? 'none' : '';
         });
 
         // If sandwich is active and a no-sandwich color is currently selected on any part, reset it
@@ -7520,6 +7524,14 @@ function bindUI() {
             const NO_SANDWICH = new Set(['c705','u727','w1200','u232','u604','u638','H1367','H1307','H1227','A427']);
             ['materialBody','materialInternal','materialDesk','materialOpenCell','materialBack'].forEach(part => {
                 if (NO_SANDWICH.has(state[part])) {
+                    state[part] = 'white_matte';
+                }
+            });
+        }
+        if (isMdf) {
+            const NO_MDF = new Set(['w1200','u604','u638','u727','u232','H1307','H1367','H1227']);
+            ['materialBody','materialInternal','materialDesk','materialOpenCell','materialBack','materialExternal'].forEach(part => {
+                if (NO_MDF.has(state[part])) {
                     state[part] = 'white_matte';
                 }
             });
@@ -10694,7 +10706,7 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
             customName: state.cabinetName, cabinetNotes: (state.cabinetNotes || '').trim(), modelName: modelNameText, cabinetModelLabel: _customModelLabel, plinthType: plinthTypeText,
             placement: _isWritingDeskCart ? 'שולחן עמידה' : (placementHebrew[state.placement] || 'ארון קיר חופשי'),
             dimsStr: _wdDimsStr,
-            material: state.boardMaterial === 'melamine' ? 'מלמין' : "סנדביץ'",
+            material: state.boardMaterial === 'mdf' ? 'MDF' : state.boardMaterial === 'melamine' ? 'מלמין' : "סנדביץ'",
             handle: (function() {
                 const labels = { pipe: 'ידית חיצונית', riding: 'ידית רוכבת', touch: "ידית טאצ'" };
                 const style = labels[state.handleStyle] || labels.pipe;
