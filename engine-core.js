@@ -4810,7 +4810,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
             const colDeskT = _deskT(!!col.hasDrawers);
             // Desk surface protrudes forward to align with door-face line (17mm w/ drawers, 28mm without)
             const deskProtrude = colDeskT;
-            _ppPartId = desk_surface_c;
+            _ppPartId = `desk_surface_c${c}`;
             createBoard(col.width, colDeskT, bodyD + deskProtrude, colCenterX, col.deskHeight - colDeskT/2, deskProtrude / 2, matDesk);
             _ppPartId = '';
             if(!isBP && _isActiveWingBuild) {
@@ -4823,13 +4823,13 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                 const drawerWidth = (col.width - gap*(numDrawers+1)) / numDrawers;
                 const drawerBottomY = col.deskHeight - colDeskT - col.drawerHeight;
                 const drawerCenterY = drawerBottomY + col.drawerHeight/2;
-                _ppPartId = desk_drawer_bottom_c;
+                _ppPartId = `desk_drawer_bottom_c${c}`;
                 createBoard(col.width, colDeskT, bodyD - 2, colCenterX, drawerBottomY + colDeskT/2, 0, matDesk);
                 _ppPartId = '';
                 for(let i=0; i<numDrawers; i++) {
                     let innerStartX = colCenterX - col.width/2;
                     let dx = innerStartX + gap + drawerWidth/2 + i * (drawerWidth + gap);
-                    _ppPartId = desk_int_drawer_c_d;
+                    _ppPartId = `desk_int_drawer_c${c}_d${i}`;
                     let mesh = createBoard(drawerWidth, col.drawerHeight, t, dx, drawerCenterY, _deskDrawerFZ, matExternal);
                     _ppPartId = '';
                     if (!isBP) _addDrawerHandleLocal(mesh, drawerWidth, col.drawerHeight, _handleStyle);
@@ -4844,7 +4844,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
             }
             startShelvesY = col.deskHeight + col.deskClearance;
             // Floor board above knee clearance (acts as first shelf of the upper desk section)
-            _ppPartId = desk_shelf_c;
+            _ppPartId = `desk_shelf_c${c}`;
             createBoard(col.width, t, bodyD, colCenterX, startShelvesY + t/2, 0, matDesk);
             _ppPartId = '';
             if(!isBP) dragHandlesData.vertical.push({ isInternalDeskClearance: true, colIndex: c, x: colCenterX, y: startShelvesY });
