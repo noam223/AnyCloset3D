@@ -228,6 +228,7 @@ const state = {
     // Editable title + intro text on order/factory print forms
     orderForm: { factory: { title: '', notes: '' }, customer: { title: '', notes: '' } },
     orderCart: [],
+    cartTrash: [],
     editingCartIndex: -1,
     currentInstallPrice: 0,
     currentCostPrice: 0,
@@ -2077,12 +2078,32 @@ try {
     });
 } catch(e) {}
 
+function _cartOpOf(snap) {
+    return (snap && window._cartHistoryOps) ? window._cartHistoryOps.get(snap) : null;
+}
+
 window.undo = function() {
-    if (state.historyIndex > 0) { state.historyIndex--; restoreHistoryState(); }
+    if (state.historyIndex <= 0) return;
+    const op = _cartOpOf(state.history[state.historyIndex]);
+    state.historyIndex--;
+    if (op && typeof window._undoCartOp === 'function') {
+        window._undoCartOp(op);
+        updateUndoRedoUI();
+        return;
+    }
+    restoreHistoryState();
 };
 
 window.redo = function() {
-    if (state.historyIndex < state.history.length - 1) { state.historyIndex++; restoreHistoryState(); }
+    if (state.historyIndex >= state.history.length - 1) return;
+    state.historyIndex++;
+    const op = _cartOpOf(state.history[state.historyIndex]);
+    if (op && typeof window._redoCartOp === 'function') {
+        window._redoCartOp(op);
+        updateUndoRedoUI();
+        return;
+    }
+    restoreHistoryState();
 };
 
 window.resetCurrentCabinet = function() {
@@ -4608,9 +4629,7 @@ function _calcWingCost(cfg, wing) {
     }
 
     const wModel = wing.cabinetModel || 'maya';
-    const wHasSideOpenCell = wModel === 'ab2_nohoney' && wing.columns && wing.columns.some(col =>
-        col.compartments && col.compartments.some(comp => comp && comp.type === 'side_open_cell'));
-    const wEffectiveModel = (wModel === 'ab2_nohoney' && wHasSideOpenCell) ? 'ab2' : wModel;
+    const wEffectiveModel = wModel === 'ab2_nohoney' ? 'c9' : wModel;
 
     let basePrice = _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel);
     if (SANDWICH_COLORS.has(wing.materialBody)) basePrice *= (1 + sandwichPct);
@@ -4652,7 +4671,7 @@ function _calcWingCost(cfg, wing) {
             if (comp && comp.partition) { partitionBlocks += Array.isArray(comp.partitions)?comp.partitions.length:1; }
         });
     });
-    if ((wModel==='ab2'||wEffectiveModel==='ab2') && openCellBlocks>0) openCellBlocks--;
+    if (wEffectiveModel==='ab2' && openCellBlocks>0) openCellBlocks--;
     finalCost += openCellBlocks*_priceNum(ex.openCell, 400);
     finalCost += partitionBlocks*_priceNum(ex.partition, 150);
 

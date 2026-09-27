@@ -2210,27 +2210,126 @@ document.addEventListener('keydown', function(e) {
 // ==========================================
 // Column templates (magic wand)
 // ==========================================
-const _COL_TPL_STORAGE_KEY = 'anycloset_column_templates_v1';
 const _COL_TPL_DESIGN_HEIGHT = 240;
 
-window._loadColumnTemplates = function() {
+// ── Shared template store (Supabase `design_templates`, visible to all users) ──
+const _TPL_LEGACY_KEYS = { column: 'anycloset_column_templates_v1', cabinet: 'anycloset_cabinet_templates_v1' };
+const _tplCache = { column: null, cabinet: null };
+const _tplLoading = { column: null, cabinet: null };
+let _tplUserId = null;
+
+function _tplLegacyList(kind) {
     try {
-        const raw = localStorage.getItem(_COL_TPL_STORAGE_KEY);
+        const raw = localStorage.getItem(_TPL_LEGACY_KEYS[kind]);
         const list = raw ? JSON.parse(raw) : [];
         return Array.isArray(list) ? list : [];
     } catch (e) {
         return [];
     }
+}
+
+function _tplToRow(kind, tpl) {
+    const data = Object.assign({}, tpl);
+    delete data.id; delete data.name; delete data.thumbnail; delete data.createdAt; delete data.createdBy;
+    const row = { id: tpl.id, kind: kind, name: tpl.name || '', data: data, thumbnail: tpl.thumbnail || null };
+    if (tpl.createdAt) row.created_at = new Date(tpl.createdAt).toISOString();
+    return row;
+}
+
+function _tplFromRow(row) {
+    return Object.assign({}, row.data || {}, {
+        id: row.id,
+        name: row.name,
+        thumbnail: row.thumbnail || null,
+        createdAt: Date.parse(row.created_at) || 0,
+        createdBy: row.created_by || null
+    });
+}
+
+async function _tplClient() {
+    const sb = window._supabase;
+    if (!sb) return null;
+    if (!_tplUserId) {
+        try {
+            const { data } = await sb.auth.getUser();
+            _tplUserId = data && data.user ? data.user.id : null;
+        } catch (e) {}
+    }
+    return _tplUserId ? sb : null;
+}
+
+async function _tplMigrateLegacy(sb, kind) {
+    const legacy = _tplLegacyList(kind);
+    if (!legacy.length) return;
+    const rows = legacy.filter(function(t) { return t && t.id; }).map(function(t) { return _tplToRow(kind, t); });
+    const { error } = await sb.from('design_templates').upsert(rows, { onConflict: 'id', ignoreDuplicates: true });
+    if (error) { console.warn('[templates] legacy upload failed', error.message); return; }
+    try { localStorage.removeItem(_TPL_LEGACY_KEYS[kind]); } catch (e) {}
+}
+
+window._refreshTemplates = function(kind) {
+    if (_tplLoading[kind]) return _tplLoading[kind];
+    _tplLoading[kind] = (async function() {
+        try {
+            const sb = await _tplClient();
+            if (!sb) return _tplCache[kind] || [];
+            await _tplMigrateLegacy(sb, kind);
+            const { data, error } = await sb.from('design_templates')
+                .select('id, name, data, thumbnail, created_by, created_at')
+                .eq('kind', kind)
+                .order('created_at', { ascending: true });
+            if (error) throw error;
+            _tplCache[kind] = (data || []).map(_tplFromRow);
+        } catch (e) {
+            console.warn('[templates] load failed', e && e.message);
+        } finally {
+            _tplLoading[kind] = null;
+        }
+        return _tplCache[kind] || [];
+    })();
+    return _tplLoading[kind];
 };
 
-window._saveColumnTemplates = function(list) {
-    try {
-        localStorage.setItem(_COL_TPL_STORAGE_KEY, JSON.stringify(list || []));
-    } catch (e) {
-        console.warn('[col-templates] save failed', e);
-        if (typeof _showToast === 'function') _showToast('⚠️ לא ניתן לשמור תבניות (אחסון מלא?)', 4000);
-    }
+window._listTemplates = function(kind) {
+    return _tplCache[kind] || _tplLegacyList(kind);
 };
+
+window._canDeleteTemplate = function(tpl) {
+    return !!tpl && (!tpl.createdBy || tpl.createdBy === _tplUserId);
+};
+
+window._addTemplate = async function(kind, tpl) {
+    const sb = await _tplClient();
+    if (!sb) {
+        if (typeof _showToast === 'function') _showToast('⚠️ יש להתחבר כדי לשמור תבנית', 3500);
+        return false;
+    }
+    const { data, error } = await sb.from('design_templates')
+        .insert(_tplToRow(kind, tpl))
+        .select('id, name, data, thumbnail, created_by, created_at')
+        .single();
+    if (error) {
+        console.warn('[templates] save failed', error.message);
+        if (typeof _showToast === 'function') _showToast('⚠️ שמירת התבנית נכשלה', 3500);
+        return false;
+    }
+    _tplCache[kind] = (_tplCache[kind] || []).concat([_tplFromRow(data)]);
+    return true;
+};
+
+window._deleteTemplate = async function(kind, id) {
+    const sb = await _tplClient();
+    if (!sb) return false;
+    const { data, error } = await sb.from('design_templates').delete().eq('id', id).select('id');
+    if (error || !data || !data.length) {
+        if (typeof _showToast === 'function') _showToast('⚠️ אפשר למחוק רק תבנית שיצרת', 3500);
+        return false;
+    }
+    _tplCache[kind] = (_tplCache[kind] || []).filter(function(t) { return t.id !== id; });
+    return true;
+};
+
+window._loadColumnTemplates = function() { return window._listTemplates('column'); };
 
 function _colTplIsLockedComp(comp) {
     if (!comp) return false;
@@ -2607,10 +2706,13 @@ window.closeColumnTemplatesSheet = function() {
     }, 220);
 };
 
-window._renderColumnTemplatesSheet = function() {
+window._renderColumnTemplatesSheet = function(skipRefresh) {
     const grid = document.getElementById('col-templates-grid');
     const emptyEl = document.getElementById('col-templates-empty');
     if (!grid) return;
+    if (!skipRefresh) {
+        window._refreshTemplates('column').then(function() { window._renderColumnTemplatesSheet(true); });
+    }
     const list = window._loadColumnTemplates();
     grid.innerHTML = '';
 
@@ -2638,7 +2740,7 @@ window._renderColumnTemplatesSheet = function() {
             '<div class="col-tpl-card-meta">' +
                 '<div class="col-tpl-card-name">' + safeName + '</div>' +
             '</div>' +
-            '<button type="button" class="col-tpl-del" title="מחק תבנית"><i class="fa-solid fa-trash"></i></button>';
+            (window._canDeleteTemplate(tpl) ? '<button type="button" class="col-tpl-del" title="מחק תבנית"><i class="fa-solid fa-trash"></i></button>' : '');
         card.addEventListener('click', function(e) {
             if (e.target.closest('.col-tpl-del')) return;
             window.applyColumnTemplate(tpl.id);
@@ -2654,7 +2756,7 @@ window._renderColumnTemplatesSheet = function() {
     });
 };
 
-window.addCurrentColumnAsTemplate = function() {
+window.addCurrentColumnAsTemplate = async function() {
     const idx = (typeof window._colTplTargetIndex === 'number')
         ? window._colTplTargetIndex
         : state.selection.colIndex;
@@ -2681,17 +2783,14 @@ window.addCurrentColumnAsTemplate = function() {
         thumbnail: thumb,
         column: serialized
     };
-    list.push(tpl);
-    window._saveColumnTemplates(list);
-    window._renderColumnTemplatesSheet();
+    if (!(await window._addTemplate('column', tpl))) return;
+    window._renderColumnTemplatesSheet(true);
     if (typeof _showToast === 'function') _showToast('התבנית "' + name + '" נשמרה ✓', 2800);
 };
 
-window.deleteColumnTemplate = function(id) {
-    let list = window._loadColumnTemplates();
-    list = list.filter(function(t) { return t.id !== id; });
-    window._saveColumnTemplates(list);
-    window._renderColumnTemplatesSheet();
+window.deleteColumnTemplate = async function(id) {
+    if (!(await window._deleteTemplate('column', id))) return;
+    window._renderColumnTemplatesSheet(true);
     if (typeof _showToast === 'function') _showToast('התבנית נמחקה', 2000);
 };
 
@@ -2714,26 +2813,7 @@ window.applyColumnTemplate = function(id) {
 };
 
 // ── Cabinet templates (full wardrobe) ───────────────────────────────────────
-const _CAB_TPL_STORAGE_KEY = 'anycloset_cabinet_templates_v1';
-
-window._loadCabinetTemplates = function() {
-    try {
-        const raw = localStorage.getItem(_CAB_TPL_STORAGE_KEY);
-        const list = raw ? JSON.parse(raw) : [];
-        return Array.isArray(list) ? list : [];
-    } catch (e) {
-        return [];
-    }
-};
-
-window._saveCabinetTemplates = function(list) {
-    try {
-        localStorage.setItem(_CAB_TPL_STORAGE_KEY, JSON.stringify(list || []));
-    } catch (e) {
-        console.warn('[cab-templates] save failed', e);
-        if (typeof _showToast === 'function') _showToast('⚠️ לא ניתן לשמור תבניות (אחסון מלא?)', 4000);
-    }
-};
+window._loadCabinetTemplates = function() { return window._listTemplates('cabinet'); };
 
 /** Serialize current editor cabinet (rawState shape) — no space-pair / no heavy blueprints. */
 window._serializeCabinetForTemplate = function() {
@@ -2979,10 +3059,13 @@ window.closeCabinetTemplatesSheet = function() {
     }, 220);
 };
 
-window._renderCabinetTemplatesSheet = function() {
+window._renderCabinetTemplatesSheet = function(skipRefresh) {
     const grid = document.getElementById('cab-templates-grid');
     const emptyEl = document.getElementById('cab-templates-empty');
     if (!grid) return;
+    if (!skipRefresh) {
+        window._refreshTemplates('cabinet').then(function() { window._renderCabinetTemplatesSheet(true); });
+    }
     const list = window._loadCabinetTemplates();
     grid.innerHTML = '';
 
@@ -3014,7 +3097,7 @@ window._renderCabinetTemplatesSheet = function() {
                 '<div class="col-tpl-card-name">' + safeName + '</div>' +
                 (dims ? '<div style="font-size:0.72rem;color:#94a3b8;margin-top:2px;">' + dims + '</div>' : '') +
             '</div>' +
-            '<button type="button" class="col-tpl-del" title="מחק תבנית"><i class="fa-solid fa-trash"></i></button>';
+            (window._canDeleteTemplate(tpl) ? '<button type="button" class="col-tpl-del" title="מחק תבנית"><i class="fa-solid fa-trash"></i></button>' : '');
         card.addEventListener('click', function(e) {
             if (e.target.closest('.col-tpl-del')) return;
             window.applyCabinetTemplate(tpl.id);
@@ -3030,7 +3113,7 @@ window._renderCabinetTemplatesSheet = function() {
     });
 };
 
-window.addCurrentCabinetAsTemplate = function() {
+window.addCurrentCabinetAsTemplate = async function() {
     if (!state || !state.wings) {
         if (typeof _showToast === 'function') _showToast('אין ארון לשמירה', 2500);
         return;
@@ -3055,17 +3138,14 @@ window.addCurrentCabinetAsTemplate = function() {
         thumbnail: thumb,
         rawState: rawState
     };
-    list.push(tpl);
-    window._saveCabinetTemplates(list);
-    window._renderCabinetTemplatesSheet();
+    if (!(await window._addTemplate('cabinet', tpl))) return;
+    window._renderCabinetTemplatesSheet(true);
     if (typeof _showToast === 'function') _showToast('תבנית הארון "' + name + '" נשמרה ✓', 2800);
 };
 
-window.deleteCabinetTemplate = function(id) {
-    let list = window._loadCabinetTemplates();
-    list = list.filter(function(t) { return t.id !== id; });
-    window._saveCabinetTemplates(list);
-    window._renderCabinetTemplatesSheet();
+window.deleteCabinetTemplate = async function(id) {
+    if (!(await window._deleteTemplate('cabinet', id))) return;
+    window._renderCabinetTemplatesSheet(true);
     if (typeof _showToast === 'function') _showToast('התבנית נמחקה', 2000);
 };
 
@@ -10937,48 +11017,257 @@ window._ensureCabinetSelected = function(preferredIndex) {
     }
 };
 
+// ── Cart trash: deleted cabinets are kept for 30 days ──────────────────────
+const _CART_TRASH_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+window._cartHistoryOps = new WeakMap();
+
+window._purgeCartTrash = function() {
+    const now = Date.now();
+    state.cartTrash = (state.cartTrash || []).filter(function(e) {
+        return e && e.item && (now - (e.deletedAt || 0)) < _CART_TRASH_TTL_MS;
+    });
+    return state.cartTrash;
+};
+
+window._updateCartTrashBadge = function() {
+    const n = window._purgeCartTrash().length;
+    const badge = document.getElementById('cart-trash-count');
+    if (badge) {
+        badge.textContent = n > 0 ? String(n) : '';
+        badge.style.display = n > 0 ? '' : 'none';
+    }
+};
+
+function _addToCartTrash(item) {
+    const light = JSON.parse(JSON.stringify(item));
+    if (light.spec && typeof window._lightCartSpecForSave === 'function') {
+        light.spec = window._lightCartSpecForSave(light.spec);
+    }
+    const entry = {
+        id: 'trash_' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36),
+        deletedAt: Date.now(),
+        item: light
+    };
+    window._purgeCartTrash();
+    state.cartTrash.push(entry);
+    return entry.id;
+}
+
+function _removeFromCartTrash(id) {
+    state.cartTrash = (state.cartTrash || []).filter(function(e) { return e && e.id !== id; });
+}
+
+function _withoutHistory(fn) {
+    const prev = state.isRestoring;
+    state.isRestoring = true;
+    try { fn(); } finally { state.isRestoring = prev; }
+}
+
+function _afterCartStructureChange() {
+    if (typeof window._roomLinksLoadForHost === 'function') {
+        window._roomLinksLoadForHost(state.editingCartIndex);
+        if (typeof window._roomPlanFurnitureChanged === 'function') window._roomPlanFurnitureChanged();
+    }
+    const cc = document.getElementById('cart-count');
+    if (cc) cc.innerText = state.orderCart.length;
+    if (typeof window._syncSpacePairTabs === 'function') window._syncSpacePairTabs();
+    const om = document.getElementById('order-modal');
+    if (om && om.style.display === 'flex') openOrderModal(om.dataset.mode || 'customer');
+    window._updateCartTrashBadge();
+}
+
+function _rebindCartPartColors() {
+    if (typeof window._importLocalPartColors !== 'function') return;
+    Object.keys(state.partColors || {}).forEach(function(k) {
+        if (k.indexOf('cart') === 0) delete state.partColors[k];
+    });
+    state.orderCart.forEach(function(it, i) {
+        if (it && it.rawState && it.rawState.partColors) {
+            window._importLocalPartColors('cart' + i, it.rawState.partColors);
+        }
+    });
+}
+
+/** Removes a cart item without confirm/history. Returns info needed to undo. */
+function _removeCartItemAt(index) {
+    const item = state.orderCart[index];
+    const wasEditing = state.editingCartIndex === index;
+    const roomLinks = JSON.parse(JSON.stringify(window._roomLinks || []));
+    const pairId = window._spacePairIdOf(item);
+    state.orderCart.splice(index, 1);
+    if (pairId && typeof window._renumberSpacePairSlots === 'function') {
+        window._renumberSpacePairSlots(pairId);
+        if (typeof window._invalidateSpacePairPreviewImages === 'function') {
+            window._invalidateSpacePairPreviewImages(pairId);
+        }
+        if (typeof window._clearSpaceCompanion === 'function') window._clearSpaceCompanion();
+    }
+    if (typeof window._onCartItemDeletedForRoomProps === 'function') {
+        window._onCartItemDeletedForRoomProps(index);
+    }
+
+    let placeholder = null;
+    if (state.orderCart.length === 0) {
+        window._bootstrapDefaultCabinet();
+        placeholder = state.orderCart[0];
+    } else if (wasEditing) {
+        window.editCartItem(Math.min(index, state.orderCart.length - 1), { force: true });
+    } else {
+        if (state.editingCartIndex > index) state.editingCartIndex--;
+        updateLeftSidebar();
+    }
+    _afterCartStructureChange();
+    return {
+        item: item, index: index, wasEditing: wasEditing, roomLinks: roomLinks,
+        cartLen: state.orderCart.length, placeholder: placeholder
+    };
+}
+
+/** Inserts a (restored) cart item; roomLinks restores the exact room layout when the cart is unchanged. */
+function _insertCartItemAt(item, index, open, roomLinks, placeholder) {
+    if (typeof window._stripSpacePairFromItem === 'function') window._stripSpacePairFromItem(item);
+    if (placeholder && state.orderCart.length === 1 && state.orderCart[0] === placeholder) {
+        state.orderCart = [];
+        state.editingCartIndex = -1;
+        open = true;
+    }
+    index = Math.max(0, Math.min(index, state.orderCart.length));
+    state.orderCart.splice(index, 0, item);
+    if (typeof state.editingCartIndex === 'number' && state.editingCartIndex >= index) state.editingCartIndex++;
+    if (roomLinks) window._roomLinks = JSON.parse(JSON.stringify(roomLinks));
+    else if (typeof window._roomLinksOnCartInsert === 'function') window._roomLinksOnCartInsert(index);
+    _rebindCartPartColors();
+    if (open) window.editCartItem(index, { force: true });
+    else updateLeftSidebar();
+    _afterCartStructureChange();
+    return index;
+}
+
+window._undoCartOp = function(op) {
+    if (!op || op.type !== 'delete') return;
+    const inTrash = (state.cartTrash || []).some(function(e) { return e && e.id === op.trashId; });
+    if (!inTrash || state.orderCart.indexOf(op.item) >= 0) return;
+    _withoutHistory(function() {
+        const cartUnchanged = state.orderCart.length === op.cartLen;
+        _removeFromCartTrash(op.trashId);
+        _insertCartItemAt(op.item, op.index, op.wasEditing, cartUnchanged ? op.roomLinks : null, op.placeholder);
+        saveHistoryState();
+    });
+    if (typeof _showToast === 'function') _showToast('הארון שוחזר ✓', 2200);
+};
+
+window._redoCartOp = function(op) {
+    if (!op || op.type !== 'delete') return;
+    const idx = state.orderCart.indexOf(op.item);
+    if (idx < 0) return;
+    _withoutHistory(function() {
+        op.trashId = _addToCartTrash(op.item);
+        const info = _removeCartItemAt(idx);
+        op.index = info.index;
+        op.wasEditing = info.wasEditing;
+        op.roomLinks = info.roomLinks;
+        op.cartLen = info.cartLen;
+        op.placeholder = info.placeholder;
+        saveHistoryState();
+    });
+};
+
+function _escTrash(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+window.openCartTrash = function() {
+    const existing = document.getElementById('cart-trash-overlay');
+    if (existing) existing.remove();
+    const list = window._purgeCartTrash().slice().sort(function(a, b) { return b.deletedAt - a.deletedAt; });
+
+    const overlay = document.createElement('div');
+    overlay.id = 'cart-trash-overlay';
+    overlay.className = 'cart-trash-overlay';
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) window.closeCartTrash(); });
+
+    const rows = list.map(function(e) {
+        const spec = (e.item && e.item.spec) || {};
+        const name = spec.customName || 'ארון ללא שם';
+        const daysLeft = Math.max(1, Math.ceil((e.deletedAt + _CART_TRASH_TTL_MS - Date.now()) / 86400000));
+        const deleted = new Date(e.deletedAt).toLocaleDateString('he-IL');
+        return '<div class="cart-trash-row">' +
+                '<div class="cart-trash-icon"><i class="fa-solid fa-box-archive"></i></div>' +
+                '<div class="cart-trash-info">' +
+                    '<div class="cart-trash-name">' + _escTrash(name) + '</div>' +
+                    (spec.dimsStr ? '<div class="cart-trash-meta">' + _escTrash(spec.dimsStr) + '</div>' : '') +
+                    '<div class="cart-trash-meta">נמחק ב-' + deleted + ' · יימחק לצמיתות בעוד ' + daysLeft + ' ימים</div>' +
+                '</div>' +
+                '<button type="button" class="cart-trash-restore" data-id="' + e.id + '"><i class="fa-solid fa-rotate-left"></i> שחזר</button>' +
+                '<button type="button" class="cart-trash-purge" data-id="' + e.id + '" title="מחק לצמיתות"><i class="fa-solid fa-trash"></i></button>' +
+            '</div>';
+    }).join('');
+
+    overlay.innerHTML =
+        '<div class="cart-trash-dialog" role="dialog" aria-label="פח אשפה">' +
+            '<div class="cart-trash-header">' +
+                '<div><i class="fa-solid fa-trash-can"></i> פח אשפה</div>' +
+                '<button type="button" class="cart-trash-close" title="סגור"><i class="fa-solid fa-xmark"></i></button>' +
+            '</div>' +
+            '<div class="cart-trash-hint">ארונות שנמחקו נשמרים כאן 30 יום ואז נמחקים לצמיתות.</div>' +
+            '<div class="cart-trash-list">' +
+                (rows || '<div class="cart-trash-empty">הפח ריק</div>') +
+            '</div>' +
+        '</div>';
+
+    overlay.querySelector('.cart-trash-close').addEventListener('click', window.closeCartTrash);
+    overlay.querySelectorAll('.cart-trash-restore').forEach(function(b) {
+        b.addEventListener('click', function() { window.restoreCartTrashItem(b.dataset.id); });
+    });
+    overlay.querySelectorAll('.cart-trash-purge').forEach(function(b) {
+        b.addEventListener('click', function() { window.purgeCartTrashItem(b.dataset.id); });
+    });
+    document.body.appendChild(overlay);
+};
+
+window.closeCartTrash = function() {
+    const overlay = document.getElementById('cart-trash-overlay');
+    if (overlay) overlay.remove();
+};
+
+window.restoreCartTrashItem = function(id) {
+    const entry = (state.cartTrash || []).find(function(e) { return e && e.id === id; });
+    if (!entry) return;
+    if (state.editingCartIndex >= 0 && state.orderCart[state.editingCartIndex] &&
+        typeof window._commitCurrentCabinetToCart === 'function') {
+        window._commitCurrentCabinetToCart({ flash: false });
+    }
+    _removeFromCartTrash(id);
+    const item = JSON.parse(JSON.stringify(entry.item));
+    _withoutHistory(function() { _insertCartItemAt(item, state.orderCart.length, true, null, null); });
+    saveHistoryState('שחזור ארון מהפח');
+    window.closeCartTrash();
+    if (typeof _showToast === 'function') _showToast('הארון שוחזר לפרויקט ✓', 2500);
+};
+
+window.purgeCartTrashItem = function(id) {
+    if (!confirm('למחוק את הארון לצמיתות? לא ניתן יהיה לשחזר אותו.')) return;
+    _removeFromCartTrash(id);
+    window._updateCartTrashBadge();
+    window._isDirty = true;
+    if (typeof saveHistoryState === 'function') _withoutHistory(function() { saveHistoryState(); });
+    window.openCartTrash();
+};
+
 window.deleteCartItem = function(index) {
     // Use a toast-style inline confirm to avoid browser confirm() suppression issues
     const _doDelete = function() {
-        const wasEditing = state.editingCartIndex === index;
-        const _deletedPairId = window._spacePairIdOf(state.orderCart[index]);
-        state.orderCart.splice(index, 1);
-        if (_deletedPairId && typeof window._renumberSpacePairSlots === 'function') {
-            window._renumberSpacePairSlots(_deletedPairId);
-            if (typeof window._invalidateSpacePairPreviewImages === 'function') {
-                window._invalidateSpacePairPreviewImages(_deletedPairId);
-            }
-            if (typeof window._clearSpaceCompanion === 'function') window._clearSpaceCompanion();
+        if (!state.orderCart[index]) return;
+        const trashId = _addToCartTrash(state.orderCart[index]);
+        let info;
+        _withoutHistory(function() { info = _removeCartItemAt(index); });
+        const before = state.history[state.historyIndex];
+        saveHistoryState('מחיקת ארון');
+        const top = state.history[state.historyIndex];
+        if (top && top !== before) {
+            window._cartHistoryOps.set(top, Object.assign({ type: 'delete', trashId: trashId }, info));
         }
-        if (typeof window._onCartItemDeletedForRoomProps === 'function') {
-            window._onCartItemDeletedForRoomProps(index);
-        }
-
-        if (state.orderCart.length === 0) {
-            window._bootstrapDefaultCabinet();
-        } else if (wasEditing) {
-            const nextIdx = Math.min(index, state.orderCart.length - 1);
-            window.editCartItem(nextIdx, { force: true });
-        } else if (state.editingCartIndex > index) {
-            state.editingCartIndex--;
-            updateLeftSidebar();
-        } else {
-            updateLeftSidebar();
-        }
-
-        if (typeof window._roomLinksLoadForHost === 'function') {
-            window._roomLinksLoadForHost(state.editingCartIndex);
-            if (typeof window._roomPlanFurnitureChanged === 'function') window._roomPlanFurnitureChanged();
-        }
-
-        const cc3 = document.getElementById('cart-count');
-        if (cc3) cc3.innerText = state.orderCart.length;
-        if (typeof window._syncSpacePairTabs === 'function') window._syncSpacePairTabs();
-        if (document.getElementById('order-modal').style.display === 'flex') {
-            const currentMode = document.getElementById('order-modal').dataset.mode || 'customer';
-            openOrderModal(currentMode);
-        }
-        saveHistoryState();
+        if (typeof _showToast === 'function') _showToast('הארון הועבר לפח (ניתן לבטל עם Ctrl+Z)', 3000);
     };
 
     // Centered modal confirm with blurred backdrop (avoids browser confirm() suppression)
@@ -11227,6 +11516,7 @@ window.duplicateCartItem = function(index) {
 window.newProject = function() {
     if (!confirm('האם אתה בטוח שברצונך להתחיל פרויקט חדש?\nכל הארונות בפרויקט הנוכחי יימחקו לצמיתות.')) return;
     state.orderCart = [];
+    state.cartTrash = [];
     state.editingCartIndex = -1;
     state.cabinetName = '';
     state.manualPrice = null;
@@ -11271,6 +11561,7 @@ window.updateLeftSidebar = function(opts) {
         const n = (state.orderCart && state.orderCart.length) || 0;
         countEl.textContent = n > 0 ? '(' + n + ')' : '';
     }
+    window._updateCartTrashBadge();
 
     if (!listContainer || !totalEl) return;
     listContainer.innerHTML = '';

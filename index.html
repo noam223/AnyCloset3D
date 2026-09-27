@@ -39,7 +39,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260910deskMerge">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
     <link rel="stylesheet" href="style-extras.css?v=20260731rpcab">
-    <link rel="stylesheet" href="style.css?v=20260924cabTpl">
+    <link rel="stylesheet" href="style.css?v=20260929trash">
     <style>
         html.thumb-only-mode #left-sidebar,
         html.thumb-only-mode #right-sidebar,
@@ -993,6 +993,10 @@
             <span id="sidebar-cabinets-count" class="sidebar-cabinets-count"></span>
             <button type="button" id="btn-new-cabinet-sidebar" class="btn-new-cabinet-sidebar" onclick="startNewCabinet()" title="שמור את הארון הנוכחי והוסף ארון חדש">
                 <i class="fa-solid fa-plus"></i> ארון חדש
+            </button>
+            <button type="button" id="btn-cart-trash" class="btn-cart-trash" onclick="openCartTrash()" title="פח אשפה — ארונות שנמחקו (30 יום)">
+                <i class="fa-solid fa-trash-can"></i>
+                <span id="cart-trash-count" class="cart-trash-count" style="display:none;"></span>
             </button>
         </div>
     </div>
@@ -2266,6 +2270,10 @@
                 onclick="startNewCabinet(); closeMobilePanel();">
                 <i class="fa-solid fa-plus"></i> ארון חדש
             </button>
+            <button class="view-btn" style="justify-content:center;border:1px solid var(--border);background:white;padding:12px 14px;border-radius:10px;font-weight:600;"
+                onclick="openCartTrash(); closeMobilePanel();" title="פח אשפה">
+                <i class="fa-solid fa-trash-can"></i>
+            </button>
         </div>
         </div>
     </div>
@@ -2668,8 +2676,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js?v=20260830adminOps"></script>
-<script src="state.js?v=20260927extDrawer12"></script>
-<script src="quick-calc.js?v=20260928mdf"></script>
+<script src="state.js?v=20260929trash"></script>
+<script src="quick-calc.js?v=20260929c9"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
 <script src="engine-core.js?v=20260928roomPose"></script>
@@ -2677,11 +2685,11 @@
 <script src="engine-blueprint.js?v=20260918noPlinthFix"></script>
 <script src="engine-room-plan.js?v=20260928cabFront"></script>
 <script src="tambour-color-picker.js?v=20260617scdoors"></script>
-<script src="ui.js?v=20260928mdf"></script>
+<script src="ui.js?v=20260929trash"></script>
 <script src="mobile.js?v=20260924cellHcm1"></script>
 <script src="part-paint.js?v=20260914A427fix"></script>
 <script src="shelf-pick.js?v=20260922sideWall"></script>
-<script src="index-init.js?v=20260928roomPose"></script>
+<script src="index-init.js?v=20260929trash"></script>
 
 <!-- ===== TAMBOUR FULL PALETTE MODAL ===== -->
 <div id="tambour-palette-modal" class="tambour-palette-overlay">

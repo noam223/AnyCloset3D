@@ -238,7 +238,9 @@ function _qcWingCost(cfg, w, h, d, model, isMelamine, shelves, intDrawers, extDr
     var ex = cfg.extras || _QC_DEFAULT_PRICING.extras;
     var cost = (model === 'sliding')
         ? _qcSlidingCost(cfg, w, h)
-        : _qcBasePrice(cfg, w, h, d, isMelamine, model, typeId);
+        : (model === 'ab2_nohoney')
+            ? _qcBasePrice(cfg, w, h, d, isMelamine, 'c9', null)
+            : _qcBasePrice(cfg, w, h, d, isMelamine, model, typeId);
     if (!isMelamine && model !== 'sliding') {
         var sandwichPct = cfg.sandwichSurcharge != null ? cfg.sandwichSurcharge : 0.15;
         cost *= (1 + sandwichPct);
@@ -255,9 +257,7 @@ function _qcWingCost(cfg, w, h, d, model, isMelamine, shelves, intDrawers, extDr
     if (intDrawers > 0) cost += intDrawers * _qcNum(ex.internalDrawer, 150);
     if (extDrawers > 0) cost += extDrawers * _qcNum(ex.externalDrawer, 200);
     var openBlocks = openCells;
-    var wEffective = model;
-    if (model === 'ab2_nohoney' && openCells > 0) wEffective = 'ab2';
-    if ((model === 'ab2' || wEffective === 'ab2') && openBlocks > 0) openBlocks--;
+    if (model === 'ab2' && openBlocks > 0) openBlocks--;
     cost += openBlocks * _qcNum(ex.openCell, 400);
     return cost;
 }

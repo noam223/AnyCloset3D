@@ -321,6 +321,8 @@
                         var cc = document.getElementById('cart-count');
                         if (cc) cc.innerText = state.orderCart.length;
                     }
+                    state.cartTrash = Array.isArray(snap.cartTrash) ? snap.cartTrash : [];
+                    if (typeof window._updateCartTrashBadge === 'function') window._updateCartTrashBadge();
                     var _snapHostIdx = (typeof snap.editingCartIndex === 'number') ? snap.editingCartIndex : 0;
                     if (!window._roomLinks && typeof window._roomLinksFromLegacy === 'function') {
                         window._roomLinksFromLegacy(window._roomExtraCabinets || [], _snapHostIdx);
@@ -512,6 +514,7 @@
             activeWing:    state.activeWing,
             presetId:      state.presetId,
             orderCart:         lightCart,
+            cartTrash:         (typeof window._purgeCartTrash === 'function') ? window._purgeCartTrash() : (state.cartTrash || []),
             editingCartIndex:  (typeof state.editingCartIndex === 'number' && state.editingCartIndex >= 0) ? state.editingCartIndex : 0,
             customer:          state.customer,
             orderForm:         state.orderForm || { factory: { title: '', notes: '' }, customer: { title: '', notes: '' } },
@@ -775,6 +778,7 @@ window._saveProjectNow = async function() {
                 activeWing:    state.activeWing,
                 presetId:      state.presetId,
                 orderCart:     lightCart,
+                cartTrash:     (typeof window._purgeCartTrash === 'function') ? window._purgeCartTrash() : (state.cartTrash || []),
                 editingCartIndex: (typeof state.editingCartIndex === 'number' && state.editingCartIndex >= 0) ? state.editingCartIndex : 0,
                 customer:      state.customer,
                 orderForm:     state.orderForm || { factory: { title: '', notes: '' }, customer: { title: '', notes: '' } },
