@@ -349,10 +349,13 @@ window._getCartCabinetLabel = function(item, index) {
 };
 
 // ── Shared rooms between project items ──────────────────────────────────────
-// _roomLinks: [{ poses: { "<cartIndex>": { x, z, rotation } } }] — every member has one pose in a
-// shared frame. The open item sits at the origin of its own room, so _roomExtraCabinets is a
-// per-host view derived from its group: a room opened from A shows B, and from B shows A.
+// Room coordinates: back wall at z = 0, room centered on x = 0 (see _getRoomRect).
+// _roomLinks: [{ poses: { "<cartIndex>": { x, z, rotation } } }] — poses are room coordinates.
+// A group = items that appear together in one room; a single-member group only remembers where
+// that item stands in its own room. The open cabinet stays at the scene origin and the whole
+// room group is placed at the inverse of its pose, so every member sees the same layout.
 window._roomLinks = window._roomLinks || [];
+window._ROOM_LINKS_VERSION = 2;
 window._roomExtraHostIdx = (typeof window._roomExtraHostIdx === 'number') ? window._roomExtraHostIdx : -1;
 
 function _rlNormRot(r) {
@@ -390,11 +393,134 @@ function _rlPose(g, idx) {
 }
 function _rlCleanup() {
     window._roomLinks = (window._roomLinks || []).filter(function(g) {
-        return g && g.poses && Object.keys(g.poses).length >= 2;
+        return g && g.poses && Object.keys(g.poses).length >= 1;
     });
 }
 
-/** Derive _roomExtraCabinets (host-relative) for the open cart item. */
+// ── Room rectangle + open cabinet pose ─────────────────────────────────────
+/** Footprint of the open cabinet (incl. side / corner wings) in its own frame. */
+function _roomHostFootprint() {
+    const wings = state.wings || {};
+    const cw = wings.center ? wings.center.width : (state.width || 160);
+    const cabD = wings.center ? (wings.center.depth || 54) : (state.depth || 54);
+    function outer(side) {
+        const w = wings[side];
+        if (!w) return null;
+        const pos = w.wingPosition || 'side';
+        const edge = cw / 2;
+        let ext;
+        if (pos === 'full_corner') ext = edge + ((w.fullCorner && w.fullCorner.size) || 100);
+        else if (pos === 'side') ext = edge + (w.depth || 0);
+        else if (pos === 'front') ext = edge;
+        else return null;
+        return ext;
+    }
+    const r = outer('right'), l = outer('left');
+    return {
+        minX: l != null ? -l : -cw / 2,
+        maxX: r != null ? r : cw / 2,
+        depth: cabD,
+        hasLeft: l != null,
+        hasRight: r != null
+    };
+}
+
+/** Room rectangle in room coordinates. Independent of the left/center/right wall setting. */
+window._getRoomRect = function() {
+    const D = (window._roomDepth && window._roomDepth > 0) ? window._roomDepth : 500;
+    const H = (window._roomHeight && window._roomHeight > 0) ? window._roomHeight : (window.MAX_GLOBAL_HEIGHT || 370);
+    let W = (window._roomWidth && window._roomWidth > 0) ? window._roomWidth : 0;
+    if (!W) {
+        const fp = _roomHostFootprint();
+        const fpW = fp.maxX - fp.minX;
+        const others = window._roomExtraCabinets || [];
+        if ((state.presetId === 'walkin') && fp.hasLeft && fp.hasRight && !others.length) {
+            W = fpW;
+        } else {
+            W = Math.max(500, fpW + 100);
+            others.forEach(function(p) {
+                const item = state.orderCart && state.orderCart[p.cartIndex];
+                if (item) W = Math.max(W, window._getCartCabinetDims(item).w + 100);
+            });
+        }
+    }
+    return { leftX: -W / 2, rightX: W / 2, backZ: 0, frontZ: D, height: H };
+};
+
+/** Where the open cabinet stands in the room when it was never moved. */
+function _roomDefaultHostPose() {
+    const fp = _roomHostFootprint();
+    const rect = window._getRoomRect();
+    let x = 0;
+    const preset = state.presetId || 'linear';
+    if (preset === 'corner-right' && fp.hasRight) x = rect.rightX - fp.maxX;
+    else if (preset === 'corner-left' && fp.hasLeft) x = rect.leftX - fp.minX;
+    else if (preset === 'walkin') x = -(fp.minX + fp.maxX) / 2;
+    return { x: x, z: fp.depth / 2 + 0.5, rotation: 0 };
+}
+
+window._getRoomHostPose = function() {
+    const h = state.editingCartIndex;
+    if (typeof h === 'number' && h >= 0) {
+        const g = _rlGroupOf(h);
+        const p = g ? _rlPose(g, h) : null;
+        if (p) return p;
+    } else if (window._roomLooseHostPose) {
+        return Object.assign({}, window._roomLooseHostPose);
+    }
+    return _roomDefaultHostPose();
+};
+
+window._setRoomHostPose = function(pose) {
+    const p = { x: Number(pose.x) || 0, z: Number(pose.z) || 0, rotation: _rlNormRot(pose.rotation) };
+    // The room moves around the cabinet in the scene — re-aim the room-view camera next time
+    window._forceCameraAnim = true;
+    window._isDirty = true;
+    const h = state.editingCartIndex;
+    if (typeof h !== 'number' || h < 0) { window._roomLooseHostPose = p; return; }
+    let g = _rlGroupOf(h);
+    if (!g) { g = { poses: {} }; window._roomLinks.push(g); }
+    g.poses[String(h)] = p;
+};
+
+/** Scene (open cabinet frame) → room coordinates. */
+window._worldToRoomXZ = function(x, z) {
+    const r = _rlCompose(window._getRoomHostPose(), { x: x, z: z, rotation: 0 });
+    return { x: r.x, z: r.z };
+};
+
+/** Room → scene (open cabinet frame) coordinates. */
+window._roomToWorldXZ = function(x, z) {
+    const r = _rlCompose(_rlInverse(window._getRoomHostPose()), { x: x, z: z, rotation: 0 });
+    return { x: r.x, z: r.z };
+};
+
+/** Direction vector scene → room (rotation only). */
+window._worldToRoomDir = function(dx, dz) {
+    const th = (window._getRoomHostPose().rotation || 0) * Math.PI / 180;
+    const c = Math.cos(th), s = Math.sin(th);
+    return { x: dx * c + dz * s, z: -dx * s + dz * c };
+};
+
+/** Axis-aligned rect (scene frame, e.g. from Box3) → axis-aligned rect in room coordinates. */
+window._worldRectToRoom = function(minX, maxX, minZ, maxZ) {
+    const pts = [[minX, minZ], [maxX, minZ], [maxX, maxZ], [minX, maxZ]].map(function(p) {
+        return window._worldToRoomXZ(p[0], p[1]);
+    });
+    const xs = pts.map(function(p) { return p.x; }), zs = pts.map(function(p) { return p.z; });
+    return { minX: Math.min.apply(null, xs), maxX: Math.max.apply(null, xs), minZ: Math.min.apply(null, zs), maxZ: Math.max.apply(null, zs) };
+};
+
+/** Box of a room-group child in room coordinates (uses the group's actual placement). */
+window._roomLocalBox = function(obj) {
+    const rg = window._roomGroup;
+    if (rg) rg.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(obj);
+    if (!rg) return box;
+    return box.applyMatrix4(new THREE.Matrix4().copy(rg.matrixWorld).invert());
+};
+
+/** Extra members of the open item's room (room coordinates). */
 window._roomLinksLoadForHost = function(hostIdx) {
     const h = (typeof hostIdx === 'number') ? hostIdx : state.editingCartIndex;
     window._roomExtraHostIdx = (typeof h === 'number' && h >= 0) ? h : -1;
@@ -403,18 +529,17 @@ window._roomLinksLoadForHost = function(hostIdx) {
         window._roomExtraCabinets = [];
         return;
     }
-    const inv = _rlInverse(_rlPose(g, h));
     const cartLen = (state.orderCart || []).length;
     window._roomExtraCabinets = Object.keys(g.poses).map(Number).filter(function(i) {
         return i !== h && i >= 0 && i < cartLen;
     }).map(function(i) {
-        const rel = _rlCompose(inv, _rlPose(g, i));
-        return { id: 'room-cab-' + i, cartIndex: i, x: rel.x, z: rel.z, rotation: rel.rotation };
+        const p = _rlPose(g, i);
+        return { id: 'room-cab-' + i, cartIndex: i, x: p.x, z: p.z, rotation: p.rotation };
     });
     if (typeof _roomDbg === 'function') _roomDbg('shared room loaded for item ' + h, window._roomExtraCabinets.slice());
 };
 
-/** Write the host-relative _roomExtraCabinets back into the shared group of the open item. */
+/** Write _roomExtraCabinets back into the shared group of the open item. */
 window._roomLinksCommit = function() {
     const h = state.editingCartIndex;
     if (typeof h !== 'number' || h < 0) return;
@@ -426,37 +551,53 @@ window._roomLinksCommit = function() {
         return p && typeof p.cartIndex === 'number' && p.cartIndex >= 0 && p.cartIndex !== h;
     });
     let g = _rlGroupOf(h);
-    const hostPose = g ? _rlPose(g, h) : { x: 0, z: 0, rotation: 0 };
     const listed = {};
     props.forEach(function(p) { listed[p.cartIndex] = true; });
     if (g) {
         Object.keys(g.poses).forEach(function(k) {
             const i = Number(k);
-            if (i !== h && !listed[i]) delete g.poses[k];
+            if (i === h || listed[i]) return;
+            // Leaves this room but keeps its own spot for its own room view
+            const solo = { poses: {} };
+            solo.poses[k] = g.poses[k];
+            window._roomLinks.push(solo);
+            delete g.poses[k];
         });
     } else {
         if (!props.length) return;
         g = { poses: {} };
-        g.poses[String(h)] = hostPose;
+        g.poses[String(h)] = window._getRoomHostPose();
         window._roomLinks.push(g);
     }
     let merged = false;
     props.forEach(function(p) {
-        const world = _rlCompose(hostPose, { x: Number(p.x) || 0, z: Number(p.z) || 0, rotation: p.rotation || 0 });
         const other = _rlGroupOf(p.cartIndex);
         if (other && other !== g) {
-            // Item already shares a room with others — bring that whole room along
-            const T = _rlCompose(world, _rlInverse(_rlPose(other, p.cartIndex)));
+            // Item already shares a room with others — they join too, keeping their spots
             Object.keys(other.poses).forEach(function(k) {
-                if (!_rlHas(g, k)) g.poses[k] = _rlCompose(T, _rlPose(other, Number(k)));
+                if (!_rlHas(g, k)) {
+                    g.poses[k] = other.poses[k];
+                    if (Number(k) !== p.cartIndex) merged = true;
+                }
             });
             other.poses = {};
-            merged = true;
         }
-        g.poses[String(p.cartIndex)] = world;
+        g.poses[String(p.cartIndex)] = {
+            x: Number(p.x) || 0, z: Number(p.z) || 0, rotation: _rlNormRot(p.rotation)
+        };
     });
     _rlCleanup();
     if (merged) window._roomLinksLoadForHost(h);
+};
+
+/** Saves before room coordinates: each group was relative to the item at its origin. */
+window._roomLinksMigrateV1 = function() {
+    (window._roomLinks || []).forEach(function(g) {
+        Object.keys(g.poses || {}).forEach(function(k) {
+            const p = g.poses[k];
+            p.z = (Number(p.z) || 0) + 27.5;
+        });
+    });
 };
 
 window._roomLinksReset = function() {
@@ -537,19 +678,19 @@ window._addRoomExtraCabinetFromCart = function(cartIndex) {
 
     const item = cart[cartIndex];
     const dims = window._getCartCabinetDims(item);
-    const b = window._roomBounds;
-    let cx = b ? (b.leftX + b.rightX) / 2 : 250;
-    let cz = b ? (b.backZ + b.frontZ) * 0.55 : 280;
-    if (b) {
-        cx = Math.max(b.leftX + dims.w / 2, Math.min(b.rightX - dims.w / 2, cx));
-        cz = Math.max(b.backZ + dims.d / 2, Math.min(b.frontZ - dims.d / 2, cz));
-    }
+    const b = window._getRoomRect();
+    const ownGroup = _rlGroupOf(cartIndex);
+    const ownPose = ownGroup ? _rlPose(ownGroup, cartIndex) : null;
+    let cx = (b.leftX + b.rightX) / 2;
+    let cz = (b.backZ + b.frontZ) * 0.55;
+    cx = Math.max(b.leftX + dims.w / 2, Math.min(b.rightX - dims.w / 2, cx));
+    cz = Math.max(b.backZ + dims.d / 2, Math.min(b.frontZ - dims.d / 2, cz));
     const prop = {
         id: 'room-cab-' + cartIndex,
         cartIndex: cartIndex,
-        x: cx,
-        z: cz,
-        rotation: 0
+        x: ownPose ? ownPose.x : cx,
+        z: ownPose ? ownPose.z : cz,
+        rotation: ownPose ? ownPose.rotation : 0
     };
     window._roomExtraCabinets.push(prop);
     window._roomLinksCommit();
@@ -585,6 +726,64 @@ window._rotateRoomExtraCabinet = function(id) {
     } else if (typeof _buildRoom === 'function') {
         _buildRoom();
     }
+};
+
+/** Room-space AABB of the open cabinet if it stood at `pose` (defaults to its current pose). */
+window._roomHostRectAt = function(pose) {
+    pose = pose || window._getRoomHostPose();
+    let minX, maxX, minZ, maxZ;
+    if (typeof cabinetGroup !== 'undefined' && cabinetGroup && cabinetGroup.children.length) {
+        cabinetGroup.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(cabinetGroup);
+        minX = box.min.x; maxX = box.max.x; minZ = box.min.z; maxZ = box.max.z;
+    } else {
+        const fp = _roomHostFootprint();
+        minX = fp.minX; maxX = fp.maxX; minZ = -fp.depth / 2; maxZ = fp.depth / 2;
+    }
+    const pts = [[minX, minZ], [maxX, minZ], [maxX, maxZ], [minX, maxZ]].map(function(p) {
+        return _rlCompose(pose, { x: p[0], z: p[1], rotation: 0 });
+    });
+    const xs = pts.map(function(p) { return p.x; }), zs = pts.map(function(p) { return p.z; });
+    return { minX: Math.min.apply(null, xs), maxX: Math.max.apply(null, xs), minZ: Math.min.apply(null, zs), maxZ: Math.max.apply(null, zs) };
+};
+
+const _ROOM_HOST_WALL_MAGNET = 15;
+
+/** Keep the open cabinet inside the room; edges close to a wall snap flush to it. */
+window._clampRoomHostPose = function(pose) {
+    const b = window._getRoomRect();
+    const r = window._roomHostRectAt(pose);
+    const out = { x: pose.x, z: pose.z, rotation: _rlNormRot(pose.rotation) };
+    function axis(lo, hi, min, max) {
+        if (hi - lo >= max - min) return (min + max) / 2 - (lo + hi) / 2;
+        if (lo < min) return min - lo;
+        if (hi > max) return max - hi;
+        if (lo - min < _ROOM_HOST_WALL_MAGNET) return min - lo;
+        if (max - hi < _ROOM_HOST_WALL_MAGNET) return max - hi;
+        return 0;
+    }
+    out.x += axis(r.minX, r.maxX, b.leftX, b.rightX);
+    out.z += axis(r.minZ, r.maxZ, b.backZ + 0.5, b.frontZ);
+    return out;
+};
+
+window._moveRoomHost = function(x, z) {
+    const cur = window._getRoomHostPose();
+    window._setRoomHostPose(window._clampRoomHostPose({ x: x, z: z, rotation: cur.rotation }));
+};
+
+window._rotateRoomHost = function() {
+    const cur = window._getRoomHostPose();
+    const before = window._roomHostRectAt(cur);
+    const cx = (before.minX + before.maxX) / 2, cz = (before.minZ + before.maxZ) / 2;
+    const next = { x: cur.x, z: cur.z, rotation: (cur.rotation + 90) % 360 };
+    const after = window._roomHostRectAt(next);
+    // Rotate around the footprint center, not the cabinet origin
+    next.x += cx - (after.minX + after.maxX) / 2;
+    next.z += cz - (after.minZ + after.maxZ) / 2;
+    window._setRoomHostPose(window._clampRoomHostPose(next));
+    if (typeof window._roomPlanFurnitureChanged === 'function') window._roomPlanFurnitureChanged();
+    else if (typeof _buildRoom === 'function') _buildRoom();
 };
 
 window._rebuildRoomExtraCabinets = function(rg) {
@@ -1341,11 +1540,8 @@ function _getLaptopPos() {
     const cabOffX = cabinetGroup.position.x || 0;
     const laptopZ = 0;
 
-    const _clampX = (x) => {
-        const b = window._roomBounds;
-        if (!b) return x;
-        return Math.max(b.leftX + 20, Math.min(b.rightX - 20, x));
-    };
+    // Desk-relative (cabinet frame); room walls are in room coordinates, so no wall clamp here
+    const _clampX = (x) => x;
 
     const wing = state.wings && state.wings.center;
 
@@ -1415,11 +1611,8 @@ function _getChairPos() {
     const chairZ = isStool ? cabD / 2 : cabD / 2 + 33;
     const deskFrontZ = cabD / 2;
 
-    const _clampX = (x) => {
-        const b = window._roomBounds;
-        if (!b) return x;
-        return Math.max(b.leftX + 40, Math.min(b.rightX - 40, x));
-    };
+    // Desk-relative (cabinet frame); room walls are in room coordinates, so no wall clamp here
+    const _clampX = (x) => x;
 
     // 1. Side desk (wing.desk.side !== 'none')
     const wing = state.wings && state.wings.center;
@@ -1536,7 +1729,7 @@ function _snapBedNearWalls(bed, bp) {
 
 window._getBedClampHalfExtents = function() {
     if (window._bedMesh) {
-        const box = new THREE.Box3().setFromObject(window._bedMesh);
+        const box = window._roomLocalBox(window._bedMesh);
         return {
             halfX: (box.max.x - box.min.x) / 2,
             halfZ: (box.max.z - box.min.z) / 2
@@ -1730,111 +1923,23 @@ function _buildRoom() {
     rg.visible = true;
     _roomDbg('build');
 
-    const roomD = (window._roomDepth  && window._roomDepth  > 0) ? window._roomDepth  : 500;
-    const roomH = (window._roomHeight && window._roomHeight > 0) ? window._roomHeight : (window.MAX_GLOBAL_HEIGHT || 370);
     const wallT = 1;     // wall thickness (thin plane)
 
-    // Cabinet dimensions
-    const cw = state.wings && state.wings.center ? state.wings.center.width : (state.width || 160);
-    const cabD = state.wings && state.wings.center ? (state.wings.center.depth || 54) : 54;
-
-    // Room wall position (only for linear/sliding presets)
-    const _preset = state.presetId || 'linear';
-    const _isLinearOrSliding = (_preset === 'linear' || _preset === 'sliding');
-    const _roomWall = _isLinearOrSliding ? (window._roomWall || state.roomWall || 'center') : 'center';
-
-    const centerEdgeL = -cw / 2;  // left edge X of center cabinet
-    const centerEdgeR =  cw / 2;  // right edge X of center cabinet
-
-    // Side wing depths (used as the perpendicular dimension when wing is rotated 90°)
-    const leftWingD  = (state.wings && state.wings.left  && state.wings.left.depth)  ? state.wings.left.depth  : 0;
-    const rightWingD = (state.wings && state.wings.right && state.wings.right.depth) ? state.wings.right.depth : 0;
-    const leftWingPos  = (state.wings && state.wings.left)  ? (state.wings.left.wingPosition  || 'side') : null;
-    const rightWingPos = (state.wings && state.wings.right) ? (state.wings.right.wingPosition || 'side') : null;
-
-    // Full-corner unit sizes (when wingPosition === 'full_corner')
-    const leftFcSize  = (state.wings && state.wings.left  && state.wings.left.fullCorner)  ? (state.wings.left.fullCorner.size  || 100) : 0;
-    const rightFcSize = (state.wings && state.wings.right && state.wings.right.fullCorner) ? (state.wings.right.fullCorner.size || 100) : 0;
-
-    const preset = state.presetId || 'linear';
-    const SIDE_MARGIN = 50; // free-side margin in cm
-    const MIN_ROOM = 500;
-
-    // ── Determine left/right wall X positions ──────────────────────────────
-    // For corner/walkin: the wall on the wing side snaps to the wing's outer back face.
-    // 'side' wing: outer back face = centerEdge ± wingDepth
-    // 'full_corner' wing: outer back face = centerEdge ± fullCornerSize
-    // For the free side (no wing): add SIDE_MARGIN.
-    let leftWallX, rightWallX;
-
-    // A wing "snaps" to the wall when it's in 'side', 'full_corner', or 'front' position
-    // 'front' wings sit in front of the center cabinet (no side extension), so their outer X = center edge
-    const hasLeftWing  = state.wings && state.wings.left  && (leftWingPos  === 'side' || leftWingPos  === 'full_corner' || leftWingPos  === 'front');
-    const hasRightWing = state.wings && state.wings.right && (rightWingPos === 'side' || rightWingPos === 'full_corner' || rightWingPos === 'front');
-
-    // Outer back face X of each wing (the face that touches the side wall)
-    // For 'front' wings: no side extension — outer X = center cabinet edge
-    const rightWingOuterX = hasRightWing
-        ? (rightWingPos === 'full_corner' ? centerEdgeR + rightFcSize : rightWingPos === 'front' ? centerEdgeR : centerEdgeR + rightWingD)
-        : null;
-    const leftWingOuterX = hasLeftWing
-        ? (leftWingPos === 'full_corner' ? -(Math.abs(centerEdgeL) + leftFcSize) : leftWingPos === 'front' ? centerEdgeL : -(Math.abs(centerEdgeL) + leftWingD))
-        : null;
-
-    if (preset === 'corner-right' && hasRightWing) {
-        // Right wall snaps to right wing outer back face
-        rightWallX = rightWingOuterX;
-        leftWallX  = Math.min(centerEdgeL - SIDE_MARGIN, -MIN_ROOM / 2);
-    } else if (preset === 'corner-left' && hasLeftWing) {
-        // Left wall snaps to left wing outer back face
-        leftWallX  = leftWingOuterX;
-        rightWallX = Math.max(centerEdgeR + SIDE_MARGIN, MIN_ROOM / 2);
-    } else if (preset === 'walkin') {
-        // Both walls snap to their respective wing outer back faces
-        rightWallX = hasRightWing ? rightWingOuterX : Math.max(centerEdgeR + SIDE_MARGIN, MIN_ROOM / 2);
-        leftWallX  = hasLeftWing  ? leftWingOuterX  : Math.min(centerEdgeL - SIDE_MARGIN, -MIN_ROOM / 2);
-    } else {
-        // Linear / sliding: room size depends on wall-snap mode and custom room width
-        const totalCabW = cw + leftWingD + rightWingD;
-        // Custom room width overrides auto-calculation (when set by user)
-        const _customRoomW = (window._roomWidth && window._roomWidth > 0) ? window._roomWidth : 0;
-        // Closure panel widths (for wall offset when closure panels are active)
-        const _closureOn = (window._closureEnabled !== false);
-        const _clW  = (_roomWall !== 'center' && _closureOn) ? Math.max(1.8, parseFloat(window._closureWidth)      || 1.8) : 0;
-        const _clWR = (_roomWall !== 'center' && _closureOn) ? Math.max(1.8, parseFloat(window._closureWidthRight) || 1.8) : 0;
-        if (_roomWall === 'left') {
-            // Left wall is at outer edge of left closure panel
-            leftWallX  = -cw / 2 - _clW;
-            rightWallX = _customRoomW > 0
-                ? (leftWallX + _customRoomW)
-                : Math.max(cw / 2 + SIDE_MARGIN * 2, MIN_ROOM / 2);
-        } else if (_roomWall === 'right') {
-            // Right wall is at outer edge of right closure panel
-            rightWallX = cw / 2 + _clWR;
-            leftWallX  = _customRoomW > 0
-                ? (rightWallX - _customRoomW)
-                : Math.min(-cw / 2 - SIDE_MARGIN * 2, -MIN_ROOM / 2);
-        } else if (_roomWall === 'both') {
-            // Both walls snap to outer edges of closure panels
-            leftWallX  = -cw / 2 - _clW;
-            rightWallX =  cw / 2 + _clWR;
-        } else {
-            // Center: use custom width if set, else auto
-            const halfRoom = _customRoomW > 0
-                ? _customRoomW / 2
-                : Math.max(MIN_ROOM, totalCabW + 100) / 2;
-            leftWallX  = -halfRoom;
-            rightWallX =  halfRoom;
-        }
-    }
-
+    // Room rectangle in room coordinates (back wall at z = 0). The open cabinet stays at the scene
+    // origin; the room group is placed at the inverse of the cabinet's room pose at the end.
+    rg.position.set(0, 0, 0);
+    rg.rotation.set(0, 0, 0);
+    rg.updateMatrixWorld(true);
+    const _rect = window._getRoomRect();
+    const _hostPose = window._getRoomHostPose();
+    const roomD = _rect.frontZ - _rect.backZ;
+    const roomH = _rect.height;
+    const leftWallX = _rect.leftX;
+    const rightWallX = _rect.rightX;
     const roomW = rightWallX - leftWallX;
     const roomCenterX = (leftWallX + rightWallX) / 2;
+    const backZ = _rect.backZ;
 
-    // Back wall sits just behind the cabinet back face.
-    const backZ = -(cabD / 2) - wallT / 2;
-
-    // Expose room bounds for bed collision clamping (in world-space cm)
     window._roomBounds = {
         leftX:  leftWallX,
         rightX: rightWallX,
@@ -1992,6 +2097,13 @@ function _buildRoom() {
         _snapBedNearWalls(bed, bp);
     }
 
+    // Desk accessories follow the open cabinet: this frame sits at its room pose
+    const hostFrame = new THREE.Group();
+    hostFrame.name = 'roomHostFrame';
+    hostFrame.position.set(_hostPose.x, 0, _hostPose.z);
+    hostFrame.rotation.y = (_hostPose.rotation || 0) * Math.PI / 180;
+    rg.add(hostFrame);
+
     // ── Office Chair model ────────────────────────────────────────────────────
     window._chairMesh = null;
     const chairModel = _getActiveChairModel();
@@ -2022,7 +2134,8 @@ function _buildRoom() {
                 if (child.isMesh) child.userData.roomProp = 'chair';
             });
             chair.userData.roomProp = 'chair';
-            rg.add(chair);
+            // Chair dragged in the 2D plan is in room coordinates; the automatic spot is desk-relative
+            (window._chairPosOverride ? rg : hostFrame).add(chair);
             window._chairMesh = chair;
         }
     }
@@ -2057,7 +2170,7 @@ function _buildRoom() {
             );
             // Step 2: add to scene, re-measure in world space, snap bottom exactly to lp.y
             // (handles GLB built-in Y offsets that cause floating)
-            rg.add(laptop);
+            hostFrame.add(laptop);
             laptop.updateMatrixWorld(true);
             const lbox2 = new THREE.Box3().setFromObject(laptop);
             laptop.position.y += lp.y - lbox2.min.y;
@@ -2111,6 +2224,13 @@ function _buildRoom() {
 
     // ── Extra project cabinets as room props ─────────────────────────────────
     window._rebuildRoomExtraCabinets(rg);
+
+    // Place the whole room around the open cabinet (inverse of its room pose)
+    const _invTh = -(_hostPose.rotation || 0) * Math.PI / 180;
+    const _ic = Math.cos(_invTh), _is = Math.sin(_invTh);
+    rg.rotation.y = _invTh;
+    rg.position.set(-(_hostPose.x * _ic + _hostPose.z * _is), 0, -(-_hostPose.x * _is + _hostPose.z * _ic));
+    rg.updateMatrixWorld(true);
 
     // Notify UI to reposition bed handles
     if (typeof window._updateBedHandles === 'function') window._updateBedHandles();
@@ -2405,8 +2525,14 @@ function updateCameraView() {
             if (rb && !window._camAnim && (window._forceCameraAnim || !window._roomPlan3dCamSet)) {
                 window._forceCameraAnim = false;
                 window._roomPlan3dCamSet = true;
-                const cx = (rb.leftX + rb.rightX) / 2;
-                const cz = (rb.backZ + rb.frontZ) / 2;
+                // Room bounds are room coordinates; the camera works in the scene (open cabinet) frame.
+                // The small offset toward the room front keeps the back wall at the top, like the 2D plan.
+                const rcx = (rb.leftX + rb.rightX) / 2;
+                const rcz = (rb.backZ + rb.frontZ) / 2;
+                const c0 = window._roomToWorldXZ(rcx, rcz);
+                const c1 = window._roomToWorldXZ(rcx, rcz + 0.01);
+                const cx = c0.x;
+                const cz = c0.z;
                 const span = Math.max(rb.rightX - rb.leftX, rb.frontZ - rb.backZ);
                 const dist = span * 1.15;
                 const oldPos = camera.position.clone();
@@ -2416,7 +2542,7 @@ function updateCameraView() {
                 window._camAnim = {
                     fromPos: oldPos,
                     fromTarget: oldTarget,
-                    toPos: new THREE.Vector3(cx, dist, cz + 0.01),
+                    toPos: new THREE.Vector3(c1.x, dist, c1.z),
                     toTarget: new THREE.Vector3(cx, 0, cz),
                     t: 0,
                     duration: 0.5,

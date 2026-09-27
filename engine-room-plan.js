@@ -11,49 +11,17 @@
     window._roomPlanPending3D = false;
     window._chairPosOverride = window._chairPosOverride || null;
     window._roomPlanRenderQueued = false;
-    window._roomPlanCabDragPreviewX = 0;
-    window._roomPlanCabSnapTarget = null;
 
-    const CAB_SNAP_MAGNET_CM = 40;
-
-    function _canDragCabinet() {
-        const preset = (typeof state !== 'undefined' && state.presetId) ? state.presetId : 'linear';
-        return preset === 'linear' || preset === 'sliding';
+    /** Scene-frame AABB → room coordinates (identity if the room helpers are missing). */
+    function _toRoomRect(minX, maxX, minZ, maxZ) {
+        if (typeof window._worldRectToRoom === 'function') return window._worldRectToRoom(minX, maxX, minZ, maxZ);
+        return { minX: minX, maxX: maxX, minZ: minZ, maxZ: maxZ };
     }
 
-    function _getCabinetSnapTargets(bounds, cabW) {
-        if (!bounds || !(cabW > 0)) return null;
-        const leftFlush = bounds.leftX + cabW / 2;
-        const rightFlush = bounds.rightX - cabW / 2;
-        const centerX = (bounds.leftX + bounds.rightX) / 2;
-        if (rightFlush < leftFlush + 0.5) {
-            return [{ wall: 'center', x: centerX }];
-        }
-        return [
-            { wall: 'left', x: leftFlush },
-            { wall: 'center', x: centerX },
-            { wall: 'right', x: rightFlush }
-        ];
-    }
-
-    function _resolveCabinetSnap(cx, bounds, cabW) {
-        const targets = _getCabinetSnapTargets(bounds, cabW);
-        if (!targets || !targets.length) return null;
-        if (targets.length === 1) return { wall: targets[0].wall, x: targets[0].x, followX: targets[0].x };
-
-        const leftFlush = targets[0].x;
-        const rightFlush = targets[2].x;
-        const roomW = bounds.rightX - bounds.leftX;
-        const t = roomW > 0.1 ? (cx - bounds.leftX) / roomW : 0.5;
-        let wall;
-        if (t < 1 / 3) wall = 'left';
-        else if (t > 2 / 3) wall = 'right';
-        else wall = 'center';
-
-        const snap = targets.find(function(tg) { return tg.wall === wall; }) || targets[1];
-        const followX = Math.max(leftFlush, Math.min(rightFlush, cx));
-        const magnet = Math.abs(followX - snap.x) <= CAB_SNAP_MAGNET_CM;
-        return { wall: snap.wall, x: magnet ? snap.x : followX, followX: followX, snapped: magnet };
+    function _meshRoomBox(obj) {
+        if (typeof window._roomLocalBox === 'function') return window._roomLocalBox(obj);
+        obj.updateMatrixWorld(true);
+        return new THREE.Box3().setFromObject(obj);
     }
 
     function _is2dPlan() {
@@ -254,15 +222,13 @@
     }
 
     function _getCabinetRect() {
-        if (typeof cabinetGroup === 'undefined' || !cabinetGroup) return null;
-        cabinetGroup.updateMatrixWorld(true);
-        const box = new THREE.Box3().setFromObject(cabinetGroup);
-        const previewX = window._roomPlanCabDragPreviewX || 0;
+        if (typeof window._roomHostRectAt !== 'function') return null;
+        const r = window._roomHostRectAt();
         return {
             id: 'cabinet',
-            minX: box.min.x + previewX, maxX: box.max.x + previewX,
-            minZ: box.min.z, maxZ: box.max.z,
-            draggable: _canDragCabinet(),
+            minX: r.minX, maxX: r.maxX,
+            minZ: r.minZ, maxZ: r.maxZ,
+            draggable: true,
             label: FURN_COLORS.cabinet.label
         };
     }
@@ -271,8 +237,7 @@
         if (window._bedVisible === false) return null;
         const usePos = _is2dPlan() || window._roomPlanDrag;
         if (!usePos && window._bedMesh) {
-            window._bedMesh.updateMatrixWorld(true);
-            const box = new THREE.Box3().setFromObject(window._bedMesh);
+            const box = _meshRoomBox(window._bedMesh);
             return {
                 id: 'bed',
                 minX: box.min.x, maxX: box.max.x,
@@ -304,13 +269,19 @@
     function _getChairRect() {
         if (window._chairVisible === false) return null;
         let cp = window._chairPosOverride;
-        if (!cp && typeof _getChairPos === 'function') cp = _getChairPos();
+        if (!cp && typeof _getChairPos === 'function') {
+            // Automatic spot is desk-relative (scene frame) → room coordinates
+            const auto = _getChairPos();
+            if (auto) {
+                const rp = typeof window._worldToRoomXZ === 'function' ? window._worldToRoomXZ(auto.x, auto.z) : auto;
+                cp = { x: rp.x, z: rp.z };
+            }
+        }
         if (!cp) return null;
 
         const usePos = _is2dPlan() || window._roomPlanDrag;
         if (!usePos && window._chairMesh) {
-            window._chairMesh.updateMatrixWorld(true);
-            const box = new THREE.Box3().setFromObject(window._chairMesh);
+            const box = _meshRoomBox(window._chairMesh);
             return {
                 id: 'chair',
                 minX: box.min.x, maxX: box.max.x,
@@ -341,7 +312,7 @@
             const dSide = wing.desk.side;
             const minX = dSide === 'right' ? cabOffX + cabW / 2 : cabOffX - cabW / 2 - dW;
             const maxX = dSide === 'right' ? cabOffX + cabW / 2 + dW : cabOffX - cabW / 2;
-            return _makeFurnItem('cabinet-desk', { minX, maxX, minZ: -cabD / 2, maxZ: cabD / 2 + 20 }, false);
+            return _makeFurnItem('cabinet-desk', _toRoomRect(minX, maxX, -cabD / 2, cabD / 2 + 20), false);
         }
 
         const cols = wing.columns || [];
@@ -349,10 +320,7 @@
         for (let i = 0; i < cols.length; i++) {
             const col = cols[i];
             if (col.type === 'desk') {
-                return _makeFurnItem('cabinet-desk', {
-                    minX: curX, maxX: curX + col.width,
-                    minZ: -cabD / 2, maxZ: cabD / 2 + 20
-                }, false);
+                return _makeFurnItem('cabinet-desk', _toRoomRect(curX, curX + col.width, -cabD / 2, cabD / 2 + 20), false);
             }
             curX += col.width;
         }
@@ -644,22 +612,25 @@
     function _applyFurnitureMove(id, cx, cz) {
         if (id === 'cabinet') {
             const d = window._roomPlanDrag;
-            if (!d || !d.bounds || !(d.cabW > 0)) return;
-            const resolved = _resolveCabinetSnap(cx, d.bounds, d.cabW);
-            if (!resolved) return;
-            window._roomPlanCabSnapTarget = resolved.wall;
-            window._roomPlanCabDragPreviewX = resolved.x - d.restCx;
-            return; // wall mode applied on pointerup — no 3D sync while dragging
+            if (!d || !d.startPose || typeof window._moveRoomHost !== 'function') return;
+            window._moveRoomHost(d.startPose.x + (cx - d.startCx), d.startPose.z + (cz - d.startCz));
+            window._roomPlanPending3D = true;
+            return;
         }
         if (id === 'bed') {
             window._bedPos = _clampBedCenter(cx, cz);
         } else if (id === 'chair') {
             const cp = _clampChairCenter(cx, cz);
-            const prev = window._chairPosOverride || (typeof _getChairPos === 'function' ? _getChairPos() : {}) || {};
-            window._chairPosOverride = {
-                x: cp.x, z: cp.z,
-                rotY: prev.rotY !== undefined ? prev.rotY : -Math.PI / 2
-            };
+            let rotY;
+            if (window._chairPosOverride && window._chairPosOverride.rotY !== undefined) {
+                rotY = window._chairPosOverride.rotY;
+            } else {
+                // Automatic chair faces the desk in the cabinet frame; the override lives in room coordinates
+                const auto = (typeof _getChairPos === 'function' ? _getChairPos() : null) || {};
+                const hostRot = typeof window._getRoomHostPose === 'function' ? (window._getRoomHostPose().rotation || 0) : 0;
+                rotY = (auto.rotY !== undefined ? auto.rotY : -Math.PI / 2) + hostRot * Math.PI / 180;
+            }
+            window._chairPosOverride = { x: cp.x, z: cp.z, rotY: rotY };
         } else if (id === 'nightstand') {
             const np = _clampFurnCenter(cx, cz, (window._NIGHTSTAND_W || 50) / 2, (window._NIGHTSTAND_D || 40) / 2);
             window._nightstandPos = np;
@@ -701,17 +672,6 @@
             }
         }
         window._roomPlanPending3D = true;
-    }
-
-    function _finishCabinetWallSnap() {
-        const wall = window._roomPlanCabSnapTarget;
-        window._roomPlanCabDragPreviewX = 0;
-        window._roomPlanCabSnapTarget = null;
-        if (!wall || typeof window._setRoomWall !== 'function') return;
-        const cur = window._roomWall || state.roomWall || 'center';
-        if (wall !== cur) {
-            window._setRoomWall(wall);
-        }
     }
 
     // ── SVG dimension helpers ───────────────────────────────────────────────
@@ -815,6 +775,23 @@
         }
         _addBtn(rotateX, 'rotate-room-cab', 'סובב 90°', 'fa-rotate-right', '');
         _addBtn(removeX, 'remove-room-cab', 'הסר מהחדר', 'fa-xmark', 'rp-room-cab-btn-remove');
+    }
+
+    function _drawRoomHostBtns(parentG, fx, fy, fw, fh) {
+        if (fw < 26 || fh < 26) return;
+        const btnSize = 22;
+        const fo = _svgEl('foreignObject', {
+            x: fx + fw - btnSize - 4, y: fy + 4, width: btnSize, height: btnSize,
+            class: 'rp-room-cab-btn-fo'
+        });
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'rp-room-cab-btn';
+        btn.title = 'סובב 90°';
+        btn.setAttribute('data-rp-action', 'rotate-room-host');
+        btn.innerHTML = '<i class="fa-solid fa-rotate-right"></i>';
+        fo.appendChild(btn);
+        parentG.appendChild(fo);
     }
 
     function _drawDimH(g, x1, x2, y, label, above) {
@@ -1024,6 +1001,9 @@
                 if (item.isRoomExtraCab || _isRoomExtraCabId(item.id)) {
                     _drawRoomExtraCabBtns(g, item, fx, fy, fw, fh);
                 }
+                if (item.id === 'cabinet') {
+                    _drawRoomHostBtns(g, fx, fy, fw, fh);
+                }
             }
 
             if (item.draggable) {
@@ -1033,46 +1013,13 @@
         });
         svg.appendChild(furnG);
 
-        // Snap guides while dragging the cabinet (left / center / right)
-        if (dragId === 'cabinet' && window._roomPlanDrag && window._roomPlanDrag.bounds) {
-            const snapBounds = window._roomPlanDrag.bounds;
-            const cabW = window._roomPlanDrag.cabW || 160;
-            const targets = _getCabinetSnapTargets(snapBounds, cabW) || [];
-            const activeWall = window._roomPlanCabSnapTarget;
-            const guideG = _svgEl('g', { class: 'rp-cab-snap-guides' });
-            const labelMap = { left: 'צמוד שמאל', center: 'מרכז', right: 'צמוד ימין' };
-            targets.forEach(function(tg) {
-                const top = _w2s(tg.x, snapBounds.backZ, tf);
-                const bot = _w2s(tg.x, snapBounds.frontZ, tf);
-                const isActiveSnap = tg.wall === activeWall;
-                guideG.appendChild(_svgEl('line', {
-                    x1: top.x, y1: top.y, x2: bot.x, y2: bot.y,
-                    stroke: isActiveSnap ? '#10b981' : '#94a3b8',
-                    'stroke-width': isActiveSnap ? '2' : '1',
-                    'stroke-dasharray': isActiveSnap ? '0' : '5 4',
-                    opacity: isActiveSnap ? '0.95' : '0.45'
-                }));
-                if (isActiveSnap) {
-                    guideG.appendChild(_svgEl('text', {
-                        x: top.x, y: top.y - 8,
-                        class: 'rp-cab-snap-label',
-                        'text-anchor': 'middle',
-                        fill: '#059669',
-                        'font-size': '11',
-                        'font-weight': '700'
-                    }, labelMap[tg.wall] || tg.wall));
-                }
-            });
-            svg.appendChild(guideG);
-        }
-
         const itemDimsG = _svgEl('g', { class: 'rp-item-dims' });
         items.forEach(function(item) {
             if (item.isWallOpening) {
                 if (item.id === dragId || item.isRoomWindow) _drawOpeningWallDims(itemDimsG, item, tf, b);
                 return;
             }
-            if (item.id === 'cabinet' || item.id === 'cabinet-desk') return;
+            if (item.id === 'cabinet-desk') return;
             _drawItemWallDims(itemDimsG, item, tf, b, item.id === dragId);
         });
         svg.appendChild(itemDimsG);
@@ -1443,6 +1390,8 @@
                     if (cabId && typeof window._removeRoomExtraCabinet === 'function') {
                         window._removeRoomExtraCabinet(cabId);
                     }
+                } else if (action === 'rotate-room-host' && typeof window._rotateRoomHost === 'function') {
+                    window._rotateRoomHost();
                 } else if (action === 'door-hinge' && typeof window._toggleRoomDoorHinge === 'function') {
                     window._toggleRoomDoorHinge();
                 } else if (action === 'door-swing' && typeof window._toggleRoomDoorSwing === 'function') {
@@ -1472,18 +1421,8 @@
                 pointerId: e.pointerId
             };
             if (hit.id === 'cabinet') {
-                const b = _getBounds();
-                if (!b || !_canDragCabinet()) return;
-                const previewX = window._roomPlanCabDragPreviewX || 0;
-                drag.restCx = center.x - previewX;
-                drag.cabW = hit.maxX - hit.minX;
-                drag.bounds = {
-                    leftX: b.leftX, rightX: b.rightX,
-                    backZ: b.backZ, frontZ: b.frontZ
-                };
-                window._roomPlanCabDragPreviewX = 0;
-                window._roomPlanCabSnapTarget = window._roomWall || state.roomWall || 'center';
-                drag.startCx = drag.restCx;
+                if (typeof window._getRoomHostPose !== 'function') return;
+                drag.startPose = window._getRoomHostPose();
             }
             window._roomPlanDrag = drag;
             svg.setPointerCapture(e.pointerId);
@@ -1501,12 +1440,7 @@
             const sy = e.clientY - rect.top;
             const dx = (sx - d.startX) / tf.scale;
             const dz = (sy - d.startY) / tf.scale;
-            // Cabinet snaps only on X (stays against the back wall)
-            if (d.id === 'cabinet') {
-                _applyFurnitureMove(d.id, d.startCx + dx, d.startCz);
-            } else {
-                _applyFurnitureMove(d.id, d.startCx + dx, d.startCz + dz);
-            }
+            _applyFurnitureMove(d.id, d.startCx + dx, d.startCz + dz);
             _queueRoomPlanRender();
         });
 
@@ -1514,13 +1448,9 @@
             const d = window._roomPlanDrag;
             if (!d) return;
             if (e && d.pointerId !== e.pointerId) return;
-            const wasCabinet = d.id === 'cabinet';
             const wasDoor = d.id === 'room-door' || _isRoomWindowId(d.id);
             window._roomPlanDrag = null;
             document.body.classList.remove('room-plan-dragging');
-            if (wasCabinet) {
-                _finishCabinetWallSnap();
-            }
             if (wasDoor && window._roomPlanPending3D && typeof window._syncRoomPlanTo3D === 'function') {
                 window._syncRoomPlanTo3D();
             }

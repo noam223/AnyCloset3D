@@ -326,6 +326,9 @@
                         window._roomLinksFromLegacy(window._roomExtraCabinets || [], _snapHostIdx);
                     }
                     if (!window._roomLinks) window._roomLinks = [];
+                    if (snap.roomLinksV !== 2 && typeof window._roomLinksMigrateV1 === 'function') {
+                        window._roomLinksMigrateV1();
+                    }
                     window._roomExtraHostIdx = -1;
                     if (snap.customer) {
                         state.customer = snap.customer;
@@ -523,8 +526,9 @@
             roomWindows: (window._roomWindows || []).map(function(w) {
                 return { id: w.id, wall: w.wall, t: w.t, width: w.width, height: w.height, sill: w.sill };
             }),
+            roomLinksV: 2,
             roomLinks: (window._roomLinks || []).filter(function(g) {
-                return g && g.poses && Object.keys(g.poses).length >= 2;
+                return g && g.poses && Object.keys(g.poses).length >= 1;
             }).map(function(g) {
                 var poses = {};
                 Object.keys(g.poses).forEach(function(k) {

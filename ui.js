@@ -6618,7 +6618,12 @@ function _clampBedPos(bp) {
 function _projectBedCenter() {
     const bp = window._bedPos || { x: 100, z: 200 };
     const bedY = 50;
+    // _bedPos is in room coordinates; the room group is placed around the open cabinet
     const worldPt = new THREE.Vector3(bp.x, bedY, bp.z);
+    if (window._roomGroup) {
+        window._roomGroup.updateMatrixWorld(true);
+        worldPt.applyMatrix4(window._roomGroup.matrixWorld);
+    }
     const pos = worldPt.project(camera);
     if (pos.z > 1) return null; // behind camera
     const cw = container.clientWidth;
@@ -6729,7 +6734,9 @@ window._updateBedHandles = function() {
             axis,
             startMouseX: e.clientX,
             startMouseY: e.clientY,
-            startVal: axis === 'x' ? bp.x : bp.z
+            startVal: axis === 'x' ? bp.x : bp.z,
+            startX: bp.x,
+            startZ: bp.z
         };
         this.classList.add('dragging');
         if (typeof controls !== 'undefined') controls.enabled = false;
@@ -6768,12 +6775,13 @@ window._updateBedHandles = function() {
         const refPt3 = new THREE.Vector3(0, 50, 101).project(camera);
         const pxPerCmZ = Math.abs((refPt3.y - refPt.y) * ch / 2) || 1;
 
-        if (d.axis === 'x') {
-            bp.x = d.startVal + (e.clientX - d.startMouseX) / pxPerCmX;
-        } else {
-            // Z axis: drag up = move toward camera (smaller Z), drag down = away
-            bp.z = d.startVal + (e.clientY - d.startMouseY) / pxPerCmZ;
-        }
+        // Screen drag → scene-frame delta → room-frame delta (room may be rotated around the cabinet)
+        const wdx = d.axis === 'x' ? (e.clientX - d.startMouseX) / pxPerCmX : 0;
+        // Z axis: drag up = move toward camera (smaller Z), drag down = away
+        const wdz = d.axis === 'x' ? 0 : (e.clientY - d.startMouseY) / pxPerCmZ;
+        const rd = (typeof window._worldToRoomDir === 'function') ? window._worldToRoomDir(wdx, wdz) : { x: wdx, z: wdz };
+        bp.x = (d.startX != null ? d.startX : bp.x) + rd.x;
+        bp.z = (d.startZ != null ? d.startZ : bp.z) + rd.z;
         // Clamp to room walls
         _clampBedPos(bp);
         window._bedPos = bp;
