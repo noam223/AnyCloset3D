@@ -221,16 +221,34 @@
         _queueRoomPlanRender();
     }
 
+    /** Door-side edge of a cabinet whose center wing spans ±w/2 × ±d/2 around (cx,cz), rotated like Object3D.rotation.y. */
+    function _cabFront(cx, cz, w, d, rotDeg, offX) {
+        const th = (rotDeg || 0) * Math.PI / 180;
+        const c = Math.cos(th), s = Math.sin(th);
+        function tr(x, z) { return { x: cx + x * c + z * s, z: cz - x * s + z * c }; }
+        const ox = offX || 0;
+        return { a: tr(ox - w / 2, d / 2), b: tr(ox + w / 2, d / 2), dir: { x: s, z: c } };
+    }
+
     function _getCabinetRect() {
         if (typeof window._roomHostRectAt !== 'function') return null;
         const r = window._roomHostRectAt();
-        return {
+        const item = {
             id: 'cabinet',
             minX: r.minX, maxX: r.maxX,
             minZ: r.minZ, maxZ: r.maxZ,
             draggable: true,
             label: FURN_COLORS.cabinet.label
         };
+        const wing = state.wings && state.wings.center;
+        if (typeof window._getRoomHostPose === 'function') {
+            const pose = window._getRoomHostPose();
+            const w = (wing && wing.width) || state.width || 160;
+            const d = (wing && wing.depth) || state.depth || 54;
+            const offX = (typeof cabinetGroup !== 'undefined' && cabinetGroup) ? (cabinetGroup.position.x || 0) : 0;
+            item.front = _cabFront(pose.x, pose.z, w, d, pose.rotation, offX);
+        }
+        return item;
     }
 
     function _getBedRect() {
@@ -371,7 +389,8 @@
                 isRoomExtraCab: true,
                 cartIndex: prop.cartIndex,
                 halfW: dims.w / 2,
-                halfD: dims.d / 2
+                halfD: dims.d / 2,
+                front: _cabFront(prop.x || 0, prop.z || 0, dims.w, dims.d, prop.rotation || 0)
             });
         });
     }
@@ -777,6 +796,35 @@
         _addBtn(removeX, 'remove-room-cab', 'הסר מהחדר', 'fa-xmark', 'rp-room-cab-btn-remove');
     }
 
+    /** Thick line on the door side + small outward arrow, so the facing direction is readable. */
+    function _drawCabinetFront(g, front, tf, isActive) {
+        const color = isActive ? '#d97706' : '#f59e0b';
+        const a = _w2s(front.a.x, front.a.z, tf);
+        const b = _w2s(front.b.x, front.b.z, tf);
+        g.appendChild(_svgEl('line', {
+            x1: a.x, y1: a.y, x2: b.x, y2: b.y,
+            stroke: color, 'stroke-width': isActive ? '5' : '4', 'stroke-linecap': 'round',
+            class: 'rp-cab-front'
+        }));
+        const len = Math.hypot(b.x - a.x, b.y - a.y);
+        if (len < 24) return;
+        // Screen direction of the front normal (world z → screen y, same scale on both axes)
+        const nx = front.dir.x, ny = front.dir.z;
+        const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+        const tipLen = 11, half = 7;
+        const tip = { x: mx + nx * (tipLen + 3), y: my + ny * (tipLen + 3) };
+        const base = { x: mx + nx * 3, y: my + ny * 3 };
+        const px = -ny, py = nx;
+        g.appendChild(_svgEl('polygon', {
+            points: [
+                tip.x + ',' + tip.y,
+                (base.x + px * half) + ',' + (base.y + py * half),
+                (base.x - px * half) + ',' + (base.y - py * half)
+            ].join(' '),
+            fill: color, class: 'rp-cab-front'
+        }));
+    }
+
     function _drawRoomHostBtns(parentG, fx, fy, fw, fh) {
         if (fw < 26 || fh < 26) return;
         const btnSize = 22;
@@ -995,6 +1043,9 @@
                     }, item.label));
                 }
 
+                if (item.front) {
+                    _drawCabinetFront(g, item.front, tf, isActive);
+                }
                 if (item.id === 'bed') {
                     _drawBedWidthBtn(g, fx, fy, fw, fh);
                 }
