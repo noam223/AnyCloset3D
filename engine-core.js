@@ -1114,10 +1114,10 @@ function _buildRoomWindowMeshes(rg) {
 
         if (p.wall !== 'front') {
             const sky = new THREE.Mesh(
-                new THREE.PlaneGeometry(w + 200, h + 160),
+                new THREE.PlaneGeometry(w, h),
                 new THREE.MeshBasicMaterial({ map: _getRoomSkyTexture() })
             );
-            sky.position.set(0, sill + h / 2, -80);
+            sky.position.set(0, sill + h / 2, -fD / 2 - 0.5);
             group.add(sky);
         }
 
