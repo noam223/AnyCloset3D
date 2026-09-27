@@ -4832,7 +4832,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                     _ppPartId = `desk_int_drawer_c${c}_d${i}`;
                     let mesh = createBoard(drawerWidth, col.drawerHeight, t, dx, drawerCenterY, _deskDrawerFZ, matExternal);
                     _ppPartId = '';
-                    if (!isBP) _addDrawerHandleLocal(mesh, drawerWidth, col.drawerHeight, _handleStyle);
+                    if (!isBP) _addPanelHandleLocal(mesh, drawerWidth, col.drawerHeight, _handleStyle);
                     const backPanel = new THREE.Mesh(new THREE.BoxGeometry(drawerWidth - 2, 2.5, 0.5), new THREE.MeshStandardMaterial({ color: 0x222222 }));
                     backPanel.position.set(dx, drawerBottomY + col.drawerHeight - 1.25, _deskDrawerFZ - t/2 - 0.25);
                     _buildGroup.add(backPanel);
