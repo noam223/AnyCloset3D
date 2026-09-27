@@ -408,29 +408,71 @@
         });
     }
 
+    function _wallNormal(wall) {
+        if (typeof window._roomWallNormal === 'function') return window._roomWallNormal(wall);
+        return { x: 0, z: -1 };
+    }
+
+    /** Grab rect for an opening centered on a wall (pad cm on both sides of the wall line). */
+    function _wallOpeningRect(wall, cx, cz, width, pad) {
+        const half = width / 2;
+        if (wall === 'front' || wall === 'back') {
+            return { minX: cx - half, maxX: cx + half, minZ: cz - pad, maxZ: cz + pad };
+        }
+        return { minX: cx - pad, maxX: cx + pad, minZ: cz - half, maxZ: cz + half };
+    }
+
     function _getRoomDoorRect() {
         const b = _getBounds();
         if (!b || typeof window._getRoomDoorPose !== 'function') return null;
         const pose = window._getRoomDoorPose(b);
         if (!pose) return null;
-        const half = pose.width / 2;
-        const pad = 16; // grab thickness into the room
-        let minX, maxX, minZ, maxZ;
-        if (pose.wall === 'front') {
-            minX = pose.cx - half; maxX = pose.cx + half;
-            minZ = pose.cz - pad; maxZ = pose.cz + 5;
-        } else if (pose.wall === 'back') {
-            minX = pose.cx - half; maxX = pose.cx + half;
-            minZ = pose.cz - 5; maxZ = pose.cz + pad;
-        } else if (pose.wall === 'left') {
-            minX = pose.cx - 5; maxX = pose.cx + pad;
-            minZ = pose.cz - half; maxZ = pose.cz + half;
-        } else {
-            minX = pose.cx - pad; maxX = pose.cx + 5;
-            minZ = pose.cz - half; maxZ = pose.cz + half;
-        }
-        return _makeFurnItem('room-door', { minX: minX, maxX: maxX, minZ: minZ, maxZ: maxZ }, true, 'דלת', {
-            doorWall: pose.wall, doorCx: pose.cx, doorCz: pose.cz, doorW: pose.width
+        return _makeFurnItem('room-door', _wallOpeningRect(pose.wall, pose.cx, pose.cz, pose.width, 14), true, 'דלת', {
+            doorWall: pose.wall, doorCx: pose.cx, doorCz: pose.cz, doorW: pose.width,
+            doorHinge: pose.hinge, doorSwing: pose.swing,
+            isWallOpening: true, openWall: pose.wall
+        });
+    }
+
+    function _getRoomWindowRects() {
+        const b = _getBounds();
+        if (!b || typeof window._getRoomWindowPoses !== 'function') return [];
+        return window._getRoomWindowPoses(b).map(function(p) {
+            return _makeFurnItem(p.id, _wallOpeningRect(p.wall, p.cx, p.cz, p.width, 12), true, 'חלון ' + Math.round(p.width), {
+                isRoomWindow: true, isWallOpening: true, openWall: p.wall,
+                winCx: p.cx, winCz: p.cz, winW: p.width, winH: p.height, winSill: p.sill
+            });
+        });
+    }
+
+    function _isRoomWindowId(id) {
+        return String(id || '').indexOf('room-win-') === 0;
+    }
+
+    /** Small HTML buttons placed inside the room, next to a wall opening. */
+    function _drawOpeningBtns(parentG, item, tf, btns) {
+        const n = _wallNormal(item.openWall);
+        const c = _w2s((item.minX + item.maxX) / 2, (item.minZ + item.maxZ) / 2, tf);
+        const btnSize = 22, gap = 4, off = 30;
+        const total = btns.length * btnSize + (btns.length - 1) * gap;
+        const ox = c.x + n.x * off, oy = c.y + n.z * off;
+        const alongX = Math.abs(n.z) > 0.5;
+        btns.forEach(function(bd, i) {
+            const shift = -total / 2 + i * (btnSize + gap);
+            const x = alongX ? ox + shift : ox - btnSize / 2;
+            const y = alongX ? oy - btnSize / 2 : oy + shift;
+            const fo = _svgEl('foreignObject', {
+                x: x, y: y, width: btnSize, height: btnSize, class: 'rp-room-cab-btn-fo'
+            });
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'rp-room-cab-btn ' + (bd.cls || '');
+            btn.title = bd.title;
+            btn.setAttribute('data-rp-action', bd.action);
+            btn.setAttribute('data-rp-open-id', item.id);
+            btn.innerHTML = bd.html;
+            fo.appendChild(btn);
+            parentG.appendChild(fo);
         });
     }
 
@@ -442,77 +484,108 @@
         const half = w / 2;
         const stroke = isActive ? '#0369a1' : '#0284c7';
         const fill = isActive ? '#bfdbfe' : '#dbeafe';
+        const n = _wallNormal(wall);
+        const right = { x: n.z, z: -n.x }; // right-hand side seen from inside the room
+        const hs = item.doorHinge === 'right' ? 1 : -1;
+        const open = item.doorSwing === 'out' ? { x: -n.x, z: -n.z } : n;
 
-        // Opening endpoints on the wall (left→right / back→front)
-        const a = (wall === 'front' || wall === 'back')
-            ? _w2s(cx - half, cz, tf)
-            : _w2s(cx, cz - half, tf);
-        const bpt = (wall === 'front' || wall === 'back')
-            ? _w2s(cx + half, cz, tf)
-            : _w2s(cx, cz + half, tf);
-
-        // Hinge at the "start" side of the opening
-        const hinge = a;
-        const r = Math.hypot(bpt.x - a.x, bpt.y - a.y);
-        if (!(r > 1)) return;
-
-        // Closed tip = other end of opening; open tip = 90° into the room
-        // Screen: +Y is down, room interior from front wall is up (−Y)
-        let openTip, sweepFlag;
-        if (wall === 'front') {
-            openTip = { x: hinge.x, y: hinge.y - r };       // into room (up)
-            sweepFlag = 1; // clockwise: open → closed along wall
-        } else if (wall === 'back') {
-            openTip = { x: hinge.x, y: hinge.y + r };       // into room (down)
-            sweepFlag = 0;
-        } else if (wall === 'left') {
-            openTip = { x: hinge.x + r, y: hinge.y };       // into room (right)
-            sweepFlag = 0;
-        } else {
-            openTip = { x: hinge.x - r, y: hinge.y };       // into room (left)
-            sweepFlag = 1;
-        }
-        const closedTip = bpt;
+        const hingeW = { x: cx + right.x * half * hs, z: cz + right.z * half * hs };
+        const closedW = { x: cx - right.x * half * hs, z: cz - right.z * half * hs };
+        const hinge = _w2s(hingeW.x, hingeW.z, tf);
+        const closedTip = _w2s(closedW.x, closedW.z, tf);
+        const openTip = _w2s(hingeW.x + open.x * w, hingeW.z + open.z * w, tf);
+        if (!(Math.hypot(closedTip.x - hinge.x, closedTip.y - hinge.y) > 1)) return;
 
         g.appendChild(_svgEl('line', {
-            x1: a.x, y1: a.y, x2: bpt.x, y2: bpt.y,
+            x1: hinge.x, y1: hinge.y, x2: closedTip.x, y2: closedTip.y,
             stroke: stroke, 'stroke-width': isActive ? '5' : '4',
             'stroke-linecap': 'square'
         }));
 
-        // Door leaf (drawn open)
         g.appendChild(_svgEl('line', {
             x1: hinge.x, y1: hinge.y, x2: openTip.x, y2: openTip.y,
             stroke: '#1d4ed8', 'stroke-width': '2.2'
         }));
 
-        // Quarter-circle swing: open tip → closed tip (same radius from hinge)
+        // Quarter-circle swing sampled in world space (closed → open)
+        const ux = closedW.x - hingeW.x, uz = closedW.z - hingeW.z;
+        const vx = open.x * w, vz = open.z * w;
+        let d = '';
+        for (let i = 0; i <= 18; i++) {
+            const a = (i / 18) * Math.PI / 2;
+            const p = _w2s(hingeW.x + ux * Math.cos(a) + vx * Math.sin(a), hingeW.z + uz * Math.cos(a) + vz * Math.sin(a), tf);
+            d += (i ? ' L ' : 'M ') + p.x.toFixed(2) + ' ' + p.y.toFixed(2);
+        }
         g.appendChild(_svgEl('path', {
-            d: 'M ' + openTip.x.toFixed(2) + ' ' + openTip.y.toFixed(2) +
-               ' A ' + r.toFixed(2) + ' ' + r.toFixed(2) +
-               ' 0 0 ' + sweepFlag + ' ' +
-               closedTip.x.toFixed(2) + ' ' + closedTip.y.toFixed(2),
-            fill: 'none', stroke: '#ef4444', 'stroke-width': '1.2',
-            'stroke-dasharray': '4 3'
+            d: d, fill: 'none', stroke: '#ef4444', 'stroke-width': '1.2', 'stroke-dasharray': '4 3'
         }));
 
-        // Hit/fill plate for easier grabbing
         const p1 = _w2s(item.minX, item.minZ, tf);
         const p2 = _w2s(item.maxX, item.maxZ, tf);
-        const fx = Math.min(p1.x, p2.x), fy = Math.min(p1.y, p2.y);
-        const fw = Math.abs(p2.x - p1.x), fh = Math.abs(p2.y - p1.y);
         g.appendChild(_svgEl('rect', {
-            x: fx, y: fy, width: Math.max(fw, 1), height: Math.max(fh, 1),
+            x: Math.min(p1.x, p2.x), y: Math.min(p1.y, p2.y),
+            width: Math.max(Math.abs(p2.x - p1.x), 1), height: Math.max(Math.abs(p2.y - p1.y), 1),
             fill: fill, stroke: 'none', opacity: '0.25', rx: '3'
         }));
 
-        const labelOff = wall === 'front' ? -14 : (wall === 'back' ? 14 : 0);
+        const lp = _w2s(cx - open.x * 12, cz - open.z * 12, tf);
         g.appendChild(_svgEl('text', {
-            x: (a.x + bpt.x) / 2,
-            y: (a.y + bpt.y) / 2 + labelOff,
+            x: lp.x, y: lp.y,
             class: 'rp-furn-label', 'text-anchor': 'middle',
             'dominant-baseline': 'middle', 'font-size': '11', fill: '#0369a1'
         }, 'דלת'));
+
+        _drawOpeningBtns(g, item, tf, [
+            { action: 'door-hinge', title: 'החלף צד ציר (ימין / שמאל)', html: '<i class="fa-solid fa-arrows-left-right"></i>' },
+            { action: 'door-swing', title: item.doorSwing === 'out' ? 'נפתחת החוצה — לחץ לפתיחה פנימה' : 'נפתחת פנימה — לחץ לפתיחה החוצה', html: '<i class="fa-solid fa-right-to-bracket"></i>' }
+        ]);
+    }
+
+    function _drawRoomWindow2D(g, item, tf, isActive) {
+        const wall = item.openWall;
+        const half = (item.winW || 120) / 2;
+        const along = (wall === 'front' || wall === 'back') ? { x: 1, z: 0 } : { x: 0, z: 1 };
+        const n = _wallNormal(wall);
+        const t = 5;
+        const pts = [
+            [-half, -t], [half, -t], [half, t], [-half, t]
+        ].map(function(q) {
+            return _w2s(item.winCx + along.x * q[0] + n.x * q[1], item.winCz + along.z * q[0] + n.z * q[1], tf);
+        });
+        g.appendChild(_svgEl('polygon', {
+            points: pts.map(function(p) { return p.x.toFixed(2) + ',' + p.y.toFixed(2); }).join(' '),
+            fill: isActive ? '#bae6fd' : '#e0f2fe', stroke: isActive ? '#0369a1' : '#0ea5e9',
+            'stroke-width': isActive ? '2' : '1.5'
+        }));
+        const a = _w2s(item.winCx - along.x * half, item.winCz - along.z * half, tf);
+        const b2 = _w2s(item.winCx + along.x * half, item.winCz + along.z * half, tf);
+        g.appendChild(_svgEl('line', {
+            x1: a.x, y1: a.y, x2: b2.x, y2: b2.y, stroke: isActive ? '#0369a1' : '#0ea5e9', 'stroke-width': '1.2'
+        }));
+        const lp = _w2s(item.winCx + n.x * 16, item.winCz + n.z * 16, tf);
+        g.appendChild(_svgEl('text', {
+            x: lp.x, y: lp.y, class: 'rp-furn-label', 'text-anchor': 'middle',
+            'dominant-baseline': 'middle', 'font-size': '10', fill: '#0369a1'
+        }, item.label));
+        _drawOpeningBtns(g, item, tf, [
+            { action: 'win-width', title: 'שנה רוחב חלון', html: '<i class="fa-solid fa-arrows-left-right"></i>' },
+            { action: 'win-remove', title: 'הסר חלון', html: '<i class="fa-solid fa-xmark"></i>', cls: 'rp-room-cab-btn-remove' }
+        ]);
+    }
+
+    /** Distances along the wall from an opening to both corners. */
+    function _drawOpeningWallDims(g, item, tf, b) {
+        const wall = item.openWall;
+        const off = 26 / tf.scale;
+        if (wall === 'front' || wall === 'back') {
+            const z = wall === 'back' ? b.backZ + off : b.frontZ - off;
+            if (item.minX - b.leftX > 1) _drawWorldDimH(g, b.leftX, item.minX, z, '', tf, wall === 'front');
+            if (b.rightX - item.maxX > 1) _drawWorldDimH(g, item.maxX, b.rightX, z, '', tf, wall === 'front');
+        } else {
+            const x = wall === 'left' ? b.leftX + off : b.rightX - off;
+            if (item.minZ - b.backZ > 1) _drawWorldDimV(g, x, b.backZ, item.minZ, tf, wall === 'right');
+            if (b.frontZ - item.maxZ > 1) _drawWorldDimV(g, x, item.maxZ, b.frontZ, tf, wall === 'right');
+        }
     }
 
     function _collectFurniture() {
@@ -532,7 +605,8 @@
         if (chair) items.push(chair);
         _getCustomItemRects().forEach(function(item) { items.push(item); });
         _getRoomExtraCabinetRects().forEach(function(item) { items.push(item); });
-        // Door last → topmost in reverse hit-test
+        // Wall openings last → topmost in reverse hit-test
+        _getRoomWindowRects().forEach(function(item) { items.push(item); });
         if (roomDoor) items.push(roomDoor);
         return items;
     }
@@ -620,6 +694,10 @@
         } else if (id === 'room-door') {
             if (typeof window._setRoomDoorFromPoint === 'function') {
                 window._setRoomDoorFromPoint(cx, cz, _getBounds());
+            }
+        } else if (_isRoomWindowId(id)) {
+            if (typeof window._setRoomWindowFromPoint === 'function') {
+                window._setRoomWindowFromPoint(id, cx, cz, _getBounds());
             }
         }
         window._roomPlanPending3D = true;
@@ -920,6 +998,8 @@
 
             if (item.id === 'room-door') {
                 _drawRoomDoor2D(g, item, tf, isActive);
+            } else if (item.isRoomWindow) {
+                _drawRoomWindow2D(g, item, tf, isActive);
             } else {
                 g.appendChild(_svgEl('rect', {
                     x: fx, y: fy, width: fw, height: fh,
@@ -988,7 +1068,11 @@
 
         const itemDimsG = _svgEl('g', { class: 'rp-item-dims' });
         items.forEach(function(item) {
-            if (item.id === 'cabinet' || item.id === 'cabinet-desk' || item.id === 'room-door') return;
+            if (item.isWallOpening) {
+                if (item.id === dragId || item.isRoomWindow) _drawOpeningWallDims(itemDimsG, item, tf, b);
+                return;
+            }
+            if (item.id === 'cabinet' || item.id === 'cabinet-desk') return;
             _drawItemWallDims(itemDimsG, item, tf, b, item.id === dragId);
         });
         svg.appendChild(itemDimsG);
@@ -1012,8 +1096,8 @@
         const items = _collectFurniture();
         list.innerHTML = '';
         items.forEach(function(item) {
-            const w = Math.round(item.maxX - item.minX);
-            const d = Math.round(item.maxZ - item.minZ);
+            const w = item.isRoomWindow ? Math.round(item.winW) : Math.round(item.maxX - item.minX);
+            const d = item.isRoomWindow ? Math.round(item.winH) : Math.round(item.maxZ - item.minZ);
             const row = document.createElement('div');
             row.className = 'room-plan-furn-row';
             const isExtraCab = item.isRoomExtraCab || _isRoomExtraCabId(item.id);
@@ -1023,6 +1107,7 @@
                 : item.id === 'room-desk' ? 'fa-desktop'
                 : item.id === 'cabinet-desk' ? 'fa-laptop'
                 : item.id === 'room-door' ? 'fa-door-open'
+                : item.isRoomWindow ? 'fa-border-all'
                 : String(item.id).indexOf('custom-') === 0 ? 'fa-cube'
                 : isExtraCab ? _projectItemIcon(state.orderCart && state.orderCart[item.cartIndex])
                 : item.id === 'cabinet' ? 'fa-door-closed'
@@ -1031,6 +1116,19 @@
                 '<i class="fa-solid ' + icon + '"></i>' +
                 '<span class="room-plan-furn-name">' + (item.label || item.id) + '</span>' +
                 '<span class="room-plan-furn-dim">' + w + '×' + d + '</span>';
+            if (item.isRoomWindow) {
+                const rmWin = document.createElement('button');
+                rmWin.type = 'button';
+                rmWin.className = 'rpc-remove-btn';
+                rmWin.title = 'הסר חלון';
+                rmWin.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+                rmWin.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (typeof window._removeRoomWindow === 'function') window._removeRoomWindow(item.id);
+                });
+                row.appendChild(rmWin);
+            }
             if (isExtraCab) {
                 const rm = document.createElement('button');
                 rm.type = 'button';
@@ -1345,6 +1443,17 @@
                     if (cabId && typeof window._removeRoomExtraCabinet === 'function') {
                         window._removeRoomExtraCabinet(cabId);
                     }
+                } else if (action === 'door-hinge' && typeof window._toggleRoomDoorHinge === 'function') {
+                    window._toggleRoomDoorHinge();
+                } else if (action === 'door-swing' && typeof window._toggleRoomDoorSwing === 'function') {
+                    window._toggleRoomDoorSwing();
+                } else if (action === 'win-width' || action === 'win-remove') {
+                    const winId = actionBtn.getAttribute('data-rp-open-id');
+                    if (winId && action === 'win-width' && typeof window._cycleRoomWindowWidth === 'function') {
+                        window._cycleRoomWindowWidth(winId);
+                    } else if (winId && action === 'win-remove' && typeof window._removeRoomWindow === 'function') {
+                        window._removeRoomWindow(winId);
+                    }
                 }
                 return;
             }
@@ -1406,7 +1515,7 @@
             if (!d) return;
             if (e && d.pointerId !== e.pointerId) return;
             const wasCabinet = d.id === 'cabinet';
-            const wasDoor = d.id === 'room-door';
+            const wasDoor = d.id === 'room-door' || _isRoomWindowId(d.id);
             window._roomPlanDrag = null;
             document.body.classList.remove('room-plan-dragging');
             if (wasCabinet) {

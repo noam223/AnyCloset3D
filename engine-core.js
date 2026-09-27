@@ -695,7 +695,7 @@ window._rebuildRoomExtraCabinets = function(rg) {
     return root;
 };
 
-// ── Room entrance door (movable on wall frame in 2D plan) ───────────────────
+// ── Room entrance door + windows (movable on walls in 2D plan) ──────────────
 window._ROOM_DOOR_W = window._ROOM_DOOR_W || 90;
 window._ROOM_DOOR_H = window._ROOM_DOOR_H || 210;
 window._roomDoor = window._roomDoor || {
@@ -703,8 +703,76 @@ window._roomDoor = window._roomDoor || {
     t: 0.5,        // 0..1 along wall
     width: 90,
     height: 210,
+    hinge: 'left', // hinge side as seen from inside the room facing the wall
+    swing: 'in',   // in = opens into the room, out = opens outward
     visible: true
 };
+window._roomWindows = Array.isArray(window._roomWindows) ? window._roomWindows : [];
+window._roomWindowSeq = window._roomWindowSeq || 0;
+window._ROOM_WINDOW_WIDTHS = [60, 90, 120, 150, 180, 240];
+
+const _ROOM_WALLS = ['front', 'back', 'left', 'right'];
+
+/** Inward unit normal of a wall (x,z). Local +X of a wall-mounted group = right-hand side seen from inside. */
+function _roomWallNormal(wall) {
+    if (wall === 'front') return { x: 0, z: -1 };
+    if (wall === 'back') return { x: 0, z: 1 };
+    if (wall === 'left') return { x: 1, z: 0 };
+    return { x: -1, z: 0 };
+}
+window._roomWallNormal = _roomWallNormal;
+
+function _roomWallRotY(wall) {
+    if (wall === 'front') return Math.PI;
+    if (wall === 'back') return 0;
+    if (wall === 'left') return Math.PI / 2;
+    return -Math.PI / 2;
+}
+
+/** Center of an opening of `width` at fraction `t` along `wall`. */
+function _roomWallPoint(b, wall, t, width) {
+    const half = width / 2;
+    if (_ROOM_WALLS.indexOf(wall) < 0) wall = 'front';
+    t = Number(t);
+    t = Math.max(0, Math.min(1, isFinite(t) ? t : 0.5));
+    let cx, cz;
+    if (wall === 'front' || wall === 'back') {
+        const minC = b.leftX + half, maxC = b.rightX - half;
+        cx = (maxC <= minC) ? (b.leftX + b.rightX) / 2 : minC + (maxC - minC) * t;
+        cz = wall === 'front' ? b.frontZ : b.backZ;
+    } else {
+        const minC = b.backZ + half, maxC = b.frontZ - half;
+        cz = (maxC <= minC) ? (b.backZ + b.frontZ) / 2 : minC + (maxC - minC) * t;
+        cx = wall === 'left' ? b.leftX : b.rightX;
+    }
+    return { wall: wall, cx: cx, cz: cz, t: t };
+}
+
+/** Snap a world point to the nearest wall; returns {wall, t} for an opening of `width`. */
+function _roomSnapToWall(b, x, z, width, walls) {
+    const half = width / 2;
+    const left = b.leftX, right = b.rightX, back = b.backZ, front = b.frontZ;
+    function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+    const outX = (x < left || x > right) ? Math.min(Math.abs(x - left), Math.abs(x - right)) : 0;
+    const outZ = (z < back || z > front) ? Math.min(Math.abs(z - back), Math.abs(z - front)) : 0;
+    const candidates = [
+        { wall: 'front', along: clamp(x, left + half, right - half), dist: Math.abs(z - front) + outX },
+        { wall: 'back', along: clamp(x, left + half, right - half), dist: Math.abs(z - back) + outX },
+        { wall: 'left', along: clamp(z, back + half, front - half), dist: Math.abs(x - left) + outZ },
+        { wall: 'right', along: clamp(z, back + half, front - half), dist: Math.abs(x - right) + outZ }
+    ].filter(function(c) { return !walls || walls.indexOf(c.wall) >= 0; });
+    candidates.sort(function(a, c) { return a.dist - c.dist; });
+    const best = candidates[0];
+    let t;
+    if (best.wall === 'front' || best.wall === 'back') {
+        const minC = left + half, maxC = right - half;
+        t = (maxC <= minC) ? 0.5 : (best.along - minC) / (maxC - minC);
+    } else {
+        const minC = back + half, maxC = front - half;
+        t = (maxC <= minC) ? 0.5 : (best.along - minC) / (maxC - minC);
+    }
+    return { wall: best.wall, t: Math.max(0, Math.min(1, t)) };
+}
 
 /** World pose for the room door on the current room bounds. */
 window._getRoomDoorPose = function(bounds) {
@@ -714,23 +782,12 @@ window._getRoomDoorPose = function(bounds) {
     if (door.visible === false) return null;
     const width = Math.max(60, Math.min(120, parseFloat(door.width) || window._ROOM_DOOR_W || 90));
     const height = Math.max(180, Math.min(240, parseFloat(door.height) || window._ROOM_DOOR_H || 210));
-    const half = width / 2;
-    let wall = door.wall || 'front';
-    if (['front', 'back', 'left', 'right'].indexOf(wall) < 0) wall = 'front';
-    const t = Math.max(0, Math.min(1, door.t != null ? Number(door.t) : 0.5));
-    let cx, cz;
-    if (wall === 'front' || wall === 'back') {
-        const minC = b.leftX + half;
-        const maxC = b.rightX - half;
-        cx = (maxC <= minC) ? (b.leftX + b.rightX) / 2 : minC + (maxC - minC) * t;
-        cz = wall === 'front' ? b.frontZ : b.backZ;
-    } else {
-        const minC = b.backZ + half;
-        const maxC = b.frontZ - half;
-        cz = (maxC <= minC) ? (b.backZ + b.frontZ) / 2 : minC + (maxC - minC) * t;
-        cx = wall === 'left' ? b.leftX : b.rightX;
-    }
-    return { wall: wall, cx: cx, cz: cz, width: width, height: height, t: t };
+    const p = _roomWallPoint(b, door.wall || 'front', door.t, width);
+    return {
+        wall: p.wall, cx: p.cx, cz: p.cz, width: width, height: height, t: p.t,
+        hinge: door.hinge === 'right' ? 'right' : 'left',
+        swing: door.swing === 'out' ? 'out' : 'in'
+    };
 };
 
 /** Snap a world point onto the room perimeter and update `_roomDoor`. */
@@ -738,38 +795,207 @@ window._setRoomDoorFromPoint = function(x, z, bounds) {
     const b = bounds || window._roomBounds;
     if (!b) return null;
     const door = window._roomDoor || (window._roomDoor = {
-        wall: 'front', t: 0.5, width: 90, height: 210, visible: true
+        wall: 'front', t: 0.5, width: 90, height: 210, hinge: 'left', swing: 'in', visible: true
     });
     const width = Math.max(60, Math.min(120, parseFloat(door.width) || 90));
-    const half = width / 2;
-    const left = b.leftX, right = b.rightX, back = b.backZ, front = b.frontZ;
-
-    function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
-
-    const candidates = [
-        { wall: 'front', x: clamp(x, left + half, right - half), z: front,
-          dist: Math.abs(z - front) + (x < left || x > right ? Math.min(Math.abs(x - left), Math.abs(x - right)) : 0) },
-        { wall: 'back', x: clamp(x, left + half, right - half), z: back,
-          dist: Math.abs(z - back) + (x < left || x > right ? Math.min(Math.abs(x - left), Math.abs(x - right)) : 0) },
-        { wall: 'left', x: left, z: clamp(z, back + half, front - half),
-          dist: Math.abs(x - left) + (z < back || z > front ? Math.min(Math.abs(z - back), Math.abs(z - front)) : 0) },
-        { wall: 'right', x: right, z: clamp(z, back + half, front - half),
-          dist: Math.abs(x - right) + (z < back || z > front ? Math.min(Math.abs(z - back), Math.abs(z - front)) : 0) }
-    ];
-    candidates.sort(function(a, c) { return a.dist - c.dist; });
-    const best = candidates[0];
-    door.wall = best.wall;
-    if (best.wall === 'front' || best.wall === 'back') {
-        const minC = left + half, maxC = right - half;
-        door.t = (maxC <= minC) ? 0.5 : (best.x - minC) / (maxC - minC);
-    } else {
-        const minC = back + half, maxC = front - half;
-        door.t = (maxC <= minC) ? 0.5 : (best.z - minC) / (maxC - minC);
-    }
-    door.t = Math.max(0, Math.min(1, door.t));
+    const snap = _roomSnapToWall(b, x, z, width);
+    door.wall = snap.wall;
+    door.t = snap.t;
     door.width = width;
     return window._getRoomDoorPose(b);
 };
+
+function _roomOpeningsChanged() {
+    if (typeof window._roomPlanFurnitureChanged === 'function') window._roomPlanFurnitureChanged();
+    else if (typeof _buildRoom === 'function') _buildRoom();
+    if (typeof window._updateRoomPropsUI === 'function') window._updateRoomPropsUI();
+    window._isDirty = true;
+}
+
+window._toggleRoomDoorHinge = function() {
+    const door = window._roomDoor;
+    if (!door) return;
+    door.hinge = door.hinge === 'right' ? 'left' : 'right';
+    _roomOpeningsChanged();
+};
+
+window._toggleRoomDoorSwing = function() {
+    const door = window._roomDoor;
+    if (!door) return;
+    door.swing = door.swing === 'out' ? 'in' : 'out';
+    _roomOpeningsChanged();
+};
+
+// ── Windows ─────────────────────────────────────────────────────────────────
+function _roomWindowDims(win, b) {
+    const roomH = (b && b.height) || window._roomHeight || 270;
+    const width = Math.max(40, Math.min(300, parseFloat(win.width) || 120));
+    const height = Math.max(40, Math.min(roomH - 10, parseFloat(win.height) || 120));
+    const rawSill = parseFloat(win.sill);
+    const sill = Math.max(0, Math.min(roomH - height - 5, isNaN(rawSill) ? 90 : rawSill));
+    return { width: width, height: height, sill: sill };
+}
+
+window._getRoomWindowPoses = function(bounds) {
+    const b = bounds || window._roomBounds;
+    if (!b) return [];
+    return (window._roomWindows || []).map(function(win) {
+        const d = _roomWindowDims(win, b);
+        const p = _roomWallPoint(b, win.wall || 'left', win.t, d.width);
+        return {
+            id: win.id, wall: p.wall, cx: p.cx, cz: p.cz, t: p.t,
+            width: d.width, height: d.height, sill: d.sill
+        };
+    });
+};
+
+window._findRoomWindow = function(id) {
+    return (window._roomWindows || []).find(function(w) { return w && w.id === id; }) || null;
+};
+
+window._addRoomWindow = function() {
+    if (!Array.isArray(window._roomWindows)) window._roomWindows = [];
+    const doorWall = (window._roomDoor && window._roomDoor.visible !== false) ? window._roomDoor.wall : null;
+    const used = {};
+    window._roomWindows.forEach(function(w) { used[w.wall] = (used[w.wall] || 0) + 1; });
+    const order = ['left', 'right', 'front', 'back'];
+    let wall = order.find(function(w) { return w !== doorWall && !used[w]; })
+        || order.find(function(w) { return w !== doorWall; }) || 'left';
+    window._roomWindowSeq = (window._roomWindowSeq || 0) + 1;
+    window._roomWindows.push({
+        id: 'room-win-' + window._roomWindowSeq,
+        wall: wall, t: 0.5, width: 120, height: 120, sill: 90
+    });
+    if (typeof state !== 'undefined' && state.viewMode !== 'room-plan' && window._roomVisible === false) {
+        window._roomVisible = true;
+    }
+    _roomOpeningsChanged();
+};
+
+window._removeRoomWindow = function(id) {
+    window._roomWindows = (window._roomWindows || []).filter(function(w) { return w && w.id !== id; });
+    _roomOpeningsChanged();
+};
+
+window._cycleRoomWindowWidth = function(id) {
+    const win = window._findRoomWindow(id);
+    if (!win) return;
+    const list = window._ROOM_WINDOW_WIDTHS;
+    const cur = parseFloat(win.width) || 120;
+    const idx = list.findIndex(function(v) { return v > cur + 0.5; });
+    win.width = idx >= 0 ? list[idx] : list[0];
+    _roomOpeningsChanged();
+};
+
+window._setRoomWindowFromPoint = function(id, x, z, bounds) {
+    const b = bounds || window._roomBounds;
+    const win = window._findRoomWindow(id);
+    if (!b || !win) return null;
+    const d = _roomWindowDims(win, b);
+    const snap = _roomSnapToWall(b, x, z, d.width);
+    win.wall = snap.wall;
+    win.t = snap.t;
+    return snap;
+};
+
+/** Wall openings (door + windows) in world coords, used to cut holes into wall planes. */
+window._getRoomWallOpenings = function(bounds) {
+    const b = bounds || window._roomBounds;
+    if (!b) return [];
+    const out = [];
+    const door = window._getRoomDoorPose(b);
+    if (door) {
+        out.push({ wall: door.wall, cx: door.cx, cz: door.cz, width: door.width + 10, bottom: 0, top: door.height + 5 });
+    }
+    window._getRoomWindowPoses(b).forEach(function(w) {
+        out.push({ wall: w.wall, cx: w.cx, cz: w.cz, width: w.width, bottom: w.sill, top: w.sill + w.height });
+    });
+    return out;
+};
+
+/** Plane geometry (w×h, facing +Z, UV 0..1) with rectangular holes {x0,x1,y0,y1} in local coords. */
+function _roomWallGeometry(w, h, holes) {
+    if (!holes || !holes.length) return new THREE.PlaneGeometry(w, h);
+    const hw = w / 2, hh = h / 2;
+    const clipped = holes.map(function(o) {
+        return {
+            x0: Math.max(-hw, Math.min(hw, o.x0)), x1: Math.max(-hw, Math.min(hw, o.x1)),
+            y0: Math.max(-hh, Math.min(hh, o.y0)), y1: Math.max(-hh, Math.min(hh, o.y1))
+        };
+    }).filter(function(o) { return o.x1 - o.x0 > 0.5 && o.y1 - o.y0 > 0.5; });
+    if (!clipped.length) return new THREE.PlaneGeometry(w, h);
+    const xs = [-hw, hw];
+    clipped.forEach(function(o) { xs.push(o.x0, o.x1); });
+    xs.sort(function(a, c) { return a - c; });
+    const pos = [], uv = [], nrm = [], idx = [];
+    function quad(xa, xb, ya, yb) {
+        const base = pos.length / 3;
+        [[xa, ya], [xb, ya], [xa, yb], [xb, yb]].forEach(function(p) {
+            pos.push(p[0], p[1], 0);
+            nrm.push(0, 0, 1);
+            uv.push((p[0] + hw) / w, (p[1] + hh) / h);
+        });
+        idx.push(base, base + 1, base + 2, base + 2, base + 1, base + 3);
+    }
+    for (let i = 0; i < xs.length - 1; i++) {
+        const xa = xs[i], xb = xs[i + 1];
+        if (xb - xa < 1e-3) continue;
+        const xm = (xa + xb) / 2;
+        const cuts = clipped.filter(function(o) { return o.x0 <= xm && o.x1 >= xm; })
+            .map(function(o) { return [o.y0, o.y1]; })
+            .sort(function(a, c) { return a[0] - c[0]; });
+        let y = -hh;
+        cuts.forEach(function(c) {
+            if (c[0] > y + 1e-3) quad(xa, xb, y, c[0]);
+            y = Math.max(y, c[1]);
+        });
+        if (hh > y + 1e-3) quad(xa, xb, y, hh);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.setIndex(idx);
+    return geo;
+}
+
+/**
+ * Holes in local coords of a wall mesh built with `_roomWallGeometry`.
+ * back: rotation 0; left: +π/2 (local X = world −Z); right: −π/2 (local X = world +Z).
+ */
+function _roomWallHoles(wall, openings, centerX, centerZ, roomH) {
+    return (openings || []).filter(function(o) { return o.wall === wall; }).map(function(o) {
+        let lx;
+        if (wall === 'back') lx = o.cx - centerX;
+        else if (wall === 'left') lx = -(o.cz - centerZ);
+        else lx = o.cz - centerZ;
+        return {
+            x0: lx - o.width / 2, x1: lx + o.width / 2,
+            y0: o.bottom - roomH / 2, y1: o.top - roomH / 2
+        };
+    });
+}
+
+let _roomSkyTex = null;
+function _getRoomSkyTexture() {
+    if (_roomSkyTex) return _roomSkyTex;
+    const c = document.createElement('canvas');
+    c.width = 4; c.height = 128;
+    const ctx = c.getContext('2d');
+    const g = ctx.createLinearGradient(0, 0, 0, 128);
+    g.addColorStop(0, '#9fcbf0');
+    g.addColorStop(0.6, '#d6ebfa');
+    g.addColorStop(1, '#eef6fb');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 4, 128);
+    _roomSkyTex = new THREE.CanvasTexture(c);
+    return _roomSkyTex;
+}
+
+function _placeOnRoomWall(group, wall, cx, cz) {
+    group.position.set(cx, 0, cz);
+    group.rotation.y = _roomWallRotY(wall);
+}
 
 function _buildRoomDoorMesh(rg) {
     const pose = typeof window._getRoomDoorPose === 'function' ? window._getRoomDoorPose() : null;
@@ -780,76 +1006,128 @@ function _buildRoomDoorMesh(rg) {
     const doorW = pose.width;
     const doorH = pose.height;
     const frameT = 5;
+    const frameD = 14;
     const leafT = 4;
     const openAngle = Math.PI * 0.28;
 
-    const frameMat = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.72, metalness: 0.05 });
-    const leafMat = new THREE.MeshStandardMaterial({ color: 0xc4a574, roughness: 0.55, metalness: 0.02 });
-    const glassMat = new THREE.MeshStandardMaterial({
-        color: 0xb8d4e8, roughness: 0.25, metalness: 0.1,
-        transparent: true, opacity: 0.35
-    });
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0xf2f2ef, roughness: 0.6, metalness: 0.02 });
+    const leafMat = new THREE.MeshStandardMaterial({ color: 0xfbfbf9, roughness: 0.5, metalness: 0.02 });
+    const panelMat = new THREE.MeshStandardMaterial({ color: 0xf0f0ec, roughness: 0.55, metalness: 0.02 });
+    const handleMat = new THREE.MeshStandardMaterial({ color: 0xb8b8b8, metalness: 0.8, roughness: 0.3 });
 
+    // Local frame: +X = right seen from inside, +Z = into the room, origin on the wall plane.
     const group = new THREE.Group();
     group.userData.roomProp = 'room-door';
 
-    // Frame: two jambs + head
-    const jambH = doorH;
-    const headW = doorW + frameT * 2;
-    const leftJamb = new THREE.Mesh(new THREE.BoxGeometry(frameT, jambH, frameT), frameMat);
-    const rightJamb = new THREE.Mesh(new THREE.BoxGeometry(frameT, jambH, frameT), frameMat);
-    const head = new THREE.Mesh(new THREE.BoxGeometry(headW, frameT, frameT), frameMat);
-    leftJamb.position.set(-doorW / 2 - frameT / 2, jambH / 2, 0);
-    rightJamb.position.set(doorW / 2 + frameT / 2, jambH / 2, 0);
+    const leftJamb = new THREE.Mesh(new THREE.BoxGeometry(frameT, doorH, frameD), frameMat);
+    const rightJamb = new THREE.Mesh(new THREE.BoxGeometry(frameT, doorH, frameD), frameMat);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(doorW + frameT * 2, frameT, frameD), frameMat);
+    leftJamb.position.set(-doorW / 2 - frameT / 2, doorH / 2, 0);
+    rightJamb.position.set(doorW / 2 + frameT / 2, doorH / 2, 0);
     head.position.set(0, doorH + frameT / 2, 0);
-    group.add(leftJamb);
-    group.add(rightJamb);
-    group.add(head);
+    group.add(leftJamb, rightJamb, head);
 
-    // Leaf on hinge group (hinge at left side of opening)
+    const hingeRight = pose.hinge === 'right';
+    const dirX = hingeRight ? -1 : 1;           // leaf extends from hinge toward the other jamb
+    const swingSign = pose.swing === 'out' ? -1 : 1;
     const hinge = new THREE.Group();
-    hinge.position.set(-doorW / 2, 0, 0);
-    hinge.rotation.y = -openAngle;
-    const leaf = new THREE.Mesh(new THREE.BoxGeometry(doorW - 1, doorH - 2, leafT), leafMat);
-    leaf.position.set((doorW - 1) / 2, doorH / 2, 0);
+    hinge.position.set(hingeRight ? doorW / 2 : -doorW / 2, 0, 0);
+    // rotation.y = φ maps local (dirX,0) to z = −dirX·sin φ → choose φ so the leaf swings toward swingSign·Z
+    hinge.rotation.y = -dirX * swingSign * openAngle;
+
+    const leafW = doorW - 1;
+    const leaf = new THREE.Mesh(new THREE.BoxGeometry(leafW, doorH - 2, leafT), leafMat);
+    leaf.position.set(dirX * leafW / 2, doorH / 2, 0);
     leaf.castShadow = true;
     hinge.add(leaf);
-    // Small upper panel "window"
-    const pane = new THREE.Mesh(new THREE.BoxGeometry(doorW * 0.35, doorH * 0.22, leafT + 0.3), glassMat);
-    pane.position.set((doorW - 1) / 2, doorH * 0.68, 0);
-    hinge.add(pane);
-    // Handle
-    const handle = new THREE.Mesh(
-        new THREE.BoxGeometry(2.2, 8, 3),
-        new THREE.MeshStandardMaterial({ color: 0xb0b0b0, metalness: 0.7, roughness: 0.3 })
-    );
-    handle.position.set(doorW - 10, doorH * 0.45, leafT / 2 + 1.2);
-    hinge.add(handle);
+
+    // Raised panels on both faces
+    [1, -1].forEach(function(face) {
+        [[doorH * 0.70, doorH * 0.38], [doorH * 0.27, doorH * 0.36]].forEach(function(pp) {
+            const panel = new THREE.Mesh(new THREE.BoxGeometry(leafW * 0.68, pp[1], 0.8), panelMat);
+            panel.position.set(dirX * leafW / 2, pp[0], face * (leafT / 2 + 0.4));
+            hinge.add(panel);
+        });
+        const handle = new THREE.Mesh(new THREE.BoxGeometry(12, 2.2, 2.5), handleMat);
+        handle.position.set(dirX * (leafW - 12), doorH * 0.47, face * (leafT / 2 + 2));
+        hinge.add(handle);
+        const rose = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.6, 1, 16), handleMat);
+        rose.rotation.x = Math.PI / 2;
+        rose.position.set(dirX * (leafW - 7), doorH * 0.47, face * (leafT / 2 + 0.5));
+        hinge.add(rose);
+    });
     group.add(hinge);
 
-    // Orient + place on wall (local +X = along wall, local +Z = out of room).
-    // Inset a bit into the room to avoid z-fighting with the wall plane.
-    const inset = 3;
-    if (pose.wall === 'front') {
-        group.position.set(pose.cx, 0, pose.cz - inset);
-        group.rotation.y = 0;
-    } else if (pose.wall === 'back') {
-        group.position.set(pose.cx, 0, pose.cz + inset);
-        group.rotation.y = Math.PI;
-    } else if (pose.wall === 'left') {
-        group.position.set(pose.cx + inset, 0, pose.cz);
-        group.rotation.y = Math.PI / 2;
-    } else {
-        group.position.set(pose.cx - inset, 0, pose.cz);
-        group.rotation.y = -Math.PI / 2;
+    // Neutral "corridor" behind the opening so an outward-opening leaf reads against something
+    if (pose.wall !== 'front') {
+        const back = new THREE.Mesh(
+            new THREE.PlaneGeometry(doorW + 160, doorH + 60),
+            new THREE.MeshStandardMaterial({ color: 0xe6e2dc, roughness: 0.95 })
+        );
+        back.position.set(0, (doorH + 60) / 2, -120);
+        group.add(back);
     }
 
+    _placeOnRoomWall(group, pose.wall, pose.cx, pose.cz);
     group.traverse(function(child) {
         if (child.isMesh) child.userData.roomProp = 'room-door';
     });
     rg.add(group);
     window._roomDoorMesh = group;
     return group;
+}
+
+function _buildRoomWindowMeshes(rg) {
+    window._roomWindowMeshes = [];
+    if (!rg || typeof window._getRoomWindowPoses !== 'function') return;
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0xf4f4f2, roughness: 0.5, metalness: 0.05 });
+    const glassMat = new THREE.MeshStandardMaterial({
+        color: 0xd8ecf8, roughness: 0.08, metalness: 0.2, transparent: true, opacity: 0.22, depthWrite: false
+    });
+    window._getRoomWindowPoses().forEach(function(p) {
+        const w = p.width, h = p.height, sill = p.sill;
+        const fT = 6, fD = 14;
+        const group = new THREE.Group();
+        group.userData.roomProp = p.id;
+
+        const top = new THREE.Mesh(new THREE.BoxGeometry(w, fT, fD), frameMat);
+        top.position.set(0, sill + h - fT / 2, 0);
+        const bot = new THREE.Mesh(new THREE.BoxGeometry(w, fT, fD), frameMat);
+        bot.position.set(0, sill + fT / 2, 0);
+        const l = new THREE.Mesh(new THREE.BoxGeometry(fT, h, fD), frameMat);
+        l.position.set(-w / 2 + fT / 2, sill + h / 2, 0);
+        const r = new THREE.Mesh(new THREE.BoxGeometry(fT, h, fD), frameMat);
+        r.position.set(w / 2 - fT / 2, sill + h / 2, 0);
+        group.add(top, bot, l, r);
+        if (w >= 100) {
+            const mid = new THREE.Mesh(new THREE.BoxGeometry(fT * 0.8, h - fT * 2, fD * 0.7), frameMat);
+            mid.position.set(0, sill + h / 2, 0);
+            group.add(mid);
+        }
+        const ledge = new THREE.Mesh(new THREE.BoxGeometry(w + 10, 3, 18), frameMat);
+        ledge.position.set(0, sill - 1.5, 6);
+        group.add(ledge);
+
+        const glass = new THREE.Mesh(new THREE.PlaneGeometry(w - fT * 2, h - fT * 2), glassMat);
+        glass.position.set(0, sill + h / 2, 0);
+        group.add(glass);
+
+        if (p.wall !== 'front') {
+            const sky = new THREE.Mesh(
+                new THREE.PlaneGeometry(w + 200, h + 160),
+                new THREE.MeshBasicMaterial({ map: _getRoomSkyTexture() })
+            );
+            sky.position.set(0, sill + h / 2, -80);
+            group.add(sky);
+        }
+
+        _placeOnRoomWall(group, p.wall, p.cx, p.cz);
+        group.traverse(function(child) {
+            if (child.isMesh) child.userData.roomProp = p.id;
+        });
+        rg.add(group);
+        window._roomWindowMeshes.push(group);
+    });
 }
 
 window._addCustomRoomItem = function(opts) {
@@ -1349,6 +1627,11 @@ window._updateRoomPropsUI = function() {
     const chairShow = window._chairVisible !== false;
     _syncToggleBtn('room-btn-toggle-bed', bedShow, 'הסתר מיטה', 'הצג מיטה', 'bed');
     _syncToggleBtn('room-btn-toggle-chair', chairShow, 'הסתר כסא', 'הצג כסא', 'chair');
+    const door = window._roomDoor || {};
+    const hingeLbl = document.querySelector('#room-btn-door-hinge span');
+    if (hingeLbl) hingeLbl.textContent = 'ציר דלת: ' + (door.hinge === 'right' ? 'ימין' : 'שמאל');
+    const swingLbl = document.querySelector('#room-btn-door-swing span');
+    if (swingLbl) swingLbl.textContent = door.swing === 'out' ? 'נפתחת החוצה' : 'נפתחת פנימה';
     const chairVarLbl = document.getElementById('room-chair-variant-label');
     if (chairVarLbl) {
         const opt = window._CHAIR_OPTIONS[window._chairVariantIdx || 0];
@@ -1556,7 +1839,8 @@ function _buildRoom() {
         leftX:  leftWallX,
         rightX: rightWallX,
         backZ:  backZ,
-        frontZ: backZ + roomD
+        frontZ: backZ + roomD,
+        height: roomH
     };
 
     // ── Texture helper: skip textures during drag for performance ──────────
@@ -1615,23 +1899,33 @@ function _buildRoom() {
     floorMesh.userData.roomPart = 'floor';
     rg.add(floorMesh);
 
+    // Door + window openings cut into the wall planes
+    const _sideWallCZ = backZ + roomD / 2 - wallT;
+    const _openings = window._getRoomWallOpenings(window._roomBounds);
+
     // ── Back wall ──────────────────────────────────────────────────────────
-    const backWall = new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomH), makeWallMat(roomW, roomH));
+    const backWall = new THREE.Mesh(
+        _roomWallGeometry(roomW, roomH, _roomWallHoles('back', _openings, roomCenterX, _sideWallCZ, roomH)),
+        makeWallMat(roomW, roomH));
     backWall.position.set(roomCenterX, roomH / 2, backZ);
     rg.add(backWall);
 
     // ── Left wall ──────────────────────────────────────────────────────────
     // Always brick texture
-    const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(roomD, roomH), makeBrickMat(roomD, roomH));
+    const leftWall = new THREE.Mesh(
+        _roomWallGeometry(roomD, roomH, _roomWallHoles('left', _openings, roomCenterX, _sideWallCZ, roomH)),
+        makeBrickMat(roomD, roomH));
     leftWall.rotation.y = Math.PI / 2;
-    leftWall.position.set(leftWallX, roomH / 2, backZ + roomD / 2 - wallT);
+    leftWall.position.set(leftWallX, roomH / 2, _sideWallCZ);
     rg.add(leftWall);
 
     // ── Right wall ─────────────────────────────────────────────────────────
     // Always use wall.jpg (same texture as back wall)
-    const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(roomD, roomH), makeWallMat(roomD, roomH));
+    const rightWall = new THREE.Mesh(
+        _roomWallGeometry(roomD, roomH, _roomWallHoles('right', _openings, roomCenterX, _sideWallCZ, roomH)),
+        makeWallMat(roomD, roomH));
     rightWall.rotation.y = -Math.PI / 2;
-    rightWall.position.set(rightWallX, roomH / 2, backZ + roomD / 2 - wallT);
+    rightWall.position.set(rightWallX, roomH / 2, _sideWallCZ);
     rg.add(rightWall);
 
     // ── Ceiling ────────────────────────────────────────────────────────────
@@ -1813,6 +2107,7 @@ function _buildRoom() {
     // ── Entrance door (movable on walls via 2D plan) ──────────────────────────
     window._roomDoorMesh = null;
     _buildRoomDoorMesh(rg);
+    _buildRoomWindowMeshes(rg);
 
     // ── Extra project cabinets as room props ─────────────────────────────────
     window._rebuildRoomExtraCabinets(rg);

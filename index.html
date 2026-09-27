@@ -1237,6 +1237,18 @@
                 <i class="fa-solid fa-plus"></i><span>הוסף פריט</span>
             </button>
             <div class="bed-tb-sep"></div>
+            <button type="button" class="room-furn-btn" id="room-btn-add-window" onclick="window._addRoomWindow()" title="הוסף חלון לקיר — גרור אותו בתוכנית 2D למיקום הרצוי">
+                <i class="fa-solid fa-border-all"></i><span>הוסף חלון</span>
+            </button>
+            <div class="bed-tb-sep"></div>
+            <button type="button" class="room-furn-btn" id="room-btn-door-hinge" onclick="window._toggleRoomDoorHinge()" title="החלף את צד הציר של הדלת (ימין / שמאל)">
+                <i class="fa-solid fa-arrows-left-right"></i><span>ציר דלת: שמאל</span>
+            </button>
+            <div class="bed-tb-sep"></div>
+            <button type="button" class="room-furn-btn" id="room-btn-door-swing" onclick="window._toggleRoomDoorSwing()" title="החלף כיוון פתיחה (פנימה לחדר / החוצה)">
+                <i class="fa-solid fa-right-to-bracket"></i><span>נפתחת פנימה</span>
+            </button>
+            <div class="bed-tb-sep"></div>
             <button type="button" class="room-furn-btn" id="room-btn-add-project-cab" onclick="window._openRoomProjectCabinetPicker()" title="הוסף לחדר ארון / שולחן / שידה שכבר קיימים בפרויקט">
                 <i class="fa-solid fa-warehouse"></i><span>הוסף מהפרויקט</span>
             </button>
@@ -2658,16 +2670,16 @@
 <script src="quick-calc.js?v=20260914quoteClose"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
-<script src="engine-core.js?v=20260927roomLinks"></script>
+<script src="engine-core.js?v=20260927roomWin"></script>
 <script src="engine-corners.js?v=20260910deskT17"></script>
 <script src="engine-blueprint.js?v=20260918noPlinthFix"></script>
-<script src="engine-room-plan.js?v=20260927roomLinks"></script>
+<script src="engine-room-plan.js?v=20260927roomWin"></script>
 <script src="tambour-color-picker.js?v=20260617scdoors"></script>
 <script src="ui.js?v=20260927roomLinks"></script>
 <script src="mobile.js?v=20260924cellHcm1"></script>
 <script src="part-paint.js?v=20260914A427fix"></script>
 <script src="shelf-pick.js?v=20260922sideWall"></script>
-<script src="index-init.js?v=20260927roomLinks"></script>
+<script src="index-init.js?v=20260927roomWin"></script>
 
 <!-- ===== TAMBOUR FULL PALETTE MODAL ===== -->
 <div id="tambour-palette-modal" class="tambour-palette-overlay">

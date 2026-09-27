@@ -248,6 +248,21 @@
                         state.roomWall   = 'center';
                         window._roomWall = 'center';
                     }
+                    // Room door + windows
+                    if (snap.roomDoor && typeof snap.roomDoor === 'object') {
+                        window._roomDoor = Object.assign({
+                            wall: 'front', t: 0.5, width: 90, height: 210, hinge: 'left', swing: 'in', visible: true
+                        }, snap.roomDoor);
+                    }
+                    window._roomWindows = Array.isArray(snap.roomWindows)
+                        ? snap.roomWindows.filter(function(w) { return w && w.id; }).map(function(w) {
+                            return { id: String(w.id), wall: w.wall, t: Number(w.t), width: Number(w.width), height: Number(w.height), sill: Number(w.sill) };
+                        })
+                        : [];
+                    window._roomWindowSeq = window._roomWindows.reduce(function(mx, w) {
+                        var m = String(w.id).match(/^room-win-(\d+)$/);
+                        return m ? Math.max(mx, parseInt(m[1], 10) || 0) : mx;
+                    }, 0);
                     // Shared rooms between project items (new format); legacy list migrated after cart restore
                     window._roomLinks = Array.isArray(snap.roomLinks)
                         ? JSON.parse(JSON.stringify(snap.roomLinks)).filter(function(g) { return g && g.poses; })
@@ -499,6 +514,15 @@
             orderForm:         state.orderForm || { factory: { title: '', notes: '' }, customer: { title: '', notes: '' } },
             orderStatus:       window._currentOrderStatus || 'quote',
             roomWall:          window._roomWall || state.roomWall || 'center',
+            roomDoor: window._roomDoor ? {
+                wall: window._roomDoor.wall, t: window._roomDoor.t,
+                width: window._roomDoor.width, height: window._roomDoor.height,
+                hinge: window._roomDoor.hinge || 'left', swing: window._roomDoor.swing || 'in',
+                visible: window._roomDoor.visible !== false
+            } : null,
+            roomWindows: (window._roomWindows || []).map(function(w) {
+                return { id: w.id, wall: w.wall, t: w.t, width: w.width, height: w.height, sill: w.sill };
+            }),
             roomLinks: (window._roomLinks || []).filter(function(g) {
                 return g && g.poses && Object.keys(g.poses).length >= 2;
             }).map(function(g) {
