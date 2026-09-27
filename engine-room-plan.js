@@ -100,7 +100,7 @@
         nightstand:  { fill: '#f5f0e8', stroke: '#92706a', label: 'שידה' },
         'room-desk': { fill: '#fef3c7', stroke: '#d97706', label: 'שולחן עבודה' },
         'room-door': { fill: '#dbeafe', stroke: '#0284c7', label: 'דלת' },
-        'room-cab':  { fill: '#dcfce7', stroke: '#059669', label: 'ארון מהפרויקט' }
+        'room-cab':  { fill: '#dcfce7', stroke: '#059669', label: 'פריט מהפרויקט' }
     };
 
     function _rectFromCenter(cx, cz, halfW, halfD, rotDeg) {
@@ -139,6 +139,21 @@
 
     function _isRoomExtraCabId(id) {
         return String(id || '').indexOf('room-cab-') === 0;
+    }
+
+    function _isProjectDesk(item) {
+        if (!item) return false;
+        if (item.spec && item.spec.isWritingDesk) return true;
+        return !!(item.rawState && item.rawState.presetId === 'writing-desk');
+    }
+
+    function _projectItemIcon(item) {
+        return _isProjectDesk(item) ? 'fa-desktop' : 'fa-warehouse';
+    }
+
+    function _escHtmlRp(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
     function _furnColors(item) {
@@ -600,6 +615,7 @@
                 const cp = _clampFurnCenter(cx, cz, halfW, halfD);
                 prop.x = cp.x;
                 prop.z = cp.z;
+                if (typeof window._roomLinksCommit === 'function') window._roomLinksCommit();
             }
         } else if (id === 'room-door') {
             if (typeof window._setRoomDoorFromPoint === 'function') {
@@ -1008,7 +1024,7 @@
                 : item.id === 'cabinet-desk' ? 'fa-laptop'
                 : item.id === 'room-door' ? 'fa-door-open'
                 : String(item.id).indexOf('custom-') === 0 ? 'fa-cube'
-                : isExtraCab ? 'fa-warehouse'
+                : isExtraCab ? _projectItemIcon(state.orderCart && state.orderCart[item.cartIndex])
                 : item.id === 'cabinet' ? 'fa-door-closed'
                 : 'fa-cube';
             row.innerHTML =
@@ -1233,6 +1249,7 @@
         list.innerHTML = '';
         const cart = state.orderCart || [];
         const added = {};
+        if (typeof window._pruneRoomExtraCabinets === 'function') window._pruneRoomExtraCabinets();
         (window._roomExtraCabinets || []).forEach(function(p) {
             if (p && typeof p.cartIndex === 'number') added[p.cartIndex] = true;
         });
@@ -1254,12 +1271,13 @@
             btn.className = 'rpc-item' + (isAdded ? ' added' : '');
             btn.disabled = isAdded || isActive;
             let badge = '';
-            if (isActive) badge = '<span class="rpc-item-badge">ארון פעיל</span>';
+            if (isActive) badge = '<span class="rpc-item-badge">פתוח עכשיו</span>';
             else if (isAdded) badge = '<span class="rpc-item-badge">כבר בחדר</span>';
+            const kind = _isProjectDesk(item) ? 'שולחן' : 'ארון';
             btn.innerHTML =
-                '<span class="rpc-item-icon"><i class="fa-solid fa-warehouse"></i></span>' +
+                '<span class="rpc-item-icon"><i class="fa-solid ' + _projectItemIcon(item) + '"></i></span>' +
                 '<span class="rpc-item-info">' +
-                    '<span class="rpc-item-title">' + label + '</span>' +
+                    '<span class="rpc-item-title">' + _escHtmlRp(label) + ' <small style="opacity:.6;font-weight:500;">· ' + kind + '</small></span>' +
                     '<span class="rpc-item-dims">' +
                         Math.round(dims.w) + '×' + Math.round(dims.d) + '×' + Math.round(dims.h) + ' ס״מ' +
                     '</span>' +

@@ -248,7 +248,11 @@
                         state.roomWall   = 'center';
                         window._roomWall = 'center';
                     }
-                    // Restore extra project cabinets placed in the room
+                    // Shared rooms between project items (new format); legacy list migrated after cart restore
+                    window._roomLinks = Array.isArray(snap.roomLinks)
+                        ? JSON.parse(JSON.stringify(snap.roomLinks)).filter(function(g) { return g && g.poses; })
+                        : null;
+                    // Restore extra project cabinets placed in the room (legacy single list)
                     if (Array.isArray(snap.roomExtraCabinets)) {
                         window._roomExtraCabinets = snap.roomExtraCabinets.map(function(p, i) {
                             return {
@@ -302,9 +306,12 @@
                         var cc = document.getElementById('cart-count');
                         if (cc) cc.innerText = state.orderCart.length;
                     }
-                    if (typeof window._pruneRoomExtraCabinets === 'function') {
-                        window._pruneRoomExtraCabinets();
+                    var _snapHostIdx = (typeof snap.editingCartIndex === 'number') ? snap.editingCartIndex : 0;
+                    if (!window._roomLinks && typeof window._roomLinksFromLegacy === 'function') {
+                        window._roomLinksFromLegacy(window._roomExtraCabinets || [], _snapHostIdx);
                     }
+                    if (!window._roomLinks) window._roomLinks = [];
+                    window._roomExtraHostIdx = -1;
                     if (snap.customer) {
                         state.customer = snap.customer;
                     }
@@ -334,6 +341,9 @@
                         window._ensureCabinetSelected(
                             (typeof snap.editingCartIndex === 'number') ? snap.editingCartIndex : 0
                         );
+                    }
+                    if (typeof window._roomLinksLoadForHost === 'function') {
+                        window._roomLinksLoadForHost(state.editingCartIndex);
                     }
                     if (typeof window._restorePresetUI === 'function') window._restorePresetUI();
                     if (typeof updateLeftSidebar === 'function') updateLeftSidebar();
@@ -489,6 +499,16 @@
             orderForm:         state.orderForm || { factory: { title: '', notes: '' }, customer: { title: '', notes: '' } },
             orderStatus:       window._currentOrderStatus || 'quote',
             roomWall:          window._roomWall || state.roomWall || 'center',
+            roomLinks: (window._roomLinks || []).filter(function(g) {
+                return g && g.poses && Object.keys(g.poses).length >= 2;
+            }).map(function(g) {
+                var poses = {};
+                Object.keys(g.poses).forEach(function(k) {
+                    var p = g.poses[k] || {};
+                    poses[k] = { x: Number(p.x) || 0, z: Number(p.z) || 0, rotation: Number(p.rotation) || 0 };
+                });
+                return { poses: poses };
+            }),
             roomExtraCabinets: (window._roomExtraCabinets || []).map(function(p) {
                 return {
                     id: p.id,

@@ -10392,6 +10392,7 @@ window.addSpaceCabinet = function() {
 
     const newIdx = state.orderCart.length - 1;
     state.editingCartIndex = newIdx;
+    if (typeof window._roomLinksLoadForHost === 'function') window._roomLinksLoadForHost(newIdx);
     if (typeof window._invalidateSpacePairPreviewImages === 'function' && pairId) {
         window._invalidateSpacePairPreviewImages(pairId);
     }
@@ -10875,6 +10876,7 @@ window._bootstrapDefaultCabinet = function() {
     item.rawState.partColors = {};
     state.orderCart = [item];
     state.editingCartIndex = 0;
+    if (typeof window._roomLinksReset === 'function') window._roomLinksReset();
     if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
     _setSaveCabinetButtonLabel();
     const cc = document.getElementById('cart-count');
@@ -10889,6 +10891,7 @@ window._ensureCabinetSelected = function(preferredIndex) {
         const item = window._snapshotCurrentCabinetToCartItem();
         state.orderCart = [item];
         state.editingCartIndex = 0;
+        if (typeof window._roomLinksReset === 'function') window._roomLinksReset();
         if (typeof window._migrateDraftPartColorsToCart === 'function') {
             window._migrateDraftPartColorsToCart(0);
         }
@@ -10941,6 +10944,11 @@ window.deleteCartItem = function(index) {
             updateLeftSidebar();
         } else {
             updateLeftSidebar();
+        }
+
+        if (typeof window._roomLinksLoadForHost === 'function') {
+            window._roomLinksLoadForHost(state.editingCartIndex);
+            if (typeof window._roomPlanFurnitureChanged === 'function') window._roomPlanFurnitureChanged();
         }
 
         const cc3 = document.getElementById('cart-count');
@@ -11065,6 +11073,7 @@ window._editCartItemNow = function(index) {
     state.blueprintHeightDimsDefault = rawState.blueprintHeightDimsDefault !== false;
 
     state.editingCartIndex = index;
+    if (typeof window._roomLinksLoadForHost === 'function') window._roomLinksLoadForHost(index);
     const _loadedItem = state.orderCart[index];
     if (_loadedItem && rawState && rawState.spacePairId && typeof window._attachSpacePairToItem === 'function') {
         window._attachSpacePairToItem(
@@ -11129,6 +11138,7 @@ window.startNewCabinet = function() {
     // Fresh cabinet — no inherited part colors
     item.rawState.partColors = {};
     state.editingCartIndex = newIdx;
+    if (typeof window._roomLinksLoadForHost === 'function') window._roomLinksLoadForHost(newIdx);
     if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
     _setSaveCabinetButtonLabel();
     const cc = document.getElementById('cart-count');
@@ -11175,6 +11185,8 @@ window.duplicateCartItem = function(index) {
     if (typeof window._setCartItemHold === 'function') window._setCartItemHold(clone, false);
     state.orderCart.splice(index + 1, 0, clone);
     const newIdx = index + 1;
+    if (typeof state.editingCartIndex === 'number' && state.editingCartIndex >= newIdx) state.editingCartIndex++;
+    if (typeof window._roomLinksOnCartInsert === 'function') window._roomLinksOnCartInsert(newIdx);
     // Re-bind all cart scopes after index shift (clone inserted in the middle)
     if (typeof window._importLocalPartColors === 'function') {
         Object.keys(state.partColors || {}).forEach(function(k) {

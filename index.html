@@ -1233,20 +1233,12 @@
                 <i class="fa-solid fa-chair"></i><span>הסתר כסא</span>
             </button>
             <div class="bed-tb-sep"></div>
-            <button type="button" class="room-furn-btn" id="room-btn-toggle-nightstand" onclick="window._toggleNightstandVisible()" title="הוסף/הסתר שידה">
-                <i class="fa-solid fa-table-cells"></i><span>הוסף שידה</span>
-            </button>
-            <div class="bed-tb-sep"></div>
-            <button type="button" class="room-furn-btn" id="room-btn-toggle-room-desk" onclick="window._toggleRoomDeskVisible()" title="הוסף/הסתר שולחן עבודה">
-                <i class="fa-solid fa-desktop"></i><span>הוסף שולחן</span>
-            </button>
-            <div class="bed-tb-sep"></div>
             <button type="button" class="room-furn-btn" id="room-btn-add-custom" onclick="window._openCustomRoomItemModal()" title="הוסף פריט מותאם לחדר">
                 <i class="fa-solid fa-plus"></i><span>הוסף פריט</span>
             </button>
             <div class="bed-tb-sep"></div>
-            <button type="button" class="room-furn-btn" id="room-btn-add-project-cab" onclick="window._openRoomProjectCabinetPicker()" title="הוסף ארון אחר מהפרויקט לחדר">
-                <i class="fa-solid fa-warehouse"></i><span>הוסף ארון מהפרויקט</span>
+            <button type="button" class="room-furn-btn" id="room-btn-add-project-cab" onclick="window._openRoomProjectCabinetPicker()" title="הוסף לחדר ארון / שולחן / שידה שכבר קיימים בפרויקט">
+                <i class="fa-solid fa-warehouse"></i><span>הוסף מהפרויקט</span>
             </button>
             <div class="bed-tb-sep"></div>
             <button type="button" class="room-furn-btn" id="room-btn-cycle-chair" onclick="window._cycleChairVariant()" title="החלף סוג כסא">
@@ -1287,12 +1279,12 @@
     <div id="room-project-cab-modal" class="custom-room-item-modal" aria-hidden="true" onclick="if(event.target===this)window._closeRoomProjectCabinetPicker()">
         <div class="cri-card rpc-card" role="dialog" aria-labelledby="rpc-title">
             <div class="cri-header">
-                <h3 id="rpc-title"><i class="fa-solid fa-warehouse"></i> הוסף ארון מהפרויקט</h3>
+                <h3 id="rpc-title"><i class="fa-solid fa-warehouse"></i> הוסף מהפרויקט לחדר</h3>
                 <button type="button" class="cri-close" onclick="window._closeRoomProjectCabinetPicker()" title="סגור"><i class="fa-solid fa-xmark"></i></button>
             </div>
-            <p class="cri-desc">בחר ארון מהעגלה להצגה בחדר — אפשר לגרור ולסובב אותו בנפרד מהארון הראשי.</p>
+            <p class="cri-desc">בחר ארון, שולחן או שידה שכבר קיימים בפרויקט. החדר משותף — כשתפתח תצוגת חדר מכל אחד מהפריטים, כולם יופיעו באותו מקום.</p>
             <div id="room-project-cab-list" class="rpc-list"></div>
-            <p id="room-project-cab-empty" class="rpc-empty" style="display:none;">אין ארונות נוספים בפרויקט. הוסף ארון לעגלה ואז חזור לכאן.</p>
+            <p id="room-project-cab-empty" class="rpc-empty" style="display:none;">אין פריטים נוספים בפרויקט. הוסף ארון / שולחן לפרויקט ואז חזור לכאן.</p>
         </div>
     </div>
 
@@ -2666,16 +2658,16 @@
 <script src="quick-calc.js?v=20260914quoteClose"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
-<script src="engine-core.js?v=20260927roomDbg"></script>
+<script src="engine-core.js?v=20260927roomLinks"></script>
 <script src="engine-corners.js?v=20260910deskT17"></script>
 <script src="engine-blueprint.js?v=20260918noPlinthFix"></script>
-<script src="engine-room-plan.js?v=20260927roomDbg"></script>
+<script src="engine-room-plan.js?v=20260927roomLinks"></script>
 <script src="tambour-color-picker.js?v=20260617scdoors"></script>
-<script src="ui.js?v=20260927roomDbg"></script>
+<script src="ui.js?v=20260927roomLinks"></script>
 <script src="mobile.js?v=20260924cellHcm1"></script>
 <script src="part-paint.js?v=20260914A427fix"></script>
 <script src="shelf-pick.js?v=20260922sideWall"></script>
-<script src="index-init.js?v=20260916spacePreview"></script>
+<script src="index-init.js?v=20260927roomLinks"></script>
 
 <!-- ===== TAMBOUR FULL PALETTE MODAL ===== -->
 <div id="tambour-palette-modal" class="tambour-palette-overlay">

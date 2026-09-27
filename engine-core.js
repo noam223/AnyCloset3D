@@ -348,27 +348,180 @@ window._getCartCabinetLabel = function(item, index) {
         (item.spec && item.spec.modelName) || ('ארון ' + ((index || 0) + 1));
 };
 
-window._pruneRoomExtraCabinets = function() {
+// ── Shared rooms between project items ──────────────────────────────────────
+// _roomLinks: [{ poses: { "<cartIndex>": { x, z, rotation } } }] — every member has one pose in a
+// shared frame. The open item sits at the origin of its own room, so _roomExtraCabinets is a
+// per-host view derived from its group: a room opened from A shows B, and from B shows A.
+window._roomLinks = window._roomLinks || [];
+window._roomExtraHostIdx = (typeof window._roomExtraHostIdx === 'number') ? window._roomExtraHostIdx : -1;
+
+function _rlNormRot(r) {
+    r = Math.round(Number(r) || 0) % 360;
+    return r < 0 ? r + 360 : r;
+}
+/** a ∘ b — pose b (expressed in a's frame) mapped into a's parent frame. Matches Object3D rotation.y. */
+function _rlCompose(a, b) {
+    const th = (a.rotation || 0) * Math.PI / 180;
+    const c = Math.cos(th), s = Math.sin(th);
+    return {
+        x: a.x + (b.x * c + b.z * s),
+        z: a.z + (-b.x * s + b.z * c),
+        rotation: _rlNormRot((a.rotation || 0) + (b.rotation || 0))
+    };
+}
+function _rlInverse(a) {
+    const th = (a.rotation || 0) * Math.PI / 180;
+    const c = Math.cos(th), s = Math.sin(th);
+    return {
+        x: -(a.x * c - a.z * s),
+        z: -(a.x * s + a.z * c),
+        rotation: _rlNormRot(-(a.rotation || 0))
+    };
+}
+function _rlHas(g, idx) {
+    return !!(g && g.poses && Object.prototype.hasOwnProperty.call(g.poses, String(idx)));
+}
+function _rlGroupOf(idx) {
+    return (window._roomLinks || []).find(function(g) { return _rlHas(g, idx); }) || null;
+}
+function _rlPose(g, idx) {
+    const p = g && g.poses && g.poses[String(idx)];
+    return p ? { x: Number(p.x) || 0, z: Number(p.z) || 0, rotation: _rlNormRot(p.rotation) } : null;
+}
+function _rlCleanup() {
+    window._roomLinks = (window._roomLinks || []).filter(function(g) {
+        return g && g.poses && Object.keys(g.poses).length >= 2;
+    });
+}
+
+/** Derive _roomExtraCabinets (host-relative) for the open cart item. */
+window._roomLinksLoadForHost = function(hostIdx) {
+    const h = (typeof hostIdx === 'number') ? hostIdx : state.editingCartIndex;
+    window._roomExtraHostIdx = (typeof h === 'number' && h >= 0) ? h : -1;
+    const g = window._roomExtraHostIdx >= 0 ? _rlGroupOf(h) : null;
+    if (!g) {
+        window._roomExtraCabinets = [];
+        return;
+    }
+    const inv = _rlInverse(_rlPose(g, h));
     const cartLen = (state.orderCart || []).length;
+    window._roomExtraCabinets = Object.keys(g.poses).map(Number).filter(function(i) {
+        return i !== h && i >= 0 && i < cartLen;
+    }).map(function(i) {
+        const rel = _rlCompose(inv, _rlPose(g, i));
+        return { id: 'room-cab-' + i, cartIndex: i, x: rel.x, z: rel.z, rotation: rel.rotation };
+    });
+    if (typeof _roomDbg === 'function') _roomDbg('shared room loaded for item ' + h, window._roomExtraCabinets.slice());
+};
+
+/** Write the host-relative _roomExtraCabinets back into the shared group of the open item. */
+window._roomLinksCommit = function() {
+    const h = state.editingCartIndex;
+    if (typeof h !== 'number' || h < 0) return;
+    if (window._roomExtraHostIdx !== h) {
+        if (typeof _roomDbg === 'function') _roomDbg('shared room commit skipped: list belongs to item ' + window._roomExtraHostIdx + ', open item is ' + h);
+        return;
+    }
+    const props = (window._roomExtraCabinets || []).filter(function(p) {
+        return p && typeof p.cartIndex === 'number' && p.cartIndex >= 0 && p.cartIndex !== h;
+    });
+    let g = _rlGroupOf(h);
+    const hostPose = g ? _rlPose(g, h) : { x: 0, z: 0, rotation: 0 };
+    const listed = {};
+    props.forEach(function(p) { listed[p.cartIndex] = true; });
+    if (g) {
+        Object.keys(g.poses).forEach(function(k) {
+            const i = Number(k);
+            if (i !== h && !listed[i]) delete g.poses[k];
+        });
+    } else {
+        if (!props.length) return;
+        g = { poses: {} };
+        g.poses[String(h)] = hostPose;
+        window._roomLinks.push(g);
+    }
+    let merged = false;
+    props.forEach(function(p) {
+        const world = _rlCompose(hostPose, { x: Number(p.x) || 0, z: Number(p.z) || 0, rotation: p.rotation || 0 });
+        const other = _rlGroupOf(p.cartIndex);
+        if (other && other !== g) {
+            // Item already shares a room with others — bring that whole room along
+            const T = _rlCompose(world, _rlInverse(_rlPose(other, p.cartIndex)));
+            Object.keys(other.poses).forEach(function(k) {
+                if (!_rlHas(g, k)) g.poses[k] = _rlCompose(T, _rlPose(other, Number(k)));
+            });
+            other.poses = {};
+            merged = true;
+        }
+        g.poses[String(p.cartIndex)] = world;
+    });
+    _rlCleanup();
+    if (merged) window._roomLinksLoadForHost(h);
+};
+
+window._roomLinksReset = function() {
+    window._roomLinks = [];
+    window._roomExtraCabinets = [];
+    window._roomExtraHostIdx = (typeof state.editingCartIndex === 'number') ? state.editingCartIndex : -1;
+};
+
+function _rlRemapIndices(mapFn) {
+    (window._roomLinks || []).forEach(function(g) {
+        const next = {};
+        Object.keys(g.poses || {}).forEach(function(k) {
+            const ni = mapFn(Number(k));
+            if (ni >= 0) next[String(ni)] = g.poses[k];
+        });
+        g.poses = next;
+    });
+    _rlCleanup();
+    // Host view is stale until the open item is re-derived
+    window._roomExtraHostIdx = -1;
+}
+
+/** Cart item inserted at `index` (items at index.. shift up by one). */
+window._roomLinksOnCartInsert = function(index) {
+    if (typeof index !== 'number') return;
+    _rlRemapIndices(function(i) { return i >= index ? i + 1 : i; });
+};
+
+/** Legacy saves: one global list of props relative to the item that was open when saved. */
+window._roomLinksFromLegacy = function(list, hostIdx) {
+    window._roomLinks = [];
+    if (!Array.isArray(list) || !list.length || typeof hostIdx !== 'number' || hostIdx < 0) return;
+    const g = { poses: {} };
+    g.poses[String(hostIdx)] = { x: 0, z: 0, rotation: 0 };
+    list.forEach(function(p) {
+        if (!p || typeof p.cartIndex !== 'number' || p.cartIndex < 0 || p.cartIndex === hostIdx) return;
+        g.poses[String(p.cartIndex)] = {
+            x: Number(p.x) || 0, z: Number(p.z) || 0, rotation: _rlNormRot(p.rotation)
+        };
+    });
+    window._roomLinks.push(g);
+    _rlCleanup();
+};
+
+window._pruneRoomExtraCabinets = function() {
+    // Self-heal: list must belong to the open item (skip while cart media capture swaps items)
+    if (!window._cartMediaRefreshRunning && typeof state.editingCartIndex === 'number' &&
+        state.editingCartIndex >= 0 && window._roomExtraHostIdx !== state.editingCartIndex) {
+        window._roomLinksLoadForHost(state.editingCartIndex);
+    }
+    const cartLen = (state.orderCart || []).length;
+    const host = state.editingCartIndex;
     window._roomExtraCabinets = (window._roomExtraCabinets || []).filter(function(p) {
-        return p && typeof p.cartIndex === 'number' && p.cartIndex >= 0 && p.cartIndex < cartLen;
+        return p && typeof p.cartIndex === 'number' && p.cartIndex >= 0 && p.cartIndex < cartLen && p.cartIndex !== host;
     });
 };
 
-/** After a cart item is deleted at `deletedIndex`, drop/reindex room props. */
+/** After a cart item is deleted at `deletedIndex`, drop/reindex shared-room members. */
 window._onCartItemDeletedForRoomProps = function(deletedIndex) {
     if (typeof deletedIndex !== 'number') return;
-    window._roomExtraCabinets = (window._roomExtraCabinets || []).filter(function(p) {
-        return p && p.cartIndex !== deletedIndex;
-    }).map(function(p) {
-        if (p.cartIndex > deletedIndex) p.cartIndex -= 1;
-        return p;
+    _rlRemapIndices(function(i) {
+        if (i === deletedIndex) return -1;
+        return i > deletedIndex ? i - 1 : i;
     });
-    if (typeof window._roomPlanFurnitureChanged === 'function') {
-        window._roomPlanFurnitureChanged();
-    } else if (typeof _buildRoom === 'function' && window._roomVisible) {
-        _buildRoom();
-    }
+    window._roomExtraCabinets = [];
 };
 
 window._findRoomExtraCabinet = function(id) {
@@ -378,6 +531,8 @@ window._findRoomExtraCabinet = function(id) {
 window._addRoomExtraCabinetFromCart = function(cartIndex) {
     const cart = state.orderCart || [];
     if (typeof cartIndex !== 'number' || cartIndex < 0 || cartIndex >= cart.length) return null;
+    if (cartIndex === state.editingCartIndex) return null;
+    window._pruneRoomExtraCabinets();
     if ((window._roomExtraCabinets || []).some(function(p) { return p.cartIndex === cartIndex; })) return null;
 
     const item = cart[cartIndex];
@@ -389,15 +544,15 @@ window._addRoomExtraCabinetFromCart = function(cartIndex) {
         cx = Math.max(b.leftX + dims.w / 2, Math.min(b.rightX - dims.w / 2, cx));
         cz = Math.max(b.backZ + dims.d / 2, Math.min(b.frontZ - dims.d / 2, cz));
     }
-    window._roomExtraCabinetSeq = (window._roomExtraCabinetSeq || 0) + 1;
     const prop = {
-        id: 'room-cab-' + window._roomExtraCabinetSeq,
+        id: 'room-cab-' + cartIndex,
         cartIndex: cartIndex,
         x: cx,
         z: cz,
         rotation: 0
     };
     window._roomExtraCabinets.push(prop);
+    window._roomLinksCommit();
     if (typeof window._roomPlanFurnitureChanged === 'function') {
         window._roomPlanFurnitureChanged();
     } else if (typeof _buildRoom === 'function') {
@@ -412,6 +567,7 @@ window._removeRoomExtraCabinet = function(id) {
         return !p || p.id !== id;
     });
     if (window._roomExtraCabinets.length === before) return;
+    window._roomLinksCommit();
     if (typeof window._roomPlanFurnitureChanged === 'function') {
         window._roomPlanFurnitureChanged();
     } else if (typeof _buildRoom === 'function') {
@@ -423,6 +579,7 @@ window._rotateRoomExtraCabinet = function(id) {
     const prop = window._findRoomExtraCabinet(id);
     if (!prop) return;
     prop.rotation = ((prop.rotation || 0) + 90) % 360;
+    window._roomLinksCommit();
     if (typeof window._roomPlanFurnitureChanged === 'function') {
         window._roomPlanFurnitureChanged();
     } else if (typeof _buildRoom === 'function') {
@@ -1192,9 +1349,6 @@ window._updateRoomPropsUI = function() {
     const chairShow = window._chairVisible !== false;
     _syncToggleBtn('room-btn-toggle-bed', bedShow, 'הסתר מיטה', 'הצג מיטה', 'bed');
     _syncToggleBtn('room-btn-toggle-chair', chairShow, 'הסתר כסא', 'הצג כסא', 'chair');
-    _syncToggleBtn('room-btn-toggle-nightstand', !!window._nightstandVisible, 'הסתר שידה', 'הוסף שידה', 'table-cells');
-    _syncToggleBtn('room-btn-toggle-room-desk', !!window._roomDeskVisible, 'הסתר שולחן', 'הוסף שולחן', 'desktop');
-
     const chairVarLbl = document.getElementById('room-chair-variant-label');
     if (chairVarLbl) {
         const opt = window._CHAIR_OPTIONS[window._chairVariantIdx || 0];
