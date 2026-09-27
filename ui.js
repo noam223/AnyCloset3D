@@ -122,18 +122,20 @@ const placementHebrew = {
 
 // ── Drawer count helpers ──────────────────────────────────────────────────────
 // Internal: 22cm for 1 drawer, +20cm per extra → 1→22, 2→42, 3→62, ...
-// External: 12cm for 1 drawer, +20cm per extra (same proportion as internal, shorter first drawer)
+// External: 12cm per drawer minimum → 1→12, 2→24, 3→36, 4→48, ...
+// Auto-fill (default count) keeps a 20cm step so tall cells don't get many tiny external fronts.
 window.MIN_DRAWER_CELL_H = 22;
 window.DRAWER_EXTRA_H = 20;
 window.MIN_EXTERNAL_DRAWER_CELL_H = 12;
-window.EXTERNAL_DRAWER_EXTRA_H = 20;
+window.EXTERNAL_DRAWER_EXTRA_H = 12;
+window.EXTERNAL_DRAWER_AUTO_STEP_H = 20;
 
 function _drawerHeightRules(drawerType) {
     const isExt = drawerType === 'external_drawers';
     return {
         minH: isExt ? window.MIN_EXTERNAL_DRAWER_CELL_H : window.MIN_DRAWER_CELL_H,
-        // Same step size so tall cells don't pack many tiny external fronts
-        extraH: isExt ? window.EXTERNAL_DRAWER_EXTRA_H : window.DRAWER_EXTRA_H
+        extraH: isExt ? window.EXTERNAL_DRAWER_EXTRA_H : window.DRAWER_EXTRA_H,
+        autoStepH: isExt ? window.EXTERNAL_DRAWER_AUTO_STEP_H : window.DRAWER_EXTRA_H
     };
 }
 window._drawerHeightRules = _drawerHeightRules;
@@ -148,11 +150,19 @@ window.minHeightForDrawerCount = minHeightForDrawerCount;
 
 function calcAutoDrawerCount(cellHeightCm, drawerType) {
     const h = Number(cellHeightCm) || 0;
-    const { minH, extraH } = _drawerHeightRules(drawerType);
+    const { minH, autoStepH } = _drawerHeightRules(drawerType);
     if (h < minH) return 0;
-    return Math.min(8, Math.floor((h - minH) / extraH) + 1);
+    return Math.min(8, Math.floor((h - minH) / autoStepH) + 1);
 }
 window.calcAutoDrawerCount = calcAutoDrawerCount;
+
+function calcMaxDrawerCount(cellHeightCm, drawerType) {
+    const h = Number(cellHeightCm) || 0;
+    const { minH, extraH } = _drawerHeightRules(drawerType);
+    if (h < minH) return 0;
+    return Math.min(8, Math.floor((h - minH) / extraH + 1e-6) + 1);
+}
+window.calcMaxDrawerCount = calcMaxDrawerCount;
 
 // Minimum drawers for a cell: always allow 1 when the cell is tall enough
 function calcMinDrawerCount(cellHeightCm, drawerType) {
@@ -190,10 +200,12 @@ function _syncDrawerCompAfterHeight(col, r) {
         comp.type = 'empty';
         return true;
     }
-    // Auto-fit drawer count to cell height (enlarge → more drawers, shrink → fewer)
+    // Auto-fit drawer count to cell height (enlarge → more drawers, shrink → fewer),
+    // but keep a manual count as long as it still fits the per-drawer minimum
     const auto = calcAutoDrawerCount(cellH, comp.type);
+    const maxCount = calcMaxDrawerCount(cellH, comp.type);
     const minCount = calcMinDrawerCount(cellH, comp.type);
-    comp.count = Math.max(minCount, Math.min(8, auto));
+    comp.count = Math.max(minCount, Math.min(maxCount, Math.max(auto, comp.count || 0)));
     return false;
 }
 window._syncDrawerCompAfterHeight = _syncDrawerCompAfterHeight;
@@ -2093,7 +2105,7 @@ function _applyColumnClipboard(target, src) {
             comp.type = 'empty';
         } else {
             const minCount = calcMinDrawerCount(cellH, comp.type);
-            const maxCount = calcAutoDrawerCount(cellH, comp.type);
+            const maxCount = calcMaxDrawerCount(cellH, comp.type);
             comp.count = Math.max(minCount, Math.min(maxCount, comp.count || 1));
         }
     }
@@ -2380,9 +2392,9 @@ window._applyColumnTemplateToCol = function(target, tplData) {
         const rules = (typeof _drawerHeightRules === 'function') ? _drawerHeightRules(comp.type) : { minH: 20 };
         if (cellH < (rules.minH || 20)) {
             comp.type = 'empty';
-        } else if (typeof calcMinDrawerCount === 'function' && typeof calcAutoDrawerCount === 'function') {
+        } else if (typeof calcMinDrawerCount === 'function' && typeof calcMaxDrawerCount === 'function') {
             const minCount = calcMinDrawerCount(cellH, comp.type);
-            const maxCount = calcAutoDrawerCount(cellH, comp.type);
+            const maxCount = calcMaxDrawerCount(cellH, comp.type);
             comp.count = Math.max(minCount, Math.min(maxCount, comp.count || 1));
         }
     }
@@ -5230,7 +5242,7 @@ window.updateDrawerCount = function(delta) {
                 if (interior !== 'internal_drawers' && interior !== 'external_drawers') return;
                 const zoneH = _getSubZoneHeightCm(col, r, sub, z);
                 const minCount = calcMinDrawerCount(zoneH, interior);
-                const maxCount = calcAutoDrawerCount(zoneH, interior);
+                const maxCount = calcMaxDrawerCount(zoneH, interior);
                 const cur = _zoneDrawerCountAt(sub, z, zoneH, interior);
                 const want = cur + delta;
                 if (delta > 0 && want > maxCount) {
@@ -5258,7 +5270,7 @@ window.updateDrawerCount = function(delta) {
         if (comp && (comp.type === 'internal_drawers' || comp.type === 'external_drawers')) {
             const cellH = _cellHeight(col, r);
             const minCount = calcMinDrawerCount(cellH, comp.type);
-            const maxCount = calcAutoDrawerCount(cellH, comp.type);
+            const maxCount = calcMaxDrawerCount(cellH, comp.type);
             const want = (comp.count || 1) + delta;
             if (delta > 0 && want > maxCount) {
                 blockedWant = want;

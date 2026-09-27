@@ -3163,7 +3163,7 @@ function _clampDrawerCompartments(col, baseY, t) {
             const cellH = Math.round(_compartmentBounds(col, r).h * 100) / 100;
             const rules = (typeof window._drawerHeightRules === 'function')
                 ? window._drawerHeightRules(comp.type)
-                : { minH: (comp.type === 'external_drawers' ? 12 : 22), extraH: 20 };
+                : { minH: (comp.type === 'external_drawers' ? 12 : 22), extraH: (comp.type === 'external_drawers' ? 12 : 20) };
             if (cellH < rules.minH) {
                 // Never dissolve a desk-merged drawer — its height is pinned by merge shelves
                 if (!comp.mergeWithDesk) comp.type = 'empty';
@@ -3171,11 +3171,11 @@ function _clampDrawerCompartments(col, baseY, t) {
                 const minCount = (typeof window.calcMinDrawerCount === 'function')
                     ? window.calcMinDrawerCount(cellH, comp.type)
                     : (cellH >= rules.minH ? 1 : 0);
-                const autoCount = (typeof window.calcAutoDrawerCount === 'function')
-                    ? window.calcAutoDrawerCount(cellH, comp.type)
+                const maxCount = (typeof window.calcMaxDrawerCount === 'function')
+                    ? window.calcMaxDrawerCount(cellH, comp.type)
                     : (Math.floor((cellH - rules.minH) / rules.extraH) + 1);
                 if (comp.count < minCount) comp.count = minCount;
-                if (comp.count > autoCount) comp.count = autoCount;
+                if (comp.count > maxCount) comp.count = maxCount;
                 if (comp.count < 1) comp.count = 1;
             }
         }
