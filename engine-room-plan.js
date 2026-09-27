@@ -67,6 +67,31 @@
         if (typeof _buildRoom === 'function') _buildRoom();
     };
 
+    function _dbgState() {
+        return (typeof window._roomDbgState === 'function') ? window._roomDbgState() : {};
+    }
+
+    /** Entering 3D inside room plan: make sure the room actually exists; repair and report if not. */
+    function _ensureRoomOn3dSwitch() {
+        if (state.viewMode !== 'room-plan') return;
+        const rg = window._roomGroup;
+        const before = _dbgState();
+        if (typeof window._roomDbg === 'function') window._roomDbg('2D → 3D', before);
+        if (rg && rg.children.length > 0 && rg.visible) return;
+
+        const reasons = [];
+        if (window._roomVisible === false) { reasons.push('_roomVisible=false'); window._roomVisible = true; }
+        if (window._isDragging) { reasons.push('_isDragging stuck'); window._isDragging = false; }
+        if (state.wingEditMode) reasons.push('wingEditMode on');
+        if (rg && !rg.visible) reasons.push('group hidden');
+        if (rg && rg.children.length === 0) reasons.push('group empty');
+        if (typeof _buildRoom === 'function') _buildRoom();
+        if (rg && !state.wingEditMode) rg.visible = true;
+
+        console.warn('[room] Room was missing when switching to 3D — rebuilt. Reasons: ' + (reasons.join(', ') || 'unknown'),
+            { before: before, after: _dbgState() });
+    }
+
     const FURN_COLORS = {
         cabinet:     { fill: '#e8edf3', stroke: '#1E3A5F', label: 'הארון שלך' },
         bed:         { fill: '#f1f5f9', stroke: '#64748b', label: 'מיטה' },
@@ -1027,6 +1052,7 @@
             window._renderRoomPlan2D();
         } else {
             window._syncRoomPlanTo3D();
+            _ensureRoomOn3dSwitch();
             if (typeof updateCameraView === 'function') updateCameraView();
         }
         if (typeof window._updateBedHandles === 'function') window._updateBedHandles();

@@ -159,8 +159,56 @@ const floor = new Proxy({}, {
     }
 });
 
+// ---- Room debug ----
+// Verbose logs: run window._roomDebug(true) in the console (persists via localStorage).
+// Unexpected room loss while תצוגת חדר is open is always reported with console.warn.
+window._DEBUG_ROOM = (function() {
+    try { return localStorage.getItem('debugRoom') === '1'; } catch (e) { return false; }
+})();
+window._roomDebug = function(on) {
+    window._DEBUG_ROOM = on !== false;
+    try { localStorage.setItem('debugRoom', window._DEBUG_ROOM ? '1' : '0'); } catch (e) { /* ignore */ }
+    console.log('[room] debug ' + (window._DEBUG_ROOM ? 'ON' : 'OFF'), window._roomDbgState());
+};
+function _roomUiActive() {
+    const b = document.body;
+    return !!(b && (b.classList.contains('room-plan-mode') || b.classList.contains('presentation-mode')));
+}
+window._roomDbgState = function() {
+    const rg = window._roomGroup;
+    return {
+        viewMode: state.viewMode,
+        subview: window._roomPlanSubview,
+        roomPlanUi: !!(document.body && document.body.classList.contains('room-plan-mode')),
+        presentation: !!(document.body && document.body.classList.contains('presentation-mode')),
+        roomVisible: window._roomVisible,
+        isDragging: !!window._isDragging,
+        wingEditMode: !!state.wingEditMode,
+        pending3D: !!window._roomPlanPending3D,
+        groupVisible: rg ? rg.visible : null,
+        groupChildren: rg ? rg.children.length : null
+    };
+};
+function _roomDbg(msg, extra) {
+    if (!window._DEBUG_ROOM) return;
+    console.log('[room] ' + msg, extra !== undefined ? extra : window._roomDbgState());
+}
+window._roomDbg = _roomDbg;
+
 // ---- Room visibility toggle ----
-window._roomVisible = false;
+let _roomVisibleVal = false;
+Object.defineProperty(window, '_roomVisible', {
+    configurable: true,
+    get: function() { return _roomVisibleVal; },
+    set: function(v) {
+        if (v === false && _roomVisibleVal !== false && document.body && document.body.classList.contains('room-plan-mode')) {
+            console.warn('[room] _roomVisible set to false while תצוגת חדר is open — room will disappear', window._roomDbgState(), new Error('who turned the room off').stack);
+        } else if (v !== _roomVisibleVal) {
+            _roomDbg('_roomVisible ' + _roomVisibleVal + ' → ' + v);
+        }
+        _roomVisibleVal = v;
+    }
+});
 window._toggleRoom = function() {
     if (typeof window._toggleRoomPlanMode === 'function' && document.getElementById('btn-room-plan')) {
         window._toggleRoomPlanMode();
@@ -1219,14 +1267,31 @@ window._rotateBed = function() {
 function _buildRoom() {
     const rg = window._roomGroup;
     while (rg.children.length > 0) rg.remove(rg.children[0]);
-    if (state.viewMode === 'blueprint') return;
+    const _inRoomPlan = !!(document.body && document.body.classList.contains('room-plan-mode'));
+    if (state.viewMode === 'blueprint') { _roomDbg('skip: blueprint view'); return; }
+    // Temporary non-room view inside תצוגת חדר (thumbnail / capture) — hide for this build only
+    if (_inRoomPlan && state.viewMode !== 'room-plan') { _roomDbg('skip: temporary ' + state.viewMode + ' view inside room plan (capture)'); return; }
     // Skip rebuild during drag — room is hidden by buildCabinetDragging(), restored by _endDrag()
-    if (window._isDragging) return;
+    if (window._isDragging) {
+        if (_inRoomPlan) console.warn('[room] _buildRoom skipped: _isDragging is still true — room stays empty until the drag ends', window._roomDbgState());
+        else _roomDbg('skip: dragging');
+        return;
+    }
     // Skip rebuild when room is toggled off by user
-    if (window._roomVisible === false) return;
+    if (window._roomVisible === false) {
+        if (_inRoomPlan) console.warn('[room] _buildRoom skipped: _roomVisible is false inside room plan', window._roomDbgState());
+        else _roomDbg('skip: room hidden');
+        return;
+    }
     // Hide room when in wing edit mode
-    if (state.wingEditMode) { rg.visible = false; return; }
+    if (state.wingEditMode) {
+        rg.visible = false;
+        if (_inRoomPlan) console.warn('[room] _buildRoom hidden: wingEditMode is on inside room plan', window._roomDbgState());
+        else _roomDbg('skip: wing edit mode');
+        return;
+    }
     rg.visible = true;
+    _roomDbg('build');
 
     const roomD = (window._roomDepth  && window._roomDepth  > 0) ? window._roomDepth  : 500;
     const roomH = (window._roomHeight && window._roomHeight > 0) ? window._roomHeight : (window.MAX_GLOBAL_HEIGHT || 370);
@@ -2235,9 +2300,14 @@ function updateCameraView() {
 function buildCabinet() {
     if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
 
-    // Room shell is only for תכנון חדר or תצוגה חופשית — never in עריכת חזית / שרטוט
-    if (state.viewMode !== 'room-plan' && !document.body.classList.contains('presentation-mode')) {
+    // Room shell is only for תכנון חדר or תצוגה חופשית — never in עריכת חזית / שרטוט.
+    // While room-plan UI is open, a temporary front view (autosave thumbnail) must not turn
+    // the room off permanently — _buildRoom skips that build instead.
+    if (state.viewMode !== 'room-plan' && !_roomUiActive()) {
         window._roomVisible = false;
+    } else if (state.viewMode === 'room-plan' && window._roomVisible === false) {
+        _roomDbg('buildCabinet: re-enabling room inside room plan');
+        window._roomVisible = true;
     }
 
     while(cabinetGroup.children.length > 0) cabinetGroup.remove(cabinetGroup.children[0]);

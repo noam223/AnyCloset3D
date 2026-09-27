@@ -31,6 +31,24 @@ function _endDrag() {
     if (window._roomGroup) window._roomGroup.visible = true;
     buildCabinet(); // full rebuild restores room
 }
+// Safety net: slider nudged by keyboard / touch cancel / focus loss never fires its own pointerup,
+// which would leave _isDragging stuck and the room permanently empty.
+(function() {
+    function _releaseStuckDrag(ev) {
+        setTimeout(function() {
+            if (!window._isDragging) return;
+            if (typeof window._roomDbg === 'function') window._roomDbg('releasing stuck drag on ' + ev.type);
+            _endDrag();
+        }, 0);
+    }
+    window.addEventListener('pointerup', _releaseStuckDrag, true);
+    window.addEventListener('pointercancel', _releaseStuckDrag, true);
+    window.addEventListener('blur', _releaseStuckDrag);
+    window.addEventListener('keyup', function(ev) {
+        const el = ev.target;
+        if (el && el.tagName === 'INPUT' && el.type === 'range') _releaseStuckDrag(ev);
+    }, true);
+})();
 // ────────────────────────────────────────────────────────────────────────────
 
 /** Format clear cell height for on-screen labels: cm with 1 decimal (36.65 → "36.7"). */
