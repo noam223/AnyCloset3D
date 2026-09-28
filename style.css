@@ -6307,6 +6307,11 @@ body.viewer-mode #canvas-container canvas {
     font-size: 0.75rem;
 }
 
+#sidebar > #price-section-wrap {
+    position: relative;
+    flex-shrink: 0;
+}
+
 /* ════════════════════════════════════════════════════════════════════
    Side icon rail — one settings group visible at a time
    ════════════════════════════════════════════════════════════════════ */
