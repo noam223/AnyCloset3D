@@ -6337,6 +6337,17 @@ body.viewer-mode #canvas-container canvas {
     border-color: #34d399;
     background: rgba(16,185,129,0.2);
 }
+#header-dims-row .hsr-title {
+    flex-shrink: 0;
+    direction: rtl;
+    padding-left: 10px;
+    border-left: 1px solid rgba(255,255,255,0.14);
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1.6;
+    color: #6ee7b7;
+    white-space: nowrap;
+}
 #header-dims-row input[type="range"] {
     background: linear-gradient(90deg,
         #34d399 0%,

@@ -39,7 +39,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260910deskMerge">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
     <link rel="stylesheet" href="style-extras.css?v=20260731rpcab">
-    <link rel="stylesheet" href="style.css?v=20260929dimGreen">
+    <link rel="stylesheet" href="style.css?v=20260929dimTitle">
     <style>
         html.thumb-only-mode #left-sidebar,
         html.thumb-only-mode #right-sidebar,
@@ -169,6 +169,7 @@
                     <button type="button" class="header-slider-btn" onclick="updateDim('width',-1);saveHistoryState();"><i class="fa-solid fa-minus"></i></button>
                     <input type="range" id="inp-width" min="10" max="600" value="160" step="1">
                     <button type="button" class="header-slider-btn" onclick="updateDim('width',1);saveHistoryState();"><i class="fa-solid fa-plus"></i></button>
+                    <span class="hsr-title">רוחב</span>
                 </div>
             </div>
             <div class="header-dim-card" data-dim="height">
@@ -184,6 +185,7 @@
                     <button type="button" class="header-slider-btn" onclick="updateDim('height',-1);saveHistoryState();"><i class="fa-solid fa-minus"></i></button>
                     <input type="range" id="inp-height" min="40" max="370" value="240" step="1">
                     <button type="button" class="header-slider-btn" onclick="updateDim('height',1);saveHistoryState();"><i class="fa-solid fa-plus"></i></button>
+                    <span class="hsr-title">גובה</span>
                 </div>
             </div>
             <div class="header-dim-card" data-dim="plinth">
@@ -199,6 +201,7 @@
                     <button type="button" class="header-slider-btn" onclick="window._setPlinthHeight((parseFloat(document.getElementById('dim-pill-plinth').value)||8.75)-0.5)"><i class="fa-solid fa-minus"></i></button>
                     <input type="range" id="inp-plinth-height" min="0" max="30" value="8.8" step="0.1">
                     <button type="button" class="header-slider-btn" onclick="window._setPlinthHeight((parseFloat(document.getElementById('dim-pill-plinth').value)||8.75)+0.5)"><i class="fa-solid fa-plus"></i></button>
+                    <span class="hsr-title">צוקל</span>
                 </div>
             </div>
             <div class="header-dim-card" data-dim="depth">
@@ -214,6 +217,7 @@
                     <button type="button" class="header-slider-btn" onclick="updateDim('depth',-1);saveHistoryState();"><i class="fa-solid fa-minus"></i></button>
                     <input type="range" id="inp-depth" min="10" max="80" value="54" step="1">
                     <button type="button" class="header-slider-btn" onclick="updateDim('depth',1);saveHistoryState();"><i class="fa-solid fa-plus"></i></button>
+                    <span class="hsr-title">עומק</span>
                 </div>
             </div>
             <div class="header-dim-card" id="header-columns-card" data-dim="columns">
@@ -228,6 +232,7 @@
                     <button type="button" class="header-slider-btn" onclick="updateColumns(-1)"><i class="fa-solid fa-minus"></i></button>
                     <input type="range" id="inp-columns" min="2" max="10" value="2" step="1">
                     <button type="button" class="header-slider-btn" onclick="updateColumns(1)"><i class="fa-solid fa-plus"></i></button>
+                    <span class="hsr-title">עמודות</span>
                 </div>
             </div>
         </div>
