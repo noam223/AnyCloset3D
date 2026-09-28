@@ -6552,3 +6552,14 @@ body.room-plan-mode #led-icons-layer { display: none; }
 }
 #tb-btn-led.active i,
 #mcp-led.active i { color: #d97706; }
+
+/* Honeycomb button turns into a remove toggle when the selection already holds one */
+.toolbar-btn .tb-remove-ic { display: none; }
+#tb-btn-honeycomb.is-removable .tb-main-ic { display: none; }
+#tb-btn-honeycomb.is-removable .tb-remove-ic { display: inline-block; color: #dc2626; }
+#tb-btn-honeycomb.is-removable:hover {
+    background: #ef4444;
+    border-color: #dc2626;
+    color: #fff;
+}
+#tb-btn-honeycomb.is-removable:hover .tb-remove-ic { color: #fff; }

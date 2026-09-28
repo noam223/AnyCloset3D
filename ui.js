@@ -1623,6 +1623,12 @@ function updateToolbarButtonHighlights() {
     const toolbar = document.getElementById('bottom-floating-toolbar');
     if(!toolbar) return;
     toolbar.querySelectorAll('button.toolbar-btn').forEach(b => b.classList.remove('active'));
+    const hcBtn = document.getElementById('tb-btn-honeycomb');
+    if (hcBtn) {
+        const removable = !!_selectionHoneycombType();
+        hcBtn.classList.toggle('is-removable', removable);
+        hcBtn.title = removable ? 'לחץ להסרת הכוורת' : '';
+    }
     // Also clear sub-panel button highlights
     ['hanging-sub-panel','drawer-sub-panel','honeycomb-sub-panel'].forEach(id => {
         const p = document.getElementById(id);
@@ -3892,6 +3898,54 @@ function updateOverlaysPosition() {
         }
     }
 }
+
+/** 'open_cell' | 'side_open_cell' when the current selection holds a honeycomb, else null. */
+function _selectionHoneycombType() {
+    if (state.selection.colIndex === -1 || state.selection.rows.length === 0) return null;
+    const col = state.columns[state.selection.colIndex];
+    const comp = col && col.compartments[state.selection.rows[0]];
+    if (!comp) return null;
+    if (_activeSubCellIdxs.size > 0 && comp.partition && Array.isArray(comp.subCells)) {
+        const keys = _sortedSubKeys(_activeSubCellIdxs);
+        const group = _findZoneDoorGroup(comp, keys);
+        let t;
+        if (group && _subKeysEqual(group.keys, keys) &&
+            (group.type === 'honeycomb' || group.type === 'open_cell' || group.type === 'side_open_cell')) {
+            t = group.type;
+        } else {
+            const { si, z } = _parseSubKey(keys[0]);
+            const sub = comp.subCells[si];
+            t = sub ? _zoneInteriorAt(sub, z) : null;
+        }
+        if (t === 'side_open_cell') return 'side_open_cell';
+        return (t === 'honeycomb' || t === 'open_cell') ? 'open_cell' : null;
+    }
+    return (comp.type === 'open_cell' || comp.type === 'side_open_cell') ? comp.type : null;
+}
+
+/** כוורת button: removes the honeycomb when the selection already has one, otherwise opens its sub-panel. */
+window.onHoneycombBtnClick = function(btn) {
+    const current = _selectionHoneycombType();
+    if (!current) {
+        toggleContentSubPanel('honeycomb', btn);
+        return;
+    }
+    closeContentSubPanels();
+    if (_activeSubCellIdxs.size > 0) {
+        setSubCellType(current);
+        updateToolbarButtonHighlights();
+        return;
+    }
+    const col = state.columns[state.selection.colIndex];
+    state.selection.rows.forEach(r => {
+        const comp = col.compartments[r];
+        if (!comp || (comp.type !== 'open_cell' && comp.type !== 'side_open_cell')) return;
+        comp.type = 'empty';
+        delete comp.honeycombNoMergeRight;
+    });
+    buildCabinet(); calculatePrice(); saveHistoryState();
+    updateToolbarButtonHighlights();
+};
 
 window.toggleContentSubPanel = function(panelKey, triggerBtn) {
     const panels = { hanging: 'hanging-sub-panel', drawer: 'drawer-sub-panel', honeycomb: 'honeycomb-sub-panel' };
@@ -7257,7 +7311,10 @@ function bindUI() {
         { id: 'tb-btn-honeycomb', key: 'honeycomb' },
     ].forEach(({ id, key }) => {
         const btn = document.getElementById(id);
-        if (btn) btn.onclick = function() { toggleContentSubPanel(key, this); };
+        if (!btn) return;
+        btn.onclick = key === 'honeycomb'
+            ? function() { onHoneycombBtnClick(this); }
+            : function() { toggleContentSubPanel(key, this); };
     });
 
     const _bfv = document.getElementById('btn-front-view');
