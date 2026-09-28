@@ -9526,12 +9526,34 @@ window.openOrderModal = async function(mode, opts) {
         </div>
     ` : window._showPricing !== false ? `
         <div class="summary-customer">
-            <div class="summary-row"><span>סה"כ ארונות (ללא התקנה):</span> <span dir="ltr" style="font-weight:bold;">₪${totalOrderPrice.toLocaleString()}</span></div>
-            <div class="summary-row"><span>סה"כ הובלה והתקנה:</span> <span dir="ltr" style="font-weight:bold;">₪${totalInstallPrice.toLocaleString()}</span></div>
-            <div class="summary-row final-total"><span>סה"כ לתשלום ללקוח:</span> <span dir="ltr">₪${(totalOrderPrice + totalInstallPrice).toLocaleString()}</span></div>
+            <div class="order-discount-editor hide-on-print">
+                <div class="order-discount-title"><i class="fa-solid fa-percent"></i> הנחה ללקוח</div>
+                <label class="order-discount-field">
+                    <span>הנחה על ארונות</span>
+                    <span class="order-discount-input-wrap"><input type="number" id="order-discount-cabinets" min="0" max="100" step="0.5" value="${_getCustomerDiscounts().cab || ''}" placeholder="0"><span>%</span></span>
+                </label>
+                <label class="order-discount-field">
+                    <span>הנחה על התקנות</span>
+                    <span class="order-discount-input-wrap"><input type="number" id="order-discount-install" min="0" max="100" step="0.5" value="${_getCustomerDiscounts().inst || ''}" placeholder="0"><span>%</span></span>
+                </label>
+            </div>
+            <div id="order-customer-totals">${_customerSummaryRowsHtml(_customerTotals(totalOrderPrice, totalInstallPrice))}</div>
         </div>` : `<div></div>
     `;
     document.getElementById('modal-footer-summary').innerHTML = footerHTML;
+    [['order-discount-cabinets', 'discountCabinetsPct'], ['order-discount-install', 'discountInstallPct']].forEach(function(pair) {
+        const inp = document.getElementById(pair[0]);
+        if (!inp) return;
+        inp.addEventListener('input', function() {
+            _setCustomerDiscount(pair[1], inp.value);
+            const box = document.getElementById('order-customer-totals');
+            if (box) box.innerHTML = _customerSummaryRowsHtml(_customerTotals(totalOrderPrice, totalInstallPrice));
+        });
+        inp.addEventListener('change', function() {
+            const v = _getCustomerDiscounts()[pair[1] === 'discountCabinetsPct' ? 'cab' : 'inst'];
+            inp.value = v || '';
+        });
+    });
     modal.style.display = 'flex';
 };
 
@@ -12598,10 +12620,68 @@ function _saveOrderFormText(mode, title, notes) {
     if (!state.orderForm) state.orderForm = { factory: { title: '', notes: '' }, customer: { title: '', notes: '' } };
     const key = mode === 'factory' ? 'factory' : 'customer';
     const defaults = _getOrderFormDefaults(mode);
-    state.orderForm[key] = {
+    state.orderForm[key] = Object.assign({}, state.orderForm[key], {
         title: (title || '').trim() || defaults.title,
         notes: (notes || '').trim()
+    });
+}
+
+function _clampPct(v) {
+    const n = Number(v);
+    return isFinite(n) ? Math.max(0, Math.min(100, n)) : 0;
+}
+
+function _getCustomerDiscounts() {
+    const c = (state.orderForm && state.orderForm.customer) || {};
+    return { cab: _clampPct(c.discountCabinetsPct), inst: _clampPct(c.discountInstallPct) };
+}
+
+function _setCustomerDiscount(field, pct) {
+    if (!state.orderForm) state.orderForm = { factory: { title: '', notes: '' }, customer: { title: '', notes: '' } };
+    if (!state.orderForm.customer) state.orderForm.customer = { title: '', notes: '' };
+    state.orderForm.customer[field] = _clampPct(pct);
+    if (typeof saveHistoryState === 'function') _withoutHistory(function() { saveHistoryState(); });
+}
+
+/** Totals for the customer summary, before and after the percentage discounts. */
+function _customerTotals(totalCabinets, totalInstall) {
+    const d = _getCustomerDiscounts();
+    const cabDiscount = Math.round(totalCabinets * d.cab / 100);
+    const instDiscount = Math.round(totalInstall * d.inst / 100);
+    return {
+        cabPct: d.cab, instPct: d.inst,
+        cabinets: totalCabinets, install: totalInstall,
+        cabDiscount: cabDiscount, instDiscount: instDiscount,
+        cabinetsNet: totalCabinets - cabDiscount,
+        installNet: totalInstall - instDiscount,
+        gross: totalCabinets + totalInstall,
+        net: totalCabinets + totalInstall - cabDiscount - instDiscount,
+        hasDiscount: cabDiscount > 0 || instDiscount > 0
     };
+}
+
+function _fmtIls(n) {
+    return '₪' + Math.round(n).toLocaleString();
+}
+
+function _customerSummaryRowsHtml(t) {
+    let html = '<div class="summary-row"><span>סה"כ ארונות (ללא התקנה):</span> <span dir="ltr" style="font-weight:bold;">' + _fmtIls(t.cabinets) + '</span></div>';
+    if (t.cabDiscount > 0) {
+        html += '<div class="summary-row summary-discount"><span>הנחה על ארונות (' + t.cabPct + '%):</span> <span dir="ltr">-' + _fmtIls(t.cabDiscount) + '</span></div>' +
+            '<div class="summary-row"><span>סה"כ ארונות אחרי הנחה:</span> <span dir="ltr" style="font-weight:bold;">' + _fmtIls(t.cabinetsNet) + '</span></div>';
+    }
+    html += '<div class="summary-row"><span>סה"כ הובלה והתקנה:</span> <span dir="ltr" style="font-weight:bold;">' + _fmtIls(t.install) + '</span></div>';
+    if (t.instDiscount > 0) {
+        html += '<div class="summary-row summary-discount"><span>הנחה על התקנה (' + t.instPct + '%):</span> <span dir="ltr">-' + _fmtIls(t.instDiscount) + '</span></div>' +
+            '<div class="summary-row"><span>סה"כ התקנה אחרי הנחה:</span> <span dir="ltr" style="font-weight:bold;">' + _fmtIls(t.installNet) + '</span></div>';
+    }
+    if (t.hasDiscount) {
+        html += '<div class="summary-row summary-gross"><span>סה"כ לפני הנחה:</span> <span dir="ltr">' + _fmtIls(t.gross) + '</span></div>' +
+            '<div class="summary-row summary-saving"><span>סה"כ הנחה:</span> <span dir="ltr">-' + _fmtIls(t.gross - t.net) + '</span></div>';
+    }
+    html += '<div class="summary-row final-total"><span>' + (t.hasDiscount ? 'סה"כ לתשלום ללקוח אחרי הנחה:' : 'סה"כ לתשלום ללקוח:') +
+        '</span> <span dir="ltr">' + _fmtIls(t.net) + '</span></div>';
+    return html;
 }
 
 function _syncOrderFormNotesPrint(notes) {
@@ -12875,17 +12955,31 @@ function _buildPrintHTML(mode) {
                    <span>סה"כ עלות התקנה:</span><span dir="ltr">₪${totalInstallPrice.toLocaleString()}</span>
                </div>
            </div>`
-        : `<div style="margin-top:20px;padding:15px;background:#eff6ff;border:2px solid #bfdbfe;border-radius:8px;">
-               <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:1rem;color:#475569;">
-                   <span>סה"כ ארונות (ללא התקנה):</span><span dir="ltr" style="font-weight:bold;">₪${totalOrderPrice.toLocaleString()}</span>
-               </div>
-               <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:1rem;color:#475569;">
-                   <span>סה"כ הובלה והתקנה:</span><span dir="ltr" style="font-weight:bold;">₪${totalInstallPrice.toLocaleString()}</span>
-               </div>
+        : (function() {
+            const t = _customerTotals(totalOrderPrice, totalInstallPrice);
+            const row = 'display:flex;justify-content:space-between;margin-bottom:8px;font-size:1rem;color:#475569;';
+            const discRow = 'display:flex;justify-content:space-between;margin-bottom:8px;font-size:1rem;color:#dc2626;';
+            let rows = `<div style="${row}"><span>סה"כ ארונות (ללא התקנה):</span><span dir="ltr" style="font-weight:bold;">${_fmtIls(t.cabinets)}</span></div>`;
+            if (t.cabDiscount > 0) {
+                rows += `<div style="${discRow}"><span>הנחה על ארונות (${t.cabPct}%):</span><span dir="ltr" style="font-weight:bold;">-${_fmtIls(t.cabDiscount)}</span></div>` +
+                    `<div style="${row}"><span>סה"כ ארונות אחרי הנחה:</span><span dir="ltr" style="font-weight:bold;">${_fmtIls(t.cabinetsNet)}</span></div>`;
+            }
+            rows += `<div style="${row}"><span>סה"כ הובלה והתקנה:</span><span dir="ltr" style="font-weight:bold;">${_fmtIls(t.install)}</span></div>`;
+            if (t.instDiscount > 0) {
+                rows += `<div style="${discRow}"><span>הנחה על התקנה (${t.instPct}%):</span><span dir="ltr" style="font-weight:bold;">-${_fmtIls(t.instDiscount)}</span></div>` +
+                    `<div style="${row}"><span>סה"כ התקנה אחרי הנחה:</span><span dir="ltr" style="font-weight:bold;">${_fmtIls(t.installNet)}</span></div>`;
+            }
+            if (t.hasDiscount) {
+                rows += `<div style="${row}border-top:1px dashed #bfdbfe;padding-top:8px;"><span>סה"כ לפני הנחה:</span><span dir="ltr" style="text-decoration:line-through;">${_fmtIls(t.gross)}</span></div>` +
+                    `<div style="${discRow}"><span>סה"כ הנחה:</span><span dir="ltr" style="font-weight:bold;">-${_fmtIls(t.gross - t.net)}</span></div>`;
+            }
+            return `<div style="margin-top:20px;padding:15px;background:#eff6ff;border:2px solid #bfdbfe;border-radius:8px;">
+               ${rows}
                <div style="display:flex;justify-content:space-between;font-size:1.6rem;font-weight:800;color:#1e3a5f;border-top:2px solid #bfdbfe;padding-top:12px;margin-top:8px;">
-                   <span>סה"כ לתשלום ללקוח:</span><span dir="ltr">₪${(totalOrderPrice + totalInstallPrice).toLocaleString()}</span>
+                   <span>${t.hasDiscount ? 'סה"כ לתשלום ללקוח אחרי הנחה:' : 'סה"כ לתשלום ללקוח:'}</span><span dir="ltr">${_fmtIls(t.net)}</span>
                </div>
            </div>`;
+        })();
 
     const formText = _getOrderFormText(mode);
     const title = formText.title;

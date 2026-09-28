@@ -932,6 +932,36 @@ body {
 .btn-new-cabinet-sidebar:active {
     filter: brightness(0.97);
 }
+.order-discount-editor {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 18px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    border-radius: 12px;
+}
+.order-discount-title { font-weight: 700; color: #9a3412; font-size: 0.95rem; }
+.order-discount-title i { margin-inline-end: 4px; }
+.order-discount-field { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--text-dark); font-weight: 600; }
+.order-discount-input-wrap { display: inline-flex; align-items: center; gap: 4px; }
+.order-discount-input-wrap input {
+    width: 72px;
+    padding: 5px 8px;
+    border: 1px solid #fdba74;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    font-weight: 700;
+    text-align: center;
+    direction: ltr;
+    background: #fff;
+}
+.summary-row.summary-discount,
+.summary-row.summary-saving { color: #dc2626; font-weight: 600; }
+.summary-row.summary-gross span:last-child { text-decoration: line-through; opacity: 0.7; }
 .btn-cart-trash {
     position: relative;
     width: 34px;
