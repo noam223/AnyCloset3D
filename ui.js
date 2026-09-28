@@ -9526,34 +9526,12 @@ window.openOrderModal = async function(mode, opts) {
         </div>
     ` : window._showPricing !== false ? `
         <div class="summary-customer">
-            <div class="order-discount-editor hide-on-print">
-                <div class="order-discount-title"><i class="fa-solid fa-percent"></i> הנחה ללקוח</div>
-                <label class="order-discount-field">
-                    <span>הנחה על ארונות</span>
-                    <span class="order-discount-input-wrap"><input type="number" id="order-discount-cabinets" min="0" max="100" step="0.5" value="${_getCustomerDiscounts().cab || ''}" placeholder="0"><span>%</span></span>
-                </label>
-                <label class="order-discount-field">
-                    <span>הנחה על התקנות</span>
-                    <span class="order-discount-input-wrap"><input type="number" id="order-discount-install" min="0" max="100" step="0.5" value="${_getCustomerDiscounts().inst || ''}" placeholder="0"><span>%</span></span>
-                </label>
-            </div>
-            <div id="order-customer-totals">${_customerSummaryRowsHtml(_customerTotals(totalOrderPrice, totalInstallPrice))}</div>
+            <div class="summary-row"><span>סה"כ ארונות (ללא התקנה):</span> <span dir="ltr" style="font-weight:bold;">₪${totalOrderPrice.toLocaleString()}</span></div>
+            <div class="summary-row"><span>סה"כ הובלה והתקנה:</span> <span dir="ltr" style="font-weight:bold;">₪${totalInstallPrice.toLocaleString()}</span></div>
+            <div class="summary-row final-total"><span>סה"כ לתשלום ללקוח:</span> <span dir="ltr">₪${(totalOrderPrice + totalInstallPrice).toLocaleString()}</span></div>
         </div>` : `<div></div>
     `;
     document.getElementById('modal-footer-summary').innerHTML = footerHTML;
-    [['order-discount-cabinets', 'discountCabinetsPct'], ['order-discount-install', 'discountInstallPct']].forEach(function(pair) {
-        const inp = document.getElementById(pair[0]);
-        if (!inp) return;
-        inp.addEventListener('input', function() {
-            _setCustomerDiscount(pair[1], inp.value);
-            const box = document.getElementById('order-customer-totals');
-            if (box) box.innerHTML = _customerSummaryRowsHtml(_customerTotals(totalOrderPrice, totalInstallPrice));
-        });
-        inp.addEventListener('change', function() {
-            const v = _getCustomerDiscounts()[pair[1] === 'discountCabinetsPct' ? 'cab' : 'inst'];
-            inp.value = v || '';
-        });
-    });
     modal.style.display = 'flex';
 };
 
@@ -12664,23 +12642,28 @@ function _fmtIls(n) {
     return '₪' + Math.round(n).toLocaleString();
 }
 
-function _customerSummaryRowsHtml(t) {
-    let html = '<div class="summary-row"><span>סה"כ ארונות (ללא התקנה):</span> <span dir="ltr" style="font-weight:bold;">' + _fmtIls(t.cabinets) + '</span></div>';
+/** Discount block + grand total for the "סיכום ללקוח" page. */
+function _customerSummaryTotalsHtml(t) {
+    if (!t.hasDiscount) {
+        return '<div class="grand-total editable" contenteditable="true">סה"כ לתשלום (כולל התקנה): ' + _fmtIls(t.gross) + '</div>';
+    }
+    const row = function(label, value, cls) {
+        return '<div class="disc-row' + (cls ? ' ' + cls : '') + '"><span class="editable" contenteditable="true">' + label +
+            '</span><span class="editable" contenteditable="true" dir="ltr">' + value + '</span></div>';
+    };
+    let html = '<div class="disc-box">';
     if (t.cabDiscount > 0) {
-        html += '<div class="summary-row summary-discount"><span>הנחה על ארונות (' + t.cabPct + '%):</span> <span dir="ltr">-' + _fmtIls(t.cabDiscount) + '</span></div>' +
-            '<div class="summary-row"><span>סה"כ ארונות אחרי הנחה:</span> <span dir="ltr" style="font-weight:bold;">' + _fmtIls(t.cabinetsNet) + '</span></div>';
+        html += row('הנחה על ארונות (' + t.cabPct + '%):', '-' + _fmtIls(t.cabDiscount), 'disc-minus') +
+            row('סה"כ ארונות אחרי הנחה:', _fmtIls(t.cabinetsNet));
     }
-    html += '<div class="summary-row"><span>סה"כ הובלה והתקנה:</span> <span dir="ltr" style="font-weight:bold;">' + _fmtIls(t.install) + '</span></div>';
     if (t.instDiscount > 0) {
-        html += '<div class="summary-row summary-discount"><span>הנחה על התקנה (' + t.instPct + '%):</span> <span dir="ltr">-' + _fmtIls(t.instDiscount) + '</span></div>' +
-            '<div class="summary-row"><span>סה"כ התקנה אחרי הנחה:</span> <span dir="ltr" style="font-weight:bold;">' + _fmtIls(t.installNet) + '</span></div>';
+        html += row('הנחה על התקנות (' + t.instPct + '%):', '-' + _fmtIls(t.instDiscount), 'disc-minus') +
+            row('סה"כ התקנות אחרי הנחה:', _fmtIls(t.installNet));
     }
-    if (t.hasDiscount) {
-        html += '<div class="summary-row summary-gross"><span>סה"כ לפני הנחה:</span> <span dir="ltr">' + _fmtIls(t.gross) + '</span></div>' +
-            '<div class="summary-row summary-saving"><span>סה"כ הנחה:</span> <span dir="ltr">-' + _fmtIls(t.gross - t.net) + '</span></div>';
-    }
-    html += '<div class="summary-row final-total"><span>' + (t.hasDiscount ? 'סה"כ לתשלום ללקוח אחרי הנחה:' : 'סה"כ לתשלום ללקוח:') +
-        '</span> <span dir="ltr">' + _fmtIls(t.net) + '</span></div>';
+    html += row('סה"כ לפני הנחה (כולל התקנה):', _fmtIls(t.gross), 'disc-gross') +
+        row('סה"כ הנחה:', '-' + _fmtIls(t.gross - t.net), 'disc-minus') +
+        '</div>' +
+        '<div class="grand-total editable" contenteditable="true">סה"כ לתשלום אחרי הנחה (כולל התקנה): ' + _fmtIls(t.net) + '</div>';
     return html;
 }
 
@@ -12955,31 +12938,17 @@ function _buildPrintHTML(mode) {
                    <span>סה"כ עלות התקנה:</span><span dir="ltr">₪${totalInstallPrice.toLocaleString()}</span>
                </div>
            </div>`
-        : (function() {
-            const t = _customerTotals(totalOrderPrice, totalInstallPrice);
-            const row = 'display:flex;justify-content:space-between;margin-bottom:8px;font-size:1rem;color:#475569;';
-            const discRow = 'display:flex;justify-content:space-between;margin-bottom:8px;font-size:1rem;color:#dc2626;';
-            let rows = `<div style="${row}"><span>סה"כ ארונות (ללא התקנה):</span><span dir="ltr" style="font-weight:bold;">${_fmtIls(t.cabinets)}</span></div>`;
-            if (t.cabDiscount > 0) {
-                rows += `<div style="${discRow}"><span>הנחה על ארונות (${t.cabPct}%):</span><span dir="ltr" style="font-weight:bold;">-${_fmtIls(t.cabDiscount)}</span></div>` +
-                    `<div style="${row}"><span>סה"כ ארונות אחרי הנחה:</span><span dir="ltr" style="font-weight:bold;">${_fmtIls(t.cabinetsNet)}</span></div>`;
-            }
-            rows += `<div style="${row}"><span>סה"כ הובלה והתקנה:</span><span dir="ltr" style="font-weight:bold;">${_fmtIls(t.install)}</span></div>`;
-            if (t.instDiscount > 0) {
-                rows += `<div style="${discRow}"><span>הנחה על התקנה (${t.instPct}%):</span><span dir="ltr" style="font-weight:bold;">-${_fmtIls(t.instDiscount)}</span></div>` +
-                    `<div style="${row}"><span>סה"כ התקנה אחרי הנחה:</span><span dir="ltr" style="font-weight:bold;">${_fmtIls(t.installNet)}</span></div>`;
-            }
-            if (t.hasDiscount) {
-                rows += `<div style="${row}border-top:1px dashed #bfdbfe;padding-top:8px;"><span>סה"כ לפני הנחה:</span><span dir="ltr" style="text-decoration:line-through;">${_fmtIls(t.gross)}</span></div>` +
-                    `<div style="${discRow}"><span>סה"כ הנחה:</span><span dir="ltr" style="font-weight:bold;">-${_fmtIls(t.gross - t.net)}</span></div>`;
-            }
-            return `<div style="margin-top:20px;padding:15px;background:#eff6ff;border:2px solid #bfdbfe;border-radius:8px;">
-               ${rows}
+        : `<div style="margin-top:20px;padding:15px;background:#eff6ff;border:2px solid #bfdbfe;border-radius:8px;">
+               <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:1rem;color:#475569;">
+                   <span>סה"כ ארונות (ללא התקנה):</span><span dir="ltr" style="font-weight:bold;">₪${totalOrderPrice.toLocaleString()}</span>
+               </div>
+               <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:1rem;color:#475569;">
+                   <span>סה"כ הובלה והתקנה:</span><span dir="ltr" style="font-weight:bold;">₪${totalInstallPrice.toLocaleString()}</span>
+               </div>
                <div style="display:flex;justify-content:space-between;font-size:1.6rem;font-weight:800;color:#1e3a5f;border-top:2px solid #bfdbfe;padding-top:12px;margin-top:8px;">
-                   <span>${t.hasDiscount ? 'סה"כ לתשלום ללקוח אחרי הנחה:' : 'סה"כ לתשלום ללקוח:'}</span><span dir="ltr">${_fmtIls(t.net)}</span>
+                   <span>סה"כ לתשלום ללקוח:</span><span dir="ltr">₪${(totalOrderPrice + totalInstallPrice).toLocaleString()}</span>
                </div>
            </div>`;
-        })();
 
     const formText = _getOrderFormText(mode);
     const title = formText.title;
@@ -14243,7 +14212,6 @@ function _buildCustomerSummaryHTML(logoDataUrl) {
         </div>`;
     });
 
-    const grandTotal = totalCabPrice + totalInstallPrice;
     const cols = _hidePrices ? '18% 1fr' : '18% 1fr 14% 14%';
 
     return `<!DOCTYPE html>
@@ -14282,6 +14250,14 @@ function _buildCustomerSummaryHTML(logoDataUrl) {
   .totals-label { grid-column: 1 / span 2; text-align: right; }
   .totals-val { text-align: center; color: #1e3a5f; }
   .grand-total { margin-top: 10px; font-size: 1.2rem; font-weight: 800; color: #1e3a5f; }
+  .disc-box { margin-top: 10px; max-width: 460px; font-size: 0.97rem; }
+  .disc-row { display: flex; justify-content: space-between; gap: 16px; padding: 3px 0; color: #334155; font-weight: 600; }
+  .disc-row.disc-minus { color: #dc2626; }
+  .disc-row.disc-gross { border-top: 1px dashed #cbd5e1; margin-top: 4px; padding-top: 7px; }
+  .disc-row.disc-gross span:last-child { text-decoration: line-through; color: #64748b; }
+  .disc-editor { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 6px 12px; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; font-size: 0.9rem; font-weight: 600; color: #9a3412; }
+  .disc-editor label { display: flex; align-items: center; gap: 5px; color: #1e293b; }
+  .disc-editor input { width: 62px; padding: 4px 6px; border: 1px solid #fdba74; border-radius: 6px; font: inherit; font-weight: 700; text-align: center; direction: ltr; }
   .action-bar { display: flex; gap: 10px; margin-bottom: 22px; flex-wrap: wrap; align-items: center; }
   .action-btn { padding: 9px 20px; border-radius: 8px; border: none; font-size: 0.95rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 7px; font-family: inherit; }
   .btn-print  { background: #1e3a5f; color: white; }
@@ -14314,6 +14290,11 @@ function _buildCustomerSummaryHTML(logoDataUrl) {
 <div class="action-bar">
   <button class="action-btn btn-print"  onclick="window.print()">🖨️ הדפסה / PDF</button>
   <button class="action-btn btn-excel"  onclick="_downloadExcel()">📊 הורדת Excel</button>
+  ${_hidePrices ? '' : `<div class="disc-editor">
+    <span>הנחה:</span>
+    <label>ארונות <input type="number" id="disc-cab" min="0" max="100" step="0.5" placeholder="0" value="${_getCustomerDiscounts().cab || ''}" oninput="window._onDiscountInput && window._onDiscountInput()">%</label>
+    <label>התקנות <input type="number" id="disc-inst" min="0" max="100" step="0.5" placeholder="0" value="${_getCustomerDiscounts().inst || ''}" oninput="window._onDiscountInput && window._onDiscountInput()">%</label>
+  </div>`}
   <span class="edit-hint">לחצו על הטקסט בדף כדי לערוך אותו לפני ההדפסה</span>
 </div>
 
@@ -14348,7 +14329,7 @@ function _buildCustomerSummaryHTML(logoDataUrl) {
   </div>`}
 </div>
 
-${_hidePrices ? '' : `<div class="grand-total editable" contenteditable="true">סה"כ לתשלום (כולל התקנה): ₪${grandTotal.toLocaleString()}</div>`}
+${_hidePrices ? '' : `<div id="summary-totals">${_customerSummaryTotalsHtml(_customerTotals(totalCabPrice, totalInstallPrice))}</div>`}
 </body>
 </html>`;
 }
@@ -14381,6 +14362,16 @@ function _buildExcelXML(d) {
         xml += '<Row><Cell><Data ss:Type="String">' + esc(r.title) + '</Data></Cell><Cell><Data ss:Type="String">' + esc(r.details) + '</Data></Cell><Cell><Data ss:Type="Number">' + r.cabPrice + '</Data></Cell><Cell><Data ss:Type="Number">' + r.instPrice + '</Data></Cell><Cell ss:StyleID="bold"><Data ss:Type="Number">' + r.totalRevenue + '</Data></Cell></Row>\n';
     });
     xml += '<Row><Cell ss:StyleID="tot"><Data ss:Type="String">סה"כ</Data></Cell><Cell ss:StyleID="tot"><Data ss:Type="String"></Data></Cell><Cell ss:StyleID="tot"><Data ss:Type="Number">' + d.totalCabPrice + '</Data></Cell><Cell ss:StyleID="tot"><Data ss:Type="Number">' + d.totalInstallPrice + '</Data></Cell><Cell ss:StyleID="tot"><Data ss:Type="Number">' + d.grandTotal + '</Data></Cell></Row>\n';
+    var t = _customerTotals(d.totalCabPrice, d.totalInstallPrice);
+    if (t.hasDiscount) {
+        var discRow = function(label, cab, inst, total, style) {
+            return '<Row><Cell ss:StyleID="' + style + '"><Data ss:Type="String">' + esc(label) + '</Data></Cell><Cell ss:StyleID="' + style + '"><Data ss:Type="String"></Data></Cell>' +
+                '<Cell ss:StyleID="' + style + '"><Data ss:Type="Number">' + cab + '</Data></Cell><Cell ss:StyleID="' + style + '"><Data ss:Type="Number">' + inst + '</Data></Cell>' +
+                '<Cell ss:StyleID="' + style + '"><Data ss:Type="Number">' + total + '</Data></Cell></Row>\n';
+        };
+        xml += discRow('הנחה (ארונות ' + t.cabPct + '% | התקנות ' + t.instPct + '%)', -t.cabDiscount, -t.instDiscount, -(t.gross - t.net), 'red');
+        xml += discRow('סה"כ אחרי הנחה', t.cabinetsNet, t.installNet, t.net, 'tot');
+    }
     xml += '</Table></Worksheet>\n';
 
     // Sheet 2: Profitability
@@ -14451,13 +14442,21 @@ window.printCustomerSummary = async function() {
     // Inject functions directly into child window — avoids </script> parsing issues
     win._excelData = excelData;
     win._buildExcelXML = _buildExcelXML;
+    win._onDiscountInput = function() {
+        const cabInp = win.document.getElementById('disc-cab');
+        const instInp = win.document.getElementById('disc-inst');
+        if (cabInp) _setCustomerDiscount('discountCabinetsPct', cabInp.value);
+        if (instInp) _setCustomerDiscount('discountInstallPct', instInp.value);
+        const box = win.document.getElementById('summary-totals');
+        if (box) box.innerHTML = _customerSummaryTotalsHtml(_customerTotals(excelData.totalCabPrice, excelData.totalInstallPrice));
+    };
 
     win._keepCabinetBlocksTogether = function() {
         var mm = 3.78;
         var pageInner = (297 - 24) * mm;
         var header = win.document.querySelector('.header');
         var used = header ? header.getBoundingClientRect().height + 12 : 0;
-        var nodes = win.document.querySelectorAll('.cab-card, .totals-row, .grand-total');
+        var nodes = win.document.querySelectorAll('.cab-card, .totals-row, .disc-box, .grand-total');
         for (var i = 0; i < nodes.length; i++) {
             var el = nodes[i];
             el.style.breakBefore = 'auto';
