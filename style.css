@@ -1077,9 +1077,9 @@ body {
     padding: 0;
 }
 .sidebar-logo-img {
-    height: 72px;
+    height: 50px;
     width: auto;
-    max-width: min(280px, 100%);
+    max-width: min(196px, 100%);
     object-fit: contain;
     object-position: right center;
     flex-shrink: 0;
