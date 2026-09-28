@@ -1692,6 +1692,7 @@ window.syncSidebarToWing = function() {
 
     _syncDimPills();
     if (typeof window._syncAllRangeFills === 'function') window._syncAllRangeFills();
+    if (typeof window._syncPartTabDots === 'function') window._syncPartTabDots();
 };
 
 function _compHasOpenCell(comp) {
@@ -1746,7 +1747,8 @@ window._updateMaterialTabVisibility = function(w) {
             const lbl = labelMap[part];
             if (!lbl) return;
             const isMobile = !!btn.closest('.mobile-panel-body');
-            btn.textContent = isMobile ? lbl[1] : lbl[0];
+            const labelEl = btn.querySelector('.ptb-label');
+            (labelEl || btn).textContent = isMobile ? lbl[1] : lbl[0];
         });
     };
 

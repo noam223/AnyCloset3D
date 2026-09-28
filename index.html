@@ -39,7 +39,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260910deskMerge">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
     <link rel="stylesheet" href="style-extras.css?v=20260731rpcab">
-    <link rel="stylesheet" href="style.css?v=20260929logo">
+    <link rel="stylesheet" href="style.css?v=20260929rail">
     <style>
         html.thumb-only-mode #left-sidebar,
         html.thumb-only-mode #right-sidebar,
@@ -154,10 +154,11 @@
             </div>
         </div>
         <p class="sidebar-section-title">עריכת מידות ארון:</p>
-        <!-- Dimension cards: label + value + slider -->
+        <!-- Dimension chips: click the number to type, hover to reveal the slider -->
         <div class="header-dims-grid" id="header-dims-row">
-            <div class="header-dim-card header-dim-card--full">
+            <div class="header-dim-card" data-dim="width">
                 <div class="header-dim-top">
+                    <i class="hdc-ic fa-solid fa-arrows-left-right"></i>
                     <label for="dim-pill-width">רוחב</label>
                     <div class="header-dim-val">
                         <input type="number" id="dim-pill-width" min="10" max="600" value="160" onchange="updateDim('width',null,this.value);saveHistoryState();">
@@ -170,8 +171,9 @@
                     <button type="button" class="header-slider-btn" onclick="updateDim('width',1);saveHistoryState();"><i class="fa-solid fa-plus"></i></button>
                 </div>
             </div>
-            <div class="header-dim-card header-dim-card--full">
+            <div class="header-dim-card" data-dim="height">
                 <div class="header-dim-top">
+                    <i class="hdc-ic fa-solid fa-arrows-up-down"></i>
                     <label for="dim-pill-height">גובה</label>
                     <div class="header-dim-val">
                         <input type="number" id="dim-pill-height" min="40" max="370" value="240" onchange="updateDim('height',null,this.value);saveHistoryState();">
@@ -184,8 +186,9 @@
                     <button type="button" class="header-slider-btn" onclick="updateDim('height',1);saveHistoryState();"><i class="fa-solid fa-plus"></i></button>
                 </div>
             </div>
-            <div class="header-dim-card">
+            <div class="header-dim-card" data-dim="plinth">
                 <div class="header-dim-top">
+                    <i class="hdc-ic fa-solid fa-grip-lines"></i>
                     <label for="dim-pill-plinth">צוקל</label>
                     <div class="header-dim-val">
                         <input type="number" id="dim-pill-plinth" min="0" max="30" step="0.1" value="8.8" onchange="window._setPlinthHeight(this.value)">
@@ -198,8 +201,9 @@
                     <button type="button" class="header-slider-btn" onclick="window._setPlinthHeight((parseFloat(document.getElementById('dim-pill-plinth').value)||8.75)+0.5)"><i class="fa-solid fa-plus"></i></button>
                 </div>
             </div>
-            <div class="header-dim-card">
+            <div class="header-dim-card" data-dim="depth">
                 <div class="header-dim-top">
+                    <i class="hdc-ic fa-solid fa-cube"></i>
                     <label for="dim-pill-depth">עומק</label>
                     <div class="header-dim-val">
                         <input type="number" id="dim-pill-depth" min="10" max="80" value="54" onchange="updateDim('depth',null,this.value);saveHistoryState();">
@@ -212,9 +216,10 @@
                     <button type="button" class="header-slider-btn" onclick="updateDim('depth',1);saveHistoryState();"><i class="fa-solid fa-plus"></i></button>
                 </div>
             </div>
-            <div class="header-dim-card header-dim-card--full" id="header-columns-card">
+            <div class="header-dim-card" id="header-columns-card" data-dim="columns">
                 <div class="header-dim-top">
-                    <label for="inp-columns">עמודות פנימיות</label>
+                    <i class="hdc-ic fa-solid fa-table-columns"></i>
+                    <label for="inp-columns">עמודות</label>
                     <div class="header-dim-val">
                         <span id="val-columns" class="header-dim-count">2</span>
                     </div>
@@ -293,8 +298,19 @@
         </div>
     </div>
 
-        <!-- ===== ROOM WALL POSITION — top of sidebar, below dimensions ===== -->
-        <div class="section" id="room-wall-section" style="padding-top:14px;">
+        <!-- ===== SIDE ICON RAIL — one settings group visible at a time (sidebar-rail.js) ===== -->
+        <div id="sb-rail-layout" data-active="colors">
+        <nav id="sb-rail" aria-label="קבוצות הגדרות">
+            <button type="button" class="sb-rail-btn" data-sbtab="customer" title="פרטי לקוח ופרויקט"><i class="fa-solid fa-user-tag"></i><span>לקוח</span></button>
+            <button type="button" class="sb-rail-btn" data-sbtab="cabinet" title="הגדרות ארון"><i class="fa-solid fa-cubes"></i><span>ארון</span></button>
+            <button type="button" class="sb-rail-btn" data-sbtab="room" title="מיקום ומידות חדר"><i class="fa-solid fa-vector-square"></i><span>חדר</span></button>
+            <button type="button" class="sb-rail-btn" data-sbtab="extras" title="יחידת צד ויחידה פינתית"><i class="fa-solid fa-puzzle-piece"></i><span>תוספות</span></button>
+            <button type="button" class="sb-rail-btn active" data-sbtab="colors" title="צבעים וחומרים"><i class="fa-solid fa-palette"></i><span>צבעים</span></button>
+        </nav>
+        <div id="sb-rail-panels">
+
+        <!-- ===== ROOM WALL POSITION ===== -->
+        <div class="section" id="room-wall-section" data-sbgroup="room" style="padding-top:14px;">
             <div class="section-title"><i class="fa-solid fa-border-all"></i> מיקום ארון בחדר</div>
             <div id="room-wall-pos-row">
                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px;">
@@ -319,84 +335,8 @@
             </div>
         </div>
 
-        <div class="section" style="background-color: var(--highlight);">
-            <div class="section-title"><i class="fa-solid fa-user-tag"></i> פרטי לקוח ופרויקט</div>
-            <div class="control-group" style="display: flex; flex-direction: column; gap: 9px; margin-bottom:0;">
-                <div class="input-icon-wrap"><i class="fa-regular fa-user"></i><input type="text" id="cust-name" class="editor-select" placeholder="שם לקוח / פרויקט" style="margin:0;"></div>
-                <div style="display:flex;gap:8px;">
-                    <div class="input-icon-wrap" style="flex:1;"><i class="fa-solid fa-phone"></i><input type="tel" id="cust-phone" class="editor-select" placeholder="טלפון" style="margin:0;"></div>
-                    <div class="input-icon-wrap" style="flex:1;"><i class="fa-solid fa-hashtag"></i><input type="text" id="cust-order-num" class="editor-select" placeholder="מס' הזמנה" style="margin:0;"></div>
-                </div>
-                <div class="input-icon-wrap"><i class="fa-solid fa-map-location-dot"></i><input type="text" id="cust-address" class="editor-select" placeholder="עיר / כתובת לאספקה" style="margin:0;"></div>
-                <div>
-                    <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:3px;">צפי אספקה</div>
-                    <div class="input-icon-wrap date-field-wrap">
-                        <i class="fa-solid fa-truck"></i>
-                        <input type="text" id="cust-delivery" class="editor-select date-mask-input" placeholder="__/__/____" inputmode="numeric" maxlength="10" autocomplete="off" style="margin:0;">
-                        <i class="fa-regular fa-calendar date-picker-icon"></i>
-                        <input type="date" id="cust-delivery-picker" class="date-native-picker" tabindex="-1" aria-label="בחירת תאריך">
-                    </div>
-                </div>
-                <div class="input-icon-wrap"><i class="fa-solid fa-pen"></i><input type="text" id="inp-cabinet-name" class="editor-select" placeholder="שם הארון (אופציונלי)" style="margin:0;"></div>
-            </div>
-        </div>
-    
-            <!-- Placeholder shown in free mode (no cabinet selected for editing) -->
-            <div id="sidebar-edit-placeholder" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 20px 32px;gap:14px;color:var(--text-light);text-align:center;">
-                <i class="fa-solid fa-hand-pointer" style="font-size:2.8rem;opacity:0.28;"></i>
-                <span style="font-size:0.92rem;font-weight:600;opacity:0.55;">בחר ארון כדי לערוך</span>
-            </div>
-    
-            <!-- All edit sections — shown only when a cabinet is selected for editing -->
-            <div id="sidebar-edit-content" style="display:none;">
-    
-            <div class="section">
-                <div class="section-title"><i class="fa-solid fa-cubes"></i> הגדרות ארון</div>
-            <div id="cabinet-model-label-row" style="margin-bottom:12px;">
-                <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:3px;">דגם ארון</div>
-                <input type="text" id="inp-cabinet-model-label" class="editor-select" placeholder="ריק = דגם הבסיס" style="margin:0;" autocomplete="off">
-            </div>
-            <div id="plinth-placement-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
-                <div id="plinth-model-row">
-                    <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:3px;">דגם בסיס</div>
-                    <select id="inp-plinth" class="editor-select" style="margin:0;">
-                        <option value="maya">צוקל נסתר</option>
-                        <option value="c9" selected>צוקל רגיל</option>
-                        <option value="regalim">ארון על רגליים</option>
-                    </select>
-                </div>
-                <div>
-                    <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:3px;">התקנה</div>
-                    <select id="inp-placement" class="editor-select" style="margin:0;">
-                        <option value="wall" selected>קיר חופשי</option>
-                        <option value="between_walls">בין קירות</option>
-                        <option value="niche">נישה</option>
-                    </select>
-                </div>
-            </div>
-            <div id="board-mat-row" style="margin-bottom:12px;">
-                <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:3px;">חומר גוף</div>
-                <select id="inp-board-mat" class="editor-select" style="margin:0;">
-                    <option value="melamine" selected>מלמין (עד 270 ס"מ)</option>
-                    <option value="sandwich">סנדביץ' (עד 240 ס"מ)</option>
-                    <option value="mdf">MDF (עד 270 ס"מ)</option>
-                </select>
-            </div>
-            <div id="wing-position-row" style="display:none;margin-top:10px;">
-                <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:3px;">מיקום כנף</div>
-                <select id="inp-wing-position" class="editor-select" style="margin:0;" onchange="updateWingPosition(this.value);">
-                    <option value="side">צדדי — חזית מיושרת עם הארון המרכזי</option>
-                    <option value="front">קדמי — בולט קדימה מחזית הארון המרכזי</option>
-                </select>
-            </div>
-            <div class="control-group" style="margin-top:12px;margin-bottom:0;">
-                <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:3px;"><i class="fa-solid fa-note-sticky" style="margin-left:4px;opacity:0.7;"></i> הערות לארון</div>
-                <textarea id="inp-cabinet-notes" class="editor-select cabinet-notes-input" rows="3" placeholder="הערות לייצור, התקנה או לקוח — יופיעו בהדפסות" style="margin:0;"></textarea>
-            </div>
-        </div>
-
         <!-- ===== ROOM SETTINGS SECTION ===== -->
-        <div class="section" id="room-settings-section">
+        <div class="section" id="room-settings-section" data-sbgroup="room">
             <div id="room-plan-sidebar-header" class="room-plan-sidebar-header" style="display:none;">
                 <div class="room-plan-sidebar-title"><i class="fa-solid fa-compass-drafting"></i> תצוגת חדר</div>
                 <div class="room-plan-sidebar-sub">גרור פריטים במבט על וראה מידות בזמן אמת</div>
@@ -436,6 +376,100 @@
             </div>
         </div>
 
+        <div class="section" id="customer-section" data-sbgroup="customer">
+            <div class="section-title"><i class="fa-solid fa-user-tag"></i> פרטי לקוח ופרויקט</div>
+            <div class="control-group" style="display: flex; flex-direction: column; gap: 9px; margin-bottom:0;">
+                <div class="input-icon-wrap"><i class="fa-regular fa-user"></i><input type="text" id="cust-name" class="editor-select" placeholder="שם לקוח / פרויקט" style="margin:0;"></div>
+                <div style="display:flex;gap:8px;">
+                    <div class="input-icon-wrap" style="flex:1;"><i class="fa-solid fa-phone"></i><input type="tel" id="cust-phone" class="editor-select" placeholder="טלפון" style="margin:0;"></div>
+                    <div class="input-icon-wrap" style="flex:1;"><i class="fa-solid fa-hashtag"></i><input type="text" id="cust-order-num" class="editor-select" placeholder="מס' הזמנה" style="margin:0;"></div>
+                </div>
+                <div class="input-icon-wrap"><i class="fa-solid fa-map-location-dot"></i><input type="text" id="cust-address" class="editor-select" placeholder="עיר / כתובת לאספקה" style="margin:0;"></div>
+                <div>
+                    <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:3px;">צפי אספקה</div>
+                    <div class="input-icon-wrap date-field-wrap">
+                        <i class="fa-solid fa-truck"></i>
+                        <input type="text" id="cust-delivery" class="editor-select date-mask-input" placeholder="__/__/____" inputmode="numeric" maxlength="10" autocomplete="off" style="margin:0;">
+                        <i class="fa-regular fa-calendar date-picker-icon"></i>
+                        <input type="date" id="cust-delivery-picker" class="date-native-picker" tabindex="-1" aria-label="בחירת תאריך">
+                    </div>
+                </div>
+                <div class="input-icon-wrap"><i class="fa-solid fa-pen"></i><input type="text" id="inp-cabinet-name" class="editor-select" placeholder="שם הארון (אופציונלי)" style="margin:0;"></div>
+            </div>
+        </div>
+    
+            <!-- Placeholder shown in free mode (no cabinet selected for editing) -->
+            <div id="sidebar-edit-placeholder" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 20px 32px;gap:14px;color:var(--text-light);text-align:center;">
+                <i class="fa-solid fa-hand-pointer" style="font-size:2.8rem;opacity:0.28;"></i>
+                <span style="font-size:0.92rem;font-weight:600;opacity:0.55;">בחר ארון כדי לערוך</span>
+            </div>
+    
+            <!-- All edit sections — shown only when a cabinet is selected for editing -->
+            <div id="sidebar-edit-content" style="display:none;">
+    
+            <div class="section" id="cabinet-settings-section" data-sbgroup="cabinet">
+                <div class="section-title"><i class="fa-solid fa-cubes"></i> הגדרות ארון</div>
+            <div id="cabinet-model-label-row" style="margin-bottom:12px;">
+                <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:3px;">דגם ארון</div>
+                <input type="text" id="inp-cabinet-model-label" class="editor-select" placeholder="ריק = דגם הבסיס" style="margin:0;" autocomplete="off">
+            </div>
+            <div id="plinth-placement-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+                <div id="plinth-model-row">
+                    <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:3px;">דגם בסיס</div>
+                    <select id="inp-plinth" class="editor-select" style="margin:0;">
+                        <option value="maya">צוקל נסתר</option>
+                        <option value="c9" selected>צוקל רגיל</option>
+                        <option value="regalim">ארון על רגליים</option>
+                    </select>
+                </div>
+                <div>
+                    <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:3px;">התקנה</div>
+                    <select id="inp-placement" class="editor-select" style="margin:0;">
+                        <option value="wall" selected>קיר חופשי</option>
+                        <option value="between_walls">בין קירות</option>
+                        <option value="niche">נישה</option>
+                    </select>
+                </div>
+            </div>
+            <div id="board-mat-row" style="margin-bottom:12px;">
+                <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:3px;">חומר גוף</div>
+                <select id="inp-board-mat" class="editor-select" style="margin:0;">
+                    <option value="melamine" selected>מלמין (עד 270 ס"מ)</option>
+                    <option value="sandwich">סנדביץ' (עד 240 ס"מ)</option>
+                    <option value="mdf">MDF (עד 270 ס"מ)</option>
+                </select>
+            </div>
+            <div id="wing-position-row" style="display:none;margin-top:10px;">
+                <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:3px;">מיקום כנף</div>
+                <select id="inp-wing-position" class="editor-select" style="margin:0;" onchange="updateWingPosition(this.value);">
+                    <option value="side">צדדי — חזית מיושרת עם הארון המרכזי</option>
+                    <option value="front">קדמי — בולט קדימה מחזית הארון המרכזי</option>
+                </select>
+            </div>
+            <div id="handle-type-row" class="control-group" style="margin-top:12px;margin-bottom:0;">
+                <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:6px;">סוג ידית / פרזול</div>
+                <div class="handle-style-row">
+                    <button type="button" class="handle-style-btn" data-style="riding" onclick="updateHandleStyle('riding')" title="ידית רוכבת">
+                        <i class="fa-solid fa-grip-lines"></i><span>רוכבת</span>
+                    </button>
+                    <button type="button" class="handle-style-btn" data-style="touch" onclick="updateHandleStyle('touch')" title="ידית טאצ'">
+                        <i class="fa-solid fa-hand-pointer"></i><span>טאצ'</span>
+                    </button>
+                    <button type="button" class="handle-style-btn active" data-style="pipe" onclick="updateHandleStyle('pipe')" title="ידית חיצונית">
+                        <i class="fa-solid fa-grip-lines-vertical"></i><span>חיצונית</span>
+                    </button>
+                </div>
+                <div class="input-icon-wrap">
+                    <i class="fa-solid fa-tag"></i>
+                    <input type="text" id="inp-handle-type" class="editor-select" placeholder="דגם / הערות (אופציונלי)..." style="margin-bottom: 0;">
+                </div>
+            </div>
+            <div class="control-group" style="margin-top:12px;margin-bottom:0;">
+                <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:3px;"><i class="fa-solid fa-note-sticky" style="margin-left:4px;opacity:0.7;"></i> הערות לארון</div>
+                <textarea id="inp-cabinet-notes" class="editor-select cabinet-notes-input" rows="3" placeholder="הערות לייצור, התקנה או לקוח — יופיעו בהדפסות" style="margin:0;"></textarea>
+            </div>
+        </div>
+
         <!-- ===== UNITS & CONTENT SECTION ===== -->
         <div class="section" id="units-content-section" style="display:none;">
             <div class="section-title"><i class="fa-solid fa-layer-group"></i> יחידות ותכולה</div>
@@ -465,7 +499,7 @@
         </div>
 
         <!-- ===== SLIDING WARDROBE SECTION (shown only for 'sliding' preset) ===== -->
-        <div class="section" id="sliding-door-section" style="display:none;">
+        <div class="section" id="sliding-door-section" data-sbgroup="cabinet" style="display:none;">
             <div class="section-title"><i class="fa-solid fa-arrows-left-right"></i> הגדרות ארון הזזה</div>
 
             <!-- Profile color -->
@@ -519,7 +553,7 @@
         </div>
         <!-- ===== END SLIDING WARDROBE SECTION ===== -->
 
-        <div class="section" id="side-unit-section" style="border-bottom:none;padding-bottom:0;">
+        <div class="section" id="side-unit-section" data-sbgroup="extras" style="border-bottom:none;padding-bottom:0;">
             <div class="section-title"><i class="fa-solid fa-table-columns"></i> יחידת צד</div>
             <!-- Type selector: styled toggle buttons -->
             <input type="hidden" id="inp-side-unit-type" value="none">
@@ -638,7 +672,7 @@
             </div>
         </div>
 
-        <div class="section" id="corner-unit-section">
+        <div class="section" id="corner-unit-section" data-sbgroup="extras">
             <div class="section-title"><i class="fa-solid fa-turn-up"></i> יחידה פינתית</div>
             <!-- Position selector: icon buttons -->
             <input type="hidden" id="inp-corner-side" value="none">
@@ -753,7 +787,7 @@
         </div>
 
         <!-- ===== BATHROOM SECTION (shown only for bathroom preset) ===== -->
-        <div class="section" id="bathroom-section" style="display:none;">
+        <div class="section" id="bathroom-section" data-sbgroup="cabinet" style="display:none;">
             <div class="section-title"><i class="fa-solid fa-sink"></i> הגדרות ארון אמבטיה</div>
 
             <!-- Style: hanging / standing -->
@@ -807,7 +841,7 @@
         </div>
 
         <!-- ===== WRITING DESK SECTION (shown only for writing-desk preset) ===== -->
-        <div class="section" id="writing-desk-section" style="display:none;">
+        <div class="section" id="writing-desk-section" data-sbgroup="cabinet" style="display:none;">
             <div class="section-title"><i class="fa-solid fa-desktop"></i> הגדרות שולחן כתיבה</div>
             <p style="font-size:0.75rem;color:var(--text-light);margin:0 0 10px;">רוחב, גובה ועומק נשלטים ממידות הארון למעלה. שתי רגליים בקצוות.</p>
 
@@ -842,37 +876,19 @@
             </div>
         </div>
 
-        <div class="section" id="materials-section" style="border-bottom: none;">
+        <div class="section" id="materials-section" data-sbgroup="colors" style="border-bottom: none;">
             <div class="section-title"><i class="fa-solid fa-palette"></i> חומרים וגימורים</div>
-            <div id="handle-type-row" class="control-group" style="margin-bottom:12px;">
-                <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:6px;">סוג ידית / פרזול</div>
-                <div class="handle-style-row">
-                    <button type="button" class="handle-style-btn" data-style="riding" onclick="updateHandleStyle('riding')" title="ידית רוכבת">
-                        <i class="fa-solid fa-grip-lines"></i><span>רוכבת</span>
-                    </button>
-                    <button type="button" class="handle-style-btn" data-style="touch" onclick="updateHandleStyle('touch')" title="ידית טאצ'">
-                        <i class="fa-solid fa-hand-pointer"></i><span>טאצ'</span>
-                    </button>
-                    <button type="button" class="handle-style-btn active" data-style="pipe" onclick="updateHandleStyle('pipe')" title="ידית חיצונית">
-                        <i class="fa-solid fa-grip-lines-vertical"></i><span>חיצונית</span>
-                    </button>
-                </div>
-                <div class="input-icon-wrap">
-                    <i class="fa-solid fa-tag"></i>
-                    <input type="text" id="inp-handle-type" class="editor-select" placeholder="דגם / הערות (אופציונלי)..." style="margin-bottom: 0;">
-                </div>
-            </div>
             <div class="control-group">
                 <div class="color-part-tabs">
-                    <button class="part-tab-btn active" data-part="materialBody">גוף וצוקל</button>
-                    <button class="part-tab-btn" data-part="materialInternal">מדפים ופנים</button>
-                    <button class="part-tab-btn" id="tab-materialBack" data-part="materialBack">גב ארון</button>
-                    <button class="part-tab-btn" id="tab-materialExternal" data-part="materialExternal">חזיתות</button>
-                    <button class="part-tab-btn" id="tab-materialDesk" data-part="materialDesk">שולחן</button>
-                    <button class="part-tab-btn" id="tab-materialOpenCell" data-part="materialOpenCell">כוורת</button>
-                    <button class="part-tab-btn" id="tab-materialSideCabinet" data-part="materialSideCabinet" style="display:none;">ארון צד</button>
-                    <button class="part-tab-btn" id="tab-materialTopPanel" data-part="materialTopPanel" style="display:none;">משטח</button>
-                    <button class="part-tab-btn" id="tab-materialUpperUnit" data-part="materialUpperUnit" style="display:none;" onclick="window._selectUpperUnitColorTab()">חלק עליון</button>
+                    <button class="part-tab-btn active" data-part="materialBody"><i class="ptb-ic fa-solid fa-cube"></i><span class="ptb-label">גוף וצוקל</span><em class="ptb-dot"></em></button>
+                    <button class="part-tab-btn" data-part="materialInternal"><i class="ptb-ic fa-solid fa-layer-group"></i><span class="ptb-label">מדפים ופנים</span><em class="ptb-dot"></em></button>
+                    <button class="part-tab-btn" id="tab-materialBack" data-part="materialBack"><i class="ptb-ic fa-solid fa-square-full"></i><span class="ptb-label">גב ארון</span><em class="ptb-dot"></em></button>
+                    <button class="part-tab-btn" id="tab-materialExternal" data-part="materialExternal"><i class="ptb-ic fa-solid fa-door-closed"></i><span class="ptb-label">חזיתות</span><em class="ptb-dot"></em></button>
+                    <button class="part-tab-btn" id="tab-materialDesk" data-part="materialDesk"><i class="ptb-ic fa-solid fa-desktop"></i><span class="ptb-label">שולחן</span><em class="ptb-dot"></em></button>
+                    <button class="part-tab-btn" id="tab-materialOpenCell" data-part="materialOpenCell"><i class="ptb-ic fa-solid fa-table-cells"></i><span class="ptb-label">כוורת</span><em class="ptb-dot"></em></button>
+                    <button class="part-tab-btn" id="tab-materialSideCabinet" data-part="materialSideCabinet" style="display:none;"><i class="ptb-ic fa-solid fa-box-archive"></i><span class="ptb-label">ארון צד</span><em class="ptb-dot"></em></button>
+                    <button class="part-tab-btn" id="tab-materialTopPanel" data-part="materialTopPanel" style="display:none;"><i class="ptb-ic fa-solid fa-grip-lines"></i><span class="ptb-label">משטח</span><em class="ptb-dot"></em></button>
+                    <button class="part-tab-btn" id="tab-materialUpperUnit" data-part="materialUpperUnit" style="display:none;"><i class="ptb-ic fa-solid fa-layer-group"></i><span class="ptb-label">חלק עליון</span><em class="ptb-dot"></em></button>
                 </div>
             </div>
             <div style="font-size: 0.9rem; font-weight: bold; margin-bottom: 12px; color: var(--text-dark);">גוונים חלקים:</div>
@@ -927,6 +943,8 @@
         </div>
 
         </div><!-- /#sidebar-edit-content -->
+        </div><!-- /#sb-rail-panels -->
+        </div><!-- /#sb-rail-layout -->
 
         <!-- Price section: always visible (outside sidebar-edit-content) -->
         <div class="price-section sticky-price" id="price-section-wrap" style="flex-direction:column; gap:8px; align-items:stretch;">
@@ -2676,16 +2694,16 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js?v=20260830adminOps"></script>
-<script src="state.js?v=20260929noUpper"></script>
+<script src="state.js?v=20260929rail"></script>
 <script src="quick-calc.js?v=20260929c9"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
 <script src="engine-core.js?v=20260928roomPose"></script>
 <script src="engine-corners.js?v=20260910deskT17"></script>
 <script src="engine-blueprint.js?v=20260918noPlinthFix"></script>
-<script src="engine-room-plan.js?v=20260928cabFront"></script>
+<script src="engine-room-plan.js?v=20260929rail"></script>
 <script src="tambour-color-picker.js?v=20260617scdoors"></script>
-<script src="ui.js?v=20260929summaryDiscount"></script>
+<script src="ui.js?v=20260929rail"></script>
 <script src="mobile.js?v=20260924cellHcm1"></script>
 <script src="part-paint.js?v=20260914A427fix"></script>
 <script src="shelf-pick.js?v=20260922sideWall"></script>
@@ -2801,7 +2819,8 @@
 </button>
 
 <script src="notes.js?v=20260714pinDelete"></script>
-<script src="tour.js?v=20260929noUpper"></script>
+<script src="tour.js?v=20260929rail"></script>
+<script src="sidebar-rail.js?v=20260929rail"></script>
 <script src="ai-renders.js?v=20260827blackLt"></script>
 <script>
     // Init AI renders after auth is ready

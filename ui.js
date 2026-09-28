@@ -7642,17 +7642,17 @@ function bindUI() {
     });
 
     document.querySelectorAll('.part-tab-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const clickedPart = e.target.getAttribute('data-part');
+        btn.addEventListener('click', () => {
+            const clickedPart = btn.getAttribute('data-part');
 
             // Special: "חלק עליון" tab — delegate to _selectUpperUnitColorTab
             if (clickedPart === 'materialUpperUnit') {
-                window._selectUpperUnitColorTab(e.target);
+                window._selectUpperUnitColorTab(btn);
                 return;
             }
 
             document.querySelectorAll('.part-tab-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
+            btn.classList.add('active');
             state.activeColorPart = clickedPart;
             _updateSandwichColorVisibility();
 

@@ -1216,6 +1216,7 @@
         const furnBar = document.getElementById('room-furniture-toolbar');
         if (furnBar) furnBar.style.display = '';
 
+        if (typeof window._sbRailSelect === 'function') window._sbRailSelect('room', { silent: true });
         const rsSec = document.getElementById('room-settings-section');
         if (rsSec) {
             rsSec.classList.add('room-plan-highlight');

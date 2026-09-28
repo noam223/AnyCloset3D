@@ -457,6 +457,7 @@ function _tourShowStep(idx) {
 
     function _doRender() {
         var el = document.querySelector(step.target);
+        if (el && typeof window._sbRailRevealFor === 'function') window._sbRailRevealFor(el);
 
         var titleEl = document.getElementById('tour-tt-title');
         var textEl  = document.getElementById('tour-tt-text');
