@@ -798,6 +798,7 @@
         .hero-right { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 
     </style>
+    <link rel="stylesheet" href="quick-calc.css?v=20260929qc">
 </head>
 <body>
 
@@ -1249,6 +1250,8 @@
                         <div class="pp-field"><label class="pp-label">זכוכית שחורה ₪</label><input class="pp-input" id="pp-doorGlassBlack" type="number" min="0"></div>
                         <div class="pp-field"><label class="pp-label">מראה ₪</label><input class="pp-input" id="pp-doorMirror" type="number" min="0"></div>
                         <div class="pp-field"><label class="pp-label">זוג לדים ₪</label><input class="pp-input" id="pp-ledPair" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">סורבטו ₪</label><input class="pp-input" id="pp-sorbet" type="number" min="0"></div>
+                        <div class="pp-field"><label class="pp-label">ידית טאצ' (לדלת/מגירה) ₪</label><input class="pp-input" id="pp-touchHandle" type="number" min="0"></div>
                     </div>
                 </div>
                 <div class="pp-section">
@@ -1655,18 +1658,21 @@
             <div class="qc-panel qc-panel-form">
                 <div class="qc-section-head">
                     <span class="qc-section-badge"><i class="fa-solid fa-ruler-combined"></i></span>
-                    <div>
+                    <div class="qc-section-head-text">
                         <div class="qc-quote-title">נתוני ארון</div>
                         <div class="qc-section-hint">מידות, דגם ותוספות</div>
                     </div>
+                    <input type="text" id="qc-cab-name" class="qc-cab-name" placeholder="שם הארון (אופציונלי)" maxlength="80">
                 </div>
-                <div class="qc-field-group">
-                    <div class="qc-field-group-label">מידות</div>
-                    <div class="qc-grid">
-                        <div class="control-group"><label>רוחב (ס"מ)</label><input type="number" id="qc-w" class="editor-select" value="160" oninput="calcQuickPrice(true)"></div>
-                        <div class="control-group"><label>גובה (ס"מ)</label><input type="number" id="qc-h" class="editor-select" value="240" oninput="calcQuickPrice(true)"></div>
-                        <div class="control-group"><label>עומק (ס"מ)</label><input type="number" id="qc-d" class="editor-select" value="54" oninput="calcQuickPrice()"></div>
-                        <div class="control-group"><label>סוג ארון</label>
+                <div class="qc-card">
+                    <div class="qc-card-label">מידות ודגם</div>
+                    <div class="qc-row qc-row-3">
+                        <div class="qc-field"><label for="qc-w">רוחב</label><div class="qc-unit-input"><input type="number" id="qc-w" value="160" oninput="calcQuickPrice(true)"><em>ס"מ</em></div></div>
+                        <div class="qc-field"><label for="qc-h">גובה</label><div class="qc-unit-input"><input type="number" id="qc-h" value="240" oninput="calcQuickPrice(true)"><em>ס"מ</em></div></div>
+                        <div class="qc-field"><label for="qc-d">עומק</label><div class="qc-unit-input"><input type="number" id="qc-d" value="54" oninput="calcQuickPrice()"><em>ס"מ</em></div></div>
+                    </div>
+                    <div class="qc-row qc-row-3">
+                        <div class="qc-field"><label for="qc-plinth">סוג ארון</label>
                             <select id="qc-plinth" class="editor-select" onchange="calcQuickPrice(true)">
                                 <option value="maya">צוקל נסתר</option>
                                 <option value="c9">צוקל רגיל</option>
@@ -1674,28 +1680,31 @@
                                 <option value="sliding">ארון הזזה</option>
                             </select>
                         </div>
-                        <div class="control-group"><label>חומר גוף</label>
+                        <div class="qc-field"><label for="qc-mat">חומר גוף</label>
                             <select id="qc-mat" class="editor-select" onchange="calcQuickPrice()">
                                 <option value="melamine">מלמין</option>
                                 <option value="sandwich">סנדביץ'</option>
                             </select>
                         </div>
-                        <div class="control-group"><label>מדפים נשלפים <span id="qc-allowed-shelves-label" class="qc-inline-note">(כלול: 8)</span></label><input type="number" id="qc-shelves" class="editor-select" value="8" oninput="calcQuickPrice(false)"></div>
+                        <div class="qc-field"><label for="qc-shelves">מדפים נשלפים <span id="qc-allowed-shelves-label" class="qc-inline-note">(כלול: 8)</span></label>
+                            <div class="qc-stepper qc-stepper-wide"><button type="button" onclick="qcStep('qc-shelves',-1)" aria-label="פחות">&minus;</button><input type="number" id="qc-shelves" value="8" min="0" oninput="calcQuickPrice(false)"><button type="button" onclick="qcStep('qc-shelves',1)" aria-label="יותר">+</button></div>
+                        </div>
                     </div>
                 </div>
-                <div class="qc-field-group">
-                    <div class="qc-field-group-label">תוספות</div>
-                    <div class="qc-grid">
-                        <div class="control-group"><label>מגירות פנים</label><input type="number" id="qc-int-d" class="editor-select" value="0" min="0" oninput="calcQuickPrice()"></div>
-                        <div class="control-group"><label>מגירות חוץ</label><input type="number" id="qc-ext-d" class="editor-select" value="0" min="0" oninput="calcQuickPrice()"></div>
-                        <div class="control-group"><label>יחידות כוורת</label><input type="number" id="qc-open-cells" class="editor-select" value="0" min="0" oninput="calcQuickPrice()"></div>
-                        <div class="control-group"><label>מחיצות</label><input type="number" id="qc-partitions" class="editor-select" value="0" min="0" oninput="calcQuickPrice()"></div>
-                        <div class="control-group"><label>דלת זכוכית פרופיל עץ</label><input type="number" id="qc-door-glass-wood" class="editor-select" value="0" min="0" oninput="calcQuickPrice()"></div>
-                        <div class="control-group"><label>דלת פרופיל אלומיניום</label><input type="number" id="qc-door-alum" class="editor-select" value="0" min="0" oninput="calcQuickPrice()"></div>
-                        <div class="control-group"><label>תוספת זוג לדים</label><input type="number" id="qc-led-pairs" class="editor-select" value="0" min="0" oninput="calcQuickPrice()"></div>
-                        <div class="control-group"><label>שם הארון (אופציונלי)</label><input type="text" id="qc-cab-name" class="editor-select" placeholder="למשל: ארון חדר שינה" maxlength="80"></div>
+                <div class="qc-card">
+                    <div class="qc-card-label">תוספות</div>
+                    <div class="qc-extras">
+                        <div class="qc-extra"><i class="fa-solid fa-bars qc-extra-ic"></i><label class="qc-extra-name" for="qc-int-d">מגירות פנים</label><div class="qc-stepper"><button type="button" onclick="qcStep('qc-int-d',-1)" aria-label="פחות">&minus;</button><input type="number" id="qc-int-d" value="0" min="0" oninput="calcQuickPrice()"><button type="button" onclick="qcStep('qc-int-d',1)" aria-label="יותר">+</button></div></div>
+                        <div class="qc-extra"><i class="fa-solid fa-inbox qc-extra-ic"></i><label class="qc-extra-name" for="qc-ext-d">מגירות חוץ</label><div class="qc-stepper"><button type="button" onclick="qcStep('qc-ext-d',-1)" aria-label="פחות">&minus;</button><input type="number" id="qc-ext-d" value="0" min="0" oninput="calcQuickPrice()"><button type="button" onclick="qcStep('qc-ext-d',1)" aria-label="יותר">+</button></div></div>
+                        <div class="qc-extra"><i class="fa-regular fa-square-full qc-extra-ic"></i><label class="qc-extra-name" for="qc-open-cells">יחידות כוורת</label><div class="qc-stepper"><button type="button" onclick="qcStep('qc-open-cells',-1)" aria-label="פחות">&minus;</button><input type="number" id="qc-open-cells" value="0" min="0" oninput="calcQuickPrice()"><button type="button" onclick="qcStep('qc-open-cells',1)" aria-label="יותר">+</button></div></div>
+                        <div class="qc-extra"><i class="fa-solid fa-table-columns qc-extra-ic"></i><label class="qc-extra-name" for="qc-partitions">מחיצות</label><div class="qc-stepper"><button type="button" onclick="qcStep('qc-partitions',-1)" aria-label="פחות">&minus;</button><input type="number" id="qc-partitions" value="0" min="0" oninput="calcQuickPrice()"><button type="button" onclick="qcStep('qc-partitions',1)" aria-label="יותר">+</button></div></div>
+                        <div class="qc-extra"><i class="fa-solid fa-arrow-up-from-bracket qc-extra-ic"></i><label class="qc-extra-name" for="qc-sorbet">סורבטו</label><div class="qc-stepper"><button type="button" onclick="qcStep('qc-sorbet',-1)" aria-label="פחות">&minus;</button><input type="number" id="qc-sorbet" value="0" min="0" oninput="calcQuickPrice()"><button type="button" onclick="qcStep('qc-sorbet',1)" aria-label="יותר">+</button></div></div>
+                        <div class="qc-extra"><i class="fa-solid fa-lightbulb qc-extra-ic"></i><label class="qc-extra-name" for="qc-led-pairs">זוג לדים</label><div class="qc-stepper"><button type="button" onclick="qcStep('qc-led-pairs',-1)" aria-label="פחות">&minus;</button><input type="number" id="qc-led-pairs" value="0" min="0" oninput="calcQuickPrice()"><button type="button" onclick="qcStep('qc-led-pairs',1)" aria-label="יותר">+</button></div></div>
+                        <div class="qc-extra"><i class="fa-solid fa-border-all qc-extra-ic"></i><label class="qc-extra-name" for="qc-door-glass-wood">דלת זכוכית פרופיל עץ</label><div class="qc-stepper"><button type="button" onclick="qcStep('qc-door-glass-wood',-1)" aria-label="פחות">&minus;</button><input type="number" id="qc-door-glass-wood" value="0" min="0" oninput="calcQuickPrice()"><button type="button" onclick="qcStep('qc-door-glass-wood',1)" aria-label="יותר">+</button></div></div>
+                        <div class="qc-extra"><i class="fa-solid fa-door-closed qc-extra-ic"></i><label class="qc-extra-name" for="qc-door-alum">דלת פרופיל אלומיניום</label><div class="qc-stepper"><button type="button" onclick="qcStep('qc-door-alum',-1)" aria-label="פחות">&minus;</button><input type="number" id="qc-door-alum" value="0" min="0" oninput="calcQuickPrice()"><button type="button" onclick="qcStep('qc-door-alum',1)" aria-label="יותר">+</button></div></div>
+                        <div class="qc-extra"><i class="fa-solid fa-hand-pointer qc-extra-ic"></i><label class="qc-extra-name" for="qc-touch">ידיות טאצ'<small>לכל דלת / מגירה</small></label><div class="qc-stepper"><button type="button" onclick="qcStep('qc-touch',-1)" aria-label="פחות">&minus;</button><input type="number" id="qc-touch" value="0" min="0" oninput="calcQuickPrice()"><button type="button" onclick="qcStep('qc-touch',1)" aria-label="יותר">+</button></div></div>
+                        <label class="qc-extra qc-extra-toggle"><i class="fa-solid fa-desktop qc-extra-ic"></i><span class="qc-extra-name">שולחן עבודה</span><input type="checkbox" id="qc-desk" onchange="calcQuickPrice()"><span class="qc-switch" aria-hidden="true"></span></label>
                     </div>
-                    <label class="checkbox-container qc-desk-check"><input type="checkbox" id="qc-desk" onchange="calcQuickPrice()"> <span>תוספת שולחן עבודה</span></label>
                 </div>
                 <div class="qc-results">
                     <div class="qc-result-row" id="qc-cost-row" style="display:none;"><span>עלות ייצור (רכש)</span><span id="qc-total-cost" class="qc-factory">₪0</span></div>
@@ -1761,7 +1770,7 @@
 </div>
 
 <script src="auth.js?v=20260830adminOps"></script>
-<script src="projects.js?v=20260916measZoom"></script>
-<script src="quick-calc.js?v=20260929c9"></script>
+<script src="projects.js?v=20260929qc"></script>
+<script src="quick-calc.js?v=20260929qc"></script>
 </body>
 </html>

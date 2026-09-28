@@ -31,6 +31,7 @@ var _QC_DEFAULT_PRICING = {
         internalDrawer: 150, externalDrawer: 200, openCell: 400, partition: 150,
         shelfFreePerMeter: 3, extraShelfMel: 60, extraShelfNonMel: 80, deskUnit: 900,
         doorGlassMel: 400, doorGlassBlack: 600, nickelLegPrice: 100, ledPair: 650,
+        sorbet: 170, touchHandle: 30,
         slidingBase: 800, slidingDoor: 350, slidingGlass: 200, slidingMirror: 350,
         slidingGold: 80, slidingBlack: 50, slidingHeightSurcharge: 0.15
     }
@@ -263,6 +264,24 @@ function _qcWingCost(cfg, w, h, d, model, isMelamine, shelves, intDrawers, extDr
 }
 
 
+/** Mark extra rows that have a non-zero value (or a checked toggle). */
+function _qcSyncExtraRows() {
+    document.querySelectorAll('#quick-calc-modal .qc-extra').forEach(function(row) {
+        var input = row.querySelector('input');
+        if (!input) return;
+        var on = input.type === 'checkbox' ? input.checked : (parseInt(input.value) || 0) > 0;
+        row.classList.toggle('has-val', on);
+    });
+}
+
+window.qcStep = function(id, delta) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    var min = el.min !== '' ? Number(el.min) : 0;
+    el.value = Math.max(min, (parseInt(el.value) || 0) + delta);
+    calcQuickPrice(false);
+};
+
 window.calcQuickPrice = function(autoUpdateShelves = false) {
     const w = parseFloat(document.getElementById('qc-w').value) || 0;
     const h = parseFloat(document.getElementById('qc-h').value) || 0;
@@ -282,6 +301,8 @@ window.calcQuickPrice = function(autoUpdateShelves = false) {
     const glassWoodDoors = parseInt((document.getElementById('qc-door-glass-wood') || {}).value) || 0;
     const alumDoors = parseInt((document.getElementById('qc-door-alum') || {}).value) || 0;
     const ledPairs = parseInt((document.getElementById('qc-led-pairs') || {}).value) || 0;
+    const sorbets = parseInt((document.getElementById('qc-sorbet') || {}).value) || 0;
+    const touchHandles = parseInt((document.getElementById('qc-touch') || {}).value) || 0;
     const hasDesk = document.getElementById('qc-desk').checked;
 
     const allowedShelves = _qcIncludedShelves(w, h, model);
@@ -302,6 +323,9 @@ window.calcQuickPrice = function(autoUpdateShelves = false) {
     finalCost += glassWoodDoors * _qcNum(ex.doorGlassMel, 400);
     finalCost += alumDoors * _qcNum(ex.doorGlassBlack, 600);
     finalCost += ledPairs * _qcNum(ex.ledPair, 650);
+    finalCost += sorbets * _qcNum(ex.sorbet, 170);
+    finalCost += touchHandles * _qcNum(ex.touchHandle, 30);
+    _qcSyncExtraRows();
 
     const installPrice = _qcInstall(cfg, w, h);
     const profitMult = cfg.profitMultiplier != null ? cfg.profitMultiplier : 1.7;
@@ -316,7 +340,8 @@ window.calcQuickPrice = function(autoUpdateShelves = false) {
         extras: {
             intDrawers: intDrawers, extDrawers: extDrawers, openCells: openCells,
             partitions: partitions, glassWoodDoors: glassWoodDoors,
-            alumDoors: alumDoors, ledPairs: ledPairs, hasDesk: !!hasDesk
+            alumDoors: alumDoors, ledPairs: ledPairs, sorbets: sorbets,
+            touchHandles: touchHandles, hasDesk: !!hasDesk
         }
     };
 
@@ -357,6 +382,8 @@ function _qcExtrasSummary(ex) {
     if (ex.glassWoodDoors) parts.push(ex.glassWoodDoors + ' דלת זכוכית פרופיל עץ');
     if (ex.alumDoors) parts.push(ex.alumDoors + ' דלת פרופיל אלומיניום');
     if (ex.ledPairs) parts.push(ex.ledPairs + ' זוג לדים');
+    if (ex.sorbets) parts.push(ex.sorbets + ' סורבטו');
+    if (ex.touchHandles) parts.push(ex.touchHandles + " ידיות טאצ'");
     if (ex.hasDesk) parts.push('שולחן עבודה');
     return parts.join(', ');
 }
@@ -407,6 +434,8 @@ window.qcLoadFormFromItem = function(item) {
     _qcSetVal('qc-door-glass-wood', ex.glassWoodDoors || 0);
     _qcSetVal('qc-door-alum', ex.alumDoors || 0);
     _qcSetVal('qc-led-pairs', ex.ledPairs || 0);
+    _qcSetVal('qc-sorbet', ex.sorbets || 0);
+    _qcSetVal('qc-touch', ex.touchHandles || 0);
     _qcSetVal('qc-desk', !!ex.hasDesk);
     _qcSetVal('qc-cab-name', item.name || '');
 };

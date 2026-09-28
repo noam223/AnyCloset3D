@@ -1886,7 +1886,8 @@ var _PP_DEFAULTS = {
         cornerDrawers3:832,cornerDrawers4:907,cornerDrawerExtra:200,cornerDesk:900,
         fullCornerBase:2800,fullCornerShelf:120,wingConnection:400,sideCabMel:12,sideCabNonMel:15,
         sideCabDoors:300,slidingBase:800,slidingDoor:350,slidingGlass:200,slidingMirror:350,
-        slidingGold:80,slidingBlack:50,slidingHeightSurcharge:0.15,nickelLegPrice:100,ledPair:650}
+        slidingGold:80,slidingBlack:50,slidingHeightSurcharge:0.15,nickelLegPrice:100,ledPair:650,
+        sorbet:170,touchHandle:30}
 };
 
 var _ppCabinetTypes = _PP_DEFAULT_CABINET_TYPES.map(function(t) { return Object.assign({}, t); });
@@ -2769,6 +2770,8 @@ function _fillPricingPanel(cfg) {
     _ppSet('pp-doorGlassBlack', _ppNum(ex.doorGlassBlack, dx.doorGlassBlack));
     _ppSet('pp-doorMirror', _ppNum(ex.doorMirror, dx.doorMirror));
     _ppSet('pp-ledPair', _ppNum(ex.ledPair, dx.ledPair));
+    _ppSet('pp-sorbet', _ppNum(ex.sorbet, dx.sorbet));
+    _ppSet('pp-touchHandle', _ppNum(ex.touchHandle, dx.touchHandle));
     _ppSet('pp-upperUnit160', _ppNum(ex.upperUnit160, dx.upperUnit160));
     _ppSet('pp-upperUnit240', _ppNum(ex.upperUnit240, dx.upperUnit240));
     _ppSet('pp-upperUnitPerCm', _ppNum(ex.upperUnitPerCm, dx.upperUnitPerCm));
@@ -2855,7 +2858,9 @@ function _readPricingPanel() {
             slidingBlack: _ppNum(_ppVal('pp-slidingBlack'), dx.slidingBlack),
             slidingHeightSurcharge: _ppFrac(_ppVal('pp-slidingHeightSurcharge')),
             nickelLegPrice: _ppNum(_ppVal('pp-nickelLegPrice'), dx.nickelLegPrice),
-            ledPair: _ppNum(_ppVal('pp-ledPair'), dx.ledPair)
+            ledPair: _ppNum(_ppVal('pp-ledPair'), dx.ledPair),
+            sorbet: _ppNum(_ppVal('pp-sorbet'), dx.sorbet),
+            touchHandle: _ppNum(_ppVal('pp-touchHandle'), dx.touchHandle)
         })
     };
 }

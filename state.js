@@ -4501,7 +4501,7 @@ var DEFAULT_PRICING_CONFIG = {
         slidingBase: 800, slidingDoor: 350, slidingGlass: 200, slidingMirror: 350,
         slidingGold: 80, slidingBlack: 50, slidingHeightSurcharge: 0.15,
         nickelLegPrice: 100,
-        ledPair: 650
+        ledPair: 650, sorbet: 170, touchHandle: 30
     }
 };
 window.DEFAULT_PRICING_CONFIG = DEFAULT_PRICING_CONFIG;
