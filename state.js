@@ -2985,20 +2985,24 @@ function _honeycombBlockNoMergeRight(col, startR, endR) {
 window._honeycombBlockNoMergeRight = _honeycombBlockNoMergeRight;
 
 function _shiftDoorsInsert(col, at) {
-    if (!col.doors) return;
-    col.doors.forEach(d => {
-        if (d.startRow >= at) d.startRow++;
-        if (d.endRow >= at) d.endRow++;
+    ['doors', 'leds'].forEach(key => {
+        if (!Array.isArray(col[key])) return;
+        col[key].forEach(d => {
+            if (d.startRow >= at) d.startRow++;
+            if (d.endRow >= at) d.endRow++;
+        });
     });
 }
 
 function _shiftDoorsRemove(col, at) {
-    if (!col.doors) return;
-    col.doors = col.doors.filter(d => !(d.startRow >= at && d.endRow <= at));
-    col.doors.forEach(d => {
-        if (d.startRow > at) d.startRow--;
-        if (d.endRow >= at) d.endRow--;
-        if (d.endRow < d.startRow) d.endRow = d.startRow;
+    ['doors', 'leds'].forEach(key => {
+        if (!Array.isArray(col[key])) return;
+        col[key] = col[key].filter(d => !(d.startRow >= at && d.endRow <= at));
+        col[key].forEach(d => {
+            if (d.startRow > at) d.startRow--;
+            if (d.endRow >= at) d.endRow--;
+            if (d.endRow < d.startRow) d.endRow = d.startRow;
+        });
     });
 }
 
@@ -3170,6 +3174,10 @@ function _syncCompartmentCount(col, baseY, t) {
     while (col.compartments.length < numComps) col.compartments.push(_emptyCompartment());
     while (col.compartments.length > numComps) col.compartments.pop();
     if (col.doors) col.doors = col.doors.filter(d => d.endRow <= numComps);
+    if (Array.isArray(col.leds)) {
+        col.leds = col.leds.filter(g => g.startRow < numComps);
+        col.leds.forEach(g => { if (g.endRow > numComps - 1) g.endRow = numComps - 1; });
+    }
 }
 
 function _clampDrawerCompartments(col, baseY, t) {
@@ -4670,6 +4678,10 @@ function _calcWingCost(cfg, wing) {
     if (wEffectiveModel==='ab2' && openCellBlocks>0) openCellBlocks--;
     finalCost += openCellBlocks*_priceNum(ex.openCell, 400);
     finalCost += partitionBlocks*_priceNum(ex.partition, 150);
+
+    let ledPairs = 0;
+    wing.columns.forEach(col => { if (Array.isArray(col.leds)) ledPairs += col.leds.length; });
+    finalCost += ledPairs * _priceNum(ex.ledPair, 650);
 
     if (wing.hasDoors) {
         wing.columns.forEach(col => {

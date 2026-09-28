@@ -619,12 +619,56 @@ window._toggleHoneycombColumnMerge = function(leftColIdx, startR, endR) {
     if (typeof saveHistoryState === 'function') saveHistoryState();
 };
 
+/** Lamp badge at the top corner of every LED group — own layer so it stays visible without hover. */
+function _renderLedCellIcons() {
+    let layer = document.getElementById('led-icons-layer');
+    if (!layer && dimLayer && dimLayer.parentNode) {
+        layer = document.createElement('div');
+        layer.id = 'led-icons-layer';
+        dimLayer.parentNode.insertBefore(layer, dimLayer);
+    }
+    if (!layer) return;
+    layer.innerHTML = '';
+    if (state.viewMode !== 'front' || !Array.isArray(state.columns)) return;
+
+    const cellEntry = (c, r) => state.dimData.find(d => d.colIndex === c && d.rowIndex === r &&
+        typeof d.h === 'number' && !d.isCellSelectBtn && !d.isSubCellBtn && !d.isPartSubWidth && !d.isColWidth);
+    const centerOf = d => (d.isPartitionedCell ? d.y - 15 : d.y);
+
+    state.columns.forEach((col, c) => {
+        if (!col || !Array.isArray(col.leds) || !col.leds.length) return;
+        col.leds.forEach(g => {
+            const top = cellEntry(c, g.endRow);
+            const bot = cellEntry(c, g.startRow);
+            if (!top || !bot) return;
+            const yTop = centerOf(top) + top.h / 2;
+            const yBot = centerOf(bot) - bot.h / 2;
+            [-1, 1].forEach(side => {
+                const strip = document.createElement('div');
+                strip.className = 'led-cell-strip';
+                strip.dataset.x3d = top.x + side * (col.width / 2 - 1.5);
+                strip.dataset.y3d = yTop;
+                strip.dataset.y3dBottom = yBot;
+                layer.appendChild(strip);
+            });
+            const el = document.createElement('div');
+            el.className = 'led-cell-icon';
+            el.dataset.x3d = top.x + col.width / 2 - 7;
+            el.dataset.y3d = yTop - 7;
+            el.title = g.startRow === g.endRow ? 'זוג לדים' : 'זוג לדים — ' + (g.endRow - g.startRow + 1) + ' תאים';
+            el.innerHTML = '<i class="fa-solid fa-lightbulb"></i>';
+            layer.appendChild(el);
+        });
+    });
+}
+
 function buildDimensionsAndButtonsUI() {
     dimLayer.innerHTML = '';
     buttonsLayer.innerHTML = '';
     // ---- Column and partition widths (same hover fade as cell dimensions) ----
     const colWidthsLayer = document.getElementById('col-widths-layer');
     if (colWidthsLayer) colWidthsLayer.innerHTML = '';
+    _renderLedCellIcons();
     if (state.viewMode !== 'front') return;
 
     state.dimData.forEach(d => {
@@ -1609,6 +1653,9 @@ function updateToolbarButtonHighlights() {
     const startR = Math.min(...state.selection.rows);
     const endR = Math.max(...state.selection.rows);
 
+    const ledBtn = document.getElementById('tb-btn-led');
+    if (ledBtn) ledBtn.classList.toggle('active', _ledGroupIndexForSelection(col) !== -1);
+
     // "תאים שווים" button: show only when 2+ consecutive rows are selected
     const equalCellsBtn = document.getElementById('tb-btn-equal-cells');
     if (equalCellsBtn) {
@@ -2044,6 +2091,7 @@ function _serializeColumnForClipboard(col) {
         shelvesY:     col.shelvesY,
         compartments: col.compartments,
         doors:        col.doors,
+        leds:         col.leds || [],
         type:         col.type,
         splitY:       col.splitY,
         floorOffset:  col.floorOffset || 0,
@@ -2079,6 +2127,7 @@ function _applyColumnClipboard(target, src) {
         });
     }
     target.doors        = srcCopy.doors;
+    target.leds         = srcCopy.leds || [];
     target.type         = srcCopy.type;
     target.floorOffset  = srcCopy.floorOffset;
     target.noPlinth     = srcCopy.noPlinth;
@@ -2419,6 +2468,7 @@ window._applyColumnTemplateToCol = function(target, tplData) {
 
     // Base structural copy (doors, type flags) without height scaling
     target.doors = src.doors ? JSON.parse(JSON.stringify(src.doors)) : [];
+    target.leds = Array.isArray(src.leds) ? JSON.parse(JSON.stringify(src.leds)) : [];
     target.type = src.type || 'normal';
     target.topPanel = !!src.topPanel;
     target.sinkPanel = !!src.sinkPanel;
@@ -2456,8 +2506,12 @@ window._applyColumnTemplateToCol = function(target, tplData) {
     const topHasSorbet = cells.length > 0 && _colTplCompHasSorbet(cells[cells.length - 1].comp);
     if (addExtraShelf) {
         const extra = { h: 0, locked: false, comp: { type: 'empty' } };
-        if (topHasSorbet) cells.unshift(extra); // grow from bottom — keep sorbet at top
-        else cells.push(extra); // default: grow from top
+        if (topHasSorbet) {
+            cells.unshift(extra); // grow from bottom — keep sorbet at top
+            target.leds.forEach(function(g) { g.startRow++; g.endRow++; });
+        } else {
+            cells.push(extra); // default: grow from top
+        }
     }
 
     const t = state.thickness;
@@ -3741,7 +3795,7 @@ function updateOverlaysPosition() {
         return localPt.project(camera);
     };
 
-    document.querySelectorAll('.dim-container, .select-all-col-btn, .col-template-btn, .sub-cell-btn, .cell-select-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn').forEach(el => {
+    document.querySelectorAll('.dim-container, .select-all-col-btn, .col-template-btn, .sub-cell-btn, .cell-select-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn, .led-cell-icon').forEach(el => {
         const pos = projectWingPoint(parseFloat(el.dataset.x3d), parseFloat(el.dataset.y3d));
         let x = (pos.x * .5 + .5) * cw;
         let y = (-(pos.y * .5) + .5) * ch;
@@ -3754,6 +3808,17 @@ function updateOverlaysPosition() {
 
         el.style.left = `${x}px`;
         el.style.top = `${y}px`;
+    });
+
+    document.querySelectorAll('.led-cell-strip').forEach(el => {
+        const x3d = parseFloat(el.dataset.x3d);
+        const a = projectWingPoint(x3d, parseFloat(el.dataset.y3d));
+        const b = projectWingPoint(x3d, parseFloat(el.dataset.y3dBottom));
+        const yA = (-(a.y * .5) + .5) * ch;
+        const yB = (-(b.y * .5) + .5) * ch;
+        el.style.left = `${(a.x * .5 + .5) * cw}px`;
+        el.style.top = `${Math.min(yA, yB)}px`;
+        el.style.height = `${Math.abs(yB - yA)}px`;
     });
 
     // ---- Column width labels (always-visible layer) ----
@@ -5156,6 +5221,40 @@ window.applyDoor = function(type) {
     }
     buildCabinet(); calculatePrice(); saveHistoryState();
     // Keep selection open — door style panel will open for style selection
+};
+
+/** Index of the LED group that fully contains the current selection, or -1. */
+function _ledGroupIndexForSelection(col) {
+    if (!col || !Array.isArray(col.leds) || state.selection.rows.length === 0) return -1;
+    const s = Math.min(...state.selection.rows);
+    const e = Math.max(...state.selection.rows);
+    return col.leds.findIndex(g => s >= g.startRow && e <= g.endRow);
+}
+window._ledGroupIndexForSelection = _ledGroupIndexForSelection;
+
+/** Toggle a pair of LED strips spanning the selected cells (priced per group). */
+window.toggleLedPair = function() {
+    if (state.selection.colIndex === -1 || state.selection.rows.length === 0) return;
+    const col = state.columns[state.selection.colIndex];
+    if (!col) return;
+    if (!Array.isArray(col.leds)) col.leds = [];
+    const hit = _ledGroupIndexForSelection(col);
+    if (hit !== -1) {
+        col.leds.splice(hit, 1);
+    } else {
+        let s = Math.min(...state.selection.rows);
+        let e = Math.max(...state.selection.rows);
+        col.leds = col.leds.filter(g => {
+            if (g.endRow < s || g.startRow > e) return true;
+            s = Math.min(s, g.startRow);
+            e = Math.max(e, g.endRow);
+            return false;
+        });
+        col.leds.push({ startRow: s, endRow: e });
+        col.leds.sort((a, b) => a.startRow - b.startRow);
+    }
+    buildCabinet(); calculatePrice(); saveHistoryState();
+    updateToolbarButtonHighlights();
 };
 
 window.applyDoorStyle = function(style) {
@@ -11825,6 +11924,26 @@ function _countCabinetContent(columns) {
     return counts;
 }
 
+function _countLedPairs(columns) {
+    if (!Array.isArray(columns)) return 0;
+    return columns.reduce(function(n, col) {
+        return n + ((col && Array.isArray(col.leds)) ? col.leds.length : 0);
+    }, 0);
+}
+
+function _countLedPairsFromRawState(rawState) {
+    if (!rawState) return 0;
+    if (!rawState.wings) return _countLedPairs(rawState.columns);
+    return ['center', 'left', 'right'].reduce(function(n, side) {
+        const w = rawState.wings[side];
+        return n + (w ? _countLedPairs(w.columns) : 0);
+    }, 0);
+}
+
+function _formatLedPairs(n) {
+    return n === 1 ? 'זוג לדים אחד' : n + ' זוגות לדים';
+}
+
 function _countCabinetContentFromRawState(rawState) {
     if (!rawState) return _emptyContentCounts();
     const merged = _emptyContentCounts();
@@ -12065,6 +12184,8 @@ function _collectWingPrintSpecRows(item, itemObj, unit) {
         label: 'מוטות תלייה לקולבים',
         value: _plainSpecValue(_formatHangingFromCounts(counts))
     });
+    const ledPairs = _countLedPairs(wing.columns);
+    if (ledPairs > 0) rows.push({ id: prefix + 'ledPairs', label: 'תאורת לד', value: _formatLedPairs(ledPairs) });
 
     return rows;
 }
@@ -12179,6 +12300,8 @@ function _collectPrintSpecRows(item, itemObj) {
         rows.push({ id: 'drawersInt', label: 'מגירות פנימיות', value: `${item.drawersInt} יחידות` });
         rows.push({ id: 'shelves', label: 'מדפים נשלפים', value: `${item.shelves} יחידות` });
         rows.push({ id: 'hangingRods', label: 'מוטות תלייה לקולבים', value: _plainSpecValue(_formatHangingRodsDisplay(itemObj)) });
+        const ledPairs = _countLedPairsFromRawState(itemObj && itemObj.rawState);
+        if (ledPairs > 0) rows.push({ id: 'ledPairs', label: 'תאורת לד', value: _formatLedPairs(ledPairs) });
     }
 
     const notes = (item.cabinetNotes || '').trim();
@@ -14142,6 +14265,8 @@ function _buildCustomerSummaryDetails(itemObj) {
 
     if (item.drawersExt > 0) details.push('מגירות חיצוניות: ' + item.drawersExt);
     if (item.drawersInt > 0) details.push('מגירות פנימיות: ' + item.drawersInt);
+    const ledPairs = _countLedPairsFromRawState(rawState);
+    if (ledPairs > 0) details.push('תאורת לד: ' + _formatLedPairs(ledPairs));
     if (deskSummary.desk !== 'ללא') {
         details.push(deskSummary.desk);
         if (deskSummary.deskDims) details.push('מידות שולחן: ' + deskSummary.deskDims);

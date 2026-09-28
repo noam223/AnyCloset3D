@@ -217,6 +217,11 @@ function updateMobileCellSheetState() {
         if (btn) btn.classList.toggle('active', type === activeType);
     });
 
+    const ledBtn = document.getElementById('mcp-led');
+    if (ledBtn && typeof window._ledGroupIndexForSelection === 'function') {
+        ledBtn.classList.toggle('active', window._ledGroupIndexForSelection(col) !== -1);
+    }
+
     // Door buttons (left panel)
     ['empty', 'right', 'left', 'double', 'flap'].forEach(type => {
         const btn = document.getElementById('mcp-door-' + type);
