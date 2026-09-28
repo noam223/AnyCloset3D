@@ -6385,6 +6385,15 @@ body.viewer-mode #canvas-container canvas {
     display: none !important;
 }
 
+#materials-section .materials-flat-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 10px 6px;
+}
+#materials-section .mat-item span {
+    word-break: normal;
+    overflow-wrap: anywhere;
+}
+
 /* Color part tabs — tiles with icon + current-finish dot */
 #materials-section .color-part-tabs {
     display: grid;
