@@ -6214,12 +6214,39 @@ body.viewer-mode #canvas-container canvas {
 #header-dims-row .header-dim-card[data-dim="plinth"]  { order: 4; }
 #header-dims-row .header-dim-card[data-dim="columns"] { order: 5; }
 #header-dims-row .header-dim-card:hover,
-#header-dims-row .header-dim-card:focus-within {
-    background: linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.1) 100%);
-    border-color: rgba(147,197,253,0.65);
-    box-shadow: 0 6px 16px rgba(2,8,23,0.22), inset 0 1px 0 rgba(255,255,255,0.12);
+#header-dims-row:not(:hover) .header-dim-card:focus-within {
+    background: linear-gradient(180deg, rgba(16,185,129,0.38) 0%, rgba(5,150,105,0.2) 100%);
+    border-color: #34d399;
+    box-shadow: 0 6px 18px rgba(16,185,129,0.3), inset 0 1px 0 rgba(255,255,255,0.14);
+}
+#header-dims-row .header-dim-card:hover .hdc-ic,
+#header-dims-row:not(:hover) .header-dim-card:focus-within .hdc-ic { color: #6ee7b7; }
+#header-dims-row .header-dim-card:hover .header-dim-top label,
+#header-dims-row:not(:hover) .header-dim-card:focus-within .header-dim-top label { color: #d1fae5; }
+/* Arrow under the chip whose slider is open */
+#header-dims-row .header-dim-top::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: calc(100% + 8px);
+    width: 0; height: 0;
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-top: 7px solid #34d399;
+    transform: translate(-50%, -3px);
+    opacity: 0;
+    transition: opacity 0.15s ease 0.2s, transform 0.15s ease 0.2s;
+    pointer-events: none;
+    z-index: 32;
+}
+#header-dims-row .header-dim-card:hover .header-dim-top::after,
+#header-dims-row:not(:hover) .header-dim-card:focus-within .header-dim-top::after {
+    opacity: 1;
+    transform: translate(-50%, 0);
+    transition-delay: 0s;
 }
 #header-dims-row .header-dim-top {
+    position: relative;
     display: grid;
     grid-template-columns: auto minmax(0, auto);
     justify-content: center;
@@ -6278,7 +6305,7 @@ body.viewer-mode #canvas-container canvas {
     gap: 10px;
     border-radius: 12px;
     background: linear-gradient(160deg, #1a3558 0%, #0f2440 100%);
-    border: 1px solid rgba(147,197,253,0.35);
+    border: 1px solid rgba(52,211,153,0.55);
     box-shadow: 0 16px 36px rgba(2,8,23,0.45);
     opacity: 0;
     visibility: hidden;
@@ -6305,6 +6332,20 @@ body.viewer-mode #canvas-container canvas {
     width: 30px; height: 30px;
     border-radius: 8px;
     font-size: 0.75rem;
+}
+#header-dims-row .header-slider-row .header-slider-btn:hover {
+    border-color: #34d399;
+    background: rgba(16,185,129,0.2);
+}
+#header-dims-row input[type="range"] {
+    background: linear-gradient(90deg,
+        #34d399 0%,
+        #34d399 calc(var(--range-ratio, 0) * (100% - var(--thumb-w)) + var(--thumb-w) / 2),
+        rgba(255,255,255,0.2) calc(var(--range-ratio, 0) * (100% - var(--thumb-w)) + var(--thumb-w) / 2)
+    );
+}
+#header-dims-row input[type="range"]::-webkit-slider-thumb {
+    box-shadow: 0 0 0 3px #34d399, 0 2px 6px rgba(0,0,0,0.3);
 }
 
 #sidebar > #price-section-wrap {
