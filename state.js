@@ -1376,13 +1376,7 @@ window.syncSidebarToWing = function() {
     // Show/hide units-content-section (יחידות ותכולה)
     const _unitsSection = document.getElementById('units-content-section');
     const _isLinearOrSliding = (state.presetId === 'linear' || state.presetId === 'sliding');
-    if (_unitsSection) {
-        _unitsSection.style.display = (_isLinearOrSliding && !_isUUEdit) ? '' : 'none';
-    }
-    const _wrapUU = document.getElementById('wrap-upper-unit');
-    if (_wrapUU) {
-        _wrapUU.style.display = (_isLinearOrSliding && state.presetId !== 'sliding' && !_isUUEdit) ? '' : 'none';
-    }
+    if (_unitsSection) _unitsSection.style.display = 'none';
     if (_isLinearOrSliding && state.presetId !== 'sliding') {
             // Sync checkbox and sub-menu visibility
             const _uuKey = 'upperUnit_' + _parentWingId;

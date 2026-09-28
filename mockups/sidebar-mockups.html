@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>מוקאפים — תפריט ימני</title>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+:root{
+    --primary:#1E3A5F; --accent:#059669; --accent-light:#10b981;
+    --bg-light:#f8fafc; --border:#e2e8f0; --text-dark:#0f172a; --text-light:#64748b; --highlight:#eff6ff;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Rubik',Tahoma,sans-serif;background:#e9edf3;color:var(--text-dark);-webkit-font-smoothing:antialiased}
+.page-head{padding:22px 32px 6px}
+.page-head h1{margin:0 0 6px;font-size:1.35rem;color:var(--primary)}
+.page-head p{margin:0;color:var(--text-light);font-size:.9rem;max-width:1100px;line-height:1.55}
+.board{display:flex;flex-wrap:wrap;gap:28px;padding:22px 32px 48px;align-items:flex-start}
+.col{width:420px;flex:0 0 420px}
+.col-label{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.col-label .num{width:30px;height:30px;border-radius:50%;background:var(--primary);color:#fff;display:grid;place-items:center;font-weight:700}
+.col-label h2{margin:0;font-size:1.05rem}
+.col-desc{font-size:.8rem;color:var(--text-light);line-height:1.5;margin:0 0 10px;min-height:48px}
+
+/* ── Frame (simulated sidebar) ── */
+.frame{position:relative;height:880px;background:#fff;border-radius:14px;box-shadow:0 10px 40px rgba(15,23,42,.14);overflow:hidden;display:flex;flex-direction:column}
+.scroll{flex:1;overflow-y:auto;position:relative}
+.scroll::-webkit-scrollbar{width:6px}.scroll::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:6px}
+
+/* ── Top (unchanged) ── */
+.top{background:linear-gradient(160deg,#1E3A5F,#15293f);color:#fff;padding:12px 16px 14px;position:relative}
+.top-logo{font-weight:700;font-size:1.05rem;display:flex;align-items:center;gap:8px}
+.top-logo b{color:#6ee7b7}
+.keep{margin-inline-start:auto;font-size:.62rem;font-weight:600;background:rgba(255,255,255,.14);padding:3px 8px;border-radius:20px;letter-spacing:.3px}
+.presets{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:10px 0}
+.presets div{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:9px;padding:7px 2px;text-align:center;font-size:.66rem}
+.presets div i{display:block;font-size:.95rem;margin-bottom:3px;opacity:.9}
+.presets div.on{background:#fff;color:var(--primary);font-weight:700}
+.dims{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.dims div{background:#fff;color:var(--text-dark);border-radius:9px;padding:6px 4px;text-align:center}
+.dims small{display:block;font-size:.6rem;color:var(--text-light)}
+.dims strong{font-size:.95rem}
+
+/* ── Shared controls ── */
+.lbl{font-size:.72rem;color:var(--text-light);margin:0 0 4px;display:block}
+.inp,.sel{width:100%;border:1.5px solid var(--border);border-radius:9px;padding:7px 10px;font:inherit;font-size:.8rem;background:#fff;color:var(--text-dark)}
+.inp-ic{position:relative}.inp-ic i{position:absolute;inset-inline-start:10px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.75rem}
+.inp-ic .inp{padding-inline-start:28px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.stack{display:flex;flex-direction:column;gap:9px}
+.seg{display:flex;background:#f1f5f9;border-radius:10px;padding:3px;gap:3px}
+.seg button{flex:1;border:none;background:transparent;border-radius:8px;padding:6px 2px;font:inherit;font-size:.7rem;font-weight:600;color:var(--text-light);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
+.seg button i{font-size:.85rem}
+.seg button.on{background:#fff;color:var(--primary);box-shadow:0 1px 3px rgba(15,23,42,.12)}
+.seg.row button{flex-direction:row;justify-content:center;gap:5px;padding:7px 2px}
+.num-card{border:1.5px solid var(--border);border-radius:10px;padding:5px 6px;text-align:center}
+.num-card small{display:block;font-size:.62rem;color:var(--text-light)}
+.num-card .stp{display:flex;align-items:center;justify-content:space-between;gap:2px}
+.num-card button{width:20px;height:20px;border:none;border-radius:6px;background:#f1f5f9;color:var(--primary);cursor:pointer;font-size:.6rem}
+.num-card strong{font-size:.88rem}
+.hint{font-size:.68rem;color:var(--text-light)}
+
+/* ── Colors (kept, restyled part chips with icons) ── */
+.parts{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px}
+.part{position:relative;display:flex;align-items:center;gap:7px;padding:6px 7px;border:1.5px solid var(--border);border-radius:10px;background:#fff;font:inherit;font-size:.72rem;font-weight:600;color:var(--text-dark);cursor:pointer;text-align:start;transition:all .15s}
+.part .pi{width:24px;height:24px;flex:0 0 24px;border-radius:7px;background:#f1f5f9;color:var(--primary);display:grid;place-items:center;font-size:.72rem;transition:all .15s}
+.part .dot{position:absolute;top:-4px;inset-inline-end:-4px;width:13px;height:13px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px #cbd5e1;background-size:cover}
+.part:hover{border-color:#94a3b8}
+.part.on{border-color:var(--primary);background:var(--highlight);color:var(--primary)}
+.part.on .pi{background:var(--primary);color:#fff}
+.sub{font-size:.8rem;font-weight:700;margin:4px 0 8px}
+.sw-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(50px,1fr));gap:8px 6px;margin-bottom:14px}
+.sw{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+.sw b{width:38px;height:38px;border-radius:50%;border:1px solid #d6dbe3;background-size:cover;transition:transform .12s}
+.sw span{font-size:.6rem;color:var(--text-light)}
+.sw.on b{box-shadow:0 0 0 2px #fff,0 0 0 4px var(--accent);transform:scale(1.04)}
+.btn-wide{width:100%;border-radius:9px;height:36px;display:flex;align-items:center;justify-content:center;gap:8px;font:inherit;font-size:.8rem;font-weight:600;cursor:pointer;margin-top:6px}
+.btn-tambour{border:1.5px dashed #cbd5e1;background:#fff;color:var(--text-dark)}
+.btn-adv{border:1.5px solid var(--primary);background:linear-gradient(135deg,#f0f9ff,#e0f0ff);color:var(--primary)}
+
+/* ── Price stub ── */
+.price{border-top:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;background:#fff}
+.price small{color:var(--text-light);font-size:.7rem;display:block}
+.price strong{font-size:1.15rem;color:var(--primary)}
+.price button{border:none;background:var(--accent);color:#fff;border-radius:9px;padding:9px 14px;font:inherit;font-weight:600;font-size:.8rem}
+
+/* ════ Style 1: accordion cards ════ */
+.v1 .scroll{background:var(--bg-light)}
+.acc{margin:8px 10px;border:1px solid var(--border);border-radius:12px;background:#fff;overflow:hidden;transition:box-shadow .15s}
+.acc.open{box-shadow:0 4px 14px rgba(15,23,42,.07);border-color:#cbd5e1}
+.acc-h{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;user-select:none}
+.acc-ic{width:32px;height:32px;border-radius:9px;background:var(--highlight);color:var(--primary);display:grid;place-items:center;font-size:.85rem;flex:0 0 32px}
+.acc.open .acc-ic{background:var(--primary);color:#fff}
+.acc-t{flex:1;min-width:0}
+.acc-t strong{display:block;font-size:.85rem}
+.acc-t span{display:block;font-size:.7rem;color:var(--text-light);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acc-ch{color:#94a3b8;transition:transform .2s;font-size:.75rem}
+.acc.open .acc-ch{transform:rotate(180deg);color:var(--primary)}
+.acc-b{display:none;padding:2px 12px 14px}
+.acc.open .acc-b{display:block}
+
+/* ════ Style 2: icon tabs ════ */
+.tabs{position:sticky;top:0;z-index:3;display:grid;grid-template-columns:repeat(5,1fr);background:#fff;border-bottom:1px solid var(--border)}
+.tab{border:none;background:none;font:inherit;padding:9px 2px 8px;font-size:.68rem;font-weight:600;color:var(--text-light);cursor:pointer;position:relative;display:flex;flex-direction:column;align-items:center;gap:4px}
+.tab i{font-size:1rem}
+.tab.on{color:var(--primary)}
+.tab.on::after{content:'';position:absolute;bottom:-1px;left:18%;right:18%;height:3px;border-radius:3px 3px 0 0;background:var(--accent)}
+.tab .badge{position:absolute;top:5px;inset-inline-end:calc(50% - 16px);width:7px;height:7px;border-radius:50%;background:var(--accent)}
+.panel{display:none;padding:14px 16px}
+.panel.on{display:block}
+.panel-title{font-size:.9rem;font-weight:700;margin:0 0 12px;display:flex;align-items:center;gap:8px;color:var(--primary)}
+
+/* ════ Style 3: tiles + drill-down ════ */
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px}
+.tile{border:1.5px solid var(--border);border-radius:12px;background:#fff;padding:10px;text-align:start;font:inherit;cursor:pointer;display:flex;flex-direction:column;gap:6px;transition:all .15s;position:relative}
+.tile:hover{border-color:var(--primary);box-shadow:0 4px 12px rgba(30,58,95,.1)}
+.tile .ti{width:30px;height:30px;border-radius:9px;background:var(--highlight);color:var(--primary);display:grid;place-items:center;font-size:.85rem}
+.tile strong{font-size:.8rem}
+.tile span{font-size:.66rem;color:var(--text-light);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .go{position:absolute;top:12px;inset-inline-end:10px;color:#cbd5e1;font-size:.7rem}
+.colors-block{padding:4px 14px 14px;border-top:1px solid var(--border)}
+.colors-block .hdr{display:flex;align-items:center;gap:8px;font-weight:700;font-size:.9rem;color:var(--primary);margin:12px 0 10px}
+.drill{position:absolute;inset:0;background:#fff;z-index:5;transform:translateX(-100%);transition:transform .25s ease;display:flex;flex-direction:column}
+.drill.show{transform:none}
+.drill-h{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border);background:var(--bg-light)}
+.drill-h button{border:none;background:#fff;border:1px solid var(--border);border-radius:8px;width:32px;height:32px;cursor:pointer;color:var(--primary)}
+.drill-h strong{font-size:.92rem}
+.drill-b{padding:14px 16px;overflow-y:auto;flex:1}
+
+/* ════ Style 4: side rail ════ */
+.v4 .body{flex:1;display:flex;min-height:0}
+.rail{width:62px;flex:0 0 62px;background:var(--bg-light);border-inline-end:1px solid var(--border);display:flex;flex-direction:column;gap:4px;padding:8px 6px}
+.rail button{border:none;background:none;border-radius:10px;padding:8px 2px;font:inherit;font-size:.6rem;font-weight:600;color:var(--text-light);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;position:relative}
+.rail button i{font-size:1.05rem}
+.rail button:hover{background:#eef2f7}
+.rail button.on{background:#fff;color:var(--primary);box-shadow:0 1px 4px rgba(15,23,42,.1)}
+.rail button.on::before{content:'';position:absolute;inset-inline-start:-6px;top:10px;bottom:10px;width:3px;border-radius:3px;background:var(--accent)}
+.v4 .scroll{padding:0}
+.v4 .panel{padding:14px 14px}
+.v4 .panel-title{justify-content:space-between}
+.v4 .panel-title em{font-style:normal;font-size:.66rem;font-weight:500;color:var(--text-light)}
+</style>
+</head>
+<body>
+
+<div class="page-head">
+    <h1>4 סגנונות לתפריט הימני — פחות גלילה</h1>
+    <p>בכל ארבעת הסגנונות: החלק העליון (סוגי ארונות + מידות) נשאר בדיוק כמו היום, <strong>"יחידה עליונה" הוסרה</strong>, ואזור הצבעים נשמר עם כפתורי חלקים מעוצבים מחדש — כל כפתור קיבל אייקון קטן ונקודת צבע שמראה את הגוון הנוכחי של החלק. הסקשנים אוחדו ל־5 קבוצות: לקוח · הגדרות ארון · חדר · תוספות · צבעים. מידות החדר הפכו מ־3 סליידרים לשורה אחת של 3 כרטיסי מספר, ובחירות כמו מיקום/חומר/ידית הפכו לכפתורי מקטע. <strong>הכול לחיץ</strong> — אפשר לנסות.</p>
+</div>
+
+<div class="board">
+
+    <!-- ════ 1 ════ -->
+    <div class="col">
+        <div class="col-label"><span class="num">1</span><h2>אקורדיון כרטיסים</h2></div>
+        <p class="col-desc">כל קבוצה היא כרטיס מקופל עם שורת סיכום (רואים את הערך בלי לפתוח). רק כרטיס אחד פתוח בכל רגע — פתיחת כרטיס סוגרת את הקודם.</p>
+        <div class="frame v1">
+            <div class="scroll">
+                <div data-top></div>
+                <div class="acc" data-acc>
+                    <div class="acc-h"><span class="acc-ic"><i class="fa-solid fa-user-tag"></i></span><div class="acc-t"><strong>לקוח ופרויקט</strong><span>משפחת כהן · 052-1234567 · הזמנה 1042</span></div><i class="fa-solid fa-chevron-down acc-ch"></i></div>
+                    <div class="acc-b" data-body="customer"></div>
+                </div>
+                <div class="acc" data-acc>
+                    <div class="acc-h"><span class="acc-ic"><i class="fa-solid fa-cubes"></i></span><div class="acc-t"><strong>הגדרות ארון</strong><span>צוקל רגיל · קיר חופשי · מלמין · ידית חיצונית</span></div><i class="fa-solid fa-chevron-down acc-ch"></i></div>
+                    <div class="acc-b" data-body="cabinet"></div>
+                </div>
+                <div class="acc" data-acc>
+                    <div class="acc-h"><span class="acc-ic"><i class="fa-solid fa-vector-square"></i></span><div class="acc-t"><strong>חדר</strong><span>מרכז · 500 × 500 · תקרה 370</span></div><i class="fa-solid fa-chevron-down acc-ch"></i></div>
+                    <div class="acc-b" data-body="room"></div>
+                </div>
+                <div class="acc" data-acc>
+                    <div class="acc-h"><span class="acc-ic"><i class="fa-solid fa-puzzle-piece"></i></span><div class="acc-t"><strong>תוספות</strong><span>יחידת צד: ללא · פינתית: ללא</span></div><i class="fa-solid fa-chevron-down acc-ch"></i></div>
+                    <div class="acc-b" data-body="extras"></div>
+                </div>
+                <div class="acc open" data-acc>
+                    <div class="acc-h"><span class="acc-ic"><i class="fa-solid fa-palette"></i></span><div class="acc-t"><strong>צבעים וחומרים</strong><span>גוף: לבן מט · חזיתות: 2024</span></div><i class="fa-solid fa-chevron-down acc-ch"></i></div>
+                    <div class="acc-b" data-body="colors"></div>
+                </div>
+                <div style="height:10px"></div>
+            </div>
+            <div data-price></div>
+        </div>
+    </div>
+
+    <!-- ════ 2 ════ -->
+    <div class="col">
+        <div class="col-label"><span class="num">2</span><h2>לשוניות עם אייקונים</h2></div>
+        <p class="col-desc">פס לשוניות דביק מתחת למידות. רואים רק קבוצה אחת בכל פעם — כמעט אפס גלילה. נקודה ירוקה מסמנת קבוצה שיש בה שינוי פעיל.</p>
+        <div class="frame v2">
+            <div class="scroll">
+                <div data-top></div>
+                <div class="tabs">
+                    <button class="tab" data-tab="customer"><i class="fa-solid fa-user-tag"></i>לקוח</button>
+                    <button class="tab" data-tab="cabinet"><i class="fa-solid fa-cubes"></i>ארון</button>
+                    <button class="tab" data-tab="room"><i class="fa-solid fa-vector-square"></i>חדר</button>
+                    <button class="tab" data-tab="extras"><i class="fa-solid fa-puzzle-piece"></i>תוספות<span class="badge"></span></button>
+                    <button class="tab on" data-tab="colors"><i class="fa-solid fa-palette"></i>צבעים</button>
+                </div>
+                <div class="panel" data-panel="customer"><div class="panel-title"><i class="fa-solid fa-user-tag"></i> פרטי לקוח ופרויקט</div><div data-body="customer"></div></div>
+                <div class="panel" data-panel="cabinet"><div class="panel-title"><i class="fa-solid fa-cubes"></i> הגדרות ארון</div><div data-body="cabinet"></div></div>
+                <div class="panel" data-panel="room"><div class="panel-title"><i class="fa-solid fa-vector-square"></i> חדר</div><div data-body="room"></div></div>
+                <div class="panel" data-panel="extras"><div class="panel-title"><i class="fa-solid fa-puzzle-piece"></i> תוספות</div><div data-body="extras"></div></div>
+                <div class="panel on" data-panel="colors"><div data-body="colors"></div></div>
+            </div>
+            <div data-price></div>
+        </div>
+    </div>
+
+    <!-- ════ 3 ════ -->
+    <div class="col">
+        <div class="col-label"><span class="num">3</span><h2>אריחים + מסך נשלף</h2></div>
+        <p class="col-desc">ההגדרות הופכות ל־4 כפתורי אריח עם הערך הנוכחי. לחיצה פותחת מסך נשלף עם כפתור חזרה. הצבעים תמיד פתוחים מתחת — הכי נגישים.</p>
+        <div class="frame v3">
+            <div class="scroll">
+                <div data-top></div>
+                <div class="tiles">
+                    <button class="tile" data-drill="customer" data-title="לקוח ופרויקט"><i class="fa-solid fa-chevron-left go"></i><span class="ti"><i class="fa-solid fa-user-tag"></i></span><strong>לקוח ופרויקט</strong><span>משפחת כהן · 1042</span></button>
+                    <button class="tile" data-drill="cabinet" data-title="הגדרות ארון"><i class="fa-solid fa-chevron-left go"></i><span class="ti"><i class="fa-solid fa-cubes"></i></span><strong>הגדרות ארון</strong><span>צוקל רגיל · מלמין</span></button>
+                    <button class="tile" data-drill="room" data-title="חדר"><i class="fa-solid fa-chevron-left go"></i><span class="ti"><i class="fa-solid fa-vector-square"></i></span><strong>חדר</strong><span>מרכז · 500×500</span></button>
+                    <button class="tile" data-drill="extras" data-title="תוספות"><i class="fa-solid fa-chevron-left go"></i><span class="ti"><i class="fa-solid fa-puzzle-piece"></i></span><strong>תוספות</strong><span>ללא</span></button>
+                </div>
+                <div class="colors-block">
+                    <div class="hdr"><i class="fa-solid fa-palette"></i> צבעים וחומרים</div>
+                    <div data-body="colors"></div>
+                </div>
+            </div>
+            <div class="drill">
+                <div class="drill-h"><button data-back title="חזרה"><i class="fa-solid fa-arrow-right"></i></button><strong data-drill-title></strong></div>
+                <div class="drill-b" data-drill-body></div>
+            </div>
+            <div data-price></div>
+        </div>
+    </div>
+
+    <!-- ════ 4 ════ -->
+    <div class="col">
+        <div class="col-label"><span class="num">4</span><h2>פס אייקונים צדדי</h2></div>
+        <p class="col-desc">בסגנון Figma / Canva: פס אייקונים אנכי בצד, והתוכן של הקבוצה הנבחרת לידו. הניווט תמיד גלוי גם כשגוללים בתוך הצבעים.</p>
+        <div class="frame v4">
+            <div data-top></div>
+            <div class="body">
+                <nav class="rail">
+                    <button data-rail="customer"><i class="fa-solid fa-user-tag"></i>לקוח</button>
+                    <button data-rail="cabinet"><i class="fa-solid fa-cubes"></i>ארון</button>
+                    <button data-rail="room"><i class="fa-solid fa-vector-square"></i>חדר</button>
+                    <button data-rail="extras"><i class="fa-solid fa-puzzle-piece"></i>תוספות</button>
+                    <button class="on" data-rail="colors"><i class="fa-solid fa-palette"></i>צבעים</button>
+                </nav>
+                <div class="scroll">
+                    <div class="panel" data-panel="customer"><div class="panel-title"><span>פרטי לקוח ופרויקט</span></div><div data-body="customer"></div></div>
+                    <div class="panel" data-panel="cabinet"><div class="panel-title"><span>הגדרות ארון</span><em>צוקל · חומר · ידית</em></div><div data-body="cabinet"></div></div>
+                    <div class="panel" data-panel="room"><div class="panel-title"><span>חדר</span><em>מיקום ומידות</em></div><div data-body="room"></div></div>
+                    <div class="panel" data-panel="extras"><div class="panel-title"><span>תוספות</span><em>צד · פינה</em></div><div data-body="extras"></div></div>
+                    <div class="panel on" data-panel="colors"><div class="panel-title"><span>צבעים וחומרים</span><em>בחר חלק ואז גוון</em></div><div data-body="colors"></div></div>
+                </div>
+            </div>
+            <div data-price></div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+const SOLIDS = [
+    ['לבן מט 2100','#f7f7f7'],['3110','#f0ede9'],['759','#ece0d4'],['705','#dbd6c6'],['U727','#a79786'],['W1200','#e7e1da'],
+    ['U232','#c59578'],['U604','#8f8e76'],['U638','#c0b598'],['3207','#F7ECD9'],['שחור מט','#2a2a2a']
+];
+const WOODS = ['2020','2024','H1367','H1307','H1227','A427','2025','2040','2041','2044','2047','2049','2062','5600','7180','456','462','463','464','480'];
+const PARTS = [
+    ['גוף וצוקל','fa-cube','#f7f7f7'],
+    ['מדפים ופנים','fa-layer-group','#f7f7f7'],
+    ['גב ארון','fa-square-full','#f0ede9'],
+    ['חזיתות','fa-door-closed','url(../textures/2024.jpg)'],
+    ['שולחן','fa-desktop','#f7f7f7'],
+    ['כוורת','fa-table-cells','#2a2a2a'],
+];
+
+const BODIES = {
+    customer: () => `
+        <div class="stack">
+            <div class="inp-ic"><i class="fa-regular fa-user"></i><input class="inp" value="משפחת כהן"></div>
+            <div class="g2">
+                <div class="inp-ic"><i class="fa-solid fa-phone"></i><input class="inp" value="052-1234567"></div>
+                <div class="inp-ic"><i class="fa-solid fa-hashtag"></i><input class="inp" value="1042"></div>
+            </div>
+            <div class="inp-ic"><i class="fa-solid fa-map-location-dot"></i><input class="inp" placeholder="עיר / כתובת לאספקה"></div>
+            <div class="g2">
+                <div class="inp-ic"><i class="fa-solid fa-truck"></i><input class="inp" placeholder="צפי אספקה"></div>
+                <div class="inp-ic"><i class="fa-solid fa-pen"></i><input class="inp" placeholder="שם הארון"></div>
+            </div>
+        </div>`,
+    cabinet: () => `
+        <div class="stack">
+            <div><span class="lbl">דגם ארון</span><input class="inp" placeholder="ריק = דגם הבסיס"></div>
+            <div class="g2">
+                <div><span class="lbl">דגם בסיס</span><select class="sel"><option>צוקל רגיל</option><option>צוקל נסתר</option><option>על רגליים</option></select></div>
+                <div><span class="lbl">התקנה</span><select class="sel"><option>קיר חופשי</option><option>בין קירות</option><option>נישה</option></select></div>
+            </div>
+            <div><span class="lbl">חומר גוף</span>
+                <div class="seg row"><button class="on">מלמין</button><button>סנדביץ'</button><button>MDF</button></div></div>
+            <div><span class="lbl">סוג ידית</span>
+                <div class="seg"><button><i class="fa-solid fa-grip-lines"></i>רוכבת</button><button><i class="fa-solid fa-hand-pointer"></i>טאצ'</button><button class="on"><i class="fa-solid fa-grip-lines-vertical"></i>חיצונית</button></div></div>
+            <div><span class="lbl"><i class="fa-solid fa-note-sticky" style="opacity:.6"></i> הערות לארון</span><textarea class="inp" rows="2" placeholder="יופיעו בהדפסות"></textarea></div>
+        </div>`,
+    room: () => `
+        <div class="stack">
+            <div><span class="lbl">מיקום ארון בחדר</span>
+                <div class="seg"><button><i class="fa-solid fa-arrow-right-to-bracket"></i>צמוד ימין</button><button class="on"><i class="fa-solid fa-minus"></i>מרכז</button><button><i class="fa-solid fa-arrows-left-right"></i>בין קירות</button><button><i class="fa-solid fa-arrow-right-to-bracket" style="transform:scaleX(-1)"></i>צמוד שמאל</button></div></div>
+            <div><span class="lbl">מידות חדר (ס"מ)</span>
+                <div class="g3">
+                    ${[['רוחב',500],['עומק',500],['תקרה',370]].map(([n,v])=>`<div class="num-card"><small>${n}</small><div class="stp"><button>+</button><strong>${v}</strong><button>−</button></div></div>`).join('')}
+                </div></div>
+        </div>`,
+    extras: () => `
+        <div class="stack">
+            <div><span class="lbl">יחידת צד</span>
+                <div class="seg"><button class="on"><i class="fa-solid fa-ban"></i>ללא</button><button><i class="fa-solid fa-desktop"></i>שולחן</button><button><i class="fa-solid fa-box-archive"></i>ארון צד</button></div></div>
+            <div><span class="lbl">יחידה פינתית</span>
+                <div class="seg"><button class="on"><i class="fa-solid fa-ban"></i>ללא</button><button><i class="fa-solid fa-arrow-right"></i>ימין</button><button><i class="fa-solid fa-arrow-left"></i>שמאל</button></div></div>
+            <div class="hint"><i class="fa-solid fa-circle-info"></i> ההגדרות המפורטות (רוחב, מגירות, סוג) נפתחות מתחת לכפתור אחרי הבחירה — כמו היום.</div>
+        </div>`,
+    colors: () => `
+        <div class="parts">
+            ${PARTS.map(([n,ic,c],i)=>`<button class="part${i===0?' on':''}"><span class="pi"><i class="fa-solid ${ic}"></i></span>${n}<em class="dot" style="background:${c};background-size:cover"></em></button>`).join('')}
+        </div>
+        <div class="sub">גוונים חלקים</div>
+        <div class="sw-grid">
+            ${SOLIDS.map(([n,c],i)=>`<div class="sw${i===0?' on':''}" data-c="${c}"><b style="background:${c}"></b><span>${n}</span></div>`).join('')}
+        </div>
+        <div class="sub">טקסטורות עץ ודוגמאות</div>
+        <div class="sw-grid">
+            ${WOODS.map(n=>`<div class="sw" data-c="url(../textures/${n}.jpg)"><b style="background-image:url(../textures/${n}.jpg)"></b><span>${n}</span></div>`).join('')}
+        </div>
+        <button class="btn-wide btn-tambour"><i class="fa-solid fa-swatchbook"></i> מניפת טמבור — 1651 גוונים</button>
+        <button class="btn-wide btn-adv"><i class="fa-solid fa-paintbrush"></i> עריכת צבעים מתקדמת</button>`,
+};
+
+const TOP = `
+    <div class="top">
+        <div class="top-logo">AnyCloset<b>3D</b><span class="keep">ללא שינוי</span></div>
+        <div class="presets">
+            <div class="on"><i class="fa-solid fa-door-closed"></i>ארון ישר</div>
+            <div><i class="fa-solid fa-turn-up"></i>פינתי</div>
+            <div><i class="fa-solid fa-arrows-left-right"></i>הזזה</div>
+            <div><i class="fa-solid fa-sink"></i>אמבטיה</div>
+            <div><i class="fa-solid fa-desktop"></i>שולחן</div>
+        </div>
+        <div class="dims">
+            <div><small>רוחב</small><strong>240</strong></div>
+            <div><small>גובה</small><strong>260</strong></div>
+            <div><small>עומק</small><strong>60</strong></div>
+            <div><small>צוקל</small><strong>8</strong></div>
+        </div>
+    </div>`;
+
+const PRICE = `<div class="price"><div><small>מחיר משוער</small><strong>₪12,450</strong></div><button><i class="fa-solid fa-cart-plus"></i> הוסף להזמנה</button></div>`;
+
+document.querySelectorAll('[data-top]').forEach(el => el.outerHTML = TOP);
+document.querySelectorAll('[data-price]').forEach(el => el.outerHTML = PRICE);
+document.querySelectorAll('[data-body]').forEach(el => el.innerHTML = BODIES[el.dataset.body]());
+
+document.addEventListener('click', e => {
+    const frame = e.target.closest('.frame');
+
+    const seg = e.target.closest('.seg button');
+    if (seg) { [...seg.parentNode.children].forEach(b => b.classList.toggle('on', b === seg)); return; }
+
+    const part = e.target.closest('.part');
+    if (part) { [...part.parentNode.children].forEach(b => b.classList.toggle('on', b === part)); return; }
+
+    const sw = e.target.closest('.sw');
+    if (sw) {
+        const box = sw.closest('[data-body="colors"]');
+        box.querySelectorAll('.sw').forEach(s => s.classList.toggle('on', s === sw));
+        const dot = box.querySelector('.part.on .dot');
+        if (dot) { dot.style.background = sw.dataset.c; dot.style.backgroundSize = 'cover'; }
+        return;
+    }
+
+    const accH = e.target.closest('.acc-h');
+    if (accH) {
+        const acc = accH.parentNode, wasOpen = acc.classList.contains('open');
+        frame.querySelectorAll('.acc').forEach(a => a.classList.remove('open'));
+        if (!wasOpen) acc.classList.add('open');
+        return;
+    }
+
+    const tab = e.target.closest('[data-tab],[data-rail]');
+    if (tab) {
+        const key = tab.dataset.tab || tab.dataset.rail;
+        [...tab.parentNode.children].forEach(t => t.classList.toggle('on', t === tab));
+        frame.querySelectorAll('[data-panel]').forEach(p => p.classList.toggle('on', p.dataset.panel === key));
+        return;
+    }
+
+    const tile = e.target.closest('[data-drill]');
+    if (tile) {
+        const d = frame.querySelector('.drill');
+        d.querySelector('[data-drill-title]').textContent = tile.dataset.title;
+        d.querySelector('[data-drill-body]').innerHTML = BODIES[tile.dataset.drill]();
+        d.classList.add('show');
+        return;
+    }
+    if (e.target.closest('[data-back]')) frame.querySelector('.drill').classList.remove('show');
+});
+</script>
+</body>
+</html>
