@@ -6316,17 +6316,14 @@ body.viewer-mode #canvas-container canvas {
 /* Columns chip: inline stepper instead of the slider popover */
 #header-dims-row .header-dim-card[data-dim="columns"] .header-dim-top::after { display: none; }
 #header-dims-row .header-cols-val {
+    direction: rtl;
     align-items: center;
-    gap: 5px;
-}
-#header-dims-row .header-cols-stepper {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
+    gap: 4px;
 }
 #header-dims-row .header-cols-step {
-    width: 18px;
-    height: 13px;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
     padding: 0;
     display: flex;
     align-items: center;
