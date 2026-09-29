@@ -834,9 +834,33 @@ function buildFullCornerUnit(side, wingData) {
 
     }
 
+    // ---- LED pairs: two glowing strips at the ends of the L opening, spanning the group's cells ----
+    if (!isBP && Array.isArray(fc.leds) && fc.leds.length) {
+        const cellY = [plinthH + t, ...shelvesY, colH - t];
+        const ledMat = new THREE.MeshBasicMaterial({ color: 0xfff1c4 });
+        fc.leds.forEach(g => {
+            const yBot = cellY[g.startRow];
+            const yTop = cellY[g.endRow + 1];
+            if (yBot == null || yTop == null || yTop - yBot < 2) return;
+            const h = yTop - yBot - 1;
+            const midY = (yBot + yTop) / 2;
+            const stripGeo = new THREE.BoxGeometry(1.2, h, 1.2);
+            // Next to the wall facing the center cabinet, just behind the front opening
+            const s1 = new THREE.Mesh(stripGeo, ledMat);
+            s1.position.set(-sign * (cw - t - 0.8), midY, frontD - 2.5);
+            fcGroup.add(s1);
+            // Next to the front wall at the far end of the side opening
+            const s2 = new THREE.Mesh(stripGeo, ledMat);
+            s2.position.set(-sign * (wingD - 2.5), midY, cd - t - 0.8);
+            fcGroup.add(s2);
+        });
+    }
+
     // ---- FC Doors — per-row spans, grouped by consecutive rows with same door style ----
     if (state.hasDoors !== false) {
         const matExt = materials[wingData.materialExternal] || materials['white_matte'];
+        const fcHandleStyle = (state.cabinetModel === 'ab2') ? 'touch'
+            : (fc.handleStyle || (typeof _getHandleStyle === 'function' ? _getHandleStyle() : 'pipe'));
 
         // Build list of door spans: consecutive rows with same non-empty door.
         // allY has (numRows+1) entries; row r spans allY[r]..allY[r+1], valid rows: 0..(allY.length-2)
@@ -1009,16 +1033,28 @@ function buildFullCornerUnit(side, wingData) {
                 }
 
                 // Handle
-                if (!isBP) {
-                    const handleH = Math.min(h * 0.35, 15);
-                    const handleMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8, roughness: 0.3 });
-                    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, handleH, 16), handleMat);
-                    if (isVertical) {
-                        // Door 2: handle protrudes outward in -sign*X from the door face
-                        handle.position.set(-sign * (t * 0.45 + 1.5), 0, -w * 0.35);
+                if (!isBP && fcHandleStyle !== 'touch') {
+                    let handle;
+                    if (fcHandleStyle === 'riding') {
+                        // Tall profile hugging the door's opening edge
+                        const profileH = Math.min(30, Math.max(8, h - 2));
+                        const ridingMat = typeof _ridingHandleMat === 'function'
+                            ? _ridingHandleMat()
+                            : new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.35, roughness: 0.45 });
+                        handle = new THREE.Mesh(new THREE.BoxGeometry(1.1, profileH, 1.1), ridingMat);
+                        if (isVertical) handle.position.set(-sign * (t * 0.45 + 0.55), 0, -(w / 2 - 0.6));
+                        else handle.position.set(sign * (w / 2 - 0.6), 0, t * 0.45 + 0.55 + fd_offset);
                     } else {
-                        // Door 1: handle protrudes in +Z from the door face (group already shifted back by fd_offset)
-                        handle.position.set(sign * w * 0.35, 0, t * 0.45 + 1.5 + fd_offset);
+                        const handleH = Math.min(h * 0.35, 15);
+                        const handleMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8, roughness: 0.3 });
+                        handle = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, handleH, 16), handleMat);
+                        if (isVertical) {
+                            // Door 2: handle protrudes outward in -sign*X from the door face
+                            handle.position.set(-sign * (t * 0.45 + 1.5), 0, -w * 0.35);
+                        } else {
+                            // Door 1: handle protrudes in +Z from the door face (group already shifted back by fd_offset)
+                            handle.position.set(sign * w * 0.35, 0, t * 0.45 + 1.5 + fd_offset);
+                        }
                     }
                     doorGroup.add(handle);
                 }

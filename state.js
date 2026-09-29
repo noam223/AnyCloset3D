@@ -560,6 +560,10 @@ window._distributeFullCornerShelves = function(wing) {
     const numComps = n + 1;
     while (fc.compartments.length < numComps) fc.compartments.push({ type: 'empty' });
     while (fc.compartments.length > numComps) fc.compartments.pop();
+    if (Array.isArray(fc.leds)) {
+        fc.leds = fc.leds.filter(g => g.startRow < numComps);
+        fc.leds.forEach(g => { if (g.endRow > numComps - 1) g.endRow = numComps - 1; });
+    }
     // Update splitY for this full corner unit
     _checkFCSplit(wing);
 };
@@ -588,10 +592,176 @@ window.updateFullCornerShelves = function(delta) {
     const w = getWing();
     if (!w || !w.fullCorner) return;
     const fc = w.fullCorner;
-    const newS = Math.max(0, Math.min(6, (fc.shelves || 0) + delta));
+    const newS = Math.max(0, Math.min(FC_MAX_SHELVES, (fc.shelves || 0) + delta));
     fc.shelves = newS;
     window._distributeFullCornerShelves(w);
     buildCabinet(); calculatePrice(); saveHistoryState();
+};
+
+// ---- Full corner cells ----
+// Row r spans allY[r]..allY[r+1] where allY = [plinthH+t, ...shelvesY, colH-t].
+const FC_MAX_SHELVES = 10;
+const FC_MIN_GAP = 20;
+
+function _fcActive() {
+    const w = getWing();
+    if (!w || !w.fullCorner) return null;
+    const fc = w.fullCorner;
+    if (!Array.isArray(fc.shelvesY)) fc.shelvesY = [];
+    if (!Array.isArray(fc.compartments)) fc.compartments = [];
+    if (!Array.isArray(fc.leds)) fc.leds = [];
+    fc.compartments.forEach(_fcMigrateComp);
+    const t = w.thickness || 1.7;
+    const bottom = (w.plinthHeight || 7) + t;
+    const top = (w.globalHeight || 240) - t;
+    return { w, fc, t, bottom, top, allY: () => [bottom, ...fc.shelvesY, top] };
+}
+window._fcCellBounds = function() {
+    const a = _fcActive();
+    return a ? a.allY() : null;
+};
+
+/** Keep a shelf clear of the split board (קושרת), which occupies splitY-t..splitY+t. */
+function _fcAvoidSplit(fc, y, t, lo, hi) {
+    if (!fc.splitY) return y;
+    const below = fc.splitY - t - FC_MIN_GAP;
+    const above = fc.splitY + t + FC_MIN_GAP;
+    if (y <= below || y >= above) return y;
+    const toBelow = (below >= lo) ? below : null;
+    const toAbove = (above <= hi) ? above : null;
+    if (toBelow == null) return toAbove != null ? toAbove : y;
+    if (toAbove == null) return toBelow;
+    return (y - toBelow <= toAbove - y) ? toBelow : toAbove;
+}
+
+function _fcCommit() { buildCabinet(); calculatePrice(); saveHistoryState(); }
+
+/** Set a cell's clear height by moving the shelf above it (the shelf below for the top cell). */
+window.setFullCornerCellHeight = function(row, cm) {
+    const a = _fcActive();
+    if (!a) return false;
+    const allY = a.allY();
+    const n = allY.length - 1;
+    if (n < 2 || row < 0 || row >= n || !(cm > 0)) return false;
+    const ys = a.fc.shelvesY;
+    let si, y, lo, hi;
+    if (row < n - 1) {
+        si = row;
+        lo = allY[row] + FC_MIN_GAP;
+        hi = allY[row + 2] - FC_MIN_GAP;
+        y = allY[row] + cm;
+    } else {
+        si = row - 1;
+        lo = allY[row - 1] + FC_MIN_GAP;
+        hi = allY[row + 1] - FC_MIN_GAP;
+        y = allY[row + 1] - cm;
+    }
+    if (hi < lo) return false;
+    y = Math.max(lo, Math.min(hi, y));
+    y = _fcAvoidSplit(a.fc, y, a.t, lo, hi);
+    ys[si] = Math.round(y * 100) / 100;
+    _fcCommit();
+    return true;
+};
+
+/** Split each selected cell in the middle with a new shelf. */
+window.fcAddShelfInCells = function(rows) {
+    const a = _fcActive();
+    if (!a) return;
+    const fc = a.fc;
+    const sorted = [...new Set(rows)].sort((x, y) => y - x);
+    let changed = false;
+    sorted.forEach(r => {
+        if (fc.shelvesY.length >= FC_MAX_SHELVES) return;
+        const allY = a.allY();
+        if (r < 0 || r >= allY.length - 1) return;
+        const lo = allY[r] + FC_MIN_GAP;
+        const hi = allY[r + 1] - FC_MIN_GAP;
+        if (hi < lo) return;
+        let mid = _fcAvoidSplit(fc, (allY[r] + allY[r + 1]) / 2, a.t, lo, hi);
+        fc.shelvesY.splice(r, 0, Math.round(mid * 100) / 100);
+        const src = fc.compartments[r] || { content: 'empty', door: 'empty' };
+        fc.compartments.splice(r + 1, 0, {
+            content: 'empty',
+            door: src.door || 'empty',
+            doorStyle: src.doorStyle || 'solid'
+        });
+        fc.leds.forEach(g => {
+            if (g.startRow > r) g.startRow++;
+            if (g.endRow >= r) g.endRow++;
+        });
+        changed = true;
+    });
+    if (!changed) return;
+    fc.shelves = fc.shelvesY.length;
+    _fcCommit();
+};
+
+/** Remove the shelf above each selected cell (below it for the top cell), merging the two cells. */
+window.fcRemoveShelfInCells = function(rows) {
+    const a = _fcActive();
+    if (!a) return;
+    const fc = a.fc;
+    const sorted = [...new Set(rows)].sort((x, y) => y - x);
+    let changed = false;
+    sorted.forEach(r => {
+        const n = fc.shelvesY.length + 1;
+        if (n < 2 || r < 0 || r >= n) return;
+        const si = r < n - 1 ? r : r - 1;
+        fc.shelvesY.splice(si, 1);
+        fc.compartments.splice(si + 1, 1);
+        fc.leds.forEach(g => {
+            if (g.startRow > si) g.startRow--;
+            if (g.endRow > si) g.endRow--;
+        });
+        changed = true;
+    });
+    if (!changed) return;
+    fc.leds = fc.leds.filter((g, i, arr) =>
+        arr.findIndex(o => o.startRow === g.startRow && o.endRow === g.endRow) === i);
+    fc.shelves = fc.shelvesY.length;
+    _fcCommit();
+};
+
+/** Spread the existing shelves evenly. */
+window.fcEqualizeCells = function() {
+    const a = _fcActive();
+    if (!a) return;
+    a.fc.shelves = a.fc.shelvesY.length;
+    window._distributeFullCornerShelves(a.w);
+    _fcCommit();
+};
+
+/** Index of the LED group that covers all of `rows`, or -1. */
+window._fcLedGroupIndex = function(rows) {
+    const a = _fcActive();
+    if (!a || !rows.length) return -1;
+    const s = Math.min(...rows), e = Math.max(...rows);
+    return a.fc.leds.findIndex(g => s >= g.startRow && e <= g.endRow);
+};
+
+/** LED pair over the selected cell span: toggles off when an existing group covers the span. */
+window.toggleFullCornerLed = function(rows) {
+    const a = _fcActive();
+    if (!a || !rows.length) return;
+    const fc = a.fc;
+    const s = Math.min(...rows), e = Math.max(...rows);
+    const hit = window._fcLedGroupIndex(rows);
+    if (hit !== -1) {
+        fc.leds.splice(hit, 1);
+    } else {
+        fc.leds = fc.leds.filter(g => g.endRow < s || g.startRow > e);
+        fc.leds.push({ startRow: s, endRow: e });
+        fc.leds.sort((x, y) => x.startRow - y.startRow);
+    }
+    _fcCommit();
+};
+
+window.setFullCornerHandleStyle = function(style) {
+    const a = _fcActive();
+    if (!a) return;
+    a.fc.handleStyle = style;
+    _fcCommit();
 };
 
 // ---- Update fullCorner compartment content (תוכן פנימי) ----
@@ -4726,6 +4896,7 @@ function _calcWingCost(cfg, wing) {
         const fc = wing.fullCorner || {};
         finalCost += _priceNum(ex.fullCornerBase, 2800);
         finalCost += (fc.shelves || 0) * _priceNum(ex.fullCornerShelf, 120);
+        finalCost += (Array.isArray(fc.leds) ? fc.leds.length : 0) * _priceNum(ex.ledPair, 650);
     }
 
     if (wing.sideCabinet && wing.sideCabinet.side !== 'none') {

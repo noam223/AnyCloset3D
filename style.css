@@ -2185,8 +2185,25 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); box-sha
 .plus-btn.selected { background: var(--success); border-color: var(--success); color: white; transform: translate(-50%, -50%) scale(1.14); box-shadow: 0 5px 16px rgba(16, 185, 129, 0.5); }
 
 /* FC cell hanger/trash buttons (3D edit mode overlays) */
-.fc-cell-btn { pointer-events: auto; box-shadow: 0 2px 8px rgba(0,0,0,0.35); }
-.fc-cell-btn:hover { filter: brightness(1.2); transform: translate(-50%,-50%) scale(1.12) !important; }
+.fc-cell-btn { pointer-events: auto; box-shadow: none; }
+.fc-cell-btn:hover { filter: none; transform: translate(-50%,-50%) !important; }
+.fc-cell-btn input[type="number"]::-webkit-inner-spin-button,
+.fc-cell-btn input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.fc-shelf-section {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 5px 8px;
+    margin-top: 4px;
+    background: rgba(99,102,241,0.08);
+    border: 1px solid rgba(99,102,241,0.25);
+    border-radius: 8px;
+    box-sizing: border-box;
+}
+.fc-shelf-section .slider-btn { width: 22px; height: 22px; font-size: 0.75rem; }
+.fc-shelf-count { font-weight: 900; color: var(--primary); font-size: 0.9rem; min-width: 16px; text-align: center; }
+.fc-shelf-label { font-size: 0.72rem; color: var(--text-light); white-space: nowrap; }
 
 .drag-handle {
     position: absolute; width: 23px; height: 23px; background: white; border-radius: 50%; border: 2px solid var(--secondary);

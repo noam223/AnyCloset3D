@@ -57,6 +57,88 @@ function _fmtCellHeightCm(h) {
     return n.toFixed(1);
 }
 window._fmtCellHeightCm = _fmtCellHeightCm;
+
+/**
+ * Cell pill shared by regular cells and full-corner cells.
+ * Selected → green ✓ circle; otherwise [trash |] [icon |] editable height | +.
+ * opts: { selected, hasContent, heightCm, onToggle, onTrash, onHeightChange(desiredCm) → false to reset, iconHtml }
+ * The pill variant exposes its height input as `el._heightInput`.
+ */
+function _buildCellPill(opts) {
+    if (opts.selected) {
+        const checkCircle = document.createElement('div');
+        checkCircle.innerHTML = '<i class="fa-solid fa-check" style="font-size:0.75rem;pointer-events:none;"></i>';
+        checkCircle.style.cssText = 'display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#10b981,#059669);color:white;cursor:pointer;flex-shrink:0;transition:transform 0.15s,box-shadow 0.15s;box-shadow:0 2px 8px rgba(16,185,129,0.55);';
+        checkCircle.addEventListener('mouseenter', () => { checkCircle.style.transform = 'scale(1.15)'; checkCircle.style.boxShadow = '0 3px 12px rgba(16,185,129,0.7)'; });
+        checkCircle.addEventListener('mouseleave', () => { checkCircle.style.transform = 'scale(1)'; checkCircle.style.boxShadow = '0 2px 8px rgba(16,185,129,0.55)'; });
+        checkCircle.addEventListener('click', (e) => { e.stopPropagation(); opts.onToggle(); });
+        return checkCircle;
+    }
+
+    // direction:ltr so internal order is predictable — in the RTL page: + on the visual left, trash on the right
+    const pill = document.createElement('div');
+    pill.style.cssText = 'display:flex;align-items:center;gap:0;direction:ltr;background:rgba(30,30,40,0.82);border-radius:15px;padding:2px 6px 2px 5px;box-shadow:0 1px 6px rgba(0,0,0,0.3);flex-shrink:0;line-height:1;';
+    const addDivider = () => {
+        const div = document.createElement('div');
+        div.style.cssText = 'width:1px;height:11px;background:rgba(255,255,255,0.2);margin:0 4px;flex-shrink:0;';
+        pill.appendChild(div);
+    };
+
+    if (opts.hasContent) {
+        const trashBtn = document.createElement('div');
+        trashBtn.innerHTML = '<i class="fa-solid fa-trash" style="font-size:0.6rem;pointer-events:none;"></i>';
+        trashBtn.style.cssText = 'display:flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;color:rgba(255,255,255,0.55);cursor:pointer;transition:color 0.15s,background 0.15s;flex-shrink:0;';
+        trashBtn.title = 'מחק תכולה מאיזור זה';
+        trashBtn.addEventListener('mouseenter', () => { trashBtn.style.color = '#ef4444'; trashBtn.style.background = 'rgba(239,68,68,0.15)'; });
+        trashBtn.addEventListener('mouseleave', () => { trashBtn.style.color = 'rgba(255,255,255,0.55)'; trashBtn.style.background = 'transparent'; });
+        trashBtn.addEventListener('click', (e) => { e.stopPropagation(); opts.onTrash(); });
+        pill.appendChild(trashBtn);
+        addDivider();
+    }
+
+    if (opts.iconHtml) {
+        const ic = document.createElement('div');
+        ic.innerHTML = opts.iconHtml;
+        ic.style.cssText = 'display:flex;align-items:center;justify-content:center;flex-shrink:0;';
+        pill.appendChild(ic);
+        addDivider();
+    }
+
+    // Height text only (no ▲▼) — keeps the pill short so it doesn't cover shelf drag handles
+    const shown = _fmtCellHeightCm(opts.heightCm);
+    const heightInput = document.createElement('input');
+    heightInput.type = 'number';
+    heightInput.step = '0.1';
+    heightInput.value = shown;
+    heightInput.title = 'לחץ לעריכת גובה התא';
+    heightInput.setAttribute('aria-label', 'גובה תא בס״מ');
+    heightInput.style.cssText = 'width:2.8em;min-width:2.4em;height:17px;border:none;background:transparent;font-size:calc(0.7rem + 2pt);font-weight:700;color:rgba(255,255,255,0.95);line-height:17px;text-align:center;outline:none;padding:0;margin:0;font-family:inherit;-moz-appearance:textfield;cursor:text;';
+    heightInput.addEventListener('mousedown', (e) => { e.stopPropagation(); });
+    heightInput.addEventListener('click', (e) => { e.stopPropagation(); heightInput.select(); });
+    heightInput.addEventListener('keydown', (e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') { e.preventDefault(); heightInput.blur(); }
+    });
+    heightInput.addEventListener('change', (e) => {
+        e.stopPropagation();
+        const desired = parseFloat(e.target.value);
+        if (isNaN(desired) || opts.onHeightChange(desired) === false) e.target.value = heightInput._shown;
+    });
+    heightInput._shown = shown;
+    pill.appendChild(heightInput);
+    addDivider();
+
+    const plusBtn = document.createElement('div');
+    plusBtn.innerHTML = '<i class="fa-solid fa-plus" style="font-size:0.68rem;pointer-events:none;"></i>';
+    plusBtn.style.cssText = 'display:flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;cursor:pointer;flex-shrink:0;transition:transform 0.15s,box-shadow 0.15s;box-shadow:0 1px 4px rgba(99,102,241,0.45);';
+    plusBtn.addEventListener('mouseenter', () => { plusBtn.style.transform = 'scale(1.12)'; plusBtn.style.boxShadow = '0 2px 8px rgba(99,102,241,0.65)'; });
+    plusBtn.addEventListener('mouseleave', () => { plusBtn.style.transform = 'scale(1)'; plusBtn.style.boxShadow = '0 1px 4px rgba(99,102,241,0.45)'; });
+    plusBtn.addEventListener('click', (e) => { e.stopPropagation(); opts.onToggle(); });
+    pill.appendChild(plusBtn);
+
+    pill._heightInput = heightInput;
+    return pill;
+}
 /** @deprecated alias — display is cm, not mm */
 function _fmtCellHeightMm(hCm) { return _fmtCellHeightCm(hCm); }
 window._fmtCellHeightMm = _fmtCellHeightMm;
@@ -953,97 +1035,29 @@ function buildDimensionsAndButtonsUI() {
             dimEl.addEventListener('pointerdown', (e) => { e.stopPropagation(); });
             dimEl.addEventListener('pointerup', (e) => { e.stopPropagation(); });
 
-            if (isSelectedRow) {
-                // Selected state: just the green ✓ circle — no pill wrapper needed
-                const checkCircle = document.createElement('div');
-                checkCircle.innerHTML = '<i class="fa-solid fa-check" style="font-size:0.75rem;pointer-events:none;"></i>';
-                checkCircle.style.cssText = 'display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#10b981,#059669);color:white;cursor:pointer;flex-shrink:0;transition:transform 0.15s,box-shadow 0.15s;box-shadow:0 2px 8px rgba(16,185,129,0.55);';
-                checkCircle.addEventListener('mouseenter', () => { checkCircle.style.transform = 'scale(1.15)'; checkCircle.style.boxShadow = '0 3px 12px rgba(16,185,129,0.7)'; });
-                checkCircle.addEventListener('mouseleave', () => { checkCircle.style.transform = 'scale(1)'; checkCircle.style.boxShadow = '0 2px 8px rgba(16,185,129,0.55)'; });
-                checkCircle.addEventListener('click', (e) => { e.stopPropagation(); toggleSelection(d.colIndex, d.rowIndex); });
-                dimEl.insertBefore(checkCircle, dimEl.firstChild);
-            } else {
-                // Build pill container — direction:ltr so internal order is predictable
-                const pill = document.createElement('div');
-                pill.style.cssText = 'display:flex;align-items:center;gap:0;direction:ltr;background:rgba(30,30,40,0.82);border-radius:15px;padding:2px 6px 2px 5px;box-shadow:0 1px 6px rgba(0,0,0,0.3);flex-shrink:0;line-height:1;';
-                // Pill layout (LTR inside pill): [(trash | divider)? | height text | divider | +]
-                // In RTL context: + on visual LEFT, height in middle, trash on visual RIGHT
-
-                if (hasContent) {
-                    // Trash — first in DOM = visual left in LTR (= visual right in RTL page)
-                    const trashBtn = document.createElement('div');
-                    trashBtn.innerHTML = '<i class="fa-solid fa-trash" style="font-size:0.6rem;pointer-events:none;"></i>';
-                    trashBtn.style.cssText = 'display:flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;color:rgba(255,255,255,0.55);cursor:pointer;transition:color 0.15s,background 0.15s;flex-shrink:0;';
-                    trashBtn.title = 'מחק תכולה מאיזור זה';
-                    trashBtn.addEventListener('mouseenter', () => { trashBtn.style.color = '#ef4444'; trashBtn.style.background = 'rgba(239,68,68,0.15)'; });
-                    trashBtn.addEventListener('mouseleave', () => { trashBtn.style.color = 'rgba(255,255,255,0.55)'; trashBtn.style.background = 'transparent'; });
-                    trashBtn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        if (state.columns[d.colIndex].compartments[d.rowIndex]) {
-                            state.columns[d.colIndex].compartments[d.rowIndex].type = 'empty';
-                            delete state.columns[d.colIndex].compartments[d.rowIndex].partition;
-                            delete state.columns[d.colIndex].compartments[d.rowIndex].partitions;
-                            delete state.columns[d.colIndex].compartments[d.rowIndex].subCells;
-                            _clearSubCellSelection();
-                        }
-                        buildCabinet(); calculatePrice(); saveHistoryState();
-                    });
-                    pill.appendChild(trashBtn);
-
-                    // Divider after trash
-                    const div1 = document.createElement('div');
-                    div1.style.cssText = 'width:1px;height:11px;background:rgba(255,255,255,0.2);margin:0 4px;flex-shrink:0;';
-                    pill.appendChild(div1);
-                }
-
-                // Height editable text only (no ▲▼) — keeps pill short so it doesn't cover shelf drag handles
-                const cellHDisp = Math.round((Number(d.h) || 0) * 10) / 10;
-                const heightInput = document.createElement('input');
-                heightInput.type = 'number';
-                heightInput.step = '0.1';
-                heightInput.value = _fmtCellHeightCm(cellHDisp);
-                heightInput.title = 'לחץ לעריכת גובה התא';
-                heightInput.setAttribute('aria-label', 'גובה תא בס״מ');
-                heightInput.style.cssText = 'width:2.8em;min-width:2.4em;height:17px;border:none;background:transparent;font-size:calc(0.7rem + 2pt);font-weight:700;color:rgba(255,255,255,0.95);line-height:17px;text-align:center;outline:none;padding:0;margin:0;font-family:inherit;-moz-appearance:textfield;cursor:text;';
-                heightInput.addEventListener('mousedown', (e) => { e.stopPropagation(); });
-                heightInput.addEventListener('click', (e) => { e.stopPropagation(); heightInput.select(); });
-                heightInput.addEventListener('keydown', (e) => {
-                    e.stopPropagation();
-                    if (e.key === 'Enter') { e.preventDefault(); heightInput.blur(); }
-                });
-                heightInput.addEventListener('change', (e) => {
-                    e.stopPropagation();
-                    const desired = parseFloat(e.target.value);
-                    if (isNaN(desired)) {
-                        e.target.value = _fmtCellHeightCm(cellHDisp);
-                        return;
+            // Pill IS the visual container: [trash |] height | + — or the green ✓ when selected
+            dimEl.insertBefore(_buildCellPill({
+                selected: isSelectedRow,
+                hasContent: hasContent,
+                heightCm: Math.round((Number(d.h) || 0) * 10) / 10,
+                onToggle: () => toggleSelection(d.colIndex, d.rowIndex),
+                onTrash: () => {
+                    const c = state.columns[d.colIndex].compartments[d.rowIndex];
+                    if (c) {
+                        c.type = 'empty';
+                        delete c.partition;
+                        delete c.partitions;
+                        delete c.subCells;
+                        _clearSubCellSelection();
                     }
+                    buildCabinet(); calculatePrice(); saveHistoryState();
+                },
+                onHeightChange: (desired) => {
                     const delta = Math.round((desired - d.h) * 100) / 100;
-                    if (Math.abs(delta) < 0.001) {
-                        e.target.value = _fmtCellHeightCm(cellHDisp);
-                        return;
-                    }
+                    if (Math.abs(delta) < 0.001) return false;
                     _adjustCellHeight(delta);
-                });
-                pill.appendChild(heightInput);
-
-                // Divider between height and +
-                const div2 = document.createElement('div');
-                div2.style.cssText = 'width:1px;height:11px;background:rgba(255,255,255,0.2);margin:0 4px;flex-shrink:0;';
-                pill.appendChild(div2);
-
-                // + button — last in DOM = visual right in LTR (= visual left in RTL page)
-                const plusBtn = document.createElement('div');
-                plusBtn.innerHTML = '<i class="fa-solid fa-plus" style="font-size:0.68rem;pointer-events:none;"></i>';
-                plusBtn.style.cssText = 'display:flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;cursor:pointer;flex-shrink:0;transition:transform 0.15s,box-shadow 0.15s;box-shadow:0 1px 4px rgba(99,102,241,0.45);';
-                plusBtn.addEventListener('mouseenter', () => { plusBtn.style.transform = 'scale(1.12)'; plusBtn.style.boxShadow = '0 2px 8px rgba(99,102,241,0.65)'; });
-                plusBtn.addEventListener('mouseleave', () => { plusBtn.style.transform = 'scale(1)'; plusBtn.style.boxShadow = '0 1px 4px rgba(99,102,241,0.45)'; });
-                plusBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleSelection(d.colIndex, d.rowIndex); });
-                pill.appendChild(plusBtn);
-
-                // Insert pill BEFORE any existing children (= visual right in RTL)
-                dimEl.insertBefore(pill, dimEl.firstChild);
-            }
+                }
+            }), dimEl.firstChild);
 
             dimEl.style.cursor = 'default';
         }
@@ -3255,112 +3269,118 @@ let _fcShelfDragSide = null;
 let _fcShelfDragCount = 0;
 let _fcSelection = { rows: [] };  // selected row indices in the full corner unit
 
+function _fcActiveSide() {
+    const aw = state.activeWing || '';
+    return aw.indexOf('full_corner_') === 0 ? aw.replace('full_corner_', '') : null;
+}
+
+function _fcActiveData() {
+    const side = _fcActiveSide();
+    const wingData = side ? state.wings[side] : null;
+    if (!wingData || !wingData.fullCorner) return null;
+    return { side, wingData, fc: wingData.fullCorner };
+}
+
+/** Cell boundaries as drawn: [bottom inner face, ...shelf centres, top inner face]. */
+function _fcAllY(wingData, fc) {
+    const t = wingData.thickness || 1.7;
+    return [(wingData.plinthHeight || 7) + t, ...(fc.shelvesY || []), (wingData.globalHeight || 240) - t];
+}
+
+/** Local anchor (front-arm centre) where the FC overlays are projected. */
+function _fcLocalAnchor(side, wingData, fc) {
+    const sign = (side === 'right') ? 1 : -1;
+    const centerWing = state.wings.center;
+    const bodyD = centerWing ? centerWing.depth : (wingData.depth || 54);
+    return { x: -sign * ((fc.size || 100) / 2), z: bodyD / 2 };
+}
+
+/** Screen pixels per cm along the FC's vertical axis at height y. */
+function _fcPxPerCm(fcGroup, anchor, y) {
+    fcGroup.updateMatrixWorld(true);
+    const a = new THREE.Vector3(anchor.x, y, anchor.z).applyMatrix4(fcGroup.matrixWorld).project(camera);
+    const b = new THREE.Vector3(anchor.x, y + 10, anchor.z).applyMatrix4(fcGroup.matrixWorld).project(camera);
+    const px = Math.abs((b.y - a.y) * 0.5 * container.clientHeight) / 10;
+    return px > 0.05 ? px : container.clientHeight / 240;
+}
+
+function _fcCompView(fc, r) {
+    const comp = (fc && fc.compartments && fc.compartments[r]) || {};
+    return {
+        content: comp.content !== undefined ? comp.content : (comp.type === 'cross_hanging' ? 'cross_hanging' : 'empty'),
+        door: comp.door !== undefined ? comp.door : (comp.type === 'door_regular' || comp.type === 'door_glass' ? 'right' : 'empty'),
+        doorStyle: comp.doorStyle || 'solid'
+    };
+}
+
+function _fcRowHasLed(fc, r) {
+    return Array.isArray(fc.leds) && fc.leds.some(g => r >= g.startRow && r <= g.endRow);
+}
+
 // Toggle selection of a FC cell row
 function _toggleFCSelection(r) {
     const idx = _fcSelection.rows.indexOf(r);
     if (idx === -1) _fcSelection.rows.push(r);
     else _fcSelection.rows.splice(idx, 1);
-    // Refresh button appearances
-    document.querySelectorAll('.fc-cell-btn').forEach(btn => {
-        const row = parseInt(btn.dataset.fcRow);
-        _applyFCBtnState(btn, row);
-    });
+    _renderAllFCCellBtns();
     updateFCToolbarState();
 }
 
 window._clearFCSelection = function _clearFCSelection() {
     _fcSelection.rows = [];
-    document.querySelectorAll('.fc-cell-btn').forEach(btn => {
-        const row = parseInt(btn.dataset.fcRow);
-        _applyFCBtnState(btn, row);
-    });
+    _renderAllFCCellBtns();
     updateFCToolbarState();
 }
 
-// Apply visual state to a FC cell button based on selection + content
-function _applyFCBtnState(btn, r) {
-    const fcSide = state.activeWing ? state.activeWing.replace('full_corner_', '') : null;
-    const fc = fcSide && state.wings[fcSide] ? state.wings[fcSide].fullCorner : null;
-    const comp = (fc && fc.compartments && fc.compartments[r]) || {};
-    const content = comp.content !== undefined ? comp.content : (comp.type === 'cross_hanging' ? 'cross_hanging' : 'empty');
-    const door = comp.door !== undefined ? comp.door : (comp.type === 'door_regular' || comp.type === 'door_glass' ? 'right' : 'empty');
-    const hasContent = content !== 'empty' || door !== 'empty';
-    const isSelected = _fcSelection.rows.includes(r);
-
-    const cellH = btn.dataset.fcHeight ? `${btn.dataset.fcHeight}` : '';
-    if (isSelected) {
-        btn.style.background = 'var(--secondary, #10b981)';
-        btn.style.color = '#fff';
-        btn.style.width = '30px';
-        btn.style.height = '30px';
-        btn.style.padding = '0';
-        btn.style.borderRadius = '6px';
-        btn.innerHTML = '<i class="fa-solid fa-check" style="font-size:1rem;"></i>';
-        btn.title = 'תא נבחר — לחץ לביטול';
-    } else if (hasContent) {
-        btn.style.background = 'rgba(30,30,40,0.82)';
-        btn.style.color = '#fff';
-        btn.style.width = 'auto';
-        btn.style.padding = '4px 10px';
-        btn.style.borderRadius = '20px';
-        btn.innerHTML = `
-            <div style="display:flex;align-items:center;gap:8px;">
-                <i class="fa-solid fa-trash fc-cell-delete" style="cursor:pointer;transition:color 0.2s;" onmouseenter="this.style.color='#ffcccc'" onmouseleave="this.style.color=''"></i>
-                <div style="width:1px;height:14px;background:rgba(255,255,255,0.4);"></div>
-                ${cellH ? `<span style="font-size:0.72rem;font-weight:700;opacity:0.85;">${cellH}</span><div style="width:1px;height:14px;background:rgba(255,255,255,0.4);"></div>` : ''}
-                <i class="fa-solid fa-plus" style="font-size:0.8rem;"></i>
-            </div>`;
-        btn.title = 'לחץ לבחירה';
-    } else {
-        btn.style.background = 'rgba(30,30,40,0.75)';
-        btn.style.color = '#fff';
-        btn.style.width = 'auto';
-        btn.style.padding = '4px 10px';
-        btn.style.borderRadius = '20px';
-        btn.innerHTML = `
-            <div style="display:flex;align-items:center;gap:6px;">
-                ${cellH ? `<span style="font-size:0.72rem;font-weight:700;opacity:0.85;">${cellH}</span><div style="width:1px;height:14px;background:rgba(255,255,255,0.4);"></div>` : ''}
-                <i class="fa-solid fa-plus" style="font-size:0.8rem;"></i>
-            </div>`;
-        btn.title = 'לחץ לבחירה';
-    }
+/** Fill one FC cell wrapper with the shared regular-cabinet pill. */
+function _renderFCCellBtn(wrap, r) {
+    const d = _fcActiveData();
+    if (!d) return;
+    const allY = _fcAllY(d.wingData, d.fc);
+    const view = _fcCompView(d.fc, r);
+    const pill = _buildCellPill({
+        selected: _fcSelection.rows.includes(r),
+        hasContent: view.content !== 'empty' || view.door !== 'empty',
+        heightCm: (allY[r + 1] || 0) - (allY[r] || 0),
+        iconHtml: _fcRowHasLed(d.fc, r)
+            ? '<i class="fa-solid fa-lightbulb" style="font-size:0.62rem;color:#fcd34d;pointer-events:none;" title="לדים"></i>'
+            : '',
+        onToggle: () => _toggleFCSelection(r),
+        onTrash: () => {
+            const d2 = _fcActiveData();
+            if (d2 && d2.fc.compartments[r]) {
+                d2.fc.compartments[r] = { content: 'empty', door: 'empty' };
+            }
+            buildCabinet(); calculatePrice(); saveHistoryState();
+        },
+        onHeightChange: (desired) => window.setFullCornerCellHeight(r, desired)
+    });
+    wrap.innerHTML = '';
+    wrap.appendChild(pill);
+    wrap._heightInput = pill._heightInput || null;
 }
 
-function _rebuildFCCellButtons(fcRealSide, wingData, fc, allY, comps, fcGroup, localCenterX, localCenterZ) {
+function _renderAllFCCellBtns() {
+    document.querySelectorAll('.fc-cell-btn').forEach(wrap => _renderFCCellBtn(wrap, parseInt(wrap.dataset.fcRow)));
+}
+
+function _rebuildFCCellButtons(fcRealSide, rowCount) {
+    const structural = (_fcCellBtnSide !== fcRealSide || _fcCellBtnCount !== rowCount);
     document.querySelectorAll('.fc-cell-btn').forEach(el => el.remove());
     _fcCellBtnSide = fcRealSide;
-    _fcCellBtnCount = allY.length - 1;
-    // Clear selection when rebuilding
-    _fcSelection.rows = [];
+    _fcCellBtnCount = rowCount;
+    if (structural) _fcSelection.rows = [];
 
-    for (let r = 0; r < allY.length - 1; r++) {
-        const btn = document.createElement('button');
-        btn.className = 'fc-cell-btn plus-btn';
-        btn.dataset.fcRow = r;
-        btn.dataset.fcHeight = _fmtCellHeightCm(allY[r + 1] - allY[r]);
-        btn.style.cssText = 'position:absolute;left:0;top:0;transform:translate(-50%,-50%);z-index:40;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1rem;transition:background 0.15s;min-width:26px;height:26px;';
-
-        _applyFCBtnState(btn, r);
-
-        btn.addEventListener('pointerdown', e => e.stopPropagation());
-        btn.addEventListener('mousedown', e => e.stopPropagation());
-        btn.addEventListener('click', e => {
-            e.stopPropagation();
-            e.preventDefault();
-            // Delete button inside pill
-            if (e.target.classList.contains('fc-cell-delete') || e.target.closest('.fc-cell-delete')) {
-                const fcSide2 = state.activeWing.replace('full_corner_', '');
-                const wd2 = state.wings[fcSide2];
-                if (wd2 && wd2.fullCorner && wd2.fullCorner.compartments[r]) {
-                    wd2.fullCorner.compartments[r] = { content: 'empty', door: 'empty' };
-                }
-                buildCabinet(); calculatePrice(); saveHistoryState();
-                return;
-            }
-            _toggleFCSelection(r);
-        });
-
-        container.appendChild(btn);
+    for (let r = 0; r < rowCount; r++) {
+        const wrap = document.createElement('div');
+        wrap.className = 'fc-cell-btn';
+        wrap.dataset.fcRow = r;
+        wrap.style.cssText = 'position:absolute;left:0;top:0;transform:translate(-50%,-50%);z-index:40;pointer-events:auto;';
+        wrap.addEventListener('pointerdown', e => e.stopPropagation());
+        wrap.addEventListener('pointerup', e => e.stopPropagation());
+        wrap.addEventListener('mousedown', e => e.stopPropagation());
+        _renderFCCellBtn(wrap, r);
+        container.appendChild(wrap);
     }
     updateFCToolbarState();
 }
@@ -3370,9 +3390,7 @@ window.updateFCToolbarState = function() {
     const toolbar = document.getElementById('fc-toolbar');
     if (!toolbar) return;
 
-    const isFCEditMode = state.wingEditMode &&
-        (state.activeWing === 'full_corner_right' || state.activeWing === 'full_corner_left');
-
+    const isFCEditMode = state.wingEditMode && !!_fcActiveSide();
     if (!isFCEditMode || _fcSelection.rows.length === 0) {
         toolbar.classList.remove('show-toolbar');
         const dsp = document.getElementById('fc-door-style-panel');
@@ -3382,27 +3400,53 @@ window.updateFCToolbarState = function() {
 
     toolbar.classList.add('show-toolbar');
 
-    // Position toolbar near center of FC unit
-    const fcRealSide = state.activeWing.replace('full_corner_', '');
-    const fcGroup = window[`_fullCornerGroup_${fcRealSide}`];
-    if (fcGroup) {
-        const wingData = state.wings[fcRealSide];
-        const fc = wingData && wingData.fullCorner;
+    const d = _fcActiveData();
+
+    // Highlight buttons based on first selected row
+    const fc2 = d && d.fc;
+    const view = _fcCompView(fc2, _fcSelection.rows[0]);
+    const hasDoor = view.door !== 'empty';
+
+    document.getElementById('fc-btn-hanging')?.classList.toggle('active', view.content === 'cross_hanging');
+    document.getElementById('fc-btn-empty-content')?.classList.toggle('active', view.content === 'empty');
+    document.getElementById('fc-btn-door-on')?.classList.toggle('active', hasDoor);
+    document.getElementById('fc-btn-door-empty')?.classList.toggle('active', !hasDoor);
+    document.getElementById('fc-btn-led')?.classList.toggle('active',
+        typeof window._fcLedGroupIndex === 'function' && window._fcLedGroupIndex(_fcSelection.rows) !== -1);
+
+    const equalBtn = document.getElementById('fc-btn-equal-cells');
+    if (equalBtn) equalBtn.style.display = (fc2 && (fc2.shelvesY || []).length > 0) ? '' : 'none';
+
+    const handleRow = document.getElementById('fc-handle-row');
+    if (handleRow) handleRow.style.display = hasDoor ? '' : 'none';
+    const handleBtn = document.getElementById('fc-btn-handle');
+    if (handleBtn) handleBtn.classList.toggle('active', !!(fc2 && fc2.handleStyle));
+
+    const shelfCount = document.getElementById('fc-shelf-count');
+    if (shelfCount) shelfCount.textContent = fc2 ? (fc2.shelvesY || []).length : 0;
+
+    // Door style inline sub-panel — show when door is active, hide otherwise
+    const dsp = document.getElementById('fc-door-style-panel');
+    if (dsp) {
+        dsp.style.display = hasDoor ? 'flex' : 'none';
+        if (hasDoor) {
+            dsp.querySelectorAll('button[data-fc-door-style]').forEach(b => {
+                b.classList.toggle('active', b.dataset.fcDoorStyle === view.doorStyle);
+            });
+        }
+    }
+
+    // Position last so the measured height includes the open sub-panels
+    const fcGroup = d && window[`_fullCornerGroup_${d.side}`];
+    if (d && fcGroup) {
         const cw_px = container.clientWidth;
         const ch_px = container.clientHeight;
-        const fcSize = (fc && fc.size) || 100;
-        const sign = (fcRealSide === 'right') ? 1 : -1;
-        const centerWing = state.wings.center;
-        const bodyD = centerWing ? centerWing.depth : (wingData ? wingData.depth : 54);
-        const localCenterX = -sign * fcSize / 2;
-        const localCenterZ = bodyD / 2;
+        const anchor = _fcLocalAnchor(d.side, d.wingData, d.fc);
+        const allY2 = _fcAllY(d.wingData, d.fc);
         const midRow = _fcSelection.rows[Math.floor(_fcSelection.rows.length / 2)];
-        const allY2 = fc ? [wingData.plinthHeight + (wingData.thickness || 1.7), ...(fc.shelvesY || []), wingData.globalHeight - (wingData.thickness || 1.7)] : [];
-        const midY = allY2.length > midRow + 1 ? (allY2[midRow] + allY2[midRow + 1]) / 2 : (wingData ? wingData.globalHeight / 2 : 120);
+        const midY = allY2.length > midRow + 1 ? (allY2[midRow] + allY2[midRow + 1]) / 2 : (d.wingData.globalHeight || 240) / 2;
         fcGroup.updateMatrixWorld(true);
-        const localPt = new THREE.Vector3(localCenterX, midY, localCenterZ);
-        localPt.applyMatrix4(fcGroup.matrixWorld);
-        const projected = localPt.clone().project(camera);
+        const projected = new THREE.Vector3(anchor.x, midY, anchor.z).applyMatrix4(fcGroup.matrixWorld).project(camera);
         let tx = (projected.x * 0.5 + 0.5) * cw_px;
         let ty = (-projected.y * 0.5 + 0.5) * ch_px;
         const tw = toolbar.offsetWidth || 300;
@@ -3412,57 +3456,60 @@ window.updateFCToolbarState = function() {
         toolbar.style.left = `${tx}px`;
         toolbar.style.top = `${ty}px`;
     }
-
-    // Highlight buttons based on first selected row
-    const fcSide = state.activeWing.replace('full_corner_', '');
-    const fc2 = state.wings[fcSide] && state.wings[fcSide].fullCorner;
-    const firstComp = (fc2 && fc2.compartments && fc2.compartments[_fcSelection.rows[0]]) || {};
-    const content = firstComp.content !== undefined ? firstComp.content : (firstComp.type === 'cross_hanging' ? 'cross_hanging' : 'empty');
-    const door = firstComp.door !== undefined ? firstComp.door : (firstComp.type === 'door_regular' || firstComp.type === 'door_glass' ? 'right' : 'empty');
-    const doorStyle = firstComp.doorStyle || 'solid';
-
-    document.getElementById('fc-btn-hanging')?.classList.toggle('active', content === 'cross_hanging');
-    document.getElementById('fc-btn-empty-content')?.classList.toggle('active', content === 'empty');
-    // Door: 'on' button active when any non-empty door is set; 'empty' button active when no door
-    document.getElementById('fc-btn-door-on')?.classList.toggle('active', door !== 'empty');
-    document.getElementById('fc-btn-door-empty')?.classList.toggle('active', door === 'empty');
-
-    // Door style inline sub-panel — show when door is active, hide otherwise
-    const dsp = document.getElementById('fc-door-style-panel');
-    if (dsp) {
-        dsp.style.display = (door !== 'empty') ? 'flex' : 'none';
-        if (door !== 'empty') {
-            dsp.querySelectorAll('button[data-fc-door-style]').forEach(b => {
-                b.classList.toggle('active', b.dataset.fcDoorStyle === doorStyle);
-            });
-        }
-    }
 };
 
 // ---- FC apply functions ----
 window.applyFCContent = function(contentType) {
-    const fcSide = state.activeWing ? state.activeWing.replace('full_corner_', '') : null;
-    if (!fcSide) return;
+    if (!_fcActiveSide()) return;
     window.updateFullCornerContent(_fcSelection.rows, contentType);
-    document.querySelectorAll('.fc-cell-btn').forEach(btn => _applyFCBtnState(btn, parseInt(btn.dataset.fcRow)));
     _clearFCSelection(); // close toolbar after applying
 };
 
 window.applyFCDoor = function(doorType) {
-    const fcSide = state.activeWing ? state.activeWing.replace('full_corner_', '') : null;
-    if (!fcSide) return;
+    if (!_fcActiveSide()) return;
     // 'on' maps to 'right' internally (both doors always shown together)
     const internalDoorType = doorType === 'on' ? 'right' : doorType;
     window.updateFullCornerDoor(_fcSelection.rows, internalDoorType);
-    document.querySelectorAll('.fc-cell-btn').forEach(btn => _applyFCBtnState(btn, parseInt(btn.dataset.fcRow)));
     _clearFCSelection(); // close toolbar after applying
 };
 
 window.applyFCDoorStyle = function(style) {
-    const fcSide = state.activeWing ? state.activeWing.replace('full_corner_', '') : null;
-    if (!fcSide) return;
+    if (!_fcActiveSide()) return;
     window.updateFullCornerDoorStyle(_fcSelection.rows, style);
     _clearFCSelection(); // close toolbar after applying
+};
+
+window.applyFCLed = function() {
+    if (!_fcActiveSide() || !_fcSelection.rows.length) return;
+    window.toggleFullCornerLed(_fcSelection.rows);
+    _renderAllFCCellBtns();
+    updateFCToolbarState();
+};
+
+window.applyFCEqualCells = function() {
+    if (!_fcActiveSide()) return;
+    window.fcEqualizeCells();
+    _renderAllFCCellBtns();
+    updateFCToolbarState();
+};
+
+/** +1 splits every selected cell with a new shelf, -1 merges each selected cell with its neighbour. */
+window.fcShelvesStep = function(delta) {
+    if (!_fcActiveSide() || !_fcSelection.rows.length) return;
+    const rows = _fcSelection.rows.slice();
+    if (delta > 0) window.fcAddShelfInCells(rows);
+    else window.fcRemoveShelfInCells(rows);
+    _clearFCSelection();
+};
+
+window.openFCHandlePicker = function() {
+    const d = _fcActiveData();
+    if (!d) return;
+    const current = d.fc.handleStyle || state.handleStyle || 'pipe';
+    _openHandlePickerSheet(current, 'ידית לדלתות הפינה המלאה', function(style) {
+        window.setFullCornerHandleStyle(style);
+        updateFCToolbarState();
+    });
 };
 
 // ── Per-unit splitY ──────────────────────────────────────────────────────────
@@ -3484,18 +3531,11 @@ function _setActiveWingSplitY(newSplitY) {
 let _fcSplitDragSide = null;
 
 function _rebuildFCSplitDragHandle(fcRealSide, wingData, fc) {
-    // Remove any existing split drag handle
     document.querySelectorAll('.fc-split-drag').forEach(el => el.remove());
     _fcSplitDragSide = fcRealSide;
 
     if (!fc.splitY) return; // no split board → no handle
 
-    const t = wingData.thickness || 1.7;
-    const plinthH = wingData.plinthHeight || 7;
-    const colH = wingData.globalHeight || 240;
-    const threshold = typeof getSplitThreshold === 'function'
-        ? getSplitThreshold(wingData)
-        : ((wingData.boardMaterial || 'melamine') === 'sandwich' ? 240 : 270);
     const MIN_GAP = 20;
 
     const handle = document.createElement('div');
@@ -3511,44 +3551,40 @@ function _rebuildFCSplitDragHandle(fcRealSide, wingData, fc) {
 
     let _dragStartY = 0;
     let _dragStartSplitY = 0;
+    let _pxPerCm = 1;
     let _isDragging = false;
 
     handle.addEventListener('pointerdown', e => {
         e.stopPropagation();
         e.preventDefault();
+        const d = _fcActiveData();
+        const fcGroup = d && window[`_fullCornerGroup_${d.side}`];
+        if (!d || !d.fc.splitY || !fcGroup) return;
         _isDragging = true;
         _dragStartY = e.clientY;
-        _dragStartSplitY = fc.splitY;
+        _dragStartSplitY = d.fc.splitY;
+        _pxPerCm = _fcPxPerCm(fcGroup, _fcLocalAnchor(d.side, d.wingData, d.fc), d.fc.splitY);
         handle.setPointerCapture(e.pointerId);
     });
 
     handle.addEventListener('pointermove', e => {
         if (!_isDragging) return;
         e.stopPropagation();
-        const fcSide2 = state.activeWing.replace('full_corner_', '');
-        const wd2 = state.wings[fcSide2];
-        if (!wd2 || !wd2.fullCorner) return;
-        const fc2 = wd2.fullCorner;
-
-        // Convert pixel delta to cm
-        const pxPerCm = container.clientHeight / colH;
-        const deltaCm = -(e.clientY - _dragStartY) / pxPerCm;
-        let newSplitY = _dragStartSplitY + deltaCm;
-
-        // Clamp: must stay above plinth+t+MIN_GAP and below threshold and below colH-t-MIN_GAP
-        // Also must not cross any shelf
-        const shelvesY2 = fc2.shelvesY || [];
-        const allY2 = [plinthH + t, ...shelvesY2, colH - t];
-        // Find the neighbours of splitY in allY2 (splitY sits between two allY entries)
-        // splitY is the top face of the double board; the board occupies splitY-2t .. splitY
-        // Minimum: must leave MIN_GAP above the board bottom (splitY-2t) and below the board top (splitY)
+        const d = _fcActiveData();
+        if (!d) return;
+        const wd2 = d.wingData;
+        const t = wd2.thickness || 1.7;
+        const plinthH = wd2.plinthHeight || 7;
+        const colH = wd2.globalHeight || 240;
+        const threshold = typeof getSplitThreshold === 'function'
+            ? getSplitThreshold(wd2)
+            : ((wd2.boardMaterial || 'melamine') === 'sandwich' ? 240 : 270);
+        let newSplitY = _dragStartSplitY - (e.clientY - _dragStartY) / _pxPerCm;
+        // The board occupies splitY-t..splitY+t and must leave MIN_GAP to the carcass boards
         const minSplitY = plinthH + t + 2 * t + MIN_GAP;
         const maxSplitY = Math.min(threshold, colH - t - MIN_GAP);
-
         newSplitY = Math.max(minSplitY, Math.min(maxSplitY, newSplitY));
-        newSplitY = Math.round(newSplitY * 10) / 10;
-
-        fc2.splitY = newSplitY;
+        d.fc.splitY = Math.round(newSplitY * 10) / 10;
         buildCabinetDragging();
     });
 
@@ -3565,18 +3601,14 @@ function _rebuildFCSplitDragHandle(fcRealSide, wingData, fc) {
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
-function _rebuildFCShelfDragHandles(fcRealSide, wingData, fc, shelvesY) {
+function _rebuildFCShelfDragHandles(fcRealSide, shelfCount) {
     document.querySelectorAll('.fc-shelf-drag').forEach(el => el.remove());
     _fcShelfDragSide = fcRealSide;
-    _fcShelfDragCount = shelvesY.length;
+    _fcShelfDragCount = shelfCount;
 
-    const t = wingData.thickness || 1.7;
-    const plinthH = wingData.plinthHeight || 7;
-    const colH = wingData.globalHeight || 240;
-    const innerH = colH - plinthH - 2 * t;
     const MIN_GAP = 20; // minimum cell height in cm
 
-    shelvesY.forEach((sy, si) => {
+    for (let si = 0; si < shelfCount; si++) {
         const handle = document.createElement('div');
         handle.className = 'fc-shelf-drag drag-handle';
         handle.dataset.fcShelfIdx = si;
@@ -3586,39 +3618,32 @@ function _rebuildFCShelfDragHandles(fcRealSide, wingData, fc, shelvesY) {
 
         let _dragStartY = 0;
         let _dragStartSy = 0;
+        let _pxPerCm = 1;
         let _isDragging = false;
 
         handle.addEventListener('pointerdown', e => {
             e.stopPropagation();
             e.preventDefault();
+            const d = _fcActiveData();
+            const fcGroup = d && window[`_fullCornerGroup_${d.side}`];
+            if (!d || !fcGroup || d.fc.shelvesY[si] == null) return;
             _isDragging = true;
             _dragStartY = e.clientY;
-            _dragStartSy = sy;
+            _dragStartSy = d.fc.shelvesY[si];
+            _pxPerCm = _fcPxPerCm(fcGroup, _fcLocalAnchor(d.side, d.wingData, d.fc), _dragStartSy);
             handle.setPointerCapture(e.pointerId);
         });
 
         handle.addEventListener('pointermove', e => {
             if (!_isDragging) return;
             e.stopPropagation();
-            const fcSide2 = state.activeWing.replace('full_corner_', '');
-            const wd2 = state.wings[fcSide2];
-            if (!wd2 || !wd2.fullCorner) return;
-            const fc2 = wd2.fullCorner;
-            const shelvesY2 = fc2.shelvesY || [];
-            const allY2 = [plinthH + t, ...shelvesY2, colH - t];
-
-            // Convert pixel delta to cm: use canvas height vs colH
-            const pxPerCm = container.clientHeight / colH;
-            const deltaCm = -(e.clientY - _dragStartY) / pxPerCm;
-            let newSy = _dragStartSy + deltaCm;
-
-            // Clamp between neighbours
-            const prevY = allY2[si] || (plinthH + t);
-            const nextY = allY2[si + 2] || (colH - t);
-            newSy = Math.max(prevY + MIN_GAP, Math.min(nextY - MIN_GAP, newSy));
-            newSy = Math.round(newSy * 10) / 10;
-
-            fc2.shelvesY[si] = newSy;
+            const d = _fcActiveData();
+            if (!d) return;
+            const allY2 = _fcAllY(d.wingData, d.fc);
+            let newSy = _dragStartSy - (e.clientY - _dragStartY) / _pxPerCm;
+            // Clamp between neighbours (allY2[si] is the boundary below shelf si, allY2[si+2] the one above)
+            newSy = Math.max(allY2[si] + MIN_GAP, Math.min(allY2[si + 2] - MIN_GAP, newSy));
+            d.fc.shelvesY[si] = Math.round(newSy * 10) / 10;
             buildCabinetDragging();
         });
 
@@ -3632,11 +3657,19 @@ function _rebuildFCShelfDragHandles(fcRealSide, wingData, fc, shelvesY) {
         });
 
         container.appendChild(handle);
-    });
+    }
+}
+
+function _fcProjectToScreen(fcGroup, x, y, z, cw_px, ch_px) {
+    const projected = new THREE.Vector3(x, y, z).applyMatrix4(fcGroup.matrixWorld).project(camera);
+    return {
+        x: Math.max(20, Math.min(cw_px - 20, (projected.x * 0.5 + 0.5) * cw_px)),
+        y: Math.max(20, Math.min(ch_px - 20, (-projected.y * 0.5 + 0.5) * ch_px))
+    };
 }
 
 function _updateFCCellButtons() {
-    const isFCEditMode = state.activeWing === 'full_corner_right' || state.activeWing === 'full_corner_left';
+    const isFCEditMode = !!_fcActiveSide();
     if (!state.wingEditMode || !isFCEditMode) {
         document.querySelectorAll('.fc-cell-btn').forEach(el => el.remove());
         document.querySelectorAll('.fc-shelf-drag').forEach(el => el.remove());
@@ -3647,97 +3680,75 @@ function _updateFCCellButtons() {
         return;
     }
 
-    const fcRealSide = state.activeWing.replace('full_corner_', '');
-    const wingData = state.wings[fcRealSide];
-    if (!wingData || !wingData.fullCorner) return;
+    const d = _fcActiveData();
+    if (!d) return;
+    const fcRealSide = d.side;
+    const wingData = d.wingData;
+    const fc = d.fc;
 
     const fcGroup = window[`_fullCornerGroup_${fcRealSide}`];
     if (!fcGroup) return;
 
-    const fc = wingData.fullCorner;
     const cw_px = container.clientWidth;
     const ch_px = container.clientHeight;
-
-    const centerWing = state.wings.center;
-    const bodyD = centerWing ? centerWing.depth : (wingData.depth || 54);
-    const t = wingData.thickness || 1.7;
-    const plinthH = wingData.plinthHeight || 7;
-    const colH = wingData.globalHeight || 240;
-    const fcSize = fc.size || 100;
-    const frontD = bodyD;
-    const sign = (fcRealSide === 'right') ? 1 : -1;
-
     const shelvesY = fc.shelvesY || [];
-    const allY = [plinthH + t, ...shelvesY, colH - t];
-    const comps = fc.compartments || [];
-
-    const localCenterX = -sign * fcSize / 2;
-    const localCenterZ = frontD / 2;
+    const allY = _fcAllY(wingData, fc);
+    const rowCount = allY.length - 1;
+    const anchor = _fcLocalAnchor(fcRealSide, wingData, fc);
 
     fcGroup.updateMatrixWorld(true);
 
-    // Rebuild cell buttons if structure or compartment state changed
-    const stateKey = comps.map(c => (c && c.type) || 'empty').join(',');
-    const needRebuildBtns = (_fcCellBtnSide !== fcRealSide || _fcCellBtnCount !== allY.length - 1 || _fcCellBtnStateKey !== stateKey);
-    if (needRebuildBtns) {
-        _fcCellBtnStateKey = stateKey;
-        _rebuildFCCellButtons(fcRealSide, wingData, fc, allY, comps, fcGroup, localCenterX, localCenterZ);
+    // Rebuild cell pills when the structure, cell contents or LEDs change
+    const stateKey = [];
+    for (let r = 0; r < rowCount; r++) {
+        const v = _fcCompView(fc, r);
+        stateKey.push(v.content + ':' + v.door + ':' + v.doorStyle + ':' + (_fcRowHasLed(fc, r) ? 1 : 0));
+    }
+    const stateKeyStr = stateKey.join(',');
+    if (_fcCellBtnSide !== fcRealSide || _fcCellBtnCount !== rowCount || _fcCellBtnStateKey !== stateKeyStr) {
+        _fcCellBtnStateKey = stateKeyStr;
+        _rebuildFCCellButtons(fcRealSide, rowCount);
     }
 
-    // Rebuild shelf drag handles if structure changed
-    const needRebuildDrag = (_fcShelfDragSide !== fcRealSide || _fcShelfDragCount !== shelvesY.length);
-    if (needRebuildDrag) {
-        _rebuildFCShelfDragHandles(fcRealSide, wingData, fc, shelvesY);
+    if (_fcShelfDragSide !== fcRealSide || _fcShelfDragCount !== shelvesY.length) {
+        _rebuildFCShelfDragHandles(fcRealSide, shelvesY.length);
     }
 
-    // Rebuild split drag handle if splitY presence changed
     const hasSplit = !!fc.splitY;
     const splitHandleExists = !!document.querySelector('.fc-split-drag');
     if (_fcSplitDragSide !== fcRealSide || hasSplit !== splitHandleExists) {
         _rebuildFCSplitDragHandle(fcRealSide, wingData, fc);
     }
 
-    // Update positions of cell buttons every frame
+    // Positions + live cell heights (they change while a shelf is dragged)
     const cellBtns = document.querySelectorAll('.fc-cell-btn');
-    for (let r = 0; r < allY.length - 1; r++) {
-        const btn = cellBtns[r];
-        if (!btn) continue;
-        const midY = (allY[r] + allY[r + 1]) / 2;
-        const localPt = new THREE.Vector3(localCenterX, midY, localCenterZ);
-        localPt.applyMatrix4(fcGroup.matrixWorld);
-        const projected = localPt.clone().project(camera);
-        let bx = Math.max(20, Math.min(cw_px - 20, (projected.x * 0.5 + 0.5) * cw_px));
-        let by = Math.max(20, Math.min(ch_px - 20, (-projected.y * 0.5 + 0.5) * ch_px));
-        btn.style.left = `${bx}px`;
-        btn.style.top = `${by}px`;
+    for (let r = 0; r < rowCount; r++) {
+        const wrap = cellBtns[r];
+        if (!wrap) continue;
+        const p = _fcProjectToScreen(fcGroup, anchor.x, (allY[r] + allY[r + 1]) / 2, anchor.z, cw_px, ch_px);
+        wrap.style.left = `${p.x}px`;
+        wrap.style.top = `${p.y}px`;
+        const inp = wrap._heightInput;
+        if (inp && document.activeElement !== inp) {
+            const txt = _fmtCellHeightCm(allY[r + 1] - allY[r]);
+            if (inp.value !== txt) { inp.value = txt; inp._shown = txt; }
+        }
     }
 
-    // Update positions of shelf drag handles every frame
     const dragHandles = document.querySelectorAll('.fc-shelf-drag');
     shelvesY.forEach((sy, si) => {
         const handle = dragHandles[si];
         if (!handle) return;
-        const localPt = new THREE.Vector3(localCenterX, sy, localCenterZ);
-        localPt.applyMatrix4(fcGroup.matrixWorld);
-        const projected = localPt.clone().project(camera);
-        let bx = Math.max(20, Math.min(cw_px - 20, (projected.x * 0.5 + 0.5) * cw_px));
-        let by = Math.max(20, Math.min(ch_px - 20, (-projected.y * 0.5 + 0.5) * ch_px));
-        handle.style.left = `${bx}px`;
-        handle.style.top = `${by}px`;
+        const p = _fcProjectToScreen(fcGroup, anchor.x, sy, anchor.z, cw_px, ch_px);
+        handle.style.left = `${p.x}px`;
+        handle.style.top = `${p.y}px`;
     });
 
-    // Update position of split drag handle every frame
     const splitHandle = document.querySelector('.fc-split-drag');
     if (splitHandle && fc.splitY) {
-        // Position at the center of the double-thickness board: fc.splitY (board occupies fc.splitY-t .. fc.splitY+t)
-        const splitMidY = fc.splitY;
-        const localPt = new THREE.Vector3(localCenterX, splitMidY, localCenterZ);
-        localPt.applyMatrix4(fcGroup.matrixWorld);
-        const projected = localPt.clone().project(camera);
-        let bx = Math.max(20, Math.min(cw_px - 20, (projected.x * 0.5 + 0.5) * cw_px));
-        let by = Math.max(20, Math.min(ch_px - 20, (-projected.y * 0.5 + 0.5) * ch_px));
-        splitHandle.style.left = `${bx}px`;
-        splitHandle.style.top = `${by}px`;
+        const p = _fcProjectToScreen(fcGroup, anchor.x, fc.splitY, anchor.z, cw_px, ch_px);
+        splitHandle.style.left = `${p.x}px`;
+        splitHandle.style.top = `${p.y}px`;
     }
 }
 
@@ -12015,12 +12026,18 @@ function _countLedPairs(columns) {
     }, 0);
 }
 
+/** LED pairs on a wing's full-corner L-unit (only when the wing is set to full corner). */
+function _countFullCornerLedPairs(wing) {
+    if (!wing || wing.wingPosition !== 'full_corner' || !wing.fullCorner) return 0;
+    return Array.isArray(wing.fullCorner.leds) ? wing.fullCorner.leds.length : 0;
+}
+
 function _countLedPairsFromRawState(rawState) {
     if (!rawState) return 0;
     if (!rawState.wings) return _countLedPairs(rawState.columns);
     return ['center', 'left', 'right'].reduce(function(n, side) {
         const w = rawState.wings[side];
-        return n + (w ? _countLedPairs(w.columns) : 0);
+        return n + (w ? _countLedPairs(w.columns) + _countFullCornerLedPairs(w) : 0);
     }, 0);
 }
 
@@ -12268,7 +12285,7 @@ function _collectWingPrintSpecRows(item, itemObj, unit) {
         label: 'מוטות תלייה לקולבים',
         value: _plainSpecValue(_formatHangingFromCounts(counts))
     });
-    const ledPairs = _countLedPairs(wing.columns);
+    const ledPairs = _countLedPairs(wing.columns) + _countFullCornerLedPairs(wing);
     if (ledPairs > 0) rows.push({ id: prefix + 'ledPairs', label: 'תאורת לד', value: _formatLedPairs(ledPairs) });
 
     return rows;

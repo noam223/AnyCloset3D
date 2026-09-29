@@ -39,7 +39,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260910deskMerge">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
     <link rel="stylesheet" href="style-extras.css?v=20260731rpcab">
-    <link rel="stylesheet" href="style.css?v=20260929z">
+    <link rel="stylesheet" href="style.css?v=20260929fc">
     <link rel="stylesheet" href="quick-calc.css?v=20260929qc">
     <style>
         html.thumb-only-mode #left-sidebar,
@@ -1606,10 +1606,16 @@
             <div class="toolbar-row">
                 <button class="toolbar-btn" id="fc-btn-empty-content" onclick="applyFCContent('empty')"><i class="fa-solid fa-ban"></i><span>ריק</span></button>
             </div>
+            <div class="toolbar-row">
+                <button class="toolbar-btn" id="fc-btn-led" onclick="applyFCLed()" title="זוג לדים לאורך התאים שנבחרו"><i class="fa-solid fa-lightbulb"></i><span>לדים</span></button>
+            </div>
+            <div class="toolbar-row">
+                <button class="toolbar-btn" id="fc-btn-equal-cells" onclick="applyFCEqualCells()" title="חלק תאים שווה בשווה"><i class="fa-solid fa-table-cells-large"></i><span>תאים שווים</span></button>
+            </div>
         </div>
         <div class="toolbar-divider"></div>
         <div class="toolbar-section">
-            <div class="toolbar-group-title">דלת</div>
+            <div class="toolbar-group-title">דלתות</div>
             <div class="toolbar-row">
                 <button class="toolbar-btn" id="fc-btn-door-empty" onclick="applyFCDoor('empty')"><i class="fa-solid fa-ban"></i><span>ללא</span></button>
             </div>
@@ -1625,6 +1631,15 @@
                     <button class="toolbar-btn" data-fc-door-style="glass_mirror" onclick="applyFCDoorStyle('glass_mirror')"><i class="fa-solid fa-mirror"></i><span>מראה</span></button>
                 </div>
             </div>
+            <div class="toolbar-row" id="fc-handle-row" style="display:none;">
+                <button class="toolbar-btn" id="fc-btn-handle" onclick="openFCHandlePicker()"><i class="fa-solid fa-grip-lines"></i><span>ידית</span></button>
+            </div>
+        </div>
+        <div class="fc-shelf-section">
+            <button class="slider-btn" onclick="fcShelvesStep(-1)" title="הסר מדף מהתאים שנבחרו"><i class="fa-solid fa-minus"></i></button>
+            <span id="fc-shelf-count" class="fc-shelf-count">0</span>
+            <button class="slider-btn" onclick="fcShelvesStep(1)" title="הוסף מדף באמצע התאים שנבחרו"><i class="fa-solid fa-plus"></i></button>
+            <span class="fc-shelf-label">מדפים</span>
         </div>
         </div><!-- /toolbar-main-col -->
     </div>
@@ -2724,16 +2739,16 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js?v=20260830adminOps"></script>
-<script src="state.js?v=20260929qc"></script>
+<script src="state.js?v=20260929fc"></script>
 <script src="quick-calc.js?v=20260929qc"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
 <script src="engine-core.js?v=20260929z"></script>
-<script src="engine-corners.js?v=20260910deskT17"></script>
+<script src="engine-corners.js?v=20260929fc"></script>
 <script src="engine-blueprint.js?v=20260918noPlinthFix"></script>
 <script src="engine-room-plan.js?v=20260929rail"></script>
 <script src="tambour-color-picker.js?v=20260617scdoors"></script>
-<script src="ui.js?v=20260929z"></script>
+<script src="ui.js?v=20260929fc"></script>
 <script src="mobile.js?v=20260929led"></script>
 <script src="part-paint.js?v=20260914A427fix"></script>
 <script src="shelf-pick.js?v=20260922sideWall"></script>
