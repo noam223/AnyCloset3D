@@ -11033,6 +11033,10 @@ window._commitCurrentCabinetToCart = function(opts) {
 
     if (state.editingCartIndex > -1 && state.orderCart[state.editingCartIndex]) {
         const oldItem = state.orderCart[state.editingCartIndex];
+        _cartLog('commit → overwriting index=' + state.editingCartIndex, {
+            was: _cartItemLabel(oldItem, state.editingCartIndex) + ' ' + ((oldItem.spec && oldItem.spec.dimsStr) || ''),
+            now: _cartItemLabel(cartItem, state.editingCartIndex) + ' ' + (cabinetSpec.dimsStr || '')
+        });
         const newHash = _hashPrintSpecSource(_collectPrintSpecRows(cabinetSpec, cartItem));
         if (oldItem && oldItem.printSpecEdits && oldItem.printSpecEdits.sourceHash === newHash) {
             cartItem.printSpecEdits = oldItem.printSpecEdits;
@@ -11211,6 +11215,75 @@ window._ensureCabinetSelected = function(preferredIndex) {
     }
 };
 
+// ── Cart debug log — on by default; window.cartDebug(false) silences it ────
+window._cartDebugOn = (function() {
+    try { return localStorage.getItem('cartDebug') !== '0'; } catch (e) { return true; }
+})();
+window.cartDebug = function(on) {
+    window._cartDebugOn = on !== false;
+    try { localStorage.setItem('cartDebug', window._cartDebugOn ? '1' : '0'); } catch (e) {}
+    console.info('[Cart] debug ' + (window._cartDebugOn ? 'ON' : 'OFF'));
+    return window._cartDebugOn;
+};
+
+function _cartItemLabel(it, i) {
+    const s = (it && it.spec) || {};
+    return s.customName || ('ארון מס\' ' + (i + 1));
+}
+
+/** Plain snapshot of the cart vs. what the sidebar currently shows. */
+window._cartSnapshot = function() {
+    const cards = Array.from(document.querySelectorAll('#cart-items-list .cart-mini-card'));
+    return {
+        editingCartIndex: state.editingCartIndex,
+        cartLength: (state.orderCart || []).length,
+        sidebarCards: cards.length,
+        sidebarIndexes: cards.map(function(c) { return c.dataset.cartIndex; }).join(','),
+        items: (state.orderCart || []).map(function(it, i) {
+            return {
+                i: i,
+                name: _cartItemLabel(it, i),
+                dims: (it && it.spec && it.spec.dimsStr) || '',
+                preset: (it && it.rawState && it.rawState.presetId) || '',
+                editing: i === state.editingCartIndex
+            };
+        })
+    };
+};
+
+function _cartLog(label, extra) {
+    if (!window._cartDebugOn) return;
+    const snap = window._cartSnapshot();
+    console.groupCollapsed('%c[Cart] ' + label, 'color:#6366f1;font-weight:700',
+        '| editing=' + snap.editingCartIndex + ' cart=' + snap.cartLength + ' cards=' + snap.sidebarCards);
+    if (extra !== undefined) console.log(extra);
+    console.table(snap.items);
+    console.trace('call stack');
+    console.groupEnd();
+}
+
+/** Warns loudly (always, even with debug off) when cart state and sidebar/editor disagree. */
+function _cartVerify(context) {
+    const snap = window._cartSnapshot();
+    const problems = [];
+    const len = snap.cartLength;
+    if (len > 0 && (snap.editingCartIndex < 0 || snap.editingCartIndex >= len)) {
+        problems.push('editingCartIndex ' + snap.editingCartIndex + ' out of range (cart has ' + len + ')');
+    }
+    const expectedIdx = (state.orderCart || []).map(function(_, i) { return String(i); }).sort().join(',');
+    const shownIdx = snap.sidebarIndexes.split(',').filter(Boolean).sort().join(',');
+    if (document.getElementById('cart-items-list') && shownIdx !== expectedIdx) {
+        problems.push('sidebar shows cards [' + shownIdx + '] but cart has [' + expectedIdx + ']');
+    }
+    if (problems.length) {
+        console.error('[Cart] ' + context + ' — state mismatch:\n  - ' + problems.join('\n  - '), snap);
+    } else if (window._cartDebugOn) {
+        console.log('%c[Cart] ' + context + ' — OK', 'color:#16a34a', snap);
+    }
+    return problems;
+}
+window._cartVerify = _cartVerify;
+
 // ── Cart trash: deleted cabinets are kept for 30 days ──────────────────────
 const _CART_TRASH_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 window._cartHistoryOps = new WeakMap();
@@ -11286,8 +11359,12 @@ function _rebindCartPartColors() {
 function _removeCartItemAt(index) {
     const item = state.orderCart[index];
     const wasEditing = state.editingCartIndex === index;
+    _cartLog('remove START index=' + index + ' "' + _cartItemLabel(item, index) + '"', { wasEditing: wasEditing });
     const roomLinks = JSON.parse(JSON.stringify(window._roomLinks || []));
     const pairId = window._spacePairIdOf(item);
+    // Unsaved part colors of the open cabinet live under 'cart<editingIndex>' and must follow the index shift
+    const liveColors = (!wasEditing && state.editingCartIndex >= 0 && typeof window._exportLocalPartColors === 'function')
+        ? window._exportLocalPartColors('cart' + state.editingCartIndex) : null;
     state.orderCart.splice(index, 1);
     if (pairId && typeof window._renumberSpacePairSlots === 'function') {
         window._renumberSpacePairSlots(pairId);
@@ -11302,15 +11379,29 @@ function _removeCartItemAt(index) {
 
     let placeholder = null;
     if (state.orderCart.length === 0) {
+        state.editingCartIndex = -1;
         window._bootstrapDefaultCabinet();
         placeholder = state.orderCart[0];
     } else if (wasEditing) {
-        window.editCartItem(Math.min(index, state.orderCart.length - 1), { force: true });
+        _rebindCartPartColors();
+        // The editor still holds the deleted cabinet: drop the stale index so editCartItem
+        // neither short-circuits (same index) nor lets anything commit it over a neighbour.
+        state.editingCartIndex = -1;
+        const next = Math.min(index, state.orderCart.length - 1);
+        _cartLog('remove → opening neighbour index=' + next);
+        window.editCartItem(next, { force: true });
     } else {
         if (state.editingCartIndex > index) state.editingCartIndex--;
+        _rebindCartPartColors();
+        if (liveColors && state.editingCartIndex >= 0) {
+            window._importLocalPartColors('cart' + state.editingCartIndex, liveColors);
+        }
+        if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
         updateLeftSidebar();
     }
     _afterCartStructureChange();
+    _cartLog('remove END');
+    _cartVerify('after remove');
     return {
         item: item, index: index, wasEditing: wasEditing, roomLinks: roomLinks,
         cartLen: state.orderCart.length, placeholder: placeholder
@@ -11449,19 +11540,41 @@ window.purgeCartTrashItem = function(id) {
 };
 
 window.deleteCartItem = function(index) {
-    // Use a toast-style inline confirm to avoid browser confirm() suppression issues
+    // Hold the item itself: the index can go stale while the confirm dialog is open
+    const target = state.orderCart[index];
+    _cartLog('delete CLICK index=' + index + ' "' + _cartItemLabel(target, index) + '"');
+    if (!target) {
+        console.error('[Cart] delete clicked for index ' + index + ' but the cart has no item there — sidebar is stale', window._cartSnapshot());
+        updateLeftSidebar();
+        return;
+    }
     const _doDelete = function() {
-        if (!state.orderCart[index]) return;
-        const trashId = _addToCartTrash(state.orderCart[index]);
-        let info;
-        _withoutHistory(function() { info = _removeCartItemAt(index); });
-        const before = state.history[state.historyIndex];
-        saveHistoryState('מחיקת ארון');
-        const top = state.history[state.historyIndex];
-        if (top && top !== before) {
-            window._cartHistoryOps.set(top, Object.assign({ type: 'delete', trashId: trashId }, info));
+        const idx = state.orderCart.indexOf(target);
+        _cartLog('delete CONFIRM "' + _cartItemLabel(target, idx) + '" clickedIndex=' + index + ' currentIndex=' + idx);
+        if (idx < 0) {
+            console.error('[Cart] delete confirmed but the cabinet is no longer in the cart', window._cartSnapshot());
+            updateLeftSidebar();
+            return;
         }
-        if (typeof _showToast === 'function') _showToast('הארון הועבר לפח (ניתן לבטל עם Ctrl+Z)', 3000);
+        try {
+            const trashId = _addToCartTrash(target);
+            let info;
+            _withoutHistory(function() { info = _removeCartItemAt(idx); });
+            const before = state.history[state.historyIndex];
+            saveHistoryState('מחיקת ארון');
+            const top = state.history[state.historyIndex];
+            if (top && top !== before) {
+                window._cartHistoryOps.set(top, Object.assign({ type: 'delete', trashId: trashId }, info));
+            }
+            if (state.orderCart.indexOf(target) >= 0) {
+                console.error('[Cart] cabinet is STILL in the cart after delete', window._cartSnapshot());
+            }
+            if (typeof _showToast === 'function') _showToast('הארון הועבר לפח (ניתן לבטל עם Ctrl+Z)', 3000);
+        } catch (err) {
+            console.error('[Cart] delete failed', err, window._cartSnapshot());
+            updateLeftSidebar();
+            throw err;
+        }
     };
 
     // Centered modal confirm with blurred backdrop (avoids browser confirm() suppression)
@@ -11477,25 +11590,42 @@ window.deleteCartItem = function(index) {
             <div style="font-size:2.2rem;">🗑️</div>
             <div style="font-size:1.2rem;font-weight:700;line-height:1.5;">למחוק ארון זה מההזמנה?</div>
             <div style="display:flex;gap:14px;width:100%;">
-                <button onclick="document.getElementById('_delete-confirm-toast').remove(); window._pendingDelete && window._pendingDelete();" style="flex:1;background:#ef4444;color:white;border:none;border-radius:10px;padding:12px 0;font-size:1.05rem;font-weight:700;cursor:pointer;transition:background 0.2s;">מחק</button>
-                <button onclick="document.getElementById('_delete-confirm-toast').remove();" style="flex:1;background:rgba(255,255,255,0.15);color:white;border:none;border-radius:10px;padding:12px 0;font-size:1.05rem;font-weight:600;cursor:pointer;transition:background 0.2s;">ביטול</button>
+                <button type="button" data-act="confirm" style="flex:1;background:#ef4444;color:white;border:none;border-radius:10px;padding:12px 0;font-size:1.05rem;font-weight:700;cursor:pointer;transition:background 0.2s;">מחק</button>
+                <button type="button" data-act="cancel" style="flex:1;background:rgba(255,255,255,0.15);color:white;border:none;border-radius:10px;padding:12px 0;font-size:1.05rem;font-weight:600;cursor:pointer;transition:background 0.2s;">ביטול</button>
             </div>
         </div>
     `;
-    window._pendingDelete = _doDelete;
+    const _close = function(reason) {
+        clearTimeout(timer);
+        if (toast.parentNode) toast.remove();
+        _cartLog('delete dialog closed: ' + reason);
+    };
+    toast.querySelector('[data-act="confirm"]').addEventListener('click', function() { _close('confirm'); _doDelete(); });
+    toast.querySelector('[data-act="cancel"]').addEventListener('click', function() { _close('cancel'); });
     document.body.appendChild(toast);
-    setTimeout(() => { const t = document.getElementById('_delete-confirm-toast'); if (t) t.remove(); }, 10000);
+    // Auto-close only this dialog — never a newer one opened for another cabinet
+    const timer = setTimeout(function() { _close('timeout (10s)'); }, 10000);
 }
 
 window.editCartItem = function(index, opts) {
     opts = opts || {};
-    if (!state.orderCart || !state.orderCart[index]) return;
-    if (index === state.editingCartIndex) return;
+    if (!state.orderCart || !state.orderCart[index]) {
+        console.error('[Cart] editCartItem(' + index + ') ignored — no cabinet at that index (stale sidebar?)', window._cartSnapshot());
+        updateLeftSidebar();
+        return;
+    }
+    if (index === state.editingCartIndex) {
+        _cartLog('editCartItem(' + index + ') ignored — already the open cabinet', { force: !!opts.force });
+        return;
+    }
     if (!opts.force && window._isCurrentCabinetDirty && window._isCurrentCabinetDirty()) {
+        _cartLog('editCartItem(' + index + ') → unsaved changes, showing save prompt');
         window._promptSaveCabinetBeforeSwitch(index);
         return;
     }
+    _cartLog('editCartItem(' + index + ') → loading "' + _cartItemLabel(state.orderCart[index], index) + '"', { from: state.editingCartIndex, force: !!opts.force });
     window._editCartItemNow(index);
+    _cartVerify('after editCartItem(' + index + ')');
 };
 
 window._editCartItemNow = function(index) {
@@ -11826,7 +11956,7 @@ window.updateLeftSidebar = function(opts) {
         const card = document.createElement('div');
         card.className = `cart-mini-card ${activeClass}${heldClass}${nestedClass}`;
         card.dataset.cartIndex = String(index);
-        card.onclick = () => { if (!isEditing) editCartItem(index); };
+        card.onclick = () => { if (state.editingCartIndex !== index) editCartItem(index); };
 
         card.innerHTML = `
             ${activeLabel}
