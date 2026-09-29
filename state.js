@@ -1342,6 +1342,17 @@ window.applyWalkinPositions = function() {
 };
 
 // ---- Wing edit mode helpers ----
+function _isSingleCabinetPreset() {
+    return state.presetId === 'linear' || state.presetId === 'sliding' || state.presetId === 'bathroom' || state.presetId === 'writing-desk';
+}
+
+function _syncHeaderDimsPlaceholder(isEditing) {
+    const row = document.getElementById('header-dims-row');
+    const ph = document.getElementById('header-dims-placeholder');
+    if (row) row.style.display = isEditing ? '' : 'none';
+    if (ph) ph.style.display = isEditing ? 'none' : 'flex';
+}
+
 function _setFreeTabActive(isFree) {
     const freeTab = document.getElementById('wing-tab-free');
     if (freeTab) {
@@ -1365,6 +1376,7 @@ function _setFreeTabActive(isFree) {
             if (_ph) _ph.style.display = 'flex';
         }
     }
+    _syncHeaderDimsPlaceholder(!isFree || _isSingleCabinetPreset() || !!state._activeUpperUnit);
 }
 
 function _setWingTabActive(wingId) {
@@ -1534,13 +1546,14 @@ window.syncSidebarToWing = function() {
 
     // Show/hide edit content vs placeholder based on edit mode.
     // For linear/sliding presets there are no wing tabs — always show edit content.
-    const _isSingleCabinet = (state.presetId === 'linear' || state.presetId === 'sliding' || state.presetId === 'bathroom' || state.presetId === 'writing-desk');
+    const _isSingleCabinet = _isSingleCabinetPreset();
     const _editContent = document.getElementById('sidebar-edit-content');
     const _placeholder = document.getElementById('sidebar-edit-placeholder');
     if (typeof window._syncSpacePairTabs === 'function') window._syncSpacePairTabs();
     const _isEditing = !!state.wingEditMode || _isSingleCabinet || _isUUEdit;
     if (_editContent) _editContent.style.display = _isEditing ? '' : 'none';
     if (_placeholder) _placeholder.style.display = _isEditing ? 'none' : 'flex';
+    _syncHeaderDimsPlaceholder(_isEditing);
     if (!_isEditing) return; // nothing to sync in free mode
 
     // Show/hide units-content-section (יחידות ותכולה)
