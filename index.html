@@ -39,7 +39,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260910deskMerge">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
     <link rel="stylesheet" href="style-extras.css?v=20260731rpcab">
-    <link rel="stylesheet" href="style.css?v=20260929fc">
+    <link rel="stylesheet" href="style.css?v=20260930cols">
     <link rel="stylesheet" href="quick-calc.css?v=20260929qc">
     <style>
         html.thumb-only-mode #left-sidebar,
@@ -233,17 +233,16 @@
             <div class="header-dim-card" id="header-columns-card" data-dim="columns">
                 <div class="header-dim-top">
                     <i class="hdc-ic fa-solid fa-table-columns"></i>
-                    <label for="inp-columns">עמודות</label>
-                    <div class="header-dim-val">
+                    <label>עמודות</label>
+                    <div class="header-dim-val header-cols-val">
+                        <div class="header-cols-stepper">
+                            <button type="button" class="header-cols-step" onclick="updateColumns(1)" title="הוסף עמודה" aria-label="הוסף עמודה"><i class="fa-solid fa-plus"></i></button>
+                            <button type="button" class="header-cols-step" onclick="updateColumns(-1)" title="הסר עמודה" aria-label="הסר עמודה"><i class="fa-solid fa-minus"></i></button>
+                        </div>
                         <span id="val-columns" class="header-dim-count">2</span>
                     </div>
                 </div>
-                <div class="header-slider-row">
-                    <button type="button" class="header-slider-btn" onclick="updateColumns(-1)"><i class="fa-solid fa-minus"></i></button>
-                    <input type="range" id="inp-columns" min="2" max="10" value="2" step="1">
-                    <button type="button" class="header-slider-btn" onclick="updateColumns(1)"><i class="fa-solid fa-plus"></i></button>
-                    <span class="hsr-title">עמודות</span>
-                </div>
+                <input type="range" id="inp-columns" min="2" max="10" value="2" step="1" hidden>
             </div>
         </div>
         <input type="number" id="inp-num-width" class="visually-hidden-dim" value="160" min="10" max="600" onchange="updateDim('width',null,this.value);saveHistoryState()">

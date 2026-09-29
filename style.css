@@ -6313,6 +6313,39 @@ body.viewer-mode #canvas-container canvas {
 #header-dims-row .header-dim-val span { font-size: 0.56rem; }
 #header-dims-row .header-dim-val .header-dim-count { font-size: 1.12rem; font-weight: 800; }
 
+/* Columns chip: inline stepper instead of the slider popover */
+#header-dims-row .header-dim-card[data-dim="columns"] .header-dim-top::after { display: none; }
+#header-dims-row .header-cols-val {
+    align-items: center;
+    gap: 5px;
+}
+#header-dims-row .header-cols-stepper {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+#header-dims-row .header-cols-step {
+    width: 18px;
+    height: 13px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.22);
+    background: rgba(255,255,255,0.08);
+    color: #d1fae5;
+    font-size: 0.5rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+}
+#header-dims-row .header-cols-step:hover {
+    background: rgba(16,185,129,0.35);
+    border-color: #34d399;
+}
+#header-dims-row .header-cols-step:active { transform: scale(0.92); }
+
 /* Slider popover under the chip row */
 #header-dims-row .header-slider-row {
     position: absolute;
