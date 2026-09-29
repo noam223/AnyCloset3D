@@ -3765,6 +3765,7 @@ window._clearSpaceCompanion = function() {
     const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
     if (cabinetGroup && (!info || info.activeSlot === 0)) {
         cabinetGroup.position.y = 0;
+        cabinetGroup.position.z = 0;
         if (info && info.activeSlot === 0) cabinetGroup.position.x = 0;
     }
 };
@@ -3785,6 +3786,7 @@ window._applySpacePairPositions = function() {
     if (cabinetGroup) {
         cabinetGroup.position.x = activeOff.x;
         cabinetGroup.position.y = activeOff.y;
+        cabinetGroup.position.z = activeOff.z || 0;
     }
     const groups = window._spaceCompanionGroups || [];
     groups.forEach(function(g) {
@@ -3792,7 +3794,7 @@ window._applySpacePairPositions = function() {
         const off = (typeof window._spaceOffsetForSlot === 'function')
             ? window._spaceOffsetForSlot(g.userData.spaceSlot)
             : { x: 0, y: 0 };
-        g.position.set(off.x, off.y, 0);
+        g.position.set(off.x, off.y, off.z || 0);
     });
     // Legacy single-group fallback
     if ((!groups.length) && window._spaceCompanionGroup) {
@@ -3800,7 +3802,7 @@ window._applySpacePairPositions = function() {
         const off = (typeof window._spaceOffsetForSlot === 'function')
             ? window._spaceOffsetForSlot(otherSlot)
             : { x: 0, y: 0 };
-        window._spaceCompanionGroup.position.set(off.x, off.y, 0);
+        window._spaceCompanionGroup.position.set(off.x, off.y, off.z || 0);
     }
 };
 

@@ -2162,7 +2162,7 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); box-sha
     margin: 4px 0 0;
 }
 .space-cab-offset-label i { margin-left: 5px; opacity: 0.8; }
-.space-cab-offset-grid { padding: 8px 0 0 !important; }
+.space-cab-offset-grid { padding: 8px 0 0 !important; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .drag-handle.space-move-handle { cursor: move; background: rgba(37,99,235,0.13); border-color: rgba(37,99,235,0.55); width: 28px; height: 28px; }
 .drag-handle.space-move-handle::before { content: '\f047'; font-family: 'FontAwesome'; font-size: 11px; color: var(--accent); margin: 0; }
 .drag-handle.space-move-handle::after { content: none; }

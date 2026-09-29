@@ -39,7 +39,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260910deskMerge">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
     <link rel="stylesheet" href="style-extras.css?v=20260731rpcab">
-    <link rel="stylesheet" href="style.css?v=20260929hc">
+    <link rel="stylesheet" href="style.css?v=20260929z">
     <link rel="stylesheet" href="quick-calc.css?v=20260929qc">
     <style>
         html.thumb-only-mode #left-sidebar,
@@ -147,6 +147,15 @@
                             <label for="inp-num-space-y">הזזה Y</label>
                             <div class="header-dim-val">
                                 <input type="number" id="inp-num-space-y" value="0" min="0" step="1" onchange="window._setSpaceOffsetFromUI('y', this.value)">
+                                <span>ס"מ</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="header-dim-card" title="הזזה בעומק — ערך חיובי מקדם את הארון קדימה מהקיר">
+                        <div class="header-dim-top">
+                            <label for="inp-num-space-z">הזזה Z</label>
+                            <div class="header-dim-val">
+                                <input type="number" id="inp-num-space-z" value="0" step="1" onchange="window._setSpaceOffsetFromUI('z', this.value)">
                                 <span>ס"מ</span>
                             </div>
                         </div>
@@ -1999,7 +2008,9 @@
                 <label class="mobile-label">הזזה אופקית X (ס"מ)</label>
                 <input type="number" id="mobile-inp-num-space-x" class="editor-select" value="0" step="1" style="margin:0 0 8px;width:100%;box-sizing:border-box;" onchange="window._setSpaceOffsetFromUI('x', this.value)">
                 <label class="mobile-label">הזזה אנכית Y (ס"מ)</label>
-                <input type="number" id="mobile-inp-num-space-y" class="editor-select" value="0" min="0" step="1" style="margin:0;width:100%;box-sizing:border-box;" onchange="window._setSpaceOffsetFromUI('y', this.value)">
+                <input type="number" id="mobile-inp-num-space-y" class="editor-select" value="0" min="0" step="1" style="margin:0 0 8px;width:100%;box-sizing:border-box;" onchange="window._setSpaceOffsetFromUI('y', this.value)">
+                <label class="mobile-label">הזזה בעומק Z (ס"מ, חיובי = קדימה)</label>
+                <input type="number" id="mobile-inp-num-space-z" class="editor-select" value="0" step="1" style="margin:0;width:100%;box-sizing:border-box;" onchange="window._setSpaceOffsetFromUI('z', this.value)">
             </div>
         </div>
         <div class="mobile-section-title">דגם ארון</div>
@@ -2717,12 +2728,12 @@
 <script src="quick-calc.js?v=20260929qc"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
-<script src="engine-core.js?v=20260928roomPose"></script>
+<script src="engine-core.js?v=20260929z"></script>
 <script src="engine-corners.js?v=20260910deskT17"></script>
 <script src="engine-blueprint.js?v=20260918noPlinthFix"></script>
 <script src="engine-room-plan.js?v=20260929rail"></script>
 <script src="tambour-color-picker.js?v=20260617scdoors"></script>
-<script src="ui.js?v=20260929hc"></script>
+<script src="ui.js?v=20260929z"></script>
 <script src="mobile.js?v=20260929led"></script>
 <script src="part-paint.js?v=20260914A427fix"></script>
 <script src="shelf-pick.js?v=20260922sideWall"></script>

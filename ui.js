@@ -6786,7 +6786,7 @@ function updateDragHandlesPosition() {
                 : (typeof window._getSpaceSlot1Item === 'function' ? window._getSpaceSlot1Item() : null);
             const off = typeof window._getSpaceOffset === 'function' ? window._getSpaceOffset(item) : { x: 0, y: 0 };
             const hy = parseFloat(handle.dataset.worldY) || 0;
-            worldPt = new THREE.Vector3(off.x, off.y + hy, (state.depth || 54) / 2);
+            worldPt = new THREE.Vector3(off.x, off.y + hy, (off.z || 0) + (state.depth || 54) / 2);
         } else {
             const x3d = parseFloat(handle.dataset.x3d);
             const y3d = handle.dataset.y3d ? parseFloat(handle.dataset.y3d) : Math.max(...state.columns.map(c => c.height));
@@ -9868,8 +9868,12 @@ window._spacePairIdOf = function(item) {
 };
 
 window._getSpaceOffset = function(item) {
-    const o = (item && (item.spaceOffset || (item.rawState && item.rawState.spaceOffset))) || { x: 0, y: 0 };
-    return { x: Math.round(Number(o.x) || 0), y: Math.round(Number(o.y) || 0) };
+    const o = (item && (item.spaceOffset || (item.rawState && item.rawState.spaceOffset))) || { x: 0, y: 0, z: 0 };
+    return {
+        x: Math.round(Number(o.x) || 0),
+        y: Math.round(Number(o.y) || 0),
+        z: Math.round(Number(o.z) || 0)
+    };
 };
 
 window._spacePairFieldsForRaw = function() {
@@ -10133,6 +10137,7 @@ window._spaceCabinetFootprint = function(slot) {
     const wings = window._spaceWingsForSlot(slot);
     const c = wings && wings.center;
     const w = (c && c.width) || 160;
+    const d = (c && c.depth) || 54;
     let h = (c && c.globalHeight) || 240;
     let fo = 0;
     if (c && c.columns && c.columns.length) {
@@ -10147,11 +10152,11 @@ window._spaceCabinetFootprint = function(slot) {
         }
         h += (uu._upperGap || 0) + uuH;
     }
-    return { w: w, h: h, floorOffset: fo };
+    return { w: w, h: h, d: d, floorOffset: fo };
 };
 
 window._spaceOffsetForSlot = function(slot) {
-    if (slot === 0) return { x: 0, y: 0 };
+    if (slot === 0) return { x: 0, y: 0, z: 0 };
     const item = window._getSpaceSlotItem(slot);
     return window._getSpaceOffset(item);
 };
@@ -10170,7 +10175,7 @@ window._suggestNextSpaceOffset = function(newWidth) {
         maxRight = w0 / 2;
     }
     const nw = Math.round(newWidth || 160);
-    return { x: Math.round(maxRight + nw / 2 + 10), y: 0 };
+    return { x: Math.round(maxRight + nw / 2 + 10), y: 0, z: 0 };
 };
 
 window._clampSpaceOffsetAgainstOthers = function(x, y, movingSlot, opts) {
@@ -10178,10 +10183,18 @@ window._clampSpaceOffsetAgainstOthers = function(x, y, movingSlot, opts) {
     const info = window._getSpacePairInfo();
     x = Math.max(-800, Math.min(800, Number(x) || 0));
     y = Math.max(0, Math.min(400, Number(y) || 0));
-    if (!info || movingSlot == null) return { x: Math.round(x), y: Math.round(y) };
+    let z = Math.max(-400, Math.min(400, Number(opts.z) || 0));
+    if (!info || movingSlot == null) return { x: Math.round(x), y: Math.round(y), z: Math.round(z) };
 
     const dM = window._spaceCabinetFootprint(movingSlot);
     const foM = dM.floorOffset || 0;
+    // Back face may go at most as far back as the anchor cabinet's back (the wall line)
+    const minZ = Math.min(0, (dM.d - window._spaceCabinetFootprint(0).d) / 2);
+    z = Math.max(minZ, z);
+
+    function overlapZAt(zz, oOffZ, dO) {
+        return Math.min(oOffZ + dO.d / 2, zz + dM.d / 2) - Math.max(oOffZ - dO.d / 2, zz - dM.d / 2);
+    }
 
     function overlapYAt(yy, oOffY, dO, foO) {
         const b0 = oOffY + foO;
@@ -10200,10 +10213,16 @@ window._clampSpaceOffsetAgainstOthers = function(x, y, movingSlot, opts) {
         const dx = x - oOff.x;
         const overlapX = half - Math.abs(dx);
         const overlapY = overlapYAt(y, oOff.y, dO, foO);
-        if (overlapX > 0 && overlapY > 0) {
+        const oZ = oOff.z || 0;
+        if (overlapX > 0 && overlapY > 0 && overlapZAt(z, oZ, dO) > 0) {
             const prefer = opts.preferAxis;
             const pushX = prefer === 'x' ? true : prefer === 'y' ? false : (overlapX <= overlapY);
-            if (pushX) {
+            if (prefer === 'z') {
+                const halfD = Math.ceil((dO.d + dM.d) / 2 - 1e-9);
+                const prevZ = opts.prevZ != null ? opts.prevZ : z;
+                z = (z < oZ || (z === oZ && prevZ < oZ)) ? oZ - halfD : oZ + halfD;
+                if (z < minZ) z = oZ + halfD;
+            } else if (pushX) {
                 let sign = dx < 0 ? -1 : (dx > 0 ? 1 : 0);
                 if (!sign && opts.prevX != null) {
                     const prevDx = (opts.prevX || 0) - oOff.x;
@@ -10225,7 +10244,7 @@ window._clampSpaceOffsetAgainstOthers = function(x, y, movingSlot, opts) {
             }
         }
     });
-    return { x: Math.round(x), y: Math.round(y) };
+    return { x: Math.round(x), y: Math.round(y), z: Math.round(z) };
 };
 
 // Back-compat alias
@@ -10247,7 +10266,9 @@ window._setSpaceOffset = function(x, y, opts) {
     const prev = window._getSpaceOffset(item);
     const offset = window._clampSpaceOffsetAgainstOthers(x, y, movingSlot, {
         preferAxis: opts.preferAxis,
-        prevX: prev.x
+        prevX: prev.x,
+        prevZ: prev.z,
+        z: opts.z != null ? opts.z : prev.z
     });
     item.spaceOffset = offset;
     if (!item.rawState) item.rawState = {};
@@ -10314,6 +10335,7 @@ window._setSpaceOffsetFromUI = function(axis, val) {
     const item = window._getSpaceMovableItem() || window._getSpaceSlot1Item();
     const cur = window._getSpaceOffset(item);
     if (axis === 'x') window._setSpaceOffset(val, cur.y, { preferAxis: 'x' });
+    else if (axis === 'z') window._setSpaceOffset(cur.x, cur.y, { preferAxis: 'z', z: val });
     else window._setSpaceOffset(cur.x, val, { preferAxis: 'y' });
 };
 
@@ -10330,6 +10352,10 @@ window._syncSpaceOffsetUI = function() {
     yids.forEach(function(id) {
         const el = document.getElementById(id);
         if (el && document.activeElement !== el) el.value = off.y;
+    });
+    ['inp-num-space-z', 'mobile-inp-num-space-z'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el && document.activeElement !== el) el.value = off.z;
     });
     const label = document.getElementById('space-cab-offset-label');
     const mLabel = document.getElementById('mobile-space-cab-offset-label');
@@ -10539,13 +10565,14 @@ window._renumberSpacePairSlots = function(pairId) {
         return;
     }
     members.sort(function(a, b) { return a.slot - b.slot; });
-    const anchorOff = members[0].offset || { x: 0, y: 0 };
+    const anchorOff = members[0].offset || { x: 0, y: 0, z: 0 };
     members.forEach(function(m, newSlot) {
         const rebased = newSlot === 0
-            ? { x: 0, y: 0 }
+            ? { x: 0, y: 0, z: 0 }
             : {
                 x: Math.round((m.offset.x || 0) - (anchorOff.x || 0)),
-                y: Math.round((m.offset.y || 0) - (anchorOff.y || 0))
+                y: Math.round((m.offset.y || 0) - (anchorOff.y || 0)),
+                z: Math.round((m.offset.z || 0) - (anchorOff.z || 0))
             };
         window._attachSpacePairToItem(m.it, pairId, newSlot, rebased);
     });
