@@ -3765,6 +3765,19 @@ window._generateMultiViewBlueprintPages = function() {
                 _bpPushCellDimLabel(p, _bpViewKey, `r${ri}`, ox + dW / 2, (cellY1 + cellY2) / 2 + 4, cellHeightLabel,
                     { x: ox, y: cellY1, w: dW, h: cellH });
             }
+            // Hanging rod — rows cut by the split band still belong to the same compartment, like the 3D
+            if (!isFCSplitBand) {
+                const ci = shelvesArr.filter(sy => sy <= rowBotCm + 0.1).length;
+                const comp = (fcData.compartments || [])[ci] || {};
+                const content = comp.content !== undefined ? comp.content : (comp.type === 'cross_hanging' ? 'cross_hanging' : 'empty');
+                if (content === 'cross_hanging' && cellH > 10) {
+                    const rodY = _bpHangRodSvgY(cellY1, sc);
+                    const rX1 = ox + 6, rX2 = ox + dW - 6, rXm = ox + dW / 2;
+                    p.push(`<line x1="${rX1.toFixed(1)}" y1="${rodY.toFixed(1)}" x2="${rX2.toFixed(1)}" y2="${rodY.toFixed(1)}" stroke="${STROKE}" stroke-width="2"/>`);
+                    // End brackets plus the joint where the two L rods meet at the corner
+                    [rX1, rXm, rX2].forEach(x => p.push(`<circle cx="${x.toFixed(1)}" cy="${rodY.toFixed(1)}" r="2" fill="${STROKE}"/>`));
+                }
+            }
         }
 
         // Dimension lines
