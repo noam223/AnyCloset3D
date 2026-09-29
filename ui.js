@@ -3453,7 +3453,8 @@ window.updateFCToolbarState = function() {
         const midY = allY2.length > midRow + 1 ? (allY2[midRow] + allY2[midRow + 1]) / 2 : (d.wingData.globalHeight || 240) / 2;
         fcGroup.updateMatrixWorld(true);
         const projected = new THREE.Vector3(anchor.x, midY, anchor.z).applyMatrix4(fcGroup.matrixWorld).project(camera);
-        let tx = (projected.x * 0.5 + 0.5) * cw_px;
+        // Nudged right so the toolbar doesn't cover the "+" select pills of neighbouring cells
+        let tx = (projected.x * 0.5 + 0.5) * cw_px + 16;
         let ty = (-projected.y * 0.5 + 0.5) * ch_px;
         const tw = toolbar.offsetWidth || 300;
         const th = toolbar.offsetHeight || 60;
