@@ -1620,7 +1620,16 @@
                 <button class="toolbar-btn" id="fc-btn-door-empty" onclick="applyFCDoor('empty')"><i class="fa-solid fa-ban"></i><span>ללא</span></button>
             </div>
             <div class="toolbar-row">
-                <button class="toolbar-btn" id="fc-btn-door-on" data-expandable onclick="applyFCDoor('on')"><i class="fa-solid fa-door-open"></i><span>דלת</span></button>
+                <button class="toolbar-btn" data-fc-door="hinge_right" data-expandable onclick="applyFCDoor('hinge_right')" title="זוג הדלתות נפתח כיחידה אחת, ציר בצד ימין"><i class="fa-solid fa-door-open"></i><span>ימין</span></button>
+            </div>
+            <div class="toolbar-row">
+                <button class="toolbar-btn" data-fc-door="hinge_left" data-expandable onclick="applyFCDoor('hinge_left')" title="זוג הדלתות נפתח כיחידה אחת, ציר בצד שמאל"><i class="fa-solid fa-door-open" style="transform:scaleX(-1);display:inline-block;"></i><span>שמאל</span></button>
+            </div>
+            <div class="toolbar-row">
+                <button class="toolbar-btn" data-fc-door="double" data-expandable onclick="applyFCDoor('double')" title="כל דלת נפתחת בנפרד, הידיות נפגשות בפינה"><i class="fa-solid fa-columns"></i><span>כפול</span></button>
+            </div>
+            <div class="toolbar-row">
+                <button class="toolbar-btn" data-fc-door="flap" data-expandable onclick="applyFCDoor('flap')" title="דלתות קלפה — נפתחות כלפי מעלה"><i class="fa-solid fa-window-maximize" style="transform:rotate(180deg);display:inline-block;"></i><span>קלפה</span></button>
                 <div id="fc-door-style-panel" class="toolbar-sub-btns" style="display:none;">
                     <div class="toolbar-sub-divider"></div>
                     <button class="toolbar-btn" data-fc-door-style="solid" onclick="applyFCDoorStyle('solid')"><i class="fa-solid fa-square"></i><span>מלמין</span></button>
@@ -2739,16 +2748,16 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js?v=20260830adminOps"></script>
-<script src="state.js?v=20260929fc"></script>
+<script src="state.js?v=20260929fcd"></script>
 <script src="quick-calc.js?v=20260929qc"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
 <script src="engine-core.js?v=20260929z"></script>
-<script src="engine-corners.js?v=20260929fc"></script>
+<script src="engine-corners.js?v=20260929fcd"></script>
 <script src="engine-blueprint.js?v=20260918noPlinthFix"></script>
 <script src="engine-room-plan.js?v=20260929rail"></script>
 <script src="tambour-color-picker.js?v=20260617scdoors"></script>
-<script src="ui.js?v=20260929del"></script>
+<script src="ui.js?v=20260929fcd"></script>
 <script src="mobile.js?v=20260929led"></script>
 <script src="part-paint.js?v=20260914A427fix"></script>
 <script src="shelf-pick.js?v=20260922sideWall"></script>

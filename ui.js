@@ -3308,7 +3308,9 @@ function _fcCompView(fc, r) {
     const comp = (fc && fc.compartments && fc.compartments[r]) || {};
     return {
         content: comp.content !== undefined ? comp.content : (comp.type === 'cross_hanging' ? 'cross_hanging' : 'empty'),
-        door: comp.door !== undefined ? comp.door : (comp.type === 'door_regular' || comp.type === 'door_glass' ? 'right' : 'empty'),
+        // Legacy 'right' was the only "door on" value and is drawn as the double layout
+        door: (function(d) { return d === 'right' ? 'double' : d; })(
+            comp.door !== undefined ? comp.door : (comp.type === 'door_regular' || comp.type === 'door_glass' ? 'double' : 'empty')),
         doorStyle: comp.doorStyle || 'solid'
     };
 }
@@ -3409,7 +3411,9 @@ window.updateFCToolbarState = function() {
 
     document.getElementById('fc-btn-hanging')?.classList.toggle('active', view.content === 'cross_hanging');
     document.getElementById('fc-btn-empty-content')?.classList.toggle('active', view.content === 'empty');
-    document.getElementById('fc-btn-door-on')?.classList.toggle('active', hasDoor);
+    document.querySelectorAll('#fc-toolbar [data-fc-door]').forEach(b => {
+        b.classList.toggle('active', b.dataset.fcDoor === view.door);
+    });
     document.getElementById('fc-btn-door-empty')?.classList.toggle('active', !hasDoor);
     document.getElementById('fc-btn-led')?.classList.toggle('active',
         typeof window._fcLedGroupIndex === 'function' && window._fcLedGroupIndex(_fcSelection.rows) !== -1);
@@ -3430,6 +3434,8 @@ window.updateFCToolbarState = function() {
     if (dsp) {
         dsp.style.display = hasDoor ? 'flex' : 'none';
         if (hasDoor) {
+            const activeRow = document.querySelector(`#fc-toolbar [data-fc-door="${view.door}"]`)?.parentElement;
+            if (activeRow && dsp.parentElement !== activeRow) activeRow.appendChild(dsp);
             dsp.querySelectorAll('button[data-fc-door-style]').forEach(b => {
                 b.classList.toggle('active', b.dataset.fcDoorStyle === view.doorStyle);
             });
@@ -3465,12 +3471,17 @@ window.applyFCContent = function(contentType) {
     _clearFCSelection(); // close toolbar after applying
 };
 
+/** doorType: 'empty' | 'hinge_right' | 'hinge_left' | 'double' | 'flap' — always applied to the door pair. */
 window.applyFCDoor = function(doorType) {
     if (!_fcActiveSide()) return;
-    // 'on' maps to 'right' internally (both doors always shown together)
-    const internalDoorType = doorType === 'on' ? 'right' : doorType;
-    window.updateFullCornerDoor(_fcSelection.rows, internalDoorType);
-    _clearFCSelection(); // close toolbar after applying
+    window.updateFullCornerDoor(_fcSelection.rows, doorType);
+    if (doorType === 'empty') {
+        _clearFCSelection();
+    } else {
+        // Keep the toolbar open so the style list under the chosen type can be picked, like the regular cabinet
+        _renderAllFCCellBtns();
+        updateFCToolbarState();
+    }
 };
 
 window.applyFCDoorStyle = function(style) {
@@ -7407,6 +7418,12 @@ function bindUI() {
                     col.shelvesY = col.shelvesY.map(y => Math.round((y + delta) * 10) / 10);
                 }
             });
+            const _fcWing = typeof getWing === 'function' ? getWing() : null;
+            const _fc = _fcWing && _fcWing.wingPosition === 'full_corner' ? _fcWing.fullCorner : null;
+            if (_fc) {
+                if (Array.isArray(_fc.shelvesY)) _fc.shelvesY = _fc.shelvesY.map(y => Math.round((y + delta) * 100) / 100);
+                if (_fc.splitY) _fc.splitY = Math.round((_fc.splitY + delta) * 100) / 100;
+            }
         }
 
         if (typeof window._setPlinthHeight === 'function') {

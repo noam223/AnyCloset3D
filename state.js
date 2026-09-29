@@ -1434,7 +1434,7 @@ window.enterWingEditMode = function(wingId) {
                 : '<i class="fa-solid fa-pen-to-square" style="margin-left:6px;color:#7eb8f7;"></i>מצב עריכת כנף';
         }
     }
-    if (!isFCEdit) syncSidebarToWing();
+    syncSidebarToWing();
     buildCabinet(); updateCameraView(); calculatePrice();
 };
 
@@ -1589,11 +1589,14 @@ window.syncSidebarToWing = function() {
     if (_drawerCountSection) _drawerCountSection.style.display = _isUUEdit ? 'none' : '';
 
     // When editing upper unit inline: update section title to indicate context
+    const _isFCEditSb = typeof _aw === 'string' && _aw.indexOf('full_corner_') === 0;
     const _cabinetSettingsTitle = document.querySelector('#sidebar-edit-content .section-title');
     if (_cabinetSettingsTitle) {
         _cabinetSettingsTitle.innerHTML = _isUUEdit
             ? '<i class="fa-solid fa-layer-group"></i> הגדרות יחידה עליונה'
-            : '<i class="fa-solid fa-cubes"></i> הגדרות ארון';
+            : _isFCEditSb
+                ? '<i class="fa-solid fa-cubes"></i> הגדרות פינה מלאה'
+                : '<i class="fa-solid fa-cubes"></i> הגדרות ארון';
     }
 
     // Hide plinth/placement/board-mat/handle-type rows when editing upper unit (not relevant)
@@ -1807,7 +1810,7 @@ window.syncSidebarToWing = function() {
     const plinthModelRowEl = document.getElementById('plinth-model-row');
     const mobilePlinthModelRowEl = document.getElementById('mobile-plinth-model-row');
     if (sdSection) sdSection.style.display = (isSliding && !_isUUEdit) ? '' : 'none';
-    if (sideUnitSectionEl) sideUnitSectionEl.style.display = (isSliding || _isUUEdit) ? 'none' : '';
+    if (sideUnitSectionEl) sideUnitSectionEl.style.display = (isSliding || _isUUEdit || _isFCEditSb) ? 'none' : '';
     if (cornerSectionEl) cornerSectionEl.style.display = (isSliding || isWingPreset || _isUUEdit) ? 'none' : '';
     if (mobileSlidingSection) mobileSlidingSection.style.display = isSliding ? '' : 'none';
     if (plinthModelRowEl) plinthModelRowEl.style.display = isSliding ? 'none' : '';

@@ -859,8 +859,23 @@ function buildFullCornerUnit(side, wingData) {
     // ---- FC Doors — per-row spans, grouped by consecutive rows with same door style ----
     if (state.hasDoors !== false) {
         const matExt = materials[wingData.materialExternal] || materials['white_matte'];
-        const fcHandleStyle = (state.cabinetModel === 'ab2') ? 'touch'
+        const fcModel = wingData.cabinetModel || state.cabinetModel;
+        const fcHandleStyle = (fcModel === 'ab2') ? 'touch'
             : (fc.handleStyle || (typeof _getHandleStyle === 'function' ? _getHandleStyle() : 'pipe'));
+        // Maya (hidden plinth, 7cm): overlay doors run down to 1.5cm like the regular cabinet
+        const fcIsInset = (fcModel === 'ab2' || fcModel === 'ab2_nohoney');
+        const fcDoorsToFloor = !fcIsInset && plinthH === 7;
+        // Legacy 'right' was the only "door on" value and drew the double layout
+        const _fcDoorType = (d) => (d === 'right' ? 'double' : d);
+        // Viewer-left end of the L is door 1's outer end on the right corner, door 2's on the left corner
+        const _fcHandleSpots = (type) => {
+            if (type === 'double') return { d1: 'corner', d2: 'corner' };
+            if (type === 'flap') return { d1: 'bottom', d2: 'bottom' };
+            const leftEndIsDoor1 = (side === 'right');
+            const handleAtViewerLeft = (type === 'hinge_right');
+            const onDoor1 = (handleAtViewerLeft === leftEndIsDoor1);
+            return onDoor1 ? { d1: 'outer', d2: null } : { d1: null, d2: 'outer' };
+        };
 
         // Build list of door spans: consecutive rows with same non-empty door.
         // allY has (numRows+1) entries; row r spans allY[r]..allY[r+1], valid rows: 0..(allY.length-2)
@@ -870,56 +885,46 @@ function buildFullCornerUnit(side, wingData) {
         const doorSpans = [];
         let spanStart = -1;
         let spanStyle = 'solid';
+        let spanType = 'double';
+        const _flush = (endR) => {
+            doorSpans.push({ startR: spanStart, endR: endR, doorStyle: spanStyle, doorType: spanType });
+            spanStart = -1;
+        };
         for (let r = 0; r < numRows; r++) {
             const ci = compIndexMap[r];
             // Split board zone row — force-break any open span
             if (ci < 0) {
-                if (spanStart !== -1) {
-                    doorSpans.push({ startR: spanStart, endR: r - 1, doorStyle: spanStyle });
-                    spanStart = -1;
-                }
+                if (spanStart !== -1) _flush(r - 1);
                 continue;
             }
             const comp = comps[ci] || {};
-            const d = comp.door !== undefined ? comp.door
-                : (comp.type === 'door_regular' ? 'right' : comp.type === 'door_glass' ? 'right' : 'empty');
+            const d = _fcDoorType(comp.door !== undefined ? comp.door
+                : (comp.type === 'door_regular' ? 'right' : comp.type === 'door_glass' ? 'right' : 'empty'));
             const ds = comp.doorStyle || (comp.type === 'door_glass' ? 'glass_melamine' : 'solid');
             if (d !== 'empty') {
-                if (spanStart === -1) {
-                    // Start a new span
-                    spanStart = r; spanStyle = ds;
-                } else if (ds !== spanStyle) {
-                    // Style changed — flush current span, start new one
-                    doorSpans.push({ startR: spanStart, endR: r - 1, doorStyle: spanStyle });
-                    spanStart = r; spanStyle = ds;
-                }
-                // If same style, just extend the span (do nothing)
-            } else {
-                if (spanStart !== -1) {
-                    // Gap — flush current span
-                    doorSpans.push({ startR: spanStart, endR: r - 1, doorStyle: spanStyle });
-                    spanStart = -1;
-                }
+                // Style or type changed — flush current span, start new one
+                if (spanStart !== -1 && (ds !== spanStyle || d !== spanType)) _flush(r - 1);
+                if (spanStart === -1) { spanStart = r; spanStyle = ds; spanType = d; }
+            } else if (spanStart !== -1) {
+                _flush(r - 1);
             }
         }
-        // Flush any open span at end
-        if (spanStart !== -1) {
-            doorSpans.push({ startR: spanStart, endR: numRows - 1, doorStyle: spanStyle });
-        }
+        if (spanStart !== -1) _flush(numRows - 1);
 
         doorSpans.forEach(span => {
             const fcDoorStyle = span.doorStyle;
+            const spots = _fcHandleSpots(span.doorType);
             const isGlass = (fcDoorStyle === 'glass_melamine' || fcDoorStyle === 'glass_black' || fcDoorStyle === 'glass_gold');
             // allY entries are the inner faces of the bounding boards (top of bottom board = plinthH+t,
             // bottom of top board = colH-t, shelf centers for intermediate shelves).
             // For overlay doors, extend by t on each side to cover the full board thickness.
-            const spanBottomY = allY[span.startR]   - t;
+            const spanBottomY = (span.startR === 0 && fcDoorsToFloor) ? 1.5 : allY[span.startR] - t;
             const spanTopY    = allY[span.endR + 1] + t;
             const spanH = spanTopY - spanBottomY;
             const spanMidY = spanBottomY + spanH / 2;
 
             // Helper: build one door panel with optional frame
-            const _makeFCDoor = (w, h, midY, posX, posZ, isVertical) => {
+            const _makeFCDoor = (w, h, midY, posX, posZ, isVertical, spot) => {
                 const doorGroup = new THREE.Group();
                 const fd = 1.5; // frame protrusion amount
                 const fd_offset = (fcDoorStyle !== 'solid') ? fd : 0;
@@ -1032,29 +1037,41 @@ function buildFullCornerUnit(side, wingData) {
                     }
                 }
 
-                // Handle
-                if (!isBP && fcHandleStyle !== 'touch') {
-                    let handle;
-                    if (fcHandleStyle === 'riding') {
-                        // Tall profile hugging the door's opening edge
-                        const profileH = Math.min(30, Math.max(8, h - 2));
-                        const ridingMat = typeof _ridingHandleMat === 'function'
+                // Handle — spot: 'corner' (edge at the L's inner corner), 'outer' (the door's far edge),
+                // 'bottom' (flap: horizontal, centred near the bottom edge), null = no handle
+                if (!isBP && spot && fcHandleStyle !== 'touch') {
+                    const isRiding = fcHandleStyle === 'riding';
+                    const mat = isRiding
+                        ? (typeof _ridingHandleMat === 'function'
                             ? _ridingHandleMat()
-                            : new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.35, roughness: 0.45 });
-                        handle = new THREE.Mesh(new THREE.BoxGeometry(1.1, profileH, 1.1), ridingMat);
-                        if (isVertical) handle.position.set(-sign * (t * 0.45 + 0.55), 0, -(w / 2 - 0.6));
-                        else handle.position.set(sign * (w / 2 - 0.6), 0, t * 0.45 + 0.55 + fd_offset);
-                    } else {
-                        const handleH = Math.min(h * 0.35, 15);
-                        const handleMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8, roughness: 0.3 });
-                        handle = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, handleH, 16), handleMat);
-                        if (isVertical) {
-                            // Door 2: handle protrudes outward in -sign*X from the door face
-                            handle.position.set(-sign * (t * 0.45 + 1.5), 0, -w * 0.35);
-                        } else {
-                            // Door 1: handle protrudes in +Z from the door face (group already shifted back by fd_offset)
-                            handle.position.set(sign * w * 0.35, 0, t * 0.45 + 1.5 + fd_offset);
+                            : new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.35, roughness: 0.45 }))
+                        : new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8, roughness: 0.3 });
+                    const out = isRiding ? 0.55 : 1.5;  // protrusion from the door face
+                    const faceX = -sign * (t * 0.45 + out);             // door 2 face (thin in X)
+                    const faceZ = t * 0.45 + out + fd_offset;           // door 1 face (thin in Z)
+                    let handle;
+                    if (spot === 'bottom') {
+                        const len = isRiding ? Math.min(30, Math.max(8, w - 2)) : Math.min(w * 0.35, 15);
+                        const y = isRiding ? -h / 2 + 0.6 : -h / 2 + 5;
+                        handle = isRiding
+                            ? new THREE.Mesh(isVertical ? new THREE.BoxGeometry(1.1, 1.1, len) : new THREE.BoxGeometry(len, 1.1, 1.1), mat)
+                            : new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, len, 16), mat);
+                        if (!isRiding) {
+                            if (isVertical) handle.rotation.x = Math.PI / 2;
+                            else handle.rotation.z = Math.PI / 2;
                         }
+                        if (isVertical) handle.position.set(faceX, y, 0);
+                        else handle.position.set(0, y, faceZ);
+                    } else {
+                        const len = isRiding ? Math.min(30, Math.max(8, h - 2)) : Math.min(h * 0.35, 15);
+                        handle = isRiding
+                            ? new THREE.Mesh(new THREE.BoxGeometry(1.1, len, 1.1), mat)
+                            : new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, len, 16), mat);
+                        const edge = isRiding ? (w / 2 - 0.6) : (w * 0.35);
+                        // Door 1's corner edge is toward +sign*X; door 2's corner edge is toward -Z
+                        const dir = (spot === 'corner') ? 1 : -1;
+                        if (isVertical) handle.position.set(faceX, 0, -dir * edge);
+                        else handle.position.set(sign * dir * edge, 0, faceZ);
                     }
                     doorGroup.add(handle);
                 }
@@ -1067,7 +1084,7 @@ function buildFullCornerUnit(side, wingData) {
                 _makeFCDoor(door1W, spanH, spanMidY,
                     -sign * (wingD + door1W / 2),
                     frontD + t * 0.45,
-                    false);
+                    false, spots.d1);
             }
 
             // Door 2: side face of vertical arm
@@ -1076,7 +1093,7 @@ function buildFullCornerUnit(side, wingData) {
                 _makeFCDoor(door2D, spanH, spanMidY,
                     -sign * (wingD + t * 0.45),
                     frontD + door2D / 2,
-                    true);
+                    true, spots.d2);
             }
         }); // end doorSpans.forEach
     } // end hasDoors
