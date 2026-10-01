@@ -431,6 +431,15 @@
         .status-option.status-production .status-option-dot { background: #f97316; }
         .status-option.status-service .status-option-dot { background: #8b5cf6; }
         .status-option.status-installed .status-option-dot { background: #e2bc58; }
+        .project-totals { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 8px; }
+        .project-total {
+            display: inline-flex; align-items: center; gap: 5px;
+            font-size: .72rem; font-weight: 700; color: #334155;
+            background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 999px; padding: 3px 9px;
+            white-space: nowrap;
+        }
+        .project-total i { font-size: .68rem; color: #64748b; }
+        .project-total b { font-weight: 800; color: var(--primary); }
         .project-meta { font-size: .75rem; color: var(--muted); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         .project-meta-item { display: flex; align-items: center; gap: 4px; }
         .project-actions { display: flex; gap: 8px; padding: 0 20px 18px; background: rgba(255,255,255,.5); }
@@ -1769,8 +1778,8 @@
     <span id="toast-text"></span>
 </div>
 
-<script src="auth.js?v=20260830adminOps"></script>
-<script src="projects.js?v=20260929qc"></script>
+<script src="auth.js?v=20261001totals"></script>
+<script src="projects.js?v=20261001totals"></script>
 <script src="quick-calc.js?v=20260929qc"></script>
 </body>
 </html>

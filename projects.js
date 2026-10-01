@@ -745,10 +745,23 @@ function _renderProjects() {
             ? '<img src="' + p.thumbnail + '" alt="' + safeName + '" loading="lazy">'
             : '<i class="fa-solid fa-cabinet-filing project-thumb-icon"></i>';
 
-        // Cabinet count badge
-        var cabinetBadge = (p.cabinet_count != null && p.cabinet_count > 0)
-            ? '<div class="cabinet-count-badge"><i class="fa-solid fa-layer-group"></i> ' + p.cabinet_count + '</div>'
+        // cart_count is derived from project_data; legacy cabinet_count was never kept up to date
+        var cabCount = p.cart_count != null ? p.cart_count : (p.cabinet_count || 0);
+        var cabinetBadge = cabCount > 0
+            ? '<div class="cabinet-count-badge"><i class="fa-solid fa-layer-group"></i> ' + cabCount + '</div>'
             : '';
+        var showPrices = !!(_plan && _plan.features && _plan.features.showPricing === true);
+        var totalsHtml = '';
+        if (cabCount > 0) {
+            var totalsParts = ['<span class="project-total"><i class="fa-solid fa-layer-group"></i> ' + cabCount + ' ' + (cabCount === 1 ? 'ארון' : 'ארונות') + '</span>'];
+            if (showPrices && p.cabinets_total != null) {
+                totalsParts.push('<span class="project-total" title="סה&quot;כ ארונות (ללא התקנה)"><i class="fa-solid fa-tag"></i> ארונות <b dir="ltr">' + _formatIls(p.cabinets_total) + '</b></span>');
+            }
+            if (showPrices && p.install_total != null) {
+                totalsParts.push('<span class="project-total" title="סה&quot;כ הובלה והתקנה"><i class="fa-solid fa-truck"></i> הובלה <b dir="ltr">' + _formatIls(p.install_total) + '</b></span>');
+            }
+            totalsHtml = '<div class="project-totals">' + totalsParts.join('') + '</div>';
+        }
         var measCount = _projectMeasCounts[p.id] || 0;
         var measBadge = measCount
             ? '<button type="button" class="project-meas-badge" title="פתח מדידות" onclick="event.stopPropagation(); openProjectMeasurements(\'' + p.id + '\')">' +
@@ -797,9 +810,9 @@ function _renderProjects() {
                 customerLine +
                 deliveryLine +
                 ownerLine +
+                totalsHtml +
                 '<div class="project-meta">' +
                     '<span class="project-meta-item"><i class="fa-regular fa-calendar"></i> ' + dateStr + '</span>' +
-                    (p.cabinet_count ? '<span class="project-meta-item"><i class="fa-solid fa-layer-group"></i> ' + p.cabinet_count + ' ארונות</span>' : '') +
                 '</div>' +
             '</div>' +
             statusFootHtml +
@@ -1820,6 +1833,11 @@ function _esc(str) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+}
+
+function _formatIls(n) {
+    var v = Math.round(Number(n) || 0);
+    return '₪' + v.toLocaleString('en-US');
 }
 
 function _formatDate(iso) {

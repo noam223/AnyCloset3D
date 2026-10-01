@@ -1047,9 +1047,21 @@ window.Projects = {
         // Try full column list first; fall back to minimal columns if schema migration hasn't run yet
         let { data, error } = await sb
             .from('projects')
-            .select('id, name, thumbnail, created_at, updated_at, locked_at, extension_expires_at, lock_extensions, cabinet_count, order_status, customer_name, customer_order_num, is_pinned, delivery_estimate, user_id, company_id, visibility')
+            .select('id, name, thumbnail, created_at, updated_at, locked_at, extension_expires_at, lock_extensions, cabinet_count, cart_count, cabinets_total, install_total, order_status, customer_name, customer_order_num, is_pinned, delivery_estimate, user_id, company_id, visibility')
             .order('is_pinned', { ascending: false })
             .order('updated_at', { ascending: false });
+        if (error) {
+            console.warn('Projects.list totals select failed (' + (error.message || error) + '), retrying without totals columns');
+            const resT = await sb
+                .from('projects')
+                .select('id, name, thumbnail, created_at, updated_at, locked_at, extension_expires_at, lock_extensions, cabinet_count, order_status, customer_name, customer_order_num, is_pinned, delivery_estimate, user_id, company_id, visibility')
+                .order('is_pinned', { ascending: false })
+                .order('updated_at', { ascending: false });
+            if (!resT.error) {
+                data = resT.data;
+                error = null;
+            }
+        }
         if (error) {
             console.warn('Projects.list company select failed (' + (error.message || error) + '), retrying without company columns');
             const res0 = await sb
