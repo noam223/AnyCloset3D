@@ -752,11 +752,12 @@ function _renderProjects() {
             : '';
         var showPrices = !!(_plan && _plan.features && _plan.features.showPricing === true);
         var totalsHtml = '';
+        var pricesHtml = '';
         if (cabCount > 0) {
             totalsHtml = '<div class="project-totals"><span class="project-total"><i class="fa-solid fa-layer-group"></i> ' +
                 cabCount + ' ' + (cabCount === 1 ? 'ארון' : 'ארונות') + '</span></div>';
             if (showPrices && (p.cabinets_total != null || p.install_total != null)) {
-                totalsHtml +=
+                pricesHtml =
                     '<div class="project-prices">' +
                         '<div class="project-price-box cabinets" title="סה&quot;כ ארונות (ללא התקנה)">' +
                             '<span class="project-price-label"><i class="fa-solid fa-tag"></i> ארונות</span>' +
@@ -823,6 +824,7 @@ function _renderProjects() {
                 '</div>' +
             '</div>' +
             statusFootHtml +
+            pricesHtml +
             '<div class="project-actions">' +
                 openBtnHtml +
                 extendBtnHtml +
