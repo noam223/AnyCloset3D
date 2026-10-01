@@ -753,14 +753,21 @@ function _renderProjects() {
         var showPrices = !!(_plan && _plan.features && _plan.features.showPricing === true);
         var totalsHtml = '';
         if (cabCount > 0) {
-            var totalsParts = ['<span class="project-total"><i class="fa-solid fa-layer-group"></i> ' + cabCount + ' ' + (cabCount === 1 ? 'ארון' : 'ארונות') + '</span>'];
-            if (showPrices && p.cabinets_total != null) {
-                totalsParts.push('<span class="project-total" title="סה&quot;כ ארונות (ללא התקנה)"><i class="fa-solid fa-tag"></i> ארונות <b dir="ltr">' + _formatIls(p.cabinets_total) + '</b></span>');
+            totalsHtml = '<div class="project-totals"><span class="project-total"><i class="fa-solid fa-layer-group"></i> ' +
+                cabCount + ' ' + (cabCount === 1 ? 'ארון' : 'ארונות') + '</span></div>';
+            if (showPrices && (p.cabinets_total != null || p.install_total != null)) {
+                totalsHtml +=
+                    '<div class="project-prices">' +
+                        '<div class="project-price-box cabinets" title="סה&quot;כ ארונות (ללא התקנה)">' +
+                            '<span class="project-price-label"><i class="fa-solid fa-tag"></i> ארונות</span>' +
+                            '<span class="project-price-value" dir="ltr">' + _formatIls(p.cabinets_total) + '</span>' +
+                        '</div>' +
+                        '<div class="project-price-box delivery" title="סה&quot;כ הובלה והתקנה">' +
+                            '<span class="project-price-label"><i class="fa-solid fa-truck"></i> הובלה</span>' +
+                            '<span class="project-price-value" dir="ltr">' + _formatIls(p.install_total) + '</span>' +
+                        '</div>' +
+                    '</div>';
             }
-            if (showPrices && p.install_total != null) {
-                totalsParts.push('<span class="project-total" title="סה&quot;כ הובלה והתקנה"><i class="fa-solid fa-truck"></i> הובלה <b dir="ltr">' + _formatIls(p.install_total) + '</b></span>');
-            }
-            totalsHtml = '<div class="project-totals">' + totalsParts.join('') + '</div>';
         }
         var measCount = _projectMeasCounts[p.id] || 0;
         var measBadge = measCount
