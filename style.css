@@ -2168,6 +2168,11 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); box-sha
 .drag-handle.space-move-handle::after { content: none; }
 .drag-handle.space-move-handle.active { background: var(--accent); border-color: var(--accent); }
 .drag-handle.space-move-handle.active::before { color: white; }
+.drag-handle.space-z-handle { cursor: ns-resize; background: rgba(217,119,6,0.14); border-color: rgba(217,119,6,0.65); width: 28px; height: 28px; }
+.drag-handle.space-z-handle::before { content: 'Z'; font-family: inherit; font-size: 11px; font-weight: 800; color: #d97706; margin: 0; }
+.drag-handle.space-z-handle::after { content: none; }
+.drag-handle.space-z-handle.active { background: #d97706; border-color: #d97706; }
+.drag-handle.space-z-handle.active::before { color: white; }
 .drag-handle.uu-move-handle { background: rgba(16,185,129,0.13); border-color: rgba(16,185,129,0.6); }
 .drag-handle.uu-move-handle::before, .drag-handle.uu-move-handle::after { color: rgba(16,185,129,0.9); }
 .drag-handle.uu-move-handle.active { background: rgba(16,185,129,0.85); border-color: #10b981; }

@@ -6692,6 +6692,17 @@ window._spaceSlot1Height = function() {
     return (rs && rs.globalHeight) || 240;
 };
 
+/** Screen px → cm scale measured at the moving cabinet's actual position (it may sit forward on Z). */
+function _spaceDragCmPerPx(off) {
+    const base = new THREE.Vector3(off.x, off.y, off.z || 0);
+    const v0 = base.clone().project(camera);
+    const vx = base.clone().add(new THREE.Vector3(100, 0, 0)).project(camera);
+    const vy = base.clone().add(new THREE.Vector3(0, 100, 0)).project(camera);
+    const dxPx = ((vx.x - v0.x) * 0.5) * container.clientWidth;
+    const dyPx = ((v0.y - vy.y) * 0.5) * container.clientHeight;
+    return { x: dxPx !== 0 ? 100 / dxPx : 1, y: dyPx !== 0 ? 100 / dyPx : 1 };
+}
+
 window._buildSpaceCabMoveHandle = function() {
     const info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
     if (!info || info.activeSlot <= 0 || state.viewMode !== 'front') return;
@@ -6704,25 +6715,39 @@ window._buildSpaceCabMoveHandle = function() {
     handle.dataset.worldY = String(h);
     handle.innerHTML = `<div class="drag-tooltip">הזז ארון ${n}: ${off.x}, ${off.y} ס"מ</div>`;
     handle.style.display = 'flex';
-    if (window._spaceCabDrag) handle.classList.add('active');
+    if (window._spaceCabDrag && window._spaceCabDrag.axis === 'xy') handle.classList.add('active');
     dragLayer.appendChild(handle);
 
-    handle.addEventListener('pointerdown', function(e) {
+    const zHandle = document.createElement('div');
+    zHandle.className = 'drag-handle space-z-handle';
+    zHandle.title = 'גרירה למעלה/למטה מזיזה את הארון אחורה/קדימה (ציר Z)';
+    zHandle.innerHTML = `<div class="drag-tooltip">עומק ארון ${n}: ${off.z} ס"מ</div>`;
+    zHandle.style.display = 'flex';
+    if (window._spaceCabDrag && window._spaceCabDrag.axis === 'z') zHandle.classList.add('active');
+    dragLayer.appendChild(zHandle);
+
+    function startDrag(e, axis, el) {
         e.preventDefault();
         e.stopPropagation();
-        handle.setPointerCapture(e.pointerId);
+        el.setPointerCapture(e.pointerId);
         controls.enabled = false;
         document.body.classList.add('dragging');
+        const cur = window._getSpaceOffset(window._getSpaceMovableItem());
         window._spaceCabDrag = {
+            axis: axis,
+            el: el,
             startMouseX: e.clientX,
             startMouseY: e.clientY,
-            startX: off.x,
-            startY: off.y,
-            prevX: off.x,
+            startX: cur.x,
+            startY: cur.y,
+            startZ: cur.z,
+            scale: _spaceDragCmPerPx(cur),
             slot: info.activeSlot
         };
-        handle.classList.add('active');
-    });
+        el.classList.add('active');
+    }
+    handle.addEventListener('pointerdown', function(e) { startDrag(e, 'xy', handle); });
+    zHandle.addEventListener('pointerdown', function(e) { startDrag(e, 'z', zHandle); });
 
     if (window._spaceCabMoveHandler) window.removeEventListener('pointermove', window._spaceCabMoveHandler);
     if (window._spaceCabUpHandler) window.removeEventListener('pointerup', window._spaceCabUpHandler);
@@ -6730,29 +6755,32 @@ window._buildSpaceCabMoveHandle = function() {
     window._spaceCabMoveHandler = function(e) {
         const d = window._spaceCabDrag;
         if (!d) return;
-        const v0 = new THREE.Vector3(0, 0, 0).project(camera);
-        const vx = new THREE.Vector3(100, 0, 0).project(camera);
-        const vy = new THREE.Vector3(0, 100, 0).project(camera);
-        const cw = container.clientWidth;
-        const ch = container.clientHeight;
-        const dxPx = ((vx.x - v0.x) * 0.5) * cw;
-        const dyPx = ((v0.y - vy.y) * 0.5) * ch;
-        const xPerPx = dxPx !== 0 ? 100 / dxPx : 1;
-        const yPerPx = dyPx !== 0 ? 100 / dyPx : 1;
-        const nx = d.startX + (e.clientX - d.startMouseX) * xPerPx;
-        const ny = d.startY + (e.clientY - d.startMouseY) * yPerPx;
-        window._setSpaceOffset(nx, ny, { dragging: true, preferAxis: undefined, slot: d.slot });
+        const dxMouse = e.clientX - d.startMouseX;
+        const dyMouse = e.clientY - d.startMouseY;
+        if (d.axis === 'z') {
+            // Front view looks straight down -Z, so depth uses the horizontal cm/px scale; dragging down = forward
+            const nz = d.startZ + dyMouse * d.scale.x;
+            window._setSpaceOffset(d.startX, d.startY, { dragging: true, preferAxis: 'z', z: nz, slot: d.slot });
+        } else {
+            const nx = d.startX + dxMouse * d.scale.x;
+            const ny = d.startY + dyMouse * d.scale.y;
+            window._setSpaceOffset(nx, ny, { dragging: true, preferAxis: undefined, slot: d.slot });
+        }
         const cur = window._getSpaceOffset(window._getSpaceMovableItem());
         const tip = handle.querySelector('.drag-tooltip');
         if (tip) tip.innerText = `הזז ארון ${n}: ${cur.x}, ${cur.y} ס"מ`;
+        const zTip = zHandle.querySelector('.drag-tooltip');
+        if (zTip) zTip.innerText = `עומק ארון ${n}: ${cur.z} ס"מ`;
         if (typeof updateDragHandlesPosition === 'function') updateDragHandlesPosition();
     };
     window._spaceCabUpHandler = function() {
-        if (!window._spaceCabDrag) return;
+        const d = window._spaceCabDrag;
+        if (!d) return;
         window._spaceCabDrag = null;
         controls.enabled = true;
         document.body.classList.remove('dragging');
         handle.classList.remove('active');
+        zHandle.classList.remove('active');
         if (typeof saveHistoryState === 'function') saveHistoryState();
     };
     window.addEventListener('pointermove', window._spaceCabMoveHandler);
@@ -6810,6 +6838,15 @@ function updateDragHandlesPosition() {
             const off = typeof window._getSpaceOffset === 'function' ? window._getSpaceOffset(item) : { x: 0, y: 0 };
             const hy = parseFloat(handle.dataset.worldY) || 0;
             worldPt = new THREE.Vector3(off.x, off.y + hy, (off.z || 0) + (state.depth || 54) / 2);
+        } else if (handle.classList.contains('space-z-handle')) {
+            // Front edge of the side panel facing away from the anchor cabinet, at mid height
+            const info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
+            const slot = info && info.activeSlot > 0 ? info.activeSlot : 1;
+            const off = window._getSpaceOffset(window._getSpaceMovableItem());
+            const fp = window._spaceCabinetFootprint(slot);
+            const side = off.x >= 0 ? 1 : -1;
+            const fo = fp.floorOffset || 0;
+            worldPt = new THREE.Vector3(off.x + side * fp.w / 2, off.y + fo + (fp.h - fo) / 2, (off.z || 0) + fp.d / 2);
         } else {
             const x3d = parseFloat(handle.dataset.x3d);
             const y3d = handle.dataset.y3d ? parseFloat(handle.dataset.y3d) : Math.max(...state.columns.map(c => c.height));
