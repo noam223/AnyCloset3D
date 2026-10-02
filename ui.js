@@ -11484,6 +11484,7 @@ function _insertCartItemAt(item, index, open, roomLinks, placeholder) {
 }
 
 window._undoCartOp = function(op) {
+    if (op && op.type === 'split') { _undoCartSplit(op); return; }
     if (!op || op.type !== 'delete') return;
     const inTrash = (state.cartTrash || []).some(function(e) { return e && e.id === op.trashId; });
     if (!inTrash || state.orderCart.indexOf(op.item) >= 0) return;
@@ -11497,6 +11498,7 @@ window._undoCartOp = function(op) {
 };
 
 window._redoCartOp = function(op) {
+    if (op && op.type === 'split') { _redoCartSplit(op); return; }
     if (!op || op.type !== 'delete') return;
     const idx = state.orderCart.indexOf(op.item);
     if (idx < 0) return;
@@ -11892,6 +11894,197 @@ window.duplicateCartItem = function(index) {
     if (typeof saveHistoryState === 'function') saveHistoryState();
 };
 
+// ── Split a corner / walk-in cabinet into standalone linear cabinets ───────
+const _SPLIT_WING_LABELS = { center: 'מרכז', right: 'צד ימין', left: 'צד שמאל' };
+
+/** Wing sides of a multi-wing cart item, in the order the pieces are created; null if not splittable. */
+window._cartItemSplitSides = function(item) {
+    const wings = item && item.rawState && item.rawState.wings;
+    if (!wings || !wings.center || !(wings.left || wings.right)) return null;
+    return ['center', 'right', 'left'].filter(function(s) { return !!wings[s]; });
+};
+
+/** Keeps only keys belonging to `side` (and its upper unit) and re-keys them to the center wing. */
+function _remapWingKeyedMap(map, side, sep) {
+    const out = {};
+    if (!map || typeof map !== 'object') return out;
+    const from = [side + sep, 'upperUnit_' + side + sep];
+    const to = ['center' + sep, 'upperUnit_center' + sep];
+    Object.keys(map).forEach(function(k) {
+        for (let i = 0; i < from.length; i++) {
+            if (k.indexOf(from[i]) === 0) {
+                out[to[i] + k.slice(from[i].length)] = map[k];
+                return;
+            }
+        }
+    });
+    return out;
+}
+
+function _buildSplitPieceRawState(rs, side, name) {
+    const piece = JSON.parse(JSON.stringify(rs));
+    const wing = JSON.parse(JSON.stringify(rs.wings[side]));
+    const centerLabel = (rs.wings.center && rs.wings.center.cabinetModelLabel) || '';
+    wing.wingPosition = 'side';
+    wing.manualPrice = null;
+    wing.manualInstallPrice = null;
+    wing.cabinetName = name;
+    if (!wing.cabinetModelLabel && centerLabel) wing.cabinetModelLabel = centerLabel;
+    if (wing.slidingDoor) wing.slidingDoor.enabled = false;
+
+    const wings = { center: wing, left: null, right: null };
+    const uu = rs.wings['upperUnit_' + side];
+    if (uu) {
+        const u = JSON.parse(JSON.stringify(uu));
+        u._parentWingId = 'center';
+        wings.upperUnit_center = u;
+    }
+    piece.wings = wings;
+    piece.presetId = 'linear';
+    piece.activeWing = 'center';
+    piece.roomWall = 'center';
+    _wingFields.forEach(function(f) {
+        if (wing[f] !== undefined) piece[f] = JSON.parse(JSON.stringify(wing[f]));
+    });
+    piece.cabinetName = name;
+    piece.manualPrice = null;
+    piece.manualInstallPrice = null;
+    piece.partColors = _remapWingKeyedMap(rs.partColors, side, '_');
+    piece.blueprintCellDimOffsets = _remapWingKeyedMap(rs.blueprintCellDimOffsets, side, '|');
+    piece.blueprintDimOffsets = _remapWingKeyedMap(rs.blueprintDimOffsets, side, '|');
+    piece.blueprintCellDimShown = _remapWingKeyedMap(rs.blueprintCellDimShown, side, '|');
+    piece.blueprintColWidthDimShown = _remapWingKeyedMap(rs.blueprintColWidthDimShown, side, '|');
+    piece.blueprintCutouts = (rs.blueprintCutouts || [])
+        .filter(function(c) { return c && (c.viewKey || 'center') === side; })
+        .map(function(c) { return Object.assign({}, c, { viewKey: 'center' }); });
+    delete piece.spacePairId;
+    delete piece.spaceSlot;
+    delete piece.spaceOffset;
+    return piece;
+}
+
+/** Replaces cart item `src` (at `index`) with one linear cabinet per wing. Caller wraps in _withoutHistory. */
+function _performCartSplit(src, index) {
+    const rs = src.rawState;
+    const sides = window._cartItemSplitSides(src);
+    const baseName = String((src.spec && src.spec.customName) || rs.wings.center.cabinetName || '').trim() || 'ארון פינתי';
+    const held = window._cartItemOnHold(src);
+    const pieces = sides.map(function(side) {
+        const name = baseName + ' - ' + _SPLIT_WING_LABELS[side];
+        const spec = JSON.parse(JSON.stringify(src.spec || {}));
+        spec.customName = name;
+        spec.imgDoors = null;
+        spec.imgOpen = null;
+        spec.wingPreviews = [];
+        spec.multiViewSVG = null;
+        spec.multiViewPages = [];
+        const piece = { spec: spec, rawState: _buildSplitPieceRawState(rs, side, name) };
+        window._setCartItemHold(piece, held);
+        return piece;
+    });
+
+    const trashId = _addToCartTrash(src);
+    if (state.editingCartIndex === index) state.editingCartIndex = -1;
+    const info = _removeCartItemAt(index);
+    pieces.forEach(function(p, i) {
+        _insertCartItemAt(p, index + i, false, null, i === 0 ? info.placeholder : null);
+    });
+    // Load + save each piece so price, dimensions and preview images are recomputed
+    const finals = [];
+    for (let i = 0; i < pieces.length; i++) {
+        window.editCartItem(index + i, { force: true });
+        window._commitCurrentCabinetToCart({ flash: false });
+        finals.push(state.orderCart[index + i]);
+    }
+    window.editCartItem(index, { force: true });
+    return { trashId: trashId, pieces: finals };
+}
+
+window.splitCartItem = function(index) {
+    const target = state.orderCart[index];
+    const sides = window._cartItemSplitSides(target);
+    if (!sides) return;
+    const wings = target.rawState.wings;
+    const hasFullCorner = sides.some(function(s) { return wings[s] && wings[s].wingPosition === 'full_corner'; });
+    const hasManualPrice = sides.some(function(s) { return wings[s] && (wings[s].manualPrice != null || wings[s].manualInstallPrice != null); });
+
+    const _doSplit = function() {
+        const idx = state.orderCart.indexOf(target);
+        if (idx < 0) { updateLeftSidebar(); return; }
+        if (state.editingCartIndex >= 0 && state.orderCart[state.editingCartIndex]) {
+            window._commitCurrentCabinetToCart({ flash: false });
+        }
+        // Committing replaces the open item object in place — re-read it
+        const src = state.orderCart[idx];
+        if (!window._cartItemSplitSides(src)) { updateLeftSidebar(); return; }
+        let res;
+        _withoutHistory(function() { res = _performCartSplit(src, idx); });
+        const before = state.history[state.historyIndex];
+        saveHistoryState('פיצול ארון פינתי');
+        const top = state.history[state.historyIndex];
+        if (top && top !== before) {
+            window._cartHistoryOps.set(top, { type: 'split', original: src, index: idx, trashId: res.trashId, pieces: res.pieces });
+        }
+        if (typeof _showToast === 'function') _showToast('הארון פוצל ל-' + res.pieces.length + ' ארונות (ניתן לבטל עם Ctrl+Z)', 3200);
+    };
+
+    const existing = document.getElementById('_split-confirm-toast');
+    if (existing) existing.remove();
+    const notes = ['כל צד יהפוך לארון ישר עצמאי בפרויקט, והארון המקורי יישמר בפח.'];
+    if (hasFullCorner) notes.push('יחידת הפינה המלאה לא תיכלל בארונות המפוצלים.');
+    if (hasManualPrice) notes.push('המחיר הידני יבוטל והמחיר יחושב מחדש לכל ארון.');
+    const toast = document.createElement('div');
+    toast.id = '_split-confirm-toast';
+    toast.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);';
+    toast.innerHTML = `
+        <div dir="rtl" style="background:#1e2840;color:white;padding:32px 36px;border-radius:20px;box-shadow:0 8px 48px rgba(0,0,0,0.55);display:flex;flex-direction:column;align-items:center;gap:18px;min-width:300px;max-width:min(440px,90vw);text-align:center;">
+            <div style="font-size:2rem;color:#93c5fd;"><i class="fa-solid fa-object-ungroup"></i></div>
+            <div style="font-size:1.2rem;font-weight:700;line-height:1.5;">לפצל את הארון ל-${sides.length} ארונות נפרדים?</div>
+            <div style="font-size:0.92rem;font-weight:400;line-height:1.6;opacity:0.85;">${notes.join('<br>')}</div>
+            <div style="display:flex;gap:14px;width:100%;">
+                <button type="button" data-act="confirm" style="flex:1;background:#2563eb;color:white;border:none;border-radius:10px;padding:12px 0;font-size:1.05rem;font-weight:700;cursor:pointer;">פצל</button>
+                <button type="button" data-act="cancel" style="flex:1;background:rgba(255,255,255,0.15);color:white;border:none;border-radius:10px;padding:12px 0;font-size:1.05rem;font-weight:600;cursor:pointer;">ביטול</button>
+            </div>
+        </div>
+    `;
+    const _close = function() { if (toast.parentNode) toast.remove(); };
+    toast.addEventListener('click', function(e) { if (e.target === toast) _close(); });
+    toast.querySelector('[data-act="confirm"]').addEventListener('click', function() { _close(); _doSplit(); });
+    toast.querySelector('[data-act="cancel"]').addEventListener('click', _close);
+    document.body.appendChild(toast);
+};
+
+function _undoCartSplit(op) {
+    if (state.orderCart.indexOf(op.original) >= 0) return;
+    const idxs = op.pieces.map(function(p) { return state.orderCart.indexOf(p); });
+    if (idxs.some(function(i) { return i < 0; })) {
+        if (typeof _showToast === 'function') _showToast('לא ניתן לבטל את הפיצול — הארונות המפוצלים כבר שונו', 3200);
+        return;
+    }
+    _withoutHistory(function() {
+        if (idxs.indexOf(state.editingCartIndex) >= 0) state.editingCartIndex = -1;
+        let placeholder = null;
+        idxs.sort(function(a, b) { return b - a; }).forEach(function(i) {
+            const info = _removeCartItemAt(i);
+            if (info.placeholder) placeholder = info.placeholder;
+        });
+        _removeFromCartTrash(op.trashId);
+        _insertCartItemAt(op.original, op.index, true, null, placeholder);
+    });
+    if (typeof _showToast === 'function') _showToast('הפיצול בוטל ✓', 2200);
+}
+
+function _redoCartSplit(op) {
+    const idx = state.orderCart.indexOf(op.original);
+    if (idx < 0) return;
+    _withoutHistory(function() {
+        const res = _performCartSplit(op.original, idx);
+        op.index = idx;
+        op.trashId = res.trashId;
+        op.pieces = res.pieces;
+    });
+}
+
 window.newProject = function() {
     if (!confirm('האם אתה בטוח שברצונך להתחיל פרויקט חדש?\nכל הארונות בפרויקט הנוכחי יימחקו לצמיתות.')) return;
     state.orderCart = [];
@@ -12024,6 +12217,7 @@ window.updateLeftSidebar = function(opts) {
                 <button class="cart-mini-btn btn-edit-mini" onclick="event.stopPropagation(); editCartItem(${index});"><i class="fa-solid fa-pen"></i> ערוך</button>
                 ${nested ? `<button class="cart-mini-btn btn-leave-space-mini" onclick="event.stopPropagation(); removeCabinetFromSpace(${index});" title="הוצא את הארון מהמרחב המשותף — הארון יישאר בפרויקט"><i class="fa-solid fa-link-slash"></i> הוצא מהקבוצה</button>` : ''}
                 <button class="cart-mini-btn" onclick="event.stopPropagation(); duplicateCartItem(${index});"><i class="fa-solid fa-copy"></i> שכפל</button>
+                ${!nested && window._cartItemSplitSides(itemObj) ? `<button class="cart-mini-btn btn-split-mini" onclick="event.stopPropagation(); splitCartItem(${index});" title="פצל את הארון הפינתי לארונות ישרים נפרדים בפרויקט"><i class="fa-solid fa-object-ungroup"></i> פצל</button>` : ''}
                 <button class="cart-mini-btn btn-del-mini" onclick="event.stopPropagation(); deleteCartItem(${index});"><i class="fa-solid fa-trash"></i> מחק</button>
                 <div style="position:relative;display:inline-flex;">
                     <button class="cart-mini-btn" id="notes-btn-cart-${index}" onclick="event.stopPropagation(); window._openDesignerNotesForCabinet(${index});" style="color:#2563eb;border-color:rgba(37,99,235,0.35);background:rgba(37,99,235,0.07);">
