@@ -1229,6 +1229,28 @@ window.Projects = {
         return { data };
     },
 
+    // ── Undo history (stored separately so project saves / viewer loads stay light) ──
+    loadHistory: async function(projectId) {
+        const sb = _getClient(); if (!sb || !projectId) return null;
+        const { data, error } = await sb
+            .from('project_history')
+            .select('data')
+            .eq('project_id', projectId)
+            .maybeSingle();
+        if (error) { console.warn('Projects.loadHistory:', error.message); return null; }
+        return data ? data.data : null;
+    },
+
+    saveHistory: async function(projectId, encoded) {
+        const sb = _getClient(); if (!sb) return { error: 'SDK not loaded' };
+        if (!projectId || !encoded) return { error: 'Missing id or data' };
+        const { error } = await sb
+            .from('project_history')
+            .upsert({ project_id: projectId, data: encoded, updated_at: new Date().toISOString() });
+        if (error) return { error: error.message };
+        return { ok: true };
+    },
+
     setVisibility: async function(projectId, visibility, userIds) {
         const sb = _getClient(); if (!sb) return { error: 'SDK not loaded' };
         const vis = (visibility === 'company' || visibility === 'shared') ? visibility : 'private';

@@ -9836,6 +9836,8 @@ window._buildCurrentCabinetCompareRaw = function() {
     }));
     const _pairLive = typeof window._spacePairFieldsForRaw === 'function' ? window._spacePairFieldsForRaw() : {};
     if (_pairLive && _pairLive.spacePairId) Object.assign(raw, _pairLive);
+    const _uid = typeof window._cartUidAt === 'function' ? window._cartUidAt(state.editingCartIndex) : null;
+    if (_uid) raw.cartUid = _uid;
     if (typeof window._cartItemOnHold === 'function' && state.orderCart && state.orderCart[state.editingCartIndex] &&
         window._cartItemOnHold(state.orderCart[state.editingCartIndex])) {
         raw.onHold = true;
@@ -10970,6 +10972,8 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
                 ? window._exportLocalPartColors()
                 : JSON.parse(JSON.stringify(state.partColors || {}))
         }));
+        const _cartUid = typeof window._cartUidAt === 'function' ? window._cartUidAt(state.editingCartIndex) : null;
+        if (_cartUid) rawState.cartUid = _cartUid;
 
         // Collect unique extra colors from per-part overrides
         const _extraColorsSet = new Set();
@@ -11341,8 +11345,6 @@ window._cartVerify = _cartVerify;
 
 // ── Cart trash: deleted cabinets are kept for 30 days ──────────────────────
 const _CART_TRASH_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-window._cartHistoryOps = new WeakMap();
-
 window._purgeCartTrash = function() {
     const now = Date.now();
     state.cartTrash = (state.cartTrash || []).filter(function(e) {
@@ -11483,15 +11485,33 @@ function _insertCartItemAt(item, index, open, roomLinks, placeholder) {
     return index;
 }
 
+// Cart ops keep live object refs in memory; after a reload only uids and trash ids remain
+function _cartOpTrashItem(trashId) {
+    const entry = (state.cartTrash || []).find(function(e) { return e && e.id === trashId; });
+    return entry ? JSON.parse(JSON.stringify(entry.item)) : null;
+}
+
+function _cartOpPlaceholder(op) {
+    if (op.placeholder) return op.placeholder;
+    if (op.placeholderUid && state.orderCart.length === 1 && window._cartUidAt(0) === op.placeholderUid) {
+        return state.orderCart[0];
+    }
+    return null;
+}
+
 window._undoCartOp = function(op) {
     if (op && op.type === 'split') { _undoCartSplit(op); return; }
     if (!op || op.type !== 'delete') return;
     const inTrash = (state.cartTrash || []).some(function(e) { return e && e.id === op.trashId; });
-    if (!inTrash || state.orderCart.indexOf(op.item) >= 0) return;
+    if (!inTrash || window._cartIndexOfUid(op.uid) >= 0 || (op.item && state.orderCart.indexOf(op.item) >= 0)) return;
+    const item = op.item || _cartOpTrashItem(op.trashId);
+    if (!item) return;
     _withoutHistory(function() {
         const cartUnchanged = state.orderCart.length === op.cartLen;
+        const placeholder = _cartOpPlaceholder(op);
         _removeFromCartTrash(op.trashId);
-        _insertCartItemAt(op.item, op.index, op.wasEditing, cartUnchanged ? op.roomLinks : null, op.placeholder);
+        _insertCartItemAt(item, op.index, op.wasEditing, cartUnchanged ? op.roomLinks : null, placeholder);
+        op.item = item;
         saveHistoryState();
     });
     if (typeof _showToast === 'function') _showToast('הארון שוחזר ✓', 2200);
@@ -11500,16 +11520,22 @@ window._undoCartOp = function(op) {
 window._redoCartOp = function(op) {
     if (op && op.type === 'split') { _redoCartSplit(op); return; }
     if (!op || op.type !== 'delete') return;
-    const idx = state.orderCart.indexOf(op.item);
+    let idx = op.item ? state.orderCart.indexOf(op.item) : -1;
+    if (idx < 0) idx = window._cartIndexOfUid(op.uid);
     if (idx < 0) return;
     _withoutHistory(function() {
-        op.trashId = _addToCartTrash(op.item);
+        const item = state.orderCart[idx];
+        op.trashId = _addToCartTrash(item);
         const info = _removeCartItemAt(idx);
+        op.item = item;
+        op.uid = item.rawState && item.rawState.cartUid;
         op.index = info.index;
         op.wasEditing = info.wasEditing;
         op.roomLinks = info.roomLinks;
         op.cartLen = info.cartLen;
         op.placeholder = info.placeholder;
+        window._normalizeCartUids();
+        op.placeholderUid = info.placeholder ? window._cartUidAt(0) : null;
         saveHistoryState();
     });
 };
@@ -11614,6 +11640,7 @@ window.deleteCartItem = function(index) {
             return;
         }
         try {
+            window._normalizeCartUids();
             const trashId = _addToCartTrash(target);
             let info;
             _withoutHistory(function() { info = _removeCartItemAt(idx); });
@@ -11621,7 +11648,10 @@ window.deleteCartItem = function(index) {
             saveHistoryState('מחיקת ארון');
             const top = state.history[state.historyIndex];
             if (top && top !== before) {
-                window._cartHistoryOps.set(top, Object.assign({ type: 'delete', trashId: trashId }, info));
+                top._cartOp = Object.assign({ type: 'delete', trashId: trashId }, info, {
+                    uid: target.rawState && target.rawState.cartUid,
+                    placeholderUid: info.placeholder && info.placeholder.rawState ? info.placeholder.rawState.cartUid : null
+                });
             }
             if (state.orderCart.indexOf(target) >= 0) {
                 console.error('[Cart] cabinet is STILL in the cart after delete', window._cartSnapshot());
@@ -11921,7 +11951,7 @@ function _remapWingKeyedMap(map, side, sep) {
     return out;
 }
 
-function _buildSplitPieceRawState(rs, side, name) {
+function _buildSplitPieceRawState(rs, side, name, uid) {
     const piece = JSON.parse(JSON.stringify(rs));
     const wing = JSON.parse(JSON.stringify(rs.wings[side]));
     const centerLabel = (rs.wings.center && rs.wings.center.cabinetModelLabel) || '';
@@ -11960,16 +11990,19 @@ function _buildSplitPieceRawState(rs, side, name) {
     delete piece.spacePairId;
     delete piece.spaceSlot;
     delete piece.spaceOffset;
+    piece.cartUid = uid || window._newCartUid();
     return piece;
 }
 
-/** Replaces cart item `src` (at `index`) with one linear cabinet per wing. Caller wraps in _withoutHistory. */
-function _performCartSplit(src, index) {
+/** Replaces cart item `src` (at `index`) with one linear cabinet per wing. Caller wraps in _withoutHistory.
+ *  `pieceUids` (on redo) recreates the pieces under the ids later history steps refer to. */
+function _performCartSplit(src, index, pieceUids) {
+    window._normalizeCartUids();
     const rs = src.rawState;
     const sides = window._cartItemSplitSides(src);
     const baseName = String((src.spec && src.spec.customName) || rs.wings.center.cabinetName || '').trim() || 'ארון פינתי';
     const held = window._cartItemOnHold(src);
-    const pieces = sides.map(function(side) {
+    const pieces = sides.map(function(side, i) {
         const name = baseName + ' - ' + _SPLIT_WING_LABELS[side];
         const spec = JSON.parse(JSON.stringify(src.spec || {}));
         spec.customName = name;
@@ -11978,7 +12011,7 @@ function _performCartSplit(src, index) {
         spec.wingPreviews = [];
         spec.multiViewSVG = null;
         spec.multiViewPages = [];
-        const piece = { spec: spec, rawState: _buildSplitPieceRawState(rs, side, name) };
+        const piece = { spec: spec, rawState: _buildSplitPieceRawState(rs, side, name, pieceUids && pieceUids[i]) };
         window._setCartItemHold(piece, held);
         return piece;
     });
@@ -11997,7 +12030,11 @@ function _performCartSplit(src, index) {
         finals.push(state.orderCart[index + i]);
     }
     window.editCartItem(index, { force: true });
-    return { trashId: trashId, pieces: finals };
+    return {
+        trashId: trashId,
+        originalUid: rs.cartUid,
+        pieceUids: finals.map(function(p) { return p.rawState.cartUid; })
+    };
 }
 
 window.splitCartItem = function(index) {
@@ -12023,9 +12060,9 @@ window.splitCartItem = function(index) {
         saveHistoryState('פיצול ארון פינתי');
         const top = state.history[state.historyIndex];
         if (top && top !== before) {
-            window._cartHistoryOps.set(top, { type: 'split', original: src, index: idx, trashId: res.trashId, pieces: res.pieces });
+            top._cartOp = { type: 'split', original: src, index: idx, trashId: res.trashId, originalUid: res.originalUid, pieceUids: res.pieceUids };
         }
-        if (typeof _showToast === 'function') _showToast('הארון פוצל ל-' + res.pieces.length + ' ארונות (ניתן לבטל עם Ctrl+Z)', 3200);
+        if (typeof _showToast === 'function') _showToast('הארון פוצל ל-' + res.pieceUids.length + ' ארונות (ניתן לבטל עם Ctrl+Z)', 3200);
     };
 
     const existing = document.getElementById('_split-confirm-toast');
@@ -12055,12 +12092,14 @@ window.splitCartItem = function(index) {
 };
 
 function _undoCartSplit(op) {
-    if (state.orderCart.indexOf(op.original) >= 0) return;
-    const idxs = op.pieces.map(function(p) { return state.orderCart.indexOf(p); });
-    if (idxs.some(function(i) { return i < 0; })) {
-        if (typeof _showToast === 'function') _showToast('לא ניתן לבטל את הפיצול — הארונות המפוצלים כבר שונו', 3200);
+    if (window._cartIndexOfUid(op.originalUid) >= 0) return;
+    const original = op.original || _cartOpTrashItem(op.trashId);
+    const idxs = (op.pieceUids || []).map(window._cartIndexOfUid);
+    if (!original || !idxs.length || idxs.some(function(i) { return i < 0; })) {
+        if (typeof _showToast === 'function') _showToast('לא ניתן לבטל את הפיצול — חלק מהארונות המפוצלים נמחקו', 3200);
         return;
     }
+    op.original = original;
     _withoutHistory(function() {
         if (idxs.indexOf(state.editingCartIndex) >= 0) state.editingCartIndex = -1;
         let placeholder = null;
@@ -12069,19 +12108,26 @@ function _undoCartSplit(op) {
             if (info.placeholder) placeholder = info.placeholder;
         });
         _removeFromCartTrash(op.trashId);
-        _insertCartItemAt(op.original, op.index, true, null, placeholder);
+        _insertCartItemAt(original, op.index, true, null, placeholder);
     });
     if (typeof _showToast === 'function') _showToast('הפיצול בוטל ✓', 2200);
 }
 
 function _redoCartSplit(op) {
-    const idx = state.orderCart.indexOf(op.original);
+    const idx = window._cartIndexOfUid(op.originalUid);
     if (idx < 0) return;
     _withoutHistory(function() {
-        const res = _performCartSplit(op.original, idx);
+        // Redone steps update only the editor — sync it into the cart before splitting
+        if (state.editingCartIndex === idx && window._isCurrentCabinetDirty()) {
+            window._commitCurrentCabinetToCart({ flash: false });
+        }
+        const src = state.orderCart[idx];
+        if (!window._cartItemSplitSides(src)) return;
+        const res = _performCartSplit(src, idx, op.pieceUids);
+        op.original = src;
         op.index = idx;
         op.trashId = res.trashId;
-        op.pieces = res.pieces;
+        op.pieceUids = res.pieceUids;
     });
 }
 

@@ -2035,7 +2035,35 @@ window.applyUpperUnitMaterial = function(matKey) {
 // ==========================================
 // History
 // ==========================================
-const MAX_HISTORY = 40;
+const MAX_HISTORY = 50;
+
+// Stable per-cabinet ids (rawState.cartUid) let history steps survive index shifts and reloads
+window._newCartUid = function() {
+    return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+};
+
+window._normalizeCartUids = function() {
+    const seen = {};
+    (state.orderCart || []).forEach(function(it) {
+        if (!it) return;
+        if (!it.rawState) it.rawState = {};
+        let uid = it.rawState.cartUid;
+        if (!uid || seen[uid]) uid = it.rawState.cartUid = window._newCartUid();
+        seen[uid] = true;
+    });
+};
+
+window._cartUidAt = function(index) {
+    const it = state.orderCart && state.orderCart[index];
+    return (it && it.rawState && it.rawState.cartUid) || null;
+};
+
+window._cartIndexOfUid = function(uid) {
+    if (!uid) return -1;
+    return (state.orderCart || []).findIndex(function(it) {
+        return it && it.rawState && it.rawState.cartUid === uid;
+    });
+};
 
 const _COMP_TYPE_LABELS = {
     empty: 'ריק',
@@ -2116,7 +2144,9 @@ function _computeHistoryLabel(prevSnap, nextSnap) {
 }
 
 function _makeHistorySnapshot() {
+    window._normalizeCartUids();
     return JSON.parse(JSON.stringify({
+        cartUid: window._cartUidAt(state.editingCartIndex),
         activeWing: state.activeWing,
         presetId: state.presetId,
         wings: state.wings,
@@ -2261,8 +2291,101 @@ try {
 } catch(e) {}
 
 function _cartOpOf(snap) {
-    return (snap && window._cartHistoryOps) ? window._cartHistoryOps.get(snap) : null;
+    return (snap && snap._cartOp) || null;
 }
+
+// ---- Persisted history: saved per project in public.project_history ----
+const _CART_OP_LIVE_FIELDS = ['item', 'original', 'placeholder'];
+
+function _serializeHistory() {
+    const history = state.history.map(function(snap) {
+        if (!snap._cartOp) return snap;
+        const op = Object.assign({}, snap._cartOp);
+        _CART_OP_LIVE_FIELDS.forEach(function(f) { delete op[f]; });
+        return Object.assign({}, snap, { _cartOp: op });
+    });
+    return JSON.stringify({ v: 1, index: state.historyIndex, history: history });
+}
+
+async function _gzipBase64(text) {
+    if (typeof CompressionStream === 'undefined') return 'json:' + text;
+    const stream = new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'));
+    const bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) {
+        bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    }
+    return 'gz:' + btoa(bin);
+}
+
+async function _decodeHistoryPayload(encoded) {
+    if (!encoded) return null;
+    if (encoded.indexOf('json:') === 0) return JSON.parse(encoded.slice(5));
+    if (encoded.indexOf('gz:') !== 0 || typeof DecompressionStream === 'undefined') return null;
+    const bin = atob(encoded.slice(3));
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+    return JSON.parse(await new Response(stream).text());
+}
+
+let _lastPersistedHistory = null;
+let _lastPersistAt = 0;
+
+/** Uploads the undo history if it changed. Without `force`, uploads at most every 30s. */
+window._persistUndoHistory = async function(projectId, opts) {
+    opts = opts || {};
+    if (!projectId || !state.history.length || typeof Projects === 'undefined' || !Projects.saveHistory) return;
+    if (!opts.force && Date.now() - _lastPersistAt < 30000) return;
+    let text;
+    try { text = _serializeHistory(); } catch (e) { console.warn('[History] serialize failed:', e); return; }
+    if (text === _lastPersistedHistory) return;
+    _lastPersistAt = Date.now();
+    try {
+        const res = await Projects.saveHistory(projectId, await _gzipBase64(text));
+        if (res && res.error) console.warn('[History] save failed:', res.error);
+        else _lastPersistedHistory = text;
+    } catch (e) {
+        console.warn('[History] save failed:', e);
+    }
+};
+
+function _sameHistoryState(a, b) {
+    if (!a || !b) return false;
+    return JSON.stringify([a.cartUid || null, a.presetId, a.activeWing, a.wings]) ===
+        JSON.stringify([b.cartUid || null, b.presetId, b.activeWing, b.wings]);
+}
+
+/** Replaces the in-memory history with the project's saved one. Returns true if one was loaded. */
+window._loadPersistedUndoHistory = async function(projectId) {
+    if (!projectId || typeof Projects === 'undefined' || !Projects.loadHistory) return false;
+    let payload = null;
+    try {
+        payload = await _decodeHistoryPayload(await Projects.loadHistory(projectId));
+    } catch (e) {
+        console.warn('[History] load failed:', e);
+        return false;
+    }
+    if (!payload || !Array.isArray(payload.history) || !payload.history.length) return false;
+    let history = payload.history;
+    let index = Math.min(Math.max(Number(payload.index) || 0, 0), history.length - 1);
+    if (history.length > MAX_HISTORY) {
+        const drop = history.length - MAX_HISTORY;
+        history = history.slice(drop);
+        index = Math.max(0, index - drop);
+    }
+    state.history = history;
+    state.historyIndex = index;
+    _lastPersistedHistory = _serializeHistory();
+    const current = _makeHistorySnapshot();
+    if (_sameHistoryState(state.history[index], current)) {
+        updateUndoRedoUI();
+    } else {
+        // Project changed after the history was last stored — record the loaded state as a new step
+        saveHistoryState('טעינת פרויקט');
+    }
+    return true;
+};
 
 window.undo = function() {
     if (state.historyIndex <= 0) return;
@@ -2339,6 +2462,22 @@ window.resetCurrentCabinet = function() {
 function restoreHistoryState() {
     state.isRestoring = true;
     const snapshot = JSON.parse(JSON.stringify(state.history[state.historyIndex]));
+
+    // A step recorded on another cabinet must be applied to that cabinet, not the open one
+    if (snapshot.cartUid && snapshot.cartUid !== window._cartUidAt(state.editingCartIndex)) {
+        const targetIdx = window._cartIndexOfUid(snapshot.cartUid);
+        if (targetIdx < 0) {
+            updateUndoRedoUI();
+            setTimeout(() => state.isRestoring = false, 50);
+            if (typeof _showToast === 'function') _showToast('הארון של שלב זה כבר לא קיים בפרויקט', 2600);
+            return;
+        }
+        if (state.editingCartIndex >= 0 && state.orderCart[state.editingCartIndex] &&
+            typeof window._isCurrentCabinetDirty === 'function' && window._isCurrentCabinetDirty()) {
+            window._commitCurrentCabinetToCart({ flash: false });
+        }
+        window._editCartItemNow(targetIdx);
+    }
     
     // Always exit wing edit mode when restoring history (prevents stale wingEditMode)
     state.wingEditMode = false;

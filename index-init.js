@@ -368,6 +368,14 @@
                     if (typeof window._restorePresetUI === 'function') window._restorePresetUI();
                     if (typeof updateLeftSidebar === 'function') updateLeftSidebar();
                     saveHistoryState();
+                    // Continue the project's saved undo history; otherwise start fresh from the loaded state
+                    var _hasSavedHistory = !_thumbOnly && typeof window._loadPersistedUndoHistory === 'function' &&
+                        await window._loadPersistedUndoHistory(proj.id);
+                    if (!_hasSavedHistory && state.history.length > 1) {
+                        state.history = state.history.slice(-1);
+                        state.historyIndex = 0;
+                        if (typeof updateUndoRedoUI === 'function') updateUndoRedoUI();
+                    }
                 }
             } catch(e) {
                 console.warn('Could not restore project data:', e);
@@ -585,6 +593,9 @@
             if (typeof _showToast === 'function') _showToast('⚠️ שגיאה בשמירת הפרויקט: ' + result.error, 5000);
         } else {
             window._isDirty = false;
+            if (typeof window._persistUndoHistory === 'function') {
+                window._persistUndoHistory(window._currentProjectId, { force: label !== 'LivePush' });
+            }
         }
     }
 
@@ -813,6 +824,9 @@ window._saveProjectNow = async function() {
             }
             console.log('[SaveNow] Saved successfully');
             window._isDirty = false;
+            if (typeof window._persistUndoHistory === 'function') {
+                window._persistUndoHistory(window._currentProjectId, { force: true });
+            }
             if (btn) { btn.innerHTML = '<i class="fa-solid fa-check"></i> נשמר!'; btn.disabled = false; }
             setTimeout(function() { if (btn) btn.innerHTML = origHTML; }, 2000);
             if (typeof _showToast === 'function') _showToast('✅ הפרויקט נשמר בהצלחה', 3000);
