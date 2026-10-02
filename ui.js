@@ -214,6 +214,34 @@ function _resolveOpenCellColorLabel(wings, fallbackKey) {
     return _colorKeyLabel(fallbackKey);
 }
 
+function _wingHasTopPanel(wing) {
+    return !!(wing && Array.isArray(wing.columns) && wing.columns.some(function(col) { return col && col.topPanel; }));
+}
+
+function _wingTopPanelColorLabel(wing, rawState) {
+    const rs = rawState || {};
+    return _colorKeyLabel((wing && wing.materialTopPanel) || rs.materialTopPanel
+        || (wing && wing.materialBody) || rs.materialBody || 'white_matte');
+}
+
+/** Top-panel (משטח עליון) color from every wing that has one; null when the cabinet has no top panel. */
+function _resolveTopPanelColorLabel(rawState, sides) {
+    const wings = rawState && rawState.wings;
+    if (!wings || typeof wings !== 'object') return null;
+    const labels = [];
+    const addWing = function(wing) {
+        if (!_wingHasTopPanel(wing)) return;
+        const label = _wingTopPanelColorLabel(wing, rawState);
+        if (labels.indexOf(label) === -1) labels.push(label);
+    };
+    const keys = sides || ['center', 'left', 'right'].concat(Object.keys(wings).filter(function(k) { return k.indexOf('upperUnit_') === 0; }));
+    keys.forEach(function(k) { addWing(wings[k]); });
+    if (!sides && wings.center && wings.center.sideCabinet && wings.center.sideCabinet.side && wings.center.sideCabinet.side !== 'none') {
+        addWing(wings.center.sideCabinet);
+    }
+    return labels.length ? labels.join(', ') : null;
+}
+
 const placementHebrew = {
     'wall': 'ארון קיר חופשי',
     'between_walls': 'ארון בין קירות',
@@ -12683,6 +12711,13 @@ function _collectWingPrintSpecRows(item, itemObj, unit) {
             value: _plainSpecValue(_colorKeyLabel(mat('materialOpenCell') || mat('materialBody') || 'white_matte'))
         });
     }
+    if (_wingHasTopPanel(wing)) {
+        rows.push({
+            id: prefix + 'colorTopPanel',
+            label: 'צבע משטח עליון',
+            value: _plainSpecValue(_wingTopPanelColorLabel(wing, rs))
+        });
+    }
 
     rows.push({ id: prefix + '_sec_hardware', section: true, label: 'פרזול ותכולה — ארון ' + unit.index });
     rows.push({
@@ -12766,6 +12801,12 @@ function _collectPrintSpecRows(item, itemObj) {
         multiUnits.forEach(function(unit) {
             _collectWingPrintSpecRows(item, itemObj, unit).forEach(function(r) { rows.push(r); });
         });
+        const upperKeys = Object.keys(itemObj.rawState.wings || {}).filter(function(k) { return k.indexOf('upperUnit_') === 0; });
+        const upperTopPanel = upperKeys.length ? _resolveTopPanelColorLabel(itemObj.rawState, upperKeys) : null;
+        if (upperTopPanel) {
+            rows.push({ id: '_sec_upper_finishes', section: true, label: 'גוונים וגימורים — יחידה עליונה' });
+            rows.push({ id: 'upperColorTopPanel', label: 'צבע משטח עליון', value: _plainSpecValue(upperTopPanel) });
+        }
         if (item.extraColors) {
             rows.push({ id: '_sec_extra', section: true, label: 'צבעים נוספים' });
             rows.push({ id: 'extraColors', label: 'צבעים נוספים בארון', value: _plainSpecValue(item.extraColors) });
@@ -12797,6 +12838,8 @@ function _collectPrintSpecRows(item, itemObj) {
         rows.push({ id: 'colorBack', label: 'צבע גב ארון', value: _plainSpecValue((item.colorBack && item.colorBack !== 'undefined') ? item.colorBack : 'לבן מט') });
         if (_formatDeskAddition(item, itemObj).desk !== 'ללא') rows.push({ id: 'colorDesk', label: 'צבע שולחן עבודה', value: _plainSpecValue(item.colorDesk) });
         if (item.hasOpenCells) rows.push({ id: 'colorOpenCell', label: 'צבע כוורת', value: _plainSpecValue(item.colorOpenCell) });
+        const topPanelColor = itemObj && _resolveTopPanelColorLabel(itemObj.rawState);
+        if (topPanelColor) rows.push({ id: 'colorTopPanel', label: 'צבע משטח עליון', value: _plainSpecValue(topPanelColor) });
         if (item.extraColors) rows.push({ id: 'extraColors', label: 'צבעים נוספים בארון', value: _plainSpecValue(item.extraColors) });
     }
 
@@ -13187,6 +13230,8 @@ function _printFinishesRows(item, itemObj, thStyle, tdStyle, sectionStyle) {
     html += _printTr(thStyle, tdStyle, 'צבע גב ארון', (item.colorBack && item.colorBack !== 'undefined') ? item.colorBack : 'לבן מט');
     if (_formatDeskAddition(item, itemObj).desk !== 'ללא') html += _printTr(thStyle, tdStyle, 'צבע שולחן עבודה', item.colorDesk);
     if (item.hasOpenCells) html += _printTr(thStyle, tdStyle, 'צבע כוורת', item.colorOpenCell);
+    const topPanelColor = itemObj && _resolveTopPanelColorLabel(itemObj.rawState);
+    if (topPanelColor) html += _printTr(thStyle, tdStyle, 'צבע משטח עליון', topPanelColor);
     if (item.extraColors) html += _printTr(thStyle, tdStyle, 'צבעים נוספים בארון', item.extraColors);
     return html;
 }
@@ -14774,6 +14819,8 @@ function _buildCustomerSummaryDetails(itemObj) {
     if ((content.openCells + content.sideOpenCells) > 0 && colorOpenCell) {
         details.push('צבע כוורת: ' + colorOpenCell);
     }
+    const colorTopPanel = _resolveTopPanelColorLabel(rawState);
+    if (colorTopPanel) details.push('צבע משטח עליון: ' + colorTopPanel);
     if (item.extraColors) details.push('צבעים נוספים: ' + item.extraColors);
 
     if (item.slidingDoor) {
