@@ -64,7 +64,17 @@
   .pcard { border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; }
   .pcard .ph { background: #f1f5f9; font-size: 11px; font-weight: 800; color: #1e3a5f; padding: 4px 7px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
   .pcard .ph > span { font-weight: 600; color: #64748b; font-size: 10px; }
-  .pcard .pi { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 4px; background: #eef2f6; }
+  .pcard .pi { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 3px; padding: 4px; background: #eef2f6; }
+  .pcard .pi div.bpcell { background: #f8fbff; outline: 1px solid #bfdbfe; }
+
+  /* blueprint pages */
+  .bp-block { border: 2px solid #93c5fd; border-radius: 4px; margin-bottom: 12px; overflow: hidden; }
+  .bp-head { background: #e8f0fe; border-bottom: 1px solid #93c5fd; padding: 5px 10px; font-size: 12px; font-weight: 800; color: #1e3a5f; display: flex; justify-content: space-between; align-items: center; }
+  .bp-head span.pg { font-weight: 600; color: #64748b; font-size: 10.5px; }
+  .bp-body { display: grid; gap: 10px; padding: 8px; background: #fff; }
+  .bp-body.c2 { grid-template-columns: 1.4fr 1fr; }
+  .bp-body .cap { text-align: center; color: #475569; }
+  .bp-body svg { display: block; margin: 0 auto; }
   .pcard .pi div { background: #fff; border-radius: 3px; text-align: center; padding: 2px; }
   .pcard .pi i { display: block; font-style: normal; font-size: 9px; color: #64748b; }
   .pcard .pi svg { display: block; margin: 0 auto; }
@@ -126,13 +136,33 @@
   <div class="imgs-h">תמונות לפי חלק <span>המספרים תואמים לתרשים ולטבלה</span></div>
   <div class="pgrid c3">
     <div class="pcard"><div class="ph"><div><span class="badge">1</span>ארון מרכזי</div><span>160 ס"מ</span></div>
-      <div class="pi"><div><i>סגור</i><svg data-cab="closed" data-cols="2" data-w="160" width="98" height="120"></svg></div><div><i>פתוח</i><svg data-cab="open" data-cols="2" data-w="160" data-led="1" width="98" height="120"></svg></div></div></div>
+      <div class="pi"><div><i>סגור</i><svg data-cab="closed" data-cols="2" data-w="160" width="70" height="112"></svg></div><div><i>פתוח</i><svg data-cab="open" data-cols="2" data-w="160" data-led="1" width="70" height="112"></svg></div></div></div>
     <div class="pcard"><div class="ph"><div><span class="badge corner">2</span>פינה (L)</div><span>100×100</span></div>
-      <div class="pi"><div><i>סגור</i><svg data-cab="closed" data-cols="1" data-w="100" width="98" height="120"></svg></div><div><i>פתוח</i><svg data-cab="open" data-cols="1" data-w="100" width="98" height="120"></svg></div></div></div>
+      <div class="pi"><div><i>סגור</i><svg data-cab="closed" data-cols="1" data-w="100" width="70" height="112"></svg></div><div><i>פתוח</i><svg data-cab="open" data-cols="1" data-w="100" width="70" height="112"></svg></div></div></div>
     <div class="pcard"><div class="ph"><div><span class="badge">3</span>כנף ימין</div><span>120 ס"מ</span></div>
-      <div class="pi"><div><i>סגור</i><svg data-cab="closed" data-cols="2" data-w="120" data-front="#8b6a4a" width="98" height="120"></svg></div><div><i>פתוח</i><svg data-cab="open" data-cols="2" data-w="120" width="98" height="120"></svg></div></div></div>
+      <div class="pi"><div><i>סגור</i><svg data-cab="closed" data-cols="2" data-w="120" data-front="#8b6a4a" width="70" height="112"></svg></div><div><i>פתוח</i><svg data-cab="open" data-cols="2" data-w="120" width="70" height="112"></svg></div></div></div>
   </div>
   <div class="foot"><span>סוגרים הכל לדירה · 1582 · ים רביצקי</span><span>עמוד 1 — שרטוט לכל חלק בעמודים הבאים (לפי אותו מספור)</span></div>
+</div>
+
+<!-- ======================= CORNER blueprints ======================= -->
+<div class="mock-label">ארון פינתי: עמודי השרטוטים
+  <small>כל שרטוט מקבל כותרת עם מספר החלק (כמו בתרשים ובטבלה). בראש העמוד הראשון שרטוט מבט על עם מידות הפריסה, ואחריו שרטוט חזית לכל חלק. שני שרטוטים בעמוד.</small>
+</div>
+<div class="page">
+  <div class="cab-title"><h2>ארון מס' 1 — ארון פינתי ימין · שרטוטים</h2><span class="sub">עמוד שרטוטים 1 מתוך 2</span></div>
+  <div class="bp-block">
+    <div class="bp-head"><div>מבט על — פריסת החלקים</div><span class="pg">מידות בס"מ</span></div>
+    <div class="bp-body"><svg id="bp-plan-corner" width="700" height="330"></svg></div>
+  </div>
+  <div class="bp-block">
+    <div class="bp-head"><div><span class="badge">1</span>ארון מרכזי — שרטוט חזית</div><span class="pg">160 × 240 × 54</span></div>
+    <div class="bp-body c2">
+      <div><div class="cap">חזית פנימית (ללא דלתות)</div><svg data-bp="2" data-w="160" data-led="1" width="400" height="390"></svg></div>
+      <div><div class="cap">מבט צד</div><svg data-bpside="54" width="240" height="390"></svg></div>
+    </div>
+  </div>
+  <div class="foot"><span>סוגרים הכל לדירה · 1582 · ים רביצקי</span><span>בעמוד הבא: <span class="badge corner">2</span> פינה (L) · <span class="badge">3</span> כנף ימין</span></div>
 </div>
 
 <!-- ======================= WALK-IN p1 ======================= -->
@@ -197,20 +227,40 @@
   <div class="cab-title"><h2>ארון מס' 2 — חדר ארונות · תמונות לפי חלק</h2><span class="sub">המספרים תואמים לתרשים ולטבלה בעמוד הקודם</span></div>
   <div class="pgrid c2">
     <div class="pcard"><div class="ph"><div><span class="badge">1</span>כנף שמאל</div><span>180 × 60</span></div>
-      <div class="pi"><div><i>סגור</i><svg data-cab="closed" data-cols="3" data-w="180" width="160" height="175"></svg></div><div><i>פתוח</i><svg data-cab="open" data-cols="3" data-w="180" data-led="1" width="160" height="175"></svg></div></div></div>
+      <div class="pi"><div><i>סגור</i><svg data-cab="closed" data-cols="3" data-w="180" width="106" height="165"></svg></div><div><i>פתוח</i><svg data-cab="open" data-cols="3" data-w="180" data-led="1" width="106" height="165"></svg></div></div></div>
     <div class="pcard"><div class="ph"><div><span class="badge corner">2</span>פינה שמאל</div><span>90×90</span></div>
-      <div class="pi"><div><i>סגור</i><svg data-cab="closed" data-cols="1" data-w="90" width="160" height="175"></svg></div><div><i>פתוח</i><svg data-cab="open" data-cols="1" data-w="90" width="160" height="175"></svg></div></div></div>
+      <div class="pi"><div><i>סגור</i><svg data-cab="closed" data-cols="1" data-w="90" width="106" height="165"></svg></div><div><i>פתוח</i><svg data-cab="open" data-cols="1" data-w="90" width="106" height="165"></svg></div></div></div>
     <div class="pcard"><div class="ph"><div><span class="badge">3</span>קיר מרכזי</div><span>240 × 60</span></div>
-      <div class="pi"><div><i>סגור</i><svg data-cab="closed" data-cols="4" data-w="240" width="160" height="175"></svg></div><div><i>פתוח</i><svg data-cab="open" data-cols="4" data-w="240" data-led="1" width="160" height="175"></svg></div></div></div>
+      <div class="pi"><div><i>סגור</i><svg data-cab="closed" data-cols="4" data-w="240" width="106" height="165"></svg></div><div><i>פתוח</i><svg data-cab="open" data-cols="4" data-w="240" data-led="1" width="106" height="165"></svg></div></div></div>
     <div class="pcard"><div class="ph"><div><span class="badge corner">4</span>פינה ימין</div><span>90×90</span></div>
-      <div class="pi"><div><i>סגור</i><svg data-cab="closed" data-cols="1" data-w="90" width="160" height="175"></svg></div><div><i>פתוח</i><svg data-cab="open" data-cols="1" data-w="90" width="160" height="175"></svg></div></div></div>
+      <div class="pi"><div><i>סגור</i><svg data-cab="closed" data-cols="1" data-w="90" width="106" height="165"></svg></div><div><i>פתוח</i><svg data-cab="open" data-cols="1" data-w="90" width="106" height="165"></svg></div></div></div>
     <div class="pcard"><div class="ph"><div><span class="badge">5</span>כנף ימין</div><span>180 × 60</span></div>
-      <div class="pi"><div><i>סגור</i><svg data-cab="closed" data-cols="3" data-w="180" width="160" height="175"></svg></div><div><i>פתוח</i><svg data-cab="open" data-cols="3" data-w="180" data-led="1" width="160" height="175"></svg></div></div></div>
+      <div class="pi"><div><i>סגור</i><svg data-cab="closed" data-cols="3" data-w="180" width="106" height="165"></svg></div><div><i>פתוח</i><svg data-cab="open" data-cols="3" data-w="180" data-led="1" width="106" height="165"></svg></div></div></div>
     <div class="pcard" style="border-style:dashed;background:#f8fafc;display:flex;align-items:center;justify-content:center;color:#64748b;font-size:11px;padding:10px;text-align:center;">
       מקום פנוי — כאן נכנס ארון צד / יחידה עליונה אם קיימים
     </div>
   </div>
   <div class="foot"><span>סוגרים הכל לדירה · 1582 · ים רביצקי</span><span>עמוד 2 מתוך 2 — שרטוטים לכל חלק בעמודים הבאים (לפי אותו מספור)</span></div>
+</div>
+
+<!-- ======================= WALK-IN blueprints ======================= -->
+<div class="mock-label">חדר ארונות: עמודי השרטוטים
+  <small>עמוד ראשון: מבט על של כל החדר עם מידות הקירות והפינות. אחריו שרטוט חזית לכל חלק לפי הסדר 1→5. הפינות מקבלות גם מבט על משלהן כי צורת ה-L חשובה לנגר (בדוגמה מוצגת פינה 2 כדי להמחיש את זה).</small>
+</div>
+<div class="page">
+  <div class="cab-title"><h2>ארון מס' 2 — חדר ארונות · שרטוטים</h2><span class="sub">עמוד שרטוטים 1 מתוך 3</span></div>
+  <div class="bp-block">
+    <div class="bp-head"><div>מבט על — כל החדר</div><span class="pg">פריסה 780 ס"מ · עומק 60</span></div>
+    <div class="bp-body"><svg id="bp-plan-walkin" width="700" height="360"></svg></div>
+  </div>
+  <div class="bp-block">
+    <div class="bp-head"><div><span class="badge corner">2</span>פינה שמאל — שרטוט</div><span class="pg">90 × 90 × 250</span></div>
+    <div class="bp-body c2">
+      <div><div class="cap">חזית פנימית</div><svg data-bp="1" data-w="90" data-h="250" width="400" height="360"></svg></div>
+      <div><div class="cap">מבט על (צורת L)</div><svg data-bpcorner="90" width="240" height="360"></svg></div>
+    </div>
+  </div>
+  <div class="foot"><span>סוגרים הכל לדירה · 1582 · ים רביצקי</span><span>שרטוט לכל חלק לפי המספור 1→5</span></div>
 </div>
 
 <script>
@@ -287,10 +337,8 @@
   const cornerFill = '#d1fae5';
 
   // Corner plan: back wall + right wall (L)
-  (function() {
-    const el = document.getElementById('plan-corner');
-    const s = 0.82, ox = 48, oy = 16, D = 54 * s;
-    const cW = 160 * s, kW = 100 * s, rW = 120 * s;
+  function drawCornerPlan(el, s, ox, oy, big) {
+    const D = 54 * s, cW = 160 * s, kW = 100 * s, rW = 120 * s;
     let h = `<rect x="${ox - 6}" y="${oy - 6}" width="${cW + kW + 6}" height="6" ${wall}/>`;
     h += `<rect x="${ox + cW + kW}" y="${oy - 6}" width="6" height="${kW + rW + 6}" ${wall}/>`;
     h += `<rect x="${ox}" y="${oy}" width="${cW}" height="${D}" ${part()}/>`;
@@ -300,15 +348,18 @@
     h += dim(ox, oy + D + 14, ox + cW, oy + D + 14, '160');
     h += dim(ox + cW, oy + D + 14, ox + cW + kW, oy + D + 14, '100');
     h += dim(ox + cW + kW - D - 14, oy + kW, ox + cW + kW - D - 14, oy + kW + rW, '120', true);
+    if (big) {
+      h += dim(ox - 14, oy, ox - 14, oy + D, '54', true);
+      h += dim(ox, oy - 18, ox + cW + kW, oy - 18, 'פריסה 380 (160 + 100 + 120)');
+      h += dim(ox + cW + kW + 18, oy, ox + cW + kW + 18, oy + kW, '100', true);
+    }
     h += `<text x="${ox + cW / 2}" y="${oy + kW + rW / 2}" text-anchor="middle" font-size="9.5" fill="#475569">חלל החדר</text>`;
     el.innerHTML = h;
-  })();
+  }
 
   // Walk-in plan: U (left wall, back wall, right wall)
-  (function() {
-    const el = document.getElementById('plan-walkin');
-    const s = 0.62, ox = 20, oy = 22, D = 60 * s;
-    const lW = 180 * s, k = 90 * s, cW = 240 * s;
+  function drawWalkinPlan(el, s, ox, oy, big) {
+    const D = 60 * s, lW = 180 * s, k = 90 * s, cW = 240 * s;
     const totalW = k + cW + k;
     let h = `<rect x="${ox - 6}" y="${oy - 6}" width="${totalW + 12}" height="6" ${wall}/>`;
     h += `<rect x="${ox - 6}" y="${oy - 6}" width="6" height="${k + lW + 6}" ${wall}/>`;
@@ -323,9 +374,104 @@
     h += dim(ox + k, oy + D + 12, ox + k + cW, oy + D + 12, '240');
     h += dim(ox + D + 14, oy + k, ox + D + 14, oy + k + lW, '180', true);
     h += dim(ox + totalW - D - 14, oy + k, ox + totalW - D - 14, oy + k + lW, '180', true);
+    if (big) {
+      h += dim(ox, oy - 18, ox + totalW, oy - 18, 'רוחב חדר 420 (90 + 240 + 90)');
+      h += dim(ox, oy + D + 12, ox + k, oy + D + 12, '90');
+      h += dim(ox + k + cW, oy + D + 12, ox + totalW, oy + D + 12, '90');
+      h += dim(ox - 18, oy, ox - 18, oy + k + lW, 'עומק חדר 270', true);
+    }
     h += `<text x="${ox + totalW / 2}" y="${oy + k + lW - 4}" text-anchor="middle" font-size="9.5" fill="#475569">כניסה לחדר</text>`;
     el.innerHTML = h;
-  })();
+  }
+
+  drawCornerPlan(document.getElementById('plan-corner'), 0.82, 48, 16, false);
+  drawWalkinPlan(document.getElementById('plan-walkin'), 0.62, 20, 22, false);
+  drawCornerPlan(document.getElementById('bp-plan-corner'), 1.25, 190, 34, true);
+  drawWalkinPlan(document.getElementById('bp-plan-walkin'), 1.2, 98, 30, true);
+
+  // Technical front view: outline, columns, shelves, drawers, rods, LED strips, dimension lines
+  const BP = '#334155', BPF = '#e8eef6', LED = '#d97706';
+  function bpSvg(cols, cw, ch, W, H, opts) {
+    opts = opts || {};
+    const small = W < 200;
+    const padL = small ? 6 : 34, padB = small ? 6 : 30, padT = small ? 6 : 10, padR = small ? 6 : 10;
+    const s = Math.min((W - padL - padR) / cw, (H - padT - padB) / ch);
+    const ox = padL + ((W - padL - padR) - cw * s) / 2, oy = padT;
+    const X = v => (ox + v * s).toFixed(1), Y = v => (oy + (ch - v) * s).toFixed(1);
+    const ln = (x1, y1, x2, y2, st, sw) => `<line x1="${X(x1)}" y1="${Y(y1)}" x2="${X(x2)}" y2="${Y(y2)}" stroke="${st}" stroke-width="${sw}"/>`;
+    const sw = small ? 0.7 : 1.1;
+    const plinth = 9, cwEach = cw / cols;
+    let p = `<rect x="${X(0)}" y="${Y(ch)}" width="${(cw * s).toFixed(1)}" height="${(ch * s).toFixed(1)}" fill="${BPF}" stroke="${BP}" stroke-width="${sw * 1.3}"/>`;
+    p += ln(0, plinth, cw, plinth, BP, sw);
+    for (let i = 0; i < cols; i++) {
+      const x = i * cwEach;
+      if (i > 0) p += ln(x, 0, x, ch, BP, sw);
+      if (i % 2 === 0) {
+        p += ln(x, ch * 0.68, x + cwEach, ch * 0.68, BP, sw);
+        p += ln(x + 4, ch * 0.65, x + cwEach - 4, ch * 0.65, BP, sw * 1.6);
+        [plinth + 20, plinth + 40, plinth + 60].forEach(y => { p += ln(x, y, x + cwEach, y, BP, sw * 0.8); });
+      } else {
+        [60, 100, 140, 180].forEach(y => { p += ln(x, y, x + cwEach, y, BP, sw); });
+      }
+      p += ln(x, ch * 0.86, x + cwEach, ch * 0.86, BP, sw);
+      if (!small && cols > 1) p += `<text x="${X(x + cwEach / 2)}" y="${(oy + ch * s + 12).toFixed(1)}" text-anchor="middle" font-size="9" fill="${BP}">${Math.round(cwEach * 10)}</text>`;
+    }
+    if (opts.led) {
+      p += ln(3, plinth + 4, 3, ch - 12, LED, small ? 1.4 : 2.4);
+      p += ln(cwEach - 3, plinth + 4, cwEach - 3, ch - 12, LED, small ? 1.4 : 2.4);
+      if (!small) p += `<text x="${X(6)}" y="${Y(ch / 2)}" font-size="9" fill="${LED}" font-weight="700" transform="rotate(-90 ${X(6)} ${Y(ch / 2)})">LED</text>`;
+    }
+    if (!small) {
+      const by = oy + ch * s + 24;
+      p += `<line x1="${X(0)}" y1="${by}" x2="${X(cw)}" y2="${by}" stroke="${BP}" stroke-width="0.8"/><text x="${X(cw / 2)}" y="${by - 3}" text-anchor="middle" font-size="10" font-weight="700" fill="${BP}">${cw * 10}</text>`;
+      const lx = ox - 18;
+      p += `<line x1="${lx}" y1="${Y(0)}" x2="${lx}" y2="${Y(ch)}" stroke="${BP}" stroke-width="0.8"/><text x="${lx - 4}" y="${Y(ch / 2)}" text-anchor="middle" font-size="10" font-weight="700" fill="${BP}" transform="rotate(-90 ${lx - 4} ${Y(ch / 2)})">${ch * 10}</text>`;
+    }
+    return p;
+  }
+
+  function bpSide(depth, ch, W, H) {
+    const s = Math.min((W - 50) / depth, (H - 40) / ch);
+    const ox = (W - depth * s) / 2, oy = 10;
+    let p = `<rect x="${ox}" y="${oy}" width="${depth * s}" height="${ch * s}" fill="${BPF}" stroke="${BP}" stroke-width="1.4"/>`;
+    p += `<line x1="${ox}" y1="${oy + (ch - 9) * s}" x2="${ox + depth * s}" y2="${oy + (ch - 9) * s}" stroke="${BP}" stroke-width="1"/>`;
+    p += `<line x1="${ox + depth * s - 2 * s}" y1="${oy}" x2="${ox + depth * s - 2 * s}" y2="${oy + ch * s}" stroke="${BP}" stroke-width="0.8" stroke-dasharray="3 2"/>`;
+    const by = oy + ch * s + 18;
+    p += `<line x1="${ox}" y1="${by}" x2="${ox + depth * s}" y2="${by}" stroke="${BP}" stroke-width="0.8"/><text x="${ox + depth * s / 2}" y="${by - 3}" text-anchor="middle" font-size="10" font-weight="700" fill="${BP}">${depth * 10}</text>`;
+    return p;
+  }
+
+  function bpCornerTop(size, depth, W, H) {
+    const s = Math.min((W - 50) / size, (H - 50) / size);
+    const ox = (W - size * s) / 2 + 8, oy = 20, k = size * s, D = depth * s;
+    let p = `<path d="M${ox},${oy} h${k} v${D} h-${k - D} v${k - D} h-${D} z" fill="#d1fae5" stroke="${BP}" stroke-width="1.4"/>`;
+    p += `<line x1="${ox + D}" y1="${oy + D}" x2="${ox}" y2="${oy}" stroke="${BP}" stroke-width="0.8" stroke-dasharray="3 2"/>`;
+    p += `<line x1="${ox}" y1="${oy - 8}" x2="${ox + k}" y2="${oy - 8}" stroke="${BP}" stroke-width="0.8"/><text x="${ox + k / 2}" y="${oy - 11}" text-anchor="middle" font-size="10" font-weight="700" fill="${BP}">${size * 10}</text>`;
+    p += `<line x1="${ox - 10}" y1="${oy}" x2="${ox - 10}" y2="${oy + k}" stroke="${BP}" stroke-width="0.8"/><text x="${ox - 14}" y="${oy + k / 2}" text-anchor="middle" font-size="10" font-weight="700" fill="${BP}" transform="rotate(-90 ${ox - 14} ${oy + k / 2})">${size * 10}</text>`;
+    p += `<text x="${ox + D + 8}" y="${oy + D + 18}" font-size="9.5" fill="#475569">עומק ${depth * 10}</text>`;
+    return p;
+  }
+
+  document.querySelectorAll('svg[data-bp]').forEach(el => {
+    el.innerHTML = bpSvg(+el.dataset.bp, +el.dataset.w, +(el.dataset.h || 240), +el.getAttribute('width'), +el.getAttribute('height'), { led: el.dataset.led === '1' });
+  });
+  document.querySelectorAll('svg[data-bpside]').forEach(el => {
+    el.innerHTML = bpSide(+el.dataset.bpside, 240, +el.getAttribute('width'), +el.getAttribute('height'));
+  });
+  document.querySelectorAll('svg[data-bpcorner]').forEach(el => {
+    el.innerHTML = bpCornerTop(+el.dataset.bpcorner, 60, +el.getAttribute('width'), +el.getAttribute('height'));
+  });
+
+  // Blueprint thumbnail as the third cell of every part card
+  document.querySelectorAll('.pcard .pi').forEach(pi => {
+    const open = pi.querySelector('svg[data-cab="open"]');
+    if (!open) return;
+    const W = +open.getAttribute('width'), H = +open.getAttribute('height');
+    const cell = document.createElement('div');
+    cell.className = 'bpcell';
+    cell.innerHTML = `<i>שרטוט</i><svg width="${W}" height="${H}">${bpSvg(+open.dataset.cols, +open.dataset.w, 240, W, H, { led: open.dataset.led === '1' })}</svg>`;
+    pi.appendChild(cell);
+  });
 })();
 </script>
 </body>
