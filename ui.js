@@ -9527,6 +9527,11 @@ window.openOrderModal = async function(mode, opts) {
         return;
     }
 
+    // Forms and blueprints are built from the cart — unsaved edits of the open cabinet would be missing
+    if (!state.wingEditMode && typeof window._isCurrentCabinetDirty === 'function' && window._isCurrentCabinetDirty()) {
+        window._commitCurrentCabinetToCart({ flash: false });
+    }
+
     // Fresh captures on open (quote / production). Skip when only rebuilding after price edits.
     if (state.orderCart.length > 0 && !opts.skipMediaRefresh) {
         _showToast('🔄 מרענן תמונות ארונות...', 3500);

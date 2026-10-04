@@ -1221,6 +1221,33 @@ function _bpHangRodSvgY(cellTopSvgY, sc) {
     return cellTopSvgY + _BP_HANG_ROD_BELOW_SHELF_CM * sc;
 }
 
+const _BP_LED_STROKE = '#d97706';
+/**
+ * LED pair — two vertical strips inside the side walls, spanning cells startRow..endRow.
+ * rowBounds are cm from the column bottom; LED rows index the same cells as col.compartments.
+ */
+function _bpDrawLedPairs(p, leds, rowBounds, x, w, botSvgY, sc, font) {
+    if (!Array.isArray(leds) || !leds.length || !Array.isArray(rowBounds)) return;
+    const inset = Math.max(3, Math.min(6, w * 0.05));
+    leds.forEach(function(g) {
+        const lastRow = rowBounds.length - 2;
+        const botCm = rowBounds[Math.min(g.startRow, lastRow)];
+        const topCm = rowBounds[Math.min(g.endRow, lastRow) + 1];
+        if (botCm == null || topCm == null || topCm <= botCm) return;
+        const y1 = botSvgY - topCm * sc + 3;
+        const y2 = botSvgY - botCm * sc - 3;
+        if (y2 - y1 < 6) return;
+        [x + inset, x + w - inset].forEach(function(sx) {
+            p.push(`<line x1="${sx.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${sx.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${_BP_LED_STROKE}" stroke-width="2.4" stroke-linecap="round"/>`);
+        });
+        if (y2 - y1 > 24) {
+            const tx = x + w - inset - 5;
+            const ty = (y1 + y2) / 2;
+            p.push(`<text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" transform="rotate(-90 ${tx.toFixed(1)} ${ty.toFixed(1)})" text-anchor="middle" font-family="${font}" font-size="9" font-weight="700" fill="${_BP_LED_STROKE}">LED</text>`);
+        }
+    });
+}
+
 function _bpIsDoorZoneType(t) {
     return t === 'door_right' || t === 'door_left' || t === 'door_double' || t === 'door_flap';
 }
@@ -2416,6 +2443,7 @@ window._generateMultiViewBlueprintSVG = function() {
                     makeShelfFn: (pp, x1, sy, x2, scc, tCm, showLabel) => shelfLine(x1, sy, x2, scc, tCm, showLabel)
                 });
             });
+            _bpDrawLedPairs(p, col.leds, rowBoundsEarly, colX, colW, _colBotY, sc, FONT);
             colX += colW;
         });
         _bpHoneycombSepFlush(p);
@@ -3405,6 +3433,7 @@ window._generateMultiViewBlueprintPages = function() {
                     makeRectFn: makeRect, makeShelfFn: makeShelfLine
                 });
             });
+            _bpDrawLedPairs(p, col.leds, rowBounds, colX, colW, _colBotSvgY, sc, FONT);
             colX += colW;
         });
 
@@ -3779,6 +3808,8 @@ window._generateMultiViewBlueprintPages = function() {
                 }
             }
         }
+        // Full-corner LED rows index compartments (shelf-to-shelf), not the split-band rows
+        _bpDrawLedPairs(p, fcData.leds, [_fcRowBase, ...shelvesArr.filter(sy => sy > _fcRowBase), cH], ox, dW, oy + dH, sc, FONT);
 
         // Dimension lines
         const dimY = oy + dH + 36;
@@ -3960,6 +3991,7 @@ window._generateMultiViewBlueprintPages = function() {
                         { x: colX, y: cellY1, w: colW, h: cellH });
                 }
             }
+            _bpDrawLedPairs(p, col.leds, rowBounds, colX, colW, oy + dH, sc, FONT);
             colX += colW;
         });
 
@@ -4232,6 +4264,7 @@ window._generateMultiViewBlueprintPages = function() {
                                 { x: colX, y: cellY1, w: colW, h: cellH });
                         }
                     }
+                    _bpDrawLedPairs(p, col.leds, rowBounds, colX, colW, oy + dH, scScale, FONT);
                     colX += colW;
                 });
 
@@ -4655,6 +4688,7 @@ window._generateMultiViewBlueprintPages = function() {
                         { x: colX, y: cellY1, w: colW, h: cellH });
                 }
             }
+            _bpDrawLedPairs(p, col.leds, rowBounds, colX, colW, oy + dH, sc, FONT);
             colX += colW;
         });
 
