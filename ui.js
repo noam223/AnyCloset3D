@@ -13390,11 +13390,13 @@ function _muPartCardsHtml(item, parts, bp) {
         const dims = p.kind === 'corner' ? `${p.w}×${p.w}` : `${p.w} × ${p.d}`;
         return `<div class="mu-card${p.kind === 'corner' ? ' is-corner' : ''}">
             <div class="mu-card-h"><span>${_muBadgeHtml(p)}${_escPrintHtml(p.label)}</span><small dir="ltr">${dims}</small></div>
-            <div class="mu-card-i" style="grid-template-columns:repeat(${cells.length},1fr);">${cells.join('')}</div>
+            <div class="mu-card-i">${cells.join('')}</div>
         </div>`;
     }).filter(Boolean);
     if (!cards.length) return '';
-    return `<div class="mu-cards-t">תמונות לפי חלק</div><div class="mu-cards">${cards.join('')}</div>`;
+    return `<div class="cmp-block mu-cards-page" style="page-break-after:always;">
+        <div class="mu-cards-t">תמונות לפי חלק</div><div class="mu-cards">${cards.join('')}</div>
+    </div>`;
 }
 
 /** Compact factory block for corner cabinets and walk-in closets: shared spec once, plan, parts table, per-part images, numbered blueprints. */
@@ -13438,8 +13440,8 @@ function _buildCompactMultiUnitHtml(o) {
         ${alert}
         ${notes}
         ${o.priceStrip || ''}
-        ${_muPartCardsHtml(item, parts, bp)}
     </div>
+    ${_muPartCardsHtml(item, parts, bp)}
     ${bpHtml}`;
 }
 
@@ -14193,14 +14195,14 @@ function _buildPrintHTML(mode) {
   .mu-alert { margin-top: 8px; border: 1px solid #fca5a5; background: #fef2f2; color: #991b1b; border-radius: 6px; padding: 6px 10px; font-size: 0.82rem; break-inside: avoid; }
   .mu-alert > div { margin-top: 3px; }
   .mu-cards-t { font-size: 0.8rem; font-weight: 800; color: #1e3a5f; border-bottom: 1.5px solid #1e3a5f; padding: 10px 0 2px; margin-bottom: 6px; break-after: avoid; page-break-after: avoid; }
-  .mu-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .mu-cards { display: grid; grid-template-columns: 1fr; gap: 10px; }
   .mu-card { border: 1px solid #cbd5e1; border-radius: 6px; overflow: hidden; break-inside: avoid; page-break-inside: avoid; }
   .mu-card-h { display: flex; justify-content: space-between; align-items: center; background: #f1f5f8; padding: 3px 8px; font-size: 0.82rem; font-weight: 800; color: #1e3a5f; }
   .mu-card-h small { color: #64748b; font-weight: 600; }
-  .mu-card-i { display: grid; gap: 4px; padding: 4px; }
+  .mu-card-i { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 6px; }
   .mu-card-i figure { text-align: center; }
-  .mu-card-i img { width: 100%; height: 120px; object-fit: contain; display: block; background: #fff; }
-  .mu-card-i svg { width: 100% !important; height: 120px !important; display: block; }
+  .mu-card-i img { width: 100%; height: 190px; object-fit: contain; display: block; background: #fff; }
+  .mu-card-i svg { width: 100% !important; height: 190px !important; display: block; }
   .mu-card-i figcaption { font-size: 0.7rem; color: #64748b; }
   .mu-bp.is-first { margin-bottom: 16px; }
   .mu-bp-h { display: flex; justify-content: space-between; align-items: center; background: #e8f0fe; border: 1px solid #93c5fd; border-bottom: none; padding: 6px 10px; font-weight: 800; color: #1e3a5f; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
