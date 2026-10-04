@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>מוקאפים — טופס שליחה לייצור</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; background: #cbd5e1; color: #1e293b; padding: 30px 0; }
+  .mock-label { width: 794px; margin: 0 auto 10px; font-size: 18px; font-weight: 800; color: #0f172a; }
+  .mock-label small { display: block; font-size: 13px; font-weight: 500; color: #334155; margin-top: 3px; }
+  .page { width: 794px; height: 1123px; margin: 0 auto 50px; background: white; padding: 26px 28px; box-shadow: 0 6px 30px rgba(15,23,42,0.18); overflow: hidden; font-size: 12px; position: relative; }
+  .num { direction: ltr; unicode-bidi: isolate; }
+
+  /* shared header */
+  .hdr { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #1e3a5f; padding-bottom: 8px; margin-bottom: 10px; }
+  .hdr h1 { font-size: 19px; color: #1e3a5f; }
+  .hdr .date { font-size: 11px; color: #64748b; }
+  .cust { display: grid; grid-template-columns: repeat(5, 1fr); border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 12px; }
+  .cust div { padding: 5px 8px; border-left: 1px solid #e2e8f0; }
+  .cust div:last-child { border-left: none; }
+  .cust b { display: block; font-size: 10px; color: #64748b; font-weight: 600; }
+  .cust span { font-size: 12px; font-weight: 700; }
+
+  .cab-title { display: flex; justify-content: space-between; align-items: center; background: #1e3a5f; color: white; border-radius: 6px; padding: 6px 12px; margin-bottom: 8px; }
+  .cab-title h2 { font-size: 15px; }
+  .cab-title .sub { font-size: 11px; opacity: 0.85; }
+
+  /* ===== A ===== */
+  .a-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+  .kv { border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; }
+  .kv h3 { font-size: 11px; background: #f1f5f9; color: #1e3a5f; padding: 4px 8px; border-bottom: 1px solid #e2e8f0; }
+  .kv table { width: 100%; border-collapse: collapse; }
+  .kv th, .kv td { padding: 3px 8px; border-bottom: 1px solid #f1f5f9; text-align: right; font-size: 11.5px; }
+  .kv tr:last-child th, .kv tr:last-child td { border-bottom: none; }
+  .kv th { width: 44%; color: #475569; font-weight: 600; }
+  .kv td { font-weight: 700; }
+  .tiles { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-bottom: 8px; }
+  .tile { border: 1px solid #e2e8f0; border-radius: 6px; text-align: center; padding: 5px 2px; }
+  .tile b { display: block; font-size: 18px; color: #1e3a5f; line-height: 1.1; }
+  .tile span { font-size: 10px; color: #475569; }
+  .tile.led { background: #fffbeb; border-color: #fcd34d; }
+  .tile.led b { color: #b45309; }
+  .line { border: 1px solid #e2e8f0; border-radius: 6px; padding: 5px 8px; margin-bottom: 6px; font-size: 11.5px; }
+  .line b { color: #475569; margin-left: 6px; }
+  .notes { background: #fffbeb; border-color: #fde68a; color: #78350f; }
+  .cost { display: flex; gap: 8px; margin-bottom: 10px; }
+  .cost div { flex: 1; background: #fef9c3; border: 1px solid #fde047; border-radius: 6px; padding: 5px 10px; display: flex; justify-content: space-between; font-weight: 800; color: #713f12; font-size: 12.5px; }
+  .imgs2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .imgbox { border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px; background: #eef2f6; text-align: center; }
+  .imgbox .cap { font-size: 10.5px; font-weight: 700; color: #1e3a5f; text-align: right; padding: 2px 4px 4px; }
+  .imgbox svg { display: block; margin: 0 auto; }
+
+  /* ===== B ===== */
+  .b-wrap { display: grid; grid-template-columns: 1.25fr 1fr; gap: 12px; }
+  .b-spec .sec { font-size: 10.5px; font-weight: 800; color: #1e3a5f; border-bottom: 1.5px solid #1e3a5f; padding: 6px 0 2px; margin-bottom: 2px; letter-spacing: 0.2px; }
+  .b-row { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; border-bottom: 1px dotted #cbd5e1; font-size: 11.5px; }
+  .b-row span:first-child { color: #475569; }
+  .b-row span:last-child { font-weight: 700; text-align: left; }
+  .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; border: 1px solid #94a3b8; vertical-align: -1px; margin-left: 4px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; padding: 5px 0; }
+  .chip { border: 1px solid #cbd5e1; border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 700; background: #f8fafc; }
+  .chip i { font-style: normal; color: #1e3a5f; font-size: 12px; margin-left: 3px; }
+  .chip.led { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
+  .b-imgs { display: flex; flex-direction: column; gap: 8px; }
+
+  /* ===== C ===== */
+  .c-card { border: 1.5px solid #1e3a5f; border-radius: 8px; margin-bottom: 12px; overflow: hidden; }
+  .c-head { display: flex; justify-content: space-between; align-items: center; background: #1e3a5f; color: white; padding: 5px 10px; }
+  .c-head h2 { font-size: 14px; }
+  .c-head .cost-mini { font-size: 11.5px; font-weight: 700; background: #fef9c3; color: #713f12; border-radius: 4px; padding: 1px 8px; }
+  .c-body { display: grid; grid-template-columns: 1fr 150px; }
+  .c-main { padding: 7px 9px; }
+  .c-keys { display: grid; grid-template-columns: repeat(5, auto); gap: 4px; margin-bottom: 6px; }
+  .c-key { background: #f1f5f9; border-radius: 4px; padding: 3px 6px; font-size: 11px; }
+  .c-key b { display: block; font-size: 9px; color: #64748b; font-weight: 600; }
+  .c-tbl { width: 100%; border-collapse: collapse; margin-bottom: 6px; table-layout: fixed; }
+  .c-tbl th { background: #f8fafc; font-size: 9.5px; color: #475569; font-weight: 700; padding: 2px 3px; border: 1px solid #e2e8f0; }
+  .c-tbl td { font-size: 11.5px; font-weight: 700; text-align: center; padding: 3px; border: 1px solid #e2e8f0; }
+  .c-tbl td.led { background: #fffbeb; color: #b45309; }
+  .c-tbl .rowh { width: 52px; background: #1e3a5f; color: white; font-size: 9.5px; }
+  .c-notes { font-size: 11px; color: #78350f; background: #fffbeb; border: 1px solid #fde68a; border-radius: 4px; padding: 3px 7px; }
+  .c-side { border-right: 1px solid #e2e8f0; background: #eef2f6; display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 6px; }
+  .c-side .cap { font-size: 9.5px; font-weight: 700; color: #1e3a5f; }
+  .foot { position: absolute; bottom: 14px; left: 28px; right: 28px; display: flex; justify-content: space-between; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 5px; }
+</style>
+</head>
+<body>
+
+<!-- ======================= MOCKUP A ======================= -->
+<div class="mock-label">מוקאפ A — שני טורים + אריחי תכולה
+  <small>המפרט מחולק ל"כללי" ול"גוונים" זה לצד זה, הפרזול כאריחי מספרים, ושתי התמונות באותו עמוד. במקום 2 עמודים (מפרט + תמונות) יוצא עמוד אחד לכל ארון.</small>
+</div>
+<div class="page">
+  <div class="hdr"><h1>הזמנת ייצור</h1><div class="date">04/10/2026 · הזמנה <span class="num">1582</span></div></div>
+  <div class="cust">
+    <div><b>לקוח</b><span>ים רביצקי</span></div>
+    <div><b>טלפון</b><span class="num">052-4800000</span></div>
+    <div><b>מס' הזמנה</b><span class="num">1582</span></div>
+    <div><b>כתובת</b><span>אשקלון</span></div>
+    <div><b>אספקה</b><span>לא צוין</span></div>
+  </div>
+
+  <div class="cab-title"><h2>ארון מס' 1 — AB3</h2><span class="sub">ארון בין קירות · <span class="num">271 × 232 × 60</span> ס"מ</span></div>
+
+  <div class="a-grid">
+    <div class="kv"><h3>כללי</h3><table>
+      <tr><th>דגם ארון</th><td>AB3</td></tr>
+      <tr><th>מיקום / התקנה</th><td>ארון בין קירות</td></tr>
+      <tr><th>מידות (ר×ג×ע)</th><td class="num">271 × 232 × 60</td></tr>
+      <tr><th>חומר גוף</th><td>מלמין</td></tr>
+      <tr><th>רגליים / צוקל</th><td>צוקל רגיל</td></tr>
+      <tr><th>תוספת שולחן</th><td>ללא</td></tr>
+    </table></div>
+    <div class="kv"><h3>גוונים וגימורים</h3><table>
+      <tr><th>גוף וצוקל</th><td>759</td></tr>
+      <tr><th>פנים (מדפים/מגירות)</th><td>759</td></tr>
+      <tr><th>חזיתות (דלתות)</th><td>759</td></tr>
+      <tr><th>גב ארון</th><td>לבן מט 2100</td></tr>
+      <tr><th>כוורת</th><td>759</td></tr>
+      <tr><th>ידיות</th><td>רוכבת — שחור מט</td></tr>
+    </table></div>
+  </div>
+
+  <div class="tiles">
+    <div class="tile"><b>3</b><span>מגירות חיצוניות</span></div>
+    <div class="tile"><b>6</b><span>מגירות פנימיות</span></div>
+    <div class="tile"><b>9</b><span>מדפים נשלפים</span></div>
+    <div class="tile"><b>2</b><span>מוטות תלייה</span></div>
+    <div class="tile led"><b>1</b><span>זוגות לדים</span></div>
+    <div class="tile"><b>0</b><span>סורבטו</span></div>
+  </div>
+  <div class="line notes"><b>הערות:</b>ארון בין קירות בנוי מ-3 חלקים</div>
+  <div class="cost"><div><span>עלות ייצור (רכש)</span><span class="num">₪5,899</span></div><div><span>עלות משלוח/התקנה</span><span class="num">₪770</span></div></div>
+
+  <div class="imgs2">
+    <div class="imgbox"><div class="cap">תצוגת חוץ (חזיתות)</div><svg data-cab="closed" width="340" height="250"></svg></div>
+    <div class="imgbox"><div class="cap">תצוגת פנים (חלוקה טכנית)</div><svg data-cab="open" width="340" height="250"></svg></div>
+  </div>
+  <div class="imgbox" style="margin-top:8px;background:#fff;"><div class="cap">שרטוט חזית (מידות מלאות בעמוד השרטוטים)</div><svg data-cab="bp" width="700" height="290"></svg></div>
+  <div class="foot"><span>סוגרים הכל לדירה · 1582 · ים רביצקי</span><span>עמוד 1 מתוך 2 — שרטוט מבט עליון בעמוד הבא</span></div>
+</div>
+
+<!-- ======================= MOCKUP B ======================= -->
+<div class="mock-label">מוקאפ B — מפרט צר בצד + תמונות לגובה
+  <small>המפרט כרשימה צפופה בטור אחד, עם דוגמית צבע ליד כל גוון והתכולה כצ'יפים. התמונות לגובה בטור השני ומתחתן תמונה ממוזערת של השרטוט. הכי קריא לנגר בעמוד אחד.</small>
+</div>
+<div class="page">
+  <div class="hdr"><h1>הזמנת ייצור</h1><div class="date">04/10/2026 · הזמנה <span class="num">1582</span></div></div>
+  <div class="cust">
+    <div><b>לקוח</b><span>ים רביצקי</span></div>
+    <div><b>טלפון</b><span class="num">052-4800000</span></div>
+    <div><b>מס' הזמנה</b><span class="num">1582</span></div>
+    <div><b>כתובת</b><span>אשקלון</span></div>
+    <div><b>אספקה</b><span>לא צוין</span></div>
+  </div>
+  <div class="cab-title"><h2>ארון מס' 1 — AB3</h2><span class="sub">ארון בין קירות</span></div>
+
+  <div class="b-wrap">
+    <div class="b-spec">
+      <div class="sec">מבנה</div>
+      <div class="b-row"><span>מידות (ר×ג×ע)</span><span class="num">271 × 232 × 60 ס"מ</span></div>
+      <div class="b-row"><span>חומר גוף</span><span>מלמין</span></div>
+      <div class="b-row"><span>רגליים / צוקל</span><span>צוקל רגיל</span></div>
+      <div class="b-row"><span>תוספת שולחן</span><span>ללא</span></div>
+
+      <div class="sec">גוונים וגימורים</div>
+      <div class="b-row"><span>גוף וצוקל</span><span><i class="sw" style="background:#f1e3d3"></i>759</span></div>
+      <div class="b-row"><span>פנים (מדפים/מגירות)</span><span><i class="sw" style="background:#f1e3d3"></i>759</span></div>
+      <div class="b-row"><span>חזיתות (דלתות)</span><span><i class="sw" style="background:#f1e3d3"></i>759</span></div>
+      <div class="b-row"><span>גב ארון</span><span><i class="sw" style="background:#fafafa"></i>לבן מט 2100</span></div>
+      <div class="b-row"><span>כוורת</span><span><i class="sw" style="background:#f1e3d3"></i>759</span></div>
+
+      <div class="sec">פרזול ותכולה</div>
+      <div class="b-row"><span>ידיות</span><span>רוכבת — שחור מט</span></div>
+      <div class="chips">
+        <span class="chip"><i>3</i>מגירות חיצוניות</span>
+        <span class="chip"><i>6</i>מגירות פנימיות</span>
+        <span class="chip"><i>9</i>מדפים נשלפים</span>
+        <span class="chip"><i>2</i>מוטות תלייה</span>
+        <span class="chip led"><i>1</i>זוג לדים</span>
+      </div>
+
+      <div class="sec">הערות</div>
+      <div style="font-size:11.5px;padding:4px 0 8px;color:#78350f;">ארון בין קירות בנוי מ-3 חלקים</div>
+
+      <div class="cost" style="flex-direction:column;gap:5px;">
+        <div><span>עלות ייצור (רכש)</span><span class="num">₪5,899</span></div>
+        <div><span>עלות משלוח/התקנה</span><span class="num">₪770</span></div>
+      </div>
+    </div>
+    <div class="b-imgs">
+      <div class="imgbox"><div class="cap">חוץ (חזיתות)</div><svg data-cab="closed" width="300" height="240"></svg></div>
+      <div class="imgbox"><div class="cap">פנים (חלוקה טכנית)</div><svg data-cab="open" width="300" height="240"></svg></div>
+      <div class="imgbox"><div class="cap">שרטוט חזית (תמונה ממוזערת)</div><svg data-cab="bp" width="300" height="190"></svg></div>
+    </div>
+  </div>
+  <div class="foot"><span>סוגרים הכל לדירה · 1582 · ים רביצקי</span><span>עמוד 1 — השרטוטים במידות מלאות בעמודים הבאים</span></div>
+</div>
+
+<!-- ======================= MOCKUP C ======================= -->
+<div class="mock-label">מוקאפ C — כרטיס ייצור צפוף: 2–3 ארונות בעמוד
+  <small>כל ארון בכרטיס אחד: נתוני המפתח בשורה, הגוונים והתכולה כטבלה רוחבית (שורה לכל נושא) ותמונה קטנה בצד. כל הפרויקט מרוכז בעמוד הראשון והשרטוטים אחריו. הכי חסכוני בדפים.</small>
+</div>
+<div class="page">
+  <div class="hdr"><h1>הזמנת ייצור — 3 ארונות</h1><div class="date">04/10/2026 · הזמנה <span class="num">1582</span></div></div>
+  <div class="cust">
+    <div><b>לקוח</b><span>ים רביצקי</span></div>
+    <div><b>טלפון</b><span class="num">052-4800000</span></div>
+    <div><b>מס' הזמנה</b><span class="num">1582</span></div>
+    <div><b>כתובת</b><span>אשקלון</span></div>
+    <div><b>אספקה</b><span>לא צוין</span></div>
+  </div>
+
+  <div id="c-cards"></div>
+
+  <div class="cost"><div><span>סה"כ עלות ייצור</span><span class="num">₪16,184</span></div><div><span>סה"כ משלוח/התקנה</span><span class="num">₪1,980</span></div></div>
+  <div class="foot"><span>סוגרים הכל לדירה · 1582 · ים רביצקי</span><span>עמוד 1 — שרטוטים לכל ארון בעמודים הבאים</span></div>
+</div>
+
+<script>
+(function() {
+  const BODY = '#f1e3d3', LINE = '#c9b8a4', IN = '#e4d5c3', DARK = '#1f1f1f';
+  function cabSvg(kind, W, H) {
+    const cw = 271, ch = 232, pad = 14;
+    const s = Math.min((W - pad * 2) / cw, (H - pad * 2) / ch);
+    const ox = (W - cw * s) / 2, oy = (H - ch * s) / 2;
+    const X = v => (ox + v * s).toFixed(1), Y = v => (oy + (ch - v) * s).toFixed(1), L = v => (v * s).toFixed(1);
+    const r = (x, y, w, h, f, st, sw) => `<rect x="${X(x)}" y="${Y(y + h)}" width="${L(w)}" height="${L(h)}" fill="${f}" stroke="${st || LINE}" stroke-width="${sw || 0.8}"/>`;
+    const ln = (x1, y1, x2, y2, st, sw) => `<line x1="${X(x1)}" y1="${Y(y1)}" x2="${X(x2)}" y2="${Y(y2)}" stroke="${st}" stroke-width="${sw}" stroke-linecap="round"/>`;
+    const cols = [[0, 91], [91, 89], [180, 91]];
+    const plinth = 9;
+    let p = '';
+    if (kind === 'bp') {
+      p += r(0, 0, cw, ch, '#e8eef6', '#334155', 1.2);
+      cols.forEach(([x, w]) => { p += r(x, 0, w, ch, 'none', '#334155', 1); });
+      [75, 169, 200].forEach(y => { p += ln(91, y, 180, y, '#334155', 1); });
+      [[0, 91], [180, 91]].forEach(([x, w]) => { [80, 160, 200].forEach(y => { p += ln(x, y, x + w, y, '#334155', 1); }); p += ln(x + 4, 150, x + w - 4, 150, '#334155', 1.6); });
+      p += ln(94, 79, 94, 165, '#d97706', 2); p += ln(177, 79, 177, 165, '#d97706', 2);
+      return p + `<text x="${X(cw / 2)}" y="${(oy + ch * s + 12).toFixed(1)}" text-anchor="middle" font-size="9" fill="#334155">2710</text>`;
+    }
+    p += r(0, 0, cw, plinth, BODY);
+    if (kind === 'closed') {
+      [[0, 45.5], [45.5, 45.5], [180, 45.5], [225.5, 45.5]].forEach(([x, w], i) => {
+        p += r(x, plinth, w, ch - plinth, BODY);
+        const hx = (i % 2 === 0) ? x + w - 3 : x + 3;
+        if (i === 1 || i === 2) p += ln(i === 1 ? x + 3 : x + w - 3, 120, i === 1 ? x + 3 : x + w - 3, 140, DARK, 1.6);
+      });
+      p += r(91, 200, 44.5, 32, BODY); p += r(135.5, 200, 44.5, 32, BODY); p += ln(135.5, 206, 135.5, 222, DARK, 1.6);
+      p += r(91, 75, 89, 125, IN); p += r(96, 80, 79, 115, BODY);
+      [0, 1, 2].forEach(i => { const y = plinth + i * 22; p += r(91, y, 89, 22, BODY); p += ln(125, y + 14, 146, y + 14, DARK, 1.6); });
+    } else {
+      p += r(0, plinth, cw, ch - plinth, IN);
+      cols.forEach(([x, w]) => { p += r(x, plinth, w, ch - plinth, 'none'); });
+      [[0, 91], [180, 91]].forEach(([x, w]) => {
+        [200, 216].forEach(y => { p += r(x + 6, y, w - 12, 10, '#fff', 'none'); });
+        p += r(x + 2, 160, w - 4, 2, BODY);
+        p += ln(x + 4, 152, x + 28, 152, '#555', 2.2);
+        p += r(x + 28, 70, 2, 90, BODY);
+        [70, 95, 120].forEach(y => { p += r(x + 30, y, w - 32, 2, BODY); });
+        [0, 1, 2].forEach(i => { p += r(x + 3, plinth + 2 + i * 20, w - 6, 18, BODY); });
+      });
+      p += r(91, 75, 89, 125, BODY); p += r(96, 80, 79, 115, '#fff');
+      p += ln(97.5, 81, 97.5, 194, '#fbbf24', 2.2); p += ln(173.5, 81, 173.5, 194, '#fbbf24', 2.2);
+      p += `<circle cx="${X(168)}" cy="${Y(189)}" r="5" fill="#fbbf24" stroke="#fff" stroke-width="1.5"/>`;
+      p += r(91, plinth, 89, 66, '#fff');
+      [169, 200].forEach(y => { p += r(91, y, 89, 2, BODY); });
+      [176, 206].forEach(y => { p += r(97, y, 77, 18, '#fff', 'none'); });
+    }
+    return p;
+  }
+  document.querySelectorAll('svg[data-cab]').forEach(el => {
+    el.innerHTML = cabSvg(el.dataset.cab, +el.getAttribute('width'), +el.getAttribute('height'));
+  });
+
+  const cabs = [
+    { n: 1, model: 'AB3', place: 'בין קירות', dims: '271 × 232 × 60', cost: '5,899', inst: '770', notes: 'ארון בין קירות בנוי מ-3 חלקים', led: 1 },
+    { n: 2, model: 'AB3', place: 'בין קירות', dims: '271 × 232 × 60', cost: '5,899', inst: '770', notes: '', led: 1 },
+    { n: 3, model: 'מאיה', place: 'קיר חופשי', dims: '154 × 232 × 60', cost: '4,386', inst: '440', notes: '', led: 0 }
+  ];
+  document.getElementById('c-cards').innerHTML = cabs.map(c => `
+    <div class="c-card">
+      <div class="c-head"><h2>ארון מס' ${c.n} — ${c.model}</h2><span class="cost-mini">רכש <span class="num">₪${c.cost}</span> · התקנה <span class="num">₪${c.inst}</span></span></div>
+      <div class="c-body">
+        <div class="c-main">
+          <div class="c-keys">
+            <div class="c-key"><b>מידות ר×ג×ע</b><span class="num">${c.dims}</span></div>
+            <div class="c-key"><b>מיקום</b>${c.place}</div>
+            <div class="c-key"><b>חומר</b>מלמין</div>
+            <div class="c-key"><b>צוקל</b>צוקל רגיל</div>
+            <div class="c-key"><b>ידיות</b>רוכבת שחור מט</div>
+          </div>
+          <table class="c-tbl">
+            <tr><th class="rowh" rowspan="2">גוונים</th><th>גוף וצוקל</th><th>פנים</th><th>חזיתות</th><th>גב</th><th>כוורת</th><th>שולחן</th></tr>
+            <tr><td>759</td><td>759</td><td>759</td><td>לבן מט 2100</td><td>759</td><td>—</td></tr>
+          </table>
+          <table class="c-tbl">
+            <tr><th class="rowh" rowspan="2">תכולה</th><th>מג' חיצ'</th><th>מג' פנים</th><th>מדפים נשלפים</th><th>מוטות</th><th>סורבטו</th><th>לדים</th></tr>
+            <tr><td>3</td><td>6</td><td>9</td><td>2</td><td>0</td><td class="${c.led ? 'led' : ''}">${c.led ? c.led + ' זוג' : '—'}</td></tr>
+          </table>
+          ${c.notes ? `<div class="c-notes"><b>הערות:</b> ${c.notes}</div>` : ''}
+        </div>
+        <div class="c-side"><div class="cap">חוץ / פנים</div><svg data-cab2="closed" width="136" height="70"></svg><svg data-cab2="open" width="136" height="70"></svg></div>
+      </div>
+    </div>`).join('');
+  document.querySelectorAll('svg[data-cab2]').forEach(el => {
+    el.innerHTML = cabSvg(el.dataset.cab2, +el.getAttribute('width'), +el.getAttribute('height'));
+  });
+})();
+</script>
+</body>
+</html>
