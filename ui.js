@@ -9026,7 +9026,8 @@ function _outlineCabinetPartsOnCanvas(ren, scn, cam) {
     const tmp = document.createElement('canvas');
     tmp.width = w; tmp.height = h;
     const tctx = tmp.getContext('2d');
-    const r = Math.max(3, Math.round(w / 300));
+    const r = Math.max(2, Math.round(w / 600));
+    const alpha = 0.55;
     try {
         others.forEach(function(c) { c.visible = false; });
         scn.background = new THREE.Color(0x000000);
@@ -9045,7 +9046,9 @@ function _outlineCabinetPartsOnCanvas(ren, scn, cam) {
             for (let i = 0; i < mask.length; i++) {
                 if (mask[i] && !inner[i]) {
                     const j = i * 4;
-                    d[j] = R; d[j + 1] = G; d[j + 2] = B; d[j + 3] = 255;
+                    d[j] = Math.round(d[j] + (R - d[j]) * alpha);
+                    d[j + 1] = Math.round(d[j + 1] + (G - d[j + 1]) * alpha);
+                    d[j + 2] = Math.round(d[j + 2] + (B - d[j + 2]) * alpha);
                 }
             }
         });
