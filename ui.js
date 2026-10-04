@@ -8935,6 +8935,94 @@ function _getSideWingCaptureViews() {
     return views;
 }
 
+/** Trim the uniform background around the rendered cabinet (call right after render — WebGL buffer is cleared afterwards). */
+function _cropCanvasToContent(src, pad) {
+    const w = src.width, h = src.height;
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const g = c.getContext('2d');
+    g.drawImage(src, 0, 0);
+    let px;
+    try { px = g.getImageData(0, 0, w, h).data; } catch (e) { return src.toDataURL('image/png'); }
+    const bg = [px[0], px[1], px[2], px[3]];
+    let minX = w, minY = h, maxX = -1, maxY = -1;
+    for (let y = 0; y < h; y += 2) {
+        for (let x = 0; x < w; x += 2) {
+            const i = (y * w + x) * 4;
+            const diff = Math.abs(px[i] - bg[0]) + Math.abs(px[i + 1] - bg[1]) + Math.abs(px[i + 2] - bg[2]) + Math.abs(px[i + 3] - bg[3]);
+            if (diff > 24) {
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+            }
+        }
+    }
+    if (maxX < 0) return c.toDataURL('image/png');
+    minX = Math.max(0, minX - pad); minY = Math.max(0, minY - pad);
+    maxX = Math.min(w - 1, maxX + pad); maxY = Math.min(h - 1, maxY + pad);
+    const out = document.createElement('canvas');
+    out.width = maxX - minX + 1; out.height = maxY - minY + 1;
+    out.getContext('2d').drawImage(c, minX, minY, out.width, out.height, 0, 0, out.width, out.height);
+    return out.toDataURL('image/png');
+}
+
+/** 45° view into the inner corner of a corner cabinet so both fronts show in one shot. */
+function _getCornerAngleCaptureView(focusX) {
+    const pid = state.presetId || '';
+    if (pid !== 'corner-left' && pid !== 'corner-right') return null;
+    const wings = state.wings || {};
+    const c = wings.center;
+    if (!c) return null;
+    const cW = c.width || state.width || 160;
+    const cD = c.depth || state.depth || 54;
+    const rects = [[-cW / 2, cW / 2, -cD / 2, cD / 2]];
+    let maxH = _wingHeightFromData(c, state.globalHeight);
+    ['left', 'right'].forEach(function(side) {
+        const w = wings[side];
+        if (!w) return;
+        const L = side === 'left';
+        const edge = L ? -cW / 2 : cW / 2;
+        const wW = w.width || 160;
+        const wD = w.depth || cD;
+        const hasCols = Array.isArray(w.columns) && w.columns.length > 0;
+        const pos = w.wingPosition || 'side';
+        maxH = Math.max(maxH, _wingHeightFromData(w, state.globalHeight));
+        if (pos === 'full_corner' && w.fullCorner) {
+            const fc = w.fullCorner.size || 100;
+            rects.push(L ? [edge - fc, edge, -cD / 2, -cD / 2 + fc] : [edge, edge + fc, -cD / 2, -cD / 2 + fc]);
+            if (hasCols) {
+                rects.push(L ? [edge - fc, edge - fc + wD, -cD / 2 + fc, -cD / 2 + fc + wW]
+                             : [edge + fc - wD, edge + fc, -cD / 2 + fc, -cD / 2 + fc + wW]);
+            }
+        } else if (hasCols && pos === 'front') {
+            rects.push(L ? [edge, edge + wD, cD / 2, cD / 2 + wW] : [edge - wD, edge, cD / 2, cD / 2 + wW]);
+        } else if (hasCols) {
+            rects.push(L ? [edge - wD, edge, -cD / 2, -cD / 2 + wW] : [edge, edge + wD, -cD / 2, -cD / 2 + wW]);
+        }
+    });
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    rects.forEach(function(r) { x0 = Math.min(x0, r[0]); x1 = Math.max(x1, r[1]); z0 = Math.min(z0, r[2]); z1 = Math.max(z1, r[3]); });
+    const dirX = pid === 'corner-right' ? -1 : 1;
+    let pMin = Infinity, pMax = -Infinity;
+    rects.forEach(function(r) {
+        [[r[0], r[2]], [r[0], r[3]], [r[1], r[2]], [r[1], r[3]]].forEach(function(p) {
+            const v = (p[0] * -dirX + p[1]) / Math.SQRT2;
+            pMin = Math.min(pMin, v); pMax = Math.max(pMax, v);
+        });
+    });
+    const tx = (x0 + x1) / 2 + (focusX || 0);
+    const tz = (z0 + z1) / 2;
+    return {
+        id: 'corner45',
+        camPos: [tx + dirX, maxH * 0.72, tz + 1],
+        camTarget: [tx, maxH * 0.5, tz],
+        fitH: maxH + 140,
+        fitW: (pMax - pMin) * 1.15 + 80,
+        crop: true
+    };
+}
+
 function _captureFrameAtView(cam, ctrl, ren, scn, view, hasDoors) {
     const fitH = view.fitH || 360;
     const fitW = view.fitW || 350;
@@ -8995,7 +9083,7 @@ function _captureFrameAtView(cam, ctrl, ren, scn, view, hasDoors) {
     // Double-render so materials/textures settle (avoids blank/white captures)
     ren.render(scn, cam);
     ren.render(scn, cam);
-    const dataUrl = ren.domElement.toDataURL('image/png');
+    const dataUrl = view.crop ? _cropCanvasToContent(ren.domElement, 18) : ren.domElement.toDataURL('image/png');
 
     state.wingEditMode = savedWingEdit;
     state.activeWing = savedActiveWing;
@@ -9195,6 +9283,14 @@ window._captureCabinetPreviewImages = function() {
         imgDoors: _captureFrameAtView(cam, ctrl, ren, scn, view, true),
         imgOpen: _captureFrameAtView(cam, ctrl, ren, scn, view, false)
     }));
+    let cornerAngle = null;
+    const cornerView = _getCornerAngleCaptureView(focusX);
+    if (cornerView) {
+        cornerAngle = {
+            imgDoors: _captureFrameAtView(cam, ctrl, ren, scn, cornerView, true),
+            imgOpen: _captureFrameAtView(cam, ctrl, ren, scn, cornerView, false)
+        };
+    }
     window._spaceCaptureCompanionOpacity = null;
 
     // Shared-space shot: all cabinets in the pair framed together (open + closed)
@@ -9246,6 +9342,7 @@ window._captureCabinetPreviewImages = function() {
         imgDoors: imgWithDoors,
         imgOpen: imgNoDoors,
         wingPreviews,
+        cornerAngle,
         multiViewPages,
         multiViewLabels,
         multiViewSVG,
@@ -9284,6 +9381,8 @@ window._cartItemNeedsMediaRefresh = function(itemObj) {
         }
     }
     if (!spec.multiViewPages || !spec.multiViewPages.length) return true;
+    const pid = itemObj.rawState.presetId;
+    if ((pid === 'corner-left' || pid === 'corner-right') && !(spec.cornerAngle && _cartImageValid(spec.cornerAngle.imgDoors))) return true;
     return false;
 };
 
@@ -9502,6 +9601,7 @@ window._refreshCartMediaForPrint = async function(opts) {
                 itemObj.spec.multiViewPages = media.multiViewPages;
                 itemObj.spec.multiViewLabels = media.multiViewLabels || [];
             }
+            itemObj.spec.cornerAngle = media.cornerAngle || null;
             if (media.multiViewSVG) itemObj.spec.multiViewSVG = media.multiViewSVG;
             if (media.captureVer) itemObj.spec.captureVer = media.captureVer;
 
@@ -11120,6 +11220,7 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
             imgSpaceDoors: (preview && preview.imgSpaceDoors) || null,
             imgSpaceOpen: (preview && preview.imgSpaceOpen) || null,
             wingPreviews: wingPreviews,
+            cornerAngle: (preview && preview.cornerAngle) || null,
             captureVer: (preview && preview.captureVer) || 4,
             corner: (function() {
                 const cu = _cornerUnitFromSources(null, null, state);
@@ -11945,6 +12046,7 @@ window.duplicateCartItem = function(index) {
         clone.spec.multiViewPages = [];
         clone.spec.multiViewLabels = [];
         clone.spec.wingPreviews = [];
+        clone.spec.cornerAngle = null;
         delete clone.spec.captureVer;
     }
     if (clone.spec && clone.spec.customName) {
@@ -12059,6 +12161,7 @@ function _performCartSplit(src, index, pieceUids) {
         spec.imgDoors = null;
         spec.imgOpen = null;
         spec.wingPreviews = [];
+        spec.cornerAngle = null;
         spec.multiViewSVG = null;
         spec.multiViewPages = [];
         spec.multiViewLabels = [];
@@ -13399,6 +13502,93 @@ function _muPartCardsHtml(item, parts, bp) {
     </div>`;
 }
 
+/** Crop a stored blueprint SVG to its drawing (drops the page frame, titles and page number) so it can be printed larger. */
+function _muCropBlueprintSvg(svgStr) {
+    if (typeof document === 'undefined' || !document.body) return null;
+    const host = document.createElement('div');
+    host.style.cssText = 'position:absolute;left:-10000px;top:0;width:1200px;height:800px;visibility:hidden;';
+    host.innerHTML = svgStr;
+    document.body.appendChild(host);
+    try {
+        const el = host.querySelector('svg');
+        if (!el) return null;
+        Array.from(el.children).forEach(function(k) {
+            const tag = k.tagName.toLowerCase();
+            if (tag === 'rect' && k.getAttribute('width') === '1200' && k.getAttribute('height') === '800' && !k.getAttribute('x')) k.remove();
+            else if (tag === 'text' && (parseFloat(k.getAttribute('y')) <= 60 || /^עמוד\s/.test(k.textContent || ''))) k.remove();
+        });
+        const b = el.getBBox();
+        if (!b || !b.width || !b.height) return null;
+        const pad = 12;
+        const vb = [b.x - pad, b.y - pad, b.width + pad * 2, b.height + pad * 2];
+        el.setAttribute('viewBox', vb.map(function(v) { return v.toFixed(1); }).join(' '));
+        el.removeAttribute('width');
+        el.removeAttribute('style');
+        el.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+        return { svg: el.outerHTML, w: vb[2], h: vb[3] };
+    } catch (e) {
+        return null;
+    } finally {
+        host.remove();
+    }
+}
+
+/** All part blueprints on one A4 sheet; picks the column count that gives the drawings the most area. */
+function _muBlueprintSheetHtml(entries, titleText) {
+    const W = 172, H = 236, gap = 5, headH = 8;
+    const n = entries.length;
+    let best = null;
+    for (let c = 1; c <= n; c++) {
+        const r = Math.ceil(n / c);
+        const cw = (W - gap * (c - 1)) / c;
+        const ch = (H - gap * (r - 1)) / r - headH;
+        const area = entries.reduce(function(sum, e) {
+            const s = Math.min(cw / e.w, ch / e.h);
+            return sum + s * s * e.w * e.h;
+        }, 0);
+        if (!best || area > best.area) best = { c: c, cw: cw, ch: ch, area: area };
+    }
+    const rowH = [];
+    entries.forEach(function(e, i) {
+        const s = Math.min(best.cw / e.w, best.ch / e.h);
+        const r = Math.floor(i / best.c);
+        rowH[r] = Math.max(rowH[r] || 0, s * e.h);
+    });
+    return `<div class="mu-sheet" style="page-break-after:always;page-break-inside:avoid;">
+        <div class="mu-sheet-t"><span>שרטוטים — כל החלקים</span><small>${_escPrintHtml(titleText)}</small></div>
+        <div class="mu-sheet-g" style="grid-template-columns:repeat(${best.c},1fr);">${entries.map(function(e, i) {
+            const h = rowH[Math.floor(i / best.c)];
+            return `<div class="mu-sheet-c"><div class="mu-bp-h"><span>${e.head}</span></div><div class="mu-sheet-b" style="height:${h.toFixed(1)}mm;">${e.svg}</div></div>`;
+        }).join('')}</div>
+    </div>`;
+}
+
+/** Corner cabinets: 45° closed/open page, then one sheet with every part's blueprint as large as fits. */
+function _muCornerPagesHtml(item, parts, bp, titleText) {
+    const ang = item.cornerAngle || {};
+    const doors = ang.imgDoors || item.imgDoors;
+    const open = ang.imgOpen || item.imgOpen;
+    const imgs = [[doors, 'סגור — עם דלתות'], [open, 'פתוח — ללא דלתות']].filter(function(x) { return x[0]; });
+    let html = imgs.length ? `<div class="cmp-block mu-angle-page" style="page-break-after:always;">
+        <div class="cmp-bar"><span>${_escPrintHtml(titleText)}</span><small>${ang.imgDoors ? 'מבט 45° — שני הצדדים' : 'הדמיה'}</small></div>
+        ${imgs.map(function(x) { return `<div class="mu-angle"><div class="cmp-cap">${x[1]}</div><img src="${x[0]}" alt=""></div>`; }).join('')}
+    </div>` : '';
+    if (!bp.labeled) return html + _printCabinetBlueprintPagesHtml(item, titleText);
+    const entries = [];
+    const leftovers = [];
+    parts.forEach(function(p) {
+        (bp.byPart[p.n] || []).forEach(function(e) {
+            const crop = _muCropBlueprintSvg(e.svg);
+            if (crop) entries.push({ head: `${_muBadgeHtml(p)}${_escPrintHtml(p.label)}`, svg: crop.svg, w: crop.w, h: crop.h });
+            else leftovers.push(e);
+        });
+    });
+    if (entries.length) html += _muBlueprintSheetHtml(entries, titleText);
+    const rest = leftovers.concat(bp.rest);
+    if (rest.length) html += _muBlueprintPagesHtml({ top: [], byPart: {}, rest: rest }, parts, titleText);
+    return html;
+}
+
 /** Compact factory block for corner cabinets and walk-in closets: shared spec once, plan, parts table, per-part images, numbered blueprints. */
 function _buildCompactMultiUnitHtml(o) {
     const item = o.item;
@@ -13429,7 +13619,11 @@ function _buildCompactMultiUnitHtml(o) {
         ? `<div class="cmp-sec">הערות</div><div class="cmp-notes">${_escPrintHtml(g.notes.join('\n'))}</div>`
         : '';
     const bp = _muBlueprintIndex(item, parts);
-    const bpHtml = bp.labeled ? _muBlueprintPagesHtml(bp, parts, o.titleText) : _printCabinetBlueprintPagesHtml(item, o.titleText);
+    const isCorner = rs.presetId === 'corner-left' || rs.presetId === 'corner-right';
+    const afterHtml = isCorner
+        ? _muCornerPagesHtml(item, parts, bp, o.titleText)
+        : _muPartCardsHtml(item, parts, bp)
+            + (bp.labeled ? _muBlueprintPagesHtml(bp, parts, o.titleText) : _printCabinetBlueprintPagesHtml(item, o.titleText));
     return `<div class="cmp-block mu-block" style="page-break-after:always;">
         <div class="cmp-bar"><span>${_escPrintHtml(o.titleText)}</span><small>${kindLbl} · ${parts.length} חלקים</small></div>
         <div class="mu-top">
@@ -13441,8 +13635,7 @@ function _buildCompactMultiUnitHtml(o) {
         ${notes}
         ${o.priceStrip || ''}
     </div>
-    ${_muPartCardsHtml(item, parts, bp)}
-    ${bpHtml}`;
+    ${afterHtml}`;
 }
 
 function _printSpecRowsHtmlEditable(rows, cartIndex) {
@@ -14204,6 +14397,16 @@ function _buildPrintHTML(mode) {
   .mu-card-i img { width: 100%; height: 190px; object-fit: contain; display: block; background: #fff; }
   .mu-card-i svg { width: 100% !important; height: 190px !important; display: block; }
   .mu-card-i figcaption { font-size: 0.7rem; color: #64748b; }
+  .mu-angle { margin-bottom: 4mm; break-inside: avoid; page-break-inside: avoid; }
+  .mu-angle img { width: 100%; height: 108mm; object-fit: contain; display: block; background: #fff; border: 1px solid #e2e8f0; border-radius: 4px; }
+  .mu-sheet { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .mu-sheet-t { display: flex; justify-content: space-between; align-items: baseline; background: #1e3a5f; color: #fff; padding: 5px 12px; border-radius: 6px; font-weight: 800; margin-bottom: 3mm; }
+  .mu-sheet-t small { font-weight: 600; opacity: 0.85; }
+  .mu-sheet-g { display: grid; gap: 5mm; width: 172mm; max-width: 100%; margin: 0 auto; }
+  .mu-sheet-c { break-inside: avoid; page-break-inside: avoid; }
+  .mu-sheet-c .mu-bp-h { height: 8mm; padding: 0 10px; }
+  .mu-sheet-b { border: 2px solid #93c5fd; background: #fff; overflow: hidden; }
+  .mu-sheet-b svg { width: 100% !important; height: 100% !important; display: block; }
   .mu-bp.is-first { margin-bottom: 16px; }
   .mu-bp-h { display: flex; justify-content: space-between; align-items: center; background: #e8f0fe; border: 1px solid #93c5fd; border-bottom: none; padding: 6px 10px; font-weight: 800; color: #1e3a5f; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .mu-bp-h small { font-weight: 600; color: #475569; }
