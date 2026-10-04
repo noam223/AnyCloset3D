@@ -9076,7 +9076,7 @@ function _orderPrintPreviewImagesHtml(item, rawState, opts) {
     const imgStyle = 'flex:1;min-height:0;width:100%;object-fit:contain;border:1px solid #e2e8f0;border-radius:4px;';
     const lblStyle = 'font-size:0.85rem;font-weight:600;color:#475569;margin-bottom:4px;padding:4px 8px;background:#f1f5f8;border-radius:4px;';
     const wrapStyle = 'flex:1;display:flex;flex-direction:column;min-height:0;';
-    let html = `
+    let html = opts.extrasOnly ? '' : `
                     <div style="${wrapStyle}">
                         <div style="${lblStyle}">${centerOutLabel}</div>
                         <img src="${item.imgDoors}" style="${imgStyle}" alt="ארון סגור">
@@ -13025,6 +13025,86 @@ function _buildPagedCabinetSpecHtml(opts) {
     return html;
 }
 
+const _COMPACT_CHIP_IDS = ['drawersExt', 'drawersInt', 'shelves', 'hangingRods', 'ledPairs', 'writingDeskDrawerCount'];
+const _COMPACT_CHIP_LABELS = { hangingRods: 'מוטות תלייה', ledPairs: 'זוגות לדים' };
+
+function _compactRowBaseId(id) {
+    return String(id || '').replace(/^w_[A-Za-z]+_/, '');
+}
+
+/** Group spec rows for the compact factory layout: per cabinet → structure, finishes, hardware rows and count chips. */
+function _compactSpecUnitsFromRows(rows) {
+    const units = [];
+    const notes = [];
+    let cur = null;
+    let bucket = 'general';
+    const newUnit = function(title, extra) {
+        cur = { title: title || '', extra: !!extra, general: [], finishes: [], hardware: [], chips: [] };
+        units.push(cur);
+    };
+    (rows || []).forEach(function(r) {
+        if (r.section) {
+            const lbl = r.label || '';
+            if (/^מפרט ארון/.test(lbl)) { newUnit(lbl); bucket = 'general'; return; }
+            if (r.id === '_sec_upper_finishes' || r.id === '_sec_extra') { newUnit(lbl, true); bucket = 'finishes'; return; }
+            bucket = lbl.indexOf('פרזול') === 0 ? 'hardware' : 'finishes';
+            return;
+        }
+        const base = _compactRowBaseId(r.id);
+        if (base === 'cabinetNotes') { if (String(r.value || '').trim()) notes.push(r.value); return; }
+        if (!cur) newUnit('');
+        if (_COMPACT_CHIP_IDS.indexOf(base) >= 0) cur.chips.push(r);
+        else cur[bucket].push(r);
+    });
+    return { units: units, notes: notes };
+}
+
+function _compactSpecListHtml(title, rows, extraHtml) {
+    if (!rows.length && !extraHtml) return '';
+    const body = rows.map(function(r) {
+        const val = _escPrintHtml(r.value).replace(/\n/g, '<br>');
+        return `<div class="cmp-row"><span>${_escPrintHtml(r.label)}</span><span${r.rtl ? ' dir="rtl"' : ''}>${val}</span></div>`;
+    }).join('');
+    return `<div class="cmp-sec">${_escPrintHtml(title)}</div>${body}${extraHtml || ''}`;
+}
+
+function _compactSpecChipsHtml(rows) {
+    if (!rows.length) return '';
+    return `<div class="cmp-chips">${rows.map(function(r) {
+        const base = _compactRowBaseId(r.id);
+        const raw = base === 'ledPairs'
+            ? String(r.value || '').replace(/^\s*זוג לדים אחד\s*$/, '1').replace(/\s*זוגות לדים\s*$/, '')
+            : String(r.value || '');
+        const m = /^\s*(\d+)\s*(.*)$/.exec(raw);
+        const rest = m ? m[2].replace(/^יחידות\s*/, '').trim() : '';
+        const lbl = (_COMPACT_CHIP_LABELS[base] || r.label) + (rest ? ' ' + rest : '');
+        const inner = m
+            ? `<i>${m[1]}</i>${_escPrintHtml(lbl)}`
+            : `${_escPrintHtml(r.label)}: <i>${_escPrintHtml(r.value)}</i>`;
+        return `<span class="cmp-chip${base === 'ledPairs' ? ' is-led' : ''}">${inner}</span>`;
+    }).join('')}</div>`;
+}
+
+/** Compact factory spec list: structure, finishes, hardware chips, notes and price strip. */
+function _buildCompactCabinetSpecHtml(opts) {
+    const g = _compactSpecUnitsFromRows(opts.specRows);
+    const units = g.units.map(function(u) {
+        if (u.extra) {
+            return `<div class="cmp-unit">${_compactSpecListHtml(u.title, u.finishes.concat(u.general, u.hardware))}</div>`;
+        }
+        const head = u.title ? `<div class="cmp-unit-h">${_escPrintHtml(u.title)}</div>` : '';
+        return `<div class="cmp-unit">${head}`
+            + _compactSpecListHtml('מבנה', u.general)
+            + _compactSpecListHtml('גוונים וגימורים', u.finishes)
+            + _compactSpecListHtml('פרזול ותכולה', u.hardware, _compactSpecChipsHtml(u.chips))
+            + `</div>`;
+    }).join('');
+    const notes = g.notes.length
+        ? `<div class="cmp-sec">הערות</div><div class="cmp-notes">${_escPrintHtml(g.notes.join('\n')).replace(/\n/g, '<br>')}</div>`
+        : '';
+    return `${units}${notes}${opts.priceStrip || ''}`;
+}
+
 function _printSpecRowsHtmlEditable(rows, cartIndex) {
     return rows.map(r => {
         if (r.section) return _printSectionHeader(r.label, '');
@@ -13494,6 +13574,41 @@ function _printSingleCabinetBlockHtml(itemObj, index, opts) {
     const numericPrice = parseInt(String(item.price || '').replace('₪', '').replace(/,/g, ''), 10) || 0;
     const itemInstall = item.installPrice || 0;
     const specRows = _resolvePrintSpecRows(itemObj);
+    const blockResult = function(html) {
+        return {
+            html: html,
+            numericPrice: numericPrice,
+            itemInstall: itemInstall,
+            itemCost: item.costPrice ? (parseInt(String(item.costPrice).replace('₪', '').replace(/,/g, ''), 10) || 0) : 0
+        };
+    };
+    if (opts.compact) {
+        const priceStrip = (hidePrices || !isFactory) ? ''
+            : `<div class="cmp-price"><span>מחיר התקנה ללקוח</span><span dir="ltr">₪${itemInstall.toLocaleString()}</span></div>`;
+        const firstBp = (item.multiViewPages && item.multiViewPages[0]) || item.multiViewSVG || '';
+        const bpThumb = firstBp
+            ? `<div class="cmp-bp-thumb"><div class="cmp-cap">שרטוט (תמונה ממוזערת)</div>${firstBp}</div>`
+            : '';
+        const extraImgs = centerOnlyImages ? '' : _orderPrintPreviewImagesHtml(item, itemObj.rawState, {
+            omitSpace: omitSpaceImages,
+            extrasOnly: true
+        });
+        return blockResult(`
+            <div class="cmp-block" style="page-break-after:always;">
+                <div class="cmp-bar">${_escPrintHtml(titleText)}</div>
+                <div class="cmp-wrap">
+                    <div class="cmp-spec">
+                        ${_buildCompactCabinetSpecHtml({ specRows: specRows, priceStrip: priceStrip })}
+                    </div>
+                    <div class="cmp-side">
+                        ${_orderPrintPreviewImagesHtml(item, itemObj.rawState, { centerOnly: true })}
+                        ${bpThumb}
+                    </div>
+                </div>
+                ${extraImgs.trim() ? `<div class="cmp-imgs">${extraImgs}</div>` : ''}
+            </div>
+            ${_printCabinetBlueprintPagesHtml(item, titleText)}`);
+    }
     const priceRows = hidePrices ? '' : isFactory
         ? `<tr><th style="background:#fef9c3;">מחיר התקנה ללקוח</th><td style="font-weight:bold;color:#713f12;font-size:1.1rem;text-align:right;">₪${(item.installPrice || 0).toLocaleString()}</td></tr>`
         : `<tr><th style="background:#eff6ff;">מחיר ארון ללקוח</th><td style="font-weight:bold;color:#1e3a5f;font-size:1.1rem;text-align:right;">₪${numericPrice.toLocaleString()}</td></tr>
@@ -13523,12 +13638,7 @@ function _printSingleCabinetBlockHtml(itemObj, index, opts) {
                 </div>
             </div>
             ${_printCabinetBlueprintPagesHtml(item, titleText)}`;
-    return {
-        html: html,
-        numericPrice: numericPrice,
-        itemInstall: itemInstall,
-        itemCost: item.costPrice ? (parseInt(String(item.costPrice).replace('₪', '').replace(/,/g, ''), 10) || 0) : 0
-    };
+    return blockResult(html);
 }
 
 function _printSpaceGroupBlockHtml(group, opts) {
@@ -13579,6 +13689,7 @@ function _printSpaceGroupBlockHtml(group, opts) {
         const block = _printSingleCabinetBlockHtml(m.itemObj, m.index, {
             isFactory: opts.isFactory,
             hidePrices: opts.hidePrices,
+            compact: opts.compact,
             thStyle: thStyle,
             tdStyle: tdStyle,
             omitSpaceImages: true,
@@ -13611,6 +13722,7 @@ function _buildPrintHTML(mode) {
             const block = _printSpaceGroupBlockHtml(group, {
                 isFactory: isFactory,
                 hidePrices: _hidePrices,
+                compact: isFactory,
                 thStyle: thStyle,
                 tdStyle: tdStyle
             });
@@ -13623,6 +13735,7 @@ function _buildPrintHTML(mode) {
         const block = _printSingleCabinetBlockHtml(group.itemObj, group.index, {
             isFactory: isFactory,
             hidePrices: _hidePrices,
+            compact: isFactory,
             thStyle: thStyle,
             tdStyle: tdStyle,
             omitSpaceImages: false
@@ -13693,6 +13806,30 @@ function _buildPrintHTML(mode) {
   }
   .bp-page svg { width: 100% !important; height: auto !important; display: block; }
   .bp-page { width: 100%; overflow: hidden; }
+  .cmp-block, .cmp-block * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .cmp-bar { background: #1e3a5f; color: #fff; padding: 7px 14px; border-radius: 6px; font-size: 1.1rem; font-weight: 800; margin-bottom: 10px; }
+  .cmp-wrap { display: grid; grid-template-columns: 1.25fr 1fr; gap: 14px; align-items: start; }
+  .cmp-unit { margin-bottom: 6px; }
+  .cmp-unit-h { font-weight: 800; color: #1e3a5f; font-size: 0.95rem; padding: 4px 10px; background: #e8eef6; border-right: 4px solid #1e3a5f; border-radius: 4px; margin: 4px 0 2px; }
+  .cmp-sec { font-size: 0.8rem; font-weight: 800; color: #1e3a5f; border-bottom: 1.5px solid #1e3a5f; padding: 7px 0 2px; margin-bottom: 2px; break-after: avoid; page-break-after: avoid; }
+  .cmp-row { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; border-bottom: 1px dotted #cbd5e1; font-size: 0.85rem; break-inside: avoid; }
+  .cmp-row > span:first-child { color: #475569; flex-shrink: 0; }
+  .cmp-row > span:last-child { font-weight: 700; color: #0f172a; text-align: left; }
+  .cmp-chips { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 0 2px; }
+  .cmp-chip { border: 1px solid #cbd5e1; border-radius: 999px; padding: 2px 9px; font-size: 0.8rem; font-weight: 700; background: #f8fafc; }
+  .cmp-chip i { font-style: normal; color: #1e3a5f; font-size: 0.9rem; margin-left: 4px; }
+  .cmp-chip.is-led { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
+  .cmp-chip.is-led i { color: #b45309; }
+  .cmp-notes { font-size: 0.85rem; color: #78350f; padding: 4px 0 8px; white-space: normal; }
+  .cmp-price { display: flex; justify-content: space-between; background: #fef9c3; border: 1px solid #fde047; border-radius: 6px; padding: 6px 12px; font-weight: 800; color: #713f12; margin-top: 6px; }
+  .cmp-side { display: flex; flex-direction: column; gap: 8px; }
+  .cmp-side > div, .cmp-imgs > div { flex: none !important; break-inside: avoid; page-break-inside: avoid; }
+  .cmp-side img { flex: none !important; height: 200px; background: #fff; }
+  .cmp-cap { font-size: 0.85rem; font-weight: 600; color: #475569; margin-bottom: 4px; padding: 4px 8px; background: #f1f5f8; border-radius: 4px; }
+  .cmp-bp-thumb { border: 1px solid #e2e8f0; border-radius: 4px; padding: 4px; background: #fff; }
+  .cmp-bp-thumb svg { width: 100% !important; height: 200px !important; display: block; }
+  .cmp-imgs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+  .cmp-imgs img { flex: none !important; height: 230px; background: #fff; }
 </style>
 </head>
 <body>
