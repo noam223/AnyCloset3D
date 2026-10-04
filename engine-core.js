@@ -5741,6 +5741,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
 
         dividers.sort((a, b) => a.y - b.y);
         let prevY = startShelvesY; 
+        const _ledRowY = [];
 
         for (let r = 0; r <= dividers.length; r++) {
             const isLast = (r === dividers.length);
@@ -6635,7 +6636,27 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
             }
             // ==========================================
 
+            _ledRowY.push([prevY, topY]);
             prevY = isLast ? col.height : div.y + div.thick/2;
+        }
+
+        // LED pairs as real meshes so preview captures (print/quote images) include them
+        if (!isBP && Array.isArray(col.leds) && col.leds.length) {
+            const ledMat = new THREE.MeshBasicMaterial({ color: 0xffc94d });
+            col.leds.forEach(g => {
+                const bot = _ledRowY[g.startRow];
+                const top = _ledRowY[Math.min(g.endRow, _ledRowY.length - 1)];
+                if (!bot || !top) return;
+                const h = top[1] - bot[0] - 1;
+                if (h < 2) return;
+                const midY = (bot[0] + top[1]) / 2;
+                const stripGeo = new THREE.BoxGeometry(1.4, h, 1.4);
+                [-1, 1].forEach(s => {
+                    const strip = new THREE.Mesh(stripGeo, ledMat);
+                    strip.position.set(colCenterX + s * (col.width / 2 - 0.9), midY, bodyD / 2 - 2.5);
+                    _buildGroup.add(strip);
+                });
+            });
         }
 
         if (state.hasDoors && col.doors && col.doors.length > 0 && !isBP) {

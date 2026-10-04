@@ -837,7 +837,7 @@ function buildFullCornerUnit(side, wingData) {
     // ---- LED pairs: two glowing strips at the ends of the L opening, spanning the group's cells ----
     if (!isBP && Array.isArray(fc.leds) && fc.leds.length) {
         const cellY = [plinthH + t, ...shelvesY, colH - t];
-        const ledMat = new THREE.MeshBasicMaterial({ color: 0xfff1c4 });
+        const ledMat = new THREE.MeshBasicMaterial({ color: 0xffc94d });
         fc.leds.forEach(g => {
             const yBot = cellY[g.startRow];
             const yTop = cellY[g.endRow + 1];
