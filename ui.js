@@ -8935,6 +8935,57 @@ function _getSideWingCaptureViews() {
     return views;
 }
 
+/** Per-part colors; fills match the blueprint engine so prints, plan and 3D tint line up. */
+const _PART_COLORS = {
+    'wing:center': { fill: '#e8f0fe', stroke: '#2563eb' },
+    'wing:left': { fill: '#d1fae5', stroke: '#059669' },
+    'wing:right': { fill: '#fce7f3', stroke: '#db2777' },
+    'corner:left': { fill: '#fef3c7', stroke: '#d97706' },
+    'corner:right': { fill: '#ede9fe', stroke: '#7c3aed' },
+    'wing:sideCabinet': { fill: '#e0f2fe', stroke: '#0284c7' }
+};
+
+function _partColorByKey(key) {
+    return _PART_COLORS[key] || { fill: '#f1f5f9', stroke: '#1e3a5f' };
+}
+
+/** Tint each part of the built cabinet in its print color; returns the cloned materials to dispose after capture. */
+function _tintCabinetPartsForCapture() {
+    const root = window.cabinetGroup;
+    if (!root || typeof THREE === 'undefined') return [];
+    const clones = [];
+    const tints = {};
+    const tintFor = function(key) {
+        if (!tints[key]) tints[key] = new THREE.Color('#ffffff').lerp(new THREE.Color(_partColorByKey(key).stroke), 0.28);
+        return tints[key];
+    };
+    root.traverse(function(obj) {
+        if (!obj.isMesh || !obj.material) return;
+        let key = 'wing:center';
+        for (let a = obj; a && a !== root; a = a.parent) {
+            const u = a.userData || {};
+            if (u.isFullCorner) { key = 'corner:' + u.side; break; }
+            if (u.wingId) {
+                const id = String(u.wingId).replace(/^upperUnit_/, '');
+                key = (id === 'left' || id === 'right' || id === 'center') ? 'wing:' + id : 'wing:sideCabinet';
+                break;
+            }
+        }
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        if (mats.some(function(m) { return m && m.transparent && m.opacity === 0; })) return;
+        const tint = tintFor(key);
+        const next = mats.map(function(m) {
+            if (!m || !m.color) return m;
+            const c = m.clone();
+            c.color.multiply(tint);
+            clones.push(c);
+            return c;
+        });
+        obj.material = Array.isArray(obj.material) ? next : next[0];
+    });
+    return clones;
+}
+
 /** Trim the uniform background around the rendered cabinet (call right after render — WebGL buffer is cleared afterwards). */
 function _cropCanvasToContent(src, pad) {
     const w = src.width, h = src.height;
@@ -9019,7 +9070,8 @@ function _getCornerAngleCaptureView(focusX) {
         camTarget: [tx, maxH * 0.5, tz],
         fitH: maxH + 140,
         fitW: (pMax - pMin) * 1.15 + 80,
-        crop: true
+        crop: true,
+        tintParts: true
     };
 }
 
@@ -9080,10 +9132,12 @@ function _captureFrameAtView(cam, ctrl, ren, scn, view, hasDoors) {
     if (typeof doorMeshes !== 'undefined' && doorMeshes) {
         doorMeshes.forEach(function(m) { m.visible = !!hasDoors; });
     }
+    const tintClones = view.tintParts ? _tintCabinetPartsForCapture() : [];
     // Double-render so materials/textures settle (avoids blank/white captures)
     ren.render(scn, cam);
     ren.render(scn, cam);
     const dataUrl = view.crop ? _cropCanvasToContent(ren.domElement, 18) : ren.domElement.toDataURL('image/png');
+    tintClones.forEach(function(m) { m.dispose(); });
 
     state.wingEditMode = savedWingEdit;
     state.activeWing = savedActiveWing;
@@ -13245,8 +13299,12 @@ function _muParseDims(row, wing, rs) {
     };
 }
 
+function _muPartColor(p) {
+    return _partColorByKey((p.kind === 'corner' ? 'corner:' : 'wing:') + p.side);
+}
+
 function _muBadgeHtml(p) {
-    return `<span class="mu-badge${p.kind === 'corner' ? ' is-corner' : ''}">${p.n}</span>`;
+    return `<span class="mu-badge" style="background:${_muPartColor(p).stroke};">${p.n}</span>`;
 }
 
 /** Corner / walk-in parts in physical order (left wing → left corner → center → right corner → right wing → side cabinet). */
@@ -13340,8 +13398,9 @@ function _muPartsTableHtml(parts) {
         Object.keys(tot).forEach(function(k) { tot[k] += p[k] || 0; });
         const wTxt = p.kind === 'corner' ? `${p.w}×${p.w}` : String(p.w);
         const hang = p.hanging ? `${p.hanging}${p.hangingNote ? ` <small>(${_escPrintHtml(p.hangingNote)})</small>` : ''}` : num(0);
-        return `<tr${p.kind === 'corner' ? ' class="is-corner"' : ''}>
-            <td class="mu-name">${_muBadgeHtml(p)}${_escPrintHtml(p.label)}</td>
+        const col = _muPartColor(p);
+        return `<tr>
+            <td class="mu-name" style="background:${col.fill};box-shadow:inset -4px 0 0 ${col.stroke};">${_muBadgeHtml(p)}${_escPrintHtml(p.label)}</td>
             <td dir="ltr">${wTxt}</td><td dir="ltr">${p.h} / ${p.d}</td><td>${num(p.cols)}</td>
             <td>${num(p.drawersExt)}</td><td>${num(p.drawersInt)}</td><td>${num(p.shelves)}</td>
             <td>${hang}</td><td class="${p.leds ? 'mu-led' : ''}">${p.leds ? p.leds : '—'}</td>
@@ -13413,8 +13472,10 @@ function _muPlanSvg(rs, parts, W, H) {
     const Y = function(y) { return (top + y * s).toFixed(1); };
     let out = `<rect x="${X(minX) - 5}" y="${top - 7}" width="${((maxX - minX) * s + 10).toFixed(1)}" height="5" fill="#cbd5e1"/>`;
     shapes.forEach(function(sh) {
-        const stroke = sh.corner ? '#0f766e' : '#1e3a5f';
-        const fill = sh.corner ? '#ccfbf1' : '#dbeafe';
+        const part = parts.find(function(q) { return q.n === sh.n; });
+        const col = part ? _muPartColor(part) : _partColorByKey('');
+        const stroke = col.stroke;
+        const fill = col.fill;
         if (sh.corner) {
             const k = sh.cut;
             const x1 = sh.x + sh.w, y1 = sh.y + sh.h;
@@ -13491,8 +13552,9 @@ function _muPartCardsHtml(item, parts, bp) {
         if (bpEntry) cells.push(`<figure class="is-bp">${bpEntry.svg}<figcaption>שרטוט</figcaption></figure>`);
         if (!cells.length) return '';
         const dims = p.kind === 'corner' ? `${p.w}×${p.w}` : `${p.w} × ${p.d}`;
-        return `<div class="mu-card${p.kind === 'corner' ? ' is-corner' : ''}">
-            <div class="mu-card-h"><span>${_muBadgeHtml(p)}${_escPrintHtml(p.label)}</span><small dir="ltr">${dims}</small></div>
+        const col = _muPartColor(p);
+        return `<div class="mu-card" style="border-color:${col.stroke};">
+            <div class="mu-card-h" style="background:${col.fill};"><span>${_muBadgeHtml(p)}${_escPrintHtml(p.label)}</span><small dir="ltr">${dims}</small></div>
             <div class="mu-card-i">${cells.join('')}</div>
         </div>`;
     }).filter(Boolean);
@@ -13558,7 +13620,9 @@ function _muBlueprintSheetHtml(entries, titleText) {
         <div class="mu-sheet-t"><span>שרטוטים — כל החלקים</span><small>${_escPrintHtml(titleText)}</small></div>
         <div class="mu-sheet-g" style="grid-template-columns:repeat(${best.c},1fr);">${entries.map(function(e, i) {
             const h = rowH[Math.floor(i / best.c)];
-            return `<div class="mu-sheet-c"><div class="mu-bp-h"><span>${e.head}</span></div><div class="mu-sheet-b" style="height:${h.toFixed(1)}mm;">${e.svg}</div></div>`;
+            const cs = e.color ? ` style="background:${e.color.fill};border-color:${e.color.stroke};"` : '';
+            const bs = e.color ? `border-color:${e.color.stroke};` : '';
+            return `<div class="mu-sheet-c"><div class="mu-bp-h"${cs}><span>${e.head}</span></div><div class="mu-sheet-b" style="height:${h.toFixed(1)}mm;${bs}">${e.svg}</div></div>`;
         }).join('')}</div>
     </div>`;
 }
@@ -13579,7 +13643,7 @@ function _muCornerPagesHtml(item, parts, bp, titleText) {
     parts.forEach(function(p) {
         (bp.byPart[p.n] || []).forEach(function(e) {
             const crop = _muCropBlueprintSvg(e.svg);
-            if (crop) entries.push({ head: `${_muBadgeHtml(p)}${_escPrintHtml(p.label)}`, svg: crop.svg, w: crop.w, h: crop.h });
+            if (crop) entries.push({ head: `${_muBadgeHtml(p)}${_escPrintHtml(p.label)}`, color: _muPartColor(p), svg: crop.svg, w: crop.w, h: crop.h });
             else leftovers.push(e);
         });
     });
@@ -14375,12 +14439,10 @@ function _buildPrintHTML(mode) {
   .mu-plan { border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px; background: #fff; }
   .mu-plan svg { display: block; }
   .mu-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; border-radius: 50%; background: #1e3a5f; color: #fff; font-size: 0.72rem; font-weight: 800; margin-left: 6px; padding: 0 4px; vertical-align: middle; }
-  .mu-badge.is-corner { background: #0f766e; }
   .mu-parts { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.8rem; break-inside: avoid; }
   .mu-parts th { background: #1e3a5f; color: #fff; padding: 4px 3px; font-weight: 700; white-space: nowrap; }
   .mu-parts td { border-bottom: 1px solid #e2e8f0; padding: 4px 3px; text-align: center; font-weight: 700; }
   .mu-parts td.mu-name { text-align: right; white-space: nowrap; }
-  .mu-parts tr.is-corner td { background: #f0fdfa; }
   .mu-parts td.mu-led { background: #fffbeb; color: #b45309; }
   .mu-parts .mu-zero { color: #cbd5e1; font-weight: 400; }
   .mu-parts small { font-weight: 500; color: #64748b; }
