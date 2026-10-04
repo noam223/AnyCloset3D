@@ -8925,11 +8925,12 @@ function _getSideWingCaptureViews() {
         });
     };
 
-    if (pid === 'corner-left') addWing('left', state.wings.left);
-    else if (pid === 'corner-right') addWing('right', state.wings.right);
-    else if (pid === 'walkin') {
-        addWing('left', state.wings.left);
-        addWing('right', state.wings.right);
+    if (pid === 'corner-left' || pid === 'corner-right' || pid === 'walkin') {
+        ['left', 'right'].forEach(function(side) {
+            const w = state.wings[side];
+            const mainSide = pid === 'walkin' || pid === 'corner-' + side;
+            if (mainSide || (w && Array.isArray(w.columns) && w.columns.length)) addWing(side, w);
+        });
     }
     return views;
 }
@@ -9213,10 +9214,13 @@ window._captureCabinetPreviewImages = function() {
     }
 
     let multiViewPages = [];
+    let multiViewLabels = [];
     let multiViewSVG = null;
     try {
         if (typeof window._generateMultiViewBlueprintPages === 'function') {
-            multiViewPages = window._generateMultiViewBlueprintPages().map(pg => pg.svg);
+            const bpPages = window._generateMultiViewBlueprintPages();
+            multiViewPages = bpPages.map(pg => pg.svg);
+            multiViewLabels = bpPages.map(pg => pg.label || '');
         }
         if (typeof window._generateMultiViewBlueprintSVG === 'function') {
             multiViewSVG = window._generateMultiViewBlueprintSVG();
@@ -9243,6 +9247,7 @@ window._captureCabinetPreviewImages = function() {
         imgOpen: imgNoDoors,
         wingPreviews,
         multiViewPages,
+        multiViewLabels,
         multiViewSVG,
         imgSpaceDoors,
         imgSpaceOpen,
@@ -9436,6 +9441,7 @@ window._refreshCartBlueprintPagesForPrint = async function() {
             const pages = window._generateMultiViewBlueprintPages();
             if (pages && pages.length) {
                 itemObj.spec.multiViewPages = pages.map(function(pg) { return pg.svg; });
+                itemObj.spec.multiViewLabels = pages.map(function(pg) { return pg.label || ''; });
                 itemObj.spec.multiViewSVG = pages[0].svg;
             }
             await new Promise(function(r) { setTimeout(r, 0); });
@@ -9494,6 +9500,7 @@ window._refreshCartMediaForPrint = async function(opts) {
             }
             if (media.multiViewPages && media.multiViewPages.length) {
                 itemObj.spec.multiViewPages = media.multiViewPages;
+                itemObj.spec.multiViewLabels = media.multiViewLabels || [];
             }
             if (media.multiViewSVG) itemObj.spec.multiViewSVG = media.multiViewSVG;
             if (media.captureVer) itemObj.spec.captureVer = media.captureVer;
@@ -11052,13 +11059,19 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
         }
 
         let multiViewPages = [];
+        let multiViewLabels = [];
         let multiViewSVG = null;
         try {
             multiViewSVG = preview.multiViewSVG || ((typeof window._generateMultiViewBlueprintSVG === 'function')
                 ? window._generateMultiViewBlueprintSVG() : null);
-            multiViewPages = (preview.multiViewPages && preview.multiViewPages.length) ? preview.multiViewPages
-                : ((typeof window._generateMultiViewBlueprintPages === 'function')
-                ? window._generateMultiViewBlueprintPages().map(pg => pg.svg) : []);
+            if (preview.multiViewPages && preview.multiViewPages.length) {
+                multiViewPages = preview.multiViewPages;
+                multiViewLabels = preview.multiViewLabels || [];
+            } else if (typeof window._generateMultiViewBlueprintPages === 'function') {
+                const bpPages = window._generateMultiViewBlueprintPages();
+                multiViewPages = bpPages.map(pg => pg.svg);
+                multiViewLabels = bpPages.map(pg => pg.label || '');
+            }
         } catch (bpErr) {
             console.warn('[cart-snapshot] blueprint generation failed:', bpErr);
         }
@@ -11115,7 +11128,8 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
             })(),
             slidingDoor: slidingDoorSpec,
             multiViewSVG: multiViewSVG,
-            multiViewPages: multiViewPages
+            multiViewPages: multiViewPages,
+            multiViewLabels: multiViewLabels
         };
     return { spec: cabinetSpec, rawState: rawState };
 };
@@ -11929,6 +11943,7 @@ window.duplicateCartItem = function(index) {
         clone.spec.imgSpaceOpen = null;
         clone.spec.multiViewSVG = null;
         clone.spec.multiViewPages = [];
+        clone.spec.multiViewLabels = [];
         clone.spec.wingPreviews = [];
         delete clone.spec.captureVer;
     }
@@ -12046,6 +12061,7 @@ function _performCartSplit(src, index, pieceUids) {
         spec.wingPreviews = [];
         spec.multiViewSVG = null;
         spec.multiViewPages = [];
+        spec.multiViewLabels = [];
         const piece = { spec: spec, rawState: _buildSplitPieceRawState(rs, side, name, pieceUids && pieceUids[i]) };
         window._setCartItemHold(piece, held);
         return piece;
@@ -13105,6 +13121,328 @@ function _buildCompactCabinetSpecHtml(opts) {
     return `${units}${notes}${opts.priceStrip || ''}`;
 }
 
+const _MU_STRUCT_KEYS = ['material', 'plinthType'];
+const _MU_FINISH_KEYS = ['colorBody', 'colorInternal', 'colorExternal', 'colorBack', 'colorOpenCell', 'colorTopPanel', 'handle'];
+
+function _muParseCount(row, isLed) {
+    if (!row) return 0;
+    let v = String(row.value || '');
+    if (isLed) v = v.replace(/^\s*זוג לדים אחד\s*$/, '1');
+    const m = /^\s*(\d+)/.exec(v);
+    return m ? parseInt(m[1], 10) : 0;
+}
+
+function _muParseDims(row, wing, rs) {
+    const m = row ? /רוחב:\s*([\d.]+)[\s\S]*?גובה:\s*([\d.]+)[\s\S]*?עומק:\s*([\d.]+)/.exec(String(row.value || '')) : null;
+    if (m) return { w: +m[1], h: +m[2], d: +m[3] };
+    return {
+        w: (wing && wing.width) || 0,
+        h: _wingBodyHeightFromData(wing, (rs && rs.globalHeight) || 240),
+        d: (wing && wing.depth) || (rs && rs.depth) || 0
+    };
+}
+
+function _muBadgeHtml(p) {
+    return `<span class="mu-badge${p.kind === 'corner' ? ' is-corner' : ''}">${p.n}</span>`;
+}
+
+/** Corner / walk-in parts in physical order (left wing → left corner → center → right corner → right wing → side cabinet). */
+function _printMultiUnitParts(itemObj, specRows) {
+    const rs = itemObj.rawState || {};
+    const units = _enumeratePrintCabinetUnits(rs);
+    if (!units) return null;
+    const wings = rs.wings || {};
+    const g = _compactSpecUnitsFromRows(specRows);
+    const rowsByIndex = {};
+    g.units.forEach(function(u) {
+        const m = /^מפרט ארון\s+(\d+)/.exec(u.title || '');
+        if (!m) return;
+        const map = {};
+        u.general.concat(u.finishes, u.hardware, u.chips).forEach(function(r) { map[_compactRowBaseId(r.id)] = r; });
+        rowsByIndex[m[1]] = map;
+    });
+    const bySide = {};
+    units.forEach(function(u) { bySide[u.side] = u; });
+    const parts = [];
+    const addWing = function(side) {
+        const u = bySide[side];
+        if (!u) return;
+        const rows = rowsByIndex[String(u.index)] || {};
+        const dims = _muParseDims(rows.dimsStr, u.wing, rs);
+        const hangNote = rows.hangingRods ? ((/\(([^)]*)\)/.exec(rows.hangingRods.value || '') || [])[1] || '') : '';
+        parts.push({
+            kind: 'wing', side: side, label: u.label, rows: rows,
+            w: dims.w, h: dims.h, d: dims.d,
+            cols: (u.wing.columns || []).length,
+            drawersExt: _muParseCount(rows.drawersExt),
+            drawersInt: _muParseCount(rows.drawersInt),
+            shelves: _muParseCount(rows.shelves),
+            hanging: _muParseCount(rows.hangingRods),
+            hangingNote: hangNote,
+            leds: Math.max(0, _muParseCount(rows.ledPairs, true) - _countFullCornerLedPairs(u.wing))
+        });
+    };
+    const addCorner = function(side) {
+        const w = wings[side];
+        if (!w || w.wingPosition !== 'full_corner' || !w.fullCorner) return;
+        const fc = w.fullCorner;
+        const counts = _emptyContentCounts();
+        (fc.compartments || []).forEach(function(c) { _accumulateCompContentCounts(counts, c); });
+        const shelves = Array.isArray(fc.shelvesY) && fc.shelvesY.length ? fc.shelvesY.length : (fc.shelves || 0);
+        parts.push({
+            kind: 'corner', side: side, label: side === 'left' ? 'פינה שמאל' : 'פינה ימין', rows: {},
+            w: fc.size || 100,
+            h: _wingBodyHeightFromData(w, rs.globalHeight || 240),
+            d: w.depth || (wings.center && wings.center.depth) || rs.depth || 54,
+            cols: 1,
+            drawersExt: counts.drawersExt,
+            drawersInt: counts.drawersInt,
+            shelves: shelves + counts.shelves,
+            hanging: counts.hanging + counts.sorbet,
+            hangingNote: counts.sorbet ? counts.sorbet + ' סורבטו' : '',
+            leds: Array.isArray(fc.leds) ? fc.leds.length : 0
+        });
+    };
+    addWing('left'); addCorner('left'); addWing('center'); addCorner('right'); addWing('right'); addWing('sideCabinet');
+    parts.forEach(function(p, i) { p.n = i + 1; });
+    return { parts: parts, groups: g };
+}
+
+/** Majority value per finish key goes to the shared spec; parts that differ become exception lines. */
+function _muCommonAndExceptions(parts) {
+    const wingParts = parts.filter(function(p) { return p.kind === 'wing'; });
+    const common = {};
+    const exceptions = [];
+    _MU_STRUCT_KEYS.concat(_MU_FINISH_KEYS).forEach(function(key) {
+        const entries = wingParts
+            .map(function(p) { return { p: p, row: p.rows[key] }; })
+            .filter(function(e) { return e.row && String(e.row.value || '').trim(); });
+        if (!entries.length) return;
+        const freq = {};
+        entries.forEach(function(e) { freq[e.row.value] = (freq[e.row.value] || 0) + 1; });
+        let best = entries[0].row.value;
+        Object.keys(freq).forEach(function(v) { if (freq[v] > freq[best]) best = v; });
+        common[key] = { label: entries[0].row.label, value: best, rtl: entries[0].row.rtl };
+        entries.forEach(function(e) {
+            if (e.row.value !== best) exceptions.push({ p: e.p, label: e.row.label, value: e.row.value });
+        });
+    });
+    return { common: common, exceptions: exceptions };
+}
+
+function _muPartsTableHtml(parts) {
+    const num = function(v) { return v ? String(v) : '<span class="mu-zero">0</span>'; };
+    const tot = { w: 0, cols: 0, drawersExt: 0, drawersInt: 0, shelves: 0, hanging: 0, leds: 0 };
+    const body = parts.map(function(p) {
+        Object.keys(tot).forEach(function(k) { tot[k] += p[k] || 0; });
+        const wTxt = p.kind === 'corner' ? `${p.w}×${p.w}` : String(p.w);
+        const hang = p.hanging ? `${p.hanging}${p.hangingNote ? ` <small>(${_escPrintHtml(p.hangingNote)})</small>` : ''}` : num(0);
+        return `<tr${p.kind === 'corner' ? ' class="is-corner"' : ''}>
+            <td class="mu-name">${_muBadgeHtml(p)}${_escPrintHtml(p.label)}</td>
+            <td dir="ltr">${wTxt}</td><td dir="ltr">${p.h} / ${p.d}</td><td>${num(p.cols)}</td>
+            <td>${num(p.drawersExt)}</td><td>${num(p.drawersInt)}</td><td>${num(p.shelves)}</td>
+            <td>${hang}</td><td class="${p.leds ? 'mu-led' : ''}">${p.leds ? p.leds : '—'}</td>
+        </tr>`;
+    }).join('');
+    return `<table class="mu-parts">
+        <thead><tr><th>חלק</th><th>רוחב</th><th>גובה / עומק</th><th>עמודות</th><th>מג' חיצ'</th><th>מג' פנים</th><th>מדפים</th><th>מוטות</th><th>לדים</th></tr></thead>
+        <tbody>${body}</tbody>
+        <tfoot><tr><td>סה"כ (${parts.length} חלקים)</td><td dir="ltr">${tot.w} <small>פריסה</small></td><td></td><td>${tot.cols}</td>
+            <td>${tot.drawersExt}</td><td>${tot.drawersInt}</td><td>${tot.shelves}</td><td>${tot.hanging}</td><td>${tot.leds}</td></tr></tfoot>
+    </table>`;
+}
+
+/** Top-view plan built from wing geometry; each part carries its print number. */
+function _muPlanSvg(rs, parts, W, H) {
+    const wings = rs.wings || {};
+    const c = wings.center || {};
+    const cW = c.width || rs.width || 160;
+    const cD = c.depth || rs.depth || 54;
+    const numOf = function(kind, side) {
+        const p = parts.find(function(q) { return q.kind === kind && q.side === side; });
+        return p ? p.n : null;
+    };
+    const shapes = [{ x: -cW / 2, y: 0, w: cW, h: cD, n: numOf('wing', 'center'), len: cW, bx: 0, by: cD / 2 }];
+    ['left', 'right'].forEach(function(side) {
+        const w = wings[side];
+        if (!w) return;
+        const L = side === 'left';
+        const edge = L ? -cW / 2 : cW / 2;
+        const wW = w.width || 160;
+        const wD = w.depth || cD;
+        const hasCols = Array.isArray(w.columns) && w.columns.length > 0;
+        const pos = w.wingPosition || 'side';
+        if (pos === 'full_corner' && w.fullCorner) {
+            const fc = w.fullCorner.size || 100;
+            const x0 = L ? edge - fc : edge;
+            const cut = { x: L ? x0 + wD : x0, y: cD, w: fc - wD, h: fc - cD };
+            shapes.push({ corner: true, x: x0, y: 0, w: fc, h: fc, cut: cut, n: numOf('corner', side), len: fc, bx: x0 + fc / 2, by: cD / 2 });
+            if (hasCols) {
+                const wx = L ? x0 : x0 + fc - wD;
+                shapes.push({ x: wx, y: fc, w: wD, h: wW, n: numOf('wing', side), len: wW, bx: wx + wD / 2, by: fc + wW / 2 });
+            }
+        } else if (hasCols) {
+            const wx = pos === 'front' ? (L ? edge : edge - wD) : (L ? edge - wD : edge);
+            const wy = pos === 'front' ? cD : 0;
+            shapes.push({ x: wx, y: wy, w: wD, h: wW, n: numOf('wing', side), len: wW, bx: wx + wD / 2, by: wy + wW / 2 });
+        }
+    });
+    const sc = c.sideCabinet;
+    const scN = numOf('wing', 'sideCabinet');
+    if (sc && scN && sc.side && sc.side !== 'none') {
+        const sW = sc.width || 60;
+        const sD = sc.depth || cD;
+        const atLeft = sc.side === 'left';
+        const sx = atLeft ? -cW / 2 - sW : cW / 2;
+        if (!shapes.some(function(s) { return s.x < sx + sW && s.x + s.w > sx && s.y < sD; })) {
+            shapes.push({ x: sx, y: 0, w: sW, h: sD, n: scN, len: sW, bx: sx + sW / 2, by: sD / 2 });
+        }
+    }
+    let minX = Infinity, maxX = -Infinity, maxY = 0;
+    shapes.forEach(function(s) {
+        minX = Math.min(minX, s.x); maxX = Math.max(maxX, s.x + s.w); maxY = Math.max(maxY, s.y + s.h);
+    });
+    const pad = 16;
+    const top = 12;
+    const s = Math.min((W - 2 * pad) / (maxX - minX), (H - top - pad) / maxY);
+    const ox = pad + ((W - 2 * pad) - (maxX - minX) * s) / 2 - minX * s;
+    const X = function(x) { return (ox + x * s).toFixed(1); };
+    const Y = function(y) { return (top + y * s).toFixed(1); };
+    let out = `<rect x="${X(minX) - 5}" y="${top - 7}" width="${((maxX - minX) * s + 10).toFixed(1)}" height="5" fill="#cbd5e1"/>`;
+    shapes.forEach(function(sh) {
+        const stroke = sh.corner ? '#0f766e' : '#1e3a5f';
+        const fill = sh.corner ? '#ccfbf1' : '#dbeafe';
+        if (sh.corner) {
+            const k = sh.cut;
+            const x1 = sh.x + sh.w, y1 = sh.y + sh.h;
+            const pts = k.x > sh.x
+                ? [[sh.x, sh.y], [x1, sh.y], [x1, k.y], [k.x, k.y], [k.x, y1], [sh.x, y1]]
+                : [[sh.x, sh.y], [x1, sh.y], [x1, y1], [k.x + k.w, y1], [k.x + k.w, k.y], [sh.x, k.y]];
+            out += `<polygon points="${pts.map(function(p) { return X(p[0]) + ',' + Y(p[1]); }).join(' ')}" fill="${fill}" stroke="${stroke}" stroke-width="1.4"/>`;
+        } else {
+            out += `<rect x="${X(sh.x)}" y="${Y(sh.y)}" width="${(sh.w * s).toFixed(1)}" height="${(sh.h * s).toFixed(1)}" fill="${fill}" stroke="${stroke}" stroke-width="1.4"/>`;
+        }
+        if (sh.n) {
+            out += `<circle cx="${X(sh.bx)}" cy="${Y(sh.by)}" r="9" fill="${stroke}"/>`
+                + `<text x="${X(sh.bx)}" y="${Y(sh.by)}" dy="3.6" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">${sh.n}</text>`;
+        }
+        out += `<text x="${X(sh.bx)}" y="${Y(sh.by)}" dy="20" text-anchor="middle" font-size="9" fill="#475569">${sh.len}</text>`;
+    });
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" height="${H}" font-family="Segoe UI, Arial, sans-serif">${out}</svg>`;
+}
+
+/** Map stored blueprint pages to parts by their labels (top view kept separate). */
+function _muBlueprintIndex(item, parts) {
+    const pages = item.multiViewPages || [];
+    const labels = item.multiViewLabels || [];
+    const out = { byPart: {}, top: [], rest: [], labeled: pages.length > 0 && labels.length === pages.length };
+    if (!out.labeled) return out;
+    pages.forEach(function(svg, i) {
+        const lbl = labels[i] || '';
+        const owner = parts.find(function(p) {
+            if (p.kind === 'corner') return lbl.indexOf('פינה מלאה ' + (p.side === 'left' ? 'שמאל' : 'ימין')) >= 0;
+            return lbl.indexOf('פינה מלאה') < 0 && lbl.indexOf(p.label) >= 0;
+        });
+        const entry = { svg: svg, label: lbl };
+        if (owner) (out.byPart[owner.n] = out.byPart[owner.n] || []).push(entry);
+        else if (lbl.indexOf('מבט עליון') >= 0) out.top.push(entry);
+        else out.rest.push(entry);
+    });
+    return out;
+}
+
+function _muBlueprintPagesHtml(bp, parts, titleText) {
+    const seq = [];
+    bp.top.forEach(function(e) { seq.push({ head: 'מבט על — פריסת החלקים', svg: e.svg }); });
+    parts.forEach(function(p) {
+        (bp.byPart[p.n] || []).forEach(function(e) {
+            const kind = (e.label.split(' — ')[0] || 'שרטוט').trim();
+            seq.push({ head: `${_muBadgeHtml(p)}${_escPrintHtml(p.label)} — ${_escPrintHtml(kind)}`, svg: e.svg });
+        });
+    });
+    bp.rest.forEach(function(e) { seq.push({ head: _escPrintHtml(e.label || 'שרטוט'), svg: e.svg }); });
+    const pagesHtml = [];
+    for (let i = 0; i < seq.length; i += 2) {
+        pagesHtml.push(`<div class="bp-page" style="page-break-after:always;page-break-inside:avoid;">${seq.slice(i, i + 2).map(function(e, k) {
+            return `<div class="mu-bp${k === 0 && i + 1 < seq.length ? ' is-first' : ''}">
+                <div class="mu-bp-h"><span>${e.head}</span><small>${_escPrintHtml(titleText)} · ${i + k + 1}/${seq.length}</small></div>
+                <div class="mu-bp-b">${e.svg}</div>
+            </div>`;
+        }).join('')}</div>`);
+    }
+    return pagesHtml.join('');
+}
+
+function _muPartCardsHtml(item, parts, bp) {
+    const cards = parts.map(function(p) {
+        let doors = '', open = '';
+        if (p.kind === 'wing' && p.side === 'center') { doors = item.imgDoors; open = item.imgOpen; }
+        else if (p.kind === 'wing') {
+            const wp = (item.wingPreviews || []).find(function(w) { return w && w.id === p.side; });
+            if (wp) { doors = wp.imgDoors; open = wp.imgOpen; }
+        }
+        const bpEntry = (bp.byPart[p.n] || [])[0];
+        const cells = [];
+        if (doors) cells.push(`<figure><img src="${doors}" alt=""><figcaption>סגור</figcaption></figure>`);
+        if (open) cells.push(`<figure><img src="${open}" alt=""><figcaption>פתוח</figcaption></figure>`);
+        if (bpEntry) cells.push(`<figure class="is-bp">${bpEntry.svg}<figcaption>שרטוט</figcaption></figure>`);
+        if (!cells.length) return '';
+        const dims = p.kind === 'corner' ? `${p.w}×${p.w}` : `${p.w} × ${p.d}`;
+        return `<div class="mu-card${p.kind === 'corner' ? ' is-corner' : ''}">
+            <div class="mu-card-h"><span>${_muBadgeHtml(p)}${_escPrintHtml(p.label)}</span><small dir="ltr">${dims}</small></div>
+            <div class="mu-card-i" style="grid-template-columns:repeat(${cells.length},1fr);">${cells.join('')}</div>
+        </div>`;
+    }).filter(Boolean);
+    if (!cards.length) return '';
+    return `<div class="mu-cards-t">תמונות לפי חלק</div><div class="mu-cards">${cards.join('')}</div>`;
+}
+
+/** Compact factory block for corner cabinets and walk-in closets: shared spec once, plan, parts table, per-part images, numbered blueprints. */
+function _buildCompactMultiUnitHtml(o) {
+    const item = o.item;
+    const rs = o.itemObj.rawState || {};
+    const parts = o.mu.parts;
+    const g = o.mu.groups;
+    const ce = _muCommonAndExceptions(parts);
+    const sharedRows = [];
+    g.units.forEach(function(u) {
+        if (!u.title && !u.extra) sharedRows.push.apply(sharedRows, u.general.concat(u.finishes, u.hardware));
+    });
+    const pick = function(keys) { return keys.map(function(k) { return ce.common[k]; }).filter(Boolean); };
+    const structRows = sharedRows.filter(function(r) { return r.id !== 'colorDesk'; }).concat(pick(_MU_STRUCT_KEYS));
+    const finishRows = sharedRows.filter(function(r) { return r.id === 'colorDesk'; }).concat(pick(_MU_FINISH_KEYS));
+    const extras = g.units.filter(function(u) { return u.extra; }).map(function(u) {
+        return _compactSpecListHtml(u.title, u.finishes.concat(u.general, u.hardware));
+    }).join('');
+    const spec = _compactSpecListHtml('מבנה — משותף לכל החלקים', structRows)
+        + _compactSpecListHtml('גוונים וגימורים — משותף לכל החלקים', finishRows)
+        + extras;
+    const kindLbl = rs.presetId === 'walkin' ? 'חדר ארונות' : 'ארון פינתי';
+    const alert = ce.exceptions.length
+        ? `<div class="mu-alert"><b>שונה מהמשותף:</b>${ce.exceptions.map(function(e) {
+            return `<div>${_muBadgeHtml(e.p)}${_escPrintHtml(e.p.label)} — ${_escPrintHtml(e.label)}: <b>${_escPrintHtml(e.value)}</b></div>`;
+        }).join('')}</div>`
+        : '';
+    const notes = g.notes.length
+        ? `<div class="cmp-sec">הערות</div><div class="cmp-notes">${_escPrintHtml(g.notes.join('\n'))}</div>`
+        : '';
+    const bp = _muBlueprintIndex(item, parts);
+    const bpHtml = bp.labeled ? _muBlueprintPagesHtml(bp, parts, o.titleText) : _printCabinetBlueprintPagesHtml(item, o.titleText);
+    return `<div class="cmp-block mu-block" style="page-break-after:always;">
+        <div class="cmp-bar"><span>${_escPrintHtml(o.titleText)}</span><small>${kindLbl} · ${parts.length} חלקים</small></div>
+        <div class="mu-top">
+            <div class="cmp-spec">${spec}</div>
+            <div class="mu-plan"><div class="cmp-cap">מבט על — מיקום החלקים</div>${_muPlanSvg(rs, parts, 300, 210)}</div>
+        </div>
+        ${_muPartsTableHtml(parts)}
+        ${alert}
+        ${notes}
+        ${o.priceStrip || ''}
+        ${_muPartCardsHtml(item, parts, bp)}
+    </div>
+    ${bpHtml}`;
+}
+
 function _printSpecRowsHtmlEditable(rows, cartIndex) {
     return rows.map(r => {
         if (r.section) return _printSectionHeader(r.label, '');
@@ -13585,6 +13923,12 @@ function _printSingleCabinetBlockHtml(itemObj, index, opts) {
     if (opts.compact) {
         const priceStrip = (hidePrices || !isFactory) ? ''
             : `<div class="cmp-price"><span>מחיר התקנה ללקוח</span><span dir="ltr">₪${itemInstall.toLocaleString()}</span></div>`;
+        const mu = _cartIsWritingDesk(itemObj) ? null : _printMultiUnitParts(itemObj, specRows);
+        if (mu && mu.parts.length > 1) {
+            return blockResult(_buildCompactMultiUnitHtml({
+                item: item, itemObj: itemObj, titleText: titleText, specRows: specRows, priceStrip: priceStrip, mu: mu
+            }));
+        }
         const firstBp = (item.multiViewPages && item.multiViewPages[0]) || item.multiViewSVG || '';
         const bpThumb = firstBp
             ? `<div class="cmp-bp-thumb"><div class="cmp-cap">שרטוט (תמונה ממוזערת)</div>${firstBp}</div>`
@@ -13830,6 +14174,39 @@ function _buildPrintHTML(mode) {
   .cmp-bp-thumb svg { width: 100% !important; height: 200px !important; display: block; }
   .cmp-imgs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
   .cmp-imgs img { flex: none !important; height: 230px; background: #fff; }
+  .cmp-bar { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .cmp-bar small { font-size: 0.8rem; font-weight: 600; opacity: 0.85; }
+  .mu-top { display: grid; grid-template-columns: 1.15fr 1fr; gap: 14px; align-items: start; }
+  .mu-plan { border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px; background: #fff; }
+  .mu-plan svg { display: block; }
+  .mu-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; border-radius: 50%; background: #1e3a5f; color: #fff; font-size: 0.72rem; font-weight: 800; margin-left: 6px; padding: 0 4px; vertical-align: middle; }
+  .mu-badge.is-corner { background: #0f766e; }
+  .mu-parts { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.8rem; break-inside: avoid; }
+  .mu-parts th { background: #1e3a5f; color: #fff; padding: 4px 3px; font-weight: 700; white-space: nowrap; }
+  .mu-parts td { border-bottom: 1px solid #e2e8f0; padding: 4px 3px; text-align: center; font-weight: 700; }
+  .mu-parts td.mu-name { text-align: right; white-space: nowrap; }
+  .mu-parts tr.is-corner td { background: #f0fdfa; }
+  .mu-parts td.mu-led { background: #fffbeb; color: #b45309; }
+  .mu-parts .mu-zero { color: #cbd5e1; font-weight: 400; }
+  .mu-parts small { font-weight: 500; color: #64748b; }
+  .mu-parts tfoot td { background: #e8eef6; border-top: 2px solid #1e3a5f; color: #1e3a5f; }
+  .mu-alert { margin-top: 8px; border: 1px solid #fca5a5; background: #fef2f2; color: #991b1b; border-radius: 6px; padding: 6px 10px; font-size: 0.82rem; break-inside: avoid; }
+  .mu-alert > div { margin-top: 3px; }
+  .mu-cards-t { font-size: 0.8rem; font-weight: 800; color: #1e3a5f; border-bottom: 1.5px solid #1e3a5f; padding: 10px 0 2px; margin-bottom: 6px; break-after: avoid; page-break-after: avoid; }
+  .mu-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .mu-card { border: 1px solid #cbd5e1; border-radius: 6px; overflow: hidden; break-inside: avoid; page-break-inside: avoid; }
+  .mu-card-h { display: flex; justify-content: space-between; align-items: center; background: #f1f5f8; padding: 3px 8px; font-size: 0.82rem; font-weight: 800; color: #1e3a5f; }
+  .mu-card-h small { color: #64748b; font-weight: 600; }
+  .mu-card-i { display: grid; gap: 4px; padding: 4px; }
+  .mu-card-i figure { text-align: center; }
+  .mu-card-i img { width: 100%; height: 120px; object-fit: contain; display: block; background: #fff; }
+  .mu-card-i svg { width: 100% !important; height: 120px !important; display: block; }
+  .mu-card-i figcaption { font-size: 0.7rem; color: #64748b; }
+  .mu-bp.is-first { margin-bottom: 16px; }
+  .mu-bp-h { display: flex; justify-content: space-between; align-items: center; background: #e8f0fe; border: 1px solid #93c5fd; border-bottom: none; padding: 6px 10px; font-weight: 800; color: #1e3a5f; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .mu-bp-h small { font-weight: 600; color: #475569; }
+  .mu-bp-h .mu-badge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .mu-bp-b { border: 2px solid #93c5fd; overflow: hidden; }
 </style>
 </head>
 <body>
