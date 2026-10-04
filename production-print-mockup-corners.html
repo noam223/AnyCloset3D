@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>מוקאפים — טופס ייצור לארון פינתי ולחדר ארונות</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; background: #cbd5e1; color: #1e293b; padding: 30px 0; }
+  .mock-label { width: 794px; margin: 0 auto 10px; font-size: 18px; font-weight: 800; color: #0f172a; }
+  .mock-label small { display: block; font-size: 13px; font-weight: 500; color: #334155; margin-top: 3px; }
+  .page { width: 794px; height: 1123px; margin: 0 auto 50px; background: white; padding: 26px 28px; box-shadow: 0 6px 30px rgba(15,23,42,0.18); overflow: hidden; font-size: 12px; position: relative; }
+  .num { direction: ltr; unicode-bidi: isolate; }
+
+  .hdr { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #1e3a5f; padding-bottom: 8px; margin-bottom: 10px; }
+  .hdr h1 { font-size: 19px; color: #1e3a5f; }
+  .hdr .date { font-size: 11px; color: #64748b; }
+  .cust { display: grid; grid-template-columns: repeat(5, 1fr); border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 12px; }
+  .cust div { padding: 5px 8px; border-left: 1px solid #e2e8f0; }
+  .cust div:last-child { border-left: none; }
+  .cust b { display: block; font-size: 10px; color: #64748b; font-weight: 600; }
+  .cust span { font-size: 12px; font-weight: 700; }
+
+  .cab-title { display: flex; justify-content: space-between; align-items: center; background: #1e3a5f; color: white; border-radius: 6px; padding: 6px 12px; margin-bottom: 10px; }
+  .cab-title h2 { font-size: 15px; }
+  .cab-title .sub { font-size: 11px; opacity: 0.85; }
+
+  /* B-style spec list */
+  .top { display: grid; grid-template-columns: 1.05fr 1fr; gap: 14px; margin-bottom: 10px; }
+  .sec { font-size: 10.5px; font-weight: 800; color: #1e3a5f; border-bottom: 1.5px solid #1e3a5f; padding: 6px 0 2px; margin-bottom: 2px; }
+  .sec:first-child { padding-top: 0; }
+  .sec small { font-weight: 600; color: #64748b; font-size: 9.5px; margin-right: 4px; }
+  .row { display: flex; justify-content: space-between; gap: 8px; padding: 2.5px 0; border-bottom: 1px dotted #cbd5e1; font-size: 11.5px; }
+  .row span:first-child { color: #475569; }
+  .row span:last-child { font-weight: 700; text-align: left; }
+
+  /* plan */
+  .plan { border: 1px solid #e2e8f0; border-radius: 6px; background: #f8fafc; padding: 6px; }
+  .cap { font-size: 10.5px; font-weight: 700; color: #1e3a5f; padding: 0 2px 4px; }
+  .plan svg { display: block; margin: 0 auto; }
+
+  /* parts table */
+  .parts { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+  .parts th { background: #1e3a5f; color: white; font-size: 10px; font-weight: 700; padding: 4px 4px; border: 1px solid #1e3a5f; }
+  .parts td { font-size: 11.5px; padding: 4px 4px; border: 1px solid #e2e8f0; text-align: center; font-weight: 700; }
+  .parts td.name { text-align: right; white-space: nowrap; }
+  .parts tr.tot td { background: #f1f5f9; color: #1e3a5f; }
+  .parts td.led { background: #fffbeb; color: #b45309; }
+  .parts td.diff { background: #fef2f2; color: #b91c1c; }
+  .parts td.muted { color: #94a3b8; font-weight: 500; }
+  .badge { display: inline-flex; align-items: center; justify-content: center; width: 17px; height: 17px; border-radius: 50%; background: #1e3a5f; color: #fff; font-size: 10px; font-weight: 800; margin-left: 5px; vertical-align: 0; }
+  .badge.corner { background: #0f766e; }
+
+  .alert { border: 1px solid #fecaca; background: #fef2f2; color: #991b1b; border-radius: 6px; padding: 5px 9px; font-size: 11.5px; margin-bottom: 6px; }
+  .alert b { margin-left: 4px; }
+  .notes { border: 1px solid #fde68a; background: #fffbeb; color: #78350f; border-radius: 6px; padding: 5px 9px; font-size: 11.5px; margin-bottom: 6px; }
+  .price { display: flex; justify-content: space-between; background: #fef9c3; border: 1px solid #fde047; border-radius: 6px; padding: 5px 12px; font-weight: 800; color: #713f12; font-size: 12.5px; margin-bottom: 10px; }
+
+  /* per-part images */
+  .imgs-h { font-size: 11.5px; font-weight: 800; color: #1e3a5f; margin-bottom: 6px; display: flex; justify-content: space-between; }
+  .imgs-h span { font-weight: 500; color: #64748b; font-size: 10.5px; }
+  .pgrid { display: grid; gap: 8px; }
+  .pgrid.c3 { grid-template-columns: repeat(3, 1fr); }
+  .pgrid.c2 { grid-template-columns: repeat(2, 1fr); }
+  .pcard { border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; }
+  .pcard .ph { background: #f1f5f9; font-size: 11px; font-weight: 800; color: #1e3a5f; padding: 4px 7px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+  .pcard .ph > span { font-weight: 600; color: #64748b; font-size: 10px; }
+  .pcard .pi { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 4px; background: #eef2f6; }
+  .pcard .pi div { background: #fff; border-radius: 3px; text-align: center; padding: 2px; }
+  .pcard .pi i { display: block; font-style: normal; font-size: 9px; color: #64748b; }
+  .pcard .pi svg { display: block; margin: 0 auto; }
+  .room { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+  .room .box { border: 1px solid #e2e8f0; border-radius: 6px; background: #eef2f6; padding: 4px; }
+  .room .box svg { display: block; margin: 0 auto; background: #fff; border-radius: 3px; }
+
+  .foot { position: absolute; bottom: 14px; left: 28px; right: 28px; display: flex; justify-content: space-between; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 5px; }
+</style>
+</head>
+<body>
+
+<!-- ======================= CORNER ======================= -->
+<div class="mock-label">ארון פינתי: עמוד אחד, כל החלקים בטבלה אחת
+  <small>מה שמשותף לכל החלקים (חומר, צוקל, גוונים, ידיות) מופיע פעם אחת. כל חלק מקבל מספר שמופיע גם בתרשים מבט העל, גם בטבלת החלקים וגם מעל התמונות שלו. חריגות (למשל גוון חזית שונה בחלק אחד) מסומנות באדום.</small>
+</div>
+<div class="page">
+  <div class="hdr"><h1>הזמנת ייצור</h1><div class="date">04/10/2026 · הזמנה <span class="num">1582</span></div></div>
+  <div class="cust">
+    <div><b>לקוח</b><span>ים רביצקי</span></div>
+    <div><b>טלפון</b><span class="num">052-4800000</span></div>
+    <div><b>מס' הזמנה</b><span class="num">1582</span></div>
+    <div><b>כתובת</b><span>אשקלון</span></div>
+    <div><b>אספקה</b><span>לא צוין</span></div>
+  </div>
+  <div class="cab-title"><h2>ארון מס' 1 — ארון פינתי ימין</h2><span class="sub">3 חלקים · גובה <span class="num">240</span> ס"מ · עומק <span class="num">54</span> ס"מ</span></div>
+
+  <div class="top">
+    <div>
+      <div class="sec">מבנה <small>משותף לכל החלקים</small></div>
+      <div class="row"><span>דגם ארון</span><span>C9</span></div>
+      <div class="row"><span>מיקום / התקנה</span><span>פינה — קיר אחורי + קיר ימני</span></div>
+      <div class="row"><span>חומר גוף</span><span>מלמין</span></div>
+      <div class="row"><span>רגליים / צוקל</span><span>צוקל רגיל</span></div>
+      <div class="sec">גוונים וגימורים <small>משותף לכל החלקים</small></div>
+      <div class="row"><span>גוף וצוקל</span><span>759</span></div>
+      <div class="row"><span>פנים (מדפים/מגירות)</span><span>759</span></div>
+      <div class="row"><span>חזיתות (דלתות)</span><span>759</span></div>
+      <div class="row"><span>גב ארון</span><span>לבן מט 2100</span></div>
+      <div class="row"><span>ידיות</span><span>רוכבת — שחור מט</span></div>
+    </div>
+    <div class="plan">
+      <div class="cap">מבט על — מיקום החלקים בחדר</div>
+      <svg id="plan-corner" width="320" height="215"></svg>
+    </div>
+  </div>
+
+  <table class="parts">
+    <tr><th style="width:150px;">חלק</th><th>רוחב</th><th>עומק</th><th>עמודות</th><th>מג' חיצ'</th><th>מג' פנים</th><th>מדפים</th><th>מוטות</th><th>לדים</th><th>חזיתות</th></tr>
+    <tr><td class="name"><span class="badge">1</span>ארון מרכזי</td><td class="num">160</td><td class="num">54</td><td>2</td><td>3</td><td>2</td><td>4</td><td>1</td><td class="led">1 זוג</td><td class="muted">משותף</td></tr>
+    <tr><td class="name"><span class="badge corner">2</span>פינה (L)</td><td class="num">100×100</td><td class="num">54</td><td>1</td><td>0</td><td>0</td><td>3</td><td>1</td><td class="muted">—</td><td class="muted">משותף</td></tr>
+    <tr><td class="name"><span class="badge">3</span>כנף ימין</td><td class="num">120</td><td class="num">54</td><td>2</td><td>0</td><td>4</td><td>2</td><td>2</td><td class="muted">—</td><td class="diff">0110 אגוז</td></tr>
+    <tr class="tot"><td class="name">סה"כ</td><td colspan="3">אורך פריסה <span class="num">380</span> ס"מ</td><td>3</td><td>6</td><td>9</td><td>4</td><td>1 זוג</td><td></td></tr>
+  </table>
+  <div class="alert"><b>שונה מהמשותף:</b>חלק 3 (כנף ימין) — חזיתות בגוון 0110 אגוז.</div>
+  <div class="notes"><b>הערות:</b> ארון בין קירות בנוי מ-3 חלקים</div>
+  <div class="price"><span>מחיר התקנה ללקוח</span><span class="num">₪880</span></div>
+
+  <div class="imgs-h">תמונות לפי חלק <span>המספרים תואמים לתרשים ולטבלה</span></div>
+  <div class="pgrid c3">
+    <div class="pcard"><div class="ph"><div><span class="badge">1</span>ארון מרכזי</div><span>160 ס"מ</span></div>
+      <div class="pi"><div><i>סגור</i><svg data-cab="closed" data-cols="2" data-w="160" width="98" height="120"></svg></div><div><i>פתוח</i><svg data-cab="open" data-cols="2" data-w="160" data-led="1" width="98" height="120"></svg></div></div></div>
+    <div class="pcard"><div class="ph"><div><span class="badge corner">2</span>פינה (L)</div><span>100×100</span></div>
+      <div class="pi"><div><i>סגור</i><svg data-cab="closed" data-cols="1" data-w="100" width="98" height="120"></svg></div><div><i>פתוח</i><svg data-cab="open" data-cols="1" data-w="100" width="98" height="120"></svg></div></div></div>
+    <div class="pcard"><div class="ph"><div><span class="badge">3</span>כנף ימין</div><span>120 ס"מ</span></div>
+      <div class="pi"><div><i>סגור</i><svg data-cab="closed" data-cols="2" data-w="120" data-front="#8b6a4a" width="98" height="120"></svg></div><div><i>פתוח</i><svg data-cab="open" data-cols="2" data-w="120" width="98" height="120"></svg></div></div></div>
+  </div>
+  <div class="foot"><span>סוגרים הכל לדירה · 1582 · ים רביצקי</span><span>עמוד 1 — שרטוט לכל חלק בעמודים הבאים (לפי אותו מספור)</span></div>
+</div>
+
+<!-- ======================= WALK-IN p1 ======================= -->
+<div class="mock-label">חדר ארונות: עמוד מפרט + עמוד תמונות
+  <small>עמוד 1: המשותף פעם אחת, תרשים U עם מספור, טבלת חלקים מלאה ותמונת החדר כולו. עמוד 2: תמונות סגור/פתוח לכל חלק עם אותו מספור, ואחריו השרטוטים.</small>
+</div>
+<div class="page">
+  <div class="hdr"><h1>הזמנת ייצור</h1><div class="date">04/10/2026 · הזמנה <span class="num">1582</span></div></div>
+  <div class="cust">
+    <div><b>לקוח</b><span>ים רביצקי</span></div>
+    <div><b>טלפון</b><span class="num">052-4800000</span></div>
+    <div><b>מס' הזמנה</b><span class="num">1582</span></div>
+    <div><b>כתובת</b><span>אשקלון</span></div>
+    <div><b>אספקה</b><span>לא צוין</span></div>
+  </div>
+  <div class="cab-title"><h2>ארון מס' 2 — חדר ארונות</h2><span class="sub">5 חלקים · 3 קירות · גובה <span class="num">250</span> ס"מ</span></div>
+
+  <div class="top">
+    <div>
+      <div class="sec">מבנה <small>משותף לכל החלקים</small></div>
+      <div class="row"><span>דגם ארון</span><span>מאיה</span></div>
+      <div class="row"><span>מיקום / התקנה</span><span>חדר ארונות — 3 קירות</span></div>
+      <div class="row"><span>חומר גוף</span><span>מלמין</span></div>
+      <div class="row"><span>רגליים / צוקל</span><span>צוקל נסתר</span></div>
+      <div class="row"><span>תוספת שולחן</span><span>ללא</span></div>
+      <div class="sec">גוונים וגימורים <small>משותף לכל החלקים</small></div>
+      <div class="row"><span>גוף וצוקל</span><span>לבן מט 2100</span></div>
+      <div class="row"><span>פנים (מדפים/מגירות)</span><span>לבן מט 2100</span></div>
+      <div class="row"><span>חזיתות (דלתות)</span><span>ללא חזיתות (פתוח)</span></div>
+      <div class="row"><span>גב ארון</span><span>לבן מט 2100</span></div>
+      <div class="row"><span>כוורת</span><span>759</span></div>
+      <div class="row"><span>ידיות</span><span>—</span></div>
+    </div>
+    <div class="plan">
+      <div class="cap">מבט על — חלוקת החדר</div>
+      <svg id="plan-walkin" width="320" height="250"></svg>
+    </div>
+  </div>
+
+  <table class="parts">
+    <tr><th style="width:150px;">חלק</th><th>רוחב</th><th>עומק</th><th>עמודות</th><th>מג' חיצ'</th><th>מג' פנים</th><th>מדפים</th><th>מוטות</th><th>לדים</th><th>משטח עליון</th></tr>
+    <tr><td class="name"><span class="badge">1</span>כנף שמאל</td><td class="num">180</td><td class="num">60</td><td>3</td><td>0</td><td>3</td><td>6</td><td>2</td><td class="led">1 זוג</td><td class="muted">—</td></tr>
+    <tr><td class="name"><span class="badge corner">2</span>פינה שמאל</td><td class="num">90×90</td><td class="num">60</td><td>1</td><td>0</td><td>0</td><td>4</td><td>0</td><td class="muted">—</td><td class="muted">—</td></tr>
+    <tr><td class="name"><span class="badge">3</span>קיר מרכזי</td><td class="num">240</td><td class="num">60</td><td>4</td><td>4</td><td>4</td><td>4</td><td>3</td><td class="led">2 זוגות</td><td>759</td></tr>
+    <tr><td class="name"><span class="badge corner">4</span>פינה ימין</td><td class="num">90×90</td><td class="num">60</td><td>1</td><td>0</td><td>0</td><td>4</td><td>0</td><td class="muted">—</td><td class="muted">—</td></tr>
+    <tr><td class="name"><span class="badge">5</span>כנף ימין</td><td class="num">180</td><td class="num">60</td><td>3</td><td>0</td><td>3</td><td>6</td><td>2</td><td class="led">1 זוג</td><td class="muted">—</td></tr>
+    <tr class="tot"><td class="name">סה"כ</td><td colspan="3">פריסה <span class="num">780</span> ס"מ</td><td>4</td><td>10</td><td>24</td><td>7</td><td>4 זוגות</td><td></td></tr>
+  </table>
+  <div class="notes"><b>הערות:</b> משטח עליון רק מעל הקיר המרכזי. לתאם גובה מוטות עם הלקוח.</div>
+  <div class="price"><span>מחיר התקנה ללקוח</span><span class="num">₪1,650</span></div>
+
+  <div class="imgs-h">החדר כולו <span>תמונות לכל חלק בעמוד הבא</span></div>
+  <div class="room">
+    <div class="box"><div class="cap">מבט כללי — סגור</div><svg data-room="closed" width="350" height="170"></svg></div>
+    <div class="box"><div class="cap">מבט כללי — פתוח</div><svg data-room="open" width="350" height="170"></svg></div>
+  </div>
+  <div class="foot"><span>סוגרים הכל לדירה · 1582 · ים רביצקי</span><span>עמוד 1 מתוך 2 — תמונות לפי חלק בעמוד הבא</span></div>
+</div>
+
+<!-- ======================= WALK-IN p2 ======================= -->
+<div class="page">
+  <div class="cab-title"><h2>ארון מס' 2 — חדר ארונות · תמונות לפי חלק</h2><span class="sub">המספרים תואמים לתרשים ולטבלה בעמוד הקודם</span></div>
+  <div class="pgrid c2">
+    <div class="pcard"><div class="ph"><div><span class="badge">1</span>כנף שמאל</div><span>180 × 60</span></div>
+      <div class="pi"><div><i>סגור</i><svg data-cab="closed" data-cols="3" data-w="180" width="160" height="175"></svg></div><div><i>פתוח</i><svg data-cab="open" data-cols="3" data-w="180" data-led="1" width="160" height="175"></svg></div></div></div>
+    <div class="pcard"><div class="ph"><div><span class="badge corner">2</span>פינה שמאל</div><span>90×90</span></div>
+      <div class="pi"><div><i>סגור</i><svg data-cab="closed" data-cols="1" data-w="90" width="160" height="175"></svg></div><div><i>פתוח</i><svg data-cab="open" data-cols="1" data-w="90" width="160" height="175"></svg></div></div></div>
+    <div class="pcard"><div class="ph"><div><span class="badge">3</span>קיר מרכזי</div><span>240 × 60</span></div>
+      <div class="pi"><div><i>סגור</i><svg data-cab="closed" data-cols="4" data-w="240" width="160" height="175"></svg></div><div><i>פתוח</i><svg data-cab="open" data-cols="4" data-w="240" data-led="1" width="160" height="175"></svg></div></div></div>
+    <div class="pcard"><div class="ph"><div><span class="badge corner">4</span>פינה ימין</div><span>90×90</span></div>
+      <div class="pi"><div><i>סגור</i><svg data-cab="closed" data-cols="1" data-w="90" width="160" height="175"></svg></div><div><i>פתוח</i><svg data-cab="open" data-cols="1" data-w="90" width="160" height="175"></svg></div></div></div>
+    <div class="pcard"><div class="ph"><div><span class="badge">5</span>כנף ימין</div><span>180 × 60</span></div>
+      <div class="pi"><div><i>סגור</i><svg data-cab="closed" data-cols="3" data-w="180" width="160" height="175"></svg></div><div><i>פתוח</i><svg data-cab="open" data-cols="3" data-w="180" data-led="1" width="160" height="175"></svg></div></div></div>
+    <div class="pcard" style="border-style:dashed;background:#f8fafc;display:flex;align-items:center;justify-content:center;color:#64748b;font-size:11px;padding:10px;text-align:center;">
+      מקום פנוי — כאן נכנס ארון צד / יחידה עליונה אם קיימים
+    </div>
+  </div>
+  <div class="foot"><span>סוגרים הכל לדירה · 1582 · ים רביצקי</span><span>עמוד 2 מתוך 2 — שרטוטים לכל חלק בעמודים הבאים (לפי אותו מספור)</span></div>
+</div>
+
+<script>
+(function() {
+  const BODY = '#f1e3d3', LINE = '#c9b8a4', IN = '#e4d5c3', DARK = '#1f1f1f', WHITE_BODY = '#f8fafc';
+
+  function cabSvg(kind, cols, cw, W, H, opts) {
+    opts = opts || {};
+    const ch = 240, pad = 6, plinth = 9;
+    const s = Math.min((W - pad * 2) / cw, (H - pad * 2) / ch);
+    const ox = (W - cw * s) / 2, oy = (H - ch * s) / 2;
+    const X = v => (ox + v * s).toFixed(1), Y = v => (oy + (ch - v) * s).toFixed(1), L = v => (v * s).toFixed(1);
+    const r = (x, y, w, h, f, st) => `<rect x="${X(x)}" y="${Y(y + h)}" width="${L(w)}" height="${L(h)}" fill="${f}" stroke="${st || LINE}" stroke-width="0.7"/>`;
+    const ln = (x1, y1, x2, y2, st, sw) => `<line x1="${X(x1)}" y1="${Y(y1)}" x2="${X(x2)}" y2="${Y(y2)}" stroke="${st}" stroke-width="${sw}" stroke-linecap="round"/>`;
+    const front = opts.front || BODY;
+    const cwEach = cw / cols;
+    let p = r(0, 0, cw, plinth, BODY);
+    for (let i = 0; i < cols; i++) {
+      const x = i * cwEach;
+      if (kind === 'closed') {
+        p += r(x, plinth, cwEach, ch - plinth, front);
+        const hx = i % 2 === 0 ? x + cwEach - 4 : x + 4;
+        p += ln(hx, 115, hx, 135, DARK, 1.4);
+      } else {
+        p += r(x, plinth, cwEach, ch - plinth, IN);
+        if (i % 2 === 0) {
+          p += r(x + 2, 165, cwEach - 4, 2, BODY);
+          p += ln(x + 4, 158, x + cwEach - 4, 158, '#555', 1.8);
+          [0, 1, 2].forEach(k => { p += r(x + 3, plinth + 3 + k * 20, cwEach - 6, 17, BODY); });
+        } else {
+          [60, 100, 140, 180].forEach(y => { p += r(x + 2, y, cwEach - 4, 2, BODY); });
+        }
+        p += r(x + 3, 205, cwEach - 6, 26, '#fff', 'none');
+      }
+    }
+    if (kind === 'open' && opts.led) {
+      p += ln(2.5, plinth + 4, 2.5, ch - 12, '#fbbf24', 2.2);
+      p += ln(cwEach - 2.5, plinth + 4, cwEach - 2.5, ch - 12, '#fbbf24', 2.2);
+    }
+    return p;
+  }
+
+  document.querySelectorAll('svg[data-cab]').forEach(el => {
+    el.innerHTML = cabSvg(el.dataset.cab, +el.dataset.cols, +el.dataset.w, +el.getAttribute('width'), +el.getAttribute('height'),
+      { led: el.dataset.led === '1', front: el.dataset.front });
+  });
+
+  // Room overview: 5 parts unfolded side by side
+  document.querySelectorAll('svg[data-room]').forEach(el => {
+    const W = +el.getAttribute('width'), H = +el.getAttribute('height');
+    const parts = [[3, 180], [1, 90], [4, 240], [1, 90], [3, 180]];
+    const total = parts.reduce((a, p) => a + p[1], 0) + 4 * 8;
+    const s = (W - 12) / total;
+    let x = 6, html = '';
+    parts.forEach(([cols, w], i) => {
+      const pw = w * s, ph = Math.min(H - 12, 240 * s * 1.0);
+      html += `<g transform="translate(${x.toFixed(1)},${((H - ph) / 2).toFixed(1)})">${cabSvg(el.dataset.room, cols, w, pw, ph, { led: el.dataset.room === 'open' && i !== 1 && i !== 3 })}</g>`;
+      html += `<circle cx="${(x + pw / 2).toFixed(1)}" cy="10" r="7" fill="${i === 1 || i === 3 ? '#0f766e' : '#1e3a5f'}"/><text x="${(x + pw / 2).toFixed(1)}" y="13.5" text-anchor="middle" font-size="9" font-weight="800" fill="#fff">${i + 1}</text>`;
+      x += pw + 8 * s;
+    });
+    el.innerHTML = html;
+  });
+
+  function badge(x, y, n, corner) {
+    return `<circle cx="${x}" cy="${y}" r="10" fill="${corner ? '#0f766e' : '#1e3a5f'}"/><text x="${x}" y="${y + 4}" text-anchor="middle" font-size="11" font-weight="800" fill="#fff">${n}</text>`;
+  }
+  function dim(x1, y1, x2, y2, label, vertical) {
+    const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+    return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#64748b" stroke-width="0.8"/>`
+      + `<text x="${vertical ? mx - 4 : mx}" y="${vertical ? my + 3 : my - 3}" text-anchor="middle" font-size="9" fill="#475569" ${vertical ? `transform="rotate(-90 ${mx - 4} ${my})"` : ''}>${label}</text>`;
+  }
+  const wall = 'fill="#cbd5e1"';
+  const part = c => `fill="${c || '#e8eef6'}" stroke="#1e3a5f" stroke-width="1.2"`;
+  const cornerFill = '#d1fae5';
+
+  // Corner plan: back wall + right wall (L)
+  (function() {
+    const el = document.getElementById('plan-corner');
+    const s = 0.82, ox = 48, oy = 16, D = 54 * s;
+    const cW = 160 * s, kW = 100 * s, rW = 120 * s;
+    let h = `<rect x="${ox - 6}" y="${oy - 6}" width="${cW + kW + 6}" height="6" ${wall}/>`;
+    h += `<rect x="${ox + cW + kW}" y="${oy - 6}" width="6" height="${kW + rW + 6}" ${wall}/>`;
+    h += `<rect x="${ox}" y="${oy}" width="${cW}" height="${D}" ${part()}/>`;
+    h += `<path d="M${ox + cW},${oy} h${kW} v${kW} h-${D} v-${kW - D} h-${kW - D} z" ${part(cornerFill)}/>`;
+    h += `<rect x="${ox + cW + kW - D}" y="${oy + kW}" width="${D}" height="${rW}" ${part()}/>`;
+    h += badge(ox + cW / 2, oy + D / 2, 1) + badge(ox + cW + kW - D / 2 - 8, oy + D / 2 + 6, 2, true) + badge(ox + cW + kW - D / 2, oy + kW + rW / 2, 3);
+    h += dim(ox, oy + D + 14, ox + cW, oy + D + 14, '160');
+    h += dim(ox + cW, oy + D + 14, ox + cW + kW, oy + D + 14, '100');
+    h += dim(ox + cW + kW - D - 14, oy + kW, ox + cW + kW - D - 14, oy + kW + rW, '120', true);
+    h += `<text x="${ox + cW / 2}" y="${oy + kW + rW / 2}" text-anchor="middle" font-size="9.5" fill="#475569">חלל החדר</text>`;
+    el.innerHTML = h;
+  })();
+
+  // Walk-in plan: U (left wall, back wall, right wall)
+  (function() {
+    const el = document.getElementById('plan-walkin');
+    const s = 0.62, ox = 20, oy = 22, D = 60 * s;
+    const lW = 180 * s, k = 90 * s, cW = 240 * s;
+    const totalW = k + cW + k;
+    let h = `<rect x="${ox - 6}" y="${oy - 6}" width="${totalW + 12}" height="6" ${wall}/>`;
+    h += `<rect x="${ox - 6}" y="${oy - 6}" width="6" height="${k + lW + 6}" ${wall}/>`;
+    h += `<rect x="${ox + totalW}" y="${oy - 6}" width="6" height="${k + lW + 6}" ${wall}/>`;
+    h += `<path d="M${ox},${oy} h${k} v${D} h-${k - D} v${k - D} h-${D} z" ${part(cornerFill)}/>`;
+    h += `<rect x="${ox + k}" y="${oy}" width="${cW}" height="${D}" ${part()}/>`;
+    h += `<path d="M${ox + k + cW},${oy} h${k} v${k} h-${D} v-${k - D} h-${k - D} z" ${part(cornerFill)}/>`;
+    h += `<rect x="${ox}" y="${oy + k}" width="${D}" height="${lW}" ${part()}/>`;
+    h += `<rect x="${ox + totalW - D}" y="${oy + k}" width="${D}" height="${lW}" ${part()}/>`;
+    h += badge(ox + D / 2, oy + k + lW / 2, 1) + badge(ox + D / 2 + 4, oy + D / 2 + 4, 2, true) + badge(ox + k + cW / 2, oy + D / 2, 3)
+       + badge(ox + totalW - D / 2 - 4, oy + D / 2 + 4, 4, true) + badge(ox + totalW - D / 2, oy + k + lW / 2, 5);
+    h += dim(ox + k, oy + D + 12, ox + k + cW, oy + D + 12, '240');
+    h += dim(ox + D + 14, oy + k, ox + D + 14, oy + k + lW, '180', true);
+    h += dim(ox + totalW - D - 14, oy + k, ox + totalW - D - 14, oy + k + lW, '180', true);
+    h += `<text x="${ox + totalW / 2}" y="${oy + k + lW - 4}" text-anchor="middle" font-size="9.5" fill="#475569">כניסה לחדר</text>`;
+    el.innerHTML = h;
+  })();
+})();
+</script>
+</body>
+</html>
