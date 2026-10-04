@@ -265,6 +265,29 @@ window._toggleDoors = function() {
     window._setDoorsVisible(!window._doorsVisible);
 };
 
+// LED lamp badge for preview captures — mirrors the editor's HTML .led-cell-icon
+let _ledIconTex = null;
+window._ledIconSprite = function() {
+    if (!_ledIconTex) {
+        const cv = document.createElement('canvas');
+        cv.width = cv.height = 128;
+        const g = cv.getContext('2d');
+        g.beginPath(); g.arc(64, 64, 60, 0, Math.PI * 2); g.fillStyle = '#ffffff'; g.fill();
+        const grad = g.createRadialGradient(64, 52, 6, 64, 64, 54);
+        grad.addColorStop(0, '#fef3c7'); grad.addColorStop(0.7, '#fbbf24'); grad.addColorStop(1, '#f59e0b');
+        g.beginPath(); g.arc(64, 64, 52, 0, Math.PI * 2); g.fillStyle = grad; g.fill();
+        g.fillStyle = '#78350f';
+        g.beginPath(); g.arc(64, 54, 19, Math.PI * 0.8, Math.PI * 2.2); g.lineTo(73, 80); g.lineTo(55, 80); g.closePath(); g.fill();
+        g.fillRect(55, 84, 18, 5);
+        g.fillRect(58, 92, 12, 5);
+        _ledIconTex = new THREE.CanvasTexture(cv);
+    }
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: _ledIconTex, transparent: true, depthTest: false }));
+    sprite.scale.set(11, 11, 1);
+    sprite.renderOrder = 999;
+    return sprite;
+};
+
 // Load room textures once
 window._woodFloorTex = null;
 window._wallTex = null;
@@ -6650,12 +6673,21 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                 const h = top[1] - bot[0] - 1;
                 if (h < 2) return;
                 const midY = (bot[0] + top[1]) / 2;
+                // Open cells have their own side boards inside the column walls
+                const inOpenCell = (col.compartments || []).slice(g.startRow, g.endRow + 1)
+                    .some(cp => cp && (cp.type === 'open_cell' || cp.type === 'side_open_cell'));
+                const halfSpan = col.width / 2 - (inOpenCell ? t : 0) - 0.9;
                 const stripGeo = new THREE.BoxGeometry(1.4, h, 1.4);
                 [-1, 1].forEach(s => {
                     const strip = new THREE.Mesh(stripGeo, ledMat);
-                    strip.position.set(colCenterX + s * (col.width / 2 - 0.9), midY, bodyD / 2 - 2.5);
+                    strip.position.set(colCenterX + s * halfSpan, midY, bodyD / 2 - 2.5);
                     _buildGroup.add(strip);
                 });
+                if (window._captureLedIcons && typeof window._ledIconSprite === 'function') {
+                    const icon = window._ledIconSprite();
+                    icon.position.set(colCenterX + halfSpan - 6, top[1] - 7, bodyD / 2 + 2);
+                    _buildGroup.add(icon);
+                }
             });
         }
 

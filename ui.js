@@ -8954,6 +8954,7 @@ function _captureFrameAtView(cam, ctrl, ren, scn, view, hasDoors) {
     // Must set ALL wings — state.hasDoors only writes the active wing via proxy
     window._spaceCaptureForceDoors = !!hasDoors;
     _setAllWingsHasDoors(hasDoors);
+    window._captureLedIcons = !hasDoors;
 
     try {
     if (isSideWingShot) {
@@ -9000,6 +9001,7 @@ function _captureFrameAtView(cam, ctrl, ren, scn, view, hasDoors) {
     return dataUrl;
     } finally {
         window._spaceCaptureForceDoors = prevForceDoors;
+        window._captureLedIcons = false;
     }
 }
 
