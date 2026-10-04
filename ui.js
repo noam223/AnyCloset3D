@@ -8949,41 +8949,115 @@ function _partColorByKey(key) {
     return _PART_COLORS[key] || { fill: '#f1f5f9', stroke: '#1e3a5f' };
 }
 
-/** Tint each part of the built cabinet in its print color; returns the cloned materials to dispose after capture. */
-function _tintCabinetPartsForCapture() {
-    const root = window.cabinetGroup;
-    if (!root || typeof THREE === 'undefined') return [];
-    const clones = [];
-    const tints = {};
-    const tintFor = function(key) {
-        if (!tints[key]) tints[key] = new THREE.Color('#ffffff').lerp(new THREE.Color(_partColorByKey(key).stroke), 0.28);
-        return tints[key];
-    };
-    root.traverse(function(obj) {
-        if (!obj.isMesh || !obj.material) return;
-        let key = 'wing:center';
-        for (let a = obj; a && a !== root; a = a.parent) {
-            const u = a.userData || {};
-            if (u.isFullCorner) { key = 'corner:' + u.side; break; }
-            if (u.wingId) {
-                const id = String(u.wingId).replace(/^upperUnit_/, '');
-                key = (id === 'left' || id === 'right' || id === 'center') ? 'wing:' + id : 'wing:sideCabinet';
-                break;
-            }
+function _partKeyForObject(obj, root) {
+    for (let a = obj; a && a !== root; a = a.parent) {
+        const u = a.userData || {};
+        if (u.isFullCorner) return 'corner:' + u.side;
+        if (u.wingId) {
+            const id = String(u.wingId).replace(/^upperUnit_/, '');
+            return (id === 'left' || id === 'right' || id === 'center') ? 'wing:' + id : 'wing:sideCabinet';
         }
-        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-        if (mats.some(function(m) { return m && m.transparent && m.opacity === 0; })) return;
-        const tint = tintFor(key);
-        const next = mats.map(function(m) {
-            if (!m || !m.color) return m;
-            const c = m.clone();
-            c.color.multiply(tint);
-            clones.push(c);
-            return c;
-        });
-        obj.material = Array.isArray(obj.material) ? next : next[0];
+    }
+    return 'wing:center';
+}
+
+/** Mask pixels that stay set after eroding by r (separable min filter). */
+function _erodeMask(mask, w, h, r) {
+    const tmp = new Uint8Array(w * h);
+    const out = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) {
+        let run = 0;
+        const row = y * w;
+        const runs = new Int32Array(w);
+        for (let x = 0; x < w; x++) { run = mask[row + x] ? run + 1 : 0; runs[x] = run; }
+        run = 0;
+        for (let x = w - 1; x >= 0; x--) {
+            run = mask[row + x] ? run + 1 : 0;
+            tmp[row + x] = (runs[x] > r && run > r) ? 1 : 0;
+        }
+    }
+    const runs = new Int32Array(h);
+    for (let x = 0; x < w; x++) {
+        let run = 0;
+        for (let y = 0; y < h; y++) { run = tmp[y * w + x] ? run + 1 : 0; runs[y] = run; }
+        run = 0;
+        for (let y = h - 1; y >= 0; y--) {
+            run = tmp[y * w + x] ? run + 1 : 0;
+            out[y * w + x] = (runs[y] > r && run > r) ? 1 : 0;
+        }
+    }
+    return out;
+}
+
+/**
+ * Copy the current render and draw a colored line just inside each part's visible silhouette.
+ * Must run right after ren.render (the WebGL buffer is not preserved).
+ */
+function _outlineCabinetPartsOnCanvas(ren, scn, cam) {
+    const src = ren.domElement;
+    const w = src.width, h = src.height;
+    const base = document.createElement('canvas');
+    base.width = w; base.height = h;
+    const bctx = base.getContext('2d');
+    bctx.drawImage(src, 0, 0);
+    const root = window.cabinetGroup;
+    if (!root || typeof THREE === 'undefined' || root.parent !== scn) return base;
+
+    const entries = [];
+    root.traverse(function(obj) {
+        if (obj === root) return;
+        if (obj.isMesh) {
+            const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+            const invisible = mats.some(function(m) { return m && m.transparent && m.opacity === 0; });
+            entries.push({ obj: obj, key: invisible ? null : _partKeyForObject(obj, root), visible: obj.visible, material: obj.material });
+        } else if (obj.isLine || obj.isSprite || obj.isPoints) {
+            entries.push({ obj: obj, key: null, visible: obj.visible, material: obj.material });
+        }
     });
-    return clones;
+    const keys = Array.from(new Set(entries.filter(function(e) { return e.key; }).map(function(e) { return e.key; })));
+    if (keys.length < 2) return base;
+
+    const others = scn.children.filter(function(c) { return c !== root && c.visible; });
+    const prevBg = scn.background;
+    const white = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, toneMapped: false });
+    const black = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide, toneMapped: false });
+    const out = bctx.getImageData(0, 0, w, h);
+    const d = out.data;
+    const tmp = document.createElement('canvas');
+    tmp.width = w; tmp.height = h;
+    const tctx = tmp.getContext('2d');
+    const r = Math.max(3, Math.round(w / 300));
+    try {
+        others.forEach(function(c) { c.visible = false; });
+        scn.background = new THREE.Color(0x000000);
+        entries.forEach(function(e) { if (!e.key) e.obj.visible = false; });
+        keys.forEach(function(key) {
+            entries.forEach(function(e) { if (e.key) e.obj.material = e.key === key ? white : black; });
+            ren.render(scn, cam);
+            tctx.clearRect(0, 0, w, h);
+            tctx.drawImage(src, 0, 0);
+            const px = tctx.getImageData(0, 0, w, h).data;
+            const mask = new Uint8Array(w * h);
+            for (let i = 0, j = 0; i < mask.length; i++, j += 4) mask[i] = px[j] > 127 ? 1 : 0;
+            const inner = _erodeMask(mask, w, h, r);
+            const hex = _partColorByKey(key).stroke.replace('#', '');
+            const R = parseInt(hex.slice(0, 2), 16), G = parseInt(hex.slice(2, 4), 16), B = parseInt(hex.slice(4, 6), 16);
+            for (let i = 0; i < mask.length; i++) {
+                if (mask[i] && !inner[i]) {
+                    const j = i * 4;
+                    d[j] = R; d[j + 1] = G; d[j + 2] = B; d[j + 3] = 255;
+                }
+            }
+        });
+    } finally {
+        entries.forEach(function(e) { e.obj.visible = e.visible; e.obj.material = e.material; });
+        others.forEach(function(c) { c.visible = true; });
+        scn.background = prevBg;
+        white.dispose();
+        black.dispose();
+    }
+    bctx.putImageData(out, 0, 0);
+    return base;
 }
 
 /** Trim the uniform background around the rendered cabinet (call right after render — WebGL buffer is cleared afterwards). */
@@ -9071,7 +9145,7 @@ function _getCornerAngleCaptureView(focusX) {
         fitH: maxH + 140,
         fitW: (pMax - pMin) * 1.15 + 80,
         crop: true,
-        tintParts: true
+        outlineParts: true
     };
 }
 
@@ -9132,12 +9206,11 @@ function _captureFrameAtView(cam, ctrl, ren, scn, view, hasDoors) {
     if (typeof doorMeshes !== 'undefined' && doorMeshes) {
         doorMeshes.forEach(function(m) { m.visible = !!hasDoors; });
     }
-    const tintClones = view.tintParts ? _tintCabinetPartsForCapture() : [];
     // Double-render so materials/textures settle (avoids blank/white captures)
     ren.render(scn, cam);
     ren.render(scn, cam);
-    const dataUrl = view.crop ? _cropCanvasToContent(ren.domElement, 18) : ren.domElement.toDataURL('image/png');
-    tintClones.forEach(function(m) { m.dispose(); });
+    const frame = view.outlineParts ? _outlineCabinetPartsOnCanvas(ren, scn, cam) : ren.domElement;
+    const dataUrl = view.crop ? _cropCanvasToContent(frame, 18) : frame.toDataURL('image/png');
 
     state.wingEditMode = savedWingEdit;
     state.activeWing = savedActiveWing;
