@@ -2009,7 +2009,7 @@ var _PP_DEFAULTS = {
     ranges:{
         c9:      {melamine:{80:970, 120:1340,160:1500,200:1870,240:2250},nonMelamine:{80:1250,120:1600,160:1945,200:2433,240:2920}},
         regalim: {melamine:{80:1050,120:1462,160:1658,200:2073,240:2487},nonMelamine:{80:1360,120:1900,160:2155,200:2700,240:3233}},
-        maya:    {melamine:{80:1050,120:1462,160:1658,200:2073,240:2487},nonMelamine:{80:1360,120:1900,160:2155,200:2700,240:3233}}
+        maya:    {melamine:{40:675,80:1050,120:1462,160:1658,200:2073,240:2487},nonMelamine:{40:830,80:1360,120:1900,160:2155,200:2700,240:3233}}
     },
     extras:{internalDrawer:150,externalDrawer:200,openCell:400,partition:150,shelfFreePerMeter:3,
         extraShelfMel:60,extraShelfNonMel:80,deskUnit:900,doorFramedMel:80,doorGlassMel:400,
@@ -2795,6 +2795,10 @@ function _ppBuildRangesTable(ranges) {
         var entry = r[t.id] || {};
         var mel = entry.melamine || {};
         var nonMel = entry.nonMelamine || {};
+        if (t.id === 'maya' && mel['40'] == null && mel['80'] != null) {
+            mel = Object.assign({ 40: Math.round(_ppNum(mel['80'], 0) / 2 + 150) }, mel);
+            nonMel = Object.assign({ 40: Math.round(_ppNum(nonMel['80'], 0) / 2 + 150) }, nonMel);
+        }
         var widths = Object.keys(mel).length ? Object.keys(mel) : Object.keys(nonMel);
         widths.sort(function(a, b) { return parseInt(a, 10) - parseInt(b, 10); });
         if (!widths.length) return;

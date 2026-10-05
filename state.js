@@ -4811,7 +4811,7 @@ var DEFAULT_PRICING_CONFIG = {
     ranges: {
         c9:      { melamine: {80:970, 120:1340,160:1500,200:1870,240:2250}, nonMelamine: {80:1250,120:1600,160:1945,200:2433,240:2920} },
         regalim: { melamine: {80:1050,120:1462,160:1658,200:2073,240:2487}, nonMelamine: {80:1360,120:1900,160:2155,200:2700,240:3233} },
-        maya:    { melamine: {80:1050,120:1462,160:1658,200:2073,240:2487}, nonMelamine: {80:1360,120:1900,160:2155,200:2700,240:3233} }
+        maya:    { melamine: {40:675,80:1050,120:1462,160:1658,200:2073,240:2487}, nonMelamine: {40:830,80:1360,120:1900,160:2155,200:2700,240:3233} }
     },
     extras: {
         internalDrawer: 150, externalDrawer: 200,
@@ -4896,9 +4896,18 @@ function _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel) {
         rt = wMelamine ? mr.melamine : (mr.nonMelamine||mr.melamine);
     }
     rt = rt || {};
+    // C9 up to 80 cm is priced from the Maya table
+    if (wEffectiveModel === 'c9' && ww <= 80 && cfgR.maya) {
+        const mr = cfgR.maya;
+        rt = (wMelamine ? mr.melamine : (mr.nonMelamine || mr.melamine)) || rt;
+    }
     const p240 = _priceNum(rt['240'], 2487);
+    const p40 = _priceNum(rt['40'], 0);
     let bp;
-    if (ww <= 80) bp = _priceNum(rt['80'], 1050);
+    if (ww <= 40 && (p40 > 0 || wEffectiveModel === 'maya' || wEffectiveModel === 'c9')) {
+        bp = p40 > 0 ? p40 : _priceNum(rt['80'], 1050) / 2 + 150;
+    }
+    else if (ww <= 80) bp = _priceNum(rt['80'], 1050);
     else if (ww <= 120) bp = _priceNum(rt['120'], 1462);
     else if (ww <= 160) bp = _priceNum(rt['160'], 1658);
     else if (ww <= 200) bp = _priceNum(rt['200'], 2073);
@@ -4912,7 +4921,7 @@ function _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel) {
 var SANDWICH_COLORS = new Set(['2025','2044','2041','456','2024','2049','2062','2047','7180','c3110','2040','2020']);
 
 function _calcIncludedShelves(ww, wh, wModel) {
-    const isC9Like = (wModel === 'c9' || wModel === 'ab2_nohoney');
+    const isC9Like = (wModel === 'c9' || wModel === 'ab2_nohoney') && ww > 80;
     let allowed = 0;
     if (!isC9Like) {
         if (ww <= 80) allowed = 5; else if (ww <= 160) allowed = 8; else allowed = 13;
