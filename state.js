@@ -2840,7 +2840,7 @@ window.updateCornerDeskHandleStyle = function(style) {
 window.HANDLE_VARIANTS = {
     pipe_silver:    { shape: 'pipe',     label: 'צינור כסף',        color: 0xaaaaaa, metalness: 0.8,  roughness: 0.2,  thumb: 'textures/handles/pipe_silver.png' },
     pipe_black:     { shape: 'pipe',     label: 'צינור שחור מט',    color: 0x1d1d1f, metalness: 0.55, roughness: 0.55, thumb: 'textures/handles/pipe_black.png' },
-    halfmoon_gold:  { shape: 'halfmoon', label: 'חצי ירח זהב מט',   color: 0xb8975f, metalness: 0.85, roughness: 0.42, thumb: 'textures/handles/halfmoon_gold.png' },
+    halfmoon_gold:  { shape: 'halfmoon', label: 'חצי ירח זהב מט',   color: 0xffdb72, metalness: 1, roughness: 0.3, envIntensity: 1.45, thumb: 'textures/handles/halfmoon_gold.png?v=2' },
     halfmoon_black: { shape: 'halfmoon', label: 'חצי ירח שחור מט',  color: 0x1d1d1f, metalness: 0.55, roughness: 0.55, thumb: 'textures/handles/halfmoon_black.png' }
 };
 window._handleVariantId = function(v) { return window.HANDLE_VARIANTS[v] ? v : 'pipe_silver'; };
@@ -2850,7 +2850,7 @@ window.RIDING_COLORS = {
     black:  { label: 'שחור מט',      color: 0x1d1d1f, metalness: 0.55, roughness: 0.55 },
     white:  { label: 'לבן',          color: 0xf4f4f2, metalness: 0.1,  roughness: 0.45 },
     nickel: { label: 'ניקל מוברש',   color: 0xc9c5bd, metalness: 0.9,  roughness: 0.35 },
-    gold:   { label: 'זהב מט',       color: 0xb8975f, metalness: 0.85, roughness: 0.42 }
+    gold:   { label: 'זהב מט',       color: 0xffdb72, metalness: 1, roughness: 0.3, envIntensity: 1.45 }
 };
 window._ridingColorId = function(c) { return window.RIDING_COLORS[c] ? c : 'black'; };
 

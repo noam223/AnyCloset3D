@@ -1430,7 +1430,7 @@ body {
 .riding-swatch .rs-black  { background: linear-gradient(180deg, #45454a 0%, #1d1d1f 55%, #111 100%); }
 .riding-swatch .rs-white  { background: linear-gradient(180deg, #fff 0%, #efefed 60%, #d7d7d3 100%); outline: 1px solid #cfcfcb; }
 .riding-swatch .rs-nickel { background: linear-gradient(180deg, #ecebe7 0%, #bdb9b1 50%, #96928a 100%); }
-.riding-swatch .rs-gold   { background: linear-gradient(180deg, #e2c793 0%, #b8975f 55%, #8a6d3d 100%); }
+.riding-swatch .rs-gold   { background: linear-gradient(180deg, #f7e7a8 0%, #dcc070 55%, #a88a3e 100%); }
 
 /* ---- Closure position buttons ---- */
 .closure-pos-btn {

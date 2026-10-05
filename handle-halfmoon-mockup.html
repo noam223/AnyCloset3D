@@ -31,7 +31,7 @@
   <div class="grp">
     <div class="grp-t">גוון ידית</div>
     <div class="btns" id="finish">
-      <button data-v="gold" class="on"><span class="sw" style="background:#b8975f"></span>זהב מט</button>
+      <button data-v="gold" class="on"><span class="sw" style="background:#dcc070"></span>זהב מט</button>
       <button data-v="black"><span class="sw" style="background:#1d1d1f"></span>שחור מט</button>
     </div>
   </div>
@@ -71,7 +71,7 @@ const HM = {
 };
 
 const FINISHES = {
-    gold:  { color: 0xb8975f, metalness: 0.85, roughness: 0.42 },
+    gold:  { color: 0xffdb72, metalness: 1, roughness: 0.3, envIntensity: 1.45 },
     black: { color: 0x1d1d1f, metalness: 0.55, roughness: 0.55 }
 };
 const FRONTS = {
@@ -131,6 +131,7 @@ function applyMat(mat, spec) {
     mat.color.setHex(spec.color).convertSRGBToLinear();
     mat.roughness = spec.roughness;
     mat.metalness = spec.metalness || 0;
+    mat.envMapIntensity = spec.envIntensity || 1;
     mat.needsUpdate = true;
 }
 applyMat(handleMat, FINISHES.gold);
