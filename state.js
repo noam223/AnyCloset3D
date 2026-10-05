@@ -2841,6 +2841,7 @@ window.updateHandleStyle = function(style) {
     });
     if (typeof window._syncCornerDeskHandleUI === 'function') window._syncCornerDeskHandleUI(w);
     buildCabinet();
+    calculatePrice();
     saveHistoryState();
 };
 
@@ -4978,12 +4979,13 @@ function _calcWingCost(cfg, wing) {
     let hasAnyDesk = (wing.desk && wing.desk.side !== 'none') || wing.columns.some(col => col.type === 'desk');
     if (hasAnyDesk) finalCost += _priceNum(ex.deskUnit, 900);
 
-    let openCellBlocks = 0, partitionBlocks = 0;
+    let openCellBlocks = 0, partitionBlocks = 0, sorbets = 0, extDrawerFronts = 0;
     wing.columns.forEach(col => {
         let inBlock = false;
         col.compartments.forEach(comp => {
             if (comp.type === 'internal_drawers') finalCost += comp.count*_priceNum(ex.internalDrawer, 150);
-            else if (comp.type === 'external_drawers') finalCost += comp.count*_priceNum(ex.externalDrawer, 200);
+            else if (comp.type === 'external_drawers') { finalCost += comp.count*_priceNum(ex.externalDrawer, 200); extDrawerFronts += comp.count || 0; }
+            else if (comp.type === 'sorbet') sorbets++;
             if (comp && comp.partition && Array.isArray(comp.subCells)) {
                 comp.subCells.forEach(sub => {
                     if (!sub || !Array.isArray(sub.zonesType)) return;
@@ -4992,7 +4994,8 @@ function _calcWingCost(cfg, wing) {
                             ? sub.zonesDrawerCount[z]
                             : (sub.count || 1);
                         if (zt === 'internal_drawers') finalCost += n * _priceNum(ex.internalDrawer, 150);
-                        else if (zt === 'external_drawers') finalCost += n * _priceNum(ex.externalDrawer, 200);
+                        else if (zt === 'external_drawers') { finalCost += n * _priceNum(ex.externalDrawer, 200); extDrawerFronts += n; }
+                        else if (zt === 'sorbet') sorbets++;
                     });
                 });
             }
@@ -5022,6 +5025,15 @@ function _calcWingCost(cfg, wing) {
                 finalCost += styleExtra * leaves;
             });
         });
+    }
+
+    finalCost += sorbets * _priceNum(ex.sorbet, 170);
+
+    // ab2 is touch by design, so its handles are already part of the model price.
+    if (wing.handleStyle === 'touch' && wModel !== 'ab2') {
+        let doorLeaves = 0;
+        if (wing.hasDoors) wing.columns.forEach(col => (col.doors || []).forEach(door => { doorLeaves += door.type === 'double' ? 2 : 1; }));
+        finalCost += (doorLeaves + extDrawerFronts) * _priceNum(ex.touchHandle, 30);
     }
 
     const splitThreshold = getSplitThreshold(wing);
