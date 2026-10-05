@@ -303,7 +303,9 @@ function _cuAddDrawerHandle(dMesh, drawerDepth, drawerFaceH, sign, t, styleOverr
         const barLen = Math.min(CU_RIDING_HANDLE_LEN, Math.max(8, drawerDepth - 3));
         const barH = 0.75;
         const barD = 0.9;
-        const mat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.35, roughness: 0.45 });
+        const mat = typeof _ridingHandleMat === 'function'
+            ? _ridingHandleMat()
+            : new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.35, roughness: 0.45 });
         // X-facing drawer front: horizontal lip on top edge, protruding toward opening
         const bar = new THREE.Mesh(new THREE.BoxGeometry(barD, barH, barLen), mat);
         bar.position.set(sign * (-t / 2 - barD / 2 - 0.4), panelH / 2 - barH / 2 - 0.15, 0);
@@ -1062,7 +1064,7 @@ function buildFullCornerUnit(side, wingData) {
                     const isRiding = fcHandleStyle === 'riding';
                     const mat = isRiding
                         ? (typeof _ridingHandleMat === 'function'
-                            ? _ridingHandleMat()
+                            ? _ridingHandleMat(wingData.ridingColor)
                             : new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.35, roughness: 0.45 }))
                         : (typeof _handleMat3D === 'function' ? _handleMat3D(fcVariant) : new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8, roughness: 0.3 }));
                     const out = isRiding ? 0.55 : 1.5;  // protrusion from the door face

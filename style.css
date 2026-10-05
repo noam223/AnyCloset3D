@@ -1410,6 +1410,27 @@ body {
 .handle-variant-opt span { font-size: 0.6rem; font-weight: 600; line-height: 1.2; text-align: center; }
 .handle-variant-opt:hover { border-color: var(--accent); color: var(--accent); }
 .handle-variant-opt.active { border-color: var(--secondary); color: var(--secondary); background: var(--accent-pale); }
+.handle-variant-opt .riding-swatch {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 56px;
+    aspect-ratio: 1;
+    border-radius: 6px;
+    background: #f1f3f4;
+}
+.riding-swatch i {
+    display: block;
+    width: 72%;
+    height: 9px;
+    border-radius: 2px;
+    box-shadow: 0 2px 3px rgba(0,0,0,0.22);
+}
+.riding-swatch .rs-black  { background: linear-gradient(180deg, #45454a 0%, #1d1d1f 55%, #111 100%); }
+.riding-swatch .rs-white  { background: linear-gradient(180deg, #fff 0%, #efefed 60%, #d7d7d3 100%); outline: 1px solid #cfcfcb; }
+.riding-swatch .rs-nickel { background: linear-gradient(180deg, #ecebe7 0%, #bdb9b1 50%, #96928a 100%); }
+.riding-swatch .rs-gold   { background: linear-gradient(180deg, #e2c793 0%, #b8975f 55%, #8a6d3d 100%); }
 
 /* ---- Closure position buttons ---- */
 .closure-pos-btn {

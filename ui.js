@@ -2929,7 +2929,7 @@ window._serializeCabinetForTemplate = function() {
         plinthHeight: state.plinthHeight,
         hasDoors: state.hasDoors,
         handleType: state.handleType,
-        handleStyle: state.handleStyle, handleVariant: state.handleVariant,
+        handleStyle: state.handleStyle, handleVariant: state.handleVariant, ridingColor: state.ridingColor,
         cabinetName: '',
         cabinetModelLabel: (state.wings && state.wings.center && state.wings.center.cabinetModelLabel) || state.cabinetModelLabel || '',
         cabinetNotes: '',
@@ -8395,7 +8395,7 @@ function bindUI() {
             cabinetModel: state.cabinetModel,
             placement: state.placement,
             width: state.width, globalHeight: state.globalHeight, depth: state.depth, thickness: state.thickness,
-            plinthHeight: state.plinthHeight, hasDoors: state.hasDoors, handleType: state.handleType, handleStyle: state.handleStyle, handleVariant: state.handleVariant,
+            plinthHeight: state.plinthHeight, hasDoors: state.hasDoors, handleType: state.handleType, handleStyle: state.handleStyle, handleVariant: state.handleVariant, ridingColor: state.ridingColor,
             cabinetName: state.cabinetName, cabinetModelLabel: (state.wings && state.wings.center && state.wings.center.cabinetModelLabel) || state.cabinetModelLabel || '', cabinetNotes: state.cabinetNotes, manualPrice: state.manualPrice,
             boardMaterial: state.boardMaterial, materialBody: state.materialBody, materialInternal: state.materialInternal,
             materialExternal: state.materialExternal, materialDesk: state.materialDesk, materialOpenCell: state.materialOpenCell, materialBack: state.materialBack, columns: state.columns, desk: state.desk
@@ -10071,7 +10071,7 @@ window._buildCurrentCabinetCompareRaw = function() {
         plinthHeight: state.plinthHeight,
         hasDoors: state.hasDoors,
         handleType: state.handleType,
-        handleStyle: state.handleStyle, handleVariant: state.handleVariant,
+        handleStyle: state.handleStyle, handleVariant: state.handleVariant, ridingColor: state.ridingColor,
         cabinetName: state.cabinetName || '',
         cabinetModelLabel: (state.wings && state.wings.center && state.wings.center.cabinetModelLabel) || state.cabinetModelLabel || '',
         cabinetNotes: state.cabinetNotes || '',
@@ -11217,7 +11217,7 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
             cabinetModel: state.cabinetModel,
             placement: state.placement,
             width: state.width, globalHeight: state.globalHeight, depth: state.depth, thickness: state.thickness,
-            plinthHeight: state.plinthHeight, hasDoors: state.hasDoors, handleType: state.handleType, handleStyle: state.handleStyle, handleVariant: state.handleVariant,
+            plinthHeight: state.plinthHeight, hasDoors: state.hasDoors, handleType: state.handleType, handleStyle: state.handleStyle, handleVariant: state.handleVariant, ridingColor: state.ridingColor,
             cabinetName: state.cabinetName, cabinetModelLabel: (state.wings && state.wings.center && state.wings.center.cabinetModelLabel) || state.cabinetModelLabel || '', cabinetNotes: state.cabinetNotes, manualPrice: state.manualPrice,
             manualInstallPrice: getWing().manualInstallPrice != null ? getWing().manualInstallPrice : null,
             boardMaterial: state.boardMaterial, materialBody: state.materialBody, materialInternal: state.materialInternal,
@@ -11318,7 +11318,7 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
             placement: _isWritingDeskCart ? 'שולחן עמידה' : (placementHebrew[state.placement] || 'ארון קיר חופשי'),
             dimsStr: _wdDimsStr,
             material: state.boardMaterial === 'mdf' ? 'MDF' : state.boardMaterial === 'melamine' ? 'מלמין' : "סנדביץ'",
-            handle: window._handleStyleLabel(state.handleStyle, state.handleVariant, state.handleType),
+            handle: window._handleStyleLabel(state.handleStyle, state.handleVariant, state.handleType, state.ridingColor),
             desk: deskInfo,
             deskDims: deskDimsInfo,
             colorBody: _colorKeyLabel(state.materialBody),
@@ -12975,7 +12975,7 @@ function _collectWingPrintSpecRows(item, itemObj, unit) {
         id: prefix + 'handle',
         label: 'סוג ידיות לחזיתות',
         value: _plainSpecValue(wing.handleStyle
-            ? window._handleStyleLabel(wing.handleStyle, wing.handleVariant, wing.handleType)
+            ? window._handleStyleLabel(wing.handleStyle, wing.handleVariant, wing.handleType, wing.ridingColor)
             : item.handle)
     });
     rows.push({
@@ -15691,7 +15691,7 @@ function _buildCustomerSummaryDetails(itemObj) {
     } else if (item.handle) {
         details.push('סוג ידיות: ' + item.handle);
     } else if (rawState && rawState.handleStyle) {
-        details.push('סוג ידיות: ' + window._handleStyleLabel(rawState.handleStyle, rawState.handleVariant, rawState.handleType));
+        details.push('סוג ידיות: ' + window._handleStyleLabel(rawState.handleStyle, rawState.handleVariant, rawState.handleType, rawState.ridingColor));
     }
 
     if (item.drawersExt > 0) details.push('מגירות חיצוניות: ' + item.drawersExt);

@@ -4245,10 +4245,10 @@ function _placeHalfMoon(parent, mat, x, y, faceZ, inward) {
 
 const RIDING_HANDLE_LEN = 30; // cm — standard riding-handle length
 
-function _ridingHandleMat() {
-    const mat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.35, roughness: 0.45, envMap: window._studioEnvMap });
-    mat.userData.castsHandleShadow = true;
-    return mat;
+function _ridingHandleMat(colorId) {
+    const C = window.RIDING_COLORS || {};
+    const spec = C[colorId || state.ridingColor] || C.black || { color: 0x1d1d1f, metalness: 0.55, roughness: 0.55 };
+    return window._makeMockupMetalMat(spec);
 }
 
 /** Riding handle on doors: tall vertical profile on the seam between door leaves. */
@@ -6482,7 +6482,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                 _registerDoorMesh(handleMesh);
                             } else if (hs === 'riding') {
                                 const barLen = Math.min(RIDING_HANDLE_LEN, Math.max(8, flapW - 4));
-                                const bar = new THREE.Mesh(new THREE.BoxGeometry(barLen, 0.8, 0.8), _handleMat3D('pipe_silver'));
+                                const bar = new THREE.Mesh(new THREE.BoxGeometry(barLen, 0.8, 0.8), _ridingHandleMat());
                                 bar.position.set(subCenterX, flapBottomY + 0.6, hz);
                                 _buildGroup.add(bar);
                                 _registerDoorMesh(bar);
