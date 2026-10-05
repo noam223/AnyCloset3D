@@ -313,7 +313,8 @@ function _cuAddDrawerHandle(dMesh, drawerDepth, drawerFaceH, sign, t, styleOverr
     const barLen = Math.min(drawerDepth * 0.55, 18);
     const barR = 0.35;
     const postH = 1.2;
-    const handleMat = new THREE.MeshStandardMaterial({ color: 0xb0b0b0, metalness: 0.85, roughness: 0.15 });
+    const handleMat = new THREE.MeshStandardMaterial({ color: 0xb0b0b0, metalness: 0.85, roughness: 0.15, envMap: window._studioEnvMap });
+    handleMat.userData.castsHandleShadow = true;
     const hOffX = sign * (-t / 2 - postH - barR * 0.5);
     const bar = new THREE.Mesh(
         new THREE.CylinderGeometry(barR, barR, barLen, 12).rotateX(Math.PI / 2),
@@ -817,7 +818,7 @@ function buildFullCornerUnit(side, wingData) {
             // Rod 1 along X (horizontal arm, full width cw)
             const rod1 = new THREE.Mesh(
                 new THREE.CylinderGeometry(1.2, 1.2, cw - t, 16),
-                new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.9 })
+                new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.9, roughness: 0.25, envMap: window._studioEnvMap })
             );
             rod1.rotation.z = Math.PI / 2;
             rod1.position.set(-sign * cw / 2, rodY, frontD / 2);
@@ -825,7 +826,7 @@ function buildFullCornerUnit(side, wingData) {
             // Rod 2 along Z (full depth cd) — center at X=-sign*wingD/2, Z=cd/2
             const rod2 = new THREE.Mesh(
                 new THREE.CylinderGeometry(1.2, 1.2, cd - t, 16),
-                new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.9 })
+                new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.9, roughness: 0.25, envMap: window._studioEnvMap })
             );
             rod2.rotation.x = Math.PI / 2;
             rod2.position.set(-sign * wingD / 2, rodY - 2.5, cd / 2);

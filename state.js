@@ -2837,9 +2837,9 @@ window.updateCornerDeskHandleStyle = function(style) {
 /** External-handle variants (all are handleStyle 'pipe'); colors are linear hex like the rest of the engine. */
 window.HANDLE_VARIANTS = {
     pipe_silver:    { shape: 'pipe',     label: 'צינור כסף',        color: 0xaaaaaa, metalness: 0.8,  roughness: 0.2,  thumb: 'textures/handles/pipe_silver.png' },
-    pipe_black:     { shape: 'pipe',     label: 'צינור שחור מט',    color: 0x1d1d1f, metalness: 0.5,  roughness: 0.55, thumb: 'textures/handles/pipe_black.png' },
-    halfmoon_gold:  { shape: 'halfmoon', label: 'חצי ירח זהב מט',   color: 0xd8b97f, metalness: 0.45, roughness: 0.4,  thumb: 'textures/handles/halfmoon_gold.png' },
-    halfmoon_black: { shape: 'halfmoon', label: 'חצי ירח שחור מט',  color: 0x1d1d1f, metalness: 0.5,  roughness: 0.55, thumb: 'textures/handles/halfmoon_black.png' }
+    pipe_black:     { shape: 'pipe',     label: 'צינור שחור מט',    color: 0x1d1d1f, metalness: 0.55, roughness: 0.55, thumb: 'textures/handles/pipe_black.png' },
+    halfmoon_gold:  { shape: 'halfmoon', label: 'חצי ירח זהב מט',   color: 0xd6b47c, metalness: 0.85, roughness: 0.38, envIntensity: 1.6, thumb: 'textures/handles/halfmoon_gold.png' },
+    halfmoon_black: { shape: 'halfmoon', label: 'חצי ירח שחור מט',  color: 0x1d1d1f, metalness: 0.55, roughness: 0.55, thumb: 'textures/handles/halfmoon_black.png' }
 };
 window._handleVariantId = function(v) { return window.HANDLE_VARIANTS[v] ? v : 'pipe_silver'; };
 /** Print/quote label: "ידית חיצונית — חצי ירח זהב מט" (+ free-text model). */

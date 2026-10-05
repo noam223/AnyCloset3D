@@ -47,9 +47,64 @@ dirLight.shadow.camera.near   =   10;
 dirLight.shadow.camera.far    = 1200;
 dirLight.shadow.mapSize.width  = 2048;
 dirLight.shadow.mapSize.height = 2048;
-dirLight.shadow.bias = -0.005;
-dirLight.shadow.normalBias = 8.5;
+dirLight.shadow.bias = -0.0005;
+dirLight.shadow.normalBias = 0.5;
 scene.add(dirLight);
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0xb0b6ba, 0);
+scene.add(hemiLight);
+const fillLight = new THREE.DirectionalLight(0xffffff, 0);
+fillLight.position.set(-300, 200, 200);
+scene.add(fillLight);
+
+// Front faces must still sum to ~1.0 so melamine colors match the catalog swatches.
+window._LIGHT_PRESETS = {
+    studio:    { ambient: 0.25, hemi: 0.42, key: 0.45, fill: 0.15 },
+    front:     { ambient: 0.4,  hemi: 0.35, key: 0.35, fill: 0.1 },
+    blueprint: { ambient: 0.6,  hemi: 0,    key: 0.2, fill: 0 }
+};
+window._applyLighting = function(name) {
+    const p = window._LIGHT_PRESETS[name] || window._LIGHT_PRESETS.studio;
+    ambientLight.intensity = p.ambient;
+    hemiLight.intensity = p.hemi;
+    dirLight.intensity = p.key;
+    fillLight.intensity = p.fill;
+};
+window._applyLighting('studio');
+
+// Studio reflections for metal handles (same layout as handle-halfmoon-mockup.html).
+// Colors are pre-encoded because this renderer outputs linear values straight to the screen.
+window._studioEnvMap = (function() {
+    const C = hex => new THREE.Color(hex).convertLinearToSRGB();
+    const env = new THREE.Scene();
+    env.add(new THREE.Mesh(new THREE.BoxGeometry(100, 60, 100), new THREE.MeshBasicMaterial({ color: C(0x3a4044), side: THREE.BackSide })));
+    const panel = (w, h, x, y, z, hex) => {
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: C(hex), side: THREE.DoubleSide }));
+        m.position.set(x, y, z);
+        m.lookAt(0, 0, 0);
+        env.add(m);
+    };
+    panel(40, 20, 0, 25, 30, 0xffffff);
+    panel(25, 30, -45, 5, 0, 0xf2f2f2);
+    panel(25, 30, 45, 5, 10, 0xdedede);
+    panel(60, 8, 0, -25, 20, 0x777777);
+    const pm = new THREE.PMREMGenerator(renderer);
+    const tex = pm.fromScene(env, 0.04).texture;
+    pm.dispose();
+    return tex;
+})();
+
+// Shadow flags are applied once per rebuild, right before the shadow pass.
+window._shadowFlagsDirty = true;
+scene.onBeforeRender = function() {
+    if (!window._shadowFlagsDirty) return;
+    window._shadowFlagsDirty = false;
+    cabinetGroup.traverse(o => {
+        if (!o.isMesh || !o.material || Array.isArray(o.material)) return;
+        const m = o.material;
+        if (m.userData && m.userData.castsHandleShadow) o.castShadow = true;
+        if (!m.transparent && !m.isMeshBasicMaterial && !o.receiveShadow) o.receiveShadow = true;
+    });
+};
 
 // ---- HDR Environment Map — applied ONLY to aluminum profile material ----
 // Stored in window._hdrEnvMap; assigned explicitly to profileMat in buildSlidingDoorCabinet.
@@ -1235,7 +1290,7 @@ function _buildRoomDoorMesh(rg) {
     const frameMat = new THREE.MeshStandardMaterial({ color: 0xf2f2ef, roughness: 0.6, metalness: 0.02 });
     const leafMat = new THREE.MeshStandardMaterial({ color: 0xfbfbf9, roughness: 0.5, metalness: 0.02 });
     const panelMat = new THREE.MeshStandardMaterial({ color: 0xf0f0ec, roughness: 0.55, metalness: 0.02 });
-    const handleMat = new THREE.MeshStandardMaterial({ color: 0xb8b8b8, metalness: 0.8, roughness: 0.3 });
+    const handleMat = new THREE.MeshStandardMaterial({ color: 0xb8b8b8, metalness: 0.8, roughness: 0.3, envMap: window._studioEnvMap });
 
     // Local frame: +X = right seen from inside, +Z = into the room, origin on the wall plane.
     const group = new THREE.Group();
@@ -2536,8 +2591,8 @@ function updateCameraView() {
         controls.enableRotate = !sub2d;
         container.classList.remove('front-mode');
         scene.background = new THREE.Color(0xeceff1);
-        dirLight.intensity = 0.10;
-        ambientLight.intensity = 0.95;
+        dirLight.position.set(120, 510, 600);
+        window._applyLighting('studio');
         dimLayer.style.display = 'none';
         buttonsLayer.style.display = 'none';
         if (typeof dragHandlesLayer !== 'undefined' && dragHandlesLayer) dragHandlesLayer.style.display = 'none';
@@ -2656,9 +2711,7 @@ function updateCameraView() {
                 lightPos = [-dist * 0.8, dist * 0.6, dist * 0.1];
             }
             dirLight.position.set(...lightPos);
-            // Keep default lighting — wing edit mode uses same intensity as free mode
-            dirLight.intensity = 0.7;
-            ambientLight.intensity = 0.6;
+            window._applyLighting('front');
             controls.enableRotate = true;
             container.classList.add('front-mode');
             scene.background = new THREE.Color(0xeceff1);
@@ -2774,8 +2827,7 @@ function updateCameraView() {
         controls.enableRotate = true; container.classList.remove('front-mode');
         scene.background = new THREE.Color(0xeceff1);
         dirLight.position.set(120, 510, 600);
-        dirLight.intensity = 0.10;
-        ambientLight.intensity = 0.95;
+        window._applyLighting('studio');
         dimLayer.style.display = 'none'; buttonsLayer.style.display = 'none';
         floor.visible = true;
 
@@ -2837,15 +2889,13 @@ function updateCameraView() {
         
         if (state.viewMode === 'blueprint') {
             scene.background = new THREE.Color(0xffffff);
-            dirLight.intensity = 0.2;
-            ambientLight.intensity = 0.6;
+            window._applyLighting('blueprint');
             dimLayer.style.display = 'none';
             buttonsLayer.style.display = 'none';
             floor.visible = false;
         } else {
             scene.background = new THREE.Color(0xeceff1);
-            dirLight.intensity = 0.10;
-            ambientLight.intensity = 0.95;
+            window._applyLighting('front');
             dimLayer.style.display = 'block';
             buttonsLayer.style.display = 'block';
             floor.visible = true;
@@ -2884,8 +2934,7 @@ function updateCameraView() {
         controls.enableRotate = true; container.classList.remove('front-mode');
         scene.background = new THREE.Color(0xeceff1);
         dirLight.position.set(120, 510, 600);
-        dirLight.intensity = 0.10;
-        ambientLight.intensity = 0.95;
+        window._applyLighting('studio');
         dimLayer.style.display = 'none'; buttonsLayer.style.display = 'none';
         floor.visible = true;
         controls.enabled = true;
@@ -2909,6 +2958,7 @@ function buildCabinet() {
     }
 
     while(cabinetGroup.children.length > 0) cabinetGroup.remove(cabinetGroup.children[0]);
+    window._shadowFlagsDirty = true;
     hitBoxes = [];
     wingHitBoxes = [];
     deskHitBoxes = [];
@@ -4063,8 +4113,11 @@ function _isHalfMoonHandle(variantId) {
 
 function _handleMat3D(variantId) {
     const v = _handleVariantSpec(variantId);
-    const mat = new THREE.MeshStandardMaterial({ color: v.color, metalness: v.metalness, roughness: v.roughness });
-    if (v.color !== 0xaaaaaa && window._hdrEnvMap) { mat.envMap = window._hdrEnvMap; mat.needsUpdate = true; }
+    const mat = new THREE.MeshStandardMaterial({
+        color: v.color, metalness: v.metalness, roughness: v.roughness,
+        envMap: window._studioEnvMap, envMapIntensity: v.envIntensity || 1
+    });
+    mat.userData.castsHandleShadow = true;
     return mat;
 }
 
@@ -4122,7 +4175,9 @@ function _placeHalfMoon(parent, mat, x, y, faceZ, inward) {
 const RIDING_HANDLE_LEN = 30; // cm — standard riding-handle length
 
 function _ridingHandleMat() {
-    return new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.35, roughness: 0.45 });
+    const mat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.35, roughness: 0.45, envMap: window._studioEnvMap });
+    mat.userData.castsHandleShadow = true;
+    return mat;
 }
 
 /** Riding handle on doors: tall vertical profile on the seam between door leaves. */
@@ -5885,7 +5940,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
 
 if (compData && compData.type === 'hanging' && !(compData.partition)) {
                 if (!isBP) {
-                    const rod = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, col.width - 2, 16), new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.9 }));
+                    const rod = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, col.width - 2, 16), new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.9, roughness: 0.25, envMap: window._studioEnvMap }));
                     rod.rotation.z = Math.PI / 2; rod.position.set(colCenterX, prevY + compH - 6, 0);
                     _buildGroup.add(rod);
                 }
