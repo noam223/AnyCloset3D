@@ -5025,7 +5025,8 @@ function _calcWingCost(cfg, wing) {
     }
 
     const splitThreshold = getSplitThreshold(wing);
-    if (wh > splitThreshold) {
+    const tallestCol = Math.max(wh || 0, ...wing.columns.map(col => col.height || 0));
+    if (tallestCol > splitThreshold) {
         let topUnitCost = 0;
         if      (ww <= 160) topUnitCost = _priceNum(ex.upperUnit160, 600);
         else if (ww <= 240) topUnitCost = _priceNum(ex.upperUnit240, 900);
