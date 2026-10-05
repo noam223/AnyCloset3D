@@ -13483,7 +13483,7 @@ function _muPartsTableHtml(parts) {
         </tr>`;
     }).join('');
     return `<table class="mu-parts">
-        <thead><tr><th>חלק</th><th>רוחב</th><th>גובה / עומק</th><th>עמודות</th><th>מג' חיצ'</th><th>מג' פנים</th><th>מדפים</th><th>מוטות</th><th>לדים</th></tr></thead>
+        <thead><tr><th>חלק</th><th>רוחב</th><th>עומק / גובה</th><th>עמודות</th><th>מג' חיצ'</th><th>מג' פנים</th><th>מדפים</th><th>מוטות</th><th>לדים</th></tr></thead>
         <tbody>${body}</tbody>
         <tfoot><tr><td>סה"כ (${parts.length} חלקים)</td><td dir="ltr">${tot.w} <small>פריסה</small></td><td></td><td>${tot.cols}</td>
             <td>${tot.drawersExt}</td><td>${tot.drawersInt}</td><td>${tot.shelves}</td><td>${tot.hanging}</td><td>${tot.leds}</td></tr></tfoot>
