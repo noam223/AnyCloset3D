@@ -71,10 +71,11 @@ window._applyLighting = function(name) {
 };
 window._applyLighting('studio');
 
-// Studio reflections for metal handles (same layout as handle-halfmoon-mockup.html).
-// Colors are pre-encoded because this renderer outputs linear values straight to the screen.
-window._studioEnvMap = (function() {
-    const C = hex => new THREE.Color(hex).convertLinearToSRGB();
+// Studio reflections (same layout as handle-halfmoon-mockup.html).
+// preEncoded: for materials rendered by this linear-output renderer; raw: for the handle shader,
+// which does its own tone mapping + sRGB encoding exactly like the mockup.
+function _buildStudioEnvMap(preEncoded) {
+    const C = hex => preEncoded ? new THREE.Color(hex).convertLinearToSRGB() : new THREE.Color(hex);
     const env = new THREE.Scene();
     env.add(new THREE.Mesh(new THREE.BoxGeometry(100, 60, 100), new THREE.MeshBasicMaterial({ color: C(0x3a4044), side: THREE.BackSide })));
     const panel = (w, h, x, y, z, hex) => {
@@ -91,19 +92,94 @@ window._studioEnvMap = (function() {
     const tex = pm.fromScene(env, 0.04).texture;
     pm.dispose();
     return tex;
-})();
+}
+window._studioEnvMap = _buildStudioEnvMap(true);
+window._studioEnvMapRaw = _buildStudioEnvMap(false);
+
+// Handle materials get the mockup's pipeline (ACES, exposure 1.05, sRGB output) inside their own
+// shader, so metal highlights roll off naturally without changing how melamine colors render.
+const _HANDLE_TONEMAP_GLSL = `
+vec3 hmRRTAndODTFit(vec3 v) {
+    vec3 a = v * (v + 0.0245786) - 0.000090537;
+    vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081;
+    return a / b;
+}
+vec3 hmACESFilmic(vec3 color) {
+    const mat3 inM = mat3(vec3(0.59719, 0.07600, 0.02840), vec3(0.35458, 0.90834, 0.13383), vec3(0.04823, 0.01566, 0.83777));
+    const mat3 outM = mat3(vec3(1.60475, -0.10208, -0.00327), vec3(-0.53108, 1.10813, -0.07276), vec3(-0.07367, -0.00605, 1.07602));
+    color *= 1.05 / 0.6;
+    color = outM * hmRRTAndODTFit(inM * color);
+    return clamp(color, 0.0, 1.0);
+}
+void main() {`;
+function _handleShaderPipeline(shader) {
+    shader.fragmentShader = shader.fragmentShader
+        .replace('void main() {', _HANDLE_TONEMAP_GLSL)
+        .replace('#include <tonemapping_fragment>', 'gl_FragColor.rgb = hmACESFilmic(gl_FragColor.rgb);')
+        .replace('#include <encodings_fragment>', 'gl_FragColor = LinearTosRGB(gl_FragColor);');
+}
+window._makeMockupMetalMat = function(spec) {
+    const mat = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(spec.color).convertSRGBToLinear(),
+        metalness: spec.metalness, roughness: spec.roughness,
+        envMap: window._studioEnvMapRaw, envMapIntensity: spec.envIntensity || 1
+    });
+    mat.onBeforeCompile = _handleShaderPipeline;
+    mat.userData.castsHandleShadow = true;
+    return mat;
+};
 
 // Shadow flags are applied once per rebuild, right before the shadow pass.
 window._shadowFlagsDirty = true;
+const _SHADOW_ROOM_FRUSTUM = { left: -400, right: 400, top: 400, bottom: -100, near: 10, far: 1200 };
+const _shadowFitCam = new THREE.OrthographicCamera();
+const _shadowFitBox = new THREE.Box3();
+const _shadowFitPt = new THREE.Vector3();
+let _shadowFitKey = '';
+
+/** Without the room, fit the shadow frustum tightly around the cabinet so small parts (handles) get sharp shadows. */
+function _fitShadowFrustum() {
+    const sc = dirLight.shadow.camera;
+    const p = dirLight.position;
+    const key = (window._roomVisible ? 'room' : 'cab') + '|' + p.x + ',' + p.y + ',' + p.z;
+    if (key === _shadowFitKey && !window._shadowFrustumDirty) return;
+    _shadowFitKey = key;
+    window._shadowFrustumDirty = false;
+    let f = _SHADOW_ROOM_FRUSTUM;
+    if (!window._roomVisible) {
+        _shadowFitBox.setFromObject(cabinetGroup);
+        if (!_shadowFitBox.isEmpty()) {
+            _shadowFitBox.expandByScalar(10);
+            _shadowFitCam.position.copy(p);
+            _shadowFitCam.lookAt(dirLight.target.position);
+            _shadowFitCam.updateMatrixWorld();
+            const inv = _shadowFitCam.matrixWorldInverse.copy(_shadowFitCam.matrixWorld).invert();
+            const mn = new THREE.Vector3(Infinity, Infinity, Infinity), mx = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
+            const b = _shadowFitBox;
+            for (let i = 0; i < 8; i++) {
+                _shadowFitPt.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).applyMatrix4(inv);
+                mn.min(_shadowFitPt); mx.max(_shadowFitPt);
+            }
+            f = { left: mn.x, right: mx.x, top: mx.y, bottom: mn.y, near: Math.max(1, -mx.z - 50), far: -mn.z + 50 };
+        }
+    }
+    sc.left = f.left; sc.right = f.right; sc.top = f.top; sc.bottom = f.bottom;
+    sc.near = f.near; sc.far = f.far;
+    sc.updateProjectionMatrix();
+}
+
 scene.onBeforeRender = function() {
-    if (!window._shadowFlagsDirty) return;
-    window._shadowFlagsDirty = false;
-    cabinetGroup.traverse(o => {
-        if (!o.isMesh || !o.material || Array.isArray(o.material)) return;
-        const m = o.material;
-        if (m.userData && m.userData.castsHandleShadow) o.castShadow = true;
-        if (!m.transparent && !m.isMeshBasicMaterial && !o.receiveShadow) o.receiveShadow = true;
-    });
+    if (window._shadowFlagsDirty) {
+        window._shadowFlagsDirty = false;
+        window._shadowFrustumDirty = true;
+        cabinetGroup.traverse(o => {
+            if (!o.isMesh || !o.material || Array.isArray(o.material)) return;
+            const m = o.material;
+            if (m.userData && m.userData.castsHandleShadow) o.castShadow = true;
+            if (!m.transparent && !m.isMeshBasicMaterial && !o.receiveShadow) o.receiveShadow = true;
+        });
+    }
+    _fitShadowFrustum();
 };
 
 // ---- HDR Environment Map — applied ONLY to aluminum profile material ----
@@ -4113,12 +4189,7 @@ function _isHalfMoonHandle(variantId) {
 
 function _handleMat3D(variantId) {
     const v = _handleVariantSpec(variantId);
-    const mat = new THREE.MeshStandardMaterial({
-        color: v.color, metalness: v.metalness, roughness: v.roughness,
-        envMap: window._studioEnvMap, envMapIntensity: v.envIntensity || 1
-    });
-    mat.userData.castsHandleShadow = true;
-    return mat;
+    return window._makeMockupMetalMat(v);
 }
 
 // Half-moon pull: 15 × 7.5 cm half ring on two standoff legs
