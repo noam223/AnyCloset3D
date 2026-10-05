@@ -825,6 +825,16 @@ function _bpClearCellHeightLabel(rowBotCm, rowTopCm, shelfT, isBottomRow, isTopR
     return _bpClearCellHeightMm(rowBotCm, rowTopCm, shelfT, isBottomRow, isTopRow);
 }
 
+/** Red translucent strip over the part of a cabinet face hidden by the adjoining cabinet (same rule as the designer's red zone). */
+function _bpDrawHiddenZone(p, ox, oy, dW, dH, sc, hiddenCm, onLeft) {
+    const hw = Math.min(dW, Math.max(0, hiddenCm) * sc);
+    if (hw < 1) return;
+    const x = onLeft ? ox : ox + dW - hw;
+    const lineX = onLeft ? ox + hw : ox + dW - hw;
+    p.push(`<rect x="${x.toFixed(1)}" y="${oy.toFixed(1)}" width="${hw.toFixed(1)}" height="${dH.toFixed(1)}" fill="#ff0000" fill-opacity="0.1" stroke="none" pointer-events="none"/>`);
+    p.push(`<line x1="${lineX.toFixed(1)}" y1="${oy.toFixed(1)}" x2="${lineX.toFixed(1)}" y2="${(oy + dH).toFixed(1)}" stroke="#ff2222" stroke-width="1.5" stroke-dasharray="6,4" pointer-events="none"/>`);
+}
+
 function _bpAppendViewCutouts(p, viewKey, ox, oy, dW, dH, sc, cabWidthCm, cabHeightCm) {
     const cutouts = _bpEnsureCutouts().filter(c => c.viewKey === viewKey);
     cutouts.forEach(co => {
@@ -3698,6 +3708,12 @@ window._generateMultiViewBlueprintPages = function() {
         }
 
         const _vkWing = wg.wd === leftWing ? 'left' : wg.wd === rightWing ? 'right' : 'center';
+        if (_vkWing === 'left' && lPos === 'side') _bpDrawHiddenZone(p, ox, oy, dW, dH, sc, cD, false);
+        else if (_vkWing === 'right' && rPos === 'side') _bpDrawHiddenZone(p, ox, oy, dW, dH, sc, cD, true);
+        else if (_vkWing === 'center') {
+            if (rPos === 'front') _bpDrawHiddenZone(p, ox, oy, dW, dH, sc, rD, false);
+            if (lPos === 'front') _bpDrawHiddenZone(p, ox, oy, dW, dH, sc, lD, true);
+        }
         _bpAppendViewCutouts(p, _vkWing, ox, oy, dW, dH, sc, wg.w, wg.h);
         _bpFlushDims(p);
         pages.push({ label: wg.label, svgParts: p, viewKey: _vkWing, cabWidthCm: wg.w, cabHeightCm: wg.h, viewMeta: { ox, oy, dW, dH, sc } });

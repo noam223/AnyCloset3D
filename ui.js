@@ -14540,8 +14540,8 @@ function _buildPrintHTML(mode) {
   .mu-sheet { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .mu-sheet-t { display: flex; justify-content: space-between; align-items: baseline; background: #1e3a5f; color: #fff; padding: 5px 12px; border-radius: 6px; font-weight: 800; margin-bottom: 3mm; }
   .mu-sheet-t small { font-weight: 600; opacity: 0.85; }
-  .mu-sheet-g { display: grid; gap: 5mm; width: 172mm; max-width: 100%; margin: 0 auto; }
-  .mu-sheet-c { break-inside: avoid; page-break-inside: avoid; }
+  .mu-sheet-g { display: grid; gap: 5mm; width: 172mm; max-width: 100%; margin: 0 auto; direction: ltr; }
+  .mu-sheet-c { break-inside: avoid; page-break-inside: avoid; direction: rtl; }
   .mu-sheet-c .mu-bp-h { height: 8mm; padding: 0 10px; }
   .mu-sheet-b { border: 2px solid #93c5fd; background: #fff; overflow: hidden; }
   .mu-sheet-b svg { width: 100% !important; height: 100% !important; display: block; }
