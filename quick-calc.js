@@ -235,6 +235,17 @@ function _qcSlidingCost(cfg, w, h) {
     return base;
 }
 
+/** Extra top unit when the cabinet is taller than one board allows (melamine/MDF above 270, sandwich above 240). */
+function _qcTopUnitCost(cfg, w, h, mat, model) {
+    if (model === 'sliding') return 0;
+    var threshold = mat === 'sandwich' ? 240 : 270;
+    if (!(h > threshold)) return 0;
+    var ex = cfg.extras || _QC_DEFAULT_PRICING.extras;
+    if (w <= 160) return _qcNum(ex.upperUnit160, 600);
+    if (w <= 240) return _qcNum(ex.upperUnit240, 900);
+    return w * _qcNum(ex.upperUnitPerCm, 3.75);
+}
+
 function _qcWingCost(cfg, w, h, d, model, isMelamine, shelves, intDrawers, extDrawers, openCells, hasDesk, typeId) {
     var ex = cfg.extras || _QC_DEFAULT_PRICING.extras;
     var cost = (model === 'sliding')
@@ -319,6 +330,8 @@ window.calcQuickPrice = function(autoUpdateShelves = false) {
 
     const ex = cfg.extras || _QC_DEFAULT_PRICING.extras;
     let finalCost = _qcWingCost(cfg, w, h, d, model, isMelamine, shelves, intDrawers, extDrawers, openCells, hasDesk, type ? type.id : typeId);
+    const topUnitCost = _qcTopUnitCost(cfg, w, h, mat, model);
+    finalCost += topUnitCost;
     finalCost += partitions * _qcNum(ex.partition, 150);
     finalCost += glassWoodDoors * _qcNum(ex.doorGlassMel, 400);
     finalCost += alumDoors * _qcNum(ex.doorGlassBlack, 600);
@@ -334,6 +347,7 @@ window.calcQuickPrice = function(autoUpdateShelves = false) {
     window._qcLastResult = {
         w: w, h: h, d: d, model: type ? type.id : typeId,
         mat: mat, shelves: shelves,
+        topUnitCost: Math.round(topUnitCost),
         cost: Math.round(finalCost),
         install: Math.round(installPrice),
         customer: Math.round(priceToCustomer),
