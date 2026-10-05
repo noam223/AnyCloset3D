@@ -471,11 +471,11 @@
                     <button type="button" class="handle-style-btn" data-style="touch" onclick="updateHandleStyle('touch')" title="ידית טאצ'">
                         <i class="fa-solid fa-hand-pointer"></i><span>טאצ'</span>
                     </button>
-                    <button type="button" class="handle-style-btn active" data-style="pipe" onclick="onExternalHandleBtn(this)" title="ידית חיצונית — בחירת דגם">
-                        <img class="handle-variant-thumb" src="textures/handles/pipe_silver.png" alt=""><span>חיצונית <i class="fa-solid fa-caret-down"></i></span>
+                    <button type="button" class="handle-style-btn active" data-style="pipe" onclick="onExternalHandleBtn()" title="ידית חיצונית">
+                        <img class="handle-variant-thumb" src="textures/handles/pipe_silver.png" alt=""><span>חיצונית</span>
                     </button>
                 </div>
-                <div class="handle-variant-menu" hidden>
+                <div class="handle-variant-menu">
                     <button type="button" class="handle-variant-opt" data-variant="pipe_silver" onclick="updateHandleVariant('pipe_silver', this)"><img src="textures/handles/pipe_silver.png" alt=""><span>צינור כסף</span></button>
                     <button type="button" class="handle-variant-opt" data-variant="pipe_black" onclick="updateHandleVariant('pipe_black', this)"><img src="textures/handles/pipe_black.png" alt=""><span>צינור שחור מט</span></button>
                     <button type="button" class="handle-variant-opt" data-variant="halfmoon_gold" onclick="updateHandleVariant('halfmoon_gold', this)"><img src="textures/handles/halfmoon_gold.png" alt=""><span>חצי ירח זהב מט</span></button>
@@ -2231,11 +2231,11 @@
             <button type="button" class="handle-style-btn mobile-handle-style-btn" data-style="touch" onclick="updateHandleStyle('touch')">
                 <i class="fa-solid fa-hand-pointer"></i><span>טאצ'</span>
             </button>
-            <button type="button" class="handle-style-btn mobile-handle-style-btn active" data-style="pipe" onclick="onExternalHandleBtn(this)" title="ידית חיצונית — בחירת דגם">
-                <img class="handle-variant-thumb" src="textures/handles/pipe_silver.png" alt=""><span>חיצונית <i class="fa-solid fa-caret-down"></i></span>
+            <button type="button" class="handle-style-btn mobile-handle-style-btn active" data-style="pipe" onclick="onExternalHandleBtn()" title="ידית חיצונית">
+                <img class="handle-variant-thumb" src="textures/handles/pipe_silver.png" alt=""><span>חיצונית</span>
             </button>
         </div>
-        <div class="handle-variant-menu" hidden>
+        <div class="handle-variant-menu">
             <button type="button" class="handle-variant-opt" data-variant="pipe_silver" onclick="updateHandleVariant('pipe_silver', this)"><img src="textures/handles/pipe_silver.png" alt=""><span>צינור כסף</span></button>
             <button type="button" class="handle-variant-opt" data-variant="pipe_black" onclick="updateHandleVariant('pipe_black', this)"><img src="textures/handles/pipe_black.png" alt=""><span>צינור שחור מט</span></button>
             <button type="button" class="handle-variant-opt" data-variant="halfmoon_gold" onclick="updateHandleVariant('halfmoon_gold', this)"><img src="textures/handles/halfmoon_gold.png" alt=""><span>חצי ירח זהב מט</span></button>
@@ -2761,7 +2761,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js?v=20261005pages"></script>
-<script src="state.js?v=20261005studioLight"></script>
+<script src="state.js?v=20261005handleMenu"></script>
 <script src="quick-calc.js?v=20261005w40"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>

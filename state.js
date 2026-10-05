@@ -2863,22 +2863,12 @@ window._syncHandleVariantUI = function(w) {
         img.src = v.thumb;
         img.alt = v.label;
     });
+    document.querySelectorAll('.handle-variant-menu').forEach(m => { m.hidden = style !== 'pipe'; });
 };
 
-window.toggleHandleVariantMenu = function(btn, forceOpen) {
-    const row = btn && btn.closest('.handle-style-row');
-    const menu = row && row.nextElementSibling && row.nextElementSibling.classList.contains('handle-variant-menu') ? row.nextElementSibling : null;
-    if (!menu) return;
-    const open = forceOpen != null ? forceOpen : menu.hidden;
-    menu.hidden = !open;
-};
-
-window.onExternalHandleBtn = function(btn) {
+window.onExternalHandleBtn = function() {
     const w = getWing();
-    if (!w) return;
-    const wasPipe = w.handleStyle === 'pipe';
-    if (!wasPipe) window.updateHandleStyle('pipe');
-    window.toggleHandleVariantMenu(btn, wasPipe ? undefined : true);
+    if (w && w.handleStyle !== 'pipe') window.updateHandleStyle('pipe');
 };
 
 window.updateHandleVariant = function(variant, el) {
@@ -2893,8 +2883,6 @@ window.updateHandleVariant = function(variant, el) {
         calculatePrice();
         saveHistoryState();
     }
-    const menu = el && el.closest('.handle-variant-menu');
-    if (menu) menu.hidden = true;
 };
 
 window.updateHandleStyle = function(style) {
@@ -2905,7 +2893,6 @@ window.updateHandleStyle = function(style) {
     document.querySelectorAll('.handle-style-btn:not(.corner-desk-handle-btn), .mobile-handle-style-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.style === style);
     });
-    if (style !== 'pipe') document.querySelectorAll('.handle-variant-menu').forEach(m => { m.hidden = true; });
     window._syncHandleVariantUI(w);
     if (typeof window._syncCornerDeskHandleUI === 'function') window._syncCornerDeskHandleUI(w);
     buildCabinet();
