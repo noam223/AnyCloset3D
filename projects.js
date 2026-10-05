@@ -9,6 +9,8 @@ var _deleteId            = null;
 var _statusChangeId      = null;
 var _searchQuery         = '';
 var _statusFilter        = 'active'; // main view: quote + measured + ordered
+var _page                = 1;
+var _PAGE_SIZE           = 30;
 var _selectedUpgradePlan = null;
 var _toastTimer          = null;
 var _devicesList         = [];
@@ -62,7 +64,7 @@ var _USER_TYPE_LABELS = {
 
     var user, plan, projects, subStatus;
     try {
-        var results = await Promise.all([Auth.getUser(), Auth.getPlan(), Projects.list(), Auth.isSubscriptionActive()]);
+        var results = await Promise.all([Auth.getUser(), Auth.getPlan(), Projects.list({ light: true }), Auth.isSubscriptionActive()]);
         user      = results[0];
         plan      = results[1];
         projects  = results[2];
@@ -71,7 +73,7 @@ var _USER_TYPE_LABELS = {
         // Fallback: load individually so one failure doesn't block everything
         try { user      = await Auth.getUser(); }           catch(e2) { console.warn('[init] getUser failed:', e2); }
         try { plan      = await Auth.getPlan(); }           catch(e2) { console.warn('[init] getPlan failed:', e2); }
-        try { projects  = await Projects.list(); }          catch(e2) { console.warn('[init] projects.list failed:', e2); showToast('שגיאה בטעינת הפרויקטים. רענן את הדף.', 'error'); }
+        try { projects  = await Projects.list({ light: true }); } catch(e2) { console.warn('[init] projects.list failed:', e2); showToast('שגיאה בטעינת הפרויקטים. רענן את הדף.', 'error'); }
         try { subStatus = await Auth.isSubscriptionActive(); } catch(e2) { console.warn('[init] subStatus failed:', e2); }
     }
     subStatus = subStatus || { active: true, reason: 'free' };
@@ -80,6 +82,8 @@ var _USER_TYPE_LABELS = {
 
     _plan     = plan;
     _projects = projects;
+    // Start first-page thumbnails now so they load alongside the rest of init
+    _loadPageThumbnails(_visibleProjects().slice(0, _PAGE_SIZE));
 
     if (user) {
         _currentUserId = user.id;
@@ -546,6 +550,7 @@ function _projectMatchesSearch(p) {
 }
 
 function _projectMatchesStatusFilter(p) {
+    if (_searchQuery) return true;
     var st = _normalizeOrderStatus(p.order_status);
     if (_statusFilter === 'active') return _isActiveOrderStatus(st);
     if (_statusFilter === 'all') return true;
@@ -573,6 +578,7 @@ function _syncStatusFilterUI() {
 
 function setStatusFilterActive() {
     _statusFilter = 'active';
+    _page = 1;
     _syncStatusFilterUI();
     _renderProjects();
 }
@@ -585,6 +591,7 @@ function setStatusFilterAll() {
 function setStatusFilter(status) {
     if (_ORDER_STATUS_KEYS.indexOf(status) === -1) return;
     _statusFilter = status;
+    _page = 1;
     _syncStatusFilterUI();
     _renderProjects();
 }
@@ -611,6 +618,7 @@ function onProjectsSearch(value, fromUser) {
         if (el) el.dataset.userTyped = '1';
     }
     _searchQuery = (value || '').trim();
+    _page = 1;
     _renderProjects();
 }
 
@@ -624,11 +632,7 @@ function _resetProjectsSearchIfAutofilled() {
 }
 
 // ── Projects grid ─────────────────────────────────────────────────────────────
-function _renderProjects() {
-    var grid = document.getElementById('projects-grid');
-    grid.innerHTML = '';
-    _syncStatusFilterUI();
-
+function _visibleProjects() {
     var visible = _projects.filter(function(p) {
         return _projectMatchesSearch(p) && _projectMatchesStatusFilter(p) && _projectMatchesAgent(p);
     });
@@ -639,6 +643,16 @@ function _renderProjects() {
         if (ap !== bp) return bp - ap;
         return new Date(b.updated_at || 0) - new Date(a.updated_at || 0);
     });
+    return visible;
+}
+
+function _renderProjects() {
+    var grid = document.getElementById('projects-grid');
+    grid.innerHTML = '';
+    _renderPager(0);
+    _syncStatusFilterUI();
+
+    var visible = _visibleProjects();
 
     var countEl = document.getElementById('content-count');
     if (countEl) {
@@ -648,6 +662,8 @@ function _renderProjects() {
         }).length;
         if (_statusFilter === 'active' && !_searchQuery) {
             countEl.textContent = activeCount + ' פרויקטים פעילים';
+        } else if (_searchQuery) {
+            countEl.textContent = visible.length + ' תוצאות בכל הסטטוסים';
         } else if (filtered) {
             countEl.textContent = visible.length + ' מתוך ' + _projects.length + ' פרויקטים';
         } else {
@@ -685,7 +701,12 @@ function _renderProjects() {
         return;
     }
 
-    visible.forEach(function(p) {
+    var totalPages = Math.max(1, Math.ceil(visible.length / _PAGE_SIZE));
+    if (_page > totalPages) _page = totalPages;
+    if (_page < 1) _page = 1;
+    var pageItems = visible.slice((_page - 1) * _PAGE_SIZE, _page * _PAGE_SIZE);
+
+    pageItems.forEach(function(p) {
         var card     = document.createElement('div');
         card.className  = 'project-card status-' + _normalizeOrderStatus(p.order_status) + (p.is_pinned ? ' is-pinned' : '');
         card.dataset.id = p.id;
@@ -743,7 +764,9 @@ function _renderProjects() {
             '<span class="project-status-foot-hint">לחץ לשינוי ▾</span></button>';
         var thumbHtml = p.thumbnail
             ? '<img src="' + p.thumbnail + '" alt="' + safeName + '" loading="lazy">'
-            : '<i class="fa-solid fa-cabinet-filing project-thumb-icon"></i>';
+            : (p.thumbnail === undefined
+                ? '<div class="project-thumb-loading"></div>'
+                : '<i class="fa-solid fa-cabinet-filing project-thumb-icon"></i>');
 
         // cart_count is derived from project_data; legacy cabinet_count was never kept up to date
         var cabCount = p.cart_count != null ? p.cart_count : (p.cabinet_count || 0);
@@ -837,6 +860,77 @@ function _renderProjects() {
 
         grid.appendChild(card);
     });
+
+    _renderPager(totalPages);
+    _loadPageThumbnails(pageItems);
+}
+
+function _renderPager(totalPages) {
+    var pager = document.getElementById('projects-pager');
+    if (!pager) {
+        var grid = document.getElementById('projects-grid');
+        if (!grid) return;
+        pager = document.createElement('div');
+        pager.id = 'projects-pager';
+        pager.className = 'projects-pager';
+        grid.parentNode.insertBefore(pager, grid.nextSibling);
+    }
+    if (totalPages <= 1) { pager.innerHTML = ''; pager.style.display = 'none'; return; }
+    pager.style.display = '';
+
+    // Compact window: first, last, current ±2, with ellipses between gaps
+    var pages = [];
+    for (var i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || Math.abs(i - _page) <= 2) pages.push(i);
+        else if (pages[pages.length - 1] !== '…') pages.push('…');
+    }
+    var html = '<button type="button" class="pager-btn" ' + (_page <= 1 ? 'disabled' : '') +
+        ' onclick="goToProjectsPage(' + (_page - 1) + ')" aria-label="הקודם"><i class="fa-solid fa-chevron-right"></i></button>';
+    pages.forEach(function(n) {
+        html += n === '…'
+            ? '<span class="pager-gap">…</span>'
+            : '<button type="button" class="pager-btn' + (n === _page ? ' active' : '') + '" onclick="goToProjectsPage(' + n + ')">' + n + '</button>';
+    });
+    html += '<button type="button" class="pager-btn" ' + (_page >= totalPages ? 'disabled' : '') +
+        ' onclick="goToProjectsPage(' + (_page + 1) + ')" aria-label="הבא"><i class="fa-solid fa-chevron-left"></i></button>';
+    pager.innerHTML = html;
+}
+
+function goToProjectsPage(n) {
+    _page = n;
+    _renderProjects();
+    var header = document.querySelector('.content-header') || document.getElementById('projects-grid');
+    if (header && header.scrollIntoView) header.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+var _thumbFetchInFlight = {};
+async function _loadPageThumbnails(items) {
+    var ids = items
+        .filter(function(p) { return p.thumbnail === undefined && !_thumbFetchInFlight[p.id]; })
+        .map(function(p) { return p.id; });
+    if (!ids.length || !window.Projects || !Projects.thumbnails) return;
+    ids.forEach(function(id) { _thumbFetchInFlight[id] = true; });
+    var map = {};
+    try { map = await Projects.thumbnails(ids); } catch (e) { console.warn('[thumbs]', e); }
+    ids.forEach(function(id) {
+        delete _thumbFetchInFlight[id];
+        var proj = _projects.find(function(x) { return x.id === id; });
+        if (!proj || proj.thumbnail !== undefined) return;
+        proj.thumbnail = map[id] || null;
+        if (proj.thumbnail) _updateProjectCardThumb(id, proj.thumbnail);
+        else _setProjectCardThumbPlaceholder(id);
+    });
+}
+
+function _setProjectCardThumbPlaceholder(projectId) {
+    var card = document.querySelector('.project-card[data-id="' + projectId + '"]');
+    var thumb = card && card.querySelector('.project-thumb');
+    if (!thumb || thumb.querySelector('img, .project-thumb-icon')) return;
+    var loading = thumb.querySelector('.project-thumb-loading');
+    if (loading) loading.remove();
+    var icon = document.createElement('i');
+    icon.className = 'fa-solid fa-cabinet-filing project-thumb-icon';
+    thumb.insertBefore(icon, thumb.firstChild);
 }
 
 // ── Thumbnail backfill for projects missing preview images ───────────────────
@@ -851,6 +945,8 @@ function _updateProjectCardThumb(projectId, dataUrl) {
     if (!thumb) return;
     var icon = thumb.querySelector('.project-thumb-icon');
     if (icon) icon.remove();
+    var loading = thumb.querySelector('.project-thumb-loading');
+    if (loading) loading.remove();
     var img = thumb.querySelector('img');
     if (img) {
         img.src = dataUrl;
@@ -863,9 +959,12 @@ function _updateProjectCardThumb(projectId, dataUrl) {
     }
 }
 
-function _startMissingThumbnailBackfill() {
+async function _startMissingThumbnailBackfill() {
     if (_thumbBackfillQueue) return;
-    var missing = _projects.filter(function(p) { return !p.thumbnail; });
+    var missingIds = [];
+    try { missingIds = await Projects.missingThumbnailIds(); } catch (e) { return; }
+    if (_thumbBackfillQueue) return;
+    var missing = _projects.filter(function(p) { return missingIds.indexOf(p.id) !== -1; });
     if (!missing.length) return;
 
     _thumbBackfillQueue = missing.slice();
@@ -1772,7 +1871,12 @@ async function confirmLinkMeasurement(projectId) {
     }
     closeModal('modal-link-measurement');
     showToast('המדידה קושרה לפרויקט', 'success');
-    try { _projects = await Projects.list(); } catch (e) {}
+    try {
+        var _prevThumbs = {};
+        _projects.forEach(function(p) { if (p.thumbnail !== undefined) _prevThumbs[p.id] = p.thumbnail; });
+        _projects = await Projects.list({ light: true });
+        _projects.forEach(function(p) { if (_prevThumbs.hasOwnProperty(p.id)) p.thumbnail = _prevThumbs[p.id]; });
+    } catch (e) {}
     await refreshProjectMeasCounts();
     _renderProjects();
     await refreshMeasurementsInbox();
@@ -2938,6 +3042,7 @@ function _projectMatchesAgent(p) {
 
 function setAgentFilter(value) {
     _agentFilter = value || 'all';
+    _page = 1;
     _renderProjects();
 }
 

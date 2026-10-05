@@ -1042,19 +1042,21 @@ window.Projects = {
     },
 
     // ── List all projects for current user ───────────────────────────────────
-    list: async function() {
+    list: async function(opts) {
         const sb = _getClient(); if (!sb) return [];
+        // light: skip thumbnails (large data URLs) — fetch them per page with thumbnails(ids)
+        const _cols = cols => (opts && opts.light) ? cols.replace('thumbnail, ', '') : cols;
         // Try full column list first; fall back to minimal columns if schema migration hasn't run yet
         let { data, error } = await sb
             .from('projects')
-            .select('id, name, thumbnail, created_at, updated_at, locked_at, extension_expires_at, lock_extensions, cabinet_count, cart_count, cabinets_total, install_total, order_status, customer_name, customer_order_num, is_pinned, delivery_estimate, user_id, company_id, visibility')
+            .select(_cols('id, name, thumbnail, created_at, updated_at, locked_at, extension_expires_at, lock_extensions, cabinet_count, cart_count, cabinets_total, install_total, order_status, customer_name, customer_order_num, is_pinned, delivery_estimate, user_id, company_id, visibility'))
             .order('is_pinned', { ascending: false })
             .order('updated_at', { ascending: false });
         if (error) {
             console.warn('Projects.list totals select failed (' + (error.message || error) + '), retrying without totals columns');
             const resT = await sb
                 .from('projects')
-                .select('id, name, thumbnail, created_at, updated_at, locked_at, extension_expires_at, lock_extensions, cabinet_count, order_status, customer_name, customer_order_num, is_pinned, delivery_estimate, user_id, company_id, visibility')
+                .select(_cols('id, name, thumbnail, created_at, updated_at, locked_at, extension_expires_at, lock_extensions, cabinet_count, order_status, customer_name, customer_order_num, is_pinned, delivery_estimate, user_id, company_id, visibility'))
                 .order('is_pinned', { ascending: false })
                 .order('updated_at', { ascending: false });
             if (!resT.error) {
@@ -1066,7 +1068,7 @@ window.Projects = {
             console.warn('Projects.list company select failed (' + (error.message || error) + '), retrying without company columns');
             const res0 = await sb
                 .from('projects')
-                .select('id, name, thumbnail, created_at, updated_at, locked_at, extension_expires_at, lock_extensions, cabinet_count, order_status, customer_name, customer_order_num, is_pinned, delivery_estimate')
+                .select(_cols('id, name, thumbnail, created_at, updated_at, locked_at, extension_expires_at, lock_extensions, cabinet_count, order_status, customer_name, customer_order_num, is_pinned, delivery_estimate'))
                 .order('is_pinned', { ascending: false })
                 .order('updated_at', { ascending: false });
             if (!res0.error) {
@@ -1078,7 +1080,7 @@ window.Projects = {
             console.warn('Projects.list full select failed (' + (error.message || error) + '), retrying without delivery_estimate');
             const res1b = await sb
                 .from('projects')
-                .select('id, name, thumbnail, created_at, updated_at, locked_at, extension_expires_at, lock_extensions, cabinet_count, order_status, customer_name, customer_order_num, is_pinned')
+                .select(_cols('id, name, thumbnail, created_at, updated_at, locked_at, extension_expires_at, lock_extensions, cabinet_count, order_status, customer_name, customer_order_num, is_pinned'))
                 .order('is_pinned', { ascending: false })
                 .order('updated_at', { ascending: false });
             if (!res1b.error) {
@@ -1090,7 +1092,7 @@ window.Projects = {
             console.warn('Projects.list pin select failed (' + (error.message || error) + '), retrying without is_pinned');
             const res2 = await sb
                 .from('projects')
-                .select('id, name, thumbnail, created_at, updated_at, locked_at, extension_expires_at, lock_extensions, cabinet_count, order_status, customer_name, customer_order_num')
+                .select(_cols('id, name, thumbnail, created_at, updated_at, locked_at, extension_expires_at, lock_extensions, cabinet_count, order_status, customer_name, customer_order_num'))
                 .order('updated_at', { ascending: false });
             if (!res2.error) {
                 data = res2.data;
@@ -1099,7 +1101,7 @@ window.Projects = {
                 console.warn('Projects.list meta select failed, retrying with minimal columns');
                 const res3 = await sb
                     .from('projects')
-                    .select('id, name, thumbnail, created_at, updated_at')
+                    .select(_cols('id, name, thumbnail, created_at, updated_at'))
                     .order('updated_at', { ascending: false });
                 data  = res3.data;
                 error = res3.error;
@@ -1213,6 +1215,23 @@ window.Projects = {
             if (error) return { error: error.message };
             return { data };
         }
+    },
+
+    // ── Thumbnails for a subset of projects (paired with list({ light: true })) ──
+    thumbnails: async function(ids) {
+        const sb = _getClient(); if (!sb || !ids || !ids.length) return {};
+        const { data, error } = await sb.from('projects').select('id, thumbnail').in('id', ids);
+        if (error) { console.warn('Projects.thumbnails:', error.message); return {}; }
+        const map = {};
+        (data || []).forEach(function(r) { map[r.id] = r.thumbnail || null; });
+        return map;
+    },
+
+    missingThumbnailIds: async function() {
+        const sb = _getClient(); if (!sb) return [];
+        const { data, error } = await sb.from('projects').select('id').is('thumbnail', null);
+        if (error) { console.warn('Projects.missingThumbnailIds:', error.message); return []; }
+        return (data || []).map(function(r) { return r.id; });
     },
 
     // ── Update thumbnail only (no project_data change) ─────────────────────
