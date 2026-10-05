@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>מוקאפ ידית חצי ירח</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Rubik, Tahoma, sans-serif; background: #eceff1; color: #1e3a5f; overflow: hidden; }
+  #view { position: fixed; inset: 0; }
+  .panel { position: fixed; top: 16px; right: 16px; background: #fff; border-radius: 12px; box-shadow: 0 6px 24px rgba(15,23,42,.12); padding: 14px 16px; width: 270px; }
+  .panel h1 { font-size: 1.05rem; margin: 0 0 4px; }
+  .panel p { font-size: .8rem; color: #64748b; margin: 0 0 12px; line-height: 1.45; }
+  .grp { margin-bottom: 12px; }
+  .grp-t { font-size: .78rem; font-weight: 700; margin-bottom: 6px; }
+  .btns { display: flex; gap: 6px; flex-wrap: wrap; }
+  .btns button { flex: 1; border: 1.5px solid #cbd5e1; background: #f8fafc; border-radius: 8px; padding: 7px 8px; font: inherit; font-size: .82rem; cursor: pointer; color: #1e3a5f; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .btns button.on { border-color: #1e3a5f; background: #1e3a5f; color: #fff; }
+  .sw { width: 14px; height: 14px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,.2); }
+  .spec { font-size: .78rem; background: #f1f5f9; border-radius: 8px; padding: 8px 10px; line-height: 1.7; }
+  .spec b { font-weight: 700; }
+</style>
+</head>
+<body>
+<div id="view"></div>
+<div class="panel">
+  <h1>ידית חצי ירח — מוקאפ</h1>
+  <p>גרור לסיבוב, גלגלת לזום. שתי ידיות על מגירות או דלתות סמוכות יוצרות עיגול שלם.</p>
+  <div class="grp">
+    <div class="grp-t">גוון ידית</div>
+    <div class="btns" id="finish">
+      <button data-v="gold" class="on"><span class="sw" style="background:#b8975f"></span>זהב מט</button>
+      <button data-v="black"><span class="sw" style="background:#1d1d1f"></span>שחור מט</button>
+    </div>
+  </div>
+  <div class="grp">
+    <div class="grp-t">תצוגה</div>
+    <div class="btns" id="scene">
+      <button data-v="single" class="on">ידית בודדת</button>
+      <button data-v="drawers">מגירות</button>
+      <button data-v="doors">דלתות</button>
+    </div>
+  </div>
+  <div class="grp">
+    <div class="grp-t">גוון חזית</div>
+    <div class="btns" id="front">
+      <button data-v="gray" class="on"><span class="sw" style="background:#5f686c"></span>אפור</button>
+      <button data-v="white"><span class="sw" style="background:#f4f4f2"></span>לבן</button>
+      <button data-v="oak"><span class="sw" style="background:#b98b5e"></span>עץ</button>
+    </div>
+  </div>
+  <div class="spec">
+    <div><b>מידה כוללת:</b> 15 × 7.5 ס"מ</div>
+    <div><b>רוחב פס:</b> 1.9 ס"מ · <b>עובי:</b> 0.8 ס"מ</div>
+    <div><b>בליטה מהחזית:</b> 2.8 ס"מ (רגליות 2 ס"מ)</div>
+  </div>
+</div>
+
+<script>
+// ---- Handle dimensions (cm) ----
+const HM = {
+    R: 7.5,          // outer radius → overall 15 × 7.5
+    band: 1.9,       // ring band width
+    plateT: 0.8,     // plate thickness
+    standoff: 2.0,   // leg length from the front face to the plate
+    legW: 1.3,       // leg size along the flat edge
+    legH: 1.1,       // leg size away from the flat edge
+    bevel: 0.07
+};
+
+const FINISHES = {
+    gold:  { color: 0xb8975f, metalness: 0.85, roughness: 0.42 },
+    black: { color: 0x1d1d1f, metalness: 0.55, roughness: 0.55 }
+};
+const FRONTS = {
+    gray:  { color: 0x5f686c, roughness: 0.75 },
+    white: { color: 0xf4f4f2, roughness: 0.7 },
+    oak:   { color: 0xb98b5e, roughness: 0.8 }
+};
+
+const view = document.getElementById('view');
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+view.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xeceff1);
+const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.5, 2000);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+// Soft studio reflections so the metal reads as metal
+(function buildEnv() {
+    const env = new THREE.Scene();
+    const room = new THREE.Mesh(new THREE.BoxGeometry(100, 60, 100), new THREE.MeshBasicMaterial({ color: 0x3a4044, side: THREE.BackSide }));
+    env.add(room);
+    const box = (w, h, x, y, z, ry, c) => {
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: c || 0xffffff, side: THREE.DoubleSide }));
+        m.position.set(x, y, z); m.rotation.y = ry || 0; m.lookAt(0, 0, 0); env.add(m);
+    };
+    box(40, 20, 0, 25, 30, 0, 0xffffff);
+    box(25, 30, -45, 5, 0, 0, 0xf2f2f2);
+    box(25, 30, 45, 5, 10, 0, 0xdedede);
+    box(60, 8, 0, -25, 20, 0, 0x777777);
+    const pm = new THREE.PMREMGenerator(renderer);
+    scene.environment = pm.fromScene(env, 0.04).texture;
+})();
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0xb0b6ba, 0.35));
+const key = new THREE.DirectionalLight(0xffffff, 0.9);
+key.position.set(-40, 60, 90);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+key.shadow.camera.left = -80; key.shadow.camera.right = 80;
+key.shadow.camera.top = 80; key.shadow.camera.bottom = -80;
+key.shadow.bias = -0.0004;
+key.shadow.radius = 4;
+scene.add(key);
+
+const handleMat = new THREE.MeshStandardMaterial();
+const frontMat = new THREE.MeshStandardMaterial();
+function applyMat(mat, spec) {
+    mat.color.setHex(spec.color).convertSRGBToLinear();
+    mat.roughness = spec.roughness;
+    mat.metalness = spec.metalness || 0;
+    mat.needsUpdate = true;
+}
+applyMat(handleMat, FINISHES.gold);
+applyMat(frontMat, FRONTS.gray);
+const carcassMat = new THREE.MeshStandardMaterial();
+applyMat(carcassMat, { color: 0x2d3336, roughness: 0.9 });
+
+/**
+ * Half-moon handle. Local frame: flat edge on the X axis (y = 0), arc toward +Y,
+ * z = 0 is the cabinet front surface, the handle projects toward +Z.
+ */
+function buildHalfMoonHandle(mat) {
+    const g = new THREE.Group();
+    const b = HM.bevel;
+    const ro = HM.R - b, ri = HM.R - HM.band + b;
+    const s = new THREE.Shape();
+    s.moveTo(ro, b);
+    s.absarc(0, b, ro, 0, Math.PI, false);
+    s.lineTo(-ri, b);
+    s.absarc(0, b, ri, Math.PI, 0, true);
+    s.lineTo(ro, b);
+    const plateGeo = new THREE.ExtrudeGeometry(s, {
+        depth: HM.plateT - b * 2, bevelEnabled: true, bevelThickness: b, bevelSize: b,
+        bevelSegments: 3, curveSegments: 96
+    });
+    const plate = new THREE.Mesh(plateGeo, mat);
+    plate.position.set(0, -b, HM.standoff + b);
+    plate.castShadow = true;
+    g.add(plate);
+
+    const legX = HM.R - HM.band / 2;
+    [-legX, legX].forEach(x => {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(HM.legW, HM.legH, HM.standoff), mat);
+        leg.position.set(x, HM.legH / 2, HM.standoff / 2);
+        leg.castShadow = true;
+        g.add(leg);
+    });
+    return g;
+}
+
+// ---- Dimension helpers (single view) ----
+function labelSprite(text) {
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 96;
+    const x = c.getContext('2d');
+    x.fillStyle = 'rgba(255,255,255,0.92)';
+    x.beginPath(); x.roundRect ? x.roundRect(28, 18, 200, 60, 14) : x.rect(28, 18, 200, 60); x.fill();
+    x.fillStyle = '#1e3a5f'; x.font = 'bold 40px Rubik, Tahoma, sans-serif';
+    x.textAlign = 'center'; x.textBaseline = 'middle'; x.direction = 'rtl';
+    x.fillText(text, 128, 50);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false }));
+    sp.scale.set(4.4, 1.65, 1);
+    sp.renderOrder = 10;
+    return sp;
+}
+function dimLine(a, b, text, offset) {
+    const g = new THREE.Group();
+    const mat = new THREE.LineBasicMaterial({ color: 0xffffff, depthTest: false });
+    const pts = [a, b];
+    const tick = offset.clone().normalize().multiplyScalar(0.6);
+    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat);
+    const t1 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([a.clone().sub(tick), a.clone().add(tick)]), mat);
+    const t2 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([b.clone().sub(tick), b.clone().add(tick)]), mat);
+    [line, t1, t2].forEach(l => { l.renderOrder = 9; g.add(l); });
+    const lbl = labelSprite(text);
+    lbl.position.copy(a).add(b).multiplyScalar(0.5).add(offset);
+    g.add(lbl);
+    return g;
+}
+
+let content = null;
+function clearContent() {
+    if (!content) return;
+    scene.remove(content);
+    content.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+    content = null;
+}
+
+function buildSingle() {
+    const g = new THREE.Group();
+    const backer = new THREE.Mesh(new THREE.BoxGeometry(30, 20, 1.8), frontMat);
+    backer.position.set(0, 3, -0.9);
+    backer.receiveShadow = true;
+    g.add(backer);
+    const h = buildHalfMoonHandle(handleMat);
+    h.position.y = -1.5;
+    g.add(h);
+    const zf = HM.standoff + HM.plateT + 0.2;
+    g.add(dimLine(new THREE.Vector3(-HM.R, -3, zf), new THREE.Vector3(HM.R, -3, zf), '15 ס"מ', new THREE.Vector3(0, -1.4, 0)));
+    g.add(dimLine(new THREE.Vector3(HM.R + 1.6, -1.5, zf), new THREE.Vector3(HM.R + 1.6, HM.R - 1.5, zf), '7.5 ס"מ', new THREE.Vector3(2.8, 0, 0)));
+    camera.position.set(-14, 9, 38);
+    controls.target.set(0, 1.5, 0);
+    return g;
+}
+
+function buildDrawers() {
+    const g = new THREE.Group();
+    const W = 60, H = 24, T = 1.8, gap = 0.3;
+    const carcass = new THREE.Mesh(new THREE.BoxGeometry(W + 3.4, H * 2 + gap * 3 + 3.4, 1), carcassMat);
+    carcass.position.set(0, 0, -1.5);
+    g.add(carcass);
+    [1, -1].forEach(dir => {
+        const front = new THREE.Mesh(new THREE.BoxGeometry(W, H, T), frontMat);
+        front.position.set(0, dir * (H + gap) / 2, -T / 2);
+        front.castShadow = true; front.receiveShadow = true;
+        g.add(front);
+        const h = buildHalfMoonHandle(handleMat);
+        // Flat edge sits on the seam: upper drawer gets the upper half, lower drawer the lower half
+        h.position.set(0, dir * (gap / 2 + 0.1), 0);
+        if (dir < 0) h.rotation.z = Math.PI;
+        g.add(h);
+    });
+    camera.position.set(-38, 22, 70);
+    controls.target.set(0, 0, 0);
+    return g;
+}
+
+function buildDoors() {
+    const g = new THREE.Group();
+    const W = 45, H = 120, T = 1.8, gap = 0.3;
+    const carcass = new THREE.Mesh(new THREE.BoxGeometry(W * 2 + gap * 3 + 3.4, H + 3.4, 1), carcassMat);
+    carcass.position.set(0, 0, -1.5);
+    g.add(carcass);
+    [-1, 1].forEach(dir => {
+        const door = new THREE.Mesh(new THREE.BoxGeometry(W, H, T), frontMat);
+        door.position.set(dir * (W + gap) / 2, 0, -T / 2);
+        door.castShadow = true; door.receiveShadow = true;
+        g.add(door);
+        const h = buildHalfMoonHandle(handleMat);
+        // Left door: arc opens to the left; right door: arc opens to the right
+        h.rotation.z = dir < 0 ? Math.PI / 2 : -Math.PI / 2;
+        h.position.set(dir * (gap / 2 + 0.1), 0, 0);
+        g.add(h);
+    });
+    camera.position.set(-55, 25, 120);
+    controls.target.set(0, 0, 0);
+    return g;
+}
+
+let mode = 'single';
+function rebuild() {
+    clearContent();
+    content = mode === 'drawers' ? buildDrawers() : mode === 'doors' ? buildDoors() : buildSingle();
+    scene.add(content);
+    controls.update();
+}
+
+function bindGroup(id, fn) {
+    const el = document.getElementById(id);
+    el.addEventListener('click', e => {
+        const b = e.target.closest('button');
+        if (!b) return;
+        el.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+        fn(b.dataset.v);
+    });
+}
+bindGroup('finish', v => applyMat(handleMat, FINISHES[v]));
+bindGroup('front', v => applyMat(frontMat, FRONTS[v]));
+bindGroup('scene', v => { mode = v; rebuild(); });
+
+addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+});
+
+rebuild();
+(function loop() {
+    requestAnimationFrame(loop);
+    controls.update();
+    renderer.render(scene, camera);
+})();
+</script>
+</body>
+</html>
