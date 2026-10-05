@@ -1366,6 +1366,51 @@ body {
     box-shadow: 0 2px 8px rgba(37,99,235,0.25);
 }
 
+.handle-style-btn .handle-variant-thumb {
+    width: 26px;
+    height: 26px;
+    object-fit: contain;
+    border-radius: 6px;
+    background: #fff;
+}
+.handle-style-btn span .fa-caret-down { font-size: 0.6rem; opacity: 0.8; }
+.handle-variant-menu {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin: -2px 0 8px;
+    padding: 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+}
+.handle-variant-menu[hidden] { display: none; }
+.handle-variant-opt {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 4px 2px 5px;
+    border: 1.5px solid transparent;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    cursor: pointer;
+    font-family: inherit;
+    color: var(--text-mid);
+    transition: all var(--transition);
+}
+.handle-variant-opt img {
+    width: 100%;
+    max-width: 56px;
+    aspect-ratio: 1;
+    object-fit: contain;
+    border-radius: 6px;
+    background: #f1f3f4;
+}
+.handle-variant-opt span { font-size: 0.6rem; font-weight: 600; line-height: 1.2; text-align: center; }
+.handle-variant-opt:hover { border-color: var(--accent); color: var(--accent); }
+.handle-variant-opt.active { border-color: var(--secondary); color: var(--secondary); background: var(--accent-pale); }
+
 /* ---- Closure position buttons ---- */
 .closure-pos-btn {
     display: flex;

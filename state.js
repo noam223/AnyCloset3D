@@ -24,6 +24,7 @@ function createWingData(overrides) {
         hasDoors: true,
         handleType: '',
         handleStyle: 'pipe',
+        handleVariant: 'pipe_silver',
         cabinetName: '',
         cabinetModelLabel: '',
         cabinetNotes: '',
@@ -187,6 +188,7 @@ function _createSideCabinetData(mainWing) {
         hasDoors: w.hasDoors !== false,
         handleType: w.handleType || '',
         handleStyle: w.handleStyle || 'pipe',
+        handleVariant: w.handleVariant || 'pipe_silver',
         cabinetModel: w.cabinetModel || 'c9',
         boardMaterial: w.boardMaterial || 'melamine',
         materialBody: w.materialSideCabinet || 'white_matte',
@@ -283,7 +285,7 @@ window.getWing = function() {
 // These getters/setters make existing code like state.width work transparently
 const _wingFields = [
     'cabinetModel','placement','width','globalHeight','depth','thickness','plinthHeight',
-    'hasDoors','handleType','handleStyle','cabinetName','cabinetModelLabel','cabinetNotes','boardMaterial',
+    'hasDoors','handleType','handleStyle','handleVariant','cabinetName','cabinetModelLabel','cabinetNotes','boardMaterial',
     'materialBody','materialInternal','materialExternal','materialDesk','materialOpenCell','materialBack',
     'materialSideCabinet','materialTopPanel',
     'activeColorPart','columns','desk','corner','fullCorner','sideCabinet','manualPrice','manualInstallPrice',
@@ -1667,6 +1669,7 @@ window.syncSidebarToWing = function() {
     document.querySelectorAll('.mobile-handle-style-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.style === _hs);
     });
+    if (typeof window._syncHandleVariantUI === 'function') window._syncHandleVariantUI(w);
     setVal('inp-cabinet-name', (function() {
         const n = w.cabinetName || '';
         const pairInfo = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
@@ -2104,7 +2107,7 @@ function _computeHistoryLabel(prevSnap, nextSnap) {
             return 'שינוי ל-' + (nw.columns || []).length + ' עמודות';
         }
         if (pw.hasDoors !== nw.hasDoors) return nw.hasDoors ? 'הצגת דלתות' : 'הסתרת דלתות';
-        if (pw.handleStyle !== nw.handleStyle) return 'שינוי סגנון ידית';
+        if (pw.handleStyle !== nw.handleStyle || (pw.handleVariant || 'pipe_silver') !== (nw.handleVariant || 'pipe_silver')) return 'שינוי סגנון ידית';
         if (pw.boardMaterial !== nw.boardMaterial) return 'שינוי חומר לוח';
         if (pw.materialBody !== nw.materialBody || pw.materialExternal !== nw.materialExternal) return 'שינוי חומר';
         if (JSON.stringify(pw.desk || {}) !== JSON.stringify(nw.desk || {})) return 'שינוי שולחן';
@@ -2418,7 +2421,7 @@ window.resetCurrentCabinet = function() {
     w.cabinetModel = 'c9';
     w.placement = 'wall';
     w.width = 160; w.globalHeight = 240; w.depth = 54;
-    w.plinthHeight = 8.75; w.hasDoors = true; w.handleType = ''; w.handleStyle = 'pipe'; w.cabinetName = ''; w.cabinetModelLabel = ''; w.cabinetNotes = '';
+    w.plinthHeight = 8.75; w.hasDoors = true; w.handleType = ''; w.handleStyle = 'pipe'; w.handleVariant = 'pipe_silver'; w.cabinetName = ''; w.cabinetModelLabel = ''; w.cabinetNotes = '';
     w.boardMaterial = 'melamine'; w.materialBody = 'white_matte'; w.materialInternal = 'white_matte';
     w.materialExternal = 'white_matte'; w.materialDesk = 'white_matte'; w.materialOpenCell = 'white_matte'; w.materialBack = 'white_matte';
     w.materialSideCabinet = 'white_matte';
@@ -2831,6 +2834,69 @@ window.updateCornerDeskHandleStyle = function(style) {
     saveHistoryState();
 };
 
+/** External-handle variants (all are handleStyle 'pipe'); colors are linear hex like the rest of the engine. */
+window.HANDLE_VARIANTS = {
+    pipe_silver:    { shape: 'pipe',     label: 'צינור כסף',        color: 0xaaaaaa, metalness: 0.8,  roughness: 0.2,  thumb: 'textures/handles/pipe_silver.png' },
+    pipe_black:     { shape: 'pipe',     label: 'צינור שחור מט',    color: 0x1d1d1f, metalness: 0.5,  roughness: 0.55, thumb: 'textures/handles/pipe_black.png' },
+    halfmoon_gold:  { shape: 'halfmoon', label: 'חצי ירח זהב מט',   color: 0xd8b97f, metalness: 0.45, roughness: 0.4,  thumb: 'textures/handles/halfmoon_gold.png' },
+    halfmoon_black: { shape: 'halfmoon', label: 'חצי ירח שחור מט',  color: 0x1d1d1f, metalness: 0.5,  roughness: 0.55, thumb: 'textures/handles/halfmoon_black.png' }
+};
+window._handleVariantId = function(v) { return window.HANDLE_VARIANTS[v] ? v : 'pipe_silver'; };
+/** Print/quote label: "ידית חיצונית — חצי ירח זהב מט" (+ free-text model). */
+window._handleStyleLabel = function(style, variant, model) {
+    const labels = { pipe: 'ידית חיצונית', riding: 'ידית רוכבת', touch: "ידית טאצ'" };
+    let s = labels[style] || labels.pipe;
+    if ((style || 'pipe') === 'pipe') s += ' — ' + window.HANDLE_VARIANTS[window._handleVariantId(variant)].label;
+    model = (model || '').trim();
+    return model ? s + ' — ' + model : s;
+};
+
+window._syncHandleVariantUI = function(w) {
+    if (!w) w = getWing();
+    const style = (w && w.handleStyle) || 'pipe';
+    const vid = window._handleVariantId(w && w.handleVariant);
+    const v = window.HANDLE_VARIANTS[vid];
+    document.querySelectorAll('.handle-variant-opt').forEach(b => {
+        b.classList.toggle('active', style === 'pipe' && b.dataset.variant === vid);
+    });
+    document.querySelectorAll('.handle-style-btn[data-style="pipe"]:not(.corner-desk-handle-btn) .handle-variant-thumb').forEach(img => {
+        img.src = v.thumb;
+        img.alt = v.label;
+    });
+};
+
+window.toggleHandleVariantMenu = function(btn, forceOpen) {
+    const row = btn && btn.closest('.handle-style-row');
+    const menu = row && row.nextElementSibling && row.nextElementSibling.classList.contains('handle-variant-menu') ? row.nextElementSibling : null;
+    if (!menu) return;
+    const open = forceOpen != null ? forceOpen : menu.hidden;
+    menu.hidden = !open;
+};
+
+window.onExternalHandleBtn = function(btn) {
+    const w = getWing();
+    if (!w) return;
+    const wasPipe = w.handleStyle === 'pipe';
+    if (!wasPipe) window.updateHandleStyle('pipe');
+    window.toggleHandleVariantMenu(btn, wasPipe ? undefined : true);
+};
+
+window.updateHandleVariant = function(variant, el) {
+    const w = getWing();
+    if (!w || !window.HANDLE_VARIANTS[variant]) return;
+    w.handleVariant = variant;
+    if (w.handleStyle !== 'pipe') {
+        window.updateHandleStyle('pipe');
+    } else {
+        window._syncHandleVariantUI(w);
+        buildCabinet();
+        calculatePrice();
+        saveHistoryState();
+    }
+    const menu = el && el.closest('.handle-variant-menu');
+    if (menu) menu.hidden = true;
+};
+
 window.updateHandleStyle = function(style) {
     const w = getWing();
     if (!w) return;
@@ -2839,6 +2905,8 @@ window.updateHandleStyle = function(style) {
     document.querySelectorAll('.handle-style-btn:not(.corner-desk-handle-btn), .mobile-handle-style-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.style === style);
     });
+    if (style !== 'pipe') document.querySelectorAll('.handle-variant-menu').forEach(m => { m.hidden = true; });
+    window._syncHandleVariantUI(w);
     if (typeof window._syncCornerDeskHandleUI === 'function') window._syncCornerDeskHandleUI(w);
     buildCabinet();
     calculatePrice();

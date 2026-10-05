@@ -1039,13 +1039,31 @@ function buildFullCornerUnit(side, wingData) {
 
                 // Handle — spot: 'corner' (edge at the L's inner corner), 'outer' (the door's far edge),
                 // 'bottom' (flap: horizontal, centred near the bottom edge), null = no handle
-                if (!isBP && spot && fcHandleStyle !== 'touch') {
+                const fcVariant = wingData.handleVariant || 'pipe_silver';
+                if (!isBP && spot && fcHandleStyle === 'pipe' && typeof _isHalfMoonHandle === 'function' && _isHalfMoonHandle(fcVariant)) {
+                    // Door 2 is thin in X and faces -sign·X: build in a frame rotated so local +Z is its face normal
+                    let host = doorGroup;
+                    if (isVertical) {
+                        host = new THREE.Group();
+                        host.rotation.y = -sign * Math.PI / 2;
+                        doorGroup.add(host);
+                    }
+                    const faceZ = t * 0.45 + (isVertical ? 0 : fd_offset);
+                    const mat = _handleMat3D(fcVariant);
+                    if (spot === 'bottom') {
+                        _placeHalfMoon(host, mat, 0, -h / 2, faceZ, 'up');
+                    } else {
+                        const dir = (spot === 'corner') ? 1 : -1;
+                        const edgeX = (isVertical ? -dir * sign : dir * sign) * w / 2;
+                        _placeHalfMoon(host, mat, edgeX, 0, faceZ, edgeX > 0 ? 'left' : 'right');
+                    }
+                } else if (!isBP && spot && fcHandleStyle !== 'touch') {
                     const isRiding = fcHandleStyle === 'riding';
                     const mat = isRiding
                         ? (typeof _ridingHandleMat === 'function'
                             ? _ridingHandleMat()
                             : new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.35, roughness: 0.45 }))
-                        : new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8, roughness: 0.3 });
+                        : (typeof _handleMat3D === 'function' ? _handleMat3D(fcVariant) : new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8, roughness: 0.3 }));
                     const out = isRiding ? 0.55 : 1.5;  // protrusion from the door face
                     const faceX = -sign * (t * 0.45 + out);             // door 2 face (thin in X)
                     const faceZ = t * 0.45 + out + fd_offset;           // door 1 face (thin in Z)

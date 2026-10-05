@@ -4051,8 +4051,72 @@ function _getHandleStyle() {
     return (s === 'touch' || s === 'riding' || s === 'pipe') ? s : 'pipe';
 }
 
-function _handleMat3D() {
-    return new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.8, roughness: 0.2 });
+function _handleVariantSpec(variantId) {
+    const V = window.HANDLE_VARIANTS || {};
+    const id = variantId || state.handleVariant;
+    return V[id] || V.pipe_silver || { shape: 'pipe', color: 0xaaaaaa, metalness: 0.8, roughness: 0.2 };
+}
+
+function _isHalfMoonHandle(variantId) {
+    return _handleVariantSpec(variantId).shape === 'halfmoon';
+}
+
+function _handleMat3D(variantId) {
+    const v = _handleVariantSpec(variantId);
+    const mat = new THREE.MeshStandardMaterial({ color: v.color, metalness: v.metalness, roughness: v.roughness });
+    if (v.color !== 0xaaaaaa && window._hdrEnvMap) { mat.envMap = window._hdrEnvMap; mat.needsUpdate = true; }
+    return mat;
+}
+
+// Half-moon pull: 15 × 7.5 cm half ring on two standoff legs
+const HALFMOON = { R: 7.5, band: 1.9, plateT: 0.8, standoff: 2.0, legW: 1.3, legH: 1.1, bevel: 0.07 };
+let _halfMoonGeoCache = null;
+function _halfMoonGeos() {
+    if (_halfMoonGeoCache) return _halfMoonGeoCache;
+    const b = HALFMOON.bevel;
+    const ro = HALFMOON.R - b, ri = HALFMOON.R - HALFMOON.band + b;
+    const s = new THREE.Shape();
+    s.moveTo(ro, b);
+    s.absarc(0, b, ro, 0, Math.PI, false);
+    s.lineTo(-ri, b);
+    s.absarc(0, b, ri, Math.PI, 0, true);
+    s.lineTo(ro, b);
+    const plate = new THREE.ExtrudeGeometry(s, {
+        depth: HALFMOON.plateT - b * 2, bevelEnabled: true, bevelThickness: b, bevelSize: b,
+        bevelSegments: 2, curveSegments: 48
+    });
+    plate.translate(0, -b, HALFMOON.standoff + b);
+    const leg = new THREE.BoxGeometry(HALFMOON.legW, HALFMOON.legH, HALFMOON.standoff);
+    _halfMoonGeoCache = { plate, leg };
+    return _halfMoonGeoCache;
+}
+
+/** Local frame: flat edge on the X axis (y = 0), arc toward +Y, z = 0 on the front face, projecting toward +Z. */
+function _buildHalfMoonHandle(mat) {
+    const g = new THREE.Group();
+    const geos = _halfMoonGeos();
+    g.add(new THREE.Mesh(geos.plate, mat));
+    const legX = HALFMOON.R - HALFMOON.band / 2;
+    [-legX, legX].forEach(x => {
+        const leg = new THREE.Mesh(geos.leg, mat);
+        leg.position.set(x, HALFMOON.legH / 2, HALFMOON.standoff / 2);
+        g.add(leg);
+    });
+    return g;
+}
+
+/** Half-moon with its flat edge on a panel edge at (x, y); `inward` = direction the arc points ('up'|'down'|'left'|'right'). */
+function _placeHalfMoon(parent, mat, x, y, faceZ, inward) {
+    const h = _buildHalfMoonHandle(mat);
+    h.rotation.z = { up: 0, left: Math.PI / 2, down: Math.PI, right: -Math.PI / 2 }[inward] || 0;
+    const nudge = 0.1;
+    h.position.set(
+        x + (inward === 'right' ? nudge : inward === 'left' ? -nudge : 0),
+        y + (inward === 'up' ? nudge : inward === 'down' ? -nudge : 0),
+        faceZ
+    );
+    parent.add(h);
+    return h;
 }
 
 const RIDING_HANDLE_LEN = 30; // cm — standard riding-handle length
@@ -4087,11 +4151,15 @@ function _addRidingDrawerHandle(mesh, panelW, panelH) {
     mesh.add(bar);
 }
 
-function _addPanelHandleLocal(mesh, panelW, panelH, style) {
+/** pairRole 'upper' = upper drawer of a stacked pair: its half-moon sits on the bottom edge so the pair forms a circle. */
+function _addPanelHandleLocal(mesh, panelW, panelH, style, pairRole) {
     if (style === 'touch') return;
     const t = state.thickness;
     if (style === 'riding') {
         _addRidingDrawerHandle(mesh, panelW, panelH);
+    } else if (_isHalfMoonHandle()) {
+        const upper = pairRole === 'upper';
+        _placeHalfMoon(mesh, _handleMat3D(), 0, upper ? -panelH / 2 : panelH / 2, t / 2, upper ? 'up' : 'down');
     } else {
         const handleH = Math.min((panelH || 40) * 0.35, 15);
         const handle = new THREE.Mesh(
@@ -4231,7 +4299,7 @@ function _renderMergedDeskDrawerBand(opts) {
             const mesh = createBoard(Math.max(2, wardW - gap * 2), eachH, t, wardCenterX, dY, drawerFZ, matDesk);
             _ppPartId = '';
             if (!isBP) {
-                _addPanelHandleLocal(mesh, Math.max(2, wardW - gap * 2), eachH, handleStyle);
+                _addPanelHandleLocal(mesh, Math.max(2, wardW - gap * 2), eachH, handleStyle, d % 2 === 1 ? 'upper' : 'lower');
                 if (typeof _registerExternalDrawerFront === 'function') _registerExternalDrawerFront(mesh);
             }
         }
@@ -5969,7 +6037,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         const mesh = createBoard(overlayW, extDrawerH, t, overlayCenterX, dY, fZ, matExternal);
                         _ppPartId = '';
                         if (typeof _registerExternalDrawerFront === 'function') _registerExternalDrawerFront(mesh);
-                        if (!isBP) _addPanelHandleLocal(mesh, overlayW, extDrawerH, compData.handleStyle || _handleStyle);
+                        if (!isBP) _addPanelHandleLocal(mesh, overlayW, extDrawerH, compData.handleStyle || _handleStyle, d % 2 === 1 ? 'upper' : 'lower');
                         // ---- Bathroom groove overlay on external drawer ----
                         const _bathGrooveExt = state.presetId === 'bathroom'
                             ? ((state.wings.center && state.wings.center.doorGrooveStyle) || 'plain')
@@ -6171,7 +6239,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             const mesh = createBoard(drawerW, extDrawerH, t, drawerCX, dY, fZ, matExternal);
                             _ppPartId = '';
                             if (typeof _registerExternalDrawerFront === 'function') _registerExternalDrawerFront(mesh);
-                            if (!isBP) _addPanelHandleLocal(mesh, drawerW, extDrawerH, handleStyle);
+                            if (!isBP) _addPanelHandleLocal(mesh, drawerW, extDrawerH, handleStyle, d % 2 === 1 ? 'upper' : 'lower');
                         }
                     } else if (subType === 'door_right' || subType === 'door_left' || subType === 'door_double') {
                         if (!state.hasDoors) return;
@@ -6207,6 +6275,10 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                 const hz = fZ + t / 2 + 1.5;
                                 if (hs === 'riding') {
                                     _addRidingDoorHandle(_buildGroup, subCenterX, doorY, hz, doorH);
+                                } else if (hs === 'pipe' && _isHalfMoonHandle()) {
+                                    const hm = _handleMat3D();
+                                    _registerDoorMesh(_placeHalfMoon(_buildGroup, hm, subCenterX, doorY, fZ + t / 2, 'left'));
+                                    _registerDoorMesh(_placeHalfMoon(_buildGroup, hm, subCenterX, doorY, fZ + t / 2, 'right'));
                                 } else if (hs === 'pipe') {
                                     const handleH = Math.min(doorH * 0.35, 12);
                                     const handleMatD = _handleMat3D();
@@ -6230,6 +6302,11 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                         ? subCenterX - doorW / 2
                                         : subCenterX + doorW / 2;
                                     _addRidingDoorHandle(_buildGroup, seamX, doorY, hz, doorH);
+                                } else if (hs === 'pipe' && doorStyle !== 'glass_mirror' && _isHalfMoonHandle()) {
+                                    // door_right: hinge on the right, opening edge (and pull) on the left
+                                    const isRight = subType === 'door_right';
+                                    const edgeX = isRight ? subCenterX - doorW / 2 : subCenterX + doorW / 2;
+                                    _registerDoorMesh(_placeHalfMoon(_buildGroup, _handleMat3D(), edgeX, doorY, fZ + t / 2, isRight ? 'right' : 'left'));
                                 } else if (hs === 'pipe' && doorStyle !== 'glass_mirror') {
                                     const isRight = subType === 'door_right';
                                     const handleX = isRight ? subCenterX - subW * 0.35 : subCenterX + subW * 0.35;
@@ -6268,7 +6345,9 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         _subCreateDoorPanel(flapW, flapH, subCenterX, flapY, fZ, _subDoorMat());
                         if (!isBP && doorStyle !== 'glass_mirror') {
                             const hz = fZ + t / 2 + 1.5;
-                            if (hs === 'pipe') {
+                            if (hs === 'pipe' && _isHalfMoonHandle()) {
+                                _registerDoorMesh(_placeHalfMoon(_buildGroup, _handleMat3D(), subCenterX, flapBottomY, fZ + t / 2, 'up'));
+                            } else if (hs === 'pipe') {
                                 const handleH = Math.min(flapH * 0.25, 12);
                                 const handleMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, handleH, 12), _handleMat3D());
                                 handleMesh.rotation.z = Math.PI / 2;
@@ -6277,7 +6356,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                 _registerDoorMesh(handleMesh);
                             } else if (hs === 'riding') {
                                 const barLen = Math.min(RIDING_HANDLE_LEN, Math.max(8, flapW - 4));
-                                const bar = new THREE.Mesh(new THREE.BoxGeometry(barLen, 0.8, 0.8), _handleMat3D());
+                                const bar = new THREE.Mesh(new THREE.BoxGeometry(barLen, 0.8, 0.8), _handleMat3D('pipe_silver'));
                                 bar.position.set(subCenterX, flapBottomY + 0.6, hz);
                                 _buildGroup.add(bar);
                                 _registerDoorMesh(bar);
@@ -6824,7 +6903,9 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                     _ppRegisterMesh(flapMesh, doorPartId);
                     _registerDoorMesh(flapMesh);
                     const _flapHandleStyle = door.handleStyle || _handleStyle;
-                    if (!isBP && _flapHandleStyle === 'pipe') {
+                    if (!isBP && _flapHandleStyle === 'pipe' && _isHalfMoonHandle()) {
+                        _registerDoorMesh(_placeHalfMoon(_buildGroup, _handleMat3D(), flapCenterX, flapBaseY, flapZ + t / 2, 'up'));
+                    } else if (!isBP && _flapHandleStyle === 'pipe') {
                         const handleH = Math.min(flapH * 0.25, 12);
                         const handleMesh = new THREE.Mesh(
                             new THREE.CylinderGeometry(0.5, 0.5, handleH, 12),
@@ -6935,7 +7016,10 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         mesh.position.set(doorLocalX, 0, 0);
                         mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geometry), edgeMat));
                         
-                        if (!isBP && (door.handleStyle || _handleStyle) === 'pipe') {
+                        if (!isBP && (door.handleStyle || _handleStyle) === 'pipe' && _isHalfMoonHandle()) {
+                            // isLeft = hinge on the left, so the opening edge is on the right
+                            _placeHalfMoon(mesh, _handleMat3D(), isLeft ? w / 2 : -w / 2, 0, t / 2, isLeft ? 'left' : 'right');
+                        } else if (!isBP && (door.handleStyle || _handleStyle) === 'pipe') {
                             const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 15, 16), _handleMat3D());
                             handle.position.set(isLeft ? w/2 - 4 : -w/2 + 4, 0, t / 2 + 1.5);
                             mesh.add(handle);
@@ -6968,7 +7052,9 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         // glass_black / glass_gold: no handle (aluminum frame doors don't have separate handles)
                         const isAlumFrame = (style === 'glass_black' || style === 'glass_gold');
                         // For glass_melamine: add handle on the frame (no back panel — glass is transparent)
-                        if (isGlass && !isAlumFrame && (door.handleStyle || _handleStyle) === 'pipe') {
+                        if (isGlass && !isAlumFrame && (door.handleStyle || _handleStyle) === 'pipe' && _isHalfMoonHandle()) {
+                            _placeHalfMoon(doorGroup, _handleMat3D(), doorLocalX + (isLeft ? w / 2 : -w / 2), 0, fz + fd / 2, isLeft ? 'left' : 'right');
+                        } else if (isGlass && !isAlumFrame && (door.handleStyle || _handleStyle) === 'pipe') {
                             const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 15, 16), _handleMat3D());
                             handle.position.set(doorLocalX + (isLeft ? w/2 - 4 : -w/2 + 4), 0, fz + fd / 2 + 1.5);
                             doorGroup.add(handle);
