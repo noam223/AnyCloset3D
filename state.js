@@ -5050,7 +5050,6 @@ function _calcWingCost(cfg, wing) {
     if (wing.wingPosition === 'full_corner') {
         const fc = wing.fullCorner || {};
         finalCost += _priceNum(ex.fullCornerBase, 2800);
-        finalCost += (fc.shelves || 0) * _priceNum(ex.fullCornerShelf, 120);
         finalCost += (Array.isArray(fc.leds) ? fc.leds.length : 0) * _priceNum(ex.ledPair, 650);
     }
 
