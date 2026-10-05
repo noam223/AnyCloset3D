@@ -1411,28 +1411,13 @@ const HANDLE_CATALOG = [
 
 window._handlePickerApply = null;
 
-function _openHandlePickerSheet(currentStyle, descText, onSelect) {
+/**
+ * finish ({ handleVariant, ridingColor }) enables the second step: after picking external / riding,
+ * the sheet shows that type's finishes and onSelect(style, choice) runs only once a finish is chosen.
+ */
+function _openHandlePickerSheet(currentStyle, descText, onSelect, finish) {
     window._handlePickerApply = onSelect;
-    const descEl = document.getElementById('handle-picker-desc-text');
-    if (descEl) descEl.textContent = descText;
-
-    const grid = document.getElementById('handle-picker-grid');
-    if (!grid) return;
-    grid.innerHTML = '';
-    HANDLE_CATALOG.forEach(h => {
-        const card = document.createElement('div');
-        card.className = 'handle-picker-card' + (h.id === currentStyle ? ' active' : '');
-        card.innerHTML = `
-            <div class="handle-picker-icon" style="color:${h.id === currentStyle ? '#fff' : 'var(--primary)'};">${h.svgPath}</div>
-            <div class="handle-picker-name">${h.label}</div>
-            <div class="handle-picker-sub">${h.sub}</div>
-        `;
-        card.addEventListener('click', () => {
-            if (typeof window._handlePickerApply === 'function') window._handlePickerApply(h.id);
-            closeHandlePicker();
-        });
-        grid.appendChild(card);
-    });
+    _renderHandleTypeStep(currentStyle, descText, finish);
 
     const overlay = document.getElementById('handle-picker-overlay');
     const sheet = document.getElementById('handle-picker-sheet');
@@ -1443,6 +1428,75 @@ function _openHandlePickerSheet(currentStyle, descText, onSelect) {
         requestAnimationFrame(() => { sheet.style.transform = ''; });
     });
     document.body.style.overflow = 'hidden';
+}
+
+function _renderHandleTypeStep(currentStyle, descText, finish) {
+    const descEl = document.getElementById('handle-picker-desc-text');
+    if (descEl) descEl.textContent = descText;
+    const grid = document.getElementById('handle-picker-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    grid.style.gridTemplateColumns = 'repeat(3,1fr)';
+    HANDLE_CATALOG.forEach(h => {
+        const card = document.createElement('div');
+        card.className = 'handle-picker-card' + (h.id === currentStyle ? ' active' : '');
+        card.innerHTML = `
+            <div class="handle-picker-icon" style="color:${h.id === currentStyle ? '#fff' : 'var(--primary)'};">${h.svgPath}</div>
+            <div class="handle-picker-name">${h.label}</div>
+            <div class="handle-picker-sub">${h.sub}</div>
+        `;
+        card.addEventListener('click', () => {
+            if (finish && h.id !== 'touch') {
+                _renderHandleFinishStep(h.id, currentStyle, descText, finish);
+                return;
+            }
+            if (typeof window._handlePickerApply === 'function') window._handlePickerApply(h.id);
+            closeHandlePicker();
+        });
+        grid.appendChild(card);
+    });
+}
+
+function _renderHandleFinishStep(style, currentStyle, descText, finish) {
+    const descEl = document.getElementById('handle-picker-desc-text');
+    if (descEl) descEl.textContent = style === 'riding' ? 'בחרו גוון לידית הרוכבת' : 'בחרו דגם לידית החיצונית';
+    const grid = document.getElementById('handle-picker-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    grid.style.gridTemplateColumns = 'repeat(4,1fr)';
+
+    const back = document.createElement('button');
+    back.type = 'button';
+    back.className = 'handle-picker-back';
+    back.innerHTML = '<i class="fa-solid fa-arrow-right"></i> חזרה לסוגי הידיות';
+    back.addEventListener('click', () => _renderHandleTypeStep(currentStyle, descText, finish));
+    grid.appendChild(back);
+
+    const isRiding = style === 'riding';
+    const src = isRiding ? window.RIDING_COLORS : window.HANDLE_VARIANTS;
+    const activeId = currentStyle !== style ? null
+        : isRiding ? window._ridingColorId(finish.ridingColor) : window._handleVariantId(finish.handleVariant);
+    Object.keys(src).forEach(id => {
+        const card = document.createElement('div');
+        card.className = 'handle-picker-card handle-finish-card' + (id === activeId ? ' active' : '');
+        const thumb = isRiding
+            ? `<span class="riding-swatch"><i class="rs-${id}"></i></span>`
+            : `<img src="${src[id].thumb}" alt="">`;
+        card.innerHTML = `<div class="handle-finish-thumb">${thumb}</div><div class="handle-picker-name">${src[id].label}</div>`;
+        card.addEventListener('click', () => {
+            if (typeof window._handlePickerApply === 'function') {
+                window._handlePickerApply(style, isRiding ? { ridingColor: id } : { handleVariant: id });
+            }
+            closeHandlePicker();
+        });
+        grid.appendChild(card);
+    });
+}
+
+function _applyHandleChoice(target, style, choice) {
+    target.handleStyle = style;
+    if (choice && choice.handleVariant) target.handleVariant = choice.handleVariant;
+    if (choice && choice.ridingColor) target.ridingColor = choice.ridingColor;
 }
 
 function _getZoneDoorHandleStyle(comp, sub, z, zoneKey) {
@@ -1456,20 +1510,34 @@ function _getZoneDoorHandleStyle(comp, sub, z, zoneKey) {
     return null;
 }
 
-function _setZoneDoorHandleStyle(comp, sub, z, zoneKey, style) {
+function _setZoneArrayValue(sub, key, z, value) {
+    if (!Array.isArray(sub[key])) sub[key] = [];
+    while (sub[key].length <= z) sub[key].push(null);
+    sub[key][z] = value;
+}
+
+function _setZoneDoorHandleStyle(comp, sub, z, zoneKey, style, choice) {
     if (comp && zoneKey) {
         const grp = _zoneDoorGroupForKey(comp, zoneKey);
         if (grp && _isDoorZoneType(grp.type)) {
-            grp.handleStyle = style;
+            _applyHandleChoice(grp, style, choice);
             return true;
         }
     }
     if (!sub) return false;
     if (!_isDoorZoneType(_zoneDoorAt(sub, z))) return false;
-    if (!Array.isArray(sub.zonesDoorHandleStyle)) sub.zonesDoorHandleStyle = [];
-    while (sub.zonesDoorHandleStyle.length <= z) sub.zonesDoorHandleStyle.push(null);
-    sub.zonesDoorHandleStyle[z] = style;
+    _setZoneArrayValue(sub, 'zonesDoorHandleStyle', z, style);
+    if (choice && choice.handleVariant) _setZoneArrayValue(sub, 'zonesDoorHandleVariant', z, choice.handleVariant);
+    if (choice && choice.ridingColor) _setZoneArrayValue(sub, 'zonesDoorRidingColor', z, choice.ridingColor);
     return true;
+}
+
+/** Current finish of a handle owner (door / drawer cell / zone group), falling back to the wing default. */
+function _handleFinishOf(obj) {
+    return {
+        handleVariant: (obj && obj.handleVariant) || state.handleVariant,
+        ridingColor: (obj && obj.ridingColor) || state.ridingColor
+    };
 }
 
 window.openHandlePicker = function() {
@@ -1486,6 +1554,7 @@ window.openHandlePicker = function() {
 
     // Resolve current style for this cell (override or wing default)
     let currentStyle = state.handleStyle || 'pipe';
+    let finish = _handleFinishOf(null);
     let descText = 'ידית לדלת';
 
     // Partition zone doors / external drawers take priority when zones are selected
@@ -1498,29 +1567,35 @@ window.openHandlePicker = function() {
             if (!sub) return;
             if (_zoneInteriorAt(sub, z) === 'external_drawers') {
                 foundExt = true;
-                if (sub.handleStyle) currentStyle = sub.handleStyle;
+                if (sub.handleStyle) { currentStyle = sub.handleStyle; finish = _handleFinishOf(sub); }
             }
             const hs = _getZoneDoorHandleStyle(firstComp, sub, z, key);
             const grp = _zoneDoorGroupForKey(firstComp, key);
             const hasDoor = (grp && _isDoorZoneType(grp.type)) || _isDoorZoneType(_zoneDoorAt(sub, z));
             if (hasDoor) {
                 foundDoor = true;
-                if (hs) currentStyle = hs;
+                if (hs) {
+                    currentStyle = hs;
+                    finish = (grp && _isDoorZoneType(grp.type)) ? _handleFinishOf(grp) : _handleFinishOf({
+                        handleVariant: (sub.zonesDoorHandleVariant || [])[z],
+                        ridingColor: (sub.zonesDoorRidingColor || [])[z]
+                    });
+                }
             }
         });
         if (foundExt && foundDoor) descText = 'ידית למגירות החיצוניות ולדלת במחיצה';
         else if (foundExt) descText = 'ידית למגירות החיצוניות במחיצה';
         else if (foundDoor) descText = 'ידית לדלת במחיצה';
-        else if (isExtDrawer && firstComp.handleStyle) currentStyle = firstComp.handleStyle;
-        else if (existingDoor && existingDoor.handleStyle) currentStyle = existingDoor.handleStyle;
+        else if (isExtDrawer && firstComp.handleStyle) { currentStyle = firstComp.handleStyle; finish = _handleFinishOf(firstComp); }
+        else if (existingDoor && existingDoor.handleStyle) { currentStyle = existingDoor.handleStyle; finish = _handleFinishOf(existingDoor); }
     } else {
-        if (isExtDrawer && firstComp.handleStyle) currentStyle = firstComp.handleStyle;
-        else if (existingDoor && existingDoor.handleStyle) currentStyle = existingDoor.handleStyle;
+        if (isExtDrawer && firstComp.handleStyle) { currentStyle = firstComp.handleStyle; finish = _handleFinishOf(firstComp); }
+        else if (existingDoor && existingDoor.handleStyle) { currentStyle = existingDoor.handleStyle; finish = _handleFinishOf(existingDoor); }
         if (isExtDrawer && existingDoor) descText = 'ידית למגירות החיצוניות ולדלת';
         else if (isExtDrawer) descText = 'ידית למגירות החיצוניות בתא';
     }
 
-    _openHandlePickerSheet(currentStyle, descText, applyHandleStyleToCell);
+    _openHandlePickerSheet(currentStyle, descText, applyHandleStyleToCell, finish);
 };
 
 window.openCornerDeskHandlePicker = function() {
@@ -1550,7 +1625,7 @@ window.closeHandlePicker = function() {
     document.body.style.overflow = '';
 };
 
-window.applyHandleStyleToCell = function(style) {
+window.applyHandleStyleToCell = function(style, choice) {
     const selCol = state.selection.colIndex;
     const col = selCol >= 0 ? state.columns[selCol] : null;
     if (!col || state.selection.rows.length === 0) return;
@@ -1566,10 +1641,10 @@ window.applyHandleStyleToCell = function(style) {
                 const sub = comp.subCells[si];
                 if (!sub) return;
                 if (_zoneInteriorAt(sub, z) === 'external_drawers') {
-                    sub.handleStyle = style;
+                    _applyHandleChoice(sub, style, choice);
                     changed = true;
                 }
-                if (_setZoneDoorHandleStyle(comp, sub, z, key, style)) {
+                if (_setZoneDoorHandleStyle(comp, sub, z, key, style, choice)) {
                     changed = true;
                 }
             });
@@ -1579,7 +1654,7 @@ window.applyHandleStyleToCell = function(style) {
     state.selection.rows.forEach(r => {
         const comp = col.compartments[r];
         if (comp && comp.type === 'external_drawers') {
-            comp.handleStyle = style;
+            _applyHandleChoice(comp, style, choice);
             changed = true;
         }
     });
@@ -1587,7 +1662,7 @@ window.applyHandleStyleToCell = function(style) {
     col.doors.forEach(door => {
         if (door.type === 'empty') return;
         if (state.selection.rows.some(r => r >= door.startRow && r <= door.endRow)) {
-            door.handleStyle = style;
+            _applyHandleChoice(door, style, choice);
             changed = true;
         }
     });
@@ -7343,6 +7418,193 @@ function _isCanvasOverlayUiTarget(el) {
     );
 }
 
+// ── Door handle height drag (front view) ────────────────────────────────────
+// Drag a door handle up/down (door.handleOffsetY); soft-snaps to neighbouring door handles
+// and to the default height. Hovering a moved handle shows a reset-to-default button.
+function _initDoorHandleDrag() {
+    const SNAP_CM = 2;
+    let drag = null;
+    let resetBtn = null, resetDoor = null, hideTimer = null;
+    let label = null, guide = null;
+
+    const enabled = () => state.viewMode === 'front'
+        && window._doorsVisible !== false
+        && !document.body.classList.contains('part-paint-active');
+
+    const isShown = o => { for (; o; o = o.parent) if (!o.visible) return false; return true; };
+
+    function pick(e) {
+        const objs = window._doorHandleObjs || [];
+        if (!objs.length) return null;
+        const rect = container.getBoundingClientRect();
+        mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const hits = raycaster.intersectObjects(objs, true);
+        for (const h of hits) {
+            const root = window._doorHandleRoot(h.object);
+            if (root && isShown(root)) return { obj: root, point: h.point };
+        }
+        return null;
+    }
+
+    const worldPos = o => o.getWorldPosition(new THREE.Vector3());
+
+    function toScreen(v) {
+        const rect = container.getBoundingClientRect();
+        const p = v.clone().project(camera);
+        return { x: rect.left + (p.x + 1) / 2 * rect.width, y: rect.top + (1 - p.y) / 2 * rect.height };
+    }
+
+    function hideReset() {
+        clearTimeout(hideTimer);
+        if (resetBtn) resetBtn.style.display = 'none';
+        resetDoor = null;
+    }
+
+    function showReset(obj) {
+        const door = obj.userData.doorHandle.door;
+        if (!door.handleOffsetY) { hideReset(); return; }
+        clearTimeout(hideTimer);
+        if (!resetBtn) {
+            resetBtn = document.createElement('button');
+            resetBtn.type = 'button';
+            resetBtn.className = 'door-handle-reset-btn';
+            resetBtn.title = 'החזר ידית למיקום ברירת המחדל';
+            resetBtn.innerHTML = '<i class="fa-solid fa-rotate-left"></i>';
+            resetBtn.addEventListener('pointerenter', () => clearTimeout(hideTimer));
+            resetBtn.addEventListener('pointerleave', () => { hideTimer = setTimeout(hideReset, 600); });
+            resetBtn.addEventListener('click', () => {
+                if (!resetDoor) return;
+                delete resetDoor.handleOffsetY;
+                hideReset();
+                buildCabinet();
+                saveHistoryState();
+            });
+            document.body.appendChild(resetBtn);
+        }
+        resetDoor = door;
+        const s = toScreen(worldPos(obj));
+        resetBtn.style.left = (s.x + 22) + 'px';
+        resetBtn.style.top = (s.y - 22) + 'px';
+        resetBtn.style.display = 'flex';
+    }
+
+    function showLabel(e, off, aligned) {
+        if (!label) {
+            label = document.createElement('div');
+            label.className = 'door-handle-offset-label';
+            document.body.appendChild(label);
+        }
+        const r = Math.round(off * 10) / 10;
+        label.textContent = (r === 0 ? 'גובה ברירת מחדל' : (r > 0 ? '↑ ' : '↓ ') + Math.abs(r) + ' ס״מ')
+            + (aligned ? ' · מיושר לידית סמוכה' : '');
+        label.style.left = e.clientX + 'px';
+        label.style.top = e.clientY + 'px';
+        label.style.display = 'block';
+    }
+
+    function setGuide(a, b) {
+        if (guide) { scene.remove(guide); guide.geometry.dispose(); guide = null; }
+        if (!a) return;
+        const dir = b.clone().sub(a).setY(0);
+        const ext = dir.lengthSq() > 0 ? dir.normalize().multiplyScalar(8) : new THREE.Vector3(8, 0, 0);
+        const geo = new THREE.BufferGeometry().setFromPoints([a.clone().sub(ext), b.clone().add(ext)]);
+        guide = new THREE.Line(geo, new THREE.LineDashedMaterial({ color: 0x2563eb, dashSize: 1.5, gapSize: 1, depthTest: false }));
+        guide.computeLineDistances();
+        guide.renderOrder = 999;
+        scene.add(guide);
+    }
+
+    container.addEventListener('pointerdown', e => {
+        if (e.button !== 0 || !enabled() || _isCanvasOverlayUiTarget(e.target)) return;
+        const hit = pick(e);
+        if (!hit) return;
+        e.stopPropagation();
+        e.preventDefault();
+        const ud = hit.obj.userData.doorHandle;
+        const door = ud.door;
+        const objs = window._doorHandleObjs.filter(o => o.userData.doorHandle.door === door);
+        const startOff = Math.max(-ud.maxOff, Math.min(ud.maxOff, door.handleOffsetY || 0));
+        const objPos = worldPos(hit.obj);
+        const others = window._doorHandleObjs
+            .filter(o => o.userData.doorHandle.door !== door && isShown(o))
+            .map(o => worldPos(o));
+        drag = {
+            door, objs, maxOff: ud.maxOff, startOff, off: startOff, moved: false,
+            plane: new THREE.Plane().setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()).negate(), hit.point),
+            startY: hit.point.y,
+            defaultY: objPos.y - startOff,
+            objPos, others,
+            startX: e.clientX, startYpx: e.clientY
+        };
+        hideReset();
+        controls.enabled = false;
+        document.body.classList.add('dragging');
+    }, true);
+
+    window.addEventListener('pointermove', e => {
+        if (!drag) return;
+        e.stopPropagation();
+        if (!drag.moved && Math.hypot(e.clientX - drag.startX, e.clientY - drag.startYpx) < 3) return;
+        drag.moved = true;
+        const rect = container.getBoundingClientRect();
+        mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const p = raycaster.ray.intersectPlane(drag.plane, new THREE.Vector3());
+        if (!p) return;
+        let off = Math.max(-drag.maxOff, Math.min(drag.maxOff, drag.startOff + (p.y - drag.startY)));
+        let snapTo = null;
+        let best = SNAP_CM;
+        drag.others.forEach(o => {
+            const d = Math.abs(drag.defaultY + off - o.y);
+            if (d < best) { best = d; snapTo = o; }
+        });
+        if (snapTo && Math.abs(snapTo.y - drag.defaultY) <= drag.maxOff) {
+            off = snapTo.y - drag.defaultY;
+        } else {
+            snapTo = null;
+            if (Math.abs(off) < SNAP_CM) off = 0;
+        }
+        drag.off = off;
+        drag.objs.forEach(o => { o.position.y = o.userData.doorHandle.baseY + off; });
+        const cur = drag.objPos.clone().setY(drag.defaultY + off);
+        setGuide(snapTo ? cur : null, snapTo ? snapTo.clone().setY(cur.y) : null);
+        showLabel(e, off, !!snapTo);
+    }, true);
+
+    window.addEventListener('pointerup', e => {
+        if (!drag) return;
+        e.stopPropagation();
+        const d = drag;
+        drag = null;
+        controls.enabled = true;
+        document.body.classList.remove('dragging');
+        setGuide(null);
+        if (label) label.style.display = 'none';
+        if (!d.moved) return;
+        if (Math.abs(d.off) < 0.05) delete d.door.handleOffsetY;
+        else d.door.handleOffsetY = Math.round(d.off * 10) / 10;
+        buildCabinet();
+        saveHistoryState();
+        const moved = (window._doorHandleObjs || []).find(o => o.userData.doorHandle.door === d.door);
+        if (moved) showReset(moved);
+    }, true);
+
+    container.addEventListener('pointermove', e => {
+        if (drag || e.buttons) return;
+        const hit = enabled() && !_isCanvasOverlayUiTarget(e.target) ? pick(e) : null;
+        container.classList.toggle('handle-drag-hover', !!hit);
+        if (hit) showReset(hit.obj);
+        else if (resetBtn && resetBtn.style.display !== 'none') {
+            clearTimeout(hideTimer);
+            hideTimer = setTimeout(hideReset, 900);
+        }
+    });
+    container.addEventListener('wheel', hideReset, { passive: true });
+}
+
 function bindUI() {
     // In viewer mode the editor DOM elements don't exist — skip all bindings
     if (window._VIEWER_MODE) return;
@@ -8209,6 +8471,8 @@ function bindUI() {
     let _pointerDownOnDeadSpace = false; // pointerdown on dead space in wing edit mode
 
     let _pointerDownCornerDesk = false;
+
+    _initDoorHandleDrag();
 
     container.addEventListener('pointerdown', (e) => {
         if (_isCanvasOverlayUiTarget(e.target)) return;

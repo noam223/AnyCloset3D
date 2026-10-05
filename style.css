@@ -6046,6 +6046,73 @@ body.viewer-mode #canvas-container canvas {
     color: var(--primary);
 }
 .handle-picker-card { position: relative; }
+.handle-picker-back {
+    grid-column: 1 / -1;
+    justify-self: start;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: none;
+    background: rgba(0,0,0,0.05);
+    border-radius: 999px;
+    padding: 6px 12px;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #475569;
+    cursor: pointer;
+}
+.handle-picker-back:hover { background: rgba(37,99,235,0.1); color: var(--primary); }
+.handle-finish-card { padding: 10px 6px; gap: 6px; }
+.handle-finish-thumb { width: 100%; display: flex; justify-content: center; }
+.handle-finish-thumb img,
+.handle-finish-thumb .riding-swatch {
+    width: 100%;
+    max-width: 72px;
+    aspect-ratio: 1;
+    object-fit: contain;
+    border-radius: 10px;
+    background: #f1f3f4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.handle-finish-card .handle-picker-name { font-size: 0.74rem; text-align: center; line-height: 1.25; }
+
+/* Door handle height drag: reset-to-default button + live offset label */
+#canvas-container.handle-drag-hover,
+#canvas-container.handle-drag-hover canvas { cursor: ns-resize !important; }
+.door-handle-reset-btn {
+    position: fixed;
+    z-index: 60;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: none;
+    background: var(--primary);
+    color: #fff;
+    font-size: 0.72rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 3px 10px rgba(15,23,42,0.28);
+    transform: translate(-50%, -50%);
+}
+.door-handle-reset-btn:hover { filter: brightness(1.12); }
+.door-handle-offset-label {
+    position: fixed;
+    z-index: 60;
+    pointer-events: none;
+    background: rgba(15,23,42,0.85);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+    transform: translate(12px, -50%);
+}
 
 /* === PRINT: hide ALL mobile UI — overrides the !important rules above === */
 @media print {

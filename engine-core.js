@@ -2587,10 +2587,19 @@ function _pickDoorHoverMesh(intersects) {
     if (!intersects || !intersects.length) return null;
     for (let i = 0; i < intersects.length; i++) {
         const obj = intersects[i] && intersects[i].object;
-        if (_isDoorHoverTarget(obj)) return obj;
+        if (_isDoorHoverTarget(obj) && !_doorHandleRoot(obj)) return obj;
     }
     return null;
 }
+
+/** The draggable door-handle object (pipe / half-moon group / riding bar) containing obj, if any. */
+function _doorHandleRoot(obj) {
+    for (let o = obj; o; o = o.parent) {
+        if (o.userData && o.userData.doorHandle) return o;
+    }
+    return null;
+}
+window._doorHandleRoot = _doorHandleRoot;
 
 /** Restore a door mesh after hover preview — never leave shared materials translucent. */
 function _clearDoorHoverOpacity(mesh) {
@@ -3041,6 +3050,8 @@ function buildCabinet() {
     window.deskHitBoxes = deskHitBoxes;
     doorMeshes = [];
     window.doorMeshes = doorMeshes;
+    window._doorHandleObjs = [];
+    _handleCtx = null;
     if (currentHoveredDoor) {
         if (typeof _clearDoorHoverOpacity === 'function') _clearDoorHoverOpacity(currentHoveredDoor);
         else if (currentHoveredDoor.material) {
@@ -4177,9 +4188,12 @@ function _getHandleStyle() {
     return (s === 'touch' || s === 'riding' || s === 'pipe') ? s : 'pipe';
 }
 
+/** Per-door / per-cell handle finish ({ handleVariant, ridingColor }) for the panel being built. */
+let _handleCtx = null;
+
 function _handleVariantSpec(variantId) {
     const V = window.HANDLE_VARIANTS || {};
-    const id = variantId || state.handleVariant;
+    const id = variantId || (_handleCtx && _handleCtx.handleVariant) || state.handleVariant;
     return V[id] || V.pipe_silver || { shape: 'pipe', color: 0xaaaaaa, metalness: 0.8, roughness: 0.2 };
 }
 
@@ -4247,8 +4261,32 @@ const RIDING_HANDLE_LEN = 30; // cm — standard riding-handle length
 
 function _ridingHandleMat(colorId) {
     const C = window.RIDING_COLORS || {};
-    const spec = C[colorId || state.ridingColor] || C.black || { color: 0x1d1d1f, metalness: 0.55, roughness: 0.55 };
+    const id = colorId || (_handleCtx && _handleCtx.ridingColor) || state.ridingColor;
+    const spec = C[id] || C.black || { color: 0x1d1d1f, metalness: 0.55, roughness: 0.55 };
     return window._makeMockupMetalMat(spec);
+}
+
+/** Legacy partition zone doors keep their handle finish in parallel per-zone arrays. */
+function _zoneDoorHandleCtx(sub, z) {
+    return {
+        handleVariant: (Array.isArray(sub.zonesDoorHandleVariant) && sub.zonesDoorHandleVariant[z]) || null,
+        ridingColor: (Array.isArray(sub.zonesDoorRidingColor) && sub.zonesDoorRidingColor[z]) || null
+    };
+}
+
+/**
+ * Door handles can be dragged along Y (door.handleOffsetY, cm from the default centre).
+ * Tags the handle for picking and applies the clamped offset.
+ */
+function _tagDoorHandle(obj, door, doorH, halfLen) {
+    const maxOff = Math.max(0, doorH / 2 - halfLen - 2);
+    const off = Math.max(-maxOff, Math.min(maxOff, door.handleOffsetY || 0));
+    obj.userData.doorHandle = { door, baseY: obj.position.y, maxOff };
+    obj.position.y += off;
+    if (!window._spaceCompanionBuilding && (!state.wingEditMode || _isActiveWingBuild)) {
+        (window._doorHandleObjs = window._doorHandleObjs || []).push(obj);
+    }
+    return obj;
 }
 
 /** Riding handle on doors: tall vertical profile on the seam between door leaves. */
@@ -6157,6 +6195,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                     const totalExtH = compTopY - compBottomY;
                     const extDrawerH = (totalExtH - doorGap * (count - 1)) / count;
                     const fZ = isInset ? (bodyD/2 - t/2) : (bodyD/2 + t/2 + 0.1); 
+                    _handleCtx = compData;
                     for(let d=0; d<count; d++) {
                         const dY = compBottomY + extDrawerH/2 + d * (extDrawerH + doorGap);
                         _ppPartId = `drawer_ext_c${c}_r${r}_d${d}`;
@@ -6172,6 +6211,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             _drawGroovesOnPanel(_buildGroup, _bathGrooveExt, overlayW, extDrawerH, t, overlayCenterX, dY, fZ + t / 2, matExternal);
                         }
                     }
+                    _handleCtx = null;
                 } else if (!isExt) {
                     const _drawerFrontGap = 8; // cm clearance from cabinet front face
                     const shelfFrontZ = _isSlidingWardrobe
@@ -6801,7 +6841,9 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                     // Interior (hanging/drawers/…) always — even when a door covers the front
                                     const interiorType = _interiorAtEng(sub, z);
                                     if (interiorType && interiorType !== 'empty') {
+                                        _handleCtx = sub;
                                         _renderSubContent(interiorType, subCenterX, subW, zoneBottomY, zoneH, si, 'solid', z);
+                                        _handleCtx = null;
                                     }
                                     // Per-zone door only if not part of a merged door group
                                     // and not already covered by a column-level overlay door
@@ -6810,7 +6852,9 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                         if (doorType && doorType !== 'empty') {
                                             const zoneStyle = (Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[z]) ? sub.zonesDoorStyle[z] : 'solid';
                                             const zoneHandle = (Array.isArray(sub.zonesDoorHandleStyle) && sub.zonesDoorHandleStyle[z]) || null;
+                                            _handleCtx = _zoneDoorHandleCtx(sub, z);
                                             _renderSubContent(doorType, subCenterX, subW, zoneBottomY, zoneH, si, zoneStyle, z, zoneHandle);
+                                            _handleCtx = null;
                                         }
                                     }
                                 }
@@ -6818,14 +6862,18 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         } else if (!isBP) {
                             const interiorType = _interiorAtEng(sub, 0);
                             if (interiorType && interiorType !== 'empty') {
+                                _handleCtx = sub;
                                 _renderSubContent(interiorType, subCenterX, subW, prevY, compH, si, 'solid', 0);
+                                _handleCtx = null;
                             }
                             if (!_coveredByColumnDoor && !_keyInDoorGroup(si, 0)) {
                                 const doorType = _doorAtEng(sub, 0);
                                 if (doorType && doorType !== 'empty') {
                                     const zoneStyle = (Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[0]) ? sub.zonesDoorStyle[0] : 'solid';
                                     const zoneHandle = (Array.isArray(sub.zonesDoorHandleStyle) && sub.zonesDoorHandleStyle[0]) || null;
+                                    _handleCtx = _zoneDoorHandleCtx(sub, 0);
                                     _renderSubContent(doorType, subCenterX, subW, prevY, compH, si, zoneStyle, 0, zoneHandle);
+                                    _handleCtx = null;
                                 }
                             }
                         }
@@ -6856,7 +6904,9 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             if (group.type === 'honeycomb' || group.type === 'open_cell' || group.type === 'side_open_cell') {
                                 _ppPartId = `opencell_sub_c${c}_r${r}_g${String(group.keys[0]).replace(/[^a-zA-Z0-9_]/g, '_')}`;
                             }
+                            _handleCtx = group;
                             _renderSubContent(group.type, centerX, spanW, minY, spanH, -1, group.style || 'solid', 0, group.handleStyle || null);
+                            _handleCtx = null;
                             _ppPartId = '';
                         });
                     }
@@ -6956,6 +7006,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
             const _doorOverlayCenterX = (_doorOverlayLeftX + _doorOverlayRightX) / 2;
 
             col.doors.forEach((door, doorIdx) => {
+                _handleCtx = door;
                 const doorPartId = `door_c${c}_d${doorIdx}`;
                 let doorBottomY, doorTopY;
                 // Clamp door row indices to valid range (guard against stale saved state)
@@ -7144,11 +7195,13 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         
                         if (!isBP && (door.handleStyle || _handleStyle) === 'pipe' && _isHalfMoonHandle()) {
                             // isLeft = hinge on the left, so the opening edge is on the right
-                            _placeHalfMoon(mesh, _handleMat3D(), isLeft ? w / 2 : -w / 2, 0, t / 2, isLeft ? 'left' : 'right');
+                            const hm = _placeHalfMoon(mesh, _handleMat3D(), isLeft ? w / 2 : -w / 2, 0, t / 2, isLeft ? 'left' : 'right');
+                            _tagDoorHandle(hm, door, dH, HALFMOON.R);
                         } else if (!isBP && (door.handleStyle || _handleStyle) === 'pipe') {
                             const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 15, 16), _handleMat3D());
                             handle.position.set(isLeft ? w/2 - 4 : -w/2 + 4, 0, t / 2 + 1.5);
                             mesh.add(handle);
+                            _tagDoorHandle(handle, door, dH, 7.5);
                         }
                         doorGroup.add(mesh);
                         _ppRegisterMesh(mesh, partIdSuffix);
@@ -7179,11 +7232,13 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         const isAlumFrame = (style === 'glass_black' || style === 'glass_gold');
                         // For glass_melamine: add handle on the frame (no back panel — glass is transparent)
                         if (isGlass && !isAlumFrame && (door.handleStyle || _handleStyle) === 'pipe' && _isHalfMoonHandle()) {
-                            _placeHalfMoon(doorGroup, _handleMat3D(), doorLocalX + (isLeft ? w / 2 : -w / 2), 0, fz + fd / 2, isLeft ? 'left' : 'right');
+                            const hm = _placeHalfMoon(doorGroup, _handleMat3D(), doorLocalX + (isLeft ? w / 2 : -w / 2), 0, fz + fd / 2, isLeft ? 'left' : 'right');
+                            _tagDoorHandle(hm, door, dH, HALFMOON.R);
                         } else if (isGlass && !isAlumFrame && (door.handleStyle || _handleStyle) === 'pipe') {
                             const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 15, 16), _handleMat3D());
                             handle.position.set(doorLocalX + (isLeft ? w/2 - 4 : -w/2 + 4), 0, fz + fd / 2 + 1.5);
                             doorGroup.add(handle);
+                            _tagDoorHandle(handle, door, dH, 7.5);
                         }
 
                         const _addFramePart = (frameMesh) => {
@@ -7254,15 +7309,17 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                     makeDoor(w, false, _doorOverlayCenterX + w/2 + doorGap/2, doorStyle, _doorOverlayW);
                 }
                 if (!isBP && (door.handleStyle || _handleStyle) === 'riding' && doorStyle !== 'glass_mirror') {
-                    if (door.type === 'double') {
-                        _addRidingDoorHandle(_buildGroup, _doorOverlayCenterX, dY, _doorHz, dH);
-                    } else if (door.type === 'left') {
-                        _addRidingDoorHandle(_buildGroup, _doorOverlayCenterX + _doorOverlayW / 2, dY, _doorHz, dH);
-                    } else if (door.type === 'right') {
-                        _addRidingDoorHandle(_buildGroup, _doorOverlayCenterX - _doorOverlayW / 2, dY, _doorHz, dH);
+                    const rx = door.type === 'double' ? _doorOverlayCenterX
+                        : door.type === 'left' ? _doorOverlayCenterX + _doorOverlayW / 2
+                        : door.type === 'right' ? _doorOverlayCenterX - _doorOverlayW / 2
+                        : null;
+                    if (rx !== null) {
+                        const rh = _addRidingDoorHandle(_buildGroup, rx, dY, _doorHz, dH);
+                        _tagDoorHandle(rh, door, dH, rh.geometry.parameters.height / 2);
                     }
                 }
             });
+            _handleCtx = null;
         }
         currentX += col.width + t;
     }
