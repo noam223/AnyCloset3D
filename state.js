@@ -2858,15 +2858,16 @@ window.RIDING_COLORS = {
 };
 window._ridingColorId = function(c) { return window.RIDING_COLORS[c] ? c : 'black'; };
 
-/** Print/quote label: "ידית חיצונית — חצי ירח זהב מט" / "ידית רוכבת — ניקל מוברש" (+ free-text model). */
+/** Print/quote label: "ידית חיצונית — חצי ירח זהב מט" / "ידית רוכבת — ניקל מוברש". A free-text model replaces it entirely. */
 window._handleStyleLabel = function(style, variant, model, ridingColor) {
+    model = (model || '').trim();
+    if (model) return model;
     const labels = { pipe: 'ידית חיצונית', riding: 'ידית רוכבת', touch: "ידית טאצ'" };
     let s = labels[style] || labels.pipe;
     const pipeVariant = window.HANDLE_VARIANTS[window._handleVariantId(variant)];
     if ((style || 'pipe') === 'pipe') s = pipeVariant.printLabel || (s + ' — ' + pipeVariant.label);
     if (style === 'riding') s += ' — ' + window.RIDING_COLORS[window._ridingColorId(ridingColor)].label;
-    model = (model || '').trim();
-    return model ? s + ' — ' + model : s;
+    return s;
 };
 
 window._syncHandleVariantUI = function(w) {
