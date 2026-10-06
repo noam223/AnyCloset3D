@@ -374,7 +374,7 @@ function tvDims(inch) {
     const standH = 4.5 + inch * 0.05;
     const footD = Math.min(26, Math.max(16, inch * 0.42));
     const panelT = 1.2, housingT = 2.2 + inch * 0.02;
-    // Z of the panel+housing centre relative to the template origin (feet are symmetric around it)
+    // Z of the panel+housing centre relative to the template origin
     const centerZ = -housingT / 2;
     return { inch, sw, sh, side, top, bottom, W, H, standH, footD, panelT, housingT, centerZ, totalH: standH + H };
 }
@@ -400,29 +400,41 @@ function _tvScreenTex() {
     });
 }
 
-// Window-like reflection on the glass: broad sheen from the top-left plus two crisp diagonal streaks
-function _tvGlareTex() {
-    return _laTex('tv-glare', () => _laCanvasTex(1024, 576, (x, w, h) => {
-        x.fillStyle = '#000'; x.fillRect(0, 0, w, h);
-        const sheen = x.createLinearGradient(0, 0, w * 0.7, h);
-        sheen.addColorStop(0, 'rgba(255,255,255,0.75)');
-        sheen.addColorStop(0.35, 'rgba(255,255,255,0.22)');
-        sheen.addColorStop(0.6, 'rgba(255,255,255,0.0)');
-        x.fillStyle = sheen; x.fillRect(0, 0, w, h);
-        const streak = (x0, width, alpha) => {
-            const slant = h * 0.55;
-            const gr = x.createLinearGradient(x0, 0, x0 + width, 0);
-            gr.addColorStop(0, 'rgba(255,255,255,0)');
-            gr.addColorStop(0.5, 'rgba(255,255,255,' + alpha + ')');
-            gr.addColorStop(1, 'rgba(255,255,255,0)');
-            x.save();
-            x.transform(1, 0, -slant / h, 1, slant, 0);
-            x.fillStyle = gr; x.fillRect(x0, 0, width, h);
-            x.restore();
-        };
-        streak(w * 0.30, w * 0.16, 0.55);
-        streak(w * 0.49, w * 0.05, 0.45);
-    }));
+// View-dependent glass gloss: soft "room window" shapes are looked up by the reflection direction
+// (in the TV's own frame, so it works for any cabinet orientation) and slide across the glass as the camera orbits.
+let _tvGlossMatCache = null;
+function _tvGlossMat() {
+    if (_tvGlossMatCache) return _tvGlossMatCache;
+    _tvGlossMatCache = new THREE.ShaderMaterial({
+        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+        polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4,
+        vertexShader: [
+            'varying vec3 vWorldPos; varying vec3 vRight; varying vec3 vUp; varying vec3 vFwd;',
+            'void main() {',
+            '  vec4 wp = modelMatrix * vec4(position, 1.0);',
+            '  vWorldPos = wp.xyz;',
+            '  vRight = normalize(modelMatrix[0].xyz); vUp = normalize(modelMatrix[1].xyz); vFwd = normalize(modelMatrix[2].xyz);',
+            '  gl_Position = projectionMatrix * viewMatrix * wp;',
+            '}'
+        ].join('\n'),
+        fragmentShader: [
+            'varying vec3 vWorldPos; varying vec3 vRight; varying vec3 vUp; varying vec3 vFwd;',
+            'float win(vec2 p, vec2 c, vec2 hs, float soft) { vec2 d = abs(p - c) - hs; return 1.0 - smoothstep(0.0, soft, max(d.x, d.y)); }',
+            'void main() {',
+            '  vec3 Vw = normalize(cameraPosition - vWorldPos);',
+            '  vec3 V = vec3(dot(Vw, vRight), dot(Vw, vUp), dot(Vw, vFwd));',
+            '  vec3 R = reflect(-V, vec3(0.0, 0.0, 1.0));',
+            '  vec2 a = vec2(atan(R.x, R.z), asin(clamp(R.y, -1.0, 1.0)));',
+            '  float fres = 0.04 + 0.96 * pow(1.0 - clamp(V.z, 0.0, 1.0), 5.0);',
+            '  float w = win(a, vec2(-0.30, -0.05), vec2(0.10, 0.45), 0.04)',
+            '          + win(a, vec2(-0.11, -0.05), vec2(0.022, 0.45), 0.02) * 0.9',
+            '          + win(a, vec2(0.34, 0.05), vec2(0.12, 0.35), 0.06) * 0.75;',
+            '  float g = w * (0.42 + fres) + fres * 0.45 + smoothstep(-0.6, 0.5, a.y) * 0.05;',
+            '  gl_FragColor = vec4(vec3(1.0), clamp(g, 0.0, 0.85));',
+            '}'
+        ].join('\n')
+    });
+    return _tvGlossMatCache;
 }
 
 function buildTv(inch) {
@@ -445,25 +457,22 @@ function buildTv(inch) {
     // Frame front face is at z = panelT / 2; gaps below ~0.2 cm z-fight at room viewing distance (near plane = 1)
     screen.position.set(0, y0 + d.bottom + d.sh / 2, panelT / 2 + 0.3);
     g.add(screen);
-    const glare = new THREE.Mesh(new THREE.PlaneGeometry(d.sw, d.sh), new THREE.MeshBasicMaterial({
-        map: _tvGlareTex(), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.5,
-        polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4
-    }));
-    glare.position.set(0, screen.position.y, panelT / 2 + 0.45);
-    glare.renderOrder = 2;
-    g.add(glare);
+    const gloss = new THREE.Mesh(new THREE.PlaneGeometry(d.sw, d.sh), _tvGlossMat());
+    gloss.position.set(0, screen.position.y, panelT / 2 + 0.45);
+    gloss.renderOrder = 2;
+    g.add(gloss);
     // Thicker electronics housing on the back, lower two thirds
     const backW = d.W * 0.78, backH = d.H * 0.62, backT = d.housingT;
     const back = _laSlab(backW, backH, backT, 1.5, 0.6, backMat);
     back.position.set(0, y0 + d.H * 0.42, -panelT / 2 - backT);
     g.add(back);
 
-    // Blade feet: A-frame in side profile, leaning outwards from the front
-    const footT = 1.1, attachY = y0 + Math.min(10, d.H * 0.18), zc = d.centerZ;
+    // Blade feet: short A-frames under the panel, tucked 0.5 cm into the bottom bezel so they never cross the screen
+    const footT = 1.1, attachY = y0 + 0.5, zc = -panelT / 2;
     const prof = new THREE.Shape();
     const fz = d.footD / 2, bz = d.footD / 2;
-    prof.moveTo(-bz, 0); prof.lineTo(-bz + 2.2, 0); prof.lineTo(0, attachY - 2.5); prof.lineTo(fz - 2.2, 0);
-    prof.lineTo(fz, 0); prof.lineTo(0.9, attachY); prof.lineTo(-0.9, attachY); prof.lineTo(-bz, 0);
+    prof.moveTo(-bz, 0); prof.lineTo(-bz + 2.2, 0); prof.lineTo(0, y0 * 0.55); prof.lineTo(fz - 2.2, 0);
+    prof.lineTo(fz, 0); prof.lineTo(0.55, attachY); prof.lineTo(-0.55, attachY); prof.lineTo(-bz, 0);
     [-1, 1].forEach(sideSign => {
         const geo = new THREE.ExtrudeGeometry(prof, { depth: footT, bevelEnabled: true, bevelThickness: 0.15, bevelSize: 0.15, bevelSegments: 1, curveSegments: 1 });
         geo.rotateY(-Math.PI / 2);
