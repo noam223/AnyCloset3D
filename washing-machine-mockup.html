@@ -3,22 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>מוקאפ מכונת כביסה</title>
+<title>מוקאפ מכונת כביסה ומייבש</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: Rubik, Tahoma, sans-serif; background: #eceff1; color: #1e3a5f; overflow: hidden; }
   #view { position: fixed; inset: 0; }
-  .panel { position: fixed; top: 16px; right: 16px; background: #fff; border-radius: 12px; box-shadow: 0 6px 24px rgba(15,23,42,.12); padding: 14px 16px; width: 280px; }
+  .panel { position: fixed; top: 16px; right: 16px; background: #fff; border-radius: 12px; box-shadow: 0 6px 24px rgba(15,23,42,.12); padding: 14px 16px; width: 290px; }
   .panel h1 { font-size: 1.05rem; margin: 0 0 4px; }
   .panel p { font-size: .8rem; color: #64748b; margin: 0 0 12px; line-height: 1.45; }
   .grp { margin-bottom: 12px; }
   .grp-t { font-size: .78rem; font-weight: 700; margin-bottom: 6px; }
   .btns { display: flex; gap: 6px; flex-wrap: wrap; }
-  .btns button { flex: 1; border: 1.5px solid #cbd5e1; background: #f8fafc; border-radius: 8px; padding: 7px 8px; font: inherit; font-size: .82rem; cursor: pointer; color: #1e3a5f; display: flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; }
+  .btns button { flex: 1 1 40%; border: 1.5px solid #cbd5e1; background: #f8fafc; border-radius: 8px; padding: 7px 8px; font: inherit; font-size: .82rem; cursor: pointer; color: #1e3a5f; display: flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; }
   .btns button.on { border-color: #1e3a5f; background: #1e3a5f; color: #fff; }
-  .sw { width: 14px; height: 14px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,.2); }
   .spec { font-size: .78rem; background: #f1f5f9; border-radius: 8px; padding: 8px 10px; line-height: 1.7; }
   .spec b { font-weight: 700; }
   .spec .perf { margin-top: 4px; padding-top: 4px; border-top: 1px solid #e2e8f0; color: #0f766e; }
@@ -27,21 +26,15 @@
 <body>
 <div id="view"></div>
 <div class="panel">
-  <h1>מכונת כביסה — מוקאפ</h1>
-  <p>גרור לסיבוב, גלגלת לזום. מודל פרוצדורלי קל (ללא קבצים חיצוניים) שמוכן להכנסה לתצוגת המערכת.</p>
-  <div class="grp">
-    <div class="grp-t">גימור</div>
-    <div class="btns" id="finish">
-      <button data-v="white" class="on"><span class="sw" style="background:#f2f3f1"></span>לבן</button>
-      <button data-v="inox"><span class="sw" style="background:#a9aeb2"></span>נירוסטה</button>
-      <button data-v="graphite"><span class="sw" style="background:#34373a"></span>גרפיט</button>
-    </div>
-  </div>
+  <h1>מכונת כביסה ומייבש — מוקאפ</h1>
+  <p>גרור לסיבוב, גלגלת לזום. גימור לבן עם דלת שחורה. מודלים פרוצדורליים קלים (ללא קבצים חיצוניים) שמוכנים להכנסה לתצוגת המערכת.</p>
   <div class="grp">
     <div class="grp-t">תצוגה</div>
     <div class="btns" id="scene">
-      <button data-v="single" class="on">מכונה בודדת</button>
-      <button data-v="niche">בתוך נישה בארון</button>
+      <button data-v="washer" class="on">מכונת כביסה</button>
+      <button data-v="dryer">מייבש כביסה</button>
+      <button data-v="pair">זה לצד זה</button>
+      <button data-v="tower">מגדל בנישה</button>
     </div>
   </div>
   <div class="grp">
@@ -52,8 +45,9 @@
     </div>
   </div>
   <div class="spec">
-    <div><b>מידות:</b> 60 × 85 × 57 ס"מ (רוחב × גובה × עומק)</div>
-    <div><b>פתח תוף:</b> קוטר 31 ס"מ · <b>דלת:</b> קוטר 42 ס"מ</div>
+    <div><b>מכונת כביסה:</b> 60 × 85 × 57 ס"מ</div>
+    <div><b>מייבש:</b> 60 × 85 × 61 ס"מ</div>
+    <div style="color:#64748b">(רוחב × גובה × עומק)</div>
     <div class="perf" id="perf"></div>
   </div>
 </div>
@@ -97,7 +91,7 @@ const key = new THREE.DirectionalLight(0xffffff, 0.85);
 key.position.set(-120, 260, 220);
 key.castShadow = true;
 key.shadow.mapSize.set(2048, 2048);
-Object.assign(key.shadow.camera, { left: -160, right: 160, top: 260, bottom: -60, near: 10, far: 900 });
+Object.assign(key.shadow.camera, { left: -180, right: 180, top: 300, bottom: -60, near: 10, far: 900 });
 key.shadow.bias = -0.0005;
 key.shadow.radius = 5;
 scene.add(key);
@@ -111,26 +105,32 @@ floor.receiveShadow = true;
 scene.add(floor);
 
 // =====================================================================
-// Washing machine — self-contained builder (portable to the engine).
+// Laundry appliances — self-contained builder (portable to the engine).
+// buildLaundryAppliance('washer' | 'dryer') → THREE.Group
 // Units: cm. Origin: floor level, centred on width and depth; front faces +Z.
 // =====================================================================
-const WM = {
-    W: 59.7, H: 84.5, D: 57,
-    feet: 1.2,         // levelling feet height
-    topT: 1.8,         // worktop lid thickness
-    panelY0: 71.5,     // bottom of the control panel
-    doorY: 42,         // door centre height
-    doorR: 20.8,       // door outer radius
-    holeR: 15.5        // drum opening radius in the front panel
+const LA_TYPES = {
+    washer: {
+        W: 59.7, H: 84.5, D: 57, doorY: 42, doorR: 20.8, holeR: 15.5,
+        drawerW: 17, label: '8 kg  ·  1400 rpm  ·  A', display: ['1:28', '40°', '1400'],
+        glass: [[0, -6], [4, -5.7], [8, -4.7], [10.8, -3.0], [12.6, -1.0], [13.2, 0.8]]
+    },
+    dryer: {
+        W: 59.7, H: 84.5, D: 61, doorY: 43, doorR: 21.5, holeR: 16.5,
+        drawerW: 24, label: '8 kg  ·  Heat pump  ·  A+++', display: ['2:05', 'Cotton', 'Dry'],
+        glass: [[0, -1.6], [6, -1.45], [10, -0.9], [12.6, -0.1], [13.2, 0.8]]
+    }
+};
+const LA_COMMON = { feet: 1.2, topT: 1.8, panelY0: 71.5 };
+
+// White body, black door ring (the chosen finish)
+const LA_FINISH = {
+    body: 0xf2f3f1, bodyRough: 0.38,
+    door: 0x1b1d1f, doorRough: 0.3, doorMetal: 0.35,
+    dark: 0x26292c, button: 0xe2e5e7
 };
 
-const WM_FINISHES = {
-    white:    { body: 0xf2f3f1, bodyMetal: 0,    bodyRough: 0.38, trim: 0xc9ced2, trimMetal: 0.9, trimRough: 0.25, dark: 0x3b4045, button: 0xe2e5e7 },
-    inox:     { body: 0xa9aeb2, bodyMetal: 0.75, bodyRough: 0.32, trim: 0x2f3438, trimMetal: 0.4, trimRough: 0.35, dark: 0x2a2e32, button: 0x8f959a },
-    graphite: { body: 0x34373a, bodyMetal: 0.2,  bodyRough: 0.4,  trim: 0x6a7075, trimMetal: 0.85, trimRough: 0.28, dark: 0x1f2225, button: 0x4a4e52 }
-};
-
-function _wmRoundedRect(w, h, r, cx = 0, cy = 0) {
+function _laRoundedRect(w, h, r, cx = 0, cy = 0) {
     const s = new THREE.Shape();
     const x0 = cx - w / 2, y0 = cy - h / 2;
     r = Math.min(r, w / 2, h / 2);
@@ -143,9 +143,9 @@ function _wmRoundedRect(w, h, r, cx = 0, cy = 0) {
 }
 
 /** Rounded slab spanning local z 0..depth, centred on x/y. */
-function _wmSlab(w, h, depth, r, bevel, mat) {
+function _laSlab(w, h, depth, r, bevel, mat) {
     const b = Math.min(bevel, depth / 2 - 0.01);
-    const geo = new THREE.ExtrudeGeometry(_wmRoundedRect(w - 2 * b, h - 2 * b, Math.max(r - b, 0.05)), {
+    const geo = new THREE.ExtrudeGeometry(_laRoundedRect(w - 2 * b, h - 2 * b, Math.max(r - b, 0.05)), {
         depth: depth - 2 * b, bevelEnabled: b > 0, bevelThickness: b, bevelSize: b, bevelSegments: 2, curveSegments: 5
     });
     geo.translate(0, 0, b);
@@ -153,13 +153,13 @@ function _wmSlab(w, h, depth, r, bevel, mat) {
 }
 
 /** Lathe around the local Z axis from (radius, z) pairs. */
-function _wmLathe(pts, segs, mat) {
+function _laLathe(pts, segs, mat) {
     const geo = new THREE.LatheGeometry(pts.map(p => new THREE.Vector2(p[0], p[1])), segs);
     geo.rotateX(Math.PI / 2);
     return new THREE.Mesh(geo, mat);
 }
 
-function _wmCanvasTex(w, h, draw) {
+function _laCanvasTex(w, h, draw) {
     const c = document.createElement('canvas');
     c.width = w; c.height = h;
     draw(c.getContext('2d'), w, h);
@@ -169,31 +169,47 @@ function _wmCanvasTex(w, h, draw) {
     return t;
 }
 
-function _wmTextures() {
-    if (_wmTextures.cache) return _wmTextures.cache;
-    const perf = _wmCanvasTex(128, 128, (x, w, h) => {
-        x.fillStyle = '#c3c8cc'; x.fillRect(0, 0, w, h);
-        const hole = (cx, cy) => {
-            x.fillStyle = '#e6e9eb'; x.beginPath(); x.arc(cx + 1.5, cy + 1.5, 9, 0, Math.PI * 2); x.fill();
-            x.fillStyle = '#2b3034'; x.beginPath(); x.arc(cx, cy, 7, 0, Math.PI * 2); x.fill();
-        };
-        [[32, 32], [96, 32], [0, 96], [64, 96], [128, 96]].forEach(p => hole(p[0], p[1]));
+const _laTexCache = {};
+function _laTex(name, make) { return _laTexCache[name] || (_laTexCache[name] = make()); }
+
+function _laDrumTex(type) {
+    return _laTex('drum-' + type, () => {
+        const t = _laCanvasTex(128, 128, (x, w, h) => {
+            x.fillStyle = '#c3c8cc'; x.fillRect(0, 0, w, h);
+            const pts = [[32, 32], [96, 32], [0, 96], [64, 96], [128, 96]];
+            pts.forEach(([cx, cy]) => {
+                if (type === 'washer') {
+                    x.fillStyle = '#e6e9eb'; x.beginPath(); x.arc(cx + 1.5, cy + 1.5, 9, 0, Math.PI * 2); x.fill();
+                    x.fillStyle = '#2b3034'; x.beginPath(); x.arc(cx, cy, 7, 0, Math.PI * 2); x.fill();
+                } else {
+                    // Dryer drum: soft embossed dimples instead of holes
+                    const gr = x.createRadialGradient(cx - 5, cy - 5, 2, cx, cy, 20);
+                    gr.addColorStop(0, '#eef1f3'); gr.addColorStop(0.6, '#c3c8cc'); gr.addColorStop(1, '#a9afb4');
+                    x.fillStyle = gr; x.beginPath(); x.arc(cx, cy, 20, 0, Math.PI * 2); x.fill();
+                }
+            });
+        });
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        return t;
     });
-    perf.wrapS = perf.wrapT = THREE.RepeatWrapping;
-    const display = _wmCanvasTex(512, 212, (x, w, h) => {
+}
+
+function _laDisplayTex(lines) {
+    return _laTex('disp-' + lines.join('|'), () => _laCanvasTex(512, 212, (x, w, h) => {
         x.fillStyle = '#0d1114'; x.fillRect(0, 0, w, h);
-        x.fillStyle = '#e8f6ff'; x.font = 'bold 110px "Segoe UI", Tahoma, sans-serif';
         x.textAlign = 'center'; x.textBaseline = 'middle';
-        x.fillText('1:28', w * 0.42, h * 0.48);
-        x.font = 'bold 34px "Segoe UI", Tahoma, sans-serif';
-        x.fillStyle = '#7fd3ff';
-        x.fillText('40°', w * 0.86, h * 0.3);
-        x.fillText('1400', w * 0.86, h * 0.68);
+        x.fillStyle = '#e8f6ff'; x.font = 'bold 110px "Segoe UI", Tahoma, sans-serif';
+        x.fillText(lines[0], w * 0.4, h * 0.48);
+        x.fillStyle = '#7fd3ff'; x.font = 'bold 32px "Segoe UI", Tahoma, sans-serif';
+        x.fillText(lines[1], w * 0.85, h * 0.3);
+        x.fillText(lines[2], w * 0.85, h * 0.68);
         x.fillStyle = '#4ade80';
-        x.beginPath(); x.arc(w * 0.08, h * 0.25, 9, 0, Math.PI * 2); x.fill();
-    });
-    const dial = _wmCanvasTex(256, 256, (x, w, h) => {
-        x.clearRect(0, 0, w, h);
+        x.beginPath(); x.arc(w * 0.07, h * 0.25, 9, 0, Math.PI * 2); x.fill();
+    }));
+}
+
+function _laDialTex() {
+    return _laTex('dial', () => _laCanvasTex(256, 256, (x, w, h) => {
         x.translate(w / 2, h / 2);
         for (let i = 0; i < 14; i++) {
             const a = -Math.PI * 0.75 + i * (Math.PI * 1.5 / 13);
@@ -204,137 +220,180 @@ function _wmTextures() {
             x.lineTo(Math.cos(a) * (i % 2 ? 104 : 112), Math.sin(a) * (i % 2 ? 104 : 112));
             x.stroke();
         }
-    });
-    const label = _wmCanvasTex(512, 64, (x, w, h) => {
-        x.clearRect(0, 0, w, h);
-        x.fillStyle = '#7c858c'; x.font = '600 34px "Segoe UI", Tahoma, sans-serif';
-        x.textAlign = 'center'; x.textBaseline = 'middle';
-        x.fillText('8 kg  ·  1400 rpm  ·  A', w / 2, h / 2);
-    });
-    return (_wmTextures.cache = { perf, display, dial, label });
+    }));
 }
 
-function buildWashingMachine(finishId) {
-    const f = WM_FINISHES[finishId] || WM_FINISHES.white;
-    const tx = _wmTextures();
-    const { W, H, D, feet, topT, panelY0, doorY, doorR, holeR } = WM;
+function _laLabelTex(text) {
+    return _laTex('label-' + text, () => _laCanvasTex(512, 64, (x, w, h) => {
+        x.fillStyle = '#7c858c'; x.font = '600 32px "Segoe UI", Tahoma, sans-serif';
+        x.textAlign = 'center'; x.textBaseline = 'middle';
+        x.fillText(text, w / 2, h / 2);
+    }));
+}
+
+function _laGrilleTex() {
+    return _laTex('grille', () => _laCanvasTex(256, 64, (x, w, h) => {
+        x.fillStyle = '#26292c';
+        for (let i = 0; i < 14; i++) {
+            const sx = 8 + i * 17.6;
+            x.beginPath();
+            x.roundRect ? x.roundRect(sx, 10, 8, 44, 4) : x.rect(sx, 10, 8, 44);
+            x.fill();
+        }
+    }));
+}
+
+function buildLaundryAppliance(type) {
+    const T = LA_TYPES[type] || LA_TYPES.washer;
+    const { W, H, D, doorY, doorR, holeR } = T;
+    const { feet, topT, panelY0 } = LA_COMMON;
+    const f = LA_FINISH;
     const F = D / 2;
+    const isDryer = type === 'dryer';
     const g = new THREE.Group();
-    g.name = 'washingMachine';
+    g.name = type;
 
     const lin = hex => new THREE.Color(hex).convertSRGBToLinear();
     const std = (color, rough, metal, extra) => new THREE.MeshStandardMaterial(Object.assign({ color: lin(color), roughness: rough, metalness: metal || 0 }, extra || {}));
+    const drumTex = _laDrumTex(type);
+    const drumBackTex = drumTex.clone();
+    drumBackTex.needsUpdate = true;
+    drumBackTex.repeat.set(7, 7);
     const M = {
-        body: std(f.body, f.bodyRough, f.bodyMetal),
-        trim: std(f.trim, f.trimRough, f.trimMetal),
+        body: std(f.body, f.bodyRough, 0),
+        door: std(f.door, f.doorRough, f.doorMetal),
         dark: std(f.dark, 0.55, 0.1),
-        smoke: std(0x23292e, 0.2, 0.1),
-        rubber: std(0x34383c, 0.85, 0),
+        smoke: std(0x101214, 0.18, 0.1),
+        rubber: std(0x2e3135, 0.85, 0),
         chrome: std(0xd8dcdf, 0.18, 1),
-        button: std(f.button, 0.4, f.bodyMetal * 0.5),
-        glass: std(0x6f8a99, 0.04, 0.1, { transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide, envMapIntensity: 1.6 }),
-        drum: std(0xffffff, 0.35, 0.75, { map: tx.perf, side: THREE.BackSide }),
-        drumBack: std(0xffffff, 0.35, 0.75, { map: tx.perf.clone() }),
-        display: std(0x000000, 0.12, 0, { emissive: 0xffffff, emissiveMap: tx.display }),
-        dial: new THREE.MeshBasicMaterial({ map: tx.dial, transparent: true, depthWrite: false }),
-        label: new THREE.MeshBasicMaterial({ map: tx.label, transparent: true, depthWrite: false }),
+        button: std(f.button, 0.4, 0),
+        glass: std(isDryer ? 0x39444b : 0x4f6470, 0.04, 0.1, { transparent: true, opacity: isDryer ? 0.5 : 0.36, depthWrite: false, side: THREE.DoubleSide, envMapIntensity: 1.7 }),
+        drum: std(0xffffff, isDryer ? 0.28 : 0.35, 0.75, { map: drumTex, side: THREE.BackSide }),
+        drumBack: std(0xffffff, 0.35, 0.75, { map: drumBackTex }),
+        display: std(0x000000, 0.12, 0, { emissive: 0xffffff, emissiveMap: _laDisplayTex(T.display) }),
+        dial: new THREE.MeshBasicMaterial({ map: _laDialTex(), transparent: true, depthWrite: false }),
+        label: new THREE.MeshBasicMaterial({ map: _laLabelTex(T.label), transparent: true, depthWrite: false }),
+        grille: new THREE.MeshBasicMaterial({ map: _laGrilleTex(), transparent: true, depthWrite: false }),
         led: new THREE.MeshBasicMaterial({ color: lin(0x4ade80) })
     };
-    tx.perf.repeat.set(23, 8);
-    M.drumBack.map.repeat.set(7, 7);
-    M.drumBack.map.needsUpdate = true;
+    drumTex.repeat.set(Math.round(2 * Math.PI * (holeR - 0.9) / 4), 8);
 
     const add = (mesh, x, y, z) => { mesh.position.set(x || 0, y || 0, z || 0); g.add(mesh); return mesh; };
 
     // ---- Cabinet shell with the drum opening punched through ----
     const bodyH = H - feet - topT, b = 0.8;
-    const shellShape = _wmRoundedRect(W - 2 * b, bodyH - 2 * b, 0.6, 0, feet + bodyH / 2);
+    const shellShape = _laRoundedRect(W - 2 * b, bodyH - 2 * b, 0.6, 0, feet + bodyH / 2);
     const hole = new THREE.Path();
     hole.absarc(0, doorY, holeR + b, 0, Math.PI * 2, true);
     shellShape.holes.push(hole);
     const shellGeo = new THREE.ExtrudeGeometry(shellShape, { depth: D - 2 * b, bevelEnabled: true, bevelThickness: b, bevelSize: b, bevelSegments: 2, curveSegments: 10 });
     shellGeo.translate(0, 0, b - F);
     add(new THREE.Mesh(shellGeo, M.body));
-    const backCap = add(new THREE.Mesh(new THREE.CircleGeometry(holeR + 1, 32), M.body), 0, doorY, -F - 0.02);
-    backCap.rotation.y = Math.PI;
+    add(new THREE.Mesh(new THREE.CircleGeometry(holeR + 1, 32), M.body), 0, doorY, -F - 0.02).rotation.y = Math.PI;
 
     // ---- Worktop lid ----
-    const lid = _wmSlab(W + 0.2, D + 0.6, topT, 1.4, 0.45, M.body);
+    const lid = _laSlab(W + 0.2, D + 0.6, topT, 1.4, 0.45, M.body);
     lid.geometry.rotateX(-Math.PI / 2);
     add(lid, 0, H - topT, 0.3);
 
     // ---- Control panel ----
-    const panelH = H - topT - 0.4 - panelY0;
-    add(_wmSlab(W - 1.6, panelH, 0.7, 1, 0.25, M.body), 0, panelY0 + panelH / 2, F);
+    const panelH = H - topT - 0.4 - panelY0, panelCY = panelY0 + panelH / 2;
+    add(_laSlab(W - 1.6, panelH, 0.7, 1, 0.25, M.body), 0, panelCY, F);
     add(new THREE.Mesh(new THREE.BoxGeometry(W - 3, 0.22, 0.1), M.dark), 0, panelY0 - 0.25, F + 0.03);
     const PF = F + 0.7;
-    // Detergent drawer with grip slot
-    const drawerX = -W / 2 + 2.4 + 8.5;
-    add(_wmSlab(17, 8.2, 0.5, 0.8, 0.15, M.body), drawerX, panelY0 + panelH / 2, PF);
-    add(new THREE.Mesh(new THREE.BoxGeometry(7, 0.7, 0.3), M.dark), drawerX, panelY0 + panelH / 2 - 3.2, PF + 0.4);
+    // Detergent drawer (washer) / condensed-water tank (dryer), with grip slot
+    const drawerX = -W / 2 + 2.4 + T.drawerW / 2;
+    add(_laSlab(T.drawerW, 8.2, 0.5, 0.8, 0.15, M.body), drawerX, panelCY, PF);
+    add(new THREE.Mesh(new THREE.BoxGeometry(T.drawerW * (isDryer ? 0.6 : 0.42), 0.7, 0.3), M.dark), drawerX, panelCY - 3.2, PF + 0.4);
+    if (isDryer) {
+        // Water-drop marking on the tank
+        const drop = new THREE.Shape();
+        drop.moveTo(0, 1.1); drop.quadraticCurveTo(0.75, 0.1, 0.55, -0.3); drop.absarc(0, -0.3, 0.55, 0, Math.PI, true); drop.quadraticCurveTo(-0.75, 0.1, 0, 1.1);
+        add(new THREE.Mesh(new THREE.ShapeGeometry(drop, 6), M.dark), drawerX + T.drawerW / 2 - 2.4, panelCY + 1.8, PF + 0.52);
+    }
     // Program dial
-    const knobX = 1.5, knobY = panelY0 + panelH / 2;
-    add(new THREE.Mesh(new THREE.PlaneGeometry(11, 11), M.dial), knobX, knobY, PF + 0.02);
-    add(new THREE.Mesh(new THREE.TorusGeometry(3.55, 0.3, 8, 40), M.chrome), knobX, knobY, PF + 0.3);
+    const knobX = isDryer ? 4 : 1.5;
+    add(new THREE.Mesh(new THREE.PlaneGeometry(11, 11), M.dial), knobX, panelCY, PF + 0.02);
+    add(new THREE.Mesh(new THREE.TorusGeometry(3.55, 0.3, 8, 40), M.chrome), knobX, panelCY, PF + 0.3);
     const knob = new THREE.Mesh(new THREE.CylinderGeometry(3.05, 3.2, 1.8, 36), M.button);
     knob.rotation.x = Math.PI / 2;
-    add(knob, knobX, knobY, PF + 0.9);
-    add(new THREE.Mesh(new THREE.BoxGeometry(0.45, 1.7, 0.15), M.dark), knobX - 1.1, knobY + 1.6, PF + 1.85).rotation.z = 0.6;
+    add(knob, knobX, panelCY, PF + 0.9);
+    add(new THREE.Mesh(new THREE.BoxGeometry(0.45, 1.7, 0.15), M.dark), knobX - 1.1, panelCY + 1.6, PF + 1.85).rotation.z = 0.6;
     // Display + touch buttons
-    add(new THREE.Mesh(new THREE.PlaneGeometry(12.5, 5.2), M.display), 15.5, knobY + 1.3, PF + 0.02);
-    [10.5, 13.8, 17.1, 20.4].forEach(x => {
+    const dispX = isDryer ? 16.5 : 15.5;
+    add(new THREE.Mesh(new THREE.PlaneGeometry(isDryer ? 10.5 : 12.5, 5.2), M.display), dispX, panelCY + 1.3, PF + 0.02);
+    (isDryer ? [12.5, 15.5, 18.5] : [10.5, 13.8, 17.1, 20.4]).forEach(x => {
         const btn = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.35, 18), M.button);
         btn.rotation.x = Math.PI / 2;
-        add(btn, x, knobY - 3.1, PF + 0.17);
+        add(btn, x, panelCY - 3.1, PF + 0.17);
     });
-    // Power button
     const pwr = new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.25, 0.5, 24), M.button);
     pwr.rotation.x = Math.PI / 2;
-    add(pwr, 25.2, knobY, PF + 0.25);
-    add(new THREE.Mesh(new THREE.TorusGeometry(1.45, 0.12, 6, 28), M.chrome), 25.2, knobY, PF + 0.1);
-    add(new THREE.Mesh(new THREE.CircleGeometry(0.25, 12), M.led), 25.2, knobY + 2.3, PF + 0.02);
+    add(pwr, 25.2, panelCY, PF + 0.25);
+    add(new THREE.Mesh(new THREE.TorusGeometry(1.45, 0.12, 6, 28), M.chrome), 25.2, panelCY, PF + 0.1);
+    add(new THREE.Mesh(new THREE.CircleGeometry(0.25, 12), M.led), 25.2, panelCY + 2.3, PF + 0.02);
 
-    // ---- Drum opening: rubber gasket, perforated drum, lifters ----
+    // ---- Drum opening: gasket, drum, lifters ----
     add(new THREE.Mesh(new THREE.TorusGeometry(holeR - 0.5, 1.0, 10, 48), M.rubber), 0, doorY, F - 0.6);
-    const drumR = holeR - 0.9, drumL = 32, drumZ = F - 1.5 - drumL / 2;
+    const drumR = holeR - 0.9, drumL = isDryer ? 36 : 32, drumZ = F - 1.5 - drumL / 2;
     const drum = new THREE.Mesh(new THREE.CylinderGeometry(drumR, drumR, drumL, 40, 1, true), M.drum);
     drum.rotation.x = Math.PI / 2;
     add(drum, 0, doorY, drumZ);
     add(new THREE.Mesh(new THREE.CircleGeometry(drumR, 40), M.drumBack), 0, doorY, drumZ - drumL / 2);
     [Math.PI / 2, Math.PI / 2 + 2.094, Math.PI / 2 - 2.094].forEach(a => {
-        const lifter = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.6, drumL - 3), M.chrome);
+        const lifter = new THREE.Mesh(new THREE.BoxGeometry(isDryer ? 2.4 : 1.6, isDryer ? 2 : 2.6, drumL - 3), M.chrome);
         lifter.rotation.z = a - Math.PI / 2;
-        add(lifter, Math.cos(a) * (drumR - 1.2), doorY + Math.sin(a) * (drumR - 1.2), drumZ);
+        add(lifter, Math.cos(a) * (drumR - 1.1), doorY + Math.sin(a) * (drumR - 1.1), drumZ);
     });
+    if (isDryer) {
+        // Lint filter seated in the bottom of the opening
+        add(_laSlab(11, 2.2, 1.2, 0.6, 0.2, M.button), 0, doorY - holeR + 1.6, F - 1.6);
+        add(new THREE.Mesh(new THREE.BoxGeometry(4, 0.5, 0.2), M.dark), 0, doorY - holeR + 1.9, F - 0.35);
+    }
 
-    // ---- Door (hinged on the left) ----
+    // ---- Door (hinged on the left): black ring, smoked bezel, tinted glass ----
     const door = new THREE.Group();
-    door.name = 'washingMachineDoor';
+    door.name = type + 'Door';
     door.position.set(-doorR + 0.3, doorY, F + 0.3);
     g.add(door);
     const dg = new THREE.Group();
     dg.position.x = doorR - 0.3;
     door.add(dg);
-    dg.add(_wmLathe([[14.4, 0.2], [14.2, 1.2], [14.5, 2.4], [15.3, 3.1], [17.5, 3.35], [19.6, 3.0], [20.6, 2.1], [20.8, 1.0], [20.5, 0.2], [14.4, 0.2]], 64, M.trim));
-    dg.add(_wmLathe([[13.0, -0.4], [12.9, 0.8], [13.4, 1.8], [14.4, 2.3], [14.5, 0.0], [13.0, -0.4]], 48, M.smoke));
-    const glass = _wmLathe([[0, -6], [4, -5.7], [8, -4.7], [10.8, -3.0], [12.6, -1.0], [13.2, 0.8]], 48, M.glass);
+    const s = doorR / 20.8;
+    const ring = [[14.4, 0.2], [14.2, 1.2], [14.5, 2.4], [15.3, 3.1], [17.5, 3.35], [19.6, 3.0], [20.6, 2.1], [20.8, 1.0], [20.5, 0.2], [14.4, 0.2]];
+    dg.add(_laLathe(ring.map(([r, z]) => [r * s, z]), 64, M.door));
+    // Thin chrome accent on the ring's front face
+    const accent = new THREE.Mesh(new THREE.TorusGeometry(17.4 * s, 0.12, 6, 64), M.chrome);
+    accent.position.z = 3.38;
+    dg.add(accent);
+    dg.add(_laLathe([[13.0, -0.4], [12.9, 0.8], [13.4, 1.8], [14.4, 2.3], [14.5, 0.0], [13.0, -0.4]].map(([r, z]) => [r * s, z]), 48, M.smoke));
+    const glass = _laLathe(T.glass.map(([r, z]) => [r * s, z]), 48, M.glass);
     glass.renderOrder = 2;
     dg.add(glass);
-    const grip = _wmSlab(1.1, 7, 1.1, 0.5, 0.25, M.dark);
+    const grip = _laSlab(1.1, 7, 1.1, 0.5, 0.25, M.smoke);
     grip.position.set(doorR - 1.9, 0, 2.6);
     dg.add(grip);
     [-5.5, 5.5].forEach(y => {
-        const hinge = _wmSlab(1.6, 3, 0.9, 0.4, 0.15, M.dark);
+        const hinge = _laSlab(1.6, 3, 0.9, 0.4, 0.15, M.dark);
         hinge.position.set(-doorR + 0.9, y, -0.6);
         dg.add(hinge);
     });
 
-    // ---- Front details: energy label, kick-plate seam, service flap ----
-    add(new THREE.Mesh(new THREE.PlaneGeometry(16, 2), M.label), 0, panelY0 - 3.2, F + 0.02);
-    add(new THREE.Mesh(new THREE.BoxGeometry(W - 3, 0.18, 0.1), M.dark), 0, feet + 7.5, F + 0.03);
-    const flapX = W / 2 - 8.5, flapY = feet + 3.9;
-    add(new THREE.Mesh(new THREE.ShapeGeometry(_wmRoundedRect(9.6, 5.6, 1), 4), M.dark), flapX, flapY, F + 0.02);
-    add(_wmSlab(9.2, 5.2, 0.2, 0.9, 0.06, M.body), flapX, flapY, F + 0.02);
+    // ---- Front details ----
+    add(new THREE.Mesh(new THREE.PlaneGeometry(18, 2.2), M.label), 0, panelY0 - 3.2, F + 0.02);
+    if (isDryer) {
+        // Full-width condenser access flap with vent grille and pull notch
+        const flapH = 9, flapY = feet + 0.6 + flapH / 2;
+        add(new THREE.Mesh(new THREE.ShapeGeometry(_laRoundedRect(W - 3.4, flapH + 0.4, 1), 4), M.dark), 0, flapY, F + 0.02);
+        add(_laSlab(W - 3.8, flapH, 0.25, 0.9, 0.08, M.body), 0, flapY, F + 0.02);
+        add(new THREE.Mesh(new THREE.PlaneGeometry(22, 4.4), M.grille), -W / 2 + 15, flapY, F + 0.3);
+        add(new THREE.Mesh(new THREE.BoxGeometry(6, 0.6, 0.2), M.dark), W / 2 - 8, flapY + flapH / 2 - 1.2, F + 0.3);
+    } else {
+        add(new THREE.Mesh(new THREE.BoxGeometry(W - 3, 0.18, 0.1), M.dark), 0, feet + 7.5, F + 0.03);
+        const flapX = W / 2 - 8.5, flapY = feet + 3.9;
+        add(new THREE.Mesh(new THREE.ShapeGeometry(_laRoundedRect(9.6, 5.6, 1), 4), M.dark), flapX, flapY, F + 0.02);
+        add(_laSlab(9.2, 5.2, 0.2, 0.9, 0.06, M.body), flapX, flapY, F + 0.02);
+    }
 
     // ---- Levelling feet ----
     const footGeo = new THREE.CylinderGeometry(2, 2.3, feet, 16);
@@ -342,33 +401,33 @@ function buildWashingMachine(finishId) {
 
     g.traverse(o => { if (o.isMesh && !o.material.transparent) { o.castShadow = true; o.receiveShadow = true; } });
     g.userData.door = door;
-    g.userData.materials = M;
+    g.userData.dims = { W, H, D };
     return g;
 }
 
-// ---- Niche scene: machine slotted into a tall cabinet column ----
-function buildNiche() {
+// ---- Tall cabinet niche around a stacked washer + dryer ----
+function buildNiche(innerH) {
     const g = new THREE.Group();
     const lin = hex => new THREE.Color(hex).convertSRGBToLinear();
     const carcass = new THREE.MeshStandardMaterial({ color: lin(0xeeeae2), roughness: 0.7 });
     const fronts = new THREE.MeshStandardMaterial({ color: lin(0x8a6e55), roughness: 0.75 });
     const handle = new THREE.MeshStandardMaterial({ color: lin(0x1d1d1f), roughness: 0.5, metalness: 0.5 });
-    const T = 1.8, depth = 60, totalH = 220, innerW = WM.W + 2.4;
+    const T = 1.8, depth = 64, totalH = 240, innerW = LA_TYPES.washer.W + 2.4;
     const box = (w, h, d, x, y, z, m) => {
         const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
         mesh.position.set(x, y, z);
         mesh.castShadow = true; mesh.receiveShadow = true;
         g.add(mesh);
     };
-    [-1, 1].forEach(s => box(T, totalH, depth, s * (innerW / 2 + T / 2), totalH / 2, 0, carcass));
+    [-1, 1].forEach(sd => box(T, totalH, depth, sd * (innerW / 2 + T / 2), totalH / 2, 0, carcass));
     box(innerW, totalH, 0.8, 0, totalH / 2, -depth / 2 + 0.4, carcass);
-    const shelfY = WM.H + 1.5;
+    const shelfY = innerH + 1.5;
     box(innerW, T, depth, 0, shelfY + T / 2, 0, carcass);
     box(innerW, T, depth, 0, totalH - T / 2, 0, carcass);
     const doorY0 = shelfY + T + 0.3, doorH = totalH - doorY0 - 0.3, doorW = innerW / 2 + T / 2 - 0.2;
-    [-1, 1].forEach(s => {
-        box(doorW, doorH, T, s * (doorW / 2 + 0.1), doorY0 + doorH / 2, depth / 2 + T / 2, fronts);
-        box(0.9, 18, 1.6, s * 1.8, doorY0 + 10, depth / 2 + T + 0.8, handle);
+    [-1, 1].forEach(sd => {
+        box(doorW, doorH, T, sd * (doorW / 2 + 0.1), doorY0 + doorH / 2, depth / 2 + T / 2, fronts);
+        box(0.9, 18, 1.6, sd * 1.8, doorY0 + 10, depth / 2 + T + 0.8, handle);
     });
     return g;
 }
@@ -401,46 +460,76 @@ function dimLine(a, b, text, offset) {
     g.add(lbl);
     return g;
 }
-function buildDims() {
+function buildDims({ W, H, D }) {
     const g = new THREE.Group();
-    const { W, H, D } = WM, F = D / 2;
-    g.add(dimLine(new THREE.Vector3(-W / 2, H + 5, F), new THREE.Vector3(W / 2, H + 5, F), '60 ס"מ', new THREE.Vector3(0, 4, 0)));
-    g.add(dimLine(new THREE.Vector3(W / 2 + 5, 0, F), new THREE.Vector3(W / 2 + 5, H, F), '85 ס"מ', new THREE.Vector3(8, 0, 0)));
-    g.add(dimLine(new THREE.Vector3(W / 2 + 5, H + 5, -F), new THREE.Vector3(W / 2 + 5, H + 5, F), '57 ס"מ', new THREE.Vector3(0, 4, 0)));
+    const F = D / 2;
+    g.add(dimLine(new THREE.Vector3(-W / 2, H + 5, F), new THREE.Vector3(W / 2, H + 5, F), Math.round(W) + ' ס"מ', new THREE.Vector3(0, 4, 0)));
+    g.add(dimLine(new THREE.Vector3(W / 2 + 5, 0, F), new THREE.Vector3(W / 2 + 5, H, F), Math.round(H) + ' ס"מ', new THREE.Vector3(8, 0, 0)));
+    g.add(dimLine(new THREE.Vector3(W / 2 + 5, H + 5, -F), new THREE.Vector3(W / 2 + 5, H + 5, F), Math.round(D) + ' ס"מ', new THREE.Vector3(0, 4, 0)));
     return g;
 }
 
 // ---- Scene state ----
-let finish = 'white', mode = 'single', doorOpen = false;
-let machine = null, extra = null;
+let mode = 'washer', doorOpen = false;
+let content = null, machines = [];
 function disposeTree(o) { o.traverse(m => { if (m.geometry) m.geometry.dispose(); }); }
 
-function machineStats(group) {
-    let tris = 0, meshes = 0;
-    const mats = new Set();
+function stats(group) {
+    let tris = 0;
     group.traverse(o => {
         if (!o.isMesh) return;
-        meshes++;
-        mats.add(o.material);
         const geo = o.geometry;
         tris += (geo.index ? geo.index.count : geo.attributes.position.count) / 3;
     });
-    return { tris: Math.round(tris), meshes, mats: mats.size };
+    return Math.round(tris);
 }
 
+const CAMS = {
+    washer: [[-95, 95, 165], [0, 45, 0]],
+    dryer:  [[-95, 95, 170], [0, 45, 0]],
+    pair:   [[-120, 115, 250], [0, 45, 0]],
+    tower:  [[-170, 160, 340], [0, 110, 0]]
+};
+
 function rebuild(resetCam) {
-    if (machine) { scene.remove(machine); disposeTree(machine); }
-    if (extra) { scene.remove(extra); disposeTree(extra); }
-    machine = buildWashingMachine(finish);
-    machine.userData.door.rotation.y = doorOpen ? -1.75 : 0;
-    scene.add(machine);
-    extra = mode === 'niche' ? buildNiche() : buildDims();
-    scene.add(extra);
-    const s = machineStats(machine);
-    document.getElementById('perf').innerHTML = `<b>משקל המודל:</b> ${s.tris.toLocaleString()} משולשים · ${s.meshes} רכיבים · ${s.mats} חומרים`;
+    if (content) { scene.remove(content); disposeTree(content); }
+    content = new THREE.Group();
+    machines = [];
+    const add = (type, x, y, frontZ) => {
+        const m = buildLaundryAppliance(type);
+        m.position.set(x, y, frontZ - m.userData.dims.D / 2);
+        m.userData.door.rotation.y = doorOpen ? -1.75 : 0;
+        content.add(m);
+        machines.push(m);
+        return m;
+    };
+    if (mode === 'washer' || mode === 'dryer') {
+        const m = add(mode, 0, 0, LA_TYPES[mode].D / 2);
+        content.add(buildDims(m.userData.dims));
+    } else if (mode === 'pair') {
+        add('washer', -31, 0, 30);
+        add('dryer', 31, 0, 30);
+    } else {
+        // Stacked: dryer on a 1.5 cm stacking kit above the washer, fronts flush
+        const frontZ = 31;
+        add('washer', 0, 0, frontZ);
+        const kit = new THREE.Mesh(new THREE.BoxGeometry(LA_TYPES.washer.W, 1.5, 58), new THREE.MeshStandardMaterial({ color: new THREE.Color(0x26292c).convertSRGBToLinear(), roughness: 0.6 }));
+        kit.position.set(0, LA_TYPES.washer.H + 0.75, frontZ - 29.5);
+        kit.castShadow = kit.receiveShadow = true;
+        content.add(kit);
+        add('dryer', 0, LA_TYPES.washer.H + 1.5, frontZ);
+        const niche = buildNiche(LA_TYPES.washer.H + 1.5 + LA_TYPES.dryer.H);
+        niche.position.z = frontZ + 1 - 32;
+        content.add(niche);
+    }
+    scene.add(content);
+    const w = buildLaundryAppliance('washer'), d = buildLaundryAppliance('dryer');
+    document.getElementById('perf').innerHTML = `<b>משקל המודל:</b> כביסה ${stats(w).toLocaleString()} · מייבש ${stats(d).toLocaleString()} משולשים`;
+    disposeTree(w); disposeTree(d);
     if (resetCam) {
-        if (mode === 'niche') { camera.position.set(-150, 140, 260); controls.target.set(0, 85, 0); }
-        else { camera.position.set(-95, 95, 165); controls.target.set(0, 42, 0); }
+        const [p, t] = CAMS[mode];
+        camera.position.set(...p);
+        controls.target.set(...t);
         controls.update();
     }
 }
@@ -454,7 +543,6 @@ function bindGroup(id, fn) {
         fn(btn.dataset.v);
     });
 }
-bindGroup('finish', v => { finish = v; rebuild(false); });
 bindGroup('scene', v => { mode = v; rebuild(true); });
 bindGroup('door', v => { doorOpen = v === 'open'; });
 
@@ -467,9 +555,8 @@ addEventListener('resize', () => {
 rebuild(true);
 (function loop() {
     requestAnimationFrame(loop);
-    const door = machine.userData.door;
     const target = doorOpen ? -1.75 : 0;
-    door.rotation.y += (target - door.rotation.y) * 0.12;
+    machines.forEach(m => { const d = m.userData.door; d.rotation.y += (target - d.rotation.y) * 0.12; });
     controls.update();
     renderer.render(scene, camera);
 })();
