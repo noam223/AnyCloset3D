@@ -400,18 +400,28 @@ function _tvScreenTex() {
     });
 }
 
-// Soft diagonal sheen across the glass, brightest at the top-left corner
+// Window-like reflection on the glass: broad sheen from the top-left plus two crisp diagonal streaks
 function _tvGlareTex() {
-    return _laTex('tv-glare', () => _laCanvasTex(512, 288, (x, w, h) => {
+    return _laTex('tv-glare', () => _laCanvasTex(1024, 576, (x, w, h) => {
         x.fillStyle = '#000'; x.fillRect(0, 0, w, h);
-        const band = x.createLinearGradient(0, 0, w * 0.75, h);
-        band.addColorStop(0, 'rgba(255,255,255,0.9)');
-        band.addColorStop(0.28, 'rgba(255,255,255,0.35)');
-        band.addColorStop(0.42, 'rgba(255,255,255,0.0)');
-        band.addColorStop(0.5, 'rgba(255,255,255,0.18)');
-        band.addColorStop(0.56, 'rgba(255,255,255,0.0)');
-        band.addColorStop(1, 'rgba(255,255,255,0.0)');
-        x.fillStyle = band; x.fillRect(0, 0, w, h);
+        const sheen = x.createLinearGradient(0, 0, w * 0.7, h);
+        sheen.addColorStop(0, 'rgba(255,255,255,0.75)');
+        sheen.addColorStop(0.35, 'rgba(255,255,255,0.22)');
+        sheen.addColorStop(0.6, 'rgba(255,255,255,0.0)');
+        x.fillStyle = sheen; x.fillRect(0, 0, w, h);
+        const streak = (x0, width, alpha) => {
+            const slant = h * 0.55;
+            const gr = x.createLinearGradient(x0, 0, x0 + width, 0);
+            gr.addColorStop(0, 'rgba(255,255,255,0)');
+            gr.addColorStop(0.5, 'rgba(255,255,255,' + alpha + ')');
+            gr.addColorStop(1, 'rgba(255,255,255,0)');
+            x.save();
+            x.transform(1, 0, -slant / h, 1, slant, 0);
+            x.fillStyle = gr; x.fillRect(x0, 0, width, h);
+            x.restore();
+        };
+        streak(w * 0.30, w * 0.16, 0.55);
+        streak(w * 0.49, w * 0.05, 0.45);
     }));
 }
 
@@ -424,7 +434,7 @@ function buildTv(inch) {
     const backMat = new THREE.MeshStandardMaterial({ color: 0x1d1f23, roughness: 0.6, metalness: 0.1, envMap: env, envMapIntensity: 0.5 });
     const footMat = new THREE.MeshStandardMaterial({ color: 0x1a1b1e, roughness: 0.3, metalness: 0.6, envMap: env, envMapIntensity: 0.9 });
     // Unlit so the cabinet shadow pass never flags it: shadow acne on a glossy lit screen shimmers when orbiting
-    const screenMat = new THREE.MeshBasicMaterial({ map: _tvScreenTex(), envMap: env, combine: THREE.AddOperation, reflectivity: 0.08 });
+    const screenMat = new THREE.MeshBasicMaterial({ map: _tvScreenTex(), envMap: env, combine: THREE.AddOperation, reflectivity: 0.08, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
 
     const panelT = d.panelT;
     const y0 = d.standH;
@@ -432,12 +442,14 @@ function buildTv(inch) {
     frame.position.set(0, y0 + d.H / 2, -panelT / 2);
     g.add(frame);
     const screen = new THREE.Mesh(new THREE.PlaneGeometry(d.sw, d.sh), screenMat);
-    screen.position.set(0, y0 + d.bottom + d.sh / 2, panelT / 2 + 0.02);
+    // Frame front face is at z = panelT / 2; gaps below ~0.2 cm z-fight at room viewing distance (near plane = 1)
+    screen.position.set(0, y0 + d.bottom + d.sh / 2, panelT / 2 + 0.3);
     g.add(screen);
     const glare = new THREE.Mesh(new THREE.PlaneGeometry(d.sw, d.sh), new THREE.MeshBasicMaterial({
-        map: _tvGlareTex(), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.22
+        map: _tvGlareTex(), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.5,
+        polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4
     }));
-    glare.position.set(0, screen.position.y, panelT / 2 + 0.05);
+    glare.position.set(0, screen.position.y, panelT / 2 + 0.45);
     glare.renderOrder = 2;
     g.add(glare);
     // Thicker electronics housing on the back, lower two thirds
