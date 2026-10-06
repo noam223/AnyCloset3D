@@ -40,51 +40,37 @@ function buildSlidingDoorCabinet(targetGroup) {
         window._silverTexMap.repeat.set(window._brushedTexRepeat, window._brushedTexRepeat);
         window._silverTexMap.needsUpdate = true;
     }
-    if (!window._goldTexMap) {
-        const tl = new THREE.TextureLoader();
-        window._goldTexMap = tl.load('images/gold.jpg', t => {
-            t.wrapS = t.wrapT = THREE.RepeatWrapping;
-            t.encoding = THREE.sRGBEncoding;
-            t.repeat.set(window._brushedTexRepeat, window._brushedTexRepeat);
-            if (typeof buildCabinet === 'function') buildCabinet();
-        });
-    } else {
-        window._goldTexMap.repeat.set(window._brushedTexRepeat, window._brushedTexRepeat);
-        window._goldTexMap.needsUpdate = true;
-    }
-
     // ---- Profile color material ----
-    // brushed: 'silver'/'gold' → texture map, NO envMap, brightness via emissive
-    // reflect: true            → solid color WITH envMap reflection (only black)
-    // reflect: false           → solid color, NO envMap (white, cream)
+    // brushed: true   → silver brush texture tinted by `color`, soft studio reflections, small emissive lift
+    // reflect: true   → solid color WITH envMap reflection (only black)
+    // reflect: false  → solid color, NO envMap (white, cream)
     const _profileSlider = (window._hdrIntensity && window._hdrIntensity.profile != null)
         ? window._hdrIntensity.profile : 2.05;
     const profileColorMap = {
-        nickel:    { color: 0xffffff, metalness: 0.5,  roughness: 0.55, brushed: 'silver', reflect: false },
+        nickel:    { color: 0xffffff, metalness: 0.3,  roughness: 0.42, brushed: true, emissive: 0xffffff, emissiveMul: 0.035 },
         black:     { color: 0x1a1a1a, metalness: 0.85, roughness: 0.3,  brushed: false,    reflect: true  },
         white:     { color: 0xf0f0f0, metalness: 0.2,  roughness: 0.6,  brushed: false,    reflect: false },
         cream:     { color: 0xf0e8d0, metalness: 0.2,  roughness: 0.6,  brushed: false,    reflect: false },
-        gold_matte:{ color: 0xffffff, metalness: 0.5,  roughness: 0.55, brushed: 'gold',   reflect: false }
+        // Same gold as the gold handles (RIDING_COLORS.gold / halfmoon_gold)
+        gold_matte:{ color: 0xffdb72, metalness: 0.3,  roughness: 0.42, brushed: true, emissive: 0xdcb860, emissiveMul: 0.15 }
     };
     const pc = profileColorMap[sd.profileColor] || profileColorMap.nickel;
     let profileMat;
     if (isBP) {
         profileMat = new THREE.MeshBasicMaterial({ color: 0x888888 });
     } else {
-        const texMap = pc.brushed === 'silver' ? window._silverTexMap
-                     : pc.brushed === 'gold'   ? window._goldTexMap
-                     : null;
         if (pc.brushed) {
-            // Brushed: texture only, no envMap, brightness via emissive
+            // Mostly diffuse so front/side faces read the key light; a little emissive lift only.
             const emissiveBrightness = Math.max(0, _profileSlider - 0.3);
             profileMat = new THREE.MeshStandardMaterial({
-                color: 0xffffff,
+                color: pc.color,
                 metalness: pc.metalness,
                 roughness: pc.roughness,
-                envMapIntensity: 0,
-                emissive: new THREE.Color(0xffffff),
-                emissiveIntensity: emissiveBrightness * 0.15,
-                ...(texMap ? { map: texMap } : {})
+                map: window._silverTexMap,
+                envMap: window._studioEnvMap || null,
+                envMapIntensity: 0.8,
+                emissive: new THREE.Color(pc.emissive),
+                emissiveIntensity: emissiveBrightness * pc.emissiveMul
             });
         } else if (pc.reflect) {
             // Reflective solid (black): envMap with slider intensity
@@ -165,12 +151,12 @@ function buildSlidingDoorCabinet(targetGroup) {
         if (typeof _registerDoorMesh === 'function') _registerDoorMesh(doorsGroup);
     }
 
-    // Helper: add a box mesh to a target group
+    // Helper: add a box mesh to a target group.
+    // No castShadow: rails/frames sit centimetres in front of the panels and would stripe them with shadow bands.
     const addBoxTo = (group, w, h, d, x, y, z, mat) => {
         const geo = new THREE.BoxGeometry(w, h, d);
         const mesh = new THREE.Mesh(geo, mat);
         mesh.position.set(x, y, z);
-        mesh.castShadow = true;
         mesh.receiveShadow = true;
         group.add(mesh);
         return mesh;
