@@ -2554,6 +2554,25 @@ body.dragging-v { cursor: ns-resize !important; }
 #tv-size-menu .tv-size-opt.active { background: var(--primary); border-color: var(--primary); color: #fff; }
 #tv-size-menu .tv-size-opt:disabled { opacity: 0.35; cursor: not-allowed; }
 #tv-size-menu .tv-size-note { font-size: 0.65rem; color: var(--text-light); margin-top: 7px; text-align: center; }
+#tv-size-menu .tv-float-opt {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    margin-top: 8px;
+    padding: 7px 0;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    background: #f8fafc;
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--primary);
+    cursor: pointer;
+}
+#tv-size-menu .tv-float-opt:hover { border-color: var(--secondary); background: #eef2ff; }
+#tv-size-menu .tv-float-opt.active { background: var(--primary); border-color: var(--primary); color: #fff; }
 
 #order-modal {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;

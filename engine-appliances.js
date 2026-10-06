@@ -429,18 +429,19 @@ function _tvGlossMat() {
             '  float w = win(a, vec2(-0.30, -0.05), vec2(0.10, 0.45), 0.04)',
             '          + win(a, vec2(-0.11, -0.05), vec2(0.022, 0.45), 0.02) * 0.9',
             '          + win(a, vec2(0.34, 0.05), vec2(0.12, 0.35), 0.06) * 0.75;',
-            '  float g = w * (0.42 + fres) + fres * 0.45 + smoothstep(-0.6, 0.5, a.y) * 0.05;',
-            '  gl_FragColor = vec4(vec3(1.0), clamp(g, 0.0, 0.85));',
+            '  float g = (w * (0.42 + fres) + fres * 0.45 + smoothstep(-0.6, 0.5, a.y) * 0.05) * 0.5;',
+            '  gl_FragColor = vec4(vec3(1.0), clamp(g, 0.0, 0.45));',
             '}'
         ].join('\n')
     });
     return _tvGlossMatCache;
 }
 
-function buildTv(inch) {
+/** floating: wall-arm look — no feet, panel stays at the same height. */
+function buildTv(inch, floating) {
     const d = tvDims(inch);
     const g = new THREE.Group();
-    g.name = 'tv' + inch;
+    g.name = 'tv' + inch + (floating ? 'f' : '');
     const env = window._studioEnvMap || null;
     const frameMat = new THREE.MeshStandardMaterial({ color: 0x141518, roughness: 0.35, metalness: 0.4, envMap: env, envMapIntensity: 0.8 });
     const backMat = new THREE.MeshStandardMaterial({ color: 0x1d1f23, roughness: 0.6, metalness: 0.1, envMap: env, envMapIntensity: 0.5 });
@@ -473,7 +474,7 @@ function buildTv(inch) {
     const fz = d.footD / 2, bz = d.footD / 2;
     prof.moveTo(-bz, 0); prof.lineTo(-bz + 2.2, 0); prof.lineTo(0, y0 * 0.55); prof.lineTo(fz - 2.2, 0);
     prof.lineTo(fz, 0); prof.lineTo(0.55, attachY); prof.lineTo(-0.55, attachY); prof.lineTo(-bz, 0);
-    [-1, 1].forEach(sideSign => {
+    if (!floating) [-1, 1].forEach(sideSign => {
         const geo = new THREE.ExtrudeGeometry(prof, { depth: footT, bevelEnabled: true, bevelThickness: 0.15, bevelSize: 0.15, bevelSegments: 1, curveSegments: 1 });
         geo.rotateY(-Math.PI / 2);
         geo.translate(footT / 2, 0, 0);
@@ -490,18 +491,19 @@ function buildTv(inch) {
 }
 
 const _tvTemplates = {};
-function _tvTemplate(inch) {
+function _tvTemplate(inch, floating) {
     const env = window._studioEnvMap || null;
-    const cached = _tvTemplates[inch];
+    const key = inch + (floating ? 'f' : '');
+    const cached = _tvTemplates[key];
     if (cached && cached.env === env) return cached.group;
-    const group = buildTv(inch);
-    _tvTemplates[inch] = { group, env };
+    const group = buildTv(inch, floating);
+    _tvTemplates[key] = { group, env };
     return group;
 }
 
 /**
  * Add a TV to `parent`. Uses the stored size, or the largest that fits when the cell shrank.
- * opts: { inch, x, bottomY, cellW, cellH, bodyD, backT, frontInset }
+ * opts: { inch, floating, x, bottomY, cellW, cellH, bodyD, backT, frontInset }
  * Returns { inch, x, topY, rightX } for the size badge, or null when nothing fits.
  */
 function addTvToCell(parent, opts) {
@@ -509,7 +511,7 @@ function addTvToCell(parent, opts) {
     if (!tvFits(inch, opts.cellW, opts.cellH)) inch = tvLargestFit(opts.cellW, opts.cellH);
     if (!inch) return null;
     const d = tvDims(inch);
-    const m = _tvTemplate(inch).clone();
+    const m = _tvTemplate(inch, !!opts.floating).clone();
     const cellMidZ = ((opts.backT || 0) - (opts.frontInset || 0)) / 2;
     m.position.set(opts.x, opts.bottomY, cellMidZ - d.centerZ);
     m.userData.isTv = true;

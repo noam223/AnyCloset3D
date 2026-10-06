@@ -5097,19 +5097,31 @@ function _openTvSizeMenu(colIndex, rowIndex, anchor) {
             : `דורש תא ברוחב ${Math.ceil(d.W + 1)} ס"מ ובגובה ${Math.ceil(d.totalH + 0.5)} ס"מ`;
         b.addEventListener('click', e => {
             e.stopPropagation();
-            comp.tv = { inch: s };
+            comp.tv = { inch: s, floating: !!comp.tv.floating };
             _closeTvSizeMenu();
             buildCabinet(); calculatePrice(); saveHistoryState();
         });
         grid.appendChild(b);
     });
     menu.appendChild(grid);
+    const floatBtn = document.createElement('button');
+    floatBtn.type = 'button';
+    floatBtn.className = 'tv-float-opt' + (comp.tv.floating ? ' active' : '');
+    floatBtn.innerHTML = '<i class="fa-solid ' + (comp.tv.floating ? 'fa-square-check' : 'fa-square') + '"></i><span>מרחפת (ללא רגליים)</span>';
+    floatBtn.title = 'מסתיר את הרגליים — המסך נשאר באותו גובה, כאילו מחובר בזרוע נסתרת מאחור';
+    floatBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        comp.tv = { inch: comp.tv.inch, floating: !comp.tv.floating };
+        _closeTvSizeMenu();
+        buildCabinet(); calculatePrice(); saveHistoryState();
+    });
     if (window.TV_SIZES.some(s => !window._tvFits(s, col.width, cellH))) {
         const note = document.createElement('div');
         note.className = 'tv-size-note';
         note.textContent = 'גדלים מושבתים דורשים תא גדול יותר';
         menu.appendChild(note);
     }
+    menu.appendChild(floatBtn);
     document.body.appendChild(menu);
     const rect = anchor.getBoundingClientRect();
     const mw = menu.offsetWidth, mh = menu.offsetHeight;
