@@ -219,10 +219,11 @@ function updateMobileCellSheetState() {
 
     const appl = (firstComp && !firstComp.partition && Array.isArray(firstComp.appliances)) ? firstComp.appliances : [];
     const applCat = document.getElementById('mcp-cat-appliances');
-    if (applCat) applCat.classList.toggle('active', appl.length > 0);
-    ['washer', 'dryer'].forEach(t => {
+    const hasTv = !!(firstComp && !firstComp.partition && firstComp.tv);
+    if (applCat) applCat.classList.toggle('active', appl.length > 0 || hasTv);
+    ['washer', 'dryer', 'tv'].forEach(t => {
         const btn = document.getElementById('mcp-appliance-' + t);
-        if (btn) btn.classList.toggle('active', appl.includes(t));
+        if (btn) btn.classList.toggle('active', t === 'tv' ? hasTv : appl.includes(t));
     });
 
     const ledBtn = document.getElementById('mcp-led');

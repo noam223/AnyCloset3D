@@ -787,6 +787,7 @@ function buildDimensionsAndButtonsUI() {
         if (d.isCellSelectBtn) return;
         if (d.isHoneycombMergeBtn) return;
         if (d.isDeskDrawerMergeBtn) return;
+        if (d.isTvSizeBtn) return;
 
         // ---- Column width label above each column (editable) ----
         if (d.isColWidth) {
@@ -1195,6 +1196,22 @@ function buildDimensionsAndButtonsUI() {
             btn.addEventListener('click', function(e) {
                 e.stopPropagation();
                 if (typeof window.toggleDeskDrawerMerge === 'function') window.toggleDeskDrawerMerge();
+            });
+            dimLayer.appendChild(btn);
+        });
+
+        state.dimData.filter(d => d.isTvSizeBtn).forEach(d => {
+            const btn = document.createElement('div');
+            btn.className = 'tv-size-btn';
+            btn.dataset.x3d = d.x;
+            btn.dataset.y3d = d.y;
+            btn.title = 'שינוי גודל הטלוויזיה';
+            btn.innerHTML = '<i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>' + d.inch + '″</span>';
+            btn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); });
+            btn.addEventListener('pointerup', e => e.stopPropagation());
+            btn.addEventListener('click', e => {
+                e.stopPropagation();
+                _openTvSizeMenu(d.colIndex, d.rowIndex, btn);
             });
             dimLayer.appendChild(btn);
         });
@@ -2059,10 +2076,12 @@ function updateToolbarButtonHighlights() {
     }
 
     const _appl = (firstComp && !firstComp.partition && Array.isArray(firstComp.appliances)) ? firstComp.appliances : [];
+    const _hasTv = !!(firstComp && !firstComp.partition && firstComp.tv);
     const btnAppl = document.getElementById('tb-btn-appliances');
-    if (btnAppl && _appl.length) btnAppl.classList.add('active');
+    if (btnAppl && (_appl.length || _hasTv)) btnAppl.classList.add('active');
     document.querySelectorAll('#appliances-sub-panel button[data-appliance-type]').forEach(b => {
-        b.classList.toggle('active', _appl.includes(b.dataset.applianceType));
+        const t = b.dataset.applianceType;
+        b.classList.toggle('active', t === 'tv' ? _hasTv : _appl.includes(t));
     });
 
     const existingDoor = col.doors.find(door => {
@@ -3940,7 +3959,7 @@ function updateOverlaysPosition() {
         return localPt.project(camera);
     };
 
-    document.querySelectorAll('.dim-container, .select-all-col-btn, .col-template-btn, .sub-cell-btn, .cell-select-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn, .led-cell-icon').forEach(el => {
+    document.querySelectorAll('.dim-container, .select-all-col-btn, .col-template-btn, .sub-cell-btn, .cell-select-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn, .led-cell-icon, .tv-size-btn').forEach(el => {
         const pos = projectWingPoint(parseFloat(el.dataset.x3d), parseFloat(el.dataset.y3d));
         let x = (pos.x * .5 + .5) * cw;
         let y = (-(pos.y * .5) + .5) * ch;
@@ -4958,6 +4977,7 @@ window.toggleCellAppliance = function(type) {
         let next = others.concat(type);
         if (next.length > 1 && h < R.stackHeight) { next = [type]; swappedH = h; }
         comp.appliances = ['washer', 'dryer'].filter(t => next.includes(t));
+        delete comp.tv;
         comp.type = 'empty';
         if (comp.partition) clearedPartition = true;
         delete comp.partition;
@@ -4987,6 +5007,121 @@ window.toggleCellAppliance = function(type) {
     buildCabinet(); calculatePrice(); saveHistoryState();
     updateToolbarButtonHighlights();
 };
+
+function _clearCompForWholeCellItem(comp, r, colIndex) {
+    comp.type = 'empty';
+    const hadPartition = !!comp.partition;
+    delete comp.partition;
+    delete comp.partitions;
+    delete comp.subCells;
+    delete comp.zoneDoorGroups;
+    if (typeof _onCompartmentTypeChangedForDeskMerge === 'function') {
+        _onCompartmentTypeChangedForDeskMerge(comp, r, colIndex);
+    }
+    return hadPartition;
+}
+
+// Toggle a TV in the selected cell(s); inserted at the largest size that fits.
+window.toggleCellTv = function() {
+    if (state.selection.colIndex === -1 || state.selection.rows.length === 0) return;
+    if (typeof window._tvLargestFit !== 'function') return;
+    const c = state.selection.colIndex;
+    const col = state.columns[c];
+    if (!col) return;
+    const rows = state.selection.rows;
+    const first = col.compartments[rows[0]];
+    const turnOn = !(first && !first.partition && first.tv);
+    let changed = 0, noFit = false, inserted = null, clearedPartition = false;
+
+    rows.forEach(r => {
+        const comp = col.compartments[r];
+        if (!comp) return;
+        if (!turnOn) { delete comp.tv; changed++; return; }
+        const inch = window._tvLargestFit(col.width, _cellHeight(col, r));
+        if (!inch) { noFit = true; return; }
+        comp.tv = { inch: inch };
+        delete comp.appliances;
+        if (_clearCompForWholeCellItem(comp, r, c)) clearedPartition = true;
+        inserted = inch;
+        changed++;
+    });
+
+    if (noFit) {
+        const need = window._tvDims(window.TV_SIZES[0]);
+        _showToast(`התא קטן מדי לטלוויזיה — לטלוויזיה ${window.TV_SIZES[0]}″ נדרש רוחב פנימי של ${Math.ceil(need.W + 1)} ס"מ וגובה של ${Math.ceil(need.totalH + 0.5)} ס"מ לפחות`, 5000);
+    } else if (inserted) {
+        _showToast(`הוכנסה טלוויזיה ${inserted}″ — לשינוי הגודל לחץ על האייקון שעל המסך`, 4000);
+    }
+    if (!changed) return;
+    if (clearedPartition && typeof _clearSubCellSelection === 'function') _clearSubCellSelection();
+    buildCabinet(); calculatePrice(); saveHistoryState();
+    updateToolbarButtonHighlights();
+};
+
+function _closeTvSizeMenu() {
+    const m = document.getElementById('tv-size-menu');
+    if (m) m.remove();
+    document.removeEventListener('pointerdown', _tvMenuOutside, true);
+}
+function _tvMenuOutside(e) {
+    const m = document.getElementById('tv-size-menu');
+    if (m && !m.contains(e.target) && !(e.target.closest && e.target.closest('.tv-size-btn'))) _closeTvSizeMenu();
+}
+
+function _openTvSizeMenu(colIndex, rowIndex, anchor) {
+    const wasOpen = document.getElementById('tv-size-menu');
+    _closeTvSizeMenu();
+    if (wasOpen && wasOpen.dataset.key === colIndex + ':' + rowIndex) return;
+    const col = state.columns[colIndex];
+    const comp = col && col.compartments[rowIndex];
+    if (!comp || !comp.tv) return;
+    const cellH = _cellHeight(col, rowIndex);
+    const shown = window._tvFits(comp.tv.inch, col.width, cellH) ? comp.tv.inch : window._tvLargestFit(col.width, cellH);
+
+    const menu = document.createElement('div');
+    menu.id = 'tv-size-menu';
+    menu.dataset.key = colIndex + ':' + rowIndex;
+    menu.innerHTML = '<div class="tv-size-title">גודל מסך (אינץ׳)</div>';
+    const grid = document.createElement('div');
+    grid.className = 'tv-size-grid';
+    window.TV_SIZES.forEach(s => {
+        const d = window._tvDims(s);
+        const fits = window._tvFits(s, col.width, cellH);
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'tv-size-opt' + (s === shown ? ' active' : '');
+        b.disabled = !fits;
+        b.textContent = s + '″';
+        b.title = fits
+            ? `${Math.round(d.W)} × ${Math.round(d.totalH)} ס"מ (כולל מעמד)`
+            : `דורש תא ברוחב ${Math.ceil(d.W + 1)} ס"מ ובגובה ${Math.ceil(d.totalH + 0.5)} ס"מ`;
+        b.addEventListener('click', e => {
+            e.stopPropagation();
+            comp.tv = { inch: s };
+            _closeTvSizeMenu();
+            buildCabinet(); calculatePrice(); saveHistoryState();
+        });
+        grid.appendChild(b);
+    });
+    menu.appendChild(grid);
+    if (window.TV_SIZES.some(s => !window._tvFits(s, col.width, cellH))) {
+        const note = document.createElement('div');
+        note.className = 'tv-size-note';
+        note.textContent = 'גדלים מושבתים דורשים תא גדול יותר';
+        menu.appendChild(note);
+    }
+    document.body.appendChild(menu);
+    const rect = anchor.getBoundingClientRect();
+    const mw = menu.offsetWidth, mh = menu.offsetHeight;
+    let left = rect.left + rect.width / 2 - mw / 2;
+    let top = rect.bottom + 8;
+    if (top + mh > window.innerHeight - 8) top = rect.top - mh - 8;
+    left = Math.max(8, Math.min(window.innerWidth - mw - 8, left));
+    menu.style.left = left + 'px';
+    menu.style.top = Math.max(8, top) + 'px';
+    setTimeout(() => document.addEventListener('pointerdown', _tvMenuOutside, true), 0);
+}
+window._openTvSizeMenu = _openTvSizeMenu;
 
 // applyContentForce: always sets the type (no toggle) — used by sub-panel buttons
 // When _activeSubCellIdx is set, routes to setSubCellType instead
@@ -5072,6 +5207,7 @@ window.applyContentForce = function(type) {
             col.compartments[r].type = newType;
         }
         delete col.compartments[r].appliances;
+        delete col.compartments[r].tv;
 
         // Clear partition data when switching to types that are incompatible with partitions
         if (newType === 'external_drawers' || newType === 'hanging' || newType === 'sorbet' || newType === 'empty' ||
@@ -5109,6 +5245,7 @@ window.applyContentForce = function(type) {
 function _enablePartitionOnComp(comp) {
     if (!comp) return;
     delete comp.appliances;
+    delete comp.tv;
     if (comp.partition) {
         if (!Array.isArray(comp.partitions) || !comp.partitions.length) comp.partitions = [0.5];
         if (!Array.isArray(comp.subCells) || comp.subCells.length < comp.partitions.length + 1) {
@@ -5368,7 +5505,10 @@ window.applyContent = function(type) {
         } else {
             col.compartments[r].type = newType;
         }
-        if (newType !== 'empty') delete col.compartments[r].appliances;
+        if (newType !== 'empty') {
+            delete col.compartments[r].appliances;
+            delete col.compartments[r].tv;
+        }
 
         // Clear partition when switching to incompatible types
         if (newType === 'external_drawers' || newType === 'hanging' || newType === 'sorbet' || newType === 'empty') {
@@ -7536,7 +7676,7 @@ function _isCanvasOverlayUiTarget(el) {
     if (!el || !el.closest) return false;
     return !!el.closest(
         '#column-quick-edit, #full-corner-quick-edit, #bottom-floating-toolbar, #bed-toolbar, #room-props-row, #room-furniture-toolbar, #room-plan-layer, #btn-room-plan-view-toggle, ' +
-        '.drag-handle, .dim-container, .col-width-label, .plus-btn, .fc-cell-btn, .select-all-col-btn, .col-template-btn, .cell-select-btn, .sub-cell-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn'
+        '.drag-handle, .dim-container, .col-width-label, .plus-btn, .fc-cell-btn, .select-all-col-btn, .col-template-btn, .cell-select-btn, .sub-cell-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn, .tv-size-btn, #tv-size-menu'
     );
 }
 

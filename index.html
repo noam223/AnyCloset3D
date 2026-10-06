@@ -39,7 +39,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260910deskMerge">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
     <link rel="stylesheet" href="style-extras.css?v=20260731rpcab">
-    <link rel="stylesheet" href="style.css?v=20261006laundryDoor">
+    <link rel="stylesheet" href="style.css?v=20261006tv">
     <link rel="stylesheet" href="quick-calc.css?v=20260929qc">
     <style>
         html.thumb-only-mode #left-sidebar,
@@ -1414,11 +1414,12 @@
             </div>
             <!-- מוצרי חשמל row -->
             <div class="toolbar-row">
-                <button class="toolbar-btn" id="tb-btn-appliances" data-expandable onclick="toggleContentSubPanel('appliances',this)" title="מכונת כביסה / מייבש — רוחב תא 60 ס&quot;מ ומעלה"><i class="fa-solid fa-plug"></i><span>מוצרי חשמל</span></button>
+                <button class="toolbar-btn" id="tb-btn-appliances" data-expandable onclick="toggleContentSubPanel('appliances',this)" title="מכונת כביסה, מייבש וטלוויזיה"><i class="fa-solid fa-plug"></i><span>מוצרי חשמל</span></button>
                 <div id="appliances-sub-panel" class="toolbar-sub-btns" style="display:none;">
                     <div class="toolbar-sub-divider"></div>
                     <button class="toolbar-btn" data-appliance-type="washer" onclick="toggleCellAppliance('washer')"><i class="la-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="2.5" width="16" height="19" rx="2.5"/><path d="M4 7h16"/><circle cx="12" cy="14" r="4.5"/><path d="M9.6 14.6c.8-.8 1.6.8 2.4 0s1.6.8 2.4 0"/></svg></i><span>מכונת כביסה</span></button>
                     <button class="toolbar-btn" data-appliance-type="dryer" onclick="toggleCellAppliance('dryer')"><i class="la-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="2.5" width="16" height="19" rx="2.5"/><path d="M4 7h16"/><circle cx="12" cy="14" r="4.5"/><path d="M10.6 12.2c-.7.9.7 1.9 0 2.9M13.4 12.2c-.7.9.7 1.9 0 2.9"/></svg></i><span>מייבש</span></button>
+                    <button class="toolbar-btn" data-appliance-type="tv" onclick="toggleCellTv()"><i class="fa-solid fa-tv"></i><span>טלוויזיה</span></button>
                 </div>
             </div>
             <!-- לדים -->
@@ -2625,6 +2626,9 @@
             <button class="mcell-side-btn" id="mcp-appliance-dryer" onclick="toggleCellAppliance('dryer'); updateMobileCellSheetState();">
                 <i class="la-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="2.5" width="16" height="19" rx="2.5"/><path d="M4 7h16"/><circle cx="12" cy="14" r="4.5"/><path d="M10.6 12.2c-.7.9.7 1.9 0 2.9M13.4 12.2c-.7.9.7 1.9 0 2.9"/></svg></i><span>מייבש</span>
             </button>
+            <button class="mcell-side-btn" id="mcp-appliance-tv" onclick="toggleCellTv(); updateMobileCellSheetState();">
+                <i class="fa-solid fa-tv"></i><span>טלוויזיה</span>
+            </button>
         </div>
 
         <!-- מחיצה sub-options -->
@@ -2795,18 +2799,18 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js?v=20261005pages"></script>
-<script src="state.js?v=20261006laundryDoor"></script>
+<script src="state.js?v=20261006tv"></script>
 <script src="quick-calc.js?v=20261005w40"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
-<script src="engine-appliances.js?v=20261006laundryDoor"></script>
-<script src="engine-core.js?v=20261006laundryDoor"></script>
-<script src="engine-corners.js?v=20261006laundryDoor"></script>
+<script src="engine-appliances.js?v=20261006tv"></script>
+<script src="engine-core.js?v=20261006tv"></script>
+<script src="engine-corners.js?v=20261006tv"></script>
 <script src="engine-blueprint.js?v=20261005hiddenZone"></script>
 <script src="engine-room-plan.js?v=20260929rail"></script>
 <script src="tambour-color-picker.js?v=20260617scdoors"></script>
-<script src="ui.js?v=20261006laundryDoor"></script>
-<script src="mobile.js?v=20261006laundryDoor"></script>
+<script src="ui.js?v=20261006tv"></script>
+<script src="mobile.js?v=20261006tv"></script>
 <script src="part-paint.js?v=20260914A427fix"></script>
 <script src="shelf-pick.js?v=20260922sideWall"></script>
 <script src="index-init.js?v=20261002hist"></script>

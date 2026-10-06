@@ -359,6 +359,151 @@ function addLaundryAppliancesToCell(parent, opts) {
     });
 }
 
+// =====================================================================
+// Flat TV on two splayed blade feet (16:9, sizes in inches).
+// Template origin: floor level under the panel centre; screen faces +Z.
+// =====================================================================
+const TV_SIZES = [32, 40, 43, 48, 50, 55, 60];
+const TV_DEFAULT_INCH = 43;
+
+function tvDims(inch) {
+    const diag = inch * 2.54, k = Math.sqrt(337);
+    const sw = diag * 16 / k, sh = diag * 9 / k;
+    const side = 0.6, top = 0.6, bottom = 1.1;
+    const W = sw + 2 * side, H = sh + top + bottom;
+    const standH = 4.5 + inch * 0.05;
+    const footD = Math.min(26, Math.max(16, inch * 0.42));
+    return { inch, sw, sh, side, top, bottom, W, H, standH, footD, totalH: standH + H };
+}
+
+/** Space a TV needs inside a cell: 0.5 cm side clearance, 0.5 cm above. */
+function tvFits(inch, cellW, cellH) {
+    const d = tvDims(inch);
+    return cellW >= d.W + 1 && cellH >= d.totalH + 0.5;
+}
+
+function tvLargestFit(cellW, cellH) {
+    let best = null;
+    TV_SIZES.forEach(s => { if (tvFits(s, cellW, cellH)) best = s; });
+    return best;
+}
+
+function _tvScreenTex() {
+    return _laTex('tv-screen', () => _laCanvasTex(1024, 576, (x, w, h) => {
+        const bg = x.createLinearGradient(0, 0, w, h);
+        bg.addColorStop(0, '#24105e'); bg.addColorStop(0.45, '#3d1fa6'); bg.addColorStop(1, '#1a0b47');
+        x.fillStyle = bg; x.fillRect(0, 0, w, h);
+        let seed = 7;
+        const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+        const bubbles = [
+            [130, 420, 150], [330, 330, 120], [520, 380, 95], [700, 250, 130], [900, 160, 150],
+            [880, 470, 140], [180, 90, 110], [430, 120, 70], [610, 520, 80], [60, 250, 70],
+            [760, 420, 45], [330, 520, 55], [560, 220, 30], [990, 340, 60]
+        ];
+        bubbles.forEach(([cx, cy, r]) => {
+            const g = x.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.1, cx, cy, r);
+            const hue = 255 + rnd() * 35;
+            g.addColorStop(0, `hsla(${hue}, 80%, 72%, 0.95)`);
+            g.addColorStop(0.55, `hsla(${hue}, 70%, 48%, 0.85)`);
+            g.addColorStop(1, `hsla(${hue + 10}, 75%, 30%, 0.9)`);
+            x.fillStyle = g;
+            x.beginPath(); x.ellipse(cx, cy, r, r * (0.82 + rnd() * 0.2), rnd() * 0.6, 0, Math.PI * 2); x.fill();
+            const rim = x.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+            rim.addColorStop(0, 'rgba(255,190,255,0.0)');
+            rim.addColorStop(0.5, 'rgba(255,150,240,0.9)');
+            rim.addColorStop(1, 'rgba(255,255,255,0.15)');
+            x.strokeStyle = rim; x.lineWidth = Math.max(2, r * 0.06);
+            x.beginPath(); x.ellipse(cx, cy, r * 0.97, r * 0.8, 0.2, Math.PI * 0.05, Math.PI * 1.1); x.stroke();
+            x.fillStyle = 'rgba(255,255,255,0.55)';
+            x.beginPath(); x.ellipse(cx - r * 0.38, cy - r * 0.42, r * 0.16, r * 0.08, -0.6, 0, Math.PI * 2); x.fill();
+        });
+        const vig = x.createRadialGradient(w / 2, h / 2, h * 0.3, w / 2, h / 2, w * 0.7);
+        vig.addColorStop(0, 'rgba(0,0,0,0)'); vig.addColorStop(1, 'rgba(8,2,30,0.45)');
+        x.fillStyle = vig; x.fillRect(0, 0, w, h);
+    }));
+}
+
+function buildTv(inch) {
+    const d = tvDims(inch);
+    const g = new THREE.Group();
+    g.name = 'tv' + inch;
+    const env = window._studioEnvMap || null;
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0x141518, roughness: 0.35, metalness: 0.4, envMap: env, envMapIntensity: 0.8 });
+    const backMat = new THREE.MeshStandardMaterial({ color: 0x1d1f23, roughness: 0.6, metalness: 0.1, envMap: env, envMapIntensity: 0.5 });
+    const footMat = new THREE.MeshStandardMaterial({ color: 0x1a1b1e, roughness: 0.3, metalness: 0.6, envMap: env, envMapIntensity: 0.9 });
+    const screenMat = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 0.12, metalness: 0, emissive: 0xffffff, emissiveMap: _tvScreenTex(), envMap: env, envMapIntensity: 0.6 });
+
+    const panelT = 1.2;
+    const y0 = d.standH;
+    const frame = _laSlab(d.W, d.H, panelT, 0.4, 0.15, frameMat);
+    frame.position.set(0, y0 + d.H / 2, -panelT / 2);
+    g.add(frame);
+    const screen = new THREE.Mesh(new THREE.PlaneGeometry(d.sw, d.sh), screenMat);
+    screen.position.set(0, y0 + d.bottom + d.sh / 2, panelT / 2 + 0.02);
+    g.add(screen);
+    // Thicker electronics housing on the back, lower two thirds
+    const backW = d.W * 0.78, backH = d.H * 0.62, backT = 2.2 + inch * 0.02;
+    const back = _laSlab(backW, backH, backT, 1.5, 0.6, backMat);
+    back.position.set(0, y0 + d.H * 0.42, -panelT / 2 - backT);
+    g.add(back);
+
+    // Blade feet: A-frame in side profile, leaning outwards from the front
+    const footT = 1.1, attachY = y0 + Math.min(10, d.H * 0.18), zc = -panelT / 2 - backT * 0.5;
+    const prof = new THREE.Shape();
+    const fz = d.footD * 0.42, bz = d.footD * 0.58;
+    prof.moveTo(-bz, 0); prof.lineTo(-bz + 2.2, 0); prof.lineTo(0, attachY - 2.5); prof.lineTo(fz - 2.2, 0);
+    prof.lineTo(fz, 0); prof.lineTo(0.9, attachY); prof.lineTo(-0.9, attachY); prof.lineTo(-bz, 0);
+    [-1, 1].forEach(sideSign => {
+        const geo = new THREE.ExtrudeGeometry(prof, { depth: footT, bevelEnabled: true, bevelThickness: 0.15, bevelSize: 0.15, bevelSegments: 1, curveSegments: 1 });
+        geo.rotateY(-Math.PI / 2);
+        geo.translate(footT / 2, 0, 0);
+        const pos = geo.attributes.position;
+        for (let i = 0; i < pos.count; i++) pos.setX(i, pos.getX(i) + sideSign * (attachY - pos.getY(i)) * 0.32);
+        geo.computeVertexNormals();
+        const foot = new THREE.Mesh(geo, footMat);
+        foot.position.set(sideSign * (d.W / 2 - Math.max(6, d.W * 0.07) - attachY * 0.32), 0, zc);
+        g.add(foot);
+    });
+
+    g.userData.dims = d;
+    return g;
+}
+
+const _tvTemplates = {};
+function _tvTemplate(inch) {
+    const env = window._studioEnvMap || null;
+    const cached = _tvTemplates[inch];
+    if (cached && cached.env === env) return cached.group;
+    const group = buildTv(inch);
+    _tvTemplates[inch] = { group, env };
+    return group;
+}
+
+/**
+ * Add a TV to `parent`. Uses the stored size, or the largest that fits when the cell shrank.
+ * opts: { inch, x, bottomY, cellW, cellH, bodyD, frontInset }
+ * Returns { inch, x, topY, rightX } for the size badge, or null when nothing fits.
+ */
+function addTvToCell(parent, opts) {
+    let inch = TV_SIZES.includes(opts.inch) ? opts.inch : TV_DEFAULT_INCH;
+    if (!tvFits(inch, opts.cellW, opts.cellH)) inch = tvLargestFit(opts.cellW, opts.cellH);
+    if (!inch) return null;
+    const d = tvDims(inch);
+    const m = _tvTemplate(inch).clone();
+    const z = Math.min(opts.bodyD / 2 - (opts.frontInset || 0) - d.footD * 0.42 - 1.5, 4);
+    m.position.set(opts.x, opts.bottomY, z);
+    m.userData.isTv = true;
+    parent.add(m);
+    return { inch, x: opts.x, topY: opts.bottomY + d.totalH, rightX: opts.x + d.W / 2 };
+}
+
+window.TV_SIZES = TV_SIZES;
+window.TV_DEFAULT_INCH = TV_DEFAULT_INCH;
+window._tvDims = tvDims;
+window._tvFits = tvFits;
+window._tvLargestFit = tvLargestFit;
+window.addTvToCell = addTvToCell;
+
 window.LAUNDRY_RULES = LAUNDRY_RULES;
 window._laundryFit = _laundryFit;
 window._laundryProtrudes = laundryProtrudes;

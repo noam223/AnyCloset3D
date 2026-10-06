@@ -6053,6 +6053,16 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                     frontInset: _isSlidingWardrobe ? _slidingPartSetback : (isInset ? t : 0)
                 });
             }
+            if (!isBP && compData && !compData.partition && compData.tv && typeof window.addTvToCell === 'function') {
+                const tvInfo = window.addTvToCell(_buildGroup, {
+                    inch: compData.tv.inch, x: colCenterX, bottomY: prevY,
+                    cellW: col.width, cellH: compH, bodyD: bodyD,
+                    frontInset: _isSlidingWardrobe ? _slidingPartSetback : (isInset ? t : 0)
+                });
+                if (tvInfo && _isActiveWingBuild) {
+                    state.dimData.push({ isTvSizeBtn: true, colIndex: c, rowIndex: r, inch: tvInfo.inch, x: tvInfo.rightX - 5, y: tvInfo.topY - 5 });
+                }
+            }
 
 if (compData && compData.type === 'hanging' && !(compData.partition)) {
                 if (!isBP) {
