@@ -302,7 +302,6 @@ function _cuAddDrawerHandle(dMesh, drawerDepth, drawerFaceH, sign, t, styleOverr
     const barR = 0.35;
     const postH = 1.2;
     const handleMat = new THREE.MeshStandardMaterial({ color: 0xb0b0b0, metalness: 0.85, roughness: 0.15, envMap: window._studioEnvMap });
-    handleMat.userData.castsHandleShadow = true;
     const hOffX = sign * (-t / 2 - postH - barR * 0.5);
     const bar = new THREE.Mesh(
         new THREE.CylinderGeometry(barR, barR, barLen, 12).rotateX(Math.PI / 2),

@@ -125,7 +125,6 @@ window._makeMockupMetalMat = function(spec) {
         envMap: window._studioEnvMapRaw, envMapIntensity: spec.envIntensity || 1
     });
     mat.onBeforeCompile = _handleShaderPipeline;
-    mat.userData.castsHandleShadow = true;
     return mat;
 };
 
@@ -137,7 +136,7 @@ const _shadowFitBox = new THREE.Box3();
 const _shadowFitPt = new THREE.Vector3();
 let _shadowFitKey = '';
 
-/** Without the room, fit the shadow frustum tightly around the cabinet so small parts (handles) get sharp shadows. */
+/** Without the room, fit the shadow frustum tightly around the cabinet so small parts get sharp shadows. */
 function _fitShadowFrustum() {
     const sc = dirLight.shadow.camera;
     const p = dirLight.position;
@@ -175,7 +174,6 @@ scene.onBeforeRender = function() {
         cabinetGroup.traverse(o => {
             if (!o.isMesh || !o.material || Array.isArray(o.material)) return;
             const m = o.material;
-            if (m.userData && m.userData.castsHandleShadow) o.castShadow = true;
             if (!m.transparent && !m.isMeshBasicMaterial && !o.receiveShadow) o.receiveShadow = true;
         });
     }
