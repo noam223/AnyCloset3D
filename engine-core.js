@@ -6045,6 +6045,15 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                 if (_isActiveWingBuild && !isLast) dragHandlesData.vertical.push({ colIndex: c, shelfIdx: div.idx, x: colCenterX, y: div.y, isSplit: (div.type === 'split') });
             }
 
+            if (!isBP && compData && !compData.partition && Array.isArray(compData.appliances) && compData.appliances.length &&
+                typeof window.addLaundryAppliancesToCell === 'function') {
+                window.addLaundryAppliancesToCell(_buildGroup, {
+                    list: compData.appliances, x: colCenterX, bottomY: prevY,
+                    cellW: col.width, cellH: compH, bodyD: bodyD, backT: backT,
+                    frontInset: _isSlidingWardrobe ? _slidingPartSetback : (isInset ? t : 0)
+                });
+            }
+
 if (compData && compData.type === 'hanging' && !(compData.partition)) {
                 if (!isBP) {
                     const rod = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, col.width - 2, 16), new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.9, roughness: 0.25, envMap: window._studioEnvMap }));

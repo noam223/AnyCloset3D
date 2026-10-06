@@ -1747,13 +1747,13 @@ function updateToolbarButtonHighlights() {
         hcBtn.title = removable ? 'לחץ להסרת הכוורת' : '';
     }
     // Also clear sub-panel button highlights
-    ['hanging-sub-panel','drawer-sub-panel','honeycomb-sub-panel'].forEach(id => {
+    ['hanging-sub-panel','drawer-sub-panel','honeycomb-sub-panel','appliances-sub-panel'].forEach(id => {
         const p = document.getElementById(id);
         if (p) p.querySelectorAll('button.toolbar-btn').forEach(b => b.classList.remove('active'));
     });
 
     // Re-sync sub-panel-open highlight: whichever sub-panel is currently visible
-    const _subPanelMap = { 'hanging-sub-panel': 'tb-btn-hanging', 'drawer-sub-panel': 'tb-btn-drawer', 'honeycomb-sub-panel': 'tb-btn-honeycomb' };
+    const _subPanelMap = { 'hanging-sub-panel': 'tb-btn-hanging', 'drawer-sub-panel': 'tb-btn-drawer', 'honeycomb-sub-panel': 'tb-btn-honeycomb', 'appliances-sub-panel': 'tb-btn-appliances' };
     Object.entries(_subPanelMap).forEach(([panelId, btnId]) => {
         const panel = document.getElementById(panelId);
         const btn = document.getElementById(btnId);
@@ -2051,6 +2051,13 @@ function updateToolbarButtonHighlights() {
         const btnPartition = toolbar.querySelector(`button[onclick="applyContent('partition')"]`);
         if(btnPartition) btnPartition.classList.add('active');
     }
+
+    const _appl = (firstComp && !firstComp.partition && Array.isArray(firstComp.appliances)) ? firstComp.appliances : [];
+    const btnAppl = document.getElementById('tb-btn-appliances');
+    if (btnAppl && _appl.length) btnAppl.classList.add('active');
+    document.querySelectorAll('#appliances-sub-panel button[data-appliance-type]').forEach(b => {
+        b.classList.toggle('active', _appl.includes(b.dataset.applianceType));
+    });
 
     const existingDoor = col.doors.find(door => {
         return state.selection.rows.some(r => r >= door.startRow && r <= door.endRow);
@@ -4074,8 +4081,8 @@ window.onHoneycombBtnClick = function(btn) {
 };
 
 window.toggleContentSubPanel = function(panelKey, triggerBtn) {
-    const panels = { hanging: 'hanging-sub-panel', drawer: 'drawer-sub-panel', honeycomb: 'honeycomb-sub-panel' };
-    const triggerBtnIds = { hanging: 'tb-btn-hanging', drawer: 'tb-btn-drawer', honeycomb: 'tb-btn-honeycomb' };
+    const panels = { hanging: 'hanging-sub-panel', drawer: 'drawer-sub-panel', honeycomb: 'honeycomb-sub-panel', appliances: 'appliances-sub-panel' };
+    const triggerBtnIds = { hanging: 'tb-btn-hanging', drawer: 'tb-btn-drawer', honeycomb: 'tb-btn-honeycomb', appliances: 'tb-btn-appliances' };
     const defaultTypes = { hanging: 'hanging', drawer: 'internal_drawers', honeycomb: 'open_cell' };
     const targetId = panels[panelKey];
     if (!targetId) return;
@@ -4864,18 +4871,82 @@ window.openSubcellToolbar = function() {};
 window.closeSubcellToolbar = function() {};
 
 window.closeContentSubPanels = function() {
-    ['hanging-sub-panel','drawer-sub-panel','honeycomb-sub-panel',
+    ['hanging-sub-panel','drawer-sub-panel','honeycomb-sub-panel','appliances-sub-panel',
      'door-style-panel-right','door-style-panel-left','door-style-panel-double'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
     // Clear trigger button highlights
-    ['tb-btn-hanging','tb-btn-drawer','tb-btn-honeycomb'].forEach(id => {
+    ['tb-btn-hanging','tb-btn-drawer','tb-btn-honeycomb','tb-btn-appliances'].forEach(id => {
         const btn = document.getElementById(id);
         if (btn) btn.classList.remove('sub-panel-open');
     });
     // Also restore main toolbar section if subcell toolbar is open
     closeSubcellToolbar();
+};
+
+// Toggle a laundry appliance in the selected cell(s). Both can be marked only when the
+// cell is tall enough to stack them; otherwise the new pick replaces the old one.
+// Selection is kept so the user can mark the second appliance right away.
+window.toggleCellAppliance = function(type) {
+    const R = window.LAUNDRY_RULES;
+    if (!R || !R.dims[type]) return;
+    if (state.selection.colIndex === -1 || state.selection.rows.length === 0) return;
+    const col = state.columns[state.selection.colIndex];
+    if (!col) return;
+    const names = { washer: 'מכונת כביסה', dryer: 'מייבש' };
+    const fmt = v => (Math.round(v * 10) / 10).toString();
+
+    if (col.width < R.minWidth) {
+        _showToast(`רוחב התא ${fmt(col.width)} ס"מ — ל${names[type]} נדרש רוחב פנימי של ${R.minWidth} ס"מ לפחות`, 4500);
+        return;
+    }
+
+    const rows = state.selection.rows;
+    const first = col.compartments[rows[0]];
+    const turnOn = !(first && !first.partition && Array.isArray(first.appliances) && first.appliances.includes(type));
+    let changed = 0, tooShortH = null, swappedH = null, clearedPartition = false;
+
+    rows.forEach(r => {
+        const comp = col.compartments[r];
+        if (!comp) return;
+        const others = (!comp.partition && Array.isArray(comp.appliances)) ? comp.appliances.filter(t => t !== type) : [];
+        if (!turnOn) {
+            if (others.length) comp.appliances = others; else delete comp.appliances;
+            changed++;
+            return;
+        }
+        const h = _cellHeight(col, r);
+        if (h < R.singleHeight) { tooShortH = h; return; }
+        let next = others.concat(type);
+        if (next.length > 1 && h < R.stackHeight) { next = [type]; swappedH = h; }
+        comp.appliances = ['washer', 'dryer'].filter(t => next.includes(t));
+        comp.type = 'empty';
+        if (comp.partition) clearedPartition = true;
+        delete comp.partition;
+        delete comp.partitions;
+        delete comp.subCells;
+        delete comp.zoneDoorGroups;
+        if (typeof _onCompartmentTypeChangedForDeskMerge === 'function') {
+            _onCompartmentTypeChangedForDeskMerge(comp, r, state.selection.colIndex);
+        }
+        changed++;
+    });
+
+    if (tooShortH !== null) {
+        _showToast(`גובה התא ${fmt(tooShortH)} ס"מ — ל${names[type]} נדרש גובה של ${R.singleHeight} ס"מ לפחות`, 4500);
+    } else if (swappedH !== null) {
+        _showToast(`גובה התא ${fmt(swappedH)} ס"מ — מכונה ומייבש יחד דורשים ${R.stackHeight} ס"מ לפחות, לכן הוכנס רק ${names[type]}`, 5000);
+    } else if (turnOn && changed) {
+        const bodyD = state.depth || 54;
+        if (bodyD < R.dims[type].D + 1) {
+            _showToast(`עומק הארון ${fmt(bodyD)} ס"מ קטן מעומק ה${names[type]} (${R.dims[type].D} ס"מ) — המכשיר יבלוט מחזית הארון`, 5000);
+        }
+    }
+    if (!changed) return;
+    if (clearedPartition && typeof _clearSubCellSelection === 'function') _clearSubCellSelection();
+    buildCabinet(); calculatePrice(); saveHistoryState();
+    updateToolbarButtonHighlights();
 };
 
 // applyContentForce: always sets the type (no toggle) — used by sub-panel buttons
@@ -4961,6 +5032,7 @@ window.applyContentForce = function(type) {
         } else {
             col.compartments[r].type = newType;
         }
+        delete col.compartments[r].appliances;
 
         // Clear partition data when switching to types that are incompatible with partitions
         if (newType === 'external_drawers' || newType === 'hanging' || newType === 'sorbet' || newType === 'empty' ||
@@ -4997,6 +5069,7 @@ window.applyContentForce = function(type) {
 /** Enable partition on a compartment (migrate hanging/drawers into both sides when possible). */
 function _enablePartitionOnComp(comp) {
     if (!comp) return;
+    delete comp.appliances;
     if (comp.partition) {
         if (!Array.isArray(comp.partitions) || !comp.partitions.length) comp.partitions = [0.5];
         if (!Array.isArray(comp.subCells) || comp.subCells.length < comp.partitions.length + 1) {
@@ -5256,6 +5329,7 @@ window.applyContent = function(type) {
         } else {
             col.compartments[r].type = newType;
         }
+        if (newType !== 'empty') delete col.compartments[r].appliances;
 
         // Clear partition when switching to incompatible types
         if (newType === 'external_drawers' || newType === 'hanging' || newType === 'sorbet' || newType === 'empty') {

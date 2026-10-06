@@ -170,7 +170,7 @@ function _mcpShowSub(category) {
     mainView.style.display = 'none';
     subView.style.display  = 'flex';
     // Hide all sub-groups, show only the requested one
-    ['hanging', 'drawer', 'cell', 'partition'].forEach(cat => {
+    ['hanging', 'drawer', 'cell', 'partition', 'appliances'].forEach(cat => {
         const el = document.getElementById('mcp-sub-' + cat);
         if (el) el.style.display = (cat === category) ? 'flex' : 'none';
     });
@@ -215,6 +215,14 @@ function updateMobileCellSheetState() {
     ['hanging', 'sorbet', 'internal_drawers', 'external_drawers', 'open_cell', 'side_open_cell'].forEach(type => {
         const btn = document.getElementById('mcp-' + type);
         if (btn) btn.classList.toggle('active', type === activeType);
+    });
+
+    const appl = (firstComp && !firstComp.partition && Array.isArray(firstComp.appliances)) ? firstComp.appliances : [];
+    const applCat = document.getElementById('mcp-cat-appliances');
+    if (applCat) applCat.classList.toggle('active', appl.length > 0);
+    ['washer', 'dryer'].forEach(t => {
+        const btn = document.getElementById('mcp-appliance-' + t);
+        if (btn) btn.classList.toggle('active', appl.includes(t));
     });
 
     const ledBtn = document.getElementById('mcp-led');
