@@ -6056,7 +6056,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
             if (!isBP && compData && !compData.partition && compData.tv && typeof window.addTvToCell === 'function') {
                 const tvInfo = window.addTvToCell(_buildGroup, {
                     inch: compData.tv.inch, x: colCenterX, bottomY: prevY,
-                    cellW: col.width, cellH: compH, bodyD: bodyD,
+                    cellW: col.width, cellH: compH, bodyD: bodyD, backT: backT,
                     frontInset: _isSlidingWardrobe ? _slidingPartSetback : (isInset ? t : 0)
                 });
                 if (tvInfo && _isActiveWingBuild) {

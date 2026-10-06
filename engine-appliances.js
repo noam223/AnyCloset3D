@@ -373,7 +373,10 @@ function tvDims(inch) {
     const W = sw + 2 * side, H = sh + top + bottom;
     const standH = 4.5 + inch * 0.05;
     const footD = Math.min(26, Math.max(16, inch * 0.42));
-    return { inch, sw, sh, side, top, bottom, W, H, standH, footD, totalH: standH + H };
+    const panelT = 1.2, housingT = 2.2 + inch * 0.02;
+    // Z of the panel+housing centre relative to the template origin (feet are symmetric around it)
+    const centerZ = -housingT / 2;
+    return { inch, sw, sh, side, top, bottom, W, H, standH, footD, panelT, housingT, centerZ, totalH: standH + H };
 }
 
 /** Space a TV needs inside a cell: 0.5 cm side clearance, 0.5 cm above. */
@@ -433,7 +436,7 @@ function buildTv(inch) {
     const footMat = new THREE.MeshStandardMaterial({ color: 0x1a1b1e, roughness: 0.3, metalness: 0.6, envMap: env, envMapIntensity: 0.9 });
     const screenMat = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 0.12, metalness: 0, emissive: 0xffffff, emissiveMap: _tvScreenTex(), envMap: env, envMapIntensity: 0.6 });
 
-    const panelT = 1.2;
+    const panelT = d.panelT;
     const y0 = d.standH;
     const frame = _laSlab(d.W, d.H, panelT, 0.4, 0.15, frameMat);
     frame.position.set(0, y0 + d.H / 2, -panelT / 2);
@@ -442,15 +445,15 @@ function buildTv(inch) {
     screen.position.set(0, y0 + d.bottom + d.sh / 2, panelT / 2 + 0.02);
     g.add(screen);
     // Thicker electronics housing on the back, lower two thirds
-    const backW = d.W * 0.78, backH = d.H * 0.62, backT = 2.2 + inch * 0.02;
+    const backW = d.W * 0.78, backH = d.H * 0.62, backT = d.housingT;
     const back = _laSlab(backW, backH, backT, 1.5, 0.6, backMat);
     back.position.set(0, y0 + d.H * 0.42, -panelT / 2 - backT);
     g.add(back);
 
     // Blade feet: A-frame in side profile, leaning outwards from the front
-    const footT = 1.1, attachY = y0 + Math.min(10, d.H * 0.18), zc = -panelT / 2 - backT * 0.5;
+    const footT = 1.1, attachY = y0 + Math.min(10, d.H * 0.18), zc = d.centerZ;
     const prof = new THREE.Shape();
-    const fz = d.footD * 0.42, bz = d.footD * 0.58;
+    const fz = d.footD / 2, bz = d.footD / 2;
     prof.moveTo(-bz, 0); prof.lineTo(-bz + 2.2, 0); prof.lineTo(0, attachY - 2.5); prof.lineTo(fz - 2.2, 0);
     prof.lineTo(fz, 0); prof.lineTo(0.9, attachY); prof.lineTo(-0.9, attachY); prof.lineTo(-bz, 0);
     [-1, 1].forEach(sideSign => {
@@ -481,7 +484,7 @@ function _tvTemplate(inch) {
 
 /**
  * Add a TV to `parent`. Uses the stored size, or the largest that fits when the cell shrank.
- * opts: { inch, x, bottomY, cellW, cellH, bodyD, frontInset }
+ * opts: { inch, x, bottomY, cellW, cellH, bodyD, backT, frontInset }
  * Returns { inch, x, topY, rightX } for the size badge, or null when nothing fits.
  */
 function addTvToCell(parent, opts) {
@@ -490,8 +493,8 @@ function addTvToCell(parent, opts) {
     if (!inch) return null;
     const d = tvDims(inch);
     const m = _tvTemplate(inch).clone();
-    const z = Math.min(opts.bodyD / 2 - (opts.frontInset || 0) - d.footD * 0.42 - 1.5, 4);
-    m.position.set(opts.x, opts.bottomY, z);
+    const cellMidZ = ((opts.backT || 0) - (opts.frontInset || 0)) / 2;
+    m.position.set(opts.x, opts.bottomY, cellMidZ - d.centerZ);
     m.userData.isTv = true;
     parent.add(m);
     return { inch, x: opts.x, topY: opts.bottomY + d.totalH, rightX: opts.x + d.W / 2 };
