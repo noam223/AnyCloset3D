@@ -400,6 +400,21 @@ function _tvScreenTex() {
     });
 }
 
+// Soft diagonal sheen across the glass, brightest at the top-left corner
+function _tvGlareTex() {
+    return _laTex('tv-glare', () => _laCanvasTex(512, 288, (x, w, h) => {
+        x.fillStyle = '#000'; x.fillRect(0, 0, w, h);
+        const band = x.createLinearGradient(0, 0, w * 0.75, h);
+        band.addColorStop(0, 'rgba(255,255,255,0.9)');
+        band.addColorStop(0.28, 'rgba(255,255,255,0.35)');
+        band.addColorStop(0.42, 'rgba(255,255,255,0.0)');
+        band.addColorStop(0.5, 'rgba(255,255,255,0.18)');
+        band.addColorStop(0.56, 'rgba(255,255,255,0.0)');
+        band.addColorStop(1, 'rgba(255,255,255,0.0)');
+        x.fillStyle = band; x.fillRect(0, 0, w, h);
+    }));
+}
+
 function buildTv(inch) {
     const d = tvDims(inch);
     const g = new THREE.Group();
@@ -408,7 +423,7 @@ function buildTv(inch) {
     const frameMat = new THREE.MeshStandardMaterial({ color: 0x141518, roughness: 0.35, metalness: 0.4, envMap: env, envMapIntensity: 0.8 });
     const backMat = new THREE.MeshStandardMaterial({ color: 0x1d1f23, roughness: 0.6, metalness: 0.1, envMap: env, envMapIntensity: 0.5 });
     const footMat = new THREE.MeshStandardMaterial({ color: 0x1a1b1e, roughness: 0.3, metalness: 0.6, envMap: env, envMapIntensity: 0.9 });
-    const screenMat = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 0.12, metalness: 0, emissive: 0xffffff, emissiveMap: _tvScreenTex(), envMap: env, envMapIntensity: 0.35 });
+    const screenMat = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 0.06, metalness: 0, emissive: 0xffffff, emissiveMap: _tvScreenTex(), envMap: env, envMapIntensity: 0.55 });
 
     const panelT = d.panelT;
     const y0 = d.standH;
@@ -418,6 +433,12 @@ function buildTv(inch) {
     const screen = new THREE.Mesh(new THREE.PlaneGeometry(d.sw, d.sh), screenMat);
     screen.position.set(0, y0 + d.bottom + d.sh / 2, panelT / 2 + 0.02);
     g.add(screen);
+    const glare = new THREE.Mesh(new THREE.PlaneGeometry(d.sw, d.sh), new THREE.MeshBasicMaterial({
+        map: _tvGlareTex(), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.22
+    }));
+    glare.position.set(0, screen.position.y, panelT / 2 + 0.05);
+    glare.renderOrder = 2;
+    g.add(glare);
     // Thicker electronics housing on the back, lower two thirds
     const backW = d.W * 0.78, backH = d.H * 0.62, backT = d.housingT;
     const back = _laSlab(backW, backH, backT, 1.5, 0.6, backMat);
