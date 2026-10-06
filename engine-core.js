@@ -7068,20 +7068,12 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                 // Column-level doors may span partitioned cells — the door covers the
                 // whole opening (including the internal partition boards behind it).
 
-                // ---- Flap door (קלפה): covers entire front face of the column (wall-to-wall, floor-to-ceiling) ----
+                // ---- Flap door (קלפה): same opening as a regular door over the selected rows, lifts upward ----
                 if (door.type === 'flap') {
-                    // Raw outer width: from outer face of left wall to outer face of right wall (NO gap)
-                    const flapLeftX  = isInset ? currentX : (isLeftmost ? currentX - t : currentX - t / 2);
-                    const flapRightX = isInset ? currentX + col.width : (isRightmost ? currentX + col.width + t : currentX + col.width + t / 2);
-                    const flapW = flapRightX - flapLeftX;
-                    const flapCenterX = (flapLeftX + flapRightX) / 2;
-                    // Align flap bottom with other doors; gap under flap when ביטול צוקל
-                    const flapBaseY = col.type === 'desk'
-                        ? (col.deskHeight + col.deskClearance)
-                        : _doorAlignBaseY;
-                    const flapTopY = col.height;
-                    const flapH = flapTopY - flapBaseY;
-                    if (flapH <= 0) return;
+                    const flapW = _doorOverlayW;
+                    const flapCenterX = _doorOverlayCenterX;
+                    const flapBaseY = doorBottomY;
+                    const flapH = dH;
                     // Position in front of the cabinet face
                     const flapZ = isInset ? (bodyD / 2 - t / 2) : (bodyD / 2 + t / 2 + 0.1);
                     const flapY = flapBaseY + flapH / 2;
