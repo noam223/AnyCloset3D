@@ -394,7 +394,7 @@ function tvLargestFit(cellW, cellH) {
 // 16:9 crop of images/TV.jpg
 function _tvScreenTex() {
     return _laTex('tv-screen', () => {
-        const t = new THREE.TextureLoader().load('textures/tv-screen.jpg');
+        const t = new THREE.TextureLoader().load('textures/tv-screen.jpg?v=2');
         t.anisotropy = 4;
         return t;
     });
