@@ -1385,6 +1385,19 @@ body {
     background: var(--bg-card);
 }
 .handle-variant-menu[hidden] { display: none; }
+.handle-variant-menu[data-for="pipe"] { grid-template-columns: repeat(3, 1fr); }
+.handle-variant-opt .handle-variant-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 56px;
+    aspect-ratio: 1;
+    border-radius: 6px;
+    background: #f1f3f4;
+    font-size: 1.35rem;
+    color: var(--primary);
+}
 .handle-variant-opt {
     display: flex;
     flex-direction: column;

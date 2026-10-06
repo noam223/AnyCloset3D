@@ -39,7 +39,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260910deskMerge">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
     <link rel="stylesheet" href="style-extras.css?v=20260731rpcab">
-    <link rel="stylesheet" href="style.css?v=20261006flapHandle">
+    <link rel="stylesheet" href="style.css?v=20261006handles2">
     <link rel="stylesheet" href="quick-calc.css?v=20260929qc">
     <style>
         html.thumb-only-mode #left-sidebar,
@@ -484,8 +484,10 @@
                 <div class="handle-variant-menu" data-for="pipe">
                     <button type="button" class="handle-variant-opt" data-variant="pipe_silver" onclick="updateHandleVariant('pipe_silver', this)"><img src="textures/handles/pipe_silver.png" alt=""><span>צינור כסף</span></button>
                     <button type="button" class="handle-variant-opt" data-variant="pipe_black" onclick="updateHandleVariant('pipe_black', this)"><img src="textures/handles/pipe_black.png" alt=""><span>צינור שחור מט</span></button>
+                    <button type="button" class="handle-variant-opt" data-variant="pipe_gold" onclick="updateHandleVariant('pipe_gold', this)"><img src="textures/handles/pipe_gold.png" alt=""><span>צינור זהב מט</span></button>
                     <button type="button" class="handle-variant-opt" data-variant="halfmoon_gold" onclick="updateHandleVariant('halfmoon_gold', this)"><img src="textures/handles/halfmoon_gold.png?v=2" alt=""><span>חצי ירח זהב מט</span></button>
                     <button type="button" class="handle-variant-opt" data-variant="halfmoon_black" onclick="updateHandleVariant('halfmoon_black', this)"><img src="textures/handles/halfmoon_black.png" alt=""><span>חצי ירח שחור מט</span></button>
+                    <button type="button" class="handle-variant-opt" data-variant="client" onclick="updateHandleVariant('client', this)" title="בהדמיה מוצגת ידית צינור שחורה; בהזמנה לייצור יירשם: לקוח מביא ידיות"><span class="handle-variant-icon"><i class="fa-solid fa-hand-holding"></i></span><span>ידיות הלקוח</span></button>
                 </div>
                 <div class="input-icon-wrap">
                     <i class="fa-solid fa-tag"></i>
@@ -2260,8 +2262,10 @@
         <div class="handle-variant-menu" data-for="pipe">
             <button type="button" class="handle-variant-opt" data-variant="pipe_silver" onclick="updateHandleVariant('pipe_silver', this)"><img src="textures/handles/pipe_silver.png" alt=""><span>צינור כסף</span></button>
             <button type="button" class="handle-variant-opt" data-variant="pipe_black" onclick="updateHandleVariant('pipe_black', this)"><img src="textures/handles/pipe_black.png" alt=""><span>צינור שחור מט</span></button>
+            <button type="button" class="handle-variant-opt" data-variant="pipe_gold" onclick="updateHandleVariant('pipe_gold', this)"><img src="textures/handles/pipe_gold.png" alt=""><span>צינור זהב מט</span></button>
             <button type="button" class="handle-variant-opt" data-variant="halfmoon_gold" onclick="updateHandleVariant('halfmoon_gold', this)"><img src="textures/handles/halfmoon_gold.png?v=2" alt=""><span>חצי ירח זהב מט</span></button>
             <button type="button" class="handle-variant-opt" data-variant="halfmoon_black" onclick="updateHandleVariant('halfmoon_black', this)"><img src="textures/handles/halfmoon_black.png" alt=""><span>חצי ירח שחור מט</span></button>
+            <button type="button" class="handle-variant-opt" data-variant="client" onclick="updateHandleVariant('client', this)" title="בהדמיה מוצגת ידית צינור שחורה; בהזמנה לייצור יירשם: לקוח מביא ידיות"><span class="handle-variant-icon"><i class="fa-solid fa-hand-holding"></i></span><span>ידיות הלקוח</span></button>
         </div>
         <div class="input-icon-wrap" style="margin-bottom:15px;">
             <i class="fa-solid fa-tag"></i>
@@ -2799,18 +2803,18 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js?v=20261005pages"></script>
-<script src="state.js?v=20261006flapHandle"></script>
+<script src="state.js?v=20261006handles2"></script>
 <script src="quick-calc.js?v=20261005w40"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
-<script src="engine-appliances.js?v=20261006flapHandle"></script>
-<script src="engine-core.js?v=20261006flapHandle"></script>
-<script src="engine-corners.js?v=20261006flapHandle"></script>
+<script src="engine-appliances.js?v=20261006handles2"></script>
+<script src="engine-core.js?v=20261006handles2"></script>
+<script src="engine-corners.js?v=20261006handles2"></script>
 <script src="engine-blueprint.js?v=20261005hiddenZone"></script>
 <script src="engine-room-plan.js?v=20260929rail"></script>
 <script src="tambour-color-picker.js?v=20260617scdoors"></script>
-<script src="ui.js?v=20261006flapHandle"></script>
-<script src="mobile.js?v=20261006flapHandle"></script>
+<script src="ui.js?v=20261006handles2"></script>
+<script src="mobile.js?v=20261006handles2"></script>
 <script src="part-paint.js?v=20260914A427fix"></script>
 <script src="shelf-pick.js?v=20260922sideWall"></script>
 <script src="index-init.js?v=20261002hist"></script>

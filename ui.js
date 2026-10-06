@@ -1493,7 +1493,7 @@ function _renderHandleFinishStep(style, currentStyle, descText, finish) {
     const src = isRiding ? window.RIDING_COLORS : window.HANDLE_VARIANTS;
     const activeId = currentStyle !== style ? null
         : isRiding ? window._ridingColorId(finish.ridingColor) : window._handleVariantId(finish.handleVariant);
-    Object.keys(src).forEach(id => {
+    Object.keys(src).filter(id => !src[id].wingOnly).forEach(id => {
         const card = document.createElement('div');
         card.className = 'handle-picker-card handle-finish-card' + (id === activeId ? ' active' : '');
         const thumb = isRiding
