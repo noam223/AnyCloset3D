@@ -423,7 +423,8 @@ function buildTv(inch) {
     const frameMat = new THREE.MeshStandardMaterial({ color: 0x141518, roughness: 0.35, metalness: 0.4, envMap: env, envMapIntensity: 0.8 });
     const backMat = new THREE.MeshStandardMaterial({ color: 0x1d1f23, roughness: 0.6, metalness: 0.1, envMap: env, envMapIntensity: 0.5 });
     const footMat = new THREE.MeshStandardMaterial({ color: 0x1a1b1e, roughness: 0.3, metalness: 0.6, envMap: env, envMapIntensity: 0.9 });
-    const screenMat = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 0.06, metalness: 0, emissive: 0xffffff, emissiveMap: _tvScreenTex(), envMap: env, envMapIntensity: 0.55 });
+    // Unlit so the cabinet shadow pass never flags it: shadow acne on a glossy lit screen shimmers when orbiting
+    const screenMat = new THREE.MeshBasicMaterial({ map: _tvScreenTex(), envMap: env, combine: THREE.AddOperation, reflectivity: 0.08 });
 
     const panelT = d.panelT;
     const y0 = d.standH;
