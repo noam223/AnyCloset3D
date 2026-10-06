@@ -4429,6 +4429,16 @@ window.updateDim = function(dim, delta, absoluteValue = null) {
         state.depth = val;
         document.getElementById('inp-depth').value = val;
         document.getElementById('inp-num-depth').value = val;
+        // Debounced so dragging the depth slider through shallow values doesn't strip doors on the way.
+        clearTimeout(window._applDoorDepthTimer);
+        window._applDoorDepthTimer = setTimeout(() => {
+            if (typeof window._removeDoorsBlockedByAppliances !== 'function') return;
+            if (window._removeDoorsBlockedByAppliances() > 0) {
+                if (typeof _showToast === 'function') _showToast('הדלת הוסרה מתא עם מכונת כביסה / מייבש — בעומק הנוכחי המכשיר בולט מחזית הארון', 5000);
+                buildCabinet(); calculatePrice();
+                if (typeof saveHistoryState === 'function') saveHistoryState();
+            }
+        }, 700);
     }
     else if (dim === 'deskWidth') {
         val = Math.max(40, Math.min(200, val));

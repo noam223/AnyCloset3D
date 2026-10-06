@@ -318,17 +318,29 @@ function _laundryFit(list, cellW, cellH) {
     return cellH >= LAUNDRY_RULES.singleHeight ? [want[0]] : [];
 }
 
+/** Depth layout: front Z of the appliances and whether they stick out past the cabinet doors' plane. */
+function _laundryLayout(list, cellW, cellH, bodyD, backT, frontInset) {
+    const fit = _laundryFit(list, cellW, cellH);
+    if (!fit.length) return null;
+    const maxD = Math.max.apply(null, fit.map(t => LA_TYPES[t].D));
+    const backFace = -bodyD / 2 + (backT || 0) + 0.3;
+    const flushFront = bodyD / 2 - (frontInset || 0) - DOOR_PROTRUSION - 0.3;
+    return { fit, frontZ: Math.max(flushFront, backFace + maxD), protrudes: backFace + maxD > flushFront + 1e-6 };
+}
+
+function laundryProtrudes(list, cellW, cellH, bodyD, frontInset) {
+    const L = _laundryLayout(list, cellW, cellH, bodyD, 0.5, frontInset);
+    return !!(L && L.protrudes);
+}
+
 /**
  * Add the cell's appliances to `parent`.
  * opts: { list, x, bottomY, cellW, cellH, bodyD, backT, frontInset }
  */
 function addLaundryAppliancesToCell(parent, opts) {
-    const fit = _laundryFit(opts.list, opts.cellW, opts.cellH);
-    if (!fit.length) return;
-    const maxD = Math.max.apply(null, fit.map(t => LA_TYPES[t].D));
-    const backFace = -opts.bodyD / 2 + (opts.backT || 0) + 0.5;
-    // Keep the door ring behind the cabinet doors when depth allows; otherwise protrude.
-    const frontZ = Math.max(opts.bodyD / 2 - (opts.frontInset || 0) - DOOR_PROTRUSION - 0.8, backFace + maxD);
+    const L = _laundryLayout(opts.list, opts.cellW, opts.cellH, opts.bodyD, opts.backT, opts.frontInset);
+    if (!L) return;
+    const { fit, frontZ } = L;
     let y = opts.bottomY;
     fit.forEach((type, i) => {
         if (i > 0) {
@@ -349,5 +361,6 @@ function addLaundryAppliancesToCell(parent, opts) {
 
 window.LAUNDRY_RULES = LAUNDRY_RULES;
 window._laundryFit = _laundryFit;
+window._laundryProtrudes = laundryProtrudes;
 window.addLaundryAppliancesToCell = addLaundryAppliancesToCell;
 })();

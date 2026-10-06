@@ -1805,6 +1805,12 @@ function updateToolbarButtonHighlights() {
 
     const firstComp = col.compartments[state.selection.rows[0]];
 
+    if (doorSection) {
+        const applBlocked = state.selection.rows.some(r => _cellApplianceBlocksDoor(col, r));
+        doorSection.classList.toggle('appl-door-blocked', applBlocked);
+        doorSection.title = applBlocked ? 'המכשיר בולט מחזית הארון — לא ניתן להתקין דלת על התא' : '';
+    }
+
     // ── Partition counter UI: show [−] N [+] next to מחיצה button when partition is active ──
     const hasPartition = firstComp && firstComp.partition &&
                          firstComp.type !== 'open_cell' && firstComp.type !== 'side_open_cell' &&
@@ -4885,6 +4891,37 @@ window.closeContentSubPanels = function() {
     closeSubcellToolbar();
 };
 
+function _laundryFrontInset() {
+    if (state.presetId === 'sliding' && state.slidingDoor && state.slidingDoor.enabled) return 6;
+    return (state.cabinetModel === 'ab2' || state.cabinetModel === 'ab2_nohoney') ? (state.thickness || 1.7) : 0;
+}
+
+/** True when the cell's washer/dryer sticks out past the cabinet front, so no door can close over it. */
+function _cellApplianceBlocksDoor(col, r) {
+    const comp = col && col.compartments && col.compartments[r];
+    if (!comp || comp.partition || !Array.isArray(comp.appliances) || !comp.appliances.length) return false;
+    if (typeof window._laundryProtrudes !== 'function') return false;
+    return window._laundryProtrudes(comp.appliances, col.width, _cellHeight(col, r), state.depth || 54, _laundryFrontInset());
+}
+window._cellApplianceBlocksDoor = _cellApplianceBlocksDoor;
+
+/** Drop doors covering cells whose appliances protrude. Returns the number of doors removed. */
+function _removeDoorsBlockedByAppliances(colIndex) {
+    let removed = 0;
+    state.columns.forEach((col, c) => {
+        if (colIndex != null && c !== colIndex) return;
+        if (!col || !Array.isArray(col.doors) || !col.doors.length) return;
+        const before = col.doors.length;
+        col.doors = col.doors.filter(d => {
+            for (let r = d.startRow; r <= d.endRow; r++) if (_cellApplianceBlocksDoor(col, r)) return false;
+            return true;
+        });
+        removed += before - col.doors.length;
+    });
+    return removed;
+}
+window._removeDoorsBlockedByAppliances = _removeDoorsBlockedByAppliances;
+
 // Toggle a laundry appliance in the selected cell(s). Both can be marked only when the
 // cell is tall enough to stack them; otherwise the new pick replaces the old one.
 // Selection is kept so the user can mark the second appliance right away.
@@ -4937,13 +4974,15 @@ window.toggleCellAppliance = function(type) {
         _showToast(`גובה התא ${fmt(tooShortH)} ס"מ — ל${names[type]} נדרש גובה של ${R.singleHeight} ס"מ לפחות`, 4500);
     } else if (swappedH !== null) {
         _showToast(`גובה התא ${fmt(swappedH)} ס"מ — מכונה ומייבש יחד דורשים ${R.stackHeight} ס"מ לפחות, לכן הוכנס רק ${names[type]}`, 5000);
-    } else if (turnOn && changed) {
-        const bodyD = state.depth || 54;
-        if (bodyD < R.dims[type].D + 1) {
-            _showToast(`עומק הארון ${fmt(bodyD)} ס"מ קטן מעומק ה${names[type]} (${R.dims[type].D} ס"מ) — המכשיר יבלוט מחזית הארון`, 5000);
-        }
     }
     if (!changed) return;
+    if (turnOn && tooShortH === null && rows.some(r => _cellApplianceBlocksDoor(col, r))) {
+        const removedDoors = _removeDoorsBlockedByAppliances(state.selection.colIndex);
+        if (swappedH === null) {
+            _showToast(`עומק הארון ${fmt(state.depth || 54)} ס"מ — המכשיר בולט מחזית הארון, לכן לא ניתן להתקין דלת על התא` +
+                (removedDoors ? ' (הדלת הוסרה)' : ''), 5000);
+        }
+    }
     if (clearedPartition && typeof _clearSubCellSelection === 'function') _clearSubCellSelection();
     buildCabinet(); calculatePrice(); saveHistoryState();
     updateToolbarButtonHighlights();
@@ -5439,6 +5478,15 @@ window.applyDoor = function(type) {
     if (hasOpenCell && type !== 'empty') {
         alert('לא ניתן להתקין דלתות על אזור שמוגדר ככוורת.');
         return;
+    }
+
+    if (type !== 'empty') {
+        for (let r = startR; r <= endR; r++) {
+            if (_cellApplianceBlocksDoor(state.columns[c], r)) {
+                _showToast(`לא ניתן להתקין דלת על תא עם מכונת כביסה / מייבש שבולטים מחזית הארון (עומק הארון ${state.depth} ס"מ)`, 5000);
+                return;
+            }
+        }
     }
 
     const existingDoorIdx = state.columns[c].doors.findIndex(door => {

@@ -2771,6 +2771,7 @@ body.dragging-v { cursor: ns-resize !important; }
 .toolbar-sub-btns .toolbar-btn span {
     font-size: 0.78rem;
 }
+.appl-door-blocked .toolbar-btn:not([onclick="applyDoor('empty')"]) { opacity: 0.35; }
 #tb-btn-appliances span { white-space: normal; line-height: 1.1; text-align: center; }
 .la-ic { display: inline-flex; align-items: center; justify-content: center; }
 .la-ic svg { width: 1.15em; height: 1.15em; display: block; }
