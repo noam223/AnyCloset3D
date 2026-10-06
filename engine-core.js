@@ -6531,10 +6531,10 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             if (hs === 'pipe' && _isHalfMoonHandle()) {
                                 _registerDoorMesh(_placeHalfMoon(_buildGroup, _handleMat3D(), subCenterX, flapBottomY, fZ + t / 2, 'up'));
                             } else if (hs === 'pipe') {
-                                const handleH = Math.min(flapH * 0.25, 12);
-                                const handleMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, handleH, 12), _handleMat3D());
+                                const handleL = Math.min(15, Math.max(6, flapW - 8));
+                                const handleMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, handleL, 16), _handleMat3D());
                                 handleMesh.rotation.z = Math.PI / 2;
-                                handleMesh.position.set(subCenterX + flapW * 0.35, flapBottomY + 4, hz);
+                                handleMesh.position.set(subCenterX, flapBottomY + 4, hz);
                                 _buildGroup.add(handleMesh);
                                 _registerDoorMesh(handleMesh);
                             } else if (hs === 'riding') {
@@ -7092,12 +7092,13 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                     if (!isBP && _flapHandleStyle === 'pipe' && _isHalfMoonHandle()) {
                         _registerDoorMesh(_placeHalfMoon(_buildGroup, _handleMat3D(), flapCenterX, flapBaseY, flapZ + t / 2, 'up'));
                     } else if (!isBP && _flapHandleStyle === 'pipe') {
-                        const handleH = Math.min(flapH * 0.25, 12);
+                        const handleL = Math.min(15, Math.max(6, flapW - 8));
                         const handleMesh = new THREE.Mesh(
-                            new THREE.CylinderGeometry(0.5, 0.5, handleH, 12),
+                            new THREE.CylinderGeometry(0.5, 0.5, handleL, 16),
                             _handleMat3D()
                         );
-                        handleMesh.position.set(flapCenterX + flapW * 0.35, flapBaseY + 4, flapZ + t / 2 + 1.5);
+                        handleMesh.rotation.z = Math.PI / 2;
+                        handleMesh.position.set(flapCenterX, flapBaseY + 4, flapZ + t / 2 + 1.5);
                         _buildGroup.add(handleMesh);
                         _registerDoorMesh(handleMesh);
                     } else if (!isBP && _flapHandleStyle === 'riding') {
