@@ -391,39 +391,13 @@ function tvLargestFit(cellW, cellH) {
     return best;
 }
 
+// 16:9 crop of images/TV.jpg
 function _tvScreenTex() {
-    return _laTex('tv-screen', () => _laCanvasTex(1024, 576, (x, w, h) => {
-        const bg = x.createLinearGradient(0, 0, w, h);
-        bg.addColorStop(0, '#24105e'); bg.addColorStop(0.45, '#3d1fa6'); bg.addColorStop(1, '#1a0b47');
-        x.fillStyle = bg; x.fillRect(0, 0, w, h);
-        let seed = 7;
-        const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-        const bubbles = [
-            [130, 420, 150], [330, 330, 120], [520, 380, 95], [700, 250, 130], [900, 160, 150],
-            [880, 470, 140], [180, 90, 110], [430, 120, 70], [610, 520, 80], [60, 250, 70],
-            [760, 420, 45], [330, 520, 55], [560, 220, 30], [990, 340, 60]
-        ];
-        bubbles.forEach(([cx, cy, r]) => {
-            const g = x.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.1, cx, cy, r);
-            const hue = 255 + rnd() * 35;
-            g.addColorStop(0, `hsla(${hue}, 80%, 72%, 0.95)`);
-            g.addColorStop(0.55, `hsla(${hue}, 70%, 48%, 0.85)`);
-            g.addColorStop(1, `hsla(${hue + 10}, 75%, 30%, 0.9)`);
-            x.fillStyle = g;
-            x.beginPath(); x.ellipse(cx, cy, r, r * (0.82 + rnd() * 0.2), rnd() * 0.6, 0, Math.PI * 2); x.fill();
-            const rim = x.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
-            rim.addColorStop(0, 'rgba(255,190,255,0.0)');
-            rim.addColorStop(0.5, 'rgba(255,150,240,0.9)');
-            rim.addColorStop(1, 'rgba(255,255,255,0.15)');
-            x.strokeStyle = rim; x.lineWidth = Math.max(2, r * 0.06);
-            x.beginPath(); x.ellipse(cx, cy, r * 0.97, r * 0.8, 0.2, Math.PI * 0.05, Math.PI * 1.1); x.stroke();
-            x.fillStyle = 'rgba(255,255,255,0.55)';
-            x.beginPath(); x.ellipse(cx - r * 0.38, cy - r * 0.42, r * 0.16, r * 0.08, -0.6, 0, Math.PI * 2); x.fill();
-        });
-        const vig = x.createRadialGradient(w / 2, h / 2, h * 0.3, w / 2, h / 2, w * 0.7);
-        vig.addColorStop(0, 'rgba(0,0,0,0)'); vig.addColorStop(1, 'rgba(8,2,30,0.45)');
-        x.fillStyle = vig; x.fillRect(0, 0, w, h);
-    }));
+    return _laTex('tv-screen', () => {
+        const t = new THREE.TextureLoader().load('textures/tv-screen.jpg');
+        t.anisotropy = 4;
+        return t;
+    });
 }
 
 function buildTv(inch) {
@@ -434,7 +408,7 @@ function buildTv(inch) {
     const frameMat = new THREE.MeshStandardMaterial({ color: 0x141518, roughness: 0.35, metalness: 0.4, envMap: env, envMapIntensity: 0.8 });
     const backMat = new THREE.MeshStandardMaterial({ color: 0x1d1f23, roughness: 0.6, metalness: 0.1, envMap: env, envMapIntensity: 0.5 });
     const footMat = new THREE.MeshStandardMaterial({ color: 0x1a1b1e, roughness: 0.3, metalness: 0.6, envMap: env, envMapIntensity: 0.9 });
-    const screenMat = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 0.12, metalness: 0, emissive: 0xffffff, emissiveMap: _tvScreenTex(), envMap: env, envMapIntensity: 0.6 });
+    const screenMat = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 0.12, metalness: 0, emissive: 0xffffff, emissiveMap: _tvScreenTex(), envMap: env, envMapIntensity: 0.35 });
 
     const panelT = d.panelT;
     const y0 = d.standH;
