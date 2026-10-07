@@ -769,15 +769,6 @@ function _renderLedCellIcons() {
             const bot = cellEntry(c, g.startRow);
             if (!top || !bot) return;
             const yTop = centerOf(top) + top.h / 2;
-            const yBot = centerOf(bot) - bot.h / 2;
-            [-1, 1].forEach(side => {
-                const strip = document.createElement('div');
-                strip.className = 'led-cell-strip';
-                strip.dataset.x3d = top.x + side * (col.width / 2 - 1.5);
-                strip.dataset.y3d = yTop;
-                strip.dataset.y3dBottom = yBot;
-                layer.appendChild(strip);
-            });
             const el = document.createElement('div');
             el.className = 'led-cell-icon';
             el.dataset.x3d = top.x + col.width / 2 - 7;
@@ -4042,17 +4033,6 @@ function updateOverlaysPosition() {
 
         el.style.left = `${x}px`;
         el.style.top = `${y}px`;
-    });
-
-    document.querySelectorAll('.led-cell-strip').forEach(el => {
-        const x3d = parseFloat(el.dataset.x3d);
-        const a = projectWingPoint(x3d, parseFloat(el.dataset.y3d));
-        const b = projectWingPoint(x3d, parseFloat(el.dataset.y3dBottom));
-        const yA = (-(a.y * .5) + .5) * ch;
-        const yB = (-(b.y * .5) + .5) * ch;
-        el.style.left = `${(a.x * .5 + .5) * cw}px`;
-        el.style.top = `${Math.min(yA, yB)}px`;
-        el.style.height = `${Math.abs(yB - yA)}px`;
     });
 
     // ---- Column width labels (always-visible layer) ----
