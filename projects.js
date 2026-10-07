@@ -40,7 +40,7 @@ var _UPGRADE_PLANS = [
     { key: 'carpenter_basic',   label: 'נגר — בסיסי',           price: '₪X/חודש',    userType: 'carpenter', maxProjects: 30,   maxDevices: 1,  desc: 'תמחור + הדמיה, עד 30 פרויקטים' },
     { key: 'carpenter_pro',     label: 'נגר — מקצועי',          price: '₪X/חודש',    userType: 'carpenter', maxProjects: null, maxDevices: 2,  desc: 'הכל כולל דוח לקוח + ייצוא לנגר' },
     // חברות
-    { key: 'company_standard',  label: 'חברה — סטנדרט',         price: '₪1,000/חודש', userType: 'company',   maxProjects: null, maxDevices: 10, desc: 'עד 5 סוכנים, 10 מכשירים, כל הפיצ\'רים' },
+    { key: 'company_standard',  label: 'חברה — סטנדרט',         price: 'צור קשר',    userType: 'company',   maxProjects: null, maxDevices: 10, desc: 'עד 5 סוכנים, 10 מכשירים, כל הפיצ\'רים' },
     { key: 'company_enterprise',label: 'חברה — ארגוני',          price: 'צור קשר',    userType: 'company',   maxProjects: null, maxDevices: 30, desc: 'עד 15 סוכנים, 30 מכשירים, תמיכה מלאה' },
 ];
 
@@ -381,6 +381,11 @@ window._annualToggle = _annualToggle;
 
 // ── Open payment via Make Scenario 1 (creates Grow payment link dynamically) ──
 async function _openPayment(planKey, installments) {
+    if (String(planKey).indexOf('company_') === 0) {
+        var waText = 'שלום, אני מעוניין במסלול החברות של AnyCloset 3D (' + planKey + ')';
+        window.open('https://wa.me/972546659798?text=' + encodeURIComponent(waText), '_blank', 'noopener');
+        return;
+    }
     installments = installments || 1;
     var SCENARIO1_WEBHOOK = 'https://hook.eu1.make.com/2p1w789m4oeh3glw0pry61y0dd6vnlvd';
 
