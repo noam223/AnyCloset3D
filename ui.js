@@ -9319,6 +9319,36 @@ function _showToast(msg, duration = 4000) {
 }
 window._showToast = _showToast;
 
+/**
+ * window.open after a long await (image refresh on a slow PC) loses the click's user activation and is
+ * silently popup-blocked. Then ask for one more click, which carries fresh activation. onOpen(win) runs once.
+ */
+function _openPrintPopup(features, onOpen) {
+    const win = window.open('', '_blank', features);
+    if (win) { onOpen(win); return; }
+    const old = document.getElementById('print-ready-prompt');
+    if (old) old.remove();
+    const box = document.createElement('div');
+    box.id = 'print-ready-prompt';
+    box.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(15,23,42,0.45);display:flex;align-items:center;justify-content:center;direction:rtl;';
+    box.innerHTML = '<div style="background:#fff;border-radius:14px;padding:22px 26px;box-shadow:0 10px 40px rgba(0,0,0,0.3);text-align:center;max-width:340px;font-family:inherit;">' +
+        '<div style="font-size:1.05rem;font-weight:700;color:#1e293b;margin-bottom:14px;">✅ הטופס מוכן להדפסה</div>' +
+        '<button type="button" data-act="open" style="background:#2563eb;color:#fff;border:none;border-radius:10px;padding:10px 22px;font-size:1rem;font-weight:700;cursor:pointer;"><i class="fa-solid fa-print"></i> פתח חלון הדפסה</button>' +
+        '<div><button type="button" data-act="cancel" style="margin-top:10px;background:none;border:none;color:#64748b;cursor:pointer;font-size:0.9rem;">ביטול</button></div></div>';
+    box.addEventListener('click', e => {
+        const act = e.target.closest('[data-act]');
+        if (!act && e.target !== box) return;
+        box.remove();
+        if (act && act.dataset.act === 'open') {
+            const w = window.open('', '_blank', features);
+            if (w) onOpen(w);
+            else _showToast('הדפדפן חסם את חלון ההדפסה — אפשרו חלונות קופצים לאתר זה', 6000);
+        }
+    });
+    document.body.appendChild(box);
+}
+window._openPrintPopup = _openPrintPopup;
+
 // ---- Cart preview refresh (images stripped on project save — regenerate from rawState) ----
 function _columnBodyHeight(col, fallback) {
     const h = (col && col.height != null) ? col.height : (fallback || 240);
@@ -15133,21 +15163,25 @@ window.printCustomer = async function() {
     }
     _showToast('🔄 מרענן תמונות לפני הדפסה...', 3000);
     try { await window._refreshCartMediaForPrint({ force: true }); } catch (e) { console.warn('[printCustomer]', e); }
-    const html = _buildPrintHTML('customer');
-    const win = window.open('', '_blank', 'width=900,height=700');
-    win.document.write(html);
-    win.document.close();
-    win.focus();
-    // Build PDF filename: סוגרים הכל לדירה (orderNum) (custName)
+    _writePrintWindow(_buildPrintHTML('customer'));
+};
+
+/** Open the print window with the form HTML and trigger print (PDF name: סוגרים הכל לדירה orderNum custName). */
+function _writePrintWindow(html) {
     const _pdfOrder = (state.customer && state.customer.orderNum) ? state.customer.orderNum : '';
     const _pdfName  = (state.customer && state.customer.name)     ? state.customer.name     : '';
     const _pdfParts = ['סוגרים הכל לדירה'];
     if (_pdfOrder) _pdfParts.push(_pdfOrder);
     if (_pdfName)  _pdfParts.push(_pdfName);
     const _pdfTitle = _pdfParts.join(' ');
-    // Set title inside setTimeout so it runs after document is fully parsed
-    setTimeout(() => { win.document.title = _pdfTitle; win.print(); }, 600);
-};
+    _openPrintPopup('width=900,height=700', win => {
+        win.document.write(html);
+        win.document.close();
+        win.focus();
+        // Set title inside setTimeout so it runs after document is fully parsed
+        setTimeout(() => { win.document.title = _pdfTitle; win.print(); }, 600);
+    });
+}
 window.printFactory = async function() {
     if (typeof window._cartHasExportableItems === 'function' && !window._cartHasExportableItems()) {
         _showToast('אין ארונות לייצוא — כל הארונות מושהים. הפעילו ארון כדי לכלול אותו.', 5000);
@@ -15156,20 +15190,7 @@ window.printFactory = async function() {
     _showToast('🔄 מרענן תמונות לפני הדפסה...', 3000);
     try { await window._refreshCartMediaForPrint({ force: true }); } catch (e) { console.warn('[printFactory]', e); }
     try { await window._refreshCartBlueprintPagesForPrint(); } catch (e) { console.warn('[printFactory] blueprint refresh failed:', e); }
-    const html = _buildPrintHTML('factory');
-    const win = window.open('', '_blank', 'width=900,height=700');
-    win.document.write(html);
-    win.document.close();
-    win.focus();
-    // Build PDF filename: סוגרים הכל לדירה (orderNum) (custName)
-    const _pdfOrder = (state.customer && state.customer.orderNum) ? state.customer.orderNum : '';
-    const _pdfName  = (state.customer && state.customer.name)     ? state.customer.name     : '';
-    const _pdfParts = ['סוגרים הכל לדירה'];
-    if (_pdfOrder) _pdfParts.push(_pdfOrder);
-    if (_pdfName)  _pdfParts.push(_pdfName);
-    const _pdfTitle = _pdfParts.join(' ');
-    // Set title inside setTimeout so it runs after document is fully parsed
-    setTimeout(() => { win.document.title = _pdfTitle; win.print(); }, 600);
+    _writePrintWindow(_buildPrintHTML('factory'));
 };
 
 // ==========================================
@@ -16545,7 +16566,10 @@ window.printCustomerSummary = async function() {
     excelData.grandTotal = excelData.totalCabPrice + excelData.totalInstallPrice;
 
     const html = _buildCustomerSummaryHTML(logoDataUrl);
-    const win = window.open('', '_blank', 'width=960,height=780');
+    _openPrintPopup('width=960,height=780', win => _fillCustomerSummaryWindow(win, html, excelData));
+};
+
+function _fillCustomerSummaryWindow(win, html, excelData) {
     win.document.write(html);
     win.document.close();
     win.focus();
@@ -16597,7 +16621,7 @@ window.printCustomerSummary = async function() {
         setTimeout(function() { win.URL.revokeObjectURL(url); a.remove(); }, 1000);
     };
     // No auto-print — user clicks the buttons in the opened page
-};
+}
 
 // ==========================================
 // 8. אתחול המערכת (Initialization)
