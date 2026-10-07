@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>הצהרת נגישות | AnyCloset 3D</title>
+<link rel="icon" type="image/png" href="images/icon-logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Heebo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --p:#1e3a5f;--pl:#2a4f80;--pd:#152b47;
+  --a:#00d4ff;--al:#33ddff;--ad:#00b8e0;
+  --bg:#f0f4f8;--w:#fff;--bd:#e2e8f0;
+  --t:#1e293b;--tl:#475569;--m:#94a3b8;
+  --ok:#22c55e;--r:16px;--rl:24px;
+}
+html{scroll-behavior:smooth}
+body{font-family:'Heebo','Inter',sans-serif;background:var(--bg);color:var(--t);line-height:1.7;min-height:100vh}
+
+/* ── NAVBAR ── */
+.navbar{position:fixed;top:0;right:0;left:0;z-index:1000;padding:0 40px;height:72px;display:flex;align-items:center;justify-content:space-between;background:rgba(15,31,53,.97);backdrop-filter:blur(12px);box-shadow:0 2px 20px rgba(0,0,0,.3)}
+.nav-brand{display:flex;align-items:center;text-decoration:none;flex:0 1 auto;min-width:0;max-width:min(240px,32vw);height:auto;margin:0}
+.nav-brand img{height:41px;width:auto;max-width:100%;display:block;object-fit:contain;mix-blend-mode:screen}
+.nav-back{display:flex;align-items:center;gap:8px;color:rgba(255,255,255,.75);text-decoration:none;font-size:.9rem;font-weight:500;padding:8px 16px;border-radius:8px;border:1px solid rgba(255,255,255,.2);transition:all .2s}
+.nav-back:hover{color:#fff;background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.4)}
+
+/* ── HERO ── */
+.page-hero{background:linear-gradient(135deg,#0f1f35 0%,#1e3a5f 60%,#2a4f80 100%);padding:120px 40px 70px;text-align:center;position:relative;overflow:hidden}
+.page-hero::before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);background-size:60px 60px;pointer-events:none}
+.page-hero-inner{position:relative;z-index:1;max-width:700px;margin:0 auto}
+.page-hero-tag{display:inline-flex;align-items:center;gap:8px;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.3);color:var(--al);font-size:.82rem;font-weight:700;padding:6px 16px;border-radius:99px;margin-bottom:20px}
+.page-hero h1{font-size:clamp(2rem,4vw,3rem);font-weight:900;color:#fff;line-height:1.2;margin-bottom:14px}
+.page-hero p{font-size:1rem;color:rgba(255,255,255,.65);line-height:1.7}
+.page-hero .updated{margin-top:16px;font-size:.82rem;color:rgba(255,255,255,.4)}
+
+/* ── CONTENT ── */
+.content-wrap{max-width:860px;margin:0 auto;padding:60px 40px 80px}
+.toc-card{background:var(--w);border:1px solid var(--bd);border-radius:var(--rl);padding:28px 32px;margin-bottom:48px;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.toc-title{font-size:.82rem;font-weight:700;color:var(--m);text-transform:uppercase;letter-spacing:.08em;margin-bottom:16px}
+.toc-list{list-style:none;display:flex;flex-direction:column;gap:8px}
+.toc-list a{color:var(--p);text-decoration:none;font-size:.92rem;font-weight:500;display:flex;align-items:center;gap:8px;transition:color .2s}
+.toc-list a:hover{color:var(--pl)}
+.toc-list a::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--a);flex-shrink:0}
+
+.section-block{margin-bottom:52px}
+.section-block:last-child{margin-bottom:0}
+.section-num{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;background:var(--p);color:#fff;border-radius:8px;font-size:.82rem;font-weight:800;margin-bottom:14px;flex-shrink:0}
+.section-block h2{font-size:1.35rem;font-weight:800;color:var(--p);margin-bottom:16px;display:flex;align-items:center;gap:12px}
+.section-block h2 .icon{width:36px;height:36px;background:rgba(30,58,95,.1);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:.95rem;color:var(--p);flex-shrink:0}
+.section-block p{font-size:.95rem;color:var(--tl);line-height:1.8;margin-bottom:14px}
+.section-block p:last-child{margin-bottom:0}
+.section-block ul{list-style:none;display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
+.section-block ul li{display:flex;align-items:flex-start;gap:10px;font-size:.93rem;color:var(--tl);line-height:1.7}
+.section-block ul li::before{content:'\f058';font-family:'Font Awesome 6 Free';font-weight:900;color:var(--ok);font-size:.75rem;margin-top:4px;flex-shrink:0}
+.section-block .highlight-box{background:rgba(30,58,95,.06);border:1px solid rgba(30,58,95,.15);border-radius:12px;padding:18px 22px;margin-top:16px}
+.section-block .highlight-box p{margin-bottom:0;font-size:.9rem}
+.section-block .warn-box{background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.25);border-radius:12px;padding:18px 22px;margin-top:16px}
+.section-block .warn-box p{margin-bottom:0;font-size:.9rem;color:var(--ad)}
+
+.divider{height:1px;background:var(--bd);margin:0 0 52px}
+
+/* ── CONTACT CARD ── */
+.contact-card{background:linear-gradient(135deg,var(--pd),var(--p));border-radius:var(--rl);padding:40px 36px;text-align:center;color:#fff;margin-top:60px}
+.contact-card h3{font-size:1.4rem;font-weight:800;margin-bottom:10px}
+.contact-card p{font-size:.95rem;color:rgba(255,255,255,.7);margin-bottom:28px;line-height:1.7}
+.contact-btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+.btn-contact{display:inline-flex;align-items:center;gap:8px;padding:11px 24px;border-radius:10px;font-size:.9rem;font-weight:700;text-decoration:none;transition:all .25s;font-family:'Heebo',sans-serif}
+.btn-contact-wa{background:#25d366;color:#fff}
+.btn-contact-wa:hover{background:#1ebe5d;transform:translateY(-2px);box-shadow:0 6px 20px rgba(37,211,102,.4)}
+.btn-contact-mail{background:rgba(255,255,255,.15);color:#fff;border:1.5px solid rgba(255,255,255,.3)}
+.btn-contact-mail:hover{background:rgba(255,255,255,.25);transform:translateY(-2px)}
+
+/* ── FOOTER ── */
+footer{background:#0a1628;padding:36px 40px;color:rgba(255,255,255,.5);text-align:center}
+footer a{color:rgba(255,255,255,.55);text-decoration:none;transition:color .2s}
+footer a:hover{color:#fff}
+.footer-links-row{display:flex;gap:20px;justify-content:center;flex-wrap:wrap;margin-bottom:14px;font-size:.88rem}
+.footer-copy{font-size:.82rem}
+
+@media(max-width:700px){
+  .navbar{padding:0 16px;height:56px;gap:10px}
+  .nav-brand{max-width:min(144px,40vw)}
+  .nav-brand img{height:29px;max-height:29px}
+  .nav-back{flex-shrink:0;padding:6px 12px;font-size:.8rem}
+  .page-hero{padding:100px 20px 50px}
+  .content-wrap{padding:40px 20px 60px}
+  .toc-card{padding:20px}
+  .contact-card{padding:28px 20px}
+  .contact-btns{flex-direction:column;align-items:center}
+}
+</style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <a href="landing.html" class="nav-brand">
+    <img src="images/logo%20small.png" alt="AnyCloset 3D">
+  </a>
+  <a href="landing.html" class="nav-back">
+    <i class="fa-solid fa-arrow-right"></i>
+    חזרה לדף הבית
+  </a>
+</nav>
+
+<!-- HERO -->
+<div class="page-hero">
+  <div class="page-hero-inner">
+    <div class="page-hero-tag"><i class="fa-solid fa-universal-access"></i> הצהרת נגישות</div>
+    <h1>הצהרת נגישות</h1>
+    <p>אנו רואים חשיבות רבה במתן שירות שוויוני לכלל המשתמשים, ופועלים כדי שהאתר והמערכת יהיו נגישים גם לאנשים עם מוגבלות.</p>
+    <div class="updated">עודכן לאחרונה: אוקטובר 2026</div>
+  </div>
+</div>
+
+<!-- CONTENT -->
+<div class="content-wrap">
+
+  <div class="section-block" id="a1">
+    <h2><span class="icon"><i class="fa-solid fa-universal-access"></i></span>1. מחויבות לנגישות</h2>
+    <p>האתר מופעל על ידי <strong>נועם דיזיין, מספר עוסק 305402075</strong>. אנו פועלים להנגשת האתר בהתאם לתקנות שוויון זכויות לאנשים עם מוגבלות (התאמות נגישות לשירות), התשע"ג-2013, ולתקן הישראלי ת"י 5568 המבוסס על הנחיות WCAG 2.0 ברמה AA.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section-block" id="a2">
+    <h2><span class="icon"><i class="fa-solid fa-list-check"></i></span>2. מה כבר נעשה באתר</h2>
+    <ul>
+      <li>האתר כתוב בעברית ומוצג מימין לשמאל, עם הגדרת שפה תקינה לקוראי מסך.</li>
+      <li>האתר מותאם לתצוגה במחשב, בטאבלט ובטלפון נייד.</li>
+      <li>ניתן להגדיל את התצוגה באמצעות הדפדפן (Ctrl ו-+) בלי לפגוע בתוכן.</li>
+      <li>כפתורים וקישורים כוללים טקסט מתאר, ונעשה מאמץ לשמור על ניגודיות צבעים קריאה.</li>
+    </ul>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section-block" id="a3">
+    <h2><span class="icon"><i class="fa-solid fa-triangle-exclamation"></i></span>3. מגבלות ידועות</h2>
+    <p>האתר נמצא בתהליך הנגשה מתמשך, וייתכן שחלקים ממנו עדיין אינם נגישים במלואם. בפרט, עורך ההדמיה התלת-ממדי מבוסס על ממשק גרפי אינטראקטיבי, ולכן השימוש בו באמצעות מקלדת בלבד או קורא מסך מוגבל.</p>
+    <p>אם נתקלתם בקושי, נשמח לסייע ולספק את המידע או השירות בדרך חלופית, למשל בשיחה או בהודעה.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section-block" id="a4">
+    <h2><span class="icon"><i class="fa-solid fa-headset"></i></span>4. רכז נגישות ופניות</h2>
+    <p>נתקלתם בבעיית נגישות או שיש לכם הצעה לשיפור? נשמח לשמוע ולטפל בהקדם:</p>
+    <ul>
+      <li><strong>רכז הנגישות:</strong> נועם</li>
+      <li><strong>דוא"ל:</strong> <a href="mailto:noamnisim@gmail.com" style="color:var(--p);font-weight:600">noamnisim@gmail.com</a></li>
+      <li><strong>טלפון / WhatsApp:</strong> <a href="https://wa.me/972546659798" target="_blank" rel="noopener" style="color:var(--p);font-weight:600">054-665-9798</a></li>
+    </ul>
+    <p>כדי שנוכל לטפל בפנייה, נא לציין את העמוד שבו נתקלתם בבעיה, תיאור קצר שלה, והדפדפן או הטכנולוגיה המסייעת שבה השתמשתם.</p>
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-links-row">
+    <a href="landing.html">דף הבית</a>
+    <a href="landing.html#pricing">תמחור</a>
+    <a href="login.html">כניסה</a>
+    <a href="terms.html">תקנון</a>
+    <a href="privacy.html">מדיניות פרטיות</a>
+    <a href="accessibility.html">הצהרת נגישות</a>
+  </div>
+  <div class="footer-copy">© 2026 נועם דיזיין. כל הזכויות שמורות.</div>
+</footer>
+
+</body>
+</html>

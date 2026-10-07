@@ -470,6 +470,9 @@
             <button class="btn-submit" id="btn-register" onclick="handleRegister()">
                 <i class="fa-solid fa-user-plus"></i> צור חשבון
             </button>
+            <p style="font-size:.78rem;color:var(--text-light);text-align:center;margin:10px 0 4px;line-height:1.6;">
+                ביצירת החשבון אני מסכים/ה ל<a href="terms.html" target="_blank" rel="noopener" style="color:var(--primary);font-weight:600;">תקנון</a> ול<a href="privacy.html" target="_blank" rel="noopener" style="color:var(--primary);font-weight:600;">מדיניות הפרטיות</a>
+            </p>
             <button class="btn-back" onclick="goBackToStep2()">
                 <i class="fa-solid fa-arrow-right"></i> חזרה
             </button>
@@ -532,8 +535,8 @@ var _selectedPlanKey  = null;
 // Plans per user type
 var _PLANS_BY_TYPE = {
     designer: [
-        { key: 'designer_monthly', name: 'מנוי חודשי',  price: '₪399/חודש', desc: 'שבוע ניסיון חינם · 3 חודשים ראשונים ₪399, לאחר מכן ₪499' },
-        { key: 'designer_annual',  name: 'מנוי שנתי',   price: '₪369/חודש', desc: 'שבוע ניסיון חינם · חיסכון 26% · ₪4,428 לשנה' }
+        { key: 'designer_monthly', name: 'מנוי חודשי',  price: '₪399/חודש', desc: 'שבוע ניסיון חינם · בהנחה מ-₪499' },
+        { key: 'designer_annual',  name: 'מנוי שנתי',   price: '₪369/חודש', desc: 'שבוע ניסיון חינם · ₪4,428 לשנה · חיסכון ₪360' }
     ],
     carpenter: [
         { key: 'carpenter_basic',        name: 'בסיסי — חודשי',  price: '₪499/חודש', desc: 'שבוע ניסיון חינם · תמחור + הדמיה, עד 30 פרויקטים' },

@@ -35,7 +35,7 @@ var _companyMeta         = null;
 var _UPGRADE_PLANS = [
     // מעצבות
     { key: 'designer_monthly',  label: 'מעצבת — חודשי',        price: '₪399/חודש',  userType: 'designer',  maxProjects: 30,   maxDevices: 1,  desc: 'עד 30 פרויקטים, 12 ארונות לפרויקט' },
-    { key: 'designer_annual',   label: 'מעצבת — שנתי',         price: '₪369/חודש',  userType: 'designer',  maxProjects: 30,   maxDevices: 1,  desc: 'עד 30 פרויקטים, 12 ארונות לפרויקט, ₪4,428 לשנה — חיסכון 26%' },
+    { key: 'designer_annual',   label: 'מעצבת — שנתי',         price: '₪369/חודש',  userType: 'designer',  maxProjects: 30,   maxDevices: 1,  desc: 'עד 30 פרויקטים, 12 ארונות לפרויקט, ₪4,428 לשנה — חיסכון ₪360' },
     // נגרים
     { key: 'carpenter_basic',   label: 'נגר — בסיסי',           price: '₪499/חודש',  userType: 'carpenter', maxProjects: 30,   maxDevices: 1,  desc: 'תמחור + הדמיה, עד 30 פרויקטים' },
     { key: 'carpenter_basic_annual', label: 'נגר — בסיסי שנתי', price: '₪449/חודש',  userType: 'carpenter', maxProjects: 30,   maxDevices: 1,  desc: 'תמחור + הדמיה, עד 30 פרויקטים, ₪5,388 לשנה — חיסכון 10%' },
@@ -237,7 +237,7 @@ function _buildPaywallPlansHTML(userType) {
     // Feature bullets per plan key
     var FEATURES = {
         designer_monthly:   ['עד 30 פרויקטים', '12 ארונות לפרויקט', 'הדמיה תלת-ממדית', 'ייצוא PDF'],
-        designer_annual:    ['עד 30 פרויקטים', '12 ארונות לפרויקט', 'הדמיה תלת-ממדית', 'ייצוא PDF', 'חיסכון 10% לעומת חודשי'],
+        designer_annual:    ['עד 30 פרויקטים', '12 ארונות לפרויקט', 'הדמיה תלת-ממדית', 'ייצוא PDF', 'חיסכון ₪360 בשנה'],
         carpenter_basic:    ['עד 30 פרויקטים', 'תמחור אוטומטי', 'הדמיה תלת-ממדית'],
         carpenter_basic_annual: ['עד 30 פרויקטים', 'תמחור אוטומטי', 'הדמיה תלת-ממדית', 'חיסכון 10% לעומת חודשי'],
         carpenter_pro:      ['פרויקטים ללא הגבלה', 'תמחור + דוח לקוח', 'ייצוא לנגר', '2 מכשירים'],
