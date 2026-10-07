@@ -6054,9 +6054,12 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                 });
             }
             if (!isBP && compData && !compData.partition && compData.tv && typeof window.addTvToCell === 'function') {
+                // Honeycomb frame boards line the block: the TV stands on its floor, between its walls
+                const hcBot = currentBlock && currentBlock.startR === r ? t : 0;
+                const hcTop = currentBlock && currentBlock.endR === r ? t : 0;
                 const tvInfo = window.addTvToCell(_buildGroup, {
-                    inch: compData.tv.inch, floating: !!compData.tv.floating, x: colCenterX, bottomY: prevY,
-                    cellW: col.width, cellH: compH, bodyD: bodyD, backT: backT,
+                    inch: compData.tv.inch, floating: !!compData.tv.floating, x: colCenterX, bottomY: prevY + hcBot,
+                    cellW: col.width - (currentBlock ? 2 * t : 0), cellH: compH - hcBot - hcTop, bodyD: bodyD, backT: backT,
                     frontInset: _isSlidingWardrobe ? _slidingPartSetback : (isInset ? t : 0)
                 });
                 if (tvInfo && _isActiveWingBuild) {

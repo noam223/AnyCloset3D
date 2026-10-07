@@ -5008,8 +5008,24 @@ window.toggleCellAppliance = function(type) {
     updateToolbarButtonHighlights();
 };
 
+const _isHoneycombCompType = tp => tp === 'open_cell' || tp === 'side_open_cell';
+
+/** Clear space for a TV: inside the honeycomb frame boards when the cell has a honeycomb (matches the 3D frame). */
+function _tvCellSpace(col, r) {
+    const comp = col.compartments[r];
+    let w = col.width, h = _cellHeight(col, r);
+    if (comp && _isHoneycombCompType(comp.type)) {
+        const t = state.thickness || 1.7;
+        const below = col.compartments[r - 1], above = col.compartments[r + 1];
+        w -= 2 * t;
+        h -= (below && below.type === comp.type ? 0 : t) + (above && above.type === comp.type ? 0 : t);
+    }
+    return { w, h };
+}
+
+/** Whole-cell items (TV) replace the cell interior, except a honeycomb frame which they sit inside. */
 function _clearCompForWholeCellItem(comp, r, colIndex) {
-    comp.type = 'empty';
+    if (!_isHoneycombCompType(comp.type)) comp.type = 'empty';
     const hadPartition = !!comp.partition;
     delete comp.partition;
     delete comp.partitions;
@@ -5037,7 +5053,8 @@ window.toggleCellTv = function() {
         const comp = col.compartments[r];
         if (!comp) return;
         if (!turnOn) { delete comp.tv; changed++; return; }
-        const inch = window._tvLargestFit(col.width, _cellHeight(col, r));
+        const sp = _tvCellSpace(col, r);
+        const inch = window._tvLargestFit(sp.w, sp.h);
         if (!inch) { noFit = true; return; }
         comp.tv = { inch: inch };
         delete comp.appliances;
@@ -5075,8 +5092,8 @@ function _openTvSizeMenu(colIndex, rowIndex, anchor) {
     const col = state.columns[colIndex];
     const comp = col && col.compartments[rowIndex];
     if (!comp || !comp.tv) return;
-    const cellH = _cellHeight(col, rowIndex);
-    const shown = window._tvFits(comp.tv.inch, col.width, cellH) ? comp.tv.inch : window._tvLargestFit(col.width, cellH);
+    const sp = _tvCellSpace(col, rowIndex);
+    const shown = window._tvFits(comp.tv.inch, sp.w, sp.h) ? comp.tv.inch : window._tvLargestFit(sp.w, sp.h);
 
     const menu = document.createElement('div');
     menu.id = 'tv-size-menu';
@@ -5086,7 +5103,7 @@ function _openTvSizeMenu(colIndex, rowIndex, anchor) {
     grid.className = 'tv-size-grid';
     window.TV_SIZES.forEach(s => {
         const d = window._tvDims(s);
-        const fits = window._tvFits(s, col.width, cellH);
+        const fits = window._tvFits(s, sp.w, sp.h);
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'tv-size-opt' + (s === shown ? ' active' : '');
@@ -5219,7 +5236,7 @@ window.applyContentForce = function(type) {
             col.compartments[r].type = newType;
         }
         delete col.compartments[r].appliances;
-        delete col.compartments[r].tv;
+        if (!_isHoneycombCompType(newType)) delete col.compartments[r].tv;
 
         // Clear partition data when switching to types that are incompatible with partitions
         if (newType === 'external_drawers' || newType === 'hanging' || newType === 'sorbet' || newType === 'empty' ||
@@ -5519,7 +5536,7 @@ window.applyContent = function(type) {
         }
         if (newType !== 'empty') {
             delete col.compartments[r].appliances;
-            delete col.compartments[r].tv;
+            if (!_isHoneycombCompType(newType)) delete col.compartments[r].tv;
         }
 
         // Clear partition when switching to incompatible types
