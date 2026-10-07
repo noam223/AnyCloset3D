@@ -115,11 +115,19 @@
         return w[part] || w.materialBody || 'white_matte';
     }
 
+    function _glassTintSwatch() {
+        var w = (typeof getWing === 'function') ? getWing() : null;
+        var key = (typeof window._glassTintKey === 'function') ? window._glassTintKey(w) : 'clear';
+        var btn = document.querySelector('#materials-section .glass-tint-btn[data-tint="' + key + '"]');
+        return btn ? { image: btn.style.backgroundImage } : null;
+    }
+
     window._syncPartTabDots = function() {
         document.querySelectorAll('#materials-section .part-tab-btn[data-part]').forEach(function(btn) {
             var dot = btn.querySelector('.ptb-dot');
             if (!dot) return;
-            var sw = _swatchFor(_partMaterial(btn.getAttribute('data-part')));
+            var part = btn.getAttribute('data-part');
+            var sw = part === 'glassTint' ? _glassTintSwatch() : _swatchFor(_partMaterial(part));
             if (!sw) { dot.classList.remove('has'); return; }
             dot.style.backgroundImage = sw.image || 'none';
             dot.style.backgroundColor = sw.color || '#fff';

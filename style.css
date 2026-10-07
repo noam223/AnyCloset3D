@@ -1969,6 +1969,25 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); box-sha
 }
 .upload-btn { background: linear-gradient(135deg, var(--secondary), #7c3aed); color: white; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
 
+/* Glass tint tab: swaps the board colour swatches for the glass tints */
+.glass-tint-panel { display: none; }
+body.color-tab-glass .glass-tint-panel { display: block; }
+body.color-tab-glass #materials-section > :not(.section-title):not(.control-group):not(.glass-tint-panel),
+body.color-tab-glass #mobile-panel-materials .mobile-panel-body > :not(.color-part-tabs):not(.glass-tint-panel) {
+    display: none !important;
+}
+.glass-tint-btn {
+    width: 42px; height: 42px; border-radius: 50%; border: 2.5px solid transparent;
+    cursor: pointer; box-shadow: 0 2px 6px rgba(15,23,42,0.15);
+    transition: transform var(--transition-bounce), border-color var(--transition), box-shadow var(--transition);
+}
+.glass-tint-btn:hover { transform: translateY(-3px) scale(1.05); box-shadow: 0 6px 14px rgba(15,23,42,0.22); }
+.glass-tint-btn.active {
+    border-color: var(--secondary);
+    transform: scale(1.12);
+    box-shadow: 0 0 0 4px rgba(37,99,235,0.15), 0 4px 12px rgba(37,99,235,0.25);
+}
+
 #compartment-editor { background: var(--bg-light); padding: 18px; border-radius: var(--radius-md); border: 1px solid var(--border); display: none; }
 .doors-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
 .door-option-btn {

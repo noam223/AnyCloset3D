@@ -45,14 +45,93 @@ function _ledGrooveMats() {
     grad.addColorStop(1, 'rgba(255,205,90,0)');
     g.fillStyle = grad;
     g.fillRect(0, 0, 64, 4);
+    // Warm wash the strips throw onto the back of the cell: strongest beside each strip, fading to the
+    // middle and feathered at the ends of the run
+    const wcv = document.createElement('canvas');
+    wcv.width = 64; wcv.height = 64;
+    const wg = wcv.getContext('2d');
+    const across = wg.createLinearGradient(0, 0, 64, 0);
+    across.addColorStop(0, 'rgba(255,196,105,0.62)');
+    across.addColorStop(0.5, 'rgba(255,196,105,0.22)');
+    across.addColorStop(1, 'rgba(255,196,105,0.62)');
+    wg.fillStyle = across;
+    wg.fillRect(0, 0, 64, 64);
+    const along = wg.createLinearGradient(0, 0, 0, 64);
+    along.addColorStop(0, 'rgba(0,0,0,0)');
+    along.addColorStop(0.1, 'rgba(0,0,0,1)');
+    along.addColorStop(0.9, 'rgba(0,0,0,1)');
+    along.addColorStop(1, 'rgba(0,0,0,0)');
+    wg.globalCompositeOperation = 'destination-in';
+    wg.fillStyle = along;
+    wg.fillRect(0, 0, 64, 64);
     window._ledGrooveMatsCache = {
         groove: new THREE.MeshBasicMaterial({ color: 0x1e1e1e }),
         lens: new THREE.MeshBasicMaterial({ color: 0xffd36b }),
-        glow: new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false, side: THREE.DoubleSide })
+        glow: new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false, side: THREE.DoubleSide }),
+        wash: new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(wcv), transparent: true, depthWrite: false })
     };
     return window._ledGrooveMatsCache;
 }
 window._ledGrooveMats = _ledGrooveMats;
+
+/**
+ * LED-lit zones behind a glass panel, in the panel's UV space. boxes = [{x0,x1,y0,y1}] in the same
+ * coordinates as the panel rect (x0/x1 null = the whole panel width). ux0/ux1 are unclamped so the
+ * brightness stays anchored to the strips even when the panel covers only part of the cell.
+ */
+function _ledLitUV(boxes, px0, px1, py0, py1) {
+    const pw = px1 - px0, ph = py1 - py0;
+    if (!boxes || !boxes.length || pw <= 0 || ph <= 0) return [];
+    const out = [];
+    boxes.forEach(b => {
+        const bx0 = b.x0 == null ? px0 : b.x0, bx1 = b.x1 == null ? px1 : b.x1;
+        const y0 = Math.max(b.y0, py0), y1 = Math.min(b.y1, py1);
+        if (y1 - y0 < 1 || Math.min(bx1, px1) - Math.max(bx0, px0) < 1) return;
+        out.push({ ux0: (bx0 - px0) / pw, ux1: (bx1 - px0) / pw, v0: (y0 - py0) / ph, v1: (y1 - py0) / ph });
+    });
+    return out;
+}
+window._ledLitUV = _ledLitUV;
+
+/**
+ * Tint a glass panel material for its wing (שקוף / מושחר) and light it where LEDs burn behind it:
+ * warm glow on the glass, and smoked glass turns more see-through there so the lit cell reads through.
+ */
+function _applyGlassTint(mat, wing, lit) {
+    const tint = window.GLASS_TINTS && window.GLASS_TINTS[window._glassTintKey(wing)];
+    if (!tint) return mat;
+    if (tint.color != null) mat.color.setHex(tint.color);
+    if (tint.opacity != null) mat.opacity = tint.opacity;
+    if (lit && lit.length) {
+        const W = 32, H = 64;
+        const glowCv = document.createElement('canvas'), alphaCv = document.createElement('canvas');
+        glowCv.width = alphaCv.width = W;
+        glowCv.height = alphaCv.height = H;
+        const gg = glowCv.getContext('2d'), ag = alphaCv.getContext('2d');
+        gg.fillStyle = '#000'; gg.fillRect(0, 0, W, H);
+        ag.fillStyle = '#fff'; ag.fillRect(0, 0, W, H);
+        const rv = Math.round(255 * tint.reveal);
+        lit.forEach(r => {
+            const x0 = Math.max(0, r.ux0) * W, x1 = Math.min(1, r.ux1) * W;
+            const y = (1 - r.v1) * H, h = (r.v1 - r.v0) * H;
+            const grad = gg.createLinearGradient(r.ux0 * W, 0, r.ux1 * W, 0);
+            grad.addColorStop(0, '#fff');
+            grad.addColorStop(0.5, '#8a8a8a');
+            grad.addColorStop(1, '#fff');
+            gg.fillStyle = grad;
+            gg.fillRect(x0, y, x1 - x0, h);
+            ag.fillStyle = `rgb(${rv},${rv},${rv})`;
+            ag.fillRect(x0, y, x1 - x0, h);
+        });
+        mat.emissive = new THREE.Color(0xffc46b);
+        mat.emissiveMap = new THREE.CanvasTexture(glowCv);
+        mat.emissiveIntensity = tint.glow;
+        if (tint.reveal < 1) mat.alphaMap = new THREE.CanvasTexture(alphaCv);
+    }
+    mat.needsUpdate = true;
+    return mat;
+}
+window._applyGlassTint = _applyGlassTint;
 
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.95);
 scene.add(ambientLight);
@@ -4602,6 +4681,10 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
     const _slidingPartD = _isSlidingWardrobe ? (bodyD - _slidingPartSetback) : bodyD;
     const _slidingPartZ = _isSlidingWardrobe ? (-_slidingPartSetback / 2) : 0; // shift back so front face is 6cm behind cabinet front
     const backT = 0.5;
+    // LED-lit zones of this wing (build-group coords) — glass in front of them shows the light.
+    // Kept per wing so the sliding-door overlay, built afterwards, can read the center wing's zones.
+    const _ledLitBoxes = [];
+    (window._ledLitBoxesByWing = window._ledLitBoxesByWing || {})[state.activeWing] = _ledLitBoxes;
     const _shelfFrontSetback = 2; // cm — shelves stop 2cm short of cabinet front
     const isInset = (state.cabinetModel === 'ab2' || state.cabinetModel === 'ab2_nohoney');
     const _handleStyle = _getHandleStyle();
@@ -5751,6 +5834,12 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                 glow.renderOrder = 2;
                 _buildGroup.add(groove, lens, glow);
             });
+            // Light thrown onto the back of the cell; sits in front of a כוורת lining back board too
+            const wash = new THREE.Mesh(new THREE.PlaneGeometry(wallX * 2, h), mats.wash);
+            wash.position.set(colCenterX, yC, -bodyD / 2 + t + 0.75);
+            wash.renderOrder = 1;
+            _buildGroup.add(wash);
+            _ledLitBoxes.push({ x0: colCenterX - wallX, x1: colCenterX + wallX, y0: botY, y1: topY });
             if (window._captureLedIcons && typeof window._ledIconSprite === 'function') {
                 const icon = window._ledIconSprite();
                 icon.position.set(colCenterX + wallX - 6, topY - 7, bodyD / 2 + 2);
@@ -7355,6 +7444,9 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                     envMapIntensity: 1.2
                                 });
                                 if (window._hdrEnvMap) { glassMat.envMap = window._hdrEnvMap; glassMat.needsUpdate = true; }
+                                const glassCX = pivotX + doorLocalX;
+                                _applyGlassTint(glassMat, state, _ledLitUV(_ledLitBoxes,
+                                    glassCX - glassW / 2, glassCX + glassW / 2, dY - glassH / 2, dY + glassH / 2));
                                 const glassMesh = new THREE.Mesh(glassGeo, glassMat);
                                 glassMesh.position.set(doorLocalX, 0, fz);
                                 doorGroup.add(glassMesh);

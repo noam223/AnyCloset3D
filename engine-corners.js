@@ -224,10 +224,15 @@ function buildSlidingDoorCabinet(targetGroup) {
         const dy = plinthH + doorH / 2;
 
         // Per-door panel material
-        const thisDoorMat = _makeDoorMat(sd.doorPanels[i] || sd.doorPanelType || 'solid', i);
+        const panelType = sd.doorPanels[i] || sd.doorPanelType || 'solid';
+        const thisDoorMat = _makeDoorMat(panelType, i);
 
         const panelW = doorW - fT * 2 - 0.4;
         const panelH = doorH - fT * 2 - 0.4;
+        if (!isBP && panelType === 'glass') {
+            const litBoxes = window._ledLitBoxesByWing && window._ledLitBoxesByWing.center;
+            _applyGlassTint(thisDoorMat, wing, _ledLitUV(litBoxes, dx - panelW / 2, dx + panelW / 2, dy - panelH / 2, dy + panelH / 2));
+        }
         addBoxTo(doorsGroup, panelW, panelH, doorT, dx, dy, dz, thisDoorMat);
 
         const frameDz = dz + doorT / 2 + 0.15;
@@ -823,6 +828,8 @@ function buildFullCornerUnit(side, wingData) {
     }
 
     // ---- LED pairs: two glowing strips at the ends of the L opening, spanning the group's cells ----
+    // Lit rows light every glass door across the L (x null = full panel width)
+    const fcLitBoxes = [];
     if (!isBP && Array.isArray(fc.leds) && fc.leds.length) {
         const cellY = [plinthH + t, ...shelvesY, colH - t];
         const mats = window._ledGrooveMats();
@@ -830,6 +837,7 @@ function buildFullCornerUnit(side, wingData) {
             const yBot = cellY[g.startRow];
             const yTop = cellY[g.endRow + 1];
             if (yBot == null || yTop == null || yTop - yBot < 2) return;
+            fcLitBoxes.push({ x0: null, x1: null, y0: yBot, y1: yTop });
             const h = yTop - yBot - 1;
             const midY = (yBot + yTop) / 2;
             // Strip set into a groove in a wall face; `alongZ` = the face runs along Z (normal along X)
@@ -994,6 +1002,7 @@ function buildFullCornerUnit(side, wingData) {
                                 glassGeo.rotateY(Math.PI / 2);
                                 const glassMat = new THREE.MeshStandardMaterial({ color: 0xc8e6ff, transparent: true, opacity: 0.25, roughness: 0.0, metalness: 0.2, side: THREE.DoubleSide, depthWrite: false });
                                 if (window._hdrEnvMap) { glassMat.envMap = window._hdrEnvMap; glassMat.needsUpdate = true; }
+                                _applyGlassTint(glassMat, wingData, _ledLitUV(fcLitBoxes, 0, 1, midY - glassH2 / 2, midY + glassH2 / 2));
                                 const glassMesh = new THREE.Mesh(glassGeo, glassMat);
                                 glassMesh.position.set(fx, 0, 0);
                                 doorGroup.add(glassMesh);
@@ -1026,6 +1035,7 @@ function buildFullCornerUnit(side, wingData) {
                                 const glassGeo = new THREE.PlaneGeometry(glassW, glassH);
                                 const glassMat = new THREE.MeshStandardMaterial({ color: 0xc8e6ff, transparent: true, opacity: 0.25, roughness: 0.0, metalness: 0.2, side: THREE.DoubleSide, depthWrite: false });
                                 if (window._hdrEnvMap) { glassMat.envMap = window._hdrEnvMap; glassMat.needsUpdate = true; }
+                                _applyGlassTint(glassMat, wingData, _ledLitUV(fcLitBoxes, 0, 1, midY - glassH / 2, midY + glassH / 2));
                                 const glassMesh = new THREE.Mesh(glassGeo, glassMat);
                                 glassMesh.position.set(0, 0, fz1);
                                 doorGroup.add(glassMesh);

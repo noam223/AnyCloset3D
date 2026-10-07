@@ -38,6 +38,7 @@ function createWingData(overrides) {
         materialBack: 'white_matte',
         materialSideCabinet: 'white_matte',
         materialTopPanel: 'white_matte',
+        glassTint: 'clear',
         activeColorPart: 'materialBody',
         columns: [],
         wingPosition: 'side',
@@ -289,7 +290,7 @@ const _wingFields = [
     'cabinetModel','placement','width','globalHeight','depth','thickness','plinthHeight',
     'hasDoors','handleType','handleStyle','handleVariant','ridingColor','cabinetName','cabinetModelLabel','cabinetNotes','boardMaterial',
     'materialBody','materialInternal','materialExternal','materialDesk','materialOpenCell','materialBack',
-    'materialSideCabinet','materialTopPanel',
+    'materialSideCabinet','materialTopPanel','glassTint',
     'activeColorPart','columns','desk','corner','fullCorner','sideCabinet','manualPrice','manualInstallPrice',
     'slidingDoor'
 ];
@@ -1900,12 +1901,66 @@ function _compHasOpenCell(comp) {
     });
 }
 
+/**
+ * Glass door tints. color/opacity null = keep the builder's own clear-glass look.
+ * Over LED-lit cells `reveal` scales the glass opacity and `glow` is the warm light seen on it.
+ */
+const GLASS_TINTS = {
+    clear:  { label: 'שקוף',  color: null,     opacity: null, reveal: 1,    glow: 0.35 },
+    smoked: { label: 'מושחר', color: 0x16181b, opacity: 0.86, reveal: 0.45, glow: 1.1 }
+};
+window.GLASS_TINTS = GLASS_TINTS;
+window._glassTintKey = function(w) {
+    return (w && GLASS_TINTS[w.glassTint]) ? w.glassTint : 'clear';
+};
+window._glassTintLabel = function(w) {
+    return GLASS_TINTS[window._glassTintKey(w)].label;
+};
+
+const _GLASS_DOOR_STYLES = ['glass_melamine', 'glass_black', 'glass_gold'];
+/** True when the wing shows at least one glass door (hinged, full-corner or sliding panel). */
+function _wingHasGlass(w) {
+    if (!w || w.hasDoors === false) return false;
+    const sd = w.slidingDoor;
+    if (sd && sd.enabled) {
+        const n = sd.numDoors || 2;
+        return Array.from({ length: n }, (_, i) => (sd.doorPanels && sd.doorPanels[i]) || sd.doorPanelType)
+            .some(p => p === 'glass');
+    }
+    if ((w.columns || []).some(col => (col.doors || []).some(d => d && _GLASS_DOOR_STYLES.includes(d.style)))) return true;
+    const fc = w.fullCorner;
+    if (w.wingPosition === 'full_corner' && fc && Array.isArray(fc.compartments)) {
+        return fc.compartments.some(c => c && c.door !== 'empty' &&
+            _GLASS_DOOR_STYLES.includes(c.doorStyle || (c.type === 'door_glass' ? 'glass_melamine' : '')));
+    }
+    return false;
+}
+window._wingHasGlass = _wingHasGlass;
+
+/** Show the glass-tint swatches instead of the board colours while the "זכוכית" tab is active. */
+window._syncGlassTintPanel = function(w) {
+    if (!w) w = getWing();
+    document.body.classList.toggle('color-tab-glass', !!w && w.activeColorPart === 'glassTint');
+    const key = window._glassTintKey(w);
+    document.querySelectorAll('.glass-tint-btn').forEach(b => b.classList.toggle('active', b.dataset.tint === key));
+};
+
+window.setGlassTint = function(key) {
+    const w = getWing();
+    if (!w || !GLASS_TINTS[key]) return;
+    w.glassTint = key;
+    window._syncGlassTintPanel(w);
+    if (typeof window._syncPartTabDots === 'function') window._syncPartTabDots();
+    buildCabinet(); saveHistoryState();
+};
+
 window._activateColorPartTab = function(part) {
     const w = getWing();
     if (!w || !part) return;
     w.activeColorPart = part;
     document.querySelectorAll('.part-tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll(`.part-tab-btn[data-part="${part}"]`).forEach(b => b.classList.add('active'));
+    window._syncGlassTintPanel(w);
     if (typeof window._updateSandwichColorVisibility === 'function') window._updateSandwichColorVisibility();
     document.querySelectorAll('.material-btn').forEach(b => b.classList.remove('active'));
     const currentMat = w[part];
@@ -1961,6 +2016,7 @@ window._updateMaterialTabVisibility = function(w) {
         const currentMat = w[activePart] || w.materialBody || 'white_matte';
         const matBtn = document.querySelector(`.material-btn[data-mat="${currentMat}"]`);
         if (matBtn) matBtn.classList.add('active');
+        window._syncGlassTintPanel(w);
         return;
     }
 
@@ -1989,6 +2045,7 @@ window._updateMaterialTabVisibility = function(w) {
 
     // Upper unit color tab: show when NOT editing the upper unit inline and an upper unit exists for current wing
     const hasUpperUnit = !_isUUEdit && !!state.wings['upperUnit_' + _aw];
+    const hasGlass = _wingHasGlass(w);
 
     // Tab IDs: desktop and mobile
     const tabMap = {
@@ -2003,6 +2060,8 @@ window._updateMaterialTabVisibility = function(w) {
         'tab-materialTopPanel':     hasTopPanel,
         'mob-tab-materialTopPanel': hasTopPanel,
         'tab-materialUpperUnit':    hasUpperUnit,
+        'tab-glassTint':            hasGlass,
+        'mob-tab-glassTint':        hasGlass,
     };
 
     Object.entries(tabMap).forEach(([id, visible]) => {
@@ -2022,6 +2081,7 @@ window._updateMaterialTabVisibility = function(w) {
         const fallbackBtn = document.querySelector(`.material-btn[data-mat="${fallbackMat}"]`);
         if (fallbackBtn) fallbackBtn.classList.add('active');
     }
+    window._syncGlassTintPanel(w);
 };
 
 // ---- Apply material to upper unit (both body and external) ----

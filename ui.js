@@ -215,6 +215,22 @@ function _resolveOpenCellColorLabel(wings, fallbackKey) {
     return _colorKeyLabel(fallbackKey);
 }
 
+/** Glass tint of every wing that has glass doors (e.g. "מושחר"), or null when there is no glass. */
+function _resolveGlassTintLabel(rawState) {
+    const wings = rawState && rawState.wings;
+    if (!wings || typeof window._wingHasGlass !== 'function') return null;
+    const labels = [];
+    const addWing = function(wing) {
+        if (!wing || !window._wingHasGlass(wing)) return;
+        const label = window._glassTintLabel(wing);
+        if (labels.indexOf(label) < 0) labels.push(label);
+    };
+    Object.keys(wings).forEach(function(k) { addWing(wings[k]); });
+    const sc = wings.center && wings.center.sideCabinet;
+    if (sc && sc.side && sc.side !== 'none') addWing(sc);
+    return labels.length ? labels.join(', ') : null;
+}
+
 function _wingHasTopPanel(wing) {
     return !!(wing && Array.isArray(wing.columns) && wing.columns.some(function(col) { return col && col.topPanel; }));
 }
@@ -8564,9 +8580,11 @@ function bindUI() {
             document.querySelectorAll('.part-tab-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             state.activeColorPart = clickedPart;
+            window._syncGlassTintPanel();
             _updateSandwichColorVisibility();
 
             document.querySelectorAll('.material-btn').forEach(b => b.classList.remove('active'));
+            if (clickedPart === 'glassTint') return;
 
             // Special: "ארון צד" tab — show the side cabinet's current body color
             if (clickedPart === 'materialSideCabinet') {
@@ -8597,6 +8615,7 @@ function bindUI() {
         }
         // Store a sentinel so material-btn clicks know to apply to upper unit
         state.activeColorPart = 'materialUpperUnit';
+        window._syncGlassTintPanel();
         _updateSandwichColorVisibility();
         document.querySelectorAll('.material-btn').forEach(b => b.classList.remove('active'));
         const uuMat = uuWing.materialBody || 'white_matte';
@@ -13655,6 +13674,9 @@ function _collectWingPrintSpecRows(item, itemObj, unit) {
             value: _plainSpecValue(_colorKeyLabel(mat('materialOpenCell') || mat('materialBody') || 'white_matte'))
         });
     }
+    if (window._wingHasGlass(wing)) {
+        rows.push({ id: prefix + 'glassTint', label: 'גוון זכוכית', value: window._glassTintLabel(wing) });
+    }
     if (_wingHasTopPanel(wing)) {
         rows.push({
             id: prefix + 'colorTopPanel',
@@ -13784,6 +13806,8 @@ function _collectPrintSpecRows(item, itemObj) {
         rows.push({ id: 'colorBack', label: 'צבע גב ארון', value: _plainSpecValue((item.colorBack && item.colorBack !== 'undefined') ? item.colorBack : 'לבן מט') });
         if (_formatDeskAddition(item, itemObj).desk !== 'ללא') rows.push({ id: 'colorDesk', label: 'צבע שולחן עבודה', value: _plainSpecValue(item.colorDesk) });
         if (item.hasOpenCells) rows.push({ id: 'colorOpenCell', label: 'צבע כוורת', value: _plainSpecValue(item.colorOpenCell) });
+        const glassTint = itemObj && _resolveGlassTintLabel(itemObj.rawState);
+        if (glassTint) rows.push({ id: 'glassTint', label: 'גוון זכוכית', value: glassTint });
         const topPanelColor = itemObj && _resolveTopPanelColorLabel(itemObj.rawState);
         if (topPanelColor) rows.push({ id: 'colorTopPanel', label: 'צבע משטח עליון', value: _plainSpecValue(topPanelColor) });
         if (item.extraColors) rows.push({ id: 'extraColors', label: 'צבעים נוספים בארון', value: _plainSpecValue(item.extraColors) });
@@ -14045,7 +14069,7 @@ function _buildCompactCabinetSpecHtml(opts) {
 }
 
 const _MU_STRUCT_KEYS = ['material', 'plinthType'];
-const _MU_FINISH_KEYS = ['colorBody', 'colorInternal', 'colorExternal', 'colorBack', 'colorOpenCell', 'colorTopPanel', 'handle'];
+const _MU_FINISH_KEYS = ['colorBody', 'colorInternal', 'colorExternal', 'colorBack', 'colorOpenCell', 'glassTint', 'colorTopPanel', 'handle'];
 
 function _muParseCount(row, isLed) {
     if (!row) return 0;
@@ -14680,6 +14704,8 @@ function _printFinishesRows(item, itemObj, thStyle, tdStyle, sectionStyle) {
     html += _printTr(thStyle, tdStyle, 'צבע גב ארון', (item.colorBack && item.colorBack !== 'undefined') ? item.colorBack : 'לבן מט');
     if (_formatDeskAddition(item, itemObj).desk !== 'ללא') html += _printTr(thStyle, tdStyle, 'צבע שולחן עבודה', item.colorDesk);
     if (item.hasOpenCells) html += _printTr(thStyle, tdStyle, 'צבע כוורת', item.colorOpenCell);
+    const glassTint = itemObj && _resolveGlassTintLabel(itemObj.rawState);
+    if (glassTint) html += _printTr(thStyle, tdStyle, 'גוון זכוכית', glassTint);
     const topPanelColor = itemObj && _resolveTopPanelColorLabel(itemObj.rawState);
     if (topPanelColor) html += _printTr(thStyle, tdStyle, 'צבע משטח עליון', topPanelColor);
     if (item.extraColors) html += _printTr(thStyle, tdStyle, 'צבעים נוספים בארון', item.extraColors);
@@ -16364,6 +16390,8 @@ function _buildCustomerSummaryDetails(itemObj) {
     if ((content.openCells + content.sideOpenCells) > 0 && colorOpenCell) {
         details.push('צבע כוורת: ' + colorOpenCell);
     }
+    const glassTint = _resolveGlassTintLabel(rawState);
+    if (glassTint) details.push('גוון זכוכית: ' + glassTint);
     const colorTopPanel = _resolveTopPanelColorLabel(rawState);
     if (colorTopPanel) details.push('צבע משטח עליון: ' + colorTopPanel);
     if (item.extraColors) details.push('צבעים נוספים: ' + item.extraColors);
