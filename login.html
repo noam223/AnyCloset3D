@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>כניסה | AnyCloset 3D</title>
+    <script src="analytics.js"></script>
     <link rel="icon" type="image/png" href="images/icon-logo.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -853,7 +854,7 @@ async function handleRegister() {
         return;
     }
 
-    // Account created — show payment step
+    window.trackPlan('sign_up', _selectedPlanKey, { method: 'email', user_type: _selectedUserType });
     goToStep4();
 }
 
@@ -885,6 +886,7 @@ async function goToStep4() {
                 }));
             } catch (eStore) {}
         }
+        window.trackPlan('start_trial', _selectedPlanKey, { user_type: _selectedUserType });
         document.getElementById('step4-desc').textContent = '✅ תקופת הניסיון הופעלה! מעביר אותך למערכת...';
         document.getElementById('step4-spinner').style.display = 'none';
         setTimeout(function() {

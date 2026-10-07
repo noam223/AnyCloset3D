@@ -133,6 +133,8 @@ var _USER_TYPE_LABELS = {
             showToast('🎉 ברוך הבא! 7 ימי ניסיון חינמיים הופעלו.' + extra, 'success');
         }, 600);
     } else if (_urlStatus === 'payment_success') {
+        var paidPlan = new URLSearchParams(window.location.search).get('plan') || (plan && plan.key);
+        window.trackPlan('purchase', paidPlan, { transaction_id: (user && user.id ? user.id : 'u') + '-' + paidPlan + '-' + new Date().toISOString().slice(0, 10) });
         history.replaceState(null, '', 'projects.html');
         setTimeout(function() {
             showToast('✅ התשלום התקבל! המנוי שלך פעיל. ברוך הבא!', 'success');
@@ -386,11 +388,13 @@ window._annualToggle = _annualToggle;
 // ── Open payment via Make Scenario 1 (creates Grow payment link dynamically) ──
 async function _openPayment(planKey, installments) {
     if (String(planKey).indexOf('company_') === 0) {
+        window.track('generate_lead', { plan: planKey, method: 'whatsapp' });
         var waText = 'שלום, אני מעוניין במסלול החברות של AnyCloset 3D (' + planKey + ')';
         window.open('https://wa.me/972546659798?text=' + encodeURIComponent(waText), '_blank', 'noopener');
         return;
     }
     installments = installments || 1;
+    window.trackPlan('begin_checkout', planKey);
     var SCENARIO1_WEBHOOK = 'https://hook.eu1.make.com/2p1w789m4oeh3glw0pry61y0dd6vnlvd';
 
     // If webhook not configured yet, go to pricing page
