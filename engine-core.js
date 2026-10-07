@@ -5785,9 +5785,20 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
             }
             // Knee space above the desk is not a compartment row — its LED pair is a column flag
             const _deskZoneTop = col.deskHeight + col.deskClearance;
-            if (!isBP && col.deskLeds) _addLedPair(col.deskHeight, _deskZoneTop, col.width / 2 - 0.9);
+            if (!isBP && col.deskHoneycomb) {
+                // Same lining frame as a regular כוורת block: boards of thickness t inside the knee space
+                const zH = col.deskClearance, zC = col.deskHeight + zH / 2;
+                _ppPartId = `opencell_desk_c${c}`;
+                createBoard(col.width, t, bodyD - 2, colCenterX, _deskZoneTop - t / 2, 1, matOpenCell);
+                createBoard(col.width, t, bodyD - 2, colCenterX, col.deskHeight + t / 2, 1, matOpenCell);
+                createBoard(col.width, zH - 2 * t, t, colCenterX, zC, -bodyD / 2 + t / 2 + 0.6, matOpenCell);
+                [-1, 1].forEach(s => createBoard(t, zH - 2 * t, bodyD - 2, colCenterX + s * (col.width / 2 - t / 2), zC, 1, matOpenCell));
+                _ppPartId = '';
+            }
+            if (!isBP && col.deskLeds) _addLedPair(col.deskHeight, _deskZoneTop, col.width / 2 - (col.deskHoneycomb ? t : 0) - 0.9);
             if (!isBP && _isActiveWingBuild) {
                 state.dimData.push({ isDeskLedBtn: true, colIndex: c, on: !!col.deskLeds, x: colCenterX + col.width / 2 - 9, y: _deskZoneTop - 9 });
+                state.dimData.push({ isDeskHoneycombBtn: true, colIndex: c, on: !!col.deskHoneycomb, x: colCenterX - col.width / 2 + 9, y: _deskZoneTop - 9 });
             }
         } else {
             // For sliding wardrobes and noPlinth columns: back panel starts above the bottom board (y=t).

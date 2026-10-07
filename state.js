@@ -1974,8 +1974,8 @@ window._updateMaterialTabVisibility = function(w) {
     const hasDesk = (w.desk && w.desk.side !== 'none') ||
                     (w.columns && w.columns.some(c => c.type === 'desk')) ||
                     (w.corner && w.corner.side !== 'none' && w.corner.type === 'desk');
-    const hasOpenCell = w.columns && w.columns.some(col =>
-        col.compartments && col.compartments.some(comp => _compHasOpenCell(comp)));
+    const hasOpenCell = w.columns && w.columns.some(col => (col.type === 'desk' && col.deskHoneycomb) ||
+        (col.compartments && col.compartments.some(comp => _compHasOpenCell(comp))));
     const hasDoors = w.hasDoors;
     const hasExternalDrawers = w.columns && w.columns.some(col =>
         col.compartments && col.compartments.some(comp =>
@@ -5113,6 +5113,7 @@ function _calcWingCost(cfg, wing) {
             if (comp && (comp.type==='open_cell'||comp.type==='side_open_cell')) { if(!inBlock){openCellBlocks++;inBlock=true;} } else { inBlock=false; }
             if (comp && comp.partition) { partitionBlocks += Array.isArray(comp.partitions)?comp.partitions.length:1; }
         });
+        if (col.type === 'desk' && col.deskHoneycomb) openCellBlocks++;
     });
     if (wEffectiveModel==='ab2' && openCellBlocks>0) openCellBlocks--;
     finalCost += openCellBlocks*_priceNum(ex.openCell, 400);

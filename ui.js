@@ -185,6 +185,7 @@ function _compHasOpenCellContent(comp) {
 function _wingHasOpenCellContent(wing) {
     if (!wing || !Array.isArray(wing.columns)) return false;
     return wing.columns.some(function(col) {
+        if (col && col.type === 'desk' && col.deskHoneycomb) return true;
         return col && Array.isArray(col.compartments) && col.compartments.some(_compHasOpenCellContent);
     });
 }
@@ -530,7 +531,7 @@ window.toggleInternalDesk = function() {
     const col = state.columns[state.activeEditCol];
     if (col.type === 'desk') {
         col.type = 'normal';
-        delete col.deskHeight; delete col.deskClearance; delete col.hasDrawers; delete col.drawerHeight; delete col.deskLeds;
+        delete col.deskHeight; delete col.deskClearance; delete col.hasDrawers; delete col.drawerHeight; delete col.deskLeds; delete col.deskHoneycomb;
     } else {
         col.type = 'desk';
         col.deskHeight = 80;
@@ -788,7 +789,7 @@ function buildDimensionsAndButtonsUI() {
         if (d.isHoneycombMergeBtn) return;
         if (d.isDeskDrawerMergeBtn) return;
         if (d.isTvSizeBtn) return;
-        if (d.isDeskLedBtn) return;
+        if (d.isDeskLedBtn || d.isDeskHoneycombBtn) return;
 
         // ---- Column width label above each column (editable) ----
         if (d.isColWidth) {
@@ -1201,18 +1202,21 @@ function buildDimensionsAndButtonsUI() {
             dimLayer.appendChild(btn);
         });
 
-        state.dimData.filter(d => d.isDeskLedBtn).forEach(d => {
+        state.dimData.filter(d => d.isDeskLedBtn || d.isDeskHoneycombBtn).forEach(d => {
+            const isLed = !!d.isDeskLedBtn;
             const btn = document.createElement('div');
-            btn.className = 'desk-led-btn' + (d.on ? ' on' : '');
+            btn.className = 'desk-led-btn' + (isLed ? '' : ' is-honeycomb') + (d.on ? ' on' : '');
             btn.dataset.x3d = d.x;
             btn.dataset.y3d = d.y;
-            btn.title = d.on ? 'הסר זוג לדים מעל השולחן' : 'הוסף זוג לדים מעל השולחן';
-            btn.innerHTML = '<i class="fa-' + (d.on ? 'solid' : 'regular') + ' fa-lightbulb"></i>' + (d.on ? '' : '<span>+</span>');
+            const what = isLed ? 'זוג לדים' : 'כוורת';
+            btn.title = (d.on ? 'הסר ' : 'הוסף ') + what + ' מעל השולחן';
+            const icon = isLed ? (d.on ? 'fa-solid fa-lightbulb' : 'fa-regular fa-lightbulb') : 'fa-regular fa-square-full';
+            btn.innerHTML = '<i class="' + icon + '"></i>' + (d.on ? '' : '<span>+</span>');
             btn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); });
             btn.addEventListener('pointerup', e => e.stopPropagation());
             btn.addEventListener('click', e => {
                 e.stopPropagation();
-                window.toggleDeskLeds(d.colIndex);
+                if (isLed) window.toggleDeskLeds(d.colIndex); else window.toggleDeskHoneycomb(d.colIndex);
             });
             dimLayer.appendChild(btn);
         });
@@ -2278,6 +2282,7 @@ function _serializeColumnForClipboard(col) {
         drawerHeight:  col.drawerHeight,
         deskDrawerCount: col.deskDrawerCount,
         deskLeds:      !!col.deskLeds,
+        deskHoneycomb: !!col.deskHoneycomb,
     };
 }
 
@@ -2314,8 +2319,10 @@ function _applyColumnClipboard(target, src) {
         target.drawerHeight   = srcCopy.drawerHeight;
         target.deskDrawerCount = srcCopy.deskDrawerCount;
         if (srcCopy.deskLeds) target.deskLeds = true; else delete target.deskLeds;
+        if (srcCopy.deskHoneycomb) target.deskHoneycomb = true; else delete target.deskHoneycomb;
     } else {
         delete target.deskLeds;
+        delete target.deskHoneycomb;
         delete target.deskHeight;
         delete target.deskClearance;
         delete target.hasDrawers;
@@ -2655,8 +2662,10 @@ window._applyColumnTemplateToCol = function(target, tplData) {
         target.drawerHeight = src.drawerHeight;
         target.deskDrawerCount = src.deskDrawerCount;
         if (src.deskLeds) target.deskLeds = true; else delete target.deskLeds;
+        if (src.deskHoneycomb) target.deskHoneycomb = true; else delete target.deskHoneycomb;
     } else {
         delete target.deskLeds;
+        delete target.deskHoneycomb;
         delete target.deskHeight;
         delete target.deskClearance;
         delete target.hasDrawers;
@@ -5755,6 +5764,14 @@ window.toggleDeskLeds = function(colIndex) {
     const col = state.columns[colIndex];
     if (!col || col.type !== 'desk') return;
     if (col.deskLeds) delete col.deskLeds; else col.deskLeds = true;
+    buildCabinet(); calculatePrice(); saveHistoryState();
+};
+
+/** Regular כוורת lining frame in the knee space above an internal desk (priced/counted as one honeycomb unit). */
+window.toggleDeskHoneycomb = function(colIndex) {
+    const col = state.columns[colIndex];
+    if (!col || col.type !== 'desk') return;
+    if (col.deskHoneycomb) delete col.deskHoneycomb; else col.deskHoneycomb = true;
     buildCabinet(); calculatePrice(); saveHistoryState();
 };
 
@@ -13334,6 +13351,7 @@ function _countCabinetContent(columns) {
     columns.forEach(function(col) {
         counts.shelves += col.shelves || 0;
         (col.compartments || []).forEach(function(comp) { _accumulateCompContentCounts(counts, comp); });
+        if (col.type === 'desk' && col.deskHoneycomb) counts.openCells++;
     });
     return counts;
 }

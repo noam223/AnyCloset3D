@@ -1267,6 +1267,17 @@ function _bpDrawColLeds(p, col, rowBounds, x, w, botSvgY, sc, font) {
     }
 }
 
+/** Regular כוורת frame in the knee space above an internal desk. ctx = the column's _bpDrawHoneycombBlock ctx. */
+function _bpDrawDeskHoneycomb(p, col, ctx) {
+    if (col.type !== 'desk' || !col.deskHoneycomb) return;
+    const deskH = col.deskHeight || 80;
+    _bpDrawHoneycombBlock(p, Object.assign({}, ctx, {
+        block: { type: 'open_cell', startR: 0, endR: 0 },
+        rowBounds: [deskH, deskH + (col.deskClearance || 80)],
+        dimKeyPrefix: 'c' + ctx.ci + 'desk'
+    }));
+}
+
 function _bpIsDoorZoneType(t) {
     return t === 'door_right' || t === 'door_left' || t === 'door_double' || t === 'door_flap';
 }
@@ -2451,17 +2462,19 @@ window._generateMultiViewBlueprintSVG = function() {
                         { x: colX, y: cellY1, w: colW, h: cellH });
                 }
             }
+            const _hcCtxOld = {
+                colX, colW, sc, colBotSvgY: _colBotY, rowBounds: rowBoundsEarly, ci, numCols: cols.length,
+                boardFill: '#94a3b8', strokeThin: STROKE_THIN, stroke: STROKE, font: FONT,
+                viewKey: _bpViewKey,
+                cols, wg, pH: colPlinthH, fo: _fo, ox, dW, wgW: wg.w,
+                makeRectFn: (pp, x, y, w, h, fill, stroke, sw) => rect(x, y, w, h, fill, stroke, sw),
+                makeShelfFn: (pp, x1, sy, x2, scc, tCm, showLabel) => shelfLine(x1, sy, x2, scc, tCm, showLabel)
+            };
             _hcBlocksOld.forEach(block => {
                 _bpMarkBlockAdjacentMerges(block, rowBoundsEarly, _fo, cols, ci, wg, colPlinthH);
-                _bpDrawHoneycombBlock(p, {
-                    block, colX, colW, sc, colBotSvgY: _colBotY, rowBounds: rowBoundsEarly, ci, numCols: cols.length,
-                    boardFill: '#94a3b8', strokeThin: STROKE_THIN, stroke: STROKE, font: FONT,
-                    viewKey: _bpViewKey,
-                    cols, wg, pH: colPlinthH, fo: _fo, ox, dW, wgW: wg.w,
-                    makeRectFn: (pp, x, y, w, h, fill, stroke, sw) => rect(x, y, w, h, fill, stroke, sw),
-                    makeShelfFn: (pp, x1, sy, x2, scc, tCm, showLabel) => shelfLine(x1, sy, x2, scc, tCm, showLabel)
-                });
+                _bpDrawHoneycombBlock(p, Object.assign({ block }, _hcCtxOld));
             });
+            _bpDrawDeskHoneycomb(p, col, _hcCtxOld);
             _bpDrawColLeds(p, col, rowBoundsEarly, colX, colW, _colBotY, sc, FONT);
             colX += colW;
         });
@@ -3442,16 +3455,18 @@ window._generateMultiViewBlueprintPages = function() {
                         { x: colX, y: cellY1, w: colW, h: cellH });
                 }
             }
+            const _hcCtx = {
+                colX, colW, sc, colBotSvgY: _colBotSvgY, rowBounds, ci, numCols: cols.length,
+                boardFill: '#94a3b8', strokeThin: STROKE_THIN, stroke: STROKE, font: FONT,
+                viewKey: _bpViewKey,
+                cols, wg, pH: colPlinthH, fo: _fo2, ox, dW, wgW: wg.w,
+                makeRectFn: makeRect, makeShelfFn: makeShelfLine
+            };
             _hcBlocks.forEach(block => {
                 _bpMarkBlockAdjacentMerges(block, rowBounds, _fo2, cols, ci, wg, colPlinthH);
-                _bpDrawHoneycombBlock(p, {
-                    block, colX, colW, sc, colBotSvgY: _colBotSvgY, rowBounds, ci, numCols: cols.length,
-                    boardFill: '#94a3b8', strokeThin: STROKE_THIN, stroke: STROKE, font: FONT,
-                    viewKey: _bpViewKey,
-                    cols, wg, pH: colPlinthH, fo: _fo2, ox, dW, wgW: wg.w,
-                    makeRectFn: makeRect, makeShelfFn: makeShelfLine
-                });
+                _bpDrawHoneycombBlock(p, Object.assign({ block }, _hcCtx));
             });
+            _bpDrawDeskHoneycomb(p, col, _hcCtx);
             _bpDrawColLeds(p, col, rowBounds, colX, colW, _colBotSvgY, sc, FONT);
             colX += colW;
         });

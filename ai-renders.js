@@ -709,6 +709,10 @@ function _getCabinetSpec() {
         var sideOpenDir = null; // 'left', 'right', or 'both'
         if (wing && wing.columns) {
             wing.columns.forEach(function(col, colIdx) {
+                if (col.type === 'desk' && col.deskHoneycomb) {
+                    hasOpenCells = true;
+                    openCellCount++;
+                }
                 if (col.compartments) {
                     col.compartments.forEach(function(comp, rowIdx) {
                         if (comp && comp.type === 'open_cell') {
