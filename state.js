@@ -4541,6 +4541,12 @@ function _deskSurfaceThickness(hasDrawers, thicknessCm) {
     return hasDrawers ? t : DESK_SURFACE_T_NO_DRAWERS;
 }
 window._deskSurfaceThickness = _deskSurfaceThickness;
+/** Internal (column) desk: a כוורת above it shares its bottom board with the desk → one 28mm board. */
+function _internalDeskSurfaceT(col, thicknessCm) {
+    if (col && col.deskHoneycomb) return DESK_SURFACE_T_NO_DRAWERS;
+    return _deskSurfaceThickness(!!(col && col.hasDrawers), thicknessCm);
+}
+window._internalDeskSurfaceT = _internalDeskSurfaceT;
 /** @deprecated use _deskSurfaceThickness — kept as 28mm fallback for no-drawer desks */
 const DESK_SURFACE_T = DESK_SURFACE_T_NO_DRAWERS;
 

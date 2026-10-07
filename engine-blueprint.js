@@ -12,6 +12,12 @@ function _bpDeskSurfaceT(hasDrawers) {
     return hasDrawers ? t : 2.8;
 }
 
+/** Internal desk surface — 28mm when a כוורת above shares it as its bottom board. */
+function _bpInternalDeskSurfaceT(col) {
+    if (typeof window._internalDeskSurfaceT === 'function') return window._internalDeskSurfaceT(col);
+    return col && col.deskHoneycomb ? 2.8 : _bpDeskSurfaceT(!!(col && col.hasDrawers));
+}
+
 function _bpCenterSideDesk(cw) {
     const wing = cw || (state.wings && state.wings.center);
     const desk = (wing && wing.desk) || state.desk;
@@ -1274,7 +1280,8 @@ function _bpDrawDeskHoneycomb(p, col, ctx) {
     _bpDrawHoneycombBlock(p, Object.assign({}, ctx, {
         block: { type: 'open_cell', startR: 0, endR: 0 },
         rowBounds: [deskH, deskH + (col.deskClearance || 80)],
-        dimKeyPrefix: 'c' + ctx.ci + 'desk'
+        dimKeyPrefix: 'c' + ctx.ci + 'desk',
+        noBottomBoard: true
     }));
 }
 
@@ -1373,7 +1380,8 @@ function _bpDrawHoneycombBlock(p, ctx) {
         block, colX, colW, sc, colBotSvgY, rowBounds, ci, numCols,
         boardFill, strokeThin, stroke, font, makeRectFn, makeShelfFn,
         viewKey, dimKeyPrefix,
-        cols, wg, pH, fo, ox, dW, wgW
+        cols, wg, pH, fo, ox, dW, wgW,
+        noBottomBoard
     } = ctx;
     // Merged runs are drawn once from the leftmost column (same as 3D)
     if (block && block.mergeLeft) return;
@@ -1416,7 +1424,7 @@ function _bpDrawHoneycombBlock(p, ctx) {
 
     // Inner face of the double top/bottom boards (matches 3D: boards of thickness t inside the cell)
     const sideTopSvg = blockTopSvg + tPx;
-    const sideBotSvg = blockBotSvg - tPx;
+    const sideBotSvg = noBottomBoard ? blockBotSvg : blockBotSvg - tPx;
     const sideH = sideBotSvg - sideTopSvg;
     if (sideH < 1) return;
 
@@ -1430,7 +1438,7 @@ function _bpDrawHoneycombBlock(p, ctx) {
     const frameW = frameX2 - frameX1;
     if (frameW > 2) {
         makeRectFn(p, frameX1, blockTopSvg, frameW, tPx, boardFill, strokeThin, 1);
-        makeRectFn(p, frameX1, blockBotSvg - tPx, frameW, tPx, boardFill, strokeThin, 1);
+        if (!noBottomBoard) makeRectFn(p, frameX1, blockBotSvg - tPx, frameW, tPx, boardFill, strokeThin, 1);
         if (frameW > 16) {
             p.push(`<text x="${((frameX1 + frameX2) / 2).toFixed(1)}" y="${(blockTopSvg + tPx / 2 + 3).toFixed(1)}" text-anchor="middle" font-family="${font}" font-size="8" fill="${stroke}" opacity="0.62">${tMm}</text>`);
         }
@@ -1462,12 +1470,12 @@ function _bpDrawHoneycombBlock(p, ctx) {
         if (botCmR == null || topCmR == null) continue;
         const isStart = ri === block.startR;
         const isEnd = ri === block.endR;
-        const innerCm = _bpHoneycombCubbyInnerCm(botCmR, topCmR, tCm, isStart, isEnd);
+        const innerCm = _bpHoneycombCubbyInnerCm(botCmR, topCmR, tCm, isStart, isEnd) + (isStart && noBottomBoard ? tCm : 0);
         if (innerCm <= 0) continue;
         let yTop = colBotSvgY - topCmR * sc;
         let yBot = colBotSvgY - botCmR * sc;
         if (isEnd) yTop += tPx;
-        if (isStart) yBot -= tPx;
+        if (isStart && !noBottomBoard) yBot -= tPx;
         if (!isEnd) yTop += tPx / 2;
         if (!isStart) yBot -= tPx / 2;
         const dimX = shelfX1 + 10;
@@ -2325,7 +2333,7 @@ window._generateMultiViewBlueprintSVG = function() {
                 rect(colX, openTop, colW, openBot - openTop, 'white', STROKE_THIN, 0.5);
                 // Desk surface line
                 p.push(`<line x1="${colX.toFixed(1)}" y1="${openTop.toFixed(1)}" x2="${(colX+colW).toFixed(1)}" y2="${openTop.toFixed(1)}" stroke="${STROKE}" stroke-width="1.5"/>`);
-                const deskSurfCm = _bpDeskSurfaceT(!!col.hasDrawers);
+                const deskSurfCm = _bpInternalDeskSurfaceT(col);
                 const deskSurfPx = deskSurfCm * sc;
                 // Drawers below desk surface
                 if (col.hasDrawers) {
@@ -3330,7 +3338,7 @@ window._generateMultiViewBlueprintPages = function() {
                 makeRect(p, colX, openTop, colW, openBot - openTop, 'white', STROKE_THIN, 0.5);
                 // Desk surface line
                 p.push(`<line x1="${colX.toFixed(1)}" y1="${openTop.toFixed(1)}" x2="${(colX+colW).toFixed(1)}" y2="${openTop.toFixed(1)}" stroke="${STROKE}" stroke-width="1.5"/>`);
-                const deskSurfCm = _bpDeskSurfaceT(!!col.hasDrawers);
+                const deskSurfCm = _bpInternalDeskSurfaceT(col);
                 const deskSurfPx = deskSurfCm * sc;
                 // Drawers below desk surface
                 if (col.hasDrawers) {

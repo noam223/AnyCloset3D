@@ -5759,11 +5759,14 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         };
 
         if (isDesk) {
-            const colDeskT = _deskT(!!col.hasDrawers);
+            // With a כוורת above, the desk doubles as its bottom board: one 28mm board in the כוורת colour
+            const colDeskT = (typeof window._internalDeskSurfaceT === 'function')
+                ? window._internalDeskSurfaceT(col, t) : _deskT(!!col.hasDrawers);
             // Desk surface protrudes forward to align with door-face line (17mm w/ drawers, 28mm without)
-            const deskProtrude = colDeskT;
+            const deskProtrude = _deskT(!!col.hasDrawers);
             _ppPartId = `desk_surface_c${c}`;
-            createBoard(col.width, colDeskT, bodyD + deskProtrude, colCenterX, col.deskHeight - colDeskT/2, deskProtrude / 2, matDesk);
+            createBoard(col.width, colDeskT, bodyD + deskProtrude, colCenterX, col.deskHeight - colDeskT/2, deskProtrude / 2,
+                (!isBP && col.deskHoneycomb) ? matOpenCell : matDesk);
             _ppPartId = '';
             if(!isBP && _isActiveWingBuild) {
                 state.dimData.push({ isInternalDeskSurface: true, colIndex: c, x: colCenterX, y: col.deskHeight/2, h: col.deskHeight });
@@ -5775,9 +5778,6 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                 const drawerWidth = (col.width - gap*(numDrawers+1)) / numDrawers;
                 const drawerBottomY = col.deskHeight - colDeskT - col.drawerHeight;
                 const drawerCenterY = drawerBottomY + col.drawerHeight/2;
-                _ppPartId = `desk_drawer_bottom_c${c}`;
-                createBoard(col.width, colDeskT, bodyD - 2, colCenterX, drawerBottomY + colDeskT/2, 0, matDesk);
-                _ppPartId = '';
                 for(let i=0; i<numDrawers; i++) {
                     let innerStartX = colCenterX - col.width/2;
                     let dx = innerStartX + gap + drawerWidth/2 + i * (drawerWidth + gap);
@@ -5826,13 +5826,12 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                 state.dimData.push({ isDeskZoneCell: true, colIndex: c, rowIndex: -1, x: colCenterX, y: col.deskHeight + col.deskClearance / 2, h: col.deskClearance });
             }
             if (!isBP && col.deskHoneycomb) {
-                // Same lining frame as a regular כוורת block: boards of thickness t inside the knee space
-                const zH = col.deskClearance, zC = col.deskHeight + zH / 2;
+                // Same lining frame as a regular כוורת block, minus the bottom board (the desk surface is it)
+                const sideH = col.deskClearance - t, sideC = col.deskHeight + sideH / 2;
                 _ppPartId = `opencell_desk_c${c}`;
                 createBoard(col.width, t, bodyD - 2, colCenterX, _deskZoneTop - t / 2, 1, matOpenCell);
-                createBoard(col.width, t, bodyD - 2, colCenterX, col.deskHeight + t / 2, 1, matOpenCell);
-                createBoard(col.width, zH - 2 * t, t, colCenterX, zC, -bodyD / 2 + t / 2 + 0.6, matOpenCell);
-                [-1, 1].forEach(s => createBoard(t, zH - 2 * t, bodyD - 2, colCenterX + s * (col.width / 2 - t / 2), zC, 1, matOpenCell));
+                createBoard(col.width, sideH, t, colCenterX, sideC, -bodyD / 2 + t / 2 + 0.6, matOpenCell);
+                [-1, 1].forEach(s => createBoard(t, sideH, bodyD - 2, colCenterX + s * (col.width / 2 - t / 2), sideC, 1, matOpenCell));
                 _ppPartId = '';
             }
             if (!isBP && col.deskLeds) _addLedPair(col.deskHeight, _deskZoneTop, col.width / 2 - (col.deskHoneycomb ? t : 0));
