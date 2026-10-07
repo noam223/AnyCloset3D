@@ -11,6 +11,8 @@ const PLAN_MAX_AGENTS: Record<string, number> = {
   company_standard: 5,
   company_enterprise: 15,
 };
+// Mirrors TRIAL_LIMITS.maxAgents in auth.js (admin counts as one).
+const TRIAL_MAX_AGENTS = 2;
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -72,12 +74,15 @@ serve(async (req: Request) => {
     .eq('company_id', company.id)
     .eq('is_active', true);
 
+  const isTrial = me.subscription_status === 'trial';
+  const trialExpired = isTrial && !!me.trial_ends_at && new Date(me.trial_ends_at) <= new Date();
   const unlimitedAgents = company.max_agents === 0;
+  const planMaxAgents = PLAN_MAX_AGENTS[me.plan || ''] || 5;
   const maxAgents = unlimitedAgents
     ? 0
     : (company.max_agents != null
       ? Number(company.max_agents)
-      : (PLAN_MAX_AGENTS[me.plan || ''] || 5));
+      : (isTrial ? Math.min(planMaxAgents, TRIAL_MAX_AGENTS) : planMaxAgents));
 
   const action = String(body.action || 'list');
 
@@ -117,8 +122,15 @@ serve(async (req: Request) => {
     const fullName = String(body.full_name || username).trim();
     if (username.length < 2) return json({ error: 'שם משתמש קצר מדי' }, 400);
     if (password.length < 6) return json({ error: 'הסיסמה חייבת לפחות 6 תווים' }, 400);
+    if (trialExpired) {
+      return json({ error: 'תקופת הניסיון הסתיימה. שדרגו למנוי כדי להוסיף סוכנים.' }, 403);
+    }
     if (!unlimitedAgents && (activeCount || 0) >= maxAgents) {
-      return json({ error: `הגעתם למכסת ${maxAgents} סוכנים` }, 400);
+      return json({
+        error: isTrial && company.max_agents == null
+          ? `בתקופת הניסיון אפשר עד ${maxAgents} משתמשים (כולל האדמין). צרו קשר להרחבה.`
+          : `הגעתם למכסת ${maxAgents} סוכנים`,
+      }, 400);
     }
 
     const { data: exists } = await admin
@@ -175,10 +187,14 @@ serve(async (req: Request) => {
 
     const { data: target } = await admin
       .from('profiles')
-      .select('id, company_id, company_role')
+      .select('id, company_id, company_role, is_active')
       .eq('id', targetId)
       .maybeSingle();
     if (!target || target.company_id !== company.id) return json({ error: 'המשתמש לא שייך לחברה' }, 404);
+
+    if (action === 'enable' && target.is_active === false && !unlimitedAgents && (activeCount || 0) >= maxAgents) {
+      return json({ error: `הגעתם למכסת ${maxAgents} משתמשים פעילים` }, 400);
+    }
 
     if (action === 'reset_password') {
       const password = String(body.password || '');

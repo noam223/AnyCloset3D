@@ -8,7 +8,8 @@ const CORS = {
 
 function publicIdFromCloudinaryUrl(url: string): string | null {
   try {
-    const m = url.match(/\/upload\/(?:[^/]+\/)*?(?:v\d+\/)?(.+)\.[a-zA-Z0-9]+$/);
+    const m = url.match(/\/upload\/(?:.*\/)?v\d+\/(.+)\.[a-zA-Z0-9]+$/)
+      || url.match(/\/upload\/(?:[^/]+\/)*?(?:v\d+\/)?(.+)\.[a-zA-Z0-9]+$/);
     return m ? decodeURIComponent(m[1]) : null;
   } catch {
     return null;

@@ -163,7 +163,7 @@ async function _loadProject() {
     try {
         var result = await _sb
             .from('projects')
-            .select('id, name, project_data, share_token, share_token_expires_at, updated_at, order_status')
+            .select('id, name, project_data, share_token, share_token_expires_at, updated_at, order_status, owner_is_trial')
             .eq('share_token', _token)
             .single();
 
@@ -179,6 +179,7 @@ async function _loadProject() {
         }
 
         var project = result.data;
+        window._trialWatermark = project.owner_is_trial === true;
         _projectId     = project.id;
         _lastUpdatedAt = project.updated_at;
 

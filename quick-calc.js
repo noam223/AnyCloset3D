@@ -762,7 +762,7 @@ window._buildQcPrintHtml = function() {
 '</div>' +
 '<div class="note">הצעה זו תקפה ל־14 יום ממועד ההנפקה, אלא אם צוין אחרת.<br>המחירים כוללים את המפורט לעיל. שינויים במידות / חומרים / תוספות עשויים לשנות את המחיר הסופי.</div>' +
 '<div class="footer"><span>' + _qcEsc(businessName || 'AnyCloset 3D') + (businessPhone ? (' · ' + _qcEsc(businessPhone)) : '') + '</span><span>נוצר במערכת AnyCloset</span></div>' +
-'</div></body></html>';
+'</div>' + (typeof window._trialWatermarkHtml === 'function' ? window._trialWatermarkHtml() : '') + '</body></html>';
 };
 
 window.qcPrintQuotePdf = function() {

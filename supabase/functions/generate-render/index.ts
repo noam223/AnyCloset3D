@@ -11,6 +11,9 @@ const GEMINI_MODELS = {
   pro:      'gemini-3-pro-image-preview',   // Nano Banana Pro
 } as const;
 
+const TRIAL_WATERMARK =
+  '/upload/l_text:Arial_56_bold:AnyCloset%203D%20%E2%80%A2%20TRIAL,co_white,o_40,a_-30,fl_tiled,x_160,y_160/';
+
 const MATERIAL_HE: Record<string, string> = {
   white_matte: 'לבן מט', white_gloss: 'לבן מבריק', black_matte: 'שחור מט',
   gray_light: 'אפור בהיר', gray_dark: 'אפור כהה', beige: 'בז\'',
@@ -126,7 +129,7 @@ serve(async (req) => {
     // ── 2. Check quota & enabled flag from profile ───────────────────────────
     const { data: profile } = await sb
       .from('profiles')
-      .select('ai_renders_enabled, ai_renders_quota, subscription_status')
+      .select('ai_renders_enabled, ai_renders_quota, subscription_status, trial_ends_at')
       .eq('id', user.id)
       .single();
 
@@ -134,6 +137,9 @@ serve(async (req) => {
     if (!aiEnabled) return json({ error: 'ai_disabled' }, 403);
 
     const isTrial = profile?.subscription_status === 'trial';
+    if (isTrial && profile?.trial_ends_at && new Date(profile.trial_ends_at) <= new Date()) {
+      return json({ error: 'trial_expired' }, 403);
+    }
     const QUOTA = isTrial ? 5 : (profile?.ai_renders_quota ?? 50);
 
     const { data: countData, error: countErr } = await sb.rpc(
@@ -253,7 +259,8 @@ serve(async (req) => {
       return json({ error: 'Cloudinary upload failed', details: errText }, 502);
     }
 
-    const { secure_url } = await cloudRes.json();
+    const { secure_url: uploadedUrl } = await cloudRes.json();
+    const secure_url = isTrial ? String(uploadedUrl).replace('/upload/', TRIAL_WATERMARK) : uploadedUrl;
 
     // ── 6. Save to DB ────────────────────────────────────────────────────────
     const { data: inserted, error: insertErr } = await sb

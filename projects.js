@@ -84,6 +84,7 @@ var _USER_TYPE_LABELS = {
 
     _plan     = plan;
     _projects = projects;
+    window._trialWatermark = !!plan.isTrial;
     // Start first-page thumbnails now so they load alongside the rest of init
     _loadPageThumbnails(_visibleProjects().slice(0, _PAGE_SIZE));
 
@@ -219,7 +220,8 @@ function _showTrialBanner(trialEndsAt, plan) {
     banner.id = 'trial-banner';
     banner.style.cssText = 'background:linear-gradient(135deg,#0f2040,#1a3a6b);color:#fff;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:.85rem;border-bottom:2px solid #00d4ff;flex-shrink:0;flex-wrap:wrap;';
     banner.innerHTML =
-        '<span style="display:flex;align-items:center;gap:8px;">⏳ <strong>' + daysLeft + ' ימי ניסיון נותרו</strong> — תוכנית ' + plan.label + '</span>' +
+        '<span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">⏳ <strong>' + daysLeft + ' ימי ניסיון נותרו</strong> — תוכנית ' + plan.label +
+        '<span style="opacity:.75;font-size:.78rem;">(בניסיון: עד ' + (plan.maxProjects != null ? plan.maxProjects : 3) + ' פרויקטים, מחשב אחד, ייצואים עם סימן מים)</span></span>' +
         '<button onclick="window.location.href=\'' + _getPaymentLink(plan.key) + '\'" style="background:#00d4ff;color:#0a1628;padding:6px 16px;border-radius:8px;font-weight:700;border:none;cursor:pointer;white-space:nowrap;font-family:inherit;font-size:.82rem;">שדרג עכשיו</button>' +
         '<button onclick="this.parentNode.remove()" style="background:none;border:none;color:rgba(255,255,255,.6);cursor:pointer;font-size:1.1rem;padding:0 4px;line-height:1;">×</button>';
     // Insert at top of page-wrap (main content area), not body

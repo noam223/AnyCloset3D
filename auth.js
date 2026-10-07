@@ -187,6 +187,10 @@ const PLAN_LIMITS = {
 PLAN_LIMITS.carpenter_basic_annual = Object.assign({}, PLAN_LIMITS.carpenter_basic, { label: 'נגר — בסיסי שנתי' });
 PLAN_LIMITS.carpenter_pro_annual   = Object.assign({}, PLAN_LIMITS.carpenter_pro,   { label: 'נגר — מקצועי שנתי' });
 
+// Applied only while subscription_status = 'trial' and the admin has not set a per-user override.
+// Mirrored server-side in private.projects_trial_guard (projects) and company-manage-agent (agents).
+const TRIAL_LIMITS = { maxProjects: 3, maxDevices: 1, maxAgents: 2 };
+
 // ── Supabase client ───────────────────────────────────────────────────────────
 let _sb = null;
 function _getClient() {
@@ -261,10 +265,12 @@ function _sessionIdFromAccessToken(token) {
 }
 
 function _needsExclusiveSession(profile, billingProfile) {
+    if (!profile) return false;
+    var billing = billingProfile || profile;
+    if (billing && billing.subscription_status === 'trial' && billing.max_devices == null) return true;
     if (!profile || (profile.company_role !== 'admin' && profile.company_role !== 'agent')) {
         return false;
     }
-    var billing = billingProfile || profile;
     // Default ON: several computers may stay signed in. OFF restores the single-PC kick.
     return billing.allow_multi_session === false;
 }
@@ -504,15 +510,19 @@ window.Auth = {
         const company = resolved.company;
         const planKey = (billing && billing.plan) ? billing.plan : 'free';
         const planDef = PLAN_LIMITS[planKey] || PLAN_LIMITS['free'];
+        const isTrial = !!(billing && billing.subscription_status === 'trial');
+        const _trialCap = function(planValue, cap) {
+            return (planValue == null) ? cap : Math.min(planValue, cap);
+        };
 
         const maxDevices = (billing && billing.max_devices != null)
             ? billing.max_devices
-            : planDef.maxDevices;
+            : (isTrial ? _trialCap(planDef.maxDevices, TRIAL_LIMITS.maxDevices) : planDef.maxDevices);
         const maxProjects = (billing && billing.max_projects === 0)
             ? null
             : (billing && billing.max_projects != null)
                 ? billing.max_projects
-                : planDef.maxProjects;
+                : (isTrial ? _trialCap(planDef.maxProjects, TRIAL_LIMITS.maxProjects) : planDef.maxProjects);
         const maxCabinetsPerProject = (billing && billing.max_cabinets_per_project === 0)
             ? null
             : (billing && billing.max_cabinets_per_project != null)
@@ -522,7 +532,7 @@ window.Auth = {
             ? null
             : (company && company.max_agents != null)
                 ? company.max_agents
-                : (planDef.maxAgents || null);
+                : (isTrial ? _trialCap(planDef.maxAgents || null, TRIAL_LIMITS.maxAgents) : (planDef.maxAgents || null));
 
         var features = Object.assign({}, planDef.features || {});
         var overrides = (billing && billing.feature_overrides) || {};
@@ -540,6 +550,7 @@ window.Auth = {
             maxCabinetsPerProject,
             maxAgents,
             features,
+            isTrial,
             subscriptionStatus: (billing && billing.subscription_status) || 'active',
             subscriptionEndsAt: (billing && billing.subscription_ends_at) || null,
             trialEndsAt: (billing && billing.trial_ends_at) || null,
@@ -1110,6 +1121,9 @@ window.Projects = {
             if (plan.maxProjects !== null) {
                 const existing = await this.list();
                 if (existing.length >= plan.maxProjects) {
+                    if (plan.isTrial) {
+                        return { error: `בתקופת הניסיון אפשר ליצור עד ${plan.maxProjects} פרויקטים. שדרג למנוי כדי לפתוח פרויקטים נוספים.` };
+                    }
                     return { error: `הגעת למגבלת ${plan.maxProjects} פרויקטים בתוכנית ${plan.label}.` };
                 }
             }
@@ -1183,6 +1197,12 @@ window.Projects = {
                     .single();
                 data = res2.data;
                 error = res2.error;
+            }
+            if (error && /trial_project_limit/.test(error.message || '')) {
+                return { error: `בתקופת הניסיון אפשר ליצור עד ${TRIAL_LIMITS.maxProjects} פרויקטים. שדרג למנוי כדי לפתוח פרויקטים נוספים.` };
+            }
+            if (error && /trial_expired/.test(error.message || '')) {
+                return { error: 'תקופת הניסיון הסתיימה. שדרג למנוי כדי להמשיך לעבוד.' };
             }
             if (error) return { error: error.message };
             return { data };
@@ -1741,7 +1761,8 @@ window.canUse = async function(featureKey) {
  */
 window._features = null;
 window.loadFeatures = async function() {
-    window._features = await Auth.getFeatures();
     window._plan = await Auth.getPlan();
+    window._features = window._plan.features || PLAN_LIMITS['free'].features;
+    window._trialWatermark = !!window._plan.isTrial;
     return window._features;
 };

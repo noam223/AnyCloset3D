@@ -15079,6 +15079,32 @@ function _printSpaceGroupBlockHtml(group, opts) {
     return { html: html, numericPrice: totalPrice, itemInstall: totalInstall, itemCost: totalCost };
 }
 
+// Top-level names must differ from the window._trialWatermark* helpers (classic scripts share the global scope).
+function _trialWmHtml() {
+    return typeof window._trialWatermarkHtml === 'function' ? window._trialWatermarkHtml() : '';
+}
+
+function _trialWmSvg(svg) {
+    return typeof window._trialWatermarkSvg === 'function' ? window._trialWatermarkSvg(svg) : svg;
+}
+
+(function _wrapBlueprintGeneratorsForTrial() {
+    const origPages = window._generateMultiViewBlueprintPages;
+    if (typeof origPages === 'function') {
+        window._generateMultiViewBlueprintPages = function () {
+            const pages = origPages.apply(this, arguments);
+            if (!window._trialWatermark || !Array.isArray(pages)) return pages;
+            return pages.map(pg => Object.assign({}, pg, { svg: _trialWmSvg(pg.svg) }));
+        };
+    }
+    const origSvg = window._generateMultiViewBlueprintSVG;
+    if (typeof origSvg === 'function') {
+        window._generateMultiViewBlueprintSVG = function () {
+            return _trialWmSvg(origSvg.apply(this, arguments));
+        };
+    }
+})();
+
 function _buildPrintHTML(mode) {
     // mode: 'customer' or 'factory'
     const isFactory = mode === 'factory';
@@ -15266,6 +15292,7 @@ ${introHTML}
 </div>
 ${cabinetsHTML}
 ${summaryHTML}
+${_trialWmHtml()}
 </body>
 </html>`;
 }
@@ -16292,7 +16319,7 @@ body { background:white; }
 .bp-page svg { max-width:100%; height:auto; }
 @media print { @page { size: A3 landscape; margin: 8mm; } .bp-page { padding:0; } }
 </style></head>
-<body>${pagesHtml}</body></html>`);
+<body>${pagesHtml}${_trialWmHtml()}</body></html>`);
     win.document.close();
     win.focus();
     setTimeout(() => { win.print(); }, 500);
@@ -16578,6 +16605,7 @@ function _buildCustomerSummaryHTML(logoDataUrl) {
 </div>
 
 ${_hidePrices ? '' : `<div id="summary-totals">${_customerSummaryTotalsHtml(_customerTotals(totalCabPrice, totalInstallPrice))}</div>`}
+${_trialWmHtml()}
 </body>
 </html>`;
 }
@@ -16600,6 +16628,7 @@ function _buildExcelXML(d) {
     // Sheet 1: Customer Summary
     xml += '<Worksheet ss:Name="סיכום ללקוח"><Table>\n';
     xml += '<Column ss:Width="130"/><Column ss:Width="200"/><Column ss:Width="100"/><Column ss:Width="100"/><Column ss:Width="110"/>\n';
+    if (typeof window._trialWatermarkExcelRow === 'function') xml += window._trialWatermarkExcelRow();
     xml += '<Row><Cell ss:StyleID="bold"><Data ss:Type="String">לקוח:</Data></Cell><Cell><Data ss:Type="String">' + esc(d.custName) + '</Data></Cell></Row>\n';
     if (d.custPhone) xml += '<Row><Cell ss:StyleID="bold"><Data ss:Type="String">טלפון:</Data></Cell><Cell><Data ss:Type="String">' + esc(d.custPhone) + '</Data></Cell></Row>\n';
     if (d.custOrder) xml += '<Row><Cell ss:StyleID="bold"><Data ss:Type="String">מס\' הזמנה:</Data></Cell><Cell><Data ss:Type="String">' + esc(d.custOrder) + '</Data></Cell></Row>\n';

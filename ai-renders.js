@@ -457,8 +457,10 @@ window._submitRender = async function() {
                 var quotaMsg = 'הגעת למכסה החודשית של ' + data.limit + ' הדמיות';
                 if (_panelOpen) _showStatus('error', quotaMsg);
                 else if (typeof window._showToast === 'function') window._showToast(quotaMsg, 3500);
-            } else if (data.error === 'ai_disabled') {
-                var disabledMsg = 'פיצ\'ר ההדמיות אינו זמין עבור חשבונך';
+            } else if (data.error === 'ai_disabled' || data.error === 'trial_expired') {
+                var disabledMsg = data.error === 'trial_expired'
+                    ? 'תקופת הניסיון הסתיימה. שדרג למנוי כדי להמשיך ליצור הדמיות.'
+                    : 'פיצ\'ר ההדמיות אינו זמין עבור חשבונך';
                 if (_panelOpen) _showStatus('error', disabledMsg);
                 else if (typeof window._showToast === 'function') window._showToast(disabledMsg, 3500);
             } else {
