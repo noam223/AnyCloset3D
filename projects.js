@@ -37,8 +37,10 @@ var _UPGRADE_PLANS = [
     { key: 'designer_monthly',  label: 'מעצבת — חודשי',        price: '₪399/חודש',  userType: 'designer',  maxProjects: 30,   maxDevices: 1,  desc: 'עד 30 פרויקטים, 12 ארונות לפרויקט' },
     { key: 'designer_annual',   label: 'מעצבת — שנתי',         price: '₪369/חודש',  userType: 'designer',  maxProjects: 30,   maxDevices: 1,  desc: 'עד 30 פרויקטים, 12 ארונות לפרויקט, ₪4,428 לשנה — חיסכון 26%' },
     // נגרים
-    { key: 'carpenter_basic',   label: 'נגר — בסיסי',           price: '₪X/חודש',    userType: 'carpenter', maxProjects: 30,   maxDevices: 1,  desc: 'תמחור + הדמיה, עד 30 פרויקטים' },
-    { key: 'carpenter_pro',     label: 'נגר — מקצועי',          price: '₪X/חודש',    userType: 'carpenter', maxProjects: null, maxDevices: 2,  desc: 'הכל כולל דוח לקוח + ייצוא לנגר' },
+    { key: 'carpenter_basic',   label: 'נגר — בסיסי',           price: '₪499/חודש',  userType: 'carpenter', maxProjects: 30,   maxDevices: 1,  desc: 'תמחור + הדמיה, עד 30 פרויקטים' },
+    { key: 'carpenter_basic_annual', label: 'נגר — בסיסי שנתי', price: '₪449/חודש',  userType: 'carpenter', maxProjects: 30,   maxDevices: 1,  desc: 'תמחור + הדמיה, עד 30 פרויקטים, ₪5,388 לשנה — חיסכון 10%' },
+    { key: 'carpenter_pro',     label: 'נגר — מקצועי',          price: '₪699/חודש',  userType: 'carpenter', maxProjects: null, maxDevices: 2,  desc: 'הכל כולל דוח לקוח + ייצוא לנגר' },
+    { key: 'carpenter_pro_annual', label: 'נגר — מקצועי שנתי',  price: '₪629/חודש',  userType: 'carpenter', maxProjects: null, maxDevices: 2,  desc: 'הכל כולל דוח לקוח + ייצוא לנגר, ₪7,548 לשנה — חיסכון 10%' },
     // חברות
     { key: 'company_standard',  label: 'חברה — סטנדרט',         price: 'צור קשר',    userType: 'company',   maxProjects: null, maxDevices: 10, desc: 'עד 5 סוכנים, 10 מכשירים, כל הפיצ\'רים' },
     { key: 'company_enterprise',label: 'חברה — ארגוני',          price: 'צור קשר',    userType: 'company',   maxProjects: null, maxDevices: 30, desc: 'עד 15 סוכנים, 30 מכשירים, תמיכה מלאה' },
@@ -237,7 +239,9 @@ function _buildPaywallPlansHTML(userType) {
         designer_monthly:   ['עד 30 פרויקטים', '12 ארונות לפרויקט', 'הדמיה תלת-ממדית', 'ייצוא PDF'],
         designer_annual:    ['עד 30 פרויקטים', '12 ארונות לפרויקט', 'הדמיה תלת-ממדית', 'ייצוא PDF', 'חיסכון 10% לעומת חודשי'],
         carpenter_basic:    ['עד 30 פרויקטים', 'תמחור אוטומטי', 'הדמיה תלת-ממדית'],
+        carpenter_basic_annual: ['עד 30 פרויקטים', 'תמחור אוטומטי', 'הדמיה תלת-ממדית', 'חיסכון 10% לעומת חודשי'],
         carpenter_pro:      ['פרויקטים ללא הגבלה', 'תמחור + דוח לקוח', 'ייצוא לנגר', '2 מכשירים'],
+        carpenter_pro_annual: ['פרויקטים ללא הגבלה', 'תמחור + דוח לקוח', 'ייצוא לנגר', '2 מכשירים', 'חיסכון 10% לעומת חודשי'],
         company_standard:   ['פרויקטים ללא הגבלה', 'עד 5 סוכנים', 'עד 10 מכשירים', 'ניהול צוות'],
         company_enterprise: ['פרויקטים ללא הגבלה', 'עד 15 סוכנים', 'עד 30 מכשירים', 'תמיכה מלאה'],
     };
@@ -245,7 +249,7 @@ function _buildPaywallPlansHTML(userType) {
     // "Popular" = annual plans (best value) or pro/enterprise for other types
     var POPULAR_KEYS = ['designer_annual', 'carpenter_pro', 'company_standard'];
 
-    var useSideBySide = plans.length === 2;
+    var useSideBySide = plans.length === 2 || plans.length === 4;
     var html = '<div style="display:' + (useSideBySide ? 'grid;grid-template-columns:1fr 1fr' : 'flex;flex-direction:column') + ';gap:12px;margin-bottom:8px;">';
 
     plans.forEach(function(p, i) {
@@ -479,7 +483,7 @@ function _renderPlanBar() {
     }
 
     // Show upgrade button unless on top-tier plans or company agent
-    var topTierPlans = ['carpenter_pro', 'company_enterprise'];
+    var topTierPlans = ['carpenter_pro', 'carpenter_pro_annual', 'company_enterprise'];
     if (_plan.companyRole !== 'agent' && topTierPlans.indexOf(_plan.key) === -1) {
         document.getElementById('btn-upgrade').style.display = 'flex';
     }
@@ -2396,7 +2400,9 @@ function _loadSubscriptionSection(profile) {
         designer_monthly: 'מעצב — חודשי',
         designer_annual:  'מעצב — שנתי',
         carpenter_basic:  'נגר — בסיסי',
+        carpenter_basic_annual: 'נגר — בסיסי שנתי',
         carpenter_pro:    'נגר — פרו',
+        carpenter_pro_annual: 'נגר — פרו שנתי',
         company_standard: 'חברה — סטנדרט',
         company_enterprise: 'חברה — אנטרפרייז'
     };

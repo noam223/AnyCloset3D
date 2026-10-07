@@ -115,6 +115,8 @@
         .plan-badge.designer_annual   { background: #cffafe; color: #0e7490; }
         .plan-badge.carpenter_basic   { background: #dcfce7; color: #166534; }
         .plan-badge.carpenter_pro     { background: #bbf7d0; color: #14532d; }
+        .plan-badge.carpenter_basic_annual { background: #dcfce7; color: #166534; }
+        .plan-badge.carpenter_pro_annual   { background: #bbf7d0; color: #14532d; }
         .plan-badge.company_standard  { background: #dbeafe; color: #1e40af; }
         .plan-badge.company_enterprise{ background: #bfdbfe; color: #1e3a8a; }
         .plan-badge.free              { background: #f1f5f9; color: var(--muted); }
@@ -348,7 +350,9 @@
                 <option value="designer_monthly">מעצבת — חודשי</option>
                 <option value="designer_annual">מעצבת — שנתי</option>
                 <option value="carpenter_basic">נגר — בסיסי</option>
+                <option value="carpenter_basic_annual">נגר — בסיסי שנתי</option>
                 <option value="carpenter_pro">נגר — מקצועי</option>
+                <option value="carpenter_pro_annual">נגר — מקצועי שנתי</option>
                 <option value="company_standard">חברה — סטנדרט</option>
                 <option value="company_enterprise">חברה — ארגוני</option>
             </select>
@@ -609,8 +613,8 @@
         <div class="modal-field"><label class="modal-label">תוכנית</label>
             <select class="modal-select" id="edit-plan-select">
                 <option value="free">חינמי</option><option value="designer_single">מעצבת — פרויקט בודד</option>
-                <option value="designer_monthly">מעצבת — חודשי</option><option value="designer_annual">מעצבת — שנתי</option><option value="carpenter_basic">נגר — בסיסי</option>
-                <option value="carpenter_pro">נגר — מקצועי</option><option value="company_standard">חברה — סטנדרט</option>
+                <option value="designer_monthly">מעצבת — חודשי</option><option value="designer_annual">מעצבת — שנתי</option><option value="carpenter_basic">נגר — בסיסי</option><option value="carpenter_basic_annual">נגר — בסיסי שנתי</option>
+                <option value="carpenter_pro">נגר — מקצועי</option><option value="carpenter_pro_annual">נגר — מקצועי שנתי</option><option value="company_standard">חברה — סטנדרט</option>
                 <option value="company_enterprise">חברה — ארגוני</option>
             </select></div>
         <div class="modal-field"><label class="modal-label">סטטוס מנוי</label>
@@ -744,8 +748,8 @@ async function _enterAdmin() {
     var s = await _adminClient().auth.getSession();
     if (s.data && s.data.session) _enterAdmin();
 })();
-var PLAN_LABELS={free:'חינמי',designer_single:'מעצבת — בודד',designer_monthly:'מעצבת — חודשי',designer_annual:'מעצבת — שנתי',carpenter_basic:'נגר — בסיסי',carpenter_pro:'נגר — מקצועי',company_standard:'חברה — סטנדרט',company_enterprise:'חברה — ארגוני'};
-var PLAN_USER_TYPE={free:'free',designer_single:'designer',designer_monthly:'designer',designer_annual:'designer',carpenter_basic:'carpenter',carpenter_pro:'carpenter',company_standard:'company',company_enterprise:'company'};
+var PLAN_LABELS={free:'חינמי',designer_single:'מעצבת — בודד',designer_monthly:'מעצבת — חודשי',designer_annual:'מעצבת — שנתי',carpenter_basic:'נגר — בסיסי',carpenter_basic_annual:'נגר — בסיסי שנתי',carpenter_pro:'נגר — מקצועי',carpenter_pro_annual:'נגר — מקצועי שנתי',company_standard:'חברה — סטנדרט',company_enterprise:'חברה — ארגוני'};
+var PLAN_USER_TYPE={free:'free',designer_single:'designer',designer_monthly:'designer',designer_annual:'designer',carpenter_basic:'carpenter',carpenter_basic_annual:'carpenter',carpenter_pro:'carpenter',carpenter_pro_annual:'carpenter',company_standard:'company',company_enterprise:'company'};
 var FEATURE_OVERRIDE_KEYS=[
     {key:'showPricing',label:'תמחור'},
     {key:'canExportCarpenter',label:'ייצוא לנגר / ייצור'},

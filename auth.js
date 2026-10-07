@@ -184,6 +184,8 @@ const PLAN_LIMITS = {
         }
     }
 };
+PLAN_LIMITS.carpenter_basic_annual = Object.assign({}, PLAN_LIMITS.carpenter_basic, { label: 'נגר — בסיסי שנתי' });
+PLAN_LIMITS.carpenter_pro_annual   = Object.assign({}, PLAN_LIMITS.carpenter_pro,   { label: 'נגר — מקצועי שנתי' });
 
 // ── Supabase client ───────────────────────────────────────────────────────────
 let _sb = null;
