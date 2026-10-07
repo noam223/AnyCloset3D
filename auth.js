@@ -618,9 +618,7 @@ window.Auth = {
 
         // Set status to 'cancelled' — Scenario 3 skips cancelled subscriptions
         // subscription_ends_at is intentionally left unchanged so user keeps access
-        const { error } = await sb.from('profiles').update({
-            subscription_status: 'cancelled'
-        }).eq('id', user.id);
+        const { error } = await sb.rpc('cancel_my_subscription');
 
         if (error) return { error: error.message };
 
@@ -635,12 +633,7 @@ window.Auth = {
         const user = await this.getUser();
         if (!user) return { error: 'Not logged in' };
 
-        const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-        const { error } = await sb.from('profiles').update({
-            plan,
-            subscription_status: 'trial',
-            trial_ends_at: trialEndsAt
-        }).eq('id', user.id);
+        const { data: trialEndsAt, error } = await sb.rpc('start_my_trial', { p_plan: plan });
 
         if (error) return { error: error.message };
         this._profileCache = null;
@@ -953,29 +946,6 @@ window.Auth = {
         const msLeft = lockDate - now;
         const hoursLeft = Math.ceil(msLeft / (1000 * 60 * 60));
         return { locked: false, locksAt: lockDate, hoursLeft };
-    },
-
-    /**
-     * Extend a project's edit window (after payment).
-     * Called after successful Grow payment webhook.
-     */
-    extendProject: async function(projectId, extensionDays) {
-        const sb = _getClient(); if (!sb) return { error: 'SDK not loaded' };
-        const now = new Date();
-        const expiresAt = new Date(now.getTime() + extensionDays * 24 * 60 * 60 * 1000);
-
-        const { data, error } = await sb
-            .from('projects')
-            .update({
-                extension_expires_at: expiresAt.toISOString(),
-                lock_extensions: sb.rpc('increment', { row_id: projectId }) // increments counter
-            })
-            .eq('id', projectId)
-            .select()
-            .single();
-
-        if (error) return { error: error.message };
-        return { data, expiresAt };
     },
 
     /**

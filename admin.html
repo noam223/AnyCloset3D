@@ -261,13 +261,15 @@
     <div class="gate-box">
         <i class="fa-solid fa-shield-halved"></i>
         <h2>פאנל ניהול</h2>
-        <p>הזן את סיסמת האדמין כדי להמשיך</p>
-        <input type="password" class="gate-input" id="gate-password" placeholder="סיסמת אדמין"
+        <p>התחבר עם חשבון AnyCloset שמוגדר כמנהל</p>
+        <input type="email" class="gate-input" id="gate-email" placeholder="אימייל" dir="ltr" autocomplete="username"
+               onkeydown="if(event.key==='Enter') document.getElementById('gate-password').focus()">
+        <input type="password" class="gate-input" id="gate-password" placeholder="סיסמה" autocomplete="current-password"
                onkeydown="if(event.key==='Enter') checkAdminPassword()">
-        <button class="gate-btn" onclick="checkAdminPassword()">
+        <button class="gate-btn" id="gate-btn" onclick="checkAdminPassword()">
             <i class="fa-solid fa-unlock"></i> כניסה
         </button>
-        <div class="gate-error" id="gate-error" style="display:none;">סיסמה שגויה</div>
+        <div class="gate-error" id="gate-error" style="display:none;"></div>
     </div>
 </div>
 
@@ -713,24 +715,35 @@
 <div class="toast" id="toast"><i id="toast-icon" class="fa-solid fa-circle-check"></i><span id="toast-text"></span></div>
 
 <script>
-// ══════════════════════════════════════════════════════════════════
-// HOW TO CHANGE THE ADMIN PASSWORD:
-// 1. Open your browser console (F12 → Console)
-// 2. Run this command with your new password:
-//    crypto.subtle.digest('SHA-256', new TextEncoder().encode('YOUR_NEW_PASSWORD'))
-//      .then(b => console.log([...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')))
-// 3. Copy the output hash and paste it below as ADMIN_PASSWORD_HASH
-// ══════════════════════════════════════════════════════════════════
-// Hash updated — SHA-256 of the new admin password
-var ADMIN_PASSWORD_HASH = 'bbb5d3477287a8310eb7e4fbc2e99fc505bd0b1c4e127b22b85dd1dd7f99d0ca';
+// Admin access = a Supabase user listed in private.app_admins (checked by is_app_admin()).
 var _ADMIN_SB_URL='https://meqxnsjycvfgfhdepguo.supabase.co';
 var _ADMIN_SB_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lcXhuc2p5Y3ZmZ2ZoZGVwZ3VvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3MDA5NDAsImV4cCI6MjA5MjI3Njk0MH0.w63bl0-1-Rgt9Nx6sVW5ueEGMojiMaxoehlPXlPH2N0';
 var _sb=null,_allUsers=[],_currentEditUserId=null,_currentPricingUserId=null,_toastTimer=null,_projectsLoaded=false,_adminProjects=[];
 
-async function _hashPassword(pw) {
-    var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw));
-    return [...new Uint8Array(buf)].map(x => x.toString(16).padStart(2,'0')).join('');
+function _adminClient() {
+    if (!_sb) _sb = supabase.createClient(_ADMIN_SB_URL, _ADMIN_SB_ANON, { auth: { storageKey: 'anycloset-admin-auth' } });
+    return _sb;
 }
+function _gateFail(msg) {
+    var el = document.getElementById('gate-error');
+    el.textContent = msg;
+    el.style.display = 'block';
+    document.getElementById('gate-password').value = '';
+}
+async function _enterAdmin() {
+    var res = await _adminClient().rpc('is_app_admin');
+    if (res.error || res.data !== true) {
+        await _sb.auth.signOut();
+        _gateFail('לחשבון הזה אין הרשאת ניהול');
+        return;
+    }
+    document.getElementById('admin-gate').style.display = 'none';
+    loadUsers();
+}
+(async function _resumeAdminSession() {
+    var s = await _adminClient().auth.getSession();
+    if (s.data && s.data.session) _enterAdmin();
+})();
 var PLAN_LABELS={free:'חינמי',designer_single:'מעצבת — בודד',designer_monthly:'מעצבת — חודשי',designer_annual:'מעצבת — שנתי',carpenter_basic:'נגר — בסיסי',carpenter_pro:'נגר — מקצועי',company_standard:'חברה — סטנדרט',company_enterprise:'חברה — ארגוני'};
 var PLAN_USER_TYPE={free:'free',designer_single:'designer',designer_monthly:'designer',designer_annual:'designer',carpenter_basic:'carpenter',carpenter_pro:'carpenter',company_standard:'company',company_enterprise:'company'};
 var FEATURE_OVERRIDE_KEYS=[
@@ -744,7 +757,18 @@ var FEATURE_OVERRIDE_KEYS=[
 var ORDER_STATUS_LABELS={quote:'הצעה',measured:'נמדד',ordered:'הוזמן',production:'ייצור',service:'שירות',installed:'הותקן'};
 var DEFAULT_PRICING={pricingMode:'ranges',sqmPrice:800,sqmPriceNonMel:1040,lmPrice:1200,lmPriceNonMel:1560,lmHeightBase:1200,lmHeightBaseNonMel:1560,lmHeightThresholdCm:240,lmHeightStepCm:30,lmHeightStepPct:0.10,materialsBoardPrice:180,materialsBoardsPerSqm:1.4,materialsMultiplier:2.5,profitMultiplier:1.7,installPricePerUnit:110,installUnitCm:42.5,installHeightSurcharge:0.20,heightSurcharge:0.20,depthSurcharge:0.20,sandwichSurcharge:0.15,ranges:{maya:{melamine:{40:675,80:1050,120:1462,160:1658,200:2073,240:2487},nonMelamine:{40:830,80:1360,120:1900,160:2155,200:2700,240:3233}}},extras:{internalDrawer:150,externalDrawer:200,openCell:400,partition:150,shelfFreePerMeter:3,extraShelfMel:60,extraShelfNonMel:80,deskUnit:900,doorFramedMel:80,doorGlassMel:400,doorGlassBlack:600,doorMirror:350,upperUnit160:600,upperUnit240:900,upperUnitPerCm:3.75,cornerDrawers3:832,cornerDrawers4:907,cornerDrawerExtra:200,cornerDesk:900,fullCornerBase:2800,fullCornerShelf:120,wingConnection:400,sideCabMel:12,sideCabNonMel:15,sideCabDoors:300,slidingBase:800,slidingDoor:350,slidingGlass:200,slidingMirror:350,slidingGold:80,slidingBlack:50,slidingHeightSurcharge:0.15,nickelLegPrice:100}};
 
-async function checkAdminPassword(){var pw=document.getElementById('gate-password').value;var hash=await _hashPassword(pw);if(hash===ADMIN_PASSWORD_HASH){document.getElementById('admin-gate').style.display='none';_sb=supabase.createClient(_ADMIN_SB_URL,_ADMIN_SB_ANON);loadUsers();}else{document.getElementById('gate-error').style.display='block';document.getElementById('gate-password').value='';document.getElementById('gate-password').focus();}}
+async function checkAdminPassword(){
+    var email=document.getElementById('gate-email').value.trim();
+    var pw=document.getElementById('gate-password').value;
+    var btn=document.getElementById('gate-btn');
+    document.getElementById('gate-error').style.display='none';
+    if(!email||!pw){_gateFail('יש להזין אימייל וסיסמה');return;}
+    btn.disabled=true;
+    var res=await _adminClient().auth.signInWithPassword({email:email,password:pw});
+    btn.disabled=false;
+    if(res.error){_gateFail('אימייל או סיסמה שגויים');return;}
+    await _enterAdmin();
+}
 function switchTab(tab){document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active');});document.querySelectorAll('.admin-tab').forEach(function(b){b.classList.remove('active');});document.getElementById('tab-'+tab).classList.add('active');document.getElementById('tab-btn-'+tab).classList.add('active');if(tab==='pricing')_populatePricingUserSelect();if(tab==='projects'&&!_projectsLoaded)searchAdminProjects();}
 async function loadUsers(){showLoadingRow();var{data:profiles,error:pErr}=await _sb.rpc('admin_get_all_profiles');if(pErr){showToast('שגיאה: '+pErr.message,'error');return;}var{data:authUsers}=await _sb.rpc('admin_get_auth_users');var authMap={};(authUsers||[]).forEach(function(u){authMap[u.id]=u;});var{data:projCounts}=await _sb.rpc('admin_get_project_counts');var projMap={};(projCounts||[]).forEach(function(p){projMap[p.user_id]=Number(p.project_count)||0;});var{data:devCounts}=await _sb.rpc('admin_get_device_counts');var devMap={};(devCounts||[]).forEach(function(d){if(!devMap[d.user_id])devMap[d.user_id]={total:0,active:0};devMap[d.user_id].total=Number(d.total_count)||0;devMap[d.user_id].active=Number(d.active_count)||0;});_allUsers=(profiles||[]).map(function(p){var au=authMap[p.id]||{};return Object.assign({},p,{_projectCount:projMap[p.id]||0,_deviceInfo:devMap[p.id]||{total:0,active:0},_emailConfirmed:!!(au.email_confirmed_at)});});updateStats();renderTable(_allUsers);}
 function showLoadingRow(){document.getElementById('users-tbody').innerHTML='<tr class="loading-row"><td colspan="10"><div class="spinner-lg"></div>טוען...</td></tr>';}
@@ -985,23 +1009,21 @@ async function confirmCancelSubscription(){
         successMsg = 'המנוי בוטל — המשתמש הוחזר לתקופת ניסיון ✓';
     }
 
-    var updateParams = {p_user_id: userId, p_subscription_status: newStatus, p_plan: u.plan || 'free'};
+    var updateParams = {
+        p_user_id: userId,
+        p_subscription_status: newStatus,
+        p_plan: u.plan || 'free',
+        p_set_subscription_ends_at: true,
+        p_subscription_ends_at: null
+    };
+    if(newStatus === 'trial' && newTrialEndsAt) {
+        updateParams.p_set_trial_ends_at = true;
+        updateParams.p_trial_ends_at = newTrialEndsAt;
+    }
     var {error} = await _sb.rpc('admin_update_profile', updateParams);
     if(error){showToast('שגיאה: '+error.message,'error');return;}
-
-    // If returning to trial, also update trial_ends_at via direct update
-    if(newStatus === 'trial' && newTrialEndsAt) {
-        await _sb.from('profiles').update({
-            trial_ends_at: newTrialEndsAt,
-            subscription_ends_at: null,
-            grow_token: null
-        }).eq('id', userId);
-    } else if(newStatus === 'inactive') {
-        await _sb.from('profiles').update({
-            subscription_ends_at: null,
-            grow_token: null
-        }).eq('id', userId);
-    }
+    var {error: tokenErr} = await _sb.rpc('admin_clear_billing_token', {p_user_id: userId});
+    if(tokenErr){showToast('שגיאה: '+tokenErr.message,'error');return;}
 
     if(u) u.subscription_status = newStatus;
     closeModal('modal-cancel-subscription');

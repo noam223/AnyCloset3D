@@ -35,12 +35,12 @@ var _companyMeta         = null;
 var _UPGRADE_PLANS = [
     // מעצבות
     { key: 'designer_monthly',  label: 'מעצבת — חודשי',        price: '₪399/חודש',  userType: 'designer',  maxProjects: 30,   maxDevices: 1,  desc: 'עד 30 פרויקטים, 12 ארונות לפרויקט' },
-    { key: 'designer_annual',   label: 'מעצבת — שנתי',         price: '₪359/חודש',  userType: 'designer',  maxProjects: 30,   maxDevices: 1,  desc: 'עד 30 פרויקטים, 12 ארונות לפרויקט, ₪4,308 לשנה — חיסכון 10%' },
+    { key: 'designer_annual',   label: 'מעצבת — שנתי',         price: '₪369/חודש',  userType: 'designer',  maxProjects: 30,   maxDevices: 1,  desc: 'עד 30 פרויקטים, 12 ארונות לפרויקט, ₪4,428 לשנה — חיסכון 26%' },
     // נגרים
     { key: 'carpenter_basic',   label: 'נגר — בסיסי',           price: '₪X/חודש',    userType: 'carpenter', maxProjects: 30,   maxDevices: 1,  desc: 'תמחור + הדמיה, עד 30 פרויקטים' },
     { key: 'carpenter_pro',     label: 'נגר — מקצועי',          price: '₪X/חודש',    userType: 'carpenter', maxProjects: null, maxDevices: 2,  desc: 'הכל כולל דוח לקוח + ייצוא לנגר' },
     // חברות
-    { key: 'company_standard',  label: 'חברה — סטנדרט',         price: '₪X/חודש',    userType: 'company',   maxProjects: null, maxDevices: 10, desc: 'עד 5 סוכנים, 10 מכשירים, כל הפיצ\'רים' },
+    { key: 'company_standard',  label: 'חברה — סטנדרט',         price: '₪1,000/חודש', userType: 'company',   maxProjects: null, maxDevices: 10, desc: 'עד 5 סוכנים, 10 מכשירים, כל הפיצ\'רים' },
     { key: 'company_enterprise',label: 'חברה — ארגוני',          price: 'צור קשר',    userType: 'company',   maxProjects: null, maxDevices: 30, desc: 'עד 15 סוכנים, 30 מכשירים, תמיכה מלאה' },
 ];
 
