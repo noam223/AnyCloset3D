@@ -5119,7 +5119,10 @@ function _calcWingCost(cfg, wing) {
     finalCost += partitionBlocks*_priceNum(ex.partition, 150);
 
     let ledPairs = 0;
-    wing.columns.forEach(col => { if (Array.isArray(col.leds)) ledPairs += col.leds.length; });
+    wing.columns.forEach(col => {
+        if (Array.isArray(col.leds)) ledPairs += col.leds.length;
+        if (col.type === 'desk' && col.deskLeds) ledPairs++;
+    });
     finalCost += ledPairs * _priceNum(ex.ledPair, 650);
 
     if (wing.hasDoors) {

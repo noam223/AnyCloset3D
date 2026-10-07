@@ -1258,6 +1258,15 @@ function _bpDrawLedPairs(p, leds, rowBounds, x, w, botSvgY, sc, font) {
     });
 }
 
+/** Column LED pairs, plus the knee-space pair above an internal desk (rowBounds are cm from the floor). */
+function _bpDrawColLeds(p, col, rowBounds, x, w, botSvgY, sc, font) {
+    _bpDrawLedPairs(p, col.leds, rowBounds, x, w, botSvgY, sc, font);
+    if (col.type === 'desk' && col.deskLeds) {
+        const deskH = col.deskHeight || 80;
+        _bpDrawLedPairs(p, [{ startRow: 0, endRow: 0 }], [deskH, deskH + (col.deskClearance || 80)], x, w, botSvgY, sc, font);
+    }
+}
+
 function _bpIsDoorZoneType(t) {
     return t === 'door_right' || t === 'door_left' || t === 'door_double' || t === 'door_flap';
 }
@@ -2453,7 +2462,7 @@ window._generateMultiViewBlueprintSVG = function() {
                     makeShelfFn: (pp, x1, sy, x2, scc, tCm, showLabel) => shelfLine(x1, sy, x2, scc, tCm, showLabel)
                 });
             });
-            _bpDrawLedPairs(p, col.leds, rowBoundsEarly, colX, colW, _colBotY, sc, FONT);
+            _bpDrawColLeds(p, col, rowBoundsEarly, colX, colW, _colBotY, sc, FONT);
             colX += colW;
         });
         _bpHoneycombSepFlush(p);
@@ -3443,7 +3452,7 @@ window._generateMultiViewBlueprintPages = function() {
                     makeRectFn: makeRect, makeShelfFn: makeShelfLine
                 });
             });
-            _bpDrawLedPairs(p, col.leds, rowBounds, colX, colW, _colBotSvgY, sc, FONT);
+            _bpDrawColLeds(p, col, rowBounds, colX, colW, _colBotSvgY, sc, FONT);
             colX += colW;
         });
 
@@ -4007,7 +4016,7 @@ window._generateMultiViewBlueprintPages = function() {
                         { x: colX, y: cellY1, w: colW, h: cellH });
                 }
             }
-            _bpDrawLedPairs(p, col.leds, rowBounds, colX, colW, oy + dH, sc, FONT);
+            _bpDrawColLeds(p, col, rowBounds, colX, colW, oy + dH, sc, FONT);
             colX += colW;
         });
 
@@ -4280,7 +4289,7 @@ window._generateMultiViewBlueprintPages = function() {
                                 { x: colX, y: cellY1, w: colW, h: cellH });
                         }
                     }
-                    _bpDrawLedPairs(p, col.leds, rowBounds, colX, colW, oy + dH, scScale, FONT);
+                    _bpDrawColLeds(p, col, rowBounds, colX, colW, oy + dH, scScale, FONT);
                     colX += colW;
                 });
 
@@ -4704,7 +4713,7 @@ window._generateMultiViewBlueprintPages = function() {
                         { x: colX, y: cellY1, w: colW, h: cellH });
                 }
             }
-            _bpDrawLedPairs(p, col.leds, rowBounds, colX, colW, oy + dH, sc, FONT);
+            _bpDrawColLeds(p, col, rowBounds, colX, colW, oy + dH, sc, FONT);
             colX += colW;
         });
 

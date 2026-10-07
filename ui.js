@@ -530,7 +530,7 @@ window.toggleInternalDesk = function() {
     const col = state.columns[state.activeEditCol];
     if (col.type === 'desk') {
         col.type = 'normal';
-        delete col.deskHeight; delete col.deskClearance; delete col.hasDrawers; delete col.drawerHeight;
+        delete col.deskHeight; delete col.deskClearance; delete col.hasDrawers; delete col.drawerHeight; delete col.deskLeds;
     } else {
         col.type = 'desk';
         col.deskHeight = 80;
@@ -788,6 +788,7 @@ function buildDimensionsAndButtonsUI() {
         if (d.isHoneycombMergeBtn) return;
         if (d.isDeskDrawerMergeBtn) return;
         if (d.isTvSizeBtn) return;
+        if (d.isDeskLedBtn) return;
 
         // ---- Column width label above each column (editable) ----
         if (d.isColWidth) {
@@ -1196,6 +1197,22 @@ function buildDimensionsAndButtonsUI() {
             btn.addEventListener('click', function(e) {
                 e.stopPropagation();
                 if (typeof window.toggleDeskDrawerMerge === 'function') window.toggleDeskDrawerMerge();
+            });
+            dimLayer.appendChild(btn);
+        });
+
+        state.dimData.filter(d => d.isDeskLedBtn).forEach(d => {
+            const btn = document.createElement('div');
+            btn.className = 'desk-led-btn' + (d.on ? ' on' : '');
+            btn.dataset.x3d = d.x;
+            btn.dataset.y3d = d.y;
+            btn.title = d.on ? 'הסר זוג לדים מעל השולחן' : 'הוסף זוג לדים מעל השולחן';
+            btn.innerHTML = '<i class="fa-' + (d.on ? 'solid' : 'regular') + ' fa-lightbulb"></i>' + (d.on ? '' : '<span>+</span>');
+            btn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); });
+            btn.addEventListener('pointerup', e => e.stopPropagation());
+            btn.addEventListener('click', e => {
+                e.stopPropagation();
+                window.toggleDeskLeds(d.colIndex);
             });
             dimLayer.appendChild(btn);
         });
@@ -2260,6 +2277,7 @@ function _serializeColumnForClipboard(col) {
         hasDrawers:    col.hasDrawers,
         drawerHeight:  col.drawerHeight,
         deskDrawerCount: col.deskDrawerCount,
+        deskLeds:      !!col.deskLeds,
     };
 }
 
@@ -2295,7 +2313,9 @@ function _applyColumnClipboard(target, src) {
         target.hasDrawers     = srcCopy.hasDrawers;
         target.drawerHeight   = srcCopy.drawerHeight;
         target.deskDrawerCount = srcCopy.deskDrawerCount;
+        if (srcCopy.deskLeds) target.deskLeds = true; else delete target.deskLeds;
     } else {
+        delete target.deskLeds;
         delete target.deskHeight;
         delete target.deskClearance;
         delete target.hasDrawers;
@@ -2634,7 +2654,9 @@ window._applyColumnTemplateToCol = function(target, tplData) {
         target.hasDrawers = src.hasDrawers;
         target.drawerHeight = src.drawerHeight;
         target.deskDrawerCount = src.deskDrawerCount;
+        if (src.deskLeds) target.deskLeds = true; else delete target.deskLeds;
     } else {
+        delete target.deskLeds;
         delete target.deskHeight;
         delete target.deskClearance;
         delete target.hasDrawers;
@@ -3959,7 +3981,7 @@ function updateOverlaysPosition() {
         return localPt.project(camera);
     };
 
-    document.querySelectorAll('.dim-container, .select-all-col-btn, .col-template-btn, .sub-cell-btn, .cell-select-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn, .led-cell-icon, .tv-size-btn').forEach(el => {
+    document.querySelectorAll('.dim-container, .select-all-col-btn, .col-template-btn, .sub-cell-btn, .cell-select-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn, .led-cell-icon, .tv-size-btn, .desk-led-btn').forEach(el => {
         const pos = projectWingPoint(parseFloat(el.dataset.x3d), parseFloat(el.dataset.y3d));
         let x = (pos.x * .5 + .5) * cw;
         let y = (-(pos.y * .5) + .5) * ch;
@@ -5726,6 +5748,14 @@ window.toggleLedPair = function() {
     }
     buildCabinet(); calculatePrice(); saveHistoryState();
     updateToolbarButtonHighlights();
+};
+
+/** LED pair in the knee space above an internal desk (not a compartment row, so not selectable). */
+window.toggleDeskLeds = function(colIndex) {
+    const col = state.columns[colIndex];
+    if (!col || col.type !== 'desk') return;
+    if (col.deskLeds) delete col.deskLeds; else col.deskLeds = true;
+    buildCabinet(); calculatePrice(); saveHistoryState();
 };
 
 window.applyDoorStyle = function(style) {
@@ -7705,7 +7735,7 @@ function _isCanvasOverlayUiTarget(el) {
     if (!el || !el.closest) return false;
     return !!el.closest(
         '#column-quick-edit, #full-corner-quick-edit, #bottom-floating-toolbar, #bed-toolbar, #room-props-row, #room-furniture-toolbar, #room-plan-layer, #btn-room-plan-view-toggle, ' +
-        '.drag-handle, .dim-container, .col-width-label, .plus-btn, .fc-cell-btn, .select-all-col-btn, .col-template-btn, .cell-select-btn, .sub-cell-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn, .tv-size-btn, #tv-size-menu'
+        '.drag-handle, .dim-container, .col-width-label, .plus-btn, .fc-cell-btn, .select-all-col-btn, .col-template-btn, .cell-select-btn, .sub-cell-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn, .tv-size-btn, #tv-size-menu, .desk-led-btn'
     );
 }
 
@@ -13311,7 +13341,7 @@ function _countCabinetContent(columns) {
 function _countLedPairs(columns) {
     if (!Array.isArray(columns)) return 0;
     return columns.reduce(function(n, col) {
-        return n + ((col && Array.isArray(col.leds)) ? col.leds.length : 0);
+        return n + ((col && Array.isArray(col.leds)) ? col.leds.length : 0) + (col && col.type === 'desk' && col.deskLeds ? 1 : 0);
     }, 0);
 }
 

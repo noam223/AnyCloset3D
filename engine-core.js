@@ -5706,6 +5706,24 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         const _isBathroomRegalim = (state.presetId === 'bathroom' && isRegalim);
         let startShelvesY = fo > 0 ? fo + t : (col.noPlinth ? t : (_isBathroomRegalim ? state.plinthHeight : state.plinthHeight + t));
 
+        // LED pairs as real meshes so preview captures (print/quote images) include them
+        const _addLedPair = (botY, topY, halfSpan) => {
+            const h = topY - botY - 1;
+            if (h < 2) return;
+            const ledMat = new THREE.MeshBasicMaterial({ color: 0xffc94d });
+            const stripGeo = new THREE.BoxGeometry(1.4, h, 1.4);
+            [-1, 1].forEach(s => {
+                const strip = new THREE.Mesh(stripGeo, ledMat);
+                strip.position.set(colCenterX + s * halfSpan, (botY + topY) / 2, bodyD / 2 - 2.5);
+                _buildGroup.add(strip);
+            });
+            if (window._captureLedIcons && typeof window._ledIconSprite === 'function') {
+                const icon = window._ledIconSprite();
+                icon.position.set(colCenterX + halfSpan - 6, topY - 7, bodyD / 2 + 2);
+                _buildGroup.add(icon);
+            }
+        };
+
         if (isDesk) {
             const colDeskT = _deskT(!!col.hasDrawers);
             // Desk surface protrudes forward to align with door-face line (17mm w/ drawers, 28mm without)
@@ -5764,6 +5782,12 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                 hitBox.position.set(colCenterX, hitY, -1);
                 hitBox.userData = { colIndex: c, rowIndex: -1 };
                 _buildGroup.add(hitBox); hitBoxes.push(hitBox);
+            }
+            // Knee space above the desk is not a compartment row — its LED pair is a column flag
+            const _deskZoneTop = col.deskHeight + col.deskClearance;
+            if (!isBP && col.deskLeds) _addLedPair(col.deskHeight, _deskZoneTop, col.width / 2 - 0.9);
+            if (!isBP && _isActiveWingBuild) {
+                state.dimData.push({ isDeskLedBtn: true, colIndex: c, on: !!col.deskLeds, x: colCenterX + col.width / 2 - 9, y: _deskZoneTop - 9 });
             }
         } else {
             // For sliding wardrobes and noPlinth columns: back panel starts above the bottom board (y=t).
@@ -6938,31 +6962,15 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
             prevY = isLast ? col.height : div.y + div.thick/2;
         }
 
-        // LED pairs as real meshes so preview captures (print/quote images) include them
         if (!isBP && Array.isArray(col.leds) && col.leds.length) {
-            const ledMat = new THREE.MeshBasicMaterial({ color: 0xffc94d });
             col.leds.forEach(g => {
                 const bot = _ledRowY[g.startRow];
                 const top = _ledRowY[Math.min(g.endRow, _ledRowY.length - 1)];
                 if (!bot || !top) return;
-                const h = top[1] - bot[0] - 1;
-                if (h < 2) return;
-                const midY = (bot[0] + top[1]) / 2;
                 // Open cells have their own side boards inside the column walls
                 const inOpenCell = (col.compartments || []).slice(g.startRow, g.endRow + 1)
                     .some(cp => cp && (cp.type === 'open_cell' || cp.type === 'side_open_cell'));
-                const halfSpan = col.width / 2 - (inOpenCell ? t : 0) - 0.9;
-                const stripGeo = new THREE.BoxGeometry(1.4, h, 1.4);
-                [-1, 1].forEach(s => {
-                    const strip = new THREE.Mesh(stripGeo, ledMat);
-                    strip.position.set(colCenterX + s * halfSpan, midY, bodyD / 2 - 2.5);
-                    _buildGroup.add(strip);
-                });
-                if (window._captureLedIcons && typeof window._ledIconSprite === 'function') {
-                    const icon = window._ledIconSprite();
-                    icon.position.set(colCenterX + halfSpan - 6, top[1] - 7, bodyD / 2 + 2);
-                    _buildGroup.add(icon);
-                }
+                _addLedPair(bot[0], top[1], col.width / 2 - (inOpenCell ? t : 0) - 0.9);
             });
         }
 
