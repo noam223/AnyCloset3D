@@ -2,6 +2,9 @@
   "mcpServers": {
     "supabase": {
       "url": "https://mcp.supabase.com/mcp?project_ref=meqxnsjycvfgfhdepguo"
+    },
+    "make": {
+      "url": "https://mcp.make.com"
     }
   }
 }
