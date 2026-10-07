@@ -1,0 +1,11 @@
+User-agent: *
+Disallow: /admin.html
+Disallow: /projects.html
+Disallow: /index.html
+Disallow: /viewer.html
+Disallow: /upload-measurement.html
+Disallow: /partner-pitch.html
+Disallow: /mockups/
+Disallow: /*-mockup*.html
+
+Sitemap: https://anycloset3d.com/sitemap.xml
