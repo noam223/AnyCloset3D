@@ -1907,7 +1907,7 @@ function _compHasOpenCell(comp) {
  */
 const GLASS_TINTS = {
     clear:  { label: 'שקוף',  color: null,     opacity: null, reveal: 1,    glow: 0.35 },
-    smoked: { label: 'מושחר', color: 0x16181b, opacity: 0.86, reveal: 0.45, glow: 1.1 }
+    smoked: { label: 'מושחר', color: 0x16181b, opacity: 0.72, reveal: 0.5, glow: 1.1 }
 };
 window.GLASS_TINTS = GLASS_TINTS;
 window._glassTintKey = function(w) {
