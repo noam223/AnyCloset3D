@@ -33,6 +33,27 @@ controls.addEventListener('change', () => {
     }
 });
 
+/** Shared materials for LED strips set into a side-wall groove (channel, diffuser, glow on the wall). */
+function _ledGrooveMats() {
+    if (window._ledGrooveMatsCache) return window._ledGrooveMatsCache;
+    const cv = document.createElement('canvas');
+    cv.width = 64; cv.height = 4;
+    const g = cv.getContext('2d');
+    const grad = g.createLinearGradient(0, 0, 64, 0);
+    grad.addColorStop(0, 'rgba(255,205,90,0)');
+    grad.addColorStop(0.5, 'rgba(255,215,120,0.6)');
+    grad.addColorStop(1, 'rgba(255,205,90,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 64, 4);
+    window._ledGrooveMatsCache = {
+        groove: new THREE.MeshBasicMaterial({ color: 0x1e1e1e }),
+        lens: new THREE.MeshBasicMaterial({ color: 0xffd36b }),
+        glow: new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false, side: THREE.DoubleSide })
+    };
+    return window._ledGrooveMatsCache;
+}
+window._ledGrooveMats = _ledGrooveMats;
+
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.95);
 scene.add(ambientLight);
 const dirLight = new THREE.DirectionalLight(0xffffff, 0.20);
@@ -5706,20 +5727,33 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         const _isBathroomRegalim = (state.presetId === 'bathroom' && isRegalim);
         let startShelvesY = fo > 0 ? fo + t : (col.noPlinth ? t : (_isBathroomRegalim ? state.plinthHeight : state.plinthHeight + t));
 
-        // LED pairs as real meshes so preview captures (print/quote images) include them
-        const _addLedPair = (botY, topY, halfSpan) => {
+        // LED pairs as real meshes so preview captures (print/quote images) include them.
+        // wallX = distance from column centre to the side wall's inner face. Each strip is an LED profile
+        // set into a groove routed in that face: dark channel flush with the wall, diffuser barely proud,
+        // soft glow spilling onto the wall around it.
+        const _addLedPair = (botY, topY, wallX) => {
             const h = topY - botY - 1;
             if (h < 2) return;
-            const ledMat = new THREE.MeshBasicMaterial({ color: 0xffc94d });
-            const stripGeo = new THREE.BoxGeometry(1.4, h, 1.4);
+            const mats = _ledGrooveMats();
+            const yC = (botY + topY) / 2, zC = bodyD / 2 - 3.5;
+            const grooveGeo = new THREE.BoxGeometry(0.5, h + 0.6, 2.2);
+            const lensGeo = new THREE.BoxGeometry(0.8, h, 1.2);
+            const glowGeo = new THREE.PlaneGeometry(7, h);
             [-1, 1].forEach(s => {
-                const strip = new THREE.Mesh(stripGeo, ledMat);
-                strip.position.set(colCenterX + s * halfSpan, (botY + topY) / 2, bodyD / 2 - 2.5);
-                _buildGroup.add(strip);
+                const face = colCenterX + s * wallX;
+                const groove = new THREE.Mesh(grooveGeo, mats.groove);
+                groove.position.set(face + s * 0.13, yC, zC);
+                const lens = new THREE.Mesh(lensGeo, mats.lens);
+                lens.position.set(face - s * 0.32, yC, zC);
+                const glow = new THREE.Mesh(glowGeo, mats.glow);
+                glow.rotation.y = Math.PI / 2;
+                glow.position.set(face - s * 0.04, yC, zC);
+                glow.renderOrder = 2;
+                _buildGroup.add(groove, lens, glow);
             });
             if (window._captureLedIcons && typeof window._ledIconSprite === 'function') {
                 const icon = window._ledIconSprite();
-                icon.position.set(colCenterX + halfSpan - 6, topY - 7, bodyD / 2 + 2);
+                icon.position.set(colCenterX + wallX - 6, topY - 7, bodyD / 2 + 2);
                 _buildGroup.add(icon);
             }
         };
@@ -5773,18 +5807,24 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                 createBoard(col.width, backH, backT, colCenterX, col.deskHeight + backH/2, -bodyD/2 + backT/2, matDesk);
                 _ppPartId = '';
             }
-            if (!isBP && _isActiveWingBuild) {
-                const hitH = startShelvesY - (state.plinthHeight + t);
-                const hitY = (state.plinthHeight + t) + hitH/2;
-                const isHoveredCol = (state.hoveredColIndex === c);
-                const hitMat = new THREE.MeshBasicMaterial({ color: isHoveredCol ? 0x2ecc71 : 0x3498db, transparent: true, opacity: isHoveredCol ? 0.05 : 0.0, depthWrite: false });
-                const hitBox = new THREE.Mesh(new THREE.BoxGeometry(col.width, hitH, bodyD - backT - 2), hitMat);
-                hitBox.position.set(colCenterX, hitY, -1);
-                hitBox.userData = { colIndex: c, rowIndex: -1 };
-                _buildGroup.add(hitBox); hitBoxes.push(hitBox);
-            }
-            // Knee space above the desk is not a compartment row — its LED pair is a column flag
+            // Knee space above the desk is not a compartment row — it is selectable as pseudo-row -1
             const _deskZoneTop = col.deskHeight + col.deskClearance;
+            if (!isBP && _isActiveWingBuild) {
+                const isHoveredCol = (state.hoveredColIndex === c);
+                const zoneSelected = state.selection.colIndex === c && state.selection.rows.includes(-1);
+                const _deskHit = (botY, topY, selected, extra) => {
+                    const hitH = topY - botY;
+                    if (hitH <= 0) return;
+                    const hitMat = new THREE.MeshBasicMaterial({ color: isHoveredCol ? 0x2ecc71 : 0x3498db, transparent: true, opacity: selected ? 0.3 : (isHoveredCol ? 0.05 : 0.0), depthWrite: false });
+                    const hitBox = new THREE.Mesh(new THREE.BoxGeometry(col.width, hitH, bodyD - backT - 2), hitMat);
+                    hitBox.position.set(colCenterX, botY + hitH / 2, -1);
+                    hitBox.userData = Object.assign({ colIndex: c, rowIndex: -1 }, extra);
+                    _buildGroup.add(hitBox); hitBoxes.push(hitBox);
+                };
+                _deskHit(state.plinthHeight + t, col.deskHeight, false, {});
+                _deskHit(col.deskHeight, startShelvesY, zoneSelected, { deskZone: true });
+                state.dimData.push({ isDeskZoneCell: true, colIndex: c, rowIndex: -1, x: colCenterX, y: col.deskHeight + col.deskClearance / 2, h: col.deskClearance });
+            }
             if (!isBP && col.deskHoneycomb) {
                 // Same lining frame as a regular כוורת block: boards of thickness t inside the knee space
                 const zH = col.deskClearance, zC = col.deskHeight + zH / 2;
@@ -5795,11 +5835,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                 [-1, 1].forEach(s => createBoard(t, zH - 2 * t, bodyD - 2, colCenterX + s * (col.width / 2 - t / 2), zC, 1, matOpenCell));
                 _ppPartId = '';
             }
-            if (!isBP && col.deskLeds) _addLedPair(col.deskHeight, _deskZoneTop, col.width / 2 - (col.deskHoneycomb ? t : 0) - 0.9);
-            if (!isBP && _isActiveWingBuild) {
-                state.dimData.push({ isDeskLedBtn: true, colIndex: c, on: !!col.deskLeds, x: colCenterX + col.width / 2 - 9, y: _deskZoneTop - 9 });
-                state.dimData.push({ isDeskHoneycombBtn: true, colIndex: c, on: !!col.deskHoneycomb, x: colCenterX - col.width / 2 + 9, y: _deskZoneTop - 9 });
-            }
+            if (!isBP && col.deskLeds) _addLedPair(col.deskHeight, _deskZoneTop, col.width / 2 - (col.deskHoneycomb ? t : 0));
         } else {
             // For sliding wardrobes and noPlinth columns: back panel starts above the bottom board (y=t).
             const backBottomY = (_isSlidingWardrobe || col.noPlinth) ? (fo > 0 ? fo + t : t) : (fo > 0 ? fo + t : state.plinthHeight + t);
@@ -6981,7 +7017,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                 // Open cells have their own side boards inside the column walls
                 const inOpenCell = (col.compartments || []).slice(g.startRow, g.endRow + 1)
                     .some(cp => cp && (cp.type === 'open_cell' || cp.type === 'side_open_cell'));
-                _addLedPair(bot[0], top[1], col.width / 2 - (inOpenCell ? t : 0) - 0.9);
+                _addLedPair(bot[0], top[1], col.width / 2 - (inOpenCell ? t : 0));
             });
         }
 

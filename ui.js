@@ -789,7 +789,7 @@ function buildDimensionsAndButtonsUI() {
         if (d.isHoneycombMergeBtn) return;
         if (d.isDeskDrawerMergeBtn) return;
         if (d.isTvSizeBtn) return;
-        if (d.isDeskLedBtn || d.isDeskHoneycombBtn) return;
+        if (d.isDeskZoneCell) return;
 
         // ---- Column width label above each column (editable) ----
         if (d.isColWidth) {
@@ -1202,23 +1202,38 @@ function buildDimensionsAndButtonsUI() {
             dimLayer.appendChild(btn);
         });
 
-        state.dimData.filter(d => d.isDeskLedBtn || d.isDeskHoneycombBtn).forEach(d => {
-            const isLed = !!d.isDeskLedBtn;
-            const btn = document.createElement('div');
-            btn.className = 'desk-led-btn' + (isLed ? '' : ' is-honeycomb') + (d.on ? ' on' : '');
-            btn.dataset.x3d = d.x;
-            btn.dataset.y3d = d.y;
-            const what = isLed ? 'זוג לדים' : 'כוורת';
-            btn.title = (d.on ? 'הסר ' : 'הוסף ') + what + ' מעל השולחן';
-            const icon = isLed ? (d.on ? 'fa-solid fa-lightbulb' : 'fa-regular fa-lightbulb') : 'fa-regular fa-square-full';
-            btn.innerHTML = '<i class="' + icon + '"></i>' + (d.on ? '' : '<span>+</span>');
-            btn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); });
-            btn.addEventListener('pointerup', e => e.stopPropagation());
-            btn.addEventListener('click', e => {
-                e.stopPropagation();
-                if (isLed) window.toggleDeskLeds(d.colIndex); else window.toggleDeskHoneycomb(d.colIndex);
-            });
-            dimLayer.appendChild(btn);
+        // Knee space above an internal desk: same cell pill as a regular cell, selects pseudo-row -1
+        state.dimData.filter(d => d.isDeskZoneCell).forEach(d => {
+            const col = state.columns[d.colIndex];
+            if (!col) return;
+            const dimEl = document.createElement('div');
+            dimEl.className = 'dim-container pill-mode';
+            dimEl.dataset.x3d = d.x;
+            dimEl.dataset.y3d = d.y;
+            dimEl.addEventListener('pointerdown', e => e.stopPropagation());
+            dimEl.addEventListener('pointerup', e => e.stopPropagation());
+            dimEl.appendChild(_buildCellPill({
+                selected: state.selection.colIndex === d.colIndex && state.selection.rows.includes(-1),
+                hasContent: !!(col.deskLeds || col.deskHoneycomb),
+                heightCm: Math.round((Number(d.h) || 0) * 10) / 10,
+                onToggle: () => toggleSelection(d.colIndex, -1),
+                onTrash: () => {
+                    delete col.deskLeds;
+                    delete col.deskHoneycomb;
+                    buildCabinet(); calculatePrice(); saveHistoryState();
+                },
+                onHeightChange: (desired) => {
+                    let maxTop = col.shelvesY.length > 0 ? col.shelvesY[0] - MIN_SHELF_GAP : col.height - MIN_SHELF_GAP;
+                    if (col.splitY) maxTop = Math.min(maxTop, col.splitY - MIN_SHELF_GAP);
+                    const clr = Math.round(Math.max(30, Math.min(maxTop - col.deskHeight, desired)) * 10) / 10;
+                    if (Math.abs(clr - col.deskClearance) < 0.001) return false;
+                    col.deskClearance = clr;
+                    distributeShelves(col);
+                    buildCabinet(); updateCameraView(); calculatePrice(); saveHistoryState();
+                }
+            }));
+            dimEl.style.cursor = 'default';
+            dimLayer.appendChild(dimEl);
         });
 
         state.dimData.filter(d => d.isTvSizeBtn).forEach(d => {
@@ -1719,6 +1734,8 @@ window.applyHandleStyleToCell = function(style, choice) {
 function updateToolbarState() {
     const toolbar = document.getElementById('bottom-floating-toolbar');
     if(!toolbar) return;
+    // Desk knee-zone selection outlives its desk (desk removed / undo) → drop it
+    if (state.selection.rows.includes(-1) && !_isDeskZoneSelection()) state.selection = { colIndex: -1, rows: [] };
     
     const hasSelection = (state.selection.colIndex > -1 && state.selection.rows.length > 0);
     const viewModeOK = (state.viewMode === 'front');
@@ -1777,6 +1794,8 @@ function updateToolbarState() {
 function updateToolbarButtonHighlights() {
     const toolbar = document.getElementById('bottom-floating-toolbar');
     if(!toolbar) return;
+    const deskZone = _isDeskZoneSelection();
+    toolbar.classList.toggle('desk-zone-mode', deskZone);
     toolbar.querySelectorAll('button.toolbar-btn').forEach(b => b.classList.remove('active'));
     const hcBtn = document.getElementById('tb-btn-honeycomb');
     if (hcBtn) {
@@ -1816,6 +1835,8 @@ function updateToolbarButtonHighlights() {
 
     const ledBtn = document.getElementById('tb-btn-led');
     if (ledBtn) ledBtn.classList.toggle('active', _ledGroupIndexForSelection(col) !== -1);
+    // Desk knee zone: only כוורת + לדים apply (CSS hides the rest of the toolbar)
+    if (deskZone) return;
 
     // "תאים שווים" button: show only when 2+ consecutive rows are selected
     const equalCellsBtn = document.getElementById('tb-btn-equal-cells');
@@ -3401,8 +3422,10 @@ window.applyCabinetTemplate = function(id) {
 
 function toggleSelection(c, r) {
     _clearSubCellSelection();
-    if (state.selection.colIndex !== c) {
-        state.selection = { colIndex: c, rows: [r] };
+    // The desk knee zone (pseudo-row -1) is never combined with regular rows
+    if (state.selection.colIndex !== c || r === -1 || state.selection.rows.includes(-1)) {
+        const deselect = state.selection.colIndex === c && state.selection.rows.length === 1 && state.selection.rows[0] === r;
+        state.selection = deselect ? { colIndex: -1, rows: [] } : { colIndex: c, rows: [r] };
     } else {
         if (state.selection.rows.includes(r)) {
             state.selection.rows = state.selection.rows.filter(row => row !== r);
@@ -3990,7 +4013,7 @@ function updateOverlaysPosition() {
         return localPt.project(camera);
     };
 
-    document.querySelectorAll('.dim-container, .select-all-col-btn, .col-template-btn, .sub-cell-btn, .cell-select-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn, .led-cell-icon, .tv-size-btn, .desk-led-btn').forEach(el => {
+    document.querySelectorAll('.dim-container, .select-all-col-btn, .col-template-btn, .sub-cell-btn, .cell-select-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn, .led-cell-icon, .tv-size-btn').forEach(el => {
         const pos = projectWingPoint(parseFloat(el.dataset.x3d), parseFloat(el.dataset.y3d));
         let x = (pos.x * .5 + .5) * cw;
         let y = (-(pos.y * .5) + .5) * ch;
@@ -4088,10 +4111,27 @@ function updateOverlaysPosition() {
     }
 }
 
+/** Column-level hitboxes also use rowIndex -1; only the desk knee-zone one shows the selection tint. */
+function _hitBoxSelected(hb) {
+    const u = hb.userData;
+    if (u.colIndex !== state.selection.colIndex || !state.selection.rows.includes(u.rowIndex)) return false;
+    return u.rowIndex !== -1 || !!u.deskZone;
+}
+
+/** True when the selection is the knee space above an internal desk (pseudo-row -1). */
+function _isDeskZoneSelection() {
+    const sel = state.selection;
+    if (sel.colIndex === -1 || sel.rows.length !== 1 || sel.rows[0] !== -1) return false;
+    const col = state.columns[sel.colIndex];
+    return !!(col && col.type === 'desk');
+}
+window._isDeskZoneSelection = _isDeskZoneSelection;
+
 /** 'open_cell' | 'side_open_cell' when the current selection holds a honeycomb, else null. */
 function _selectionHoneycombType() {
     if (state.selection.colIndex === -1 || state.selection.rows.length === 0) return null;
     const col = state.columns[state.selection.colIndex];
+    if (_isDeskZoneSelection()) return col.deskHoneycomb ? 'open_cell' : null;
     const comp = col && col.compartments[state.selection.rows[0]];
     if (!comp) return null;
     if (_activeSubCellIdxs.size > 0 && comp.partition && Array.isArray(comp.subCells)) {
@@ -4114,6 +4154,12 @@ function _selectionHoneycombType() {
 
 /** כוורת button: removes the honeycomb when the selection already has one, otherwise opens its sub-panel. */
 window.onHoneycombBtnClick = function(btn) {
+    if (_isDeskZoneSelection()) {
+        closeContentSubPanels();
+        window.toggleDeskHoneycomb(state.selection.colIndex);
+        updateToolbarButtonHighlights();
+        return;
+    }
     const current = _selectionHoneycombType();
     if (!current) {
         toggleContentSubPanel('honeycomb', btn);
@@ -5191,6 +5237,10 @@ window.applyContentForce = function(type) {
         _dbgHang('applyContentForce ABORT: no selection');
         return;
     }
+    if (_isDeskZoneSelection()) {
+        if (type === 'open_cell' && !state.columns[state.selection.colIndex].deskHoneycomb) window.toggleDeskHoneycomb(state.selection.colIndex);
+        return;
+    }
 
     // Partition is cell-level only — never apply as zone content
     if (type === 'partition') {
@@ -5442,6 +5492,10 @@ window.applyContent = function(type) {
     _dbgHangSnapshot('applyContent IN type=' + type);
     if (state.selection.colIndex === -1 || state.selection.rows.length === 0) {
         _dbgHang('applyContent ABORT: no selection');
+        return;
+    }
+    if (_isDeskZoneSelection()) {
+        if (type === 'open_cell') window.toggleDeskHoneycomb(state.selection.colIndex);
         return;
     }
 
@@ -5727,6 +5781,7 @@ window.applyDoor = function(type) {
 
 /** Index of the LED group that fully contains the current selection, or -1. */
 function _ledGroupIndexForSelection(col) {
+    if (_isDeskZoneSelection()) return col && col.deskLeds ? 0 : -1;
     if (!col || !Array.isArray(col.leds) || state.selection.rows.length === 0) return -1;
     const s = Math.min(...state.selection.rows);
     const e = Math.max(...state.selection.rows);
@@ -5737,6 +5792,11 @@ window._ledGroupIndexForSelection = _ledGroupIndexForSelection;
 /** Toggle a pair of LED strips spanning the selected cells (priced per group). */
 window.toggleLedPair = function() {
     if (state.selection.colIndex === -1 || state.selection.rows.length === 0) return;
+    if (_isDeskZoneSelection()) {
+        window.toggleDeskLeds(state.selection.colIndex);
+        updateToolbarButtonHighlights();
+        return;
+    }
     const col = state.columns[state.selection.colIndex];
     if (!col) return;
     if (!Array.isArray(col.leds)) col.leds = [];
@@ -5759,7 +5819,7 @@ window.toggleLedPair = function() {
     updateToolbarButtonHighlights();
 };
 
-/** LED pair in the knee space above an internal desk (not a compartment row, so not selectable). */
+/** LED pair in the knee space above an internal desk (selected as pseudo-row -1). */
 window.toggleDeskLeds = function(colIndex) {
     const col = state.columns[colIndex];
     if (!col || col.type !== 'desk') return;
@@ -7752,7 +7812,7 @@ function _isCanvasOverlayUiTarget(el) {
     if (!el || !el.closest) return false;
     return !!el.closest(
         '#column-quick-edit, #full-corner-quick-edit, #bottom-floating-toolbar, #bed-toolbar, #room-props-row, #room-furniture-toolbar, #room-plan-layer, #btn-room-plan-view-toggle, ' +
-        '.drag-handle, .dim-container, .col-width-label, .plus-btn, .fc-cell-btn, .select-all-col-btn, .col-template-btn, .cell-select-btn, .sub-cell-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn, .tv-size-btn, #tv-size-menu, .desk-led-btn'
+        '.drag-handle, .dim-container, .col-width-label, .plus-btn, .fc-cell-btn, .select-all-col-btn, .col-template-btn, .cell-select-btn, .sub-cell-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn, .tv-size-btn, #tv-size-menu'
     );
 }
 
@@ -8756,7 +8816,7 @@ function bindUI() {
             state.hoveredColIndex = hoverCol; state.activeEditCol = hoverCol;
             hitBoxes.forEach(hb => {
                 if (hb.userData.noHighlight) return; // invisible trigger zones — never show highlight
-                const isSelected = (hb.userData.colIndex === state.selection.colIndex && state.selection.rows.includes(hb.userData.rowIndex));
+                const isSelected = _hitBoxSelected(hb);
                 const isHovered = (hb.userData.colIndex === state.hoveredColIndex);
                 hb.material.opacity = isSelected ? 0.3 : (isHovered ? 0.05 : 0.0);
             });
@@ -8765,7 +8825,7 @@ function bindUI() {
             state.hoveredColIndex = -1;
             hitBoxes.forEach(hb => {
                 if (hb.userData.noHighlight) return; // invisible trigger zones — never show highlight
-                const isSelected = (hb.userData.colIndex === state.selection.colIndex && state.selection.rows.includes(hb.userData.rowIndex));
+                const isSelected = _hitBoxSelected(hb);
                 hb.material.opacity = isSelected ? 0.3 : 0.0;
             });
             buildDragHandlesUI();
@@ -16802,8 +16862,14 @@ document.addEventListener('keydown', (e) => {
         const { colIndex, rows } = state.selection;
         if (colIndex > -1 && rows.length > 0 && state.columns[colIndex]) {
             let changed = false;
+            const col = state.columns[colIndex];
+            if (_isDeskZoneSelection() && (col.deskLeds || col.deskHoneycomb)) {
+                delete col.deskLeds;
+                delete col.deskHoneycomb;
+                changed = true;
+            }
             rows.forEach(r => {
-                const comp = state.columns[colIndex].compartments[r];
+                const comp = col.compartments[r];
                 if (comp && comp.type !== 'empty') {
                     comp.type = 'empty';
                     delete comp.partition; delete comp.partitionX; delete comp.subCells;

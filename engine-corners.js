@@ -825,22 +825,31 @@ function buildFullCornerUnit(side, wingData) {
     // ---- LED pairs: two glowing strips at the ends of the L opening, spanning the group's cells ----
     if (!isBP && Array.isArray(fc.leds) && fc.leds.length) {
         const cellY = [plinthH + t, ...shelvesY, colH - t];
-        const ledMat = new THREE.MeshBasicMaterial({ color: 0xffc94d });
+        const mats = window._ledGrooveMats();
         fc.leds.forEach(g => {
             const yBot = cellY[g.startRow];
             const yTop = cellY[g.endRow + 1];
             if (yBot == null || yTop == null || yTop - yBot < 2) return;
             const h = yTop - yBot - 1;
             const midY = (yBot + yTop) / 2;
-            const stripGeo = new THREE.BoxGeometry(1.2, h, 1.2);
-            // Next to the wall facing the center cabinet, just behind the front opening
-            const s1 = new THREE.Mesh(stripGeo, ledMat);
-            s1.position.set(-sign * (cw - t - 0.8), midY, frontD - 2.5);
-            fcGroup.add(s1);
-            // Next to the front wall at the far end of the side opening
-            const s2 = new THREE.Mesh(stripGeo, ledMat);
-            s2.position.set(-sign * (wingD - 2.5), midY, cd - t - 0.8);
-            fcGroup.add(s2);
+            // Strip set into a groove in a wall face; `alongZ` = the face runs along Z (normal along X)
+            const addGrooved = (alongZ, faceX, faceZ, inward) => {
+                const dims = (across, depth) => alongZ ? [depth, across] : [across, depth];
+                const [gx, gz] = dims(2.2, 0.5), [lx, lz] = dims(1.2, 0.8);
+                const groove = new THREE.Mesh(new THREE.BoxGeometry(gx, h + 0.6, gz), mats.groove);
+                const lens = new THREE.Mesh(new THREE.BoxGeometry(lx, h, lz), mats.lens);
+                const glow = new THREE.Mesh(new THREE.PlaneGeometry(7, h), mats.glow);
+                if (alongZ) glow.rotation.y = Math.PI / 2;
+                glow.renderOrder = 2;
+                [[groove, -0.13], [lens, 0.32], [glow, 0.04]].forEach(([m, off]) => {
+                    m.position.set(alongZ ? faceX + inward * off : faceX, midY, alongZ ? faceZ : faceZ + inward * off);
+                    fcGroup.add(m);
+                });
+            };
+            // Wall facing the center cabinet, just behind the front opening
+            addGrooved(true, -sign * (cw - t), frontD - 3.5, sign);
+            // Front wall at the far end of the side opening
+            addGrooved(false, -sign * (wingD - 3.5), cd - t, -1);
         });
     }
 

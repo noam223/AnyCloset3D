@@ -39,7 +39,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260910deskMerge">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
     <link rel="stylesheet" href="style-extras.css?v=20260731rpcab">
-    <link rel="stylesheet" href="style.css?v=20261007deskHoney">
+    <link rel="stylesheet" href="style.css?v=20261007deskZone2">
     <link rel="stylesheet" href="quick-calc.css?v=20260929qc">
     <style>
         html.thumb-only-mode #left-sidebar,
@@ -1406,7 +1406,7 @@
                 </div>
             </div>
             <!-- כוורת row -->
-            <div class="toolbar-row">
+            <div class="toolbar-row tb-desk-ok">
                 <button class="toolbar-btn" id="tb-btn-honeycomb" data-expandable onclick="onHoneycombBtnClick(this)"><i class="fa-regular fa-square-full tb-main-ic"></i><i class="fa-solid fa-trash tb-remove-ic"></i><span>כוורת</span></button>
                 <div id="honeycomb-sub-panel" class="toolbar-sub-btns" style="display:none;">
                     <div class="toolbar-sub-divider"></div>
@@ -1425,7 +1425,7 @@
                 </div>
             </div>
             <!-- לדים -->
-            <div class="toolbar-row">
+            <div class="toolbar-row tb-desk-ok">
                 <button class="toolbar-btn" id="tb-btn-led" onclick="toggleLedPair()" title="זוג לדים לאורך התאים שנבחרו"><i class="fa-solid fa-lightbulb"></i><span>לדים</span></button>
             </div>
             <!-- תאים שווים -->
@@ -2545,19 +2545,19 @@
         <div class="mcell-panel-label">תכולה</div>
 
         <!-- Category buttons -->
-        <button class="mcell-cat-btn" id="mcp-cat-hanging" onclick="_mcpShowSub('hanging')">
+        <button class="mcell-cat-btn mcp-desk-hide" id="mcp-cat-hanging" onclick="_mcpShowSub('hanging')">
             <i class="fa-solid fa-shirt"></i><span>תלייה</span>
         </button>
-        <button class="mcell-cat-btn" id="mcp-cat-drawer" onclick="_mcpShowSub('drawer')">
+        <button class="mcell-cat-btn mcp-desk-hide" id="mcp-cat-drawer" onclick="_mcpShowSub('drawer')">
             <i class="fa-solid fa-bars"></i><span>מגירה</span>
         </button>
         <button class="mcell-cat-btn" id="mcp-cat-cell" onclick="_mcpShowSub('cell')">
             <i class="fa-regular fa-square-full"></i><span>כוורת</span>
         </button>
-        <button class="mcell-cat-btn" id="mcp-cat-partition" onclick="_mcpShowSub('partition')">
+        <button class="mcell-cat-btn mcp-desk-hide" id="mcp-cat-partition" onclick="_mcpShowSub('partition')">
             <i class="fa-solid fa-table-columns"></i><span>מחיצה</span>
         </button>
-        <button class="mcell-cat-btn" id="mcp-cat-appliances" onclick="_mcpShowSub('appliances')">
+        <button class="mcell-cat-btn mcp-desk-hide" id="mcp-cat-appliances" onclick="_mcpShowSub('appliances')">
             <i class="fa-solid fa-plug"></i><span>חשמל</span>
         </button>
         <button class="mcell-cat-btn" id="mcp-led" onclick="toggleLedPair(); updateMobileCellSheetState();">
@@ -2580,11 +2580,11 @@
         </button>
 
         <!-- Cell height stepper -->
-        <div class="mcell-panel-sep"></div>
-        <div class="mcell-panel-label" style="font-size:0.58rem;">גובה</div>
-        <button class="mcell-mini-btn" id="mcp-height-plus"><i class="fa-solid fa-plus"></i></button>
-        <input class="mcell-height-input" type="number" id="mcp-height-val" min="10" max="300" step="0.1" value="50">
-        <button class="mcell-mini-btn" id="mcp-height-minus"><i class="fa-solid fa-minus"></i></button>
+        <div class="mcell-panel-sep mcp-desk-hide"></div>
+        <div class="mcell-panel-label mcp-desk-hide" style="font-size:0.58rem;">גובה</div>
+        <button class="mcell-mini-btn mcp-desk-hide" id="mcp-height-plus"><i class="fa-solid fa-plus"></i></button>
+        <input class="mcell-height-input mcp-desk-hide" type="number" id="mcp-height-val" min="10" max="300" step="0.1" value="50">
+        <button class="mcell-mini-btn mcp-desk-hide" id="mcp-height-minus"><i class="fa-solid fa-minus"></i></button>
     </div>
 
     <!-- ── VIEW: SUB-CATEGORY ── -->
@@ -2803,18 +2803,18 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js?v=20261005pages"></script>
-<script src="state.js?v=20261007deskHoney"></script>
+<script src="state.js?v=20261007deskZone2"></script>
 <script src="quick-calc.js?v=20261005w40"></script>
 <script src="bathroom-preset.js?v=20260528a"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
-<script src="engine-appliances.js?v=20261007deskHoney"></script>
-<script src="engine-core.js?v=20261007deskHoney"></script>
-<script src="engine-corners.js?v=20261007deskHoney"></script>
-<script src="engine-blueprint.js?v=20261007deskHoney"></script>
+<script src="engine-appliances.js?v=20261007deskZone2"></script>
+<script src="engine-core.js?v=20261007deskZone2"></script>
+<script src="engine-corners.js?v=20261007deskZone2"></script>
+<script src="engine-blueprint.js?v=20261007deskZone2"></script>
 <script src="engine-room-plan.js?v=20260929rail"></script>
 <script src="tambour-color-picker.js?v=20260617scdoors"></script>
-<script src="ui.js?v=20261007deskHoney"></script>
-<script src="mobile.js?v=20261007deskHoney"></script>
+<script src="ui.js?v=20261007deskZone2"></script>
+<script src="mobile.js?v=20261007deskZone2"></script>
 <script src="part-paint.js?v=20260914A427fix"></script>
 <script src="shelf-pick.js?v=20260922sideWall"></script>
 <script src="index-init.js?v=20261002hist"></script>
@@ -2931,7 +2931,7 @@
 <script src="notes.js?v=20260714pinDelete"></script>
 <script src="tour.js?v=20260929rail"></script>
 <script src="sidebar-rail.js?v=20260929rail"></script>
-<script src="ai-renders.js?v=20261007deskHoney"></script>
+<script src="ai-renders.js?v=20261007deskZone2"></script>
 <script>
     // Init AI renders after auth is ready
     document.addEventListener('DOMContentLoaded', function() {

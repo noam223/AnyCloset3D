@@ -201,8 +201,14 @@ function updateMobileCellSheetState() {
     if (!col.compartments) col.compartments = {};
     if (!Array.isArray(col.doors)) col.doors = [];
 
+    const deskZone = typeof window._isDeskZoneSelection === 'function' && window._isDeskZoneSelection();
+    ['mobile-cell-right-panel', 'mobile-cell-left-panel'].forEach(id => {
+        const p = document.getElementById(id);
+        if (p) p.classList.toggle('desk-zone-mode', deskZone);
+    });
     const firstComp = col.compartments[state.selection.rows[0]];
-    const activeType = (firstComp && firstComp.type !== 'empty') ? firstComp.type : null;
+    const activeType = deskZone ? (col.deskHoneycomb ? 'open_cell' : null)
+        : ((firstComp && firstComp.type !== 'empty') ? firstComp.type : null);
     const activeCategory = activeType ? (_mcpTypeToCategory[activeType] || null) : null;
 
     // Highlight category buttons in main view
@@ -920,8 +926,8 @@ function _bindCanvasTouchEvents() {
                 const c = obj.userData.colIndex;
                 const r = obj.userData.rowIndex;
                 if (c !== undefined) {
-                    if (r !== undefined && r >= 0) {
-                        // Tap on a cell → select it and open side panels
+                    if (r !== undefined && (r >= 0 || obj.userData.deskZone)) {
+                        // Tap on a cell (or the knee space above an internal desk) → select it and open side panels
                         state.selection = { colIndex: c, rows: [r] };
                         state.activeEditCol = c;
                         // Rebuild to show selection highlight
@@ -1030,6 +1036,7 @@ window.buildDimensionsAndButtonsUI = function() {
             if (match) {
                 dimEl.dataset.colIndex = match.colIndex;
                 dimEl.dataset.rowIndex = match.rowIndex;
+                if (match.isDeskZoneCell) dimEl.dataset.deskZone = '1';
             }
         });
     }
@@ -1080,7 +1087,7 @@ function _openCellSheetFromDim(dimEl) {
     const colIndex = parseInt(dimEl.dataset.colIndex);
     const rowIndex = parseInt(dimEl.dataset.rowIndex);
 
-    if (isNaN(colIndex) || isNaN(rowIndex) || colIndex === -1 || rowIndex === -1) return;
+    if (isNaN(colIndex) || isNaN(rowIndex) || colIndex === -1 || (rowIndex === -1 && dimEl.dataset.deskZone !== '1')) return;
 
     // Set selection, rebuild to show green highlight, then open panels
     state.selection = { colIndex: colIndex, rows: [rowIndex] };
