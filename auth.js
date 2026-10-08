@@ -268,7 +268,7 @@ function _needsExclusiveSession(profile, billingProfile) {
     if (!profile) return false;
     var billing = billingProfile || profile;
     if (billing && billing.subscription_status === 'trial' && billing.max_devices == null) return true;
-    if (!profile || (profile.company_role !== 'admin' && profile.company_role !== 'agent')) {
+    if (profile.company_role !== 'admin' && profile.company_role !== 'agent') {
         return false;
     }
     // Default ON: several computers may stay signed in. OFF restores the single-PC kick.
