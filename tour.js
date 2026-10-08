@@ -47,6 +47,13 @@ function _ctx() {
     };
 }
 
+// True when the current cabinet can start a shared space but none exists yet.
+function _spacePending() {
+    var canUse = typeof window._spacePairCanUse === 'function' && window._spacePairCanUse();
+    var info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
+    return !!canUse && !info;
+}
+
 function _docsList() {
     var a = [];
     if (_vis('#btn-customer-quote')) a.push('הצעת מחיר');
@@ -134,7 +141,7 @@ var TOPICS = [
     // ── 2. סוגי ארונות, תבניות ומידות ───────────────────────────────────────
     {
         key: 'design', icon: '📐', title: 'סוגי ארונות, תבניות ומידות',
-        desc: 'תבניות מוכנות, סוגי ארונות, ארונות במרחב ומידות',
+        desc: 'תבניות מוכנות, סוגי ארונות, מידות ועמודות',
         steps: [
             {
                 target: '.preset-btn-wand',
@@ -163,16 +170,6 @@ var TOPICS = [
                 position: 'left'
             },
             {
-                target: '#btn-add-space-cab',
-                when: function(c) { return c.spaceMax > 1; },
-                title: '➕ כמה ארונות במרחב אחד',
-                text: function(c) {
-                    return 'מוסיף ארון נוסף לאותה סצנה תלת-ממדית — למשל ארון ושולחן זה לצד זה. עוברים ביניהם בלשוניות ומזיזים כל ארון במרחב (X / Y / Z).' +
-                        (c.spaceMax <= 2 ? ' במנוי שלך: עד ' + c.spaceMax + ' ארונות במרחב.' : '');
-                },
-                position: 'left'
-            },
-            {
                 target: [
                     '#header-dims-row .header-dim-card[data-dim="width"]',
                     '#header-dims-row .header-dim-card[data-dim="height"]',
@@ -192,7 +189,60 @@ var TOPICS = [
         ]
     },
 
-    // ── 3. תוכן תאים ודלתות ─────────────────────────────────────────────────
+    // ── 3. ארונות במרחב אחד ─────────────────────────────────────────────────
+    {
+        key: 'space', icon: '🧱', title: 'כמה ארונות במרחב אחד',
+        desc: 'הוספת ארון לאותה סצנה, מעבר בין ארונות ומיקום במרחב',
+        when: function(c) { return c.spaceMax > 1; },
+        steps: [
+            {
+                target: '#btn-add-space-cab',
+                title: '➕ הוספת ארון למרחב',
+                text: function(c) {
+                    var cap = c.spaceMax <= 2 ? ' במנוי שלך: עד ' + c.spaceMax + ' ארונות במרחב.' : '';
+                    return _spacePending()
+                        ? 'מוסיף ארון חדש לאותה סצנה תלת-ממדית — למשל ארון ושולחן כתיבה זה לצד זה, או ארון עליון מעל שידה. הארון הנוכחי נשמר, והחדש נפתח לעריכה לידו.' + cap +
+                          '<br>לחצו <b>הוסף ארון עכשיו</b> ונמשיך להראות איך עובדים עם הארונות במרחב.'
+                        : 'מוסיף עוד ארון לאותו מרחב — הארון החדש נפתח לעריכה ליד הקיימים.' + cap;
+                },
+                action: {
+                    label: '➕ הוסף ארון עכשיו',
+                    when: function() { return _spacePending(); },
+                    run: function() { if (typeof window.addSpaceCabinet === 'function') window.addSpaceCabinet(); }
+                },
+                position: 'left'
+            },
+            {
+                target: '#btn-join-space-cab',
+                title: '🔗 חיבור ארון קיים',
+                text: 'כבר יש בפרויקט ארון רגיל, ארון הזזה או שולחן כתיבה? מחברים אותו לאותו מרחב במקום ליצור ארון חדש.',
+                position: 'left'
+            },
+            {
+                target: '#space-cab-tabs-btns',
+                afterAction: true,
+                title: '🗂️ מעבר בין הארונות',
+                text: 'לכל ארון במרחב יש לשונית. לחיצה על לשונית — או על הארון עצמו בהדמיה — פותחת אותו לעריכה. כל ארון נערך בנפרד: מידות, תכולה וצבעים.',
+                position: 'left'
+            },
+            {
+                target: '#space-cab-offset-row',
+                afterAction: true,
+                title: '🧭 מיקום הארון במרחב',
+                text: '<b>X</b> — הזזה ימינה/שמאלה, <b>Y</b> — הגבהה מהרצפה (למשל ארון עליון), <b>Z</b> — קידום קדימה מהקיר. הערכים נמדדים ביחס לארון הראשון במרחב, בס"מ.',
+                position: 'left'
+            },
+            {
+                target: '#btn-leave-space-cab',
+                afterAction: true,
+                title: '🔓 הוצאה מהמרחב',
+                text: 'מוציא את הארון הנוכחי מהמרחב המשותף — הוא נשאר בפרויקט כארון נפרד. ארון שנוסף רק לניסיון אפשר למחוק מהכרטיס שלו בפאנל הפרויקט.',
+                position: 'left'
+            }
+        ]
+    },
+
+    // ── 4. תוכן תאים ודלתות ─────────────────────────────────────────────────
     {
         key: 'cells', icon: '🗂️', title: 'תוכן תאים ודלתות',
         desc: 'תלייה, מחיצות, מגירות, כוורת, מוצרי חשמל, לדים ודלתות',
@@ -598,12 +648,18 @@ function _resolveTopic(key) {
     var topic = TOPIC_BY_KEY[key];
     if (!topic) return [];
     var c = _ctx();
+    if (topic.when && !topic.when(c)) return [];
     var out = [];
     var needsEdit = false;
+    var actionPending = topic.steps.some(function(s) {
+        return s.action && (!s.action.when || s.action.when(c)) && _stepEls(s).some(function(e) { return _reachable(e, s); });
+    });
     topic.steps.forEach(function(s) {
         if (s.when && !s.when(c)) return;
         var els = _stepEls(s);
         if (!els.length) return;
+        // Revealed by the topic's action — kept now, dropped at show time if it never appears.
+        if (s.afterAction && actionPending) { out.push(s); return; }
         if (!_editOpen() && els.every(function(e) { return e.closest('#sidebar-edit-content'); })) {
             needsEdit = true;
             return;
@@ -617,7 +673,7 @@ function _resolveTopic(key) {
 // ── State ───────────────────────────────────────────────────────────────────
 var T = {
     active: false, key: null, steps: [], idx: 0, els: [], token: 0, raf: 0, layoutKey: '',
-    toolbar: false, selectedByTour: false, enteredRoom: false, subOpen: null, railOrig: null
+    toolbar: false, selectedByTour: false, enteredRoom: false, subOpen: null, railOrig: null, railEl: null
 };
 
 function _inRoomPlan() { return typeof state !== 'undefined' && state && state.viewMode === 'room-plan'; }
@@ -727,6 +783,7 @@ function _ensureDOM() {
             '<defs><mask id="tour-spotlight-mask">' +
                 '<rect width="100%" height="100%" fill="white"/>' +
                 '<rect id="tour-spotlight-hole" rx="10" ry="10" fill="black" width="0" height="0"/>' +
+                '<rect id="tour-spotlight-hole2" rx="10" ry="10" fill="black" width="0" height="0"/>' +
             '</mask></defs>' +
             '<rect width="100%" height="100%" fill="rgba(0,0,0,0.62)" mask="url(#tour-spotlight-mask)"/>' +
         '</svg>';
@@ -737,6 +794,10 @@ function _ensureDOM() {
     ring.id = 'tour-spotlight-ring';
     document.body.appendChild(ring);
 
+    var ring2 = document.createElement('div');
+    ring2.id = 'tour-spotlight-ring2';
+    document.body.appendChild(ring2);
+
     var tt = document.createElement('div');
     tt.id = 'tour-tooltip';
     tt.innerHTML =
@@ -744,7 +805,8 @@ function _ensureDOM() {
             '<div class="tour-tt-title-wrap"><span id="tour-tt-count"></span><span id="tour-tt-title"></span></div>' +
             '<button class="tour-close-btn" onclick="window._stopTour()" title="סגור מדריך">✕</button>' +
         '</div>' +
-        '<div id="tour-tt-text"></div>';
+        '<div id="tour-tt-text"></div>' +
+        '<div id="tour-tt-actions"></div>';
     document.body.appendChild(tt);
 
     var nav = document.createElement('div');
@@ -768,7 +830,9 @@ function _setChromeVisible(on) {
     ['tour-overlay', 'tour-tooltip'].forEach(function(id) { var el = $(id); if (el) el.style.display = on ? 'block' : 'none'; });
     var nav = $('tour-nav-bar');
     if (nav) nav.style.display = on ? 'flex' : 'none';
-    if (!on) { var ring = $('tour-spotlight-ring'); if (ring) ring.style.display = 'none'; }
+    if (!on) {
+        ['tour-spotlight-ring', 'tour-spotlight-ring2'].forEach(function(id) { var r = $(id); if (r) r.style.display = 'none'; });
+    }
 }
 
 function _renderChrome() {
@@ -781,6 +845,21 @@ function _renderChrome() {
     if (titleEl) titleEl.textContent = _val(step.title, c);
     if (textEl) textEl.innerHTML = _val(step.text, c);
     if (countEl) countEl.textContent = (T.idx + 1) + ' מתוך ' + T.steps.length;
+
+    var actionsEl = $('tour-tt-actions');
+    if (actionsEl) {
+        actionsEl.innerHTML = '';
+        var act = step.action;
+        if (act && (!act.when || act.when(c))) {
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'tour-tt-action';
+            btn.textContent = act.label;
+            btn.onclick = function() { _runAction(step); };
+            actionsEl.appendChild(btn);
+        }
+        actionsEl.style.display = actionsEl.children.length ? '' : 'none';
+    }
 
     var dotsEl = $('tour-dots');
     if (dotsEl) {
@@ -853,10 +932,10 @@ function _scrollIntoViewIfNeeded(el) {
     sc.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
 }
 
-function _setHole(r) {
-    var hole = $('tour-spotlight-hole');
-    var ring = $('tour-spotlight-ring');
-    var pad = 8;
+function _setHole(r, holeId, ringId) {
+    var hole = $(holeId || 'tour-spotlight-hole');
+    var ring = $(ringId || 'tour-spotlight-ring');
+    var pad = holeId ? 4 : 8;
     if (!r) {
         if (hole) { hole.setAttribute('width', '0'); hole.setAttribute('height', '0'); }
         if (ring) ring.style.display = 'none';
@@ -944,14 +1023,16 @@ function _layoutTick() {
     var step = T.steps[T.idx];
     if (step && T.els.length) {
         var r = _unionRect(T.els);
+        var r2 = T.railEl ? _unionRect([T.railEl]) : null;
         var tt = $('tour-tooltip');
-        var key = r
-            ? [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)].join(',')
-            : 'none';
-        key += '|' + window.innerWidth + 'x' + window.innerHeight + '|' + (tt ? tt.offsetHeight : 0);
+        var rk = function(x) {
+            return x ? [Math.round(x.left), Math.round(x.top), Math.round(x.width), Math.round(x.height)].join(',') : 'none';
+        };
+        var key = rk(r) + '|' + rk(r2) + '|' + window.innerWidth + 'x' + window.innerHeight + '|' + (tt ? tt.offsetHeight : 0);
         if (key !== T.layoutKey) {
             T.layoutKey = key;
             _setHole(r);
+            _setHole(r2, 'tour-spotlight-hole2', 'tour-spotlight-ring2');
             var navOnTop = _placeNav(r);
             if (r) _placeTooltip(r, step.position, navOnTop);
             else _centerTooltip();
@@ -972,7 +1053,9 @@ function _show(idx, dir) {
     var tt = $('tour-tooltip');
     if (delay > 60) {
         T.els = [];
+        T.railEl = null;
         _setHole(null);
+        _setHole(null, 'tour-spotlight-hole2', 'tour-spotlight-ring2');
         if (tt) tt.style.visibility = 'hidden';
     } else {
         _renderChrome();
@@ -991,11 +1074,24 @@ function _show(idx, dir) {
             return;
         }
         T.els = els;
+        var holder = els[0].closest('[data-sbgroup]');
+        T.railEl = holder
+            ? q('#sb-rail .sb-rail-btn[data-sbtab="' + holder.getAttribute('data-sbgroup') + '"]')
+            : null;
         T.layoutKey = '';
         _scrollIntoViewIfNeeded(els[0]);
         _renderChrome();
         if (tt) tt.style.visibility = '';
     }, delay);
+}
+
+function _runAction(step) {
+    if (!T.active || !step.action) return;
+    try { step.action.run(); } catch (e) { console.warn('[tour] action failed:', e); }
+    var token = ++T.token;
+    var tt = $('tour-tooltip');
+    if (tt) tt.style.visibility = 'hidden';
+    setTimeout(function() { if (token === T.token && T.active) _next(); }, 700);
 }
 
 function _next() {
@@ -1048,7 +1144,9 @@ window._stopTour = function() {
     T.token++;
     cancelAnimationFrame(T.raf);
     T.els = [];
+    T.railEl = null;
     _setHole(null);
+    _setHole(null, 'tour-spotlight-hole2', 'tour-spotlight-ring2');
     _setChromeVisible(false);
     _cleanupAll();
 };

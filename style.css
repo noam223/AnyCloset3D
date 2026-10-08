@@ -5798,6 +5798,34 @@ body.viewer-mode #canvas-container canvas {
     0%, 100% { box-shadow: 0 0 0 4px rgba(96,165,250,0.28), 0 0 22px rgba(59,130,246,0.45); }
     50%      { box-shadow: 0 0 0 7px rgba(96,165,250,0.12), 0 0 30px rgba(59,130,246,0.6); }
 }
+#tour-spotlight-ring2 {
+    position: fixed;
+    z-index: 100001;
+    pointer-events: none;
+    display: none;
+    border: 2px solid #60a5fa;
+    border-radius: 10px;
+    box-shadow: 0 0 0 3px rgba(96,165,250,0.25), 0 0 14px rgba(59,130,246,0.4);
+}
+#tour-tt-actions {
+    padding: 0 16px 14px;
+}
+#tour-tt-actions:empty { display: none; }
+.tour-tt-action {
+    width: 100%;
+    padding: 10px 14px;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: #fff;
+    font: inherit;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(37,99,235,0.35);
+    transition: transform .12s, box-shadow .12s;
+}
+.tour-tt-action:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(37,99,235,0.45); }
 
 /* ============================================================
    MOBILE CRITICAL OVERRIDES (extracted from index.html)
