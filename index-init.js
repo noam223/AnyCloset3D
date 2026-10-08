@@ -901,14 +901,6 @@ function _applyPlanEditorGates(plan, features) {
             }
             return origAddWing.apply(this, arguments);
         };
-        var origCornerSide = window.updateCornerSide;
-        window.updateCornerSide = function(side) {
-            if (side && side !== 'none') {
-                window._showPlanUpsell('יחידה פינתית');
-                return;
-            }
-            return origCornerSide.apply(this, arguments);
-        };
     }
 
     if (features.fullTambourPalette === false && typeof window._setTambourCuratedMode === 'function') {
