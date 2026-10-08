@@ -264,6 +264,8 @@
             .admin-tab span { display: none; }
         }
     </style>
+    <script src="pricing-core.js?v=20261008a"></script>
+    <script src="pricing-panel.js?v=20261008a"></script>
 </head>
 <body>
 
@@ -475,11 +477,21 @@
 
         <!-- Pricing form (hidden until user selected) -->
         <div id="pricing-form" style="display:none;">
+            <!-- Shared pricing panel (pricing-panel.js) is mounted here -->
+            <div id="pricing-panel-mount"></div>
+            <!-- Save bar (admin-specific: saves to another user's account) -->
+            <div class="pricing-save-bar" style="padding:16px 0;display:flex;align-items:center;gap:12px;">
+                <button class="btn-save-pricing" onclick="savePricingConfig()" style="height:42px;background:var(--primary);color:white;border:none;border-radius:10px;padding:0 22px;font-size:.88rem;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:8px;">
+                    <i class="fa-solid fa-floppy-disk"></i> שמור הגדרות תמחור
+                </button>
+                <span class="pricing-saved-note" id="pricing-saved-note" style="display:none;color:#16a34a;font-size:.85rem;font-weight:700;">
+                    <i class="fa-solid fa-circle-check"></i> נשמר בהצלחה!
+                </span>
+            </div>
+            <div class="pricing-form" style="display:none;"><!-- legacy placeholder, kept for compatibility -->
 
-            <div class="pricing-form">
-
-                <!-- ① Pricing mode -->
-                <div class="pricing-section">
+                <!-- ① Pricing mode — OLD FORM (hidden; replaced by PricingPanel above) -->
+                <div class="pricing-section" style="display:none;">
                     <div class="pricing-section-title"><i class="fa-solid fa-sliders"></i> שיטת תמחור</div>
                     <div class="pricing-mode-btns" id="pricing-mode-btns">
                         <button class="pricing-mode-btn active" data-mode="ranges" onclick="setPricingMode('ranges')">טווחי מידות<br><small>לפי רוחב</small></button>
@@ -619,15 +631,7 @@
                         <div class="pricing-field"><label>רגל ניקל (₪)</label><input type="number" class="pricing-input" id="p-nickelLegPrice" min="0" step="10"></div>
                     </div>
                 </div>
-                <div class="pricing-save-bar">
-                    <button class="btn-save-pricing" onclick="savePricingConfig()">
-                        <i class="fa-solid fa-floppy-disk"></i> שמור הגדרות תמחור
-                    </button>
-                    <span class="pricing-saved-note" id="pricing-saved-note">
-                        <i class="fa-solid fa-circle-check"></i> נשמר בהצלחה!
-                    </span>
-                </div>
-            </div><!-- /pricing-form inner -->
+            </div><!-- /pricing-form inner (legacy, hidden) -->
         </div><!-- /pricing-form outer -->
     </div><!-- /tab-pricing -->
 </main>
@@ -1093,218 +1097,27 @@ async function confirmCancelSubscription(){
 }
 function _populatePricingUserSelect(){var sel=document.getElementById('pricing-user-select');var prev=sel.value;sel.innerHTML='<option value="">— בחר משתמש —</option>';_allUsers.forEach(function(u){var opt=document.createElement('option');opt.value=u.id;opt.textContent=(u.full_name||'—')+' ('+( u.email||u.id)+')';sel.appendChild(opt);});if(prev)sel.value=prev;}
 
-var _PRICING_ENGINES=[
-    {id:'maya',label:'צוקל נסתר'},
-    {id:'c9',label:'צוקל רגיל'},
-    {id:'regalim',label:'ארון על רגליים'},
-    {id:'sliding',label:'ארון הזזה'},
-    {id:'ab2',label:'AB2 (חזית פנימית + כוורת)'},
-    {id:'ab2_nohoney',label:'ארון עם חזיתות פנימיות'}
-];
-var _LEGACY_TYPE_LABELS={maya:'מאיה',c9:'C9',regalim:'רגלים',ab2:'AB2',ab2_nohoney:'ארון עם חזיתות פנימיות',sliding:'ארון הזזה'};
-var _NEW_TYPE_WIDTHS=[80,120,160,200,240];
-var _RANGE_RESERVED_KEYS=['melamine','nonMelamine','other','sliding'];
-
-// Fields edited by this form. pct=true means stored as a fraction (0.2) and shown as a percent (20).
-var _PRICING_TOP_FIELDS=[
-    {k:'sqmPrice'},{k:'sqmPriceNonMel'},{k:'lmPrice'},{k:'lmPriceNonMel'},
-    {k:'lmHeightBase'},{k:'lmHeightBaseNonMel'},{k:'lmHeightThresholdCm'},{k:'lmHeightStepCm'},{k:'lmHeightStepPct',pct:true},
-    {k:'materialsBoardPrice'},{k:'materialsBoardsPerSqm'},{k:'materialsMultiplier'},
-    {k:'profitMultiplier'},{k:'heightSurcharge',pct:true},{k:'depthSurcharge',pct:true},{k:'sandwichSurcharge',pct:true},
-    {k:'installPricePerUnit'},{k:'installUnitCm'},{k:'installHeightSurcharge',pct:true}
-];
-var _PRICING_EXTRA_FIELDS=[
-    {k:'internalDrawer'},{k:'externalDrawer'},{k:'openCell'},{k:'partition'},{k:'shelfFreePerMeter'},
-    {k:'extraShelfMel'},{k:'extraShelfNonMel'},{k:'deskUnit'},
-    {k:'doorFramedMel'},{k:'doorGlassMel'},{k:'doorGlassBlack'},{k:'doorMirror'},{k:'ledPair'},{k:'sorbet'},{k:'touchHandle'},
-    {k:'upperUnit160'},{k:'upperUnit240'},{k:'upperUnitPerCm'},
-    {k:'cornerDrawers3'},{k:'cornerDrawers4'},{k:'cornerDrawerExtra'},{k:'cornerDesk'},{k:'fullCornerBase'},{k:'fullCornerShelf'},{k:'wingConnection'},
-    {k:'sideCabMel'},{k:'sideCabNonMel'},{k:'sideCabDoors'},
-    {k:'slidingBase'},{k:'slidingDoor'},{k:'slidingGlass'},{k:'slidingMirror'},{k:'slidingGold'},{k:'slidingBlack'},{k:'slidingHeightSurcharge',pct:true},
-    {k:'nickelLegPrice'}
-];
-
-var _loadedPricingCfg=null,_adminCabinetTypes=[],_pricingDirty=false;
+// ── Pricing panel (uses shared pricing-panel.js) ─────────────────────────────
+var _loadedPricingCfg=null,_pricingDirty=false;
 
 function _pNum(v,fb){if(v===''||v==null)return fb;var n=Number(v);return isFinite(n)?n:fb;}
-function _pToField(v,pct){return pct?Math.round(v*1000)/10:v;}
-function _pFromField(raw,fb,pct){if(!pct)return _pNum(raw,fb);var n=_pNum(raw,null);return n==null?fb:Math.round(n*10)/1000;}
 function _pClone(o){return JSON.parse(JSON.stringify(o));}
-
-function _normalizeCabinetTypes(cfg){
-    var list=(cfg&&Array.isArray(cfg.cabinetTypes)&&cfg.cabinetTypes.length)?cfg.cabinetTypes:null;
-    if(!list){
-        var ranges=(cfg&&cfg.ranges)||{};
-        list=Object.keys(ranges).filter(function(k){return _RANGE_RESERVED_KEYS.indexOf(k)===-1;}).map(function(id){return {id:id,label:_LEGACY_TYPE_LABELS[id]||id,engine:id};});
-        if(!list.length)list=DEFAULT_PRICING.cabinetTypes;
-    }
-    var seen={},out=[];
-    list.forEach(function(t){
-        if(!t||!t.id||t.id==='other'||seen[t.id])return;
-        seen[t.id]=true;
-        var engine=(t.engine&&t.engine!=='other')?t.engine:t.id;
-        if(!_PRICING_ENGINES.some(function(e){return e.id===engine;}))engine='maya';
-        out.push({id:String(t.id),label:(t.label&&String(t.label).trim())||String(t.id),engine:engine});
-    });
-    if(!out.some(function(t){return t.engine==='sliding';}))out.push({id:'sliding',label:'ארון הזזה',engine:'sliding'});
-    return out;
+// Mount the shared pricing panel (once per user load)
+var _panelMounted=false;
+function _ensurePanelMounted(){
+    if(_panelMounted)return;
+    _panelMounted=true;
+    PricingPanel.mount('pricing-panel-mount',{showSaveBar:false});
 }
 
-function _rangeTypes(){return _adminCabinetTypes.filter(function(t){return t.engine!=='sliding';});}
+// _normalizeCabinetTypes: now delegated to PricingCore.normalizeTypes
 
-function _syncTypesFromDom(){
-    var rows=document.querySelectorAll('#p-cabinet-types .type-row');
-    if(!rows.length)return;
-    var next=[];
-    rows.forEach(function(row){
-        var id=row.getAttribute('data-id');
-        if(!id)return;
-        var label=row.querySelector('.type-label').value.trim();
-        next.push({id:id,label:label||id,engine:row.querySelector('.type-engine').value});
-    });
-    _adminCabinetTypes=next;
-}
+// Cabinet type helpers now in PricingPanel
 
-function _renderCabinetTypes(){
-    var wrap=document.getElementById('p-cabinet-types');
-    var head='<div class="types-head"><span>שם תצוגה</span><span>סוג בנייה</span><span></span></div>';
-    wrap.innerHTML=head+_adminCabinetTypes.map(function(t){
-        var opts=_PRICING_ENGINES.map(function(e){return '<option value="'+e.id+'"'+(t.engine===e.id?' selected':'')+'>'+_esc(e.label)+'</option>';}).join('');
-        var hint=t.engine==='sliding'?'<div class="type-hint">התמחור בסקשן ארון הזזה, לא בטבלת הרוחב</div>':'';
-        return '<div class="type-row" data-id="'+_esc(t.id)+'">'+
-            '<input class="pricing-input type-label" type="text" maxlength="60" value="'+_esc(t.label)+'" oninput="onCabinetTypeLabelChange()">'+
-            '<select class="pricing-input type-engine" onchange="onCabinetTypeEngineChange(this)">'+opts+'</select>'+
-            '<button type="button" class="btn-del-row" title="מחק סוג" onclick="deleteCabinetType(this.closest(\'.type-row\').getAttribute(\'data-id\'))"><i class="fa-solid fa-trash"></i></button>'+
-            hint+'</div>';
-    }).join('');
-}
+// (All cabinet-type / range-table / field helpers now in pricing-panel.js)
 
-function _typeOptionsHtml(selectedId){
-    return _rangeTypes().map(function(t){return '<option value="'+_esc(t.id)+'"'+(t.id===selectedId?' selected':'')+'>'+_esc(t.label)+'</option>';}).join('');
-}
-
-function _refreshRangeTypeSelects(){
-    document.querySelectorAll('#ranges-tbody select.range-type').forEach(function(sel){
-        var cur=sel.value;
-        sel.innerHTML=_typeOptionsHtml(cur);
-    });
-    _markRangeGroups();
-}
-
-function _markRangeGroups(){
-    var prev=null;
-    document.querySelectorAll('#ranges-tbody tr').forEach(function(tr){
-        var sel=tr.querySelector('select.range-type');
-        var cur=sel?sel.value:null;
-        tr.classList.toggle('type-start',prev!==null&&cur!==prev);
-        prev=cur;
-    });
-}
-
-function onCabinetTypeLabelChange(){_syncTypesFromDom();_refreshRangeTypeSelects();}
-
-function onCabinetTypeEngineChange(sel){
-    var id=sel.closest('.type-row').getAttribute('data-id');
-    var before=_adminCabinetTypes.find(function(t){return t.id===id;});
-    var prevEngine=before?before.engine:null;
-    _syncTypesFromDom();
-    if(prevEngine==='sliding'&&sel.value!=='sliding'){_NEW_TYPE_WIDTHS.forEach(function(w){_addRangeRowData(id,w,0,0);});}
-    if(sel.value==='sliding'&&prevEngine!=='sliding'){_removeRangeRowsForType(id);}
-    _renderCabinetTypes();
-    _refreshRangeTypeSelects();
-}
-
-function addCabinetType(){
-    _syncTypesFromDom();
-    var id='custom_'+Date.now().toString(36);
-    _adminCabinetTypes.push({id:id,label:'סוג חדש',engine:'maya'});
-    _renderCabinetTypes();
-    _refreshRangeTypeSelects();
-    _NEW_TYPE_WIDTHS.forEach(function(w){_addRangeRowData(id,w,0,0);});
-    _markRangeGroups();
-    _pricingDirty=true;
-    var labels=document.querySelectorAll('#p-cabinet-types .type-label');
-    if(labels.length){var last=labels[labels.length-1];last.focus();last.select();}
-}
-
-function deleteCabinetType(id){
-    _syncTypesFromDom();
-    if(_adminCabinetTypes.length<=1){showToast('חייב להישאר לפחות סוג ארון אחד','error');return;}
-    var t=_adminCabinetTypes.find(function(x){return x.id===id;});
-    if(!confirm('למחוק את הסוג "'+(t?t.label:id)+'" ואת כל שורות המחיר שלו?'))return;
-    _adminCabinetTypes=_adminCabinetTypes.filter(function(x){return x.id!==id;});
-    _removeRangeRowsForType(id);
-    _renderCabinetTypes();
-    _refreshRangeTypeSelects();
-    _pricingDirty=true;
-}
-
-function _removeRangeRowsForType(id){
-    document.querySelectorAll('#ranges-tbody tr').forEach(function(tr){
-        var sel=tr.querySelector('select.range-type');
-        if(sel&&sel.value===id)tr.remove();
-    });
-}
-
-function _addRangeRowData(typeId,width,mel,nonMel){
-    var types=_rangeTypes();
-    if(!types.length)return;
-    if(!types.some(function(t){return t.id===typeId;}))typeId=types[0].id;
-    var tbody=document.getElementById('ranges-tbody');
-    var rows=Array.prototype.slice.call(tbody.querySelectorAll('tr'));
-    var tr=document.createElement('tr');
-    tr.innerHTML=
-        '<td><select class="range-type" onchange="_markRangeGroups()">'+_typeOptionsHtml(typeId)+'</select></td>'+
-        '<td><input type="number" min="1" step="1" class="range-width" value="'+(width!=null?width:'')+'"></td>'+
-        '<td><input type="number" min="0" step="1" class="range-mel" value="'+(mel!=null?mel:0)+'"></td>'+
-        '<td><input type="number" min="0" step="1" class="range-nonmel" value="'+(nonMel!=null?nonMel:0)+'"></td>'+
-        '<td style="text-align:center;"><button type="button" class="btn-del-row" title="מחק שורה" onclick="this.closest(\'tr\').remove();_markRangeGroups();_pricingDirty=true;">&#x2715;</button></td>';
-    var lastOfType=null;
-    rows.forEach(function(r){var s=r.querySelector('select.range-type');if(s&&s.value===typeId)lastOfType=r;});
-    if(lastOfType&&lastOfType.nextSibling)tbody.insertBefore(tr,lastOfType.nextSibling);
-    else tbody.appendChild(tr);
-}
-
-function addRangeRow(){
-    var types=_rangeTypes();
-    if(!types.length){showToast('אין סוג ארון עם טבלת רוחב','error');return;}
-    var lastSel=document.querySelector('#ranges-tbody tr:last-child select.range-type');
-    _addRangeRowData(lastSel?lastSel.value:types[0].id,null,0,0);
-    _markRangeGroups();
-    _pricingDirty=true;
-}
-
-function _buildRangesTable(ranges){
-    var tbody=document.getElementById('ranges-tbody');
-    tbody.innerHTML='';
-    _rangeTypes().forEach(function(t){
-        var entry=ranges[t.id]||{};
-        var mel=entry.melamine||{},nonMel=entry.nonMelamine||{};
-        var widths={};
-        Object.keys(mel).concat(Object.keys(nonMel)).forEach(function(w){widths[w]=true;});
-        Object.keys(widths).sort(function(a,b){return Number(a)-Number(b);}).forEach(function(w){
-            _addRangeRowData(t.id,Number(w),_pNum(mel[w],0),_pNum(nonMel[w],0));
-        });
-    });
-    _markRangeGroups();
-}
-
-function _readRangesTable(){
-    var result={},errors=[],seen={};
-    document.querySelectorAll('#ranges-tbody tr').forEach(function(tr){
-        tr.classList.remove('row-invalid');
-        var typeId=tr.querySelector('select.range-type').value;
-        var width=_pNum(tr.querySelector('.range-width').value,null);
-        if(width==null||width<=0){tr.classList.add('row-invalid');errors.push('רוחב חסר או לא תקין');return;}
-        var key=typeId+'|'+width;
-        if(seen[key]){tr.classList.add('row-invalid');errors.push('רוחב '+width+' מופיע פעמיים באותו סוג');return;}
-        seen[key]=true;
-        if(!result[typeId])result[typeId]={melamine:{},nonMelamine:{}};
-        result[typeId].melamine[width]=_pNum(tr.querySelector('.range-mel').value,0);
-        result[typeId].nonMelamine[width]=_pNum(tr.querySelector('.range-nonmel').value,0);
-    });
-    return {ranges:result,errors:errors};
-}
+// ── Admin pricing: load / fill / save ────────────────────────────────────────
+var _currentPricingUserId=null;
 
 async function loadPricingForUser(){
     var sel=document.getElementById('pricing-user-select');
@@ -1312,72 +1125,42 @@ async function loadPricingForUser(){
     if(_pricingDirty&&_currentPricingUserId&&userId!==_currentPricingUserId&&!confirm('יש שינויים שלא נשמרו. לעבור משתמש בלי לשמור?')){sel.value=_currentPricingUserId;return;}
     if(!userId){document.getElementById('pricing-form').style.display='none';_currentPricingUserId=null;return;}
     _currentPricingUserId=userId;
-    document.getElementById('pricing-form').style.display='block';
+    var form=document.getElementById('pricing-form');
+    form.style.display='block';
+    _ensurePanelMounted();
     try{
         var {data,error}=await _sb.rpc('admin_get_pricing_config',{target_user_id:userId});
         if(error)throw error;
         _loadedPricingCfg=(data&&Object.keys(data).length>0)?data:null;
-        _fillPricingForm(_loadedPricingCfg||DEFAULT_PRICING);
+        PricingPanel.fill(_loadedPricingCfg||DEFAULT_PRICING);
     }catch(e){
         showToast('שגיאה בטעינת תמחור: '+e.message,'error');
         _loadedPricingCfg=null;
-        _fillPricingForm(DEFAULT_PRICING);
+        PricingPanel.fill(DEFAULT_PRICING);
     }
+    _pricingDirty=false;
 }
 
 function resetPricingToDefaults(){
     if(!_currentPricingUserId){showToast('יש לבחור משתמש תחילה','error');return;}
     if(!confirm('להחליף את כל הערכים בטופס בברירות המחדל? השינוי יישמר רק אחרי לחיצה על "שמור".'))return;
-    _fillPricingForm(DEFAULT_PRICING);
+    PricingPanel.fill(DEFAULT_PRICING);
     _pricingDirty=true;
-}
-
-function _fillPricingForm(cfg){
-    var c=cfg||DEFAULT_PRICING;
-    setPricingMode(c.pricingMode||'ranges');
-    _PRICING_TOP_FIELDS.forEach(function(f){
-        document.getElementById('p-'+f.k).value=_pToField(_pNum(c[f.k],DEFAULT_PRICING[f.k]),f.pct);
-    });
-    var ex=c.extras||{},dx=DEFAULT_PRICING.extras;
-    _PRICING_EXTRA_FIELDS.forEach(function(f){
-        document.getElementById('p-'+f.k).value=_pToField(_pNum(ex[f.k],dx[f.k]),f.pct);
-    });
-    _adminCabinetTypes=_normalizeCabinetTypes(c);
-    _renderCabinetTypes();
-    _buildRangesTable(c.ranges||DEFAULT_PRICING.ranges);
-    _pricingDirty=false;
-}
-
-function setPricingMode(mode){document.querySelectorAll('.pricing-mode-btn').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-mode')===mode);});document.querySelectorAll('.mode-section').forEach(function(s){s.classList.remove('visible');});var sec=document.getElementById('mode-'+mode);if(sec)sec.classList.add('visible');}
-
-function _readPricingForm(){
-    _syncTypesFromDom();
-    var base=_loadedPricingCfg?_pClone(_loadedPricingCfg):{};
-    var activeMode=document.querySelector('.pricing-mode-btn.active');
-    var cfg=Object.assign(base,{pricingMode:activeMode?activeMode.getAttribute('data-mode'):'ranges'});
-    _PRICING_TOP_FIELDS.forEach(function(f){cfg[f.k]=_pFromField(document.getElementById('p-'+f.k).value,DEFAULT_PRICING[f.k],f.pct);});
-    var ex=Object.assign({},base.extras||{});
-    _PRICING_EXTRA_FIELDS.forEach(function(f){ex[f.k]=_pFromField(document.getElementById('p-'+f.k).value,DEFAULT_PRICING.extras[f.k],f.pct);});
-    cfg.extras=ex;
-    cfg.cabinetTypes=_adminCabinetTypes.map(function(t){return {id:t.id,label:t.label,engine:t.engine};});
-    var read=_readRangesTable();
-    // Range tables keyed by something that was never a cabinet type (legacy configs) are still read by the pricing engine as fallbacks.
-    var loadedTypeIds=_normalizeCabinetTypes(base).map(function(t){return t.id;});
-    var ranges={};
-    Object.keys(base.ranges||{}).forEach(function(k){if(loadedTypeIds.indexOf(k)===-1)ranges[k]=base.ranges[k];});
-    cfg.ranges=Object.assign(ranges,read.ranges);
-    return {cfg:cfg,errors:read.errors};
 }
 
 async function savePricingConfig(){
     if(!_currentPricingUserId){showToast('יש לבחור משתמש תחילה','error');return;}
-    var out=_readPricingForm(),cfg=out.cfg;
-    if(out.errors.length){showToast('יש שורות לא תקינות בטבלת הרוחב (מסומנות באדום): '+out.errors[0],'error');return;}
+    var cfg=PricingPanel.read();
+    // Validate range table when ranges mode
     if(cfg.pricingMode==='ranges'){
-        var missing=_rangeTypes().filter(function(t){return !cfg.ranges[t.id]||!Object.keys(cfg.ranges[t.id].melamine||{}).length;});
+        var nonSliding=(cfg.cabinetTypes||[]).filter(function(t){return t.engine!=='sliding';});
+        var missing=nonSliding.filter(function(t){return !cfg.ranges[t.id]||!Object.keys(cfg.ranges[t.id].melamine||{}).length;});
         if(missing.length){showToast('לסוג "'+missing[0].label+'" אין שורות מחיר בטבלת הרוחב','error');return;}
         var zeroRows=0;
-        _rangeTypes().forEach(function(t){var m=cfg.ranges[t.id].melamine,n=cfg.ranges[t.id].nonMelamine;Object.keys(m).forEach(function(w){if(!m[w]||!n[w])zeroRows++;});});
+        nonSliding.forEach(function(t){
+            var m=(cfg.ranges[t.id]||{}).melamine||{},n=(cfg.ranges[t.id]||{}).nonMelamine||{};
+            Object.keys(m).forEach(function(w){if(!m[w]||!n[w])zeroRows++;});
+        });
         if(zeroRows&&!confirm('יש '+zeroRows+' שורות בטבלת הרוחב עם מחיר 0. לשמור בכל זאת?'))return;
     }
     try{
@@ -1385,11 +1168,13 @@ async function savePricingConfig(){
         if(error)throw error;
         _loadedPricingCfg=cfg;
         _pricingDirty=false;
+        // show saved note
+        var note=document.getElementById('pricing-saved-note');
+        if(note){note.style.display='inline';setTimeout(function(){note.style.display='none';},3000);}
         showToast('התמחור נשמר בהצלחה ✓','success');
     }catch(e){showToast('שגיאה בשמירה: '+e.message,'error');}
 }
 document.addEventListener('input',function(e){if(e.target&&e.target.closest&&e.target.closest('#pricing-form'))_pricingDirty=true;});
-document.addEventListener('click',function(e){if(e.target&&e.target.closest&&e.target.closest('#pricing-mode-btns'))_pricingDirty=true;});
 </script>
 </body>
 </html>

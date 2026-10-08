@@ -2764,31 +2764,41 @@ function _ppRefreshRangeModelSelects() {
     });
 }
 
+var _ppPanelMounted = false;
+function _ensurePricingPanelMounted() {
+    if (_ppPanelMounted) return;
+    _ppPanelMounted = true;
+    var isAgent = _plan && _plan.companyRole === 'agent';
+    PricingPanel.mount('pricing-panel-mount', {
+        showSaveBar: !isAgent,
+        saveLabel: 'שמור הגדרות תמחור',
+        onSave: savePricingSettings,
+        onReset: resetPricingToDefaults
+    });
+}
+
 async function _loadPricingForm() {
     try {
         var sb = supabase.createClient(
             'https://meqxnsjycvfgfhdepguo.supabase.co',
             'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lcXhuc2p5Y3ZmZ2ZoZGVwZ3VvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3MDA5NDAsImV4cCI6MjA5MjI3Njk0MH0.w63bl0-1-Rgt9Nx6sVW5ueEGMojiMaxoehlPXlPH2N0'
         );
+        _ensurePricingPanelMounted();
         var { data: { user } } = await sb.auth.getUser();
-        if (!user) {
-            _fillPricingPanel(_PP_DEFAULTS);
-            return;
-        }
+        if (!user) { PricingPanel.fill(_PP_DEFAULTS); return; }
         var billingId = user.id;
         if (_plan && _plan.companyRole === 'agent') {
             billingId = await Auth.getBillingUserId() || user.id;
         }
         var { data: row } = await sb.from('pricing_configs').select('config').eq('user_id', billingId).single();
-        var saveBar = document.getElementById('pp-save-bar');
-        if (saveBar) saveBar.style.display = (_plan && _plan.companyRole === 'agent') ? 'none' : 'flex';
         _pricingCfg = (row && row.config && Object.keys(row.config).length > 0) ? row.config : null;
         if (_pricingCfg) _ppNormalizePricingConfig(_pricingCfg);
         window._pricingConfig = _pricingCfg;
-        _fillPricingPanel(_pricingCfg || _PP_DEFAULTS);
+        PricingPanel.fill(_pricingCfg || _PP_DEFAULTS);
         if (typeof window.applyCabinetTypeSelects === 'function') window.applyCabinetTypeSelects(window._pricingConfig || _PP_DEFAULTS);
     } catch(e) {
-        _fillPricingPanel(_PP_DEFAULTS);
+        _ensurePricingPanelMounted();
+        PricingPanel.fill(_PP_DEFAULTS);
     }
 }
 
@@ -3059,18 +3069,17 @@ async function savePricingSettings() {
             showToast('רק אדמין החברה יכול לערוך תמחור', 'error');
             return;
         }
-        var problem = _ppValidateRangesTable();
-        if (problem) { showToast(problem, 'error'); return; }
-        var cfg = _readPricingPanel();
+        var cfg = PricingPanel.read();
         if (cfg.pricingMode === 'ranges') {
-            var emptyType = _ppRangeTypes().find(function(t) { return !cfg.ranges[t.id]; });
-            if (emptyType) { showToast('לסוג "' + emptyType.label + '" אין שורות מחיר בטבלת הרוחב', 'error'); return; }
+            var nonSliding = (cfg.cabinetTypes || []).filter(function(t) { return t.engine !== 'sliding'; });
+            var emptyType = nonSliding.find(function(t) { return !cfg.ranges[t.id]; });
+            if (emptyType) { showToast('לסוג "' + emptyType.label + '" אין שורות מחיר', 'error'); return; }
             var zeroRows = 0;
-            _ppRangeTypes().forEach(function(t) {
-                var r = cfg.ranges[t.id];
-                Object.keys(r.melamine).forEach(function(w) { if (!r.melamine[w] || !r.nonMelamine[w]) zeroRows++; });
+            nonSliding.forEach(function(t) {
+                var r = cfg.ranges[t.id] || {};
+                Object.keys(r.melamine || {}).forEach(function(w) { if (!r.melamine[w] || !(r.nonMelamine || {})[w]) zeroRows++; });
             });
-            if (zeroRows && !confirm('יש ' + zeroRows + ' שורות בטבלת הרוחב עם מחיר 0. לשמור בכל זאת?')) return;
+            if (zeroRows && !confirm('יש ' + zeroRows + ' שורות עם מחיר 0. לשמור בכל זאת?')) return;
         }
         var { error } = await sb.from('pricing_configs').upsert(
             { user_id: user.id, config: cfg, updated_at: new Date().toISOString() },
@@ -3080,6 +3089,7 @@ async function savePricingSettings() {
         _pricingCfg = cfg;
         window._pricingConfig = cfg;
         if (typeof window.applyCabinetTypeSelects === 'function') window.applyCabinetTypeSelects(cfg);
+        PricingPanel.showSavedNote(3000);
         showToast('הגדרות התמחור נשמרו ✓', 'success');
     } catch(e) {
         showToast('שגיאה בשמירה: ' + e.message, 'error');
@@ -3087,8 +3097,8 @@ async function savePricingSettings() {
 }
 
 function resetPricingToDefaults() {
-    if (!confirm('להחליף את כל הערכים בטופס בברירות המחדל? השינוי יישמר רק אחרי לחיצה על "שמור הגדרות תמחור".')) return;
-    _fillPricingPanel(_PP_DEFAULTS);
+    if (!confirm('להחליף את כל הערכים בטופס בברירות המחדל? השינוי יישמר רק אחרי לחיצה על "שמור".')) return;
+    PricingPanel.fill(_PP_DEFAULTS);
     if (typeof window.applyCabinetTypeSelects === 'function') window.applyCabinetTypeSelects(_PP_DEFAULTS);
     showToast('הוחזר לברירת מחדל', 'success');
 }

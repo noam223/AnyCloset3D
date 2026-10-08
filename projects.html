@@ -1167,12 +1167,13 @@
             </div>
         </div>
 
-        <!-- TAB: PRICING -->
+        <!-- TAB: PRICING — rendered by shared pricing-panel.js -->
         <div class="page-tab" id="tab-pricing">
-            <div class="pricing-panel-wrap">
-                <div class="pp-section">
-                    <div class="pp-section-title"><i class="fa-solid fa-sliders"></i> שיטת תמחור</div>
-                    <p style="font-size:.83rem;color:var(--muted);margin-bottom:14px;line-height:1.5;">בחר כיצד מחושב המחיר האוטומטי. ההגדרות נשמרות לחשבונך ומשפיעות על כל הפרויקטים.</p>
+            <div class="pricing-panel-wrap" style="max-width:860px;">
+                <div id="pricing-panel-mount"></div>
+                <!-- Old pp- form (hidden — PricingPanel renders above) -->
+                <div class="pp-section" style="display:none;">
+                    <div class="pp-section-title"></div>
                     <div class="pricing-mode-row" id="pp-mode-btns">
                         <button class="pp-mode-btn" data-mode="ranges" onclick="ppSetMode('ranges')">טווחים</button>
                         <button class="pp-mode-btn" data-mode="sqm" onclick="ppSetMode('sqm')">מ"ר</button>
@@ -1316,14 +1317,6 @@
                         <div class="pp-field"><label class="pp-label">תוספת גובה הזזה %</label><input class="pp-input" id="pp-slidingHeightSurcharge" type="number" min="0"></div>
                         <div class="pp-field"><label class="pp-label">רגל ניקל ₪</label><input class="pp-input" id="pp-nickelLegPrice" type="number" min="0"></div>
                     </div>
-                </div>
-                <div id="pp-save-bar" style="display:flex;gap:12px;align-items:center;padding:8px 0 24px;">
-                    <button class="profile-save-btn accent" onclick="savePricingSettings()">
-                        <i class="fa-solid fa-floppy-disk"></i> שמור הגדרות תמחור
-                    </button>
-                    <button class="profile-save-btn" style="background:var(--border-l);color:var(--text-2);box-shadow:none;border:1.5px solid var(--border);" onclick="resetPricingToDefaults()">
-                        <i class="fa-solid fa-rotate-right"></i> אפס לברירת מחדל
-                    </button>
                 </div>
             </div>
         </div>
@@ -1803,6 +1796,8 @@
 
 <script src="auth.js?v=20261008trial"></script>
 <script src="trial-watermark.js?v=20261008trial"></script>
+<script src="pricing-core.js?v=20261008a"></script>
+<script src="pricing-panel.js?v=20261008a"></script>
 <script src="projects.js?v=20261008types"></script>
 <script src="quick-calc.js?v=20261008types"></script>
 </body>
