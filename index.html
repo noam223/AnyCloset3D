@@ -40,7 +40,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260910deskMerge">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
     <link rel="stylesheet" href="style-extras.css?v=20260731rpcab">
-    <link rel="stylesheet" href="style.css?v=20261007ledStripOff">
+    <link rel="stylesheet" href="style.css?v=20261009tour">
     <link rel="stylesheet" href="quick-calc.css?v=20260929qc">
     <style>
         html.thumb-only-mode #left-sidebar,
@@ -939,7 +939,7 @@
                 </div>
             </div>
             <div style="font-size: 0.9rem; font-weight: bold; margin-bottom: 12px; color: var(--text-dark);">גוונים חלקים:</div>
-            <div class="materials-flat-grid" style="margin-bottom: 25px;">
+            <div class="materials-flat-grid" id="mat-solid-grid" style="margin-bottom: 25px;">
                 <div class="mat-item"><button class="material-btn active" data-mat="white_matte" style="background-color: #f7f7f7; border: 1px solid #ccc;" title="לבן מט 2100"></button><span onclick="this.previousElementSibling.click()">לבן מט 2100</span></div>
                 <div class="mat-item"><button class="material-btn" data-mat="c3110" style="background-color: #f0ede9;" title="3110"></button><span onclick="this.previousElementSibling.click()">3110</span></div>
                 <div class="mat-item"><button class="material-btn" data-mat="c795" style="background-color: #ece0d4;" title="759"></button><span onclick="this.previousElementSibling.click()">759</span></div>
@@ -953,7 +953,7 @@
                 <div class="mat-item"><button class="material-btn" data-mat="black_matte" style="background-color: #2a2a2a;" title="שחור מט"></button><span onclick="this.previousElementSibling.click()">שחור מט</span></div>
             </div>
             <div style="font-size: 0.9rem; font-weight: bold; margin-bottom: 12px; color: var(--text-dark);">טקסטורות עץ ודוגמאות:</div>
-            <div class="materials-flat-grid">
+            <div class="materials-flat-grid" id="mat-texture-grid">
                 <div class="mat-item"><button class="material-btn" data-mat="2020" style="background-image: url('textures/2020.jpg'); background-size: cover;" title="2020"></button><span onclick="this.previousElementSibling.click()">2020</span></div>
                 <div class="mat-item"><button class="material-btn" data-mat="2024" style="background-image: url('textures/2024.jpg'); background-size: cover;" title="2024"></button><span onclick="this.previousElementSibling.click()">2024</span></div>
                 <div class="mat-item" data-no-sandwich="true" data-no-mdf="true"><button class="material-btn" data-mat="H1367" style="background-image: url('textures/H1367.jpg'); background-size: cover;" title="H1367"></button><span onclick="this.previousElementSibling.click()">H1367</span></div>
@@ -2955,7 +2955,7 @@
 </button>
 
 <script src="notes.js?v=20260714pinDelete"></script>
-<script src="tour.js?v=20260929rail"></script>
+<script src="tour.js?v=20261009tour"></script>
 <script src="sidebar-rail.js?v=20261007glassTint"></script>
 <script src="ai-renders.js?v=20261008plans"></script>
 <script>
@@ -2979,61 +2979,12 @@
                 <span class="tour-sheet-header-icon">📚</span>
                 <div>
                     <div class="tour-sheet-header-title" id="tour-sheet-title">בחר הדרכה</div>
-                    <div class="tour-sheet-header-desc">לחץ על נושא כדי להתחיל</div>
+                    <div class="tour-sheet-header-desc" id="tour-sheet-desc">לחץ על נושא כדי להתחיל</div>
                 </div>
             </div>
             <button type="button" class="tour-sheet-close" onclick="window._closeTourSheet()" aria-label="סגור">✕</button>
         </div>
-        <div class="tour-sheet-list">
-        <button class="tour-sheet-card" onclick="window._startTour('quickstart')">
-            <span class="tour-sheet-icon">🚀</span>
-            <div class="tour-sheet-info">
-                <div class="tour-sheet-title">התחלה מהירה</div>
-                <div class="tour-sheet-desc">סקירה כללית של המערכת — 6 שלבים</div>
-            </div>
-            <i class="fa-solid fa-chevron-left tour-sheet-arrow"></i>
-        </button>
-        <button class="tour-sheet-card" onclick="window._startTour('cellContent')">
-            <span class="tour-sheet-icon">🗂️</span>
-            <div class="tour-sheet-info">
-                <div class="tour-sheet-title">תוכן תאים ודלתות</div>
-                <div class="tour-sheet-desc">תלייה, מגירות, כוורת, מחיצה, דלתות — 8 שלבים</div>
-            </div>
-            <i class="fa-solid fa-chevron-left tour-sheet-arrow"></i>
-        </button>
-        <button class="tour-sheet-card" onclick="window._startTour('placement')">
-            <span class="tour-sheet-icon">🏠</span>
-            <div class="tour-sheet-info">
-                <div class="tour-sheet-title">מיקום וסגירות</div>
-                <div class="tour-sheet-desc">קירות, נישות, הגדרות חדר — 4 שלבים</div>
-            </div>
-            <i class="fa-solid fa-chevron-left tour-sheet-arrow"></i>
-        </button>
-        <button class="tour-sheet-card" onclick="window._startTour('extras')">
-            <span class="tour-sheet-icon">🪑</span>
-            <div class="tour-sheet-info">
-                <div class="tour-sheet-title">יחידות נוספות</div>
-                <div class="tour-sheet-desc">יחידת צד, יחידה פינתית, יחידה עליונה, ארון הזזה — 5 שלבים</div>
-            </div>
-            <i class="fa-solid fa-chevron-left tour-sheet-arrow"></i>
-        </button>
-        <button class="tour-sheet-card" onclick="window._startTour('materials')">
-            <span class="tour-sheet-icon">🎨</span>
-            <div class="tour-sheet-info">
-                <div class="tour-sheet-title">חומרים וגימורים</div>
-                <div class="tour-sheet-desc">צבעים, טקסטורות, עריכת צבעים מתקדמת — 4 שלבים</div>
-            </div>
-            <i class="fa-solid fa-chevron-left tour-sheet-arrow"></i>
-        </button>
-        <button class="tour-sheet-card" onclick="window._startTour('ordering')">
-            <span class="tour-sheet-icon">📋</span>
-            <div class="tour-sheet-info">
-                <div class="tour-sheet-title">הזמנה ופרויקט</div>
-                <div class="tour-sheet-desc">הוספה להזמנה, הצעת מחיר, שמירה ושיתוף — 4 שלבים</div>
-            </div>
-            <i class="fa-solid fa-chevron-left tour-sheet-arrow"></i>
-        </button>
-        </div>
+        <div class="tour-sheet-list" id="tour-sheet-list"></div>
     </div>
 </div>
 <!-- ===== END TOUR SELECTION POPUP BOTTOM SHEET ===== -->
