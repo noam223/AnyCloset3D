@@ -287,7 +287,7 @@ window.getWing = function() {
 // ---- Proxy: read per-wing fields from active wing ----
 // These getters/setters make existing code like state.width work transparently
 const _wingFields = [
-    'cabinetModel','placement','width','globalHeight','depth','thickness','plinthHeight',
+    'cabinetModel','cabinetTypeId','placement','width','globalHeight','depth','thickness','plinthHeight',
     'hasDoors','handleType','handleStyle','handleVariant','ridingColor','cabinetName','cabinetModelLabel','cabinetNotes','boardMaterial',
     'materialBody','materialInternal','materialExternal','materialDesk','materialOpenCell','materialBack',
     'materialSideCabinet','materialTopPanel','glassTint',
@@ -1648,7 +1648,9 @@ window.syncSidebarToWing = function() {
     setVal('inp-num-width', w.width); setVal('inp-width', w.width);
     setVal('inp-num-height', w.globalHeight); setVal('inp-height', w.globalHeight);
     setVal('inp-num-depth', w.depth); setVal('inp-depth', w.depth);
-    setVal('inp-plinth', w.cabinetModel || 'maya');
+    setVal('inp-plinth', typeof window.cabinetTypeSelectValue === 'function'
+        ? window.cabinetTypeSelectValue(w.cabinetModel || 'maya', w.cabinetTypeId)
+        : (w.cabinetModel || 'maya'));
     setVal('inp-placement', w.placement || 'wall');
     setVal('inp-board-mat', w.boardMaterial);
     setVal('inp-columns', w.columns.length);
@@ -5008,9 +5010,13 @@ function _priceNum(v, fb) {
     return isFinite(n) ? n : fb;
 }
 
-function _pricingRangeKey(cfg, engine) {
+function _pricingRangeKey(cfg, engine, typeId) {
     const cfgR = (cfg && cfg.ranges) || DEFAULT_PRICING_CONFIG.ranges;
     const types = (cfg && Array.isArray(cfg.cabinetTypes)) ? cfg.cabinetTypes : [];
+    if (typeId && cfgR[typeId]) {
+        const own = types.find(function(t) { return t && t.id === typeId; });
+        if (own && (own.engine === engine || (engine === 'c9' && own.engine === 'ab2_nohoney'))) return typeId;
+    }
     const hit = types.find(function(t) {
         return t && t.engine !== 'sliding' && (t.engine === engine || t.id === engine) && cfgR[t.id];
     });
@@ -5030,7 +5036,27 @@ function _pricingRangeKey(cfg, engine) {
     return keys[0] || 'maya';
 }
 
-function _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel) {
+/** Price from a width table: the nearest listed width at or above ww; beyond the widest entry, scale linearly. Zero/empty cells are skipped. */
+function _rangeTablePrice(rt, ww, engine) {
+    if (!rt) return null;
+    if (ww <= 40 && (engine === 'maya' || engine === 'c9')) {
+        const p40 = _priceNum(rt['40'], 0);
+        if (p40 > 0) return p40;
+        const p80 = _priceNum(rt['80'], 0);
+        if (p80 > 0) return p80 / 2 + 150;
+    }
+    const widths = Object.keys(rt).map(Number)
+        .filter(function(w) { return w > 0 && isFinite(w) && _priceNum(rt[w], 0) > 0; })
+        .sort(function(a, b) { return a - b; });
+    if (!widths.length) return null;
+    for (let i = 0; i < widths.length; i++) {
+        if (ww <= widths[i]) return _priceNum(rt[widths[i]], 0);
+    }
+    const maxW = widths[widths.length - 1];
+    return (_priceNum(rt[maxW], 0) / maxW) * ww;
+}
+
+function _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel, wTypeId) {
     const mode  = cfg.pricingMode || 'ranges';
     const hS    = cfg.heightSurcharge != null ? cfg.heightSurcharge : 0.20;
     const dS    = cfg.depthSurcharge  != null ? cfg.depthSurcharge  : 0.20;
@@ -5059,28 +5085,19 @@ function _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel) {
     if (cfgR.melamine && !cfgR.maya && !cfgR.c9) {
         rt = wMelamine ? cfgR.melamine : (cfgR.nonMelamine||cfgR.melamine);
     } else {
-        const mk = _pricingRangeKey(cfg, wEffectiveModel);
+        const mk = _pricingRangeKey(cfg, wEffectiveModel, wTypeId);
         const mr = cfgR[mk] || DEFAULT_PRICING_CONFIG.ranges.maya || DEFAULT_PRICING_CONFIG.ranges.c9;
         rt = wMelamine ? mr.melamine : (mr.nonMelamine||mr.melamine);
+        // C9 up to 80 cm is priced from the Maya table, except for an additional C9-built type that has its own table.
+        if (wEffectiveModel === 'c9' && ww <= 80 && cfgR.maya && mk === _pricingRangeKey(cfg, wEffectiveModel)) {
+            rt = (wMelamine ? cfgR.maya.melamine : (cfgR.maya.nonMelamine || cfgR.maya.melamine)) || rt;
+        }
     }
-    rt = rt || {};
-    // C9 up to 80 cm is priced from the Maya table
-    if (wEffectiveModel === 'c9' && ww <= 80 && cfgR.maya) {
-        const mr = cfgR.maya;
-        rt = (wMelamine ? mr.melamine : (mr.nonMelamine || mr.melamine)) || rt;
+    let bp = _rangeTablePrice(rt, ww, wEffectiveModel);
+    if (bp == null) {
+        const dm = DEFAULT_PRICING_CONFIG.ranges.maya;
+        bp = _rangeTablePrice(wMelamine ? dm.melamine : dm.nonMelamine, ww, wEffectiveModel);
     }
-    const p240 = _priceNum(rt['240'], 2487);
-    const p40 = _priceNum(rt['40'], 0);
-    let bp;
-    if (ww <= 40 && (p40 > 0 || wEffectiveModel === 'maya' || wEffectiveModel === 'c9')) {
-        bp = p40 > 0 ? p40 : _priceNum(rt['80'], 1050) / 2 + 150;
-    }
-    else if (ww <= 80) bp = _priceNum(rt['80'], 1050);
-    else if (ww <= 120) bp = _priceNum(rt['120'], 1462);
-    else if (ww <= 160) bp = _priceNum(rt['160'], 1658);
-    else if (ww <= 200) bp = _priceNum(rt['200'], 2073);
-    else if (ww <= 240) bp = p240;
-    else bp = (p240 / 240) * ww;
     if (wh >= 241) bp *= (1 + hS);
     if (wd > 54) bp *= (1 + dS);
     return bp;
@@ -5138,7 +5155,7 @@ function _calcWingCost(cfg, wing) {
     const wModel = wing.cabinetModel || 'maya';
     const wEffectiveModel = wModel === 'ab2_nohoney' ? 'c9' : wModel;
 
-    let basePrice = _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel);
+    let basePrice = _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel, wing.cabinetTypeId);
     if (SANDWICH_COLORS.has(wing.materialBody)) basePrice *= (1 + sandwichPct);
     if (wEffectiveModel === 'regalim' && (cfg.pricingMode||'ranges') === 'ranges') {
         const legCount = ww<=110 ? 4 : ww<=180 ? 6 : 8;

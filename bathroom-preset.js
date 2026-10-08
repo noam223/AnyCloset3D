@@ -71,7 +71,7 @@ window._applyBathroomPreset = function() {
 
     // Sync plinth model selector
     const plinthSel = document.getElementById('inp-plinth');
-    if (plinthSel) plinthSel.value = 'regalim';
+    if (plinthSel) plinthSel.value = typeof window.cabinetTypeSelectValue === 'function' ? window.cabinetTypeSelectValue('regalim') : 'regalim';
 
     // Use updateDim so column heights + sliders are all updated correctly
     _applyBathDepth(BATH_DEPTH);
@@ -115,7 +115,7 @@ window._setBathroomStyle = function(style) {
 
     // Sync the plinth model selector in sidebar
     const plinthSel = document.getElementById('inp-plinth');
-    if (plinthSel) plinthSel.value = cw.cabinetModel;
+    if (plinthSel) plinthSel.value = typeof window.cabinetTypeSelectValue === 'function' ? window.cabinetTypeSelectValue(cw.cabinetModel, cw.cabinetTypeId) : cw.cabinetModel;
 
     _updateBathroomSectionUI();
     if (typeof buildCabinet === 'function') buildCabinet();

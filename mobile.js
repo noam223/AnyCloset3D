@@ -1149,7 +1149,9 @@ function _syncMobileInputsFromState() {
     if (mColVal) mColVal.innerText = state.columns ? state.columns.length : 2;
 
     const mPlinth = document.getElementById('mobile-inp-plinth');
-    if (mPlinth) mPlinth.value = state.cabinetModel || 'maya';
+    if (mPlinth) mPlinth.value = typeof window.cabinetTypeSelectValue === 'function'
+        ? window.cabinetTypeSelectValue(state.cabinetModel || 'maya', state.cabinetTypeId)
+        : (state.cabinetModel || 'maya');
 
     const mPlacement = document.getElementById('mobile-inp-placement');
     if (mPlacement) mPlacement.value = state.placement || 'wall';

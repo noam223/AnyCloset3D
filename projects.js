@@ -2853,12 +2853,42 @@ function _ppAddRangeRowData(model, width, melVal, nonMelVal) {
 
 function ppAddRangeRow() {
     var types = _ppRangeTypes();
-    _ppAddRangeRowData(types[0] ? types[0].id : 'maya', 80, 0, 0);
+    var tbody = document.getElementById('pp-ranges-tbody');
+    var lastSel = tbody ? tbody.querySelector('tr:last-child select') : null;
+    var typeId = lastSel ? lastSel.value : (types[0] ? types[0].id : 'maya');
+    var maxW = 0;
+    if (tbody) tbody.querySelectorAll('tr').forEach(function(tr) {
+        var sel = tr.querySelector('select');
+        var inp = tr.querySelectorAll('td')[1] && tr.querySelectorAll('td')[1].querySelector('input');
+        if (sel && sel.value === typeId && inp) maxW = Math.max(maxW, _ppNum(inp.value, 0));
+    });
+    _ppAddRangeRowData(typeId, maxW ? maxW + 40 : 80, 0, 0);
 }
 
 function ppDeleteRangeRow(btn) {
     var tr = btn.closest('tr');
     if (tr) tr.remove();
+}
+
+/** Returns an error message for the first bad row (missing width, duplicate width within a type), marking bad rows red; null if all rows are valid. */
+function _ppValidateRangesTable() {
+    var tbody = document.getElementById('pp-ranges-tbody');
+    if (!tbody) return null;
+    var seen = {}, problem = null;
+    tbody.querySelectorAll('tr').forEach(function(tr) {
+        var cells = tr.querySelectorAll('td');
+        if (cells.length < 4) return;
+        var sel = cells[0].querySelector('select');
+        var widthInp = cells[1].querySelector('input');
+        var width = _ppNum(widthInp.value, null);
+        var bad = null;
+        if (width == null || width <= 0) bad = 'יש שורה בטבלת הרוחב בלי רוחב תקין';
+        else if (seen[(sel ? sel.value : '') + '|' + width]) bad = 'הרוחב ' + width + ' מופיע פעמיים באותו סוג ארון';
+        else seen[(sel ? sel.value : '') + '|' + width] = true;
+        widthInp.style.borderColor = bad ? '#ef4444' : '';
+        if (bad && !problem) problem = bad;
+    });
+    return problem;
 }
 
 function _ppReadRangesTable() {
@@ -3029,7 +3059,19 @@ async function savePricingSettings() {
             showToast('רק אדמין החברה יכול לערוך תמחור', 'error');
             return;
         }
+        var problem = _ppValidateRangesTable();
+        if (problem) { showToast(problem, 'error'); return; }
         var cfg = _readPricingPanel();
+        if (cfg.pricingMode === 'ranges') {
+            var emptyType = _ppRangeTypes().find(function(t) { return !cfg.ranges[t.id]; });
+            if (emptyType) { showToast('לסוג "' + emptyType.label + '" אין שורות מחיר בטבלת הרוחב', 'error'); return; }
+            var zeroRows = 0;
+            _ppRangeTypes().forEach(function(t) {
+                var r = cfg.ranges[t.id];
+                Object.keys(r.melamine).forEach(function(w) { if (!r.melamine[w] || !r.nonMelamine[w]) zeroRows++; });
+            });
+            if (zeroRows && !confirm('יש ' + zeroRows + ' שורות בטבלת הרוחב עם מחיר 0. לשמור בכל זאת?')) return;
+        }
         var { error } = await sb.from('pricing_configs').upsert(
             { user_id: user.id, config: cfg, updated_at: new Date().toISOString() },
             { onConflict: 'user_id' }
@@ -3045,6 +3087,7 @@ async function savePricingSettings() {
 }
 
 function resetPricingToDefaults() {
+    if (!confirm('להחליף את כל הערכים בטופס בברירות המחדל? השינוי יישמר רק אחרי לחיצה על "שמור הגדרות תמחור".')) return;
     _fillPricingPanel(_PP_DEFAULTS);
     if (typeof window.applyCabinetTypeSelects === 'function') window.applyCabinetTypeSelects(_PP_DEFAULTS);
     showToast('הוחזר לברירת מחדל', 'success');

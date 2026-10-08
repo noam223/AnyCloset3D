@@ -8118,9 +8118,20 @@ function bindUI() {
     }
 
     document.getElementById('inp-plinth').addEventListener('change', (e) => {
-        const val = e.target.value;
+        const typeId = e.target.value;
+        const val = typeof window.cabinetTypeEngine === 'function' ? window.cabinetTypeEngine(typeId) : typeId;
         const prevModel = state.cabinetModel;
-        if (val === prevModel) return;
+        const mPlinthSel = document.getElementById('mobile-inp-plinth');
+        if (mPlinthSel && mPlinthSel.value !== typeId) mPlinthSel.value = typeId;
+        if (val === prevModel) {
+            if (state.cabinetTypeId !== typeId) {
+                state.cabinetTypeId = typeId;
+                state.manualPrice = null;
+                calculatePrice(); saveHistoryState();
+            }
+            return;
+        }
+        state.cabinetTypeId = typeId;
 
         const prevPlinth = state.plinthHeight || 0;
         state.cabinetModel = val;
@@ -8163,9 +8174,6 @@ function bindUI() {
             });
             if (typeof window._syncCornerDeskHandleUI === 'function') window._syncCornerDeskHandleUI();
         }
-
-        const mPlinth = document.getElementById('mobile-inp-plinth');
-        if (mPlinth && mPlinth.value !== val) mPlinth.value = val;
 
         state.manualPrice = null;
         buildCabinet(); calculatePrice(); saveHistoryState();
@@ -11871,6 +11879,9 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
         if(state.cabinetModel === 'ab2_nohoney') modelNameText = 'ארון עם חזיתות פנימיות';
         if(state.cabinetModel === 'ab2') modelNameText = 'AB2';
         if(state.cabinetModel === 'regalim') modelNameText = 'רגלי ניקל';
+        const _cfgTypes = (window._pricingConfig && Array.isArray(window._pricingConfig.cabinetTypes)) ? window._pricingConfig.cabinetTypes : [];
+        const _customType = _cfgTypes.find(t => t && t.id === state.cabinetTypeId && t.engine === state.cabinetModel && t.id !== t.engine);
+        if (_customType && _customType.label) modelNameText = _customType.label;
         const _isWritingDeskCart = state.presetId === 'writing-desk';
         const _wdCart = _isWritingDeskCart && state.wings && state.wings.center
             ? (state.wings.center.writingDesk || {}) : {};

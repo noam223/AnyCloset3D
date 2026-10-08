@@ -133,31 +133,42 @@ global.applyCabinetTypeSelects = function(cfg) {
         }
     }
 
-    var designerTypes = [];
-    var seenEng = {};
-    types.forEach(function(t) {
-        if (t.engine === 'sliding') return;
-        if (seenEng[t.engine]) return;
-        seenEng[t.engine] = true;
-        designerTypes.push({ engine: t.engine, label: t.label });
-    });
+    var designerTypes = types.filter(function(t) { return t.engine !== 'sliding'; });
     ['inp-plinth', 'mobile-inp-plinth'].forEach(function(id) {
         var sel = document.getElementById(id);
         if (!sel || !designerTypes.length) return;
         var curD = sel.value;
         sel.innerHTML = designerTypes.map(function(t) {
-            return '<option value="' + _qcEsc(t.engine) + '">' + _qcEsc(t.label) + '</option>';
+            return '<option value="' + _qcEsc(t.id) + '" data-engine="' + _qcEsc(t.engine) + '">' + _qcEsc(t.label) + '</option>';
         }).join('');
         if (curD && [].some.call(sel.options, function(o) { return o.value === curD; })) {
             sel.value = curD;
+        } else if (curD && [].some.call(sel.options, function(o) { return o.getAttribute('data-engine') === curD; })) {
+            sel.value = [].find.call(sel.options, function(o) { return o.getAttribute('data-engine') === curD; }).value;
         } else if (curD) {
             var o = document.createElement('option');
             o.value = curD;
+            o.setAttribute('data-engine', curD);
             o.textContent = _QC_LEGACY_LABELS[curD] || curD;
             sel.appendChild(o);
             sel.value = curD;
         }
     });
+};
+
+/** Designer selector value → construction engine. Accepts a type id or (legacy) an engine id. */
+global.cabinetTypeEngine = function(idOrEngine) {
+    var t = _qcFindType(_qcCfg(), idOrEngine);
+    return t ? t.engine : idOrEngine;
+};
+
+/** Which designer option represents a wing: its saved type if still valid for its engine, else the first type built that way. */
+global.cabinetTypeSelectValue = function(engine, typeId) {
+    var types = _qcTypes(_qcCfg());
+    var own = typeId && types.find(function(t) { return t.id === typeId && t.engine === engine; });
+    if (own) return own.id;
+    var first = types.find(function(t) { return t.engine === engine; });
+    return first ? first.id : engine;
 };
 
 function _qcIncludedShelves(ww, wh, wModel) {
@@ -197,6 +208,26 @@ function _qcRtPrice(rt, key, fb) {
     return _qcNum(v, fb);
 }
 
+/** Same lookup as _rangeTablePrice in state.js: nearest listed width at or above ww, linear beyond the widest; zero cells skipped. */
+function _qcRangeTablePrice(rt, ww, engine) {
+    if (!rt) return null;
+    if (ww <= 40 && (engine === 'maya' || engine === 'c9')) {
+        var p40 = _qcRtPrice(rt, 40, 0);
+        if (p40 > 0) return p40;
+        var p80 = _qcRtPrice(rt, 80, 0);
+        if (p80 > 0) return p80 / 2 + 150;
+    }
+    var widths = Object.keys(rt).map(Number)
+        .filter(function(w) { return w > 0 && isFinite(w) && _qcNum(rt[w], 0) > 0; })
+        .sort(function(a, b) { return a - b; });
+    if (!widths.length) return null;
+    for (var i = 0; i < widths.length; i++) {
+        if (ww <= widths[i]) return _qcNum(rt[widths[i]], 0);
+    }
+    var maxW = widths[widths.length - 1];
+    return (_qcNum(rt[maxW], 0) / maxW) * ww;
+}
+
 function _qcBasePrice(cfg, ww, wh, wd, wMelamine, engine, typeId) {
     var hS = cfg.heightSurcharge != null ? cfg.heightSurcharge : 0.20;
     var dS = cfg.depthSurcharge != null ? cfg.depthSurcharge : 0.20;
@@ -204,23 +235,15 @@ function _qcBasePrice(cfg, ww, wh, wd, wMelamine, engine, typeId) {
     var mk = _qcRangeKey(cfg, engine, typeId);
     var mr = cfgR[mk] || _QC_DEFAULT_PRICING.ranges.maya || {};
     var rt = wMelamine ? mr.melamine : (mr.nonMelamine || mr.melamine);
-    rt = rt || {};
-    // C9 up to 80 cm is priced from the Maya table
-    if (engine === 'c9' && ww <= 80 && cfgR.maya) {
+    // C9 up to 80 cm is priced from the Maya table, except for an additional C9-built type that has its own table.
+    if (engine === 'c9' && ww <= 80 && cfgR.maya && mk === _qcRangeKey(cfg, engine)) {
         rt = (wMelamine ? cfgR.maya.melamine : (cfgR.maya.nonMelamine || cfgR.maya.melamine)) || rt;
     }
-    var p240 = _qcRtPrice(rt, 240, 2487);
-    var p40 = _qcRtPrice(rt, 40, 0);
-    var bp;
-    if (ww <= 40 && (p40 > 0 || engine === 'maya' || engine === 'c9')) {
-        bp = p40 > 0 ? p40 : _qcRtPrice(rt, 80, 1050) / 2 + 150;
+    var bp = _qcRangeTablePrice(rt, ww, engine);
+    if (bp == null) {
+        var dm = _QC_DEFAULT_PRICING.ranges.maya;
+        bp = _qcRangeTablePrice(wMelamine ? dm.melamine : dm.nonMelamine, ww, engine);
     }
-    else if (ww <= 80) bp = _qcRtPrice(rt, 80, 1050);
-    else if (ww <= 120) bp = _qcRtPrice(rt, 120, 1462);
-    else if (ww <= 160) bp = _qcRtPrice(rt, 160, 1658);
-    else if (ww <= 200) bp = _qcRtPrice(rt, 200, 2073);
-    else if (ww <= 240) bp = p240;
-    else bp = (p240 / 240) * ww;
     if (wh >= 241) bp *= (1 + hS);
     if (wd > 54) bp *= (1 + dS);
     return bp;
