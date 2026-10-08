@@ -14,6 +14,7 @@ var STATUS_LABELS = {
     service: 'קריאת שירות',
     installed: 'התקנה הושלמה'
 };
+var SIMPLE_STATUS_LABELS = { quote: 'פעיל', installed: 'הושלם' };
 
 var _approvals = {};          // { cabIdx: true }
 var _pinMode = false;
@@ -82,7 +83,11 @@ function updateStatusBadge() {
     var el = document.getElementById('viewer-order-status-badge');
     if (!el) return;
     var key = window._viewerOrderStatus || 'quote';
-    el.textContent = STATUS_LABELS[key] || key;
+    var a = api();
+    var pd = (a && a.getProjectData && a.getProjectData()) || {};
+    var labels = pd.statusMode === 'simple' ? SIMPLE_STATUS_LABELS : STATUS_LABELS;
+    if (!labels[key]) key = 'quote';
+    el.textContent = labels[key];
     el.dataset.status = key;
     el.style.display = 'inline-flex';
 }
@@ -220,11 +225,13 @@ function openSummary() {
     var pd = a.getProjectData() || {};
     var cart = pd.orderCart || pd.cart || [];
     var statusKey = window._viewerOrderStatus || pd.orderStatus || 'quote';
+    var labels = pd.statusMode === 'simple' ? SIMPLE_STATUS_LABELS : STATUS_LABELS;
+    if (!labels[statusKey]) statusKey = 'quote';
     var cust = (pd.customer || (typeof state !== 'undefined' && state.customer) || {});
     var showPrice = window._showPricing === true;
 
     var html = '';
-    html += '<div class="vs-status" data-status="' + esc(statusKey) + '"><i class="fa-solid fa-clipboard-list"></i> סטטוס: <strong>' + esc(STATUS_LABELS[statusKey] || statusKey) + '</strong></div>';
+    html += '<div class="vs-status" data-status="' + esc(statusKey) + '"><i class="fa-solid fa-clipboard-list"></i> סטטוס: <strong>' + esc(labels[statusKey]) + '</strong></div>';
     if (cust.name || cust.phone || cust.address) {
         html += '<div class="vs-cust">';
         if (cust.name) html += '<div><i class="fa-regular fa-user"></i> ' + esc(cust.name) + '</div>';

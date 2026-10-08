@@ -527,7 +527,7 @@
 
 </div>
 
-<script src="auth.js?v=20261008trial"></script>
+<script src="auth.js?v=20261008plans"></script>
 <script>
 // ── State ────────────────────────────────────────────────────────────────────
 var _selectedUserType = null;
@@ -536,8 +536,10 @@ var _selectedPlanKey  = null;
 // Plans per user type
 var _PLANS_BY_TYPE = {
     designer: [
-        { key: 'designer_monthly', name: 'מנוי חודשי',  price: '₪399/חודש', desc: 'שבוע ניסיון חינם · בהנחה מ-₪499' },
-        { key: 'designer_annual',  name: 'מנוי שנתי',   price: '₪369/חודש', desc: 'שבוע ניסיון חינם · ₪4,428 לשנה · חיסכון ₪360' }
+        { key: 'designer_basic',          name: 'בסיסי — חודשי',   price: '₪399/חודש', desc: 'שבוע ניסיון חינם · 30 פרויקטים, 30 הדמיות AI, 35 גווני טמבור' },
+        { key: 'designer_basic_annual',   name: 'בסיסי — שנתי',    price: '₪369/חודש', desc: 'שבוע ניסיון חינם · ₪4,428 לשנה · חיסכון ₪360' },
+        { key: 'designer_premium',        name: 'פרימיום — חודשי', price: '₪549/חודש', desc: 'שבוע ניסיון חינם · 100 פרויקטים, תמחור, כל סוגי הארונות, 100 הדמיות AI' },
+        { key: 'designer_premium_annual', name: 'פרימיום — שנתי',  price: '₪519/חודש', desc: 'שבוע ניסיון חינם · ₪6,228 לשנה · חיסכון ₪360' }
     ],
     carpenter: [
         { key: 'carpenter_basic',        name: 'בסיסי — חודשי',  price: '₪499/חודש', desc: 'שבוע ניסיון חינם · תמחור + הדמיה, עד 30 פרויקטים' },

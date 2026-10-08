@@ -10455,6 +10455,11 @@ window._refreshCartMediaForPrint = async function(opts) {
     }
 };
 
+/** Prices in printed / shared documents: hidden when the plan has no pricing or no quotes (designers). */
+window._docsHidePrices = function() {
+    return window._showPricing === false || !!(window._features && window._features.canQuote === false);
+};
+
 window.openOrderModal = async function(mode, opts) {
     // mode: 'customer' or 'factory'
     opts = opts || {};
@@ -10517,7 +10522,7 @@ window.openOrderModal = async function(mode, opts) {
     if (actionsEl) {
         actionsEl.innerHTML = isFactory
             ? `<button class="print-btn-large" onclick="printFactory()" style="flex:1;background:#475569;box-shadow:0 4px 15px rgba(71,85,105,0.4);"><i class="fa-solid fa-industry"></i> הדפס לייצור (עלויות רכש)</button>`
-            : window._showPricing !== false
+            : !window._docsHidePrices()
                 ? `<button class="print-btn-large" onclick="printCustomer()" style="flex:1;"><i class="fa-solid fa-file-invoice-dollar"></i> הדפס ללקוח (מחירון)</button>`
                 : `<button class="print-btn-large" onclick="printCustomer()" style="flex:1;"><i class="fa-solid fa-file-invoice-dollar"></i> הדפס סיכום ללקוח</button>`;
     }
@@ -10552,7 +10557,7 @@ window.openOrderModal = async function(mode, opts) {
         if (!isNaN(numericPrice)) totalOrderPrice += numericPrice;
         totalInstallPrice += itemInstall; totalCostPrice += itemCost;
 
-        const priceRowsModal = !isFactory && window._showPricing !== false ? `
+        const priceRowsModal = window._docsHidePrices() ? `` : !isFactory ? `
                     <tr class="view-customer">
                         <th style="background:var(--highlight); vertical-align:middle;">מחיר ארון ללקוח</th>
                         <td style="font-weight:bold; color:var(--primary); font-size:1.15rem; text-align:right;">
@@ -10571,7 +10576,7 @@ window.openOrderModal = async function(mode, opts) {
                             </div>
                         </td>
                     </tr>
-                    ` : !isFactory ? `` : `
+                    ` : `
                     <tr class="view-factory">
                         <th style="background:#fef08a;">עלות ייצור (רכש)</th>
                         <td style="font-weight:bold; color:#854d0e; font-size:1.15rem; text-align:right;">
@@ -10711,18 +10716,18 @@ window.openOrderModal = async function(mode, opts) {
     });
 
     // Footer summary
-    const footerHTML = isFactory ? `
+    const footerHTML = window._docsHidePrices() ? `<div></div>` : isFactory ? `
         <div class="summary-factory" style="display:block;">
             <div class="summary-row"><span>סה"כ עלויות ייצור (רכש):</span> <span dir="ltr" style="font-weight:bold;color:#854d0e;">₪${totalCostPrice.toLocaleString()}</span></div>
             <div class="summary-row"><span>סה"כ עלויות משלוח/התקנה:</span> <span dir="ltr" style="font-weight:bold;color:#713f12;">₪${totalInstallPrice.toLocaleString()}</span></div>
             <div class="summary-row final-total" style="color:#854d0e; border-top: 2px solid #fef08a;"><span>סה"כ עלויות פרויקט (רכש נטו):</span> <span dir="ltr">₪${(totalCostPrice + totalInstallPrice).toLocaleString()}</span></div>
         </div>
-    ` : window._showPricing !== false ? `
+    ` : `
         <div class="summary-customer">
             <div class="summary-row"><span>סה"כ ארונות (ללא התקנה):</span> <span dir="ltr" style="font-weight:bold;">₪${totalOrderPrice.toLocaleString()}</span></div>
             <div class="summary-row"><span>סה"כ הובלה והתקנה:</span> <span dir="ltr" style="font-weight:bold;">₪${totalInstallPrice.toLocaleString()}</span></div>
             <div class="summary-row final-total"><span>סה"כ לתשלום ללקוח:</span> <span dir="ltr">₪${(totalOrderPrice + totalInstallPrice).toLocaleString()}</span></div>
-        </div>` : `<div></div>
+        </div>
     `;
     document.getElementById('modal-footer-summary').innerHTML = footerHTML;
     modal.style.display = 'flex';
@@ -10878,6 +10883,13 @@ window._promptSaveCabinetBeforeSwitch = function(targetIndex) {
 // ==========================================
 window._SPACE_COMPATIBLE_PRESETS = ['linear', 'sliding', 'writing-desk'];
 window._SPACE_MAX_CABINETS = 4;
+
+/** Plan cap (e.g. designer Basic = 2). Slot clamping keeps using the system max so older projects stay intact. */
+window._spacePlanMax = function() {
+    const sys = window._SPACE_MAX_CABINETS || 4;
+    const p = window._plan && window._plan.maxSpaceCabinets;
+    return p ? Math.min(p, sys) : sys;
+};
 
 window._isSpaceCompatiblePreset = function(presetId) {
     const p = presetId || 'linear';
@@ -11069,7 +11081,8 @@ window._getSpacePairInfoAt = function(cartIndex) {
         members: members,
         others: others,
         count: members.length,
-        canAddMore: members.length < (window._SPACE_MAX_CABINETS || 4),
+        canAddMore: members.length < window._spacePlanMax(),
+        planLimitReached: members.length >= window._spacePlanMax() && members.length < (window._SPACE_MAX_CABINETS || 4),
         slotIndices: slotIndices,
         // Legacy 2-cab fields (kept for older call sites)
         otherIndex: others.length ? others[0].index : -1,
@@ -11449,6 +11462,10 @@ window._fillSpaceJoinList = function(el, indices) {
 window.toggleJoinSpacePicker = function() {
     if (!window._spacePairCanUse()) return;
     const info = window._getSpacePairInfo();
+    if (info && info.planLimitReached && typeof window._showPlanUpsell === 'function') {
+        window._showPlanUpsell('הוספת יותר מ-' + window._spacePlanMax() + ' ארונות במרחב');
+        return;
+    }
     if (info && !info.canAddMore) return;
     const indices = window._joinableSpaceCabinets();
     if (!indices.length) return;
@@ -11531,8 +11548,12 @@ window._syncSpacePairTabs = function() {
     const mTabsWrap = document.getElementById('mobile-space-cab-tabs-btns');
     const offsetRow = document.getElementById('space-cab-offset-row');
     const mOffsetRow = document.getElementById('mobile-space-cab-offset-row');
-    const canAdd = canUse && (!info || info.canAddMore);
+    const planLocked = !!(info && info.planLimitReached);
+    const canAdd = canUse && (!info || info.canAddMore || planLocked);
     const joinable = canAdd ? window._joinableSpaceCabinets() : [];
+    [addBtn, mAddBtn, joinBtn, mJoinBtn].forEach(function(b) {
+        if (b) b.classList.toggle('plan-locked', planLocked);
+    });
     const showOffset = !!(info && info.activeSlot > 0);
     const showLeave = !!(info && info.count >= 2);
 
@@ -11667,6 +11688,10 @@ window.removeCabinetFromSpace = function(index) {
 window.addSpaceCabinet = function() {
     if (!window._spacePairCanUse()) return;
     const existing = window._getSpacePairInfo();
+    if (existing && existing.planLimitReached && typeof window._showPlanUpsell === 'function') {
+        window._showPlanUpsell('הוספת יותר מ-' + window._spacePlanMax() + ' ארונות במרחב');
+        return;
+    }
     if (existing && !existing.canAddMore) return;
     if (typeof window._commitCurrentCabinetToCart === 'function') {
         window._commitCurrentCabinetToCart({ flash: false });
@@ -14739,7 +14764,7 @@ function _getOrderFormDefaults(mode) {
     return {
         title: isFactory
             ? 'שרטוט ייצור והתקנה'
-            : (window._showPricing !== false ? 'הצעת מחיר ללקוח' : 'סיכום פרויקט ללקוח'),
+            : (!window._docsHidePrices() ? 'הצעת מחיר ללקוח' : 'סיכום פרויקט ללקוח'),
         notes: ''
     };
 }
@@ -15125,7 +15150,7 @@ function _buildPrintHTML(mode) {
     const tdStyle = 'text-align:right;color:#1e293b;padding:10px 14px;border:1px solid #e2e8f0;background:white;';
 
     // Collect cart data
-    const _hidePrices = (window._showPricing === false);
+    const _hidePrices = window._docsHidePrices();
     let totalOrderPrice = 0, totalInstallPrice = 0, totalCostPrice = 0;
     let cabinetsHTML = '';
 
@@ -16477,7 +16502,7 @@ function _buildCustomerSummaryHTML(logoDataUrl) {
     const custPhone = state.customer?.phone   || '';
     const custOrder = state.customer?.orderNum || '';
     const custAddr  = state.customer?.address  || '';
-    const _hidePrices = (window._showPricing === false);
+    const _hidePrices = window._docsHidePrices();
 
     const rows = _buildCartData();
     let totalCabPrice = 0, totalInstallPrice = 0;

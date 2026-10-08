@@ -11,6 +11,14 @@ const GEMINI_MODELS = {
   pro:      'gemini-3-pro-image-preview',   // Nano Banana Pro
 } as const;
 
+// Monthly AI quota per plan when profiles.ai_renders_quota is NULL. Keep in sync with aiRendersQuota in auth.js.
+function planRenderQuota(plan?: string | null): number {
+  const p = String(plan || '');
+  if (p.startsWith('designer_premium')) return 100;
+  if (p.startsWith('designer_')) return 30;
+  return 50;
+}
+
 const TRIAL_WATERMARK =
   '/upload/l_text:Arial_56_bold:AnyCloset%203D%20%E2%80%A2%20TRIAL,co_white,o_40,a_-30,fl_tiled,x_160,y_160/';
 
@@ -129,7 +137,7 @@ serve(async (req) => {
     // ── 2. Check quota & enabled flag from profile ───────────────────────────
     const { data: profile } = await sb
       .from('profiles')
-      .select('ai_renders_enabled, ai_renders_quota, subscription_status, trial_ends_at')
+      .select('ai_renders_enabled, ai_renders_quota, subscription_status, trial_ends_at, plan')
       .eq('id', user.id)
       .single();
 
@@ -140,7 +148,7 @@ serve(async (req) => {
     if (isTrial && profile?.trial_ends_at && new Date(profile.trial_ends_at) <= new Date()) {
       return json({ error: 'trial_expired' }, 403);
     }
-    const QUOTA = isTrial ? 5 : (profile?.ai_renders_quota ?? 50);
+    const QUOTA = isTrial ? 5 : (profile?.ai_renders_quota ?? planRenderQuota(profile?.plan));
 
     const { data: countData, error: countErr } = await sb.rpc(
       'get_ai_renders_count_this_month',

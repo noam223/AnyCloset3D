@@ -34,8 +34,10 @@ var _companyMeta         = null;
 // Organized by user type, shown in upgrade modal
 var _UPGRADE_PLANS = [
     // מעצבות
-    { key: 'designer_monthly',  label: 'מעצבת — חודשי',        price: '₪399/חודש',  userType: 'designer',  maxProjects: 30,   maxDevices: 1,  desc: 'עד 30 פרויקטים, 12 ארונות לפרויקט' },
-    { key: 'designer_annual',   label: 'מעצבת — שנתי',         price: '₪369/חודש',  userType: 'designer',  maxProjects: 30,   maxDevices: 1,  desc: 'עד 30 פרויקטים, 12 ארונות לפרויקט, ₪4,428 לשנה — חיסכון ₪360' },
+    { key: 'designer_basic',          label: 'מעצבת — בסיסי',         price: '₪399/חודש', userType: 'designer', maxProjects: 30,  maxDevices: 1, desc: 'עד 30 פרויקטים, 30 הדמיות AI, 35 גווני טמבור נבחרים' },
+    { key: 'designer_basic_annual',   label: 'מעצבת — בסיסי שנתי',    price: '₪369/חודש', userType: 'designer', maxProjects: 30,  maxDevices: 1, desc: 'עד 30 פרויקטים, 30 הדמיות AI, ₪4,428 לשנה — חיסכון ₪360' },
+    { key: 'designer_premium',        label: 'מעצבת — פרימיום',       price: '₪549/חודש', userType: 'designer', maxProjects: 100, maxDevices: 1, desc: 'עד 100 פרויקטים, תמחור ארונות, כל סוגי הארונות, 100 הדמיות AI, 1651 גווני טמבור' },
+    { key: 'designer_premium_annual', label: 'מעצבת — פרימיום שנתי',  price: '₪519/חודש', userType: 'designer', maxProjects: 100, maxDevices: 1, desc: 'כל הפרימיום, ₪6,228 לשנה — חיסכון ₪360' },
     // נגרים
     { key: 'carpenter_basic',   label: 'נגר — בסיסי',           price: '₪499/חודש',  userType: 'carpenter', maxProjects: 30,   maxDevices: 1,  desc: 'תמחור + הדמיה, עד 30 פרויקטים' },
     { key: 'carpenter_basic_annual', label: 'נגר — בסיסי שנתי', price: '₪449/חודש',  userType: 'carpenter', maxProjects: 30,   maxDevices: 1,  desc: 'תמחור + הדמיה, עד 30 פרויקטים, ₪5,388 לשנה — חיסכון 10%' },
@@ -85,6 +87,7 @@ var _USER_TYPE_LABELS = {
     _plan     = plan;
     _projects = projects;
     window._trialWatermark = !!plan.isTrial;
+    if (window.Projects && Projects.applyPlanStatuses) Projects.applyPlanStatuses(plan);
     // Start first-page thumbnails now so they load alongside the rest of init
     _loadPageThumbnails(_visibleProjects().slice(0, _PAGE_SIZE));
 
@@ -240,8 +243,10 @@ function _buildPaywallPlansHTML(userType) {
 
     // Feature bullets per plan key
     var FEATURES = {
-        designer_monthly:   ['עד 30 פרויקטים', '12 ארונות לפרויקט', 'הדמיה תלת-ממדית', 'ייצוא PDF'],
-        designer_annual:    ['עד 30 פרויקטים', '12 ארונות לפרויקט', 'הדמיה תלת-ממדית', 'ייצוא PDF', 'חיסכון ₪360 בשנה'],
+        designer_basic:          ['עד 30 פרויקטים', '30 הדמיות AI בחודש', '35 גווני טמבור נבחרים', 'ארון + ארון נוסף במרחב', 'שיתוף עם לקוח בזמן אמת'],
+        designer_basic_annual:   ['עד 30 פרויקטים', '30 הדמיות AI בחודש', '35 גווני טמבור נבחרים', 'שיתוף עם לקוח בזמן אמת', 'חיסכון ₪360 בשנה'],
+        designer_premium:        ['עד 100 פרויקטים', 'תמחור ארונות לפי מחירון שוק', 'כל סוגי הארונות כולל פינתיים וחדר ארונות', '100 הדמיות AI בחודש', '1651 גווני טמבור'],
+        designer_premium_annual: ['עד 100 פרויקטים', 'תמחור ארונות לפי מחירון שוק', 'כל סוגי הארונות כולל פינתיים וחדר ארונות', '100 הדמיות AI בחודש', 'חיסכון ₪360 בשנה'],
         carpenter_basic:    ['עד 30 פרויקטים', 'תמחור אוטומטי', 'הדמיה תלת-ממדית'],
         carpenter_basic_annual: ['עד 30 פרויקטים', 'תמחור אוטומטי', 'הדמיה תלת-ממדית', 'חיסכון 10% לעומת חודשי'],
         carpenter_pro:      ['פרויקטים ללא הגבלה', 'תמחור + דוח לקוח', 'ייצוא לנגר', '2 מכשירים'],
@@ -251,7 +256,7 @@ function _buildPaywallPlansHTML(userType) {
     };
 
     // "Popular" = annual plans (best value) or pro/enterprise for other types
-    var POPULAR_KEYS = ['designer_annual', 'carpenter_pro', 'company_standard'];
+    var POPULAR_KEYS = ['designer_premium', 'carpenter_pro', 'company_standard'];
 
     var useSideBySide = plans.length === 2 || plans.length === 4;
     var html = '<div style="display:' + (useSideBySide ? 'grid;grid-template-columns:1fr 1fr' : 'flex;flex-direction:column') + ';gap:12px;margin-bottom:8px;">';
@@ -524,6 +529,9 @@ function _normalizeOrderStatus(status) {
 }
 
 function _statusIconClass(status) {
+    if (window.Projects && Projects.simpleStatuses) {
+        return _normalizeOrderStatus(status) === 'installed' ? 'fa-circle-check' : 'fa-briefcase';
+    }
     var icons = {
         quote: 'fa-file-invoice-dollar',
         measured: 'fa-ruler-combined',
@@ -536,6 +544,7 @@ function _statusIconClass(status) {
 }
 
 function _statusChipLabelHtml(status) {
+    if (window.Projects && Projects.simpleStatuses) return _orderStatusLabel(status);
     var labels = {
         quote: 'הצעת<br>מחיר',
         measured: 'נשלחה<br>מדידה',
@@ -1430,7 +1439,7 @@ function onMeasurementInboxChange(payload) {
         _applyMeasurementBadges(linkedId);
         if (linkedId && (ev === 'INSERT' || ev === 'UPDATE')) {
             var p = _projects.find(function(x) { return x.id === linkedId; });
-            if (p && (p.order_status === 'quote' || !p.order_status)) {
+            if (p && (p.order_status === 'quote' || !p.order_status) && _ORDER_STATUS_KEYS.indexOf('measured') !== -1) {
                 p.order_status = 'measured';
                 var card = document.querySelector('.project-card[data-id="' + linkedId + '"]');
                 if (card) {
@@ -2241,7 +2250,10 @@ async function _loadAllRendersGallery() {
         // Load quota
         var { data: countData } = await sb.rpc('get_ai_renders_count_this_month', { p_user_id: user.id });
         var used = countData ?? 0;
-        if (quota) quota.textContent = 'השתמשת ב-' + used + ' מתוך 50 הדמיות החודש';
+        var { data: quotaRow } = await sb.from('profiles').select('ai_renders_quota, subscription_status').eq('id', user.id).single();
+        var limit = (quotaRow && quotaRow.subscription_status === 'trial') ? 5
+            : ((quotaRow && quotaRow.ai_renders_quota != null) ? quotaRow.ai_renders_quota : ((_plan && _plan.aiRendersQuota) || 50));
+        if (quota) quota.textContent = 'השתמשת ב-' + used + ' מתוך ' + limit + ' הדמיות החודש';
 
         if (!renders || !renders.length) {
             grid.innerHTML = '<div style="text-align:center;padding:80px 20px;color:#94a3b8;">' +
@@ -2403,8 +2415,12 @@ function _loadSubscriptionSection(profile) {
 
     // Plan label
     var PLAN_NAMES = {
-        designer_monthly: 'מעצב — חודשי',
-        designer_annual:  'מעצב — שנתי',
+        designer_basic:          'מעצבת — בסיסי',
+        designer_basic_annual:   'מעצבת — בסיסי שנתי',
+        designer_premium:        'מעצבת — פרימיום',
+        designer_premium_annual: 'מעצבת — פרימיום שנתי',
+        designer_monthly: 'מעצבת — חודשי',
+        designer_annual:  'מעצבת — שנתי',
         carpenter_basic:  'נגר — בסיסי',
         carpenter_basic_annual: 'נגר — בסיסי שנתי',
         carpenter_pro:    'נגר — פרו',

@@ -299,6 +299,7 @@
         .status-filter-btn.active.status-service { background: var(--pastel-service-deep); }
         .status-filter-btn.active.status-installed { background: var(--pastel-installed-deep); }
         .status-filter-btn:not(.active) { opacity: .65; }
+        html.simple-statuses .hide-in-simple-statuses { display: none !important; }
         .status-filter-btn i { font-size: .82rem; }
         .status-filter-count {
             display: inline-flex; align-items: center; justify-content: center;
@@ -1590,7 +1591,7 @@
         </p>
         <input class="modal-input" id="link-project-search" type="search" placeholder="חיפוש לפי שם פרויקט / לקוח / מספר הזמנה..."
                oninput="filterLinkProjectList(this.value)" style="margin-bottom:8px;">
-        <label style="display:flex;align-items:center;gap:8px;font-size:.8rem;font-weight:600;color:var(--text-2);margin-bottom:4px;">
+        <label class="hide-in-simple-statuses" style="display:flex;align-items:center;gap:8px;font-size:.8rem;font-weight:600;color:var(--text-2);margin-bottom:4px;">
             <input type="checkbox" id="link-set-measured" checked>
             עדכן סטטוס ל־"נשלחה מדידה" (אם עדיין הצעת מחיר)
         </label>
@@ -1794,11 +1795,11 @@
     <span id="toast-text"></span>
 </div>
 
-<script src="auth.js?v=20261008trial"></script>
+<script src="auth.js?v=20261008plans"></script>
 <script src="trial-watermark.js?v=20261008trial"></script>
 <script src="pricing-core.js?v=20261008a"></script>
 <script src="pricing-panel.js?v=20261008a"></script>
-<script src="projects.js?v=20261008types"></script>
+<script src="projects.js?v=20261008plans"></script>
 <script src="quick-calc.js?v=20261008types"></script>
 </body>
 </html>

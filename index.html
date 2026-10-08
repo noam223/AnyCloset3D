@@ -49,6 +49,14 @@
         html.thumb-only-mode #mobile-bottom-bar,
         html.thumb-only-mode #auth-gate { display: none !important; }
         html.thumb-only-mode #canvas-container { inset: 0 !important; }
+        .preset-btn.plan-locked, html.plan-no-corners .corner-side-btn:not([data-side="none"]),
+        .space-cab-add-btn.plan-locked, .space-cab-join-btn.plan-locked { position: relative; opacity: .5; }
+        .preset-btn.plan-locked::after, html.plan-no-corners .corner-side-btn:not([data-side="none"])::after,
+        .space-cab-add-btn.plan-locked::after, .space-cab-join-btn.plan-locked::after {
+            content: "\f023"; font-family: "Font Awesome 6 Free"; font-weight: 900;
+            position: absolute; top: 3px; left: 4px; font-size: .62rem; color: #7c3aed;
+        }
+        .tambour-curated-note { margin: 8px 0 0; font-size: .8rem; color: #7c3aed; font-weight: 600; }
     </style>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -1068,7 +1076,7 @@
         <div class="total-price" id="left-sidebar-total">₪0</div>
         </div>
         <div style="display:flex; gap:8px; margin-top:15px;">
-            <button class="view-btn cart-btn" style="flex:1; justify-content: center; background: var(--primary); color: white; border: none; padding: 12px; font-size: 1rem;" onclick="openOrderModal('customer')">
+            <button id="btn-customer-quote" class="view-btn cart-btn" style="flex:1; justify-content: center; background: var(--primary); color: white; border: none; padding: 12px; font-size: 1rem;" onclick="openOrderModal('customer')">
                 <i class="fa-solid fa-file-invoice-dollar"></i> הצעת מחיר
             </button>
             <button id="btn-factory-order" class="view-btn" style="display:none; flex:1; justify-content: center; background: #475569; color: white; border: none; padding: 12px; font-size: 1rem; border-radius:10px; cursor:pointer;" onclick="openOrderModal('factory')">
@@ -2379,7 +2387,7 @@
             </div>
         </div>
         <div style="display:flex;gap:8px;margin-bottom:10px;">
-            <button class="btn-add-cart" style="flex:1;" onclick="openOrderModal('customer'); closeMobilePanel();">
+            <button id="mobile-btn-customer-quote" class="btn-add-cart" style="flex:1;" onclick="openOrderModal('customer'); closeMobilePanel();">
                 <i class="fa-solid fa-file-invoice-dollar"></i> הצעת מחיר
             </button>
             <button class="view-btn" style="flex:1;justify-content:center;background:#475569;color:white;border:none;padding:12px;border-radius:10px;font-weight:600;" onclick="openOrderModal('factory'); closeMobilePanel();">
@@ -2387,7 +2395,7 @@
             </button>
         </div>
         <div style="display:flex;gap:8px;">
-            <button class="view-btn" style="flex:1;justify-content:center;background:var(--accent);color:white;border:none;padding:12px;border-radius:10px;font-weight:600;"
+            <button id="mobile-btn-quick-calc" class="view-btn" style="flex:1;justify-content:center;background:var(--accent);color:white;border:none;padding:12px;border-radius:10px;font-weight:600;"
                 onclick="openQuickCalcModal(); closeMobilePanel();">
                 <i class="fa-solid fa-calculator"></i> מחשבון מהיר
             </button>
@@ -2819,7 +2827,7 @@
 
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="auth.js?v=20261008trial"></script>
+<script src="auth.js?v=20261008plans"></script>
 <script src="trial-watermark.js?v=20261008trial"></script>
 <script src="state.js?v=20261008types"></script>
 <script src="quick-calc.js?v=20261008types"></script>
@@ -2830,12 +2838,12 @@
 <script src="engine-corners.js?v=20261007glassTint"></script>
 <script src="engine-blueprint.js?v=20261007deskMerge28"></script>
 <script src="engine-room-plan.js?v=20260929rail"></script>
-<script src="tambour-color-picker.js?v=20260617scdoors"></script>
-<script src="ui.js?v=20261008types"></script>
+<script src="tambour-color-picker.js?v=20261008plans"></script>
+<script src="ui.js?v=20261008plans"></script>
 <script src="mobile.js?v=20261008types"></script>
 <script src="part-paint.js?v=20260914A427fix"></script>
 <script src="shelf-pick.js?v=20260922sideWall"></script>
-<script src="index-init.js?v=20261002hist"></script>
+<script src="index-init.js?v=20261008plans"></script>
 
 <!-- ===== TAMBOUR FULL PALETTE MODAL ===== -->
 <div id="tambour-palette-modal" class="tambour-palette-overlay">
@@ -2949,7 +2957,7 @@
 <script src="notes.js?v=20260714pinDelete"></script>
 <script src="tour.js?v=20260929rail"></script>
 <script src="sidebar-rail.js?v=20261007glassTint"></script>
-<script src="ai-renders.js?v=20261008trial"></script>
+<script src="ai-renders.js?v=20261008plans"></script>
 <script>
     // Init AI renders after auth is ready
     document.addEventListener('DOMContentLoaded', function() {

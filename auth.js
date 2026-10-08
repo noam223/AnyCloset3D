@@ -31,12 +31,14 @@ const PLAN_LIMITS = {
             isCompany:             false,
         }
     },
-    designer_monthly: {
-        label:                  'מעצבת — חודשי',
+    designer_basic: {
+        label:                  'מעצבת — בסיסי',
         userType:               'designer',
         price:                  0,
         maxProjects:            30,
-        maxCabinetsPerProject:  12,
+        maxCabinetsPerProject:  null,
+        maxSpaceCabinets:       2,           // ארון + עוד ארון אחד במרחב
+        aiRendersQuota:         30,
         maxDevices:             1,
         projectLockDays:        null,
         extensionDays:          null,
@@ -44,30 +46,42 @@ const PLAN_LIMITS = {
             showPricing:           false,
             canExportPDF:          true,
             canExport3D:           true,
-            canExportCarpenter:    true,
+            canExportCarpenter:    true,     // טופס שליחה לייצור
             canExportBlueprint:    true,
-            canViewCustomerReport: true,
+            canViewCustomerReport: true,     // סיכום ללקוח (ללא מחירים)
+            canQuickCalc:          false,
+            canQuote:              false,    // אין הצעת מחיר — רק סיכום ללקוח
+            canCornerCabinets:     false,    // ללא ארונות פינה / חדר ארונות / יחידה פינתית
+            fullTambourPalette:    false,    // 35 גווני טמבור נבחרים
+            simpleStatuses:        true,     // פעיל / הושלם
             canExtendProject:      false,
             canManageDevices:      false,
             isCompany:             false,
         }
     },
-    designer_annual: {
-        label:                  'מעצבת — שנתי',
+    designer_premium: {
+        label:                  'מעצבת — פרימיום',
         userType:               'designer',
         price:                  0,
-        maxProjects:            30,
-        maxCabinetsPerProject:  12,
+        maxProjects:            100,
+        maxCabinetsPerProject:  null,
+        maxSpaceCabinets:       null,        // מקסימום המערכת
+        aiRendersQuota:         100,
         maxDevices:             1,
         projectLockDays:        null,
         extensionDays:          null,
         features: {
-            showPricing:           false,
+            showPricing:           true,     // תמחור לפי מחירון המערכת
             canExportPDF:          true,
             canExport3D:           true,
             canExportCarpenter:    true,
             canExportBlueprint:    true,
             canViewCustomerReport: true,
+            canQuickCalc:          false,
+            canQuote:              false,
+            canCornerCabinets:     true,
+            fullTambourPalette:    true,     // 1651 גוונים
+            simpleStatuses:        true,
             canExtendProject:      false,
             canManageDevices:      false,
             isCompany:             false,
@@ -184,6 +198,11 @@ const PLAN_LIMITS = {
         }
     }
 };
+PLAN_LIMITS.designer_basic_annual   = Object.assign({}, PLAN_LIMITS.designer_basic,   { label: 'מעצבת — בסיסי שנתי' });
+PLAN_LIMITS.designer_premium_annual = Object.assign({}, PLAN_LIMITS.designer_premium, { label: 'מעצבת — פרימיום שנתי' });
+// Legacy designer keys (pre basic/premium split) behave like Basic.
+PLAN_LIMITS.designer_monthly = Object.assign({}, PLAN_LIMITS.designer_basic,        { label: 'מעצבת — חודשי' });
+PLAN_LIMITS.designer_annual  = Object.assign({}, PLAN_LIMITS.designer_basic_annual, { label: 'מעצבת — שנתי' });
 PLAN_LIMITS.carpenter_basic_annual = Object.assign({}, PLAN_LIMITS.carpenter_basic, { label: 'נגר — בסיסי שנתי' });
 PLAN_LIMITS.carpenter_pro_annual   = Object.assign({}, PLAN_LIMITS.carpenter_pro,   { label: 'נגר — מקצועי שנתי' });
 
@@ -995,6 +1014,37 @@ window.Projects = {
         installed:  'התקנה הושלמה'
     },
 
+    SIMPLE_STATUSES: { quote: 'פעיל', installed: 'הושלם' },
+    simpleStatuses: false,
+
+    /** Designer plans use two statuses only (stored as 'quote' / 'installed'). Mutates in place — pages keep references. */
+    applyPlanStatuses: function(plan) {
+        if (!plan || !plan.features || !plan.features.simpleStatuses) return false;
+        var simple = this.SIMPLE_STATUSES;
+        var keys = Object.keys(simple);
+        this.ORDER_STATUS_KEYS.splice(0, this.ORDER_STATUS_KEYS.length);
+        Array.prototype.push.apply(this.ORDER_STATUS_KEYS, keys);
+        var labels = this.ORDER_STATUSES;
+        Object.keys(labels).forEach(function(k) { delete labels[k]; });
+        keys.forEach(function(k) { labels[k] = simple[k]; });
+        this.simpleStatuses = true;
+        document.documentElement.classList.add('simple-statuses');
+        document.querySelectorAll('.status-filter-btn[data-status], .status-option[data-status], .order-status-option[data-status]').forEach(function(el) {
+            var st = el.getAttribute('data-status');
+            if (st === 'active' || st === 'all') return;
+            if (keys.indexOf(st) === -1) { el.style.display = 'none'; return; }
+            if (el.classList.contains('status-filter-btn')) {
+                // "פעילים" already covers 'quote'
+                if (st === 'quote') el.style.display = 'none';
+                else el.innerHTML = '<i class="fa-solid fa-circle-check"></i> ' + simple[st];
+                return;
+            }
+            var spans = el.querySelectorAll('span:not([class])');
+            if (spans.length) spans[spans.length - 1].textContent = simple[st];
+        });
+        return true;
+    },
+
     _extractProjectMeta: function(projectData) {
         if (!projectData) return {};
         const cust = projectData.customer || {};
@@ -1686,7 +1736,7 @@ window.MeasurementInbox = {
             .eq('id', measurementId);
         if (uErr) return { error: uErr.message };
 
-        if (opts.setMeasured !== false) {
+        if (opts.setMeasured !== false && Projects.ORDER_STATUS_KEYS.indexOf('measured') !== -1) {
             const st = proj.order_status || 'quote';
             if (st === 'quote' || !st) {
                 await Projects.updateOrderStatus(projectId, 'measured');

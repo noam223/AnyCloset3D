@@ -156,6 +156,7 @@
         var pricingSummary = document.getElementById('sidebar-pricing-summary');
         if (pricingSummary) pricingSummary.style.display = 'block';
     }
+    if (typeof window.updateLeftSidebar === 'function') window.updateLeftSidebar();
 
     // All feature buttons start hidden in HTML — show them based on plan features
     if (_features && _features.canExportCarpenter) {
@@ -168,15 +169,24 @@
         if (btnReport) btnReport.style.display = 'flex';
     }
 
-    if (_features && _features.showPricing !== false) {
+    var _canQuickCalc = !!(_features && _features.showPricing !== false && _features.canQuickCalc !== false);
+    if (_canQuickCalc) {
         var btnCalc = document.getElementById('btn-quick-calc-open');
         if (btnCalc) btnCalc.style.display = 'flex';
+    } else {
+        var mBtnCalc = document.getElementById('mobile-btn-quick-calc');
+        if (mBtnCalc) mBtnCalc.style.display = 'none';
     }
 
     if (_features && (_features.canExportBlueprint || _features.canExportCarpenter)) {
         var btnMvbp = document.getElementById('btn-multiview-blueprint');
         if (btnMvbp) btnMvbp.style.display = 'inline-flex';
     }
+
+    if (window.Projects && Projects.applyPlanStatuses && Projects.applyPlanStatuses(_planInfo)) {
+        window._syncOrderStatusUI();
+    }
+    _applyPlanEditorGates(_planInfo, _features || {});
 
     // Note: btn-3d-view is always available — it now enters presentation mode (free-orbit + room).
 
@@ -527,6 +537,7 @@
             customer:          state.customer,
             orderForm:         state.orderForm || { factory: { title: '', notes: '' }, customer: { title: '', notes: '' } },
             orderStatus:       window._currentOrderStatus || 'quote',
+            statusMode:        (window.Projects && Projects.simpleStatuses) ? 'simple' : 'full',
             roomWall:          window._roomWall || state.roomWall || 'center',
             roomDoor: window._roomDoor ? {
                 wall: window._roomDoor.wall, t: window._roomDoor.t,
@@ -794,6 +805,7 @@ window._saveProjectNow = async function() {
                 customer:      state.customer,
                 orderForm:     state.orderForm || { factory: { title: '', notes: '' }, customer: { title: '', notes: '' } },
                 orderStatus:   window._currentOrderStatus || 'quote',
+                statusMode:    (window.Projects && Projects.simpleStatuses) ? 'simple' : 'full',
                 tambourPalette: state.tambourPalette || {},
                 blueprintCutouts: state.blueprintCutouts || [],
                 blueprintCellDimOffsets: state.blueprintCellDimOffsets || {},
@@ -847,6 +859,65 @@ function _escHtml(str) {
 
 window._currentOrderStatus = window._currentOrderStatus || 'quote';
 
+// ── Plan-based editor gates (designer Basic / Premium) ──────────────────────
+var _CORNER_PRESETS = ['corner-right', 'corner-left', 'walkin'];
+
+window._showPlanUpsell = function(what) {
+    var msg = '🔒 ' + what + ' זמין במנוי פרימיום';
+    if (typeof _showToast === 'function') _showToast(msg, 4500);
+    else alert(msg);
+};
+
+function _applyPlanEditorGates(plan, features) {
+    if (features.canQuote === false) {
+        var q = document.getElementById('btn-customer-quote');
+        if (q) q.style.display = 'none';
+        var mq = document.getElementById('mobile-btn-customer-quote');
+        if (mq) {
+            mq.innerHTML = '<i class="fa-solid fa-file-invoice"></i> סיכום ללקוח';
+            mq.setAttribute('onclick', 'printCustomerSummary(); closeMobilePanel();');
+        }
+    }
+
+    if (features.canCornerCabinets === false) {
+        document.documentElement.classList.add('plan-no-corners');
+        document.querySelectorAll('.preset-btn').forEach(function(btn) {
+            var m = (btn.getAttribute('onclick') || '').match(/applyPreset\('([^']+)'\)/);
+            if (m && _CORNER_PRESETS.indexOf(m[1]) !== -1) btn.classList.add('plan-locked');
+        });
+        var origApplyPreset = window.applyPreset;
+        window.applyPreset = function(presetId) {
+            if (_CORNER_PRESETS.indexOf(presetId) !== -1) {
+                window._showPlanUpsell(presetId === 'walkin' ? 'חדר ארונות' : 'ארון פינתי');
+                return;
+            }
+            return origApplyPreset.apply(this, arguments);
+        };
+        var origAddWing = window.addWing;
+        window.addWing = function(side) {
+            if ((side === 'left' || side === 'right') && !(state.wings && state.wings[side])) {
+                window._showPlanUpsell('ארון פינתי');
+                return;
+            }
+            return origAddWing.apply(this, arguments);
+        };
+        var origCornerSide = window.updateCornerSide;
+        window.updateCornerSide = function(side) {
+            if (side && side !== 'none') {
+                window._showPlanUpsell('יחידה פינתית');
+                return;
+            }
+            return origCornerSide.apply(this, arguments);
+        };
+    }
+
+    if (features.fullTambourPalette === false && typeof window._setTambourCuratedMode === 'function') {
+        window._setTambourCuratedMode(true);
+    }
+
+    if (typeof window._syncSpacePairTabs === 'function') window._syncSpacePairTabs();
+}
+
 function _orderStatusLabel(status) {
     var map = (Projects && Projects.ORDER_STATUSES) || {
         quote: 'הצעת מחיר', measured: 'נשלחה מדידה', ordered: 'נסגרה עסקה',
@@ -857,6 +928,9 @@ function _orderStatusLabel(status) {
 }
 
 function _orderStatusIconClass(status) {
+    if (window.Projects && Projects.simpleStatuses) {
+        return status === 'installed' ? 'fa-circle-check' : 'fa-briefcase';
+    }
     var icons = {
         quote: 'fa-file-invoice-dollar',
         measured: 'fa-ruler-combined',

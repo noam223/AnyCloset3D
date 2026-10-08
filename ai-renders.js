@@ -151,7 +151,8 @@ async function _updateQuota() {
     var used = countRes.data ?? 0;
     var profile = profileRes.data || {};
     var isTrial = profile.subscription_status === 'trial';
-    var limit = isTrial ? 5 : (profile.ai_renders_quota ?? 50);
+    var planQuota = (window._plan && window._plan.aiRendersQuota) || 50;
+    var limit = isTrial ? 5 : (profile.ai_renders_quota ?? planQuota);
     var pct = Math.min(100, Math.round(used / limit * 100));
 
     var text = document.getElementById('ai-renders-quota-text');
