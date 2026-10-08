@@ -10,48 +10,48 @@
     var csvLoaded = false;
     var curatedMode = false;
 
-    // Designer Basic palette. approx = code not in the 1651 CSV, hex is an estimate.
+    // Designer Basic palette — every code exists in the 1651 CSV.
     var CURATED_COLORS = [
         // לבן ושמנת
-        { name: 'Hush White',       id: 'OW221P', hex: '#F0ECE1' },
-        { name: 'Snow White',       id: 'OW201P', hex: '#F5EFE1' },
-        { name: 'Pure White',       id: 'WW2200', hex: '#F4F3EE', approx: true },
-        { name: 'Soft White',       id: '0003P',  hex: '#F2E8DB' },
-        { name: 'Soft Hint',        id: 'WW2206', hex: '#EEEAE0', approx: true },
-        { name: 'Lucid Vision',     id: 'WW2202', hex: '#F1EFE8', approx: true },
-        { name: 'Mirage',           id: 'OW520P', hex: '#DFDBD4' },
-        { name: 'Intimate White',   id: 'OW212P', hex: '#EEE7DC' },
-        { name: 'Mobe Pearl',       id: 'OW222P', hex: '#ECE2D7' },
-        { name: 'Milk',             id: '1593P',  hex: '#F1ECE0', approx: true },
-        { name: 'Whipped Cream',    id: '0365P',  hex: '#E7DCD2' },
+        { name: 'Hush White',        id: 'OW221P',  hex: '#F0ECE1' },
+        { name: 'Snow White',        id: 'OW201P',  hex: '#F5EFE1' },
+        { name: 'Swan Wing',         id: 'OW11P',   hex: '#F5EBD9' },
+        { name: 'Soft White',        id: '0003P',   hex: '#F2E8DB' },
+        { name: 'White Lace',        id: 'OW211P',  hex: '#F1EEE3' },
+        { name: 'Secret White',      id: '1548P',   hex: '#EFEAE0' },
+        { name: 'Mirage',            id: 'OW520P',  hex: '#DFDBD4' },
+        { name: 'Intimate White',    id: 'OW212P',  hex: '#EEE7DC' },
+        { name: 'Mobe Pearl',        id: 'OW222P',  hex: '#ECE2D7' },
+        { name: 'Swan Lake',         id: '0021P',   hex: '#ECE8E0' },
+        { name: 'Whipped Cream',     id: '0365P',   hex: '#E7DCD2' },
         // בז', גרז' ומוקה
-        { name: 'De Ja Vu',         id: '1541P',  hex: '#E9E4DA' },
-        { name: 'Marble Grey',      id: '1542P',  hex: '#D6D0C6' },
-        { name: 'Footsteps',        id: '1534P',  hex: '#DFDCD5' },
-        { name: 'White Mocha',      id: '0012P',  hex: '#EBE0CC' },
-        { name: 'חול מדבר',         id: 'BE500',  hex: '#D9C7A7', approx: true },
-        { name: 'אדמה סמוקה',       id: 'BE2110', hex: '#B89383', approx: true },
+        { name: 'De Ja Vu',          id: '1541P',   hex: '#E9E4DA' },
+        { name: 'Marble Grey',       id: '1542P',   hex: '#D6D0C6' },
+        { name: 'Footsteps',         id: '1534P',   hex: '#DFDCD5' },
+        { name: 'White Mocha',       id: '0012P',   hex: '#EBE0CC' },
+        { name: 'Organdy',           id: '0647T',   hex: '#CCB89D' },
+        { name: 'Tan Tone',          id: '0437T',   hex: '#B69D94' },
         // אפור ואבן
-        { name: 'Sound of Silence', id: '1513P',  hex: '#EAEAE4' },
-        { name: 'Solitude',         id: '1543P',  hex: '#C2BBAF' },
-        { name: 'Mountain Grey',    id: '1544T',  hex: '#A7A59D' },
-        { name: 'אפור אבן',         id: '1577P',  hex: '#C8BDAD' },
-        { name: 'מינרל',            id: '8207T',  hex: '#A9A9A2', approx: true },
-        { name: 'אפור בטון',        id: '1537T',  hex: '#9D9E9D' },
+        { name: 'Sound of Silence',  id: '1513P',   hex: '#EAEAE4' },
+        { name: 'Solitude',          id: '1543P',   hex: '#C2BBAF' },
+        { name: 'Mountain Grey',     id: '1544T',   hex: '#A7A59D' },
+        { name: 'אפור אבן',          id: '1577P',   hex: '#C8BDAD' },
+        { name: 'Earth Grey',        id: '1536P/T', hex: '#B4B2AF' },
+        { name: 'אפור בטון',         id: '1537T',   hex: '#9D9E9D' },
         // כהים ודרמטיים
-        { name: 'Stormy Sky',       id: '1545T',  hex: '#8C8880' },
-        { name: 'אבן בזלת',         id: '8393T',  hex: '#5E5F5E', approx: true },
-        { name: 'אפור גרניט',       id: '8336T',  hex: '#6F7072', approx: true },
-        { name: 'נירוסטה',          id: '8333T',  hex: '#8E9192', approx: true },
-        { name: 'Revenge',          id: '1466T',  hex: '#93949F' },
+        { name: 'Stormy Sky',        id: '1545T',   hex: '#8C8880' },
+        { name: 'Revealing Mystery', id: '1532A',   hex: '#616261' },
+        { name: 'Nocturnes Owl',     id: '1525A',   hex: '#454748' },
+        { name: 'November Rain',     id: '1523T/A', hex: '#7B7E84' },
+        { name: 'Revenge',           id: '1466T',   hex: '#93949F' },
         // צבעוניים מעושנים
-        { name: 'Blush Rose',       id: '0241P',  hex: '#E8CFC8', approx: true },
-        { name: 'Powder Pink',      id: '1211P',  hex: '#E9D3D2', approx: true },
-        { name: 'לילק ערפילי',      id: 'SU3113', hex: '#C9C2CF', approx: true },
-        { name: 'Ash White',        id: 'OW241P', hex: '#E5E3DC' },
-        { name: 'תכלת שמיימי',      id: 'DN3213', hex: '#C9D9E0', approx: true },
-        { name: "וינטאג'",          id: 'DN3210', hex: '#B7C1BC', approx: true },
-        { name: 'ירוק מרווה',       id: '0953P',  hex: '#BECDC6' }
+        { name: 'Apple Blush',       id: '0204P',   hex: '#D6C2C0' },
+        { name: 'Tiny Pink',         id: '0029P',   hex: '#E9DCDD' },
+        { name: 'Moonlit Path',      id: '1436P',   hex: '#CBC4CE' },
+        { name: 'Ash White',         id: 'OW241P',  hex: '#E5E3DC' },
+        { name: 'In the Rain',       id: '1142P',   hex: '#C5D3D9' },
+        { name: 'Aqueous',           id: '0995P',   hex: '#B5C2BB' },
+        { name: 'ירוק מרווה',        id: '0953P',   hex: '#BECDC6' }
     ];
 
     function curatedCounterText(n) {
