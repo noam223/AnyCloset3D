@@ -5205,7 +5205,7 @@ function _openTvSizeMenu(colIndex, rowIndex, anchor) {
         _closeTvSizeMenu();
         buildCabinet(); calculatePrice(); saveHistoryState();
     });
-    if (window.TV_SIZES.some(s => !window._tvFits(s, col.width, cellH))) {
+    if (window.TV_SIZES.some(s => !window._tvFits(s, sp.w, sp.h))) {
         const note = document.createElement('div');
         note.className = 'tv-size-note';
         note.textContent = 'גדלים מושבתים דורשים תא גדול יותר';
