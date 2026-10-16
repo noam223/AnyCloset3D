@@ -483,6 +483,18 @@ function updateQuickEditPanelUI() {
     panel.classList.add('visible');
 }
 
+// ── Shelf snap mode: removes the minimum 5cm gap between shelves ──────────────
+window._shelfSnapActive = false;
+window.toggleShelfSnap = function() {
+    window._shelfSnapActive = !window._shelfSnapActive;
+    MIN_SHELF_GAP = window._shelfSnapActive ? 0 : 5;
+    window.MIN_SHELF_GAP = MIN_SHELF_GAP;
+    const btn = document.getElementById('qe-btn-snap-shelves');
+    if (btn) btn.classList.toggle('active', window._shelfSnapActive);
+    const hint = document.getElementById('qe-snap-hint');
+    if (hint) hint.style.display = window._shelfSnapActive ? 'block' : 'none';
+};
+
 window.toggleNoPlinth = function() {
     if (state.activeEditCol === -1 || !state.columns[state.activeEditCol]) return;
     const col = state.columns[state.activeEditCol];

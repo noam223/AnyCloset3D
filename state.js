@@ -5,7 +5,8 @@ const MAX_COL_WIDTH = 120;
 const MIN_COL_WIDTH = 1;
 const MIN_WARDROBE_WIDTH = 10;
 window.MIN_WARDROBE_WIDTH = MIN_WARDROBE_WIDTH;
-const MIN_SHELF_GAP = 5;
+let MIN_SHELF_GAP = 5;
+window.MIN_SHELF_GAP = MIN_SHELF_GAP;
 const MAX_GLOBAL_HEIGHT = 370;
 window.MAX_GLOBAL_HEIGHT = MAX_GLOBAL_HEIGHT;
 const MAX_OVERLAY_DOOR_HEIGHT = 270;
@@ -3185,7 +3186,9 @@ function _spaceShelvesInSpan(innerBottom, innerH, count) {
 }
 
 function _maxShelvesInSpan(innerH) {
-    return Math.max(0, Math.min(8, Math.floor(innerH / MIN_SHELF_GAP) - 1));
+    // When snap mode is active MIN_SHELF_GAP may be 0 — guard against division by zero
+    const slot = MIN_SHELF_GAP > 0 ? MIN_SHELF_GAP : (state.thickness || 1.8);
+    return Math.max(0, Math.min(20, Math.floor(innerH / slot) - 1));
 }
 
 /**
