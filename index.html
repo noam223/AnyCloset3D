@@ -40,7 +40,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260910deskMerge">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
     <link rel="stylesheet" href="style-extras.css?v=20260731rpcab">
-    <link rel="stylesheet" href="style.css?v=20261009tour2">
+    <link rel="stylesheet" href="style.css?v=20261016disc">
     <link rel="stylesheet" href="quick-calc.css?v=20260929qc">
     <style>
         html.thumb-only-mode #left-sidebar,
@@ -1068,11 +1068,34 @@
     <div class="cart-items-list" id="cart-items-list"></div>
     <div class="left-sidebar-footer">
         <div id="sidebar-pricing-summary" style="display:none;">
-        <div class="sidebar-summary-breakdown" style="font-size: 0.95rem; color: var(--text-light); margin-bottom: 12px; font-weight: 500;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;"><span>סה"כ ארונות:</span><span id="sidebar-cab-total" style="color: var(--text-dark); font-weight: 600;">₪0</span></div>
+        <div class="sidebar-summary-breakdown" style="font-size: 0.95rem; color: var(--text-light); margin-bottom: 10px; font-weight: 500;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span>סה"כ ארונות:</span><span id="sidebar-cab-total" style="color: var(--text-dark); font-weight: 600;">₪0</span></div>
             <div style="display: flex; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px dashed var(--border); padding-bottom: 8px;"><span>סה"כ התקנות:</span><span id="sidebar-inst-total" style="color: var(--text-dark); font-weight: 600;">₪0</span></div>
+
+            <!-- ── Discount rows ── -->
+            <div class="sidebar-disc-row">
+                <span class="sidebar-disc-label"><i class="fa-solid fa-tag" style="font-size:.8em;opacity:.7;"></i> הנחה ארונות</span>
+                <div class="sidebar-disc-inp-wrap">
+                    <input type="number" id="sidebar-disc-cab" class="sidebar-disc-inp" min="0" max="100" step="0.5" placeholder="0"
+                        oninput="window._onSidebarDiscount()">
+                    <span class="sidebar-disc-pct">%</span>
+                </div>
+            </div>
+            <div class="sidebar-disc-row" style="margin-bottom:8px;">
+                <span class="sidebar-disc-label"><i class="fa-solid fa-tag" style="font-size:.8em;opacity:.7;"></i> הנחה התקנות</span>
+                <div class="sidebar-disc-inp-wrap">
+                    <input type="number" id="sidebar-disc-inst" class="sidebar-disc-inp" min="0" max="100" step="0.5" placeholder="0"
+                        oninput="window._onSidebarDiscount()">
+                    <span class="sidebar-disc-pct">%</span>
+                </div>
+            </div>
+            <!-- Net after discount (visible only when discount > 0) -->
+            <div id="sidebar-after-disc" style="display:none; border-top:1px dashed var(--border); padding-top:8px; margin-top:2px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:0.82rem;color:#ef4444;"><span>הנחה כוללת:</span><span id="sidebar-disc-amount" dir="ltr">-₪0</span></div>
+                <div style="display:flex;justify-content:space-between;font-size:0.88rem;color:var(--text-dark);font-weight:700;"><span>אחרי הנחה:</span><span id="sidebar-net-total" dir="ltr">₪0</span></div>
+            </div>
         </div>
-        <div class="total-label">סה"כ פרויקט לתשלום:</div>
+        <div class="total-label" id="sidebar-total-label">סה"כ פרויקט לתשלום:</div>
         <div class="total-price" id="left-sidebar-total">₪0</div>
         </div>
         <div style="display:flex; gap:8px; margin-top:15px;">
@@ -2846,7 +2869,7 @@
 <script src="engine-blueprint.js?v=20261007deskMerge28"></script>
 <script src="engine-room-plan.js?v=20260929rail"></script>
 <script src="tambour-color-picker.js?v=20261009colors"></script>
-<script src="ui.js?v=20261016snap"></script>
+<script src="ui.js?v=20261016disc"></script>
 <script src="mobile.js?v=20261008types"></script>
 <script src="part-paint.js?v=20260914A427fix"></script>
 <script src="shelf-pick.js?v=20260922sideWall"></script>

@@ -13355,7 +13355,36 @@ window.updateLeftSidebar = function(opts) {
     const grandTotal = totalCabinetsPrice + totalInstallPrice;
     if (cabTotalEl) cabTotalEl.innerHTML = `<span dir="ltr">₪${totalCabinetsPrice.toLocaleString()}</span>`;
     if (instTotalEl) instTotalEl.innerHTML = `<span dir="ltr">₪${totalInstallPrice.toLocaleString()}</span>`;
-    totalEl.innerHTML = `<span dir="ltr">₪${grandTotal.toLocaleString()}</span>`;
+
+    // ── Sidebar discount display ─────────────────────────────────────────
+    const discounts = typeof _getCustomerDiscounts === 'function' ? _getCustomerDiscounts() : { cab: 0, inst: 0 };
+    // Sync input values from state (without triggering oninput)
+    const cabInp  = document.getElementById('sidebar-disc-cab');
+    const instInp = document.getElementById('sidebar-disc-inst');
+    if (cabInp  && document.activeElement !== cabInp)  cabInp.value  = discounts.cab  > 0 ? discounts.cab  : '';
+    if (instInp && document.activeElement !== instInp) instInp.value = discounts.inst > 0 ? discounts.inst : '';
+
+    const cabDiscount  = Math.round(totalCabinetsPrice * discounts.cab  / 100);
+    const instDiscount = Math.round(totalInstallPrice  * discounts.inst / 100);
+    const totalDiscount = cabDiscount + instDiscount;
+    const netTotal      = grandTotal - totalDiscount;
+
+    const afterDiscEl   = document.getElementById('sidebar-after-disc');
+    const discAmountEl  = document.getElementById('sidebar-disc-amount');
+    const netTotalEl    = document.getElementById('sidebar-net-total');
+    const totalLabelEl  = document.getElementById('sidebar-total-label');
+
+    if (totalDiscount > 0) {
+        if (afterDiscEl)  afterDiscEl.style.display  = 'block';
+        if (discAmountEl) discAmountEl.innerHTML = `<span dir="ltr">-₪${totalDiscount.toLocaleString()}</span>`;
+        if (netTotalEl)   netTotalEl.innerHTML   = `<span dir="ltr">₪${netTotal.toLocaleString()}</span>`;
+        if (totalLabelEl) totalLabelEl.textContent = 'סה"כ לפני הנחה:';
+        totalEl.innerHTML = `<span dir="ltr">₪${grandTotal.toLocaleString()}</span>`;
+    } else {
+        if (afterDiscEl)  afterDiscEl.style.display = 'none';
+        if (totalLabelEl) totalLabelEl.textContent = 'סה"כ פרויקט לתשלום:';
+        totalEl.innerHTML = `<span dir="ltr">₪${grandTotal.toLocaleString()}</span>`;
+    }
 
     // Restore cart notes badges after re-render (badge elements are recreated as display:none)
     if (typeof window._updateCartNotesBadges === 'function' && window._currentShareToken) {
@@ -14818,6 +14847,15 @@ function _setCustomerDiscount(field, pct) {
     state.orderForm.customer[field] = _clampPct(pct);
     if (typeof saveHistoryState === 'function') _withoutHistory(function() { saveHistoryState(); });
 }
+
+/** Called from the sidebar discount inputs — saves to state and refreshes sidebar totals. */
+window._onSidebarDiscount = function() {
+    const cabInp  = document.getElementById('sidebar-disc-cab');
+    const instInp = document.getElementById('sidebar-disc-inst');
+    if (cabInp)  _setCustomerDiscount('discountCabinetsPct',  cabInp.value);
+    if (instInp) _setCustomerDiscount('discountInstallPct',   instInp.value);
+    if (typeof window.updateLeftSidebar === 'function') window.updateLeftSidebar();
+};
 
 /** Totals for the customer summary, before and after the percentage discounts. */
 function _customerTotals(totalCabinets, totalInstall) {

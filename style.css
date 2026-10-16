@@ -1674,6 +1674,53 @@ body {
 .total-label { font-size: 0.72rem; color: var(--text-light); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;}
 .total-price { font-size: 1.9rem; font-weight: 800; color: var(--primary); margin-top: 3px; letter-spacing: -0.03em;}
 
+/* ── Sidebar discount inputs ─────────────────────────────── */
+.sidebar-disc-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    margin-bottom: 5px;
+}
+.sidebar-disc-label {
+    font-size: 0.82rem;
+    color: var(--text-light);
+    white-space: nowrap;
+    flex: 1;
+}
+.sidebar-disc-inp-wrap {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    background: white;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 2px 6px;
+    transition: border-color .15s;
+}
+.sidebar-disc-inp-wrap:focus-within {
+    border-color: var(--secondary, #2563eb);
+}
+.sidebar-disc-inp {
+    width: 52px;
+    border: none;
+    outline: none;
+    font-size: 0.88rem;
+    font-weight: 700;
+    font-family: inherit;
+    color: var(--text-dark);
+    background: transparent;
+    text-align: center;
+    -moz-appearance: textfield;
+}
+.sidebar-disc-inp::-webkit-outer-spin-button,
+.sidebar-disc-inp::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.sidebar-disc-pct {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    font-weight: 600;
+}
+
 .section { padding: 18px 20px; border-bottom: 1px solid var(--border); animation: fadeInUp 0.3s ease both; }
 .section-title {
     font-size: 0.68rem;
