@@ -677,8 +677,45 @@
                 const halfW = (swapped ? dims.d : dims.w) / 2;
                 const halfD = (swapped ? dims.w : dims.d) / 2;
                 const cp = _clampFurnCenter(cx, cz, halfW, halfD);
-                prop.x = cp.x;
-                prop.z = cp.z;
+
+                // ── Snap to other furniture edges ─────────────────────────
+                const SNAP_THRESHOLD = 8; // cm
+                const allItems = _collectFurniture().filter(function(i) { return i.id !== id; });
+                const xEdges = [], zEdges = [];
+                allItems.forEach(function(i) {
+                    xEdges.push(i.minX, i.maxX);
+                    zEdges.push(i.minZ, i.maxZ);
+                });
+                const bounds = _getBounds();
+                if (bounds) {
+                    xEdges.push(bounds.leftX, bounds.rightX);
+                    zEdges.push(bounds.backZ, bounds.frontZ);
+                }
+
+                var snappedX = cp.x, snappedZ = cp.z;
+                // Try snapping left or right edge of this cabinet to any X snap line
+                var bestXDist = SNAP_THRESHOLD + 1;
+                var itemLeft = cp.x - halfW, itemRight = cp.x + halfW;
+                xEdges.forEach(function(ex) {
+                    var dl = Math.abs(itemLeft - ex);
+                    var dr = Math.abs(itemRight - ex);
+                    if (dl < bestXDist) { bestXDist = dl; snappedX = ex + halfW; }
+                    if (dr < bestXDist) { bestXDist = dr; snappedX = ex - halfW; }
+                });
+                // Try snapping back or front edge of this cabinet to any Z snap line
+                var bestZDist = SNAP_THRESHOLD + 1;
+                var itemBack = cp.z - halfD, itemFront = cp.z + halfD;
+                zEdges.forEach(function(ez) {
+                    var db = Math.abs(itemBack - ez);
+                    var df = Math.abs(itemFront - ez);
+                    if (db < bestZDist) { bestZDist = db; snappedZ = ez + halfD; }
+                    if (df < bestZDist) { bestZDist = df; snappedZ = ez - halfD; }
+                });
+                // Re-clamp after snap (snap could push outside room bounds)
+                const finalCp = _clampFurnCenter(snappedX, snappedZ, halfW, halfD);
+
+                prop.x = finalCp.x;
+                prop.z = finalCp.z;
                 if (typeof window._roomLinksCommit === 'function') window._roomLinksCommit();
             }
         } else if (id === 'room-door') {

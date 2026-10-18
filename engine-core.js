@@ -465,10 +465,16 @@ window._doorsVisible = true;
 window._isHideableDoorFront = function(m) {
     return !!(m && !m.userData.keepVisibleWhenDoorsHidden);
 };
+window._spaceCompanionDoorMeshes = window._spaceCompanionDoorMeshes || [];
 window._setDoorsVisible = function(wantVisible) {
     window._doorsVisible = !!wantVisible;
     var meshes = (typeof doorMeshes !== 'undefined' && doorMeshes) ? doorMeshes : (window.doorMeshes || []);
     meshes.forEach(function(m) {
+        if (!m || !window._isHideableDoorFront(m)) return;
+        m.visible = window._doorsVisible;
+    });
+    // Also apply to companion cabinets in space/room view (their doors are tracked separately)
+    (window._spaceCompanionDoorMeshes || []).forEach(function(m) {
         if (!m || !window._isHideableDoorFront(m)) return;
         m.visible = window._doorsVisible;
     });
@@ -2487,6 +2493,14 @@ function _buildRoom() {
     // Notify UI to reposition bed handles
     if (typeof window._updateBedHandles === 'function') window._updateBedHandles();
     if (typeof window._updateRoomPropsUI === 'function') window._updateRoomPropsUI();
+
+    // Apply doors visibility to room-extra-cabinet doors (added after main-cabinet check)
+    if (window._doorsVisible === false) {
+        var _allDoorMeshes = (typeof doorMeshes !== 'undefined' && doorMeshes) ? doorMeshes : (window.doorMeshes || []);
+        _allDoorMeshes.forEach(function(m) {
+            if (m && window._isHideableDoorFront(m)) m.visible = false;
+        });
+    }
 }
 
 const materials = {
@@ -4020,6 +4034,7 @@ window._clearSpaceCompanion = function() {
     window._spaceCompanionHits = [];
     window._spaceCompanionGroup = null;
     window._spaceCompanionHit = null;
+    window._spaceCompanionDoorMeshes = [];
     const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
     if (cabinetGroup && (!info || info.activeSlot === 0)) {
         cabinetGroup.position.y = 0;
@@ -4154,7 +4169,13 @@ window._rebuildSpaceCompanion = function() {
             g.userData.spaceSlot = member.slot;
             g.userData.cartIndex = member.index;
             scene.add(g);
+            // Track door count before building so we can capture companion's own door meshes
+            var _doorsBeforeCompanion = doorMeshes.length;
             window.buildCabinetIntoGroup(g);
+            // Capture companion door meshes BEFORE they get wiped in finally's restore
+            var _companionNewDoors = doorMeshes.slice(_doorsBeforeCompanion);
+            if (!window._spaceCompanionDoorMeshes) window._spaceCompanionDoorMeshes = [];
+            window._spaceCompanionDoorMeshes = window._spaceCompanionDoorMeshes.concat(_companionNewDoors);
 
             const cw = state.wings && state.wings.center;
             const hitW = (cw && cw.width) || state.width || 160;
@@ -4175,6 +4196,12 @@ window._rebuildSpaceCompanion = function() {
         window._spaceCompanionGroup = window._spaceCompanionGroups[0] || null;
         window._spaceCompanionHit = window._spaceCompanionHits[0] || null;
         if (typeof window._applySpacePairPositions === 'function') window._applySpacePairPositions();
+        // Apply current door visibility to companion meshes immediately
+        if (window._doorsVisible === false) {
+            (window._spaceCompanionDoorMeshes || []).forEach(function(m) {
+                if (m && window._isHideableDoorFront(m)) m.visible = false;
+            });
+        }
     } catch (e) {
         console.warn('[spaceCompanion] failed to build', e);
         window._clearSpaceCompanion();
