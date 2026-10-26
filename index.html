@@ -40,7 +40,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260910deskMerge">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
     <link rel="stylesheet" href="style-extras.css?v=20260731rpcab">
-    <link rel="stylesheet" href="style.css?v=20261016disc">
+    <link rel="stylesheet" href="style.css?v=20261026orderpv">
     <link rel="stylesheet" href="quick-calc.css?v=20260929qc">
     <style>
         html.thumb-only-mode #left-sidebar,
@@ -1100,7 +1100,7 @@
         </div>
         <div style="display:flex; gap:8px; margin-top:15px;">
             <button id="btn-customer-quote" class="view-btn cart-btn" style="flex:1; justify-content: center; background: var(--primary); color: white; border: none; padding: 12px; font-size: 1rem;" onclick="openOrderModal('customer')">
-                <i class="fa-solid fa-file-invoice-dollar"></i> הצעת מחיר
+                <i class="fa-solid fa-file-invoice-dollar"></i> הזמנת לקוח
             </button>
             <button id="btn-factory-order" class="view-btn" style="display:none; flex:1; justify-content: center; background: #475569; color: white; border: none; padding: 12px; font-size: 1rem; border-radius:10px; cursor:pointer;" onclick="openOrderModal('factory')">
                 <i class="fa-solid fa-industry"></i> שליחה לייצור
@@ -1798,7 +1798,7 @@
 <div id="order-modal" data-mode="customer">
     <div class="modal-content">
         <div class="modal-header">
-            <h2 id="order-modal-title"><i class="fa-solid fa-file-invoice-dollar"></i> הצעת מחיר ללקוח</h2>
+            <h2 id="order-modal-title"><i class="fa-solid fa-file-invoice-dollar"></i> הזמנת לקוח</h2>
             <button class="close-modal" id="btn-close-cart"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="print-only-customer-details" id="print-customer-details" style="display:none;">
@@ -2418,7 +2418,7 @@
         </div>
         <div style="display:flex;gap:8px;margin-bottom:10px;">
             <button id="mobile-btn-customer-quote" class="btn-add-cart" style="flex:1;" onclick="openOrderModal('customer'); closeMobilePanel();">
-                <i class="fa-solid fa-file-invoice-dollar"></i> הצעת מחיר
+                <i class="fa-solid fa-file-invoice-dollar"></i> הזמנת לקוח
             </button>
             <button class="view-btn" style="flex:1;justify-content:center;background:#475569;color:white;border:none;padding:12px;border-radius:10px;font-weight:600;" onclick="openOrderModal('factory'); closeMobilePanel();">
                 <i class="fa-solid fa-industry"></i> שליחה לייצור
@@ -2869,7 +2869,7 @@
 <script src="engine-blueprint.js?v=20261007deskMerge28"></script>
 <script src="engine-room-plan.js?v=20261016snap"></script>
 <script src="tambour-color-picker.js?v=20261009colors"></script>
-<script src="ui.js?v=20261026touch"></script>
+<script src="ui.js?v=20261026orderpv"></script>
 <script src="mobile.js?v=20261008types"></script>
 <script src="part-paint.js?v=20260914A427fix"></script>
 <script src="shelf-pick.js?v=20260922sideWall"></script>

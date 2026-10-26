@@ -2724,6 +2724,18 @@ body.dragging-v { cursor: ns-resize !important; }
 .cabinet-header-wrapper { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; background: var(--bg-light); padding: 10px 15px; border-radius: 8px;}
 .cabinet-title { font-size: 1.4rem; color: var(--primary); margin:0; font-weight: 700;}
 .cart-item-actions { display: flex; gap: 10px; }
+.order-preview-tools { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.order-preview-tool { background: var(--bg-light); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.order-preview-tool .opt-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.order-preview-tool .opt-head strong { color: var(--primary); font-size: 1rem; }
+.order-preview-tool .action-btn { padding: 6px 10px; font-size: 0.82rem; }
+.order-preview-tool .opt-prices { display: flex; flex-wrap: wrap; gap: 8px 14px; }
+.order-preview-tool .opt-price { display: flex; align-items: center; gap: 5px; font-size: 0.85rem; font-weight: 600; color: var(--text-light); }
+.order-preview-tool .opt-price input { width: 84px; border: 1px solid var(--border); border-radius: 6px; padding: 3px 6px; font: inherit; font-weight: 700; color: var(--primary); text-align: right; direction: ltr; background: white; }
+.order-preview-tool .opt-images summary { cursor: pointer; font-size: 0.85rem; font-weight: 600; color: var(--text-light); }
+.order-preview-tool .opt-images .print-images-container { margin-top: 10px; gap: 12px; }
+.order-preview-hint { font-size: 0.85rem; color: #1e40af; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 8px 12px; margin-bottom: 10px; }
+.order-preview-frame { display: block; width: 100%; min-height: 400px; border: 1px solid var(--border); border-radius: 10px; background: white; }
 .action-btn {
     padding: 9px 16px; border: none; border-radius: var(--radius-sm);
     font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;

@@ -10506,9 +10506,7 @@ window.openOrderModal = async function(mode, opts) {
         _showToast('🔄 מרענן תמונות ארונות...', 3500);
         try {
             await window._refreshCartMediaForPrint({ force: true });
-            if (mode === 'factory') {
-                await window._refreshCartBlueprintPagesForPrint();
-            }
+            await window._refreshCartBlueprintPagesForPrint();
         } catch (e) {
             console.warn('[openOrderModal] media refresh failed:', e);
             _showToast('⚠️ חלק מהתמונות לא עודכנו — נסה שוב', 4000);
@@ -10548,9 +10546,7 @@ window.openOrderModal = async function(mode, opts) {
     if (actionsEl) {
         actionsEl.innerHTML = isFactory
             ? `<button class="print-btn-large" onclick="printFactory()" style="flex:1;background:#475569;box-shadow:0 4px 15px rgba(71,85,105,0.4);"><i class="fa-solid fa-industry"></i> הדפס לייצור (עלויות רכש)</button>`
-            : !window._docsHidePrices()
-                ? `<button class="print-btn-large" onclick="printCustomer()" style="flex:1;"><i class="fa-solid fa-file-invoice-dollar"></i> הדפס ללקוח (מחירון)</button>`
-                : `<button class="print-btn-large" onclick="printCustomer()" style="flex:1;"><i class="fa-solid fa-file-invoice-dollar"></i> הדפס סיכום ללקוח</button>`;
+            : `<button class="print-btn-large" onclick="printCustomer()" style="flex:1;"><i class="fa-solid fa-file-invoice-dollar"></i> הדפס הזמנת לקוח</button>`;
     }
 
     container.innerHTML = '';
@@ -10572,134 +10568,49 @@ window.openOrderModal = async function(mode, opts) {
         return;
     }
 
+    const hidePricesUi = window._docsHidePrices();
+    let toolsHTML = '';
     state.orderCart.forEach((itemObj, index) => {
         if (typeof window._cartItemOnHold === 'function' && window._cartItemOnHold(itemObj)) return;
         const item = itemObj.spec;
         const titleText = item.customName ? item.customName : (_cartIsWritingDesk(itemObj) ? `שולחן מס' ${index + 1}` : `ארון מס' ${index + 1}`);
-        const detailLabel = _cartIsWritingDesk(itemObj) ? 'שולחן' : 'ארון';
         const numericPrice = parseInt(item.price.replace('₪', '').replace(/,/g, ''));
         const itemInstall = item.installPrice || 0;
         const itemCost = item.costPrice ? parseInt(item.costPrice.replace('₪', '').replace(/,/g, '')) : 0;
         if (!isNaN(numericPrice)) totalOrderPrice += numericPrice;
         totalInstallPrice += itemInstall; totalCostPrice += itemCost;
 
-        const priceRowsModal = window._docsHidePrices() ? `` : !isFactory ? `
-                    <tr class="view-customer">
-                        <th style="background:var(--highlight); vertical-align:middle;">מחיר ארון ללקוח</th>
-                        <td style="font-weight:bold; color:var(--primary); font-size:1.15rem; text-align:right;">
-                            <div style="display:flex; align-items:center; justify-content:flex-start; gap:4px;">
-                                <input type="number" class="modal-price-input" data-index="${index}" value="${numericPrice}" style="font-size:1.15rem; font-weight:bold; color:var(--primary); border:1px solid var(--border); border-radius:6px; width:80px; text-align:right; direction:ltr; outline:none; font-family:inherit; padding:2px 4px; background:white;">
-                                <span>₪</span>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr class="view-customer">
-                        <th style="background:var(--highlight);">הובלה והתקנה</th>
-                        <td style="font-weight:bold; color:var(--primary); font-size:1.15rem; text-align:right;">
-                            <div style="display:flex; align-items:center; justify-content:flex-start; gap:4px;">
-                                <input type="number" class="modal-install-input" data-index="${index}" value="${itemInstall}" style="font-size:1.15rem; font-weight:bold; color:var(--primary); border:1px solid var(--border); border-radius:6px; width:80px; text-align:right; direction:ltr; outline:none; font-family:inherit; padding:2px 4px; background:white;">
-                                <span>₪</span>
-                            </div>
-                        </td>
-                    </tr>
-                    ` : `
-                    <tr class="view-factory">
-                        <th style="background:#fef08a;">עלות ייצור (רכש)</th>
-                        <td style="font-weight:bold; color:#854d0e; font-size:1.15rem; text-align:right;">
-                            <div style="display:flex; align-items:center; justify-content:flex-start; gap:4px;">
-                                <input type="number" class="modal-cost-input" data-index="${index}" value="${itemCost}" style="font-size:1.15rem; font-weight:bold; color:#854d0e; border:1px solid #fef08a; border-radius:6px; width:80px; text-align:right; direction:ltr; outline:none; font-family:inherit; padding:2px 4px; background:#fefce8;">
-                                <span>₪</span>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr class="view-factory">
-                        <th style="background:#fef9c3;">עלות משלוח/התקנה</th>
-                        <td style="font-weight:bold; color:#713f12; font-size:1.15rem; text-align:right;">
-                            <div style="display:flex; align-items:center; justify-content:flex-start; gap:4px;">
-                                <input type="number" class="modal-install-input" data-index="${index}" value="${itemInstall}" style="font-size:1.15rem; font-weight:bold; color:#713f12; border:1px solid #fef9c3; border-radius:6px; width:80px; text-align:right; direction:ltr; outline:none; font-family:inherit; padding:2px 4px; background:#fefce8;">
-                                <span>₪</span>
-                            </div>
-                        </td>
-                    </tr>
-                    `;
-
-        const specRows = _resolvePrintSpecRows(itemObj);
-        const split = _splitPrintSpecRowsByCabinet(specRows);
-        let cabinetHTML = '';
-
-        if (!split.units.length) {
-            cabinetHTML += `
-            <div class="cabinet-print-page">
-                <div class="cabinet-header-wrapper">
-                    <h3 class="cabinet-title">פרטי ${detailLabel}: ${titleText}</h3>
+        const priceField = (cls, label, value) =>
+            `<label class="opt-price">${label}<input type="number" class="${cls}" data-index="${index}" value="${value}"><span>₪</span></label>`;
+        const priceInputs = hidePricesUi ? '' : isFactory
+            ? priceField('modal-cost-input', 'עלות ייצור (רכש)', itemCost) + priceField('modal-install-input', 'עלות משלוח/התקנה', itemInstall)
+            : priceField('modal-price-input', 'מחיר ארון ללקוח', isNaN(numericPrice) ? 0 : numericPrice) + priceField('modal-install-input', 'הובלה והתקנה', itemInstall);
+        const imageTools = isFactory
+            ? `<details class="opt-images"><summary><i class="fa-solid fa-image"></i> החלפת תמונות</summary>
+                    <div class="print-images-container">${_orderPreviewImagesHtml(item, itemObj.rawState, { cartIndex: index, replaceable: true })}</div>
+               </details>`
+            : '';
+        toolsHTML += `
+            <div class="order-preview-tool" data-cart-index="${index}">
+                <div class="opt-head">
+                    <strong>${_escPrintHtml(titleText)}</strong>
                     <div class="cart-item-actions">
                         <button class="action-btn edit-btn" onclick="editCartItem(${index})"><i class="fa-solid fa-pen"></i> ערוך ארון</button>
                         <button class="action-btn del-btn" onclick="deleteCartItem(${index})"><i class="fa-solid fa-trash"></i> מחיקה</button>
                     </div>
                 </div>
-                <table class="spec-table">
-                    ${_printSpecRowsHtmlEditable(specRows, index)}
-                    ${priceRowsModal}
-                </table>
+                ${priceInputs ? `<div class="opt-prices">${priceInputs}</div>` : ''}
+                ${imageTools}
             </div>`;
-        } else {
-            split.units.forEach(function(unit, ui) {
-                const isFirst = ui === 0;
-                const isLast = ui === split.units.length - 1;
-                const pageRows = isFirst
-                    ? split.shared.concat(unit.rows)
-                    : unit.rows.slice();
-                if (isLast && split.trailing.length) {
-                    pageRows.push.apply(pageRows, split.trailing);
-                }
-                const heading = isFirst
-                    ? ('פרטי ' + detailLabel + ': ' + titleText)
-                    : unit.title;
-                cabinetHTML += `
-            <div class="cabinet-print-page">
-                <div class="cabinet-header-wrapper">
-                    <h3 class="cabinet-title">${heading}</h3>
-                    ${isFirst ? `<div class="cart-item-actions">
-                        <button class="action-btn edit-btn" onclick="editCartItem(${index})"><i class="fa-solid fa-pen"></i> ערוך ארון</button>
-                        <button class="action-btn del-btn" onclick="deleteCartItem(${index})"><i class="fa-solid fa-trash"></i> מחיקה</button>
-                    </div>` : ''}
-                </div>
-                <table class="spec-table">
-                    ${_printSpecRowsHtmlEditable(pageRows, index)}
-                    ${isFirst ? priceRowsModal : ''}
-                </table>
-            </div>`;
-            });
-        }
-
-        cabinetHTML += `
-            <div class="cabinet-print-page">
-                <div class="cabinet-header-wrapper">
-                    <h3 class="cabinet-title">תמונות ${detailLabel}: ${titleText}</h3>
-                </div>
-                <div class="print-images-container">
-                    ${_orderPreviewImagesHtml(item, itemObj.rawState, { cartIndex: index, replaceable: isFactory })}
-                </div>
-                ${(() => {
-                    const bpPages = (item.multiViewPages && item.multiViewPages.length)
-                        ? item.multiViewPages
-                        : (item.multiViewSVG ? [item.multiViewSVG] : []);
-                    if (!bpPages.length) return '';
-                    return bpPages.map(function(svg, pi) {
-                        const label = bpPages.length > 1
-                            ? ('שרטוט ייצור (' + (pi + 1) + '/' + bpPages.length + ')')
-                            : 'שרטוט ייצור';
-                        return `
-                <div style="margin-top:12px;">
-                    <div class="img-label" style="background:#e8f0fe;color:#1e3a5f;border:1px solid #93c5fd;padding:6px 10px;font-weight:bold;margin-bottom:6px;">${label}</div>
-                    <div style="border:1px solid #bfdbfe;border-radius:4px;overflow:hidden;">${svg}</div>
-                </div>`;
-                    }).join('');
-                })()}
-            </div>
-        `;
-        container.insertAdjacentHTML('beforeend', cabinetHTML);
     });
+
+    if (toolsHTML) {
+        container.innerHTML = `
+            <div class="order-preview-tools hide-on-print">${toolsHTML}</div>
+            <div class="order-preview-hint hide-on-print"><i class="fa-solid fa-pen-to-square"></i> זו התצוגה המדויקת של הטופס המודפס — לחצו על ערך בטופס כדי לערוך אותו</div>
+            <iframe id="order-preview-frame" class="order-preview-frame" title="תצוגה מקדימה של הטופס"></iframe>`;
+        _renderOrderPreviewDoc();
+    }
 
     if (!container.innerHTML.trim()) {
         container.innerHTML = '<div style="padding:28px 18px;text-align:center;color:#64748b;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:12px;">' +
@@ -14151,6 +14062,7 @@ function _compactRowBaseId(id) {
 function _compactSpecUnitsFromRows(rows) {
     const units = [];
     const notes = [];
+    const noteIds = [];
     let cur = null;
     let bucket = 'general';
     const newUnit = function(title, extra) {
@@ -14166,19 +14078,26 @@ function _compactSpecUnitsFromRows(rows) {
             return;
         }
         const base = _compactRowBaseId(r.id);
-        if (base === 'cabinetNotes') { if (String(r.value || '').trim()) notes.push(r.value); return; }
+        if (base === 'cabinetNotes') { if (String(r.value || '').trim()) { notes.push(r.value); noteIds.push(r.id); } return; }
         if (!cur) newUnit('');
         if (_COMPACT_CHIP_IDS.indexOf(base) >= 0) cur.chips.push(r);
         else cur[bucket].push(r);
     });
-    return { units: units, notes: notes };
+    return { units: units, notes: notes, noteIds: noteIds };
+}
+
+function _compactNotesHtml(g) {
+    if (!g.notes.length) return '';
+    const idAttr = g.noteIds.length === 1 ? ` data-row-id="${_escPrintHtml(g.noteIds[0])}"` : '';
+    return `<div class="cmp-sec">הערות</div><div class="cmp-notes"${idAttr}>${_escPrintHtml(g.notes.join('\n')).replace(/\n/g, '<br>')}</div>`;
 }
 
 function _compactSpecListHtml(title, rows, extraHtml) {
     if (!rows.length && !extraHtml) return '';
     const body = rows.map(function(r) {
         const val = _escPrintHtml(r.value).replace(/\n/g, '<br>');
-        return `<div class="cmp-row"><span>${_escPrintHtml(r.label)}</span><span${r.rtl ? ' dir="rtl"' : ''}>${val}</span></div>`;
+        const idAttr = r.id ? ` data-row-id="${_escPrintHtml(r.id)}"` : '';
+        return `<div class="cmp-row"${idAttr}><span>${_escPrintHtml(r.label)}</span><span${r.rtl ? ' dir="rtl"' : ''}>${val}</span></div>`;
     }).join('');
     return `<div class="cmp-sec">${_escPrintHtml(title)}</div>${body}${extraHtml || ''}`;
 }
@@ -14214,10 +14133,7 @@ function _buildCompactCabinetSpecHtml(opts) {
             + _compactSpecListHtml('פרזול ותכולה', u.hardware, _compactSpecChipsHtml(u.chips))
             + `</div>`;
     }).join('');
-    const notes = g.notes.length
-        ? `<div class="cmp-sec">הערות</div><div class="cmp-notes">${_escPrintHtml(g.notes.join('\n')).replace(/\n/g, '<br>')}</div>`
-        : '';
-    return `${units}${notes}${opts.priceStrip || ''}`;
+    return `${units}${_compactNotesHtml(g)}${opts.priceStrip || ''}`;
 }
 
 const _MU_STRUCT_KEYS = ['material', 'plinthType'];
@@ -14325,7 +14241,7 @@ function _muCommonAndExceptions(parts) {
         entries.forEach(function(e) { freq[e.row.value] = (freq[e.row.value] || 0) + 1; });
         let best = entries[0].row.value;
         Object.keys(freq).forEach(function(v) { if (freq[v] > freq[best]) best = v; });
-        common[key] = { label: entries[0].row.label, value: best, rtl: entries[0].row.rtl };
+        common[key] = { id: 'common:' + key, label: entries[0].row.label, value: best, rtl: entries[0].row.rtl };
         entries.forEach(function(e) {
             if (e.row.value !== best) exceptions.push({ p: e.p, label: e.row.label, value: e.row.value });
         });
@@ -14621,16 +14537,14 @@ function _buildCompactMultiUnitHtml(o) {
             return `<div>${_muBadgeHtml(e.p)}${_escPrintHtml(e.p.label)} — ${_escPrintHtml(e.label)}: <b>${_escPrintHtml(e.value)}</b></div>`;
         }).join('')}</div>`
         : '';
-    const notes = g.notes.length
-        ? `<div class="cmp-sec">הערות</div><div class="cmp-notes">${_escPrintHtml(g.notes.join('\n'))}</div>`
-        : '';
+    const notes = _compactNotesHtml(g);
     const bp = _muBlueprintIndex(item, parts);
     const isCorner = rs.presetId === 'corner-left' || rs.presetId === 'corner-right';
     const afterHtml = isCorner
         ? _muCornerPagesHtml(item, parts, bp, o.titleText)
         : _muPartCardsHtml(item, parts, bp)
             + (bp.labeled ? _muBlueprintPagesHtml(bp, parts, o.titleText) : _printCabinetBlueprintPagesHtml(item, o.titleText));
-    return `<div class="cmp-block mu-block" style="page-break-after:always;">
+    return `<div class="cmp-block mu-block" data-cart-index="${o.index}" style="page-break-after:always;">
         <div class="cmp-bar"><span>${_escPrintHtml(o.titleText)}</span><small>${kindLbl} · ${parts.length} חלקים</small></div>
         <div class="mu-top">
             <div class="cmp-spec">${spec}</div>
@@ -14673,6 +14587,79 @@ function _bindPrintSpecRowInputs(container) {
         inp.addEventListener('change', persist);
         inp.addEventListener('input', persist);
     });
+}
+
+/** "common:<key>" rows are shared by every part of a corner / walk-in cabinet — edit them on all parts. */
+function _updatePrintSpecRowAny(itemObj, rowId, newValue) {
+    if (String(rowId).indexOf('common:') !== 0) { _updatePrintSpecRow(itemObj, rowId, newValue); return; }
+    const key = rowId.slice('common:'.length);
+    _resolvePrintSpecRows(itemObj);
+    itemObj.printSpecEdits.rows.forEach(function(r) {
+        if (!r.section && _compactRowBaseId(r.id) === key) r.value = newValue;
+    });
+}
+
+let _orderPreviewRenderTimer = null;
+function _queueOrderPreviewDocRender(delay) {
+    clearTimeout(_orderPreviewRenderTimer);
+    _orderPreviewRenderTimer = setTimeout(_renderOrderPreviewDoc, delay == null ? 250 : delay);
+}
+
+/** Preview = the exact print document, so what you edit is what prints. */
+function _renderOrderPreviewDoc() {
+    const frame = document.getElementById('order-preview-frame');
+    const modal = document.getElementById('order-modal');
+    if (!frame || !modal) return;
+    if (frame.offsetHeight) frame.style.height = frame.offsetHeight + 'px';
+    frame.onload = function() { _wireOrderPreviewDoc(frame); };
+    frame.srcdoc = _buildPrintHTML(modal.dataset.mode || 'customer');
+}
+
+function _wireOrderPreviewDoc(frame) {
+    const doc = frame.contentDocument;
+    if (!doc || !doc.body) return;
+    const st = doc.createElement('style');
+    st.textContent =
+        '[data-edit-target]{cursor:text;border-radius:3px;outline:1px dashed transparent;outline-offset:1px;}' +
+        '[data-edit-target]:hover{outline-color:#93c5fd;background:#f8fbff;}' +
+        '[data-edit-target]:focus{outline:2px solid #3b82f6;background:#eff6ff;}';
+    doc.head.appendChild(st);
+
+    doc.querySelectorAll('[data-row-id]').forEach(function(el) {
+        const block = el.closest('[data-cart-index]');
+        if (!block) return;
+        const idx = parseInt(block.getAttribute('data-cart-index'), 10);
+        const rowId = el.getAttribute('data-row-id');
+        const target = el.classList.contains('cmp-row') ? el.lastElementChild : el;
+        if (!target) return;
+        const multiline = el.classList.contains('cmp-notes');
+        target.setAttribute('contenteditable', 'true');
+        target.setAttribute('spellcheck', 'false');
+        target.setAttribute('data-edit-target', '');
+        target.addEventListener('input', function() {
+            const itemObj = state.orderCart[idx];
+            if (!itemObj) return;
+            const text = target.innerText.replace(/\u00a0/g, ' ').replace(/\n+$/, '');
+            _updatePrintSpecRowAny(itemObj, rowId, multiline ? text : text.replace(/\n/g, ' '));
+        });
+        target.addEventListener('blur', function() {
+            if (typeof saveHistoryState === 'function') saveHistoryState();
+            if (rowId.indexOf('common:') === 0) _queueOrderPreviewDocRender(50);
+        });
+        if (!multiline) {
+            target.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') { e.preventDefault(); target.blur(); }
+            });
+        }
+    });
+
+    const fit = function() {
+        frame.style.height = Math.max(doc.documentElement.scrollHeight, doc.body.scrollHeight) + 'px';
+    };
+    fit();
+    doc.querySelectorAll('img').forEach(function(img) { if (!img.complete) img.addEventListener('load', fit); });
+    const RO = frame.contentWindow && frame.contentWindow.ResizeObserver;
+    if (RO) new RO(fit).observe(doc.body);
 }
 
 function _getOrderReplaceImageInput() {
@@ -14791,6 +14778,7 @@ function _bindOrderPreviewImageReplace(container) {
                     const dataUrl = await _readLocalImageAsDataUrl(file);
                     _applyCartPreviewImage(itemObj.spec, slot, dataUrl, true);
                     _syncOrderPreviewCard(container, slot, dataUrl, true);
+                    _queueOrderPreviewDocRender();
                     if (typeof saveHistoryState === 'function') saveHistoryState();
                     if (typeof _showToast === 'function') _showToast('התמונה הוחלפה — תופיע ב-PDF', 2500);
                 } catch (e) {
@@ -14814,6 +14802,7 @@ function _bindOrderPreviewImageReplace(container) {
             _applyCartPreviewImage(itemObj.spec, slot, restored, false);
             delete t.obj[t.key + 'Auto'];
             _syncOrderPreviewCard(container, slot, restored, false);
+            _queueOrderPreviewDocRender();
             if (typeof saveHistoryState === 'function') saveHistoryState();
             if (typeof _showToast === 'function') _showToast('ההדמיה שוחזרה', 2000);
         });
@@ -14903,7 +14892,7 @@ function _getOrderFormDefaults(mode) {
     return {
         title: isFactory
             ? 'שרטוט ייצור והתקנה'
-            : (!window._docsHidePrices() ? 'הצעת מחיר ללקוח' : 'סיכום פרויקט ללקוח'),
+            : 'הזמנת לקוח',
         notes: ''
     };
 }
@@ -14913,8 +14902,11 @@ function _getOrderFormText(mode) {
     const key = mode === 'factory' ? 'factory' : 'customer';
     const defaults = _getOrderFormDefaults(mode);
     const stored = state.orderForm[key] || {};
+    let storedTitle = (stored.title || '').trim();
+    // Saving the notes also saved the then-default customer title; treat old defaults as unset.
+    if (key === 'customer' && (storedTitle === 'הצעת מחיר ללקוח' || storedTitle === 'סיכום פרויקט ללקוח')) storedTitle = '';
     return {
-        title: (stored.title || '').trim() || defaults.title,
+        title: storedTitle || defaults.title,
         notes: (stored.notes || '').trim()
     };
 }
@@ -15033,6 +15025,7 @@ function _bindOrderFormEditor() {
                 ? '<i class="fa-solid fa-industry"></i> ' + _escPrintHtml(formText.title)
                 : '<i class="fa-solid fa-file-invoice-dollar"></i> ' + _escPrintHtml(formText.title);
         }
+        _queueOrderPreviewDocRender(400);
     };
     titleInp.addEventListener('input', persist);
     if (notesInp) notesInp.addEventListener('input', persist);
@@ -15136,12 +15129,14 @@ function _printSingleCabinetBlockHtml(itemObj, index, opts) {
         };
     };
     if (opts.compact) {
-        const priceStrip = (hidePrices || !isFactory) ? ''
-            : `<div class="cmp-price"><span>מחיר התקנה ללקוח</span><span dir="ltr">₪${itemInstall.toLocaleString()}</span></div>`;
+        const priceStrip = hidePrices ? '' : isFactory
+            ? `<div class="cmp-price"><span>מחיר התקנה ללקוח</span><span dir="ltr">₪${itemInstall.toLocaleString()}</span></div>`
+            : `<div class="cmp-price"><span>מחיר ארון ללקוח</span><span dir="ltr">₪${numericPrice.toLocaleString()}</span></div>
+               <div class="cmp-price"><span>הובלה והתקנה</span><span dir="ltr">₪${itemInstall.toLocaleString()}</span></div>`;
         const mu = _cartIsWritingDesk(itemObj) ? null : _printMultiUnitParts(itemObj, specRows);
         if (mu && mu.parts.length > 1) {
             return blockResult(_buildCompactMultiUnitHtml({
-                item: item, itemObj: itemObj, titleText: titleText, specRows: specRows, priceStrip: priceStrip, mu: mu
+                item: item, itemObj: itemObj, index: index, titleText: titleText, specRows: specRows, priceStrip: priceStrip, mu: mu
             }));
         }
         const firstBp = (item.multiViewPages && item.multiViewPages[0]) || item.multiViewSVG || '';
@@ -15153,7 +15148,7 @@ function _printSingleCabinetBlockHtml(itemObj, index, opts) {
             extrasOnly: true
         });
         return blockResult(`
-            <div class="cmp-block" style="page-break-after:always;">
+            <div class="cmp-block" data-cart-index="${index}" style="page-break-after:always;">
                 <div class="cmp-bar">${_escPrintHtml(titleText)}</div>
                 <div class="cmp-wrap">
                     <div class="cmp-spec">
@@ -15307,7 +15302,7 @@ function _buildPrintHTML(mode) {
             const block = _printSpaceGroupBlockHtml(group, {
                 isFactory: isFactory,
                 hidePrices: _hidePrices,
-                compact: isFactory,
+                compact: true,
                 thStyle: thStyle,
                 tdStyle: tdStyle
             });
@@ -15320,7 +15315,7 @@ function _buildPrintHTML(mode) {
         const block = _printSingleCabinetBlockHtml(group.itemObj, group.index, {
             isFactory: isFactory,
             hidePrices: _hidePrices,
-            compact: isFactory,
+            compact: true,
             thStyle: thStyle,
             tdStyle: tdStyle,
             omitSpaceImages: false
@@ -15488,6 +15483,7 @@ window.printCustomer = async function() {
     }
     _showToast('🔄 מרענן תמונות לפני הדפסה...', 3000);
     try { await window._refreshCartMediaForPrint({ force: true }); } catch (e) { console.warn('[printCustomer]', e); }
+    try { await window._refreshCartBlueprintPagesForPrint(); } catch (e) { console.warn('[printCustomer] blueprint refresh failed:', e); }
     _writePrintWindow(_buildPrintHTML('customer'));
 };
 
