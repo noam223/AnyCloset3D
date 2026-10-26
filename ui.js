@@ -164,6 +164,20 @@ function _colorKeyLabel(key) {
     return s;
 }
 
+function _extraColorsLabel(partColors) {
+    if (!partColors || typeof partColors !== 'object') return null;
+    const set = new Set();
+    Object.values(partColors).forEach(function(key) { if (key) set.add(_colorKeyLabel(key)); });
+    return set.size > 0 ? Array.from(set).join(', ') : null;
+}
+
+/** Per-cabinet overrides live in rawState.partColors; spec.extraColors on older saves mixed in every cabinet's colors. */
+function _resolveExtraColors(item, itemObj) {
+    const pc = itemObj && itemObj.rawState && itemObj.rawState.partColors;
+    if (pc && typeof pc === 'object') return _extraColorsLabel(pc);
+    return (item && item.extraColors) || null;
+}
+
 function _compHasOpenCellContent(comp) {
     if (!comp) return false;
     if (comp.type === 'open_cell' || comp.type === 'side_open_cell') return true;
@@ -11986,14 +12000,7 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
         const _cartUid = typeof window._cartUidAt === 'function' ? window._cartUidAt(state.editingCartIndex) : null;
         if (_cartUid) rawState.cartUid = _cartUid;
 
-        // Collect unique extra colors from per-part overrides
-        const _extraColorsSet = new Set();
-        if (state.partColors && typeof state.partColors === 'object') {
-            Object.values(state.partColors).forEach(key => {
-                if (key) _extraColorsSet.add(_colorKeyLabel(key));
-            });
-        }
-        const extraColorsStr = _extraColorsSet.size > 0 ? Array.from(_extraColorsSet).join(', ') : null;
+        const extraColorsStr = _extraColorsLabel(rawState.partColors);
 
         // Build sliding door summary for spec sheet
         const _sd = state.presetId === 'sliding' && state.slidingDoor && state.slidingDoor.enabled ? state.slidingDoor : null;
@@ -13832,9 +13839,9 @@ function _collectPrintSpecRows(item, itemObj) {
             rows.push({ id: '_sec_upper_finishes', section: true, label: 'גוונים וגימורים — יחידה עליונה' });
             rows.push({ id: 'upperColorTopPanel', label: 'צבע משטח עליון', value: _plainSpecValue(upperTopPanel) });
         }
-        if (item.extraColors) {
+        if (_resolveExtraColors(item, itemObj)) {
             rows.push({ id: '_sec_extra', section: true, label: 'צבעים נוספים' });
-            rows.push({ id: 'extraColors', label: 'צבעים נוספים בארון', value: _plainSpecValue(item.extraColors) });
+            rows.push({ id: 'extraColors', label: 'צבעים נוספים בארון', value: _plainSpecValue(_resolveExtraColors(item, itemObj)) });
         }
         const notesMulti = (item.cabinetNotes || '').trim();
         if (notesMulti) rows.push({ id: 'cabinetNotes', label: 'הערות', value: notesMulti, multiline: true });
@@ -13851,7 +13858,7 @@ function _collectPrintSpecRows(item, itemObj) {
         rows.push({ id: 'colorBody', label: 'צבע גוף (רגליים ומשטח)', value: _plainSpecValue(item.colorBody || '—') });
         const drawerColor = item.colorDrawers || item.colorExternal;
         if (drawerColor) rows.push({ id: 'colorDrawers', label: 'צבע מגירות', value: _plainSpecValue(drawerColor) });
-        if (item.extraColors) rows.push({ id: 'extraColors', label: 'צבעים נוספים', value: _plainSpecValue(item.extraColors) });
+        if (_resolveExtraColors(item, itemObj)) rows.push({ id: 'extraColors', label: 'צבעים נוספים', value: _plainSpecValue(_resolveExtraColors(item, itemObj)) });
     } else {
         rows.push({ id: 'colorBody', label: 'צבע גוף וצוקל', value: _plainSpecValue(item.colorBody) });
         rows.push({ id: 'colorInternal', label: 'צבע פנים (מדפים/מגירות)', value: _plainSpecValue(item.colorInternal) });
@@ -13867,7 +13874,7 @@ function _collectPrintSpecRows(item, itemObj) {
         if (glassTint) rows.push({ id: 'glassTint', label: 'גוון זכוכית', value: glassTint });
         const topPanelColor = itemObj && _resolveTopPanelColorLabel(itemObj.rawState);
         if (topPanelColor) rows.push({ id: 'colorTopPanel', label: 'צבע משטח עליון', value: _plainSpecValue(topPanelColor) });
-        if (item.extraColors) rows.push({ id: 'extraColors', label: 'צבעים נוספים בארון', value: _plainSpecValue(item.extraColors) });
+        if (_resolveExtraColors(item, itemObj)) rows.push({ id: 'extraColors', label: 'צבעים נוספים בארון', value: _plainSpecValue(_resolveExtraColors(item, itemObj)) });
     }
 
     rows.push({ id: '_sec_hardware', section: true, label: 'פרזול ותכולה' });
@@ -14748,7 +14755,7 @@ function _printFinishesRows(item, itemObj, thStyle, tdStyle, sectionStyle) {
         html += _printTr(thStyle, tdStyle, 'צבע גוף (רגליים ומשטח)', item.colorBody || '—');
         const drawerColor = item.colorDrawers || item.colorExternal;
         if (drawerColor) html += _printTr(thStyle, tdStyle, 'צבע מגירות', drawerColor);
-        if (item.extraColors) html += _printTr(thStyle, tdStyle, 'צבעים נוספים', item.extraColors);
+        if (_resolveExtraColors(item, itemObj)) html += _printTr(thStyle, tdStyle, 'צבעים נוספים', _resolveExtraColors(item, itemObj));
         return html;
     }
     html += _printTr(thStyle, tdStyle, 'צבע גוף וצוקל', item.colorBody);
@@ -14765,7 +14772,7 @@ function _printFinishesRows(item, itemObj, thStyle, tdStyle, sectionStyle) {
     if (glassTint) html += _printTr(thStyle, tdStyle, 'גוון זכוכית', glassTint);
     const topPanelColor = itemObj && _resolveTopPanelColorLabel(itemObj.rawState);
     if (topPanelColor) html += _printTr(thStyle, tdStyle, 'צבע משטח עליון', topPanelColor);
-    if (item.extraColors) html += _printTr(thStyle, tdStyle, 'צבעים נוספים בארון', item.extraColors);
+    if (_resolveExtraColors(item, itemObj)) html += _printTr(thStyle, tdStyle, 'צבעים נוספים בארון', _resolveExtraColors(item, itemObj));
     return html;
 }
 
@@ -16446,7 +16453,7 @@ function _buildCustomerSummaryDetails(itemObj) {
         if (colorBody) details.push('צבע גוף (רגליים ומשטח): ' + colorBody);
         const colorDrawers = item.colorDrawers || _summarySpecOrRaw(item, rawState, 'colorDrawers', 'materialExternal');
         if (colorDrawers) details.push('צבע מגירות: ' + colorDrawers);
-        if (item.extraColors) details.push('צבעים נוספים: ' + item.extraColors);
+        if (_resolveExtraColors(item, itemObj)) details.push('צבעים נוספים: ' + _resolveExtraColors(item, itemObj));
         if (item.writingDeskHasDrawers !== false) {
             if (item.handle) details.push('סוג ידיות למגירות: ' + item.handle);
             const n = item.writingDeskDrawerCount != null ? item.writingDeskDrawerCount : (item.drawersExt || 0);
@@ -16487,7 +16494,7 @@ function _buildCustomerSummaryDetails(itemObj) {
     if (glassTint) details.push('גוון זכוכית: ' + glassTint);
     const colorTopPanel = _resolveTopPanelColorLabel(rawState);
     if (colorTopPanel) details.push('צבע משטח עליון: ' + colorTopPanel);
-    if (item.extraColors) details.push('צבעים נוספים: ' + item.extraColors);
+    if (_resolveExtraColors(item, itemObj)) details.push('צבעים נוספים: ' + _resolveExtraColors(item, itemObj));
 
     if (item.slidingDoor) {
         details.push('ארון הזזה — ' + item.slidingDoor.numDoors + ' דלתות | פרופיל: ' + item.slidingDoor.profileColor);
