@@ -13525,6 +13525,92 @@ function _formatLedPairs(n) {
     return n === 1 ? 'זוג לדים אחד' : n + ' זוגות לדים';
 }
 
+/** Mirrors the engine: ab2 is touch by design; doors / drawer blocks may override the wing style. */
+function _wingDefaultHandleStyle(wing, rs) {
+    const model = (wing && wing.cabinetModel) || (rs && rs.cabinetModel);
+    if (model === 'ab2') return 'touch';
+    return (wing && wing.handleStyle) || (rs && rs.handleStyle) || 'pipe';
+}
+
+function _drawerCountAt(comp, zoneIdx) {
+    if (comp && Array.isArray(comp.zonesDrawerCount) && zoneIdx != null && comp.zonesDrawerCount[zoneIdx] > 0) {
+        return comp.zonesDrawerCount[zoneIdx];
+    }
+    return (comp && comp.count) || 1;
+}
+
+function _countTouchHandlesInWing(wing, rs, out) {
+    out = out || { doors: 0, drawers: 0 };
+    if (!wing || !Array.isArray(wing.columns)) return out;
+    const def = _wingDefaultHandleStyle(wing, rs);
+    const isTouch = function(s) { return (s || def) === 'touch'; };
+    wing.columns.forEach(function(col) {
+        if (!col) return;
+        if (wing.hasDoors !== false) {
+            (col.doors || []).forEach(function(door) {
+                if (door && isTouch(door.handleStyle)) out.doors += door.type === 'double' ? 2 : 1;
+            });
+        }
+        (col.compartments || []).forEach(function(comp) {
+            if (!comp) return;
+            if (comp.partition && Array.isArray(comp.subCells)) {
+                comp.subCells.forEach(function(sub) {
+                    if (!sub || !isTouch(sub.handleStyle)) return;
+                    if (Array.isArray(sub.zonesType) && sub.zonesType.length) {
+                        sub.zonesType.forEach(function(zt, z) {
+                            if (zt === 'external_drawers') out.drawers += _drawerCountAt(sub, z);
+                        });
+                    } else if (sub.type === 'external_drawers') {
+                        out.drawers += _drawerCountAt(sub);
+                    }
+                });
+            } else if (comp.type === 'external_drawers' && isTouch(comp.handleStyle)) {
+                out.drawers += _drawerCountAt(comp);
+            }
+        });
+    });
+    return out;
+}
+
+/** Touch handles for one wing side (+ its upper unit), or the whole cabinet when side is omitted. */
+function _countTouchHandlesFromRawState(rs, side) {
+    const out = { doors: 0, drawers: 0 };
+    if (!rs) return out;
+    const sliding = rs.presetId === 'sliding';
+    const add = function(w) {
+        if (!w) return;
+        if (sliding) {
+            const doors = out.doors;
+            _countTouchHandlesInWing(w, rs, out);
+            out.doors = doors;
+        } else {
+            _countTouchHandlesInWing(w, rs, out);
+        }
+    };
+    if (!rs.wings) { add(rs); return out; }
+    const sides = side ? [side] : ['center', 'left', 'right'];
+    sides.forEach(function(s) {
+        add(rs.wings[s]);
+        const uu = rs.wings['upperUnit_' + s];
+        if (uu && uu._isUpperUnit) add(uu);
+    });
+    const center = rs.wings.center;
+    const sc = center && center.sideCabinet;
+    if ((!side || side === 'sideCabinet') && sc && sc.side !== 'none' && Array.isArray(sc.columns)) {
+        add(Object.assign({}, sc, {
+            hasDoors: sc.hasDoors != null ? sc.hasDoors : center.hasDoors,
+            handleStyle: sc.handleStyle || center.handleStyle,
+            cabinetModel: sc.cabinetModel || center.cabinetModel
+        }));
+    }
+    return out;
+}
+
+function _pushTouchHandleRows(rows, prefix, t) {
+    if (t.doors > 0) rows.push({ id: prefix + 'touchDoors', label: 'דלתות טאצ\'', value: t.doors + ' יחידות' });
+    if (t.drawers > 0) rows.push({ id: prefix + 'touchDrawers', label: 'מגירות טאצ\'', value: t.drawers + ' יחידות' });
+}
+
 function _countCabinetContentFromRawState(rawState) {
     if (!rawState) return _emptyContentCounts();
     const merged = _emptyContentCounts();
@@ -13757,6 +13843,7 @@ function _collectWingPrintSpecRows(item, itemObj, unit) {
             ? window._handleStyleLabel(wing.handleStyle, wing.handleVariant, wing.handleType, wing.ridingColor)
             : item.handle)
     });
+    _pushTouchHandleRows(rows, prefix, _countTouchHandlesFromRawState(rs, unit.side));
     rows.push({
         id: prefix + 'drawersExt',
         label: 'מגירות חיצוניות',
@@ -13898,6 +13985,7 @@ function _collectPrintSpecRows(item, itemObj) {
     } else {
         rows.push({ id: 'handle', label: 'סוג ידיות לחזיתות', value: _plainSpecValue(item.handle) });
     }
+    if (itemObj && itemObj.rawState) _pushTouchHandleRows(rows, '', _countTouchHandlesFromRawState(itemObj.rawState));
     if (!isWD) {
         rows.push({ id: 'drawersExt', label: 'מגירות חיצוניות', value: `${item.drawersExt} יחידות` });
         rows.push({ id: 'drawersInt', label: 'מגירות פנימיות', value: `${item.drawersInt} יחידות` });
@@ -14800,6 +14888,9 @@ function _printHardwareRows(item, itemObj, thStyle, tdStyle, sectionStyle) {
     } else {
         html += _printTr(thStyle, tdStyle, 'סוג ידיות לחזיתות', `<strong>${item.handle}</strong>`);
     }
+    const touchRows = [];
+    if (itemObj && itemObj.rawState) _pushTouchHandleRows(touchRows, '', _countTouchHandlesFromRawState(itemObj.rawState));
+    touchRows.forEach(function(r) { html += _printTr(thStyle, tdStyle, r.label, r.value); });
     html += _printTr(thStyle, tdStyle, 'מגירות חיצוניות', `${item.drawersExt} יחידות`);
     html += _printTr(thStyle, tdStyle, 'מגירות פנימיות', `${item.drawersInt} יחידות`);
     html += _printTr(thStyle, tdStyle, 'מדפים נשלפים', `${item.shelves} יחידות`);
