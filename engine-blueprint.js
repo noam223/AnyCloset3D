@@ -1226,7 +1226,11 @@ function _bpSideOpenCellOpenDir(ci, numCols, bottomY) {
     const opensRight = ci === numCols - 1
         || (rightNeighbor && rightNeighbor.height <= y + 0.5)
         || (rightNeighbor && (rightNeighbor.floorOffset || 0) > y + 0.5);
-    if (opensLeft && opensRight) return ci < numCols / 2 ? 'left' : 'right';
+    if (opensLeft && opensRight) {
+        const pref = cols && cols[ci] && cols[ci].sideOpenSide;
+        if (pref === 'left' || pref === 'right') return pref;
+        return ci < numCols / 2 ? 'left' : 'right';
+    }
     if (opensLeft) return 'left';
     if (opensRight) return 'right';
     return 'none';

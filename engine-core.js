@@ -4307,6 +4307,19 @@ function _drawGroovesOnPanel(group, grooveStyle, panelW, panelH, panelT, cx, cy,
     }
 }
 
+/** כוורת צד: when both sides are free (e.g. a single column) the column's sideOpenSide picks the side. */
+function _pickSideOpenDir(c, opensLeft, opensRight) {
+    if (opensLeft && opensRight) {
+        if (_isActiveWingBuild && window._sideOpenAmbiguousCols) window._sideOpenAmbiguousCols[c] = true;
+        const pref = state.columns[c] && state.columns[c].sideOpenSide;
+        if (pref === 'left' || pref === 'right') return pref;
+        return (c < state.columns.length / 2) ? 'left' : 'right';
+    }
+    if (opensLeft) return 'left';
+    if (opensRight) return 'right';
+    return 'none';
+}
+
 function _getHandleStyle() {
     if (state.cabinetModel === 'ab2') return 'touch';
     const s = state.handleStyle || 'pipe';
@@ -5141,6 +5154,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
     }
 
     let _deskMergeBandInfo = null;
+    if (_isActiveWingBuild) window._sideOpenAmbiguousCols = {};
     let leftWallHoles = [];
     let rightWallHoles = [];
     let internalHoles = Array(state.columns.length).fill().map(() => []); 
@@ -5194,15 +5208,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                     || (rightNeighbor && rightNeighbor.height <= block.bottomY + 0.5)
                     || (rightNeighbor && (rightNeighbor.floorOffset || 0) > block.bottomY + 0.5);
                 
-                if (opensLeft && opensRight) {
-                    block.openDir = (c < state.columns.length / 2) ? 'left' : 'right';
-                } else if (opensLeft) {
-                    block.openDir = 'left';
-                } else if (opensRight) {
-                    block.openDir = 'right';
-                } else {
-                    block.openDir = 'none'; 
-                }
+                block.openDir = _pickSideOpenDir(c, opensLeft, opensRight);
 
                 if (block.openDir === 'left') {
                     if (c === 0) leftWallHoles.push({ bottom: block.bottomY, top: block.topY });
@@ -5257,10 +5263,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                     const opensRight = c === state.columns.length - 1
                         || (rightNeighbor && rightNeighbor.height <= zBot + 0.5)
                         || (rightNeighbor && (rightNeighbor.floorOffset || 0) > zBot + 0.5);
-                    let openDir = 'none';
-                    if (opensLeft && opensRight) openDir = (c < state.columns.length / 2) ? 'left' : 'right';
-                    else if (opensLeft) openDir = 'left';
-                    else if (opensRight) openDir = 'right';
+                    const openDir = _pickSideOpenDir(c, opensLeft, opensRight);
                     if (openDir === 'left' && si === 0) {
                         if (c === 0) leftWallHoles.push({ bottom: zBot, top: zTop });
                         else internalHoles[c - 1].push({ bottom: zBot, top: zTop });
@@ -5274,6 +5277,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         
         columnBlocks.push(blocks);
     }
+    if (_isActiveWingBuild && typeof window._refreshSideOpenDirRow === 'function') window._refreshSideOpenDirRow();
 
     // Adjacent כוורת columns at the same height → one continuous open frame
     // (skip shared side walls + punch carcass divider in that Y band).
@@ -6786,10 +6790,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             const colRightEdge = colCenterX + col.width / 2;
                             const touchesLeft = subIdx === 0 || (subIdx < 0 && (subCenterX - subW / 2) <= colLeftEdge + t);
                             const touchesRight = subIdx === lastSi || (subIdx < 0 && (subCenterX + subW / 2) >= colRightEdge - t);
-                            let openDir = 'none';
-                            if (opensLeft && opensRight) openDir = (c < state.columns.length / 2) ? 'left' : 'right';
-                            else if (opensLeft) openDir = 'left';
-                            else if (opensRight) openDir = 'right';
+                            const openDir = _pickSideOpenDir(c, opensLeft, opensRight);
                             if (openDir === 'left' && touchesLeft) skipLeft = true;
                             if (openDir === 'right' && touchesRight) skipRight = true;
                         }

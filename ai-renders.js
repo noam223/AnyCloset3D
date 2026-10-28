@@ -602,7 +602,10 @@ function _computeSideOpenCellViewDir(colIdx, columns, rowIdx) {
         || (rightNeighbor && rightNeighbor.height <= bottomY + 0.5)
         || (rightNeighbor && (rightNeighbor.floorOffset || 0) > bottomY + 0.5);
 
-    if (opensLeft && opensRight) return colIdx < numCols / 2 ? 'left' : 'right';
+    if (opensLeft && opensRight) {
+        if (col && (col.sideOpenSide === 'left' || col.sideOpenSide === 'right')) return col.sideOpenSide;
+        return colIdx < numCols / 2 ? 'left' : 'right';
+    }
     if (opensLeft) return 'left';
     if (opensRight) return 'right';
     return null;

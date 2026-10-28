@@ -1824,7 +1824,44 @@ function updateToolbarState() {
     if (typeof window._updateRoomWallUI === 'function') window._updateRoomWallUI();
 }
 
+function _compHasSideOpenCell(comp) {
+    if (!comp) return false;
+    if (comp.type === 'side_open_cell') return true;
+    if ((comp.zoneDoorGroups || []).some(g => g && g.type === 'side_open_cell')) return true;
+    return (comp.subCells || []).some(sub => sub && (sub.type === 'side_open_cell'
+        || (Array.isArray(sub.zonesType) && sub.zonesType.includes('side_open_cell'))));
+}
+
+/** Show "פתוח לשמאל / לימין" only for a selected כוורת צד whose both sides are free. */
+window._refreshSideOpenDirRow = function() {
+    const row = document.getElementById('tb-side-open-dir-row');
+    if (!row) return;
+    const c = state.selection ? state.selection.colIndex : -1;
+    const col = c >= 0 ? state.columns[c] : null;
+    const isSliding = state.presetId === 'sliding' && state.slidingDoor && state.slidingDoor.enabled;
+    const show = !!(col && !isSliding && state.selection.rows.length
+        && state.selection.rows.some(r => _compHasSideOpenCell(col.compartments[r]))
+        && window._sideOpenAmbiguousCols && window._sideOpenAmbiguousCols[c]);
+    row.style.display = show ? '' : 'none';
+    if (!show) return;
+    const current = (col.sideOpenSide === 'left' || col.sideOpenSide === 'right')
+        ? col.sideOpenSide
+        : (c < state.columns.length / 2 ? 'left' : 'right');
+    row.querySelectorAll('button[data-side-open]').forEach(b => b.classList.toggle('active', b.dataset.sideOpen === current));
+};
+
+window.setSideOpenSide = function(side) {
+    const c = state.selection ? state.selection.colIndex : -1;
+    const col = c >= 0 ? state.columns[c] : null;
+    if (!col || (side !== 'left' && side !== 'right')) return;
+    col.sideOpenSide = side;
+    buildCabinet();
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+    window._refreshSideOpenDirRow();
+};
+
 function updateToolbarButtonHighlights() {
+    window._refreshSideOpenDirRow();
     const toolbar = document.getElementById('bottom-floating-toolbar');
     if(!toolbar) return;
     const deskZone = _isDeskZoneSelection();

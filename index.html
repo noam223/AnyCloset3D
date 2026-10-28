@@ -1454,6 +1454,11 @@
                     <button class="toolbar-btn" data-honeycomb-type="side_open_cell" onclick="applyContentForce('side_open_cell'); closeContentSubPanels();"><i class="fa-solid fa-arrow-right-from-bracket"></i><span>כוורת צד</span></button>
                 </div>
             </div>
+            <!-- כוורת צד: choose the open side when both sides are free -->
+            <div class="toolbar-row" id="tb-side-open-dir-row" style="display:none;">
+                <button class="toolbar-btn" data-side-open="left" onclick="setSideOpenSide('left')" title="הכוורת תיפתח לצד שמאל"><i class="fa-solid fa-arrow-left"></i><span>פתוח לשמאל</span></button>
+                <button class="toolbar-btn" data-side-open="right" onclick="setSideOpenSide('right')" title="הכוורת תיפתח לצד ימין"><i class="fa-solid fa-arrow-right"></i><span>פתוח לימין</span></button>
+            </div>
             <!-- מוצרי חשמל row -->
             <div class="toolbar-row">
                 <button class="toolbar-btn" id="tb-btn-appliances" data-expandable onclick="toggleContentSubPanel('appliances',this)" title="מכונת כביסה, מייבש וטלוויזיה"><i class="fa-solid fa-plug"></i><span>מוצרי חשמל</span></button>
@@ -2864,12 +2869,12 @@
 <script src="bathroom-preset.js?v=20261008types"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
 <script src="engine-appliances.js?v=20261007deskMerge28"></script>
-<script src="engine-core.js?v=20261016doors"></script>
+<script src="engine-core.js?v=20261028sideopen"></script>
 <script src="engine-corners.js?v=20261007glassTint"></script>
-<script src="engine-blueprint.js?v=20261007deskMerge28"></script>
+<script src="engine-blueprint.js?v=20261028sideopen"></script>
 <script src="engine-room-plan.js?v=20261016snap"></script>
 <script src="tambour-color-picker.js?v=20261009colors"></script>
-<script src="ui.js?v=20261026orderpv"></script>
+<script src="ui.js?v=20261028sideopen"></script>
 <script src="mobile.js?v=20261008types"></script>
 <script src="part-paint.js?v=20260914A427fix"></script>
 <script src="shelf-pick.js?v=20260922sideWall"></script>
@@ -2987,7 +2992,7 @@
 <script src="notes.js?v=20260714pinDelete"></script>
 <script src="tour.js?v=20261009tour2"></script>
 <script src="sidebar-rail.js?v=20261007glassTint"></script>
-<script src="ai-renders.js?v=20261008plans"></script>
+<script src="ai-renders.js?v=20261028sideopen"></script>
 <script>
     // Init AI renders after auth is ready
     document.addEventListener('DOMContentLoaded', function() {
