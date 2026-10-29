@@ -4702,7 +4702,7 @@ function _renderShoeDrawerCell(opts) {
     const fenceD = Math.max(2, shelfD - fenceInset * 2);
     const fenceFrontZ = frontZ - fenceInset;
     const fenceBackZ = backZ + fenceInset;
-    const metalMat = isBP ? matInternal : new THREE.MeshStandardMaterial({ color: 0xc8c8c8, metalness: 0.75, roughness: 0.3 });
+    const metalMat = isBP ? matInternal : new THREE.MeshStandardMaterial({ color: 0x9a9fa5, metalness: 0.65, roughness: 0.4 });
     const runnerMat = isBP ? matInternal : new THREE.MeshStandardMaterial({ color: 0x8a8a8a, metalness: 0.6, roughness: 0.45 });
 
     for (let d = 0; d < n; d++) {
@@ -4722,7 +4722,7 @@ function _renderShoeDrawerCell(opts) {
             group.add(runner);
         });
 
-        const fenceH = Math.max(3, Math.min(8, unitH * 0.4, unitH - (shelfTop - unitBottom) - 3));
+        const fenceH = Math.max(1.5, Math.max(3, Math.min(8, unitH * 0.4, unitH - (shelfTop - unitBottom) - 3)) - 2);
         const railY = shelfTop + fenceH;
         const xL = centerX - fenceW / 2, xR = centerX + fenceW / 2;
         const zMid = (fenceFrontZ + fenceBackZ) / 2;
