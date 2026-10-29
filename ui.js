@@ -7328,6 +7328,7 @@ function _spaceDragCmPerPx(off) {
 window._buildSpaceCabMoveHandle = function() {
     const info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
     const gizmoReady = !!(window.THREE && THREE.TransformControls);
+    window._spaceRotHover = false;
     if (!info || info.activeSlot <= 0) return;
     if (state.viewMode !== 'front' && !(state.viewMode === '3d' && gizmoReady)) return;
     const item = window._getSpaceMovableItem();
@@ -7358,6 +7359,8 @@ window._buildSpaceCabMoveHandle = function() {
     rotHandle.title = 'סיבוב הארון ב-90°';
     rotHandle.innerHTML = `<div class="drag-tooltip">סיבוב ארון ${n}: ${off.rot || 0}°</div>`;
     rotHandle.style.display = 'flex';
+    rotHandle.addEventListener('pointerenter', function() { window._spaceRotHover = true; });
+    rotHandle.addEventListener('pointerleave', function() { window._spaceRotHover = false; });
     rotHandle.addEventListener('pointerdown', function(e) { e.preventDefault(); e.stopPropagation(); });
     rotHandle.addEventListener('click', function(e) {
         e.preventDefault();
@@ -7467,10 +7470,10 @@ function _ensureSpaceGizmo() {
     // use |dot|, so feeding it |eye| per component disables only the flipping.
     const giz = g.children.find(function(c) { return c && c.type === 'TransformControlsGizmo'; });
     if (giz) {
-        // Pastel palette instead of the stock saturated axis colours
+        // Softer palette instead of the stock saturated axis colours
         const pastel = [
-            [[1, 0, 0], 0xf08a8a], [[0, 1, 0], 0x8fd4a0], [[0, 0, 1], 0x8fb4f0],
-            [[1, 1, 0], 0xf3e29a], [[0, 1, 1], 0x9fe0e0], [[1, 0, 1], 0xe0a8e6]
+            [[1, 0, 0], 0xe05a5a], [[0, 1, 0], 0x45b866], [[0, 0, 1], 0x4a86e0],
+            [[1, 1, 0], 0xe6c84e], [[0, 1, 1], 0x4fc3c3], [[1, 0, 1], 0xc266cf]
         ];
         const seen = new Set();
         giz.traverse(function(o) {
@@ -7491,8 +7494,20 @@ function _ensureSpaceGizmo() {
             if (!eye || this.mode !== 'translate') return origUpdate.apply(this, arguments);
             const ex = eye.x, ey = eye.y, ez = eye.z;
             eye.set(Math.abs(ex), Math.abs(ey), Math.abs(ez));
-            try { return origUpdate.apply(this, arguments); }
+            try { origUpdate.apply(this, arguments); }
             finally { eye.set(ex, ey, ez); }
+            // Hover: the stock gizmo whitens every handle — keep true colours, only fade the others
+            const set = this.axis && this.gizmo && this.gizmo[this.mode];
+            if (set) {
+                const axis = this.axis;
+                set.children.forEach(function(h) {
+                    const m = h.material;
+                    if (!m || !m._color) return;
+                    m.color.copy(m._color);
+                    const related = h.name === axis || axis.split('').some(function(a) { return h.name === a; });
+                    m.opacity = related ? 1 : (m._opacity || 1) * 0.18;
+                });
+            }
         };
     }
 
@@ -7521,7 +7536,41 @@ function _ensureSpaceGizmo() {
     window._spaceGizmoScene = gScene;
     window._spaceGizmoProxy = proxy;
     window._spaceGizmo = g;
+    _bindSpaceGizmoHover();
     return g;
+}
+
+// Gizmo shows only while the pointer is over the active cabinet (or on the gizmo / rotate button).
+// A short grace period lets the pointer travel from the cabinet onto an arrow tip outside it.
+window._spaceGizmoHoverUntil = 0;
+const _SPACE_GIZMO_GRACE_MS = 700;
+function _spaceGizmoAlwaysOn() {
+    return !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+}
+function _bindSpaceGizmoHover() {
+    const ray = new THREE.Raycaster();
+    const ndc = new THREE.Vector2();
+    let lastT = 0;
+    renderer.domElement.addEventListener('pointermove', function(e) {
+        const now = performance.now();
+        if (now - lastT < 40) return;
+        lastT = now;
+        if (!cabinetGroup || !_spaceGizmoTarget()) return;
+        const rect = renderer.domElement.getBoundingClientRect();
+        ndc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        ndc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        ray.setFromCamera(ndc, camera);
+        if (ray.intersectObject(cabinetGroup, true).length) {
+            window._spaceGizmoHoverUntil = now + _SPACE_GIZMO_GRACE_MS;
+        }
+    });
+}
+function _spaceGizmoShouldShow(g) {
+    if (_spaceGizmoAlwaysOn()) return true;
+    const now = performance.now();
+    if (g && (g.dragging || (g.object && g.axis))) window._spaceGizmoHoverUntil = now + _SPACE_GIZMO_GRACE_MS;
+    if (window._spaceRotHover) window._spaceGizmoHoverUntil = now + _SPACE_GIZMO_GRACE_MS;
+    return now < window._spaceGizmoHoverUntil;
 }
 
 /** Per-frame: attach/detach the gizmo and keep it on the cabinet pivot; renders the overlay scene. */
@@ -7529,7 +7578,7 @@ window._syncAndRenderSpaceGizmo = function() {
     const t = _spaceGizmoTarget();
     const g = t ? _ensureSpaceGizmo() : window._spaceGizmo;
     if (!g) return;
-    if (!t) {
+    if (!t || !_spaceGizmoShouldShow(g)) {
         if (g.object) g.detach();
         g.enabled = false;
         return;
@@ -7592,8 +7641,10 @@ function updateDragHandlesPosition() {
                 }
             }
             worldPt = new THREE.Vector3(currentWX, wy, state.depth / 2);
-        } else if (handle.classList.contains('space-rot-handle') && window._spaceGizmo && window._spaceGizmo.object) {
-            // Beside the 3D axis gizmo (its pivot)
+        } else if (handle.classList.contains('space-rot-handle') && window._spaceGizmo) {
+            // Beside the 3D axis gizmo (its pivot); shown together with the gizmo
+            const shown = !!window._spaceGizmo.object || !!window._spaceRotHover;
+            handle.style.display = shown ? 'flex' : 'none';
             const p = window._spaceGizmoProxy.position;
             worldPt = new THREE.Vector3(p.x, p.y, p.z);
         } else if (handle.classList.contains('space-move-handle') || handle.classList.contains('space-rot-handle')) {
@@ -7632,7 +7683,7 @@ function updateDragHandlesPosition() {
         let x = (pos.x * .5 + .5) * cw;
         let y = (-(pos.y * .5) + .5) * ch;
         // Rotate button sits just beside the space move handle / in the empty upper-right quadrant of the gizmo
-        const _besideGizmo = handle.classList.contains('space-rot-handle') && window._spaceGizmo && window._spaceGizmo.object;
+        const _besideGizmo = handle.classList.contains('space-rot-handle') && !!window._spaceGizmo;
         if (_besideGizmo) { x += 48; y -= 48; }
         else if (handle.classList.contains('space-rot-handle')) x += 36;
 
