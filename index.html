@@ -1486,6 +1486,11 @@
                 <button class="slider-btn" style="width:26px;height:26px;" onclick="updateDrawerCount(-1)"><i class="fa-solid fa-minus"></i></button>
                 <span id="floating-drawer-min" style="font-size:0.7rem;color:var(--text-light);margin-right:2px;"></span>
             </div>
+            <!-- מגירה פנימית: integral (slot) vs external handle -->
+            <div class="toolbar-row" id="tb-int-handle-row" style="display:none;">
+                <button class="toolbar-btn" data-int-handle="integral" onclick="setInternalDrawerHandle('integral')" title="ידית חריץ בחזית המגירה"><i class="fa-solid fa-minus"></i><span>ידית אינטגרלית</span></button>
+                <button class="toolbar-btn" data-int-handle="external" onclick="setInternalDrawerHandle('external')" title="ידית מותקנת על חזית המגירה"><i class="fa-solid fa-grip-lines"></i><span>ידית חיצונית</span></button>
+            </div>
             <!-- ידית button — shown only when external_drawers is selected -->
             <div class="toolbar-row" id="tb-handle-picker-row" style="display:none;">
                 <button class="toolbar-btn" id="tb-btn-handle-picker" onclick="openHandlePicker()">
@@ -2634,6 +2639,14 @@
             <button class="mcell-mini-btn" onclick="updateDrawerCount(-1); updateMobileCellSheetState();"><i class="fa-solid fa-minus"></i></button>
         </div>
 
+        <!-- Internal drawer handle — integral (slot) / external -->
+        <div id="mcp-int-handle" style="display:none;width:100%;flex-direction:column;align-items:center;gap:4px;">
+            <div class="mcell-panel-sep"></div>
+            <div class="mcell-panel-label" style="font-size:0.58rem;">ידית</div>
+            <button class="mcell-side-btn" id="mcp-int-handle-integral" onclick="setInternalDrawerHandle('integral'); updateMobileCellSheetState();"><i class="fa-solid fa-minus"></i><span>אינטגרלית</span></button>
+            <button class="mcell-side-btn" id="mcp-int-handle-external" onclick="setInternalDrawerHandle('external'); updateMobileCellSheetState();"><i class="fa-solid fa-grip-lines"></i><span>חיצונית</span></button>
+        </div>
+
         <!-- Handle picker — shown only when external_drawers is selected -->
         <div class="mcell-panel-sep" id="mcp-handle-sep-r" style="display:none;"></div>
         <button class="mcell-cat-btn" id="mcp-handle-btn-r" style="display:none;" onclick="openHandlePicker()">
@@ -2873,13 +2886,13 @@
 <script src="bathroom-preset.js?v=20261008types"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
 <script src="engine-appliances.js?v=20261007deskMerge28"></script>
-<script src="engine-core.js?v=20261029shoefence3"></script>
+<script src="engine-core.js?v=20261029inthandle"></script>
 <script src="engine-corners.js?v=20261007glassTint"></script>
-<script src="engine-blueprint.js?v=20261029shoebp"></script>
+<script src="engine-blueprint.js?v=20261029inthandle"></script>
 <script src="engine-room-plan.js?v=20261016snap"></script>
 <script src="tambour-color-picker.js?v=20261009colors"></script>
-<script src="ui.js?v=20261029shoe"></script>
-<script src="mobile.js?v=20261029shoe"></script>
+<script src="ui.js?v=20261029inthandle"></script>
+<script src="mobile.js?v=20261029inthandle"></script>
 <script src="part-paint.js?v=20260914A427fix"></script>
 <script src="shelf-pick.js?v=20260922sideWall"></script>
 <script src="index-init.js?v=20261009corner"></script>

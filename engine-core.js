@@ -4618,13 +4618,18 @@ function _renderInternalDrawerBoxCell(opts) {
         createBoard, matInternal,
         centerX, cellWidth, cellBottomY, compH, count,
         shelfFrontZ, cabinetBackZ,
-        partIdPrefix,
+        partIdPrefix, group, isBP,
     } = opts;
+    const externalHandle = opts.handleMode === 'external';
 
     const frameT = state.thickness;
     const sideSpacerT = 2.8; // 28mm — clearance panel beside column/partition wall
     const innerGap = 0.4;
-    const fingerGap = 2.5;
+    // Integral handle = finger slot above each front; an external handle doesn't need the slot.
+    const fingerGap = externalHandle ? 0.4 : 2.5;
+    const handleMat = (externalHandle && group && !isBP)
+        ? new THREE.MeshStandardMaterial({ color: 0xb8b8b8, metalness: 0.5, roughness: 0.3, envMap: window._studioEnvMap || null })
+        : null;
     const drawerH = (compH - innerGap * (count + 1)) / count;
     const actualDrawerH = drawerH - fingerGap;
     const cellCenterY = cellBottomY + compH / 2;
@@ -4673,6 +4678,24 @@ function _renderInternalDrawerBoxCell(opts) {
         }
         createBoard(drwW, boxH, frameT, boxCenterX, boxCenterY, drwFrontCenterZ, matInternal);
         if (partIdPrefix) _ppPartId = '';
+        if (handleMat) {
+            const barLen = Math.max(4, Math.min(16, drwW * 0.35));
+            const standoff = 2.2;
+            const r = 0.55;
+            const barZ = drawerFrontFaceZ + standoff;
+            const bar = new THREE.Mesh(new THREE.CylinderGeometry(r, r, barLen, 14), handleMat);
+            bar.rotation.z = Math.PI / 2;
+            bar.position.set(boxCenterX, boxCenterY, barZ);
+            bar.name = 'internalDrawerHandle';
+            group.add(bar);
+            [-1, 1].forEach(function(s) {
+                const post = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.8, r * 0.8, standoff, 10), handleMat);
+                post.rotation.x = Math.PI / 2;
+                post.position.set(boxCenterX + s * (barLen / 2 - r), boxCenterY, drawerFrontFaceZ + standoff / 2);
+                post.name = 'internalDrawerHandle';
+                group.add(post);
+            });
+        }
 
         createBoard(drwW, frameT, drwD, boxCenterX, boxBottomY + frameT / 2, drwCenterZ, matInternal);
         createBoard(frameT, boxH, drwD, boxCenterX - drwW / 2 + frameT / 2, boxCenterY, drwCenterZ, matInternal);
@@ -6529,6 +6552,8 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         shelfFrontZ,
                         cabinetBackZ,
                         partIdPrefix: `drawer_c${c}_r${r}`,
+                        group: _buildGroup, isBP,
+                        handleMode: compData.intHandle,
                     });
                 }
             }
@@ -6645,6 +6670,8 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             shelfFrontZ,
                             cabinetBackZ,
                             partIdPrefix: `drawer_sub_c${c}_r${r}_${_subSide}`,
+                            group: _buildGroup, isBP,
+                            handleMode: (subIdx >= 0 && compData.subCells && compData.subCells[subIdx]) ? compData.subCells[subIdx].intHandle : null,
                         });
                     } else if (subType === 'shoe_drawers') {
                         const sub = (subIdx >= 0 && compData.subCells) ? compData.subCells[subIdx] : null;

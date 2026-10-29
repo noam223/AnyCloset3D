@@ -301,6 +301,17 @@ function updateMobileCellSheetState() {
     if (drawerSection) drawerSection.style.display = isDrawerSelected ? 'flex' : 'none';
     if (drawerDisplay) drawerDisplay.innerText = currentCount;
 
+    const intHandleSection = document.getElementById('mcp-int-handle');
+    if (intHandleSection) {
+        const targets = typeof _selectedInternalDrawerTargets === 'function' ? _selectedInternalDrawerTargets() : [];
+        intHandleSection.style.display = targets.length ? 'flex' : 'none';
+        const ext = !!(targets[0] && targets[0].intHandle === 'external');
+        const bInt = document.getElementById('mcp-int-handle-integral');
+        const bExt = document.getElementById('mcp-int-handle-external');
+        if (bInt) bInt.classList.toggle('active', targets.length > 0 && !ext);
+        if (bExt) bExt.classList.toggle('active', ext);
+    }
+
     // ── Handle picker button visibility ──
     let _showHandleR = false;
     let _cellHandleOverride = null;

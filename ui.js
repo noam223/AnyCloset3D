@@ -1866,8 +1866,58 @@ window.setSideOpenSide = function(side) {
     window._refreshSideOpenDirRow();
 };
 
+/** Selected internal-drawer holders: whole compartments, or the selected partition sub-cells. */
+function _selectedInternalDrawerTargets() {
+    const c = state.selection ? state.selection.colIndex : -1;
+    const col = c >= 0 ? state.columns[c] : null;
+    if (!col || !state.selection.rows.length) return [];
+    const out = [];
+    if (typeof _activeSubCellIdxs !== 'undefined' && _activeSubCellIdxs.size > 0) {
+        const comp0 = col.compartments[state.selection.rows[0]];
+        if (comp0 && comp0.partition && Array.isArray(comp0.subCells)) {
+            _activeSubCellIdxs.forEach(function(key) {
+                const { si, z } = _parseSubKey(key);
+                const sub = comp0.subCells[si];
+                if (sub && _zoneInteriorAt(sub, z) === 'internal_drawers' && out.indexOf(sub) < 0) out.push(sub);
+            });
+            return out;
+        }
+    }
+    state.selection.rows.forEach(function(r) {
+        const comp = col.compartments[r];
+        if (comp && comp.type === 'internal_drawers') out.push(comp);
+    });
+    return out;
+}
+
+/** Show "ידית אינטגרלית / חיצונית" while internal drawers are selected. */
+window._refreshIntHandleRow = function() {
+    const row = document.getElementById('tb-int-handle-row');
+    if (!row) return;
+    const targets = _selectedInternalDrawerTargets();
+    row.style.display = targets.length ? '' : 'none';
+    if (!targets.length) return;
+    const current = targets[0].intHandle === 'external' ? 'external' : 'integral';
+    row.querySelectorAll('button[data-int-handle]').forEach(b => b.classList.toggle('active', b.dataset.intHandle === current));
+};
+
+window.setInternalDrawerHandle = function(mode) {
+    if (mode !== 'integral' && mode !== 'external') return;
+    const targets = _selectedInternalDrawerTargets();
+    if (!targets.length) return;
+    targets.forEach(function(t) {
+        if (mode === 'external') t.intHandle = 'external';
+        else delete t.intHandle;
+    });
+    buildCabinet();
+    if (typeof calculatePrice === 'function') calculatePrice();
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+    window._refreshIntHandleRow();
+};
+
 function updateToolbarButtonHighlights() {
     window._refreshSideOpenDirRow();
+    window._refreshIntHandleRow();
     const toolbar = document.getElementById('bottom-floating-toolbar');
     if(!toolbar) return;
     const deskZone = _isDeskZoneSelection();
@@ -2136,6 +2186,8 @@ function updateToolbarButtonHighlights() {
             const tbHandleDoorBtn = document.getElementById('tb-btn-handle-picker-door');
             if (tbHandleDoorBtn) tbHandleDoorBtn.classList.toggle('active', hasDoorOverride);
         }
+        window._refreshSideOpenDirRow();
+        window._refreshIntHandleRow();
         return;
     }
 
@@ -2293,6 +2345,8 @@ function updateToolbarButtonHighlights() {
         const tbHandleDoorBtn = document.getElementById('tb-btn-handle-picker-door');
         if (tbHandleDoorBtn) tbHandleDoorBtn.classList.toggle('active', !!existingDoor.handleStyle);
     }
+    window._refreshSideOpenDirRow();
+    window._refreshIntHandleRow();
 }
 
 function _getColumnRowCount(col) {
@@ -13404,7 +13458,7 @@ function _escPrintHtml(s) {
 }
 
 function _emptyContentCounts() {
-    return { shelves: 0, hanging: 0, sorbet: 0, drawersInt: 0, drawersExt: 0, drawersShoe: 0, openCells: 0, sideOpenCells: 0 };
+    return { shelves: 0, hanging: 0, sorbet: 0, drawersInt: 0, drawersExt: 0, drawersShoe: 0, drawersIntExtHandle: 0, openCells: 0, sideOpenCells: 0 };
 }
 
 function _addContentTypeToCounts(counts, type, comp, zoneIdx) {
@@ -13415,6 +13469,7 @@ function _addContentTypeToCounts(counts, type, comp, zoneIdx) {
             ? comp.zonesDrawerCount[zoneIdx]
             : ((comp && comp.count) || 1);
         counts.drawersInt += n;
+        if (comp && comp.intHandle === 'external') counts.drawersIntExtHandle += n;
     } else if (type === 'external_drawers') {
         const n = (comp && Array.isArray(comp.zonesDrawerCount) && zoneIdx != null && comp.zonesDrawerCount[zoneIdx] > 0)
             ? comp.zonesDrawerCount[zoneIdx]
@@ -13587,6 +13642,7 @@ function _countCabinetContentFromRawState(rawState) {
             merged.drawersInt += c.drawersInt;
             merged.drawersExt += c.drawersExt;
             merged.drawersShoe += c.drawersShoe;
+            merged.drawersIntExtHandle += c.drawersIntExtHandle;
             merged.openCells += c.openCells;
             merged.sideOpenCells += c.sideOpenCells;
         });
@@ -13599,6 +13655,7 @@ function _countCabinetContentFromRawState(rawState) {
             merged.drawersInt += c.drawersInt;
             merged.drawersExt += c.drawersExt;
             merged.drawersShoe += c.drawersShoe;
+            merged.drawersIntExtHandle += c.drawersIntExtHandle;
             merged.openCells += c.openCells;
             merged.sideOpenCells += c.sideOpenCells;
         }
@@ -13818,6 +13875,9 @@ function _collectWingPrintSpecRows(item, itemObj, unit) {
         label: 'מגירות פנימיות',
         value: (counts.drawersInt || 0) + ' יחידות'
     });
+    if (counts.drawersIntExtHandle > 0) {
+        rows.push({ id: prefix + 'drawersIntExtHandle', label: 'מגירות פנימיות עם ידית חיצונית', value: counts.drawersIntExtHandle + ' יחידות' });
+    }
     if (counts.drawersShoe > 0) {
         rows.push({ id: prefix + 'drawersShoe', label: 'מגירות נעליים', value: counts.drawersShoe + ' יחידות' });
     }
@@ -13956,6 +14016,8 @@ function _collectPrintSpecRows(item, itemObj) {
     if (!isWD) {
         rows.push({ id: 'drawersExt', label: 'מגירות חיצוניות', value: `${item.drawersExt} יחידות` });
         rows.push({ id: 'drawersInt', label: 'מגירות פנימיות', value: `${item.drawersInt} יחידות` });
+        const intExtN = itemObj && itemObj.rawState ? (_countCabinetContentFromRawState(itemObj.rawState).drawersIntExtHandle || 0) : 0;
+        if (intExtN > 0) rows.push({ id: 'drawersIntExtHandle', label: 'מגירות פנימיות עם ידית חיצונית', value: intExtN + ' יחידות' });
         const shoeN = _itemShoeDrawerCount(item, itemObj);
         if (shoeN > 0) rows.push({ id: 'drawersShoe', label: 'מגירות נעליים', value: shoeN + ' יחידות' });
         rows.push({ id: 'shelves', label: 'מדפים נשלפים', value: `${item.shelves} יחידות` });
