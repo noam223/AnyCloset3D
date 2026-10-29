@@ -4702,8 +4702,14 @@ function _renderShoeDrawerCell(opts) {
     const fenceD = Math.max(2, shelfD - fenceInset * 2);
     const fenceFrontZ = frontZ - fenceInset;
     const fenceBackZ = backZ + fenceInset;
-    const metalMat = isBP ? matInternal : new THREE.MeshStandardMaterial({ color: 0x9a9fa5, metalness: 0.65, roughness: 0.4 });
-    const runnerMat = isBP ? matInternal : new THREE.MeshStandardMaterial({ color: 0x8a8a8a, metalness: 0.6, roughness: 0.45 });
+    // Low metalness + envMap: a high-metalness material without reflections renders near-black.
+    const metalMat = isBP ? matInternal : new THREE.MeshStandardMaterial({
+        color: 0xa9adb2, metalness: 0.35, roughness: 0.4,
+        envMap: window._studioEnvMap || null, envMapIntensity: 1.0
+    });
+    const runnerMat = isBP ? matInternal : new THREE.MeshStandardMaterial({
+        color: 0x8a8a8a, metalness: 0.35, roughness: 0.45, envMap: window._studioEnvMap || null
+    });
 
     for (let d = 0; d < n; d++) {
         const unitBottom = cellBottomY + d * unitH;
