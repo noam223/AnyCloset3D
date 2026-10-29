@@ -7467,6 +7467,24 @@ function _ensureSpaceGizmo() {
     // use |dot|, so feeding it |eye| per component disables only the flipping.
     const giz = g.children.find(function(c) { return c && c.type === 'TransformControlsGizmo'; });
     if (giz) {
+        // Pastel palette instead of the stock saturated axis colours
+        const pastel = [
+            [[1, 0, 0], 0xf08a8a], [[0, 1, 0], 0x8fd4a0], [[0, 0, 1], 0x8fb4f0],
+            [[1, 1, 0], 0xf3e29a], [[0, 1, 1], 0x9fe0e0], [[1, 0, 1], 0xe0a8e6]
+        ];
+        const seen = new Set();
+        giz.traverse(function(o) {
+            const m = o.material;
+            if (!m || !m.color || seen.has(m)) return;
+            seen.add(m);
+            const c = m.color;
+            pastel.forEach(function(p) {
+                if (Math.abs(c.r - p[0][0]) < 0.05 && Math.abs(c.g - p[0][1]) < 0.05 && Math.abs(c.b - p[0][2]) < 0.05) {
+                    c.setHex(p[1]);
+                    if (m._color) m._color.setHex(p[1]);
+                }
+            });
+        });
         const origUpdate = giz.updateMatrixWorld;
         giz.updateMatrixWorld = function() {
             const eye = this.eye;
