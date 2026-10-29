@@ -7513,8 +7513,12 @@ function updateDragHandlesPosition() {
         y = Math.max(h/2 + 5, Math.min(ch - h/2 - 5, y));
 
         handle.style.left = `${x}px`;
-        // Upper unit move handle: raise 20px above projected position
-        handle.style.top = `${handle.classList.contains('uu-move-handle') ? y - 20 : y}px`;
+        // Upper unit move handle: raise 20px above projected position.
+        // Space move/rotate handles float above the cabinet top so they never cover the partition handles there.
+        let lift = 0;
+        if (handle.classList.contains('uu-move-handle')) lift = 20;
+        else if (handle.classList.contains('space-move-handle') || handle.classList.contains('space-rot-handle')) lift = 42;
+        handle.style.top = `${Math.max(h / 2 + 5, y - lift)}px`;
     });
     if (typeof window._updateShelfTrashPos === 'function') window._updateShelfTrashPos();
 }
