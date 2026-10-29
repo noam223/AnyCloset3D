@@ -4681,7 +4681,7 @@ function _renderInternalDrawerBoxCell(opts) {
     }
 }
 
-/** Shoe pull-out shelves: board on side runners with front/back lips and two metal rails per unit. */
+/** Shoe pull-out shelves: board on side runners with a metal rail fence on all 4 sides, rising from the shelf surface. */
 function _renderShoeDrawerCell(opts) {
     const {
         createBoard, matInternal, group, isBP,
@@ -4696,10 +4696,12 @@ function _renderShoeDrawerCell(opts) {
     const shelfW = Math.max(4, cellWidth - runnerT * 2);
     const shelfD = Math.max(10, frontZ - backZ);
     const shelfCenterZ = backZ + shelfD / 2;
-    const frontLipH = Math.min(5, Math.max(2.5, unitH * 0.25));
-    const backLipH = Math.min(4, Math.max(2, unitH * 0.2));
     const railR = 0.5;
-    const railLen = Math.max(2, shelfW - boardT * 2);
+    const fenceInset = 1.2;
+    const fenceW = Math.max(2, shelfW - fenceInset * 2);
+    const fenceD = Math.max(2, shelfD - fenceInset * 2);
+    const fenceFrontZ = frontZ - fenceInset;
+    const fenceBackZ = backZ + fenceInset;
     const metalMat = isBP ? matInternal : new THREE.MeshStandardMaterial({ color: 0xc8c8c8, metalness: 0.75, roughness: 0.3 });
     const runnerMat = isBP ? matInternal : new THREE.MeshStandardMaterial({ color: 0x8a8a8a, metalness: 0.6, roughness: 0.45 });
 
@@ -4711,35 +4713,40 @@ function _renderShoeDrawerCell(opts) {
         if (partIdPrefix) _ppPartId = `${partIdPrefix}_d${d}`;
         createBoard(shelfW, boardT, shelfD, centerX, shelfY, shelfCenterZ, matInternal);
         if (partIdPrefix) _ppPartId = '';
-        createBoard(shelfW, frontLipH, boardT, centerX, shelfTop + frontLipH / 2, frontZ - boardT / 2, matInternal);
-        createBoard(shelfW, backLipH, boardT, centerX, shelfTop + backLipH / 2, backZ + boardT / 2, matInternal);
 
-        if (group) {
-            [-1, 1].forEach(function(side) {
-                const runner = new THREE.Mesh(new THREE.BoxGeometry(runnerT * 0.8, 3.5, shelfD), runnerMat);
-                runner.position.set(centerX + side * (cellWidth / 2 - runnerT / 2), shelfY, shelfCenterZ);
-                runner.name = 'shoeDrawerRunner';
-                group.add(runner);
+        if (!group) continue;
+        [-1, 1].forEach(function(side) {
+            const runner = new THREE.Mesh(new THREE.BoxGeometry(runnerT * 0.8, 3.5, shelfD), runnerMat);
+            runner.position.set(centerX + side * (cellWidth / 2 - runnerT / 2), shelfY, shelfCenterZ);
+            runner.name = 'shoeDrawerRunner';
+            group.add(runner);
+        });
+
+        const fenceH = Math.max(3, Math.min(8, unitH * 0.4, unitH - (shelfTop - unitBottom) - 3));
+        const railY = shelfTop + fenceH;
+        const xL = centerX - fenceW / 2, xR = centerX + fenceW / 2;
+        const zMid = (fenceFrontZ + fenceBackZ) / 2;
+        const addRail = function(len, x, z, alongX) {
+            const rail = new THREE.Mesh(new THREE.CylinderGeometry(railR, railR, len + railR * 2, 12), metalMat);
+            if (alongX) rail.rotation.z = Math.PI / 2;
+            else rail.rotation.x = Math.PI / 2;
+            rail.position.set(x, railY, z);
+            rail.name = 'shoeDrawerRail';
+            group.add(rail);
+        };
+        addRail(fenceW, centerX, fenceFrontZ, true);
+        addRail(fenceW, centerX, fenceBackZ, true);
+        addRail(fenceD, xL, zMid, false);
+        addRail(fenceD, xR, zMid, false);
+
+        [xL, xR].forEach(function(x) {
+            [fenceFrontZ, fenceBackZ].forEach(function(z) {
+                const post = new THREE.Mesh(new THREE.CylinderGeometry(railR, railR, fenceH, 10), metalMat);
+                post.position.set(x, shelfTop + fenceH / 2, z);
+                post.name = 'shoeDrawerRailPost';
+                group.add(post);
             });
-            const railY = shelfTop + Math.min(Math.max(frontLipH + 3, unitH * 0.45), unitH - 2);
-            [frontZ - boardT / 2, backZ + boardT / 2].forEach(function(z) {
-                const rail = new THREE.Mesh(new THREE.CylinderGeometry(railR, railR, railLen, 12), metalMat);
-                rail.rotation.z = Math.PI / 2;
-                rail.position.set(centerX, railY, z);
-                rail.name = 'shoeDrawerRail';
-                group.add(rail);
-            });
-            [centerX - railLen / 2, centerX + railLen / 2].forEach(function(x) {
-                [frontZ - boardT / 2, backZ + boardT / 2].forEach(function(z) {
-                    const postH = railY - shelfTop;
-                    if (postH <= 0.5) return;
-                    const post = new THREE.Mesh(new THREE.CylinderGeometry(railR * 0.8, railR * 0.8, postH, 8), metalMat);
-                    post.position.set(x, shelfTop + postH / 2, z);
-                    post.name = 'shoeDrawerRailPost';
-                    group.add(post);
-                });
-            });
-        }
+        });
     }
 }
 
