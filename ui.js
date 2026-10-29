@@ -7333,7 +7333,9 @@ window._buildSpaceCabMoveHandle = function() {
     handle.className = 'drag-handle space-move-handle';
     handle.dataset.worldY = String(h);
     handle.innerHTML = `<div class="drag-tooltip">הזז ארון ${n}: ${off.x}, ${off.y} ס"מ</div>`;
-    handle.style.display = 'flex';
+    // With the 3D axis gizmo available, the X/Y and Z screen handles are redundant
+    const useGizmo = !!(window.THREE && THREE.TransformControls);
+    handle.style.display = useGizmo ? 'none' : 'flex';
     if (window._spaceCabDrag && window._spaceCabDrag.axis === 'xy') handle.classList.add('active');
     dragLayer.appendChild(handle);
 
@@ -7341,7 +7343,7 @@ window._buildSpaceCabMoveHandle = function() {
     zHandle.className = 'drag-handle space-z-handle';
     zHandle.title = 'גרירה למעלה/למטה מזיזה את הארון אחורה/קדימה (ציר Z)';
     zHandle.innerHTML = `<div class="drag-tooltip">עומק ארון ${n}: ${off.z} ס"מ</div>`;
-    zHandle.style.display = 'flex';
+    zHandle.style.display = useGizmo ? 'none' : 'flex';
     if (window._spaceCabDrag && window._spaceCabDrag.axis === 'z') zHandle.classList.add('active');
     dragLayer.appendChild(zHandle);
 
@@ -7421,6 +7423,87 @@ window._buildSpaceCabMoveHandle = function() {
     };
     window.addEventListener('pointermove', window._spaceCabMoveHandler);
     window.addEventListener('pointerup', window._spaceCabUpHandler);
+};
+
+// ── 3D axis gizmo (TransformControls) for the active extra cabinet in a shared space ──
+// Lives in its own overlay scene so captures / thumbnails of `scene` never include it.
+window._spaceGizmoScene = null;
+window._spaceGizmo = null;
+window._spaceGizmoProxy = null;
+window._spaceGizmoBlockClick = false;
+
+function _spaceGizmoTarget() {
+    const info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
+    if (!info || info.activeSlot <= 0) return null;
+    if (state.viewMode !== 'front' && state.viewMode !== '3d') return null;
+    if (state.wingEditMode || document.body.classList.contains('room-plan-mode')) return null;
+    const item = window._getSpaceMovableItem();
+    if (!item) return null;
+    const off = window._getSpaceOffset(item);
+    const fp = window._spaceCabinetFootprint(info.activeSlot);
+    return { slot: info.activeSlot, off: off, pivotH: Math.max(20, (fp.h || 200) / 2) };
+}
+
+function _ensureSpaceGizmo() {
+    if (window._spaceGizmo) return window._spaceGizmo;
+    if (!window.THREE || !THREE.TransformControls) return null;
+    const gScene = new THREE.Scene();
+    const proxy = new THREE.Object3D();
+    gScene.add(proxy);
+    const g = new THREE.TransformControls(camera, renderer.domElement);
+    g.setMode('translate');
+    g.setSpace('world');
+    g.setTranslationSnap(1);
+    g.setSize((window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ? 1.4 : 1);
+    gScene.add(g);
+
+    g.addEventListener('mouseDown', function() { window._spaceGizmoBlockClick = true; });
+    g.addEventListener('mouseUp', function() {
+        setTimeout(function() { window._spaceGizmoBlockClick = false; }, 0);
+    });
+    g.addEventListener('dragging-changed', function(ev) {
+        controls.enabled = !ev.value;
+        document.body.classList.toggle('dragging', !!ev.value);
+        if (!ev.value && typeof saveHistoryState === 'function') saveHistoryState();
+    });
+    g.addEventListener('objectChange', function() {
+        const t = _spaceGizmoTarget();
+        if (!t || !g.dragging) return;
+        const axis = (g.axis || '').toLowerCase();
+        const prefer = (axis === 'x' || axis === 'y' || axis === 'z') ? axis : undefined;
+        window._setSpaceOffset(proxy.position.x, proxy.position.y - t.pivotH, {
+            dragging: true, preferAxis: prefer, z: proxy.position.z, slot: t.slot
+        });
+        // Snap the gizmo back onto the clamped (collision / room-limited) position
+        const cur = window._getSpaceOffset(window._getSpaceMovableItem());
+        proxy.position.set(cur.x, cur.y + t.pivotH, cur.z || 0);
+    });
+
+    window._spaceGizmoScene = gScene;
+    window._spaceGizmoProxy = proxy;
+    window._spaceGizmo = g;
+    return g;
+}
+
+/** Per-frame: attach/detach the gizmo and keep it on the cabinet pivot; renders the overlay scene. */
+window._syncAndRenderSpaceGizmo = function() {
+    const t = _spaceGizmoTarget();
+    const g = t ? _ensureSpaceGizmo() : window._spaceGizmo;
+    if (!g) return;
+    if (!t) {
+        if (g.object) g.detach();
+        g.enabled = false;
+        return;
+    }
+    const proxy = window._spaceGizmoProxy;
+    if (!g.dragging) proxy.position.set(t.off.x, t.off.y + t.pivotH, t.off.z || 0);
+    if (g.object !== proxy) g.attach(proxy);
+    g.enabled = true;
+    const prevAuto = renderer.autoClear;
+    renderer.autoClear = false;
+    renderer.clearDepth();
+    renderer.render(window._spaceGizmoScene, camera);
+    renderer.autoClear = prevAuto;
 };
 
 function createHandle(dir, x3d, y3d = null, text = 'גרירה') {
@@ -9091,6 +9174,7 @@ function bindUI() {
 
     container.addEventListener('pointerup', (e) => {
         if (_isCanvasOverlayUiTarget(e.target)) return;
+        if (window._spaceGizmoBlockClick) return;
         if (e.button !== 0) return;
 
         // Only treat as a click if pointer didn't move more than 5px (not a drag)
@@ -17407,6 +17491,7 @@ function animate() {
 
     if (!(state.viewMode === 'room-plan' && window._roomPlanSubview === '2d')) {
         renderer.render(scene, camera);
+        if (typeof window._syncAndRenderSpaceGizmo === 'function') window._syncAndRenderSpaceGizmo();
     }
 }
 animate();
