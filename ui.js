@@ -11588,7 +11588,7 @@ window._setSpaceOffset = function(x, y, opts) {
  * Aligning X and Z together gives an exact corner-to-corner fit.
  */
 window._spaceSnapOffset = function(x, y, z, slot, axes) {
-    const SNAP = 6;
+    const SNAP = 1;
     const info = window._getSpacePairInfo();
     if (!info || !axes) return { x: x, y: y, z: z };
     const dM = window._spaceCabinetFootprint(slot);
