@@ -275,17 +275,20 @@ function _bpDrawCornerDeskFrontParts(p, cu, ox, oy, dW, dH, sc, STROKE, STROKE_T
     const drawerHcm = cu.deskDrawerHeight || 13;
     const gapCm = 0.4;
     if (numDrawers > 0) {
+        // One row of drawers side by side across the desk width
+        const dy = deskTopY + deskSurfCm * sc;
+        const dh = drawerHcm * sc;
+        const gapPx = gapCm * sc;
+        const eachW = (innerW - 3 - gapPx * (numDrawers - 1)) / numDrawers;
         for (let i = 0; i < numDrawers; i++) {
-            const topOffsetCm = deskSurfCm + i * (drawerHcm + gapCm);
-            const dy = deskTopY + topOffsetCm * sc;
-            const dh = drawerHcm * sc;
-            drawRect(innerX + 1.5, dy + 1, innerW - 3, dh - 2, 'rgba(255,255,255,0.85)', STROKE, 1);
-            const hndW = Math.min(innerW * 0.4, 28);
-            const hndX = innerX + (innerW - hndW) / 2;
+            const dx = innerX + 1.5 + i * (eachW + gapPx);
+            drawRect(dx, dy + 1, eachW, dh - 2, 'rgba(255,255,255,0.85)', STROKE, 1);
+            const hndW = Math.min(eachW * 0.4, 28);
+            const hndX = dx + (eachW - hndW) / 2;
             const hndY = dy + dh * 0.5;
             p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX + hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="2"/>`);
         }
-        const drawersZoneH = numDrawers * drawerHcm + gapCm * Math.max(numDrawers - 1, 0);
+        const drawersZoneH = drawerHcm;
         const kneeH = Math.max(cuH - deskSurfCm - drawersZoneH, 0);
         const dimX = isLeft ? (ox + dW + 18) : (ox - 18);
         const drawerTopY = deskTopY + deskSurfT;

@@ -437,7 +437,8 @@ function buildCornerUnit() {
         if (numDeskDrawers > 0) {
             const drawerH = cu.deskDrawerHeight || 13;
             const gap = 0.4;
-            const drawerZoneH = numDeskDrawers * drawerH + gap * (numDeskDrawers - 1);
+            // Multiple drawers sit side by side across the desk width — one row, one drawer height.
+            const drawerZoneH = drawerH;
             const zoneTopY = deskH - deskT;
             const zoneBotY = zoneTopY - drawerZoneH;
             const zoneCenterY = (zoneTopY + zoneBotY) / 2;
@@ -494,7 +495,7 @@ function buildCornerUnit() {
                 const drawerD = (innerD - gap * (numDeskDrawers + 1)) / numDeskDrawers;
                 for (let i = 0; i < numDeskDrawers; i++) {
                     const dZ = -innerD / 2 + gap + drawerD / 2 + i * (drawerD + gap);
-                    const dY = zoneTopY - drawerH / 2 - i * (drawerH + gap);
+                    const dY = zoneTopY - drawerH / 2;
                     const drwW = drawerD - innerGap;
                     _addDrawerInCarcass(dY, drwW, dZ);
                 }
