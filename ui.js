@@ -7496,16 +7496,26 @@ function _ensureSpaceGizmo() {
             eye.set(Math.abs(ex), Math.abs(ey), Math.abs(ez));
             try { origUpdate.apply(this, arguments); }
             finally { eye.set(ex, ey, ez); }
-            // Hover: the stock gizmo whitens every handle — keep true colours, only fade the others
-            const set = this.axis && this.gizmo && this.gizmo[this.mode];
+            // Hover: the stock gizmo whitens every handle — keep true colours, only fade the others.
+            // Then apply the show/hide fade. Materials are shared between handles, so set each once.
+            const set = this.gizmo && this.gizmo[this.mode];
             if (set) {
                 const axis = this.axis;
+                const fade = window._spaceGizmoFade == null ? 1 : window._spaceGizmoFade;
+                const done = new Set();
                 set.children.forEach(function(h) {
                     const m = h.material;
-                    if (!m || !m._color) return;
+                    if (!m || !m._color || done.has(m)) return;
+                    done.add(m);
                     m.color.copy(m._color);
-                    const related = h.name === axis || axis.split('').some(function(a) { return h.name === a; });
-                    m.opacity = related ? 1 : (m._opacity || 1) * 0.18;
+                    const base = m._opacity || 1;
+                    let op = base;
+                    if (axis) {
+                        const related = h.name === axis || axis.split('').some(function(a) { return h.name === a; });
+                        op = related ? 1 : base * 0.18;
+                    }
+                    m.transparent = true;
+                    m.opacity = op * fade;
                 });
             }
         };
@@ -7574,7 +7584,16 @@ window._syncAndRenderSpaceGizmo = function() {
     const t = _spaceGizmoTarget();
     const g = t ? _ensureSpaceGizmo() : window._spaceGizmo;
     if (!g) return;
-    if (!t || !_spaceGizmoShouldShow(g)) {
+    const now = performance.now();
+    const dt = Math.min(100, now - (window._spaceGizmoFadeT || now));
+    window._spaceGizmoFadeT = now;
+    const want = !!t && _spaceGizmoShouldShow(g);
+    window._spaceGizmoWanted = want;
+    const FADE_MS = 120;
+    let fade = window._spaceGizmoFade || 0;
+    fade = Math.max(0, Math.min(1, fade + (want ? 1 : -1) * dt / FADE_MS));
+    window._spaceGizmoFade = fade;
+    if (!t || (!want && fade <= 0)) {
         if (g.object) g.detach();
         g.enabled = false;
         return;
@@ -7582,7 +7601,8 @@ window._syncAndRenderSpaceGizmo = function() {
     const proxy = window._spaceGizmoProxy;
     if (!g.dragging) proxy.position.set(t.off.x, t.off.y + t.pivotH, t.off.z || 0);
     if (g.object !== proxy) g.attach(proxy);
-    g.enabled = true;
+    // Fading out: still drawn, but no longer grabbable
+    g.enabled = want;
     const prevAuto = renderer.autoClear;
     renderer.autoClear = false;
     renderer.clearDepth();
@@ -7639,8 +7659,11 @@ function updateDragHandlesPosition() {
             worldPt = new THREE.Vector3(currentWX, wy, state.depth / 2);
         } else if (handle.classList.contains('space-rot-handle') && window._spaceGizmo) {
             // Beside the 3D axis gizmo (its pivot); shown together with the gizmo
-            const shown = !!window._spaceGizmo.object || !!window._spaceRotHover;
-            handle.style.display = shown ? 'flex' : 'none';
+            const shown = !!window._spaceGizmoWanted || !!window._spaceRotHover;
+            handle.style.display = 'flex';
+            handle.style.transition = 'opacity 0.12s ease';
+            handle.style.opacity = shown ? '1' : '0';
+            handle.style.pointerEvents = shown ? 'auto' : 'none';
             const p = window._spaceGizmoProxy.position;
             worldPt = new THREE.Vector3(p.x, p.y, p.z);
         } else if (handle.classList.contains('space-move-handle') || handle.classList.contains('space-rot-handle')) {
