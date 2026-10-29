@@ -40,7 +40,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260910deskMerge">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
     <link rel="stylesheet" href="style-extras.css?v=20260731rpcab">
-    <link rel="stylesheet" href="style.css?v=20261026orderpv">
+    <link rel="stylesheet" href="style.css?v=20261029spacerot">
     <link rel="stylesheet" href="quick-calc.css?v=20260929qc">
     <style>
         html.thumb-only-mode #left-sidebar,
@@ -169,6 +169,13 @@
                             </div>
                         </div>
                     </div>
+                </div>
+                <div class="space-cab-offset-label"><i class="fa-solid fa-rotate-right"></i> סיבוב הארון</div>
+                <div class="space-rot-row" data-space-rot-row>
+                    <button type="button" class="space-rot-btn" data-space-rot="0" onclick="window._setSpaceRotation(0)">0°</button>
+                    <button type="button" class="space-rot-btn" data-space-rot="90" onclick="window._setSpaceRotation(90)">90°</button>
+                    <button type="button" class="space-rot-btn" data-space-rot="180" onclick="window._setSpaceRotation(180)">180°</button>
+                    <button type="button" class="space-rot-btn" data-space-rot="270" onclick="window._setSpaceRotation(270)">270°</button>
                 </div>
             </div>
         </div>
@@ -2118,6 +2125,13 @@
                 <input type="number" id="mobile-inp-num-space-y" class="editor-select" value="0" min="0" step="1" style="margin:0 0 8px;width:100%;box-sizing:border-box;" onchange="window._setSpaceOffsetFromUI('y', this.value)">
                 <label class="mobile-label">הזזה בעומק Z (ס"מ, חיובי = קדימה)</label>
                 <input type="number" id="mobile-inp-num-space-z" class="editor-select" value="0" step="1" style="margin:0;width:100%;box-sizing:border-box;" onchange="window._setSpaceOffsetFromUI('z', this.value)">
+                <label class="mobile-label" style="margin-top:8px;display:block;">סיבוב הארון</label>
+                <div class="space-rot-row" data-space-rot-row>
+                    <button type="button" class="space-rot-btn" data-space-rot="0" onclick="window._setSpaceRotation(0)">0°</button>
+                    <button type="button" class="space-rot-btn" data-space-rot="90" onclick="window._setSpaceRotation(90)">90°</button>
+                    <button type="button" class="space-rot-btn" data-space-rot="180" onclick="window._setSpaceRotation(180)">180°</button>
+                    <button type="button" class="space-rot-btn" data-space-rot="270" onclick="window._setSpaceRotation(270)">270°</button>
+                </div>
             </div>
         </div>
         <div class="mobile-section-title">דגם ארון</div>
@@ -2886,12 +2900,12 @@
 <script src="bathroom-preset.js?v=20261008types"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
 <script src="engine-appliances.js?v=20261007deskMerge28"></script>
-<script src="engine-core.js?v=20261029inthandle"></script>
+<script src="engine-core.js?v=20261029spacerot"></script>
 <script src="engine-corners.js?v=20261029cdeskrow"></script>
 <script src="engine-blueprint.js?v=20261029cdeskrow"></script>
 <script src="engine-room-plan.js?v=20261016snap"></script>
 <script src="tambour-color-picker.js?v=20261009colors"></script>
-<script src="ui.js?v=20261029inthandle"></script>
+<script src="ui.js?v=20261029spacerot"></script>
 <script src="mobile.js?v=20261029inthandle"></script>
 <script src="part-paint.js?v=20260914A427fix"></script>
 <script src="shelf-pick.js?v=20260922sideWall"></script>

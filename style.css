@@ -2318,6 +2318,21 @@ body.color-tab-glass #mobile-panel-materials .mobile-panel-body > :not(.color-pa
 .drag-handle.space-z-handle::after { content: none; }
 .drag-handle.space-z-handle.active { background: #d97706; border-color: #d97706; }
 .drag-handle.space-z-handle.active::before { color: white; }
+.drag-handle.space-rot-handle { cursor: pointer; background: rgba(124,58,237,0.13); border-color: rgba(124,58,237,0.6); width: 28px; height: 28px; }
+.drag-handle.space-rot-handle::before { content: '\f01e'; font-family: 'FontAwesome'; font-size: 11px; color: #7c3aed; margin: 0; }
+.drag-handle.space-rot-handle::after { content: none; }
+.drag-handle.space-rot-handle:hover { background: #7c3aed; border-color: #7c3aed; }
+.drag-handle.space-rot-handle:hover::before { color: white; }
+.space-rot-row { display: flex; gap: 6px; margin-top: 8px; }
+.space-rot-btn {
+    flex: 1 1 0; padding: 6px 0; border-radius: 8px; cursor: pointer;
+    font-size: 0.8rem; font-weight: 700;
+    background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.85);
+    border: 1px solid rgba(255,255,255,0.18);
+}
+.space-rot-btn.active { background: #7c3aed; border-color: #7c3aed; color: #fff; }
+#mobile-space-cab-offset-row .space-rot-btn { background: #f3f4f6; color: #1f2937; border-color: #d1d5db; }
+#mobile-space-cab-offset-row .space-rot-btn.active { background: #7c3aed; border-color: #7c3aed; color: #fff; }
 .drag-handle.uu-move-handle { background: rgba(16,185,129,0.13); border-color: rgba(16,185,129,0.6); }
 .drag-handle.uu-move-handle::before, .drag-handle.uu-move-handle::after { color: rgba(16,185,129,0.9); }
 .drag-handle.uu-move-handle.active { background: rgba(16,185,129,0.85); border-color: #10b981; }

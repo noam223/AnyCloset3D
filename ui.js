@@ -7345,6 +7345,23 @@ window._buildSpaceCabMoveHandle = function() {
     if (window._spaceCabDrag && window._spaceCabDrag.axis === 'z') zHandle.classList.add('active');
     dragLayer.appendChild(zHandle);
 
+    const rotHandle = document.createElement('div');
+    rotHandle.className = 'drag-handle space-rot-handle';
+    rotHandle.dataset.worldY = String(h);
+    rotHandle.title = 'סיבוב הארון ב-90°';
+    rotHandle.innerHTML = `<div class="drag-tooltip">סיבוב ארון ${n}: ${off.rot || 0}°</div>`;
+    rotHandle.style.display = 'flex';
+    rotHandle.addEventListener('pointerdown', function(e) { e.preventDefault(); e.stopPropagation(); });
+    rotHandle.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        window._rotateSpaceCabinet();
+        const cur = window._getSpaceOffset(window._getSpaceMovableItem());
+        const tip = rotHandle.querySelector('.drag-tooltip');
+        if (tip) tip.textContent = `סיבוב ארון ${n}: ${cur.rot || 0}°`;
+    });
+    dragLayer.appendChild(rotHandle);
+
     function startDrag(e, axis, el) {
         e.preventDefault();
         e.stopPropagation();
@@ -7451,12 +7468,16 @@ function updateDragHandlesPosition() {
                 }
             }
             worldPt = new THREE.Vector3(currentWX, wy, state.depth / 2);
-        } else if (handle.classList.contains('space-move-handle')) {
+        } else if (handle.classList.contains('space-move-handle') || handle.classList.contains('space-rot-handle')) {
             const item = typeof window._getSpaceMovableItem === 'function' ? window._getSpaceMovableItem()
                 : (typeof window._getSpaceSlot1Item === 'function' ? window._getSpaceSlot1Item() : null);
             const off = typeof window._getSpaceOffset === 'function' ? window._getSpaceOffset(item) : { x: 0, y: 0 };
             const hy = parseFloat(handle.dataset.worldY) || 0;
-            worldPt = new THREE.Vector3(off.x, off.y + hy, (off.z || 0) + (state.depth || 54) / 2);
+            const info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
+            const fp = (info && info.activeSlot > 0 && typeof window._spaceCabinetFootprint === 'function')
+                ? window._spaceCabinetFootprint(info.activeSlot) : null;
+            const halfD = fp ? fp.d / 2 : (state.depth || 54) / 2;
+            worldPt = new THREE.Vector3(off.x, off.y + hy, (off.z || 0) + halfD);
         } else if (handle.classList.contains('space-z-handle')) {
             // Front edge of the side panel facing away from the anchor cabinet, at mid height
             const info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
@@ -7482,6 +7503,8 @@ function updateDragHandlesPosition() {
         
         let x = (pos.x * .5 + .5) * cw;
         let y = (-(pos.y * .5) + .5) * ch;
+        // Rotate button sits just beside the space move handle
+        if (handle.classList.contains('space-rot-handle')) x += 36;
 
         // גבולות גזרה לידיות הגרירה
         const w = handle.offsetWidth || 24;
@@ -10956,8 +10979,15 @@ window._getSpaceOffset = function(item) {
     return {
         x: Math.round(Number(o.x) || 0),
         y: Math.round(Number(o.y) || 0),
-        z: Math.round(Number(o.z) || 0)
+        z: Math.round(Number(o.z) || 0),
+        rot: window._normSpaceRot(o.rot)
     };
+};
+
+/** Space-cabinet rotation in quarter turns: 0 / 90 / 180 / 270 (clockwise seen from above). */
+window._normSpaceRot = function(r) {
+    const n = Math.round((Number(r) || 0) / 90) * 90;
+    return ((n % 360) + 360) % 360;
 };
 
 window._spacePairFieldsForRaw = function() {
@@ -11237,7 +11267,10 @@ window._spaceCabinetFootprint = function(slot) {
         }
         h += (uu._upperGap || 0) + uuH;
     }
-    return { w: w, h: h, d: d, floorOffset: fo };
+    // World-axis extents: a quarter turn swaps width (X) and depth (Z)
+    const rot = slot > 0 ? (window._spaceOffsetForSlot(slot).rot || 0) : 0;
+    if (rot === 90 || rot === 270) return { w: d, h: h, d: w, floorOffset: fo, rot: rot };
+    return { w: w, h: h, d: d, floorOffset: fo, rot: rot };
 };
 
 window._spaceOffsetForSlot = function(slot) {
@@ -11268,7 +11301,7 @@ window._clampSpaceOffsetAgainstOthers = function(x, y, movingSlot, opts) {
     const info = window._getSpacePairInfo();
     x = Math.max(-800, Math.min(800, Number(x) || 0));
     y = Math.max(0, Math.min(400, Number(y) || 0));
-    let z = Math.max(-400, Math.min(400, Number(opts.z) || 0));
+    let z = Math.max(-400, Math.min(600, Number(opts.z) || 0));
     if (!info || movingSlot == null) return { x: Math.round(x), y: Math.round(y), z: Math.round(z) };
 
     const dM = window._spaceCabinetFootprint(movingSlot);
@@ -11329,7 +11362,36 @@ window._clampSpaceOffsetAgainstOthers = function(x, y, movingSlot, opts) {
             }
         }
     });
+
+    // Hard limit: the cabinet (rotated footprint) stays inside the room walls / under the ceiling
+    const rb = window._spaceRoomBoundsScene();
+    if (rb) {
+        const fitAxis = function(v, lo, hi) { return lo > hi ? (lo + hi) / 2 : Math.max(lo, Math.min(hi, v)); };
+        x = fitAxis(x, rb.minX + dM.w / 2, rb.maxX - dM.w / 2);
+        z = fitAxis(z, rb.minZ + dM.d / 2, rb.maxZ - dM.d / 2);
+        if (rb.height > 0) y = Math.max(0, Math.min(y, rb.height - dM.h));
+    }
     return { x: Math.round(x), y: Math.round(y), z: Math.round(z) };
+};
+
+/** Room rectangle (walls) in the shared-space scene frame, or null when no room is shown. */
+window._spaceRoomBoundsScene = function() {
+    const b = window._roomBounds;
+    const rg = window._roomGroup;
+    if (!b || !rg || window._roomVisible === false || !rg.visible || !rg.children.length) return null;
+    const th = rg.rotation.y || 0;
+    const c = Math.cos(th), s = Math.sin(th);
+    const px = rg.position.x || 0, pz = rg.position.z || 0;
+    const xs = [], zs = [];
+    [[b.leftX, b.backZ], [b.rightX, b.backZ], [b.rightX, b.frontZ], [b.leftX, b.frontZ]].forEach(function(p) {
+        xs.push(px + p[0] * c + p[1] * s);
+        zs.push(pz - p[0] * s + p[1] * c);
+    });
+    return {
+        minX: Math.min.apply(null, xs), maxX: Math.max.apply(null, xs),
+        minZ: Math.min.apply(null, zs), maxZ: Math.max.apply(null, zs),
+        height: b.height || 0
+    };
 };
 
 // Back-compat alias
@@ -11355,6 +11417,7 @@ window._setSpaceOffset = function(x, y, opts) {
         prevZ: prev.z,
         z: opts.z != null ? opts.z : prev.z
     });
+    offset.rot = prev.rot || 0;
     item.spaceOffset = offset;
     if (!item.rawState) item.rawState = {};
     item.rawState.spaceOffset = offset;
@@ -11377,6 +11440,33 @@ window._setSpaceOffset = function(x, y, opts) {
     if (typeof updateOverlaysPosition === 'function') updateOverlaysPosition();
     if (typeof updateDragHandlesPosition === 'function') updateDragHandlesPosition();
     if (!opts.silent && typeof saveHistoryState === 'function' && !opts.dragging) saveHistoryState();
+};
+
+/** Rotate the active extra cabinet in the shared space to `rot` (0/90/180/270) around its own centre. */
+window._setSpaceRotation = function(rot) {
+    const info = window._getSpacePairInfo();
+    if (!info || info.activeSlot <= 0) return;
+    const item = state.orderCart[info.slotIndices[info.activeSlot]];
+    if (!item) return;
+    const prev = window._getSpaceOffset(item);
+    const next = window._normSpaceRot(rot);
+    if (next === prev.rot) return;
+    const stored = { x: prev.x, y: prev.y, z: prev.z, rot: next };
+    item.spaceOffset = stored;
+    if (!item.rawState) item.rawState = {};
+    item.rawState.spaceOffset = stored;
+    // The footprint changed (w/d swap) — re-resolve overlaps and the wall line
+    window._setSpaceOffset(prev.x, prev.y, { slot: info.activeSlot, z: prev.z, silent: true });
+    if (typeof window._invalidateSpacePairPreviewImages === 'function') {
+        window._invalidateSpacePairPreviewImages(info.pairId);
+    }
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+};
+
+window._rotateSpaceCabinet = function() {
+    const item = window._getSpaceMovableItem();
+    if (!item) return;
+    window._setSpaceRotation((window._getSpaceOffset(item).rot || 0) + 90);
 };
 
 /** When a shared-space cabinet is raised off the floor, convert plinth → bottom panel. */
@@ -11441,6 +11531,9 @@ window._syncSpaceOffsetUI = function() {
     ['inp-num-space-z', 'mobile-inp-num-space-z'].forEach(function(id) {
         const el = document.getElementById(id);
         if (el && document.activeElement !== el) el.value = off.z;
+    });
+    document.querySelectorAll('.space-rot-btn[data-space-rot]').forEach(function(btn) {
+        btn.classList.toggle('active', Number(btn.getAttribute('data-space-rot')) === (off.rot || 0));
     });
     const label = document.getElementById('space-cab-offset-label');
     const mLabel = document.getElementById('mobile-space-cab-offset-label');
