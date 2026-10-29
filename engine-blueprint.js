@@ -382,15 +382,26 @@ const _BP_CELL_DIM_FONT = 10;
 const _BP_DOOR_STYLE_SUFFIX = { solid: '', framed_melamine: ' מסגרת', glass_melamine: ' זכוכית', glass_black: ' זכ.שחורה', glass_gold: ' זכ.זהב', glass_mirror: ' מראה' };
 const _BP_SPLIT_FILL = '#6e675c';
 
-/** Shoe pull-out shelf unit in front view: front lip + dashed rail (no handle), label on the first unit. */
-function _bpShoeDrawerMarks(p, cx, w, dy, dh, idx, stroke, font) {
-    const x1 = cx - w / 2, x2 = cx + w / 2;
-    const lipY = dy + dh - Math.min(5, dh * 0.2);
-    const railY = dy + dh * 0.4;
-    p.push(`<line x1="${x1.toFixed(1)}" y1="${lipY.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${lipY.toFixed(1)}" stroke="${stroke}" stroke-width="1.6"/>`);
-    p.push(`<line x1="${x1.toFixed(1)}" y1="${railY.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${railY.toFixed(1)}" stroke="${stroke}" stroke-width="1" stroke-dasharray="3,2" opacity="0.8"/>`);
-    if (idx === 0 && dh > 16) {
-        p.push(`<text x="${cx.toFixed(1)}" y="${(railY - 3).toFixed(1)}" text-anchor="middle" font-family="${font}" font-size="10" fill="${stroke}" opacity="0.65">מגירת נעליים</text>`);
+/**
+ * Shoe pull-out shelf unit in front view (x/w = inner cell span, dy/dh = unit span, SVG y grows down):
+ * shelf board at the bottom of the unit + low rail fence (2 posts + top rail), label at the top of the first unit.
+ */
+function _bpShoeDrawerMarks(p, x, w, dy, dh, idx, stroke, font) {
+    const pad = Math.min(6, w * 0.06);
+    const sx1 = x + pad, sx2 = x + w - pad;
+    const shelfH = Math.max(2, Math.min(3.5, dh * 0.06));
+    const shelfTop = dy + dh - 3 - shelfH;
+    const fenceH = Math.max(3, Math.min(10, dh * 0.2));
+    const railY = shelfTop - fenceH;
+    const fenceCol = '#8a9099';
+    const fx1 = sx1 + 2, fx2 = sx2 - 2;
+    p.push(`<rect x="${sx1.toFixed(1)}" y="${shelfTop.toFixed(1)}" width="${(sx2 - sx1).toFixed(1)}" height="${shelfH.toFixed(1)}" fill="rgba(30,58,95,0.12)" stroke="${stroke}" stroke-width="0.9"/>`);
+    p.push(`<line x1="${fx1.toFixed(1)}" y1="${railY.toFixed(1)}" x2="${fx2.toFixed(1)}" y2="${railY.toFixed(1)}" stroke="${fenceCol}" stroke-width="1.4" stroke-linecap="round"/>`);
+    [fx1, fx2].forEach(function(px) {
+        p.push(`<line x1="${px.toFixed(1)}" y1="${railY.toFixed(1)}" x2="${px.toFixed(1)}" y2="${shelfTop.toFixed(1)}" stroke="${fenceCol}" stroke-width="1.4" stroke-linecap="round"/>`);
+    });
+    if (idx === 0 && dh > 34) {
+        p.push(`<text x="${(x + w / 2).toFixed(1)}" y="${(dy + 13).toFixed(1)}" text-anchor="middle" font-family="${font}" font-size="10" fill="${stroke}" opacity="0.6">מגירת נעליים</text>`);
     }
 }
 
@@ -1535,6 +1546,10 @@ function _bpDrawPartitionZoneContent(p, zoneType, zoneStyle, x1, x2, zSvgTop, zS
         const dh = zSvgH / dCount;
         for (let di = 0; di < dCount; di++) {
             const dy = zSvgTop + di * dh;
+            if (zoneType === 'shoe_drawers') {
+                _bpShoeDrawerMarks(p, x1 + 2, subZoneW - 4, dy, dh, di, _BP_STROKE, _BP_FONT);
+                continue;
+            }
             p.push(`<rect x="${(x1+2).toFixed(1)}" y="${(dy+1).toFixed(1)}" width="${(subZoneW-4).toFixed(1)}" height="${(dh-2).toFixed(1)}" fill="none" stroke="${_BP_STROKE_THIN}" stroke-width="0.8" opacity="0.7"/>`);
             if (zoneType === 'external_drawers') {
                 const hndW = Math.min(subZoneW * 0.35, 18);
@@ -1545,8 +1560,6 @@ function _bpDrawPartitionZoneContent(p, zoneType, zoneStyle, x1, x2, zSvgTop, zS
         }
         if (zoneType === 'external_drawers' && zSvgH > 18) {
             p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 14).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="10" fill="${_BP_STROKE}" opacity="0.6">מגירות חיצוניות</text>`);
-        } else if (zoneType === 'shoe_drawers' && zSvgH > 14) {
-            p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + Math.min(14, dh - 3)).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="9" fill="${_BP_STROKE}" opacity="0.6">מגירת נעליים</text>`);
         }
     } else if (zoneType === 'door_right' || zoneType === 'door_left' || zoneType === 'door_double') {
         const pad = 3;
@@ -2444,11 +2457,11 @@ window._generateMultiViewBlueprintSVG = function() {
                     const dh = cellH / drawerCount;
                     for (let di = 0; di < drawerCount; di++) {
                         const dy = cellY1 + di * dh;
-                        rect(colX + 2, dy + 1, colW - 4, dh - 2, 'rgba(255,255,255,0.5)', STROKE_THIN, 0.8);
+                        if (cellType !== 'shoe_drawers') rect(colX + 2, dy + 1, colW - 4, dh - 2, 'rgba(255,255,255,0.5)', STROKE_THIN, 0.8);
                         const hndW = Math.min(colW * 0.35, 22);
                         const hndX = colX + (colW - hndW) / 2;
                         const hndY = dy + dh * 0.5;
-                        if (cellType === 'shoe_drawers') _bpShoeDrawerMarks(p, hndX + hndW / 2, hndW * 2, dy, dh, di, STROKE, _BP_FONT); else p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
+                        if (cellType === 'shoe_drawers') _bpShoeDrawerMarks(p, colX + 2, colW - 4, dy, dh, di, STROKE, _BP_FONT); else p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
                     }
                 } else if (cellType === 'open_cell') {
                     const _hcBlkLbl = _bpHoneycombBlockAtRow(_hcBlocksOld, ri);
@@ -3437,11 +3450,11 @@ window._generateMultiViewBlueprintPages = function() {
                     const dh = cellH / drawerCount;
                     for (let di = 0; di < drawerCount; di++) {
                         const dy = cellY1 + di * dh;
-                        makeRect(p, colX + 2, dy + 1, colW - 4, dh - 2, 'rgba(255,255,255,0.5)', STROKE_THIN, 0.8);
+                        if (cellType !== 'shoe_drawers') makeRect(p, colX + 2, dy + 1, colW - 4, dh - 2, 'rgba(255,255,255,0.5)', STROKE_THIN, 0.8);
                         const hndW = Math.min(colW * 0.35, 22);
                         const hndX = colX + (colW - hndW) / 2;
                         const hndY = dy + dh * 0.5;
-                        if (cellType === 'shoe_drawers') _bpShoeDrawerMarks(p, hndX + hndW / 2, hndW * 2, dy, dh, di, STROKE, _BP_FONT); else p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
+                        if (cellType === 'shoe_drawers') _bpShoeDrawerMarks(p, colX + 2, colW - 4, dy, dh, di, STROKE, _BP_FONT); else p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
                     }
                 } else if (cellType === 'open_cell') {
                     const _hcBlkLblP = _bpHoneycombBlockAtRow(_hcBlocks, ri);
@@ -4024,11 +4037,11 @@ window._generateMultiViewBlueprintPages = function() {
                     const dh = cellH / drawerCount;
                     for (let di = 0; di < drawerCount; di++) {
                         const dy = cellY1 + di * dh;
-                        makeRect(p, colX + 2, dy + 1, colW - 4, dh - 2, 'rgba(255,255,255,0.5)', STROKE_THIN, 0.8);
+                        if (cellType !== 'shoe_drawers') makeRect(p, colX + 2, dy + 1, colW - 4, dh - 2, 'rgba(255,255,255,0.5)', STROKE_THIN, 0.8);
                         const hndW = Math.min(colW * 0.35, 22);
                         const hndX = colX + (colW - hndW) / 2;
                         const hndY = dy + dh * 0.5;
-                        if (cellType === 'shoe_drawers') _bpShoeDrawerMarks(p, hndX + hndW / 2, hndW * 2, dy, dh, di, STROKE, _BP_FONT); else p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
+                        if (cellType === 'shoe_drawers') _bpShoeDrawerMarks(p, colX + 2, colW - 4, dy, dh, di, STROKE, _BP_FONT); else p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
                     }
                 }
 
@@ -4295,11 +4308,11 @@ window._generateMultiViewBlueprintPages = function() {
                             const dh = cellH / drawerCount;
                             for (let di = 0; di < drawerCount; di++) {
                                 const dy = cellY1 + di * dh;
-                                makeRect(p, colX + 2, dy + 1, colW - 4, dh - 2, 'rgba(255,255,255,0.5)', STROKE_THIN, 0.8);
+                                if (cellType !== 'shoe_drawers') makeRect(p, colX + 2, dy + 1, colW - 4, dh - 2, 'rgba(255,255,255,0.5)', STROKE_THIN, 0.8);
                                 const hndW = Math.min(colW * 0.35, 22);
                                 const hndX = colX + (colW - hndW) / 2;
                                 const hndY = dy + dh * 0.5;
-                                if (cellType === 'shoe_drawers') _bpShoeDrawerMarks(p, hndX + hndW / 2, hndW * 2, dy, dh, di, STROKE, _BP_FONT); else p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
+                                if (cellType === 'shoe_drawers') _bpShoeDrawerMarks(p, colX + 2, colW - 4, dy, dh, di, STROKE, _BP_FONT); else p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
                             }
                         } else if (cellType === 'open_cell') {
                             const pad = 5;
@@ -4460,11 +4473,11 @@ window._generateMultiViewBlueprintPages = function() {
                         const dh = cellH / drawerCount;
                         for (let di = 0; di < drawerCount; di++) {
                             const dy = cellY1 + di * dh;
-                            makeRect(p, ox + 2, dy + 1, dW - 4, dh - 2, 'rgba(255,255,255,0.5)', STROKE_THIN, 0.8);
+                            if (cellType !== 'shoe_drawers') makeRect(p, ox + 2, dy + 1, dW - 4, dh - 2, 'rgba(255,255,255,0.5)', STROKE_THIN, 0.8);
                             const hndW = Math.min(dW * 0.35, 22);
                             const hndX = ox + (dW - hndW) / 2;
                             const hndY = dy + dh * 0.5;
-                            if (cellType === 'shoe_drawers') _bpShoeDrawerMarks(p, hndX + hndW / 2, hndW * 2, dy, dh, di, STROKE, _BP_FONT); else p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
+                            if (cellType === 'shoe_drawers') _bpShoeDrawerMarks(p, ox + 2, dW - 4, dy, dh, di, STROKE, _BP_FONT); else p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
                         }
                     } else if (cellType === 'open_cell') {
                         const pad = 5;
@@ -4722,11 +4735,11 @@ window._generateMultiViewBlueprintPages = function() {
                     const dh = cellH / drawerCount;
                     for (let di = 0; di < drawerCount; di++) {
                         const dy = cellY1 + di * dh;
-                        makeRect(p, colX + 2, dy + 1, colW - 4, dh - 2, 'rgba(255,255,255,0.5)', STROKE_THIN, 0.8);
+                        if (cellType !== 'shoe_drawers') makeRect(p, colX + 2, dy + 1, colW - 4, dh - 2, 'rgba(255,255,255,0.5)', STROKE_THIN, 0.8);
                         const hndW = Math.min(colW * 0.35, 22);
                         const hndX = colX + (colW - hndW) / 2;
                         const hndY = dy + dh * 0.5;
-                        if (cellType === 'shoe_drawers') _bpShoeDrawerMarks(p, hndX + hndW / 2, hndW * 2, dy, dh, di, STROKE, _BP_FONT); else p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
+                        if (cellType === 'shoe_drawers') _bpShoeDrawerMarks(p, colX + 2, colW - 4, dy, dh, di, STROKE, _BP_FONT); else p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
                     }
                 } else if (cellType === 'open_cell') {
                     const pad = 5;
