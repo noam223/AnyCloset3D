@@ -7403,11 +7403,11 @@ window._buildSpaceCabMoveHandle = function() {
         if (d.axis === 'z') {
             // Front view looks straight down -Z, so depth uses the horizontal cm/px scale; dragging down = forward
             const nz = d.startZ + dyMouse * d.scale.x;
-            window._setSpaceOffset(d.startX, d.startY, { dragging: true, preferAxis: 'z', z: nz, slot: d.slot });
+            window._setSpaceOffset(d.startX, d.startY, { dragging: true, preferAxis: 'z', z: nz, slot: d.slot, snapAxes: 'z' });
         } else {
             const nx = d.startX + dxMouse * d.scale.x;
             const ny = d.startY + dyMouse * d.scale.y;
-            window._setSpaceOffset(nx, ny, { dragging: true, preferAxis: undefined, slot: d.slot });
+            window._setSpaceOffset(nx, ny, { dragging: true, preferAxis: undefined, slot: d.slot, snapAxes: 'xy' });
         }
         const cur = window._getSpaceOffset(window._getSpaceMovableItem());
         const tip = handle.querySelector('.drag-tooltip');
@@ -7493,7 +7493,7 @@ function _ensureSpaceGizmo() {
         const axis = (g.axis || '').toLowerCase();
         const prefer = (axis === 'x' || axis === 'y' || axis === 'z') ? axis : undefined;
         window._setSpaceOffset(proxy.position.x, proxy.position.y - t.pivotH, {
-            dragging: true, preferAxis: prefer, z: proxy.position.z, slot: t.slot
+            dragging: true, preferAxis: prefer, z: proxy.position.z, slot: t.slot, snapAxes: axis
         });
         // Snap the gizmo back onto the clamped (collision / room-limited) position
         const cur = window._getSpaceOffset(window._getSpaceMovableItem());
@@ -11528,11 +11528,16 @@ window._setSpaceOffset = function(x, y, opts) {
     const item = state.orderCart[info.slotIndices[movingSlot]];
     if (!item) return;
     const prev = window._getSpaceOffset(item);
+    let zIn = opts.z != null ? opts.z : prev.z;
+    if (opts.snapAxes) {
+        const s = window._spaceSnapOffset(x, y, zIn, movingSlot, opts.snapAxes);
+        x = s.x; y = s.y; zIn = s.z;
+    }
     const offset = window._clampSpaceOffsetAgainstOthers(x, y, movingSlot, {
         preferAxis: opts.preferAxis,
         prevX: prev.x,
         prevZ: prev.z,
-        z: opts.z != null ? opts.z : prev.z
+        z: zIn
     });
     offset.rot = prev.rot || 0;
     item.spaceOffset = offset;
@@ -11557,6 +11562,47 @@ window._setSpaceOffset = function(x, y, opts) {
     if (typeof updateOverlaysPosition === 'function') updateOverlaysPosition();
     if (typeof updateDragHandlesPosition === 'function') updateDragHandlesPosition();
     if (!opts.silent && typeof saveHistoryState === 'function' && !opts.dragging) saveHistoryState();
+};
+
+/**
+ * Drag snapping: pull the moving cabinet's faces onto the other cabinets' faces and the room walls
+ * when within SNAP cm — only on the dragged axes (`axes` like 'x', 'xz', 'xy').
+ * Aligning X and Z together gives an exact corner-to-corner fit.
+ */
+window._spaceSnapOffset = function(x, y, z, slot, axes) {
+    const SNAP = 6;
+    const info = window._getSpacePairInfo();
+    if (!info || !axes) return { x: x, y: y, z: z };
+    const dM = window._spaceCabinetFootprint(slot);
+    const foM = dM.floorOffset || 0;
+    const xs = [], zs = [], ys = [foM];
+    info.members.forEach(function(m) {
+        if (m.slot === slot) return;
+        const dO = window._spaceCabinetFootprint(m.slot);
+        const o = window._spaceOffsetForSlot(m.slot);
+        const oz = o.z || 0;
+        xs.push(o.x - dO.w / 2, o.x + dO.w / 2);
+        zs.push(oz - dO.d / 2, oz + dO.d / 2);
+        ys.push(o.y + (dO.floorOffset || 0), o.y + dO.h);
+    });
+    const rb = window._spaceRoomBoundsScene();
+    if (rb) { xs.push(rb.minX, rb.maxX); zs.push(rb.minZ, rb.maxZ); }
+
+    function snapEdges(v, edges, targets) {
+        let best = null;
+        edges.forEach(function(e) {
+            targets.forEach(function(t) {
+                const d = t - (v + e);
+                if (Math.abs(d) <= SNAP && (best === null || Math.abs(d) < Math.abs(best))) best = d;
+            });
+        });
+        return best === null ? v : v + best;
+    }
+    const a = String(axes).toLowerCase();
+    if (a.indexOf('x') !== -1) x = snapEdges(Number(x) || 0, [-dM.w / 2, dM.w / 2], xs);
+    if (a.indexOf('z') !== -1) z = snapEdges(Number(z) || 0, [-dM.d / 2, dM.d / 2], zs);
+    if (a.indexOf('y') !== -1) y = snapEdges(Number(y) || 0, [foM, dM.h], ys);
+    return { x: x, y: y, z: z };
 };
 
 /** Rotate the active extra cabinet in the shared space to `rot` (0/90/180/270) around its own centre. */
