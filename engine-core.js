@@ -4681,6 +4681,68 @@ function _renderInternalDrawerBoxCell(opts) {
     }
 }
 
+/** Shoe pull-out shelves: board on side runners with front/back lips and two metal rails per unit. */
+function _renderShoeDrawerCell(opts) {
+    const {
+        createBoard, matInternal, group, isBP,
+        centerX, cellWidth, cellBottomY, compH, count,
+        frontZ, backZ,
+        partIdPrefix,
+    } = opts;
+    const n = Math.max(1, count | 0);
+    const boardT = state.thickness;
+    const runnerT = 1.3; // 13mm runner clearance per side
+    const unitH = compH / n;
+    const shelfW = Math.max(4, cellWidth - runnerT * 2);
+    const shelfD = Math.max(10, frontZ - backZ);
+    const shelfCenterZ = backZ + shelfD / 2;
+    const frontLipH = Math.min(5, Math.max(2.5, unitH * 0.25));
+    const backLipH = Math.min(4, Math.max(2, unitH * 0.2));
+    const railR = 0.5;
+    const railLen = Math.max(2, shelfW - boardT * 2);
+    const metalMat = isBP ? matInternal : new THREE.MeshStandardMaterial({ color: 0xc8c8c8, metalness: 0.75, roughness: 0.3 });
+    const runnerMat = isBP ? matInternal : new THREE.MeshStandardMaterial({ color: 0x8a8a8a, metalness: 0.6, roughness: 0.45 });
+
+    for (let d = 0; d < n; d++) {
+        const unitBottom = cellBottomY + d * unitH;
+        const shelfY = unitBottom + Math.min(3, unitH * 0.15) + boardT / 2;
+        const shelfTop = shelfY + boardT / 2;
+
+        if (partIdPrefix) _ppPartId = `${partIdPrefix}_d${d}`;
+        createBoard(shelfW, boardT, shelfD, centerX, shelfY, shelfCenterZ, matInternal);
+        if (partIdPrefix) _ppPartId = '';
+        createBoard(shelfW, frontLipH, boardT, centerX, shelfTop + frontLipH / 2, frontZ - boardT / 2, matInternal);
+        createBoard(shelfW, backLipH, boardT, centerX, shelfTop + backLipH / 2, backZ + boardT / 2, matInternal);
+
+        if (group) {
+            [-1, 1].forEach(function(side) {
+                const runner = new THREE.Mesh(new THREE.BoxGeometry(runnerT * 0.8, 3.5, shelfD), runnerMat);
+                runner.position.set(centerX + side * (cellWidth / 2 - runnerT / 2), shelfY, shelfCenterZ);
+                runner.name = 'shoeDrawerRunner';
+                group.add(runner);
+            });
+            const railY = shelfTop + Math.min(Math.max(frontLipH + 3, unitH * 0.45), unitH - 2);
+            [frontZ - boardT / 2, backZ + boardT / 2].forEach(function(z) {
+                const rail = new THREE.Mesh(new THREE.CylinderGeometry(railR, railR, railLen, 12), metalMat);
+                rail.rotation.z = Math.PI / 2;
+                rail.position.set(centerX, railY, z);
+                rail.name = 'shoeDrawerRail';
+                group.add(rail);
+            });
+            [centerX - railLen / 2, centerX + railLen / 2].forEach(function(x) {
+                [frontZ - boardT / 2, backZ + boardT / 2].forEach(function(z) {
+                    const postH = railY - shelfTop;
+                    if (postH <= 0.5) return;
+                    const post = new THREE.Mesh(new THREE.CylinderGeometry(railR * 0.8, railR * 0.8, postH, 8), metalMat);
+                    post.position.set(x, shelfTop + postH / 2, z);
+                    post.name = 'shoeDrawerRailPost';
+                    group.add(post);
+                });
+            });
+        }
+    }
+}
+
 function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveWing) {
     const isBP = state.viewMode === 'blueprint';
     const bpMat = new THREE.MeshBasicMaterial({ color: 0xffffff, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
@@ -6330,6 +6392,19 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                 }
             }
             // =========================
+            else if (compData && compData.type === 'shoe_drawers') {
+                _renderShoeDrawerCell({
+                    createBoard, matInternal, group: _buildGroup, isBP,
+                    centerX: colCenterX,
+                    cellWidth: col.width,
+                    cellBottomY: prevY,
+                    compH,
+                    count: compData.count || 1,
+                    frontZ: _isSlidingWardrobe ? (bodyD / 2 - 10) : (bodyD / 2 - 3),
+                    backZ: _isSlidingWardrobe ? (-bodyD / 2 + 1) : (-bodyD / 2 + backT + 0.5),
+                    partIdPrefix: `shoe_c${c}_r${r}`,
+                });
+            }
             else if (compData && (compData.type === 'internal_drawers' || compData.type === 'external_drawers')) {
                 const isExt = compData.type === 'external_drawers';
                 const count = compData.count;
@@ -6557,6 +6632,22 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             shelfFrontZ,
                             cabinetBackZ,
                             partIdPrefix: `drawer_sub_c${c}_r${r}_${_subSide}`,
+                        });
+                    } else if (subType === 'shoe_drawers') {
+                        const sub = (subIdx >= 0 && compData.subCells) ? compData.subCells[subIdx] : null;
+                        const zc = sub && Array.isArray(sub.zonesDrawerCount) ? (sub.zonesDrawerCount[zoneIdx] | 0) : 0;
+                        const count = zc > 0 ? zc : ((sub && sub.count > 0) ? (sub.count | 0) : Math.max(1, Math.floor(zoneH / 18)));
+                        const _subSide = subCenterX < colCenterX ? 'R' : 'L';
+                        _renderShoeDrawerCell({
+                            createBoard, matInternal, group: _buildGroup, isBP,
+                            centerX: subCenterX,
+                            cellWidth: subW,
+                            cellBottomY: zoneBottomY,
+                            compH: zoneH,
+                            count: Math.max(1, Math.min(8, count)),
+                            frontZ: _isSlidingWardrobe ? (bodyD / 2 - 10) : (bodyD / 2 - 3),
+                            backZ: _isSlidingWardrobe ? (-bodyD / 2 + 1) : (-bodyD / 2 + backT + 0.5),
+                            partIdPrefix: `shoe_sub_c${c}_r${r}_${_subSide}`,
                         });
                     } else if (subType === 'external_drawers') {
                         // Match full-cell external drawers: overlay fronts + handles + MAYA plinth cover

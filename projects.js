@@ -2035,7 +2035,7 @@ var _PP_DEFAULTS = {
         regalim: {melamine:{80:1050,120:1462,160:1658,200:2073,240:2487},nonMelamine:{80:1360,120:1900,160:2155,200:2700,240:3233}},
         maya:    {melamine:{40:675,80:1050,120:1462,160:1658,200:2073,240:2487},nonMelamine:{40:830,80:1360,120:1900,160:2155,200:2700,240:3233}}
     },
-    extras:{internalDrawer:150,externalDrawer:200,openCell:400,partition:150,shelfFreePerMeter:3,
+    extras:{internalDrawer:150,shoeDrawer:150,externalDrawer:200,openCell:400,partition:150,shelfFreePerMeter:3,
         extraShelfMel:60,extraShelfNonMel:80,deskUnit:900,doorFramedMel:80,doorGlassMel:400,
         doorGlassBlack:600,doorMirror:350,upperUnit160:600,upperUnit240:900,upperUnitPerCm:3.75,
         cornerDrawers3:832,cornerDrawers4:907,cornerDrawerExtra:200,cornerDesk:900,
@@ -2967,6 +2967,7 @@ function _fillPricingPanel(cfg) {
     var dx = _PP_DEFAULTS.extras;
     _ppSet('pp-internalDrawer', _ppNum(ex.internalDrawer, dx.internalDrawer));
     _ppSet('pp-externalDrawer', _ppNum(ex.externalDrawer, dx.externalDrawer));
+    _ppSet('pp-shoeDrawer', _ppNum(ex.shoeDrawer, dx.shoeDrawer));
     _ppSet('pp-openCell', _ppNum(ex.openCell, dx.openCell));
     _ppSet('pp-partition', _ppNum(ex.partition, dx.partition));
     _ppSet('pp-shelfFreePerMeter', _ppNum(ex.shelfFreePerMeter, dx.shelfFreePerMeter));
@@ -3035,6 +3036,7 @@ function _readPricingPanel() {
         extras: Object.assign({}, existing.extras || {}, {
             internalDrawer: _ppNum(_ppVal('pp-internalDrawer'), dx.internalDrawer),
             externalDrawer: _ppNum(_ppVal('pp-externalDrawer'), dx.externalDrawer),
+            shoeDrawer: _ppNum(_ppVal('pp-shoeDrawer'), dx.shoeDrawer),
             openCell: _ppNum(_ppVal('pp-openCell'), dx.openCell),
             partition: _ppNum(_ppVal('pp-partition'), dx.partition),
             shelfFreePerMeter: _ppNum(_ppVal('pp-shelfFreePerMeter'), dx.shelfFreePerMeter),

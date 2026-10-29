@@ -27,7 +27,7 @@ var DEFAULTS = {
         maya:    { melamine: {40:675,80:1050,120:1462,160:1658,200:2073,240:2487}, nonMelamine: {40:830,80:1360,120:1900,160:2155,200:2700,240:3233} }
     },
     extras: {
-        internalDrawer: 150, externalDrawer: 200,
+        internalDrawer: 150, shoeDrawer: 150, externalDrawer: 200,
         openCell: 400, partition: 150,
         shelfFreePerMeter: 3, extraShelfMel: 60, extraShelfNonMel: 80,
         deskUnit: 900,

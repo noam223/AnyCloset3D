@@ -28,7 +28,7 @@ var _QC_DEFAULT_PRICING = {
         maya:    { melamine: {40:675,80:1050,120:1462,160:1658,200:2073,240:2487}, nonMelamine: {40:830,80:1360,120:1900,160:2155,200:2700,240:3233} }
     },
     extras: {
-        internalDrawer: 150, externalDrawer: 200, openCell: 400, partition: 150,
+        internalDrawer: 150, shoeDrawer: 150, externalDrawer: 200, openCell: 400, partition: 150,
         shelfFreePerMeter: 3, extraShelfMel: 60, extraShelfNonMel: 80, deskUnit: 900,
         doorGlassMel: 400, doorGlassBlack: 600, nickelLegPrice: 100, ledPair: 650,
         sorbet: 170, touchHandle: 30,
@@ -228,18 +228,52 @@ function _qcRangeTablePrice(rt, ww, engine) {
     return (_qcNum(rt[maxW], 0) / maxW) * ww;
 }
 
+/** Mirrors _calcWingBasePrice in state.js, including the formula modes. */
 function _qcBasePrice(cfg, ww, wh, wd, wMelamine, engine, typeId) {
+    var mode = cfg.pricingMode || 'ranges';
     var hS = cfg.heightSurcharge != null ? cfg.heightSurcharge : 0.20;
     var dS = cfg.depthSurcharge != null ? cfg.depthSurcharge : 0.20;
-    var cfgR = cfg.ranges || _QC_DEFAULT_PRICING.ranges;
-    var mk = _qcRangeKey(cfg, engine, typeId);
-    var mr = cfgR[mk] || _QC_DEFAULT_PRICING.ranges.maya || {};
-    var rt = wMelamine ? mr.melamine : (mr.nonMelamine || mr.melamine);
-    // C9 up to 80 cm is priced from the Maya table, except for an additional C9-built type that has its own table.
-    if (engine === 'c9' && ww <= 80 && cfgR.maya && mk === _qcRangeKey(cfg, engine)) {
-        rt = (wMelamine ? cfgR.maya.melamine : (cfgR.maya.nonMelamine || cfgR.maya.melamine)) || rt;
+    var bp;
+    if (mode === 'sqm') {
+        var ps = wMelamine ? _qcNum(cfg.sqmPrice, 800) : _qcNum(cfg.sqmPriceNonMel, _qcNum(cfg.sqmPrice, 800) * 1.3);
+        bp = ps * (ww / 100) * (wh / 100);
+        if (wd > 54) bp *= (1 + dS);
+        return bp;
     }
-    var bp = _qcRangeTablePrice(rt, ww, engine);
+    if (mode === 'lm') {
+        var pl = wMelamine ? _qcNum(cfg.lmPrice, 1200) : _qcNum(cfg.lmPriceNonMel, _qcNum(cfg.lmPrice, 1200) * 1.3);
+        bp = pl * (ww / 100);
+        if (wh >= 241) bp *= (1 + hS);
+        if (wd > 54) bp *= (1 + dS);
+        return bp;
+    }
+    if (mode === 'lm_height') {
+        var base = wMelamine ? _qcNum(cfg.lmHeightBase, 1200) : _qcNum(cfg.lmHeightBaseNonMel, _qcNum(cfg.lmHeightBase, 1200) * 1.3);
+        var steps = Math.max(0, Math.floor((wh - _qcNum(cfg.lmHeightThresholdCm, 240)) / _qcNum(cfg.lmHeightStepCm, 30)));
+        bp = base * (ww / 100) * (1 + steps * _qcNum(cfg.lmHeightStepPct, 0.10));
+        if (wd > 54) bp *= (1 + dS);
+        return bp;
+    }
+    if (mode === 'materials') {
+        var sqm = (ww / 100) * (wh / 100);
+        bp = sqm * _qcNum(cfg.materialsBoardsPerSqm, 1.4) * _qcNum(cfg.materialsBoardPrice, 180) * _qcNum(cfg.materialsMultiplier, 2.5);
+        if (wd > 54) bp *= (1 + dS);
+        return bp;
+    }
+    var cfgR = cfg.ranges || _QC_DEFAULT_PRICING.ranges;
+    var rt;
+    if (cfgR.melamine && !cfgR.maya && !cfgR.c9) {
+        rt = wMelamine ? cfgR.melamine : (cfgR.nonMelamine || cfgR.melamine);
+    } else {
+        var mk = _qcRangeKey(cfg, engine, typeId);
+        var mr = cfgR[mk] || _QC_DEFAULT_PRICING.ranges.maya || {};
+        rt = wMelamine ? mr.melamine : (mr.nonMelamine || mr.melamine);
+        // C9 up to 80 cm is priced from the Maya table, except for an additional C9-built type that has its own table.
+        if (engine === 'c9' && ww <= 80 && cfgR.maya && mk === _qcRangeKey(cfg, engine)) {
+            rt = (wMelamine ? cfgR.maya.melamine : (cfgR.maya.nonMelamine || cfgR.maya.melamine)) || rt;
+        }
+    }
+    bp = _qcRangeTablePrice(rt, ww, engine);
     if (bp == null) {
         var dm = _QC_DEFAULT_PRICING.ranges.maya;
         bp = _qcRangeTablePrice(wMelamine ? dm.melamine : dm.nonMelamine, ww, engine);

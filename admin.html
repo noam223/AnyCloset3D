@@ -266,8 +266,8 @@
             .admin-tab span { display: none; }
         }
     </style>
-    <script src="pricing-core.js?v=20261008a"></script>
-    <script src="pricing-panel.js?v=20261008a"></script>
+    <script src="pricing-core.js?v=20261029shoe"></script>
+    <script src="pricing-panel.js?v=20261029shoe"></script>
 </head>
 <body>
 
@@ -832,7 +832,7 @@ var ORDER_STATUS_LABELS={quote:'הצעה',measured:'נמדד',ordered:'הוזמ�
 var DEFAULT_PRICING={pricingMode:'ranges',sqmPrice:800,sqmPriceNonMel:1040,lmPrice:1200,lmPriceNonMel:1560,lmHeightBase:1200,lmHeightBaseNonMel:1560,lmHeightThresholdCm:240,lmHeightStepCm:30,lmHeightStepPct:0.10,materialsBoardPrice:180,materialsBoardsPerSqm:1.4,materialsMultiplier:2.5,profitMultiplier:1.7,installPricePerUnit:110,installUnitCm:42.5,installHeightSurcharge:0.20,heightSurcharge:0.20,depthSurcharge:0.20,sandwichSurcharge:0.15,
 cabinetTypes:[{id:'maya',label:'צוקל נסתר',engine:'maya'},{id:'c9',label:'צוקל רגיל',engine:'c9'},{id:'regalim',label:'ארון על רגליים',engine:'regalim'},{id:'sliding',label:'ארון הזזה',engine:'sliding'}],
 ranges:{c9:{melamine:{80:970,120:1340,160:1500,200:1870,240:2250},nonMelamine:{80:1250,120:1600,160:1945,200:2433,240:2920}},regalim:{melamine:{80:1050,120:1462,160:1658,200:2073,240:2487},nonMelamine:{80:1360,120:1900,160:2155,200:2700,240:3233}},maya:{melamine:{40:675,80:1050,120:1462,160:1658,200:2073,240:2487},nonMelamine:{40:830,80:1360,120:1900,160:2155,200:2700,240:3233}}},
-extras:{internalDrawer:150,externalDrawer:200,openCell:400,partition:150,shelfFreePerMeter:3,extraShelfMel:60,extraShelfNonMel:80,deskUnit:900,doorFramedMel:80,doorGlassMel:400,doorGlassBlack:600,doorMirror:350,upperUnit160:600,upperUnit240:900,upperUnitPerCm:3.75,cornerDrawers3:832,cornerDrawers4:907,cornerDrawerExtra:200,cornerDesk:900,fullCornerBase:2800,fullCornerShelf:120,wingConnection:400,sideCabMel:12,sideCabNonMel:15,sideCabDoors:300,slidingBase:800,slidingDoor:350,slidingGlass:200,slidingMirror:350,slidingGold:80,slidingBlack:50,slidingHeightSurcharge:0.15,nickelLegPrice:100,ledPair:650,sorbet:170,touchHandle:30}};
+extras:{internalDrawer:150,shoeDrawer:150,externalDrawer:200,openCell:400,partition:150,shelfFreePerMeter:3,extraShelfMel:60,extraShelfNonMel:80,deskUnit:900,doorFramedMel:80,doorGlassMel:400,doorGlassBlack:600,doorMirror:350,upperUnit160:600,upperUnit240:900,upperUnitPerCm:3.75,cornerDrawers3:832,cornerDrawers4:907,cornerDrawerExtra:200,cornerDesk:900,fullCornerBase:2800,fullCornerShelf:120,wingConnection:400,sideCabMel:12,sideCabNonMel:15,sideCabDoors:300,slidingBase:800,slidingDoor:350,slidingGlass:200,slidingMirror:350,slidingGold:80,slidingBlack:50,slidingHeightSurcharge:0.15,nickelLegPrice:100,ledPair:650,sorbet:170,touchHandle:30}};
 
 async function checkAdminPassword(){
     var email=document.getElementById('gate-email').value.trim();

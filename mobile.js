@@ -158,7 +158,7 @@ window.updateMobileColBarUI = updateMobileColBarUI;
 // Map content type → category key
 const _mcpTypeToCategory = {
     hanging: 'hanging', sorbet: 'hanging',
-    internal_drawers: 'drawer', external_drawers: 'drawer',
+    internal_drawers: 'drawer', external_drawers: 'drawer', shoe_drawers: 'drawer',
     open_cell: 'cell', side_open_cell: 'cell',
     partition: 'partition'
 };
@@ -218,7 +218,7 @@ function updateMobileCellSheetState() {
     });
 
     // Highlight sub-option buttons
-    ['hanging', 'sorbet', 'internal_drawers', 'external_drawers', 'open_cell', 'side_open_cell'].forEach(type => {
+    ['hanging', 'sorbet', 'internal_drawers', 'external_drawers', 'shoe_drawers', 'open_cell', 'side_open_cell'].forEach(type => {
         const btn = document.getElementById('mcp-' + type);
         if (btn) btn.classList.toggle('active', type === activeType);
     });
@@ -279,7 +279,7 @@ function updateMobileCellSheetState() {
             const sub = comp0.subCells[si];
             if (sub) {
                 const interior = _zoneInteriorAt(sub, z);
-                if (interior === 'internal_drawers' || interior === 'external_drawers') {
+                if (_isDrawerType(interior)) {
                     isDrawerSelected = true;
                     const zoneH = _getSubZoneHeightCm(col, r0, sub, z);
                     currentCount = _zoneDrawerCountAt(sub, z, zoneH);
@@ -290,7 +290,7 @@ function updateMobileCellSheetState() {
     if (!isDrawerSelected) {
         state.selection.rows.forEach(r => {
             const comp = col.compartments[r];
-            if (comp && (comp.type === 'internal_drawers' || comp.type === 'external_drawers')) {
+            if (comp && (_isDrawerType(comp.type))) {
                 isDrawerSelected = true;
                 currentCount = comp.count;
             }

@@ -276,6 +276,7 @@ function _extrasHtml() {
         '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">' +
             _field('internalDrawer', 'מגירה פנימית (₪)', 'min="0" step="10"') +
             _field('externalDrawer', 'מגירה חיצונית (₪)', 'min="0" step="10"') +
+            _field('shoeDrawer', 'מגירת נעליים (₪)', 'min="0" step="10"') +
             _field('openCell', 'תא פתוח (₪)', 'min="0" step="10"') +
             _field('partition', 'מחיצה (₪)', 'min="0" step="10"') +
             _field('shelfFreePerMeter', 'מדפים חינם למטר', 'min="0" step="0.5"') +
@@ -670,6 +671,7 @@ function fill(cfg) {
     // extras
     _set('internalDrawer',  _num(ex.internalDrawer, dx.internalDrawer || 150));
     _set('externalDrawer',  _num(ex.externalDrawer, dx.externalDrawer || 200));
+    _set('shoeDrawer',      _num(ex.shoeDrawer, dx.shoeDrawer || 150));
     _set('openCell',        _num(ex.openCell, dx.openCell || 400));
     _set('partition',       _num(ex.partition, dx.partition || 150));
     _set('shelfFreePerMeter',_num(ex.shelfFreePerMeter, dx.shelfFreePerMeter || 3));
@@ -712,7 +714,7 @@ function fill(cfg) {
 function read() {
     _syncTypesFromDom();
     var ex = {};
-    ['internalDrawer','externalDrawer','openCell','partition','shelfFreePerMeter',
+    ['internalDrawer','externalDrawer','shoeDrawer','openCell','partition','shelfFreePerMeter',
      'extraShelfMel','extraShelfNonMel','deskUnit',
      'doorFramedMel','doorGlassMel','doorGlassBlack','doorMirror','ledPair','sorbet','touchHandle',
      'upperUnit160','upperUnit240','upperUnitPerCm',

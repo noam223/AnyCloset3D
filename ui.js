@@ -288,8 +288,14 @@ window.DRAWER_EXTRA_H = 20;
 window.MIN_EXTERNAL_DRAWER_CELL_H = 12;
 window.EXTERNAL_DRAWER_EXTRA_H = 12;
 window.EXTERNAL_DRAWER_AUTO_STEP_H = 20;
+// Shoe pull-out shelf: 18cm for 1 unit, +18cm per extra → 1→18, 2→36, 3→54, ...
+window.MIN_SHOE_DRAWER_CELL_H = 18;
+window.SHOE_DRAWER_EXTRA_H = 18;
 
 function _drawerHeightRules(drawerType) {
+    if (drawerType === 'shoe_drawers') {
+        return { minH: window.MIN_SHOE_DRAWER_CELL_H, extraH: window.SHOE_DRAWER_EXTRA_H, autoStepH: window.SHOE_DRAWER_EXTRA_H };
+    }
     const isExt = drawerType === 'external_drawers';
     return {
         minH: isExt ? window.MIN_EXTERNAL_DRAWER_CELL_H : window.MIN_DRAWER_CELL_H,
@@ -350,7 +356,7 @@ window._toastDrawerHeightBlocked = _toastDrawerHeightBlocked;
 /** Sync drawer count (or clear) after a cell height change. Returns true if cleared. */
 function _syncDrawerCompAfterHeight(col, r) {
     const comp = col && col.compartments && col.compartments[r];
-    if (!comp || (comp.type !== 'internal_drawers' && comp.type !== 'external_drawers')) return false;
+    if (!comp || (!_isDrawerType(comp.type))) return false;
     const cellH = _cellHeight(col, r);
     const { minH } = _drawerHeightRules(comp.type);
     if (cellH < minH) {
@@ -373,7 +379,7 @@ function _onCompartmentTypeChangedForDeskMerge(comp, row, colIndex) {
     if (!state.desk || !state.desk.mergeDrawers) return;
     const indices = state.desk.mergeColIndices || (state.desk.mergeColIndex != null ? [state.desk.mergeColIndex] : []);
     if (state.desk.mergeRow !== row || indices.indexOf(colIndex) < 0) return;
-    const stillDrawer = comp && (comp.type === 'external_drawers' || comp.type === 'internal_drawers');
+    const stillDrawer = comp && (_isDrawerType(comp.type));
     if (!stillDrawer || !comp.mergeWithDesk) {
         if (typeof _clearDeskMergeFlags === 'function') _clearDeskMergeFlags();
     }
@@ -2020,7 +2026,7 @@ function updateToolbarButtonHighlights() {
             if (btn) btn.classList.add('active');
             const subBtn = document.querySelector(`#hanging-sub-panel button[data-hanging-type="${interiorType}"]`);
             if (subBtn) subBtn.classList.add('active');
-        } else if (interiorType === 'internal_drawers' || interiorType === 'external_drawers') {
+        } else if (_isDrawerType(interiorType)) {
             const btn = document.getElementById('tb-btn-drawer');
             if (btn) btn.classList.add('active');
             const subBtn = document.querySelector(`#drawer-sub-panel button[data-drawer-type="${interiorType}"]`);
@@ -2079,7 +2085,7 @@ function updateToolbarButtonHighlights() {
         const drawerSection = document.getElementById('drawer-count-section');
         const drawerDisplay = document.getElementById('floating-drawer-count');
         const drawerMinLabel = document.getElementById('floating-drawer-min');
-        let isZoneDrawer = interiorType === 'internal_drawers' || interiorType === 'external_drawers';
+        let isZoneDrawer = _isDrawerType(interiorType);
         let zoneDrawerCount = 2;
         let zoneMinCount = 1;
         if (isZoneDrawer && activeSub) {
@@ -2165,7 +2171,7 @@ function updateToolbarButtonHighlights() {
             // Highlight sub-panel button
             const subBtn = document.querySelector(`#hanging-sub-panel button[data-hanging-type="${t}"]`);
             if (subBtn) subBtn.classList.add('active');
-        } else if (t === 'internal_drawers' || t === 'external_drawers') {
+        } else if (_isDrawerType(t)) {
             const btn = document.getElementById('tb-btn-drawer');
             if (btn) btn.classList.add('active');
             const subBtn = document.querySelector(`#drawer-sub-panel button[data-drawer-type="${t}"]`);
@@ -2235,7 +2241,7 @@ function updateToolbarButtonHighlights() {
 
     state.selection.rows.forEach(r => {
         const comp = col.compartments[r];
-        if (comp && (comp.type === 'internal_drawers' || comp.type === 'external_drawers')) {
+        if (comp && (_isDrawerType(comp.type))) {
             isDrawerSelected = true;
             currentCount = comp.count;
             minCount = calcMinDrawerCount(_cellHeight(col, r), comp.type);
@@ -2438,7 +2444,7 @@ function _applyColumnClipboard(target, src) {
 
     for (let r = 0; r < target.compartments.length; r++) {
         const comp = target.compartments[r];
-        if (!comp || (comp.type !== 'internal_drawers' && comp.type !== 'external_drawers')) continue;
+        if (!comp || (!_isDrawerType(comp.type))) continue;
         const cellH = _cellHeight(target, r);
         const { minH } = _drawerHeightRules(comp.type);
         if (cellH < minH) {
@@ -2656,7 +2662,7 @@ window._loadColumnTemplates = function() { return window._listTemplates('column'
 function _colTplIsLockedComp(comp) {
     if (!comp) return false;
     const t = comp.type;
-    if (t === 'internal_drawers' || t === 'external_drawers' || t === 'hanging' ||
+    if (_isDrawerType(t) || t === 'hanging' ||
         t === 'sorbet' || t === 'cross_hanging') return true;
     if (t === 'partition' && Array.isArray(comp.subCells)) {
         return comp.subCells.some(function(sub) {
@@ -2664,8 +2670,7 @@ function _colTplIsLockedComp(comp) {
             if (_colTplIsLockedComp(sub)) return true;
             const zones = sub.zones || [];
             return zones.some(function(z) {
-                return z && (z.type === 'hanging' || z.type === 'sorbet' || z.type === 'internal_drawers' ||
-                    z.type === 'external_drawers' || z.type === 'cross_hanging');
+                return z && (z.type === 'hanging' || z.type === 'sorbet' || _isDrawerType(z.type) || z.type === 'cross_hanging');
             });
         });
     }
@@ -2835,7 +2840,7 @@ window._applyColumnTemplateToCol = function(target, tplData) {
     // Clamp drawer counts to new cell heights
     for (let r = 0; r < target.compartments.length; r++) {
         const comp = target.compartments[r];
-        if (!comp || (comp.type !== 'internal_drawers' && comp.type !== 'external_drawers')) continue;
+        if (!comp || (!_isDrawerType(comp.type))) continue;
         const cellH = _cellHeight(target, r);
         const rules = (typeof _drawerHeightRules === 'function') ? _drawerHeightRules(comp.type) : { minH: 20 };
         if (cellH < (rules.minH || 20)) {
@@ -4384,7 +4389,7 @@ function _subKey(si, z) { return `${si}:${z}`; }
 
 const _DOOR_ZONE_TYPES = new Set(['door_right', 'door_left', 'door_double', 'door_flap']);
 const _MERGE_ZONE_TYPES = new Set([..._DOOR_ZONE_TYPES, 'honeycomb', 'side_open_cell']);
-const _INTERIOR_ZONE_TYPES = new Set(['hanging', 'sorbet', 'internal_drawers', 'external_drawers', 'honeycomb', 'open_cell', 'side_open_cell']);
+const _INTERIOR_ZONE_TYPES = new Set(['hanging', 'sorbet', 'internal_drawers', 'external_drawers', 'shoe_drawers', 'honeycomb', 'open_cell', 'side_open_cell']);
 
 /** Whether a column can open its left/right carcass wall at a given Y (air / short neighbor / floating). */
 function _sideOpenExposure(c, bottomY) {
@@ -4943,7 +4948,7 @@ window.setSubCellType = function(type, opts) {
                 activateOpenCellTab = true;
             }
             sub.zonesType[z] = newType;
-            if (newType === 'internal_drawers' || newType === 'external_drawers') {
+            if (_isDrawerType(newType)) {
                 const zoneH = _getSubZoneHeightCm(state.columns[c], r, sub, z);
                 const { minH } = _drawerHeightRules(newType);
                 if (zoneH < minH) {
@@ -5363,7 +5368,7 @@ window.applyContentForce = function(type) {
         if (!col.compartments[r]) return;
         const newType = type;
 
-        if ((newType === 'internal_drawers' || newType === 'external_drawers')) {
+        if ((_isDrawerType(newType))) {
             const cellH = _cellHeight(col, r);
             const { minH } = _drawerHeightRules(newType);
             if (cellH < minH) {
@@ -5402,7 +5407,7 @@ window.applyContentForce = function(type) {
 
     // Clear selection BEFORE buildCabinet so the render has no highlight
     // Keep selection for drawer types so the drawer-count section stays visible
-    const _keepsSelSCT = ['internal_drawers', 'external_drawers'];
+    const _keepsSelSCT = ['internal_drawers', 'external_drawers', 'shoe_drawers'];
     if (!_keepsSelSCT.includes(type)) {
         state.selection = { colIndex: -1, rows: [] };
         closeContentSubPanels();
@@ -5426,14 +5431,14 @@ function _enablePartitionOnComp(comp) {
     }
     const prevType = comp.type || 'empty';
     const migratable = (prevType === 'hanging' || prevType === 'sorbet' ||
-        prevType === 'internal_drawers' || prevType === 'external_drawers');
+        _isDrawerType(prevType));
     comp.partition = true;
     comp.partitions = [0.5];
     if (migratable) {
         const left = { type: prevType, shelves: 0, zonesType: [prevType] };
         const right = { type: prevType, shelves: 0, zonesType: [prevType] };
         if (typeof comp.count === 'number' && comp.count > 0 &&
-            (prevType === 'internal_drawers' || prevType === 'external_drawers')) {
+            (_isDrawerType(prevType))) {
             left.count = comp.count;
             right.count = comp.count;
         }
@@ -5486,7 +5491,7 @@ function _mergeAdjacentRowsIntoPartition(col, rows) {
     }
 
     // Prefer migratable / already-partitioned content from the selection (clone before splice)
-    const _MIG = new Set(['hanging', 'sorbet', 'internal_drawers', 'external_drawers']);
+    const _MIG = new Set(['hanging', 'sorbet', 'internal_drawers', 'external_drawers', 'shoe_drawers']);
     let seedComp = col.compartments[startR];
     for (let r = startR; r <= endR; r++) {
         const comp = col.compartments[r];
@@ -5665,7 +5670,7 @@ window.applyContent = function(type) {
         const newType = (currentType === type) ? 'empty' : type;
 
         // Block drawer assignment if cell is too short
-        if ((newType === 'internal_drawers' || newType === 'external_drawers') && newType !== 'empty') {
+        if ((_isDrawerType(newType)) && newType !== 'empty') {
             const cellH = _cellHeight(col, r);
             const { minH } = _drawerHeightRules(newType);
             if (cellH < minH) {
@@ -5708,7 +5713,7 @@ window.applyContent = function(type) {
     // 'partition' keeps selection so subcell panel stays visible
     // 'hanging', 'external_drawers', 'honeycomb' keep selection so style sub-panel can be used
     // 'internal_drawers' keeps selection so drawer-count section stays visible
-    const keepsSelection = ['partition', 'hanging', 'external_drawers', 'honeycomb', 'internal_drawers'];
+    const keepsSelection = ['partition', 'hanging', 'external_drawers', 'honeycomb', 'internal_drawers', 'shoe_drawers'];
     if (!keepsSelection.includes(type)) {
         state.selection = { colIndex: -1, rows: [] };
         closeContentSubPanels();
@@ -6073,7 +6078,7 @@ window.updateDrawerCount = function(delta) {
                 const sub = comp.subCells[si];
                 if (!sub) return;
                 const interior = _zoneInteriorAt(sub, z);
-                if (interior !== 'internal_drawers' && interior !== 'external_drawers') return;
+                if (!_isDrawerType(interior)) return;
                 const zoneH = _getSubZoneHeightCm(col, r, sub, z);
                 const minCount = calcMinDrawerCount(zoneH, interior);
                 const maxCount = calcMaxDrawerCount(zoneH, interior);
@@ -6101,7 +6106,7 @@ window.updateDrawerCount = function(delta) {
 
     state.selection.rows.forEach(r => {
         const comp = col.compartments[r];
-        if (comp && (comp.type === 'internal_drawers' || comp.type === 'external_drawers')) {
+        if (comp && (_isDrawerType(comp.type))) {
             const cellH = _cellHeight(col, r);
             const minCount = calcMinDrawerCount(cellH, comp.type);
             const maxCount = calcMaxDrawerCount(cellH, comp.type);
@@ -12032,6 +12037,7 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
             hanging: _isWritingDeskCart ? 0 : hangingRods,
             sorbetCount: _isWritingDeskCart ? 0 : contentCounts.sorbet,
             drawersInt: _isWritingDeskCart ? 0 : intDrawers,
+            drawersShoe: _isWritingDeskCart ? 0 : (contentCounts.drawersShoe || 0),
             drawersExt: _isWritingDeskCart ? _wdDrawerCountCart : extDrawers,
             price: priceStr, costPrice: '₪' + (state.currentCostPrice || 0).toLocaleString(),
             installPrice: getWing().manualInstallPrice != null ? getWing().manualInstallPrice : state.currentInstallPrice,
@@ -13398,7 +13404,7 @@ function _escPrintHtml(s) {
 }
 
 function _emptyContentCounts() {
-    return { shelves: 0, hanging: 0, sorbet: 0, drawersInt: 0, drawersExt: 0, openCells: 0, sideOpenCells: 0 };
+    return { shelves: 0, hanging: 0, sorbet: 0, drawersInt: 0, drawersExt: 0, drawersShoe: 0, openCells: 0, sideOpenCells: 0 };
 }
 
 function _addContentTypeToCounts(counts, type, comp, zoneIdx) {
@@ -13414,6 +13420,8 @@ function _addContentTypeToCounts(counts, type, comp, zoneIdx) {
             ? comp.zonesDrawerCount[zoneIdx]
             : ((comp && comp.count) || 1);
         counts.drawersExt += n;
+    } else if (type === 'shoe_drawers') {
+        counts.drawersShoe += _drawerCountAt(comp, zoneIdx);
     }
     else if (type === 'open_cell') counts.openCells++;
     else if (type === 'side_open_cell') counts.sideOpenCells++;
@@ -13485,6 +13493,12 @@ function _drawerCountAt(comp, zoneIdx) {
         return comp.zonesDrawerCount[zoneIdx];
     }
     return (comp && comp.count) || 1;
+}
+
+function _itemShoeDrawerCount(item, itemObj) {
+    if (item && item.drawersShoe != null) return item.drawersShoe || 0;
+    const rs = itemObj && itemObj.rawState;
+    return rs ? (_countCabinetContentFromRawState(rs).drawersShoe || 0) : 0;
 }
 
 function _countTouchHandlesInWing(wing, rs, out) {
@@ -13572,6 +13586,7 @@ function _countCabinetContentFromRawState(rawState) {
             merged.sorbet += c.sorbet;
             merged.drawersInt += c.drawersInt;
             merged.drawersExt += c.drawersExt;
+            merged.drawersShoe += c.drawersShoe;
             merged.openCells += c.openCells;
             merged.sideOpenCells += c.sideOpenCells;
         });
@@ -13583,6 +13598,7 @@ function _countCabinetContentFromRawState(rawState) {
             merged.sorbet += c.sorbet;
             merged.drawersInt += c.drawersInt;
             merged.drawersExt += c.drawersExt;
+            merged.drawersShoe += c.drawersShoe;
             merged.openCells += c.openCells;
             merged.sideOpenCells += c.sideOpenCells;
         }
@@ -13802,6 +13818,9 @@ function _collectWingPrintSpecRows(item, itemObj, unit) {
         label: 'מגירות פנימיות',
         value: (counts.drawersInt || 0) + ' יחידות'
     });
+    if (counts.drawersShoe > 0) {
+        rows.push({ id: prefix + 'drawersShoe', label: 'מגירות נעליים', value: counts.drawersShoe + ' יחידות' });
+    }
     rows.push({
         id: prefix + 'shelves',
         label: 'מדפים נשלפים',
@@ -13937,6 +13956,8 @@ function _collectPrintSpecRows(item, itemObj) {
     if (!isWD) {
         rows.push({ id: 'drawersExt', label: 'מגירות חיצוניות', value: `${item.drawersExt} יחידות` });
         rows.push({ id: 'drawersInt', label: 'מגירות פנימיות', value: `${item.drawersInt} יחידות` });
+        const shoeN = _itemShoeDrawerCount(item, itemObj);
+        if (shoeN > 0) rows.push({ id: 'drawersShoe', label: 'מגירות נעליים', value: shoeN + ' יחידות' });
         rows.push({ id: 'shelves', label: 'מדפים נשלפים', value: `${item.shelves} יחידות` });
         rows.push({ id: 'hangingRods', label: 'מוטות תלייה לקולבים', value: _plainSpecValue(_formatHangingRodsDisplay(itemObj)) });
         const ledPairs = _countLedPairsFromRawState(itemObj && itemObj.rawState);
@@ -14088,7 +14109,7 @@ function _buildPagedCabinetSpecHtml(opts) {
     return html;
 }
 
-const _COMPACT_CHIP_IDS = ['drawersExt', 'drawersInt', 'shelves', 'hangingRods', 'ledPairs', 'writingDeskDrawerCount'];
+const _COMPACT_CHIP_IDS = ['drawersExt', 'drawersInt', 'drawersShoe', 'shelves', 'hangingRods', 'ledPairs', 'writingDeskDrawerCount'];
 const _COMPACT_CHIP_LABELS = { hangingRods: 'מוטות תלייה', ledPairs: 'זוגות לדים' };
 
 function _compactRowBaseId(id) {
@@ -14232,6 +14253,7 @@ function _printMultiUnitParts(itemObj, specRows) {
             cols: (u.wing.columns || []).length,
             drawersExt: _muParseCount(rows.drawersExt),
             drawersInt: _muParseCount(rows.drawersInt),
+            drawersShoe: _muParseCount(rows.drawersShoe),
             shelves: _muParseCount(rows.shelves),
             hanging: _muParseCount(rows.hangingRods),
             hangingNote: hangNote,
@@ -14253,6 +14275,7 @@ function _printMultiUnitParts(itemObj, specRows) {
             cols: 1,
             drawersExt: counts.drawersExt,
             drawersInt: counts.drawersInt,
+            drawersShoe: counts.drawersShoe,
             shelves: shelves + counts.shelves,
             hanging: counts.hanging + counts.sorbet,
             hangingNote: counts.sorbet ? counts.sorbet + ' סורבטו' : '',
@@ -14288,7 +14311,8 @@ function _muCommonAndExceptions(parts) {
 
 function _muPartsTableHtml(parts) {
     const num = function(v) { return v ? String(v) : '<span class="mu-zero">0</span>'; };
-    const tot = { w: 0, cols: 0, drawersExt: 0, drawersInt: 0, shelves: 0, hanging: 0, leds: 0 };
+    const tot = { w: 0, cols: 0, drawersExt: 0, drawersInt: 0, drawersShoe: 0, shelves: 0, hanging: 0, leds: 0 };
+    const hasShoe = parts.some(function(p) { return p.drawersShoe > 0; });
     const body = parts.map(function(p) {
         Object.keys(tot).forEach(function(k) { tot[k] += p[k] || 0; });
         const wTxt = p.kind === 'corner' ? `${p.w}×${p.w}` : String(p.w);
@@ -14297,15 +14321,15 @@ function _muPartsTableHtml(parts) {
         return `<tr>
             <td class="mu-name" style="background:${col.fill};box-shadow:inset -4px 0 0 ${col.stroke};">${_muBadgeHtml(p)}${_escPrintHtml(p.label)}</td>
             <td dir="ltr">${wTxt}</td><td dir="ltr">${p.h} / ${p.d}</td><td>${num(p.cols)}</td>
-            <td>${num(p.drawersExt)}</td><td>${num(p.drawersInt)}</td><td>${num(p.shelves)}</td>
+            <td>${num(p.drawersExt)}</td><td>${num(p.drawersInt)}</td>${hasShoe ? `<td>${num(p.drawersShoe)}</td>` : ''}<td>${num(p.shelves)}</td>
             <td>${hang}</td><td class="${p.leds ? 'mu-led' : ''}">${p.leds ? p.leds : '—'}</td>
         </tr>`;
     }).join('');
     return `<table class="mu-parts">
-        <thead><tr><th>חלק</th><th>רוחב</th><th>עומק / גובה</th><th>עמודות</th><th>מג' חיצ'</th><th>מג' פנים</th><th>מדפים</th><th>מוטות</th><th>לדים</th></tr></thead>
+        <thead><tr><th>חלק</th><th>רוחב</th><th>עומק / גובה</th><th>עמודות</th><th>מג' חיצ'</th><th>מג' פנים</th>${hasShoe ? "<th>מג' נעליים</th>" : ''}<th>מדפים</th><th>מוטות</th><th>לדים</th></tr></thead>
         <tbody>${body}</tbody>
         <tfoot><tr><td>סה"כ (${parts.length} חלקים)</td><td dir="ltr">${tot.w} <small>פריסה</small></td><td></td><td>${tot.cols}</td>
-            <td>${tot.drawersExt}</td><td>${tot.drawersInt}</td><td>${tot.shelves}</td><td>${tot.hanging}</td><td>${tot.leds}</td></tr></tfoot>
+            <td>${tot.drawersExt}</td><td>${tot.drawersInt}</td>${hasShoe ? `<td>${tot.drawersShoe}</td>` : ''}<td>${tot.shelves}</td><td>${tot.hanging}</td><td>${tot.leds}</td></tr></tfoot>
     </table>`;
 }
 
@@ -14919,6 +14943,8 @@ function _printHardwareRows(item, itemObj, thStyle, tdStyle, sectionStyle) {
     touchRows.forEach(function(r) { html += _printTr(thStyle, tdStyle, r.label, r.value); });
     html += _printTr(thStyle, tdStyle, 'מגירות חיצוניות', `${item.drawersExt} יחידות`);
     html += _printTr(thStyle, tdStyle, 'מגירות פנימיות', `${item.drawersInt} יחידות`);
+    const shoeN = _itemShoeDrawerCount(item, itemObj);
+    if (shoeN > 0) html += _printTr(thStyle, tdStyle, 'מגירות נעליים', `${shoeN} יחידות`);
     html += _printTr(thStyle, tdStyle, 'מדפים נשלפים', `${item.shelves} יחידות`);
     html += _printTr(thStyle, tdStyle, 'מוטות תלייה לקולבים', _formatHangingRodsDisplay(itemObj));
     return html;
@@ -16632,6 +16658,8 @@ function _buildCustomerSummaryDetails(itemObj) {
 
     if (item.drawersExt > 0) details.push('מגירות חיצוניות: ' + item.drawersExt);
     if (item.drawersInt > 0) details.push('מגירות פנימיות: ' + item.drawersInt);
+    const shoeN = _itemShoeDrawerCount(item, { rawState: rawState });
+    if (shoeN > 0) details.push('מגירות נעליים: ' + shoeN);
     const ledPairs = _countLedPairsFromRawState(rawState);
     if (ledPairs > 0) details.push('תאורת לד: ' + _formatLedPairs(ledPairs));
     if (deskSummary.desk !== 'ללא') {
@@ -17382,6 +17410,7 @@ function _fillUserPricingForm(cfg) {
     const dx = (typeof DEFAULT_PRICING_CONFIG !== 'undefined' && DEFAULT_PRICING_CONFIG.extras) ? DEFAULT_PRICING_CONFIG.extras : {};
     _sv('ups-internalDrawer', _upsNum(ex.internalDrawer, dx.internalDrawer != null ? dx.internalDrawer : 150));
     _sv('ups-externalDrawer', _upsNum(ex.externalDrawer, dx.externalDrawer != null ? dx.externalDrawer : 200));
+    _sv('ups-shoeDrawer', _upsNum(ex.shoeDrawer, dx.shoeDrawer != null ? dx.shoeDrawer : 150));
     _sv('ups-openCell', _upsNum(ex.openCell, dx.openCell != null ? dx.openCell : 400));
     _sv('ups-partition', _upsNum(ex.partition, dx.partition != null ? dx.partition : 150));
     _sv('ups-shelfFreePerMeter', _upsNum(ex.shelfFreePerMeter, dx.shelfFreePerMeter != null ? dx.shelfFreePerMeter : 3));
@@ -17434,6 +17463,7 @@ function _readUserPricingForm() {
         extras: Object.assign({}, existingExtras, {
             internalDrawer: _upsNum(_gv('ups-internalDrawer'), dx.internalDrawer != null ? dx.internalDrawer : 150),
             externalDrawer: _upsNum(_gv('ups-externalDrawer'), dx.externalDrawer != null ? dx.externalDrawer : 200),
+            shoeDrawer: _upsNum(_gv('ups-shoeDrawer'), existingExtras.shoeDrawer != null ? existingExtras.shoeDrawer : (dx.shoeDrawer != null ? dx.shoeDrawer : 150)),
             openCell: _upsNum(_gv('ups-openCell'), dx.openCell != null ? dx.openCell : 400),
             partition: _upsNum(_gv('ups-partition'), dx.partition != null ? dx.partition : 150),
             shelfFreePerMeter: _upsNum(_gv('ups-shelfFreePerMeter'), dx.shelfFreePerMeter != null ? dx.shelfFreePerMeter : 3),

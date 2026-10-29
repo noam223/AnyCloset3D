@@ -1443,6 +1443,7 @@
                     <div class="toolbar-sub-divider"></div>
                     <button class="toolbar-btn" data-drawer-type="internal_drawers" onclick="applyContentForce('internal_drawers'); closeContentSubPanels();"><i class="fa-solid fa-bars"></i><span>פנים</span></button>
                     <button class="toolbar-btn" data-drawer-type="external_drawers" onclick="applyContentForce('external_drawers'); closeContentSubPanels();"><i class="fa-solid fa-inbox"></i><span>חוץ</span></button>
+                    <button class="toolbar-btn" data-drawer-type="shoe_drawers" onclick="applyContentForce('shoe_drawers'); closeContentSubPanels();"><i class="fa-solid fa-shoe-prints"></i><span>נעליים</span></button>
                 </div>
             </div>
             <!-- כוורת row -->
@@ -2673,6 +2674,9 @@
             <button class="mcell-side-btn" id="mcp-external_drawers" onclick="applyContent('external_drawers'); updateMobileCellSheetState();">
                 <i class="fa-solid fa-inbox"></i><span>חיצונית</span>
             </button>
+            <button class="mcell-side-btn" id="mcp-shoe_drawers" onclick="applyContent('shoe_drawers'); updateMobileCellSheetState();">
+                <i class="fa-solid fa-shoe-prints"></i><span>נעליים</span>
+            </button>
         </div>
 
         <!-- כוורת sub-options -->
@@ -2864,18 +2868,18 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js?v=20261008plans"></script>
 <script src="trial-watermark.js?v=20261008trial"></script>
-<script src="state.js?v=20261016snap"></script>
-<script src="quick-calc.js?v=20261008types"></script>
+<script src="state.js?v=20261029shoe"></script>
+<script src="quick-calc.js?v=20261029shoe"></script>
 <script src="bathroom-preset.js?v=20261008types"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
 <script src="engine-appliances.js?v=20261007deskMerge28"></script>
-<script src="engine-core.js?v=20261028sideopen"></script>
+<script src="engine-core.js?v=20261029shoe"></script>
 <script src="engine-corners.js?v=20261007glassTint"></script>
-<script src="engine-blueprint.js?v=20261028sideopen"></script>
+<script src="engine-blueprint.js?v=20261029shoe"></script>
 <script src="engine-room-plan.js?v=20261016snap"></script>
 <script src="tambour-color-picker.js?v=20261009colors"></script>
-<script src="ui.js?v=20261028sideopen"></script>
-<script src="mobile.js?v=20261008types"></script>
+<script src="ui.js?v=20261029shoe"></script>
+<script src="mobile.js?v=20261029shoe"></script>
 <script src="part-paint.js?v=20260914A427fix"></script>
 <script src="shelf-pick.js?v=20260922sideWall"></script>
 <script src="index-init.js?v=20261009corner"></script>
@@ -2992,7 +2996,7 @@
 <script src="notes.js?v=20260714pinDelete"></script>
 <script src="tour.js?v=20261009tour2"></script>
 <script src="sidebar-rail.js?v=20261007glassTint"></script>
-<script src="ai-renders.js?v=20261028sideopen"></script>
+<script src="ai-renders.js?v=20261029shoe"></script>
 <script>
     // Init AI renders after auth is ready
     document.addEventListener('DOMContentLoaded', function() {

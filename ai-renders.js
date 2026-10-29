@@ -663,6 +663,7 @@ function _buildAiRenderPrompt(spec, opts) {
         spec.columns ? ('חלוקה: ' + spec.columns + ' עמודות אנכיות.') : '',
         spec.plinthHeightCm > 0 ? ('צוקל בגובה ' + spec.plinthHeightCm + ' ס"מ — שמור בדיוק.') : '',
         spec.hasDrawers ? 'כולל מגירות בחלק התחתון — שמור על מיקום ופרופורציה.' : '',
+        spec.hasShoeDrawers ? 'כולל מגירות נעליים: מדפים נשלפים על מסילות עם שפה קדמית נמוכה ומוטות מתכת לרוחב — שמור על מיקומם כבתמונות.' : '',
         spec.hasDoors === false ? 'ללא דלתות — כל התאים פתוחים מהחזית.' : '',
         spec.hasSideDesk ? 'כולל שולחן צד משולב — שמור על מיקומו ביחס לארון.' : '',
         spec.numSlidingDoors ? ('ארון הזזה עם ' + spec.numSlidingDoors + ' דלתות הזזה — שמור מסילות, פרופיל וחלוקת פנלים כבתמונות.') : '',
@@ -742,11 +743,20 @@ function _getCabinetSpec() {
 
         // Detect drawers
         var hasDrawers = false;
+        var hasShoeDrawers = false;
+        var _isShoe = function(c) {
+            if (!c) return false;
+            if (c.type === 'shoe_drawers') return true;
+            return !!(c.partition && Array.isArray(c.subCells) && c.subCells.some(function(s) {
+                return s && (s.type === 'shoe_drawers' || (Array.isArray(s.zonesType) && s.zonesType.indexOf('shoe_drawers') >= 0));
+            }));
+        };
         if (wing && wing.columns) {
             wing.columns.forEach(function(col) {
                 if (col.type === 'desk' || (col.compartments && col.compartments.some(function(c) { return c && c.type === 'drawer'; }))) {
                     hasDrawers = true;
                 }
+                if (col.compartments && col.compartments.some(_isShoe)) hasShoeDrawers = true;
             });
         }
 
@@ -770,6 +780,7 @@ function _getCabinetSpec() {
             sideOpenDir:      sideOpenDir,
             openCellCount:    openCellCount,
             hasDrawers:       hasDrawers,
+            hasShoeDrawers:   hasShoeDrawers,
             columns:          wing ? wing.columns.length : null,
             hasSideDesk:      !!(state.desk && state.desk.side && state.desk.side !== 'none'),
             numSlidingDoors:  slidingDoor ? (slidingDoor.numDoors || 2) : null,

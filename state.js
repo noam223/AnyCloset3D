@@ -2133,11 +2133,18 @@ window._cartIndexOfUid = function(uid) {
     });
 };
 
+/** Content types that hold a drawer count (comp.count / zonesDrawerCount). */
+function _isDrawerType(t) {
+    return t === 'internal_drawers' || t === 'external_drawers' || t === 'shoe_drawers';
+}
+window._isDrawerType = _isDrawerType;
+
 const _COMP_TYPE_LABELS = {
     empty: 'ריק',
     hanging: 'תלייה',
     internal_drawers: 'מגירות פנימיות',
     external_drawers: 'מגירות חיצוניות',
+    shoe_drawers: 'מגירות נעליים',
     open_cell: 'תא פתוח',
     side_open_cell: 'תא פתוח צד',
     honeycomb: 'כוורת',
@@ -3369,7 +3376,7 @@ function _removePhysicalShelfByIndex(col, si, wingData) {
     if (!Array.isArray(col.compartments)) col.compartments = [];
     while (col.compartments.length <= di + 1) col.compartments.push(_emptyCompartment());
 
-    const _MIG = new Set(['hanging', 'sorbet', 'internal_drawers', 'external_drawers']);
+    const _MIG = new Set(['hanging', 'sorbet', 'internal_drawers', 'external_drawers', 'shoe_drawers']);
     const a = col.compartments[di];
     const b = col.compartments[di + 1];
     let keep = a;
@@ -3536,7 +3543,7 @@ window.deleteShelfAt = function(colIndex, shelfIdx) {
         col.compartments.push((typeof _emptyCompartment === 'function') ? _emptyCompartment() : { type: 'empty', count: 2 });
     }
 
-    const _MIG = new Set(['hanging', 'sorbet', 'internal_drawers', 'external_drawers']);
+    const _MIG = new Set(['hanging', 'sorbet', 'internal_drawers', 'external_drawers', 'shoe_drawers']);
     const a = col.compartments[di];
     const b = col.compartments[di + 1];
     let keep = a;
@@ -3667,7 +3674,7 @@ function _clampDrawerCompartments(col, baseY, t) {
     if (!col || !col.compartments) return;
     for (let r = 0; r < col.compartments.length; r++) {
         const comp = col.compartments[r];
-        if (comp && (comp.type === 'internal_drawers' || comp.type === 'external_drawers')) {
+        if (comp && _isDrawerType(comp.type)) {
             const cellH = Math.round(_compartmentBounds(col, r).h * 100) / 100;
             const rules = (typeof window._drawerHeightRules === 'function')
                 ? window._drawerHeightRules(comp.type)
@@ -4987,7 +4994,7 @@ var DEFAULT_PRICING_CONFIG = {
         maya:    { melamine: {40:675,80:1050,120:1462,160:1658,200:2073,240:2487}, nonMelamine: {40:830,80:1360,120:1900,160:2155,200:2700,240:3233} }
     },
     extras: {
-        internalDrawer: 150, externalDrawer: 200,
+        internalDrawer: 150, shoeDrawer: 150, externalDrawer: 200,
         openCell: 400, partition: 150,
         shelfFreePerMeter: 3, extraShelfMel: 60, extraShelfNonMel: 80,
         deskUnit: 900,
@@ -5181,6 +5188,7 @@ function _calcWingCost(cfg, wing) {
         let inBlock = false;
         col.compartments.forEach(comp => {
             if (comp.type === 'internal_drawers') finalCost += comp.count*_priceNum(ex.internalDrawer, 150);
+            else if (comp.type === 'shoe_drawers') finalCost += (comp.count || 1) * _priceNum(ex.shoeDrawer, 150);
             else if (comp.type === 'external_drawers') { finalCost += comp.count*_priceNum(ex.externalDrawer, 200); extDrawerFronts += comp.count || 0; }
             else if (comp.type === 'sorbet') sorbets++;
             if (comp && comp.partition && Array.isArray(comp.subCells)) {
@@ -5191,6 +5199,7 @@ function _calcWingCost(cfg, wing) {
                             ? sub.zonesDrawerCount[z]
                             : (sub.count || 1);
                         if (zt === 'internal_drawers') finalCost += n * _priceNum(ex.internalDrawer, 150);
+                        else if (zt === 'shoe_drawers') finalCost += n * _priceNum(ex.shoeDrawer, 150);
                         else if (zt === 'external_drawers') { finalCost += n * _priceNum(ex.externalDrawer, 200); extDrawerFronts += n; }
                         else if (zt === 'sorbet') sorbets++;
                     });
