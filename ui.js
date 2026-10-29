@@ -6726,7 +6726,10 @@ window.addEventListener('pointerup', () => {
 
 function buildDragHandlesUI() {
     dragLayer.innerHTML = '';
-    if(state.viewMode !== 'front') return;
+    if(state.viewMode !== 'front') {
+        if (state.viewMode === '3d' && typeof window._buildSpaceCabMoveHandle === 'function') window._buildSpaceCabMoveHandle();
+        return;
+    }
 
     dragHandlesData.horizontal.forEach((x3d, index) => {
         const colLeft = state.columns[index];
@@ -7324,7 +7327,9 @@ function _spaceDragCmPerPx(off) {
 
 window._buildSpaceCabMoveHandle = function() {
     const info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
-    if (!info || info.activeSlot <= 0 || state.viewMode !== 'front') return;
+    const gizmoReady = !!(window.THREE && THREE.TransformControls);
+    if (!info || info.activeSlot <= 0) return;
+    if (state.viewMode !== 'front' && !(state.viewMode === '3d' && gizmoReady)) return;
     const item = window._getSpaceMovableItem();
     const off = window._getSpaceOffset(item);
     const h = window._spaceSlot1Height();
@@ -7454,8 +7459,24 @@ function _ensureSpaceGizmo() {
     g.setMode('translate');
     g.setSpace('world');
     g.setTranslationSnap(1);
-    g.setSize((window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ? 1.4 : 1);
+    g.setSize((window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ? 0.85 : 0.6);
     gScene.add(g);
+
+    // Keep every arrow pointing to its positive axis: the stock gizmo flips an axis whenever the
+    // camera is on its negative side. Its flip tests are signed dot(axis, eye) while the hide tests
+    // use |dot|, so feeding it |eye| per component disables only the flipping.
+    const giz = g.children.find(function(c) { return c && c.type === 'TransformControlsGizmo'; });
+    if (giz) {
+        const origUpdate = giz.updateMatrixWorld;
+        giz.updateMatrixWorld = function() {
+            const eye = this.eye;
+            if (!eye || this.mode !== 'translate') return origUpdate.apply(this, arguments);
+            const ex = eye.x, ey = eye.y, ez = eye.z;
+            eye.set(Math.abs(ex), Math.abs(ey), Math.abs(ez));
+            try { return origUpdate.apply(this, arguments); }
+            finally { eye.set(ex, ey, ez); }
+        };
+    }
 
     g.addEventListener('mouseDown', function() { window._spaceGizmoBlockClick = true; });
     g.addEventListener('mouseUp', function() {
@@ -7518,11 +7539,13 @@ function createHandle(dir, x3d, y3d = null, text = 'גרירה') {
 }
 
 function updateDragHandlesPosition() {
-    if(state.viewMode !== 'front') return;
+    // Free 3D view keeps only the space-cabinet rotate button (beside the axis gizmo)
+    const _only3dRot = state.viewMode === '3d';
+    if (state.viewMode !== 'front' && !_only3dRot) return;
     const cw = container.clientWidth;
     const ch = container.clientHeight;
 
-    document.querySelectorAll('.drag-handle').forEach(handle => {
+    document.querySelectorAll(_only3dRot ? '.drag-handle.space-rot-handle' : '.drag-handle').forEach(handle => {
         let worldPt;
         if (handle.dataset.world === '1') {
             // World-space handle (e.g. upper unit move handle): use worldX/worldY directly
@@ -7551,6 +7574,10 @@ function updateDragHandlesPosition() {
                 }
             }
             worldPt = new THREE.Vector3(currentWX, wy, state.depth / 2);
+        } else if (handle.classList.contains('space-rot-handle') && window._spaceGizmo && window._spaceGizmo.object) {
+            // Beside the 3D axis gizmo (its pivot)
+            const p = window._spaceGizmoProxy.position;
+            worldPt = new THREE.Vector3(p.x, p.y, p.z);
         } else if (handle.classList.contains('space-move-handle') || handle.classList.contains('space-rot-handle')) {
             const item = typeof window._getSpaceMovableItem === 'function' ? window._getSpaceMovableItem()
                 : (typeof window._getSpaceSlot1Item === 'function' ? window._getSpaceSlot1Item() : null);
@@ -7586,8 +7613,10 @@ function updateDragHandlesPosition() {
         
         let x = (pos.x * .5 + .5) * cw;
         let y = (-(pos.y * .5) + .5) * ch;
-        // Rotate button sits just beside the space move handle
-        if (handle.classList.contains('space-rot-handle')) x += 36;
+        // Rotate button sits just beside the space move handle / in the empty upper-right quadrant of the gizmo
+        const _besideGizmo = handle.classList.contains('space-rot-handle') && window._spaceGizmo && window._spaceGizmo.object;
+        if (_besideGizmo) { x += 48; y -= 48; }
+        else if (handle.classList.contains('space-rot-handle')) x += 36;
 
         // גבולות גזרה לידיות הגרירה
         const w = handle.offsetWidth || 24;
@@ -7600,7 +7629,7 @@ function updateDragHandlesPosition() {
         // Space move/rotate handles float above the cabinet top so they never cover the partition handles there.
         let lift = 0;
         if (handle.classList.contains('uu-move-handle')) lift = 20;
-        else if (handle.classList.contains('space-move-handle') || handle.classList.contains('space-rot-handle')) lift = 42;
+        else if (handle.classList.contains('space-move-handle') || (handle.classList.contains('space-rot-handle') && !_besideGizmo)) lift = 42;
         handle.style.top = `${Math.max(h / 2 + 5, y - lift)}px`;
     });
     if (typeof window._updateShelfTrashPos === 'function') window._updateShelfTrashPos();
