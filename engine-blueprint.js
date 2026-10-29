@@ -382,13 +382,13 @@ const _BP_CELL_DIM_FONT = 10;
 const _BP_DOOR_STYLE_SUFFIX = { solid: '', framed_melamine: ' מסגרת', glass_melamine: ' זכוכית', glass_black: ' זכ.שחורה', glass_gold: ' זכ.זהב', glass_mirror: ' מראה' };
 const _BP_SPLIT_FILL = '#6e675c';
 
-/** Integral (finger-slot) handle: a thin recessed slot along the top edge of the drawer front. */
-function _bpSlotHandle(p, hndX, hndW, dy, dh, stroke) {
-    const slotH = Math.max(2, Math.min(3.5, dh * 0.08));
-    const slotY = dy + 1 + Math.min(4, dh * 0.08);
-    const slotW = hndW * 1.6;
-    const slotX = hndX - (slotW - hndW) / 2;
-    p.push(`<rect x="${slotX.toFixed(1)}" y="${slotY.toFixed(1)}" width="${slotW.toFixed(1)}" height="${slotH.toFixed(1)}" rx="${(slotH / 2).toFixed(1)}" fill="rgba(30,58,95,0.10)" stroke="${stroke}" stroke-width="0.9"/>`);
+/** Integral (finger-slot) handle: a recessed channel across the full width of the drawer front, at its top edge. */
+function _bpSlotHandle(p, x, w, dy, dh, stroke) {
+    const slotH = Math.max(2.5, Math.min(4, dh * 0.07));
+    const y1 = dy + 1, y2 = y1 + slotH;
+    const x1 = x + 1, x2 = x + w - 1;
+    p.push(`<rect x="${x1.toFixed(1)}" y="${y1.toFixed(1)}" width="${(x2 - x1).toFixed(1)}" height="${slotH.toFixed(1)}" fill="rgba(30,58,95,0.16)" stroke="none"/>`);
+    p.push(`<line x1="${x1.toFixed(1)}" y1="${y2.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${stroke}" stroke-width="0.9"/>`);
 }
 
 /**
@@ -1566,7 +1566,7 @@ function _bpDrawPartitionZoneContent(p, zoneType, zoneStyle, x1, x2, zSvgTop, zS
                 const hndY = dy + dh * 0.5;
                 p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${_BP_STROKE}" stroke-width="1.2"/>`);
             } else if (zoneType === 'internal_drawers') {
-                _bpSlotHandle(p, hndX, hndW, dy, dh, _BP_STROKE);
+                _bpSlotHandle(p, x1 + 2, subZoneW - 4, dy, dh, _BP_STROKE);
             }
         }
         if (zoneType === 'external_drawers' && zSvgH > 18) {
@@ -2472,7 +2472,7 @@ window._generateMultiViewBlueprintSVG = function() {
                         const hndW = Math.min(colW * 0.35, 22);
                         const hndX = colX + (colW - hndW) / 2;
                         const hndY = dy + dh * 0.5;
-                        if (cellType === 'shoe_drawers') _bpShoeDrawerMarks(p, colX + 2, colW - 4, dy, dh, di, STROKE, _BP_FONT); else if (cellType === 'internal_drawers' && comp.intHandle !== 'external') _bpSlotHandle(p, hndX, hndW, dy, dh, STROKE); else p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
+                        if (cellType === 'shoe_drawers') _bpShoeDrawerMarks(p, colX + 2, colW - 4, dy, dh, di, STROKE, _BP_FONT); else if (cellType === 'internal_drawers' && comp.intHandle !== 'external') _bpSlotHandle(p, colX + 2, colW - 4, dy, dh, STROKE); else p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
                     }
                 } else if (cellType === 'open_cell') {
                     const _hcBlkLbl = _bpHoneycombBlockAtRow(_hcBlocksOld, ri);
@@ -3465,7 +3465,7 @@ window._generateMultiViewBlueprintPages = function() {
                         const hndW = Math.min(colW * 0.35, 22);
                         const hndX = colX + (colW - hndW) / 2;
                         const hndY = dy + dh * 0.5;
-                        if (cellType === 'shoe_drawers') _bpShoeDrawerMarks(p, colX + 2, colW - 4, dy, dh, di, STROKE, _BP_FONT); else if (cellType === 'internal_drawers' && comp.intHandle !== 'external') _bpSlotHandle(p, hndX, hndW, dy, dh, STROKE); else p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
+                        if (cellType === 'shoe_drawers') _bpShoeDrawerMarks(p, colX + 2, colW - 4, dy, dh, di, STROKE, _BP_FONT); else if (cellType === 'internal_drawers' && comp.intHandle !== 'external') _bpSlotHandle(p, colX + 2, colW - 4, dy, dh, STROKE); else p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
                     }
                 } else if (cellType === 'open_cell') {
                     const _hcBlkLblP = _bpHoneycombBlockAtRow(_hcBlocks, ri);
@@ -4052,7 +4052,7 @@ window._generateMultiViewBlueprintPages = function() {
                         const hndW = Math.min(colW * 0.35, 22);
                         const hndX = colX + (colW - hndW) / 2;
                         const hndY = dy + dh * 0.5;
-                        if (cellType === 'shoe_drawers') _bpShoeDrawerMarks(p, colX + 2, colW - 4, dy, dh, di, STROKE, _BP_FONT); else if (cellType === 'internal_drawers' && comp.intHandle !== 'external') _bpSlotHandle(p, hndX, hndW, dy, dh, STROKE); else p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
+                        if (cellType === 'shoe_drawers') _bpShoeDrawerMarks(p, colX + 2, colW - 4, dy, dh, di, STROKE, _BP_FONT); else if (cellType === 'internal_drawers' && comp.intHandle !== 'external') _bpSlotHandle(p, colX + 2, colW - 4, dy, dh, STROKE); else p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
                     }
                 }
 
@@ -4323,7 +4323,7 @@ window._generateMultiViewBlueprintPages = function() {
                                 const hndW = Math.min(colW * 0.35, 22);
                                 const hndX = colX + (colW - hndW) / 2;
                                 const hndY = dy + dh * 0.5;
-                                if (cellType === 'shoe_drawers') _bpShoeDrawerMarks(p, colX + 2, colW - 4, dy, dh, di, STROKE, _BP_FONT); else if (cellType === 'internal_drawers' && comp.intHandle !== 'external') _bpSlotHandle(p, hndX, hndW, dy, dh, STROKE); else p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
+                                if (cellType === 'shoe_drawers') _bpShoeDrawerMarks(p, colX + 2, colW - 4, dy, dh, di, STROKE, _BP_FONT); else if (cellType === 'internal_drawers' && comp.intHandle !== 'external') _bpSlotHandle(p, colX + 2, colW - 4, dy, dh, STROKE); else p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
                             }
                         } else if (cellType === 'open_cell') {
                             const pad = 5;
@@ -4488,7 +4488,7 @@ window._generateMultiViewBlueprintPages = function() {
                             const hndW = Math.min(dW * 0.35, 22);
                             const hndX = ox + (dW - hndW) / 2;
                             const hndY = dy + dh * 0.5;
-                            if (cellType === 'shoe_drawers') _bpShoeDrawerMarks(p, ox + 2, dW - 4, dy, dh, di, STROKE, _BP_FONT); else if (cellType === 'internal_drawers' && comp.intHandle !== 'external') _bpSlotHandle(p, hndX, hndW, dy, dh, STROKE); else p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
+                            if (cellType === 'shoe_drawers') _bpShoeDrawerMarks(p, ox + 2, dW - 4, dy, dh, di, STROKE, _BP_FONT); else if (cellType === 'internal_drawers' && comp.intHandle !== 'external') _bpSlotHandle(p, ox + 2, dW - 4, dy, dh, STROKE); else p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
                         }
                     } else if (cellType === 'open_cell') {
                         const pad = 5;
@@ -4750,7 +4750,7 @@ window._generateMultiViewBlueprintPages = function() {
                         const hndW = Math.min(colW * 0.35, 22);
                         const hndX = colX + (colW - hndW) / 2;
                         const hndY = dy + dh * 0.5;
-                        if (cellType === 'shoe_drawers') _bpShoeDrawerMarks(p, colX + 2, colW - 4, dy, dh, di, STROKE, _BP_FONT); else if (cellType === 'internal_drawers' && comp.intHandle !== 'external') _bpSlotHandle(p, hndX, hndW, dy, dh, STROKE); else p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
+                        if (cellType === 'shoe_drawers') _bpShoeDrawerMarks(p, colX + 2, colW - 4, dy, dh, di, STROKE, _BP_FONT); else if (cellType === 'internal_drawers' && comp.intHandle !== 'external') _bpSlotHandle(p, colX + 2, colW - 4, dy, dh, STROKE); else p.push(`<line x1="${hndX.toFixed(1)}" y1="${hndY.toFixed(1)}" x2="${(hndX+hndW).toFixed(1)}" y2="${hndY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.8"/>`);
                     }
                 } else if (cellType === 'open_cell') {
                     const pad = 5;
