@@ -7540,37 +7540,33 @@ function _ensureSpaceGizmo() {
     return g;
 }
 
-// Gizmo shows only while the pointer is over the active cabinet (or on the gizmo / rotate button).
-// A short grace period lets the pointer travel from the cabinet onto an arrow tip outside it.
-window._spaceGizmoHoverUntil = 0;
-const _SPACE_GIZMO_GRACE_MS = 700;
+// Gizmo shows only while the pointer is over the active cabinet, on one of its arrows, or on the
+// rotate button. The gizmo's own pointermove listener runs first, so `g.axis` is already set when the
+// pointer slides from the cabinet onto an arrow tip outside it.
+window._spaceGizmoHover = false;
 function _spaceGizmoAlwaysOn() {
     return !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
 }
 function _bindSpaceGizmoHover() {
     const ray = new THREE.Raycaster();
     const ndc = new THREE.Vector2();
-    let lastT = 0;
-    renderer.domElement.addEventListener('pointermove', function(e) {
-        const now = performance.now();
-        if (now - lastT < 40) return;
-        lastT = now;
-        if (!cabinetGroup || !_spaceGizmoTarget()) return;
-        const rect = renderer.domElement.getBoundingClientRect();
+    const el = renderer.domElement;
+    el.addEventListener('pointermove', function(e) {
+        const g = window._spaceGizmo;
+        if (g && g.object && g.axis) { window._spaceGizmoHover = true; return; }
+        if (!cabinetGroup || !_spaceGizmoTarget()) { window._spaceGizmoHover = false; return; }
+        const rect = el.getBoundingClientRect();
         ndc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
         ndc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
         ray.setFromCamera(ndc, camera);
-        if (ray.intersectObject(cabinetGroup, true).length) {
-            window._spaceGizmoHoverUntil = now + _SPACE_GIZMO_GRACE_MS;
-        }
+        window._spaceGizmoHover = ray.intersectObject(cabinetGroup, true).length > 0;
     });
+    el.addEventListener('pointerleave', function() { window._spaceGizmoHover = false; });
 }
 function _spaceGizmoShouldShow(g) {
     if (_spaceGizmoAlwaysOn()) return true;
-    const now = performance.now();
-    if (g && (g.dragging || (g.object && g.axis))) window._spaceGizmoHoverUntil = now + _SPACE_GIZMO_GRACE_MS;
-    if (window._spaceRotHover) window._spaceGizmoHoverUntil = now + _SPACE_GIZMO_GRACE_MS;
-    return now < window._spaceGizmoHoverUntil;
+    if (g && g.dragging) return true;
+    return !!(window._spaceGizmoHover || window._spaceRotHover);
 }
 
 /** Per-frame: attach/detach the gizmo and keep it on the cabinet pivot; renders the overlay scene. */
