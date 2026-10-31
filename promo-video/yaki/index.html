@@ -4,85 +4,90 @@
 <meta charset="utf-8">
 <title>AnyCloset 3D — מקרה בוחן</title>
 <style>
-@font-face { font-family: Serif; font-weight: 300; src: url(assets/fonts/frank-ruhl-libre-hebrew-300-normal.woff2) format('woff2'); unicode-range: U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F; }
-@font-face { font-family: Serif; font-weight: 500; src: url(assets/fonts/frank-ruhl-libre-hebrew-500-normal.woff2) format('woff2'); unicode-range: U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F; }
-@font-face { font-family: Serif; font-weight: 700; src: url(assets/fonts/frank-ruhl-libre-hebrew-700-normal.woff2) format('woff2'); unicode-range: U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F; }
-@font-face { font-family: Serif; font-weight: 900; src: url(assets/fonts/frank-ruhl-libre-hebrew-900-normal.woff2) format('woff2'); unicode-range: U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F; }
-@font-face { font-family: Serif; font-weight: 300; src: url(assets/fonts/frank-ruhl-libre-latin-300-normal.woff2) format('woff2'); }
-@font-face { font-family: Serif; font-weight: 500; src: url(assets/fonts/frank-ruhl-libre-latin-500-normal.woff2) format('woff2'); }
-@font-face { font-family: Serif; font-weight: 700; src: url(assets/fonts/frank-ruhl-libre-latin-700-normal.woff2) format('woff2'); }
-@font-face { font-family: Serif; font-weight: 900; src: url(assets/fonts/frank-ruhl-libre-latin-900-normal.woff2) format('woff2'); }
-@font-face { font-family: Sans; font-weight: 400; src: url(assets/fonts/heebo-hebrew-400-normal.woff2) format('woff2'); unicode-range: U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F; }
-@font-face { font-family: Sans; font-weight: 700; src: url(assets/fonts/heebo-hebrew-700-normal.woff2) format('woff2'); unicode-range: U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F; }
-@font-face { font-family: Sans; font-weight: 400; src: url(assets/fonts/heebo-latin-400-normal.woff2) format('woff2'); }
-@font-face { font-family: Sans; font-weight: 700; src: url(assets/fonts/heebo-latin-700-normal.woff2) format('woff2'); }
+@font-face { font-family: Heebo; font-weight: 400; src: url(assets/fonts/heebo-hebrew-400-normal.woff2) format('woff2'); unicode-range: U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F; }
+@font-face { font-family: Heebo; font-weight: 700; src: url(assets/fonts/heebo-hebrew-700-normal.woff2) format('woff2'); unicode-range: U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F; }
+@font-face { font-family: Heebo; font-weight: 800; src: url(assets/fonts/heebo-hebrew-800-normal.woff2) format('woff2'); unicode-range: U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F; }
+@font-face { font-family: Heebo; font-weight: 900; src: url(assets/fonts/heebo-hebrew-900-normal.woff2) format('woff2'); unicode-range: U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F; }
+@font-face { font-family: Heebo; font-weight: 400; src: url(assets/fonts/heebo-latin-400-normal.woff2) format('woff2'); }
+@font-face { font-family: Heebo; font-weight: 700; src: url(assets/fonts/heebo-latin-700-normal.woff2) format('woff2'); }
+@font-face { font-family: Heebo; font-weight: 800; src: url(assets/fonts/heebo-latin-800-normal.woff2) format('woff2'); }
+@font-face { font-family: Heebo; font-weight: 900; src: url(assets/fonts/heebo-latin-900-normal.woff2) format('woff2'); }
 
-:root { --paper: #F2EDE4; --paper2: #EAE3D7; --ink: #1F1C19; --muted: #7A7168; --oak: #A8744A; --teal: #2FAFB5; }
+/* AnyCloset system palette (landing.html / first promo) */
+:root {
+  --navy: #071224; --brand: #1e3a5f; --surface: #0c1d36; --text: #ffffff; --muted: #9fb3c8;
+  --accent: #00d4ff; --accent2: #7deaff;
+  --bgfill: radial-gradient(60% 50% at 80% 15%, rgba(30,58,95,.95), transparent 70%),
+            radial-gradient(50% 45% at 10% 90%, rgba(0,120,170,.32), transparent 70%),
+            linear-gradient(160deg, #081530 0%, #071224 55%, #050c1a 100%);
+}
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { background: var(--paper); overflow: hidden; }
-#stage { position: relative; overflow: hidden; background: var(--paper); color: var(--ink); font-family: Sans, sans-serif; }
+html, body { background: var(--navy); overflow: hidden; -webkit-font-smoothing: antialiased; }
+#stage { position: relative; overflow: hidden; background: var(--bgfill); color: var(--text); font-family: Heebo, sans-serif; }
+#stage::before { content: ''; position: absolute; inset: 0; pointer-events: none;
+  background-image: linear-gradient(rgba(0,212,255,.05) 1.5px, transparent 1.5px), linear-gradient(90deg, rgba(0,212,255,.05) 1.5px, transparent 1.5px);
+  background-size: 80px 80px; -webkit-mask-image: radial-gradient(80% 70% at 50% 50%, #000 30%, transparent 85%); }
 .abs { position: absolute; }
 .scene { position: absolute; inset: 0; }
 canvas.win { position: absolute; display: block; }
-.serif { font-family: Serif, serif; }
+.serif { font-family: Heebo, sans-serif; letter-spacing: -.01em; }
 .mask { display: block; overflow: hidden; padding-bottom: .08em; }
-.mask > span { display: inline-block; will-change: transform; }
-.kicker { font-family: Sans; font-weight: 700; letter-spacing: .18em; font-size: 22px; color: var(--muted); }
-.kicker b { color: var(--oak); font-weight: 700; }
-.rule { height: 1.5px; background: var(--ink); transform-origin: right center; }
+.kicker { font-weight: 800; letter-spacing: .14em; font-size: 22px; color: var(--muted); }
+.kicker b { color: var(--accent); font-weight: 900; }
+.rule { height: 3px; border-radius: 3px; background: linear-gradient(to left, var(--accent), rgba(0,212,255,0)); transform-origin: right center; }
 
 /* S1 */
 #s1 .block { position: absolute; text-align: right; }
-#s1 .l1, #s1 .l2 { font-family: Serif; font-weight: 700; line-height: 1.02; }
-#s1 .l3 { font-family: Serif; font-weight: 300; color: var(--oak); margin-top: .35em; }
+#s1 .l1, #s1 .l2 { font-weight: 900; line-height: 1.05; letter-spacing: -.015em; }
+#s1 .l2 { color: var(--accent); }
+#s1 .l3 { font-weight: 400; color: var(--muted); margin-top: .45em; }
 
 /* blueprint overlay */
 #bp { position: absolute; inset: 0; overflow: visible; }
-#bp line, #bp path { stroke: var(--ink); fill: none; stroke-width: 1.6; }
-#bp .thin { stroke-width: 1; }
-#bp text { font-family: Serif; font-weight: 500; fill: var(--ink); paint-order: stroke; stroke: var(--paper); stroke-width: 14px; stroke-linejoin: round; }
-.tblock { position: absolute; border: 1.5px solid var(--ink); font-size: 19px; }
-.tblock div { padding: 10px 16px; border-top: 1px solid var(--ink); display: flex; justify-content: space-between; gap: 24px; }
-.tblock div:first-child { border-top: 0; font-weight: 700; }
+#bp line, #bp path { stroke: var(--accent2); fill: none; stroke-width: 2; }
+#bp line { stroke: var(--accent); stroke-width: 3; filter: drop-shadow(0 0 6px rgba(0,212,255,.6)); }
+#bp .thin { stroke-width: 1.2; opacity: .8; }
+#bp text { font-family: Heebo; font-weight: 800; fill: #fff; paint-order: stroke; stroke: var(--navy); stroke-width: 14px; stroke-linejoin: round; }
+.tblock { position: absolute; border: 1.5px solid rgba(125,234,255,.55); border-radius: 14px; overflow: hidden; font-size: 19px; background: rgba(12,29,54,.7); }
+.tblock div { padding: 10px 16px; border-top: 1px solid rgba(125,234,255,.3); display: flex; justify-content: space-between; gap: 24px; }
+.tblock div:first-child { border-top: 0; font-weight: 800; color: var(--accent); }
 .tblock span:last-child { color: var(--muted); }
 
 /* letterbox */
-.bar { position: absolute; left: 0; right: 0; background: var(--paper); }
+.bar { position: absolute; left: 0; right: 0; background: rgba(7,18,36,.94); }
 .bar .in { position: absolute; inset: 0; display: flex; align-items: center; justify-content: space-between; }
 
 /* triptych */
-.panel-frame { position: absolute; border: 1.5px solid var(--ink); pointer-events: none; }
-.plabel { position: absolute; display: flex; align-items: baseline; gap: 14px; }
-.plabel .num { font-family: Serif; font-weight: 300; color: var(--oak); }
-.plabel .txt { font-family: Serif; font-weight: 700; }
+.panel-frame { position: absolute; border: 2px solid rgba(0,212,255,.45); border-radius: 20px; pointer-events: none; }
+.plabel { position: absolute; display: flex; align-items: baseline; gap: 14px; border-top-left-radius: 16px; }
+.plabel .num { font-weight: 900; color: var(--accent); }
+.plabel .txt { font-weight: 800; }
 
 /* slider */
 #imgbox { position: absolute; overflow: hidden; }
 #imgbox img { position: absolute; display: block; }
 #handle { position: absolute; width: 0; }
-#handle .ln { position: absolute; top: 0; bottom: 0; left: -1px; width: 2px; background: var(--paper); box-shadow: 0 0 12px rgba(0,0,0,.35); }
-#handle .knob { position: absolute; left: -34px; width: 68px; height: 68px; border-radius: 50%; background: var(--paper); box-shadow: 0 6px 18px rgba(0,0,0,.25); display: flex; align-items: center; justify-content: center; font-size: 26px; color: var(--ink); font-family: Sans; letter-spacing: 6px; padding-left: 6px; }
-.tag { position: absolute; background: var(--paper); color: var(--ink); font-size: 20px; font-weight: 700; letter-spacing: .08em; padding: 8px 16px; }
+#handle .ln { position: absolute; top: 0; bottom: 0; left: -1.5px; width: 3px; background: var(--accent); box-shadow: 0 0 18px rgba(0,212,255,.9); }
+#handle .knob { position: absolute; left: -36px; width: 72px; height: 72px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 40px rgba(0,212,255,.7); display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 900; color: var(--navy); letter-spacing: 6px; padding-left: 6px; }
+.tag { position: absolute; background: rgba(7,18,36,.85); color: #fff; font-size: 20px; font-weight: 800; letter-spacing: .04em; padding: 9px 18px; border-radius: 999px; border: 1.5px solid rgba(0,212,255,.5); }
 
 /* spread */
-.facts .row { display: flex; justify-content: space-between; align-items: baseline; border-top: 1px solid rgba(31,28,25,.35); }
-.facts .k { font-family: Sans; color: var(--muted); }
-.facts .v { font-family: Serif; font-weight: 500; }
+.facts .row { display: flex; justify-content: space-between; align-items: baseline; border-top: 1px solid rgba(125,234,255,.22); }
+.facts .k { color: var(--muted); font-weight: 700; }
+.facts .v { font-weight: 800; }
 .tl { position: absolute; }
-.tl .track { position: absolute; height: 1.5px; background: rgba(31,28,25,.25); }
-.tl .fill { position: absolute; height: 1.5px; background: var(--oak); transform-origin: right center; }
-.tl .dot { position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; border: 1.5px solid var(--ink); background: var(--paper); }
-.tl .dot i { position: absolute; inset: 2px; border-radius: 50%; background: var(--oak); }
-.tl .lab { position: absolute; transform: translateX(-50%); font-family: Serif; font-weight: 500; white-space: nowrap; }
+.tl .track { position: absolute; height: 3px; margin-top: -1.5px; border-radius: 3px; background: rgba(125,234,255,.18); }
+.tl .fill { position: absolute; height: 3px; margin-top: -1.5px; border-radius: 3px; background: var(--accent); box-shadow: 0 0 12px rgba(0,212,255,.7); transform-origin: right center; }
+.tl .dot { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; border: 2px solid var(--accent); background: var(--navy); }
+.tl .dot i { position: absolute; inset: 3px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px rgba(0,212,255,.9); }
+.tl .lab { position: absolute; transform: translateX(-50%); font-weight: 800; white-space: nowrap; }
 
 /* outro */
-#page { position: absolute; inset: 0; background: var(--paper); }
-#pageShadow { position: absolute; top: 0; bottom: 0; width: 120px; background: linear-gradient(to left, rgba(0,0,0,.18), transparent); }
-.word { font-family: Sans; font-weight: 700; direction: ltr; letter-spacing: -.01em; }
-.word b { color: var(--teal); }
+#page { position: absolute; inset: 0; background: var(--bgfill); }
+#pageShadow { position: absolute; top: 0; bottom: 0; width: 140px; }
 
-#grain { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .085; mix-blend-mode: multiply; pointer-events: none; image-rendering: pixelated; }
-#vig { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent 55%, rgba(60,45,30,.16) 100%); }
+#grain { display: none; }
+#vig { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(75% 70% at 50% 50%, transparent 55%, rgba(0,0,0,.45) 100%); }
 </style>
 </head>
 <body>

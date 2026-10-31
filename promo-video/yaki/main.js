@@ -1,4 +1,4 @@
-// Case-study promo: editorial paper look + the real project model rendered live with three.js.
+﻿// Case-study promo: editorial paper look + the real project model rendered live with three.js.
 // Deterministic: everything is driven by one paused GSAP timeline + renderFrame(t).
 let markReady;
 window.__ready = new Promise(r => { markReady = r; });
@@ -40,7 +40,7 @@ const IMG = { w: 1186, h: 896, closet: { l: 0.19, r: 0.84, t: 0.119, b: 0.93 } }
 const SL = { fov: 40, target: [0, 120, 0], pos: [55, 130, 417] };
 
 /* ───────────── three.js ───────────── */
-const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: true });
 renderer.setPixelRatio(1);
 renderer.setSize(W, H, false);
 renderer.outputEncoding = THREE.LinearEncoding;
@@ -48,7 +48,7 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.setScissorTest(true);
 const scene = new THREE.Scene();
-const BG = new THREE.Color(0xeceff1), PAPER3D = new THREE.Color(0xF2EDE4);
+const BG = new THREE.Color(0xeceff1);
 scene.add(new THREE.AmbientLight(0xffffff, 0.4));
 const sun = new THREE.DirectionalLight(0xffffff, 0.35); sun.position.set(120, 510, 600); sun.castShadow = true;
 Object.assign(sun.shadow.camera, { left: -400, right: 400, top: 400, bottom: -400, near: 10, far: 2000 });
@@ -58,8 +58,8 @@ scene.add(new THREE.HemisphereLight(0xffffff, 0xb0b6ba, 0.35));
 const fill = new THREE.DirectionalLight(0xffffff, 0.1); fill.position.set(-300, 200, 200); scene.add(fill);
 const cam = new THREE.PerspectiveCamera(40, W / H, 10, 6000);
 
-const paperMat = new THREE.MeshBasicMaterial({ color: 0xF7F3EC, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
-const lineMat = new THREE.LineBasicMaterial({ color: 0x24201c });
+const paperMat = new THREE.MeshBasicMaterial({ color: 0x0c2546, transparent: true, opacity: 0.9, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+const lineMat = new THREE.LineBasicMaterial({ color: 0x7deaff });
 const closetParts = [];
 let roomRoot;
 
@@ -86,7 +86,7 @@ function prepare(root, isCloset) {
 function setPass(ink) {
   for (const p of closetParts) { p.o.material = ink ? paperMat : p.mat; p.edges.visible = ink; }
   roomRoot.visible = !ink;
-  scene.background = ink ? PAPER3D : BG;
+  scene.background = ink ? null : BG;
 }
 function applyView(v, w, h) {
   cam.fov = v.fov; cam.aspect = w / h;
@@ -110,8 +110,8 @@ function renderTo(canvas, v, ink, w, h) {
   const ctx = canvas.getContext('2d');
   ctx.globalCompositeOperation = 'copy';
   ctx.drawImage(renderer.domElement, 0, H - h, w, h, 0, 0, w, h);
-  if (ink) { // thicken 1px GL lines without darkening the paper
-    ctx.globalCompositeOperation = 'darken';
+  if (ink) { // thicken 1px GL lines without brightening the faces
+    ctx.globalCompositeOperation = 'lighten';
     ctx.drawImage(renderer.domElement, 0, H - h, w, h, 1, 0, w, h);
     ctx.drawImage(renderer.domElement, 0, H - h, w, h, 0, 1, w, h);
   }
@@ -145,7 +145,7 @@ const PV = {
 /* ───────────── DOM ───────────── */
 const cMain = el('canvas', 'win'); css(cMain, { left: 0, top: 0, width: W, height: H });
 const cInk = el('canvas', 'win'); css(cInk, { left: 0, top: 0, width: W, height: H });
-const wipeRule = el('div', 'abs'); css(wipeRule, { top: 0, height: H, width: 2, background: 'var(--ink)', opacity: 0 });
+const wipeRule = el('div', 'abs'); css(wipeRule, { top: 0, height: H, width: 4, background: 'var(--accent)', boxShadow: '0 0 24px 4px rgba(0,212,255,.8)', opacity: 0 });
 
 // blueprint overlay (svg) — geometry filled in after the model loads
 const bp = document.createElementNS(SVGNS, 'svg'); bp.id = 'bp';
@@ -159,13 +159,13 @@ const s1b = el('div', 'block', s1);
 const s1l1 = el('div', 'l1', s1b, masked('קיר אחד ריק.'));
 const s1l2 = el('div', 'l2', s1b, masked('330 ס״מ של אפשרויות.'));
 const s1l3 = el('div', 'l3', s1b, masked('ולקוח שרוצה לראות — לפני שהוא מזמין.'));
-css(s1l1, { fontSize: P ? 92 : 118 }); css(s1l2, { fontSize: P ? 92 : 118 }); css(s1l3, { fontSize: P ? 42 : 50 });
+css(s1l1, { fontSize: P ? 84 : 108 }); css(s1l2, { fontSize: P ? 84 : 108 }); css(s1l3, { fontSize: P ? 40 : 46 });
 
 // S2 texts
 const s2 = el('div', 'scene'); s2.id = 's2';
 const s2k = el('div', 'kicker abs', s2, '<b>01</b> — מדידה'); css(s2k, { right: M, top: P ? 150 : 110 });
 const s2t = el('div', 'serif abs', s2, masked('הכל מתחיל') + '<br>' + masked('בשרטוט.'));
-css(s2t, { right: M, top: P ? 195 : 150, fontSize: P ? 84 : 72, fontWeight: 700, lineHeight: 1.05, textAlign: 'right' });
+css(s2t, { right: M, top: P ? 195 : 150, fontSize: P ? 84 : 72, fontWeight: 900, lineHeight: 1.05, textAlign: 'right' });
 const tblock = el('div', 'tblock', s2, `
   <div><span>AnyCloset 3D</span><span>מקרה בוחן</span></div>
   <div><span>קיר שינה — ארון + נישת TV</span><span>ק״מ 1:25</span></div>
@@ -178,30 +178,30 @@ const barT = el('div', 'bar', s3); css(barT, { top: 0, height: L.bars[0] });
 const barB = el('div', 'bar', s3); css(barB, { bottom: 0, height: L.bars[1] });
 const barTi = el('div', 'in', barT); css(barTi, { padding: `0 ${M}px`, alignItems: P ? 'flex-end' : 'center', paddingBottom: P ? 28 : 0 });
 el('div', 'kicker', barTi, '<b>02</b> — תלת־ממד');
-el('div', 'word', barTi, 'AnyCloset<b>3D</b>').style.fontSize = '24px';
+css(el('img', '', barTi), { height: P ? 46 : 38 }).src = 'assets/brand/logo-wide.png';
 const barBi = el('div', 'in', barB); css(barBi, { padding: `0 ${M}px` });
 if (P) { barBi.style.flexDirection = 'column'; barBi.style.alignItems = 'flex-end'; barBi.style.justifyContent = 'center'; barBi.style.gap = '18px'; }
 const s3t = el('div', 'serif', barBi, masked('ואז הוא קם לחיים.'));
-css(s3t, { fontSize: P ? 76 : 58, fontWeight: 700 });
+css(s3t, { fontSize: P ? 76 : 58, fontWeight: 900 });
 const s3s = el('div', '', barBi, 'כל דלת, מגירה וידית — בדיוק כפי שתוכננו.');
 css(s3s, { fontSize: P ? 30 : 25, color: 'var(--muted)' });
 
 // S4 — paper sheet with three detail windows
-const s4 = el('div', 'scene'); s4.id = 's4'; css(s4, { background: 'var(--paper)', boxShadow: '0 -30px 60px rgba(0,0,0,.18)' });
+const s4 = el('div', 'scene'); s4.id = 's4'; css(s4, { background: 'var(--bgfill)', boxShadow: '0 -30px 80px rgba(0,0,0,.55)' });
 const s4k = el('div', 'kicker abs', s4, '<b>03</b> — פרטים'); css(s4k, { right: M, top: P ? 130 : 62 });
 const s4t = el('div', 'serif abs', s4, masked('הפרטים הקטנים, בגדול.'));
-css(s4t, { right: M, top: P ? 170 : 92, fontSize: P ? 70 : 60, fontWeight: 700 });
+css(s4t, { right: M, top: P ? 170 : 92, fontSize: P ? 70 : 60, fontWeight: 900 });
 const PR = (() => {
   if (P) { const top = 320, gap = 28, ph = (H - top - 170 - 2 * gap) / 3; return [0, 1, 2].map(i => ({ x: M, y: top + i * (ph + gap), w: W - 2 * M, h: ph })); }
   const top = 196, gap = 32, ph = 790, pw = (W - 2 * M - 2 * gap) / 3;
   return [0, 1, 2].map(i => ({ x: W - M - pw - i * (pw + gap), y: top, w: pw, h: ph }));
 })();
 const PANELS = [['A', 'i.', 'שמונה מגירות'], ['B', 'ii.', 'נישה ל־55״'], ['C', 'iii.', 'ידיות שחורות']].map(([id, num, txt], i) => {
-  const wrap = el('div', 'abs', s4); css(wrap, { left: PR[i].x, top: PR[i].y, width: PR[i].w, height: PR[i].h, overflow: 'hidden' });
+  const wrap = el('div', 'abs', s4); css(wrap, { left: PR[i].x, top: PR[i].y, width: PR[i].w, height: PR[i].h, overflow: 'hidden', borderRadius: '20px', boxShadow: '0 30px 70px rgba(0,0,0,.45)' });
   const c = el('canvas', 'win', wrap); css(c, { left: 0, top: 0, width: '100%', height: '100%' });
   const frame = el('div', 'panel-frame', wrap); css(frame, { inset: 0 });
   const chip = el('div', 'plabel', wrap, `<span class="num">${num}</span><span class="txt">${txt}</span>`);
-  css(chip, { right: 0, bottom: 0, background: 'var(--paper)', padding: P ? '12px 22px' : '14px 22px', fontSize: P ? 34 : 34 });
+  css(chip, { right: 0, bottom: 0, background: 'var(--surface)', padding: P ? '12px 22px' : '14px 22px', fontSize: P ? 34 : 34 });
   return { id, wrap, c, chip };
 });
 
@@ -219,8 +219,8 @@ const s5k = el('div', 'kicker', s5txt, '<b>04</b> — הדמיה');
 const s5t = el('div', 'serif', s5txt, P ? masked('ככה זה ייראה.') : masked('ככה זה') + '<br>' + masked('ייראה.'));
 const s5a = el('div', 'serif', s5txt, masked('באמת.'));
 const s5s = el('div', '', s5txt, 'הדמיה ריאליסטית ב־AI — מתוך אותו תכנון תלת־ממדי, בלחיצה.');
-css(s5t, { fontSize: P ? 88 : 110, fontWeight: 700, lineHeight: 1.02, marginTop: 22 });
-css(s5a, { fontSize: P ? 88 : 110, fontWeight: 300, color: 'var(--oak)', lineHeight: 1.1 });
+css(s5t, { fontSize: P ? 88 : 110, fontWeight: 900, lineHeight: 1.02, marginTop: 22 });
+css(s5a, { fontSize: P ? 88 : 110, fontWeight: 900, color: 'var(--accent)', lineHeight: 1.1 });
 css(s5s, { fontSize: P ? 30 : 26, color: 'var(--muted)', marginTop: P ? 0 : 40, lineHeight: 1.45 });
 if (P) { css(s5txt, { right: M, left: M, top: 140, textAlign: 'right' }); css(s5s, { position: 'absolute', top: L.box.y + L.box.h + 50 - 140, right: 0, left: 0 }); }
 else css(s5txt, { right: M, width: 560, top: 250, textAlign: 'right' });
@@ -231,7 +231,7 @@ const s6txt = el('div', 'abs', s6);
 css(s6txt, P ? { left: M, right: M, top: L.spread.h + 60 } : { left: L.spread.w + 90, right: M, top: 120 });
 const s6k = el('div', 'kicker', s6txt, '<b>מקרה בוחן</b> · פרויקט אמיתי');
 const s6t = el('div', 'serif', s6txt, masked('מהקיר הריק —') + '<br>' + masked('לעסקה סגורה.'));
-css(s6t, { fontSize: P ? 76 : 82, fontWeight: 700, lineHeight: 1.05, marginTop: 20 });
+css(s6t, { fontSize: P ? 76 : 82, fontWeight: 900, lineHeight: 1.05, marginTop: 20 });
 const s6r = el('div', 'rule', s6txt); css(s6r, { marginTop: P ? 34 : 40 });
 const facts = el('div', 'facts', s6txt);
 const FACTS = [['מידות', '330 × 240 × 54 ס״מ'], ['תכולה', '2 ארונות · 8 מגירות · נישת TV'], ['סטטוס', 'נסגרה עסקה ✓']];
@@ -258,14 +258,14 @@ const dots = STEPS.map((s, i) => {
 // S7 — outro page
 const s7 = el('div', 'scene'); s7.id = 's7';
 const page = el('div', '', s7); page.id = 'page';
-const pageShadow = el('div', '', page); pageShadow.id = 'pageShadow'; css(pageShadow, { left: '100%', background: 'linear-gradient(to right, rgba(0,0,0,.2), transparent)' });
+const pageShadow = el('div', '', page); pageShadow.id = 'pageShadow'; css(pageShadow, { left: '100%', background: 'linear-gradient(to right, rgba(0,212,255,.35) 0, rgba(0,0,0,.45) 3px, transparent)' });
 const out = el('div', 'abs', page); css(out, { left: 0, right: 0, top: 0, bottom: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' });
-const oIcon = el('img', '', out); oIcon.src = 'assets/brand/icon.png'; css(oIcon, { width: P ? 230 : 190, height: P ? 230 : 190 });
-const oWord = el('div', 'word', out, 'AnyCloset<b>3D</b>'); css(oWord, { fontSize: P ? 76 : 64, marginTop: 18 });
+const oIcon = el('img', '', out); oIcon.src = 'assets/brand/logo-wide.png'; css(oIcon, { width: P ? 860 : 820 });
+const oWord = el('div', '', out);
 const oRule = el('div', 'rule', out); css(oRule, { width: P ? 140 : 120, marginTop: P ? 48 : 38, transformOrigin: 'center' });
 const oSlogan = el('div', 'serif', out, masked('מסקיצה להזמנה.') + '<br>' + masked('במקום אחד.'));
-css(oSlogan, { fontSize: P ? 90 : 76, fontWeight: 700, lineHeight: 1.08, marginTop: P ? 48 : 38 });
-const oUrl = el('div', '', out, 'anycloset3d.com'); css(oUrl, { fontSize: P ? 36 : 30, letterSpacing: '.14em', marginTop: P ? 56 : 42, direction: 'ltr', color: 'var(--oak)', fontWeight: 700 });
+css(oSlogan, { fontSize: P ? 92 : 80, fontWeight: 900, lineHeight: 1.08, marginTop: P ? 48 : 38 });
+const oUrl = el('div', '', out, 'anycloset3d.com'); css(oUrl, { fontSize: P ? 40 : 34, letterSpacing: '.04em', marginTop: P ? 60 : 46, direction: 'ltr', color: '#071224', background: 'var(--accent)', padding: P ? '22px 56px' : '18px 50px', borderRadius: '999px', fontWeight: 800, boxShadow: '0 0 50px rgba(0,212,255,.45)' });
 
 // film grain + vignette
 const grain = el('canvas', ''); grain.id = 'grain'; grain.width = W / 2; grain.height = H / 2;
@@ -312,7 +312,7 @@ const BP_PATHS = [pHatch, pExtW, pDimW, pExtH, pDimH, pLead];
 const BP_TEXT = [tW, tH, tD];
 
 // S1 text sits on the same horizon the blueprint stands on
-const s1w = P ? W - 2 * M : 1060;
+const s1w = P ? W - 2 * M : 1300;
 css(s1b, { right: M, bottom: H - yB + (P ? 44 : 40), width: s1w });
 
 /* ───────────── slider alignment (3D camera ↔ AI render) ───────────── */
@@ -501,7 +501,7 @@ function renderFrame(t) {
 
   if (t >= T.s5) {
     placeImg(S.flip);
-    imgbox.style.clipPath = `inset(0 0 0 ${S.slide * 100}%)`;
+    imgbox.style.clipPath = `inset(0 0 0 ${S.slide * 100}% round ${S.flip > 0 ? 0 : 20}px)`;
     css(handle, { left: BX.x + S.slide * BX.w, top: BX.y, height: BX.h });
     handle.querySelector('.knob').style.top = (BX.h / 2 - 34) + 'px';
   }
