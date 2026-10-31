@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>AnyCloset 3D — מקרה בוחן</title>
+<style>
+@font-face { font-family: Serif; font-weight: 300; src: url(assets/fonts/frank-ruhl-libre-hebrew-300-normal.woff2) format('woff2'); unicode-range: U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F; }
+@font-face { font-family: Serif; font-weight: 500; src: url(assets/fonts/frank-ruhl-libre-hebrew-500-normal.woff2) format('woff2'); unicode-range: U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F; }
+@font-face { font-family: Serif; font-weight: 700; src: url(assets/fonts/frank-ruhl-libre-hebrew-700-normal.woff2) format('woff2'); unicode-range: U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F; }
+@font-face { font-family: Serif; font-weight: 900; src: url(assets/fonts/frank-ruhl-libre-hebrew-900-normal.woff2) format('woff2'); unicode-range: U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F; }
+@font-face { font-family: Serif; font-weight: 300; src: url(assets/fonts/frank-ruhl-libre-latin-300-normal.woff2) format('woff2'); }
+@font-face { font-family: Serif; font-weight: 500; src: url(assets/fonts/frank-ruhl-libre-latin-500-normal.woff2) format('woff2'); }
+@font-face { font-family: Serif; font-weight: 700; src: url(assets/fonts/frank-ruhl-libre-latin-700-normal.woff2) format('woff2'); }
+@font-face { font-family: Serif; font-weight: 900; src: url(assets/fonts/frank-ruhl-libre-latin-900-normal.woff2) format('woff2'); }
+@font-face { font-family: Sans; font-weight: 400; src: url(assets/fonts/heebo-hebrew-400-normal.woff2) format('woff2'); unicode-range: U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F; }
+@font-face { font-family: Sans; font-weight: 700; src: url(assets/fonts/heebo-hebrew-700-normal.woff2) format('woff2'); unicode-range: U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F; }
+@font-face { font-family: Sans; font-weight: 400; src: url(assets/fonts/heebo-latin-400-normal.woff2) format('woff2'); }
+@font-face { font-family: Sans; font-weight: 700; src: url(assets/fonts/heebo-latin-700-normal.woff2) format('woff2'); }
+
+:root { --paper: #F2EDE4; --paper2: #EAE3D7; --ink: #1F1C19; --muted: #7A7168; --oak: #A8744A; --teal: #2FAFB5; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: var(--paper); overflow: hidden; }
+#stage { position: relative; overflow: hidden; background: var(--paper); color: var(--ink); font-family: Sans, sans-serif; }
+.abs { position: absolute; }
+.scene { position: absolute; inset: 0; }
+canvas.win { position: absolute; display: block; }
+.serif { font-family: Serif, serif; }
+.mask { display: block; overflow: hidden; padding-bottom: .08em; }
+.mask > span { display: inline-block; will-change: transform; }
+.kicker { font-family: Sans; font-weight: 700; letter-spacing: .18em; font-size: 22px; color: var(--muted); }
+.kicker b { color: var(--oak); font-weight: 700; }
+.rule { height: 1.5px; background: var(--ink); transform-origin: right center; }
+
+/* S1 */
+#s1 .block { position: absolute; text-align: right; }
+#s1 .l1, #s1 .l2 { font-family: Serif; font-weight: 700; line-height: 1.02; }
+#s1 .l3 { font-family: Serif; font-weight: 300; color: var(--oak); margin-top: .35em; }
+
+/* blueprint overlay */
+#bp { position: absolute; inset: 0; overflow: visible; }
+#bp line, #bp path { stroke: var(--ink); fill: none; stroke-width: 1.6; }
+#bp .thin { stroke-width: 1; }
+#bp text { font-family: Serif; font-weight: 500; fill: var(--ink); paint-order: stroke; stroke: var(--paper); stroke-width: 14px; stroke-linejoin: round; }
+.tblock { position: absolute; border: 1.5px solid var(--ink); font-size: 19px; }
+.tblock div { padding: 10px 16px; border-top: 1px solid var(--ink); display: flex; justify-content: space-between; gap: 24px; }
+.tblock div:first-child { border-top: 0; font-weight: 700; }
+.tblock span:last-child { color: var(--muted); }
+
+/* letterbox */
+.bar { position: absolute; left: 0; right: 0; background: var(--paper); }
+.bar .in { position: absolute; inset: 0; display: flex; align-items: center; justify-content: space-between; }
+
+/* triptych */
+.panel-frame { position: absolute; border: 1.5px solid var(--ink); pointer-events: none; }
+.plabel { position: absolute; display: flex; align-items: baseline; gap: 14px; }
+.plabel .num { font-family: Serif; font-weight: 300; color: var(--oak); }
+.plabel .txt { font-family: Serif; font-weight: 700; }
+
+/* slider */
+#imgbox { position: absolute; overflow: hidden; }
+#imgbox img { position: absolute; display: block; }
+#handle { position: absolute; width: 0; }
+#handle .ln { position: absolute; top: 0; bottom: 0; left: -1px; width: 2px; background: var(--paper); box-shadow: 0 0 12px rgba(0,0,0,.35); }
+#handle .knob { position: absolute; left: -34px; width: 68px; height: 68px; border-radius: 50%; background: var(--paper); box-shadow: 0 6px 18px rgba(0,0,0,.25); display: flex; align-items: center; justify-content: center; font-size: 26px; color: var(--ink); font-family: Sans; letter-spacing: 6px; padding-left: 6px; }
+.tag { position: absolute; background: var(--paper); color: var(--ink); font-size: 20px; font-weight: 700; letter-spacing: .08em; padding: 8px 16px; }
+
+/* spread */
+.facts .row { display: flex; justify-content: space-between; align-items: baseline; border-top: 1px solid rgba(31,28,25,.35); }
+.facts .k { font-family: Sans; color: var(--muted); }
+.facts .v { font-family: Serif; font-weight: 500; }
+.tl { position: absolute; }
+.tl .track { position: absolute; height: 1.5px; background: rgba(31,28,25,.25); }
+.tl .fill { position: absolute; height: 1.5px; background: var(--oak); transform-origin: right center; }
+.tl .dot { position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; border: 1.5px solid var(--ink); background: var(--paper); }
+.tl .dot i { position: absolute; inset: 2px; border-radius: 50%; background: var(--oak); }
+.tl .lab { position: absolute; transform: translateX(-50%); font-family: Serif; font-weight: 500; white-space: nowrap; }
+
+/* outro */
+#page { position: absolute; inset: 0; background: var(--paper); }
+#pageShadow { position: absolute; top: 0; bottom: 0; width: 120px; background: linear-gradient(to left, rgba(0,0,0,.18), transparent); }
+.word { font-family: Sans; font-weight: 700; direction: ltr; letter-spacing: -.01em; }
+.word b { color: var(--teal); }
+
+#grain { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .085; mix-blend-mode: multiply; pointer-events: none; image-rendering: pixelated; }
+#vig { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent 55%, rgba(60,45,30,.16) 100%); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="lib/gsap.min.js"></script>
+<script src="lib/three.min.js"></script>
+<script src="lib/GLTFLoader.js"></script>
+<script type="module" src="main.js"></script>
+</body>
+</html>
