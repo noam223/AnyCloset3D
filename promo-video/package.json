@@ -1,0 +1,19 @@
+{
+  "name": "anycloset-promo",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "private": "true",
+  "type": "module",
+  "dependencies": {
+    "@fontsource/heebo": "^5.3.0",
+    "gsap": "^3.15.0",
+    "puppeteer-core": "^25.16.0"
+  }
+}
