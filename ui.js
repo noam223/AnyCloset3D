@@ -16011,7 +16011,7 @@ function _buildPrintHTML(mode) {
   .cust-approval p { font-size: 0.68rem; line-height: 1.45; color: #475569; text-align: justify; }
   .cust-approval-fields { margin-top: 12px; display: flex; flex-direction: column; gap: 14px; }
   .cust-approval-fields > div { display: flex; align-items: flex-end; gap: 8px; font-size: 0.8rem; font-weight: 700; color: #1e293b; }
-  .cust-approval-fields span { flex-shrink: 0; min-width: 52px; }
+  .cust-approval-fields span { flex-shrink: 0; width: 4.6em; }
   .cust-approval-fields i { flex: 1; border-bottom: 1px solid #1e293b; height: 1px; }
   .cmp-price { display: flex; justify-content: space-between; background: #fef9c3; border: 1px solid #fde047; border-radius: 6px; padding: 6px 12px; font-weight: 800; color: #713f12; margin-top: 6px; }
   .cmp-side { display: flex; flex-direction: column; gap: 8px; }
