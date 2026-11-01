@@ -12705,6 +12705,7 @@ window.sendOrderForSignature = async function() {
     const session = sb && (await sb.auth.getSession()).data.session;
     if (!session) { alert('יש להתחבר מחדש למערכת.'); return; }
     _showToast('🔄 מכין את ההזמנה לחתימה...', 3000);
+    for (let i = 0; i < 120 && window._cartMediaRefreshRunning; i++) await new Promise(r => setTimeout(r, 250));
     try {
         const res = await fetch(_ORDER_SIGN_FN, {
             method: 'POST',

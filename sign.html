@@ -25,6 +25,7 @@
         .lead { font-size: .88rem; color: var(--muted); line-height: 1.55; }
         .doc-box { background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; position: relative; }
         .doc-box iframe { border: 0; display: block; transform-origin: top right; background: #fff; }
+        .terms { font-size: .84rem; line-height: 1.6; color: #334155; background: #f8fafc; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-top: 10px; }
         label { display: block; font-size: .8rem; font-weight: 700; color: var(--muted); margin: 14px 0 6px; }
         input[type="text"] { width: 100%; height: 48px; border: 1.5px solid var(--line); border-radius: 12px; padding: 0 14px; font: inherit; font-size: 1rem; background: #f8fafc; outline: none; }
         input[type="text"]:focus { border-color: var(--blue); background: #fff; }
@@ -98,6 +99,13 @@
         }
     }
 
+    function termsText(docHtml) {
+        try {
+            var p = new DOMParser().parseFromString(docHtml, 'text/html').querySelector('.cust-approval p');
+            return p ? p.textContent.trim() : '';
+        } catch (e) { return ''; }
+    }
+
     function brandHtml() {
         return '<div class="brand">' +
             (data.logo_url ? '<img src="' + esc(data.logo_url) + '" alt="">' : '') +
@@ -120,6 +128,7 @@
             '<div style="margin-top:10px;"><button type="button" class="btn-light" id="btn-print"><i class="fa-solid fa-print"></i> הדפסה / שמירה כ-PDF</button></div></div>';
         if (!signed) {
             html += '<div class="card" id="sign-card"><h1>חתימת לקוח</h1>' +
+                (termsText(data.html) ? '<p class="terms">' + esc(termsText(data.html)) + '</p>' : '') +
                 (data.customer_name ? '' :
                     '<label for="f-name">שם לקוח</label><input type="text" id="f-name" autocomplete="name">') +
                 '<label for="f-id">תעודת זהות</label><input type="text" id="f-id" inputmode="numeric" autocomplete="off" maxlength="9" placeholder="9 ספרות">' +
