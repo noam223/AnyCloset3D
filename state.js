@@ -24,7 +24,7 @@ function createWingData(overrides) {
         plinthHeight: 8.75,
         hasDoors: true,
         handleType: '',
-        handleStyle: 'pipe',
+        handleStyle: 'none', // no handle chosen yet — must be picked before a customer order prints
         handleVariant: 'pipe_silver',
         ridingColor: 'black',
         cabinetName: '',
@@ -359,6 +359,9 @@ window.addWing = function(side) {
     newWing.globalHeight = center.globalHeight;
     newWing.depth = center.depth;
     newWing.thickness = center.thickness;
+    newWing.handleStyle = center.handleStyle;
+    newWing.handleVariant = center.handleVariant;
+    newWing.ridingColor = center.ridingColor;
     newWing.plinthHeight = center.plinthHeight;
     newWing.boardMaterial = center.boardMaterial;
     newWing.materialBody = center.materialBody;
@@ -466,6 +469,9 @@ window.toggleUpperUnit = function(wingId) {
             materialExternal: parentWing.materialExternal || 'white_matte',
             materialBack: parentWing.materialBack || 'white_matte',
             cabinetModel: parentWing.cabinetModel || 'c9',
+            handleStyle: parentWing.handleStyle || 'none',
+            handleVariant: parentWing.handleVariant || 'pipe_silver',
+            ridingColor: parentWing.ridingColor || 'black',
             hasDoors: true,
             wingPosition: 'front', // not a side wing — prevents door/side clipping treating UU as side
             _isUpperUnit: true,
@@ -1940,6 +1946,86 @@ function _wingHasGlass(w) {
 }
 window._wingHasGlass = _wingHasGlass;
 
+// ── Order-closing options (per cabinet, stored on the center wing so every save/restore path keeps them) ──
+window.ORDER_OPTS_DEFAULT = { levelingFeet: '', leds: 'no', engraving: 'no', engravingColor: 'black', shelfThickness: 17 };
+
+/** Effective order options for a wings object (defaults filled in). */
+window._orderOpts = function(wings) {
+    const ws = wings || (typeof state !== 'undefined' ? state.wings : null);
+    const c = ws && ws.center;
+    return Object.assign({}, window.ORDER_OPTS_DEFAULT, (c && c.orderOpts) || {});
+};
+
+/** Shelf board thickness in cm: 2.8 when the cabinet is set to 28 mm shelves, else the body board. */
+window._shelfThicknessCm = function(bodyT) {
+    const body = bodyT || (typeof state !== 'undefined' && state.thickness) || 1.7;
+    return window._orderOpts().shelfThickness === 28 ? 2.8 : body;
+};
+
+/** LED pairs placed in the 3D model of a wings object (all main wings incl. full-corner units). */
+window._ledPairsInWings = function(wings) {
+    if (!wings) return 0;
+    let n = 0;
+    ['center', 'left', 'right'].forEach(function(side) {
+        const w = wings[side];
+        if (!w) return;
+        (w.columns || []).forEach(function(col) {
+            if (Array.isArray(col.leds)) n += col.leds.length;
+            if (col.type === 'desk' && col.deskLeds) n++;
+        });
+        if (w.wingPosition === 'full_corner' && w.fullCorner && Array.isArray(w.fullCorner.leds)) n += w.fullCorner.leds.length;
+    });
+    return n;
+};
+
+/** 'yes' whenever LEDs are placed in the 3D model, otherwise the manual choice. */
+window._orderLedsEffective = function(wings) {
+    const ws = wings || state.wings;
+    return window._ledPairsInWings(ws) > 0 ? 'yes' : window._orderOpts(ws).leds;
+};
+
+/** True when any main wing has a glass door. */
+window._wingsHaveGlass = function(wings) {
+    if (!wings) return false;
+    return ['center', 'left', 'right'].some(function(side) { return wings[side] && _wingHasGlass(wings[side]); });
+};
+
+window.setOrderOpt = function(key, value) {
+    const c = state.wings && state.wings.center;
+    if (!c || !(key in window.ORDER_OPTS_DEFAULT)) return;
+    if (key === 'shelfThickness') value = Number(value) === 28 ? 28 : 17;
+    const opts = Object.assign({}, c.orderOpts || {});
+    opts[key] = value;
+    c.orderOpts = opts;
+    if (key === 'shelfThickness') {
+        if (typeof buildCabinet === 'function') buildCabinet();
+        if (typeof calculatePrice === 'function') calculatePrice();
+    }
+    window._syncOrderOptsUI();
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+};
+
+window._syncOrderOptsUI = function() {
+    if (typeof state === 'undefined' || !state.wings) return;
+    const o = window._orderOpts();
+    const ledPairs = window._ledPairsInWings(state.wings);
+    const leds = ledPairs > 0 ? 'yes' : o.leds;
+    const feet = document.getElementById('inp-order-leveling-feet');
+    if (feet && document.activeElement !== feet) feet.value = o.levelingFeet || '';
+    document.querySelectorAll('[data-order-opt]').forEach(function(btn) {
+        const key = btn.getAttribute('data-order-opt');
+        const val = btn.getAttribute('data-val');
+        let cur = o[key];
+        if (key === 'leds') cur = leds;
+        btn.classList.toggle('active', String(cur) === val);
+        if (key === 'leds') btn.disabled = ledPairs > 0 && val === 'no';
+    });
+    const ledHint = document.getElementById('order-leds-auto-hint');
+    if (ledHint) ledHint.style.display = ledPairs > 0 ? '' : 'none';
+    const engColors = document.getElementById('order-engraving-colors');
+    if (engColors) engColors.style.display = o.engraving === 'yes' ? '' : 'none';
+};
+
 /** Show the glass-tint swatches instead of the board colours while the "זכוכית" tab is active. */
 window._syncGlassTintPanel = function(w) {
     if (!w) w = getWing();
@@ -2493,7 +2579,7 @@ window.resetCurrentCabinet = function() {
     w.cabinetModel = 'c9';
     w.placement = 'wall';
     w.width = 160; w.globalHeight = 240; w.depth = 54;
-    w.plinthHeight = 8.75; w.hasDoors = true; w.handleType = ''; w.handleStyle = 'pipe'; w.handleVariant = 'pipe_silver'; w.ridingColor = 'black'; w.cabinetName = ''; w.cabinetModelLabel = ''; w.cabinetNotes = '';
+    w.plinthHeight = 8.75; w.hasDoors = true; w.handleType = ''; w.handleStyle = 'none'; w.handleVariant = 'pipe_silver'; w.ridingColor = 'black'; w.cabinetName = ''; w.cabinetModelLabel = ''; w.cabinetNotes = '';
     w.boardMaterial = 'melamine'; w.materialBody = 'white_matte'; w.materialInternal = 'white_matte';
     w.materialExternal = 'white_matte'; w.materialDesk = 'white_matte'; w.materialOpenCell = 'white_matte'; w.materialBack = 'white_matte';
     w.materialSideCabinet = 'white_matte';
@@ -2932,6 +3018,7 @@ window._ridingColorId = function(c) { return window.RIDING_COLORS[c] ? c : 'blac
 window._handleStyleLabel = function(style, variant, model, ridingColor) {
     model = (model || '').trim();
     if (model) return model;
+    if (style === 'none') return 'ללא — לא נבחרו ידיות';
     const labels = { pipe: 'ידית חיצונית', riding: 'ידית רוכבת', touch: "ידית טאצ'" };
     let s = labels[style] || labels.pipe;
     const pipeVariant = window.HANDLE_VARIANTS[window._handleVariantId(variant)];
@@ -2995,8 +3082,12 @@ window.updateHandleVariant = function(variant, el) {
 window.updateHandleStyle = function(style) {
     const w = getWing();
     if (!w) return;
-    if (style !== 'pipe' && style !== 'riding' && style !== 'touch') return;
+    if (style !== 'pipe' && style !== 'riding' && style !== 'touch' && style !== 'none') return;
     w.handleStyle = style;
+    // The upper unit and side cabinet have no handle picker of their own — they follow this cabinet
+    const _uu = !state._activeUpperUnit && state.wings['upperUnit_' + state.activeWing];
+    if (_uu) { _uu.handleStyle = style; _uu.handleVariant = w.handleVariant; _uu.ridingColor = w.ridingColor; }
+    if (w.sideCabinet) { w.sideCabinet.handleStyle = style; w.sideCabinet.handleVariant = w.handleVariant; w.sideCabinet.ridingColor = w.ridingColor; }
     document.querySelectorAll('.handle-style-btn:not(.corner-desk-handle-btn), .mobile-handle-style-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.style === style);
     });
@@ -3173,7 +3264,8 @@ function _compartmentBounds(col, r, wingData) {
         : ((col && col.type === 'desk') ? col.deskHeight + col.deskClearance + t
             : ((col && col.noPlinth) ? t : plinthH + t));
     const dividers = [];
-    ((col && col.shelvesY) || []).forEach(y => dividers.push({ y: y, thick: t }));
+    const shelfT = window._shelfThicknessCm(t);
+    ((col && col.shelvesY) || []).forEach(y => dividers.push({ y: y, thick: shelfT }));
     if (col && col.splitY && col.splitY > startY) dividers.push({ y: col.splitY, thick: 2 * t });
     dividers.sort((a, b) => a.y - b.y);
     const bottomY = (r <= 0) ? startY
@@ -3220,7 +3312,7 @@ function _getDeskMergePinInfo(col, wingData) {
     const baseY = _columnBaseY(col, wingData);
     const startY = baseY + t;
     const dividers = [];
-    (col.shelvesY || []).forEach((y, idx) => dividers.push({ y: y, type: 'shelf', idx: idx, thick: t }));
+    (col.shelvesY || []).forEach((y, idx) => dividers.push({ y: y, type: 'shelf', idx: idx, thick: window._shelfThicknessCm(t) }));
     if (_hasActiveSplit(col, baseY, t)) {
         dividers.push({ y: col.splitY, type: 'split', idx: -1, thick: 2 * t });
     }
@@ -4733,7 +4825,7 @@ function _ensureDeskBandCell(col, band, preferredRows) {
 
     // Divider list matching _compartmentBounds (shelves + optional קושרת)
     const dividers = [];
-    col.shelvesY.forEach((y, idx) => dividers.push({ y: y, type: 'shelf', idx: idx, thick: t }));
+    col.shelvesY.forEach((y, idx) => dividers.push({ y: y, type: 'shelf', idx: idx, thick: window._shelfThicknessCm(t) }));
     if (col.splitY && col.splitY > startY) {
         dividers.push({ y: col.splitY, type: 'split', thick: 2 * t, idx: -1 });
     }

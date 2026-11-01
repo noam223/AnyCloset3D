@@ -40,7 +40,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260910deskMerge">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
     <link rel="stylesheet" href="style-extras.css?v=20260731rpcab">
-    <link rel="stylesheet" href="style.css?v=20261029spacerot">
+    <link rel="stylesheet" href="style.css?v=20261101orderopts">
     <link rel="stylesheet" href="quick-calc.css?v=20260929qc">
     <style>
         html.thumb-only-mode #left-sidebar,
@@ -482,6 +482,9 @@
             <div id="handle-type-row" class="control-group" style="margin-top:12px;margin-bottom:0;">
                 <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:6px;">סוג ידית / פרזול</div>
                 <div class="handle-style-row">
+                    <button type="button" class="handle-style-btn" data-style="none" onclick="updateHandleStyle('none')" title="טרם נבחרו ידיות — חובה לבחור לפני הדפסת הזמנת לקוח">
+                        <i class="fa-solid fa-ban"></i><span>ללא</span>
+                    </button>
                     <button type="button" class="handle-style-btn" data-style="riding" onclick="updateHandleStyle('riding')" title="ידית רוכבת">
                         <i class="fa-solid fa-grip-lines"></i><span>רוכבת</span>
                     </button>
@@ -829,6 +832,49 @@
                             <button class="slider-btn" onclick="updateCorner('deskDrawerHeight', (state.corner.deskDrawerHeight||13)-1)"><i class="fa-solid fa-minus"></i></button>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== ORDER-CLOSING OPTIONS (per cabinet) ===== -->
+        <div class="section" id="order-options-section" data-sbgroup="extras">
+            <div class="section-title"><i class="fa-solid fa-clipboard-check"></i> תוספות לסגירת הזמנה</div>
+
+            <div class="order-opt-item">
+                <label class="order-opt-label" for="inp-order-leveling-feet">רגלי פילוס</label>
+                <select id="inp-order-leveling-feet" class="editor-select order-opt-select" onchange="setOrderOpt('levelingFeet', this.value)">
+                    <option value=""></option>
+                    <option value="yes">כן</option>
+                    <option value="no">לא</option>
+                </select>
+            </div>
+
+            <div class="order-opt-item">
+                <div class="order-opt-label">לדים</div>
+                <div class="order-opt-row">
+                    <button type="button" class="order-opt-btn" data-order-opt="leds" data-val="yes" onclick="setOrderOpt('leds','yes')">כן</button>
+                    <button type="button" class="order-opt-btn" data-order-opt="leds" data-val="no" onclick="setOrderOpt('leds','no')">לא</button>
+                </div>
+                <div id="order-leds-auto-hint" class="order-opt-hint" style="display:none;"><i class="fa-solid fa-lightbulb"></i> יש לדים בהדמיה — מסומן אוטומטית</div>
+            </div>
+
+            <div class="order-opt-item">
+                <div class="order-opt-label">חריטות בחזיתות</div>
+                <div class="order-opt-row">
+                    <button type="button" class="order-opt-btn" data-order-opt="engraving" data-val="yes" onclick="setOrderOpt('engraving','yes')">כן</button>
+                    <button type="button" class="order-opt-btn" data-order-opt="engraving" data-val="no" onclick="setOrderOpt('engraving','no')">לא</button>
+                </div>
+                <div id="order-engraving-colors" class="order-opt-row order-opt-sub" style="display:none;">
+                    <button type="button" class="order-opt-btn" data-order-opt="engravingColor" data-val="black" onclick="setOrderOpt('engravingColor','black')"><span class="order-opt-swatch" style="background:#1d1d1f"></span>שחור</button>
+                    <button type="button" class="order-opt-btn" data-order-opt="engravingColor" data-val="gold" onclick="setOrderOpt('engravingColor','gold')"><span class="order-opt-swatch" style="background:#d4af37"></span>זהב</button>
+                </div>
+            </div>
+
+            <div class="order-opt-item">
+                <div class="order-opt-label">עובי מדפים</div>
+                <div class="order-opt-row">
+                    <button type="button" class="order-opt-btn" data-order-opt="shelfThickness" data-val="17" onclick="setOrderOpt('shelfThickness',17)">17 מ"מ</button>
+                    <button type="button" class="order-opt-btn" data-order-opt="shelfThickness" data-val="28" onclick="setOrderOpt('shelfThickness',28)">28 מ"מ</button>
                 </div>
             </div>
         </div>
@@ -2316,6 +2362,9 @@
         <div class="mobile-panel-divider"></div>
         <div class="mobile-section-title">ידיות ופרזול</div>
         <div class="handle-style-row" style="margin-bottom:10px;">
+            <button type="button" class="handle-style-btn mobile-handle-style-btn" data-style="none" onclick="updateHandleStyle('none')" title="טרם נבחרו ידיות — חובה לבחור לפני הדפסת הזמנת לקוח">
+                <i class="fa-solid fa-ban"></i><span>ללא</span>
+            </button>
             <button type="button" class="handle-style-btn mobile-handle-style-btn" data-style="riding" onclick="updateHandleStyle('riding')">
                 <i class="fa-solid fa-grip-lines"></i><span>רוכבת</span>
             </button>
@@ -2896,17 +2945,17 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js?v=20261008plans"></script>
 <script src="trial-watermark.js?v=20261008trial"></script>
-<script src="state.js?v=20261029shoe"></script>
+<script src="state.js?v=20261101orderopts"></script>
 <script src="quick-calc.js?v=20261029shoe"></script>
 <script src="bathroom-preset.js?v=20261008types"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
 <script src="engine-appliances.js?v=20261007deskMerge28"></script>
-<script src="engine-core.js?v=20261029spacerot"></script>
-<script src="engine-corners.js?v=20261029cdeskrow"></script>
-<script src="engine-blueprint.js?v=20261029cdeskrow"></script>
+<script src="engine-core.js?v=20261101orderopts"></script>
+<script src="engine-corners.js?v=20261101orderopts"></script>
+<script src="engine-blueprint.js?v=20261101orderopts"></script>
 <script src="engine-room-plan.js?v=20261016snap"></script>
 <script src="tambour-color-picker.js?v=20261009colors"></script>
-<script src="ui.js?v=20261029gizmofade"></script>
+<script src="ui.js?v=20261101orderopts"></script>
 <script src="mobile.js?v=20261029inthandle"></script>
 <script src="part-paint.js?v=20260914A427fix"></script>
 <script src="shelf-pick.js?v=20260922sideWall"></script>

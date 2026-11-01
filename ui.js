@@ -10825,6 +10825,11 @@ window.openOrderModal = async function(mode, opts) {
         window._commitCurrentCabinetToCart({ flash: false });
     }
 
+    if (!opts.skipMediaRefresh) {
+        if (!window._confirmGlassWithoutLeds()) return;
+        if (mode === 'customer' && window._blockIfHandlesMissing()) return;
+    }
+
     // Fresh captures on open (quote / production). Skip when only rebuilding after price edits.
     if (state.orderCart.length > 0 && !opts.skipMediaRefresh) {
         _showToast('🔄 מרענן תמונות ארונות...', 3500);
@@ -12560,6 +12565,59 @@ window._cartHasExportableItems = function() {
     return (state.orderCart || []).some(function(it) {
         return it && !window._cartItemOnHold(it);
     });
+};
+
+// ── Order-closing checks (run before customer order / production export) ──
+function _orderCheckItems() {
+    return (state.orderCart || []).map(function(it, i) {
+        if (!it || window._cartItemOnHold(it)) return null;
+        const name = (it.spec && it.spec.customName) || ('ארון ' + (i + 1));
+        return { item: it, name: name, rs: it.rawState || {} };
+    }).filter(Boolean);
+}
+
+/** Wing still on the default "no handle chosen" (touch-only models / sliding wardrobes need none). */
+function _wingNeedsHandleChoice(w, rs) {
+    if (!w || w.handleStyle !== 'none' || w._isUpperUnit) return false;
+    if ((w.handleType || '').trim()) return false;
+    if (w.cabinetModel === 'ab2') return false;
+    if (w.slidingDoor && w.slidingDoor.enabled) return false;
+    if (rs && rs.presetId === 'writing-desk' && w.desk && w.desk.hasDrawers === false) return false;
+    return true;
+}
+
+/** Names of cart cabinets whose handles were never picked. */
+window._cabinetsMissingHandles = function() {
+    return _orderCheckItems().filter(function(c) {
+        const ws = c.rs.wings;
+        if (!ws) return false;
+        return Object.keys(ws).some(function(k) { return _wingNeedsHandleChoice(ws[k], c.rs); });
+    }).map(function(c) { return c.name; });
+};
+
+/** Names of cart cabinets that have glass doors but no LEDs. */
+window._cabinetsGlassWithoutLeds = function() {
+    return _orderCheckItems().filter(function(c) {
+        const ws = c.rs.wings;
+        return ws && window._wingsHaveGlass(ws) && window._orderLedsEffective(ws) !== 'yes';
+    }).map(function(c) { return c.name; });
+};
+
+/** Confirm glass-doors-without-LEDs; returns false when the user wants to go back and fix it. */
+window._confirmGlassWithoutLeds = function() {
+    const names = window._cabinetsGlassWithoutLeds();
+    if (!names.length) return true;
+    return confirm('בארונות הבאים יש דלתות זכוכית ללא לדים:\n\n• ' + names.join('\n• ') +
+        '\n\nלאשר שבאמת אין לדים בארונות אלו?\n(ביטול — חזרה לעריכה)');
+};
+
+/** Customer order cannot print while a cabinet has no handle chosen. */
+window._blockIfHandlesMissing = function() {
+    const names = window._cabinetsMissingHandles();
+    if (!names.length) return false;
+    alert('לא נבחרו ידיות בארונות הבאים:\n\n• ' + names.join('\n• ') +
+        '\n\nיש לבחור סוג ידית (הגדרות ארון ← סוג ידית / פרזול) לפני הדפסת הזמנת לקוח.');
+    return true;
 };
 
 window._setCartItemHold = function(item, held) {
@@ -14301,6 +14359,7 @@ function _collectPrintSpecRows(item, itemObj) {
             rows.push({ id: '_sec_extra', section: true, label: 'צבעים נוספים' });
             rows.push({ id: 'extraColors', label: 'צבעים נוספים בארון', value: _plainSpecValue(_resolveExtraColors(item, itemObj)) });
         }
+        _pushOrderOptionRows(rows, itemObj);
         const notesMulti = (item.cabinetNotes || '').trim();
         if (notesMulti) rows.push({ id: 'cabinetNotes', label: 'הערות', value: notesMulti, multiline: true });
         return rows;
@@ -14370,10 +14429,28 @@ function _collectPrintSpecRows(item, itemObj) {
         if (ledPairs > 0) rows.push({ id: 'ledPairs', label: 'תאורת לד', value: _formatLedPairs(ledPairs) });
     }
 
+    if (!isWD) _pushOrderOptionRows(rows, itemObj);
     const notes = (item.cabinetNotes || '').trim();
     if (notes) rows.push({ id: 'cabinetNotes', label: 'הערות', value: notes, multiline: true });
 
     return rows;
+}
+
+/** "תוספות לסגירת הזמנה" block — leveling feet, LEDs, front engraving, shelf thickness. */
+function _pushOrderOptionRows(rows, itemObj) {
+    const wings = itemObj && itemObj.rawState && itemObj.rawState.wings;
+    const o = window._orderOpts(wings || {});
+    const leds = window._orderLedsEffective(wings || {});
+    const yesNo = function(v) { return v === 'yes' ? 'כן' : v === 'no' ? 'לא' : 'לא צוין'; };
+    rows.push({ id: '_sec_order_opts', section: true, label: 'תוספות לסגירת הזמנה' });
+    rows.push({ id: 'levelingFeet', label: 'רגלי פילוס', value: yesNo(o.levelingFeet) });
+    rows.push({ id: 'ledsChoice', label: 'לדים', value: yesNo(leds) });
+    rows.push({
+        id: 'engraving',
+        label: 'חריטות בחזיתות',
+        value: o.engraving === 'yes' ? 'כן — ' + (o.engravingColor === 'gold' ? 'זהב' : 'שחור') : 'לא'
+    });
+    rows.push({ id: 'shelfThickness', label: 'עובי מדפים', value: (o.shelfThickness === 28 ? 28 : 17) + ' מ"מ' });
 }
 
 function _hashPrintSpecSource(rows) {
@@ -15950,6 +16027,7 @@ window.printCustomer = async function() {
         _showToast('אין ארונות לייצוא — כל הארונות מושהים. הפעילו ארון כדי לכלול אותו.', 5000);
         return;
     }
+    if (window._blockIfHandlesMissing()) return;
     _showToast('🔄 מרענן תמונות לפני הדפסה...', 3000);
     try { await window._refreshCartMediaForPrint({ force: true }); } catch (e) { console.warn('[printCustomer]', e); }
     try { await window._refreshCartBlueprintPagesForPrint(); } catch (e) { console.warn('[printCustomer] blueprint refresh failed:', e); }

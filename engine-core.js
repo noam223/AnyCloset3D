@@ -3143,6 +3143,8 @@ function updateCameraView() {
 
 function buildCabinet() {
     if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
+    // Order options panel: LED auto-mark and per-cabinet values follow every rebuild
+    if (typeof window._syncOrderOptsUI === 'function') window._syncOrderOptsUI();
 
     // Room shell is only for תכנון חדר or תצוגה חופשית — never in עריכת חזית / שרטוט.
     // While room-plan UI is open, a temporary front view (autosave thumbnail) must not turn
@@ -4331,7 +4333,8 @@ function _pickSideOpenDir(c, opensLeft, opensRight) {
 function _getHandleStyle() {
     if (state.cabinetModel === 'ab2') return 'touch';
     const s = state.handleStyle || 'pipe';
-    return (s === 'touch' || s === 'riding' || s === 'pipe') ? s : 'pipe';
+    // 'none' = no handle chosen yet: fronts are drawn without handles
+    return (s === 'touch' || s === 'riding' || s === 'pipe' || s === 'none') ? s : 'pipe';
 }
 
 /** Per-door / per-cell handle finish ({ handleVariant, ridingColor }) for the panel being built. */
@@ -4463,7 +4466,7 @@ function _addRidingDrawerHandle(mesh, panelW, panelH) {
 
 /** pairRole 'upper' = upper drawer of a stacked pair: its half-moon sits on the bottom edge so the pair forms a circle. */
 function _addPanelHandleLocal(mesh, panelW, panelH, style, pairRole) {
-    if (style === 'touch') return;
+    if (style === 'touch' || style === 'none') return;
     const t = state.thickness;
     if (style === 'riding') {
         _addRidingDrawerHandle(mesh, panelW, panelH);
@@ -5272,7 +5275,8 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         let startShelvesY = _fo > 0 ? _fo + t : state.plinthHeight + t;
         if (col.type === 'desk') startShelvesY = col.deskHeight + col.deskClearance + _deskT(!!col.hasDrawers);
         let dividers = [];
-        col.shelvesY.forEach((y, idx) => dividers.push({ y: y, type: 'shelf', thick: t, idx: idx }));
+        const _shelfT = window._shelfThicknessCm ? window._shelfThicknessCm(t) : t;
+        col.shelvesY.forEach((y, idx) => dividers.push({ y: y, type: 'shelf', thick: _shelfT, idx: idx }));
         if (col.splitY && col.splitY > startShelvesY) dividers.push({ y: col.splitY, type: 'split', thick: 2*t, idx: -1 });
         dividers.sort((a, b) => a.y - b.y);
         
@@ -6091,7 +6095,8 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         }
 
         let dividers = [];
-        col.shelvesY.forEach((y, idx) => dividers.push({ y: y, type: 'shelf', thick: t, idx: idx }));
+        const _shelfT = window._shelfThicknessCm ? window._shelfThicknessCm(t) : t;
+        col.shelvesY.forEach((y, idx) => dividers.push({ y: y, type: 'shelf', thick: _shelfT, idx: idx }));
         if (col.splitY && col.splitY > startShelvesY) dividers.push({ y: col.splitY, type: 'split', thick: 2*t, idx: -1 });
         
         // --- אלגוריתם זיהוי מדפים המוסתרים מאחורי חזיתות פנימיות ---

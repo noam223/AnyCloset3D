@@ -277,18 +277,18 @@ const CU_RIDING_HANDLE_LEN = 30;
 function _cuGetHandleStyle() {
     if (state.cabinetModel === 'ab2') return 'touch';
     const s = state.handleStyle || 'pipe';
-    return (s === 'touch' || s === 'riding' || s === 'pipe') ? s : 'pipe';
+    return (s === 'touch' || s === 'riding' || s === 'pipe' || s === 'none') ? s : 'pipe';
 }
 
 function _cuGetCornerDeskHandleStyle(cu) {
     if (state.cabinetModel === 'ab2') return 'touch';
     const s = (cu && cu.deskHandleStyle) || state.handleStyle || 'pipe';
-    return (s === 'touch' || s === 'riding' || s === 'pipe') ? s : 'pipe';
+    return (s === 'touch' || s === 'riding' || s === 'pipe' || s === 'none') ? s : 'pipe';
 }
 
 function _cuAddDrawerHandle(dMesh, drawerDepth, drawerFaceH, sign, t, styleOverride) {
     const style = styleOverride || _cuGetHandleStyle();
-    if (style === 'touch') return;
+    if (style === 'touch' || style === 'none') return;
     const panelH = drawerFaceH - 0.5;
     if (style === 'riding') {
         const barLen = Math.min(CU_RIDING_HANDLE_LEN, Math.max(8, drawerDepth - 3));
@@ -1065,7 +1065,7 @@ function buildFullCornerUnit(side, wingData) {
                         const edgeX = (isVertical ? -dir * sign : dir * sign) * w / 2;
                         _placeHalfMoon(host, mat, edgeX, 0, faceZ, edgeX > 0 ? 'left' : 'right');
                     }
-                } else if (!isBP && spot && fcHandleStyle !== 'touch') {
+                } else if (!isBP && spot && fcHandleStyle !== 'touch' && fcHandleStyle !== 'none') {
                     const isRiding = fcHandleStyle === 'riding';
                     const mat = isRiding
                         ? (typeof _ridingHandleMat === 'function'

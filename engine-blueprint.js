@@ -723,6 +723,11 @@ function _bpShelfTCm() {
     return state.thickness || 1.7;
 }
 
+/** Shelf board thickness (17 mm body board, or 28 mm when selected in the order options). */
+function _bpShelfBoardTCm() {
+    return (typeof window._shelfThicknessCm === 'function') ? window._shelfThicknessCm(_bpShelfTCm()) : _bpShelfTCm();
+}
+
 // Match engine-core startShelvesY — bottom of first clear cell row (cm from floor)
 function _bpRowBaseCm(col, plinthH) {
     const t = _bpShelfTCm();
@@ -758,13 +763,13 @@ function _bpDrawTopBottomBoards(shelfLineFn, col, colX, colW, colBotSvgY, visibl
     else botCenterCm = (plinthH || 0) + t / 2;
 
     if (botCenterCm != null && botCenterCm > 0 && botCenterCm < visibleHCm) {
-        shelfLineFn(colX, colBotSvgY - botCenterCm * sc, colX + colW);
+        shelfLineFn(colX, colBotSvgY - botCenterCm * sc, colX + colW, t);
     }
 
     // Top board center — matches engine-core createBoard at col.height - t/2
     const topCenterCm = visibleHCm - t / 2;
     if (topCenterCm > 0 && (botCenterCm == null || topCenterCm > botCenterCm + t * 0.5)) {
-        shelfLineFn(colX, colBotSvgY - topCenterCm * sc, colX + colW);
+        shelfLineFn(colX, colBotSvgY - topCenterCm * sc, colX + colW, t);
     }
 }
 
@@ -858,9 +863,9 @@ function _bpDrawOuterSideWalls(p, drawVline, ox, dW, colXPositions, sc) {
  *   - last-row top = column outer height (top board sits at height - t/2)
  */
 function _bpClearCellHeightCm(rowBotCm, rowTopCm, shelfT, isBottomRow, isTopRow) {
-    const t = shelfT != null ? shelfT : _bpShelfTCm();
+    const t = shelfT != null ? shelfT : _bpShelfBoardTCm();
     const botFace = isBottomRow ? (+rowBotCm) : (+rowBotCm) + t / 2;
-    const topFace = isTopRow ? (+rowTopCm) - t : (+rowTopCm) - t / 2;
+    const topFace = isTopRow ? (+rowTopCm) - _bpShelfTCm() : (+rowTopCm) - t / 2;
     return Math.max(0, topFace - botFace);
 }
 
@@ -1860,7 +1865,7 @@ window._generateMultiViewBlueprintSVG = function() {
 
     const rect = (x,y,w,h,fill,stroke,sw=1.5) => p.push(`<rect x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" width="${(+w).toFixed(1)}" height="${(+h).toFixed(1)}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`);
     const shelfLine = (x1, sy, x2, sc, tCm, showLabel) => {
-        const t = tCm != null ? tCm : (state.thickness || 1.7);
+        const t = tCm != null ? tCm : _bpShelfBoardTCm();
         const tPx = t * sc;
         if (tPx < 0.4) return;
         const halfT = tPx / 2;
@@ -2353,7 +2358,7 @@ window._generateMultiViewBlueprintSVG = function() {
             });
             // Structural top + bottom boards (17mm) — already in cell math, now visible
             _bpDrawTopBottomBoards(
-                function(x1, sy, x2) { shelfLine(x1, sy, x2, sc); },
+                function(x1, sy, x2, tCm) { shelfLine(x1, sy, x2, sc, tCm); },
                 col, colX, colW, _colBotY, _visibleH, colPlinthH, sc
             );
 
@@ -2408,7 +2413,7 @@ window._generateMultiViewBlueprintSVG = function() {
                 }
                 // Clearance board (shelf above clearance zone) — measured from column bottom
                 const clrBoardY = _colBotY - (deskH + deskClr) * sc;
-                shelfLine(colX, clrBoardY, colX + colW, sc);
+                shelfLine(colX, clrBoardY, colX + colW, sc, _bpShelfTCm());
                 // Label "שולחן" inside the open area
                 const lblY = openTop + (openBot - openTop) / 2 + 4;
                 p.push(`<text x="${(colX+colW/2).toFixed(1)}" y="${lblY.toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.5">שולחן</text>`);
@@ -2419,7 +2424,7 @@ window._generateMultiViewBlueprintSVG = function() {
             const _splitYOldAdj = _splitYOldAdjE;
             const _splitTopOldAdj = _splitTopOldAdjE;
             const numRows = rowBounds.length - 1;
-            const _t_shelf = state.thickness || 1.7;
+            const _t_shelf = _bpShelfBoardTCm();
             for (let ri = 0; ri < numRows; ri++) {
                 const rowBotCm = rowBounds[ri];
                 const rowTopCm = rowBounds[ri + 1];
@@ -2500,10 +2505,10 @@ window._generateMultiViewBlueprintSVG = function() {
                     viewKey: _bpViewKey, ri, cellIsBottom: ri === 0, cellIsTop: ri === numRows - 1,
                     font: FONT, stroke: STROKE, strokeThin: STROKE_THIN,
                     vlineFn: function(x, y1, y2) { vline(x, y1, y2, sc); },
-                    shelfLineFn: function(x1, y, x2) { shelfLine(x1, y, x2, sc); },
+                    shelfLineFn: function(x1, y, x2) { shelfLine(x1, y, x2, sc, _bpShelfTCm()); },
                     dimHFn: dimH,
                     makeRectP: function(pp, x, y, w, h, fill, stroke, sw) { rect(x, y, w, h, fill, stroke, sw); },
-                    makeShelfP: function(pp, x1, sy, x2, scc, tCm, showLabel) { shelfLine(x1, sy, x2, scc, tCm, showLabel); }
+                    makeShelfP: function(pp, x1, sy, x2, scc, tCm, showLabel) { shelfLine(x1, sy, x2, scc, tCm != null ? tCm : _bpShelfTCm(), showLabel); }
                 });
 
                 // Per-cell height: small text label INSIDE the cell (centered)
@@ -2807,7 +2812,7 @@ window._generateMultiViewBlueprintPages = function() {
     const makeRect = (p, x,y,w,h,fill,stroke,sw=1.5) =>
         p.push(`<rect x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" width="${(+w).toFixed(1)}" height="${(+h).toFixed(1)}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`);
     const makeShelfLine = (p, x1, sy, x2, sc, tCm, showLabel) => {
-        const t = tCm != null ? tCm : (state.thickness || 1.7);
+        const t = tCm != null ? tCm : _bpShelfBoardTCm();
         const tPx = t * sc;
         if (tPx < 0.4) return;
         const halfT = tPx / 2;
@@ -3357,7 +3362,7 @@ window._generateMultiViewBlueprintPages = function() {
             });
             // Structural top + bottom boards (17mm) — already in cell math, now visible
             _bpDrawTopBottomBoards(
-                function(x1, sy, x2) { makeShelfLine(p, x1, sy, x2, sc); },
+                function(x1, sy, x2, tCm) { makeShelfLine(p, x1, sy, x2, sc, tCm); },
                 col, colX, colW, _colBotSvgY, _visibleH2, colPlinthH, sc
             );
 
@@ -3413,13 +3418,13 @@ window._generateMultiViewBlueprintPages = function() {
                 }
                 // Clearance board (shelf above clearance zone)
                 const clrBoardY = _colBotSvgY - (deskH + deskClr) * sc;
-                makeShelfLine(p, colX, clrBoardY, colX + colW, sc);
+                makeShelfLine(p, colX, clrBoardY, colX + colW, sc, _bpShelfTCm());
                 // Label inside open area
                 const lblY = openTop + (openBot - openTop) / 2 + 4;
                 p.push(`<text x="${(colX+colW/2).toFixed(1)}" y="${lblY.toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.5">שולחן</text>`);
             }
 
-            const _t_shelf2 = state.thickness || 1.7;
+            const _t_shelf2 = _bpShelfBoardTCm();
             for (let ri = 0; ri < numRows; ri++) {
                 const rowBotCm = rowBounds[ri];
                 const rowTopCm = rowBounds[ri + 1];
@@ -3493,10 +3498,10 @@ window._generateMultiViewBlueprintPages = function() {
                     viewKey: _bpViewKey, ri, cellIsBottom: ri === 0, cellIsTop: ri === numRows - 1,
                     font: FONT, stroke: STROKE, strokeThin: STROKE_THIN,
                     vlineFn: function(x, y1, y2) { makeVline(p, x, y1, y2, sc); },
-                    shelfLineFn: function(x1, y, x2) { makeShelfLine(p, x1, y, x2, sc); },
+                    shelfLineFn: function(x1, y, x2) { makeShelfLine(p, x1, y, x2, sc, _bpShelfTCm()); },
                     dimHFn: function(ax1, ax2, ay, albl, aabove) { makeDimH(p, ax1, ax2, ay, albl, aabove); },
                     makeRectP: makeRect,
-                    makeShelfP: makeShelfLine
+                    makeShelfP: function(pp, x1, sy, x2, scc, tCm, showLabel) { makeShelfLine(pp, x1, sy, x2, scc, tCm != null ? tCm : _bpShelfTCm(), showLabel); }
                 });
 
                 // Skip height label for cells that fall within the split band
@@ -3849,7 +3854,7 @@ window._generateMultiViewBlueprintPages = function() {
             makeShelfLine(p, ox, sy_px, ox + dW, sc);
         });
         _bpDrawTopBottomBoards(
-            function(x1, sy, x2) { makeShelfLine(p, x1, sy, x2, sc); },
+            function(x1, sy, x2, tCm) { makeShelfLine(p, x1, sy, x2, sc, tCm); },
             { noPlinth: false, floorOffset: 0 },
             ox, dW, oy + dH, cH, pH, sc
         );
@@ -3878,7 +3883,7 @@ window._generateMultiViewBlueprintPages = function() {
         }
         const _fcRowBase = _bpRowBaseCm({ noPlinth: false, floorOffset: 0 }, pH);
         const rowBounds = [_fcRowBase, ...fcAllBounds.filter(sy => sy > _fcRowBase), cH];
-        const _t_shelfFC = state.thickness || 1.7;
+        const _t_shelfFC = _bpShelfBoardTCm();
         const _fcNumRows = rowBounds.length - 1;
         for (let ri = 0; ri < _fcNumRows; ri++) {
             const rowBotCm = rowBounds[ri];
@@ -3975,7 +3980,7 @@ window._generateMultiViewBlueprintPages = function() {
                 makeShelfLine(p, colX, oy + dH - sy*sc, colX + colW, sc);
             });
             _bpDrawTopBottomBoards(
-                function(x1, sy, x2) { makeShelfLine(p, x1, sy, x2, sc); },
+                function(x1, sy, x2, tCm) { makeShelfLine(p, x1, sy, x2, sc, tCm); },
                 col, colX, colW, oy + dH, col.height || wg.h, colPlinthH, sc
             );
 
@@ -4007,7 +4012,7 @@ window._generateMultiViewBlueprintPages = function() {
             const _rowBaseFC = _bpRowBaseCm(col, colPlinthH);
             const rowBounds = [_rowBaseFC, ..._allBoundsFC.filter(sy => sy > _rowBaseFC), wg.h];
             const numRows = rowBounds.length - 1;
-            const _t_shelfFCW = state.thickness || 1.7;
+            const _t_shelfFCW = _bpShelfBoardTCm();
             for (let ri = 0; ri < numRows; ri++) {
                 const rowBotCm = rowBounds[ri];
                 const rowTopCm = rowBounds[ri + 1];
@@ -4071,10 +4076,10 @@ window._generateMultiViewBlueprintPages = function() {
                     viewKey: _bpViewKey, ri, cellIsBottom: ri === 0, cellIsTop: ri === numRows - 1,
                     font: FONT, stroke: STROKE, strokeThin: STROKE_THIN,
                     vlineFn: function(x, y1, y2) { makeVline(p, x, y1, y2, sc); },
-                    shelfLineFn: function(x1, y, x2) { makeShelfLine(p, x1, y, x2, sc); },
+                    shelfLineFn: function(x1, y, x2) { makeShelfLine(p, x1, y, x2, sc, _bpShelfTCm()); },
                     dimHFn: function(ax1, ax2, ay, albl, aabove) { makeDimH(p, ax1, ax2, ay, albl, aabove); },
                     makeRectP: makeRect,
-                    makeShelfP: makeShelfLine
+                    makeShelfP: function(pp, x1, sy, x2, scc, tCm, showLabel) { makeShelfLine(pp, x1, sy, x2, scc, tCm != null ? tCm : _bpShelfTCm(), showLabel); }
                 });
 
                 // Skip height label for split band cells
@@ -4248,7 +4253,7 @@ window._generateMultiViewBlueprintPages = function() {
                         makeShelfLine(p, colX, oy + dH - sy*scScale, colX + colW, scScale);
                     });
                     _bpDrawTopBottomBoards(
-                        function(x1, sy, x2) { makeShelfLine(p, x1, sy, x2, scScale); },
+                        function(x1, sy, x2, tCm) { makeShelfLine(p, x1, sy, x2, scScale, tCm); },
                         col, colX, colW, oy + dH, col.height || scH, colPlinthH, scScale
                     );
 
@@ -4279,7 +4284,7 @@ window._generateMultiViewBlueprintPages = function() {
                     }
                     const rowBounds = [_rowBaseSC, ..._allBoundsSC.filter(sy => sy > _rowBaseSC), scH];
                     const numRows = rowBounds.length - 1;
-                    const _t_shelfSC = state.thickness || 1.7;
+                    const _t_shelfSC = _bpShelfBoardTCm();
                     for (let ri = 0; ri < numRows; ri++) {
                         const rowBotCm = rowBounds[ri];
                         const rowTopCm = rowBounds[ri + 1];
@@ -4347,10 +4352,10 @@ window._generateMultiViewBlueprintPages = function() {
                             viewKey: _bpViewKey, ri, cellIsBottom: ri === 0, cellIsTop: ri === numRows - 1,
                             font: FONT, stroke: STROKE, strokeThin: STROKE_THIN,
                             vlineFn: function(x, y1, y2) { makeVline(p, x, y1, y2, scScale); },
-                            shelfLineFn: function(x1, y, x2) { makeShelfLine(p, x1, y, x2, scScale); },
+                            shelfLineFn: function(x1, y, x2) { makeShelfLine(p, x1, y, x2, scScale, _bpShelfTCm()); },
                             dimHFn: function(ax1, ax2, ay, albl, aabove) { makeDimH(p, ax1, ax2, ay, albl, aabove); },
                             makeRectP: makeRect,
-                            makeShelfP: makeShelfLine
+                            makeShelfP: function(pp, x1, sy, x2, scc, tCm, showLabel) { makeShelfLine(pp, x1, sy, x2, scc, tCm != null ? tCm : _bpShelfTCm(), showLabel); }
                         });
 
                         const _isSplitBandSC = _splitYSC > 0 &&
@@ -4445,7 +4450,7 @@ window._generateMultiViewBlueprintPages = function() {
                     makeShelfLine(p, ox, oy + dH - sy*scScale, ox + dW, scScale);
                 });
                 _bpDrawTopBottomBoards(
-                    function(x1, sy, x2) { makeShelfLine(p, x1, sy, x2, scScale); },
+                    function(x1, sy, x2, tCm) { makeShelfLine(p, x1, sy, x2, scScale, tCm); },
                     col, ox, dW, oy + dH, col.height || scH, colPlinthH, scScale
                 );
 
@@ -4472,7 +4477,7 @@ window._generateMultiViewBlueprintPages = function() {
                 }
                 const rowBounds = [_rowBaseSC, ..._allBoundsSC.filter(sy => sy > _rowBaseSC), scH];
                 const numRows = rowBounds.length - 1;
-                const _t_shelfSC = state.thickness || 1.7;
+                const _t_shelfSC = _bpShelfBoardTCm();
                 const cellCX = ox + dW / 2;
 
                 for (let ri = 0; ri < numRows; ri++) {
@@ -4721,7 +4726,7 @@ window._generateMultiViewBlueprintPages = function() {
             });
             // Upper unit: no plinth — bottom + top boards (17mm)
             _bpDrawTopBottomBoards(
-                function(x1, sy, x2) { makeShelfLine(p, x1, sy, x2, sc); },
+                function(x1, sy, x2, tCm) { makeShelfLine(p, x1, sy, x2, sc, tCm); },
                 Object.assign({}, col, { noPlinth: true }),
                 colX, colW, oy + dH, col.height || uuH, 0, sc
             );
@@ -4730,7 +4735,7 @@ window._generateMultiViewBlueprintPages = function() {
             const shelvesArr = (col.shelvesY || []).slice().sort((a,b) => a-b);
             const _uuRowBase = _bpRowBaseCm(Object.assign({}, col, { noPlinth: true }), 0);
             const rowBounds = [_uuRowBase, ...shelvesArr.filter(sy => sy > _uuRowBase && sy < uuH), uuH];
-            const _t_shelfUU = state.thickness || 1.7;
+            const _t_shelfUU = _bpShelfBoardTCm();
             const _uuNumRows = rowBounds.length - 1;
             for (let ri = 0; ri < _uuNumRows; ri++) {
                 const rowBotCm = rowBounds[ri];
@@ -4774,10 +4779,10 @@ window._generateMultiViewBlueprintPages = function() {
                     viewKey: _bpViewKey, ri, cellIsBottom: ri === 0, cellIsTop: ri === _uuNumRows - 1,
                     font: FONT, stroke: STROKE, strokeThin: STROKE_THIN,
                     vlineFn: function(x, y1, y2) { makeVline(p, x, y1, y2, sc); },
-                    shelfLineFn: function(x1, y, x2) { makeShelfLine(p, x1, y, x2, sc); },
+                    shelfLineFn: function(x1, y, x2) { makeShelfLine(p, x1, y, x2, sc, _bpShelfTCm()); },
                     dimHFn: function(ax1, ax2, ay, albl, aabove) { makeDimH(p, ax1, ax2, ay, albl, aabove); },
                     makeRectP: makeRect,
-                    makeShelfP: makeShelfLine
+                    makeShelfP: function(pp, x1, sy, x2, scc, tCm, showLabel) { makeShelfLine(pp, x1, sy, x2, scc, tCm != null ? tCm : _bpShelfTCm(), showLabel); }
                 });
 
                 if (_bpIsHoneycombType(cellType)) {
