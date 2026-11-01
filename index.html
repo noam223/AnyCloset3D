@@ -40,7 +40,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260910deskMerge">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
     <link rel="stylesheet" href="style-extras.css?v=20260731rpcab">
-    <link rel="stylesheet" href="style.css?v=20261101orderopts">
+    <link rel="stylesheet" href="style.css?v=20261101closures">
     <link rel="stylesheet" href="quick-calc.css?v=20260929qc">
     <style>
         html.thumb-only-mode #left-sidebar,
@@ -843,10 +843,18 @@
             <div class="order-opt-item">
                 <label class="order-opt-label" for="inp-order-leveling-feet">רגלי פילוס</label>
                 <select id="inp-order-leveling-feet" class="editor-select order-opt-select" onchange="setOrderOpt('levelingFeet', this.value)">
-                    <option value=""></option>
+                    <option value="no">ללא</option>
                     <option value="yes">כן</option>
-                    <option value="no">לא</option>
                 </select>
+            </div>
+
+            <div class="order-opt-item">
+                <div class="order-opt-label">סגירות</div>
+                <div class="order-opt-row">
+                    <button type="button" class="order-opt-btn" data-order-opt="closures" data-val="yes" onclick="setOrderOpt('closures','yes')">כן</button>
+                    <button type="button" class="order-opt-btn" data-order-opt="closures" data-val="no" onclick="setOrderOpt('closures','no')">ללא</button>
+                </div>
+                <div class="order-opt-hint"><i class="fa-solid fa-circle-info"></i> כן: ‎+₪750 למחיר הארון, ‎+₪300 להתקנה</div>
             </div>
 
             <div class="order-opt-item">
@@ -2945,7 +2953,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js?v=20261008plans"></script>
 <script src="trial-watermark.js?v=20261008trial"></script>
-<script src="state.js?v=20261101orderopts"></script>
+<script src="state.js?v=20261101closures"></script>
 <script src="quick-calc.js?v=20261029shoe"></script>
 <script src="bathroom-preset.js?v=20261008types"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
@@ -2955,7 +2963,7 @@
 <script src="engine-blueprint.js?v=20261101orderopts"></script>
 <script src="engine-room-plan.js?v=20261016snap"></script>
 <script src="tambour-color-picker.js?v=20261009colors"></script>
-<script src="ui.js?v=20261101custterms"></script>
+<script src="ui.js?v=20261101closures"></script>
 <script src="mobile.js?v=20261029inthandle"></script>
 <script src="part-paint.js?v=20260914A427fix"></script>
 <script src="shelf-pick.js?v=20260922sideWall"></script>

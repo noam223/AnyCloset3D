@@ -10826,8 +10826,8 @@ window.openOrderModal = async function(mode, opts) {
     }
 
     if (!opts.skipMediaRefresh) {
-        if (!window._confirmGlassWithoutLeds()) return;
         if (mode === 'customer' && window._blockIfHandlesMissing()) return;
+        if (!(await window._confirmOrderClosing())) return;
     }
 
     // Fresh captures on open (quote / production). Skip when only rebuilding after price edits.
@@ -12603,12 +12603,57 @@ window._cabinetsGlassWithoutLeds = function() {
     }).map(function(c) { return c.name; });
 };
 
-/** Confirm glass-doors-without-LEDs; returns false when the user wants to go back and fix it. */
-window._confirmGlassWithoutLeds = function() {
-    const names = window._cabinetsGlassWithoutLeds();
-    if (!names.length) return true;
-    return confirm('בארונות הבאים יש דלתות זכוכית ללא לדים:\n\n• ' + names.join('\n• ') +
-        '\n\nלאשר שבאמת אין לדים בארונות אלו?\n(ביטול — חזרה לעריכה)');
+/** Names of cart cabinets ordered without closures. */
+window._cabinetsWithoutClosures = function() {
+    return _orderCheckItems().filter(function(c) {
+        return window._orderOpts(c.rs.wings || {}).closures !== 'yes';
+    }).map(function(c) { return c.name; });
+};
+
+/** Styled confirm popup; resolves true on "אישור", false on "ביטול" / Esc / backdrop. */
+window._orderConfirmPopup = function(title, questions) {
+    return new Promise(function(resolve) {
+        const esc = function(s) { return String(s).replace(/[&<>"]/g, function(ch) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]; }); };
+        const overlay = document.createElement('div');
+        overlay.className = 'order-confirm-overlay';
+        overlay.innerHTML =
+            '<div class="order-confirm-box" role="dialog" aria-modal="true" dir="rtl">' +
+                '<div class="order-confirm-title"><i class="fa-solid fa-triangle-exclamation"></i> ' + esc(title) + '</div>' +
+                '<ul class="order-confirm-list">' + questions.map(function(q) { return '<li>' + esc(q) + '</li>'; }).join('') + '</ul>' +
+                '<div class="order-confirm-actions">' +
+                    '<button type="button" class="order-confirm-ok">אישור</button>' +
+                    '<button type="button" class="order-confirm-cancel">ביטול</button>' +
+                '</div>' +
+            '</div>';
+        const done = function(ok) {
+            document.removeEventListener('keydown', onKey, true);
+            overlay.remove();
+            resolve(ok);
+        };
+        const onKey = function(e) {
+            if (e.key === 'Escape') { e.preventDefault(); done(false); }
+            else if (e.key === 'Enter') { e.preventDefault(); done(true); }
+        };
+        overlay.addEventListener('click', function(e) { if (e.target === overlay) done(false); });
+        overlay.querySelector('.order-confirm-ok').addEventListener('click', function() { done(true); });
+        overlay.querySelector('.order-confirm-cancel').addEventListener('click', function() { done(false); });
+        document.addEventListener('keydown', onKey, true);
+        document.body.appendChild(overlay);
+        overlay.querySelector('.order-confirm-ok').focus();
+    });
+};
+
+/** Confirm glass-doors-without-LEDs and cabinets without closures; false = back to editing. */
+window._confirmOrderClosing = function() {
+    const questions = [];
+    window._cabinetsGlassWithoutLeds().forEach(function(n) {
+        questions.push('בארון "' + n + '" יש דלתות זכוכית — האם אתה מאשר שהוא ללא לדים?');
+    });
+    window._cabinetsWithoutClosures().forEach(function(n) {
+        questions.push('האם אתה מאשר שארון "' + n + '" הוא ללא סגירות?');
+    });
+    if (!questions.length) return Promise.resolve(true);
+    return window._orderConfirmPopup('אימות לפני סגירת הזמנה', questions);
 };
 
 /** Customer order cannot print while a cabinet has no handle chosen. */
@@ -14441,9 +14486,10 @@ function _pushOrderOptionRows(rows, itemObj) {
     const wings = itemObj && itemObj.rawState && itemObj.rawState.wings;
     const o = window._orderOpts(wings || {});
     const leds = window._orderLedsEffective(wings || {});
-    const yesNo = function(v) { return v === 'yes' ? 'כן' : v === 'no' ? 'לא' : 'לא צוין'; };
+    const yesNo = function(v) { return v === 'yes' ? 'כן' : 'לא'; };
     rows.push({ id: '_sec_order_opts', section: true, label: 'תוספות לסגירת הזמנה' });
-    rows.push({ id: 'levelingFeet', label: 'רגלי פילוס', value: yesNo(o.levelingFeet) });
+    rows.push({ id: 'levelingFeet', label: 'רגלי פילוס', value: o.levelingFeet === 'yes' ? 'כן' : 'ללא' });
+    rows.push({ id: 'closures', label: 'סגירות', value: o.closures === 'yes' ? 'כן' : 'ללא' });
     rows.push({ id: 'ledsChoice', label: 'לדים', value: yesNo(leds) });
     rows.push({
         id: 'engraving',

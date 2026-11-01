@@ -1947,13 +1947,18 @@ function _wingHasGlass(w) {
 window._wingHasGlass = _wingHasGlass;
 
 // ── Order-closing options (per cabinet, stored on the center wing so every save/restore path keeps them) ──
-window.ORDER_OPTS_DEFAULT = { levelingFeet: '', leds: 'no', engraving: 'no', engravingColor: 'black', shelfThickness: 17 };
+window.ORDER_OPTS_DEFAULT = { levelingFeet: 'no', closures: 'no', leds: 'no', engraving: 'no', engravingColor: 'black', shelfThickness: 17 };
+window.CLOSURES_PRICE_CUSTOMER = 750;
+window.CLOSURES_PRICE_INSTALL = 300;
 
 /** Effective order options for a wings object (defaults filled in). */
 window._orderOpts = function(wings) {
     const ws = wings || (typeof state !== 'undefined' ? state.wings : null);
     const c = ws && ws.center;
-    return Object.assign({}, window.ORDER_OPTS_DEFAULT, (c && c.orderOpts) || {});
+    const o = Object.assign({}, window.ORDER_OPTS_DEFAULT, (c && c.orderOpts) || {});
+    if (o.levelingFeet !== 'yes') o.levelingFeet = 'no';
+    if (o.closures !== 'yes') o.closures = 'no';
+    return o;
 };
 
 /** Shelf board thickness in cm: 2.8 when the cabinet is set to 28 mm shelves, else the body board. */
@@ -2000,6 +2005,8 @@ window.setOrderOpt = function(key, value) {
     if (key === 'shelfThickness') {
         if (typeof buildCabinet === 'function') buildCabinet();
         if (typeof calculatePrice === 'function') calculatePrice();
+    } else if (key === 'closures' && typeof calculatePrice === 'function') {
+        calculatePrice();
     }
     window._syncOrderOptsUI();
     if (typeof saveHistoryState === 'function') saveHistoryState();
@@ -2011,7 +2018,7 @@ window._syncOrderOptsUI = function() {
     const ledPairs = window._ledPairsInWings(state.wings);
     const leds = ledPairs > 0 ? 'yes' : o.leds;
     const feet = document.getElementById('inp-order-leveling-feet');
-    if (feet && document.activeElement !== feet) feet.value = o.levelingFeet || '';
+    if (feet && document.activeElement !== feet) feet.value = o.levelingFeet;
     document.querySelectorAll('[data-order-opt]').forEach(function(btn) {
         const key = btn.getAttribute('data-order-opt');
         const val = btn.getAttribute('data-val');
@@ -5476,12 +5483,15 @@ function calculatePrice() {
     const numRegularWings = (hasLeftWing ? 1 : 0) + (hasRightWing ? 1 : 0);
     if (numRegularWings >= 1) totalCost += numRegularWings * _priceNum(ex.wingConnection, 400);
 
+    const hasClosures = window._orderOpts(state.wings).closures === 'yes';
+    if (hasClosures) totalInstall += window.CLOSURES_PRICE_INSTALL;
+
     state.currentCostPrice    = Math.round(totalCost);
     state.currentInstallPrice = Math.round(totalInstall);
 
     const activeWing       = getWing();
     const profitMult       = cfg.profitMultiplier != null ? cfg.profitMultiplier : 1.7;
-    const priceToCustomer  = totalCost * profitMult;
+    const priceToCustomer  = totalCost * profitMult + (hasClosures ? window.CLOSURES_PRICE_CUSTOMER : 0);
     const finalDisplayPrice = activeWing.manualPrice !== null ? activeWing.manualPrice : Math.round(priceToCustomer);
 
     const priceDisplayEl = document.getElementById('price-display');
