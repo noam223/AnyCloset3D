@@ -10826,7 +10826,7 @@ window.openOrderModal = async function(mode, opts) {
     }
 
     if (!opts.skipMediaRefresh) {
-        if (mode === 'customer' && (window._blockIfCustomerNameMissing() || window._blockIfHandlesMissing())) return;
+        if (mode === 'customer' && (window._blockIfCustomerDetailsMissing() || window._blockIfHandlesMissing())) return;
         if (!(await window._confirmOrderClosing())) return;
     }
 
@@ -12669,11 +12669,19 @@ window._confirmOrderClosing = function() {
     return window._orderConfirmPopup('אימות לפני סגירת הזמנה', questions);
 };
 
-/** Customer order needs a customer name (it is printed on the signature line). */
-window._blockIfCustomerNameMissing = function() {
-    if (((state.customer && state.customer.name) || '').trim()) return false;
-    alert('לא הוזן שם לקוח.\n\nיש למלא שם לקוח (לשונית "לקוח" בתפריט) לפני הוצאת הזמנת לקוח.');
-    const inp = document.getElementById('cust-name');
+/** Customer order needs full customer details (delivery date is optional). */
+window._blockIfCustomerDetailsMissing = function() {
+    const c = state.customer || {};
+    const missing = [
+        ['name', 'שם לקוח', 'cust-name'],
+        ['phone', 'טלפון', 'cust-phone'],
+        ['orderNum', 'מספר הזמנה', 'cust-order-num'],
+        ['address', 'כתובת', 'cust-address']
+    ].filter(function(f) { return !String(c[f[0]] || '').trim(); });
+    if (!missing.length) return false;
+    alert('חסרים פרטי לקוח:\n\n• ' + missing.map(function(f) { return f[1]; }).join('\n• ') +
+        '\n\nיש למלא אותם (לשונית "לקוח" בתפריט) לפני הוצאת הזמנת לקוח.');
+    const inp = document.getElementById(missing[0][2]);
     if (inp && inp.offsetParent) inp.focus();
     return true;
 };
@@ -12696,7 +12704,7 @@ window.sendOrderForSignature = async function() {
         _showToast('אין ארונות לייצוא — כל הארונות מושהים.', 4000);
         return;
     }
-    if (window._blockIfCustomerNameMissing() || window._blockIfHandlesMissing()) return;
+    if (window._blockIfCustomerDetailsMissing() || window._blockIfHandlesMissing()) return;
     if (!window._currentProjectId) {
         alert('יש לשמור את הפרויקט לפני שליחה לחתימה (כפתור "שמור").');
         return;
@@ -16252,7 +16260,7 @@ window.printCustomer = async function() {
         _showToast('אין ארונות לייצוא — כל הארונות מושהים. הפעילו ארון כדי לכלול אותו.', 5000);
         return;
     }
-    if (window._blockIfCustomerNameMissing() || window._blockIfHandlesMissing()) return;
+    if (window._blockIfCustomerDetailsMissing() || window._blockIfHandlesMissing()) return;
     _showToast('🔄 מרענן תמונות לפני הדפסה...', 3000);
     try { await window._refreshCartMediaForPrint({ force: true }); } catch (e) { console.warn('[printCustomer]', e); }
     try { await window._refreshCartBlueprintPagesForPrint(); } catch (e) { console.warn('[printCustomer] blueprint refresh failed:', e); }
