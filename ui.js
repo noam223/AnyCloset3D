@@ -14614,7 +14614,7 @@ function _compactSpecUnitsFromRows(rows) {
         if (r.section) {
             const lbl = r.label || '';
             if (/^מפרט ארון/.test(lbl)) { newUnit(lbl); bucket = 'general'; return; }
-            if (r.id === '_sec_upper_finishes' || r.id === '_sec_extra') { newUnit(lbl, true); bucket = 'finishes'; return; }
+            if (r.id === '_sec_upper_finishes' || r.id === '_sec_extra' || r.id === '_sec_order_opts') { newUnit(lbl, true); bucket = 'finishes'; return; }
             bucket = lbl.indexOf('פרזול') === 0 ? 'hardware' : 'finishes';
             return;
         }
@@ -15056,6 +15056,18 @@ function _muCornerPagesHtml(item, parts, bp, titleText) {
 }
 
 /** Compact factory block for corner cabinets and walk-in closets: shared spec once, plan, parts table, per-part images, numbered blueprints. */
+/** Customer-order terms (small print) + fill-in name / ID / signature lines, under the spec table. */
+function _customerApprovalHtml() {
+    return `<div class="cust-approval">
+        <p>הלקוח מאשר כי הפרטים שנסגרו מופיעים בטופס הזה כולל גוון צבעים בהתאם לקוד הצבע ועל פי כך ישלח לייצור, ניתן לבצע שינוי בהזמנה עד 48 שעות לאחר החתימה או לאחר קבלת המדידה ואישור הלקוח ולא יאוחר מכך, ידוע ללקוח שזמן האספקה נע בין 21-45 ימי עסקים מרגע חתימה על ההזמנה ולא מעבר לכך. תשלום על ההובלה וההתקנה משולם ישירות למתקין ביום ההתקנה ועל הלקוח להכין את התשלום מראש.</p>
+        <div class="cust-approval-fields">
+            <div><span>שם לקוח:</span><i></i></div>
+            <div><span>ת.ז.:</span><i></i></div>
+            <div><span>חתימה:</span><i></i></div>
+        </div>
+    </div>`;
+}
+
 function _buildCompactMultiUnitHtml(o) {
     const item = o.item;
     const rs = o.itemObj.rawState || {};
@@ -15091,7 +15103,7 @@ function _buildCompactMultiUnitHtml(o) {
     return `<div class="cmp-block mu-block" data-cart-index="${o.index}" style="page-break-after:always;">
         <div class="cmp-bar"><span>${_escPrintHtml(o.titleText)}</span><small>${kindLbl} · ${parts.length} חלקים</small></div>
         <div class="mu-top">
-            <div class="cmp-spec">${spec}</div>
+            <div class="cmp-spec">${spec}${o.approvalHtml || ''}</div>
             <div class="mu-plan"><div class="cmp-cap">מבט על — מיקום החלקים</div>${_muPlanSvg(rs, parts, 300, 210)}</div>
         </div>
         ${_muPartsTableHtml(parts)}
@@ -15682,7 +15694,8 @@ function _printSingleCabinetBlockHtml(itemObj, index, opts) {
         const mu = _cartIsWritingDesk(itemObj) ? null : _printMultiUnitParts(itemObj, specRows);
         if (mu && mu.parts.length > 1) {
             return blockResult(_buildCompactMultiUnitHtml({
-                item: item, itemObj: itemObj, index: index, titleText: titleText, specRows: specRows, priceStrip: priceStrip, mu: mu
+                item: item, itemObj: itemObj, index: index, titleText: titleText, specRows: specRows, priceStrip: priceStrip, mu: mu,
+                approvalHtml: isFactory ? '' : _customerApprovalHtml()
             }));
         }
         const firstBp = (item.multiViewPages && item.multiViewPages[0]) || item.multiViewSVG || '';
@@ -15699,6 +15712,7 @@ function _printSingleCabinetBlockHtml(itemObj, index, opts) {
                 <div class="cmp-wrap">
                     <div class="cmp-spec">
                         ${_buildCompactCabinetSpecHtml({ specRows: specRows, priceStrip: priceStrip })}
+                        ${isFactory ? '' : _customerApprovalHtml()}
                     </div>
                     <div class="cmp-side">
                         ${_orderPrintPreviewImagesHtml(item, itemObj.rawState, { centerOnly: true })}
@@ -15947,6 +15961,12 @@ function _buildPrintHTML(mode) {
   .cmp-chip.is-led { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
   .cmp-chip.is-led i { color: #b45309; }
   .cmp-notes { font-size: 0.85rem; color: #78350f; padding: 4px 0 8px; white-space: normal; }
+  .cust-approval { margin-top: 10px; padding-top: 6px; border-top: 1px solid #cbd5e1; break-inside: avoid; page-break-inside: avoid; }
+  .cust-approval p { font-size: 0.68rem; line-height: 1.45; color: #475569; text-align: justify; }
+  .cust-approval-fields { margin-top: 12px; display: flex; flex-direction: column; gap: 14px; }
+  .cust-approval-fields > div { display: flex; align-items: flex-end; gap: 8px; font-size: 0.8rem; font-weight: 700; color: #1e293b; }
+  .cust-approval-fields span { flex-shrink: 0; min-width: 52px; }
+  .cust-approval-fields i { flex: 1; border-bottom: 1px solid #1e293b; height: 1px; }
   .cmp-price { display: flex; justify-content: space-between; background: #fef9c3; border: 1px solid #fde047; border-radius: 6px; padding: 6px 12px; font-weight: 800; color: #713f12; margin-top: 6px; }
   .cmp-side { display: flex; flex-direction: column; gap: 8px; }
   .cmp-side > div, .cmp-imgs > div { flex: none !important; break-inside: avoid; page-break-inside: avoid; }
