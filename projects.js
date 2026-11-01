@@ -19,6 +19,7 @@ var _measurementUnread   = 0;
 var _linkMeasurementId   = null;
 var _measurementChannel  = null;
 var _projectMeasCounts   = {};
+var _projectSigned       = {};
 var _projectMeasFiles    = [];
 var _measViewerFiles     = [];
 var _measViewerIndex     = 0;
@@ -854,6 +855,7 @@ function _renderProjects() {
                 '<div class="project-thumb-date"><i class="fa-regular fa-clock" style="margin-left:4px"></i>' + dateStr + '</div>' +
                 cabinetBadge +
                 measBadge +
+                _signedBadgeHtml(p.id) +
                 (!isLocked ? '<div class="project-open-overlay"><button class="project-open-btn" onclick="openProject(\'' + p.id + '\')"><i class="fa-solid fa-pencil-ruler"></i> פתח לעריכה</button></div>' : '') +
             '</div>' +
             lockBadgeHtml +
@@ -1391,11 +1393,44 @@ async function refreshMeasurementUnread() {
 }
 
 async function refreshProjectMeasCounts() {
+    try { await refreshProjectSignedOrders(); } catch (eSig) {}
     if (!window.MeasurementInbox || !MeasurementInbox.countsByProject) {
         _projectMeasCounts = {};
         return;
     }
     _projectMeasCounts = await MeasurementInbox.countsByProject() || {};
+}
+
+/** Latest signed customer order per project (order_signatures, RLS = own rows). */
+async function refreshProjectSignedOrders() {
+    var sb = window._supabase;
+    if (!sb) return;
+    var res = await sb.from('order_signatures')
+        .select('project_id, token, signer_name, signed_at')
+        .eq('status', 'signed')
+        .order('signed_at', { ascending: false });
+    if (res.error) return;
+    var map = {};
+    (res.data || []).forEach(function(r) {
+        if (r.project_id && !map[r.project_id]) map[r.project_id] = r;
+    });
+    _projectSigned = map;
+}
+
+function openSignedOrder(token, print) {
+    window.open('sign.html?t=' + encodeURIComponent(token) + (print ? '&print=1' : ''), '_blank', 'noopener');
+}
+
+function _signedBadgeHtml(projectId) {
+    var s = _projectSigned[projectId];
+    if (!s) return '';
+    var t = String(s.token).replace(/[^a-f0-9]/gi, '');
+    var when = s.signed_at ? new Date(s.signed_at).toLocaleDateString('he-IL') : '';
+    return '<div class="project-signed-badge" onclick="event.stopPropagation()" title="נחתם ע&quot;י ' + _esc(s.signer_name || '') + (when ? ' · ' + when : '') + '">' +
+        '<span class="project-signed-label"><i class="fa-solid fa-file-signature"></i> נחתם</span>' +
+        '<button type="button" onclick="event.stopPropagation(); openSignedOrder(\'' + t + '\')" title="פתח הזמנה חתומה"><i class="fa-regular fa-eye"></i> הזמנה חתומה</button>' +
+        '<button type="button" onclick="event.stopPropagation(); openSignedOrder(\'' + t + '\', true)" title="הדפס הזמנה חתומה"><i class="fa-solid fa-print"></i></button>' +
+    '</div>';
 }
 
 function _applyMeasurementBadges(pulseProjectId) {

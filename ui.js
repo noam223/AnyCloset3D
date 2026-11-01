@@ -12789,9 +12789,50 @@ window._refreshOrderSignStatus = async function() {
             '<span class="order-sign-row-btns">' +
                 (signed ? '' : '<button type="button" onclick="_orderSignSharePopup(\'' + _orderSignUrl(r.token) + '\')">שלח שוב</button>') +
                 '<a href="' + _orderSignUrl(r.token) + '" target="_blank" rel="noopener">' + (signed ? 'פתח מסמך חתום' : 'צפה') + '</a>' +
+                (signed ? '<button type="button" onclick="_openSignedOrder(\'' + r.token + '\', true)"><i class="fa-solid fa-print"></i> הדפס</button>' : '') +
             '</span></div>';
     }).join('');
 };
+
+window._openSignedOrder = function(token, print) {
+    window.open(_orderSignUrl(token) + (print ? '&print=1' : ''), '_blank', 'noopener');
+};
+
+/** "נחתם" box under the order status in the left sidebar (latest signed order of the open project). */
+window._refreshSidebarSignedOrder = async function() {
+    const el = document.getElementById('sidebar-signed-order');
+    const sb = window._supabase;
+    const pid = window._currentProjectId;
+    if (!el) return;
+    if (!sb || !pid) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    const { data } = await sb.from('order_signatures')
+        .select('token, signer_name, signed_at')
+        .eq('project_id', pid)
+        .eq('status', 'signed')
+        .order('signed_at', { ascending: false })
+        .limit(1);
+    if (pid !== window._currentProjectId) return;
+    const r = data && data[0];
+    if (!r) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    const when = new Date(r.signed_at).toLocaleDateString('he-IL');
+    el.innerHTML =
+        '<div class="sidebar-signed-info"><i class="fa-solid fa-file-signature"></i> הזמנה נחתמה' +
+            '<small>' + _escPrintHtml(r.signer_name || '') + ' · ' + when + '</small></div>' +
+        '<div class="sidebar-signed-btns">' +
+            '<button type="button" onclick="_openSignedOrder(\'' + r.token + '\')"><i class="fa-regular fa-eye"></i> פתח</button>' +
+            '<button type="button" onclick="_openSignedOrder(\'' + r.token + '\', true)"><i class="fa-solid fa-print"></i> הדפס</button>' +
+        '</div>';
+    el.style.display = '';
+};
+
+(function() {
+    let lastPid;
+    setInterval(function() {
+        if (window._currentProjectId === lastPid) return;
+        lastPid = window._currentProjectId;
+        if (window._refreshSidebarSignedOrder) window._refreshSidebarSignedOrder();
+    }, 1500);
+})();
 
 /** Live notice when a customer signs: toast, refresh the list, move the project to "ordered". */
 window._listenOrderSignatures = async function() {
@@ -12807,6 +12848,7 @@ window._listenOrderSignatures = async function() {
             _showToast('✍️ ' + (r.signer_name || 'הלקוח') + ' חתם/ה על ההזמנה', 7000);
             if (r.project_id && r.project_id === window._currentProjectId) {
                 window._refreshOrderSignStatus();
+                window._refreshSidebarSignedOrder();
                 const st = window._currentOrderStatus;
                 if ((!st || st === 'quote' || st === 'measured') && window._setProjectOrderStatus) window._setProjectOrderStatus('ordered');
             }

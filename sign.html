@@ -54,7 +54,9 @@
     var FN = 'https://meqxnsjycvfgfhdepguo.supabase.co/functions/v1/order-sign';
     var ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lcXhuc2p5Y3ZmZ2ZoZGVwZ3VvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3MDA5NDAsImV4cCI6MjA5MjI3Njk0MH0.w63bl0-1-Rgt9Nx6sVW5ueEGMojiMaxoehlPXlPH2N0';
     var DOC_W = 860;
-    var token = (new URLSearchParams(location.search).get('t') || '').replace(/[^a-f0-9]/gi, '');
+    var params = new URLSearchParams(location.search);
+    var token = (params.get('t') || '').replace(/[^a-f0-9]/gi, '');
+    var autoPrint = params.get('print') === '1';
     var app = document.getElementById('app');
     var data = null;
 
@@ -165,6 +167,12 @@
             var imgs = frame.contentDocument ? frame.contentDocument.images : [];
             for (var i = 0; i < imgs.length; i++) imgs[i].addEventListener('load', fit);
             setTimeout(fit, 600);
+            if (autoPrint) {
+                autoPrint = false;
+                setTimeout(function () {
+                    try { frame.contentWindow.focus(); frame.contentWindow.print(); } catch (e) {}
+                }, 800);
+            }
         };
         window.addEventListener('resize', fit);
     }

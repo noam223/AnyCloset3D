@@ -330,6 +330,19 @@
             cursor: pointer; font-family: inherit; box-shadow: 0 4px 14px rgba(15,118,110,.35);
         }
         .project-meas-badge:hover { background: #115e59; }
+        .project-signed-badge {
+            position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 7;
+            display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+            background: #15803d; color: #fff; border: 1.5px solid rgba(255,255,255,.75);
+            border-radius: 999px; padding: 3px 4px 3px 4px; font-size: .7rem; font-weight: 800;
+            box-shadow: 0 4px 14px rgba(21,128,61,.35); cursor: default;
+        }
+        .project-signed-label { padding: 0 6px 0 2px; display: inline-flex; align-items: center; gap: 4px; }
+        .project-signed-badge button {
+            border: 0; background: rgba(255,255,255,.95); color: #15803d; font: inherit; font-size: .68rem; font-weight: 800;
+            border-radius: 999px; padding: 4px 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+        }
+        .project-signed-badge button:hover { background: #dcfce7; }
         .project-meas-badge.is-new { animation: measPulse 1.4s ease-in-out 3; }
         @keyframes measPulse {
             0%, 100% { box-shadow: 0 4px 14px rgba(15,118,110,.35); }
@@ -1800,7 +1813,7 @@
 <script src="trial-watermark.js?v=20261008trial"></script>
 <script src="pricing-core.js?v=20261029shoe"></script>
 <script src="pricing-panel.js?v=20261029shoe"></script>
-<script src="projects.js?v=20261029shoe"></script>
+<script src="projects.js?v=20261101signedaccess"></script>
 <script src="quick-calc.js?v=20261029shoe"></script>
 </body>
 </html>
