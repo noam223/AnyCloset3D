@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="robots" content="noindex, nofollow">
+    <title>חתימה על הזמנה | AnyCloset</title>
+    <link rel="icon" type="image/png" href="images/icon-logo.png">
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --navy: #1e3a5f; --blue: #2563eb; --ok: #059669; --bg: #eef2f7; --card: #fff;
+            --line: #e2e8f0; --text: #0f172a; --muted: #64748b; --err: #dc2626;
+        }
+        body { font-family: Rubik, sans-serif; background: var(--bg); color: var(--text); min-height: 100dvh; padding: 16px 12px 40px; }
+        .wrap { max-width: 860px; margin: 0 auto; }
+        .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+        .brand img { max-height: 44px; max-width: 140px; object-fit: contain; }
+        .brand strong { display: block; font-size: 1.05rem; }
+        .brand span { font-size: .8rem; color: var(--muted); }
+        .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 18px 16px 20px; box-shadow: 0 8px 28px rgba(15,23,42,.06); margin-bottom: 14px; }
+        h1 { font-size: 1.2rem; font-weight: 800; color: var(--navy); margin-bottom: 4px; }
+        .lead { font-size: .88rem; color: var(--muted); line-height: 1.55; }
+        .doc-box { background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; position: relative; }
+        .doc-box iframe { border: 0; display: block; transform-origin: top right; background: #fff; }
+        label { display: block; font-size: .8rem; font-weight: 700; color: var(--muted); margin: 14px 0 6px; }
+        input[type="text"] { width: 100%; height: 48px; border: 1.5px solid var(--line); border-radius: 12px; padding: 0 14px; font: inherit; font-size: 1rem; background: #f8fafc; outline: none; }
+        input[type="text"]:focus { border-color: var(--blue); background: #fff; }
+        .sig-wrap { position: relative; border: 1.5px dashed #94a3b8; border-radius: 12px; background: #f8fafc; touch-action: none; }
+        .sig-wrap canvas { display: block; width: 100%; height: 180px; touch-action: none; cursor: crosshair; }
+        .sig-hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: .9rem; pointer-events: none; }
+        .sig-clear { position: absolute; top: 8px; left: 8px; border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 4px 10px; font: inherit; font-size: .78rem; cursor: pointer; color: var(--muted); }
+        .agree { display: flex; gap: 10px; align-items: flex-start; margin-top: 16px; font-size: .85rem; line-height: 1.5; }
+        .agree input { width: 20px; height: 20px; flex-shrink: 0; margin-top: 1px; accent-color: var(--navy); }
+        .submit { width: 100%; height: 52px; margin-top: 18px; border: 0; border-radius: 14px; background: linear-gradient(135deg, #1e3a5f, #0f1f38); color: #fff; font: inherit; font-size: 1.02rem; font-weight: 800; cursor: pointer; }
+        .submit:disabled { opacity: .55; cursor: default; }
+        .err { margin-top: 12px; color: var(--err); font-size: .88rem; font-weight: 600; display: none; }
+        .banner { display: flex; gap: 10px; align-items: center; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; border-radius: 14px; padding: 14px 16px; font-weight: 700; margin-bottom: 14px; }
+        .banner i { font-size: 1.4rem; }
+        .fatal { text-align: center; padding: 40px 16px; }
+        .fatal i { font-size: 2.4rem; color: #f59e0b; margin-bottom: 12px; }
+        .btn-light { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: #fff; border-radius: 12px; padding: 10px 14px; font: inherit; font-weight: 700; cursor: pointer; color: var(--navy); }
+        .loading { text-align: center; padding: 60px 0; color: var(--muted); }
+    </style>
+</head>
+<body>
+<div class="wrap" id="app"><div class="loading"><i class="fa-solid fa-spinner fa-spin"></i> טוען הזמנה...</div></div>
+
+<script>
+(function () {
+    var FN = 'https://meqxnsjycvfgfhdepguo.supabase.co/functions/v1/order-sign';
+    var ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lcXhuc2p5Y3ZmZ2ZoZGVwZ3VvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3MDA5NDAsImV4cCI6MjA5MjI3Njk0MH0.w63bl0-1-Rgt9Nx6sVW5ueEGMojiMaxoehlPXlPH2N0';
+    var DOC_W = 860;
+    var token = (new URLSearchParams(location.search).get('t') || '').replace(/[^a-f0-9]/gi, '');
+    var app = document.getElementById('app');
+    var data = null;
+
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+    function headers(extra) {
+        return Object.assign({ apikey: ANON, Authorization: 'Bearer ' + ANON }, extra || {});
+    }
+    function fatal(msg) {
+        app.innerHTML = '<div class="card fatal"><i class="fa-solid fa-triangle-exclamation"></i><h1>' + esc(msg) + '</h1></div>';
+    }
+    function fmtDate(iso) {
+        try { return new Date(iso).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' }); } catch (e) { return ''; }
+    }
+    function validId(raw) {
+        var id = String(raw || '').replace(/\D/g, '');
+        if (id.length < 5 || id.length > 9) return false;
+        id = ('000000000' + id).slice(-9);
+        var sum = 0;
+        for (var i = 0; i < 9; i++) {
+            var n = Number(id[i]) * ((i % 2) + 1);
+            if (n > 9) n -= 9;
+            sum += n;
+        }
+        return sum % 10 === 0;
+    }
+
+    async function load() {
+        if (token.length < 32) return fatal('הקישור לא תקין');
+        try {
+            var res = await fetch(FN + '?t=' + token, { headers: headers() });
+            var d = {};
+            try { d = await res.json(); } catch (e) {}
+            if (!res.ok || !d.ok) return fatal(d.error || 'לא ניתן לטעון את ההזמנה');
+            data = d;
+            render();
+        } catch (e) {
+            fatal('שגיאת תקשורת — נסו לרענן את הדף');
+        }
+    }
+
+    function brandHtml() {
+        return '<div class="brand">' +
+            (data.logo_url ? '<img src="' + esc(data.logo_url) + '" alt="">' : '') +
+            '<div><strong>' + esc(data.business_name) + '</strong><span>הזמנה ללקוח' + (data.customer_name ? ' · ' + esc(data.customer_name) : '') + '</span></div>' +
+        '</div>';
+    }
+
+    function render() {
+        var signed = data.status === 'signed';
+        var html = brandHtml();
+        if (signed) {
+            html += '<div class="banner"><i class="fa-solid fa-circle-check"></i><div>ההזמנה נחתמה' +
+                (data.signer_name ? ' על ידי ' + esc(data.signer_name) : '') +
+                (data.signed_at ? ' · ' + esc(fmtDate(data.signed_at)) : '') + '</div></div>';
+        } else {
+            html += '<div class="card"><h1>אישור הזמנה וחתימה</h1>' +
+                '<p class="lead">עברו על פרטי ההזמנה, ובסוף הדף מלאו את הפרטים וחתמו.</p></div>';
+        }
+        html += '<div class="card" style="padding:10px;"><div class="doc-box" id="doc-box"><iframe id="doc-frame" sandbox="allow-same-origin allow-modals" title="הזמנה"></iframe></div>' +
+            '<div style="margin-top:10px;"><button type="button" class="btn-light" id="btn-print"><i class="fa-solid fa-print"></i> הדפסה / שמירה כ-PDF</button></div></div>';
+        if (!signed) {
+            html += '<div class="card" id="sign-card"><h1>חתימת לקוח</h1>' +
+                (data.customer_name ? '' :
+                    '<label for="f-name">שם לקוח</label><input type="text" id="f-name" autocomplete="name">') +
+                '<label for="f-id">תעודת זהות</label><input type="text" id="f-id" inputmode="numeric" autocomplete="off" maxlength="9" placeholder="9 ספרות">' +
+                '<label>חתימה</label><div class="sig-wrap"><canvas id="sig"></canvas><div class="sig-hint" id="sig-hint">חתמו כאן באצבע</div><button type="button" class="sig-clear" id="sig-clear">נקה</button></div>' +
+                '<label class="agree"><input type="checkbox" id="f-agree"><span>קראתי את פרטי ההזמנה והתנאים המופיעים בה ואני מאשר/ת אותם.</span></label>' +
+                '<button type="button" class="submit" id="btn-sign"><i class="fa-solid fa-signature"></i> חתום ושלח</button>' +
+                '<div class="err" id="err"></div></div>';
+        }
+        app.innerHTML = html;
+        mountDoc(data.html);
+        document.getElementById('btn-print').onclick = function () {
+            var f = document.getElementById('doc-frame');
+            try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) {}
+        };
+        if (!signed) mountSignature();
+    }
+
+    function mountDoc(docHtml) {
+        var box = document.getElementById('doc-box');
+        var frame = document.getElementById('doc-frame');
+        frame.style.width = DOC_W + 'px';
+        frame.srcdoc = docHtml;
+        function fit() {
+            var d = frame.contentDocument;
+            if (!d || !d.body) return;
+            var scale = Math.min(1, box.clientWidth / DOC_W);
+            var h = Math.max(d.documentElement.scrollHeight, d.body.scrollHeight);
+            frame.style.height = h + 'px';
+            frame.style.transform = 'scale(' + scale + ')';
+            box.style.height = Math.ceil(h * scale) + 'px';
+        }
+        frame.onload = function () {
+            fit();
+            var imgs = frame.contentDocument ? frame.contentDocument.images : [];
+            for (var i = 0; i < imgs.length; i++) imgs[i].addEventListener('load', fit);
+            setTimeout(fit, 600);
+        };
+        window.addEventListener('resize', fit);
+    }
+
+    function mountSignature() {
+        var canvas = document.getElementById('sig');
+        var hint = document.getElementById('sig-hint');
+        var ctx = canvas.getContext('2d');
+        var drawing = false, inked = 0, last = null;
+        function size() {
+            var r = canvas.getBoundingClientRect();
+            var dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+            canvas.width = Math.round(r.width * dpr);
+            canvas.height = Math.round(r.height * dpr);
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.lineWidth = 2.4; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#0f172a';
+            inked = 0; hint.style.display = '';
+        }
+        function pt(e) { var r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+        canvas.addEventListener('pointerdown', function (e) {
+            e.preventDefault(); drawing = true; last = pt(e);
+            canvas.setPointerCapture(e.pointerId); hint.style.display = 'none';
+        });
+        canvas.addEventListener('pointermove', function (e) {
+            if (!drawing) return;
+            e.preventDefault();
+            var p = pt(e);
+            ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+            inked += Math.abs(p.x - last.x) + Math.abs(p.y - last.y);
+            last = p;
+        });
+        ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (t) {
+            canvas.addEventListener(t, function () { drawing = false; });
+        });
+        document.getElementById('sig-clear').onclick = function () { ctx.clearRect(0, 0, canvas.width, canvas.height); size(); };
+        size();
+
+        var idInp = document.getElementById('f-id');
+        idInp.addEventListener('input', function () { idInp.value = idInp.value.replace(/\D/g, '').slice(0, 9); });
+
+        document.getElementById('btn-sign').onclick = async function () {
+            var err = document.getElementById('err');
+            var btn = this;
+            function fail(m) { err.textContent = m; err.style.display = 'block'; }
+            err.style.display = 'none';
+            var nameEl = document.getElementById('f-name');
+            var name = nameEl ? nameEl.value.trim() : '';
+            if (nameEl && name.length < 2) return fail('יש למלא שם לקוח');
+            if (!validId(idInp.value)) return fail('מספר תעודת הזהות לא תקין');
+            if (inked < 40) return fail('יש לחתום בתיבת החתימה');
+            if (!document.getElementById('f-agree').checked) return fail('יש לאשר את פרטי ההזמנה והתנאים');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> שולח...';
+            try {
+                var res = await fetch(FN, {
+                    method: 'POST',
+                    headers: headers({ 'Content-Type': 'application/json' }),
+                    body: JSON.stringify({ action: 'sign', token: token, name: name, id_number: idInp.value, signature: canvas.toDataURL('image/png') })
+                });
+                var d = {};
+                try { d = await res.json(); } catch (e) {}
+                if (!res.ok || !d.ok) throw new Error(d.error || 'החתימה נכשלה');
+                window.scrollTo(0, 0);
+                await load();
+            } catch (e) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-signature"></i> חתום ושלח';
+                fail(e.message || 'החתימה נכשלה');
+            }
+        };
+    }
+
+    load();
+})();
+</script>
+</body>
+</html>

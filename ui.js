@@ -10826,7 +10826,7 @@ window.openOrderModal = async function(mode, opts) {
     }
 
     if (!opts.skipMediaRefresh) {
-        if (mode === 'customer' && window._blockIfHandlesMissing()) return;
+        if (mode === 'customer' && (window._blockIfCustomerNameMissing() || window._blockIfHandlesMissing())) return;
         if (!(await window._confirmOrderClosing())) return;
     }
 
@@ -10875,7 +10875,20 @@ window.openOrderModal = async function(mode, opts) {
     if (actionsEl) {
         actionsEl.innerHTML = isFactory
             ? `<button class="print-btn-large" onclick="printFactory()" style="flex:1;background:#475569;box-shadow:0 4px 15px rgba(71,85,105,0.4);"><i class="fa-solid fa-industry"></i> הדפס לייצור (עלויות רכש)</button>`
-            : `<button class="print-btn-large" onclick="printCustomer()" style="flex:1;"><i class="fa-solid fa-file-invoice-dollar"></i> הדפס הזמנת לקוח</button>`;
+            : `<button class="print-btn-large" onclick="printCustomer()" style="flex:1;"><i class="fa-solid fa-file-invoice-dollar"></i> הדפס הזמנת לקוח</button>
+               <button class="print-btn-large order-sign-btn" onclick="sendOrderForSignature()" style="flex:1;"><i class="fa-solid fa-signature"></i> שלח ללקוח לחתימה דיגיטלית</button>`;
+    }
+    let signStatusEl = document.getElementById('order-sign-status');
+    if (!signStatusEl && actionsEl) {
+        signStatusEl = document.createElement('div');
+        signStatusEl.id = 'order-sign-status';
+        signStatusEl.className = 'order-sign-status hide-on-print';
+        actionsEl.insertAdjacentElement('afterend', signStatusEl);
+    }
+    if (signStatusEl) {
+        signStatusEl.innerHTML = '';
+        signStatusEl.style.display = isFactory ? 'none' : '';
+        if (!isFactory) window._refreshOrderSignStatus();
     }
 
     container.innerHTML = '';
@@ -12655,6 +12668,143 @@ window._confirmOrderClosing = function() {
     if (!questions.length) return Promise.resolve(true);
     return window._orderConfirmPopup('אימות לפני סגירת הזמנה', questions);
 };
+
+/** Customer order needs a customer name (it is printed on the signature line). */
+window._blockIfCustomerNameMissing = function() {
+    if (((state.customer && state.customer.name) || '').trim()) return false;
+    alert('לא הוזן שם לקוח.\n\nיש למלא שם לקוח (לשונית "לקוח" בתפריט) לפני הוצאת הזמנת לקוח.');
+    const inp = document.getElementById('cust-name');
+    if (inp && inp.offsetParent) inp.focus();
+    return true;
+};
+
+// ── Remote digital signature (sign.html + order-sign edge function) ──
+const _ORDER_SIGN_FN = 'https://meqxnsjycvfgfhdepguo.supabase.co/functions/v1/order-sign';
+
+function _orderSignUrl(token) {
+    return location.origin + location.pathname.replace(/[^/]*$/, '') + 'sign.html?t=' + token;
+}
+
+function _waPhone(raw) {
+    let d = String(raw || '').replace(/\D/g, '');
+    if (d.startsWith('0')) d = '972' + d.slice(1);
+    return d.length >= 11 ? d : '';
+}
+
+window.sendOrderForSignature = async function() {
+    if (window._cartHasExportableItems && !window._cartHasExportableItems()) {
+        _showToast('אין ארונות לייצוא — כל הארונות מושהים.', 4000);
+        return;
+    }
+    if (window._blockIfCustomerNameMissing() || window._blockIfHandlesMissing()) return;
+    if (!window._currentProjectId) {
+        alert('יש לשמור את הפרויקט לפני שליחה לחתימה (כפתור "שמור").');
+        return;
+    }
+    const sb = window._supabase;
+    const session = sb && (await sb.auth.getSession()).data.session;
+    if (!session) { alert('יש להתחבר מחדש למערכת.'); return; }
+    _showToast('🔄 מכין את ההזמנה לחתימה...', 3000);
+    try {
+        const res = await fetch(_ORDER_SIGN_FN, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+            body: JSON.stringify({
+                action: 'create',
+                project_id: window._currentProjectId,
+                customer_name: (state.customer.name || '').trim(),
+                html: _buildPrintHTML('customer')
+            })
+        });
+        let d = {};
+        try { d = await res.json(); } catch (e) {}
+        if (!res.ok || !d.ok) throw new Error(d.error || 'יצירת הקישור נכשלה');
+        _orderSignSharePopup(_orderSignUrl(d.token));
+        window._refreshOrderSignStatus();
+    } catch (e) {
+        alert('שליחה לחתימה נכשלה: ' + (e.message || e));
+    }
+};
+
+function _orderSignSharePopup(url) {
+    const name = (state.customer.name || '').trim();
+    const msg = `שלום ${name}, מצורף קישור לאישור וחתימה דיגיטלית על ההזמנה:\n${url}`;
+    const phone = _waPhone(state.customer.phone);
+    const wa = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(msg);
+    const overlay = document.createElement('div');
+    overlay.className = 'order-confirm-overlay';
+    overlay.innerHTML =
+        '<div class="order-confirm-box" role="dialog" aria-modal="true" dir="rtl">' +
+            '<div class="order-confirm-title"><i class="fa-solid fa-signature" style="color:#059669"></i> קישור לחתימה דיגיטלית</div>' +
+            '<p class="order-sign-lead">שלחו את הקישור ללקוח. הוא ימלא ת.ז. ויחתום מהטלפון, וההזמנה החתומה תחזור אליכם לכאן.</p>' +
+            '<input type="text" class="order-sign-link" readonly dir="ltr">' +
+            '<div class="order-confirm-actions order-sign-actions">' +
+                '<a class="order-sign-wa" target="_blank" rel="noopener"><i class="fa-brands fa-whatsapp"></i> וואטסאפ</a>' +
+                '<button type="button" class="order-sign-copy"><i class="fa-regular fa-copy"></i> העתק קישור</button>' +
+                '<button type="button" class="order-confirm-cancel">סגור</button>' +
+            '</div>' +
+        '</div>';
+    const linkEl = overlay.querySelector('.order-sign-link');
+    linkEl.value = url;
+    overlay.querySelector('.order-sign-wa').href = wa;
+    const close = function() { overlay.remove(); };
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) close(); });
+    overlay.querySelector('.order-confirm-cancel').onclick = close;
+    overlay.querySelector('.order-sign-copy').onclick = async function() {
+        try { await navigator.clipboard.writeText(url); } catch (e) { linkEl.select(); document.execCommand('copy'); }
+        _showToast('הקישור הועתק', 2000);
+    };
+    document.body.appendChild(overlay);
+    linkEl.select();
+}
+
+/** Signature requests of the open project, shown under the customer-order buttons. */
+window._refreshOrderSignStatus = async function() {
+    const el = document.getElementById('order-sign-status');
+    const sb = window._supabase;
+    if (!el || !sb || !window._currentProjectId) { if (el) el.innerHTML = ''; return; }
+    const { data, error } = await sb.from('order_signatures')
+        .select('id, token, status, signer_name, signed_at, created_at')
+        .eq('project_id', window._currentProjectId)
+        .neq('status', 'cancelled')
+        .order('created_at', { ascending: false })
+        .limit(5);
+    if (error || !data || !data.length) { el.innerHTML = ''; return; }
+    const fmt = function(iso) { return new Date(iso).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' }); };
+    el.innerHTML = '<div class="order-sign-list-t"><i class="fa-solid fa-signature"></i> חתימות דיגיטליות</div>' + data.map(function(r) {
+        const signed = r.status === 'signed';
+        const label = signed
+            ? '<b class="is-signed"><i class="fa-solid fa-circle-check"></i> נחתם</b> ע"י ' + _escPrintHtml(r.signer_name || '') + ' · ' + fmt(r.signed_at)
+            : '<b class="is-pending"><i class="fa-regular fa-clock"></i> ממתין לחתימה</b> · נשלח ' + fmt(r.created_at);
+        return '<div class="order-sign-row"><span>' + label + '</span>' +
+            '<span class="order-sign-row-btns">' +
+                (signed ? '' : '<button type="button" onclick="_orderSignSharePopup(\'' + _orderSignUrl(r.token) + '\')">שלח שוב</button>') +
+                '<a href="' + _orderSignUrl(r.token) + '" target="_blank" rel="noopener">' + (signed ? 'פתח מסמך חתום' : 'צפה') + '</a>' +
+            '</span></div>';
+    }).join('');
+};
+
+/** Live notice when a customer signs: toast, refresh the list, move the project to "ordered". */
+window._listenOrderSignatures = async function() {
+    const sb = window._supabase;
+    if (!sb || window._orderSignChannel) return;
+    const { data } = await sb.auth.getUser();
+    const uid = data && data.user && data.user.id;
+    if (!uid) return;
+    window._orderSignChannel = sb.channel('order-signatures-' + uid)
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'order_signatures', filter: 'user_id=eq.' + uid }, function(payload) {
+            const r = payload.new || {};
+            if (r.status !== 'signed') return;
+            _showToast('✍️ ' + (r.signer_name || 'הלקוח') + ' חתם/ה על ההזמנה', 7000);
+            if (r.project_id && r.project_id === window._currentProjectId) {
+                window._refreshOrderSignStatus();
+                const st = window._currentOrderStatus;
+                if ((!st || st === 'quote' || st === 'measured') && window._setProjectOrderStatus) window._setProjectOrderStatus('ordered');
+            }
+        })
+        .subscribe();
+};
+setTimeout(function() { if (window._listenOrderSignatures) window._listenOrderSignatures(); }, 4000);
 
 /** Customer order cannot print while a cabinet has no handle chosen. */
 window._blockIfHandlesMissing = function() {
@@ -15102,15 +15252,21 @@ function _muCornerPagesHtml(item, parts, bp, titleText) {
 }
 
 /** Compact factory block for corner cabinets and walk-in closets: shared spec once, plan, parts table, per-part images, numbered blueprints. */
-/** Customer-order terms (small print) + fill-in name / ID / signature lines, under the spec table. */
+/**
+ * Customer-order terms (small print) + name / ID / signature lines, once at the end of the whole order.
+ * The data-sig markers are filled in server-side by the order-sign function — keep them exact.
+ */
 function _customerApprovalHtml() {
+    const name = _escPrintHtml(((state.customer && state.customer.name) || '').trim());
     return `<div class="cust-approval">
+        <div class="cust-approval-t">אישור הזמנה וחתימת לקוח</div>
         <p>הלקוח מאשר כי הפרטים שנסגרו מופיעים בטופס הזה כולל גוון צבעים בהתאם לקוד הצבע ועל פי כך ישלח לייצור, ניתן לבצע שינוי בהזמנה עד 48 שעות לאחר החתימה או לאחר קבלת המדידה ואישור הלקוח ולא יאוחר מכך, ידוע ללקוח שזמן האספקה נע בין 21-45 ימי עסקים מרגע חתימה על ההזמנה ולא מעבר לכך. תשלום על ההובלה וההתקנה משולם ישירות למתקין ביום ההתקנה ועל הלקוח להכין את התשלום מראש.</p>
         <div class="cust-approval-fields">
-            <div><span>שם לקוח:</span><i></i></div>
-            <div><span>ת.ז.:</span><i></i></div>
-            <div><span>חתימה:</span><i></i></div>
+            <div><span>שם לקוח:</span><i data-sig="name">${name}</i></div>
+            <div><span>ת.ז.:</span><i data-sig="id"></i></div>
+            <div><span>חתימה:</span><i data-sig="sig"></i></div>
         </div>
+        <!--sig-stamp-->
     </div>`;
 }
 
@@ -15149,7 +15305,7 @@ function _buildCompactMultiUnitHtml(o) {
     return `<div class="cmp-block mu-block" data-cart-index="${o.index}" style="page-break-after:always;">
         <div class="cmp-bar"><span>${_escPrintHtml(o.titleText)}</span><small>${kindLbl} · ${parts.length} חלקים</small></div>
         <div class="mu-top">
-            <div class="cmp-spec">${spec}${o.approvalHtml || ''}</div>
+            <div class="cmp-spec">${spec}</div>
             <div class="mu-plan"><div class="cmp-cap">מבט על — מיקום החלקים</div>${_muPlanSvg(rs, parts, 300, 210)}</div>
         </div>
         ${_muPartsTableHtml(parts)}
@@ -15740,8 +15896,7 @@ function _printSingleCabinetBlockHtml(itemObj, index, opts) {
         const mu = _cartIsWritingDesk(itemObj) ? null : _printMultiUnitParts(itemObj, specRows);
         if (mu && mu.parts.length > 1) {
             return blockResult(_buildCompactMultiUnitHtml({
-                item: item, itemObj: itemObj, index: index, titleText: titleText, specRows: specRows, priceStrip: priceStrip, mu: mu,
-                approvalHtml: isFactory ? '' : _customerApprovalHtml()
+                item: item, itemObj: itemObj, index: index, titleText: titleText, specRows: specRows, priceStrip: priceStrip, mu: mu
             }));
         }
         const firstBp = (item.multiViewPages && item.multiViewPages[0]) || item.multiViewSVG || '';
@@ -15758,7 +15913,6 @@ function _printSingleCabinetBlockHtml(itemObj, index, opts) {
                 <div class="cmp-wrap">
                     <div class="cmp-spec">
                         ${_buildCompactCabinetSpecHtml({ specRows: specRows, priceStrip: priceStrip })}
-                        ${isFactory ? '' : _customerApprovalHtml()}
                     </div>
                     <div class="cmp-side">
                         ${_orderPrintPreviewImagesHtml(item, itemObj.rawState, { centerOnly: true })}
@@ -16007,12 +16161,15 @@ function _buildPrintHTML(mode) {
   .cmp-chip.is-led { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
   .cmp-chip.is-led i { color: #b45309; }
   .cmp-notes { font-size: 0.85rem; color: #78350f; padding: 4px 0 8px; white-space: normal; }
-  .cust-approval { margin-top: 10px; padding-top: 6px; border-top: 1px solid #cbd5e1; break-inside: avoid; page-break-inside: avoid; }
-  .cust-approval p { font-size: 0.68rem; line-height: 1.45; color: #475569; text-align: justify; }
-  .cust-approval-fields { margin-top: 12px; display: flex; flex-direction: column; gap: 14px; }
-  .cust-approval-fields > div { display: flex; align-items: flex-end; gap: 8px; font-size: 0.8rem; font-weight: 700; color: #1e293b; }
-  .cust-approval-fields span { flex-shrink: 0; width: 4.6em; }
-  .cust-approval-fields i { flex: 1; border-bottom: 1px solid #1e293b; height: 1px; }
+  .cust-approval { margin-top: 24px; padding: 12px 14px; border: 1px solid #cbd5e1; border-radius: 8px; break-inside: avoid; page-break-inside: avoid; }
+  .cust-approval-t { font-size: 0.9rem; font-weight: 800; color: #1e3a5f; margin-bottom: 6px; }
+  .cust-approval p { font-size: 0.72rem; line-height: 1.5; color: #475569; text-align: justify; }
+  .cust-approval-fields { margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr 1.3fr; gap: 18px; }
+  .cust-approval-fields > div { display: flex; align-items: flex-end; gap: 8px; font-size: 0.85rem; font-weight: 700; color: #1e293b; }
+  .cust-approval-fields span { flex-shrink: 0; }
+  .cust-approval-fields i { flex: 1; min-width: 0; border-bottom: 1px solid #1e293b; min-height: 1.5em; font-style: normal; font-weight: 600; padding: 0 4px 1px; }
+  .cust-approval-fields i img { display: block; max-height: 60px; max-width: 100%; }
+  .cust-approval-stamp { margin-top: 8px; font-size: 0.7rem; color: #15803d; font-weight: 700; }
   .cmp-price { display: flex; justify-content: space-between; background: #fef9c3; border: 1px solid #fde047; border-radius: 6px; padding: 6px 12px; font-weight: 800; color: #713f12; margin-top: 6px; }
   .cmp-side { display: flex; flex-direction: column; gap: 8px; }
   .cmp-side > div, .cmp-imgs > div { flex: none !important; break-inside: avoid; page-break-inside: avoid; }
@@ -16083,6 +16240,7 @@ ${introHTML}
 </div>
 ${cabinetsHTML}
 ${summaryHTML}
+${mode === 'customer' ? _customerApprovalHtml() : ''}
 ${_trialWmHtml()}
 </body>
 </html>`;
@@ -16093,7 +16251,7 @@ window.printCustomer = async function() {
         _showToast('אין ארונות לייצוא — כל הארונות מושהים. הפעילו ארון כדי לכלול אותו.', 5000);
         return;
     }
-    if (window._blockIfHandlesMissing()) return;
+    if (window._blockIfCustomerNameMissing() || window._blockIfHandlesMissing()) return;
     _showToast('🔄 מרענן תמונות לפני הדפסה...', 3000);
     try { await window._refreshCartMediaForPrint({ force: true }); } catch (e) { console.warn('[printCustomer]', e); }
     try { await window._refreshCartBlueprintPagesForPrint(); } catch (e) { console.warn('[printCustomer] blueprint refresh failed:', e); }
