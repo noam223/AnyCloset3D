@@ -16215,8 +16215,8 @@ function _buildPrintHTML(mode) {
   .header-bar h1 { font-size: 1.3rem; margin: 0; white-space: nowrap; }
   .header-date { font-size: 0.8rem; color: #64748b; white-space: nowrap; }
   .header-bar > img { max-height: 40px !important; max-width: 130px !important; flex-shrink: 0; }
-  .cust-grid { display: grid; grid-template-columns: repeat(4, auto); gap: 2px 16px; background: #f8fafc; padding: 6px 10px; border-radius: 6px; font-size: 0.8rem; line-height: 1.4; border: 1px solid #e2e8f0; margin-bottom: 10px; }
-  .cust-grid .cust-addr { grid-column: 1 / -1; }
+  .cust-grid { display: flex; flex-wrap: wrap; gap: 2px 20px; background: #f8fafc; padding: 6px 10px; border-radius: 6px; font-size: 0.8rem; line-height: 1.4; border: 1px solid #e2e8f0; margin-bottom: 10px; }
+  .cust-grid > div { flex: 0 1 auto; max-width: 100%; }
   @media print {
     body { padding: 10px; }
     @page { margin: 15mm; size: A4; }
