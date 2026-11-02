@@ -5289,11 +5289,15 @@ function _calcWingCost(cfg, wing) {
     let hasAnyDesk = (wing.desk && wing.desk.side !== 'none') || wing.columns.some(col => col.type === 'desk');
     if (hasAnyDesk) finalCost += _priceNum(ex.deskUnit, 900);
 
-    // Honeycomb priced per contiguous block, tiered by the block height (≤60 / 61-120 / >120 cm)
-    const openCellBlockHeights = [];
+    // Honeycomb priced per unit, tiered by size (≤60 / 61-120 / >120 cm): a single-column
+    // block by its height, a unit merged across columns (same type + same Y band, like the
+    // 3D engine) by the larger of its height and total width.
+    const openCellColBlocks = [];
+    let extraOpenCellUnits = 0;
     let partitionBlocks = 0, sorbets = 0, extDrawerFronts = 0;
-    wing.columns.forEach(col => {
-        let inBlock = false, blockBottom = 0;
+    wing.columns.forEach((col, ci) => {
+        const colBlocks = openCellColBlocks[ci] = [];
+        let cur = null;
         col.compartments.forEach((comp, r) => {
             if (comp.type === 'internal_drawers') finalCost += comp.count*_priceNum(ex.internalDrawer, 150);
             else if (comp.type === 'shoe_drawers') finalCost += (comp.count || 1) * _priceNum(ex.shoeDrawer, 150);
@@ -5315,14 +5319,36 @@ function _calcWingCost(cfg, wing) {
             }
             if (comp && (comp.type==='open_cell'||comp.type==='side_open_cell')) {
                 const b = _compartmentBounds(col, r, wing);
-                if (!inBlock) { blockBottom = b.bottomY; openCellBlockHeights.push(0); inBlock = true; }
-                openCellBlockHeights[openCellBlockHeights.length - 1] = Math.round(b.topY - blockBottom);
-            } else { inBlock = false; }
+                if (!cur || cur.type !== comp.type) {
+                    cur = { type: comp.type, startR: r, endR: r, bottomY: b.bottomY, topY: b.topY };
+                    colBlocks.push(cur);
+                }
+                cur.endR = r;
+                cur.topY = b.topY;
+            } else { cur = null; }
             if (comp && comp.partition) { partitionBlocks += Array.isArray(comp.partitions)?comp.partitions.length:1; }
         });
-        if (col.type === 'desk' && col.deskHoneycomb) openCellBlockHeights.push(0);
+        if (col.type === 'desk' && col.deskHoneycomb) extraOpenCellUnits++;
     });
-    const openCellPrices = openCellBlockHeights.map(h => _openCellBlockPrice(ex, h)).sort((a, b) => b - a);
+    const openCellSizes = [];
+    const _ocMatch = (a, b) => a.type === b.type &&
+        Math.abs(a.bottomY - b.bottomY) <= 0.5 && Math.abs(a.topY - b.topY) <= 0.5;
+    openCellColBlocks.forEach((blocks, ci) => blocks.forEach(blk => {
+        if (blk.merged) return;
+        let width = wing.columns[ci].width || 0, spanCols = 1, walk = blk, wc = ci;
+        while (wc + 1 < openCellColBlocks.length &&
+               !_honeycombBlockNoMergeRight(wing.columns[wc], walk.startR, walk.endR)) {
+            const next = openCellColBlocks[wc + 1].find(nb => !nb.merged && _ocMatch(nb, blk));
+            if (!next) break;
+            next.merged = true;
+            wc++; walk = next; spanCols++;
+            width += wing.columns[wc].width || 0;
+        }
+        const h = blk.topY - blk.bottomY;
+        openCellSizes.push(Math.round(spanCols > 1 ? Math.max(h, width) : h));
+    }));
+    for (let i = 0; i < extraOpenCellUnits; i++) openCellSizes.push(0);
+    const openCellPrices = openCellSizes.map(s => _openCellBlockPrice(ex, s)).sort((a, b) => b - a);
     if (wEffectiveModel==='ab2' && openCellPrices.length) openCellPrices.shift();
     finalCost += openCellPrices.reduce((s, p) => s + p, 0);
     finalCost += partitionBlocks*_priceNum(ex.partition, 150);
