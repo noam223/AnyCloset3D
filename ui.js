@@ -14237,6 +14237,36 @@ function _countTouchHandlesInWing(wing, rs, out) {
     return out;
 }
 
+/** Door leaves in the whole cabinet (a double door counts as 2; sliding = its panel count). */
+function _countDoorsInWing(w, rs) {
+    if (!w || !Array.isArray(w.columns)) return 0;
+    if (w.slidingDoor && rs && rs.presetId === 'sliding') return w.slidingDoor.numDoors || 0;
+    if (w.hasDoors === false) return 0;
+    let n = 0;
+    w.columns.forEach(function(col) {
+        (col && col.doors || []).forEach(function(door) { if (door) n += door.type === 'double' ? 2 : 1; });
+    });
+    return n;
+}
+
+function _countDoorsFromRawState(rs) {
+    if (!rs) return 0;
+    let n = 0;
+    const add = function(w) { n += _countDoorsInWing(w, rs); };
+    if (!rs.wings) { add(rs); return n; }
+    ['center', 'left', 'right'].forEach(function(s) {
+        add(rs.wings[s]);
+        const uu = rs.wings['upperUnit_' + s];
+        if (uu && uu._isUpperUnit) add(uu);
+    });
+    const center = rs.wings.center;
+    const sc = center && center.sideCabinet;
+    if (sc && sc.side !== 'none' && Array.isArray(sc.columns)) {
+        add(Object.assign({}, sc, { hasDoors: sc.hasDoors != null ? sc.hasDoors : center.hasDoors }));
+    }
+    return n;
+}
+
 /** Touch handles for one wing side (+ its upper unit), or the whole cabinet when side is omitted. */
 function _countTouchHandlesFromRawState(rs, side) {
     const out = { doors: 0, drawers: 0 };
@@ -14513,6 +14543,8 @@ function _collectWingPrintSpecRows(item, itemObj, unit) {
             : item.handle)
     });
     _pushTouchHandleRows(rows, prefix, _countTouchHandlesFromRawState(rs, unit.side));
+    const unitDoors = _countDoorsInWing(wing, rs);
+    if (unitDoors > 0) rows.push({ id: prefix + 'doorsCount', label: 'דלתות', value: unitDoors + ' יחידות' });
     rows.push({
         id: prefix + 'drawersExt',
         label: 'מגירות חיצוניות',
@@ -14663,6 +14695,8 @@ function _collectPrintSpecRows(item, itemObj) {
     }
     if (itemObj && itemObj.rawState) _pushTouchHandleRows(rows, '', _countTouchHandlesFromRawState(itemObj.rawState));
     if (!isWD) {
+        const doorsN = _countDoorsFromRawState(itemObj && itemObj.rawState);
+        if (doorsN > 0) rows.push({ id: 'doorsCount', label: 'דלתות', value: doorsN + ' יחידות' });
         rows.push({ id: 'drawersExt', label: 'מגירות חיצוניות', value: `${item.drawersExt} יחידות` });
         rows.push({ id: 'drawersInt', label: 'מגירות פנימיות', value: `${item.drawersInt} יחידות` });
         const intExtN = itemObj && itemObj.rawState ? (_countCabinetContentFromRawState(itemObj.rawState).drawersIntExtHandle || 0) : 0;
@@ -14701,7 +14735,8 @@ function _pushOrderOptionRows(rows, itemObj) {
 }
 
 function _hashPrintSpecSource(rows) {
-    const payload = rows.filter(r => !r.section).map(r => `${r.id}:${r.value}`).join('\n');
+    // doorsCount was added later; keeping it out of the hash preserves existing manual edits
+    const payload = rows.filter(r => !r.section && !/doorsCount$/.test(r.id)).map(r => `${r.id}:${r.value}`).join('\n');
     let h = 5381;
     for (let i = 0; i < payload.length; i++) h = ((h << 5) + h) ^ payload.charCodeAt(i);
     return (h >>> 0).toString(36);
@@ -14839,7 +14874,7 @@ function _buildPagedCabinetSpecHtml(opts) {
     return html;
 }
 
-const _COMPACT_CHIP_IDS = ['drawersExt', 'drawersInt', 'drawersShoe', 'shelves', 'hangingRods', 'ledPairs', 'writingDeskDrawerCount'];
+const _COMPACT_CHIP_IDS = ['doorsCount', 'drawersExt', 'drawersInt', 'drawersShoe', 'shelves', 'hangingRods', 'ledPairs', 'writingDeskDrawerCount'];
 const _COMPACT_CHIP_LABELS = { hangingRods: 'מוטות תלייה', ledPairs: 'זוגות לדים' };
 
 function _compactRowBaseId(id) {
@@ -15879,6 +15914,47 @@ function _printCabinetNotesRow(notes, thStyle, tdStyle) {
     return `<tr><th style="${thStyle}">הערות</th><td style="${tdStyle}white-space:pre-wrap;line-height:1.55;">${_escPrintHtml(n)}</td></tr>`;
 }
 
+/**
+ * Strip the page title / subtitle / page number baked into a blueprint SVG and crop its
+ * viewBox to the drawing, so it fills the print frame. Returns the subtitle for the frame header.
+ */
+function _fitBlueprintSvgForPrint(svgStr) {
+    const host = document.createElement('div');
+    host.style.cssText = 'position:absolute;left:-100000px;top:0;width:1000px;visibility:hidden;';
+    host.innerHTML = svgStr;
+    const svg = host.querySelector('svg');
+    if (!svg) return { svg: svgStr, label: '' };
+    document.body.appendChild(host);
+    try {
+        const vb = svg.viewBox && svg.viewBox.baseVal;
+        const pageW = vb && vb.width, pageH = vb && vb.height;
+        if (!pageW || !pageH) return { svg: svgStr, label: '' };
+        let label = '';
+        Array.from(svg.children).forEach(function(el) {
+            const tag = el.tagName.toLowerCase();
+            if (tag === 'rect' && +el.getAttribute('width') === pageW && +el.getAttribute('height') === pageH) { el.remove(); return; }
+            if (tag !== 'text') return;
+            const txt = (el.textContent || '').trim();
+            const y = +el.getAttribute('y') || 0;
+            if (/^שרטוט טכני/.test(txt) || /^עמוד \d+ \/ \d+$/.test(txt)) { el.remove(); return; }
+            if (y <= 60 && !label) { label = txt; el.remove(); }
+        });
+        const bb = svg.getBBox();
+        if (!bb || bb.width < 10 || bb.height < 10) return { svg: svgStr, label: label };
+        const pad = Math.max(bb.width, bb.height) * 0.02;
+        svg.setAttribute('viewBox', [bb.x - pad, bb.y - pad, bb.width + pad * 2, bb.height + pad * 2].map(v => v.toFixed(1)).join(' '));
+        svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+        svg.removeAttribute('width');
+        svg.removeAttribute('height');
+        svg.setAttribute('style', 'display:block;width:100%;height:100%;');
+        return { svg: svg.outerHTML, label: label };
+    } catch (e) {
+        return { svg: svgStr, label: '' };
+    } finally {
+        host.remove();
+    }
+}
+
 function _printCabinetBlueprintPagesHtml(item, titleText) {
     const bpPages = item.multiViewPages && item.multiViewPages.length > 0
         ? item.multiViewPages
@@ -15892,11 +15968,12 @@ function _printCabinetBlueprintPagesHtml(item, titleText) {
             <div class="bp-page" style="page-break-after:always;page-break-inside:avoid;">
                 ${pair.map((svg, si) => {
                     const globalIdx = pairIdx * 2 + si;
-                    return `<div style="margin-bottom:${si === 0 && pair.length > 1 ? '16px' : '0'};">
-                    <div style="font-size:1rem;font-weight:bold;margin-bottom:6px;background:#e8f0fe;padding:6px;text-align:center;border:1px solid #93c5fd;border-bottom:none;">
-                        שרטוט טכני — ${titleText}${bpPages.length > 1 ? ` (עמוד ${globalIdx + 1}/${bpPages.length})` : ''}
+                    const fit = _fitBlueprintSvgForPrint(svg);
+                    return `<div style="margin-bottom:${si === 0 && pair.length > 1 ? '10px' : '0'};">
+                    <div style="font-size:0.95rem;font-weight:bold;background:#e8f0fe;padding:5px 8px;text-align:center;border:1px solid #93c5fd;border-bottom:none;">
+                        שרטוט טכני — ${titleText}${fit.label ? ` · ${_escPrintHtml(fit.label)}` : ''}${bpPages.length > 1 ? ` (עמוד ${globalIdx + 1}/${bpPages.length})` : ''}
                     </div>
-                    <div style="border:2px solid #93c5fd;display:block;overflow:hidden;width:100%;">${svg}</div>
+                    <div class="bp-frame">${fit.svg}</div>
                 </div>`;
                 }).join('')}
             </div>`).join('');
@@ -16223,6 +16300,8 @@ function _buildPrintHTML(mode) {
   }
   .bp-page svg { width: 100% !important; height: auto !important; display: block; }
   .bp-page { width: 100%; overflow: hidden; }
+  .bp-frame { border: 2px solid #93c5fd; width: 100%; height: 118mm; padding: 3mm; overflow: hidden; background: #fff; }
+  .bp-frame svg { width: 100% !important; height: 100% !important; }
   .cmp-block, .cmp-block * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .cmp-bar { background: #1e3a5f; color: #fff; padding: 5px 12px; border-radius: 6px; font-size: 1rem; font-weight: 800; margin-bottom: 8px; }
   .cmp-wrap { display: grid; grid-template-columns: 1.25fr 1fr; gap: 14px; align-items: start; }
