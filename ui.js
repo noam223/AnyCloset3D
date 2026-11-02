@@ -15217,7 +15217,7 @@ function _muBlueprintPagesHtml(bp, parts, titleText) {
         pagesHtml.push(`<div class="bp-page" style="page-break-after:always;page-break-inside:avoid;">${seq.slice(i, i + 2).map(function(e, k) {
             return `<div class="mu-bp${k === 0 && i + 1 < seq.length ? ' is-first' : ''}">
                 <div class="mu-bp-h"><span>${e.head}</span><small>${_escPrintHtml(titleText)} · ${i + k + 1}/${seq.length}</small></div>
-                <div class="mu-bp-b">${e.svg}</div>
+                <div class="mu-bp-b bp-frame">${_fitBlueprintSvgForPrint(e.svg).svg}</div>
             </div>`;
         }).join('')}</div>`);
     }
@@ -15932,7 +15932,8 @@ function _fitBlueprintSvgForPrint(svgStr) {
         let label = '';
         Array.from(svg.children).forEach(function(el) {
             const tag = el.tagName.toLowerCase();
-            if (tag === 'rect' && +el.getAttribute('width') === pageW && +el.getAttribute('height') === pageH) { el.remove(); return; }
+            if (tag === 'rect' && (el.getAttribute('fill') || '').toLowerCase() === 'white' &&
+                +el.getAttribute('width') >= pageW * 0.85) { el.remove(); return; }
             if (tag !== 'text') return;
             const txt = (el.textContent || '').trim();
             const y = +el.getAttribute('y') || 0;
