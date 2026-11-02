@@ -16230,7 +16230,7 @@ function _buildPrintHTML(mode) {
   .cust-approval-stamp { margin-top: 8px; font-size: 0.7rem; color: #15803d; font-weight: 700; }
   .cmp-price { display: flex; justify-content: space-between; gap: 8px; background: #fef9c3; border: 1px solid #fde047; border-radius: 6px; padding: 6px 12px; font-weight: 800; color: #713f12; margin-top: 6px; }
   .cmp-prices { display: grid; grid-template-columns: 1fr 1fr; gap: 0 8px; break-inside: avoid; page-break-inside: avoid; }
-  .cmp-prices .cmp-price { padding: 6px 8px; font-size: 0.85rem; }
+  .cmp-prices .cmp-price { padding: 5px 7px; font-size: 0.78rem; white-space: nowrap; align-items: center; }
   .cmp-rows2 { display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; }
   .cmp-side { display: flex; flex-direction: column; gap: 8px; }
   .cmp-side > div, .cmp-imgs > div { flex: none !important; break-inside: avoid; page-break-inside: avoid; }
