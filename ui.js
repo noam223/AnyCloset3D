@@ -16208,14 +16208,15 @@ function _buildPrintHTML(mode) {
 <title>${pdfTitle}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; direction: rtl; background: white; color: #1e293b; padding: 20px; font-size: 14px; }
+  body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; direction: rtl; background: white; color: #1e293b; padding: 12px 20px; font-size: 14px; }
   h1 { font-size: 1.6rem; color: #1e3a5f; margin-bottom: 6px; }
-  .header-bar { border-bottom: 3px solid #1e3a5f; padding-bottom: 10px; margin-bottom: 14px; display:flex; justify-content:space-between; align-items:center; gap: 16px; }
-  .header-bar > div:first-child { flex-shrink: 0; }
-  .header-bar h1 { font-size: 1.35rem; margin-bottom: 2px; white-space: nowrap; }
-  .header-bar > img { max-height: 44px !important; max-width: 110px !important; flex-shrink: 0; }
-  .cust-grid { flex: 1; min-width: 0; display: grid; grid-template-columns: auto auto; gap: 2px 14px; background: #f8fafc; padding: 6px 10px; border-radius: 8px; font-size: 0.78rem; line-height: 1.35; border: 1px solid #e2e8f0; }
-  .cust-grid > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .header-bar { border-bottom: 2px solid #1e3a5f; padding-bottom: 6px; margin-bottom: 8px; display:flex; justify-content:space-between; align-items:center; gap: 16px; }
+  .header-title { display: flex; align-items: baseline; gap: 12px; }
+  .header-bar h1 { font-size: 1.3rem; margin: 0; white-space: nowrap; }
+  .header-date { font-size: 0.8rem; color: #64748b; white-space: nowrap; }
+  .header-bar > img { max-height: 40px !important; max-width: 130px !important; flex-shrink: 0; }
+  .cust-grid { display: grid; grid-template-columns: repeat(4, auto); gap: 2px 16px; background: #f8fafc; padding: 6px 10px; border-radius: 6px; font-size: 0.8rem; line-height: 1.4; border: 1px solid #e2e8f0; margin-bottom: 10px; }
+  .cust-grid .cust-addr { grid-column: 1 / -1; }
   @media print {
     body { padding: 10px; }
     @page { margin: 15mm; size: A4; }
@@ -16223,7 +16224,7 @@ function _buildPrintHTML(mode) {
   .bp-page svg { width: 100% !important; height: auto !important; display: block; }
   .bp-page { width: 100%; overflow: hidden; }
   .cmp-block, .cmp-block * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .cmp-bar { background: #1e3a5f; color: #fff; padding: 7px 14px; border-radius: 6px; font-size: 1.1rem; font-weight: 800; margin-bottom: 10px; }
+  .cmp-bar { background: #1e3a5f; color: #fff; padding: 5px 12px; border-radius: 6px; font-size: 1rem; font-weight: 800; margin-bottom: 8px; }
   .cmp-wrap { display: grid; grid-template-columns: 1.25fr 1fr; gap: 14px; align-items: start; }
   .cmp-unit { margin-bottom: 6px; }
   .cmp-unit-h { font-weight: 800; color: #1e3a5f; font-size: 0.95rem; padding: 4px 10px; background: #e8eef6; border-right: 4px solid #1e3a5f; border-radius: 4px; margin: 4px 0 2px; }
@@ -16303,18 +16304,18 @@ function _buildPrintHTML(mode) {
 </head>
 <body>
 <div class="header-bar">
-  <div>
+  <div class="header-title">
     <h1>📋 ${title}</h1>
-    <div style="font-size:0.85rem;color:#64748b;margin-top:4px;">תאריך: ${new Date().toLocaleDateString('he-IL')}</div>
-  </div>
-  <div class="cust-grid">
-    <div><strong>שם פרויקט/לקוח:</strong> ${custName}</div>
-    <div><strong>טלפון:</strong> ${custPhone}</div>
-    <div><strong>מספר הזמנה:</strong> ${custOrder}</div>
-    <div><strong>כתובת:</strong> ${custAddr}</div>
-    <div><strong>צפי אספקה:</strong> ${custDelivery}</div>
+    <span class="header-date">תאריך: ${new Date().toLocaleDateString('he-IL')}</span>
   </div>
   ${_logoHtml}
+</div>
+<div class="cust-grid">
+  <div><strong>שם פרויקט/לקוח:</strong> ${custName}</div>
+  <div><strong>טלפון:</strong> ${custPhone}</div>
+  <div><strong>מספר הזמנה:</strong> ${custOrder}</div>
+  <div><strong>צפי אספקה:</strong> ${custDelivery}</div>
+  <div class="cust-addr"><strong>כתובת:</strong> ${custAddr}</div>
 </div>
 ${introHTML}
 ${cabinetsHTML}
