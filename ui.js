@@ -14861,7 +14861,9 @@ function _compactSpecUnitsFromRows(rows) {
         if (r.section) {
             const lbl = r.label || '';
             if (/^מפרט ארון/.test(lbl)) { newUnit(lbl); bucket = 'general'; return; }
-            if (r.id === '_sec_upper_finishes' || r.id === '_sec_extra' || r.id === '_sec_order_opts') { newUnit(lbl, true); bucket = 'finishes'; return; }
+            if (r.id === '_sec_upper_finishes' || r.id === '_sec_extra' || r.id === '_sec_order_opts') {
+                newUnit(lbl, true); cur.twoCol = r.id === '_sec_order_opts'; bucket = 'finishes'; return;
+            }
             bucket = lbl.indexOf('פרזול') === 0 ? 'hardware' : 'finishes';
             return;
         }
@@ -14880,14 +14882,15 @@ function _compactNotesHtml(g) {
     return `<div class="cmp-sec">הערות</div><div class="cmp-notes"${idAttr}>${_escPrintHtml(g.notes.join('\n')).replace(/\n/g, '<br>')}</div>`;
 }
 
-function _compactSpecListHtml(title, rows, extraHtml) {
+function _compactSpecListHtml(title, rows, extraHtml, twoCol) {
     if (!rows.length && !extraHtml) return '';
     const body = rows.map(function(r) {
         const val = _escPrintHtml(r.value).replace(/\n/g, '<br>');
         const idAttr = r.id ? ` data-row-id="${_escPrintHtml(r.id)}"` : '';
         return `<div class="cmp-row"${idAttr}><span>${_escPrintHtml(r.label)}</span><span${r.rtl ? ' dir="rtl"' : ''}>${val}</span></div>`;
     }).join('');
-    return `<div class="cmp-sec">${_escPrintHtml(title)}</div>${body}${extraHtml || ''}`;
+    const rowsHtml = twoCol ? `<div class="cmp-rows2">${body}</div>` : body;
+    return `<div class="cmp-sec">${_escPrintHtml(title)}</div>${rowsHtml}${extraHtml || ''}`;
 }
 
 function _compactSpecChipsHtml(rows) {
@@ -14912,7 +14915,7 @@ function _buildCompactCabinetSpecHtml(opts) {
     const g = _compactSpecUnitsFromRows(opts.specRows);
     const units = g.units.map(function(u) {
         if (u.extra) {
-            return `<div class="cmp-unit">${_compactSpecListHtml(u.title, u.finishes.concat(u.general, u.hardware))}</div>`;
+            return `<div class="cmp-unit">${_compactSpecListHtml(u.title, u.finishes.concat(u.general, u.hardware), '', u.twoCol)}</div>`;
         }
         const head = u.title ? `<div class="cmp-unit-h">${_escPrintHtml(u.title)}</div>` : '';
         return `<div class="cmp-unit">${head}`
@@ -15942,8 +15945,8 @@ function _printSingleCabinetBlockHtml(itemObj, index, opts) {
     if (opts.compact) {
         const priceStrip = hidePrices ? '' : isFactory
             ? `<div class="cmp-price"><span>מחיר התקנה ללקוח</span><span dir="ltr">₪${itemInstall.toLocaleString()}</span></div>`
-            : `<div class="cmp-price"><span>מחיר ארון ללקוח</span><span dir="ltr">₪${numericPrice.toLocaleString()}</span></div>
-               <div class="cmp-price"><span>הובלה והתקנה</span><span dir="ltr">₪${itemInstall.toLocaleString()}</span></div>`;
+            : `<div class="cmp-prices"><div class="cmp-price"><span>מחיר ארון ללקוח</span><span dir="ltr">₪${numericPrice.toLocaleString()}</span></div>
+               <div class="cmp-price"><span>הובלה והתקנה</span><span dir="ltr">₪${itemInstall.toLocaleString()}</span></div></div>`;
         const mu = _cartIsWritingDesk(itemObj) ? null : _printMultiUnitParts(itemObj, specRows);
         if (mu && mu.parts.length > 1) {
             return blockResult(_buildCompactMultiUnitHtml({
@@ -16191,7 +16194,10 @@ function _buildPrintHTML(mode) {
   h1 { font-size: 1.6rem; color: #1e3a5f; margin-bottom: 6px; }
   .header-bar { border-bottom: 3px solid #1e3a5f; padding-bottom: 10px; margin-bottom: 14px; display:flex; justify-content:space-between; align-items:center; gap: 16px; }
   .header-bar > div:first-child { flex-shrink: 0; }
-  .cust-grid { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 3px 18px; background: #f8fafc; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; border: 1px solid #e2e8f0; }
+  .header-bar h1 { font-size: 1.35rem; margin-bottom: 2px; white-space: nowrap; }
+  .header-bar > img { max-height: 44px !important; max-width: 110px !important; flex-shrink: 0; }
+  .cust-grid { flex: 1; min-width: 0; display: grid; grid-template-columns: auto auto; gap: 2px 14px; background: #f8fafc; padding: 6px 10px; border-radius: 8px; font-size: 0.78rem; line-height: 1.35; border: 1px solid #e2e8f0; }
+  .cust-grid > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   @media print {
     body { padding: 10px; }
     @page { margin: 15mm; size: A4; }
@@ -16222,7 +16228,10 @@ function _buildPrintHTML(mode) {
   .cust-approval-fields i { flex: 1; min-width: 0; border-bottom: 1px solid #1e293b; min-height: 1.5em; font-style: normal; font-weight: 600; padding: 0 4px 1px; }
   .cust-approval-fields i img { display: block; max-height: 60px; max-width: 100%; }
   .cust-approval-stamp { margin-top: 8px; font-size: 0.7rem; color: #15803d; font-weight: 700; }
-  .cmp-price { display: flex; justify-content: space-between; background: #fef9c3; border: 1px solid #fde047; border-radius: 6px; padding: 6px 12px; font-weight: 800; color: #713f12; margin-top: 6px; }
+  .cmp-price { display: flex; justify-content: space-between; gap: 8px; background: #fef9c3; border: 1px solid #fde047; border-radius: 6px; padding: 6px 12px; font-weight: 800; color: #713f12; margin-top: 6px; }
+  .cmp-prices { display: grid; grid-template-columns: 1fr 1fr; gap: 0 8px; break-inside: avoid; page-break-inside: avoid; }
+  .cmp-prices .cmp-price { padding: 6px 8px; font-size: 0.85rem; }
+  .cmp-rows2 { display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; }
   .cmp-side { display: flex; flex-direction: column; gap: 8px; }
   .cmp-side > div, .cmp-imgs > div { flex: none !important; break-inside: avoid; page-break-inside: avoid; }
   .cmp-side img { flex: none !important; height: 200px; background: #fff; }
