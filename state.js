@@ -5094,7 +5094,7 @@ var DEFAULT_PRICING_CONFIG = {
     },
     extras: {
         internalDrawer: 150, shoeDrawer: 150, externalDrawer: 200,
-        openCell: 400, partition: 150,
+        openCell: 400, openCell34: 600, openCell5: 800, partition: 150,
         shelfFreePerMeter: 3, extraShelfMel: 60, extraShelfNonMel: 80,
         deskUnit: 900,
         doorFramedMel: 80, doorGlassMel: 400, doorGlassBlack: 600, doorMirror: 350,
@@ -5117,6 +5117,13 @@ function _priceNum(v, fb) {
     if (v === '' || v == null) return fb;
     var n = Number(v);
     return isFinite(n) ? n : fb;
+}
+
+/** Honeycomb block cost by its cell count: 1-2 cells / 3-4 cells / more than 4. */
+function _openCellBlockPrice(ex, cells) {
+    if (cells > 4) return _priceNum(ex.openCell5, 800);
+    if (cells >= 3) return _priceNum(ex.openCell34, 600);
+    return _priceNum(ex.openCell, 400);
 }
 
 function _pricingRangeKey(cfg, engine, typeId) {
@@ -5282,7 +5289,9 @@ function _calcWingCost(cfg, wing) {
     let hasAnyDesk = (wing.desk && wing.desk.side !== 'none') || wing.columns.some(col => col.type === 'desk');
     if (hasAnyDesk) finalCost += _priceNum(ex.deskUnit, 900);
 
-    let openCellBlocks = 0, partitionBlocks = 0, sorbets = 0, extDrawerFronts = 0;
+    // Honeycomb priced per contiguous block, tiered by its cell count (1-2 / 3-4 / 5+)
+    const openCellBlockSizes = [];
+    let partitionBlocks = 0, sorbets = 0, extDrawerFronts = 0;
     wing.columns.forEach(col => {
         let inBlock = false;
         col.compartments.forEach(comp => {
@@ -5304,13 +5313,17 @@ function _calcWingCost(cfg, wing) {
                     });
                 });
             }
-            if (comp && (comp.type==='open_cell'||comp.type==='side_open_cell')) { if(!inBlock){openCellBlocks++;inBlock=true;} } else { inBlock=false; }
+            if (comp && (comp.type==='open_cell'||comp.type==='side_open_cell')) {
+                if (!inBlock) { openCellBlockSizes.push(0); inBlock = true; }
+                openCellBlockSizes[openCellBlockSizes.length - 1]++;
+            } else { inBlock = false; }
             if (comp && comp.partition) { partitionBlocks += Array.isArray(comp.partitions)?comp.partitions.length:1; }
         });
-        if (col.type === 'desk' && col.deskHoneycomb) openCellBlocks++;
+        if (col.type === 'desk' && col.deskHoneycomb) openCellBlockSizes.push(1);
     });
-    if (wEffectiveModel==='ab2' && openCellBlocks>0) openCellBlocks--;
-    finalCost += openCellBlocks*_priceNum(ex.openCell, 400);
+    const openCellPrices = openCellBlockSizes.map(n => _openCellBlockPrice(ex, n)).sort((a, b) => b - a);
+    if (wEffectiveModel==='ab2' && openCellPrices.length) openCellPrices.shift();
+    finalCost += openCellPrices.reduce((s, p) => s + p, 0);
     finalCost += partitionBlocks*_priceNum(ex.partition, 150);
 
     let ledPairs = 0;

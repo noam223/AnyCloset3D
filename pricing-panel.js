@@ -277,7 +277,9 @@ function _extrasHtml() {
             _field('internalDrawer', 'מגירה פנימית (₪)', 'min="0" step="10"') +
             _field('externalDrawer', 'מגירה חיצונית (₪)', 'min="0" step="10"') +
             _field('shoeDrawer', 'מגירת נעליים (₪)', 'min="0" step="10"') +
-            _field('openCell', 'תא פתוח (₪)', 'min="0" step="10"') +
+            _field('openCell', 'כוורת 1-2 תאים (₪)', 'min="0" step="10"') +
+            _field('openCell34', 'כוורת 3-4 תאים (₪)', 'min="0" step="10"') +
+            _field('openCell5', 'כוורת מעל 4 תאים (₪)', 'min="0" step="10"') +
             _field('partition', 'מחיצה (₪)', 'min="0" step="10"') +
             _field('shelfFreePerMeter', 'מדפים חינם למטר', 'min="0" step="0.5"') +
             _field('extraShelfMel', 'מדף נוסף — מלמין (₪)', 'min="0" step="5"') +
@@ -673,6 +675,8 @@ function fill(cfg) {
     _set('externalDrawer',  _num(ex.externalDrawer, dx.externalDrawer || 200));
     _set('shoeDrawer',      _num(ex.shoeDrawer, dx.shoeDrawer || 150));
     _set('openCell',        _num(ex.openCell, dx.openCell || 400));
+    _set('openCell34',      _num(ex.openCell34, dx.openCell34 || 600));
+    _set('openCell5',       _num(ex.openCell5, dx.openCell5 || 800));
     _set('partition',       _num(ex.partition, dx.partition || 150));
     _set('shelfFreePerMeter',_num(ex.shelfFreePerMeter, dx.shelfFreePerMeter || 3));
     _set('extraShelfMel',   _num(ex.extraShelfMel, dx.extraShelfMel || 60));
@@ -714,7 +718,7 @@ function fill(cfg) {
 function read() {
     _syncTypesFromDom();
     var ex = {};
-    ['internalDrawer','externalDrawer','shoeDrawer','openCell','partition','shelfFreePerMeter',
+    ['internalDrawer','externalDrawer','shoeDrawer','openCell','openCell34','openCell5','partition','shelfFreePerMeter',
      'extraShelfMel','extraShelfNonMel','deskUnit',
      'doorFramedMel','doorGlassMel','doorGlassBlack','doorMirror','ledPair','sorbet','touchHandle',
      'upperUnit160','upperUnit240','upperUnitPerCm',

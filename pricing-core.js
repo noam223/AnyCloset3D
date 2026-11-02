@@ -28,7 +28,7 @@ var DEFAULTS = {
     },
     extras: {
         internalDrawer: 150, shoeDrawer: 150, externalDrawer: 200,
-        openCell: 400, partition: 150,
+        openCell: 400, openCell34: 600, openCell5: 800, partition: 150,
         shelfFreePerMeter: 3, extraShelfMel: 60, extraShelfNonMel: 80,
         deskUnit: 900,
         doorFramedMel: 80, doorGlassMel: 400, doorGlassBlack: 600, doorMirror: 350,

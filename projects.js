@@ -2070,7 +2070,7 @@ var _PP_DEFAULTS = {
         regalim: {melamine:{80:1050,120:1462,160:1658,200:2073,240:2487},nonMelamine:{80:1360,120:1900,160:2155,200:2700,240:3233}},
         maya:    {melamine:{40:675,80:1050,120:1462,160:1658,200:2073,240:2487},nonMelamine:{40:830,80:1360,120:1900,160:2155,200:2700,240:3233}}
     },
-    extras:{internalDrawer:150,shoeDrawer:150,externalDrawer:200,openCell:400,partition:150,shelfFreePerMeter:3,
+    extras:{internalDrawer:150,shoeDrawer:150,externalDrawer:200,openCell:400,openCell34:600,openCell5:800,partition:150,shelfFreePerMeter:3,
         extraShelfMel:60,extraShelfNonMel:80,deskUnit:900,doorFramedMel:80,doorGlassMel:400,
         doorGlassBlack:600,doorMirror:350,upperUnit160:600,upperUnit240:900,upperUnitPerCm:3.75,
         cornerDrawers3:832,cornerDrawers4:907,cornerDrawerExtra:200,cornerDesk:900,
@@ -3004,6 +3004,8 @@ function _fillPricingPanel(cfg) {
     _ppSet('pp-externalDrawer', _ppNum(ex.externalDrawer, dx.externalDrawer));
     _ppSet('pp-shoeDrawer', _ppNum(ex.shoeDrawer, dx.shoeDrawer));
     _ppSet('pp-openCell', _ppNum(ex.openCell, dx.openCell));
+    _ppSet('pp-openCell34', _ppNum(ex.openCell34, dx.openCell34));
+    _ppSet('pp-openCell5', _ppNum(ex.openCell5, dx.openCell5));
     _ppSet('pp-partition', _ppNum(ex.partition, dx.partition));
     _ppSet('pp-shelfFreePerMeter', _ppNum(ex.shelfFreePerMeter, dx.shelfFreePerMeter));
     _ppSet('pp-extraShelfMel', _ppNum(ex.extraShelfMel, dx.extraShelfMel));
@@ -3073,6 +3075,8 @@ function _readPricingPanel() {
             externalDrawer: _ppNum(_ppVal('pp-externalDrawer'), dx.externalDrawer),
             shoeDrawer: _ppNum(_ppVal('pp-shoeDrawer'), dx.shoeDrawer),
             openCell: _ppNum(_ppVal('pp-openCell'), dx.openCell),
+            openCell34: _ppNum(_ppVal('pp-openCell34'), dx.openCell34),
+            openCell5: _ppNum(_ppVal('pp-openCell5'), dx.openCell5),
             partition: _ppNum(_ppVal('pp-partition'), dx.partition),
             shelfFreePerMeter: _ppNum(_ppVal('pp-shelfFreePerMeter'), dx.shelfFreePerMeter),
             extraShelfMel: _ppNum(_ppVal('pp-extraShelfMel'), dx.extraShelfMel),
