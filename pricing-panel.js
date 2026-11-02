@@ -277,9 +277,9 @@ function _extrasHtml() {
             _field('internalDrawer', 'מגירה פנימית (₪)', 'min="0" step="10"') +
             _field('externalDrawer', 'מגירה חיצונית (₪)', 'min="0" step="10"') +
             _field('shoeDrawer', 'מגירת נעליים (₪)', 'min="0" step="10"') +
-            _field('openCell', 'כוורת 1-2 תאים (₪)', 'min="0" step="10"') +
-            _field('openCell34', 'כוורת 3-4 תאים (₪)', 'min="0" step="10"') +
-            _field('openCell5', 'כוורת מעל 4 תאים (₪)', 'min="0" step="10"') +
+            _field('openCell', 'כוורת עד 60 ס\"מ (₪)', 'min="0" step="10"') +
+            _field('openCell34', 'כוורת 61-120 ס\"מ (₪)', 'min="0" step="10"') +
+            _field('openCell5', 'כוורת מעל 120 ס\"מ (₪)', 'min="0" step="10"') +
             _field('partition', 'מחיצה (₪)', 'min="0" step="10"') +
             _field('shelfFreePerMeter', 'מדפים חינם למטר', 'min="0" step="0.5"') +
             _field('extraShelfMel', 'מדף נוסף — מלמין (₪)', 'min="0" step="5"') +

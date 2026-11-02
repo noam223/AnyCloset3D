@@ -5119,10 +5119,10 @@ function _priceNum(v, fb) {
     return isFinite(n) ? n : fb;
 }
 
-/** Honeycomb block cost by its cell count: 1-2 cells / 3-4 cells / more than 4. */
-function _openCellBlockPrice(ex, cells) {
-    if (cells > 4) return _priceNum(ex.openCell5, 800);
-    if (cells >= 3) return _priceNum(ex.openCell34, 600);
+/** Honeycomb block cost by its height (cm): up to 60 / 61-120 / above 120. */
+function _openCellBlockPrice(ex, heightCm) {
+    if (heightCm > 120) return _priceNum(ex.openCell5, 800);
+    if (heightCm > 60) return _priceNum(ex.openCell34, 600);
     return _priceNum(ex.openCell, 400);
 }
 
@@ -5289,12 +5289,12 @@ function _calcWingCost(cfg, wing) {
     let hasAnyDesk = (wing.desk && wing.desk.side !== 'none') || wing.columns.some(col => col.type === 'desk');
     if (hasAnyDesk) finalCost += _priceNum(ex.deskUnit, 900);
 
-    // Honeycomb priced per contiguous block, tiered by its cell count (1-2 / 3-4 / 5+)
-    const openCellBlockSizes = [];
+    // Honeycomb priced per contiguous block, tiered by the block height (≤60 / 61-120 / >120 cm)
+    const openCellBlockHeights = [];
     let partitionBlocks = 0, sorbets = 0, extDrawerFronts = 0;
     wing.columns.forEach(col => {
-        let inBlock = false;
-        col.compartments.forEach(comp => {
+        let inBlock = false, blockBottom = 0;
+        col.compartments.forEach((comp, r) => {
             if (comp.type === 'internal_drawers') finalCost += comp.count*_priceNum(ex.internalDrawer, 150);
             else if (comp.type === 'shoe_drawers') finalCost += (comp.count || 1) * _priceNum(ex.shoeDrawer, 150);
             else if (comp.type === 'external_drawers') { finalCost += comp.count*_priceNum(ex.externalDrawer, 200); extDrawerFronts += comp.count || 0; }
@@ -5314,14 +5314,15 @@ function _calcWingCost(cfg, wing) {
                 });
             }
             if (comp && (comp.type==='open_cell'||comp.type==='side_open_cell')) {
-                if (!inBlock) { openCellBlockSizes.push(0); inBlock = true; }
-                openCellBlockSizes[openCellBlockSizes.length - 1]++;
+                const b = _compartmentBounds(col, r, wing);
+                if (!inBlock) { blockBottom = b.bottomY; openCellBlockHeights.push(0); inBlock = true; }
+                openCellBlockHeights[openCellBlockHeights.length - 1] = Math.round(b.topY - blockBottom);
             } else { inBlock = false; }
             if (comp && comp.partition) { partitionBlocks += Array.isArray(comp.partitions)?comp.partitions.length:1; }
         });
-        if (col.type === 'desk' && col.deskHoneycomb) openCellBlockSizes.push(1);
+        if (col.type === 'desk' && col.deskHoneycomb) openCellBlockHeights.push(0);
     });
-    const openCellPrices = openCellBlockSizes.map(n => _openCellBlockPrice(ex, n)).sort((a, b) => b - a);
+    const openCellPrices = openCellBlockHeights.map(h => _openCellBlockPrice(ex, h)).sort((a, b) => b - a);
     if (wEffectiveModel==='ab2' && openCellPrices.length) openCellPrices.shift();
     finalCost += openCellPrices.reduce((s, p) => s + p, 0);
     finalCost += partitionBlocks*_priceNum(ex.partition, 150);
