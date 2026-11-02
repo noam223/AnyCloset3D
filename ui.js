@@ -16189,8 +16189,9 @@ function _buildPrintHTML(mode) {
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; direction: rtl; background: white; color: #1e293b; padding: 20px; font-size: 14px; }
   h1 { font-size: 1.6rem; color: #1e3a5f; margin-bottom: 6px; }
-  .header-bar { border-bottom: 3px solid #1e3a5f; padding-bottom: 12px; margin-bottom: 20px; display:flex; justify-content:space-between; align-items:flex-end; }
-  .cust-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 20px; background: #f8fafc; padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 0.95rem; border: 1px solid #e2e8f0; }
+  .header-bar { border-bottom: 3px solid #1e3a5f; padding-bottom: 10px; margin-bottom: 14px; display:flex; justify-content:space-between; align-items:center; gap: 16px; }
+  .header-bar > div:first-child { flex-shrink: 0; }
+  .cust-grid { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 3px 18px; background: #f8fafc; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; border: 1px solid #e2e8f0; }
   @media print {
     body { padding: 10px; }
     @page { margin: 15mm; size: A4; }
@@ -16279,16 +16280,16 @@ function _buildPrintHTML(mode) {
     <h1>📋 ${title}</h1>
     <div style="font-size:0.85rem;color:#64748b;margin-top:4px;">תאריך: ${new Date().toLocaleDateString('he-IL')}</div>
   </div>
+  <div class="cust-grid">
+    <div><strong>שם פרויקט/לקוח:</strong> ${custName}</div>
+    <div><strong>טלפון:</strong> ${custPhone}</div>
+    <div><strong>מספר הזמנה:</strong> ${custOrder}</div>
+    <div><strong>כתובת:</strong> ${custAddr}</div>
+    <div><strong>צפי אספקה:</strong> ${custDelivery}</div>
+  </div>
   ${_logoHtml}
 </div>
 ${introHTML}
-<div class="cust-grid">
-  <div><strong>שם פרויקט/לקוח:</strong> ${custName}</div>
-  <div><strong>טלפון:</strong> ${custPhone}</div>
-  <div><strong>מספר הזמנה:</strong> ${custOrder}</div>
-  <div><strong>כתובת:</strong> ${custAddr}</div>
-  <div><strong>צפי אספקה:</strong> ${custDelivery}</div>
-</div>
 ${cabinetsHTML}
 ${summaryHTML}
 ${mode === 'customer' ? _customerApprovalHtml() : ''}
