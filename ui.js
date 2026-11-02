@@ -14041,8 +14041,8 @@ window.updateLeftSidebar = function(opts) {
         if (afterDiscEl)  afterDiscEl.style.display  = 'block';
         if (discAmountEl) discAmountEl.innerHTML = `<span dir="ltr">-₪${totalDiscount.toLocaleString()}</span>`;
         if (netTotalEl)   netTotalEl.innerHTML   = `<span dir="ltr">₪${netTotal.toLocaleString()}</span>`;
-        if (totalLabelEl) totalLabelEl.textContent = 'סה"כ לפני הנחה:';
-        totalEl.innerHTML = `<span dir="ltr">₪${grandTotal.toLocaleString()}</span>`;
+        if (totalLabelEl) totalLabelEl.textContent = 'סה"כ פרויקט לתשלום אחרי הנחה:';
+        totalEl.innerHTML = `<span dir="ltr"><s class="total-price-old">₪${grandTotal.toLocaleString()}</s> ₪${netTotal.toLocaleString()}</span>`;
     } else {
         if (afterDiscEl)  afterDiscEl.style.display = 'none';
         if (totalLabelEl) totalLabelEl.textContent = 'סה"כ פרויקט לתשלום:';
@@ -15807,6 +15807,34 @@ function _customerSummaryTotalsHtml(t) {
     return html;
 }
 
+/** Totals box of the customer order form; discounted amounts show the original price struck through. */
+function _printCustomerTotalsHtml(t) {
+    const amount = function(gross, net) {
+        return gross !== net
+            ? `<span dir="ltr"><s style="color:#94a3b8;font-weight:600;font-size:0.7em;margin-left:8px;">${_fmtIls(gross)}</s> ${_fmtIls(net)}</span>`
+            : `<span dir="ltr">${_fmtIls(net)}</span>`;
+    };
+    const row = function(label, gross, net, pct) {
+        const tag = pct > 0 ? ` <small style="color:#dc2626;font-weight:700;">(הנחה ${pct}%)</small>` : '';
+        return `<div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:1rem;color:#475569;">
+                   <span>${label}${tag}</span><span style="font-weight:bold;">${amount(gross, net)}</span>
+               </div>`;
+    };
+    const discLine = t.hasDiscount
+        ? `<div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:1rem;color:#dc2626;font-weight:700;">
+                   <span>סה"כ הנחה:</span><span dir="ltr">-${_fmtIls(t.gross - t.net)}</span>
+               </div>`
+        : '';
+    return `<div style="margin-top:20px;padding:15px;background:#eff6ff;border:2px solid #bfdbfe;border-radius:8px;break-inside:avoid;page-break-inside:avoid;">
+               ${row('סה"כ ארונות (ללא התקנה):', t.cabinets, t.cabinetsNet, t.cabPct)}
+               ${row('סה"כ הובלה והתקנה:', t.install, t.installNet, t.instPct)}
+               ${discLine}
+               <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:1.6rem;font-weight:800;color:#1e3a5f;border-top:2px solid #bfdbfe;padding-top:12px;margin-top:8px;">
+                   <span>${t.hasDiscount ? 'סה"כ לתשלום אחרי הנחה:' : 'סה"כ לתשלום ללקוח:'}</span>${amount(t.gross, t.net)}
+               </div>
+           </div>`;
+}
+
 function _syncOrderFormNotesPrint(notes) {
     const notesPrint = document.getElementById('order-form-notes-print');
     if (!notesPrint) return;
@@ -16146,17 +16174,7 @@ function _buildPrintHTML(mode) {
                    <span>סה"כ עלות התקנה:</span><span dir="ltr">₪${totalInstallPrice.toLocaleString()}</span>
                </div>
            </div>`
-        : `<div style="margin-top:20px;padding:15px;background:#eff6ff;border:2px solid #bfdbfe;border-radius:8px;">
-               <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:1rem;color:#475569;">
-                   <span>סה"כ ארונות (ללא התקנה):</span><span dir="ltr" style="font-weight:bold;">₪${totalOrderPrice.toLocaleString()}</span>
-               </div>
-               <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:1rem;color:#475569;">
-                   <span>סה"כ הובלה והתקנה:</span><span dir="ltr" style="font-weight:bold;">₪${totalInstallPrice.toLocaleString()}</span>
-               </div>
-               <div style="display:flex;justify-content:space-between;font-size:1.6rem;font-weight:800;color:#1e3a5f;border-top:2px solid #bfdbfe;padding-top:12px;margin-top:8px;">
-                   <span>סה"כ לתשלום ללקוח:</span><span dir="ltr">₪${(totalOrderPrice + totalInstallPrice).toLocaleString()}</span>
-               </div>
-           </div>`;
+        : _printCustomerTotalsHtml(_customerTotals(totalOrderPrice, totalInstallPrice));
 
     const formText = _getOrderFormText(mode);
     const title = formText.title;

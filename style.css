@@ -1735,6 +1735,7 @@ body {
 }
 .total-label { font-size: 0.72rem; color: var(--text-light); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;}
 .total-price { font-size: 1.9rem; font-weight: 800; color: var(--primary); margin-top: 3px; letter-spacing: -0.03em;}
+.total-price-old { font-size: 0.55em; font-weight: 600; color: var(--text-light); margin-right: 6px; vertical-align: middle; }
 
 /* ── Sidebar discount inputs ─────────────────────────────── */
 .sidebar-disc-row {
