@@ -10276,7 +10276,7 @@ function _captureFrameAtView(cam, ctrl, ren, scn, view, hasDoors) {
     ren.render(scn, cam);
     ren.render(scn, cam);
     const frame = view.outlineParts ? _outlineCabinetPartsOnCanvas(ren, scn, cam) : ren.domElement;
-    const dataUrl = view.crop ? _cropCanvasToContent(frame, 18) : frame.toDataURL('image/png');
+    const dataUrl = _cropCanvasToContent(frame, view.crop ? 18 : 12);
 
     state.wingEditMode = savedWingEdit;
     state.activeWing = savedActiveWing;
@@ -10356,7 +10356,7 @@ function _orderPrintPreviewImagesHtml(item, rawState, opts) {
     const multiFront = _cartHasMultiFrontViews(rawState);
     const centerOutLabel = multiFront ? 'תצוגת חוץ (חזית מרכזית)' : 'תצוגת חוץ (חזיתות)';
     const centerInLabel = multiFront ? 'תצוגת פנים (חזית מרכזית)' : 'תצוגת פנים (חלוקה טכנית)';
-    const imgStyle = 'flex:1;min-height:0;width:100%;object-fit:contain;border:1px solid #e2e8f0;border-radius:4px;';
+    const imgStyle = 'display:block;align-self:center;width:auto;height:auto;max-width:100%;max-height:120mm;border:1px solid #e2e8f0;border-radius:4px;';
     const lblStyle = 'font-size:0.85rem;font-weight:600;color:#475569;margin-bottom:4px;padding:4px 8px;background:#f1f5f8;border-radius:4px;';
     const wrapStyle = 'flex:1;display:flex;flex-direction:column;min-height:0;';
     let html = opts.extrasOnly ? '' : `
@@ -10442,8 +10442,17 @@ window._captureCabinetPreviewImages = function() {
     const savedTarget = ctrl.target.clone();
     const savedCamAnim = window._camAnim;
     const savedCamFov = cam.fov;
+    const savedCamAspect = cam.aspect;
+    const savedPixelRatio = ren.getPixelRatio();
+    const savedSize = ren.getSize(new THREE.Vector2());
     window._doorsVisible = true;
+    // Fixed landscape render target: shots don't depend on the editor viewport shape and stay sharp after cropping
+    ren.setPixelRatio(1);
+    ren.setSize(1600, 1200, false);
+    cam.aspect = 1600 / 1200;
+    cam.updateProjectionMatrix();
 
+    try {
     const snapCenterWing = state.wings.center;
     const snapCols = snapCenterWing && snapCenterWing.columns && snapCenterWing.columns.length > 0
         ? snapCenterWing.columns : null;
@@ -10519,6 +10528,7 @@ window._captureCabinetPreviewImages = function() {
         console.warn('[capture] blueprint generation failed:', e);
     }
 
+    restoreRenderSize();
     cam.fov = savedCamFov;
     cam.updateProjectionMatrix();
     cam.position.copy(savedCamPos);
@@ -10542,8 +10552,17 @@ window._captureCabinetPreviewImages = function() {
         multiViewSVG,
         imgSpaceDoors,
         imgSpaceOpen,
-        captureVer: 9
+        captureVer: 10
     };
+    } finally {
+        restoreRenderSize();
+    }
+    function restoreRenderSize() {
+        ren.setPixelRatio(savedPixelRatio);
+        ren.setSize(savedSize.x, savedSize.y, false);
+        cam.aspect = savedCamAspect;
+        cam.updateProjectionMatrix();
+    }
 };
 
 function _cartImageValid(src) {
@@ -10589,6 +10608,8 @@ window._cartItemNeedsMediaRefresh = function(itemObj) {
                 JSON.stringify(rs.wings || {}).indexOf('"handleStyle":"touch"') >= 0) return true;
         } catch (e) { /* ignore */ }
     }
+    // v10: shots are cropped to the cabinet (older ones had wide empty margins)
+    if (!spec.captureVer || spec.captureVer < 10) return true;
     const pid = itemObj.rawState.presetId;
     if ((pid === 'corner-left' || pid === 'corner-right') && !(spec.cornerAngle && _cartImageValid(spec.cornerAngle.imgDoors))) return true;
     return false;
@@ -16508,12 +16529,12 @@ function _buildPrintHTML(mode) {
   .cmp-rows2 { display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; }
   .cmp-side { display: flex; flex-direction: column; gap: 8px; }
   .cmp-side > div, .cmp-imgs > div { flex: none !important; break-inside: avoid; page-break-inside: avoid; }
-  .cmp-side img { flex: none !important; height: 200px; background: #fff; }
+  .cmp-side img { flex: none !important; max-height: 200px !important; background: #fff; }
   .cmp-cap { font-size: 0.85rem; font-weight: 600; color: #475569; margin-bottom: 4px; padding: 4px 8px; background: #f1f5f8; border-radius: 4px; }
   .cmp-bp-thumb { border: 1px solid #e2e8f0; border-radius: 4px; padding: 4px; background: #fff; }
   .cmp-bp-thumb svg { width: 100% !important; height: 200px !important; display: block; }
   .cmp-imgs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
-  .cmp-imgs img { flex: none !important; height: 230px; background: #fff; }
+  .cmp-imgs img { flex: none !important; max-height: 230px !important; background: #fff; }
   .cmp-bar { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
   .cmp-bar small { font-size: 0.8rem; font-weight: 600; opacity: 0.85; }
   .mu-top { display: grid; grid-template-columns: 1.15fr 1fr; gap: 14px; align-items: start; }
@@ -16537,11 +16558,11 @@ function _buildPrintHTML(mode) {
   .mu-card-h small { color: #64748b; font-weight: 600; }
   .mu-card-i { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 6px; }
   .mu-card-i figure { text-align: center; }
-  .mu-card-i img { width: 100%; height: 190px; object-fit: contain; display: block; background: #fff; }
+  .mu-card-i img { width: auto; height: auto; max-width: 100%; max-height: 190px; display: block; margin: 0 auto; background: #fff; }
   .mu-card-i svg { width: 100% !important; height: 190px !important; display: block; }
   .mu-card-i figcaption { font-size: 0.7rem; color: #64748b; }
   .mu-angle { margin-bottom: 4mm; break-inside: avoid; page-break-inside: avoid; }
-  .mu-angle img { width: 100%; height: 108mm; object-fit: contain; display: block; background: #fff; border: 1px solid #e2e8f0; border-radius: 4px; }
+  .mu-angle img { width: auto; height: auto; max-width: 100%; max-height: 108mm; display: block; margin: 0 auto; background: #fff; border: 1px solid #e2e8f0; border-radius: 4px; }
   .mu-sheet { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .mu-sheet-t { display: flex; justify-content: space-between; align-items: baseline; background: #1e3a5f; color: #fff; padding: 5px 12px; border-radius: 6px; font-weight: 800; margin-bottom: 3mm; }
   .mu-sheet-t small { font-weight: 600; opacity: 0.85; }

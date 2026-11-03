@@ -2881,7 +2881,7 @@ body.dragging-v { cursor: ns-resize !important; }
 
 .print-images-container { display: flex; flex-direction: column; gap: 30px; align-items: center; margin-top: 30px; }
 .print-img-wrapper { width: 100%; text-align: center; background: white; padding: 15px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 10px rgba(0,0,0,0.03); }
-.print-img-wrapper img { width: 100%; height: auto; max-height: 600px; object-fit: contain; border-radius: 8px; border: 1px solid #e2e8f0; }
+.print-img-wrapper img { display: block; margin: 0 auto; width: auto; max-width: 100%; height: auto; max-height: 600px; border-radius: 8px; border: 1px solid #e2e8f0; }
 .print-img-wrapper.is-replaced img { outline: 2px solid #2563eb; outline-offset: 1px; }
 .print-img-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
 .print-img-head .img-label { margin-bottom: 0; }
@@ -3202,7 +3202,7 @@ body.dragging-v { cursor: ns-resize !important; }
     
     .print-images-container { display: flex !important; flex-direction: column !important; align-items: center !important; margin-top: 20px !important; }
     .print-img-wrapper { width: 100% !important; border: none !important; box-shadow: none !important; page-break-inside: avoid !important; break-inside: avoid !important; margin-bottom: 20px !important; padding: 0 !important;}
-    .print-img-wrapper img { width: 100% !important; max-height: 700px !important; border: 1px solid #ccc !important; object-fit: contain !important; }
+    .print-img-wrapper img { width: auto !important; max-width: 100% !important; max-height: 700px !important; border: 1px solid #ccc !important; }
     
     .modal-footer-price { page-break-inside: avoid !important; break-inside: avoid !important; margin-top: 20px !important; }
 
@@ -3242,7 +3242,7 @@ body.dragging-v { cursor: ns-resize !important; }
     }
     body.print-customer .print-img-wrapper { flex: 1 !important; max-width: 32% !important; }
     body.print-customer .print-img-wrapper img {
-        width: 100% !important; max-height: 200px !important; object-fit: contain !important; border: 1px solid #eee;
+        width: auto !important; max-width: 100% !important; max-height: 200px !important; border: 1px solid #eee;
     }
     body.print-customer .img-label { font-size: 0.8rem !important; margin-bottom: 5px !important; }
 
@@ -3250,7 +3250,7 @@ body.dragging-v { cursor: ns-resize !important; }
     body.print-factory .print-images-container { display: block !important; margin-top: 30px !important; }
     body.print-factory .print-img-wrapper { margin-bottom: 40px !important; page-break-inside: avoid; }
     body.print-factory .print-img-wrapper img {
-        width: 100% !important; max-height: 900px !important; object-fit: contain !important;
+        width: auto !important; max-width: 100% !important; max-height: 900px !important;
         border: 2px solid #bbb; box-shadow: none !important;
     }
     body.print-factory .img-label {
