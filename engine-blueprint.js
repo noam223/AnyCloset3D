@@ -403,6 +403,55 @@ function _bpSlotHandle(p, x, w, dy, dh, stroke, idx, count) {
 }
 
 /**
+ * Internal drawer cell in front view, same outline as the 3D box (_renderInternalDrawerBoxCell):
+ * 28mm side spacers, 17mm frame around the opening, fronts behind the frame with a finger slot
+ * above each one (or a bar handle when intHandle is external). x/w = cell span, y/h = cell span
+ * in SVG px (y grows down), k = px per cm.
+ */
+function _bpInternalDrawerCell(p, x, w, y, h, count, k, externalHandle) {
+    const n = Math.max(1, count | 0);
+    const S = _BP_STROKE;
+    const f = function(v) { return v.toFixed(1); };
+    const spacer = Math.min(2.8 * k, w * 0.12);
+    const frame = Math.min(1.7 * k, w * 0.08, h * 0.08);
+    const gap = 0.4 * k;
+    const finger = (externalHandle ? 0.4 : 2.5) * k;
+    const boxL = x + spacer, boxR = x + w - spacer;
+    const boxW = boxR - boxL;
+    if (boxW < 6 || h < 6) return;
+    [x, boxR].forEach(function(sx) {
+        p.push(`<rect x="${f(sx)}" y="${f(y)}" width="${f(spacer)}" height="${f(h)}" fill="rgba(30,58,95,0.10)" stroke="${S}" stroke-width="0.7"/>`);
+    });
+    const opL = boxL + frame, opR = boxR - frame;
+    const opT = y + frame, opB = y + h - frame;
+    const drawerH = (h - gap * (n + 1)) / n;
+    for (let d = 0; d < n; d++) {
+        // 3D index 0 is the bottom drawer; front sits below its finger slot
+        const slotBot = y + h - gap - d * (drawerH + gap);
+        const frontB = slotBot;
+        const frontT = slotBot - drawerH + finger;
+        const fT = Math.max(opT, frontT), fB = Math.min(opB, frontB);
+        if (fB - fT > 1) {
+            p.push(`<rect x="${f(opL)}" y="${f(fT)}" width="${f(opR - opL)}" height="${f(fB - fT)}" fill="rgba(255,255,255,0.85)" stroke="${S}" stroke-width="0.9"/>`);
+        }
+        const sT = Math.max(opT, frontT - finger), sB = Math.min(opB, frontT);
+        if (!externalHandle && sB - sT > 0.5) {
+            p.push(`<rect x="${f(opL)}" y="${f(sT)}" width="${f(opR - opL)}" height="${f(sB - sT)}" fill="rgba(30,58,95,0.55)" stroke="none"/>`);
+        }
+        if (externalHandle && fB - fT > 4) {
+            const hw = Math.min((opR - opL) * 0.35, 16 * k);
+            const hy = (fT + fB) / 2;
+            p.push(`<line x1="${f((opL + opR - hw) / 2)}" y1="${f(hy)}" x2="${f((opL + opR + hw) / 2)}" y2="${f(hy)}" stroke="${S}" stroke-width="1.8" stroke-linecap="round"/>`);
+        }
+    }
+    // Frame ring on top of the fronts (it sits in front of them in 3D)
+    p.push(`<path d="M${f(boxL)},${f(y)}H${f(boxR)}V${f(y + h)}H${f(boxL)}Z M${f(opL)},${f(opT)}V${f(opB)}H${f(opR)}V${f(opT)}Z" fill="rgba(30,58,95,0.18)" fill-rule="evenodd" stroke="${S}" stroke-width="0.9"/>`);
+    if (h > 40 && boxW > 40) {
+        p.push(`<text x="${f((boxL + boxR) / 2)}" y="${f(y + h - frame - Math.max(6, drawerH * 0.25))}" text-anchor="middle" font-family="${_BP_FONT}" font-size="10" fill="${S}" opacity="0.6">מגירות פנימיות</text>`);
+    }
+}
+
+/**
  * Shoe pull-out shelf unit in front view (x/w = inner cell span, dy/dh = unit span, SVG y grows down):
  * shelf board at the bottom of the unit + low rail fence (2 posts + top rail), label at the top of the first unit.
  */
@@ -1566,6 +1615,8 @@ function _bpDrawPartitionZoneContent(p, zoneType, zoneStyle, x1, x2, zSvgTop, zS
         if (zSvgH > 18) p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 14).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="10" fill="${_BP_STROKE}" opacity="0.6">כוורת</text>`);
     } else if (zoneType === 'side_open_cell') {
         if (zSvgH > 18) p.push(`<text x="${subZoneCX.toFixed(1)}" y="${(zSvgTop + 14).toFixed(1)}" text-anchor="middle" font-family="${_BP_FONT}" font-size="10" fill="${_BP_STROKE}" opacity="0.6">כוורת צד</text>`);
+    } else if (zoneType === 'internal_drawers') {
+        _bpInternalDrawerCell(p, x1, subZoneW, zSvgTop, zSvgH, (drawerCount > 0) ? drawerCount : 2, sc, intHandle === 'external');
     } else if (_isDrawerType(zoneType)) {
         const dCount = (drawerCount > 0) ? drawerCount : 2;
         const dh = zSvgH / dCount;
@@ -2479,6 +2530,8 @@ window._generateMultiViewBlueprintSVG = function() {
                     p.push(`<rect x="${handleX.toFixed(1)}" y="${hRodY.toFixed(1)}" width="${handleW.toFixed(1)}" height="${handleH.toFixed(1)}" fill="${STROKE}" rx="1" opacity="0.75"/>`);
                     // תווית
                     if (cellH > 25) p.push(`<text x="${cellCX.toFixed(1)}" y="${(cellY1 + 10).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.55">סורבטו</text>`);
+                } else if (cellType === 'internal_drawers') {
+                    _bpInternalDrawerCell(p, colX, colW, cellY1, cellH, comp.count || 2, sc, comp.intHandle === 'external');
                 } else if (_isDrawerType(cellType)) {
                     const drawerCount = comp.count || 2;
                     const dh = cellH / drawerCount;
@@ -3474,6 +3527,8 @@ window._generateMultiViewBlueprintPages = function() {
                     const handleX  = (hRodX1 + hRodX2) / 2 - handleW / 2;
                     p.push(`<rect x="${handleX.toFixed(1)}" y="${hRodY.toFixed(1)}" width="${handleW.toFixed(1)}" height="${handleH.toFixed(1)}" fill="${STROKE}" rx="1" opacity="0.75"/>`);
                     if (cellH > 25) p.push(`<text x="${cellCX.toFixed(1)}" y="${(cellY1 + 10).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.55">סורבטו</text>`);
+                } else if (cellType === 'internal_drawers') {
+                    _bpInternalDrawerCell(p, colX, colW, cellY1, cellH, comp.count || 2, sc, comp.intHandle === 'external');
                 } else if (_isDrawerType(cellType)) {
                     const drawerCount = comp.count || 2;
                     const dh = cellH / drawerCount;
@@ -4061,6 +4116,8 @@ window._generateMultiViewBlueprintPages = function() {
                     const handleX  = (hRodX1 + hRodX2) / 2 - handleW / 2;
                     p.push(`<rect x="${handleX.toFixed(1)}" y="${hRodY.toFixed(1)}" width="${handleW.toFixed(1)}" height="${handleH.toFixed(1)}" fill="${STROKE}" rx="1" opacity="0.75"/>`);
                     if (cellH > 25) p.push(`<text x="${cellCX.toFixed(1)}" y="${(cellY1 + 10).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.55">סורבטו</text>`);
+                } else if (cellType === 'internal_drawers') {
+                    _bpInternalDrawerCell(p, colX, colW, cellY1, cellH, comp.count || 2, sc, comp.intHandle === 'external');
                 } else if (_isDrawerType(cellType)) {
                     const drawerCount = comp.count || 2;
                     const dh = cellH / drawerCount;
@@ -4332,6 +4389,8 @@ window._generateMultiViewBlueprintPages = function() {
                             const handleX  = (hRodX1 + hRodX2) / 2 - handleW / 2;
                             p.push(`<rect x="${handleX.toFixed(1)}" y="${hRodY.toFixed(1)}" width="${handleW.toFixed(1)}" height="${handleH.toFixed(1)}" fill="${STROKE}" rx="1" opacity="0.75"/>`);
                             if (cellH > 25) p.push(`<text x="${cellCX.toFixed(1)}" y="${(cellY1 + 10).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="11" fill="${STROKE}" opacity="0.55">סורבטו</text>`);
+                        } else if (cellType === 'internal_drawers') {
+                            _bpInternalDrawerCell(p, colX, colW, cellY1, cellH, comp.count || 2, scScale, comp.intHandle === 'external');
                         } else if (_isDrawerType(cellType)) {
                             const drawerCount = comp.count || 2;
                             const dh = cellH / drawerCount;
@@ -4497,6 +4556,8 @@ window._generateMultiViewBlueprintPages = function() {
                     if (cellType === 'hanging') {
                         const rodY = _bpHangRodSvgY(cellY1, scScale);
                         p.push(`<line x1="${(ox + 4).toFixed(1)}" y1="${rodY.toFixed(1)}" x2="${(ox + dW - 4).toFixed(1)}" y2="${rodY.toFixed(1)}" stroke="${STROKE}" stroke-width="2"/>`);
+                    } else if (cellType === 'internal_drawers') {
+                        _bpInternalDrawerCell(p, ox, dW, cellY1, cellH, comp.count || 2, scScale, comp.intHandle === 'external');
                     } else if (_isDrawerType(cellType)) {
                         const drawerCount = comp.count || 2;
                         const dh = cellH / drawerCount;
@@ -4759,6 +4820,8 @@ window._generateMultiViewBlueprintPages = function() {
                     p.push(`<line x1="${hRodX1.toFixed(1)}" y1="${rodY.toFixed(1)}" x2="${hRodX2.toFixed(1)}" y2="${rodY.toFixed(1)}" stroke="${STROKE}" stroke-width="2"/>`);
                     p.push(`<circle cx="${hRodX1.toFixed(1)}" cy="${rodY.toFixed(1)}" r="2" fill="${STROKE}"/>`);
                     p.push(`<circle cx="${hRodX2.toFixed(1)}" cy="${rodY.toFixed(1)}" r="2" fill="${STROKE}"/>`);
+                } else if (cellType === 'internal_drawers') {
+                    _bpInternalDrawerCell(p, colX, colW, cellY1, cellH, comp.count || 2, sc, comp.intHandle === 'external');
                 } else if (_isDrawerType(cellType)) {
                     const drawerCount = comp.count || 2;
                     const dh = cellH / drawerCount;

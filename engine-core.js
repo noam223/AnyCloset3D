@@ -4734,6 +4734,8 @@ function _renderInternalDrawerBoxCell(opts) {
             });
         }
 
+        // Blueprint is a front elevation: box sides/bottom/back would only double the front outline
+        if (isBP) continue;
         createBoard(drwW, frameT, drwD, boxCenterX, boxBottomY + frameT / 2, drwCenterZ, matInternal);
         createBoard(frameT, boxH, drwD, boxCenterX - drwW / 2 + frameT / 2, boxCenterY, drwCenterZ, matInternal);
         createBoard(frameT, boxH, drwD, boxCenterX + drwW / 2 - frameT / 2, boxCenterY, drwCenterZ, matInternal);
