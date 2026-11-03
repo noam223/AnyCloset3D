@@ -7325,11 +7325,19 @@ function _spaceDragCmPerPx(off) {
     return { x: dxPx !== 0 ? 100 / dxPx : 1, y: dyPx !== 0 ? 100 / dyPx : 1 };
 }
 
+/** A corner desk merged with a cabinet shelf is part of that cabinet — its position follows the column. */
+window._spaceActiveLocked = function() {
+    if (state.presetId !== 'corner-unit') return false;
+    const cw = state.wings && state.wings.center;
+    return !!(cw && cw.corner && cw.corner.type === 'desk' && cw.corner.mergeShelf);
+};
+
 window._buildSpaceCabMoveHandle = function() {
     const info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
     const gizmoReady = !!(window.THREE && THREE.TransformControls);
     window._spaceRotHover = false;
     if (!info || info.activeSlot <= 0) return;
+    if (window._spaceActiveLocked()) return;
     if (state.viewMode !== 'front' && !(state.viewMode === '3d' && gizmoReady)) return;
     const item = window._getSpaceMovableItem();
     const off = window._getSpaceOffset(item);
@@ -7443,6 +7451,7 @@ window._spaceGizmoBlockClick = false;
 function _spaceGizmoTarget() {
     const info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
     if (!info || info.activeSlot <= 0) return null;
+    if (window._spaceActiveLocked()) return null;
     if (state.viewMode !== 'front' && state.viewMode !== '3d') return null;
     if (state.wingEditMode || document.body.classList.contains('room-plan-mode')) return null;
     const item = window._getSpaceMovableItem();
@@ -11715,6 +11724,7 @@ window._spaceSnapOffset = function(x, y, z, slot, axes) {
 window._setSpaceRotation = function(rot) {
     const info = window._getSpacePairInfo();
     if (!info || info.activeSlot <= 0) return;
+    if (window._spaceActiveLocked()) return;
     const item = state.orderCart[info.slotIndices[info.activeSlot]];
     if (!item) return;
     const prev = window._getSpaceOffset(item);
@@ -11776,6 +11786,7 @@ window._syncSpaceLiftBottomPanel = function(item, lifted) {
 };
 
 window._setSpaceOffsetFromUI = function(axis, val) {
+    if (window._spaceActiveLocked()) return;
     const item = window._getSpaceMovableItem() || window._getSpaceSlot1Item();
     const cur = window._getSpaceOffset(item);
     if (axis === 'x') window._setSpaceOffset(val, cur.y, { preferAxis: 'x' });
@@ -11807,8 +11818,16 @@ window._syncSpaceOffsetUI = function() {
     const label = document.getElementById('space-cab-offset-label');
     const mLabel = document.getElementById('mobile-space-cab-offset-label');
     const n = info && info.activeSlot > 0 ? (info.activeSlot + 1) : 2;
-    const text = 'מיקום ארון ' + n + ' במרחב';
-    if (label) label.innerHTML = '<i class="fa-solid fa-up-down-left-right"></i> ' + text;
+    const locked = window._spaceActiveLocked();
+    ['inp-num-space-x', 'mobile-inp-num-space-x', 'inp-num-space-y', 'mobile-inp-num-space-y',
+     'inp-num-space-z', 'mobile-inp-num-space-z'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) el.disabled = locked;
+    });
+    document.querySelectorAll('.space-rot-btn[data-space-rot]').forEach(function(btn) { btn.disabled = locked; });
+    const text = locked ? 'מוזג עם הארון — המיקום נקבע לפי העמודה' : 'מיקום ארון ' + n + ' במרחב';
+    const icon = locked ? 'fa-link' : 'fa-up-down-left-right';
+    if (label) label.innerHTML = '<i class="fa-solid ' + icon + '"></i> ' + text;
     if (mLabel) mLabel.textContent = text;
 };
 
