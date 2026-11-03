@@ -63,24 +63,22 @@ window._applyCornerUnitPreset = function(type, side) {
 };
 
 /**
- * The cabinet a standalone corner unit sits in front of: a non-rotated space member whose
- * front face touches the unit's back and whose width overlaps it. Returns
- * { off, wing, col, colIndex } with col = the column right behind the unit, or null.
+ * The cabinet a standalone corner unit (space slot `slot`) sits in front of: a non-rotated
+ * space member whose front face touches the unit's back and whose width overlaps it.
+ * Returns { slot, off, wing, col, colIndex } (col = the column behind the unit) or null.
  */
-function _cuFindHostColumn() {
+function _cuFindHostColumn(cu, slot, preferCol) {
     if (typeof window._getSpacePairInfo !== 'function') return null;
     const info = window._getSpacePairInfo();
-    const cw = _getCUWing();
-    if (!info || !cw || !cw.corner) return null;
-    const cu = cw.corner;
-    const me = window._spaceOffsetForSlot(info.activeSlot);
+    if (!info || !cu) return null;
+    const me = window._spaceOffsetForSlot(slot);
     const turned = me.rot === 90 || me.rot === 270;
     const halfX = (turned ? (cu.depth || 54) : (cu.width || 60)) / 2;
     const halfZ = (turned ? (cu.width || 60) : (cu.depth || 54)) / 2;
     const backZ = (me.z || 0) - halfZ;
     let best = null;
     info.members.forEach(function(m) {
-        if (m.slot === info.activeSlot) return;
+        if (m.slot === slot) return;
         const off = window._spaceOffsetForSlot(m.slot);
         if (off.rot) return;
         const wings = window._spaceWingsForSlot(m.slot);
@@ -90,78 +88,197 @@ function _cuFindHostColumn() {
         const gapZ = Math.abs(((off.z || 0) + fp.d / 2) - backZ);
         const overlap = Math.min(me.x + halfX, off.x + fp.w / 2) - Math.max(me.x - halfX, off.x - fp.w / 2);
         if (gapZ > 15 || overlap <= 0) return;
-        if (!best || gapZ < best.gapZ) best = { off: off, wing: w, gapZ: gapZ };
+        if (!best || gapZ < best.gapZ) best = { slot: m.slot, off: off, wing: w, gapZ: gapZ };
     });
     if (!best) return null;
-    // Column under the unit's center (columns run left → right inside the outer walls)
     const w = best.wing;
-    const t = w.thickness || 1.7;
-    const localX = me.x - best.off.x;
-    let x = -(w.width || 160) / 2 + t;
-    let colIndex = localX < 0 ? 0 : w.columns.length - 1;
-    for (let i = 0; i < w.columns.length; i++) {
-        const cwid = w.columns[i].width || 0;
-        if (localX >= x && localX <= x + cwid + t) { colIndex = i; break; }
-        x += cwid + t;
+    let colIndex = -1;
+    if (preferCol != null && preferCol >= 0 && preferCol < w.columns.length) {
+        colIndex = preferCol;
+    } else {
+        // Column under the unit's center (columns run left → right inside the outer walls)
+        const t = w.thickness || 1.7;
+        const localX = me.x - best.off.x;
+        let x = -(w.width || 160) / 2 + t;
+        colIndex = localX < 0 ? 0 : w.columns.length - 1;
+        for (let i = 0; i < w.columns.length; i++) {
+            const cwid = w.columns[i].width || 0;
+            if (localX >= x && localX <= x + cwid + t) { colIndex = i; break; }
+            x += cwid + t;
+        }
     }
     best.col = w.columns[colIndex];
     best.colIndex = colIndex;
     return best;
 }
 
-/** Shelf tops (cm from the corner unit's floor) of the host column behind a corner desk. */
-function _cuHostShelfTops(host) {
-    const t = host.wing.thickness || 1.7;
-    const shelfT = typeof window._shelfThicknessCm === 'function' ? window._shelfThicknessCm(t) : t;
-    const me = window._spaceOffsetForSlot(window._getSpacePairInfo().activeSlot);
-    const dy = (host.off.y || 0) - (me.y || 0);
+function _cuShelfT(w) {
+    const t = w.thickness || 1.7;
+    return typeof window._shelfThicknessCm === 'function' ? window._shelfThicknessCm(t) : t;
+}
+
+/** Column center (host-local X) and its outer span including both side boards. */
+function _cuColumnSpan(w, ci) {
+    const t = w.thickness || 1.7;
+    let x = -(w.width || 160) / 2 + t;
+    for (let i = 0; i < ci; i++) x += (w.columns[i].width || 0) + t;
+    const cwid = w.columns[ci].width || 0;
+    return { center: x + cwid / 2, span: cwid + 2 * t };
+}
+
+/** Shelf tops of the host column, in cm from the corner unit's floor. */
+function _cuHostShelfTops(host, deskOff) {
+    const shelfT = _cuShelfT(host.wing);
+    const dy = (host.off.y || 0) - (deskOff.y || 0);
     return ((host.col && host.col.shelvesY) || []).map(function(y) {
         return Math.round((y + shelfT / 2 + dy) * 10) / 10;
     });
 }
 
-/** Corner desk ⇄ existing shelf: the desk top is set flush with the nearest shelf of the column behind it. */
+function _cuNearestIndex(arr, v) {
+    let bi = 0;
+    for (let i = 1; i < arr.length; i++) if (Math.abs(arr[i] - v) < Math.abs(arr[bi] - v)) bi = i;
+    return bi;
+}
+
+function _cuSetSlotX(slot, x) {
+    const info = window._getSpacePairInfo();
+    const item = info && state.orderCart[info.slotIndices[slot]];
+    if (!item) return;
+    const o = Object.assign({}, window._getSpaceOffset(item), { x: x });
+    item.spaceOffset = o;
+    if (!item.rawState) item.rawState = {};
+    item.rawState.spaceOffset = o;
+}
+
+/**
+ * Desk follows the merged shelf/column: top flush with the shelf, depth = column span,
+ * centered on the column. Returns true if anything changed.
+ */
+function _cuAlignDeskToHost(cu, slot) {
+    const ms = cu && cu.mergeShelf;
+    if (!ms) return false;
+    const host = _cuFindHostColumn(cu, slot, ms.colIndex);
+    if (!host) return false;
+    const me = window._spaceOffsetForSlot(slot);
+    const tops = _cuHostShelfTops(host, me);
+    if (!tops.length) return false;
+    const si = (ms.shelfIndex != null && tops[ms.shelfIndex] != null && Math.abs(tops[ms.shelfIndex] - ms.y) < 0.05)
+        ? ms.shelfIndex : _cuNearestIndex(tops, ms.y);
+    const top = tops[si];
+    const span = _cuColumnSpan(host.wing, host.colIndex);
+    const depth = Math.max(30, Math.min(120, Math.round(span.span * 10) / 10));
+    const newX = Math.round(host.off.x + span.center);
+    const changed = Math.abs((cu.height || 0) - top) > 0.05 || Math.abs((cu.depth || 0) - depth) > 0.05 || me.x !== newX;
+    cu.height = top;
+    cu.depth = depth;
+    cu.mergeShelf = { y: top, colIndex: host.colIndex, shelfIndex: si };
+    if (me.x !== newX) _cuSetSlotX(slot, newX);
+    return changed;
+}
+
+/** Column follows the desk: the merged shelf moves to the desk height / the column takes the desk depth. */
+function _cuPushDeskToHost(cu, slot, dim) {
+    const ms = cu && cu.mergeShelf;
+    if (!ms) return;
+    const host = _cuFindHostColumn(cu, slot, ms.colIndex);
+    if (!host) return;
+    const w = host.wing;
+    const cols = w.columns;
+    const col = host.col;
+    if (dim === 'height' && col.shelvesY && col.shelvesY.length) {
+        const me = window._spaceOffsetForSlot(slot);
+        const si = (ms.shelfIndex != null && col.shelvesY[ms.shelfIndex] != null) ? ms.shelfIndex : 0;
+        const dy = (host.off.y || 0) - (me.y || 0);
+        col.shelvesY[si] = Math.max(5, Math.round((cu.height - _cuShelfT(w) / 2 - dy) * 10) / 10);
+        ms.y = cu.height;
+    } else if (dim === 'depth' && cols.length > 1) {
+        const minW = (typeof MIN_COL_WIDTH !== 'undefined') ? MIN_COL_WIDTH : 20;
+        const t = w.thickness || 1.7;
+        const ci = host.colIndex;
+        const nb = cols[ci === cols.length - 1 ? ci - 1 : ci + 1];
+        const delta = Math.round(cu.depth - 2 * t) - Math.round(col.width);
+        let newW = Math.round(col.width + delta);
+        let nbW = Math.round(nb.width - delta);
+        if (newW < minW) { nbW -= (minW - newW); newW = minW; }
+        if (nbW < minW) { newW -= (minW - nbW); nbW = minW; }
+        if (newW >= minW && nbW >= minW) { col.width = newW; nb.width = nbW; }
+    }
+    _cuAlignDeskToHost(cu, slot);
+}
+
+/** Corner desk ⇄ existing shelf: desk and column share height (shelf top) and width (column span). */
 window.toggleCornerDeskShelfMerge = function() {
     const cw = _getCUWing();
     if (!_isCornerUnitPreset() || !cw || !cw.corner || cw.corner.type !== 'desk') return;
     const cu = cw.corner;
+    const info = window._getSpacePairInfo && window._getSpacePairInfo();
     const toast = (msg, ms) => { if (typeof _showToast === 'function') _showToast(msg, ms || 3000); };
     if (cu.mergeShelf) {
         delete cu.mergeShelf;
     } else {
-        const host = _cuFindHostColumn();
+        const host = info ? _cuFindHostColumn(cu, info.activeSlot) : null;
         if (!host) { toast('השולחן צריך לעמוד צמוד לחזית של ארון במרחב כדי להתמזג עם מדף'); return; }
-        const tops = _cuHostShelfTops(host).filter(function(y) { return y >= 40 && y <= 130; });
-        if (!tops.length) { toast('לא נמצא מדף בגובה שולחן (40-130 ס"מ) בעמודה שמאחורי השולחן'); return; }
-        const cur = cu.height || 75;
-        const top = tops.reduce(function(a, b) { return Math.abs(b - cur) < Math.abs(a - cur) ? b : a; });
-        cu.height = top;
-        cu.mergeShelf = { y: top, colIndex: host.colIndex };
-        toast('גובה השולחן הותאם למדף בגובה ' + top + ' ס"מ', 2800);
+        const tops = _cuHostShelfTops(host, window._spaceOffsetForSlot(info.activeSlot));
+        const inRange = tops.filter(function(y) { return y >= 40 && y <= 130; });
+        if (!inRange.length) { toast('לא נמצא מדף בגובה שולחן (40-130 ס"מ) בעמודה שמאחורי השולחן'); return; }
+        const top = inRange[_cuNearestIndex(inRange, cu.height || 75)];
+        cu.mergeShelf = { y: top, colIndex: host.colIndex, shelfIndex: tops.indexOf(top) };
+        _cuAlignDeskToHost(cu, info.activeSlot);
+        toast('השולחן הותאם לעמודה — גובה ' + cu.height + ' ס"מ, רוחב ' + cu.depth + ' ס"מ', 2800);
     }
     _cuSyncWingDims(cw);
     window._updateExtrasSections();
+    if (typeof window._syncSpaceOffsetUI === 'function') window._syncSpaceOffsetUI();
     if (typeof buildCabinet === 'function') buildCabinet();
     if (typeof updateCameraView === 'function') updateCameraView();
     if (typeof calculatePrice === 'function') calculatePrice();
     if (typeof saveHistoryState === 'function') saveHistoryState();
 };
 
-/** Keeps a merged corner desk on its shelf when the host shelf was moved meanwhile. */
-function _cuResyncShelfMerge() {
-    const cw = _getCUWing();
-    if (!_isCornerUnitPreset() || !cw || !cw.corner || !cw.corner.mergeShelf) return;
-    const host = _cuFindHostColumn();
-    if (!host) return;
-    const cu = cw.corner;
-    const tops = _cuHostShelfTops(host);
-    if (!tops.length) return;
-    const top = tops.reduce(function(a, b) { return Math.abs(b - cu.mergeShelf.y) < Math.abs(a - cu.mergeShelf.y) ? b : a; });
-    if (Math.abs(top - (cu.height || 0)) < 0.05) return;
-    cu.height = top;
-    cu.mergeShelf = { y: top, colIndex: host.colIndex };
-    _cuSyncWingDims(cw);
+/**
+ * Before every build: merged corner desks in the space follow their host column
+ * (live state when the desk is being edited, its saved snapshot otherwise).
+ */
+function _cuSyncMergedDesks() {
+    if (typeof window._getSpacePairInfo !== 'function') return;
+    const info = window._getSpacePairInfo();
+    if (!info) return;
+    info.members.forEach(function(m) {
+        const live = m.slot === info.activeSlot;
+        if (live && !_isCornerUnitPreset()) return;
+        const item = state.orderCart[info.slotIndices[m.slot]];
+        const raw = live ? null : (item && item.rawState);
+        if (!live && (!raw || raw.presetId !== 'corner-unit')) return;
+        const wing = live ? _getCUWing() : (raw.wings && raw.wings.center);
+        const cu = wing && wing.corner;
+        if (!cu || !cu.mergeShelf || cu.type !== 'desk') return;
+        if (!_cuAlignDeskToHost(cu, m.slot)) return;
+        if (live) {
+            _cuSyncWingDims(wing);
+            if (typeof window._syncSpaceOffsetUI === 'function') window._syncSpaceOffsetUI();
+        } else {
+            wing.width = cu.width; wing.depth = cu.depth; wing.globalHeight = cu.height;
+            if (raw.width != null) raw.width = cu.width;
+            if (raw.depth != null) raw.depth = cu.depth;
+        }
+    });
 }
+
+// engine-core.js (buildCabinet) loads after this file
+document.addEventListener('DOMContentLoaded', function() {
+    const _origBuild = window.buildCabinet;
+    if (typeof _origBuild !== 'function') return;
+    let busy = false;
+    window.buildCabinet = function() {
+        if (!busy) {
+            busy = true;
+            try { _cuSyncMergedDesks(); } catch (e) { console.warn('corner desk merge sync', e); }
+            busy = false;
+        }
+        return _origBuild.apply(this, arguments);
+    };
+});
 
 /** Called by _applyPresetCore when converting a corner unit into another cabinet type. */
 window._leaveCornerUnitPreset = function() {
@@ -303,7 +420,6 @@ window._updateExtrasSections = function() {
 (function() {
     const _origSync = window.syncSidebarToWing;
     window.syncSidebarToWing = function() {
-        _cuResyncShelfMerge();
         if (typeof _origSync === 'function') _origSync();
         window._updateExtrasSections();
     };
@@ -351,13 +467,19 @@ window._updateExtrasSections = function() {
         if (!cw || !cw.corner) return;
         const cu = cw.corner;
         const key = dim;
-        const limits = { width: [30, 120], depth: [30, 80], height: [40, 280] }[key];
+        const limits = { width: [30, 120], depth: [30, 120], height: [40, 280] }[key];
         const cur = cu[key] || CU_DEFAULTS.drawers[key];
         let val = (absoluteValue !== null && absoluteValue !== undefined) ? parseInt(absoluteValue, 10) : cur + (delta || 0);
         if (isNaN(val)) return;
         val = Math.max(limits[0], Math.min(limits[1], val));
         cu[key] = val;
-        if (key === 'height') delete cu.mergeShelf;
+        if (cu.mergeShelf && cu.type === 'desk' && (key === 'height' || key === 'depth')) {
+            const info = window._getSpacePairInfo && window._getSpacePairInfo();
+            if (info) {
+                _cuPushDeskToHost(cu, info.activeSlot, key);
+                if (typeof window._syncSpaceOffsetUI === 'function') window._syncSpaceOffsetUI();
+            }
+        }
         state.manualPrice = null;
         _cuSyncWingDims(cw);
         if (typeof buildCabinet === 'function') buildCabinet();

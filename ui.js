@@ -14766,7 +14766,7 @@ function _collectPrintSpecRows(item, itemObj) {
             }
             rows.push({ id: 'cornerDeskFloating', label: 'רגל בקצה', value: cuRaw.deskFloating ? 'ללא — שולחן מרחף' : 'כן' });
             if (cuRaw.mergeShelf) {
-                rows.push({ id: 'cornerDeskShelfMerge', label: 'מיזוג עם מדף בארון', value: 'כן — משטח בגובה ' + cuRaw.mergeShelf.y + ' ס"מ, בקו המדף' });
+                rows.push({ id: 'cornerDeskShelfMerge', label: 'מיזוג עם מדף בארון', value: 'כן — משטח בגובה ' + cuRaw.mergeShelf.y + ' ס"מ בקו המדף, ברוחב העמודה (' + Math.round(cuRaw.depth || 0) + ' ס"מ)' });
             }
         } else {
             rows.push({ id: 'cornerDrawers', label: 'מספר מגירות', value: (cuRaw.drawerCount || 4) + ' יחידות' });
