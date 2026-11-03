@@ -16729,7 +16729,7 @@ ${_trialWmHtml()}
     var imgs = bl.querySelector('.cmp-main-imgs');
     if (!imgs || !pxPerMm) return;
     var top = imgs.getBoundingClientRect().top - (i === 0 ? bodyTop : bl.getBoundingClientRect().top - 10);
-    var cap = imgs.querySelector('div > div');
+    var cap = imgs.querySelector('.cmp-main-imgs > div > div');
     var capH = cap ? cap.offsetHeight + 4 : 0;
     var avail = (267 * pxPerMm - top - capH) / pxPerMm - 8;
     var h = Math.max(55, Math.min(160, avail));
