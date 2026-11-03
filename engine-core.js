@@ -563,7 +563,7 @@ window._touchIconSprite = function() {
         _touchIconTex = new THREE.CanvasTexture(cv);
     }
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: _touchIconTex, transparent: true, depthTest: false }));
-    sprite.scale.set(10, 13.75, 1);
+    sprite.scale.set(14, 19.25, 1);
     sprite.renderOrder = 999;
     return sprite;
 };
@@ -7738,9 +7738,9 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         }
                     }
                     if (!isBP && window._captureTouchIcons && (door.handleStyle || _handleStyle) === 'touch'
-                        && style !== 'glass_mirror' && w >= 18 && dH >= 25) {
+                        && style !== 'glass_mirror' && w >= 22 && dH >= 30) {
                         const icon = window._touchIconSprite();
-                        icon.position.set(doorLocalX + (isLeft ? w / 2 - 8 : -w / 2 + 8), 0, t / 2 + 3);
+                        icon.position.set(doorLocalX + (isLeft ? w / 2 - 10 : -w / 2 + 10), 0, t / 2 + 3);
                         doorGroup.add(icon);
                     }
                     _registerDoorMesh(doorGroup);
