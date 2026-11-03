@@ -10257,7 +10257,9 @@ function _rotatedSpacePartCaptureView() {
     if (!info || info.count < 2 || !info.activeSlot || typeof cabinetGroup === 'undefined' || !cabinetGroup) return null;
     const rotY = cabinetGroup.rotation.y || 0;
     if (Math.abs(Math.sin(rotY)) < 0.2) return null;
+    // Frame the whole corner (desk + the cabinets around it) so the part is seen in context
     const box = new THREE.Box3().setFromObject(cabinetGroup);
+    (window._spaceCompanionGroups || []).forEach(function(g) { if (g) box.union(new THREE.Box3().setFromObject(g)); });
     if (box.isEmpty()) return null;
     const minY = Math.max(0, box.min.y);
     const dx = Math.sin(rotY), dz = Math.cos(rotY) + 1;
@@ -10273,10 +10275,36 @@ function _rotatedSpacePartCaptureView() {
     const h = box.max.y - minY;
     return {
         id: 'spaceRotated',
-        camPos: [tx + ux, ty + h * 0.9, tz + uz],
+        camPos: [tx + ux, ty + h * 0.35, tz + uz],
         camTarget: [tx, ty, tz],
-        fitH: h + 120,
-        fitW: (pMax - pMin) + 120
+        fitH: h + 80,
+        fitW: (pMax - pMin) + 80,
+        companionOpacity: 0.45,
+        keepCompanions: true
+    };
+}
+
+/** Cabinet hosting a corner desk: angled toward the desk side instead of a flat front shot. */
+function _cornerDeskHostCaptureView(focusX, focusY, snapW, snapH) {
+    const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
+    if (!info || info.count < 2 || !Array.isArray(info.members)) return null;
+    let side = 0;
+    info.members.forEach(function(m) {
+        if (m.slot === info.activeSlot) return;
+        const it = state.orderCart && state.orderCart[m.index];
+        if (!it || !it.rawState || it.rawState.presetId !== 'corner-unit') return;
+        const off = window._spaceOffsetForSlot(m.slot) || { x: 0 };
+        if (!side) side = (off.x || 0) >= focusX ? 1 : -1;
+    });
+    if (!side) return null;
+    const a = 28 * Math.PI / 180;
+    const depth = (state.wings && state.wings.center && state.wings.center.depth) || state.depth || 54;
+    return {
+        id: 'cornerDeskHost',
+        camPos: [focusX + side * Math.sin(a), focusY + snapH * 0.15, Math.cos(a)],
+        camTarget: [focusX, focusY, 0],
+        fitH: snapH + 120,
+        fitW: snapW * Math.cos(a) + depth * Math.sin(a) + 150
     };
 }
 
@@ -10329,9 +10357,9 @@ function _captureFrameAtView(cam, ctrl, ren, scn, view, hasDoors) {
     }
     ctrl.update();
 
-    if (typeof window._fadeSpaceCompanionsForCapture === 'function' &&
-        window._spaceCaptureCompanionOpacity != null) {
-        window._fadeSpaceCompanionsForCapture(window._spaceCaptureCompanionOpacity);
+    const companionOpacity = view.companionOpacity != null ? view.companionOpacity : window._spaceCaptureCompanionOpacity;
+    if (typeof window._fadeSpaceCompanionsForCapture === 'function' && companionOpacity != null) {
+        window._fadeSpaceCompanionsForCapture(companionOpacity);
     }
 
     // Ensure door meshes aren't hidden by the editor "הסתר חזיתות" toggle
@@ -10349,7 +10377,7 @@ function _captureFrameAtView(cam, ctrl, ren, scn, view, hasDoors) {
     // Faded companion cabinets fill the frame — crop to the focus part only
     let bounds = null;
     const companions = (window._spaceCompanionGroups || []).filter(function(g) { return g && g.visible; });
-    if (companions.length && view.id !== 'space') {
+    if (companions.length && view.id !== 'space' && !view.keepCompanions) {
         frame = _copyCanvas(frame);
         companions.forEach(function(g) { g.visible = false; });
         try {
@@ -10551,7 +10579,7 @@ window._captureCabinetPreviewImages = function() {
             focusY = (snapH / 2) + (off.y || 0);
         }
     } catch (e) { /* keep origin focus */ }
-    const centerView = _rotatedSpacePartCaptureView() || {
+    const centerView = _rotatedSpacePartCaptureView() || _cornerDeskHostCaptureView(focusX, focusY, snapW, snapH) || {
         camPos: [focusX, focusY, 1],
         camTarget: [focusX, focusY, 0],
         fitH: snapH + 120,
@@ -10635,7 +10663,7 @@ window._captureCabinetPreviewImages = function() {
         multiViewSVG,
         imgSpaceDoors,
         imgSpaceOpen,
-        captureVer: 11
+        captureVer: 12
     };
     } finally {
         restoreRenderSize();
@@ -10692,7 +10720,7 @@ window._cartItemNeedsMediaRefresh = function(itemObj) {
         } catch (e) { /* ignore */ }
     }
     // v11: shots are cropped to the focus part with a margin; rotated space parts are shot diagonally
-    if (!spec.captureVer || spec.captureVer < 11) return true;
+    if (!spec.captureVer || spec.captureVer < 12) return true;
     const pid = itemObj.rawState.presetId;
     if ((pid === 'corner-left' || pid === 'corner-right') && !(spec.cornerAngle && _cartImageValid(spec.cornerAngle.imgDoors))) return true;
     return false;
