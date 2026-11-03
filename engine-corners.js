@@ -427,7 +427,8 @@ function buildCornerUnit() {
     const innerD     = cuW - t;                     // inner depth in Z
 
     if (cu.type === 'desk') {
-        const matDesk = materials[state.materialDesk] || matBody;
+        // Standalone corner desk has no separate "שולחן" color tab — it is the unit's body
+        const matDesk = standalone ? matBody : (materials[state.materialDesk] || matBody);
         const deskH = cu.height || 80;
         const fingerGap = 2.5;
         const innerGap = 0.4;

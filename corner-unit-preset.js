@@ -126,19 +126,62 @@ function _cuColumnSpan(w, ci) {
     return { center: x + cwid / 2, span: cwid + 2 * t };
 }
 
-/** Shelf tops of the host column, in cm from the corner unit's floor. */
-function _cuHostShelfTops(host, deskOff) {
-    const shelfT = _cuShelfT(host.wing);
+/**
+ * Mergeable surfaces of the host column, in cm from the corner unit's floor:
+ * shelf tops ({kind:'shelf', idx: shelvesY index}) and the top of each כוורת's own
+ * bottom board ({kind:'cubby', idx: row}).
+ */
+function _cuHostSurfaces(host, deskOff) {
+    const w = host.wing;
+    const col = host.col;
+    const t = w.thickness || 1.7;
+    const shelfT = _cuShelfT(w);
     const dy = (host.off.y || 0) - (deskOff.y || 0);
-    return ((host.col && host.col.shelvesY) || []).map(function(y) {
-        return Math.round((y + shelfT / 2 + dy) * 10) / 10;
+    const r1 = function(v) { return Math.round(v * 10) / 10; };
+    const out = [];
+    ((col && col.shelvesY) || []).forEach(function(y, i) {
+        out.push({ kind: 'shelf', idx: i, y: r1(y + shelfT / 2 + dy) });
     });
+    const comps = (col && col.compartments) || [];
+    const wd = {
+        plinthHeight: w.plinthHeight != null ? w.plinthHeight : state.plinthHeight,
+        thickness: t
+    };
+    const wholeOpen = function(c) { return !!c && (c.type === 'open_cell' || c.type === 'side_open_cell'); };
+    comps.forEach(function(comp, r) {
+        if (typeof _compHasOpenCell !== 'function' || !_compHasOpenCell(comp)) return;
+        // Stacked whole-row כוורות form one unit: only its lowest row has a bottom board
+        if (wholeOpen(comp) && r > 0 && comps[r - 1] && comps[r - 1].type === comp.type) return;
+        const b = window._compartmentBounds(col, r, wd);
+        out.push({ kind: 'cubby', idx: r, y: r1(b.bottomY + t + dy) });
+    });
+    return out;
 }
 
 function _cuNearestIndex(arr, v) {
     let bi = 0;
     for (let i = 1; i < arr.length; i++) if (Math.abs(arr[i] - v) < Math.abs(arr[bi] - v)) bi = i;
     return bi;
+}
+
+/** Desk-height surface to merge with: a כוורת bottom first, else the nearest shelf. */
+function _cuPickSurface(surfaces, nearY) {
+    const inRange = surfaces.filter(function(s) { return s.y >= 40 && s.y <= 130; });
+    if (!inRange.length) return null;
+    const cubbies = inRange.filter(function(s) { return s.kind === 'cubby'; });
+    const pool = cubbies.length ? cubbies : inRange;
+    return pool[_cuNearestIndex(pool.map(function(s) { return s.y; }), nearY)];
+}
+
+/** The surface a merged desk is tied to (same kind + index, else nearest of the same kind / any). */
+function _cuCurrentSurface(surfaces, ms) {
+    if (!surfaces.length) return null;
+    const kind = ms.kind || 'shelf';
+    const exact = surfaces.find(function(s) { return s.kind === kind && s.idx === ms.idx && Math.abs(s.y - ms.y) < 0.05; });
+    if (exact) return exact;
+    const same = surfaces.filter(function(s) { return s.kind === kind; });
+    const pool = same.length ? same : surfaces;
+    return pool[_cuNearestIndex(pool.map(function(s) { return s.y; }), ms.y)];
 }
 
 function _cuSetSlotX(slot, x) {
@@ -152,32 +195,33 @@ function _cuSetSlotX(slot, x) {
 }
 
 /**
- * Desk follows the merged shelf/column: top flush with the shelf, depth = column span,
- * centered on the column. Returns true if anything changed.
+ * Desk follows the merged surface/column: top flush with the shelf or כוורת bottom,
+ * depth = column span, centered on the column. Returns true if anything changed.
  */
 function _cuAlignDeskToHost(cu, slot) {
     const ms = cu && cu.mergeShelf;
     if (!ms) return false;
+    if (ms.idx == null && ms.shelfIndex != null) { ms.kind = 'shelf'; ms.idx = ms.shelfIndex; }
     const host = _cuFindHostColumn(cu, slot, ms.colIndex);
     if (!host) return false;
     const me = window._spaceOffsetForSlot(slot);
-    const tops = _cuHostShelfTops(host, me);
-    if (!tops.length) return false;
-    const si = (ms.shelfIndex != null && tops[ms.shelfIndex] != null && Math.abs(tops[ms.shelfIndex] - ms.y) < 0.05)
-        ? ms.shelfIndex : _cuNearestIndex(tops, ms.y);
-    const top = tops[si];
+    const surf = _cuCurrentSurface(_cuHostSurfaces(host, me), ms);
+    if (!surf) return false;
     const span = _cuColumnSpan(host.wing, host.colIndex);
     const depth = Math.max(30, Math.min(120, Math.round(span.span * 10) / 10));
     const newX = Math.round(host.off.x + span.center);
-    const changed = Math.abs((cu.height || 0) - top) > 0.05 || Math.abs((cu.depth || 0) - depth) > 0.05 || me.x !== newX;
-    cu.height = top;
+    const changed = Math.abs((cu.height || 0) - surf.y) > 0.05 || Math.abs((cu.depth || 0) - depth) > 0.05 || me.x !== newX;
+    cu.height = surf.y;
     cu.depth = depth;
-    cu.mergeShelf = { y: top, colIndex: host.colIndex, shelfIndex: si };
+    cu.mergeShelf = { y: surf.y, colIndex: host.colIndex, kind: surf.kind, idx: surf.idx };
     if (me.x !== newX) _cuSetSlotX(slot, newX);
     return changed;
 }
 
-/** Column follows the desk: the merged shelf moves to the desk height / the column takes the desk depth. */
+/**
+ * Column follows the desk: the merged shelf (or the shelf the כוורת stands on) moves to
+ * the desk height / the column takes the desk depth.
+ */
 function _cuPushDeskToHost(cu, slot, dim) {
     const ms = cu && cu.mergeShelf;
     if (!ms) return;
@@ -186,15 +230,30 @@ function _cuPushDeskToHost(cu, slot, dim) {
     const w = host.wing;
     const cols = w.columns;
     const col = host.col;
+    const t = w.thickness || 1.7;
     if (dim === 'height' && col.shelvesY && col.shelvesY.length) {
         const me = window._spaceOffsetForSlot(slot);
-        const si = (ms.shelfIndex != null && col.shelvesY[ms.shelfIndex] != null) ? ms.shelfIndex : 0;
         const dy = (host.off.y || 0) - (me.y || 0);
-        col.shelvesY[si] = Math.max(5, cu.height - _cuShelfT(w) / 2 - dy);
-        ms.y = cu.height;
+        const shelfT = _cuShelfT(w);
+        let si = -1;
+        let boardBelowTop = cu.height;
+        if (ms.kind === 'cubby') {
+            // The כוורת's bottom board rests on the divider below its row
+            const surf = _cuCurrentSurface(_cuHostSurfaces(host, me), ms);
+            if (surf) {
+                const divY = surf.y - t - dy - shelfT / 2;
+                si = col.shelvesY.findIndex(function(y) { return Math.abs(y - divY) < 0.1; });
+            }
+            boardBelowTop = cu.height - t;
+        } else if (ms.idx != null && col.shelvesY[ms.idx] != null) {
+            si = ms.idx;
+        }
+        if (si >= 0) {
+            col.shelvesY[si] = Math.max(5, boardBelowTop - shelfT / 2 - dy);
+            ms.y = cu.height;
+        }
     } else if (dim === 'depth' && cols.length > 1) {
         const minW = (typeof MIN_COL_WIDTH !== 'undefined') ? MIN_COL_WIDTH : 20;
-        const t = w.thickness || 1.7;
         const ci = host.colIndex;
         const nb = cols[ci === cols.length - 1 ? ci - 1 : ci + 1];
         const delta = Math.round(cu.depth - 2 * t) - Math.round(col.width);
@@ -207,7 +266,7 @@ function _cuPushDeskToHost(cu, slot, dim) {
     _cuAlignDeskToHost(cu, slot);
 }
 
-/** Corner desk ⇄ existing shelf: desk and column share height (shelf top) and width (column span). */
+/** Corner desk ⇄ host column: shared height (כוורת bottom / shelf top) and width (column span). */
 window.toggleCornerDeskShelfMerge = function() {
     const cw = _getCUWing();
     if (!_isCornerUnitPreset() || !cw || !cw.corner || cw.corner.type !== 'desk') return;
@@ -219,13 +278,12 @@ window.toggleCornerDeskShelfMerge = function() {
     } else {
         const host = info ? _cuFindHostColumn(cu, info.activeSlot) : null;
         if (!host) { toast('השולחן צריך לעמוד צמוד לחזית של ארון במרחב כדי להתמזג עם מדף'); return; }
-        const tops = _cuHostShelfTops(host, window._spaceOffsetForSlot(info.activeSlot));
-        const inRange = tops.filter(function(y) { return y >= 40 && y <= 130; });
-        if (!inRange.length) { toast('לא נמצא מדף בגובה שולחן (40-130 ס"מ) בעמודה שמאחורי השולחן'); return; }
-        const top = inRange[_cuNearestIndex(inRange, cu.height || 75)];
-        cu.mergeShelf = { y: top, colIndex: host.colIndex, shelfIndex: tops.indexOf(top) };
+        const surf = _cuPickSurface(_cuHostSurfaces(host, window._spaceOffsetForSlot(info.activeSlot)), cu.height || 75);
+        if (!surf) { toast('לא נמצא מדף או כוורת בגובה שולחן (40-130 ס"מ) בעמודה שמאחורי השולחן'); return; }
+        cu.mergeShelf = { y: surf.y, colIndex: host.colIndex, kind: surf.kind, idx: surf.idx };
         _cuAlignDeskToHost(cu, info.activeSlot);
-        toast('השולחן הותאם לעמודה — גובה ' + cu.height + ' ס"מ, רוחב ' + cu.depth + ' ס"מ', 2800);
+        toast('השולחן מוזג עם ' + (surf.kind === 'cubby' ? 'תחתית הכוורת' : 'המדף') +
+            ' — גובה ' + cu.height + ' ס"מ, רוחב ' + cu.depth + ' ס"מ', 2800);
     }
     _cuSyncWingDims(cw);
     window._updateExtrasSections();
@@ -354,8 +412,9 @@ window._updateExtrasSections = function() {
         if (btn) {
             btn.classList.toggle('active', merged);
             btn.innerHTML = merged
-                ? '<i class="fa-solid fa-link-slash"></i> בטל מיזוג עם המדף (' + cw.corner.mergeShelf.y + ' ס"מ)'
-                : '<i class="fa-solid fa-link"></i> מזג עם מדף בארון';
+                ? '<i class="fa-solid fa-link-slash"></i> בטל מיזוג עם ' + (cw.corner.mergeShelf.kind === 'cubby' ? 'הכוורת' : 'המדף') +
+                    ' (' + cw.corner.mergeShelf.y + ' ס"מ)'
+                : '<i class="fa-solid fa-link"></i> מזג עם כוורת / מדף בארון';
         }
     }
     if (!isCU) {
