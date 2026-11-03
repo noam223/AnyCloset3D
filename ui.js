@@ -10249,8 +10249,8 @@ function _getCornerAngleCaptureView(focusX) {
 }
 
 /**
- * A space part rotated in the room (e.g. a corner desk turned 90°) is shot diagonally between its own front
- * and the room front, slightly from above — the plain front shot would look at it edge-on / from underneath.
+ * A space part rotated in the room (e.g. a corner desk turned 90°) is shot diagonally into the corner together
+ * with its cabinets, slightly from above — the plain front shot would look at it edge-on / from underneath.
  */
 function _rotatedSpacePartCaptureView() {
     const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
@@ -10258,13 +10258,17 @@ function _rotatedSpacePartCaptureView() {
     const rotY = cabinetGroup.rotation.y || 0;
     if (Math.abs(Math.sin(rotY)) < 0.2) return null;
     // Frame the whole corner (desk + the cabinets around it) so the part is seen in context
-    const box = new THREE.Box3().setFromObject(cabinetGroup);
+    const partBox = new THREE.Box3().setFromObject(cabinetGroup);
+    const box = partBox.clone();
     (window._spaceCompanionGroups || []).forEach(function(g) { if (g) box.union(new THREE.Box3().setFromObject(g)); });
-    if (box.isEmpty()) return null;
+    if (box.isEmpty() || partBox.isEmpty()) return null;
     const minY = Math.max(0, box.min.y);
-    const dx = Math.sin(rotY), dz = Math.cos(rotY) + 1;
-    const len = Math.hypot(dx, dz) || 1;
-    const ux = dx / len, uz = dz / len;
+    // Look into the corner from the open side (where the other cabinets extend), 35° off the room front
+    const partCx = (partBox.min.x + partBox.max.x) / 2;
+    const allCx = (box.min.x + box.max.x) / 2;
+    const side = Math.abs(allCx - partCx) < 1 ? 0 : (allCx < partCx ? -1 : 1);
+    const a = 35 * Math.PI / 180;
+    const ux = side * Math.sin(a), uz = side ? Math.cos(a) : 1;
     let pMin = Infinity, pMax = -Infinity;
     [[box.min.x, box.min.z], [box.min.x, box.max.z], [box.max.x, box.min.z], [box.max.x, box.max.z]].forEach(function(p) {
         const v = p[0] * uz - p[1] * ux;
@@ -10279,7 +10283,7 @@ function _rotatedSpacePartCaptureView() {
         camTarget: [tx, ty, tz],
         fitH: h + 80,
         fitW: (pMax - pMin) + 80,
-        companionOpacity: 0.45,
+        companionOpacity: 1,
         keepCompanions: true
     };
 }
