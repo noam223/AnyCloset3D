@@ -356,9 +356,11 @@ function buildCornerUnit() {
     const plinthH = state.plinthHeight;
     const sign = (cu.side === 'right') ? 1 : -1;
     const _hasCornerDeskDrawers = Math.min(cu.deskDrawerCount || 0, 3) > 0;
-    const deskT = (typeof window._deskSurfaceThickness === 'function')
+    // Merged with a host shelf / כוורת bottom: same board thickness → reads as one continuous board
+    const _mergedBoardT = (standalone && cu.type === 'desk' && cu.mergeShelf && cu.mergeShelf.boardT) || 0;
+    const deskT = _mergedBoardT || ((typeof window._deskSurfaceThickness === 'function')
         ? window._deskSurfaceThickness(_hasCornerDeskDrawers, t)
-        : (_hasCornerDeskDrawers ? t : 2.8);
+        : (_hasCornerDeskDrawers ? t : 2.8));
 
     // Group center in world space:
     // X center: sign * (mainW/2 - cuD/2)  — inside cabinet

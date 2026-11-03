@@ -210,10 +210,12 @@ function _cuAlignDeskToHost(cu, slot) {
     const span = _cuColumnSpan(host.wing, host.colIndex);
     const depth = Math.max(30, Math.min(120, Math.round(span.span * 10) / 10));
     const newX = Math.round(host.off.x + span.center);
-    const changed = Math.abs((cu.height || 0) - surf.y) > 0.05 || Math.abs((cu.depth || 0) - depth) > 0.05 || me.x !== newX;
+    const boardT = Math.round((surf.kind === 'cubby' ? (host.wing.thickness || 1.7) : _cuShelfT(host.wing)) * 100) / 100;
+    const changed = Math.abs((cu.height || 0) - surf.y) > 0.05 || Math.abs((cu.depth || 0) - depth) > 0.05 ||
+        me.x !== newX || ms.boardT !== boardT;
     cu.height = surf.y;
     cu.depth = depth;
-    cu.mergeShelf = { y: surf.y, colIndex: host.colIndex, kind: surf.kind, idx: surf.idx };
+    cu.mergeShelf = { y: surf.y, colIndex: host.colIndex, kind: surf.kind, idx: surf.idx, boardT: boardT, hostSlot: host.slot };
     if (me.x !== newX) _cuSetSlotX(slot, newX);
     return changed;
 }
@@ -301,6 +303,9 @@ window.toggleCornerDeskShelfMerge = function() {
 function _cuSyncMergedDesks() {
     if (typeof window._getSpacePairInfo !== 'function') return;
     const info = window._getSpacePairInfo();
+    // Host boards merged with a desk, per host slot → drawn in the desk color (engine-core)
+    const boards = {};
+    window._cuMergeBoards = boards;
     if (!info) return;
     info.members.forEach(function(m) {
         const live = m.slot === info.activeSlot;
@@ -311,7 +316,15 @@ function _cuSyncMergedDesks() {
         const wing = live ? _getCUWing() : (raw.wings && raw.wings.center);
         const cu = wing && wing.corner;
         if (!cu || !cu.mergeShelf || cu.type !== 'desk') return;
-        if (!_cuAlignDeskToHost(cu, m.slot)) return;
+        const changed = _cuAlignDeskToHost(cu, m.slot);
+        const ms = cu.mergeShelf;
+        if (ms.hostSlot != null && _cuFindHostColumn(cu, m.slot, ms.colIndex)) {
+            (boards[ms.hostSlot] = boards[ms.hostSlot] || []).push({
+                colIndex: ms.colIndex, kind: ms.kind, idx: ms.idx,
+                mat: wing.materialBody || (live ? state.materialBody : raw.materialBody) || 'white_matte'
+            });
+        }
+        if (!changed) return;
         if (live) {
             _cuSyncWingDims(wing);
             if (typeof window._syncSpaceOffsetUI === 'function') window._syncSpaceOffsetUI();

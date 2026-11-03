@@ -4055,6 +4055,22 @@ window._clearSpaceCompanion = function() {
     }
 };
 
+/**
+ * Material of a host board merged with a standalone corner desk (window._cuMergeBoards,
+ * filled by corner-unit-preset.js per host space slot), or null.
+ */
+function _cuMergedBoardMat(colIndex, kind, idx) {
+    const map = window._cuMergeBoards;
+    if (!map) return null;
+    const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
+    if (!info) return null;
+    const slot = window._spaceBuildSlot != null ? window._spaceBuildSlot : info.activeSlot;
+    const list = map[slot];
+    if (!list) return null;
+    const hit = list.find(function(e) { return e.colIndex === colIndex && e.kind === kind && e.idx === idx; });
+    return hit ? (materials[hit.mat] || materials['white_matte'] || null) : null;
+}
+
 /** Space rotation (degrees, clockwise from above) → Object3D.rotation.y. */
 function _spaceRotY(off) {
     return -((off && off.rot) || 0) * Math.PI / 180;
@@ -4190,7 +4206,8 @@ window._rebuildSpaceCompanion = function() {
             scene.add(g);
             // Track door count before building so we can capture companion's own door meshes
             var _doorsBeforeCompanion = doorMeshes.length;
-            window.buildCabinetIntoGroup(g);
+            window._spaceBuildSlot = member.slot;
+            try { window.buildCabinetIntoGroup(g); } finally { window._spaceBuildSlot = null; }
             // Capture companion door meshes BEFORE they get wiped in finally's restore
             var _companionNewDoors = doorMeshes.slice(_doorsBeforeCompanion);
             if (!window._spaceCompanionDoorMeshes) window._spaceCompanionDoorMeshes = [];
@@ -6161,7 +6178,21 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
 
                 _ppPartId = block.paintId || `opencell_c${c}_b${block.startR}`;
                 createBoard(cellW, innerT, bodyD - 2, cellX, block.topY - innerT/2, 1, matOpenCell);
-                createBoard(cellW, innerT, bodyD - 2, cellX, block.bottomY + innerT/2, 1, matOpenCell);
+                // Bottom board merged with a standalone corner desk → desk color (any column of the span)
+                let _cuDeskMat = null;
+                for (let cc = c; cc <= endC && !_cuDeskMat; cc++) {
+                    const sb = cc === c ? block : (columnBlocks[cc] || []).find(b =>
+                        b.type === block.type && Math.abs(b.bottomY - block.bottomY) < _OC_Y_EPS);
+                    if (sb) _cuDeskMat = _cuMergedBoardMat(cc, 'cubby', sb.startR);
+                }
+                if (_cuDeskMat) {
+                    const _ppSaved = _ppPartId;
+                    _ppPartId = '';
+                    createBoard(cellW, innerT, bodyD - 2, cellX, block.bottomY + innerT/2, 1, _cuDeskMat);
+                    _ppPartId = _ppSaved;
+                } else {
+                    createBoard(cellW, innerT, bodyD - 2, cellX, block.bottomY + innerT/2, 1, matOpenCell);
+                }
                 createBoard(cellW, block.h - 2*innerT, t, cellX, block.centerY, -bodyD/2 + t/2 + 0.6, matOpenCell);
 
                 if (block.type === 'open_cell') {
@@ -6274,11 +6305,14 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                  (snap.neighborColIdx === c && snap.neighborShelfIdx === div.idx))) {
                 boardMat = matSnapHighlight;
             }
-            if (div.type === 'shelf') {
+            // Shelf merged with a standalone corner desk: one board with the desk — desk color, flush front
+            const _cuDeskMat = (!isBP && div.type === 'shelf') ? _cuMergedBoardMat(c, 'shelf', div.idx) : null;
+            if (_cuDeskMat) boardMat = _cuDeskMat;
+            if (div.type === 'shelf' && !_cuDeskMat) {
                 boardD = Math.max(t, boardD - _shelfFrontSetback);
                 boardZ -= _shelfFrontSetback / 2;
             }
-            _ppPartId = (insideBlock && insideBlock.paintId)
+            _ppPartId = _cuDeskMat ? '' : (insideBlock && insideBlock.paintId)
                 ? insideBlock.paintId
                 : (div.type === 'shelf' ? `shelf_c${c}_r${div.idx}` : `split_c${c}`);
             if (div.type === 'split') {
@@ -6924,8 +6958,16 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         const frameY = zoneBottomY + zoneH / 2;
                         // Top board
                         createBoard(subW, innerT, bodyD - 2, subCenterX, zoneBottomY + zoneH - innerT / 2, 1, matOpenCell);
-                        // Bottom board
-                        createBoard(subW, innerT, bodyD - 2, subCenterX, zoneBottomY + innerT / 2, 1, matOpenCell);
+                        // Bottom board (desk color when merged with a standalone corner desk)
+                        const _cuSubDeskMat = (zoneIdx === 0) ? _cuMergedBoardMat(c, 'cubby', r) : null;
+                        if (_cuSubDeskMat) {
+                            const _ppSaved = _ppPartId;
+                            _ppPartId = '';
+                            createBoard(subW, innerT, bodyD - 2, subCenterX, zoneBottomY + innerT / 2, 1, _cuSubDeskMat);
+                            _ppPartId = _ppSaved;
+                        } else {
+                            createBoard(subW, innerT, bodyD - 2, subCenterX, zoneBottomY + innerT / 2, 1, matOpenCell);
+                        }
                         // Back panel
                         createBoard(subW - 2 * innerT, zoneH - 2 * innerT, 0.5, subCenterX, frameY, -bodyD / 2 + 0.6, matOpenCell);
                         // Side walls — skip shared wall when adjacent sub-cell is also honeycomb (merge)
