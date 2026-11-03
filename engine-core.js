@@ -524,46 +524,42 @@ window._ledIconSprite = function() {
 };
 
 let _touchIconTex = null;
-/** Print capture (closed doors): "press" badge with a fingertip + טאצ' label on push-to-open doors. */
+/** Print capture (closed doors): pressing hand with tap waves + טאצ' label on push-to-open doors (no badge frame). */
 window._touchIconSprite = function() {
     if (!_touchIconTex) {
         const cv = document.createElement('canvas');
-        cv.width = 128; cv.height = 176;
+        cv.width = 200; cv.height = 260;
         const g = cv.getContext('2d');
         const navy = '#1e3a5f';
-        g.beginPath(); g.arc(64, 64, 60, 0, Math.PI * 2); g.fillStyle = '#ffffff'; g.fill();
-        g.lineWidth = 5; g.strokeStyle = navy; g.stroke();
-        // Press ripples above the fingertip
-        g.lineWidth = 4; g.lineCap = 'round';
-        [13, 22].forEach(function(r) {
-            g.beginPath(); g.arc(64, 40, r, Math.PI * 1.2, Math.PI * 1.8); g.stroke();
-        });
-        // Pointing hand: index finger + palm
-        g.fillStyle = navy;
+        const cx = 100;
         const rr = function(x, y, w, h, r) {
             g.beginPath();
-            g.moveTo(x + r, y); g.lineTo(x + w - r, y); g.quadraticCurveTo(x + w, y, x + w, y + r);
-            g.lineTo(x + w, y + h - r); g.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-            g.lineTo(x + r, y + h); g.quadraticCurveTo(x, y + h, x, y + h - r);
-            g.lineTo(x, y + r); g.quadraticCurveTo(x, y, x + r, y);
+            g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+            g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r);
             g.closePath(); g.fill();
         };
-        rr(56, 38, 16, 50, 8);
-        rr(42, 74, 46, 34, 12);
-        g.fillStyle = '#ffffff';
-        g.fillRect(58, 84, 2, 12); g.fillRect(70, 84, 2, 12);
-        // Label
+        // Tap waves above the fingertip
+        g.strokeStyle = navy; g.lineWidth = 7; g.lineCap = 'round';
+        [22, 36].forEach(function(r) {
+            g.beginPath(); g.arc(cx, 70, r, Math.PI * 1.2, Math.PI * 1.8); g.stroke();
+        });
+        // Hand: index finger, palm, folded thumb
+        g.save();
+        g.translate(cx, 115); g.scale(1.5, 1.5);
         g.fillStyle = navy;
-        g.font = 'bold 34px Heebo, Arial, sans-serif';
-        g.textAlign = 'center'; g.textBaseline = 'middle';
+        rr(-9, -40, 18, 58, 9);
+        rr(-30, 8, 60, 46, 14);
+        rr(-30, 0, 14, 30, 7);
+        g.restore();
+        g.fillStyle = navy;
+        g.font = 'bold 46px Heebo, Arial, sans-serif';
+        g.textAlign = 'center';
         g.direction = 'rtl';
-        g.lineWidth = 6; g.strokeStyle = '#ffffff';
-        g.strokeText('טאצ\'', 64, 150);
-        g.fillText('טאצ\'', 64, 150);
+        g.fillText('טאצ\'', cx, 240);
         _touchIconTex = new THREE.CanvasTexture(cv);
     }
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: _touchIconTex, transparent: true, depthTest: false }));
-    sprite.scale.set(14, 19.25, 1);
+    sprite.scale.set(20, 26, 1);
     sprite.renderOrder = 999;
     return sprite;
 };
@@ -7738,9 +7734,9 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         }
                     }
                     if (!isBP && window._captureTouchIcons && (door.handleStyle || _handleStyle) === 'touch'
-                        && style !== 'glass_mirror' && w >= 22 && dH >= 30) {
+                        && style !== 'glass_mirror' && w >= 28 && dH >= 34) {
                         const icon = window._touchIconSprite();
-                        icon.position.set(doorLocalX + (isLeft ? w / 2 - 10 : -w / 2 + 10), 0, t / 2 + 3);
+                        icon.position.set(doorLocalX + (isLeft ? w / 2 - 13 : -w / 2 + 13), 0, t / 2 + 3);
                         doorGroup.add(icon);
                     }
                     _registerDoorMesh(doorGroup);
