@@ -296,14 +296,29 @@ function _cuPushDeskToHost(cu, slot, dim) {
         const minW = (typeof MIN_COL_WIDTH !== 'undefined') ? MIN_COL_WIDTH : 20;
         const ci = host.colIndex;
         const nb = cols[ci === cols.length - 1 ? ci - 1 : ci + 1];
-        const delta = Math.round(cu.depth - 2 * t) - Math.round(col.width);
-        let newW = Math.round(col.width + delta);
-        let nbW = Math.round(nb.width - delta);
+        const r1 = function(v) { return Math.round(v * 10) / 10; };
+        let newW = r1(cu.depth - 2 * t);
+        let nbW = Math.round((col.width + nb.width - newW) * 100) / 100;
         if (newW < minW) { nbW -= (minW - newW); newW = minW; }
         if (nbW < minW) { newW -= (minW - nbW); nbW = minW; }
         if (newW >= minW && nbW >= minW) { col.width = newW; nb.width = nbW; }
     }
+    _cuCommitHostColumns(host.slot, w);
     _cuAlignDeskToHost(cu, slot);
+}
+
+/** A saved host also keeps a root `columns` copy that companion builds read over wings.center. */
+function _cuCommitHostColumns(hostSlot, w) {
+    const info = window._getSpacePairInfo();
+    const idx = info && info.slotIndices[hostSlot];
+    if (idx == null || idx === state.editingCartIndex) return;
+    const item = state.orderCart[idx];
+    const raw = item && item.rawState;
+    if (!raw || !raw.wings || raw.wings.center !== w) return;
+    if ((raw.activeWing || 'center') === 'center') raw.columns = JSON.parse(JSON.stringify(w.columns));
+    if (typeof window._invalidateSpacePairPreviewImages === 'function' && typeof window._spacePairIdOf === 'function') {
+        window._invalidateSpacePairPreviewImages(window._spacePairIdOf(item));
+    }
 }
 
 /** Corner desk ⇄ host column: shared height (כוורת bottom / shelf top) and width (column span). */
