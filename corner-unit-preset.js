@@ -190,7 +190,7 @@ function _cuPushDeskToHost(cu, slot, dim) {
         const me = window._spaceOffsetForSlot(slot);
         const si = (ms.shelfIndex != null && col.shelvesY[ms.shelfIndex] != null) ? ms.shelfIndex : 0;
         const dy = (host.off.y || 0) - (me.y || 0);
-        col.shelvesY[si] = Math.max(5, Math.round((cu.height - _cuShelfT(w) / 2 - dy) * 10) / 10);
+        col.shelvesY[si] = Math.max(5, cu.height - _cuShelfT(w) / 2 - dy);
         ms.y = cu.height;
     } else if (dim === 'depth' && cols.length > 1) {
         const minW = (typeof MIN_COL_WIDTH !== 'undefined') ? MIN_COL_WIDTH : 20;
