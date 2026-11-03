@@ -10322,7 +10322,7 @@ function _cornerDeskHostCaptureView(focusX, focusY, snapW, snapH) {
         fitH: snapH + 120,
         fitW: (maxX - minX) * Math.cos(a) + depth * Math.sin(a) + 150,
         cropSlots: deskSlots,
-        slotOpacity: 0.65
+        slotOpacity: 0.85
     };
 }
 
