@@ -2305,6 +2305,25 @@ body.color-tab-glass #mobile-panel-materials .mobile-panel-body > :not(.color-pa
 .space-unit-add-btn:hover { background: rgba(37,99,235,0.12); }
 .space-unit-add-btn.plan-locked { opacity:0.55; }
 .space-unit-add-hint { font-size:0.72rem; color:var(--text-light); text-align:center; margin-top:6px; line-height:1.35; }
+.corner-desk-merge-btn {
+    width:100%; padding:9px 12px; border-radius:10px; border:1.5px dashed var(--accent, #0d9488);
+    background:var(--bg-light); color:var(--text-dark); font-size:0.78rem; font-weight:700; cursor:pointer;
+    font-family:inherit; display:flex; align-items:center; justify-content:center; gap:8px;
+}
+.corner-desk-merge-btn.active { border-style:solid; background:rgba(13,148,136,0.12); color:#0f766e; }
+.corner-side-popup {
+    position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:10050; direction:rtl;
+    background:#fff; border-radius:14px; box-shadow:0 18px 50px rgba(0,0,0,0.25); padding:18px 18px 12px;
+    min-width:280px; font-family:inherit; text-align:center;
+}
+.corner-side-popup-title { font-weight:800; font-size:0.95rem; margin-bottom:12px; color:#1f2937; }
+.corner-side-popup-btns { display:flex; gap:10px; }
+.corner-side-popup-btns button {
+    flex:1; padding:14px 10px; border-radius:10px; border:1.5px solid #d1d5db; background:#f9fafb;
+    font-size:0.85rem; font-weight:700; cursor:pointer; font-family:inherit; display:flex; flex-direction:column; align-items:center; gap:6px;
+}
+.corner-side-popup-btns button:hover { border-color:#0d9488; background:rgba(13,148,136,0.08); color:#0f766e; }
+.corner-side-popup-cancel { margin-top:10px; background:none; border:none; color:#6b7280; font-size:0.78rem; cursor:pointer; font-family:inherit; }
 .space-cab-join-btn {
     width:100%; margin-top:6px; padding:9px 12px; border-radius:8px; border:1.5px dashed #0d9488;
     background: rgba(13,148,136,0.07); color: #0f766e; font-size:0.8rem; font-weight:700;

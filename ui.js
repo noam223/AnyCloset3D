@@ -12119,10 +12119,12 @@ window._configureSpaceUnit = function(kind, host) {
     }
     if (kind === 'cornerDrawers' || kind === 'cornerDesk') {
         state.presetId = 'corner-unit';
+        const side = (host && host.cornerSide === 'left') ? 'left' : 'right';
         if (typeof window._applyCornerUnitPreset === 'function') {
-            window._applyCornerUnitPreset(kind === 'cornerDesk' ? 'desk' : 'drawers');
+            window._applyCornerUnitPreset(kind === 'cornerDesk' ? 'desk' : 'drawers', side);
         }
-        return 0;
+        // Quarter turn so the open side faces into the corner (toward the host's interior)
+        return side === 'left' ? 270 : 90;
     }
     if (kind === 'sideCabinet') {
         if (host) Object.assign(cw, host);
@@ -12141,8 +12143,40 @@ window._configureSpaceUnit = function(kind, host) {
 };
 
 /** Adds a new cabinet / add-on unit (side desk, side cabinet, corner drawers, corner desk) to the shared space. */
-window.addSpaceUnit = function(kind) {
+/** Corner units ask which inner corner of the current cabinet they go into. */
+window._askCornerUnitSide = function(kind) {
+    const old = document.getElementById('_corner-side-popup');
+    if (old) old.remove();
+    const popup = document.createElement('div');
+    popup.id = '_corner-side-popup';
+    popup.className = 'corner-side-popup';
+    const title = kind === 'cornerDesk' ? 'שולחן פינתי' : 'שידה פינתית';
+    popup.innerHTML =
+        '<div class="corner-side-popup-title">' + title + ' — לאיזו פינה?</div>' +
+        '<div class="corner-side-popup-btns">' +
+        '<button type="button" data-side="right"><i class="fa-solid fa-arrow-right"></i> פינה ימין</button>' +
+        '<button type="button" data-side="left"><i class="fa-solid fa-arrow-left"></i> פינה שמאל</button>' +
+        '</div>' +
+        '<button type="button" class="corner-side-popup-cancel">ביטול</button>';
+    document.body.appendChild(popup);
+    const close = function() {
+        popup.remove();
+        document.removeEventListener('mousedown', outside, true);
+    };
+    const outside = function(e) { if (!popup.contains(e.target)) close(); };
+    popup.querySelectorAll('button[data-side]').forEach(function(b) {
+        b.addEventListener('click', function() {
+            close();
+            window.addSpaceUnit(kind, { cornerSide: b.dataset.side });
+        });
+    });
+    popup.querySelector('.corner-side-popup-cancel').addEventListener('click', close);
+    setTimeout(function() { document.addEventListener('mousedown', outside, true); }, 0);
+};
+
+window.addSpaceUnit = function(kind, opts) {
     kind = kind || 'cabinet';
+    opts = opts || {};
     if (!window._spacePairCanUse()) return;
     const existing = window._getSpacePairInfo();
     if (existing && existing.planLimitReached && typeof window._showPlanUpsell === 'function') {
@@ -12150,6 +12184,11 @@ window.addSpaceUnit = function(kind) {
         return;
     }
     if (existing && !existing.canAddMore) return;
+    const isCornerKind = kind === 'cornerDrawers' || kind === 'cornerDesk';
+    if (isCornerKind && !opts.cornerSide) {
+        window._askCornerUnitSide(kind);
+        return;
+    }
     if (typeof window._commitCurrentCabinetToCart === 'function') {
         window._commitCurrentCabinetToCart({ flash: false });
     }
@@ -12158,6 +12197,12 @@ window.addSpaceUnit = function(kind) {
     if (!existing && window._spacePairIdOf(state.orderCart[idx0])) return;
 
     const host = window._spaceUnitHostSnapshot();
+    if (host && isCornerKind) host.cornerSide = opts.cornerSide;
+    // Host frame for corner placement (offsets are relative to the space anchor)
+    const hostSlot = existing ? window._spacePairSlotOf(state.orderCart[idx0]) : 0;
+    const hostOff = existing ? window._spaceOffsetForSlot(hostSlot) : { x: 0, y: 0, z: 0, rot: 0 };
+    const hostW = state.width || 160;
+    const hostD = state.depth || 54;
     let pairId;
     let nextSlot;
     let maxRight;
@@ -12188,7 +12233,17 @@ window.addSpaceUnit = function(kind) {
     itemN.rawState.partColors = {};
     const rsN = itemN.rawState || {};
     const wN = Math.round((rot === 90 || rot === 270) ? (rsN.depth || 54) : (rsN.width || 160));
-    const offset = { x: Math.round(maxRight + wN / 2 + 10), y: 0 };
+    let offset = { x: Math.round(maxRight + wN / 2 + 10), y: 0 };
+    const cuN = rsN.wings && rsN.wings.center && rsN.wings.center.corner;
+    if (isCornerKind && cuN && !(hostOff.rot)) {
+        // Inner corner: inside the host's width, protruding forward from its front face
+        const sgn = opts.cornerSide === 'left' ? -1 : 1;
+        offset = {
+            x: Math.round((hostOff.x || 0) + sgn * (hostW / 2 - (cuN.depth || 54) / 2)),
+            y: Math.round(hostOff.y || 0),
+            z: Math.round((hostOff.z || 0) + hostD / 2 + (cuN.width || 60) / 2)
+        };
+    }
     if (rot) offset.rot = rot;
     window._attachSpacePairToItem(itemN, pairId, nextSlot, offset);
     state.orderCart.push(itemN);
@@ -12304,8 +12359,9 @@ function _formatDeskAddition(item, itemObj, liveState) {
     const cu = _cornerUnitFromSources(item, itemObj, liveState);
     if (cu && cu.type === 'desk') {
         const sideHe = cu.side === 'right' ? 'ימין' : 'שמאל';
-        let lab = cu.standalone ? 'שולחן פינתי' : 'שולחן פינתי (' + sideHe + ')';
+        let lab = cu.standalone ? 'שולחן פינתי (פינה ' + sideHe + ')' : 'שולחן פינתי (' + sideHe + ')';
         if (cu.deskFloating) lab += ' — מרחף';
+        if (cu.mergeShelf) lab += ' — ממוזג למדף';
         labels.push(lab);
         let dims = 'רוחב: ' + Math.round(cu.width || 60) + ' ס"מ | גובה: ' +
             Math.round(cu.height || 90) + ' ס"מ | עומק: ' + Math.round(cu.depth || 54) + ' ס"מ';
@@ -14709,6 +14765,9 @@ function _collectPrintSpecRows(item, itemObj) {
                 rows.push({ id: 'handle', label: 'סוג ידיות למגירות', value: _plainSpecValue(window._handleStyleLabel(hs, w0 && w0.handleVariant, '', w0 && w0.ridingColor)) });
             }
             rows.push({ id: 'cornerDeskFloating', label: 'רגל בקצה', value: cuRaw.deskFloating ? 'ללא — שולחן מרחף' : 'כן' });
+            if (cuRaw.mergeShelf) {
+                rows.push({ id: 'cornerDeskShelfMerge', label: 'מיזוג עם מדף בארון', value: 'כן — משטח בגובה ' + cuRaw.mergeShelf.y + ' ס"מ, בקו המדף' });
+            }
         } else {
             rows.push({ id: 'cornerDrawers', label: 'מספר מגירות', value: (cuRaw.drawerCount || 4) + ' יחידות' });
             rows.push({ id: 'handle', label: 'סוג ידיות למגירות', value: _plainSpecValue(item.handle) });

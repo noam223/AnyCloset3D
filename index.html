@@ -40,7 +40,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260910deskMerge">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
     <link rel="stylesheet" href="style-extras.css?v=20260731rpcab">
-    <link rel="stylesheet" href="style.css?v=20261102spaceunits">
+    <link rel="stylesheet" href="style.css?v=20261103cornerside">
     <link rel="stylesheet" href="quick-calc.css?v=20260929qc">
     <style>
         html.thumb-only-mode #left-sidebar,
@@ -816,6 +816,12 @@
                 </div>
                 <!-- Desk drawer count (shown when type=desk) -->
                 <div id="corner-desk-drawer-section" style="display:none;">
+                    <div class="control-group" id="corner-desk-merge-row" style="margin-bottom:8px;display:none;">
+                        <button type="button" id="corner-desk-merge-btn" class="corner-desk-merge-btn" onclick="toggleCornerDeskShelfMerge()">
+                            <i class="fa-solid fa-link"></i> מזג עם מדף בארון
+                        </button>
+                        <div class="space-unit-add-hint">גובה השולחן יותאם למדף הקרוב בעמודה שמאחוריו</div>
+                    </div>
                     <div class="control-group" style="margin-bottom:8px;">
                         <button type="button" id="corner-desk-float-btn" onclick="updateCorner('deskFloating', !(state.corner && state.corner.deskFloating))"
                             style="width:100%;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.78rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all 0.18s;">
@@ -2990,14 +2996,14 @@
 <script src="quick-calc.js?v=20261029shoe"></script>
 <script src="bathroom-preset.js?v=20261008types"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
-<script src="corner-unit-preset.js?v=20261102spaceunits2"></script>
+<script src="corner-unit-preset.js?v=20261103cornerside"></script>
 <script src="engine-appliances.js?v=20261007deskMerge28"></script>
 <script src="engine-core.js?v=20261102spaceunits2"></script>
 <script src="engine-corners.js?v=20261102spaceunits2"></script>
 <script src="engine-blueprint.js?v=20261102spaceunits2"></script>
 <script src="engine-room-plan.js?v=20261016snap"></script>
 <script src="tambour-color-picker.js?v=20261009colors"></script>
-<script src="ui.js?v=20261102spaceunits2"></script>
+<script src="ui.js?v=20261103cornerside"></script>
 <script src="mobile.js?v=20261029inthandle"></script>
 <script src="part-paint.js?v=20260914A427fix"></script>
 <script src="shelf-pick.js?v=20260922sideWall"></script>
