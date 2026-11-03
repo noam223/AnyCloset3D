@@ -446,7 +446,7 @@ function _bpInternalDrawerCell(p, x, w, y, h, count, k, externalHandle) {
     }
     // Frame ring on top of the fronts (it sits in front of them in 3D)
     p.push(`<path d="M${f(boxL)},${f(y)}H${f(boxR)}V${f(y + h)}H${f(boxL)}Z M${f(opL)},${f(opT)}V${f(opB)}H${f(opR)}V${f(opT)}Z" fill="rgba(30,58,95,0.18)" fill-rule="evenodd" stroke="${S}" stroke-width="0.9"/>`);
-    if (h > 40 && boxW > 40) {
+    if (!externalHandle && h > 40 && boxW > 40) {
         p.push(`<text x="${f((boxL + boxR) / 2)}" y="${f(y + h - frame - Math.max(6, drawerH * 0.25))}" text-anchor="middle" font-family="${_BP_FONT}" font-size="10" fill="${S}" opacity="0.6">מגירות פנימיות</text>`);
     }
 }
