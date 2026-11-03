@@ -7727,7 +7727,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                     if (!isBP && window._captureTouchIcons && (door.handleStyle || _handleStyle) === 'touch'
                         && style !== 'glass_mirror' && w >= 28 && dH >= 34) {
                         const icon = window._touchIconSprite();
-                        icon.position.set(doorLocalX + (isLeft ? w / 2 - 13 : -w / 2 + 13), 0, t / 2 + 3);
+                        icon.position.set(doorLocalX, 0, t / 2 + 3);
                         doorGroup.add(icon);
                     }
                     _registerDoorMesh(doorGroup);

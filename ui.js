@@ -10121,13 +10121,51 @@ function _outlineCabinetPartsOnCanvas(ren, scn, cam) {
     return base;
 }
 
+/** Snapshot a canvas (the WebGL buffer is cleared after the frame, so copy right after render). */
+function _copyCanvas(src) {
+    const c = document.createElement('canvas');
+    c.width = src.width; c.height = src.height;
+    c.getContext('2d').drawImage(src, 0, 0);
+    return c;
+}
+
+/** Bounding box of everything that differs from the corner background color, or null. */
+function _canvasContentBounds(c) {
+    const w = c.width, h = c.height;
+    let px;
+    try { px = c.getContext('2d').getImageData(0, 0, w, h).data; } catch (e) { return null; }
+    const bg = [px[0], px[1], px[2], px[3]];
+    let minX = w, minY = h, maxX = -1, maxY = -1;
+    for (let y = 0; y < h; y += 2) {
+        for (let x = 0; x < w; x += 2) {
+            const i = (y * w + x) * 4;
+            const diff = Math.abs(px[i] - bg[0]) + Math.abs(px[i + 1] - bg[1]) + Math.abs(px[i + 2] - bg[2]) + Math.abs(px[i + 3] - bg[3]);
+            if (diff > 24) {
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+            }
+        }
+    }
+    return maxX < 0 ? null : { minX: minX, minY: minY, maxX: maxX, maxY: maxY };
+}
+
 /** Trim the uniform background around the rendered cabinet (call right after render — WebGL buffer is cleared afterwards). */
-function _cropCanvasToContent(src, pad) {
+function _cropCanvasToContent(src, pad, bounds) {
     const w = src.width, h = src.height;
     const c = document.createElement('canvas');
     c.width = w; c.height = h;
     const g = c.getContext('2d');
     g.drawImage(src, 0, 0);
+    if (bounds) {
+        const minX = Math.max(0, bounds.minX - pad), minY = Math.max(0, bounds.minY - pad);
+        const maxX = Math.min(w - 1, bounds.maxX + pad), maxY = Math.min(h - 1, bounds.maxY + pad);
+        const out = document.createElement('canvas');
+        out.width = maxX - minX + 1; out.height = maxY - minY + 1;
+        out.getContext('2d').drawImage(c, minX, minY, out.width, out.height, 0, 0, out.width, out.height);
+        return out.toDataURL('image/png');
+    }
     let px;
     try { px = g.getImageData(0, 0, w, h).data; } catch (e) { return src.toDataURL('image/png'); }
     const bg = [px[0], px[1], px[2], px[3]];
@@ -10210,6 +10248,38 @@ function _getCornerAngleCaptureView(focusX) {
     };
 }
 
+/**
+ * A space part rotated in the room (e.g. a corner desk turned 90°) is shot diagonally between its own front
+ * and the room front, slightly from above — the plain front shot would look at it edge-on / from underneath.
+ */
+function _rotatedSpacePartCaptureView() {
+    const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
+    if (!info || info.count < 2 || !info.activeSlot || typeof cabinetGroup === 'undefined' || !cabinetGroup) return null;
+    const rotY = cabinetGroup.rotation.y || 0;
+    if (Math.abs(Math.sin(rotY)) < 0.2) return null;
+    const box = new THREE.Box3().setFromObject(cabinetGroup);
+    if (box.isEmpty()) return null;
+    const minY = Math.max(0, box.min.y);
+    const dx = Math.sin(rotY), dz = Math.cos(rotY) + 1;
+    const len = Math.hypot(dx, dz) || 1;
+    const ux = dx / len, uz = dz / len;
+    let pMin = Infinity, pMax = -Infinity;
+    [[box.min.x, box.min.z], [box.min.x, box.max.z], [box.max.x, box.min.z], [box.max.x, box.max.z]].forEach(function(p) {
+        const v = p[0] * uz - p[1] * ux;
+        pMin = Math.min(pMin, v); pMax = Math.max(pMax, v);
+    });
+    const tx = (box.min.x + box.max.x) / 2, tz = (box.min.z + box.max.z) / 2;
+    const ty = (minY + box.max.y) / 2;
+    const h = box.max.y - minY;
+    return {
+        id: 'spaceRotated',
+        camPos: [tx + ux, ty + h * 0.9, tz + uz],
+        camTarget: [tx, ty, tz],
+        fitH: h + 120,
+        fitW: (pMax - pMin) + 120
+    };
+}
+
 function _captureFrameAtView(cam, ctrl, ren, scn, view, hasDoors) {
     const fitH = view.fitH || 360;
     const fitW = view.fitW || 350;
@@ -10275,8 +10345,21 @@ function _captureFrameAtView(cam, ctrl, ren, scn, view, hasDoors) {
     // Double-render so materials/textures settle (avoids blank/white captures)
     ren.render(scn, cam);
     ren.render(scn, cam);
-    const frame = view.outlineParts ? _outlineCabinetPartsOnCanvas(ren, scn, cam) : ren.domElement;
-    const dataUrl = _cropCanvasToContent(frame, view.crop ? 18 : 12);
+    let frame = view.outlineParts ? _outlineCabinetPartsOnCanvas(ren, scn, cam) : ren.domElement;
+    // Faded companion cabinets fill the frame — crop to the focus part only
+    let bounds = null;
+    const companions = (window._spaceCompanionGroups || []).filter(function(g) { return g && g.visible; });
+    if (companions.length && view.id !== 'space') {
+        frame = _copyCanvas(frame);
+        companions.forEach(function(g) { g.visible = false; });
+        try {
+            ren.render(scn, cam);
+            bounds = _canvasContentBounds(_copyCanvas(ren.domElement));
+        } finally {
+            companions.forEach(function(g) { g.visible = true; });
+        }
+    }
+    const dataUrl = _cropCanvasToContent(frame, 40, bounds);
 
     state.wingEditMode = savedWingEdit;
     state.activeWing = savedActiveWing;
@@ -10468,7 +10551,7 @@ window._captureCabinetPreviewImages = function() {
             focusY = (snapH / 2) + (off.y || 0);
         }
     } catch (e) { /* keep origin focus */ }
-    const centerView = {
+    const centerView = _rotatedSpacePartCaptureView() || {
         camPos: [focusX, focusY, 1],
         camTarget: [focusX, focusY, 0],
         fitH: snapH + 120,
@@ -10552,7 +10635,7 @@ window._captureCabinetPreviewImages = function() {
         multiViewSVG,
         imgSpaceDoors,
         imgSpaceOpen,
-        captureVer: 10
+        captureVer: 11
     };
     } finally {
         restoreRenderSize();
@@ -10608,8 +10691,8 @@ window._cartItemNeedsMediaRefresh = function(itemObj) {
                 JSON.stringify(rs.wings || {}).indexOf('"handleStyle":"touch"') >= 0) return true;
         } catch (e) { /* ignore */ }
     }
-    // v10: shots are cropped to the cabinet (older ones had wide empty margins)
-    if (!spec.captureVer || spec.captureVer < 10) return true;
+    // v11: shots are cropped to the focus part with a margin; rotated space parts are shot diagonally
+    if (!spec.captureVer || spec.captureVer < 11) return true;
     const pid = itemObj.rawState.presetId;
     if ((pid === 'corner-left' || pid === 'corner-right') && !(spec.cornerAngle && _cartImageValid(spec.cornerAngle.imgDoors))) return true;
     return false;
