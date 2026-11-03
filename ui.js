@@ -10264,8 +10264,12 @@ function _captureFrameAtView(cam, ctrl, ren, scn, view, hasDoors) {
     }
 
     // Ensure door meshes aren't hidden by the editor "הסתר חזיתות" toggle
+    // (open shot = same as the toggle: external drawers and other keep-visible fronts stay)
     if (typeof doorMeshes !== 'undefined' && doorMeshes) {
-        doorMeshes.forEach(function(m) { m.visible = !!hasDoors; });
+        doorMeshes.forEach(function(m) {
+            if (!m) return;
+            m.visible = !!hasDoors || !window._isHideableDoorFront(m);
+        });
     }
     // Double-render so materials/textures settle (avoids blank/white captures)
     ren.render(scn, cam);
@@ -10536,7 +10540,7 @@ window._captureCabinetPreviewImages = function() {
         multiViewSVG,
         imgSpaceDoors,
         imgSpaceOpen,
-        captureVer: 5
+        captureVer: 6
     };
 };
 
@@ -10569,6 +10573,12 @@ window._cartItemNeedsMediaRefresh = function(itemObj) {
         }
     }
     if (!spec.multiViewPages || !spec.multiViewPages.length) return true;
+    // v6: open shots keep external drawer fronts (older captures hid them with the doors)
+    if ((!spec.captureVer || spec.captureVer < 6) && !spec.imgOpenManual) {
+        try {
+            if (JSON.stringify(itemObj.rawState.wings || {}).indexOf('external_drawers') >= 0) return true;
+        } catch (e) { /* ignore */ }
+    }
     const pid = itemObj.rawState.presetId;
     if ((pid === 'corner-left' || pid === 'corner-right') && !(spec.cornerAngle && _cartImageValid(spec.cornerAngle.imgDoors))) return true;
     return false;
