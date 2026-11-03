@@ -524,7 +524,7 @@ window._ledIconSprite = function() {
 };
 
 let _touchIconTex = null;
-/** Print capture (closed doors): pressing hand with tap waves + טאצ' label on push-to-open doors (no badge frame). */
+/** Print capture (closed doors): Carbon "touch-1" hand icon + טאצ' label on push-to-open doors (no badge frame). */
 window._touchIconSprite = function() {
     if (!_touchIconTex) {
         const cv = document.createElement('canvas');
@@ -532,24 +532,15 @@ window._touchIconSprite = function() {
         const g = cv.getContext('2d');
         const navy = '#1e3a5f';
         const cx = 100;
-        const rr = function(x, y, w, h, r) {
-            g.beginPath();
-            g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
-            g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r);
-            g.closePath(); g.fill();
-        };
-        // Tap waves above the fingertip
-        g.strokeStyle = navy; g.lineWidth = 7; g.lineCap = 'round';
-        [22, 36].forEach(function(r) {
-            g.beginPath(); g.arc(cx, 70, r, Math.PI * 1.2, Math.PI * 1.8); g.stroke();
-        });
-        // Hand: index finger, palm, folded thumb
+        // Carbon Icons "touch-1" (Apache-2.0), 32×32 viewBox
+        const paths = [
+            'M20 8h-2A5 5 0 0 0 8 8H6a7 7 0 0 1 14 0',
+            'M25 15a2.94 2.94 0 0 0-1.47.4A3 3 0 0 0 21 14a2.94 2.94 0 0 0-1.47.4A3 3 0 0 0 16 13.18V8a3 3 0 0 0-6 0v11.1l-2.23-1.52A2.93 2.93 0 0 0 6 17a3 3 0 0 0-2.12 5.13l8 7.3A6.16 6.16 0 0 0 16 31h5a7 7 0 0 0 7-7v-6a3 3 0 0 0-3-3m1 9a5 5 0 0 1-5 5h-5a4.17 4.17 0 0 1-2.76-1l-7.95-7.3A1 1 0 0 1 5 20a1 1 0 0 1 1.6-.8l5.4 3.7V8a1 1 0 0 1 2 0v11h2v-3a1 1 0 0 1 2 0v3h2v-2a1 1 0 0 1 2 0v2h2v-1a1 1 0 0 1 2 0Z'
+        ];
         g.save();
-        g.translate(cx, 115); g.scale(1.5, 1.5);
+        g.translate(cx - 16 * 5.6, 2); g.scale(5.6, 5.6);
         g.fillStyle = navy;
-        rr(-9, -40, 18, 58, 9);
-        rr(-30, 8, 60, 46, 14);
-        rr(-30, 0, 14, 30, 7);
+        paths.forEach(function(d) { g.fill(new Path2D(d)); });
         g.restore();
         g.fillStyle = navy;
         g.font = 'bold 46px Heebo, Arial, sans-serif';

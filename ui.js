@@ -10542,7 +10542,7 @@ window._captureCabinetPreviewImages = function() {
         multiViewSVG,
         imgSpaceDoors,
         imgSpaceOpen,
-        captureVer: 8
+        captureVer: 9
     };
 };
 
@@ -10581,8 +10581,8 @@ window._cartItemNeedsMediaRefresh = function(itemObj) {
             if (JSON.stringify(itemObj.rawState.wings || {}).indexOf('external_drawers') >= 0) return true;
         } catch (e) { /* ignore */ }
     }
-    // v8: closed-door shots mark touch (push-to-open) doors (v7 had a smaller framed badge)
-    if ((!spec.captureVer || spec.captureVer < 8) && !spec.imgDoorsManual) {
+    // v9: closed-door shots mark touch (push-to-open) doors with the Carbon touch icon
+    if ((!spec.captureVer || spec.captureVer < 9) && !spec.imgDoorsManual) {
         const rs = itemObj.rawState;
         try {
             if (rs.handleStyle === 'touch' || rs.cabinetModel === 'ab2' ||
