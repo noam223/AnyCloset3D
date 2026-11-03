@@ -684,10 +684,10 @@ function _buildAiRenderPrompt(spec, opts) {
         if (totals.length) line('סה"כ בחזית: ' + totals.join(', ') + '. אל תוסיף ואל תחסיר אף דלת, מגירה או תא.');
         var styleKeys = Object.keys(spec.doorStyles || {});
         if (styleKeys.length === 1) line('סוג כל הדלתות: ' + (_AI_DOOR_STYLE_HE[styleKeys[0]] || _AI_DOOR_STYLE_HE.solid) + '.');
-        if (spec.mainHandle) line('ידיות (ברירת מחדל לכל החזיתות): ' + spec.mainHandle + '.');
+        if (spec.mainHandle) line('ידיות (אלא אם צוין אחרת בעמודה): ' + spec.mainHandle + '.');
     }
     line(spec.hasShoeDrawers ? 'מגירות נעליים: מדפים נשלפים ללא חזית, עם גדר מוטות מתכת נמוכה סביב המשטח.' : null);
-    var openNote = _aiOpenCellsNote(spec);
+    var openNote = (spec.frontsLayout && spec.frontsLayout.length) ? '' : _aiOpenCellsNote(spec);
     if (openNote) L.push(openNote);
 
     L.push('');
@@ -733,7 +733,8 @@ function _aiHandleText(obj, wing) {
     return window._handleStyleLabel(style,
         (obj && obj.handleVariant) || (wing && wing.handleVariant) || state.handleVariant,
         '',
-        (obj && obj.ridingColor) || (wing && wing.ridingColor) || state.ridingColor);
+        (obj && obj.ridingColor) || (wing && wing.ridingColor) || state.ridingColor)
+        + (style === 'riding' ? ' (פרופיל מתכת דק הרוכב על קצה הדלת)' : '');
 }
 
 function _aiDoorText(door, wing) {
@@ -758,7 +759,12 @@ function _aiDescribeWingFronts(wing, totals) {
     var hasDoors = wing.hasDoors !== false;
     return wing.columns.map(function(col, ci) {
         var segs = [];
-        var push = function(t) { if (t && segs[segs.length - 1] !== t) segs.push(t); };
+        var push = function(t) {
+            if (!t) return;
+            var last = segs[segs.length - 1];
+            if (last && last.t === t) last.n++;
+            else segs.push({ t: t, n: 1 });
+        };
         if (col.type === 'desk') {
             push('עמדת שולחן עבודה משולבת: משטח כתיבה וחלל פתוח לרגליים מתחתיו' + (col.deskHoneycomb ? ', כוורת פתוחה מעליו' : ''));
         }
@@ -772,7 +778,7 @@ function _aiDescribeWingFronts(wing, totals) {
                     totals.doors += dt.leaves;
                     totals.doorStyles[dt.style] = (totals.doorStyles[dt.style] || 0) + dt.leaves;
                     var span = door.endRow - door.startRow + 1;
-                    push(dt.text + (span === comps.length && comps.length > 1 ? ' — לכל גובה העמודה' : ''));
+                    push((span === comps.length && comps.length > 1 ? 'לכל גובה העמודה: ' : '') + dt.text);
                 }
                 continue;
             }
@@ -795,7 +801,9 @@ function _aiDescribeWingFronts(wing, totals) {
                 push('תא ללא דלת — התכולה גלויה' + (comp.type === 'hanging' ? ' (מוט תלייה)' : comp.type === 'internal_drawers' ? ' (מגירות פנימיות)' : ' (מדפים)'));
             }
         }
-        return 'עמודה ' + (ci + 1) + ' (רוחב ' + Math.round(col.width || 0) + ' ס"מ): ' + (segs.length ? (segs.length > 1 ? 'מלמעלה למטה — ' : '') + segs.join('; מתחת: ') : 'ללא חזיתות');
+        return 'עמודה ' + (ci + 1) + ' (רוחב ' + Math.round(col.width || 0) + ' ס"מ): ' + (segs.length ? (segs.length > 1 ? 'מלמעלה למטה — ' : '') + segs.map(function(s) {
+            return s.n > 1 ? s.n + ' × [' + s.t + '] זה מעל זה' : s.t;
+        }).join('; מתחת: ') : 'ללא חזיתות');
     });
 }
 
