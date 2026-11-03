@@ -10322,7 +10322,7 @@ function _cornerDeskHostCaptureView(focusX, focusY, snapW, snapH) {
         fitH: snapH + 120,
         fitW: (maxX - minX) * Math.cos(a) + depth * Math.sin(a) + 150,
         cropSlots: deskSlots,
-        slotOpacity: 0.5
+        slotOpacity: 0.65
     };
 }
 
@@ -10541,6 +10541,8 @@ window._fadeSpaceCompanionsForCapture = function(opacity, onlyGroups) {
             if (obj.userData && obj.userData.spaceCompanion) return;
             if (!obj.userData) obj.userData = {};
             if (!obj.userData._fadeMatReady) {
+                const m0 = Array.isArray(obj.material) ? obj.material[0] : obj.material;
+                if (m0 && m0.transparent && m0.opacity === 0) obj.userData._fadeSkip = true;
                 if (Array.isArray(obj.material)) {
                     obj.material = obj.material.map(function(m) { return m ? m.clone() : m; });
                 } else if (obj.material.clone) {
@@ -10548,6 +10550,7 @@ window._fadeSpaceCompanionsForCapture = function(opacity, onlyGroups) {
                 }
                 obj.userData._fadeMatReady = true;
             }
+            if (obj.userData._fadeSkip) return;
             const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
             mats.forEach(function(m) {
                 if (!m) return;
