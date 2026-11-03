@@ -2294,6 +2294,17 @@ body.color-tab-glass #mobile-panel-materials .mobile-panel-body > :not(.color-pa
     cursor:pointer; font-family:inherit; display:flex; align-items:center; justify-content:center; gap:8px;
 }
 .space-cab-add-btn:hover { background: rgba(37,99,235,0.12); }
+.space-unit-add-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.space-unit-add-btn {
+    position:relative; padding:9px 6px; border-radius:8px; border:1.5px dashed var(--accent);
+    background: rgba(37,99,235,0.06); color: var(--accent); font-size:0.78rem; font-weight:700;
+    cursor:pointer; font-family:inherit; display:flex; flex-direction:column; align-items:center; gap:4px;
+}
+.space-unit-add-btn i { font-size:1.05rem; }
+.space-unit-add-btn::before { content:'+'; position:absolute; top:3px; inset-inline-start:7px; font-size:0.85rem; font-weight:800; }
+.space-unit-add-btn:hover { background: rgba(37,99,235,0.12); }
+.space-unit-add-btn.plan-locked { opacity:0.55; }
+.space-unit-add-hint { font-size:0.72rem; color:var(--text-light); text-align:center; margin-top:6px; line-height:1.35; }
 .space-cab-join-btn {
     width:100%; margin-top:6px; padding:9px 12px; border-radius:8px; border:1.5px dashed #0d9488;
     background: rgba(13,148,136,0.07); color: #0f766e; font-size:0.8rem; font-weight:700;

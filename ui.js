@@ -11160,7 +11160,7 @@ window._promptSaveCabinetBeforeSwitch = function(targetIndex) {
 // Multi cabinet in the same 3D space (up to 4: linear / sliding / writing-desk)
 // Slot 0 is the world anchor; slots 1..n each store spaceOffset relative to it.
 // ==========================================
-window._SPACE_COMPATIBLE_PRESETS = ['linear', 'sliding', 'writing-desk'];
+window._SPACE_COMPATIBLE_PRESETS = ['linear', 'sliding', 'writing-desk', 'corner-unit'];
 window._SPACE_MAX_CABINETS = 4;
 
 /** Plan cap (e.g. designer Basic = 2). Slot clamping keeps using the system max so older projects stay intact. */
@@ -11981,6 +11981,7 @@ window._syncSpacePairTabs = function() {
         });
     }
     if (info) window._syncSpaceOffsetUI();
+    if (typeof window._updateExtrasSections === 'function') window._updateExtrasSections();
 };
 
 window._unlinkSpacePair = function(opts) {
@@ -12027,7 +12028,8 @@ window._renumberSpacePairSlots = function(pairId) {
             : {
                 x: Math.round((m.offset.x || 0) - (anchorOff.x || 0)),
                 y: Math.round((m.offset.y || 0) - (anchorOff.y || 0)),
-                z: Math.round((m.offset.z || 0) - (anchorOff.z || 0))
+                z: Math.round((m.offset.z || 0) - (anchorOff.z || 0)),
+                rot: m.offset.rot || 0
             };
         window._attachSpacePairToItem(m.it, pairId, newSlot, rebased);
     });
@@ -12081,6 +12083,66 @@ window.removeCabinetFromSpace = function(index) {
 };
 
 window.addSpaceCabinet = function() {
+    window.addSpaceUnit('cabinet');
+};
+
+/** Fields a "side cabinet" unit copies from the cabinet it was added next to. */
+window._SPACE_UNIT_HOST_FIELDS = [
+    'globalHeight', 'depth', 'thickness', 'plinthHeight', 'cabinetModel', 'boardMaterial',
+    'materialBody', 'materialInternal', 'materialExternal', 'materialOpenCell', 'materialBack',
+    'handleType', 'handleStyle', 'handleVariant', 'ridingColor'
+];
+
+window._spaceUnitHostSnapshot = function() {
+    const cw = state.wings && state.wings.center;
+    if (!cw) return null;
+    const host = {};
+    window._SPACE_UNIT_HOST_FIELDS.forEach(function(f) {
+        if (cw[f] !== undefined) host[f] = JSON.parse(JSON.stringify(cw[f]));
+    });
+    if (state.presetId === 'writing-desk' || state.presetId === 'corner-unit') {
+        delete host.globalHeight;
+        delete host.depth;
+        delete host.plinthHeight;
+    }
+    return host;
+};
+
+/** Turns the freshly reset editor cabinet into the requested add-on unit. Returns the space rotation. */
+window._configureSpaceUnit = function(kind, host) {
+    const cw = state.wings && state.wings.center;
+    if (!cw) return 0;
+    if (kind === 'sideDesk') {
+        state.presetId = 'writing-desk';
+        if (typeof window._applyWritingDeskPreset === 'function') window._applyWritingDeskPreset();
+        return 0;
+    }
+    if (kind === 'cornerDrawers' || kind === 'cornerDesk') {
+        state.presetId = 'corner-unit';
+        if (typeof window._applyCornerUnitPreset === 'function') {
+            window._applyCornerUnitPreset(kind === 'cornerDesk' ? 'desk' : 'drawers');
+        }
+        return 0;
+    }
+    if (kind === 'sideCabinet') {
+        if (host) Object.assign(cw, host);
+        const t = cw.thickness || 1.7;
+        cw.width = 40;
+        cw.hasDoors = true;
+        const col = {
+            type: 'normal', width: cw.width - t * 2, height: cw.globalHeight || 240,
+            shelves: 3, splitY: null, shelvesY: [], compartments: [], doors: [], floorOffset: 0
+        };
+        _distributeShelves(col, cw);
+        cw.columns = [col];
+        return 90;
+    }
+    return 0;
+};
+
+/** Adds a new cabinet / add-on unit (side desk, side cabinet, corner drawers, corner desk) to the shared space. */
+window.addSpaceUnit = function(kind) {
+    kind = kind || 'cabinet';
     if (!window._spacePairCanUse()) return;
     const existing = window._getSpacePairInfo();
     if (existing && existing.planLimitReached && typeof window._showPlanUpsell === 'function') {
@@ -12093,44 +12155,41 @@ window.addSpaceCabinet = function() {
     }
     const idx0 = state.editingCartIndex;
     if (idx0 < 0 || !state.orderCart[idx0]) return;
+    if (!existing && window._spacePairIdOf(state.orderCart[idx0])) return;
 
+    const host = window._spaceUnitHostSnapshot();
     let pairId;
     let nextSlot;
-    let offset;
+    let maxRight;
 
     if (existing) {
         pairId = existing.pairId;
         nextSlot = existing.count;
-        let maxRight = 0;
+        maxRight = 0;
         existing.members.forEach(function(m) {
             const fp = window._spaceCabinetFootprint(m.slot);
             const off = window._spaceOffsetForSlot(m.slot);
             maxRight = Math.max(maxRight, off.x + fp.w / 2);
         });
-        if (typeof window._resetEditorToDefaultLinearCabinet === 'function') {
-            window._resetEditorToDefaultLinearCabinet();
-        }
-        const itemN = window._snapshotCurrentCabinetToCartItem();
-        itemN.rawState.partColors = {};
-        const wN = Math.round((itemN.rawState && itemN.rawState.width) || 160);
-        offset = { x: Math.round(maxRight + wN / 2 + 10), y: 0 };
-        window._attachSpacePairToItem(itemN, pairId, nextSlot, offset);
-        state.orderCart.push(itemN);
     } else {
-        if (window._spacePairIdOf(state.orderCart[idx0])) return;
-        const w0 = Math.round(state.width || 160);
         pairId = 'sp_' + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36);
+        nextSlot = 1;
+        maxRight = Math.round(state.width || 160) / 2;
         window._attachSpacePairToItem(state.orderCart[idx0], pairId, 0, { x: 0, y: 0 });
-        if (typeof window._resetEditorToDefaultLinearCabinet === 'function') {
-            window._resetEditorToDefaultLinearCabinet();
-        }
-        const itemN = window._snapshotCurrentCabinetToCartItem();
-        itemN.rawState.partColors = {};
-        const wN = Math.round((itemN.rawState && itemN.rawState.width) || 160);
-        offset = { x: Math.round((w0 + wN) / 2 + 10), y: 0 };
-        window._attachSpacePairToItem(itemN, pairId, 1, offset);
-        state.orderCart.push(itemN);
     }
+
+    if (typeof window._resetEditorToDefaultLinearCabinet === 'function') {
+        window._resetEditorToDefaultLinearCabinet();
+    }
+    const rot = window._configureSpaceUnit(kind, host);
+    const itemN = window._snapshotCurrentCabinetToCartItem();
+    itemN.rawState.partColors = {};
+    const rsN = itemN.rawState || {};
+    const wN = Math.round((rot === 90 || rot === 270) ? (rsN.depth || 54) : (rsN.width || 160));
+    const offset = { x: Math.round(maxRight + wN / 2 + 10), y: 0 };
+    if (rot) offset.rot = rot;
+    window._attachSpacePairToItem(itemN, pairId, nextSlot, offset);
+    state.orderCart.push(itemN);
 
     const newIdx = state.orderCart.length - 1;
     state.editingCartIndex = newIdx;
@@ -12243,7 +12302,7 @@ function _formatDeskAddition(item, itemObj, liveState) {
     const cu = _cornerUnitFromSources(item, itemObj, liveState);
     if (cu && cu.type === 'desk') {
         const sideHe = cu.side === 'right' ? 'ימין' : 'שמאל';
-        let lab = 'שולחן פינתי (' + sideHe + ')';
+        let lab = cu.standalone ? 'שולחן פינתי' : 'שולחן פינתי (' + sideHe + ')';
         if (cu.deskFloating) lab += ' — מרחף';
         labels.push(lab);
         let dims = 'רוחב: ' + Math.round(cu.width || 60) + ' ס"מ | גובה: ' +
@@ -13431,7 +13490,8 @@ window._editCartItemNow = function(index) {
     // Reset viewMode and orbit state based on preset type
     // Linear/sliding cabinets use front view; corner/walkin use 3d view
     const _loadedPreset = state.presetId || 'linear';
-    const _isLinearPreset = (_loadedPreset === 'linear' || _loadedPreset === 'sliding');
+    const _isLinearPreset = (_loadedPreset === 'linear' || _loadedPreset === 'sliding' ||
+        _loadedPreset === 'writing-desk' || _loadedPreset === 'corner-unit');
     if (_isLinearPreset) {
         state.viewMode = 'front';
         window._orbitFree = false;
@@ -14358,6 +14418,14 @@ function _cartIsWritingDesk(itemObj) {
     return !!(rs && rs.presetId === 'writing-desk');
 }
 
+/** Corner data of a standalone corner-unit cart item (corner drawers / corner desk), else null. */
+function _cartStandaloneCorner(itemObj) {
+    const rs = itemObj && itemObj.rawState;
+    if (!rs || rs.presetId !== 'corner-unit') return null;
+    const cw = rs.wings && rs.wings.center;
+    return (cw && cw.corner) || null;
+}
+
 function _printTr(thStyle, tdStyle, thLabel, tdHtml, tdExtra) {
     const th = thStyle ? ` style="${thStyle}"` : '';
     const td = tdStyle ? ` style="${tdStyle}${tdExtra || ''}"` : (tdExtra ? ` style="${tdExtra}"` : '');
@@ -14580,6 +14648,10 @@ function _collectWingPrintSpecRows(item, itemObj, unit) {
 function _defaultModelNameFromRaw(rawState) {
     if (!rawState) return 'מאיה';
     if (rawState.presetId === 'writing-desk') return 'שולחן כתיבה';
+    if (rawState.presetId === 'corner-unit') {
+        const cu = rawState.wings && rawState.wings.center && rawState.wings.center.corner;
+        return (cu && cu.type === 'desk') ? 'שולחן פינתי' : 'שידה פינתית';
+    }
     if (rawState.presetId === 'sliding') {
         const wing = rawState.wings && rawState.wings.center;
         const panels = (wing && wing.slidingDoor && wing.slidingDoor.doorPanels) || [];
@@ -14613,6 +14685,37 @@ function _collectPrintSpecRows(item, itemObj) {
     const isWD = _cartIsWritingDesk(itemObj);
     if (itemObj && itemObj.rawState) _enrichSpecColorsFromRaw(item, itemObj.rawState);
     const rows = [];
+    const cuRaw = _cartStandaloneCorner(itemObj);
+    if (cuRaw) {
+        const isDeskCU = cuRaw.type === 'desk';
+        rows.push({ id: 'modelName', label: 'סוג מוצר', value: _plainSpecValue(_resolvePrintModelName(item, itemObj)) });
+        rows.push({ id: 'dimsStr', label: 'מידות חיצוניות', rtl: true, value: _plainSpecValue(
+            'רוחב: ' + Math.round(cuRaw.width || 60) + ' ס"מ | גובה: ' + Math.round(cuRaw.height || 90) +
+            ' ס"מ | עומק: ' + Math.round(cuRaw.depth || 54) + ' ס"מ') });
+        rows.push({ id: '_sec_finishes', section: true, label: 'גוונים וגימורים' });
+        rows.push({ id: 'colorBody', label: 'צבע גוף', value: _plainSpecValue(item.colorBody || '—') });
+        const cuDrawerColor = item.colorDrawers || item.colorExternal;
+        if (cuDrawerColor) rows.push({ id: 'colorDrawers', label: 'צבע מגירות', value: _plainSpecValue(cuDrawerColor) });
+        rows.push({ id: '_sec_hardware', section: true, label: 'פרזול ותכולה' });
+        if (isDeskCU) {
+            const n = Math.min(cuRaw.deskDrawerCount || 0, 3);
+            rows.push({ id: 'cornerDeskDrawers', label: 'מגירות מתחת לשולחן', value: n > 0 ? (n + ' יחידות × ' + (cuRaw.deskDrawerHeight || 13) + ' ס"מ') : 'ללא' });
+            if (n > 0) {
+                const rs0 = itemObj && itemObj.rawState;
+                const w0 = rs0 && rs0.wings && rs0.wings.center;
+                let hs = cuRaw.deskHandleStyle || (w0 && w0.handleStyle) || 'pipe';
+                rows.push({ id: 'handle', label: 'סוג ידיות למגירות', value: _plainSpecValue(window._handleStyleLabel(hs, w0 && w0.handleVariant, '', w0 && w0.ridingColor)) });
+            }
+            rows.push({ id: 'cornerDeskFloating', label: 'רגל בקצה', value: cuRaw.deskFloating ? 'ללא — שולחן מרחף' : 'כן' });
+        } else {
+            rows.push({ id: 'cornerDrawers', label: 'מספר מגירות', value: (cuRaw.drawerCount || 4) + ' יחידות' });
+            rows.push({ id: 'handle', label: 'סוג ידיות למגירות', value: _plainSpecValue(item.handle) });
+        }
+        _pushOrderOptionRows(rows, itemObj);
+        const notesCU = (item.cabinetNotes || '').trim();
+        if (notesCU) rows.push({ id: 'cabinetNotes', label: 'הערות', value: notesCU, multiline: true });
+        return rows;
+    }
     const multiUnits = (!isWD && itemObj) ? _enumeratePrintCabinetUnits(itemObj.rawState) : null;
 
     rows.push({ id: 'modelName', label: isWD ? 'סוג מוצר' : 'דגם ארון', value: _plainSpecValue(_resolvePrintModelName(item, itemObj)) });
@@ -17537,7 +17640,8 @@ function _buildCustomerSummaryDetails(itemObj) {
     const cu = _cornerUnitFromSources(item, itemObj);
     if (cu && cu.side !== 'none' && cu.type !== 'desk') {
         const cuSide = cu.side === 'right' ? 'ימין' : 'שמאל';
-        details.push('יחידה פינתית מגירות ×' + (cu.drawerCount || 4) + ' (' + cuSide + ')');
+        details.push(cu.standalone ? ('שידה פינתית — ' + (cu.drawerCount || 4) + ' מגירות')
+            : ('יחידה פינתית מגירות ×' + (cu.drawerCount || 4) + ' (' + cuSide + ')'));
     }
     if (item.cabinetNotes && item.cabinetNotes.trim()) {
         details.push('הערות: ' + item.cabinetNotes.trim());

@@ -1860,7 +1860,7 @@ window._generateMultiViewBlueprintSVG = function() {
       <marker id="as" markerWidth="${ARROW}" markerHeight="${ARROW}" refX="1" refY="${ARROW/2}" orient="auto"><path d="M${ARROW},0 L${ARROW},${ARROW} L0,${ARROW/2} z" fill="${DIM_C}"/></marker>
     </defs>`);
     p.push(`<rect width="${SVG_W}" height="${SVG_H}" fill="white"/>`);
-    const presetLabel = pid === 'walkin' ? 'חדר ארונות' : (pid.startsWith('corner')) ? 'ארון פינתי' : 'ארון';
+    const presetLabel = pid === 'walkin' ? 'חדר ארונות' : pid === 'corner-unit' ? 'יחידה פינתית' : (pid.startsWith('corner')) ? 'ארון פינתי' : 'ארון';
     p.push(`<text x="${SVG_W/2}" y="26" text-anchor="middle" font-family="${FONT}" font-size="18" font-weight="bold" fill="${STROKE}">שרטוט טכני — ${presetLabel}</text>`);
 
     const rect = (x,y,w,h,fill,stroke,sw=1.5) => p.push(`<rect x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" width="${(+w).toFixed(1)}" height="${(+h).toFixed(1)}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`);
@@ -2800,7 +2800,9 @@ window._generateMultiViewBlueprintPages = function() {
     const MARGIN = 60, PAD = 80, LABEL_H = 30;
     const SVG_W = 1200;
     const PAGE_H = 800;  // height of each page SVG
-    const presetLabel = pid === 'writing-desk' ? 'שולחן כתיבה' : pid === 'walkin' ? 'חדר ארונות' : (pid.startsWith('corner')) ? 'ארון פינתי' : pid === 'sliding' ? 'ארון הזזה' : 'ארון';
+    const presetLabel = pid === 'writing-desk' ? 'שולחן כתיבה'
+        : pid === 'corner-unit' ? ((centerWing && centerWing.corner && centerWing.corner.type === 'desk') ? 'שולחן פינתי' : 'שידה פינתית')
+        : pid === 'walkin' ? 'חדר ארונות' : (pid.startsWith('corner')) ? 'ארון פינתי' : pid === 'sliding' ? 'ארון הזזה' : 'ארון';
 
     // Shared SVG helpers — operate on a local array `p`
     const makeDefs = (p) => {
@@ -4878,6 +4880,56 @@ window._generateMultiViewBlueprintPages = function() {
             const _emptyCenterIdx = pages.findIndex(pg => pg.label && pg.label.includes('ארון מרכזי'));
             if (_emptyCenterIdx >= 0) pages.splice(_emptyCenterIdx, 1);
         }
+    }
+
+    // ---- STANDALONE CORNER UNIT (corner drawers / corner desk) ----
+    if (pid === 'corner-unit' && centerWing && centerWing.corner) {
+        const cu = centerWing.corner;
+        const cuW = cu.width || 60, cuH = cu.height || 90, cuD = cu.depth || 54;
+        const isDesk = cu.type === 'desk';
+        const unitLabel = isDesk ? 'שולחן פינתי' : 'שידה פינתית';
+        const p = [];
+        _bpStartPage('corner-unit-front');
+        const drawAreaY = 65;
+        const drawAreaH = PAGE_H - drawAreaY - MARGIN - 80;
+        const pw = SVG_W - MARGIN * 2;
+        const scScale = Math.min((pw - PAD * 2) / Math.max(cuW, 1), (drawAreaH - PAD * 2) / Math.max(cuH, 1));
+        const dW = cuW * scScale;
+        const dH = cuH * scScale;
+        const ox = MARGIN + (pw - dW) / 2;
+        const oy = drawAreaY + (drawAreaH - dH) / 2;
+        p.push(`<rect x="${MARGIN}" y="${drawAreaY}" width="${pw}" height="${drawAreaH}" rx="4" fill="white" stroke="${STROKE_THIN}" stroke-width="1"/>`);
+        const dimH = (x1, x2, y, lbl, above) => makeDimH(p, x1, x2, y, lbl, above);
+        const dimV = (x, y1, y2, lbl) => makeDimV(p, x, y1, y2, lbl);
+        const dimVL = (x, y1, y2, lbl) => makeDimVLeft(p, x, y1, y2, lbl);
+        if (isDesk) {
+            _bpDrawCornerDeskFrontParts(p, cu, ox, oy, dW, dH, scScale, STROKE, STROKE_THIN, FONT, dimH, dimV, dimVL);
+        } else {
+            makeRect(p, ox, oy, dW, dH, FILL_CAB, STROKE, 2);
+            const pHcm = centerWing.plinthHeight || 0;
+            const tCm = centerWing.thickness || state.thickness || 1.7;
+            const n = Math.max(1, cu.drawerCount || 4);
+            const innerTop = oy + tCm * scScale;
+            const innerBot = oy + dH - (pHcm + tCm) * scScale;
+            const gap = 0.4 * scScale;
+            const eachH = (innerBot - innerTop - gap * (n - 1)) / n;
+            for (let i = 0; i < n; i++) {
+                const y = innerTop + i * (eachH + gap);
+                makeRect(p, ox + tCm * scScale, y, dW - tCm * 2 * scScale, eachH, 'rgba(255,255,255,0.9)', STROKE, 1);
+                const hw = Math.min(dW * 0.3, 40);
+                p.push(`<line x1="${(ox + (dW - hw) / 2).toFixed(1)}" y1="${(y + eachH * 0.3).toFixed(1)}" x2="${(ox + (dW + hw) / 2).toFixed(1)}" y2="${(y + eachH * 0.3).toFixed(1)}" stroke="${STROKE}" stroke-width="2"/>`);
+            }
+            makeDimH(p, ox, ox + dW, oy + dH + 36, `${_bpMm(cuW)}`, true);
+            makeDimV(p, ox + dW + 14, oy, oy + dH, `${_bpMm(cuH)}`);
+            p.push(`<text x="${(ox + dW / 2).toFixed(1)}" y="${(oy + dH + 56).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.75">עומק: ${_bpMm(cuD)} מ"מ · ${n} מגירות</text>`);
+        }
+        _bpAppendViewCutouts(p, 'corner-unit-front', ox, oy, dW, dH, scScale, cuW, cuH);
+        _bpFlushDims(p);
+        // Only this page + the top view: the generic cabinet pages are empty (no columns)
+        for (let i = pages.length - 1; i >= 0; i--) {
+            if (!(pages[i].label && pages[i].label.includes('מבט עליון'))) pages.splice(i, 1);
+        }
+        pages.push({ label: 'שרטוט חזית — ' + unitLabel, svgParts: p, viewKey: 'corner-unit-front', cabWidthCm: cuW, cabHeightCm: cuH, viewMeta: { ox, oy, dW, dH, sc: scScale } });
     }
 
     // Reorder: front views first, top view (מבט עליון) last

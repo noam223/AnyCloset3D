@@ -327,6 +327,8 @@ function _cuAddDrawerHandle(dMesh, drawerDepth, drawerFaceH, sign, t, styleOverr
 function buildCornerUnit() {
     const cu = state.corner;
     if (!cu || cu.side === 'none') return;
+    // Standalone corner-unit cabinet: the unit is the whole cabinet, centered on its own origin
+    const standalone = state.presetId === 'corner-unit';
 
     const isBP = state.viewMode === 'blueprint';
     const t = state.thickness;
@@ -361,8 +363,8 @@ function buildCornerUnit() {
     // Group center in world space:
     // X center: sign * (mainW/2 - cuD/2)  — inside cabinet
     // Z center: bodyD/2 + cuW/2           — protrudes forward
-    const cuCenterX = sign * (mainW / 2 - cuD / 2);
-    const cuCenterZ = bodyD / 2 + cuW / 2;
+    const cuCenterX = standalone ? 0 : sign * (mainW / 2 - cuD / 2);
+    const cuCenterZ = standalone ? 0 : bodyD / 2 + cuW / 2;
 
     const cuGroup = new THREE.Group();
     cuGroup.position.set(cuCenterX, 0, cuCenterZ);

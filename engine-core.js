@@ -1776,8 +1776,9 @@ function _getCornerDeskPlacement() {
     const cuW = corner.width || 60;
     const cuD = corner.depth || bodyD;
     const deskH = corner.height || 75;
-    const cuCenterX = sign * (mainW / 2 - cuD / 2);
-    const cuCenterZ = bodyD / 2 + cuW / 2;
+    const standalone = state.presetId === 'corner-unit';
+    const cuCenterX = standalone ? 0 : sign * (mainW / 2 - cuD / 2);
+    const cuCenterZ = standalone ? 0 : bodyD / 2 + cuW / 2;
     return { cabOffX, cuCenterX, cuCenterZ, deskH, sign, cuW, cuD };
 }
 
@@ -5202,6 +5203,11 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                 deskHitBoxes.push(deskHitBox);
             }
         }
+        return;
+    }
+
+    if (state.presetId === 'corner-unit') {
+        if (state.corner && state.corner.side !== 'none') buildCornerUnit();
         return;
     }
 

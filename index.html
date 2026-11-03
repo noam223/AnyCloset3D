@@ -40,7 +40,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260910deskMerge">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
     <link rel="stylesheet" href="style-extras.css?v=20260731rpcab">
-    <link rel="stylesheet" href="style.css?v=20261102discount">
+    <link rel="stylesheet" href="style.css?v=20261102spaceunits">
     <link rel="stylesheet" href="quick-calc.css?v=20260929qc">
     <style>
         html.thumb-only-mode #left-sidebar,
@@ -603,6 +603,25 @@
         </div>
         <!-- ===== END SLIDING WARDROBE SECTION ===== -->
 
+        <div class="section" id="space-units-section" data-sbgroup="extras">
+            <div class="section-title"><i class="fa-solid fa-plus"></i> הוספת יחידה למרחב</div>
+            <div class="space-unit-add-grid">
+                <button type="button" class="space-unit-add-btn" onclick="addSpaceUnit('sideDesk')" title="מוסיף שולחן צד כארון נפרד במרחב">
+                    <i class="fa-solid fa-desktop"></i><span>שולחן צד</span>
+                </button>
+                <button type="button" class="space-unit-add-btn" onclick="addSpaceUnit('sideCabinet')" title="מוסיף ארון צד צר כארון נפרד במרחב">
+                    <i class="fa-solid fa-door-closed"></i><span>ארון צד</span>
+                </button>
+                <button type="button" class="space-unit-add-btn" onclick="addSpaceUnit('cornerDrawers')" title="מוסיף שידה פינתית כארון נפרד במרחב">
+                    <i class="fa-solid fa-layer-group"></i><span>שידה פינתית</span>
+                </button>
+                <button type="button" class="space-unit-add-btn" onclick="addSpaceUnit('cornerDesk')" title="מוסיף שולחן פינתי כארון נפרד במרחב">
+                    <i class="fa-solid fa-turn-up"></i><span>שולחן פינתי</span>
+                </button>
+            </div>
+            <div class="space-unit-add-hint">כל יחידה נוספת כארון נפרד במרחב — אפשר להזיז ולסובב אותה</div>
+        </div>
+
         <div class="section" id="side-unit-section" data-sbgroup="extras" style="border-bottom:none;padding-bottom:0;">
             <div class="section-title"><i class="fa-solid fa-table-columns"></i> יחידת צד</div>
             <!-- Type selector: styled toggle buttons -->
@@ -723,10 +742,10 @@
         </div>
 
         <div class="section" id="corner-unit-section" data-sbgroup="extras">
-            <div class="section-title"><i class="fa-solid fa-turn-up"></i> יחידה פינתית</div>
+            <div class="section-title"><i class="fa-solid fa-turn-up"></i> <span id="corner-unit-title">יחידה פינתית</span></div>
             <!-- Position selector: icon buttons -->
             <input type="hidden" id="inp-corner-side" value="none">
-            <div class="side-unit-type-btns" style="display:flex;gap:6px;margin-bottom:0;">
+            <div class="side-unit-type-btns" id="corner-side-btns" style="display:flex;gap:6px;margin-bottom:0;">
                 <button class="corner-side-btn active" data-side="none" onclick="updateCornerSide('none')" title="ללא יחידה פינתית" style="flex:1;padding:7px 4px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.78rem;font-weight:600;cursor:pointer;transition:all 0.18s;display:flex;flex-direction:column;align-items:center;gap:3px;">
                     <i class="fa-solid fa-ban" style="font-size:1.1rem;"></i>
                     <span>ללא</span>
@@ -758,6 +777,7 @@
                         </button>
                     </div>
                 </div>
+                <div id="corner-dims-group">
                 <div class="control-group">
                     <div class="label-row"><span>רוחב (ס"מ)</span><input type="number" id="inp-num-corner-width" class="value-badge-input" value="60" min="30" max="120" onchange="updateCorner('width', this.value)"></div>
                     <div class="slider-row">
@@ -781,6 +801,7 @@
                         <input type="range" id="inp-corner-depth" min="30" max="80" value="54" step="1" oninput="document.getElementById('inp-num-corner-depth').value=this.value; updateCorner('depth', this.value)">
                         <button class="slider-btn" onclick="updateCorner('depth', (state.corner.depth||54)-1)"><i class="fa-solid fa-minus"></i></button>
                     </div>
+                </div>
                 </div>
                 <!-- Drawer count (shown when type=drawers) -->
                 <div id="corner-drawer-section" style="display:none;">
@@ -2274,6 +2295,16 @@
             <option value="sandwich">סנדביץ' (עד 240 ס"מ)</option>
                     <option value="mdf">MDF (עד 270 ס"מ)</option>
         </select>
+        <div id="mobile-space-units-block">
+            <div class="mobile-section-title">הוספת יחידה למרחב</div>
+            <div class="space-unit-add-grid" style="margin-bottom:12px;">
+                <button type="button" class="space-unit-add-btn" onclick="addSpaceUnit('sideDesk')"><i class="fa-solid fa-desktop"></i><span>שולחן צד</span></button>
+                <button type="button" class="space-unit-add-btn" onclick="addSpaceUnit('sideCabinet')"><i class="fa-solid fa-door-closed"></i><span>ארון צד</span></button>
+                <button type="button" class="space-unit-add-btn" onclick="addSpaceUnit('cornerDrawers')"><i class="fa-solid fa-layer-group"></i><span>שידה פינתית</span></button>
+                <button type="button" class="space-unit-add-btn" onclick="addSpaceUnit('cornerDesk')"><i class="fa-solid fa-turn-up"></i><span>שולחן פינתי</span></button>
+            </div>
+        </div>
+        <div id="mobile-side-unit-block" style="display:none;">
         <div class="mobile-section-title">יחידת צד</div>
         <div style="display:flex;gap:6px;margin-bottom:10px;">
             <button class="side-unit-btn active" data-type="none" onclick="updateSideUnitType('none'); document.querySelectorAll('.side-unit-btn').forEach(b=>b.classList.toggle('active',b.dataset.type==='none')); document.getElementById('mobile-desk-controls').style.display='none'; document.getElementById('mobile-sc-controls').style.display='none';" style="flex:1;padding:7px 4px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.75rem;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;">
@@ -2331,6 +2362,7 @@
             <div style="font-size:0.75rem;color:var(--text-light);text-align:center;margin-top:6px;">
                 <i class="fa-solid fa-hand-pointer" style="margin-left:4px;"></i>לחץ על ארון הצד בהדמייה לעריכה מתקדמת
             </div>
+        </div>
         </div>
         <!-- Mobile sliding door controls (shown only for sliding preset) -->
         <div id="mobile-sliding-section" style="display:none;">
@@ -2954,17 +2986,18 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js?v=20261008plans"></script>
 <script src="trial-watermark.js?v=20261008trial"></script>
-<script src="state.js?v=20261102honeywidth"></script>
+<script src="state.js?v=20261102spaceunits"></script>
 <script src="quick-calc.js?v=20261029shoe"></script>
 <script src="bathroom-preset.js?v=20261008types"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
+<script src="corner-unit-preset.js?v=20261102spaceunits"></script>
 <script src="engine-appliances.js?v=20261007deskMerge28"></script>
-<script src="engine-core.js?v=20261101orderopts"></script>
-<script src="engine-corners.js?v=20261101orderopts"></script>
-<script src="engine-blueprint.js?v=20261101orderopts"></script>
+<script src="engine-core.js?v=20261102spaceunits"></script>
+<script src="engine-corners.js?v=20261102spaceunits"></script>
+<script src="engine-blueprint.js?v=20261102spaceunits"></script>
 <script src="engine-room-plan.js?v=20261016snap"></script>
 <script src="tambour-color-picker.js?v=20261009colors"></script>
-<script src="ui.js?v=20261102bpfit2"></script>
+<script src="ui.js?v=20261102spaceunits"></script>
 <script src="mobile.js?v=20261029inthandle"></script>
 <script src="part-paint.js?v=20260914A427fix"></script>
 <script src="shelf-pick.js?v=20260922sideWall"></script>
