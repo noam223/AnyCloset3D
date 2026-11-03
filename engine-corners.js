@@ -368,6 +368,8 @@ function buildCornerUnit() {
 
     const cuGroup = new THREE.Group();
     cuGroup.position.set(cuCenterX, 0, cuCenterZ);
+    // Standalone: turn the open (drawer / seat) side to face the front (+Z)
+    if (standalone) cuGroup.rotation.y = sign * Math.PI / 2;
 
     // Local space (group centered at cuCenterX, cuCenterZ):
     //   X: [-cuD/2 .. +cuD/2]
@@ -386,14 +388,15 @@ function buildCornerUnit() {
         const bpMat = new THREE.MeshBasicMaterial({ color: 0xffffff, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
         const bpEdge = new THREE.LineBasicMaterial({ color: 0x000000 });
         // Front-view rectangle: width=cuD, height=cuH, centered at (cuCenterX, cuH/2)
-        const geo = new THREE.PlaneGeometry(cuD, cuH);
+        const faceW = standalone ? cuW : cuD;
+        const geo = new THREE.PlaneGeometry(faceW, cuH);
         const mesh = new THREE.Mesh(geo, bpMat);
         mesh.position.set(cuCenterX, cuH / 2, 0);
         mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo), bpEdge));
         _buildGroup.add(mesh);
         // Add width + height dimension data
-        state.bpData.push({ type: 'width', val: Math.round(cuD), x: cuCenterX, y: -20, halfW: cuD / 2 });
-        state.bpData.push({ type: 'height', val: Math.round(cuH), x: cuCenterX + sign * (cuD / 2 + 15), y: cuH / 2, halfH: cuH / 2 });
+        state.bpData.push({ type: 'width', val: Math.round(faceW), x: cuCenterX, y: -20, halfW: faceW / 2 });
+        state.bpData.push({ type: 'height', val: Math.round(cuH), x: cuCenterX + sign * (faceW / 2 + 15), y: cuH / 2, halfH: cuH / 2 });
         return;
     }
 

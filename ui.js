@@ -12182,6 +12182,8 @@ window.addSpaceUnit = function(kind) {
         window._resetEditorToDefaultLinearCabinet();
     }
     const rot = window._configureSpaceUnit(kind, host);
+    // The snapshot reads the live price fields
+    if (typeof calculatePrice === 'function') calculatePrice();
     const itemN = window._snapshotCurrentCabinetToCartItem();
     itemN.rawState.partColors = {};
     const rsN = itemN.rawState || {};

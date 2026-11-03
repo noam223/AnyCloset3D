@@ -1810,6 +1810,11 @@ function _getLaptopPos() {
         const deskH = wd.height != null ? wd.height : 75;
         return { x: _clampX(cabOffX), y: deskH, z: laptopZ };
     }
+    // 0b. Standalone corner desk (rotated to face the front like a writing desk)
+    if (state.presetId === 'corner-unit') {
+        const cd = _getActiveCornerDesk();
+        return cd ? { x: _clampX(cabOffX), y: cd.height || 75, z: laptopZ } : null;
+    }
 
     // 1. Side desk
     if (wing && wing.desk && wing.desk.side !== 'none') {
@@ -1879,6 +1884,9 @@ function _getChairPos() {
     // 0. Standalone writing desk
     if (state.presetId === 'writing-desk' && wing) {
         return { x: _clampX(cabOffX), z: chairZ, rotY: -Math.PI / 2, deskFrontZ: deskFrontZ };
+    }
+    if (state.presetId === 'corner-unit') {
+        return _getActiveCornerDesk() ? { x: _clampX(cabOffX), z: chairZ, rotY: -Math.PI / 2, deskFrontZ: deskFrontZ } : null;
     }
 
     if (wing && wing.desk && wing.desk.side !== 'none') {

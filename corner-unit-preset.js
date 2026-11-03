@@ -3,7 +3,8 @@
 // Standalone "corner unit" cabinet (corner drawers / corner desk) that lives as its own
 // cabinet in a shared space. Data stays in wing.corner (flagged standalone) so the existing
 // corner controls, renderer, pricing and print helpers keep working.
-// Header dims map to the unit: width = corner.depth (X), depth = corner.width (Z), height = corner.height.
+// The engine turns the unit so its open side faces the front, so header dims map straight:
+// width = corner.width (front face), depth = corner.depth, height = corner.height.
 // Also owns the add-ons tab: the "add unit to space" buttons and the legacy embedded add-on sections.
 // Loaded after writing-desk-preset.js in index.html.
 // ==========================================
@@ -25,8 +26,8 @@ function _isCornerUnitPreset() {
 function _cuSyncWingDims(cw) {
     if (!cw || !cw.corner) return;
     const cu = cw.corner;
-    cw.width = cu.depth || 54;
-    cw.depth = cu.width || 60;
+    cw.width = cu.width || 60;
+    cw.depth = cu.depth || 54;
     cw.globalHeight = cu.height || 90;
     const sync = (ids, val) => ids.forEach(id => { const el = document.getElementById(id); if (el) el.value = val; });
     sync(['inp-width', 'inp-num-width', 'dim-pill-width', 'inp-slider-width', 'ep-inp-width', 'ep-inp-num-width'], cw.width);
@@ -229,8 +230,8 @@ window._updateExtrasSections = function() {
         const cw = _getCUWing();
         if (!cw || !cw.corner) return;
         const cu = cw.corner;
-        const key = dim === 'width' ? 'depth' : (dim === 'depth' ? 'width' : 'height');
-        const limits = { depth: [30, 80], width: [30, 120], height: [40, 280] }[key];
+        const key = dim;
+        const limits = { width: [30, 120], depth: [30, 80], height: [40, 280] }[key];
         const cur = cu[key] || CU_DEFAULTS.drawers[key];
         let val = (absoluteValue !== null && absoluteValue !== undefined) ? parseInt(absoluteValue, 10) : cur + (delta || 0);
         if (isNaN(val)) return;

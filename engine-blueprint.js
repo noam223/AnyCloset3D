@@ -303,10 +303,12 @@ function _bpDrawCornerDeskFrontParts(p, cu, ox, oy, dW, dH, sc, STROKE, STROKE_T
     }
 
     // Cabinet-connection side
-    const cabX = isLeft ? (ox + dW) : ox;
-    p.push(`<line x1="${cabX.toFixed(1)}" y1="${deskTopY.toFixed(1)}" x2="${cabX.toFixed(1)}" y2="${deskBotY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.4" stroke-dasharray="5,4"/>`);
-    const cabLblX = isLeft ? (cabX - 8) : (cabX + 8);
-    p.push(`<text x="${cabLblX.toFixed(1)}" y="${(deskTopY + deskSurfT + 14).toFixed(1)}" text-anchor="${isLeft ? 'end' : 'start'}" font-family="${FONT || 'Rubik,Tahoma,sans-serif'}" font-size="11" fill="${STROKE}" opacity="0.7">חיבור לארון</text>`);
+    if (!cu.standalone) {
+        const cabX = isLeft ? (ox + dW) : ox;
+        p.push(`<line x1="${cabX.toFixed(1)}" y1="${deskTopY.toFixed(1)}" x2="${cabX.toFixed(1)}" y2="${deskBotY.toFixed(1)}" stroke="${STROKE}" stroke-width="1.4" stroke-dasharray="5,4"/>`);
+        const cabLblX = isLeft ? (cabX - 8) : (cabX + 8);
+        p.push(`<text x="${cabLblX.toFixed(1)}" y="${(deskTopY + deskSurfT + 14).toFixed(1)}" text-anchor="${isLeft ? 'end' : 'start'}" font-family="${FONT || 'Rubik,Tahoma,sans-serif'}" font-size="11" fill="${STROKE}" opacity="0.7">חיבור לארון</text>`);
+    }
 
     const midX = ox + dW / 2;
     const midY = deskTopY + dH * 0.62;
@@ -315,7 +317,7 @@ function _bpDrawCornerDeskFrontParts(p, cu, ox, oy, dW, dH, sc, STROKE, STROKE_T
     dimHFn(ox, ox + dW, deskBotY + 36, `${_bpMm(cuW)}`);
     if (isLeft) dimVLeftFn(ox - 14, deskTopY, deskBotY, `${_bpMm(cuH)}`);
     else dimVFn(ox + dW + 14, deskTopY, deskBotY, `${_bpMm(cuH)}`);
-    p.push(`<text x="${midX.toFixed(1)}" y="${(deskBotY + 56).toFixed(1)}" text-anchor="middle" font-family="${FONT || 'Rubik,Tahoma,sans-serif'}" font-size="12" fill="${STROKE}" opacity="0.75">עומק (לאורך הארון): ${_bpMm(cuD)} מ"מ</text>`);
+    p.push(`<text x="${midX.toFixed(1)}" y="${(deskBotY + 56).toFixed(1)}" text-anchor="middle" font-family="${FONT || 'Rubik,Tahoma,sans-serif'}" font-size="12" fill="${STROKE}" opacity="0.75">${cu.standalone ? 'עומק' : 'עומק (לאורך הארון)'}: ${_bpMm(cuD)} מ"מ</text>`);
 }
 
 /**
