@@ -10283,12 +10283,12 @@ function _rotatedSpacePartCaptureView() {
         camTarget: [tx, ty, tz],
         fitH: h + 80,
         fitW: (pMax - pMin) + 80,
-        companionOpacity: 1,
+        companionOpacity: 0.18,
         keepCompanions: true
     };
 }
 
-/** Cabinet hosting a corner desk: angled toward the desk side instead of a flat front shot. */
+/** Cabinet hosting a corner desk: angled from the side opposite the desk (same side as the desk's own shot). */
 function _cornerDeskHostCaptureView(focusX, focusY, snapW, snapH) {
     const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
     if (!info || info.count < 2 || !Array.isArray(info.members)) return null;
@@ -10298,7 +10298,7 @@ function _cornerDeskHostCaptureView(focusX, focusY, snapW, snapH) {
         const it = state.orderCart && state.orderCart[m.index];
         if (!it || !it.rawState || it.rawState.presetId !== 'corner-unit') return;
         const off = window._spaceOffsetForSlot(m.slot) || { x: 0 };
-        if (!side) side = (off.x || 0) >= focusX ? 1 : -1;
+        if (!side) side = (off.x || 0) >= focusX ? -1 : 1;
     });
     if (!side) return null;
     const a = 28 * Math.PI / 180;
@@ -10667,7 +10667,7 @@ window._captureCabinetPreviewImages = function() {
         multiViewSVG,
         imgSpaceDoors,
         imgSpaceOpen,
-        captureVer: 12
+        captureVer: 13
     };
     } finally {
         restoreRenderSize();
@@ -10724,7 +10724,7 @@ window._cartItemNeedsMediaRefresh = function(itemObj) {
         } catch (e) { /* ignore */ }
     }
     // v11: shots are cropped to the focus part with a margin; rotated space parts are shot diagonally
-    if (!spec.captureVer || spec.captureVer < 12) return true;
+    if (!spec.captureVer || spec.captureVer < 13) return true;
     const pid = itemObj.rawState.presetId;
     if ((pid === 'corner-left' || pid === 'corner-right') && !(spec.cornerAngle && _cartImageValid(spec.cornerAngle.imgDoors))) return true;
     return false;
