@@ -6185,12 +6185,8 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                         b.type === block.type && Math.abs(b.bottomY - block.bottomY) < _OC_Y_EPS);
                     if (sb) _cuDeskMat = _cuMergedBoardMat(cc, 'cubby', sb.startR);
                 }
-                if (_cuDeskMat) {
-                    const _ppSaved = _ppPartId;
-                    _ppPartId = '';
-                    createBoard(cellW, innerT, bodyD - 2, cellX, block.bottomY + innerT/2, 1, _cuDeskMat);
-                    _ppPartId = _ppSaved;
-                } else {
+                // Merged: the corner desk's board continues into the column in place of this one
+                if (!_cuDeskMat) {
                     createBoard(cellW, innerT, bodyD - 2, cellX, block.bottomY + innerT/2, 1, matOpenCell);
                 }
                 createBoard(cellW, block.h - 2*innerT, t, cellX, block.centerY, -bodyD/2 + t/2 + 0.6, matOpenCell);
@@ -6327,6 +6323,8 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
                 const shelfThick = (_mergeShelfThick != null) ? _mergeShelfThick : div.thick;
                 const shelfMesh = createBoard(boardW, shelfThick, boardD, boardX, div.y, boardZ, boardMat);
                 _applyShelfUV(shelfMesh, boardW, boardD, div.idx + c * 100);
+                // Merged: the corner desk's board continues into the column here — keep only the pick target
+                if (_cuDeskMat && shelfMesh) shelfMesh.visible = false;
                 if (!isBP && shelfMesh) {
                     shelfMesh.userData.shelfRef = { colIndex: c, shelfIdx: div.idx };
                     _registerShelfPickMesh(shelfMesh, boardW, shelfThick, boardD);
@@ -6960,12 +6958,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         createBoard(subW, innerT, bodyD - 2, subCenterX, zoneBottomY + zoneH - innerT / 2, 1, matOpenCell);
                         // Bottom board (desk color when merged with a standalone corner desk)
                         const _cuSubDeskMat = (zoneIdx === 0) ? _cuMergedBoardMat(c, 'cubby', r) : null;
-                        if (_cuSubDeskMat) {
-                            const _ppSaved = _ppPartId;
-                            _ppPartId = '';
-                            createBoard(subW, innerT, bodyD - 2, subCenterX, zoneBottomY + innerT / 2, 1, _cuSubDeskMat);
-                            _ppPartId = _ppSaved;
-                        } else {
+                        if (!_cuSubDeskMat) {
                             createBoard(subW, innerT, bodyD - 2, subCenterX, zoneBottomY + innerT / 2, 1, matOpenCell);
                         }
                         // Back panel

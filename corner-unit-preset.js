@@ -238,9 +238,22 @@ function _cuAlignDeskToHost(cu, slot) {
     const boardT = Math.round((surf.kind === 'cubby' ? (host.wing.thickness || 1.7) : _cuShelfT(host.wing)) * 100) / 100;
     const changed = Math.abs((cu.height || 0) - surf.y) > 0.05 || Math.abs((cu.depth || 0) - depth) > 0.05 ||
         me.x !== newX || ms.boardT !== boardT;
+    // Tongue of the desk board reaching into the column (replaces the host board there)
+    const r1 = function(v) { return Math.round(v * 100) / 100; };
+    const tongue = {
+        w: r1(host.col.width || 0),
+        d: r1(Math.max(0, (host.wing.depth || 54) - 2)),
+        cx: r1(host.off.x + span.center - newX)
+    };
+    const prevT = ms.tongue || {};
+    const tongueChanged = prevT.w !== tongue.w || prevT.d !== tongue.d || prevT.cx !== tongue.cx;
     cu.height = surf.y;
     cu.depth = depth;
-    cu.mergeShelf = { y: surf.y, colIndex: host.colIndex, kind: surf.kind, idx: surf.idx, boardT: boardT, hostSlot: host.slot };
+    cu.mergeShelf = { y: surf.y, colIndex: host.colIndex, kind: surf.kind, idx: surf.idx, boardT: boardT, hostSlot: host.slot, tongue: tongue };
+    if (tongueChanged && !changed) {
+        if (me.x !== newX) _cuSetSlotX(slot, newX);
+        return true;
+    }
     if (me.x !== newX) _cuSetSlotX(slot, newX);
     return changed;
 }

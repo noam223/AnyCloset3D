@@ -435,7 +435,42 @@ function buildCornerUnit() {
         const fingerGap = 2.5;
         const innerGap = 0.4;
         // Surface: full width × full depth (28mm thick)
-        addBoard(cuD, deskT, cuW, 0, deskH - deskT / 2, 0, matDesk, 'corner_desk_surface');
+        const tongue = (standalone && cu.mergeShelf && cu.mergeShelf.tongue) || null;
+        if (tongue && tongue.w > 0 && tongue.d > 0) {
+            // Merged with a host shelf / כוורת bottom: ONE board — desk top plus a tongue into the
+            // column (local −Z faces the host), so no seam line between them.
+            const zb = -cuW / 2;
+            const tl = tongue.cx - tongue.w / 2, tr = tongue.cx + tongue.w / 2;
+            const shp = new THREE.Shape();
+            shp.moveTo(-cuD / 2, zb);
+            shp.lineTo(tl, zb);
+            shp.lineTo(tl, zb - tongue.d);
+            shp.lineTo(tr, zb - tongue.d);
+            shp.lineTo(tr, zb);
+            shp.lineTo(cuD / 2, zb);
+            shp.lineTo(cuD / 2, cuW / 2);
+            shp.lineTo(-cuD / 2, cuW / 2);
+            shp.closePath();
+            const geo = new THREE.ExtrudeGeometry(shp, { depth: deskT, bevelEnabled: false });
+            geo.rotateX(Math.PI / 2);              // shape y → +Z, extrusion → −Y (top at y = 0)
+            const uv = geo.attributes.uv;
+            for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / 100, uv.getY(i) / 100);
+            let useMat = matDesk;
+            if (!isBP && typeof window._getPartColorOverride === 'function') {
+                const ok = window._getPartColorOverride(_ppWingId, 'corner_desk_surface');
+                if (ok && materials[ok]) useMat = materials[ok];
+            }
+            const mesh = new THREE.Mesh(geo, useMat.clone ? useMat.clone() : useMat);
+            mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeM));
+            mesh.position.set(0, deskH, 0);
+            cuGroup.add(mesh);
+            if (!isBP && typeof window._scopedPartColorId === 'function') {
+                mesh.userData.partId = window._scopedPartColorId(_ppWingId, 'corner_desk_surface');
+                if (window.partMeshes) window.partMeshes.push(mesh);
+            }
+        } else {
+            addBoard(cuD, deskT, cuW, 0, deskH - deskT / 2, 0, matDesk, 'corner_desk_surface');
+        }
         // Back leg at far Z (outer end) — omitted when deskFloating
         if (!cu.deskFloating) {
             addBoard(cuD, deskH, t, 0, deskH / 2, backWallZ, matDesk, 'corner_desk_leg');
