@@ -442,6 +442,13 @@ function buildCornerUnit() {
         }
         // Drawers under desk — desk-colored carcass shell + drawer boxes
         const numDeskDrawers = Math.min(cu.deskDrawerCount || 0, 3);
+        // Standalone: 10cm קושרת under the surface along the wall side (the drawer carcass side covers it otherwise)
+        if (standalone && numDeskDrawers === 0) {
+            const railH = 10;
+            const railLen = cu.deskFloating ? cuW : cuW - t;
+            const railZ = cu.deskFloating ? 0 : -t / 2;
+            addBoard(t, railH, railLen, sideWallX, deskH - deskT - railH / 2, railZ, matDesk, 'corner_desk_rail');
+        }
         if (numDeskDrawers > 0) {
             const drawerH = cu.deskDrawerHeight || 13;
             const gap = 0.4;

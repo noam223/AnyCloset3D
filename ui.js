@@ -14784,6 +14784,9 @@ function _collectPrintSpecRows(item, itemObj) {
                 rows.push({ id: 'handle', label: 'סוג ידיות למגירות', value: _plainSpecValue(window._handleStyleLabel(hs, w0 && w0.handleVariant, '', w0 && w0.ridingColor)) });
             }
             rows.push({ id: 'cornerDeskFloating', label: 'רגל בקצה', value: cuRaw.deskFloating ? 'ללא — שולחן מרחף' : 'כן' });
+            if (!(cuRaw.deskDrawerCount > 0)) {
+                rows.push({ id: 'cornerDeskRail', label: 'קושרת מתחת למשטח', value: '10 ס"מ — בצד הקיר' });
+            }
             if (cuRaw.mergeShelf) {
                 const mergeWith = cuRaw.mergeShelf.kind === 'cubby' ? 'תחתית הכוורת' : 'המדף';
                 rows.push({ id: 'cornerDeskShelfMerge', label: 'מיזוג עם הארון', value: 'כן — משטח בגובה ' + cuRaw.mergeShelf.y + ' ס"מ בקו ' + mergeWith + ', ברוחב העמודה (' + Math.round(cuRaw.depth || 0) + ' ס"מ)' });
