@@ -127,6 +127,22 @@ function _cuColumnSpan(w, ci) {
 }
 
 /**
+ * Host-local X edges of a merged desk: flush with the column's inner faces (the כוורת line),
+ * covering only an outer side wall of the cabinet — never a divider shared with the next column.
+ */
+function _cuDeskEdges(host) {
+    const w = host.wing;
+    const t = w.thickness || 1.7;
+    const span = _cuColumnSpan(w, host.colIndex);
+    const half = (host.col.width || 0) / 2;
+    const last = w.columns.length - 1;
+    return {
+        l: span.center - half - (host.colIndex === 0 ? t : 0),
+        r: span.center + half + (host.colIndex === last ? t : 0)
+    };
+}
+
+/**
  * Mergeable surfaces of the host column, in cm from the corner unit's floor:
  * shelf tops ({kind:'shelf', idx: shelvesY index}) and the top of each כוורת's own
  * bottom board ({kind:'cubby', idx: row}).
@@ -221,7 +237,7 @@ function _cuSetSlotX(slot, x) {
 
 /**
  * Desk follows the merged surface/column: top flush with the shelf or כוורת bottom,
- * depth = column span, centered on the column. Returns true if anything changed.
+ * depth = column (+ outer side wall), edges per _cuDeskEdges. Returns true if anything changed.
  */
 function _cuAlignDeskToHost(cu, slot) {
     const ms = cu && cu.mergeShelf;
@@ -233,8 +249,10 @@ function _cuAlignDeskToHost(cu, slot) {
     const surf = _cuCurrentSurface(_cuHostSurfaces(host, me), ms);
     if (!surf) return false;
     const span = _cuColumnSpan(host.wing, host.colIndex);
-    const depth = Math.max(30, Math.min(120, Math.round(span.span * 10) / 10));
-    const newX = Math.round(host.off.x + span.center);
+    const edges = _cuDeskEdges(host);
+    const depth = Math.max(30, Math.min(120, Math.round((edges.r - edges.l) * 10) / 10));
+    const exactX = host.off.x + (edges.l + edges.r) / 2;
+    const newX = Math.round(exactX);
     const boardT = Math.round((surf.kind === 'cubby' ? (host.wing.thickness || 1.7) : _cuShelfT(host.wing)) * 100) / 100;
     const changed = Math.abs((cu.height || 0) - surf.y) > 0.05 || Math.abs((cu.depth || 0) - depth) > 0.05 ||
         me.x !== newX || ms.boardT !== boardT;
@@ -243,10 +261,12 @@ function _cuAlignDeskToHost(cu, slot) {
     const tongue = {
         w: r1(host.col.width || 0),
         d: r1(Math.max(0, (host.wing.depth || 54) - 2)),
-        cx: r1(host.off.x + span.center - newX)
+        cx: r1(host.off.x + span.center - newX),
+        // Space offsets are whole cm; the top is shifted by the remainder so its edges land exactly
+        sx: r1(exactX - newX)
     };
     const prevT = ms.tongue || {};
-    const tongueChanged = prevT.w !== tongue.w || prevT.d !== tongue.d || prevT.cx !== tongue.cx;
+    const tongueChanged = prevT.w !== tongue.w || prevT.d !== tongue.d || prevT.cx !== tongue.cx || prevT.sx !== tongue.sx;
     cu.height = surf.y;
     cu.depth = depth;
     cu.mergeShelf = { y: surf.y, colIndex: host.colIndex, kind: surf.kind, idx: surf.idx, boardT: boardT, hostSlot: host.slot, tongue: tongue };
@@ -297,7 +317,9 @@ function _cuPushDeskToHost(cu, slot, dim) {
         const ci = host.colIndex;
         const nb = cols[ci === cols.length - 1 ? ci - 1 : ci + 1];
         const r1 = function(v) { return Math.round(v * 10) / 10; };
-        let newW = r1(cu.depth - 2 * t);
+        const edges = _cuDeskEdges(host);
+        const walls = (edges.r - edges.l) - (col.width || 0);
+        let newW = r1(cu.depth - walls);
         let nbW = Math.round((col.width + nb.width - newW) * 100) / 100;
         if (newW < minW) { nbW -= (minW - newW); newW = minW; }
         if (nbW < minW) { newW -= (minW - nbW); nbW = minW; }

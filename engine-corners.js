@@ -436,11 +436,13 @@ function buildCornerUnit() {
         const innerGap = 0.4;
         // Surface: full width × full depth (28mm thick)
         const tongue = (standalone && cu.mergeShelf && cu.mergeShelf.tongue) || null;
+        const deskSX = (tongue && tongue.sx) || 0;
         if (tongue && tongue.w > 0 && tongue.d > 0) {
             // Merged with a host shelf / כוורת bottom: ONE board — desk top plus a tongue into the
             // column (local −Z faces the host), so no seam line between them.
             const zb = -cuW / 2;
-            const tl = tongue.cx - tongue.w / 2, tr = tongue.cx + tongue.w / 2;
+            const tcx = tongue.cx - deskSX;
+            const tl = tcx - tongue.w / 2, tr = tcx + tongue.w / 2;
             const shp = new THREE.Shape();
             shp.moveTo(-cuD / 2, zb);
             shp.lineTo(tl, zb);
@@ -462,7 +464,7 @@ function buildCornerUnit() {
             }
             const mesh = new THREE.Mesh(geo, useMat.clone ? useMat.clone() : useMat);
             mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeM));
-            mesh.position.set(0, deskH, 0);
+            mesh.position.set(deskSX, deskH, 0);
             cuGroup.add(mesh);
             if (!isBP && typeof window._scopedPartColorId === 'function') {
                 mesh.userData.partId = window._scopedPartColorId(_ppWingId, 'corner_desk_surface');
@@ -473,7 +475,7 @@ function buildCornerUnit() {
         }
         // Back leg at far Z (outer end) — omitted when deskFloating
         if (!cu.deskFloating) {
-            addBoard(cuD, deskH, t, 0, deskH / 2, backWallZ, matDesk, 'corner_desk_leg');
+            addBoard(cuD, deskH, t, deskSX, deskH / 2, backWallZ, matDesk, 'corner_desk_leg');
         }
         // Drawers under desk — desk-colored carcass shell + drawer boxes
         const numDeskDrawers = Math.min(cu.deskDrawerCount || 0, 3);
@@ -482,7 +484,7 @@ function buildCornerUnit() {
             const railH = 10;
             const railLen = cu.deskFloating ? cuW : cuW - t;
             const railZ = cu.deskFloating ? 0 : -t / 2;
-            addBoard(t, railH, railLen, sideWallX, deskH - deskT - railH / 2, railZ, matDesk, 'corner_desk_rail');
+            addBoard(t, railH, railLen, sideWallX + deskSX, deskH - deskT - railH / 2, railZ, matDesk, 'corner_desk_rail');
         }
         if (numDeskDrawers > 0) {
             const drawerH = cu.deskDrawerHeight || 13;
