@@ -16326,40 +16326,8 @@ function _printSpaceGroupBlockHtml(group, opts) {
     opts = opts || {};
     const thStyle = opts.thStyle;
     const tdStyle = opts.tdStyle;
-    const baseName = _escPrintHtml(group.baseName || 'ארון במרחב משותף');
-    let spaceDoors = '';
-    let spaceOpen = '';
-    for (let i = 0; i < group.members.length; i++) {
-        const spec = group.members[i].itemObj && group.members[i].itemObj.spec;
-        if (!spec) continue;
-        if (!spaceDoors && _cartImageValid(spec.imgSpaceDoors)) spaceDoors = spec.imgSpaceDoors;
-        if (!spaceOpen && _cartImageValid(spec.imgSpaceOpen)) spaceOpen = spec.imgSpaceOpen;
-        if (spaceDoors && spaceOpen) break;
-    }
-    const cellStyle = 'flex:1;min-width:260px;display:flex;flex-direction:column;min-height:0;';
-    const lblStyle = 'font-size:0.9rem;font-weight:700;color:#475569;margin-bottom:8px;padding:4px 8px;background:#f1f5f8;border-radius:4px;';
-    const imgStyle = 'width:100%;max-height:68vh;object-fit:contain;border:1px solid #e2e8f0;border-radius:6px;background:#fff;';
-    const emptyStyle = 'padding:28px;text-align:center;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:8px;';
-    let html = `
-            <div style="page-break-after:always;">
-                <h2 style="font-size:1.45rem;color:#0f172a;margin:0 0 16px;padding:14px 16px;background:#ecfeff;border-radius:10px;border-right:5px solid #0f766e;">
-                    ${baseName}
-                </h2>
-                <div style="display:flex;flex-direction:row;flex-wrap:wrap;gap:16px;align-items:stretch;">
-                    <div style="${cellStyle}">
-                        <div style="${lblStyle}">תצוגת חוץ — כל החלקים (סגור)</div>
-                        ${spaceDoors
-                            ? `<img src="${spaceDoors}" alt="מרחב סגור" style="${imgStyle}">`
-                            : `<div style="${emptyStyle}">אין תמונת מרחב סגור</div>`}
-                    </div>
-                    <div style="${cellStyle}">
-                        <div style="${lblStyle}">תצוגת פנים — כל החלקים (פתוח)</div>
-                        ${spaceOpen
-                            ? `<img src="${spaceOpen}" alt="מרחב פתוח" style="${imgStyle}">`
-                            : `<div style="${emptyStyle}">אין תמונת מרחב פתוח</div>`}
-                    </div>
-                </div>
-            </div>`;
+    // Each part prints its own closed/open images beside its spec — no separate whole-space page
+    let html = '';
 
     let totalPrice = 0, totalInstall = 0, totalCost = 0;
     group.members.forEach(function(m) {
