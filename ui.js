@@ -16402,10 +16402,6 @@ function _printSingleCabinetBlockHtml(itemObj, index, opts) {
                 item: item, itemObj: itemObj, index: index, titleText: titleText, specRows: specRows, priceStrip: priceStrip, mu: mu
             }));
         }
-        const firstBp = (item.multiViewPages && item.multiViewPages[0]) || item.multiViewSVG || '';
-        const bpThumb = firstBp
-            ? `<div class="cmp-bp-thumb"><div class="cmp-cap">שרטוט (תמונה ממוזערת)</div>${firstBp}</div>`
-            : '';
         const extraImgs = centerOnlyImages ? '' : _orderPrintPreviewImagesHtml(item, itemObj.rawState, {
             omitSpace: omitSpaceImages,
             extrasOnly: true
@@ -16413,14 +16409,11 @@ function _printSingleCabinetBlockHtml(itemObj, index, opts) {
         return blockResult(`
             <div class="cmp-block" data-cart-index="${index}" style="page-break-after:always;">
                 <div class="cmp-bar">${_escPrintHtml(titleText)}</div>
-                <div class="cmp-wrap">
-                    <div class="cmp-spec">
-                        ${_buildCompactCabinetSpecHtml({ specRows: specRows, priceStrip: priceStrip })}
-                    </div>
-                    <div class="cmp-side">
-                        ${_orderPrintPreviewImagesHtml(item, itemObj.rawState, { centerOnly: true })}
-                        ${bpThumb}
-                    </div>
+                <div class="cmp-spec cmp-spec2">
+                    ${_buildCompactCabinetSpecHtml({ specRows: specRows, priceStrip: priceStrip })}
+                </div>
+                <div class="cmp-main-imgs">
+                    ${_orderPrintPreviewImagesHtml(item, itemObj.rawState, { centerOnly: true })}
                 </div>
                 ${extraImgs.trim() ? `<div class="cmp-imgs">${extraImgs}</div>` : ''}
             </div>
@@ -16617,6 +16610,12 @@ function _buildPrintHTML(mode) {
   .cmp-block, .cmp-block * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .cmp-bar { background: #1e3a5f; color: #fff; padding: 5px 12px; border-radius: 6px; font-size: 1rem; font-weight: 800; margin-bottom: 8px; }
   .cmp-wrap { display: grid; grid-template-columns: 1.25fr 1fr; gap: 14px; align-items: start; }
+  .cmp-spec2 { column-count: 2; column-gap: 20px; }
+  .cmp-spec2 .cmp-unit { margin-bottom: 0; }
+  .cmp-spec2 .cmp-prices, .cmp-spec2 .cmp-price { column-span: all; }
+  .cmp-main-imgs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; break-inside: avoid; page-break-inside: avoid; }
+  .cmp-main-imgs > div { flex: none !important; }
+  .cmp-main-imgs img { max-height: 115mm !important; background: #fff; }
   .cmp-unit { margin-bottom: 6px; }
   .cmp-unit-h { font-weight: 800; color: #1e3a5f; font-size: 0.95rem; padding: 4px 10px; background: #e8eef6; border-right: 4px solid #1e3a5f; border-radius: 4px; margin: 4px 0 2px; }
   .cmp-sec { font-size: 0.8rem; font-weight: 800; color: #1e3a5f; border-bottom: 1.5px solid #1e3a5f; padding: 7px 0 2px; margin-bottom: 2px; break-after: avoid; page-break-after: avoid; }
@@ -16713,6 +16712,32 @@ ${cabinetsHTML}
 ${summaryHTML}
 ${mode === 'customer' ? _customerApprovalHtml() : ''}
 ${_trialWmHtml()}
+<script>
+/* Grow the two main images to fill what's left of each cabinet's first A4 page (measured at print width) */
+(function () {
+  var blocks = [].slice.call(document.querySelectorAll('.cmp-block'));
+  if (!blocks.length) return;
+  var b = document.body, prevW = b.style.width, prevP = b.style.padding;
+  b.style.width = '180mm'; b.style.padding = '10px';
+  var probe = document.createElement('div');
+  probe.style.height = '100mm';
+  b.appendChild(probe);
+  var pxPerMm = probe.offsetHeight / 100;
+  b.removeChild(probe);
+  var bodyTop = b.getBoundingClientRect().top;
+  blocks.forEach(function (bl, i) {
+    var imgs = bl.querySelector('.cmp-main-imgs');
+    if (!imgs || !pxPerMm) return;
+    var top = imgs.getBoundingClientRect().top - (i === 0 ? bodyTop : bl.getBoundingClientRect().top - 10);
+    var cap = imgs.querySelector('div > div');
+    var capH = cap ? cap.offsetHeight + 4 : 0;
+    var avail = (267 * pxPerMm - top - capH) / pxPerMm - 8;
+    var h = Math.max(55, Math.min(160, avail));
+    [].forEach.call(imgs.querySelectorAll('img'), function (im) { im.style.setProperty('max-height', h + 'mm', 'important'); });
+  });
+  b.style.width = prevW; b.style.padding = prevP;
+})();
+</script>
 </body>
 </html>`;
 }
