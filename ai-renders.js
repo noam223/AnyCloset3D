@@ -62,7 +62,7 @@ function _injectPanel() {
             </div>
         </div>
         <div class="ai-renders-generate-btns">
-            <button id="btn-generate-render" class="btn-generate-render" onclick="window._generateRender(false)" title="Nano Banana — מהיר">
+            <button id="btn-generate-render" class="btn-generate-render" onclick="window._generateRender(false)" title="Nano Banana 2.1 — מהיר">
                 <i class="fa-solid fa-sparkles"></i> צור הדמיה חדשה
             </button>
             <button id="btn-generate-render-pro" class="btn-generate-render btn-generate-render-pro" onclick="window._generateRenderPro()" title="Nano Banana Pro — איכות מקסימלית">
@@ -639,51 +639,164 @@ function _buildAiRenderPrompt(spec, opts) {
     var single = !!opts.singleView;
     var hasRight = !!opts.hasRightImage;
     var hexColor = opts.hexColor;
+    var L = [];
+    var line = function(t) { if (t) L.push('- ' + t); };
 
-    var imagesIntro = single
-        ? 'מצורפת תמונת ייחוס אחת מהזווית הנוכחית בתוכנת התכנון.'
-        : hasRight
-            ? 'מצורפות 3 תמונות ייחוס של אותו ארון (סדר חשוב):\n1) חזית ישרה — פרופורציות מדויקות\n2) זווית תלת-ממד משמאל\n3) זווית תלת-ממד מימין'
-            : 'מצורפות 2 תמונות ייחוס:\n1) חזית ישרה\n2) זווית תלת-ממד';
+    L.push(single
+        ? 'תמונת הייחוס המצורפת היא מודל תלת-ממד של הארון מתוכנת התכנון.'
+        : 'תמונות הייחוס המצורפות הן מודל תלת-ממד של אותו ארון מתוכנת התכנון: ' +
+          (hasRight ? '(1) חזית ישרה, (2) זווית משמאל, (3) זווית מימין.' : '(1) חזית ישרה, (2) זווית תלת-ממד.') +
+          ' תמונת החזית קובעת את החלוקה והפרופורציות; הזוויות מראות עומק ונפח. אם יש סתירה — החזית קובעת.');
+    L.push('');
+    L.push('משימה: צילום פנים פוטוריאליסטי אחד של הארון הזה בדיוק, מותקן בחדר אמיתי. זה לא עיצוב מחדש — זו העתקה מדויקת של הארון לצילום מציאותי.');
 
+    L.push('');
+    L.push('מבנה הארון:');
     var dims = [
-        spec.widthCm && ('רוחב ' + spec.widthCm + ' ס"מ'),
-        spec.heightCm && ('גובה ' + spec.heightCm + ' ס"מ'),
-        spec.depthCm && ('עומק ' + spec.depthCm + ' ס"מ')
-    ].filter(Boolean).join(', ');
+        spec.widthCm && ('רוחב ' + spec.widthCm),
+        spec.heightCm && ('גובה ' + spec.heightCm),
+        spec.depthCm && ('עומק ' + spec.depthCm)
+    ].filter(Boolean).join(' × ');
+    if (dims) line('מידות חיצוניות (ס"מ): ' + dims + '.');
+    if (spec.columns) line(spec.columns + ' עמודות אנכיות' + (spec.frontsLayout && spec.frontsLayout.length > 1 ? ' בגוף המרכזי' : '') + ', ברוחבים שמפורטים למטה.');
+    line(spec.plinthText ? spec.plinthText + '.' : null);
+    line(spec.hasSideDesk ? 'שולחן צד משולב בצד הארון — באותו מיקום וגובה כמו בייחוס.' : null);
 
+    L.push('');
+    L.push('חזיתות — חלוקה מדויקת (משמאל לימין כפי שרואים את הארון מלפנים):');
+    if (spec.numSlidingDoors) {
+        var panelHe = { solid: 'פנל אטום', glass: 'זכוכית', mirror: 'מראה', mirror_dark: 'מראה כהה' };
+        line('ארון הזזה: בדיוק ' + spec.numSlidingDoors + ' דלתות הזזה על מסילה עליונה ותחתונה, ללא צירים וללא ידיות בולטות.');
+        if (spec.slidingPanels && spec.slidingPanels.length) {
+            line(spec.slidingPanels.map(function(p, i) { return 'דלת ' + (i + 1) + ': ' + (panelHe[p] || panelHe.solid); }).join(', ') + '.');
+        }
+    } else if (spec.frontsLayout && spec.frontsLayout.length) {
+        spec.frontsLayout.forEach(function(w) {
+            if (w.title) L.push(w.title + ':');
+            w.columns.forEach(function(c) { line(c); });
+        });
+    }
+    if (!spec.numSlidingDoors) {
+        var totals = [];
+        if (spec.doorCount != null) totals.push(spec.doorCount === 0 ? 'ללא דלתות' : 'בדיוק ' + spec.doorCount + ' כנפי דלת');
+        if (spec.extDrawerCount) totals.push(spec.extDrawerCount + ' מגירות חיצוניות');
+        if (spec.frontOpenCells) totals.push(spec.frontOpenCells + ' תאים פתוחים');
+        if (totals.length) line('סה"כ בחזית: ' + totals.join(', ') + '. אל תוסיף ואל תחסיר אף דלת, מגירה או תא.');
+        var styleKeys = Object.keys(spec.doorStyles || {});
+        if (styleKeys.length === 1) line('סוג כל הדלתות: ' + (_AI_DOOR_STYLE_HE[styleKeys[0]] || _AI_DOOR_STYLE_HE.solid) + '.');
+        if (spec.mainHandle) line('ידיות (ברירת מחדל לכל החזיתות): ' + spec.mainHandle + '.');
+    }
+    line(spec.hasShoeDrawers ? 'מגירות נעליים: מדפים נשלפים ללא חזית, עם גדר מוטות מתכת נמוכה סביב המשטח.' : null);
+    var openNote = _aiOpenCellsNote(spec);
+    if (openNote) L.push(openNote);
+
+    L.push('');
+    L.push('גוונים וחומרים (העתק את הגוון והטקסטורה בדיוק מהתמונות):');
     var bodyKey = spec.materialBody || spec.materialExternal;
-    var colorLine = hexColor
-        ? ('צבע גוף/חזית דומיננטי: ' + hexColor + (bodyKey && _AI_MATERIAL_HE[bodyKey] ? ' (' + _AI_MATERIAL_HE[bodyKey] + ')' : '') + '.')
-        : (bodyKey && _AI_MATERIAL_HE[bodyKey] ? ('גוון גוף: ' + _AI_MATERIAL_HE[bodyKey] + '.') : '');
+    line(spec.colorBodyLabel ? 'גוף הארון: ' + spec.colorBodyLabel + (hexColor ? ' (~' + hexColor + ')' : '') + '.'
+        : (bodyKey && _AI_MATERIAL_HE[bodyKey] ? 'גוף הארון: ' + _AI_MATERIAL_HE[bodyKey] + '.' : null));
+    line(spec.colorFrontsLabel ? 'חזיתות (דלתות ומגירות): ' + spec.colorFrontsLabel + '.' : null);
+    line(spec.colorInternalLabel && spec.frontOpenCells ? 'פנים התאים הפתוחים: ' + spec.colorInternalLabel + '.' : null);
+    line('גימור מלמין/עץ אמיתי עם טקסטורה עדינה — לא פלסטיק מבריק ולא משטח שטוח של רינדור.');
 
-    var specLines = [
-        dims ? ('מידות חיצוניות: ' + dims + '.') : '',
-        colorLine,
-        spec.columns ? ('חלוקה: ' + spec.columns + ' עמודות אנכיות.') : '',
-        spec.plinthHeightCm > 0 ? ('צוקל בגובה ' + spec.plinthHeightCm + ' ס"מ — שמור בדיוק.') : '',
-        spec.hasDrawers ? 'כולל מגירות בחלק התחתון — שמור על מיקום ופרופורציה.' : '',
-        spec.hasShoeDrawers ? 'כולל מגירות נעליים: מדפים נשלפים על מסילות, ללא חזית, עם גדר מוטות מתכת נמוכה מכל 4 הצדדים שיוצאת מהמשטח — שמור על מיקומם כבתמונות.' : '',
-        spec.hasDoors === false ? 'ללא דלתות — כל התאים פתוחים מהחזית.' : '',
-        spec.hasSideDesk ? 'כולל שולחן צד משולב — שמור על מיקומו ביחס לארון.' : '',
-        spec.numSlidingDoors ? ('ארון הזזה עם ' + spec.numSlidingDoors + ' דלתות הזזה — שמור מסילות, פרופיל וחלוקת פנלים כבתמונות.') : '',
-        _aiOpenCellsNote(spec),
-        _aiClosureCeilingNote()
-    ].filter(Boolean);
+    L.push('');
+    L.push('כללי דיוק — חובה:');
+    line('מספר העמודות, הדלתות, המגירות והתאים הפתוחים, וסדרם משמאל לימין — זהים לתמונת החזית.');
+    line('כל דלת נשארת בסוג שלה (חלקה / מסגרת / זכוכית / מראה). ידיות רק היכן שמצוין, ובסוג ובגוון שמצוין; בחזית טאצ\' — אין ידית כלל.');
+    line('כל הדלתות והמגירות סגורות. אל תוסיף דלתות לתאים פתוחים ואל תסגור תאים פתוחים.');
+    line(_aiClosureCeilingNote().replace(/^- /, ''));
+    line('ללא טקסט, מידות, לוגו, אייקונים או סימני מים בתמונה.');
 
-    return imagesIntro + '\n\n' +
-        'משימה: צור תמונה פוטוריאליסטית אחת (צילום אדריכלי פנים) של אותו ארון בדיוק, מותקן בסביבה אמיתית.\n\n' +
-        'דיוק מוחלט (אל תסטה מהייחוס):\n' +
-        '- שמור זהות מלאה של הארון: צורה, חלוקה, ידיות, צבעים, עומק וגובה.\n' +
-        '- אל תוסיף דלתות לתאים פתוחים ואל תסגור תאים שפתוחים בייחוס.\n' +
-        '- ' + _aiClosureCeilingNote().replace(/^- /, '') + '\n' +
-        (specLines.length ? '\nמפרט:\n' + specLines.map(function(l) { return (l.indexOf('- ') === 0) ? l : '- ' + l; }).join('\n') + '\n' : '\n') +
-        '\nסביבה וצילום:\n' +
-        '- ' + _aiRoomContext(spec.presetId) + '\n' +
-        '- הארון צמוד לקיר, לא חוסם אותו ריהוט אחר.\n' +
-        '- תאורה: אור יום רך מחלון בצד, צללים טבעיים, ללא פלאש קשה.\n' +
-        '- זווית מצלמה: 3/4 קדמית קלה, גובה עיניים, תחושת עדשת 35mm.\n' +
-        '- טקסטורות מלמינה/עץ מציאותיות, ללא מראה "רינדור מחשב" או פלסטיקי.';
+    L.push('');
+    L.push('סביבה וצילום:');
+    line(_aiRoomContext(spec.presetId));
+    line('הארון צמוד לקיר ואף רהיט או חפץ לא מסתיר אותו. הארון כולו בתוך הפריים, מהרצפה ועד מעל קצהו העליון.');
+    line('אור יום רך מחלון בצד, צללים טבעיים ומגע עדין של הארון ברצפה. ללא פלאש קשה.');
+    line('מצלמה בגובה עיניים, זווית 3/4 קדמית קלה, עדשה בתחושת 35mm, קווים אנכיים ישרים.');
+    return L.join('\n');
+}
+
+var _AI_DOOR_STYLE_HE = {
+    solid: 'חזית חלקה (פנל אחיד, ללא מסגרת וללא זכוכית)',
+    framed_melamine: 'חזית עם מסגרת מלמין רחבה סביב פנל אטום',
+    glass_melamine: 'זכוכית שקופה במסגרת מלמין',
+    glass_black: 'זכוכית שקופה במסגרת אלומיניום שחורה דקה',
+    glass_gold: 'זכוכית שקופה במסגרת אלומיניום זהב דקה',
+    glass_mirror: 'מראה מלאה (כל הדלת מראה, ללא מסגרת וללא ידית)'
+};
+
+function _aiHandleText(obj, wing) {
+    var style = (obj && obj.handleStyle) || (typeof _wingDefaultHandleStyle === 'function' ? _wingDefaultHandleStyle(wing, state) : (wing && wing.handleStyle)) || 'pipe';
+    if (style === 'touch') return "ללא ידית — פתיחת טאצ' בלחיצה (אסור לצייר ידית)";
+    if (style === 'none') return 'ללא ידית';
+    if (typeof window._handleStyleLabel !== 'function') return null;
+    return window._handleStyleLabel(style,
+        (obj && obj.handleVariant) || (wing && wing.handleVariant) || state.handleVariant,
+        '',
+        (obj && obj.ridingColor) || (wing && wing.ridingColor) || state.ridingColor);
+}
+
+function _aiDoorText(door, wing) {
+    var leaves = door.type === 'double' ? 2 : 1;
+    var kind = door.type === 'double' ? 'דלת כפולה (2 כנפיים נפתחות לצדדים)'
+        : door.type === 'left' ? 'דלת אחת, ציר בצד שמאל'
+        : door.type === 'right' ? 'דלת אחת, ציר בצד ימין'
+        : door.type === 'flap' ? 'דלת קלפה אופקית (נפתחת כלפי מעלה)'
+        : 'דלת';
+    var style = door.style || 'solid';
+    var parts = [kind, _AI_DOOR_STYLE_HE[style] || _AI_DOOR_STYLE_HE.solid];
+    if (style !== 'glass_mirror') {
+        var h = _aiHandleText(door, wing);
+        if (h) parts.push('ידית: ' + h);
+    }
+    return { text: parts.join(' · '), leaves: leaves, style: style };
+}
+
+/** Front layout of one wing, column by column (viewer's left → right), each column top → bottom. */
+function _aiDescribeWingFronts(wing, totals) {
+    if (!wing || !Array.isArray(wing.columns)) return [];
+    var hasDoors = wing.hasDoors !== false;
+    return wing.columns.map(function(col, ci) {
+        var segs = [];
+        var push = function(t) { if (t && segs[segs.length - 1] !== t) segs.push(t); };
+        if (col.type === 'desk') {
+            push('עמדת שולחן עבודה משולבת: משטח כתיבה וחלל פתוח לרגליים מתחתיו' + (col.deskHoneycomb ? ', כוורת פתוחה מעליו' : ''));
+        }
+        var comps = col.compartments || [];
+        var doors = hasDoors ? (col.doors || []).filter(Boolean) : [];
+        for (var r = comps.length - 1; r >= 0; r--) {
+            var door = doors.find(function(d) { return r >= d.startRow && r <= d.endRow; });
+            if (door) {
+                if (r === door.endRow) {
+                    var dt = _aiDoorText(door, wing);
+                    totals.doors += dt.leaves;
+                    totals.doorStyles[dt.style] = (totals.doorStyles[dt.style] || 0) + dt.leaves;
+                    var span = door.endRow - door.startRow + 1;
+                    push(dt.text + (span === comps.length && comps.length > 1 ? ' — לכל גובה העמודה' : ''));
+                }
+                continue;
+            }
+            var comp = comps[r];
+            if (!comp) continue;
+            if (comp.partition && Array.isArray(comp.subCells)) {
+                push('תא מחולק ל-' + comp.subCells.length + ' תתי-תאים — העתק בדיוק מתמונת החזית');
+            } else if (comp.type === 'external_drawers') {
+                var n = comp.count || 1;
+                totals.drawers += n;
+                var hd = _aiHandleText(comp, wing);
+                push(n + ' מגירות חיצוניות' + (hd ? ' (ידית: ' + hd + ')' : ''));
+            } else if (comp.type === 'side_open_cell') {
+                totals.openCells++;
+                push('תא פתוח ללא דלת, פתוח גם מהצד (ללא דופן צד)');
+            } else if (comp.type === 'open_cell') {
+                totals.openCells++;
+                push('תא פתוח ללא דלת (כוורת)');
+            } else if (col.type !== 'desk') {
+                push('תא ללא דלת — התכולה גלויה' + (comp.type === 'hanging' ? ' (מוט תלייה)' : comp.type === 'internal_drawers' ? ' (מגירות פנימיות)' : ' (מדפים)'));
+            }
+        }
+        return 'עמודה ' + (ci + 1) + ' (רוחב ' + Math.round(col.width || 0) + ' ס"מ): ' + (segs.length ? (segs.length > 1 ? 'מלמעלה למטה — ' : '') + segs.join('; מתחת: ') : 'ללא חזיתות');
+    });
 }
 
 function _getDominantColor() {
@@ -764,12 +877,33 @@ function _getCabinetSpec() {
         var slidingDoor = (state.presetId === 'sliding' && centerWing && centerWing.slidingDoor && centerWing.slidingDoor.enabled)
             ? centerWing.slidingDoor : null;
 
+        var frontTotals = { doors: 0, drawers: 0, openCells: 0, doorStyles: {} };
+        var frontsLayout = [];
+        if (!slidingDoor) {
+            var wingNames = { center: 'גוף מרכזי', left: 'אגף שמאלי', right: 'אגף ימני' };
+            var wingSides = ['left', 'center', 'right'].filter(function(s) {
+                return state.wings && state.wings[s] && Array.isArray(state.wings[s].columns) && state.wings[s].columns.length;
+            });
+            if (!wingSides.length && wing) wingSides = [null];
+            wingSides.forEach(function(s) {
+                var w = s ? state.wings[s] : wing;
+                var lines = _aiDescribeWingFronts(w, frontTotals);
+                if (!lines.length) return;
+                frontsLayout.push({ title: wingSides.length > 1 ? wingNames[s] : null, columns: lines });
+            });
+        }
+        var colorOf = function(k) { return (k && typeof _colorKeyLabel === 'function') ? _colorKeyLabel(k) : null; };
+        var plinthText = state.presetId === 'writing-desk' ? null
+            : state.cabinetModel === 'regalim' ? 'רגלי ניקל בגובה 10 ס"מ'
+            : state.cabinetModel === 'c9' ? 'צוקל רגיל בגובה ' + Math.round(state.plinthHeight || 0) + ' ס"מ, בקו החזית'
+            : (state.plinthHeight > 0 ? 'צוקל נסתר (שקוע פנימה) בגובה ' + Math.round(state.plinthHeight) + ' ס"מ' : null);
+
         return {
             presetId:         state.presetId,
             cabinetModel:     state.cabinetModel || null,
-            widthCm:          Math.round(state.globalWidth),
-            heightCm:         Math.round(state.globalHeight),
-            depthCm:          Math.round(state.globalDepth || 58),
+            widthCm:          Math.round(state.globalWidth || state.width || 0) || null,
+            heightCm:         Math.round(state.globalHeight || 0) || null,
+            depthCm:          Math.round(state.globalDepth || state.depth || 58),
             plinthHeightCm:   Math.round(state.plinthHeight || 0),
             material:         wing ? (wing.boardMaterial || state.boardMaterial) : state.boardMaterial,
             materialBody:     wing ? wing.materialBody : null,
@@ -785,6 +919,17 @@ function _getCabinetSpec() {
             hasSideDesk:      !!(state.desk && state.desk.side && state.desk.side !== 'none'),
             numSlidingDoors:  slidingDoor ? (slidingDoor.numDoors || 2) : null,
             slidingPanelType: slidingDoor ? (slidingDoor.doorPanelType || 'solid') : null,
+            slidingPanels:    slidingDoor ? (slidingDoor.doorPanels || []).slice(0, slidingDoor.numDoors || 2) : null,
+            frontsLayout:     frontsLayout,
+            doorCount:        frontTotals.doors,
+            doorStyles:       frontTotals.doorStyles,
+            extDrawerCount:   frontTotals.drawers,
+            frontOpenCells:   frontTotals.openCells,
+            mainHandle:       wing ? _aiHandleText(null, wing) : null,
+            colorBodyLabel:   colorOf(state.materialBody),
+            colorFrontsLabel: colorOf(state.materialExternal),
+            colorInternalLabel: colorOf(state.materialInternal),
+            plinthText:       plinthText,
         };
     } catch(e) { return null; }
 }

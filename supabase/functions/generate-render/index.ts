@@ -7,9 +7,10 @@ const CORS = {
 };
 
 const GEMINI_MODELS = {
-  standard: 'gemini-3.1-flash-image',       // Nano Banana 2
+  standard: 'gemini-nano-banana-2.1',       // Nano Banana 2.1
   pro:      'gemini-3-pro-image-preview',   // Nano Banana Pro
 } as const;
+const GEMINI_STANDARD_FALLBACK = 'gemini-3.1-flash-image'; // Nano Banana 2
 
 // Monthly AI quota per plan when profiles.ai_renders_quota is NULL. Keep in sync with aiRendersQuota in auth.js.
 function planRenderQuota(plan?: string | null): number {
@@ -213,7 +214,8 @@ serve(async (req) => {
       : '') });
 
     const GEMINI_KEY = Deno.env.get('GEMINI_API_KEY')!;
-    const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${GEMINI_KEY}`;
+    const geminiUrl = (model: string) =>
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
 
     const generationConfig: Record<string, unknown> = {
       responseModalities: ['IMAGE', 'TEXT'],
@@ -222,7 +224,7 @@ serve(async (req) => {
       generationConfig.imageConfig = { imageSize: '2K' };
     }
 
-    const geminiRes = await fetch(GEMINI_URL, {
+    const callGemini = (model: string) => fetch(geminiUrl(model), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -230,6 +232,12 @@ serve(async (req) => {
         generationConfig,
       }),
     });
+
+    let geminiRes = await callGemini(geminiModel);
+    if (!geminiRes.ok && tier === 'standard' && (geminiRes.status === 404 || geminiRes.status === 400)) {
+      console.warn(`${geminiModel} unavailable (${geminiRes.status}): ${await geminiRes.text()} — falling back to ${GEMINI_STANDARD_FALLBACK}`);
+      geminiRes = await callGemini(GEMINI_STANDARD_FALLBACK);
+    }
 
     if (!geminiRes.ok) {
       const errText = await geminiRes.text();
