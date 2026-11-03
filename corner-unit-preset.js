@@ -184,6 +184,31 @@ function _cuCurrentSurface(surfaces, ms) {
     return pool[_cuNearestIndex(pool.map(function(s) { return s.y; }), ms.y)];
 }
 
+/**
+ * A corner unit sitting in a host's inner corner keeps its back against the host front and its
+ * outer side flush with the host side wall, so resizing grows it outward only.
+ */
+function _cuKeepAttachedToHost(cu, slot, host, key, oldVal) {
+    const info = window._getSpacePairInfo();
+    const item = info && state.orderCart[info.slotIndices[slot]];
+    if (!item) return;
+    const off = window._getSpaceOffset(item);
+    if (off.rot !== 90 && off.rot !== 270) return;
+    const fp = window._spaceCabinetFootprint(host.slot);
+    const o = Object.assign({}, off);
+    o.z = Math.round((host.off.z || 0) + fp.d / 2 + (cu.width || 60) / 2);
+    if (key === 'depth' && !cu.mergeShelf) {
+        const sgn = off.rot === 270 ? -1 : 1;
+        const cornerX = function(d) { return host.off.x + sgn * (fp.w / 2 - d / 2); };
+        // Only when it actually sat in the corner (not moved elsewhere along the front)
+        if (Math.abs(off.x - cornerX(oldVal)) <= 1.5) o.x = Math.round(cornerX(cu.depth || 54));
+    }
+    item.spaceOffset = o;
+    if (!item.rawState) item.rawState = {};
+    item.rawState.spaceOffset = o;
+    if (typeof window._syncSpaceOffsetUI === 'function') window._syncSpaceOffsetUI();
+}
+
 function _cuSetSlotX(slot, x) {
     const info = window._getSpacePairInfo();
     const item = info && state.orderCart[info.slotIndices[slot]];
@@ -544,7 +569,11 @@ window._updateExtrasSections = function() {
         let val = (absoluteValue !== null && absoluteValue !== undefined) ? parseInt(absoluteValue, 10) : cur + (delta || 0);
         if (isNaN(val)) return;
         val = Math.max(limits[0], Math.min(limits[1], val));
+        const info = window._getSpacePairInfo && window._getSpacePairInfo();
+        const attachHost = (info && info.activeSlot > 0 && (key === 'width' || key === 'depth'))
+            ? _cuFindHostColumn(cu, info.activeSlot, cu.mergeShelf && cu.mergeShelf.colIndex) : null;
         cu[key] = val;
+        if (attachHost) _cuKeepAttachedToHost(cu, info.activeSlot, attachHost, key, cur);
         if (cu.mergeShelf && cu.type === 'desk' && (key === 'height' || key === 'depth')) {
             const info = window._getSpacePairInfo && window._getSpacePairInfo();
             if (info) {
