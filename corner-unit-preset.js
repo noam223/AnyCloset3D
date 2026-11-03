@@ -381,6 +381,9 @@ function _cuSyncMergedDesks() {
     // Host boards merged with a desk, per host slot → drawn in the desk color (engine-core)
     const boards = {};
     window._cuMergeBoards = boards;
+    // Host doors under a merged desk's drawer band stop below it (engine-core)
+    const doorClamps = {};
+    window._cuDeskDoorClamps = doorClamps;
     if (!info) return;
     info.members.forEach(function(m) {
         const live = m.slot === info.activeSlot;
@@ -398,6 +401,11 @@ function _cuSyncMergedDesks() {
                 colIndex: ms.colIndex, kind: ms.kind, idx: ms.idx,
                 mat: wing.materialBody || (live ? state.materialBody : raw.materialBody) || 'white_matte'
             });
+            if ((cu.deskDrawerCount || 0) > 0) {
+                const dy = (window._spaceOffsetForSlot(m.slot).y || 0) - (window._spaceOffsetForSlot(ms.hostSlot).y || 0);
+                const drawerBottom = dy + cu.height - (ms.boardT || 1.7) - (cu.deskDrawerHeight || 13);
+                (doorClamps[ms.hostSlot] = doorClamps[ms.hostSlot] || []).push({ colIndex: ms.colIndex, y: drawerBottom });
+            }
         }
         if (!changed) return;
         if (live) {

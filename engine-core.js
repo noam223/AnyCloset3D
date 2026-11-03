@@ -4071,6 +4071,21 @@ function _cuMergedBoardMat(colIndex, kind, idx) {
     return hit ? (materials[hit.mat] || materials['white_matte'] || null) : null;
 }
 
+/**
+ * Door top in a host column behind a merged corner desk with drawers: a door reaching into the
+ * desk's drawer band stops below it (window._cuDeskDoorClamps, cabinet-local drawer bottom Y).
+ */
+function _cuClampDoorTopUnderDesk(colIndex, bottomY, topY, gap) {
+    const map = window._cuDeskDoorClamps;
+    if (!map) return topY;
+    const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
+    if (!info) return topY;
+    const slot = window._spaceBuildSlot != null ? window._spaceBuildSlot : info.activeSlot;
+    const hit = (map[slot] || []).find(function(e) { return e.colIndex === colIndex; });
+    if (!hit || topY <= hit.y || bottomY >= hit.y - 2) return topY;
+    return hit.y - gap / 2;
+}
+
 /** Space rotation (degrees, clockwise from above) → Object3D.rotation.y. */
 function _spaceRotY(off) {
     return -((off && off.rot) || 0) * Math.PI / 180;
@@ -7430,6 +7445,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                 ({ doorBottomY, doorTopY } = _clearDoorsFromDeskMergeFrame(
                     col, door, doorBottomY, doorTopY, doorGap, deskT
                 ));
+                doorTopY = _cuClampDoorTopUnderDesk(c, doorBottomY, doorTopY, doorGap);
                 
                 const dH = doorTopY - doorBottomY;
                 if(dH <= 0) return;
