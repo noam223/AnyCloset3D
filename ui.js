@@ -10231,6 +10231,7 @@ function _captureFrameAtView(cam, ctrl, ren, scn, view, hasDoors) {
     window._spaceCaptureForceDoors = !!hasDoors;
     _setAllWingsHasDoors(hasDoors);
     window._captureLedIcons = !hasDoors;
+    window._captureTouchIcons = !!hasDoors;
 
     try {
     if (isSideWingShot) {
@@ -10283,6 +10284,7 @@ function _captureFrameAtView(cam, ctrl, ren, scn, view, hasDoors) {
     } finally {
         window._spaceCaptureForceDoors = prevForceDoors;
         window._captureLedIcons = false;
+        window._captureTouchIcons = false;
     }
 }
 
@@ -10540,7 +10542,7 @@ window._captureCabinetPreviewImages = function() {
         multiViewSVG,
         imgSpaceDoors,
         imgSpaceOpen,
-        captureVer: 6
+        captureVer: 7
     };
 };
 
@@ -10577,6 +10579,14 @@ window._cartItemNeedsMediaRefresh = function(itemObj) {
     if ((!spec.captureVer || spec.captureVer < 6) && !spec.imgOpenManual) {
         try {
             if (JSON.stringify(itemObj.rawState.wings || {}).indexOf('external_drawers') >= 0) return true;
+        } catch (e) { /* ignore */ }
+    }
+    // v7: closed-door shots mark touch (push-to-open) doors
+    if ((!spec.captureVer || spec.captureVer < 7) && !spec.imgDoorsManual) {
+        const rs = itemObj.rawState;
+        try {
+            if (rs.handleStyle === 'touch' || rs.cabinetModel === 'ab2' ||
+                JSON.stringify(rs.wings || {}).indexOf('"handleStyle":"touch"') >= 0) return true;
         } catch (e) { /* ignore */ }
     }
     const pid = itemObj.rawState.presetId;

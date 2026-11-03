@@ -523,6 +523,51 @@ window._ledIconSprite = function() {
     return sprite;
 };
 
+let _touchIconTex = null;
+/** Print capture (closed doors): "press" badge with a fingertip + טאצ' label on push-to-open doors. */
+window._touchIconSprite = function() {
+    if (!_touchIconTex) {
+        const cv = document.createElement('canvas');
+        cv.width = 128; cv.height = 176;
+        const g = cv.getContext('2d');
+        const navy = '#1e3a5f';
+        g.beginPath(); g.arc(64, 64, 60, 0, Math.PI * 2); g.fillStyle = '#ffffff'; g.fill();
+        g.lineWidth = 5; g.strokeStyle = navy; g.stroke();
+        // Press ripples above the fingertip
+        g.lineWidth = 4; g.lineCap = 'round';
+        [13, 22].forEach(function(r) {
+            g.beginPath(); g.arc(64, 40, r, Math.PI * 1.2, Math.PI * 1.8); g.stroke();
+        });
+        // Pointing hand: index finger + palm
+        g.fillStyle = navy;
+        const rr = function(x, y, w, h, r) {
+            g.beginPath();
+            g.moveTo(x + r, y); g.lineTo(x + w - r, y); g.quadraticCurveTo(x + w, y, x + w, y + r);
+            g.lineTo(x + w, y + h - r); g.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            g.lineTo(x + r, y + h); g.quadraticCurveTo(x, y + h, x, y + h - r);
+            g.lineTo(x, y + r); g.quadraticCurveTo(x, y, x + r, y);
+            g.closePath(); g.fill();
+        };
+        rr(56, 38, 16, 50, 8);
+        rr(42, 74, 46, 34, 12);
+        g.fillStyle = '#ffffff';
+        g.fillRect(58, 84, 2, 12); g.fillRect(70, 84, 2, 12);
+        // Label
+        g.fillStyle = navy;
+        g.font = 'bold 34px Heebo, Arial, sans-serif';
+        g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.direction = 'rtl';
+        g.lineWidth = 6; g.strokeStyle = '#ffffff';
+        g.strokeText('טאצ\'', 64, 150);
+        g.fillText('טאצ\'', 64, 150);
+        _touchIconTex = new THREE.CanvasTexture(cv);
+    }
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: _touchIconTex, transparent: true, depthTest: false }));
+    sprite.scale.set(10, 13.75, 1);
+    sprite.renderOrder = 999;
+    return sprite;
+};
+
 // Load room textures once
 window._woodFloorTex = null;
 window._wallTex = null;
@@ -7691,6 +7736,12 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                 doorGroup.add(glassMesh);
                             }
                         }
+                    }
+                    if (!isBP && window._captureTouchIcons && (door.handleStyle || _handleStyle) === 'touch'
+                        && style !== 'glass_mirror' && w >= 18 && dH >= 25) {
+                        const icon = window._touchIconSprite();
+                        icon.position.set(doorLocalX + (isLeft ? w / 2 - 8 : -w / 2 + 8), 0, t / 2 + 3);
+                        doorGroup.add(icon);
                     }
                     _registerDoorMesh(doorGroup);
                 };
