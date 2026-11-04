@@ -14530,6 +14530,9 @@ function _countTouchHandlesInWing(wing, rs, out) {
             (col.doors || []).forEach(function(door) {
                 if (door && isTouch(door.handleStyle)) out.doors += door.type === 'double' ? 2 : 1;
             });
+            _forEachPartitionDoor(col, function(type, handleStyle) {
+                if (isTouch(handleStyle)) out.doors += type === 'door_double' ? 2 : 1;
+            });
         }
         (col.compartments || []).forEach(function(comp) {
             if (!comp) return;
@@ -14552,6 +14555,36 @@ function _countTouchHandlesInWing(wing, rs, out) {
     return out;
 }
 
+/** Doors drawn inside partitioned cells (per-zone + merged zone groups), skipping rows under a column door. Read-only. */
+function _forEachPartitionDoor(col, cb) {
+    if (!col || !Array.isArray(col.compartments)) return;
+    const isDoor = function(t) { return typeof t === 'string' && _DOOR_ZONE_TYPES.has(t); };
+    col.compartments.forEach(function(comp, r) {
+        if (!comp || !comp.partition || !Array.isArray(comp.subCells)) return;
+        const covered = (col.doors || []).some(function(d) {
+            return d && r >= d.startRow && r <= d.endRow && d.type && d.type !== 'empty';
+        });
+        if (covered) return;
+        const groups = Array.isArray(comp.zoneDoorGroups) ? comp.zoneDoorGroups : [];
+        groups.forEach(function(g) {
+            if (g && isDoor(g.type)) cb(g.type, g.handleStyle || null);
+        });
+        const inGroup = function(key) { return groups.some(function(g) { return g && Array.isArray(g.keys) && g.keys.indexOf(key) >= 0; }); };
+        comp.subCells.forEach(function(sub, si) {
+            if (!sub) return;
+            const zones = (sub.shelves || 0) + 1;
+            for (let z = 0; z < zones; z++) {
+                if (inGroup(si + ':' + z)) continue;
+                let t = Array.isArray(sub.zonesDoor) ? sub.zonesDoor[z] : null;
+                if (!isDoor(t) && Array.isArray(sub.zonesType)) t = sub.zonesType[z];
+                if (!isDoor(t) && z === 0 && !Array.isArray(sub.zonesDoor)) t = sub.type;
+                if (!isDoor(t)) continue;
+                cb(t, (Array.isArray(sub.zonesDoorHandleStyle) && sub.zonesDoorHandleStyle[z]) || null);
+            }
+        });
+    });
+}
+
 /** Door leaves in the whole cabinet (a double door counts as 2; sliding = its panel count). */
 function _countDoorsInWing(w, rs) {
     if (!w || !Array.isArray(w.columns)) return 0;
@@ -14560,6 +14593,7 @@ function _countDoorsInWing(w, rs) {
     let n = 0;
     w.columns.forEach(function(col) {
         (col && col.doors || []).forEach(function(door) { if (door) n += door.type === 'double' ? 2 : 1; });
+        _forEachPartitionDoor(col, function(type) { n += type === 'door_double' ? 2 : 1; });
     });
     return n;
 }
@@ -15118,7 +15152,8 @@ function _resolvePrintSpecRows(itemObj) {
     const merged = auto.map(autoRow => {
         if (autoRow.section) return { ...autoRow };
         const prevRow = prev.rows.find(r => r.id === autoRow.id);
-        return prevRow ? { ...autoRow, value: prevRow.value } : { ...autoRow };
+        if (prevRow && /doorsCount$/.test(autoRow.id) && !prevRow.edited) return { ...autoRow };
+        return prevRow ? { ...autoRow, value: prevRow.value, edited: prevRow.edited } : { ...autoRow };
     });
     itemObj.printSpecEdits.rows = merged;
     return merged;
@@ -15127,7 +15162,7 @@ function _resolvePrintSpecRows(itemObj) {
 function _updatePrintSpecRow(itemObj, rowId, newValue) {
     _resolvePrintSpecRows(itemObj);
     const row = itemObj.printSpecEdits.rows.find(r => r.id === rowId);
-    if (row && !row.section) row.value = newValue;
+    if (row && !row.section) { row.value = newValue; row.edited = true; }
 }
 
 function _printSpecRowsHtml(rows, thStyle, tdStyle, sectionStyle) {
