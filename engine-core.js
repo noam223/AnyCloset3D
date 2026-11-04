@@ -6729,8 +6729,20 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         cloned.opacity = 1;
                         return cloned;
                     };
-                    const _subCreateDoorPanel = (w, h, cx, cy, z, mat) => {
+                    // uvTotalW/uvIsLeft: double door — the texture spans both leaves like column doors
+                    const _subCreateDoorPanel = (w, h, cx, cy, z, mat, uvTotalW, uvIsLeft) => {
                         const mesh = createBoard(w, h, t, cx, cy, z, mat);
+                        if (!isBP && mesh.material && mesh.material.map) {
+                            const uv = mesh.geometry.attributes.uv;
+                            const totalW = uvTotalW || w;
+                            const uScale = totalW / h;
+                            const uOffset = (1 - uScale) / 2;
+                            const uStart = uvTotalW ? (uvIsLeft ? uOffset : uOffset + uScale / 2) : uOffset;
+                            const uSpan = uvTotalW ? uScale / 2 : uScale;
+                            const rawU = [0, 1, 0, 1], rawV = [1, 1, 0, 0];
+                            for (let i = 16; i < 24; i++) uv.setXY(i, uStart + rawU[(i - 16) % 4] * uSpan, rawV[(i - 16) % 4]);
+                            uv.needsUpdate = true;
+                        }
                         _registerDoorMesh(mesh);
                         return mesh;
                     };
@@ -6905,8 +6917,8 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             const halfW = (subW + t) / 2;
                             const lCX = subCenterX - halfW / 2;
                             const rCX = subCenterX + halfW / 2;
-                            _subCreateDoorPanel(halfW, doorH, lCX, doorY, fZ, doorMat);
-                            _subCreateDoorPanel(halfW, doorH, rCX, doorY, fZ, doorMat);
+                            _subCreateDoorPanel(halfW, doorH, lCX, doorY, fZ, doorMat, halfW * 2, true);
+                            _subCreateDoorPanel(halfW, doorH, rCX, doorY, fZ, doorMat, halfW * 2, false);
                             if (!isBP) {
                                 const hz = fZ + t / 2 + 1.5;
                                 if (hs === 'riding') {
