@@ -54,6 +54,7 @@
         var mob = document.getElementById('mob-mat-texture-grid');
         if (mob) _injectGrid(mob, true);
     };
-    if (document.readyState !== 'loading') window._injectEggerExtraGrids();
-    else document.addEventListener('DOMContentLoaded', window._injectEggerExtraGrids);
+    // Must run before ui.js binds .material-btn click handlers — the sidebar markup is above this script tag.
+    window._injectEggerExtraGrids();
+    document.addEventListener('DOMContentLoaded', window._injectEggerExtraGrids);
 })();
