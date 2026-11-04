@@ -12601,7 +12601,7 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
         const wingPreviews = preview.wingPreviews || [];
         const imgBlueprint = null;
 
-        const contentCounts = _countCabinetContentFromRawState({ wings: state.wings, columns: state.columns });
+        const contentCounts = _countCabinetContentFromRawState({ wings: state.wings, columns: state.columns, presetId: state.presetId });
         const totalShelves = contentCounts.shelves;
         const hangingRods = contentCounts.hanging + contentCounts.sorbet;
         const intDrawers = contentCounts.drawersInt;
@@ -14655,9 +14655,22 @@ function _pushTouchHandleRows(rows, prefix, t) {
     if (t.drawers > 0) rows.push({ id: prefix + 'touchDrawers', label: 'מגירות טאצ\'', value: t.drawers + ' יחידות' });
 }
 
+/** Drawer fronts of an attached side desk — same default as the engine (≤80cm → 1, wider → 2). */
+function _sideDeskDrawerCount(rawState) {
+    if (!rawState || rawState.presetId === 'writing-desk' || rawState.presetId === 'corner-unit') return 0;
+    const one = function(desk) {
+        if (!desk || !desk.side || desk.side === 'none' || !desk.hasDrawers) return 0;
+        if (desk.drawerCount != null) return Math.max(0, desk.drawerCount | 0);
+        return (desk.width || 0) <= 80 ? 1 : 2;
+    };
+    if (rawState.wings) return ['center', 'left', 'right'].reduce(function(s, k) { return s + one(rawState.wings[k] && rawState.wings[k].desk); }, 0);
+    return one(rawState.desk);
+}
+
 function _countCabinetContentFromRawState(rawState) {
     if (!rawState) return _emptyContentCounts();
     const merged = _emptyContentCounts();
+    merged.drawersExt += _sideDeskDrawerCount(rawState);
     if (rawState.wings) {
         ['center', 'left', 'right'].forEach(function(side) {
             const w = rawState.wings[side];
@@ -14688,7 +14701,9 @@ function _countCabinetContentFromRawState(rawState) {
         }
         return merged;
     }
-    return _countCabinetContent(rawState.columns);
+    const flat = _countCabinetContent(rawState.columns);
+    flat.drawersExt += merged.drawersExt;
+    return flat;
 }
 
 function _formatHangingRodsDisplay(itemObj) {
@@ -15096,7 +15111,8 @@ function _collectPrintSpecRows(item, itemObj) {
     if (!isWD) {
         const doorsN = _countDoorsFromRawState(itemObj && itemObj.rawState);
         if (doorsN > 0) rows.push({ id: 'doorsCount', label: 'דלתות', value: doorsN + ' יחידות' });
-        rows.push({ id: 'drawersExt', label: 'מגירות חיצוניות', value: `${item.drawersExt} יחידות` });
+        const extN = itemObj && itemObj.rawState ? _countCabinetContentFromRawState(itemObj.rawState).drawersExt : item.drawersExt;
+        rows.push({ id: 'drawersExt', label: 'מגירות חיצוניות', value: `${extN} יחידות` });
         rows.push({ id: 'drawersInt', label: 'מגירות פנימיות', value: `${item.drawersInt} יחידות` });
         const intExtN = itemObj && itemObj.rawState ? (_countCabinetContentFromRawState(itemObj.rawState).drawersIntExtHandle || 0) : 0;
         if (intExtN > 0) rows.push({ id: 'drawersIntExtHandle', label: 'מגירות פנימיות עם ידית חיצונית', value: intExtN + ' יחידות' });
