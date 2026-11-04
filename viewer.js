@@ -57,7 +57,7 @@ var MATERIAL_LIST = [
     { key: '463',   img: 'textures/463.jpg',   label: '463' },
     { key: '464',   img: 'textures/464.jpg',   label: '464' },
     { key: '480',   img: 'textures/480.jpg',   label: '480' }
-];
+].concat((window.EGGER_EXTRA_COLORS || []).map(function(c) { return { key: c.key, img: c.img, bg: c.hex, label: 'EGGER ' + c.code }; }));
 
 // ── Derived lookup maps ───────────────────────────────────────────────────────
 var MATERIAL_COLORS = {};
@@ -752,11 +752,16 @@ function _buildColorGridHTML(field) {
         || _getOriginalMaterial(_activeCabIdx, field);
     var html = '';
     var inTextures = false;
+    var inEgger = false;
     MATERIAL_LIST.forEach(function(m) {
         var isTexture = !!m.img;
         if (isTexture && !inTextures) {
             inTextures = true;
             html += '<div class="vd-grid-section">טקסטורות עץ</div>';
+        }
+        if (!inEgger && window._isEggerExtraColor && window._isEggerExtraColor(m.key)) {
+            inEgger = true;
+            html += '<div class="vd-grid-section">צבעי EGGER נוספים</div>';
         }
         var selected = m.key === currentKey ? ' selected' : '';
         var style = isTexture

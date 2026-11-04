@@ -201,6 +201,27 @@
             texGrid.appendChild(btn);
         });
         container.appendChild(texGrid);
+
+        const eggerList = window.EGGER_EXTRA_COLORS || [];
+        if (!eggerList.length) return;
+        const egLabel = document.createElement('div');
+        egLabel.className = 'pp-swatch-section-label';
+        egLabel.style.marginTop = '8px';
+        egLabel.textContent = 'צבעי EGGER נוספים';
+        container.appendChild(egLabel);
+
+        const egGrid = document.createElement('div');
+        egGrid.className = 'pp-swatches-grid';
+        eggerList.forEach(c => {
+            const btn = document.createElement('button');
+            btn.className = 'pp-swatch pp-swatch-tex' + (c.key === currentKey ? ' pp-swatch-active' : '');
+            btn.title = 'EGGER ' + c.code;
+            btn.style.cssText = `background-image:url('${c.img}');background-size:cover;border:2px solid #bbb;`;
+            btn.dataset.colorKey = c.key;
+            btn.addEventListener('click', () => _applyColor(c.key));
+            egGrid.appendChild(btn);
+        });
+        container.appendChild(egGrid);
     }
 
     function _openPanel(x, y, mesh, partId) {

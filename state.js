@@ -3134,7 +3134,7 @@ window.updateUndoRedoUI = updateUndoRedoUI;
 // Melamine body colors that allow up to 275 cm without upper split / surcharge
 const MELAMINE_EXTENDED_HEIGHT_COLORS = new Set([
     'w1200', 'H1367', 'H1307', 'H1227', 'u727', 'u232', 'u604', 'u638'
-]);
+].concat(window.EGGER_EXTRA_KEYS || []));
 
 function _materialAllowsExtendedMelamineHeight(materialKey) {
     return !!materialKey && MELAMINE_EXTENDED_HEIGHT_COLORS.has(String(materialKey));

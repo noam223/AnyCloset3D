@@ -153,6 +153,7 @@ const colorNamesHebrew = {
     '7180': 'גוון 7180', '456': 'גוון 456', '462': 'גוון 462', '463': 'גוון 463',
     '464': 'גוון 464', '480': 'גוון 480'
 };
+(window.EGGER_EXTRA_COLORS || []).forEach(function(c) { colorNamesHebrew[c.key] = 'EGGER ' + c.code; });
 
 /** Human label for a material color key — never collapses unknown codes to "ברירת מחדל". */
 function _colorKeyLabel(key) {
@@ -685,7 +686,7 @@ window._rebuildDoorPanelTabs = function() {
         { key: '463',   img: 'textures/463.jpg',   border: '#bbb', label: '463' },
         { key: '464',   img: 'textures/464.jpg',   border: '#bbb', label: '464' },
         { key: '480',   img: 'textures/480.jpg',   border: '#bbb', label: '480' },
-    ];
+    ].concat((window.EGGER_EXTRA_COLORS || []).map(c => ({ key: c.key, img: c.img, border: '#bbb', label: c.label })));
 
     let html = `<div style="font-size:0.78rem;color:var(--text-light);margin-bottom:6px;">סוג פנל לכל דלת</div>`;
 
@@ -8873,7 +8874,7 @@ function bindUI() {
         // If sandwich is active and a no-sandwich color is currently selected on any part, reset it
         // Exception: materialExternal is allowed to keep any color (fronts are melamine in sandwich)
         if (isSandwich) {
-            const NO_SANDWICH = new Set(['c705','u727','w1200','u232','u604','u638','H1367','H1307','H1227','A427']);
+            const NO_SANDWICH = new Set(['c705','u727','w1200','u232','u604','u638','H1367','H1307','H1227','A427'].concat(window.EGGER_EXTRA_KEYS || []));
             ['materialBody','materialInternal','materialDesk','materialOpenCell','materialBack'].forEach(part => {
                 if (NO_SANDWICH.has(state[part])) {
                     state[part] = 'white_matte';
@@ -8881,7 +8882,7 @@ function bindUI() {
             });
         }
         if (isMdf) {
-            const NO_MDF = new Set(['w1200','u604','u638','u727','u232','H1307','H1367','H1227']);
+            const NO_MDF = new Set(['w1200','u604','u638','u727','u232','H1307','H1367','H1227'].concat(window.EGGER_EXTRA_KEYS || []));
             ['materialBody','materialInternal','materialDesk','materialOpenCell','materialBack','materialExternal'].forEach(part => {
                 if (NO_MDF.has(state[part])) {
                     state[part] = 'white_matte';

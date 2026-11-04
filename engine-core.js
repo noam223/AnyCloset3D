@@ -2597,6 +2597,13 @@ textureNames.forEach(name => {
     tex.repeat.set(1, 1); 
     materials[name] = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7 });
 });
+(window.EGGER_EXTRA_COLORS || []).forEach(c => {
+    const tex = textureLoader.load(c.img);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(1, 1);
+    materials[c.key] = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7 });
+});
 
 const edgeMat = new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.15 });
 const matSnapHighlight = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.4, emissive: 0x16a34a, emissiveIntensity: 0.25 });
