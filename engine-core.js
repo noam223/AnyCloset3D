@@ -6877,6 +6877,20 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                 doorBottomY = baseY + doorGap / 2;
                             }
                         }
+                        if (!isInset) {
+                            // Same edges as column overlay doors: reveal at shelves, flush with the top
+                            const zoneTop = zoneBottomY + zoneH;
+                            if (isLast && zoneTop >= col.height - t - 0.6) doorTopY = col.height - doorGap / 2;
+                            else doorTopY -= doorGap / 2;
+                            if (!isBottomZone || col.type === 'desk') doorBottomY += doorGap / 2;
+                        }
+                        if (state.desk && state.desk.mergeDrawers && (col.compartments || []).some(cp => cp && cp.mergeWithDesk)) {
+                            const _dT = (typeof window._deskSurfaceThickness === 'function') ? window._deskSurfaceThickness(true) : 1.7;
+                            const _bandTop = state.desk.height;
+                            const _bandBot = state.desk.height - _dT - (state.desk.drawerHeight || 12);
+                            if ((doorBottomY + doorTopY) / 2 < (_bandTop + _bandBot) / 2) doorTopY = Math.min(doorTopY, _bandBot - doorGap / 2);
+                            else doorBottomY = Math.max(doorBottomY, _bandTop + doorGap / 2);
+                        }
                         const doorH = Math.max(2, doorTopY - doorBottomY);
                         const doorY = (doorBottomY + doorTopY) / 2;
                         const doorMat = _subDoorMat();
