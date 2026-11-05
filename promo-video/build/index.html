@@ -61,6 +61,9 @@ html, body { background: var(--navy); overflow: hidden; -webkit-font-smoothing: 
 .pin b { position: absolute; left: -11px; top: -11px; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 6px rgba(0,212,255,.25), 0 0 20px rgba(0,212,255,.9); }
 .pin span { position: absolute; top: -20px; white-space: nowrap; background: rgba(7,18,36,.92); color: #fff; font: 800 20px Heebo; padding: 7px 14px; border-radius: 10px; border: 1.5px solid rgba(0,212,255,.55); }
 .pin.r span { left: 20px; } .pin.l span { right: 20px; }
+.wipe { position: absolute; top: 0; bottom: 0; width: 4px; margin-left: -2px; background: #fff; box-shadow: 0 0 18px 4px rgba(0,212,255,.9), 0 0 60px 10px rgba(0,212,255,.45); z-index: 3; pointer-events: none; }
+.badge { position: absolute; top: 22px; right: 22px; align-items: center; gap: 10px; padding: 10px 20px; border-radius: 999px; background: rgba(7,18,36,.86); border: 1.5px solid rgba(0,212,255,.6); color: #fff; font: 800 22px Heebo; box-shadow: 0 0 24px rgba(0,212,255,.35); z-index: 3; }
+.badge b { color: var(--accent); }
 
 /* text */
 .block { position: absolute; display: flex; flex-direction: column; }
@@ -79,6 +82,10 @@ html, body { background: var(--navy); overflow: hidden; -webkit-font-smoothing: 
 </head>
 <body>
 <div id="stage"></div>
+<script>
+const __c = new URLSearchParams(location.search).get('c');
+if (__c && __c !== 'content' && /^[\w-]+$/.test(__c)) document.write(`<script src="${__c}.js"><\/script>`);
+</script>
 <script src="main.js"></script>
 </body>
 </html>

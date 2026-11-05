@@ -30,14 +30,18 @@ const words = text => text.split(' ').map(w => {
 }).join(' ');
 
 /* ───────────── content ───────────── */
+// A content file (index.html?c=content-xyz) may set window.CONTENT to override any of these.
+const C = window.CONTENT || {};
 const IW = 974, IH = 1276;   // editor captures, cropped to canvas + right panel
 const RW = 1336, RH = 1276;  // full-window 3D captures
 
-const FEATS = ['מידות מדויקות', '4 עמודות', 'אחסון עליון', 'חלוקת מדפים', 'תלייה ארוכה', 'מגירות נעליים', 'תלייה כפולה',
+const FEATS = C.FEATS || ['מידות מדויקות', '4 עמודות', 'אחסון עליון', 'חלוקת מדפים', 'תלייה ארוכה', 'מגירות נעליים', 'תלייה כפולה',
   'מגירות פנימיות', 'סורבטו', 'מגירות חיצוניות', 'תאורת LED', 'דלתות + קלפות', 'מראה וזכוכית', 'גוון עץ', 'ידיות', 'מחיר בזמן אמת'];
 
 // focus: [x, y, scale] in capture pixels; click/ring in capture pixels.
-const STEPS = [
+// PRE: optional capture shown before step 1 (the empty starting point).
+const PRE = C.PRE || null;
+const STEPS = C.STEPS || [
   { img: 's01', title: 'מגדירים *מידות*', sub: '300 × 250 × 60 ס״מ — מקלידים, והארון מתעדכן מיד.', click: [930, 350], focus: [766, 360, 1.0], ring: [577, 318, 380, 58], feats: [0] },
   { img: 's02', title: 'מוסיפים *עמודה*', sub: 'לחיצה על + והרוחב מתחלק שווה בין 4 עמודות.', click: [630, 353], focus: [560, 420, 1.0], ring: [578, 320, 70, 56], feats: [1] },
   { img: 's03', title: '*אחסון* עליון', sub: 'מדף בגובה 212 ס״מ בכל העמודות — מקום לשמיכות ומזוודות.', click: [300, 440], focus: [277, 560, 0.92], ring: [0, 412, 555, 58], feats: [2] },
@@ -55,26 +59,41 @@ const STEPS = [
 ];
 const T_IN = 3, STEP = 2;
 STEPS.forEach((s, i) => { s.t0 = T_IN + i * STEP; s.t1 = s.t0 + STEP; });
-const T_REV = T_IN + STEPS.length * STEP;          // 31
-const REV = [
-  { img: 'r1b', t0: T_REV, t1: T_REV + 2 },
-  { img: 'r2', t0: T_REV + 2, t1: T_REV + 4 },
-  { img: 'r3', t0: T_REV + 4, t1: T_REV + 8 },
-  { img: 'r4', t0: T_REV + 8, t1: T_REV + 10 },
+const T_REV = T_IN + STEPS.length * STEP;
+// Reveal shots: w/h default to RW/RH; c = framing centre in image px; k = zoom relative to cover;
+// grp = shots sharing one slow zoom (so a wipe between them stays aligned); wipe = enter with a wipe line.
+const REV = C.REV || [
+  { img: 'r1b', dur: 2 }, { img: 'r2', dur: 2 }, { img: 'r3', dur: 4, pins: true }, { img: 'r4', dur: 2 },
 ];
-const T_OUT = T_REV + 10;                           // 41
-const DURATION = T_OUT + 5;                         // 46
-const PINS = [
+let tRev = T_REV;
+REV.forEach(r => { r.w = r.w || RW; r.h = r.h || RH; r.t0 = tRev; tRev = Math.round((tRev + r.dur) * 1000) / 1000; r.t1 = tRev; });
+REV.forEach(r => {
+  const g = r.grp ? REV.filter(q => q.grp === r.grp) : [r];
+  r.z0 = g[0].t0; r.z1 = g[g.length - 1].t1;
+});
+const T_OUT = tRev;
+const DURATION = T_OUT + 5;
+const PINS = C.PINS || [
   [522, 196, 'אחסון עליון'], [248, 560, 'תלייה ארוכה + LED'], [561, 640, 'תלייה כפולה'], [261, 1057, 'מגירות נעליים'],
   [822, 913, 'מגירות פנימיות'], [1044, 587, 'סורבטו'], [1070, 960, 'מגירות חיצוניות'],
 ];
-const PIN_T0 = REV[2].t0 + 0.45, PIN_DT = 0.34;
+const PIN_REV = REV[REV.findIndex(r => r.pins)];
+const PIN_DT = C.PIN_DT || 0.34;
+const PIN_T0 = PIN_REV.t0 + 0.45;
+const rt = a => (a === 'out' ? T_OUT : REV[a[0]].t0 + (a[1] || 0));
+const REV_BLOCKS = C.REV_BLOCKS || [
+  { from: [0], to: [2], kick: 'התוצאה', title: 'הדמיית *3D* מיידית', sub: 'אותו ארון, מכל זווית — ישר מתוך העורך.' },
+  { from: [2], to: [3], kick: 'מבפנים', title: 'הכל *במקום*', sub: 'כל תא תוכנן לשימוש — ומוכן לשרטוט ייצור.' },
+  { from: [3], to: 'out', kick: 'סיכום', title: `${FEATS.length} *פיצ'רים.* ארון אחד.`, sub: 'מתוכנן נכון, נראה נכון — בפחות מדקה של עבודה בעורך.', sum: true },
+];
 const BLOCKS = [
   ...STEPS.map((s, i) => ({ t0: s.t0, t1: s.t1, kick: `שלב ${String(i + 1).padStart(2, '0')}`, title: s.title, sub: s.sub })),
-  { t0: T_REV, t1: REV[2].t0, kick: 'התוצאה', title: 'הדמיית *3D* מיידית', sub: 'אותו ארון, מכל זווית — ישר מתוך העורך.' },
-  { t0: REV[2].t0, t1: REV[3].t0, kick: 'מבפנים', title: 'הכל *במקום*', sub: 'כל תא תוכנן לשימוש — ומוכן לשרטוט ייצור.' },
-  { t0: REV[3].t0, t1: T_OUT, kick: 'סיכום', title: `${FEATS.length} *פיצ'רים.* ארון אחד.`, sub: 'מתוכנן נכון, נראה נכון — בפחות מדקה של עבודה בעורך.' },
+  ...REV_BLOCKS.map(b => ({ t0: rt(b.from), t1: rt(b.to), kick: b.kick, title: b.title, sub: b.sub, sum: b.sum })),
 ];
+const T_SUM = (BLOCKS.find(b => b.sum) || { t0: T_OUT }).t0;
+const WIPE = REV.find(r => r.wipe);
+const WIPE_D = 1.2;
+const INTRO = C.INTRO || { l1: 'בונים ארון בגדים', l2: '*מאפס.*', sub: 'צעד אחר צעד, בתוך הממשק האמיתי של AnyCloset3D', subP: 'צעד אחר צעד, בתוך הממשק<br>האמיתי של AnyCloset3D' };
 
 /* ───────────── layout ───────────── */
 const L = P ? {
@@ -102,10 +121,14 @@ const win = css(el('div', 'win'), { left: L.win.x, top: L.win.y, width: L.win.w,
 el('div', 'chrome', win, '<i></i><i></i><i></i><div class="url">anycloset3d.com — עורך הארונות</div>');
 const view = el('div', 'view', win);
 const cam = el('div', 'cam', view);
-const imgs = STEPS.map(s => { const i = el('img', '', cam); i.src = `assets/shots/${s.img}.jpg`; css(i, { width: IW, height: IH, opacity: 0 }); return i; });
+const SHOTS = [...(PRE ? [PRE] : []), ...STEPS.map(s => s.img)];
+const OFS = PRE ? 1 : 0;
+const imgs = SHOTS.map(n => { const i = el('img', '', cam); i.src = `assets/shots/${n}.jpg`; css(i, { width: IW, height: IH, opacity: 0 }); return i; });
 const cam3 = el('div', 'cam', view);
-const rimgs = REV.map(r => { const i = el('img', '', cam3); i.src = `assets/shots/${r.img}.jpg`; css(i, { width: RW, height: RH, opacity: 0 }); return i; });
-const pinEls = PINS.map(([x, , label]) => el('div', 'pin ' + (x < RW * 0.5 ? 'r' : 'l'), cam3, `<b></b><span>${label}</span>`));
+const rimgs = REV.map(r => { const i = el('img', '', cam3); i.src = `assets/shots/${r.img}.jpg`; css(i, { width: r.w, height: r.h, opacity: 0, transformOrigin: '0 0' }); return i; });
+const pinEls = PINS.map(([x, , label]) => el('div', 'pin ' + (x < PIN_REV.w * 0.5 ? 'r' : 'l'), cam3, `<b></b><span>${label}</span>`));
+const wipeLine = el('div', 'wipe', view);
+const badge = el('div', 'badge', view, C.BADGE || '');
 const flash = el('div', 'flash', view);
 const ring = el('div', 'ring', view);
 const ripple = el('div', 'ripple', view);
@@ -125,12 +148,14 @@ STEPS.forEach(s => {
   s.feats.forEach((f, k) => { featAt[f] = s.t0 + 0.85 + k * 0.14; });
   (s.feats2 || []).forEach((f, k) => { featAt[f] = s.t0 + 1.45 + k * 0.14; });
 });
+const featRevAt = r => r.t0 + (r.wipe ? WIPE_D : 0.6);
+REV.forEach(r => (r.feats || []).forEach((f, k) => { featAt[f] = featRevAt(r) + k * 0.14; }));
 
 const intro = css(el('div', 'abs'), { left: 0, right: 0, top: P ? 720 : 300, textAlign: 'center' });
 const iRec = css(el('div', 'rec', intro, '<i></i>TIMELAPSE'), { justifyContent: 'center', fontSize: P ? 26 : 26, marginBottom: 26 });
-const iT1 = css(el('div', 'h1', intro, words('בונים ארון בגדים')), { fontSize: P ? 96 : 112 });
-const iT2 = css(el('div', 'h1', intro, words('*מאפס.*')), { fontSize: P ? 96 : 112 });
-const iSub = css(el('div', 'sub', intro, P ? 'צעד אחר צעד, בתוך הממשק<br>האמיתי של AnyCloset3D' : 'צעד אחר צעד, בתוך הממשק האמיתי של AnyCloset3D'), { fontSize: P ? 36 : 36, marginTop: 28 });
+const iT1 = css(el('div', 'h1', intro, words(INTRO.l1)), { fontSize: P ? 96 : 112 });
+const iT2 = css(el('div', 'h1', intro, words(INTRO.l2)), { fontSize: P ? 96 : 112 });
+const iSub = css(el('div', 'sub', intro, P ? INTRO.subP : INTRO.sub), { fontSize: P ? 36 : 36, marginTop: 28 });
 
 const outro = el('div', '', stage); outro.id = 'outro';
 const oLogo = el('img', '', outro); oLogo.src = 'assets/brand/logo-wide.png'; css(oLogo, { width: P ? 640 : 600, marginBottom: P ? 70 : 56 });
@@ -203,11 +228,12 @@ function renderFrame(t) {
   cam.style.transform = `translate(${c.x}px, ${c.y}px) scale(${c.s})`;
   const step = STEPS[si], u = t - step.t0;
   const swap = t < T_IN ? 0 : eio(seg(u, 0.55, 0.78));
+  const cur = si + OFS;
   imgs.forEach((im, k) => {
     let o = 0;
-    if (t < T_IN || si === 0) o = k === 0 ? 1 : 0;
-    else if (k === si) o = swap;
-    else if (k === si - 1) o = 1;
+    if (t < T_IN || cur === 0) o = k === 0 ? 1 : 0;
+    else if (k === cur) o = swap;
+    else if (k === cur - 1) o = 1;
     im.style.opacity = o;
   });
   const showUi = t < T_REV + 0.5;
@@ -249,38 +275,56 @@ function renderFrame(t) {
   /* 3D reveal */
   const r3 = t >= T_REV - 0.2;
   cam3.style.display = r3 ? 'block' : 'none';
+  wipeLine.style.display = 'none';
   if (r3) {
     let idx = REV.findIndex(r => t < r.t1);
     if (idx < 0) idx = REV.length - 1;
     const r = REV[idx];
-    const z = 1 + 0.06 * seg(t, r.t0, r.t1) + (idx === 0 ? 0.05 * (1 - eo(seg(t, T_REV, T_REV + 1.2))) : 0);
-    const s0 = Math.max(VW / RW, VH / RH) * z;
-    const drx = (idx % 2 ? -1 : 1) * 14 * seg(t, r.t0, r.t1);
-    const x = (VW - RW * s0) / 2 + drx, y = (VH - RH * s0) / 2;
-    cam3.style.transform = `translate(${x}px, ${y}px) scale(${s0})`;
+    const placeRev = (q, k) => {
+      const z = 1 + 0.06 * seg(t, q.z0, q.z1) + (k === 0 ? 0.05 * (1 - eo(seg(t, T_REV, T_REV + 1.2))) : 0);
+      const s = Math.max(VW / q.w, VH / q.h) * (q.k || 1) * z;
+      const [cx, cy] = q.c || [q.w / 2, q.h / 2];
+      const fit = (c, iw, vw) => (iw * s <= vw ? (vw - iw * s) / 2 : Math.min(0, Math.max(vw - iw * s, vw / 2 - c * s)));
+      const drx = q.grp ? 0 : (k % 2 ? -1 : 1) * 14 * seg(t, q.t0, q.t1);
+      return { s, x: fit(cx, q.w, VW) + drx, y: fit(cy, q.h, VH) };
+    };
     rimgs.forEach((im, k) => {
-      let o = 0;
-      if (k === idx) o = k === 0 ? seg(t, T_REV - 0.2, T_REV + 0.15) : seg(t, r.t0, r.t0 + 0.35);
-      else if (k === idx - 1) o = 1;
+      let o = 0, clip = 'none';
+      if (k === idx) {
+        if (r.wipe) {
+          const lx = lerp(VW, 0, eio(seg(t, r.t0, r.t0 + WIPE_D)));
+          const q = placeRev(r, k);
+          o = 1; clip = `inset(0 0 0 ${Math.max(0, (lx - q.x) / q.s)}px)`;
+          const wl = seg(t, r.t0, r.t0 + WIPE_D);
+          if (wl > 0 && wl < 1) css(wipeLine, { display: 'block', left: lx });
+        } else o = k === 0 ? seg(t, T_REV - 0.2, T_REV + 0.15) : seg(t, r.t0, r.t0 + 0.35);
+      } else if (k === idx - 1) o = 1;
       im.style.opacity = o;
+      im.style.clipPath = clip;
+      if (o > 0) { const q = placeRev(REV[k], k); im.style.transform = `translate(${q.x}px, ${q.y}px) scale(${q.s})`; }
     });
+    const pk = REV.indexOf(PIN_REV), pq = placeRev(PIN_REV, pk);
     pinEls.forEach((p, k) => {
       const [px, py] = PINS[k];
-      const a = seg(t, PIN_T0 + k * PIN_DT, PIN_T0 + k * PIN_DT + 0.35), out = 1 - seg(t, REV[3].t0 - 0.25, REV[3].t0);
+      const a = seg(t, PIN_T0 + k * PIN_DT, PIN_T0 + k * PIN_DT + 0.35), out = 1 - seg(t, PIN_REV.t1 - 0.25, PIN_REV.t1);
       const show = a * out;
-      css(p, { display: show > 0 ? 'block' : 'none', left: px, top: py, opacity: Math.min(1, a * 2) * out, transform: `scale(${(0.4 + 0.6 * eback(a)) / s0})` });
+      css(p, { display: show > 0 ? 'block' : 'none', left: pq.x + px * pq.s, top: pq.y + py * pq.s, opacity: Math.min(1, a * 2) * out, transform: `scale(${0.4 + 0.6 * eback(a)})` });
     });
   }
+  if (WIPE && C.BADGE) {
+    const b = eo(seg(t, WIPE.t0 + WIPE_D - 0.1, WIPE.t0 + WIPE_D + 0.4)) * (1 - seg(t, T_OUT - 0.2, T_OUT));
+    css(badge, { display: b > 0 ? 'flex' : 'none', opacity: b, transform: `translateY(${(1 - b) * -16}px)` });
+  } else badge.style.display = 'none';
 
   /* text blocks + chips */
   BLOCKS.forEach((b, k) => setBlock(blockEls[k], b, t));
   chipsBox.style.opacity = seg(t, 2.8, 3.3) * (1 - seg(t, T_OUT - 0.1, T_OUT + 0.3));
-  const glow = t >= REV[3].t0 ? Math.sin(Math.PI * seg(t, REV[3].t0, REV[3].t0 + 0.9)) : 0;
+  const glow = t >= T_SUM ? Math.sin(Math.PI * seg(t, T_SUM, T_SUM + 0.9)) : 0;
   chipEls.forEach((ch, k) => {
     const on = t >= featAt[k];
     ch.classList.toggle('on', on);
     const pop = on ? seg(t, featAt[k], featAt[k] + 0.3) : 1;
-    const g = glow * Math.max(0, 1 - Math.abs(k / FEATS.length - seg(t, REV[3].t0, REV[3].t0 + 0.9)) * 3);
+    const g = glow * Math.max(0, 1 - Math.abs(k / FEATS.length - seg(t, T_SUM, T_SUM + 0.9)) * 3);
     ch.style.transform = `scale(${on ? 1 + 0.16 * Math.sin(Math.PI * pop) + g * 0.08 : 1})`;
   });
 
@@ -307,13 +351,17 @@ STEPS.forEach(s => {
   if (s.focus2) sfx(s.t0 + 1.0, 'whoosh', 0.35);
 });
 sfx(T_REV - 1.5, 'riser', 0.7); sfx(T_REV, 'boom', 1);
-sfx(REV[1].t0, 'whoosh', 0.5); sfx(REV[2].t0, 'whoosh', 0.55); sfx(REV[3].t0, 'whoosh', 0.5);
+REV.slice(1).forEach(r => {
+  if (r.wipe) { sfx(r.t0 - 0.9, 'riser', 0.6); sfx(r.t0, 'whoosh', 0.75); sfx(r.t0 + WIPE_D, 'shimmer', 0.7); }
+  else sfx(r.t0, 'whoosh', 0.5);
+  (r.feats || []).forEach((_, k) => sfx(featRevAt(r) + k * 0.14, 'pop', 0.6));
+});
 PINS.forEach((_, k) => sfx(PIN_T0 + k * PIN_DT, 'tick', 0.7));
-sfx(REV[3].t0 + 0.1, 'shimmer', 0.6);
+sfx(T_SUM + 0.1, 'shimmer', 0.6);
 sfx(T_OUT, 'whoosh', 0.7); sfx(T_OUT + 0.35, 'hit', 0.7); sfx(T_OUT + 1.6, 'chime', 0.9);
 
 window.__cues = {
-  duration: DURATION, video: { name: 'anycloset-timelapse', fps: FPS },
+  duration: DURATION, video: { name: C.NAME || 'anycloset-timelapse', fps: FPS },
   scenes: [
     { type: 'intro', t0: 0, t1: T_IN },
     ...STEPS.map((s, i) => ({ type: 'step' + String(i + 1).padStart(2, '0'), t0: s.t0, t1: s.t1 })),
