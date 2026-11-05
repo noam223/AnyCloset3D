@@ -11103,7 +11103,7 @@ window.openOrderModal = async function(mode, opts) {
     state.orderCart.forEach((itemObj, index) => {
         if (typeof window._cartItemOnHold === 'function' && window._cartItemOnHold(itemObj)) return;
         const item = itemObj.spec;
-        const titleText = item.customName ? item.customName : (_cartIsWritingDesk(itemObj) ? `שולחן מס' ${index + 1}` : `ארון מס' ${index + 1}`);
+        const titleText = item.customName ? item.customName : _cartDefaultTitle(itemObj, index);
         const numericPrice = parseInt(item.price.replace('₪', '').replace(/,/g, ''));
         const itemInstall = item.installPrice || 0;
         const itemCost = item.costPrice ? parseInt(item.costPrice.replace('₪', '').replace(/,/g, '')) : 0;
@@ -11438,7 +11438,7 @@ window._stripSpacePairFromItem = function(item) {
 window._spaceTabLabel = function(item, slot) {
     const name = ((item && item.spec && item.spec.customName) ||
         (item && item.rawState && item.rawState.cabinetName) || '').trim();
-    return name || ('ארון ' + (slot + 1));
+    return name || (_cartIsCornerDesk(item) ? 'שולחן פינתי' : ('ארון ' + (slot + 1)));
 };
 
 /** Strip trailing " חלק N" so the shared base name can be edited. */
@@ -12047,7 +12047,7 @@ window._fillSpaceJoinList = function(el, indices) {
         icon.style.marginLeft = '6px';
         icon.style.opacity = '0.7';
         btn.appendChild(icon);
-        btn.appendChild(document.createTextNode(name || ('ארון מס\' ' + (i + 1))));
+        btn.appendChild(document.createTextNode(name || _cartDefaultTitle(it, i)));
         el.appendChild(btn);
     });
 };
@@ -12899,7 +12899,7 @@ window._cartHasExportableItems = function() {
 function _orderCheckItems() {
     return (state.orderCart || []).map(function(it, i) {
         if (!it || window._cartItemOnHold(it)) return null;
-        const name = (it.spec && it.spec.customName) || ('ארון ' + (i + 1));
+        const name = (it.spec && it.spec.customName) || (_cartIsCornerDesk(it) ? 'שולחן פינתי' : ('ארון ' + (i + 1)));
         return { item: it, name: name, rs: it.rawState || {} };
     }).filter(Boolean);
 }
@@ -12911,6 +12911,9 @@ function _wingNeedsHandleChoice(w, rs) {
     if (w.cabinetModel === 'ab2') return false;
     if (w.slidingDoor && w.slidingDoor.enabled) return false;
     if (rs && rs.presetId === 'writing-desk' && w.desk && w.desk.hasDrawers === false) return false;
+    if (rs && rs.presetId === 'corner-unit' && w.corner && w.corner.type === 'desk') {
+        return !w.corner.deskHandleStyle && (w.corner.deskDrawerCount || 0) > 0;
+    }
     return true;
 }
 
@@ -13279,7 +13282,7 @@ window.cartDebug = function(on) {
 
 function _cartItemLabel(it, i) {
     const s = (it && it.spec) || {};
-    return s.customName || ('ארון מס\' ' + (i + 1));
+    return s.customName || _cartDefaultTitle(it, i);
 }
 
 /** Plain snapshot of the cart vs. what the sidebar currently shows. */
@@ -14196,7 +14199,7 @@ window.updateLeftSidebar = function(opts) {
     function _cartItemTitle(itemObj, index) {
         const item = itemObj.spec || {};
         if (item.customName) return item.customName;
-        return _cartIsWritingDesk(itemObj) ? (`שולחן מס' ${index + 1}`) : (`ארון מס' ${index + 1}`);
+        return _cartDefaultTitle(itemObj, index);
     }
 
     function _buildCartMiniCard(itemObj, index, nested) {
@@ -14729,6 +14732,17 @@ function _cartStandaloneCorner(itemObj) {
     if (!rs || rs.presetId !== 'corner-unit') return null;
     const cw = rs.wings && rs.wings.center;
     return (cw && cw.corner) || null;
+}
+
+function _cartIsCornerDesk(itemObj) {
+    const cu = _cartStandaloneCorner(itemObj);
+    return !!(cu && cu.type === 'desk');
+}
+
+/** Title for a cart item without a custom name. */
+function _cartDefaultTitle(itemObj, index) {
+    if (_cartIsCornerDesk(itemObj)) return 'שולחן פינתי';
+    return _cartIsWritingDesk(itemObj) ? `שולחן מס' ${index + 1}` : `ארון מס' ${index + 1}`;
 }
 
 function _printTr(thStyle, tdStyle, thLabel, tdHtml, tdExtra) {
@@ -16452,8 +16466,8 @@ function _printSingleCabinetBlockHtml(itemObj, index, opts) {
     const item = itemObj.spec;
     const titleText = titleOverride || (item.customName
         ? item.customName
-        : (_cartIsWritingDesk(itemObj) ? `שולחן מס' ${index + 1}` : `ארון מס' ${index + 1}`));
-    const detailLabel = _cartIsWritingDesk(itemObj) ? 'שולחן' : 'ארון';
+        : _cartDefaultTitle(itemObj, index));
+    const detailLabel = (_cartIsWritingDesk(itemObj) || _cartIsCornerDesk(itemObj)) ? 'שולחן' : 'ארון';
     const numericPrice = parseInt(String(item.price || '').replace('₪', '').replace(/,/g, ''), 10) || 0;
     const itemInstall = item.installPrice || 0;
     const specRows = _resolvePrintSpecRows(itemObj);
@@ -17963,7 +17977,7 @@ function _buildCartData() {
     state.orderCart.forEach((itemObj, index) => {
         if (typeof window._cartItemOnHold === 'function' && window._cartItemOnHold(itemObj)) return;
         const item = itemObj.spec;
-        const title = item.customName ? item.customName : (_cartIsWritingDesk(itemObj) ? `שולחן מס' ${index + 1}` : `ארון מס' ${index + 1}`);
+        const title = item.customName ? item.customName : _cartDefaultTitle(itemObj, index);
         const cabPrice = parseInt((item.price || '0').replace('₪','').replace(/,/g,'')) || 0;
         const instPrice = item.installPrice || 0;
         const costPrice = item.costPrice ? (parseInt(item.costPrice.replace('₪','').replace(/,/g,'')) || 0) : 0;
