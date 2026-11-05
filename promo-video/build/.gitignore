@@ -1,0 +1,5 @@
+/renders/
+/frames/
+/shots-raw/
+audio/*.wav
+audio/*.json
