@@ -1,6 +1,7 @@
 // ==========================================
 // 3D export of the cabinet being edited — SketchUp (Collada .dae in a zip with textures)
-// and AutoCAD (DXF R12 with 3DFACE entities, one layer per part type).
+// AutoCAD (DXF R12 with 3DFACE entities, one layer per part type) and 3ds Max / Blender
+// (OBJ + MTL in a zip with textures).
 // Engine units are cm, Y-up; DXF is written in mm, Z-up.
 // ==========================================
 (function() {
@@ -303,6 +304,80 @@
         return files;
     }
 
+    // ---------- OBJ + MTL (3ds Max / Blender / Rhino) ----------
+    async function _buildOBJ(parts) {
+        const f = function(x) { return (Math.round(x * 10000) / 10000).toString(); };
+        const mats = new Map();
+        const textures = [];
+        const texByImg = new Map();
+        const obj = ['# AnyCloset 3D — units: centimeters, Y-up', 'mtllib cabinet.mtl'];
+        let vBase = 1;
+        const v = new THREE.Vector3();
+        parts.forEach(function(p, pi) {
+            const mat = p.material;
+            let mi = mats.get(mat);
+            if (!mi) {
+                const img = mat && mat.map && mat.map.image;
+                let tex = null;
+                if (img && (img.naturalWidth || img.width)) {
+                    tex = texByImg.get(img);
+                    if (!tex) {
+                        tex = { name: 'textures/tex' + textures.length + '.jpg', img: img };
+                        textures.push(tex);
+                        texByImg.set(img, tex);
+                    }
+                }
+                mi = {
+                    id: 'mat' + mats.size, tex: tex,
+                    rgb: mat && mat.color ? [mat.color.r, mat.color.g, mat.color.b] : [0.8, 0.8, 0.8],
+                    opacity: mat && mat.transparent ? (mat.opacity == null ? 1 : mat.opacity) : 1,
+                    repeat: mat && mat.map ? mat.map.repeat : null, offset: mat && mat.map ? mat.map.offset : null
+                };
+                mats.set(mat, mi);
+            }
+            const g = p.mesh.geometry;
+            const pos = g.attributes.position, nor = g.attributes.normal, uv = g.attributes.uv;
+            const nm = new THREE.Matrix3().getNormalMatrix(p.matrix);
+            const partName = String((p.mesh.userData && p.mesh.userData.partId) || ('part_' + pi)).split('::').pop().replace(/\s+/g, '_');
+            obj.push('o ' + LAYERS[p.layer].name + '_' + partName, 'g ' + LAYERS[p.layer].name, 'usemtl ' + mi.id);
+            for (let i = 0; i < pos.count; i++) {
+                v.fromBufferAttribute(pos, i).applyMatrix4(p.matrix);
+                obj.push('v ' + f(v.x) + ' ' + f(v.y) + ' ' + f(v.z));
+            }
+            if (uv) for (let i = 0; i < pos.count; i++) {
+                let u = uv.getX(i), vv = uv.getY(i);
+                if (mi.repeat) { u = u * mi.repeat.x + mi.offset.x; vv = vv * mi.repeat.y + mi.offset.y; }
+                obj.push('vt ' + f(u) + ' ' + f(vv));
+            }
+            if (nor) for (let i = 0; i < pos.count; i++) {
+                v.fromBufferAttribute(nor, i).applyMatrix3(nm).normalize();
+                obj.push('vn ' + f(v.x) + ' ' + f(v.y) + ' ' + f(v.z));
+            }
+            const idx = g.index ? g.index.array : Array.from({ length: pos.count }, function(_, i) { return i; });
+            const ref = function(i) {
+                const k = vBase + i;
+                return k + '/' + (uv ? k : '') + (nor ? '/' + k : '');
+            };
+            for (let i = 0; i + 2 < idx.length; i += 3) obj.push('f ' + ref(idx[i]) + ' ' + ref(idx[i + 1]) + ' ' + ref(idx[i + 2]));
+            vBase += pos.count;
+        });
+
+        const mtl = ['# AnyCloset 3D'];
+        mats.forEach(function(mi) {
+            mtl.push('newmtl ' + mi.id, 'Ka 0 0 0', 'Kd ' + mi.rgb.map(f).join(' '), 'Ks 0.05 0.05 0.05', 'Ns 10', 'illum 2');
+            if (mi.opacity < 1) mtl.push('d ' + f(mi.opacity), 'Tr ' + f(1 - mi.opacity));
+            if (mi.tex) mtl.push('map_Kd ' + mi.tex.name);
+            mtl.push('');
+        });
+
+        const files = [{ name: 'cabinet.obj', data: obj.join('\n') + '\n' }, { name: 'cabinet.mtl', data: mtl.join('\n') }];
+        for (let i = 0; i < textures.length; i++) {
+            const blob = await _textureBlob(textures[i].img);
+            if (blob) files.push({ name: textures[i].name, data: blob });
+        }
+        return files;
+    }
+
     // ---------- download / UI ----------
     function _fileBaseName() {
         const name = (typeof state !== 'undefined' && (state.cabinetName || (state.wings && state.wings.center && state.wings.center.cabinetName))) || 'ארון';
@@ -352,11 +427,12 @@
                 if (format === 'dxf') {
                     _download(new Blob([_buildDXF(parts)], { type: 'application/dxf' }), base + '.dxf');
                 } else {
-                    const files = await _buildDAE(parts);
+                    const isObj = format === 'obj';
+                    const files = isObj ? await _buildOBJ(parts) : await _buildDAE(parts);
                     const JSZip = await _loadJSZip();
                     const zip = new JSZip();
                     files.forEach(function(fl) { zip.file(fl.name, fl.data); });
-                    _download(await zip.generateAsync({ type: 'blob' }), base + ' - SketchUp.zip');
+                    _download(await zip.generateAsync({ type: 'blob' }), base + (isObj ? ' - 3ds Max.zip' : ' - SketchUp.zip'));
                 }
                 _toast('הקובץ ירד בהצלחה');
             } catch (e) {
@@ -396,10 +472,11 @@
         m.innerHTML =
             '<div style="font-size:.74rem;color:#64748b;padding:2px 10px 6px;">ייצוא הארון שבעריכה — דלתות סגורות, בשכבה נפרדת</div>' +
             item('dae', 'fa-solid fa-cube', 'SketchUp (DAE)', 'כולל צבעים וטקסטורות · קובץ ZIP — לחלץ ולייבא את cabinet.dae') +
-            item('dxf', 'fa-solid fa-drafting-compass', 'AutoCAD (DXF)', 'במילימטרים · שכבות: Body, Shelves, Drawers, Doors, Handles');
+            item('dxf', 'fa-solid fa-drafting-compass', 'AutoCAD (DXF)', 'במילימטרים · שכבות: Body, Shelves, Drawers, Doors, Handles') +
+            item('obj', 'fa-solid fa-cubes', '3ds Max / Blender (OBJ)', 'כולל צבעים וטקסטורות · ס"מ · קובץ ZIP — לחלץ ולייבא את cabinet.obj');
         document.body.appendChild(m);
         setTimeout(function() { document.addEventListener('mousedown', _outside, true); }, 0);
     };
 
-    window._export3DDebug = { collect: _collectParts, dxf: _buildDXF, dae: _buildDAE };
+    window._export3DDebug = { collect: _collectParts, dxf: _buildDXF, dae: _buildDAE, obj: _buildOBJ };
 })();
