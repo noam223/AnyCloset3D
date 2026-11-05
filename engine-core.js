@@ -4207,6 +4207,9 @@ window._rebuildSpaceCompanion = function() {
         bpData: state.bpData ? state.bpData.slice() : [],
         hitBoxes: hitBoxes.slice(),
         doorMeshes: doorMeshes.slice(),
+        partMeshes: (window.partMeshes || []).slice(),
+        shelfPickMeshes: (window.shelfPickMeshes || []).slice(),
+        shelfWallOccluders: (window.shelfWallOccluders || []).slice(),
         dragHandlesData: {
             horizontal: (dragHandlesData.horizontal || []).slice(),
             vertical: (dragHandlesData.vertical || []).slice(),
@@ -4317,6 +4320,10 @@ window._rebuildSpaceCompanion = function() {
     saved.hitBoxes.forEach(function(h) { hitBoxes.push(h); });
     doorMeshes.length = 0;
     saved.doorMeshes.forEach(function(m) { doorMeshes.push(m); });
+    // Only the cabinet being edited is pickable (shelves / part-paint)
+    window.partMeshes = saved.partMeshes;
+    window.shelfPickMeshes = saved.shelfPickMeshes;
+    window.shelfWallOccluders = saved.shelfWallOccluders;
     dragHandlesData.horizontal = saved.dragHandlesData.horizontal;
     dragHandlesData.vertical = saved.dragHandlesData.vertical;
     dragHandlesData.roofs = saved.dragHandlesData.roofs;
