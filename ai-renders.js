@@ -1209,7 +1209,7 @@ function _injectStyles() {
         .ai-render-edit-box.open { display: flex; }
         .ai-lightbox.editing .ai-lightbox-inner img { max-height: 60vh; }
         .ai-render-edit-box textarea {
-            width: 100%; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 8px 10px;
+            width: 100%; box-sizing: border-box; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 8px 10px;
             font-size: 0.85rem; font-family: inherit; resize: vertical; outline: none; direction: rtl;
         }
         .ai-render-edit-box textarea:focus { border-color: #a855f7; }
