@@ -583,6 +583,8 @@ window._toggleRenderEdit = function(show) {
     if (!box || _renderEditBusy) return;
     var open = show === undefined ? !box.classList.contains('open') : !!show;
     box.classList.toggle('open', open);
+    var lb = document.getElementById('ai-lightbox');
+    if (lb) lb.classList.toggle('editing', open);
     if (open) {
         var ta = document.getElementById('ai-render-edit-text');
         if (ta) ta.focus();
@@ -1205,6 +1207,7 @@ function _injectStyles() {
             background: #fff; border-radius: 10px; padding: 10px 12px; direction: rtl;
         }
         .ai-render-edit-box.open { display: flex; }
+        .ai-lightbox.editing .ai-lightbox-inner img { max-height: 60vh; }
         .ai-render-edit-box textarea {
             width: 100%; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 8px 10px;
             font-size: 0.85rem; font-family: inherit; resize: vertical; outline: none; direction: rtl;
