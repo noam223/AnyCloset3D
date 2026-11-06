@@ -86,6 +86,8 @@ html, body { background: var(--navy); overflow: hidden; -webkit-font-smoothing: 
 const __c = new URLSearchParams(location.search).get('c');
 if (__c && __c !== 'content' && /^[\w-]+$/.test(__c)) document.write(`<script src="${__c}.js"><\/script>`);
 </script>
-<script src="main.js"></script>
+<script>
+document.write(`<script src="${window.CONTENT && window.CONTENT.TEMPLATE === 'tutorial' ? 'tutorial' : 'main'}.js"><\/script>`);
+</script>
 </body>
 </html>

@@ -3,3 +3,4 @@
 /shots-raw/
 audio/*.wav
 audio/*.json
+audio/vo/

@@ -4,7 +4,7 @@
 //   --sheet       with --snap: also tile them into frames/qa/sheet_<content>_<format>.jpg
 //   --cues        only write audio/cues-<content>.json (timeline SFX + music map) and exit
 //   --serve-root  serve a parent folder too, so content can use '../assets/...' paths
-//   (default) write cues, run audio/synth.mjs, render renders/<name>_<format>.mp4
+//   (default) write cues, run the mixer (cues.mixer, default audio/synth.mjs), render renders/<name>_<format>.mp4
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -100,7 +100,8 @@ if (args.includes('--cues')) {
   const out = path.join(outDir, `${NAME}_${FORMAT}.mp4`);
   const audio = MIX;
   if (!args.includes('--no-audio')) {
-    const r = spawnSync(process.execPath, [path.join(ROOT, 'audio', 'synth.mjs'), CUES, MIX], { stdio: 'inherit' });
+    const mixer = /^[\w-]+\.mjs$/.test(cues.mixer || '') ? cues.mixer : 'synth.mjs';
+    const r = spawnSync(process.execPath, [path.join(ROOT, 'audio', mixer), CUES, MIX], { stdio: 'inherit' });
     if (r.status !== 0) throw new Error('audio synth failed');
   }
   const withAudio = !args.includes('--no-audio') && fs.existsSync(audio);
