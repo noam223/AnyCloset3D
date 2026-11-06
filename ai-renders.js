@@ -307,11 +307,16 @@ function _openPromptDialog(imageFront, image3dLeft, image3dRight, hexColor, cabi
 
     // Build default prompt for textarea
     var spec = cabinetSpec || {};
+    var scene = _aiDefaultScene(spec.presetId);
     var defaultPrompt = _buildAiRenderPrompt(spec, {
         singleView: false,
         hasRightImage: !!image3dRight,
-        hexColor: hexColor
+        hexColor: hexColor,
+        scene: scene
     });
+    var sceneChips = _AI_SCENES.map(function(s) {
+        return '<button type="button" class="ai-scene-chip' + (s.id === scene ? ' active' : '') + '" data-scene="' + s.id + '" onclick="window._aiSelectScene(\'' + s.id + '\')"><i class="fa-solid ' + s.icon + '"></i> ' + s.label + '</button>';
+    }).join('');
 
     var dlg = document.createElement('div');
     dlg.id = 'ai-prompt-dialog';
@@ -345,6 +350,11 @@ function _openPromptDialog(imageFront, image3dLeft, image3dRight, hexColor, cabi
                     '<div id="ai-extra-images-row" style="display:flex;gap:8px;flex-wrap:wrap;"></div>' +
                 '</div>' +
             '</div>' +
+            // Scene picker
+            '<div style="padding:14px 22px 0;">' +
+                '<div style="font-size:0.8rem;font-weight:700;color:#64748b;margin-bottom:8px;">סצנת מיקום</div>' +
+                '<div class="ai-scene-chips">' + sceneChips + '</div>' +
+            '</div>' +
             // Prompt textarea
             '<div style="padding:14px 22px 0;">' +
                 '<div style="font-size:0.8rem;font-weight:700;color:#64748b;margin-bottom:6px;">פרומפט <span style="font-weight:400;color:#94a3b8;">(ניתן לערוך)</span></div>' +
@@ -364,6 +374,7 @@ function _openPromptDialog(imageFront, image3dLeft, image3dRight, hexColor, cabi
     dlg._hexColor     = hexColor;
     dlg._cabinetSpec  = cabinetSpec;
     dlg._renderTier   = renderTier;
+    dlg._scene        = scene;
     document.body.appendChild(dlg);
 }
 
@@ -572,12 +583,40 @@ var _AI_MATERIAL_HE = {
     brown_light: 'חום בהיר', brown_dark: 'חום כהה', oak: 'אלון', walnut: 'אגוז', pine: 'אורן'
 };
 
-function _aiRoomContext(presetId) {
-    if (presetId === 'bathroom') return 'חדר אמבטיה מודרני ונקי, עם כיור ומראה ברקע (לא מסתירים את הארון).';
-    if (presetId === 'sliding' || presetId === 'walkin') return 'חדר הלבשה / חדר שינה גדול עם ארון בגדים מובנה לאורך הקיר.';
-    if (presetId === 'corner-left' || presetId === 'corner-right') return 'פינת חדר שינה מעוצבת עם הארון בפינה.';
-    return 'חדר שינה מעוצב ואיכותי, הארון צמוד לקיר האחורי.';
+var _AI_SCENES = [
+    { id: 'bedroom',  label: 'חדר שינה',   icon: 'fa-bed' },
+    { id: 'entrance', label: 'כניסה לבית', icon: 'fa-door-open' },
+    { id: 'bathroom', label: 'חדר אמבטיה', icon: 'fa-bath' },
+    { id: 'kitchen',  label: 'מטבח',       icon: 'fa-kitchen-set' }
+];
+
+function _aiDefaultScene(presetId) {
+    return presetId === 'bathroom' ? 'bathroom' : 'bedroom';
 }
+
+function _aiRoomContext(presetId, scene) {
+    scene = scene || _aiDefaultScene(presetId);
+    if (scene === 'bathroom') return 'מיקום: חדר אמבטיה מודרני ונקי, עם כיור ומראה ברקע (לא מסתירים את הארון).';
+    if (scene === 'entrance') return 'מיקום: כניסה לבית / מבואה מעוצבת — הארון ממוקם ליד דלת הכניסה כארון כניסה, רצפה מעוצבת ותאורה חמה ומזמינה.';
+    if (scene === 'kitchen') return 'מיקום: מטבח מודרני ומעוצב — הארון עומד בחלל המטבח כיחידת אחסון לצד המטבח, בלי להפוך לארון מטבח ובלי לשנות את מבנהו.';
+    if (presetId === 'sliding' || presetId === 'walkin') return 'מיקום: חדר הלבשה / חדר שינה גדול עם ארון בגדים מובנה לאורך הקיר.';
+    if (presetId === 'corner-left' || presetId === 'corner-right') return 'מיקום: פינת חדר שינה מעוצבת עם הארון בפינה.';
+    return 'מיקום: חדר שינה מעוצב ואיכותי, הארון צמוד לקיר האחורי.';
+}
+
+window._aiSelectScene = function(scene) {
+    var dlg = document.getElementById('ai-prompt-dialog');
+    if (!dlg || dlg._scene === scene) return;
+    var presetId = dlg._cabinetSpec && dlg._cabinetSpec.presetId;
+    var ta = document.getElementById('ai-prompt-text');
+    var oldLine = _aiRoomContext(presetId, dlg._scene);
+    var newLine = _aiRoomContext(presetId, scene);
+    if (ta) ta.value = ta.value.indexOf(oldLine) >= 0 ? ta.value.replace(oldLine, newLine) : ta.value + '\n- ' + newLine;
+    dlg._scene = scene;
+    dlg.querySelectorAll('.ai-scene-chip').forEach(function(b) {
+        b.classList.toggle('active', b.getAttribute('data-scene') === scene);
+    });
+};
 
 function _computeSideOpenCellViewDir(colIdx, columns, rowIdx) {
     // Mirrors engine-core.js openDir — from front-view / user perspective (שמאל = viewer's left)
@@ -709,7 +748,7 @@ function _buildAiRenderPrompt(spec, opts) {
 
     L.push('');
     L.push('סביבה וצילום:');
-    line(_aiRoomContext(spec.presetId));
+    line(_aiRoomContext(spec.presetId, opts.scene));
     line('הארון צמוד לקיר ואף רהיט או חפץ לא מסתיר אותו. הארון כולו בתוך הפריים, מהרצפה ועד מעל קצהו העליון.');
     line('אור יום רך מחלון בצד, צללים טבעיים ומגע עדין של הארון ברצפה. ללא פלאש קשה.');
     line('מצלמה בגובה עיניים, זווית 3/4 קדמית קלה, עדשה בתחושת 35mm, קווים אנכיים ישרים.');
@@ -994,6 +1033,14 @@ function _injectStyles() {
             display: flex; align-items: center; justify-content: center; gap: 8px;
             transition: opacity 0.2s, transform 0.15s;
         }
+        .ai-scene-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+        .ai-scene-chip {
+            padding: 8px 14px; border-radius: 999px; border: 1.5px solid #e2e8f0; background: #f8fafc;
+            color: #374151; font-size: 0.82rem; font-weight: 600; font-family: inherit; cursor: pointer;
+            display: flex; align-items: center; gap: 6px; transition: all 0.15s;
+        }
+        .ai-scene-chip:hover { border-color: #a855f7; }
+        .ai-scene-chip.active { background: #f3e8ff; border-color: #a855f7; color: #6d28d9; }
         .btn-generate-render-pro {
             background: linear-gradient(135deg,#f59e0b,#d97706);
             box-shadow: 0 2px 12px rgba(245,158,11,0.35);
