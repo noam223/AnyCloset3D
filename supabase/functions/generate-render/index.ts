@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { encode as encodeBase64 } from 'https://deno.land/std@0.168.0/encoding/base64.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -64,6 +65,15 @@ function fidelityAppendix(): string {
     `- אין לשנות את עיצוב הארון, אין להוסיף או להסיר דלתות, מגירות, מדפים או אלמנטים שלא מופיעים בייחוס.\n` +
     `- ללא טקסט, לוגו, סימן מים או מסגרת מסך בתוצאה.\n` +
     `- ${closureCeilingNote().replace(/^- /, '')}`;
+}
+
+function editPrompt(instruction: string): string {
+  return 'ערוך את התמונה המצורפת לפי ההוראה הבאה בלבד:\n' +
+    `«${instruction}»\n\n` +
+    'כללים:\n' +
+    '- שנה רק את מה שההוראה מבקשת. כל השאר נשאר זהה ככל האפשר: הארון (מבנה, חלוקה, דלתות, מגירות, ידיות, גוונים), זווית המצלמה, התאורה, החדר והקומפוזיציה.\n' +
+    '- התוצאה נשארת צילום פוטוריאליסטי באותה רזולוציה ויחס גובה-רוחב.\n' +
+    '- ללא טקסט, לוגו או סימני מים.';
 }
 
 function buildDefaultPrompt(
@@ -163,26 +173,45 @@ serve(async (req) => {
     }
 
     // ── 3. Parse body ────────────────────────────────────────────────────────
-    const { image_front, image_3d, image_3d_right, extra_images, hex_color, project_id, preset_id, cabinet_spec, custom_prompt, single_view, model_tier } = await req.json();
-    if (!image_front) return json({ error: 'image_front required' }, 400);
+    const { image_front, image_3d, image_3d_right, extra_images, hex_color, project_id, preset_id, cabinet_spec, custom_prompt, single_view, model_tier, edit_image_url, edit_instruction } = await req.json();
+    const CLOUD_NAME = Deno.env.get('CLOUDINARY_CLOUD_NAME')!;
+    const isEdit = !!edit_image_url;
+    if (isEdit) {
+      if (!String(edit_instruction || '').trim()) return json({ error: 'edit_instruction required' }, 400);
+      if (!String(edit_image_url).startsWith(`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/`)) {
+        return json({ error: 'invalid edit_image_url' }, 400);
+      }
+    } else if (!image_front) {
+      return json({ error: 'image_front required' }, 400);
+    }
 
     const tier = model_tier === 'pro' ? 'pro' : 'standard';
     const geminiModel = GEMINI_MODELS[tier];
     const spec = (cabinet_spec || {}) as Record<string, unknown>;
     const hasRightImage = !!image_3d_right;
 
-    const instructions = custom_prompt?.trim()
-      ? custom_prompt.trim() + fidelityAppendix()
-      : buildDefaultPrompt(spec, hex_color, !!single_view, hasRightImage);
+    const instructions = isEdit
+      ? editPrompt(String(edit_instruction).trim())
+      : custom_prompt?.trim()
+        ? custom_prompt.trim() + fidelityAppendix()
+        : buildDefaultPrompt(spec, hex_color, !!single_view, hasRightImage);
 
     // ── 4. Build Gemini parts (interleaved image labels) ─────────────────────
-    const cleanFront = image_front.replace(/^data:image\/\w+;base64,/, '');
     const parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [];
 
-    if (single_view) {
+    if (isEdit) {
+      const srcUrl = String(edit_image_url).replace(TRIAL_WATERMARK, '/upload/');
+      const srcRes = await fetch(srcUrl);
+      if (!srcRes.ok) return json({ error: 'Could not load image to edit' }, 400);
+      const srcMime = srcRes.headers.get('content-type') || 'image/jpeg';
+      parts.push({ text: 'התמונה לעריכה:' });
+      parts.push({ inlineData: { mimeType: srcMime, data: encodeBase64(new Uint8Array(await srcRes.arrayBuffer())) } });
+    } else if (single_view) {
+      const cleanFront = image_front.replace(/^data:image\/\w+;base64,/, '');
       parts.push({ text: 'תמונת ייחוס — מבט מהזווית הנוכחית:' });
       parts.push({ inlineData: { mimeType: 'image/jpeg', data: cleanFront } });
     } else {
+      const cleanFront = image_front.replace(/^data:image\/\w+;base64,/, '');
       parts.push({ text: 'תמונת ייחוס 1 — חזית ישרה (פרופורציות מדויקות):' });
       parts.push({ inlineData: { mimeType: 'image/jpeg', data: cleanFront } });
 
@@ -204,7 +233,7 @@ serve(async (req) => {
         if (!img) return;
         const extraMime = img.startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
         const extraData = img.replace(/^data:image\/\w+;base64,/, '');
-        parts.push({ text: `\nתמונת ייחוס נוספת ${i + 1}:` });
+        parts.push({ text: isEdit ? `\nתמונת עזר ${i + 1} (לשימוש לפי ההוראה):` : `\nתמונת ייחוס נוספת ${i + 1}:` });
         parts.push({ inlineData: { mimeType: extraMime, data: extraData } });
       });
     }
@@ -257,7 +286,6 @@ serve(async (req) => {
     const resultBase64 = `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
 
     // ── 5. Upload to Cloudinary ──────────────────────────────────────────────
-    const CLOUD_NAME    = Deno.env.get('CLOUDINARY_CLOUD_NAME')!;
     const UPLOAD_PRESET = Deno.env.get('CLOUDINARY_UPLOAD_PRESET') ?? 'ai_renders';
 
     const formData = new FormData();

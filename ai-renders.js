@@ -94,10 +94,22 @@ function _injectLightbox() {
                    style="font-size:0.82rem;color:#a855f7;text-decoration:none;display:flex;align-items:center;gap:5px;">
                     <i class="fa-solid fa-download"></i> הורד תמונה
                 </a>
+                <button id="ai-lightbox-edit" onclick="window._toggleRenderEdit()"
+                        style="background:none;border:none;cursor:pointer;color:#a855f7;font-size:0.82rem;display:flex;align-items:center;gap:5px;font-family:inherit;">
+                    <i class="fa-solid fa-pen-to-square"></i> תקן תמונה
+                </button>
                 <button id="ai-lightbox-delete" onclick="window._deleteCurrentRender()"
                         style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:0.82rem;display:flex;align-items:center;gap:5px;">
                     <i class="fa-solid fa-trash"></i> מחק
                 </button>
+            </div>
+            <div id="ai-render-edit-box" class="ai-render-edit-box">
+                <textarea id="ai-render-edit-text" rows="2" placeholder="מה לתקן? למשל: החלף את הרצפה לפרקט בהיר, הסר את העציץ, הוסף שטיח..."></textarea>
+                <div class="ai-render-edit-actions">
+                    <button type="button" class="ai-render-edit-send" onclick="window._submitRenderEdit()"><i class="fa-solid fa-wand-magic-sparkles"></i> שלח תיקון</button>
+                    <button type="button" class="ai-render-edit-cancel" onclick="window._toggleRenderEdit(false)">ביטול</button>
+                    <span id="ai-render-edit-status"></span>
+                </div>
             </div>
         </div>
     `;
@@ -561,6 +573,80 @@ window._openAiLightbox = function(index) {
 window._closeAiLightbox = function() {
     var lb = document.getElementById('ai-lightbox');
     if (lb) lb.classList.remove('open');
+    window._toggleRenderEdit(false);
+};
+
+var _renderEditBusy = false;
+
+window._toggleRenderEdit = function(show) {
+    var box = document.getElementById('ai-render-edit-box');
+    if (!box || _renderEditBusy) return;
+    var open = show === undefined ? !box.classList.contains('open') : !!show;
+    box.classList.toggle('open', open);
+    if (open) {
+        var ta = document.getElementById('ai-render-edit-text');
+        if (ta) ta.focus();
+    }
+};
+
+window._submitRenderEdit = async function() {
+    var r = _projectRenders[_lightboxIndex];
+    var ta = document.getElementById('ai-render-edit-text');
+    var status = document.getElementById('ai-render-edit-status');
+    var sendBtn = document.querySelector('.ai-render-edit-send');
+    var instruction = ta ? ta.value.trim() : '';
+    if (!r || !r.image_url || _renderEditBusy) return;
+    if (!instruction) { if (ta) ta.focus(); return; }
+
+    _renderEditBusy = true;
+    if (sendBtn) sendBtn.disabled = true;
+    if (ta) ta.disabled = true;
+    if (status) status.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> מתקן את התמונה... (15–30 שניות)';
+    try {
+        var sessionRes = await _sbRenders.auth.getSession();
+        var session = sessionRes.data && sessionRes.data.session;
+        if (!session) throw new Error('לא מחובר');
+        var res = await fetch(
+            'https://meqxnsjycvfgfhdepguo.supabase.co/functions/v1/generate-render',
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + session.access_token,
+                },
+                body: JSON.stringify({
+                    edit_image_url:   r.image_url,
+                    edit_instruction: instruction,
+                    hex_color:        r.hex_color || null,
+                    project_id:       r.project_id || window._currentProjectId || null,
+                    preset_id:        (typeof state !== 'undefined') ? state.presetId : null,
+                    model_tier:       'standard',
+                }),
+            }
+        );
+        var data = await res.json();
+        if (!res.ok) {
+            throw new Error(data.error === 'quota_exceeded'
+                ? 'הגעת למכסה החודשית של ' + data.limit + ' הדמיות'
+                : (data.error || 'התיקון נכשל'));
+        }
+        _projectRenders.unshift({ id: data.id, image_url: data.image_url, created_at: data.created_at, project_id: r.project_id, hex_color: r.hex_color });
+        _renderGrid();
+        if (ta) ta.value = '';
+        if (status) status.textContent = '';
+        _renderEditBusy = false;
+        window._toggleRenderEdit(false);
+        window._openAiLightbox(0);
+        if (typeof window._showToast === 'function') window._showToast('התמונה תוקנה — נשמרה כהדמיה חדשה', 3000);
+    } catch (e) {
+        console.error('[ai-renders] edit error:', e);
+        if (status) status.textContent = 'שגיאה: ' + (e.message || e);
+    } finally {
+        _renderEditBusy = false;
+        if (sendBtn) sendBtn.disabled = false;
+        if (ta) ta.disabled = false;
+        await _updateQuota();
+    }
 };
 
 window._lightboxNav = function(dir) {
@@ -1113,6 +1199,29 @@ function _injectStyles() {
             display: flex; align-items: center; gap: 18px;
             background: rgba(255,255,255,0.07); border-radius: 8px; padding: 8px 16px;
         }
+
+        .ai-render-edit-box {
+            display: none; width: min(560px, 90vw); flex-direction: column; gap: 8px;
+            background: #fff; border-radius: 10px; padding: 10px 12px; direction: rtl;
+        }
+        .ai-render-edit-box.open { display: flex; }
+        .ai-render-edit-box textarea {
+            width: 100%; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 8px 10px;
+            font-size: 0.85rem; font-family: inherit; resize: vertical; outline: none; direction: rtl;
+        }
+        .ai-render-edit-box textarea:focus { border-color: #a855f7; }
+        .ai-render-edit-actions { display: flex; align-items: center; gap: 8px; }
+        .ai-render-edit-send {
+            padding: 7px 16px; border-radius: 8px; border: none; color: #fff; font-weight: 700;
+            background: linear-gradient(135deg,#a855f7,#7c3aed); font-family: inherit; cursor: pointer;
+            display: flex; align-items: center; gap: 6px; font-size: 0.82rem;
+        }
+        .ai-render-edit-send:disabled { opacity: 0.5; cursor: wait; }
+        .ai-render-edit-cancel {
+            padding: 7px 14px; border-radius: 8px; border: 1.5px solid #e2e8f0; background: #f8fafc;
+            color: #374151; font-family: inherit; cursor: pointer; font-size: 0.82rem;
+        }
+        #ai-render-edit-status { font-size: 0.8rem; color: #64748b; }
 
         /* Toolbar button */
         #btn-ai-render {
