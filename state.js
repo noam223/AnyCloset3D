@@ -4266,7 +4266,8 @@ function _blankColumn(width, template) {
         floorOffset: 0,
         topPanel: false,
         sinkPanel: false,
-        noPlinth: !!(template && template.noPlinth)
+        noPlinth: !!(template && template.noPlinth),
+        spaceBottomPanel: !!(template && template.spaceBottomPanel)
     };
     distributeShelves(col);
     return col;
