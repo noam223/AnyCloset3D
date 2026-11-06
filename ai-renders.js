@@ -675,7 +675,9 @@ var _AI_SCENES = [
     { id: 'bedroom',  label: 'חדר שינה',   icon: 'fa-bed' },
     { id: 'entrance', label: 'כניסה לבית', icon: 'fa-door-open' },
     { id: 'bathroom', label: 'חדר אמבטיה', icon: 'fa-bath' },
-    { id: 'kitchen',  label: 'מטבח',       icon: 'fa-kitchen-set' }
+    { id: 'kitchen',  label: 'מטבח',       icon: 'fa-kitchen-set' },
+    { id: 'kids',     label: 'חדר ילדים',  icon: 'fa-children' },
+    { id: 'tvwall',   label: 'קיר טלוויזיה', icon: 'fa-tv' }
 ];
 
 function _aiDefaultScene(presetId) {
@@ -687,6 +689,8 @@ function _aiRoomContext(presetId, scene) {
     if (scene === 'bathroom') return 'מיקום: חדר אמבטיה מודרני ונקי, עם כיור ומראה ברקע (לא מסתירים את הארון).';
     if (scene === 'entrance') return 'מיקום: כניסה לבית / מבואה מעוצבת — הארון ממוקם ליד דלת הכניסה כארון כניסה, רצפה מעוצבת ותאורה חמה ומזמינה.';
     if (scene === 'kitchen') return 'מיקום: מטבח מודרני ומעוצב — הארון עומד בחלל המטבח כיחידת אחסון לצד המטבח, בלי להפוך לארון מטבח ובלי לשנות את מבנהו.';
+    if (scene === 'kids') return 'מיקום: חדר ילדים מעוצב, צבעוני ועליז — מיטת ילד, שטיח רך וצעצועים בודדים בחדר, בלי להסתיר את הארון.';
+    if (scene === 'tvwall') return 'מיקום: סלון מעוצב, קיר טלוויזיה — בשטח הריק / הפתוח בתוך הארון תלויה על הקיר טלוויזיה שטוחה גדולה (מסך כבוי, שחור), כך שהארון מקיף אותה. התאם את גודל הטלוויזיה לשטח הפתוח, בלי לשנות, להזיז או להסיר אף חלק של הארון. ספה ושולחן קפה מול הקיר, בלי להסתיר את הארון.';
     if (presetId === 'sliding' || presetId === 'walkin') return 'מיקום: חדר הלבשה / חדר שינה גדול עם ארון בגדים מובנה לאורך הקיר.';
     if (presetId === 'corner-left' || presetId === 'corner-right') return 'מיקום: פינת חדר שינה מעוצבת עם הארון בפינה.';
     return 'מיקום: חדר שינה מעוצב ואיכותי, הארון צמוד לקיר האחורי.';
