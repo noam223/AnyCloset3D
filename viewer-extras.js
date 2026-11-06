@@ -799,6 +799,7 @@ window._viewerExtrasOnCabinetSwitch = function (idx) {
 window._viewerExtrasOnLiveFollow = function (idx, projectData) {
     updateLiveFocusBanner(idx, projectData);
     updateStatusBadge();
+    loadPinsForCabinet(idx);
 };
 
 window._viewerExtrasOnProjectUpdate = function (projectData, row) {
