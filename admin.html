@@ -176,6 +176,47 @@
         .company-member, .device-row { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--border); font-size:0.84rem; }
         .company-member:last-child, .device-row:last-child { border-bottom:none; }
         .modal-box.wide { max-width:720px; max-height:88vh; overflow:auto; }
+        .modal-box.xwide { max-width:920px; max-height:90vh; overflow:auto; }
+        .ov-section { margin-top:18px; }
+        .ov-section-title { font-size:0.8rem; font-weight:800; color:var(--primary); margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+        .ov-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; }
+        .ov-stat { background:#f8fafc; border:1px solid var(--border); border-radius:12px; padding:10px 12px; }
+        .ov-stat-val { font-size:1.25rem; font-weight:800; color:var(--text); line-height:1.2; }
+        .ov-stat-lbl { font-size:0.72rem; color:var(--muted); font-weight:600; margin-top:2px; }
+        .ov-stat-sub { font-size:0.7rem; color:var(--muted); margin-top:2px; }
+        .ov-card { border:1px solid var(--border); border-radius:12px; padding:14px 16px; background:white; }
+        .ov-sub-head { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; }
+        .ov-pill { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:999px; font-size:0.74rem; font-weight:700; background:#f1f5f9; color:var(--text); }
+        .ov-pill.green { background:#dcfce7; color:#166534; }
+        .ov-pill.amber { background:#fef3c7; color:#92400e; }
+        .ov-pill.red { background:#fee2e2; color:#991b1b; }
+        .ov-pill.blue { background:#dbeafe; color:#1e40af; }
+        .ov-banner { margin-top:12px; padding:10px 12px; border-radius:10px; font-size:0.8rem; line-height:1.6; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+        .ov-banner.info { background:#eff6ff; border:1px solid #bfdbfe; color:#1e3a8a; }
+        .ov-banner.warn { background:#fffbeb; border:1px solid #fde68a; color:#92400e; }
+        .ov-actions { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:10px; margin-top:12px; }
+        .ov-action { border:1px solid var(--border); border-radius:12px; padding:12px; background:#fcfdfe; display:flex; flex-direction:column; gap:8px; }
+        .ov-action-title { font-size:0.82rem; font-weight:800; display:flex; align-items:center; gap:6px; }
+        .ov-action-desc { font-size:0.74rem; color:var(--muted); line-height:1.5; }
+        .ov-row { display:flex; gap:8px; align-items:center; }
+        .ov-row .modal-input { height:36px; font-size:0.85rem; }
+        .ov-btn { height:36px; padding:0 14px; border-radius:9px; border:none; font-size:0.8rem; font-weight:700; font-family:inherit; cursor:pointer; white-space:nowrap; display:inline-flex; align-items:center; justify-content:center; gap:6px; background:var(--primary); color:white; }
+        .ov-btn:disabled { opacity:0.45; cursor:not-allowed; }
+        .ov-btn.green { background:#0f766e; }
+        .ov-btn.amber { background:#d97706; }
+        .ov-btn.ghost { background:#f1f5f9; color:var(--text); border:1px solid var(--border); }
+        .ov-btn.sm { height:28px; padding:0 10px; font-size:0.72rem; }
+        .ov-table { width:100%; border-collapse:collapse; }
+        .ov-table th { padding:6px 8px; font-size:0.7rem; }
+        .ov-table td { padding:7px 8px; font-size:0.78rem; white-space:normal; }
+        .ov-details { border:1px solid var(--border); border-radius:12px; margin-top:10px; background:white; }
+        .ov-details > summary { cursor:pointer; padding:10px 14px; font-size:0.8rem; font-weight:700; list-style:none; display:flex; justify-content:space-between; }
+        .ov-details > summary::-webkit-details-marker { display:none; }
+        .ov-details[open] > summary { border-bottom:1px solid var(--border); }
+        .ov-details-body { padding:4px 8px 8px; overflow-x:auto; }
+        .ov-empty { padding:12px; text-align:center; color:var(--muted); font-size:0.78rem; }
+        .ov-err { padding:12px; border-radius:10px; background:#fee2e2; color:#991b1b; font-size:0.8rem; }
+        .ov-biz-logo { width:44px; height:44px; object-fit:contain; border-radius:8px; border:1px solid var(--border); background:white; }
         .modal-box.scroll { max-height:88vh; overflow:auto; }
         .feat-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
         .feat-row { display:flex; flex-direction:column; gap:4px; }
@@ -720,7 +761,7 @@
     </div>
 </div>
 <div class="modal-overlay" id="modal-user-details">
-    <div class="modal-box" style="max-width:520px;">
+    <div class="modal-box xwide">
         <div class="modal-title"><i class="fa-solid fa-user"></i> פרטי משתמש</div>
         <div id="user-details-content" style="font-size:0.85rem;line-height:1.8;"></div>
         <div class="modal-actions" style="margin-top:18px;">
@@ -869,8 +910,204 @@ function _featureSelectHtml(ov){ov=ov||{};return FEATURE_OVERRIDE_KEYS.map(funct
 function _readFeatureOverrides(){var out={};FEATURE_OVERRIDE_KEYS.forEach(function(f){var el=document.getElementById('feat-'+f.key);if(!el)return;if(el.value==='true')out[f.key]=true;else if(el.value==='false')out[f.key]=false;});return out;}
 function openEditPlan(userId){var u=_allUsers.find(function(x){return x.id===userId;});if(!u)return;_currentEditUserId=userId;document.getElementById('edit-user-id').value=userId;document.getElementById('edit-user-info').innerHTML='<strong>'+_esc(u.full_name||'—')+'</strong> · '+_esc(u.email||u.id)+(u.company_code?(' · חברה '+_esc(u.company_code)):'');document.getElementById('edit-plan-select').value=u.plan||'free';document.getElementById('edit-status-select').value=u.subscription_status||'active';document.getElementById('edit-trial-ends').value=_toDateInput(u.trial_ends_at);document.getElementById('edit-subscription-ends').value=_toDateInput(u.subscription_ends_at);document.getElementById('edit-max-devices').value=u.max_devices||'';document.getElementById('edit-max-projects').value=u.max_projects!=null?u.max_projects:'';document.getElementById('edit-max-cabinets').value=u.max_cabinets_per_project!=null?u.max_cabinets_per_project:'';var isCo=_isCompanyUser(u);var wrap=document.getElementById('edit-max-agents-wrap');if(wrap)wrap.style.display=isCo?'':'none';var admin=_companyAdmin(u)||u;document.getElementById('edit-max-agents').value=admin.company_max_agents!=null?admin.company_max_agents:'';document.getElementById('edit-allow-multi').checked=_companyAllowMulti(u);document.getElementById('edit-ai-enabled').checked=(u.ai_renders_enabled!==false);document.getElementById('edit-ai-quota').value=(u.ai_renders_quota!=null?u.ai_renders_quota:'');document.getElementById('edit-notes').value=u.admin_notes||'';var ovSource=_isCompanyUser(u)?admin:u;document.getElementById('edit-feature-overrides').innerHTML=_featureSelectHtml(ovSource.feature_overrides);openModal('modal-edit-plan');}
 async function saveUserPlan(){var userId=document.getElementById('edit-user-id').value,plan=document.getElementById('edit-plan-select').value,status=document.getElementById('edit-status-select').value,maxDevRaw=document.getElementById('edit-max-devices').value,notes=document.getElementById('edit-notes').value.trim(),maxDevices=maxDevRaw?parseInt(maxDevRaw):null,aiEnabled=document.getElementById('edit-ai-enabled').checked,aiQuotaRaw=document.getElementById('edit-ai-quota').value,aiQuota=aiQuotaRaw!==''?parseInt(aiQuotaRaw,10):null,maxAgRaw=document.getElementById('edit-max-agents').value,maxAgents=maxAgRaw!==''?parseInt(maxAgRaw,10):null,allowMulti=document.getElementById('edit-allow-multi').checked,trialAt=_fromDateInput(document.getElementById('edit-trial-ends').value),subAt=_fromDateInput(document.getElementById('edit-subscription-ends').value),maxProjRaw=document.getElementById('edit-max-projects').value,maxCabRaw=document.getElementById('edit-max-cabinets').value,maxProjects=maxProjRaw!==''?parseInt(maxProjRaw,10):null,maxCabinets=maxCabRaw!==''?parseInt(maxCabRaw,10):null,featOv=_readFeatureOverrides();var u=_allUsers.find(function(x){return x.id===userId;});var{error}=await _sb.rpc('admin_update_profile',{p_user_id:userId,p_plan:plan,p_subscription_status:status,p_max_devices:maxDevices,p_admin_notes:notes||null,p_allow_multi_session:allowMulti,p_ai_renders_enabled:aiEnabled,p_ai_renders_quota:aiQuota,p_set_ai_renders_quota:true,p_trial_ends_at:trialAt,p_subscription_ends_at:subAt,p_set_trial_ends_at:true,p_set_subscription_ends_at:true});if(error){showToast('שגיאה: '+error.message,'error');return;}var overrideTarget=(_isCompanyUser(u)?_companyAdminId(u):userId)||userId;var{error:eOv}=await _sb.rpc('admin_set_plan_overrides',{p_user_id:overrideTarget,p_max_projects:maxProjects,p_max_cabinets_per_project:maxCabinets,p_feature_overrides:featOv});if(eOv){showToast('שגיאה בשמירת מכסות/פיצ׳רים: '+eOv.message,'error');return;}var flagTarget=u?_companyAdminId(u):userId;if(flagTarget&&flagTarget!==userId){var{error:eFlag}=await _sb.rpc('admin_update_profile',{p_user_id:flagTarget,p_allow_multi_session:allowMulti});if(eFlag){showToast('שגיאה בשמירת מתג מחשבים: '+eFlag.message,'error');return;}}if(u&&(u.company_id||(plan&&String(plan).indexOf('company_')===0))){var{error:e3}=await _sb.rpc('admin_set_company_max_agents',{p_admin_user_id:_companyAdminId(u),p_max_agents:maxAgents});if(e3){showToast('שגיאה בשמירת מכסת סוכנים: '+e3.message,'error');return;}if(u.company_id){_allUsers.forEach(function(x){if(x.company_id===u.company_id){x.company_max_agents=maxAgents;x.allow_multi_session=allowMulti;}});}}if(u){u.plan=plan;u.subscription_status=status;if(maxDevices!==null)u.max_devices=maxDevices;u.admin_notes=notes||null;u.ai_renders_enabled=aiEnabled;u.ai_renders_quota=aiQuota;u.allow_multi_session=allowMulti;u.trial_ends_at=trialAt;u.subscription_ends_at=subAt;}var applyTo=overrideTarget;_allUsers.forEach(function(x){if(x.id===applyTo||(u&&u.company_id&&x.company_id===u.company_id&&x.company_role==='admin')){x.max_projects=maxProjects;x.max_cabinets_per_project=maxCabinets;x.feature_overrides=featOv;}});closeModal('modal-edit-plan');updateStats();filterUsers();showToast('התוכנית עודכנה','success');}
-async function openUserDetails(userId){var u=_allUsers.find(function(x){return x.id===userId;});if(!u)return;_currentEditUserId=userId;var plan=u.plan||'free',status=u.subscription_status||'active',di=u._deviceInfo,q=_companyQuota(u),seats=_isCompanyUser(u)?(_activeAgentCount(u)+' / '+(q===0?'ללא הגבלה':(q==null?'ברירת מחדל':q))):'—';document.getElementById('user-details-content').innerHTML='<table style="width:100%;border-collapse:collapse;">'+_dr('שם',u.full_name||'—')+_dr('אימייל',u.email||u.id)+_dr('טלפון',u.phone?_phoneCell(u):'—')+(u.company_code?_dr('מספר חברה',u.company_id?'<button class="btn-link" onclick="closeModal(\'modal-user-details\');openCompanyView(\''+u.company_id+'\')">'+_esc(u.company_code)+'</button>':_esc(u.company_code)):'')+(u.agent_username?_dr('שם משתמש',u.agent_username):'')+(u.company_role?_dr('תפקיד בחברה',u.company_role==='admin'?'אדמין':'סוכן'):'')+_dr('סטטוס סוכן',u.is_active===false?'מושבת':'פעיל')+_dr('תוכנית','<span class="plan-badge '+plan+'">'+(PLAN_LABELS[plan]||plan)+'</span>')+_dr('סטטוס','<span class="status-badge '+status+'">'+_statusLabel(status)+'</span>')+_dr('פרויקטים',u._projectCount)+_dr('מכשירים',di.active+' פעילים / '+di.total+' סה"כ')+_dr('מכשירים מקסימום',u.max_devices||'ברירת מחדל')+_dr('סוכנים פעילים / מכסה',seats)+_dr('מחשבים במקביל',_companyAllowMulti(u)?'כן':'לא — קיק למחשב יחיד')+_dr('ניסיון עד',u.trial_ends_at?_formatDate(u.trial_ends_at):'—')+_dr('מנוי עד',u.subscription_ends_at?_formatDate(u.subscription_ends_at):'—')+_dr('נרשם',_formatDate(u.created_at))+(u.admin_notes?_dr('הערות אדמין',u.admin_notes):'')+'</table><div id="user-devices-box" style="margin-top:14px;"><div class="spinner-lg"></div></div>';openModal('modal-user-details');await _renderUserDevices(userId);}
+async function openUserDetails(userId){var u=_allUsers.find(function(x){return x.id===userId;});if(!u)return;_currentEditUserId=userId;var plan=u.plan||'free',status=u.subscription_status||'active',di=u._deviceInfo,q=_companyQuota(u),seats=_isCompanyUser(u)?(_activeAgentCount(u)+' / '+(q===0?'ללא הגבלה':(q==null?'ברירת מחדל':q))):'—';document.getElementById('user-details-content').innerHTML='<table style="width:100%;border-collapse:collapse;">'+_dr('שם',u.full_name||'—')+_dr('אימייל',u.email||u.id)+_dr('טלפון',u.phone?_phoneCell(u):'—')+(u.company_code?_dr('מספר חברה',u.company_id?'<button class="btn-link" onclick="closeModal(\'modal-user-details\');openCompanyView(\''+u.company_id+'\')">'+_esc(u.company_code)+'</button>':_esc(u.company_code)):'')+(u.agent_username?_dr('שם משתמש',u.agent_username):'')+(u.company_role?_dr('תפקיד בחברה',u.company_role==='admin'?'אדמין':'סוכן'):'')+_dr('סטטוס סוכן',u.is_active===false?'מושבת':'פעיל')+_dr('תוכנית','<span class="plan-badge '+plan+'">'+(PLAN_LABELS[plan]||plan)+'</span>')+_dr('סטטוס','<span class="status-badge '+status+'">'+_statusLabel(status)+'</span>')+_dr('פרויקטים',u._projectCount)+_dr('מכשירים',di.active+' פעילים / '+di.total+' סה"כ')+_dr('מכשירים מקסימום',u.max_devices||'ברירת מחדל')+_dr('סוכנים פעילים / מכסה',seats)+_dr('מחשבים במקביל',_companyAllowMulti(u)?'כן':'לא — קיק למחשב יחיד')+_dr('ניסיון עד',u.trial_ends_at?_formatDate(u.trial_ends_at):'—')+_dr('מנוי עד',u.subscription_ends_at?_formatDate(u.subscription_ends_at):'—')+_dr('נרשם',_formatDate(u.created_at))+(u.admin_notes?_dr('הערות אדמין',u.admin_notes):'')+'</table><div id="user-overview-box"><div class="spinner-lg" style="margin-top:18px;"></div></div><div id="user-devices-box" style="margin-top:14px;"><div class="spinner-lg"></div></div>';openModal('modal-user-details');_renderUserOverview(userId);await _renderUserDevices(userId);}
 function _dr(l,v){return '<tr><td style="padding:5px 0;color:var(--muted);font-size:0.78rem;width:40%;font-weight:600;">'+l+'</td><td style="padding:5px 0;font-size:0.85rem;">'+v+'</td></tr>';}
+
+// ── User overview: usage, business, subscription & Grow billing control ─────
+var _ovUserId=null,_ovData=null,_ovSettings={},_ovRefreshTimer=null;
+var _OV_ADJ_STATUS={scheduled:['מתוזמן','blue'],done:['בוצע','green'],cancelled:['בוטל',''],failed:['נכשל','red']};
+var _OV_ACT_LABEL={update_sum:'שינוי סכום הוראת קבע',cancel_debit:'ביטול הוראת קבע',refund:'זיכוי חיוב'};
+var _OV_ACT_STATUS={sent:['ממתין לתשובה','amber'],ok:['הצליח','green'],failed:['נכשל','red']};
+var _OV_BIZ_TYPE={licensed:'עוסק מורשה',exempt:'עוסק פטור',company:'חברה בע"מ'};
+var _OV_BIZ_INFO_LABELS={name:'שם העסק',type:'סוג עסק',taxId:'ח.פ / ע.מ',address:'כתובת',website:'אתר',bio:'אודות'};
+function _ovMoney(n){if(n==null||n==='')return '—';return '₪'+Number(n).toLocaleString('he-IL',{maximumFractionDigits:2});}
+function _ovDateTime(iso){if(!iso)return '—';return new Date(iso).toLocaleString('he-IL',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});}
+function _ovDaysLeft(iso){if(!iso)return null;return Math.ceil((new Date(iso)-Date.now())/86400000);}
+function _ovPill(text,cls){return '<span class="ov-pill '+(cls||'')+'">'+text+'</span>';}
+function _ovStat(val,lbl,sub){return '<div class="ov-stat"><div class="ov-stat-val">'+val+'</div><div class="ov-stat-lbl">'+lbl+'</div>'+(sub?'<div class="ov-stat-sub">'+sub+'</div>':'')+'</div>';}
+function _ovNote(){var el=document.getElementById('ov-note');return el&&el.value.trim()?el.value.trim():null;}
+
+async function _renderUserOverview(userId){
+    _ovUserId=userId;
+    clearTimeout(_ovRefreshTimer);
+    var res=await Promise.all([_sb.rpc('admin_get_user_overview',{p_user_id:userId}),_sb.rpc('admin_get_billing_settings')]);
+    if(_ovUserId!==userId)return;
+    var box=document.getElementById('user-overview-box');
+    if(!box)return;
+    if(res[0].error){box.innerHTML='<div class="ov-err" style="margin-top:14px;">שגיאה בטעינת נתוני המשתמש: '+_esc(res[0].error.message)+'</div>';return;}
+    _ovData=res[0].data||{};
+    _ovSettings=(res[1]&&res[1].data)||{};
+    var u=_allUsers.find(function(x){return x.id===userId;})||{};
+    box.innerHTML=_ovUsageHtml(_ovData)+_ovSubscriptionHtml(u,_ovData)+_ovBusinessHtml(_ovData.business||{})+_ovHistoryHtml(_ovData);
+    if((_ovData.actions||[]).some(function(a){return a.status==='sent';}))
+        _ovRefreshTimer=setTimeout(function(){if(_ovUserId===userId&&document.getElementById('modal-user-details').classList.contains('open'))_renderUserOverview(userId);},5000);
+}
+
+function _ovUsageHtml(d){
+    var p=d.projects||{},r=d.renders||{};
+    return '<div class="ov-section"><div class="ov-section-title"><i class="fa-solid fa-chart-simple"></i> שימוש</div><div class="ov-stats">'
+        +_ovStat(p.active||0,'פרויקטים פעילים','מתוך '+(p.total||0)+(p.locked?' · '+p.locked+' נעולים':''))
+        +_ovStat(p.updated_30d||0,'עודכנו ב-30 יום',p.shared?p.shared+' משותפים בלינק':'')
+        +_ovStat(r.total||0,'הדמיות AI שבוצעו',(r.this_month||0)+' החודש')
+        +_ovStat(r.saved||0,'הדמיות שמורות','')
+        +_ovStat(p.last_activity?_formatDate(p.last_activity):'—','פעילות אחרונה','')
+        +'</div></div>';
+}
+
+function _ovSubscriptionHtml(u,d){
+    var b=d.billing||{},plan=u.plan||'free',status=u.subscription_status||'active';
+    var isTrial=status==='trial';
+    var endIso=isTrial?u.trial_ends_at:u.subscription_ends_at;
+    var days=_ovDaysLeft(endIso);
+    var cycle=b.cycle==='annual'?_ovPill('<i class="fa-solid fa-calendar"></i> מנוי שנתי','blue')
+        :b.cycle==='monthly'?_ovPill('<i class="fa-solid fa-rotate"></i> מנוי חודשי — הוראת קבע','blue')
+        :_ovPill('ללא מנוי בתשלום');
+    var stCls=status==='active'?'green':status==='trial'?'amber':'red';
+    var daysTxt=days==null?'':(days>=0?'עוד '+days+' ימים':'הסתיים לפני '+Math.abs(days)+' ימים');
+    var h='<div class="ov-section"><div class="ov-section-title"><i class="fa-solid fa-credit-card"></i> מנוי וחיוב</div><div class="ov-card">'
+        +'<div class="ov-sub-head"><span class="plan-badge '+plan+'">'+(PLAN_LABELS[plan]||plan)+'</span>'+_ovPill(_statusLabel(status),stCls)+cycle+'</div>'
+        +'<table style="width:100%;border-collapse:collapse;margin-top:10px;">'
+        +_dr(isTrial?'הניסיון מסתיים':'המנוי בתוקף עד',endIso?_formatDate(endIso)+(daysTxt?' <span style="color:var(--muted);font-size:0.78rem;">('+daysTxt+')</span>':''):'—');
+    if(b.cycle==='monthly'){
+        var nextIso=u.subscription_ends_at?new Date(new Date(u.subscription_ends_at).getTime()-3*86400000).toISOString():null;
+        h+=_dr('חיוב חודשי רגיל',_ovMoney(b.regular_sum))
+          +_dr('החיוב הבא (משוער)',nextIso&&status==='active'?_formatDate(nextIso):'—')
+          +_dr('אסמכתא ב-Grow',b.asmachta?_esc(b.asmachta):'<span style="color:#b45309;font-weight:700;">חסרה</span>')
+          +_dr('חיבור להוראת הקבע',b.grow_ready?_ovPill('מחובר','green'):_ovPill('לא מחובר','amber'));
+    }
+    h+='</table>';
+    var sched=(d.adjustments||[]).find(function(a){return a.status==='scheduled';});
+    if(sched){
+        var what=sched.kind==='free_month'?'<strong>חודש חינם</strong> — החיוב הבא יזוכה במלואו אוטומטית מיד אחרי שיתבצע'
+            :'<strong>הנחה</strong> — החיוב הבא יהיה '+_ovMoney(sched.charge_sum)+' במקום '+_ovMoney(sched.regular_sum)+', ואחריו הסכום יחזור לרגיל';
+        h+='<div class="ov-banner info"><span><i class="fa-solid fa-gift"></i> מתוזמן לחיוב הבא: '+what+(sched.note?' · '+_esc(sched.note):'')+'</span>'
+          +'<button class="ov-btn ghost sm" onclick="ovCancelAdjustment(\''+sched.id+'\')"><i class="fa-solid fa-xmark"></i> בטל הטבה</button></div>';
+    }
+    if(b.cycle==='monthly'&&!_ovSettings.grow_api_enabled){
+        h+='<div class="ov-banner warn"><span><i class="fa-solid fa-triangle-exclamation"></i> כדי לשנות סכומים ולבטל הוראות קבע אוטומטית צריך להגדיר את מזהה העסק ב-Grow (userId). זיכוי "חודש חינם" עובד גם בלי זה.</span>'
+          +'<span class="ov-row"><input class="modal-input" id="ov-grow-user-id" placeholder="Grow userId" style="width:170px;direction:ltr;"><button class="ov-btn sm" onclick="ovSaveGrowUserId()">שמור</button></span></div>';
+    }
+    if(b.cycle==='monthly'&&b.transaction_id&&!b.asmachta){
+        h+='<div class="ov-banner warn"><span><i class="fa-solid fa-hashtag"></i> חסרה אסמכתא של הוראת הקבע (מופיעה בדשבורד של Grow ליד העסקה '+_esc(b.transaction_id)+'). בלעדיה אי אפשר לשנות סכום או לבטל אוטומטית.</span>'
+          +'<span class="ov-row"><input class="modal-input" id="ov-asmachta" placeholder="אסמכתא" style="width:150px;direction:ltr;"><button class="ov-btn sm" onclick="ovSaveAsmachta()">שמור</button></span></div>';
+    }
+    h+=_ovActionsHtml(u,d,sched)+'</div></div>';
+    return h;
+}
+
+function _ovActionsHtml(u,d,sched){
+    var b=d.billing||{},status=u.subscription_status||'active';
+    var canDiscount=b.cycle==='monthly'&&b.grow_ready&&_ovSettings.grow_api_enabled&&!sched&&b.regular_sum!=null;
+    var discountWhy=b.cycle!=='monthly'?'זמין רק למנוי חודשי בהוראת קבע'
+        :!_ovSettings.grow_api_enabled?'חסר מזהה העסק ב-Grow'
+        :!b.grow_ready?'הוראת הקבע לא מחוברת (חסרה אסמכתא או שהמנוי לא פעיל)'
+        :sched?'כבר מתוזמנת הטבה לחיוב הבא'
+        :b.regular_sum==null?'הסכום החודשי הרגיל לא ידוע (יתעדכן אחרי החיוב הבא)':'';
+    var giftDesc=b.grow_ready?'החיוב החודשי הבא ב-Grow יתבצע כרגיל ויזוכה במלואו אוטומטית מיד אחריו.'
+        :'תאריך סיום '+(status==='trial'?'הניסיון':'המנוי')+' יוארך בחודש'+((status==='inactive'||status==='cancelled')?' והמנוי יופעל מחדש':'')+'.';
+    var canCancel=status==='active'||status==='trial';
+    return '<div class="ov-actions">'
+        +'<div class="ov-action"><div class="ov-action-title" style="color:#0f766e;"><i class="fa-solid fa-gift"></i> חודש מתנה</div><div class="ov-action-desc">'+giftDesc+'</div>'
+            +'<button class="ov-btn green" onclick="ovGiftMonth()"'+(sched&&b.grow_ready?' disabled title="כבר מתוזמנת הטבה"':'')+'><i class="fa-solid fa-gift"></i> תן חודש חינם</button></div>'
+        +'<div class="ov-action"><div class="ov-action-title"><i class="fa-solid fa-percent"></i> הנחה לחיוב הבא</div><div class="ov-action-desc">'+(canDiscount?'הסכום ב-Grow ישתנה לחיוב אחד בלבד ויחזור אוטומטית ל-'+_ovMoney(b.regular_sum)+' אחריו.':discountWhy)+'</div>'
+            +'<div class="ov-row"><input class="modal-input" type="number" min="1" step="1" id="ov-discount-sum" placeholder="סכום לחיוב (₪)"'+(canDiscount?'':' disabled')+'><button class="ov-btn" onclick="ovScheduleDiscount()"'+(canDiscount?'':' disabled')+'>קבע</button></div></div>'
+        +'<div class="ov-action"><div class="ov-action-title" style="color:#b45309;"><i class="fa-solid fa-ban"></i> ביטול מנוי</div><div class="ov-action-desc">'
+            +(b.cycle==='monthly'?(b.grow_ready&&_ovSettings.grow_api_enabled?'הוראת הקבע ב-Grow תבוטל אוטומטית.':'הביטול ייכנס לרשימת "ביטולים ממתינים" לביטול ידני ב-Grow.'):b.cycle==='annual'?'מנוי שנתי — אין חיובים עתידיים לבטל ב-Grow.':'עוצר את הגישה בתשלום.')+'</div>'
+            +'<button class="ov-btn amber" onclick="closeModal(\'modal-user-details\');openCancelSubscription(\''+u.id+'\')"'+(canCancel?'':' disabled')+'><i class="fa-solid fa-ban"></i> בטל מנוי</button></div>'
+        +'</div>'
+        +'<div class="ov-row" style="margin-top:10px;"><input class="modal-input" id="ov-note" placeholder="הערה פנימית לפעולה (לא חובה) — תישמר בהיסטוריה"></div>';
+}
+
+function _ovBusinessHtml(biz){
+    var info=biz.info&&typeof biz.info==='object'?biz.info:{};
+    var vals={name:biz.business_name||info.name,taxId:biz.business_id||info.taxId,type:biz.business_type||info.type};
+    Object.keys(info).forEach(function(k){if(vals[k]==null||vals[k]==='')vals[k]=info[k];});
+    var rows='';
+    Object.keys(vals).forEach(function(k){
+        var v=vals[k];
+        if(v==null||v===''||typeof v==='object')return;
+        if(k==='type')v=_OV_BIZ_TYPE[v]||v;
+        var cell=k==='website'?'<a href="'+_esc(/^https?:\/\//i.test(v)?v:'https://'+v)+'" target="_blank" rel="noopener" style="color:var(--primary);direction:ltr;">'+_esc(v)+'</a>':_esc(String(v));
+        rows+=_dr(_esc(_OV_BIZ_INFO_LABELS[k]||k),cell);
+    });
+    if(!rows&&!biz.logo_url)return '';
+    return '<div class="ov-section"><div class="ov-section-title"><i class="fa-solid fa-briefcase"></i> פרטי העסק</div><div class="ov-card" style="display:flex;gap:14px;align-items:flex-start;">'
+        +(biz.logo_url?'<img class="ov-biz-logo" src="'+_esc(biz.logo_url)+'" alt="">':'')
+        +'<table style="width:100%;border-collapse:collapse;">'+(rows||_dr('פרטים','—'))+'</table></div></div>';
+}
+
+function _ovHistoryHtml(d){
+    var pays=d.payments||[],adjs=d.adjustments||[],acts=d.actions||[];
+    var payRows=pays.map(function(p){
+        return '<tr><td>'+_ovDateTime(p.paid_at)+'</td><td>'+_ovMoney(p.sum)+'</td><td>'+(p.source==='recurring'?'חיוב חודשי':'תשלום ראשון')+'</td><td>'+_esc(PLAN_LABELS[p.plan]||p.plan||'—')+'</td><td style="direction:ltr;text-align:right;">'+_esc(p.asmachta||'—')+'</td><td>'+(p.refunded_at?_ovPill('זוכה '+_ovMoney(p.refunded_sum),'green'):'—')+'</td></tr>';
+    }).join('');
+    var adjRows=adjs.map(function(a){
+        var st=_OV_ADJ_STATUS[a.status]||[a.status,''];
+        var what=a.kind==='free_month'?'חודש חינם':'הנחה: '+_ovMoney(a.charge_sum)+' במקום '+_ovMoney(a.regular_sum);
+        return '<tr><td>'+_ovDateTime(a.created_at)+'</td><td>'+what+'</td><td>'+_ovPill(st[0],st[1])+'</td><td>'+_esc(a.note||'—')+'</td><td>'+(a.status==='scheduled'?'<button class="ov-btn ghost sm" onclick="ovCancelAdjustment(\''+a.id+'\')">בטל</button>':'')+'</td></tr>';
+    }).join('');
+    var actRows=acts.map(function(a){
+        var st=_OV_ACT_STATUS[a.status]||[a.status,''];
+        return '<tr><td>'+_ovDateTime(a.created_at)+'</td><td>'+(_OV_ACT_LABEL[a.action]||a.action)+(a.sum!=null?' ('+_ovMoney(a.sum)+')':'')+'</td><td>'+_ovPill(st[0],st[1])+'</td><td style="color:#991b1b;">'+_esc(a.error||'')+'</td><td>'+(a.status==='failed'?'<button class="ov-btn ghost sm" onclick="ovRetryAction(\''+a.id+'\')"><i class="fa-solid fa-rotate-right"></i> נסה שוב</button>':'')+'</td></tr>';
+    }).join('');
+    function sec(title,count,head,rows,open){
+        return '<details class="ov-details"'+(open?' open':'')+'><summary><span>'+title+'</span><span style="color:var(--muted);">'+count+'</span></summary><div class="ov-details-body">'
+            +(rows?'<table class="ov-table"><thead><tr>'+head.map(function(x){return '<th>'+x+'</th>';}).join('')+'</tr></thead><tbody>'+rows+'</tbody></table>':'<div class="ov-empty">אין נתונים עדיין</div>')+'</div></details>';
+    }
+    return '<div class="ov-section"><div class="ov-section-title"><i class="fa-solid fa-clock-rotate-left"></i> היסטוריה</div>'
+        +sec('תשלומים',pays.length,['תאריך','סכום','סוג','תוכנית','אסמכתא','זיכוי'],payRows,pays.length>0)
+        +sec('הטבות (הנחות / חודשים חינם)',adjs.length,['נוצר','הטבה','סטטוס','הערה',''],adjRows,false)
+        +sec('פעולות מול Grow',acts.length,['זמן','פעולה','סטטוס','שגיאה',''],actRows,acts.some(function(a){return a.status!=='ok';}))
+        +'</div>';
+}
+
+async function _ovAfterAction(msg){
+    showToast(msg,'success');
+    await _renderUserOverview(_ovUserId);
+}
+async function ovGiftMonth(){
+    var b=(_ovData&&_ovData.billing)||{};
+    if(!confirm(b.grow_ready?'לתת חודש חינם?\nהחיוב החודשי הבא ב-Grow יזוכה במלואו אוטומטית.':'לתת חודש חינם?\nתאריך סיום המנוי יוארך בחודש.'))return;
+    var res=await _sb.rpc('admin_gift_free_month',{p_user_id:_ovUserId,p_note:_ovNote()});
+    if(res.error){showToast('שגיאה: '+res.error.message,'error');return;}
+    if(res.data==='extended')loadUsers();
+    await _ovAfterAction(res.data==='refund_next'?'מתוזמן — החיוב הבא יזוכה אוטומטית ✓':'המנוי הוארך בחודש ✓');
+}
+async function ovScheduleDiscount(){
+    var sum=Number(document.getElementById('ov-discount-sum').value);
+    var b=(_ovData&&_ovData.billing)||{};
+    if(!sum||sum<1){showToast('הזן סכום לחיוב','error');return;}
+    if(b.regular_sum&&sum>=Number(b.regular_sum)){showToast('הסכום חייב להיות נמוך מ-'+_ovMoney(b.regular_sum),'error');return;}
+    if(!confirm('החיוב הבא יהיה '+_ovMoney(sum)+' במקום '+_ovMoney(b.regular_sum)+'.\nאחרי החיוב הסכום יחזור לרגיל אוטומטית. להמשיך?'))return;
+    var res=await _sb.rpc('admin_schedule_discount',{p_user_id:_ovUserId,p_charge_sum:sum,p_note:_ovNote()});
+    if(res.error){showToast('שגיאה: '+res.error.message,'error');return;}
+    await _ovAfterAction('נשלח ל-Grow — הסטטוס יתעדכן תוך כמה שניות');
+}
+async function ovCancelAdjustment(adjId){
+    if(!confirm('לבטל את ההטבה המתוזמנת?'))return;
+    var res=await _sb.rpc('admin_cancel_adjustment',{p_adjustment_id:adjId});
+    if(res.error){showToast('שגיאה: '+res.error.message,'error');return;}
+    await _ovAfterAction('ההטבה בוטלה ✓');
+}
+async function ovRetryAction(actionId){
+    var res=await _sb.rpc('admin_retry_billing_action',{p_action_id:actionId});
+    if(res.error){showToast('שגיאה: '+res.error.message,'error');return;}
+    await _ovAfterAction('נשלח שוב ל-Grow');
+}
+async function ovSaveAsmachta(){
+    var v=document.getElementById('ov-asmachta').value.trim();
+    if(!v){showToast('הזן אסמכתא','error');return;}
+    var res=await _sb.rpc('admin_set_grow_asmachta',{p_user_id:_ovUserId,p_asmachta:v});
+    if(res.error){showToast('שגיאה: '+res.error.message,'error');return;}
+    await _ovAfterAction('האסמכתא נשמרה ✓');
+}
+async function ovSaveGrowUserId(){
+    var v=document.getElementById('ov-grow-user-id').value.trim();
+    if(!v){showToast('הזן את מזהה העסק','error');return;}
+    var res=await _sb.rpc('admin_set_grow_user_id',{p_value:v});
+    if(res.error){showToast('שגיאה: '+res.error.message,'error');return;}
+    await _ovAfterAction('מזהה העסק ב-Grow נשמר ✓');
+}
 async function _renderUserDevices(userId){
     var box=document.getElementById('user-devices-box');
     if(!box)return;
@@ -1098,6 +1335,12 @@ async function confirmCancelSubscription(){
         updateParams.p_set_trial_ends_at = true;
         updateParams.p_trial_ends_at = newTrialEndsAt;
     }
+    // Must run before admin_clear_billing_token: the Grow cancel call needs the token.
+    var growRes = await _sb.rpc('admin_cancel_grow_debit', {p_user_id: userId});
+    if(growRes.error){showToast('שגיאה בביטול הוראת הקבע: '+growRes.error.message,'error');return;}
+    var hasGrowDebit = !!u.grow_transaction_id && String(u.plan||'').indexOf('annual') === -1;
+    if(growRes.data) successMsg += ' · בקשת ביטול נשלחה ל-Grow';
+    else if(hasGrowDebit) successMsg += ' · יש לבטל את הוראת הקבע ידנית ב-Grow';
     var {error} = await _sb.rpc('admin_update_profile', updateParams);
     if(error){showToast('שגיאה: '+error.message,'error');return;}
     var {error: tokenErr} = await _sb.rpc('admin_clear_billing_token', {p_user_id: userId});
@@ -1107,6 +1350,7 @@ async function confirmCancelSubscription(){
     closeModal('modal-cancel-subscription');
     updateStats();
     filterUsers();
+    loadPendingCancellations();
     showToast(successMsg, 'success');
 }
 function _populatePricingUserSelect(){var sel=document.getElementById('pricing-user-select');var prev=sel.value;sel.innerHTML='<option value="">— בחר משתמש —</option>';_allUsers.forEach(function(u){var opt=document.createElement('option');opt.value=u.id;opt.textContent=(u.full_name||'—')+' ('+( u.email||u.id)+')';sel.appendChild(opt);});if(prev)sel.value=prev;}
