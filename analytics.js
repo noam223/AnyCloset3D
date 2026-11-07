@@ -5,8 +5,8 @@
     var GA_ID = 'G-W9N8M22WTH';
 
     var PLAN_VALUES = {
-        designer_basic:          199,
-        designer_basic_annual:   2028,
+        designer_basic:          229,
+        designer_basic_annual:   2388,
         designer_premium:        299,
         designer_premium_annual: 3228,
         carpenter_basic:        499,

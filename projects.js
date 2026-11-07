@@ -35,8 +35,8 @@ var _companyMeta         = null;
 // Organized by user type, shown in upgrade modal
 var _UPGRADE_PLANS = [
     // מעצבות
-    { key: 'designer_basic',          label: 'מעצבת — בסיסי',         price: '₪199/חודש', userType: 'designer', maxProjects: 30,  maxDevices: 1, desc: 'עד 30 פרויקטים, 30 הדמיות AI, 35 גווני טמבור נבחרים' },
-    { key: 'designer_basic_annual',   label: 'מעצבת — בסיסי שנתי',    price: '₪169/חודש', userType: 'designer', maxProjects: 30,  maxDevices: 1, desc: 'עד 30 פרויקטים, 30 הדמיות AI, ₪2,028 לשנה — חיסכון ₪360' },
+    { key: 'designer_basic',          label: 'מעצבת — בסיסי',         price: '₪229/חודש', userType: 'designer', maxProjects: 30,  maxDevices: 1, desc: 'עד 30 פרויקטים, 30 הדמיות AI, 35 גווני טמבור נבחרים' },
+    { key: 'designer_basic_annual',   label: 'מעצבת — בסיסי שנתי',    price: '₪199/חודש', userType: 'designer', maxProjects: 30,  maxDevices: 1, desc: 'עד 30 פרויקטים, 30 הדמיות AI, ₪2,388 לשנה — חיסכון ₪360' },
     { key: 'designer_premium',        label: 'מעצבת — פרימיום',       price: '₪299/חודש', userType: 'designer', maxProjects: 100, maxDevices: 1, desc: 'עד 100 פרויקטים, תמחור ארונות, כל סוגי הארונות, 100 הדמיות AI, 1651 גווני טמבור' },
     { key: 'designer_premium_annual', label: 'מעצבת — פרימיום שנתי',  price: '₪269/חודש', userType: 'designer', maxProjects: 100, maxDevices: 1, desc: 'כל הפרימיום, ₪3,228 לשנה — חיסכון ₪360' },
     // נגרים
