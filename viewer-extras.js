@@ -423,10 +423,30 @@ function enterCompare(idxA, idxB) {
 
     state.viewMode = '3d';
     if (typeof updateCameraView === 'function') updateCameraView();
+    fitCameraToCompare();
     showCompareBar(idxA, idxB);
     a.setLiveMode(false);
     if (a.updateLiveBadge) a.updateLiveBadge();
     toast('השוואה זה-לצד-זה');
+}
+
+// updateCameraView frames the hidden single cabinet; on portrait phones the side-by-side pair would be cut off.
+function fitCameraToCompare() {
+    var cam = window.camera, ctrl = window.controls;
+    if (!_compareRoot || !cam || !cam.isPerspectiveCamera || typeof THREE === 'undefined') return;
+    var box = new THREE.Box3().setFromObject(_compareRoot);
+    if (box.isEmpty()) return;
+    var size = box.getSize(new THREE.Vector3());
+    var center = box.getCenter(new THREE.Vector3());
+    var vFov = cam.fov * Math.PI / 180;
+    var hFov = 2 * Math.atan(Math.tan(vFov / 2) * cam.aspect);
+    var dist = Math.max((size.y * 1.25) / (2 * Math.tan(vFov / 2)), (size.x * 1.15) / (2 * Math.tan(hFov / 2))) + size.z;
+    var dir = cam.position.clone().sub(ctrl ? ctrl.target : center);
+    if (dir.lengthSq() < 1e-6) dir.set(0, 0.3, 1);
+    dir.normalize();
+    cam.position.copy(center.clone().add(dir.multiplyScalar(dist)));
+    if (ctrl) { ctrl.target.copy(center); ctrl.update(); }
+    if (window.renderer && window.scene) window.renderer.render(window.scene, cam);
 }
 
 function showCompareBar(idxA, idxB) {
@@ -435,8 +455,10 @@ function showCompareBar(idxA, idxB) {
     var list = (api() && api().getCabinetList()) || [];
     var la = (list[idxA] && list[idxA].label) || ('ארון ' + (idxA + 1));
     var lb = (list[idxB] && list[idxB].label) || ('ארון ' + (idxB + 1));
-    document.getElementById('viewer-compare-label-a').textContent = la;
-    document.getElementById('viewer-compare-label-b').textContent = lb;
+    var elA = document.getElementById('viewer-compare-label-a');
+    var elB = document.getElementById('viewer-compare-label-b');
+    elA.textContent = la; elA.parentElement.title = la;
+    elB.textContent = lb; elB.parentElement.title = lb;
     bar.style.display = 'flex';
 }
 
