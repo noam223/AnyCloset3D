@@ -903,6 +903,13 @@ function _applyPlanEditorGates(plan, features) {
         };
     }
 
+    if (features.canTemplates === false) {
+        document.documentElement.classList.add('plan-no-templates');
+        ['openColumnTemplatesSheet', 'openCabinetTemplatesSheet'].forEach(function(fn) {
+            window[fn] = function() { window._showPlanUpsell('תבניות עמודה וארון'); };
+        });
+    }
+
     if (features.fullTambourPalette === false && typeof window._setTambourCuratedMode === 'function') {
         window._setTambourCuratedMode(true);
     }

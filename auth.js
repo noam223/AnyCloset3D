@@ -52,6 +52,7 @@ const PLAN_LIMITS = {
             canQuickCalc:          false,
             canQuote:              false,    // אין הצעת מחיר — רק סיכום ללקוח
             canCornerCabinets:     false,    // ללא ארונות פינה / חדר ארונות / יחידה פינתית
+            canTemplates:          false,    // תבניות עמודה וארון — פרימיום
             fullTambourPalette:    false,    // 35 גווני טמבור נבחרים
             simpleStatuses:        true,     // פעיל / הושלם
             canExtendProject:      false,
@@ -80,6 +81,7 @@ const PLAN_LIMITS = {
             canQuickCalc:          false,
             canQuote:              false,
             canCornerCabinets:     true,
+            canTemplates:          true,
             fullTambourPalette:    true,     // 1651 גוונים
             simpleStatuses:        true,
             canExtendProject:      false,
