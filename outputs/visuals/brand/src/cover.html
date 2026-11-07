@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="he">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="fonts.css">
+<style>
+  html, body { margin: 0; }
+  .canvas {
+    width: 1640px; height: 624px; position: relative; overflow: hidden;
+    font-family: 'Heebo', sans-serif; color: #FFFFFF;
+    background: linear-gradient(120deg, #152B47 0%, #1E3A5F 55%, #152B47 100%);
+  }
+  .grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(0, 212, 255, 0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 212, 255, 0.07) 1px, transparent 1px);
+    background-size: 48px 48px;
+    -webkit-mask-image: linear-gradient(90deg, #000 0%, rgba(0,0,0,0.5) 45%, transparent 70%);
+  }
+  .glow {
+    position: absolute; left: 330px; top: 40px; width: 720px; height: 560px;
+    background: radial-gradient(ellipse, rgba(0, 212, 255, 0.20) 0%, rgba(0, 212, 255, 0) 65%);
+  }
+
+  /* Facebook mobile shows only the middle ~1110px, so all content lives between x=265 and x=1375 */
+  .text {
+    position: absolute; right: 315px; top: 112px; width: 560px; direction: rtl; text-align: right;
+  }
+  .logo { display: block; width: 470px; margin: 0 0 34px 0; }
+  h1 {
+    margin: 0 0 14px; font-weight: 800; font-size: 48px; line-height: 1.15; letter-spacing: -0.5px; white-space: nowrap;
+  }
+  .sub {
+    margin: 0 0 30px; font-weight: 400; font-size: 25px; line-height: 1.4; color: #B9C8DB;
+  }
+  .cta {
+    display: inline-block; padding: 12px 26px; border-radius: 999px;
+    background: #00D4FF; color: #152B47; font-weight: 800; font-size: 23px;
+  }
+
+  .shots { position: absolute; left: 300px; top: 92px; width: 560px; height: 440px; }
+  .shot {
+    position: absolute; border-radius: 16px; overflow: hidden;
+    box-shadow: 0 24px 50px rgba(0, 0, 0, 0.45);
+    border: 2px solid rgba(255, 255, 255, 0.14);
+  }
+  .shot img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .shot.model { left: 0; top: 0; width: 330px; height: 250px; }
+  .shot.model img { object-position: 50% 50%; transform: scale(1.18); transform-origin: 48% 52%; }
+  .shot.model .tag { bottom: auto; top: 12px; }
+  .shot.ai { left: 190px; top: 150px; width: 370px; height: 280px; border-color: rgba(0, 212, 255, 0.55); }
+  .shot.ai img { object-position: 48% 50%; }
+  .tag {
+    position: absolute; bottom: 12px; right: 12px; padding: 5px 14px; border-radius: 999px;
+    background: rgba(21, 43, 71, 0.86); color: #FFFFFF; font-weight: 700; font-size: 17px; direction: rtl;
+  }
+  .arrow {
+    position: absolute; left: 76px; top: 280px; width: 96px; height: 96px;
+  }
+</style>
+</head>
+<body>
+  <div class="canvas">
+    <div class="grid"></div>
+    <div class="glow"></div>
+
+    <div class="shots">
+      <div class="shot model"><img src="sample-3d.jpg" alt=""><span class="tag">מודל תלת-ממדי</span></div>
+      <div class="shot ai"><img src="ai-01.jpg" alt=""><span class="tag">הדמיית AI</span></div>
+      <svg class="arrow" viewBox="0 0 96 96" fill="none" stroke="#00D4FF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 10 C 18 50, 40 72, 78 76" />
+        <path d="M64 62 L 80 76 L 64 90" />
+      </svg>
+    </div>
+
+    <div class="text">
+      <img class="logo" src="logo-wide.png" alt="AnyCloset 3D">
+      <h1>הדמיית ארונות בתלת-ממד,<br>ישר מהדפדפן</h1>
+      <p class="sub">תכנון, תמחור ושיתוף חי עם הלקוח, תוך דקות</p>
+      <span class="cta">שבוע ניסיון חינם · בלי כרטיס אשראי</span>
+    </div>
+  </div>
+</body>
+</html>
