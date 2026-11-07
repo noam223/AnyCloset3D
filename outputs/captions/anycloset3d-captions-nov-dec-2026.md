@@ -2,7 +2,7 @@
 
 **מקור:** `context/content-calendar.md` ו-`context/brand-style.md`.
 **הנחות:** אין עדיין פוסטים קודמים, נתוני ביצועים או מחקר מתחרים. הכיתובים נכתבו מתוך פרופיל המותג בלבד.
-**קישור להרשמה:** https://anycloset3d.vercel.app/login.html (לבדוק שזה הקישור הנכון לפני הפרסום).
+**קישור להרשמה:** https://anycloset3d.com/login.html (לבדוק שזה הקישור הנכון לפני הפרסום).
 
 **איך משתמשים:**
 - **פייסבוק:** הכיתוב כמו שהוא, כולל הקישור, ובלי האשטגים או עם 2–3 מהם.
@@ -58,7 +58,7 @@
 מכירה מעצבת או נגר שזה יכול לחסוך להם זמן? תייגי אותם 👇
 
 שבוע ניסיון חינם, בלי כרטיס אשראי:
-https://anycloset3d.vercel.app/login.html
+https://anycloset3d.com/login.html
 
 **קריאה לפעולה:** תיוג + קישור לניסיון.
 
@@ -78,7 +78,7 @@ https://anycloset3d.vercel.app/login.html
 ככה הלקוחה כבר לא צריכה לדמיין. היא רואה.
 
 רוצה לנסות על הפרויקט הבא שלך?
-שבוע ניסיון חינם, בלי כרטיס אשראי 👈 https://anycloset3d.vercel.app/login.html
+שבוע ניסיון חינם, בלי כרטיס אשראי 👈 https://anycloset3d.com/login.html
 
 **קריאה לפעולה:** קישור לניסיון.
 
@@ -143,7 +143,7 @@ https://anycloset3d.vercel.app/login.html
 את ההדמיה צריך בשביל ה"וואו" של הלקוחה.
 ב-AnyCloset 3D מקבלים את שניהם מאותו תכנון.
 
-נסי בעצמך, שבוע חינם 👈 https://anycloset3d.vercel.app/login.html
+נסי בעצמך, שבוע חינם 👈 https://anycloset3d.com/login.html
 
 **קריאה לפעולה:** קישור לניסיון.
 
@@ -166,7 +166,7 @@ https://anycloset3d.vercel.app/login.html
 
 ככה פגישת אישור הופכת לשיחת טלפון של חמש דקות.
 
-שבוע ניסיון חינם, בלי כרטיס אשראי 👈 https://anycloset3d.vercel.app/login.html
+שבוע ניסיון חינם, בלי כרטיס אשראי 👈 https://anycloset3d.com/login.html
 
 **קריאה לפעולה:** קישור לניסיון.
 
@@ -284,7 +284,7 @@ https://anycloset3d.vercel.app/login.html
 נרשמים תוך דקה ומתחילים לתכנן מיד.
 אם זה לא בשבילך, פשוט לא ממשיכים. אין שום חיוב.
 
-להתחיל 👈 https://anycloset3d.vercel.app/login.html
+להתחיל 👈 https://anycloset3d.com/login.html
 
 **קריאה לפעולה:** הרשמה.
 **הערה:** לבדוק שכל היכולות ברשימה כלולות גם בתקופת הניסיון.
@@ -369,7 +369,7 @@ https://anycloset3d.vercel.app/login.html
 
 במקום שרטוט, אקסל, וואטסאפ וסקיצה: מקום אחד.
 
-שבוע ניסיון חינם, בלי כרטיס אשראי 👈 https://anycloset3d.vercel.app/login.html
+שבוע ניסיון חינם, בלי כרטיס אשראי 👈 https://anycloset3d.com/login.html
 
 **קריאה לפעולה:** הרשמה.
 
