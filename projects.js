@@ -381,7 +381,7 @@ function _annualToggle(planKey, installments) {
     var btnCta  = document.getElementById(cardId + '-cta');
     if (!btnFull || !btnInst || !btnCta) return;
 
-    var isInst = installments === 12;
+    var isInst = installments > 1;
     btnFull.style.background = isInst ? '#f1f5f9' : '#0099cc';
     btnFull.style.color      = isInst ? '#475569'  : '#fff';
     btnInst.style.background = isInst ? '#0099cc'  : '#f1f5f9';
@@ -389,7 +389,7 @@ function _annualToggle(planKey, installments) {
 
     // Update CTA onclick
     btnCta.setAttribute('onclick', '_openPayment(\'' + planKey + '\',' + installments + ')');
-    btnCta.textContent = isInst ? 'התחל ב-12 תשלומים' : 'התחל עכשיו';
+    btnCta.textContent = isInst ? 'התחל ב-3 תשלומים' : 'התחל עכשיו';
 }
 window._annualToggle = _annualToggle;
 
