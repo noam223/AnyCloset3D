@@ -1,10 +1,12 @@
-// Narrated sales-pitch template (16:9): one scene per narration line (tut-vo.mjs writes vo.json), each scene
-// sized to its line. Scene types: hook, logo, app, grid, ai, deal, live, compare, outro.
+// Narrated sales-pitch template (16:9 and 9:16): one scene per narration line (tut-vo.mjs writes vo.json), each
+// scene sized to its line. Scene types: hook, logo, app, grid, ai, deal, live, compare, outro.
 // Deterministic: renderFrame(t) derives every element from t; render.mjs seeks frame by frame.
 // Render with --serve-root .. (gallery images live in ../assets/renders).
+// Portrait keeps content inside y≈130–1560 so captions and the Reels/TikTok UI don't cover it.
 let markReady;
 window.__ready = new Promise(r => { markReady = r; });
-const W = 1920, H = 1080, FPS = 30;
+const P = new URLSearchParams(location.search).get('f') === '9x16';
+const W = P ? 1080 : 1920, H = P ? 1920 : 1080, FPS = 30;
 const C = window.CONTENT;
 const IW = 1904, IH = 1071;
 const BRAND_RE = /אֶנִי קְלוֹזֶט תְּרִי דִי/g;
@@ -32,6 +34,7 @@ const words = text => text.split(' ').map(w => {
 const accWords = text => {
   let on = false;
   return text.split(' ').map(w => {
+    if (w === '|') return '<br>';
     if (w.startsWith('*')) on = true;
     const a = on; if (w.endsWith('*')) on = false;
     return `<span class="mw"><span class="${a ? 'acc' : ''}">${w.replace(/\*/g, '')}</span></span>`;
@@ -98,6 +101,9 @@ el('style', '', document.head, `
 .sweep { position:absolute; top:-20%; height:140%; width:260px; z-index:40; pointer-events:none; transform:skewX(-18deg);
   background:linear-gradient(90deg, transparent, rgba(125,234,255,.18), rgba(255,255,255,.55), rgba(125,234,255,.18), transparent); }
 .flashw { position:absolute; inset:0; background:#fff; z-index:41; pointer-events:none; }
+${P ? `.cap { bottom:300px; white-space:normal; width:max-content; max-width:940px; font-size:40px; line-height:1.3; padding:12px 30px; }
+.hud { left:50%; top:96px; height:46px; transform:translateX(-50%); }
+.crow { font-size:42px; }` : ''}
 `);
 
 /* ───────────── shared pieces ───────────── */
@@ -118,6 +124,7 @@ function cover(iw, ih, fw, fh, k = 1, c) {
   const fit = (cc, i, f) => (i * s <= f ? (f - i * s) / 2 : Math.min(0, Math.max(f - i * s, f / 2 - cc * s)));
   return { s, x: fit(cx, iw, fw), y: fit(cy, ih, fh) };
 }
+const TOPT = { x: 40, y: 168, w: W - 80, align: 'center', fs: 76 };
 const CUES = [];
 const cue = (t, type, g = 1) => CUES.push([+t.toFixed(3), type, g]);
 
@@ -139,14 +146,16 @@ T.hook = {
       { x: 640, y: 40, w: 300, h: 170, title: 'LAYERS', body: [1, 2, 3, 4].map(i => `<div style="font:600 18px Heebo;color:#8d949f;direction:ltr;text-align:left">▸ Layer_0${i}_final_v${i + 3}</div>`).join('') },
       { x: 700, y: 770, w: 330, h: 150, title: 'SAVE', body: `<div style="font:800 24px Heebo">שומר קובץ… 2.4GB</div><div class="pbar" style="margin-top:18px"><div class="sv"></div></div>` },
     ];
+    if (P) [[40, 170], [570, 230], [530, 1180], [50, 1050], [700, 560], [100, 1320]].forEach(([x, y], i) => Object.assign(tpl[i], { x, y }));
     s._ = {
       red,
       wins: tpl.map((p, i) => {
         const w = css(el('div', 'fw', root, `<div class="tb"><i></i><i></i><i></i><span>${p.title}</span></div><div class="bd">${p.body}</div>`), { left: p.x, top: p.y, width: p.w, height: p.h });
         return { w, p, at: 0.15 + i * 0.32, ph: rand() * 6, spin: w.querySelector('.spin'), bar: w.querySelector('.pbar > div'), eta: w.querySelector('.eta'), sv: w.querySelector('.sv') };
       }),
-      panel: css(el('div', '', root), { position: 'absolute', left: 560, top: 360, width: 800, height: 330, borderRadius: 30, background: 'rgba(7,18,36,.82)', boxShadow: '0 0 80px rgba(7,18,36,.9)', zIndex: 4 }),
-      title: css(el('div', 'ptitle', root, `<div>${words(s.l1)}</div><div>${accWords(s.l2)}</div>`), { position: 'absolute', left: 0, right: 0, top: 392, textAlign: 'center', fontSize: 112, zIndex: 5 }),
+      panel: css(el('div', '', root), P ? { position: 'absolute', left: 50, top: 780, width: 980, height: 330, borderRadius: 30, background: 'rgba(7,18,36,.82)', boxShadow: '0 0 80px rgba(7,18,36,.9)', zIndex: 4 }
+        : { position: 'absolute', left: 560, top: 360, width: 800, height: 330, borderRadius: 30, background: 'rgba(7,18,36,.82)', boxShadow: '0 0 80px rgba(7,18,36,.9)', zIndex: 4 }),
+      title: css(el('div', 'ptitle', root, `<div>${words(s.l1)}</div><div>${accWords(s.l2)}</div>`), { position: 'absolute', left: 0, right: 0, top: P ? 812 : 392, textAlign: 'center', fontSize: P ? 108 : 112, zIndex: 5 }),
     };
     s._.title.querySelectorAll('.acc').forEach(a => { a.style.color = '#ff6b6b'; });
     s._.wins.forEach(o => cue(s.t0 + o.at, 'pop', 0.45));
@@ -157,7 +166,7 @@ T.hook = {
     wins.forEach((o, i) => {
       const a = eob(seg(u, o.at, o.at + 0.45));
       const jx = Math.sin(t * 23 + o.ph) * 5 * shake, jy = Math.cos(t * 19 + o.ph) * 4 * shake;
-      const cx = 960 - (o.p.x + o.p.w / 2), cy = 540 - (o.p.y + o.p.h / 2);
+      const cx = W / 2 - (o.p.x + o.p.w / 2), cy = H / 2 - (o.p.y + o.p.h / 2);
       css(o.w, { opacity: seg(u, o.at, o.at + 0.2) * (1 - suck * 0.8),
         transform: `translate(${jx + cx * suck}px, ${jy + Math.sin(u * 0.8 + o.ph) * 8 + cy * suck}px) scale(${(0.7 + 0.3 * a) * (1 - suck * 0.9)}) rotate(${(i % 2 ? 1 : -1) * (1.5 + suck * 8)}deg)` });
       if (o.spin) o.spin.style.transform = `rotate(${u * 420}deg)`;
@@ -179,9 +188,9 @@ T.logo = {
         const c = css(el('div', 'gcard', root, `<img src="${shot(n)}">`), { width: 230, height: 170 });
         return { c, a: (i / ring.length) * Math.PI * 2 };
       }),
-      glow: css(el('div', '', root), { position: 'absolute', left: 560, top: 240, width: 800, height: 600, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(0,212,255,.35), transparent)', zIndex: 1 }),
-      logo: css(el('img', '', root), { position: 'absolute', width: 820, left: 550, top: 400, zIndex: 3 }),
-      line: css(el('div', 'ptitle', root, accWords(s.line)), { position: 'absolute', left: 0, right: 0, top: 590, textAlign: 'center', fontSize: 64, zIndex: 3 }),
+      glow: css(el('div', '', root), { position: 'absolute', left: W / 2 - 400, top: H / 2 - 300, width: 800, height: 600, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(0,212,255,.35), transparent)', zIndex: 1 }),
+      logo: css(el('img', '', root), P ? { position: 'absolute', width: 820, left: 130, top: 790, zIndex: 3 } : { position: 'absolute', width: 820, left: 550, top: 400, zIndex: 3 }),
+      line: css(el('div', 'ptitle', root, accWords(P ? s.line.replace('. ', '. | ') : s.line)), { position: 'absolute', left: 0, right: 0, top: P ? 990 : 590, textAlign: 'center', fontSize: P ? 76 : 64, zIndex: 3 }),
     };
     s._.logo.src = 'assets/brand/logo-wide.png';
     cue(s.t0 + 0.05, 'impact', 0.8); cue(s.t0 + 0.2, 'shimmer', 0.6);
@@ -193,8 +202,8 @@ T.logo = {
     css(glow, { opacity: 0.4 + 0.6 * (1 - seg(u, 0.2, 1.6)), transform: `scale(${0.6 + 0.6 * a})` });
     animWords(line, u, 0.7, 0.08);
     orb.forEach((o, i) => {
-      const ang = o.a + u * 0.18, rx = 760, ry = 360;
-      const x = 960 + Math.cos(ang) * rx * (0.7 + 0.3 * a) - 115, y = 520 + Math.sin(ang) * ry * (0.7 + 0.3 * a) - 85;
+      const ang = o.a + u * 0.18, rx = P ? 400 : 760, ry = P ? 640 : 360;
+      const x = W / 2 + Math.cos(ang) * rx * (0.7 + 0.3 * a) - 115, y = H / 2 - 20 + Math.sin(ang) * ry * (0.7 + 0.3 * a) - 85;
       css(o.c, { left: x, top: y, opacity: 0.55 * seg(u, 0.3 + i * 0.06, 0.8 + i * 0.06), transform: `scale(${0.75 + 0.25 * eob(seg(u, 0.3 + i * 0.06, 0.9 + i * 0.06))})`, zIndex: 0 });
     });
   },
@@ -202,21 +211,21 @@ T.logo = {
 
 T.app = {
   build(s, root) {
-    const L = s.side === 'left', WW = 1160, VH = Math.round(WW * IH / IW), WH = VH + 44;
-    const wx = L ? 90 : W - 90 - WW, wy = Math.round((H - WH) / 2) - 18;
+    const L = s.side === 'left', WW = P ? 1000 : 1160, VH = P ? 760 : Math.round(WW * IH / IW), WH = VH + 44;
+    const wx = P ? 40 : L ? 90 : W - 90 - WW, wy = P ? 320 : Math.round((H - WH) / 2) - 18;
     const win = css(el('div', 'win', root, `<div class="chrome"><i></i><i></i><i></i><div class="url">anycloset3d.com</div></div>`), { left: wx, top: wy, width: WW, height: WH });
     const view = el('div', 'view', win), cam = el('div', 'cam', view);
     const imgs = s.imgs.map(n => { const i = el('img', '', cam); i.src = shot(n); css(i, { width: IW, height: IH, opacity: 0 }); return i; });
     const flash = css(el('div', '', view), { position: 'absolute', inset: 0, background: 'rgba(0,212,255,.25)', opacity: 0, zIndex: 3 });
     const tx = L ? 1320 : 90;
-    const tb = tblock(root, s, { x: tx, y: 250, w: 510, fs: 82 });
+    const tb = tblock(root, s, P ? { x: 40, y: 1170, w: 1000, fs: 84, align: 'center', sub: false } : { x: tx, y: 250, w: 510, fs: 82 });
     let ticks = null, sw = null;
     if (s.ticks) {
-      const box = css(el('div', 'chips', tb.box), { position: 'relative', marginTop: 34, gap: '12px', direction: 'rtl', justifyContent: 'flex-start' });
-      ticks = s.ticks.map(n => css(el('div', 'chip', box, `<i></i>${n}`), { fontSize: 25, padding: '8px 18px 8px 14px' }));
+      const box = css(el('div', 'chips', tb.box), { position: 'relative', marginTop: 34, gap: '12px', direction: 'rtl', justifyContent: P ? 'center' : 'flex-start' });
+      ticks = s.ticks.map(n => css(el('div', 'chip', box, `<i></i>${n}`), { fontSize: P ? 28 : 25, padding: '8px 18px 8px 14px' }));
     }
     if (s.swatches) {
-      const box = css(el('div', '', tb.box), { position: 'relative', marginTop: 40, display: 'flex', gap: '16px', direction: 'rtl' });
+      const box = css(el('div', '', tb.box), { position: 'relative', marginTop: 40, display: 'flex', gap: '16px', direction: 'rtl', justifyContent: P ? 'center' : 'flex-start' });
       sw = s.swatches.map(c => css(el('div', '', box), { width: 62, height: 62, borderRadius: '50%', background: c, border: '3px solid rgba(255,255,255,.25)', boxShadow: '0 8px 20px rgba(0,0,0,.4)' }));
     }
     const n = s.imgs.length, span = s.vd * 0.92;
@@ -226,10 +235,10 @@ T.app = {
   frame(s, u, t) {
     const { L, WW, VH, win, cam, imgs, flash, tb, ticks, sw, at } = s._;
     const e = eo(seg(u, 0, 0.75));
-    css(win, { opacity: seg(u, 0, 0.3), transform: `translateX(${(1 - e) * (L ? -90 : 90)}px) scale(${0.94 + 0.06 * e})` });
-    const f0 = s.focus[0], f1 = s.focus[1], k = eio(seg(t, s.t0 + 0.4, s.t1));
+    css(win, { opacity: seg(u, 0, 0.3), transform: P ? `translateY(${(1 - e) * -70}px) scale(${0.94 + 0.06 * e})` : `translateX(${(1 - e) * (L ? -90 : 90)}px) scale(${0.94 + 0.06 * e})` });
+    const [f0, f1] = P ? (s.focusP || [[720, 535, 1], [720, 520, 1.18]]) : s.focus, k = eio(seg(t, s.t0 + 0.4, s.t1));
     const f = [lerp(f0[0], f1[0], k), lerp(f0[1], f1[1], k), Math.exp(lerp(Math.log(f0[2]), Math.log(f1[2]), k))];
-    const sc = (WW / IW) * f[2];
+    const sc = Math.max(WW / IW, VH / IH) * f[2];
     const cx = Math.min(0, Math.max(WW - IW * sc, WW / 2 - f[0] * sc)), cy = Math.min(0, Math.max(VH - IH * sc, VH / 2 - f[1] * sc));
     cam.style.transform = `translate(${cx}px, ${cy}px) scale(${sc})`;
     let cur = 0; at.forEach((a, i) => { if (a > 0 && t >= a) cur = i; });
@@ -255,11 +264,11 @@ T.app = {
 
 T.grid = {
   build(s, root) {
-    const tb = tblock(root, s, { x: 0, y: 64, w: W, align: 'center', fs: 78 });
-    const cw = 400, ch = 292, gap = 28, x0 = (W - (4 * cw + 3 * gap)) / 2, y0 = 262;
+    const tb = tblock(root, s, P ? TOPT : { x: 0, y: 64, w: W, align: 'center', fs: 78 });
+    const NC = P ? 2 : 4, cw = P ? 480 : 400, ch = P ? 258 : 292, gap = P ? 24 : 28, x0 = (W - (NC * cw + (NC - 1) * gap)) / 2, y0 = P ? 370 : 262;
     const span = s.vd * 0.82;
     const cards = s.items.map(([n, label], k) => {
-      const col = 3 - (k % 4), row = k >> 2;
+      const col = NC - 1 - (k % NC), row = Math.floor(k / NC);
       const c = css(el('div', 'gcard', root, `<img src="${shot(n)}"><div class="lb">${label}</div>`), { left: x0 + col * (cw + gap), top: y0 + row * (ch + gap), width: cw, height: ch });
       const img = c.querySelector('img'); css(img, { top: -(cw * 1276 / 1336 - ch) / 2 });
       const at = s.v0 + span * k / s.items.length;
@@ -282,15 +291,15 @@ T.grid = {
 
 T.ai = {
   build(s, root) {
-    const tb = tblock(root, s, { x: 0, y: 34, w: W, align: 'center', fs: 76 });
-    const B = { x: 290, y: 206, w: 1340, h: 748 };
+    const tb = tblock(root, s, P ? TOPT : { x: 0, y: 34, w: W, align: 'center', fs: 76 });
+    const B = P ? { x: 40, y: 400, w: 1000, h: 700 } : { x: 290, y: 206, w: 1340, h: 748 };
     const fr = el('div', 'frame', root);
     const a = el('img', '', fr), b = el('img', '', fr);
     a.src = shot(s.from); b.src = shot(s.to);
     const wl = css(el('div', 'wipe', fr), { display: 'none' });
     const t3 = el('div', 'tagpill', fr, 'תלת־ממד מהעורך');
     const tai = el('div', 'tagpill', fr, '<b>✦</b> הדמיה פוטוריאליסטית');
-    const cw = 420, chh = 236, gap = 22, x0 = (W - (3 * cw + 2 * gap)) / 2, y0 = 208;
+    const cw = P ? 320 : 420, chh = P ? 340 : 236, gap = P ? 20 : 22, x0 = (W - (3 * cw + 2 * gap)) / 2, y0 = P ? 360 : 208;
     const cells = [];
     for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) if (!(r === 1 && c === 1)) cells.push({ x: x0 + c * (cw + gap), y: y0 + r * (chh + gap) });
     const gal = s.gallery.slice(0, 8).map((n, i) => {
@@ -336,9 +345,9 @@ T.ai = {
 
 T.deal = {
   build(s, root) {
-    const tb = tblock(root, s, { x: 0, y: 34, w: W, align: 'center', fs: 76 });
-    const cw = 520, ch = 610, gap = 50, x0 = (W - (3 * cw + 2 * gap)) / 2, y0 = 240;
-    const X = k => x0 + (2 - k) * (cw + gap);
+    const tb = tblock(root, s, P ? TOPT : { x: 0, y: 34, w: W, align: 'center', fs: 76 });
+    const cw = 520, ch = 610, gap = 50, x0 = (W - (3 * cw + 2 * gap)) / 2, y0 = P ? 560 : 240;
+    const X = k => (P ? (W - cw) / 2 : x0 + (2 - k) * (cw + gap));
     const c0 = css(el('div', 'dcard', root, `<div class="dh"><i>₪</i>מחיר בזמן אמת</div><div class="big">₪ 0</div><div class="demo">דוגמה</div>`), { left: X(0), top: y0, width: cw, height: ch });
     const rows0 = ['גוף וחזיתות', 'ידיות ופרזול', 'התקנה', 'הנחה 10%'].map((r, i) => css(el('div', 'drow', c0, `<span>${r}</span><b>✓</b>`), { top: 270 + i * 70 }));
     const c1 = css(el('div', 'dcard', root, `<div class="dh"><i>✍</i>חתימה דיגיטלית</div>`), { left: X(1), top: y0, width: cw, height: ch });
@@ -353,7 +362,7 @@ T.deal = {
     css(el('div', 'drow', c2, '<span>פריט</span><span>מידות</span><span>כמות</span>'), { top: 116, color: 'var(--muted)', fontSize: 22 });
     const rows2 = s.cuts.map((r, i) => css(el('div', 'drow', c2, `<span>${r[0]}</span><span style="direction:ltr">${r[1]}</span><b>${r[2]}</b>`), { top: 180 + i * 64 }));
     const ok2 = css(el('div', 'ok', c2, 'נשלח לייצור ✓'), { top: 530 });
-    const at = [0, 1, 2].map(k => s.v0 - 0.1 + k * s.vd * 0.3);
+    const at = [0, 1, 2].map(k => s.v0 - 0.1 + k * s.vd * (P ? 0.36 : 0.3));
     s._ = { tb, cards: [c0, c1, c2], rows0, big: c0.querySelector('.big'), sig, ok1, rows2, ok2, at };
     at.forEach(a => cue(a, 'whoosh', 0.35));
     cue(at[0] + 0.3, 'counter', 0.5); cue(at[1] + 1.25, 'stamp', 0.7); cue(at[2] + 1.2, 'ding', 0.6);
@@ -361,7 +370,14 @@ T.deal = {
   frame(s, u, t) {
     const { tb, cards, rows0, big, sig, ok1, rows2, ok2, at } = s._;
     tb.upd(u);
-    cards.forEach((c, k) => { const a = eob(seg(t, at[k], at[k] + 0.5)); css(c, { opacity: seg(t, at[k], at[k] + 0.2), transform: `translateY(${(1 - a) * 60}px) scale(${0.9 + 0.1 * a})` }); });
+    cards.forEach((c, k) => {
+      const a = eob(seg(t, at[k], at[k] + 0.5));
+      if (P) {
+        // one card at a time: the next one slides in and pushes the current one out
+        const x = eo(seg(t, at[k], at[k] + 0.45)), g = k < 2 ? eio(seg(t, at[k + 1] - 0.15, at[k + 1] + 0.2)) : 0;
+        css(c, { zIndex: k + 1, opacity: seg(t, at[k], at[k] + 0.12) * (1 - g), transform: `translateX(${(1 - x) * 900 - g * 500}px) scale(${1.45 * (0.92 + 0.08 * a) * (1 - 0.15 * g)}) rotate(${(1 - x) * 5}deg)` });
+      } else css(c, { opacity: seg(t, at[k], at[k] + 0.2), transform: `translateY(${(1 - a) * 60}px) scale(${0.9 + 0.1 * a})` });
+    });
     const n = Math.round(s.price * eo(seg(t, at[0] + 0.3, at[0] + 1.4)));
     big.textContent = '₪ ' + n.toLocaleString('en-US');
     rows0.forEach((r, i) => css(r, { opacity: seg(t, at[0] + 0.4 + i * 0.18, at[0] + 0.6 + i * 0.18) }));
@@ -374,8 +390,8 @@ T.deal = {
 
 T.live = {
   build(s, root) {
-    const tb = tblock(root, s, { x: 0, y: 34, w: W, align: 'center', fs: 76 });
-    const R = { x: 284, y: 206, w: 1351, h: 760 };
+    const tb = tblock(root, s, P ? TOPT : { x: 0, y: 34, w: W, align: 'center', fs: 76 });
+    const R = P ? { x: 40, y: 400, w: 1000, h: 1080 } : { x: 284, y: 206, w: 1351, h: 760 };
     const fr = css(el('div', 'frame', root), { left: R.x, top: R.y, width: R.w, height: R.h });
     const a = el('img', '', fr), b = el('img', '', fr);
     a.src = shot(s.img); b.src = shot(s.img2);
@@ -390,29 +406,32 @@ T.live = {
     const e = eo(seg(u, 0, 0.6));
     css(fr, { opacity: seg(u, 0, 0.3), transform: `scale(${0.95 + 0.05 * e})` });
     const place = (im, f) => {
-      const sc = (R.w / IW) * f[2];
+      const sc = Math.max(R.w / IW, R.h / IH) * f[2];
       const x = Math.min(0, Math.max(R.w - IW * sc, R.w / 2 - f[0] * sc)), y = Math.min(0, Math.max(R.h - IH * sc, R.h / 2 - f[1] * sc));
       im.style.transform = `translate(${x}px, ${y}px) scale(${sc})`;
     };
     const k1 = eio(seg(t, s.v0 + 0.8, sw));
-    place(a, [lerp(952, 1500, k1), lerp(535, 520, k1), lerp(1, 1.55, k1)]);
+    // portrait: pan across the composed frame from the editor to the phone receiving the change
+    place(a, P ? [lerp(600, 1660, k1), 535, 1] : [lerp(952, 1500, k1), lerp(535, 520, k1), lerp(1, 1.55, k1)]);
     const k2 = seg(t, sw, s.t1 + 0.3);
-    place(b, [952, 535, lerp(1.12, 1, eo(k2))]);
+    place(b, P ? [700, 535, lerp(1.08, 1, eo(k2))] : [952, 535, lerp(1.12, 1, eo(k2))]);
     b.style.opacity = eio(seg(t, sw, sw + 0.4));
   },
 };
 
 T.compare = {
   build(s, root) {
-    const cw = 760, top = 150, hh = 760;
-    const right = css(el('div', 'ccol', root), { left: W / 2 + 40, top, width: cw, height: hh, background: 'linear-gradient(170deg, rgba(0,212,255,.14), rgba(12,29,54,.9))', border: '2px solid rgba(0,212,255,.6)', boxShadow: '0 0 60px rgba(0,212,255,.25)' });
-    const left = css(el('div', 'ccol', root), { left: W / 2 - 40 - cw, top, width: cw, height: hh, background: 'rgba(30,34,42,.75)', border: '2px solid rgba(160,170,185,.25)' });
+    // landscape: side by side; portrait: heavy software on top, AnyCloset3D below
+    const cw = P ? 960 : 760, top = 150, hh = P ? 590 : 760;
+    const RB = P ? { left: 60, top: 900 } : { left: W / 2 + 40, top }, LB = P ? { left: 60, top: 250 } : { left: W / 2 - 40 - cw, top };
+    const right = css(el('div', 'ccol', root), { ...RB, width: cw, height: hh, background: 'linear-gradient(170deg, rgba(0,212,255,.14), rgba(12,29,54,.9))', border: '2px solid rgba(0,212,255,.6)', boxShadow: '0 0 60px rgba(0,212,255,.25)' });
+    const left = css(el('div', 'ccol', root), { ...LB, width: cw, height: hh, background: 'rgba(30,34,42,.75)', border: '2px solid rgba(160,170,185,.25)' });
     const lg = el('img', '', right); lg.src = 'assets/brand/logo-wide.png'; css(lg, { position: 'absolute', height: 60, right: 40, top: 44 });
     css(el('div', '', left, 'תוכנות כבדות'), { position: 'absolute', right: 40, top: 40, font: '900 52px Heebo', color: '#aeb6c2' });
-    const vs = el('div', 'vs', root, 'VS'); css(vs, { top: top + hh / 2 });
+    const vs = el('div', 'vs', root, 'VS'); css(vs, { top: P ? 870 : top + hh / 2 });
     const fr = [0.02, 0.2, 0.4, 0.64];
     const rows = s.rows.map(([bad, good], k) => {
-      const y = 170 + k * 140;
+      const y = P ? 145 + k * 106 : 170 + k * 140;
       const l = css(el('div', 'crow', left, `<span class="mk" style="background:rgba(255,107,107,.15);color:#ff6b6b;border:2px solid #ff6b6b">✕</span><span>${bad}</span><span class="st"></span>`), { top: y, color: '#c9d0da' });
       const r = css(el('div', 'crow', right, `<span class="mk" style="background:var(--accent);color:var(--navy);box-shadow:0 0 20px rgba(0,212,255,.8)">✓</span><span>${good}</span>`), { top: y, color: '#fff' });
       const st = l.querySelector('.st'); st._txt = l.children[1];
@@ -425,8 +444,9 @@ T.compare = {
   frame(s, u, t) {
     const { right, left, vs, rows } = s._;
     const e = eo(seg(u, 0, 0.6));
-    css(left, { opacity: seg(u, 0, 0.3), transform: `translateX(${(1 - e) * -80}px)` });
-    css(right, { opacity: seg(u, 0.1, 0.4), transform: `translateX(${(1 - eo(seg(u, 0.1, 0.7))) * 80}px)` });
+    const ax = P ? 'translateY' : 'translateX';
+    css(left, { opacity: seg(u, 0, 0.3), transform: `${ax}(${(1 - e) * -80}px)` });
+    css(right, { opacity: seg(u, 0.1, 0.4), transform: `${ax}(${(1 - eo(seg(u, 0.1, 0.7))) * 80}px)` });
     css(vs, { opacity: seg(u, 0.3, 0.5), transform: `scale(${eob(seg(u, 0.3, 0.7))})` });
     rows.forEach(({ l, r, st, at }) => {
       const p = eo(seg(t, at - 0.1, at + 0.3));
