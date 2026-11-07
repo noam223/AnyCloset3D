@@ -87,7 +87,7 @@ const __c = new URLSearchParams(location.search).get('c');
 if (__c && __c !== 'content' && /^[\w-]+$/.test(__c)) document.write(`<script src="${__c}.js"><\/script>`);
 </script>
 <script>
-document.write(`<script src="${window.CONTENT && window.CONTENT.TEMPLATE === 'tutorial' ? 'tutorial' : 'main'}.js"><\/script>`);
+document.write(`<script src="${({ tutorial: 'tutorial', pitch: 'pitch' })[window.CONTENT && window.CONTENT.TEMPLATE] || 'main'}.js"><\/script>`);
 </script>
 </body>
 </html>
