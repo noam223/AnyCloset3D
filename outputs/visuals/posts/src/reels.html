@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="he">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../brand/src/fonts.css">
+<style>
+  html, body { margin: 0; background: transparent; }
+  body { display: flex; flex-direction: column; gap: 40px; align-items: flex-start; }
+  .r {
+    width: 1080px; height: 1920px; position: relative; overflow: hidden; direction: rtl; text-align: center;
+    font-family: 'Heebo', sans-serif; color: #fff;
+  }
+  .bg { position: absolute; inset: 0; background: linear-gradient(160deg, #152B47 0%, #1E3A5F 55%, #152B47 100%); }
+  .bg::before {
+    content: ''; position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(0, 212, 255, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 212, 255, 0.06) 1px, transparent 1px);
+    background-size: 54px 54px;
+  }
+  .logo { position: absolute; top: 110px; left: 50%; transform: translateX(-50%); width: 440px; }
+  .t { position: absolute; left: 70px; right: 70px; }
+  .h { font-weight: 900; font-size: 92px; line-height: 1.08; margin: 0; }
+  .s { font-weight: 400; font-size: 44px; line-height: 1.35; color: #B9C8DB; margin: 0; }
+  .cyan { color: #00D4FF; }
+  .pill { display: inline-block; padding: 22px 48px; border-radius: 999px; background: #00D4FF; color: #152B47; font-weight: 800; font-size: 42px; }
+  .url { font-weight: 700; font-size: 36px; color: #7F95B2; direction: ltr; display: inline-block; }
+  .photo { position: absolute; left: 70px; right: 70px; overflow: hidden; border-radius: 30px; box-shadow: 0 30px 70px rgba(0,0,0,0.45); }
+  .photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .tag { position: absolute; top: 24px; right: 24px; padding: 10px 26px; border-radius: 999px; background: rgba(21, 43, 71, 0.88); font-weight: 700; font-size: 32px; }
+  .tag.ai { background: #00D4FF; color: #152B47; }
+  .hole { position: absolute; left: 0; right: 0; top: 656px; height: 608px; background: transparent; }
+</style>
+</head>
+<body>
+
+<!-- Post 5: frame around the 16:9 live-sharing clip, which is placed at y=656 (1080x608) -->
+<div class="r" data-out="reel05-frame">
+  <div class="bg" style="clip-path: polygon(0 0, 100% 0, 100% 656px, 0 656px, 0 1264px, 100% 1264px, 100% 100%, 0 100%)"></div>
+  <img class="logo" src="../../brand/src/logo-wide.png" alt="">
+  <div class="t" style="top:300px"><p class="h">שולחת ללקוחה <span class="cyan">קישור</span>...</p></div>
+  <div class="t" style="top:1330px"><p class="h" style="font-size:76px">והיא רואה כל שינוי<br><span class="cyan">בזמן אמת</span></p>
+    <p class="s" style="margin-top:28px">בלי התקנה. בלי חשבון.</p></div>
+  <div class="t" style="top:1720px"><span class="url">anycloset3d.com</span></div>
+</div>
+
+<!-- Post 10: Hanukkah LED reel, four stills -->
+<div class="r" data-out="reel10-a">
+  <div class="photo" style="inset:0; border-radius:0; box-shadow:none; left:0; right:0"><img src="ai-02.jpg" style="filter: brightness(0.38)"></div>
+  <div class="t" style="top:720px"><p class="h" style="font-size:150px">חג אורים</p>
+    <p class="h cyan" style="font-size:90px; margin-top:20px">גם בתוך הארון</p></div>
+</div>
+<div class="r" data-out="reel10-b">
+  <div class="bg"></div>
+  <div class="t" style="top:300px"><p class="h">פס לד <span class="cyan">בלחיצה</span></p>
+    <p class="s" style="margin-top:24px">רואים בדיוק איך הוא מאיר את התאים והזכוכית</p></div>
+  <div class="photo" style="top:700px; height:900px"><img src="sample-3d.jpg" style="object-position:42% 50%"><span class="tag">המודל במערכת</span></div>
+</div>
+<div class="r" data-out="reel10-c">
+  <div class="bg"></div>
+  <div class="t" style="top:300px"><p class="h">ואותו ארון<br><span class="cyan">בהדמיית AI</span></p></div>
+  <div class="photo" style="top:700px; height:900px"><img src="ai-01.jpg" style="object-position:48% 50%"><span class="tag ai">הדמיית AI</span></div>
+</div>
+<div class="r" data-out="reel10-d">
+  <div class="bg"></div>
+  <img class="logo" src="../../brand/src/logo-wide.png" alt="" style="top:640px; width:620px">
+  <div class="t" style="top:880px"><p class="h">חג אורים שמח</p></div>
+  <div class="t" style="top:1130px"><span class="pill">שבוע ניסיון חינם · בלי כרטיס אשראי</span>
+    <div style="margin-top:30px"><span class="url">anycloset3d.com</span></div></div>
+</div>
+
+</body>
+</html>

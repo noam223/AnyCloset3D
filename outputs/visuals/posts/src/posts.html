@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="he">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../brand/src/fonts.css">
+<style>
+  html, body { margin: 0; background: #555; }
+  body { display: flex; flex-direction: column; gap: 40px; align-items: flex-start; }
+
+  .slide {
+    position: relative; overflow: hidden; direction: rtl; text-align: right;
+    font-family: 'Heebo', sans-serif; color: #1E293B; box-sizing: border-box;
+  }
+  .sq { width: 1080px; height: 1080px; }
+  .pt { width: 1080px; height: 1350px; }
+
+  .dark { color: #FFFFFF; background: linear-gradient(135deg, #152B47 0%, #1E3A5F 60%, #152B47 100%); }
+  .dark::before {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(0, 212, 255, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 212, 255, 0.06) 1px, transparent 1px);
+    background-size: 54px 54px;
+    -webkit-mask-image: radial-gradient(ellipse at 50% 100%, #000 0%, transparent 75%);
+  }
+  .light { background: #F0F4F8; }
+
+  .brandbar {
+    position: absolute; top: 56px; left: 64px; right: 64px; height: 44px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .brandbar img { height: 40px; direction: ltr; }
+  .light .brandbar img.wide { display: none; }
+  .brandbar .mark { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 26px; color: #1E3A5F; direction: ltr; }
+  .brandbar .mark img { height: 44px; }
+  .dark .brandbar .mark { display: none; }
+  .count { font-weight: 700; font-size: 24px; color: #94A3B8; direction: ltr; }
+  .dark .count { color: #7F95B2; }
+
+  .pad { position: absolute; left: 72px; right: 72px; }
+  h1, h2, p { margin: 0; }
+  .h-xl { font-weight: 900; font-size: 92px; line-height: 1.05; letter-spacing: -1px; }
+  .h-l { font-weight: 800; font-size: 72px; line-height: 1.1; letter-spacing: -0.5px; }
+  .h-m { font-weight: 800; font-size: 54px; line-height: 1.15; }
+  .body { font-weight: 400; font-size: 34px; line-height: 1.45; color: #475569; }
+  .dark .body { color: #B9C8DB; }
+  .cyan { color: #00D4FF; }
+  .navy { color: #1E3A5F; }
+
+  .pill {
+    display: inline-block; padding: 18px 40px; border-radius: 999px;
+    background: #00D4FF; color: #152B47; font-weight: 800; font-size: 34px;
+  }
+  .url { font-weight: 700; font-size: 28px; color: #7F95B2; direction: ltr; display: inline-block; }
+
+  .photo { position: absolute; overflow: hidden; border-radius: 26px; box-shadow: 0 30px 60px rgba(0,0,0,0.35); }
+  .photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .light .photo { box-shadow: 0 20px 44px rgba(21, 43, 71, 0.18); }
+  .tag {
+    position: absolute; top: 20px; right: 20px; padding: 8px 22px; border-radius: 999px;
+    background: rgba(21, 43, 71, 0.88); color: #fff; font-weight: 700; font-size: 26px;
+  }
+  .tag.ai { background: #00D4FF; color: #152B47; }
+
+  .num {
+    display: inline-flex; align-items: center; justify-content: center; width: 96px; height: 96px; border-radius: 24px;
+    background: #1E3A5F; color: #00D4FF; font-weight: 900; font-size: 46px; direction: ltr;
+  }
+  .label { font-weight: 800; font-size: 56px; color: #1E3A5F; line-height: 1.15; }
+  .value { font-weight: 900; font-size: 210px; line-height: 0.9; color: #1E3A5F; direction: rtl; letter-spacing: -6px; white-space: nowrap; }
+  .value small { font-size: 72px; letter-spacing: 0; font-weight: 800; color: #475569; margin-right: 18px; }
+  .dim { display: block; }
+  .n { unicode-bidi: isolate; direction: ltr; }
+  .nobar .brandbar { display: none; }
+
+  .save { font-weight: 700; font-size: 30px; color: #475569; }
+  .check { display: flex; gap: 18px; align-items: center; font-weight: 700; font-size: 36px; margin-bottom: 20px; }
+  .check i { font-style: normal; width: 46px; height: 46px; border-radius: 50%; background: rgba(0, 212, 255, 0.16); color: #00D4FF; display: inline-flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 900; flex: none; }
+  .check em { font-style: normal; font-weight: 400; font-size: 26px; color: #B9C8DB; }
+
+  .opt { display: flex; align-items: center; gap: 24px; background: #fff; border-radius: 22px; padding: 26px 32px; margin-bottom: 22px; font-weight: 700; font-size: 40px; color: #1E3A5F; box-shadow: 0 10px 26px rgba(21, 43, 71, 0.08); }
+  .opt b { width: 70px; height: 70px; border-radius: 18px; background: #1E3A5F; color: #00D4FF; display: inline-flex; align-items: center; justify-content: center; font-size: 36px; font-weight: 900; direction: ltr; flex: none; }
+
+  .row { display: flex; justify-content: space-between; align-items: baseline; padding: 26px 0; border-bottom: 2px solid #D5DFEA; }
+  .row .k { font-weight: 700; font-size: 36px; color: #1E3A5F; }
+  .row .k span { display: block; font-weight: 400; font-size: 25px; color: #64748B; margin-top: 4px; }
+  .row .v { font-weight: 900; font-size: 46px; color: #1E3A5F; direction: rtl; white-space: nowrap; }
+  .row .v small { font-size: 26px; font-weight: 700; color: #64748B; }
+  .sig { display: flex; align-items: center; gap: 12px; justify-content: center; font-weight: 700; font-size: 24px; color: #64748B; direction: ltr; }
+  .sig img { height: 34px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const LOGO = '../../brand/src/logo-wide.png';
+const ICON = '../../brand/src/icon-hires.png';
+const brandbar = (count) => `
+  <div class="brandbar">
+    ${count ? `<span class="count">${count}</span>` : '<span></span>'}
+    <img class="wide" src="${LOGO}" alt="">
+    <span class="mark">AnyCloset 3D <img src="${ICON}" alt=""></span>
+  </div>`;
+const slide = (out, cls, html, count) => `<div class="slide ${cls}" data-out="${out}">${brandbar(count)}${html}</div>`;
+const cta = (top) => `<div class="pad" style="top:${top}px"><span class="pill">שבוע ניסיון חינם · בלי כרטיס אשראי</span><div style="margin-top:22px"><span class="url">anycloset3d.com</span></div></div>`;
+
+const S = [];
+
+// Post 1: opening
+S.push(slide('post01-opening', 'sq dark', `
+  <div class="pad" style="top:168px">
+    <h1 class="h-l">תכנון ארונות בתלת-ממד.<br>בדפדפן. <span class="cyan">תוך דקות.</span></h1>
+  </div>
+  <div class="photo" style="left:72px; right:72px; top:420px; height:500px; background:#EBF0F5"><img src="editor-crop.png" style="object-fit:contain"></div>
+  <div class="pad" style="top:960px; text-align:center"><span class="url">anycloset3d.com</span></div>
+`));
+
+// Post 3: six measurements carousel
+const M = [
+  ['עומק ארון בגדים', '55–60', 'ס"מ', 'קולב רגיל רוחבו כ-45 ס"מ, וצריך מרווח כדי שהבגדים לא יימעכו בדלת.'],
+  ['מוט תלייה לבגדים ארוכים', '150–170', 'ס"מ', 'גובה פנוי מתחת למוט, לשמלות, מעילים ומכנסיים תלויים באורך מלא.'],
+  ['מוט תלייה לחולצות', '~100', 'ס"מ', 'גובה פנוי מתחת למוט. שני מוטות אחד מעל השני מכפילים את שטח התלייה.'],
+  ['מרווח בין מדפים', '30–40', 'ס"מ', 'לערימה של בגדים מקופלים שלא מתמוטטת כשמוציאים פריט מלמטה.'],
+  ['גובה מגירה', '15–25', 'ס"מ', 'נמוכה לאביזרים ולבגדים קטנים, גבוהה יותר לסוודרים.'],
+  ['רוחב כנף דלת צירים', '50–60', 'ס"מ', 'זה המקסימום לכנף. כנף רחבה יותר כבדה על הצירים ותופסת יותר מקום כשהיא נפתחת.'],
+];
+S.push(slide('post03-1', 'pt dark', `
+  <div class="photo" style="left:0; right:0; top:0; height:1350px; border-radius:0; box-shadow:none; opacity:0.22"><img src="ai-04.jpg"></div>
+  <div class="pad" style="top:330px">
+    <h1 class="h-xl">6 מידות<br>שכל מעצבת<br>צריכה לזכור<br><span class="cyan">בתכנון ארון</span></h1>
+    <p class="body" style="margin-top:46px">דף עזר לפגישה הבאה. שמרי את הפוסט.</p>
+  </div>
+`, '1/8'));
+M.forEach(([label, val, unit, note], i) => {
+  S.push(slide(`post03-${i + 2}`, 'pt light', `
+    <div class="pad" style="top:250px"><span class="num">0${i + 1}</span></div>
+    <div class="pad" style="top:400px"><h2 class="label">${label}</h2></div>
+    <div class="pad" style="top:560px; text-align:right"><div class="value"><span class="n">${val}</span><small>${unit}</small></div></div>
+    <svg class="pad dim" style="top:800px; height:60px" viewBox="0 0 936 60" preserveAspectRatio="none">
+      <line x1="10" y1="30" x2="926" y2="30" stroke="#00D4FF" stroke-width="5"/>
+      <line x1="10" y1="8" x2="10" y2="52" stroke="#00D4FF" stroke-width="5"/>
+      <line x1="926" y1="8" x2="926" y2="52" stroke="#00D4FF" stroke-width="5"/>
+    </svg>
+    <div class="pad" style="top:920px"><p class="body">${note}</p></div>
+  `, `${i + 2}/8`));
+});
+S.push(slide('post03-8', 'pt dark', `
+  <div class="pad" style="top:200px"><h2 class="h-l">את כל המידות האלה<br><span class="cyan">רואים מול העיניים</span><br>כשמתכננים במערכת</h2></div>
+  <div class="photo" style="left:72px; right:72px; top:610px; height:440px; background:#EBF0F5"><img src="editor-crop.png" style="object-fit:contain"></div>
+  ${cta(1110)}
+`, '8/8'));
+
+// Post 4: 3D model vs AI render
+S.push(slide('post04-model-vs-ai', 'pt dark', `
+  <div class="pad" style="top:150px"><h1 class="h-m">אותו ארון. אותן מידות.</h1></div>
+  <div class="photo" style="left:72px; right:72px; top:260px; height:440px"><img src="sample-3d.jpg" style="object-position:45% 50%"><span class="tag">מודל תלת-ממדי במערכת</span></div>
+  <div class="photo" style="left:72px; right:72px; top:730px; height:440px; outline:4px solid #00D4FF"><img src="ai-01.jpg" style="object-position:45% 45%"><span class="tag ai">הדמיית AI בלחיצה</span></div>
+  <div class="pad" style="top:1210px"><p class="h-m" style="font-size:44px">איזו תמונה הלקוחה תאשר מהר יותר?</p></div>
+`));
+
+// Group post 2: measurements sheet
+S.push(slide('group2-measurements-sheet', 'pt light nobar', `
+  <div class="pad" style="top:110px">
+    <h1 class="h-l navy">דף מידות<br>לתכנון ארונות</h1>
+    <p class="body" style="margin-top:14px">מידות מקובלות לארון בגדים. לשמור לפגישה הבאה.</p>
+  </div>
+  <div class="pad" style="top:470px">
+    ${M.map(([k, v, u, n]) => `<div class="row"><div class="k">${k}</div><div class="v"><span class="n">${v}</span> <small>${u}</small></div></div>`).join('')}
+  </div>
+  <div class="pad" style="top:1240px"><div class="sig"><img src="${ICON}" alt="">AnyCloset 3D</div></div>
+`));
+
+// Post 6: three production mistakes
+S.push(slide('post06-1', 'pt dark', `
+  <div class="photo" style="left:0; right:0; top:0; height:1350px; border-radius:0; box-shadow:none; opacity:0.2"><img src="ai-03.jpg"></div>
+  <div class="pad" style="top:360px">
+    <h1 class="h-xl">3 טעויות<br>שגורמות לארון<br>להיראות <span class="cyan">אחרת</span><br>מהתכנון</h1>
+  </div>
+`, '1/5'));
+[
+  ['מידה שלא הועברה', 'מידות בוואטסאפ, בתמונה, בשיחת טלפון. משהו תמיד הולך לאיבוד בדרך לנגריה.'],
+  ['גוון שהתפרש אחרת', '"לבן שמנת" זה לא מספר גוון. מה שהלקוחה דמיינה ומה שהנגר הזמין הם שני גוונים שונים.'],
+  ['חלוקה פנימית שהנגר "הבין לבד"', 'מגירות, מוטות ומדפים שלא סומנו במדויק. הנגר משלים את החסר לפי ההרגל שלו.'],
+].forEach(([t, d], i) => {
+  S.push(slide(`post06-${i + 2}`, 'pt light', `
+    <div class="pad" style="top:330px"><span class="num">0${i + 1}</span></div>
+    <div class="pad" style="top:490px"><h2 class="h-l navy">${t}</h2></div>
+    <div class="pad" style="top:800px"><p class="body" style="font-size:40px">${d}</p></div>
+  `, `${i + 2}/5`));
+});
+S.push(slide('post06-5', 'pt dark', `
+  <div class="pad" style="top:190px"><h2 class="h-l">הפתרון:<br><span class="cyan">מפרט אחד מסודר</span></h2>
+    <p class="body" style="margin-top:24px">התכנון עצמו הוא המפרט: מידות, גווני טמבור וחלוקה פנימית, בטופס אחד שעובר לנגר.</p></div>
+  <div class="photo" style="left:72px; right:72px; top:600px; height:340px; background:#fff; padding:24px; box-sizing:border-box"><img src="order-form.png" style="object-fit:contain"></div>
+  <div class="pad" style="top:970px"><p class="body" style="font-size:28px">טופס ההזמנה מתוך AnyCloset 3D</p></div>
+  ${cta(1110)}
+`, '5/5'));
+
+// Post 7: poll
+S.push(slide('post07-poll', 'sq light', `
+  <div class="pad" style="top:160px"><h1 class="h-m navy" style="font-size:60px">איך את מראה היום ללקוחה<br>איך הארון ייראה?</h1></div>
+  <div class="pad" style="top:400px">
+    <div class="opt"><b>A</b>סקיצה ביד</div>
+    <div class="opt"><b>B</b>SketchUp / AutoCAD</div>
+    <div class="opt"><b>C</b>תמונות השראה</div>
+    <div class="opt"><b>D</b>הנגר מראה לה</div>
+  </div>
+  <div class="pad" style="top:990px"><p class="save">ענו בתגובות. את התוצאות אשתף בשבוע הבא.</p></div>
+`));
+
+// Post 9: free trial
+S.push(slide('post09-free-trial', 'sq dark', `
+  <div class="pad" style="top:150px"><h1 class="h-l">שבוע ניסיון חינם.<br><span class="cyan">גישה מלאה.</span></h1></div>
+  <div class="pad" style="top:400px; left:470px">
+    <div class="check"><i>✓</i>תכנון בתלת-ממד</div>
+    <div class="check"><i>✓</i>שיתוף חי עם הלקוחה</div>
+    <div class="check"><i>✓</i>הדמיות AI</div>
+    <div class="check"><i>✓</i><span>תמחור אוטומטי <em>(פרימיום)</em></span></div>
+    <div class="check"><i>✓</i>טופס מסודר לנגר</div>
+  </div>
+  <div class="photo" style="left:72px; width:370px; top:400px; height:400px; background:#EBF0F5"><img src="editor-crop.png" style="object-position:40% 50%"></div>
+  <div class="pad" style="top:870px"><span class="pill">להתחיל שבוע חינם</span><span class="body" style="margin-right:28px; font-size:30px">בלי כרטיס אשראי</span></div>
+`));
+
+// Post 11: choosing a shade
+S.push(slide('post11-1', 'pt dark', `
+  <div class="photo" style="left:72px; right:72px; top:150px; height:640px"><img src="ai-06.jpg"></div>
+  <div class="pad" style="top:860px"><h1 class="h-xl">איך בוחרים<br>גוון לארון: <span class="cyan">4 כללים</span></h1></div>
+`, '1/6'));
+[
+  ['גודל החדר', 'בחדר קטן, גוון בהיר "פותח" את החלל. גוון כהה עובד טוב יותר בחדר גדול.', 'ai-03.jpg'],
+  ['אור טבעי', 'אותו גוון נראה אחרת בחדר מואר ובחדר חשוך. כדאי לבדוק אותו בשעות שונות של היום.', 'ai-12.jpg'],
+  ['שאר הנגרות בבית', 'הארון צריך לדבר עם הדלתות, המטבח והרצפה, לא להתחרות בהם.', 'ai-04.jpg'],
+  ['כמה זמן זה ייראה טוב?', 'גוון טרנדי של השנה, מול גוון שמחזיק עשר שנים. שווה לשאול את הלקוחה מראש.', 'ai-08.jpg'],
+].forEach(([t, d, img], i) => {
+  S.push(slide(`post11-${i + 2}`, 'pt light', `
+    <div class="photo" style="left:72px; right:72px; top:140px; height:560px"><img src="${img}"></div>
+    <div class="pad" style="top:760px; display:flex; gap:28px; align-items:center"><span class="num">0${i + 1}</span><h2 class="h-l navy" style="font-size:64px">${t}</h2></div>
+    <div class="pad" style="top:920px"><p class="body" style="font-size:38px">${d}</p></div>
+  `, `${i + 2}/6`));
+});
+S.push(slide('post11-6', 'pt dark', `
+  <div class="pad" style="top:180px"><h2 class="h-l">אותו ארון,<br><span class="cyan">1,651 גווני טמבור</span></h2>
+    <p class="body" style="margin-top:22px">במקום דוגמאות מול הקיר, מראים ללקוחה כל גוון על המסך, לפני שמחליטים.</p></div>
+  <div class="photo" style="left:72px; width:452px; top:560px; height:480px"><img src="ai-07.jpg"></div>
+  <div class="photo" style="right:72px; width:452px; top:560px; height:480px"><img src="ai-10.jpg"></div>
+  <div class="pad" style="top:1100px"><p class="body" style="font-size:26px">1,651 גוונים בתוכנית פרימיום, 35 בבסיסית.</p></div>
+  ${cta(1170).replace('margin-top:22px', 'margin-top:14px')}
+`, '6/6'));
+
+document.getElementById('root').outerHTML = S.join('\n');
+</script>
+</body>
+</html>
