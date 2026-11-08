@@ -282,11 +282,12 @@ const placementHebrew = {
 
 // ── Drawer count helpers ──────────────────────────────────────────────────────
 // Internal: 22cm for 1 drawer, +20cm per extra → 1→22, 2→42, 3→62, ...
-// External: 12cm per drawer minimum → 1→12, 2→24, 3→36, 4→48, ...
+// External: a single drawer from 5cm; 12cm per drawer when stacked → 2→24, 3→36, 4→48, ...
 // Auto-fill (default count) keeps a 20cm step so tall cells don't get many tiny external fronts.
 window.MIN_DRAWER_CELL_H = 22;
 window.DRAWER_EXTRA_H = 20;
 window.MIN_EXTERNAL_DRAWER_CELL_H = 12;
+window.MIN_EXTERNAL_SINGLE_DRAWER_H = 5;
 window.EXTERNAL_DRAWER_EXTRA_H = 12;
 window.EXTERNAL_DRAWER_AUTO_STEP_H = 20;
 // Shoe pull-out shelf: 18cm for 1 unit, +18cm per extra → 1→18, 2→36, 3→54, ...
@@ -295,11 +296,13 @@ window.SHOE_DRAWER_EXTRA_H = 18;
 
 function _drawerHeightRules(drawerType) {
     if (drawerType === 'shoe_drawers') {
-        return { minH: window.MIN_SHOE_DRAWER_CELL_H, extraH: window.SHOE_DRAWER_EXTRA_H, autoStepH: window.SHOE_DRAWER_EXTRA_H };
+        return { minH: window.MIN_SHOE_DRAWER_CELL_H, baseH: window.MIN_SHOE_DRAWER_CELL_H, extraH: window.SHOE_DRAWER_EXTRA_H, autoStepH: window.SHOE_DRAWER_EXTRA_H };
     }
     const isExt = drawerType === 'external_drawers';
+    // minH: smallest cell that takes one drawer. baseH: first-drawer height used when stacking more.
     return {
-        minH: isExt ? window.MIN_EXTERNAL_DRAWER_CELL_H : window.MIN_DRAWER_CELL_H,
+        minH: isExt ? window.MIN_EXTERNAL_SINGLE_DRAWER_H : window.MIN_DRAWER_CELL_H,
+        baseH: isExt ? window.MIN_EXTERNAL_DRAWER_CELL_H : window.MIN_DRAWER_CELL_H,
         extraH: isExt ? window.EXTERNAL_DRAWER_EXTRA_H : window.DRAWER_EXTRA_H,
         autoStepH: isExt ? window.EXTERNAL_DRAWER_AUTO_STEP_H : window.DRAWER_EXTRA_H
     };
@@ -309,24 +312,26 @@ window._drawerHeightRules = _drawerHeightRules;
 function minHeightForDrawerCount(n, drawerType) {
     const count = Math.max(0, Math.round(Number(n) || 0));
     if (count < 1) return 0;
-    const { minH, extraH } = _drawerHeightRules(drawerType);
-    return minH + extraH * (count - 1);
+    const { minH, baseH, extraH } = _drawerHeightRules(drawerType);
+    return count === 1 ? minH : baseH + extraH * (count - 1);
 }
 window.minHeightForDrawerCount = minHeightForDrawerCount;
 
 function calcAutoDrawerCount(cellHeightCm, drawerType) {
     const h = Number(cellHeightCm) || 0;
-    const { minH, autoStepH } = _drawerHeightRules(drawerType);
+    const { minH, baseH, autoStepH } = _drawerHeightRules(drawerType);
     if (h < minH) return 0;
-    return Math.min(8, Math.floor((h - minH) / autoStepH) + 1);
+    if (h < baseH) return 1;
+    return Math.min(8, Math.floor((h - baseH) / autoStepH) + 1);
 }
 window.calcAutoDrawerCount = calcAutoDrawerCount;
 
 function calcMaxDrawerCount(cellHeightCm, drawerType) {
     const h = Number(cellHeightCm) || 0;
-    const { minH, extraH } = _drawerHeightRules(drawerType);
+    const { minH, baseH, extraH } = _drawerHeightRules(drawerType);
     if (h < minH) return 0;
-    return Math.min(8, Math.floor((h - minH) / extraH + 1e-6) + 1);
+    if (h < baseH) return 1;
+    return Math.min(8, Math.floor((h - baseH) / extraH + 1e-6) + 1);
 }
 window.calcMaxDrawerCount = calcMaxDrawerCount;
 
