@@ -17117,6 +17117,28 @@ function _spaceGroupBlueprintSvg(group) {
     }
 }
 
+/** Wider than tall → cover images go one above the other; otherwise side by side. */
+function _spaceGroupIsWide(group, bpSvg) {
+    const vb = bpSvg && (bpSvg.match(/viewBox="([^"]+)"/) || [])[1];
+    if (vb) {
+        const n = vb.trim().split(/[\s,]+/).map(Number);
+        if (n[2] > 0 && n[3] > 0) return n[2] > n[3];
+    }
+    let minX = Infinity, maxX = -Infinity, maxY = 0;
+    group.members.forEach(function(m) {
+        const rs = m.itemObj.rawState || {};
+        const wing = (rs.wings && rs.wings.center) || {};
+        const off = (typeof window._getSpaceOffset === 'function') ? window._getSpaceOffset(m.itemObj) : { x: 0, y: 0, rot: 0 };
+        const side = (off.rot === 90 || off.rot === 270);
+        const w = (side ? (wing.depth || rs.depth) : (wing.width || rs.width)) || 0;
+        const h = _wingBodyHeightFromData(wing, rs.globalHeight || 240);
+        minX = Math.min(minX, (off.x || 0) - w / 2);
+        maxX = Math.max(maxX, (off.x || 0) + w / 2);
+        maxY = Math.max(maxY, (off.y || 0) + h);
+    });
+    return isFinite(minX) && maxY > 0 && (maxX - minX) > maxY;
+}
+
 /** Group cover page: closed shot of the whole space (parts outlined in their colors) + one blueprint of all parts together. */
 function _printSpaceGroupOverviewHtml(group) {
     const src = group.members.map(function(m) { return m.itemObj.spec || {}; })
@@ -17141,7 +17163,7 @@ function _printSpaceGroupOverviewHtml(group) {
     }).join('');
     return `<div class="cmp-block mu-angle-page" style="page-break-after:always;">
         <div class="cmp-bar"><span>${_escPrintHtml(group.baseName)}</span><small>${group.members.length} חלקים במרחב</small></div>
-        ${bpSvg ? `<div class="mu-space-stack">${imgHtml}</div>` : `<div class="mu-angle-row">${imgHtml}</div>`}
+        ${_spaceGroupIsWide(group, bpSvg) ? `<div class="mu-space-stack">${imgHtml}</div>` : `<div class="mu-angle-row">${imgHtml}</div>`}
         <table class="mu-parts">
             <thead><tr><th>חלק</th><th>רוחב</th><th>גובה</th><th>עומק</th></tr></thead>
             <tbody>${rows}</tbody>
@@ -17377,6 +17399,7 @@ function _buildPrintHTML(mode) {
   .mu-space-stack .mu-angle img { max-height: 80mm; }
   .mu-angle-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 6mm; align-items: start; }
   .mu-angle-row .mu-angle img { max-height: 150mm; }
+  .mu-angle-row .mu-space-bp svg { max-height: 150mm; }
   .mu-sheet { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .mu-sheet-t { display: flex; justify-content: space-between; align-items: baseline; background: #1e3a5f; color: #fff; padding: 5px 12px; border-radius: 6px; font-weight: 800; margin-bottom: 3mm; }
   .mu-sheet-t small { font-weight: 600; opacity: 0.85; }
