@@ -6931,12 +6931,25 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         const doorH = Math.max(2, doorTopY - doorBottomY);
                         const doorY = (doorBottomY + doorTopY) / 2;
                         const doorMat = _subDoorMat();
+                        const _addSubTouchIcon = (cx, w) => {
+                            if (isBP || !window._captureTouchIcons || window._spaceBuildSlot != null
+                                || hs !== 'touch' || doorStyle === 'glass_mirror') return;
+                            const s = Math.min(1, (w - 6) / 20, (doorH - 6) / 26);
+                            if (s < 0.45) return;
+                            const icon = window._touchIconSprite();
+                            icon.scale.multiplyScalar(s);
+                            icon.position.set(cx, doorY, fZ + t / 2 + 3);
+                            _buildGroup.add(icon);
+                            _registerDoorMesh(icon);
+                        };
                         if (subType === 'door_double') {
                             const halfW = (subW + t) / 2;
                             const lCX = subCenterX - halfW / 2;
                             const rCX = subCenterX + halfW / 2;
                             _subCreateDoorPanel(halfW, doorH, lCX, doorY, fZ, doorMat, halfW * 2, true);
                             _subCreateDoorPanel(halfW, doorH, rCX, doorY, fZ, doorMat, halfW * 2, false);
+                            _addSubTouchIcon(lCX, halfW);
+                            _addSubTouchIcon(rCX, halfW);
                             if (!isBP) {
                                 const hz = fZ + t / 2 + 1.5;
                                 if (hs === 'riding') {
@@ -6961,6 +6974,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         } else {
                             const doorW = subW + t;
                             _subCreateDoorPanel(doorW, doorH, subCenterX, doorY, fZ, doorMat);
+                            _addSubTouchIcon(subCenterX, doorW);
                             if (!isBP) {
                                 const hz = fZ + t / 2 + 1.5;
                                 if (hs === 'riding') {

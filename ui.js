@@ -10871,7 +10871,7 @@ window._captureCabinetPreviewImages = function() {
         multiViewSVG,
         imgSpaceDoors,
         imgSpaceOpen,
-        captureVer: 14
+        captureVer: 15
     };
     } finally {
         restoreRenderSize();
@@ -10925,6 +10925,14 @@ window._cartItemNeedsMediaRefresh = function(itemObj) {
         try {
             if (rs.handleStyle === 'touch' || rs.cabinetModel === 'ab2' ||
                 JSON.stringify(rs.wings || {}).indexOf('"handleStyle":"touch"') >= 0) return true;
+        } catch (e) { /* ignore */ }
+    }
+    // v15: touch icons also on partition (sub-cell) doors
+    if ((!spec.captureVer || spec.captureVer < 15) && !spec.imgDoorsManual) {
+        const rs = itemObj.rawState;
+        try {
+            if (rs.handleStyle === 'touch' || rs.cabinetModel === 'ab2' ||
+                JSON.stringify(rs.wings || {}).indexOf('"touch"') >= 0) return true;
         } catch (e) { /* ignore */ }
     }
     // v11: shots are cropped to the focus part with a margin; rotated space parts are shot diagonally
