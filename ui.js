@@ -16989,7 +16989,7 @@ function _printSpaceGroupOverviewHtml(group) {
     }).join('');
     return `<div class="cmp-block mu-angle-page" style="page-break-after:always;">
         <div class="cmp-bar"><span>${_escPrintHtml(group.baseName)}</span><small>${group.members.length} חלקים במרחב</small></div>
-        ${imgs.map(function(x) { return `<div class="mu-angle"><div class="cmp-cap">${x[1]}</div><img src="${x[0]}" alt=""></div>`; }).join('')}
+        <div class="mu-angle-row">${imgs.map(function(x) { return `<div class="mu-angle"><div class="cmp-cap">${x[1]}</div><img src="${x[0]}" alt=""></div>`; }).join('')}</div>
         <table class="mu-parts">
             <thead><tr><th>חלק</th><th>רוחב</th><th>גובה</th><th>עומק</th></tr></thead>
             <tbody>${rows}</tbody>
@@ -17220,6 +17220,8 @@ function _buildPrintHTML(mode) {
   .mu-card-i figcaption { font-size: 0.7rem; color: #64748b; }
   .mu-angle { margin-bottom: 4mm; break-inside: avoid; page-break-inside: avoid; }
   .mu-angle img { width: auto; height: auto; max-width: 100%; max-height: 108mm; display: block; margin: 0 auto; background: #fff; border: 1px solid #e2e8f0; border-radius: 4px; }
+  .mu-angle-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 6mm; align-items: start; }
+  .mu-angle-row .mu-angle img { max-height: 150mm; }
   .mu-sheet { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .mu-sheet-t { display: flex; justify-content: space-between; align-items: baseline; background: #1e3a5f; color: #fff; padding: 5px 12px; border-radius: 6px; font-weight: 800; margin-bottom: 3mm; }
   .mu-sheet-t small { font-weight: 600; opacity: 0.85; }
