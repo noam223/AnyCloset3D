@@ -1,5 +1,5 @@
 // Uploads the month's media to Supabase Storage and schedules the page posts in social_posts.
-// Usage: node outputs/social/schedule.mjs dry | test | upload | list | run
+// Usage: node outputs/social/schedule.mjs dry | test | upload | list | run   (dry/upload accept post numbers, e.g. upload 13 14)
 // The secret is read from %USERPROFILE%\.anycloset\social-secret.txt (Vault: social_cron_secret).
 
 import fs from 'node:fs';
@@ -29,6 +29,10 @@ const POSTS = [
   { n: 10, at: '2026-12-06T18:00', kind: 'video', files: ['visuals/posts/video/post10-hanukkah-led_9x16.mp4'] },
   { n: 11, at: '2026-12-08T20:30', kind: 'carousel', files: seq('post11', 6) },
   { n: 12, at: '2026-12-10T20:30', kind: 'video', files: ['visuals/posts/video/post12-full-workflow_9x16.mp4'] },
+  { n: 13, at: '2026-11-12T20:30', kind: 'video', files: ['visuals/posts/video/extra/designers-pitch_9x16.mp4'] },
+  { n: 14, at: '2026-11-14T20:30', kind: 'video', files: ['visuals/posts/video/extra/girls-room_9x16.mp4'] },
+  { n: 15, at: '2026-12-13T20:30', kind: 'video', files: ['visuals/posts/video/extra/promo-B_9x16.mp4'] },
+  { n: 16, at: '2026-12-15T20:30', kind: 'video', files: ['visuals/posts/video/extra/promo-C_9x16.mp4'] },
 ];
 
 function captionFor(n) {
@@ -76,7 +80,8 @@ async function upload(rel) {
 }
 
 function buildPosts() {
-  return POSTS.map((p) => {
+  const only = process.argv.slice(3).map(Number);
+  return POSTS.filter((p) => !only.length || only.includes(p.n)).map((p) => {
     const fb = captionFor(p.n);
     return {
       label: `2026-11 post ${String(p.n).padStart(2, '0')}`,
