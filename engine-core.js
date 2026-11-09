@@ -202,9 +202,10 @@ function _aoLoad() {
         const sz = renderer.getSize(_aoSize);
         const composer = new THREE.EffectComposer(renderer);
         const pass = new THREE.SSAOPass(scene, camera, sz.x, sz.y);
-        pass.kernelRadius = 16;
-        pass.minDistance = 0.0006;
-        pass.maxDistance = 0.02;
+        // Lower minDistance self-occludes large flat surfaces seen at grazing angles (blocky streaks on walls and doors)
+        pass.kernelRadius = 24;
+        pass.minDistance = 0.003;
+        pass.maxDistance = 0.03;
         // Glass, ghost walls, overlays and glows must not occlude what is behind them in the normal pass
         let hidden = [];
         pass.overrideVisibility = function() {
@@ -2617,7 +2618,8 @@ function _buildRoom() {
     // Painted plaster: flat warm white with a fine roller relief tiled at real scale
     const PLASTER_TILE_CM = 120;
     const makeWallMat = (wallW, wallH) => {
-        const mat = new THREE.MeshStandardMaterial({ color: 0xefebe5, roughness: 0.93, metalness: 0.0, side: THREE.FrontSide });
+        // Emissive stands in for the light bounced around a real room, which the scene lights don't model
+        const mat = new THREE.MeshStandardMaterial({ color: 0xfaf8f4, emissive: 0x2a2826, roughness: 0.93, metalness: 0.0, side: THREE.FrontSide });
         if (!_skipTex && window._wallPlasterNormalTex) {
             mat.normalMap = _roomTexVariant(window._wallPlasterNormalTex, wallW / PLASTER_TILE_CM, wallH / PLASTER_TILE_CM, 0, 0);
             mat.normalScale.set(0.6, 0.6);
@@ -2636,15 +2638,15 @@ function _buildRoom() {
         floorMat.color.set(0xffffff);
         if (window._woodFloorNormalTex) {
             floorMat.normalMap = window._woodFloorNormalTex;
-            floorMat.normalScale.set(0.45, 0.45);
+            floorMat.normalScale.set(0.7, 0.7);
         }
         if (window._woodFloorRoughTex) {
             floorMat.roughnessMap = window._woodFloorRoughTex;
-            floorMat.roughness = 1.0;
+            floorMat.roughness = 0.8;
         }
         if (window._hdrEnvMap) {
             floorMat.envMap = window._hdrEnvMap;
-            floorMat.envMapIntensity = 0.45;
+            floorMat.envMapIntensity = 0.9;
         }
     }
     const floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomD), floorMat);
