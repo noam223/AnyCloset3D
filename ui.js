@@ -16969,12 +16969,121 @@ function _printSpacePartTitle(group, m) {
             : ('חלק ' + (m.slot + 1)));
 }
 
-/** Group cover page: every part of the shared space together, each outlined in its own color (like corner parts). */
+/**
+ * One blueprint of the whole shared space: each part's stored front-elevation page, brought to a common
+ * scale and placed at its space offset (floor-aligned), outlined in its part color, plus the overall width.
+ * Parts turned sideways (90° / 270°) can't be shown in a front elevation and are left out. Null if < 2 parts fit.
+ */
+function _spaceGroupBlueprintSvg(group) {
+    if (typeof document === 'undefined' || !document.body) return null;
+    const parts = [];
+    group.members.forEach(function(m, i) {
+        const spec = m.itemObj.spec || {};
+        const pages = spec.multiViewPages || [];
+        const labels = spec.multiViewLabels || [];
+        if (!pages.length) return;
+        let idx = labels.findIndex(function(l) { return /חזית/.test(l || '') && (l || '').indexOf('מרכזי') >= 0; });
+        if (idx < 0) idx = labels.findIndex(function(l) { return /חזית/.test(l || ''); });
+        if (idx < 0) idx = 0;
+        const off = window._getSpaceOffset(m.itemObj);
+        if (off.rot === 90 || off.rot === 270) return;
+        const rs = m.itemObj.rawState || {};
+        const wCm = (rs.wings && rs.wings.center && rs.wings.center.width) || rs.width || 0;
+        if (!(wCm > 0)) return;
+        parts.push({ n: i + 1, slot: m.slot, svg: pages[idx], off: off, wCm: wCm });
+    });
+    if (parts.length < 2) return null;
+
+    const host = document.createElement('div');
+    host.style.cssText = 'position:absolute;left:-10000px;top:0;width:1200px;height:800px;visibility:hidden;';
+    document.body.appendChild(host);
+    try {
+        const NS = 'http://www.w3.org/2000/svg';
+        const out = document.createElementNS(NS, 'svg');
+        out.setAttribute('xmlns', NS);
+        host.appendChild(out);
+        const minOffX = Math.min.apply(null, parts.map(function(p) { return p.off.x - p.wCm / 2; }));
+        const maxOffX = Math.max.apply(null, parts.map(function(p) { return p.off.x + p.wCm / 2; }));
+        const placed = [];
+        parts.forEach(function(p) {
+            const tmp = document.createElement('div');
+            tmp.innerHTML = p.svg;
+            const src = tmp.querySelector('svg');
+            if (!src) return;
+            host.appendChild(src);
+            // Each column is its own stroke-width=2 rect — the cabinet body is their union
+            let bx = Infinity, by = Infinity, bx2 = -Infinity, by2 = -Infinity;
+            Array.from(src.children).forEach(function(k) {
+                const tag = k.tagName.toLowerCase();
+                if (tag === 'rect' && k.getAttribute('width') === '1200' && k.getAttribute('height') === '800' && !k.getAttribute('x')) { k.remove(); return; }
+                if (tag === 'text' && (parseFloat(k.getAttribute('y')) <= 60 || /^עמוד\s/.test(k.textContent || ''))) { k.remove(); return; }
+                if (tag === 'rect' && k.getAttribute('stroke-width') === '2') {
+                    const x = +k.getAttribute('x'), y = +k.getAttribute('y');
+                    bx = Math.min(bx, x); by = Math.min(by, y);
+                    bx2 = Math.max(bx2, x + (+k.getAttribute('width'))); by2 = Math.max(by2, y + (+k.getAttribute('height')));
+                }
+            });
+            if (!isFinite(bx) || bx2 <= bx) { src.remove(); return; }
+            const bw = bx2 - bx, bh = by2 - by;
+            const leftmost = p.off.x - p.wCm / 2 <= minOffX + 0.5;
+            const rightmost = p.off.x + p.wCm / 2 >= maxOffX - 0.5;
+            // Vertical dims beside a part would sit on its neighbour — keep them only on the outer ends
+            src.querySelectorAll('g[data-dim="v"]').forEach(function(g) {
+                const b = g.getBBox();
+                const cx = b.x + b.width / 2;
+                if ((cx < bx && !leftmost) || (cx > bx + bw && !rightmost)) g.remove();
+            });
+            placed.push({ p: p, src: src, bx: bx, by: by, bw: bw, bh: bh, sc: bw / p.wCm });
+        });
+        if (placed.length < 2) return null;
+        const S = Math.min.apply(null, placed.map(function(q) { return q.sc; }));
+        placed.forEach(function(q) {
+            const k = S / q.sc;
+            const tx = (q.p.off.x - q.p.wCm / 2) * S - q.bx * k;
+            const ty = -(q.p.off.y || 0) * S - (q.by + q.bh) * k;
+            const g = document.createElementNS(NS, 'g');
+            g.setAttribute('transform', `translate(${tx.toFixed(2)},${ty.toFixed(2)}) scale(${k.toFixed(5)})`);
+            Array.from(q.src.childNodes).forEach(function(c) { g.appendChild(c); });
+            const col = _spaceSlotColor(q.p.slot);
+            const x0 = q.bx, y0 = q.by;
+            g.insertAdjacentHTML('beforeend',
+                `<rect x="${x0}" y="${y0}" width="${q.bw}" height="${q.bh}" fill="none" stroke="${col.stroke}" stroke-width="${(3 / k).toFixed(2)}"/>`
+                + `<circle cx="${x0 + q.bw / 2}" cy="${y0 - 16 / k}" r="${(10 / k).toFixed(2)}" fill="${col.stroke}"/>`
+                + `<text x="${x0 + q.bw / 2}" y="${y0 - 16 / k}" dy="${(4 / k).toFixed(2)}" text-anchor="middle" font-size="${(12 / k).toFixed(2)}" font-weight="700" fill="#fff" font-family="Rubik,Tahoma,sans-serif">${q.p.n}</text>`);
+            out.appendChild(g);
+            q.src.remove();
+        });
+        let bb = out.getBBox();
+        const dimY = bb.y + bb.height + 26;
+        const x1 = minOffX * S, x2 = maxOffX * S;
+        out.insertAdjacentHTML('beforeend',
+            `<g stroke="#1e3a5f" stroke-width="1.5">`
+            + `<line x1="${x1}" y1="${dimY - 5}" x2="${x1}" y2="${dimY + 5}"/><line x1="${x2}" y1="${dimY - 5}" x2="${x2}" y2="${dimY + 5}"/>`
+            + `<line x1="${x1}" y1="${dimY}" x2="${x2}" y2="${dimY}" marker-start="url(#as)" marker-end="url(#ae)"/></g>`
+            + `<text x="${(x1 + x2) / 2}" y="${dimY + 18}" text-anchor="middle" font-size="15" font-weight="700" fill="#1e3a5f" font-family="Rubik,Tahoma,sans-serif">${_bpMm(maxOffX - minOffX)}</text>`);
+        bb = out.getBBox();
+        const pad = 14;
+        out.setAttribute('viewBox', [bb.x - pad, bb.y - pad, bb.width + pad * 2, bb.height + pad * 2].map(function(v) { return v.toFixed(1); }).join(' '));
+        out.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+        return out.outerHTML;
+    } catch (e) {
+        console.warn('[print] space group blueprint failed:', e);
+        return null;
+    } finally {
+        host.remove();
+    }
+}
+
+/** Group cover page: closed shot of the whole space (parts outlined in their colors) + one blueprint of all parts together. */
 function _printSpaceGroupOverviewHtml(group) {
     const src = group.members.map(function(m) { return m.itemObj.spec || {}; })
         .find(function(s) { return _cartImageValid(s.imgSpaceDoors) || _cartImageValid(s.imgSpaceOpen); }) || {};
-    const imgs = [[src.imgSpaceDoors, 'סגור — עם דלתות'], [src.imgSpaceOpen, 'פתוח — ללא דלתות']]
-        .filter(function(x) { return _cartImageValid(x[0]); });
+    const bpSvg = _spaceGroupBlueprintSvg(group);
+    const imgs = [[src.imgSpaceDoors, 'סגור — עם דלתות']];
+    if (!bpSvg) imgs.push([src.imgSpaceOpen, 'פתוח — ללא דלתות']);
+    const imgHtml = imgs.filter(function(x) { return _cartImageValid(x[0]); })
+        .map(function(x) { return `<div class="mu-angle"><div class="cmp-cap">${x[1]}</div><img src="${x[0]}" alt=""></div>`; }).join('')
+        + (bpSvg ? `<div class="mu-angle"><div class="cmp-cap">שרטוט — כל החלקים יחד</div><div class="mu-space-bp">${bpSvg}</div></div>` : '');
     const rows = group.members.map(function(m, i) {
         const rs = m.itemObj.rawState || {};
         const wing = (rs.wings && rs.wings.center) || {};
@@ -16989,7 +17098,7 @@ function _printSpaceGroupOverviewHtml(group) {
     }).join('');
     return `<div class="cmp-block mu-angle-page" style="page-break-after:always;">
         <div class="cmp-bar"><span>${_escPrintHtml(group.baseName)}</span><small>${group.members.length} חלקים במרחב</small></div>
-        <div class="mu-angle-row">${imgs.map(function(x) { return `<div class="mu-angle"><div class="cmp-cap">${x[1]}</div><img src="${x[0]}" alt=""></div>`; }).join('')}</div>
+        ${bpSvg ? `<div class="mu-space-stack">${imgHtml}</div>` : `<div class="mu-angle-row">${imgHtml}</div>`}
         <table class="mu-parts">
             <thead><tr><th>חלק</th><th>רוחב</th><th>גובה</th><th>עומק</th></tr></thead>
             <tbody>${rows}</tbody>
@@ -17220,6 +17329,9 @@ function _buildPrintHTML(mode) {
   .mu-card-i figcaption { font-size: 0.7rem; color: #64748b; }
   .mu-angle { margin-bottom: 4mm; break-inside: avoid; page-break-inside: avoid; }
   .mu-angle img { width: auto; height: auto; max-width: 100%; max-height: 108mm; display: block; margin: 0 auto; background: #fff; border: 1px solid #e2e8f0; border-radius: 4px; }
+  .mu-space-bp { border: 1px solid #e2e8f0; border-radius: 4px; background: #fff; }
+  .mu-space-bp svg { display: block; width: 100%; height: auto; max-height: 100mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .mu-space-stack .mu-angle img { max-height: 80mm; }
   .mu-angle-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 6mm; align-items: start; }
   .mu-angle-row .mu-angle img { max-height: 150mm; }
   .mu-sheet { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
