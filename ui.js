@@ -5389,8 +5389,19 @@ window._openTvSizeMenu = _openTvSizeMenu;
         return info.leaf === 'left' ? 'הכנף השמאלית' : 'הכנף הימנית';
     }
 
+    function subDoorStyle(info) {
+        if (info.group) return info.group.handleStyle || null;
+        return (Array.isArray(info.sub.zonesDoorHandleStyle) && info.sub.zonesDoorHandleStyle[info.z]) || null;
+    }
+
     function dropOutcome(info) {
         const door = info.door;
+        if (info.subDoor) {
+            const what = info.kind === 'double' ? 'הדלת הכפולה' : info.kind === 'flap' ? 'הקלפה' : 'הדלת';
+            if (subDoorStyle(info) === 'touch') return { ok: true, undo: true, text: "הסרת טאצ' מ" + what, done: "הטאצ' הוסר — " + what + " חוזרת לידית של הארון" };
+            if (!subDoorStyle(info) && _getHandleStyle() === 'touch') return { ok: false, text: what + " כבר בטאצ'" };
+            return { ok: true, text: "טאצ' ל" + what.slice(1) + ' במחיצה', done: "הוחל טאצ' על " + what + ' במחיצה' };
+        }
         const where = leafLabel(info);
         if (door.type === 'double') {
             const doorHs = door.handleStyle || _getHandleStyle();
@@ -5423,7 +5434,9 @@ window._openTvSizeMenu = _openTvSizeMenu;
     function highlight(obj) {
         clearHighlight();
         if (!obj) return;
-        const box = new THREE.Box3().setFromObject(obj);
+        const box = new THREE.Box3();
+        const panels = obj.userData && obj.userData.doorLeaf && obj.userData.doorLeaf.panels;
+        (panels || [obj]).forEach(p => box.expandByObject(p));
         if (box.isEmpty()) return;
         const size = box.getSize(new THREE.Vector3());
         const mesh = new THREE.Mesh(
@@ -5452,7 +5465,14 @@ window._openTvSizeMenu = _openTvSizeMenu;
     function apply(info) {
         const door = info.door;
         const out = dropOutcome(info);
-        if (door.type === 'double') {
+        if (info.subDoor) {
+            if (info.group) {
+                if (out.undo) delete info.group.handleStyle;
+                else info.group.handleStyle = 'touch';
+            } else {
+                _setZoneArrayValue(info.sub, 'zonesDoorHandleStyle', info.z, out.undo ? null : 'touch');
+            }
+        } else if (door.type === 'double') {
             if (out.undo) delete door.touchLeaf;
             else door.touchLeaf = info.leaf;
         } else if (out.undo) {

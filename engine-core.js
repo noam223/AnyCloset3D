@@ -6764,6 +6764,26 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         _registerDoorMesh(mesh);
                         return mesh;
                     };
+                    // Touch drag target: per-zone door (sub.zonesDoorHandleStyle[z]) or merged zone door group
+                    const _tagSubDoorLeaf = (panels, kind) => {
+                        if (isBP) return;
+                        const sub = (subIdx >= 0 && compData.subCells) ? compData.subCells[subIdx] : null;
+                        const group = (!sub && _handleCtx && Array.isArray(_handleCtx.keys)) ? _handleCtx : null;
+                        if (!sub && !group) return;
+                        const info = { subDoor: true, kind, sub, z: zoneIdx, group, panels, door: { type: kind } };
+                        panels.forEach(m => { m.userData.doorLeaf = info; });
+                    };
+                    const _addSubTouchIconAt = (cx, cy, fZ, w, h) => {
+                        if (isBP || !window._captureTouchIcons || window._spaceBuildSlot != null
+                            || hs !== 'touch' || doorStyle === 'glass_mirror') return;
+                        const s = Math.min(1, (w - 6) / 20, (h - 6) / 26);
+                        if (s < 0.45) return;
+                        const icon = window._touchIconSprite();
+                        icon.scale.multiplyScalar(s);
+                        icon.position.set(cx, cy, fZ + t / 2 + 3);
+                        _buildGroup.add(icon);
+                        _registerDoorMesh(icon);
+                    };
                     if (subType === 'hanging' || subType === 'sorbet') {
                         // Place near the front face so the rod is obvious in front-edit view
                         const rodZ = Math.max(0, bodyD / 2 - 10);
@@ -6931,23 +6951,15 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         const doorH = Math.max(2, doorTopY - doorBottomY);
                         const doorY = (doorBottomY + doorTopY) / 2;
                         const doorMat = _subDoorMat();
-                        const _addSubTouchIcon = (cx, w) => {
-                            if (isBP || !window._captureTouchIcons || window._spaceBuildSlot != null
-                                || hs !== 'touch' || doorStyle === 'glass_mirror') return;
-                            const s = Math.min(1, (w - 6) / 20, (doorH - 6) / 26);
-                            if (s < 0.45) return;
-                            const icon = window._touchIconSprite();
-                            icon.scale.multiplyScalar(s);
-                            icon.position.set(cx, doorY, fZ + t / 2 + 3);
-                            _buildGroup.add(icon);
-                            _registerDoorMesh(icon);
-                        };
+                        const _addSubTouchIcon = (cx, w) => _addSubTouchIconAt(cx, doorY, fZ, w, doorH);
                         if (subType === 'door_double') {
                             const halfW = (subW + t) / 2;
                             const lCX = subCenterX - halfW / 2;
                             const rCX = subCenterX + halfW / 2;
-                            _subCreateDoorPanel(halfW, doorH, lCX, doorY, fZ, doorMat, halfW * 2, true);
-                            _subCreateDoorPanel(halfW, doorH, rCX, doorY, fZ, doorMat, halfW * 2, false);
+                            _tagSubDoorLeaf([
+                                _subCreateDoorPanel(halfW, doorH, lCX, doorY, fZ, doorMat, halfW * 2, true),
+                                _subCreateDoorPanel(halfW, doorH, rCX, doorY, fZ, doorMat, halfW * 2, false)
+                            ], 'double');
                             _addSubTouchIcon(lCX, halfW);
                             _addSubTouchIcon(rCX, halfW);
                             if (!isBP) {
@@ -6973,7 +6985,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             }
                         } else {
                             const doorW = subW + t;
-                            _subCreateDoorPanel(doorW, doorH, subCenterX, doorY, fZ, doorMat);
+                            _tagSubDoorLeaf([_subCreateDoorPanel(doorW, doorH, subCenterX, doorY, fZ, doorMat)], 'single');
                             _addSubTouchIcon(subCenterX, doorW);
                             if (!isBP) {
                                 const hz = fZ + t / 2 + 1.5;
@@ -7022,7 +7034,8 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         const flapH = Math.max(2, flapTopY - flapBottomY);
                         const flapY = (flapBottomY + flapTopY) / 2;
                         const flapW = subW + t;
-                        _subCreateDoorPanel(flapW, flapH, subCenterX, flapY, fZ, _subDoorMat());
+                        _tagSubDoorLeaf([_subCreateDoorPanel(flapW, flapH, subCenterX, flapY, fZ, _subDoorMat())], 'flap');
+                        _addSubTouchIconAt(subCenterX, flapY, fZ, flapW, flapH);
                         if (!isBP && doorStyle !== 'glass_mirror') {
                             const hz = fZ + t / 2 + 1.5;
                             if (hs === 'pipe' && _isHalfMoonHandle()) {
