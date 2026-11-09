@@ -809,6 +809,8 @@ window._brickWallTex = null;
     tl.load('images/wood-floor.jpg', function(t) {
         t.wrapS = t.wrapT = THREE.RepeatWrapping;
         t.encoding = THREE.sRGBEncoding;
+        // Keeps the planks crisp at the grazing angles a floor is mostly seen from
+        t.anisotropy = renderer.capabilities.getMaxAnisotropy();
         window._woodFloorTex = t;
         if (typeof buildCabinet === 'function') buildCabinet();
     });
@@ -823,6 +825,18 @@ window._brickWallTex = null;
         t.encoding = THREE.sRGBEncoding;
         window._brickWallTex = t;
         if (typeof buildCabinet === 'function') buildCabinet();
+    });
+    // Relief / gloss maps (linear data): floor maps follow the floor color map's repeat, the plaster
+    // relief tiles on its own (walls have no color map)
+    const aniso = renderer.capabilities.getMaxAnisotropy();
+    [['images/wood-floor-normal.jpg', '_woodFloorNormalTex'], ['images/wood-floor-rough.jpg', '_woodFloorRoughTex'],
+     ['images/wall-plaster-normal.jpg', '_wallPlasterNormalTex']].forEach(function(e) {
+        tl.load(e[0], function(t) {
+            t.wrapS = t.wrapT = THREE.RepeatWrapping;
+            t.anisotropy = aniso;
+            window[e[1]] = t;
+            if (typeof buildCabinet === 'function') buildCabinet();
+        });
     });
 })();
 
@@ -2600,39 +2614,38 @@ function _buildRoom() {
     const _skipTex = !!window._roomTexDragging;
 
     // ── Materials ──────────────────────────────────────────────────────────
-    // Wall material — "cover" fit: texture height fills wall height, width overflows (centered)
+    // Painted plaster: flat warm white with a fine roller relief tiled at real scale
+    const PLASTER_TILE_CM = 120;
     const makeWallMat = (wallW, wallH) => {
-        const mat = new THREE.MeshStandardMaterial({ color: 0xf0ede8, roughness: 0.9, metalness: 0.0, side: THREE.FrontSide });
-        if (!_skipTex && window._wallTex) {
-            const img = window._wallTex.image;
-            const texAspect = (img && img.width && img.height) ? (img.width / img.height) : 2.0;
-            const wallAspect = wallW / wallH;
-            const repeatX = wallAspect / texAspect;
-            mat.map = _roomTexVariant(window._wallTex, repeatX, 1, (1 - repeatX) / 2, 0);
-            mat.color.set(0xffffff);
+        const mat = new THREE.MeshStandardMaterial({ color: 0xefebe5, roughness: 0.93, metalness: 0.0, side: THREE.FrontSide });
+        if (!_skipTex && window._wallPlasterNormalTex) {
+            mat.normalMap = _roomTexVariant(window._wallPlasterNormalTex, wallW / PLASTER_TILE_CM, wallH / PLASTER_TILE_CM, 0, 0);
+            mat.normalScale.set(0.6, 0.6);
         }
         return mat;
     };
-
-    const makeBrickMat = (wallW, wallH) => {
-        const mat = new THREE.MeshStandardMaterial({ color: 0xc0a080, roughness: 0.95, metalness: 0.0, side: THREE.FrontSide });
-        if (!_skipTex && window._brickWallTex) {
-            const img = window._brickWallTex.image;
-            const texAspect = (img && img.width && img.height) ? (img.width / img.height) : 1.5;
-            const wallAspect = wallW / wallH;
-            const repeatX = wallAspect / texAspect;
-            mat.map = _roomTexVariant(window._brickWallTex, repeatX, 1, (1 - repeatX) / 2, 0);
-            mat.color.set(0xffffff);
-        }
-        return mat;
-    };
+    const makeBrickMat = makeWallMat;
 
     // ── Floor ──────────────────────────────────────────────────────────────
+    // Satin-lacquered oak: plank joints and grain in relief, gloss varying with the grain, and a soft
+    // reflection of the environment. Relief/gloss maps share the color map's repeat.
     const tileSizeCm = 200;
     const floorMat = new THREE.MeshStandardMaterial({ color: 0xd4a96a, roughness: 0.8, metalness: 0.0 });
     if (!_skipTex && window._woodFloorTex) {
         floorMat.map = _roomTexVariant(window._woodFloorTex, roomW / tileSizeCm, roomD / tileSizeCm, 0, 0);
         floorMat.color.set(0xffffff);
+        if (window._woodFloorNormalTex) {
+            floorMat.normalMap = window._woodFloorNormalTex;
+            floorMat.normalScale.set(0.45, 0.45);
+        }
+        if (window._woodFloorRoughTex) {
+            floorMat.roughnessMap = window._woodFloorRoughTex;
+            floorMat.roughness = 1.0;
+        }
+        if (window._hdrEnvMap) {
+            floorMat.envMap = window._hdrEnvMap;
+            floorMat.envMapIntensity = 0.45;
+        }
     }
     const floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomD), floorMat);
     floorMesh.rotation.x = -Math.PI / 2;
@@ -2673,6 +2686,35 @@ function _buildRoom() {
     rightWall.position.set(rightWallX, roomH / 2, _sideWallCZ);
     rightWall.userData._roomOwned = true;
     rg.add(rightWall);
+
+    // ── Skirting boards (interrupted at floor-level openings such as the door) ──
+    {
+        const SK_H = 8, SK_T = 1.2;
+        const skMat = new THREE.MeshStandardMaterial({ color: 0xf3f1ec, roughness: 0.45, metalness: 0.0 });
+        [[backWall, roomW, 'back'], [leftWall, roomD, 'left'], [rightWall, roomD, 'right']].forEach(function(e) {
+            const wall = e[0], len = e[1];
+            const cuts = _roomWallHoles(e[2], _openings, roomCenterX, _sideWallCZ, roomH)
+                .filter(function(o) { return o.y0 <= -roomH / 2 + 1; })
+                .map(function(o) { return [o.x0, o.x1]; })
+                .sort(function(a, b) { return a[0] - b[0]; });
+            const segs = [];
+            let x = -len / 2;
+            cuts.forEach(function(c) {
+                if (c[0] > x) segs.push([x, Math.min(c[0], len / 2)]);
+                x = Math.max(x, c[1]);
+            });
+            if (len / 2 > x) segs.push([x, len / 2]);
+            segs.forEach(function(s) {
+                const w = s[1] - s[0];
+                if (w < 1) return;
+                const sk = new THREE.Mesh(new THREE.BoxGeometry(w, SK_H, SK_T), skMat);
+                sk.position.set((s[0] + s[1]) / 2, SK_H / 2 - roomH / 2, SK_T / 2);
+                sk.receiveShadow = true;
+                sk.userData._roomOwned = true;
+                wall.add(sk);
+            });
+        });
+    }
 
     // ── Ceiling ────────────────────────────────────────────────────────────
     // When closure panels are active, the room ceiling plane snaps to the top of the closure ceiling panel
