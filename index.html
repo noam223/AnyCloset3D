@@ -1356,6 +1356,7 @@
     <button class="view-btn" id="btn-mirror-cabinet" title="היפוך כיוון הארון — מה שבימין עובר לשמאל (גם כל הארונות במרחב יחד). לחיצה נוספת מחזירה." onclick="window.mirrorCabinet && window.mirrorCabinet()"><i class="fa-solid fa-left-right"></i> היפוך כיוון</button>
     <button class="view-btn icon-btn" id="btn-toggle-doors" title="הצג/הסתר חזיתות (תצוגה בלבד — לא משנה את השמירה)" onclick="window._toggleDoors && window._toggleDoors()"><i class="fa-solid fa-door-closed"></i></button>
     <button class="view-btn icon-btn" id="btn-toggle-ao" title="הצללה רכה בתלת־מימד" onclick="window._toggleAO && window._toggleAO()"><i class="fa-solid fa-circle-half-stroke"></i></button>
+    <button class="view-btn icon-btn" id="btn-toggle-room3d" title="חדר ברקע בתלת־מימד" onclick="window._toggleEditorRoom && window._toggleEditorRoom()"><i class="fa-solid fa-house"></i></button>
     <!-- Room wall position selector — only shown for linear/sliding presets -->
     <div id="room-wall-selector" style="display:none; align-items:center; gap:3px; margin:0 4px;" title="מיקום ארון בחדר">
         <button id="btn-wall-left"   class="view-btn icon-btn" style="font-size:0.72rem;padding:4px 7px;" title="צמוד לקיר שמאל"  onclick="window._setRoomWall('left')">← שמאל</button>
@@ -3007,12 +3008,12 @@
 <script src="writing-desk-preset.js?v=20260823h370"></script>
 <script src="corner-unit-preset.js?v=20261103deskdoor"></script>
 <script src="engine-appliances.js?v=20261007deskMerge28"></script>
-<script src="engine-core.js?v=20261109ssao2"></script>
+<script src="engine-core.js?v=20261109room3d"></script>
 <script src="engine-corners.js?v=20261109ridingFlush"></script>
 <script src="engine-blueprint.js?v=20261109colInOut"></script>
 <script src="engine-room-plan.js?v=20261016snap"></script>
 <script src="tambour-color-picker.js?v=20261009colors"></script>
-<script src="ui.js?v=20261109ssao"></script>
+<script src="ui.js?v=20261109room3d"></script>
 <script src="mirror-cabinet.js?v=20261109mirror"></script>
 <script src="mobile.js?v=20261029inthandle"></script>
 <script src="part-paint.js?v=20261104egger"></script>

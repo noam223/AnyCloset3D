@@ -7988,7 +7988,8 @@ window._updateBedHandles = function() {
     const tb = document.getElementById('bed-toolbar');
     if (!tb) return;
 
-    const shouldShow = (window._roomVisible || state.viewMode === 'room-plan') && window._bedGroup && window._bedVisible !== false &&
+    const shouldShow = (window._roomVisible || state.viewMode === 'room-plan') && !window._roomIsBackdrop() &&
+                       window._bedGroup && window._bedVisible !== false &&
                        (state.viewMode !== 'room-plan' || window._roomPlanSubview === '3d') &&
                        (window._bedHovered || window._bedDrag);
     if (!shouldShow) { tb.style.display = 'none'; return; }
@@ -12024,7 +12025,7 @@ window._clampSpaceOffsetAgainstOthers = function(x, y, movingSlot, opts) {
 window._spaceRoomBoundsScene = function() {
     const b = window._roomBounds;
     const rg = window._roomGroup;
-    if (!b || !rg || window._roomVisible === false || !rg.visible || !rg.children.length) return null;
+    if (!b || !rg || window._roomVisible === false || window._roomIsBackdrop() || !rg.visible || !rg.children.length) return null;
     const th = rg.rotation.y || 0;
     const c = Math.cos(th), s = Math.sin(th);
     const px = rg.position.x || 0, pz = rg.position.z || 0;
@@ -19114,10 +19115,27 @@ document.addEventListener('keydown', (e) => {
 
 function _r(v) { return Math.round(v * 10) / 10; } // round to 1 decimal
 
+// Last drawn camera pose — animate() skips frames where nothing moved (see window._requestRender)
+const _rodCamSnap = new Float64Array(33);
+let _rodLastDraw = 0, _rodDrewPrev = false;
+function _rodCameraMoved() {
+    camera.updateMatrixWorld();
+    const a = camera.matrixWorld.elements, b = camera.projectionMatrix.elements;
+    let moved = false;
+    for (let i = 0; i < 16; i++) {
+        if (_rodCamSnap[i] !== a[i]) { _rodCamSnap[i] = a[i]; moved = true; }
+        if (_rodCamSnap[16 + i] !== b[i]) { _rodCamSnap[16 + i] = b[i]; moved = true; }
+    }
+    const w = renderer.domElement.width * 100000 + renderer.domElement.height;
+    if (_rodCamSnap[32] !== w) { _rodCamSnap[32] = w; moved = true; }
+    return moved;
+}
+
 function animate() {
     requestAnimationFrame(animate);
     const now = performance.now();
-    const dt = Math.min((now - _lastFrameTime) / 1000, 0.1);
+    const rawDt = (now - _lastFrameTime) / 1000;
+    const dt = Math.min(rawDt, 0.1);
     _lastFrameTime = now;
 
     // Drive camera animation (window._camAnim set by updateCameraView in engine.js)
@@ -19165,7 +19183,17 @@ function animate() {
         }
     }
 
-    if (!(state.viewMode === 'room-plan' && window._roomPlanSubview === '2d')) {
+    const plan2d = state.viewMode === 'room-plan' && window._roomPlanSubview === '2d';
+    const camMoved = _rodCameraMoved();
+    let draw = !plan2d && (camMoved || !!window._camAnim || window._shadowFlagsDirty ||
+        now < (window._renderUntil || 0) || now - _rodLastDraw > 1000 || window._renderOnDemandOff);
+    if (draw && now - _rodLastDraw > 1000 && renderer.shadowMap) renderer.shadowMap.needsUpdate = true;
+    if (!draw) { _rodDrewPrev = false; return; }
+    if (_rodDrewPrev && typeof window._noteFrameTime === 'function') window._noteFrameTime(rawDt);
+    _rodDrewPrev = true;
+    _rodLastDraw = now;
+
+    {
         if(typeof updateOverlaysPosition === 'function') updateOverlaysPosition();
         if(typeof updateDragHandlesPosition === 'function') updateDragHandlesPosition();
         if(typeof updateToolbarState === 'function') updateToolbarState();
@@ -19184,11 +19212,9 @@ function animate() {
         });
     }
 
-    if (!(state.viewMode === 'room-plan' && window._roomPlanSubview === '2d')) {
-        if (typeof window._renderMain === 'function') window._renderMain();
-        else renderer.render(scene, camera);
-        if (typeof window._syncAndRenderSpaceGizmo === 'function') window._syncAndRenderSpaceGizmo();
-    }
+    if (typeof window._renderMain === 'function') window._renderMain();
+    else renderer.render(scene, camera);
+    if (typeof window._syncAndRenderSpaceGizmo === 'function') window._syncAndRenderSpaceGizmo();
 }
 animate();
 

@@ -223,6 +223,7 @@ function _aoLoad() {
         };
         composer.addPass(pass);
         _ao = { composer: composer, w: 0, h: 0 };
+        window._requestRender(false);
     }).catch(function(e) {
         console.warn('[ao] failed to load', e);
         window._aoEnabled = false;
@@ -231,12 +232,17 @@ function _aoLoad() {
 }
 
 function _aoWanted() {
-    if (!window._aoEnabled) return false;
+    if (!window._aoEnabled || window._aoAutoOff) return false;
     const m = state.viewMode;
     return m === '3d' || (m === 'room-plan' && window._roomPlanSubview !== '2d');
 }
 
 window._renderMain = function() {
+    window._inMainRender = true;
+    try { _renderMainInner(); } finally { window._inMainRender = false; }
+};
+
+function _renderMainInner() {
     if (_aoWanted()) {
         if (_ao) {
             const sz = renderer.getSize(_aoSize);
@@ -269,18 +275,92 @@ window._renderMain = function() {
         _aoLoad();
     }
     renderer.render(scene, camera);
-};
+}
 
 window._syncAoButton = function() {
     const btn = document.getElementById('btn-toggle-ao');
     if (!btn) return;
-    btn.classList.toggle('toggled-off', !window._aoEnabled);
-    btn.title = window._aoEnabled ? 'הצללה רכה בתלת־מימד: פועלת (לחץ לכיבוי)' : 'הצללה רכה בתלת־מימד: כבויה (לחץ להפעלה)';
+    const on = window._aoEnabled && !window._aoAutoOff;
+    btn.classList.toggle('toggled-off', !on);
+    btn.title = on ? 'הצללה רכה בתלת־מימד: פועלת (לחץ לכיבוי)'
+        : window._aoAutoOff ? 'הצללה רכה כובתה אוטומטית כי התצוגה איטית במחשב הזה (לחץ להפעלה)'
+        : 'הצללה רכה בתלת־מימד: כבויה (לחץ להפעלה)';
 };
 window._toggleAO = function() {
-    window._aoEnabled = !window._aoEnabled;
+    if (window._aoAutoOff) {
+        window._aoAutoOff = false;
+        window._aoEnabled = true;
+        _aoUserKept = true;
+    } else {
+        window._aoEnabled = !window._aoEnabled;
+    }
     try { localStorage.setItem('ac_ao', window._aoEnabled ? '1' : '0'); } catch (e) { /* ignore */ }
     window._syncAoButton();
+    window._requestRender(false);
+};
+
+// Render on demand: animate() in ui.js draws only while the camera moves, after a rebuild, during user
+// input, and once a second as a safety net — an idle editor leaves the GPU alone. The key light never
+// follows the camera, so the shadow map is redrawn only when the scene itself may have changed.
+// Escape hatch: localStorage ac_rod = '0' draws every frame again
+window._renderOnDemandOff = (function() { try { return localStorage.getItem('ac_rod') === '0'; } catch (e) { return false; } })();
+renderer.shadowMap.autoUpdate = window._renderOnDemandOff;
+renderer.shadowMap.needsUpdate = true;
+window._renderUntil = 0;
+window._requestRender = function(sceneChanged) {
+    window._renderUntil = Math.max(window._renderUntil || 0, performance.now() + 250);
+    if (sceneChanged !== false) renderer.shadowMap.needsUpdate = true;
+};
+(function() {
+    let orbiting = false;
+    controls.addEventListener('start', function() { orbiting = true; });
+    controls.addEventListener('end', function() { orbiting = false; window._requestRender(false); });
+    const opts = { capture: true, passive: true };
+    // A held button that is not orbiting the camera is dragging something in the scene
+    window.addEventListener('pointermove', function(e) { window._requestRender(!!e.buttons && !orbiting); }, opts);
+    ['wheel', 'resize'].forEach(function(t) {
+        window.addEventListener(t, function() { window._requestRender(false); }, opts);
+    });
+    ['pointerdown', 'pointerup', 'click', 'keydown', 'keyup', 'input', 'change'].forEach(function(t) {
+        window.addEventListener(t, function() { window._requestRender(true); }, opts);
+    });
+    const lm = THREE.DefaultLoadingManager;
+    const prevProgress = lm.onProgress;
+    lm.onProgress = function() {
+        window._requestRender(true);
+        if (typeof prevProgress === 'function') return prevProgress.apply(this, arguments);
+    };
+})();
+
+// Weak GPUs: when continuous rendering stays slow, drop the soft shadows first, then the shadow-map
+// resolution. Frames right after a rebuild are CPU-bound and not counted.
+window._aoAutoOff = false;
+let _aoUserKept = false;
+let _perfSamples = 0, _perfSlow = 0, _perfDone = false;
+window._noteFrameTime = function(dt) {
+    if (_perfDone || !(dt > 0) || dt > 0.5) return;
+    if (performance.now() - (window._lastBuildAt || 0) < 150) return;
+    _perfSamples++;
+    if (dt > 0.045) _perfSlow++;
+    if (_perfSamples < 90) return;
+    const slow = _perfSlow / _perfSamples > 0.6;
+    _perfSamples = 0;
+    _perfSlow = 0;
+    if (!slow) return;
+    if (_aoWanted() && !_aoUserKept) {
+        window._aoAutoOff = true;
+        window._syncAoButton();
+        console.info('[perf] slow frames — soft shadows turned off');
+        return;
+    }
+    if (dirLight.shadow.mapSize.x > 1024) {
+        dirLight.shadow.mapSize.set(1024, 1024);
+        if (dirLight.shadow.map) { dirLight.shadow.map.dispose(); dirLight.shadow.map = null; }
+        renderer.shadowMap.needsUpdate = true;
+        console.info('[perf] slow frames — shadow map lowered to 1024');
+        return;
+    }
+    _perfDone = true;
 };
 window._syncAoButton();
 
@@ -353,12 +433,14 @@ let _shadowFitKey = '';
 function _fitShadowFrustum() {
     const sc = dirLight.shadow.camera;
     const p = dirLight.position;
-    const key = (window._roomVisible ? 'room' : 'cab') + '|' + p.x + ',' + p.y + ',' + p.z;
+    const roomShown = !!(window._roomVisible && window._roomGroup && window._roomGroup.visible);
+    const key = (roomShown ? 'room' : 'cab') + '|' + p.x + ',' + p.y + ',' + p.z;
     if (key === _shadowFitKey && !window._shadowFrustumDirty) return;
     _shadowFitKey = key;
     window._shadowFrustumDirty = false;
+    renderer.shadowMap.needsUpdate = true;
     let f = _SHADOW_ROOM_FRUSTUM;
-    if (!window._roomVisible) {
+    if (!roomShown) {
         _shadowFitBox.setFromObject(cabinetGroup);
         if (!_shadowFitBox.isEmpty()) {
             _shadowFitBox.expandByScalar(10);
@@ -380,10 +462,30 @@ function _fitShadowFrustum() {
     sc.updateProjectionMatrix();
 }
 
-scene.onBeforeRender = function() {
+const _roomBackdropDir = new THREE.Vector3();
+/**
+ * Editor room backdrop: shown only on screen (captures stay room-free), in 3D and once the front
+ * view is orbited away from straight-on, so the editing view keeps its clean background.
+ */
+function _syncRoomBackdrop(cam) {
+    const rg = window._roomGroup;
+    if (!rg || !window._roomIsBackdrop()) return;
+    let show = !!window._inMainRender && !state.wingEditMode;
+    if (show && state.viewMode === 'front') {
+        cam.getWorldDirection(_roomBackdropDir);
+        show = _roomBackdropDir.z > -0.97;
+    }
+    rg.visible = show;
+}
+
+scene.onBeforeRender = function(r, s, cam) {
+    _syncRoomBackdrop(cam);
+    // Captures may toggle doors or views without a rebuild — always give them a fresh shadow map
+    if (!window._inMainRender) renderer.shadowMap.needsUpdate = true;
     if (window._shadowFlagsDirty) {
         window._shadowFlagsDirty = false;
         window._shadowFrustumDirty = true;
+        renderer.shadowMap.needsUpdate = true;
         cabinetGroup.traverse(o => {
             if (!o.isMesh || !o.material || Array.isArray(o.material)) return;
             const m = o.material;
@@ -573,6 +675,36 @@ window._toggleRoom = function() {
     if (typeof window._updateRoomPropsUI === 'function') window._updateRoomPropsUI();
 };
 
+// ---- Room as a backdrop behind the cabinet in the editor (toolbar toggle, remembered per browser) ----
+window._room3dPref = (function() {
+    try { return localStorage.getItem('ac_room3d') !== '0'; } catch (e) { return true; }
+})();
+/** Room shown in the editor only as scenery — not תצוגת חדר / presentation, where it is the subject. */
+window._roomIsBackdrop = function() {
+    return !!window._roomVisible && state.viewMode !== 'room-plan' && !_roomUiActive();
+};
+function _editorRoomWanted() {
+    if (!window._room3dPref || state.wingEditMode) return false;
+    if (state.viewMode !== 'front' && state.viewMode !== '3d') return false;
+    // Editor page only (the viewer has its own scene); spaces place cabinets outside the room rectangle
+    if (!document.getElementById('btn-toggle-room3d')) return false;
+    const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
+    return !(info && info.others && info.others.length);
+}
+window._syncEditorRoomButton = function() {
+    const btn = document.getElementById('btn-toggle-room3d');
+    if (!btn) return;
+    btn.classList.toggle('toggled-off', !window._room3dPref);
+    btn.title = window._room3dPref ? 'חדר ברקע בתלת־מימד: מוצג (לחץ להסתרה)' : 'חדר ברקע בתלת־מימד: מוסתר (לחץ להצגה)';
+};
+window._toggleEditorRoom = function() {
+    window._room3dPref = !window._room3dPref;
+    try { localStorage.setItem('ac_room3d', window._room3dPref ? '1' : '0'); } catch (e) { /* ignore */ }
+    window._syncEditorRoomButton();
+    if (typeof buildCabinet === 'function') buildCabinet();
+};
+window._syncEditorRoomButton();
+
 // ---- Doors visibility toggle ----
 window._doorsVisible = true;
 window._isHideableDoorFront = function(m) {
@@ -587,7 +719,7 @@ window._setDoorsVisible = function(wantVisible) {
         m.visible = window._doorsVisible;
     });
     // Also apply to companion cabinets in space/room view (their doors are tracked separately)
-    (window._spaceCompanionDoorMeshes || []).forEach(function(m) {
+    (window._spaceCompanionDoorMeshes || []).concat(window._roomExtraDoorMeshes || []).forEach(function(m) {
         if (!m || !window._isHideableDoorFront(m)) return;
         m.visible = window._doorsVisible;
     });
@@ -1194,14 +1326,63 @@ window._rebuildRoomExtraCabinets = function(rg) {
     const root = new THREE.Group();
     root.name = 'roomExtraCabinets';
     window._roomExtraCabinetGroup = root;
+    window._roomExtraDoorMeshes = [];
     if (!rg) return root;
 
     const props = window._roomExtraCabinets || [];
     if (!props.length || typeof window.buildCabinetIntoGroup !== 'function') {
+        _roomExtraCache.forEach(function(entry) {
+            entry.group.traverse(function(o) { if (o.geometry) o.geometry.dispose(); });
+        });
+        _roomExtraCache.clear();
         rg.add(root);
         return root;
     }
 
+    // Built cabinets are reused until their saved state (or the shared part paint) changes, so editing
+    // the open cabinet does not rebuild every other cabinet standing in the room
+    const paintKey = JSON.stringify(state.partColors || null);
+    const plan = props.map(function(prop) {
+        const item = state.orderCart && state.orderCart[prop.cartIndex];
+        if (!item || !item.rawState) return null;
+        const id = prop.id || ('room-cab-' + prop.cartIndex);
+        const key = prop.cartIndex + '|' + paintKey + '|' + JSON.stringify(item.rawState);
+        const hit = _roomExtraCache.get(id);
+        return { prop: prop, rs: item.rawState, id: id, key: key, hit: (hit && hit.key === key) ? hit : null };
+    }).filter(Boolean);
+    const misses = plan.filter(function(p) { return !p.hit; });
+    if (misses.length) _buildRoomExtraCabinets(misses);
+
+    const live = {};
+    const extraDoors = [];
+    plan.forEach(function(p) {
+        const entry = _roomExtraCache.get(p.id);
+        if (!entry || entry.key !== p.key) return;
+        live[p.id] = true;
+        const g = entry.group;
+        g.position.set(p.prop.x || 0, 0, p.prop.z || 0);
+        g.rotation.y = ((p.prop.rotation || 0) * Math.PI) / 180;
+        root.add(g);
+        entry.doors.forEach(function(m) {
+            extraDoors.push(m);
+            if (window._isHideableDoorFront(m)) m.visible = window._doorsVisible !== false;
+        });
+    });
+    // Kept out of doorMeshes so hover / door editing never targets a cabinet that is not open
+    window._roomExtraDoorMeshes = extraDoors;
+    _roomExtraCache.forEach(function(entry, id) {
+        if (live[id]) return;
+        entry.group.traverse(function(o) { if (o.geometry) o.geometry.dispose(); });
+        _roomExtraCache.delete(id);
+    });
+
+    rg.add(root);
+    return root;
+};
+
+const _roomExtraCache = new Map();
+
+function _buildRoomExtraCabinets(misses) {
     // Deep-clone active editor state so prop builds cannot mutate it
     const saved = {
         wings: JSON.parse(JSON.stringify(state.wings || {})),
@@ -1224,13 +1405,31 @@ window._rebuildRoomExtraCabinets = function(rg) {
         desk: state.desk ? JSON.parse(JSON.stringify(state.desk)) : state.desk,
         partColors: state.partColors,
         _activeUpperUnit: state._activeUpperUnit,
-        ppScope: window._ppColorScope
+        ppScope: window._ppColorScope,
+        // Room cabinets are scenery: their dimensions, hit boxes and handles must not join the open cabinet's
+        dimData: state.dimData ? state.dimData.slice() : [],
+        bpData: state.bpData ? state.bpData.slice() : [],
+        hitBoxes: hitBoxes.slice(),
+        wingHitBoxes: wingHitBoxes.slice(),
+        deskHitBoxes: deskHitBoxes.slice(),
+        partMeshes: (window.partMeshes || []).slice(),
+        shelfPickMeshes: (window.shelfPickMeshes || []).slice(),
+        shelfWallOccluders: (window.shelfWallOccluders || []).slice(),
+        doorHandleObjs: (window._doorHandleObjs || []).slice(),
+        dragHandlesData: Object.keys(dragHandlesData).reduce(function(o, k) {
+            o[k] = Array.isArray(dragHandlesData[k]) ? dragHandlesData[k].slice() : dragHandlesData[k];
+            return o;
+        }, {})
     };
 
-    props.forEach(function(prop) {
-        const item = state.orderCart && state.orderCart[prop.cartIndex];
-        if (!item || !item.rawState) return;
-        const rs = item.rawState;
+    misses.forEach(function(p) {
+        const prop = p.prop;
+        const rs = p.rs;
+        const old = _roomExtraCache.get(p.id);
+        if (old) {
+            old.group.traverse(function(o) { if (o.geometry) o.geometry.dispose(); });
+            _roomExtraCache.delete(p.id);
+        }
         try {
             if (rs.wings) {
                 const wingsCopy = JSON.parse(JSON.stringify(rs.wings));
@@ -1257,10 +1456,9 @@ window._rebuildRoomExtraCabinets = function(rg) {
             g.userData.roomProp = prop.id;
             g.userData.roomExtraCabinet = true;
             g.userData.cartIndex = prop.cartIndex;
+            const doorsBefore = doorMeshes.length;
             window.buildCabinetIntoGroup(g);
-            g.position.set(prop.x || 0, 0, prop.z || 0);
-            g.rotation.y = ((prop.rotation || 0) * Math.PI) / 180;
-            root.add(g);
+            _roomExtraCache.set(p.id, { key: p.key, group: g, doors: doorMeshes.splice(doorsBefore) });
         } catch (e) {
             console.warn('[roomExtraCabinets] failed to build cartIndex', prop.cartIndex, e);
         }
@@ -1292,10 +1490,20 @@ window._rebuildRoomExtraCabinets = function(rg) {
     state.partColors = saved.partColors;
     state._activeUpperUnit = saved._activeUpperUnit;
     window._ppColorScope = saved.ppScope;
-
-    rg.add(root);
-    return root;
-};
+    state.dimData = saved.dimData;
+    state.bpData = saved.bpData;
+    hitBoxes.length = 0;
+    saved.hitBoxes.forEach(function(h) { hitBoxes.push(h); });
+    wingHitBoxes.length = 0;
+    saved.wingHitBoxes.forEach(function(h) { wingHitBoxes.push(h); });
+    deskHitBoxes.length = 0;
+    saved.deskHitBoxes.forEach(function(h) { deskHitBoxes.push(h); });
+    window.partMeshes = saved.partMeshes;
+    window.shelfPickMeshes = saved.shelfPickMeshes;
+    window.shelfWallOccluders = saved.shelfWallOccluders;
+    window._doorHandleObjs = saved.doorHandleObjs;
+    Object.keys(saved.dragHandlesData).forEach(function(k) { dragHandlesData[k] = saved.dragHandlesData[k]; });
+}
 
 // ── Room entrance door + windows (movable on walls in 2D plan) ──────────────
 window._ROOM_DOOR_W = window._ROOM_DOOR_W || 90;
@@ -2248,10 +2456,11 @@ window._updateRoomPropsUI = function() {
     const tbWidth = document.getElementById('bed-tb-width-label');
     if (tbWidth) tbWidth.textContent = (window._bedWidthCm || 160);
 
+    const roomEditable = (window._roomVisible && !window._roomIsBackdrop()) || state.viewMode === 'room-plan';
     const propsRow = document.getElementById('room-props-row');
-    if (propsRow) propsRow.style.display = (window._roomVisible || state.viewMode === 'room-plan') ? '' : 'none';
+    if (propsRow) propsRow.style.display = roomEditable ? '' : 'none';
     const furnBar = document.getElementById('room-furniture-toolbar');
-    if (furnBar) furnBar.style.display = (window._roomVisible || state.viewMode === 'room-plan') ? '' : 'none';
+    if (furnBar) furnBar.style.display = roomEditable ? '' : 'none';
 };
 
 // Rotate bed 90° clockwise on each call
@@ -2306,9 +2515,36 @@ window._rotateBed = function() {
     });
 })();
 
+// Repeat/offset variants of the room textures, kept so a rebuild does not re-upload the image to the GPU
+const _roomTexCache = new Map();
+function _roomTexVariant(base, rx, ry, ox, oy) {
+    const key = base.uuid + '|' + rx.toFixed(4) + '|' + ry.toFixed(4) + '|' + ox.toFixed(4) + '|' + oy.toFixed(4);
+    let t = _roomTexCache.get(key);
+    if (!t) {
+        if (_roomTexCache.size > 24) {
+            _roomTexCache.forEach(function(v) { v.dispose(); });
+            _roomTexCache.clear();
+        }
+        t = base.clone();
+        t.needsUpdate = true;
+        t.repeat.set(rx, ry);
+        t.offset.set(ox, oy);
+        _roomTexCache.set(key, t);
+    }
+    return t;
+}
+
 function _buildRoom() {
     const rg = window._roomGroup;
+    rg.traverse(function(o) {
+        if (!o.userData._roomOwned) return;
+        if (o.geometry) o.geometry.dispose();
+        // During a bed drag the walls wear shared stand-in materials (ui.js _stripRoomTextures)
+        if (o.material && !Array.isArray(o.material) && !window._roomMatBackup) o.material.dispose();
+    });
     while (rg.children.length > 0) rg.remove(rg.children[0]);
+    window._shadowFlagsDirty = true;
+    if (typeof window._requestRender === 'function') window._requestRender();
     const _inRoomPlan = !!(document.body && document.body.classList.contains('room-plan-mode'));
     if (state.viewMode === 'blueprint') { _roomDbg('skip: blueprint view'); return; }
     // Temporary non-room view inside תצוגת חדר (thumbnail / capture) — hide for this build only
@@ -2368,15 +2604,11 @@ function _buildRoom() {
     const makeWallMat = (wallW, wallH) => {
         const mat = new THREE.MeshStandardMaterial({ color: 0xf0ede8, roughness: 0.9, metalness: 0.0, side: THREE.FrontSide });
         if (!_skipTex && window._wallTex) {
-            const wt = window._wallTex.clone();
-            wt.needsUpdate = true;
-            const img = wt.image;
+            const img = window._wallTex.image;
             const texAspect = (img && img.width && img.height) ? (img.width / img.height) : 2.0;
             const wallAspect = wallW / wallH;
             const repeatX = wallAspect / texAspect;
-            wt.repeat.set(repeatX, 1);
-            wt.offset.set((1 - repeatX) / 2, 0);
-            mat.map = wt;
+            mat.map = _roomTexVariant(window._wallTex, repeatX, 1, (1 - repeatX) / 2, 0);
             mat.color.set(0xffffff);
         }
         return mat;
@@ -2385,15 +2617,11 @@ function _buildRoom() {
     const makeBrickMat = (wallW, wallH) => {
         const mat = new THREE.MeshStandardMaterial({ color: 0xc0a080, roughness: 0.95, metalness: 0.0, side: THREE.FrontSide });
         if (!_skipTex && window._brickWallTex) {
-            const bt = window._brickWallTex.clone();
-            bt.needsUpdate = true;
-            const img = bt.image;
+            const img = window._brickWallTex.image;
             const texAspect = (img && img.width && img.height) ? (img.width / img.height) : 1.5;
             const wallAspect = wallW / wallH;
             const repeatX = wallAspect / texAspect;
-            bt.repeat.set(repeatX, 1);
-            bt.offset.set((1 - repeatX) / 2, 0);
-            mat.map = bt;
+            mat.map = _roomTexVariant(window._brickWallTex, repeatX, 1, (1 - repeatX) / 2, 0);
             mat.color.set(0xffffff);
         }
         return mat;
@@ -2403,10 +2631,7 @@ function _buildRoom() {
     const tileSizeCm = 200;
     const floorMat = new THREE.MeshStandardMaterial({ color: 0xd4a96a, roughness: 0.8, metalness: 0.0 });
     if (!_skipTex && window._woodFloorTex) {
-        const ft = window._woodFloorTex.clone();
-        ft.needsUpdate = true;
-        ft.repeat.set(roomW / tileSizeCm, roomD / tileSizeCm);
-        floorMat.map = ft;
+        floorMat.map = _roomTexVariant(window._woodFloorTex, roomW / tileSizeCm, roomD / tileSizeCm, 0, 0);
         floorMat.color.set(0xffffff);
     }
     const floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomD), floorMat);
@@ -2414,6 +2639,7 @@ function _buildRoom() {
     floorMesh.position.set(roomCenterX, 0, backZ + roomD / 2 - wallT);
     floorMesh.receiveShadow = true;
     floorMesh.userData.roomPart = 'floor';
+    floorMesh.userData._roomOwned = true;
     rg.add(floorMesh);
 
     // Door + window openings cut into the wall planes
@@ -2425,6 +2651,7 @@ function _buildRoom() {
         _roomWallGeometry(roomW, roomH, _roomWallHoles('back', _openings, roomCenterX, _sideWallCZ, roomH)),
         makeWallMat(roomW, roomH));
     backWall.position.set(roomCenterX, roomH / 2, backZ);
+    backWall.userData._roomOwned = true;
     rg.add(backWall);
 
     // ── Left wall ──────────────────────────────────────────────────────────
@@ -2434,6 +2661,7 @@ function _buildRoom() {
         makeBrickMat(roomD, roomH));
     leftWall.rotation.y = Math.PI / 2;
     leftWall.position.set(leftWallX, roomH / 2, _sideWallCZ);
+    leftWall.userData._roomOwned = true;
     rg.add(leftWall);
 
     // ── Right wall ─────────────────────────────────────────────────────────
@@ -2443,6 +2671,7 @@ function _buildRoom() {
         makeWallMat(roomD, roomH));
     rightWall.rotation.y = -Math.PI / 2;
     rightWall.position.set(rightWallX, roomH / 2, _sideWallCZ);
+    rightWall.userData._roomOwned = true;
     rg.add(rightWall);
 
     // ── Ceiling ────────────────────────────────────────────────────────────
@@ -2466,6 +2695,7 @@ function _buildRoom() {
         const ceilMesh = new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomD), ceilMat);
         ceilMesh.rotation.x = Math.PI / 2;
         ceilMesh.position.set(roomCenterX, _ceilPlaneY, backZ + roomD / 2 - wallT);
+        ceilMesh.userData._roomOwned = true;
         rg.add(ceilMesh);
     }
 
@@ -3307,11 +3537,12 @@ function buildCabinet() {
     // Order options panel: LED auto-mark and per-cabinet values follow every rebuild
     if (typeof window._syncOrderOptsUI === 'function') window._syncOrderOptsUI();
 
-    // Room shell is only for תכנון חדר or תצוגה חופשית — never in עריכת חזית / שרטוט.
+    // Outside תכנון חדר / תצוגה חופשית the room is only an editor backdrop (see _syncRoomBackdrop).
     // While room-plan UI is open, a temporary front view (autosave thumbnail) must not turn
     // the room off permanently — _buildRoom skips that build instead.
+    window._lastBuildAt = performance.now();
     if (state.viewMode !== 'room-plan' && !_roomUiActive()) {
-        window._roomVisible = false;
+        window._roomVisible = _editorRoomWanted();
     } else if (state.viewMode === 'room-plan' && window._roomVisible === false) {
         _roomDbg('buildCabinet: re-enabling room inside room plan');
         window._roomVisible = true;
