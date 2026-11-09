@@ -179,10 +179,10 @@ async function askAI(question, context) {
 function injectStyles() {
     if ($('help-chat-styles')) return;
     var css =
-        '#btn-help-chat{background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.35);color:#fff;border-radius:8px;padding:5px 10px;cursor:pointer;font-size:.8rem;font-weight:600;display:flex;align-items:center;gap:5px;white-space:nowrap;font-family:inherit}' +
-        '#btn-help-chat:hover{background:rgba(255,255,255,.3)}' +
-        '.sidebar-header-top{gap:6px}' +
-        '#help-chat{position:fixed;bottom:16px;right:calc(var(--layout-sidebar-right,420px) + 16px);width:370px;height:min(560px,calc(100dvh - 32px));background:#fff;border-radius:16px;box-shadow:0 18px 50px rgba(15,23,42,.28),0 0 0 1px rgba(15,23,42,.06);display:none;flex-direction:column;z-index:100000;direction:rtl;font-family:inherit;overflow:hidden}' +
+        '#btn-help-chat{position:fixed;bottom:20px;right:calc(var(--layout-sidebar-right,420px) + 20px);z-index:9000;background:linear-gradient(135deg,#1E3A5F,#152B47);color:#fff;border:2px solid rgba(0,212,255,.55);border-radius:999px;padding:10px 16px;cursor:pointer;font-size:.9rem;font-weight:700;display:flex;align-items:center;gap:7px;white-space:nowrap;font-family:inherit;box-shadow:0 6px 20px rgba(15,23,42,.3);transition:transform .15s,box-shadow .15s}' +
+        '#btn-help-chat i{color:#00D4FF;font-size:1.05rem}' +
+        '#btn-help-chat:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(15,23,42,.35)}' +
+        '#help-chat{position:fixed;bottom:80px;right:calc(var(--layout-sidebar-right,420px) + 20px);width:370px;height:min(560px,calc(100dvh - 100px));background:#fff;border-radius:16px;box-shadow:0 18px 50px rgba(15,23,42,.28),0 0 0 1px rgba(15,23,42,.06);display:none;flex-direction:column;z-index:100000;direction:rtl;font-family:inherit;overflow:hidden}' +
         '#help-chat.open{display:flex}' +
         '.hc-head{background:linear-gradient(135deg,#1E3A5F,#152B47);color:#fff;padding:12px 14px;display:flex;align-items:center;gap:10px}' +
         '.hc-head-ico{width:34px;height:34px;border-radius:50%;background:rgba(0,212,255,.18);display:flex;align-items:center;justify-content:center;color:#00D4FF;flex-shrink:0}' +
@@ -207,7 +207,8 @@ function injectStyles() {
         '.hc-input:focus{outline:none;border-color:#00D4FF}' +
         '.hc-send{background:#1E3A5F;color:#fff;border:none;border-radius:10px;width:42px;cursor:pointer;font-size:.95rem}' +
         '.hc-send:disabled{opacity:.5;cursor:default}' +
-        '@media (max-width:768px){#help-chat{right:0;left:0;bottom:0;width:auto;height:85dvh;border-radius:16px 16px 0 0}}';
+        '@media (max-width:768px){#help-chat{right:0;left:0;bottom:0;width:auto;height:85dvh;border-radius:16px 16px 0 0}' +
+            '#btn-help-chat{right:12px;bottom:84px;padding:12px;font-size:0}#btn-help-chat i{font-size:1.2rem}}';
     var st = document.createElement('style');
     st.id = 'help-chat-styles';
     st.textContent = css;
@@ -368,16 +369,16 @@ window._toggleHelpChat = function() {
 };
 
 function mountButton() {
-    var tourBtn = $('btn-start-tour');
-    if (!tourBtn || $('btn-help-chat')) return;
+    if (!$('canvas-container') || $('btn-help-chat')) return;
     injectStyles();
     var b = document.createElement('button');
     b.id = 'btn-help-chat';
     b.type = 'button';
     b.title = 'עוזר תמיכה — שאלו איך עושים כל דבר';
+    b.setAttribute('aria-label', 'עזרה');
     b.innerHTML = '<i class="fa-solid fa-comments"></i> עזרה';
     b.onclick = window._toggleHelpChat;
-    tourBtn.parentNode.insertBefore(b, tourBtn.nextSibling);
+    document.body.appendChild(b);
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountButton);
