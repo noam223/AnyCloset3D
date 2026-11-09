@@ -2828,11 +2828,6 @@ window._updateRoomPropsUI = function() {
     const chairShow = window._chairVisible !== false;
     _syncToggleBtn('room-btn-toggle-bed', bedShow, 'הסתר מיטה', 'הצג מיטה', 'bed');
     _syncToggleBtn('room-btn-toggle-chair', chairShow, 'הסתר כסא', 'הצג כסא', 'chair');
-    const door = window._roomDoor || {};
-    const hingeLbl = document.querySelector('#room-btn-door-hinge span');
-    if (hingeLbl) hingeLbl.textContent = 'ציר דלת: ' + (door.hinge === 'right' ? 'ימין' : 'שמאל');
-    const swingLbl = document.querySelector('#room-btn-door-swing span');
-    if (swingLbl) swingLbl.textContent = door.swing === 'out' ? 'נפתחת החוצה' : 'נפתחת פנימה';
     const chairVarLbl = document.getElementById('room-chair-variant-label');
     if (chairVarLbl) {
         const opt = window._CHAIR_OPTIONS[window._chairVariantIdx || 0];
