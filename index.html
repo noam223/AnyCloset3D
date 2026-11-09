@@ -40,7 +40,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260910deskMerge">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
     <link rel="stylesheet" href="style-extras.css?v=20260731rpcab">
-    <link rel="stylesheet" href="style.css?v=20261103cropshots">
+    <link rel="stylesheet" href="style.css?v=20261109touchLeaf">
     <link rel="stylesheet" href="quick-calc.css?v=20260929qc">
     <style>
         html.thumb-only-mode #left-sidebar,
@@ -489,13 +489,14 @@
                     <button type="button" class="handle-style-btn" data-style="riding" onclick="updateHandleStyle('riding')" title="ידית רוכבת">
                         <i class="fa-solid fa-grip-lines"></i><span>רוכבת</span>
                     </button>
-                    <button type="button" class="handle-style-btn" data-style="touch" onclick="updateHandleStyle('touch')" title="ידית טאצ'">
+                    <button type="button" class="handle-style-btn handle-touch-draggable" data-style="touch" onclick="updateHandleStyle('touch')" title="לחיצה — טאצ' לכל הארון · גרירה אל דלת — טאצ' רק לדלת או לכנף שעליה משחררים">
                         <i class="fa-solid fa-hand-pointer"></i><span>טאצ'</span>
                     </button>
                     <button type="button" class="handle-style-btn active" data-style="pipe" onclick="onExternalHandleBtn()" title="ידית חיצונית">
                         <img class="handle-variant-thumb" src="textures/handles/pipe_silver.png" alt=""><span>חיצונית</span>
                     </button>
                 </div>
+                <div class="handle-drag-hint"><i class="fa-solid fa-up-down-left-right"></i>גררו את "טאצ'" אל דלת או כנף בהדמיה כדי להחיל טאצ' רק עליה</div>
                 <div class="handle-variant-menu" data-for="riding" hidden>
                     <button type="button" class="handle-variant-opt riding-color-opt" data-color="black" onclick="updateRidingColor('black')"><span class="riding-swatch"><i class="rs-black"></i></span><span>שחור מט</span></button>
                     <button type="button" class="handle-variant-opt riding-color-opt" data-color="white" onclick="updateRidingColor('white')"><span class="riding-swatch"><i class="rs-white"></i></span><span>לבן</span></button>
@@ -3001,12 +3002,12 @@
 <script src="writing-desk-preset.js?v=20260823h370"></script>
 <script src="corner-unit-preset.js?v=20261103deskdoor"></script>
 <script src="engine-appliances.js?v=20261007deskMerge28"></script>
-<script src="engine-core.js?v=20261105spacepick"></script>
+<script src="engine-core.js?v=20261109touchLeaf"></script>
 <script src="engine-corners.js?v=20261103deskedge"></script>
 <script src="engine-blueprint.js?v=20261103intdrw2"></script>
 <script src="engine-room-plan.js?v=20261016snap"></script>
 <script src="tambour-color-picker.js?v=20261009colors"></script>
-<script src="ui.js?v=20261108drawer5"></script>
+<script src="ui.js?v=20261109touchLeaf"></script>
 <script src="mobile.js?v=20261029inthandle"></script>
 <script src="part-paint.js?v=20261104egger"></script>
 <script src="shelf-pick.js?v=20260922sideWall"></script>

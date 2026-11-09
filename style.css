@@ -1342,6 +1342,24 @@ body {
     margin-bottom: 8px;
 }
 .handle-style-row:has(> [data-style="none"]) { grid-template-columns: repeat(4, 1fr); }
+.handle-style-btn.handle-touch-draggable { cursor: grab; touch-action: none; }
+.handle-drag-hint {
+    display: flex; align-items: center; gap: 6px;
+    margin: -2px 0 8px; font-size: 0.72rem; color: var(--text-light); line-height: 1.35;
+}
+.handle-drag-hint i { font-size: 0.7rem; opacity: 0.75; }
+body.touch-door-dragging, body.touch-door-dragging * { cursor: grabbing !important; user-select: none !important; }
+.touch-drag-ghost {
+    position: fixed; z-index: 100000; pointer-events: none;
+    transform: translate(-50%, calc(-100% - 14px));
+    display: flex; align-items: center; gap: 7px;
+    padding: 7px 12px; border-radius: 10px;
+    background: #334155; color: #fff; font-size: 13px; font-weight: 600; white-space: nowrap;
+    box-shadow: 0 6px 20px rgba(15,23,42,0.3);
+    transition: background 0.12s;
+}
+.touch-drag-ghost.ok { background: #2563eb; }
+.touch-drag-ghost.bad { background: #b45309; }
 
 /* Order-closing options (extras tab) */
 .order-opt-item { margin-bottom: 12px; }

@@ -5353,6 +5353,182 @@ function _openTvSizeMenu(colIndex, rowIndex, anchor) {
 }
 window._openTvSizeMenu = _openTvSizeMenu;
 
+// Drag the sidebar "טאצ'" button onto a door: a double-door leaf gets door.touchLeaf
+// (the other leaf keeps its handle); a single door gets a per-door touch handle. Drop again to undo.
+(function _initTouchDoorDrag() {
+    const DRAG_PX = 6;
+    let drag = null;
+    let suppressClick = false;
+
+    function visibleChain(o) {
+        for (; o; o = o.parent) if (o.visible === false) return false;
+        return true;
+    }
+
+    function doorAt(x, y) {
+        const rect = container.getBoundingClientRect();
+        if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return null;
+        const under = document.elementFromPoint(x, y);
+        if (under && under !== renderer.domElement && !container.contains(under)) return null;
+        mouse.x = ((x - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((y - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const hits = raycaster.intersectObjects(window.doorMeshes || [], true);
+        for (const h of hits) {
+            if (!visibleChain(h.object) || h.object.isLine || h.object.isLineSegments) continue;
+            for (let o = h.object; o; o = o.parent) {
+                if (o.userData && o.userData.doorLeaf) return { leafInfo: o.userData.doorLeaf, obj: o };
+            }
+            return { leafInfo: null };
+        }
+        return null;
+    }
+
+    function leafLabel(info) {
+        if (info.door.type !== 'double') return 'הדלת הזו';
+        return info.leaf === 'left' ? 'הכנף השמאלית' : 'הכנף הימנית';
+    }
+
+    function dropOutcome(info) {
+        const door = info.door;
+        const where = leafLabel(info);
+        if (door.type === 'double') {
+            const doorHs = door.handleStyle || _getHandleStyle();
+            if (doorHs === 'touch') return { ok: false, text: "הדלת כבר כולה בטאצ'" };
+            if (door.touchLeaf === info.leaf) {
+                return { ok: true, undo: true, text: "הסרת טאצ' מ" + where, done: "הטאצ' הוסר מ" + where };
+            }
+            return {
+                ok: true, text: "טאצ' ל" + where.slice(1),
+                done: "הוחל טאצ' על " + where + (doorHs !== 'none' ? ' — הידית נשארת רק בכנף השנייה' : '')
+            };
+        }
+        if (door.type === 'left' || door.type === 'right') {
+            if (door.handleStyle === 'touch') return { ok: true, undo: true, text: "הסרת טאצ' מהדלת", done: "הטאצ' הוסר — הדלת חוזרת לידית של הארון" };
+            if (_getHandleStyle() === 'touch') return { ok: false, text: "הדלת כבר בטאצ'" };
+            return { ok: true, text: "טאצ' לדלת הזו", done: "הוחל טאצ' על הדלת" };
+        }
+        return { ok: false, text: 'אפשר לשחרר על דלת רגילה או כפולה' };
+    }
+
+    function clearHighlight() {
+        if (drag && drag.hl) {
+            scene.remove(drag.hl);
+            drag.hl.geometry.dispose();
+            drag.hl.material.dispose();
+            drag.hl = null;
+        }
+    }
+
+    function highlight(obj) {
+        clearHighlight();
+        if (!obj) return;
+        const box = new THREE.Box3().setFromObject(obj);
+        if (box.isEmpty()) return;
+        const size = box.getSize(new THREE.Vector3());
+        const mesh = new THREE.Mesh(
+            new THREE.BoxGeometry(size.x + 1, size.y + 1, size.z + 1),
+            new THREE.MeshBasicMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.28, depthTest: false })
+        );
+        mesh.renderOrder = 999;
+        box.getCenter(mesh.position);
+        scene.add(mesh);
+        drag.hl = mesh;
+    }
+
+    function update(x, y) {
+        drag.ghost.style.left = x + 'px';
+        drag.ghost.style.top = y + 'px';
+        const hit = doorAt(x, y);
+        const info = hit && hit.leafInfo;
+        const out = info ? dropOutcome(info) : null;
+        drag.target = out && out.ok ? info : null;
+        highlight(drag.target ? hit.obj : null);
+        drag.label.textContent = out ? out.text : (hit ? 'אפשר לשחרר על דלת רגילה או כפולה' : 'גררו אל דלת בהדמיה');
+        drag.ghost.classList.toggle('ok', !!drag.target);
+        drag.ghost.classList.toggle('bad', !!out && !out.ok);
+    }
+
+    function apply(info) {
+        const door = info.door;
+        const out = dropOutcome(info);
+        if (door.type === 'double') {
+            if (out.undo) delete door.touchLeaf;
+            else door.touchLeaf = info.leaf;
+        } else if (out.undo) {
+            delete door.handleStyle;
+        } else {
+            door.handleStyle = 'touch';
+        }
+        buildCabinet(); calculatePrice(); saveHistoryState();
+        if (typeof updateToolbarState === 'function') updateToolbarState();
+        _showToast(out.done, 3500);
+    }
+
+    function begin() {
+        drag.started = true;
+        const g = document.createElement('div');
+        g.className = 'touch-drag-ghost';
+        g.innerHTML = '<i class="fa-solid fa-hand-pointer"></i><span></span>';
+        document.body.appendChild(g);
+        drag.ghost = g;
+        drag.label = g.querySelector('span');
+        document.body.classList.add('touch-door-dragging');
+    }
+
+    function movedFar(e) {
+        return Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) >= DRAG_PX;
+    }
+
+    function end(e) {
+        if (!drag) return;
+        const d = drag;
+        if (!d.started && e && e.type === 'pointerup' && movedFar(e)) begin();
+        if (d.started) {
+            if (e && e.type === 'pointerup') update(e.clientX, e.clientY);
+            const target = d.target;
+            clearHighlight();
+            d.ghost.remove();
+            document.body.classList.remove('touch-door-dragging');
+            suppressClick = true;
+            setTimeout(() => { suppressClick = false; }, 400);
+            if (target) apply(target);
+        }
+        drag = null;
+    }
+
+    function onDown(e) {
+        const btn = e.target.closest && e.target.closest('#handle-type-row .handle-style-btn[data-style="touch"]');
+        if (!btn || e.button !== 0 || state.cabinetModel === 'ab2') return;
+        drag = { btn, x0: e.clientX, y0: e.clientY, started: false, target: null, hl: null };
+        try { btn.setPointerCapture(e.pointerId); } catch (_) {}
+    }
+
+    function onMove(e) {
+        if (!drag) return;
+        if (!drag.started) {
+            if (!movedFar(e)) return;
+            begin();
+        }
+        update(e.clientX, e.clientY);
+    }
+
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', end);
+    document.addEventListener('pointercancel', end);
+    document.addEventListener('dragstart', e => {
+        if (e.target.closest && e.target.closest('#handle-type-row .handle-style-btn[data-style="touch"]')) e.preventDefault();
+    }, true);
+    document.addEventListener('click', e => {
+        if (suppressClick && e.target.closest && e.target.closest('.handle-style-btn')) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            suppressClick = false;
+        }
+    }, true);
+})();
+
 // applyContentForce: always sets the type (no toggle) — used by sub-panel buttons
 // When _activeSubCellIdx is set, routes to setSubCellType instead
 window.applyContentForce = function(type) {
@@ -14538,6 +14714,7 @@ function _countTouchHandlesInWing(wing, rs, out) {
         if (wing.hasDoors !== false) {
             (col.doors || []).forEach(function(door) {
                 if (door && isTouch(door.handleStyle)) out.doors += door.type === 'double' ? 2 : 1;
+                else if (door && door.type === 'double' && (door.touchLeaf === 'left' || door.touchLeaf === 'right')) out.doors += 1;
             });
             _forEachPartitionDoor(col, function(type, handleStyle) {
                 if (isTouch(handleStyle)) out.doors += type === 'door_double' ? 2 : 1;

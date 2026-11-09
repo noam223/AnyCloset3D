@@ -4417,6 +4417,17 @@ function _pickSideOpenDir(c, opensLeft, opensRight) {
     return 'none';
 }
 
+/** Double doors can make one leaf push-to-open (door.touchLeaf); the other keeps the door's handle. */
+function _doorTouchLeaf(door) {
+    return (door && door.type === 'double' && (door.touchLeaf === 'left' || door.touchLeaf === 'right')) ? door.touchLeaf : null;
+}
+window._doorTouchLeaf = _doorTouchLeaf;
+
+function _doorLeafHandleStyle(door, leaf) {
+    if (_doorTouchLeaf(door) === leaf) return 'touch';
+    return (door && door.handleStyle) || _getHandleStyle();
+}
+
 function _getHandleStyle() {
     if (state.cabinetModel === 'ab2') return 'touch';
     const s = state.handleStyle || 'pipe';
@@ -7584,7 +7595,9 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                     const pivotX = centerX + (isLeft ? -w/2 : w/2);
                     const doorGroup = new THREE.Group();
                     doorGroup.position.set(pivotX, dY, zPos - fd_offset);
+                    doorGroup.userData.doorLeaf = { door, colIndex: c, doorIdx, leaf: isLeft ? 'left' : 'right' };
                     _buildGroup.add(doorGroup);
+                    const leafHs = _doorLeafHandleStyle(door, isLeft ? 'left' : 'right');
                     
                     const doorLocalX = isLeft ? w/2 : -w/2;
 
@@ -7660,11 +7673,11 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         mesh.position.set(doorLocalX, 0, 0);
                         mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geometry), edgeMat));
                         
-                        if (!isBP && (door.handleStyle || _handleStyle) === 'pipe' && _isHalfMoonHandle()) {
+                        if (!isBP && leafHs === 'pipe' && _isHalfMoonHandle()) {
                             // isLeft = hinge on the left, so the opening edge is on the right
                             const hm = _placeHalfMoon(mesh, _handleMat3D(), isLeft ? w / 2 : -w / 2, 0, t / 2, isLeft ? 'left' : 'right');
                             _tagDoorHandle(hm, door, dH, HALFMOON.R);
-                        } else if (!isBP && (door.handleStyle || _handleStyle) === 'pipe') {
+                        } else if (!isBP && leafHs === 'pipe') {
                             const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 15, 16), _handleMat3D());
                             handle.position.set(isLeft ? w/2 - 4 : -w/2 + 4, 0, t / 2 + 1.5);
                             mesh.add(handle);
@@ -7698,10 +7711,10 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         // glass_black / glass_gold: no handle (aluminum frame doors don't have separate handles)
                         const isAlumFrame = (style === 'glass_black' || style === 'glass_gold');
                         // For glass_melamine: add handle on the frame (no back panel — glass is transparent)
-                        if (isGlass && !isAlumFrame && (door.handleStyle || _handleStyle) === 'pipe' && _isHalfMoonHandle()) {
+                        if (isGlass && !isAlumFrame && leafHs === 'pipe' && _isHalfMoonHandle()) {
                             const hm = _placeHalfMoon(doorGroup, _handleMat3D(), doorLocalX + (isLeft ? w / 2 : -w / 2), 0, fz + fd / 2, isLeft ? 'left' : 'right');
                             _tagDoorHandle(hm, door, dH, HALFMOON.R);
-                        } else if (isGlass && !isAlumFrame && (door.handleStyle || _handleStyle) === 'pipe') {
+                        } else if (isGlass && !isAlumFrame && leafHs === 'pipe') {
                             const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 15, 16), _handleMat3D());
                             handle.position.set(doorLocalX + (isLeft ? w/2 - 4 : -w/2 + 4), 0, fz + fd / 2 + 1.5);
                             doorGroup.add(handle);
@@ -7765,7 +7778,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         }
                     }
                     if (!isBP && window._captureTouchIcons && window._spaceBuildSlot == null
-                        && (door.handleStyle || _handleStyle) === 'touch'
+                        && leafHs === 'touch'
                         && style !== 'glass_mirror' && w >= 28 && dH >= 34) {
                         const icon = window._touchIconSprite();
                         icon.position.set(doorLocalX, 0, t / 2 + 3);
@@ -7785,8 +7798,11 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                     makeDoor(w, true, _doorOverlayCenterX - w/2 - doorGap/2, doorStyle, _doorOverlayW);
                     makeDoor(w, false, _doorOverlayCenterX + w/2 + doorGap/2, doorStyle, _doorOverlayW);
                 }
+                const _touchLeaf = _doorTouchLeaf(door);
                 if (!isBP && (door.handleStyle || _handleStyle) === 'riding' && doorStyle !== 'glass_mirror') {
-                    const rx = door.type === 'double' ? _doorOverlayCenterX
+                    // A touch leaf has no handle — slide the seam profile onto the other leaf's edge
+                    const rx = door.type === 'double'
+                        ? _doorOverlayCenterX + (_touchLeaf === 'left' ? 1 : _touchLeaf === 'right' ? -1 : 0) * (doorGap / 2 + 0.5)
                         : door.type === 'left' ? _doorOverlayCenterX + _doorOverlayW / 2
                         : door.type === 'right' ? _doorOverlayCenterX - _doorOverlayW / 2
                         : null;
