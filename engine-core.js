@@ -1378,16 +1378,10 @@ window._clampRoomHostPose = function(pose) {
     const b = window._getRoomRect();
     const r = window._roomHostRectAt(pose);
     const out = { x: pose.x, z: pose.z, rotation: _rlNormRot(pose.rotation) };
-    function axis(lo, hi, min, max) {
-        if (hi - lo >= max - min) return (min + max) / 2 - (lo + hi) / 2;
-        if (lo < min) return min - lo;
-        if (hi > max) return max - hi;
-        if (lo - min < _ROOM_HOST_WALL_MAGNET) return min - lo;
-        if (max - hi < _ROOM_HOST_WALL_MAGNET) return max - hi;
-        return 0;
-    }
-    out.x += axis(r.minX, r.maxX, b.leftX, b.rightX);
-    out.z += axis(r.minZ, r.maxZ, b.backZ + 0.5, b.frontZ);
+    const s = window._roomFitShift(r, _ROOM_HOST_WALL_MAGNET,
+        { leftX: b.leftX, rightX: b.rightX, backZ: b.backZ + 0.5, frontZ: b.frontZ, height: b.height });
+    out.x += s.dx;
+    out.z += s.dz;
     return out;
 };
 
@@ -1891,7 +1885,7 @@ function _roomWallFeatureSetSpan(f, b, lo, hi) {
     const span = _roomWallSpan(b, f.wall);
     lo = Math.max(span.lo, lo);
     hi = Math.min(span.hi, hi);
-    const width = Math.max(_WALL_FEATURE_MIN, hi - lo);
+    const width = Math.round(Math.max(_WALL_FEATURE_MIN, hi - lo) * 10) / 10;
     const range = (span.hi - span.lo) - width;
     f.width = width;
     f.t = range > 0 ? Math.max(0, Math.min(1, (lo - span.lo) / range)) : 0.5;
@@ -1917,8 +1911,76 @@ window._setRoomWallFeatureFromPoint = function(id, x, z, bounds) {
     return snap;
 };
 
+/**
+ * Shift {dx, dz} that brings `rect` inside the room or into one of its niches, whichever needs the
+ * smaller move. Within `magnet` cm of a wall (room or niche) the rect is pulled flush against it.
+ */
+window._roomFitShift = function(rect, magnet, bounds) {
+    const b = bounds || window._roomBounds;
+    if (!b) return { dx: 0, dz: 0 };
+    magnet = magnet || 0;
+    function axis(lo, hi, min, max) {
+        if (hi - lo >= max - min) return (min + max) / 2 - (lo + hi) / 2;
+        if (lo < min) return min - lo;
+        if (hi > max) return max - hi;
+        if (lo - min < magnet) return min - lo;
+        if (max - hi < magnet) return max - hi;
+        return 0;
+    }
+    const regions = [{ minX: b.leftX, maxX: b.rightX, minZ: b.backZ, maxZ: b.frontZ }];
+    window._getRoomWallFeaturePoses(b).forEach(function(f) {
+        if (f.type !== 'niche') return;
+        const alongX = f.wall === 'front' || f.wall === 'back';
+        if ((alongX ? rect.maxX - rect.minX : rect.maxZ - rect.minZ) > f.width + 0.5) return;
+        const r = { minX: b.leftX, maxX: b.rightX, minZ: b.backZ, maxZ: b.frontZ };
+        if (f.wall === 'back') r.minZ -= f.depth;
+        else if (f.wall === 'front') r.maxZ += f.depth;
+        else if (f.wall === 'left') r.minX -= f.depth;
+        else r.maxX += f.depth;
+        if (alongX) { r.minX = f.minX; r.maxX = f.maxX; } else { r.minZ = f.minZ; r.maxZ = f.maxZ; }
+        regions.push(r);
+    });
+    let best = null;
+    regions.forEach(function(r) {
+        const s = { dx: axis(rect.minX, rect.maxX, r.minX, r.maxX), dz: axis(rect.minZ, rect.maxZ, r.minZ, r.maxZ) };
+        s.cost = Math.abs(s.dx) + Math.abs(s.dz);
+        if (!best || s.cost < best.cost - 1e-6) best = s;
+    });
+    return { dx: best.dx, dz: best.dz };
+};
+
+/** Room-space rects of a niche's free interior that `rect` occupies beyond the wall line, or null. */
+function _rectInNiche(f, rect) {
+    const alongX = f.wall === 'front' || f.wall === 'back';
+    const aLo = alongX ? rect.minX : rect.minZ, aHi = alongX ? rect.maxX : rect.maxZ;
+    const nLo = alongX ? f.minX : f.minZ, nHi = alongX ? f.maxX : f.maxZ;
+    if (aHi <= nLo + 0.5 || aLo >= nHi - 0.5) return null;
+    let protrude;
+    if (f.wall === 'back') protrude = f.cz - rect.minZ;
+    else if (f.wall === 'front') protrude = rect.maxZ - f.cz;
+    else if (f.wall === 'left') protrude = f.cx - rect.minX;
+    else protrude = rect.maxX - f.cx;
+    if (protrude <= 0.5) return null;
+    return { lo: aLo, hi: aHi, protrude: protrude };
+}
+window._roomRectInNiche = _rectInNiche;
+
+/** Limits that keep a niche's walls from cutting through `obstacles` standing inside it. */
+function _nicheLimits(pose, obstacles) {
+    const lim = { loMax: Infinity, hiMin: -Infinity, depthMin: 0 };
+    if (pose.type !== 'niche') return lim;
+    (obstacles || []).forEach(function(r) {
+        const hit = _rectInNiche(pose, r);
+        if (!hit) return;
+        lim.loMax = Math.min(lim.loMax, hit.lo);
+        lim.hiMin = Math.max(lim.hiMin, hit.hi);
+        lim.depthMin = Math.max(lim.depthMin, Math.ceil(hit.protrude));
+    });
+    return lim;
+}
+
 /** Resize from a handle: 'lo' / 'hi' move an end along the wall, 'depth' moves the face off the wall. */
-window._resizeRoomWallFeature = function(id, handle, x, z, bounds) {
+window._resizeRoomWallFeature = function(id, handle, x, z, bounds, obstacles) {
     const b = bounds || window._roomBounds;
     const f = window._findRoomWallFeature(id);
     if (!b || !f) return;
@@ -1928,35 +1990,45 @@ window._resizeRoomWallFeature = function(id, handle, x, z, bounds) {
     const along = Math.round(alongX ? x : z);
     const lo = (alongX ? pose.cx : pose.cz) - pose.width / 2;
     const hi = lo + pose.width;
+    // Niche walls stop at furniture standing inside the niche, so they can be closed flush on it
+    const lim = _nicheLimits(pose, obstacles);
     if (handle === 'lo') {
-        _roomWallFeatureSetSpan(f, b, Math.min(along, hi - _WALL_FEATURE_MIN), hi);
+        _roomWallFeatureSetSpan(f, b, Math.min(along, hi - _WALL_FEATURE_MIN, lim.loMax), hi);
     } else if (handle === 'hi') {
-        _roomWallFeatureSetSpan(f, b, lo, Math.max(along, lo + _WALL_FEATURE_MIN));
+        _roomWallFeatureSetSpan(f, b, lo, Math.max(along, lo + _WALL_FEATURE_MIN, lim.hiMin));
     } else if (handle === 'depth') {
         const n = _roomWallNormal(pose.wall);
         const off = (x - pose.cx) * n.x + (z - pose.cz) * n.z;
-        f.depth = Math.round(Math.abs(off));
+        f.depth = Math.max(Math.round(Math.abs(off)), lim.depthMin);
         f.depth = _roomWallFeatureDims(f, b).depth;
     }
 };
 
-/** Exact sizes typed in the furniture list; keeps the feature's left/back end in place. */
-window._setRoomWallFeatureSize = function(id, width, depth) {
+/** Typed value from a 2D dimension label: width / depth, or the gap to the lo / hi corner of the wall. */
+window._setRoomWallFeatureDim = function(id, key, value, obstacles) {
     const b = window._roomBounds;
     const f = window._findRoomWallFeature(id);
-    if (!b || !f) return;
+    if (!b || !f || !isFinite(value) || value < 0) return;
     const pose = window._getRoomWallFeaturePoses(b).find(function(p) { return p.id === id; });
-    if (pose && isFinite(width) && width > 0) {
-        const alongX = pose.wall === 'front' || pose.wall === 'back';
-        const lo = (alongX ? pose.cx : pose.cz) - pose.width / 2;
-        const span = _roomWallSpan(b, f.wall);
-        const w = Math.min(width, span.hi - span.lo);
-        const start = Math.min(lo, span.hi - w);
-        _roomWallFeatureSetSpan(f, b, start, start + w);
-    }
-    if (isFinite(depth) && depth > 0) {
-        f.depth = depth;
+    if (!pose) return;
+    const alongX = pose.wall === 'front' || pose.wall === 'back';
+    const span = _roomWallSpan(b, pose.wall);
+    const lo = (alongX ? pose.cx : pose.cz) - pose.width / 2;
+    const w = pose.width;
+    const lim = _nicheLimits(pose, obstacles);
+    if (key === 'width') {
+        const nw = Math.max(_WALL_FEATURE_MIN, Math.min(value, span.hi - span.lo), lim.hiMin - lo);
+        const start = Math.min(lo, span.hi - nw);
+        _roomWallFeatureSetSpan(f, b, start, start + nw);
+    } else if (key === 'depth') {
+        f.depth = Math.max(value, lim.depthMin);
         f.depth = _roomWallFeatureDims(f, b).depth;
+    } else if (key === 'from-lo') {
+        const start = Math.max(span.lo, Math.min(span.hi - w, span.lo + value));
+        _roomWallFeatureSetSpan(f, b, start, start + w);
+    } else if (key === 'from-hi') {
+        const end = Math.min(span.hi, Math.max(span.lo + w, span.hi - value));
+        _roomWallFeatureSetSpan(f, b, end - w, end);
     }
     _roomOpeningsChanged();
 };

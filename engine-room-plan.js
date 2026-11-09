@@ -161,14 +161,31 @@
     function _calcTransform(svgW, svgH) {
         const b = _getBounds();
         if (!b) return null;
-        const pad = 72;
         const roomW = b.rightX - b.leftX;
         const roomD = b.frontZ - b.backZ;
-        const baseScale = Math.min((svgW - pad * 2) / roomW, (svgH - pad * 2) / roomD);
+        // Fit niches too — they reach beyond the room walls, with their dimensions further out
+        let ox = b.leftX, oz = b.backZ, ex = b.rightX, ez = b.frontZ;
+        let hasNiche = false;
+        if (typeof window._getRoomWallFeaturePoses === 'function') {
+            window._getRoomWallFeaturePoses(b).forEach(function(f) {
+                if (f.type === 'niche') hasNiche = true;
+                ox = Math.min(ox, f.minX); oz = Math.min(oz, f.minZ);
+                ex = Math.max(ex, f.maxX); ez = Math.max(ez, f.maxZ);
+            });
+        }
+        const pad = hasNiche ? 108 : 72;
+        let baseScale = Math.min((svgW - pad * 2) / (ex - ox), (svgH - pad * 2) / (ez - oz));
+        // Keep the fit still while dragging, or resizing a niche would slide the plan under the pointer
+        const lock = window._roomPlanFitLock;
+        if (window._roomPlanDrag && lock && lock.w === svgW && lock.h === svgH) {
+            ox = lock.ox; oz = lock.oz; baseScale = lock.baseScale;
+        } else {
+            window._roomPlanFitLock = { ox: ox, oz: oz, baseScale: baseScale, w: svgW, h: svgH };
+        }
         const zoom = window._roomPlanZoom || 1;
         const scale = baseScale * zoom;
         return {
-            b, pad, scale, baseScale, zoom, svgW, svgH, roomW, roomD,
+            b, pad, scale, baseScale, zoom, svgW, svgH, roomW, roomD, ox, oz,
             panX: window._roomPlanPanX || 0,
             panY: window._roomPlanPanY || 0,
             cx: svgW / 2,
@@ -177,8 +194,8 @@
     }
 
     function _w2s(x, z, tf) {
-        const bx = tf.pad + (x - tf.b.leftX) * tf.baseScale;
-        const by = tf.pad + (z - tf.b.backZ) * tf.baseScale;
+        const bx = tf.pad + (x - tf.ox) * tf.baseScale;
+        const by = tf.pad + (z - tf.oz) * tf.baseScale;
         const zoom = tf.zoom || 1;
         return {
             x: tf.cx + (bx - tf.cx) * zoom + tf.panX,
@@ -191,8 +208,8 @@
         const bx = tf.cx + (sx - tf.cx - tf.panX) / zoom;
         const by = tf.cy + (sy - tf.cy - tf.panY) / zoom;
         return {
-            x: tf.b.leftX + (bx - tf.pad) / tf.baseScale,
-            z: tf.b.backZ + (by - tf.pad) / tf.baseScale
+            x: tf.ox + (bx - tf.pad) / tf.baseScale,
+            z: tf.oz + (by - tf.pad) / tf.baseScale
         };
     }
 
@@ -610,22 +627,14 @@
             face = -f.depth;
         }
 
-        const lc = toS([0, face / 2]);
-        const lenPx = f.width * tf.scale;
-        const sizeText = Math.round(f.width) + '×' + Math.round(f.depth);
-        if (f.type === 'pillar' && Math.abs(face) * tf.scale > 18) {
-            _drawPill(g, lc.x, lc.y, item.label + ' ' + sizeText, 10, lenPx - 4);
+        if (f.type === 'pillar' && !isSel && face * tf.scale > 18) {
+            const lc = toS([0, face / 2]);
+            _drawPill(g, lc.x, lc.y, item.label, 10, f.width * tf.scale - 4);
         }
 
         if (!isSel) return;
-        const btnOff = Math.max(face, 0) * tf.scale + 22;
-        if (f.type === 'niche' || Math.abs(face) * tf.scale <= 18 || lenPx < 60) {
-            // Beyond the buttons, so the pill never covers them
-            const text = item.label + ' ' + sizeText;
-            const pillHalf = along.x === 1 ? 10 : (text.length * 10 * 0.56 + 14) / 2;
-            const lp = toS([0, (btnOff + 17 + pillHalf) / tf.scale]);
-            _drawPill(g, lp.x, lp.y, text, 10);
-        }
+        // Pillar width dimension runs just past its face, so its buttons sit beyond it
+        const btnOff = f.type === 'pillar' ? face * tf.scale + 44 : 24;
         [['lo', -half, face / 2], ['hi', half, face / 2], ['depth', 0, face]].forEach(function(h) {
             const p = toS([h[1], h[2]]);
             const c = _svgEl('circle', {
@@ -646,10 +655,97 @@
         });
     }
 
+    /**
+     * Width / depth of a wall feature, plus (when selected) its gaps to both wall corners.
+     * Every number is clickable and opens an inline editor.
+     */
+    function _drawWallFeatureDims(g, item, tf, b, isSel) {
+        const f = item.feat;
+        const alongX = f.wall === 'front' || f.wall === 'back';
+        const n = _wallNormal(f.wall);
+        const along = alongX ? { x: 1, z: 0 } : { x: 0, z: 1 };
+        const s = tf.scale;
+        const half = f.width / 2;
+        const tw = tf.wallPx / s;
+        const P = function(a, o) {
+            return _w2s(f.cx + along.x * a + n.x * o, f.cz + along.z * a + n.z * o, tf);
+        };
+        const dim = function(a0, o0, a1, o1, da, dO, value, key, active) {
+            const e0 = P(a0, o0), e1 = P(a1, o1);
+            const d0 = P(a0 + da, o0 + dO), d1 = P(a1 + da, o1 + dO);
+            if (da || dO) {
+                g.appendChild(_svgEl('line', { x1: e0.x, y1: e0.y, x2: d0.x, y2: d0.y, class: 'rp-dim-ext' }));
+                g.appendChild(_svgEl('line', { x1: e1.x, y1: e1.y, x2: d1.x, y2: d1.y, class: 'rp-dim-ext' }));
+            }
+            const cls = active ? 'rp-dim-line rp-dim-active' : 'rp-dim-line';
+            g.appendChild(_svgEl('line', { x1: d0.x, y1: d0.y, x2: d1.x, y2: d1.y, class: cls }));
+            _dimTick(g, d0.x, d0.y, active ? 'rp-dim-tick rp-dim-active' : 'rp-dim-tick');
+            _dimTick(g, d1.x, d1.y, active ? 'rp-dim-tick rp-dim-active' : 'rp-dim-tick');
+            const rounded = Math.round(value);
+            _drawDimLabel(g, (d0.x + d1.x) / 2, (d0.y + d1.y) / 2, rounded, { valign: 'middle', active: active });
+            const label = g.lastChild;
+            label.classList.add('rp-dim-editable');
+            label.setAttribute('data-rp-edit', key);
+            label.setAttribute('data-rp-feat-id', f.id);
+            label.setAttribute('data-rp-value', rounded);
+            const title = _svgEl('title', null, 'לחץ לעריכת המידה');
+            label.appendChild(title);
+        };
+
+        if (f.type === 'niche') {
+            // Outside the room: width beyond the niche's back wall, depth beside it
+            const out = tw + 16 / s;
+            dim(-half, -f.depth, half, -f.depth, 0, -out, f.width, 'width', isSel);
+            dim(half, 0, half, -f.depth, out, 0, f.depth, 'depth', isSel);
+        } else if (isSel) {
+            dim(-half, f.depth, half, f.depth, 0, 14 / s, f.width, 'width', true);
+            dim(half, 0, half, f.depth, 14 / s, 0, f.depth, 'depth', true);
+        }
+        if (!isSel) return;
+        const span = alongX ? { lo: b.leftX, hi: b.rightX } : { lo: b.backZ, hi: b.frontZ };
+        const c = alongX ? f.cx : f.cz;
+        const inside = 16 / s;
+        if (c - half - span.lo > 1) dim(span.lo - c, inside, -half, inside, 0, 0, c - half - span.lo, 'from-lo', true);
+        if (span.hi - (c + half) > 1) dim(half, inside, span.hi - c, inside, 0, 0, span.hi - (c + half), 'from-hi', true);
+    }
+
+    function _openFeatureDimEditor(el) {
+        const prev = document.getElementById('rp-dim-editor');
+        if (prev) prev.remove();
+        const id = el.getAttribute('data-rp-feat-id');
+        const key = el.getAttribute('data-rp-edit');
+        const r = el.getBoundingClientRect();
+        const inp = document.createElement('input');
+        inp.id = 'rp-dim-editor';
+        inp.type = 'number';
+        inp.min = '0';
+        inp.className = 'rp-dim-editor';
+        inp.value = el.getAttribute('data-rp-value');
+        inp.style.left = (r.left + r.width / 2 - 34) + 'px';
+        inp.style.top = (r.top + r.height / 2 - 15) + 'px';
+        document.body.appendChild(inp);
+        inp.focus();
+        inp.select();
+        let done = false;
+        const finish = function(apply) {
+            if (done) return;
+            done = true;
+            const v = parseFloat(inp.value);
+            inp.remove();
+            if (apply && isFinite(v)) _editFeatureDim(id, key, v);
+        };
+        inp.addEventListener('keydown', function(e) {
+            e.stopPropagation();
+            if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+            else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+        });
+        inp.addEventListener('blur', function() { finish(true); });
+    }
+
     /** Distances along the wall from an opening to both corners. */
-    function _drawOpeningWallDims(g, item, tf, b, offCm) {
+    function _drawOpeningWallDims(g, item, tf, b) {
         const wall = item.openWall;
-        const off = offCm != null ? offCm : 26 / tf.scale;
+        const off = 26 / tf.scale;
         if (wall === 'front' || wall === 'back') {
             const z = wall === 'back' ? b.backZ + off : b.frontZ - off;
             if (item.minX - b.leftX > 1) _drawWorldDimH(g, b.leftX, item.minX, z, '', tf, wall === 'front');
@@ -709,10 +805,57 @@
     function _clampFurnCenter(x, z, halfW, halfD) {
         const b = _getBounds();
         if (!b) return { x, z };
+        if (typeof window._roomFitShift === 'function') {
+            const s = window._roomFitShift({ minX: x - halfW, maxX: x + halfW, minZ: z - halfD, maxZ: z + halfD }, 0, b);
+            return { x: x + s.dx, z: z + s.dz };
+        }
         return {
             x: Math.max(b.leftX + halfW, Math.min(b.rightX - halfW, x)),
             z: Math.max(b.backZ + halfD, Math.min(b.frontZ - halfD, z))
         };
+    }
+
+    /** Furniture footprints that niche walls must not cut through. */
+    function _nicheObstacles() {
+        return _collectFurniture().filter(function(i) {
+            return !i.isWallFeature && !i.isWallOpening && i.id !== 'room-door' && i.id !== 'cabinet-desk';
+        });
+    }
+
+    function _featurePose(id) {
+        return (window._getRoomWallFeaturePoses(_getBounds()) || []).find(function(p) { return p.id === id; }) || null;
+    }
+
+    /** Items standing inside a niche, with their starting positions, so they can travel with it. */
+    function _nicheContents(id) {
+        const pose = _featurePose(id);
+        if (!pose || pose.type !== 'niche') return [];
+        return _nicheObstacles().filter(function(r) { return !!window._roomRectInNiche(pose, r); }).map(function(r) {
+            return { id: r.id, center: _rectCenter(r), hostStart: r.id === 'cabinet' ? window._getRoomHostPose() : null };
+        });
+    }
+
+    function _carryNicheContents(contents, before, after) {
+        if (!contents || !contents.length || !before || !after) return;
+        const same = before.wall === after.wall;
+        const dx = same ? after.cx - before.cx : 0;
+        const dz = same ? after.cz - before.cz : 0;
+        contents.forEach(function(c) {
+            if (c.hostStart) window._moveRoomHost(c.hostStart.x + dx, c.hostStart.z + dz);
+            else _applyFurnitureMove(c.id, c.center.x + dx, c.center.z + dz);
+        });
+        window._roomPlanPending3D = true;
+    }
+
+    /** Typed niche/pillar dimension: sizes stop at furniture inside, moves carry it along. */
+    function _editFeatureDim(id, key, value) {
+        const before = _featurePose(id);
+        const contents = _nicheContents(id);
+        window._setRoomWallFeatureDim(id, key, value, _nicheObstacles());
+        if (key === 'from-lo' || key === 'from-hi') {
+            _carryNicheContents(contents, before, _featurePose(id));
+            _queueRoomPlanRender();
+        }
     }
 
     function _clampChairCenter(x, z) {
@@ -1455,19 +1598,13 @@
         const itemDimsG = _svgEl('g', { class: 'rp-item-dims' });
         // Wall distances only for the selected / dragged item — all of them at once bury the plan
         items.forEach(function(item) {
+            if (item.isWallFeature) {
+                _drawWallFeatureDims(itemDimsG, item, tf, b, item.id === selId);
+                return;
+            }
             if (item.id !== selId) return;
             if (item.isWallOpening) {
                 _drawOpeningWallDims(itemDimsG, item, tf, b);
-                return;
-            }
-            if (item.isWallFeature) {
-                const f = item.feat;
-                const wallRect = f.type === 'niche' ? item : {
-                    minX: Math.min(item.minX, f.cx), maxX: Math.max(item.maxX, f.cx),
-                    minZ: Math.min(item.minZ, f.cz), maxZ: Math.max(item.maxZ, f.cz)
-                };
-                const off = (f.type === 'pillar' ? f.depth : 0) + 16 / tf.scale;
-                _drawOpeningWallDims(itemDimsG, Object.assign({}, wallRect, { openWall: f.wall }), tf, b, off);
                 return;
             }
             if (item.id === 'cabinet-desk') return;
@@ -1518,7 +1655,7 @@
             if (item.isWallFeature) {
                 const dimEl = row.querySelector('.room-plan-furn-dim');
                 dimEl.textContent = '';
-                const mkInput = function(val, title) {
+                const mkInput = function(val, title, key) {
                     const inp = document.createElement('input');
                     inp.type = 'number';
                     inp.min = '5';
@@ -1526,13 +1663,12 @@
                     inp.value = Math.round(val);
                     inp.title = title;
                     inp.addEventListener('change', function() {
-                        window._setRoomWallFeatureSize(item.id,
-                            parseFloat(wInp.value), parseFloat(dInp.value));
+                        _editFeatureDim(item.id, key, parseFloat(inp.value));
                     });
                     return inp;
                 };
-                const wInp = mkInput(item.feat.width, 'רוחב לאורך הקיר (ס"מ)');
-                const dInp = mkInput(item.feat.depth, item.feat.type === 'niche' ? 'עומק הנישה (ס"מ)' : 'בליטה מהקיר (ס"מ)');
+                const wInp = mkInput(item.feat.width, 'רוחב לאורך הקיר (ס"מ)', 'width');
+                const dInp = mkInput(item.feat.depth, item.feat.type === 'niche' ? 'עומק הנישה (ס"מ)' : 'בליטה מהקיר (ס"מ)', 'depth');
                 dimEl.appendChild(wInp);
                 dimEl.appendChild(document.createTextNode('×'));
                 dimEl.appendChild(dInp);
@@ -1873,6 +2009,13 @@
 
         svg.addEventListener('pointerdown', function(e) {
             if (state.viewMode !== 'room-plan' || window._roomPlanSubview !== '2d') return;
+            const editEl = e.target.closest('[data-rp-edit]');
+            if (editEl) {
+                e.preventDefault();
+                e.stopPropagation();
+                _openFeatureDimEditor(editEl);
+                return;
+            }
             const handleEl = e.target.closest('[data-rp-handle]');
             if (handleEl) {
                 e.preventDefault();
@@ -1880,6 +2023,7 @@
                 window._roomPlanDrag = {
                     id: handleEl.getAttribute('data-rp-feat-id'),
                     handle: handleEl.getAttribute('data-rp-handle'),
+                    obstacles: _nicheObstacles(),
                     pointerId: e.pointerId
                 };
                 svg.setPointerCapture(e.pointerId);
@@ -1962,6 +2106,10 @@
                 if (typeof window._getRoomHostPose !== 'function') return;
                 drag.startPose = window._getRoomHostPose();
             }
+            if (_isWallFeatureId(hit.id)) {
+                drag.featStart = _featurePose(hit.id);
+                drag.contents = _nicheContents(hit.id);
+            }
             window._roomPlanDrag = drag;
             svg.setPointerCapture(e.pointerId);
             document.body.classList.add('room-plan-dragging');
@@ -1978,7 +2126,7 @@
             const sy = e.clientY - rect.top;
             if (d.handle) {
                 const wp = _s2w(sx, sy, tf);
-                window._resizeRoomWallFeature(d.id, d.handle, wp.x, wp.z, _getBounds());
+                window._resizeRoomWallFeature(d.id, d.handle, wp.x, wp.z, _getBounds(), d.obstacles);
                 window._roomPlanPending3D = true;
                 _queueRoomPlanRender();
                 return;
@@ -1986,6 +2134,7 @@
             const dx = (sx - d.startX) / tf.scale;
             const dz = (sy - d.startY) / tf.scale;
             _applyFurnitureMove(d.id, d.startCx + dx, d.startCz + dz);
+            if (d.contents) _carryNicheContents(d.contents, d.featStart, _featurePose(d.id));
             _queueRoomPlanRender();
         });
 
