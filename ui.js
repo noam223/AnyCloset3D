@@ -14103,6 +14103,61 @@ window.duplicateCartItem = function(index) {
     if (typeof saveHistoryState === 'function') saveHistoryState();
 };
 
+/** Duplicate every cabinet of a shared space as a new, independent space (same layout and positions). */
+window.duplicateSpaceGroup = function(pairId) {
+    if (!pairId) return;
+    if (state.editingCartIndex >= 0 && state.orderCart[state.editingCartIndex]) {
+        window._commitCurrentCabinetToCart({ flash: false });
+    }
+    const members = [];
+    state.orderCart.forEach(function(it, i) {
+        if (window._spacePairIdOf(it) === pairId) members.push({ it: it, index: i, slot: window._spacePairSlotOf(it) });
+    });
+    if (members.length < 2) return;
+    if (typeof window._spacePlanMax === 'function' && members.length > window._spacePlanMax()) {
+        if (typeof _showToast === 'function') _showToast('המסלול הנוכחי לא כולל מרחב בגודל הזה', 3000);
+        return;
+    }
+    members.sort(function(a, b) { return a.slot - b.slot; });
+
+    const newPairId = 'sp_' + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36);
+    const srcBase = window._spacePairBaseNameFromItem(members[0].it);
+    let insertAt = Math.max.apply(null, members.map(function(m) { return m.index; })) + 1;
+    const firstNew = insertAt;
+    members.forEach(function(m) {
+        const clone = {
+            spec: JSON.parse(JSON.stringify(m.it.spec || {})),
+            rawState: JSON.parse(JSON.stringify(m.it.rawState || {}))
+        };
+        const sp = clone.spec;
+        sp.imgDoors = null;
+        sp.imgOpen = null;
+        sp.imgBlueprint = null;
+        sp.imgSpaceDoors = null;
+        sp.imgSpaceOpen = null;
+        sp.multiViewSVG = null;
+        sp.multiViewPages = [];
+        sp.multiViewLabels = [];
+        sp.wingPreviews = [];
+        sp.cornerAngle = null;
+        delete sp.captureVer;
+        delete clone.rawState.cartUid;
+        if (typeof window._setCartItemHold === 'function') window._setCartItemHold(clone, false);
+        window._attachSpacePairToItem(clone, newPairId, m.slot, JSON.parse(JSON.stringify(window._getSpaceOffset(m.it))));
+        state.orderCart.splice(insertAt, 0, clone);
+        if (typeof state.editingCartIndex === 'number' && state.editingCartIndex >= insertAt) state.editingCartIndex++;
+        if (typeof window._roomLinksOnCartInsert === 'function') window._roomLinksOnCartInsert(insertAt);
+        insertAt++;
+    });
+    if (typeof window._normalizeCartUids === 'function') window._normalizeCartUids();
+    if (srcBase) window._applySpacePairCabinetNames(newPairId, 'העתק של ' + srcBase);
+    _rebindCartPartColors();
+    window.editCartItem(firstNew, { force: true });
+    _afterCartStructureChange();
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+    if (typeof _showToast === 'function') _showToast('המרחב שוכפל — ' + members.length + ' ארונות', 2500);
+};
+
 // ── Split a corner / walk-in cabinet into standalone linear cabinets ───────
 const _SPLIT_WING_LABELS = { center: 'מרכז', right: 'צד ימין', left: 'צד שמאל' };
 
@@ -14503,7 +14558,9 @@ window.updateLeftSidebar = function(opts) {
         group.innerHTML = `
             <div class="cart-space-group-header">
                 <div class="cart-space-group-title"><i class="fa-solid fa-layer-group"></i> ${groupTitle}</div>
-                <div class="cart-space-group-meta">${entry.members.length} חלקים במרחב</div>
+                <div class="cart-space-group-meta">${entry.members.length} חלקים במרחב
+                    <button type="button" class="cart-mini-btn cart-space-group-dup" onclick="event.stopPropagation(); duplicateSpaceGroup('${entry.pairId}');" title="שכפל את כל הארונות שבמרחב כקבוצה חדשה — עם אותו סידור ומיקומים"><i class="fa-solid fa-clone"></i> שכפל קבוצה</button>
+                </div>
                 ${window._showPricing !== false ? `<div class="cart-space-group-price"><span dir="ltr">₪${groupPrice.toLocaleString()}</span> <span class="cart-space-group-install">+ <span dir="ltr">₪${groupInstall.toLocaleString()}</span> התקנה</span></div>` : ''}
             </div>
             <div class="cart-space-group-body"></div>

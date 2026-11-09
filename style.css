@@ -1624,6 +1624,27 @@ body.touch-door-dragging, body.touch-door-dragging * { cursor: grabbing !importa
     color: var(--text-light);
     font-weight: 600;
 }
+.cart-space-group-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+.cart-mini-btn.cart-space-group-dup {
+    flex: none;
+    min-width: 0;
+    padding: 4px 10px;
+    font-size: 0.74rem;
+    border-radius: 999px;
+    color: var(--secondary);
+    background: #eff6ff;
+    border: 1.5px solid rgba(37,99,235,0.25);
+}
+.cart-mini-btn.cart-space-group-dup:hover {
+    background: var(--secondary);
+    color: #fff;
+    border-color: transparent;
+}
 .cart-space-group-price {
     margin-top: 4px;
     font-weight: 800;
