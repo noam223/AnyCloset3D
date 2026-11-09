@@ -2848,6 +2848,14 @@ function _buildRoom() {
         const bedBox = new THREE.Box3().setFromObject(bed);
         const bedCenter = new THREE.Vector3();
         bedBox.getCenter(bedCenter);
+        // Unrotated frame footprint, so the 2D plan draws the bed at the model's real size
+        const bedSide = Math.round((window._bedRotation || 0) / 90) % 2 === 1;
+        const bedEx = bedBox.max.x - bedBox.min.x, bedEz = bedBox.max.z - bedBox.min.z;
+        window._bedFootprintCm = {
+            w: bedSide ? bedEz : bedEx,
+            l: bedSide ? bedEx : bedEz,
+            forWidth: window._bedWidthCm || 160
+        };
         bed.position.set(
             bp.x - bedCenter.x,
             -bedBox.min.y,

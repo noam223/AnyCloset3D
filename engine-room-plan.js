@@ -265,23 +265,27 @@
             };
         }
         const bp = window._bedPos || { x: 150, z: 200 };
-        const rot = ((window._bedRotation || 0) * Math.PI) / 180;
-        const w = (window._bedWidthCm || 160) / 2;
-        const l = 100;
-        const corners = [
-            { x: -w, z: -l }, { x: w, z: -l }, { x: w, z: l }, { x: -w, z: l }
-        ].map(function(c) {
-            const cos = Math.cos(rot), sin = Math.sin(rot);
-            return { x: bp.x + c.x * cos - c.z * sin, z: bp.z + c.x * sin + c.z * cos };
-        });
-        const xs = corners.map(c => c.x), zs = corners.map(c => c.z);
+        const r = _bedFootprint(bp.x, bp.z);
         return {
             id: 'bed',
-            minX: Math.min(...xs), maxX: Math.max(...xs),
-            minZ: Math.min(...zs), maxZ: Math.max(...zs),
+            minX: r.minX, maxX: r.maxX,
+            minZ: r.minZ, maxZ: r.maxZ,
             draggable: true,
             label: FURN_COLORS.bed.label
         };
+    }
+
+    /** Bed frame size in cm ({ w, l }): the 3D model's footprint, adjusted when the width changed in 2D. */
+    function _bedSize() {
+        const mattress = window._bedWidthCm || 160;
+        const fp = window._bedFootprintCm;
+        if (!fp || !(fp.w > 0) || !(fp.l > 0)) return { w: mattress, l: 200 };
+        return { w: fp.w + (mattress - (fp.forWidth || mattress)), l: fp.l };
+    }
+
+    function _bedFootprint(cx, cz) {
+        const sz = _bedSize();
+        return _rectFromCenter(cx, cz, sz.w / 2, sz.l / 2, window._bedRotation || 0);
     }
 
     function _getChairRect() {
@@ -469,8 +473,6 @@
         const cz = item.doorCz;
         const w = item.doorW || 90;
         const half = w / 2;
-        const stroke = isActive ? '#0369a1' : '#0284c7';
-        const fill = isActive ? '#bfdbfe' : '#dbeafe';
         const n = _wallNormal(wall);
         const right = { x: n.z, z: -n.x }; // right-hand side seen from inside the room
         const hs = item.doorHinge === 'right' ? 1 : -1;
@@ -483,43 +485,45 @@
         const openTip = _w2s(hingeW.x + open.x * w, hingeW.z + open.z * w, tf);
         if (!(Math.hypot(closedTip.x - hinge.x, closedTip.y - hinge.y) > 1)) return;
 
-        g.appendChild(_svgEl('line', {
-            x1: hinge.x, y1: hinge.y, x2: closedTip.x, y2: closedTip.y,
-            stroke: stroke, 'stroke-width': isActive ? '5' : '4',
-            'stroke-linecap': 'square'
-        }));
+        _drawWallGap(g, wall, cx, cz, w, tf, '#ffffff');
 
-        g.appendChild(_svgEl('line', {
-            x1: hinge.x, y1: hinge.y, x2: openTip.x, y2: openTip.y,
-            stroke: '#1d4ed8', 'stroke-width': '2.2'
-        }));
-
-        // Quarter-circle swing sampled in world space (closed → open)
+        // Swing sector + arc sampled in world space (closed → open)
         const ux = closedW.x - hingeW.x, uz = closedW.z - hingeW.z;
         const vx = open.x * w, vz = open.z * w;
-        let d = '';
-        for (let i = 0; i <= 18; i++) {
-            const a = (i / 18) * Math.PI / 2;
+        let arc = '';
+        for (let i = 0; i <= 24; i++) {
+            const a = (i / 24) * Math.PI / 2;
             const p = _w2s(hingeW.x + ux * Math.cos(a) + vx * Math.sin(a), hingeW.z + uz * Math.cos(a) + vz * Math.sin(a), tf);
-            d += (i ? ' L ' : 'M ') + p.x.toFixed(2) + ' ' + p.y.toFixed(2);
+            arc += (i ? ' L ' : 'M ') + p.x.toFixed(2) + ' ' + p.y.toFixed(2);
         }
         g.appendChild(_svgEl('path', {
-            d: d, fill: 'none', stroke: '#ef4444', 'stroke-width': '1.2', 'stroke-dasharray': '4 3'
+            d: 'M ' + hinge.x.toFixed(2) + ' ' + hinge.y.toFixed(2) + ' L' + arc.slice(1) + ' Z',
+            fill: isActive ? 'rgba(14,165,233,0.14)' : 'rgba(14,165,233,0.07)', stroke: 'none'
+        }));
+        g.appendChild(_svgEl('path', {
+            d: arc, fill: 'none', stroke: isActive ? '#0284c7' : '#94a3b8', 'stroke-width': '1.1'
         }));
 
-        const p1 = _w2s(item.minX, item.minZ, tf);
-        const p2 = _w2s(item.maxX, item.maxZ, tf);
-        g.appendChild(_svgEl('rect', {
-            x: Math.min(p1.x, p2.x), y: Math.min(p1.y, p2.y),
-            width: Math.max(Math.abs(p2.x - p1.x), 1), height: Math.max(Math.abs(p2.y - p1.y), 1),
-            fill: fill, stroke: 'none', opacity: '0.25', rx: '3'
+        // Door leaf: 4 cm slab hinged at the jamb, drawn open
+        const tW = 4;
+        const ul = { x: ux / w, z: uz / w };
+        const leaf = [
+            hingeW,
+            { x: hingeW.x + open.x * w, z: hingeW.z + open.z * w },
+            { x: hingeW.x + open.x * w + ul.x * tW, z: hingeW.z + open.z * w + ul.z * tW },
+            { x: hingeW.x + ul.x * tW, z: hingeW.z + ul.z * tW }
+        ].map(function(p) { return _w2s(p.x, p.z, tf); });
+        g.appendChild(_svgEl('polygon', {
+            points: leaf.map(function(p) { return p.x.toFixed(2) + ',' + p.y.toFixed(2); }).join(' '),
+            fill: '#ffffff', stroke: isActive ? '#0369a1' : '#334155', 'stroke-width': '1.4',
+            'stroke-linejoin': 'round'
         }));
 
-        const lp = _w2s(cx - open.x * 12, cz - open.z * 12, tf);
+        const lp = _w2s(cx + open.x * w * 0.62, cz + open.z * w * 0.62, tf);
         g.appendChild(_svgEl('text', {
             x: lp.x, y: lp.y,
-            class: 'rp-furn-label', 'text-anchor': 'middle',
-            'dominant-baseline': 'middle', 'font-size': '11', fill: '#0369a1'
+            class: 'rp-furn-label rp-opening-label', 'text-anchor': 'middle',
+            'dominant-baseline': 'middle'
         }, 'דלת'));
 
         _drawOpeningBtns(g, item, tf, [
@@ -530,29 +534,30 @@
 
     function _drawRoomWindow2D(g, item, tf, isActive) {
         const wall = item.openWall;
-        const half = (item.winW || 120) / 2;
+        const winW = item.winW || 120;
+        const half = winW / 2;
         const along = (wall === 'front' || wall === 'back') ? { x: 1, z: 0 } : { x: 0, z: 1 };
         const n = _wallNormal(wall);
-        const t = 5;
-        const pts = [
-            [-half, -t], [half, -t], [half, t], [-half, t]
-        ].map(function(q) {
-            return _w2s(item.winCx + along.x * q[0] + n.x * q[1], item.winCz + along.z * q[0] + n.z * q[1], tf);
+        const tw = tf.wallPx / tf.scale;
+        _drawWallGap(g, wall, item.winCx, item.winCz, winW, tf, isActive ? '#e0f2fe' : '#f0f9ff');
+        // Two glass panes inside the wall thickness, plus the inner sill
+        [0.36, 0.64].forEach(function(f) {
+            const a = _w2s(item.winCx - along.x * half - n.x * tw * f, item.winCz - along.z * half - n.z * tw * f, tf);
+            const b2 = _w2s(item.winCx + along.x * half - n.x * tw * f, item.winCz + along.z * half - n.z * tw * f, tf);
+            g.appendChild(_svgEl('line', {
+                x1: a.x, y1: a.y, x2: b2.x, y2: b2.y,
+                stroke: isActive ? '#0369a1' : '#38bdf8', 'stroke-width': '1.3'
+            }));
         });
-        g.appendChild(_svgEl('polygon', {
-            points: pts.map(function(p) { return p.x.toFixed(2) + ',' + p.y.toFixed(2); }).join(' '),
-            fill: isActive ? '#bae6fd' : '#e0f2fe', stroke: isActive ? '#0369a1' : '#0ea5e9',
-            'stroke-width': isActive ? '2' : '1.5'
-        }));
-        const a = _w2s(item.winCx - along.x * half, item.winCz - along.z * half, tf);
-        const b2 = _w2s(item.winCx + along.x * half, item.winCz + along.z * half, tf);
+        const s1 = _w2s(item.winCx - along.x * (half + 4) + n.x * 3, item.winCz - along.z * (half + 4) + n.z * 3, tf);
+        const s2 = _w2s(item.winCx + along.x * (half + 4) + n.x * 3, item.winCz + along.z * (half + 4) + n.z * 3, tf);
         g.appendChild(_svgEl('line', {
-            x1: a.x, y1: a.y, x2: b2.x, y2: b2.y, stroke: isActive ? '#0369a1' : '#0ea5e9', 'stroke-width': '1.2'
+            x1: s1.x, y1: s1.y, x2: s2.x, y2: s2.y, stroke: '#94a3b8', 'stroke-width': '1', 'stroke-linecap': 'round'
         }));
-        const lp = _w2s(item.winCx + n.x * 16, item.winCz + n.z * 16, tf);
+        const lp = _w2s(item.winCx + n.x * (52 / tf.scale), item.winCz + n.z * (52 / tf.scale), tf);
         g.appendChild(_svgEl('text', {
-            x: lp.x, y: lp.y, class: 'rp-furn-label', 'text-anchor': 'middle',
-            'dominant-baseline': 'middle', 'font-size': '10', fill: '#0369a1'
+            x: lp.x, y: lp.y, class: 'rp-furn-label rp-opening-label', 'text-anchor': 'middle',
+            'dominant-baseline': 'middle'
         }, item.label));
         _drawOpeningBtns(g, item, tf, [
             { action: 'win-width', title: 'שנה רוחב חלון', html: '<i class="fa-solid fa-arrows-left-right"></i>' },
@@ -602,18 +607,21 @@
         return { x: (r.minX + r.maxX) / 2, z: (r.minZ + r.maxZ) / 2 };
     }
 
+    // The 3D bed mesh is only rebuilt when leaving 2D, so its extents go stale after a 2D rotation —
+    // clamp against the plan footprint instead
     function _clampBedCenter(x, z) {
-        const bp = { x, z };
-        if (typeof _clampBedPos === 'function') _clampBedPos(bp);
-        else {
-            const b = _getBounds();
-            if (b) {
-                bp.x = Math.max(b.leftX + 80, Math.min(b.rightX - 80, bp.x));
-                bp.z = Math.max(b.backZ + 80, Math.min(b.frontZ - 80, bp.z));
-            }
-        }
-        return bp;
+        const r = _bedFootprint(0, 0);
+        return _clampFurnCenter(x, z, r.maxX, r.maxZ);
     }
+
+    window._rotateBedInPlan = function() {
+        if (typeof window._rotateBed !== 'function') return;
+        window._rotateBed();
+        const bp = window._bedPos || { x: 150, z: 200 };
+        window._bedPos = _clampBedCenter(bp.x, bp.z);
+        window._roomPlanPending3D = true;
+        _queueRoomPlanRender();
+    };
 
     function _clampFurnCenter(x, z, halfW, halfD) {
         const b = _getBounds();
@@ -804,6 +812,20 @@
         btn.innerHTML = '<i class="fa-solid fa-arrows-left-right"></i><span>' + widthCm + '</span>';
         fo.appendChild(btn);
         parentG.appendChild(fo);
+
+        const rotSize = 24;
+        const rfo = _svgEl('foreignObject', {
+            x: bx - rotSize - 4, y: by, width: rotSize, height: rotSize,
+            class: 'rp-room-cab-btn-fo'
+        });
+        const rbtn = document.createElement('button');
+        rbtn.type = 'button';
+        rbtn.className = 'rp-room-cab-btn';
+        rbtn.title = 'סובב מיטה 90°';
+        rbtn.setAttribute('data-rp-action', 'rotate-bed');
+        rbtn.innerHTML = '<i class="fa-solid fa-rotate-right"></i>';
+        rfo.appendChild(rbtn);
+        parentG.appendChild(rfo);
     }
 
     function _drawRoomExtraCabBtns(parentG, item, fx, fy, fw, fh) {
@@ -862,6 +884,202 @@
         }));
     }
 
+    // ── Plan drawings (top view) ────────────────────────────────────────────
+
+    /** Opening cut through the wall band (the band lies outside the room bounds). */
+    function _drawWallGap(g, wall, cx, cz, width, tf, fill) {
+        const n = _wallNormal(wall);
+        const along = (wall === 'front' || wall === 'back') ? { x: 1, z: 0 } : { x: 0, z: 1 };
+        const half = width / 2;
+        const tw = tf.wallPx / tf.scale;
+        const inner = 0.6 / tf.scale, outer = tw + 0.6 / tf.scale;
+        const pts = [[-half, inner], [half, inner], [half, -outer], [-half, -outer]].map(function(q) {
+            return _w2s(cx + along.x * q[0] + n.x * q[1], cz + along.z * q[0] + n.z * q[1], tf);
+        });
+        g.appendChild(_svgEl('polygon', {
+            points: pts.map(function(p) { return p.x.toFixed(2) + ',' + p.y.toFixed(2); }).join(' '),
+            fill: fill, stroke: 'none'
+        }));
+        [[0, 3], [1, 2]].forEach(function(e) {
+            g.appendChild(_svgEl('line', {
+                x1: pts[e[0]].x, y1: pts[e[0]].y, x2: pts[e[1]].x, y2: pts[e[1]].y,
+                stroke: '#1f2937', 'stroke-width': '1.6'
+            }));
+        });
+    }
+
+    function _drawPill(g, cx, cy, text, size, maxW) {
+        const fs = size || 11;
+        const w = String(text).length * fs * 0.56 + 14;
+        const h = fs + 9;
+        if (maxW && w > maxW) return;
+        g.appendChild(_svgEl('rect', {
+            x: cx - w / 2, y: cy - h / 2, width: w, height: h, rx: h / 2,
+            class: 'rp-pill-bg'
+        }));
+        g.appendChild(_svgEl('text', {
+            x: cx, y: cy + 0.5, class: 'rp-pill-text', 'font-size': fs,
+            'text-anchor': 'middle', 'dominant-baseline': 'middle'
+        }, String(text)));
+    }
+
+    function _drawBed2D(g, box, tf, isActive) {
+        const s = tf.scale;
+        const sz = _bedSize();
+        const W = sz.w * s;
+        const L = sz.l * s;
+        // Headboard sits on the bed's local -z; three.js rotation.y turns that toward (-sin θ, -cos θ)
+        const bg = _svgEl('g', {
+            transform: 'translate(' + (box.fx + box.fw / 2).toFixed(2) + ' ' + (box.fy + box.fh / 2).toFixed(2) +
+                ') rotate(' + (-(window._bedRotation || 0)) + ')'
+        });
+        const x0 = -W / 2, y0 = -L / 2;
+        bg.appendChild(_svgEl('rect', {
+            x: x0, y: y0, width: W, height: L, rx: 3 * s,
+            fill: '#d9c4a5', stroke: isActive ? '#1E3A5F' : '#9c8160', 'stroke-width': isActive ? 2 : 1.2,
+            filter: 'url(#rp-shadow)'
+        }));
+        bg.appendChild(_svgEl('rect', { x: x0, y: y0, width: W, height: 8 * s, rx: 2 * s, fill: '#8a6d4b' }));
+        bg.appendChild(_svgEl('rect', {
+            x: x0 + 3 * s, y: y0 + 9 * s, width: W - 6 * s, height: L - 12 * s, rx: 5 * s,
+            fill: '#ffffff', stroke: '#e7e5e4', 'stroke-width': 1
+        }));
+        const n = W / s >= 120 ? 2 : 1;
+        const gap = 6 * s;
+        const pw = (W - 6 * s - gap * (n + 1)) / n;
+        for (let i = 0; i < n; i++) {
+            bg.appendChild(_svgEl('rect', {
+                x: x0 + 3 * s + gap + i * (pw + gap), y: y0 + 15 * s, width: pw, height: 34 * s, rx: 9 * s,
+                fill: '#f8fafc', stroke: '#cbd5e1', 'stroke-width': 1
+            }));
+        }
+        const dy = y0 + 60 * s;
+        bg.appendChild(_svgEl('rect', {
+            x: x0 + 1.5 * s, y: dy, width: W - 3 * s, height: L - 61.5 * s, rx: 5 * s,
+            fill: '#dbe4ee', stroke: '#b4c3d3', 'stroke-width': 1
+        }));
+        bg.appendChild(_svgEl('rect', {
+            x: x0 + 1.5 * s, y: dy, width: W - 3 * s, height: 16 * s, rx: 4 * s,
+            fill: '#eef3f8', stroke: '#b4c3d3', 'stroke-width': 0.8
+        }));
+        bg.appendChild(_svgEl('path', {
+            d: 'M ' + (x0 + W * 0.18) + ' ' + (dy + 30 * s) + ' Q ' + (x0 + W * 0.5) + ' ' + (dy + 44 * s) + ' ' +
+                (x0 + W * 0.82) + ' ' + (dy + 30 * s),
+            fill: 'none', stroke: '#c5d2df', 'stroke-width': 1
+        }));
+        g.appendChild(bg);
+    }
+
+    function _drawCabinet2D(g, item, tf, box, isActive) {
+        g.appendChild(_svgEl('rect', {
+            x: box.fx, y: box.fy, width: box.fw, height: box.fh, rx: 1.5,
+            fill: item.id === 'cabinet' ? '#fdfcfa' : '#f7faf8',
+            stroke: isActive ? '#1E3A5F' : '#475569', 'stroke-width': isActive ? 2 : 1.3,
+            filter: 'url(#rp-shadow)'
+        }));
+        if (box.fw > 14 && box.fh > 14) {
+            g.appendChild(_svgEl('rect', {
+                x: box.fx + 3, y: box.fy + 3, width: box.fw - 6, height: box.fh - 6, rx: 1,
+                fill: 'none', stroke: '#e2e8f0', 'stroke-width': 1
+            }));
+        }
+        const wing = state.wings && state.wings.center;
+        if (item.id === 'cabinet' && item.front && wing && wing.columns && wing.columns.length > 1) {
+            const total = wing.columns.reduce(function(s, c) { return s + (c.width || 0); }, 0);
+            const d = wing.depth || state.depth || 54;
+            let acc = 0;
+            for (let i = 0; i < wing.columns.length - 1; i++) {
+                acc += wing.columns[i].width || 0;
+                const t = total > 0 ? acc / total : 0;
+                const fx = item.front.a.x + (item.front.b.x - item.front.a.x) * t;
+                const fz = item.front.a.z + (item.front.b.z - item.front.a.z) * t;
+                const p1 = _w2s(fx, fz, tf);
+                const p2 = _w2s(fx - item.front.dir.x * d, fz - item.front.dir.z * d, tf);
+                g.appendChild(_svgEl('line', {
+                    x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, stroke: '#cbd5e1', 'stroke-width': 1
+                }));
+            }
+        }
+    }
+
+    function _drawWoodTop(g, box, fill, stroke, isActive) {
+        g.appendChild(_svgEl('rect', {
+            x: box.fx, y: box.fy, width: box.fw, height: box.fh, rx: 2,
+            fill: fill, stroke: isActive ? '#1E3A5F' : stroke, 'stroke-width': isActive ? 2 : 1.2,
+            filter: 'url(#rp-shadow)'
+        }));
+        if (box.fw > 12 && box.fh > 12) {
+            g.appendChild(_svgEl('rect', {
+                x: box.fx + 2.5, y: box.fy + 2.5, width: box.fw - 5, height: box.fh - 5, rx: 1,
+                fill: 'none', stroke: 'rgba(255,255,255,0.35)', 'stroke-width': 1
+            }));
+        }
+    }
+
+    function _drawFurnBody(g, item, tf, box, colors, isActive) {
+        const s = tf.scale;
+        const cx = box.fx + box.fw / 2, cy = box.fy + box.fh / 2;
+        if (item.id === 'bed') {
+            _drawBed2D(g, box, tf, isActive);
+            return;
+        }
+        if (item.id === 'cabinet' || item.isRoomExtraCab || _isRoomExtraCabId(item.id)) {
+            _drawCabinet2D(g, item, tf, box, isActive);
+            _drawPill(g, cx, cy, item.label, 11, box.fw - 6);
+            return;
+        }
+        if (item.id === 'nightstand') {
+            _drawWoodTop(g, box, '#c9a77c', '#8a6a45', isActive);
+            const r = Math.min(box.fw, box.fh) * 0.24;
+            g.appendChild(_svgEl('circle', { cx: cx, cy: cy, r: r, fill: '#fff8e6', stroke: '#d6b47c', 'stroke-width': 1 }));
+            g.appendChild(_svgEl('circle', { cx: cx, cy: cy, r: r * 0.35, fill: '#f3d9a4' }));
+            return;
+        }
+        if (item.id === 'room-desk' || item.id === 'cabinet-desk') {
+            _drawWoodTop(g, box, item.id === 'room-desk' ? '#dcc29c' : '#e8d7bb', '#9a7b52', isActive);
+            const lw = 34 * s, lh = 24 * s;
+            if (box.fw > lw + 8 && box.fh > lh + 8) {
+                const horiz = box.fw >= box.fh;
+                const w = horiz ? lw : lh, h = horiz ? lh : lw;
+                g.appendChild(_svgEl('rect', {
+                    x: cx - w / 2, y: cy - h / 2, width: w, height: h, rx: 1.5 * s,
+                    fill: '#e2e8f0', stroke: '#94a3b8', 'stroke-width': 1
+                }));
+                g.appendChild(_svgEl('rect', {
+                    x: cx - w / 2 + 2.5 * s, y: cy - h / 2 + 2.5 * s, width: w - 5 * s, height: h - 5 * s, rx: 1 * s,
+                    fill: '#cbd5e1'
+                }));
+            }
+            if (item.id === 'room-desk') _drawPill(g, cx, box.fy + box.fh - 12, item.label, 10, box.fw - 6);
+            return;
+        }
+        if (item.id === 'chair') {
+            const r = Math.min(box.fw, box.fh) * 0.42;
+            g.appendChild(_svgEl('circle', {
+                cx: cx, cy: cy, r: r, fill: '#e5e7eb', stroke: isActive ? '#1E3A5F' : '#64748b',
+                'stroke-width': isActive ? 2 : 1.2, filter: 'url(#rp-shadow)'
+            }));
+            g.appendChild(_svgEl('circle', { cx: cx, cy: cy, r: r * 0.64, fill: '#f8fafc', stroke: '#cbd5e1', 'stroke-width': 1 }));
+            return;
+        }
+        g.appendChild(_svgEl('rect', {
+            x: box.fx, y: box.fy, width: box.fw, height: box.fh, rx: 3,
+            fill: colors.fill, stroke: isActive ? '#1E3A5F' : colors.stroke, 'stroke-width': isActive ? 2 : 1.2,
+            filter: 'url(#rp-shadow)'
+        }));
+        if (box.fw > 12 && box.fh > 12) {
+            g.appendChild(_svgEl('rect', {
+                x: box.fx + 3, y: box.fy + 3, width: box.fw - 6, height: box.fh - 6, rx: 2,
+                fill: 'none', stroke: 'rgba(255,255,255,0.5)', 'stroke-width': 1
+            }));
+        }
+        _drawPill(g, cx, cy, item.label, 10, box.fw - 6);
+    }
+
+    function _dimTick(g, x, y, cls) {
+        g.appendChild(_svgEl('line', { x1: x - 3.5, y1: y + 3.5, x2: x + 3.5, y2: y - 3.5, class: cls || 'rp-dim-tick' }));
+    }
+
     function _drawRoomHostBtns(parentG, fx, fy, fw, fh) {
         if (fw < 26 || fh < 26) return;
         const btnSize = 22;
@@ -909,6 +1127,8 @@
         g.appendChild(_svgEl('line', { x1: p1.x, y1: p1.y, x2: p1.x, y2: ly, class: 'rp-dim-ext' }));
         g.appendChild(_svgEl('line', { x1: p2.x, y1: p2.y, x2: p2.x, y2: ly, class: 'rp-dim-ext' }));
         g.appendChild(_svgEl('line', { x1: p1.x, y1: ly, x2: p2.x, y2: ly, class: 'rp-dim-line' }));
+        _dimTick(g, p1.x, ly);
+        _dimTick(g, p2.x, ly);
         _drawDimLabel(g, (p1.x + p2.x) / 2, ly + (above ? -4 : 14), dist, {
             valign: above ? 'above' : 'below'
         });
@@ -923,6 +1143,8 @@
         g.appendChild(_svgEl('line', { x1: p1.x, y1: p1.y, x2: lx, y2: p1.y, class: 'rp-dim-ext' }));
         g.appendChild(_svgEl('line', { x1: p2.x, y1: p2.y, x2: lx, y2: p2.y, class: 'rp-dim-ext' }));
         g.appendChild(_svgEl('line', { x1: lx, y1: p1.y, x2: lx, y2: p2.y, class: 'rp-dim-line' }));
+        _dimTick(g, lx, p1.y);
+        _dimTick(g, lx, p2.y);
         const labelX = lx + (left ? -1 : 1) * _dimLabelHalfW(dist, false);
         _drawDimLabel(g, labelX, (p1.y + p2.y) / 2, dist, {
             valign: 'middle',
@@ -933,6 +1155,12 @@
     function _drawItemWallDims(g, rect, tf, b, active) {
         if (!rect || !b) return;
         const cls = active ? 'rp-dim-line rp-dim-active' : 'rp-dim-line';
+        const tickCls = active ? 'rp-dim-tick rp-dim-active' : 'rp-dim-tick';
+        const line = function(p1, p2) {
+            g.appendChild(_svgEl('line', { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, class: cls }));
+            _dimTick(g, p1.x, p1.y, tickCls);
+            _dimTick(g, p2.x, p2.y, tickCls);
+        };
 
         const leftDist = rect.minX - b.leftX;
         const rightDist = b.rightX - rect.maxX;
@@ -943,7 +1171,7 @@
         if (leftDist > 5) {
             const p1 = _w2s(b.leftX, dimZ, tf);
             const p2 = _w2s(rect.minX, dimZ, tf);
-            g.appendChild(_svgEl('line', { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, class: cls }));
+            line(p1, p2);
             _drawDimLabel(g, (p1.x + p2.x) / 2, p1.y - 5, Math.round(leftDist), {
                 valign: 'above', active: active
             });
@@ -951,7 +1179,7 @@
         if (rightDist > 5) {
             const p1 = _w2s(rect.maxX, dimZ, tf);
             const p2 = _w2s(b.rightX, dimZ, tf);
-            g.appendChild(_svgEl('line', { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, class: cls }));
+            line(p1, p2);
             _drawDimLabel(g, (p1.x + p2.x) / 2, p1.y - 5, Math.round(rightDist), {
                 valign: 'above', active: active
             });
@@ -961,7 +1189,7 @@
         if (backDist > 5) {
             const p1 = _w2s(dimX, b.backZ, tf);
             const p2 = _w2s(dimX, rect.minZ, tf);
-            g.appendChild(_svgEl('line', { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, class: cls }));
+            line(p1, p2);
             const backLabel = Math.round(backDist);
             _drawDimLabel(g, p1.x + _dimLabelHalfW(backLabel, active), (p1.y + p2.y) / 2, backLabel, {
                 valign: 'middle', baseline: 'middle', active: active
@@ -970,7 +1198,7 @@
         if (frontDist > 5) {
             const p1 = _w2s(dimX, rect.maxZ, tf);
             const p2 = _w2s(dimX, b.frontZ, tf);
-            g.appendChild(_svgEl('line', { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, class: cls }));
+            line(p1, p2);
             const frontLabel = Math.round(frontDist);
             _drawDimLabel(g, p1.x + _dimLabelHalfW(frontLabel, active), (p1.y + p2.y) / 2, frontLabel, {
                 valign: 'middle', baseline: 'middle', active: active
@@ -1001,47 +1229,82 @@
 
         while (svg.firstChild) svg.removeChild(svg.firstChild);
 
-        const defs = _svgEl('defs');
-        const pattern = _svgEl('pattern', {
-            id: 'rp-wall-hatch', patternUnits: 'userSpaceOnUse',
-            width: '8', height: '8', patternTransform: 'rotate(45)'
-        });
-        pattern.appendChild(_svgEl('line', {
-            x1: '0', y1: '0', x2: '0', y2: '8',
-            stroke: '#94a3b8', 'stroke-width': '1.2'
-        }));
-        defs.appendChild(pattern);
-        svg.appendChild(defs);
-
         const tf = _calcTransform(cw, ch);
         if (!tf) return;
+        tf.wallPx = Math.max(8, Math.min(16, 12 * tf.scale));
 
         const tl = _w2s(b.leftX, b.backZ, tf);
         const br = _w2s(b.rightX, b.frontZ, tf);
         const rw = br.x - tl.x;
         const rh = br.y - tl.y;
+        const T = tf.wallPx;
+
+        const defs = _svgEl('defs');
+        const grid = _svgEl('pattern', { id: 'rp-grid', patternUnits: 'userSpaceOnUse', width: '24', height: '24' });
+        grid.appendChild(_svgEl('path', { d: 'M 24 0 L 0 0 0 24', fill: 'none', stroke: '#e3e8ef', 'stroke-width': '1' }));
+        defs.appendChild(grid);
+        // Oak parquet at real scale (2 m tile), anchored to the room corner so it pans and zooms with the plan
+        const tile = 200 * tf.scale;
+        const floor = _svgEl('pattern', {
+            id: 'rp-floor', patternUnits: 'userSpaceOnUse',
+            x: tl.x.toFixed(2), y: tl.y.toFixed(2), width: tile.toFixed(2), height: tile.toFixed(2)
+        });
+        floor.appendChild(_svgEl('image', {
+            href: 'images/oak-floor.jpg', x: 0, y: 0, width: tile.toFixed(2), height: tile.toFixed(2),
+            preserveAspectRatio: 'none'
+        }));
+        defs.appendChild(floor);
+        const shadow = _svgEl('filter', { id: 'rp-shadow', x: '-20%', y: '-20%', width: '140%', height: '140%' });
+        shadow.appendChild(_svgEl('feDropShadow', {
+            dx: '0', dy: '1.5', stdDeviation: '2.2', 'flood-color': '#0f172a', 'flood-opacity': '0.22'
+        }));
+        defs.appendChild(shadow);
+        svg.appendChild(defs);
+
+        svg.appendChild(_svgEl('rect', { x: 0, y: 0, width: cw, height: ch, fill: '#f6f8fb' }));
+        svg.appendChild(_svgEl('rect', { x: 0, y: 0, width: cw, height: ch, fill: 'url(#rp-grid)' }));
 
         const roomG = _svgEl('g', { class: 'rp-room' });
         roomG.appendChild(_svgEl('rect', {
-            x: tl.x - 14, y: tl.y - 14,
-            width: rw + 28, height: rh + 28,
-            fill: 'url(#rp-wall-hatch)', stroke: '#1e293b',
-            'stroke-width': '3', rx: '2'
+            x: tl.x - T, y: tl.y - T, width: rw + T * 2, height: rh + T * 2,
+            fill: '#2f343c', rx: '1.5', filter: 'url(#rp-shadow)'
         }));
+        roomG.appendChild(_svgEl('rect', { x: tl.x, y: tl.y, width: rw, height: rh, fill: 'url(#rp-floor)' }));
+        // Lightens the parquet so furniture and dimensions stay readable
+        roomG.appendChild(_svgEl('rect', { x: tl.x, y: tl.y, width: rw, height: rh, fill: '#fffaf2', opacity: '0.3' }));
         roomG.appendChild(_svgEl('rect', {
-            x: tl.x, y: tl.y, width: rw, height: rh,
-            fill: '#fafbfc', stroke: 'none'
+            x: tl.x + 2, y: tl.y + 2, width: Math.max(rw - 4, 0), height: Math.max(rh - 4, 0),
+            fill: 'none', stroke: 'rgba(15,23,42,0.10)', 'stroke-width': '4'
         }));
         svg.appendChild(roomG);
 
+        // Area under the room + a 1 m scale bar
+        const areaM2 = ((b.rightX - b.leftX) * (b.frontZ - b.backZ) / 10000).toFixed(1);
+        const infoG = _svgEl('g', { class: 'rp-info' });
+        infoG.appendChild(_svgEl('text', {
+            x: tl.x + rw / 2, y: br.y + T + 22, class: 'rp-room-area', 'text-anchor': 'middle'
+        }, 'שטח החדר ' + areaM2 + ' מ״ר'));
+        const barLen = 100 * tf.scale;
+        const bx0 = tl.x - T, by0 = br.y + T + 22;
+        if (barLen > 20) {
+            infoG.appendChild(_svgEl('line', { x1: bx0, y1: by0, x2: bx0 + barLen, y2: by0, class: 'rp-scale-bar' }));
+            infoG.appendChild(_svgEl('line', { x1: bx0, y1: by0 - 4, x2: bx0, y2: by0 + 4, class: 'rp-scale-bar' }));
+            infoG.appendChild(_svgEl('line', { x1: bx0 + barLen, y1: by0 - 4, x2: bx0 + barLen, y2: by0 + 4, class: 'rp-scale-bar' }));
+            infoG.appendChild(_svgEl('text', {
+                x: bx0 + barLen / 2, y: by0 - 8, class: 'rp-scale-text', 'text-anchor': 'middle'
+            }, '1 מ׳'));
+        }
+        svg.appendChild(infoG);
+
         const dimsG = _svgEl('g', { class: 'rp-dims' });
-        _drawWorldDimH(dimsG, b.leftX, b.rightX, b.backZ - 28 / tf.scale, '', tf, true);
-        _drawWorldDimV(dimsG, b.leftX - 28 / tf.scale, b.backZ, b.frontZ, tf, true);
+        _drawWorldDimH(dimsG, b.leftX, b.rightX, b.backZ - (T + 14) / tf.scale, '', tf, true);
+        _drawWorldDimV(dimsG, b.leftX - (T + 14) / tf.scale, b.backZ, b.frontZ, tf, true);
         svg.appendChild(dimsG);
 
         const furnG = _svgEl('g', { class: 'rp-furniture' });
         const items = _collectFurniture();
         const dragId = window._roomPlanDrag ? window._roomPlanDrag.id : null;
+        const selId = dragId || window._roomPlanSelected || null;
 
         items.forEach(function(item) {
             const p1 = _w2s(item.minX, item.minZ, tf);
@@ -1052,6 +1315,7 @@
             const fh = Math.abs(p2.y - p1.y);
             const colors = _furnColors(item);
             const isActive = item.id === dragId;
+            const isSel = item.id === selId;
 
             const g = _svgEl('g', {
                 class: 'rp-furn-item' + (item.draggable ? ' rp-draggable' : '') + (isActive ? ' rp-active' : ''),
@@ -1063,22 +1327,13 @@
             } else if (item.isRoomWindow) {
                 _drawRoomWindow2D(g, item, tf, isActive);
             } else {
-                g.appendChild(_svgEl('rect', {
-                    x: fx, y: fy, width: fw, height: fh,
-                    fill: colors.fill, stroke: colors.stroke,
-                    'stroke-width': isActive ? '2.5' : '1.5',
-                    rx: '4'
-                }));
-
-                const labelSize = Math.max(9, Math.min(12, fw / 8));
-                if (fw > 36 && fh > 20) {
-                    g.appendChild(_svgEl('text', {
-                        x: fx + fw / 2, y: fy + fh / 2,
-                        class: 'rp-furn-label', 'text-anchor': 'middle',
-                        'dominant-baseline': 'middle',
-                        'font-size': labelSize
-                    }, item.label));
+                if (isSel && item.draggable) {
+                    g.appendChild(_svgEl('rect', {
+                        x: fx - 4, y: fy - 4, width: fw + 8, height: fh + 8, rx: 6,
+                        class: 'rp-select-ring'
+                    }));
                 }
+                _drawFurnBody(g, item, tf, { fx: fx, fy: fy, fw: fw, fh: fh }, colors, isActive || isSel);
 
                 if (item.front) {
                     _drawCabinetFront(g, item.front, tf, isActive);
@@ -1102,13 +1357,15 @@
         svg.appendChild(furnG);
 
         const itemDimsG = _svgEl('g', { class: 'rp-item-dims' });
+        // Wall distances only for the selected / dragged item — all of them at once bury the plan
         items.forEach(function(item) {
+            if (item.id !== selId) return;
             if (item.isWallOpening) {
-                if (item.id === dragId || item.isRoomWindow) _drawOpeningWallDims(itemDimsG, item, tf, b);
+                _drawOpeningWallDims(itemDimsG, item, tf, b);
                 return;
             }
             if (item.id === 'cabinet-desk') return;
-            _drawItemWallDims(itemDimsG, item, tf, b, item.id === dragId);
+            _drawItemWallDims(itemDimsG, item, tf, b, true);
         });
         svg.appendChild(itemDimsG);
 
@@ -1241,6 +1498,7 @@
         window._roomVisible = true;
         window._roomPlanSubview = '2d';
         window._roomPlanPending3D = false;
+        window._roomPlanSelected = 'cabinet';
         _resetRoomPlanView();
         state.viewMode = 'room-plan';
         window._orbitFree = false;
@@ -1469,6 +1727,12 @@
                 const action = actionBtn.getAttribute('data-rp-action');
                 if (action === 'cycle-bed-width' && typeof window._cycleBedWidth === 'function') {
                     window._cycleBedWidth();
+                    const bp = window._bedPos || { x: 150, z: 200 };
+                    window._bedPos = _clampBedCenter(bp.x, bp.z);
+                    _queueRoomPlanRender();
+                } else if (action === 'rotate-bed') {
+                    window._roomPlanSelected = 'bed';
+                    window._rotateBedInPlan();
                 } else if (action === 'rotate-room-cab') {
                     const cabId = actionBtn.getAttribute('data-rp-cab-id');
                     if (cabId && typeof window._rotateRoomExtraCabinet === 'function') {
@@ -1499,9 +1763,16 @@
             const sx = e.clientX - rect.left;
             const sy = e.clientY - rect.top;
             const hit = _hitTestFurn(sx, sy);
-            if (!hit) return;
+            if (!hit) {
+                if (window._roomPlanSelected) {
+                    window._roomPlanSelected = null;
+                    _queueRoomPlanRender();
+                }
+                return;
+            }
             e.preventDefault();
             e.stopPropagation();
+            window._roomPlanSelected = hit.id;
             const center = _rectCenter(hit);
             const drag = {
                 id: hit.id,
