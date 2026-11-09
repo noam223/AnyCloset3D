@@ -16969,6 +16969,45 @@ function _printSpacePartTitle(group, m) {
             : ('חלק ' + (m.slot + 1)));
 }
 
+/** Enlarge a part's text, stroke widths and dimension-label gaps by f (keeps labels clear of their dim lines). */
+function _spaceBpNormalizeAnnotations(root, f) {
+    const num = function(el, a) { return parseFloat(el.getAttribute(a)); };
+    root.querySelectorAll('g[data-dim]').forEach(function(g) {
+        const main = g.querySelector('line[marker-start]');
+        if (!main) return;
+        const horiz = g.getAttribute('data-dim') === 'h';
+        const c = horiz ? num(main, 'y1') : num(main, 'x1');
+        if (!isFinite(c)) return;
+        const keys = horiz ? ['y1', 'y2'] : ['x1', 'x2'];
+        g.querySelectorAll('line').forEach(function(ln) {
+            if (ln === main) return;
+            keys.forEach(function(a) { const v = num(ln, a); if (isFinite(v)) ln.setAttribute(a, (c + (v - c) * f).toFixed(1)); });
+        });
+        g.querySelectorAll('text').forEach(function(t) {
+            const tx = num(t, 'x'), ty = num(t, 'y');
+            if (horiz) {
+                if (isFinite(ty)) t.setAttribute('y', (c + (ty - c) * f).toFixed(1));
+                return;
+            }
+            const m = (t.getAttribute('transform') || '').match(/rotate\(\s*-90\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\)/);
+            if (!m || !isFinite(tx) || !isFinite(ty)) return;
+            const my = parseFloat(m[2]);
+            const nx = c + (tx - c) * f;
+            t.setAttribute('x', nx.toFixed(1));
+            t.setAttribute('y', (my + (ty - my) * f).toFixed(1));
+            t.setAttribute('transform', `rotate(-90,${nx.toFixed(1)},${my.toFixed(1)})`);
+        });
+    });
+    root.querySelectorAll('[stroke-width]').forEach(function(el) {
+        const w = num(el, 'stroke-width');
+        if (w > 0) el.setAttribute('stroke-width', (w * f).toFixed(2));
+    });
+    root.querySelectorAll('text[font-size]').forEach(function(t) {
+        const fs = num(t, 'font-size');
+        if (fs > 0) t.setAttribute('font-size', (fs * f).toFixed(2));
+    });
+}
+
 /**
  * One blueprint of the whole shared space: each part's stored front-elevation page, brought to a common
  * scale and placed at its space offset (floor-aligned), outlined in its part color, plus the overall width.
@@ -17037,8 +17076,12 @@ function _spaceGroupBlueprintSvg(group) {
         });
         if (placed.length < 2) return null;
         const S = Math.min.apply(null, placed.map(function(q) { return q.sc; }));
+        const kMax = Math.max.apply(null, placed.map(function(q) { return S / q.sc; }));
         placed.forEach(function(q) {
             const k = S / q.sc;
+            // Each part's page was fitted to its own size, so shrinking it to the shared scale would shrink its
+            // text and lines too — bring them back to the size they have in the least-shrunk part
+            if (kMax / k > 1.01) _spaceBpNormalizeAnnotations(q.src, kMax / k);
             const tx = (q.p.off.x - q.p.wCm / 2) * S - q.bx * k;
             const ty = -(q.p.off.y || 0) * S - (q.by + q.bh) * k;
             const g = document.createElementNS(NS, 'g');
