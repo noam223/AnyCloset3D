@@ -220,6 +220,21 @@ body{font-family:'Inter','Heebo',sans-serif;background:var(--w);color:var(--t);o
 .pprice-amt{font-size:2.2rem;font-weight:900;color:var(--t);line-height:1}
 .pprice-per{font-size:.85rem;color:var(--m);margin-top:4px}
 .pprice-note{font-size:.78rem;color:var(--tl);margin-top:6px;line-height:1.5;background:rgba(0,212,255,.06);border-radius:6px;padding:5px 8px}
+.pbill{display:flex;gap:4px;background:var(--bg);border-radius:99px;padding:5px;width:fit-content;margin:-28px auto 40px}
+.pbill-btn{padding:9px 22px;border-radius:99px;border:none;background:transparent;font-family:inherit;font-size:.9rem;font-weight:700;color:var(--tl);cursor:pointer;transition:all .25s;display:flex;align-items:center;gap:8px}
+.pbill-btn.on{background:var(--p);color:#fff;box-shadow:0 4px 14px rgba(30,58,95,.3)}
+.pbill-btn:hover:not(.on){color:var(--t)}
+.pbill-save{font-size:.7rem;font-weight:800;padding:2px 8px;border-radius:99px;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#1a1000}
+.pyear{display:flex;align-items:center;gap:8px;width:100%;margin-top:12px;padding:10px 12px;border-radius:12px;border:1.5px solid #f59e0b;background:linear-gradient(135deg,#fffbeb,#fef3c7);color:#92400e;font-family:inherit;font-size:.86rem;font-weight:600;text-align:right;cursor:pointer;transition:all .2s}
+.pyear:hover{box-shadow:0 6px 18px rgba(245,158,11,.3);transform:translateY(-1px)}
+.pyear b{font-weight:900;color:#78350f}
+.pyear-tag{flex-shrink:0;font-size:.7rem;font-weight:800;padding:3px 8px;border-radius:99px;background:#f59e0b;color:#fff}
+.pyear i{margin-right:auto;font-size:.8rem}
+.pyear-save{display:inline-flex;align-items:center;gap:6px;margin-top:10px;font-size:.8rem;font-weight:800;padding:4px 12px;border-radius:99px;background:rgba(34,197,94,.12);color:#16a34a;border:1px solid rgba(34,197,94,.3)}
+.price-sec .yr-only{display:none}
+.price-sec.annual .yr-only{display:block}
+.price-sec.annual .pyear-save.yr-only{display:inline-flex}
+.price-sec.annual .mo-only{display:none!important}
 .ppills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:20px}
 .ppill{display:inline-flex;align-items:center;gap:4px;font-size:.75rem;font-weight:700;padding:3px 10px;border-radius:99px;white-space:nowrap}
 .ppill-green{background:rgba(34,197,94,.12);color:#16a34a;border:1px solid rgba(34,197,94,.3)}
@@ -593,6 +608,11 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
       </button>
     </div>
 
+    <div class="pbill rv d2" id="pbill" role="group" aria-label="תקופת חיוב">
+      <button type="button" class="pbill-btn on" data-bill="monthly" onclick="setBilling('monthly')">חודשי</button>
+      <button type="button" class="pbill-btn" data-bill="annual" onclick="setBilling('annual')">שנתי <span class="pbill-save" id="pbill-save"></span></button>
+    </div>
+
     <!-- Designer Plans -->
     <div class="ppanel on" id="panel-designer">
 
@@ -600,10 +620,7 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
       <div class="pcard rv d1">
         <div class="pname">בסיסי</div>
         <div class="ptype">מעצבת פנים — חודשי</div>
-        <div class="pprice">
-          <div class="pprice-amt">₪229<span style="font-size:1rem;font-weight:600">/חודש</span></div>
-          <div class="pprice-note">או ₪199/חודש במנוי שנתי (₪2,388 לשנה)</div>
-        </div>
+        <div class="pprice" data-m="229" data-y="199"></div>
         <div class="ppills">
           <span class="ppill ppill-green"><i class="fa-solid fa-gift"></i> שבוע ניסיון חינם</span>
         </div>
@@ -621,7 +638,7 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
           <li class="dim"><i class="fa-solid fa-xmark n"></i> תבניות עמודה וארון שמורות</li>
         </ul>
         <a href="login.html?plan=designer_basic" class="btn-plan btn-plan-o">התחל שבוע ניסיון חינם</a>
-        <a href="login.html?plan=designer_basic_annual" style="display:block;text-align:center;margin-top:10px;font-size:.85rem;font-weight:700;color:var(--ad);">או מנוי שנתי — חיסכון ₪360</a>
+        <a href="login.html?plan=designer_basic_annual" class="mo-only" style="display:block;text-align:center;margin-top:10px;font-size:.85rem;font-weight:700;color:var(--ad);">או מנוי שנתי — חיסכון ₪360</a>
       </div>
 
       <!-- פרימיום -->
@@ -629,10 +646,7 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
         <div class="pbadge pbadge-gold">⭐ הכי פופולרי</div>
         <div class="pname">פרימיום</div>
         <div class="ptype">מעצבת פנים — חודשי</div>
-        <div class="pprice">
-          <div class="pprice-amt">₪299<span style="font-size:1rem;font-weight:600">/חודש</span></div>
-          <div class="pprice-note">או ₪269/חודש במנוי שנתי (₪3,228 לשנה)</div>
-        </div>
+        <div class="pprice" data-m="299" data-y="269"></div>
         <div class="ppills">
           <span class="ppill ppill-green"><i class="fa-solid fa-gift"></i> שבוע ניסיון חינם</span>
         </div>
@@ -649,7 +663,7 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
           <li><i class="fa-solid fa-check y"></i> טופס שליחה לייצור + סיכום ללקוח</li>
         </ul>
         <a href="login.html?plan=designer_premium" class="btn-plan btn-plan-p">התחל שבוע ניסיון חינם</a>
-        <a href="login.html?plan=designer_premium_annual" style="display:block;text-align:center;margin-top:10px;font-size:.85rem;font-weight:700;color:var(--ad);">או מנוי שנתי — חיסכון ₪360</a>
+        <a href="login.html?plan=designer_premium_annual" class="mo-only" style="display:block;text-align:center;margin-top:10px;font-size:.85rem;font-weight:700;color:var(--ad);">או מנוי שנתי — חיסכון ₪360</a>
       </div>
 
     </div>
@@ -659,10 +673,7 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
       <div class="pcard rv d1">
         <div class="pname">בסיסי</div>
         <div class="ptype">נגר — חודשי</div>
-        <div class="pprice">
-          <div class="pprice-amt">₪499<span style="font-size:1rem;font-weight:600">/חודש</span></div>
-          <div class="pprice-note">או ₪449/חודש במנוי שנתי (₪5,388 לשנה)</div>
-        </div>
+        <div class="pprice" data-m="499" data-y="449"></div>
         <div class="ppills">
           <span class="ppill ppill-green"><i class="fa-solid fa-gift"></i> שבוע ניסיון חינם</span>
         </div>
@@ -677,16 +688,13 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
           <li class="dim"><i class="fa-solid fa-xmark n"></i> דוח ללקוח</li>
         </ul>
         <a href="login.html?plan=carpenter_basic" class="btn-plan btn-plan-o">התחל שבוע ניסיון חינם</a>
-        <a href="login.html?plan=carpenter_basic_annual" style="display:block;text-align:center;margin-top:10px;font-size:.85rem;font-weight:700;color:var(--ad);">או מנוי שנתי — חיסכון 10%</a>
+        <a href="login.html?plan=carpenter_basic_annual" class="mo-only" style="display:block;text-align:center;margin-top:10px;font-size:.85rem;font-weight:700;color:var(--ad);">או מנוי שנתי — חיסכון 10%</a>
       </div>
       <div class="pcard feat rv d2">
         <div class="pbadge">⭐ הכי פופולרי</div>
         <div class="pname">מקצועי</div>
         <div class="ptype">נגר — חודשי</div>
-        <div class="pprice">
-          <div class="pprice-amt">₪699<span style="font-size:1rem;font-weight:600">/חודש</span></div>
-          <div class="pprice-note">או ₪629/חודש במנוי שנתי (₪7,548 לשנה)</div>
-        </div>
+        <div class="pprice" data-m="699" data-y="629"></div>
         <div class="ppills">
           <span class="ppill ppill-green"><i class="fa-solid fa-gift"></i> שבוע ניסיון חינם</span>
         </div>
@@ -701,7 +709,7 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
           <li><i class="fa-solid fa-check y"></i> דוח ללקוח</li>
         </ul>
         <a href="login.html?plan=carpenter_pro" class="btn-plan btn-plan-p">התחל שבוע ניסיון חינם</a>
-        <a href="login.html?plan=carpenter_pro_annual" style="display:block;text-align:center;margin-top:10px;font-size:.85rem;font-weight:700;color:var(--ad);">או מנוי שנתי — חיסכון 10%</a>
+        <a href="login.html?plan=carpenter_pro_annual" class="mo-only" style="display:block;text-align:center;margin-top:10px;font-size:.85rem;font-weight:700;color:var(--ad);">או מנוי שנתי — חיסכון 10%</a>
       </div>
     </div>
 
@@ -928,7 +936,49 @@ function switchTab(type) {
     el.classList.remove('on');
     setTimeout(() => el.classList.add('on'), 50);
   });
+  updateBillingSave(type);
 }
+
+// ── Monthly / annual billing toggle ───────────────────────────
+const shekel = n => '₪' + n.toLocaleString('en-US');
+
+function renderPrices() {
+  document.querySelectorAll('.pprice[data-m]').forEach(el => {
+    const m = +el.dataset.m, y = +el.dataset.y, save = (m - y) * 12;
+    el.innerHTML =
+      `<div class="pprice-orig yr-only">${shekel(m)}/חודש</div>` +
+      `<div class="pprice-amt"><span class="pp-val">${shekel(m)}</span><span style="font-size:1rem;font-weight:600">/חודש</span></div>` +
+      `<div class="pprice-per yr-only">${shekel(y * 12)} לשנה</div>` +
+      `<div class="pyear-save yr-only"><i class="fa-solid fa-piggy-bank"></i> חוסכים ${shekel(save)} בשנה</div>` +
+      `<button type="button" class="pyear mo-only" onclick="setBilling('annual')"><span class="pyear-tag">שנתי</span>` +
+      `<span><b>${shekel(y)}</b>/חודש · חוסכים <b>${shekel(save)}</b> בשנה</span><i class="fa-solid fa-arrow-left"></i></button>`;
+  });
+}
+
+function updateBillingSave(type) {
+  const prices = [...document.querySelectorAll(`#panel-${type} .pprice[data-m]`)];
+  const bill = document.getElementById('pbill');
+  bill.style.visibility = prices.length ? '' : 'hidden';
+  const pct = Math.max(0, ...prices.map(p => Math.round((1 - p.dataset.y / p.dataset.m) * 100)));
+  document.getElementById('pbill-save').textContent = pct ? `עד ${pct}% הנחה` : '';
+}
+
+function setBilling(mode) {
+  const annual = mode === 'annual';
+  document.querySelector('.price-sec').classList.toggle('annual', annual);
+  document.querySelectorAll('.pbill-btn').forEach(b => b.classList.toggle('on', b.dataset.bill === mode));
+  document.querySelectorAll('.pprice[data-m]').forEach(el => {
+    el.querySelector('.pp-val').textContent = shekel(annual ? +el.dataset.y : +el.dataset.m);
+    const card = el.closest('.pcard');
+    const type = card.querySelector('.ptype');
+    type.textContent = type.textContent.replace(annual ? 'חודשי' : 'שנתי', annual ? 'שנתי' : 'חודשי');
+    const cta = card.querySelector('.btn-plan');
+    cta.setAttribute('href', cta.getAttribute('href').replace(/(plan=\w+?)(_annual)?$/, annual ? '$1_annual' : '$1'));
+  });
+}
+
+renderPrices();
+updateBillingSave('designer');
 
 // ── Scroll reveal (IntersectionObserver) ─────────────────────
 const revealEls = document.querySelectorAll('.rv, .rvl, .rvr');
