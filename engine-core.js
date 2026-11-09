@@ -176,13 +176,7 @@ window._applyLighting('studio');
 const _AO_BASE = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/';
 const _AO_SCRIPTS = ['shaders/CopyShader.js', 'shaders/SSAOShader.js', 'math/SimplexNoise.js',
     'postprocessing/Pass.js', 'postprocessing/EffectComposer.js', 'postprocessing/ShaderPass.js', 'postprocessing/SSAOPass.js'];
-window._aoEnabled = (function() {
-    try {
-        const v = localStorage.getItem('ac_ao');
-        if (v === '1' || v === '0') return v === '1';
-    } catch (e) { /* ignore */ }
-    return !(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
-})();
+window._aoEnabled = !(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
 let _ao = null, _aoLoading = null;
 const _aoSize = new THREE.Vector2();
 
@@ -240,7 +234,13 @@ function _aoWanted() {
 
 window._renderMain = function() {
     window._inMainRender = true;
-    try { _renderMainInner(); } finally { window._inMainRender = false; }
+    try {
+        _renderFloorReflection();
+        _renderMainInner();
+    } finally {
+        window._inMainRender = false;
+        _floorRefl.strength.value = 0;
+    }
 };
 
 function _renderMainInner() {
@@ -265,7 +265,6 @@ function _renderMainInner() {
                 ok = false;
                 console.warn('[ao] render failed — disabling', e);
                 window._aoEnabled = false;
-                window._syncAoButton();
             } finally {
                 camera.near = n;
                 camera.far = f;
@@ -277,28 +276,6 @@ function _renderMainInner() {
     }
     renderer.render(scene, camera);
 }
-
-window._syncAoButton = function() {
-    const btn = document.getElementById('btn-toggle-ao');
-    if (!btn) return;
-    const on = window._aoEnabled && !window._aoAutoOff;
-    btn.classList.toggle('toggled-off', !on);
-    btn.title = on ? 'הצללה רכה בתלת־מימד: פועלת (לחץ לכיבוי)'
-        : window._aoAutoOff ? 'הצללה רכה כובתה אוטומטית כי התצוגה איטית במחשב הזה (לחץ להפעלה)'
-        : 'הצללה רכה בתלת־מימד: כבויה (לחץ להפעלה)';
-};
-window._toggleAO = function() {
-    if (window._aoAutoOff) {
-        window._aoAutoOff = false;
-        window._aoEnabled = true;
-        _aoUserKept = true;
-    } else {
-        window._aoEnabled = !window._aoEnabled;
-    }
-    try { localStorage.setItem('ac_ao', window._aoEnabled ? '1' : '0'); } catch (e) { /* ignore */ }
-    window._syncAoButton();
-    window._requestRender(false);
-};
 
 // Render on demand: animate() in ui.js draws only while the camera moves, after a rebuild, during user
 // input, and once a second as a safety net — an idle editor leaves the GPU alone. The key light never
@@ -336,7 +313,6 @@ window._requestRender = function(sceneChanged) {
 // Weak GPUs: when continuous rendering stays slow, drop the soft shadows first, then the shadow-map
 // resolution. Frames right after a rebuild are CPU-bound and not counted.
 window._aoAutoOff = false;
-let _aoUserKept = false;
 let _perfSamples = 0, _perfSlow = 0, _perfDone = false;
 window._noteFrameTime = function(dt) {
     if (_perfDone || !(dt > 0) || dt > 0.5) return;
@@ -348,10 +324,9 @@ window._noteFrameTime = function(dt) {
     _perfSamples = 0;
     _perfSlow = 0;
     if (!slow) return;
-    if (_aoWanted() && !_aoUserKept) {
+    if (_aoWanted()) {
         window._aoAutoOff = true;
-        window._syncAoButton();
-        console.info('[perf] slow frames — soft shadows turned off');
+        console.info('[perf] slow frames — soft shadows and floor reflection turned off');
         return;
     }
     if (dirLight.shadow.mapSize.x > 1024) {
@@ -363,7 +338,6 @@ window._noteFrameTime = function(dt) {
     }
     _perfDone = true;
 };
-window._syncAoButton();
 
 // Studio reflections (same layout as handle-halfmoon-mockup.html).
 // preEncoded: for materials rendered by this linear-output renderer; raw: for the handle shader,
@@ -495,6 +469,105 @@ scene.onBeforeRender = function(r, s, cam) {
     }
     _fitShadowFrustum();
 };
+
+// Satin floor: the scene mirrored in the floor plane at half resolution, blurred through its mipmaps by
+// the floor's gloss map. Only main renders get it — captures see the floor without the reflection.
+const _floorRefl = {
+    rt: null,
+    cam: new THREE.PerspectiveCamera(),
+    map: { value: null },
+    mtx: { value: new THREE.Matrix4() },
+    strength: { value: 0 }
+};
+window._floorReflectStrength = 2.2;
+window._floorReflectOff = (function() { try { return localStorage.getItem('ac_floorrefl') === '0'; } catch (e) { return false; } })();
+const _frPos = new THREE.Vector3(), _frTarget = new THREE.Vector3(), _frUp = new THREE.Vector3();
+const _frRot = new THREE.Matrix4(), _frSize = new THREE.Vector2();
+const _frBias = new THREE.Matrix4().set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1);
+
+window._floorReflectMaterial = function(mat) {
+    mat.onBeforeCompile = function(sh) {
+        sh.uniforms.floorReflMap = _floorRefl.map;
+        sh.uniforms.floorReflMtx = _floorRefl.mtx;
+        sh.uniforms.floorReflStrength = _floorRefl.strength;
+        sh.vertexShader = 'uniform mat4 floorReflMtx;\nvarying vec4 vFloorReflUv;\n' + sh.vertexShader.replace(
+            '#include <project_vertex>',
+            '#include <project_vertex>\n\tvFloorReflUv = floorReflMtx * modelMatrix * vec4( transformed, 1.0 );');
+        sh.fragmentShader = 'uniform sampler2D floorReflMap;\nuniform float floorReflStrength;\nvarying vec4 vFloorReflUv;\n' + sh.fragmentShader.replace(
+            '#include <tonemapping_fragment>', [
+                'if ( floorReflStrength > 0.0 ) {',
+                // The plank relief ripples the reflection the way a real lacquered floor does
+                '\tvec2 floorReflUv = vFloorReflUv.xy / vFloorReflUv.w + ( normal.xy - geometryNormal.xy ) * 0.06;',
+                '\tfloat floorRough = clamp( roughnessFactor, 0.0, 1.0 );',
+                '\tvec3 floorRefl = texture2D( floorReflMap, floorReflUv, floorRough * 10.0 ).rgb;',
+                '\tfloat floorFresnel = pow( 1.0 - clamp( dot( normalize( vViewPosition ), normal ), 0.0, 1.0 ), 5.0 );',
+                '\tfloat floorK = floorReflStrength * mix( 0.05, 1.0, floorFresnel ) * ( 1.0 - floorRough );',
+                '\tgl_FragColor.rgb = mix( gl_FragColor.rgb, floorRefl, floorK );',
+                '}',
+                '#include <tonemapping_fragment>'
+            ].join('\n'));
+    };
+};
+
+function _renderFloorReflection() {
+    _floorRefl.strength.value = 0;
+    const fm = window._roomFloorMesh;
+    if (!fm || window._floorReflectOff || window._aoAutoOff || window._floorReflectStrength <= 0) return;
+    _syncRoomBackdrop(camera);
+    let root = fm;
+    for (; root.parent; root = root.parent) if (!root.visible) return;
+    if (root !== scene || !fm.visible) return;
+    fm.updateWorldMatrix(true, false);
+    const floorY = fm.matrixWorld.elements[13];
+    camera.updateMatrixWorld();
+    if (camera.position.y <= floorY + 1) return;
+
+    renderer.getDrawingBufferSize(_frSize);
+    const w = Math.max(1, Math.floor(_frSize.x / 2)), h = Math.max(1, Math.floor(_frSize.y / 2));
+    if (!_floorRefl.rt) {
+        _floorRefl.rt = new THREE.WebGLRenderTarget(w, h, {
+            minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter, generateMipmaps: true
+        });
+    } else if (_floorRefl.rt.width !== w || _floorRefl.rt.height !== h) {
+        _floorRefl.rt.setSize(w, h);
+    }
+
+    // Mirror the camera's position, aim point and up vector across the floor plane
+    const rc = _floorRefl.cam;
+    _frRot.extractRotation(camera.matrixWorld);
+    _frTarget.set(0, 0, -1).applyMatrix4(_frRot).add(camera.position);
+    _frUp.set(0, 1, 0).applyMatrix4(_frRot);
+    _frPos.copy(camera.position);
+    _frPos.y = 2 * floorY - _frPos.y;
+    _frTarget.y = 2 * floorY - _frTarget.y;
+    _frUp.y = -_frUp.y;
+    rc.position.copy(_frPos);
+    rc.up.copy(_frUp);
+    rc.lookAt(_frTarget);
+    rc.updateMatrixWorld();
+    rc.projectionMatrix.copy(camera.projectionMatrix);
+    rc.projectionMatrixInverse.copy(camera.projectionMatrixInverse);
+    _floorRefl.mtx.value.copy(_frBias).multiply(rc.projectionMatrix).multiply(rc.matrixWorldInverse);
+
+    // Dimension lines, labels, handles and glows are UI, not part of the room
+    const hidden = [fm];
+    scene.traverseVisible(function(o) {
+        if (o.isLine || o.isPoints || o.isSprite) hidden.push(o);
+        else if (o.isMesh && o.material && !Array.isArray(o.material) && o.material.isMeshBasicMaterial) hidden.push(o);
+    });
+    hidden.forEach(function(o) { o.visible = false; });
+    const prevRT = renderer.getRenderTarget();
+    try {
+        renderer.setRenderTarget(_floorRefl.rt);
+        renderer.clear();
+        renderer.render(scene, rc);
+    } finally {
+        renderer.setRenderTarget(prevRT);
+        hidden.forEach(function(o) { o.visible = true; });
+    }
+    _floorRefl.map.value = _floorRefl.rt.texture;
+    _floorRefl.strength.value = window._floorReflectStrength;
+}
 
 // ---- HDR Environment Map — applied ONLY to aluminum profile material ----
 // Stored in window._hdrEnvMap; assigned explicitly to profileMat in buildSlidingDoorCabinet.
@@ -807,9 +880,10 @@ window._wallTex = null;
 window._brickWallTex = null;
 (function() {
     const tl = new THREE.TextureLoader();
-    tl.load('images/wood-floor.jpg', function(t) {
+    // Oak parquet: ambientCG WoodFloor051 (CC0), 2 m tile. Left linear: the renderer outputs linear, so an
+    // sRGB decode would turn this mid-tone oak dark red.
+    tl.load('images/oak-floor.jpg', function(t) {
         t.wrapS = t.wrapT = THREE.RepeatWrapping;
-        t.encoding = THREE.sRGBEncoding;
         // Keeps the planks crisp at the grazing angles a floor is mostly seen from
         t.anisotropy = renderer.capabilities.getMaxAnisotropy();
         window._woodFloorTex = t;
@@ -830,7 +904,7 @@ window._brickWallTex = null;
     // Relief / gloss maps (linear data): floor maps follow the floor color map's repeat, the plaster
     // relief tiles on its own (walls have no color map)
     const aniso = renderer.capabilities.getMaxAnisotropy();
-    [['images/wood-floor-normal.jpg', '_woodFloorNormalTex'], ['images/wood-floor-rough.jpg', '_woodFloorRoughTex'],
+    [['images/oak-floor-normal.jpg', '_woodFloorNormalTex'], ['images/oak-floor-rough.jpg', '_woodFloorRoughTex'],
      ['images/wall-plaster-normal.jpg', '_wallPlasterNormalTex']].forEach(function(e) {
         tl.load(e[0], function(t) {
             t.wrapS = t.wrapT = THREE.RepeatWrapping;
@@ -2629,8 +2703,8 @@ function _buildRoom() {
     const makeBrickMat = makeWallMat;
 
     // ── Floor ──────────────────────────────────────────────────────────────
-    // Satin-lacquered oak: plank joints and grain in relief, gloss varying with the grain, and a soft
-    // reflection of the environment. Relief/gloss maps share the color map's repeat.
+    // Satin-lacquered oak: plank joints and grain in relief, gloss varying with the grain, and a blurred
+    // reflection of the room. Relief/gloss maps share the color map's repeat.
     const tileSizeCm = 200;
     const floorMat = new THREE.MeshStandardMaterial({ color: 0xd4a96a, roughness: 0.8, metalness: 0.0 });
     if (!_skipTex && window._woodFloorTex) {
@@ -2642,12 +2716,13 @@ function _buildRoom() {
         }
         if (window._woodFloorRoughTex) {
             floorMat.roughnessMap = window._woodFloorRoughTex;
-            floorMat.roughness = 0.8;
+            floorMat.roughness = 1.0;
         }
         if (window._hdrEnvMap) {
             floorMat.envMap = window._hdrEnvMap;
-            floorMat.envMapIntensity = 0.9;
+            floorMat.envMapIntensity = 0.5;
         }
+        window._floorReflectMaterial(floorMat);
     }
     const floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomD), floorMat);
     floorMesh.rotation.x = -Math.PI / 2;
@@ -2656,6 +2731,7 @@ function _buildRoom() {
     floorMesh.userData.roomPart = 'floor';
     floorMesh.userData._roomOwned = true;
     rg.add(floorMesh);
+    window._roomFloorMesh = floorMesh;
 
     // Door + window openings cut into the wall planes
     const _sideWallCZ = backZ + roomD / 2 - wallT;
