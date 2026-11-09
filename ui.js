@@ -10209,6 +10209,14 @@ function _partColorByKey(key) {
     return _PART_COLORS[key] || { fill: '#f1f5f9', stroke: '#1e3a5f' };
 }
 
+const _SPACE_SLOT_COLOR_KEYS = ['wing:center', 'wing:left', 'wing:right', 'corner:left', 'corner:right', 'wing:sideCabinet'];
+
+/** Shared-space part colors (by slot) — same palette as corner parts. */
+function _spaceSlotColor(slot) {
+    const n = _SPACE_SLOT_COLOR_KEYS.length;
+    return _partColorByKey(_SPACE_SLOT_COLOR_KEYS[((Math.round(Number(slot)) || 0) % n + n) % n]);
+}
+
 function _partKeyForObject(obj, root) {
     for (let a = obj; a && a !== root; a = a.parent) {
         const u = a.userData || {};
@@ -10253,7 +10261,7 @@ function _erodeMask(mask, w, h, r) {
  * Copy the current render and draw a colored line just inside each part's visible silhouette.
  * Must run right after ren.render (the WebGL buffer is not preserved).
  */
-function _outlineCabinetPartsOnCanvas(ren, scn, cam) {
+function _outlineCabinetPartsOnCanvas(ren, scn, cam, bySpaceSlot) {
     const src = ren.domElement;
     const w = src.width, h = src.height;
     const base = document.createElement('canvas');
@@ -10263,21 +10271,34 @@ function _outlineCabinetPartsOnCanvas(ren, scn, cam) {
     const root = window.cabinetGroup;
     if (!root || typeof THREE === 'undefined' || root.parent !== scn) return base;
 
+    // bySpaceSlot: one color per shared-space cabinet (the edited one + its companions)
+    const roots = [{ group: root, key: null }];
+    if (bySpaceSlot) {
+        const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
+        roots[0].key = 'slot:' + ((info && info.activeSlot) || 0);
+        (window._spaceCompanionGroups || []).forEach(function(g) {
+            if (g && g.parent === scn && g.visible && g.userData.spaceSlot != null) roots.push({ group: g, key: 'slot:' + g.userData.spaceSlot });
+        });
+    }
     const entries = [];
-    root.traverse(function(obj) {
-        if (obj === root) return;
-        if (obj.isMesh) {
-            const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-            const invisible = mats.some(function(m) { return m && m.transparent && m.opacity === 0; });
-            entries.push({ obj: obj, key: invisible ? null : _partKeyForObject(obj, root), visible: obj.visible, material: obj.material });
-        } else if (obj.isLine || obj.isSprite || obj.isPoints) {
-            entries.push({ obj: obj, key: null, visible: obj.visible, material: obj.material });
-        }
+    roots.forEach(function(r) {
+        r.group.traverse(function(obj) {
+            if (obj === r.group) return;
+            if (obj.isMesh) {
+                const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+                const invisible = (obj.userData && obj.userData.spaceCompanion)
+                    || mats.some(function(m) { return m && m.transparent && m.opacity === 0; });
+                entries.push({ obj: obj, key: invisible ? null : (r.key || _partKeyForObject(obj, r.group)), visible: obj.visible, material: obj.material });
+            } else if (obj.isLine || obj.isSprite || obj.isPoints) {
+                entries.push({ obj: obj, key: null, visible: obj.visible, material: obj.material });
+            }
+        });
     });
     const keys = Array.from(new Set(entries.filter(function(e) { return e.key; }).map(function(e) { return e.key; })));
     if (keys.length < 2) return base;
 
-    const others = scn.children.filter(function(c) { return c !== root && c.visible; });
+    const rootGroups = roots.map(function(r) { return r.group; });
+    const others = scn.children.filter(function(c) { return rootGroups.indexOf(c) < 0 && c.visible; });
     const prevBg = scn.background;
     const white = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, toneMapped: false });
     const black = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide, toneMapped: false });
@@ -10301,7 +10322,8 @@ function _outlineCabinetPartsOnCanvas(ren, scn, cam) {
             const mask = new Uint8Array(w * h);
             for (let i = 0, j = 0; i < mask.length; i++, j += 4) mask[i] = px[j] > 127 ? 1 : 0;
             const inner = _erodeMask(mask, w, h, r);
-            const hex = _partColorByKey(key).stroke.replace('#', '');
+            const col = key.indexOf('slot:') === 0 ? _spaceSlotColor(key.slice(5)) : _partColorByKey(key);
+            const hex = col.stroke.replace('#', '');
             const R = parseInt(hex.slice(0, 2), 16), G = parseInt(hex.slice(2, 4), 16), B = parseInt(hex.slice(4, 6), 16);
             for (let i = 0; i < mask.length; i++) {
                 if (mask[i] && !inner[i]) {
@@ -10598,7 +10620,8 @@ function _captureFrameAtView(cam, ctrl, ren, scn, view, hasDoors) {
     // Double-render so materials/textures settle (avoids blank/white captures)
     ren.render(scn, cam);
     ren.render(scn, cam);
-    let frame = view.outlineParts ? _outlineCabinetPartsOnCanvas(ren, scn, cam) : ren.domElement;
+    let frame = (view.outlineParts || view.outlineSpaceSlots)
+        ? _outlineCabinetPartsOnCanvas(ren, scn, cam, !!view.outlineSpaceSlots) : ren.domElement;
     // Faded companion cabinets fill the frame — crop to the focus part only
     let bounds = null;
     const companions = (window._spaceCompanionGroups || []).filter(function(g) { return g && g.visible && !isCropSlot(g); });
@@ -10844,6 +10867,7 @@ window._captureCabinetPreviewImages = function() {
             ? window._computeSpacePairCaptureView(pairInfo)
             : null;
         if (spaceView) {
+            spaceView.outlineSpaceSlots = true;
             imgSpaceDoors = _captureFrameAtView(cam, ctrl, ren, scn, spaceView, true);
             imgSpaceOpen = _captureFrameAtView(cam, ctrl, ren, scn, spaceView, false);
         }
@@ -10891,7 +10915,7 @@ window._captureCabinetPreviewImages = function() {
         multiViewSVG,
         imgSpaceDoors,
         imgSpaceOpen,
-        captureVer: 15
+        captureVer: 16
     };
     } finally {
         restoreRenderSize();
@@ -10930,6 +10954,8 @@ window._cartItemNeedsMediaRefresh = function(itemObj) {
         if (pairCount >= 2) {
             if (!spec.captureVer || spec.captureVer < 5) return true;
             if (!_cartImageValid(spec.imgSpaceDoors) || !_cartImageValid(spec.imgSpaceOpen)) return true;
+            // v16: whole-space shots outline each part in its own color (group overview page)
+            if (spec.captureVer < 16 && !spec.imgSpaceDoorsManual) return true;
         }
     }
     if (!spec.multiViewPages || !spec.multiViewPages.length) return true;
@@ -16936,19 +16962,51 @@ function _printSingleCabinetBlockHtml(itemObj, index, opts) {
     return blockResult(html);
 }
 
+function _printSpacePartTitle(group, m) {
+    return (m.itemObj.spec && m.itemObj.spec.customName)
+        || ((typeof window._spacePartSuffix === 'function')
+            ? ((group.baseName ? (group.baseName + ' ') : '') + window._spacePartSuffix(m.slot))
+            : ('חלק ' + (m.slot + 1)));
+}
+
+/** Group cover page: every part of the shared space together, each outlined in its own color (like corner parts). */
+function _printSpaceGroupOverviewHtml(group) {
+    const src = group.members.map(function(m) { return m.itemObj.spec || {}; })
+        .find(function(s) { return _cartImageValid(s.imgSpaceDoors) || _cartImageValid(s.imgSpaceOpen); }) || {};
+    const imgs = [[src.imgSpaceDoors, 'סגור — עם דלתות'], [src.imgSpaceOpen, 'פתוח — ללא דלתות']]
+        .filter(function(x) { return _cartImageValid(x[0]); });
+    const rows = group.members.map(function(m, i) {
+        const rs = m.itemObj.rawState || {};
+        const wing = (rs.wings && rs.wings.center) || {};
+        const col = _spaceSlotColor(m.slot);
+        const w = wing.width || rs.width || 0;
+        const h = _wingBodyHeightFromData(wing, rs.globalHeight || 240);
+        const d = wing.depth || rs.depth || 0;
+        return `<tr>
+            <td class="mu-name" style="background:${col.fill};box-shadow:inset -4px 0 0 ${col.stroke};"><span class="mu-badge" style="background:${col.stroke};">${i + 1}</span>${_escPrintHtml(_printSpacePartTitle(group, m))}</td>
+            <td dir="ltr">${w}</td><td dir="ltr">${h}</td><td dir="ltr">${d}</td>
+        </tr>`;
+    }).join('');
+    return `<div class="cmp-block mu-angle-page" style="page-break-after:always;">
+        <div class="cmp-bar"><span>${_escPrintHtml(group.baseName)}</span><small>${group.members.length} חלקים במרחב</small></div>
+        ${imgs.map(function(x) { return `<div class="mu-angle"><div class="cmp-cap">${x[1]}</div><img src="${x[0]}" alt=""></div>`; }).join('')}
+        <table class="mu-parts">
+            <thead><tr><th>חלק</th><th>רוחב</th><th>גובה</th><th>עומק</th></tr></thead>
+            <tbody>${rows}</tbody>
+        </table>
+    </div>`;
+}
+
 function _printSpaceGroupBlockHtml(group, opts) {
     opts = opts || {};
     const thStyle = opts.thStyle;
     const tdStyle = opts.tdStyle;
-    // Each part prints its own closed/open images beside its spec — no separate whole-space page
-    let html = '';
+    // Cover page with all parts together, then each part with its own closed/open images beside its spec
+    let html = _printSpaceGroupOverviewHtml(group);
 
     let totalPrice = 0, totalInstall = 0, totalCost = 0;
     group.members.forEach(function(m) {
-        const partTitle = (m.itemObj.spec && m.itemObj.spec.customName)
-            || ((typeof window._spacePartSuffix === 'function')
-                ? ((group.baseName ? (group.baseName + ' ') : '') + window._spacePartSuffix(m.slot))
-                : ('חלק ' + (m.slot + 1)));
+        const partTitle = _printSpacePartTitle(group, m);
         const block = _printSingleCabinetBlockHtml(m.itemObj, m.index, {
             isFactory: opts.isFactory,
             hidePrices: opts.hidePrices,
