@@ -202,8 +202,8 @@ function _aoLoad() {
         const sz = renderer.getSize(_aoSize);
         const composer = new THREE.EffectComposer(renderer);
         const pass = new THREE.SSAOPass(scene, camera, sz.x, sz.y);
-        pass.kernelRadius = 18;
-        pass.minDistance = 0.0002;
+        pass.kernelRadius = 16;
+        pass.minDistance = 0.0006;
         pass.maxDistance = 0.02;
         // Glass, ghost walls, overlays and glows must not occlude what is behind them in the normal pass
         let hidden = [];
