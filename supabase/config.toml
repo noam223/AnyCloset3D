@@ -12,3 +12,7 @@ verify_jwt = false
 
 [functions.company-manage-agent]
 verify_jwt = true
+
+# Called by pg_cron and outputs/social/schedule.mjs with the x-social-secret header.
+[functions.social-publisher]
+verify_jwt = false
