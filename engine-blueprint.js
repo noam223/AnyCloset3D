@@ -713,6 +713,34 @@ function _bpMaybePushColWidthDim(p, viewKey, ci, x1, x2, y, lbl, makeDimHFn, abo
 }
 
 /**
+ * Per-column width dims in two rows: clear inner width between the boards (yInner) and the
+ * column's outer width as its own box = inner + 2 boards (yOuter, multi-column only — a single
+ * column's outer width is the overall width). Positions follow the real board layout.
+ */
+function _bpPushColInnerOuterWidthDims(p, viewKey, cols, colXPositions, ox, dW, sc, tCm, yInner, yOuter, makeDimHFn, faceY, faceH) {
+    if (!cols || !cols.length || !colXPositions) return;
+    const t = tCm != null ? +tCm : (state.thickness || 1.7);
+    const tPx = t * sc;
+    const multi = cols.length > 1;
+    let xCm = t;
+    cols.forEach((col, ci) => {
+        const cp = colXPositions[ci];
+        if (!col || !cp) return;
+        const wCm = cp.wCm || 0;
+        const isLast = ci === cols.length - 1;
+        const x1 = ox + xCm * sc;
+        const x2 = isLast ? (ox + dW - tPx) : (x1 + wCm * sc);
+        xCm += wCm + t;
+        _bpMaybePushInnerWidthDim(p, viewKey, 'colInW:c' + ci, x1, x2, yInner, `${_bpMm(wCm)}`, makeDimHFn, false);
+        if (!multi) return;
+        const fy = faceY != null ? faceY : cp.colTopY;
+        const fh = faceH != null ? faceH : ((cp.colBotY != null && cp.colTopY != null) ? cp.colBotY - cp.colTopY : null);
+        _bpMaybePushColWidthDim(p, viewKey, ci, x1 - tPx, x2 + tPx, yOuter,
+            `${_bpMm(wCm + 2 * t)}`, makeDimHFn, false, fy, fh);
+    });
+}
+
+/**
  * Extra overall-height dimension for every column shorter than the wing max.
  * Standing: floor → column top. Hanging: cabinet body only (install height is chosen on site).
  */
@@ -2649,22 +2677,15 @@ window._generateMultiViewBlueprintSVG = function() {
         const _hasFloorPlinthOld = pH > 0 && _bpAnyColumnOnFloor(cols);
         const _plinthBottomY = _bpWidthDimBaseY(oy, dH, pH, sc, cols);
         const _hasMultiCols = colXPositions.length > 1;
-        const dimY = _plinthBottomY + (_hasMultiCols ? 54 : 36);
+        const dimY = _plinthBottomY + (_hasMultiCols ? 82 : 56);
         // Total width (below plinth) — includes side desk / side cabinet when present
         _bpPushOverallWidthWithExtras(dimH, ox, dW, sc, _isCenterWg ? _horizExtra : { left: 0, right: 0 }, wg.w, dimY);
         // Per-column width dims — placed just below the plinth bottom
         {
             const _tCmHC = state.thickness || 1.7;
             _bpPushHoneycombInnerWidthDims(p, _bpViewKey, cols, colXPositions, sc, _tCmHC, _plinthBottomY + 6, dimH, wg, pH);
-            colXPositions.forEach((cp, ci) => {
-                const col = cols[ci];
-                if (_hasMultiCols || _bpColumnHasHoneycomb(col)) {
-                    const faceY = (cp.colTopY != null) ? cp.colTopY : oy;
-                    const faceH = (cp.colBotY != null && cp.colTopY != null) ? (cp.colBotY - cp.colTopY) : dH;
-                    _bpMaybePushColWidthDim(p, _bpViewKey, ci, cp.x1, cp.x2, _plinthBottomY + 18,
-                        `${_bpMm(cp.wCm)}`, dimH, false, faceY, faceH);
-                }
-            });
+            _bpPushColInnerOuterWidthDims(p, _bpViewKey, cols, colXPositions, ox, dW, sc, _tCmHC,
+                _plinthBottomY + 18, _plinthBottomY + 36, dimH);
         }
         // Overall height: standing columns floor→top; hanging cabinets show body height only
         // Place opposite a side desk so the dim does not sit on top of the desk
@@ -3673,7 +3694,7 @@ window._generateMultiViewBlueprintPages = function() {
         const _hasFloorPlinth2 = pH > 0 && _bpAnyColumnOnFloor(cols);
         const _widthDimBaseY = _bpWidthDimBaseY(oy, dH, pH, sc, cols);
         const _hasMultiCols2 = colXPositions.length > 1;
-        const dimY = _widthDimBaseY + (_hasMultiCols2 ? 54 : 36);
+        const dimY = _widthDimBaseY + (_hasMultiCols2 ? 82 : 56);
         _bpPushOverallWidthWithExtras(
             function(x1, x2, y, lbl) { makeDimH(p, x1, x2, y, lbl); },
             ox, dW, sc, _isCenterWg2 ? _horizExtra2 : { left: 0, right: 0 }, wg.w, dimY
@@ -3684,16 +3705,9 @@ window._generateMultiViewBlueprintPages = function() {
                 p, _bpViewKey, cols, colXPositions, sc, _tCmHC2, _widthDimBaseY + 6,
                 (ax1, ax2, ay, albl, aabove) => makeDimH(p, ax1, ax2, ay, albl, aabove), wg, pH
             );
-            colXPositions.forEach((cp, ci) => {
-                const col = cols[ci];
-                if (_hasMultiCols2 || _bpColumnHasHoneycomb(col)) {
-                    const faceY = (cp.colTopY != null) ? cp.colTopY : oy;
-                    const faceH = (cp.colBotY != null && cp.colTopY != null) ? (cp.colBotY - cp.colTopY) : dH;
-                    _bpMaybePushColWidthDim(p, _bpViewKey, ci, cp.x1, cp.x2, _widthDimBaseY + 18,
-                        `${_bpMm(cp.wCm)}`,
-                        (x1, x2, y, lbl, above) => makeDimH(p, x1, x2, y, lbl, above), false, faceY, faceH);
-                }
-            });
+            _bpPushColInnerOuterWidthDims(p, _bpViewKey, cols, colXPositions, ox, dW, sc, _tCmHC2,
+                _widthDimBaseY + 18, _widthDimBaseY + 36,
+                (x1, x2, y, lbl, above) => makeDimH(p, x1, x2, y, lbl, above));
         }
         // Overall height: standing columns floor→top; hanging cabinets show body height only
         {
@@ -4162,7 +4176,7 @@ window._generateMultiViewBlueprintPages = function() {
 
         // Dimension lines — in multi-view dH = wg.h*sc = full height, oy+dH IS the floor/plinth bottom
         const _hasMultiCols2 = colXPositions.length > 1;
-        const dimY = oy + dH + (_hasMultiCols2 ? 54 : 36);
+        const dimY = oy + dH + (_hasMultiCols2 ? 82 : 56);
         makeDimH(p, ox, ox + dW, dimY, `${_bpMm(wg.w)}`);
         {
             const _tCmHCFc = state.thickness || 1.7;
@@ -4170,14 +4184,9 @@ window._generateMultiViewBlueprintPages = function() {
                 p, _bpViewKey, cols, colXPositions, sc, _tCmHCFc, oy + dH + 6,
                 (ax1, ax2, ay, albl, aabove) => makeDimH(p, ax1, ax2, ay, albl, aabove), wg, pH
             );
-            colXPositions.forEach((cp, ci) => {
-                const col = cols[ci];
-                if (_hasMultiCols2 || _bpColumnHasHoneycomb(col)) {
-                    _bpMaybePushColWidthDim(p, _bpViewKey, ci, cp.x1, cp.x2, oy + dH + 18,
-                        `${_bpMm(cp.wCm)}`,
-                        (x1, x2, y, lbl, above) => makeDimH(p, x1, x2, y, lbl, above), false, oy, dH);
-                }
-            });
+            _bpPushColInnerOuterWidthDims(p, _bpViewKey, cols, colXPositions, ox, dW, sc, _tCmHCFc,
+                oy + dH + 18, oy + dH + 36,
+                (x1, x2, y, lbl, above) => makeDimH(p, x1, x2, y, lbl, above), oy, dH);
         }
         makeDimV(p, ox - 54, oy, oy + dH, `${_bpMm(wg.h)}`);
         if (pH > 0) {
@@ -4438,7 +4447,7 @@ window._generateMultiViewBlueprintPages = function() {
                 // Dimension lines — all placed BELOW the plinth bottom
                 const _hasMultiColsSC = colXPositions.length > 1;
                 const _plinthBotYSC = oy + dH + scPH * scScale;
-                const dimY = _plinthBotYSC + (_hasMultiColsSC ? 54 : 36);
+                const dimY = _plinthBotYSC + (_hasMultiColsSC ? 82 : 56);
                 makeDimH(p, ox, ox + dW, dimY, `${_bpMm(scW)}`);
                 {
                     const _tCmHCSc = state.thickness || 1.7;
@@ -4447,14 +4456,9 @@ window._generateMultiViewBlueprintPages = function() {
                         (ax1, ax2, ay, albl, aabove) => makeDimH(p, ax1, ax2, ay, albl, aabove),
                         { w: scW }, scPH
                     );
-                    colXPositions.forEach((cp, ci) => {
-                        const col = cols[ci];
-                        if (_hasMultiColsSC || _bpColumnHasHoneycomb(col)) {
-                            _bpMaybePushColWidthDim(p, _bpViewKey, ci, cp.x1, cp.x2, _plinthBotYSC + 18,
-                                `${_bpMm(cp.wCm)}`,
-                                (x1, x2, y, lbl, above) => makeDimH(p, x1, x2, y, lbl, above), false, oy, dH);
-                        }
-                    });
+                    _bpPushColInnerOuterWidthDims(p, _bpViewKey, cols, colXPositions, ox, dW, scScale, _tCmHCSc,
+                        _plinthBotYSC + 18, _plinthBotYSC + 36,
+                        (x1, x2, y, lbl, above) => makeDimH(p, x1, x2, y, lbl, above), oy, dH);
                 }
                 makeDimV(p, ox - 54, oy, oy + dH, `${_bpMm(scH)}`);
                 if (scPH > 0) makeDimV(p, ox + dW + 18, oy + dH - scPH*scScale, oy + dH, `${_bpMm(scPH)}`);
@@ -4865,7 +4869,7 @@ window._generateMultiViewBlueprintPages = function() {
 
         // Dimension lines — upper unit has no plinth, so just use oy+dH as base
         const _hasMultiColsUU = colXPositions.length > 1;
-        const dimY = oy + dH + (_hasMultiColsUU ? 54 : 36);
+        const dimY = oy + dH + (_hasMultiColsUU ? 82 : 56);
         makeDimH(p, ox, ox + dW, dimY, `${_bpMm(uuW)}`);
         {
             const _tCmHCUu = state.thickness || 1.7;
@@ -4874,14 +4878,9 @@ window._generateMultiViewBlueprintPages = function() {
                 (ax1, ax2, ay, albl, aabove) => makeDimH(p, ax1, ax2, ay, albl, aabove),
                 { w: uuW }, 0
             );
-            colXPositions.forEach((cp, ci) => {
-                const col = uuCols[ci];
-                if (_hasMultiColsUU || _bpColumnHasHoneycomb(col)) {
-                    _bpMaybePushColWidthDim(p, _bpViewKey, ci, cp.x1, cp.x2, oy + dH + 18,
-                        `${_bpMm(cp.wCm)}`,
-                        (x1, x2, y, lbl, above) => makeDimH(p, x1, x2, y, lbl, above), false, oy, dH);
-                }
-            });
+            _bpPushColInnerOuterWidthDims(p, _bpViewKey, uuCols, colXPositions, ox, dW, sc, _tCmHCUu,
+                oy + dH + 18, oy + dH + 36,
+                (x1, x2, y, lbl, above) => makeDimH(p, x1, x2, y, lbl, above), oy, dH);
         }
         makeDimV(p, ox - 54, oy, oy + dH, `${_bpMm(uuH)}`);
         // Gap label (distance between upper unit and main cabinet)
