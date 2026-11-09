@@ -1963,10 +1963,26 @@ window._setRoomWallFeatureSize = function(id, width, depth) {
 
 window._roomWallFeaturesChanged = _roomOpeningsChanged;
 
-function _buildRoomWallFeatures(rg, makeWallMat, roomH) {
+/** `floor`: the room floor mesh, its size and its back-left corner, so niche floors continue its planks. */
+function _buildRoomWallFeatures(rg, makeWallMat, roomH, floor) {
     const b = window._roomBounds;
     if (!b) return;
     window._getRoomWallFeaturePoses(b).forEach(function(f) {
+        if (f.type === 'niche' && floor) {
+            const geo = new THREE.PlaneGeometry(f.maxX - f.minX, f.maxZ - f.minZ);
+            geo.rotateX(-Math.PI / 2);
+            geo.translate((f.minX + f.maxX) / 2, 0.05, (f.minZ + f.maxZ) / 2);
+            // Same UV mapping as the room floor plane (u along +x, v toward −z), extended past its edges
+            const pos = geo.attributes.position, uv = geo.attributes.uv;
+            for (let i = 0; i < pos.count; i++) {
+                uv.setXY(i, (pos.getX(i) - floor.minX) / floor.w, (floor.maxZ - pos.getZ(i)) / floor.d);
+            }
+            const m = new THREE.Mesh(geo, floor.mesh.material);
+            m.receiveShadow = true;
+            m.userData._roomOwned = true;
+            m.userData.roomPart = 'wall-feature';
+            rg.add(m);
+        }
         const g = new THREE.Group();
         _placeOnRoomWall(g, f.wall, f.cx, f.cz);
         const add = function(geo, mat, x, y, z, ry, rx) {
@@ -1987,12 +2003,6 @@ function _buildRoomWallFeatures(rg, makeWallMat, roomH) {
             add(new THREE.PlaneGeometry(f.width, roomH), makeWallMat(f.width, roomH), 0, roomH / 2, -f.depth);
             add(new THREE.PlaneGeometry(f.depth, roomH), makeWallMat(f.depth, roomH), -f.width / 2, roomH / 2, -f.depth / 2, Math.PI / 2);
             add(new THREE.PlaneGeometry(f.depth, roomH), makeWallMat(f.depth, roomH), f.width / 2, roomH / 2, -f.depth / 2, -Math.PI / 2);
-            const floorMat = new THREE.MeshStandardMaterial({ color: 0xd4a96a, roughness: 0.55, metalness: 0.0 });
-            if (window._woodFloorTex && !window._roomTexDragging) {
-                floorMat.map = _roomTexVariant(window._woodFloorTex, f.width / 200, f.depth / 200, 0, 0);
-                floorMat.color.set(0xffffff);
-            }
-            add(new THREE.PlaneGeometry(f.width, f.depth), floorMat, 0, 0, -f.depth / 2, 0, -Math.PI / 2);
         }
         rg.add(g);
     });
@@ -3011,7 +3021,10 @@ function _buildRoom() {
         });
     }
 
-    _buildRoomWallFeatures(rg, makeWallMat, roomH);
+    _buildRoomWallFeatures(rg, makeWallMat, roomH, {
+        mesh: floorMesh, w: roomW, d: roomD,
+        minX: roomCenterX - roomW / 2, maxZ: backZ + roomD - wallT
+    });
 
     // ── Ceiling ────────────────────────────────────────────────────────────
     // When closure panels are active, the room ceiling plane snaps to the top of the closure ceiling panel
