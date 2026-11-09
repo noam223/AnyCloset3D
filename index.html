@@ -39,7 +39,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style-base.css?v=20260910deskMerge">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
-    <link rel="stylesheet" href="style-extras.css?v=20261110niche">
+    <link rel="stylesheet" href="style-extras.css?v=20261110addmenu">
     <link rel="stylesheet" href="style.css?v=20261109spaceDel">
     <link rel="stylesheet" href="quick-calc.css?v=20260929qc">
     <style>
@@ -1427,23 +1427,29 @@
                 <i class="fa-solid fa-chair"></i><span>הסתר כסא</span>
             </button>
             <div class="bed-tb-sep"></div>
-            <button type="button" class="room-furn-btn" id="room-btn-add-custom" onclick="window._openCustomRoomItemModal()" title="הוסף פריט מותאם לחדר">
-                <i class="fa-solid fa-plus"></i><span>הוסף פריט</span>
-            </button>
-            <div class="bed-tb-sep"></div>
-            <button type="button" class="room-furn-btn" id="room-btn-add-window" onclick="window._addRoomWindow()" title="הוסף חלון לקיר — גרור אותו בתוכנית 2D למיקום הרצוי">
-                <i class="fa-solid fa-border-all"></i><span>הוסף חלון</span>
-            </button>
-            <button type="button" class="room-furn-btn" id="room-btn-add-pillar" onclick="window._addRoomWallFeature('pillar')" title="הוסף עמוד שבולט מהקיר — גרור לאורך הקירות, משוך את הידיות לשינוי מידות">
-                <i class="fa-solid fa-square"></i><span>הוסף עמוד</span>
-            </button>
-            <button type="button" class="room-furn-btn" id="room-btn-add-niche" onclick="window._addRoomWallFeature('niche')" title="הוסף נישה (שקע) בקיר — גרור לאורך הקירות, משוך את הידיות לשינוי מידות">
-                <i class="fa-solid fa-inbox"></i><span>הוסף נישה</span>
-            </button>
-            <div class="bed-tb-sep"></div>
-            <button type="button" class="room-furn-btn" id="room-btn-add-project-cab" onclick="window._openRoomProjectCabinetPicker()" title="הוסף לחדר ארון / שולחן / שידה שכבר קיימים בפרויקט">
-                <i class="fa-solid fa-warehouse"></i><span>הוסף מהפרויקט</span>
-            </button>
+            <div class="room-add-menu-wrap">
+                <button type="button" class="room-furn-btn" id="room-btn-add-menu" aria-haspopup="menu" aria-expanded="false" title="הוסף לחדר">
+                    <i class="fa-solid fa-plus"></i><span>הוסף</span><i class="fa-solid fa-chevron-up room-add-caret"></i>
+                </button>
+                <div class="room-add-menu" id="room-add-menu" role="menu">
+                    <button type="button" class="room-add-item" role="menuitem" id="room-btn-add-custom" data-room-add="custom" title="הוסף פריט מותאם לחדר">
+                        <i class="fa-solid fa-ruler-combined"></i><span>הוסף פריט לפי מידה</span>
+                    </button>
+                    <button type="button" class="room-add-item" role="menuitem" id="room-btn-add-project-cab" data-room-add="project" title="הוסף לחדר ארון / שולחן / שידה שכבר קיימים בפרויקט">
+                        <i class="fa-solid fa-warehouse"></i><span>הוסף מהפרויקט</span>
+                    </button>
+                    <div class="room-add-sep"></div>
+                    <button type="button" class="room-add-item" role="menuitem" id="room-btn-add-window" data-room-add="window" title="הוסף חלון לקיר — גרור אותו בתוכנית 2D למיקום הרצוי">
+                        <i class="fa-solid fa-border-all"></i><span>הוסף חלון</span>
+                    </button>
+                    <button type="button" class="room-add-item" role="menuitem" id="room-btn-add-pillar" data-room-add="pillar" title="הוסף עמוד שבולט מהקיר — גרור לאורך הקירות, משוך את הידיות לשינוי מידות">
+                        <i class="fa-solid fa-square"></i><span>הוסף עמוד</span>
+                    </button>
+                    <button type="button" class="room-add-item" role="menuitem" id="room-btn-add-niche" data-room-add="niche" title="הוסף נישה (שקע) בקיר — גרור לאורך הקירות, משוך את הידיות לשינוי מידות">
+                        <i class="fa-solid fa-inbox"></i><span>הוסף נישה</span>
+                    </button>
+                </div>
+            </div>
             <div class="bed-tb-sep"></div>
             <button type="button" class="room-furn-btn" id="room-btn-cycle-chair" onclick="window._cycleChairVariant()" title="החלף סוג כסא">
                 <i class="fa-solid fa-right-left"></i><span>כסא: <strong id="room-chair-variant-label">משרדי</strong></span>
@@ -3001,7 +3007,7 @@
 <script src="engine-core.js?v=20261110nodoorbtn"></script>
 <script src="engine-corners.js?v=20261109ridingFlush"></script>
 <script src="engine-blueprint.js?v=20261109colInOut"></script>
-<script src="engine-room-plan.js?v=20261110niche4"></script>
+<script src="engine-room-plan.js?v=20261110addmenu"></script>
 <script src="tambour-color-picker.js?v=20261009colors"></script>
 <script src="ui.js?v=20261110shelfSnap"></script>
 <script src="mirror-cabinet.js?v=20261109mirror"></script>

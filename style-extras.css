@@ -297,6 +297,85 @@ body.room-plan-dragging #room-plan-svg {
     cursor: grabbing;
 }
 
+.room-add-menu-wrap {
+    position: relative;
+}
+
+.room-add-caret {
+    font-size: 0.6rem;
+    opacity: 0.7;
+    transition: transform 0.15s;
+}
+
+#room-btn-add-menu.active .room-add-caret {
+    transform: rotate(180deg);
+}
+
+.room-add-menu {
+    position: absolute;
+    bottom: calc(100% + 12px);
+    right: 50%;
+    transform: translate(50%, 6px);
+    min-width: 210px;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    background: rgba(15, 23, 42, 0.94);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 14px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.15s, transform 0.15s, visibility 0.15s;
+    z-index: 40;
+}
+
+.room-add-menu.open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translate(50%, 0);
+}
+
+.room-add-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 9px 12px;
+    border: none;
+    border-radius: 9px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.92);
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-align: right;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.room-add-item i {
+    width: 16px;
+    text-align: center;
+    color: #5eead4;
+}
+
+.room-add-item:hover,
+.room-add-item:focus-visible {
+    background: rgba(16, 185, 129, 0.35);
+    outline: none;
+}
+
+.room-add-sep {
+    height: 1px;
+    margin: 4px 6px;
+    background: rgba(255, 255, 255, 0.14);
+}
+
 .room-furn-btn.room-furn-view-toggle {
     background: rgba(5, 150, 105, 0.22);
     border: 1px solid rgba(5, 150, 105, 0.45);

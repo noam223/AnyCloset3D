@@ -2170,8 +2170,41 @@
                 if (e.target === customModal) window._closeCustomRoomItemModal();
             });
         }
+        const addBtn = document.getElementById('room-btn-add-menu');
+        const addMenu = document.getElementById('room-add-menu');
+        const setAddMenu = function(open) {
+            if (!addBtn || !addMenu) return;
+            addMenu.classList.toggle('open', open);
+            addBtn.classList.toggle('active', open);
+            addBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        };
+        if (addBtn && addMenu) {
+            const addActions = {
+                custom: function() { window._openCustomRoomItemModal(); },
+                project: function() { window._openRoomProjectCabinetPicker(); },
+                window: function() { window._addRoomWindow(); },
+                pillar: function() { window._addRoomWallFeature('pillar'); },
+                niche: function() { window._addRoomWallFeature('niche'); }
+            };
+            addBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                setAddMenu(!addMenu.classList.contains('open'));
+            });
+            addMenu.addEventListener('click', function(e) {
+                const item = e.target.closest('[data-room-add]');
+                if (!item) return;
+                setAddMenu(false);
+                const run = addActions[item.getAttribute('data-room-add')];
+                if (run) run();
+            });
+            document.addEventListener('pointerdown', function(e) {
+                if (addMenu.classList.contains('open') && !e.target.closest('.room-add-menu-wrap')) setAddMenu(false);
+            }, true);
+        }
+
         document.addEventListener('keydown', function(e) {
             if (e.key !== 'Escape') return;
+            setAddMenu(false);
             window._closeCustomRoomItemModal();
             if (typeof window._closeRoomProjectCabinetPicker === 'function') {
                 window._closeRoomProjectCabinetPicker();
