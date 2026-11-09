@@ -129,6 +129,7 @@
             return { fill: _colorToSvg(item.customColor), stroke: '#64748b' };
         }
         if (_isRoomExtraCabId(item.id)) return FURN_COLORS['room-cab'];
+        if (item.isRoomDoor) return FURN_COLORS['room-door'];
         return FURN_COLORS[item.id] || FURN_COLORS.chair;
     }
 
@@ -430,15 +431,22 @@
         return { minX: cx - pad, maxX: cx + pad, minZ: cz - half, maxZ: cz + half };
     }
 
-    function _getRoomDoorRect() {
+    function _isRoomDoorId(id) {
+        id = String(id || '');
+        return id === 'room-door' || id.indexOf('room-door-') === 0;
+    }
+
+    function _getRoomDoorRects() {
         const b = _getBounds();
-        if (!b || typeof window._getRoomDoorPose !== 'function') return null;
-        const pose = window._getRoomDoorPose(b);
-        if (!pose) return null;
-        return _makeFurnItem('room-door', _wallOpeningRect(pose.wall, pose.cx, pose.cz, pose.width, 14), true, 'דלת', {
-            doorWall: pose.wall, doorCx: pose.cx, doorCz: pose.cz, doorW: pose.width,
-            doorHinge: pose.hinge, doorSwing: pose.swing,
-            isWallOpening: true, openWall: pose.wall
+        if (!b || typeof window._getRoomDoorPoses !== 'function') return [];
+        const poses = window._getRoomDoorPoses(b);
+        return poses.map(function(pose, i) {
+            const label = poses.length > 1 ? 'דלת ' + (i + 1) : 'דלת';
+            return _makeFurnItem(pose.id, _wallOpeningRect(pose.wall, pose.cx, pose.cz, pose.width, 14), true, label, {
+                doorWall: pose.wall, doorCx: pose.cx, doorCz: pose.cz, doorW: pose.width,
+                doorHinge: pose.hinge, doorSwing: pose.swing,
+                isRoomDoor: true, isWallOpening: true, openWall: pose.wall
+            });
         });
     }
 
@@ -556,11 +564,12 @@
             x: lp.x, y: lp.y,
             class: 'rp-furn-label rp-opening-label', 'text-anchor': 'middle',
             'dominant-baseline': 'middle'
-        }, 'דלת'));
+        }, item.label || 'דלת'));
 
         _drawOpeningBtns(g, item, tf, [
             { action: 'door-hinge', title: 'החלף צד ציר (ימין / שמאל)', html: '<i class="fa-solid fa-arrows-left-right"></i>' },
-            { action: 'door-swing', title: item.doorSwing === 'out' ? 'נפתחת החוצה — לחץ לפתיחה פנימה' : 'נפתחת פנימה — לחץ לפתיחה החוצה', html: '<i class="fa-solid fa-right-to-bracket"></i>' }
+            { action: 'door-swing', title: item.doorSwing === 'out' ? 'נפתחת החוצה — לחץ לפתיחה פנימה' : 'נפתחת פנימה — לחץ לפתיחה החוצה', html: '<i class="fa-solid fa-right-to-bracket"></i>' },
+            { action: 'door-remove', title: 'הסר דלת', html: '<i class="fa-solid fa-xmark"></i>', cls: 'rp-room-cab-btn-remove' }
         ]);
     }
 
@@ -765,7 +774,6 @@
         const chair = _getChairRect();
         const nightstand = _getNightstandRect();
         const roomDesk = _getRoomDeskRect();
-        const roomDoor = _getRoomDoorRect();
         // Wall features first → furniture standing against them stays grabbable
         _getWallFeatureRects().forEach(function(item) { items.push(item); });
         if (cab) items.push(cab);
@@ -778,7 +786,7 @@
         _getRoomExtraCabinetRects().forEach(function(item) { items.push(item); });
         // Wall openings last → topmost in reverse hit-test
         _getRoomWindowRects().forEach(function(item) { items.push(item); });
-        if (roomDoor) items.push(roomDoor);
+        _getRoomDoorRects().forEach(function(item) { items.push(item); });
         return items;
     }
 
@@ -818,7 +826,7 @@
     /** Furniture footprints that niche walls must not cut through. */
     function _nicheObstacles() {
         return _collectFurniture().filter(function(i) {
-            return !i.isWallFeature && !i.isWallOpening && i.id !== 'room-door' && i.id !== 'cabinet-desk';
+            return !i.isWallFeature && !i.isWallOpening && !i.isRoomDoor && i.id !== 'cabinet-desk';
         });
     }
 
@@ -953,9 +961,9 @@
                 prop.z = finalCp.z;
                 if (typeof window._roomLinksCommit === 'function') window._roomLinksCommit();
             }
-        } else if (id === 'room-door') {
+        } else if (_isRoomDoorId(id)) {
             if (typeof window._setRoomDoorFromPoint === 'function') {
-                window._setRoomDoorFromPoint(cx, cz, _getBounds());
+                window._setRoomDoorFromPoint(cx, cz, _getBounds(), id);
             }
         } else if (_isRoomWindowId(id)) {
             if (typeof window._setRoomWindowFromPoint === 'function') {
@@ -1557,7 +1565,7 @@
                 'data-id': item.id
             });
 
-            if (item.id === 'room-door') {
+            if (item.isRoomDoor) {
                 _drawRoomDoor2D(g, item, tf, isActive);
             } else if (item.isRoomWindow) {
                 _drawRoomWindow2D(g, item, tf, isActive);
@@ -1641,7 +1649,7 @@
                 : item.id === 'nightstand' ? 'fa-table-cells'
                 : item.id === 'room-desk' ? 'fa-desktop'
                 : item.id === 'cabinet-desk' ? 'fa-laptop'
-                : item.id === 'room-door' ? 'fa-door-open'
+                : item.isRoomDoor ? 'fa-door-open'
                 : item.isRoomWindow ? 'fa-border-all'
                 : item.isWallFeature ? (item.feat.type === 'niche' ? 'fa-inbox' : 'fa-square')
                 : String(item.id).indexOf('custom-') === 0 ? 'fa-cube'
@@ -1683,6 +1691,19 @@
                     window._removeRoomWallFeature(item.id);
                 });
                 row.appendChild(rmFeat);
+            }
+            if (item.isRoomDoor) {
+                const rmDoor = document.createElement('button');
+                rmDoor.type = 'button';
+                rmDoor.className = 'rpc-remove-btn';
+                rmDoor.title = 'הסר דלת';
+                rmDoor.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+                rmDoor.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window._removeRoomDoor(item.id);
+                });
+                row.appendChild(rmDoor);
             }
             if (item.isRoomWindow) {
                 const rmWin = document.createElement('button');
@@ -2067,10 +2088,11 @@
                     else window._removeRoomWallFeature(featId);
                 } else if (action === 'rotate-room-host' && typeof window._rotateRoomHost === 'function') {
                     window._rotateRoomHost();
-                } else if (action === 'door-hinge' && typeof window._toggleRoomDoorHinge === 'function') {
-                    window._toggleRoomDoorHinge();
-                } else if (action === 'door-swing' && typeof window._toggleRoomDoorSwing === 'function') {
-                    window._toggleRoomDoorSwing();
+                } else if (action === 'door-hinge' || action === 'door-swing' || action === 'door-remove') {
+                    const doorId = actionBtn.getAttribute('data-rp-open-id') || 'room-door';
+                    if (action === 'door-hinge') window._toggleRoomDoorHinge(doorId);
+                    else if (action === 'door-swing') window._toggleRoomDoorSwing(doorId);
+                    else window._removeRoomDoor(doorId);
                 } else if (action === 'win-width' || action === 'win-remove') {
                     const winId = actionBtn.getAttribute('data-rp-open-id');
                     if (winId && action === 'win-width' && typeof window._cycleRoomWindowWidth === 'function') {
@@ -2142,7 +2164,7 @@
             const d = window._roomPlanDrag;
             if (!d) return;
             if (e && d.pointerId !== e.pointerId) return;
-            const wasDoor = d.id === 'room-door' || _isRoomWindowId(d.id) || _isWallFeatureId(d.id);
+            const wasDoor = _isRoomDoorId(d.id) || _isRoomWindowId(d.id) || _isWallFeatureId(d.id);
             if (_isWallFeatureId(d.id)) window._isDirty = true;
             window._roomPlanDrag = null;
             document.body.classList.remove('room-plan-dragging');
@@ -2182,6 +2204,7 @@
             const addActions = {
                 custom: function() { window._openCustomRoomItemModal(); },
                 project: function() { window._openRoomProjectCabinetPicker(); },
+                door: function() { window._addRoomDoor(); },
                 window: function() { window._addRoomWindow(); },
                 pillar: function() { window._addRoomWallFeature('pillar'); },
                 niche: function() { window._addRoomWallFeature('niche'); }

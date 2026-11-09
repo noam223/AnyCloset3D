@@ -1667,35 +1667,66 @@ function _roomSnapToWall(b, x, z, width, walls) {
     return { wall: best.wall, t: Math.max(0, Math.min(1, t)) };
 }
 
-/** World pose for the room door on the current room bounds. */
-window._getRoomDoorPose = function(bounds) {
-    const b = bounds || window._roomBounds;
-    if (!b) return null;
-    const door = window._roomDoor || {};
-    if (door.visible === false) return null;
+// Additional doors beyond the main entrance (`_roomDoor` keeps id 'room-door').
+window._roomExtraDoors = Array.isArray(window._roomExtraDoors) ? window._roomExtraDoors : [];
+window._roomDoorSeq = window._roomDoorSeq || 0;
+
+function _findRoomDoor(id) {
+    if (!id || id === 'room-door') return window._roomDoor || null;
+    return (window._roomExtraDoors || []).find(function(d) { return d && d.id === id; }) || null;
+}
+window._findRoomDoor = _findRoomDoor;
+
+function _roomDoorPoseOf(door, b, id) {
+    if (!door || !b || door.visible === false) return null;
     const width = Math.max(60, Math.min(120, parseFloat(door.width) || window._ROOM_DOOR_W || 90));
     const height = Math.max(180, Math.min(240, parseFloat(door.height) || window._ROOM_DOOR_H || 210));
     const p = _roomWallPoint(b, door.wall || 'front', door.t, width);
     return {
-        wall: p.wall, cx: p.cx, cz: p.cz, width: width, height: height, t: p.t,
+        id: id, wall: p.wall, cx: p.cx, cz: p.cz, width: width, height: height, t: p.t,
         hinge: door.hinge === 'right' ? 'right' : 'left',
         swing: door.swing === 'out' ? 'out' : 'in'
     };
-};
+}
 
-/** Snap a world point onto the room perimeter and update `_roomDoor`. */
-window._setRoomDoorFromPoint = function(x, z, bounds) {
+/** World pose for the main room door on the current room bounds. */
+window._getRoomDoorPose = function(bounds) {
     const b = bounds || window._roomBounds;
     if (!b) return null;
-    const door = window._roomDoor || (window._roomDoor = {
-        wall: 'front', t: 0.5, width: 90, height: 210, hinge: 'left', swing: 'in', visible: true
+    return _roomDoorPoseOf(window._roomDoor || {}, b, 'room-door');
+};
+
+/** Poses of every visible door (main + extra). */
+window._getRoomDoorPoses = function(bounds) {
+    const b = bounds || window._roomBounds;
+    if (!b) return [];
+    const out = [];
+    const main = window._getRoomDoorPose(b);
+    if (main) out.push(main);
+    (window._roomExtraDoors || []).forEach(function(d) {
+        const p = _roomDoorPoseOf(d, b, d.id);
+        if (p) out.push(p);
     });
+    return out;
+};
+
+/** Snap a world point onto the room perimeter and update the door `id` (default: main door). */
+window._setRoomDoorFromPoint = function(x, z, bounds, id) {
+    const b = bounds || window._roomBounds;
+    if (!b) return null;
+    let door = _findRoomDoor(id);
+    if (!door) {
+        if (id && id !== 'room-door') return null;
+        door = window._roomDoor = {
+            wall: 'front', t: 0.5, width: 90, height: 210, hinge: 'left', swing: 'in', visible: true
+        };
+    }
     const width = Math.max(60, Math.min(120, parseFloat(door.width) || 90));
     const snap = _roomSnapToWall(b, x, z, width);
     door.wall = snap.wall;
     door.t = snap.t;
     door.width = width;
-    return window._getRoomDoorPose(b);
+    return _roomDoorPoseOf(door, b, id || 'room-door');
 };
 
 function _roomOpeningsChanged() {
@@ -1705,17 +1736,55 @@ function _roomOpeningsChanged() {
     window._isDirty = true;
 }
 
-window._toggleRoomDoorHinge = function() {
-    const door = window._roomDoor;
+window._toggleRoomDoorHinge = function(id) {
+    const door = _findRoomDoor(id);
     if (!door) return;
     door.hinge = door.hinge === 'right' ? 'left' : 'right';
     _roomOpeningsChanged();
 };
 
-window._toggleRoomDoorSwing = function() {
-    const door = window._roomDoor;
+window._toggleRoomDoorSwing = function(id) {
+    const door = _findRoomDoor(id);
     if (!door) return;
     door.swing = door.swing === 'out' ? 'in' : 'out';
+    _roomOpeningsChanged();
+};
+
+/** Add a door on a wall without one; re-shows the main door first if it was removed. */
+window._addRoomDoor = function() {
+    if (!Array.isArray(window._roomExtraDoors)) window._roomExtraDoors = [];
+    const used = {};
+    window._getRoomDoorPoses().forEach(function(p) { used[p.wall] = true; });
+    const order = ['right', 'left', 'back', 'front'];
+    const wall = order.find(function(w) { return !used[w]; }) || 'right';
+    let id;
+    const main = window._roomDoor;
+    if (main && main.visible === false) {
+        main.visible = true;
+        main.wall = wall;
+        main.t = 0.5;
+        id = 'room-door';
+    } else {
+        window._roomDoorSeq = (window._roomDoorSeq || 0) + 1;
+        id = 'room-door-' + window._roomDoorSeq;
+        window._roomExtraDoors.push({
+            id: id, wall: wall, t: 0.5, width: 90, height: 210, hinge: 'left', swing: 'in'
+        });
+    }
+    window._roomPlanSelected = id;
+    if (typeof state !== 'undefined' && state.viewMode !== 'room-plan' && window._roomVisible === false) {
+        window._roomVisible = true;
+    }
+    _roomOpeningsChanged();
+};
+
+window._removeRoomDoor = function(id) {
+    if (!id || id === 'room-door') {
+        if (window._roomDoor) window._roomDoor.visible = false;
+    } else {
+        window._roomExtraDoors = (window._roomExtraDoors || []).filter(function(d) { return d && d.id !== id; });
+    }
+    if (window._roomPlanSelected === (id || 'room-door')) window._roomPlanSelected = null;
     _roomOpeningsChanged();
 };
 
@@ -1748,12 +1817,12 @@ window._findRoomWindow = function(id) {
 
 window._addRoomWindow = function() {
     if (!Array.isArray(window._roomWindows)) window._roomWindows = [];
-    const doorWall = (window._roomDoor && window._roomDoor.visible !== false) ? window._roomDoor.wall : null;
+    const doorWalls = window._getRoomDoorPoses().map(function(p) { return p.wall; });
     const used = {};
     window._roomWindows.forEach(function(w) { used[w.wall] = (used[w.wall] || 0) + 1; });
     const order = ['left', 'right', 'front', 'back'];
-    let wall = order.find(function(w) { return w !== doorWall && !used[w]; })
-        || order.find(function(w) { return w !== doorWall; }) || 'left';
+    let wall = order.find(function(w) { return doorWalls.indexOf(w) < 0 && !used[w]; })
+        || order.find(function(w) { return doorWalls.indexOf(w) < 0; }) || 'left';
     window._roomWindowSeq = (window._roomWindowSeq || 0) + 1;
     window._roomWindows.push({
         id: 'room-win-' + window._roomWindowSeq,
@@ -1796,10 +1865,9 @@ window._getRoomWallOpenings = function(bounds) {
     const b = bounds || window._roomBounds;
     if (!b) return [];
     const out = [];
-    const door = window._getRoomDoorPose(b);
-    if (door) {
+    window._getRoomDoorPoses(b).forEach(function(door) {
         out.push({ wall: door.wall, cx: door.cx, cz: door.cz, width: door.width + 10, bottom: 0, top: door.height + 5 });
-    }
+    });
     window._getRoomWindowPoses(b).forEach(function(w) {
         out.push({ wall: w.wall, cx: w.cx, cz: w.cz, width: w.width, bottom: w.sill, top: w.sill + w.height });
     });
@@ -2164,12 +2232,20 @@ function _placeOnRoomWall(group, wall, cx, cz) {
     group.rotation.y = _roomWallRotY(wall);
 }
 
-function _buildRoomDoorMesh(rg) {
-    const pose = typeof window._getRoomDoorPose === 'function' ? window._getRoomDoorPose() : null;
-    if (!pose || !rg) {
-        window._roomDoorMesh = null;
-        return null;
-    }
+function _buildRoomDoorMeshes(rg) {
+    window._roomDoorMesh = null;
+    window._roomDoorMeshes = [];
+    if (!rg) return;
+    window._getRoomDoorPoses().forEach(function(pose) {
+        const mesh = _buildRoomDoorMesh(rg, pose);
+        window._roomDoorMeshes.push(mesh);
+        if (pose.id === 'room-door') window._roomDoorMesh = mesh;
+    });
+}
+
+function _buildRoomDoorMesh(rg, pose) {
+    if (!pose || !rg) return null;
+    const propId = pose.id || 'room-door';
     const doorW = pose.width;
     const doorH = pose.height;
     const frameT = 5;
@@ -2184,7 +2260,7 @@ function _buildRoomDoorMesh(rg) {
 
     // Local frame: +X = right seen from inside, +Z = into the room, origin on the wall plane.
     const group = new THREE.Group();
-    group.userData.roomProp = 'room-door';
+    group.userData.roomProp = propId;
 
     const leftJamb = new THREE.Mesh(new THREE.BoxGeometry(frameT, doorH, frameD), frameMat);
     const rightJamb = new THREE.Mesh(new THREE.BoxGeometry(frameT, doorH, frameD), frameMat);
@@ -2237,10 +2313,9 @@ function _buildRoomDoorMesh(rg) {
 
     _placeOnRoomWall(group, pose.wall, pose.cx, pose.cz);
     group.traverse(function(child) {
-        if (child.isMesh) child.userData.roomProp = 'room-door';
+        if (child.isMesh) child.userData.roomProp = propId;
     });
     rg.add(group);
-    window._roomDoorMesh = group;
     return group;
 }
 
@@ -3287,8 +3362,7 @@ function _buildRoom() {
     });
 
     // ── Entrance door (movable on walls via 2D plan) ──────────────────────────
-    window._roomDoorMesh = null;
-    _buildRoomDoorMesh(rg);
+    _buildRoomDoorMeshes(rg);
     _buildRoomWindowMeshes(rg);
 
     // ── Extra project cabinets as room props ─────────────────────────────────

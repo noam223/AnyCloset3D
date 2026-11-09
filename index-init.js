@@ -264,6 +264,18 @@
                             wall: 'front', t: 0.5, width: 90, height: 210, hinge: 'left', swing: 'in', visible: true
                         }, snap.roomDoor);
                     }
+                    window._roomExtraDoors = Array.isArray(snap.roomExtraDoors)
+                        ? snap.roomExtraDoors.filter(function(d) { return d && d.id; }).map(function(d) {
+                            return {
+                                id: String(d.id), wall: d.wall, t: Number(d.t), width: Number(d.width), height: Number(d.height),
+                                hinge: d.hinge === 'right' ? 'right' : 'left', swing: d.swing === 'out' ? 'out' : 'in'
+                            };
+                        })
+                        : [];
+                    window._roomDoorSeq = window._roomExtraDoors.reduce(function(mx, d) {
+                        var m = String(d.id).match(/^room-door-(\d+)$/);
+                        return m ? Math.max(mx, parseInt(m[1], 10) || 0) : mx;
+                    }, 0);
                     window._roomWindows = Array.isArray(snap.roomWindows)
                         ? snap.roomWindows.filter(function(w) { return w && w.id; }).map(function(w) {
                             return { id: String(w.id), wall: w.wall, t: Number(w.t), width: Number(w.width), height: Number(w.height), sill: Number(w.sill) };
@@ -554,6 +566,9 @@
                 hinge: window._roomDoor.hinge || 'left', swing: window._roomDoor.swing || 'in',
                 visible: window._roomDoor.visible !== false
             } : null,
+            roomExtraDoors: (window._roomExtraDoors || []).map(function(d) {
+                return { id: d.id, wall: d.wall, t: d.t, width: d.width, height: d.height, hinge: d.hinge || 'left', swing: d.swing || 'in' };
+            }),
             roomWindows: (window._roomWindows || []).map(function(w) {
                 return { id: w.id, wall: w.wall, t: w.t, width: w.width, height: w.height, sill: w.sill };
             }),
