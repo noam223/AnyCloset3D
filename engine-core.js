@@ -4558,7 +4558,7 @@ function _addRidingDrawerHandle(mesh, panelW, panelH) {
     const barH = 0.75;
     const barD = 0.9;
     const bar = new THREE.Mesh(new THREE.BoxGeometry(barLen, barH, barD), mat);
-    bar.position.set(0, panelH / 2 - barH / 2 - 0.15, t / 2 + barD / 2 + 0.4);
+    bar.position.set(0, panelH / 2 - barH / 2 - 0.15, t / 2 + barD / 2);
     mesh.add(bar);
 }
 
@@ -6940,7 +6940,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             if (!isBP) {
                                 const hz = fZ + t / 2 + 1.5;
                                 if (hs === 'riding') {
-                                    _addRidingDoorHandle(_buildGroup, subCenterX, doorY, hz, doorH);
+                                    _addRidingDoorHandle(_buildGroup, subCenterX, doorY, fZ + t / 2, doorH);
                                 } else if (hs === 'pipe' && _isHalfMoonHandle()) {
                                     const hm = _handleMat3D();
                                     _registerDoorMesh(_placeHalfMoon(_buildGroup, hm, subCenterX, doorY, fZ + t / 2, 'left'));
@@ -6967,7 +6967,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                     const seamX = subType === 'door_right'
                                         ? subCenterX - doorW / 2
                                         : subCenterX + doorW / 2;
-                                    _addRidingDoorHandle(_buildGroup, seamX, doorY, hz, doorH);
+                                    _addRidingDoorHandle(_buildGroup, seamX, doorY, fZ + t / 2, doorH);
                                 } else if (hs === 'pipe' && doorStyle !== 'glass_mirror' && _isHalfMoonHandle()) {
                                     // door_right: hinge on the right, opening edge (and pull) on the left
                                     const isRight = subType === 'door_right';
@@ -7790,7 +7790,8 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                 const doorStyle = door.style || 'solid';
                 // Use clipped overlay dimensions (_doorOverlayW / _doorOverlayCenterX)
                 // so doors don't extend into the hidden zone behind the center cabinet
-                const _doorHz = zPos + t / 2 + 1.5 + ((doorStyle !== 'solid' && doorStyle !== 'glass_mirror') ? 1.5 : 0);
+                // Front face is zPos + t/2 for every style (framed groups are shifted back by their frame depth)
+                const _doorFaceZ = zPos + t / 2;
                 if (door.type === 'left') makeDoor(_doorOverlayW, true, _doorOverlayCenterX, doorStyle);
                 if (door.type === 'right') makeDoor(_doorOverlayW, false, _doorOverlayCenterX, doorStyle);
                 if (door.type === 'double') {
@@ -7807,7 +7808,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         : door.type === 'right' ? _doorOverlayCenterX - _doorOverlayW / 2
                         : null;
                     if (rx !== null) {
-                        const rh = _addRidingDoorHandle(_buildGroup, rx, dY, _doorHz, dH);
+                        const rh = _addRidingDoorHandle(_buildGroup, rx, dY, _doorFaceZ, dH);
                         _tagDoorHandle(rh, door, dH, rh.geometry.parameters.height / 2);
                     }
                 }

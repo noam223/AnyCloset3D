@@ -299,7 +299,7 @@ function _cuAddDrawerHandle(dMesh, drawerDepth, drawerFaceH, sign, t, styleOverr
             : new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.35, roughness: 0.45 });
         // X-facing drawer front: horizontal lip on top edge, protruding toward opening
         const bar = new THREE.Mesh(new THREE.BoxGeometry(barD, barH, barLen), mat);
-        bar.position.set(sign * (-t / 2 - barD / 2 - 0.4), panelH / 2 - barH / 2 - 0.15, 0);
+        bar.position.set(sign * (-t / 2 - barD / 2), panelH / 2 - barH / 2 - 0.15, 0);
         dMesh.add(bar);
         return;
     }
