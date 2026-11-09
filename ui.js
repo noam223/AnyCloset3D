@@ -16969,8 +16969,11 @@ function _printSpacePartTitle(group, m) {
             : ('חלק ' + (m.slot + 1)));
 }
 
-/** Enlarge a part's text, stroke widths and dimension-label gaps by f (keeps labels clear of their dim lines). */
-function _spaceBpNormalizeAnnotations(root, f) {
+/**
+ * Enlarge a part's text, stroke widths and dimension-label gaps by f (keeps labels clear of their dim lines).
+ * Height dims beside the body (bx..bx+bw) are also pushed out by f so the bigger labels don't land on the side wall.
+ */
+function _spaceBpNormalizeAnnotations(root, f, bx, bw) {
     const num = function(el, a) { return parseFloat(el.getAttribute(a)); };
     root.querySelectorAll('g[data-dim]').forEach(function(g) {
         const main = g.querySelector('line[marker-start]');
@@ -16978,6 +16981,13 @@ function _spaceBpNormalizeAnnotations(root, f) {
         const horiz = g.getAttribute('data-dim') === 'h';
         const c = horiz ? num(main, 'y1') : num(main, 'x1');
         if (!isFinite(c)) return;
+        if (!horiz && isFinite(bx) && isFinite(bw)) {
+            const edge = c < bx ? bx : (c > bx + bw ? bx + bw : null);
+            if (edge !== null) {
+                const dx = (c - edge) * (f - 1);
+                g.setAttribute('transform', `translate(${dx.toFixed(1)},0) ${g.getAttribute('transform') || ''}`.trim());
+            }
+        }
         const keys = horiz ? ['y1', 'y2'] : ['x1', 'x2'];
         g.querySelectorAll('line').forEach(function(ln) {
             if (ln === main) return;
@@ -17081,7 +17091,7 @@ function _spaceGroupBlueprintSvg(group) {
             const k = S / q.sc;
             // Each part's page was fitted to its own size, so shrinking it to the shared scale would shrink its
             // text and lines too — bring them back to the size they have in the least-shrunk part
-            if (kMax / k > 1.01) _spaceBpNormalizeAnnotations(q.src, kMax / k);
+            if (kMax / k > 1.01) _spaceBpNormalizeAnnotations(q.src, kMax / k, q.bx, q.bw);
             const tx = (q.p.off.x - q.p.wCm / 2) * S - q.bx * k;
             const ty = -(q.p.off.y || 0) * S - (q.by + q.bh) * k;
             const g = document.createElementNS(NS, 'g');
