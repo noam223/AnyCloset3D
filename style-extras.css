@@ -395,6 +395,17 @@ body.room-plan-dragging #room-plan-svg {
     pointer-events: none;
 }
 
+#room-plan-svg .rp-feat-handle {
+    fill: #ffffff;
+    stroke: #0d9488;
+    stroke-width: 2.5;
+    filter: drop-shadow(0 1px 2px rgba(15, 23, 42, 0.35));
+}
+
+#room-plan-svg .rp-feat-handle:hover {
+    fill: #ccfbf1;
+}
+
 #room-plan-svg .rp-room-area {
     fill: #64748b;
     font-size: 12px;
@@ -815,6 +826,28 @@ body.room-plan-dragging #room-plan-svg .rp-draggable {
     padding: 2px 8px;
     border-radius: 20px;
     border: 1px solid var(--border);
+}
+
+.room-plan-feat-input {
+    width: 42px;
+    padding: 0 2px;
+    border: none;
+    background: transparent;
+    font: inherit;
+    color: var(--text);
+    text-align: center;
+    -moz-appearance: textfield;
+}
+
+.room-plan-feat-input::-webkit-inner-spin-button,
+.room-plan-feat-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.room-plan-feat-input:focus {
+    outline: 1px solid #0d9488;
+    border-radius: 4px;
 }
 
 #btn-room-plan.active {

@@ -39,7 +39,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style-base.css?v=20260910deskMerge">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
-    <link rel="stylesheet" href="style-extras.css?v=20261110plan2d">
+    <link rel="stylesheet" href="style-extras.css?v=20261110walls">
     <link rel="stylesheet" href="style.css?v=20261109spaceDel">
     <link rel="stylesheet" href="quick-calc.css?v=20260929qc">
     <style>
@@ -1433,6 +1433,12 @@
             <div class="bed-tb-sep"></div>
             <button type="button" class="room-furn-btn" id="room-btn-add-window" onclick="window._addRoomWindow()" title="הוסף חלון לקיר — גרור אותו בתוכנית 2D למיקום הרצוי">
                 <i class="fa-solid fa-border-all"></i><span>הוסף חלון</span>
+            </button>
+            <button type="button" class="room-furn-btn" id="room-btn-add-pillar" onclick="window._addRoomWallFeature('pillar')" title="הוסף עמוד שבולט מהקיר — גרור לאורך הקירות, משוך את הידיות לשינוי מידות">
+                <i class="fa-solid fa-square"></i><span>הוסף עמוד</span>
+            </button>
+            <button type="button" class="room-furn-btn" id="room-btn-add-niche" onclick="window._addRoomWallFeature('niche')" title="הוסף נישה (שקע) בקיר — גרור לאורך הקירות, משוך את הידיות לשינוי מידות">
+                <i class="fa-solid fa-inbox"></i><span>הוסף נישה</span>
             </button>
             <div class="bed-tb-sep"></div>
             <button type="button" class="room-furn-btn" id="room-btn-door-hinge" onclick="window._toggleRoomDoorHinge()" title="החלף את צד הציר של הדלת (ימין / שמאל)">
@@ -3000,10 +3006,10 @@
 <script src="writing-desk-preset.js?v=20260823h370"></script>
 <script src="corner-unit-preset.js?v=20261103deskdoor"></script>
 <script src="engine-appliances.js?v=20261007deskMerge28"></script>
-<script src="engine-core.js?v=20261110custom"></script>
+<script src="engine-core.js?v=20261110walls2"></script>
 <script src="engine-corners.js?v=20261109ridingFlush"></script>
 <script src="engine-blueprint.js?v=20261109colInOut"></script>
-<script src="engine-room-plan.js?v=20261110custom"></script>
+<script src="engine-room-plan.js?v=20261110walls2"></script>
 <script src="tambour-color-picker.js?v=20261009colors"></script>
 <script src="ui.js?v=20261110shelfSnap"></script>
 <script src="mirror-cabinet.js?v=20261109mirror"></script>
@@ -3011,7 +3017,7 @@
 <script src="part-paint.js?v=20261104egger"></script>
 <script src="shelf-pick.js?v=20260922sideWall"></script>
 <script src="export-3d.js?v=20261105exp3dobj"></script>
-<script src="index-init.js?v=20261107tpl"></script>
+<script src="index-init.js?v=20261110walls"></script>
 
 <!-- ===== TAMBOUR FULL PALETTE MODAL ===== -->
 <div id="tambour-palette-modal" class="tambour-palette-overlay">

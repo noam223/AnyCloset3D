@@ -1809,8 +1809,194 @@ window._getRoomWallOpenings = function(bounds) {
     window._getRoomWindowPoses(b).forEach(function(w) {
         out.push({ wall: w.wall, cx: w.cx, cz: w.cz, width: w.width, bottom: w.sill, top: w.sill + w.height });
     });
+    window._getRoomWallFeaturePoses(b).forEach(function(f) {
+        if (f.type === 'niche') out.push({ wall: f.wall, cx: f.cx, cz: f.cz, width: f.width, bottom: 0, top: b.height + 1 });
+    });
     return out;
 };
+
+// ── Wall features: pillars protruding into the room, niches recessed into the wall ──
+window._roomWallFeatures = Array.isArray(window._roomWallFeatures) ? window._roomWallFeatures : [];
+window._roomWallFeatureSeq = window._roomWallFeatureSeq || 0;
+const _WALL_FEATURE_MIN = 10;
+
+function _roomWallSpan(b, wall) {
+    return (wall === 'front' || wall === 'back')
+        ? { lo: b.leftX, hi: b.rightX }
+        : { lo: b.backZ, hi: b.frontZ };
+}
+
+function _roomWallFeatureDims(f, b) {
+    const span = _roomWallSpan(b, f.wall);
+    const across = (f.wall === 'front' || f.wall === 'back') ? (b.frontZ - b.backZ) : (b.rightX - b.leftX);
+    const width = Math.max(_WALL_FEATURE_MIN, Math.min(span.hi - span.lo, parseFloat(f.width) || 40));
+    const maxDepth = f.type === 'niche' ? 150 : Math.max(_WALL_FEATURE_MIN, across - 20);
+    const depth = Math.max(5, Math.min(maxDepth, parseFloat(f.depth) || 30));
+    return { width: width, depth: depth };
+}
+
+window._getRoomWallFeaturePoses = function(bounds) {
+    const b = bounds || window._roomBounds;
+    if (!b) return [];
+    return (window._roomWallFeatures || []).map(function(f) {
+        const d = _roomWallFeatureDims(f, b);
+        const p = _roomWallPoint(b, f.wall || 'back', f.t, d.width);
+        const n = _roomWallNormal(p.wall);
+        // Pillars extend inward (along the normal), niches outward behind the wall line
+        const sign = f.type === 'niche' ? -1 : 1;
+        const ex = n.x * d.depth * sign, ez = n.z * d.depth * sign;
+        const alongX = p.wall === 'front' || p.wall === 'back';
+        const ax = alongX ? d.width / 2 : 0, az = alongX ? 0 : d.width / 2;
+        return {
+            id: f.id, type: f.type === 'niche' ? 'niche' : 'pillar', wall: p.wall, t: p.t,
+            cx: p.cx, cz: p.cz, width: d.width, depth: d.depth,
+            minX: Math.min(p.cx - ax, p.cx + ex - ax), maxX: Math.max(p.cx + ax, p.cx + ex + ax),
+            minZ: Math.min(p.cz - az, p.cz + ez - az), maxZ: Math.max(p.cz + az, p.cz + ez + az)
+        };
+    });
+};
+
+window._findRoomWallFeature = function(id) {
+    return (window._roomWallFeatures || []).find(function(f) { return f && f.id === id; }) || null;
+};
+
+window._addRoomWallFeature = function(type) {
+    if (!Array.isArray(window._roomWallFeatures)) window._roomWallFeatures = [];
+    window._roomWallFeatureSeq = (window._roomWallFeatureSeq || 0) + 1;
+    const niche = type === 'niche';
+    const id = 'room-feat-' + window._roomWallFeatureSeq;
+    window._roomWallFeatures.push({
+        id: id, type: niche ? 'niche' : 'pillar', wall: 'left', t: niche ? 0.65 : 0.25,
+        width: niche ? 80 : 40, depth: niche ? 40 : 30
+    });
+    window._roomPlanSelected = id;
+    _roomOpeningsChanged();
+};
+
+window._removeRoomWallFeature = function(id) {
+    window._roomWallFeatures = (window._roomWallFeatures || []).filter(function(f) { return f && f.id !== id; });
+    if (window._roomPlanSelected === id) window._roomPlanSelected = null;
+    _roomOpeningsChanged();
+};
+
+window._toggleRoomWallFeatureType = function(id) {
+    const f = window._findRoomWallFeature(id);
+    if (!f) return;
+    f.type = f.type === 'niche' ? 'pillar' : 'niche';
+    _roomOpeningsChanged();
+};
+
+/** Set center fraction `t` so the feature spans [lo, hi] along its wall. */
+function _roomWallFeatureSetSpan(f, b, lo, hi) {
+    const span = _roomWallSpan(b, f.wall);
+    lo = Math.max(span.lo, lo);
+    hi = Math.min(span.hi, hi);
+    const width = Math.max(_WALL_FEATURE_MIN, hi - lo);
+    const range = (span.hi - span.lo) - width;
+    f.width = width;
+    f.t = range > 0 ? Math.max(0, Math.min(1, (lo - span.lo) / range)) : 0.5;
+}
+
+/** Drag a feature to the wall nearest to (x, z); snaps flush to a corner within 6 cm. */
+window._setRoomWallFeatureFromPoint = function(id, x, z, bounds) {
+    const b = bounds || window._roomBounds;
+    const f = window._findRoomWallFeature(id);
+    if (!b || !f) return null;
+    const d = _roomWallFeatureDims(f, b);
+    const snap = _roomSnapToWall(b, x, z, d.width);
+    f.wall = snap.wall;
+    const span = _roomWallSpan(b, f.wall);
+    const range = (span.hi - span.lo) - d.width;
+    let t = snap.t;
+    if (range > 0) {
+        if (t * range < 6) t = 0;
+        else if ((1 - t) * range < 6) t = 1;
+    }
+    f.t = t;
+    f.width = d.width;
+    return snap;
+};
+
+/** Resize from a handle: 'lo' / 'hi' move an end along the wall, 'depth' moves the face off the wall. */
+window._resizeRoomWallFeature = function(id, handle, x, z, bounds) {
+    const b = bounds || window._roomBounds;
+    const f = window._findRoomWallFeature(id);
+    if (!b || !f) return;
+    const pose = window._getRoomWallFeaturePoses(b).find(function(p) { return p.id === id; });
+    if (!pose) return;
+    const alongX = pose.wall === 'front' || pose.wall === 'back';
+    const along = Math.round(alongX ? x : z);
+    const lo = (alongX ? pose.cx : pose.cz) - pose.width / 2;
+    const hi = lo + pose.width;
+    if (handle === 'lo') {
+        _roomWallFeatureSetSpan(f, b, Math.min(along, hi - _WALL_FEATURE_MIN), hi);
+    } else if (handle === 'hi') {
+        _roomWallFeatureSetSpan(f, b, lo, Math.max(along, lo + _WALL_FEATURE_MIN));
+    } else if (handle === 'depth') {
+        const n = _roomWallNormal(pose.wall);
+        const off = (x - pose.cx) * n.x + (z - pose.cz) * n.z;
+        f.depth = Math.round(Math.abs(off));
+        f.depth = _roomWallFeatureDims(f, b).depth;
+    }
+};
+
+/** Exact sizes typed in the furniture list; keeps the feature's left/back end in place. */
+window._setRoomWallFeatureSize = function(id, width, depth) {
+    const b = window._roomBounds;
+    const f = window._findRoomWallFeature(id);
+    if (!b || !f) return;
+    const pose = window._getRoomWallFeaturePoses(b).find(function(p) { return p.id === id; });
+    if (pose && isFinite(width) && width > 0) {
+        const alongX = pose.wall === 'front' || pose.wall === 'back';
+        const lo = (alongX ? pose.cx : pose.cz) - pose.width / 2;
+        const span = _roomWallSpan(b, f.wall);
+        const w = Math.min(width, span.hi - span.lo);
+        const start = Math.min(lo, span.hi - w);
+        _roomWallFeatureSetSpan(f, b, start, start + w);
+    }
+    if (isFinite(depth) && depth > 0) {
+        f.depth = depth;
+        f.depth = _roomWallFeatureDims(f, b).depth;
+    }
+    _roomOpeningsChanged();
+};
+
+window._roomWallFeaturesChanged = _roomOpeningsChanged;
+
+function _buildRoomWallFeatures(rg, makeWallMat, roomH) {
+    const b = window._roomBounds;
+    if (!b) return;
+    window._getRoomWallFeaturePoses(b).forEach(function(f) {
+        const g = new THREE.Group();
+        _placeOnRoomWall(g, f.wall, f.cx, f.cz);
+        const add = function(geo, mat, x, y, z, ry, rx) {
+            const m = new THREE.Mesh(geo, mat);
+            m.position.set(x, y, z);
+            if (ry) m.rotation.y = ry;
+            if (rx) m.rotation.x = rx;
+            m.castShadow = true;
+            m.receiveShadow = true;
+            m.userData._roomOwned = true;
+            m.userData.roomPart = 'wall-feature';
+            g.add(m);
+        };
+        if (f.type === 'pillar') {
+            add(new THREE.BoxGeometry(f.width, roomH, f.depth), makeWallMat(f.width, roomH), 0, roomH / 2, f.depth / 2);
+        } else {
+            // Recess faces looking into the room: back, both sides, and parquet floor
+            add(new THREE.PlaneGeometry(f.width, roomH), makeWallMat(f.width, roomH), 0, roomH / 2, -f.depth);
+            add(new THREE.PlaneGeometry(f.depth, roomH), makeWallMat(f.depth, roomH), -f.width / 2, roomH / 2, -f.depth / 2, Math.PI / 2);
+            add(new THREE.PlaneGeometry(f.depth, roomH), makeWallMat(f.depth, roomH), f.width / 2, roomH / 2, -f.depth / 2, -Math.PI / 2);
+            const floorMat = new THREE.MeshStandardMaterial({ color: 0xd4a96a, roughness: 0.55, metalness: 0.0 });
+            if (window._woodFloorTex && !window._roomTexDragging) {
+                floorMat.map = _roomTexVariant(window._woodFloorTex, f.width / 200, f.depth / 200, 0, 0);
+                floorMat.color.set(0xffffff);
+            }
+            add(new THREE.PlaneGeometry(f.width, f.depth), floorMat, 0, 0, -f.depth / 2, 0, -Math.PI / 2);
+        }
+        rg.add(g);
+    });
+}
 
 /** Plane geometry (w×h, facing +Z, UV 0..1) with rectangular holes {x0,x1,y0,y1} in local coords. */
 function _roomWallGeometry(w, h, holes) {
@@ -2824,6 +3010,8 @@ function _buildRoom() {
             });
         });
     }
+
+    _buildRoomWallFeatures(rg, makeWallMat, roomH);
 
     // ── Ceiling ────────────────────────────────────────────────────────────
     // When closure panels are active, the room ceiling plane snaps to the top of the closure ceiling panel

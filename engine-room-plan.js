@@ -440,11 +440,26 @@
         return String(id || '').indexOf('room-win-') === 0;
     }
 
+    function _isWallFeatureId(id) {
+        return String(id || '').indexOf('room-feat-') === 0;
+    }
+
+    function _getWallFeatureRects() {
+        const b = _getBounds();
+        if (!b || typeof window._getRoomWallFeaturePoses !== 'function') return [];
+        return window._getRoomWallFeaturePoses(b).map(function(p) {
+            return _makeFurnItem(p.id, p, true, p.type === 'niche' ? 'נישה' : 'עמוד', {
+                isWallFeature: true, feat: p, openWall: p.wall
+            });
+        });
+    }
+
     /** Small HTML buttons placed inside the room, next to a wall opening. */
-    function _drawOpeningBtns(parentG, item, tf, btns) {
+    function _drawOpeningBtns(parentG, item, tf, btns, offPx) {
         const n = _wallNormal(item.openWall);
-        const c = _w2s((item.minX + item.maxX) / 2, (item.minZ + item.maxZ) / 2, tf);
-        const btnSize = 22, gap = 4, off = 30;
+        const c = _w2s(item.anchorX != null ? item.anchorX : (item.minX + item.maxX) / 2,
+            item.anchorZ != null ? item.anchorZ : (item.minZ + item.maxZ) / 2, tf);
+        const btnSize = 22, gap = 4, off = offPx || 30;
         const total = btns.length * btnSize + (btns.length - 1) * gap;
         const ox = c.x + n.x * off, oy = c.y + n.z * off;
         const alongX = Math.abs(n.z) > 0.5;
@@ -565,10 +580,76 @@
         ]);
     }
 
+    function _drawWallFeature2D(g, item, tf, isActive, isSel) {
+        const f = item.feat;
+        const n = _wallNormal(f.wall);
+        const along = (f.wall === 'front' || f.wall === 'back') ? { x: 1, z: 0 } : { x: 0, z: 1 };
+        const half = f.width / 2;
+        const tw = tf.wallPx / tf.scale;
+        const eps = 0.6 / tf.scale;
+        const toS = function(q) {
+            return _w2s(f.cx + along.x * q[0] + n.x * q[1], f.cz + along.z * q[0] + n.z * q[1], tf);
+        };
+        const poly = function(pts, attrs) {
+            attrs.points = pts.map(toS).map(function(p) { return p.x.toFixed(2) + ',' + p.y.toFixed(2); }).join(' ');
+            g.appendChild(_svgEl('polygon', attrs));
+        };
+        const hot = isActive || isSel;
+        let face;
+        if (f.type === 'pillar') {
+            const body = [[-half, -eps], [half, -eps], [half, f.depth], [-half, f.depth]];
+            poly(body, { fill: hot ? '#3b4452' : '#2f343c' });
+            poly(body, { fill: 'url(#rp-hatch)' });
+            face = f.depth;
+        } else {
+            // Wall band wraps the recess, then the parquet continues into it
+            poly([[-half - tw, eps], [half + tw, eps], [half + tw, -f.depth - tw], [-half - tw, -f.depth - tw]], { fill: '#2f343c' });
+            const recess = [[-half, eps * 2], [half, eps * 2], [half, -f.depth], [-half, -f.depth]];
+            poly(recess, { fill: 'url(#rp-floor)' });
+            poly(recess, { fill: hot ? '#ccfbf1' : '#fffaf2', opacity: hot ? '0.45' : '0.3' });
+            face = -f.depth;
+        }
+
+        const lc = toS([0, face / 2]);
+        const lenPx = f.width * tf.scale;
+        const sizeText = Math.round(f.width) + '×' + Math.round(f.depth);
+        if (f.type === 'pillar' && Math.abs(face) * tf.scale > 18) {
+            _drawPill(g, lc.x, lc.y, item.label + ' ' + sizeText, 10, lenPx - 4);
+        }
+
+        if (!isSel) return;
+        const btnOff = Math.max(face, 0) * tf.scale + 22;
+        if (f.type === 'niche' || Math.abs(face) * tf.scale <= 18 || lenPx < 60) {
+            // Beyond the buttons, so the pill never covers them
+            const text = item.label + ' ' + sizeText;
+            const pillHalf = along.x === 1 ? 10 : (text.length * 10 * 0.56 + 14) / 2;
+            const lp = toS([0, (btnOff + 17 + pillHalf) / tf.scale]);
+            _drawPill(g, lp.x, lp.y, text, 10);
+        }
+        [['lo', -half, face / 2], ['hi', half, face / 2], ['depth', 0, face]].forEach(function(h) {
+            const p = toS([h[1], h[2]]);
+            const c = _svgEl('circle', {
+                cx: p.x, cy: p.y, r: 6.5, class: 'rp-feat-handle',
+                'data-rp-handle': h[0], 'data-rp-feat-id': f.id
+            });
+            const isAlongX = along.x === 1;
+            c.style.cursor = h[0] === 'depth' ? (isAlongX ? 'ns-resize' : 'ew-resize') : (isAlongX ? 'ew-resize' : 'ns-resize');
+            g.appendChild(c);
+        });
+        const btnItem = { openWall: f.wall, anchorX: f.cx, anchorZ: f.cz };
+        _drawOpeningBtns(g, btnItem, tf, [
+            { action: 'feat-toggle', title: f.type === 'niche' ? 'הפוך לעמוד בולט' : 'הפוך לנישה', html: '<i class="fa-solid fa-right-left"></i>' },
+            { action: 'feat-remove', title: 'הסר', html: '<i class="fa-solid fa-xmark"></i>', cls: 'rp-room-cab-btn-remove' }
+        ], btnOff);
+        g.querySelectorAll('[data-rp-action^="feat-"]').forEach(function(btn) {
+            btn.setAttribute('data-rp-open-id', f.id);
+        });
+    }
+
     /** Distances along the wall from an opening to both corners. */
-    function _drawOpeningWallDims(g, item, tf, b) {
+    function _drawOpeningWallDims(g, item, tf, b, offCm) {
         const wall = item.openWall;
-        const off = 26 / tf.scale;
+        const off = offCm != null ? offCm : 26 / tf.scale;
         if (wall === 'front' || wall === 'back') {
             const z = wall === 'back' ? b.backZ + off : b.frontZ - off;
             if (item.minX - b.leftX > 1) _drawWorldDimH(g, b.leftX, item.minX, z, '', tf, wall === 'front');
@@ -589,6 +670,8 @@
         const nightstand = _getNightstandRect();
         const roomDesk = _getRoomDeskRect();
         const roomDoor = _getRoomDoorRect();
+        // Wall features first → furniture standing against them stays grabbable
+        _getWallFeatureRects().forEach(function(item) { items.push(item); });
         if (cab) items.push(cab);
         if (cabDesk) items.push(cabDesk);
         if (bed) items.push(bed);
@@ -667,7 +750,8 @@
         } else if (String(id).indexOf('custom-') === 0) {
             const custom = _findCustomItem(id);
             if (custom) {
-                const cp = _clampFurnCenter(cx, cz, custom.w / 2, custom.d / 2);
+                const side = Math.round((custom.rotation || 0) / 90) % 2 === 1;
+                const cp = _clampFurnCenter(cx, cz, (side ? custom.d : custom.w) / 2, (side ? custom.w : custom.d) / 2);
                 custom.x = cp.x;
                 custom.z = cp.z;
             }
@@ -734,6 +818,8 @@
             if (typeof window._setRoomWindowFromPoint === 'function') {
                 window._setRoomWindowFromPoint(id, cx, cz, _getBounds());
             }
+        } else if (_isWallFeatureId(id)) {
+            window._setRoomWallFeatureFromPoint(id, cx, cz, _getBounds());
         }
         window._roomPlanPending3D = true;
     }
@@ -1255,6 +1341,11 @@
             preserveAspectRatio: 'none'
         }));
         defs.appendChild(floor);
+        const hatch = _svgEl('pattern', {
+            id: 'rp-hatch', patternUnits: 'userSpaceOnUse', width: '7', height: '7', patternTransform: 'rotate(45)'
+        });
+        hatch.appendChild(_svgEl('line', { x1: 0, y1: 0, x2: 0, y2: 7, stroke: 'rgba(255,255,255,0.16)', 'stroke-width': '1.4' }));
+        defs.appendChild(hatch);
         const shadow = _svgEl('filter', { id: 'rp-shadow', x: '-20%', y: '-20%', width: '140%', height: '140%' });
         shadow.appendChild(_svgEl('feDropShadow', {
             dx: '0', dy: '1.5', stdDeviation: '2.2', 'flood-color': '#0f172a', 'flood-opacity': '0.22'
@@ -1327,6 +1418,8 @@
                 _drawRoomDoor2D(g, item, tf, isActive);
             } else if (item.isRoomWindow) {
                 _drawRoomWindow2D(g, item, tf, isActive);
+            } else if (item.isWallFeature) {
+                _drawWallFeature2D(g, item, tf, isActive, isSel);
             } else {
                 if (isSel && item.draggable) {
                     g.appendChild(_svgEl('rect', {
@@ -1367,6 +1460,16 @@
                 _drawOpeningWallDims(itemDimsG, item, tf, b);
                 return;
             }
+            if (item.isWallFeature) {
+                const f = item.feat;
+                const wallRect = f.type === 'niche' ? item : {
+                    minX: Math.min(item.minX, f.cx), maxX: Math.max(item.maxX, f.cx),
+                    minZ: Math.min(item.minZ, f.cz), maxZ: Math.max(item.maxZ, f.cz)
+                };
+                const off = (f.type === 'pillar' ? f.depth : 0) + 16 / tf.scale;
+                _drawOpeningWallDims(itemDimsG, Object.assign({}, wallRect, { openWall: f.wall }), tf, b, off);
+                return;
+            }
             if (item.id === 'cabinet-desk') return;
             _drawItemWallDims(itemDimsG, item, tf, b, true);
         });
@@ -1403,6 +1506,7 @@
                 : item.id === 'cabinet-desk' ? 'fa-laptop'
                 : item.id === 'room-door' ? 'fa-door-open'
                 : item.isRoomWindow ? 'fa-border-all'
+                : item.isWallFeature ? (item.feat.type === 'niche' ? 'fa-inbox' : 'fa-square')
                 : String(item.id).indexOf('custom-') === 0 ? 'fa-cube'
                 : isExtraCab ? _projectItemIcon(state.orderCart && state.orderCart[item.cartIndex])
                 : item.id === 'cabinet' ? 'fa-door-closed'
@@ -1411,6 +1515,39 @@
                 '<i class="fa-solid ' + icon + '"></i>' +
                 '<span class="room-plan-furn-name">' + (item.label || item.id) + '</span>' +
                 '<span class="room-plan-furn-dim">' + w + '×' + d + '</span>';
+            if (item.isWallFeature) {
+                const dimEl = row.querySelector('.room-plan-furn-dim');
+                dimEl.textContent = '';
+                const mkInput = function(val, title) {
+                    const inp = document.createElement('input');
+                    inp.type = 'number';
+                    inp.min = '5';
+                    inp.className = 'room-plan-feat-input';
+                    inp.value = Math.round(val);
+                    inp.title = title;
+                    inp.addEventListener('change', function() {
+                        window._setRoomWallFeatureSize(item.id,
+                            parseFloat(wInp.value), parseFloat(dInp.value));
+                    });
+                    return inp;
+                };
+                const wInp = mkInput(item.feat.width, 'רוחב לאורך הקיר (ס"מ)');
+                const dInp = mkInput(item.feat.depth, item.feat.type === 'niche' ? 'עומק הנישה (ס"מ)' : 'בליטה מהקיר (ס"מ)');
+                dimEl.appendChild(wInp);
+                dimEl.appendChild(document.createTextNode('×'));
+                dimEl.appendChild(dInp);
+                const rmFeat = document.createElement('button');
+                rmFeat.type = 'button';
+                rmFeat.className = 'rpc-remove-btn';
+                rmFeat.title = 'הסר';
+                rmFeat.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+                rmFeat.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window._removeRoomWallFeature(item.id);
+                });
+                row.appendChild(rmFeat);
+            }
             if (item.isRoomWindow) {
                 const rmWin = document.createElement('button');
                 rmWin.type = 'button';
@@ -1736,6 +1873,19 @@
 
         svg.addEventListener('pointerdown', function(e) {
             if (state.viewMode !== 'room-plan' || window._roomPlanSubview !== '2d') return;
+            const handleEl = e.target.closest('[data-rp-handle]');
+            if (handleEl) {
+                e.preventDefault();
+                e.stopPropagation();
+                window._roomPlanDrag = {
+                    id: handleEl.getAttribute('data-rp-feat-id'),
+                    handle: handleEl.getAttribute('data-rp-handle'),
+                    pointerId: e.pointerId
+                };
+                svg.setPointerCapture(e.pointerId);
+                document.body.classList.add('room-plan-dragging');
+                return;
+            }
             const actionBtn = e.target.closest('[data-rp-action]');
             if (actionBtn) {
                 e.preventDefault();
@@ -1767,6 +1917,10 @@
                     } else {
                         window._removeCustomRoomItem(itemId);
                     }
+                } else if (action === 'feat-toggle' || action === 'feat-remove') {
+                    const featId = actionBtn.getAttribute('data-rp-open-id');
+                    if (action === 'feat-toggle') window._toggleRoomWallFeatureType(featId);
+                    else window._removeRoomWallFeature(featId);
                 } else if (action === 'rotate-room-host' && typeof window._rotateRoomHost === 'function') {
                     window._rotateRoomHost();
                 } else if (action === 'door-hinge' && typeof window._toggleRoomDoorHinge === 'function') {
@@ -1822,6 +1976,13 @@
             const rect = svg.getBoundingClientRect();
             const sx = e.clientX - rect.left;
             const sy = e.clientY - rect.top;
+            if (d.handle) {
+                const wp = _s2w(sx, sy, tf);
+                window._resizeRoomWallFeature(d.id, d.handle, wp.x, wp.z, _getBounds());
+                window._roomPlanPending3D = true;
+                _queueRoomPlanRender();
+                return;
+            }
             const dx = (sx - d.startX) / tf.scale;
             const dz = (sy - d.startY) / tf.scale;
             _applyFurnitureMove(d.id, d.startCx + dx, d.startCz + dz);
@@ -1832,7 +1993,8 @@
             const d = window._roomPlanDrag;
             if (!d) return;
             if (e && d.pointerId !== e.pointerId) return;
-            const wasDoor = d.id === 'room-door' || _isRoomWindowId(d.id);
+            const wasDoor = d.id === 'room-door' || _isRoomWindowId(d.id) || _isWallFeatureId(d.id);
+            if (_isWallFeatureId(d.id)) window._isDirty = true;
             window._roomPlanDrag = null;
             document.body.classList.remove('room-plan-dragging');
             if (wasDoor && window._roomPlanPending3D && typeof window._syncRoomPlanTo3D === 'function') {

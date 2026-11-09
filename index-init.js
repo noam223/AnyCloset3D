@@ -273,6 +273,15 @@
                         var m = String(w.id).match(/^room-win-(\d+)$/);
                         return m ? Math.max(mx, parseInt(m[1], 10) || 0) : mx;
                     }, 0);
+                    window._roomWallFeatures = Array.isArray(snap.roomWallFeatures)
+                        ? snap.roomWallFeatures.filter(function(f) { return f && f.id; }).map(function(f) {
+                            return { id: String(f.id), type: f.type === 'niche' ? 'niche' : 'pillar', wall: f.wall, t: Number(f.t), width: Number(f.width), depth: Number(f.depth) };
+                        })
+                        : [];
+                    window._roomWallFeatureSeq = window._roomWallFeatures.reduce(function(mx, f) {
+                        var m = String(f.id).match(/^room-feat-(\d+)$/);
+                        return m ? Math.max(mx, parseInt(m[1], 10) || 0) : mx;
+                    }, 0);
                     // Shared rooms between project items (new format); legacy list migrated after cart restore
                     window._roomLinks = Array.isArray(snap.roomLinks)
                         ? JSON.parse(JSON.stringify(snap.roomLinks)).filter(function(g) { return g && g.poses; })
@@ -547,6 +556,9 @@
             } : null,
             roomWindows: (window._roomWindows || []).map(function(w) {
                 return { id: w.id, wall: w.wall, t: w.t, width: w.width, height: w.height, sill: w.sill };
+            }),
+            roomWallFeatures: (window._roomWallFeatures || []).map(function(f) {
+                return { id: f.id, type: f.type, wall: f.wall, t: f.t, width: f.width, depth: f.depth };
             }),
             roomLinksV: 2,
             roomLinks: (window._roomLinks || []).filter(function(g) {
