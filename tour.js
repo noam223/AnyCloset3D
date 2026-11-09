@@ -1144,6 +1144,37 @@ window._startTour = function(key) {
     _show(0, 1);
 };
 
+// Starts a topic at the step whose target matches `target` (falls back to the first step).
+window._startTourAt = function(key, target) {
+    window._startTour(key);
+    if (!T.active || !target) return;
+    var idx = -1;
+    T.steps.forEach(function(s, i) {
+        if (idx < 0 && [].concat(s.target).indexOf(target) >= 0) idx = i;
+    });
+    if (idx > 0) _show(idx, 1);
+};
+
+// Plan-aware flat list of every tour step, for the help assistant's knowledge base.
+window._tourCatalog = function() {
+    var c = _ctx();
+    var out = [];
+    TOPICS.forEach(function(t) {
+        if (t.when && !t.when(c)) return;
+        t.steps.forEach(function(s) {
+            if (s.when && !s.when(c)) return;
+            out.push({
+                topic: t.key,
+                topicTitle: _val(t.title, c),
+                target: [].concat(s.target)[0],
+                title: _val(s.title, c),
+                text: _val(s.text, c)
+            });
+        });
+    });
+    return out;
+};
+
 window._stopTour = function() {
     if (!T.active) { _setChromeVisible(false); return; }
     T.active = false;
