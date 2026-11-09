@@ -171,6 +171,119 @@ window._applyLighting = function(name) {
 };
 window._applyLighting('studio');
 
+// Soft contact shadows (SSAO) in the orbit 3D views. Post-processing only — material colors and the
+// front/blueprint views are untouched, and captures (print, AI) keep calling renderer.render directly.
+const _AO_BASE = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/';
+const _AO_SCRIPTS = ['shaders/CopyShader.js', 'shaders/SSAOShader.js', 'math/SimplexNoise.js',
+    'postprocessing/Pass.js', 'postprocessing/EffectComposer.js', 'postprocessing/ShaderPass.js', 'postprocessing/SSAOPass.js'];
+window._aoEnabled = (function() {
+    try {
+        const v = localStorage.getItem('ac_ao');
+        if (v === '1' || v === '0') return v === '1';
+    } catch (e) { /* ignore */ }
+    return !(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+})();
+let _ao = null, _aoLoading = null;
+const _aoSize = new THREE.Vector2();
+
+function _aoLoad() {
+    if (_aoLoading) return _aoLoading;
+    _aoLoading = _AO_SCRIPTS.reduce(function(p, s) {
+        return p.then(function() {
+            return new Promise(function(res, rej) {
+                const el = document.createElement('script');
+                el.src = _AO_BASE + s;
+                el.onload = res;
+                el.onerror = rej;
+                document.head.appendChild(el);
+            });
+        });
+    }, Promise.resolve()).then(function() {
+        const sz = renderer.getSize(_aoSize);
+        const composer = new THREE.EffectComposer(renderer);
+        const pass = new THREE.SSAOPass(scene, camera, sz.x, sz.y);
+        pass.kernelRadius = 18;
+        pass.minDistance = 0.0002;
+        pass.maxDistance = 0.02;
+        // Glass, ghost walls, overlays and glows must not occlude what is behind them in the normal pass
+        let hidden = [];
+        pass.overrideVisibility = function() {
+            hidden = [];
+            scene.traverseVisible(function(o) {
+                if (!(o.isMesh || o.isLine || o.isPoints || o.isSprite)) return;
+                const m = Array.isArray(o.material) ? o.material[0] : o.material;
+                if (o.isMesh && m && !m.transparent && !m.isMeshBasicMaterial) return;
+                hidden.push(o);
+            });
+            hidden.forEach(function(o) { o.visible = false; });
+        };
+        pass.restoreVisibility = function() {
+            hidden.forEach(function(o) { o.visible = true; });
+            hidden = [];
+        };
+        composer.addPass(pass);
+        _ao = { composer: composer, w: 0, h: 0 };
+    }).catch(function(e) {
+        console.warn('[ao] failed to load', e);
+        window._aoEnabled = false;
+    });
+    return _aoLoading;
+}
+
+function _aoWanted() {
+    if (!window._aoEnabled) return false;
+    const m = state.viewMode;
+    return m === '3d' || (m === 'room-plan' && window._roomPlanSubview !== '2d');
+}
+
+window._renderMain = function() {
+    if (_aoWanted()) {
+        if (_ao) {
+            const sz = renderer.getSize(_aoSize);
+            if (sz.x !== _ao.w || sz.y !== _ao.h) {
+                _ao.composer.setSize(sz.x, sz.y);
+                _ao.w = sz.x;
+                _ao.h = sz.y;
+            }
+            // The app's 1..20000 depth range is too coarse for SSAO — flat walls band. Tighten it per frame.
+            const n = camera.near, f = camera.far;
+            const d = camera.position.distanceTo(controls.target);
+            camera.near = Math.max(n, Math.min(10, d * 0.05));
+            camera.far = Math.min(f, d * 3 + 1500);
+            camera.updateProjectionMatrix();
+            let ok = true;
+            try {
+                _ao.composer.render();
+            } catch (e) {
+                ok = false;
+                console.warn('[ao] render failed — disabling', e);
+                window._aoEnabled = false;
+                window._syncAoButton();
+            } finally {
+                camera.near = n;
+                camera.far = f;
+                camera.updateProjectionMatrix();
+            }
+            if (ok) return;
+        }
+        _aoLoad();
+    }
+    renderer.render(scene, camera);
+};
+
+window._syncAoButton = function() {
+    const btn = document.getElementById('btn-toggle-ao');
+    if (!btn) return;
+    btn.classList.toggle('toggled-off', !window._aoEnabled);
+    btn.title = window._aoEnabled ? 'הצללה רכה בתלת־מימד: פועלת (לחץ לכיבוי)' : 'הצללה רכה בתלת־מימד: כבויה (לחץ להפעלה)';
+};
+window._toggleAO = function() {
+    window._aoEnabled = !window._aoEnabled;
+    try { localStorage.setItem('ac_ao', window._aoEnabled ? '1' : '0'); } catch (e) { /* ignore */ }
+    window._syncAoButton();
+};
+window._syncAoButton();
+
 // Studio reflections (same layout as handle-halfmoon-mockup.html).
 // preEncoded: for materials rendered by this linear-output renderer; raw: for the handle shader,
 // which does its own tone mapping + sRGB encoding exactly like the mockup.

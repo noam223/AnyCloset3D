@@ -19185,7 +19185,8 @@ function animate() {
     }
 
     if (!(state.viewMode === 'room-plan' && window._roomPlanSubview === '2d')) {
-        renderer.render(scene, camera);
+        if (typeof window._renderMain === 'function') window._renderMain();
+        else renderer.render(scene, camera);
         if (typeof window._syncAndRenderSpaceGizmo === 'function') window._syncAndRenderSpaceGizmo();
     }
 }
