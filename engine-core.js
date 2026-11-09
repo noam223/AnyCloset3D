@@ -2061,6 +2061,37 @@ window._addCustomRoomItem = function(opts) {
     if (typeof window._updateRoomPropsUI === 'function') window._updateRoomPropsUI();
 };
 
+function _customRoomItemChanged() {
+    if (typeof window._roomPlanFurnitureChanged === 'function') {
+        window._roomPlanFurnitureChanged();
+    } else if (typeof _buildRoom === 'function') {
+        _buildRoom();
+    }
+    if (typeof window._updateRoomPropsUI === 'function') window._updateRoomPropsUI();
+}
+
+window._removeCustomRoomItem = function(id) {
+    const before = window._customRoomItems.length;
+    window._customRoomItems = window._customRoomItems.filter(function(item) { return item.id !== id; });
+    if (window._customRoomItems.length === before) return;
+    if (window._roomPlanSelected === id) window._roomPlanSelected = null;
+    _customRoomItemChanged();
+};
+
+window._rotateCustomRoomItem = function(id) {
+    const item = window._customRoomItems.find(function(it) { return it.id === id; });
+    if (!item) return;
+    item.rotation = ((item.rotation || 0) + 90) % 360;
+    const b = window._roomBounds;
+    if (b) {
+        const side = Math.round(item.rotation / 90) % 2 === 1;
+        const hw = (side ? item.d : item.w) / 2, hd = (side ? item.w : item.d) / 2;
+        item.x = Math.max(b.leftX + hw, Math.min(b.rightX - hw, item.x));
+        item.z = Math.max(b.backZ + hd, Math.min(b.frontZ - hd, item.z));
+    }
+    _customRoomItemChanged();
+};
+
 // ── Office Chair GLB ─────────────────────────────────────────────────────────
 window._CHAIR_OPTIONS = [
     { id: 'chair1', path: 'images/office_chair.glb',  shortName: 'משרדי',  targetHeightCm: 120 },

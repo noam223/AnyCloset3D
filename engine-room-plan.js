@@ -828,8 +828,9 @@
         parentG.appendChild(rfo);
     }
 
-    function _drawRoomExtraCabBtns(parentG, item, fx, fy, fw, fh) {
+    function _drawRoomExtraCabBtns(parentG, item, fx, fy, fw, fh, kind) {
         if (fw < 40 || fh < 28) return;
+        const prefix = kind === 'custom' ? 'custom-item' : 'room-cab';
         const btnSize = 22;
         const gap = 4;
         const by = fy + 4;
@@ -851,8 +852,8 @@
             fo.appendChild(btn);
             parentG.appendChild(fo);
         }
-        _addBtn(rotateX, 'rotate-room-cab', 'סובב 90°', 'fa-rotate-right', '');
-        _addBtn(removeX, 'remove-room-cab', 'הסר מהחדר', 'fa-xmark', 'rp-room-cab-btn-remove');
+        _addBtn(rotateX, 'rotate-' + prefix, 'סובב 90°', 'fa-rotate-right', '');
+        _addBtn(removeX, 'remove-' + prefix, 'הסר מהחדר', 'fa-xmark', 'rp-room-cab-btn-remove');
     }
 
     /** Thick line on the door side + small outward arrow, so the facing direction is readable. */
@@ -1343,6 +1344,8 @@
                 }
                 if (item.isRoomExtraCab || _isRoomExtraCabId(item.id)) {
                     _drawRoomExtraCabBtns(g, item, fx, fy, fw, fh);
+                } else if (String(item.id).indexOf('custom-') === 0) {
+                    _drawRoomExtraCabBtns(g, item, fx, fy, fw, fh, 'custom');
                 }
                 if (item.id === 'cabinet') {
                     _drawRoomHostBtns(g, fx, fy, fw, fh);
@@ -1420,6 +1423,19 @@
                     if (typeof window._removeRoomWindow === 'function') window._removeRoomWindow(item.id);
                 });
                 row.appendChild(rmWin);
+            }
+            if (String(item.id).indexOf('custom-') === 0) {
+                const rmCustom = document.createElement('button');
+                rmCustom.type = 'button';
+                rmCustom.className = 'rpc-remove-btn';
+                rmCustom.title = 'הסר מהחדר';
+                rmCustom.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+                rmCustom.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window._removeCustomRoomItem(item.id);
+                });
+                row.appendChild(rmCustom);
             }
             if (isExtraCab) {
                 const rm = document.createElement('button');
@@ -1742,6 +1758,14 @@
                     const cabId = actionBtn.getAttribute('data-rp-cab-id');
                     if (cabId && typeof window._removeRoomExtraCabinet === 'function') {
                         window._removeRoomExtraCabinet(cabId);
+                    }
+                } else if (action === 'rotate-custom-item' || action === 'remove-custom-item') {
+                    const itemId = actionBtn.getAttribute('data-rp-cab-id');
+                    if (action === 'rotate-custom-item') {
+                        window._roomPlanSelected = itemId;
+                        window._rotateCustomRoomItem(itemId);
+                    } else {
+                        window._removeCustomRoomItem(itemId);
                     }
                 } else if (action === 'rotate-room-host' && typeof window._rotateRoomHost === 'function') {
                     window._rotateRoomHost();
