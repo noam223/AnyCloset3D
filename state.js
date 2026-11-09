@@ -2470,7 +2470,7 @@ function _cartOpOf(snap) {
 }
 
 // ---- Persisted history: saved per project in public.project_history ----
-const _CART_OP_LIVE_FIELDS = ['item', 'original', 'placeholder'];
+const _CART_OP_LIVE_FIELDS = ['item', 'items', 'original', 'placeholder'];
 
 function _serializeHistory() {
     const history = state.history.map(function(snap) {

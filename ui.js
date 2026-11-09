@@ -13677,6 +13677,7 @@ function _cartOpPlaceholder(op) {
 
 window._undoCartOp = function(op) {
     if (op && op.type === 'split') { _undoCartSplit(op); return; }
+    if (op && op.type === 'deleteGroup') { _undoSpaceGroupDelete(op); return; }
     if (!op || op.type !== 'delete') return;
     const inTrash = (state.cartTrash || []).some(function(e) { return e && e.id === op.trashId; });
     if (!inTrash || window._cartIndexOfUid(op.uid) >= 0 || (op.item && state.orderCart.indexOf(op.item) >= 0)) return;
@@ -13695,6 +13696,7 @@ window._undoCartOp = function(op) {
 
 window._redoCartOp = function(op) {
     if (op && op.type === 'split') { _redoCartSplit(op); return; }
+    if (op && op.type === 'deleteGroup') { _redoSpaceGroupDelete(op); return; }
     if (!op || op.type !== 'delete') return;
     let idx = op.item ? state.orderCart.indexOf(op.item) : -1;
     if (idx < 0) idx = window._cartIndexOfUid(op.uid);
@@ -13868,6 +13870,133 @@ window.deleteCartItem = function(index) {
     document.body.appendChild(toast);
     // Auto-close only this dialog — never a newer one opened for another cabinet
     const timer = setTimeout(function() { _close('timeout (10s)'); }, 10000);
+}
+
+/** Trashes every cabinet of a shared space; returns the undo record (null if nothing was removed). */
+function _deleteSpaceGroupNow(pairId, uids) {
+    const members = [];
+    state.orderCart.forEach(function(it, i) {
+        const uid = it && it.rawState && it.rawState.cartUid;
+        if (uids ? uids.indexOf(uid) >= 0 : window._spacePairIdOf(it) === pairId) {
+            members.push({ it: it, uid: uid, index: i, slot: window._spacePairSlotOf(it), offset: window._getSpaceOffset(it) });
+        }
+    });
+    if (!members.length) return null;
+    // Removing a member renumbers the rest of the space, so each one's slot/offset is kept for undo
+    const parts = [];
+    let placeholder = null;
+    _withoutHistory(function() {
+        members.slice().sort(function(a, b) { return b.index - a.index; }).forEach(function(m) {
+            const idx = state.orderCart.indexOf(m.it);
+            if (idx < 0) return;
+            const trashId = _addToCartTrash(m.it);
+            const info = _removeCartItemAt(idx);
+            if (info.placeholder) placeholder = info.placeholder;
+            parts.push({ trashId: trashId, uid: m.uid, index: idx, slot: m.slot, offset: m.offset });
+        });
+    });
+    window._normalizeCartUids();
+    return {
+        type: 'deleteGroup',
+        pairId: pairId,
+        parts: parts,
+        items: members.map(function(m) { return m.it; }),
+        placeholder: placeholder,
+        placeholderUid: placeholder ? window._cartUidAt(0) : null
+    };
+}
+
+window.deleteSpaceGroup = function(pairId) {
+    if (!pairId) return;
+    const count = state.orderCart.filter(function(it) { return window._spacePairIdOf(it) === pairId; }).length;
+    if (!count) return;
+    const _doDelete = function() {
+        const editItem = state.orderCart[state.editingCartIndex];
+        if (editItem && window._spacePairIdOf(editItem) === pairId) {
+            window._commitCurrentCabinetToCart({ flash: false });
+        }
+        window._normalizeCartUids();
+        const op = _deleteSpaceGroupNow(pairId);
+        if (!op) return;
+        const before = state.history[state.historyIndex];
+        saveHistoryState('מחיקת קבוצת ארונות');
+        const top = state.history[state.historyIndex];
+        if (top && top !== before) top._cartOp = op;
+        if (typeof _showToast === 'function') _showToast(count + ' הארונות שבמרחב הועברו לפח (ניתן לבטל עם Ctrl+Z)', 3200);
+    };
+
+    const existing = document.getElementById('_delete-confirm-toast');
+    if (existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.id = '_delete-confirm-toast';
+    toast.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);';
+    toast.innerHTML = `
+        <div style="background:#1e2840;color:white;padding:36px 40px;border-radius:20px;font-size:1.15rem;font-weight:600;box-shadow:0 8px 48px rgba(0,0,0,0.55);display:flex;flex-direction:column;align-items:center;gap:24px;min-width:300px;max-width:90vw;text-align:center;">
+            <div style="font-size:2.2rem;">🗑️</div>
+            <div style="font-size:1.2rem;font-weight:700;line-height:1.5;">למחוק את כל ${count} הארונות שבמרחב?</div>
+            <div style="font-size:0.92rem;font-weight:500;opacity:0.8;margin-top:-12px;">הארונות יעברו לפח — אפשר לבטל עם Ctrl+Z</div>
+            <div style="display:flex;gap:14px;width:100%;">
+                <button type="button" data-act="confirm" style="flex:1;background:#ef4444;color:white;border:none;border-radius:10px;padding:12px 0;font-size:1.05rem;font-weight:700;cursor:pointer;">מחק קבוצה</button>
+                <button type="button" data-act="cancel" style="flex:1;background:rgba(255,255,255,0.15);color:white;border:none;border-radius:10px;padding:12px 0;font-size:1.05rem;font-weight:600;cursor:pointer;">ביטול</button>
+            </div>
+        </div>
+    `;
+    const _close = function() {
+        clearTimeout(timer);
+        if (toast.parentNode) toast.remove();
+    };
+    toast.querySelector('[data-act="confirm"]').addEventListener('click', function() { _close(); _doDelete(); });
+    toast.querySelector('[data-act="cancel"]').addEventListener('click', _close);
+    document.body.appendChild(toast);
+    const timer = setTimeout(_close, 10000);
+};
+
+function _undoSpaceGroupDelete(op) {
+    const parts = (op.parts || []).slice().reverse();
+    if (!parts.length) return;
+    if (parts.some(function(p) { return window._cartIndexOfUid(p.uid) >= 0; })) return;
+    const restored = [];
+    _withoutHistory(function() {
+        let placeholder = _cartOpPlaceholder(op);
+        parts.forEach(function(p) {
+            const live = (op.items || []).find(function(it) { return it && it.rawState && it.rawState.cartUid === p.uid; });
+            const item = live || _cartOpTrashItem(p.trashId);
+            if (!item) return;
+            _removeFromCartTrash(p.trashId);
+            if (placeholder && state.orderCart.length === 1 && state.orderCart[0] === placeholder) {
+                state.orderCart = [];
+                state.editingCartIndex = -1;
+            }
+            placeholder = null;
+            const index = Math.max(0, Math.min(p.index, state.orderCart.length));
+            state.orderCart.splice(index, 0, item);
+            if (state.editingCartIndex >= index) state.editingCartIndex++;
+            if (typeof window._roomLinksOnCartInsert === 'function') window._roomLinksOnCartInsert(index);
+            window._attachSpacePairToItem(item, op.pairId, p.slot, JSON.parse(JSON.stringify(p.offset || { x: 0, y: 0 })));
+            restored.push(item);
+        });
+        _rebindCartPartColors();
+        const first = restored.length ? state.orderCart.indexOf(restored[restored.length - 1]) : -1;
+        if (first >= 0) window.editCartItem(first, { force: true });
+        else updateLeftSidebar();
+        _afterCartStructureChange();
+        saveHistoryState();
+    });
+    if (typeof _showToast === 'function') _showToast('קבוצת הארונות שוחזרה ✓', 2200);
+}
+
+function _redoSpaceGroupDelete(op) {
+    const uids = (op.parts || []).map(function(p) { return p.uid; });
+    let fresh = null;
+    _withoutHistory(function() {
+        fresh = _deleteSpaceGroupNow(op.pairId, uids);
+        saveHistoryState();
+    });
+    if (!fresh) return;
+    op.parts = fresh.parts;
+    op.items = fresh.items;
+    op.placeholder = fresh.placeholder;
+    op.placeholderUid = fresh.placeholderUid;
 }
 
 window.editCartItem = function(index, opts) {
@@ -14560,6 +14689,7 @@ window.updateLeftSidebar = function(opts) {
                 <div class="cart-space-group-title"><i class="fa-solid fa-layer-group"></i> ${groupTitle}</div>
                 <div class="cart-space-group-meta">${entry.members.length} חלקים במרחב
                     <button type="button" class="cart-mini-btn cart-space-group-dup" onclick="event.stopPropagation(); duplicateSpaceGroup('${entry.pairId}');" title="שכפל את כל הארונות שבמרחב כקבוצה חדשה — עם אותו סידור ומיקומים"><i class="fa-solid fa-clone"></i> שכפל קבוצה</button>
+                    <button type="button" class="cart-mini-btn cart-space-group-del" onclick="event.stopPropagation(); deleteSpaceGroup('${entry.pairId}');" title="מחק את כל הארונות שבמרחב — יעברו לפח, ניתן לבטל עם Ctrl+Z"><i class="fa-solid fa-trash"></i> מחק קבוצה</button>
                 </div>
                 ${window._showPricing !== false ? `<div class="cart-space-group-price"><span dir="ltr">₪${groupPrice.toLocaleString()}</span> <span class="cart-space-group-install">+ <span dir="ltr">₪${groupInstall.toLocaleString()}</span> התקנה</span></div>` : ''}
             </div>

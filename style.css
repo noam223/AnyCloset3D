@@ -1627,9 +1627,9 @@ body.touch-door-dragging, body.touch-door-dragging * { cursor: grabbing !importa
 .cart-space-group-meta {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 8px;
+    gap: 6px;
 }
+.cart-mini-btn.cart-space-group-dup { margin-inline-start: auto; }
 .cart-mini-btn.cart-space-group-dup {
     flex: none;
     min-width: 0;
@@ -1639,6 +1639,21 @@ body.touch-door-dragging, body.touch-door-dragging * { cursor: grabbing !importa
     color: var(--secondary);
     background: #eff6ff;
     border: 1.5px solid rgba(37,99,235,0.25);
+}
+.cart-mini-btn.cart-space-group-del {
+    flex: none;
+    min-width: 0;
+    padding: 4px 10px;
+    font-size: 0.74rem;
+    border-radius: 999px;
+    color: #dc2626;
+    background: #fef2f2;
+    border: 1.5px solid rgba(220,38,38,0.25);
+}
+.cart-mini-btn.cart-space-group-del:hover {
+    background: #dc2626;
+    color: #fff;
+    border-color: transparent;
 }
 .cart-mini-btn.cart-space-group-dup:hover {
     background: var(--secondary);
