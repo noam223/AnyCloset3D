@@ -1417,9 +1417,39 @@ async function refreshProjectSignedOrders() {
     _projectSigned = map;
 }
 
+var _signedViewerToken = '';
+
 function openSignedOrder(token, print) {
-    window.open('sign.html?t=' + encodeURIComponent(token) + (print ? '&print=1' : ''), '_blank', 'noopener');
+    var t = String(token || '').replace(/[^a-f0-9]/gi, '');
+    if (!t) return;
+    _signedViewerToken = t;
+    var frame = document.getElementById('signed-viewer-frame');
+    frame.src = 'sign.html?t=' + encodeURIComponent(t) + (print ? '&print=1' : '');
+    openModal('modal-signed-order');
 }
+
+function printSignedOrderViewer() {
+    if (!_signedViewerToken) return;
+    document.getElementById('signed-viewer-frame').src =
+        'sign.html?t=' + encodeURIComponent(_signedViewerToken) + '&print=1&r=' + Date.now();
+}
+
+function openSignedOrderInTab() {
+    if (!_signedViewerToken) return;
+    window.open('sign.html?t=' + encodeURIComponent(_signedViewerToken), '_blank', 'noopener');
+}
+
+function closeSignedOrderViewer() {
+    closeModal('modal-signed-order');
+    document.getElementById('signed-viewer-frame').src = 'about:blank';
+    _signedViewerToken = '';
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Escape') return;
+    var m = document.getElementById('modal-signed-order');
+    if (m && m.classList.contains('open')) closeSignedOrderViewer();
+});
 
 function _signedBadgeHtml(projectId) {
     var s = _projectSigned[projectId];

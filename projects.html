@@ -343,6 +343,30 @@
             border-radius: 999px; padding: 4px 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
         }
         .project-signed-badge button:hover { background: #dcfce7; }
+        .modal-overlay.signed-viewer-overlay { z-index: 310; }
+        .signed-viewer-box {
+            width: min(980px, 100%); height: min(92vh, 100%); background: #fff; border-radius: 18px;
+            box-shadow: var(--shadow-xl); display: flex; flex-direction: column; overflow: hidden;
+            animation: popIn .24s cubic-bezier(.34,1.56,.64,1);
+        }
+        .signed-viewer-bar {
+            display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+            border-bottom: 1px solid var(--border); background: #f8fafc;
+        }
+        .signed-viewer-title { flex: 1; font-weight: 800; font-size: .92rem; color: #15803d; display: flex; align-items: center; gap: 8px; }
+        .signed-viewer-btn {
+            border: 1px solid var(--border); background: #fff; color: #334155; border-radius: 10px;
+            padding: 7px 12px; font: inherit; font-size: .8rem; font-weight: 700; cursor: pointer;
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        .signed-viewer-btn.icon { width: 36px; height: 34px; padding: 0; }
+        .signed-viewer-btn:hover { background: #dcfce7; border-color: #86efac; color: #15803d; }
+        .signed-viewer-btn.close:hover { background: #fee2e2; border-color: #fca5a5; color: #b91c1c; }
+        .signed-viewer-frame { flex: 1; width: 100%; border: 0; background: #f1f5f9; }
+        @media (max-width: 640px) {
+            .modal-overlay.signed-viewer-overlay { padding: 0; }
+            .signed-viewer-box { height: 100%; border-radius: 0; }
+        }
         .project-meas-badge.is-new { animation: measPulse 1.4s ease-in-out 3; }
         @keyframes measPulse {
             0%, 100% { box-shadow: 0 4px 14px rgba(15,118,110,.35); }
@@ -1633,6 +1657,19 @@
     </div>
 </div>
 
+<!-- Modal: Signed order viewer -->
+<div class="modal-overlay signed-viewer-overlay" id="modal-signed-order" role="dialog" aria-modal="true" aria-label="הזמנה חתומה" onclick="if (event.target === this) closeSignedOrderViewer()">
+    <div class="signed-viewer-box">
+        <div class="signed-viewer-bar">
+            <div class="signed-viewer-title"><i class="fa-solid fa-file-signature"></i> הזמנה חתומה</div>
+            <button type="button" class="signed-viewer-btn" onclick="printSignedOrderViewer()" title="הדפס"><i class="fa-solid fa-print"></i> הדפס</button>
+            <button type="button" class="signed-viewer-btn icon" onclick="openSignedOrderInTab()" title="פתח בלשונית חדשה" aria-label="פתח בלשונית חדשה"><i class="fa-solid fa-up-right-from-square"></i></button>
+            <button type="button" class="signed-viewer-btn icon close" onclick="closeSignedOrderViewer()" title="סגור" aria-label="סגור"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <iframe id="signed-viewer-frame" class="signed-viewer-frame" src="about:blank" title="הזמנה חתומה"></iframe>
+    </div>
+</div>
+
 <!-- Modal: Measurement file lightbox viewer -->
 <div class="modal-overlay meas-viewer-overlay" id="modal-meas-viewer" role="dialog" aria-modal="true" aria-label="צפייה במדידה">
     <div class="meas-viewer-shell" onclick="event.stopPropagation()">
@@ -1815,7 +1852,7 @@
 <script src="trial-watermark.js?v=20261008trial"></script>
 <script src="pricing-core.js?v=20261102honeyheight"></script>
 <script src="pricing-panel.js?v=20261102honeyheight"></script>
-<script src="projects.js?v=20261110signed"></script>
+<script src="projects.js?v=20261110signview"></script>
 <script src="quick-calc.js?v=20261029shoe"></script>
 </body>
 </html>
