@@ -276,6 +276,13 @@
                         var m = String(d.id).match(/^room-door-(\d+)$/);
                         return m ? Math.max(mx, parseInt(m[1], 10) || 0) : mx;
                     }, 0);
+                    if (typeof window._normRoomFloorStyle === 'function') {
+                        window._roomFloorStyle = window._normRoomFloorStyle(snap.roomFloorStyle);
+                    }
+                    var wc = snap.roomWallColor;
+                    window._roomWallColor = (wc && typeof wc.hex === 'string' && /^#[0-9a-f]{3,8}$/i.test(wc.hex))
+                        ? { id: String(wc.id || ''), name: String(wc.name || ''), hex: wc.hex } : null;
+                    if (typeof window._syncRoomFinishesUI === 'function') window._syncRoomFinishesUI();
                     window._roomWindows = Array.isArray(snap.roomWindows)
                         ? snap.roomWindows.filter(function(w) { return w && w.id; }).map(function(w) {
                             return { id: String(w.id), wall: w.wall, t: Number(w.t), width: Number(w.width), height: Number(w.height), sill: Number(w.sill) };
@@ -569,6 +576,8 @@
             roomExtraDoors: (window._roomExtraDoors || []).map(function(d) {
                 return { id: d.id, wall: d.wall, t: d.t, width: d.width, height: d.height, hinge: d.hinge || 'left', swing: d.swing || 'in' };
             }),
+            roomFloorStyle: window._roomFloorStyle ? Object.assign({}, window._roomFloorStyle) : null,
+            roomWallColor: window._roomWallColor ? Object.assign({}, window._roomWallColor) : null,
             roomWindows: (window._roomWindows || []).map(function(w) {
                 return { id: w.id, wall: w.wall, t: w.t, width: w.width, height: w.height, sill: w.sill };
             }),

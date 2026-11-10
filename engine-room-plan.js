@@ -1481,14 +1481,16 @@
         const grid = _svgEl('pattern', { id: 'rp-grid', patternUnits: 'userSpaceOnUse', width: '24', height: '24' });
         grid.appendChild(_svgEl('path', { d: 'M 24 0 L 0 0 0 24', fill: 'none', stroke: '#e3e8ef', 'stroke-width': '1' }));
         defs.appendChild(grid);
-        // Oak parquet at real scale (2 m tile), anchored to the room corner so it pans and zooms with the plan
-        const tile = 200 * tf.scale;
+        // Room floor (parquet / porcelain tiles) at real scale, anchored to the room corner so it pans and zooms with the plan
+        const fp2d = typeof window._roomFloorPattern2D === 'function'
+            ? window._roomFloorPattern2D() : { href: 'images/oak-floor.jpg', wCm: 200, hCm: 200, parquet: true };
+        const tileW = fp2d.wCm * tf.scale, tileH = fp2d.hCm * tf.scale;
         const floor = _svgEl('pattern', {
             id: 'rp-floor', patternUnits: 'userSpaceOnUse',
-            x: tl.x.toFixed(2), y: tl.y.toFixed(2), width: tile.toFixed(2), height: tile.toFixed(2)
+            x: tl.x.toFixed(2), y: tl.y.toFixed(2), width: tileW.toFixed(2), height: tileH.toFixed(2)
         });
         floor.appendChild(_svgEl('image', {
-            href: 'images/oak-floor.jpg', x: 0, y: 0, width: tile.toFixed(2), height: tile.toFixed(2),
+            href: fp2d.href, x: 0, y: 0, width: tileW.toFixed(2), height: tileH.toFixed(2),
             preserveAspectRatio: 'none'
         }));
         defs.appendChild(floor);
@@ -1519,6 +1521,16 @@
             x: tl.x + 2, y: tl.y + 2, width: Math.max(rw - 4, 0), height: Math.max(rh - 4, 0),
             fill: 'none', stroke: 'rgba(15,23,42,0.10)', 'stroke-width': '4'
         }));
+        const _hostDragging = !!(window._roomPlanDrag && window._roomPlanDrag.id === 'cabinet');
+        (window._autoClosureStrips || []).forEach(function(s) {
+            if (s.kind === 'top' || _hostDragging) return;
+            const a = _w2s(s.minX, s.minZ, tf), c = _w2s(s.maxX, s.maxZ, tf);
+            roomG.appendChild(_svgEl('rect', {
+                x: Math.min(a.x, c.x), y: Math.min(a.y, c.y),
+                width: Math.max(Math.abs(c.x - a.x), 2), height: Math.max(Math.abs(c.y - a.y), 2),
+                fill: s.color, stroke: '#334155', 'stroke-width': '1'
+            }));
+        });
         svg.appendChild(roomG);
 
         // Area under the room + a 1 m scale bar
@@ -2164,7 +2176,8 @@
             const d = window._roomPlanDrag;
             if (!d) return;
             if (e && d.pointerId !== e.pointerId) return;
-            const wasDoor = _isRoomDoorId(d.id) || _isRoomWindowId(d.id) || _isWallFeatureId(d.id);
+            const wasDoor = _isRoomDoorId(d.id) || _isRoomWindowId(d.id) || _isWallFeatureId(d.id)
+                || (d.id === 'cabinet' && typeof window._autoClosuresActive === 'function' && window._autoClosuresActive());
             if (_isWallFeatureId(d.id)) window._isDirty = true;
             window._roomPlanDrag = null;
             document.body.classList.remove('room-plan-dragging');

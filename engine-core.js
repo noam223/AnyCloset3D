@@ -1107,6 +1107,173 @@ window._setRoomHostPose = function(pose) {
     g.poses[String(h)] = p;
 };
 
+// ── Auto closures (order option "סגירות: כן") ───────────────────────────────
+// A cabinet side standing against a wall is kept _AUTO_CLOSURE_GAP from it and the gap is closed with a
+// front strip; a top strip closes cabinet → ceiling (order option closureCeiling). The old room-wall
+// side/ceiling panels are skipped while this is active.
+const _AUTO_CLOSURE_GAP = 5;
+const _AUTO_CLOSURE_NEAR = 15;
+const _AUTO_CLOSURE_T = 1.8;
+window._autoClosureStrips = [];
+
+window._autoClosuresActive = function() {
+    if (typeof state === 'undefined' || !state.wings || !state.wings.center) return false;
+    return window._orderOpts(state.wings).closures === 'yes';
+};
+
+function _autoClosureCabHeight() {
+    let h = 0;
+    const scan = function(cols) { (cols || []).forEach(function(c) { h = Math.max(h, Number(c && c.height) || 0); }); };
+    ['center', 'left', 'right'].forEach(function(s) { if (state.wings && state.wings[s]) scan(state.wings[s].columns); });
+    scan(state.columns);
+    return h || state.globalHeight || 240;
+}
+
+/** Where each local side (±x) of the cabinet meets the room: outward axis/sign and the gap to that wall. */
+function _autoClosureSides(pose, rect, fp) {
+    const out = {};
+    [['left', fp.minX, -1], ['right', fp.maxX, 1]].forEach(function(e) {
+        const p = _rlCompose(pose, { x: e[1], z: 0, rotation: 0 });
+        const q = _rlCompose(pose, { x: e[1] + e[2], z: 0, rotation: 0 });
+        const ux = q.x - p.x, uz = q.z - p.z;
+        let s = null;
+        if (ux < -0.9) s = { ax: 'x', sign: -1, gap: p.x - rect.leftX };
+        else if (ux > 0.9) s = { ax: 'x', sign: 1, gap: rect.rightX - p.x };
+        else if (uz < -0.9) s = { ax: 'z', sign: -1, gap: p.z - rect.backZ };
+        else if (uz > 0.9) s = { ax: 'z', sign: 1, gap: rect.frontZ - p.z };
+        out[e[0]] = s;
+    });
+    return out;
+}
+
+/**
+ * Keeps the open cabinet _AUTO_CLOSURE_GAP from the walls it stands against (or is pinned to by the
+ * left/right/between-walls buttons). Writes the pose quietly — it is derived, so no dirty flag/camera move.
+ * Returns { left, right } gaps (cm) of the sides that get a closure strip.
+ */
+window._applyAutoClosurePose = function() {
+    window._autoClosureLayout = null;
+    if (!window._autoClosuresActive()) return null;
+    const fp = _roomHostFootprint();
+    const preset = state.presetId || 'linear';
+    const rw = (preset === 'linear' || preset === 'sliding') ? (window._roomWall || state.roomWall || 'center') : 'center';
+    const pose = window._getRoomHostPose();
+    let rect = window._getRoomRect();
+    let sides = _autoClosureSides(pose, rect, fp);
+    const forced = { left: rw === 'left' || rw === 'both', right: rw === 'right' || rw === 'both' };
+
+    // "בין קירות": the room spans exactly cabinet + two gaps along the sides' axis
+    if (rw === 'both' && sides.left && sides.right && sides.left.ax === sides.right.ax) {
+        const span = Math.round(fp.maxX - fp.minX + 2 * _AUTO_CLOSURE_GAP);
+        const key = sides.left.ax === 'x' ? '_roomWidth' : '_roomDepth';
+        const cur = sides.left.ax === 'x' ? rect.rightX - rect.leftX : rect.frontZ - rect.backZ;
+        if (Math.abs(cur - span) > 0.5) {
+            window[key] = span;
+            const which = key === '_roomWidth' ? 'width' : 'depth';
+            const sl = document.getElementById('inp-room-' + which);
+            const nm = document.getElementById('inp-num-room-' + which);
+            if (sl) sl.value = span;
+            if (nm) nm.value = span;
+            rect = window._getRoomRect();
+            sides = _autoClosureSides(pose, rect, fp);
+        }
+    }
+
+    const p = { x: pose.x, z: pose.z, rotation: pose.rotation };
+    const move = function(s, d) { if (s.ax === 'x') p.x += s.sign * d; else p.z += s.sign * d; };
+    const near = { left: false, right: false };
+    const gaps = { left: 0, right: 0 };
+    // Second pass: pulling one side to its wall can bring the opposite side within reach of the other wall
+    for (let pass = 0; pass < 2; pass++) {
+        sides = _autoClosureSides(p, rect, fp);
+        ['left', 'right'].forEach(function(k) {
+            near[k] = !!(sides[k] && (forced[k] || sides[k].gap <= _AUTO_CLOSURE_NEAR));
+        });
+        if (near.left && near.right && sides.left.ax === sides.right.ax) {
+            const L = sides.left.gap, R = sides.right.gap, total = L + R;
+            let nl = L;
+            if (total < 2 * _AUTO_CLOSURE_GAP) nl = total / 2;
+            else if (L < _AUTO_CLOSURE_GAP) nl = _AUTO_CLOSURE_GAP;
+            else if (R < _AUTO_CLOSURE_GAP) nl = total - _AUTO_CLOSURE_GAP;
+            move(sides.left, L - nl);
+            gaps.left = nl;
+            gaps.right = total - nl;
+            break;
+        }
+        ['left', 'right'].forEach(function(k) {
+            if (!near[k]) return;
+            move(sides[k], sides[k].gap - _AUTO_CLOSURE_GAP);
+            gaps[k] = _AUTO_CLOSURE_GAP;
+        });
+    }
+    if (Math.abs(p.x - pose.x) > 0.05 || Math.abs(p.z - pose.z) > 0.05) {
+        const h = state.editingCartIndex;
+        if (typeof h !== 'number' || h < 0) {
+            window._roomLooseHostPose = p;
+        } else {
+            let g = _rlGroupOf(h);
+            if (!g) { g = { poses: {} }; window._roomLinks.push(g); }
+            g.poses[String(h)] = p;
+        }
+    }
+    window._autoClosureLayout = { left: near.left ? gaps.left : 0, right: near.right ? gaps.right : 0 };
+    return window._autoClosureLayout;
+};
+
+/** Closure strips in the room group (room coordinates), after _applyAutoClosurePose. */
+function _buildAutoClosureStrips(rg, roomH) {
+    window._autoClosureStrips = [];
+    const lay = window._autoClosureLayout;
+    if (!lay) return;
+    const fp = _roomHostFootprint();
+    const pose = window._getRoomHostPose();
+    const cabH = _autoClosureCabHeight();
+    const inset = state.cabinetModel === 'ab2' || state.cabinetModel === 'ab2_nohoney';
+    const frontZ = fp.depth / 2 + (inset ? 0 : 1.8);
+    const zc = frontZ - _AUTO_CLOSURE_T / 2;
+    const c = state.wings.center;
+    const matKey = c.materialBody || c.boardMaterial || state.materialBody || state.boardMaterial;
+    const baseMat = (typeof materials !== 'undefined' && materials && materials[matKey]) ? materials[matKey] : null;
+    const mat = baseMat ? baseMat.clone() : new THREE.MeshStandardMaterial({ color: 0xd4c5b0, roughness: 0.7 });
+
+    const grp = new THREE.Group();
+    grp.position.set(pose.x, 0, pose.z);
+    grp.rotation.y = (pose.rotation || 0) * Math.PI / 180;
+    grp.userData._roomOwned = true;
+    const strips = [];
+    const add = function(kind, x0, x1, y0, y1) {
+        if (x1 - x0 < 0.3 || y1 - y0 < 0.3) return;
+        const m = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, y1 - y0, _AUTO_CLOSURE_T), mat);
+        m.position.set((x0 + x1) / 2, (y0 + y1) / 2, zc);
+        m.castShadow = true;
+        m.receiveShadow = true;
+        m.userData._roomOwned = true;
+        m.userData.roomPart = 'closure';
+        m.userData.closureKind = kind;
+        grp.add(m);
+        strips.push({ kind: kind, x0: x0, x1: x1 });
+    };
+    if (lay.left > 0) add('left', fp.minX - lay.left, fp.minX, 0, cabH);
+    if (lay.right > 0) add('right', fp.maxX, fp.maxX + lay.right, 0, cabH);
+    if (window._orderOpts(state.wings).closureCeiling !== 'no') {
+        add('top', fp.minX - lay.left, fp.maxX + lay.right, cabH, roomH);
+    }
+    if (!grp.children.length) { mat.dispose(); return; }
+    rg.add(grp);
+
+    // Room-coordinate footprints for the 2D plan
+    window._autoClosureStrips = strips.map(function(s) {
+        const a = _rlCompose(pose, { x: s.x0, z: frontZ - _AUTO_CLOSURE_T, rotation: 0 });
+        const b = _rlCompose(pose, { x: s.x1, z: frontZ, rotation: 0 });
+        return {
+            kind: s.kind,
+            minX: Math.min(a.x, b.x), maxX: Math.max(a.x, b.x),
+            minZ: Math.min(a.z, b.z), maxZ: Math.max(a.z, b.z),
+            color: baseMat && baseMat.color ? '#' + baseMat.color.getHexString() : '#b8a888'
+        };
+    });
+}
+
 /** Scene (open cabinet frame) → room coordinates. */
 window._worldToRoomXZ = function(x, z) {
     const r = _rlCompose(window._getRoomHostPose(), { x: x, z: z, rotation: 0 });
@@ -3036,6 +3203,7 @@ function _buildRoom() {
     rg.position.set(0, 0, 0);
     rg.rotation.set(0, 0, 0);
     rg.updateMatrixWorld(true);
+    window._applyAutoClosurePose();
     const _rect = window._getRoomRect();
     const _hostPose = window._getRoomHostPose();
     const roomD = _rect.frontZ - _rect.backZ;
@@ -3060,9 +3228,14 @@ function _buildRoom() {
     // ── Materials ──────────────────────────────────────────────────────────
     // Painted plaster: flat warm white with a fine roller relief tiled at real scale
     const PLASTER_TILE_CM = 120;
+    const _wallPaint = window._roomWallColor && window._roomWallColor.hex ? new THREE.Color(window._roomWallColor.hex) : null;
     const makeWallMat = (wallW, wallH) => {
         // Emissive stands in for the light bounced around a real room, which the scene lights don't model
         const mat = new THREE.MeshStandardMaterial({ color: 0xfaf8f4, emissive: 0x2a2826, roughness: 0.93, metalness: 0.0, side: THREE.FrontSide });
+        if (_wallPaint) {
+            mat.color.copy(_wallPaint);
+            mat.emissive.copy(_wallPaint).multiplyScalar(0.17);
+        }
         if (!_skipTex && window._wallPlasterNormalTex) {
             mat.normalMap = _roomTexVariant(window._wallPlasterNormalTex, wallW / PLASTER_TILE_CM, wallH / PLASTER_TILE_CM, 0, 0);
             mat.normalScale.set(0.6, 0.6);
@@ -3074,18 +3247,22 @@ function _buildRoom() {
     // ── Floor ──────────────────────────────────────────────────────────────
     // Satin-lacquered oak: plank joints and grain in relief, gloss varying with the grain, and a blurred
     // reflection of the room. Relief/gloss maps share the color map's repeat.
-    const tileSizeCm = 200;
+    // Porcelain tiles (room-finishes.js) use a generated tile-block texture without the plank relief maps.
+    const _floorTex = typeof window._roomFloorTexInfo === 'function' ? window._roomFloorTexInfo()
+        : (window._woodFloorTex ? { map: window._woodFloorTex, wCm: 200, hCm: 200, parquet: true } : null);
     const floorMat = new THREE.MeshStandardMaterial({ color: 0xd4a96a, roughness: 0.8, metalness: 0.0 });
-    if (!_skipTex && window._woodFloorTex) {
-        floorMat.map = _roomTexVariant(window._woodFloorTex, roomW / tileSizeCm, roomD / tileSizeCm, 0, 0);
+    if (!_skipTex && _floorTex) {
+        floorMat.map = _roomTexVariant(_floorTex.map, roomW / _floorTex.wCm, roomD / _floorTex.hCm, 0, 0);
         floorMat.color.set(0xffffff);
-        if (window._woodFloorNormalTex) {
+        if (_floorTex.parquet && window._woodFloorNormalTex) {
             floorMat.normalMap = window._woodFloorNormalTex;
             floorMat.normalScale.set(0.7, 0.7);
         }
-        if (window._woodFloorRoughTex) {
+        if (_floorTex.parquet && window._woodFloorRoughTex) {
             floorMat.roughnessMap = window._woodFloorRoughTex;
             floorMat.roughness = 1.0;
+        } else if (!_floorTex.parquet) {
+            floorMat.roughness = _floorTex.roughness;
         }
         if (window._hdrEnvMap) {
             floorMat.envMap = window._hdrEnvMap;
@@ -3178,7 +3355,7 @@ function _buildRoom() {
         const _ceilRW = _ceilIsLS ? (window._roomWall || state.roomWall || 'center') : 'center';
         const _ceilOn = (window._closureEnabled !== false);
         let _ceilPlaneY = roomH;
-        if (_ceilRW !== 'center' && _ceilIsLS && _ceilOn) {
+        if (_ceilRW !== 'center' && _ceilIsLS && _ceilOn && !window._autoClosuresActive()) {
             const _cabHc = state.columns && state.columns.length > 0
                 ? Math.max(...state.columns.map(c => c.height))
                 : (state.globalHeight || 240);
@@ -3192,6 +3369,7 @@ function _buildRoom() {
         ceilMesh.userData._roomOwned = true;
         rg.add(ceilMesh);
     }
+    _buildAutoClosureStrips(rg, roomH);
 
     // ── Bed model ──────────────────────────────────────────────────────────────
     window._bedMesh = null;
@@ -4617,7 +4795,7 @@ function buildCabinet() {
         // Reset ceiling mesh tracking
         window._closureCeilMeshes = [];
 
-        if (_rw !== 'center' && _isLinearOrSliding) {
+        if (_rw !== 'center' && _isLinearOrSliding && !window._autoClosuresActive()) {
             const _closureOn   = (window._closureEnabled !== false);
             // Left side panel width
             const _closureW    = _closureOn ? Math.max(1.8, parseFloat(window._closureWidth)      || 1.8) : 0;
@@ -4808,7 +4986,7 @@ function buildCabinet() {
         const _isLSH = (_presetH === 'linear' || _presetH === 'sliding');
         const _rwH = _isLSH ? (window._roomWall || state.roomWall || 'center') : 'center';
         const _closureOnH = (window._closureEnabled !== false);
-        if (_rwH !== 'center' && _isLSH && _closureOnH) {
+        if (_rwH !== 'center' && _isLSH && _closureOnH && !window._autoClosuresActive()) {
             const _cabHH = state.columns && state.columns.length > 0
                 ? Math.max(...state.columns.map(c => c.height))
                 : (state.globalHeight || 240);
@@ -4830,7 +5008,7 @@ function buildCabinet() {
         const _preset2 = state.presetId || 'linear';
         const _isLS2 = (_preset2 === 'linear' || _preset2 === 'sliding');
         const _rw2 = _isLS2 ? (window._roomWall || state.roomWall || 'center') : 'center';
-        if (_rw2 !== 'center' && _isLS2) {
+        if (_rw2 !== 'center' && _isLS2 && !window._autoClosuresActive()) {
             const _cw2 = state.wings && state.wings.center ? state.wings.center.width : (state.width || 160);
             const _closureOn2 = (window._closureEnabled !== false);
             const _clW2  = _closureOn2 ? Math.max(1.8, parseFloat(window._closureWidth)      || 1.8) : 0;

@@ -158,7 +158,9 @@
                     '<span class="tambour-color-name" title="' + escapeHtml(color.name) + '">' + escapeHtml(color.name) + '</span>' +
                 '</div>';
             card.addEventListener('click', function() {
-                window.applyTambourColor(color);
+                var handler = pickHandler;
+                if (handler) handler(color);
+                else window.applyTambourColor(color);
                 closeTambourPalette();
             });
             grid.appendChild(card);
@@ -201,7 +203,15 @@
         }
     }
 
+    // When set, a picked colour goes to this callback instead of the active cabinet part (e.g. room wall paint)
+    var pickHandler = null;
+    window.openTambourPaletteFor = function(handler) {
+        window.openTambourPalette();
+        pickHandler = typeof handler === 'function' ? handler : null;
+    };
+
     window.openTambourPalette = async function() {
+        pickHandler = null;
         if (!modal) return;
         if (typeof closeMobilePanel === 'function') closeMobilePanel();
         await loadCSVData();
@@ -214,6 +224,7 @@
         if (!modal) return;
         modal.classList.remove('active');
         document.body.style.overflow = '';
+        pickHandler = null;
     }
     window.closeTambourPalette = closeTambourPalette;
 

@@ -39,7 +39,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style-base.css?v=20260910deskMerge">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
-    <link rel="stylesheet" href="style-extras.css?v=20261110addmenu">
+    <link rel="stylesheet" href="style-extras.css?v=20261110floors">
     <link rel="stylesheet" href="style.css?v=20261109spaceDel">
     <link rel="stylesheet" href="quick-calc.css?v=20260929qc">
     <style>
@@ -400,6 +400,26 @@
                     <button class="slider-btn" onclick="window._setRoomSize('height', (parseInt(document.getElementById('inp-num-room-height').value)||370)-5)"><i class="fa-solid fa-minus"></i></button>
                 </div>
             </div>
+            <div class="section-title" style="margin-top:14px;"><i class="fa-solid fa-swatchbook"></i> ריצוף וקירות</div>
+            <div class="room-finish-kinds">
+                <button type="button" class="room-finish-kind" data-floor-kind="parquet"><i class="fa-solid fa-grip-lines"></i> פרקט</button>
+                <button type="button" class="room-finish-kind" data-floor-kind="tile"><i class="fa-solid fa-border-all"></i> גרניט פורצלן</button>
+            </div>
+            <div id="room-floor-swatches" class="room-finish-swatches"></div>
+            <div id="room-tile-sizes" class="room-finish-sizes" style="display:none;"></div>
+            <div class="room-finish-label">גוון קירות</div>
+            <div class="room-wall-color-row">
+                <span id="room-wall-color-chip" class="room-wall-color-chip"></span>
+                <span id="room-wall-color-name" class="room-wall-color-name">לבן (ברירת מחדל)</span>
+                <button type="button" class="room-wall-color-btn" onclick="window._pickRoomWallColor()"><i class="fa-solid fa-palette"></i> טמבור</button>
+                <button type="button" id="room-wall-color-reset" class="room-wall-color-reset" title="חזרה ללבן" onclick="window._setRoomWallColor(null)" style="display:none;"><i class="fa-solid fa-rotate-left"></i></button>
+            </div>
+            <div class="room-finish-label">לייסט סגירה עד התקרה</div>
+            <div class="order-opt-row">
+                <button type="button" class="order-opt-btn" data-order-opt="closureCeiling" data-val="yes" onclick="setOrderOpt('closureCeiling','yes')">פעיל</button>
+                <button type="button" class="order-opt-btn" data-order-opt="closureCeiling" data-val="no" onclick="setOrderOpt('closureCeiling','no')">ללא</button>
+            </div>
+            <div class="order-opt-hint"><i class="fa-solid fa-circle-info"></i> כשמסומן "סגירות: כן" הארון מורחק 5 ס"מ מהקיר עם לייסט סגירה, ולייסט עליון עד התקרה</div>
             <div class="section-title room-plan-structure-title" style="display:none;margin-top:14px;"><i class="fa-solid fa-couch"></i> ריהוט בחדר</div>
             <div id="room-plan-furniture-list" class="room-plan-furniture-list" style="display:none;"></div>
             <div id="room-props-row" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
@@ -3001,24 +3021,25 @@
 <script src="auth.js?v=20261107tpl"></script>
 <script src="trial-watermark.js?v=20261008trial"></script>
 <script src="egger-colors.js?v=20261104egger2"></script>
-<script src="state.js?v=20261110shelfSnap"></script>
+<script src="state.js?v=20261110closures"></script>
 <script src="quick-calc.js?v=20261029shoe"></script>
 <script src="bathroom-preset.js?v=20261008types"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
 <script src="corner-unit-preset.js?v=20261103deskdoor"></script>
 <script src="engine-appliances.js?v=20261007deskMerge28"></script>
-<script src="engine-core.js?v=20261110insetdoors"></script>
+<script src="engine-core.js?v=20261110closures2"></script>
 <script src="engine-corners.js?v=20261109ridingFlush"></script>
 <script src="engine-blueprint.js?v=20261109colInOut"></script>
-<script src="engine-room-plan.js?v=20261110doors"></script>
-<script src="tambour-color-picker.js?v=20261009colors"></script>
+<script src="engine-room-plan.js?v=20261110floors"></script>
+<script src="tambour-color-picker.js?v=20261110roomwall"></script>
+<script src="room-finishes.js?v=20261110tilesimg"></script>
 <script src="ui.js?v=20261110shelfSnap"></script>
 <script src="mirror-cabinet.js?v=20261109mirror"></script>
 <script src="mobile.js?v=20261029inthandle"></script>
 <script src="part-paint.js?v=20261104egger"></script>
 <script src="shelf-pick.js?v=20260922sideWall"></script>
 <script src="export-3d.js?v=20261105exp3dobj"></script>
-<script src="index-init.js?v=20261110doors"></script>
+<script src="index-init.js?v=20261110floors"></script>
 
 <!-- ===== TAMBOUR FULL PALETTE MODAL ===== -->
 <div id="tambour-palette-modal" class="tambour-palette-overlay">

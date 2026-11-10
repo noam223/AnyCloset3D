@@ -2082,3 +2082,20 @@ body.viewer-mode #canvas-container canvas {
     /* Show the order modal content for printing */
     #order-modal { display: block !important; position: static !important; background: white !important; }
 }
+/* ── Room finishes (floor / wall paint) ── */
+.room-finish-kinds { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+.room-finish-kind { padding: 7px 4px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--bg-light); color: var(--text-dark); font-family: inherit; font-size: 0.76rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.room-finish-kind.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.room-finish-swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; }
+.room-finish-swatch { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 5px 3px; border-radius: 8px; border: 1.5px solid var(--border); background: #fff; font-family: inherit; font-size: 0.68rem; font-weight: 600; color: var(--text-dark); cursor: pointer; }
+.room-finish-swatch.active { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.18); }
+.room-finish-chip { width: 100%; height: 22px; border-radius: 5px; border: 1px solid rgba(15, 23, 42, 0.12); }
+.room-finish-sizes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 8px; }
+.room-finish-size { padding: 6px 2px; border-radius: 7px; border: 1.5px solid var(--border); background: var(--bg-light); color: var(--text-dark); font-family: inherit; font-size: 0.72rem; font-weight: 700; cursor: pointer; direction: ltr; }
+.room-finish-size.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.room-finish-label { margin: 12px 0 6px; font-size: 0.76rem; font-weight: 700; color: var(--text-dark); }
+.room-wall-color-row { display: flex; align-items: center; gap: 7px; }
+.room-wall-color-chip { flex: 0 0 auto; width: 28px; height: 28px; border-radius: 7px; border: 1px solid rgba(15, 23, 42, 0.18); background: #faf8f4; }
+.room-wall-color-name { flex: 1 1 auto; min-width: 0; font-size: 0.74rem; color: var(--text-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room-wall-color-btn, .room-wall-color-reset { flex: 0 0 auto; padding: 6px 9px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--bg-light); color: var(--text-dark); font-family: inherit; font-size: 0.74rem; font-weight: 600; cursor: pointer; }
+.room-wall-color-btn:hover, .room-wall-color-reset:hover, .room-finish-kind:hover, .room-finish-swatch:hover, .room-finish-size:hover { border-color: var(--primary); }

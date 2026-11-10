@@ -1955,7 +1955,7 @@ function _wingHasGlass(w) {
 window._wingHasGlass = _wingHasGlass;
 
 // ── Order-closing options (per cabinet, stored on the center wing so every save/restore path keeps them) ──
-window.ORDER_OPTS_DEFAULT = { levelingFeet: 'no', closures: 'no', leds: 'no', engraving: 'no', engravingColor: 'black', shelfThickness: 17 };
+window.ORDER_OPTS_DEFAULT = { levelingFeet: 'no', closures: 'no', closureCeiling: 'yes', leds: 'no', engraving: 'no', engravingColor: 'black', shelfThickness: 17 };
 window.CLOSURES_PRICE_CUSTOMER = 750;
 window.CLOSURES_PRICE_INSTALL = 300;
 
@@ -1966,6 +1966,7 @@ window._orderOpts = function(wings) {
     const o = Object.assign({}, window.ORDER_OPTS_DEFAULT, (c && c.orderOpts) || {});
     if (o.levelingFeet !== 'yes') o.levelingFeet = 'no';
     if (o.closures !== 'yes') o.closures = 'no';
+    if (o.closureCeiling !== 'no') o.closureCeiling = 'yes';
     return o;
 };
 
@@ -2013,8 +2014,10 @@ window.setOrderOpt = function(key, value) {
     if (key === 'shelfThickness') {
         if (typeof buildCabinet === 'function') buildCabinet();
         if (typeof calculatePrice === 'function') calculatePrice();
-    } else if (key === 'closures' && typeof calculatePrice === 'function') {
-        calculatePrice();
+    } else if (key === 'closures' || key === 'closureCeiling') {
+        if (typeof buildCabinet === 'function') buildCabinet();
+        if (typeof calculatePrice === 'function') calculatePrice();
+        if (typeof window._renderRoomPlan2D === 'function') window._renderRoomPlan2D();
     }
     window._syncOrderOptsUI();
     if (typeof saveHistoryState === 'function') saveHistoryState();
