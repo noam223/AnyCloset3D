@@ -175,6 +175,24 @@ for (let i = 0; i < _ROOM_SPOT_COUNT; i++) {
     scene.add(l.target);
     _roomSpots.push(l);
 }
+// Sun through up to two room windows: a shadowed cone from outside the glass, so the walls frame it into a
+// window-shaped patch and furniture in its path catches it. Shadow maps only refresh while a window uses them.
+const _ROOM_DAYLIGHT_COUNT = 2;
+const _ROOM_DAYLIGHT = 0.45;
+const _roomDaylights = [];
+for (let i = 0; i < _ROOM_DAYLIGHT_COUNT; i++) {
+    const l = new THREE.SpotLight(0xfff4e2, 0, 0, 0.5, 0.35, 1);
+    l.castShadow = true;
+    l.shadow.mapSize.set(1024, 1024);
+    l.shadow.camera.near = 50;
+    l.shadow.camera.far = 1200;
+    l.shadow.bias = -0.0008;
+    l.shadow.radius = 4;
+    l.shadow.autoUpdate = false;
+    scene.add(l);
+    scene.add(l.target);
+    _roomDaylights.push(l);
+}
 window._roomSpotsPlaced = false;
 function _roomLightingWanted() {
     return window._lightPresetName === 'studio' && window._roomSpotsPlaced &&
@@ -192,6 +210,7 @@ window._applyLighting = function(name) {
     if (room) fillLight.position.set(0, 120, 600);
     else fillLight.position.set(-300, 200, 200);
     _roomSpots.forEach(function(l) { l.intensity = p.spot || 0; });
+    _roomDaylights.forEach(function(l) { l.intensity = room && l.userData.placed ? _ROOM_DAYLIGHT : 0; });
 };
 /** Called every drawn frame: follows the room being shown/hidden without touching each toggle path. */
 window._syncRoomLighting = function() {
@@ -207,6 +226,21 @@ function _placeRoomSpots(rg, pts) {
         l.target.updateMatrixWorld();
     });
     window._roomSpotsPlaced = pts.length > 0;
+    window._roomLightActive = null;
+}
+
+/** Daylight sources for the room windows ({ pos, target } in room coordinates) → world. */
+function _placeRoomDaylights(rg, list) {
+    _roomDaylights.forEach(function(l, i) {
+        const d = list[i];
+        l.userData.placed = !!d;
+        l.shadow.autoUpdate = !!d;
+        l.shadow.needsUpdate = true;
+        if (!d) { l.position.set(0, -1000, 0); l.target.position.set(0, -1100, 0); l.target.updateMatrixWorld(); return; }
+        l.position.copy(rg.localToWorld(new THREE.Vector3(d.pos.x, d.pos.y, d.pos.z)));
+        l.target.position.copy(rg.localToWorld(new THREE.Vector3(d.target.x, d.target.y, d.target.z)));
+        l.target.updateMatrixWorld();
+    });
     window._roomLightActive = null;
 }
 window._applyLighting('studio');
@@ -2633,6 +2667,7 @@ function _buildRoomDoorMesh(rg, pose) {
 
 function _buildRoomWindowMeshes(rg) {
     window._roomWindowMeshes = [];
+    window._roomDaylightPts = [];
     if (!rg || typeof window._getRoomWindowPoses !== 'function') return;
     const frameMat = new THREE.MeshStandardMaterial({ color: 0xf4f4f2, roughness: 0.5, metalness: 0.05 });
     const glassMat = new THREE.MeshStandardMaterial({
@@ -2681,9 +2716,27 @@ function _buildRoomWindowMeshes(rg) {
         });
         rg.add(group);
         window._roomWindowMeshes.push(group);
+        _addRoomWindowDaylight(rg, p);
     });
 }
 
+// Sun slanting in through the windows: 40° above the horizon, a little off the wall normal
+const _SUN_ELEV = 40 * Math.PI / 180;
+const _SUN_SKEW = 0.3;
+
+/** Where the sun for window `p` sits (window._roomDaylightPts, room coordinates): outside, aimed through the glass. */
+function _addRoomWindowDaylight(rg, p) {
+    const n = _roomWallNormal(p.wall);
+    const hl = Math.hypot(1, _SUN_SKEW);
+    const hx = (n.x + n.z * _SUN_SKEW) / hl, hz = (n.z - n.x * _SUN_SKEW) / hl;
+    const c = Math.cos(_SUN_ELEV), s = Math.sin(_SUN_ELEV);
+    const cy = p.sill + p.height / 2;
+    const back = 320, ahead = cy / s;
+    window._roomDaylightPts.push({
+        pos: { x: p.cx - hx * c * back, y: cy + s * back, z: p.cz - hz * c * back },
+        target: { x: p.cx + hx * c * ahead, y: 0, z: p.cz + hz * c * ahead }
+    });
+}
 window._addCustomRoomItem = function(opts) {
     opts = opts || {};
     const b = window._roomBounds;
@@ -3725,6 +3778,12 @@ function _buildRoom() {
     rg.position.set(-(_hostPose.x * _ic + _hostPose.z * _is), 0, -(-_hostPose.x * _is + _hostPose.z * _ic));
     rg.updateMatrixWorld(true);
     _placeRoomSpots(rg, window._roomSpotPts || []);
+    // Walls, window frames and furniture block the window sun (the ceiling never casts: the key light sits above it)
+    [backWall, leftWall, rightWall].forEach(function(w) { w.castShadow = true; });
+    rg.traverse(function(o) {
+        if (o.isMesh && o.userData.roomProp && !o.material.transparent && !o.material.isMeshBasicMaterial) o.castShadow = true;
+    });
+    _placeRoomDaylights(rg, window._roomDaylightPts || []);
 
     // Notify UI to reposition bed handles
     if (typeof window._updateBedHandles === 'function') window._updateBedHandles();
