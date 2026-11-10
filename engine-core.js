@@ -7972,6 +7972,15 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                 // Build boundary X positions: [colLeft, partX0, partX1, ..., colRight]
                 const boundaryXs = [colLeft, ...partitions.map(px => colLeft + col.width * px), colLeft + col.width];
 
+                // Inset fronts: a partition with only external drawers on both sides is part of the
+                // visible front frame → flush with the carcass front, in body color.
+                const _subAllExtDrawers = (si) => {
+                    const sub = compData.subCells && compData.subCells[si];
+                    if (!sub) return false;
+                    const zones = (Array.isArray(sub.zonesType) && sub.zonesType.length) ? sub.zonesType : [sub.type];
+                    return zones.every(zt => zt === 'external_drawers');
+                };
+
                 // Draw N partition boards + push drag handles
                 partitions.forEach((px, pi) => {
                     const partX = colLeft + col.width * px;
@@ -7979,6 +7988,8 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                     if (ocBlk && ocBlk.paintId) _ppPartId = ocBlk.paintId;
                     if (isBP) {
                         createBoard(t, compH, 0, partX, compCenterY, 0);
+                    } else if (isInset && partMat === matInternal && _subAllExtDrawers(pi) && _subAllExtDrawers(pi + 1)) {
+                        createBoard(t, compH, bodyD - 1, partX, compCenterY, 0.5, matBody);
                     } else {
                         createBoard(t, compH, partD, partX, compCenterY, partZ, partMat);
                     }
