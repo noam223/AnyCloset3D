@@ -5397,7 +5397,12 @@ function _calcWingCost(cfg, wing) {
                 else if (style === 'glass_melamine')                        styleExtra = _priceNum(ex.doorGlassMel, 400);
                 else if (style === 'glass_black' || style === 'glass_gold') styleExtra = _priceNum(ex.doorGlassBlack, 600);
                 else if (style === 'glass_mirror')                          styleExtra = _priceNum(ex.doorMirror, 350);
-                finalCost += styleExtra * leaves;
+                // Dropped mirrors (glued front / inner face) are priced per leaf like a mirror door;
+                // a glued-front leaf is a plain panel underneath, so it drops the style extra.
+                const mirLeaves = function(l) { return Array.isArray(l) ? Math.min(leaves, l.length) : 0; };
+                const mirOut = style === 'glass_mirror' ? 0 : mirLeaves(door.mirrorOut);
+                const mirIn = style === 'glass_mirror' ? 0 : mirLeaves(door.mirrorIn);
+                finalCost += styleExtra * (leaves - mirOut) + (mirOut + mirIn) * _priceNum(ex.doorMirror, 350);
             });
         });
     }

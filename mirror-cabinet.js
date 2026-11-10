@@ -120,6 +120,8 @@
                 if (!d) return;
                 d.type = _swapLR(d.type);
                 if (d.touchLeaf) d.touchLeaf = _swapLR(d.touchLeaf);
+                if (Array.isArray(d.mirrorOut)) d.mirrorOut = d.mirrorOut.map(_swapLR);
+                if (Array.isArray(d.mirrorIn)) d.mirrorIn = d.mirrorIn.map(_swapLR);
             });
             (col.compartments || []).forEach(_mirrorCompartment);
         });

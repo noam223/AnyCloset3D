@@ -39,7 +39,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style-base.css?v=20260910deskMerge">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
-    <link rel="stylesheet" href="style-extras.css?v=20261110floors">
+    <link rel="stylesheet" href="style-extras.css?v=20261110doormirror">
     <link rel="stylesheet" href="style.css?v=20261109spaceDel">
     <link rel="stylesheet" href="quick-calc.css?v=20260929qc">
     <style>
@@ -522,6 +522,16 @@
                     </button>
                 </div>
                 <div class="handle-drag-hint"><i class="fa-solid fa-up-down-left-right"></i>גררו את "טאצ'" אל דלת או כנף בהדמיה כדי להחיל טאצ' רק עליה</div>
+                <div style="font-size:0.78rem;color:var(--text-light);margin:4px 0 6px;">מראה על דלת</div>
+                <div class="mirror-drag-row">
+                    <button type="button" class="mirror-drag-btn" data-mirror="out" onclick="_showToast('גררו את המראה אל דלת או כנף בהדמיה', 2500)" title="גרירה אל דלת — מראה מודבקת על כל חזית הדלת, ללא מסגרת וללא ידית · גרירה שוב — הסרה">
+                        <i class="fa-solid fa-square-full"></i><span>מראה חיצונית</span>
+                    </button>
+                    <button type="button" class="mirror-drag-btn" data-mirror="in" onclick="_showToast('גררו את המראה אל דלת או כנף בהדמיה', 2500)" title="גרירה אל דלת — מראה בצד הפנימי של הדלת · גרירה שוב — הסרה">
+                        <i class="fa-regular fa-square"></i><span>מראה פנימית</span>
+                    </button>
+                </div>
+                <div class="handle-drag-hint"><i class="fa-solid fa-up-down-left-right"></i>גררו מראה אל דלת או כנף בהדמיה · גרירה שוב מסירה</div>
                 <div class="handle-variant-menu" data-for="riding" hidden>
                     <button type="button" class="handle-variant-opt riding-color-opt" data-color="black" onclick="updateRidingColor('black')"><span class="riding-swatch"><i class="rs-black"></i></span><span>שחור מט</span></button>
                     <button type="button" class="handle-variant-opt riding-color-opt" data-color="white" onclick="updateRidingColor('white')"><span class="riding-swatch"><i class="rs-white"></i></span><span>לבן</span></button>
@@ -3026,20 +3036,20 @@
 <script src="auth.js?v=20261107tpl"></script>
 <script src="trial-watermark.js?v=20261008trial"></script>
 <script src="egger-colors.js?v=20261104egger2"></script>
-<script src="state.js?v=20261110closures"></script>
+<script src="state.js?v=20261110doormirror"></script>
 <script src="quick-calc.js?v=20261029shoe"></script>
 <script src="bathroom-preset.js?v=20261008types"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
 <script src="corner-unit-preset.js?v=20261103deskdoor"></script>
 <script src="engine-appliances.js?v=20261007deskMerge28"></script>
-<script src="engine-core.js?v=20261110niche"></script>
+<script src="engine-core.js?v=20261110doormirror2"></script>
 <script src="engine-corners.js?v=20261109ridingFlush"></script>
 <script src="engine-blueprint.js?v=20261109colInOut"></script>
 <script src="engine-room-plan.js?v=20261110floors"></script>
 <script src="tambour-color-picker.js?v=20261110roomwall"></script>
 <script src="room-finishes.js?v=20261110gloss"></script>
-<script src="ui.js?v=20261110roomspots"></script>
-<script src="mirror-cabinet.js?v=20261109mirror"></script>
+<script src="ui.js?v=20261110doormirror"></script>
+<script src="mirror-cabinet.js?v=20261110doormirror"></script>
 <script src="mobile.js?v=20261029inthandle"></script>
 <script src="part-paint.js?v=20261104egger"></script>
 <script src="shelf-pick.js?v=20260922sideWall"></script>

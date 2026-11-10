@@ -2099,3 +2099,14 @@ body.viewer-mode #canvas-container canvas {
 .room-wall-color-name { flex: 1 1 auto; min-width: 0; font-size: 0.74rem; color: var(--text-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .room-wall-color-btn, .room-wall-color-reset { flex: 0 0 auto; padding: 6px 9px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--bg-light); color: var(--text-dark); font-family: inherit; font-size: 0.74rem; font-weight: 600; cursor: pointer; }
 .room-wall-color-btn:hover, .room-wall-color-reset:hover, .room-finish-kind:hover, .room-finish-swatch:hover, .room-finish-size:hover { border-color: var(--primary); }
+/* Mirror-on-door drag sources (handle panel) */
+.mirror-drag-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+.mirror-drag-btn {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    padding: 8px 4px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: var(--bg-card); color: var(--text-mid); font-family: inherit; font-weight: 600;
+    cursor: grab; touch-action: none; transition: all var(--transition);
+}
+.mirror-drag-btn i { font-size: 0.95rem; opacity: 0.85; color: #64748b; }
+.mirror-drag-btn span { font-size: 0.68rem; }
+.mirror-drag-btn:hover { background: var(--accent-pale); border-color: var(--accent); color: var(--accent); }

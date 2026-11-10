@@ -914,6 +914,38 @@ window._touchIconSprite = function() {
     return sprite;
 };
 
+const _mirrorIconTex = {};
+/** Print capture: framed-mirror glyph + label on doors with a dropped mirror ('out' glued front / 'in' inner face). */
+window._mirrorIconSprite = function(kind) {
+    const inner = kind === 'in';
+    if (!_mirrorIconTex[kind]) {
+        const cv = document.createElement('canvas');
+        cv.width = 260; cv.height = 260;
+        const g = cv.getContext('2d');
+        const navy = '#1e3a5f';
+        const cx = 130;
+        // Light card behind glyph and label so they stay readable on the reflective sheet
+        g.fillStyle = 'rgba(255,255,255,0.88)';
+        g.beginPath(); g.roundRect(4, 4, 252, 252, 28); g.fill();
+        g.strokeStyle = navy; g.lineWidth = 9; g.lineJoin = 'round';
+        g.beginPath(); g.roundRect(cx - 52, 14, 104, 142, 12); g.stroke();
+        g.lineWidth = 7; g.lineCap = 'round';
+        g.beginPath(); g.moveTo(cx - 28, 70); g.lineTo(cx + 2, 40); g.stroke();
+        g.beginPath(); g.moveTo(cx - 28, 104); g.lineTo(cx + 26, 50); g.stroke();
+        if (inner) { g.setLineDash([10, 9]); g.lineWidth = 5; g.beginPath(); g.roundRect(cx - 36, 30, 72, 110, 6); g.stroke(); g.setLineDash([]); }
+        g.fillStyle = navy;
+        g.font = 'bold 42px Heebo, Arial, sans-serif';
+        g.textAlign = 'center';
+        g.direction = 'rtl';
+        g.fillText(inner ? 'מראה פנימית' : 'מראה', cx, 214);
+        _mirrorIconTex[kind] = new THREE.CanvasTexture(cv);
+    }
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: _mirrorIconTex[kind], transparent: true, depthTest: false }));
+    sprite.scale.set(24, 24, 1);
+    sprite.renderOrder = 999;
+    return sprite;
+};
+
 // Load room textures once
 window._woodFloorTex = null;
 window._wallTex = null;
@@ -5560,6 +5592,24 @@ function _doorTouchLeaf(door) {
 }
 window._doorTouchLeaf = _doorTouchLeaf;
 
+/**
+ * Per-leaf mirrors dropped on a door: door.mirrorOut / door.mirrorIn list the leaves ('left' | 'right';
+ * a single door uses its own type) carrying a glued full-front mirror / a mirror on the inner face.
+ */
+function _doorLeafMirror(door, kind, leaf) {
+    const list = door && (kind === 'in' ? door.mirrorIn : door.mirrorOut);
+    return Array.isArray(list) && list.indexOf(leaf) >= 0;
+}
+window._doorLeafMirror = _doorLeafMirror;
+
+function _mirrorMaterial() {
+    const intensity = (window._hdrIntensity && window._hdrIntensity.mirror != null) ? window._hdrIntensity.mirror : 2.8;
+    const m = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 1.0, roughness: 0.0, envMapIntensity: intensity, side: THREE.FrontSide });
+    const map = window._hdrEnvMapSharp || window._hdrEnvMap;
+    if (map) { m.envMap = map; m.needsUpdate = true; }
+    return m;
+}
+
 function _doorLeafHandleStyle(door, leaf) {
     if (_doorTouchLeaf(door) === leaf) return 'touch';
     return (door && door.handleStyle) || _getHandleStyle();
@@ -8785,6 +8835,11 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                 const makeDoor = (w, isLeft, centerX, style, uvTotalW, partIdSuffix) => {
                     style = style || 'solid';
                     partIdSuffix = partIdSuffix || doorPartId;
+                    const leafKey = isLeft ? 'left' : 'right';
+                    // Glued mirror: a plain door panel with a mirror sheet over its whole front, no frame or handle
+                    const mirrorOut = !isBP && style !== 'glass_mirror' && _doorLeafMirror(door, 'out', leafKey);
+                    const mirrorIn = !isBP && style !== 'glass_mirror' && _doorLeafMirror(door, 'in', leafKey);
+                    if (mirrorOut) style = 'solid';
                     // For framed/glass styles, the frame profiles protrude fd=1.5cm in front of the door panel.
                     // To keep all door styles flush at the same front face, shift the door group back by fd
                     // so the frame's front face aligns with a solid door's front face.
@@ -8796,7 +8851,8 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                     doorGroup.position.set(pivotX, dY, zPos - fd_offset);
                     doorGroup.userData.doorLeaf = { door, colIndex: c, doorIdx, leaf: isLeft ? 'left' : 'right' };
                     _buildGroup.add(doorGroup);
-                    const leafHs = _doorLeafHandleStyle(door, isLeft ? 'left' : 'right');
+                    const _leafHs = _doorLeafHandleStyle(door, leafKey);
+                    const leafHs = mirrorOut && _leafHs !== 'touch' ? 'none' : _leafHs;
                     
                     const doorLocalX = isLeft ? w/2 : -w/2;
 
@@ -8884,7 +8940,21 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         }
                         doorGroup.add(mesh);
                         _ppRegisterMesh(mesh, partIdSuffix);
-                        if (_bathGroove !== 'plain') {
+                        if (mirrorOut) {
+                            const sheet = new THREE.Mesh(new THREE.BoxGeometry(w, dH, 0.4), _mirrorMaterial());
+                            sheet.position.set(doorLocalX, 0, t / 2 + 0.2);
+                            doorGroup.add(sheet);
+                        }
+                        if (mirrorIn) {
+                            // Inner mirror sits inside the door's edges so the hinges and the closing rebate stay clear
+                            const mw = w - 8, mh = dH - 8;
+                            if (mw > 4 && mh > 4) {
+                                const sheet = new THREE.Mesh(new THREE.BoxGeometry(mw, mh, 0.4), _mirrorMaterial());
+                                sheet.position.set(doorLocalX, 0, -t / 2 - 0.2);
+                                doorGroup.add(sheet);
+                            }
+                        }
+                        if (_bathGroove !== 'plain' && !mirrorOut) {
                             _drawGroovesOnPanel(doorGroup, _bathGroove, w, dH, t, doorLocalX, 0, t / 2 + 0.05, matExternal);
                         }
                     }
@@ -8976,12 +9046,24 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             }
                         }
                     }
-                    if (!isBP && window._captureTouchIcons && window._spaceBuildSlot == null
-                        && leafHs === 'touch'
-                        && style !== 'glass_mirror' && w >= 28 && dH >= 34) {
-                        const icon = window._touchIconSprite();
-                        icon.position.set(doorLocalX, 0, t / 2 + 3);
-                        doorGroup.add(icon);
+                    if (!isBP && window._captureTouchIcons && window._spaceBuildSlot == null) {
+                        const touchIcon = leafHs === 'touch' && style !== 'glass_mirror' && w >= 28 && dH >= 34;
+                        if (touchIcon) {
+                            const icon = window._touchIconSprite();
+                            icon.position.set(doorLocalX, 0, t / 2 + 3);
+                            doorGroup.add(icon);
+                        }
+                        const kinds = (mirrorOut ? ['out'] : []).concat(mirrorIn ? ['in'] : []);
+                        if (kinds.length && w >= 26 && dH >= 30 * (kinds.length + (touchIcon ? 1 : 0))) {
+                            // Stacked above the touch icon (or centred on the door when there is none)
+                            const step = 28;
+                            const first = touchIcon ? step : -(kinds.length - 1) * step / 2;
+                            kinds.forEach(function(k, i) {
+                                const icon = window._mirrorIconSprite(k);
+                                icon.position.set(doorLocalX, first + i * step, t / 2 + 3);
+                                doorGroup.add(icon);
+                            });
+                        }
                     }
                     _registerDoorMesh(doorGroup);
                 };
@@ -8998,11 +9080,15 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                     makeDoor(w, true, _doorOverlayCenterX - w/2 - doorGap/2, doorStyle, _doorOverlayW);
                     makeDoor(w, false, _doorOverlayCenterX + w/2 + doorGap/2, doorStyle, _doorOverlayW);
                 }
-                const _touchLeaf = _doorTouchLeaf(door);
-                if (!isBP && (door.handleStyle || _handleStyle) === 'riding' && doorStyle !== 'glass_mirror') {
-                    // A touch leaf has no handle — slide the seam profile onto the other leaf's edge
+                // Touch and glued-mirror leaves carry no handle
+                const _bareLeaf = function(lf) { return _doorTouchLeaf(door) === lf || _doorLeafMirror(door, 'out', lf); };
+                const _bareSide = door.type === 'double'
+                    ? (_bareLeaf('left') ? (_bareLeaf('right') ? 'both' : 'left') : (_bareLeaf('right') ? 'right' : null))
+                    : (_bareLeaf(door.type) ? 'both' : null);
+                if (!isBP && (door.handleStyle || _handleStyle) === 'riding' && doorStyle !== 'glass_mirror' && _bareSide !== 'both') {
+                    // A bare leaf has no handle — slide the seam profile onto the other leaf's edge
                     const rx = door.type === 'double'
-                        ? _doorOverlayCenterX + (_touchLeaf === 'left' ? 1 : _touchLeaf === 'right' ? -1 : 0) * (doorGap / 2 + 0.5)
+                        ? _doorOverlayCenterX + (_bareSide === 'left' ? 1 : _bareSide === 'right' ? -1 : 0) * (doorGap / 2 + 0.5)
                         : door.type === 'left' ? _doorOverlayCenterX + _doorOverlayW / 2
                         : door.type === 'right' ? _doorOverlayCenterX - _doorOverlayW / 2
                         : null;

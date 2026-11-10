@@ -5343,6 +5343,7 @@ window._openTvSizeMenu = _openTvSizeMenu;
 
 // Drag the sidebar "טאצ'" button onto a door: a double-door leaf gets door.touchLeaf
 // (the other leaf keeps its handle); a single door gets a per-door touch handle. Drop again to undo.
+// The sidebar mirror buttons use the same drag: they toggle the leaf in door.mirrorOut / door.mirrorIn.
 (function _initTouchDoorDrag() {
     const DRAG_PX = 6;
     let drag = null;
@@ -5382,7 +5383,29 @@ window._openTvSizeMenu = _openTvSizeMenu;
         return (Array.isArray(info.sub.zonesDoorHandleStyle) && info.sub.zonesDoorHandleStyle[info.z]) || null;
     }
 
+    const GLASS_STYLES = ['glass_melamine', 'glass_black', 'glass_gold'];
+
+    function mirrorOutcome(info, kind) {
+        const door = info.door;
+        if (info.subDoor || (door.type !== 'left' && door.type !== 'right' && door.type !== 'double')) {
+            return { ok: false, text: 'מראה אפשר לשחרר על דלת רגילה או כפולה' };
+        }
+        const where = leafLabel(info);
+        const name = kind === 'in' ? 'מראה פנימית' : 'מראה חיצונית';
+        if (door.style === 'glass_mirror') return { ok: false, text: 'הדלת כבר דלת מראה' };
+        if (kind === 'in' && GLASS_STYLES.indexOf(door.style) >= 0) return { ok: false, text: 'אין מראה פנימית בדלת זכוכית' };
+        if (window._doorLeafMirror(door, kind, info.leaf)) {
+            return { ok: true, undo: true, text: 'הסרת ' + name + ' מ' + where, done: 'ה' + name + ' הוסרה מ' + where };
+        }
+        return {
+            ok: true, text: name + ' ל' + where.slice(1),
+            done: kind === 'in' ? 'נוספה מראה פנימית ל' + where.slice(1)
+                : 'נוספה מראה חיצונית על כל החזית של ' + where + ' — ללא מסגרת וללא ידית'
+        };
+    }
+
     function dropOutcome(info) {
+        if (drag && drag.mode !== 'touch') return mirrorOutcome(info, drag.mode);
         const door = info.door;
         if (info.subDoor) {
             const what = info.kind === 'double' ? 'הדלת הכפולה' : info.kind === 'flap' ? 'הקלפה' : 'הדלת';
@@ -5446,6 +5469,7 @@ window._openTvSizeMenu = _openTvSizeMenu;
         drag.target = out && out.ok ? info : null;
         highlight(drag.target ? hit.obj : null);
         drag.label.textContent = out ? out.text : (hit ? 'אפשר לשחרר על דלת רגילה או כפולה' : 'גררו אל דלת בהדמיה');
+        if (!out && hit && drag.mode !== 'touch') drag.label.textContent = 'מראה אפשר לשחרר על דלת רגילה או כפולה';
         drag.ghost.classList.toggle('ok', !!drag.target);
         drag.ghost.classList.toggle('bad', !!out && !out.ok);
     }
@@ -5453,7 +5477,13 @@ window._openTvSizeMenu = _openTvSizeMenu;
     function apply(info) {
         const door = info.door;
         const out = dropOutcome(info);
-        if (info.subDoor) {
+        if (drag && drag.mode !== 'touch') {
+            const key = drag.mode === 'in' ? 'mirrorIn' : 'mirrorOut';
+            const list = (Array.isArray(door[key]) ? door[key] : []).filter(l => l !== info.leaf);
+            if (!out.undo) list.push(info.leaf);
+            if (list.length) door[key] = list;
+            else delete door[key];
+        } else if (info.subDoor) {
             if (info.group) {
                 if (out.undo) delete info.group.handleStyle;
                 else info.group.handleStyle = 'touch';
@@ -5477,7 +5507,7 @@ window._openTvSizeMenu = _openTvSizeMenu;
         drag.started = true;
         const g = document.createElement('div');
         g.className = 'touch-drag-ghost';
-        g.innerHTML = '<i class="fa-solid fa-hand-pointer"></i><span></span>';
+        g.innerHTML = '<i class="fa-solid ' + (drag.mode === 'touch' ? 'fa-hand-pointer' : 'fa-square-full') + '"></i><span></span>';
         document.body.appendChild(g);
         drag.ghost = g;
         drag.label = g.querySelector('span');
@@ -5505,10 +5535,14 @@ window._openTvSizeMenu = _openTvSizeMenu;
         drag = null;
     }
 
+    const DRAG_SRC = '#handle-type-row .handle-style-btn[data-style="touch"], .mirror-drag-btn[data-mirror]';
+
     function onDown(e) {
-        const btn = e.target.closest && e.target.closest('#handle-type-row .handle-style-btn[data-style="touch"]');
-        if (!btn || e.button !== 0 || state.cabinetModel === 'ab2') return;
-        drag = { btn, x0: e.clientX, y0: e.clientY, started: false, target: null, hl: null };
+        const btn = e.target.closest && e.target.closest(DRAG_SRC);
+        if (!btn || e.button !== 0) return;
+        const mode = btn.getAttribute('data-mirror') || 'touch';
+        if (mode === 'touch' && state.cabinetModel === 'ab2') return;
+        drag = { btn, mode, x0: e.clientX, y0: e.clientY, started: false, target: null, hl: null };
         try { btn.setPointerCapture(e.pointerId); } catch (_) {}
     }
 
@@ -5526,10 +5560,10 @@ window._openTvSizeMenu = _openTvSizeMenu;
     document.addEventListener('pointerup', end);
     document.addEventListener('pointercancel', end);
     document.addEventListener('dragstart', e => {
-        if (e.target.closest && e.target.closest('#handle-type-row .handle-style-btn[data-style="touch"]')) e.preventDefault();
+        if (e.target.closest && e.target.closest(DRAG_SRC)) e.preventDefault();
     }, true);
     document.addEventListener('click', e => {
-        if (suppressClick && e.target.closest && e.target.closest('.handle-style-btn')) {
+        if (suppressClick && e.target.closest && e.target.closest('.handle-style-btn, .mirror-drag-btn')) {
             e.preventDefault();
             e.stopImmediatePropagation();
             suppressClick = false;
@@ -14945,6 +14979,10 @@ function _countTouchHandlesInWing(wing, rs, out) {
             (col.doors || []).forEach(function(door) {
                 if (door && isTouch(door.handleStyle)) out.doors += door.type === 'double' ? 2 : 1;
                 else if (door && door.type === 'double' && (door.touchLeaf === 'left' || door.touchLeaf === 'right')) out.doors += 1;
+                if (door && door.style !== 'glass_mirror') {
+                    out.mirrorOut = (out.mirrorOut || 0) + (Array.isArray(door.mirrorOut) ? door.mirrorOut.length : 0);
+                    out.mirrorIn = (out.mirrorIn || 0) + (Array.isArray(door.mirrorIn) ? door.mirrorIn.length : 0);
+                }
             });
             _forEachPartitionDoor(col, function(type, handleStyle) {
                 if (isTouch(handleStyle)) out.doors += type === 'door_double' ? 2 : 1;
@@ -15069,6 +15107,8 @@ function _countTouchHandlesFromRawState(rs, side) {
 function _pushTouchHandleRows(rows, prefix, t) {
     if (t.doors > 0) rows.push({ id: prefix + 'touchDoors', label: 'דלתות טאצ\'', value: t.doors + ' יחידות' });
     if (t.drawers > 0) rows.push({ id: prefix + 'touchDrawers', label: 'מגירות טאצ\'', value: t.drawers + ' יחידות' });
+    if (t.mirrorOut > 0) rows.push({ id: prefix + 'mirrorOut', label: 'מראה חיצונית על דלת', value: t.mirrorOut + ' יחידות (מודבקת על כל החזית)' });
+    if (t.mirrorIn > 0) rows.push({ id: prefix + 'mirrorIn', label: 'מראה פנימית בדלת', value: t.mirrorIn + ' יחידות' });
 }
 
 /** Drawer fronts of an attached side desk — same default as the engine (≤80cm → 1, wider → 2). */
