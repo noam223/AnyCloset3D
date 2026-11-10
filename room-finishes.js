@@ -15,7 +15,7 @@ window.ROOM_TILE_FINISHES = [
     { id: 'concrete',      label: 'בטון בהיר', swatch: '#bebbb5', roughness: 0.55, faces: _tileFaces('concrete') },
     { id: 'concrete_dark', label: 'בטון כהה',  swatch: '#7d7c79', roughness: 0.55, faces: _tileFaces('concrete-dark') },
     { id: 'carrara',       label: 'קררה',      swatch: '#f3f3f1', roughness: 0.25, faces: _tileFaces('carrara') },
-    { id: 'stone',         label: 'אבן בז\'',  swatch: '#d4c8b4', roughness: 0.5,  faces: _tileFaces('stone'), directional: true }
+    { id: 'stone',         label: 'אבן בז\'',  swatch: '#d3cdc2', roughness: 0.5,  faces: _tileFaces('stone'), directional: true, saturation: 0.45 }
 ];
 function _tileFaces(name) {
     return [1, 2, 3].map(function(n) { return 'images/tiles/' + name + '-' + n + '.jpg'; });
@@ -111,7 +111,7 @@ window._roomWallColor = window._roomWallColor || null;
             ctx.restore();
             return;
         }
-        const base = { concrete: '#bdbab4', concrete_dark: '#7e7d7a', stone: '#d5c9b6' }[finish] || '#bdbab4';
+        const base = { concrete: '#bdbab4', concrete_dark: '#7e7d7a', stone: '#d3cdc2' }[finish] || '#bdbab4';
         ctx.fillStyle = base;
         ctx.fillRect(x0, y0, w, h);
         if (finish === 'stone') {
@@ -146,7 +146,8 @@ window._roomWallColor = window._roomWallColor || null;
         const n = d.length / 4;
         return s.map(function(v) { return Math.max(1, v / n); });
     }
-    function _balancedFace(img, avg, mean) {
+    function _balancedFace(img, avg, mean, saturation) {
+        const sat = typeof saturation === 'number' ? saturation : 1;
         const c = document.createElement('canvas');
         c.width = img.naturalWidth;
         c.height = img.naturalHeight;
@@ -156,9 +157,14 @@ window._roomWallColor = window._roomWallColor || null;
         const d = id.data;
         const g = [0, 1, 2].map(function(k) { return 1 + (mean[k] / avg[k] - 1) * 0.8; });
         for (let i = 0; i < d.length; i += 4) {
-            d[i] = Math.min(255, d[i] * g[0]);
-            d[i + 1] = Math.min(255, d[i + 1] * g[1]);
-            d[i + 2] = Math.min(255, d[i + 2] * g[2]);
+            let r = d[i] * g[0], gg = d[i + 1] * g[1], b = d[i + 2] * g[2];
+            if (sat !== 1) {
+                const l = 0.2126 * r + 0.7152 * gg + 0.0722 * b;
+                r = l + (r - l) * sat; gg = l + (gg - l) * sat; b = l + (b - l) * sat;
+            }
+            d[i] = Math.min(255, r);
+            d[i + 1] = Math.min(255, gg);
+            d[i + 2] = Math.min(255, b);
         }
         x.putImageData(id, 0, 0);
         return c;
@@ -180,7 +186,7 @@ window._roomWallColor = window._roomWallColor || null;
                     const mean = [0, 1, 2].map(function(k) {
                         return avgs.reduce(function(a, v) { return a + v[k]; }, 0) / avgs.length;
                     });
-                    e.faces.forEach(function(f, i) { f.img = _balancedFace(f.img, avgs[i], mean); });
+                    e.faces.forEach(function(f, i) { f.img = _balancedFace(f.img, avgs[i], mean, fin.saturation); });
                     e.ready = true;
                     _invalidateFinish(finish);
                 };
@@ -375,7 +381,8 @@ window._syncRoomFinishesUI = function() {
         const cur = s.kind === 'tile' ? s.finish : s.tone;
         sw.innerHTML = list.map(function(t) {
             return '<button type="button" class="room-finish-swatch' + (t.id === cur ? ' active' : '') + '" data-floor-opt="' + t.id + '" title="' + t.label + '">' +
-                '<span class="room-finish-chip" style="background:' + t.swatch + (t.faces ? ' url(' + t.faces[0] + ') center/cover' : '') + ';"></span><span>' + t.label + '</span></button>';
+                '<span class="room-finish-chip" style="background:' + t.swatch + (t.faces ? ' url(' + t.faces[0] + ') center/cover' : '') + ';' +
+                (t.saturation ? 'filter:saturate(' + t.saturation + ');' : '') + '"></span><span>' + t.label + '</span></button>';
         }).join('');
     }
     const sz = document.getElementById('room-tile-sizes');
