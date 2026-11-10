@@ -8185,7 +8185,7 @@ window._updateBedHandles = function() {
 window._roomWall          = window._roomWall          || 'center';
 window._roomWidth         = window._roomWidth         || 0;   // 0 = auto (based on cabinet)
 window._roomDepth         = window._roomDepth         || 0;   // 0 = auto
-window._roomHeight        = window._roomHeight        || 0;   // 0 = auto (370cm default)
+window._roomHeight        = window._roomHeight        || 0;   // 0 = auto (275cm, raised to the tallest cabinet)
 window._closureEnabled    = true;
 window._closureWidth      = window._closureWidth      || 1.8; // cm — left side panel width
 window._closureWidthRight = window._closureWidthRight || 1.8; // cm — right side panel width (for 'both' mode)

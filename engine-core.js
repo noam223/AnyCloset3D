@@ -1155,10 +1155,55 @@ function _roomHostFootprint() {
     };
 }
 
+const _ROOM_DEFAULT_HEIGHT = 275;
+
+/** Top (cm from the floor) of a cabinet's wings: tallest column, plus a stacked upper unit. */
+function _roomWingsTop(wings) {
+    if (!wings) return 0;
+    let top = 0;
+    Object.keys(wings).forEach(function(k) {
+        const w = wings[k];
+        if (!w || typeof w !== 'object' || w._isUpperUnit || /^upperUnit_/.test(k)) return;
+        let h = w.globalHeight || 0;
+        (w.columns || []).forEach(function(c) { h = Math.max(h, c.height || 0); });
+        const uu = wings['upperUnit_' + k];
+        if (uu && uu._isUpperUnit) {
+            let uuH = uu.globalHeight || 40;
+            (uu.columns || []).forEach(function(c) { uuH = Math.max(uuH, c.height || 0); });
+            h += (uu._upperGap || 0) + uuH;
+        }
+        top = Math.max(top, h);
+    });
+    return top;
+}
+
+/** Tallest cabinet top in the room: the open cabinet, its shared-space members and room extras. */
+function _roomCabinetsTop() {
+    let top = Math.max(_roomWingsTop(state.wings), state.globalHeight || 0);
+    (state.columns || []).forEach(function(c) { top = Math.max(top, c.height || 0); });
+    const info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
+    if (info) {
+        info.members.forEach(function(m) {
+            const off = window._spaceOffsetForSlot(m.slot);
+            top = Math.max(top, (off.y || 0) + _roomWingsTop(window._spaceWingsForSlot(m.slot)));
+        });
+    }
+    (window._roomExtraCabinets || []).forEach(function(p) {
+        const item = state.orderCart && state.orderCart[p.cartIndex];
+        if (item) top = Math.max(top, window._getCartCabinetDims(item).h);
+    });
+    return top;
+}
+
+/** Room height when the user never set one: 275 cm, raised to the tallest cabinet when it is higher. */
+window._autoRoomHeight = function() {
+    return Math.max(_ROOM_DEFAULT_HEIGHT, Math.ceil(_roomCabinetsTop() - 0.01));
+};
+
 /** Room rectangle in room coordinates. Independent of the left/center/right wall setting. */
 window._getRoomRect = function() {
     const D = (window._roomDepth && window._roomDepth > 0) ? window._roomDepth : 500;
-    const H = (window._roomHeight && window._roomHeight > 0) ? window._roomHeight : (window.MAX_GLOBAL_HEIGHT || 370);
+    const H = (window._roomHeight && window._roomHeight > 0) ? window._roomHeight : window._autoRoomHeight();
     let W = (window._roomWidth && window._roomWidth > 0) ? window._roomWidth : 0;
     if (!W) {
         const fp = _roomHostFootprint();
@@ -5229,6 +5274,12 @@ function buildCabinet() {
             const _rhNum    = document.getElementById('inp-num-room-height');
             if (_rhSlider) _rhSlider.value = _autoRoomH;
             if (_rhNum)    _rhNum.value    = _autoRoomH;
+        } else if (!(window._roomHeight > 0)) {
+            const _autoH = window._autoRoomHeight();
+            const _rhSlider = document.getElementById('inp-room-height');
+            const _rhNum    = document.getElementById('inp-num-room-height');
+            if (_rhSlider) _rhSlider.value = _autoH;
+            if (_rhNum)    _rhNum.value    = _autoH;
         }
     }
 
