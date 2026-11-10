@@ -1028,6 +1028,114 @@ function _bpColumnHasHoneycomb(col) {
 }
 
 /** cm → mm label with 1 decimal (e.g. 72.45 → "724.5"). */
+/**
+ * Host cabinet of a standalone corner desk merged into one of its columns (mergeShelf.tongue).
+ * The desk's own cart item is matched by its merge data, since the print refresh builds each
+ * item's blueprint without switching the editing index. Returns { wing } or null.
+ */
+function _bpCornerUnitHost(cu) {
+    const ms = cu && cu.mergeShelf;
+    const tg = ms && ms.tongue;
+    if (!ms || ms.hostSlot == null || !tg || !(tg.w > 0) || !(tg.d > 0)) return null;
+    if (typeof window._spacePairIdOf !== 'function' || typeof window._spacePairSlotOf !== 'function') return null;
+    const cart = state.orderCart || [];
+    const ed = state.editingCartIndex;
+    const sameDesk = function(raw) {
+        const c = raw && raw.presetId === 'corner-unit' && raw.wings && raw.wings.center && raw.wings.center.corner;
+        const t2 = c && c.mergeShelf && c.mergeShelf.tongue;
+        return !!t2 && c.mergeShelf.hostSlot === ms.hostSlot &&
+            Math.abs((t2.cx || 0) - (tg.cx || 0)) < 0.01 && Math.abs((c.width || 0) - (cu.width || 0)) < 0.01;
+    };
+    const matches = [];
+    cart.forEach(function(it, i) { if (it && sameDesk(it.rawState)) matches.push(i); });
+    let deskIdx = matches.indexOf(ed) >= 0 ? ed : (matches.length ? matches[0] : -1);
+    if (deskIdx < 0 && cart[ed] && cart[ed].rawState && cart[ed].rawState.presetId === 'corner-unit') deskIdx = ed;
+    if (deskIdx < 0) return null;
+    const pairId = window._spacePairIdOf(cart[deskIdx]);
+    if (!pairId) return null;
+    const hostIdx = cart.findIndex(function(it, i) {
+        return i !== deskIdx && window._spacePairIdOf(it) === pairId && window._spacePairSlotOf(it) === ms.hostSlot;
+    });
+    if (hostIdx < 0) return null;
+    const raw = cart[hostIdx].rawState || {};
+    const live = hostIdx === ed && state.presetId !== 'corner-unit';
+    let wing = live ? (state.wings && state.wings.center) : (raw.wings && raw.wings.center);
+    if (wing && (!wing.columns || !wing.columns.length) && !live && raw.columns && raw.columns.length) {
+        wing = Object.assign({}, wing, { columns: raw.columns });
+    }
+    const ci = ms.colIndex;
+    if (!wing || !wing.columns || !(ci >= 0 && ci < wing.columns.length)) return null;
+    return { wing: wing };
+}
+
+/** Top view: host cabinet + desk protruding from its front, tongue inside the column dashed. */
+function _bpCornerUnitHostTopView(p, cu, host, box, f) {
+    const FONT = _BP_FONT, STROKE = _BP_STROKE, STROKE_THIN = _BP_STROKE_THIN;
+    const w = host.wing, cols = w.columns, t = w.thickness || 1.7;
+    const hW = w.width || 160, hD = w.depth || 54;
+    const ms = cu.mergeShelf, tg = ms.tongue;
+    let colX = -hW / 2 + t;
+    for (let i = 0; i < ms.colIndex; i++) colX += (cols[i].width || 0) + t;
+    // Desk-local X (the tongue's frame): host center sits where its merged column meets the tongue
+    const hostCX = (tg.cx || 0) - (colX + (cols[ms.colIndex].width || 0) / 2);
+    const hx1 = hostCX - hW / 2, hx2 = hostCX + hW / 2;
+    const dL = cu.width || 60, dW = cu.depth || 54, sx = tg.sx || 0;
+    const dx1 = sx - dW / 2, dx2 = sx + dW / 2;
+    const tx1 = (tg.cx || 0) - tg.w / 2, tx2 = (tg.cx || 0) + tg.w / 2;
+
+    const xmin = Math.min(hx1, dx1), xmax = Math.max(hx2, dx2);
+    const padL = 90, padR = 150, padT = 80, padB = 150;
+    const sc = Math.min((box.w - padL - padR) / (xmax - xmin), (box.h - padT - padB) / (hD + dL));
+    const ox = box.x + padL + ((box.w - padL - padR) - (xmax - xmin) * sc) / 2 - xmin * sc;
+    const oy = box.y + padT + ((box.h - padT - padB) - (hD + dL) * sc) / 2 + hD * sc;
+    const X = function(x) { return ox + x * sc; };
+    const Y = function(z) { return oy + z * sc; };
+    const txt = function(x, y, s, size, op, weight) {
+        p.push(`<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="${size}"${weight ? ` font-weight="${weight}"` : ''} fill="${STROKE}" opacity="${op}">${s}</text>`);
+    };
+
+    // Host cabinet with its column dividers
+    f.makeRect(p, X(hx1), Y(-hD), hW * sc, hD * sc, '#e8effc', STROKE, 2);
+    let dx = hx1 + t;
+    for (let i = 0; i < cols.length - 1; i++) {
+        dx += (cols[i].width || 0);
+        f.makeRect(p, X(dx), Y(-hD), t * sc, hD * sc, '#cbd5e1', STROKE_THIN, 1);
+        dx += t;
+    }
+    // Desk board: protruding part solid, tongue inside the column dashed (hidden under the cabinet top)
+    p.push(`<rect x="${X(tx1).toFixed(1)}" y="${Y(-tg.d).toFixed(1)}" width="${(tg.w * sc).toFixed(1)}" height="${(tg.d * sc).toFixed(1)}" fill="#fef9c3" fill-opacity="0.75" stroke="${STROKE}" stroke-width="1.5" stroke-dasharray="7 4"/>`);
+    f.makeRect(p, X(dx1), Y(0), dW * sc, dL * sc, '#fef9c3', STROKE, 2);
+
+    // Labels: cabinet in its widest free stretch beside the tongue
+    const freeL = tx1 - hx1, freeR = hx2 - tx2;
+    const labX = freeL >= freeR ? (hx1 + tx1) / 2 : (tx2 + hx2) / 2;
+    txt(X(labX), Y(-hD / 2) + 5, 'ארון', 14, 0.8);
+    txt(X(sx), Y(dL / 2) + 5, 'שולחן', 14, 0.8);
+    txt(X((tx1 + tx2) / 2), Y(-tg.d / 2) + 4, 'פלטה בתוך הארון', 10, 0.75);
+    if (freeL >= freeR ? freeL > 20 : freeR > 20) txt(X(labX), Y(0) + 15, 'חזית ארון', 11, 0.6);
+
+    // Dimensions
+    f.makeDimH(p, X(hx1), X(hx2), Y(-hD) - 22, `${_bpMm(hW)}`);
+    f.makeDimV(p, X(xmin) - 34, Y(-hD), Y(0), `${_bpMm(hD)}`);
+    const rx = X(xmax) + 30;
+    f.makeDimV(p, rx, Y(0), Y(dL), `${_bpMm(dL)}`);
+    f.makeDimV(p, rx, Y(-tg.d), Y(0), `${_bpMm(tg.d)}`);
+    f.makeDimV(p, rx + 50, Y(-tg.d), Y(dL), `${_bpMm(tg.d + dL)}`);
+    const by = Y(dL) + 24;
+    if (dx1 - hx1 > 0.5) f.makeDimH(p, X(hx1), X(dx1), by, `${_bpMm(dx1 - hx1)}`, false);
+    f.makeDimH(p, X(dx1), X(dx2), by, `${_bpMm(dW)}`, false);
+    if (hx2 - dx2 > 0.5) f.makeDimH(p, X(dx2), X(hx2), by, `${_bpMm(hx2 - dx2)}`, false);
+
+    // Production legend
+    const lx = box.x + box.w - 24, ly = box.y + box.h - 78;
+    const line = function(i, s, bold) {
+        p.push(`<text x="${lx}" y="${ly + i * 20}" text-anchor="start" direction="rtl" font-family="${FONT}" font-size="13"${bold ? ' font-weight="700"' : ''} fill="${STROKE}">${s}</text>`);
+    };
+    line(0, `השולחן בולט מחזית הארון: ${_bpMm(dL)} מ״מ`, true);
+    line(1, `כניסת הפלטה לתוך הארון: ${_bpMm(tg.d)} מ״מ (מקווקו)`);
+    line(2, `אורך פלטה כולל: ${_bpMm(tg.d + dL)} מ״מ`);
+}
+
 function _bpMm(cm) {
     const n = Math.round((Number(cm) || 0) * 100) / 10;
     return n.toFixed(1);
@@ -2996,6 +3104,14 @@ window._generateMultiViewBlueprintPages = function() {
         // front view) — its wing width/depth only mirror the unit size, so drawing them would double it.
         if (pid === 'corner-unit' && centerWing && centerWing.corner) {
             const cu = centerWing.corner;
+            const host = _bpCornerUnitHost(cu);
+            if (host) {
+                _bpCornerUnitHostTopView(p, cu, host, { x: MARGIN, y: drawAreaY, w: pw, h: drawAreaH },
+                    { makeRect, makeDimH, makeDimV });
+                _bpFlushDims(p);
+                pages.push({ label: 'מבט עליון — תוכנית רצפה', svgParts: p, viewKey: 'top' });
+                break topView;
+            }
             const uW = cu.width || 60, uD = cu.depth || 54;
             const usc = Math.min((pw - PAD * 2) / uW, (drawAreaH - PAD * 2) / uD);
             const ux = MARGIN + (pw - uW * usc) / 2, uy = drawAreaY + (drawAreaH - uD * usc) / 2;
