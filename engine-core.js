@@ -7785,6 +7785,10 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             if (isLast && zoneTop >= col.height - t - 0.6) doorTopY = col.height - doorGap / 2;
                             else doorTopY -= doorGap / 2;
                             if (!isBottomZone || col.type === 'desk') doorBottomY += doorGap / 2;
+                        } else {
+                            // Inset: inside the clear opening, like column inset doors
+                            doorTopY = zoneBottomY + zoneH - doorGap / 2;
+                            if (!isBottomZone || col.type === 'desk') doorBottomY = zoneBottomY + doorGap / 2;
                         }
                         if (state.desk && state.desk.mergeDrawers && (col.compartments || []).some(cp => cp && cp.mergeWithDesk)) {
                             const _dT = (typeof window._deskSurfaceThickness === 'function') ? window._deskSurfaceThickness(true) : 1.7;
@@ -7798,9 +7802,10 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         const doorMat = _subDoorMat();
                         const _addSubTouchIcon = (cx, w) => _addSubTouchIconAt(cx, doorY, fZ, w, doorH);
                         if (subType === 'door_double') {
-                            const halfW = (subW + t) / 2;
-                            const lCX = subCenterX - halfW / 2;
-                            const rCX = subCenterX + halfW / 2;
+                            const halfW = isInset ? (subW - 2 * doorGap) / 2 : (subW + t) / 2;
+                            const leafOff = isInset ? (halfW + doorGap) / 2 : halfW / 2;
+                            const lCX = subCenterX - leafOff;
+                            const rCX = subCenterX + leafOff;
                             _tagSubDoorLeaf([
                                 _subCreateDoorPanel(halfW, doorH, lCX, doorY, fZ, doorMat, halfW * 2, true),
                                 _subCreateDoorPanel(halfW, doorH, rCX, doorY, fZ, doorMat, halfW * 2, false)
@@ -7829,7 +7834,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                 }
                             }
                         } else {
-                            const doorW = subW + t;
+                            const doorW = isInset ? subW - doorGap : subW + t;
                             _tagSubDoorLeaf([_subCreateDoorPanel(doorW, doorH, subCenterX, doorY, fZ, doorMat)], 'single');
                             _addSubTouchIcon(subCenterX, doorW);
                             if (!isBP) {
@@ -7876,9 +7881,13 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                 flapBottomY = baseY + doorGap / 2;
                             }
                         }
+                        if (isInset) {
+                            flapTopY = zoneBottomY + zoneH - doorGap / 2;
+                            if (!isBottomZoneFlap || col.type === 'desk') flapBottomY = zoneBottomY + doorGap / 2;
+                        }
                         const flapH = Math.max(2, flapTopY - flapBottomY);
                         const flapY = (flapBottomY + flapTopY) / 2;
-                        const flapW = subW + t;
+                        const flapW = isInset ? subW - doorGap : subW + t;
                         _tagSubDoorLeaf([_subCreateDoorPanel(flapW, flapH, subCenterX, flapY, fZ, _subDoorMat())], 'flap');
                         _addSubTouchIconAt(subCenterX, flapY, fZ, flapW, flapH);
                         if (!isBP && doorStyle !== 'glass_mirror') {
@@ -7972,14 +7981,28 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                 // Build boundary X positions: [colLeft, partX0, partX1, ..., colRight]
                 const boundaryXs = [colLeft, ...partitions.map(px => colLeft + col.width * px), colLeft + col.width];
 
-                // Inset fronts: a partition with only external drawers on both sides is part of the
-                // visible front frame → flush with the carcass front, in body color.
-                const _subAllExtDrawers = (si) => {
+                // Inset fronts: a partition with fronts (external drawers / doors) on both sides is part
+                // of the visible front frame → flush with the carcass front, in body color.
+                const _isFrontType = (ft) => ft === 'external_drawers' || ft === 'door_right' || ft === 'door_left'
+                    || ft === 'door_double' || ft === 'door_flap';
+                const _groupsOf = (si) => (compData.zoneDoorGroups || []).filter(g => g && Array.isArray(g.keys)
+                    && g.keys.some(k => parseInt(String(k).split(':')[0], 10) === si));
+                const _subAllFronted = (si) => {
                     const sub = compData.subCells && compData.subCells[si];
                     if (!sub) return false;
                     const zones = (Array.isArray(sub.zonesType) && sub.zonesType.length) ? sub.zonesType : [sub.type];
-                    return zones.every(zt => zt === 'external_drawers');
+                    const groups = _groupsOf(si);
+                    return zones.every((zt, z) => {
+                        if (_isFrontType(zt)) return true;
+                        if (Array.isArray(sub.zonesDoor) && _isFrontType(sub.zonesDoor[z])) return true;
+                        const g = groups.find(gr => gr.keys.includes(si + ':' + z));
+                        return !!(g && _isFrontType(g.type));
+                    });
                 };
+                const _coveredByColDoor = isHiddenByDoor(compCenterY);
+                // A merged door spanning both sides covers the partition → keep it inside
+                const _frontSpansPartition = (pi) => _groupsOf(pi).some(g => _isFrontType(g.type)
+                    && g.keys.some(k => parseInt(String(k).split(':')[0], 10) === pi + 1));
 
                 // Draw N partition boards + push drag handles
                 partitions.forEach((px, pi) => {
@@ -7988,7 +8011,8 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                     if (ocBlk && ocBlk.paintId) _ppPartId = ocBlk.paintId;
                     if (isBP) {
                         createBoard(t, compH, 0, partX, compCenterY, 0);
-                    } else if (isInset && partMat === matInternal && _subAllExtDrawers(pi) && _subAllExtDrawers(pi + 1)) {
+                    } else if (isInset && partMat === matInternal && !_coveredByColDoor
+                        && _subAllFronted(pi) && _subAllFronted(pi + 1) && !_frontSpansPartition(pi)) {
                         createBoard(t, compH, bodyD - 1, partX, compCenterY, 0.5, matBody);
                     } else {
                         createBoard(t, compH, partD, partX, compCenterY, partZ, partMat);
