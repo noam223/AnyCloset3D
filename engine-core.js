@@ -3263,10 +3263,12 @@ function _buildRoom() {
             floorMat.roughness = 1.0;
         } else if (!_floorTex.parquet) {
             floorMat.roughness = _floorTex.roughness;
+            // Very light slabs blow out under the room lights; a tint keeps the veining readable
+            if (_floorTex.tint != null) floorMat.color.set(_floorTex.tint);
         }
         if (window._hdrEnvMap) {
             floorMat.envMap = window._hdrEnvMap;
-            floorMat.envMapIntensity = 0.5;
+            floorMat.envMapIntensity = _floorTex.env != null ? _floorTex.env : 0.5;
         }
         window._floorReflectMaterial(floorMat);
     }

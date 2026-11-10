@@ -14,7 +14,7 @@ window.ROOM_PARQUET_TONES = [
 window.ROOM_TILE_FINISHES = [
     { id: 'concrete',      label: 'בטון בהיר', swatch: '#bebbb5', roughness: 0.55, faces: _tileFaces('concrete') },
     { id: 'concrete_dark', label: 'בטון כהה',  swatch: '#7d7c79', roughness: 0.55, faces: _tileFaces('concrete-dark') },
-    { id: 'carrara',       label: 'קררה',      swatch: '#f3f3f1', roughness: 0.25, faces: _tileFaces('carrara') },
+    { id: 'carrara',       label: 'קררה',      swatch: '#f3f3f1', roughness: 0.45, tint: 0xc4c4c1, env: 0.2, faces: _tileFaces('carrara') },
     { id: 'stone',         label: 'אבן בז\'',  swatch: '#d3cdc2', roughness: 0.5,  faces: _tileFaces('stone'), directional: true, saturation: 0.45 }
 ];
 function _tileFaces(name) {
@@ -318,7 +318,8 @@ window._roomWallColor = window._roomWallColor || null;
         if (s.kind === 'tile') {
             const c = _tileCanvas(s.finish, s.size);
             const fin = window.ROOM_TILE_FINISHES.find(function(f) { return f.id === s.finish; });
-            return { map: _canvasTexture('tile:' + s.finish + ':' + s.size, c.canvas), wCm: c.wCm, hCm: c.hCm, parquet: false, roughness: fin ? fin.roughness : 0.5 };
+            return { map: _canvasTexture('tile:' + s.finish + ':' + s.size, c.canvas), wCm: c.wCm, hCm: c.hCm, parquet: false,
+                roughness: fin ? fin.roughness : 0.5, tint: fin && fin.tint, env: fin && fin.env };
         }
         if (!window._woodFloorTex) return null;
         if (s.tone === 'oak') return { map: window._woodFloorTex, wCm: 200, hCm: 200, parquet: true };
