@@ -1186,6 +1186,58 @@ function _autoClosureSides(pose, rect, fp) {
     return out;
 }
 
+/** Room-wall niche the open cabinet stands in (beyond the wall line), with the cabinet's room rect. */
+function _autoClosureNiche(pose, rect, fp) {
+    const pts = [[fp.minX, -fp.depth / 2], [fp.maxX, -fp.depth / 2], [fp.minX, fp.depth / 2], [fp.maxX, fp.depth / 2]]
+        .map(function(c) { return _rlCompose(pose, { x: c[0], z: c[1], rotation: 0 }); });
+    const r = {
+        minX: Math.min.apply(null, pts.map(function(q) { return q.x; })), maxX: Math.max.apply(null, pts.map(function(q) { return q.x; })),
+        minZ: Math.min.apply(null, pts.map(function(q) { return q.z; })), maxZ: Math.max.apply(null, pts.map(function(q) { return q.z; }))
+    };
+    const n = window._getRoomWallFeaturePoses(rect).find(function(f) { return f.type === 'niche' && _rectInNiche(f, r); });
+    return n ? { niche: n, rect: r } : null;
+}
+
+function _writeAutoClosurePose(p, pose) {
+    if (Math.abs(p.x - pose.x) <= 0.05 && Math.abs(p.z - pose.z) <= 0.05) return;
+    const h = state.editingCartIndex;
+    if (typeof h !== 'number' || h < 0) {
+        window._roomLooseHostPose = p;
+    } else {
+        let g = _rlGroupOf(h);
+        if (!g) { g = { poses: {} }; window._roomLinks.push(g); }
+        g.poses[String(h)] = p;
+    }
+}
+
+/**
+ * In a niche the cabinet is centred between the niche walls with _AUTO_CLOSURE_GAP on each side; a niche
+ * narrower than cabinet + two gaps is widened. Returns the layout, or null when not standing in a niche.
+ */
+function _applyAutoClosureNiche(pose, rect, fp) {
+    const hit = _autoClosureNiche(pose, rect, fp);
+    if (!hit) return null;
+    const alongX = hit.niche.wall === 'front' || hit.niche.wall === 'back';
+    const sides = _autoClosureSides(pose, rect, fp);
+    const ax = alongX ? 'x' : 'z';
+    if (!sides.left || !sides.right || sides.left.ax !== ax || sides.right.ax !== ax) return null;
+    const aLo = alongX ? hit.rect.minX : hit.rect.minZ, aHi = alongX ? hit.rect.maxX : hit.rect.maxZ;
+    const cabW = aHi - aLo;
+    let n = hit.niche;
+    if (n.width < cabW + 2 * _AUTO_CLOSURE_GAP - 0.5) {
+        const f = window._findRoomWallFeature(n.id);
+        const c = alongX ? n.cx : n.cz;
+        if (f) {
+            _roomWallFeatureSetSpan(f, rect, c - cabW / 2 - _AUTO_CLOSURE_GAP, c + cabW / 2 + _AUTO_CLOSURE_GAP);
+            n = window._getRoomWallFeaturePoses(rect).find(function(q) { return q.id === n.id; }) || n;
+        }
+    }
+    const d = (alongX ? n.cx : n.cz) - (aLo + aHi) / 2;
+    _writeAutoClosurePose({ x: pose.x + (alongX ? d : 0), z: pose.z + (alongX ? 0 : d), rotation: pose.rotation }, pose);
+    const g = Math.max(0, (n.width - cabW) / 2);
+    return { left: g, right: g };
+}
+
 /**
  * Keeps the open cabinet _AUTO_CLOSURE_GAP from the walls it stands against (or is pinned to by the
  * left/right/between-walls buttons). Writes the pose quietly — it is derived, so no dirty flag/camera move.
@@ -1199,6 +1251,8 @@ window._applyAutoClosurePose = function() {
     const rw = (preset === 'linear' || preset === 'sliding') ? (window._roomWall || state.roomWall || 'center') : 'center';
     const pose = window._getRoomHostPose();
     let rect = window._getRoomRect();
+    const inNiche = _applyAutoClosureNiche(pose, rect, fp);
+    if (inNiche) return (window._autoClosureLayout = inNiche);
     let sides = _autoClosureSides(pose, rect, fp);
     const forced = { left: rw === 'left' || rw === 'both', right: rw === 'right' || rw === 'both' };
 
@@ -1246,16 +1300,7 @@ window._applyAutoClosurePose = function() {
             gaps[k] = _AUTO_CLOSURE_GAP;
         });
     }
-    if (Math.abs(p.x - pose.x) > 0.05 || Math.abs(p.z - pose.z) > 0.05) {
-        const h = state.editingCartIndex;
-        if (typeof h !== 'number' || h < 0) {
-            window._roomLooseHostPose = p;
-        } else {
-            let g = _rlGroupOf(h);
-            if (!g) { g = { poses: {} }; window._roomLinks.push(g); }
-            g.poses[String(h)] = p;
-        }
-    }
+    _writeAutoClosurePose(p, pose);
     window._autoClosureLayout = { left: near.left ? gaps.left : 0, right: near.right ? gaps.right : 0 };
     return window._autoClosureLayout;
 };
@@ -2247,8 +2292,10 @@ function _nicheLimits(pose, obstacles) {
     (obstacles || []).forEach(function(r) {
         const hit = _rectInNiche(pose, r);
         if (!hit) return;
-        lim.loMax = Math.min(lim.loMax, hit.lo);
-        lim.hiMin = Math.max(lim.hiMin, hit.hi);
+        // With closures the cabinet keeps its gap (and closure strip) to both niche walls
+        const gap = r.id === 'cabinet' && window._autoClosuresActive() ? _AUTO_CLOSURE_GAP : 0;
+        lim.loMax = Math.min(lim.loMax, hit.lo - gap);
+        lim.hiMin = Math.max(lim.hiMin, hit.hi + gap);
         lim.depthMin = Math.max(lim.depthMin, Math.ceil(hit.protrude));
     });
     return lim;
