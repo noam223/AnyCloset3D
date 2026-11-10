@@ -3298,7 +3298,9 @@ function _buildRoom() {
             floorMat.normalMap = window._woodFloorNormalTex;
             floorMat.normalScale.set(0.7, 0.7);
         }
-        if (_floorTex.parquet && window._woodFloorRoughTex) {
+        if (_floorTex.parquet && _floorTex.matte) {
+            floorMat.roughness = 0.9;
+        } else if (_floorTex.parquet && window._woodFloorRoughTex) {
             floorMat.roughnessMap = window._woodFloorRoughTex;
             floorMat.roughness = 1.0;
         } else if (!_floorTex.parquet) {
@@ -3308,7 +3310,7 @@ function _buildRoom() {
         }
         if (window._hdrEnvMap) {
             floorMat.envMap = window._hdrEnvMap;
-            floorMat.envMapIntensity = _floorTex.env != null ? _floorTex.env : 0.5;
+            floorMat.envMapIntensity = _floorTex.env != null ? _floorTex.env : (_floorTex.matte ? 0.15 : 0.5);
         }
         window._floorReflectMaterial(floorMat);
     }

@@ -21,7 +21,7 @@ function _tileFaces(name) {
     return [1, 2, 3].map(function(n) { return 'images/tiles/' + name + '-' + n + '.jpg'; });
 }
 window.ROOM_TILE_SIZES = ['60x120', '80x80', '100x100', '120x120'];
-window.ROOM_FLOOR_DEFAULT = { kind: 'parquet', tone: 'oak', finish: 'concrete', size: '60x120' };
+window.ROOM_FLOOR_DEFAULT = { kind: 'parquet', tone: 'oak', finish: 'concrete', size: '60x120', gloss: 'glossy' };
 
 window._normRoomFloorStyle = function(s) {
     const d = window.ROOM_FLOOR_DEFAULT;
@@ -31,6 +31,7 @@ window._normRoomFloorStyle = function(s) {
     if (!window.ROOM_PARQUET_TONES.some(function(t) { return t.id === o.tone; })) o.tone = d.tone;
     if (!window.ROOM_TILE_FINISHES.some(function(t) { return t.id === o.finish; })) o.finish = d.finish;
     if (window.ROOM_TILE_SIZES.indexOf(o.size) < 0) o.size = d.size;
+    if (o.gloss !== 'matte') o.gloss = 'glossy';
     return o;
 };
 window._roomFloorStyle = window._normRoomFloorStyle(window._roomFloorStyle);
@@ -318,14 +319,17 @@ window._roomWallColor = window._roomWallColor || null;
         if (s.kind === 'tile') {
             const c = _tileCanvas(s.finish, s.size);
             const fin = window.ROOM_TILE_FINISHES.find(function(f) { return f.id === s.finish; });
+            const matte = s.gloss === 'matte';
             return { map: _canvasTexture('tile:' + s.finish + ':' + s.size, c.canvas), wCm: c.wCm, hCm: c.hCm, parquet: false,
-                roughness: fin ? fin.roughness : 0.5, tint: fin && fin.tint, env: fin && fin.env };
+                roughness: matte ? 0.85 : (fin ? fin.roughness : 0.5), tint: fin && fin.tint,
+                env: matte ? 0.12 : (fin && fin.env), matte: matte };
         }
         if (!window._woodFloorTex) return null;
-        if (s.tone === 'oak') return { map: window._woodFloorTex, wCm: 200, hCm: 200, parquet: true };
+        const matte = s.gloss === 'matte';
+        if (s.tone === 'oak') return { map: window._woodFloorTex, wCm: 200, hCm: 200, parquet: true, matte: matte };
         const c = _parquetCanvas(s.tone);
-        if (!c) return { map: window._woodFloorTex, wCm: 200, hCm: 200, parquet: true };
-        return { map: _canvasTexture('parquet:' + s.tone, c.canvas), wCm: 200, hCm: 200, parquet: true };
+        if (!c) return { map: window._woodFloorTex, wCm: 200, hCm: 200, parquet: true, matte: matte };
+        return { map: _canvasTexture('parquet:' + s.tone, c.canvas), wCm: 200, hCm: 200, parquet: true, matte: matte };
     };
 
     /** Image + real size (cm) for the 2D plan's floor pattern. */
@@ -394,6 +398,9 @@ window._syncRoomFinishesUI = function() {
             return '<button type="button" class="room-finish-size' + (v === s.size ? ' active' : '') + '" data-tile-size="' + v + '">' + p[0] + '×' + p[1] + '</button>';
         }).join('');
     }
+    document.querySelectorAll('[data-floor-gloss]').forEach(function(b) {
+        b.classList.toggle('active', b.getAttribute('data-floor-gloss') === s.gloss);
+    });
     const wc = window._roomWallColor;
     const chip = document.getElementById('room-wall-color-chip');
     if (chip) chip.style.background = wc ? wc.hex : '#faf8f4';
@@ -413,7 +420,9 @@ document.addEventListener('click', function(e) {
         return;
     }
     const size = e.target.closest('[data-tile-size]');
-    if (size) window._setRoomFloorStyle({ size: size.getAttribute('data-tile-size') });
+    if (size) { window._setRoomFloorStyle({ size: size.getAttribute('data-tile-size') }); return; }
+    const gloss = e.target.closest('[data-floor-gloss]');
+    if (gloss) window._setRoomFloorStyle({ gloss: gloss.getAttribute('data-floor-gloss') });
 });
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function() { window._syncRoomFinishesUI(); });
