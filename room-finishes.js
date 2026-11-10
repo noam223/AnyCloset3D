@@ -12,11 +12,14 @@ window.ROOM_PARQUET_TONES = [
     { id: 'walnut',    label: 'אגוז',       filter: 'brightness(0.48) saturate(1.15) hue-rotate(-6deg)',    swatch: '#5e4330' }
 ];
 window.ROOM_TILE_FINISHES = [
-    { id: 'concrete',      label: 'בטון בהיר', swatch: '#bebbb5', roughness: 0.55, img: 'images/tiles/concrete.jpg' },
-    { id: 'concrete_dark', label: 'בטון כהה',  swatch: '#7d7c79', roughness: 0.55, img: 'images/tiles/concrete-dark.jpg' },
-    { id: 'calacatta',     label: 'קלקטה',     swatch: '#f1eee9', roughness: 0.22, img: 'images/tiles/calacatta.jpg' },
-    { id: 'stone',         label: 'אבן בז\'',  swatch: '#d4c8b4', roughness: 0.5,  img: 'images/tiles/stone.jpg' }
+    { id: 'concrete',      label: 'בטון בהיר', swatch: '#bebbb5', roughness: 0.55, faces: _tileFaces('concrete') },
+    { id: 'concrete_dark', label: 'בטון כהה',  swatch: '#7d7c79', roughness: 0.55, faces: _tileFaces('concrete-dark') },
+    { id: 'carrara',       label: 'קררה',      swatch: '#f3f3f1', roughness: 0.25, faces: _tileFaces('carrara') },
+    { id: 'stone',         label: 'אבן בז\'',  swatch: '#d4c8b4', roughness: 0.5,  faces: _tileFaces('stone'), directional: true }
 ];
+function _tileFaces(name) {
+    return [1, 2, 3].map(function(n) { return 'images/tiles/' + name + '-' + n + '.jpg'; });
+}
 window.ROOM_TILE_SIZES = ['60x120', '80x80', '100x100', '120x120'];
 window.ROOM_FLOOR_DEFAULT = { kind: 'parquet', tone: 'oak', finish: 'concrete', size: '60x120' };
 
@@ -24,6 +27,7 @@ window._normRoomFloorStyle = function(s) {
     const d = window.ROOM_FLOOR_DEFAULT;
     const o = Object.assign({}, d, s || {});
     if (o.kind !== 'tile') o.kind = 'parquet';
+    if (o.finish === 'calacatta') o.finish = 'carrara';
     if (!window.ROOM_PARQUET_TONES.some(function(t) { return t.id === o.tone; })) o.tone = d.tone;
     if (!window.ROOM_TILE_FINISHES.some(function(t) { return t.id === o.finish; })) o.finish = d.finish;
     if (window.ROOM_TILE_SIZES.indexOf(o.size) < 0) o.size = d.size;
@@ -95,19 +99,16 @@ window._roomWallColor = window._roomWallColor || null;
     }
 
     function _drawTileSurface(ctx, finish, x0, y0, w, h, ppc, rnd) {
-        if (finish === 'calacatta') {
-            ctx.fillStyle = '#f3f1ed';
+        if (finish === 'carrara') {
+            ctx.fillStyle = '#f4f4f2';
             ctx.fillRect(x0, y0, w, h);
-            _blotches(ctx, x0, y0, w, h, ppc, rnd, 30, '150,146,140', 0.03, 0.08, 10, 40);
+            _blotches(ctx, x0, y0, w, h, ppc, rnd, 30, '160,160,158', 0.03, 0.07, 10, 40);
             ctx.save();
             ctx.filter = 'blur(' + Math.max(2, 1.2 * ppc) + 'px)';
-            const main = 2 + Math.floor(rnd() * 2);
-            for (let v = 0; v < main; v++) _vein(ctx, x0, y0, w, h, ppc, rnd, 'rgba(150,146,140,0.3)', 2 + rnd() * 3);
+            for (let v = 0; v < 2; v++) _vein(ctx, x0, y0, w, h, ppc, rnd, 'rgba(160,160,158,0.22)', 2 + rnd() * 3);
             ctx.filter = 'blur(' + Math.max(1, 0.35 * ppc) + 'px)';
-            for (let v = 0; v < main; v++) _vein(ctx, x0, y0, w, h, ppc, rnd, 'rgba(128,124,118,0.32)', 0.4 + rnd() * 0.6);
-            for (let v = 0; v < 2; v++) _vein(ctx, x0, y0, w, h, ppc, rnd, 'rgba(184,156,110,0.26)', 0.3 + rnd() * 0.4);
+            for (let v = 0; v < 2; v++) _vein(ctx, x0, y0, w, h, ppc, rnd, 'rgba(150,150,148,0.2)', 0.3 + rnd() * 0.4);
             ctx.restore();
-            for (let v = 0; v < 3; v++) _vein(ctx, x0, y0, w, h, ppc, rnd, 'rgba(140,136,130,0.14)', 0.08 + rnd() * 0.08);
             return;
         }
         const base = { concrete: '#bdbab4', concrete_dark: '#7e7d7a', stone: '#d5c9b6' }[finish] || '#bdbab4';
@@ -130,18 +131,66 @@ window._roomWallColor = window._roomWallColor || null;
         _specks(ctx, x0, y0, w, h, ppc, rnd, Math.round(w * h / (ppc * ppc) * 0.3), dark ? '170,170,168' : '240,238,234', 0.25);
     }
 
-    // Photographic slab surfaces; until one loads the procedural surface above stands in
-    const _tileImgs = {};
-    function _tileImage(finish) {
-        const fin = window.ROOM_TILE_FINISHES.find(function(f) { return f.id === finish; });
-        if (!fin || !fin.img) return null;
-        let e = _tileImgs[finish];
-        if (!e) {
-            e = _tileImgs[finish] = { img: new Image(), ready: false };
-            e.img.onload = function() { e.ready = true; _invalidateFinish(finish); };
-            e.img.src = fin.img;
+    // Photographic slab faces (several per finish, like a real tile batch); until all have loaded the
+    // procedural surface above stands in. Each face's colour is pulled most of the way to the batch
+    // average so neighbouring tiles vary in pattern without looking patchy.
+    const _tileFaceSets = {};
+    function _avgRgb(img) {
+        const c = document.createElement('canvas');
+        c.width = c.height = 16;
+        const x = c.getContext('2d');
+        x.drawImage(img, 0, 0, 16, 16);
+        const d = x.getImageData(0, 0, 16, 16).data;
+        const s = [0, 0, 0];
+        for (let i = 0; i < d.length; i += 4) { s[0] += d[i]; s[1] += d[i + 1]; s[2] += d[i + 2]; }
+        const n = d.length / 4;
+        return s.map(function(v) { return Math.max(1, v / n); });
+    }
+    function _balancedFace(img, avg, mean) {
+        const c = document.createElement('canvas');
+        c.width = img.naturalWidth;
+        c.height = img.naturalHeight;
+        const x = c.getContext('2d');
+        x.drawImage(img, 0, 0);
+        const id = x.getImageData(0, 0, c.width, c.height);
+        const d = id.data;
+        const g = [0, 1, 2].map(function(k) { return 1 + (mean[k] / avg[k] - 1) * 0.8; });
+        for (let i = 0; i < d.length; i += 4) {
+            d[i] = Math.min(255, d[i] * g[0]);
+            d[i + 1] = Math.min(255, d[i + 1] * g[1]);
+            d[i + 2] = Math.min(255, d[i + 2] * g[2]);
         }
-        return e.ready ? e.img : null;
+        x.putImageData(id, 0, 0);
+        return c;
+    }
+    function _tileFaceSet(finish) {
+        const fin = window.ROOM_TILE_FINISHES.find(function(f) { return f.id === finish; });
+        if (!fin || !fin.faces || !fin.faces.length) return null;
+        let e = _tileFaceSets[finish];
+        if (!e) {
+            e = _tileFaceSets[finish] = { faces: [], ready: false };
+            let left = fin.faces.length;
+            fin.faces.forEach(function(src) {
+                const img = new Image();
+                const done = function() {
+                    if (--left) return;
+                    e.faces = e.faces.filter(function(f) { return f.img.naturalWidth > 0; });
+                    if (!e.faces.length) return;
+                    const avgs = e.faces.map(function(f) { return _avgRgb(f.img); });
+                    const mean = [0, 1, 2].map(function(k) {
+                        return avgs.reduce(function(a, v) { return a + v[k]; }, 0) / avgs.length;
+                    });
+                    e.faces.forEach(function(f, i) { f.img = _balancedFace(f.img, avgs[i], mean); });
+                    e.ready = true;
+                    _invalidateFinish(finish);
+                };
+                img.onload = done;
+                img.onerror = done;
+                img.src = src;
+                e.faces.push({ img: img });
+            });
+        }
+        return e.ready ? e.faces : null;
     }
     function _invalidateFinish(finish) {
         const prefix = 'tile:' + finish + ':';
@@ -157,51 +206,74 @@ window._roomWallColor = window._roomWallColor || null;
         }
     }
 
-    /** One tile cut from a random part of the slab photo (sometimes turned 180°) so neighbours differ. */
-    function _drawTileFromImage(ctx, img, x0, y0, w, h, rnd) {
-        const ar = w / h;
+    /**
+     * One tile cut from a random part of a slab face, turned by quarter turns (square tiles) or half turns
+     * (rectangular tiles).
+     */
+    function _drawTileFromFace(ctx, face, x0, y0, w, h, quarterTurns) {
+        const img = face.img;
+        const rotW = quarterTurns % 2 ? h : w, rotH = quarterTurns % 2 ? w : h;
+        const ar = rotW / rotH;
         let cw = img.width, ch = cw / ar;
         if (ch > img.height) { ch = img.height; cw = ch * ar; }
-        const k = 0.8 + rnd() * 0.2;
+        const k = 0.8 + face.rnd() * 0.2;
         cw *= k; ch *= k;
-        const sx = rnd() * (img.width - cw), sy = rnd() * (img.height - ch);
+        const sx = face.rnd() * (img.width - cw), sy = face.rnd() * (img.height - ch);
         ctx.save();
         ctx.translate(x0 + w / 2, y0 + h / 2);
-        if (rnd() < 0.5) ctx.rotate(Math.PI);
-        ctx.drawImage(img, sx, sy, cw, ch, -w / 2, -h / 2, w, h);
+        ctx.rotate(quarterTurns * Math.PI / 2);
+        ctx.drawImage(img, sx, sy, cw, ch, -rotW / 2, -rotH / 2, rotW, rotH);
         ctx.restore();
     }
 
-    /** A 2×2 block of tiles with grout joints; returns { canvas, wCm, hCm }. */
+    const TILE_BLOCK = 3;
+
+    /** A TILE_BLOCK × TILE_BLOCK block of tiles with grout joints; returns { canvas, wCm, hCm }. */
     function _tileCanvas(finish, size) {
         const key = 'tile:' + finish + ':' + size;
         if (_canvasCache[key]) return _canvasCache[key];
         const td = _tileDims(size);
-        const wCm = td.x * 2, hCm = td.z * 2;
-        const ppc = Math.min(8, 2048 / Math.max(wCm, hCm));
+        const N = TILE_BLOCK;
+        const wCm = td.x * N, hCm = td.z * N;
+        const ppc = Math.min(8, 3072 / Math.max(wCm, hCm));
         const cv = document.createElement('canvas');
         cv.width = Math.round(wCm * ppc);
         cv.height = Math.round(hCm * ppc);
         const ctx = cv.getContext('2d');
         const rnd = _rng(_hash(key));
-        const tw = cv.width / 2, th = cv.height / 2;
-        const img = _tileImage(finish);
-        for (let j = 0; j < 2; j++) {
-            for (let i = 0; i < 2; i++) {
+        const tw = cv.width / N, th = cv.height / N;
+        const faces = _tileFaceSet(finish);
+        const square = td.x === td.z;
+        const fin = window.ROOM_TILE_FINISHES.find(function(f) { return f.id === finish; });
+        const directional = !!(fin && fin.directional);
+        const grid = [];
+        for (let j = 0; j < N; j++) {
+            for (let i = 0; i < N; i++) {
                 ctx.save();
                 ctx.beginPath();
                 ctx.rect(i * tw, j * th, tw, th);
                 ctx.clip();
-                if (img) _drawTileFromImage(ctx, img, i * tw, j * th, tw, th, rnd);
-                else _drawTileSurface(ctx, finish, i * tw, j * th, tw, th, ppc, rnd);
+                if (faces) {
+                    // Avoid repeating the face of the left / upper neighbour (wrapping, since the block repeats)
+                    const nb = [grid[j * N + (i + N - 1) % N], j ? grid[(j - 1) * N + i] : grid[(N - 1) * N + i]];
+                    let fi = Math.floor(rnd() * faces.length);
+                    for (let t = 0; t < faces.length && faces.length > 2 && nb.indexOf(fi) >= 0; t++) fi = (fi + 1) % faces.length;
+                    grid[j * N + i] = fi;
+                    const turns = square && !directional ? Math.floor(rnd() * 4) : (rnd() < 0.5 ? 0 : 2);
+                    _drawTileFromFace(ctx, { img: faces[fi].img, rnd: rnd }, i * tw, j * th, tw, th, turns);
+                } else {
+                    _drawTileSurface(ctx, finish, i * tw, j * th, tw, th, ppc, rnd);
+                }
                 ctx.restore();
             }
         }
-        // Grout: half a joint on each edge so the block tiles seamlessly
+        // Grout: half a joint on each block edge so the block tiles seamlessly
         const gw = Math.max(1.5, 0.3 * ppc);
-        ctx.fillStyle = finish === 'concrete_dark' ? '#5f5e5b' : (finish === 'calacatta' ? '#d9d6d0' : '#a7a39b');
-        [0, tw, cv.width].forEach(function(x) { ctx.fillRect(x - gw / 2, 0, gw, cv.height); });
-        [0, th, cv.height].forEach(function(y) { ctx.fillRect(0, y - gw / 2, cv.width, gw); });
+        ctx.fillStyle = finish === 'concrete_dark' ? '#5f5e5b' : (finish === 'carrara' ? '#dcdcd9' : '#a7a39b');
+        for (let k = 0; k <= N; k++) {
+            ctx.fillRect(k * tw - gw / 2, 0, gw, cv.height);
+            ctx.fillRect(0, k * th - gw / 2, cv.width, gw);
+        }
         return (_canvasCache[key] = { canvas: cv, wCm: wCm, hCm: hCm });
     }
 
@@ -303,7 +375,7 @@ window._syncRoomFinishesUI = function() {
         const cur = s.kind === 'tile' ? s.finish : s.tone;
         sw.innerHTML = list.map(function(t) {
             return '<button type="button" class="room-finish-swatch' + (t.id === cur ? ' active' : '') + '" data-floor-opt="' + t.id + '" title="' + t.label + '">' +
-                '<span class="room-finish-chip" style="background:' + t.swatch + (t.img ? ' url(' + t.img + ') center/cover' : '') + ';"></span><span>' + t.label + '</span></button>';
+                '<span class="room-finish-chip" style="background:' + t.swatch + (t.faces ? ' url(' + t.faces[0] + ') center/cover' : '') + ';"></span><span>' + t.label + '</span></button>';
         }).join('');
     }
     const sz = document.getElementById('room-tile-sizes');
