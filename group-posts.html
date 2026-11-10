@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>לוח פרסום לקבוצות | AnyCloset 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+    --p:#1e3a5f;--pd:#0f1f35;--a:#00d4ff;--ad:#00a6c9;
+    --bg:#f0f4f8;--w:#fff;--bd:#e2e8f0;--t:#1e293b;--tl:#475569;--m:#94a3b8;
+    --ok:#16a34a;--okbg:#dcfce7;--warn:#b45309;--warnbg:#fef3c7;
+    --carp:#7c3aed;--carpbg:#ede9fe;--des:#db2777;--desbg:#fce7f3;--all:#0369a1;--allbg:#e0f2fe;
+}
+body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--t);line-height:1.6}
+button{font-family:inherit;cursor:pointer}
+
+/* Header */
+.top{background:linear-gradient(135deg,var(--pd),var(--p) 60%,#2a4f80);color:#fff;padding:28px 24px 22px}
+.top-in{max-width:980px;margin:0 auto}
+.top h1{font-size:1.7rem;font-weight:800}
+.top p{opacity:.8;font-size:.95rem;margin-top:2px}
+.progress{margin-top:16px;display:flex;align-items:center;gap:12px}
+.bar{flex:1;height:10px;background:rgba(255,255,255,.15);border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--a);border-radius:99px;transition:width .4s}
+.progress span{font-weight:700;font-size:.9rem;white-space:nowrap}
+
+.toolbar{position:sticky;top:0;z-index:20;background:rgba(240,244,248,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--bd)}
+.toolbar-in{max-width:980px;margin:0 auto;padding:10px 24px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chip{border:1.5px solid var(--bd);background:var(--w);color:var(--tl);padding:6px 14px;border-radius:99px;font-size:.85rem;font-weight:500;transition:all .15s}
+.chip:hover{border-color:var(--p)}
+.chip.on{background:var(--p);border-color:var(--p);color:#fff}
+.sp{flex:1}
+.btn-ghost{border:1.5px solid var(--p);background:transparent;color:var(--p);padding:6px 14px;border-radius:10px;font-weight:700;font-size:.85rem}
+.btn-ghost:hover{background:var(--p);color:#fff}
+
+main{max-width:980px;margin:0 auto;padding:20px 24px 80px}
+
+.tips{background:var(--w);border:1px solid var(--bd);border-radius:16px;padding:16px 20px;margin-bottom:22px}
+.tips summary{font-weight:700;color:var(--p);cursor:pointer}
+.tips ul{margin:10px 18px 0 0;color:var(--tl);font-size:.92rem}
+.tips li{margin:4px 0}
+
+/* Timeline */
+.week{margin:30px 0 10px;font-size:.8rem;font-weight:800;letter-spacing:.04em;color:var(--m)}
+.day{display:grid;grid-template-columns:96px 1fr;gap:16px;margin-bottom:16px}
+.date{position:sticky;top:64px;align-self:start;text-align:center;background:var(--w);border:1px solid var(--bd);border-radius:14px;padding:10px 6px}
+.date .dw{font-size:.8rem;color:var(--tl);font-weight:500}
+.date .dn{font-size:2rem;font-weight:800;color:var(--p);line-height:1.1}
+.date .dm{font-size:.8rem;color:var(--tl)}
+.date .badge{display:inline-block;margin-top:6px;font-size:.7rem;font-weight:700;padding:2px 8px;border-radius:99px}
+.day.today .date{border:2px solid var(--a);box-shadow:0 0 0 4px rgba(0,212,255,.15)}
+.badge.today{background:var(--a);color:var(--pd)}
+.badge.late{background:var(--warnbg);color:var(--warn)}
+
+.card{background:var(--w);border:1px solid var(--bd);border-radius:18px;overflow:hidden;box-shadow:0 1px 3px rgba(15,31,53,.04);transition:opacity .2s}
+.card.done{opacity:.55}
+.card-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:14px 18px;border-bottom:1px solid var(--bd)}
+.card-head h3{font-size:1.05rem;font-weight:700;color:var(--t);margin-left:auto}
+.tag{font-size:.75rem;font-weight:700;padding:3px 10px;border-radius:99px}
+.tag.carpenters{background:var(--carpbg);color:var(--carp)}
+.tag.designers{background:var(--desbg);color:var(--des)}
+.tag.all{background:var(--allbg);color:var(--all)}
+.tag.kind{background:#f1f5f9;color:var(--tl)}
+.tag.time{background:#f1f5f9;color:var(--p)}
+
+.card-body{display:grid;grid-template-columns:1fr;gap:0}
+.card-body.has-img{grid-template-columns:minmax(0,1fr) 260px}
+.text-wrap{padding:16px 18px}
+.post-text{white-space:pre-wrap;font-size:.95rem;color:var(--t);background:#f8fafc;border:1px solid var(--bd);border-radius:12px;padding:14px 16px;max-height:340px;overflow:auto}
+.img-wrap{padding:16px 18px 16px 0;display:flex;flex-direction:column;gap:8px}
+.img-wrap img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:12px;border:1px solid var(--bd);background:#f1f5f9}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.btn{border:none;border-radius:10px;padding:8px 14px;font-size:.85rem;font-weight:700;display:inline-flex;align-items:center;gap:6px;transition:all .15s}
+.btn.main{background:var(--p);color:#fff}
+.btn.main:hover{background:#2a4f80}
+.btn.soft{background:#eef2f7;color:var(--p)}
+.btn.soft:hover{background:#e2e8f0}
+.btn.copied{background:var(--ok)!important;color:#fff!important}
+
+.comment{margin-top:12px;font-size:.85rem;color:var(--tl);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.comment code{background:#f1f5f9;border:1px dashed var(--bd);border-radius:8px;padding:4px 10px;font-family:inherit;color:var(--t)}
+
+.card-foot{border-top:1px solid var(--bd);padding:12px 18px;display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:#fbfcfe}
+.card-foot .lbl{font-size:.8rem;color:var(--tl);font-weight:500}
+.g{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--bd);background:var(--w);border-radius:99px;padding:4px 6px 4px 12px;font-size:.8rem}
+.g a{color:var(--p);text-decoration:none;font-weight:500}
+.g a:hover{text-decoration:underline}
+.g input{width:16px;height:16px;accent-color:var(--ok)}
+.g.ok{border-color:var(--ok);background:var(--okbg)}
+.nogroups{font-size:.8rem;color:var(--m)}
+.done-btn{margin-right:auto}
+.done-btn.on{background:var(--okbg);color:var(--ok)}
+
+/* Groups dialog */
+dialog{border:none;border-radius:18px;padding:0;width:min(640px,94vw);box-shadow:0 24px 60px rgba(15,31,53,.3)}
+dialog::backdrop{background:rgba(15,31,53,.45)}
+.dlg-h{padding:18px 22px;border-bottom:1px solid var(--bd);display:flex;align-items:center}
+.dlg-h h2{font-size:1.15rem;color:var(--p);flex:1}
+.dlg-b{padding:16px 22px;max-height:60vh;overflow:auto}
+.dlg-b p{font-size:.88rem;color:var(--tl);margin-bottom:12px}
+.grow{display:grid;grid-template-columns:1.2fr 1.6fr 120px 34px;gap:8px;margin-bottom:8px}
+.grow input,.grow select{border:1.5px solid var(--bd);border-radius:10px;padding:8px 10px;font-family:inherit;font-size:.88rem;min-width:0}
+.grow input:focus,.grow select:focus{outline:none;border-color:var(--a)}
+.x{border:none;background:#fee2e2;color:#b91c1c;border-radius:10px;font-weight:800}
+.dlg-f{padding:14px 22px;border-top:1px solid var(--bd);display:flex;gap:8px}
+
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--pd);color:#fff;padding:10px 20px;border-radius:12px;font-weight:500;font-size:.9rem;transition:transform .25s;z-index:50}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.empty{text-align:center;color:var(--m);padding:60px 0}
+
+@media (max-width:720px){
+    .day{grid-template-columns:1fr}
+    .date{position:static;display:flex;align-items:baseline;gap:8px;justify-content:flex-start;padding:8px 14px}
+    .date .dn{font-size:1.3rem}
+    .card-body.has-img{grid-template-columns:1fr}
+    .img-wrap{padding:0 18px 16px;order:-1}
+    .grow{grid-template-columns:1fr 1fr}
+    .grow input[data-k="url"]{grid-column:1/-1}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+    <div class="top-in">
+        <h1>לוח פרסום לקבוצות פייסבוק</h1>
+        <p>AnyCloset 3D · פוסט אחד לכל תאריך, מוכן להעתקה. מפרסמים ידנית ומסמנים כאן מה כבר עלה.</p>
+        <div class="progress"><div class="bar"><i id="bar"></i></div><span id="progress-txt"></span></div>
+    </div>
+</header>
+
+<div class="toolbar">
+    <div class="toolbar-in" id="filters">
+        <button class="chip on" data-f="all">הכל</button>
+        <button class="chip" data-f="carpenters">נגרים</button>
+        <button class="chip" data-f="designers">מעצבות פנים</button>
+        <button class="chip" data-f="open">טרם פורסמו</button>
+        <span class="sp"></span>
+        <button class="btn-ghost" id="open-groups">ניהול קבוצות</button>
+    </div>
+</div>
+
+<main>
+    <details class="tips">
+        <summary>כללי אצבע לפרסום בלי שהפוסטים יירדו</summary>
+        <ul>
+            <li>לפני פרסום ראשון בקבוצה, קרא את כללי הקבוצה. בהרבה קבוצות פרסום מותר רק ביום קבוע או באישור מנהל.</li>
+            <li>אותו פוסט לעד 3–4 קבוצות ביום, עם כמה דקות הפרש בין פרסום לפרסום.</li>
+            <li>כדאי לשנות את המשפט הראשון קצת לכל קבוצה. פייסבוק מזהה טקסט זהה שמפורסם שוב ושוב.</li>
+            <li>הקישור לאתר הולך בתגובה הראשונה ולא בגוף הפוסט. פוסטים עם קישור מקבלים פחות חשיפה ויותר נמחקים.</li>
+            <li>לענות לכל תגובה בשעה הראשונה. זה מה שמקפיץ את הפוסט בפיד של הקבוצה.</li>
+        </ul>
+    </details>
+
+    <div id="timeline"></div>
+</main>
+
+<dialog id="groups-dlg">
+    <div class="dlg-h"><h2>הקבוצות שלי</h2><button class="btn soft" data-close>סגור</button></div>
+    <div class="dlg-b">
+        <p>הוסף את הקבוצות שאתה חבר בהן ולמי הן מיועדות. בכל פוסט יופיעו הקבוצות המתאימות לקהל שלו, עם קישור ישיר וסימון "פורסם".</p>
+        <div id="groups-list"></div>
+        <button class="btn soft" id="add-group">+ הוסף קבוצה</button>
+    </div>
+    <div class="dlg-f"><button class="btn main" id="save-groups">שמור</button><button class="btn soft" data-close>ביטול</button></div>
+</dialog>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SITE = 'anycloset3d.com';
+const IMG = 'pitch-assets/landing-gallery/';
+const AUD = { carpenters: 'נגרים', designers: 'מעצבות פנים', all: 'כללי' };
+
+const POSTS = [
+{
+    id: 'p01', date: '2026-11-11', time: '20:30', aud: 'carpenters', title: 'כמה זמן לוקחת לכם הדמיה?',
+    img: IMG + 'best/18-adi-tamsut.jpg',
+    text:
+`שאלה לנגרים כאן:
+כמה זמן לוקח לכם להכין ללקוח הדמיה של ארון לפני שהוא סוגר?
+
+בדרך כלל זה ערב שלם בסקצ'אפ, ואז הלקוח מבקש "רק להזיז את המדף" ומתחילים מחדש.
+
+היום אני בונה את הארון במערכת שפיתחתי, AnyCloset 3D: מכניס מידות, מחלק עמודות, בוחר חזיתות וגוונים, ותוך כמה דקות יש הדמיה כמו בתמונה, מחיר אוטומטי ושרטוט לייצור.
+
+מה אתם משתמשים היום? מעניין אותי לשמוע.`,
+    comment: `למי ששאל: ${SITE} (שבוע ניסיון חינם, בלי כרטיס אשראי)`
+},
+{
+    id: 'p02', date: '2026-11-15', time: '20:30', aud: 'designers', title: 'לקוחה שלא מצליחה לדמיין',
+    img: IMG + 'best/16-shirly-peled.jpg',
+    text:
+`מכירות את הרגע שהלקוחה מסתכלת על הסקיצה ואומרת "אני לא בטוחה שאני רואה את זה"?
+
+בארונות זה הכי קשה. מידות, חלוקה פנימית, גוון החזית מול הרצפה והקיר. הכל צריך להתחבר בראש שלה.
+
+מה שעובד: מראים לה את הארון בתלת-ממד בתוך חדר, מסובבים, פותחים דלתות, מחליפים גוון בזמן אמת. והתמונה הסופית יוצאת בהדמיה ריאליסטית כמו זו.
+
+איך אתן מציגות ללקוחות תכנון של ארון לפני ההזמנה?`,
+    comment: `התוכנה שאני עובד איתה: ${SITE}`
+},
+{
+    id: 'p03', date: '2026-11-17', time: '12:30', aud: 'carpenters', title: '6 מידות שחייבים לקחת לפני ארון',
+    img: null,
+    text:
+`רשימה קצרה שחוסכת ביקורים חוזרים. 6 מידות שכדאי לקחת תמיד לפני שאני מתמחר ארון:
+
+1. רוחב הנישה ב-3 גבהים (למטה, באמצע, למעלה). קירות כמעט אף פעם לא ישרים.
+2. גובה עד התקרה בשני הצדדים, כולל פלטות או סינרים.
+3. מיקום שקעים, מפסקים ומזגן על הקיר שמאחורי הארון.
+4. משקוף, חלון או דלת שנפתחים ליד הארון ואיפה הם מתנגשים בחזית.
+5. פנלים וצוקל של הקיר, כדי לדעת כמה להרחיק את הגב.
+6. מעבר מהכניסה לבניין ועד החדר: מעלית, גרם מדרגות, פינות.
+
+מה הייתם מוסיפים לרשימה?`,
+    comment: `אני מכניס את כל המידות ישר למערכת ההדמיה שלי, ${SITE}, והיא מחשבת מחיר ושרטוט לנגר`
+},
+{
+    id: 'p04', date: '2026-11-19', time: '20:30', aud: 'designers', title: 'ארון הזזה: מתי כן ומתי לא',
+    img: IMG + 'best/21-sliding.jpg',
+    text:
+`ארון הזזה או ארון פתיחה? כמה דברים שכדאי לבדוק לפני שממליצים:
+
+- חדר צר, או מיטה קרובה לארון: הזזה מנצחת, כי לא צריך מרחב פתיחה.
+- רוצים לראות את כל הארון בבת אחת: פתיחה. בהזזה תמיד חצי מוסתר.
+- עומק: ארון הזזה צריך כ-8–10 ס"מ יותר בשביל המסילות.
+- חזית אחידה וגדולה, בלי ידיות: הזזה נראית הכי נקי.
+
+בתמונה: הדמיה של ארון הזזה, לפני ייצור.
+
+מה הלקוחות שלכן מעדיפים לאחרונה?`,
+    comment: `התכנון וההדמיה נעשו ב-${SITE}`
+},
+{
+    id: 'p05', date: '2026-11-22', time: '20:30', aud: 'carpenters', title: 'פינה בארון: איך לא להפסיד עליה',
+    img: IMG + 'sim/03-idan-corner-3d.jpg',
+    text:
+`ארון פינתי זה המקום שהכי קל להפסיד בו כסף. ההמחשה ללקוח מסובכת, והתמחור עוד יותר.
+
+מה שעובד: לבנות את הפינה בתלת-ממד (בתמונה, מתוך המערכת), עם החלוקה הפנימית האמיתית. המחיר מחושב אוטומטית לפי החומר, המידות והאביזרים, והלקוח רואה בדיוק מה הוא מקבל.
+
+איך אתם מתמחרים פינות? לפי מטר אורך, או לפי יחידה?`,
+    comment: `המערכת: ${SITE}. יש שבוע ניסיון חינם למי שרוצה לנסות על פרויקט אמיתי`
+},
+{
+    id: 'p06', date: '2026-11-24', time: '12:30', aud: 'all', title: 'מה מעכב סגירת עסקה?',
+    img: null,
+    text:
+`שאלה פתוחה לכל מי שעובד עם ארונות בהתאמה אישית (נגרים, מעצבות, חברות):
+
+מה הדבר שהכי מעכב לכם סגירת עסקה?
+
+א. הלקוח לא מצליח לדמיין את הארון
+ב. ויכוחים על מחיר
+ג. סבבים אינסופיים של שינויים
+ד. הלקוח "חושב על זה" ונעלם
+
+הרבה פעמים זה ג'. מה שקיצר את זה הכי הרבה: לעשות את השינויים מול הלקוח בזמן אמת, בפגישה עצמה.
+
+מסקרן אותי מה אצלכם.`,
+    comment: `מה שאני משתמש בו לשינויים בזמן אמת מול הלקוח: ${SITE}`
+},
+{
+    id: 'p07', date: '2026-11-26', time: '20:30', aud: 'designers', title: 'עץ + גוון: שילוב שתמיד עובד',
+    img: IMG + 'best/04-yossi-carmit.jpg',
+    text:
+`שילוב שעובד כמעט תמיד בארונות: גוף בעץ טבעי, חזיתות בגוון טמבור רך.
+
+למה זה עובד:
+- העץ מחמם את החדר ומתחבר לפרקט
+- הגוון מאפשר להתאים את הארון לקיר ולטקסטיל
+- אפשר לשנות גוון בעתיד בלי להחליף את כל הארון
+
+הטריק: לבדוק את הגוון מול הקיר והרצפה האמיתיים של הלקוח לפני שמזמינים, ולא על דוגמית קטנה.
+
+בתמונה: הדמיה מתוך תכנון של ארון כזה.`,
+    comment: `ההדמיה נעשתה ב-${SITE}. יש שם את כל מניפת טמבור`
+},
+{
+    id: 'p08', date: '2026-11-29', time: '20:30', aud: 'carpenters', title: 'שרטוט לייצור בלי טעויות',
+    img: IMG + 'best/05-rivka-klein.jpg',
+    text:
+`טעות שקל מאוד לעשות בייצור: שולחן שנכנס לתוך ארון.
+
+על הנייר היה כתוב "שולחן 95". בפועל הפלטה נכנסת עוד 52 ס"מ לתוך הארון, אז אורך הפלטה הוא 147. ואם במפעל חותכים 95, הפלטה הולכת לפח.
+
+לכן חשוב שבשרטוט לייצור יופיע מבט על: הארון, כמה השולחן בולט מהחזית, כמה נכנס פנימה, ואורך פלטה כולל. בלי מקום לפרשנות.
+
+קרו לכם טעויות דומות בין השרטוט לייצור?`,
+    comment: `השרטוטים יוצאים אוטומטית מהמערכת שלי, ${SITE}`
+},
+{
+    id: 'p09', date: '2026-12-01', time: '12:30', aud: 'designers', title: '3 טעויות נפוצות בתכנון ארון',
+    img: null,
+    text:
+`3 טעויות נפוצות בתכנון ארונות לחדר שינה:
+
+1. מוט תלייה ארוך אחד לכל הרוחב. עדיף לחלק: תלייה כפולה לחולצות, ותלייה ארוכה רק בעמודה אחת.
+2. מגירות בגובה הרצפה בלבד. מגירה בגובה 80–100 ס"מ נוחה הרבה יותר לשימוש יומיומי.
+3. לשכוח את הגובה העליון. ארון עד התקרה עם מדפים לאחסון עונתי שווה עוד הרבה מקום.
+
+מה הייתן מוסיפות?`,
+    comment: `אני מתכנן ובודק את החלוקה בתלת-ממד לפני ייצור: ${SITE}`
+},
+{
+    id: 'p10', date: '2026-12-03', time: '20:30', aud: 'carpenters', title: 'פגישה מרחוק עם הלקוח',
+    img: IMG + 'best/12-shasha-a.jpg',
+    text:
+`טיפ שחוסך המון נסיעות:
+
+במקום לנסוע ללקוח עם סקיצה, שולחים לו קישור. הלקוח פותח בטלפון ורואה את הארון בתלת-ממד, ותוך כדי שיחה משנים גוון, מזיז מדף או מוסיף מגירה, והוא רואה את זה מתעדכן אצלו.
+
+בסוף השיחה יש תכנון מאושר ומחיר. בלי עוד סבב.
+
+מישהו כאן עובד ככה עם לקוחות?`,
+    comment: `זה פיצ'ר "שיתוף בלייב" ב-${SITE}`
+},
+{
+    id: 'p11', date: '2026-12-06', time: '20:30', aud: 'all', title: 'מה הייתם משנים?',
+    img: IMG + 'best/15-kaskas.jpg',
+    text:
+`הדמיה של ארון לפני ייצור.
+
+שאלה לאנשי המקצוע כאן: מה הייתם משנים בתכנון?
+חלוקה, גוונים, ידיות, כל דבר. אשמח לביקורת אמיתית.`,
+    comment: `תוכנן ב-${SITE}`
+},
+{
+    id: 'p12', date: '2026-12-08', time: '20:30', aud: 'all', title: 'הזמנה לנסות',
+    img: IMG + 'best/08-shir-elimi.jpg',
+    text:
+`בחודש האחרון שיתפתי כאן הדמיות וטיפים. למי שתהה באיזו תוכנה מדובר:
+
+זו AnyCloset 3D, מערכת שפיתחתי לנגרים, מעצבות פנים וחברות ריהוט:
+- הדמיה תלת-ממדית של הארון בתוך חדר
+- תמחור אוטומטי לפי מידות וחומרים
+- שרטוט מפורט לייצור
+- שיתוף בזמן אמת עם הלקוח
+- הדמיות AI ריאליסטיות כמו בתמונה
+
+יש שבוע ניסיון חינם בלי כרטיס אשראי. קישור בתגובה הראשונה.
+אשמח לפידבק מכל מי שמנסה.`,
+    comment: `${SITE}. שבוע ניסיון חינם, בלי כרטיס אשראי`
+}
+];
+
+const LS_GROUPS = 'gp_groups_v1', LS_DONE = 'gp_done_v1', LS_POSTED = 'gp_posted_v1';
+const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d; } catch (e) { return d; } };
+const save = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+let groups = load(LS_GROUPS, []);
+let doneByGroup = load(LS_DONE, {});
+let posted = load(LS_POSTED, {});
+let filter = 'all';
+
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const parseDate = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const dayKey = d => d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+const todayKey = dayKey(new Date());
+
+function toast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+function flash(btn, label) {
+    const old = btn.textContent;
+    btn.classList.add('copied');
+    btn.textContent = label || 'הועתק';
+    setTimeout(() => { btn.classList.remove('copied'); btn.textContent = old; }, 1400);
+}
+
+async function copyText(text, btn) {
+    try {
+        await navigator.clipboard.writeText(text);
+    } catch (e) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+    }
+    flash(btn);
+}
+
+// Clipboard images must be PNG
+function imagePng(src) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const c = document.createElement('canvas');
+            c.width = img.naturalWidth;
+            c.height = img.naturalHeight;
+            c.getContext('2d').drawImage(img, 0, 0);
+            c.toBlob(b => b ? resolve(b) : reject(new Error('blob')), 'image/png');
+        };
+        img.onerror = reject;
+        img.src = src;
+    });
+}
+
+async function copyImage(src, btn) {
+    if (!navigator.clipboard || typeof ClipboardItem === 'undefined') {
+        toast('הדפדפן לא תומך בהעתקת תמונה. השתמש בהורדה');
+        return;
+    }
+    try {
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': imagePng(src) })]);
+        flash(btn);
+    } catch (e) {
+        toast('ההעתקה נכשלה. השתמש בהורדה');
+    }
+}
+
+function audGroups(aud) {
+    return groups.filter(g => g.name && (aud === 'all' || g.aud === 'all' || g.aud === aud));
+}
+
+function render() {
+    const tl = document.getElementById('timeline');
+    const list = POSTS.slice().sort((a, b) => a.date.localeCompare(b.date)).filter(p => {
+        if (filter === 'open') return !posted[p.id];
+        if (filter === 'all') return true;
+        return p.aud === filter || p.aud === 'all';
+    });
+
+    const total = POSTS.length, doneN = POSTS.filter(p => posted[p.id]).length;
+    document.getElementById('bar').style.width = (doneN / total * 100) + '%';
+    document.getElementById('progress-txt').textContent = `${doneN} מתוך ${total} פורסמו`;
+
+    if (!list.length) { tl.innerHTML = '<div class="empty">אין פוסטים להצגה בסינון הזה</div>'; return; }
+
+    const fmtW = new Intl.DateTimeFormat('he-IL', { weekday: 'long' });
+    const fmtM = new Intl.DateTimeFormat('he-IL', { month: 'long' });
+    const fmtWeek = new Intl.DateTimeFormat('he-IL', { day: 'numeric', month: 'long' });
+    let html = '', lastWeek = null;
+
+    list.forEach(p => {
+        const d = parseDate(p.date);
+        const ws = new Date(d); ws.setDate(d.getDate() - d.getDay());
+        const wk = dayKey(ws);
+        if (wk !== lastWeek) {
+            const we = new Date(ws); we.setDate(ws.getDate() + 6);
+            html += `<div class="week">שבוע ${fmtWeek.format(ws)} – ${fmtWeek.format(we)}</div>`;
+            lastWeek = wk;
+        }
+        const k = dayKey(d);
+        const isToday = k === todayKey, isLate = k < todayKey && !posted[p.id];
+        const gl = audGroups(p.aud);
+        const gd = doneByGroup[p.id] || {};
+        const groupsHtml = gl.length
+            ? gl.map(g => `<label class="g${gd[g.id] ? ' ok' : ''}"><input type="checkbox" data-post="${p.id}" data-group="${g.id}"${gd[g.id] ? ' checked' : ''}>${g.url ? `<a href="${esc(g.url)}" target="_blank" rel="noopener">${esc(g.name)}</a>` : esc(g.name)}</label>`).join('')
+            : `<span class="nogroups">אין עדיין קבוצות מתאימות. הוסף ב"ניהול קבוצות"</span>`;
+
+        html += `
+<section class="day${isToday ? ' today' : ''}">
+    <div class="date">
+        <div class="dw">${fmtW.format(d)}</div>
+        <div class="dn">${d.getDate()}</div>
+        <div class="dm">${fmtM.format(d)}</div>
+        ${isToday ? '<span class="badge today">היום</span>' : isLate ? '<span class="badge late">באיחור</span>' : ''}
+    </div>
+    <article class="card${posted[p.id] ? ' done' : ''}">
+        <div class="card-head">
+            <h3>${esc(p.title)}</h3>
+            <span class="tag time">${p.time}</span>
+            <span class="tag ${p.aud}">${AUD[p.aud]}</span>
+            <span class="tag kind">${p.img ? 'טקסט + תמונה' : 'טקסט בלבד'}</span>
+        </div>
+        <div class="card-body${p.img ? ' has-img' : ''}">
+            <div class="text-wrap">
+                <div class="post-text">${esc(p.text)}</div>
+                <div class="row">
+                    <button class="btn main" data-copy-text="${p.id}">העתק טקסט</button>
+                </div>
+                <div class="comment">
+                    <span>תגובה ראשונה:</span><code>${esc(p.comment)}</code>
+                    <button class="btn soft" data-copy-comment="${p.id}">העתק</button>
+                </div>
+            </div>
+            ${p.img ? `
+            <div class="img-wrap">
+                <img src="${p.img}" alt="${esc(p.title)}" loading="lazy">
+                <div class="row" style="margin-top:0">
+                    <button class="btn main" data-copy-img="${p.id}">העתק תמונה</button>
+                    <a class="btn soft" href="${p.img}" download>הורד</a>
+                </div>
+            </div>` : ''}
+        </div>
+        <div class="card-foot">
+            <span class="lbl">פורסם ב:</span>
+            ${groupsHtml}
+            <button class="btn soft done-btn${posted[p.id] ? ' on' : ''}" data-done="${p.id}">${posted[p.id] ? 'פורסם ✓' : 'סמן כפורסם'}</button>
+        </div>
+    </article>
+</section>`;
+    });
+    tl.innerHTML = html;
+}
+
+document.getElementById('timeline').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    const byId = id => POSTS.find(p => p.id === id);
+    if (b.dataset.copyText) copyText(byId(b.dataset.copyText).text, b);
+    else if (b.dataset.copyComment) copyText(byId(b.dataset.copyComment).comment, b);
+    else if (b.dataset.copyImg) copyImage(byId(b.dataset.copyImg).img, b);
+    else if (b.dataset.done) {
+        const id = b.dataset.done;
+        if (posted[id]) delete posted[id]; else posted[id] = new Date().toISOString();
+        save(LS_POSTED, posted);
+        render();
+    }
+});
+
+document.getElementById('timeline').addEventListener('change', e => {
+    const cb = e.target;
+    if (!cb.dataset.post) return;
+    const m = doneByGroup[cb.dataset.post] = doneByGroup[cb.dataset.post] || {};
+    if (cb.checked) m[cb.dataset.group] = new Date().toISOString(); else delete m[cb.dataset.group];
+    save(LS_DONE, doneByGroup);
+    cb.closest('.g').classList.toggle('ok', cb.checked);
+});
+
+document.getElementById('filters').addEventListener('click', e => {
+    const c = e.target.closest('[data-f]');
+    if (!c) return;
+    filter = c.dataset.f;
+    document.querySelectorAll('#filters .chip').forEach(x => x.classList.toggle('on', x === c));
+    render();
+});
+
+// Groups dialog
+const dlg = document.getElementById('groups-dlg');
+const gList = document.getElementById('groups-list');
+function groupRow(g) {
+    const r = document.createElement('div');
+    r.className = 'grow';
+    r.dataset.id = g.id;
+    r.innerHTML = `
+        <input data-k="name" placeholder="שם הקבוצה" value="${esc(g.name || '')}">
+        <input data-k="url" placeholder="https://www.facebook.com/groups/..." value="${esc(g.url || '')}" dir="ltr">
+        <select data-k="aud">
+            <option value="carpenters"${g.aud === 'carpenters' ? ' selected' : ''}>נגרים</option>
+            <option value="designers"${g.aud === 'designers' ? ' selected' : ''}>מעצבות פנים</option>
+            <option value="all"${g.aud === 'all' ? ' selected' : ''}>כללי</option>
+        </select>
+        <button class="x" title="מחק">×</button>`;
+    r.querySelector('.x').onclick = () => r.remove();
+    return r;
+}
+document.getElementById('open-groups').onclick = () => {
+    gList.innerHTML = '';
+    (groups.length ? groups : [{ id: 'g' + Date.now(), aud: 'carpenters' }]).forEach(g => gList.appendChild(groupRow(g)));
+    dlg.showModal();
+};
+document.getElementById('add-group').onclick = () => gList.appendChild(groupRow({ id: 'g' + Date.now(), aud: 'carpenters' }));
+dlg.querySelectorAll('[data-close]').forEach(b => b.onclick = () => dlg.close());
+document.getElementById('save-groups').onclick = () => {
+    groups = [...gList.querySelectorAll('.grow')].map(r => ({
+        id: r.dataset.id,
+        name: r.querySelector('[data-k="name"]').value.trim(),
+        url: r.querySelector('[data-k="url"]').value.trim(),
+        aud: r.querySelector('[data-k="aud"]').value
+    })).filter(g => g.name);
+    save(LS_GROUPS, groups);
+    dlg.close();
+    render();
+    toast('הקבוצות נשמרו');
+};
+
+render();
+const firstOpen = document.querySelector('.day.today') || [...document.querySelectorAll('.day')].find(s => !s.querySelector('.card.done'));
+if (firstOpen) setTimeout(() => firstOpen.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+</script>
+</body>
+</html>
