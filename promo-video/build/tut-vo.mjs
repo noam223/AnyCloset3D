@@ -42,7 +42,7 @@ function trimWav(buf) {
 }
 
 const list = [];
-for (const [i, s] of C.STEPS.entries()) {
+for (const [i, s] of (C.VO_ITEMS || C.STEPS).entries()) {
   const text = s.say || s.sub;
   if (!text) { list.push(null); continue; }
   const style = s.style || STYLE;

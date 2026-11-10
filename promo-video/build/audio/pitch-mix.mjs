@@ -143,6 +143,13 @@ const S = {
   chime: (t, g) => [[880, 1], [1318.5, 0.6], [1760, 0.45]].forEach(([f, a], i) =>
     add(fx, t + i * 0.012, 2.6, x => [1, 2.76, 5.4].reduce((s, k, j) => s + Math.sin(TAU * f * k * x) * Math.exp(-x * (1.6 + j * 2.5)) / (1 + j * 2.5), 0) * a * 0.2, g, i % 2 ? 0.35 : -0.35)),
 };
+// timelapse cue names (main.js) mapped onto this palette
+Object.assign(S, {
+  riser: (t, g) => S.whooshBig(t + 1.4, g * 0.7),
+  hit: (t, g) => S.stamp(t, g),
+  boom: (t, g) => S.impact(t, g),
+  blip: (t, g) => S.tick(t, g * 0.6),
+});
 for (const [t, type, g] of cues.sfx || []) if (S[type]) S[type](t, g);
 
 /* ── duck music under speech (smoothed) ── */

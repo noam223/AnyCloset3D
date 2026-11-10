@@ -3,6 +3,7 @@
 // Deterministic: renderFrame(t) derives every element from t; render.mjs seeks frame by frame.
 let markReady;
 window.__ready = new Promise(r => { markReady = r; });
+if (window.__readyHook) window.__ready.then(window.__readyHook);
 const QS = new URLSearchParams(location.search);
 const FORMAT = QS.get('f') || '16x9';
 const SIZES = { '16x9': [1920, 1080], '9x16': [1080, 1920] };
@@ -32,8 +33,8 @@ const words = text => text.split(' ').map(w => {
 /* ───────────── content ───────────── */
 // A content file (index.html?c=content-xyz) may set window.CONTENT to override any of these.
 const C = window.CONTENT || {};
-const IW = 974, IH = 1276;   // editor captures, cropped to canvas + right panel
-const RW = 1336, RH = 1276;  // full-window 3D captures
+const IW = C.IW || 974, IH = C.IH || 1276;   // editor captures, cropped to canvas + right panel
+const RW = C.RW || 1336, RH = C.RH || 1276;  // full-window 3D captures
 
 const FEATS = C.FEATS || ['מידות מדויקות', '4 עמודות', 'אחסון עליון', 'חלוקת מדפים', 'תלייה ארוכה', 'מגירות נעליים', 'תלייה כפולה',
   'מגירות פנימיות', 'סורבטו', 'מגירות חיצוניות', 'תאורת LED', 'דלתות + קלפות', 'מראה וזכוכית', 'גוון עץ', 'ידיות', 'מחיר בזמן אמת'];
@@ -57,9 +58,11 @@ const STEPS = C.STEPS || [
   { img: 's13_sel', title: 'גוון *עץ*', sub: 'בוחרים גוון מהקטלוג, והחזיתות מתעדכנות מיד.', click: [790, 842], focus: [560, 860, 0.8], ring: [762, 812, 58, 62], feats: [13] },
   { img: 's14', title: 'ידיות + *מחיר*', sub: 'ידית לכל דלת ומגירה. המחיר מתעדכן בזמן אמת.', click: [306, 1194], focus: [300, 650, 0.88], focus2: [800, 1100, 1.0], ring: [764, 1156, 200, 64], ring2: true, feats: [14], feats2: [15] },
 ];
-const T_IN = 3, STEP = 2;
-STEPS.forEach((s, i) => { s.t0 = T_IN + i * STEP; s.t1 = s.t0 + STEP; });
-const T_REV = T_IN + STEPS.length * STEP;
+const T_IN = 3, STEP = C.STEP || 2;
+let tStep = T_IN;
+STEPS.forEach(s => { s.t0 = tStep; tStep = Math.round((tStep + (s.dur || STEP)) * 1000) / 1000; s.t1 = tStep; s.d = s.t1 - s.t0; });
+const T_REV = tStep;
+const stepAt = t => { const i = STEPS.findIndex(s => t < s.t1); return i < 0 ? STEPS.length - 1 : i; };
 // Reveal shots: w/h default to RW/RH; c = framing centre in image px; k = zoom relative to cover;
 // grp = shots sharing one slow zoom (so a wipe between them stays aligned); wipe = enter with a wipe line.
 const REV = C.REV || [
@@ -74,7 +77,7 @@ REV.forEach(r => {
 const T_OUT = tRev;
 // Showcase mode: reveal shots numbered with n (e.g. one per cabinet type) drive the HUD counter.
 const REV_N = Math.max(0, ...REV.map(r => r.n || 0));
-const DURATION = T_OUT + 5;
+const DURATION = T_OUT + (C.OUT_DUR || 5);
 const PINS = C.PINS || [
   [522, 196, 'אחסון עליון'], [248, 560, 'תלייה ארוכה + LED'], [561, 640, 'תלייה כפולה'], [261, 1057, 'מגירות נעליים'],
   [822, 913, 'מגירות פנימיות'], [1044, 587, 'סורבטו'], [1070, 960, 'מגירות חיצוניות'],
@@ -109,6 +112,8 @@ const L = P ? {
   block: { right: 80, top: 268, w: 900, kick: 24, title: 80, sub: 32, gap: 14 },
   chips: { right: 80, top: 650, w: 900, fs: 22, gap: 12 },
 };
+for (const [k, v] of Object.entries((C.LAYOUT || {})[P ? 'P' : 'L'] || {})) L[k] = typeof v === 'object' ? { ...L[k], ...v } : v;
+const OUT = { l1: 'מסקיצה להזמנה.', l2: '*במקום אחד.*', cta: 'anycloset3d.com', ...(C.OUTRO || {}) };
 const VW = L.win.w, VH = L.win.h - 44;
 
 /* ───────────── DOM ───────────── */
@@ -163,9 +168,9 @@ const iSub = css(el('div', 'sub', intro, P ? INTRO.subP : INTRO.sub), { fontSize
 
 const outro = el('div', '', stage); outro.id = 'outro';
 const oLogo = el('img', '', outro); oLogo.src = 'assets/brand/logo-wide.png'; css(oLogo, { width: P ? 640 : 600, marginBottom: P ? 70 : 56 });
-const oT1 = css(el('div', 'h1', outro, words('מסקיצה להזמנה.')), { fontSize: P ? 92 : 104 });
-const oT2 = css(el('div', 'h1', outro, words('*במקום אחד.*')), { fontSize: P ? 92 : 104 });
-const oCta = css(el('div', 'cta', outro, 'anycloset3d.com'), { fontSize: P ? 38 : 36, padding: P ? '20px 56px' : '18px 52px', marginTop: P ? 80 : 60 });
+const oT1 = css(el('div', 'h1', outro, words(OUT.l1)), { fontSize: P ? 92 : 104 });
+const oT2 = css(el('div', 'h1', outro, words(OUT.l2)), { fontSize: P ? 92 : 104 });
+const oCta = css(el('div', 'cta', outro, OUT.cta), { fontSize: P ? 38 : 36, padding: P ? '20px 56px' : '18px 52px', marginTop: P ? 80 : 60 });
 el('div', '', stage).id = 'vig';
 
 /* ───────────── camera math ───────────── */
@@ -175,7 +180,7 @@ const finalFocus = i => STEPS[i].focus2 || STEPS[i].focus;
 const mixF = (a, b, k) => [lerp(a[0], b[0], k), lerp(a[1], b[1], k), Math.exp(lerp(Math.log(a[2]), Math.log(b[2]), k))];
 function camAt(t) {
   if (t < T_IN || !STEPS.length) return overview;
-  const i = Math.min(STEPS.length - 1, Math.floor((t - T_IN) / STEP)), s = STEPS[i], u = t - s.t0;
+  const i = stepAt(t), s = STEPS[i], u = t - s.t0;
   let f = mixF(i ? finalFocus(i - 1) : overview, s.focus, eio(seg(u, 0, 0.62)));
   if (s.focus2) f = mixF(f, s.focus2, eio(seg(u, 1.0, 1.55)));
   return f;
@@ -217,7 +222,7 @@ function renderFrame(t) {
   for (const e of [logo, rec, stepno, bar]) e.style.opacity = hud;
   rec.querySelector('i').style.opacity = 0.35 + 0.65 * (Math.sin(t * Math.PI * 2) > -0.2 ? 1 : 0);
   barFill.style.transform = `scaleX(${STEPS.length ? seg(t, T_IN, T_REV) : seg(t, T_REV, T_OUT)})`;
-  const si = Math.max(0, Math.min(STEPS.length - 1, Math.floor((t - T_IN) / STEP)));
+  const si = stepAt(t);
   if (t < T_REV) stepno.innerHTML = `שלב <b>${String(si + 1).padStart(2, '0')}</b> / ${STEPS.length}`;
   else if (REV_N) {
     const r = REV.find(q => t < q.t1) || REV[REV.length - 1];
@@ -231,7 +236,7 @@ function renderFrame(t) {
 
   /* editor captures */
   const f = camAt(t);
-  const drift = t >= T_IN ? 1 + 0.02 * seg(t - (T_IN + si * STEP), 0.6, STEP) : 1;
+  const drift = t >= T_IN ? 1 + 0.02 * seg(t - STEPS[si].t0, 0.6, STEPS[si].d) : 1;
   const c = place(f, drift);
   cam.style.transform = `translate(${c.x}px, ${c.y}px) scale(${c.s})`;
   const step = STEPS[si] || { t0: T_IN, click: [0, 0] }, u = t - step.t0;
@@ -255,8 +260,8 @@ function renderFrame(t) {
   let rOn = 0, R = null;
   if (t >= T_IN && t < T_REV) {
     R = step.ring;
-    if (step.ring2) rOn = seg(u, 1.5, 1.7) * (1 - seg(u, STEP - 0.15, STEP));
-    else rOn = seg(u, 0.8, 1.0) * (1 - seg(u, STEP - 0.15, STEP));
+    if (step.ring2) rOn = seg(u, 1.5, 1.7) * (1 - seg(u, step.d - 0.15, step.d));
+    else rOn = seg(u, 0.8, 1.0) * (1 - seg(u, step.d - 0.15, step.d));
   }
   if (R && rOn > 0) {
     const pad = 7, pulse = 1 + 0.06 * Math.max(0, Math.sin((u - 0.8) * Math.PI * 2.2)) * (1 - seg(u, 1.4, 1.9));
@@ -272,7 +277,7 @@ function renderFrame(t) {
     const tu = t < T_IN ? 0 : u;
     const k = eio(seg(tu, 0.0, 0.48));
     let px = lerp(prev[0], step.click[0], k), py = lerp(prev[1], step.click[1], k) - Math.sin(Math.PI * k) * 60;
-    const away = eio(seg(tu, 0.95, STEP)); px += away * 26; py += away * 34;
+    const away = eio(seg(tu, 0.95, step.d)); px += away * 26; py += away * 34;
     const press = 1 - 0.18 * Math.sin(Math.PI * seg(tu, 0.48, 0.62));
     const sx = c.x + px * c.s, sy = c.y + py * c.s;
     css(cursor, { display: 'block', opacity: cuOn, transform: `translate(${sx - 6}px, ${sy - 3}px) scale(${press})` });
@@ -379,6 +384,10 @@ window.__cues = {
   sfx: SFX.sort((a, b) => a[0] - b[0]),
   T: { intro: T_IN, step: STEP, reveal: T_REV, out: T_OUT },
 };
+if (C.VO_CUES) Object.assign(window.__cues, {
+  mixer: 'pitch-mix.mjs', vo: C.VO_CUES,
+  music: { groove: T_IN, brk: T_REV, out: T_OUT },
+});
 window.__seek = t => { renderFrame(t); };
 
 Promise.all([
