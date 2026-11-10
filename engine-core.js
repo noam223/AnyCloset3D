@@ -162,13 +162,53 @@ window._LIGHT_PRESETS = {
     front:     { ambient: 0.4,  hemi: 0.35, key: 0.35, fill: 0.1 },
     blueprint: { ambient: 0.6,  hemi: 0,    key: 0.2, fill: 0 }
 };
+// Room shown around the cabinet: recessed ceiling spots carry the light and the sky-like key/hemi lights are
+// dimmed. The spot count is fixed (intensity 0 when off) so showing/hiding the room never recompiles materials.
+// Fill comes in low from the front here, lifting fronts and walls without brightening the floor.
+window._LIGHT_PRESETS.room = { ambient: 0.45, hemi: 0.16, key: 0.22, fill: 0.2, spot: 0.35 };
+const _ROOM_SPOT_COUNT = 6;
+const _roomSpots = [];
+for (let i = 0; i < _ROOM_SPOT_COUNT; i++) {
+    // Downlight cone: walls and tall fronts next to a spot sit outside the cone instead of burning out
+    const l = new THREE.SpotLight(0xfff8f0, 0, 650, Math.PI / 3, 0.8, 2);
+    scene.add(l);
+    scene.add(l.target);
+    _roomSpots.push(l);
+}
+window._roomSpotsPlaced = false;
+function _roomLightingWanted() {
+    return window._lightPresetName === 'studio' && window._roomSpotsPlaced &&
+        !!(window._roomGroup && window._roomGroup.visible);
+}
 window._applyLighting = function(name) {
-    const p = window._LIGHT_PRESETS[name] || window._LIGHT_PRESETS.studio;
+    window._lightPresetName = name;
+    const room = _roomLightingWanted();
+    window._roomLightActive = room;
+    const p = room ? window._LIGHT_PRESETS.room : (window._LIGHT_PRESETS[name] || window._LIGHT_PRESETS.studio);
     ambientLight.intensity = p.ambient;
     hemiLight.intensity = p.hemi;
     dirLight.intensity = p.key;
     fillLight.intensity = p.fill;
+    if (room) fillLight.position.set(0, 120, 600);
+    else fillLight.position.set(-300, 200, 200);
+    _roomSpots.forEach(function(l) { l.intensity = p.spot || 0; });
 };
+/** Called every drawn frame: follows the room being shown/hidden without touching each toggle path. */
+window._syncRoomLighting = function() {
+    if (_roomLightingWanted() !== !!window._roomLightActive) window._applyLighting(window._lightPresetName || 'studio');
+};
+/** Spot positions in room coordinates → world (room group already placed). */
+function _placeRoomSpots(rg, pts) {
+    _roomSpots.forEach(function(l, i) {
+        const p = pts[i];
+        if (!p) { l.position.set(0, -1000, 0); l.target.position.set(0, -1100, 0); return; }
+        l.position.copy(rg.localToWorld(new THREE.Vector3(p.x, p.y, p.z)));
+        l.target.position.set(l.position.x, l.position.y - 100, l.position.z);
+        l.target.updateMatrixWorld();
+    });
+    window._roomSpotsPlaced = pts.length > 0;
+    window._roomLightActive = null;
+}
 window._applyLighting('studio');
 
 // Soft contact shadows (SSAO) in the orbit 3D views. Post-processing only — material colors and the
@@ -3364,12 +3404,34 @@ function _buildRoom() {
             const _ceilThickC = Math.max(1.8, parseFloat(window._closureCeilWidth) || 1.8);
             _ceilPlaneY = _cabHc + _ceilThickC;
         }
-        const ceilMat = new THREE.MeshStandardMaterial({ color: 0xf5f5f0, roughness: 0.9, metalness: 0.0, side: THREE.FrontSide });
+        // Emissive stands in for light bounced off the floor and walls, which the downward spots don't reach
+        const ceilMat = new THREE.MeshStandardMaterial({ color: 0xf5f5f0, emissive: 0x4a4946, roughness: 0.9, metalness: 0.0, side: THREE.FrontSide });
         const ceilMesh = new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomD), ceilMat);
         ceilMesh.rotation.x = Math.PI / 2;
         ceilMesh.position.set(roomCenterX, _ceilPlaneY, backZ + roomD / 2 - wallT);
         ceilMesh.userData._roomOwned = true;
         rg.add(ceilMesh);
+
+        // Recessed spots: 3 × 2 grid; the fixtures face down so they vanish from a bird's-eye view
+        window._roomSpotPts = [];
+        const rimMat = new THREE.MeshStandardMaterial({ color: 0xd9d9d6, roughness: 0.5, side: THREE.FrontSide });
+        const lensMat = new THREE.MeshBasicMaterial({ color: 0xfffbf2 });
+        [0.3, 0.7].forEach(function(fz) {
+            [0.22, 0.5, 0.78].forEach(function(fx) {
+                const x = leftWallX + roomW * fx, z = backZ + roomD * fz;
+                window._roomSpotPts.push({ x: x, y: _ceilPlaneY - 4, z: z });
+                const rim = new THREE.Mesh(new THREE.CircleGeometry(5, 24), rimMat);
+                rim.rotation.x = Math.PI / 2;
+                rim.position.set(x, _ceilPlaneY - 0.2, z);
+                rim.userData._roomOwned = true;
+                rg.add(rim);
+                const lens = new THREE.Mesh(new THREE.CircleGeometry(3.4, 24), lensMat);
+                lens.rotation.x = Math.PI / 2;
+                lens.position.set(x, _ceilPlaneY - 0.3, z);
+                lens.userData._roomOwned = true;
+                rg.add(lens);
+            });
+        });
     }
     _buildAutoClosureStrips(rg, roomH);
 
@@ -3554,6 +3616,7 @@ function _buildRoom() {
     rg.rotation.y = _invTh;
     rg.position.set(-(_hostPose.x * _ic + _hostPose.z * _is), 0, -(-_hostPose.x * _is + _hostPose.z * _ic));
     rg.updateMatrixWorld(true);
+    _placeRoomSpots(rg, window._roomSpotPts || []);
 
     // Notify UI to reposition bed handles
     if (typeof window._updateBedHandles === 'function') window._updateBedHandles();

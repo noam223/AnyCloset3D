@@ -19200,6 +19200,7 @@ function animate() {
         });
     }
 
+    if (typeof window._syncRoomLighting === 'function') window._syncRoomLighting();
     if (typeof window._renderMain === 'function') window._renderMain();
     else renderer.render(scene, camera);
     if (typeof window._syncAndRenderSpaceGizmo === 'function') window._syncAndRenderSpaceGizmo();
