@@ -855,7 +855,6 @@ function _renderProjects() {
                 '<div class="project-thumb-date"><i class="fa-regular fa-clock" style="margin-left:4px"></i>' + dateStr + '</div>' +
                 cabinetBadge +
                 measBadge +
-                _signedBadgeHtml(p.id) +
                 (!isLocked ? '<div class="project-open-overlay"><button class="project-open-btn" onclick="openProject(\'' + p.id + '\')"><i class="fa-solid fa-pencil-ruler"></i> פתח לעריכה</button></div>' : '') +
             '</div>' +
             lockBadgeHtml +
@@ -867,6 +866,7 @@ function _renderProjects() {
                 customerLine +
                 deliveryLine +
                 ownerLine +
+                _signedBadgeHtml(p.id) +
                 totalsHtml +
                 '<div class="project-meta">' +
                     '<span class="project-meta-item"><i class="fa-regular fa-calendar"></i> ' + dateStr + '</span>' +
