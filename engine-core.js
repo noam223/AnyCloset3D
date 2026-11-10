@@ -2435,6 +2435,32 @@ function _buildRoomWallFeatures(rg, makeWallMat, roomH, floor) {
 }
 
 /** Plane geometry (w×h, facing +Z, UV 0..1) with rectangular holes {x0,x1,y0,y1} in local coords. */
+/**
+ * Painted-wall falloff the scene lights can't produce: the inner corners, the floor line and the ceiling
+ * line sit in soft shade and the wall dims slightly away from the ceiling spots. Works on the wall's
+ * local plane (centred, x along the wall, y up), so it needs the wall size.
+ */
+function _roomWallShading(mat, wallW, wallH) {
+    mat.onBeforeCompile = function(sh) {
+        sh.uniforms.wallHalf = { value: new THREE.Vector2(wallW / 2, wallH / 2) };
+        sh.vertexShader = 'varying vec2 vWallP;\n' + sh.vertexShader.replace(
+            '#include <begin_vertex>', '#include <begin_vertex>\n\tvWallP = position.xy;');
+        sh.fragmentShader = 'uniform vec2 wallHalf;\nvarying vec2 vWallP;\n' + sh.fragmentShader.replace(
+            '#include <emissivemap_fragment>', [
+                '#include <emissivemap_fragment>',
+                '\tfloat wallCorner = min( vWallP.x + wallHalf.x, wallHalf.x - vWallP.x );',
+                '\tfloat wallUp = clamp( ( vWallP.y + wallHalf.y ) / ( 2.0 * wallHalf.y ), 0.0, 1.0 );',
+                '\tfloat wallShade = mix( 0.87, 1.0, smoothstep( 0.0, 0.85, wallUp ) )',
+                '\t\t* ( 1.0 - 0.16 * exp( -wallCorner / 45.0 ) )',
+                '\t\t* ( 1.0 - 0.1 * exp( -( vWallP.y + wallHalf.y ) / 25.0 ) )',
+                '\t\t* ( 1.0 - 0.14 * exp( -( wallHalf.y - vWallP.y ) / 30.0 ) );',
+                '\tdiffuseColor.rgb *= wallShade;',
+                '\ttotalEmissiveRadiance *= wallShade;'
+            ].join('\n'));
+    };
+    mat.customProgramCacheKey = function() { return 'roomWallShade'; };
+}
+
 function _roomWallGeometry(w, h, holes) {
     if (!holes || !holes.length) return new THREE.PlaneGeometry(w, h);
     const hw = w / 2, hh = h / 2;
@@ -3350,11 +3376,12 @@ function _buildRoom() {
     const _wallPaint = window._roomWallColor && window._roomWallColor.hex ? new THREE.Color(window._roomWallColor.hex) : null;
     const makeWallMat = (wallW, wallH) => {
         // Emissive stands in for the light bounced around a real room, which the scene lights don't model
-        const mat = new THREE.MeshStandardMaterial({ color: 0xfaf8f4, emissive: 0x2a2826, roughness: 0.93, metalness: 0.0, side: THREE.FrontSide });
+        const mat = new THREE.MeshStandardMaterial({ color: 0xfaf8f4, emissive: 0x141312, roughness: 0.93, metalness: 0.0, side: THREE.FrontSide });
         if (_wallPaint) {
             mat.color.copy(_wallPaint);
-            mat.emissive.copy(_wallPaint).multiplyScalar(0.17);
+            mat.emissive.copy(_wallPaint).multiplyScalar(0.08);
         }
+        _roomWallShading(mat, wallW, wallH);
         if (!_skipTex && window._wallPlasterNormalTex) {
             mat.normalMap = _roomTexVariant(window._wallPlasterNormalTex, wallW / PLASTER_TILE_CM, wallH / PLASTER_TILE_CM, 0, 0);
             mat.normalScale.set(0.6, 0.6);
