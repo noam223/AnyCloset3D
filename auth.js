@@ -21,6 +21,7 @@ const PLAN_LIMITS = {
         extensionDays:          3,           // הארכה בתשלום — 3 ימים נוספים
         features: {
             showPricing:           false,    // מעצבת לא רואה תמחור
+            canEditPricing:        false,
             canExportPDF:          true,
             canExport3D:           true,
             canExportCarpenter:    true,     // שליחה לייצור — כן
@@ -44,6 +45,7 @@ const PLAN_LIMITS = {
         extensionDays:          null,
         features: {
             showPricing:           false,
+            canEditPricing:        false,
             canExportPDF:          true,
             canExport3D:           true,
             canExportCarpenter:    true,     // טופס שליחה לייצור
@@ -73,6 +75,7 @@ const PLAN_LIMITS = {
         extensionDays:          null,
         features: {
             showPricing:           true,     // תמחור לפי מחירון המערכת
+            canEditPricing:        false,    // מחירון השוק בלבד — עריכה רק לנגר
             canExportPDF:          true,
             canExport3D:           true,
             canExportCarpenter:    true,
@@ -91,44 +94,35 @@ const PLAN_LIMITS = {
     },
 
     // ── נגרים ────────────────────────────────────────────────────────────────
-    carpenter_basic: {
-        label:                  'נגר — בסיסי',
+    // מנוי נגר יחיד — אותו מחיר ואותן מגבלות כמו מעצבת פרימיום, עם כלי העבודה של נגר
+    carpenter_pro: {
+        label:                  'נגר',
         userType:               'carpenter',
         price:                  0,
-        maxProjects:            30,
-        maxCabinetsPerProject:  null,        // ללא הגבלה
+        maxProjects:            100,
+        maxCabinetsPerProject:  null,
+        maxSpaceCabinets:       null,
+        aiRendersQuota:         100,
         maxDevices:             1,
         projectLockDays:        null,
         extensionDays:          null,
         features: {
-            showPricing:        true,
-            canExportPDF:       true,
-            canExport3D:        true,
-            canExportCarpenter: false,       // ייצוא תוכנית לנגר — לא
-            canViewCustomerReport: false,    // דוח פירוט ללקוח — לא
-            canExtendProject:   false,
-            canManageDevices:   false,
-            isCompany:          false,
-        }
-    },
-    carpenter_pro: {
-        label:                  'נגר — מקצועי',
-        userType:               'carpenter',
-        price:                  0,
-        maxProjects:            null,        // ללא הגבלה
-        maxCabinetsPerProject:  null,
-        maxDevices:             2,
-        projectLockDays:        null,
-        extensionDays:          null,
-        features: {
-            showPricing:        true,
-            canExportPDF:       true,
-            canExport3D:        true,
-            canExportCarpenter: true,        // ייצוא תוכנית לנגר ✓
-            canViewCustomerReport: true,     // דוח פירוט ללקוח ✓
-            canExtendProject:   false,
-            canManageDevices:   false,
-            isCompany:          false,
+            showPricing:           true,
+            canEditPricing:        true,     // מחירון אישי — רק לנגר
+            canExportPDF:          true,
+            canExport3D:           true,
+            canExportCarpenter:    true,
+            canExportBlueprint:    true,
+            canViewCustomerReport: true,
+            canQuickCalc:          true,     // מחשבון הצעות מחיר
+            canQuote:              true,     // הצעת מחיר ללקוח עם מחירים
+            canCornerCabinets:     true,
+            canTemplates:          true,
+            fullTambourPalette:    true,
+            simpleStatuses:        false,    // מסלול סטטוסים מלא: מדידה → עסקה → ייצור → שירות
+            canExtendProject:      false,
+            canManageDevices:      false,
+            isCompany:             false,
         }
     },
 
@@ -205,8 +199,10 @@ PLAN_LIMITS.designer_premium_annual = Object.assign({}, PLAN_LIMITS.designer_pre
 // Legacy designer keys (pre basic/premium split) behave like Basic.
 PLAN_LIMITS.designer_monthly = Object.assign({}, PLAN_LIMITS.designer_basic,        { label: 'מעצבת — חודשי' });
 PLAN_LIMITS.designer_annual  = Object.assign({}, PLAN_LIMITS.designer_basic_annual, { label: 'מעצבת — שנתי' });
-PLAN_LIMITS.carpenter_basic_annual = Object.assign({}, PLAN_LIMITS.carpenter_basic, { label: 'נגר — בסיסי שנתי' });
-PLAN_LIMITS.carpenter_pro_annual   = Object.assign({}, PLAN_LIMITS.carpenter_pro,   { label: 'נגר — מקצועי שנתי' });
+PLAN_LIMITS.carpenter_pro_annual   = Object.assign({}, PLAN_LIMITS.carpenter_pro, { label: 'נגר — שנתי' });
+// Legacy carpenter Basic keys behave like the single carpenter plan.
+PLAN_LIMITS.carpenter_basic        = Object.assign({}, PLAN_LIMITS.carpenter_pro, { label: 'נגר' });
+PLAN_LIMITS.carpenter_basic_annual = Object.assign({}, PLAN_LIMITS.carpenter_pro, { label: 'נגר — שנתי' });
 
 // Applied only while subscription_status = 'trial' and the admin has not set a per-user override.
 // Mirrored server-side in private.projects_trial_guard (projects) and company-manage-agent (agents).

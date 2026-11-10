@@ -16,7 +16,7 @@ const GEMINI_STANDARD_FALLBACK = 'gemini-3.1-flash-image'; // Nano Banana 2
 // Monthly AI quota per plan when profiles.ai_renders_quota is NULL. Keep in sync with aiRendersQuota in auth.js.
 function planRenderQuota(plan?: string | null): number {
   const p = String(plan || '');
-  if (p.startsWith('designer_premium')) return 100;
+  if (p.startsWith('designer_premium') || p.startsWith('carpenter_')) return 100;
   if (p.startsWith('designer_')) return 30;
   return 50;
 }

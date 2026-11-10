@@ -10,10 +10,8 @@
         designer_basic_annual:   2388,
         designer_premium:        299,
         designer_premium_annual: 3228,
-        carpenter_basic:        499,
-        carpenter_basic_annual: 5388,
-        carpenter_pro:          699,
-        carpenter_pro_annual:   7548
+        carpenter_pro:          299,
+        carpenter_pro_annual:   3228
     };
 
     // GA event name -> Meta standard event

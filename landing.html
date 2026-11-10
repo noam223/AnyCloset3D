@@ -217,6 +217,7 @@ body{font-family:'Inter','Heebo',sans-serif;background:var(--w);color:var(--t);o
 .ptab:hover:not(.on){color:var(--t);background:rgba(255,255,255,.5)}
 .ppanel{display:none}
 .ppanel.on{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px;max-width:800px;margin:0 auto}
+#panel-carpenter.on{max-width:420px}
 .pcard{border:2px solid var(--bd);border-radius:var(--rl);padding:36px 28px;position:relative;transition:all .3s;background:var(--w)}
 .pcard:hover{transform:translateY(-4px);box-shadow:0 24px 64px rgba(0,0,0,.12)}
 .pcard.feat{border-color:var(--p);box-shadow:0 0 0 1px var(--p),0 8px 32px rgba(0,0,0,.12)}
@@ -590,9 +591,9 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
         <div class="aud-title">נגרים</div>
         <div class="aud-subtitle">תמחר מהר, ייצר נכון, הרוויח יותר</div>
         <ul class="aud-list">
-          <li><i class="fa-solid fa-check"></i> תמחור אוטומטי מדויק לכל ארון</li>
+          <li><i class="fa-solid fa-check"></i> מחירון אישי — תמחור אוטומטי לפי המחירים שלך</li>
           <li><i class="fa-solid fa-check"></i> שרטוט טכני מלא לייצור</li>
-          <li><i class="fa-solid fa-check"></i> עד 30 פרויקטים פעילים במקביל</li>
+          <li><i class="fa-solid fa-check"></i> הצעות מחיר ללקוח, עד 100 פרויקטים</li>
           <li><i class="fa-solid fa-check"></i> דוח פירוט מלא ללקוח</li>
         </ul>
         <a href="login.html" class="btn-aud">
@@ -704,46 +705,27 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
 
     <!-- Carpenter Plans -->
     <div class="ppanel" id="panel-carpenter">
-      <div class="pcard rv d1">
-        <div class="pname">בסיסי</div>
+      <div class="pcard feat rv d1">
+        <div class="pbadge">🔨 מנוי נגר</div>
+        <div class="pname">נגר</div>
         <div class="ptype">נגר — חודשי</div>
-        <div class="pprice" data-m="499" data-y="449"></div>
+        <div class="pprice" data-m="299" data-y="269"></div>
         <div class="ppills">
           <span class="ppill ppill-green"><i class="fa-solid fa-gift"></i> שבוע ניסיון חינם</span>
         </div>
         <div class="pdiv"></div>
         <ul class="pfeats">
-          <li><i class="fa-solid fa-check y"></i> עד 30 פרויקטים</li>
-          <li><i class="fa-solid fa-check y"></i> ארונות ללא הגבלה</li>
-          <li><i class="fa-solid fa-check y"></i> תמחור אוטומטי</li>
-          <li><i class="fa-solid fa-check y"></i> הדמיה תלת-מימדית</li>
-          <li><i class="fa-solid fa-check y"></i> ייצוא PDF</li>
-          <li class="dim"><i class="fa-solid fa-xmark n"></i> שרטוט לנגר</li>
-          <li class="dim"><i class="fa-solid fa-xmark n"></i> דוח ללקוח</li>
-        </ul>
-        <a href="login.html?plan=carpenter_basic" class="btn-plan btn-plan-o">התחל שבוע ניסיון חינם</a>
-        <a href="login.html?plan=carpenter_basic_annual" class="mo-only" style="display:block;text-align:center;margin-top:10px;font-size:.85rem;font-weight:700;color:var(--ad);">או מנוי שנתי — חיסכון 10%</a>
-      </div>
-      <div class="pcard feat rv d2">
-        <div class="pbadge">⭐ הכי פופולרי</div>
-        <div class="pname">מקצועי</div>
-        <div class="ptype">נגר — חודשי</div>
-        <div class="pprice" data-m="699" data-y="629"></div>
-        <div class="ppills">
-          <span class="ppill ppill-green"><i class="fa-solid fa-gift"></i> שבוע ניסיון חינם</span>
-        </div>
-        <div class="pdiv"></div>
-        <ul class="pfeats">
-          <li><i class="fa-solid fa-check y"></i> פרויקטים ללא הגבלה</li>
-          <li><i class="fa-solid fa-check y"></i> ארונות ללא הגבלה</li>
-          <li><i class="fa-solid fa-check y"></i> תמחור אוטומטי</li>
-          <li><i class="fa-solid fa-check y"></i> הדמיה תלת-מימדית</li>
-          <li><i class="fa-solid fa-check y"></i> ייצוא PDF</li>
-          <li><i class="fa-solid fa-check y"></i> שרטוט לנגר</li>
-          <li><i class="fa-solid fa-check y"></i> דוח ללקוח</li>
+          <li><i class="fa-solid fa-check y"></i> מחירון אישי — אתה קובע את מחירי הארונות</li>
+          <li><i class="fa-solid fa-check y"></i> הצעת מחיר ללקוח + מחשבון מהיר</li>
+          <li><i class="fa-solid fa-check y"></i> מסלול סטטוסים מלא: הצעה ← נמדד ← הוזמן ← ייצור ← הותקן</li>
+          <li><i class="fa-solid fa-check y"></i> עד 100 פרויקטים</li>
+          <li><i class="fa-solid fa-check y"></i> כל סוגי הארונות — כולל פינתיים וחדר ארונות</li>
+          <li><i class="fa-solid fa-check y"></i> שרטוט טכני לייצור + דוח ללקוח</li>
+          <li><i class="fa-solid fa-wand-magic-sparkles" style="color:#a855f7;"></i> עד 100 הדמיות AI בחודש</li>
+          <li><i class="fa-solid fa-check y"></i> 1651 גווני טמבור + תבניות שמורות</li>
         </ul>
         <a href="login.html?plan=carpenter_pro" class="btn-plan btn-plan-p">התחל שבוע ניסיון חינם</a>
-        <a href="login.html?plan=carpenter_pro_annual" class="mo-only" style="display:block;text-align:center;margin-top:10px;font-size:.85rem;font-weight:700;color:var(--ad);">או מנוי שנתי — חיסכון 10%</a>
+        <a href="login.html?plan=carpenter_pro_annual" class="mo-only" style="display:block;text-align:center;margin-top:10px;font-size:.85rem;font-weight:700;color:var(--ad);">או מנוי שנתי — חיסכון ₪360</a>
       </div>
     </div>
 
@@ -822,7 +804,7 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
           <i class="fa-solid fa-chevron-down faq-arrow"></i>
         </button>
         <div class="faq-a">
-          <p>למעצבות: בסיסי ₪229/חודש או ₪199/חודש בשנתי (₪2,388 לשנה). פרימיום ₪299/חודש או ₪269/חודש בשנתי (₪3,228 לשנה). השנתי חוסך ₪360 בשנה, והפיצ'רים זהים לחודשי. כל המנויים כוללים שבוע ניסיון חינם, בלי כרטיס אשראי.</p>
+          <p>למעצבות: בסיסי ₪229/חודש או ₪199/חודש בשנתי (₪2,388 לשנה). פרימיום ₪299/חודש או ₪269/חודש בשנתי (₪3,228 לשנה). לנגרים: מנוי אחד ₪299/חודש או ₪269/חודש בשנתי (₪3,228 לשנה), עם מחירון אישי והצעות מחיר ללקוח. השנתי חוסך ₪360 בשנה, והפיצ'רים זהים לחודשי. כל המנויים כוללים שבוע ניסיון חינם, בלי כרטיס אשראי.</p>
         </div>
       </div>
       <div class="faq-item rv d3">

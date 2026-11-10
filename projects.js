@@ -40,10 +40,8 @@ var _UPGRADE_PLANS = [
     { key: 'designer_premium',        label: 'מעצבת — פרימיום',       price: '₪299/חודש', userType: 'designer', maxProjects: 100, maxDevices: 1, desc: 'עד 100 פרויקטים, תמחור ארונות, כל סוגי הארונות, 100 הדמיות AI, 1651 גווני טמבור' },
     { key: 'designer_premium_annual', label: 'מעצבת — פרימיום שנתי',  price: '₪269/חודש', userType: 'designer', maxProjects: 100, maxDevices: 1, desc: 'כל הפרימיום, ₪3,228 לשנה — חיסכון ₪360' },
     // נגרים
-    { key: 'carpenter_basic',   label: 'נגר — בסיסי',           price: '₪499/חודש',  userType: 'carpenter', maxProjects: 30,   maxDevices: 1,  desc: 'תמחור + הדמיה, עד 30 פרויקטים' },
-    { key: 'carpenter_basic_annual', label: 'נגר — בסיסי שנתי', price: '₪449/חודש',  userType: 'carpenter', maxProjects: 30,   maxDevices: 1,  desc: 'תמחור + הדמיה, עד 30 פרויקטים, ₪5,388 לשנה — חיסכון 10%' },
-    { key: 'carpenter_pro',     label: 'נגר — מקצועי',          price: '₪699/חודש',  userType: 'carpenter', maxProjects: null, maxDevices: 2,  desc: 'הכל כולל דוח לקוח + ייצוא לנגר' },
-    { key: 'carpenter_pro_annual', label: 'נגר — מקצועי שנתי',  price: '₪629/חודש',  userType: 'carpenter', maxProjects: null, maxDevices: 2,  desc: 'הכל כולל דוח לקוח + ייצוא לנגר, ₪7,548 לשנה — חיסכון 10%' },
+    { key: 'carpenter_pro',        label: 'נגר — חודשי', price: '₪299/חודש', userType: 'carpenter', maxProjects: 100, maxDevices: 1, desc: 'מחירון אישי, הצעות מחיר ללקוח, מסלול סטטוסים מלא, 100 פרויקטים, 100 הדמיות AI' },
+    { key: 'carpenter_pro_annual', label: 'נגר — שנתי',  price: '₪269/חודש', userType: 'carpenter', maxProjects: 100, maxDevices: 1, desc: 'כל מנוי הנגר, ₪3,228 לשנה — חיסכון ₪360' },
     // חברות
     { key: 'company_standard',  label: 'חברה — סטנדרט',         price: 'צור קשר',    userType: 'company',   maxProjects: null, maxDevices: 10, desc: 'עד 5 סוכנים, 10 מכשירים, כל הפיצ\'רים' },
     { key: 'company_enterprise',label: 'חברה — ארגוני',          price: 'צור קשר',    userType: 'company',   maxProjects: null, maxDevices: 30, desc: 'עד 15 סוכנים, 30 מכשירים, תמיכה מלאה' },
@@ -171,6 +169,7 @@ var _USER_TYPE_LABELS = {
     if (statPlan) statPlan.textContent = plan.label || '—';
 
     _renderPlanBar();
+    _applyPlanNavGates();
     _syncStatusFilterUI();
     try { await refreshProjectMeasCounts(); } catch (eMeas) {}
     _renderProjects();
@@ -248,10 +247,8 @@ function _buildPaywallPlansHTML(userType) {
         designer_basic_annual:   ['עד 30 פרויקטים', '30 הדמיות AI בחודש', '35 גווני טמבור נבחרים', 'שיתוף עם לקוח בזמן אמת', 'חיסכון ₪360 בשנה'],
         designer_premium:        ['עד 100 פרויקטים', 'תמחור ארונות לפי מחירון שוק', 'כל סוגי הארונות כולל פינתיים וחדר ארונות', '100 הדמיות AI בחודש', '1651 גווני טמבור', 'תבניות עמודה וארון שמורות'],
         designer_premium_annual: ['עד 100 פרויקטים', 'תמחור ארונות לפי מחירון שוק', 'כל סוגי הארונות כולל פינתיים וחדר ארונות', '100 הדמיות AI בחודש', 'תבניות עמודה וארון שמורות', 'חיסכון ₪360 בשנה'],
-        carpenter_basic:    ['עד 30 פרויקטים', 'תמחור אוטומטי', 'הדמיה תלת-ממדית'],
-        carpenter_basic_annual: ['עד 30 פרויקטים', 'תמחור אוטומטי', 'הדמיה תלת-ממדית', 'חיסכון 10% לעומת חודשי'],
-        carpenter_pro:      ['פרויקטים ללא הגבלה', 'תמחור + דוח לקוח', 'ייצוא לנגר', '2 מכשירים'],
-        carpenter_pro_annual: ['פרויקטים ללא הגבלה', 'תמחור + דוח לקוח', 'ייצוא לנגר', '2 מכשירים', 'חיסכון 10% לעומת חודשי'],
+        carpenter_pro:        ['מחירון אישי — עריכת הגדרות התמחור', 'הצעת מחיר ללקוח + מחשבון הצעות', 'מסלול סטטוסים מלא: מדידה, עסקה, ייצור, שירות', 'עד 100 פרויקטים', 'כל סוגי הארונות', '100 הדמיות AI בחודש'],
+        carpenter_pro_annual: ['מחירון אישי — עריכת הגדרות התמחור', 'הצעת מחיר ללקוח + מחשבון הצעות', 'מסלול סטטוסים מלא', 'עד 100 פרויקטים', '100 הדמיות AI בחודש', 'חיסכון ₪360 בשנה'],
         company_standard:   ['פרויקטים ללא הגבלה', 'עד 5 סוכנים', 'עד 10 מכשירים', 'ניהול צוות'],
         company_enterprise: ['פרויקטים ללא הגבלה', 'עד 15 סוכנים', 'עד 30 מכשירים', 'תמיכה מלאה'],
     };
@@ -2185,6 +2182,20 @@ function _ppNum(v, fallback) {
     return isFinite(n) ? n : fallback;
 }
 
+/** Personal price list: carpenters and companies. Designers price by the market list (admin may still set one). */
+function _canEditPricing() {
+    var f = (_plan && _plan.features) || {};
+    return f.canEditPricing !== false;
+}
+
+function _applyPlanNavGates() {
+    var f = (_plan && _plan.features) || {};
+    var navPricing = document.getElementById('nav-pricing');
+    if (navPricing) navPricing.style.display = _canEditPricing() ? '' : 'none';
+    var navCalc = document.getElementById('nav-quick-calc');
+    if (navCalc) navCalc.style.display = (f.showPricing !== false && f.canQuickCalc !== false) ? '' : 'none';
+}
+
 // ── Tab switching ─────────────────────────────────────────────────────────────
 function switchPage(page) {
     // Update sidebar nav
@@ -2214,6 +2225,11 @@ function switchPage(page) {
         if (planBar)   planBar.style.display = 'none';
         _loadProfileForm();
     } else if (page === 'pricing') {
+        if (!_canEditPricing()) {
+            showToast('🔒 עריכת מחירון אישי זמינה במנוי נגר. במנוי מעצבת התמחור לפי מחירון השוק.', 'error');
+            switchPage('projects');
+            return;
+        }
         if (heroTitle) heroTitle.textContent = 'הגדרות תמחור';
         if (heroRight) heroRight.style.display = 'none';
         if (heroStats) heroStats.style.display = 'none';
@@ -2486,10 +2502,10 @@ function _loadSubscriptionSection(profile) {
         designer_premium_annual: 'מעצבת — פרימיום שנתי',
         designer_monthly: 'מעצבת — חודשי',
         designer_annual:  'מעצבת — שנתי',
-        carpenter_basic:  'נגר — בסיסי',
-        carpenter_basic_annual: 'נגר — בסיסי שנתי',
-        carpenter_pro:    'נגר — פרו',
-        carpenter_pro_annual: 'נגר — פרו שנתי',
+        carpenter_basic:  'נגר',
+        carpenter_basic_annual: 'נגר — שנתי',
+        carpenter_pro:    'נגר',
+        carpenter_pro_annual: 'נגר — שנתי',
         company_standard: 'חברה — סטנדרט',
         company_enterprise: 'חברה — אנטרפרייז'
     };
