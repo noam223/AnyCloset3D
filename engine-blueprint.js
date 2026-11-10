@@ -2982,7 +2982,7 @@ window._generateMultiViewBlueprintPages = function() {
     const pages = []; // { label, svg }
 
     // ---- PAGE 0: TOP VIEW ----
-    {
+    topView: {
         const p = [];
         _bpStartPage('top');
         const drawAreaY = 65;
@@ -2991,6 +2991,24 @@ window._generateMultiViewBlueprintPages = function() {
 
         // Panel border
         p.push(`<rect x="${MARGIN}" y="${drawAreaY}" width="${pw}" height="${drawAreaH}" rx="4" fill="white" stroke="${STROKE_THIN}" stroke-width="1"/>`);
+
+        // Standalone corner unit: the unit itself is the whole footprint (width along its front, as in its
+        // front view) — its wing width/depth only mirror the unit size, so drawing them would double it.
+        if (pid === 'corner-unit' && centerWing && centerWing.corner) {
+            const cu = centerWing.corner;
+            const uW = cu.width || 60, uD = cu.depth || 54;
+            const usc = Math.min((pw - PAD * 2) / uW, (drawAreaH - PAD * 2) / uD);
+            const ux = MARGIN + (pw - uW * usc) / 2, uy = drawAreaY + (drawAreaH - uD * usc) / 2;
+            makeRect(p, ux, uy, uW * usc, uD * usc, '#fef9c3', STROKE, 2);
+            const uLabel = cu.type === 'desk' ? 'שולחן פינתי' : 'שידה פינתית';
+            p.push(`<text x="${(ux + uW * usc / 2).toFixed(1)}" y="${(uy + uD * usc / 2 + 5).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="14" fill="${STROKE}" opacity="0.8">${uLabel}</text>`);
+            p.push(`<text x="${(ux + uW * usc / 2).toFixed(1)}" y="${(uy + uD * usc + 15).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="13" fill="${STROKE}" opacity="0.6">חזית</text>`);
+            makeDimH(p, ux, ux + uW * usc, uy - 14, `${_bpMm(uW)}`);
+            makeDimV(p, ux + uW * usc + 14, uy, uy + uD * usc, `${_bpMm(uD)}`);
+            _bpFlushDims(p);
+            pages.push({ label: 'מבט עליון — תוכנית רצפה', svgParts: p, viewKey: 'top' });
+            break topView;
+        }
 
         // Compute world bounds in cm
         let minX = -cW/2, maxX = cW/2, minZ = 0, maxZ = cD;
