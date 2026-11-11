@@ -3616,6 +3616,7 @@ function _buildRoom() {
         ceilMesh.rotation.x = Math.PI / 2;
         ceilMesh.position.set(roomCenterX, _ceilPlaneY, backZ + roomD / 2 - wallT);
         ceilMesh.userData._roomOwned = true;
+        ceilMesh.userData.roomPart = 'ceiling';
         rg.add(ceilMesh);
 
         // Recessed spots: 3 × 2 grid; the fixtures face down so they vanish from a bird's-eye view
@@ -3630,11 +3631,13 @@ function _buildRoom() {
                 rim.rotation.x = Math.PI / 2;
                 rim.position.set(x, _ceilPlaneY - 0.2, z);
                 rim.userData._roomOwned = true;
+                rim.userData.roomPart = 'ceiling';
                 rg.add(rim);
                 const lens = new THREE.Mesh(new THREE.CircleGeometry(3.4, 24), lensMat);
                 lens.rotation.x = Math.PI / 2;
                 lens.position.set(x, _ceilPlaneY - 0.3, z);
                 lens.userData._roomOwned = true;
+                lens.userData.roomPart = 'ceiling';
                 rg.add(lens);
             });
         });
