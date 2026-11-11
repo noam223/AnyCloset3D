@@ -15347,7 +15347,7 @@ function _collectWingPrintSpecRows(item, itemObj, unit) {
     });
     rows.push({
         id: prefix + 'colorExternal',
-        label: 'צבע חזיתות (דלתות)',
+        label: 'צבע חזיתות (דלתות ומגירות חוץ)',
         value: _plainSpecValue(_colorKeyLabel(mat('materialExternal') || mat('materialBody') || 'white_matte'))
     });
     rows.push({
@@ -15541,7 +15541,7 @@ function _collectPrintSpecRows(item, itemObj) {
         if (item.slidingDoor) {
             rows.push({ id: 'slidingDoorColors', label: 'צבע חזיתות הזזה', value: _plainSpecValue(item.slidingDoor.doorColorsStr) });
         } else {
-            rows.push({ id: 'colorExternal', label: 'צבע חזיתות (דלתות)', value: _plainSpecValue(item.colorExternal) });
+            rows.push({ id: 'colorExternal', label: 'צבע חזיתות (דלתות ומגירות חוץ)', value: _plainSpecValue(item.colorExternal) });
         }
         rows.push({ id: 'colorBack', label: 'צבע גב ארון', value: _plainSpecValue((item.colorBack && item.colorBack !== 'undefined') ? item.colorBack : 'לבן מט') });
         if (_formatDeskAddition(item, itemObj).desk !== 'ללא') rows.push({ id: 'colorDesk', label: 'צבע שולחן עבודה', value: _plainSpecValue(item.colorDesk) });
@@ -16570,7 +16570,7 @@ function _printFinishesRows(item, itemObj, thStyle, tdStyle, sectionStyle) {
     if (item.slidingDoor) {
         html += _printTr(thStyle, tdStyle, 'צבע חזיתות הזזה', item.slidingDoor.doorColorsStr);
     } else {
-        html += _printTr(thStyle, tdStyle, 'צבע חזיתות (דלתות)', item.colorExternal);
+        html += _printTr(thStyle, tdStyle, 'צבע חזיתות (דלתות ומגירות חוץ)', item.colorExternal);
     }
     html += _printTr(thStyle, tdStyle, 'צבע גב ארון', (item.colorBack && item.colorBack !== 'undefined') ? item.colorBack : 'לבן מט');
     if (_formatDeskAddition(item, itemObj).desk !== 'ללא') html += _printTr(thStyle, tdStyle, 'צבע שולחן עבודה', item.colorDesk);
@@ -18592,7 +18592,7 @@ function _buildCustomerSummaryDetails(itemObj) {
 
     if (colorBody) details.push('צבע גוף וצוקל: ' + colorBody);
     if (colorInternal) details.push('צבע פנים (מדפים/מגירות): ' + colorInternal);
-    if (colorExternal) details.push('צבע חזיתות (דלתות): ' + colorExternal);
+    if (colorExternal) details.push('צבע חזיתות (דלתות ומגירות חוץ): ' + colorExternal);
     if (colorBack && colorBack !== 'undefined') details.push('צבע גב ארון: ' + colorBack);
     const deskSummary = _formatDeskAddition(item, itemObj);
     if (deskSummary.desk !== 'ללא' && colorDesk) details.push('צבע שולחן עבודה: ' + colorDesk);
