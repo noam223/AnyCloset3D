@@ -727,8 +727,9 @@ function _bpPushColInnerWidthDims(p, viewKey, cols, colXPositions, ox, dW, sc, t
         if (!col || !cp) return;
         const isFirst = ci === 0;
         const isLast = ci === cols.length - 1;
-        const x1 = (isFirst ? ox + tPx : cp.x1 + tPx / 2) + GAP;
-        const x2 = (isLast ? ox + dW - tPx : cp.x2 - tPx / 2) - GAP;
+        // Outer walls and partitions are all drawn centred on their line, so every inner face is half a board in
+        const x1 = (isFirst ? ox : cp.x1) + tPx / 2 + GAP;
+        const x2 = (isLast ? ox + dW : cp.x2) - tPx / 2 - GAP;
         _bpMaybePushInnerWidthDim(p, viewKey, 'colInW:c' + ci, x1, x2, yInner,
             `${_bpMm(cp.wCm || 0)}`, makeDimHFn, false);
     });
