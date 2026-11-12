@@ -368,10 +368,11 @@ function _bpSideCabinetDoorExtra(cw, scSide) {
     if (!cols || !cols.length) return 0;
     const edgeCol = (scSide === 'right') ? cols[cols.length - 1] : cols[0];
     if (!edgeCol.doors || !edgeCol.doors.length) return 0;
+    if (typeof window._centerDepthIncludesFronts === 'function' && window._centerDepthIncludesFronts()) return 0;
     return cw.thickness || state.thickness || 1.7;
 }
 
-/** Depth (cm) visible in side elevation — main cabinet depth + optional door overlap. */
+/** Depth (cm) visible in side elevation — main cabinet depth (+ door overlap only where the depth excludes the doors). */
 function _bpSideCabinetSideDepthCm(cw, scSide) {
     const centerD = cw ? (cw.depth || 54) : 54;
     return centerD + _bpSideCabinetDoorExtra(cw, scSide);

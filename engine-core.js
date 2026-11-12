@@ -4878,6 +4878,8 @@ function buildCabinet() {
         if (!cols || !cols.length) return 0;
         const edgeCol = (scSide === 'right') ? cols[cols.length - 1] : cols[0];
         if (!edgeCol.doors || !edgeCol.doors.length) return 0;
+        // Main cabinet's depth already includes its doors (body shortened) — side cabinet matches at plain depth
+        if (_centerDepthIncludesFronts()) return 0;
         return centerWing.thickness || state.thickness || 1.7;
     }
 
@@ -6219,7 +6221,37 @@ function _renderShoeDrawerCell(opts) {
     }
 }
 
+/**
+ * Doors / external drawer fronts mounted on the body face (not inset, not sliding): the wing's depth
+ * includes them, so the body is this much shallower. Corner (L) cabinets keep body = depth for their joints.
+ */
+function _wingFrontOverlayCm(t) {
+    if (!_centerDepthIncludesFronts()) return 0;
+    if (state.presetId === 'writing-desk' || state.presetId === 'corner-unit') return 0;
+    const cols = state.columns || [];
+    const hasDoorFronts = !!state.hasDoors && cols.some(c => c && c.doors && c.doors.length);
+    const hasDrawerFronts = cols.some(c => c && (c.compartments || []).some(comp => comp && comp.type === 'external_drawers'));
+    return (hasDoorFronts || hasDrawerFronts) ? (t || 1.7) + 0.1 : 0;
+}
+
+function _centerDepthIncludesFronts() {
+    if (state.cabinetModel === 'ab2' || state.cabinetModel === 'ab2_nohoney') return false;
+    if (state.presetId === 'sliding' && state.slidingDoor && state.slidingDoor.enabled) return false;
+    return !(state.wings && (state.wings.left || state.wings.right));
+}
+window._centerDepthIncludesFronts = _centerDepthIncludesFronts;
+
+/** Builds the wing, then slides its meshes back by half the front overlay so the back stays on the wall line and the fronts end at +depth/2. */
 function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveWing) {
+    const group = _buildGroup;
+    const firstNew = group ? group.children.length : 0;
+    _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveWing);
+    const shift = _wingFrontOverlayCm(state.thickness) / 2;
+    if (!shift || !group || state.viewMode === 'blueprint') return;
+    for (let i = firstNew; i < group.children.length; i++) group.children[i].position.z -= shift;
+}
+
+function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveWing) {
     const isBP = state.viewMode === 'blueprint';
     const bpMat = new THREE.MeshBasicMaterial({ color: 0xffffff, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
     
@@ -6244,7 +6276,11 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
     const _ox = _offsetX || 0;
 
     const t = state.thickness;
-    const bodyD = state.depth;
+    const _frontOverlayD = isBP ? 0 : _wingFrontOverlayCm(t);
+    const bodyD = state.depth - _frontOverlayD;
+    // Side desk keeps the full depth (flush with the door faces); +overlay/2 cancels the wing's back-shift
+    const _sideDeskD = state.depth;
+    const _sideDeskZ = _frontOverlayD / 2;
     // Desk surface: 17mm with drawers, 28mm without (see _deskSurfaceThickness)
     const _deskT = (hasDrawers) => (typeof window._deskSurfaceThickness === 'function')
         ? window._deskSurfaceThickness(!!hasDrawers, t)
@@ -6253,6 +6289,7 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
     // Default deskT used for merge band / side-desk-with-drawers geometry (17mm when drawers on)
     const deskT = deskTSide;
     const _deskDrawerFZ = bodyD / 2 - t / 2 - 1.5; // recessed inside frame (like internal drawers)
+    const _sideDeskDrawerFZ = _sideDeskD / 2 - t / 2 - 1.5 + _sideDeskZ;
     // For sliding wardrobes: internal column partitions are set back 6cm from the front face
     const _isSlidingWardrobe = state.presetId === 'sliding' && state.slidingDoor && state.slidingDoor.enabled;
     const _slidingPartSetback = 6; // cm — front 6cm reserved for door track
@@ -6648,10 +6685,10 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
         let dir = (dSide === 'left') ? -1 : 1;
         const surfaceCenterX = startX + dir * (dWidth / 2);
         _ppPartId = 'side_desk_surface';
-        createBoard(dWidth, deskT, bodyD, surfaceCenterX, dHeight - deskT/2, 0, matDesk);
+        createBoard(dWidth, deskT, _sideDeskD, surfaceCenterX, dHeight - deskT/2, _sideDeskZ, matDesk);
         _ppPartId = 'side_desk_leg';
         const legX = startX + dir * (dWidth - t/2);
-        createBoard(t, dHeight - deskT, bodyD, legX, (dHeight - deskT)/2, 0, matDesk);
+        createBoard(t, dHeight - deskT, _sideDeskD, legX, (dHeight - deskT)/2, _sideDeskZ, matDesk);
         _ppPartId = '';
         if (state.desk.hasDrawers && !state.desk.mergeDrawers) {
             const numDrawers = (state.desk.drawerCount != null) ? state.desk.drawerCount : (dWidth <= 80 ? 1 : 2);
@@ -6663,12 +6700,12 @@ function _buildWingGeometry(targetGroup, _offsetX, _offsetY, _offsetZ, isActiveW
             for(let i=0; i<numDrawers; i++) {
                 let dx = (dSide === 'left') ? (startX - innerWidth) + gap + drawerWidth/2 + i * (drawerWidth + gap) : startX + gap + drawerWidth/2 + i * (drawerWidth + gap);
                 _ppPartId = `desk_drawer_d${i}`;
-                let mesh = createBoard(drawerWidth, drawerH, t, dx, drawerCenterY, _deskDrawerFZ, matExternal);
+                let mesh = createBoard(drawerWidth, drawerH, t, dx, drawerCenterY, _sideDeskDrawerFZ, matExternal);
                 _ppPartId = '';
                 if (!isBP) _addPanelHandleLocal(mesh, drawerWidth, drawerH, _handleStyle);
                 if (!isBP) {
                     const backPanel = new THREE.Mesh(new THREE.BoxGeometry(drawerWidth - 2, 2.5, 0.5), new THREE.MeshStandardMaterial({ color: 0x222222 }));
-                    backPanel.position.set(dx, drawerBottomY + drawerH - 1.25, _deskDrawerFZ - t/2 - 0.25);
+                    backPanel.position.set(dx, drawerBottomY + drawerH - 1.25, _sideDeskDrawerFZ - t/2 - 0.25);
                     _buildGroup.add(backPanel);
                 }
             }
