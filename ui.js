@@ -12571,6 +12571,15 @@ window._configureSpaceUnit = function(kind, host) {
     if (kind === 'sideDesk') {
         state.presetId = 'writing-desk';
         if (typeof window._applyWritingDeskPreset === 'function') window._applyWritingDeskPreset();
+        // Start flush with the cabinet it was added next to; the user can change the depth afterwards
+        if (host && host.depth > 0) {
+            cw.depth = host.depth;
+            ['inp-depth', 'inp-num-depth', 'dim-pill-depth', 'inp-slider-depth'].forEach(function(id) {
+                const el = document.getElementById(id);
+                if (el) el.value = host.depth;
+            });
+            if (typeof window._syncAllRangeFills === 'function') window._syncAllRangeFills();
+        }
         return 0;
     }
     if (kind === 'cornerDrawers' || kind === 'cornerDesk') {
