@@ -2128,6 +2128,9 @@ window._updateMaterialTabVisibility = function(w) {
     }
 
     _applyPartTabLabels(_partTabDefaultLabels);
+    // The desk branch above hides these; restore them when returning to a cabinet in the same space
+    document.querySelectorAll('.part-tab-btn[data-part="materialBody"], .part-tab-btn[data-part="materialInternal"], .part-tab-btn[data-part="materialBack"]')
+        .forEach(btn => { btn.style.display = ''; });
 
     // _isUUEdit: true when editing upper unit inline
     const _isUUEdit = !!state._activeUpperUnit;
