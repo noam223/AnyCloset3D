@@ -713,37 +713,30 @@ function _bpMaybePushColWidthDim(p, viewKey, ci, x1, x2, y, lbl, makeDimHFn, abo
 }
 
 /**
- * Per-column width dims in two rows: clear inner width between the boards (yInner) and the
- * column's outer width as its own box = inner + 2 boards (yOuter, multi-column only — a single
- * column's outer width is the overall width). Arrow ends sit on the board faces as drawn:
- * outer walls run inward from ox / ox+dW, partitions are centred on cp.x1 / cp.x2.
+ * Per-column clear inner width (between the boards). Only the whole unit gets an outer width —
+ * per-column outer widths share partitions and don't add up to the total.
+ * Arrow ends stop a few px short of the drawn board faces so they don't merge with the boards.
  */
-function _bpPushColInnerOuterWidthDims(p, viewKey, cols, colXPositions, ox, dW, sc, tCm, yInner, yOuter, makeDimHFn, faceY, faceH) {
+function _bpPushColInnerWidthDims(p, viewKey, cols, colXPositions, ox, dW, sc, tCm, yInner, makeDimHFn) {
     if (!cols || !cols.length || !colXPositions) return;
     const t = tCm != null ? +tCm : (state.thickness || 1.7);
     const tPx = t * sc;
-    const multi = cols.length > 1;
+    const GAP = 3;
     cols.forEach((col, ci) => {
         const cp = colXPositions[ci];
         if (!col || !cp) return;
-        const wCm = cp.wCm || 0;
         const isFirst = ci === 0;
         const isLast = ci === cols.length - 1;
-        const outerL = isFirst ? ox : cp.x1 - tPx / 2;
-        const outerR = isLast ? ox + dW : cp.x2 + tPx / 2;
-        _bpMaybePushInnerWidthDim(p, viewKey, 'colInW:c' + ci, outerL + tPx, outerR - tPx, yInner,
-            `${_bpMm(wCm)}`, makeDimHFn, false);
-        if (!multi) return;
-        const fy = faceY != null ? faceY : cp.colTopY;
-        const fh = faceH != null ? faceH : ((cp.colBotY != null && cp.colTopY != null) ? cp.colBotY - cp.colTopY : null);
-        _bpMaybePushColWidthDim(p, viewKey, ci, outerL, outerR, yOuter,
-            `${_bpMm(wCm + 2 * t)}`, makeDimHFn, false, fy, fh);
+        const x1 = (isFirst ? ox + tPx : cp.x1 + tPx / 2) + GAP;
+        const x2 = (isLast ? ox + dW - tPx : cp.x2 - tPx / 2) - GAP;
+        _bpMaybePushInnerWidthDim(p, viewKey, 'colInW:c' + ci, x1, x2, yInner,
+            `${_bpMm(cp.wCm || 0)}`, makeDimHFn, false);
     });
 }
 
 /**
  * Stacked rows under the cabinet, one lane per row so each label (drawn 16px under its line)
- * clears the next row's line: honeycomb inner → column inner → column outer → overall width.
+ * clears the next row's line: honeycomb inner → column inner → overall width.
  */
 function _bpWidthDimLanes(baseY, cols) {
     const LANE = 26;
@@ -751,7 +744,6 @@ function _bpWidthDimLanes(baseY, cols) {
     const lanes = {};
     if ((cols || []).some(_bpColumnHasHoneycomb)) { lanes.hc = y; y += LANE; }
     lanes.inner = y; y += LANE;
-    if ((cols || []).length > 1) { lanes.outer = y; y += LANE; }
     lanes.total = y + 6;
     return lanes;
 }
@@ -2809,8 +2801,8 @@ window._generateMultiViewBlueprintSVG = function() {
         {
             const _tCmHC = state.thickness || 1.7;
             _bpPushHoneycombInnerWidthDims(p, _bpViewKey, cols, colXPositions, sc, _tCmHC, _wLanes.hc, dimH, wg, pH);
-            _bpPushColInnerOuterWidthDims(p, _bpViewKey, cols, colXPositions, ox, dW, sc, _tCmHC,
-                _wLanes.inner, _wLanes.outer, dimH);
+            _bpPushColInnerWidthDims(p, _bpViewKey, cols, colXPositions, ox, dW, sc, _tCmHC,
+                _wLanes.inner, dimH);
         }
         // Overall height: standing columns floor→top; hanging cabinets show body height only
         // Place opposite a side desk so the dim does not sit on top of the desk
@@ -3857,8 +3849,8 @@ window._generateMultiViewBlueprintPages = function() {
                 p, _bpViewKey, cols, colXPositions, sc, _tCmHC2, _wLanes2.hc,
                 (ax1, ax2, ay, albl, aabove) => makeDimH(p, ax1, ax2, ay, albl, aabove), wg, pH
             );
-            _bpPushColInnerOuterWidthDims(p, _bpViewKey, cols, colXPositions, ox, dW, sc, _tCmHC2,
-                _wLanes2.inner, _wLanes2.outer,
+            _bpPushColInnerWidthDims(p, _bpViewKey, cols, colXPositions, ox, dW, sc, _tCmHC2,
+                _wLanes2.inner,
                 (x1, x2, y, lbl, above) => makeDimH(p, x1, x2, y, lbl, above));
         }
         // Overall height: standing columns floor→top; hanging cabinets show body height only
@@ -4337,9 +4329,9 @@ window._generateMultiViewBlueprintPages = function() {
                 p, _bpViewKey, cols, colXPositions, sc, _tCmHCFc, _wLanesFc.hc,
                 (ax1, ax2, ay, albl, aabove) => makeDimH(p, ax1, ax2, ay, albl, aabove), wg, pH
             );
-            _bpPushColInnerOuterWidthDims(p, _bpViewKey, cols, colXPositions, ox, dW, sc, _tCmHCFc,
-                _wLanesFc.inner, _wLanesFc.outer,
-                (x1, x2, y, lbl, above) => makeDimH(p, x1, x2, y, lbl, above), oy, dH);
+            _bpPushColInnerWidthDims(p, _bpViewKey, cols, colXPositions, ox, dW, sc, _tCmHCFc,
+                _wLanesFc.inner,
+                (x1, x2, y, lbl, above) => makeDimH(p, x1, x2, y, lbl, above));
         }
         makeDimV(p, ox - 54, oy, oy + dH, `${_bpMm(wg.h)}`);
         if (pH > 0) {
@@ -4610,9 +4602,9 @@ window._generateMultiViewBlueprintPages = function() {
                         (ax1, ax2, ay, albl, aabove) => makeDimH(p, ax1, ax2, ay, albl, aabove),
                         { w: scW }, scPH
                     );
-                    _bpPushColInnerOuterWidthDims(p, _bpViewKey, cols, colXPositions, ox, dW, scScale, _tCmHCSc,
-                        _wLanesSC.inner, _wLanesSC.outer,
-                        (x1, x2, y, lbl, above) => makeDimH(p, x1, x2, y, lbl, above), oy, dH);
+                    _bpPushColInnerWidthDims(p, _bpViewKey, cols, colXPositions, ox, dW, scScale, _tCmHCSc,
+                        _wLanesSC.inner,
+                        (x1, x2, y, lbl, above) => makeDimH(p, x1, x2, y, lbl, above));
                 }
                 makeDimV(p, ox - 54, oy, oy + dH, `${_bpMm(scH)}`);
                 if (scPH > 0) makeDimV(p, ox + dW + 18, oy + dH - scPH*scScale, oy + dH, `${_bpMm(scPH)}`);
@@ -5033,9 +5025,9 @@ window._generateMultiViewBlueprintPages = function() {
                 (ax1, ax2, ay, albl, aabove) => makeDimH(p, ax1, ax2, ay, albl, aabove),
                 { w: uuW }, 0
             );
-            _bpPushColInnerOuterWidthDims(p, _bpViewKey, uuCols, colXPositions, ox, dW, sc, _tCmHCUu,
-                _wLanesUU.inner, _wLanesUU.outer,
-                (x1, x2, y, lbl, above) => makeDimH(p, x1, x2, y, lbl, above), oy, dH);
+            _bpPushColInnerWidthDims(p, _bpViewKey, uuCols, colXPositions, ox, dW, sc, _tCmHCUu,
+                _wLanesUU.inner,
+                (x1, x2, y, lbl, above) => makeDimH(p, x1, x2, y, lbl, above));
         }
         makeDimV(p, ox - 54, oy, oy + dH, `${_bpMm(uuH)}`);
         // Gap label (distance between upper unit and main cabinet)
