@@ -825,7 +825,7 @@ window._toggleRoom = function() {
 
 // ---- Room as a backdrop behind the cabinet in the editor (toolbar toggle, remembered per browser) ----
 window._room3dPref = (function() {
-    try { return localStorage.getItem('ac_room3d') !== '0'; } catch (e) { return true; }
+    try { return localStorage.getItem('ac_room3d_v2') === '1'; } catch (e) { return false; }
 })();
 /** Room shown in the editor only as scenery — not תצוגת חדר / presentation, where it is the subject. */
 window._roomIsBackdrop = function() {
@@ -847,7 +847,7 @@ window._syncEditorRoomButton = function() {
 };
 window._toggleEditorRoom = function() {
     window._room3dPref = !window._room3dPref;
-    try { localStorage.setItem('ac_room3d', window._room3dPref ? '1' : '0'); } catch (e) { /* ignore */ }
+    try { localStorage.setItem('ac_room3d_v2', window._room3dPref ? '1' : '0'); } catch (e) { /* ignore */ }
     window._syncEditorRoomButton();
     if (typeof buildCabinet === 'function') buildCabinet();
 };
@@ -873,8 +873,10 @@ window._setDoorsVisible = function(wantVisible) {
     });
     const btn = document.getElementById('btn-toggle-doors');
     if (btn) {
-        // Designer top-bar is icon-only; keep label short if text mode exists
-        if (btn.classList.contains('icon-btn')) {
+        if (btn.classList.contains('toggle-btn')) {
+            const ic = btn.querySelector('i');
+            if (ic) ic.className = window._doorsVisible ? 'fa-solid fa-door-closed' : 'fa-solid fa-door-open';
+        } else if (btn.classList.contains('icon-btn')) {
             btn.innerHTML = window._doorsVisible
                 ? '<i class="fa-solid fa-door-closed"></i>'
                 : '<i class="fa-solid fa-door-open"></i>';

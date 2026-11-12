@@ -40,7 +40,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260910deskMerge">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
     <link rel="stylesheet" href="style-extras.css?v=20261110doormirror">
-    <link rel="stylesheet" href="style.css?v=20261109spaceDel">
+    <link rel="stylesheet" href="style.css?v=20261112toggles">
     <link rel="stylesheet" href="quick-calc.css?v=20260929qc">
     <style>
         html.thumb-only-mode #left-sidebar,
@@ -372,7 +372,7 @@
         <!-- ===== ROOM SETTINGS SECTION ===== -->
         <div class="section" id="room-settings-section" data-sbgroup="room">
             <div id="room-plan-sidebar-header" class="room-plan-sidebar-header" style="display:none;">
-                <div class="room-plan-sidebar-title"><i class="fa-solid fa-compass-drafting"></i> תצוגת חדר</div>
+                <div class="room-plan-sidebar-title"><i class="fa-solid fa-couch"></i> תצוגת חדר</div>
                 <div class="room-plan-sidebar-sub">גרור פריטים במבט על וראה מידות בזמן אמת</div>
             </div>
             <div class="section-title"><i class="fa-solid fa-vector-square"></i> מידות חדר</div>
@@ -1383,14 +1383,14 @@
 
 <!-- ===== TOP BAR (Desktop — fixed over canvas center) ===== -->
 <div id="top-bar">
-    <button class="view-btn active" id="btn-front-view"><i class="fa-solid fa-pen-ruler"></i> עריכת חזית</button>
-    <button class="view-btn" id="btn-blueprint-view" style="display:none;"><i class="fa-solid fa-drafting-compass"></i> שרטוט ייצור</button>
-    <button class="view-btn" id="btn-multiview-blueprint" onclick="openMultiViewBlueprint()" style="display:none;"><i class="fa-solid fa-layer-group"></i> שרטוט ייצור</button>
+    <button class="view-btn active" id="btn-front-view"><i class="fa-solid fa-pen-ruler"></i> עריכת ארון</button>
+    <button class="view-btn" id="btn-blueprint-view" style="display:none;"><i class="fa-solid fa-compass-drafting"></i> שרטוט</button>
+    <button class="view-btn" id="btn-multiview-blueprint" onclick="openMultiViewBlueprint()" style="display:none;"><i class="fa-solid fa-compass-drafting"></i> שרטוט</button>
     <button class="view-btn icon-btn" id="btn-reset-view" title="איפוס זווית מצלמה" style="display:none;" onclick="window._orbitFree=false; const b=document.getElementById('btn-reset-view'); if(b) b.style.display='none'; updateCameraView();"><i class="fa-solid fa-arrows-rotate"></i></button>
-    <button class="view-btn" id="btn-room-plan" title="תצוגת חדר — מבט על 2D עם גרירת ריהוט" onclick="window._toggleRoomPlanMode()"><i class="fa-solid fa-compass-drafting"></i> תצוגת חדר</button>
-    <button class="view-btn" id="btn-mirror-cabinet" title="היפוך כיוון הארון — מה שבימין עובר לשמאל (גם כל הארונות במרחב יחד). לחיצה נוספת מחזירה." onclick="window.mirrorCabinet && window.mirrorCabinet()"><i class="fa-solid fa-left-right"></i> היפוך כיוון</button>
-    <button class="view-btn icon-btn" id="btn-toggle-doors" title="הצג/הסתר חזיתות (תצוגה בלבד — לא משנה את השמירה)" onclick="window._toggleDoors && window._toggleDoors()"><i class="fa-solid fa-door-closed"></i></button>
-    <button class="view-btn icon-btn" id="btn-toggle-room3d" title="חדר ברקע בתלת־מימד" onclick="window._toggleEditorRoom && window._toggleEditorRoom()"><i class="fa-solid fa-house"></i></button>
+    <button class="view-btn" id="btn-room-plan" title="תצוגת חדר — מבט על 2D עם גרירת ריהוט" onclick="window._toggleRoomPlanMode()"><i class="fa-solid fa-couch"></i> תצוגת חדר</button>
+    <button class="view-btn" id="btn-mirror-cabinet" title="היפוך כיוון הארון — מה שבימין עובר לשמאל (גם כל הארונות במרחב יחד). לחיצה נוספת מחזירה." onclick="window.mirrorCabinet && window.mirrorCabinet()"><i class="fa-solid fa-left-right"></i> שנה כיוון</button>
+    <button class="view-btn toggle-btn" id="btn-toggle-doors" title="הצג/הסתר חזיתות (תצוגה בלבד — לא משנה את השמירה)" onclick="window._toggleDoors && window._toggleDoors()"><i class="fa-solid fa-door-closed"></i><span>הצג דלתות</span></button>
+    <button class="view-btn toggle-btn toggled-off" id="btn-toggle-room3d" title="חדר ברקע בתלת־מימד" onclick="window._toggleEditorRoom && window._toggleEditorRoom()"><i class="fa-solid fa-house"></i><span>הצג חדר</span></button>
     <!-- Room wall position selector — only shown for linear/sliding presets -->
     <div id="room-wall-selector" style="display:none; align-items:center; gap:3px; margin:0 4px;" title="מיקום ארון בחדר">
         <button id="btn-wall-left"   class="view-btn icon-btn" style="font-size:0.72rem;padding:4px 7px;" title="צמוד לקיר שמאל"  onclick="window._setRoomWall('left')">← שמאל</button>
@@ -2144,10 +2144,10 @@
     <div class="mobile-panel-body">
         <div class="mobile-view-btns">
             <button class="mobile-view-mode-btn active" id="mbtn-front-view" onclick="setMobileView('front')">
-                <i class="fa-solid fa-pen-ruler"></i><span>עריכת חזית</span>
+                <i class="fa-solid fa-pen-ruler"></i><span>עריכת ארון</span>
             </button>
             <button class="mobile-view-mode-btn" id="mbtn-blueprint-view" onclick="setMobileView('blueprint')">
-                <i class="fa-solid fa-drafting-compass"></i><span>שרטוט ייצור</span>
+                <i class="fa-solid fa-compass-drafting"></i><span>שרטוט</span>
             </button>
         </div>
         <div class="mobile-panel-divider"></div>
@@ -2162,7 +2162,7 @@
                 <i class="fa-solid fa-rotate-left"></i> חזור
             </button>
             <button class="mobile-action-btn" id="mbtn-mirror-cabinet" onclick="window.mirrorCabinet && window.mirrorCabinet()">
-                <i class="fa-solid fa-left-right"></i> היפוך כיוון
+                <i class="fa-solid fa-left-right"></i> שנה כיוון
             </button>
             <button class="mobile-action-btn danger" onclick="resetCurrentCabinet()">
                 <i class="fa-solid fa-trash-arrow-up"></i> אפס
@@ -3042,7 +3042,7 @@
 <script src="writing-desk-preset.js?v=20260823h370"></script>
 <script src="corner-unit-preset.js?v=20261103deskdoor"></script>
 <script src="engine-appliances.js?v=20261007deskMerge28"></script>
-<script src="engine-core.js?v=20261111roomexp"></script>
+<script src="engine-core.js?v=20261112toggles"></script>
 <script src="engine-corners.js?v=20261109ridingFlush"></script>
 <script src="engine-blueprint.js?v=20261110cuhost"></script>
 <script src="engine-room-plan.js?v=20261110floors"></script>
