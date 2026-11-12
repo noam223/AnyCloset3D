@@ -539,6 +539,7 @@ var TOPICS = [
             },
             {
                 target: ['#btn-load-json', '#btn-save-json'],
+                when: function() { return _vis('#btn-save-json'); },
                 title: '💾 גיבוי לקובץ',
                 text: 'שמירת הפרויקט כקובץ במחשב וטעינה שלו בחזרה — גיבוי נוסף מעבר לשמירה בענן.',
                 position: 'bottom'

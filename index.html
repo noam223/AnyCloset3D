@@ -1404,8 +1404,8 @@
         <button class="view-btn icon-btn" id="btn-redo" onclick="redo()" title="בצע שוב" disabled><i class="fa-solid fa-rotate-left"></i></button>
         <button class="view-btn icon-btn text-danger" id="btn-reset" onclick="resetCurrentCabinet()" title="אפס ארון נוכחי לחלוטין"><i class="fa-solid fa-trash-arrow-up"></i></button>
         <div class="divider"></div>
-        <button class="view-btn file-btn" id="btn-save-json"><i class="fa-solid fa-save"></i> שמור</button>
-        <button class="view-btn file-btn" id="btn-load-json" onclick="document.getElementById('inp-load-json').click()"><i class="fa-solid fa-folder-open"></i> טען</button>
+        <button class="view-btn file-btn" id="btn-save-json" style="display:none;"><i class="fa-solid fa-save"></i> שמור</button>
+        <button class="view-btn file-btn" id="btn-load-json" style="display:none;" onclick="document.getElementById('inp-load-json').click()"><i class="fa-solid fa-folder-open"></i> טען</button>
         <input type="file" id="inp-load-json" accept=".json" style="display:none;">
         <button class="view-btn file-btn" id="btn-export-3d" onclick="window._openExport3DMenu(event)" title="ייצוא קובץ תלת-ממד ל-SketchUp / AutoCAD / 3ds Max"><i class="fa-solid fa-cube"></i> ייצוא 3D</button>
         <div class="divider"></div>
@@ -2615,6 +2615,7 @@
         <button class="mobile-panel-close" onclick="closeMobilePanel()"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="mobile-panel-body">
+        <div id="mobile-json-file-section" style="display:none;">
         <div class="mobile-section-title">שמירה וטעינה</div>
         <div style="display:flex;gap:10px;margin-bottom:15px;">
             <button class="mobile-action-btn" style="flex:1;" onclick="document.getElementById('btn-save-json').click(); closeMobilePanel();">
@@ -2625,6 +2626,7 @@
             </button>
         </div>
         <div class="mobile-panel-divider"></div>
+        </div>
         <div class="mobile-section-title">מחשבון תמחור מהיר</div>
         <button class="mobile-action-btn" style="width:100%;" onclick="openQuickCalcModal(); closeMobilePanel();">
             <i class="fa-solid fa-calculator"></i> פתח מחשבון מהיר
@@ -3054,7 +3056,7 @@
 <script src="part-paint.js?v=20261104egger"></script>
 <script src="shelf-pick.js?v=20260922sideWall"></script>
 <script src="export-3d.js?v=20261111roomexp"></script>
-<script src="index-init.js?v=20261110floors"></script>
+<script src="index-init.js?v=20261112jsonCompany"></script>
 
 <!-- ===== TAMBOUR FULL PALETTE MODAL ===== -->
 <div id="tambour-palette-modal" class="tambour-palette-overlay">
@@ -3166,7 +3168,7 @@
 </button>
 
 <script src="notes.js?v=20260714pinDelete"></script>
-<script src="tour.js?v=20261109helpchat"></script>
+<script src="tour.js?v=20261112jsonCompany"></script>
 <script src="help-kb.js?v=20261109helpchat"></script>
 <script src="help-chat.js?v=20261109helpfloat"></script>
 <script src="sidebar-rail.js?v=20261007glassTint"></script>

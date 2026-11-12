@@ -178,6 +178,15 @@
         if (mBtnCalc) mBtnCalc.style.display = 'none';
     }
 
+    if (_features && _features.isCompany) {
+        ['btn-save-json', 'btn-load-json'].forEach(function(id) {
+            var b = document.getElementById(id);
+            if (b) b.style.display = 'flex';
+        });
+        var mJson = document.getElementById('mobile-json-file-section');
+        if (mJson) mJson.style.display = 'block';
+    }
+
     if (_features && (_features.canExportBlueprint || _features.canExportCarpenter)) {
         var btnMvbp = document.getElementById('btn-multiview-blueprint');
         if (btnMvbp) btnMvbp.style.display = 'inline-flex';
