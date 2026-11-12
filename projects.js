@@ -2478,6 +2478,34 @@ async function _loadProfileForm() {
 }
 
 // ── Subscription management section in profile tab ───────────────────────────
+function _addMonthsClamped(date, months) {
+    var d = new Date(date.getTime());
+    var day = d.getDate();
+    d.setDate(1);
+    d.setMonth(d.getMonth() + months);
+    var lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    d.setDate(Math.min(day, lastDay));
+    return d;
+}
+
+/** subscription_ends_at when Make set it; otherwise roll the billing anchor (trial end / signup) forward to the next future cycle. */
+function _subscriptionRenewalDate(profile, isAnnual) {
+    if (profile.subscription_ends_at) return new Date(profile.subscription_ends_at);
+    var anchorIso = profile.trial_ends_at || profile.created_at;
+    if (!anchorIso) return null;
+    var anchor = new Date(anchorIso);
+    if (isNaN(anchor.getTime())) return null;
+    var step = isAnnual ? 12 : 1;
+    var now = new Date();
+    var n = step;
+    var next = _addMonthsClamped(anchor, n);
+    while (next <= now) {
+        n += step;
+        next = _addMonthsClamped(anchor, n);
+    }
+    return next;
+}
+
 function _loadSubscriptionSection(profile) {
     var section = document.getElementById('subscription-section');
     if (!section || !profile) return;
@@ -2526,19 +2554,29 @@ function _loadSubscriptionSection(profile) {
         }
     }
 
-    // Period end date
+    // Period end / next renewal date
+    var isAnnual  = plan.indexOf('annual') !== -1;
+    var renewDate = _subscriptionRenewalDate(profile, isAnnual);
+    var renewText = renewDate
+        ? renewDate.toLocaleDateString('he-IL', { day: 'numeric', month: 'long', year: 'numeric' })
+        : '';
     var endsRow   = document.getElementById('sub-ends-row');
     var endsLabel = document.getElementById('sub-ends-label');
-    if (profile.subscription_ends_at && endsRow && endsLabel) {
-        var endsDate = new Date(profile.subscription_ends_at);
-        var isAnnual = plan && plan.indexOf('annual') !== -1;
-        var prefix   = status === 'cancelled'
+    if (renewDate && endsRow && endsLabel) {
+        var prefix = status === 'cancelled'
             ? 'גישה עד: '
-            : (isAnnual ? 'חידוש שנתי ב: ' : 'חידוש חודשי ב: ');
-        endsLabel.textContent = prefix + _formatDate(profile.subscription_ends_at);
+            : (isAnnual ? 'המנוי השנתי מתחדש ב־' : 'המנוי החודשי מתחדש ב־');
+        endsLabel.textContent = prefix + renewText;
         endsRow.style.display = '';
     } else if (endsRow) {
         endsRow.style.display = 'none';
+    }
+    var cancelText = document.getElementById('sub-cancel-text');
+    if (cancelText) {
+        var period = isAnnual ? 'השנתי' : 'החודשי';
+        cancelText.textContent = renewDate
+            ? 'המנוי יתחדש אוטומטית ב־' + renewText + '. ביטול המנוי יפסיק את החיוב ' + period + ' הבא, ותוכל להמשיך להשתמש במערכת עד תאריך זה.'
+            : 'ביטול המנוי יפסיק את החיוב ' + period + ' הבא. תוכל להמשיך להשתמש במערכת עד סוף תקופת המנוי הנוכחית.';
     }
 
     // Show/hide cancel button vs cancelled notice
