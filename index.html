@@ -624,7 +624,7 @@
             <!-- Door count -->
             <div class="control-group" style="margin-bottom:0;">
                 <div class="label-row">
-                    <span>מספר דלתות</span>
+                    <span>מספר דלתות / עמודות</span>
                     <span id="val-sd-doors" class="value-badge">2</span>
                 </div>
                 <div class="slider-row">
@@ -634,7 +634,7 @@
                     <button class="slider-btn" onclick="updateSlidingDoor('numDoors',Math.max(2,(getSlidingDoor().numDoors||2)-1))"><i class="fa-solid fa-minus"></i></button>
                 </div>
                 <div style="font-size:0.72rem;color:var(--text-light);margin-top:4px;text-align:center;">
-                    מחושב אוטומטית · ניתן לשנות ידנית
+                    כל דלת = עמודה · מחושב אוטומטית לפי הרוחב · ניתן לשנות ידנית
                 </div>
             </div>
         </div>
@@ -2440,7 +2440,7 @@
                     style="flex:1;padding:7px 4px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.78rem;font-weight:600;cursor:pointer;">מראה</button>
             </div>
             <div class="mobile-dim-row">
-                <span class="mobile-dim-label">מספר דלתות</span>
+                <span class="mobile-dim-label">דלתות / עמודות</span>
                 <div class="mobile-stepper">
                     <button class="mobile-stepper-btn" onclick="updateSlidingDoor('numDoors',Math.max(2,(getSlidingDoor().numDoors||2)-1))"><i class="fa-solid fa-minus"></i></button>
                     <span id="mobile-val-sd-doors" class="mobile-stepper-val" style="display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--secondary);">2</span>
