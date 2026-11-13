@@ -17077,7 +17077,10 @@ function _spaceGroupBlueprintSvg(group) {
         const rs = m.itemObj.rawState || {};
         const wCm = (rs.wings && rs.wings.center && rs.wings.center.width) || rs.width || 0;
         if (!(wCm > 0)) return;
-        parts.push({ n: i + 1, slot: m.slot, svg: pages[idx], off: off, wCm: wCm });
+        // The page's body outline starts at the raised bottom, not at the part's floor
+        const cols = (rs.wings && rs.wings.center && rs.wings.center.columns) || rs.columns || [];
+        const floorCm = cols.length ? Math.min.apply(null, cols.map(function(c) { return (c && c.floorOffset) || 0; })) : 0;
+        parts.push({ n: i + 1, slot: m.slot, svg: pages[idx], off: off, wCm: wCm, floorCm: floorCm });
     });
     if (parts.length < 2) return null;
 
@@ -17131,7 +17134,7 @@ function _spaceGroupBlueprintSvg(group) {
             // text and lines too — bring them back to the size they have in the least-shrunk part
             if (kMax / k > 1.01) _spaceBpNormalizeAnnotations(q.src, kMax / k, q.bx, q.bw);
             const tx = (q.p.off.x - q.p.wCm / 2) * S - q.bx * k;
-            const ty = -(q.p.off.y || 0) * S - (q.by + q.bh) * k;
+            const ty = -((q.p.off.y || 0) + q.p.floorCm) * S - (q.by + q.bh) * k;
             const g = document.createElementNS(NS, 'g');
             g.setAttribute('transform', `translate(${tx.toFixed(2)},${ty.toFixed(2)}) scale(${k.toFixed(5)})`);
             Array.from(q.src.childNodes).forEach(function(c) { g.appendChild(c); });
