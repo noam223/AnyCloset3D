@@ -188,6 +188,38 @@ body{font-family:'Inter','Heebo',sans-serif;background:var(--w);color:var(--t);o
   .feat-highlight-desc{margin:0 auto}
 }
 
+/* ── ROOM BUILDER ── */
+.room-sec{background:linear-gradient(180deg,#fff 0%,#f6f9fc 100%)}
+.room-sec .sec-hd{text-align:center}
+.room-sec .sec-sub{margin:0 auto;max-width:680px}
+.room-shot{margin:0;background:var(--w);border:1px solid var(--bd);border-radius:var(--rl);overflow:hidden;box-shadow:0 18px 50px rgba(15,31,53,.10)}
+.room-shot img{display:block;width:100%;height:auto}
+.room-shot figcaption{display:flex;align-items:center;gap:10px;padding:14px 18px;font-size:.9rem;font-weight:600;color:var(--t)}
+.room-shot figcaption i{color:var(--ad)}
+.room-hero{display:grid;grid-template-columns:1.35fr 1fr;gap:36px;align-items:center;margin-bottom:36px}
+.room-points{list-style:none;display:flex;flex-direction:column;gap:14px}
+.room-points li{display:flex;gap:14px;align-items:flex-start}
+.room-points li i{width:38px;height:38px;border-radius:11px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(0,212,255,.12);color:var(--ad);font-size:1rem}
+.room-points b{display:block;font-size:1rem;color:var(--p);margin-bottom:2px}
+.room-points span{font-size:.88rem;color:var(--tl);line-height:1.6}
+.room-pair{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start;margin-bottom:56px}
+.room-opts-title{text-align:center;font-size:1.35rem;font-weight:900;color:var(--p);margin-bottom:24px}
+.room-opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:20px}
+.room-opt{background:var(--w);border:1px solid var(--bd);border-radius:var(--r);padding:24px 22px;transition:transform .25s,box-shadow .25s}
+.room-opt:hover{transform:translateY(-4px);box-shadow:0 18px 44px rgba(0,0,0,.09)}
+.room-opt-hd{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.room-opt-hd .feat-icon{width:44px;height:44px;font-size:1.1rem;border-radius:12px;margin:0}
+.room-opt-hd h3{font-size:1.02rem;font-weight:800;color:var(--t)}
+.room-opt ul{list-style:none;display:flex;flex-direction:column;gap:8px}
+.room-opt li{position:relative;padding-right:18px;font-size:.87rem;color:var(--tl);line-height:1.55}
+.room-opt li::before{content:'';position:absolute;right:2px;top:.62em;width:7px;height:7px;border-radius:50%;background:var(--a)}
+.room-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.room-chips span{font-size:.74rem;font-weight:600;color:var(--p);background:rgba(30,58,95,.07);border-radius:99px;padding:3px 10px}
+.room-cta{text-align:center;margin-top:44px}
+@media(max-width:900px){
+  .room-hero,.room-pair{grid-template-columns:1fr}
+}
+
 /* ── AUDIENCE ── */
 .aud-sec{background:linear-gradient(160deg,#0f1f35 0%,#1e3a5f 50%,#152b47 100%);position:relative;overflow:hidden}
 .aud-sec::before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);background-size:50px 50px}
@@ -377,6 +409,7 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
   </a>
   <ul class="nav-links">
     <li><a href="#features">פיצ'רים</a></li>
+    <li><a href="#room">בניית חדר</a></li>
     <li><a href="#audience">למי זה מיועד</a></li>
     <li><a href="#pricing">חבילות מנויים</a></li>
   </ul>
@@ -507,6 +540,113 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
         <div class="feat-title">שמירה בענן אוטומטית</div>
         <div class="feat-desc">כל הפרויקטים שמורים בענן ומסונכרנים בין המכשירים שלך — לעולם לא תאבד עבודה.</div>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     ROOM BUILDER
+════════════════════════════════════════════════════════════ -->
+<section class="sec room-sec" id="room">
+  <div class="sec-in">
+    <div class="sec-hd rv">
+      <div class="sec-tag"><i class="fa-solid fa-couch"></i> חדש במערכת</div>
+      <h2 class="sec-title">בונים חדר שלם — לא רק ארון</h2>
+      <p class="sec-sub">מגדירים את מידות החדר, מוסיפים דלתות, חלונות, עמודים ונישות, בוחרים ריצוף וצבע קירות — ומציבים את הארונות בדיוק במקום. הלקוח רואה איך הארון ייראה בחדר האמיתי שלו, עוד לפני שנחתך לוח אחד.</p>
+    </div>
+
+    <div class="room-hero">
+      <figure class="room-shot rvl">
+        <img src="images/room/room-3d.jpg" alt="הדמיית חדר שינה בתלת-ממד עם ארון אגוז, עמודת מדפים פתוחה, מיטה, ריצוף פרקט ותאורת ספוטים" width="1400" height="875" loading="lazy">
+        <figcaption><i class="fa-solid fa-cube"></i> הדמיית החדר בתלת-ממד — צילום מתוך המערכת</figcaption>
+      </figure>
+      <ul class="room-points rvr">
+        <li><i class="fa-solid fa-ruler-combined"></i><div><b>מידות חדר אמיתיות</b><span>רוחב ועומק עד 20 מטר, גובה תקרה עד 5 מטר — עם מידות חיות על כל קיר.</span></div></li>
+        <li><i class="fa-solid fa-vector-square"></i><div><b>מבט על דו-ממדי ותלת-ממד</b><span>גוררים פריטים בתוכנית הקומה ועוברים בלחיצה להדמיה תלת-ממדית מלאה.</span></div></li>
+        <li><i class="fa-solid fa-door-open"></i><div><b>דלתות, חלונות, עמודים ונישות</b><span>ממקמים כל פתח ואלמנט על הקיר — והארון מתחשב בהם.</span></div></li>
+        <li><i class="fa-solid fa-paint-roller"></i><div><b>ריצוף וצבע קירות</b><span>פרקט, גרניט פורצלן וצבעי טמבור — כדי שההדמיה תיראה כמו הבית של הלקוח.</span></div></li>
+        <li><i class="fa-solid fa-file-export"></i><div><b>ייצוא החדר כולו לתלת-ממד</b><span>קובץ אחד לסקצ'אפ, אוטוקאד או 3ds Max — קירות, ריהוט וכל הארונות.</span></div></li>
+      </ul>
+    </div>
+
+    <div class="room-pair">
+      <figure class="room-shot rv d1">
+        <img src="images/room/room-plan.jpg" alt="תוכנית חדר במבט על עם תפריט הוספת דלת, חלון, עמוד ונישה והגדרות ריצוף" width="1009" height="900" loading="lazy">
+        <figcaption><i class="fa-solid fa-map"></i> תוכנית החדר במבט על — הוספת פריטים והגדרות ריצוף</figcaption>
+      </figure>
+      <figure class="room-shot rv d2">
+        <img src="images/room/room-tiles.jpg" alt="אותו חדר עם ארון אלון ושחור, ידיות זהב, ריצוף גרניט פורצלן קררה וקירות בגוון בז'" width="1400" height="875" loading="lazy">
+        <figcaption><i class="fa-solid fa-swatchbook"></i> אותו חדר בסגנון אחר — גרניט פורצלן קררה, קירות בז' וארון אלון-שחור</figcaption>
+      </figure>
+    </div>
+
+    <h3 class="room-opts-title rv">כל מה שאפשר להוסיף ולהגדיר בחדר</h3>
+    <div class="room-opts">
+      <div class="room-opt rv d1">
+        <div class="room-opt-hd"><div class="feat-icon fi-b"><i class="fa-solid fa-ruler-combined"></i></div><h3>מבנה החדר</h3></div>
+        <ul>
+          <li>רוחב ועומק החדר: 200–2000 ס"מ</li>
+          <li>גובה תקרה: 200–500 ס"מ</li>
+          <li>מידות חיות ושטח החדר במ"ר</li>
+          <li>מעבר מהיר בין מבט על לתלת-ממד</li>
+        </ul>
+      </div>
+      <div class="room-opt rv d2">
+        <div class="room-opt-hd"><div class="feat-icon fi-a"><i class="fa-solid fa-door-open"></i></div><h3>פתחים ואלמנטים בקיר</h3></div>
+        <ul>
+          <li>דלתות כניסה עם כיוון פתיחה</li>
+          <li>חלונות — כולל אור שמש שנכנס לחדר</li>
+          <li>עמודים בולטים מהקיר</li>
+          <li>נישות בקיר</li>
+          <li>גרירה חופשית של כל אלמנט לאורך הקיר</li>
+        </ul>
+      </div>
+      <div class="room-opt rv d3">
+        <div class="room-opt-hd"><div class="feat-icon fi-g"><i class="fa-solid fa-couch"></i></div><h3>ריהוט וארונות</h3></div>
+        <ul>
+          <li>כל הארונות, השולחנות והשידות מהפרויקט — באותו חדר</li>
+          <li>הוספת פריט חופשי לפי מידה</li>
+          <li>מיטה בגדלים שונים — סיבוב וגרירה</li>
+          <li>כיסא בסגנונות שונים</li>
+          <li>הצגה והסתרה של ריהוט בלחיצה</li>
+        </ul>
+      </div>
+      <div class="room-opt rv d4">
+        <div class="room-opt-hd"><div class="feat-icon fi-o"><i class="fa-solid fa-border-all"></i></div><h3>ריצוף</h3></div>
+        <ul>
+          <li>פרקט ב-7 גוונים
+            <div class="room-chips"><span>אלון טבעי</span><span>אלון בהיר</span><span>אלון מולבן</span><span>אלון דבש</span><span>אלון אפור</span><span>אלון מעושן</span><span>אגוז</span></div>
+          </li>
+          <li>גרניט פורצלן
+            <div class="room-chips"><span>בטון בהיר</span><span>בטון כהה</span><span>קררה</span><span>אבן בז'</span></div>
+          </li>
+          <li>גדלי אריח
+            <div class="room-chips"><span>60×120</span><span>80×80</span><span>100×100</span><span>120×120</span></div>
+          </li>
+          <li>גימור מבריק או מט</li>
+        </ul>
+      </div>
+      <div class="room-opt rv d5">
+        <div class="room-opt-hd"><div class="feat-icon fi-v"><i class="fa-solid fa-palette"></i></div><h3>קירות, גימורים ותאורה</h3></div>
+        <ul>
+          <li>צבע קירות מכל פלטת טמבור</li>
+          <li>לייסט סגירה עד התקרה</li>
+          <li>מרווח אוטומטי של 5 ס"מ מהקיר הסמוך</li>
+          <li>ספוטים שקועים בתקרה</li>
+        </ul>
+      </div>
+      <div class="room-opt rv d6">
+        <div class="room-opt-hd"><div class="feat-icon fi-r"><i class="fa-solid fa-arrows-left-right-to-line"></i></div><h3>מיקום הארון וייצוא</h3></div>
+        <ul>
+          <li>מיקום בלחיצה: צמוד ימין, מרכז, בין קירות או צמוד שמאל</li>
+          <li>ייצוא החדר כולו לקובץ תלת-ממד (SketchUp, AutoCAD, 3ds Max)</li>
+          <li>כל ארון בקבוצה נפרדת, קירות וריהוט בשכבות נפרדות</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="room-cta rv">
+      <a href="login.html?tab=register" class="btn-hp"><i class="fa-solid fa-couch"></i> נסו לבנות חדר בחינם</a>
     </div>
   </div>
 </section>
