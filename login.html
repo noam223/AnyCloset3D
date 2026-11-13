@@ -1076,7 +1076,16 @@ function _translateError(msg) {
     }
     // If ?plan=<key> in URL (coming from landing.html pricing buttons),
     // switch to register tab and pre-select the plan after user type is chosen
-    var urlPlan = new URLSearchParams(window.location.search).get('plan');
+    var urlParams = new URLSearchParams(window.location.search);
+    var urlPlan = urlParams.get('plan');
+    var urlType = urlParams.get('type');
+    if (!urlPlan && ['designer', 'carpenter', 'company'].indexOf(urlType) >= 0) {
+        switchTab('register');
+        selectUserType(urlType);
+        goToStep2();
+    } else if (!urlPlan && urlParams.get('tab') === 'register') {
+        switchTab('register');
+    }
     if (urlPlan) {
         // Determine user type from plan key prefix
         var typeFromPlan = urlPlan.startsWith('designer') ? 'designer'
