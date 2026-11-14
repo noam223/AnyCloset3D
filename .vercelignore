@@ -3,3 +3,17 @@ promo-video/
 context/
 outputs/
 skills-lock.json
+
+# Internal files that must not be served by the site
+.cursor/
+.roo/
+.git/
+supabase/
+docs/
+make-blueprints/
+motion-video-from-code-creator-documentation/
+api.txt
+.env
+.env.*
+*.md
+*.sql

@@ -284,12 +284,14 @@ function _dnAppendBubble(note, container) {
                 '<div style="margin-top:6px;font-size:0.72rem;opacity:0.75;">לחץ להצגה על הארון ↗</div>' +
             '</div>';
     } else if (type === 'voice_note' || (payload && payload.type === 'voice')) {
-        var src = payload && payload.dataUrl ? payload.dataUrl : '';
+        // payload comes from an anonymous client — only a base64 data:audio URL is allowed
+        var src = payload && typeof payload.dataUrl === 'string' && /^data:audio\/[\w.+-]+(;[\w.+-]+=[\w.+-]+)*;base64,[A-Za-z0-9+/=]+$/.test(payload.dataUrl) ? payload.dataUrl : '';
+        var dur = payload ? Math.round(Number(payload.duration)) : 0;
         bubbleHtml =
             '<div class="designer-note-bubble special voice ' + (isClient ? 'client' : 'designer') + '">' +
                 '<i class="fa-solid fa-microphone"></i> הודעה קולית' +
-                (payload && payload.duration ? (' (' + payload.duration + ' שנ׳)') : '') +
-                (src ? ('<audio controls src="' + src + '" style="width:100%;margin-top:8px;max-width:240px;"></audio>') : '') +
+                (dur > 0 ? (' (' + dur + ' שנ׳)') : '') +
+                (src ? ('<audio controls src="' + _dnEsc(src) + '" style="width:100%;margin-top:8px;max-width:240px;"></audio>') : '') +
             '</div>';
     } else if (type === 'color_change') {
         bubbleHtml =

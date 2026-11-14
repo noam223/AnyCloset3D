@@ -92,9 +92,14 @@ serve(async (req) => {
     if (render.user_id !== user.id) return json({ error: 'Forbidden' }, 403);
 
     let cloudDeleted = false;
-    if (render.image_url && String(render.image_url).includes('cloudinary.com')) {
-      const publicId = publicIdFromCloudinaryUrl(render.image_url);
-      if (publicId) cloudDeleted = await destroyCloudinaryImage(publicId);
+    const cloudName = Deno.env.get('CLOUDINARY_CLOUD_NAME');
+    const imageUrl = String(render.image_url || '');
+    if (cloudName && imageUrl.startsWith(`https://res.cloudinary.com/${cloudName}/image/upload/`)) {
+      const publicId = publicIdFromCloudinaryUrl(imageUrl);
+      // Only assets that generate-render uploaded may be destroyed with the account secret
+      if (publicId && /^ai_renders\/[A-Za-z0-9_\-]+$/.test(publicId)) {
+        cloudDeleted = await destroyCloudinaryImage(publicId);
+      }
     }
 
     const { error: deleteErr } = await sb
@@ -111,7 +116,7 @@ serve(async (req) => {
     return json({ success: true, cloud_deleted: cloudDeleted });
   } catch (e) {
     console.error('[delete-render] Unhandled error:', e);
-    return json({ error: 'Internal server error', details: String(e) }, 500);
+    return json({ error: 'Internal server error' }, 500);
   }
 });
 

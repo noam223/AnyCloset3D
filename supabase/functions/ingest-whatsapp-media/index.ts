@@ -110,6 +110,79 @@ function fromSimplePayload(body: Record<string, unknown>): MediaInfo | null {
   };
 }
 
+const MAX_MEDIA_BYTES = 25 * 1024 * 1024;
+const FETCH_TIMEOUT_MS = 20_000;
+
+const ALLOWED_MIME = new Set([
+  'image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+]);
+
+function isPrivateIp(ip: string): boolean {
+  const v4 = ip.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])];
+    return a === 0 || a === 10 || a === 127 || a >= 224
+      || (a === 100 && b >= 64 && b <= 127)
+      || (a === 169 && b === 254)
+      || (a === 172 && b >= 16 && b <= 31)
+      || (a === 192 && b === 168);
+  }
+  const v6 = ip.toLowerCase();
+  return v6 === '::1' || v6 === '::' || v6.startsWith('fc') || v6.startsWith('fd')
+    || v6.startsWith('fe80') || v6.startsWith('::ffff:');
+}
+
+// SSRF guard: media URLs come from the webhook body, so only public https hosts are fetched
+async function assertPublicHttpsUrl(raw: string): Promise<URL> {
+  const url = new URL(raw);
+  if (url.protocol !== 'https:') throw new Error('media url must be https');
+  if (url.username || url.password) throw new Error('credentials in url');
+  if (url.port && url.port !== '443') throw new Error('non-standard port');
+  const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  if (!host.includes('.') || /^[\d.]+$/.test(host) || host.includes(':')
+      || /(^|\.)(localhost|local|internal|localdomain|supabase\.co|supabase\.in)$/.test(host)) {
+    throw new Error('host not allowed');
+  }
+  const addrs: string[] = [];
+  let dnsUnavailable = typeof Deno.resolveDns !== 'function';
+  if (!dnsUnavailable) {
+    for (const type of ['A', 'AAAA'] as const) {
+      try {
+        addrs.push(...await Deno.resolveDns(host, type));
+      } catch (e) {
+        if (!(e instanceof Deno.errors.NotFound)) dnsUnavailable = true;
+      }
+    }
+  }
+  if (addrs.some(isPrivateIp)) throw new Error('host resolves to a private address');
+  if (!addrs.length && !dnsUnavailable) throw new Error('host does not resolve');
+  return url;
+}
+
+async function readCapped(res: Response, max: number): Promise<Uint8Array> {
+  const declared = Number(res.headers.get('content-length') || 0);
+  if (declared > max) throw new Error('media too large');
+  const reader = res.body!.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > max) { await reader.cancel(); throw new Error('media too large'); }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const c of chunks) { out.set(c, off); off += c.byteLength; }
+  return out;
+}
+
 function guessExt(mime: string | null, fileName: string | null): string {
   if (fileName && fileName.includes('.')) {
     const ext = fileName.split('.').pop()!.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -200,16 +273,31 @@ serve(async (req) => {
       }
     }
 
-    const dl = await fetch(media.fileUrl);
+    let mediaUrl: URL;
+    try {
+      mediaUrl = await assertPublicHttpsUrl(media.fileUrl);
+    } catch (e) {
+      console.warn('[ingest] rejected media url:', e instanceof Error ? e.message : e);
+      return json({ error: 'Media URL not allowed' }, 400);
+    }
+
+    const dl = await fetch(mediaUrl, {
+      redirect: 'manual',
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
     if (!dl.ok) {
       return json({ error: 'Failed to download media', status: dl.status }, 502);
     }
 
-    const bytes = new Uint8Array(await dl.arrayBuffer());
-    const mimeType =
-      media.mimeType ||
-      dl.headers.get('content-type') ||
-      'application/octet-stream';
+    let bytes: Uint8Array;
+    try {
+      bytes = await readCapped(dl, MAX_MEDIA_BYTES);
+    } catch {
+      return json({ error: 'Media too large' }, 413);
+    }
+    const declaredMime = String(media.mimeType || dl.headers.get('content-type') || '')
+      .split(';')[0].trim().toLowerCase();
+    const mimeType = ALLOWED_MIME.has(declaredMime) ? declaredMime : 'application/octet-stream';
     const ext = guessExt(mimeType, media.fileName);
     const safeName = (media.fileName || `measurement.${ext}`)
       .replace(/[^\w.\-()\u0590-\u05FF ]+/g, '_')
@@ -224,7 +312,8 @@ serve(async (req) => {
       });
 
     if (upErr) {
-      return json({ error: 'Upload failed: ' + upErr.message }, 500);
+      console.error('[ingest] upload failed:', upErr.message);
+      return json({ error: 'Upload failed' }, 500);
     }
 
     const { data: signed } = await sb.storage
@@ -254,12 +343,13 @@ serve(async (req) => {
       if (insErr.code === '23505') {
         return json({ ok: true, duplicate: true });
       }
-      return json({ error: 'Insert failed: ' + insErr.message }, 500);
+      console.error('[ingest] insert failed:', insErr.message);
+      return json({ error: 'Insert failed' }, 500);
     }
 
     return json({ ok: true, id: row.id, storage_path: storagePath });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return json({ error: msg }, 500);
+    console.error('[ingest] unhandled:', e instanceof Error ? e.message : e);
+    return json({ error: 'Internal error' }, 500);
   }
 });

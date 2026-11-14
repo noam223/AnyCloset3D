@@ -84,6 +84,7 @@ var _liveMode        = true;
 
 // Notes
 var _notesChannel    = null;
+var _notesCabIdx     = null;
 var _notesOpen       = false;
 var _notesCabIdx     = 0;      // which cabinet's notes are shown in the panel
 var _notesCountPerCab = {};    // { cabIdx: count }
@@ -108,7 +109,10 @@ document.addEventListener('DOMContentLoaded', function() {
         _showError('שגיאת טעינה', 'לא ניתן לטעון את הספרייה. נסה לרענן את הדף.');
         return;
     }
-    _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+    // RLS only exposes the project/messages whose share_token matches this header
+    _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
+        global: { headers: { 'x-share-token': _token } }
+    });
 
     // Resize handler
     window.addEventListener('resize', function() {
@@ -168,7 +172,7 @@ async function _loadProject() {
             .single();
 
         if (result.error || !result.data) {
-            _showError('פרויקט לא נמצא', 'הקישור אינו תקין או שהמעצב ביטל את השיתוף.');
+            _showError('פרויקט לא נמצא', 'הקישור אינו תקין, פג תוקף, או שהמעצב ביטל את השיתוף. בקש קישור חדש מהמעצב.');
             return;
         }
 
@@ -1047,30 +1051,11 @@ window._setViewerView = function(mode) {
 function _setupRealtime() {
     if (!_sb || !_token) return;
 
-    _realtimeChannel = _sb.channel('viewer-project-' + _token)
-        .on('postgres_changes', {
-            event:  'UPDATE',
-            schema: 'public',
-            table:  'projects',
-            filter: 'share_token=eq.' + _token
-        }, function(payload) {
-            if (!payload.new) return;
-            _lastUpdatedAt = payload.new.updated_at;
-            _projectData   = payload.new.project_data;
-            if (payload.new.order_status) {
-                window._viewerOrderStatus = payload.new.order_status;
-                if (_projectData) _projectData.orderStatus = payload.new.order_status;
-            } else if (_projectData && _projectData.orderStatus) {
-                window._viewerOrderStatus = _projectData.orderStatus;
-            }
-            _applyLiveProjectData(_projectData, { followLive: _liveMode });
-            if (_liveMode) {
-                setTimeout(function() { _captureSnapshot(_activeCabIdx); }, 350);
-            }
-            _flashLiveBadge();
-            if (typeof window._viewerExtrasOnProjectUpdate === 'function') {
-                window._viewerExtrasOnProjectUpdate(_projectData, payload.new);
-            }
+    // Anonymous viewers can't receive postgres_changes (RLS needs the share-token header),
+    // so a DB trigger broadcasts a change signal on a topic named after the token.
+    _realtimeChannel = _sb.channel('share:' + _token + ':project')
+        .on('broadcast', { event: 'project_updated' }, function() {
+            _refreshProjectFromServer();
         })
         .subscribe(function(status) {
             if (status === 'SUBSCRIBED') {
@@ -1091,35 +1076,37 @@ function _setupRealtime() {
 }
 
 // ── Polling fallback ──────────────────────────────────────────────────────────
+async function _refreshProjectFromServer() {
+    try {
+        var result = await _sb
+            .from('projects')
+            .select('updated_at, project_data, order_status')
+            .eq('share_token', _token)
+            .single();
+        if (result.data && result.data.updated_at !== _lastUpdatedAt) {
+            _lastUpdatedAt = result.data.updated_at;
+            _projectData   = result.data.project_data;
+            if (result.data.order_status) {
+                window._viewerOrderStatus = result.data.order_status;
+                if (_projectData) _projectData.orderStatus = result.data.order_status;
+            }
+            _applyLiveProjectData(_projectData, { followLive: _liveMode });
+            if (_liveMode) {
+                setTimeout(function() { _captureSnapshot(_activeCabIdx); }, 350);
+            }
+            _flashLiveBadge();
+            if (typeof window._viewerExtrasOnProjectUpdate === 'function') {
+                window._viewerExtrasOnProjectUpdate(_projectData, result.data);
+            }
+        }
+    } catch(e) {
+        console.warn('[Viewer] Refresh error:', e);
+    }
+}
+
 function _startPolling() {
     if (_pollTimer) return;
-    _pollTimer = setInterval(async function() {
-        try {
-            var result = await _sb
-                .from('projects')
-                .select('updated_at, project_data, order_status')
-                .eq('share_token', _token)
-                .single();
-            if (result.data && result.data.updated_at !== _lastUpdatedAt) {
-                _lastUpdatedAt = result.data.updated_at;
-                _projectData   = result.data.project_data;
-                if (result.data.order_status) {
-                    window._viewerOrderStatus = result.data.order_status;
-                    if (_projectData) _projectData.orderStatus = result.data.order_status;
-                }
-                _applyLiveProjectData(_projectData, { followLive: _liveMode });
-                if (_liveMode) {
-                    setTimeout(function() { _captureSnapshot(_activeCabIdx); }, 350);
-                }
-                _flashLiveBadge();
-                if (typeof window._viewerExtrasOnProjectUpdate === 'function') {
-                    window._viewerExtrasOnProjectUpdate(_projectData, result.data);
-                }
-            }
-        } catch(e) {
-            console.warn('[Viewer] Poll error:', e);
-        }
-    }, POLL_INTERVAL);
+    _pollTimer = setInterval(_refreshProjectFromServer, POLL_INTERVAL);
 }
 
 // ── Flash the LIVE badge ──────────────────────────────────────────────────────
@@ -1308,23 +1295,23 @@ function _queryNotesNoFilter() {
 // Subscribe to realtime new notes for the current cabinet
 function _subscribeNotesRealtime(cabIdx) {
     if (!_sb || !_token) return;
-    if (_notesChannel) { _notesChannel.unsubscribe(); _notesChannel = null; }
+    _notesCabIdx = cabIdx;
+    // The broadcast topic is fixed per token, so keep one channel and only track the viewed cabinet
+    if (_notesChannel) return;
 
-    _notesChannel = _sb.channel('viewer-notes-' + _token + '-' + cabIdx)
-        .on('postgres_changes', {
-            event:  'INSERT',
-            schema: 'public',
-            table:  'project_messages',
-            filter: 'share_token=eq.' + _token
-        }, function(payload) {
-            var note = payload.new;
+    _notesChannel = _sb.channel('share:' + _token + ':notes')
+        .on('broadcast', { event: 'message_inserted' }, async function(msg) {
+            var info = msg && msg.payload;
+            if (!info || !info.id || info.sender_role === 'client') return;
+            var res = await _sb.from('project_messages').select('*').eq('id', info.id).maybeSingle();
+            var note = res && res.data;
             if (!note) return;
 
             // Skip client's own messages — already added optimistically
             if (note.sender_role === 'client') return;
 
             var noteIdx = (note.cabinet_index !== null && note.cabinet_index !== undefined) ? Number(note.cabinet_index) : null;
-            var curIdx  = (cabIdx !== null && cabIdx !== undefined) ? Number(cabIdx) : null;
+            var curIdx  = (_notesCabIdx !== null && _notesCabIdx !== undefined) ? Number(_notesCabIdx) : null;
 
             // Update counts for all cabinets
             var countKey = (noteIdx !== null) ? noteIdx : 0;
@@ -1351,14 +1338,9 @@ function _subscribeNotesRealtime(cabIdx) {
             var list = document.getElementById('viewer-notes-list');
             if (list) list.scrollTop = list.scrollHeight;
         })
-        .on('postgres_changes', {
-            event:  'DELETE',
-            schema: 'public',
-            table:  'project_messages',
-            filter: 'share_token=eq.' + _token
-        }, function(payload) {
+        .on('broadcast', { event: 'message_deleted' }, function(msg) {
             if (typeof window._viewerExtrasOnNoteDeleted === 'function') {
-                window._viewerExtrasOnNoteDeleted(payload.old);
+                window._viewerExtrasOnNoteDeleted(msg && msg.payload);
             }
         })
         .subscribe();

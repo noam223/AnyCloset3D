@@ -731,10 +731,11 @@ window._viewerExtrasRenderNoteBubble = function (note, list) {
             '<i class="fa-solid fa-location-dot"></i> סימון על הארון<br>' +
             esc(payload && payload.text ? payload.text : note.message) + '</div>';
     } else if (type === 'voice_note' || (payload && payload.type === 'voice')) {
-        var src = payload && payload.dataUrl ? payload.dataUrl : '';
+        var src = payload && typeof payload.dataUrl === 'string' && /^data:audio\/[\w.+-]+(;[\w.+-]+=[\w.+-]+)*;base64,[A-Za-z0-9+/=]+$/.test(payload.dataUrl) ? payload.dataUrl : '';
+        var dur = payload ? Math.round(Number(payload.duration)) : 0;
         inner = '<div class="viewer-note-bubble special voice"><i class="fa-solid fa-microphone"></i> הודעה קולית' +
-            (payload && payload.duration ? (' (' + payload.duration + ' שנ׳)') : '') +
-            (src ? ('<audio controls src="' + src + '" style="width:100%;margin-top:8px;"></audio>') : '') +
+            (dur > 0 ? (' (' + dur + ' שנ׳)') : '') +
+            (src ? ('<audio controls src="' + esc(src) + '" style="width:100%;margin-top:8px;"></audio>') : '') +
             '</div>';
     } else if (type === 'color_change') {
         inner = '<div class="viewer-note-bubble special color">' + esc(note.message).replace(/\n/g, '<br>') + '</div>';

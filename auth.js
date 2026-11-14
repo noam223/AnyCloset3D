@@ -1554,14 +1554,6 @@ window.GrowPayments = {
 window.MeasurementInbox = {
     INGEST_URL: SUPABASE_URL + '/functions/v1/upload-measurement',
 
-    _randomToken: function() {
-        const bytes = new Uint8Array(24);
-        crypto.getRandomValues(bytes);
-        return Array.from(bytes, function(b) {
-            return b.toString(16).padStart(2, '0');
-        }).join('');
-    },
-
     getIngestToken: async function() {
         const sb = _getClient(); if (!sb) return { error: 'SDK not loaded' };
         const billingId = await Auth.getBillingUserId();
@@ -1589,15 +1581,10 @@ window.MeasurementInbox = {
             if (cur.error) return cur;
             if (cur.token) return { token: cur.token };
         }
-        const token = this._randomToken();
-        const { data, error } = await sb
-            .from('profiles')
-            .update({ whatsapp_ingest_token: token, updated_at: new Date().toISOString() })
-            .eq('id', user.id)
-            .select('whatsapp_ingest_token')
-            .single();
+        // Token is generated server-side; profiles.whatsapp_ingest_token is not client-writable
+        const { data, error } = await sb.rpc('rotate_my_whatsapp_ingest_token');
         if (error) return { error: error.message };
-        return { token: data.whatsapp_ingest_token };
+        return { token: data };
     },
 
     webhookUrlForToken: function(token) {
