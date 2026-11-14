@@ -188,6 +188,43 @@ body{font-family:'Inter','Heebo',sans-serif;background:var(--w);color:var(--t);o
   .feat-highlight-desc{margin:0 auto}
 }
 
+/* ── PROBLEM / SOLUTION ── */
+.ps-sec{background:var(--w)}
+.ps-sec .sec-hd{text-align:center;margin-bottom:44px}
+.ps-sec .sec-sub{margin:0 auto;max-width:640px}
+.ps-tag-pain{background:rgba(239,68,68,.1);color:#dc2626}
+.ps-head,.ps-row{display:grid;grid-template-columns:1fr 56px 1fr;align-items:stretch}
+.ps-head{margin-bottom:12px}
+.ps-head div{font-size:.95rem;font-weight:800;display:flex;align-items:center;gap:8px;padding:0 6px}
+.ps-head .h-pain{color:#dc2626}
+.ps-head .h-sol{color:#0f9f6e}
+.ps-rows{display:flex;flex-direction:column;gap:14px}
+.ps-card{border-radius:var(--r);padding:18px 20px;display:flex;gap:14px;align-items:flex-start}
+.ps-card i.ic{flex-shrink:0;width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:1rem}
+.ps-card b{display:block;font-size:1.02rem;font-weight:800;margin-bottom:3px}
+.ps-card span{font-size:.9rem;line-height:1.55;color:var(--tl)}
+.ps-pain{background:#fff5f5;border:1px solid #fde2e2}
+.ps-pain i.ic{background:#fee2e2;color:#dc2626}
+.ps-pain b{color:#7f1d1d}
+.ps-sol{background:#f0fdf8;border:1px solid #c9f2e1;box-shadow:0 8px 24px rgba(15,159,110,.08)}
+.ps-sol i.ic{background:#d1fae5;color:#0f9f6e}
+.ps-sol b{color:var(--p)}
+.ps-arrow{display:flex;align-items:center;justify-content:center;color:var(--ad);font-size:1.2rem}
+.ps-result{margin-top:40px;background:linear-gradient(135deg,var(--pd),var(--p));border-radius:var(--rl);padding:30px 34px;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;box-shadow:0 18px 44px rgba(15,31,53,.18)}
+.ps-result p{color:#fff;font-size:1.15rem;font-weight:700;line-height:1.5;max-width:640px}
+.ps-result p strong{color:var(--a)}
+.ps-result .btn-hp{animation:none}
+@media(max-width:760px){
+  .ps-head{display:none}
+  .ps-row{grid-template-columns:1fr;gap:0}
+  .ps-arrow{height:34px}
+  .ps-arrow i{transform:rotate(-90deg)}
+  .ps-pain{border-radius:var(--r) var(--r) 10px 10px}
+  .ps-sol{border-radius:10px 10px var(--r) var(--r)}
+  .ps-rows{gap:26px}
+  .ps-result{padding:24px;text-align:center;justify-content:center}
+}
+
 /* ── CABINET BUILDER ── */
 .cab-sec{background:var(--w)}
 .cab-sec .sec-hd{text-align:center}
@@ -447,7 +484,7 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
   </ul>
   <div class="nav-actions" id="nav-actions">
     <a href="login.html" class="nav-login">התחברות</a>
-    <a href="login.html?tab=register" class="nav-cta"><span class="nav-cta-long">הצטרף עכשיו</span><span class="nav-cta-short">הצטרף</span></a>
+    <a href="login.html?tab=register" class="nav-cta"><span class="nav-cta-long">התחל בחינם</span><span class="nav-cta-short">הצטרף</span></a>
   </div>
 </nav>
 
@@ -470,7 +507,7 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
     </h1>
     <p class="hero-sub">
       <span class="hero-punch">בונים ארון בהתאמה אישית — תוך רגעים בודדים.</span>
-      בלי תוכנות כבדות ובלי שעות של שרטוט: תכנון, תמחור ושיתוף עם הלקוח במקום אחד.
+      בלי תוכנות כבדות ובלי שעות של שרטוט. הלקוח רואה את הארון שלו בתלת-ממד, מקבל מחיר ומאשר — כבר בפגישה.
     </p>
     <div class="hero-actions">
       <a href="login.html?tab=register" class="btn-hp">
@@ -502,6 +539,57 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
   <div class="scroll-ind">
     <span>גלול למטה</span>
     <i class="fa-solid fa-chevron-down"></i>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     PROBLEM / SOLUTION
+════════════════════════════════════════════════════════════ -->
+<section class="sec ps-sec" id="problem">
+  <div class="sec-in">
+    <div class="sec-hd rv">
+      <div class="sec-tag ps-tag-pain"><i class="fa-solid fa-triangle-exclamation"></i> מכירים את זה?</div>
+      <h2 class="sec-title">עסקאות לא נתקעות על המחיר —<br>הן נתקעות על הדרך</h2>
+      <p class="sec-sub">שרטוטים שלוקחים ערב שלם, לקוח שלא מצליח לדמיין, ועוד סבב תיקונים על כל שינוי קטן. כך נראה התהליך בלי המערכת, וכך הוא נראה איתה.</p>
+    </div>
+
+    <div class="ps-head" aria-hidden="true">
+      <div class="h-pain"><i class="fa-solid fa-circle-xmark"></i> בלי AnyCloset 3D</div>
+      <div></div>
+      <div class="h-sol"><i class="fa-solid fa-circle-check"></i> עם AnyCloset 3D</div>
+    </div>
+    <div class="ps-rows">
+      <div class="ps-row rv d1">
+        <div class="ps-card ps-pain"><i class="ic fa-solid fa-hourglass-half"></i><div><b>ערב שלם על כל שרטוט</b><span>סקיצות ביד, אוטוקאד או SketchUp: תוכנות כבדות שלוקח חודשים ללמוד, ושעות על כל ארון.</span></div></div>
+        <div class="ps-arrow"><i class="fa-solid fa-arrow-left"></i></div>
+        <div class="ps-card ps-sol"><i class="ic fa-solid fa-bolt"></i><div><b>ארון מוכן בדקות</b><span>עורך פשוט בעברית: מידות, עמודות ותכולה בלחיצות. בלי ללמוד תוכנה ובלי להתקין כלום.</span></div></div>
+      </div>
+      <div class="ps-row rv d2">
+        <div class="ps-card ps-pain"><i class="ic fa-solid fa-face-meh"></i><div><b>הלקוח לא מצליח לדמיין</b><span>הוא מסתכל על סקיצה, אומר "אני אחשוב על זה" והולך להשוות מחירים אצל אחרים.</span></div></div>
+        <div class="ps-arrow"><i class="fa-solid fa-arrow-left"></i></div>
+        <div class="ps-card ps-sol"><i class="ic fa-solid fa-cube"></i><div><b>הלקוח רואה את הארון שלו ומאשר</b><span>הדמיה בתלת-ממד ותמונה ריאליסטית ב-AI, בגוונים ובמידות האמיתיים שלו.</span></div></div>
+      </div>
+      <div class="ps-row rv d3">
+        <div class="ps-card ps-pain"><i class="ic fa-solid fa-rotate-left"></i><div><b>כל שינוי — מתחילים מחדש</b><span>"אפשר להזיז את המגירות?" זה עוד סבב שרטוט, עוד יום המתנה, והלקוח מתקרר.</span></div></div>
+        <div class="ps-arrow"><i class="fa-solid fa-arrow-left"></i></div>
+        <div class="ps-card ps-sol"><i class="ic fa-solid fa-broadcast-tower"></i><div><b>משנים בלחיצה, מול הלקוח</b><span>בפגישה או בקישור לשיתוף בלייב: הלקוח רואה כל שינוי מתעדכן אצלו בזמן אמת.</span></div></div>
+      </div>
+      <div class="ps-row rv d4">
+        <div class="ps-card ps-pain"><i class="ic fa-solid fa-calculator"></i><div><b>הצעת מחיר באקסל</b><span>חישובים ידניים על כל מגירה ומדף. טעות אחת והעבודה הופכת להפסד.</span></div></div>
+        <div class="ps-arrow"><i class="fa-solid fa-arrow-left"></i></div>
+        <div class="ps-card ps-sol"><i class="ic fa-solid fa-shekel-sign"></i><div><b>מחיר אוטומטי שמתעדכן עם כל שינוי</b><span>לפי המחירון האישי שלך או לפי מחירון שוק, ונותנים מחיר כבר בפגישה.</span></div></div>
+      </div>
+      <div class="ps-row rv d5">
+        <div class="ps-card ps-pain"><i class="ic fa-solid fa-ruler-combined"></i><div><b>מה שסוכם ≠ מה שיוצר</b><span>מידה שנשכחה, מגירה במקום הלא נכון, ותיקון שיוצא מהכיס שלך.</span></div></div>
+        <div class="ps-arrow"><i class="fa-solid fa-arrow-left"></i></div>
+        <div class="ps-card ps-sol"><i class="ic fa-solid fa-drafting-compass"></i><div><b>שרטוט לייצור מתוך מה שאושר</b><span>שרטוט טכני עם כל המידות נוצר אוטומטית מאותו ארון שהלקוח ראה ואישר.</span></div></div>
+      </div>
+    </div>
+
+    <div class="ps-result rv">
+      <p>פחות שעות על שרטוטים, פחות סבבי תיקונים — <strong>ויותר עסקאות שנסגרות כבר בפגישה הראשונה.</strong></p>
+      <a href="login.html?tab=register" class="btn-hp"><i class="fa-solid fa-rocket"></i> נסו שבוע חינם</a>
+    </div>
   </div>
 </section>
 
@@ -1106,11 +1194,11 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
       </div>
       <div class="faq-item rv d6">
         <button class="faq-q" onclick="toggleFaq(this)">
-          <span>האם הנתונים שלי מאובטחים?</span>
+          <span>איפה נשמרים הפרויקטים שלי?</span>
           <i class="fa-solid fa-chevron-down faq-arrow"></i>
         </button>
         <div class="faq-a">
-          <p>כן. כל הנתונים מאוחסנים בענן מאובטח (Supabase) עם הצפנה מלאה. הפרויקטים שלך פרטיים ונגישים רק לך.</p>
+          <p>הפרויקטים נשמרים בענן של Supabase, בחיבור מוצפן (HTTPS), וכל פרויקט נגיש רק לחשבון שלך — אלא אם תבחר לשתף אותו בקישור. פרטים נוספים ב<a href="privacy.html">מדיניות הפרטיות</a>.</p>
         </div>
       </div>
     </div>
@@ -1122,7 +1210,7 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
 ════════════════════════════════════════════════════════════ -->
 <section class="cta-sec">
   <div class="cta-inner rv">
-    <h2 class="cta-title">מוכן להתחיל?</h2>
+    <h2 class="cta-title">הלקוח הבא שלך יכול לראות את הארון שלו — כבר היום</h2>
     <p class="cta-sub">
       תכנון, הדמיה והצעת מחיר — כבר מהפרויקט הבא שלך.<br>
       ניסיון חינמי — ללא כרטיס אשראי.
@@ -1167,7 +1255,7 @@ footer{background:#0a1628;padding:60px 40px 30px;color:rgba(255,255,255,.6)}
         <div class="footer-col-title">יצירת קשר</div>
         <ul class="footer-links">
           <li><a href="mailto:noamnisim@gmail.com">noamnisim@gmail.com</a></li>
-          <li><a href="#">תמיכה טכנית</a></li>
+          <li><a href="https://wa.me/972546659798" target="_blank" rel="noopener">תמיכה בוואטסאפ</a></li>
           <li><a href="terms.html">תקנון ותנאי שימוש</a></li>
           <li><a href="privacy.html">מדיניות פרטיות</a></li>
           <li><a href="accessibility.html">הצהרת נגישות</a></li>
