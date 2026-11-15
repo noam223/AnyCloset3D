@@ -5463,6 +5463,14 @@ function _spaceRotY(off) {
     return -((off && off.rot) || 0) * Math.PI / 180;
 }
 
+/** True when blueprint should show the whole shared space as a front elevation (no side profiles). */
+window._isSpaceBlueprintFrontOnly = function() {
+    if (!state || state.viewMode !== 'blueprint') return false;
+    if (window._spaceBuildSlot != null) return true;
+    const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
+    return !!(info && info.count >= 2);
+};
+
 window._applySpacePairPositions = function() {
     const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
     if (!info) {
@@ -6672,7 +6680,10 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
             if (isBP) {
                 state.bpData.push({ type: 'width', val: Math.round(dWidth), x: 0, y: -20, halfW: dWidth / 2 });
                 state.bpData.push({ type: 'height', val: Math.round(dHeight), x: legRightX + 15, y: dHeight / 2, halfH: dHeight / 2 });
-                state.bpData.push({ type: 'width', val: Math.round(state.depth), x: 0, y: -45, halfW: state.depth / 2 });
+                // Depth dim belongs to single-cabinet side elevation — skip in shared-space front BP
+                if (!window._isSpaceBlueprintFrontOnly || !window._isSpaceBlueprintFrontOnly()) {
+                    state.bpData.push({ type: 'width', val: Math.round(state.depth), x: 0, y: -45, halfW: state.depth / 2 });
+                }
             }
             if (!isBP) {
                 dragHandlesData.desk.push({ type: 'deskHeight', x: legRightX, y: dHeight, writingDesk: true });
@@ -9409,7 +9420,11 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
         }
     }
 
-    if (isBP) {
+    // Shared-space blueprint: front elevation of every part together — no per-cabinet side profiles
+    const _spaceBpFrontOnly = isBP && typeof window._isSpaceBlueprintFrontOnly === 'function'
+        && window._isSpaceBlueprintFrontOnly();
+
+    if (isBP && !_spaceBpFrontOnly) {
         // Use the actual tallest column height (not the nominal globalHeight which may be stale
         // when individual columns have been shortened via the roof drag handle).
         const _actualMaxH = state.columns && state.columns.length > 0

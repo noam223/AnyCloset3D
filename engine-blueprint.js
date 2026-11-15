@@ -5353,11 +5353,11 @@ function _renderBlueprintOverlay() {
         }
     });
 
-    // Shared-space: overall width across all parts (companions + host)
+    // Shared-space: overall width + height across all parts (companions + host)
     try {
         const pairInfo = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
         if (pairInfo && pairInfo.count >= 2 && typeof window._spaceCabinetFootprint === 'function') {
-            let minX = Infinity, maxX = -Infinity, minY = Infinity;
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
             pairInfo.members.forEach(function(m) {
                 const fp = window._spaceCabinetFootprint(m.slot);
                 const off = (typeof window._spaceOffsetForSlot === 'function')
@@ -5365,6 +5365,7 @@ function _renderBlueprintOverlay() {
                 minX = Math.min(minX, (off.x || 0) - fp.w / 2);
                 maxX = Math.max(maxX, (off.x || 0) + fp.w / 2);
                 minY = Math.min(minY, (off.y || 0) + (fp.floorOffset || 0));
+                maxY = Math.max(maxY, (off.y || 0) + fp.h);
             });
             if (isFinite(minX) && maxX > minX) {
                 const dimY = minY - 28;
@@ -5372,13 +5373,29 @@ function _renderBlueprintOverlay() {
                 const pR = _projectWorld3Dto2D(maxX, dimY, 2);
                 const dimLineY = Math.max(pL.y, pR.y) + DIM_OFFSET;
                 const midX = ((pL.x + pR.x) / 2).toFixed(1);
-                const overall = Math.round(maxX - minX);
+                const overallW = Math.round(maxX - minX);
                 svgParts.push(`<line x1="${pL.x.toFixed(1)}" y1="${dimLineY.toFixed(1)}" x2="${pR.x.toFixed(1)}" y2="${dimLineY.toFixed(1)}"
                   stroke="${STROKE}" stroke-width="${STROKE_W}" marker-start="url(#arr-start)" marker-end="url(#arr-end)"/>`);
                 svgParts.push(`
                   <rect x="${(parseFloat(midX) - 28).toFixed(1)}" y="${(dimLineY - 9).toFixed(1)}" width="56" height="16" rx="3" fill="white"/>
                   <text x="${midX}" y="${(dimLineY - 6).toFixed(1)}" text-anchor="middle" dominant-baseline="auto"
-                    font-family="'Rubik',Tahoma,sans-serif" font-size="13" font-weight="bold" fill="${STROKE}">${overall}</text>
+                    font-family="'Rubik',Tahoma,sans-serif" font-size="13" font-weight="bold" fill="${STROKE}">${overallW}</text>
+                `);
+            }
+            if (isFinite(minY) && maxY > minY) {
+                const dimX = minX - 28;
+                const pB = _projectWorld3Dto2D(dimX, minY, 2);
+                const pT = _projectWorld3Dto2D(dimX, maxY, 2);
+                const dimLineX = Math.min(pB.x, pT.x) - DIM_OFFSET;
+                const midY = ((pB.y + pT.y) / 2).toFixed(1);
+                const overallH = Math.round(maxY - minY);
+                svgParts.push(`<line x1="${dimLineX.toFixed(1)}" y1="${pT.y.toFixed(1)}" x2="${dimLineX.toFixed(1)}" y2="${pB.y.toFixed(1)}"
+                  stroke="${STROKE}" stroke-width="${STROKE_W}" marker-start="url(#arr-start)" marker-end="url(#arr-end)"/>`);
+                svgParts.push(`
+                  <rect x="${(dimLineX - 8).toFixed(1)}" y="${(parseFloat(midY) - 22).toFixed(1)}" width="16" height="44" rx="3" fill="white"/>
+                  <text x="${dimLineX.toFixed(1)}" y="${midY}" text-anchor="middle" dominant-baseline="middle"
+                    font-family="'Rubik',Tahoma,sans-serif" font-size="13" font-weight="bold" fill="${STROKE}"
+                    transform="rotate(-90,${dimLineX.toFixed(1)},${midY})">${overallH}</text>
                 `);
             }
         }
