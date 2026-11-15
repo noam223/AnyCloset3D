@@ -1280,7 +1280,7 @@ function exportUsersCsv(){
 }
 function openEditFromDetails(){closeModal('modal-user-details');if(_currentEditUserId)openEditPlan(_currentEditUserId);}
 async function confirmEmail(userId){var{error}=await _sb.rpc('admin_confirm_user_email',{user_id:userId});if(error){showToast('שגיאה: '+error.message,'error');return;}var u=_allUsers.find(function(x){return x.id===userId;});if(u)u._emailConfirmed=true;filterUsers();showToast('המייל אושר ✓','success');}
-async function deleteUser(userId,userEmail){if(!confirm('האם אתה בטוח שברצונך למחוק:\n'+userEmail+'\n\nפעולה זו בלתי הפיכה!'))return;var{error}=await _sb.rpc('admin_delete_user',{user_id:userId});if(error){showToast('שגיאה: '+error.message,'error');return;}_allUsers=_allUsers.filter(function(x){return x.id!==userId;});updateStats();filterUsers();showToast('המשתמש נמחק','success');}
+async function deleteUser(userId,userEmail){var u=_allUsers.find(function(x){return x.id===userId;});var warn=(u&&u.company_id&&u.company_role==='admin')?'\n\nשים לב: המשתמש הוא מנהל חברה — החברה תימחק גם היא.':'';if(!confirm('האם אתה בטוח שברצונך למחוק:\n'+userEmail+warn+'\n\nפעולה זו בלתי הפיכה!'))return;var{error}=await _sb.rpc('admin_delete_user',{user_id:userId});if(error){showToast('שגיאה: '+error.message,'error');return;}_allUsers=_allUsers.filter(function(x){return x.id!==userId;});updateStats();filterUsers();showToast('המשתמש נמחק','success');}
 function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 document.addEventListener('click',function(e){if(e.target.classList.contains('modal-overlay'))e.target.classList.remove('open');});
