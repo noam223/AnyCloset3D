@@ -1226,8 +1226,8 @@ function renderOpenTodos() {
         '<div class="open-todos-table" role="table">' +
             '<div class="open-todos-thead" role="row">' +
                 '<span class="ot-col-check"></span>' +
-                '<span class="ot-col-text">משימה</span>' +
                 '<span class="ot-col-proj">שם פרויקט</span>' +
+                '<span class="ot-col-text">משימה</span>' +
                 '<span class="ot-col-date">נפתחה</span>' +
                 '<span class="ot-col-del"></span>' +
             '</div>' +
@@ -1236,10 +1236,10 @@ function renderOpenTodos() {
                     var opened = _formatTodoOpenedAt(t.created_at);
                     return '<div class="open-todos-row" role="row">' +
                         '<span class="ot-col-check"><input type="checkbox" aria-label="סמן כבוצע" onchange="toggleOpenTodo(\'' + t.id + '\', this.checked)"></span>' +
-                        '<span class="ot-col-text" title="' + _escAttr(t.text) + '">' + _escHtml(t.text) + '</span>' +
                         '<button type="button" class="ot-col-proj" title="פתח פרויקט" onclick="openProject(\'' + t.project_id + '\')">' +
                             _escHtml(t.project_name || 'פרויקט') +
                         '</button>' +
+                        '<span class="ot-col-text" title="' + _escAttr(t.text) + '">' + _escHtml(t.text) + '</span>' +
                         '<span class="ot-col-date">' + _escHtml(opened || '—') + '</span>' +
                         '<span class="ot-col-del"><button type="button" class="open-todos-item-del" title="מחק" onclick="deleteOpenTodo(\'' + t.id + '\')"><i class="fa-solid fa-xmark"></i></button></span>' +
                     '</div>';
