@@ -156,7 +156,8 @@
         }
         .open-todos-thead, .open-todos-row {
             display: grid;
-            grid-template-columns: 28px minmax(100px, .9fr) minmax(120px, 1.4fr) 120px 28px;
+            /* project col = widest name; task starts immediately after it */
+            grid-template-columns: 28px max-content minmax(0, 1fr) 120px 28px;
             gap: 8px; align-items: center; padding: 0 10px;
         }
         .open-todos-thead {
@@ -185,12 +186,14 @@
             font-weight: 650; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
         .ot-col-proj {
-            justify-self: stretch; border: none; background: transparent; color: #0f3a5f;
+            justify-self: start; border: none; background: transparent; color: #0f3a5f;
             border-radius: 0; padding: 0; font: inherit; font-size: .8rem; font-weight: 800;
-            cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-            text-align: right; max-width: 100%;
+            cursor: pointer; white-space: nowrap; overflow: visible; text-overflow: clip;
+            text-align: right; max-width: min(42vw, 360px);
         }
+        .open-todos-thead .ot-col-proj { max-width: none; }
         .ot-col-proj:hover { color: #0284c7; text-decoration: underline; }
+        .ot-col-text { justify-self: stretch; text-align: right; }
         .ot-col-date {
             font-size: .7rem; font-weight: 700; color: #0284c7; white-space: nowrap;
             font-variant-numeric: tabular-nums;
@@ -207,9 +210,10 @@
         }
         @media (max-width: 900px) {
             .open-todos-thead, .open-todos-row {
-                grid-template-columns: 24px 90px minmax(0, 1fr) 24px;
+                grid-template-columns: 24px max-content minmax(0, 1fr) 24px;
             }
             .ot-col-date, .open-todos-thead .ot-col-date { display: none; }
+            .ot-col-proj { max-width: 40vw; overflow: hidden; text-overflow: ellipsis; }
         }
         .inbox-list { display: flex; flex-direction: column; gap: 12px; max-height: min(62vh, 520px); overflow-y: auto; margin-bottom: 16px; }
         .inbox-item {
