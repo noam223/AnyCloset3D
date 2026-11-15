@@ -674,7 +674,6 @@ function _renderProjects() {
     grid.innerHTML = '';
     _renderPager(0);
     _syncStatusFilterUI();
-    _fillOpenTodosProjectSelect();
 
     var visible = _visibleProjects();
 
@@ -1053,23 +1052,130 @@ async function refreshOpenTodos() {
     renderOpenTodos();
 }
 
-function _fillOpenTodosProjectSelect(preferredId) {
-    var sel = document.getElementById('open-todos-project');
-    if (!sel) return;
-    var prev = preferredId || sel.value || '';
-    var opts = (_projects || []).slice().sort(function(a, b) {
-        return String(a.name || '').localeCompare(String(b.name || ''), 'he');
-    });
-    if (!opts.length) {
-        sel.innerHTML = '<option value="">אין פרויקטים</option>';
-        sel.disabled = true;
+var _openTodosSelectedId = '';
+var _openTodosSuggestIdx = -1;
+
+function _openTodosProjectMeta(p) {
+    var bits = [];
+    if (p.customer_name) bits.push(p.customer_name);
+    if (p.customer_order_num) bits.push('#' + p.customer_order_num);
+    return bits.join(' · ');
+}
+
+function _matchOpenTodosProjects(q) {
+    q = String(q || '').trim().toLowerCase();
+    var list = (_projects || []).slice();
+    if (!q) {
+        return list.sort(function(a, b) {
+            return String(a.name || '').localeCompare(String(b.name || ''), 'he');
+        }).slice(0, 12);
+    }
+    return list.filter(function(p) {
+        var fields = [p.name, p.customer_name, p.customer_order_num];
+        return fields.some(function(f) { return f && String(f).toLowerCase().indexOf(q) !== -1; });
+    }).slice(0, 20);
+}
+
+function _setOpenTodosSuggestOpen(open) {
+    var box = document.getElementById('open-todos-suggest');
+    if (!box) return;
+    box.classList.toggle('open', !!open);
+}
+
+function _renderOpenTodosSuggest(items) {
+    var box = document.getElementById('open-todos-suggest');
+    if (!box) return;
+    _openTodosSuggestIdx = -1;
+    if (!items.length) {
+        box.innerHTML = '<div class="empty">לא נמצאו פרויקטים</div>';
+        _setOpenTodosSuggestOpen(true);
         return;
     }
-    sel.disabled = false;
-    sel.innerHTML = opts.map(function(p) {
-        return '<option value="' + _escAttr(p.id) + '">' + _escHtml(p.name || 'פרויקט') + '</option>';
+    box.innerHTML = items.map(function(p, i) {
+        var meta = _openTodosProjectMeta(p);
+        return '<button type="button" role="option" data-idx="' + i + '" data-id="' + _escAttr(p.id) + '"' +
+            ' onclick="selectOpenTodosProject(\'' + p.id + '\')">' +
+            '<strong>' + _escHtml(p.name || 'ללא שם') + '</strong>' +
+            (meta ? '<span>' + _escHtml(meta) + '</span>' : '') +
+            '</button>';
     }).join('');
-    if (prev && opts.some(function(p) { return p.id === prev; })) sel.value = prev;
+    _setOpenTodosSuggestOpen(true);
+}
+
+function onOpenTodosProjectSearch(value, forceOpen) {
+    var idEl = document.getElementById('open-todos-project-id');
+    if (idEl && idEl.value && forceOpen !== true) {
+        // Typing after a selection clears it
+        clearOpenTodosProject(true);
+    }
+    var items = _matchOpenTodosProjects(value);
+    _renderOpenTodosSuggest(items);
+}
+
+function onOpenTodosProjectKey(e) {
+    var box = document.getElementById('open-todos-suggest');
+    if (!box || !box.classList.contains('open')) {
+        if (e.key === 'ArrowDown') onOpenTodosProjectSearch(e.target.value, true);
+        return;
+    }
+    var opts = box.querySelectorAll('button[data-id]');
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (!opts.length) return;
+        if (e.key === 'ArrowDown') _openTodosSuggestIdx = Math.min(opts.length - 1, _openTodosSuggestIdx + 1);
+        else _openTodosSuggestIdx = Math.max(0, _openTodosSuggestIdx - 1);
+        opts.forEach(function(btn, i) {
+            btn.style.background = i === _openTodosSuggestIdx ? '#f0f9ff' : '';
+        });
+        if (opts[_openTodosSuggestIdx]) opts[_openTodosSuggestIdx].scrollIntoView({ block: 'nearest' });
+        return;
+    }
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        if (_openTodosSuggestIdx >= 0 && opts[_openTodosSuggestIdx]) {
+            selectOpenTodosProject(opts[_openTodosSuggestIdx].getAttribute('data-id'));
+        } else if (opts.length === 1) {
+            selectOpenTodosProject(opts[0].getAttribute('data-id'));
+        }
+        return;
+    }
+    if (e.key === 'Escape') {
+        _setOpenTodosSuggestOpen(false);
+    }
+}
+
+function selectOpenTodosProject(projectId) {
+    var p = (_projects || []).find(function(x) { return x.id === projectId; });
+    if (!p) return;
+    _openTodosSelectedId = projectId;
+    var idEl = document.getElementById('open-todos-project-id');
+    var searchEl = document.getElementById('open-todos-project-search');
+    var chip = document.getElementById('open-todos-selected');
+    var label = document.getElementById('open-todos-selected-label');
+    if (idEl) idEl.value = projectId;
+    if (searchEl) searchEl.value = p.name || '';
+    if (label) {
+        var meta = _openTodosProjectMeta(p);
+        label.textContent = (p.name || 'פרויקט') + (meta ? (' · ' + meta) : '');
+    }
+    if (chip) chip.classList.add('show');
+    _setOpenTodosSuggestOpen(false);
+    var taskInput = document.getElementById('open-todos-input');
+    if (taskInput) taskInput.focus();
+}
+
+function clearOpenTodosProject(keepFocus) {
+    _openTodosSelectedId = '';
+    var idEl = document.getElementById('open-todos-project-id');
+    var searchEl = document.getElementById('open-todos-project-search');
+    var chip = document.getElementById('open-todos-selected');
+    var label = document.getElementById('open-todos-selected-label');
+    if (idEl) idEl.value = '';
+    if (searchEl && !keepFocus) searchEl.value = '';
+    if (label) label.textContent = '';
+    if (chip) chip.classList.remove('show');
+    _setOpenTodosSuggestOpen(false);
+    if (!keepFocus && searchEl) searchEl.focus();
 }
 
 function renderOpenTodos() {
@@ -1078,11 +1184,10 @@ function renderOpenTodos() {
     var countEl = document.getElementById('open-todos-count');
     if (!panel || !groupsEl) return;
 
-    _fillOpenTodosProjectSelect();
     if (countEl) countEl.textContent = String(_openTodos.length);
 
     if (!_openTodos.length) {
-        groupsEl.innerHTML = '<p class="open-todos-empty">אין משימות פתוחות. בחר פרויקט למעלה והוסף משימה.</p>';
+        groupsEl.innerHTML = '<p class="open-todos-empty">אין משימות פתוחות. חפש פרויקט למעלה והוסף משימה.</p>';
         return;
     }
 
@@ -1121,12 +1226,21 @@ function renderOpenTodos() {
 }
 
 async function addOpenTodoFromCompose() {
-    var sel = document.getElementById('open-todos-project');
+    var idEl = document.getElementById('open-todos-project-id');
+    var searchEl = document.getElementById('open-todos-project-search');
     var input = document.getElementById('open-todos-input');
-    if (!sel || !input) return;
-    var projectId = sel.value;
+    if (!input) return;
+    var projectId = (idEl && idEl.value) || _openTodosSelectedId || '';
+    if (!projectId && searchEl) {
+        var matches = _matchOpenTodosProjects(searchEl.value);
+        if (matches.length === 1) {
+            selectOpenTodosProject(matches[0].id);
+            projectId = matches[0].id;
+        }
+    }
     if (!projectId) {
-        showToast('בחר פרויקט', 'error');
+        showToast('חפש ובחר פרויקט', 'error');
+        if (searchEl) searchEl.focus();
         return;
     }
     await addOpenTodo(projectId, input);
@@ -1144,9 +1258,15 @@ async function addOpenTodo(projectId, inputEl) {
         return;
     }
     if (inputEl) inputEl.value = '';
-    _fillOpenTodosProjectSelect(projectId);
+    selectOpenTodosProject(projectId);
     await refreshOpenTodos();
 }
+
+document.addEventListener('click', function(e) {
+    var wrap = document.querySelector('.open-todos-project-wrap');
+    if (!wrap) return;
+    if (!wrap.contains(e.target)) _setOpenTodosSuggestOpen(false);
+});
 
 async function toggleOpenTodo(todoId, isDone) {
     if (!window.ProjectTodos || !todoId) return;

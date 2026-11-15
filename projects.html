@@ -91,21 +91,48 @@
             border: 1px solid rgba(20,184,166,.35); border-radius: 999px; padding: 3px 10px;
         }
         .open-todos-compose {
-            display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px;
+            display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 14px;
             padding: 10px 12px; border-radius: 12px; background: #f8fafc; border: 1px solid var(--border);
         }
-        .open-todos-compose select,
+        .open-todos-project-wrap { position: relative; flex: 1 1 220px; min-width: 180px; max-width: 320px; }
         .open-todos-compose input {
             border: 1.5px solid var(--border); border-radius: 8px; padding: 8px 10px;
-            font-size: .82rem; font-family: inherit; background: #fff;
+            font-size: .82rem; font-family: inherit; background: #fff; width: 100%; box-sizing: border-box;
         }
-        .open-todos-compose select { min-width: 160px; max-width: 220px; }
-        .open-todos-compose input { flex: 1; min-width: 160px; }
-        .open-todos-compose button {
+        .open-todos-compose #open-todos-input { flex: 1 1 180px; min-width: 160px; width: auto; }
+        .open-todos-selected {
+            display: none; align-items: center; gap: 6px; margin-top: 6px; padding: 5px 8px;
+            border-radius: 8px; background: #eefaf8; border: 1px solid rgba(20,184,166,.35);
+            font-size: .75rem; font-weight: 700; color: #0f766e;
+        }
+        .open-todos-selected.show { display: flex; }
+        .open-todos-selected button {
+            border: none; background: transparent; color: #64748b; cursor: pointer; padding: 0 2px;
+            font-size: .8rem; margin-inline-start: auto;
+        }
+        .open-todos-selected button:hover { color: #dc2626; }
+        .open-todos-suggest {
+            display: none; position: absolute; right: 0; left: 0; top: calc(100% + 4px); z-index: 40;
+            max-height: 220px; overflow-y: auto; background: #fff; border: 1px solid var(--border);
+            border-radius: 10px; box-shadow: 0 10px 28px rgba(15,23,42,.12);
+        }
+        .open-todos-suggest.open { display: block; }
+        .open-todos-suggest button {
+            display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%;
+            border: none; border-bottom: 1px solid #f1f5f9; background: #fff; padding: 9px 12px;
+            text-align: right; cursor: pointer; font-family: inherit;
+        }
+        .open-todos-suggest button:last-child { border-bottom: none; }
+        .open-todos-suggest button:hover { background: #f0f9ff; }
+        .open-todos-suggest strong { font-size: .82rem; font-weight: 800; color: var(--text); }
+        .open-todos-suggest span { font-size: .72rem; color: var(--muted); font-weight: 600; }
+        .open-todos-suggest .empty { padding: 12px; text-align: center; color: var(--muted); font-size: .8rem; }
+        .open-todos-compose > button {
             border: none; border-radius: 8px; padding: 8px 14px; cursor: pointer; font-family: inherit;
             font-size: .8rem; font-weight: 800; background: var(--primary); color: #fff; white-space: nowrap;
+            margin-top: 0; align-self: stretch;
         }
-        .open-todos-compose button:hover { filter: brightness(1.06); }
+        .open-todos-compose > button:hover { filter: brightness(1.06); }
         .open-todos-groups { display: flex; flex-direction: column; gap: 14px; }
         .open-todos-group {
             border: 1px solid var(--border); border-radius: 12px; background: #f8fafc; overflow: hidden;
@@ -1058,7 +1085,23 @@
                     </div>
                 </div>
                 <div class="open-todos-compose" id="open-todos-compose">
-                    <select id="open-todos-project" aria-label="בחר פרויקט"></select>
+                    <div class="open-todos-project-wrap">
+                        <input type="hidden" id="open-todos-project-id" value="">
+                        <input type="text" id="open-todos-project-search" autocomplete="off"
+                            placeholder="חיפוש פרויקט לפי שם או מספר רכש..."
+                            aria-label="חיפוש פרויקט"
+                            aria-autocomplete="list"
+                            aria-controls="open-todos-suggest"
+                            oninput="onOpenTodosProjectSearch(this.value)"
+                            onfocus="onOpenTodosProjectSearch(this.value, true)"
+                            onkeydown="onOpenTodosProjectKey(event)">
+                        <div class="open-todos-suggest" id="open-todos-suggest" role="listbox"></div>
+                        <div class="open-todos-selected" id="open-todos-selected">
+                            <i class="fa-solid fa-folder"></i>
+                            <span id="open-todos-selected-label"></span>
+                            <button type="button" title="נקה בחירה" onclick="clearOpenTodosProject()"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                    </div>
                     <input type="text" id="open-todos-input" maxlength="200" placeholder="מה צריך לעשות?"
                         onkeydown="if(event.key==='Enter'){event.preventDefault();addOpenTodoFromCompose();}">
                     <button type="button" onclick="addOpenTodoFromCompose()">הוסף משימה</button>
@@ -1941,7 +1984,7 @@
 <script src="trial-watermark.js?v=20261008trial"></script>
 <script src="pricing-core.js?v=20261102honeyheight"></script>
 <script src="pricing-panel.js?v=20261102honeyheight"></script>
-<script src="projects.js?v=20261115todos2"></script>
+<script src="projects.js?v=20261115todos3"></script>
 <script src="quick-calc.js?v=20261029shoe"></script>
 <script src="accessibility.js?v=20261115c"></script>
 </body>
