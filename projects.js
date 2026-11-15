@@ -1246,6 +1246,29 @@ function renderOpenTodos() {
                 }).join('') +
             '</div>' +
         '</div>';
+
+    _syncOpenTodosProjectColWidth();
+}
+
+function _syncOpenTodosProjectColWidth() {
+    var table = document.querySelector('#open-todos-groups .open-todos-table');
+    if (!table) return;
+    var probe = document.createElement('span');
+    probe.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;font:800 .8rem Rubik,Inter,sans-serif;';
+    document.body.appendChild(probe);
+    var maxW = 0;
+    var header = table.querySelector('.open-todos-thead .ot-col-proj');
+    if (header) {
+        probe.textContent = header.textContent || 'שם פרויקט';
+        maxW = Math.max(maxW, probe.offsetWidth);
+    }
+    table.querySelectorAll('.open-todos-row .ot-col-proj').forEach(function(el) {
+        probe.textContent = el.textContent || '';
+        maxW = Math.max(maxW, probe.offsetWidth);
+    });
+    document.body.removeChild(probe);
+    var capped = Math.min(Math.ceil(maxW + 4), Math.floor(window.innerWidth * 0.42), 360);
+    table.style.setProperty('--ot-proj-w', Math.max(capped, 72) + 'px');
 }
 
 async function addOpenTodoFromCompose() {

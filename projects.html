@@ -153,11 +153,11 @@
         .open-todos-groups { margin: 0; }
         .open-todos-table {
             border: 1px solid #bfdbfe; border-radius: 10px; overflow: hidden; background: #fff;
+            --ot-proj-w: max-content;
         }
         .open-todos-thead, .open-todos-row {
             display: grid;
-            /* project col = widest name; task starts immediately after it */
-            grid-template-columns: 28px max-content minmax(0, 1fr) 120px 28px;
+            grid-template-columns: 28px var(--ot-proj-w) minmax(0, 1fr) 120px 28px;
             gap: 8px; align-items: center; padding: 0 10px;
         }
         .open-todos-thead {
@@ -166,7 +166,7 @@
             color: #0369a1; text-transform: none;
         }
         .open-todos-tbody {
-            max-height: calc(8 * 36px); /* exactly 8 visible rows */
+            max-height: calc(8 * 36px);
             overflow-y: auto;
             scrollbar-width: thin;
             scrollbar-color: #7dd3fc transparent;
@@ -183,17 +183,16 @@
         .ot-col-check { display: flex; align-items: center; justify-content: center; }
         .ot-col-check input { width: 14px; height: 14px; accent-color: #0ea5e9; cursor: pointer; margin: 0; }
         .ot-col-text {
-            font-weight: 650; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            font-weight: 650; color: var(--text); white-space: nowrap; overflow: hidden;
+            text-overflow: ellipsis; text-align: right; min-width: 0;
         }
         .ot-col-proj {
-            justify-self: start; border: none; background: transparent; color: #0f3a5f;
+            justify-self: stretch; border: none; background: transparent; color: #0f3a5f;
             border-radius: 0; padding: 0; font: inherit; font-size: .8rem; font-weight: 800;
-            cursor: pointer; white-space: nowrap; overflow: visible; text-overflow: clip;
-            text-align: right; max-width: min(42vw, 360px);
+            cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            text-align: right; width: 100%;
         }
-        .open-todos-thead .ot-col-proj { max-width: none; }
         .ot-col-proj:hover { color: #0284c7; text-decoration: underline; }
-        .ot-col-text { justify-self: stretch; text-align: right; }
         .ot-col-date {
             font-size: .7rem; font-weight: 700; color: #0284c7; white-space: nowrap;
             font-variant-numeric: tabular-nums;
@@ -210,10 +209,9 @@
         }
         @media (max-width: 900px) {
             .open-todos-thead, .open-todos-row {
-                grid-template-columns: 24px max-content minmax(0, 1fr) 24px;
+                grid-template-columns: 24px var(--ot-proj-w) minmax(0, 1fr) 24px;
             }
             .ot-col-date, .open-todos-thead .ot-col-date { display: none; }
-            .ot-col-proj { max-width: 40vw; overflow: hidden; text-overflow: ellipsis; }
         }
         .inbox-list { display: flex; flex-direction: column; gap: 12px; max-height: min(62vh, 520px); overflow-y: auto; margin-bottom: 16px; }
         .inbox-item {
@@ -2032,7 +2030,7 @@
 <script src="trial-watermark.js?v=20261008trial"></script>
 <script src="pricing-core.js?v=20261102honeyheight"></script>
 <script src="pricing-panel.js?v=20261102honeyheight"></script>
-<script src="projects.js?v=20261115todoCols"></script>
+<script src="projects.js?v=20261115todoAlign"></script>
 <script src="quick-calc.js?v=20261029shoe"></script>
 <script src="accessibility.js?v=20261115c"></script>
 </body>
