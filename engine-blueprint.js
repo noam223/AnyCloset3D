@@ -5205,9 +5205,26 @@ function addBlueprintSprites() {
 }
 
 function _project3Dto2D(x3d, y3d, z3d) {
-    // Project a 3D world point to 2D canvas pixel coordinates
-    const vec = new THREE.Vector3(x3d, y3d, z3d);
+    // Project a 3D point to 2D canvas pixels.
+    // bpData is in cabinet local space — transform by cabinetGroup when present (space offsets).
+    const vec = new THREE.Vector3(x3d, y3d, z3d == null ? 2 : z3d);
+    if (typeof cabinetGroup !== 'undefined' && cabinetGroup) {
+        cabinetGroup.updateMatrixWorld(true);
+        vec.applyMatrix4(cabinetGroup.matrixWorld);
+    }
     vec.project(camera); // NDC: -1..1
+    const cw = renderer.domElement.clientWidth;
+    const ch = renderer.domElement.clientHeight;
+    return {
+        x: (vec.x + 1) / 2 * cw,
+        y: (-vec.y + 1) / 2 * ch
+    };
+}
+
+/** World-space project (already includes space offsets / companion positions). */
+function _projectWorld3Dto2D(x3d, y3d, z3d) {
+    const vec = new THREE.Vector3(x3d, y3d, z3d == null ? 2 : z3d);
+    vec.project(camera);
     const cw = renderer.domElement.clientWidth;
     const ch = renderer.domElement.clientHeight;
     return {
@@ -5335,6 +5352,37 @@ function _renderBlueprintOverlay() {
             `);
         }
     });
+
+    // Shared-space: overall width across all parts (companions + host)
+    try {
+        const pairInfo = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
+        if (pairInfo && pairInfo.count >= 2 && typeof window._spaceCabinetFootprint === 'function') {
+            let minX = Infinity, maxX = -Infinity, minY = Infinity;
+            pairInfo.members.forEach(function(m) {
+                const fp = window._spaceCabinetFootprint(m.slot);
+                const off = (typeof window._spaceOffsetForSlot === 'function')
+                    ? window._spaceOffsetForSlot(m.slot) : { x: 0, y: 0 };
+                minX = Math.min(minX, (off.x || 0) - fp.w / 2);
+                maxX = Math.max(maxX, (off.x || 0) + fp.w / 2);
+                minY = Math.min(minY, (off.y || 0) + (fp.floorOffset || 0));
+            });
+            if (isFinite(minX) && maxX > minX) {
+                const dimY = minY - 28;
+                const pL = _projectWorld3Dto2D(minX, dimY, 2);
+                const pR = _projectWorld3Dto2D(maxX, dimY, 2);
+                const dimLineY = Math.max(pL.y, pR.y) + DIM_OFFSET;
+                const midX = ((pL.x + pR.x) / 2).toFixed(1);
+                const overall = Math.round(maxX - minX);
+                svgParts.push(`<line x1="${pL.x.toFixed(1)}" y1="${dimLineY.toFixed(1)}" x2="${pR.x.toFixed(1)}" y2="${dimLineY.toFixed(1)}"
+                  stroke="${STROKE}" stroke-width="${STROKE_W}" marker-start="url(#arr-start)" marker-end="url(#arr-end)"/>`);
+                svgParts.push(`
+                  <rect x="${(parseFloat(midX) - 28).toFixed(1)}" y="${(dimLineY - 9).toFixed(1)}" width="56" height="16" rx="3" fill="white"/>
+                  <text x="${midX}" y="${(dimLineY - 6).toFixed(1)}" text-anchor="middle" dominant-baseline="auto"
+                    font-family="'Rubik',Tahoma,sans-serif" font-size="13" font-weight="bold" fill="${STROKE}">${overall}</text>
+                `);
+            }
+        }
+    } catch (eSpaceBp) { /* ignore */ }
 
     bpLayer.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="${cw}" height="${ch}" style="position:absolute;top:0;left:0;overflow:visible;">${svgParts.join('')}</svg>`;
 }

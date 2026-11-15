@@ -881,9 +881,9 @@ window._setDoorsVisible = function(wantVisible) {
                 ? '<i class="fa-solid fa-door-closed"></i>'
                 : '<i class="fa-solid fa-door-open"></i>';
         } else {
-            btn.innerHTML = window._doorsVisible
-                ? '<i class="fa-solid fa-door-closed"></i> הסתר חזיתות'
-                : '<i class="fa-solid fa-door-open"></i> הצג חזיתות';
+        btn.innerHTML = window._doorsVisible
+            ? '<i class="fa-solid fa-door-closed"></i> הסתר חזיתות'
+            : '<i class="fa-solid fa-door-open"></i> הצג חזיתות';
         }
         btn.classList.toggle('toggled-off', !window._doorsVisible);
         btn.title = window._doorsVisible ? 'הסתר חזיתות (תצוגה בלבד)' : 'הצג חזיתות (תצוגה בלבד)';
@@ -3339,7 +3339,7 @@ window._rotateBed = function() {
     if (typeof window._roomPlanFurnitureChanged === 'function') {
         window._roomPlanFurnitureChanged();
     } else {
-        if (typeof _buildRoom === 'function') _buildRoom();
+    if (typeof _buildRoom === 'function') _buildRoom();
     }
     if (typeof window._updateBedHandles === 'function') window._updateBedHandles();
 };
@@ -3537,9 +3537,9 @@ function _buildRoom() {
     const backWall = new THREE.Mesh(
         _roomWallGeometry(roomW, roomH, _roomWallHoles('back', _openings, roomCenterX, _sideWallCZ, roomH)),
         makeWallMat(roomW, roomH));
-    backWall.position.set(roomCenterX, roomH / 2, backZ);
+        backWall.position.set(roomCenterX, roomH / 2, backZ);
     backWall.userData._roomOwned = true;
-    rg.add(backWall);
+        rg.add(backWall);
 
     // ── Left wall ──────────────────────────────────────────────────────────
     // Always brick texture
@@ -4347,7 +4347,16 @@ function updateCameraView() {
     const hasAnyWing = leftWing || rightWing;
     const hasCorner = state.corner && state.corner.side !== 'none';
 
-    if (state.viewMode === 'blueprint') {
+    // Shared-space: front/blueprint frame every part together (not just the active host)
+    const _spacePairInfo = (typeof window._getSpacePairInfo === 'function')
+        ? window._getSpacePairInfo() : null;
+    const _spaceCombinedView = (_spacePairInfo && _spacePairInfo.count >= 2
+        && (state.viewMode === 'front' || state.viewMode === 'blueprint')
+        && typeof window._computeSpacePairCaptureView === 'function')
+        ? window._computeSpacePairCaptureView(_spacePairInfo) : null;
+
+    if (state.viewMode === 'blueprint' && !_spaceCombinedView) {
+        // Single-cabinet blueprint: shift for side elevation
         totalWidth += centerD + 120;
         targetX += (centerD + 60) / 2;
     }
@@ -4356,9 +4365,23 @@ function updateCameraView() {
     let fitHeight = maxColH + 120;
     let fitWidth = totalWidth + sideProtrusion + 150;
 
-    if (state.viewMode === 'blueprint') {
+    if (state.viewMode === 'blueprint' && !_spaceCombinedView) {
         fitHeight += 80;
         fitWidth += 80;
+    }
+
+    let targetY = maxColH / 2;
+    if (state.viewMode === 'blueprint' && !_spaceCombinedView) targetY -= 25;
+
+    if (_spaceCombinedView) {
+        targetX = _spaceCombinedView.camTarget[0];
+        targetY = _spaceCombinedView.camTarget[1];
+        fitHeight = _spaceCombinedView.fitH;
+        fitWidth = _spaceCombinedView.fitW;
+        if (state.viewMode === 'blueprint') {
+            fitHeight += 40;
+            fitWidth += 40;
+        }
     }
     
     camera.fov = 45;
@@ -4367,9 +4390,6 @@ function updateCameraView() {
     const distY = fitHeight / (2 * Math.tan(Math.PI * camera.fov / 360));
     const distX = fitWidth / (2 * Math.tan(Math.PI * camera.fov / 360)) / camera.aspect;
     const targetDistance = Math.max(distY, distX);
-
-    let targetY = maxColH / 2;
-    if (state.viewMode === 'blueprint') targetY -= 25;
 
     // 3D mode with wings or corner: use preset-specific camera positions
     if ((hasAnyWing || hasCorner) && state.viewMode !== 'front' && state.viewMode !== 'blueprint') {
@@ -4458,19 +4478,19 @@ function updateCameraView() {
         if (shouldAnimFrontCam) {
             window._forceCameraAnim = false;
             window._frontCamPositioned = true;
-            const oldCamPos = camera.position.clone();
-            const oldTarget = controls.target.clone();
-            controls.enabled = false;
-            controls.enableDamping = false;
-            window._camAnim = {
-                fromPos: oldCamPos,
-                fromTarget: oldTarget,
-                toPos: new THREE.Vector3(...toPosArr),
-                toTarget: new THREE.Vector3(...toTargetArr),
-                t: 0,
-                duration: 0.6,
-                onDone: null
-            };
+        const oldCamPos = camera.position.clone();
+        const oldTarget = controls.target.clone();
+        controls.enabled = false;
+        controls.enableDamping = false;
+        window._camAnim = {
+            fromPos: oldCamPos,
+            fromTarget: oldTarget,
+            toPos: new THREE.Vector3(...toPosArr),
+            toTarget: new THREE.Vector3(...toTargetArr),
+            t: 0,
+            duration: 0.6,
+            onDone: null
+        };
         } else if (!window._camAnim) {
             controls.enabled = true;
         }
@@ -5444,10 +5464,6 @@ function _spaceRotY(off) {
 }
 
 window._applySpacePairPositions = function() {
-    if (state.viewMode === 'blueprint') {
-        if (cabinetGroup) { cabinetGroup.position.set(0, 0, 0); cabinetGroup.rotation.y = 0; }
-        return;
-    }
     const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
     if (!info) {
         if (cabinetGroup) { cabinetGroup.position.set(0, 0, 0); cabinetGroup.rotation.y = 0; }
@@ -5484,7 +5500,9 @@ window._applySpacePairPositions = function() {
 window._rebuildSpaceCompanion = function() {
     if (window._spaceCompanionBuilding) return;
     const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
-    if (!info || state.viewMode === 'blueprint') {
+    // Blueprint used to clear companions (single-cabinet side elevation). For shared-space
+    // cabinets we keep companions so front/blueprint show every part together.
+    if (!info) {
         window._clearSpaceCompanion();
         return;
     }
@@ -7498,7 +7516,7 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
             startShelvesY = col.deskHeight + col.deskClearance;
             // Floor board above knee clearance (acts as first shelf of the upper desk section)
             _ppPartId = `desk_shelf_c${c}`;
-            createBoard(col.width, t, bodyD, colCenterX, startShelvesY + t/2, 0, matDesk);
+            createBoard(col.width, t, bodyD, colCenterX, startShelvesY + t/2, 0, matDesk); 
             _ppPartId = '';
             if(!isBP) dragHandlesData.vertical.push({ isInternalDeskClearance: true, colIndex: c, x: colCenterX, y: startShelvesY });
             startShelvesY += t; 
@@ -7517,10 +7535,10 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
                     const hitH = topY - botY;
                     if (hitH <= 0) return;
                     const hitMat = new THREE.MeshBasicMaterial({ color: isHoveredCol ? 0x2ecc71 : 0x3498db, transparent: true, opacity: selected ? 0.3 : (isHoveredCol ? 0.05 : 0.0), depthWrite: false });
-                    const hitBox = new THREE.Mesh(new THREE.BoxGeometry(col.width, hitH, bodyD - backT - 2), hitMat);
+                const hitBox = new THREE.Mesh(new THREE.BoxGeometry(col.width, hitH, bodyD - backT - 2), hitMat);
                     hitBox.position.set(colCenterX, botY + hitH / 2, -1);
                     hitBox.userData = Object.assign({ colIndex: c, rowIndex: -1 }, extra);
-                    _buildGroup.add(hitBox); hitBoxes.push(hitBox);
+                _buildGroup.add(hitBox); hitBoxes.push(hitBox);
                 };
                 _deskHit(state.plinthHeight + t, col.deskHeight, false, {});
                 _deskHit(col.deskHeight, startShelvesY, zoneSelected, { deskZone: true });
@@ -7623,14 +7641,14 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
 
                 let cellW = spanW;
                 let cellX = currentX + spanW / 2;
-
+                
                 if (block.type === 'side_open_cell') {
                     if (block.openDir === 'left') { cellW += t; cellX -= t / 2; }
                     if (walkBlk.openDir === 'right') { cellW += t; cellX += t / 2; }
                 }
 
                 _ppPartId = block.paintId || `opencell_c${c}_b${block.startR}`;
-                createBoard(cellW, innerT, bodyD - 2, cellX, block.topY - innerT/2, 1, matOpenCell);
+                createBoard(cellW, innerT, bodyD - 2, cellX, block.topY - innerT/2, 1, matOpenCell); 
                 // Bottom board merged with a standalone corner desk → desk color (any column of the span)
                 let _cuDeskMat = null;
                 for (let cc = c; cc <= endC && !_cuDeskMat; cc++) {
@@ -7640,19 +7658,19 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
                 }
                 // Merged: the corner desk's board continues into the column in place of this one
                 if (!_cuDeskMat) {
-                    createBoard(cellW, innerT, bodyD - 2, cellX, block.bottomY + innerT/2, 1, matOpenCell);
+                createBoard(cellW, innerT, bodyD - 2, cellX, block.bottomY + innerT/2, 1, matOpenCell); 
                 }
                 createBoard(cellW, block.h - 2*innerT, t, cellX, block.centerY, -bodyD/2 + t/2 + 0.6, matOpenCell);
-
+                
                 if (block.type === 'open_cell') {
-                    createBoard(innerT, block.h - 2*innerT, bodyD - 2, cellX - cellW/2 + innerT/2, block.centerY, 1, matOpenCell);
-                    createBoard(innerT, block.h - 2*innerT, bodyD - 2, cellX + cellW/2 - innerT/2, block.centerY, 1, matOpenCell);
+                    createBoard(innerT, block.h - 2*innerT, bodyD - 2, cellX - cellW/2 + innerT/2, block.centerY, 1, matOpenCell); 
+                    createBoard(innerT, block.h - 2*innerT, bodyD - 2, cellX + cellW/2 - innerT/2, block.centerY, 1, matOpenCell); 
                 } else if (block.type === 'side_open_cell') {
                     if (block.openDir !== 'left') {
-                        createBoard(innerT, block.h - 2*innerT, bodyD - 2, cellX - cellW/2 + innerT/2, block.centerY, 1, matOpenCell);
+                        createBoard(innerT, block.h - 2*innerT, bodyD - 2, cellX - cellW/2 + innerT/2, block.centerY, 1, matOpenCell); 
                     }
                     if (walkBlk.openDir !== 'right') {
-                        createBoard(innerT, block.h - 2*innerT, bodyD - 2, cellX + cellW/2 - innerT/2, block.centerY, 1, matOpenCell);
+                        createBoard(innerT, block.h - 2*innerT, bodyD - 2, cellX + cellW/2 - innerT/2, block.centerY, 1, matOpenCell); 
                     }
                 }
                 _ppPartId = '';
@@ -7775,7 +7793,7 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
             } else {
                 const shelfThick = (_mergeShelfThick != null) ? _mergeShelfThick : div.thick;
                 const shelfMesh = createBoard(boardW, shelfThick, boardD, boardX, div.y, boardZ, boardMat);
-                _applyShelfUV(shelfMesh, boardW, boardD, div.idx + c * 100);
+            _applyShelfUV(shelfMesh, boardW, boardD, div.idx + c * 100);
                 // Merged: the corner desk's board continues into the column here — keep only the pick target
                 if (_cuDeskMat && shelfMesh) shelfMesh.visible = false;
                 if (!isBP && shelfMesh) {
@@ -8355,15 +8373,15 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                     _registerDoorMesh(_placeHalfMoon(_buildGroup, hm, subCenterX, doorY, fZ + t / 2, 'left'));
                                     _registerDoorMesh(_placeHalfMoon(_buildGroup, hm, subCenterX, doorY, fZ + t / 2, 'right'));
                                 } else if (hs === 'pipe') {
-                                    const handleH = Math.min(doorH * 0.35, 12);
+                                const handleH = Math.min(doorH * 0.35, 12);
                                     const handleMatD = _handleMat3D();
-                                    const hL = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, handleH, 12), handleMatD);
+                                const hL = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, handleH, 12), handleMatD);
                                     hL.position.set(lCX + halfW * 0.35, doorY, hz);
-                                    _buildGroup.add(hL);
+                                _buildGroup.add(hL);
                                     _registerDoorMesh(hL);
-                                    const hR = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, handleH, 12), handleMatD);
+                                const hR = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, handleH, 12), handleMatD);
                                     hR.position.set(rCX - halfW * 0.35, doorY, hz);
-                                    _buildGroup.add(hR);
+                                _buildGroup.add(hR);
                                     _registerDoorMesh(hR);
                                 }
                             }
@@ -8384,14 +8402,14 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                     const edgeX = isRight ? subCenterX - doorW / 2 : subCenterX + doorW / 2;
                                     _registerDoorMesh(_placeHalfMoon(_buildGroup, _handleMat3D(), edgeX, doorY, fZ + t / 2, isRight ? 'right' : 'left'));
                                 } else if (hs === 'pipe' && doorStyle !== 'glass_mirror') {
-                                    const isRight = subType === 'door_right';
-                                    const handleX = isRight ? subCenterX - subW * 0.35 : subCenterX + subW * 0.35;
-                                    const handleMesh = new THREE.Mesh(
-                                        new THREE.CylinderGeometry(0.5, 0.5, Math.min(doorH * 0.35, 12), 12),
+                                const isRight = subType === 'door_right';
+                                const handleX = isRight ? subCenterX - subW * 0.35 : subCenterX + subW * 0.35;
+                                const handleMesh = new THREE.Mesh(
+                                    new THREE.CylinderGeometry(0.5, 0.5, Math.min(doorH * 0.35, 12), 12),
                                         _handleMat3D()
-                                    );
+                                );
                                     handleMesh.position.set(handleX, doorY, hz);
-                                    _buildGroup.add(handleMesh);
+                                _buildGroup.add(handleMesh);
                                     _registerDoorMesh(handleMesh);
                                 }
                             }
@@ -8474,7 +8492,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         // Bottom board (desk color when merged with a standalone corner desk)
                         const _cuSubDeskMat = (zoneIdx === 0) ? _cuMergedBoardMat(c, 'cubby', r) : null;
                         if (!_cuSubDeskMat) {
-                            createBoard(subW, innerT, bodyD - 2, subCenterX, zoneBottomY + innerT / 2, 1, matOpenCell);
+                        createBoard(subW, innerT, bodyD - 2, subCenterX, zoneBottomY + innerT / 2, 1, matOpenCell);
                         }
                         // Back panel
                         createBoard(subW - 2 * innerT, zoneH - 2 * innerT, 0.5, subCenterX, frameY, -bodyD / 2 + 0.6, matOpenCell);

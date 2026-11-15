@@ -1104,23 +1104,38 @@ window._setViewerView = function(mode) {
         window._viewerDoorsModeTimer = null;
     }
 
+    // Reframe camera on every view switch (space groups need combined fit)
+    window._forceCameraAnim = true;
+    window._frontCamPositioned = false;
+
     if (viewMode === 'blueprint') {
         if (canvas) { canvas.classList.add('blueprint-mode'); canvas.classList.remove('front-mode', 'mode-3d'); }
         if (bpLayer) bpLayer.style.display = 'block';
         if (dimLayer) { dimLayer.style.display = 'none'; dimLayer.style.opacity = '0'; }
         if (typeof buildCabinet === 'function') buildCabinet();
+        // Ensure space companions survive blueprint rebuild + combined framing
+        if (typeof window._rebuildSpaceCompanion === 'function') window._rebuildSpaceCompanion();
+        if (typeof window._applySpacePairPositions === 'function') window._applySpacePairPositions();
         if (typeof updateCameraView === 'function') updateCameraView();
+        // Re-project dim overlay after camera settles on the combined space frame
+        setTimeout(function() {
+            if (state.viewMode === 'blueprint' && typeof addBlueprintSprites === 'function') addBlueprintSprites();
+        }, 700);
     } else if (viewMode === 'front') {
         if (canvas) { canvas.classList.add('front-mode'); canvas.classList.remove('blueprint-mode', 'mode-3d'); }
         if (bpLayer) { bpLayer.style.display = 'none'; bpLayer.innerHTML = ''; }
         if (dimLayer) { dimLayer.style.display = 'block'; dimLayer.style.opacity = '1'; }
         if (typeof buildCabinet === 'function') buildCabinet();
+        if (typeof window._rebuildSpaceCompanion === 'function') window._rebuildSpaceCompanion();
+        if (typeof window._applySpacePairPositions === 'function') window._applySpacePairPositions();
         if (typeof updateCameraView === 'function') updateCameraView();
     } else {
         if (canvas) { canvas.classList.add('mode-3d'); canvas.classList.remove('front-mode', 'blueprint-mode'); }
         if (bpLayer) { bpLayer.style.display = 'none'; bpLayer.innerHTML = ''; }
         if (dimLayer) { dimLayer.style.display = 'none'; dimLayer.style.opacity = '0'; }
         if (typeof buildCabinet === 'function') buildCabinet();
+        if (typeof window._rebuildSpaceCompanion === 'function') window._rebuildSpaceCompanion();
+        if (typeof window._applySpacePairPositions === 'function') window._applySpacePairPositions();
         if (typeof updateCameraView === 'function') updateCameraView();
         // Absolute re-apply after meshes exist (also handled in buildCabinet for doors-open)
         window._viewerDoorsModeTimer = setTimeout(function() {
