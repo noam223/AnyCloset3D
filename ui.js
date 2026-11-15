@@ -5138,9 +5138,9 @@ function _removeDoorsBlockedByAppliances(colIndex) {
 }
 window._removeDoorsBlockedByAppliances = _removeDoorsBlockedByAppliances;
 
-// Toggle a laundry appliance in the selected cell(s). Both can be marked only when the
-// cell is tall enough to stack them; otherwise the new pick replaces the old one.
-// Selection is kept so the user can mark the second appliance right away.
+// Toggle a laundry appliance in the selected cell(s). Both can be marked when the cell is
+// wide enough for side-by-side (≥122cm) or tall enough to stack; otherwise the new pick
+// replaces the old one. Selection is kept so the user can mark the second appliance right away.
 window.toggleCellAppliance = function(type) {
     const R = window.LAUNDRY_RULES;
     if (!R || !R.dims[type]) return;
@@ -5149,6 +5149,7 @@ window.toggleCellAppliance = function(type) {
     if (!col) return;
     const names = { washer: 'מכונת כביסה', dryer: 'מייבש' };
     const fmt = v => (Math.round(v * 10) / 10).toString();
+    const sideW = R.sideBySideWidth || 122;
 
     if (col.width < R.minWidth) {
         _showToast(`רוחב התא ${fmt(col.width)} ס"מ — ל${names[type]} נדרש רוחב פנימי של ${R.minWidth} ס"מ לפחות`, 4500);
@@ -5158,7 +5159,7 @@ window.toggleCellAppliance = function(type) {
     const rows = state.selection.rows;
     const first = col.compartments[rows[0]];
     const turnOn = !(first && !first.partition && Array.isArray(first.appliances) && first.appliances.includes(type));
-    let changed = 0, tooShortH = null, swappedH = null, clearedPartition = false;
+    let changed = 0, tooShortH = null, swappedH = null, swappedW = null, clearedPartition = false;
 
     rows.forEach(r => {
         const comp = col.compartments[r];
@@ -5172,7 +5173,15 @@ window.toggleCellAppliance = function(type) {
         const h = _cellHeight(col, r);
         if (h < R.singleHeight) { tooShortH = h; return; }
         let next = others.concat(type);
-        if (next.length > 1 && h < R.stackHeight) { next = [type]; swappedH = h; }
+        if (next.length > 1) {
+            const canSide = col.width >= sideW && h >= R.singleHeight;
+            const canStack = h >= R.stackHeight;
+            if (!canSide && !canStack) {
+                next = [type];
+                swappedH = h;
+                swappedW = col.width;
+            }
+        }
         comp.appliances = ['washer', 'dryer'].filter(t => next.includes(t));
         delete comp.tv;
         comp.type = 'empty';
@@ -5190,7 +5199,11 @@ window.toggleCellAppliance = function(type) {
     if (tooShortH !== null) {
         _showToast(`גובה התא ${fmt(tooShortH)} ס"מ — ל${names[type]} נדרש גובה של ${R.singleHeight} ס"מ לפחות`, 4500);
     } else if (swappedH !== null) {
-        _showToast(`גובה התא ${fmt(swappedH)} ס"מ — מכונה ומייבש יחד דורשים ${R.stackHeight} ס"מ לפחות, לכן הוכנס רק ${names[type]}`, 5000);
+        _showToast(
+            `מכונה ומייבש יחד דורשים רוחב ${sideW} ס"מ ומעלה (זה לצד זה) או גובה ${R.stackHeight} ס"מ (אחד מעל השני). ` +
+            `התא ${fmt(swappedW)}×${fmt(swappedH)} — הוכנס רק ${names[type]}`,
+            5500
+        );
     }
     if (!changed) return;
     if (turnOn && tooShortH === null && rows.some(r => _cellApplianceBlocksDoor(col, r))) {

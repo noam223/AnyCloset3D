@@ -30,6 +30,8 @@ const LAUNDRY_RULES = {
     minWidth: 60,
     singleHeight: 85,
     stackHeight: 170,
+    // Wide cell: washer + dryer side by side (≈2×59.7 + clearance)
+    sideBySideWidth: 122,
     dims: { washer: { W: 59.7, H: 84.5, D: 57 }, dryer: { W: 59.7, H: 84.5, D: 61 } }
 };
 
@@ -310,11 +312,24 @@ function _template(type) {
     return group;
 }
 
-/** Which of the requested appliances fit a cell of the given size (stack order: washer below dryer). */
+/** True when both machines fit next to each other (wide cell, single-machine height). */
+function _laundryIsSideBySide(list, cellW, cellH) {
+    const want = ['washer', 'dryer'].filter(t => Array.isArray(list) && list.includes(t));
+    return want.length === 2
+        && cellW >= LAUNDRY_RULES.sideBySideWidth
+        && cellH >= LAUNDRY_RULES.singleHeight;
+}
+
+/** Which of the requested appliances fit a cell of the given size.
+ *  Prefer side-by-side when the cell is wide enough; otherwise stack (washer below dryer). */
 function _laundryFit(list, cellW, cellH) {
     const want = ['washer', 'dryer'].filter(t => Array.isArray(list) && list.includes(t));
     if (!want.length || cellW < LAUNDRY_RULES.minWidth) return [];
-    if (want.length === 2 && cellH >= LAUNDRY_RULES.stackHeight) return want;
+    if (want.length === 2) {
+        if (_laundryIsSideBySide(want, cellW, cellH)) return want;
+        if (cellH >= LAUNDRY_RULES.stackHeight) return want;
+        return cellH >= LAUNDRY_RULES.singleHeight ? [want[0]] : [];
+    }
     return cellH >= LAUNDRY_RULES.singleHeight ? [want[0]] : [];
 }
 
@@ -325,7 +340,12 @@ function _laundryLayout(list, cellW, cellH, bodyD, backT, frontInset) {
     const maxD = Math.max.apply(null, fit.map(t => LA_TYPES[t].D));
     const backFace = -bodyD / 2 + (backT || 0) + 0.3;
     const flushFront = bodyD / 2 - (frontInset || 0) - DOOR_PROTRUSION - 0.3;
-    return { fit, frontZ: Math.max(flushFront, backFace + maxD), protrudes: backFace + maxD > flushFront + 1e-6 };
+    return {
+        fit,
+        sideBySide: _laundryIsSideBySide(list, cellW, cellH),
+        frontZ: Math.max(flushFront, backFace + maxD),
+        protrudes: backFace + maxD > flushFront + 1e-6
+    };
 }
 
 function laundryProtrudes(list, cellW, cellH, bodyD, frontInset) {
@@ -340,7 +360,27 @@ function laundryProtrudes(list, cellW, cellH, bodyD, frontInset) {
 function addLaundryAppliancesToCell(parent, opts) {
     const L = _laundryLayout(opts.list, opts.cellW, opts.cellH, opts.bodyD, opts.backT, opts.frontInset);
     if (!L) return;
-    const { fit, frontZ } = L;
+    const { fit, frontZ, sideBySide } = L;
+
+    if (sideBySide && fit.length === 2) {
+        // Side-by-side: washer | dryer, centred in the cell with even outer/inner gaps
+        const w0 = LA_TYPES[fit[0]].W;
+        const w1 = LA_TYPES[fit[1]].W;
+        const free = Math.max(0, opts.cellW - w0 - w1);
+        const gap = free / 3; // left margin, middle gap, right margin
+        const leftX = opts.x - opts.cellW / 2 + gap + w0 / 2;
+        const rightX = opts.x + opts.cellW / 2 - gap - w1 / 2;
+        [leftX, rightX].forEach(function(px, i) {
+            const type = fit[i];
+            const m = _template(type).clone();
+            m.position.set(px, opts.bottomY, frontZ - LA_TYPES[type].D / 2);
+            m.userData.isLaundryAppliance = true;
+            parent.add(m);
+        });
+        return;
+    }
+
+    // Stacked: dryer on a stacking kit above the washer
     let y = opts.bottomY;
     fit.forEach((type, i) => {
         if (i > 0) {
@@ -528,6 +568,7 @@ window.addTvToCell = addTvToCell;
 
 window.LAUNDRY_RULES = LAUNDRY_RULES;
 window._laundryFit = _laundryFit;
+window._laundryIsSideBySide = _laundryIsSideBySide;
 window._laundryProtrudes = laundryProtrudes;
 window.addLaundryAppliancesToCell = addLaundryAppliancesToCell;
 })();
