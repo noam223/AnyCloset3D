@@ -218,16 +218,53 @@ async function _loadProject() {
     }
 }
 
-/** Active cabinet index the designer is editing (from snap). */
+/** Cart-index helpers for shared-space grouping in the client viewer. */
+function _viewerSpacePairId(item) {
+    if (!item) return null;
+    return item.spacePairId || (item.rawState && item.rawState.spacePairId) || null;
+}
+function _viewerSpaceSlot(item) {
+    if (!item) return 0;
+    var s = (item.spaceSlot != null) ? item.spaceSlot
+        : (item.rawState && item.rawState.spaceSlot != null ? item.rawState.spaceSlot : 0);
+    return Math.max(0, Number(s) || 0);
+}
+function _viewerStripPartSuffix(name) {
+    if (typeof window._stripSpacePartSuffix === 'function') return window._stripSpacePartSuffix(name);
+    return String(name || '').replace(/\s*חלק\s*\d+\s*$/u, '').trim();
+}
+/** Map a cart index → collapsed nav index (space pairs share one card). */
+function _viewerListIndexForCart(cartIdx) {
+    if (!_cabinetList || !_cabinetList.length) return 0;
+    for (var i = 0; i < _cabinetList.length; i++) {
+        var cab = _cabinetList[i];
+        if (!cab) continue;
+        if (cab.cartIndices && cab.cartIndices.indexOf(cartIdx) >= 0) return i;
+        if (cab.primaryIdx === cartIdx || cab.cartIndex === cartIdx) return i;
+    }
+    return Math.max(0, Math.min(cartIdx, _cabinetList.length - 1));
+}
+/** Aggregate note/unread counts for a nav card (sums all cart indices in a space group). */
+function _viewerNoteCountForListIdx(listIdx, map) {
+    map = map || {};
+    var cab = _cabinetList && _cabinetList[listIdx];
+    if (!cab) return map[listIdx] || 0;
+    var keys = cab.cartIndices && cab.cartIndices.length ? cab.cartIndices : [cab.primaryIdx != null ? cab.primaryIdx : listIdx];
+    var n = 0;
+    keys.forEach(function(k) { n += map[k] || 0; });
+    return n;
+}
+
+/** Active nav index for the designer's live editingCartIndex (space pairs collapse to one card). */
 function _resolveLiveCabIndex(projectData) {
     var cart = (projectData && (projectData.orderCart || projectData.cart)) || [];
-    var len = cart.length || (_cabinetList ? _cabinetList.length : 0);
-    var idx = (projectData && typeof projectData.editingCartIndex === 'number')
+    var cartIdx = (projectData && typeof projectData.editingCartIndex === 'number')
         ? projectData.editingCartIndex
         : 0;
-    if (idx < 0) idx = 0;
-    if (len > 0 && idx >= len) idx = len - 1;
-    return idx;
+    if (cartIdx < 0) cartIdx = 0;
+    if (cart.length > 0 && cartIdx >= cart.length) cartIdx = cart.length - 1;
+    if (_cabinetList && _cabinetList.length) return _viewerListIndexForCart(cartIdx);
+    return cartIdx;
 }
 
 /**
@@ -289,6 +326,8 @@ function _applyLiveProjectData(projectData, opts) {
             _scrollActiveCabIntoView();
         }
 
+        // Space groups: show all members together (same as designer canvas)
+        _viewerEnsureSpaceCompanions(_activeCabIdx);
         _updateInfoStrip();
         if (opts.captureThumb) {
             setTimeout(function() { _captureSnapshot(_activeCabIdx); }, 400);
@@ -318,42 +357,20 @@ function _scrollActiveCabIntoView() {
 }
 
 // ── Build cabinet list from project data ─────────────────────────────────────
+// Shared-space members collapse to ONE client card (the combined cabinet), not N duplicates.
 function _buildCabinetList(projectData) {
-    var prevThumbs = (_cabinetList || []).map(function(c) { return c && c.thumbnail; });
+    var prevByPair = {};
+    var prevByCart = {};
+    (_cabinetList || []).forEach(function(c) {
+        if (!c) return;
+        if (c.spacePairId) prevByPair[c.spacePairId] = c.thumbnail;
+        var key = c.primaryIdx != null ? c.primaryIdx : c.cartIndex;
+        if (key != null) prevByCart[key] = c.thumbnail;
+    });
     _cabinetList = [];
 
     var cart = projectData.orderCart || projectData.cart || [];
-    var cartEntries = cart.map(function(item, idx) {
-        var spec     = item.spec || {};
-        var rawState = item.rawState || {};
-        var label    = spec.customName || spec.dimsStr || ('ארון ' + (idx + 1));
-        var hasWings = rawState.wings && (rawState.wings.center || rawState.wings.left || rawState.wings.right);
-
-        // Extract dims from spec or rawState
-        var w = rawState.width || (rawState.wings && rawState.wings.center && rawState.wings.center.width) || 0;
-        var h = rawState.globalHeight || (rawState.wings && rawState.wings.center && rawState.wings.center.globalHeight) || 0;
-        var d = rawState.depth || (rawState.wings && rawState.wings.center && rawState.wings.center.depth) || 0;
-        var matBody = rawState.materialBody || (rawState.wings && rawState.wings.center && rawState.wings.center.materialBody) || '';
-        var matDoors = rawState.materialExternal || (rawState.wings && rawState.wings.center && rawState.wings.center.materialExternal) || '';
-        var matInternal = rawState.materialInternal || (rawState.wings && rawState.wings.center && rawState.wings.center.materialInternal) || '';
-
-        return {
-            label: label,
-            wings: hasWings ? rawState.wings : (item.wings || null),
-            activeCabinet: hasWings ? null : rawState,
-            presetId: rawState.presetId || item.presetId || 'linear',
-            activeWing: rawState.activeWing || item.activeWing || 'center',
-            thumbnail: prevThumbs[idx] || null,
-            dims: { w: w, h: h, d: d },
-            materialBody: matBody,
-            materialDoors: matDoors,
-            materialInternal: matInternal
-        };
-    });
-
-    if (cartEntries.length > 0) {
-        _cabinetList = cartEntries;
-    } else {
+    if (!cart.length) {
         var pd = projectData;
         _cabinetList = [{
             label: 'ארון נוכחי',
@@ -365,8 +382,88 @@ function _buildCabinetList(projectData) {
             dims: { w: pd.width || 0, h: pd.globalHeight || 0, d: pd.depth || 0 },
             materialBody: pd.materialBody || '',
             materialDoors: pd.materialExternal || '',
-            materialInternal: pd.materialInternal || ''
+            materialInternal: pd.materialInternal || '',
+            primaryIdx: 0,
+            cartIndex: 0,
+            cartIndices: [0]
         }];
+    } else {
+        var seenPairs = {};
+        cart.forEach(function(item, idx) {
+            var spec = item.spec || {};
+            var rawState = item.rawState || {};
+            var pairId = _viewerSpacePairId(item);
+            var slot = _viewerSpaceSlot(item);
+            var label = spec.customName || spec.dimsStr || ('ארון ' + (idx + 1));
+            var hasWings = rawState.wings && (rawState.wings.center || rawState.wings.left || rawState.wings.right);
+            var w = rawState.width || (rawState.wings && rawState.wings.center && rawState.wings.center.width) || 0;
+            var h = rawState.globalHeight || (rawState.wings && rawState.wings.center && rawState.wings.center.globalHeight) || 0;
+            var d = rawState.depth || (rawState.wings && rawState.wings.center && rawState.wings.center.depth) || 0;
+            var matBody = rawState.materialBody || (rawState.wings && rawState.wings.center && rawState.wings.center.materialBody) || '';
+            var matDoors = rawState.materialExternal || (rawState.wings && rawState.wings.center && rawState.wings.center.materialExternal) || '';
+            var matInternal = rawState.materialInternal || (rawState.wings && rawState.wings.center && rawState.wings.center.materialInternal) || '';
+
+            if (pairId) {
+                if (seenPairs[pairId] != null) {
+                    var existing = _cabinetList[seenPairs[pairId]];
+                    existing.cartIndices.push(idx);
+                    existing.memberCount = existing.cartIndices.length;
+                    if (slot === 0 || (existing.primarySlot != null && slot < existing.primarySlot)) {
+                        existing.primaryIdx = idx;
+                        existing.primarySlot = slot;
+                        existing.cartIndex = idx;
+                        existing.wings = hasWings ? rawState.wings : (item.wings || existing.wings);
+                        existing.activeCabinet = hasWings ? null : rawState;
+                        existing.presetId = rawState.presetId || item.presetId || existing.presetId;
+                        existing.activeWing = rawState.activeWing || item.activeWing || existing.activeWing;
+                        existing.dims = { w: w, h: h, d: d };
+                        existing.materialBody = matBody || existing.materialBody;
+                        existing.materialDoors = matDoors || existing.materialDoors;
+                        existing.materialInternal = matInternal || existing.materialInternal;
+                    }
+                    var base = _viewerStripPartSuffix(label);
+                    if (base) existing.label = base;
+                    return;
+                }
+                seenPairs[pairId] = _cabinetList.length;
+                _cabinetList.push({
+                    label: _viewerStripPartSuffix(label) || label,
+                    wings: hasWings ? rawState.wings : (item.wings || null),
+                    activeCabinet: hasWings ? null : rawState,
+                    presetId: rawState.presetId || item.presetId || 'linear',
+                    activeWing: rawState.activeWing || item.activeWing || 'center',
+                    thumbnail: prevByPair[pairId] || prevByCart[idx] || null,
+                    dims: { w: w, h: h, d: d },
+                    materialBody: matBody,
+                    materialDoors: matDoors,
+                    materialInternal: matInternal,
+                    spacePairId: pairId,
+                    primaryIdx: idx,
+                    primarySlot: slot,
+                    cartIndex: idx,
+                    cartIndices: [idx],
+                    memberCount: 1
+                });
+                return;
+            }
+
+            _cabinetList.push({
+                label: label,
+                wings: hasWings ? rawState.wings : (item.wings || null),
+                activeCabinet: hasWings ? null : rawState,
+                presetId: rawState.presetId || item.presetId || 'linear',
+                activeWing: rawState.activeWing || item.activeWing || 'center',
+                thumbnail: prevByCart[idx] || null,
+                dims: { w: w, h: h, d: d },
+                materialBody: matBody,
+                materialDoors: matDoors,
+                materialInternal: matInternal,
+                primaryIdx: idx,
+                cartIndex: idx,
+                cartIndices: [idx],
+                memberCount: 1
+            });
+        });
     }
 
     if (_liveMode) {
@@ -425,8 +522,8 @@ function _updateCardBadge(cabIdx) {
     var noteBtn = card.querySelector('.viewer-cab-note-btn');
     if (!noteBtn) return;
 
-    var noteCount   = _notesCountPerCab[cabIdx] || 0;
-    var unreadCount = _unreadCountPerCab[cabIdx] || 0;
+    var noteCount   = _viewerNoteCountForListIdx(cabIdx, _notesCountPerCab);
+    var unreadCount = _viewerNoteCountForListIdx(cabIdx, _unreadCountPerCab);
     var newClass = 'viewer-cab-note-btn' + (unreadCount > 0 ? ' has-unread' : (noteCount > 0 ? ' has-notes' : ''));
     noteBtn.className = newClass;
 
@@ -451,8 +548,8 @@ function _renderCabinetNav() {
 
     _cabinetList.forEach(function(cab, idx) {
         var isActive    = (idx === _activeCabIdx);
-        var noteCount   = _notesCountPerCab[idx] || 0;
-        var unreadCount = _unreadCountPerCab[idx] || 0;
+        var noteCount   = _viewerNoteCountForListIdx(idx, _notesCountPerCab);
+        var unreadCount = _viewerNoteCountForListIdx(idx, _unreadCountPerCab);
 
         // Collect material colors for swatches (body + doors)
         var swatchColors = [];
@@ -465,9 +562,11 @@ function _renderCabinetNav() {
         // Fallback swatch
         if (swatchColors.length === 0) swatchColors.push({ color: '#c8a87a', title: '' });
 
-        // Dims string
+        // Dims string — space groups show part count instead of a single part's dims
         var dimsStr = '';
-        if (cab.dims) {
+        if (cab.memberCount > 1) {
+            dimsStr = cab.memberCount + ' חלקים במרחב';
+        } else if (cab.dims) {
             var w = cab.dims.w || 0, h = cab.dims.h || 0, d = cab.dims.d || 0;
             if (w || h || d) dimsStr = w + '×' + h + '×' + d + ' ס"מ';
         }
@@ -576,15 +675,13 @@ function _switchCabinet(idx) {
         activeCabinet: cab.activeCabinet,
         presetId: cab.presetId,
         activeWing: cab.activeWing,
-        customer: _projectData ? _projectData.customer : null
+        customer: _projectData ? _projectData.customer : null,
+        orderCart: _projectData ? (_projectData.orderCart || _projectData.cart) : null
     };
 
     _restoreState(syntheticData);
-    // Keep part-color / paint scope on the cabinet the customer is viewing
-    try {
-        state.editingCartIndex = idx;
-        if (typeof _syncPartColorScope === 'function') _syncPartColorScope();
-    } catch (eScope) {}
+    // Keep part-color / paint scope on the host cart item; rebuild companions for space groups
+    _viewerEnsureSpaceCompanions(idx);
     // Apply any viewer color overrides for this cabinet
     _applyViewerColorOverride(idx);
     _updateInfoStrip();
@@ -894,7 +991,7 @@ async function _sendAutoColorNote(cabIdx, field, oldKey, newKey) {
             message:     msg,
             message_type: 'color_change'
         };
-        if (_cabIndexColExists !== false) payload.cabinet_index = cabIdx;
+        if (_cabIndexColExists !== false) payload.cabinet_index = _viewerCartKeyForList(cabIdx);
         var result = await _sb.from('project_messages').insert(payload);
         if (result.error && result.error.code === '42703') {
             _cabIndexColExists = false;
@@ -1189,7 +1286,48 @@ function _updateTopBarBadge() {
 // Whether cabinet_index column exists (detected at runtime)
 var _cabIndexColExists = null; // null=unknown, true=yes, false=no
 
-// Load notes for a specific cabinet index
+/** Primary cart index for a nav card (messages / approvals store by cart index). */
+function _viewerCartKeyForList(listIdx) {
+    var cab = _cabinetList && _cabinetList[listIdx];
+    if (!cab) return listIdx;
+    if (cab.primaryIdx != null) return cab.primaryIdx;
+    if (cab.cartIndex != null) return cab.cartIndex;
+    if (cab.cartIndices && cab.cartIndices.length) return cab.cartIndices[0];
+    return listIdx;
+}
+/** Cart indices whose notes belong to a nav card (space groups = all members). */
+function _viewerNoteCartKeys(listIdx) {
+    var cab = _cabinetList && _cabinetList[listIdx];
+    if (!cab) return [listIdx];
+    var keys = (cab.cartIndices && cab.cartIndices.length)
+        ? cab.cartIndices.slice()
+        : [_viewerCartKeyForList(listIdx)];
+    var primary = _viewerCartKeyForList(listIdx);
+    var pi = keys.indexOf(primary);
+    if (pi > 0) {
+        keys.splice(pi, 1);
+        keys.unshift(primary);
+    }
+    return keys;
+}
+/** After restoring host wings, rebuild companion meshes for a space-group card. */
+function _viewerEnsureSpaceCompanions(listIdx) {
+    var cab = _cabinetList && _cabinetList[listIdx];
+    if (!cab) return;
+    var cartIdx = _viewerCartKeyForList(listIdx);
+    try {
+        state.editingCartIndex = cartIdx;
+        if (typeof _syncPartColorScope === 'function') _syncPartColorScope();
+        if (cab.memberCount > 1 && typeof window._rebuildSpaceCompanion === 'function') {
+            window._rebuildSpaceCompanion();
+            if (typeof window._applySpacePairPositions === 'function') window._applySpacePairPositions();
+        } else if (typeof window._clearSpaceCompanion === 'function') {
+            window._clearSpaceCompanion();
+        }
+    } catch (e) { /* ignore */ }
+}
+
+// Load notes for a specific nav-card index (aggregates all cart members of a space group)
 async function _loadNotesForCabinet(cabIdx) {
     if (!_sb || !_token) {
         console.warn('[Viewer] _loadNotesForCabinet: missing _sb or _token');
@@ -1197,10 +1335,14 @@ async function _loadNotesForCabinet(cabIdx) {
     }
     _notesCabIdx = cabIdx;
     _renderNotesCabTabs();
+    var noteKeys = _viewerNoteCartKeys(cabIdx);
+    var primaryKey = noteKeys[0];
 
     try {
-        // First attempt: with cabinet_index filter (if column known to exist or unknown)
-        var result = await _queryNotes(cabIdx);
+        // Space groups span several cart indices — load all notes then filter client-side
+        var result = (noteKeys.length > 1)
+            ? await _queryNotesNoFilter()
+            : await _queryNotes(primaryKey);
 
         // If column doesn't exist, retry without cabinet_index filter
         if (result.error && result.error.code === '42703') {
@@ -1221,18 +1363,12 @@ async function _loadNotesForCabinet(cabIdx) {
         }
         if (!result.data) return;
 
-        // Filter client-side by cabinet_index when column exists but fallback was used,
-        // or when column doesn't exist — filter by position in _cabinetList
-        var notes = result.data;
-        if (_cabIndexColExists === false) {
-            // Column missing: filter client-side by matching cabinet_index field if present,
-            // otherwise show notes that have no cabinet_index (treat as cabinet 0)
-            notes = result.data.filter(function(row) {
-                var rowIdx = (row.cabinet_index !== null && row.cabinet_index !== undefined)
-                    ? Number(row.cabinet_index) : 0;
-                return rowIdx === Number(cabIdx);
-            });
-        }
+        // Notes are stored by cart index; map them onto this nav card
+        var notes = result.data.filter(function(row) {
+            var rowIdx = (row.cabinet_index !== null && row.cabinet_index !== undefined)
+                ? Number(row.cabinet_index) : 0;
+            return noteKeys.indexOf(rowIdx) >= 0;
+        });
 
         var list = document.getElementById('viewer-notes-list');
         if (!list) return;
@@ -1249,11 +1385,7 @@ async function _loadNotesForCabinet(cabIdx) {
             notes.forEach(function(note) { _appendNote(note); });
         }
 
-        // Update count for this cabinet but don't re-render nav (avoids badge flash)
-        // _loadAllNotesCounts already has accurate counts; only update if we have fresh data
-        if (notes.length > 0 || _notesCountPerCab[cabIdx] === undefined) {
-            _notesCountPerCab[cabIdx] = notes.length;
-        }
+        // Counts stay keyed by cart index (_loadAllNotesCounts); don't overwrite with list idx
         _subscribeNotesRealtime(cabIdx);
 
         setTimeout(function() {
@@ -1311,9 +1443,10 @@ function _subscribeNotesRealtime(cabIdx) {
             if (note.sender_role === 'client') return;
 
             var noteIdx = (note.cabinet_index !== null && note.cabinet_index !== undefined) ? Number(note.cabinet_index) : null;
-            var curIdx  = (_notesCabIdx !== null && _notesCabIdx !== undefined) ? Number(_notesCabIdx) : null;
+            var curListIdx = (_notesCabIdx !== null && _notesCabIdx !== undefined) ? Number(_notesCabIdx) : null;
+            var listIdx = (noteIdx !== null) ? _viewerListIndexForCart(noteIdx) : curListIdx;
 
-            // Update counts for all cabinets
+            // Update counts keyed by cart index
             var countKey = (noteIdx !== null) ? noteIdx : 0;
             _notesCountPerCab[countKey] = (_notesCountPerCab[countKey] || 0) + 1;
 
@@ -1323,11 +1456,12 @@ function _subscribeNotesRealtime(cabIdx) {
                 _updateTopBarBadge();
             }
 
-            // Update only the specific card's badge — avoids full DOM rebuild / flash
-            _updateCardBadge(countKey);
+            // Update the collapsed nav card badge
+            if (listIdx != null) _updateCardBadge(listIdx);
 
-            // Only append to list if it's for the currently viewed cabinet
-            if (noteIdx !== curIdx) return;
+            // Only append to list if note belongs to the open nav card (space group = any member)
+            var openKeys = (curListIdx != null) ? _viewerNoteCartKeys(curListIdx) : [];
+            if (noteIdx === null || openKeys.indexOf(noteIdx) < 0) return;
 
             var placeholder = document.getElementById('viewer-notes-placeholder');
             if (placeholder) placeholder.remove();
@@ -1389,7 +1523,7 @@ function _renderNotesCabTabs() {
         tab.className = 'viewer-notes-cab-tab' + (idx === _notesCabIdx ? ' active' : '');
         tab.dataset.idx = idx;
 
-        var unread = _unreadCountPerCab[idx] || 0;
+        var unread = _viewerNoteCountForListIdx(idx, _unreadCountPerCab);
         var badgeHtml = unread > 0
             ? '<span class="viewer-notes-tab-badge">' + unread + '</span>'
             : '';
@@ -1420,9 +1554,13 @@ function _openNotesPanel() {
     }
     document.body.classList.add('notes-open');
 
-    // Clear unread for current cabinet FIRST, then update total
-    var prevUnread = _unreadCountPerCab[_notesCabIdx] || 0;
-    _unreadCountPerCab[_notesCabIdx] = 0;
+    // Clear unread for all cart members of this nav card, then update total
+    var clearKeys = _viewerNoteCartKeys(_notesCabIdx);
+    var prevUnread = 0;
+    clearKeys.forEach(function(k) {
+        prevUnread += _unreadCountPerCab[k] || 0;
+        _unreadCountPerCab[k] = 0;
+    });
     _totalUnread = Math.max(0, _totalUnread - prevUnread);
 
     // Clear top bar badge
@@ -1435,7 +1573,7 @@ function _openNotesPanel() {
         if (card) {
             var noteBtn = card.querySelector('.viewer-cab-note-btn');
             if (noteBtn) {
-                var noteCount = _notesCountPerCab[_notesCabIdx] || 0;
+                var noteCount = _viewerNoteCountForListIdx(_notesCabIdx, _notesCountPerCab);
                 noteBtn.className = 'viewer-cab-note-btn' + (noteCount > 0 ? ' has-notes' : '');
                 var badge = noteBtn.querySelector('.viewer-cab-note-btn-badge');
                 if (badge) badge.textContent = '';
@@ -1478,13 +1616,14 @@ window._viewerSendNote = async function() {
     if (!_clientName) _clientName = 'לקוח';
     input.value = '';
 
-    // Optimistically append
+    // Notes are keyed by cart index (host / slot-0 for space groups)
+    var noteCartKey = _viewerNoteCartKeys(_notesCabIdx)[0];
     var optimistic = {
         sender_role: 'client',
         sender_name: _clientName,
         message: msg,
         created_at: new Date().toISOString(),
-        cabinet_index: _notesCabIdx,
+        cabinet_index: noteCartKey,
         message_type: 'note'
     };
     var placeholder = document.getElementById('viewer-notes-placeholder');
@@ -1492,7 +1631,7 @@ window._viewerSendNote = async function() {
     _appendNote(optimistic);
 
     // Update count
-    _notesCountPerCab[_notesCabIdx] = (_notesCountPerCab[_notesCabIdx] || 0) + 1;
+    _notesCountPerCab[noteCartKey] = (_notesCountPerCab[noteCartKey] || 0) + 1;
     _renderCabinetNav();
 
     try {
@@ -1505,9 +1644,9 @@ window._viewerSendNote = async function() {
             message:     msg
         };
 
-        // Add optional columns if they exist
+        // Add optional columns if they exist — always store cart index (host for space groups)
         if (_cabIndexColExists !== false) {
-            insertPayload.cabinet_index = _notesCabIdx;
+            insertPayload.cabinet_index = noteCartKey;
         }
         insertPayload.message_type = 'note';
 
@@ -1649,7 +1788,10 @@ window._viewerApi = {
     applyLiveProjectData: function(d, o) { return _applyLiveProjectData(d, o); },
     resolveLiveCabIndex: function(d) { return _resolveLiveCabIndex(d); },
     updateLiveBadge: function() { return _updateLiveBadge(); },
-    updateInfoStrip: function() { return _updateInfoStrip(); }
+    updateInfoStrip: function() { return _updateInfoStrip(); },
+    cartKeyForList: function(i) { return _viewerCartKeyForList(i); },
+    listIndexForCart: function(i) { return _viewerListIndexForCart(i); },
+    noteCartKeys: function(i) { return _viewerNoteCartKeys(i); }
 };
 
 })(); // end IIFE

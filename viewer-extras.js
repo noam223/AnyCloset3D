@@ -53,6 +53,33 @@ function parsePayload(msg) {
     try { return JSON.parse(t); } catch (e) { return null; }
 }
 
+/** Map nav-card index → cart index for DB messages (space groups share the host). */
+function cartKeyForList(listIdx) {
+    var a = api();
+    if (a && typeof a.cartKeyForList === 'function') return a.cartKeyForList(listIdx);
+    return listIdx;
+}
+/** Map stored cart index → nav-card index (space members collapse to one card). */
+function listIndexForCart(cartIdx) {
+    var a = api();
+    if (a && typeof a.listIndexForCart === 'function') return a.listIndexForCart(cartIdx);
+    return cartIdx;
+}
+/** Whether a nav card is approved (any member cart index counts). */
+function isListApproved(listIdx) {
+    if (_approvals[listIdx]) return true;
+    var a = api();
+    var cab = a && a.getCabinetList && a.getCabinetList()[listIdx];
+    if (!cab) return !!_approvals[cartKeyForList(listIdx)];
+    var keys = cab.cartIndices && cab.cartIndices.length
+        ? cab.cartIndices
+        : [cab.primaryIdx != null ? cab.primaryIdx : listIdx];
+    for (var i = 0; i < keys.length; i++) {
+        if (_approvals[keys[i]]) return true;
+    }
+    return !!_approvals[listIdx];
+}
+
 async function insertMessage(messageType, message, cabIdx) {
     var a = api();
     if (!a || !a.getSb() || !a.getToken() || !a.getProjectId()) return { error: 'no-api' };
@@ -65,7 +92,7 @@ async function insertMessage(messageType, message, cabIdx) {
         message_type: messageType
     };
     if (a.cabIndexColExists() !== false && typeof cabIdx === 'number') {
-        payload.cabinet_index = cabIdx;
+        payload.cabinet_index = cartKeyForList(cabIdx);
     }
     var res = await a.getSb().from('project_messages').insert(payload).select('id').single();
     if (res.error && res.error.code === '42703') {
@@ -136,8 +163,15 @@ async function loadApprovalsFromMessages() {
             if (typeof idx !== 'number' || seen[idx]) return;
             seen[idx] = true;
             var p2 = parsePayload(row.message);
-            if (!p2 || p2.approved !== false) _approvals[idx] = true;
-            else delete _approvals[idx];
+            // Keep both cart key and collapsed nav index so hearts match space groups
+            var listIdx = listIndexForCart(idx);
+            if (!p2 || p2.approved !== false) {
+                _approvals[idx] = true;
+                _approvals[listIdx] = true;
+            } else {
+                delete _approvals[idx];
+                delete _approvals[listIdx];
+            }
         });
         if (a.renderCabinetNav) a.renderCabinetNav();
     } catch (e) {
@@ -151,18 +185,27 @@ async function toggleApproval(cabIdx) {
     var list = a.getCabinetList() || [];
     var cab = list[cabIdx];
     var label = cab ? cab.label : ('ארון ' + (cabIdx + 1));
-    var next = !_approvals[cabIdx];
+    var cartKey = cartKeyForList(cabIdx);
+    var next = !isListApproved(cabIdx);
     _approvals[cabIdx] = next;
+    _approvals[cartKey] = next;
+    if (cab && cab.cartIndices) {
+        cab.cartIndices.forEach(function (k) {
+            if (next) _approvals[k] = true;
+            else delete _approvals[k];
+        });
+    }
     if (a.renderCabinetNav) a.renderCabinetNav();
     var payload = JSON.stringify({
         type: 'approval',
         approved: next,
-        cabinetIndex: cabIdx,
+        cabinetIndex: cartKey,
         cabLabel: label
     });
     var res = await insertMessage('cabinet_approval', payload, cabIdx);
     if (res.error) {
         _approvals[cabIdx] = !next;
+        _approvals[cartKey] = !next;
         if (a.renderCabinetNav) a.renderCabinetNav();
         toast('שגיאה בשמירת האישור');
         return;
@@ -174,7 +217,7 @@ async function toggleApproval(cabIdx) {
             sender_name: a.getClientName(),
             message: payload,
             created_at: new Date().toISOString(),
-            cabinet_index: cabIdx,
+            cabinet_index: cartKey,
             message_type: 'cabinet_approval'
         });
     }
@@ -241,18 +284,37 @@ function openSummary() {
     }
     html += '<div class="vs-cabs">';
     list.forEach(function (cab, i) {
-        var item = cart[i] && cart[i].spec ? cart[i].spec : {};
-        var approved = !!_approvals[i];
+        var cartIdx = (cab.primaryIdx != null) ? cab.primaryIdx
+            : (cab.cartIndex != null ? cab.cartIndex : i);
+        var item = cart[cartIdx] && cart[cartIdx].spec ? cart[cartIdx].spec : {};
+        var approved = isListApproved(i);
         html += '<div class="vs-cab' + (approved ? ' approved' : '') + '">';
         html += '<div class="vs-cab-title">' + (approved ? '❤️ ' : '') + esc(cab.label) + '</div>';
-        if (cab.dims && (cab.dims.w || cab.dims.h || cab.dims.d)) {
+        if (cab.memberCount > 1) {
+            html += '<div class="vs-cab-dims">' + cab.memberCount + ' חלקים במרחב</div>';
+        } else if (cab.dims && (cab.dims.w || cab.dims.h || cab.dims.d)) {
             html += '<div class="vs-cab-dims">' + cab.dims.w + '×' + cab.dims.h + '×' + cab.dims.d + ' ס"מ</div>';
         }
         var mats = [];
         if (cab.materialBody) mats.push('גוף: ' + ((a.materialNames && a.materialNames[cab.materialBody]) || cab.materialBody));
         if (cab.materialDoors) mats.push('חזית: ' + ((a.materialNames && a.materialNames[cab.materialDoors]) || cab.materialDoors));
         if (mats.length) html += '<div class="vs-cab-mats">' + esc(mats.join(' · ')) + '</div>';
-        if (showPrice && item.price) html += '<div class="vs-cab-price">' + esc(item.price) + '</div>';
+        if (showPrice) {
+            var priceSum = 0;
+            var hasPrice = false;
+            var keys = (cab.cartIndices && cab.cartIndices.length) ? cab.cartIndices : [cartIdx];
+            keys.forEach(function (k) {
+                var sp = cart[k] && cart[k].spec;
+                if (!sp || !sp.price) return;
+                hasPrice = true;
+                priceSum += parseInt(String(sp.price).replace('₪', '').replace(/,/g, ''), 10) || 0;
+            });
+            if (hasPrice) {
+                html += '<div class="vs-cab-price">₪' + priceSum.toLocaleString() + '</div>';
+            } else if (item.price) {
+                html += '<div class="vs-cab-price">' + esc(item.price) + '</div>';
+            }
+        }
         html += '</div>';
     });
     html += '</div>';
@@ -333,9 +395,12 @@ function _loadCabWingsIntoState(cabIdx) {
     var a = api();
     var pd = a.getProjectData() || {};
     var cart = pd.orderCart || pd.cart || [];
-    var item = cart[cabIdx];
     var list = a.getCabinetList() || [];
     var cab = list[cabIdx];
+    var cartIdx = cab
+        ? ((cab.primaryIdx != null) ? cab.primaryIdx : (cab.cartIndex != null ? cab.cartIndex : cabIdx))
+        : cabIdx;
+    var item = cart[cartIdx];
     if (item && item.rawState && item.rawState.wings) {
         var rs = item.rawState;
         try {
@@ -802,9 +867,10 @@ window._viewerExtrasDecorateCard = function (card, idx) {
     var foot = card.querySelector('.viewer-cab-footer');
     if (!foot) return;
     var btn = document.createElement('button');
-    btn.className = 'viewer-cab-approve-btn' + (_approvals[idx] ? ' active' : '');
-    btn.title = _approvals[idx] ? 'בטל אישור' : 'אני רוצה את הארון הזה';
-    btn.innerHTML = _approvals[idx] ? '<i class="fa-solid fa-heart"></i>' : '<i class="fa-regular fa-heart"></i>';
+    var approved = isListApproved(idx);
+    btn.className = 'viewer-cab-approve-btn' + (approved ? ' active' : '');
+    btn.title = approved ? 'בטל אישור' : 'אני רוצה את הארון הזה';
+    btn.innerHTML = approved ? '<i class="fa-solid fa-heart"></i>' : '<i class="fa-regular fa-heart"></i>';
     btn.onclick = function (e) {
         e.stopPropagation();
         toggleApproval(idx);

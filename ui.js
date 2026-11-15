@@ -18724,29 +18724,61 @@ function _buildCustomerSummaryDetails(itemObj) {
 }
 
 // Helper: build cart data array for reuse in HTML + Excel
+// Shared-space members collapse to one customer-summary row (same as print grouping).
 function _buildCartData() {
     const rows = [];
-    state.orderCart.forEach((itemObj, index) => {
-        if (typeof window._cartItemOnHold === 'function' && window._cartItemOnHold(itemObj)) return;
-        const item = itemObj.spec;
-        const title = item.customName ? item.customName : _cartDefaultTitle(itemObj, index);
-        const cabPrice = parseInt((item.price || '0').replace('₪','').replace(/,/g,'')) || 0;
-        const instPrice = item.installPrice || 0;
-        const costPrice = item.costPrice ? (parseInt(item.costPrice.replace('₪','').replace(/,/g,'')) || 0) : 0;
+    const pushRow = function(title, details, cabPrice, instPrice, costPrice) {
         const totalRevenue = cabPrice + instPrice;
         const profit = totalRevenue - costPrice;
         const profitPct = costPrice > 0 ? Math.round((profit / totalRevenue) * 100) : 0;
-
         rows.push({
-            title,
-            details: _buildCustomerSummaryDetails(itemObj).join(' | '),
-            cabPrice,
-            instPrice,
-            costPrice,
-            totalRevenue,
-            profit,
-            profitPct
+            title: title,
+            details: details,
+            cabPrice: cabPrice,
+            instPrice: instPrice,
+            costPrice: costPrice,
+            totalRevenue: totalRevenue,
+            profit: profit,
+            profitPct: profitPct
         });
+    };
+    const parseMoney = function(v) {
+        return parseInt(String(v || '0').replace('₪', '').replace(/,/g, ''), 10) || 0;
+    };
+
+    _groupCartItemsForPrint().forEach(function(group) {
+        if (group.type === 'space' && group.members && group.members.length) {
+            let cabPrice = 0, instPrice = 0, costPrice = 0;
+            const detailChunks = [];
+            group.members.forEach(function(m) {
+                const item = m.itemObj && m.itemObj.spec;
+                if (!item) return;
+                cabPrice += parseMoney(item.price);
+                instPrice += item.installPrice || 0;
+                costPrice += item.costPrice ? parseMoney(item.costPrice) : 0;
+                const partDetails = _buildCustomerSummaryDetails(m.itemObj);
+                if (partDetails.length) {
+                    const partLabel = (item.customName || ('חלק ' + (m.slot + 1)));
+                    detailChunks.push(partLabel + ': ' + partDetails.join(' | '));
+                }
+            });
+            const title = (group.baseName || 'ארון במרחב משותף') +
+                ' (' + group.members.length + ' חלקים)';
+            pushRow(title, detailChunks.join(' | '), cabPrice, instPrice, costPrice);
+            return;
+        }
+        const itemObj = group.itemObj;
+        const index = group.index;
+        if (!itemObj || !itemObj.spec) return;
+        const item = itemObj.spec;
+        const title = item.customName ? item.customName : _cartDefaultTitle(itemObj, index);
+        pushRow(
+            title,
+            _buildCustomerSummaryDetails(itemObj).join(' | '),
+            parseMoney(item.price),
+            item.installPrice || 0,
+            item.costPrice ? parseMoney(item.costPrice) : 0
+        );
     });
     return rows;
 }
