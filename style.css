@@ -6800,93 +6800,96 @@ body.viewer-mode #canvas-container canvas {
 #header-dims-row.header-dims-grid {
     display: flex;
     gap: 6px;
-    padding: 8px 0 6px;
+    padding: 8px 0 0;
     position: relative;
     z-index: 3;
 }
-/* Cabinet name — dark navy title strip flush to the menu below */
-.header-cab-name-card {
+/* Hide the header bottom shimmer — the name strip is the real footer edge */
+.sidebar-header:has(#header-cabinet-name-card)::after {
+    display: none;
+}
+/* Cabinet name — compact dark footer strip, flush under dims and to the rail menu */
+#header-cabinet-name-card.header-cab-name-card {
     display: block;
     width: auto;
     box-sizing: border-box;
-    /* Bleed to sidebar-header edges + bottom so the strip meets the rail menu */
-    margin: 6px -18px -12px;
-    padding: 10px 18px 14px;
+    position: relative;
+    z-index: 2;
+    /* Bleed to sidebar-header side + bottom padding so strip meets the rail */
+    margin: 8px -18px -12px;
+    padding: 9px 18px 13px;
     border-radius: 0;
-    background: #0b1a2e;
+    /* Match --primary-dark so it continues the header gradient, not a bolted-on block */
+    background: var(--primary-dark);
     border: none;
     border-top: 1px solid rgba(255,255,255,0.1);
     box-shadow: none;
+    min-width: 0;
     transition: background 0.15s;
 }
-.header-cab-name-card:hover,
-.header-cab-name-card:focus-within {
-    background: #0f2340;
-    border-color: rgba(147,197,253,0.35);
+#header-cabinet-name-card.header-cab-name-card:hover,
+#header-cabinet-name-card.header-cab-name-card:focus-within {
+    background: #132848;
+    border-top-color: rgba(147,197,253,0.28);
     box-shadow: none;
 }
-.header-cab-name-card .header-dim-top {
+#header-cabinet-name-card .header-dim-top {
     position: relative;
-    display: grid;
-    grid-template-columns: auto auto;
-    grid-template-rows: auto auto;
+    display: flex;
+    flex-direction: row;
     align-items: center;
-    column-gap: 6px;
-    row-gap: 4px;
+    gap: 8px;
     margin: 0;
 }
-.header-cab-name-card .hdc-ic {
-    font-size: 0.72rem;
+#header-cabinet-name-card .hdc-ic {
+    font-size: 0.7rem;
     color: #93c5fd;
-    opacity: 0.95;
-    grid-column: 1;
-    grid-row: 1;
+    opacity: 0.9;
+    flex-shrink: 0;
 }
-.header-cab-name-card:hover .hdc-ic,
-.header-cab-name-card:focus-within .hdc-ic { color: #bfdbfe; }
-.header-cab-name-card .header-dim-top label {
-    font-size: 0.72rem;
+#header-cabinet-name-card:hover .hdc-ic,
+#header-cabinet-name-card:focus-within .hdc-ic { color: #bfdbfe; }
+#header-cabinet-name-card .header-dim-top label {
+    font-size: 0.7rem;
     font-weight: 700;
     color: #93c5fd;
     letter-spacing: 0.02em;
     white-space: nowrap;
     margin: 0;
-    grid-column: 2;
-    grid-row: 1;
+    flex-shrink: 0;
 }
-.header-cab-name-card:hover .header-dim-top label,
-.header-cab-name-card:focus-within .header-dim-top label { color: #bfdbfe; }
-.header-cab-name-card .header-name-val {
+#header-cabinet-name-card:hover .header-dim-top label,
+#header-cabinet-name-card:focus-within .header-dim-top label { color: #bfdbfe; }
+#header-cabinet-name-card .header-name-val {
     display: flex;
+    flex: 1 1 auto;
     min-width: 0;
-    justify-content: stretch;
-    grid-column: 1 / -1;
-    grid-row: 2;
 }
-.header-cab-name-card .header-name-val input {
+#header-cabinet-name-card .header-name-val input {
     width: 100%;
     min-width: 0;
     border: none;
     outline: none;
     background: transparent;
     color: #fff;
-    font-size: 0.95rem;
+    font-size: 0.92rem;
     font-weight: 700;
     text-align: right;
-    padding: 2px 0;
+    padding: 4px 6px;
     border-radius: 6px;
     font-family: inherit;
+    line-height: 1.25;
 }
-.header-cab-name-card .header-name-val input::placeholder {
-    color: rgba(147, 197, 253, 0.45);
+#header-cabinet-name-card .header-name-val input::placeholder {
+    color: rgba(147, 197, 253, 0.42);
     font-weight: 600;
+    font-style: normal;
 }
-.header-cab-name-card .header-name-val input:hover { background: rgba(255,255,255,0.06); }
-.header-cab-name-card .header-name-val input:focus {
+#header-cabinet-name-card .header-name-val input:hover { background: rgba(255,255,255,0.06); }
+#header-cabinet-name-card .header-name-val input:focus {
     background: #fff;
     color: var(--primary);
     box-shadow: 0 0 0 2px #93c5fd;
-    padding: 2px 6px;
 }
 #header-dims-placeholder {
     align-items: center;
