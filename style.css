@@ -6804,12 +6804,13 @@ body.viewer-mode #canvas-container canvas {
     position: relative;
     z-index: 3;
 }
-/* Cabinet name — full-width blue card under the dimension chips */
+/* Cabinet name — full-width blue card under the dimension chips.
+   Top margin clears the dim-slider popover so hover on a chip doesn't cover the name. */
 .header-cab-name-card {
     display: block;
     width: 100%;
     box-sizing: border-box;
-    margin: 0 0 12px;
+    margin: 56px 0 12px;
     padding: 8px 10px 9px;
     border-radius: 12px;
     background: linear-gradient(180deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.06) 100%);
