@@ -8882,6 +8882,36 @@ function bindUI() {
         });
     }
 
+    // Dimension chips: open compact slider only on click (not hover)
+    (function _initHeaderDimClickSliders() {
+        const row = document.getElementById('header-dims-row');
+        if (!row || row.dataset.dimClickBound === '1') return;
+        row.dataset.dimClickBound = '1';
+        const closeAll = function(except) {
+            row.querySelectorAll('.header-dim-card.is-open').forEach(function(c) {
+                if (c !== except) c.classList.remove('is-open');
+            });
+        };
+        row.querySelectorAll('.header-dim-card[data-dim]').forEach(function(card) {
+            if (card.dataset.dim === 'columns') return;
+            card.addEventListener('click', function(e) {
+                if (e.target.closest('.header-slider-row')) return;
+                if (e.target.closest('input[type="number"]')) return;
+                const willOpen = !card.classList.contains('is-open');
+                closeAll(card);
+                card.classList.toggle('is-open', willOpen);
+            });
+        });
+        document.addEventListener('pointerdown', function(e) {
+            if (!row.querySelector('.header-dim-card.is-open')) return;
+            if (row.contains(e.target)) return;
+            closeAll();
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeAll();
+        });
+    })();
+
     function _syncCabinetModelLabel(val) {
         const v = val || '';
         if (state.wings && state.wings.center) state.wings.center.cabinetModelLabel = v;
