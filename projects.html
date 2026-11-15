@@ -74,6 +74,63 @@
             font-size: .8rem; font-weight: 800; background: #14b8a6; color: #fff;
         }
         .inbox-banner-btn:hover { background: #0f766e; }
+        .open-todos-panel {
+            display: none; margin: 0 0 22px; padding: 18px 20px; border-radius: 16px;
+            background: var(--bg-card); border: 1px solid var(--border); box-shadow: var(--shadow-sm);
+        }
+        .open-todos-panel.show { display: block; }
+        .open-todos-header {
+            display: flex; align-items: center; justify-content: space-between; gap: 12px;
+            margin-bottom: 14px; flex-wrap: wrap;
+        }
+        .open-todos-title {
+            font-size: 1.02rem; font-weight: 800; color: var(--primary);
+            display: flex; align-items: center; gap: 8px;
+        }
+        .open-todos-count {
+            font-size: .72rem; font-weight: 800; color: #0f766e; background: #eefaf8;
+            border: 1px solid rgba(20,184,166,.35); border-radius: 999px; padding: 3px 10px;
+        }
+        .open-todos-groups { display: flex; flex-direction: column; gap: 14px; }
+        .open-todos-group {
+            border: 1px solid var(--border); border-radius: 12px; background: #f8fafc; overflow: hidden;
+        }
+        .open-todos-group-head {
+            display: flex; align-items: center; justify-content: space-between; gap: 10px;
+            padding: 10px 12px; background: #fff; border-bottom: 1px solid var(--border);
+        }
+        .open-todos-group-name {
+            font-size: .88rem; font-weight: 800; color: var(--text); cursor: pointer;
+            background: none; border: none; font-family: inherit; padding: 0; text-align: right;
+        }
+        .open-todos-group-name:hover { color: var(--primary); }
+        .open-todos-add {
+            display: flex; gap: 6px; align-items: center; flex: 1; max-width: 280px; justify-content: flex-end;
+        }
+        .open-todos-add input {
+            flex: 1; min-width: 0; border: 1.5px solid var(--border); border-radius: 8px;
+            padding: 6px 10px; font-size: .78rem; font-family: inherit; background: #fff;
+        }
+        .open-todos-add button {
+            border: none; border-radius: 8px; padding: 6px 10px; cursor: pointer; font-family: inherit;
+            font-size: .75rem; font-weight: 800; background: var(--primary); color: #fff; white-space: nowrap;
+        }
+        .open-todos-list { list-style: none; margin: 0; padding: 6px 8px 8px; display: flex; flex-direction: column; gap: 4px; }
+        .open-todos-item {
+            display: flex; align-items: flex-start; gap: 10px; padding: 8px 8px;
+            border-radius: 8px; background: transparent;
+        }
+        .open-todos-item:hover { background: rgba(15,23,42,.03); }
+        .open-todos-item input[type="checkbox"] {
+            width: 16px; height: 16px; margin-top: 2px; accent-color: #14b8a6; cursor: pointer; flex-shrink: 0;
+        }
+        .open-todos-item-text { flex: 1; font-size: .84rem; font-weight: 600; color: var(--text); line-height: 1.35; }
+        .open-todos-item-del {
+            border: none; background: transparent; color: #94a3b8; cursor: pointer; padding: 2px 6px;
+            border-radius: 6px; font-size: .78rem;
+        }
+        .open-todos-item-del:hover { color: #dc2626; background: #fef2f2; }
+        .open-todos-empty { font-size: .82rem; color: var(--muted); padding: 4px 2px; }
         .inbox-list { display: flex; flex-direction: column; gap: 12px; max-height: min(62vh, 520px); overflow-y: auto; margin-bottom: 16px; }
         .inbox-item {
             display: grid; grid-template-columns: 72px 1fr; gap: 12px; padding: 12px;
@@ -977,6 +1034,16 @@
                     פתח תיבת מדידות
                 </button>
             </div>
+            <div class="open-todos-panel" id="open-todos-panel">
+                <div class="open-todos-header">
+                    <div class="open-todos-title">
+                        <i class="fa-solid fa-square-check"></i>
+                        משימות פתוחות
+                        <span class="open-todos-count" id="open-todos-count">0</span>
+                    </div>
+                </div>
+                <div class="open-todos-groups" id="open-todos-groups"></div>
+            </div>
             <div class="content-header">
                 <div class="content-title">כל הפרויקטים</div>
                 <form class="projects-search-wrap" role="search" autocomplete="off" onsubmit="return false;">
@@ -1849,11 +1916,11 @@
     <span id="toast-text"></span>
 </div>
 
-<script src="auth.js?v=20261114sec"></script>
+<script src="auth.js?v=20261115todos"></script>
 <script src="trial-watermark.js?v=20261008trial"></script>
 <script src="pricing-core.js?v=20261102honeyheight"></script>
 <script src="pricing-panel.js?v=20261102honeyheight"></script>
-<script src="projects.js?v=20261112renewDate"></script>
+<script src="projects.js?v=20261115todos"></script>
 <script src="quick-calc.js?v=20261029shoe"></script>
 <script src="accessibility.js?v=20261115b"></script>
 </body>

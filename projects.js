@@ -172,6 +172,7 @@ var _USER_TYPE_LABELS = {
     _applyPlanNavGates();
     _syncStatusFilterUI();
     try { await refreshProjectMeasCounts(); } catch (eMeas) {}
+    try { await refreshOpenTodos(); } catch (eTodos) { console.warn('[init] open todos', eTodos); }
     _renderProjects();
     _resetProjectsSearchIfAutofilled();
     setTimeout(_resetProjectsSearchIfAutofilled, 150);
@@ -1042,6 +1043,108 @@ function newProject() {
 }
 
 // ── Open project ──────────────────────────────────────────────────────────────
+// ── Open project TODOs checklist ─────────────────────────────────────────────
+var _openTodos = [];
+
+async function refreshOpenTodos() {
+    if (!window.ProjectTodos) return;
+    _openTodos = await ProjectTodos.listOpen();
+    renderOpenTodos();
+}
+
+function renderOpenTodos() {
+    var panel = document.getElementById('open-todos-panel');
+    var groupsEl = document.getElementById('open-todos-groups');
+    var countEl = document.getElementById('open-todos-count');
+    if (!panel || !groupsEl) return;
+
+    if (!_openTodos.length) {
+        panel.classList.remove('show');
+        groupsEl.innerHTML = '';
+        if (countEl) countEl.textContent = '0';
+        return;
+    }
+
+    panel.classList.add('show');
+    if (countEl) countEl.textContent = String(_openTodos.length);
+
+    var byProject = {};
+    var order = [];
+    _openTodos.forEach(function(t) {
+        var pid = t.project_id;
+        if (!byProject[pid]) {
+            byProject[pid] = { id: pid, name: t.project_name || 'פרויקט', items: [] };
+            order.push(pid);
+        }
+        byProject[pid].items.push(t);
+    });
+
+    groupsEl.innerHTML = order.map(function(pid) {
+        var g = byProject[pid];
+        var itemsHtml = g.items.map(function(t) {
+            return '<li class="open-todos-item">' +
+                '<input type="checkbox" aria-label="סמן כבוצע" onchange="toggleOpenTodo(\'' + t.id + '\', this.checked)">' +
+                '<span class="open-todos-item-text">' + _escHtml(t.text) + '</span>' +
+                '<button type="button" class="open-todos-item-del" title="מחק" onclick="deleteOpenTodo(\'' + t.id + '\')"><i class="fa-solid fa-xmark"></i></button>' +
+                '</li>';
+        }).join('');
+        return '<div class="open-todos-group" data-project-id="' + _escAttr(pid) + '">' +
+            '<div class="open-todos-group-head">' +
+                '<button type="button" class="open-todos-group-name" onclick="openProject(\'' + pid + '\')">' + _escHtml(g.name) + '</button>' +
+                '<div class="open-todos-add">' +
+                    '<input type="text" maxlength="200" placeholder="משימה חדשה..." ' +
+                        'onkeydown="if(event.key===\'Enter\'){event.preventDefault();addOpenTodo(\'' + pid + '\', this);}">' +
+                    '<button type="button" onclick="addOpenTodo(\'' + pid + '\', this.previousElementSibling)">הוסף</button>' +
+                '</div>' +
+            '</div>' +
+            '<ul class="open-todos-list">' + itemsHtml + '</ul>' +
+            '</div>';
+    }).join('');
+}
+
+async function addOpenTodo(projectId, inputEl) {
+    if (!window.ProjectTodos || !projectId) return;
+    var text = inputEl ? String(inputEl.value || '').trim() : '';
+    if (!text) return;
+    if (inputEl) inputEl.disabled = true;
+    var result = await ProjectTodos.add(projectId, text);
+    if (inputEl) inputEl.disabled = false;
+    if (result.error) {
+        showToast(result.error, 'error');
+        return;
+    }
+    if (inputEl) inputEl.value = '';
+    await refreshOpenTodos();
+}
+
+async function toggleOpenTodo(todoId, isDone) {
+    if (!window.ProjectTodos || !todoId) return;
+    var result = await ProjectTodos.toggle(todoId, !!isDone);
+    if (result.error) {
+        showToast(result.error, 'error');
+        await refreshOpenTodos();
+        return;
+    }
+    if (isDone) {
+        _openTodos = _openTodos.filter(function(t) { return t.id !== todoId; });
+        renderOpenTodos();
+    } else {
+        await refreshOpenTodos();
+    }
+}
+
+async function deleteOpenTodo(todoId) {
+    if (!window.ProjectTodos || !todoId) return;
+    if (!confirm('למחוק את המשימה?')) return;
+    var result = await ProjectTodos.remove(todoId);
+    if (result.error) {
+        showToast(result.error, 'error');
+        return;
+    }
+    _openTodos = _openTodos.filter(function(t) { return t.id !== todoId; });
+    renderOpenTodos();
+}
+
 function openProject(id) {
     window.location.href = 'index.html?project=' + id;
 }

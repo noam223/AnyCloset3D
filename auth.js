@@ -1493,6 +1493,100 @@ window.Projects = {
 };
 
 // ==========================================
+// Project TODOs (designer checklist per project)
+// ==========================================
+
+window.ProjectTodos = {
+    listOpen: async function() {
+        const sb = _getClient(); if (!sb) return [];
+        const { data, error } = await sb
+            .from('project_todos')
+            .select('id, project_id, text, is_done, sort_order, created_at, projects(id, name)')
+            .eq('is_done', false)
+            .order('created_at', { ascending: false });
+        if (error) {
+            console.warn('ProjectTodos.listOpen:', error.message);
+            return [];
+        }
+        return (data || []).map(function(row) {
+            return {
+                id: row.id,
+                project_id: row.project_id,
+                text: row.text,
+                is_done: !!row.is_done,
+                sort_order: row.sort_order || 0,
+                created_at: row.created_at,
+                project_name: (row.projects && row.projects.name) ? row.projects.name : 'פרויקט'
+            };
+        });
+    },
+
+    listForProject: async function(projectId) {
+        const sb = _getClient(); if (!sb || !projectId) return [];
+        const { data, error } = await sb
+            .from('project_todos')
+            .select('id, project_id, text, is_done, sort_order, created_at, done_at')
+            .eq('project_id', projectId)
+            .order('is_done', { ascending: true })
+            .order('sort_order', { ascending: true })
+            .order('created_at', { ascending: false });
+        if (error) {
+            console.warn('ProjectTodos.listForProject:', error.message);
+            return [];
+        }
+        return data || [];
+    },
+
+    add: async function(projectId, text) {
+        const sb = _getClient(); if (!sb) return { error: 'SDK not loaded' };
+        const user = await Auth.getUser();
+        if (!user) return { error: 'Not logged in' };
+        const cleaned = String(text || '').trim();
+        if (!projectId) return { error: 'Missing project' };
+        if (!cleaned) return { error: 'Empty task' };
+        const { data, error } = await sb
+            .from('project_todos')
+            .insert({
+                project_id: projectId,
+                user_id: user.id,
+                text: cleaned,
+                is_done: false,
+                sort_order: 0
+            })
+            .select('id, project_id, text, is_done, sort_order, created_at')
+            .single();
+        if (error) return { error: error.message };
+        return { data };
+    },
+
+    toggle: async function(todoId, isDone) {
+        const sb = _getClient(); if (!sb) return { error: 'SDK not loaded' };
+        if (!todoId) return { error: 'Missing id' };
+        const done = !!isDone;
+        const patch = {
+            is_done: done,
+            done_at: done ? new Date().toISOString() : null
+        };
+        const { data, error } = await sb
+            .from('project_todos')
+            .update(patch)
+            .eq('id', todoId)
+            .select('id, project_id, text, is_done, sort_order, created_at, done_at')
+            .single();
+        if (error) return { error: error.message };
+        return { data };
+    },
+
+    remove: async function(todoId) {
+        const sb = _getClient(); if (!sb) return { error: 'SDK not loaded' };
+        if (!todoId) return { error: 'Missing id' };
+        const { error } = await sb.from('project_todos').delete().eq('id', todoId);
+        if (error) return { error: error.message };
+        return { success: true };
+    }
+};
+
+// ==========================================
 // Grow Payments
 // ==========================================
 

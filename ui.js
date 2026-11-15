@@ -13519,8 +13519,89 @@ window._refreshSidebarSignedOrder = async function() {
         if (window._currentProjectId === lastPid) return;
         lastPid = window._currentProjectId;
         if (window._refreshSidebarSignedOrder) window._refreshSidebarSignedOrder();
+        if (window._refreshSidebarTodos) window._refreshSidebarTodos();
     }, 1500);
 })();
+
+window._refreshSidebarTodos = async function() {
+    const listEl = document.getElementById('sidebar-todos-list');
+    const countEl = document.getElementById('sidebar-todos-count');
+    const addBtn = document.getElementById('btn-sidebar-todo-add');
+    const inputEl = document.getElementById('sidebar-todo-input');
+    if (!listEl) return;
+    const pid = window._currentProjectId;
+    if (addBtn) addBtn.disabled = !pid;
+    if (inputEl) inputEl.disabled = !pid;
+    if (!pid || !window.ProjectTodos) {
+        listEl.innerHTML = '<li class="sidebar-todos-empty">שמור פרויקט כדי להוסיף משימות</li>';
+        if (countEl) { countEl.style.display = 'none'; countEl.textContent = '0'; }
+        return;
+    }
+    const todos = await ProjectTodos.listForProject(pid);
+    if (pid !== window._currentProjectId) return;
+    const openCount = todos.filter(function(t) { return !t.is_done; }).length;
+    if (countEl) {
+        if (openCount > 0) {
+            countEl.textContent = String(openCount);
+            countEl.style.display = '';
+        } else {
+            countEl.style.display = 'none';
+            countEl.textContent = '0';
+        }
+    }
+    if (!todos.length) {
+        listEl.innerHTML = '<li class="sidebar-todos-empty">אין משימות עדיין</li>';
+        return;
+    }
+    listEl.innerHTML = todos.map(function(t) {
+        const doneCls = t.is_done ? ' is-done' : '';
+        return '<li class="sidebar-todos-item' + doneCls + '" data-todo-id="' + t.id + '">' +
+            '<input type="checkbox"' + (t.is_done ? ' checked' : '') +
+                ' onchange="window._toggleSidebarTodo(\'' + t.id + '\', this.checked)">' +
+            '<span class="sidebar-todos-text">' + _escPrintHtml(t.text) + '</span>' +
+            '<button type="button" class="sidebar-todos-del" title="מחק" onclick="window._deleteSidebarTodo(\'' + t.id + '\')"><i class="fa-solid fa-xmark"></i></button>' +
+            '</li>';
+    }).join('');
+};
+
+window._addSidebarTodo = async function() {
+    const inputEl = document.getElementById('sidebar-todo-input');
+    const pid = window._currentProjectId;
+    if (!pid || !window.ProjectTodos || !inputEl) return;
+    const text = String(inputEl.value || '').trim();
+    if (!text) return;
+    inputEl.disabled = true;
+    const result = await ProjectTodos.add(pid, text);
+    inputEl.disabled = false;
+    if (result.error) {
+        if (typeof _showToast === 'function') _showToast(result.error, 3000);
+        return;
+    }
+    inputEl.value = '';
+    await window._refreshSidebarTodos();
+};
+
+window._toggleSidebarTodo = async function(todoId, isDone) {
+    if (!window.ProjectTodos || !todoId) return;
+    const result = await ProjectTodos.toggle(todoId, !!isDone);
+    if (result.error) {
+        if (typeof _showToast === 'function') _showToast(result.error, 3000);
+        await window._refreshSidebarTodos();
+        return;
+    }
+    await window._refreshSidebarTodos();
+};
+
+window._deleteSidebarTodo = async function(todoId) {
+    if (!window.ProjectTodos || !todoId) return;
+    if (!confirm('למחוק את המשימה?')) return;
+    const result = await ProjectTodos.remove(todoId);
+    if (result.error) {
+        if (typeof _showToast === 'function') _showToast(result.error, 3000);
+        return;
+    }
+    await window._refreshSidebarTodos();
+};
 
 /** Live notice when a customer signs: toast, refresh the list, move the project to "ordered". */
 window._listenOrderSignatures = async function() {
