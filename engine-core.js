@@ -5477,14 +5477,16 @@ window._applySpacePairPositions = function() {
         if (cabinetGroup) { cabinetGroup.position.set(0, 0, 0); cabinetGroup.rotation.y = 0; }
         return;
     }
+    // Blueprint front elevation: flatten Z so depth offsets don't create ghost double-lines
+    const flattenZ = !!(state && state.viewMode === 'blueprint');
     const activeOff = (typeof window._spaceOffsetForSlot === 'function')
         ? window._spaceOffsetForSlot(info.activeSlot)
         : { x: 0, y: 0 };
     if (cabinetGroup) {
         cabinetGroup.position.x = activeOff.x;
         cabinetGroup.position.y = activeOff.y;
-        cabinetGroup.position.z = activeOff.z || 0;
-        cabinetGroup.rotation.y = info.activeSlot > 0 ? _spaceRotY(activeOff) : 0;
+        cabinetGroup.position.z = flattenZ ? 0 : (activeOff.z || 0);
+        cabinetGroup.rotation.y = flattenZ ? 0 : (info.activeSlot > 0 ? _spaceRotY(activeOff) : 0);
     }
     const groups = window._spaceCompanionGroups || [];
     groups.forEach(function(g) {
@@ -5492,8 +5494,8 @@ window._applySpacePairPositions = function() {
         const off = (typeof window._spaceOffsetForSlot === 'function')
             ? window._spaceOffsetForSlot(g.userData.spaceSlot)
             : { x: 0, y: 0 };
-        g.position.set(off.x, off.y, off.z || 0);
-        g.rotation.y = g.userData.spaceSlot > 0 ? _spaceRotY(off) : 0;
+        g.position.set(off.x, off.y, flattenZ ? 0 : (off.z || 0));
+        g.rotation.y = flattenZ ? 0 : (g.userData.spaceSlot > 0 ? _spaceRotY(off) : 0);
     });
     // Legacy single-group fallback
     if ((!groups.length) && window._spaceCompanionGroup) {
@@ -5501,7 +5503,7 @@ window._applySpacePairPositions = function() {
         const off = (typeof window._spaceOffsetForSlot === 'function')
             ? window._spaceOffsetForSlot(otherSlot)
             : { x: 0, y: 0 };
-        window._spaceCompanionGroup.position.set(off.x, off.y, off.z || 0);
+        window._spaceCompanionGroup.position.set(off.x, off.y, flattenZ ? 0 : (off.z || 0));
     }
 };
 

@@ -5262,6 +5262,11 @@ function _renderBlueprintOverlay() {
       </marker>
     </defs>`);
 
+    // Shared-space front BP: overall W/H come from the pair overlay below — skip host bottom widths
+    const _spaceBpOverlay = (typeof window._getSpacePairInfo === 'function')
+        ? window._getSpacePairInfo() : null;
+    const _skipHostBottomWidths = !!(!_spaceBpOverlay ? false : _spaceBpOverlay.count >= 2);
+
     state.bpData.forEach(d => {
         if (d.type === 'num') {
             // Cell number badge — small circle with number
@@ -5274,6 +5279,7 @@ function _renderBlueprintOverlay() {
             `);
 
         } else if (d.type === 'width') {
+            if (_skipHostBottomWidths && !d.isSubCell) return;
             // Horizontal dimension line below the cabinet/column
             // d.x = center X of column, d.y = Y position (negative = below cabinet)
             // We need left and right edges — stored as d.x1/d.x2 if available, else use d.x ± d.halfW
@@ -5355,7 +5361,7 @@ function _renderBlueprintOverlay() {
 
     // Shared-space: overall width + height across all parts (companions + host)
     try {
-        const pairInfo = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
+        const pairInfo = _spaceBpOverlay;
         if (pairInfo && pairInfo.count >= 2 && typeof window._spaceCabinetFootprint === 'function') {
             let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
             pairInfo.members.forEach(function(m) {
@@ -5364,11 +5370,20 @@ function _renderBlueprintOverlay() {
                     ? window._spaceOffsetForSlot(m.slot) : { x: 0, y: 0 };
                 minX = Math.min(minX, (off.x || 0) - fp.w / 2);
                 maxX = Math.max(maxX, (off.x || 0) + fp.w / 2);
+                // Visual bottom of each part (hanging units use floorOffset)
                 minY = Math.min(minY, (off.y || 0) + (fp.floorOffset || 0));
                 maxY = Math.max(maxY, (off.y || 0) + fp.h);
             });
+            // True floor of the whole assembly (ignore hanging floorOffset for overall height)
+            let floorY = Infinity;
+            pairInfo.members.forEach(function(m) {
+                const off = (typeof window._spaceOffsetForSlot === 'function')
+                    ? window._spaceOffsetForSlot(m.slot) : { x: 0, y: 0 };
+                floorY = Math.min(floorY, off.y || 0);
+            });
+            if (!isFinite(floorY)) floorY = minY;
             if (isFinite(minX) && maxX > minX) {
-                const dimY = minY - 28;
+                const dimY = floorY - 36;
                 const pL = _projectWorld3Dto2D(minX, dimY, 2);
                 const pR = _projectWorld3Dto2D(maxX, dimY, 2);
                 const dimLineY = Math.max(pL.y, pR.y) + DIM_OFFSET;
@@ -5382,13 +5397,13 @@ function _renderBlueprintOverlay() {
                     font-family="'Rubik',Tahoma,sans-serif" font-size="13" font-weight="bold" fill="${STROKE}">${overallW}</text>
                 `);
             }
-            if (isFinite(minY) && maxY > minY) {
-                const dimX = minX - 28;
-                const pB = _projectWorld3Dto2D(dimX, minY, 2);
+            if (isFinite(floorY) && maxY > floorY) {
+                const dimX = minX - 36;
+                const pB = _projectWorld3Dto2D(dimX, floorY, 2);
                 const pT = _projectWorld3Dto2D(dimX, maxY, 2);
                 const dimLineX = Math.min(pB.x, pT.x) - DIM_OFFSET;
                 const midY = ((pB.y + pT.y) / 2).toFixed(1);
-                const overallH = Math.round(maxY - minY);
+                const overallH = Math.round(maxY - floorY);
                 svgParts.push(`<line x1="${dimLineX.toFixed(1)}" y1="${pT.y.toFixed(1)}" x2="${dimLineX.toFixed(1)}" y2="${pB.y.toFixed(1)}"
                   stroke="${STROKE}" stroke-width="${STROKE_W}" marker-start="url(#arr-start)" marker-end="url(#arr-end)"/>`);
                 svgParts.push(`
