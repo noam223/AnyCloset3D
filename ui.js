@@ -19468,6 +19468,7 @@ function _fillUserPricingForm(cfg) {
     _sv('ups-doorGlassMel', _upsNum(ex.doorGlassMel, dx.doorGlassMel != null ? dx.doorGlassMel : 400));
     _sv('ups-doorGlassBlack', _upsNum(ex.doorGlassBlack, dx.doorGlassBlack != null ? dx.doorGlassBlack : 600));
     _sv('ups-doorMirror', _upsNum(ex.doorMirror, dx.doorMirror != null ? dx.doorMirror : 350));
+    _sv('ups-deskMirror', _upsNum(ex.deskMirror, dx.deskMirror != null ? dx.deskMirror : 400));
 }
 
 function _readUserPricingForm() {
@@ -19521,6 +19522,7 @@ function _readUserPricingForm() {
             doorGlassMel: _upsNum(_gv('ups-doorGlassMel'), dx.doorGlassMel != null ? dx.doorGlassMel : 400),
             doorGlassBlack: _upsNum(_gv('ups-doorGlassBlack'), dx.doorGlassBlack != null ? dx.doorGlassBlack : 600),
             doorMirror: _upsNum(_gv('ups-doorMirror'), dx.doorMirror != null ? dx.doorMirror : 350),
+            deskMirror: _upsNum(_gv('ups-deskMirror'), dx.deskMirror != null ? dx.deskMirror : 400),
         })
     };
 }

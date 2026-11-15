@@ -32,6 +32,7 @@ var DEFAULTS = {
         shelfFreePerMeter: 3, extraShelfMel: 60, extraShelfNonMel: 80,
         deskUnit: 900,
         doorFramedMel: 80, doorGlassMel: 400, doorGlassBlack: 600, doorMirror: 350,
+        deskMirror: 400,
         upperUnit160: 600, upperUnit240: 900, upperUnitPerCm: 3.75,
         cornerDrawers3: 832, cornerDrawers4: 907, cornerDrawerExtra: 200,
         cornerDesk: 900, fullCornerBase: 2800, fullCornerShelf: 120,

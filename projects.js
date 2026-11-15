@@ -2099,7 +2099,7 @@ var _PP_DEFAULTS = {
     },
     extras:{internalDrawer:150,shoeDrawer:150,externalDrawer:200,openCell:400,openCell34:600,openCell5:800,partition:150,shelfFreePerMeter:3,
         extraShelfMel:60,extraShelfNonMel:80,deskUnit:900,doorFramedMel:80,doorGlassMel:400,
-        doorGlassBlack:600,doorMirror:350,upperUnit160:600,upperUnit240:900,upperUnitPerCm:3.75,
+        doorGlassBlack:600,doorMirror:350,deskMirror:400,upperUnit160:600,upperUnit240:900,upperUnitPerCm:3.75,
         cornerDrawers3:832,cornerDrawers4:907,cornerDrawerExtra:200,cornerDesk:900,
         fullCornerBase:2800,fullCornerShelf:120,wingConnection:400,sideCabMel:12,sideCabNonMel:15,
         sideCabDoors:300,slidingBase:800,slidingDoor:350,slidingGlass:200,slidingMirror:350,
@@ -3123,6 +3123,7 @@ function _fillPricingPanel(cfg) {
     _ppSet('pp-doorGlassMel', _ppNum(ex.doorGlassMel, dx.doorGlassMel));
     _ppSet('pp-doorGlassBlack', _ppNum(ex.doorGlassBlack, dx.doorGlassBlack));
     _ppSet('pp-doorMirror', _ppNum(ex.doorMirror, dx.doorMirror));
+    _ppSet('pp-deskMirror', _ppNum(ex.deskMirror, dx.deskMirror));
     _ppSet('pp-ledPair', _ppNum(ex.ledPair, dx.ledPair));
     _ppSet('pp-sorbet', _ppNum(ex.sorbet, dx.sorbet));
     _ppSet('pp-touchHandle', _ppNum(ex.touchHandle, dx.touchHandle));
@@ -3194,6 +3195,7 @@ function _readPricingPanel() {
             doorGlassMel: _ppNum(_ppVal('pp-doorGlassMel'), dx.doorGlassMel),
             doorGlassBlack: _ppNum(_ppVal('pp-doorGlassBlack'), dx.doorGlassBlack),
             doorMirror: _ppNum(_ppVal('pp-doorMirror'), dx.doorMirror),
+            deskMirror: _ppNum(_ppVal('pp-deskMirror'), dx.deskMirror),
             upperUnit160: _ppNum(_ppVal('pp-upperUnit160'), dx.upperUnit160),
             upperUnit240: _ppNum(_ppVal('pp-upperUnit240'), dx.upperUnit240),
             upperUnitPerCm: _ppNum(_ppVal('pp-upperUnitPerCm'), dx.upperUnitPerCm),

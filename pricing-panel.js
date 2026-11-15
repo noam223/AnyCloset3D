@@ -299,6 +299,7 @@ function _doorsHtml() {
             _field('doorGlassMel', 'דלת זכוכית מלמין (₪)', 'min="0" step="10"') +
             _field('doorGlassBlack', 'דלת זכוכית שחורה/זהב (₪)', 'min="0" step="10"') +
             _field('doorMirror', 'דלת מראה (₪)', 'min="0" step="10"') +
+            _field('deskMirror', 'מראה בגב תא פתוח / מעל שולחן (₪)', 'min="0" step="10"') +
             _field('ledPair', 'זוג לדים (₪)', 'min="0" step="10"') +
             _field('sorbet', 'סורבטו (₪)', 'min="0" step="10"') +
             _field('touchHandle', 'ידית טאצ\' לדלת/מגירה (₪)', 'min="0" step="5"') +
@@ -686,6 +687,7 @@ function fill(cfg) {
     _set('doorGlassMel',    _num(ex.doorGlassMel, dx.doorGlassMel || 400));
     _set('doorGlassBlack',  _num(ex.doorGlassBlack, dx.doorGlassBlack || 600));
     _set('doorMirror',      _num(ex.doorMirror, dx.doorMirror || 350));
+    _set('deskMirror',      _num(ex.deskMirror, dx.deskMirror || 400));
     _set('ledPair',         _num(ex.ledPair, dx.ledPair || 650));
     _set('sorbet',          _num(ex.sorbet, dx.sorbet || 170));
     _set('touchHandle',     _num(ex.touchHandle, dx.touchHandle || 30));
@@ -720,7 +722,7 @@ function read() {
     var ex = {};
     ['internalDrawer','externalDrawer','shoeDrawer','openCell','openCell34','openCell5','partition','shelfFreePerMeter',
      'extraShelfMel','extraShelfNonMel','deskUnit',
-     'doorFramedMel','doorGlassMel','doorGlassBlack','doorMirror','ledPair','sorbet','touchHandle',
+     'doorFramedMel','doorGlassMel','doorGlassBlack','doorMirror','deskMirror','ledPair','sorbet','touchHandle',
      'upperUnit160','upperUnit240','upperUnitPerCm',
      'cornerDrawers3','cornerDrawers4','cornerDrawerExtra','cornerDesk',
      'fullCornerBase','fullCornerShelf','wingConnection',
