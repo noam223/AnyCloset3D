@@ -5262,10 +5262,10 @@ function _renderBlueprintOverlay() {
       </marker>
     </defs>`);
 
-    // Shared-space front BP: overall W/H come from the pair overlay below — skip host bottom widths
+    // Shared-space front BP: per-part + overall dims come from the pair overlay — skip host W/H
     const _spaceBpOverlay = (typeof window._getSpacePairInfo === 'function')
         ? window._getSpacePairInfo() : null;
-    const _skipHostBottomWidths = !!(!_spaceBpOverlay ? false : _spaceBpOverlay.count >= 2);
+    const _spaceBpActive = !!(!_spaceBpOverlay ? false : _spaceBpOverlay.count >= 2);
 
     state.bpData.forEach(d => {
         if (d.type === 'num') {
@@ -5279,7 +5279,7 @@ function _renderBlueprintOverlay() {
             `);
 
         } else if (d.type === 'width') {
-            if (_skipHostBottomWidths && !d.isSubCell) return;
+            if (_spaceBpActive && !d.isSubCell) return;
             // Horizontal dimension line below the cabinet/column
             // d.x = center X of column, d.y = Y position (negative = below cabinet)
             // We need left and right edges — stored as d.x1/d.x2 if available, else use d.x ± d.halfW
@@ -5314,6 +5314,7 @@ function _renderBlueprintOverlay() {
             `);
 
         } else if (d.type === 'height' || d.type === 'overall-height') {
+            if (_spaceBpActive) return;
             // Vertical dimension line to the left of the column/cabinet
             // d.x = X position (already offset left), d.y = center Y of compartment
             const halfH = d.halfH !== undefined ? d.halfH : (d.h !== undefined ? d.h / 2 : 0);
@@ -5359,59 +5360,91 @@ function _renderBlueprintOverlay() {
         }
     });
 
-    // Shared-space: overall width + height across all parts (companions + host)
+    // Shared-space: per-cabinet W/H + overall across all parts
     try {
         const pairInfo = _spaceBpOverlay;
         if (pairInfo && pairInfo.count >= 2 && typeof window._spaceCabinetFootprint === 'function') {
-            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            const parts = [];
+            let minX = Infinity, maxX = -Infinity, maxY = -Infinity, floorY = Infinity;
             pairInfo.members.forEach(function(m) {
                 const fp = window._spaceCabinetFootprint(m.slot);
                 const off = (typeof window._spaceOffsetForSlot === 'function')
                     ? window._spaceOffsetForSlot(m.slot) : { x: 0, y: 0 };
-                minX = Math.min(minX, (off.x || 0) - fp.w / 2);
-                maxX = Math.max(maxX, (off.x || 0) + fp.w / 2);
-                // Visual bottom of each part (hanging units use floorOffset)
-                minY = Math.min(minY, (off.y || 0) + (fp.floorOffset || 0));
-                maxY = Math.max(maxY, (off.y || 0) + fp.h);
+                const ox = off.x || 0;
+                const oy = off.y || 0;
+                const fo = fp.floorOffset || 0;
+                const left = ox - fp.w / 2;
+                const right = ox + fp.w / 2;
+                const bot = oy + fo;
+                const top = oy + fp.h;
+                const visH = Math.max(0, top - bot);
+                parts.push({
+                    slot: m.slot,
+                    left: left,
+                    right: right,
+                    bot: bot,
+                    top: top,
+                    w: fp.w,
+                    h: visH,
+                    d: fp.d
+                });
+                minX = Math.min(minX, left);
+                maxX = Math.max(maxX, right);
+                maxY = Math.max(maxY, top);
+                floorY = Math.min(floorY, oy);
             });
-            // True floor of the whole assembly (ignore hanging floorOffset for overall height)
-            let floorY = Infinity;
-            pairInfo.members.forEach(function(m) {
-                const off = (typeof window._spaceOffsetForSlot === 'function')
-                    ? window._spaceOffsetForSlot(m.slot) : { x: 0, y: 0 };
-                floorY = Math.min(floorY, off.y || 0);
-            });
-            if (!isFinite(floorY)) floorY = minY;
-            if (isFinite(minX) && maxX > minX) {
-                const dimY = floorY - 36;
-                const pL = _projectWorld3Dto2D(minX, dimY, 2);
-                const pR = _projectWorld3Dto2D(maxX, dimY, 2);
+            if (!isFinite(floorY)) floorY = 0;
+
+            function _spacePushWidthDim(left, right, worldY, val) {
+                const pL = _projectWorld3Dto2D(left, worldY, 2);
+                const pR = _projectWorld3Dto2D(right, worldY, 2);
                 const dimLineY = Math.max(pL.y, pR.y) + DIM_OFFSET;
                 const midX = ((pL.x + pR.x) / 2).toFixed(1);
-                const overallW = Math.round(maxX - minX);
                 svgParts.push(`<line x1="${pL.x.toFixed(1)}" y1="${dimLineY.toFixed(1)}" x2="${pR.x.toFixed(1)}" y2="${dimLineY.toFixed(1)}"
                   stroke="${STROKE}" stroke-width="${STROKE_W}" marker-start="url(#arr-start)" marker-end="url(#arr-end)"/>`);
                 svgParts.push(`
-                  <rect x="${(parseFloat(midX) - 28).toFixed(1)}" y="${(dimLineY - 9).toFixed(1)}" width="56" height="16" rx="3" fill="white"/>
+                  <rect x="${(parseFloat(midX) - 22).toFixed(1)}" y="${(dimLineY - 9).toFixed(1)}" width="44" height="16" rx="3" fill="white"/>
                   <text x="${midX}" y="${(dimLineY - 6).toFixed(1)}" text-anchor="middle" dominant-baseline="auto"
-                    font-family="'Rubik',Tahoma,sans-serif" font-size="13" font-weight="bold" fill="${STROKE}">${overallW}</text>
+                    font-family="'Rubik',Tahoma,sans-serif" font-size="12" font-weight="bold" fill="${STROKE}">${val}</text>
                 `);
             }
-            if (isFinite(floorY) && maxY > floorY) {
-                const dimX = minX - 36;
-                const pB = _projectWorld3Dto2D(dimX, floorY, 2);
-                const pT = _projectWorld3Dto2D(dimX, maxY, 2);
-                const dimLineX = Math.min(pB.x, pT.x) - DIM_OFFSET;
+            function _spacePushHeightDim(worldX, bot, top, val, side) {
+                // side: -1 = left of part, +1 = right of part
+                const pB = _projectWorld3Dto2D(worldX, bot, 2);
+                const pT = _projectWorld3Dto2D(worldX, top, 2);
+                const dimLineX = side < 0
+                    ? Math.min(pB.x, pT.x) - DIM_OFFSET
+                    : Math.max(pB.x, pT.x) + DIM_OFFSET;
                 const midY = ((pB.y + pT.y) / 2).toFixed(1);
-                const overallH = Math.round(maxY - floorY);
                 svgParts.push(`<line x1="${dimLineX.toFixed(1)}" y1="${pT.y.toFixed(1)}" x2="${dimLineX.toFixed(1)}" y2="${pB.y.toFixed(1)}"
                   stroke="${STROKE}" stroke-width="${STROKE_W}" marker-start="url(#arr-start)" marker-end="url(#arr-end)"/>`);
+                const labelX = side < 0 ? dimLineX - 8 : dimLineX + 8;
                 svgParts.push(`
-                  <rect x="${(dimLineX - 8).toFixed(1)}" y="${(parseFloat(midY) - 22).toFixed(1)}" width="16" height="44" rx="3" fill="white"/>
-                  <text x="${dimLineX.toFixed(1)}" y="${midY}" text-anchor="middle" dominant-baseline="middle"
-                    font-family="'Rubik',Tahoma,sans-serif" font-size="13" font-weight="bold" fill="${STROKE}"
-                    transform="rotate(-90,${dimLineX.toFixed(1)},${midY})">${overallH}</text>
+                  <rect x="${(labelX - 8).toFixed(1)}" y="${(parseFloat(midY) - 22).toFixed(1)}" width="16" height="44" rx="3" fill="white"/>
+                  <text x="${labelX.toFixed(1)}" y="${midY}" text-anchor="middle" dominant-baseline="middle"
+                    font-family="'Rubik',Tahoma,sans-serif" font-size="12" font-weight="bold" fill="${STROKE}"
+                    transform="rotate(-90,${labelX.toFixed(1)},${midY})">${val}</text>
                 `);
+            }
+
+            // Per-cabinet dimensions (every part in the shared space)
+            parts.forEach(function(p) {
+                if (p.w > 0.5) _spacePushWidthDim(p.left, p.right, p.bot - 18, Math.round(p.w));
+                if (p.h > 0.5) {
+                    // Outer side: leftmost → left, others → right (avoids stacking on overall H)
+                    const mid = (p.left + p.right) / 2;
+                    const side = (mid - minX) < 8 ? -1 : 1;
+                    const hx = side < 0 ? p.left - 14 : p.right + 14;
+                    _spacePushHeightDim(hx, p.bot, p.top, Math.round(p.h), side);
+                }
+            });
+
+            // Overall assembly dims (outer ring)
+            if (isFinite(minX) && maxX > minX) {
+                _spacePushWidthDim(minX, maxX, floorY - 52, Math.round(maxX - minX));
+            }
+            if (isFinite(floorY) && maxY > floorY) {
+                _spacePushHeightDim(minX - 36, floorY, maxY, Math.round(maxY - floorY), -1);
             }
         }
     } catch (eSpaceBp) { /* ignore */ }
