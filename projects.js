@@ -674,6 +674,7 @@ function _renderProjects() {
     grid.innerHTML = '';
     _renderPager(0);
     _syncStatusFilterUI();
+    _fillOpenTodosProjectSelect();
 
     var visible = _visibleProjects();
 
@@ -1052,21 +1053,38 @@ async function refreshOpenTodos() {
     renderOpenTodos();
 }
 
+function _fillOpenTodosProjectSelect(preferredId) {
+    var sel = document.getElementById('open-todos-project');
+    if (!sel) return;
+    var prev = preferredId || sel.value || '';
+    var opts = (_projects || []).slice().sort(function(a, b) {
+        return String(a.name || '').localeCompare(String(b.name || ''), 'he');
+    });
+    if (!opts.length) {
+        sel.innerHTML = '<option value="">אין פרויקטים</option>';
+        sel.disabled = true;
+        return;
+    }
+    sel.disabled = false;
+    sel.innerHTML = opts.map(function(p) {
+        return '<option value="' + _escAttr(p.id) + '">' + _escHtml(p.name || 'פרויקט') + '</option>';
+    }).join('');
+    if (prev && opts.some(function(p) { return p.id === prev; })) sel.value = prev;
+}
+
 function renderOpenTodos() {
     var panel = document.getElementById('open-todos-panel');
     var groupsEl = document.getElementById('open-todos-groups');
     var countEl = document.getElementById('open-todos-count');
     if (!panel || !groupsEl) return;
 
+    _fillOpenTodosProjectSelect();
+    if (countEl) countEl.textContent = String(_openTodos.length);
+
     if (!_openTodos.length) {
-        panel.classList.remove('show');
-        groupsEl.innerHTML = '';
-        if (countEl) countEl.textContent = '0';
+        groupsEl.innerHTML = '<p class="open-todos-empty">אין משימות פתוחות. בחר פרויקט למעלה והוסף משימה.</p>';
         return;
     }
-
-    panel.classList.add('show');
-    if (countEl) countEl.textContent = String(_openTodos.length);
 
     var byProject = {};
     var order = [];
@@ -1102,6 +1120,18 @@ function renderOpenTodos() {
     }).join('');
 }
 
+async function addOpenTodoFromCompose() {
+    var sel = document.getElementById('open-todos-project');
+    var input = document.getElementById('open-todos-input');
+    if (!sel || !input) return;
+    var projectId = sel.value;
+    if (!projectId) {
+        showToast('בחר פרויקט', 'error');
+        return;
+    }
+    await addOpenTodo(projectId, input);
+}
+
 async function addOpenTodo(projectId, inputEl) {
     if (!window.ProjectTodos || !projectId) return;
     var text = inputEl ? String(inputEl.value || '').trim() : '';
@@ -1114,6 +1144,7 @@ async function addOpenTodo(projectId, inputEl) {
         return;
     }
     if (inputEl) inputEl.value = '';
+    _fillOpenTodosProjectSelect(projectId);
     await refreshOpenTodos();
 }
 
