@@ -8892,6 +8892,19 @@ function bindUI() {
                 if (c !== except) c.classList.remove('is-open');
             });
         };
+        // Canvas pointerdown uses preventDefault (OrbitControls) so inputs never blur —
+        // clear focus + text selection explicitly when leaving the dims row.
+        const blurDimInputs = function() {
+            row.querySelectorAll('input[type="number"], input[type="text"]').forEach(function(inp) {
+                if (document.activeElement === inp) {
+                    try { inp.blur(); } catch (err) {}
+                }
+            });
+            try {
+                const sel = window.getSelection && window.getSelection();
+                if (sel && sel.removeAllRanges) sel.removeAllRanges();
+            } catch (err) {}
+        };
         row.querySelectorAll('.header-dim-card[data-dim]').forEach(function(card) {
             if (card.dataset.dim === 'columns') return;
             card.addEventListener('click', function(e) {
@@ -8907,13 +8920,19 @@ function bindUI() {
                 card.classList.toggle('is-open', willOpen);
             });
         });
+        // Capture phase: run even when the 3D canvas swallows the event
         document.addEventListener('pointerdown', function(e) {
-            if (!row.querySelector('.header-dim-card.is-open')) return;
             if (row.contains(e.target)) return;
+            const nameCard = document.getElementById('header-cabinet-name-card');
+            if (nameCard && nameCard.contains(e.target)) return;
             closeAll();
-        });
+            blurDimInputs();
+        }, true);
         document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') closeAll();
+            if (e.key === 'Escape') {
+                closeAll();
+                blurDimInputs();
+            }
         });
     })();
 
