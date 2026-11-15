@@ -75,24 +75,33 @@
         }
         .inbox-banner-btn:hover { background: #0f766e; }
         .open-todos-panel {
-            display: block; margin: 0 0 22px; padding: 18px 20px; border-radius: 16px;
-            background: var(--bg-card); border: 1px solid var(--border); box-shadow: var(--shadow-sm);
+            display: block; margin: 0 0 22px; padding: 16px 18px 14px; border-radius: 16px;
+            background: linear-gradient(180deg, #f0f9ff 0%, #ffffff 42%);
+            border: 1px solid #c7dff5; box-shadow: var(--shadow-sm);
+            position: relative; overflow: hidden;
+        }
+        .open-todos-panel::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+            background: linear-gradient(90deg, #0ea5e9, #14b8a6 55%, #2563eb);
         }
         .open-todos-header {
             display: flex; align-items: center; justify-content: space-between; gap: 12px;
-            margin-bottom: 14px; flex-wrap: wrap;
+            margin-bottom: 12px; flex-wrap: wrap;
         }
         .open-todos-title {
-            font-size: 1.02rem; font-weight: 800; color: var(--primary);
+            font-size: 1.02rem; font-weight: 800; color: #0f3a5f;
             display: flex; align-items: center; gap: 8px;
         }
+        .open-todos-title i { color: #0ea5e9; }
         .open-todos-count {
-            font-size: .72rem; font-weight: 800; color: #0f766e; background: #eefaf8;
-            border: 1px solid rgba(20,184,166,.35); border-radius: 999px; padding: 3px 10px;
+            font-size: .72rem; font-weight: 800; color: #0369a1; background: #e0f2fe;
+            border: 1px solid #7dd3fc; border-radius: 999px; padding: 3px 10px;
         }
         .open-todos-compose {
-            display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 14px;
-            padding: 10px 12px; border-radius: 12px; background: #f8fafc; border: 1px solid var(--border);
+            display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 12px;
+            padding: 10px 12px; border-radius: 12px;
+            background: linear-gradient(135deg, #ecfeff, #eff6ff);
+            border: 1px solid #bae6fd;
         }
         .open-todos-project-wrap { position: relative; flex: 1 1 220px; min-width: 180px; max-width: 320px; }
         .open-todos-compose input {
@@ -129,52 +138,74 @@
         .open-todos-suggest .empty { padding: 12px; text-align: center; color: var(--muted); font-size: .8rem; }
         .open-todos-compose > button {
             border: none; border-radius: 8px; padding: 8px 14px; cursor: pointer; font-family: inherit;
-            font-size: .8rem; font-weight: 800; background: var(--primary); color: #fff; white-space: nowrap;
-            margin-top: 0; align-self: stretch;
+            font-size: .8rem; font-weight: 800; background: linear-gradient(135deg, #0284c7, #0ea5e9); color: #fff; white-space: nowrap;
+            margin-top: 0; align-self: stretch; box-shadow: 0 2px 8px rgba(14,165,233,.28);
         }
         .open-todos-compose > button:hover { filter: brightness(1.06); }
-        .open-todos-groups { display: flex; flex-direction: column; gap: 14px; }
-        .open-todos-group {
-            border: 1px solid var(--border); border-radius: 12px; background: #f8fafc; overflow: hidden;
+        .open-todos-groups {
+            display: flex; flex-direction: column; gap: 10px;
+            max-height: 416px; /* ~8 task rows */
+            overflow-y: auto;
+            padding-left: 2px; padding-right: 4px;
+            scrollbar-width: thin;
+            scrollbar-color: #7dd3fc transparent;
         }
+        .open-todos-groups::-webkit-scrollbar { width: 6px; }
+        .open-todos-groups::-webkit-scrollbar-thumb { background: #7dd3fc; border-radius: 99px; }
+        .open-todos-group {
+            border: 1px solid #bfdbfe; border-radius: 12px; background: #fff; overflow: hidden;
+            box-shadow: 0 1px 3px rgba(14,165,233,.06);
+        }
+        .open-todos-group:nth-child(3n+1) { border-color: #bae6fd; }
+        .open-todos-group:nth-child(3n+2) { border-color: #99f6e4; }
+        .open-todos-group:nth-child(3n+3) { border-color: #c7d2fe; }
+        .open-todos-group:nth-child(3n+1) .open-todos-group-head { background: linear-gradient(90deg, #e0f2fe, #f0f9ff); }
+        .open-todos-group:nth-child(3n+2) .open-todos-group-head { background: linear-gradient(90deg, #ccfbf1, #f0fdfa); }
+        .open-todos-group:nth-child(3n+3) .open-todos-group-head { background: linear-gradient(90deg, #e0e7ff, #f5f3ff); }
         .open-todos-group-head {
             display: flex; align-items: center; justify-content: space-between; gap: 10px;
-            padding: 10px 12px; background: #fff; border-bottom: 1px solid var(--border);
+            padding: 8px 12px; border-bottom: 1px solid rgba(148,163,184,.25);
+            position: sticky; top: 0; z-index: 1;
         }
         .open-todos-group-name {
-            font-size: .88rem; font-weight: 800; color: var(--text); cursor: pointer;
+            font-size: .88rem; font-weight: 800; color: #0f3a5f; cursor: pointer;
             background: none; border: none; font-family: inherit; padding: 0; text-align: right;
         }
-        .open-todos-group-name:hover { color: var(--primary); }
+        .open-todos-group-name:hover { color: #0284c7; }
         .open-todos-add {
             display: flex; gap: 6px; align-items: center; flex: 1; max-width: 280px; justify-content: flex-end;
         }
         .open-todos-add input {
-            flex: 1; min-width: 0; border: 1.5px solid var(--border); border-radius: 8px;
+            flex: 1; min-width: 0; border: 1.5px solid #bae6fd; border-radius: 8px;
             padding: 6px 10px; font-size: .78rem; font-family: inherit; background: #fff;
         }
         .open-todos-add button {
             border: none; border-radius: 8px; padding: 6px 10px; cursor: pointer; font-family: inherit;
-            font-size: .75rem; font-weight: 800; background: var(--primary); color: #fff; white-space: nowrap;
+            font-size: .75rem; font-weight: 800; background: #0ea5e9; color: #fff; white-space: nowrap;
         }
-        .open-todos-list { list-style: none; margin: 0; padding: 6px 8px 8px; display: flex; flex-direction: column; gap: 4px; }
+        .open-todos-list { list-style: none; margin: 0; padding: 4px 6px 6px; display: flex; flex-direction: column; gap: 3px; }
         .open-todos-item {
-            display: flex; align-items: flex-start; gap: 10px; padding: 8px 8px;
-            border-radius: 8px; background: transparent;
+            display: flex; align-items: flex-start; gap: 10px; padding: 7px 8px;
+            border-radius: 8px; background: #f8fafc; border: 1px solid transparent;
+            min-height: 44px; box-sizing: border-box;
         }
-        .open-todos-item:hover { background: rgba(15,23,42,.03); }
+        .open-todos-item:nth-child(even) { background: #f0f9ff; }
+        .open-todos-item:hover { background: #e0f2fe; border-color: #bae6fd; }
         .open-todos-item input[type="checkbox"] {
-            width: 16px; height: 16px; margin-top: 2px; accent-color: #14b8a6; cursor: pointer; flex-shrink: 0;
+            width: 16px; height: 16px; margin-top: 2px; accent-color: #0ea5e9; cursor: pointer; flex-shrink: 0;
         }
         .open-todos-item-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
         .open-todos-item-text { font-size: .84rem; font-weight: 600; color: var(--text); line-height: 1.35; }
-        .open-todos-item-date { font-size: .7rem; font-weight: 600; color: var(--muted); }
+        .open-todos-item-date { font-size: .7rem; font-weight: 700; color: #0284c7; }
         .open-todos-item-del {
             border: none; background: transparent; color: #94a3b8; cursor: pointer; padding: 2px 6px;
             border-radius: 6px; font-size: .78rem;
         }
         .open-todos-item-del:hover { color: #dc2626; background: #fef2f2; }
-        .open-todos-empty { font-size: .82rem; color: var(--muted); padding: 4px 2px; }
+        .open-todos-empty {
+            font-size: .82rem; color: #0369a1; padding: 10px 12px; border-radius: 10px;
+            background: #e0f2fe; border: 1px dashed #7dd3fc;
+        }
         .inbox-list { display: flex; flex-direction: column; gap: 12px; max-height: min(62vh, 520px); overflow-y: auto; margin-bottom: 16px; }
         .inbox-item {
             display: grid; grid-template-columns: 72px 1fr; gap: 12px; padding: 12px;
@@ -1987,7 +2018,7 @@
 <script src="trial-watermark.js?v=20261008trial"></script>
 <script src="pricing-core.js?v=20261102honeyheight"></script>
 <script src="pricing-panel.js?v=20261102honeyheight"></script>
-<script src="projects.js?v=20261115todoDate"></script>
+<script src="projects.js?v=20261115todoColor"></script>
 <script src="quick-calc.js?v=20261029shoe"></script>
 <script src="accessibility.js?v=20261115c"></script>
 </body>
