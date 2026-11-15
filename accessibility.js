@@ -145,8 +145,8 @@
     var root = document.createElement('div');
     root.id = 'ac-a11y-root';
     root.innerHTML =
+      // International Symbol of Access (wheelchair) — do not put a /* */ comment between + concatenations (becomes unary + → NaN)
       '<button type="button" id="ac-a11y-btn" aria-expanded="false" aria-controls="ac-a11y-panel" title="תפריט נגישות" aria-label="פתח תפריט נגישות">' +
-        /* International Symbol of Access (official wheelchair mark) */ +
         '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
           '<circle cx="14.2" cy="4.2" r="2.1" fill="#fff"/>' +
           '<path fill="#fff" d="M7.6 20.6a4.4 4.4 0 1 1 0-8.8 4.4 4.4 0 0 1 0 8.8zm0-2a2.4 2.4 0 1 0 0-4.8 2.4 2.4 0 0 0 0 4.8z"/>' +
