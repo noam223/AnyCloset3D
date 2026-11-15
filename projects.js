@@ -1046,6 +1046,14 @@ function newProject() {
 // ── Open project TODOs checklist ─────────────────────────────────────────────
 var _openTodos = [];
 
+function _formatTodoOpenedAt(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
+        ' · ' + d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+}
+
 async function refreshOpenTodos() {
     if (!window.ProjectTodos) return;
     _openTodos = await ProjectTodos.listOpen();
@@ -1205,9 +1213,13 @@ function renderOpenTodos() {
     groupsEl.innerHTML = order.map(function(pid) {
         var g = byProject[pid];
         var itemsHtml = g.items.map(function(t) {
+            var opened = _formatTodoOpenedAt(t.created_at);
             return '<li class="open-todos-item">' +
                 '<input type="checkbox" aria-label="סמן כבוצע" onchange="toggleOpenTodo(\'' + t.id + '\', this.checked)">' +
-                '<span class="open-todos-item-text">' + _escHtml(t.text) + '</span>' +
+                '<span class="open-todos-item-body">' +
+                    '<span class="open-todos-item-text">' + _escHtml(t.text) + '</span>' +
+                    (opened ? '<span class="open-todos-item-date">נפתחה ' + _escHtml(opened) + '</span>' : '') +
+                '</span>' +
                 '<button type="button" class="open-todos-item-del" title="מחק" onclick="deleteOpenTodo(\'' + t.id + '\')"><i class="fa-solid fa-xmark"></i></button>' +
                 '</li>';
         }).join('');

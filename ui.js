@@ -13555,10 +13555,21 @@ window._refreshSidebarTodos = async function() {
     }
     listEl.innerHTML = todos.map(function(t) {
         const doneCls = t.is_done ? ' is-done' : '';
+        let opened = '';
+        if (t.created_at) {
+            const d = new Date(t.created_at);
+            if (!isNaN(d.getTime())) {
+                opened = d.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
+                    ' · ' + d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+            }
+        }
         return '<li class="sidebar-todos-item' + doneCls + '" data-todo-id="' + t.id + '">' +
             '<input type="checkbox"' + (t.is_done ? ' checked' : '') +
                 ' onchange="window._toggleSidebarTodo(\'' + t.id + '\', this.checked)">' +
-            '<span class="sidebar-todos-text">' + _escPrintHtml(t.text) + '</span>' +
+            '<span class="sidebar-todos-body">' +
+                '<span class="sidebar-todos-text">' + _escPrintHtml(t.text) + '</span>' +
+                (opened ? '<span class="sidebar-todos-date">נפתחה ' + _escPrintHtml(opened) + '</span>' : '') +
+            '</span>' +
             '<button type="button" class="sidebar-todos-del" title="מחק" onclick="window._deleteSidebarTodo(\'' + t.id + '\')"><i class="fa-solid fa-xmark"></i></button>' +
             '</li>';
     }).join('');

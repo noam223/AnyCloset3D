@@ -166,7 +166,9 @@
         .open-todos-item input[type="checkbox"] {
             width: 16px; height: 16px; margin-top: 2px; accent-color: #14b8a6; cursor: pointer; flex-shrink: 0;
         }
-        .open-todos-item-text { flex: 1; font-size: .84rem; font-weight: 600; color: var(--text); line-height: 1.35; }
+        .open-todos-item-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+        .open-todos-item-text { font-size: .84rem; font-weight: 600; color: var(--text); line-height: 1.35; }
+        .open-todos-item-date { font-size: .7rem; font-weight: 600; color: var(--muted); }
         .open-todos-item-del {
             border: none; background: transparent; color: #94a3b8; cursor: pointer; padding: 2px 6px;
             border-radius: 6px; font-size: .78rem;
@@ -1985,7 +1987,7 @@
 <script src="trial-watermark.js?v=20261008trial"></script>
 <script src="pricing-core.js?v=20261102honeyheight"></script>
 <script src="pricing-panel.js?v=20261102honeyheight"></script>
-<script src="projects.js?v=20261115heroCompact"></script>
+<script src="projects.js?v=20261115todoDate"></script>
 <script src="quick-calc.js?v=20261029shoe"></script>
 <script src="accessibility.js?v=20261115c"></script>
 </body>
