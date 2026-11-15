@@ -6860,8 +6860,8 @@ body.viewer-mode #canvas-container canvas {
     outline: none;
     background: transparent;
     color: #fff;
-    font-size: 1.12rem;
-    font-weight: 800;
+    font-size: 0.98rem;
+    font-weight: 700;
     text-align: right;
     padding: 2px 4px;
     border-radius: 6px;

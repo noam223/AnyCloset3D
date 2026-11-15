@@ -8906,11 +8906,17 @@ function bindUI() {
             });
         };
         // Canvas pointerdown uses preventDefault (OrbitControls) so inputs never blur —
-        // clear focus + text selection explicitly when leaving the dims row.
+        // clear focus + text selection explicitly when leaving the dims row / name field.
         const blurDimInputs = function() {
             row.querySelectorAll('input[type="number"], input[type="text"]').forEach(function(inp) {
                 if (document.activeElement === inp) {
                     try { inp.blur(); } catch (err) {}
+                }
+            });
+            ['inp-cabinet-name', 'mobile-inp-cabinet-name'].forEach(function(id) {
+                const nameInp = document.getElementById(id);
+                if (nameInp && document.activeElement === nameInp) {
+                    try { nameInp.blur(); } catch (err) {}
                 }
             });
             try {
