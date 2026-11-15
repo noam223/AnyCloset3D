@@ -239,13 +239,20 @@ body {
 .history-list {
     max-height: min(360px, 50vh);
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 6px;
     display: flex;
     flex-direction: column;
     gap: 2px;
+    min-width: 0;
 }
 .history-item {
+    box-sizing: border-box;
     width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    display: block;
+    direction: rtl;
     text-align: right;
     border: none;
     background: transparent;
@@ -254,12 +261,13 @@ body {
     font-family: inherit;
     font-size: 0.8rem;
     font-weight: 500;
+    line-height: 1.35;
     color: var(--text-dark);
     cursor: pointer;
     transition: background 0.15s, color 0.15s;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 .history-item:hover { background: rgba(37, 99, 235, 0.08); }
 .history-item.active {

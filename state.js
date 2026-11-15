@@ -2393,8 +2393,9 @@ function _positionHistoryPanel(anchorEl) {
     const panel = document.getElementById('history-panel');
     if (!panel || !anchorEl) return;
     const r = anchorEl.getBoundingClientRect();
-    const panelW = 280;
-    let left = r.left + (r.width / 2) - (panelW / 2);
+    const panelW = Math.min(340, Math.max(280, window.innerWidth - 16));
+    // Prefer aligning to the button's right edge (RTL toolbar sits on the right)
+    let left = r.right - panelW;
     left = Math.max(8, Math.min(left, window.innerWidth - panelW - 8));
     panel.style.top = (r.bottom + 8) + 'px';
     panel.style.left = left + 'px';
