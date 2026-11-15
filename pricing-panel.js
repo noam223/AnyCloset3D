@@ -800,10 +800,13 @@ function updatePreview() {
         if (!type) { resultEl.innerHTML = '<div style="font-size:.75rem;opacity:.75;margin-bottom:2px;">תצוגה מקדימה</div><div style="font-size:1rem;">—</div>'; return; }
         var res = PC.preview(cfg, { typeId: type.id, w: w, h: h, d: d, melamine: _melamine });
         var mel = _melamine ? 'מלמין' : 'לא מלמין';
+        var costLine = (window._showCostPricing === true || (window._features && window._features.showCostPricing))
+            ? '<div style="font-size:.75rem;opacity:.75;">עלות: ' + res.cost.toLocaleString() + ' ₪ · התקנה: ' + res.install.toLocaleString() + ' ₪</div>'
+            : '<div style="font-size:.75rem;opacity:.75;">התקנה: ' + res.install.toLocaleString() + ' ₪</div>';
         resultEl.innerHTML =
             '<div style="font-size:.73rem;opacity:.7;margin-bottom:3px;">' + _esc(type.label) + ' ' + w + '×' + h + ' ' + mel + '</div>' +
             '<div style="font-size:1.2rem;font-weight:800;">ללקוח: ' + res.customer.toLocaleString() + ' ₪</div>' +
-            '<div style="font-size:.75rem;opacity:.75;">עלות: ' + res.cost.toLocaleString() + ' ₪ · התקנה: ' + res.install.toLocaleString() + ' ₪</div>';
+            costLine;
     } catch (e) {
         resultEl.innerHTML = '<div style="font-size:.8rem;opacity:.7;">שגיאה בחישוב</div>';
     }

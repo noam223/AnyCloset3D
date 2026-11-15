@@ -2107,6 +2107,29 @@ var _PP_DEFAULTS = {
         sorbet:170,touchHandle:30}
 };
 
+/** Empty personal list for carpenters (all cost fields 0) — they enter their own prices. */
+function _ppEmptyDefaults() {
+    if (window.PricingCore && typeof window.PricingCore.emptyConfig === 'function') {
+        var e = window.PricingCore.emptyConfig();
+        e.cabinetTypes = _PP_DEFAULT_CABINET_TYPES.map(function(t) { return Object.assign({}, t); });
+        return e;
+    }
+    if (typeof window._getEmptyPricingConfig === 'function') {
+        var e2 = window._getEmptyPricingConfig();
+        e2.cabinetTypes = _PP_DEFAULT_CABINET_TYPES.map(function(t) { return Object.assign({}, t); });
+        return e2;
+    }
+    return JSON.parse(JSON.stringify(_PP_DEFAULTS));
+}
+
+function _ppFormDefaults() {
+    var ut = _plan && _plan.userType;
+    if (ut === 'carpenter' || (typeof window._isCarpenterPricingUser === 'function' && window._isCarpenterPricingUser())) {
+        return _ppEmptyDefaults();
+    }
+    return _PP_DEFAULTS;
+}
+
 var _ppCabinetTypes = _PP_DEFAULT_CABINET_TYPES.map(function(t) { return Object.assign({}, t); });
 
 function _ppCloneTypes(list) {
@@ -2920,7 +2943,7 @@ async function _loadPricingForm() {
         );
         _ensurePricingPanelMounted();
         var { data: { user } } = await sb.auth.getUser();
-        if (!user) { PricingPanel.fill(_PP_DEFAULTS); return; }
+        if (!user) { PricingPanel.fill(_ppFormDefaults()); return; }
         var billingId = user.id;
         if (_plan && _plan.companyRole === 'agent') {
             billingId = await Auth.getBillingUserId() || user.id;
@@ -2928,12 +2951,13 @@ async function _loadPricingForm() {
         var { data: row } = await sb.from('pricing_configs').select('config').eq('user_id', billingId).single();
         _pricingCfg = (row && row.config && Object.keys(row.config).length > 0) ? row.config : null;
         if (_pricingCfg) _ppNormalizePricingConfig(_pricingCfg);
-        window._pricingConfig = _pricingCfg;
-        PricingPanel.fill(_pricingCfg || _PP_DEFAULTS);
-        if (typeof window.applyCabinetTypeSelects === 'function') window.applyCabinetTypeSelects(window._pricingConfig || _PP_DEFAULTS);
+        var formDefaults = _ppFormDefaults();
+        window._pricingConfig = _pricingCfg || ((_plan && _plan.userType === 'carpenter') ? formDefaults : null);
+        PricingPanel.fill(_pricingCfg || formDefaults);
+        if (typeof window.applyCabinetTypeSelects === 'function') window.applyCabinetTypeSelects(window._pricingConfig || formDefaults);
     } catch(e) {
         _ensurePricingPanelMounted();
-        PricingPanel.fill(_PP_DEFAULTS);
+        PricingPanel.fill(_ppFormDefaults());
     }
 }
 
@@ -3238,10 +3262,14 @@ async function savePricingSettings() {
 }
 
 function resetPricingToDefaults() {
-    if (!confirm('להחליף את כל הערכים בטופס בברירות המחדל? השינוי יישמר רק אחרי לחיצה על "שמור".')) return;
-    PricingPanel.fill(_PP_DEFAULTS);
-    if (typeof window.applyCabinetTypeSelects === 'function') window.applyCabinetTypeSelects(_PP_DEFAULTS);
-    showToast('הוחזר לברירת מחדל', 'success');
+    var blank = _ppFormDefaults();
+    var msg = (_plan && _plan.userType === 'carpenter')
+        ? 'לאפס את כל המחירים ל־0? תוכל להזין את המחירון שלך ואז לשמור.'
+        : 'להחליף את כל הערכים בטופס בברירות המחדל? השינוי יישמר רק אחרי לחיצה על "שמור".';
+    if (!confirm(msg)) return;
+    PricingPanel.fill(blank);
+    if (typeof window.applyCabinetTypeSelects === 'function') window.applyCabinetTypeSelects(blank);
+    showToast((_plan && _plan.userType === 'carpenter') ? 'הטופס אופס — הזן את המחירים שלך' : 'הוחזר לברירת מחדל', 'success');
 }
 
 function _memberLabel(userId) {

@@ -425,8 +425,11 @@ window.calcQuickPrice = function(autoUpdateShelves = false) {
     };
 
     const costEl = document.getElementById('qc-total-cost');
+    const costRow = document.getElementById('qc-cost-row');
     const installEl = document.getElementById('qc-install');
     const custEl = document.getElementById('qc-total-cust');
+    const showCost = window._showCostPricing === true || (window._features && window._features.showCostPricing === true);
+    if (costRow) costRow.style.display = showCost ? '' : 'none';
     if (costEl) costEl.innerText = '₪' + Math.round(finalCost).toLocaleString();
     if (installEl) installEl.innerText = '₪' + Math.round(installPrice).toLocaleString();
     if (custEl) custEl.innerText = '₪' + Math.round(priceToCustomer).toLocaleString();

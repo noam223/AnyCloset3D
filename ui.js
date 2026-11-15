@@ -11256,6 +11256,12 @@ window._docsHidePrices = function() {
     return window._showPricing === false || !!(window._features && window._features.canQuote === false);
 };
 
+/** Production cost / רכש — carpenters & companies only; designers see consumer prices only. */
+window._showCostPricingUi = function() {
+    if (window._showCostPricing === true) return true;
+    return !!(window._features && window._features.showCostPricing === true);
+};
+
 window.openOrderModal = async function(mode, opts) {
     // mode: 'customer' or 'factory'
     opts = opts || {};
@@ -11370,8 +11376,11 @@ window.openOrderModal = async function(mode, opts) {
 
         const priceField = (cls, label, value) =>
             `<label class="opt-price">${label}<input type="number" class="${cls}" data-index="${index}" value="${value}"><span>₪</span></label>`;
+        const showCostUi = !hidePricesUi && window._showCostPricingUi();
         const priceInputs = hidePricesUi ? '' : isFactory
-            ? priceField('modal-cost-input', 'עלות ייצור (רכש)', itemCost) + priceField('modal-install-input', 'עלות משלוח/התקנה', itemInstall)
+            ? (showCostUi
+                ? priceField('modal-cost-input', 'עלות ייצור (רכש)', itemCost) + priceField('modal-install-input', 'עלות משלוח/התקנה', itemInstall)
+                : priceField('modal-price-input', 'מחיר ארון ללקוח', isNaN(numericPrice) ? 0 : numericPrice) + priceField('modal-install-input', 'הובלה והתקנה', itemInstall))
             : priceField('modal-price-input', 'מחיר ארון ללקוח', isNaN(numericPrice) ? 0 : numericPrice) + priceField('modal-install-input', 'הובלה והתקנה', itemInstall);
         const imageTools = isFactory
             ? `<details class="opt-images"><summary><i class="fa-solid fa-image"></i> החלפת תמונות</summary>
@@ -11440,8 +11449,8 @@ window.openOrderModal = async function(mode, opts) {
         });
     });
 
-    // Footer summary
-    const footerHTML = window._docsHidePrices() ? `<div></div>` : isFactory ? `
+    // Footer summary — factory cost totals only when showCostPricing (carpenters/companies)
+    const footerHTML = window._docsHidePrices() ? `<div></div>` : (isFactory && window._showCostPricingUi()) ? `
         <div class="summary-factory" style="display:block;">
             <div class="summary-row"><span>סה"כ עלויות ייצור (רכש):</span> <span dir="ltr" style="font-weight:bold;color:#854d0e;">₪${totalCostPrice.toLocaleString()}</span></div>
             <div class="summary-row"><span>סה"כ עלויות משלוח/התקנה:</span> <span dir="ltr" style="font-weight:bold;color:#713f12;">₪${totalInstallPrice.toLocaleString()}</span></div>
@@ -18875,22 +18884,25 @@ function _buildExcelXML(d) {
     }
     xml += '</Table></Worksheet>\n';
 
-    // Sheet 2: Profitability
-    xml += '<Worksheet ss:Name="רווחיות"><Table>\n';
-    xml += '<Column ss:Width="130"/><Column ss:Width="100"/><Column ss:Width="100"/><Column ss:Width="100"/><Column ss:Width="110"/><Column ss:Width="90"/>\n';
-    xml += '<Row>' + ['ארון','מחיר ארון ללקוח','עלות ייצור','עלות התקנה','רווח גולמי','% רווח'].map(h => '<Cell ss:StyleID="hdr"><Data ss:Type="String">' + esc(h) + '</Data></Cell>').join('') + '</Row>\n';
-    var totalCabAll = 0, totalCostAll = 0, totalProfitAll = 0;
-    rows.forEach(function(r) {
-        // profit = cabinet price only minus production cost (installation is a pass-through)
-        var cabProfit = r.cabPrice - r.costPrice;
-        var cabProfitPct = r.cabPrice > 0 ? Math.round((cabProfit / r.cabPrice) * 100) : 0;
-        totalCabAll += r.cabPrice; totalCostAll += r.costPrice; totalProfitAll += cabProfit;
-        var st = cabProfit >= 0 ? 'grn' : 'red';
-        xml += '<Row><Cell><Data ss:Type="String">' + esc(r.title) + '</Data></Cell><Cell><Data ss:Type="Number">' + r.cabPrice + '</Data></Cell><Cell><Data ss:Type="Number">' + r.costPrice + '</Data></Cell><Cell><Data ss:Type="Number">' + r.instPrice + '</Data></Cell><Cell ss:StyleID="' + st + '"><Data ss:Type="Number">' + cabProfit + '</Data></Cell><Cell ss:StyleID="' + st + '"><Data ss:Type="String">' + cabProfitPct + '%</Data></Cell></Row>\n';
-    });
-    var totalPct = totalCabAll > 0 ? Math.round((totalProfitAll / totalCabAll) * 100) : 0;
-    xml += '<Row><Cell ss:StyleID="tot"><Data ss:Type="String">סה"כ</Data></Cell><Cell ss:StyleID="tot"><Data ss:Type="Number">' + totalCabAll + '</Data></Cell><Cell ss:StyleID="tot"><Data ss:Type="Number">' + totalCostAll + '</Data></Cell><Cell ss:StyleID="tot"><Data ss:Type="Number">' + d.totalInstallPrice + '</Data></Cell><Cell ss:StyleID="tot"><Data ss:Type="Number">' + totalProfitAll + '</Data></Cell><Cell ss:StyleID="tot"><Data ss:Type="String">' + totalPct + '%</Data></Cell></Row>\n';
-    xml += '</Table></Worksheet>\n</Workbook>';
+    // Sheet 2: Profitability — cost/margin only for carpenters & companies
+    if (window._showCostPricingUi && window._showCostPricingUi()) {
+        xml += '<Worksheet ss:Name="רווחיות"><Table>\n';
+        xml += '<Column ss:Width="130"/><Column ss:Width="100"/><Column ss:Width="100"/><Column ss:Width="100"/><Column ss:Width="110"/><Column ss:Width="90"/>\n';
+        xml += '<Row>' + ['ארון','מחיר ארון ללקוח','עלות ייצור','עלות התקנה','רווח גולמי','% רווח'].map(h => '<Cell ss:StyleID="hdr"><Data ss:Type="String">' + esc(h) + '</Data></Cell>').join('') + '</Row>\n';
+        var totalCabAll = 0, totalCostAll = 0, totalProfitAll = 0;
+        rows.forEach(function(r) {
+            // profit = cabinet price only minus production cost (installation is a pass-through)
+            var cabProfit = r.cabPrice - r.costPrice;
+            var cabProfitPct = r.cabPrice > 0 ? Math.round((cabProfit / r.cabPrice) * 100) : 0;
+            totalCabAll += r.cabPrice; totalCostAll += r.costPrice; totalProfitAll += cabProfit;
+            var st = cabProfit >= 0 ? 'grn' : 'red';
+            xml += '<Row><Cell><Data ss:Type="String">' + esc(r.title) + '</Data></Cell><Cell><Data ss:Type="Number">' + r.cabPrice + '</Data></Cell><Cell><Data ss:Type="Number">' + r.costPrice + '</Data></Cell><Cell><Data ss:Type="Number">' + r.instPrice + '</Data></Cell><Cell ss:StyleID="' + st + '"><Data ss:Type="Number">' + cabProfit + '</Data></Cell><Cell ss:StyleID="' + st + '"><Data ss:Type="String">' + cabProfitPct + '%</Data></Cell></Row>\n';
+        });
+        var totalPct = totalCabAll > 0 ? Math.round((totalProfitAll / totalCabAll) * 100) : 0;
+        xml += '<Row><Cell ss:StyleID="tot"><Data ss:Type="String">סה"כ</Data></Cell><Cell ss:StyleID="tot"><Data ss:Type="Number">' + totalCabAll + '</Data></Cell><Cell ss:StyleID="tot"><Data ss:Type="Number">' + totalCostAll + '</Data></Cell><Cell ss:StyleID="tot"><Data ss:Type="Number">' + d.totalInstallPrice + '</Data></Cell><Cell ss:StyleID="tot"><Data ss:Type="Number">' + totalProfitAll + '</Data></Cell><Cell ss:StyleID="tot"><Data ss:Type="String">' + totalPct + '%</Data></Cell></Row>\n';
+        xml += '</Table></Worksheet>\n';
+    }
+    xml += '</Workbook>';
     return xml;
 }
 

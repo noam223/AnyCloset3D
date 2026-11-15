@@ -75,10 +75,15 @@
         }
     }
 
-    // 3. Load pricing config from Supabase for this user
+    // 3. Load features first — needed to decide empty carpenter vs market designer defaults
+    var _features = await loadFeatures();
+    var _planInfo  = window._plan;
+
+    // 3b. Load pricing config from Supabase for this user
+    var _sb_init = null;
     if (user) {
         try {
-            var _sb_init = window._supabase || (window.supabase && window.supabase.createClient
+            _sb_init = window._supabase || (window.supabase && window.supabase.createClient
                 ? window.supabase.createClient(
                     'https://meqxnsjycvfgfhdepguo.supabase.co',
                     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lcXhuc2p5Y3ZmZ2ZoZGVwZ3VvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3MDA5NDAsImV4cCI6MjA5MjI3Njk0MH0.w63bl0-1-Rgt9Nx6sVW5ueEGMojiMaxoehlPXlPH2N0'
@@ -105,8 +110,17 @@
                     }
                     console.log('[pricing] Loaded user pricing config from Supabase');
                 } else {
-                    window._pricingConfig = null;
-                    console.log('[pricing] No custom pricing config — using defaults');
+                    // Carpenters start empty and enter their own costs; designers keep market consumer defaults
+                    if ((_planInfo && _planInfo.userType === 'carpenter') ||
+                        (typeof window._isCarpenterPricingUser === 'function' && window._isCarpenterPricingUser())) {
+                        window._pricingConfig = (typeof window._getEmptyPricingConfig === 'function')
+                            ? window._getEmptyPricingConfig()
+                            : (window.EMPTY_PRICING_CONFIG || null);
+                        console.log('[pricing] No personal pricing — carpenter empty list');
+                    } else {
+                        window._pricingConfig = null;
+                        console.log('[pricing] No custom pricing config — using market defaults');
+                    }
                 }
             }
         } catch(e) {
@@ -116,10 +130,13 @@
     }
 
     if (typeof window.applyCabinetTypeSelects === 'function') {
-        window.applyCabinetTypeSelects(window._pricingConfig || window.DEFAULT_PRICING_CONFIG);
+        var _typesCfg = window._pricingConfig
+            || ((typeof window._getPricingCfg === 'function') ? window._getPricingCfg() : null)
+            || window.DEFAULT_PRICING_CONFIG;
+        window.applyCabinetTypeSelects(_typesCfg);
     }
 
-    // 3b. Load user logo
+    // 3c. Load user logo
     if (user && _sb_init) {
         try {
             var _logoUserId = user.id;
@@ -144,12 +161,11 @@
         }
     }
 
-    // 4. Load features and apply UI gates based on plan  (was §3 before pricing block)
-    var _features = await loadFeatures();
-    var _planInfo  = window._plan;
-
+    // 4. Apply UI gates based on plan features
     // price-boxes-row and sidebar-pricing-summary start hidden — show only if showPricing is true
     window._showPricing = (_features && _features.showPricing === true);
+    // Designers see consumer/market prices only; cost/רכש is carpenter+company
+    window._showCostPricing = (_features && _features.showCostPricing === true);
     if (window._showPricing) {
         var priceBoxesRow = document.getElementById('price-boxes-row');
         if (priceBoxesRow) priceBoxesRow.style.display = 'flex';

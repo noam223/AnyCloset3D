@@ -5126,7 +5126,47 @@ var DEFAULT_PRICING_CONFIG = {
 };
 window.DEFAULT_PRICING_CONFIG = DEFAULT_PRICING_CONFIG;
 
-function _getPricingCfg() { return window._pricingConfig || DEFAULT_PRICING_CONFIG; }
+/** Blank personal list — carpenters start here until they save their own prices. */
+function _buildEmptyPricingConfig() {
+    if (window.PricingCore && typeof window.PricingCore.emptyConfig === 'function') {
+        return window.PricingCore.emptyConfig();
+    }
+    var e = JSON.parse(JSON.stringify(DEFAULT_PRICING_CONFIG));
+    e.sqmPrice = 0; e.sqmPriceNonMel = 0;
+    e.lmPrice = 0; e.lmPriceNonMel = 0;
+    e.lmHeightBase = 0; e.lmHeightBaseNonMel = 0;
+    e.materialsBoardPrice = 0; e.materialsBoardsPerSqm = 0; e.materialsMultiplier = 0;
+    e.installPricePerUnit = 0;
+    e.heightSurcharge = 0; e.depthSurcharge = 0; e.sandwichSurcharge = 0;
+    e.installHeightSurcharge = 0;
+    Object.keys(e.ranges || {}).forEach(function(engine) {
+        ['melamine', 'nonMelamine'].forEach(function(mat) {
+            var map = (e.ranges[engine] && e.ranges[engine][mat]) || {};
+            Object.keys(map).forEach(function(w) { map[w] = 0; });
+        });
+    });
+    Object.keys(e.extras || {}).forEach(function(k) { e.extras[k] = 0; });
+    return e;
+}
+window.EMPTY_PRICING_CONFIG = _buildEmptyPricingConfig();
+
+function _isCarpenterPricingUser() {
+    var ut = window._plan && window._plan.userType;
+    if (ut === 'carpenter') return true;
+    // Trial / free fallback is carpenter-typed
+    if (ut === 'company' || ut === 'designer') return false;
+    return !!(window._features && window._features.canEditPricing === true && window._features.showCostPricing === true);
+}
+
+function _getPricingCfg() {
+    if (window._pricingConfig) return window._pricingConfig;
+    if (_isCarpenterPricingUser()) {
+        return window.EMPTY_PRICING_CONFIG || _buildEmptyPricingConfig();
+    }
+    return DEFAULT_PRICING_CONFIG;
+}
+window._isCarpenterPricingUser = _isCarpenterPricingUser;
+window._getEmptyPricingConfig = _buildEmptyPricingConfig;
 
 function _priceNum(v, fb) {
     if (v === '' || v == null) return fb;

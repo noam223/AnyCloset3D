@@ -21,6 +21,7 @@ const PLAN_LIMITS = {
         extensionDays:          3,           // הארכה בתשלום — 3 ימים נוספים
         features: {
             showPricing:           false,    // מעצבת לא רואה תמחור
+            showCostPricing:       false,    // ללא מחירי עלות / רכש
             canEditPricing:        false,
             canExportPDF:          true,
             canExport3D:           true,
@@ -45,6 +46,7 @@ const PLAN_LIMITS = {
         extensionDays:          null,
         features: {
             showPricing:           false,
+            showCostPricing:       false,
             canEditPricing:        false,
             canExportPDF:          true,
             canExport3D:           true,
@@ -74,7 +76,8 @@ const PLAN_LIMITS = {
         projectLockDays:        null,
         extensionDays:          null,
         features: {
-            showPricing:           true,     // תמחור לפי מחירון המערכת
+            showPricing:           true,     // תמחור לפי מחירון שוק לצרכן
+            showCostPricing:       false,    // מעצבת לא רואה עלויות רכש
             canEditPricing:        false,    // מחירון השוק בלבד — עריכה רק לנגר
             canExportPDF:          true,
             canExport3D:           true,
@@ -108,6 +111,7 @@ const PLAN_LIMITS = {
         extensionDays:          null,
         features: {
             showPricing:           true,
+            showCostPricing:       true,     // עלות רכש + רווח
             canEditPricing:        true,     // מחירון אישי — רק לנגר
             canExportPDF:          true,
             canExport3D:           true,
@@ -139,6 +143,7 @@ const PLAN_LIMITS = {
         extensionDays:          null,
         features: {
             showPricing:        true,
+            showCostPricing:    true,
             canExportPDF:       true,
             canExport3D:        true,
             canExportCarpenter: true,
@@ -161,6 +166,7 @@ const PLAN_LIMITS = {
         extensionDays:          null,
         features: {
             showPricing:        true,
+            showCostPricing:    true,
             canExportPDF:       true,
             canExport3D:        true,
             canExportCarpenter: true,
@@ -184,6 +190,7 @@ const PLAN_LIMITS = {
         extensionDays:          null,
         features: {
             showPricing:        true,
+            showCostPricing:    true,
             canExportPDF:       false,
             canExport3D:        false,
             canExportCarpenter: false,

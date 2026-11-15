@@ -293,8 +293,33 @@ function preview(cfg, opts) {
     };
 }
 
+/** Blank personal price list for carpenters who have not saved their own yet. */
+function emptyConfig() {
+    var e = clone(DEFAULTS);
+    e.sqmPrice = 0; e.sqmPriceNonMel = 0;
+    e.lmPrice = 0; e.lmPriceNonMel = 0;
+    e.lmHeightBase = 0; e.lmHeightBaseNonMel = 0;
+    e.materialsBoardPrice = 0; e.materialsBoardsPerSqm = 0; e.materialsMultiplier = 0;
+    e.profitMultiplier = 1.7;
+    e.installPricePerUnit = 0;
+    e.heightSurcharge = 0; e.depthSurcharge = 0; e.sandwichSurcharge = 0;
+    e.installHeightSurcharge = 0;
+    Object.keys(e.ranges || {}).forEach(function(engine) {
+        ['melamine', 'nonMelamine'].forEach(function(mat) {
+            var map = (e.ranges[engine] && e.ranges[engine][mat]) || {};
+            Object.keys(map).forEach(function(w) { map[w] = 0; });
+        });
+    });
+    Object.keys(e.extras || {}).forEach(function(k) { e.extras[k] = 0; });
+    return e;
+}
+
+var EMPTY = emptyConfig();
+
 global.PricingCore = {
     DEFAULTS: DEFAULTS,
+    EMPTY: EMPTY,
+    emptyConfig: emptyConfig,
     ENGINES: ENGINES,
     LEGACY_LABELS: LEGACY_LABELS,
     RANGE_RESERVED_KEYS: RANGE_RESERVED_KEYS,
