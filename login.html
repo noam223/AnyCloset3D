@@ -350,12 +350,10 @@
                     <div class="utc-label">נגר</div>
                     <div class="utc-sub">ייצור ותמחור</div>
                 </div>
-                <div class="user-type-card" data-type="company" onclick="selectUserType('company')">
-                    <i class="fa-solid fa-building"></i>
-                    <div class="utc-label">חברת ריהוט</div>
-                    <div class="utc-sub">צוות + סניפים</div>
-                </div>
             </div>
+            <p style="margin:14px 0 0;font-size:0.82rem;color:var(--text-light);text-align:center;line-height:1.45;">
+                חברת ריהוט? <a href="https://wa.me/972546659798?text=%D7%A9%D7%9C%D7%95%D7%9D%2C%20%D7%90%D7%A0%D7%99%20%D7%9E%D7%A2%D7%95%D7%A0%D7%99%D7%99%D7%9F%20%D7%91%D7%9E%D7%A1%D7%9C%D7%95%D7%9C%20%D7%97%D7%91%D7%A8%D7%94%20%D7%A9%D7%9C%20AnyCloset%203D" target="_blank" rel="noopener" style="color:var(--accent);font-weight:700;">צור קשר בוואטסאפ</a>
+            </p>
             <button class="btn-submit" id="btn-step1-next" onclick="goToStep2()" disabled>
                 המשך <i class="fa-solid fa-arrow-left"></i>
             </button>
@@ -548,10 +546,8 @@ var _PLANS_BY_TYPE = {
         { key: 'carpenter_pro',        name: 'נגר — חודשי', price: '₪299/חודש', desc: 'שבוע ניסיון חינם · מחירון אישי, הצעות מחיר ללקוח, מסלול סטטוסים מלא, 100 פרויקטים' },
         { key: 'carpenter_pro_annual', name: 'נגר — שנתי',  price: '₪269/חודש', desc: 'שבוע ניסיון חינם · ₪3,228 לשנה · חיסכון ₪360' }
     ],
-    company: [
-        { key: 'company_standard',   name: 'סטנדרט',     price: 'בהתאמה אישית', desc: 'שבוע ניסיון חינם · עד 5 סוכנים, 10 מכשירים, כל הפיצ\'רים' },
-        { key: 'company_enterprise', name: 'ארגוני',      price: 'צור קשר',  desc: 'עד 15 סוכנים, 30 מכשירים, תמיכה מלאה' }
-    ]
+    // Company plans are sales-assisted only — not offered in self-serve registration
+    company: []
 };
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
@@ -648,6 +644,11 @@ async function handleSetNewPassword() {
 
 // ── Step 1: User type ─────────────────────────────────────────────────────────
 function selectUserType(type) {
+    // Company accounts are opened manually after sales contact — not self-serve
+    if (type === 'company') {
+        window.open('https://wa.me/972546659798?text=%D7%A9%D7%9C%D7%95%D7%9D%2C%20%D7%90%D7%A0%D7%99%20%D7%9E%D7%A2%D7%95%D7%A0%D7%99%D7%99%D7%9F%20%D7%91%D7%9E%D7%A1%D7%9C%D7%95%D7%9C%20%D7%97%D7%91%D7%A8%D7%94%20%D7%A9%D7%9C%20AnyCloset%203D', '_blank', 'noopener');
+        return;
+    }
     _selectedUserType = type;
     document.querySelectorAll('.user-type-card').forEach(function(c) {
         c.classList.toggle('selected', c.dataset.type === type);
@@ -1082,7 +1083,12 @@ function _translateError(msg) {
     var urlParams = new URLSearchParams(window.location.search);
     var urlPlan = urlParams.get('plan');
     var urlType = urlParams.get('type');
-    if (!urlPlan && ['designer', 'carpenter', 'company'].indexOf(urlType) >= 0) {
+    if (urlType === 'company' || (urlPlan && String(urlPlan).indexOf('company_') === 0)) {
+        // Company is sales-assisted only — send to WhatsApp instead of self-serve trial
+        window.location.replace('https://wa.me/972546659798?text=%D7%A9%D7%9C%D7%95%D7%9D%2C%20%D7%90%D7%A0%D7%99%20%D7%9E%D7%A2%D7%95%D7%A0%D7%99%D7%99%D7%9F%20%D7%91%D7%9E%D7%A1%D7%9C%D7%95%D7%9C%20%D7%97%D7%91%D7%A8%D7%94%20%D7%A9%D7%9C%20AnyCloset%203D');
+        return;
+    }
+    if (!urlPlan && ['designer', 'carpenter'].indexOf(urlType) >= 0) {
         switchTab('register');
         selectUserType(urlType);
         goToStep2();
@@ -1093,7 +1099,6 @@ function _translateError(msg) {
         // Determine user type from plan key prefix
         var typeFromPlan = urlPlan.startsWith('designer') ? 'designer'
                          : urlPlan.startsWith('carpenter') ? 'carpenter'
-                         : urlPlan.startsWith('company') ? 'company'
                          : null;
         switchTab('register');
         if (typeFromPlan) {

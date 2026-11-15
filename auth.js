@@ -670,18 +670,16 @@ window.Auth = {
         const user = await this.getUser();
         if (!user) return { error: 'Not logged in' };
 
+        // Company plans are sales-assisted only — no self-serve trial
+        if (plan && String(plan).indexOf('company_') === 0) {
+            return { error: 'מסלול חברה נפתח בתיאום איתנו. צרו קשר בוואטסאפ להטמעה.' };
+        }
+
         const { data: trialEndsAt, error } = await sb.rpc('start_my_trial', { p_plan: plan });
 
         if (error) return { error: error.message };
         this._profileCache = null;
-        let company = null;
-        if (plan && String(plan).indexOf('company_') === 0) {
-            const ensured = await this.ensureCompany();
-            company = ensured && !ensured.error ? (ensured.data || null) : null;
-            const profile = await this.getProfile();
-            if (company && profile) company.agent_username = profile.agent_username;
-        }
-        return { success: true, trialEndsAt, company };
+        return { success: true, trialEndsAt, company: null };
     },
 
     // ── Listen to auth state changes ─────────────────────────────────────────
