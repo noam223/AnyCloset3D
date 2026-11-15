@@ -348,7 +348,11 @@ T.deal = {
     const tb = tblock(root, s, P ? TOPT : { x: 0, y: 34, w: W, align: 'center', fs: 76 });
     const cw = 520, ch = 610, gap = 50, x0 = (W - (3 * cw + 2 * gap)) / 2, y0 = P ? 560 : 240;
     const X = k => (P ? (W - cw) / 2 : x0 + (2 - k) * (cw + gap));
-    const c0 = css(el('div', 'dcard', root, `<div class="dh"><i>₪</i>מחיר בזמן אמת</div><div class="big">₪ 0</div><div class="demo">דוגמה</div>`), { left: X(0), top: y0, width: cw, height: ch });
+    const priceLabel = s.priceLabel || 'מחיר בזמן אמת';
+    const priceDemo = s.priceDemo || 'דוגמה';
+    const cutsLabel = s.cutsLabel || 'רשימת חיתוכים לנגר';
+    const cutsOk = s.cutsOk || 'מוכן להורדה ✓';
+    const c0 = css(el('div', 'dcard', root, `<div class="dh"><i>₪</i>${priceLabel}</div><div class="big">₪ 0</div><div class="demo">${priceDemo}</div>`), { left: X(0), top: y0, width: cw, height: ch });
     const rows0 = ['גוף וחזיתות', 'ידיות ופרזול', 'התקנה', 'הנחה 10%'].map((r, i) => css(el('div', 'drow', c0, `<span>${r}</span><b>✓</b>`), { top: 270 + i * 70 }));
     const c1 = css(el('div', 'dcard', root, `<div class="dh"><i>✍</i>חתימה דיגיטלית</div>`), { left: X(1), top: y0, width: cw, height: ch });
     const ph = css(el('div', 'phone', c1, `<div class="scr">
@@ -358,10 +362,10 @@ T.deal = {
       <div style="position:absolute;right:20px;left:20px;bottom:22px;height:44px;border-radius:12px;background:#1e3a5f"></div></div>`), { left: (cw - 236) / 2, top: 100 });
     const sig = ph.querySelector('.sig');
     const ok1 = css(el('div', 'ok', c1, 'נחתם ✓'), { top: 530 });
-    const c2 = css(el('div', 'dcard', root, `<div class="dh"><i>✂</i>רשימת חיתוכים לנגר</div>`), { left: X(2), top: y0, width: cw, height: ch });
+    const c2 = css(el('div', 'dcard', root, `<div class="dh"><i>✂</i>${cutsLabel}</div>`), { left: X(2), top: y0, width: cw, height: ch });
     css(el('div', 'drow', c2, '<span>פריט</span><span>מידות</span><span>כמות</span>'), { top: 116, color: 'var(--muted)', fontSize: 22 });
     const rows2 = s.cuts.map((r, i) => css(el('div', 'drow', c2, `<span>${r[0]}</span><span style="direction:ltr">${r[1]}</span><b>${r[2]}</b>`), { top: 180 + i * 64 }));
-    const ok2 = css(el('div', 'ok', c2, 'נשלח לייצור ✓'), { top: 530 });
+    const ok2 = css(el('div', 'ok', c2, cutsOk), { top: 530 });
     const at = [0, 1, 2].map(k => s.v0 - 0.1 + k * s.vd * (P ? 0.36 : 0.3));
     s._ = { tb, cards: [c0, c1, c2], rows0, big: c0.querySelector('.big'), sig, ok1, rows2, ok2, at };
     at.forEach(a => cue(a, 'whoosh', 0.35));
