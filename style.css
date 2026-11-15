@@ -6825,6 +6825,7 @@ body.viewer-mode #canvas-container canvas {
     border-top: 1px solid rgba(255,255,255,0.1);
     box-shadow: none;
     min-width: 0;
+    direction: rtl;
     transition: background 0.15s;
 }
 #header-cabinet-name-card.header-cab-name-card:hover,
@@ -6837,9 +6838,12 @@ body.viewer-mode #canvas-container canvas {
     position: relative;
     display: flex;
     flex-direction: row;
+    flex-wrap: nowrap;
     align-items: center;
+    justify-content: flex-start;
     gap: 8px;
     margin: 0;
+    direction: rtl;
 }
 #header-cabinet-name-card .hdc-ic {
     font-size: 0.7rem;
@@ -6864,6 +6868,7 @@ body.viewer-mode #canvas-container canvas {
     display: flex;
     flex: 1 1 auto;
     min-width: 0;
+    direction: rtl;
 }
 #header-cabinet-name-card .header-name-val input {
     width: 100%;
@@ -6874,7 +6879,9 @@ body.viewer-mode #canvas-container canvas {
     color: #fff;
     font-size: 0.92rem;
     font-weight: 700;
+    direction: rtl;
     text-align: right;
+    unicode-bidi: plaintext;
     padding: 4px 6px;
     border-radius: 6px;
     font-family: inherit;
