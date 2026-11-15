@@ -1607,6 +1607,10 @@
                     <button class="toolbar-btn" data-appliance-type="tv" onclick="toggleCellTv()"><i class="fa-solid fa-tv"></i><span>טלוויזיה</span></button>
                 </div>
             </div>
+            <!-- מראה מעל שולחן פנימי -->
+            <div class="toolbar-row tb-desk-ok tb-desk-mirror-only">
+                <button class="toolbar-btn" id="tb-btn-desk-mirror" onclick="toggleDeskMirror()" title="מראה על הגב מעל השולחן הפנימי"><i class="fa-solid fa-circle-half-stroke"></i><span>מראה</span></button>
+            </div>
             <!-- לדים -->
             <div class="toolbar-row tb-desk-ok">
                 <button class="toolbar-btn" id="tb-btn-led" onclick="toggleLedPair()" title="זוג לדים לאורך התאים שנבחרו"><i class="fa-solid fa-lightbulb"></i><span>לדים</span></button>
@@ -2781,6 +2785,9 @@
         </button>
         <button class="mcell-cat-btn mcp-desk-hide" id="mcp-cat-appliances" onclick="_mcpShowSub('appliances')">
             <i class="fa-solid fa-plug"></i><span>חשמל</span>
+        </button>
+        <button class="mcell-cat-btn mcp-desk-only" id="mcp-desk-mirror" onclick="toggleDeskMirror(); updateMobileCellSheetState();">
+            <i class="fa-solid fa-circle-half-stroke"></i><span>מראה</span>
         </button>
         <button class="mcell-cat-btn" id="mcp-led" onclick="toggleLedPair(); updateMobileCellSheetState();">
             <i class="fa-solid fa-lightbulb"></i><span>לדים</span>

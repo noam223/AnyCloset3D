@@ -2789,7 +2789,7 @@ body.dragging-v { cursor: ns-resize !important; }
 .tv-size-btn i { font-size: 0.68rem; }
 .tv-size-btn:hover { background: rgba(99, 102, 241, 0.95); transform: translate(-50%, -50%) scale(1.08); }
 
-/* Desk knee-zone selection: only כוורת + לדים apply */
+/* Desk knee-zone selection: only כוורת + מראה + לדים apply */
 #bottom-floating-toolbar.desk-zone-mode #toolbar-section-main > .toolbar-row:not(.tb-desk-ok),
 #bottom-floating-toolbar.desk-zone-mode #drawer-count-section,
 #bottom-floating-toolbar.desk-zone-mode #toolbar-divider-main,
@@ -2797,6 +2797,9 @@ body.dragging-v { cursor: ns-resize !important; }
 #bottom-floating-toolbar.desk-zone-mode #tb-subcell-shelf-section,
 #mobile-cell-left-panel.desk-zone-mode,
 #mobile-cell-right-panel.desk-zone-mode .mcp-desk-hide { display: none !important; }
+/* Mirror above desk: only relevant in the knee-zone selection */
+#mobile-cell-right-panel:not(.desk-zone-mode) .mcp-desk-only,
+#bottom-floating-toolbar:not(.desk-zone-mode) .tb-desk-mirror-only { display: none !important; }
 
 #tv-size-menu {
     position: fixed;

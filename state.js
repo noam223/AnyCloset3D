@@ -2301,6 +2301,9 @@ function _computeHistoryLabel(prevSnap, nextSnap) {
                 if (nc.type === 'desk') return 'הוספת שולחן פנימי';
                 return 'שינוי עמודה';
             }
+            if (!!pc.deskMirror !== !!nc.deskMirror) return nc.deskMirror ? 'הוספת מראה מעל שולחן' : 'הסרת מראה מעל שולחן';
+            if (!!pc.deskHoneycomb !== !!nc.deskHoneycomb) return nc.deskHoneycomb ? 'הוספת כוורת מעל שולחן' : 'הסרת כוורת מעל שולחן';
+            if (!!pc.deskLeds !== !!nc.deskLeds) return nc.deskLeds ? 'הוספת לדים מעל שולחן' : 'הסרת לדים מעל שולחן';
             const ps = (pc.shelvesY || []).length;
             const ns = (nc.shelvesY || []).length;
             if (ps !== ns) return ns > ps ? 'הוספת מדף' : 'הסרת מדף';
@@ -5429,6 +5432,12 @@ function _calcWingCost(cfg, wing) {
         if (col.type === 'desk' && col.deskLeds) ledPairs++;
     });
     finalCost += ledPairs * _priceNum(ex.ledPair, 650);
+
+    let deskMirrors = 0;
+    wing.columns.forEach(col => {
+        if (col.type === 'desk' && col.deskMirror) deskMirrors++;
+    });
+    finalCost += deskMirrors * _priceNum(ex.doorMirror, 350);
 
     if (wing.hasDoors) {
         wing.columns.forEach(col => {

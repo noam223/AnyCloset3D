@@ -1532,6 +1532,28 @@ function _bpDrawDeskHoneycomb(p, col, ctx) {
     }));
 }
 
+/** Mirror sheet on the back of the knee space above an internal desk. */
+function _bpDrawDeskMirror(p, col, ctx) {
+    if (col.type !== 'desk' || !col.deskMirror || !ctx) return;
+    const deskH = col.deskHeight || 80;
+    const clr = col.deskClearance || 80;
+    const inset = 2;
+    const x = ctx.colX + inset * ctx.sc;
+    const w = Math.max(4, ctx.colW - inset * 2 * ctx.sc);
+    const botY = ctx.colBotSvgY - (deskH + inset) * ctx.sc;
+    const topY = ctx.colBotSvgY - (deskH + clr - inset) * ctx.sc;
+    const h = Math.max(4, botY - topY);
+    const makeRect = ctx.makeRectFn;
+    if (typeof makeRect === 'function') {
+        makeRect(p, x, topY, w, h, '#dbe4ee', ctx.strokeThin || '#64748b', 1);
+    } else {
+        p.push(`<rect x="${x.toFixed(1)}" y="${topY.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="#dbe4ee" stroke="${ctx.strokeThin || '#64748b'}" stroke-width="1"/>`);
+    }
+    if (h > 16 && w > 28) {
+        p.push(`<text x="${(x + w / 2).toFixed(1)}" y="${(topY + h / 2 + 3).toFixed(1)}" text-anchor="middle" font-family="${ctx.font || 'Arial,sans-serif'}" font-size="9" fill="#475569">מראה</text>`);
+    }
+}
+
 function _bpIsDoorZoneType(t) {
     return t === 'door_right' || t === 'door_left' || t === 'door_double' || t === 'door_flap';
 }
@@ -2740,6 +2762,7 @@ window._generateMultiViewBlueprintSVG = function() {
                 _bpDrawHoneycombBlock(p, Object.assign({ block }, _hcCtxOld));
             });
             _bpDrawDeskHoneycomb(p, col, _hcCtxOld);
+            _bpDrawDeskMirror(p, col, _hcCtxOld);
             _bpDrawColLeds(p, col, rowBoundsEarly, colX, colW, _colBotY, sc, FONT);
             colX += colW;
         });
@@ -3756,6 +3779,7 @@ window._generateMultiViewBlueprintPages = function() {
                 _bpDrawHoneycombBlock(p, Object.assign({ block }, _hcCtx));
             });
             _bpDrawDeskHoneycomb(p, col, _hcCtx);
+            _bpDrawDeskMirror(p, col, _hcCtx);
             _bpDrawColLeds(p, col, rowBounds, colX, colW, _colBotSvgY, sc, FONT);
             colX += colW;
         });

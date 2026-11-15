@@ -7535,6 +7535,19 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
                 [-1, 1].forEach(s => createBoard(t, sideH, bodyD - 2, colCenterX + s * (col.width / 2 - t / 2), sideC, 1, matOpenCell));
                 _ppPartId = '';
             }
+            if (!isBP && col.deskMirror) {
+                // Mirror sheet on the back of the knee space (in front of back panel / honeycomb lining)
+                const inset = col.deskHoneycomb ? t + 0.4 : 1.5;
+                const mW = Math.max(4, col.width - inset * 2);
+                const mH = Math.max(4, col.deskClearance - inset * 2);
+                const backFaceZ = col.deskHoneycomb
+                    ? (-bodyD / 2 + t / 2 + 0.6 + t / 2 + 0.2)
+                    : (-bodyD / 2 + backT + 0.2);
+                const sheet = new THREE.Mesh(new THREE.BoxGeometry(mW, mH, 0.4), _mirrorMaterial());
+                sheet.position.set(colCenterX, col.deskHeight + col.deskClearance / 2, backFaceZ);
+                _buildGroup.add(sheet);
+                _ppRegisterMesh(sheet, `desk_mirror_c${c}`);
+            }
             if (!isBP && col.deskLeds) _addLedPair(col.deskHeight, _deskZoneTop, col.width / 2 - (col.deskHoneycomb ? t : 0));
         } else {
             // For sliding wardrobes and noPlinth columns: back panel starts above the bottom board (y=t).

@@ -573,7 +573,7 @@ window.toggleInternalDesk = function() {
     const col = state.columns[state.activeEditCol];
     if (col.type === 'desk') {
         col.type = 'normal';
-        delete col.deskHeight; delete col.deskClearance; delete col.hasDrawers; delete col.drawerHeight; delete col.deskLeds; delete col.deskHoneycomb;
+        delete col.deskHeight; delete col.deskClearance; delete col.hasDrawers; delete col.drawerHeight; delete col.deskLeds; delete col.deskHoneycomb; delete col.deskMirror;
     } else {
         col.type = 'desk';
         col.deskHeight = 80;
@@ -1247,12 +1247,13 @@ function buildDimensionsAndButtonsUI() {
             dimEl.addEventListener('pointerup', e => e.stopPropagation());
             dimEl.appendChild(_buildCellPill({
                 selected: state.selection.colIndex === d.colIndex && state.selection.rows.includes(-1),
-                hasContent: !!(col.deskLeds || col.deskHoneycomb),
+                hasContent: !!(col.deskLeds || col.deskHoneycomb || col.deskMirror),
                 heightCm: Math.round((Number(d.h) || 0) * 10) / 10,
                 onToggle: () => toggleSelection(d.colIndex, -1),
                 onTrash: () => {
                     delete col.deskLeds;
                     delete col.deskHoneycomb;
+                    delete col.deskMirror;
                     buildCabinet(); calculatePrice(); saveHistoryState();
                 },
                 onHeightChange: (desired) => {
@@ -1955,7 +1956,9 @@ function updateToolbarButtonHighlights() {
 
     const ledBtn = document.getElementById('tb-btn-led');
     if (ledBtn) ledBtn.classList.toggle('active', _ledGroupIndexForSelection(col) !== -1);
-    // Desk knee zone: only כוורת + לדים apply (CSS hides the rest of the toolbar)
+    const deskMirrorBtn = document.getElementById('tb-btn-desk-mirror');
+    if (deskMirrorBtn) deskMirrorBtn.classList.toggle('active', !!(deskZone && col && col.deskMirror));
+    // Desk knee zone: only כוורת + מראה + לדים apply (CSS hides the rest of the toolbar)
     if (deskZone) return;
 
     // "תאים שווים" button: show only when 2+ consecutive rows are selected
@@ -2428,6 +2431,7 @@ function _serializeColumnForClipboard(col) {
         deskDrawerCount: col.deskDrawerCount,
         deskLeds:      !!col.deskLeds,
         deskHoneycomb: !!col.deskHoneycomb,
+        deskMirror:    !!col.deskMirror,
     };
 }
 
@@ -2465,9 +2469,11 @@ function _applyColumnClipboard(target, src) {
         target.deskDrawerCount = srcCopy.deskDrawerCount;
         if (srcCopy.deskLeds) target.deskLeds = true; else delete target.deskLeds;
         if (srcCopy.deskHoneycomb) target.deskHoneycomb = true; else delete target.deskHoneycomb;
+        if (srcCopy.deskMirror) target.deskMirror = true; else delete target.deskMirror;
     } else {
         delete target.deskLeds;
         delete target.deskHoneycomb;
+        delete target.deskMirror;
         delete target.deskHeight;
         delete target.deskClearance;
         delete target.hasDrawers;
@@ -2807,9 +2813,11 @@ window._applyColumnTemplateToCol = function(target, tplData) {
         target.deskDrawerCount = src.deskDrawerCount;
         if (src.deskLeds) target.deskLeds = true; else delete target.deskLeds;
         if (src.deskHoneycomb) target.deskHoneycomb = true; else delete target.deskHoneycomb;
+        if (src.deskMirror) target.deskMirror = true; else delete target.deskMirror;
     } else {
         delete target.deskLeds;
         delete target.deskHoneycomb;
+        delete target.deskMirror;
         delete target.deskHeight;
         delete target.deskClearance;
         delete target.hasDrawers;
@@ -6167,6 +6175,19 @@ window.toggleDeskLeds = function(colIndex) {
     if (!col || col.type !== 'desk') return;
     if (col.deskLeds) delete col.deskLeds; else col.deskLeds = true;
     buildCabinet(); calculatePrice(); saveHistoryState();
+};
+
+/** Mirror sheet on the back of the knee space above an internal desk. */
+window.toggleDeskMirror = function(colIndex) {
+    if (typeof colIndex !== 'number') {
+        if (!_isDeskZoneSelection()) return;
+        colIndex = state.selection.colIndex;
+    }
+    const col = state.columns[colIndex];
+    if (!col || col.type !== 'desk') return;
+    if (col.deskMirror) delete col.deskMirror; else col.deskMirror = true;
+    buildCabinet(); calculatePrice(); saveHistoryState();
+    updateToolbarButtonHighlights();
 };
 
 /** Regular כוורת lining frame in the knee space above an internal desk (priced/counted as one honeycomb unit). */
@@ -14993,6 +15014,7 @@ function _countTouchHandlesInWing(wing, rs, out) {
     const isTouch = function(s) { return (s || def) === 'touch'; };
     wing.columns.forEach(function(col) {
         if (!col) return;
+        if (col.type === 'desk' && col.deskMirror) out.deskMirror = (out.deskMirror || 0) + 1;
         if (wing.hasDoors !== false) {
             (col.doors || []).forEach(function(door) {
                 if (door && isTouch(door.handleStyle)) out.doors += door.type === 'double' ? 2 : 1;
@@ -15127,6 +15149,7 @@ function _pushTouchHandleRows(rows, prefix, t) {
     if (t.drawers > 0) rows.push({ id: prefix + 'touchDrawers', label: 'מגירות טאצ\'', value: t.drawers + ' יחידות' });
     if (t.mirrorOut > 0) rows.push({ id: prefix + 'mirrorOut', label: 'מראה חיצונית על דלת', value: t.mirrorOut + ' יחידות (מודבקת על כל החזית)' });
     if (t.mirrorIn > 0) rows.push({ id: prefix + 'mirrorIn', label: 'מראה פנימית בדלת', value: t.mirrorIn + ' יחידות' });
+    if (t.deskMirror > 0) rows.push({ id: prefix + 'deskMirror', label: 'מראה מעל שולחן', value: t.deskMirror + (t.deskMirror === 1 ? ' יחידה' : ' יחידות') });
 }
 
 /** Drawer fronts of an attached side desk — same default as the engine (≤80cm → 1, wider → 2). */
@@ -18649,6 +18672,10 @@ function _buildCustomerSummaryDetails(itemObj) {
     if (shoeN > 0) details.push('מגירות נעליים: ' + shoeN);
     const ledPairs = _countLedPairsFromRawState(rawState);
     if (ledPairs > 0) details.push('תאורת לד: ' + _formatLedPairs(ledPairs));
+    if (rawState) {
+        const deskMir = _countTouchHandlesFromRawState(rawState).deskMirror || 0;
+        if (deskMir > 0) details.push('מראה מעל שולחן: ' + deskMir + (deskMir === 1 ? ' יחידה' : ' יחידות'));
+    }
     if (deskSummary.desk !== 'ללא') {
         details.push(deskSummary.desk);
         if (deskSummary.deskDims) details.push('מידות שולחן: ' + deskSummary.deskDims);
@@ -19136,9 +19163,10 @@ document.addEventListener('keydown', (e) => {
         if (colIndex > -1 && rows.length > 0 && state.columns[colIndex]) {
             let changed = false;
             const col = state.columns[colIndex];
-            if (_isDeskZoneSelection() && (col.deskLeds || col.deskHoneycomb)) {
+            if (_isDeskZoneSelection() && (col.deskLeds || col.deskHoneycomb || col.deskMirror)) {
                 delete col.deskLeds;
                 delete col.deskHoneycomb;
+                delete col.deskMirror;
                 changed = true;
             }
             rows.forEach(r => {

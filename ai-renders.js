@@ -897,7 +897,7 @@ function _aiDescribeWingFronts(wing, totals) {
             else segs.push({ t: t, n: 1 });
         };
         if (col.type === 'desk') {
-            push('עמדת שולחן עבודה משולבת: משטח כתיבה וחלל פתוח לרגליים מתחתיו' + (col.deskHoneycomb ? ', כוורת פתוחה מעליו' : ''));
+            push('עמדת שולחן עבודה משולבת: משטח כתיבה וחלל פתוח לרגליים מתחתיו' + (col.deskHoneycomb ? ', כוורת פתוחה מעליו' : '') + (col.deskMirror ? ', מראה על הגב מעליו' : ''));
         }
         var comps = col.compartments || [];
         var doors = hasDoors ? (col.doors || []).filter(Boolean) : [];
