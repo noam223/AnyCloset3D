@@ -8896,7 +8896,12 @@ function bindUI() {
             if (card.dataset.dim === 'columns') return;
             card.addEventListener('click', function(e) {
                 if (e.target.closest('.header-slider-row')) return;
-                if (e.target.closest('input[type="number"]')) return;
+                // Number field: open this card's slider (keep open while typing)
+                if (e.target.closest('input[type="number"]')) {
+                    closeAll(card);
+                    card.classList.add('is-open');
+                    return;
+                }
                 const willOpen = !card.classList.contains('is-open');
                 closeAll(card);
                 card.classList.toggle('is-open', willOpen);
