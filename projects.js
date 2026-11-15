@@ -1050,8 +1050,8 @@ function _formatTodoOpenedAt(iso) {
     if (!iso) return '';
     var d = new Date(iso);
     if (isNaN(d.getTime())) return '';
-    return d.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
-        ' · ' + d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: '2-digit' }) +
+        ' ' + d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
 }
 
 async function refreshOpenTodos() {
@@ -1199,42 +1199,30 @@ function renderOpenTodos() {
         return;
     }
 
-    var byProject = {};
-    var order = [];
-    _openTodos.forEach(function(t) {
-        var pid = t.project_id;
-        if (!byProject[pid]) {
-            byProject[pid] = { id: pid, name: t.project_name || 'פרויקט', items: [] };
-            order.push(pid);
-        }
-        byProject[pid].items.push(t);
-    });
-
-    groupsEl.innerHTML = order.map(function(pid) {
-        var g = byProject[pid];
-        var itemsHtml = g.items.map(function(t) {
-            var opened = _formatTodoOpenedAt(t.created_at);
-            return '<li class="open-todos-item">' +
-                '<input type="checkbox" aria-label="סמן כבוצע" onchange="toggleOpenTodo(\'' + t.id + '\', this.checked)">' +
-                '<span class="open-todos-item-body">' +
-                    '<span class="open-todos-item-text">' + _escHtml(t.text) + '</span>' +
-                    (opened ? '<span class="open-todos-item-date">נפתחה ' + _escHtml(opened) + '</span>' : '') +
-                '</span>' +
-                '<button type="button" class="open-todos-item-del" title="מחק" onclick="deleteOpenTodo(\'' + t.id + '\')"><i class="fa-solid fa-xmark"></i></button>' +
-                '</li>';
-        }).join('');
-        return '<div class="open-todos-group" data-project-id="' + _escAttr(pid) + '">' +
-            '<div class="open-todos-group-head">' +
-                '<button type="button" class="open-todos-group-name" onclick="openProject(\'' + pid + '\')">' + _escHtml(g.name) + '</button>' +
-                '<div class="open-todos-add">' +
-                    '<input type="text" maxlength="200" placeholder="משימה חדשה..." ' +
-                        'onkeydown="if(event.key===\'Enter\'){event.preventDefault();addOpenTodo(\'' + pid + '\', this);}">' +
-                    '<button type="button" onclick="addOpenTodo(\'' + pid + '\', this.previousElementSibling)">הוסף</button>' +
-                '</div>' +
+    groupsEl.innerHTML =
+        '<div class="open-todos-table" role="table">' +
+            '<div class="open-todos-thead" role="row">' +
+                '<span class="ot-col-check"></span>' +
+                '<span class="ot-col-text">משימה</span>' +
+                '<span class="ot-col-proj">פרויקט</span>' +
+                '<span class="ot-col-date">נפתחה</span>' +
+                '<span class="ot-col-del"></span>' +
             '</div>' +
-            '<ul class="open-todos-list">' + itemsHtml + '</ul>' +
-            '</div>';
-    }).join('');
+            '<div class="open-todos-tbody">' +
+                _openTodos.map(function(t) {
+                    var opened = _formatTodoOpenedAt(t.created_at);
+                    return '<div class="open-todos-row" role="row">' +
+                        '<span class="ot-col-check"><input type="checkbox" aria-label="סמן כבוצע" onchange="toggleOpenTodo(\'' + t.id + '\', this.checked)"></span>' +
+                        '<span class="ot-col-text" title="' + _escAttr(t.text) + '">' + _escHtml(t.text) + '</span>' +
+                        '<button type="button" class="ot-col-proj" title="פתח פרויקט" onclick="openProject(\'' + t.project_id + '\')">' +
+                            _escHtml(t.project_name || 'פרויקט') +
+                        '</button>' +
+                        '<span class="ot-col-date">' + _escHtml(opened || '—') + '</span>' +
+                        '<span class="ot-col-del"><button type="button" class="open-todos-item-del" title="מחק" onclick="deleteOpenTodo(\'' + t.id + '\')"><i class="fa-solid fa-xmark"></i></button></span>' +
+                    '</div>';
+                }).join('') +
+            '</div>' +
+        '</div>';
 }
 
 async function addOpenTodoFromCompose() {
