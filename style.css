@@ -6800,9 +6800,81 @@ body.viewer-mode #canvas-container canvas {
 #header-dims-row.header-dims-grid {
     display: flex;
     gap: 6px;
-    padding: 8px 0 12px;
+    padding: 8px 0 6px;
     position: relative;
     z-index: 3;
+}
+/* Cabinet name — full-width blue card under the dimension chips */
+.header-cab-name-card {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    margin: 0 0 12px;
+    padding: 8px 10px 9px;
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.06) 100%);
+    border: 1px solid rgba(255,255,255,0.16);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+    transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.header-cab-name-card:hover,
+.header-cab-name-card:focus-within {
+    background: linear-gradient(180deg, rgba(16,185,129,0.38) 0%, rgba(5,150,105,0.2) 100%);
+    border-color: #34d399;
+    box-shadow: 0 6px 18px rgba(16,185,129,0.3), inset 0 1px 0 rgba(255,255,255,0.14);
+}
+.header-cab-name-card .header-dim-top {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: 6px;
+    margin: 0;
+}
+.header-cab-name-card .hdc-ic {
+    font-size: 0.68rem;
+    color: #93c5fd;
+    opacity: 0.9;
+}
+.header-cab-name-card:hover .hdc-ic,
+.header-cab-name-card:focus-within .hdc-ic { color: #6ee7b7; }
+.header-cab-name-card .header-dim-top label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #bfdbfe;
+    white-space: nowrap;
+    margin: 0;
+}
+.header-cab-name-card:hover .header-dim-top label,
+.header-cab-name-card:focus-within .header-dim-top label { color: #d1fae5; }
+.header-cab-name-card .header-name-val {
+    display: flex;
+    min-width: 0;
+    justify-content: stretch;
+}
+.header-cab-name-card .header-name-val input {
+    width: 100%;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: #fff;
+    font-size: 0.92rem;
+    font-weight: 700;
+    text-align: right;
+    padding: 2px 4px;
+    border-radius: 6px;
+    font-family: inherit;
+}
+.header-cab-name-card .header-name-val input::placeholder {
+    color: rgba(191, 219, 254, 0.45);
+    font-weight: 500;
+}
+.header-cab-name-card .header-name-val input:hover { background: rgba(255,255,255,0.1); }
+.header-cab-name-card .header-name-val input:focus {
+    background: #fff;
+    color: var(--primary);
+    box-shadow: 0 0 0 2px #93c5fd;
 }
 #header-dims-placeholder {
     align-items: center;

@@ -265,6 +265,15 @@
                 <input type="range" id="inp-columns" min="2" max="10" value="2" step="1" hidden>
             </div>
         </div>
+        <div class="header-dim-card header-cab-name-card" id="header-cabinet-name-card" data-dim="name">
+            <div class="header-dim-top">
+                <i class="hdc-ic fa-solid fa-pen"></i>
+                <label for="inp-cabinet-name">שם הארון</label>
+                <div class="header-dim-val header-name-val">
+                    <input type="text" id="inp-cabinet-name" placeholder="אופציונלי — למשל ארון חדר הורים" maxlength="80" autocomplete="off">
+                </div>
+            </div>
+        </div>
         <input type="number" id="inp-num-width" class="visually-hidden-dim" value="160" min="10" max="600" onchange="updateDim('width',null,this.value);saveHistoryState()">
         <input type="number" id="inp-num-height" class="visually-hidden-dim" value="240" min="40" max="370" onchange="updateDim('height',null,this.value);saveHistoryState()">
         <input type="number" id="inp-num-depth" class="visually-hidden-dim" value="54" min="10" max="80" onchange="updateDim('depth',null,this.value);saveHistoryState()">
@@ -453,7 +462,6 @@
                         <input type="date" id="cust-delivery-picker" class="date-native-picker" tabindex="-1" aria-label="בחירת תאריך">
                     </div>
                 </div>
-                <div class="input-icon-wrap"><i class="fa-solid fa-pen"></i><input type="text" id="inp-cabinet-name" class="editor-select" placeholder="שם הארון (אופציונלי)" style="margin:0;"></div>
             </div>
         </div>
     
@@ -2655,14 +2663,6 @@
         <button class="mobile-panel-close" onclick="closeMobilePanel()"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="mobile-panel-body">
-        <div class="mobile-section-title">שם הארון</div>
-        <div class="input-icon-wrap" style="margin-bottom:15px;">
-            <i class="fa-solid fa-pen"></i>
-            <input type="text" id="mobile-inp-cabinet-name2" class="editor-select" placeholder="למשל: ארון חדר הורים..." style="margin:0;"
-                oninput="window._onCabinetNameInput(this.value, { save: false, updateSidebar: true });"
-                onchange="window._onCabinetNameInput(this.value, { save: true, updateSidebar: true });">
-        </div>
-        <div class="mobile-panel-divider"></div>
         <div class="mobile-section-title">פרטי לקוח</div>
         <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:15px;">
             <div class="input-icon-wrap"><i class="fa-regular fa-user"></i>

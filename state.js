@@ -1368,8 +1368,10 @@ function _isSingleCabinetPreset() {
 
 function _syncHeaderDimsPlaceholder(isEditing) {
     const row = document.getElementById('header-dims-row');
+    const nameCard = document.getElementById('header-cabinet-name-card');
     const ph = document.getElementById('header-dims-placeholder');
     if (row) row.style.display = isEditing ? '' : 'none';
+    if (nameCard) nameCard.style.display = isEditing ? '' : 'none';
     if (ph) ph.style.display = isEditing ? 'none' : 'flex';
 }
 
