@@ -478,7 +478,7 @@ function _renderPlanBar() {
         document.getElementById('plan-bar-count').textContent = 'ללא הגבלת פרויקטים';
         var fill = document.getElementById('plan-bar-fill');
         fill.style.width = '0%';
-        fill.className   = 'plan-bar-fill';
+        fill.className   = 'hero-plan-fill';
     } else {
         var pct = Math.min(100, Math.round((used / max) * 100));
         document.getElementById('plan-bar-label').textContent =
@@ -489,7 +489,7 @@ function _renderPlanBar() {
                 : 'נותרו ' + (max - used) + ' פרויקטים';
         var fill = document.getElementById('plan-bar-fill');
         fill.style.width = pct + '%';
-        fill.className   = 'plan-bar-fill' + (pct >= 100 ? ' full' : pct >= 75 ? ' warn' : '');
+        fill.className   = 'hero-plan-fill' + (pct >= 100 ? ' full' : pct >= 75 ? ' warn' : '');
     }
 
     // Show upgrade button unless on top-tier plans or company agent
