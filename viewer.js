@@ -1076,13 +1076,39 @@ function _updateDetailsBar() {
 
 // ── View switching ────────────────────────────────────────────────────────────
 window._viewerDoorsModeTimer = null;
+
+function _syncViewerDoorsToggle() {
+    var open = window._viewerDoorsMode === 'doors-open';
+    var btn = document.getElementById('vdtab-doors-toggle');
+    var icon = document.getElementById('vdtab-doors-icon');
+    var label = document.getElementById('vdtab-doors-label');
+    if (btn) {
+        btn.classList.toggle('doors-open', open);
+        btn.setAttribute('aria-pressed', open ? 'true' : 'false');
+        btn.title = open ? 'חזיתות פתוחות — לחץ לסגור' : 'חזיתות סגורות — לחץ לפתוח';
+    }
+    if (icon) {
+        icon.className = 'fa-solid ' + (open ? 'fa-door-open' : 'fa-door-closed');
+    }
+    if (label) label.textContent = open ? 'פתוח' : 'סגור';
+}
+
+/** Single toggle: סגור ↔ פתוח (always shows in 3D). */
+window._toggleViewerDoors = function() {
+    var next = (window._viewerDoorsMode === 'doors-open') ? 'doors-closed' : 'doors-open';
+    window._setViewerView(next);
+};
+
 window._setViewerView = function(mode) {
     var viewMode = mode;
     if (mode === 'doors-open' || mode === 'doors-closed') {
         window._viewerDoorsMode = mode;
         viewMode = '3d';
-    } else if (mode === '3d' || mode === 'front' || mode === 'blueprint') {
-        window._viewerDoorsMode = null;
+    } else if (mode === '3d') {
+        // Stay on 3D; keep last doors state (default closed)
+        if (!window._viewerDoorsMode) window._viewerDoorsMode = 'doors-closed';
+    } else if (mode === 'front' || mode === 'blueprint') {
+        // Leave doors state as-is for when user returns to 3D
     }
     state.viewMode = viewMode;
 
@@ -1091,9 +1117,12 @@ window._setViewerView = function(mode) {
         _viewerForceHasDoorsOn();
     }
 
-    document.querySelectorAll('.vd-tab').forEach(function(btn) {
-        btn.classList.toggle('active', btn.dataset.view === mode);
+    // View tabs: 3D stays active while doors toggle is used; toggle syncs separately
+    var activeView = (mode === 'doors-open' || mode === 'doors-closed') ? '3d' : mode;
+    document.querySelectorAll('.vd-tab[data-view]').forEach(function(btn) {
+        btn.classList.toggle('active', btn.dataset.view === activeView);
     });
+    _syncViewerDoorsToggle();
 
     var bpLayer  = document.getElementById('blueprint-layer');
     var canvas   = document.getElementById('canvas-container');

@@ -201,6 +201,17 @@
         border-color: rgba(255,255,255,0.9);
         font-weight: 700;
     }
+    .vd-tab.doors-open {
+        background: rgba(16, 185, 129, 0.22);
+        border-color: rgba(110, 231, 183, 0.65);
+        color: #d1fae5;
+        font-weight: 700;
+    }
+    .vd-tab.doors-open.active {
+        background: rgba(255,255,255,0.95);
+        color: #047857;
+        border-color: rgba(255,255,255,0.9);
+    }
     .vd-tab:active { transform: scale(0.96); }
     /* Separator between tabs and toggle buttons */
     .vd-row2-sep {
@@ -1523,11 +1534,9 @@
         <button class="vd-tab active" id="vdtab-3d" data-view="3d" onclick="window._setViewerView('3d')">
             <i class="fa-solid fa-cube"></i> 3D
         </button>
-        <button class="vd-tab" id="vdtab-doors-closed" data-view="doors-closed" onclick="window._setViewerView('doors-closed')">
-            <i class="fa-solid fa-door-closed"></i> סגור
-        </button>
-        <button class="vd-tab" id="vdtab-doors-open" data-view="doors-open" onclick="window._setViewerView('doors-open')">
-            <i class="fa-solid fa-door-open"></i> פתוח
+        <button class="vd-tab" id="vdtab-doors-toggle" type="button" onclick="window._toggleViewerDoors()" title="החלף בין חזיתות סגורות לפתוחות" aria-pressed="false">
+            <i class="fa-solid fa-door-closed" id="vdtab-doors-icon"></i>
+            <span id="vdtab-doors-label">סגור</span>
         </button>
         <button class="vd-tab" id="vdtab-front" data-view="front" onclick="window._setViewerView('front')">
             <i class="fa-solid fa-square"></i> קדמי
@@ -1734,7 +1743,7 @@
 <script src="shelf-pick.js?v=20260922sideWall"></script>
 
 <!-- ===== VIEWER LOGIC ===== -->
-<script src="viewer.js?v=20261115spaceBp"></script>
+<script src="viewer.js?v=20261115doorsToggle"></script>
 <script src="viewer-extras.js?v=20261115spaceHost"></script>
 <script src="accessibility.js?v=20261115b"></script>
 
