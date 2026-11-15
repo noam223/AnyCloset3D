@@ -270,6 +270,8 @@ function _resolveLiveCabIndex(projectData) {
 /**
  * Apply project data to the viewer.
  * followLive: restore designer's live canvas (top-level wings) and highlight editingCartIndex.
+ * Space groups always restore the host (slot 0) as the main mesh + companions — never the
+ * designer's currently-edited member alone (that duplicated the active part and hid the host).
  */
 function _applyLiveProjectData(projectData, opts) {
     opts = opts || {};
@@ -284,10 +286,16 @@ function _applyLiveProjectData(projectData, opts) {
         _renderCabinetNav();
         _scrollActiveCabIntoView();
 
-        // Live canvas = top-level wings from designer; fall back to cart item rawState
         var liveIdx = _activeCabIdx;
         var cab = _cabinetList[liveIdx];
-        if (projectData.wings) {
+        var isSpaceGroup = !!(cab && cab.memberCount > 1);
+
+        if (isSpaceGroup) {
+            // Combined space: host wings + companions from cart (ignore live top-level wings)
+            _viewerRestoreListCab(liveIdx, projectData);
+            _renderCabinetNav();
+            _scrollActiveCabIntoView();
+        } else if (projectData.wings) {
             _restoreState({
                 wings: projectData.wings,
                 activeWing: projectData.activeWing || (cab && cab.activeWing) || 'center',
@@ -295,39 +303,29 @@ function _applyLiveProjectData(projectData, opts) {
                 orderCart: projectData.orderCart || projectData.cart,
                 customer: projectData.customer
             });
+            if (cab) {
+                var center = projectData.wings.center || {};
+                cab.wings = projectData.wings;
+                cab.presetId = projectData.presetId || cab.presetId;
+                cab.activeWing = projectData.activeWing || cab.activeWing;
+                cab.dims = {
+                    w: center.width || cab.dims.w || 0,
+                    h: center.globalHeight || cab.dims.h || 0,
+                    d: center.depth || cab.dims.d || 0
+                };
+                cab.materialBody = center.materialBody || cab.materialBody;
+                cab.materialDoors = center.materialExternal || cab.materialDoors;
+                cab.materialInternal = center.materialInternal || cab.materialInternal;
+                _renderCabinetNav();
+                _scrollActiveCabIntoView();
+            }
+            if (typeof window._clearSpaceCompanion === 'function') window._clearSpaceCompanion();
         } else if (cab) {
-            _restoreState({
-                wings: cab.wings,
-                activeCabinet: cab.activeCabinet,
-                presetId: cab.presetId,
-                activeWing: cab.activeWing,
-                orderCart: projectData.orderCart || projectData.cart,
-                customer: projectData.customer
-            });
+            _viewerRestoreListCab(liveIdx, projectData);
         } else {
             _restoreState(projectData);
         }
 
-        // Keep list metadata (dims/swatches) in sync with live wings for the active card
-        if (cab && projectData.wings) {
-            var center = projectData.wings.center || {};
-            cab.wings = projectData.wings;
-            cab.presetId = projectData.presetId || cab.presetId;
-            cab.activeWing = projectData.activeWing || cab.activeWing;
-            cab.dims = {
-                w: center.width || cab.dims.w || 0,
-                h: center.globalHeight || cab.dims.h || 0,
-                d: center.depth || cab.dims.d || 0
-            };
-            cab.materialBody = center.materialBody || cab.materialBody;
-            cab.materialDoors = center.materialExternal || cab.materialDoors;
-            cab.materialInternal = center.materialInternal || cab.materialInternal;
-            _renderCabinetNav();
-            _scrollActiveCabIntoView();
-        }
-
-        // Space groups: show all members together (same as designer canvas)
-        _viewerEnsureSpaceCompanions(_activeCabIdx);
         _updateInfoStrip();
         if (opts.captureThumb) {
             setTimeout(function() { _captureSnapshot(_activeCabIdx); }, 400);
@@ -670,18 +668,8 @@ function _switchCabinet(idx) {
     var cab = _cabinetList[idx];
     if (!cab) return;
 
-    var syntheticData = {
-        wings: cab.wings,
-        activeCabinet: cab.activeCabinet,
-        presetId: cab.presetId,
-        activeWing: cab.activeWing,
-        customer: _projectData ? _projectData.customer : null,
-        orderCart: _projectData ? (_projectData.orderCart || _projectData.cart) : null
-    };
-
-    _restoreState(syntheticData);
-    // Keep part-color / paint scope on the host cart item; rebuild companions for space groups
-    _viewerEnsureSpaceCompanions(idx);
+    // Host (+ companions for space groups) from cart — never stale live non-host wings
+    _viewerRestoreListCab(idx, _projectData);
     // Apply any viewer color overrides for this cabinet
     _applyViewerColorOverride(idx);
     _updateInfoStrip();
@@ -1310,21 +1298,72 @@ function _viewerNoteCartKeys(listIdx) {
     }
     return keys;
 }
-/** After restoring host wings, rebuild companion meshes for a space-group card. */
-function _viewerEnsureSpaceCompanions(listIdx) {
+/**
+ * Restore a nav card into the 3D scene.
+ * Space groups: always load slot-0 (host) wings as the main cabinet, then companions for the rest.
+ */
+function _viewerRestoreListCab(listIdx, projectData) {
     var cab = _cabinetList && _cabinetList[listIdx];
     if (!cab) return;
+    projectData = projectData || _projectData || {};
+    var cart = projectData.orderCart || projectData.cart
+        || (typeof state !== 'undefined' && state.orderCart) || [];
     var cartIdx = _viewerCartKeyForList(listIdx);
+    var item = cart[cartIdx];
+    var rs = item && item.rawState;
+    var payload = {
+        customer: projectData.customer || (_projectData && _projectData.customer) || null,
+        orderCart: cart
+    };
+
+    if (cab.memberCount > 1 && rs && rs.wings) {
+        payload.wings = rs.wings;
+        payload.presetId = rs.presetId || cab.presetId || 'linear';
+        payload.activeWing = rs.activeWing || cab.activeWing || 'center';
+        cab.wings = rs.wings;
+        cab.presetId = payload.presetId;
+        cab.activeWing = payload.activeWing;
+        var center = rs.wings.center || {};
+        cab.dims = {
+            w: center.width || rs.width || (cab.dims && cab.dims.w) || 0,
+            h: center.globalHeight || rs.globalHeight || (cab.dims && cab.dims.h) || 0,
+            d: center.depth || rs.depth || (cab.dims && cab.dims.d) || 0
+        };
+        cab.materialBody = center.materialBody || rs.materialBody || cab.materialBody;
+        cab.materialDoors = center.materialExternal || rs.materialExternal || cab.materialDoors;
+        cab.materialInternal = center.materialInternal || rs.materialInternal || cab.materialInternal;
+    } else if (rs && rs.wings) {
+        payload.wings = rs.wings;
+        payload.presetId = rs.presetId || cab.presetId || 'linear';
+        payload.activeWing = rs.activeWing || cab.activeWing || 'center';
+    } else {
+        payload.wings = cab.wings;
+        payload.activeCabinet = cab.activeCabinet;
+        payload.presetId = cab.presetId || 'linear';
+        payload.activeWing = cab.activeWing || 'center';
+    }
+
     try {
         state.editingCartIndex = cartIdx;
         if (typeof _syncPartColorScope === 'function') _syncPartColorScope();
+    } catch (eScope) {}
+
+    _restoreState(payload);
+
+    // buildCabinet already rebuilds companions; refresh again after host index is set
+    try {
         if (cab.memberCount > 1 && typeof window._rebuildSpaceCompanion === 'function') {
             window._rebuildSpaceCompanion();
             if (typeof window._applySpacePairPositions === 'function') window._applySpacePairPositions();
         } else if (typeof window._clearSpaceCompanion === 'function') {
             window._clearSpaceCompanion();
         }
-    } catch (e) { /* ignore */ }
+    } catch (eComp) {}
+}
+
+/** @deprecated use _viewerRestoreListCab — kept as alias for older call sites */
+function _viewerEnsureSpaceCompanions(listIdx) {
+    _viewerRestoreListCab(listIdx, _projectData);
 }
 
 // Load notes for a specific nav-card index (aggregates all cart members of a space group)
