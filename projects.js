@@ -1045,6 +1045,24 @@ function newProject() {
 // ── Open project ──────────────────────────────────────────────────────────────
 // ── Open project TODOs checklist ─────────────────────────────────────────────
 var _openTodos = [];
+var _OPEN_TODOS_PANEL_KEY = 'anycloset_open_todos_panel';
+
+function toggleOpenTodosPanel(forceOpen) {
+    var panel = document.getElementById('open-todos-panel');
+    var btn = document.getElementById('open-todos-toggle');
+    if (!panel) return;
+    var open = typeof forceOpen === 'boolean' ? forceOpen : !panel.classList.contains('is-open');
+    panel.classList.toggle('is-open', open);
+    if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    try { localStorage.setItem(_OPEN_TODOS_PANEL_KEY, open ? '1' : '0'); } catch (e) {}
+}
+
+function _restoreOpenTodosPanelState() {
+    var saved = null;
+    try { saved = localStorage.getItem(_OPEN_TODOS_PANEL_KEY); } catch (e) {}
+    // Default collapsed to keep the projects grid visible
+    toggleOpenTodosPanel(saved === '1');
+}
 
 function _formatTodoOpenedAt(iso) {
     if (!iso) return '';
@@ -1058,6 +1076,11 @@ async function refreshOpenTodos() {
     if (!window.ProjectTodos) return;
     _openTodos = await ProjectTodos.listOpen();
     renderOpenTodos();
+    var panel = document.getElementById('open-todos-panel');
+    if (panel && !panel.dataset.todosInit) {
+        panel.dataset.todosInit = '1';
+        _restoreOpenTodosPanelState();
+    }
 }
 
 var _openTodosSelectedId = '';
@@ -1204,7 +1227,7 @@ function renderOpenTodos() {
             '<div class="open-todos-thead" role="row">' +
                 '<span class="ot-col-check"></span>' +
                 '<span class="ot-col-text">משימה</span>' +
-                '<span class="ot-col-proj">פרויקט</span>' +
+                '<span class="ot-col-proj">שם פרויקט</span>' +
                 '<span class="ot-col-date">נפתחה</span>' +
                 '<span class="ot-col-del"></span>' +
             '</div>' +

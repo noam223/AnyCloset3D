@@ -85,17 +85,28 @@
         }
         .open-todos-header {
             display: flex; align-items: center; justify-content: space-between; gap: 10px;
-            margin-bottom: 8px; flex-wrap: wrap;
+            margin: 0; flex-wrap: nowrap; width: 100%;
+            border: none; background: transparent; padding: 2px 0; cursor: pointer;
+            font: inherit; text-align: right; color: inherit;
         }
+        .open-todos-header:hover .open-todos-title { color: #0284c7; }
         .open-todos-title {
             font-size: .92rem; font-weight: 800; color: #0f3a5f;
             display: flex; align-items: center; gap: 7px;
         }
-        .open-todos-title i { color: #0ea5e9; font-size: .9rem; }
+        .open-todos-title > i.fa-square-check { color: #0ea5e9; font-size: .9rem; }
+        .open-todos-chevron {
+            margin-inline-start: auto; color: #64748b; font-size: .78rem;
+            transition: transform .2s ease;
+        }
+        .open-todos-panel.is-open .open-todos-chevron { transform: rotate(180deg); }
+        .open-todos-panel.is-open .open-todos-header { margin-bottom: 8px; }
         .open-todos-count {
             font-size: .68rem; font-weight: 800; color: #0369a1; background: #e0f2fe;
             border: 1px solid #7dd3fc; border-radius: 999px; padding: 2px 8px;
         }
+        .open-todos-body { display: none; }
+        .open-todos-panel.is-open .open-todos-body { display: block; }
         .open-todos-compose {
             display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 8px;
             padding: 6px 8px; border-radius: 10px; background: #f0f9ff; border: 1px solid #bae6fd;
@@ -174,13 +185,12 @@
             font-weight: 650; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
         .ot-col-proj {
-            justify-self: stretch; border: none; background: #ecfeff; color: #0f766e;
-            border: 1px solid #99f6e4; border-radius: 999px; padding: 2px 8px;
-            font: inherit; font-size: .72rem; font-weight: 800; cursor: pointer;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center;
-            max-width: 100%;
+            justify-self: stretch; border: none; background: transparent; color: #0f3a5f;
+            border-radius: 0; padding: 0; font: inherit; font-size: .8rem; font-weight: 800;
+            cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            text-align: right; max-width: 100%;
         }
-        .ot-col-proj:hover { background: #ccfbf1; color: #115e59; }
+        .ot-col-proj:hover { color: #0284c7; text-decoration: underline; }
         .ot-col-date {
             font-size: .7rem; font-weight: 700; color: #0284c7; white-space: nowrap;
             font-variant-numeric: tabular-nums;
@@ -1106,36 +1116,41 @@
                 </button>
             </div>
             <div class="open-todos-panel" id="open-todos-panel">
-                <div class="open-todos-header">
-                    <div class="open-todos-title">
+                <button type="button" class="open-todos-header" id="open-todos-toggle"
+                    aria-expanded="false" aria-controls="open-todos-body"
+                    onclick="toggleOpenTodosPanel()">
+                    <span class="open-todos-title">
                         <i class="fa-solid fa-square-check"></i>
                         משימות פתוחות
                         <span class="open-todos-count" id="open-todos-count">0</span>
-                    </div>
-                </div>
-                <div class="open-todos-compose" id="open-todos-compose">
-                    <div class="open-todos-project-wrap">
-                        <input type="hidden" id="open-todos-project-id" value="">
-                        <input type="text" id="open-todos-project-search" autocomplete="off"
-                            placeholder="חיפוש פרויקט לפי שם או מספר רכש..."
-                            aria-label="חיפוש פרויקט"
-                            aria-autocomplete="list"
-                            aria-controls="open-todos-suggest"
-                            oninput="onOpenTodosProjectSearch(this.value)"
-                            onfocus="onOpenTodosProjectSearch(this.value, true)"
-                            onkeydown="onOpenTodosProjectKey(event)">
-                        <div class="open-todos-suggest" id="open-todos-suggest" role="listbox"></div>
-                        <div class="open-todos-selected" id="open-todos-selected">
-                            <i class="fa-solid fa-folder"></i>
-                            <span id="open-todos-selected-label"></span>
-                            <button type="button" title="נקה בחירה" onclick="clearOpenTodosProject()"><i class="fa-solid fa-xmark"></i></button>
+                    </span>
+                    <i class="fa-solid fa-chevron-down open-todos-chevron" aria-hidden="true"></i>
+                </button>
+                <div class="open-todos-body" id="open-todos-body">
+                    <div class="open-todos-compose" id="open-todos-compose">
+                        <div class="open-todos-project-wrap">
+                            <input type="hidden" id="open-todos-project-id" value="">
+                            <input type="text" id="open-todos-project-search" autocomplete="off"
+                                placeholder="חיפוש פרויקט לפי שם או מספר רכש..."
+                                aria-label="חיפוש פרויקט"
+                                aria-autocomplete="list"
+                                aria-controls="open-todos-suggest"
+                                oninput="onOpenTodosProjectSearch(this.value)"
+                                onfocus="onOpenTodosProjectSearch(this.value, true)"
+                                onkeydown="onOpenTodosProjectKey(event)">
+                            <div class="open-todos-suggest" id="open-todos-suggest" role="listbox"></div>
+                            <div class="open-todos-selected" id="open-todos-selected">
+                                <i class="fa-solid fa-folder"></i>
+                                <span id="open-todos-selected-label"></span>
+                                <button type="button" title="נקה בחירה" onclick="clearOpenTodosProject()"><i class="fa-solid fa-xmark"></i></button>
+                            </div>
                         </div>
+                        <input type="text" id="open-todos-input" maxlength="200" placeholder="מה צריך לעשות?"
+                            onkeydown="if(event.key==='Enter'){event.preventDefault();addOpenTodoFromCompose();}">
+                        <button type="button" onclick="addOpenTodoFromCompose()">הוסף משימה</button>
                     </div>
-                    <input type="text" id="open-todos-input" maxlength="200" placeholder="מה צריך לעשות?"
-                        onkeydown="if(event.key==='Enter'){event.preventDefault();addOpenTodoFromCompose();}">
-                    <button type="button" onclick="addOpenTodoFromCompose()">הוסף משימה</button>
+                    <div class="open-todos-groups" id="open-todos-groups"></div>
                 </div>
-                <div class="open-todos-groups" id="open-todos-groups"></div>
             </div>
             <div class="content-header">
                 <div class="content-title">כל הפרויקטים</div>
@@ -2013,7 +2028,7 @@
 <script src="trial-watermark.js?v=20261008trial"></script>
 <script src="pricing-core.js?v=20261102honeyheight"></script>
 <script src="pricing-panel.js?v=20261102honeyheight"></script>
-<script src="projects.js?v=20261115todoTable"></script>
+<script src="projects.js?v=20261115todoExpand"></script>
 <script src="quick-calc.js?v=20261029shoe"></script>
 <script src="accessibility.js?v=20261115c"></script>
 </body>
