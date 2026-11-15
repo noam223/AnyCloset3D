@@ -34,9 +34,10 @@
     '#ac-a11y-skip{position:absolute;right:-9999px;top:auto;width:1px;height:1px;overflow:hidden;z-index:100000}',
     '#ac-a11y-skip:focus{position:fixed;right:16px;top:16px;width:auto;height:auto;padding:12px 18px;background:#0a1628;color:#fff;border:2px solid #00d4ff;border-radius:10px;font:700 1rem Heebo,Arial,sans-serif;text-decoration:none;outline:none}',
     '#ac-a11y-root{position:fixed;z-index:99990;left:16px;bottom:16px;font-family:Heebo,Arial,sans-serif;direction:rtl}',
-    '#ac-a11y-btn{width:56px;height:56px;border-radius:50%;border:2px solid #fff;background:#1e3a5f;color:#fff;cursor:pointer;box-shadow:0 8px 28px rgba(15,31,53,.35);display:flex;align-items:center;justify-content:center;font-size:1.45rem;transition:transform .2s,box-shadow .2s}',
-    '#ac-a11y-btn:hover,#ac-a11y-btn:focus{transform:scale(1.06);box-shadow:0 10px 32px rgba(0,212,255,.35);outline:3px solid #00d4ff;outline-offset:2px}',
-    '#ac-a11y-btn[aria-expanded="true"]{background:#00d4ff;color:#0a1628}',
+    '#ac-a11y-btn{width:56px;height:56px;border-radius:50%;border:2px solid #fff;background:#005CBC;color:#fff;cursor:pointer;box-shadow:0 8px 28px rgba(0,92,188,.4);display:flex;align-items:center;justify-content:center;padding:0;transition:transform .2s,box-shadow .2s}',
+    '#ac-a11y-btn svg{display:block;width:34px;height:34px}',
+    '#ac-a11y-btn:hover,#ac-a11y-btn:focus{transform:scale(1.06);box-shadow:0 10px 32px rgba(0,92,188,.55);outline:3px solid #fff;outline-offset:2px}',
+    '#ac-a11y-btn[aria-expanded="true"]{background:#004a96}',
     '#ac-a11y-panel{display:none;position:absolute;left:0;bottom:68px;width:min(320px,calc(100vw - 32px));background:#fff;color:#1e293b;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 18px 50px rgba(15,31,53,.22);padding:14px;max-height:min(70vh,520px);overflow:auto}',
     '#ac-a11y-panel.open{display:block}',
     '#ac-a11y-panel h2{margin:0 0 10px;font-size:1.05rem;font-weight:800;color:#1e3a5f}',
@@ -145,7 +146,12 @@
     root.id = 'ac-a11y-root';
     root.innerHTML =
       '<button type="button" id="ac-a11y-btn" aria-expanded="false" aria-controls="ac-a11y-panel" title="תפריט נגישות" aria-label="פתח תפריט נגישות">' +
-        '<svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="4.5" r="2.2" fill="currentColor"/><path fill="currentColor" d="M17.5 8.2c-.9-.4-2.4-.9-5.5-.9s-4.6.5-5.5.9A1.5 1.5 0 0 0 5.5 9.6v2.1c0 .7.5 1.3 1.2 1.4l2.1.3c.2 1.8.8 3.3 1.7 4.5l-2.7 3.2a1.2 1.2 0 1 0 1.8 1.5l2.4-2.9c.4.2.9.3 1.5.3s1.1-.1 1.5-.3l2.4 2.9a1.2 1.2 0 1 0 1.8-1.5l-2.7-3.2c.9-1.2 1.5-2.7 1.7-4.5l2.1-.3c.7-.1 1.2-.7 1.2-1.4V9.6c0-.6-.4-1.2-1-1.4z"/></svg>' +
+        /* International Symbol of Access (official wheelchair mark) */ +
+        '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+          '<circle cx="14.2" cy="4.2" r="2.1" fill="#fff"/>' +
+          '<path fill="#fff" d="M7.6 20.6a4.4 4.4 0 1 1 0-8.8 4.4 4.4 0 0 1 0 8.8zm0-2a2.4 2.4 0 1 0 0-4.8 2.4 2.4 0 0 0 0 4.8z"/>' +
+          '<path fill="#fff" d="M9.8 8.6h5.1c.9 0 1.5.4 1.9 1.2l2.4 4.8c.2.5 0 1.1-.5 1.3-.5.2-1.1 0-1.3-.5l-2.2-4.3h-2.4l1 4.2c.1.5-.2 1-.7 1.1l-4 .9c-.5.1-1-.2-1.1-.7-.1-.5.2-1 .7-1.1l2.9-.6-1.2-5.3H9.8c-.6 0-1-.5-1-1s.4-1 1-1z"/>' +
+        '</svg>' +
       '</button>' +
       '<div id="ac-a11y-panel" role="dialog" aria-label="הגדרות נגישות" aria-modal="false">' +
         '<h2>תפריט נגישות</h2>' +
