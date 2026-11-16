@@ -199,8 +199,47 @@ window._kitchenTotalWidth = function(numCols, unitW, thickness) {
     return Math.round((n * uw + window._kitchenWallCount(n) * t) * 10) / 10;
 };
 
+/** Total run width from actual column carcass widths (double side walls per unit). */
+window._kitchenWidthFromColumns = function(cols, thickness) {
+    const list = Array.isArray(cols) ? cols : [];
+    const t = thickness != null ? thickness : _kitThickness();
+    if (!list.length) return 0;
+    const inner = list.reduce(function(sum, col) {
+        return sum + ((col && col.width) || KIT_UNIT_W);
+    }, 0);
+    return Math.round((inner + window._kitchenWallCount(list.length) * t) * 10) / 10;
+};
+
 window._kitchenGapBetweenUnits = function() {
     return 2 * _kitThickness();
+};
+
+/**
+ * Commit kitchen run width from columns without proportional rescale.
+ * Wardrobe updateDim rescale was crushing fixed 60cm units (parseInt + shared-wall math).
+ */
+window._kitchenCommitRunWidth = function(wing) {
+    wing = wing || _getKitWing();
+    if (!wing) return 0;
+    const t = wing.thickness || _kitThickness();
+    const cols = wing.columns || [];
+    let newW;
+    if (!cols.length) {
+        newW = wing.kitchenCornerL ? KIT_CORNER_STUB_W : (KIT_UNIT_W + 2 * t);
+    } else {
+        newW = window._kitchenWidthFromColumns(cols, t);
+    }
+    wing.width = newW;
+    // state.width proxies the active wing — keep UI inputs in sync without updateDim rescale
+    try {
+        const wEl = document.getElementById('inp-width');
+        const nEl = document.getElementById('inp-num-width');
+        const pill = document.getElementById('dim-pill-width');
+        if (wEl) wEl.value = newW;
+        if (nEl) nEl.value = newW;
+        if (pill) pill.value = Math.round(newW);
+    } catch (e) { /* DOM may be unavailable during early init */ }
+    return newW;
 };
 
 function _kitInitColumns(opts) {
@@ -232,7 +271,7 @@ function _kitInitColumns(opts) {
     }
     cw.columns = cols;
     state.columns = cols;
-    _applyKitDim('width', window._kitchenTotalWidth(n, KIT_UNIT_W, t));
+    window._kitchenCommitRunWidth(cw);
     if (typeof _syncColumnCountInputs === 'function') _syncColumnCountInputs(n);
 }
 
@@ -328,9 +367,8 @@ window._configureKitchenCarcass = function(role, opts) {
             cw.columns = [];
             state.columns = [];
             // Tiny stub so only the full-corner L is visible and sits flush next to adjacent runs.
-            // Mark cornerL BEFORE width so updateDim won't invent a column.
             cw.kitchenCornerL = true;
-            _applyKitDim('width', KIT_CORNER_STUB_W);
+            window._kitchenCommitRunWidth(cw);
             // Re-clear in case anything still tried to seed a column
             cw.columns = [];
             state.columns = [];
@@ -547,7 +585,6 @@ window._kitchenAddUnit = function(side) {
     const template = liveCols.length
         ? (side === 'left' ? liveCols[0] : liveCols[liveCols.length - 1])
         : null;
-    const t = cw.thickness || _kitThickness();
     const newCol = typeof _blankColumn === 'function'
         ? _blankColumn(KIT_UNIT_W, template)
         : {
@@ -574,19 +611,8 @@ window._kitchenAddUnit = function(side) {
     cw.columns = side === 'left' ? [newCol].concat(liveCols) : liveCols.concat([newCol]);
     const isCenterArm = state.activeWing === 'center' || (!state.wings.left && !state.wings.right);
     if (isCenterArm) state.columns = cw.columns;
-    // First unit on an empty corner stub: replace stub width; else add unit + 2 walls
-    const wasEmpty = liveCols.length === 0;
-    const addW = KIT_UNIT_W + 2 * t;
-    const newW = wasEmpty
-        ? addW
-        : (cw.width || KIT_WIDTH) + addW;
-    cw.width = Math.round(newW * 10) / 10;
-    if (isCenterArm) {
-        _applyKitDim('width', cw.width);
-    } else if (typeof updateDim === 'function') {
-        // Keep wing width in sync with sidebar when editing a side arm
-        updateDim('width', null, cw.width);
-    }
+    // Keep unit carcass widths intact — grow the run by 2 side walls + unit (no wardrobe rescale)
+    window._kitchenCommitRunWidth(cw);
 
     if (typeof _fixEdgeColumnMerges === 'function') _fixEdgeColumnMerges();
     if (typeof _syncColumnCountInputs === 'function') _syncColumnCountInputs(cw.columns.length);
@@ -609,20 +635,11 @@ window._kitchenRemoveUnitAt = function(idx) {
     idx = parseInt(idx, 10);
     if (isNaN(idx) || idx < 0 || idx >= cols.length) return false;
 
-    const removed = cols[idx];
-    const remW = (removed && removed.width) || KIT_UNIT_W;
-    const t = cw.thickness || _kitThickness();
     cw.columns = cols.slice(0, idx).concat(cols.slice(idx + 1));
     const isCenterArm = state.activeWing === 'center' || (!state.wings.left && !state.wings.right);
     if (isCenterArm) state.columns = cw.columns;
-
-    const newW = Math.max(KIT_UNIT_W + 2 * t, (cw.width || KIT_WIDTH) - remW - 2 * t);
-    cw.width = Math.round(newW * 10) / 10;
-    if (isCenterArm) {
-        _applyKitDim('width', cw.width);
-    } else if (typeof updateDim === 'function') {
-        updateDim('width', null, cw.width);
-    }
+    // Shrink run from remaining unit carcasses (preserve their widths — no proportional crush)
+    window._kitchenCommitRunWidth(cw);
 
     // Clear selection so UI doesn't point at a removed column
     if (state.selection) {
