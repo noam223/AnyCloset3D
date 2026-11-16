@@ -15020,24 +15020,29 @@ window.updateLeftSidebar = function(opts) {
         card.dataset.cartIndex = String(index);
         card.onclick = () => { if (state.editingCartIndex !== index) editCartItem(index); };
 
+        // RTL grid order: thumb (right) → body → actions (left)
         card.innerHTML = `
-            <button type="button" class="cart-mini-btn btn-hold-mini" title="${held ? 'הפעל ארון' : 'השהה ארון'}" onclick="event.stopPropagation(); toggleCartItemHold(${index});"><i class="fa-solid fa-${held ? 'play' : 'pause'}"></i></button>
-            <div class="cart-mini-card-main">
-                ${thumbHtml}
-                <div class="cart-mini-card-body">
-                    <div class="cart-mini-card-title">${holdBadge}${partChip}${activeChip}${titleText}</div>
-                    <div class="cart-mini-card-desc" dir="rtl">${item.dimsStr || ''}</div>
-                    ${window._showPricing !== false ? `<div class="cart-mini-card-price"><span dir="ltr">${item.price}</span>${itemInstall ? ` <span class="cart-mini-install">+₪${itemInstall.toLocaleString()}</span>` : ''}</div>` : ''}
-                </div>
+            ${thumbHtml}
+            <div class="cart-mini-card-body">
+                <div class="cart-mini-card-title">${holdBadge}${partChip}${activeChip}${titleText}</div>
+                <div class="cart-mini-card-desc" dir="rtl">${item.dimsStr || ''}</div>
+                ${window._showPricing !== false ? `<div class="cart-mini-card-price"><span dir="ltr">${item.price}</span>${itemInstall ? ` <span class="cart-mini-install">+₪${itemInstall.toLocaleString()}</span>` : ''}</div>` : ''}
             </div>
             <div class="cart-mini-actions">
-                ${nested ? `<button class="cart-mini-btn btn-leave-space-mini" onclick="event.stopPropagation(); removeCabinetFromSpace(${index});" title="הוצא מהקבוצה"><i class="fa-solid fa-link-slash"></i></button>` : ''}
-                <button class="cart-mini-btn" onclick="event.stopPropagation(); duplicateCartItem(${index});" title="שכפל"><i class="fa-solid fa-copy"></i></button>
-                ${!nested && window._cartItemSplitSides(itemObj) ? `<button class="cart-mini-btn btn-split-mini" onclick="event.stopPropagation(); splitCartItem(${index});" title="פצל"><i class="fa-solid fa-object-ungroup"></i></button>` : ''}
-                <button class="cart-mini-btn btn-del-mini" onclick="event.stopPropagation(); deleteCartItem(${index});" title="מחק"><i class="fa-solid fa-trash"></i></button>
+                <button type="button" class="cart-mini-btn btn-hold-mini" title="${held ? 'הפעל ארון' : 'השהה ארון'}" onclick="event.stopPropagation(); toggleCartItemHold(${index});">
+                    <i class="fa-solid fa-${held ? 'play' : 'pause'}"></i> ${held ? 'הפעל' : 'השהה'}
+                </button>
+                <button type="button" class="cart-mini-btn" onclick="event.stopPropagation(); duplicateCartItem(${index});" title="שכפל">
+                    <i class="fa-solid fa-copy"></i> שכפל
+                </button>
+                ${nested ? `<button type="button" class="cart-mini-btn btn-leave-space-mini" onclick="event.stopPropagation(); removeCabinetFromSpace(${index});" title="הוצא מהקבוצה"><i class="fa-solid fa-link-slash"></i> הוצא</button>` : ''}
+                ${!nested && window._cartItemSplitSides(itemObj) ? `<button type="button" class="cart-mini-btn btn-split-mini" onclick="event.stopPropagation(); splitCartItem(${index});" title="פצל"><i class="fa-solid fa-object-ungroup"></i> פצל</button>` : ''}
+                <button type="button" class="cart-mini-btn btn-del-mini" onclick="event.stopPropagation(); deleteCartItem(${index});" title="מחק">
+                    <i class="fa-solid fa-trash"></i> מחק
+                </button>
                 <div class="cart-mini-notes-wrap">
-                    <button class="cart-mini-btn cart-mini-notes-btn" id="notes-btn-cart-${index}" onclick="event.stopPropagation(); window._openDesignerNotesForCabinet(${index});" title="תיקונים">
-                        <i class="fa-solid fa-note-sticky"></i>
+                    <button type="button" class="cart-mini-btn cart-mini-notes-btn" id="notes-btn-cart-${index}" onclick="event.stopPropagation(); window._openDesignerNotesForCabinet(${index});" title="תיקונים">
+                        <i class="fa-solid fa-note-sticky"></i> תיקונים
                     </button>
                     <span id="notes-badge-cart-${index}" class="cart-mini-notes-badge" style="display:none;"></span>
                 </div>
