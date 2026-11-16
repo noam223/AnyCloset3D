@@ -8050,7 +8050,10 @@ window._syncAndRenderSpaceGizmo = function() {
 function createHandle(dir, x3d, y3d = null, text = 'גרירה') {
     const el = document.createElement('div');
     el.className = `drag-handle ${dir}`;
-    el.dataset.x3d = x3d; if(y3d) el.dataset.y3d = y3d;
+    el.dataset.x3d = x3d;
+    // y=0 is valid (floor / no-plinth bottom) — do NOT treat it as falsy or the handle
+    // lands at the column roof until the first drag.
+    if (y3d != null && y3d !== '' && !Number.isNaN(Number(y3d))) el.dataset.y3d = String(y3d);
     // For vertical handles add a larger invisible hit area for easier grabbing
     const hitArea = dir === 'vertical' ? '<div class="drag-hit-area"></div>' : '';
     el.innerHTML = `<div class="drag-tooltip">${text}</div>${hitArea}`;
@@ -8059,9 +8062,10 @@ function createHandle(dir, x3d, y3d = null, text = 'גרירה') {
 }
 
 function updateDragHandlesPosition() {
-    // Free 3D view keeps only the space-cabinet rotate button (beside the axis gizmo)
-    const _only3dRot = state.viewMode === '3d';
-    if (state.viewMode !== 'front' && !_only3dRot) return;
+    // Kitchen (and upper-unit) edits in 3D need full handle projection — not only space-rotate.
+    const _kit3dEdit = state.presetId === 'kitchen' && state.viewMode === '3d';
+    const _only3dRot = state.viewMode === '3d' && !_kit3dEdit;
+    if (state.viewMode !== 'front' && !_only3dRot && !_kit3dEdit) return;
     const cw = container.clientWidth;
     const ch = container.clientHeight;
 
@@ -8124,7 +8128,10 @@ function updateDragHandlesPosition() {
             worldPt = new THREE.Vector3(off.x + side * fp.w / 2, off.y + fo + (fp.h - fo) / 2, (off.z || 0) + fp.d / 2);
         } else {
             const x3d = parseFloat(handle.dataset.x3d);
-            const y3d = handle.dataset.y3d ? parseFloat(handle.dataset.y3d) : Math.max(...state.columns.map(c => c.height));
+            // dataset.y3d="0" must count — empty/missing falls back to roof
+            const y3d = (handle.dataset.y3d != null && handle.dataset.y3d !== '')
+                ? parseFloat(handle.dataset.y3d)
+                : Math.max(...state.columns.map(c => c.height));
             worldPt = new THREE.Vector3(x3d, y3d, state.depth / 2);
             if (window._activeWingGroup) {
                 window._activeWingGroup.updateMatrixWorld(true);

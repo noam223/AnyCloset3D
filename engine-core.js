@@ -7667,7 +7667,11 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
             // Kitchen return arms need pick hitboxes even when another wing is active
             const _kitPickAlwaysPlinth = state.presetId === 'kitchen' && !_isUpperUnitBuild;
             if (!isBP && (_isActiveWingBuild || _kitPickAlwaysPlinth)) {
-                const handleY = fo > 0 ? fo : state.plinthHeight;
+                // Upper / no-plinth units sit on y=0 — never use plinthHeight (often 0 on kitchen UU,
+                // which used to drop dataset.y3d and park the handle on the roof).
+                const handleY = fo > 0
+                    ? fo
+                    : ((col.noPlinth || _isUpperUnitBuild) ? 0 : (state.plinthHeight || 0));
                 if (_isActiveWingBuild) {
                     // Floor offset handle: shifted left so it doesn't overlap the select-all button
                     dragHandlesData.floors.push({ colIndex: c, x: colCenterX - 5, y: handleY, fo: fo });

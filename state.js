@@ -426,11 +426,16 @@ window._enterUpperUnitEdit = function(parentId) {
         // Show on-screen banner
         const banner = document.getElementById('upper-unit-edit-banner');
         if (banner) banner.style.display = 'flex';
+        state.hoveredColIndex = -1;
         syncSidebarToWing();
         buildCabinet();
         if (typeof updateCameraView === 'function') updateCameraView();
         if (typeof _setCanvasHoverLayersVisible === 'function') _setCanvasHoverLayersVisible(true);
         if (typeof updateOverlaysPosition === 'function') updateOverlaysPosition();
+        if (typeof updateDragHandlesPosition === 'function') updateDragHandlesPosition();
+        if (typeof window._replayCanvasPointerMove === 'function') {
+            requestAnimationFrame(function() { window._replayCanvasPointerMove(); });
+        }
     }
 };
 
@@ -441,10 +446,14 @@ window._exitUpperUnitEdit = function() {
     // Hide on-screen banner
     const banner = document.getElementById('upper-unit-edit-banner');
     if (banner) banner.style.display = 'none';
+    state.hoveredColIndex = -1;
     syncSidebarToWing();
     buildCabinet();
     if (typeof updateCameraView === 'function') updateCameraView();
     if (typeof updateOverlaysPosition === 'function') updateOverlaysPosition();
+    if (typeof window._replayCanvasPointerMove === 'function') {
+        requestAnimationFrame(function() { window._replayCanvasPointerMove(); });
+    }
 };
 
 window.toggleUpperUnit = function(wingId) {
@@ -2839,10 +2848,20 @@ function restoreHistoryState() {
     syncSidebarToWing();
     // Restore preset UI (button highlights, section visibility, position menu)
     if (typeof window._restorePresetUI === 'function') window._restorePresetUI();
+    // Hover was wiped — force handle rebuild even if the mouse never moved after Undo
+    state.hoveredColIndex = -1;
     buildCabinet(); updateCameraView(); calculatePrice();
     if (state._activeUpperUnit || state.presetId === 'kitchen') {
         if (typeof _setCanvasHoverLayersVisible === 'function') _setCanvasHoverLayersVisible(true);
         if (typeof updateOverlaysPosition === 'function') updateOverlaysPosition();
+        if (typeof updateDragHandlesPosition === 'function') updateDragHandlesPosition();
+    }
+    // Re-hit-test under the cursor so roof/floor/shelf handles come back immediately
+    if (typeof window._replayCanvasPointerMove === 'function') {
+        requestAnimationFrame(function() {
+            window._replayCanvasPointerMove();
+            if (typeof updateDragHandlesPosition === 'function') updateDragHandlesPosition();
+        });
     }
     updateUndoRedoUI();
     setTimeout(() => state.isRestoring = false, 50);
