@@ -4201,6 +4201,57 @@ function _hingeSpreadCm(lo, hi, n, edgeCm) {
     return out;
 }
 
+/** Loaded once from images/hinge-plate.glb (scaled to cm, neck along +Y, thickness along +X). */
+let _hingePlateTemplate = null;
+function _prepareHingePlateTemplate(root) {
+    const inner = root.clone(true);
+    // Source model is thin on Z and wide on X. Turn the flat face onto the wall (+X out).
+    inner.rotation.y = Math.PI / 2;
+    inner.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(inner);
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    box.getSize(size);
+    box.getCenter(center);
+    const span = Math.max(size.z, 0.001);
+    const scale = 4.1 / span;
+    inner.scale.setScalar(scale);
+    inner.position.set(-box.min.x * scale, -center.y * scale, -center.z * scale);
+    inner.traverse(function(o) {
+        if (!o.isMesh) return;
+        o.castShadow = false;
+        o.receiveShadow = false;
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        mats.forEach(function(m) {
+            if (!m) return;
+            m.polygonOffset = true;
+            m.polygonOffsetFactor = -2;
+            m.polygonOffsetUnits = -2;
+        });
+    });
+    const wrap = new THREE.Group();
+    wrap.add(inner);
+    wrap.userData.outExtent = Math.max(0.2, (box.max.x - box.min.x) * scale);
+    _hingePlateTemplate = wrap;
+}
+function _loadHingePlateModel() {
+    if (typeof THREE === 'undefined' || typeof THREE.GLTFLoader === 'undefined') {
+        setTimeout(_loadHingePlateModel, 200);
+        return;
+    }
+    new THREE.GLTFLoader().load('images/hinge-plate.glb', function(gltf) {
+        _prepareHingePlateTemplate(gltf.scene);
+        if (!window._hingePlateRebuilt && typeof buildCabinet === 'function'
+            && typeof cabinetGroup !== 'undefined' && cabinetGroup && cabinetGroup.children.length) {
+            window._hingePlateRebuilt = true;
+            buildCabinet();
+        }
+    }, undefined, function(err) {
+        console.warn('[hinge] plate model failed to load', err);
+    });
+}
+_loadHingePlateModel();
+
 /**
  * Cabinet mounting-plate silhouette: two mirrored wings side by side,
  * with a short neck rising from the center. Shape XY (X = width, Y = length).
@@ -4237,6 +4288,7 @@ function _hingePlateShape() {
  * Mirrored wings with a short neck; screws and slots are omitted.
  */
 function _buildHingeMountPlate() {
+    if (_hingePlateTemplate) return _hingePlateTemplate.clone(true);
     let mat = _addHingeHardware._matNi;
     if (!mat) {
         mat = new THREE.MeshStandardMaterial({
