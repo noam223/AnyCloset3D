@@ -512,6 +512,8 @@ function updateQuickEditPanelUI() {
     }
 
     panel.classList.add('visible');
+    // Re-place immediately so kitchen 3D doesn't leave the bar stuck under #top-bar
+    if (typeof updateOverlaysPosition === 'function') updateOverlaysPosition();
 }
 
 window.toggleNoPlinth = function() {
@@ -4094,6 +4096,57 @@ function _updateFCCellButtons() {
     }
 }
 
+/** Keep floating overlays below the fixed #top-bar (panel CSS adds translateY +12px). */
+function _overlayTopClearancePx() {
+    const topBar = document.getElementById('top-bar');
+    const host = (typeof container !== 'undefined' && container)
+        ? container
+        : document.getElementById('canvas-container');
+    if (!topBar || !host) return 56;
+    const tb = topBar.getBoundingClientRect();
+    const hr = host.getBoundingClientRect();
+    return Math.max(8, Math.ceil(tb.bottom - hr.top - 12 + 10));
+}
+
+/** Project a wing-local point to canvas pixel coords. */
+function _projectWingLocalToCanvas(localX, localY, localZ) {
+    const localPt = new THREE.Vector3(localX, localY, localZ != null ? localZ : ((state.depth || 56) / 2));
+    if (window._activeWingGroup) {
+        window._activeWingGroup.updateMatrixWorld(true);
+        localPt.applyMatrix4(window._activeWingGroup.matrixWorld);
+    } else if (window.cabinetGroup) {
+        window.cabinetGroup.updateMatrixWorld(true);
+        localPt.applyMatrix4(window.cabinetGroup.matrixWorld);
+    }
+    return localPt.project(camera);
+}
+
+/** Place #column-quick-edit under the edited column; clamp below top-bar. */
+function _positionColumnQuickEditPanel() {
+    if (state.activeEditCol === -1 || !state.columns[state.activeEditCol]) return;
+    const panel = document.getElementById('column-quick-edit');
+    if (!panel || !panel.classList.contains('visible')) return;
+    if (!container || typeof camera === 'undefined') return;
+
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+    let currentX = -(state.width || 0) / 2 + (state.thickness || 1.7);
+    for (let c = 0; c < state.activeEditCol; c++) {
+        if (state.columns[c]) currentX += state.columns[c].width + (state.thickness || 1.7);
+    }
+    const colCenterX = currentX + state.columns[state.activeEditCol].width / 2;
+    const pos = _projectWingLocalToCanvas(colCenterX, 0);
+    let x = (pos.x * 0.5 + 0.5) * cw;
+    let y = (-(pos.y * 0.5) + 0.5) * ch;
+    const pw = panel.offsetWidth || 200;
+    const ph = panel.offsetHeight || 50;
+    const minTop = _overlayTopClearancePx();
+    x = Math.max(pw / 2 + 10, Math.min(cw - pw / 2 - 10, x));
+    y = Math.min(ch - ph - 10, Math.max(minTop, y));
+    panel.style.left = `${x}px`;
+    panel.style.top = `${y}px`;
+}
+
 function updateOverlaysPosition() {
     // In 3D mode: only handle FC cell buttons and FC panel (if in FC edit mode)
     const isFCEditMode3d = state.wingEditMode &&
@@ -4126,12 +4179,15 @@ function updateOverlaysPosition() {
                 let fcY = (-projected.y * 0.5 + 0.5) * ch_px;
                 const pw = fcPanel.offsetWidth || 200;
                 const ph = fcPanel.offsetHeight || 50;
+                const minTop = _overlayTopClearancePx();
                 fcX = Math.max(pw / 2 + 10, Math.min(cw_px - pw / 2 - 10, fcX));
-                fcY = Math.min(ch_px - ph - 10, Math.max(ph / 2 + 10, fcY));
+                fcY = Math.min(ch_px - ph - 10, Math.max(minTop, fcY));
                 fcPanel.style.left = `${fcX}px`;
                 fcPanel.style.top = `${fcY}px`;
             }
         }
+        // Kitchen uses 3D + column quick-edit — was never positioned here, so it sat under #top-bar
+        if (state.presetId === 'kitchen') _positionColumnQuickEditPanel();
         return;
     }
 
@@ -4184,28 +4240,7 @@ function updateOverlaysPosition() {
     });
 
     if (state.activeEditCol !== -1 && state.columns[state.activeEditCol] && state.viewMode === 'front') {
-        const panel = document.getElementById('column-quick-edit');
-        if(!panel) return;
-        let currentX = -state.width/2 + state.thickness;
-        for (let c = 0; c < state.activeEditCol; c++) {
-            if(state.columns[c]) currentX += state.columns[c].width + state.thickness;
-        }
-        const colCenterX = currentX + state.columns[state.activeEditCol].width/2;
-        // Position panel below the plinth: y=0 is the bottom of the cabinet (floor level)
-        const pos = projectWingPoint(colCenterX, 0);
-        
-        let x = (pos.x * .5 + .5) * cw;
-        let y = (-(pos.y * .5) + .5) * ch;
-        
-        // גבולות גזרה לפאנל העריכה המהירה
-        const pw = panel.offsetWidth || 200;
-        x = Math.max(pw/2 + 10, Math.min(cw - pw/2 - 10, x));
-        // Clamp so panel doesn't go below canvas bottom
-        const ph = panel.offsetHeight || 50;
-        y = Math.min(ch - ph - 10, y);
-        
-        panel.style.left = `${x}px`;
-        panel.style.top = `${y}px`;
+        _positionColumnQuickEditPanel();
     }
 
     // ---- Full corner quick edit panel positioning ----
