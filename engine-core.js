@@ -8495,17 +8495,28 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
                     }
                 }
                 const isHoveredCol = (state.hoveredColIndex === c);
-                const hitMat = new THREE.MeshBasicMaterial({ color: isHoveredCol ? 0x2ecc71 : 0x3498db, transparent: true, opacity: (state.selection.colIndex === c && state.selection.rows.includes(r)) ? 0.3 : (isHoveredCol ? 0.05 : 0.0), depthWrite: false });
+                // Space companions rebuild with the active cabinet's selection still in state —
+                // never bake that tint onto the other run (same colIndex would "select" both).
+                const _spacePassive = !!(window._spaceBuildSlot != null || window._spaceCompanionBuilding);
+                const _isSelCell = !_spacePassive && state.selection.colIndex === c && state.selection.rows.includes(r);
+                const hitMat = new THREE.MeshBasicMaterial({
+                    color: (!_spacePassive && isHoveredCol) ? 0x2ecc71 : 0x3498db,
+                    transparent: true,
+                    opacity: _spacePassive ? 0.0 : (_isSelCell ? 0.3 : (isHoveredCol ? 0.05 : 0.0)),
+                    depthWrite: false
+                });
                 const hitBox = new THREE.Mesh(new THREE.BoxGeometry(col.width, compH, bodyD - backT - 2), hitMat);
                 // Kitchen: always register unit hitboxes on every arm so return-run units stay selectable
                 // even when the empty corner stub / another wing is the "active" wing.
-                const _kitPickAlways = state.presetId === 'kitchen' && !_isUpperUnitBuild;
+                // Skip companions — they are switched via the space hit volume, not cell picks.
+                const _kitPickAlways = state.presetId === 'kitchen' && !_isUpperUnitBuild && !_spacePassive;
                 if (_isActiveWingBuild || _kitPickAlways) {
                     hitBox.position.set(colCenterX, compCenterY, -1);
                     const _hitWingId = (_buildGroup && _buildGroup.userData && _buildGroup.userData.wingId) || _ppWingId || 'center';
                     hitBox.userData = { colIndex: c, rowIndex: r, wingId: _hitWingId };
+                    if (_spacePassive) hitBox.userData.noHighlight = true;
                     _buildGroup.add(hitBox);
-                    hitBoxes.push(hitBox);
+                    if (!_spacePassive) hitBoxes.push(hitBox);
                 }
                 
                 if (_isActiveWingBuild && !isLast) dragHandlesData.vertical.push({ colIndex: c, shelfIdx: div.idx, x: colCenterX, y: div.y, isSplit: (div.type === 'split') });
