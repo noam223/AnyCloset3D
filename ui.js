@@ -9801,6 +9801,21 @@ function bindUI() {
                 // No FC group found — treat any click as dead space exit
                 _pointerDownOnDeadSpace = true;
             }
+        } else if (state._activeUpperUnit) {
+            // Upper-unit edit: dead space = outside THIS upper unit (not lower run / empty room)
+            const uuKey = state._activeUpperUnit;
+            const hitIntersects = raycaster.intersectObjects(hitBoxes);
+            const hitOnUuCell = hitIntersects.some(function(h) {
+                const wid = h.object && h.object.userData && h.object.userData.wingId;
+                return wid === uuKey;
+            });
+            const uuHitBoxes = (wingHitBoxes || []).filter(function(h) {
+                return h.userData && h.userData.wingId === uuKey;
+            });
+            const uuIntersects = uuHitBoxes.length ? raycaster.intersectObjects(uuHitBoxes) : [];
+            if (!hitOnUuCell && uuIntersects.length === 0) {
+                _pointerDownOnDeadSpace = true;
+            }
         }
 
         // Corner desk click — change drawer handle style
@@ -9892,6 +9907,24 @@ function bindUI() {
             const hitIntersects = raycaster.intersectObjects(hitBoxes);
             if (hitIntersects.length === 0) {
                 exitWingEditMode();
+                return;
+            }
+        }
+
+        // Upper-unit edit: click outside the upper unit → back to lower cabinet
+        if (state._activeUpperUnit && _pointerDownOnDeadSpace && typeof window._exitUpperUnitEdit === 'function') {
+            const hitIntersects = raycaster.intersectObjects(hitBoxes);
+            const uuKey = state._activeUpperUnit;
+            const stillOnUu = hitIntersects.some(function(h) {
+                const wid = h.object && h.object.userData && h.object.userData.wingId;
+                return wid === uuKey;
+            });
+            const uuHitBoxes = (wingHitBoxes || []).filter(function(h) {
+                return h.userData && h.userData.wingId === uuKey;
+            });
+            const uuStill = uuHitBoxes.length ? raycaster.intersectObjects(uuHitBoxes) : [];
+            if (!stillOnUu && uuStill.length === 0) {
+                window._exitUpperUnitEdit();
                 return;
             }
         }
