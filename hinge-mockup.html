@@ -118,13 +118,13 @@
     addEventListener('resize', resize);
     resize();
 
-    // Fixed catalog angle: look at the plate face (same view as the hardware photo)
+    // Face-on catalog view (like the hardware photo), with a gentle yaw
     let t = 0;
     function tick() {
-      t += 0.01;
-      const a = 0.55 + Math.sin(t) * 0.25;
-      camera.position.set(10 * Math.cos(a), 3.2, 10 * Math.sin(a));
-      camera.lookAt(0.5, 0.2, 0);
+      t += 0.012;
+      const yaw = Math.sin(t) * 0.35;
+      camera.position.set(11, 2.2 + Math.sin(t * 0.5) * 0.4, yaw * 8);
+      camera.lookAt(0.4, 0.15, 0);
       renderer.render(scene, camera);
       requestAnimationFrame(tick);
     }
