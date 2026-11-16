@@ -4216,8 +4216,8 @@ function _hingePlateShape() {
     s.quadraticCurveTo(-2.05, 0.88, -1.62, 0.88);
     s.lineTo(-0.95, 0.88);
     s.quadraticCurveTo(-0.55, 0.88, -0.55, 1.28);
-    s.lineTo(-0.55, 1.78);
-    s.absarc(0, 1.78, 0.55, Math.PI, 0, true); // rounded top of the short neck
+    s.lineTo(-0.55, 2.2);
+    s.lineTo(0.55, 2.2);
     s.lineTo(0.55, 1.28);
     s.quadraticCurveTo(0.55, 0.88, 0.95, 0.88);
     s.lineTo(1.62, 0.88);
