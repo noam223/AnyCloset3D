@@ -1062,6 +1062,239 @@ window._setKitchenPresetButtonsVisible = function(visible) {
     });
 };
 
+/** One 60cm kitchen bay — optional appliance + door. */
+function _kitMakeShowcaseCol(spec) {
+    spec = spec || {};
+    const baseH = KIT_HEIGHT;
+    const col = typeof _blankColumn === 'function'
+        ? _blankColumn(KIT_UNIT_W, null)
+        : {
+            type: 'normal', width: KIT_UNIT_W, height: baseH,
+            shelves: 0, splitY: null, shelvesY: [], compartments: [], doors: [],
+            floorOffset: 0
+        };
+    col.width = KIT_UNIT_W;
+    col.height = baseH;
+    col.topPanel = true;
+    col.sinkPanel = false;
+    col.noPlinth = false;
+    col.floorOffset = 0;
+    if (typeof distributeShelves === 'function') distributeShelves(col);
+    if (!col.compartments || !col.compartments.length) {
+        col.compartments = [{ type: 'empty' }];
+    }
+    const appliance = spec.appliance || null;
+    if (appliance) {
+        const comp = col.compartments[0];
+        comp.type = 'empty';
+        comp.appliances = [appliance];
+        delete comp.partition;
+        delete comp.partitions;
+        delete comp.subCells;
+        delete comp.tv;
+        if (appliance === 'fridge') {
+            col._kitFridgePrev = { height: baseH, topPanel: true };
+            col.height = (window.KITCHEN_RULES && window.KITCHEN_RULES.dims && window.KITCHEN_RULES.dims.fridge)
+                ? window.KITCHEN_RULES.dims.fridge.H : 177;
+            col.topPanel = false;
+        }
+    }
+    const blocksDoor = !!(appliance && window.KITCHEN_RULES && window.KITCHEN_RULES.blocksDoor
+        && window.KITCHEN_RULES.blocksDoor[appliance]);
+    if (spec.door && !blocksDoor && col.compartments.length) {
+        col.doors = [{
+            startRow: 0,
+            endRow: Math.max(0, col.compartments.length - 1),
+            type: spec.door
+        }];
+    } else {
+        col.doors = [];
+    }
+    return col;
+}
+
+/** Kitchen wall cabinets above a base/corner arm. */
+function _kitAttachShowcaseUpper(parentId) {
+    const parent = state.wings && state.wings[parentId];
+    if (!parent || !parent.columns || !parent.columns.length) return null;
+    const key = 'upperUnit_' + parentId;
+    const gap = Math.max(20, KIT_UPPER_Y - (parent.globalHeight || KIT_HEIGHT));
+    const uu = typeof createWingData === 'function' ? createWingData() : {};
+    uu.globalHeight = KIT_UPPER_H;
+    uu.depth = KIT_UPPER_D;
+    uu.thickness = parent.thickness || _kitThickness();
+    uu.plinthHeight = 0;
+    uu.boardMaterial = 'sandwich';
+    uu.cabinetModel = 'c9';
+    uu.cabinetTypeId = 'c9';
+    uu.kitchenRole = 'upper';
+    uu.hasDoors = true;
+    uu.wingPosition = 'front';
+    uu._isUpperUnit = true;
+    uu._upperGap = gap;
+    uu._upperOffsetX = 0;
+    uu._parentWingId = parentId;
+    uu.slidingDoor = { enabled: false };
+    ['materialBody', 'materialInternal', 'materialExternal', 'materialOpenCell', 'materialBack',
+        'handleType', 'handleStyle', 'handleVariant', 'ridingColor'
+    ].forEach(function(f) {
+        if (parent[f] !== undefined) uu[f] = JSON.parse(JSON.stringify(parent[f]));
+    });
+    const cols = [];
+    parent.columns.forEach(function(pc, i) {
+        const col = typeof _blankColumn === 'function'
+            ? _blankColumn(KIT_UNIT_W, null)
+            : {
+                type: 'normal', width: KIT_UNIT_W, height: KIT_UPPER_H,
+                shelves: 1, splitY: null, shelvesY: [], compartments: [], doors: []
+            };
+        col.width = KIT_UNIT_W;
+        col.height = KIT_UPPER_H;
+        col.topPanel = false;
+        col.noPlinth = true;
+        col.spaceBottomPanel = true;
+        col.floorOffset = 0;
+        if (typeof distributeShelves === 'function') distributeShelves(col);
+        if (!col.compartments || !col.compartments.length) {
+            col.compartments = [{ type: 'empty' }];
+        }
+        // No upper bay above the fridge tower
+        const isFridge = !!(pc && (pc._kitFridgePrev || (pc.height || 0) > (parent.globalHeight || KIT_HEIGHT) + 20));
+        if (!isFridge) {
+            col.doors = [{
+                startRow: 0,
+                endRow: Math.max(0, col.compartments.length - 1),
+                type: (i % 2) ? 'hinge_left' : 'hinge_right'
+            }];
+        } else {
+            col.doors = [];
+            // Keep open carcass above fridge so width still matches the run
+            col.compartments.forEach(function(c) { if (c) c.type = 'empty'; });
+        }
+        cols.push(col);
+    });
+    uu.columns = cols;
+    uu.width = window._kitchenWidthFromColumns(cols, uu.thickness);
+    state.wings[key] = uu;
+    return uu;
+}
+
+function _kitApplyShowcaseMaterials(wing) {
+    if (!wing) return;
+    wing.boardMaterial = 'sandwich';
+    wing.cabinetModel = 'c9';
+    wing.cabinetTypeId = 'c9';
+    wing.materialBody = wing.materialBody || 'white_matte';
+    wing.materialInternal = wing.materialInternal || 'white_matte';
+    wing.materialExternal = wing.materialExternal || 'white_matte';
+    wing.materialOpenCell = wing.materialOpenCell || 'white_matte';
+    wing.materialBack = wing.materialBack || 'white_matte';
+    wing.handleType = 'standard';
+    wing.handleStyle = 'pipe';
+    wing.handleVariant = 'pipe_black';
+    wing.hasDoors = true;
+    wing.orderOpts = Object.assign({}, wing.orderOpts || {}, { levelingFeet: 'yes' });
+}
+
+/**
+ * Build a complete ~4m × 4m L kitchen in place:
+ * fridge · cabinet · oven · cabinet · dishwasher · sink · ר + return run,
+ * wall uppers on both arms, coloured stone worktop.
+ */
+window._buildKitchenShowcase4x4 = function() {
+    window._kitchenAdminUnlocked = true;
+    if (typeof window._setKitchenPresetButtonsVisible === 'function') {
+        window._setKitchenPresetButtonsVisible(true);
+    }
+    // Seed a kitchen carcass so wings / materials exist
+    if (!window._configureKitchenCarcass('base', { numCols: 1 })) {
+        if (typeof _showToast === 'function') _showToast('לא ניתן לבנות מטבח לדוגמה', 3500);
+        return false;
+    }
+
+    const cw = state.wings.center;
+    _kitApplyShowcaseMaterials(cw);
+    cw.globalHeight = KIT_HEIGHT;
+    cw.depth = KIT_DEPTH;
+    cw.plinthHeight = KIT_PLINTH;
+    cw.cabinetName = 'מטבח 4×4';
+    state.cabinetName = 'מטבח 4×4';
+    state.presetId = 'kitchen';
+
+    // Main wall ≈ 3.8m (6×60 + walls) ending at the corner; return ≈ 4.1m (ר 90 + 5×60)
+    const centerPlan = [
+        { appliance: 'fridge' },
+        { door: 'hinge_right' },
+        { appliance: 'oven' },
+        { door: 'hinge_left' },
+        { appliance: 'dishwasher' },
+        { appliance: 'sink', door: 'hinge_right' }
+    ];
+    const armPlan = [
+        { door: 'hinge_left' },
+        { door: 'hinge_right' },
+        { door: 'hinge_left' },
+        { door: 'hinge_right' },
+        { door: 'hinge_left' }
+    ];
+    const centerCols = centerPlan.map(function(spec) { return _kitMakeShowcaseCol(spec); });
+
+    if (!window._configureKitchenCornerL('right', {
+        host: cw,
+        columns: centerCols,
+        armCols: 0
+    })) return false;
+
+    const arm = state.wings.right;
+    if (!arm) return false;
+    _kitApplyShowcaseMaterials(arm);
+    arm.columns = armPlan.map(function(spec) { return _kitMakeShowcaseCol(spec); });
+    window._kitchenCommitRunWidth(arm);
+
+    // Recenter materials / brand after corner rebuild
+    ['center', 'right'].forEach(function(s) {
+        _kitApplyShowcaseMaterials(state.wings[s]);
+    });
+    if (state.wings.center) {
+        state.wings.center.columns = centerCols;
+        state.columns = centerCols;
+        window._kitchenCommitRunWidth(state.wings.center);
+    }
+
+    _kitApplyBrandToAllArms('sensa', false);
+    state.countertopBrand = 'sensa';
+    state.activeColorPart = 'materialTopPanel';
+
+    // Clear leftover uppers then attach kitchen wall cabinets
+    Object.keys(state.wings || {}).forEach(function(k) {
+        if (k.indexOf('upperUnit_') === 0) delete state.wings[k];
+    });
+    _kitAttachShowcaseUpper('center');
+    _kitAttachShowcaseUpper('right');
+
+    state.activeWing = 'center';
+    state._activeUpperUnit = null;
+    state._activeUpperUnitParent = null;
+    state.viewMode = '3d';
+    state.selection = { colIndex: -1, rows: [] };
+    window._forceCameraAnim = true;
+    window._corner3dCamPositioned = false;
+
+    if (typeof syncSidebarToWing === 'function') syncSidebarToWing();
+    if (typeof buildCabinet === 'function') buildCabinet();
+    if (typeof updateCameraView === 'function') updateCameraView();
+    if (typeof calculatePrice === 'function') calculatePrice();
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+    if (typeof window._updateKitchenSectionUI === 'function') window._updateKitchenSectionUI();
+    if (typeof window._syncKitchenApplianceToolbar === 'function') window._syncKitchenApplianceToolbar();
+    if (typeof _showToast === 'function') {
+        const meters = (typeof window._kitchenLinearMeters === 'function')
+            ? window._kitchenLinearMeters() : 0;
+        _showToast('מטבח 4×4 נבנה — כיור, מדיח, תנור, מקרר, עליונים ושיש (' + meters + ' מ׳)', 5000);
+    }
+    return true;
+};
+
 window._initKitchenAdminGate = async function() {
     let ok = false;
     try {

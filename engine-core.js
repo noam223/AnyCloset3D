@@ -5005,10 +5005,24 @@ function buildCabinet() {
         // In edit mode: only render if we're editing this upper unit's parent
         if (inEditMode && savedActiveWing !== parentId) return;
 
-        // Compute Y offset above parent wing
-        const mainH = parentWing.columns && parentWing.columns.length > 0
-            ? Math.max(...parentWing.columns.map(c => c.height))
-            : (parentWing.globalHeight || 240);
+        // Compute Y offset above parent wing.
+        // Kitchen: sit on the worktop line (globalHeight) — ignore tall fridge niches.
+        let mainH = parentWing.globalHeight || 240;
+        if (parentWing.columns && parentWing.columns.length > 0) {
+            if (state.presetId === 'kitchen') {
+                const baseHs = parentWing.columns
+                    .filter(function(c) {
+                        if (!c) return false;
+                        if (c._kitFridgePrev) return false;
+                        const gh = parentWing.globalHeight || 88;
+                        return (c.height || gh) <= gh + 8;
+                    })
+                    .map(function(c) { return c.height || parentWing.globalHeight || 88; });
+                mainH = baseHs.length ? Math.max.apply(null, baseHs) : (parentWing.globalHeight || 88);
+            } else {
+                mainH = Math.max(...parentWing.columns.map(c => c.height));
+            }
+        }
 
         const upperGroup = new THREE.Group();
         upperGroup.position.y = mainH + (uuWing._upperGap || 60);
@@ -5858,9 +5872,22 @@ window.buildCabinetIntoGroup = function(targetGroup) {
         const uuKey = 'upperUnit_center';
         const uuWing = state.wings[uuKey];
         if (uuWing && uuWing._isUpperUnit) {
-            const mainH = centerWing.columns && centerWing.columns.length > 0
-                ? Math.max(...centerWing.columns.map(c => c.height))
-                : (centerWing.globalHeight || 240);
+            let mainH = centerWing.globalHeight || 240;
+            if (centerWing.columns && centerWing.columns.length > 0) {
+                if (state.presetId === 'kitchen') {
+                    const baseHs = centerWing.columns
+                        .filter(function(c) {
+                            if (!c) return false;
+                            if (c._kitFridgePrev) return false;
+                            const gh = centerWing.globalHeight || 88;
+                            return (c.height || gh) <= gh + 8;
+                        })
+                        .map(function(c) { return c.height || centerWing.globalHeight || 88; });
+                    mainH = baseHs.length ? Math.max.apply(null, baseHs) : (centerWing.globalHeight || 88);
+                } else {
+                    mainH = Math.max(...centerWing.columns.map(c => c.height));
+                }
+            }
             const upperGroup = new THREE.Group();
             upperGroup.position.y = mainH + (uuWing._upperGap || 60);
             upperGroup.position.x = (uuWing._upperOffsetX || 0);
