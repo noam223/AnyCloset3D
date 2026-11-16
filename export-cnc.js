@@ -1733,27 +1733,26 @@
         v.anno = null;
         v.labels = [];
     }
-    function _annoLabel(text, wide) {
+    function _annoLabel(text) {
         const canvas = document.createElement('canvas');
-        canvas.width = wide ? 512 : 320;
-        canvas.height = 96;
+        canvas.width = 512;
+        canvas.height = 128;
         const g = canvas.getContext('2d');
-        g.fillStyle = 'rgba(255,255,255,0.94)';
-        g.fillRect(0, 0, canvas.width, canvas.height);
-        g.strokeStyle = wide ? '#1e3a5f' : '#c2410c';
-        g.lineWidth = 4;
-        g.strokeRect(3, 3, canvas.width - 6, canvas.height - 6);
-        g.fillStyle = wide ? '#1e3a5f' : '#9a3412';
-        g.font = 'bold 44px Arial, sans-serif';
+        g.clearRect(0, 0, canvas.width, canvas.height);
+        g.font = '600 54px Arial, sans-serif';
         g.textAlign = 'center';
         g.textBaseline = 'middle';
-        g.direction = 'rtl';
+        g.lineJoin = 'round';
+        g.lineWidth = 14;
+        g.strokeStyle = 'rgba(255,255,255,0.92)';
+        g.strokeText(text, canvas.width / 2, canvas.height / 2);
+        g.fillStyle = '#1c1917';
         g.fillText(text, canvas.width / 2, canvas.height / 2);
         const tex = new THREE.CanvasTexture(canvas);
-        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false }));
         sprite.renderOrder = 6;
-        sprite.userData.wide = !!wide;
-        sprite.scale.set(wide ? 22 : 14, 5.5, 1);
+        sprite.userData.wide = true;
+        sprite.scale.set(18, 4.5, 1);
         return sprite;
     }
     function _annoLine(group, a, b, color) {
@@ -1773,54 +1772,52 @@
         v.meshes.forEach(function(mesh) { box.expandByObject(mesh); });
         if (box.isEmpty()) return;
         const min = box.min, max = box.max;
-        const gap = 7;
-        const tick = 2.2;
-        const dim = 0x1e3a5f;
-        const put = function(a, b, label, at) {
-            _annoLine(anno, a, b, dim);
+        const gap = 8;
+        const dim = 0x44403c;
+        const ext = 0x78716c;
+        const put = function(a, b, label, extA, extB) {
             const dir = b.clone().sub(a);
             const len = dir.length() || 1;
-            dir.multiplyScalar(tick / len);
-            const n = new THREE.Vector3(-dir.z, 0, dir.x).normalize().multiplyScalar(tick);
-            if (Math.abs(b.y - a.y) > Math.abs(b.x - a.x) && Math.abs(b.y - a.y) > Math.abs(b.z - a.z)) {
-                n.set(tick, 0, 0);
-            }
-            _annoLine(anno, a.clone().sub(n), a.clone().add(n), dim);
-            _annoLine(anno, b.clone().sub(n), b.clone().add(n), dim);
-            const sprite = _annoLabel(label, true);
-            sprite.position.copy(at);
+            dir.multiplyScalar(1 / len);
+            const opening = Math.min(9, len * 0.22);
+            const mid = a.clone().lerp(b, 0.5);
+            _annoLine(anno, a, mid.clone().addScaledVector(dir, -opening), dim);
+            _annoLine(anno, mid.clone().addScaledVector(dir, opening), b, dim);
+            const ref = Math.abs(dir.y) < 0.85 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
+            const side = new THREE.Vector3().crossVectors(dir, ref).normalize().multiplyScalar(1.15);
+            _annoLine(anno, a, a.clone().addScaledVector(dir, 2.6).add(side), dim);
+            _annoLine(anno, a, a.clone().addScaledVector(dir, 2.6).sub(side), dim);
+            _annoLine(anno, b, b.clone().addScaledVector(dir, -2.6).add(side), dim);
+            _annoLine(anno, b, b.clone().addScaledVector(dir, -2.6).sub(side), dim);
+            const extend = function(from, to) {
+                const out = to.clone().sub(from);
+                const n = out.length() || 1;
+                _annoLine(anno, from, to.clone().addScaledVector(out, 1.8 / n), ext);
+            };
+            if (extA && extB) { extend(extA, a); extend(extB, b); }
+            const sprite = _annoLabel(label);
+            sprite.position.copy(mid);
             anno.add(sprite);
             v.labels.push(sprite);
         };
-        const midX = (min.x + max.x) / 2, midY = (min.y + max.y) / 2, midZ = (min.z + max.z) / 2;
         const wMm = Math.round((max.x - min.x) * 10);
         const hMm = Math.round((max.y - min.y) * 10);
         const dMm = Math.round((max.z - min.z) * 10);
-        put(new THREE.Vector3(min.x, min.y, max.z + gap), new THREE.Vector3(max.x, min.y, max.z + gap),
-            'רוחב ' + wMm, new THREE.Vector3(midX, min.y, max.z + gap + 3));
-        put(new THREE.Vector3(min.x - gap, min.y, max.z), new THREE.Vector3(min.x - gap, max.y, max.z),
-            'גובה ' + hMm, new THREE.Vector3(min.x - gap - 3, midY, max.z));
-        put(new THREE.Vector3(max.x + gap, min.y, min.z), new THREE.Vector3(max.x + gap, min.y, max.z),
-            'עומק ' + dMm, new THREE.Vector3(max.x + gap + 3, min.y, midZ));
+        put(new THREE.Vector3(min.x, min.y, max.z + gap), new THREE.Vector3(max.x, min.y, max.z + gap), wMm + '  רוחב',
+            new THREE.Vector3(min.x, min.y, max.z), new THREE.Vector3(max.x, min.y, max.z));
+        put(new THREE.Vector3(min.x - gap, min.y, max.z), new THREE.Vector3(min.x - gap, max.y, max.z), hMm + '  גובה',
+            new THREE.Vector3(min.x, min.y, max.z), new THREE.Vector3(min.x, max.y, max.z));
+        put(new THREE.Vector3(max.x + gap, min.y, min.z), new THREE.Vector3(max.x + gap, min.y, max.z), dMm + '  עומק',
+            new THREE.Vector3(max.x, min.y, min.z), new THREE.Vector3(max.x, min.y, max.z));
 
-        const seenY = {};
-        const dotGeo = new THREE.SphereGeometry(0.7, 12, 8);
+        const dotGeo = new THREE.SphereGeometry(0.55, 12, 8);
         const dotMat = new THREE.MeshBasicMaterial({ color: 0xc2410c, depthTest: false });
         UI.result.panels.forEach(function(r) {
             (r.hinges || []).forEach(function(h) {
-                const p = new THREE.Vector3(h[0] / 10, h[1] / 10, h[2] / 10);
                 const dot = new THREE.Mesh(dotGeo, dotMat);
-                dot.position.copy(p);
+                dot.position.set(h[0] / 10, h[1] / 10, h[2] / 10);
                 dot.renderOrder = 5;
                 anno.add(dot);
-                const key = Math.round(p.y * 10);
-                if (seenY[key]) return;
-                seenY[key] = true;
-                const fromBottom = Math.round((p.y - min.y) * 10);
-                const tag = _annoLabel('ציר ' + fromBottom, false);
-                tag.position.set(p.x, p.y, max.z + 2);
-                anno.add(tag);
-                v.labels.push(tag);
             });
         });
     }
@@ -1949,7 +1946,7 @@
                     '</div>' +
                     '<div id="cnc-3d-wrap" style="width:460px;flex-shrink:0;position:relative;background:#e7e5e4;border-right:1px solid #e2e8f0;">' +
                         '<canvas id="cnc-3d" style="width:100%;height:100%;display:block;"></canvas>' +
-                        '<div style="position:absolute;top:8px;right:10px;left:10px;font-size:.72rem;color:#44403c;pointer-events:none;">מידות וצירים במ״מ · מעבר על שורה מסמן את החלק</div>' +
+                        '<div style="position:absolute;top:8px;right:10px;left:10px;font-size:.72rem;color:#44403c;pointer-events:none;">מידות כלליות במ״מ · נקודה כתומה = מיקום ציר</div>' +
                         '<button type="button" id="cnc-3d-doors" style="position:absolute;bottom:10px;left:10px;z-index:2;border:1px solid #d6d3d1;border-radius:8px;background:rgba(255,255,255,.94);color:#44403c;font:inherit;font-size:.74rem;font-weight:700;padding:6px 10px;cursor:pointer;">הסתר דלתות</button>' +
                     '</div>' +
                 '</div>' +
