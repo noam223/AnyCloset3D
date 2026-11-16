@@ -5151,7 +5151,7 @@ window._syncKitchenApplianceToolbar = function() {
     });
     const btn = document.getElementById('tb-btn-appliances');
     if (btn) {
-        btn.title = isKit ? 'כיור, מדיח ותנור' : 'מכונת כביסה, מייבש וטלוויזיה';
+        btn.title = isKit ? 'כיור, מדיח, תנור ומקרר' : 'מכונת כביסה, מייבש וטלוויזיה';
     }
     if (isKit && typeof window._renderKitchenBrandExamples === 'function') {
         window._renderKitchenBrandExamples();
@@ -5185,12 +5185,11 @@ window.toggleCellAppliance = function(type) {
     if (!col) return;
     const names = {
         washer: 'מכונת כביסה', dryer: 'מייבש',
-        sink: 'כיור', dishwasher: 'מדיח', oven: 'תנור'
+        sink: 'כיור', dishwasher: 'מדיח', oven: 'תנור', fridge: 'מקרר'
     };
     const fmt = v => (Math.round(v * 10) / 10).toString();
     const sideW = R.sideBySideWidth || 122;
     const minW = R.minWidth || 60;
-
     // Allow tiny float drift (e.g. kitchen 60 → 59.9 after rescale)
     if (col.width < minW - 0.2) {
         _showToast(`רוחב התא ${fmt(col.width)} ס"מ — ל${names[type] || type} נדרש רוחב פנימי של ${minW} ס"מ לפחות`, 4500);
@@ -5201,6 +5200,7 @@ window.toggleCellAppliance = function(type) {
     const first = col.compartments[rows[0]];
     const turnOn = !(first && !first.partition && Array.isArray(first.appliances) && first.appliances.includes(type));
     let changed = 0, tooShortH = null, swappedH = null, swappedW = null, clearedPartition = false;
+    let fridgeRaised = false;
 
     rows.forEach(r => {
         const comp = col.compartments[r];
@@ -5208,6 +5208,12 @@ window.toggleCellAppliance = function(type) {
         const others = (!comp.partition && Array.isArray(comp.appliances)) ? comp.appliances.filter(t => t !== type) : [];
         if (!turnOn) {
             if (others.length) comp.appliances = others; else delete comp.appliances;
+            // Restore base bay after removing a tall fridge
+            if (type === 'fridge' && col._kitFridgePrev) {
+                col.height = col._kitFridgePrev.height;
+                col.topPanel = col._kitFridgePrev.topPanel;
+                delete col._kitFridgePrev;
+            }
             changed++;
             return;
         }
@@ -5215,9 +5221,18 @@ window.toggleCellAppliance = function(type) {
         if (!isKitType && R.singleHeight && h < R.singleHeight) { tooShortH = h; return; }
         if (isKitType) {
             const needH = (R.dims[type] && R.dims[type].H) || 0;
-            // Sink is shallow. Dishwasher/oven sit in the full carcass bay (floor→worktop),
+            // Fridge: auto-raise this column into a tall niche (no shared worktop on top).
+            if (type === 'fridge' && needH && (col.height || h) < needH - 0.5) {
+                if (!col._kitFridgePrev) {
+                    col._kitFridgePrev = { height: col.height, topPanel: col.topPanel !== false };
+                }
+                col.height = needH;
+                col.topPanel = false;
+                fridgeRaised = true;
+            }
+            // Sink is shallow. Dishwasher/oven/fridge sit in the full carcass bay (floor→top),
             // so compare against column height — not the inner shelf-bay cellH (~74cm with plinth).
-            const hCheck = (type === 'dishwasher' || type === 'oven')
+            const hCheck = (type === 'dishwasher' || type === 'oven' || type === 'fridge')
                 ? (col.height || h)
                 : h;
             if (type !== 'sink' && needH && hCheck < needH - 5) { tooShortH = hCheck; return; }
@@ -5258,11 +5273,13 @@ window.toggleCellAppliance = function(type) {
             `התא ${fmt(swappedW)}×${fmt(swappedH)} — הוכנס רק ${names[type]}`,
             5500
         );
+    } else if (fridgeRaised) {
+        _showToast('העמודה הוגבהה למקרר (177 ס"מ) — בלי משטח עליון בעמודה זו', 4500);
     }
     if (!changed) return;
     if (turnOn && tooShortH === null && rows.some(r => _cellApplianceBlocksDoor(col, r))) {
         const removedDoors = _removeDoorsBlockedByAppliances(state.selection.colIndex);
-        if (swappedH === null) {
+        if (swappedH === null && !fridgeRaised) {
             _showToast(`המכשיר חוסם דלת בחזית התא` +
                 (removedDoors ? ' (הדלת הוסרה)' : ''), 5000);
         }
