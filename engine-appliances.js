@@ -577,14 +577,15 @@ window.addLaundryAppliancesToCell = addLaundryAppliancesToCell;
 // =====================================================================
 const KIT_APPLIANCE_TYPES = {
     sink:        { W: 56, H: 20, D: 48, label: 'כיור' },
-    dishwasher:  { W: 59.5, H: 82, D: 55, label: 'מדיח' },
+    // European under-counter DW: ~86.5cm so it sits just under an 88cm kitchen carcass top
+    dishwasher:  { W: 59.5, H: 86.5, D: 57, label: 'מדיח כלים' },
     oven:        { W: 59.5, H: 60, D: 55, label: 'תנור' }
 };
 const KITCHEN_RULES = {
     minWidth: 60,
     dims: {
         sink: { W: 56, H: 20, D: 48 },
-        dishwasher: { W: 59.5, H: 82, D: 55 },
+        dishwasher: { W: 59.5, H: 86.5, D: 57 },
         oven: { W: 59.5, H: 60, D: 55 }
     },
     // dishwasher/oven typically block a front door
@@ -605,6 +606,101 @@ function _kitApplianceMat(hex, rough) {
         color: hex, roughness: rough == null ? 0.45 : rough, metalness: 0.15,
         envMap: window._studioEnvMap || null
     });
+}
+
+/** Realistic under-counter dishwasher — same visual language as laundry machines. */
+function buildKitchenDishwasher() {
+    const T = KIT_APPLIANCE_TYPES.dishwasher;
+    const W = T.W, H = T.H, D = T.D;
+    const feet = 1.2;
+    const F = D / 2;
+    const g = new THREE.Group();
+    g.name = 'kitchenAppliance_dishwasher';
+
+    const env = window._studioEnvMap || null;
+    const std = (color, rough, metal, extra) => new THREE.MeshStandardMaterial(Object.assign({
+        color: color, roughness: rough, metalness: metal || 0,
+        envMap: env, envMapIntensity: 0.85
+    }, extra || {}));
+    const M = {
+        body: std(0xf1f2f0, 0.36, 0.05),
+        door: std(0xe8eaec, 0.32, 0.08),
+        dark: std(0x2a2d31, 0.55, 0.12),
+        chrome: std(0xd5d9dc, 0.2, 0.95, { envMapIntensity: 1.1 }),
+        button: std(0xe6e8ea, 0.4, 0.05),
+        display: std(0x000000, 0.12, 0, {
+            emissive: 0xffffff,
+            emissiveMap: _laDisplayTex(['1:45', 'Eco', '45°'])
+        }),
+        grille: new THREE.MeshBasicMaterial({ map: _laGrilleTex(), transparent: true, depthWrite: false }),
+        led: new THREE.MeshBasicMaterial({ color: 0x4ade80 }),
+        label: new THREE.MeshBasicMaterial({
+            map: _laLabelTex('14 place  ·  A+++  ·  Silent'),
+            transparent: true, depthWrite: false
+        })
+    };
+    const add = (mesh, x, y, z) => { mesh.position.set(x || 0, y || 0, z || 0); g.add(mesh); return mesh; };
+
+    // ---- Shell (rounded body) ----
+    const bodyH = H - feet;
+    const bodyCy = feet + bodyH / 2;
+    add(_laSlab(W, bodyH, D, 0.7, 0.35, M.body), 0, bodyCy, 0);
+
+    // ---- Top control fascia (integrated, not a drawer) ----
+    const panelH = 7.2;
+    const panelY = H - panelH / 2 - 0.35;
+    add(_laSlab(W - 1.2, panelH, 0.85, 0.6, 0.2, M.door), 0, panelY, F);
+    const PF = F + 0.85;
+    // Display + program buttons
+    add(new THREE.Mesh(new THREE.PlaneGeometry(14, 4.6), M.display), -10, panelY + 0.4, PF + 0.02);
+    [6, 10, 14, 18].forEach((x, i) => {
+        const btn = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.35, 18), M.button);
+        btn.rotation.x = Math.PI / 2;
+        add(btn, x, panelY + (i < 2 ? 1.4 : -1.4), PF + 0.18);
+    });
+    const pwr = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.15, 0.45, 22), M.button);
+    pwr.rotation.x = Math.PI / 2;
+    add(pwr, 24, panelY, PF + 0.22);
+    add(new THREE.Mesh(new THREE.TorusGeometry(1.35, 0.1, 6, 24), M.chrome), 24, panelY, PF + 0.08);
+    add(new THREE.Mesh(new THREE.CircleGeometry(0.22, 12), M.led), 24, panelY + 2.1, PF + 0.02);
+    add(new THREE.Mesh(new THREE.PlaneGeometry(22, 1.6), M.label), 0, panelY - 2.6, PF + 0.02);
+
+    // ---- Main door (flush front — no external bar handle) ----
+    const doorTop = H - panelH - 0.7;
+    const doorBot = feet + 9.5;
+    const doorH = Math.max(20, doorTop - doorBot);
+    const doorCy = (doorTop + doorBot) / 2;
+    add(_laSlab(W - 1.6, doorH, 0.7, 0.9, 0.22, M.door), 0, doorCy, F + 0.05);
+    // Subtle horizontal door seams (rack sections)
+    [-doorH * 0.18, doorH * 0.12].forEach(dy => {
+        add(new THREE.Mesh(new THREE.BoxGeometry(W - 4.5, 0.12, 0.08), M.dark), 0, doorCy + dy, F + 0.42);
+    });
+    // Recessed grip pocket at top of door (integrated handle)
+    const gripY = doorTop - 1.6;
+    add(new THREE.Mesh(new THREE.BoxGeometry(W - 8, 1.8, 0.55), M.dark), 0, gripY, F + 0.55);
+    add(_laSlab(W - 9, 1.2, 0.35, 0.4, 0.1, M.chrome), 0, gripY, F + 0.85);
+
+    // ---- Bottom vent / toe grille ----
+    const ventH = 7.5;
+    const ventY = feet + 0.8 + ventH / 2;
+    add(new THREE.Mesh(new THREE.ShapeGeometry(_laRoundedRect(W - 2.8, ventH + 0.3, 0.8), 4), M.dark), 0, ventY, F + 0.02);
+    add(_laSlab(W - 3.2, ventH, 0.25, 0.7, 0.08, M.body), 0, ventY, F + 0.02);
+    add(new THREE.Mesh(new THREE.PlaneGeometry(28, 4.2), M.grille), 0, ventY, F + 0.28);
+
+    // ---- Side chrome trim lines ----
+    [-1, 1].forEach(sx => {
+        add(new THREE.Mesh(new THREE.BoxGeometry(0.12, doorH * 0.92, 0.08), M.chrome),
+            sx * (W / 2 - 1.1), doorCy, F + 0.42);
+    });
+
+    // ---- Levelling feet ----
+    const footGeo = new THREE.CylinderGeometry(1.8, 2.1, feet, 14);
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => {
+        add(new THREE.Mesh(footGeo, M.dark), sx * (W / 2 - 5), feet / 2, sz * (F - 5));
+    });
+
+    g.userData.dims = { W, H, D };
+    return g;
 }
 
 function buildKitchenAppliance(type) {
@@ -637,7 +733,10 @@ function buildKitchenAppliance(type) {
         g.userData.sinkRimLocalY = 0;
         g.userData.sinkCutoutW = T.W;
         g.userData.sinkCutoutD = T.D;
+    } else if (type === 'dishwasher') {
+        return buildKitchenDishwasher();
     } else if (type === 'oven') {
+        const env = window._studioEnvMap || null;
         const body = new THREE.Mesh(
             new THREE.BoxGeometry(T.W, T.H, T.D),
             _kitApplianceMat(0x2a2d31, 0.4)
@@ -646,36 +745,37 @@ function buildKitchenAppliance(type) {
         g.add(body);
         const glass = new THREE.Mesh(
             new THREE.BoxGeometry(T.W * 0.72, T.H * 0.48, 0.6),
-            new THREE.MeshStandardMaterial({ color: 0x111318, roughness: 0.15, metalness: 0.4, envMap: window._studioEnvMap || null })
+            new THREE.MeshStandardMaterial({
+                color: 0x111318, roughness: 0.12, metalness: 0.45,
+                envMap: env, envMapIntensity: 1.2
+            })
         );
         glass.position.set(0, T.H * 0.48, T.D / 2 - 0.2);
         g.add(glass);
+        // Recessed chrome bar (less "drawer-like")
         const handle = new THREE.Mesh(
-            new THREE.BoxGeometry(T.W * 0.5, 1.2, 1.5),
-            _kitApplianceMat(0xd0d4d8, 0.3)
+            new THREE.CylinderGeometry(0.55, 0.55, T.W * 0.55, 16),
+            _kitApplianceMat(0xd0d4d8, 0.22)
         );
-        handle.position.set(0, T.H * 0.78, T.D / 2 + 0.4);
+        handle.rotation.z = Math.PI / 2;
+        handle.position.set(0, T.H * 0.82, T.D / 2 + 0.9);
         g.add(handle);
+        [[-1], [1]].forEach(([sx]) => {
+            const standoff = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.35, 0.35, 1.2, 10),
+                _kitApplianceMat(0xb8bcc0, 0.3)
+            );
+            standoff.rotation.x = Math.PI / 2;
+            standoff.position.set(sx * T.W * 0.22, T.H * 0.82, T.D / 2 + 0.35);
+            g.add(standoff);
+        });
     } else {
-        // dishwasher
         const body = new THREE.Mesh(
             new THREE.BoxGeometry(T.W, T.H, T.D),
             _kitApplianceMat(0xf0f2f4, 0.42)
         );
         body.position.y = T.H / 2;
         g.add(body);
-        const panel = new THREE.Mesh(
-            new THREE.BoxGeometry(T.W - 1, T.H * 0.22, 1),
-            _kitApplianceMat(0xe4e7ea, 0.4)
-        );
-        panel.position.set(0, T.H * 0.86, T.D / 2 - 0.3);
-        g.add(panel);
-        const handle = new THREE.Mesh(
-            new THREE.BoxGeometry(T.W * 0.45, 1, 1.4),
-            _kitApplianceMat(0x8a9098, 0.3)
-        );
-        handle.position.set(0, T.H * 0.72, T.D / 2 + 0.3);
-        g.add(handle);
     }
     g.userData.isKitchenAppliance = true;
     g.userData.applianceType = type;
@@ -683,9 +783,17 @@ function buildKitchenAppliance(type) {
 }
 
 const _kitTemplates = {};
+const _KIT_TMPL_VER = { dishwasher: 'dw-real-2', sink: 'sink-1', oven: 'oven-2' };
 function _kitTemplate(type) {
-    if (!_kitTemplates[type]) _kitTemplates[type] = buildKitchenAppliance(type);
-    return _kitTemplates[type];
+    const key = type + ':' + (_KIT_TMPL_VER[type] || 'v1');
+    if (!_kitTemplates[key]) {
+        const built = buildKitchenAppliance(type);
+        built.userData = built.userData || {};
+        built.userData.isKitchenAppliance = true;
+        built.userData.applianceType = type;
+        _kitTemplates[key] = built;
+    }
+    return _kitTemplates[key];
 }
 
 function kitchenApplianceProtrudes(list, cellW, cellH, bodyD, frontInset) {
@@ -729,8 +837,10 @@ function addKitchenAppliancesToCell(parent, opts) {
             d: T.D
         };
     } else if (type === 'dishwasher') {
-        // Freestanding on the floor (behind external plinth), like a real under-counter DW
+        // Floor-standing under worktop (behind external plinth). Slight air gap under carcass top is normal.
         y = 0;
+        const targetH = Math.max(T.H, Math.min(T.H + 2, (colTop || T.H) - 1.2));
+        if (targetH > T.H + 0.15) m.scale.y = targetH / T.H;
     } else if (type === 'oven') {
         // Sit on carcass floor board, capped under worktop
         y = Math.max(opts.bottomY || 0, colTop - T.H);
