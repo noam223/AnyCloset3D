@@ -7992,7 +7992,9 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
                     window.addKitchenAppliancesToCell(_buildGroup, {
                         list: _kitList, x: colCenterX, bottomY: prevY,
                         cellW: col.width, cellH: compH, bodyD: bodyD, backT: backT,
-                        frontInset: _appInset
+                        frontInset: _appInset,
+                        // Sink mounts at carcass top (worktop line), not mid-cell
+                        colTopY: col.height
                     });
                 }
                 if (_laundList.length && typeof window.addLaundryAppliancesToCell === 'function') {
@@ -9524,9 +9526,38 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                     const panelCenterX = (panelLeftX + panelRightX) / 2;
                     const panelY = spanH + TOP_PANEL_T / 2;
                     _ppPartId = `top_panel_${spanStart}`;
-                    const tpMesh = createBoard(panelW, TOP_PANEL_T, bodyD, panelCenterX, panelY, 0, _kitTopMat);
+                    // Kitchen sink cutouts in the worktop
+                    const _sinkCutouts = [];
+                    if (_kitTops && typeof window._kitchenColHasSink === 'function') {
+                        const _sinkDims = (window.KIT_APPLIANCE_TYPES && window.KIT_APPLIANCE_TYPES.sink)
+                            ? window.KIT_APPLIANCE_TYPES.sink : { W: 56, D: 48 };
+                        for (let ci = spanStart; ci < spanEnd; ci++) {
+                            if (!window._kitchenColHasSink(_wingCols[ci])) continue;
+                            const colCx = colLeftEdges[ci] + _wingCols[ci].width / 2;
+                            const cutW = Math.min(_sinkDims.W, _wingCols[ci].width - 2);
+                            const cutD = Math.min(_sinkDims.D, bodyD - 4);
+                            const frontZ = bodyD / 2;
+                            const cutZ = frontZ - cutD / 2 - 1;
+                            _sinkCutouts.push({
+                                x: colCx - panelCenterX,
+                                z: cutZ,
+                                w: cutW,
+                                d: cutD
+                            });
+                        }
+                    }
+                    if (_sinkCutouts.length && typeof window._createKitchenWorktopWithCutouts === 'function') {
+                        const tpMesh = window._createKitchenWorktopWithCutouts(
+                            panelW, TOP_PANEL_T, bodyD, _kitTopMat, _sinkCutouts, activeEdgeMat
+                        );
+                        tpMesh.position.set(panelCenterX, spanH, 0);
+                        _buildGroup.add(tpMesh);
+                        if (typeof _ppRegisterMesh === 'function') _ppRegisterMesh(tpMesh, `top_panel_${spanStart}`);
+                    } else {
+                        const tpMesh = createBoard(panelW, TOP_PANEL_T, bodyD, panelCenterX, panelY, 0, _kitTopMat);
+                        _applyHorizBoardUV(tpMesh, panelLeftX, panelW, bodyD, state.width);
+                    }
                     _ppPartId = '';
-                    _applyHorizBoardUV(tpMesh, panelLeftX, panelW, bodyD, state.width);
                 } else {
                     // Individual panel per column (mixed heights)
                     for (let ci = spanStart; ci < spanEnd; ci++) {
@@ -9539,9 +9570,26 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         const panelCenterX = (panelLeftX + panelRightX) / 2;
                         const panelY = sc.height + TOP_PANEL_T / 2;
                         _ppPartId = `top_panel_${ci}`;
-                        const tpMesh = createBoard(panelW, TOP_PANEL_T, bodyD, panelCenterX, panelY, 0, _kitTopMat);
+                        const _hasSink = _kitTops && typeof window._kitchenColHasSink === 'function'
+                            && window._kitchenColHasSink(sc);
+                        if (_hasSink && typeof window._createKitchenWorktopWithCutouts === 'function') {
+                            const _sinkDims = (window.KIT_APPLIANCE_TYPES && window.KIT_APPLIANCE_TYPES.sink)
+                                ? window.KIT_APPLIANCE_TYPES.sink : { W: 56, D: 48 };
+                            const cutW = Math.min(_sinkDims.W, sc.width - 2);
+                            const cutD = Math.min(_sinkDims.D, bodyD - 4);
+                            const cutZ = bodyD / 2 - cutD / 2 - 1;
+                            const tpMesh = window._createKitchenWorktopWithCutouts(
+                                panelW, TOP_PANEL_T, bodyD, _kitTopMat,
+                                [{ x: 0, z: cutZ, w: cutW, d: cutD }],
+                                activeEdgeMat
+                            );
+                            tpMesh.position.set(panelCenterX, sc.height, 0);
+                            _buildGroup.add(tpMesh);
+                        } else {
+                            const tpMesh = createBoard(panelW, TOP_PANEL_T, bodyD, panelCenterX, panelY, 0, _kitTopMat);
+                            _applyHorizBoardUV(tpMesh, panelLeftX, panelW, bodyD, state.width);
+                        }
                         _ppPartId = '';
-                        _applyHorizBoardUV(tpMesh, panelLeftX, panelW, bodyD, state.width);
                     }
                 }
                 spanStart = inSpan ? c : -1;

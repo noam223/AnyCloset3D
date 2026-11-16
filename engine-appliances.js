@@ -613,24 +613,30 @@ function buildKitchenAppliance(type) {
     g.name = 'kitchenAppliance_' + type;
 
     if (type === 'sink') {
+        // Origin at rim (countertop line / קו אפס): basin hangs below, faucet above
+        const basinH = Math.max(10, T.H * 0.75);
+        const rimT = 1.2;
         const basin = new THREE.Mesh(
-            new THREE.BoxGeometry(T.W, Math.max(8, T.H * 0.55), T.D),
+            new THREE.BoxGeometry(T.W - 2, basinH, T.D - 2),
             _kitApplianceMat(0xc5ccd3, 0.35)
         );
-        basin.position.y = T.H * 0.35;
+        basin.position.y = -basinH / 2;
         g.add(basin);
         const rim = new THREE.Mesh(
-            new THREE.BoxGeometry(T.W + 2, 1.2, T.D + 2),
+            new THREE.BoxGeometry(T.W + 2, rimT, T.D + 2),
             _kitApplianceMat(0xe8ecf0, 0.4)
         );
-        rim.position.y = T.H * 0.7;
+        rim.position.y = 0;
         g.add(rim);
         const faucet = new THREE.Mesh(
             new THREE.CylinderGeometry(0.7, 0.7, 12, 10),
             _kitApplianceMat(0x9aa3ad, 0.25)
         );
-        faucet.position.set(0, T.H * 0.7 + 6, -T.D * 0.28);
+        faucet.position.set(0, 6, -T.D * 0.28);
         g.add(faucet);
+        g.userData.sinkRimLocalY = 0;
+        g.userData.sinkCutoutW = T.W;
+        g.userData.sinkCutoutD = T.D;
     } else if (type === 'oven') {
         const body = new THREE.Mesh(
             new THREE.BoxGeometry(T.W, T.H, T.D),
@@ -693,7 +699,8 @@ function kitchenApplianceProtrudes(list, cellW, cellH, bodyD, frontInset) {
 
 /**
  * Add kitchen appliances into a cell.
- * opts: { list, x, bottomY, cellW, cellH, bodyD, backT, frontInset }
+ * opts: { list, x, bottomY, cellW, cellH, bodyD, backT, frontInset, colTopY }
+ * Sink sits at colTopY (carcass top / worktop line) with rim at קו אפס.
  */
 function addKitchenAppliancesToCell(parent, opts) {
     const list = (opts.list || []).filter(t => KIT_APPLIANCE_TYPES[t]);
@@ -702,15 +709,92 @@ function addKitchenAppliancesToCell(parent, opts) {
     // One appliance per cell in v1 — take first kitchen type
     const type = list[0];
     const T = KIT_APPLIANCE_TYPES[type];
+    // Rebuild sink template if older cached mesh had wrong origin
+    if (type === 'sink') delete _kitTemplates.sink;
     const m = _kitTemplate(type).clone();
     let y = opts.bottomY;
+    let z = frontZ - T.D / 2;
     if (type === 'sink') {
-        // Sit near the top of the base unit (counter height feel)
-        y = opts.bottomY + Math.max(0, (opts.cellH || 80) - T.H - 2);
+        // Rim at carcass top (worktop underside / קו אפס של המשטח)
+        const colTop = (opts.colTopY != null)
+            ? opts.colTopY
+            : (opts.bottomY + (opts.cellH || 80));
+        y = colTop;
+        z = frontZ - T.D / 2 - 1; // slight inset from front face
+        m.userData.kitchenSinkAtCounter = true;
+        m.userData.sinkCutout = {
+            x: opts.x,
+            z: z,
+            w: T.W,
+            d: T.D
+        };
     }
-    m.position.set(opts.x, y, frontZ - T.D / 2);
+    m.position.set(opts.x, y, z);
     parent.add(m);
 }
+
+/** True if a kitchen column has a sink appliance in any compartment. */
+window._kitchenColHasSink = function(col) {
+    if (!col || !Array.isArray(col.compartments)) return false;
+    return col.compartments.some(function(comp) {
+        return comp && Array.isArray(comp.appliances) && comp.appliances.indexOf('sink') >= 0;
+    });
+};
+
+/**
+ * Worktop board with rectangular sink cutouts (ExtrudeGeometry).
+ * cutouts: [{ x, z, w, d }] in panel-local coords (origin = panel center, z forward +).
+ */
+window._createKitchenWorktopWithCutouts = function(panelW, panelT, panelD, mat, cutouts, edgeMat) {
+    const hw = panelW / 2;
+    const hd = panelD / 2;
+    const shape = new THREE.Shape();
+    shape.moveTo(-hw, -hd);
+    shape.lineTo(hw, -hd);
+    shape.lineTo(hw, hd);
+    shape.lineTo(-hw, hd);
+    shape.lineTo(-hw, -hd);
+
+    (cutouts || []).forEach(function(c) {
+        if (!c || !(c.w > 1) || !(c.d > 1)) return;
+        const hole = new THREE.Path();
+        // Shape Y maps to world -Z after rotateX(-90°), so use y = -z for cutout centers
+        const x0 = c.x - c.w / 2;
+        const y0 = (-c.z) - c.d / 2;
+        const x1 = Math.max(-hw + 0.5, Math.min(hw - 0.5, x0));
+        const x2 = Math.max(-hw + 0.5, Math.min(hw - 0.5, x0 + c.w));
+        const y1 = Math.max(-hd + 0.5, Math.min(hd - 0.5, y0));
+        const y2 = Math.max(-hd + 0.5, Math.min(hd - 0.5, y0 + c.d));
+        if (x2 - x1 < 2 || y2 - y1 < 2) return;
+        hole.moveTo(x1, y1);
+        hole.lineTo(x2, y1);
+        hole.lineTo(x2, y2);
+        hole.lineTo(x1, y2);
+        hole.lineTo(x1, y1);
+        shape.holes.push(hole);
+    });
+
+    const geo = new THREE.ExtrudeGeometry(shape, {
+        depth: panelT,
+        bevelEnabled: false,
+        curveSegments: 1
+    });
+    // Shape is X/Z (as X/Y); extrude along +Z → rotate so thickness is Y
+    geo.rotateX(-Math.PI / 2);
+    // After rotateX(-90°): extruded +Z becomes +Y. Bottom of slab at y=0 → shift so center at panelT/2
+    geo.translate(0, panelT / 2, 0);
+    geo.computeVertexNormals();
+
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.castShadow = false;
+    mesh.receiveShadow = true;
+    if (edgeMat) {
+        try {
+            mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat));
+        } catch (e) { /* ignore */ }
+    }
+    return mesh;
+};
 
 window._kitchenApplianceProtrudes = kitchenApplianceProtrudes;
 window.addKitchenAppliancesToCell = addKitchenAppliancesToCell;
