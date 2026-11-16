@@ -7151,7 +7151,18 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
                 _ppPartId = '';
             };
             if (_kitDouble) {
+                // One thick board for perf; dark center groove shows the double-carcass join
                 _drawKitWallSegs(wallX + t / 2, `divider_c${c}`, 2 * t);
+                if (wallTotalH > 0.5) {
+                    const _seamGeo = new THREE.BoxGeometry(0.14, wallTotalH, Math.max(0.5, (_partD || bodyD) * 0.98));
+                    const _seamMat = new THREE.MeshBasicMaterial({ color: 0x1e293b });
+                    const _seam = new THREE.Mesh(_seamGeo, _seamMat);
+                    _seam.position.set(wallX + t / 2, wallBottomY + wallTotalH / 2, _partZ || 0);
+                    _seam.castShadow = false;
+                    _seam.receiveShadow = false;
+                    _seam.userData.skipPartPaint = true;
+                    _buildGroup.add(_seam);
+                }
             } else {
                 _drawKitWallSegs(wallX, `divider_c${c}`);
             }

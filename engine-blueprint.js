@@ -723,14 +723,17 @@ function _bpPushColInnerWidthDims(p, viewKey, cols, colXPositions, ox, dW, sc, t
     const t = tCm != null ? +tCm : (state.thickness || 1.7);
     const tPx = t * sc;
     const GAP = 3;
+    const kit = _bpIsKitchenPreset();
     cols.forEach((col, ci) => {
         const cp = colXPositions[ci];
         if (!col || !cp) return;
         const isFirst = ci === 0;
         const isLast = ci === cols.length - 1;
-        // Outer walls and partitions are all drawn centred on their line, so every inner face is half a board in
-        const x1 = (isFirst ? ox : cp.x1) + tPx / 2 + GAP;
-        const x2 = (isLast ? ox + dW : cp.x2) - tPx / 2 - GAP;
+        // Shared wardrobe partition: half a board into each side.
+        // Kitchen double carcass: full board into each side at the join.
+        const joinInset = kit ? tPx : (tPx / 2);
+        const x1 = (isFirst ? ox : cp.x1) + (isFirst ? tPx / 2 : joinInset) + GAP;
+        const x2 = (isLast ? ox + dW : cp.x2) - (isLast ? tPx / 2 : joinInset) - GAP;
         _bpMaybePushInnerWidthDim(p, viewKey, 'colInW:c' + ci, x1, x2, yInner,
             `${_bpMm(cp.wCm || 0)}`, makeDimHFn, false);
     });
@@ -1434,6 +1437,29 @@ function _bpVlineWithHoles(drawVline, x, sepTopY, sepBotY, holes) {
         y = Math.max(y, holeBot);
     });
     if (sepBotY - y > 1) drawVline(x, y, sepBotY);
+}
+
+function _bpIsKitchenPreset() {
+    return !!(state && state.presetId === 'kitchen');
+}
+
+/**
+ * Kitchen carcass join: two separate boards (each thickness t) meeting at x,
+ * plus a center seam so the blueprint shows 2×17mm walls — not one thick slab.
+ * drawOneWall(x, y1, y2) draws one board of thickness t centered on x.
+ */
+function _bpDrawKitchenDoubleDivider(drawOneWall, x, y1, y2, sc, pushSvg) {
+    const tPx = (state.thickness || 1.7) * (sc || 1);
+    if (typeof drawOneWall !== 'function' || (y2 - y1) < 2 || tPx < 0.4) return;
+    drawOneWall(x - tPx / 2, y1, y2);
+    drawOneWall(x + tPx / 2, y1, y2);
+    if (typeof pushSvg === 'function') {
+        pushSvg(
+            `<line x1="${(+x).toFixed(1)}" y1="${(+y1).toFixed(1)}" ` +
+            `x2="${(+x).toFixed(1)}" y2="${(+y2).toFixed(1)}" ` +
+            `stroke="#1e293b" stroke-width="1.15" opacity="0.7"/>`
+        );
+    }
 }
 
 /** Cover punched separator gaps so no residual mid-wall shows inside a merged כוורת. */
@@ -2550,9 +2576,17 @@ window._generateMultiViewBlueprintSVG = function() {
                 const prevTopY = prevBotY - prevVisibleH * sc;
                 const sepTopY = Math.min(_colTopY, prevTopY);
                 const sepBotY = Math.max(_colBotY, prevBotY);
-                const _sepHoles = _bpOpenCellSepHolesSvg(prevCol, col, wg, pH, oy, dH, sc);
-                _bpVlineWithHoles((x, y1, y2) => vline(x, y1, y2, sc), colX, sepTopY, sepBotY, _sepHoles);
-                if (_sepHoles && _sepHoles.length) _bpHoneycombSepAddHoles(colX, _sepHoles);
+                if (_bpIsKitchenPreset()) {
+                    _bpDrawKitchenDoubleDivider(
+                        function(x, y1, y2) { vline(x, y1, y2, sc); },
+                        colX, sepTopY, sepBotY, sc,
+                        function(svg) { p.push(svg); }
+                    );
+                } else {
+                    const _sepHoles = _bpOpenCellSepHolesSvg(prevCol, col, wg, pH, oy, dH, sc);
+                    _bpVlineWithHoles((x, y1, y2) => vline(x, y1, y2, sc), colX, sepTopY, sepBotY, _sepHoles);
+                    if (_sepHoles && _sepHoles.length) _bpHoneycombSepAddHoles(colX, _sepHoles);
+                }
             }
 
             const _splitYOld = col.splitY || 0;
@@ -3576,9 +3610,17 @@ window._generateMultiViewBlueprintPages = function() {
                 const prevTopY2 = prevBotY2 - prevVisibleH2 * sc;
                 const sepTopY = Math.min(_colTopSvgY, prevTopY2);
                 const sepBotY = Math.max(_colBotSvgY, prevBotY2);
-                const _sepHoles2 = _bpOpenCellSepHolesSvg(prevCol, col, wg, pH, oy, dH, sc);
-                _bpVlineWithHoles((x, y1, y2) => makeVline(p, x, y1, y2, sc), colX, sepTopY, sepBotY, _sepHoles2);
-                if (_sepHoles2 && _sepHoles2.length) _bpHoneycombSepAddHoles(colX, _sepHoles2);
+                if (_bpIsKitchenPreset()) {
+                    _bpDrawKitchenDoubleDivider(
+                        function(x, y1, y2) { makeVline(p, x, y1, y2, sc); },
+                        colX, sepTopY, sepBotY, sc,
+                        function(svg) { p.push(svg); }
+                    );
+                } else {
+                    const _sepHoles2 = _bpOpenCellSepHolesSvg(prevCol, col, wg, pH, oy, dH, sc);
+                    _bpVlineWithHoles((x, y1, y2) => makeVline(p, x, y1, y2, sc), colX, sepTopY, sepBotY, _sepHoles2);
+                    if (_sepHoles2 && _sepHoles2.length) _bpHoneycombSepAddHoles(colX, _sepHoles2);
+                }
             }
 
             const shelvesArr = (col.shelvesY || []).slice().sort((a,b) => a-b);
@@ -4213,7 +4255,17 @@ window._generateMultiViewBlueprintPages = function() {
             const colPlinthH = col.noPlinth ? 0 : pH;
             colXPositions.push({ x1: colX, x2: colX + colW, wCm: (col.width != null ? col.width : wg.w) });
 
-            if (ci > 0) makeVline(p, colX, oy, oy + dH, sc);
+            if (ci > 0) {
+                if (_bpIsKitchenPreset()) {
+                    _bpDrawKitchenDoubleDivider(
+                        function(x, y1, y2) { makeVline(p, x, y1, y2, sc); },
+                        colX, oy, oy + dH, sc,
+                        function(svg) { p.push(svg); }
+                    );
+                } else {
+                    makeVline(p, colX, oy, oy + dH, sc);
+                }
+            }
 
             const _splitYFC = col.splitY || 0;
             const _splitTFC = (state.thickness || 1.7) * 2;
@@ -4486,7 +4538,17 @@ window._generateMultiViewBlueprintPages = function() {
                     const colPlinthH = col.noPlinth ? 0 : scPH;
                     colXPositions.push({ x1: colX, x2: colX + colW, wCm: (col.width != null ? col.width : scW) });
 
-                    if (ci > 0) makeVline(p, colX, oy, oy + dH, scScale);
+                    if (ci > 0) {
+                        if (_bpIsKitchenPreset()) {
+                            _bpDrawKitchenDoubleDivider(
+                                function(x, y1, y2) { makeVline(p, x, y1, y2, scScale); },
+                                colX, oy, oy + dH, scScale,
+                                function(svg) { p.push(svg); }
+                            );
+                        } else {
+                            makeVline(p, colX, oy, oy + dH, scScale);
+                        }
+                    }
                     const _splitYSC = col.splitY || 0;
                     const _splitTSC = (state.thickness || 1.7) * 2;
                     (col.shelvesY || []).forEach(sy => {
@@ -4959,7 +5021,17 @@ window._generateMultiViewBlueprintPages = function() {
             const colW = isLastCol ? (ox + dW - colX) : (col.width || uuW) * sc;
             colXPositions.push({ x1: colX, x2: colX + colW, wCm: (col.width != null ? col.width : uuW) });
 
-            if (ci > 0) makeVline(p, colX, oy, oy + dH, sc);
+            if (ci > 0) {
+                if (_bpIsKitchenPreset()) {
+                    _bpDrawKitchenDoubleDivider(
+                        function(x, y1, y2) { makeVline(p, x, y1, y2, sc); },
+                        colX, oy, oy + dH, sc,
+                        function(svg) { p.push(svg); }
+                    );
+                } else {
+                    makeVline(p, colX, oy, oy + dH, sc);
+                }
+            }
 
             // Shelf lines
             (col.shelvesY || []).forEach(sy => {
