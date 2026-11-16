@@ -808,8 +808,10 @@ function buildKitchenOven() {
             transparent: true, opacity: 0.22, depthWrite: false,
             side: THREE.DoubleSide, envMapIntensity: 2.2
         }),
-        // Dark oven interior (not a flat grey panel)
-        cavity: _kitStdMat(0x181a1e, 0.7, 0.25, { emissive: 0x2a1810, emissiveIntensity: 0.35 }),
+        // Dark oven interior — BackSide so the open window looks INTO the cavity
+        cavity: _kitStdMat(0x181a1e, 0.7, 0.25, {
+            emissive: 0x2a1810, emissiveIntensity: 0.35, side: THREE.BackSide
+        }),
         cavityBack: _kitStdMat(0x101214, 0.65, 0.2),
         rack: _kitStdMat(0xc8ccd0, 0.25, 0.9, { envMapIntensity: 1.1 }),
         display: _kitStdMat(0x000000, 0.12, 0, {
@@ -1080,7 +1082,7 @@ function buildKitchenAppliance(type) {
 }
 
 const _kitTemplates = {};
-const _KIT_TMPL_VER = { dishwasher: 'dw-laund-3', sink: 'sink-1', oven: 'oven-glass-4', fridge: 'fridge-1' };
+const _KIT_TMPL_VER = { dishwasher: 'dw-laund-3', sink: 'sink-1', oven: 'oven-glass-5', fridge: 'fridge-1' };
 function _kitTemplate(type) {
     const key = type + ':' + (_KIT_TMPL_VER[type] || 'v1');
     if (!_kitTemplates[key]) {
