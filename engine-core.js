@@ -865,12 +865,14 @@ window._setDoorsVisible = function(wantVisible) {
     window._doorsVisible = !!wantVisible;
     var meshes = (typeof doorMeshes !== 'undefined' && doorMeshes) ? doorMeshes : (window.doorMeshes || []);
     meshes.forEach(function(m) {
-        if (!m || !window._isHideableDoorFront(m)) return;
+        if (!m || (m.userData && m.userData.isHingeHardware)) return;
+        if (!window._isHideableDoorFront(m)) return;
         m.visible = window._doorsVisible;
     });
     // Also apply to companion cabinets in space/room view (their doors are tracked separately)
     (window._spaceCompanionDoorMeshes || []).concat(window._roomExtraDoorMeshes || []).forEach(function(m) {
-        if (!m || !window._isHideableDoorFront(m)) return;
+        if (!m || (m.userData && m.userData.isHingeHardware)) return;
+        if (!window._isHideableDoorFront(m)) return;
         m.visible = window._doorsVisible;
     });
     const btn = document.getElementById('btn-toggle-doors');
@@ -892,9 +894,42 @@ window._setDoorsVisible = function(wantVisible) {
     }
     const mobileChk = document.getElementById('mobile-inp-has-doors');
     if (mobileChk) mobileChk.checked = window._doorsVisible;
+    if (typeof window._applyHingeVisibility === 'function') window._applyHingeVisibility();
 };
 window._toggleDoors = function() {
     window._setDoorsVisible(!window._doorsVisible);
+};
+
+// ---- Hinge hardware visibility toggle ----
+window._hingesVisible = true;
+window._collectDoorMeshLists = function() {
+    var main = (typeof doorMeshes !== 'undefined' && doorMeshes) ? doorMeshes : (window.doorMeshes || []);
+    return [main, window._spaceCompanionDoorMeshes || [], window._roomExtraDoorMeshes || []];
+};
+window._applyHingeVisibility = function() {
+    var hingesOn = window._hingesVisible !== false;
+    var doorsOn = window._doorsVisible !== false;
+    window._collectDoorMeshLists().forEach(function(list) {
+        list.forEach(function(m) {
+            if (!m || !m.userData || !m.userData.isHingeHardware) return;
+            // Plate on carcass stays when doors are hidden; cup/arm follow the door
+            m.visible = hingesOn && (m.userData.keepVisibleWhenDoorsHidden || doorsOn);
+        });
+    });
+    var btn = document.getElementById('btn-toggle-hinges');
+    if (btn) {
+        btn.classList.toggle('toggled-off', !hingesOn);
+        btn.title = hingesOn ? 'הסתר צירי דלתות בהדמיה' : 'הצג צירי דלתות בהדמיה';
+        var ic = btn.querySelector('i');
+        if (ic) ic.style.opacity = hingesOn ? '' : '0.45';
+    }
+};
+window._setHingesVisible = function(wantVisible) {
+    window._hingesVisible = !!wantVisible;
+    window._applyHingeVisibility();
+};
+window._toggleHinges = function() {
+    window._setHingesVisible(!window._hingesVisible);
 };
 
 // LED lamp badge for preview captures — mirrors the editor's HTML .led-cell-icon
@@ -1815,11 +1850,13 @@ window._rebuildRoomExtraCabinets = function(rg) {
         root.add(g);
         entry.doors.forEach(function(m) {
             extraDoors.push(m);
+            if (m.userData && m.userData.isHingeHardware) return;
             if (window._isHideableDoorFront(m)) m.visible = window._doorsVisible !== false;
         });
     });
     // Kept out of doorMeshes so hover / door editing never targets a cabinet that is not open
     window._roomExtraDoorMeshes = extraDoors;
+    if (typeof window._applyHingeVisibility === 'function') window._applyHingeVisibility();
     _roomExtraCache.forEach(function(entry, id) {
         if (live[id]) return;
         entry.group.traverse(function(o) { if (o.geometry) o.geometry.dispose(); });
@@ -4286,7 +4323,14 @@ function _addHingeHardware(parent, opts) {
         // Track plate too so space/companion rebuilds keep it, but never hide with fronts
         _registerDoorMesh(plateGroup);
     }
-    if (window._doorsVisible === false) doorGroup.visible = false;
+    if (typeof window._applyHingeVisibility === 'function') window._applyHingeVisibility();
+    else {
+        if (window._doorsVisible === false) doorGroup.visible = false;
+        if (window._hingesVisible === false) {
+            doorGroup.visible = false;
+            plateGroup.visible = false;
+        }
+    }
     return plateGroup;
 }
 window._addHingeHardware = _addHingeHardware;
@@ -5999,12 +6043,14 @@ window._rebuildSpaceCompanion = function() {
         window._spaceCompanionGroup = window._spaceCompanionGroups[0] || null;
         window._spaceCompanionHit = window._spaceCompanionHits[0] || null;
         if (typeof window._applySpacePairPositions === 'function') window._applySpacePairPositions();
-        // Apply current door visibility to companion meshes immediately
+        // Apply current door / hinge visibility to companion meshes immediately
         if (window._doorsVisible === false) {
             (window._spaceCompanionDoorMeshes || []).forEach(function(m) {
-                if (m && window._isHideableDoorFront(m)) m.visible = false;
+                if (!m || (m.userData && m.userData.isHingeHardware)) return;
+                if (window._isHideableDoorFront(m)) m.visible = false;
             });
         }
+        if (typeof window._applyHingeVisibility === 'function') window._applyHingeVisibility();
     } catch (e) {
         console.warn('[spaceCompanion] failed to build', e);
         window._clearSpaceCompanion();
