@@ -4153,6 +4153,113 @@ function _registerDoorMesh(mesh) {
     window.doorMeshes = doorMeshes;
 }
 
+/** CNC-aligned hinge count / spread (lengths in cm). */
+function _hingeCountCm(lenCm) {
+    const mm = lenCm * 10;
+    return mm <= 900 ? 2 : (mm <= 1600 ? 3 : (mm <= 2000 ? 4 : 5));
+}
+function _hingeSpreadCm(lo, hi, n, edgeCm) {
+    const e = Math.min(edgeCm, (hi - lo) / 4);
+    const out = [];
+    for (let i = 0; i < n; i++) out.push(lo + e + (hi - lo - 2 * e) * (n === 1 ? 0.5 : i / (n - 1)));
+    return out;
+}
+
+/**
+ * Procedural Blum-style hinge hardware on the inner carcass face (and cup on the door back).
+ * Positions match CNC defaults: cupCenter 21.5mm, hingeEdge 100mm, plateFront 37mm.
+ * Meshes are registered as door meshes so "הסתר חזיתות" hides them too.
+ */
+function _addHingeHardware(parent, opts) {
+    if (!parent || !opts || opts.isBP) return;
+    const hinge = opts.hinge; // 'left' | 'right' | 'top'
+    if (hinge !== 'left' && hinge !== 'right' && hinge !== 'top') return;
+    const w = opts.w, h = opts.h;
+    if (!(w > 4) || !(h > 4)) return;
+    const cx = opts.cx, cy = opts.cy, cz = opts.cz;
+    const doorT = opts.doorT != null ? opts.doorT : 1.7;
+    const boardT = opts.boardT != null ? opts.boardT : doorT;
+    const bodyD = opts.bodyD != null ? opts.bodyD : 35;
+    const isInset = !!opts.isInset;
+    const doorGap = opts.doorGap != null ? opts.doorGap : 0.2;
+    const cupCenter = 2.15;
+    const hingeEdge = 10;
+    const plateFront = 3.7;
+    const cupR = 1.75;
+    const doorLeft = cx - w / 2, doorRight = cx + w / 2;
+    const doorBot = cy - h / 2, doorTop = cy + h / 2;
+    const doorBackZ = cz - doorT / 2;
+    const carcassFrontZ = isInset ? (bodyD / 2 - boardT) : (bodyD / 2);
+    const plateZ = carcassFrontZ - plateFront;
+
+    let mat = _addHingeHardware._mat;
+    if (!mat) {
+        mat = new THREE.MeshStandardMaterial({
+            color: 0xb0b4b8, metalness: 0.85, roughness: 0.35
+        });
+        _addHingeHardware._mat = mat;
+    }
+
+    const group = new THREE.Group();
+    group.userData.skipPartPaint = true;
+    group.userData.isHingeHardware = true;
+
+    const addCup = (x, y) => {
+        const cup = new THREE.Mesh(new THREE.CylinderGeometry(cupR, cupR, 1.1, 16), mat);
+        cup.rotation.x = Math.PI / 2;
+        cup.position.set(x, y, doorBackZ - 0.15);
+        group.add(cup);
+    };
+    const addPlateArm = (px, py, pz, alongY) => {
+        // Mounting plate on the inner carcass face
+        const plate = new THREE.Mesh(
+            alongY
+                ? new THREE.BoxGeometry(0.12, 5.2, 2.2)
+                : new THREE.BoxGeometry(5.2, 0.12, 2.2),
+            mat
+        );
+        plate.position.set(px, py, pz);
+        group.add(plate);
+        // Short arm toward the door cup
+        const arm = new THREE.Mesh(new THREE.BoxGeometry(alongY ? 1.8 : 0.35, alongY ? 0.35 : 1.8, 0.9), mat);
+        if (alongY) {
+            const inward = hinge === 'left' ? 1 : -1;
+            arm.position.set(px + inward * 1.0, py, (pz + doorBackZ) / 2);
+        } else {
+            arm.position.set(px, py - 1.0, (pz + doorBackZ) / 2);
+        }
+        group.add(arm);
+    };
+
+    if (hinge === 'top') {
+        const ys = doorTop - cupCenter;
+        const xs = _hingeSpreadCm(doorLeft, doorRight, _hingeCountCm(w), hingeEdge);
+        // Plate on underside of the top board
+        const plateY = doorTop + (isInset ? doorGap / 2 : 0) + 0.06;
+        xs.forEach(function(x) {
+            addCup(x, ys);
+            addPlateArm(x, plateY, plateZ, false);
+        });
+    } else {
+        const ys = _hingeSpreadCm(doorBot, doorTop, _hingeCountCm(h), hingeEdge);
+        const cupX = hinge === 'left' ? (doorLeft + cupCenter) : (doorRight - cupCenter);
+        // Inner face of the supporting side (overlay overlaps the wall; inset sits between walls)
+        const plateX = isInset
+            ? (hinge === 'left' ? doorLeft - doorGap / 2 - 0.06 : doorRight + doorGap / 2 + 0.06)
+            : (hinge === 'left' ? doorLeft + boardT - doorGap / 2 : doorRight - boardT + doorGap / 2);
+        ys.forEach(function(y) {
+            addCup(cupX, y);
+            addPlateArm(plateX, y, plateZ, true);
+        });
+    }
+
+    parent.add(group);
+    if (typeof _registerDoorMesh === 'function') _registerDoorMesh(group);
+    if (window._doorsVisible === false) group.visible = false;
+    return group;
+}
+window._addHingeHardware = _addHingeHardware;
+
 /** External drawer fronts stay visible when "הסתר חזיתות" hides door panels. */
 function _registerExternalDrawerFront(mesh) {
     if (!mesh) return;
@@ -6633,10 +6740,23 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
         createBoard(kitPlinthT, kitPlinthH, sidePlinthD, halfW - kitPlinthT / 2, kitPlinthH / 2, sidePlinthZ);
         _ppPartId = '';
 
-        // Carcass floor board on top of the feet (full run width) — top at plinthH+t matches startShelvesY
-        _ppPartId = 'plinth_floor';
-        createBoard(cabinetW, t, bodyD - kitPlinthT, 0, kitPlinthH + t / 2, -kitPlinthT / 2);
-        _ppPartId = '';
+        // Per-unit carcass floor on top of the feet (matches CNC cut) — top at plinthH+t matches startShelvesY
+        {
+            const floorCols = state.columns || [];
+            let floorX = -halfW + t;
+            if (floorCols.length) {
+                for (let fi = 0; fi < floorCols.length; fi++) {
+                    const fw = floorCols[fi].width || 60;
+                    _ppPartId = `plinth_floor_c${fi}`;
+                    createBoard(fw, t, bodyD - kitPlinthT, floorX + fw / 2, kitPlinthH + t / 2, -kitPlinthT / 2);
+                    floorX = floorX + fw + ((fi < floorCols.length - 1) ? (2 * t) : t);
+                }
+            } else {
+                _ppPartId = 'plinth_floor';
+                createBoard(cabinetW, t, bodyD - kitPlinthT, 0, kitPlinthH + t / 2, -kitPlinthT / 2);
+            }
+            _ppPartId = '';
+        }
     }
 
     // ---- רגלי ניקל: מצויר פעם אחת לכל כנף (לא לכל עמודה) ----
@@ -7309,9 +7429,11 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
                 _applyHorizBoardUV(plinthTopMesh, currentX, col.width, bodyD, state.width);
             } else if (!col.noPlinth && !_isSlidingWardrobe && !isRegalim && !isKitchenBase) {
                 // For sliding wardrobes: full-width bottom board is added by buildSlidingDoorCabinet — skip per-column plinth
-                // For regalim / kitchen: plate + external plinth already drawn — skip solid filled צוקל
+                // For regalim / kitchen: plate + external plinth already drawn — skip צוקל here
+                // Front plinth strip only (matches CNC cut) + floor board on top
+                _ppPartId = `plinth_external_c${c}`;
+                createBoard(col.width, state.plinthHeight, t, colCenterX, state.plinthHeight / 2, bodyD / 2 - t / 2);
                 _ppPartId = `plinth_c${c}`;
-                createBoard(col.width, state.plinthHeight, bodyD, colCenterX, state.plinthHeight/2, 0);
                 const plinthTopMesh = createBoard(col.width, t, bodyD, colCenterX, state.plinthHeight + t/2, 0);
                 _ppPartId = '';
                 _applyHorizBoardUV(plinthTopMesh, currentX, col.width, bodyD, state.width);
@@ -7437,7 +7559,7 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
             // For sliding wardrobes: internal partitions are set back 6cm from front face
             const _partD = _slidingPartD;
             const _partZ = _slidingPartZ;
-            // Kitchen: separate carcass look — one thick 2t divider (same gap as two boards, half the meshes)
+            // Kitchen: separate carcasses — two unit-side boards with a 2t gap between columns
             const _kitDouble = (state.presetId === 'kitchen');
             
             let sortedHoles = internalHoles[c].sort((a,b) => a.bottom - b.bottom);
@@ -7461,8 +7583,9 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
                 _ppPartId = '';
             };
             if (_kitDouble) {
-                // One thick board for perf; dark center groove shows the double-carcass join
-                _drawKitWallSegs(wallX + t / 2, `divider_c${c}`, 2 * t);
+                // Two real unit sides (matches CNC cut) with a dark seam between them
+                _drawKitWallSegs(wallX, `divider_c${c}_a`, t);
+                _drawKitWallSegs(wallX + t, `divider_c${c}_b`, t);
                 if (wallTotalH > 0.5) {
                     const _seamGeo = new THREE.BoxGeometry(0.14, wallTotalH, Math.max(0.5, (_partD || bodyD) * 0.98));
                     const _seamMat = new THREE.MeshBasicMaterial({ color: 0x1e293b });
@@ -7776,7 +7899,8 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
             const _skipRoofForKitSink = state.presetId === 'kitchen'
                 && typeof window._kitchenColHasSink === 'function'
                 && window._kitchenColHasSink(col);
-            if (!_skipRoofForKitSink) {
+            // Sliding: full-width TOP is added by buildSlidingDoorCabinet — skip per-column roof
+            if (!_skipRoofForKitSink && !_isSlidingWardrobe) {
                 _ppPartId = `top_c${c}`;
                 const topMesh = createBoard(col.width, t, bodyD, colCenterX, col.height - t/2, 0);
                 _ppPartId = '';
@@ -8547,6 +8671,12 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             uv.needsUpdate = true;
                         }
                         _registerDoorMesh(mesh);
+                        if (cncHinge && !isBP) {
+                            _addHingeHardware(_buildGroup, {
+                                hinge: cncHinge, w: w, h: h, cx: cx, cy: cy, cz: z,
+                                doorT: t, boardT: t, bodyD: bodyD, isInset: isInset, doorGap: doorGap, isBP: isBP
+                            });
+                        }
                         return mesh;
                     };
                     // Touch drag target: per-zone door (sub.zonesDoorHandleStyle[z]) or merged zone door group
@@ -9405,6 +9535,12 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                     _ppRegisterMesh(flapMesh, doorPartId);
                     flapMesh.userData.cncHinge = 'top'; // CNC export: hinge cups along the top edge
                     _registerDoorMesh(flapMesh);
+                    if (!isBP) {
+                        _addHingeHardware(_buildGroup, {
+                            hinge: 'top', w: flapW, h: flapH, cx: flapCenterX, cy: flapY, cz: flapZ,
+                            doorT: t, boardT: t, bodyD: bodyD, isInset: isInset, doorGap: doorGap, isBP: isBP
+                        });
+                    }
                     const _flapHandleStyle = door.handleStyle || _handleStyle;
                     if (!isBP && _flapHandleStyle === 'pipe' && _isHalfMoonHandle()) {
                         _registerDoorMesh(_placeHalfMoon(_buildGroup, _handleMat3D(), flapCenterX, flapBaseY, flapZ + t / 2, 'up'));
@@ -9526,6 +9662,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
 
                         const mesh = new THREE.Mesh(geometry, doorMat);
                         mesh.position.set(doorLocalX, 0, 0);
+                        mesh.userData.cncHinge = isLeft ? 'left' : 'right';
                         mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geometry), edgeMat));
                         
                         if (!isBP && leafHs === 'pipe' && _isHalfMoonHandle()) {
@@ -9666,6 +9803,13 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         }
                     }
                     _registerDoorMesh(doorGroup);
+                    if (!isBP && style !== 'glass_mirror' && !isGlass) {
+                        _addHingeHardware(_buildGroup, {
+                            hinge: isLeft ? 'left' : 'right',
+                            w: w, h: dH, cx: centerX, cy: dY, cz: zPos,
+                            doorT: t, boardT: t, bodyD: bodyD, isInset: isInset, doorGap: doorGap, isBP: isBP
+                        });
+                    }
                 };
 
                 const doorStyle = door.style || 'solid';
