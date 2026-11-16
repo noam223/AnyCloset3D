@@ -40,7 +40,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260910deskMerge">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
     <link rel="stylesheet" href="style-extras.css?v=20261110doormirror">
-    <link rel="stylesheet" href="style.css?v=20261116kitSpace">
+    <link rel="stylesheet" href="style.css?v=20261116todosModal">
     <link rel="stylesheet" href="quick-calc.css?v=20260929qc">
     <style>
         html.thumb-only-mode #left-sidebar,
@@ -1223,6 +1223,12 @@
                 </button>
                 <span id="chat-unread-badge">0</span>
             </div>
+            <div class="left-sidebar-todos-wrap">
+                <button type="button" id="btn-project-todos" onclick="window._openProjectTodosModal()" title="משימות לפרויקט" class="left-sidebar-todos-btn">
+                    <i class="fa-solid fa-square-check"></i> משימות
+                </button>
+                <span class="sidebar-todos-count" id="sidebar-todos-count" style="display:none;">0</span>
+            </div>
         </div>
         <div class="left-sidebar-status-row">
             <button type="button" id="sidebar-order-status-trigger" class="sidebar-status-current status-quote" data-status="quote" onclick="window._openOrderStatusModal()" title="לחץ לשינוי סטטוס">
@@ -1234,20 +1240,6 @@
                 </span>
             </button>
             <div id="sidebar-signed-order" class="sidebar-signed-order" style="display:none;"></div>
-        </div>
-        <div id="sidebar-todos" class="sidebar-todos">
-            <div class="sidebar-todos-head">
-                <span class="sidebar-todos-title"><i class="fa-solid fa-square-check"></i> משימות</span>
-                <span class="sidebar-todos-count" id="sidebar-todos-count" style="display:none;">0</span>
-            </div>
-            <ul class="sidebar-todos-list" id="sidebar-todos-list"></ul>
-            <div class="sidebar-todos-add">
-                <input type="text" id="sidebar-todo-input" placeholder="משימה חדשה..." maxlength="200"
-                    onkeydown="if(event.key==='Enter'){event.preventDefault();window._addSidebarTodo();}">
-                <button type="button" id="btn-sidebar-todo-add" onclick="window._addSidebarTodo()" title="הוסף משימה">
-                    <i class="fa-solid fa-plus"></i>
-                </button>
-            </div>
         </div>
         <div id="sidebar-cabinets-label" class="sidebar-cabinets-label">
             <i class="fa-solid fa-list-check"></i>
@@ -3163,7 +3155,7 @@
 <script src="engine-room-plan.js?v=20261110floors"></script>
 <script src="tambour-color-picker.js?v=20261110roomwall"></script>
 <script src="room-finishes.js?v=20261110gloss"></script>
-<script src="ui.js?v=20261116kitSpace"></script>
+<script src="ui.js?v=20261116todosModal"></script>
 <script src="mirror-cabinet.js?v=20261110doormirror"></script>
 <script src="mobile.js?v=20261029inthandle"></script>
 <script src="part-paint.js?v=20261104egger"></script>
@@ -3317,6 +3309,33 @@
 </div>
 <!-- ===== END TOUR SELECTION POPUP BOTTOM SHEET ===== -->
 
+
+<!-- ===== PROJECT TODOS MODAL ===== -->
+<div id="project-todos-modal" class="project-todos-modal-overlay" onclick="if(event.target===this)window._closeProjectTodosModal()">
+    <div class="project-todos-modal-box" role="dialog" aria-labelledby="project-todos-modal-title">
+        <div class="project-todos-modal-head">
+            <div class="project-todos-modal-title" id="project-todos-modal-title">
+                <i class="fa-solid fa-square-check"></i> משימות
+                <span class="sidebar-todos-count" id="project-todos-modal-count" style="display:none;">0</span>
+            </div>
+            <button type="button" class="project-todos-modal-close" onclick="window._closeProjectTodosModal()" title="סגור" aria-label="סגור">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <p class="project-todos-modal-desc">רשימת משימות לפרויקט הנוכחי</p>
+        <ul class="sidebar-todos-list" id="sidebar-todos-list"></ul>
+        <div class="sidebar-todos-add">
+            <input type="text" id="sidebar-todo-input" placeholder="משימה חדשה..." maxlength="200"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();window._addSidebarTodo();}">
+            <button type="button" id="btn-sidebar-todo-add" onclick="window._addSidebarTodo()" title="הוסף משימה">
+                <i class="fa-solid fa-plus"></i>
+            </button>
+        </div>
+        <div class="project-todos-modal-actions">
+            <button type="button" class="project-todos-modal-done" onclick="window._closeProjectTodosModal()">סגור</button>
+        </div>
+    </div>
+</div>
 
 <!-- ===== ORDER STATUS MODAL (sidebar) ===== -->
 <div id="order-status-modal" class="order-status-modal-overlay" onclick="if(event.target===this)window._closeOrderStatusModal()">

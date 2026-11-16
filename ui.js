@@ -13625,9 +13625,44 @@ window._refreshSidebarSignedOrder = async function() {
     }, 1500);
 })();
 
+window._setSidebarTodosCount = function(openCount) {
+    const n = Math.max(0, Math.round(Number(openCount) || 0));
+    ['sidebar-todos-count', 'project-todos-modal-count'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (n > 0) {
+            el.textContent = String(n);
+            el.style.display = '';
+        } else {
+            el.style.display = 'none';
+            el.textContent = '0';
+        }
+    });
+};
+
+window._openProjectTodosModal = async function() {
+    const modal = document.getElementById('project-todos-modal');
+    if (modal) modal.classList.add('open');
+    await window._refreshSidebarTodos();
+    const inputEl = document.getElementById('sidebar-todo-input');
+    if (inputEl && !inputEl.disabled) {
+        setTimeout(function() { try { inputEl.focus(); } catch (e) {} }, 30);
+    }
+};
+
+window._closeProjectTodosModal = function() {
+    const modal = document.getElementById('project-todos-modal');
+    if (modal) modal.classList.remove('open');
+};
+
+document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Escape') return;
+    const modal = document.getElementById('project-todos-modal');
+    if (modal && modal.classList.contains('open')) window._closeProjectTodosModal();
+});
+
 window._refreshSidebarTodos = async function() {
     const listEl = document.getElementById('sidebar-todos-list');
-    const countEl = document.getElementById('sidebar-todos-count');
     const addBtn = document.getElementById('btn-sidebar-todo-add');
     const inputEl = document.getElementById('sidebar-todo-input');
     if (!listEl) return;
@@ -13636,21 +13671,13 @@ window._refreshSidebarTodos = async function() {
     if (inputEl) inputEl.disabled = !pid;
     if (!pid || !window.ProjectTodos) {
         listEl.innerHTML = '<li class="sidebar-todos-empty">שמור פרויקט כדי להוסיף משימות</li>';
-        if (countEl) { countEl.style.display = 'none'; countEl.textContent = '0'; }
+        window._setSidebarTodosCount(0);
         return;
     }
     const todos = await ProjectTodos.listForProject(pid);
     if (pid !== window._currentProjectId) return;
     const openCount = todos.filter(function(t) { return !t.is_done; }).length;
-    if (countEl) {
-        if (openCount > 0) {
-            countEl.textContent = String(openCount);
-            countEl.style.display = '';
-        } else {
-            countEl.style.display = 'none';
-            countEl.textContent = '0';
-        }
-    }
+    window._setSidebarTodosCount(openCount);
     if (!todos.length) {
         listEl.innerHTML = '<li class="sidebar-todos-empty">אין משימות עדיין</li>';
         return;
