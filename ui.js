@@ -434,9 +434,11 @@ function updateQuickEditPanelUI() {
         }
     }
 
-    if (state.activeEditCol === -1 || state.viewMode !== 'front' || !state.columns[state.activeEditCol]) {
+    // Kitchen corner uses 3D view — still allow unit quick-edit when a column is active
+    const _qeViewOk = state.viewMode === 'front' || state.presetId === 'kitchen';
+    if (state.activeEditCol === -1 || !_qeViewOk || !state.columns[state.activeEditCol]) {
         // Full-column select-all should still open quick-edit (incl. split columns >270)
-        if (state.viewMode === 'front' && _isFullColumnSelected()) {
+        if (_qeViewOk && _isFullColumnSelected()) {
             state.activeEditCol = state.selection.colIndex;
         } else {
             _updateCopyPasteGroupVisibility();
@@ -9543,7 +9545,19 @@ function bindUI() {
 
         const intersects = raycaster.intersectObjects(hitBoxes);
         let hoverCol = -1;
-        if (intersects.length > 0) hoverCol = intersects[0].object.userData.colIndex;
+        let hoverWingId = null;
+        if (intersects.length > 0) {
+            hoverCol = intersects[0].object.userData.colIndex;
+            hoverWingId = intersects[0].object.userData.wingId || null;
+        }
+
+        // Kitchen multi-arm: switch active wing so state.columns points at the hovered unit
+        if (state.presetId === 'kitchen' && hoverWingId && !state.wingEditMode &&
+            (hoverWingId === 'left' || hoverWingId === 'right' || hoverWingId === 'center') &&
+            hoverWingId !== state.activeWing && state.wings[hoverWingId]) {
+            state.activeWing = hoverWingId;
+            if (typeof syncSidebarToWing === 'function') syncSidebarToWing();
+        }
 
         // Desk hover detection — show drag handles when hovering anywhere over the external desk
         const deskIntersects = (window.deskHitBoxes && window.deskHitBoxes.length > 0)
@@ -9764,9 +9778,15 @@ function bindUI() {
                         return;
                     }
                     // Wing hit box in free mode → enter wing edit mode
+                    // Kitchen: left/right return arms are normal unit runs — don't steal column picks.
+                    // Only the L carcass (full_corner_*) opens wing/FC edit from a 3D click.
                     if (!state.wingEditMode) {
-                        enterWingEditMode(wingId);
-                        return;
+                        const _kitSkipArmWing = state.presetId === 'kitchen' &&
+                            (wingId === 'left' || wingId === 'right');
+                        if (!_kitSkipArmWing) {
+                            enterWingEditMode(wingId);
+                            return;
+                        }
                     }
                 }
             }

@@ -4570,6 +4570,11 @@ function buildCabinet() {
     const centerWing = state.wings.center;
     const inEditMode = state.wingEditMode;
 
+    // Legacy kitchen corner stubs were KIT_DEPTH wide and left a visible gap beside adjacent runs
+    if (!window._spaceCompanionBuilding && typeof window._normalizeKitchenCornerStub === 'function') {
+        window._normalizeKitchenCornerStub();
+    }
+
     // Always render center wing from center data
     state.activeWing = 'center';
     _buildGroup = cabinetGroup;
@@ -7193,27 +7198,32 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
                 // Kitchen: full-width floor plate + external plinth already drawn — no per-column solid צוקל
             }
             // ידית גרירה לתחתית — נשמרת תמיד (לא רק כשמרחפים)
-            if (!isBP && _isActiveWingBuild) {
+            // Kitchen return arms need pick hitboxes even when another wing is active
+            const _kitPickAlwaysPlinth = state.presetId === 'kitchen' && !_isUpperUnitBuild;
+            if (!isBP && (_isActiveWingBuild || _kitPickAlwaysPlinth)) {
                 const handleY = fo > 0 ? fo : state.plinthHeight;
-                // Floor offset handle: shifted left so it doesn't overlap the select-all button
-                dragHandlesData.floors.push({ colIndex: c, x: colCenterX - 5, y: handleY, fo: fo });
-                // Select-all-column button: shifted right so it sits next to the floor handle
-                dragHandlesData.selectAll.push({ colIndex: c, x: colCenterX + 5, y: state.plinthHeight / 2 });
+                if (_isActiveWingBuild) {
+                    // Floor offset handle: shifted left so it doesn't overlap the select-all button
+                    dragHandlesData.floors.push({ colIndex: c, x: colCenterX - 5, y: handleY, fo: fo });
+                    // Select-all-column button: shifted right so it sits next to the floor handle
+                    dragHandlesData.selectAll.push({ colIndex: c, x: colCenterX + 5, y: state.plinthHeight / 2 });
+                }
 
                 // Extra hitboxes: plinth zone (bottom) + above-roof zone (top) for easier hover detection
                 // noHighlight=true: these are invisible trigger zones — never show selection highlight
                 const hitMatExtra = new THREE.MeshBasicMaterial({ color: 0x3498db, transparent: true, opacity: 0.0, depthWrite: false });
+                const _hitWingIdP = (_buildGroup && _buildGroup.userData && _buildGroup.userData.wingId) || _ppWingId || 'center';
                 // Plinth / floor-offset zone: from y=0 to plinthHeight (or fo)
                 const plinthHitH = Math.max(state.plinthHeight, fo > 0 ? fo : state.plinthHeight) + 2;
                 const plinthHitBox = new THREE.Mesh(new THREE.BoxGeometry(col.width, plinthHitH, bodyD), hitMatExtra.clone());
                 plinthHitBox.position.set(colCenterX, plinthHitH / 2, -1);
-                plinthHitBox.userData = { colIndex: c, rowIndex: -1, noHighlight: true };
+                plinthHitBox.userData = { colIndex: c, rowIndex: -1, noHighlight: true, wingId: _hitWingIdP };
                 _buildGroup.add(plinthHitBox); hitBoxes.push(plinthHitBox);
                 // Above-roof zone: 15cm above col.height
                 const roofExtH = 15;
                 const roofHitBox = new THREE.Mesh(new THREE.BoxGeometry(col.width, roofExtH, bodyD), hitMatExtra.clone());
                 roofHitBox.position.set(colCenterX, col.height + roofExtH / 2, -1);
-                roofHitBox.userData = { colIndex: c, rowIndex: -1, noHighlight: true };
+                roofHitBox.userData = { colIndex: c, rowIndex: -1, noHighlight: true, wingId: _hitWingIdP };
                 _buildGroup.add(roofHitBox); hitBoxes.push(roofHitBox);
             }
         }
@@ -8077,7 +8087,16 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
                 const isHoveredCol = (state.hoveredColIndex === c);
                 const hitMat = new THREE.MeshBasicMaterial({ color: isHoveredCol ? 0x2ecc71 : 0x3498db, transparent: true, opacity: (state.selection.colIndex === c && state.selection.rows.includes(r)) ? 0.3 : (isHoveredCol ? 0.05 : 0.0), depthWrite: false });
                 const hitBox = new THREE.Mesh(new THREE.BoxGeometry(col.width, compH, bodyD - backT - 2), hitMat);
-                if (_isActiveWingBuild) { hitBox.position.set(colCenterX, compCenterY, -1); hitBox.userData = { colIndex: c, rowIndex: r }; _buildGroup.add(hitBox); hitBoxes.push(hitBox); }
+                // Kitchen: always register unit hitboxes on every arm so return-run units stay selectable
+                // even when the empty corner stub / another wing is the "active" wing.
+                const _kitPickAlways = state.presetId === 'kitchen' && !_isUpperUnitBuild;
+                if (_isActiveWingBuild || _kitPickAlways) {
+                    hitBox.position.set(colCenterX, compCenterY, -1);
+                    const _hitWingId = (_buildGroup && _buildGroup.userData && _buildGroup.userData.wingId) || _ppWingId || 'center';
+                    hitBox.userData = { colIndex: c, rowIndex: r, wingId: _hitWingId };
+                    _buildGroup.add(hitBox);
+                    hitBoxes.push(hitBox);
+                }
                 
                 if (_isActiveWingBuild && !isLast) dragHandlesData.vertical.push({ colIndex: c, shelfIdx: div.idx, x: colCenterX, y: div.y, isSplit: (div.type === 'split') });
             }

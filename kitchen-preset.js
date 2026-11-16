@@ -35,14 +35,56 @@ window.KITCHEN_COUNTERTOP_BRANDS = [
 // Back-compat alias if anything still reads the old name
 window.KITCHEN_BRAND_EXAMPLES = window.KITCHEN_COUNTERTOP_BRANDS;
 
+/** Near-zero width for the empty corner stub — wide stubs left a visible gap beside the main run. */
+const KIT_CORNER_STUB_W = 0.2;
+
 function _getKitWing() {
     // Prefer the active arm (center / left / right) so +60 extends the selected L leg
     if (typeof getWing === 'function') {
         const aw = getWing();
-        if (aw && !aw._isUpperUnit) return aw;
+        if (aw && !aw._isUpperUnit) {
+            // Empty corner stub is only an L anchor — +60 / delete must hit the L arm
+            if (aw.kitchenCornerL && (!aw.columns || !aw.columns.length) && state.activeWing === 'center') {
+                if (state.wings.right && state.wings.right.kitchenCornerL) return state.wings.right;
+                if (state.wings.left && state.wings.left.kitchenCornerL) return state.wings.left;
+            }
+            return aw;
+        }
     }
     return state && state.wings && state.wings.center ? state.wings.center : null;
 }
+
+/** Shrink legacy empty stubs (width≈56) so the ר sits flush against adjacent runs. */
+window._normalizeKitchenCornerStub = function() {
+    if (!window._isKitchenPreset || !window._isKitchenPreset()) return false;
+    const cw = state && state.wings && state.wings.center;
+    if (!cw || !cw.kitchenCornerL) return false;
+    if (cw.columns && cw.columns.length) return false;
+    if (cw.width != null && cw.width <= 1) return false;
+    const prevW = cw.width;
+    cw.width = KIT_CORNER_STUB_W;
+    if (state.activeWing === 'center') {
+        try { state.columns = []; } catch (e) { /* proxy */ }
+    }
+    // Pull the corner toward its space neighbor by ~half the removed stub width
+    if (prevW > 10 && typeof window._getSpacePairInfo === 'function' && typeof window._setSpaceOffset === 'function') {
+        const info = window._getSpacePairInfo();
+        if (info && info.count >= 2 && info.activeSlot > 0) {
+            const side = (state.wings.right && state.wings.right.kitchenCornerL) ? 'right'
+                : (state.wings.left && state.wings.left.kitchenCornerL) ? 'left' : null;
+            const cur = (typeof window._spaceOffsetForSlot === 'function')
+                ? window._spaceOffsetForSlot(info.activeSlot) : { x: 0, y: 0, z: 0 };
+            const dx = (prevW - KIT_CORNER_STUB_W) / 2;
+            const nextX = (cur.x || 0) - (side === 'left' ? -dx : dx);
+            window._setSpaceOffset(nextX, cur.y || 0, {
+                z: cur.z || 0,
+                rot: cur.rot || 0,
+                silent: true
+            });
+        }
+    }
+    return true;
+};
 
 /** True when this kitchen cabinet is a full L (ר) corner with a side arm. */
 window._isKitchenCornerL = function() {
@@ -285,10 +327,10 @@ window._configureKitchenCarcass = function(role, opts) {
         if (nCorner <= 0) {
             cw.columns = [];
             state.columns = [];
-            // Narrow stub so only the full-corner L is visible; +60 extends later.
+            // Tiny stub so only the full-corner L is visible and sits flush next to adjacent runs.
             // Mark cornerL BEFORE width so updateDim won't invent a column.
             cw.kitchenCornerL = true;
-            _applyKitDim('width', KIT_DEPTH);
+            _applyKitDim('width', KIT_CORNER_STUB_W);
             // Re-clear in case anything still tried to seed a column
             cw.columns = [];
             state.columns = [];
@@ -413,10 +455,12 @@ window._configureKitchenCornerL = function(side, opts) {
     state.wings[side] = arm;
     if (typeof _showWingTab === 'function') _showWingTab(side);
 
-    state.activeWing = 'center';
+    // Activate the L arm (not the empty stub) so +60 / unit pick / sidebar target the right wing
+    state.activeWing = side;
     state.viewMode = '3d';
     window._forceCameraAnim = true;
     window._corner3dCamPositioned = false;
+    if (typeof syncSidebarToWing === 'function') syncSidebarToWing();
     if (typeof _showToast === 'function') {
         _showToast('פינת ר מלאה עם מדפים — הוסיפו יחידות עם +60 להמשך הזרועות', 4000);
     }
