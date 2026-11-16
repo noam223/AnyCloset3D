@@ -818,7 +818,8 @@ function buildDimensionsAndButtonsUI() {
     const colWidthsLayer = document.getElementById('col-widths-layer');
     if (colWidthsLayer) colWidthsLayer.innerHTML = '';
     _renderLedCellIcons();
-    if (state.viewMode !== 'front') return;
+    // Kitchen corner uses 3D view — still show cell/unit edit overlays
+    if (state.viewMode !== 'front' && state.presetId !== 'kitchen') return;
 
     state.dimData.forEach(d => {
         // isSubCellBtn and isCellSelectBtn entries are handled separately below — skip here
@@ -1777,7 +1778,7 @@ function updateToolbarState() {
     if (state.selection.rows.includes(-1) && !_isDeskZoneSelection()) state.selection = { colIndex: -1, rows: [] };
     
     const hasSelection = (state.selection.colIndex > -1 && state.selection.rows.length > 0);
-    const viewModeOK = (state.viewMode === 'front');
+    const viewModeOK = (state.viewMode === 'front' || state.presetId === 'kitchen');
 
     if (hasSelection && viewModeOK) {
         toolbar.classList.add('show-toolbar');
@@ -2384,7 +2385,7 @@ function _updateCopyPasteGroupVisibility() {
     if (!copyPasteGroup) return;
     const selCol = state.selection.colIndex;
     const selColData = selCol !== -1 ? state.columns[selCol] : null;
-    const isFullColSelected = state.viewMode === 'front' && selColData &&
+    const isFullColSelected = (state.viewMode === 'front' || state.presetId === 'kitchen') && selColData &&
         state.selection.rows.length === _getColumnRowCount(selColData);
     copyPasteGroup.style.display = isFullColSelected ? '' : 'none';
     const pasteBtn = document.getElementById('qe-btn-paste');
@@ -9788,6 +9789,25 @@ function bindUI() {
                             return;
                         }
                     }
+                }
+            }
+        }
+
+        // Kitchen 3D: click a unit hitbox to select the column/cell (toolbar + cell edit buttons)
+        if (state.presetId === 'kitchen') {
+            const kitHits = raycaster.intersectObjects(hitBoxes);
+            if (kitHits.length > 0) {
+                const ud = kitHits[0].object.userData || {};
+                if (ud.colIndex != null && ud.colIndex >= 0) {
+                    if (ud.wingId && state.wings[ud.wingId] &&
+                        (ud.wingId === 'left' || ud.wingId === 'right' || ud.wingId === 'center') &&
+                        ud.wingId !== state.activeWing) {
+                        state.activeWing = ud.wingId;
+                        if (typeof syncSidebarToWing === 'function') syncSidebarToWing();
+                    }
+                    if (ud.rowIndex != null && ud.rowIndex >= 0) toggleSelection(ud.colIndex, ud.rowIndex);
+                    else selectAllColumn(ud.colIndex);
+                    return;
                 }
             }
         }

@@ -577,15 +577,15 @@ window.addLaundryAppliancesToCell = addLaundryAppliancesToCell;
 // =====================================================================
 const KIT_APPLIANCE_TYPES = {
     sink:        { W: 56, H: 20, D: 48, label: 'כיור' },
-    // European under-counter DW: ~86.5cm so it sits just under an 88cm kitchen carcass top
-    dishwasher:  { W: 59.5, H: 86.5, D: 57, label: 'מדיח כלים' },
+    // Under-counter DW: depth fits a 56cm kitchen carcass (_laSlab extrudes +Z from local 0)
+    dishwasher:  { W: 59.5, H: 86.5, D: 55, label: 'מדיח כלים' },
     oven:        { W: 59.5, H: 60, D: 55, label: 'תנור' }
 };
 const KITCHEN_RULES = {
     minWidth: 60,
     dims: {
         sink: { W: 56, H: 20, D: 48 },
-        dishwasher: { W: 59.5, H: 86.5, D: 57 },
+        dishwasher: { W: 59.5, H: 86.5, D: 55 },
         oven: { W: 59.5, H: 60, D: 55 }
     },
     // dishwasher/oven typically block a front door
@@ -783,7 +783,7 @@ function buildKitchenAppliance(type) {
 }
 
 const _kitTemplates = {};
-const _KIT_TMPL_VER = { dishwasher: 'dw-real-2', sink: 'sink-1', oven: 'oven-2' };
+const _KIT_TMPL_VER = { dishwasher: 'dw-flush-1', sink: 'sink-1', oven: 'oven-2' };
 function _kitTemplate(type) {
     const key = type + ':' + (_KIT_TMPL_VER[type] || 'v1');
     if (!_kitTemplates[key]) {
@@ -837,8 +837,10 @@ function addKitchenAppliancesToCell(parent, opts) {
             d: T.D
         };
     } else if (type === 'dishwasher') {
-        // Floor-standing under worktop (behind external plinth). Slight air gap under carcass top is normal.
+        // Floor-standing under worktop. _laSlab bodies extrude +Z from local 0 → place so
+        // the front face lands at the carcass front (was: centered, so DW stuck out ~full depth).
         y = 0;
+        z = frontZ - T.D;
         const targetH = Math.max(T.H, Math.min(T.H + 2, (colTop || T.H) - 1.2));
         if (targetH > T.H + 0.15) m.scale.y = targetH / T.H;
     } else if (type === 'oven') {
