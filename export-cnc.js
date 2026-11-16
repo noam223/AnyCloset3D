@@ -1602,14 +1602,20 @@
         const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
         renderer.setClearColor(0x000000, 0);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(35, 1, 1, 5000);
-        scene.add(new THREE.HemisphereLight(0xfff6ea, 0xc5d4e4, 0.95));
-        const key = new THREE.DirectionalLight(0xfff4e6, 0.72);
-        key.position.set(60, 120, 80);
+        scene.add(new THREE.HemisphereLight(0xfff6ea, 0xb9c6d6, 0.38));
+        const key = new THREE.DirectionalLight(0xfff7ee, 1.25);
+        key.castShadow = true;
+        key.shadow.mapSize.set(2048, 2048);
+        key.shadow.bias = -0.0008;
+        key.shadow.normalBias = 1.2;
         scene.add(key);
-        const fill = new THREE.DirectionalLight(0xdbe7f5, 0.38);
-        fill.position.set(-90, 40, 30);
+        scene.add(key.target);
+        const fill = new THREE.DirectionalLight(0xd5e2f2, 0.22);
+        fill.position.set(-80, 30, 40);
         scene.add(fill);
         const controls = (typeof THREE.OrbitControls === 'function')
             ? new THREE.OrbitControls(camera, canvas) : null;
@@ -1624,18 +1630,19 @@
                 if (view.viewDir.lengthSq() > 1e-6) view.viewDir.normalize();
             });
         }
-        const board = { roughness: 0.62, metalness: 0.02 };
+        const board = { roughness: 0.72, metalness: 0.02 };
         const mats = {
-            idle: new THREE.MeshStandardMaterial(Object.assign({ color: 0xf4efe6 }, board)),
-            door: new THREE.MeshStandardMaterial(Object.assign({ color: 0xfffdf8 }, board)),
-            back: new THREE.MeshStandardMaterial(Object.assign({ color: 0xe6ddd0 }, board)),
+            idle: new THREE.MeshStandardMaterial(Object.assign({ color: 0xf3eee6 }, board)),
+            door: new THREE.MeshStandardMaterial(Object.assign({ color: 0xf7f4ee }, board)),
+            top: new THREE.MeshStandardMaterial(Object.assign({ color: 0xe7d7c0, roughness: 0.8, metalness: 0.02 })),
+            back: new THREE.MeshStandardMaterial(Object.assign({ color: 0xd5cbbd }, board)),
             sel: new THREE.MeshStandardMaterial({ color: 0x4f46e5, emissive: 0x312e81, roughness: 0.42, metalness: 0.04 }),
             hover: new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xb45309, roughness: 0.4, metalness: 0.02 }),
-            edge: new THREE.LineBasicMaterial({ color: 0xb7aa9a, transparent: true, opacity: 0.85 })
+            edge: new THREE.LineBasicMaterial({ color: 0x8d8274, transparent: true, opacity: 0.9 })
         };
         const group = new THREE.Group();
         scene.add(group);
-        UI.view = { renderer: renderer, scene: scene, camera: camera, controls: controls, group: group, mats: mats, token: '', meshes: [] };
+        UI.view = { renderer: renderer, scene: scene, camera: camera, controls: controls, group: group, mats: mats, key: key, token: '', meshes: [] };
         const fit = function() {
             const w = wrap.clientWidth || 340, h = wrap.clientHeight || 400;
             renderer.setSize(w, h, false);
@@ -1720,6 +1727,25 @@
         v.camera.updateProjectionMatrix();
         if (v.controls) { v.controls.target.copy(center); v.controls.update(); }
         v.framing = false;
+        _fitShadow(v);
+    }
+    function _fitShadow(v) {
+        if (!v.key || !v.meshes.length) return;
+        const box = new THREE.Box3();
+        v.meshes.forEach(function(mesh) { box.expandByObject(mesh); });
+        if (box.isEmpty()) return;
+        const c = box.getCenter(new THREE.Vector3());
+        const s = box.getSize(new THREE.Vector3());
+        const r = Math.max(s.x, s.y, s.z) * 0.72;
+        v.key.position.set(c.x + s.x * 0.15, c.y + s.y * 0.9, c.z + s.z * 1.1);
+        v.key.target.position.copy(c);
+        v.key.target.updateMatrixWorld();
+        const cam = v.key.shadow.camera;
+        cam.left = cam.bottom = -r;
+        cam.right = cam.top = r;
+        cam.near = 1;
+        cam.far = r * 5;
+        cam.updateProjectionMatrix();
     }
     function _clearAnno(v) {
         if (!v || !v.anno) return;
@@ -1861,10 +1887,13 @@
             UI.result.panels.forEach(function(r, i) {
                 (r.poses || []).forEach(function(pose) {
                     const base = (r.code === 'DOOR' || r.code === 'DRAWER_FRONT') ? v.mats.door
-                        : (r.code === 'BACK' ? v.mats.back : v.mats.idle);
+                        : (r.code === 'BACK' ? v.mats.back
+                            : (r.code === 'DESK' || r.code === 'SHELF' || r.code === 'TOP' || r.code === 'BOTTOM' || r.code === 'SPLIT' ? v.mats.top : v.mats.idle));
                     const mesh = new THREE.Mesh(geo, base);
                     mesh.matrix.copy(_poseMatrix(pose));
                     mesh.matrixAutoUpdate = false;
+                    mesh.castShadow = true;
+                    mesh.receiveShadow = true;
                     mesh.userData.row = i;
                     mesh.userData.door = r.code === 'DOOR';
                     mesh.userData.baseMat = base;
