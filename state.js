@@ -5601,6 +5601,33 @@ function calculatePrice() {
     const cfg = _getPricingCfg();
     const ex  = cfg.extras || DEFAULT_PRICING_CONFIG.extras;
 
+    // Kitchen (admin preview): flat ₪/linear-meter customer price — appliances visual only
+    if (state.presetId === 'kitchen') {
+        const perM = (typeof window.KIT_PRICE_PER_METER === 'number') ? window.KIT_PRICE_PER_METER : 1300;
+        const meters = (typeof window._kitchenLinearMeters === 'function')
+            ? window._kitchenLinearMeters()
+            : ((state.wings && state.wings.center && state.wings.center.width) || state.width || 0) / 100;
+        const customerPrice = Math.round(meters * perM);
+        const profitMult = cfg.profitMultiplier != null ? cfg.profitMultiplier : 1.7;
+        state.currentCostPrice = Math.round(customerPrice / profitMult);
+        state.currentInstallPrice = 0;
+        const activeWingKit = getWing() || (state.wings && state.wings.center);
+        const finalDisplayPriceKit = (activeWingKit && activeWingKit.manualPrice !== null && activeWingKit.manualPrice !== undefined)
+            ? activeWingKit.manualPrice
+            : customerPrice;
+        const priceDisplayElKit = document.getElementById('price-display');
+        if (priceDisplayElKit) priceDisplayElKit.value = finalDisplayPriceKit;
+        const resetBtnKit = document.getElementById('btn-reset-price');
+        if (resetBtnKit) {
+            resetBtnKit.style.display = (activeWingKit && activeWingKit.manualPrice != null) ? 'block' : 'none';
+        }
+        const installDisplayElKit = document.getElementById('install-price-display');
+        if (installDisplayElKit) installDisplayElKit.value = 0;
+        const resetInstallBtnKit = document.getElementById('btn-reset-install-price');
+        if (resetInstallBtnKit) resetInstallBtnKit.style.display = 'none';
+        return;
+    }
+
     // Sum cost across all active wings
     let totalCost = 0;
     let totalInstall = 0;

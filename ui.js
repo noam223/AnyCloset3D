@@ -505,6 +505,9 @@ function updateQuickEditPanelUI() {
     }
 
     _updateCopyPasteGroupVisibility();
+    if (typeof window._syncKitchenDeleteSelectedUI === 'function') {
+        window._syncKitchenDeleteSelectedUI();
+    }
 
     panel.classList.add('visible');
 }
@@ -2384,6 +2387,9 @@ function _updateCopyPasteGroupVisibility() {
     copyPasteGroup.style.display = isFullColSelected ? '' : 'none';
     const pasteBtn = document.getElementById('qe-btn-paste');
     if (pasteBtn) pasteBtn.style.display = (_copiedColumn && isFullColSelected) ? '' : 'none';
+    if (typeof window._syncKitchenDeleteSelectedUI === 'function') {
+        window._syncKitchenDeleteSelectedUI();
+    }
 }
 
 // Helper: check if the entire column is currently selected
@@ -12796,9 +12802,9 @@ window._askCornerUnitSide = function(kind) {
     popup.id = '_corner-side-popup';
     popup.className = 'corner-side-popup';
     const title = kind === 'cornerDesk' ? 'שולחן פינתי'
-        : (kind === 'kitchenCorner' ? 'פינת מטבח (ר מלאה)' : 'שידה פינתית');
+        : (kind === 'kitchenCorner' ? 'פינת מטבח — ר מלאה עם מדפים' : 'שידה פינתית');
     popup.innerHTML =
-        '<div class="corner-side-popup-title">' + title + ' — לאיזו כיוון?</div>' +
+        '<div class="corner-side-popup-title">' + title + ' — כיוון?</div>' +
         '<div class="corner-side-popup-btns">' +
         '<button type="button" data-side="right"><i class="fa-solid fa-arrow-right"></i> ר ימין</button>' +
         '<button type="button" data-side="left"><i class="fa-solid fa-arrow-left"></i> ר שמאל</button>' +
