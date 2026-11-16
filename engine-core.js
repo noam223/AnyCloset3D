@@ -4224,9 +4224,21 @@ function _prepareHingePlateTemplate(root) {
         const mats = Array.isArray(o.material) ? o.material : [o.material];
         mats.forEach(function(m) {
             if (!m) return;
+            // The source render is near-black metal. Force a satin nickel that
+            // stays light even when the scene has no reflection map.
+            m.map = null;
+            m.metalnessMap = null;
+            m.roughnessMap = null;
+            m.emissiveMap = null;
+            if (m.color) m.color.set(0xd8dce1);
+            m.metalness = 0.62;
+            m.roughness = 0.32;
+            m.envMap = window._hdrEnvMap || window._studioEnvMap || null;
+            m.envMapIntensity = 1.15;
             m.polygonOffset = true;
             m.polygonOffsetFactor = -2;
             m.polygonOffsetUnits = -2;
+            m.needsUpdate = true;
         });
     });
     const wrap = new THREE.Group();
