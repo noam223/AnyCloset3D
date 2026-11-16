@@ -1,6 +1,7 @@
 // ==========================================
 // CNC export of the cabinet being edited: one layered DXF R12 per board (cut outline, shelf-pin holes,
-// hinge cups, back-panel groove), a combined DXF per material/thickness and a CSV cut list — in a zip.
+// hinge cups, hinge-plate holes, confirmat face holes, back-panel groove), a combined DXF per
+// material/thickness and a CSV cut list — in a zip.
 // Boards are read from the built 3D scene (the collector of export-3d.js); manufacturing rules then fix
 // what the visual model simplifies (back panel seat, shelf clearances, plinth blocks, double walls,
 // boards that overlap one another in the scene).
@@ -29,6 +30,16 @@
         cupDepth: 12.5,
         cupCenter: 21.5,        // cup centre from the door edge
         hingeEdge: 100,         // first / last cup from the door ends
+        hingePlates: true,
+        plateDia: 5,
+        plateDepth: 12,
+        platePitch: 32,         // spacing between the two plate screws
+        plateFront: 37,         // plate centre from the front edge of the side (overlay)
+        carcassConnectors: true,
+        confFaceDia: 5,         // confirmat pilot in the face of the side / divider
+        confFaceDepth: 34,      // clamped to board thickness − 2 at drill time
+        confEdgeInset: 50,      // from front / rear along the depth
+        confCount: 0,           // 0 = auto (2 up to 500 mm depth, else 3)
         plinthStrips: 1,        // boards cut for each solid plinth block: 0 none · 1 front · 2 front + rear
         edgeBandThickness: 0    // subtracted from the cut size on banded edges
     };
@@ -825,6 +836,157 @@
             if (_thick(door) < cfg.cupDepth + 2) model.warnings.push('דלת בעובי ' + _fmt(_thick(door)) + ' מ"מ דקה מדי לכוס ציר בעומק ' + cfg.cupDepth);
         });
 
+        // --- confirmat face holes in sides / dividers against fixed horizontals ---
+        const FIXED_H = { TOP: 1, BOTTOM: 1, DESK: 1, SPLIT: 1 };
+        const VERT = { SIDE_L: 1, SIDE_R: 1, DIVIDER: 1, UNIT_SIDE: 1, PARTITION: 1 };
+        const verts = body.filter(function(p) {
+            return VERT[p.role.code] && !p.horizontal && !p.poly && !p.corner && !p.synthetic && _thick(p) >= 12;
+        });
+        if (cfg.carcassConnectors) {
+            model.panels.forEach(function(H) {
+                if (!FIXED_H[H.role.code] || !H.horizontal || H.poly || H.corner) return;
+                const sUp = _iv(H, UP);
+                const y = (sUp[0] + sUp[1]) / 2;
+                const find = function(dir) {
+                    const e = V3(0, 0, 0).crossVectors(dir, UP).normalize();
+                    const end = _iv(H, dir)[1], hE = _iv(H, e);
+                    return verts.filter(function(P) {
+                        if (P === H || Math.abs(_normal(P).dot(dir)) < 0.999) return false;
+                        return Math.abs(_iv(P, dir)[0] - end) <= 2 && _overlap(_iv(P, e), hE) >= 20 &&
+                            y > _iv(P, UP)[0] + 2 && y < _iv(P, UP)[1] - 2;
+                    });
+                };
+                const axes = [0, 1, 2].filter(function(i) { return i !== H.ti; }).map(function(i) {
+                    const sides = [1, -1].map(function(s) {
+                        const dir = H.ax[i].clone().multiplyScalar(s);
+                        return { dir: dir, panels: find(dir) };
+                    });
+                    return { i: i, sides: sides, score: sides.filter(function(s) { return s.panels.length; }).length };
+                });
+                axes.sort(function(a, b) { return (b.score - a.score) || (a.i - b.i); });
+                const pick = axes[0];
+                if (!pick || !pick.score) return;
+                const depthI = [0, 1, 2].filter(function(i) { return i !== H.ti && i !== pick.i; })[0];
+                const depth = H.ax[depthI];
+                const dIv = _iv(H, depth), len = dIv[1] - dIv[0];
+                if (len < 40) return;
+                const inset = len >= 2 * cfg.confEdgeInset + 40 ? cfg.confEdgeInset : len / 4;
+                const n = cfg.confCount > 0 ? Math.max(1, Math.round(cfg.confCount)) : (len > 500 ? 3 : 2);
+                const pos = [];
+                for (let i = 0; i < n; i++) pos.push(dIv[0] + inset + (n === 1 ? 0 : (len - 2 * inset) * i / (n - 1)));
+                let any = false;
+                pick.sides.forEach(function(side) {
+                    side.panels.forEach(function(P) {
+                        const pFace = _sgn(-side.dir.dot(_normal(P)));
+                        const faceCoord = _iv(P, side.dir)[0];
+                        const depthFit = _r1(Math.min(cfg.confFaceDepth, _thick(P) - 2));
+                        if (depthFit < 5) return;
+                        pos.forEach(function(dPos) {
+                            const pe = _iv(P, depth);
+                            if (dPos < pe[0] + 8 || dPos > pe[1] - 8) return;
+                            const pt = _pt(side.dir, faceCoord, depth, dPos, UP, y);
+                            const clash = P.ops.some(function(o) {
+                                return o.type === 'drill' && o.face === pFace && o.p.distanceTo(pt) < (o.d + cfg.confFaceDia) / 2 + 2;
+                            });
+                            if (clash) return;
+                            P.ops.push({ type: 'drill', d: cfg.confFaceDia, depth: depthFit, face: pFace, tag: 'confirmat', p: pt });
+                            any = true;
+                        });
+                    });
+                });
+                if (any) H.notes.push('קידוח קצה קונפירמט Ø7 בעיבוד קצה / ידני');
+            });
+        }
+
+        // --- hinge mounting-plate holes (aligned to the cups already on the door) ---
+        if (cfg.hingePlates && cfg.hinges) {
+            const halfP = cfg.platePitch / 2;
+            model.panels.forEach(function(door) {
+                if (door.role.code !== 'DOOR') return;
+                const cups = door.ops.filter(function(o) { return o.type === 'drill' && o.tag === 'cup'; });
+                if (!cups.length || !door.hinge) return;
+                const f = door.front;
+                const r = V3(0, 0, 0).crossVectors(UP, f).normalize();
+                const ivUp = _iv(door, UP), ivR = _iv(door, r);
+
+                if (door.hinge === 'top') {
+                    const tops = body.filter(function(p) {
+                        return p.role.code === 'TOP' && p.horizontal && !p.poly && !p.corner &&
+                            _overlap(_iv(p, r), ivR) > 40 && Math.abs(_iv(p, UP)[0] - ivUp[1]) <= 30;
+                    });
+                    const TOP = tops[0];
+                    if (!TOP) {
+                        model.warnings.push('קלפה בלי גג תומך — לא נוספו חורי פלטת ציר');
+                        return;
+                    }
+                    const pFace = _sgn(-UP.dot(_normal(TOP)));
+                    const faceCoord = _iv(TOP, UP)[0];
+                    const frontEdge = _iv(TOP, f)[1];
+                    const plateZ = frontEdge - cfg.plateFront;
+                    const depthFit = _r1(Math.min(cfg.plateDepth, _thick(TOP) - 2));
+                    if (depthFit < 5 || plateZ < _iv(TOP, f)[0] + 8 || plateZ > frontEdge - 8) {
+                        model.warnings.push('פלטת ציר לקלפה מחוץ לגבולות הגג — לא נוספה');
+                        return;
+                    }
+                    cups.forEach(function(cup) {
+                        const x = cup.p.dot(r);
+                        [-halfP, halfP].forEach(function(dx) {
+                            const xx = x + dx;
+                            if (xx < _iv(TOP, r)[0] + 8 || xx > _iv(TOP, r)[1] - 8) return;
+                            const pt = _pt(r, xx, f, plateZ, UP, faceCoord);
+                            const clash = TOP.ops.some(function(o) {
+                                return o.type === 'drill' && o.face === pFace && o.p.distanceTo(pt) < (o.d + cfg.plateDia) / 2 + 2;
+                            });
+                            if (!clash) TOP.ops.push({ type: 'drill', d: cfg.plateDia, depth: depthFit, face: pFace, tag: 'plate', p: pt });
+                        });
+                    });
+                    return;
+                }
+
+                const hingeOut = door.hinge === 'left' ? r.clone().negate() : r.clone();
+                const edge = door.hinge === 'left' ? ivR[0] : ivR[1];
+                const doorR = door.c.dot(r);
+                const sides = verts.filter(function(P) {
+                    if (Math.abs(_normal(P).dot(r)) < 0.999) return false;
+                    // Wall must sit on the hinge side of the door and near the hinge edge (same axis as `edge`)
+                    if (door.hinge === 'left' ? P.c.dot(r) > doorR : P.c.dot(r) < doorR) return false;
+                    const pR = _iv(P, r);
+                    return Math.min(Math.abs(pR[0] - edge), Math.abs(pR[1] - edge)) <= 40 &&
+                        _overlap(_iv(P, UP), ivUp) > 50;
+                });
+                if (!sides.length) {
+                    model.warnings.push('דלת ' + door.hinge + ' בלי דופן תומכת — לא נוספו חורי פלטת ציר');
+                    return;
+                }
+                const P = sides.sort(function(a, b) {
+                    const da = Math.min(Math.abs(_iv(a, r)[0] - edge), Math.abs(_iv(a, r)[1] - edge));
+                    const db = Math.min(Math.abs(_iv(b, r)[0] - edge), Math.abs(_iv(b, r)[1] - edge));
+                    return da - db;
+                })[0];
+                const pFace = _sgn(-hingeOut.dot(_normal(P)));
+                const faceCoord = _iv(P, hingeOut)[0];
+                const frontEdge = _iv(P, f)[1];
+                const plateZ = frontEdge - cfg.plateFront;
+                const depthFit = _r1(Math.min(cfg.plateDepth, _thick(P) - 2));
+                if (depthFit < 5 || plateZ < _iv(P, f)[0] + 8 || plateZ > frontEdge - 8) {
+                    model.warnings.push('פלטת ציר מחוץ לגבולות הדופן — לא נוספה');
+                    return;
+                }
+                cups.forEach(function(cup) {
+                    const y = cup.p.dot(UP);
+                    [-halfP, halfP].forEach(function(dy) {
+                        const yy = y + dy;
+                        if (yy < _iv(P, UP)[0] + 8 || yy > _iv(P, UP)[1] - 8) return;
+                        const pt = _pt(hingeOut, faceCoord, f, plateZ, UP, yy);
+                        const clash = P.ops.some(function(o) {
+                            return o.type === 'drill' && o.face === pFace && o.p.distanceTo(pt) < (o.d + cfg.plateDia) / 2 + 2;
+                        });
+                        if (!clash) P.ops.push({ type: 'drill', d: cfg.plateDia, depth: depthFit, face: pFace, tag: 'plate', p: pt });
+                    });
+                });
+            });
+        }
+
         // Corner-unit carcass boards are exported as outlines only
         const cornerBoards = model.panels.filter(function(p) {
             return p.corner && !p.isFront && !p.ops.length && p.role.code !== 'DRAWER_FRONT' && p.role.code !== 'DOOR';
@@ -1007,7 +1169,7 @@
                     return Math.hypot(d.x - (r.L - o.x), d.y - o.y) < (d.d + o.d) / 2 && d.depth + o.depth > r.T - 1;
                 });
             });
-            if (meet) w.push(who + ': חורי פינים משני צדי הלוח באותו מיקום נפגשים (עומק כולל גדול מעובי הלוח) — לקדוח חור עובר או להקטין עומק');
+            if (meet) w.push(who + ': קידוחים משני צדי הלוח באותו מיקום נפגשים (עומק כולל גדול מעובי הלוח) — לקדוח חור עובר או להקטין עומק');
         });
         const total = list.reduce(function(s, r) { return s + r.qty; }, 0);
         if (total !== model.sceneBoards) w.push('בדיקת כמות: ' + total + ' לוחות בייצוא מול ' + model.sceneBoards + ' לוחות עץ בהדמיה');
@@ -1209,15 +1371,23 @@
             : 'ללא חורי פינים') + '. מרווח צד למדף: ' + c.shelfSideGap + ' מ"מ לכל צד.');
         L.push('צירים: ' + (c.hinges
             ? 'כוס Ø' + c.cupDia + ' בעומק ' + c.cupDepth + ', מרכז ' + c.cupCenter + ' מ"מ מקצה הדלת, ראשון ואחרון ' + c.hingeEdge + ' מ"מ מהקצוות. כמות לפי גובה: עד 900 — 2, עד 1600 — 3, עד 2000 — 4, מעל — 5.'
-            : 'ללא קידוח כוסות.'));
+            : 'ללא קידוח כוסות.') +
+            (c.hingePlates
+                ? ' פלטות בדפנות: Ø' + c.plateDia + '×' + c.plateDepth + ', מרווח ' + c.platePitch + ', מרכז ' + c.plateFront + ' מ"מ מהקצה הקדמי.'
+                : ' ללא חורי פלטות.'));
+        L.push('חיבורי גוף: ' + (c.carcassConnectors
+            ? 'קונפירמט — קידוח פנים בדפנות/מחיצות Ø' + c.confFaceDia + ' (עומק עד ' + c.confFaceDepth + ', מצומצם לעובי הלוח), ' +
+              c.confEdgeInset + ' מ"מ מקצה קדמי/אחורי' + (c.confCount > 0 ? ', ' + c.confCount + ' חורים לחיבור.' : ' (2 עד עומק 500, אחרת 3).') +
+              ' קידוח הקצה בלוח האופקי (Ø7) אינו ב-DXF — הערה בלבד.'
+            : 'ללא חורי קונפירמט.'));
         L.push('צוקל: ' + ['בלוק הצוקל לא יוצא', 'פס קדמי לכל בלוק צוקל', 'פס קדמי ואחורי לכל בלוק צוקל'][Math.max(0, Math.min(2, Math.round(c.plinthStrips)))] + '.');
         L.push('קנט: ' + (c.edgeBandThickness > 0 ? 'מידות החיתוך קטנות ב-' + c.edgeBandThickness + ' מ"מ בכל קצה מקונט.' : 'מידות החיתוך הן מידות גמר (ללא הפחתת קנט).'), '');
         L.push('סיכום חומרים', '------------');
         result.stock.forEach(function(s) { L.push(s.matLabel + ' ' + s.T + ' מ"מ: ' + s.count + ' לוחות, ' + s.area.toFixed(2) + ' מ"ר נטו'); });
         L.push('');
         L.push('לא כלול', '-------');
-        L.push('חיבורי גוף (קונפירמט / מיניפיקס / דיבלים), חורי פלטות הצירים בדפנות, ארגזי מגירות וחורי מסילות,');
-        L.push('קינון על גיליון ו-G-code. כיוון הסיבים והקנטים נקבעים לפי מוסכמה — לבדוק מול ההזמנה.', '');
+        L.push('מיניפיקס ודיבלים (רק קונפירמט), קידוח קצה קונפירמט בלוח האופקי, ארגזי מגירות וחורי מסילות,');
+        L.push('קינון על גיליון, ייצוא כל ההזמנה בבת אחת, ו-G-code. כיוון הסיבים והקנטים נקבעים לפי מוסכמה — לבדוק מול ההזמנה.', '');
         if (result.skipped.length) {
             L.push('חלקים שלא יוצאו', '---------------');
             result.skipped.forEach(function(s) { L.push('- ' + s); });
@@ -1296,6 +1466,17 @@
         { k: 'cupDepth', label: 'עומק כוס', step: 0.5 },
         { k: 'cupCenter', label: 'מרכז הכוס מקצה הדלת', step: 0.5 },
         { k: 'hingeEdge', label: 'ציר ראשון / אחרון מהקצה' },
+        { k: 'hingePlates', label: 'חורי פלטות צירים בדפנות', check: true },
+        { k: 'plateDia', label: 'קוטר פלטה', step: 0.5 },
+        { k: 'plateDepth', label: 'עומק פלטה', step: 0.5 },
+        { k: 'platePitch', label: 'מרווח בין בורגי הפלטה' },
+        { k: 'plateFront', label: 'מרכז הפלטה מקצה הדופן הקדמי' },
+        { sec: 'חיבורי גוף' },
+        { k: 'carcassConnectors', label: 'חורי קונפירמט בדפנות', check: true },
+        { k: 'confFaceDia', label: 'קוטר קידוח פנים', step: 0.5 },
+        { k: 'confFaceDepth', label: 'עומק קידוח פנים', step: 0.5 },
+        { k: 'confEdgeInset', label: 'מרחק מקצה קדמי / אחורי' },
+        { k: 'confCount', label: 'מספר חורים לחיבור (0=אוטומטי)' },
         { sec: 'כללי' },
         { k: 'plinthStrips', label: 'לוחות צוקל לכל בלוק', opts: [[0, 'ללא'], [1, 'פס קדמי'], [2, 'פס קדמי + אחורי']] },
         { k: 'edgeBandThickness', label: 'הפחתת עובי קנט ממידת החיתוך', step: 0.1 }
