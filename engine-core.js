@@ -4168,7 +4168,7 @@ function _hingeSpreadCm(lo, hi, n, edgeCm) {
 /**
  * Procedural Blum-style hinge hardware on the inner carcass face (and cup on the door back).
  * Positions match CNC defaults: cupCenter 21.5mm, hingeEdge 100mm, plateFront 37mm.
- * Meshes are registered as door meshes so "הסתר חזיתות" hides them too.
+ * Door-side cup+arm hide with "הסתר חזיתות"; the mounting plate on the carcass stays visible.
  */
 function _addHingeHardware(parent, opts) {
     if (!parent || !opts || opts.isBP) return;
@@ -4200,18 +4200,23 @@ function _addHingeHardware(parent, opts) {
         _addHingeHardware._mat = mat;
     }
 
-    const group = new THREE.Group();
-    group.userData.skipPartPaint = true;
-    group.userData.isHingeHardware = true;
+    // Plate stays on the carcass; cup/arm belong to the door and hide with fronts
+    const plateGroup = new THREE.Group();
+    plateGroup.userData.skipPartPaint = true;
+    plateGroup.userData.isHingeHardware = true;
+    plateGroup.userData.keepVisibleWhenDoorsHidden = true;
+
+    const doorGroup = new THREE.Group();
+    doorGroup.userData.skipPartPaint = true;
+    doorGroup.userData.isHingeHardware = true;
 
     const addCup = (x, y) => {
         const cup = new THREE.Mesh(new THREE.CylinderGeometry(cupR, cupR, 1.1, 16), mat);
         cup.rotation.x = Math.PI / 2;
         cup.position.set(x, y, doorBackZ - 0.15);
-        group.add(cup);
+        doorGroup.add(cup);
     };
     const addPlateArm = (px, py, pz, alongY) => {
-        // Mounting plate on the inner carcass face
         const plate = new THREE.Mesh(
             alongY
                 ? new THREE.BoxGeometry(0.12, 5.2, 2.2)
@@ -4219,22 +4224,31 @@ function _addHingeHardware(parent, opts) {
             mat
         );
         plate.position.set(px, py, pz);
-        group.add(plate);
-        // Short arm toward the door cup
-        const arm = new THREE.Mesh(new THREE.BoxGeometry(alongY ? 1.8 : 0.35, alongY ? 0.35 : 1.8, 0.9), mat);
+        plateGroup.add(plate);
+        // Short carcass stub (stays visible) + longer arm toward the cup (hides with door)
+        const stub = new THREE.Mesh(
+            alongY ? new THREE.BoxGeometry(0.7, 0.35, 0.9) : new THREE.BoxGeometry(0.35, 0.7, 0.9),
+            mat
+        );
+        const arm = new THREE.Mesh(
+            alongY ? new THREE.BoxGeometry(1.4, 0.3, 0.7) : new THREE.BoxGeometry(0.3, 1.4, 0.7),
+            mat
+        );
         if (alongY) {
             const inward = hinge === 'left' ? 1 : -1;
-            arm.position.set(px + inward * 1.0, py, (pz + doorBackZ) / 2);
+            stub.position.set(px + inward * 0.4, py, pz);
+            arm.position.set(px + inward * 1.2, py, (pz + doorBackZ) / 2);
         } else {
-            arm.position.set(px, py - 1.0, (pz + doorBackZ) / 2);
+            stub.position.set(px, py - 0.4, pz);
+            arm.position.set(px, py - 1.2, (pz + doorBackZ) / 2);
         }
-        group.add(arm);
+        plateGroup.add(stub);
+        doorGroup.add(arm);
     };
 
     if (hinge === 'top') {
         const ys = doorTop - cupCenter;
         const xs = _hingeSpreadCm(doorLeft, doorRight, _hingeCountCm(w), hingeEdge);
-        // Plate on underside of the top board
         const plateY = doorTop + (isInset ? doorGap / 2 : 0) + 0.06;
         xs.forEach(function(x) {
             addCup(x, ys);
@@ -4243,7 +4257,6 @@ function _addHingeHardware(parent, opts) {
     } else {
         const ys = _hingeSpreadCm(doorBot, doorTop, _hingeCountCm(h), hingeEdge);
         const cupX = hinge === 'left' ? (doorLeft + cupCenter) : (doorRight - cupCenter);
-        // Inner face of the supporting side (overlay overlaps the wall; inset sits between walls)
         const plateX = isInset
             ? (hinge === 'left' ? doorLeft - doorGap / 2 - 0.06 : doorRight + doorGap / 2 + 0.06)
             : (hinge === 'left' ? doorLeft + boardT - doorGap / 2 : doorRight - boardT + doorGap / 2);
@@ -4253,10 +4266,15 @@ function _addHingeHardware(parent, opts) {
         });
     }
 
-    parent.add(group);
-    if (typeof _registerDoorMesh === 'function') _registerDoorMesh(group);
-    if (window._doorsVisible === false) group.visible = false;
-    return group;
+    parent.add(plateGroup);
+    parent.add(doorGroup);
+    if (typeof _registerDoorMesh === 'function') {
+        _registerDoorMesh(doorGroup);
+        // Track plate too so space/companion rebuilds keep it, but never hide with fronts
+        _registerDoorMesh(plateGroup);
+    }
+    if (window._doorsVisible === false) doorGroup.visible = false;
+    return plateGroup;
 }
 window._addHingeHardware = _addHingeHardware;
 
