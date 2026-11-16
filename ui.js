@@ -14991,7 +14991,7 @@ window.updateLeftSidebar = function(opts) {
         const activeClass = isEditing ? 'active-editing' : '';
         const heldClass = held ? ' on-hold' : '';
         const nestedClass = nested ? ' cart-mini-card-nested' : '';
-        const activeLabel = isEditing ? '<div style="position:absolute; top:-12px; right:15px; background:var(--accent); color:white; font-size:11px; padding:3px 10px; border-radius:12px; font-weight:bold; box-shadow:0 2px 5px rgba(0,0,0,0.15); border: 2px solid white;"><i class="fa-solid fa-pen"></i> בעריכה כעת</div>' : '';
+        const activeChip = isEditing ? '<span class="cart-editing-chip"><i class="fa-solid fa-pen"></i> בעריכה</span>' : '';
         const holdBadge = held ? '<span class="cart-hold-badge"><i class="fa-solid fa-pause"></i> מושהה</span>' : '';
         const titleText = _cartItemTitle(itemObj, index);
         const partSlot = (typeof window._spacePairIdOf === 'function' && window._spacePairIdOf(itemObj) != null)
@@ -15000,27 +15000,20 @@ window.updateLeftSidebar = function(opts) {
             ? `<span class="cart-space-part-chip">${window._spacePartSuffix(partSlot)}</span>`
             : '';
 
-        const _itemPreset = (itemObj.rawState && itemObj.rawState.presetId) || 'linear';
-        const _isLinearOrSliding = (_itemPreset === 'linear' || _itemPreset === 'sliding');
-        const _curRoomWall = (itemObj.rawState && itemObj.rawState.roomWall) || 'center';
-        const _wallSelectorHTML = (!nested && _isLinearOrSliding) ? `
-            <div style="display:flex;align-items:center;gap:4px;margin-top:6px;padding-top:6px;border-top:1px solid var(--border);">
-                <span style="font-size:0.78rem;color:var(--text-light);flex-shrink:0;">מיקום בחדר:</span>
-                <div style="display:flex;gap:3px;flex:1;">
-                    <button onclick="event.stopPropagation(); window.setCartItemRoomWall(${index},'left');"
-                        style="flex:1;padding:3px 4px;font-size:0.75rem;border-radius:5px;border:1.5px solid ${_curRoomWall==='left'?'var(--accent)':'var(--border)'};background:${_curRoomWall==='left'?'rgba(var(--accent-rgb,99,102,241),0.12)':'transparent'};color:${_curRoomWall==='left'?'var(--accent)':'var(--text-light)'};cursor:pointer;font-weight:${_curRoomWall==='left'?'700':'400'};" title="צמוד לקיר שמאל">
-                        ← שמאל
-                    </button>
-                    <button onclick="event.stopPropagation(); window.setCartItemRoomWall(${index},'center');"
-                        style="flex:1;padding:3px 4px;font-size:0.75rem;border-radius:5px;border:1.5px solid ${_curRoomWall==='center'?'var(--accent)':'var(--border)'};background:${_curRoomWall==='center'?'rgba(var(--accent-rgb,99,102,241),0.12)':'transparent'};color:${_curRoomWall==='center'?'var(--accent)':'var(--text-light)'};cursor:pointer;font-weight:${_curRoomWall==='center'?'700':'400'};" title="מרכז">
-                        מרכז
-                    </button>
-                    <button onclick="event.stopPropagation(); window.setCartItemRoomWall(${index},'right');"
-                        style="flex:1;padding:3px 4px;font-size:0.75rem;border-radius:5px;border:1.5px solid ${_curRoomWall==='right'?'var(--accent)':'var(--border)'};background:${_curRoomWall==='right'?'rgba(var(--accent-rgb,99,102,241),0.12)':'transparent'};color:${_curRoomWall==='right'?'var(--accent)':'var(--text-light)'};cursor:pointer;font-weight:${_curRoomWall==='right'?'700':'400'};" title="צמוד לקיר ימין">
-                        ימין →
-                    </button>
-                </div>
-            </div>` : '';
+        let thumbSrc = null;
+        if (typeof _cartImageValid === 'function') {
+            if (_cartImageValid(item.imgDoors)) thumbSrc = item.imgDoors;
+            else if (_cartImageValid(item.imgSpaceDoors)) thumbSrc = item.imgSpaceDoors;
+            else if (item.wingPreviews && item.wingPreviews.length) {
+                for (let wi = 0; wi < item.wingPreviews.length; wi++) {
+                    const w = item.wingPreviews[wi];
+                    if (w && _cartImageValid(w.imgDoors)) { thumbSrc = w.imgDoors; break; }
+                }
+            }
+        }
+        const thumbHtml = thumbSrc
+            ? `<div class="cart-mini-thumb"><img src="${thumbSrc}" alt=""></div>`
+            : `<div class="cart-mini-thumb cart-mini-thumb-empty"><i class="fa-solid fa-cube"></i></div>`;
 
         const card = document.createElement('div');
         card.className = `cart-mini-card ${activeClass}${heldClass}${nestedClass}`;
@@ -15028,23 +15021,26 @@ window.updateLeftSidebar = function(opts) {
         card.onclick = () => { if (state.editingCartIndex !== index) editCartItem(index); };
 
         card.innerHTML = `
-            ${activeLabel}
-            <button type="button" class="cart-mini-btn btn-hold-mini" title="${held ? 'הפעל ארון' : 'השהה ארון'}" onclick="event.stopPropagation(); toggleCartItemHold(${index});"><i class="fa-solid fa-${held ? 'play' : 'pause'}"></i> ${held ? 'הפעל' : 'השהה'}</button>
-            <div class="cart-mini-card-title">${holdBadge}${partChip}${titleText}</div>
-            <div class="cart-mini-card-desc" dir="rtl">${item.dimsStr || ''}</div>
-            ${window._showPricing !== false ? `<div class="cart-mini-card-price"><span dir="ltr">${item.price}</span> <span style="font-size:0.85rem; font-weight:normal; color:var(--text-light);">+ <span dir="ltr">₪${itemInstall.toLocaleString()}</span> התקנה</span></div>` : ''}
-            ${_wallSelectorHTML}
+            <button type="button" class="cart-mini-btn btn-hold-mini" title="${held ? 'הפעל ארון' : 'השהה ארון'}" onclick="event.stopPropagation(); toggleCartItemHold(${index});"><i class="fa-solid fa-${held ? 'play' : 'pause'}"></i></button>
+            <div class="cart-mini-card-main">
+                ${thumbHtml}
+                <div class="cart-mini-card-body">
+                    <div class="cart-mini-card-title">${holdBadge}${partChip}${activeChip}${titleText}</div>
+                    <div class="cart-mini-card-desc" dir="rtl">${item.dimsStr || ''}</div>
+                    ${window._showPricing !== false ? `<div class="cart-mini-card-price"><span dir="ltr">${item.price}</span>${itemInstall ? ` <span class="cart-mini-install">+₪${itemInstall.toLocaleString()}</span>` : ''}</div>` : ''}
+                </div>
+            </div>
             <div class="cart-mini-actions">
-                <button class="cart-mini-btn btn-edit-mini" onclick="event.stopPropagation(); editCartItem(${index});"><i class="fa-solid fa-pen"></i> ערוך</button>
-                ${nested ? `<button class="cart-mini-btn btn-leave-space-mini" onclick="event.stopPropagation(); removeCabinetFromSpace(${index});" title="הוצא את הארון מהמרחב המשותף — הארון יישאר בפרויקט"><i class="fa-solid fa-link-slash"></i> הוצא מהקבוצה</button>` : ''}
-                <button class="cart-mini-btn" onclick="event.stopPropagation(); duplicateCartItem(${index});"><i class="fa-solid fa-copy"></i> שכפל</button>
-                ${!nested && window._cartItemSplitSides(itemObj) ? `<button class="cart-mini-btn btn-split-mini" onclick="event.stopPropagation(); splitCartItem(${index});" title="פצל את הארון הפינתי לארונות ישרים נפרדים בפרויקט"><i class="fa-solid fa-object-ungroup"></i> פצל</button>` : ''}
-                <button class="cart-mini-btn btn-del-mini" onclick="event.stopPropagation(); deleteCartItem(${index});"><i class="fa-solid fa-trash"></i> מחק</button>
-                <div style="position:relative;display:inline-flex;">
-                    <button class="cart-mini-btn" id="notes-btn-cart-${index}" onclick="event.stopPropagation(); window._openDesignerNotesForCabinet(${index});" style="color:#2563eb;border-color:rgba(37,99,235,0.35);background:rgba(37,99,235,0.07);">
-                        <i class="fa-solid fa-note-sticky"></i> תיקונים
+                <button class="cart-mini-btn btn-edit-mini" onclick="event.stopPropagation(); editCartItem(${index});" title="ערוך"><i class="fa-solid fa-pen"></i></button>
+                ${nested ? `<button class="cart-mini-btn btn-leave-space-mini" onclick="event.stopPropagation(); removeCabinetFromSpace(${index});" title="הוצא מהקבוצה"><i class="fa-solid fa-link-slash"></i></button>` : ''}
+                <button class="cart-mini-btn" onclick="event.stopPropagation(); duplicateCartItem(${index});" title="שכפל"><i class="fa-solid fa-copy"></i></button>
+                ${!nested && window._cartItemSplitSides(itemObj) ? `<button class="cart-mini-btn btn-split-mini" onclick="event.stopPropagation(); splitCartItem(${index});" title="פצל"><i class="fa-solid fa-object-ungroup"></i></button>` : ''}
+                <button class="cart-mini-btn btn-del-mini" onclick="event.stopPropagation(); deleteCartItem(${index});" title="מחק"><i class="fa-solid fa-trash"></i></button>
+                <div class="cart-mini-notes-wrap">
+                    <button class="cart-mini-btn cart-mini-notes-btn" id="notes-btn-cart-${index}" onclick="event.stopPropagation(); window._openDesignerNotesForCabinet(${index});" title="תיקונים">
+                        <i class="fa-solid fa-note-sticky"></i>
                     </button>
-                    <span id="notes-badge-cart-${index}" style="display:none;position:absolute;top:-5px;left:-5px;background:#ef4444;color:white;border-radius:50%;width:15px;height:15px;font-size:9px;font-weight:700;align-items:center;justify-content:center;line-height:1;z-index:10;pointer-events:none;"></span>
+                    <span id="notes-badge-cart-${index}" class="cart-mini-notes-badge" style="display:none;"></span>
                 </div>
             </div>
         `;
