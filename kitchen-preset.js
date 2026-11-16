@@ -113,29 +113,20 @@ window._applyKitchenPreset = function() {
     }
 };
 
-/** Switch room scenery from bedroom (bed + parquet) to a kitchen feel (tiles, no bed). */
+/** Kitchen room scenery: hide bedroom furniture. Do not change floor — kitchens may use parquet or tile. */
 function _applyKitchenRoomView() {
     if (!window._kitchenRoomSnapshot) {
         window._kitchenRoomSnapshot = {
-            floor: typeof window._normRoomFloorStyle === 'function'
-                ? window._normRoomFloorStyle(window._roomFloorStyle)
-                : Object.assign({}, window._roomFloorStyle || {}),
             bedVisible: window._bedVisible !== false,
             chairVisible: window._chairVisible !== false
         };
     }
     window._bedVisible = false;
     window._chairVisible = false;
-    if (typeof window._setRoomFloorStyle === 'function') {
-        // Porcelain tiles suit kitchens better than bedroom parquet
-        window._setRoomFloorStyle({ kind: 'tile', finish: 'concrete', size: '60x120', gloss: 'matte' });
-    } else if (typeof window._normRoomFloorStyle === 'function') {
-        window._roomFloorStyle = window._normRoomFloorStyle({
-            kind: 'tile', finish: 'concrete', size: '60x120', gloss: 'matte'
-        });
-    }
     if (typeof window._updateRoomPropsUI === 'function') window._updateRoomPropsUI();
     _syncKitchenRoomFurnitureUI();
+    if (typeof _buildRoom === 'function' && window._roomVisible) _buildRoom();
+    else if (typeof buildCabinet === 'function') buildCabinet();
 }
 
 function _leaveKitchenRoomView() {
@@ -144,13 +135,10 @@ function _leaveKitchenRoomView() {
     window._kitchenRoomSnapshot = null;
     window._bedVisible = snap.bedVisible !== false;
     window._chairVisible = snap.chairVisible !== false;
-    if (snap.floor && typeof window._setRoomFloorStyle === 'function') {
-        window._setRoomFloorStyle(snap.floor);
-    } else if (snap.floor) {
-        window._roomFloorStyle = snap.floor;
-    }
     if (typeof window._updateRoomPropsUI === 'function') window._updateRoomPropsUI();
     _syncKitchenRoomFurnitureUI();
+    if (typeof _buildRoom === 'function' && window._roomVisible) _buildRoom();
+    else if (typeof buildCabinet === 'function') buildCabinet();
 }
 
 function _syncKitchenRoomFurnitureUI() {
@@ -298,9 +286,8 @@ function _updateKitchenSectionUI() {
     }
     _renderKitchenBrandExamples();
     if (isKit) {
-        // Keep room scenery kitchen-like when restoring / switching wings
-        if (window._bedVisible !== false || window._chairVisible !== false ||
-            !(window._roomFloorStyle && window._roomFloorStyle.kind === 'tile')) {
+        // Keep bedroom furniture hidden; never force a floor kind
+        if (window._bedVisible !== false || window._chairVisible !== false) {
             _applyKitchenRoomView();
         } else {
             _syncKitchenRoomFurnitureUI();
