@@ -15043,7 +15043,7 @@ window.updateLeftSidebar = function(opts) {
         card.dataset.cartIndex = String(index);
         card.onclick = () => { if (state.editingCartIndex !== index) editCartItem(index); };
 
-        // RTL grid order: thumb (right) → body → actions (left)
+        // Top: thumb + title/dims; bottom: action buttons in a 2-column grid
         card.innerHTML = `
             ${thumbHtml}
             <div class="cart-mini-card-body">
@@ -15058,8 +15058,6 @@ window.updateLeftSidebar = function(opts) {
                 <button type="button" class="cart-mini-btn" onclick="event.stopPropagation(); duplicateCartItem(${index});" title="שכפל">
                     <i class="fa-solid fa-copy"></i> שכפל
                 </button>
-                ${nested ? `<button type="button" class="cart-mini-btn btn-leave-space-mini" onclick="event.stopPropagation(); removeCabinetFromSpace(${index});" title="הוצא מהקבוצה"><i class="fa-solid fa-link-slash"></i> הוצא</button>` : ''}
-                ${!nested && window._cartItemSplitSides(itemObj) ? `<button type="button" class="cart-mini-btn btn-split-mini" onclick="event.stopPropagation(); splitCartItem(${index});" title="פצל"><i class="fa-solid fa-object-ungroup"></i> פצל</button>` : ''}
                 <button type="button" class="cart-mini-btn btn-del-mini" onclick="event.stopPropagation(); deleteCartItem(${index});" title="מחק">
                     <i class="fa-solid fa-trash"></i> מחק
                 </button>
@@ -15069,6 +15067,8 @@ window.updateLeftSidebar = function(opts) {
                     </button>
                     <span id="notes-badge-cart-${index}" class="cart-mini-notes-badge" style="display:none;"></span>
                 </div>
+                ${nested ? `<button type="button" class="cart-mini-btn btn-leave-space-mini" onclick="event.stopPropagation(); removeCabinetFromSpace(${index});" title="הוצא מהקבוצה"><i class="fa-solid fa-link-slash"></i> הוצא</button>` : ''}
+                ${!nested && window._cartItemSplitSides(itemObj) ? `<button type="button" class="cart-mini-btn btn-split-mini" onclick="event.stopPropagation(); splitCartItem(${index});" title="פצל"><i class="fa-solid fa-object-ungroup"></i> פצל</button>` : ''}
             </div>
         `;
         return card;
