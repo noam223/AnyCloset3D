@@ -87,6 +87,13 @@
     // 3. Load features first — needed to decide empty carpenter vs market designer defaults
     var _features = await loadFeatures();
     var _planInfo  = window._plan;
+    // App-admin flag (private.app_admins) — used to gate unfinished features like CNC export
+    window._isAppAdmin = false;
+    try {
+        if (window.Auth && typeof Auth.isAppAdmin === 'function') {
+            window._isAppAdmin = !!(await Auth.isAppAdmin());
+        }
+    } catch (eAdmin) { window._isAppAdmin = false; }
 
     // 3b. Load pricing config from Supabase for this user
     var _sb_init = null;

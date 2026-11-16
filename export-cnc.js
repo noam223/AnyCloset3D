@@ -1423,6 +1423,11 @@
 
     window._openCncExport = function() {
         if (X3().closeMenu) X3().closeMenu();
+        // Hidden from everyone except the platform admin while the feature is still rolling out
+        if (!window._isAppAdmin) {
+            _toast('ייצוא CNC זמין כרגע רק למנהל המערכת.', 4000);
+            return;
+        }
         if (window._features && !window._features.canExportCarpenter) {
             _toast('ייצוא CNC אינו זמין בתוכנית הנוכחית שלך. שדרג כדי לגשת לקובצי הייצור.', 5000);
             return;

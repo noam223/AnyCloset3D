@@ -631,7 +631,8 @@
             item('dae', 'fa-solid fa-cube', 'SketchUp (DAE)', 'כולל צבעים וטקסטורות · קובץ ZIP — לחלץ ולייבא את קובץ ה-DAE') +
             item('dxf', 'fa-solid fa-drafting-compass', 'AutoCAD (DXF)', 'במילימטרים · שכבה לכל סוג חלק (Body, Doors, Room...)') +
             item('obj', 'fa-solid fa-cubes', '3ds Max / Blender (OBJ)', 'כולל צבעים וטקסטורות · ס"מ · קובץ ZIP — לחלץ ולייבא את קובץ ה-OBJ') +
-            (typeof window._openCncExport === 'function'
+            // CNC export is admin-only for now (window._isAppAdmin is set in index-init.js)
+            (typeof window._openCncExport === 'function' && window._isAppAdmin
                 ? '<div style="height:1px;background:#e2e8f0;margin:6px 4px;"></div>' +
                   item('cnc', 'fa-solid fa-gears', 'CNC — DXF ורשימת חיתוך',
                       'קובץ DXF שכבתי לכל לוח (קידוחים, חריץ גב) + רשימת חיתוך CSV · תמיד לארון שבעריכה',
