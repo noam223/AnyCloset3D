@@ -1911,7 +1911,8 @@ body.touch-door-dragging, body.touch-door-dragging * { cursor: grabbing !importa
 .cart-mini-notes-wrap {
     position: relative;
     display: block;
-    width: 100%;
+    flex: 1 1 0;
+    width: auto;
     min-width: 0;
 }
 .cart-mini-notes-btn {
@@ -2058,16 +2059,16 @@ body.touch-door-dragging, body.touch-door-dragging * { cursor: grabbing !importa
     top: auto;
     left: auto;
     z-index: 1;
-    flex: none;
-    width: 100%;
+    flex: 1 1 0;
+    width: auto;
     min-width: 0;
     height: var(--cart-btn-h, 28px);
     min-height: var(--cart-btn-h, 28px);
     max-height: var(--cart-btn-h, 28px);
-    padding: 0 8px;
-    font-size: 0.7rem;
+    padding: 0 4px;
+    font-size: 0.68rem;
     font-weight: 700;
-    gap: 5px;
+    gap: 3px;
     border-radius: 8px;
     color: #64748b;
     border: 1px solid #cbd5e1;
@@ -2115,8 +2116,9 @@ body.touch-door-dragging, body.touch-door-dragging * { cursor: grabbing !importa
 
 .cart-mini-actions {
     grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: stretch;
     gap: var(--cart-btn-gap, 4px);
     margin-top: 0;
     border-top: 1px solid var(--border);
@@ -2129,23 +2131,23 @@ body.touch-door-dragging, body.touch-door-dragging * { cursor: grabbing !importa
     box-sizing: border-box;
 }
 .cart-mini-btn {
-    flex: none;
+    flex: 1 1 0;
     min-width: 0;
-    width: 100%;
+    width: auto;
     height: var(--cart-btn-h, 28px);
     min-height: var(--cart-btn-h, 28px);
     max-height: var(--cart-btn-h, 28px);
-    padding: 0 8px;
+    padding: 0 4px;
     border: 1px solid var(--border);
     border-radius: 8px;
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     cursor: pointer;
     font-weight: 700;
     transition: all 160ms cubic-bezier(0.4,0,0.2,1);
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 5px;
+    gap: 3px;
     position: relative;
     overflow: hidden;
     background: #f8fafc;
