@@ -1599,15 +1599,18 @@
         const wrap = document.getElementById('cnc-3d-wrap');
         const canvas = document.getElementById('cnc-3d');
         if (!wrap || !canvas) return;
-        const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+        const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-        renderer.setClearColor(0xe7e5e4, 1);
+        renderer.setClearColor(0x000000, 0);
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(35, 1, 1, 5000);
-        scene.add(new THREE.AmbientLight(0xffffff, 0.75));
-        const key = new THREE.DirectionalLight(0xffffff, 0.7);
-        key.position.set(80, 140, 90);
+        scene.add(new THREE.HemisphereLight(0xfff6ea, 0xc5d4e4, 0.95));
+        const key = new THREE.DirectionalLight(0xfff4e6, 0.72);
+        key.position.set(60, 120, 80);
         scene.add(key);
+        const fill = new THREE.DirectionalLight(0xdbe7f5, 0.38);
+        fill.position.set(-90, 40, 30);
+        scene.add(fill);
         const controls = (typeof THREE.OrbitControls === 'function')
             ? new THREE.OrbitControls(camera, canvas) : null;
         if (controls) {
@@ -1621,10 +1624,14 @@
                 if (view.viewDir.lengthSq() > 1e-6) view.viewDir.normalize();
             });
         }
+        const board = { roughness: 0.62, metalness: 0.02 };
         const mats = {
-            idle: new THREE.MeshStandardMaterial({ color: 0xd6d3d1, roughness: 0.72, metalness: 0.04 }),
-            sel: new THREE.MeshStandardMaterial({ color: 0x4f46e5, emissive: 0x312e81, roughness: 0.45 }),
-            hover: new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xb45309, roughness: 0.4 })
+            idle: new THREE.MeshStandardMaterial(Object.assign({ color: 0xf4efe6 }, board)),
+            door: new THREE.MeshStandardMaterial(Object.assign({ color: 0xfffdf8 }, board)),
+            back: new THREE.MeshStandardMaterial(Object.assign({ color: 0xe6ddd0 }, board)),
+            sel: new THREE.MeshStandardMaterial({ color: 0x4f46e5, emissive: 0x312e81, roughness: 0.42, metalness: 0.04 }),
+            hover: new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xb45309, roughness: 0.4, metalness: 0.02 }),
+            edge: new THREE.LineBasicMaterial({ color: 0xb7aa9a, transparent: true, opacity: 0.85 })
         };
         const group = new THREE.Group();
         scene.add(group);
@@ -1810,6 +1817,16 @@
         put(new THREE.Vector3(max.x + gap, min.y, min.z), new THREE.Vector3(max.x + gap, min.y, max.z), dMm + '  עומק',
             new THREE.Vector3(max.x, min.y, min.z), new THREE.Vector3(max.x, min.y, max.z));
 
+        const shadow = new THREE.Mesh(
+            new THREE.CircleGeometry(1, 48),
+            new THREE.MeshBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.16, depthWrite: false })
+        );
+        shadow.rotation.x = -Math.PI / 2;
+        shadow.position.set((min.x + max.x) / 2, min.y - 0.2, (min.z + max.z) / 2);
+        shadow.scale.set(Math.max(8, (max.x - min.x) * 0.58), Math.max(6, (max.z - min.z) * 0.7), 1);
+        shadow.renderOrder = 0;
+        anno.add(shadow);
+
         const dotGeo = new THREE.SphereGeometry(0.55, 12, 8);
         const dotMat = new THREE.MeshBasicMaterial({ color: 0xc2410c, depthTest: false });
         UI.result.panels.forEach(function(r) {
@@ -1835,14 +1852,25 @@
             _clearAnno(v);
             while (v.group.children.length) v.group.remove(v.group.children[0]);
             v.meshes = [];
+            if (v.boxGeo) v.boxGeo.dispose();
+            if (v.edgeGeo) v.edgeGeo.dispose();
             const geo = new THREE.BoxGeometry(1, 1, 1);
+            const edgeGeo = new THREE.EdgesGeometry(geo, 1);
+            v.boxGeo = geo;
+            v.edgeGeo = edgeGeo;
             UI.result.panels.forEach(function(r, i) {
                 (r.poses || []).forEach(function(pose) {
-                    const mesh = new THREE.Mesh(geo, v.mats.idle);
+                    const base = (r.code === 'DOOR' || r.code === 'DRAWER_FRONT') ? v.mats.door
+                        : (r.code === 'BACK' ? v.mats.back : v.mats.idle);
+                    const mesh = new THREE.Mesh(geo, base);
                     mesh.matrix.copy(_poseMatrix(pose));
                     mesh.matrixAutoUpdate = false;
                     mesh.userData.row = i;
                     mesh.userData.door = r.code === 'DOOR';
+                    mesh.userData.baseMat = base;
+                    const edge = new THREE.LineSegments(edgeGeo, v.mats.edge);
+                    edge.userData.edge = true;
+                    mesh.add(edge);
                     v.group.add(mesh);
                     v.meshes.push(mesh);
                 });
@@ -1868,7 +1896,7 @@
         if (!v) return;
         v.meshes.forEach(function(mesh) {
             const row = mesh.userData.row;
-            mesh.material = row === UI.hover ? v.mats.hover : (row === UI.sel ? v.mats.sel : v.mats.idle);
+            mesh.material = row === UI.hover ? v.mats.hover : (row === UI.sel ? v.mats.sel : (mesh.userData.baseMat || v.mats.idle));
         });
     }
     function _dispose3d() {
@@ -1877,6 +1905,8 @@
         _clearAnno(v);
         if (v.raf) cancelAnimationFrame(v.raf);
         if (v.ro) v.ro.disconnect();
+        if (v.boxGeo) v.boxGeo.dispose();
+        if (v.edgeGeo) v.edgeGeo.dispose();
         if (v.controls) v.controls.dispose();
         v.renderer.dispose();
         Object.keys(v.mats).forEach(function(k) { v.mats[k].dispose(); });
@@ -1944,7 +1974,7 @@
                         '<div id="cnc-preview" style="flex:0 0 46%;min-height:0;display:flex;gap:14px;padding:12px 14px;border-bottom:1px solid #e2e8f0;background:#f8fafc;"></div>' +
                         '<div id="cnc-list" style="flex:1;min-height:0;overflow:auto;"></div>' +
                     '</div>' +
-                    '<div id="cnc-3d-wrap" style="width:460px;flex-shrink:0;position:relative;background:#e7e5e4;border-right:1px solid #e2e8f0;">' +
+                    '<div id="cnc-3d-wrap" style="width:460px;flex-shrink:0;position:relative;background:radial-gradient(120% 90% at 50% 12%, #f7f4ef 0%, #e7eef6 58%, #d5e0ec 100%);border-right:1px solid #e2e8f0;">' +
                         '<canvas id="cnc-3d" style="width:100%;height:100%;display:block;"></canvas>' +
                         '<div style="position:absolute;top:8px;right:10px;left:10px;font-size:.72rem;color:#44403c;pointer-events:none;">מידות כלליות במ״מ · נקודה כתומה = מיקום ציר</div>' +
                         '<button type="button" id="cnc-3d-doors" style="position:absolute;bottom:10px;left:10px;z-index:2;border:1px solid #d6d3d1;border-radius:8px;background:rgba(255,255,255,.94);color:#44403c;font:inherit;font-size:.74rem;font-weight:700;padding:6px 10px;cursor:pointer;">הסתר דלתות</button>' +
