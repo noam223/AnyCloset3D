@@ -621,43 +621,9 @@
 
         </div>
 
-        <!-- ===== SLIDING WARDROBE SECTION (shown only for 'sliding' preset) ===== -->
+        <!-- ===== SLIDING WARDROBE — structural settings stay under ארון ===== -->
         <div class="section" id="sliding-door-section" data-sbgroup="cabinet" style="display:none;">
             <div class="section-title"><i class="fa-solid fa-arrows-left-right"></i> הגדרות ארון הזזה</div>
-
-            <!-- Profile color -->
-            <div class="control-group" style="margin-bottom:12px;">
-                <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:6px;">צבע פרזול אלומיניום</div>
-                <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                    <button class="sd-profile-btn active" data-color="nickel" onclick="updateSlidingDoor('profileColor','nickel')"
-                        style="flex:1;min-width:60px;padding:6px 4px;border-radius:8px;border:1.5px solid var(--border);background:linear-gradient(135deg,#c8c8c8,#e8e8e8);color:#333;font-size:0.75rem;font-weight:600;cursor:pointer;transition:all 0.18s;">
-                        ניקל מוברש
-                    </button>
-                    <button class="sd-profile-btn" data-color="black" onclick="updateSlidingDoor('profileColor','black')"
-                        style="flex:1;min-width:60px;padding:6px 4px;border-radius:8px;border:1.5px solid var(--border);background:#222;color:#fff;font-size:0.75rem;font-weight:600;cursor:pointer;transition:all 0.18s;">
-                        שחור
-                    </button>
-                    <button class="sd-profile-btn" data-color="white" onclick="updateSlidingDoor('profileColor','white')"
-                        style="flex:1;min-width:60px;padding:6px 4px;border-radius:8px;border:1.5px solid var(--border);background:#f5f5f5;color:#333;font-size:0.75rem;font-weight:600;cursor:pointer;transition:all 0.18s;">
-                        לבן
-                    </button>
-                    <button class="sd-profile-btn" data-color="cream" onclick="updateSlidingDoor('profileColor','cream')"
-                        style="flex:1;min-width:60px;padding:6px 4px;border-radius:8px;border:1.5px solid var(--border);background:#f0e8d0;color:#555;font-size:0.75rem;font-weight:600;cursor:pointer;transition:all 0.18s;">
-                        שמנת
-                    </button>
-                    <button class="sd-profile-btn" data-color="gold_matte" onclick="updateSlidingDoor('profileColor','gold_matte')"
-                        style="flex:1;min-width:60px;padding:6px 4px;border-radius:8px;border:1.5px solid var(--border);background:linear-gradient(135deg,#b8960c,#d4af37);color:#fff;font-size:0.75rem;font-weight:600;cursor:pointer;transition:all 0.18s;">
-                        זהב מט
-                    </button>
-                </div>
-            </div>
-
-            <!-- Per-door panel type tabs — rebuilt dynamically by _rebuildDoorPanelTabs() -->
-            <div id="sd-door-panels-container" style="margin-bottom:12px;">
-                <!-- Populated by _rebuildDoorPanelTabs() in ui.js -->
-            </div>
-
-            <!-- Door count -->
             <div class="control-group" style="margin-bottom:0;">
                 <div class="label-row">
                     <span>מספר דלתות / עמודות</span>
@@ -674,7 +640,7 @@
                 </div>
             </div>
         </div>
-        <!-- ===== END SLIDING WARDROBE SECTION ===== -->
+        <!-- ===== END SLIDING WARDROBE STRUCTURAL ===== -->
 
         <div class="section" id="space-units-section" data-sbgroup="extras">
             <div class="section-title"><i class="fa-solid fa-plus"></i> הוספת יחידה למרחב</div>
@@ -1098,6 +1064,38 @@
 
         <div class="section" id="materials-section" data-sbgroup="colors" style="border-bottom: none;">
             <div class="section-title"><i class="fa-solid fa-palette"></i> חומרים וגימורים</div>
+
+            <!-- Sliding wardrobe: profile + per-door type/color live under צבעים -->
+            <div id="sliding-colors-block" style="display:none;margin-bottom:18px;">
+                <div class="control-group" style="margin-bottom:12px;">
+                    <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:6px;">צבע פרזול אלומיניום</div>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                        <button class="sd-profile-btn active" data-color="nickel" onclick="updateSlidingDoor('profileColor','nickel')"
+                            style="flex:1;min-width:60px;padding:6px 4px;border-radius:8px;border:1.5px solid var(--border);background:linear-gradient(135deg,#c8c8c8,#e8e8e8);color:#333;font-size:0.75rem;font-weight:600;cursor:pointer;transition:all 0.18s;">
+                            ניקל מוברש
+                        </button>
+                        <button class="sd-profile-btn" data-color="black" onclick="updateSlidingDoor('profileColor','black')"
+                            style="flex:1;min-width:60px;padding:6px 4px;border-radius:8px;border:1.5px solid var(--border);background:#222;color:#fff;font-size:0.75rem;font-weight:600;cursor:pointer;transition:all 0.18s;">
+                            שחור
+                        </button>
+                        <button class="sd-profile-btn" data-color="white" onclick="updateSlidingDoor('profileColor','white')"
+                            style="flex:1;min-width:60px;padding:6px 4px;border-radius:8px;border:1.5px solid var(--border);background:#f5f5f5;color:#333;font-size:0.75rem;font-weight:600;cursor:pointer;transition:all 0.18s;">
+                            לבן
+                        </button>
+                        <button class="sd-profile-btn" data-color="cream" onclick="updateSlidingDoor('profileColor','cream')"
+                            style="flex:1;min-width:60px;padding:6px 4px;border-radius:8px;border:1.5px solid var(--border);background:#f0e8d0;color:#555;font-size:0.75rem;font-weight:600;cursor:pointer;transition:all 0.18s;">
+                            שמנת
+                        </button>
+                        <button class="sd-profile-btn" data-color="gold_matte" onclick="updateSlidingDoor('profileColor','gold_matte')"
+                            style="flex:1;min-width:60px;padding:6px 4px;border-radius:8px;border:1.5px solid var(--border);background:linear-gradient(135deg,#b8960c,#d4af37);color:#fff;font-size:0.75rem;font-weight:600;cursor:pointer;transition:all 0.18s;">
+                            זהב מט
+                        </button>
+                    </div>
+                </div>
+                <div id="sd-door-panels-container" style="margin-bottom:4px;"></div>
+                <div style="height:1px;background:var(--border);margin:14px 0 4px;"></div>
+            </div>
+
             <div class="control-group">
                 <div class="color-part-tabs">
                     <button class="part-tab-btn active" data-part="materialBody"><i class="ptb-ic fa-solid fa-cube"></i><span class="ptb-label">גוף וצוקל</span><em class="ptb-dot"></em></button>
@@ -2532,32 +2530,10 @@
             </div>
         </div>
         </div>
-        <!-- Mobile sliding door controls (shown only for sliding preset) -->
+        <!-- Mobile sliding structural controls (door count) — colors live in materials panel -->
         <div id="mobile-sliding-section" style="display:none;">
             <div class="mobile-panel-divider"></div>
             <div class="mobile-section-title"><i class="fa-solid fa-arrows-left-right" style="margin-left:5px;"></i> ארון הזזה</div>
-            <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:6px;">צבע פרזול</div>
-            <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px;">
-                <button class="sd-profile-btn" data-color="nickel" onclick="updateSlidingDoor('profileColor','nickel')"
-                    style="flex:1;min-width:55px;padding:5px 3px;border-radius:7px;border:1.5px solid var(--border);background:linear-gradient(135deg,#c8c8c8,#e8e8e8);color:#333;font-size:0.72rem;font-weight:600;cursor:pointer;">ניקל</button>
-                <button class="sd-profile-btn" data-color="black" onclick="updateSlidingDoor('profileColor','black')"
-                    style="flex:1;min-width:55px;padding:5px 3px;border-radius:7px;border:1.5px solid var(--border);background:#222;color:#fff;font-size:0.72rem;font-weight:600;cursor:pointer;">שחור</button>
-                <button class="sd-profile-btn" data-color="white" onclick="updateSlidingDoor('profileColor','white')"
-                    style="flex:1;min-width:55px;padding:5px 3px;border-radius:7px;border:1.5px solid var(--border);background:#f5f5f5;color:#333;font-size:0.72rem;font-weight:600;cursor:pointer;">לבן</button>
-                <button class="sd-profile-btn" data-color="cream" onclick="updateSlidingDoor('profileColor','cream')"
-                    style="flex:1;min-width:55px;padding:5px 3px;border-radius:7px;border:1.5px solid var(--border);background:#f0e8d0;color:#555;font-size:0.72rem;font-weight:600;cursor:pointer;">שמנת</button>
-                <button class="sd-profile-btn" data-color="gold_matte" onclick="updateSlidingDoor('profileColor','gold_matte')"
-                    style="flex:1;min-width:55px;padding:5px 3px;border-radius:7px;border:1.5px solid var(--border);background:linear-gradient(135deg,#b8960c,#d4af37);color:#fff;font-size:0.72rem;font-weight:600;cursor:pointer;">זהב</button>
-            </div>
-            <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:6px;">סוג פנל</div>
-            <div style="display:flex;gap:6px;margin-bottom:12px;">
-                <button class="sd-panel-btn active" data-panel="solid" onclick="updateSlidingDoor('doorPanelType','solid')"
-                    style="flex:1;padding:7px 4px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.78rem;font-weight:600;cursor:pointer;">חלק</button>
-                <button class="sd-panel-btn" data-panel="glass" onclick="updateSlidingDoor('doorPanelType','glass')"
-                    style="flex:1;padding:7px 4px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.78rem;font-weight:600;cursor:pointer;">זכוכית</button>
-                <button class="sd-panel-btn" data-panel="mirror" onclick="updateSlidingDoor('doorPanelType','mirror')"
-                    style="flex:1;padding:7px 4px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.78rem;font-weight:600;cursor:pointer;">מראה</button>
-            </div>
             <div class="mobile-dim-row">
                 <span class="mobile-dim-label">דלתות / עמודות</span>
                 <div class="mobile-stepper">
@@ -2614,6 +2590,24 @@
         <button class="mobile-panel-close" onclick="closeMobilePanel()"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="mobile-panel-body">
+        <div id="mobile-sliding-colors-block" style="display:none;margin-bottom:14px;">
+            <div class="mobile-section-title" style="margin-top:0;"><i class="fa-solid fa-arrows-left-right" style="margin-left:5px;"></i> דלתות הזזה</div>
+            <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:6px;">צבע פרזול</div>
+            <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px;">
+                <button class="sd-profile-btn" data-color="nickel" onclick="updateSlidingDoor('profileColor','nickel')"
+                    style="flex:1;min-width:55px;padding:5px 3px;border-radius:7px;border:1.5px solid var(--border);background:linear-gradient(135deg,#c8c8c8,#e8e8e8);color:#333;font-size:0.72rem;font-weight:600;cursor:pointer;">ניקל</button>
+                <button class="sd-profile-btn" data-color="black" onclick="updateSlidingDoor('profileColor','black')"
+                    style="flex:1;min-width:55px;padding:5px 3px;border-radius:7px;border:1.5px solid var(--border);background:#222;color:#fff;font-size:0.72rem;font-weight:600;cursor:pointer;">שחור</button>
+                <button class="sd-profile-btn" data-color="white" onclick="updateSlidingDoor('profileColor','white')"
+                    style="flex:1;min-width:55px;padding:5px 3px;border-radius:7px;border:1.5px solid var(--border);background:#f5f5f5;color:#333;font-size:0.72rem;font-weight:600;cursor:pointer;">לבן</button>
+                <button class="sd-profile-btn" data-color="cream" onclick="updateSlidingDoor('profileColor','cream')"
+                    style="flex:1;min-width:55px;padding:5px 3px;border-radius:7px;border:1.5px solid var(--border);background:#f0e8d0;color:#555;font-size:0.72rem;font-weight:600;cursor:pointer;">שמנת</button>
+                <button class="sd-profile-btn" data-color="gold_matte" onclick="updateSlidingDoor('profileColor','gold_matte')"
+                    style="flex:1;min-width:55px;padding:5px 3px;border-radius:7px;border:1.5px solid var(--border);background:linear-gradient(135deg,#b8960c,#d4af37);color:#fff;font-size:0.72rem;font-weight:600;cursor:pointer;">זהב</button>
+            </div>
+            <div id="mobile-sd-door-panels-container" style="margin-bottom:10px;"></div>
+            <div class="mobile-panel-divider"></div>
+        </div>
         <div class="color-part-tabs" style="margin-bottom:15px;">
             <button class="part-tab-btn active" data-part="materialBody">גוף</button>
             <button class="part-tab-btn" data-part="materialInternal">פנים</button>
@@ -3170,7 +3164,7 @@
 <script src="auth.js?v=20261116kitchen"></script>
 <script src="trial-watermark.js?v=20261008trial"></script>
 <script src="egger-colors.js?v=20261116eggerKeep1"></script>
-<script src="state.js?v=20261116kitEdit1"></script>
+<script src="state.js?v=20261116sdColors1"></script>
 <script src="quick-calc.js?v=20261029shoe"></script>
 <script src="bathroom-preset.js?v=20261008types"></script>
 <script src="kitchen-preset.js?v=20261116kitEdit1"></script>
@@ -3186,7 +3180,7 @@
 <script src="bluran-color-picker.js?v=20261116bluran"></script>
 <script src="formex-color-picker.js?v=20261116formexTex1"></script>
 <script src="room-finishes.js?v=20261110gloss"></script>
-<script src="ui.js?v=20261116eggerKeep1"></script>
+<script src="ui.js?v=20261116sdColors1"></script>
 <script src="mirror-cabinet.js?v=20261110doormirror"></script>
 <script src="mobile.js?v=20261029inthandle"></script>
 <script src="part-paint.js?v=20261104egger"></script>

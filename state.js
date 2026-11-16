@@ -1044,6 +1044,7 @@ function _applyPresetCore(presetId, rightPos, leftPos) {
     if (cornerSection) cornerSection.style.display = (_isSliding || _hasWings) ? 'none' : '';
     if (plinthModelRow) plinthModelRow.style.display = _isSliding ? 'none' : '';
     if (mobilePlinthModelRow) mobilePlinthModelRow.style.display = _isSliding ? 'none' : '';
+    if (typeof window._syncSlidingColorsBlock === 'function') window._syncSlidingColorsBlock(_isSliding);
 
     // Linear/bathroom cabinet: go directly to front/edit view (no wings to orbit around)
     // Corner/walkin: stay in 3D so user sees the full layout
@@ -1093,6 +1094,7 @@ window._restorePresetUI = function() {
     if (cornerSection) cornerSection.style.display = (_isSliding || _hasWings) ? 'none' : '';
     if (plinthModelRow) plinthModelRow.style.display = _isSliding ? 'none' : '';
     if (mobilePlinthModelRow) mobilePlinthModelRow.style.display = _isSliding ? 'none' : '';
+    if (typeof window._syncSlidingColorsBlock === 'function') window._syncSlidingColorsBlock(_isSliding);
 
     // Show/hide preset position menu for corner presets
     const ppm = document.getElementById('preset-position-menu');
@@ -1262,6 +1264,7 @@ window._resetEditorToDefaultLinearCabinet = function() {
     if (cornerSection) cornerSection.style.display = '';
     if (plinthModelRow) plinthModelRow.style.display = '';
     if (mobilePlinthModelRow) mobilePlinthModelRow.style.display = '';
+    if (typeof window._syncSlidingColorsBlock === 'function') window._syncSlidingColorsBlock(false);
 
     if (typeof _setFreeTabActive === 'function') _setFreeTabActive(true);
     if (typeof window._updateRoomWallUI === 'function') window._updateRoomWallUI();
@@ -1857,12 +1860,16 @@ window.syncSidebarToWing = function() {
     const mobileSlidingSection = document.getElementById('mobile-sliding-section');
     const plinthModelRowEl = document.getElementById('plinth-model-row');
     const mobilePlinthModelRowEl = document.getElementById('mobile-plinth-model-row');
-    if (sdSection) sdSection.style.display = (isSliding && !_isUUEdit) ? '' : 'none';
+    const showSlidingStruct = isSliding && !_isUUEdit;
+    if (sdSection) sdSection.style.display = showSlidingStruct ? '' : 'none';
     if (sideUnitSectionEl) sideUnitSectionEl.style.display = (isSliding || _isUUEdit || _isFCEditSb) ? 'none' : '';
     if (cornerSectionEl) cornerSectionEl.style.display = (isSliding || isWingPreset || _isUUEdit) ? 'none' : '';
     if (mobileSlidingSection) mobileSlidingSection.style.display = isSliding ? '' : 'none';
     if (plinthModelRowEl) plinthModelRowEl.style.display = isSliding ? 'none' : '';
     if (mobilePlinthModelRowEl) mobilePlinthModelRowEl.style.display = isSliding ? 'none' : '';
+    if (typeof window._syncSlidingColorsBlock === 'function') {
+        window._syncSlidingColorsBlock(showSlidingStruct);
+    }
     if (isSliding && w.slidingDoor) {
         const sd = w.slidingDoor;
         // Auto-recalculate door count if not manually set
@@ -2135,6 +2142,30 @@ window._updateMaterialTabVisibility = function(w) {
         const currentMat = w[activePart] || w.materialBody || 'white_matte';
         const matBtn = document.querySelector(`.material-btn[data-mat="${currentMat}"]`);
         if (matBtn) matBtn.classList.add('active');
+        window._syncGlassTintPanel(w);
+        return;
+    }
+
+    // Sliding wardrobe: door types/colors live in צבעים; hide unrelated part tabs
+    if (state.presetId === 'sliding') {
+        _applyPartTabLabels(_partTabDefaultLabels);
+        const slidingAllowed = new Set(['materialBody', 'materialInternal', 'materialBack', 'glassTint']);
+        const hasGlass = _wingHasGlass(w);
+        document.querySelectorAll('.part-tab-btn[data-part]').forEach(btn => {
+            const part = btn.getAttribute('data-part');
+            if (part === 'glassTint') btn.style.display = hasGlass ? '' : 'none';
+            else btn.style.display = slidingAllowed.has(part) ? '' : 'none';
+        });
+        const activePart = w.activeColorPart || 'materialBody';
+        if (!slidingAllowed.has(activePart) || (activePart === 'glassTint' && !hasGlass)) {
+            w.activeColorPart = 'materialBody';
+            document.querySelectorAll('.part-tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.part-tab-btn[data-part="materialBody"]').forEach(b => b.classList.add('active'));
+            document.querySelectorAll('.material-btn').forEach(b => b.classList.remove('active'));
+            const fallbackMat = w.materialBody || 'white_matte';
+            const fallbackBtn = document.querySelector(`.material-btn[data-mat="${fallbackMat}"]`);
+            if (fallbackBtn) fallbackBtn.classList.add('active');
+        }
         window._syncGlassTintPanel(w);
         return;
     }

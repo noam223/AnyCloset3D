@@ -629,11 +629,29 @@ window.updateDeskDrawerCountInput = function(val) {
 }
 
 // ---- Per-door panel type tabs for sliding wardrobe sidebar ----
+/** Show/hide sliding door color UI inside the צבעים tab (desktop + mobile). */
+window._syncSlidingColorsBlock = function(show) {
+    const visible = !!show;
+    const desk = document.getElementById('sliding-colors-block');
+    const mob = document.getElementById('mobile-sliding-colors-block');
+    if (desk) desk.style.display = visible ? '' : 'none';
+    if (mob) mob.style.display = visible ? '' : 'none';
+    if (visible && typeof window._rebuildDoorPanelTabs === 'function') {
+        window._rebuildDoorPanelTabs();
+    }
+};
+
 window._rebuildDoorPanelTabs = function() {
-    const container = document.getElementById('sd-door-panels-container');
-    if (!container) return;
+    const containers = [
+        document.getElementById('sd-door-panels-container'),
+        document.getElementById('mobile-sd-door-panels-container')
+    ].filter(Boolean);
+    if (!containers.length) return;
     const sd = getSlidingDoor();
-    if (!sd || !sd.enabled) { container.innerHTML = ''; return; }
+    if (!sd || !sd.enabled) {
+        containers.forEach(c => { c.innerHTML = ''; });
+        return;
+    }
     const numDoors = sd.numDoors || 2;
     if (!sd.doorPanels || sd.doorPanels.length < numDoors) {
         if (!sd.doorPanels) sd.doorPanels = [];
@@ -751,7 +769,7 @@ window._rebuildDoorPanelTabs = function() {
         html += `</div>`;
     }
 
-    container.innerHTML = html;
+    containers.forEach(c => { c.innerHTML = html; });
 };
 
 window._toggleHoneycombColumnMerge = function(leftColIdx, startR, endR) {
@@ -10153,6 +10171,7 @@ window._applyLoadedJsonProject = function(data, opts) {
             if (cuSection) cuSection.style.display = isSliding ? 'none' : '';
             if (plinthRow) plinthRow.style.display = isSliding ? 'none' : '';
             if (mobilePlinthRow) mobilePlinthRow.style.display = isSliding ? 'none' : '';
+            if (typeof window._syncSlidingColorsBlock === 'function') window._syncSlidingColorsBlock(isSliding);
             document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
             const activePresetBtn = document.getElementById(`preset-btn-${data.presetId}`);
             if (activePresetBtn) activePresetBtn.classList.add('active');
