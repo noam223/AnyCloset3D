@@ -170,13 +170,20 @@ function _makeKitchenCornerArm(side, opts) {
 }
 
 function _applyKitDim(dim, value) {
+    // Width never goes through updateDim for kitchen — that path rescales units.
+    if (dim === 'width') {
+        const cw = _getKitWing();
+        if (!cw) return;
+        if (!cw.columns || !cw.columns.length) cw.width = value;
+        window._kitchenCommitRunWidth(cw);
+        return;
+    }
     if (typeof updateDim === 'function') {
         updateDim(dim, null, value);
         return;
     }
     const cw = _getKitWing();
     if (!cw) return;
-    if (dim === 'width') cw.width = value;
     if (dim === 'height') cw.globalHeight = value;
     if (dim === 'depth') cw.depth = value;
 }
@@ -216,7 +223,7 @@ window._kitchenGapBetweenUnits = function() {
 
 /**
  * Commit kitchen run width from columns without proportional rescale.
- * Wardrobe updateDim rescale was crushing fixed 60cm units (parseInt + shared-wall math).
+ * Wardrobe updateDim rescale was crushing fixed 60cm units.
  */
 window._kitchenCommitRunWidth = function(wing) {
     wing = wing || _getKitWing();
@@ -230,14 +237,15 @@ window._kitchenCommitRunWidth = function(wing) {
         newW = window._kitchenWidthFromColumns(cols, t);
     }
     wing.width = newW;
-    // state.width proxies the active wing — keep UI inputs in sync without updateDim rescale
     try {
         const wEl = document.getElementById('inp-width');
         const nEl = document.getElementById('inp-num-width');
         const pill = document.getElementById('dim-pill-width');
+        const mobile = document.getElementById('mobile-inp-num-width');
         if (wEl) wEl.value = newW;
         if (nEl) nEl.value = newW;
         if (pill) pill.value = Math.round(newW);
+        if (mobile) mobile.value = newW;
     } catch (e) { /* DOM may be unavailable during early init */ }
     return newW;
 };
@@ -611,7 +619,7 @@ window._kitchenAddUnit = function(side) {
     cw.columns = side === 'left' ? [newCol].concat(liveCols) : liveCols.concat([newCol]);
     const isCenterArm = state.activeWing === 'center' || (!state.wings.left && !state.wings.right);
     if (isCenterArm) state.columns = cw.columns;
-    // Keep unit carcass widths intact — grow the run by 2 side walls + unit (no wardrobe rescale)
+    // Keep unit carcass widths intact — grow the run by 2 side walls + unit
     window._kitchenCommitRunWidth(cw);
 
     if (typeof _fixEdgeColumnMerges === 'function') _fixEdgeColumnMerges();
@@ -638,7 +646,6 @@ window._kitchenRemoveUnitAt = function(idx) {
     cw.columns = cols.slice(0, idx).concat(cols.slice(idx + 1));
     const isCenterArm = state.activeWing === 'center' || (!state.wings.left && !state.wings.right);
     if (isCenterArm) state.columns = cw.columns;
-    // Shrink run from remaining unit carcasses (preserve their widths — no proportional crush)
     window._kitchenCommitRunWidth(cw);
 
     // Clear selection so UI doesn't point at a removed column
@@ -709,7 +716,7 @@ window._syncKitchenDeleteSelectedUI = function() {
     ['btn-kitchen-remove-selected', 'mobile-btn-kitchen-remove-selected'].forEach(function(id) {
         const btn = document.getElementById(id);
         if (!btn) return;
-        btn.style.display = isKit ? '' : 'none';
+        btn.style.display = isKit ? 'inline-flex' : 'none';
         btn.disabled = !hasSel;
         btn.style.opacity = hasSel ? '1' : '0.45';
         btn.title = hasSel
