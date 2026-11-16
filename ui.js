@@ -14744,11 +14744,18 @@ window._editCartItemNow = function(index) {
     state.wingEditSnapshot = null;
 
     // Reset viewMode and orbit state based on preset type
-    // Linear/sliding cabinets use front view; corner/walkin use 3d view
+    // Linear / kitchen / bathroom use front edit view; classic corner / walk-in use 3d
     const _loadedPreset = state.presetId || 'linear';
-    const _isLinearPreset = (_loadedPreset === 'linear' || _loadedPreset === 'sliding' ||
-        _loadedPreset === 'writing-desk' || _loadedPreset === 'corner-unit');
-    if (_isLinearPreset) {
+    const _isFrontEditPreset = (_loadedPreset === 'linear' || _loadedPreset === 'sliding' ||
+        _loadedPreset === 'writing-desk' || _loadedPreset === 'corner-unit' ||
+        _loadedPreset === 'kitchen' || _loadedPreset === 'bathroom');
+    // Kitchen L-corner keeps a 3d camera so both arms are visible
+    const _kitchenIsL = _loadedPreset === 'kitchen' && !!(
+        state.wings && ((state.wings.left && state.wings.left.kitchenCornerL) ||
+            (state.wings.right && state.wings.right.kitchenCornerL) ||
+            (state.wings.center && state.wings.center.kitchenCornerL && (state.wings.left || state.wings.right)))
+    );
+    if (_isFrontEditPreset && !_kitchenIsL) {
         state.viewMode = 'front';
         window._orbitFree = false;
     } else {

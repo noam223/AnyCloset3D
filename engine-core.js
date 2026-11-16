@@ -4887,11 +4887,21 @@ function updateCameraView() {
             camera.position.set(targetX + targetDistance * 0.6, maxColH * 0.8, targetDistance * 0.8);
             controls.target.set(targetX, maxColH / 2, 0);
         }
-        controls.enableRotate = true; container.classList.remove('front-mode');
+        controls.enableRotate = true;
         scene.background = new THREE.Color(0xeceff1);
         dirLight.position.set(120, 510, 600);
         window._applyLighting('studio');
-        dimLayer.style.display = 'none'; buttonsLayer.style.display = 'none';
+        // Kitchen (incl. ר corner) still needs cell pills / + buttons while in 3d.
+        // front-mode here is only for the arrow cursor — rotate stays enabled above.
+        if (state.presetId === 'kitchen') {
+            container.classList.add('front-mode');
+            dimLayer.style.display = 'block';
+            buttonsLayer.style.display = 'block';
+        } else {
+            container.classList.remove('front-mode');
+            dimLayer.style.display = 'none';
+            buttonsLayer.style.display = 'none';
+        }
         floor.visible = true;
         controls.enabled = true;
         controls.update();
