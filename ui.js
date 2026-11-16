@@ -15031,7 +15031,6 @@ window.updateLeftSidebar = function(opts) {
                 </div>
             </div>
             <div class="cart-mini-actions">
-                <button class="cart-mini-btn btn-edit-mini" onclick="event.stopPropagation(); editCartItem(${index});" title="ערוך"><i class="fa-solid fa-pen"></i></button>
                 ${nested ? `<button class="cart-mini-btn btn-leave-space-mini" onclick="event.stopPropagation(); removeCabinetFromSpace(${index});" title="הוצא מהקבוצה"><i class="fa-solid fa-link-slash"></i></button>` : ''}
                 <button class="cart-mini-btn" onclick="event.stopPropagation(); duplicateCartItem(${index});" title="שכפל"><i class="fa-solid fa-copy"></i></button>
                 ${!nested && window._cartItemSplitSides(itemObj) ? `<button class="cart-mini-btn btn-split-mini" onclick="event.stopPropagation(); splitCartItem(${index});" title="פצל"><i class="fa-solid fa-object-ungroup"></i></button>` : ''}
