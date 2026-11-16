@@ -15120,9 +15120,10 @@ window.updateLeftSidebar = function(opts) {
         group.innerHTML = `
             <div class="cart-space-group-header">
                 <div class="cart-space-group-title"><i class="fa-solid fa-layer-group"></i> ${groupTitle}</div>
-                <div class="cart-space-group-meta">${entry.members.length} חלקים במרחב
-                    <button type="button" class="cart-mini-btn cart-space-group-dup" onclick="event.stopPropagation(); duplicateSpaceGroup('${entry.pairId}');" title="שכפל את כל הארונות שבמרחב כקבוצה חדשה — עם אותו סידור ומיקומים"><i class="fa-solid fa-clone"></i> שכפל קבוצה</button>
-                    <button type="button" class="cart-mini-btn cart-space-group-del" onclick="event.stopPropagation(); deleteSpaceGroup('${entry.pairId}');" title="מחק את כל הארונות שבמרחב — יעברו לפח, ניתן לבטל עם Ctrl+Z"><i class="fa-solid fa-trash"></i> מחק קבוצה</button>
+                <div class="cart-space-group-meta">${entry.members.length} חלקים במרחב</div>
+                <div class="cart-space-group-actions">
+                    <button type="button" class="cart-mini-btn cart-space-group-dup" onclick="event.stopPropagation(); duplicateSpaceGroup('${entry.pairId}');" title="שכפל את כל הארונות שבמרחב כקבוצה חדשה — עם אותו סידור ומיקומים"><i class="fa-solid fa-clone"></i> שכפל</button>
+                    <button type="button" class="cart-mini-btn cart-space-group-del" onclick="event.stopPropagation(); deleteSpaceGroup('${entry.pairId}');" title="מחק את כל הארונות שבמרחב — יעברו לפח, ניתן לבטל עם Ctrl+Z"><i class="fa-solid fa-trash"></i> מחק</button>
                 </div>
                 ${window._showPricing !== false ? `<div class="cart-space-group-price"><span dir="ltr">₪${groupPrice.toLocaleString()}</span> <span class="cart-space-group-install">+ <span dir="ltr">₪${groupInstall.toLocaleString()}</span> התקנה</span></div>` : ''}
             </div>

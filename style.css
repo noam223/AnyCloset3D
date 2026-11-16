@@ -1970,28 +1970,33 @@ body.touch-door-dragging, body.touch-door-dragging * { cursor: grabbing !importa
     color: var(--text-light);
     font-weight: 600;
 }
-.cart-space-group-meta {
+.cart-space-group-actions {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 6px;
+    margin-top: 6px;
 }
-.cart-mini-btn.cart-space-group-dup { margin-inline-start: auto; }
-.cart-mini-btn.cart-space-group-dup {
-    flex: none;
+.cart-mini-btn.cart-space-group-dup,
+.cart-mini-btn.cart-space-group-del {
+    flex: 1 1 auto;
+    width: auto;
     min-width: 0;
+    max-width: 100%;
+    height: auto;
+    min-height: 28px;
+    max-height: none;
     padding: 4px 10px;
     font-size: 0.74rem;
     border-radius: 999px;
+    justify-content: center;
+}
+.cart-mini-btn.cart-space-group-dup {
     color: var(--secondary);
     background: #eff6ff;
     border: 1.5px solid rgba(37,99,235,0.25);
 }
 .cart-mini-btn.cart-space-group-del {
-    flex: none;
-    min-width: 0;
-    padding: 4px 10px;
-    font-size: 0.74rem;
-    border-radius: 999px;
     color: #dc2626;
     background: #fef2f2;
     border: 1.5px solid rgba(220,38,38,0.25);
