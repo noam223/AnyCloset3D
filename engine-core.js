@@ -7552,10 +7552,16 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
                 }
             }
         } else {
-            _ppPartId = `top_c${c}`;
-            const topMesh = createBoard(col.width, t, bodyD, colCenterX, col.height - t/2, 0);
-            _ppPartId = '';
-            _applyHorizBoardUV(topMesh, currentX, col.width, bodyD, state.width);
+            // Kitchen sink: skip 17mm carcass roof so the basin can hang through the worktop cutout
+            const _skipRoofForKitSink = state.presetId === 'kitchen'
+                && typeof window._kitchenColHasSink === 'function'
+                && window._kitchenColHasSink(col);
+            if (!_skipRoofForKitSink) {
+                _ppPartId = `top_c${c}`;
+                const topMesh = createBoard(col.width, t, bodyD, colCenterX, col.height - t/2, 0);
+                _ppPartId = '';
+                _applyHorizBoardUV(topMesh, currentX, col.width, bodyD, state.width);
+            }
             if(!isBP && _isActiveWingBuild) dragHandlesData.roofs.push({ colIndex: c, x: colCenterX, y: col.height });
         }
 

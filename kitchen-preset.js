@@ -430,6 +430,8 @@ window._kitchenLinearMeters = function() {
     ['center', 'left', 'right'].forEach(function(s) {
         const w = state.wings && state.wings[s];
         if (!w) return;
+        // Empty corner stub is only an L anchor — do not bill its width
+        if (s === 'center' && w.kitchenCornerL && (!w.columns || !w.columns.length)) return;
         // Full-corner arm: count L block + return units (empty arm stores size as width only once)
         if (w.wingPosition === 'full_corner' && w.fullCorner) {
             const fc = w.fullCorner.size || 90;
@@ -510,10 +512,20 @@ window._kitchenAddUnit = function(side) {
             floorOffset: 0, topPanel: true, sinkPanel: false, noPlinth: false
         };
     newCol.width = KIT_UNIT_W;
-    newCol.topPanel = true;
     newCol.sinkPanel = false;
     newCol.height = cw.globalHeight || KIT_HEIGHT;
-    newCol.noPlinth = false;
+    // Preserve upper-unit flags — do not force base plinth/worktop onto wall cabinets
+    const isUpper = cw.kitchenRole === 'upper' ||
+        (typeof window._isKitchenUpper === 'function' && window._isKitchenUpper());
+    if (isUpper) {
+        newCol.topPanel = false;
+        newCol.noPlinth = true;
+        newCol.spaceBottomPanel = true;
+    } else {
+        newCol.topPanel = true;
+        newCol.noPlinth = false;
+        newCol.spaceBottomPanel = false;
+    }
 
     cw.columns = side === 'left' ? [newCol].concat(liveCols) : liveCols.concat([newCol]);
     const isCenterArm = state.activeWing === 'center' || (!state.wings.left && !state.wings.right);
