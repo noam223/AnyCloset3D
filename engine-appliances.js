@@ -714,11 +714,11 @@ function addKitchenAppliancesToCell(parent, opts) {
     const m = _kitTemplate(type).clone();
     let y = opts.bottomY;
     let z = frontZ - T.D / 2;
+    const colTop = (opts.colTopY != null)
+        ? opts.colTopY
+        : (opts.bottomY + (opts.cellH || 80));
     if (type === 'sink') {
         // Rim at carcass top (worktop underside / קו אפס של המשטח)
-        const colTop = (opts.colTopY != null)
-            ? opts.colTopY
-            : (opts.bottomY + (opts.cellH || 80));
         y = colTop;
         z = frontZ - T.D / 2 - 1; // slight inset from front face
         m.userData.kitchenSinkAtCounter = true;
@@ -728,6 +728,12 @@ function addKitchenAppliancesToCell(parent, opts) {
             w: T.W,
             d: T.D
         };
+    } else if (type === 'dishwasher') {
+        // Freestanding on the floor (behind external plinth), like a real under-counter DW
+        y = 0;
+    } else if (type === 'oven') {
+        // Sit on carcass floor board, capped under worktop
+        y = Math.max(opts.bottomY || 0, colTop - T.H);
     }
     m.position.set(opts.x, y, z);
     parent.add(m);

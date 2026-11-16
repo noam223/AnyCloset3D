@@ -5212,8 +5212,12 @@ window.toggleCellAppliance = function(type) {
         if (!isKitType && R.singleHeight && h < R.singleHeight) { tooShortH = h; return; }
         if (isKitType) {
             const needH = (R.dims[type] && R.dims[type].H) || 0;
-            // Sink is shallow; dishwasher/oven need enough cell height
-            if (type !== 'sink' && needH && h < needH - 5) { tooShortH = h; return; }
+            // Sink is shallow. Dishwasher/oven sit in the full carcass bay (floor→worktop),
+            // so compare against column height — not the inner shelf-bay cellH (~74cm with plinth).
+            const hCheck = (type === 'dishwasher' || type === 'oven')
+                ? (col.height || h)
+                : h;
+            if (type !== 'sink' && needH && hCheck < needH - 5) { tooShortH = hCheck; return; }
             // One kitchen appliance per cell in v1
             comp.appliances = [type];
         } else {
