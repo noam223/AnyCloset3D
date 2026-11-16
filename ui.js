@@ -4168,8 +4168,68 @@ function _positionColumnQuickEditPanel() {
     panel.style.top = `${y}px`;
 }
 
+/** Project wing-local overlays (cell dims / + buttons / width labels) to canvas pixels. */
+function _positionWingCellOverlays() {
+    if (!container || typeof camera === 'undefined') return;
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+    const depth = (typeof state.depth === 'number' && state.depth > 0) ? state.depth : 56;
+
+    const projectWingPoint = (localX, localY) => {
+        const localPt = new THREE.Vector3(localX, localY, depth / 2);
+        if (window._activeWingGroup) {
+            window._activeWingGroup.updateMatrixWorld(true);
+            localPt.applyMatrix4(window._activeWingGroup.matrixWorld);
+        } else if (window.cabinetGroup) {
+            window.cabinetGroup.updateMatrixWorld(true);
+            localPt.applyMatrix4(window.cabinetGroup.matrixWorld);
+        }
+        return localPt.project(camera);
+    };
+
+    document.querySelectorAll('.dim-container, .select-all-col-btn, .col-template-btn, .sub-cell-btn, .cell-select-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn, .led-cell-icon, .tv-size-btn').forEach(el => {
+        if (el.dataset.x3d == null || el.dataset.y3d == null) return;
+        const pos = projectWingPoint(parseFloat(el.dataset.x3d), parseFloat(el.dataset.y3d));
+        // Behind camera / degenerate projection — hide
+        if (!isFinite(pos.x) || !isFinite(pos.y) || pos.z > 1) {
+            el.style.visibility = 'hidden';
+            return;
+        }
+        el.style.visibility = '';
+        let x = (pos.x * .5 + .5) * cw;
+        let y = (-(pos.y * .5) + .5) * ch;
+
+        const w = el.offsetWidth || 50;
+        const h = el.offsetHeight || 24;
+
+        x = Math.max(w/2 + 5, Math.min(cw - w/2 - 5, x));
+        y = Math.max(h/2 + 5, Math.min(ch - h/2 - 5, y));
+
+        el.style.left = `${x}px`;
+        el.style.top = `${y}px`;
+    });
+
+    document.querySelectorAll('#col-widths-layer .col-width-label').forEach(el => {
+        if (!el.dataset.x3d) return;
+        const pos = projectWingPoint(parseFloat(el.dataset.x3d), parseFloat(el.dataset.y3d));
+        if (!isFinite(pos.x) || !isFinite(pos.y) || pos.z > 1) {
+            el.style.visibility = 'hidden';
+            return;
+        }
+        el.style.visibility = '';
+        let x = (pos.x * .5 + .5) * cw;
+        let y = (-(pos.y * .5) + .5) * ch;
+        const w = el.offsetWidth || 50;
+        const h = el.offsetHeight || 22;
+        x = Math.max(w/2 + 5, Math.min(cw - w/2 - 5, x));
+        y = Math.max(h/2 + 5, Math.min(ch - h/2 - 5, y));
+        el.style.left = `${x}px`;
+        el.style.top = `${y}px`;
+    });
+}
+
 function updateOverlaysPosition() {
-    // In 3D mode: only handle FC cell buttons and FC panel (if in FC edit mode)
+    // In 3D mode: FC cell buttons / panel, plus kitchen cell overlays (kitchen edits in 3D)
     const isFCEditMode3d = state.wingEditMode &&
         (state.activeWing === 'full_corner_right' || state.activeWing === 'full_corner_left');
 
@@ -4207,58 +4267,20 @@ function updateOverlaysPosition() {
                 fcPanel.style.top = `${fcY}px`;
             }
         }
-        // Kitchen uses 3D + column quick-edit — was never positioned here, so it sat under #top-bar
-        if (state.presetId === 'kitchen') _positionColumnQuickEditPanel();
+        // Kitchen (base + upper-unit edit) keeps cell pills in 3D — must project every frame
+        // or they stay at 0,0 / opacity-0 and "עריכת תא" looks broken after exit/re-enter.
+        if (state.presetId === 'kitchen' || state._activeUpperUnit) {
+            _positionWingCellOverlays();
+            _positionColumnQuickEditPanel();
+            if (typeof updateDragHandlesPosition === 'function') updateDragHandlesPosition();
+        }
         return;
     }
 
     // Remove FC cell buttons when not in 3D
     document.querySelectorAll('.fc-cell-btn').forEach(el => el.remove());
 
-    const cw = container.clientWidth;
-    const ch = container.clientHeight;
-
-    // Helper: convert local wing coords (x, y) to world 3D, then project to 2D screen
-    const projectWingPoint = (localX, localY) => {
-        const localPt = new THREE.Vector3(localX, localY, state.depth / 2);
-        if (window._activeWingGroup) {
-            window._activeWingGroup.updateMatrixWorld(true);
-            localPt.applyMatrix4(window._activeWingGroup.matrixWorld);
-        } else if (window.cabinetGroup) {
-            window.cabinetGroup.updateMatrixWorld(true);
-            localPt.applyMatrix4(window.cabinetGroup.matrixWorld);
-        }
-        return localPt.project(camera);
-    };
-
-    document.querySelectorAll('.dim-container, .select-all-col-btn, .col-template-btn, .sub-cell-btn, .cell-select-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn, .led-cell-icon, .tv-size-btn').forEach(el => {
-        const pos = projectWingPoint(parseFloat(el.dataset.x3d), parseFloat(el.dataset.y3d));
-        let x = (pos.x * .5 + .5) * cw;
-        let y = (-(pos.y * .5) + .5) * ch;
-
-        const w = el.offsetWidth || 50;
-        const h = el.offsetHeight || 24;
-
-        x = Math.max(w/2 + 5, Math.min(cw - w/2 - 5, x));
-        y = Math.max(h/2 + 5, Math.min(ch - h/2 - 5, y));
-
-        el.style.left = `${x}px`;
-        el.style.top = `${y}px`;
-    });
-
-    // ---- Column width labels (always-visible layer) ----
-    document.querySelectorAll('#col-widths-layer .col-width-label').forEach(el => {
-        if (!el.dataset.x3d) return;
-        const pos = projectWingPoint(parseFloat(el.dataset.x3d), parseFloat(el.dataset.y3d));
-        let x = (pos.x * .5 + .5) * cw;
-        let y = (-(pos.y * .5) + .5) * ch;
-        const w = el.offsetWidth || 50;
-        const h = el.offsetHeight || 22;
-        x = Math.max(w/2 + 5, Math.min(cw - w/2 - 5, x));
-        y = Math.max(h/2 + 5, Math.min(ch - h/2 - 5, y));
-        el.style.left = `${x}px`;
-        el.style.top = `${y}px`;
-    });
+    _positionWingCellOverlays();
 
     if (state.activeEditCol !== -1 && state.columns[state.activeEditCol] && state.viewMode === 'front') {
         _positionColumnQuickEditPanel();
@@ -7127,7 +7149,9 @@ window.addEventListener('pointerup', () => {
 
 function buildDragHandlesUI() {
     dragLayer.innerHTML = '';
-    if(state.viewMode !== 'front') {
+    // Kitchen edits in 3D (incl. upper-unit inline) — still need shelf / roof drag handles
+    const _kit3dEdit = state.presetId === 'kitchen' && state.viewMode === '3d';
+    if(state.viewMode !== 'front' && !_kit3dEdit) {
         if (state.viewMode === '3d' && typeof window._buildSpaceCabMoveHandle === 'function') window._buildSpaceCabMoveHandle();
         return;
     }
@@ -9723,7 +9747,9 @@ function bindUI() {
         const isOverUI = e.target.closest('#dimensions-layer, #buttons-layer, #drag-handles-layer, #col-widths-layer, #column-quick-edit, #bottom-floating-toolbar');
         const isSelected = state.selection.colIndex !== -1;
         const widthFocused = document.activeElement && document.activeElement.closest && document.activeElement.closest('#col-widths-layer');
-        const shouldShowUI = (hoverCol !== -1) || isOverUI || isSelected || state.hoveredDesk || widthFocused;
+        // Upper-unit / kitchen edit: keep cell overlays visible without requiring hover
+        const shouldShowUI = (hoverCol !== -1) || isOverUI || isSelected || state.hoveredDesk || widthFocused
+            || !!state._activeUpperUnit || (state.presetId === 'kitchen' && state.viewMode === '3d');
         _setCanvasHoverLayersVisible(shouldShowUI);
     });
 

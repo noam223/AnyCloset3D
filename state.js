@@ -428,6 +428,9 @@ window._enterUpperUnitEdit = function(parentId) {
         if (banner) banner.style.display = 'flex';
         syncSidebarToWing();
         buildCabinet();
+        if (typeof updateCameraView === 'function') updateCameraView();
+        if (typeof _setCanvasHoverLayersVisible === 'function') _setCanvasHoverLayersVisible(true);
+        if (typeof updateOverlaysPosition === 'function') updateOverlaysPosition();
     }
 };
 
@@ -440,6 +443,8 @@ window._exitUpperUnitEdit = function() {
     if (banner) banner.style.display = 'none';
     syncSidebarToWing();
     buildCabinet();
+    if (typeof updateCameraView === 'function') updateCameraView();
+    if (typeof updateOverlaysPosition === 'function') updateOverlaysPosition();
 };
 
 window.toggleUpperUnit = function(wingId) {
@@ -2421,7 +2426,10 @@ function _makeHistorySnapshot() {
         activeWing: state.activeWing,
         presetId: state.presetId,
         wings: state.wings,
-        partColors: state.partColors || {}
+        partColors: state.partColors || {},
+        // Keep upper-unit inline edit across undo/redo — clearing it broke cell overlays
+        _activeUpperUnit: state._activeUpperUnit || null,
+        _activeUpperUnitParent: state._activeUpperUnitParent || null
     }));
 }
 
@@ -2754,11 +2762,10 @@ function restoreHistoryState() {
     // Always exit wing edit mode when restoring history (prevents stale wingEditMode)
     state.wingEditMode = false;
     state.wingEditSnapshot = null;
-    // Clear inline upper unit edit state
-    state._activeUpperUnit = null;
-    state._activeUpperUnitParent = null;
-    const _uuBanner4 = document.getElementById('upper-unit-edit-banner');
-    if (_uuBanner4) _uuBanner4.style.display = 'none';
+
+    // Remember UU edit before restore — legacy snapshots omit these fields
+    const _prevUU = state._activeUpperUnit;
+    const _prevUUParent = state._activeUpperUnitParent;
 
     // Restore wings (including any upperUnit_* wings)
     // First remove any upperUnit_* keys not in snapshot
@@ -2778,6 +2785,28 @@ function restoreHistoryState() {
     // Restore per-part color overrides
     state.partColors = snapshot.partColors ? JSON.parse(JSON.stringify(snapshot.partColors)) : {};
 
+    // Restore (or keep) inline upper-unit edit — UNDO used to always clear this and
+    // leave cell overlays pointing at the wrong wing / unpositioned in 3D.
+    let _restoreUU = snapshot._activeUpperUnit || null;
+    let _restoreUUParent = snapshot._activeUpperUnitParent || null;
+    if (!_restoreUU && _prevUU && state.wings[_prevUU]) {
+        _restoreUU = _prevUU;
+        _restoreUUParent = _prevUUParent || String(_prevUU).replace(/^upperUnit_/, '') || 'center';
+    }
+    if (_restoreUU && state.wings[_restoreUU]) {
+        state._activeUpperUnit = _restoreUU;
+        state._activeUpperUnitParent = _restoreUUParent
+            || String(_restoreUU).replace(/^upperUnit_/, '')
+            || 'center';
+        const _uuBanner4 = document.getElementById('upper-unit-edit-banner');
+        if (_uuBanner4) _uuBanner4.style.display = 'flex';
+    } else {
+        state._activeUpperUnit = null;
+        state._activeUpperUnitParent = null;
+        const _uuBanner4 = document.getElementById('upper-unit-edit-banner');
+        if (_uuBanner4) _uuBanner4.style.display = 'none';
+    }
+
     // Reset viewMode based on preset type (prevents stale 3d view when undoing to a linear cabinet)
     const _snapPreset = state.presetId || 'linear';
     const _snapIsLinear = (_snapPreset === 'linear' || _snapPreset === 'sliding');
@@ -2787,7 +2816,7 @@ function restoreHistoryState() {
     window._corner3dCamPositioned = false;
     window._frontCamPositioned = false;
     window._wingEditCamInit = false;
-    // Sync view button highlights
+    // Sync view button highlights (front = edit UI; kitchen stays in 3d camera)
     document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
     const _snapViewBtn = document.getElementById('btn-front-view');
     if (_snapViewBtn) _snapViewBtn.classList.add('active');
@@ -2811,6 +2840,10 @@ function restoreHistoryState() {
     // Restore preset UI (button highlights, section visibility, position menu)
     if (typeof window._restorePresetUI === 'function') window._restorePresetUI();
     buildCabinet(); updateCameraView(); calculatePrice();
+    if (state._activeUpperUnit || state.presetId === 'kitchen') {
+        if (typeof _setCanvasHoverLayersVisible === 'function') _setCanvasHoverLayersVisible(true);
+        if (typeof updateOverlaysPosition === 'function') updateOverlaysPosition();
+    }
     updateUndoRedoUI();
     setTimeout(() => state.isRestoring = false, 50);
 }
