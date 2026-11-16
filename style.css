@@ -1861,8 +1861,9 @@ body.touch-door-dragging, body.touch-door-dragging * { cursor: grabbing !importa
 }
 .cart-mini-thumb {
     width: 72px;
-    height: auto;
+    height: 72px;
     min-height: 72px;
+    max-height: 72px;
     border-radius: 0;
     overflow: hidden;
     flex-shrink: 0;
@@ -1872,12 +1873,14 @@ body.touch-door-dragging, body.touch-door-dragging * { cursor: grabbing !importa
     display: flex;
     align-items: center;
     justify-content: center;
-    align-self: stretch;
+    align-self: center;
 }
 .cart-mini-thumb img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
     object-position: center center;
     display: block;
 }
