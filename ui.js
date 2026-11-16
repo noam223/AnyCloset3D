@@ -5144,6 +5144,9 @@ window._syncKitchenApplianceToolbar = function() {
     if (btn) {
         btn.title = isKit ? 'כיור, מדיח ותנור' : 'מכונת כביסה, מייבש וטלוויזיה';
     }
+    if (isKit && typeof window._renderKitchenBrandExamples === 'function') {
+        window._renderKitchenBrandExamples();
+    }
 };
 
 /** Drop doors covering cells whose appliances protrude. Returns the number of doors removed. */

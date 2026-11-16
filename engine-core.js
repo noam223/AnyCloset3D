@@ -7888,7 +7888,8 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
                     window.addKitchenAppliancesToCell(_buildGroup, {
                         list: _kitList, x: colCenterX, bottomY: prevY,
                         cellW: col.width, cellH: compH, bodyD: bodyD, backT: backT,
-                        frontInset: _appInset
+                        frontInset: _appInset,
+                        brand: compData.applianceBrand || null
                     });
                 }
                 if (_laundList.length && typeof window.addLaundryAppliancesToCell === 'function') {

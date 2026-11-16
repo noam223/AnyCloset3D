@@ -10,6 +10,20 @@ const KIT_DEPTH  = 56;
 const KIT_UNIT_W = 60;
 const KIT_PLINTH = 10; // c9-ish
 
+/** Leading kitchen appliance brands commonly sold / represented in Israel (UI examples only). */
+window.KITCHEN_BRAND_EXAMPLES = [
+    { id: 'bosch', label: 'Bosch' },
+    { id: 'siemens', label: 'Siemens' },
+    { id: 'aeg', label: 'AEG' },
+    { id: 'miele', label: 'Miele' },
+    { id: 'samsung', label: 'Samsung' },
+    { id: 'lg', label: 'LG' },
+    { id: 'electrolux', label: 'Electrolux' },
+    { id: 'neff', label: 'Neff' },
+    { id: 'smeg', label: 'Smeg' },
+    { id: 'constructa', label: 'Constructa' }
+];
+
 function _getKitWing() {
     return state && state.wings && state.wings.center ? state.wings.center : null;
 }
@@ -219,7 +233,79 @@ function _updateKitchenSectionUI() {
     if (typeof window._syncKitchenApplianceToolbar === 'function') {
         window._syncKitchenApplianceToolbar();
     }
+    _renderKitchenBrandExamples();
 }
+
+function _renderKitchenBrandExamples() {
+    const host = document.getElementById('kitchen-brand-examples');
+    if (!host) return;
+    const brands = window.KITCHEN_BRAND_EXAMPLES || [];
+    if (!host.dataset.ready) {
+        host.innerHTML = brands.map(b =>
+            '<button type="button" class="kit-brand-chip" data-brand="' + b.id + '" ' +
+            'onclick="window._setKitchenApplianceBrand(\'' + b.id + '\')" ' +
+            'title="סמן מותג על המכשיר בתא הנבחר" ' +
+            'style="padding:5px 9px;border-radius:999px;border:1.5px solid var(--border);background:var(--bg-light);' +
+            'color:var(--text-dark);font-size:0.72rem;font-weight:700;cursor:pointer;font-family:inherit;">' +
+            b.label + '</button>'
+        ).join('');
+        host.dataset.ready = '1';
+    }
+    let current = '';
+    try {
+        if (state && state.selection && state.selection.colIndex >= 0 && state.selection.rows && state.selection.rows.length) {
+            const col = state.columns[state.selection.colIndex];
+            const comp = col && col.compartments && col.compartments[state.selection.rows[0]];
+            if (comp && Array.isArray(comp.appliances) && comp.appliances.length) {
+                current = comp.applianceBrand || '';
+            }
+        }
+    } catch (e) {}
+    host.querySelectorAll('.kit-brand-chip').forEach(btn => {
+        const on = btn.dataset.brand === current;
+        btn.classList.toggle('active', on);
+        btn.style.borderColor = on ? 'var(--accent)' : 'var(--border)';
+        btn.style.background = on ? 'rgba(99,102,241,0.12)' : 'var(--bg-light)';
+        btn.style.color = on ? 'var(--accent)' : 'var(--text-dark)';
+    });
+}
+
+window._setKitchenApplianceBrand = function(brandId) {
+    if (!window._isKitchenPreset()) return;
+    const brands = window.KITCHEN_BRAND_EXAMPLES || [];
+    const hit = brands.find(b => b.id === brandId);
+    if (!hit) return;
+    if (!state || state.selection.colIndex < 0 || !state.selection.rows || !state.selection.rows.length) {
+        if (typeof _showToast === 'function') _showToast('בחרו קודם תא עם מכשיר מטבח', 3200);
+        return;
+    }
+    const col = state.columns[state.selection.colIndex];
+    if (!col) return;
+    let changed = 0;
+    state.selection.rows.forEach(r => {
+        const comp = col.compartments && col.compartments[r];
+        if (!comp || comp.partition || !Array.isArray(comp.appliances) || !comp.appliances.length) return;
+        const hasKit = comp.appliances.some(t =>
+            typeof window._isKitchenApplianceType === 'function' && window._isKitchenApplianceType(t)
+        );
+        if (!hasKit) return;
+        if (comp.applianceBrand === brandId) delete comp.applianceBrand;
+        else comp.applianceBrand = brandId;
+        changed++;
+    });
+    if (!changed) {
+        if (typeof _showToast === 'function') _showToast('התא הנבחר לא מכיל כיור / מדיח / תנור', 3500);
+        return;
+    }
+    _renderKitchenBrandExamples();
+    if (typeof buildCabinet === 'function') buildCabinet();
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+};
+
+window._kitchenBrandLabel = function(brandId) {
+    const hit = (window.KITCHEN_BRAND_EXAMPLES || []).find(b => b.id === brandId);
+    return hit ? hit.label : '';
+};
 
 // Kitchen mode: grow/shrink width instead of equal redistribute
 (function() {
@@ -235,6 +321,7 @@ function _updateKitchenSectionUI() {
 })();
 
 window._updateKitchenSectionUI = _updateKitchenSectionUI;
+window._renderKitchenBrandExamples = _renderKitchenBrandExamples;
 
 window._setKitchenPresetButtonsVisible = function(visible) {
     ['preset-btn-kitchen', 'mobile-preset-btn-kitchen'].forEach(function(id) {
