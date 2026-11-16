@@ -7098,6 +7098,67 @@ body.viewer-mode #canvas-container canvas {
 }
 .btn-open-formex-palette:active { transform: translateY(0); }
 
+/* ── EGGER colours — collapsed toggle panel ── */
+.egger-palette-wrap {
+    width: 100%;
+}
+.btn-toggle-egger-palette {
+    width: 100%;
+    margin: 0 0 10px;
+    padding: 11px 14px;
+    border-radius: 10px;
+    border: 1.5px solid rgba(100, 116, 139, 0.4);
+    background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+    color: #334155;
+    font-size: 0.88rem;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.18s ease;
+}
+.btn-toggle-egger-palette:hover {
+    background: linear-gradient(135deg, #e2e8f0, #cbd5e1);
+    border-color: #64748b;
+    box-shadow: 0 4px 14px rgba(100, 116, 139, 0.18);
+    transform: translateY(-1px);
+}
+.btn-toggle-egger-palette:active { transform: translateY(0); }
+.egger-palette-wrap.has-selection .btn-toggle-egger-palette {
+    border-color: #0f766e;
+    background: linear-gradient(135deg, #ecfdf5, #ccfbf1);
+    color: #0f766e;
+}
+.egger-palette-count {
+    font-weight: 600;
+    opacity: 0.75;
+    font-size: 0.8rem;
+}
+.egger-palette-chevron {
+    margin-inline-start: auto;
+    font-size: 0.75rem;
+    transition: transform 0.2s ease;
+}
+.egger-palette-wrap.open .egger-palette-chevron {
+    transform: rotate(180deg);
+}
+.egger-palette-panel {
+    margin: 0 0 12px;
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+}
+.egger-palette-panel[hidden] {
+    display: none !important;
+}
+.egger-palette-panel .egger-all-grid {
+    margin: 0;
+}
+
 .bluran-palette-tabs {
     display: flex;
     flex-wrap: wrap;

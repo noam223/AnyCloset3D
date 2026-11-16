@@ -9298,7 +9298,7 @@ function bindUI() {
         // If sandwich is active and a no-sandwich color is currently selected on any part, reset it
         // Exception: materialExternal is allowed to keep any color (fronts are melamine in sandwich)
         if (isSandwich) {
-            const NO_SANDWICH = new Set(['c705','u727','w1200','u232','u604','u638','H1367','H1307','H1227','A427'].concat(window.EGGER_EXTRA_KEYS || []));
+            const NO_SANDWICH = new Set(['c705','A427'].concat(window.EGGER_ALL_KEYS || []));
             ['materialBody','materialInternal','materialDesk','materialOpenCell','materialBack'].forEach(part => {
                 if (NO_SANDWICH.has(state[part])) {
                     state[part] = 'white_matte';
@@ -9306,7 +9306,7 @@ function bindUI() {
             });
         }
         if (isMdf) {
-            const NO_MDF = new Set(['w1200','u604','u638','u727','u232','H1307','H1367','H1227'].concat(window.EGGER_EXTRA_KEYS || []));
+            const NO_MDF = new Set(window.EGGER_ALL_KEYS || []);
             ['materialBody','materialInternal','materialDesk','materialOpenCell','materialBack','materialExternal'].forEach(part => {
                 if (NO_MDF.has(state[part])) {
                     state[part] = 'white_matte';
@@ -9373,6 +9373,9 @@ function bindUI() {
             const matBtn = document.querySelector(`.material-btn[data-mat="${currentMat}"]`);
             if (matBtn) matBtn.classList.add('active');
             else if (currentMat === 'custom') document.getElementById('btn-upload-texture').classList.add('active');
+            if (typeof window._syncEggerPaletteActive === 'function') {
+                window._syncEggerPaletteActive(currentMat, { open: !!matBtn && !!matBtn.closest('.egger-palette-panel') });
+            }
         });
     });
 
@@ -9404,6 +9407,9 @@ function bindUI() {
             const targetBtn = e.target.classList.contains('material-btn') ? e.target : e.target.closest('.material-btn');
             targetBtn.classList.add('active');
             const matValue = targetBtn.getAttribute('data-mat');
+            if (typeof window._syncEggerPaletteActive === 'function') {
+                window._syncEggerPaletteActive(matValue, { open: !!targetBtn.closest('.egger-palette-panel') });
+            }
             // Special: "חלק עליון" material tab — apply color to upper unit wing
             if (state.activeColorPart === 'materialUpperUnit') {
                 if (typeof window.applyUpperUnitMaterial === 'function') window.applyUpperUnitMaterial(matValue);
