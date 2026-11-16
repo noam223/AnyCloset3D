@@ -8411,8 +8411,10 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
             // Shelf merged with a standalone corner desk: one board with the desk — desk color, flush front
             const _cuDeskMat = (!isBP && div.type === 'shelf') ? _cuMergedBoardMat(c, 'shelf', div.idx) : null;
             if (_cuDeskMat) boardMat = _cuDeskMat;
-            // Shelves inside a כוורת sit flush with the front; other shelves stay 2cm back
-            if (div.type === 'shelf' && !_cuDeskMat && !insideBlock) {
+            // Shelves inside a כוורת, and the shelf that closes it (above the doors
+            // below, or under whatever sits on top), sit flush with the front.
+            // Other shelves stay 2cm back.
+            if (div.type === 'shelf' && !_cuDeskMat && !insideBlock && !isBoundaryOfOpenCell) {
                 boardD = Math.max(t, boardD - _shelfFrontSetback);
                 boardZ -= _shelfFrontSetback / 2;
             }
