@@ -901,7 +901,7 @@ window._toggleDoors = function() {
 };
 
 // ---- Hinge hardware visibility toggle ----
-window._hingesVisible = true;
+window._hingesVisible = false;
 window._collectDoorMeshLists = function() {
     var main = (typeof doorMeshes !== 'undefined' && doorMeshes) ? doorMeshes : (window.doorMeshes || []);
     return [main, window._spaceCompanionDoorMeshes || [], window._roomExtraDoorMeshes || []];
