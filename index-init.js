@@ -29,6 +29,15 @@
         // On error, allow access — don't block the user
     }
 
+    // Kitchen preset is app-admin only — reveal button after session is known
+    try {
+        if (typeof window._initKitchenAdminGate === 'function') {
+            await window._initKitchenAdminGate();
+        }
+    } catch (e) {
+        console.warn('[kitchen] admin gate:', e);
+    }
+
     // Auth passed — show app unless a project is loading from URL
     var projectId = new URLSearchParams(window.location.search).get('project');
     if (projectId) {

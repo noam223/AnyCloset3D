@@ -2246,6 +2246,7 @@ function updateToolbarButtonHighlights() {
     const _hasTv = !!(firstComp && !firstComp.partition && firstComp.tv);
     const btnAppl = document.getElementById('tb-btn-appliances');
     if (btnAppl && (_appl.length || _hasTv)) btnAppl.classList.add('active');
+    if (typeof window._syncKitchenApplianceToolbar === 'function') window._syncKitchenApplianceToolbar();
     document.querySelectorAll('#appliances-sub-panel button[data-appliance-type]').forEach(b => {
         const t = b.dataset.applianceType;
         b.classList.toggle('active', t === 'tv' ? _hasTv : _appl.includes(t));
@@ -5116,10 +5117,34 @@ function _laundryFrontInset() {
 function _cellApplianceBlocksDoor(col, r) {
     const comp = col && col.compartments && col.compartments[r];
     if (!comp || comp.partition || !Array.isArray(comp.appliances) || !comp.appliances.length) return false;
+    const inset = _laundryFrontInset();
+    const depth = state.depth || 54;
+    const h = _cellHeight(col, r);
+    if (typeof window._kitchenListHasDoorBlocker === 'function' && window._kitchenListHasDoorBlocker(comp.appliances)) {
+        return true;
+    }
+    if (typeof window._kitchenApplianceProtrudes === 'function' &&
+        window._kitchenApplianceProtrudes(comp.appliances, col.width, h, depth, inset)) {
+        return true;
+    }
     if (typeof window._laundryProtrudes !== 'function') return false;
-    return window._laundryProtrudes(comp.appliances, col.width, _cellHeight(col, r), state.depth || 54, _laundryFrontInset());
+    return window._laundryProtrudes(comp.appliances, col.width, h, depth, inset);
 }
 window._cellApplianceBlocksDoor = _cellApplianceBlocksDoor;
+
+window._syncKitchenApplianceToolbar = function() {
+    const isKit = !!(state && state.presetId === 'kitchen');
+    document.querySelectorAll('.appliance-laundry').forEach(el => {
+        el.style.display = isKit ? 'none' : '';
+    });
+    document.querySelectorAll('.appliance-kitchen').forEach(el => {
+        el.style.display = isKit ? '' : 'none';
+    });
+    const btn = document.getElementById('tb-btn-appliances');
+    if (btn) {
+        btn.title = isKit ? 'כיור, מדיח ותנור' : 'מכונת כביסה, מייבש וטלוויזיה';
+    }
+};
 
 /** Drop doors covering cells whose appliances protrude. Returns the number of doors removed. */
 function _removeDoorsBlockedByAppliances(colIndex) {
@@ -5138,21 +5163,24 @@ function _removeDoorsBlockedByAppliances(colIndex) {
 }
 window._removeDoorsBlockedByAppliances = _removeDoorsBlockedByAppliances;
 
-// Toggle a laundry appliance in the selected cell(s). Both can be marked when the cell is
-// wide enough for side-by-side (≥122cm) or tall enough to stack; otherwise the new pick
-// replaces the old one. Selection is kept so the user can mark the second appliance right away.
+// Toggle laundry or kitchen appliance in the selected cell(s).
 window.toggleCellAppliance = function(type) {
-    const R = window.LAUNDRY_RULES;
-    if (!R || !R.dims[type]) return;
+    const isKitType = typeof window._isKitchenApplianceType === 'function' && window._isKitchenApplianceType(type);
+    const R = isKitType ? window.KITCHEN_RULES : window.LAUNDRY_RULES;
+    if (!R || !R.dims || !R.dims[type]) return;
     if (state.selection.colIndex === -1 || state.selection.rows.length === 0) return;
     const col = state.columns[state.selection.colIndex];
     if (!col) return;
-    const names = { washer: 'מכונת כביסה', dryer: 'מייבש' };
+    const names = {
+        washer: 'מכונת כביסה', dryer: 'מייבש',
+        sink: 'כיור', dishwasher: 'מדיח', oven: 'תנור'
+    };
     const fmt = v => (Math.round(v * 10) / 10).toString();
     const sideW = R.sideBySideWidth || 122;
+    const minW = R.minWidth || 60;
 
-    if (col.width < R.minWidth) {
-        _showToast(`רוחב התא ${fmt(col.width)} ס"מ — ל${names[type]} נדרש רוחב פנימי של ${R.minWidth} ס"מ לפחות`, 4500);
+    if (col.width < minW) {
+        _showToast(`רוחב התא ${fmt(col.width)} ס"מ — ל${names[type] || type} נדרש רוחב פנימי של ${minW} ס"מ לפחות`, 4500);
         return;
     }
 
@@ -5171,18 +5199,26 @@ window.toggleCellAppliance = function(type) {
             return;
         }
         const h = _cellHeight(col, r);
-        if (h < R.singleHeight) { tooShortH = h; return; }
-        let next = others.concat(type);
-        if (next.length > 1) {
-            const canSide = col.width >= sideW && h >= R.singleHeight;
-            const canStack = h >= R.stackHeight;
-            if (!canSide && !canStack) {
-                next = [type];
-                swappedH = h;
-                swappedW = col.width;
+        if (!isKitType && R.singleHeight && h < R.singleHeight) { tooShortH = h; return; }
+        if (isKitType) {
+            const needH = (R.dims[type] && R.dims[type].H) || 0;
+            // Sink is shallow; dishwasher/oven need enough cell height
+            if (type !== 'sink' && needH && h < needH - 5) { tooShortH = h; return; }
+            // One kitchen appliance per cell in v1
+            comp.appliances = [type];
+        } else {
+            let next = others.filter(t => t === 'washer' || t === 'dryer').concat(type);
+            if (next.length > 1) {
+                const canSide = col.width >= sideW && h >= R.singleHeight;
+                const canStack = h >= R.stackHeight;
+                if (!canSide && !canStack) {
+                    next = [type];
+                    swappedH = h;
+                    swappedW = col.width;
+                }
             }
+            comp.appliances = ['washer', 'dryer'].filter(t => next.includes(t));
         }
-        comp.appliances = ['washer', 'dryer'].filter(t => next.includes(t));
         delete comp.tv;
         comp.type = 'empty';
         if (comp.partition) clearedPartition = true;
@@ -5197,7 +5233,8 @@ window.toggleCellAppliance = function(type) {
     });
 
     if (tooShortH !== null) {
-        _showToast(`גובה התא ${fmt(tooShortH)} ס"מ — ל${names[type]} נדרש גובה של ${R.singleHeight} ס"מ לפחות`, 4500);
+        const needH = isKitType ? ((R.dims[type] && R.dims[type].H) || 60) : R.singleHeight;
+        _showToast(`גובה התא ${fmt(tooShortH)} ס"מ — ל${names[type] || type} נדרש גובה של ${needH} ס"מ לפחות`, 4500);
     } else if (swappedH !== null) {
         _showToast(
             `מכונה ומייבש יחד דורשים רוחב ${sideW} ס"מ ומעלה (זה לצד זה) או גובה ${R.stackHeight} ס"מ (אחד מעל השני). ` +
@@ -5209,7 +5246,7 @@ window.toggleCellAppliance = function(type) {
     if (turnOn && tooShortH === null && rows.some(r => _cellApplianceBlocksDoor(col, r))) {
         const removedDoors = _removeDoorsBlockedByAppliances(state.selection.colIndex);
         if (swappedH === null) {
-            _showToast(`עומק הארון ${fmt(state.depth || 54)} ס"מ — המכשיר בולט מחזית הארון, לכן לא ניתן להתקין דלת על התא` +
+            _showToast(`המכשיר חוסם דלת בחזית התא` +
                 (removedDoors ? ' (הדלת הוסרה)' : ''), 5000);
         }
     }

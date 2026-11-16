@@ -571,4 +571,147 @@ window._laundryFit = _laundryFit;
 window._laundryIsSideBySide = _laundryIsSideBySide;
 window._laundryProtrudes = laundryProtrudes;
 window.addLaundryAppliancesToCell = addLaundryAppliancesToCell;
+
+// =====================================================================
+// Kitchen appliances (sink / dishwasher / oven) — simple styled boxes for v1
+// =====================================================================
+const KIT_APPLIANCE_TYPES = {
+    sink:        { W: 56, H: 20, D: 48, label: 'כיור' },
+    dishwasher:  { W: 59.5, H: 82, D: 55, label: 'מדיח' },
+    oven:        { W: 59.5, H: 60, D: 55, label: 'תנור' }
+};
+const KITCHEN_RULES = {
+    minWidth: 60,
+    dims: {
+        sink: { W: 56, H: 20, D: 48 },
+        dishwasher: { W: 59.5, H: 82, D: 55 },
+        oven: { W: 59.5, H: 60, D: 55 }
+    },
+    // dishwasher/oven typically block a front door
+    blocksDoor: { sink: false, dishwasher: true, oven: true }
+};
+window.KITCHEN_RULES = KITCHEN_RULES;
+window.KIT_APPLIANCE_TYPES = KIT_APPLIANCE_TYPES;
+window._isKitchenApplianceType = function(type) {
+    return !!(type && KIT_APPLIANCE_TYPES[type]);
+};
+window._kitchenListHasDoorBlocker = function(list) {
+    if (!Array.isArray(list)) return false;
+    return list.some(t => KITCHEN_RULES.blocksDoor[t]);
+};
+
+function _kitApplianceMat(hex, rough) {
+    return new THREE.MeshStandardMaterial({
+        color: hex, roughness: rough == null ? 0.45 : rough, metalness: 0.15,
+        envMap: window._studioEnvMap || null
+    });
+}
+
+function buildKitchenAppliance(type) {
+    const T = KIT_APPLIANCE_TYPES[type] || KIT_APPLIANCE_TYPES.dishwasher;
+    const g = new THREE.Group();
+    g.name = 'kitchenAppliance_' + type;
+
+    if (type === 'sink') {
+        const basin = new THREE.Mesh(
+            new THREE.BoxGeometry(T.W, Math.max(8, T.H * 0.55), T.D),
+            _kitApplianceMat(0xc5ccd3, 0.35)
+        );
+        basin.position.y = T.H * 0.35;
+        g.add(basin);
+        const rim = new THREE.Mesh(
+            new THREE.BoxGeometry(T.W + 2, 1.2, T.D + 2),
+            _kitApplianceMat(0xe8ecf0, 0.4)
+        );
+        rim.position.y = T.H * 0.7;
+        g.add(rim);
+        const faucet = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.7, 0.7, 12, 10),
+            _kitApplianceMat(0x9aa3ad, 0.25)
+        );
+        faucet.position.set(0, T.H * 0.7 + 6, -T.D * 0.28);
+        g.add(faucet);
+    } else if (type === 'oven') {
+        const body = new THREE.Mesh(
+            new THREE.BoxGeometry(T.W, T.H, T.D),
+            _kitApplianceMat(0x2a2d31, 0.4)
+        );
+        body.position.y = T.H / 2;
+        g.add(body);
+        const glass = new THREE.Mesh(
+            new THREE.BoxGeometry(T.W * 0.72, T.H * 0.48, 0.6),
+            new THREE.MeshStandardMaterial({ color: 0x111318, roughness: 0.15, metalness: 0.4, envMap: window._studioEnvMap || null })
+        );
+        glass.position.set(0, T.H * 0.48, T.D / 2 - 0.2);
+        g.add(glass);
+        const handle = new THREE.Mesh(
+            new THREE.BoxGeometry(T.W * 0.5, 1.2, 1.5),
+            _kitApplianceMat(0xd0d4d8, 0.3)
+        );
+        handle.position.set(0, T.H * 0.78, T.D / 2 + 0.4);
+        g.add(handle);
+    } else {
+        // dishwasher
+        const body = new THREE.Mesh(
+            new THREE.BoxGeometry(T.W, T.H, T.D),
+            _kitApplianceMat(0xf0f2f4, 0.42)
+        );
+        body.position.y = T.H / 2;
+        g.add(body);
+        const panel = new THREE.Mesh(
+            new THREE.BoxGeometry(T.W - 1, T.H * 0.22, 1),
+            _kitApplianceMat(0xe4e7ea, 0.4)
+        );
+        panel.position.set(0, T.H * 0.86, T.D / 2 - 0.3);
+        g.add(panel);
+        const handle = new THREE.Mesh(
+            new THREE.BoxGeometry(T.W * 0.45, 1, 1.4),
+            _kitApplianceMat(0x8a9098, 0.3)
+        );
+        handle.position.set(0, T.H * 0.72, T.D / 2 + 0.3);
+        g.add(handle);
+    }
+    g.userData.isKitchenAppliance = true;
+    g.userData.applianceType = type;
+    return g;
+}
+
+const _kitTemplates = {};
+function _kitTemplate(type) {
+    if (!_kitTemplates[type]) _kitTemplates[type] = buildKitchenAppliance(type);
+    return _kitTemplates[type];
+}
+
+function kitchenApplianceProtrudes(list, cellW, cellH, bodyD, frontInset) {
+    if (!Array.isArray(list) || !list.length) return false;
+    const usableD = Math.max(1, (bodyD || 56) - (frontInset || 0) - 0.5);
+    return list.some(t => {
+        const d = KIT_APPLIANCE_TYPES[t];
+        return d && d.D > usableD + 0.5;
+    });
+}
+
+/**
+ * Add kitchen appliances into a cell.
+ * opts: { list, x, bottomY, cellW, cellH, bodyD, backT, frontInset }
+ */
+function addKitchenAppliancesToCell(parent, opts) {
+    const list = (opts.list || []).filter(t => KIT_APPLIANCE_TYPES[t]);
+    if (!list.length) return;
+    const frontZ = ((opts.bodyD || 56) / 2) - (opts.frontInset || 0);
+    // One appliance per cell in v1 — take first kitchen type
+    const type = list[0];
+    const T = KIT_APPLIANCE_TYPES[type];
+    const m = _kitTemplate(type).clone();
+    let y = opts.bottomY;
+    if (type === 'sink') {
+        // Sit near the top of the base unit (counter height feel)
+        y = opts.bottomY + Math.max(0, (opts.cellH || 80) - T.H - 2);
+    }
+    m.position.set(opts.x, y, frontZ - T.D / 2);
+    parent.add(m);
+}
+
+window._kitchenApplianceProtrudes = kitchenApplianceProtrudes;
+window.addKitchenAppliancesToCell = addKitchenAppliancesToCell;
 })();

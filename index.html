@@ -122,6 +122,10 @@
                     <i class="fa-solid fa-sink" style="font-size:1.4rem;opacity:0.9;"></i>
                     <span>אמבטיה</span>
                 </button>
+                <button class="preset-btn" id="preset-btn-kitchen" onclick="applyPreset('kitchen')" title="ארון מטבח" style="display:none;">
+                    <i class="fa-solid fa-kitchen-set" style="font-size:1.4rem;opacity:0.9;"></i>
+                    <span>מטבח</span>
+                </button>
             </div>
         </div>
         <div id="space-cab-tabs" style="display:none;">
@@ -959,6 +963,32 @@
             </div>
         </div>
 
+        <!-- ===== KITCHEN SECTION (app-admin only, shown for kitchen preset) ===== -->
+        <div class="section" id="kitchen-section" data-sbgroup="cabinet" style="display:none;">
+            <div class="section-title"><i class="fa-solid fa-kitchen-set"></i> יחידת מטבח</div>
+            <p style="font-size:0.75rem;color:var(--text-light);margin:0 0 10px;">תחתון סנדוויץ׳ · גובה 88 · עומק 56. הוספת יחידה מוסיפה 60 ס״מ לרוחב.</p>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;">
+                <span style="font-size:0.8rem;color:var(--text-dark);">יחידות: <strong id="kitchen-unit-count">3</strong></span>
+                <span style="font-size:0.72rem;color:var(--text-light);">גוף: סנדוויץ׳ (נעול)</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
+                <button type="button" onclick="window._kitchenAddUnit('right')" style="padding:8px 4px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.78rem;font-weight:600;cursor:pointer;">
+                    <i class="fa-solid fa-plus"></i> יחידה ימין (+60)
+                </button>
+                <button type="button" onclick="window._kitchenAddUnit('left')" style="padding:8px 4px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.78rem;font-weight:600;cursor:pointer;">
+                    <i class="fa-solid fa-plus"></i> יחידה שמאל (+60)
+                </button>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                <button type="button" onclick="window._kitchenRemoveUnit('right')" style="padding:7px 4px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-light);font-size:0.72rem;font-weight:600;cursor:pointer;">
+                    <i class="fa-solid fa-minus"></i> הסר ימין
+                </button>
+                <button type="button" onclick="window._kitchenRemoveUnit('left')" style="padding:7px 4px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-light);font-size:0.72rem;font-weight:600;cursor:pointer;">
+                    <i class="fa-solid fa-minus"></i> הסר שמאל
+                </button>
+            </div>
+        </div>
+
         <!-- ===== BATHROOM SECTION (shown only for bathroom preset) ===== -->
         <div class="section" id="bathroom-section" data-sbgroup="cabinet" style="display:none;">
             <div class="section-title"><i class="fa-solid fa-sink"></i> הגדרות ארון אמבטיה</div>
@@ -1621,12 +1651,15 @@
             </div>
             <!-- מוצרי חשמל row -->
             <div class="toolbar-row">
-                <button class="toolbar-btn" id="tb-btn-appliances" data-expandable onclick="toggleContentSubPanel('appliances',this)" title="מכונת כביסה, מייבש וטלוויזיה"><i class="fa-solid fa-plug"></i><span>מוצרי חשמל</span></button>
+                <button class="toolbar-btn" id="tb-btn-appliances" data-expandable onclick="toggleContentSubPanel('appliances',this)" title="מוצרי חשמל"><i class="fa-solid fa-plug"></i><span>מוצרי חשמל</span></button>
                 <div id="appliances-sub-panel" class="toolbar-sub-btns" style="display:none;">
                     <div class="toolbar-sub-divider"></div>
-                    <button class="toolbar-btn" data-appliance-type="washer" onclick="toggleCellAppliance('washer')"><i class="la-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="2.5" width="16" height="19" rx="2.5"/><path d="M4 7h16"/><circle cx="12" cy="14" r="4.5"/><path d="M9.6 14.6c.8-.8 1.6.8 2.4 0s1.6.8 2.4 0"/></svg></i><span>מכונת כביסה</span></button>
-                    <button class="toolbar-btn" data-appliance-type="dryer" onclick="toggleCellAppliance('dryer')"><i class="la-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="2.5" width="16" height="19" rx="2.5"/><path d="M4 7h16"/><circle cx="12" cy="14" r="4.5"/><path d="M10.6 12.2c-.7.9.7 1.9 0 2.9M13.4 12.2c-.7.9.7 1.9 0 2.9"/></svg></i><span>מייבש</span></button>
-                    <button class="toolbar-btn" data-appliance-type="tv" onclick="toggleCellTv()"><i class="fa-solid fa-tv"></i><span>טלוויזיה</span></button>
+                    <button class="toolbar-btn appliance-laundry" data-appliance-type="washer" onclick="toggleCellAppliance('washer')"><i class="la-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="2.5" width="16" height="19" rx="2.5"/><path d="M4 7h16"/><circle cx="12" cy="14" r="4.5"/><path d="M9.6 14.6c.8-.8 1.6.8 2.4 0s1.6.8 2.4 0"/></svg></i><span>מכונת כביסה</span></button>
+                    <button class="toolbar-btn appliance-laundry" data-appliance-type="dryer" onclick="toggleCellAppliance('dryer')"><i class="la-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="2.5" width="16" height="19" rx="2.5"/><path d="M4 7h16"/><circle cx="12" cy="14" r="4.5"/><path d="M10.6 12.2c-.7.9.7 1.9 0 2.9M13.4 12.2c-.7.9.7 1.9 0 2.9"/></svg></i><span>מייבש</span></button>
+                    <button class="toolbar-btn appliance-laundry" data-appliance-type="tv" onclick="toggleCellTv()"><i class="fa-solid fa-tv"></i><span>טלוויזיה</span></button>
+                    <button class="toolbar-btn appliance-kitchen" data-appliance-type="sink" onclick="toggleCellAppliance('sink')" style="display:none;"><i class="fa-solid fa-sink"></i><span>כיור</span></button>
+                    <button class="toolbar-btn appliance-kitchen" data-appliance-type="dishwasher" onclick="toggleCellAppliance('dishwasher')" style="display:none;"><i class="fa-solid fa-droplet"></i><span>מדיח</span></button>
+                    <button class="toolbar-btn appliance-kitchen" data-appliance-type="oven" onclick="toggleCellAppliance('oven')" style="display:none;"><i class="fa-solid fa-fire-burner"></i><span>תנור</span></button>
                 </div>
             </div>
             <!-- מראה מעל שולחן פנימי -->
@@ -2247,6 +2280,10 @@
                 style="flex:1;min-width:48px;padding:6px 4px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.72rem;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;">
                 <i class="fa-solid fa-sink" style="font-size:1rem;"></i><span>אמבטיה</span>
             </button>
+            <button class="preset-btn" id="mobile-preset-btn-kitchen" onclick="applyPreset('kitchen')" title="ארון מטבח"
+                style="display:none;flex:1;min-width:48px;padding:6px 4px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.72rem;font-weight:600;cursor:pointer;flex-direction:column;align-items:center;gap:2px;">
+                <i class="fa-solid fa-kitchen-set" style="font-size:1rem;"></i><span>מטבח</span>
+            </button>
             <button class="preset-btn" id="mobile-preset-btn-writing-desk" onclick="applyPreset('writing-desk')" title="שולחן כתיבה"
                 style="flex:1;min-width:48px;padding:6px 4px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.72rem;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;">
                 <i class="fa-solid fa-desktop" style="font-size:1rem;"></i><span>שולחן</span>
@@ -2353,6 +2390,7 @@
             <button class="dfm-btn" onclick="_epStepDim('depth',-1)"><i class="fa-solid fa-minus"></i></button>
         </div>
         <div class="mobile-panel-divider"></div>
+        <div id="mobile-columns-block">
         <div class="mobile-section-title">עמודות פנימיות</div>
         <div class="mobile-dim-row">
             <span class="mobile-dim-label">מספר עמודות</span>
@@ -2360,6 +2398,16 @@
                 <button class="mobile-stepper-btn" onclick="updateColumns(-1)"><i class="fa-solid fa-minus"></i></button>
                 <span id="mobile-val-columns" class="mobile-stepper-val" style="display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--secondary);">2</span>
                 <button class="mobile-stepper-btn" onclick="updateColumns(1)"><i class="fa-solid fa-plus"></i></button>
+            </div>
+        </div>
+        </div>
+        <div id="mobile-kitchen-block" style="display:none;">
+            <div class="mobile-section-title">יחידת מטבח (+60 ס״מ)</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">
+                <button type="button" class="mobile-stepper-btn" style="height:auto;padding:8px;" onclick="window._kitchenAddUnit('right')"><i class="fa-solid fa-plus"></i> ימין</button>
+                <button type="button" class="mobile-stepper-btn" style="height:auto;padding:8px;" onclick="window._kitchenAddUnit('left')"><i class="fa-solid fa-plus"></i> שמאל</button>
+                <button type="button" class="mobile-stepper-btn" style="height:auto;padding:8px;" onclick="window._kitchenRemoveUnit('right')"><i class="fa-solid fa-minus"></i> הסר ימין</button>
+                <button type="button" class="mobile-stepper-btn" style="height:auto;padding:8px;" onclick="window._kitchenRemoveUnit('left')"><i class="fa-solid fa-minus"></i> הסר שמאל</button>
             </div>
         </div>
         <div class="mobile-panel-divider"></div>
@@ -2878,14 +2926,23 @@
 
         <!-- מוצרי חשמל sub-options -->
         <div id="mcp-sub-appliances" style="display:none;width:100%;flex-direction:column;align-items:center;gap:4px;">
-            <button class="mcell-side-btn" id="mcp-appliance-washer" onclick="toggleCellAppliance('washer'); updateMobileCellSheetState();">
+            <button class="mcell-side-btn appliance-laundry" id="mcp-appliance-washer" onclick="toggleCellAppliance('washer'); updateMobileCellSheetState();">
                 <i class="la-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="2.5" width="16" height="19" rx="2.5"/><path d="M4 7h16"/><circle cx="12" cy="14" r="4.5"/><path d="M9.6 14.6c.8-.8 1.6.8 2.4 0s1.6.8 2.4 0"/></svg></i><span>מכונה</span>
             </button>
-            <button class="mcell-side-btn" id="mcp-appliance-dryer" onclick="toggleCellAppliance('dryer'); updateMobileCellSheetState();">
+            <button class="mcell-side-btn appliance-laundry" id="mcp-appliance-dryer" onclick="toggleCellAppliance('dryer'); updateMobileCellSheetState();">
                 <i class="la-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="2.5" width="16" height="19" rx="2.5"/><path d="M4 7h16"/><circle cx="12" cy="14" r="4.5"/><path d="M10.6 12.2c-.7.9.7 1.9 0 2.9M13.4 12.2c-.7.9.7 1.9 0 2.9"/></svg></i><span>מייבש</span>
             </button>
-            <button class="mcell-side-btn" id="mcp-appliance-tv" onclick="toggleCellTv(); updateMobileCellSheetState();">
+            <button class="mcell-side-btn appliance-laundry" id="mcp-appliance-tv" onclick="toggleCellTv(); updateMobileCellSheetState();">
                 <i class="fa-solid fa-tv"></i><span>טלוויזיה</span>
+            </button>
+            <button class="mcell-side-btn appliance-kitchen" id="mcp-appliance-sink" onclick="toggleCellAppliance('sink'); updateMobileCellSheetState();" style="display:none;">
+                <i class="fa-solid fa-sink"></i><span>כיור</span>
+            </button>
+            <button class="mcell-side-btn appliance-kitchen" id="mcp-appliance-dishwasher" onclick="toggleCellAppliance('dishwasher'); updateMobileCellSheetState();" style="display:none;">
+                <i class="fa-solid fa-droplet"></i><span>מדיח</span>
+            </button>
+            <button class="mcell-side-btn appliance-kitchen" id="mcp-appliance-oven" onclick="toggleCellAppliance('oven'); updateMobileCellSheetState();" style="display:none;">
+                <i class="fa-solid fa-fire-burner"></i><span>תנור</span>
             </button>
         </div>
 
@@ -3056,28 +3113,29 @@
 
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="auth.js?v=20261115todos"></script>
+<script src="auth.js?v=20261116kitchen"></script>
 <script src="trial-watermark.js?v=20261008trial"></script>
 <script src="egger-colors.js?v=20261104egger2"></script>
-<script src="state.js?v=20261112deskTabs"></script>
+<script src="state.js?v=20261116kitchen"></script>
 <script src="quick-calc.js?v=20261029shoe"></script>
 <script src="bathroom-preset.js?v=20261008types"></script>
+<script src="kitchen-preset.js?v=20261116kitchen"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
 <script src="corner-unit-preset.js?v=20261103deskdoor"></script>
-<script src="engine-appliances.js?v=20261115laundrySide"></script>
-<script src="engine-core.js?v=20261115spaceBp3"></script>
+<script src="engine-appliances.js?v=20261116kitchen"></script>
+<script src="engine-core.js?v=20261116kitchen"></script>
 <script src="engine-corners.js?v=20261109ridingFlush"></script>
 <script src="engine-blueprint.js?v=20261115spaceBp4"></script>
 <script src="engine-room-plan.js?v=20261110floors"></script>
 <script src="tambour-color-picker.js?v=20261110roomwall"></script>
 <script src="room-finishes.js?v=20261110gloss"></script>
-<script src="ui.js?v=20261115todoDate"></script>
+<script src="ui.js?v=20261116kitchen"></script>
 <script src="mirror-cabinet.js?v=20261110doormirror"></script>
 <script src="mobile.js?v=20261029inthandle"></script>
 <script src="part-paint.js?v=20261104egger"></script>
 <script src="shelf-pick.js?v=20260922sideWall"></script>
 <script src="export-3d.js?v=20261111roomexp"></script>
-<script src="index-init.js?v=20261112jsonCompany"></script>
+<script src="index-init.js?v=20261116kitchen"></script>
 
 <!-- ===== TAMBOUR FULL PALETTE MODAL ===== -->
 <div id="tambour-palette-modal" class="tambour-palette-overlay">

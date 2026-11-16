@@ -457,6 +457,28 @@ window.Auth = {
         return data;
     },
 
+    // ── Platform / app admin (private.app_admins) ────────────────────────────
+    _appAdminCache: undefined,
+    isAppAdmin: async function() {
+        if (this._appAdminCache !== undefined) return this._appAdminCache;
+        const sb = _getClient();
+        if (!sb) { this._appAdminCache = false; return false; }
+        try {
+            const { data, error } = await sb.rpc('is_app_admin');
+            if (error) {
+                console.warn('Auth.isAppAdmin:', error.message);
+                this._appAdminCache = false;
+                return false;
+            }
+            this._appAdminCache = !!data;
+            return this._appAdminCache;
+        } catch (e) {
+            console.warn('Auth.isAppAdmin:', e);
+            this._appAdminCache = false;
+            return false;
+        }
+    },
+
     // ── Check if logged in ───────────────────────────────────────────────────
     isLoggedIn: async function() {
         const session = await this.getSession();

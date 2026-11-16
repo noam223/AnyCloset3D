@@ -1001,6 +1001,9 @@ function _applyPresetCore(presetId, rightPos, leftPos) {
     } else if (presetId === 'bathroom') {
         // Bathroom cabinet — handled by bathroom-preset.js
         if (typeof window._applyBathroomPreset === 'function') window._applyBathroomPreset();
+    } else if (presetId === 'kitchen') {
+        // Kitchen base run — handled by kitchen-preset.js (app-admin only)
+        if (typeof window._applyKitchenPreset === 'function') window._applyKitchenPreset();
     } else if (presetId === 'writing-desk') {
         // Standalone writing desk — handled by writing-desk-preset.js
         if (typeof window._applyWritingDeskPreset === 'function') window._applyWritingDeskPreset();
@@ -1044,7 +1047,7 @@ function _applyPresetCore(presetId, rightPos, leftPos) {
 
     // Linear/bathroom cabinet: go directly to front/edit view (no wings to orbit around)
     // Corner/walkin: stay in 3D so user sees the full layout
-    state.viewMode = (presetId === 'linear' || presetId === 'sliding' || presetId === 'bathroom' || presetId === 'writing-desk' || presetId === 'corner-unit') ? 'front' : '3d';
+    state.viewMode = (presetId === 'linear' || presetId === 'sliding' || presetId === 'bathroom' || presetId === 'kitchen' || presetId === 'writing-desk' || presetId === 'corner-unit') ? 'front' : '3d';
     _setFreeTabActive(true);
     syncSidebarToWing();
     if (typeof window._syncSpacePairTabs === 'function') window._syncSpacePairTabs();
@@ -1272,7 +1275,7 @@ window.applyPreset = function(presetId) {
     _pendingPresetId = presetId;
     _pendingWingPositions = { left: 'side', right: 'side' };
 
-    if (presetId === 'linear' || presetId === 'sliding' || presetId === 'bathroom' || presetId === 'writing-desk' || presetId === 'corner-unit') {
+    if (presetId === 'linear' || presetId === 'sliding' || presetId === 'bathroom' || presetId === 'kitchen' || presetId === 'writing-desk' || presetId === 'corner-unit') {
         // No position needed — apply immediately
         _applyPresetCore(presetId, null, null);
         const ppm = document.getElementById('preset-position-menu');
@@ -1363,7 +1366,7 @@ window.applyWalkinPositions = function() {
 
 // ---- Wing edit mode helpers ----
 function _isSingleCabinetPreset() {
-    return state.presetId === 'linear' || state.presetId === 'sliding' || state.presetId === 'bathroom' || state.presetId === 'writing-desk' || state.presetId === 'corner-unit';
+    return state.presetId === 'linear' || state.presetId === 'sliding' || state.presetId === 'bathroom' || state.presetId === 'kitchen' || state.presetId === 'writing-desk' || state.presetId === 'corner-unit';
 }
 
 function _syncHeaderDimsPlaceholder(isEditing) {

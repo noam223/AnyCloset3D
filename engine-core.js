@@ -7876,13 +7876,28 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
                 if (_isActiveWingBuild && !isLast) dragHandlesData.vertical.push({ colIndex: c, shelfIdx: div.idx, x: colCenterX, y: div.y, isSplit: (div.type === 'split') });
             }
 
-            if (!isBP && compData && !compData.partition && Array.isArray(compData.appliances) && compData.appliances.length &&
-                typeof window.addLaundryAppliancesToCell === 'function') {
-                window.addLaundryAppliancesToCell(_buildGroup, {
-                    list: compData.appliances, x: colCenterX, bottomY: prevY,
-                    cellW: col.width, cellH: compH, bodyD: bodyD, backT: backT,
-                    frontInset: _isSlidingWardrobe ? _slidingPartSetback : (isInset ? t : 0)
+            if (!isBP && compData && !compData.partition && Array.isArray(compData.appliances) && compData.appliances.length) {
+                const _kitList = compData.appliances.filter(function(a) {
+                    return typeof window._isKitchenApplianceType === 'function' && window._isKitchenApplianceType(a);
                 });
+                const _laundList = compData.appliances.filter(function(a) {
+                    return a === 'washer' || a === 'dryer';
+                });
+                const _appInset = _isSlidingWardrobe ? _slidingPartSetback : (isInset ? t : 0);
+                if (_kitList.length && typeof window.addKitchenAppliancesToCell === 'function') {
+                    window.addKitchenAppliancesToCell(_buildGroup, {
+                        list: _kitList, x: colCenterX, bottomY: prevY,
+                        cellW: col.width, cellH: compH, bodyD: bodyD, backT: backT,
+                        frontInset: _appInset
+                    });
+                }
+                if (_laundList.length && typeof window.addLaundryAppliancesToCell === 'function') {
+                    window.addLaundryAppliancesToCell(_buildGroup, {
+                        list: _laundList, x: colCenterX, bottomY: prevY,
+                        cellW: col.width, cellH: compH, bodyD: bodyD, backT: backT,
+                        frontInset: _appInset
+                    });
+                }
             }
             if (!isBP && compData && !compData.partition && compData.tv && typeof window.addTvToCell === 'function') {
                 // Honeycomb frame boards line the block: the TV stands on its floor, between its walls
