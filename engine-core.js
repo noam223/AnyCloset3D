@@ -5065,6 +5065,38 @@ function buildCabinet() {
     ['left','right'].forEach(side => {
         const fw = state.wings[side];
         if (!fw || fw.wingPosition !== 'full_corner') return;
+        // Kitchen ר: the L is the main body — keep it visible while editing the stub or its return arm
+        if (typeof window._isKitchenCornerWing === 'function' && window._isKitchenCornerWing(fw) &&
+            typeof window.buildKitchenCornerUnit === 'function') {
+            if (isFCEditMode && savedActiveWing !== `full_corner_${side}`) return;
+            if (inEditMode && !isFCEditMode && savedActiveWing !== 'center' && savedActiveWing !== side) return;
+            let kOffX = 0, kOffZ = 0;
+            if (inEditMode && savedActiveWing === side) {
+                // The return arm is drawn at the origin in edit mode — shift the L by the same amount
+                const kEdge = centerWing ? centerWing.width / 2 : 80;
+                const kCenterD = centerWing ? centerWing.depth : 54;
+                const kFc = (fw.fullCorner && fw.fullCorner.size) || 100;
+                const kSign = (side === 'right') ? 1 : -1;
+                kOffX = -kSign * (kEdge + kFc - (fw.depth || 54) / 2);
+                kOffZ = -(-kCenterD / 2 + kFc + (fw.width || 80) / 2);
+            }
+            const kGroup = window.buildKitchenCornerUnit(side, fw, { offsetX: kOffX, offsetZ: kOffZ });
+            if (!inEditMode && kGroup && kGroup.isGroup) {
+                const kSign = (side === 'right') ? 1 : -1;
+                const kW = (fw.fullCorner && fw.fullCorner.size) || 90;
+                const kH = (fw.globalHeight || 88) + 2.8;
+                const kHit = new THREE.Mesh(
+                    new THREE.BoxGeometry(kW + 2, kH + 2, kW + 2),
+                    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, depthTest: false })
+                );
+                kHit.renderOrder = 999;
+                kHit.position.set(kGroup.position.x - kSign * kW / 2, kH / 2, kGroup.position.z + kW / 2);
+                kHit.userData = { wingId: `full_corner_${side}` };
+                cabinetGroup.add(kHit);
+                wingHitBoxes.push(kHit);
+            }
+            return;
+        }
         // In wing edit mode (editing the side wing): hide the full corner unit
         if (inEditMode && !isFCEditMode) return;
         // In full corner edit mode: only show the matching side's L-unit
@@ -5375,6 +5407,34 @@ function buildCabinet() {
 }
 
 // Build a single linear cabinet snapshot into an arbitrary THREE.Group (layout / compare mode).
+/** Kitchen ר arms (L carcass + optional return units) into an off-screen group (space companions). */
+function _buildKitchenCornerArmsInto(targetGroup, centerWing) {
+    const edge = centerWing.width / 2;
+    const centerD = centerWing.depth || 54;
+    ['left', 'right'].forEach(function(side) {
+        const fw = state.wings[side];
+        if (!fw || !window._isKitchenCornerWing(fw)) return;
+        window.buildKitchenCornerUnit(side, fw, { parent: targetGroup });
+        if (!fw.columns || !fw.columns.length) return;
+        const sign = (side === 'right') ? 1 : -1;
+        const fcSize = (fw.fullCorner && fw.fullCorner.size) || 100;
+        const wg = new THREE.Group();
+        wg.rotation.y = -sign * Math.PI / 2;
+        wg.position.set(sign * (edge + fcSize - (fw.depth || 54) / 2), 0,
+            -centerD / 2 + fcSize + (fw.width || 80) / 2);
+        wg.userData.wingId = side;
+        targetGroup.add(wg);
+        state.activeWing = side;
+        _buildGroup = wg;
+        _isActiveWingBuild = false;
+        _ppWingId = side;
+        _buildWingGeometry(wg, 0, 0, 0, false);
+        state.activeWing = 'center';
+        _buildGroup = targetGroup;
+        _ppWingId = 'center';
+    });
+}
+
 window.buildCabinetIntoGroup = function(targetGroup) {
     while (targetGroup.children.length > 0) targetGroup.remove(targetGroup.children[0]);
 
@@ -5387,7 +5447,9 @@ window.buildCabinetIntoGroup = function(targetGroup) {
     state.activeWing = 'center';
 
     const centerWing = state.wings.center;
-    if (centerWing) {
+    const _kitCornerStub = !!(state.presetId === 'kitchen' && centerWing && centerWing.kitchenCornerL &&
+        (!centerWing.columns || !centerWing.columns.length));
+    if (centerWing && !_kitCornerStub) {
         _buildGroup = targetGroup;
         _isActiveWingBuild = false;
         _ppWingId = 'center';
@@ -5417,6 +5479,12 @@ window.buildCabinetIntoGroup = function(targetGroup) {
 
     if (state.presetId === 'sliding' && typeof buildSlidingDoorCabinet === 'function') {
         buildSlidingDoorCabinet(targetGroup);
+    }
+
+    // Kitchen ר part: draw the L carcass + return units (the center is only an anchor stub)
+    if (state.presetId === 'kitchen' && centerWing && centerWing.kitchenCornerL &&
+        typeof window.buildKitchenCornerUnit === 'function') {
+        _buildKitchenCornerArmsInto(targetGroup, centerWing);
     }
 
     state.activeWing = savedActiveWing;
@@ -5637,6 +5705,17 @@ window._rebuildSpaceCompanion = function() {
             const hitMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
             const hit = new THREE.Mesh(new THREE.BoxGeometry(hitW, hitH, hitD), hitMat);
             hit.position.set(0, hitH / 2, 0);
+            if (state.presetId === 'kitchen' && cw && cw.kitchenCornerL) {
+                // ר part: the body is the L beside the stub — cover the whole built part
+                const kBox = new THREE.Box3().setFromObject(g);
+                if (!kBox.isEmpty()) {
+                    const kSize = kBox.getSize(new THREE.Vector3());
+                    const kCtr = kBox.getCenter(new THREE.Vector3()).sub(g.position);
+                    hit.geometry.dispose();
+                    hit.geometry = new THREE.BoxGeometry(kSize.x + 2, kSize.y + 2, kSize.z + 2);
+                    hit.position.copy(kCtr);
+                }
+            }
             hit.userData.spaceCompanion = true;
             hit.userData.spaceSlot = member.slot;
             hit.userData.cartIndex = member.index;
