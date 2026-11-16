@@ -4202,104 +4202,122 @@ function _hingeSpreadCm(lo, hi, n, edgeCm) {
 }
 
 /**
- * Real 3D Blum CLIP mounting plate (geometry, not a photo card).
- * Local: +X out from the wall, Y = long rail, Z = wing span.
- * Matches the cruciform stamped-nickel plate used on cabinet side walls.
+ * 3D cabinet hinge mounting plate (stamped nickel), matching the hardware photo.
+ * Local: +X out from the wall, Y = length, Z = width (wings).
+ * Built with ExtrudeGeometry silhouette + raised clip channel — not a photo card.
  */
 function _buildHingeMountPlate() {
-    let mat = _addHingeHardware._mat;
-    let matDark = _addHingeHardware._matDark;
+    // Fresh materials each session (avoid stale photo-card mats)
+    let mat = _addHingeHardware._matNi;
+    let matDark = _addHingeHardware._matNiDark;
     if (!mat) {
         mat = new THREE.MeshStandardMaterial({
-            color: 0xd5dae0, metalness: 0.7, roughness: 0.38,
+            color: 0xe8eaee, metalness: 0.55, roughness: 0.35,
             polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2
         });
-        _addHingeHardware._mat = mat;
+        _addHingeHardware._matNi = mat;
     }
     if (!matDark) {
         matDark = new THREE.MeshStandardMaterial({
-            color: 0x555a60, metalness: 0.45, roughness: 0.55,
+            color: 0x4a4e54, metalness: 0.5, roughness: 0.5,
             polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2
         });
-        _addHingeHardware._matDark = matDark;
+        _addHingeHardware._matNiDark = matDark;
     }
 
     const g = new THREE.Group();
     const add = (mesh) => { g.add(mesh); return mesh; };
+
+    // ---- Base plate silhouette in Shape XY (X→wing/Z, Y→length), extruded to thickness ----
+    // Approximates the butterfly / wing mounting plate from the reference photo
+    const shape = new THREE.Shape();
+    // Outer outline (cm), centered — total ~4.6 wide × 5.4 tall
+    shape.moveTo(0.0, -2.7);
+    shape.bezierCurveTo(-0.9, -2.7, -1.7, -2.55, -2.15, -2.15);
+    shape.bezierCurveTo(-2.4, -1.85, -2.3, -1.2, -2.25, -0.7);
+    shape.bezierCurveTo(-2.2, -0.15, -1.6, 0.05, -1.05, 0.15);
+    shape.lineTo(-0.7, 0.35);
+    shape.bezierCurveTo(-1.5, 0.55, -2.2, 0.9, -2.3, 1.55);
+    shape.bezierCurveTo(-2.35, 2.0, -2.25, 2.4, -1.85, 2.55);
+    shape.bezierCurveTo(-1.2, 2.75, -0.5, 2.7, 0.0, 2.7);
+    shape.bezierCurveTo(0.5, 2.7, 1.2, 2.75, 1.85, 2.55);
+    shape.bezierCurveTo(2.25, 2.4, 2.35, 2.0, 2.3, 1.55);
+    shape.bezierCurveTo(2.2, 0.9, 1.5, 0.55, 0.7, 0.35);
+    shape.lineTo(1.05, 0.15);
+    shape.bezierCurveTo(1.6, 0.05, 2.2, -0.15, 2.25, -0.7);
+    shape.bezierCurveTo(2.3, -1.2, 2.4, -1.85, 2.15, -2.15);
+    shape.bezierCurveTo(1.7, -2.55, 0.9, -2.7, 0.0, -2.7);
+
+    // Mounting-hole cutouts (diagonal wings)
+    const holeL = new THREE.Path();
+    holeL.absarc(-1.45, -1.35, 0.28, 0, Math.PI * 2, true);
+    shape.holes.push(holeL);
+    const holeR = new THREE.Path();
+    holeR.absarc(1.45, 1.35, 0.28, 0, Math.PI * 2, true);
+    shape.holes.push(holeR);
+
+    const baseDepth = 0.14;
+    const baseGeo = new THREE.ExtrudeGeometry(shape, {
+        depth: baseDepth,
+        bevelEnabled: true,
+        bevelThickness: 0.025,
+        bevelSize: 0.03,
+        bevelSegments: 2,
+        curveSegments: 16
+    });
+    // Shape XY + extrude Z → rotate so extruded face sits on the wall (+X out)
+    baseGeo.rotateY(-Math.PI / 2);
+    // After rotateY(-90): old Z → X, old X → -Z. Shift so back is at x=0
+    baseGeo.translate(baseDepth / 2 + 0.02, 0, 0);
+    add(new THREE.Mesh(baseGeo, mat));
+
+    // ---- Raised clip channel (hollow U-rail down the center) ----
+    const chW = 1.05, chH = 0.48, chLen = 4.4, wallT = 0.16;
     const box = (sx, sy, sz, x, y, z, m) => {
         const mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), m || mat);
         mesh.position.set(x, y, z);
         return add(mesh);
     };
+    const x0 = baseDepth + 0.02;
+    box(0.08, chLen, chW - 2 * wallT, x0 + 0.04, -0.15, 0);                 // channel floor
+    box(chH, chLen, wallT, x0 + chH / 2, -0.15, -chW / 2 + wallT / 2);       // left wall
+    box(chH, chLen, wallT, x0 + chH / 2, -0.15, chW / 2 - wallT / 2);        // right wall
+    box(chH, wallT, chW, x0 + chH / 2, -0.15 - chLen / 2 + wallT / 2, 0);    // closed bottom
+    // Open clip end (top) — short lips only
+    box(chH * 0.45, wallT, wallT, x0 + chH * 0.3, -0.15 + chLen / 2 - wallT / 2, -chW / 2 + wallT / 2);
+    box(chH * 0.45, wallT, wallT, x0 + chH * 0.3, -0.15 + chLen / 2 - wallT / 2, chW / 2 - wallT / 2);
+    // Dark slot in channel
+    box(0.05, 1.2, 0.32, x0 + 0.1, -0.1, 0, matDark);
+    // Small center hole in channel (as in photo)
+    const cen = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 12), matDark);
+    cen.rotation.z = Math.PI / 2;
+    cen.position.set(x0 + 0.1, 0.55, 0);
+    add(cen);
 
-    // Real CLIP plate ≈ 57×40 mm — cm in scene
-    const L = 5.7;          // rail length (Y)
-    const baseT = 0.15;     // sheet thickness (X)
-    const chW = 1.15;       // raised channel outer width (Z)
-    const wingSpan = 4.0;   // total Z across wings
-    const wingExt = (wingSpan - chW) / 2;
-    const wingLen = 1.7;    // each wing pad along Y
-    const wingY = 1.55;     // wing center offset from plate center
-    const chH = 0.55;       // channel rise (X)
-    const wallT = 0.2;      // channel wall thickness (Z)
-
-    // --- Flat stamped base (cross / wing silhouette) ---
-    box(baseT, L, chW + 0.25, baseT / 2, 0, 0); // center spine
-    box(baseT, wingLen, wingExt + 0.08, baseT / 2, -wingY, -(chW / 2 + wingExt / 2)); // lower-left wing
-    box(baseT, wingLen, wingExt + 0.08, baseT / 2, wingY, (chW / 2 + wingExt / 2));   // upper-right wing
-    // Soft corners where wings meet the spine
-    box(baseT, 0.7, wingExt * 0.55, baseT / 2, -wingY + wingLen * 0.35, -(chW / 2 + wingExt * 0.35));
-    box(baseT, 0.7, wingExt * 0.55, baseT / 2, wingY - wingLen * 0.35, (chW / 2 + wingExt * 0.35));
-
-    // --- Raised U-channel (clip rail) ---
-    const chY0 = -L * 0.42;
-    const chLen = L * 0.84;
-    const chMidY = chY0 + chLen / 2;
-    // Floor of the channel
-    box(0.1, chLen, chW - 2 * wallT, baseT + 0.05, chMidY, 0);
-    // Left / right walls
-    box(chH, chLen, wallT, baseT + chH / 2, chMidY, -chW / 2 + wallT / 2);
-    box(chH, chLen, wallT, baseT + chH / 2, chMidY, chW / 2 - wallT / 2);
-    // Closed bottom end of the rail
-    box(chH, wallT, chW, baseT + chH / 2, chY0 + wallT / 2, 0);
-    // Top clip lips (open end for the hinge arm)
-    const topY = chY0 + chLen - wallT / 2;
-    box(chH * 0.55, wallT, wallT, baseT + chH * 0.35, topY, -chW / 2 + wallT / 2);
-    box(chH * 0.55, wallT, wallT, baseT + chH * 0.35, topY, chW / 2 - wallT / 2);
-
-    // Dark elongated adjustment slot in the channel floor
-    box(0.06, 1.35, 0.38, baseT + 0.12, 0.05, 0, matDark);
-
-    // Height-adjustment screw on the right of the channel (near top)
-    const screwY = L * 0.18;
-    const screwZ = chW / 2 + 0.02;
-    const boss = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.14, 14), mat);
+    // ---- Height / depth adjustment screw (on the wing, with boss) ----
+    const screwY = 1.15, screwZ = -1.55;
+    const boss = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.12, 16), mat);
     boss.rotation.z = Math.PI / 2;
-    boss.position.set(baseT + chH * 0.45, screwY, screwZ);
+    boss.position.set(x0 + 0.08, screwY, screwZ);
     add(boss);
-    const head = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.1, 14), matDark);
+    const head = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.1, 16), matDark);
     head.rotation.z = Math.PI / 2;
-    head.position.set(baseT + chH * 0.45 + 0.08, screwY, screwZ);
+    head.position.set(x0 + 0.16, screwY, screwZ);
     add(head);
-    // Phillips slot
-    box(0.04, 0.28, 0.05, baseT + chH * 0.45 + 0.14, screwY, screwZ, matDark);
-    box(0.04, 0.05, 0.28, baseT + chH * 0.45 + 0.14, screwY, screwZ, matDark);
+    box(0.035, 0.26, 0.045, x0 + 0.22, screwY, screwZ, matDark);
+    box(0.035, 0.045, 0.26, x0 + 0.22, screwY, screwZ, matDark);
 
-    // Countersunk mounting holes (diagonal wings)
-    const addHole = (y, z) => {
-        const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.42, 0.07, 16), matDark);
+    // Countersink rings around mounting holes (extra depth cue)
+    const ringAt = (y, z) => {
+        const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.42, 0.05, 18), matDark);
         ring.rotation.z = Math.PI / 2;
-        ring.position.set(baseT + 0.03, y, z);
+        ring.position.set(x0 + 0.01, y, z);
         add(ring);
-        const hole = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.1, 12), matDark);
-        hole.rotation.z = Math.PI / 2;
-        hole.position.set(baseT + 0.04, y, z);
-        add(hole);
     };
-    addHole(-wingY, -(chW / 2 + wingExt / 2));
-    addHole(wingY, chW / 2 + wingExt / 2);
+    ringAt(-1.35, -1.45);
+    ringAt(1.35, 1.45);
 
-    g.userData.outExtent = baseT + chH;
+    g.userData.outExtent = x0 + chH;
     return g;
 }
 
