@@ -285,8 +285,13 @@ window._configureKitchenCarcass = function(role, opts) {
         if (nCorner <= 0) {
             cw.columns = [];
             state.columns = [];
-            // Narrow stub so only the full-corner L is visible; +60 extends later
+            // Narrow stub so only the full-corner L is visible; +60 extends later.
+            // Mark cornerL BEFORE width so updateDim won't invent a column.
+            cw.kitchenCornerL = true;
             _applyKitDim('width', KIT_DEPTH);
+            // Re-clear in case anything still tried to seed a column
+            cw.columns = [];
+            state.columns = [];
             if (typeof _syncColumnCountInputs === 'function') _syncColumnCountInputs(0);
         } else {
             _kitInitColumns({ numCols: nCorner, height: KIT_HEIGHT, topPanel: true });
@@ -380,6 +385,13 @@ window._kitchenLinearMeters = function() {
     ['center', 'left', 'right'].forEach(function(s) {
         const w = state.wings && state.wings[s];
         if (!w) return;
+        // Full-corner arm: count L block + return units (empty arm stores size as width only once)
+        if (w.wingPosition === 'full_corner' && w.fullCorner) {
+            const fc = w.fullCorner.size || 90;
+            const hasCols = !!(w.columns && w.columns.length);
+            cm += hasCols ? (fc + (w.width || 0)) : fc;
+            return;
+        }
         cm += w.width || 0;
     });
     return Math.round((cm / 100) * 100) / 100;

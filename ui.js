@@ -5188,7 +5188,8 @@ window.toggleCellAppliance = function(type) {
     const sideW = R.sideBySideWidth || 122;
     const minW = R.minWidth || 60;
 
-    if (col.width < minW) {
+    // Allow tiny float drift (e.g. kitchen 60 → 59.9 after rescale)
+    if (col.width < minW - 0.2) {
         _showToast(`רוחב התא ${fmt(col.width)} ס"מ — ל${names[type] || type} נדרש רוחב פנימי של ${minW} ס"מ לפחות`, 4500);
         return;
     }
@@ -12739,7 +12740,8 @@ window._configureSpaceUnit = function(kind, host) {
         if (kind === 'kitchenCorner') {
             const side = (host && host.cornerSide === 'left') ? 'left' : 'right';
             if (typeof window._configureKitchenCornerL === 'function') {
-                window._configureKitchenCornerL(side, { host: host, numCols: 2 });
+                // Corner only (full ר + shelves). Do NOT pass numCols — that adds extra base units.
+                window._configureKitchenCornerL(side, { host: host });
             }
             // L geometry is built into the cabinet (center + side wing) — no space rotation
             return 0;

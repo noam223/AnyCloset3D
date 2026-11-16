@@ -4618,7 +4618,16 @@ window.updateDim = function(dim, delta, absoluteValue = null) {
             const minCols = Math.ceil((state.width - state.thickness*2) / effectiveMaxColW);
             const colInput = document.getElementById('inp-columns');
             if(colInput) colInput.min = minCols;
-            if(state.columns.length < minCols) {
+            // Kitchen corner stub may legitimately have 0 columns (full-corner L only)
+            const kitchenCornerEmptyStub = !!(
+                state.presetId === 'kitchen' &&
+                activeWingData &&
+                activeWingData.kitchenCornerL &&
+                (!state.columns || state.columns.length === 0)
+            );
+            if (kitchenCornerEmptyStub) {
+                // Keep width only — do not invent a base unit next to the ר
+            } else if(state.columns.length < minCols) {
                 // Add extra columns on the right without wiping existing interiors
                 _applyColumnCountChange(minCols, 'right', true);
             } else {
