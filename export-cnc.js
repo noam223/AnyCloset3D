@@ -1487,7 +1487,7 @@
         { k: 'plinthStrips', label: 'לוחות צוקל לכל בלוק', opts: [[0, 'ללא'], [1, 'פס קדמי'], [2, 'פס קדמי + אחורי']] },
         { k: 'edgeBandThickness', label: 'הפחתת עובי קנט ממידת החיתוך', step: 0.1 }
     ];
-    const UI = { cfg: null, result: null, sel: 0, hover: -1, side: 'A', timer: null, view: null };
+    const UI = { cfg: null, result: null, sel: 0, hover: -1, side: 'A', timer: null, view: null, hideDoors: false };
     function _esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
     function _toast(msg, ms) {
         if (typeof _showToast === 'function') { _showToast(msg, ms || 4000); return; }
@@ -1607,7 +1607,17 @@
         scene.add(key);
         const controls = (typeof THREE.OrbitControls === 'function')
             ? new THREE.OrbitControls(camera, canvas) : null;
-        if (controls) { controls.enableDamping = true; controls.dampingFactor = 0.12; }
+        if (controls) {
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.12;
+            controls.addEventListener('start', function() { if (UI.view) UI.view.userMoved = true; });
+            controls.addEventListener('change', function() {
+                const view = UI.view;
+                if (!view || view.framing) return;
+                view.viewDir = view.camera.position.clone().sub(controls.target);
+                if (view.viewDir.lengthSq() > 1e-6) view.viewDir.normalize();
+            });
+        }
         const mats = {
             idle: new THREE.MeshStandardMaterial({ color: 0xd6d3d1, roughness: 0.72, metalness: 0.04 }),
             sel: new THREE.MeshStandardMaterial({ color: 0x4f46e5, emissive: 0x312e81, roughness: 0.45 }),
@@ -1621,6 +1631,7 @@
             renderer.setSize(w, h, false);
             camera.aspect = w / Math.max(1, h);
             camera.updateProjectionMatrix();
+            _frame3d(UI.view, false);
         };
         fit();
         UI.view.fit = fit;
@@ -1644,7 +1655,7 @@
             );
             const ray = new THREE.Raycaster();
             ray.setFromCamera(ndc, camera);
-            const hits = ray.intersectObjects(UI.view.meshes, false);
+            const hits = ray.intersectObjects(UI.view.meshes.filter(function(mesh) { return mesh.visible; }), false);
             if (!hits.length) return;
             UI.sel = hits[0].object.userData.row;
             UI.side = 'A';
@@ -1665,6 +1676,31 @@
         m.setPosition(pose.c[0] / 10, pose.c[1] / 10, pose.c[2] / 10);
         return m;
     }
+    // Frame the cabinet to the 3D pane. Keeps the current viewing angle after the first fit.
+    function _frame3d(v, resetDir) {
+        if (!v || !v.meshes.length) return;
+        const box = new THREE.Box3().setFromObject(v.group);
+        if (box.isEmpty()) return;
+        const center = box.getCenter(new THREE.Vector3());
+        const radius = Math.max(box.getBoundingSphere(new THREE.Sphere()).radius, 8);
+        const fov = v.camera.fov * Math.PI / 180;
+        const aspect = v.camera.aspect || 1;
+        const distV = radius / Math.sin(fov / 2);
+        const hfov = 2 * Math.atan(Math.tan(fov / 2) * aspect);
+        const distH = radius / Math.sin(Math.max(hfov, 0.2) / 2);
+        const dist = Math.max(distV, distH) * 1.16;
+        let dir = (!resetDir && v.viewDir && v.viewDir.lengthSq() > 1e-6) ? v.viewDir.clone() : new THREE.Vector3(0.72, 0.38, 1);
+        dir.normalize();
+        v.viewDir = dir.clone();
+        v.framing = true;
+        v.camera.position.copy(center).add(dir.multiplyScalar(dist));
+        v.camera.near = Math.max(0.1, dist / 80);
+        v.camera.far = dist + radius * 10;
+        v.camera.lookAt(center);
+        v.camera.updateProjectionMatrix();
+        if (v.controls) { v.controls.target.copy(center); v.controls.update(); }
+        v.framing = false;
+    }
     function _sync3d() {
         _mount3d();
         const v = UI.view;
@@ -1684,21 +1720,25 @@
                     mesh.matrix.copy(_poseMatrix(pose));
                     mesh.matrixAutoUpdate = false;
                     mesh.userData.row = i;
+                    mesh.userData.door = r.code === 'DOOR';
                     v.group.add(mesh);
                     v.meshes.push(mesh);
                 });
             });
-            if (refit && v.meshes.length) {
-                const box = new THREE.Box3().setFromObject(v.group);
-                const c = box.getCenter(new THREE.Vector3());
-                const s = box.getSize(new THREE.Vector3());
-                const dist = Math.max(s.x, s.y, s.z, 40) * 1.35;
-                v.camera.position.set(c.x + dist * 0.75, c.y + dist * 0.45, c.z + dist);
-                v.camera.lookAt(c);
-                if (v.controls) { v.controls.target.copy(c); v.controls.update(); }
-            }
+            if (v.meshes.length) _frame3d(v, refit || !v.userMoved);
         }
         _highlight3d();
+        _apply3dDoors();
+    }
+    function _apply3dDoors() {
+        const v = UI.view;
+        if (!v) return;
+        v.meshes.forEach(function(mesh) { mesh.visible = !(UI.hideDoors && mesh.userData.door); });
+        const btn = document.getElementById('cnc-3d-doors');
+        if (!btn) return;
+        btn.innerHTML = '<i class="fa-solid fa-door-open" style="margin-left:6px;"></i>' + (UI.hideDoors ? 'הצג דלתות' : 'הסתר דלתות');
+        btn.style.background = UI.hideDoors ? '#4f46e5' : 'rgba(255,255,255,.94)';
+        btn.style.color = UI.hideDoors ? '#fff' : '#44403c';
     }
     function _highlight3d() {
         const v = UI.view;
@@ -1761,13 +1801,14 @@
         UI.cfg = _loadSettings();
         UI.sel = 0;
         UI.hover = -1;
+        UI.hideDoors = false;
         UI.side = 'A';
         const m = document.createElement('div');
         m.id = 'cnc-export-modal';
         m.dir = 'rtl';
         m.style.cssText = 'position:fixed;inset:0;z-index:10060;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;font-family:inherit;';
         m.innerHTML =
-            '<div style="background:#fff;border-radius:14px;width:min(1240px,96vw);height:min(820px,94vh);display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(15,23,42,.35);overflow:hidden;">' +
+            '<div style="background:#fff;border-radius:14px;width:min(1380px,97vw);height:min(860px,94vh);display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(15,23,42,.35);overflow:hidden;">' +
                 '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid #e2e8f0;">' +
                     '<div><b style="font-size:1rem;color:#0f172a;"><i class="fa-solid fa-gears" style="color:#4f46e5;margin-left:8px;"></i>ייצוא CNC — DXF ורשימת חיתוך</b>' +
                     '<div style="font-size:.74rem;color:#64748b;margin-top:2px;">הארון שבעריכה · קובץ DXF שכבתי לכל לוח, קובץ מרוכז לכל חומר ורשימת חיתוך CSV</div></div>' +
@@ -1779,9 +1820,10 @@
                         '<div id="cnc-preview" style="flex:0 0 46%;min-height:0;display:flex;gap:14px;padding:12px 14px;border-bottom:1px solid #e2e8f0;background:#f8fafc;"></div>' +
                         '<div id="cnc-list" style="flex:1;min-height:0;overflow:auto;"></div>' +
                     '</div>' +
-                    '<div id="cnc-3d-wrap" style="width:340px;flex-shrink:0;position:relative;background:#e7e5e4;border-right:1px solid #e2e8f0;">' +
+                    '<div id="cnc-3d-wrap" style="width:460px;flex-shrink:0;position:relative;background:#e7e5e4;border-right:1px solid #e2e8f0;">' +
                         '<canvas id="cnc-3d" style="width:100%;height:100%;display:block;"></canvas>' +
                         '<div style="position:absolute;top:8px;right:10px;left:10px;font-size:.72rem;color:#44403c;pointer-events:none;">מודל הארון · מעבר על שורה מסמן את החלק</div>' +
+                        '<button type="button" id="cnc-3d-doors" style="position:absolute;bottom:10px;left:10px;z-index:2;border:1px solid #d6d3d1;border-radius:8px;background:rgba(255,255,255,.94);color:#44403c;font:inherit;font-size:.74rem;font-weight:700;padding:6px 10px;cursor:pointer;">הסתר דלתות</button>' +
                     '</div>' +
                 '</div>' +
                 '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 18px;border-top:1px solid #e2e8f0;background:#f8fafc;">' +
@@ -1827,6 +1869,11 @@
             if (row) { UI.sel = Number(row.getAttribute('data-cnc-row')); UI.hover = -1; UI.side = 'A'; _render('data'); return; }
             const side = e.target.closest && e.target.closest('[data-cnc-side]');
             if (side) { UI.side = side.getAttribute('data-cnc-side'); _render('data'); return; }
+            if (e.target.id === 'cnc-3d-doors' || (e.target.closest && e.target.closest('#cnc-3d-doors'))) {
+                UI.hideDoors = !UI.hideDoors;
+                _apply3dDoors();
+                return;
+            }
             if (e.target.id === 'cnc-reset') {
                 UI.cfg = Object.assign({}, CNC_DEFAULTS);
                 _saveSettings(UI.cfg);
