@@ -779,10 +779,10 @@ window._createKitchenWorktopWithCutouts = function(panelW, panelT, panelD, mat, 
         bevelEnabled: false,
         curveSegments: 1
     });
-    // Shape is X/Z (as X/Y); extrude along +Z → rotate so thickness is Y
+    // Shape is X/Z (as X/Y); extrude along +Z → rotate so thickness is +Y
+    // After rotateX(-90°): bottom of slab at y=0, top at y=panelT (center at panelT/2).
+    // Do NOT translate up — that lifted the worktop off the carcass and left a gap.
     geo.rotateX(-Math.PI / 2);
-    // After rotateX(-90°): extruded +Z becomes +Y. Bottom of slab at y=0 → shift so center at panelT/2
-    geo.translate(0, panelT / 2, 0);
     geo.computeVertexNormals();
 
     const mesh = new THREE.Mesh(geo, mat);
