@@ -6335,6 +6335,77 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
     const _handleStyle = _getHandleStyle();
     const isTouch = (_handleStyle === 'touch');
     const isRegalim = (state.cabinetModel === 'regalim');
+    // Kitchen base/corner: carcass on leveling feet + continuous external kick plinth (not solid filled צוקל)
+    const isKitchenBase = state.presetId === 'kitchen' &&
+        !(typeof window._isKitchenUpper === 'function' && window._isKitchenUpper()) &&
+        (state.plinthHeight > 0) &&
+        !(state.activeWing && String(state.activeWing).indexOf('upperUnit_') === 0);
+
+    // ---- מטבח: רגלי פילוס + צוקל חיצוני רציף על כל הפס ----
+    // Carcass sits on leveling feet; thin external kickboard covers the whole bottom strip.
+    if (isKitchenBase) {
+        const kitPlinthH = state.plinthHeight;
+        const kitLegH = Math.max(2, kitPlinthH); // feet reach underside of carcass floor
+        const kitPlinthT = Math.max(1.6, Math.min(t, 1.8)); // thin external kick board
+        const cabinetW = state.width;
+        const halfW = cabinetW / 2;
+        const halfD = bodyD / 2;
+
+        if (!isBP) {
+            // Leveling feet (black plastic) under each kitchen unit
+            const footMat = new THREE.MeshStandardMaterial({
+                color: 0x2a2a2a, roughness: 0.55, metalness: 0.15
+            });
+            const FOOT_TOP_R = 1.1;
+            const FOOT_BOT_R = 1.6;
+            const insetX = 4;
+            const insetZ = 4;
+            const footZs = [-halfD + insetZ, halfD - insetZ - kitPlinthT];
+            const cols = state.columns || [];
+            let xCursor = -halfW + t;
+            const footXs = [];
+            if (cols.length) {
+                for (let ci = 0; ci < cols.length; ci++) {
+                    const cw = cols[ci].width || 60;
+                    const left = xCursor;
+                    const right = xCursor + cw;
+                    footXs.push(left + insetX, right - insetX);
+                    xCursor = right + ((ci < cols.length - 1) ? (2 * t) : t);
+                }
+            } else {
+                footXs.push(-halfW + insetX, halfW - insetX);
+            }
+            const uniqXs = [];
+            footXs.forEach(function(x) {
+                if (!uniqXs.some(function(u) { return Math.abs(u - x) < 1; })) uniqXs.push(x);
+            });
+            uniqXs.forEach(function(lx) {
+                footZs.forEach(function(lz) {
+                    const foot = new THREE.Mesh(
+                        new THREE.CylinderGeometry(FOOT_TOP_R, FOOT_BOT_R, kitLegH, 12),
+                        footMat
+                    );
+                    foot.position.set(lx, kitLegH / 2, lz);
+                    foot.castShadow = false;
+                    _buildGroup.add(foot);
+                });
+            });
+        }
+
+        // Continuous external plinth covering the whole bottom strip (front + side returns)
+        _ppPartId = 'plinth_external';
+        createBoard(cabinetW, kitPlinthH, kitPlinthT, 0, kitPlinthH / 2, halfD - kitPlinthT / 2);
+        const sidePlinthD = Math.max(4, bodyD - kitPlinthT);
+        const sidePlinthZ = -kitPlinthT / 2;
+        createBoard(kitPlinthT, kitPlinthH, sidePlinthD, -halfW + kitPlinthT / 2, kitPlinthH / 2, sidePlinthZ);
+        createBoard(kitPlinthT, kitPlinthH, sidePlinthD, halfW - kitPlinthT / 2, kitPlinthH / 2, sidePlinthZ);
+        _ppPartId = '';
+
+        // Carcass floor board on top of the feet (full run width) — top at plinthH+t matches startShelvesY
+        _ppPartId = 'plinth_floor';
+        createBoard(cabinetW, t, bodyD - kitPlinthT, 0, kitPlinthH + t / 2, -kitPlinthT / 2);
+        _ppPartId = '';
+    }
 
     // ---- רגלי ניקל: מצויר פעם אחת לכל כנף (לא לכל עמודה) ----
     // פלטה: 1.7 ס"מ עובי, רוחב מלא, יושבת על הרגליים
@@ -6998,15 +7069,15 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
                 const floorMesh = createBoard(col.width, t, bodyD, colCenterX, fo + t/2, 0);
                 _ppPartId = '';
                 _applyHorizBoardUV(floorMesh, currentX, col.width, bodyD, state.width);
-            } else if (col.noPlinth && !_isSlidingWardrobe && !isRegalim && (_isUpperUnitBuild || col.spaceBottomPanel)) {
+            } else if (col.noPlinth && !_isSlidingWardrobe && !isRegalim && !isKitchenBase && (_isUpperUnitBuild || col.spaceBottomPanel)) {
                 // יחידה עליונה / ארון מורם במרחב: דופן תחתונה בעובי לוח (בלי צוקל)
                 _ppPartId = `plinth_c${c}`;
                 const plinthTopMesh = createBoard(col.width, t, bodyD, colCenterX, t/2, 0);
                 _ppPartId = '';
                 _applyHorizBoardUV(plinthTopMesh, currentX, col.width, bodyD, state.width);
-            } else if (!col.noPlinth && !_isSlidingWardrobe && !isRegalim) {
+            } else if (!col.noPlinth && !_isSlidingWardrobe && !isRegalim && !isKitchenBase) {
                 // For sliding wardrobes: full-width bottom board is added by buildSlidingDoorCabinet — skip per-column plinth
-                // For regalim: plate already drawn as full-width mesh above — skip per-column plinth solid
+                // For regalim / kitchen: plate + external plinth already drawn — skip solid filled צוקל
                 _ppPartId = `plinth_c${c}`;
                 createBoard(col.width, state.plinthHeight, bodyD, colCenterX, state.plinthHeight/2, 0);
                 const plinthTopMesh = createBoard(col.width, t, bodyD, colCenterX, state.plinthHeight + t/2, 0);
@@ -7022,6 +7093,8 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
                     _ppPartId = '';
                     _applyHorizBoardUV(plinthTopMesh, currentX, col.width, bodyD, state.width);
                 }
+            } else if (!col.noPlinth && !_isSlidingWardrobe && isKitchenBase) {
+                // Kitchen: full-width floor plate + external plinth already drawn — no per-column solid צוקל
             }
             // ידית גרירה לתחתית — נשמרת תמיד (לא רק כשמרחפים)
             if (!isBP && _isActiveWingBuild) {
@@ -7054,7 +7127,7 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
             // For sliding wardrobes: outer side walls extend to floor (y=0), like the aluminum plinth
             // For regalim: walls start from plinthHeight (top of plate)
             let wallBottomY = fo;
-            if (isRegalim && fo === 0) wallBottomY = state.plinthHeight;
+            if ((isRegalim || isKitchenBase) && fo === 0) wallBottomY = state.plinthHeight;
             // For desk columns: plinth area is open — wall starts above plinth zone
             if (isDesk && fo === 0) wallBottomY = state.plinthHeight;
             const wallTopY = col.height;
@@ -7086,9 +7159,9 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
         if (c === _cols.length - 1) {
             // קיר ימני קיצוני — מתחיל מ-floorOffset של העמודה
             // For sliding wardrobes: outer side walls extend to floor (y=0), like the aluminum plinth
-            // For regalim: walls start from plinthHeight (top of plate)
+            // For regalim / kitchen: walls start from plinthHeight (top of plate / above feet)
             let wallBottomY = fo;
-            if (isRegalim && fo === 0) wallBottomY = state.plinthHeight;
+            if ((isRegalim || isKitchenBase) && fo === 0) wallBottomY = state.plinthHeight;
             // For desk columns: plinth area is open — wall starts above plinth zone
             if (isDesk && fo === 0) wallBottomY = state.plinthHeight;
             const wallTopY = rightH;
@@ -7118,8 +7191,8 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
             let wallBottomY = (fo > 0 && nextFO > 0) ? Math.min(fo, nextFO) : 0;
             // For sliding wardrobes: bottom board top is at y=plinthH, so partitions start at y=plinthH
             if (_isSlidingWardrobe) wallBottomY = Math.max(wallBottomY, state.plinthHeight);
-            // For regalim: internal partitions start from plinthHeight (top of plate)
-            if (isRegalim && wallBottomY === 0) wallBottomY = state.plinthHeight;
+            // For regalim / kitchen: internal partitions start from plinthHeight (top of plate / above feet)
+            if ((isRegalim || isKitchenBase) && wallBottomY === 0) wallBottomY = state.plinthHeight;
             // For desk columns: plinth area is open — partition starts above plinth zone
             if ((isDesk || (nextCol && nextCol.type === 'desk')) && wallBottomY === 0) wallBottomY = state.plinthHeight;
             const wallTopY = rightH;

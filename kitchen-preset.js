@@ -96,6 +96,7 @@ function _makeKitchenCornerArm(side, opts) {
     w.wingPosition = 'side';
     w.slidingDoor = w.slidingDoor || {};
     w.slidingDoor.enabled = false;
+    w.orderOpts = Object.assign({}, w.orderOpts || {}, { levelingFeet: 'yes' });
     const src = opts.host || c || {};
     ['materialBody', 'materialInternal', 'materialExternal', 'materialOpenCell', 'materialBack',
         'materialTopPanel', 'handleType', 'handleStyle', 'handleVariant', 'ridingColor', 'countertopBrand'
@@ -209,6 +210,11 @@ window._configureKitchenCarcass = function(role, opts) {
     cw.boardMaterial = 'sandwich';
     cw.slidingDoor = cw.slidingDoor || {};
     cw.slidingDoor.enabled = false;
+    // Kitchen base/corner: leveling feet under carcass + external kick plinth (order note)
+    if (role !== 'upper') {
+        cw.orderOpts = Object.assign({}, cw.orderOpts || {}, { levelingFeet: 'yes' });
+        if (typeof window._syncOrderOptsUI === 'function') window._syncOrderOptsUI();
+    }
 
     if (opts.host) {
         ['materialBody', 'materialInternal', 'materialExternal', 'materialOpenCell', 'materialBack',
