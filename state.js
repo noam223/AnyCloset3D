@@ -4158,13 +4158,24 @@ window.updateQE = function(field, delta, unit) {
         col.height = Math.max(minH, Math.min(MAX_GLOBAL_HEIGHT, Math.round(col.height + delta)));
     }
     if (field === 'width') {
-        let neighborIndex = (cIndex === state.columns.length - 1) ? cIndex - 1 : cIndex + 1;
-        if (neighborIndex >= 0 && neighborIndex < state.columns.length) {
-            let neighbor = state.columns[neighborIndex];
-            let newW = Math.round(col.width + delta);
-            let newNeighborW = Math.round(neighbor.width - delta);
-            if (newW >= MIN_COL_WIDTH && newNeighborW >= MIN_COL_WIDTH) {
-                col.width = newW; neighbor.width = newNeighborW;
+        if (state.presetId === 'kitchen') {
+            // Separate carcasses: grow/shrink the run, do not steal from the neighbor unit
+            const newW = Math.round(col.width + delta);
+            if (newW >= MIN_COL_WIDTH) {
+                col.width = newW;
+                if (typeof window._kitchenCommitRunWidth === 'function') {
+                    window._kitchenCommitRunWidth(state.wings[state.activeWing]);
+                }
+            }
+        } else {
+            let neighborIndex = (cIndex === state.columns.length - 1) ? cIndex - 1 : cIndex + 1;
+            if (neighborIndex >= 0 && neighborIndex < state.columns.length) {
+                let neighbor = state.columns[neighborIndex];
+                let newW = Math.round(col.width + delta);
+                let newNeighborW = Math.round(neighbor.width - delta);
+                if (newW >= MIN_COL_WIDTH && newNeighborW >= MIN_COL_WIDTH) {
+                    col.width = newW; neighbor.width = newNeighborW;
+                }
             }
         }
     }
@@ -4201,20 +4212,28 @@ window._setColumnWidthCm = function(cIndex, desiredCm) {
     const minW = (typeof MIN_COL_WIDTH !== 'undefined') ? MIN_COL_WIDTH : 20;
     let desired = Math.round(desiredCm);
     if (isNaN(desired)) return Math.round(col.width);
+    const isKit = state.presetId === 'kitchen';
+    const t = state.thickness || 1.7;
 
-    if (cols.length === 1) {
-        // Single column: changing width changes total cabinet width
-        const t = state.thickness || 1.7;
-        const newTotal = Math.max(40, Math.min(600, desired + t * 2));
-        desired = Math.max(minW, Math.round(newTotal - t * 2));
-        state.width = desired + t * 2;
+    if (cols.length === 1 || isKit) {
+        // Single column, or kitchen separate carcass: changing width grows/shrinks total run
+        // (kitchen must not steal from the neighbor — that crushed adjacent units into double walls)
+        desired = Math.max(minW, desired);
         col.width = desired;
-        const pill = document.getElementById('dim-pill-width');
-        if (pill) pill.value = Math.round(state.width);
-        const inp = document.getElementById('inp-num-width');
-        if (inp) inp.value = Math.round(state.width);
+        if (isKit && typeof window._kitchenCommitRunWidth === 'function') {
+            window._kitchenCommitRunWidth(state.wings[state.activeWing]);
+        } else {
+            const newTotal = Math.max(40, Math.min(600, desired + t * 2));
+            desired = Math.max(minW, Math.round(newTotal - t * 2));
+            state.width = desired + t * 2;
+            col.width = desired;
+            const pill = document.getElementById('dim-pill-width');
+            if (pill) pill.value = Math.round(state.width);
+            const inp = document.getElementById('inp-num-width');
+            if (inp) inp.value = Math.round(state.width);
+        }
     } else {
-        // Multi-column: keep total width — steal/give from neighbor (same as updateQE width)
+        // Multi-column wardrobe: keep total width — steal/give from neighbor (same as updateQE width)
         let neighborIndex = (cIndex === cols.length - 1) ? cIndex - 1 : cIndex + 1;
         const neighbor = cols[neighborIndex];
         if (!neighbor) return Math.round(col.width);
@@ -4630,7 +4649,8 @@ function _rescaleColumnHeights(newHeight) {
 window.updateDim = function(dim, delta, absoluteValue = null) {
     let val;
     if (absoluteValue !== null) {
-        val = parseInt(absoluteValue);
+        // Kitchen widths are fractional (60 + 2×1.7 walls). parseInt crushed units on every +60.
+        val = parseFloat(absoluteValue);
     } else {
         if (dim === 'width') val = state.width + delta;
         if (dim === 'height') val = state.globalHeight + delta;
@@ -4644,10 +4664,21 @@ window.updateDim = function(dim, delta, absoluteValue = null) {
     if (dim === 'width') {
         // Clamp to room width if set by user
         const _maxW = (window._roomWidth && window._roomWidth > 0) ? window._roomWidth : 600;
-        val = Math.max(MIN_WARDROBE_WIDTH, Math.min(_maxW, val));
+        const activeWingData = state.wings[state.activeWing];
+        // Kitchen corner stub is a near-zero L anchor — do not force MIN_WARDROBE_WIDTH (10)
+        const kitchenCornerEmptyStub = !!(
+            state.presetId === 'kitchen' &&
+            activeWingData &&
+            activeWingData.kitchenCornerL &&
+            (!state.columns || state.columns.length === 0)
+        );
+        const _minW = kitchenCornerEmptyStub ? 0.2 : MIN_WARDROBE_WIDTH;
+        val = Math.round(Math.max(_minW, Math.min(_maxW, val)) * 10) / 10;
         state.width = val;
-        document.getElementById('inp-width').value = val;
-        document.getElementById('inp-num-width').value = val;
+        const _wEl = document.getElementById('inp-width');
+        const _wnEl = document.getElementById('inp-num-width');
+        if (_wEl) _wEl.value = val;
+        if (_wnEl) _wnEl.value = val;
 
         // For sliding wardrobes: auto-recalculate doors AND columns together
         if (state.presetId === 'sliding') {
@@ -4667,24 +4698,31 @@ window.updateDim = function(dim, delta, absoluteValue = null) {
                 if (colInput) colInput.value = cw.slidingDoor.numDoors;
                 if (colLbl) colLbl.innerText = cw.slidingDoor.numDoors;
             }
+        } else if (state.presetId === 'kitchen') {
+            // Kitchen units are separate carcasses (+60 / −unit). Do not invent columns or
+            // proportionally crush fixed module widths when the run width is edited.
+            if (kitchenCornerEmptyStub) {
+                // Keep stub width only — do not invent a base unit next to the ר
+            } else if (state.columns && state.columns.length) {
+                if (typeof window._kitchenWidthFromColumns === 'function') {
+                    const snapped = window._kitchenWidthFromColumns(state.columns, state.thickness);
+                    if (Math.abs(snapped - val) > 0.05) {
+                        // Slider/typed width: keep unit carcasses, snap total to double-wall formula
+                        val = snapped;
+                        state.width = val;
+                        if (_wEl) _wEl.value = val;
+                        if (_wnEl) _wnEl.value = val;
+                    }
+                }
+            }
         } else {
             // Normal wardrobe: rescale existing columns proportionally (preserves internal structure)
-            const activeWingData = state.wings[state.activeWing];
             const _wingPos = activeWingData ? (activeWingData.wingPosition || 'side') : null;
             const effectiveMaxColW = (_wingPos === 'front' || (_wingPos === 'side' && state.activeWing !== 'center')) ? 160 : MAX_COL_WIDTH;
             const minCols = Math.ceil((state.width - state.thickness*2) / effectiveMaxColW);
             const colInput = document.getElementById('inp-columns');
             if(colInput) colInput.min = minCols;
-            // Kitchen corner stub may legitimately have 0 columns (full-corner L only)
-            const kitchenCornerEmptyStub = !!(
-                state.presetId === 'kitchen' &&
-                activeWingData &&
-                activeWingData.kitchenCornerL &&
-                (!state.columns || state.columns.length === 0)
-            );
-            if (kitchenCornerEmptyStub) {
-                // Keep width only — do not invent a base unit next to the ר
-            } else if(state.columns.length < minCols) {
+            if(state.columns.length < minCols) {
                 // Add extra columns on the right without wiping existing interiors
                 _applyColumnCountChange(minCols, 'right', true);
             } else {

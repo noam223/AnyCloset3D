@@ -7116,7 +7116,10 @@ function buildDragHandlesUI() {
         return;
     }
 
-    dragHandlesData.horizontal.forEach((x3d, index) => {
+    // Kitchen: units are separate carcasses with double walls — divider drag steals width and
+    // crushes neighbors. Use +60 / delete-unit / width label instead.
+    const _kitNoHDrag = !!(state.presetId === 'kitchen');
+    if (!_kitNoHDrag) dragHandlesData.horizontal.forEach((x3d, index) => {
         const colLeft = state.columns[index];
         const colRight = state.columns[index + 1];
         if (!colLeft || !colRight) return;
@@ -12236,16 +12239,92 @@ window._spaceWingsForSlot = function(slot) {
     return (item && item.rawState && item.rawState.wings) || null;
 };
 
+/**
+ * Axis-aligned plan rects for a cabinet's wings (local frame, origin = center-wing centre).
+ * Includes kitchen ר (full_corner L + return units) so space collision matches the real carcass.
+ */
+window._spaceCabinetPlanRects = function(wings) {
+    wings = wings || {};
+    const c = wings.center || {};
+    const cW = c.width || 160;
+    const cD = c.depth || 54;
+    const rects = [];
+    const kitCornerStub = !!(c.kitchenCornerL && (!c.columns || !c.columns.length));
+    if (!kitCornerStub) {
+        rects.push([-cW / 2, cW / 2, -cD / 2, cD / 2]);
+    }
+    ['left', 'right'].forEach(function(side) {
+        const w = wings[side];
+        if (!w) return;
+        const L = side === 'left';
+        const edge = L ? -cW / 2 : cW / 2;
+        const wW = w.width || 160;
+        const wD = w.depth || cD;
+        const hasCols = Array.isArray(w.columns) && w.columns.length > 0;
+        const pos = w.wingPosition || 'side';
+        if (pos === 'full_corner' && w.fullCorner) {
+            const fc = w.fullCorner.size || 100;
+            // L block beside the center run
+            rects.push(L
+                ? [edge - fc, edge, -cD / 2, -cD / 2 + fc]
+                : [edge, edge + fc, -cD / 2, -cD / 2 + fc]);
+            if (hasCols) {
+                // Return units beyond the L
+                rects.push(L
+                    ? [edge - fc, edge - fc + wD, -cD / 2 + fc, -cD / 2 + fc + wW]
+                    : [edge + fc - wD, edge + fc, -cD / 2 + fc, -cD / 2 + fc + wW]);
+            }
+        } else if (hasCols && pos === 'front') {
+            rects.push(L
+                ? [edge, edge + wD, cD / 2, cD / 2 + wW]
+                : [edge - wD, edge, cD / 2, cD / 2 + wW]);
+        } else if (hasCols) {
+            rects.push(L
+                ? [edge - wD, edge, -cD / 2, -cD / 2 + wW]
+                : [edge, edge + wD, -cD / 2, -cD / 2 + wW]);
+        }
+    });
+    if (!rects.length) rects.push([-cW / 2, cW / 2, -cD / 2, cD / 2]);
+    return rects;
+};
+
 window._spaceCabinetFootprint = function(slot) {
     const wings = window._spaceWingsForSlot(slot);
     const c = wings && wings.center;
-    const w = (c && c.width) || 160;
-    const d = (c && c.depth) || 54;
+    let w = (c && c.width) || 160;
+    let d = (c && c.depth) || 54;
+    let cx = 0;
+    let cz = 0;
     let h = (c && c.globalHeight) || 240;
     let fo = 0;
     if (c && c.columns && c.columns.length) {
         h = Math.max.apply(null, c.columns.map(function(col) { return col.height || h; }));
         fo = Math.min.apply(null, c.columns.map(function(col) { return col.floorOffset || 0; }));
+    }
+    // Expand AABB for multi-arm / kitchen ר so units cannot crush into the L or side runs
+    if (wings && (wings.left || wings.right || (c && c.kitchenCornerL))) {
+        const rects = window._spaceCabinetPlanRects(wings);
+        let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+        rects.forEach(function(r) {
+            x0 = Math.min(x0, r[0]); x1 = Math.max(x1, r[1]);
+            z0 = Math.min(z0, r[2]); z1 = Math.max(z1, r[3]);
+        });
+        w = Math.max(1, x1 - x0);
+        d = Math.max(1, z1 - z0);
+        cx = (x0 + x1) / 2;
+        cz = (z0 + z1) / 2;
+        ['left', 'right'].forEach(function(side) {
+            const wing = wings[side];
+            if (!wing) return;
+            const wh = wing.globalHeight || h;
+            if (wing.columns && wing.columns.length) {
+                h = Math.max(h, Math.max.apply(null, wing.columns.map(function(col) { return col.height || wh; })));
+            } else {
+                h = Math.max(h, wh);
+            }
+            // Kitchen L worktop sits above carcass
+            if (wing.kitchenCornerL && wing.fullCorner) h = Math.max(h, wh + 2.8);
+        });
     }
     const uu = wings && wings.upperUnit_center;
     if (uu && uu._isUpperUnit) {
@@ -12255,10 +12334,12 @@ window._spaceCabinetFootprint = function(slot) {
         }
         h += (uu._upperGap || 0) + uuH;
     }
-    // World-axis extents: a quarter turn swaps width (X) and depth (Z)
+    // World-axis extents: a quarter turn swaps width (X) and depth (Z), and their centres
     const rot = slot > 0 ? (window._spaceOffsetForSlot(slot).rot || 0) : 0;
-    if (rot === 90 || rot === 270) return { w: d, h: h, d: w, floorOffset: fo, rot: rot };
-    return { w: w, h: h, d: d, floorOffset: fo, rot: rot };
+    if (rot === 90 || rot === 270) {
+        return { w: d, h: h, d: w, cx: cz, cz: -cx, floorOffset: fo, rot: rot };
+    }
+    return { w: w, h: h, d: d, cx: cx, cz: cz, floorOffset: fo, rot: rot };
 };
 
 window._spaceOffsetForSlot = function(slot) {
@@ -12274,7 +12355,7 @@ window._suggestNextSpaceOffset = function(newWidth) {
         info.members.forEach(function(m) {
             const fp = window._spaceCabinetFootprint(m.slot);
             const off = window._spaceOffsetForSlot(m.slot);
-            maxRight = Math.max(maxRight, off.x + fp.w / 2);
+            maxRight = Math.max(maxRight, off.x + (fp.cx || 0) + fp.w / 2);
         });
     } else {
         const w0 = Math.round(state.width || 160);
@@ -12294,12 +12375,20 @@ window._clampSpaceOffsetAgainstOthers = function(x, y, movingSlot, opts) {
 
     const dM = window._spaceCabinetFootprint(movingSlot);
     const foM = dM.floorOffset || 0;
+    const mCx0 = dM.cx || 0;
+    const mCz0 = dM.cz || 0;
+    const fp0 = window._spaceCabinetFootprint(0);
     // Back face may go at most as far back as the anchor cabinet's back (the wall line)
-    const minZ = Math.min(0, (dM.d - window._spaceCabinetFootprint(0).d) / 2);
-    z = Math.max(minZ, z);
+    const minZ = Math.min(0, ((dM.cz || 0) - dM.d / 2) - ((fp0.cz || 0) - fp0.d / 2));
+    // Keep moving AABB behind/at the wall relative to its own centre offset
+    z = Math.max(minZ - mCz0, z);
 
     function overlapZAt(zz, oOffZ, dO) {
-        return Math.min(oOffZ + dO.d / 2, zz + dM.d / 2) - Math.max(oOffZ - dO.d / 2, zz - dM.d / 2);
+        const a0 = (oOffZ + (dO.cz || 0)) - dO.d / 2;
+        const a1 = (oOffZ + (dO.cz || 0)) + dO.d / 2;
+        const b0 = (zz + mCz0) - dM.d / 2;
+        const b1 = (zz + mCz0) + dM.d / 2;
+        return Math.min(a1, b1) - Math.max(a0, b0);
     }
 
     function overlapYAt(yy, oOffY, dO, foO) {
@@ -12315,8 +12404,10 @@ window._clampSpaceOffsetAgainstOthers = function(x, y, movingSlot, opts) {
         const dO = window._spaceCabinetFootprint(m.slot);
         const oOff = window._spaceOffsetForSlot(m.slot);
         const foO = dO.floorOffset || 0;
+        const oCx = oOff.x + (dO.cx || 0);
+        const oCz = (oOff.z || 0) + (dO.cz || 0);
         const half = (dO.w + dM.w) / 2;
-        const dx = x - oOff.x;
+        const dx = (x + mCx0) - oCx;
         const overlapX = half - Math.abs(dx);
         const overlapY = overlapYAt(y, oOff.y, dO, foO);
         const oZ = oOff.z || 0;
@@ -12326,26 +12417,29 @@ window._clampSpaceOffsetAgainstOthers = function(x, y, movingSlot, opts) {
             if (prefer === 'z') {
                 const halfD = Math.ceil((dO.d + dM.d) / 2 - 1e-9);
                 const prevZ = opts.prevZ != null ? opts.prevZ : z;
-                z = (z < oZ || (z === oZ && prevZ < oZ)) ? oZ - halfD : oZ + halfD;
-                if (z < minZ) z = oZ + halfD;
+                const mCz = z + mCz0;
+                const nextCz = (mCz < oCz || (mCz === oCz && (prevZ + mCz0) < oCz))
+                    ? oCz - halfD : oCz + halfD;
+                z = nextCz - mCz0;
+                if (z < minZ - mCz0) z = (oCz + halfD) - mCz0;
             } else if (pushX) {
                 let sign = dx < 0 ? -1 : (dx > 0 ? 1 : 0);
                 if (!sign && opts.prevX != null) {
-                    const prevDx = (opts.prevX || 0) - oOff.x;
+                    const prevDx = ((opts.prevX || 0) + mCx0) - oCx;
                     sign = prevDx < 0 ? -1 : 1;
                 }
                 if (!sign) sign = 1;
-                x = oOff.x + sign * Math.ceil(half - 1e-9);
+                x = (oCx + sign * Math.ceil(half - 1e-9)) - mCx0;
             } else {
                 y = Math.max(0, Math.ceil(oOff.y + dO.h - foM - 1e-9));
                 if (overlapX > 0 && overlapYAt(y, oOff.y, dO, foO) > 0) {
                     let sign = dx < 0 ? -1 : (dx > 0 ? 1 : 0);
                     if (!sign && opts.prevX != null) {
-                        const prevDx = (opts.prevX || 0) - oOff.x;
+                        const prevDx = ((opts.prevX || 0) + mCx0) - oCx;
                         sign = prevDx < 0 ? -1 : 1;
                     }
                     if (!sign) sign = 1;
-                    x = oOff.x + sign * Math.ceil(half - 1e-9);
+                    x = (oCx + sign * Math.ceil(half - 1e-9)) - mCx0;
                 }
             }
         }
@@ -12355,8 +12449,8 @@ window._clampSpaceOffsetAgainstOthers = function(x, y, movingSlot, opts) {
     const rb = window._spaceRoomBoundsScene();
     if (rb) {
         const fitAxis = function(v, lo, hi) { return lo > hi ? (lo + hi) / 2 : Math.max(lo, Math.min(hi, v)); };
-        x = fitAxis(x, rb.minX + dM.w / 2, rb.maxX - dM.w / 2);
-        z = fitAxis(z, rb.minZ + dM.d / 2, rb.maxZ - dM.d / 2);
+        x = fitAxis(x + mCx0, rb.minX + dM.w / 2, rb.maxX - dM.w / 2) - mCx0;
+        z = fitAxis(z + mCz0, rb.minZ + dM.d / 2, rb.maxZ - dM.d / 2) - mCz0;
         if (rb.height > 0) y = Math.max(0, Math.min(y, rb.height - dM.h));
     }
     return { x: Math.round(x), y: Math.round(y), z: Math.round(z) };
@@ -12446,13 +12540,16 @@ window._spaceSnapOffset = function(x, y, z, slot, axes) {
     if (!info || !axes) return { x: x, y: y, z: z };
     const dM = window._spaceCabinetFootprint(slot);
     const foM = dM.floorOffset || 0;
+    const mCx = dM.cx || 0;
+    const mCz = dM.cz || 0;
     const xs = [], zs = [], ys = [foM];
     info.members.forEach(function(m) {
         if (m.slot === slot) return;
         const dO = window._spaceCabinetFootprint(m.slot);
         const o = window._spaceOffsetForSlot(m.slot);
-        const oz = o.z || 0;
-        xs.push(o.x - dO.w / 2, o.x + dO.w / 2);
+        const ox = o.x + (dO.cx || 0);
+        const oz = (o.z || 0) + (dO.cz || 0);
+        xs.push(ox - dO.w / 2, ox + dO.w / 2);
         zs.push(oz - dO.d / 2, oz + dO.d / 2);
         ys.push(o.y + (dO.floorOffset || 0), o.y + dO.h);
     });
@@ -12470,8 +12567,13 @@ window._spaceSnapOffset = function(x, y, z, slot, axes) {
         return best === null ? v : v + best;
     }
     const a = String(axes).toLowerCase();
-    if (a.indexOf('x') !== -1) x = snapEdges(Number(x) || 0, [-dM.w / 2, dM.w / 2], xs);
-    if (a.indexOf('z') !== -1) z = snapEdges(Number(z) || 0, [-dM.d / 2, dM.d / 2], zs);
+    // Snap using AABB centre offsets so kitchen ר edges align flush
+    if (a.indexOf('x') !== -1) {
+        x = snapEdges(Number(x) || 0, [mCx - dM.w / 2, mCx + dM.w / 2], xs);
+    }
+    if (a.indexOf('z') !== -1) {
+        z = snapEdges(Number(z) || 0, [mCz - dM.d / 2, mCz + dM.d / 2], zs);
+    }
     if (a.indexOf('y') !== -1) y = snapEdges(Number(y) || 0, [foM, dM.h], ys);
     return { x: x, y: y, z: z };
 };
