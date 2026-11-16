@@ -691,38 +691,9 @@ function kitchenApplianceProtrudes(list, cellW, cellH, bodyD, frontInset) {
     });
 }
 
-function _kitBrandBadge(label, width) {
-    const c = document.createElement('canvas');
-    c.width = 256; c.height = 64;
-    const x = c.getContext('2d');
-    x.clearRect(0, 0, 256, 64);
-    x.fillStyle = 'rgba(20,24,28,0.82)';
-    x.beginPath();
-    const r = 10;
-    x.moveTo(r, 8); x.lineTo(248 - r, 8); x.quadraticCurveTo(248, 8, 248, 8 + r);
-    x.lineTo(248, 56 - r); x.quadraticCurveTo(248, 56, 248 - r, 56);
-    x.lineTo(r, 56); x.quadraticCurveTo(8, 56, 8, 56 - r);
-    x.lineTo(8, 8 + r); x.quadraticCurveTo(8, 8, r, 8); x.closePath();
-    x.fill();
-    x.fillStyle = '#f4f6f8';
-    x.font = 'bold 28px Arial, sans-serif';
-    x.textAlign = 'center';
-    x.textBaseline = 'middle';
-    x.fillText(String(label || '').slice(0, 14), 128, 34);
-    const tex = new THREE.CanvasTexture(c);
-    tex.anisotropy = 4;
-    const w = Math.min(width * 0.55, 28);
-    const h = w * (64 / 256);
-    const mesh = new THREE.Mesh(
-        new THREE.PlaneGeometry(w, h),
-        new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false })
-    );
-    return mesh;
-}
-
 /**
  * Add kitchen appliances into a cell.
- * opts: { list, x, bottomY, cellW, cellH, bodyD, backT, frontInset, brand }
+ * opts: { list, x, bottomY, cellW, cellH, bodyD, backT, frontInset }
  */
 function addKitchenAppliancesToCell(parent, opts) {
     const list = (opts.list || []).filter(t => KIT_APPLIANCE_TYPES[t]);
@@ -738,14 +709,6 @@ function addKitchenAppliancesToCell(parent, opts) {
         y = opts.bottomY + Math.max(0, (opts.cellH || 80) - T.H - 2);
     }
     m.position.set(opts.x, y, frontZ - T.D / 2);
-    const brandLabel = opts.brandLabel ||
-        (typeof window._kitchenBrandLabel === 'function' ? window._kitchenBrandLabel(opts.brand) : '') ||
-        opts.brand;
-    if (brandLabel) {
-        const badge = _kitBrandBadge(brandLabel, T.W);
-        badge.position.set(0, type === 'sink' ? T.H * 0.35 : T.H * 0.55, T.D / 2 + 0.35);
-        m.add(badge);
-    }
     parent.add(m);
 }
 

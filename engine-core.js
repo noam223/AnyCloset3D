@@ -7888,8 +7888,7 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
                     window.addKitchenAppliancesToCell(_buildGroup, {
                         list: _kitList, x: colCenterX, bottomY: prevY,
                         cellW: col.width, cellH: compH, bodyD: bodyD, backT: backT,
-                        frontInset: _appInset,
-                        brand: compData.applianceBrand || null
+                        frontInset: _appInset
                     });
                 }
                 if (_laundList.length && typeof window.addLaundryAppliancesToCell === 'function') {
@@ -9413,7 +9412,9 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                     const panelCenterX = (panelLeftX + panelRightX) / 2;
                     const panelY = spanH + TOP_PANEL_T / 2;
                     _ppPartId = `top_panel_${spanStart}`;
-                    const tpMesh = createBoard(panelW, TOP_PANEL_T, bodyD, panelCenterX, panelY, 0, matTopPanel);
+                    const _kitTopMat = (state.presetId === 'kitchen' && typeof window._kitchenCountertopMaterial === 'function')
+                        ? window._kitchenCountertopMaterial(matTopPanel) : matTopPanel;
+                    const tpMesh = createBoard(panelW, TOP_PANEL_T, bodyD, panelCenterX, panelY, 0, _kitTopMat);
                     _ppPartId = '';
                     _applyHorizBoardUV(tpMesh, panelLeftX, panelW, bodyD, state.width);
                 } else {
@@ -9428,7 +9429,9 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         const panelCenterX = (panelLeftX + panelRightX) / 2;
                         const panelY = sc.height + TOP_PANEL_T / 2;
                         _ppPartId = `top_panel_${ci}`;
-                        const tpMesh = createBoard(panelW, TOP_PANEL_T, bodyD, panelCenterX, panelY, 0, matTopPanel);
+                        const _kitTopMat2 = (state.presetId === 'kitchen' && typeof window._kitchenCountertopMaterial === 'function')
+                            ? window._kitchenCountertopMaterial(matTopPanel) : matTopPanel;
+                        const tpMesh = createBoard(panelW, TOP_PANEL_T, bodyD, panelCenterX, panelY, 0, _kitTopMat2);
                         _ppPartId = '';
                         _applyHorizBoardUV(tpMesh, panelLeftX, panelW, bodyD, state.width);
                     }

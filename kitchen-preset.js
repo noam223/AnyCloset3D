@@ -10,19 +10,24 @@ const KIT_DEPTH  = 56;
 const KIT_UNIT_W = 60;
 const KIT_PLINTH = 10; // c9-ish
 
-/** Leading kitchen appliance brands commonly sold / represented in Israel (UI examples only). */
-window.KITCHEN_BRAND_EXAMPLES = [
-    { id: 'bosch', label: 'Bosch' },
-    { id: 'siemens', label: 'Siemens' },
-    { id: 'aeg', label: 'AEG' },
-    { id: 'miele', label: 'Miele' },
-    { id: 'samsung', label: 'Samsung' },
-    { id: 'lg', label: 'LG' },
-    { id: 'electrolux', label: 'Electrolux' },
-    { id: 'neff', label: 'Neff' },
-    { id: 'smeg', label: 'Smeg' },
-    { id: 'constructa', label: 'Constructa' }
+/**
+ * Leading stone / porcelain / quartz countertop brands commonly sold in Israel (UI examples only).
+ * colorHex = soft preview tint for the worktop mesh (not a real material library).
+ */
+window.KITCHEN_COUNTERTOP_BRANDS = [
+    { id: 'caesarstone', label: 'אבן קיסר', kind: 'קוורץ', colorHex: 0xe8e6e1 },
+    { id: 'silestone', label: 'Silestone', kind: 'קוורץ', colorHex: 0xf2efe8 },
+    { id: 'dekton', label: 'Dekton', kind: 'פורצלן', colorHex: 0xc8cbcf },
+    { id: 'neolith', label: 'Neolith', kind: 'פורצלן', colorHex: 0xf5f5f3 },
+    { id: 'laminam', label: 'Laminam', kind: 'פורצלן', colorHex: 0xebe4d8 },
+    { id: 'infinity', label: 'Infinity', kind: 'פורצלן', colorHex: 0xdde1e5 },
+    { id: 'sensa', label: 'Sensa', kind: 'שיש טבעי', colorHex: 0xd4c4a8 },
+    { id: 'corian', label: 'Corian', kind: 'אקריל', colorHex: 0xf7f7f5 },
+    { id: 'compac', label: 'Compac', kind: 'קוורץ', colorHex: 0xefe8dc },
+    { id: 'technistone', label: 'Technistone', kind: 'קוורץ', colorHex: 0xd5d2cc }
 ];
+// Back-compat alias if anything still reads the old name
+window.KITCHEN_BRAND_EXAMPLES = window.KITCHEN_COUNTERTOP_BRANDS;
 
 function _getKitWing() {
     return state && state.wings && state.wings.center ? state.wings.center : null;
@@ -236,31 +241,31 @@ function _updateKitchenSectionUI() {
     _renderKitchenBrandExamples();
 }
 
+function _kitCountertopBrandId() {
+    const cw = _getKitWing();
+    return (cw && cw.countertopBrand) || (state && state.countertopBrand) || '';
+}
+
 function _renderKitchenBrandExamples() {
     const host = document.getElementById('kitchen-brand-examples');
     if (!host) return;
-    const brands = window.KITCHEN_BRAND_EXAMPLES || [];
-    if (!host.dataset.ready) {
+    const brands = window.KITCHEN_COUNTERTOP_BRANDS || [];
+    // Rebuild when switching from appliance brands → countertop brands
+    if (host.dataset.ready !== 'countertop-v1') {
         host.innerHTML = brands.map(b =>
             '<button type="button" class="kit-brand-chip" data-brand="' + b.id + '" ' +
-            'onclick="window._setKitchenApplianceBrand(\'' + b.id + '\')" ' +
-            'title="סמן מותג על המכשיר בתא הנבחר" ' +
+            'onclick="window._setKitchenCountertopBrand(\'' + b.id + '\')" ' +
+            'title="' + (b.kind || 'משטח') + ' — להמחשה בלבד" ' +
             'style="padding:5px 9px;border-radius:999px;border:1.5px solid var(--border);background:var(--bg-light);' +
-            'color:var(--text-dark);font-size:0.72rem;font-weight:700;cursor:pointer;font-family:inherit;">' +
+            'color:var(--text-dark);font-size:0.72rem;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:5px;">' +
+            '<span style="width:10px;height:10px;border-radius:50%;background:#' +
+            (b.colorHex != null ? b.colorHex.toString(16).padStart(6, '0') : 'ddd') +
+            ';border:1px solid rgba(0,0,0,0.12);flex-shrink:0;"></span>' +
             b.label + '</button>'
         ).join('');
-        host.dataset.ready = '1';
+        host.dataset.ready = 'countertop-v1';
     }
-    let current = '';
-    try {
-        if (state && state.selection && state.selection.colIndex >= 0 && state.selection.rows && state.selection.rows.length) {
-            const col = state.columns[state.selection.colIndex];
-            const comp = col && col.compartments && col.compartments[state.selection.rows[0]];
-            if (comp && Array.isArray(comp.appliances) && comp.appliances.length) {
-                current = comp.applianceBrand || '';
-            }
-        }
-    } catch (e) {}
+    const current = _kitCountertopBrandId();
     host.querySelectorAll('.kit-brand-chip').forEach(btn => {
         const on = btn.dataset.brand === current;
         btn.classList.toggle('active', on);
@@ -270,41 +275,50 @@ function _renderKitchenBrandExamples() {
     });
 }
 
-window._setKitchenApplianceBrand = function(brandId) {
+window._setKitchenCountertopBrand = function(brandId) {
     if (!window._isKitchenPreset()) return;
-    const brands = window.KITCHEN_BRAND_EXAMPLES || [];
+    const brands = window.KITCHEN_COUNTERTOP_BRANDS || [];
     const hit = brands.find(b => b.id === brandId);
     if (!hit) return;
-    if (!state || state.selection.colIndex < 0 || !state.selection.rows || !state.selection.rows.length) {
-        if (typeof _showToast === 'function') _showToast('בחרו קודם תא עם מכשיר מטבח', 3200);
-        return;
-    }
-    const col = state.columns[state.selection.colIndex];
-    if (!col) return;
-    let changed = 0;
-    state.selection.rows.forEach(r => {
-        const comp = col.compartments && col.compartments[r];
-        if (!comp || comp.partition || !Array.isArray(comp.appliances) || !comp.appliances.length) return;
-        const hasKit = comp.appliances.some(t =>
-            typeof window._isKitchenApplianceType === 'function' && window._isKitchenApplianceType(t)
-        );
-        if (!hasKit) return;
-        if (comp.applianceBrand === brandId) delete comp.applianceBrand;
-        else comp.applianceBrand = brandId;
-        changed++;
-    });
-    if (!changed) {
-        if (typeof _showToast === 'function') _showToast('התא הנבחר לא מכיל כיור / מדיח / תנור', 3500);
-        return;
+    const cw = _getKitWing();
+    if (!cw) return;
+    if (cw.countertopBrand === brandId) {
+        delete cw.countertopBrand;
+        if (state) delete state.countertopBrand;
+    } else {
+        cw.countertopBrand = brandId;
+        if (state) state.countertopBrand = brandId;
     }
     _renderKitchenBrandExamples();
     if (typeof buildCabinet === 'function') buildCabinet();
     if (typeof saveHistoryState === 'function') saveHistoryState();
 };
 
+window._kitchenCountertopBrand = function() {
+    const id = _kitCountertopBrandId();
+    return (window.KITCHEN_COUNTERTOP_BRANDS || []).find(b => b.id === id) || null;
+};
+
 window._kitchenBrandLabel = function(brandId) {
-    const hit = (window.KITCHEN_BRAND_EXAMPLES || []).find(b => b.id === brandId);
+    const hit = (window.KITCHEN_COUNTERTOP_BRANDS || []).find(b => b.id === brandId);
     return hit ? hit.label : '';
+};
+
+/** Preview material for kitchen worktop when a countertop brand example is selected. */
+window._kitchenCountertopMaterial = function(fallbackMat) {
+    const brand = window._kitchenCountertopBrand && window._kitchenCountertopBrand();
+    if (!brand || typeof THREE === 'undefined') return fallbackMat;
+    if (!window._kitCtMatCache) window._kitCtMatCache = {};
+    const key = brand.id + '-' + brand.colorHex;
+    if (!window._kitCtMatCache[key]) {
+        window._kitCtMatCache[key] = new THREE.MeshStandardMaterial({
+            color: brand.colorHex,
+            roughness: 0.42,
+            metalness: 0.04,
+            envMap: window._studioEnvMap || null
+        });
+    }
+    return window._kitCtMatCache[key];
 };
 
 // Kitchen mode: grow/shrink width instead of equal redistribute
