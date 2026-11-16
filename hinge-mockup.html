@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>מוקאפ 3D — פלטת ציר ארון</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #3d444c; overflow: hidden; font-family: system-ui, sans-serif; }
+    #c { display: block; width: 100%; height: 100%; }
+    .label {
+      position: fixed; top: 16px; right: 16px; color: #e8eaed;
+      background: rgba(0,0,0,.55); padding: 10px 14px; border-radius: 8px; font-size: 14px;
+      max-width: 280px; line-height: 1.35; z-index: 2;
+    }
+    .label strong { display: block; font-size: 16px; margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <div class="label">
+    <strong>מודל תלת־מימד — פלטת Blum CLIP</strong>
+    גיאומטריה אמיתית על דופן ארון (מבט כמו בתמונת הייחוס)
+  </div>
+  <canvas id="c"></canvas>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    const canvas = document.getElementById('c');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setClearColor(0x3d444c, 1);
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+    const key = new THREE.DirectionalLight(0xffffff, 1.15);
+    key.position.set(8, 6, 5);
+    scene.add(key);
+    const fill = new THREE.DirectionalLight(0xffffff, 0.55);
+    fill.position.set(4, -2, -6);
+    scene.add(fill);
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x6a5a48, 0.45);
+    scene.add(hemi);
+
+    // Inner face of a cabinet side (beige wood)
+    const wall = new THREE.Mesh(
+      new THREE.BoxGeometry(1.7, 22, 16),
+      new THREE.MeshStandardMaterial({ color: 0xe0d0b6, roughness: 0.9, metalness: 0 })
+    );
+    wall.position.set(-0.85, 0, 0);
+    scene.add(wall);
+
+    const mat = new THREE.MeshStandardMaterial({ color: 0xd5dae0, metalness: 0.7, roughness: 0.38 });
+    const matDark = new THREE.MeshStandardMaterial({ color: 0x555a60, metalness: 0.45, roughness: 0.55 });
+
+    function buildPlate() {
+      const g = new THREE.Group();
+      const add = (m) => { g.add(m); return m; };
+      const box = (sx, sy, sz, x, y, z, m) => {
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), m || mat);
+        mesh.position.set(x, y, z);
+        return add(mesh);
+      };
+      const L = 5.7, baseT = 0.15, chW = 1.15, wingSpan = 4.0;
+      const wingExt = (wingSpan - chW) / 2, wingLen = 1.7, wingY = 1.55, chH = 0.55, wallT = 0.2;
+
+      box(baseT, L, chW + 0.25, baseT / 2, 0, 0);
+      box(baseT, wingLen, wingExt + 0.08, baseT / 2, -wingY, -(chW / 2 + wingExt / 2));
+      box(baseT, wingLen, wingExt + 0.08, baseT / 2, wingY, (chW / 2 + wingExt / 2));
+      box(baseT, 0.7, wingExt * 0.55, baseT / 2, -wingY + wingLen * 0.35, -(chW / 2 + wingExt * 0.35));
+      box(baseT, 0.7, wingExt * 0.55, baseT / 2, wingY - wingLen * 0.35, (chW / 2 + wingExt * 0.35));
+
+      const chY0 = -L * 0.42, chLen = L * 0.84, chMidY = chY0 + chLen / 2;
+      box(0.1, chLen, chW - 2 * wallT, baseT + 0.05, chMidY, 0);
+      box(chH, chLen, wallT, baseT + chH / 2, chMidY, -chW / 2 + wallT / 2);
+      box(chH, chLen, wallT, baseT + chH / 2, chMidY, chW / 2 - wallT / 2);
+      box(chH, wallT, chW, baseT + chH / 2, chY0 + wallT / 2, 0);
+      const topY = chY0 + chLen - wallT / 2;
+      box(chH * 0.55, wallT, wallT, baseT + chH * 0.35, topY, -chW / 2 + wallT / 2);
+      box(chH * 0.55, wallT, wallT, baseT + chH * 0.35, topY, chW / 2 - wallT / 2);
+      box(0.06, 1.35, 0.38, baseT + 0.12, 0.05, 0, matDark);
+
+      const screwY = L * 0.18, screwZ = chW / 2 + 0.02;
+      const boss = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.14, 14), mat);
+      boss.rotation.z = Math.PI / 2;
+      boss.position.set(baseT + chH * 0.45, screwY, screwZ);
+      add(boss);
+      const head = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.1, 14), matDark);
+      head.rotation.z = Math.PI / 2;
+      head.position.set(baseT + chH * 0.45 + 0.08, screwY, screwZ);
+      add(head);
+      box(0.04, 0.28, 0.05, baseT + chH * 0.45 + 0.14, screwY, screwZ, matDark);
+      box(0.04, 0.05, 0.28, baseT + chH * 0.45 + 0.14, screwY, screwZ, matDark);
+
+      function hole(y, z) {
+        const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.42, 0.07, 16), matDark);
+        ring.rotation.z = Math.PI / 2;
+        ring.position.set(baseT + 0.03, y, z);
+        add(ring);
+        const h = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.1, 12), matDark);
+        h.rotation.z = Math.PI / 2;
+        h.position.set(baseT + 0.04, y, z);
+        add(h);
+      }
+      hole(-wingY, -(chW / 2 + wingExt / 2));
+      hole(wingY, chW / 2 + wingExt / 2);
+      return g;
+    }
+
+    const plate = buildPlate();
+    plate.position.set(0.08, 0, 0);
+    plate.scale.setScalar(1.6);
+    scene.add(plate);
+
+    function resize() {
+      const w = innerWidth, h = innerHeight;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+    addEventListener('resize', resize);
+    resize();
+
+    // Fixed catalog angle: look at the plate face (same view as the hardware photo)
+    let t = 0;
+    function tick() {
+      t += 0.01;
+      const a = 0.55 + Math.sin(t) * 0.25;
+      camera.position.set(10 * Math.cos(a), 3.2, 10 * Math.sin(a));
+      camera.lookAt(0.5, 0.2, 0);
+      renderer.render(scene, camera);
+      requestAnimationFrame(tick);
+    }
+    tick();
+  </script>
+</body>
+</html>

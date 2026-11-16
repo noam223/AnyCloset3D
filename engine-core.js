@@ -4201,117 +4201,105 @@ function _hingeSpreadCm(lo, hi, n, edgeCm) {
     return out;
 }
 
-/** Shared material for cabinet (Blum CLIP) mounting plates — photo texture when available. */
-function _hingePlateMaterial() {
-    if (_addHingeHardware._matPlate) return _addHingeHardware._matPlate;
-    const mat = new THREE.MeshStandardMaterial({
-        color: 0xffffff,
-        metalness: 0.55,
-        roughness: 0.4,
-        transparent: true,
-        alphaTest: 0.35,
-        side: THREE.DoubleSide,
-        depthWrite: true,
-        polygonOffset: true,
-        polygonOffsetFactor: -2,
-        polygonOffsetUnits: -2
-    });
-    _addHingeHardware._matPlate = mat;
-    // Load the real cabinet mounting-plate photo and punch out the dark studio background
-    if (!_addHingeHardware._texLoading) {
-        _addHingeHardware._texLoading = true;
-        const img = new Image();
-        img.decoding = 'async';
-        img.onload = function() {
-            try {
-                const cv = document.createElement('canvas');
-                cv.width = img.naturalWidth || img.width;
-                cv.height = img.naturalHeight || img.height;
-                const ctx = cv.getContext('2d');
-                ctx.drawImage(img, 0, 0);
-                const imageData = ctx.getImageData(0, 0, cv.width, cv.height);
-                const px = imageData.data;
-                let minX = cv.width, minY = cv.height, maxX = 0, maxY = 0;
-                for (let i = 0, p = 0; i < px.length; i += 4, p++) {
-                    const r = px[i], g = px[i + 1], b = px[i + 2];
-                    const lum = (r + g + b) / 3;
-                    // Studio backdrop is near-black; keep the nickel plate + soft contact shadow
-                    if (lum < 42 && r < 55 && g < 55 && b < 55) {
-                        px[i + 3] = 0;
-                    } else {
-                        const x = p % cv.width;
-                        const y = (p / cv.width) | 0;
-                        if (x < minX) minX = x;
-                        if (y < minY) minY = y;
-                        if (x > maxX) maxX = x;
-                        if (y > maxY) maxY = y;
-                    }
-                }
-                ctx.putImageData(imageData, 0, 0);
-                // Tight crop around the plate
-                const pad = 4;
-                minX = Math.max(0, minX - pad);
-                minY = Math.max(0, minY - pad);
-                maxX = Math.min(cv.width - 1, maxX + pad);
-                maxY = Math.min(cv.height - 1, maxY + pad);
-                const cw = Math.max(1, maxX - minX + 1);
-                const ch = Math.max(1, maxY - minY + 1);
-                const cropped = document.createElement('canvas');
-                cropped.width = cw;
-                cropped.height = ch;
-                cropped.getContext('2d').drawImage(cv, minX, minY, cw, ch, 0, 0, cw, ch);
-                const tex = new THREE.CanvasTexture(cropped);
-                if (THREE.sRGBEncoding !== undefined) tex.encoding = THREE.sRGBEncoding;
-                tex.anisotropy = 4;
-                tex.needsUpdate = true;
-                mat.map = tex;
-                mat.alphaMap = tex;
-                mat.needsUpdate = true;
-                _addHingeHardware._tex = tex;
-                _addHingeHardware._texAspect = cw / ch;
-            } catch (e) {
-                console.warn('[hinge] plate texture failed', e);
-            }
-        };
-        img.onerror = function() { console.warn('[hinge] could not load images/hinge-mount-plate-ref.png'); };
-        img.src = 'images/hinge-mount-plate-ref.png';
-    }
-    return mat;
-}
-
 /**
- * Cabinet Blum CLIP mounting plate — photo-based card (not a room-door butt hinge).
- * Local: +X out from wall, Y = rail length, Z = wing span.
+ * Real 3D Blum CLIP mounting plate (geometry, not a photo card).
+ * Local: +X out from the wall, Y = long rail, Z = wing span.
+ * Matches the cruciform stamped-nickel plate used on cabinet side walls.
  */
 function _buildHingeMountPlate() {
-    const g = new THREE.Group();
-    // Real Blum CLIP mounting plate ≈ 57×42 mm (cm in the scene)
-    const plateH = 5.7; // along Y (rail)
-    const plateW = 4.2; // along Z (wings)
-    const thick = 0.14;
-
-    const mat = _hingePlateMaterial();
-    // Plane in XY facing +Z → rotate so it faces +X (into the cabinet)
-    const face = new THREE.Mesh(new THREE.PlaneGeometry(plateW, plateH), mat);
-    face.rotation.y = Math.PI / 2;
-    face.position.set(thick + 0.01, 0, 0);
-    face.renderOrder = 3;
-    g.add(face);
-
-    // Thin nickel slab behind the photo for a bit of edge when viewed at an angle
-    let matEdge = _addHingeHardware._matEdge;
-    if (!matEdge) {
-        matEdge = new THREE.MeshStandardMaterial({
-            color: 0xb8bcbf, metalness: 0.85, roughness: 0.35,
-            polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1
+    let mat = _addHingeHardware._mat;
+    let matDark = _addHingeHardware._matDark;
+    if (!mat) {
+        mat = new THREE.MeshStandardMaterial({
+            color: 0xd5dae0, metalness: 0.7, roughness: 0.38,
+            polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2
         });
-        _addHingeHardware._matEdge = matEdge;
+        _addHingeHardware._mat = mat;
     }
-    const slab = new THREE.Mesh(new THREE.BoxGeometry(thick, plateH * 0.92, plateW * 0.72), matEdge);
-    slab.position.set(thick / 2, 0, 0);
-    g.add(slab);
+    if (!matDark) {
+        matDark = new THREE.MeshStandardMaterial({
+            color: 0x555a60, metalness: 0.45, roughness: 0.55,
+            polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2
+        });
+        _addHingeHardware._matDark = matDark;
+    }
 
-    g.userData.outExtent = thick + 0.05;
+    const g = new THREE.Group();
+    const add = (mesh) => { g.add(mesh); return mesh; };
+    const box = (sx, sy, sz, x, y, z, m) => {
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), m || mat);
+        mesh.position.set(x, y, z);
+        return add(mesh);
+    };
+
+    // Real CLIP plate ≈ 57×40 mm — cm in scene
+    const L = 5.7;          // rail length (Y)
+    const baseT = 0.15;     // sheet thickness (X)
+    const chW = 1.15;       // raised channel outer width (Z)
+    const wingSpan = 4.0;   // total Z across wings
+    const wingExt = (wingSpan - chW) / 2;
+    const wingLen = 1.7;    // each wing pad along Y
+    const wingY = 1.55;     // wing center offset from plate center
+    const chH = 0.55;       // channel rise (X)
+    const wallT = 0.2;      // channel wall thickness (Z)
+
+    // --- Flat stamped base (cross / wing silhouette) ---
+    box(baseT, L, chW + 0.25, baseT / 2, 0, 0); // center spine
+    box(baseT, wingLen, wingExt + 0.08, baseT / 2, -wingY, -(chW / 2 + wingExt / 2)); // lower-left wing
+    box(baseT, wingLen, wingExt + 0.08, baseT / 2, wingY, (chW / 2 + wingExt / 2));   // upper-right wing
+    // Soft corners where wings meet the spine
+    box(baseT, 0.7, wingExt * 0.55, baseT / 2, -wingY + wingLen * 0.35, -(chW / 2 + wingExt * 0.35));
+    box(baseT, 0.7, wingExt * 0.55, baseT / 2, wingY - wingLen * 0.35, (chW / 2 + wingExt * 0.35));
+
+    // --- Raised U-channel (clip rail) ---
+    const chY0 = -L * 0.42;
+    const chLen = L * 0.84;
+    const chMidY = chY0 + chLen / 2;
+    // Floor of the channel
+    box(0.1, chLen, chW - 2 * wallT, baseT + 0.05, chMidY, 0);
+    // Left / right walls
+    box(chH, chLen, wallT, baseT + chH / 2, chMidY, -chW / 2 + wallT / 2);
+    box(chH, chLen, wallT, baseT + chH / 2, chMidY, chW / 2 - wallT / 2);
+    // Closed bottom end of the rail
+    box(chH, wallT, chW, baseT + chH / 2, chY0 + wallT / 2, 0);
+    // Top clip lips (open end for the hinge arm)
+    const topY = chY0 + chLen - wallT / 2;
+    box(chH * 0.55, wallT, wallT, baseT + chH * 0.35, topY, -chW / 2 + wallT / 2);
+    box(chH * 0.55, wallT, wallT, baseT + chH * 0.35, topY, chW / 2 - wallT / 2);
+
+    // Dark elongated adjustment slot in the channel floor
+    box(0.06, 1.35, 0.38, baseT + 0.12, 0.05, 0, matDark);
+
+    // Height-adjustment screw on the right of the channel (near top)
+    const screwY = L * 0.18;
+    const screwZ = chW / 2 + 0.02;
+    const boss = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.14, 14), mat);
+    boss.rotation.z = Math.PI / 2;
+    boss.position.set(baseT + chH * 0.45, screwY, screwZ);
+    add(boss);
+    const head = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.1, 14), matDark);
+    head.rotation.z = Math.PI / 2;
+    head.position.set(baseT + chH * 0.45 + 0.08, screwY, screwZ);
+    add(head);
+    // Phillips slot
+    box(0.04, 0.28, 0.05, baseT + chH * 0.45 + 0.14, screwY, screwZ, matDark);
+    box(0.04, 0.05, 0.28, baseT + chH * 0.45 + 0.14, screwY, screwZ, matDark);
+
+    // Countersunk mounting holes (diagonal wings)
+    const addHole = (y, z) => {
+        const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.42, 0.07, 16), matDark);
+        ring.rotation.z = Math.PI / 2;
+        ring.position.set(baseT + 0.03, y, z);
+        add(ring);
+        const hole = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.1, 12), matDark);
+        hole.rotation.z = Math.PI / 2;
+        hole.position.set(baseT + 0.04, y, z);
+        add(hole);
+    };
+    addHole(-wingY, -(chW / 2 + wingExt / 2));
+    addHole(wingY, chW / 2 + wingExt / 2);
+
+    g.userData.outExtent = baseT + chH;
     return g;
 }
 
