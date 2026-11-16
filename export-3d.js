@@ -610,8 +610,8 @@
         m.style.cssText = 'position:fixed;z-index:10050;background:#fff;border:1px solid #e2e8f0;border-radius:12px;' +
             'box-shadow:0 10px 30px rgba(15,23,42,.18);padding:8px;width:270px;font-family:inherit;' +
             'top:' + Math.round(r.bottom + 6) + 'px;left:' + Math.round(Math.max(8, r.left + r.width / 2 - 135)) + 'px;';
-        const item = function(fmt, icon, title, desc) {
-            return '<button type="button" onclick="window._export3D(\'' + fmt + '\')" style="display:flex;gap:10px;align-items:flex-start;width:100%;' +
+        const item = function(fmt, icon, title, desc, onclick) {
+            return '<button type="button" onclick="' + (onclick || ('window._export3D(\'' + fmt + '\')')) + '" style="display:flex;gap:10px;align-items:flex-start;width:100%;' +
                 'text-align:right;background:none;border:0;border-radius:8px;padding:9px 10px;cursor:pointer;font:inherit;color:#0f172a;" ' +
                 'onmouseover="this.style.background=\'#f1f5f9\'" onmouseout="this.style.background=\'none\'">' +
                 '<i class="' + icon + '" style="margin-top:3px;color:#4f46e5;width:16px;"></i>' +
@@ -630,11 +630,21 @@
             '<div id="export3d-note" style="font-size:.74rem;color:#64748b;padding:2px 10px 6px;"></div>' +
             item('dae', 'fa-solid fa-cube', 'SketchUp (DAE)', 'כולל צבעים וטקסטורות · קובץ ZIP — לחלץ ולייבא את קובץ ה-DAE') +
             item('dxf', 'fa-solid fa-drafting-compass', 'AutoCAD (DXF)', 'במילימטרים · שכבה לכל סוג חלק (Body, Doors, Room...)') +
-            item('obj', 'fa-solid fa-cubes', '3ds Max / Blender (OBJ)', 'כולל צבעים וטקסטורות · ס"מ · קובץ ZIP — לחלץ ולייבא את קובץ ה-OBJ');
+            item('obj', 'fa-solid fa-cubes', '3ds Max / Blender (OBJ)', 'כולל צבעים וטקסטורות · ס"מ · קובץ ZIP — לחלץ ולייבא את קובץ ה-OBJ') +
+            (typeof window._openCncExport === 'function'
+                ? '<div style="height:1px;background:#e2e8f0;margin:6px 4px;"></div>' +
+                  item('cnc', 'fa-solid fa-gears', 'CNC — DXF ורשימת חיתוך',
+                      'קובץ DXF שכבתי לכל לוח (קידוחים, חריץ גב) + רשימת חיתוך CSV · תמיד לארון שבעריכה',
+                      'window._openCncExport()')
+                : '');
         document.body.appendChild(m);
         window._setExport3DScope(window._export3DScope);
         setTimeout(function() { document.addEventListener('mousedown', _outside, true); }, 0);
     };
 
-    window._export3DDebug = { collect: _collectParts, collectRoom: _collectRoomParts, withRoom: _withRoomBuilt, dxf: _buildDXF, dae: _buildDAE, obj: _buildOBJ };
+    window._export3DDebug = {
+        collect: _collectParts, collectRoom: _collectRoomParts, withRoom: _withRoomBuilt, dxf: _buildDXF, dae: _buildDAE, obj: _buildOBJ,
+        // Shared with export-cnc.js
+        loadJSZip: _loadJSZip, download: _download, fileBaseName: _fileBaseName, closeMenu: _closeMenu, toast: _toast
+    };
 })();

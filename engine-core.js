@@ -6344,8 +6344,9 @@ function _renderInternalDrawerBoxCell(opts) {
     const cellLeft = centerX - cellWidth / 2;
     const cellRight = centerX + cellWidth / 2;
 
-    createBoard(sideSpacerT, compH, sideSpacerD, cellLeft + sideSpacerT / 2, cellCenterY, sideSpacerCenterZ, matInternal);
-    createBoard(sideSpacerT, compH, sideSpacerD, cellRight - sideSpacerT / 2, cellCenterY, sideSpacerCenterZ, matInternal);
+    // cncRole / cncSkip: part name and "not a cut board" marks read by the CNC export
+    createBoard(sideSpacerT, compH, sideSpacerD, cellLeft + sideSpacerT / 2, cellCenterY, sideSpacerCenterZ, matInternal).userData.cncRole = 'SPACER';
+    createBoard(sideSpacerT, compH, sideSpacerD, cellRight - sideSpacerT / 2, cellCenterY, sideSpacerCenterZ, matInternal).userData.cncRole = 'SPACER';
 
     // Drawer box envelope (17mm frame) — inset in X after 28mm spacers, forward in Z
     const boxLeft = cellLeft + sideSpacerT;
@@ -6398,10 +6399,12 @@ function _renderInternalDrawerBoxCell(opts) {
 
         // Blueprint is a front elevation: box sides/bottom/back would only double the front outline
         if (isBP) continue;
-        createBoard(drwW, frameT, drwD, boxCenterX, boxBottomY + frameT / 2, drwCenterZ, matInternal);
-        createBoard(frameT, boxH, drwD, boxCenterX - drwW / 2 + frameT / 2, boxCenterY, drwCenterZ, matInternal);
-        createBoard(frameT, boxH, drwD, boxCenterX + drwW / 2 - frameT / 2, boxCenterY, drwCenterZ, matInternal);
-        createBoard(drwW - frameT * 2, boxH, frameT, boxCenterX, boxCenterY, drwBackZ + frameT / 2, matInternal);
+        [
+            createBoard(drwW, frameT, drwD, boxCenterX, boxBottomY + frameT / 2, drwCenterZ, matInternal),
+            createBoard(frameT, boxH, drwD, boxCenterX - drwW / 2 + frameT / 2, boxCenterY, drwCenterZ, matInternal),
+            createBoard(frameT, boxH, drwD, boxCenterX + drwW / 2 - frameT / 2, boxCenterY, drwCenterZ, matInternal),
+            createBoard(drwW - frameT * 2, boxH, frameT, boxCenterX, boxCenterY, drwBackZ + frameT / 2, matInternal)
+        ].forEach(function(m) { m.userData.cncSkip = 'drawerBox'; });
     }
 }
 
@@ -8528,8 +8531,10 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         return cloned;
                     };
                     // uvTotalW/uvIsLeft: double door — the texture spans both leaves like column doors
-                    const _subCreateDoorPanel = (w, h, cx, cy, z, mat, uvTotalW, uvIsLeft) => {
+                    // cncHinge: hinge edge as seen from the front ('left' | 'right' | 'top') — read by the CNC export
+                    const _subCreateDoorPanel = (w, h, cx, cy, z, mat, uvTotalW, uvIsLeft, cncHinge) => {
                         const mesh = createBoard(w, h, t, cx, cy, z, mat);
+                        if (cncHinge) mesh.userData.cncHinge = cncHinge;
                         if (!isBP && mesh.material && mesh.material.map) {
                             const uv = mesh.geometry.attributes.uv;
                             const totalW = uvTotalW || w;
@@ -8742,8 +8747,8 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             const lCX = subCenterX - leafOff;
                             const rCX = subCenterX + leafOff;
                             _tagSubDoorLeaf([
-                                _subCreateDoorPanel(halfW, doorH, lCX, doorY, fZ, doorMat, halfW * 2, true),
-                                _subCreateDoorPanel(halfW, doorH, rCX, doorY, fZ, doorMat, halfW * 2, false)
+                                _subCreateDoorPanel(halfW, doorH, lCX, doorY, fZ, doorMat, halfW * 2, true, 'left'),
+                                _subCreateDoorPanel(halfW, doorH, rCX, doorY, fZ, doorMat, halfW * 2, false, 'right')
                             ], 'double');
                             _addSubTouchIcon(lCX, halfW);
                             _addSubTouchIcon(rCX, halfW);
@@ -8770,7 +8775,8 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             }
                         } else {
                             const doorW = isInset ? subW - doorGap : subW + t;
-                            _tagSubDoorLeaf([_subCreateDoorPanel(doorW, doorH, subCenterX, doorY, fZ, doorMat)], 'single');
+                            _tagSubDoorLeaf([_subCreateDoorPanel(doorW, doorH, subCenterX, doorY, fZ, doorMat, undefined, undefined,
+                                subType === 'door_right' ? 'right' : 'left')], 'single');
                             _addSubTouchIcon(subCenterX, doorW);
                             if (!isBP) {
                                 const hz = fZ + t / 2 + 1.5;
@@ -8823,7 +8829,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         const flapH = Math.max(2, flapTopY - flapBottomY);
                         const flapY = (flapBottomY + flapTopY) / 2;
                         const flapW = isInset ? subW - doorGap : subW + t;
-                        _tagSubDoorLeaf([_subCreateDoorPanel(flapW, flapH, subCenterX, flapY, fZ, _subDoorMat())], 'flap');
+                        _tagSubDoorLeaf([_subCreateDoorPanel(flapW, flapH, subCenterX, flapY, fZ, _subDoorMat(), undefined, undefined, 'top')], 'flap');
                         _addSubTouchIconAt(subCenterX, flapY, fZ, flapW, flapH);
                         if (!isBP && doorStyle !== 'glass_mirror') {
                             const hz = fZ + t / 2 + 1.5;
@@ -8948,9 +8954,9 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         createBoard(t, compH, 0, partX, compCenterY, 0);
                     } else if (isInset && partMat === matInternal && !_coveredByColDoor
                         && _subAllFronted(pi) && _subAllFronted(pi + 1) && !_frontSpansPartition(pi)) {
-                        createBoard(t, compH, bodyD - 1, partX, compCenterY, 0.5, matBody);
+                        createBoard(t, compH, bodyD - 1, partX, compCenterY, 0.5, matBody).userData.cncRole = 'PARTITION';
                     } else {
-                        createBoard(t, compH, partD, partX, compCenterY, partZ, partMat);
+                        createBoard(t, compH, partD, partX, compCenterY, partZ, partMat).userData.cncRole = 'PARTITION';
                     }
                     _ppPartId = '';
                     if (!isBP) {
@@ -9397,6 +9403,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                     if (isBP) flapMesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(flapGeo), new THREE.LineBasicMaterial({ color: 0x000000 })));
                     _buildGroup.add(flapMesh);
                     _ppRegisterMesh(flapMesh, doorPartId);
+                    flapMesh.userData.cncHinge = 'top'; // CNC export: hinge cups along the top edge
                     _registerDoorMesh(flapMesh);
                     const _flapHandleStyle = door.handleStyle || _handleStyle;
                     if (!isBP && _flapHandleStyle === 'pipe' && _isHalfMoonHandle()) {

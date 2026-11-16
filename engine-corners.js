@@ -200,10 +200,10 @@ function buildSlidingDoorCabinet(targetGroup) {
     const innerW = totalW - t * 2; // inner width between side walls
     // Bottom board: top edge flush with top of aluminum plinth rail (y=plinthH)
     // Board spans y=plinthH-t .. y=plinthH, center at y=plinthH-t/2
-    addBoxTo(frameGroup, innerW, t, bodyD, 0, plinthH - t / 2, 0, bodyMat);
+    addBoxTo(frameGroup, innerW, t, bodyD, 0, plinthH - t / 2, 0, bodyMat).userData.cncRole = 'BOTTOM'; // CNC export part name
     // Top board: sits at ceiling level, full width, full depth
     // Offset -0.05 in Y to sit just below the per-column ceiling boards (avoid Z-fighting)
-    addBoxTo(frameGroup, innerW, t, bodyD, 0, totalH - t / 2 - 0.05, 0, bodyMat);
+    addBoxTo(frameGroup, innerW, t, bodyD, 0, totalH - t / 2 - 0.05, 0, bodyMat).userData.cncRole = 'TOP'; // CNC export part name
 
     // ---- SLIDING DOORS ----
     // Front door: center at z = +29 (front face flush with cabinet front)
@@ -369,6 +369,7 @@ function buildCornerUnit() {
     const cuCenterZ = standalone ? 0 : bodyD / 2 + cuW / 2;
 
     const cuGroup = new THREE.Group();
+    cuGroup.userData.cncNoFront = true; // CNC export: local +Z is not the front edge of these boards
     cuGroup.position.set(cuCenterX, 0, cuCenterZ);
     // Standalone: turn the open (drawer / seat) side to face the front (+Z)
     if (standalone) cuGroup.rotation.y = sign * Math.PI / 2;
@@ -528,15 +529,18 @@ function buildCornerUnit() {
                 const boxH = actualDrawerH;
                 const boxBottomY = actualDY - boxH / 2;
                 const dMesh = addBoard(t, boxH, drwW, drwFrontX, actualDY, dZ, matExternal);
+                dMesh.userData.cncRole = 'DRAWER_FRONT'; // CNC export part name
                 if (!isBP) {
                     _cuAddDrawerHandle(dMesh, drwW, drawerH, sign, t, handleStyle);
                     if (useFingerGap) _addFingerGap(dY, drwW, dZ);
                 }
                 // Inner drawer box — bottom + sides; back closes deep (X) face in desk tone
-                addBoard(drwInnerDepth, t, drwW, drwInnerCenterX, boxBottomY + t / 2, dZ, matInternal);
-                addBoard(drwInnerDepth, boxH, t, drwInnerCenterX, actualDY, dZ - drwW / 2 + t / 2, matInternal);
-                addBoard(drwInnerDepth, boxH, t, drwInnerCenterX, actualDY, dZ + drwW / 2 - t / 2, matInternal);
-                addBoard(t, boxH, Math.max(drwW - t * 2, 1), drwDeepX, actualDY, dZ, matDesk);
+                [
+                    addBoard(drwInnerDepth, t, drwW, drwInnerCenterX, boxBottomY + t / 2, dZ, matInternal),
+                    addBoard(drwInnerDepth, boxH, t, drwInnerCenterX, actualDY, dZ - drwW / 2 + t / 2, matInternal),
+                    addBoard(drwInnerDepth, boxH, t, drwInnerCenterX, actualDY, dZ + drwW / 2 - t / 2, matInternal),
+                    addBoard(t, boxH, Math.max(drwW - t * 2, 1), drwDeepX, actualDY, dZ, matDesk)
+                ].forEach(function(m) { m.userData.cncSkip = 'drawerBox'; }); // drawer boxes are not part of the CNC export
             };
 
             if (numDeskDrawers === 1) {
@@ -589,6 +593,7 @@ function buildCornerUnit() {
         for (let i = 0; i < numDrawers; i++) {
             const dY = plinthH + t + drawerH / 2 + i * (drawerH + 0.4);
             const dMesh = addBoard(t, drawerH - 0.5, innerD, fX, dY, innerCtrZ, matExternal);
+            dMesh.userData.cncRole = 'DRAWER_FRONT'; // CNC export part name
             if (!isBP) _cuAddDrawerHandle(dMesh, innerD, drawerH, sign, t);
         }
     }
@@ -672,6 +677,7 @@ function buildFullCornerUnit(side, wingData) {
     const originZ = -bodyD / 2;                // back face aligned with center cabinet back
 
     const fcGroup = new THREE.Group();
+    fcGroup.userData.cncNoFront = true; // CNC export: local +Z is not the front edge of these boards
     fcGroup.position.set(originX, 0, originZ);
     fcGroup.userData.isFullCorner = true;
     fcGroup.userData.side = side;
@@ -1005,6 +1011,20 @@ function buildFullCornerUnit(side, wingData) {
                     const mesh = new THREE.Mesh(geo, mat);
                     mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeM));
                     doorGroup.add(mesh);
+                    // CNC export: hinge edge as seen from this door's front. 'corner' handle = hinged at the outer end,
+                    // 'outer' handle = the free bi-fold leaf (hinged to the other leaf at the corner), none = outer end.
+                    // Door 1 faces +Z (corner edge toward +sign*X); door 2 faces -sign*X (corner edge toward -Z).
+                    const hingeAtCorner = (spot === 'outer');
+                    mesh.userData.cncHinge = (spot === 'bottom') ? 'top'
+                        : ((sign > 0) === hingeAtCorner ? 'right' : 'left');
+                    if (isVertical) {
+                        mesh.userData.cncHinge = (spot === 'bottom') ? 'top'
+                            : ((sign > 0) === hingeAtCorner ? 'left' : 'right');
+                        mesh.userData.cncFront = [-sign, 0, 0];
+                    }
+                    if (hingeAtCorner) mesh.userData.cncBifold = true;
+                    mesh.userData.cncThick = t; // drawn 10% thinner than the real board
+                    mesh.userData.cncStyle = fcDoorStyle;
                 }
 
                 // Frame profiles (framed_melamine, glass_*)
