@@ -8544,28 +8544,29 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
                     }
                 }
                 const isHoveredCol = (state.hoveredColIndex === c);
-                // Space companions / inactive kitchen arms share colIndex with the active run —
-                // only the active wing may bake selection/hover tint (otherwise two cells light up).
+                // Space companions: never bake the active cabinet's selection tint onto the other run.
+                // Kitchen: no 3D cell tint at all — selection UI is the dim buttons / drag handles
+                // (same as wardrobes in front view). A blue mesh was covering those overlays.
                 const _spacePassive = !!(window._spaceBuildSlot != null || window._spaceCompanionBuilding);
-                const _isSelCell = !_spacePassive && _isActiveWingBuild
+                const _kitNoHitTint = state.presetId === 'kitchen';
+                const _isSelCell = !_spacePassive && !_kitNoHitTint && _isActiveWingBuild
                     && state.selection.colIndex === c && state.selection.rows.includes(r);
-                const _bakeHover = !_spacePassive && _isActiveWingBuild && isHoveredCol;
+                const _bakeHover = !_spacePassive && !_kitNoHitTint && _isActiveWingBuild && isHoveredCol;
                 const hitMat = new THREE.MeshBasicMaterial({
                     color: _bakeHover ? 0x2ecc71 : 0x3498db,
                     transparent: true,
-                    opacity: _spacePassive ? 0.0 : (_isSelCell ? 0.3 : (_bakeHover ? 0.05 : 0.0)),
+                    opacity: (_spacePassive || _kitNoHitTint) ? 0.0 : (_isSelCell ? 0.3 : (_bakeHover ? 0.05 : 0.0)),
                     depthWrite: false
                 });
                 const hitBox = new THREE.Mesh(new THREE.BoxGeometry(col.width, compH, bodyD - backT - 2), hitMat);
-                // Kitchen: always register unit hitboxes on every arm so return-run units stay selectable
-                // even when the empty corner stub / another wing is the "active" wing.
-                // Skip companions — they are switched via the space hit volume, not cell picks.
+                // Kitchen: keep invisible hitboxes on every arm only for wing hover-switch —
+                // cell pick/select goes through the HTML dim buttons like a normal wardrobe.
                 const _kitPickAlways = state.presetId === 'kitchen' && !_isUpperUnitBuild && !_spacePassive;
                 if (_isActiveWingBuild || _kitPickAlways) {
                     hitBox.position.set(colCenterX, compCenterY, -1);
                     const _hitWingId = (_buildGroup && _buildGroup.userData && _buildGroup.userData.wingId) || _ppWingId || 'center';
                     hitBox.userData = { colIndex: c, rowIndex: r, wingId: _hitWingId };
-                    if (_spacePassive) hitBox.userData.noHighlight = true;
+                    if (_spacePassive || _kitNoHitTint) hitBox.userData.noHighlight = true;
                     _buildGroup.add(hitBox);
                     if (!_spacePassive) hitBoxes.push(hitBox);
                 }

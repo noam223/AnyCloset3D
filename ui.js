@@ -9925,24 +9925,8 @@ function bindUI() {
             }
         }
 
-        // Kitchen 3D: click a unit hitbox to select the column/cell (toolbar + cell edit buttons)
-        if (state.presetId === 'kitchen') {
-            const kitHits = raycaster.intersectObjects(hitBoxes);
-            if (kitHits.length > 0) {
-                const ud = kitHits[0].object.userData || {};
-                if (ud.colIndex != null && ud.colIndex >= 0) {
-                    if (ud.wingId && state.wings[ud.wingId] &&
-                        (ud.wingId === 'left' || ud.wingId === 'right' || ud.wingId === 'center') &&
-                        ud.wingId !== state.activeWing) {
-                        state.activeWing = ud.wingId;
-                        if (typeof syncSidebarToWing === 'function') syncSidebarToWing();
-                    }
-                    if (ud.rowIndex != null && ud.rowIndex >= 0) toggleSelection(ud.colIndex, ud.rowIndex);
-                    else selectAllColumn(ud.colIndex);
-                    return;
-                }
-            }
-        }
+        // Kitchen: do NOT select cells via 3D hitboxes — that blue mesh fought the dim
+        // buttons and drag handles. Cell select works through the HTML overlays like wardrobes.
 
         let needsRebuild = false;
 
