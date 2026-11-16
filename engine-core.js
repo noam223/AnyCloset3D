@@ -4302,15 +4302,20 @@ function _addHingeHardware(parent, opts) {
 
     const placePlate = (wx, wy, wz, orient) => {
         const plate = _buildHingeMountPlate();
-        // Local +X points out from the wall into the cabinet; back sits at wallClear
+        // Plate is built neck-up. Turn it 90° so the neck points to the cabinet front,
+        // and the wings sit one above the other on the inner face.
         if (orient === 'left') {
+            plate.rotation.x = Math.PI / 2;
             plate.position.set(wx + wallClear, wy, wz);
         } else if (orient === 'right') {
-            plate.rotation.y = Math.PI;
+            plate.rotation.set(-Math.PI / 2, Math.PI, 0);
             plate.position.set(wx - wallClear, wy, wz);
         } else {
-            // Underside of roof: local +X → world −Y
-            plate.rotation.z = -Math.PI / 2;
+            plate.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(
+                new THREE.Vector3(0, -1, 0),
+                new THREE.Vector3(0, 0, 1),
+                new THREE.Vector3(-1, 0, 0)
+            ));
             plate.position.set(wx, wy - wallClear, wz);
         }
         plateGroup.add(plate);
