@@ -803,12 +803,15 @@ function buildKitchenOven() {
         smoke: _kitStdMat(0x0c0e12, 0.2, 0.2),
         chrome: _kitStdMat(0xd8dcdf, 0.18, 1, { envMapIntensity: 1.2 }),
         button: _kitStdMat(0x2e333a, 0.35, 0.4),
-        glass: _kitStdMat(0x3a4650, 0.04, 0.15, {
-            transparent: true, opacity: 0.38, depthWrite: false,
-            side: THREE.DoubleSide, envMapIntensity: 1.7
+        // Clear smoked glass — low opacity so racks/cavity read as a real window
+        glass: _kitStdMat(0x6a8496, 0.02, 0.05, {
+            transparent: true, opacity: 0.22, depthWrite: false,
+            side: THREE.DoubleSide, envMapIntensity: 2.2
         }),
-        cavity: _kitStdMat(0x3a3e45, 0.55, 0.4),
-        rack: _kitStdMat(0xb8bcc0, 0.3, 0.85),
+        // Dark oven interior (not a flat grey panel)
+        cavity: _kitStdMat(0x181a1e, 0.7, 0.25, { emissive: 0x2a1810, emissiveIntensity: 0.35 }),
+        cavityBack: _kitStdMat(0x101214, 0.65, 0.2),
+        rack: _kitStdMat(0xc8ccd0, 0.25, 0.9, { envMapIntensity: 1.1 }),
         display: _kitStdMat(0x000000, 0.12, 0, {
             emissive: 0xffffff, emissiveMap: _kitOvenDisplayTex()
         }),
@@ -821,12 +824,12 @@ function buildKitchenOven() {
     };
     const add = (mesh, x, y, z) => { mesh.position.set(x || 0, y || 0, z || 0); g.add(mesh); return mesh; };
 
-    // Window (glass square) size — clearly readable from a few metres
-    const winW = W * 0.72;
-    const winH = H * 0.48;
-    const winCy = H * 0.42;
-    const panelH = 10.5;
-    const panelCY = H - panelH / 2 - 0.35;
+    // Window (glass square) — large and centred on the door
+    const winW = W * 0.78;
+    const winH = H * 0.52;
+    const winCy = H * 0.40;
+    const panelH = 11.5;
+    const panelCY = H - panelH / 2 - 0.25;
 
     // ---- Body shell with rectangular window punched through (washer drum technique) ----
     const b = 0.55;
@@ -890,25 +893,38 @@ function buildKitchenOven() {
     add(new THREE.Mesh(new THREE.BoxGeometry(frameT, winH, 0.4), M.smoke), -(winW / 2 + frameT / 2), winCy, F + 0.4);
     add(new THREE.Mesh(new THREE.BoxGeometry(frameT, winH, 0.4), M.smoke), winW / 2 + frameT / 2, winCy, F + 0.4);
 
-    // Inner cavity + racks visible through the glass square
-    add(new THREE.Mesh(new THREE.BoxGeometry(winW - 1.2, winH - 1.2, 20), M.cavity), 0, winCy, F - 14);
+    // Dark cavity box + back wall (reads as depth behind glass, not a flat grey plate)
+    add(new THREE.Mesh(new THREE.BoxGeometry(winW - 0.8, winH - 0.8, 22), M.cavity), 0, winCy, F - 15);
+    add(new THREE.Mesh(new THREE.PlaneGeometry(winW - 2, winH - 2), M.cavityBack), 0, winCy, F - 25.5);
+    // Wire racks (front bars + depth bars) so the glass square clearly shows an oven interior
     [-1, 0, 1].forEach(i => {
-        add(new THREE.Mesh(new THREE.BoxGeometry(winW - 5, 0.22, 18), M.rack), 0, winCy + i * (winH * 0.22), F - 14);
+        const ry = winCy + i * (winH * 0.24);
+        add(new THREE.Mesh(new THREE.BoxGeometry(winW - 6, 0.18, 18), M.rack), 0, ry, F - 15);
+        for (let k = -3; k <= 3; k++) {
+            add(new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 18), M.rack), k * ((winW - 8) / 6), ry, F - 15);
+        }
     });
 
-    // The glass square itself (tinted + reflective, same language as washer door glass)
+    // The glass square itself — large translucent pane with chrome frame (washer-door language)
     const glass = new THREE.Mesh(new THREE.PlaneGeometry(winW, winH), M.glass);
     glass.renderOrder = 2;
     add(glass, 0, winCy, F + 0.72);
-    // Chrome lip around the glass square
-    const lip = 0.4;
+    // Soft specular highlight strip on the glass (reads as glass even at a glance)
+    const gloss = new THREE.Mesh(
+        new THREE.PlaneGeometry(winW * 0.22, winH * 0.85),
+        new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.14, depthWrite: false })
+    );
+    gloss.renderOrder = 3;
+    add(gloss, -winW * 0.28, winCy, F + 0.74);
+    // Thick chrome lip around the glass square
+    const lip = 0.55;
     [
-        [0, winCy + winH / 2, winW + 0.5, lip],
-        [0, winCy - winH / 2, winW + 0.5, lip],
-        [-(winW / 2), winCy, lip, winH],
-        [winW / 2, winCy, lip, winH]
+        [0, winCy + winH / 2 + lip / 2, winW + lip * 2, lip],
+        [0, winCy - winH / 2 - lip / 2, winW + lip * 2, lip],
+        [-(winW / 2 + lip / 2), winCy, lip, winH],
+        [winW / 2 + lip / 2, winCy, lip, winH]
     ].forEach(([x, y, ww, hh]) => {
-        add(new THREE.Mesh(new THREE.BoxGeometry(ww, hh, 0.14), M.chrome), x, y, F + 0.8);
+        add(new THREE.Mesh(new THREE.BoxGeometry(ww, hh, 0.22), M.chrome), x, y, F + 0.82);
     });
 
     // ---- Chrome bar handle above the glass ----
@@ -1064,7 +1080,7 @@ function buildKitchenAppliance(type) {
 }
 
 const _kitTemplates = {};
-const _KIT_TMPL_VER = { dishwasher: 'dw-laund-3', sink: 'sink-1', oven: 'oven-glass-3', fridge: 'fridge-1' };
+const _KIT_TMPL_VER = { dishwasher: 'dw-laund-3', sink: 'sink-1', oven: 'oven-glass-4', fridge: 'fridge-1' };
 function _kitTemplate(type) {
     const key = type + ':' + (_KIT_TMPL_VER[type] || 'v1');
     if (!_kitTemplates[key]) {
