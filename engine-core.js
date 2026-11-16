@@ -4780,15 +4780,27 @@ function updateCameraView() {
 
     // 3D mode with wings or corner: use preset-specific camera positions
     if ((hasAnyWing || hasCorner) && state.viewMode !== 'front' && state.viewMode !== 'blueprint') {
-        controls.enableRotate = true; container.classList.remove('front-mode');
+        controls.enableRotate = true;
+        // Kitchen L still edits cells in 3D — keep arrow cursor + dim/button overlays.
+        // (Removing front-mode here was restoring the OrbitControls grab hand between units.)
+        const _kitKeepEditCursor = state.presetId === 'kitchen';
+        if (_kitKeepEditCursor) {
+            container.classList.add('front-mode');
+            dimLayer.style.display = 'block';
+            buttonsLayer.style.display = 'block';
+        } else {
+            container.classList.remove('front-mode');
+            dimLayer.style.display = 'none';
+            buttonsLayer.style.display = 'none';
+        }
         scene.background = new THREE.Color(0xeceff1);
         dirLight.position.set(120, 510, 600);
         window._applyLighting('studio');
-        dimLayer.style.display = 'none'; buttonsLayer.style.display = 'none';
         floor.visible = true;
 
         // User already orbited — keep their camera angle, just refresh overlays
         if (window._orbitFree) {
+            if (_kitKeepEditCursor) container.classList.add('front-mode');
             controls.enabled = true;
             controls.update();
             if (typeof buildDragHandlesUI === 'function') buildDragHandlesUI();
