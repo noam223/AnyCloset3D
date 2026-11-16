@@ -834,6 +834,8 @@ window._roomIsBackdrop = function() {
 function _editorRoomWanted() {
     if (!window._room3dPref || state.wingEditMode) return false;
     if (state.viewMode !== 'front' && state.viewMode !== '3d') return false;
+    // Kitchen already has denser carcass meshes; room backdrop + lighting makes orbit feel sluggish
+    if (state.presetId === 'kitchen') return false;
     // Editor page only (the viewer has its own scene); spaces place cabinets outside the room rectangle
     if (!document.getElementById('btn-toggle-room3d')) return false;
     const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
@@ -7125,31 +7127,31 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
             // For sliding wardrobes: internal partitions are set back 6cm from front face
             const _partD = _slidingPartD;
             const _partZ = _slidingPartZ;
-            // Kitchen: each unit is a separate carcass → double side wall between units
+            // Kitchen: separate carcass look — one thick 2t divider (same gap as two boards, half the meshes)
             const _kitDouble = (state.presetId === 'kitchen');
             
             let sortedHoles = internalHoles[c].sort((a,b) => a.bottom - b.bottom);
-            const _drawKitWallSegs = (xPos, partId) => {
+            const _drawKitWallSegs = (xPos, partId, wallT) => {
+                const wt = (wallT != null) ? wallT : t;
                 let currentY = wallBottomY;
                 _ppPartId = partId;
                 for (let hole of sortedHoles) {
                     if (hole.bottom - currentY > 0.01) {
                         const segH = hole.bottom - currentY;
-                        const wm = createBoard(t, segH, _partD, xPos, currentY + segH / 2, _partZ);
-                        _applyVertWallUV(wm, currentY - wallBottomY, segH, wallTotalH, _partD, t);
+                        const wm = createBoard(wt, segH, _partD, xPos, currentY + segH / 2, _partZ);
+                        _applyVertWallUV(wm, currentY - wallBottomY, segH, wallTotalH, _partD, wt);
                     }
                     currentY = Math.max(currentY, hole.top);
                 }
                 if (wallTopY - currentY > 0.01) {
                     const segH = wallTopY - currentY;
-                    const wm = createBoard(t, segH, _partD, xPos, currentY + segH / 2, _partZ);
-                    _applyVertWallUV(wm, currentY - wallBottomY, segH, wallTotalH, _partD, t);
+                    const wm = createBoard(wt, segH, _partD, xPos, currentY + segH / 2, _partZ);
+                    _applyVertWallUV(wm, currentY - wallBottomY, segH, wallTotalH, _partD, wt);
                 }
                 _ppPartId = '';
             };
             if (_kitDouble) {
-                _drawKitWallSegs(wallX, `divider_c${c}_a`);
-                _drawKitWallSegs(wallX + t, `divider_c${c}_b`);
+                _drawKitWallSegs(wallX + t / 2, `divider_c${c}`, 2 * t);
             } else {
                 _drawKitWallSegs(wallX, `divider_c${c}`);
             }
@@ -9407,30 +9409,31 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
             _cx += _wingCols[c].width + _kitTopGap;
         }
 
-        // Find merged spans: consecutive columns with topPanel=true and same height
-        // Kitchen base: never merge — each unit has its own separate worktop (upper units: no worktop)
-        const _kitSeparateTops = (state.presetId === 'kitchen' && !_kitIsUpper);
+        // Find merged spans: consecutive columns with topPanel=true and same height.
+        // Kitchen: merge equal-height worktops into one continuous slab (faster + more realistic);
+        // still span each unit's side walls via kitchen column gaps (2t).
+        const _kitTops = (state.presetId === 'kitchen' && !_kitIsUpper);
         let spanStart = -1;
         for (let c = 0; c <= _wingCols.length; c++) {
             const col = _wingCols[c];
             const inSpan = col && col.topPanel && !_kitIsUpper;
             if (inSpan && spanStart === -1) {
                 spanStart = c;
-            } else if ((!inSpan || c === _wingCols.length || _kitSeparateTops) && spanStart !== -1) {
-                // End of span: columns [spanStart .. c-1] (kitchen forces end after one column)
-                const spanEnd = _kitSeparateTops ? (spanStart + 1) : c;
+            } else if ((!inSpan || c === _wingCols.length ||
+                (inSpan && Math.abs(col.height - _wingCols[spanStart].height) >= 0.1)) && spanStart !== -1) {
+                const spanEnd = c;
                 const spanCols = _wingCols.slice(spanStart, spanEnd);
                 const spanH = spanCols[0].height;
-                const allSameH = !_kitSeparateTops && spanCols.every(sc => Math.abs(sc.height - spanH) < 0.1);
-                const _kitTopMat = (state.presetId === 'kitchen' && !_kitIsUpper && typeof window._kitchenCountertopMaterial === 'function')
+                const allSameH = spanCols.every(sc => Math.abs(sc.height - spanH) < 0.1);
+                const _kitTopMat = (_kitTops && typeof window._kitchenCountertopMaterial === 'function')
                     ? window._kitchenCountertopMaterial(matTopPanel) : matTopPanel;
 
                 if (allSameH && spanCols.length > 1) {
                     // One merged board spanning all columns in span
-                    // Outer walls extend full t; internal partitions are shared so use t/2
-                    const leftOffset = spanStart === 0 ? t : t / 2;
+                    // Kitchen: each unit owns both side walls → outer edges use full t
+                    const leftOffset = (_kitTops || spanStart === 0) ? t : t / 2;
                     const lastColIdx = spanEnd - 1;
-                    const rightOffset = lastColIdx === _wingCols.length - 1 ? t : t / 2;
+                    const rightOffset = (_kitTops || lastColIdx === _wingCols.length - 1) ? t : t / 2;
                     const panelLeftX = colLeftEdges[spanStart] - leftOffset;
                     const panelRightX = colLeftEdges[lastColIdx] + _wingCols[lastColIdx].width + rightOffset;
                     const panelW = panelRightX - panelLeftX;
@@ -9441,12 +9444,11 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                     _ppPartId = '';
                     _applyHorizBoardUV(tpMesh, panelLeftX, panelW, bodyD, state.width);
                 } else {
-                    // Individual panel per column (kitchen default / mixed heights)
+                    // Individual panel per column (mixed heights)
                     for (let ci = spanStart; ci < spanEnd; ci++) {
                         const sc = _wingCols[ci];
-                        // Kitchen separate carcass: each top covers this unit's inner + both side walls
-                        const leftOffset = _kitSeparateTops ? t : (ci === 0 ? t : t / 2);
-                        const rightOffset = _kitSeparateTops ? t : (ci === _wingCols.length - 1 ? t : t / 2);
+                        const leftOffset = _kitTops ? t : (ci === 0 ? t : t / 2);
+                        const rightOffset = _kitTops ? t : (ci === _wingCols.length - 1 ? t : t / 2);
                         const panelLeftX = colLeftEdges[ci] - leftOffset;
                         const panelRightX = colLeftEdges[ci] + sc.width + rightOffset;
                         const panelW = panelRightX - panelLeftX;
@@ -9458,11 +9460,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         _applyHorizBoardUV(tpMesh, panelLeftX, panelW, bodyD, state.width);
                     }
                 }
-                if (_kitSeparateTops && inSpan && c < _wingCols.length) {
-                    spanStart = c;
-                } else {
-                    spanStart = -1;
-                }
+                spanStart = inSpan ? c : -1;
             }
         }
     }
