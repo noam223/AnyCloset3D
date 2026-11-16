@@ -40,7 +40,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260910deskMerge">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
     <link rel="stylesheet" href="style-extras.css?v=20261110doormirror">
-    <link rel="stylesheet" href="style.css?v=20261115todoDate">
+    <link rel="stylesheet" href="style.css?v=20261116kitHide">
     <link rel="stylesheet" href="quick-calc.css?v=20260929qc">
     <style>
         html.thumb-only-mode #left-sidebar,
@@ -544,6 +544,7 @@
                     </button>
                 </div>
                 <div class="handle-drag-hint"><i class="fa-solid fa-up-down-left-right"></i>גררו את "טאצ'" אל דלת או כנף בהדמיה כדי להחיל טאצ' רק עליה</div>
+                <div id="door-mirror-block">
                 <div style="font-size:0.78rem;color:var(--text-light);margin:4px 0 6px;">מראה על דלת</div>
                 <div class="mirror-drag-row">
                     <button type="button" class="mirror-drag-btn" data-mirror="out" onclick="_showToast('גררו את המראה אל דלת או כנף בהדמיה', 2500)" title="גרירה אל דלת — מראה מודבקת על כל חזית הדלת, ללא מסגרת וללא ידית · גרירה שוב — הסרה">
@@ -554,6 +555,7 @@
                     </button>
                 </div>
                 <div class="handle-drag-hint"><i class="fa-solid fa-up-down-left-right"></i>גררו מראה אל דלת או כנף בהדמיה · גרירה שוב מסירה</div>
+                </div>
                 <div class="handle-variant-menu" data-for="riding" hidden>
                     <button type="button" class="handle-variant-opt riding-color-opt" data-color="black" onclick="updateRidingColor('black')"><span class="riding-swatch"><i class="rs-black"></i></span><span>שחור מט</span></button>
                     <button type="button" class="handle-variant-opt riding-color-opt" data-color="white" onclick="updateRidingColor('white')"><span class="riding-swatch"><i class="rs-white"></i></span><span>לבן</span></button>
@@ -3127,7 +3129,7 @@
 <script src="state.js?v=20261116kitFix"></script>
 <script src="quick-calc.js?v=20261029shoe"></script>
 <script src="bathroom-preset.js?v=20261008types"></script>
-<script src="kitchen-preset.js?v=20261116kitfix"></script>
+<script src="kitchen-preset.js?v=20261116kitHide"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
 <script src="corner-unit-preset.js?v=20261103deskdoor"></script>
 <script src="engine-appliances.js?v=20261116stone"></script>

@@ -249,8 +249,14 @@ window._kitchenRemoveUnit = function(side) {
     if (typeof saveHistoryState === 'function') saveHistoryState();
 };
 
+function _syncKitchenModeClass() {
+    const isKit = window._isKitchenPreset && window._isKitchenPreset();
+    if (document.body) document.body.classList.toggle('kitchen-mode', !!isKit);
+}
+
 function _updateKitchenSectionUI() {
     const isKit = window._isKitchenPreset();
+    _syncKitchenModeClass();
     const section = document.getElementById('kitchen-section');
     if (section) section.style.display = isKit ? '' : 'none';
 
@@ -549,4 +555,5 @@ window._initKitchenAdminGate = async function() {
 document.addEventListener('DOMContentLoaded', function() {
     window._setKitchenPresetButtonsVisible(false);
     if (window._initKitchenAdminGate) window._initKitchenAdminGate();
+    _syncKitchenModeClass();
 });

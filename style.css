@@ -2928,6 +2928,42 @@ body.dragging-v { cursor: ns-resize !important; }
 #mobile-cell-right-panel:not(.desk-zone-mode) .mcp-desk-only,
 #bottom-floating-toolbar:not(.desk-zone-mode) .tb-desk-mirror-only { display: none !important; }
 
+/* Kitchen preset: hide wardrobe-only features (mirrors, hanging, honeycomb, shoes, side units…) */
+body.kitchen-mode #door-mirror-block,
+body.kitchen-mode #side-unit-section,
+body.kitchen-mode #corner-unit-section,
+body.kitchen-mode #space-units-section,
+body.kitchen-mode #mobile-side-unit-block,
+body.kitchen-mode #mobile-space-units-block,
+body.kitchen-mode #qe-desk-group,
+body.kitchen-mode #qe-desk-drawers-group,
+body.kitchen-mode #qe-desk-drawer-count-group,
+body.kitchen-mode #qe-btn-desk,
+body.kitchen-mode #tb-btn-hanging,
+body.kitchen-mode #hanging-sub-panel,
+body.kitchen-mode #tb-btn-honeycomb,
+body.kitchen-mode #honeycomb-sub-panel,
+body.kitchen-mode .toolbar-row:has(#tb-btn-hanging),
+body.kitchen-mode .toolbar-row:has(#tb-btn-honeycomb),
+body.kitchen-mode .toolbar-row.tb-desk-mirror-only,
+body.kitchen-mode #tb-btn-desk-mirror,
+body.kitchen-mode #tb-side-open-dir-row,
+body.kitchen-mode [data-drawer-type="shoe_drawers"],
+body.kitchen-mode [data-door-style="glass_mirror"],
+body.kitchen-mode [data-fc-door-style="glass_mirror"],
+body.kitchen-mode #mcp-door-style-glass_mirror,
+body.kitchen-mode #mcp-cat-hanging,
+body.kitchen-mode #mcp-cat-cell,
+body.kitchen-mode #mcp-desk-mirror,
+body.kitchen-mode #mcp-shoe_drawers,
+body.kitchen-mode #mcp-sub-hanging,
+body.kitchen-mode #mcp-sub-cell,
+body.kitchen-mode .appliance-laundry,
+body.kitchen-mode .mirror-drag-btn,
+body.kitchen-mode .mirror-drag-row {
+    display: none !important;
+}
+
 #tv-size-menu {
     position: fixed;
     z-index: 2000;
