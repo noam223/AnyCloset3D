@@ -1,0 +1,1530 @@
+{
+  "brand": "Bluran",
+  "version": 1,
+  "categories": [
+    {
+      "id": "hpl_solid",
+      "name": "HPL גוונים חלקים",
+      "items": [
+        {
+          "id": "AH07",
+          "name": "אפור",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#e0dcd9"
+        },
+        {
+          "id": "AH04",
+          "name": "בז'",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#d9d1cb"
+        },
+        {
+          "id": "AH01",
+          "name": "גרפיט",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#57595a"
+        },
+        {
+          "id": "AH05",
+          "name": "חול",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#e6ded5"
+        },
+        {
+          "id": "AH06",
+          "name": "לבן",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#f8f9fd"
+        },
+        {
+          "id": "PH158SM",
+          "name": "לבן צדף",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#fafbf5"
+        },
+        {
+          "id": "PH159SM",
+          "name": "אפור בהיר",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#d2cbc1"
+        },
+        {
+          "id": "PH160SM",
+          "name": "לבן אפרפר",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#fbfaf6"
+        },
+        {
+          "id": "PH161SM",
+          "name": "שנהב",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#fff5e3"
+        },
+        {
+          "id": "PH162SM",
+          "name": "אפור כהה",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#2f2b2c"
+        },
+        {
+          "id": "PH163SM",
+          "name": "גרייז'",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#ced2b9"
+        }
+      ]
+    },
+    {
+      "id": "acrylic_matte",
+      "name": "אקריל PURE מט",
+      "items": [
+        {
+          "id": "ZA35SM",
+          "name": "גרייז׳",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#cec5bc"
+        },
+        {
+          "id": "ZA38SM",
+          "name": "קפה",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#afa49a"
+        },
+        {
+          "id": "ZA02SM",
+          "name": "שנהב",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#ffeccc"
+        },
+        {
+          "id": "ZA03SM",
+          "name": "מוקה",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#b39e83"
+        },
+        {
+          "id": "ZA04SM",
+          "name": "סהרה",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#cdbeab"
+        },
+        {
+          "id": "ZA05SM",
+          "name": "אפור חאקי",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#696357"
+        },
+        {
+          "id": "ZA06SM",
+          "name": "לבן",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#ffffff"
+        },
+        {
+          "id": "ZA07SM",
+          "name": "אפרפר",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#9e9a99"
+        },
+        {
+          "id": "ZA08SM",
+          "name": "כחול אינדיגו",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#333645"
+        },
+        {
+          "id": "ZA310SM",
+          "name": "אפור מעושן",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#55565a"
+        },
+        {
+          "id": "ZA69SM",
+          "name": "כחול עתיק",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#939aa0"
+        },
+        {
+          "id": "ZA70SM",
+          "name": "ירוק עתיק",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#94a3a0"
+        },
+        {
+          "id": "ZA71SM",
+          "name": "אפור בהיר",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#d2cbc1"
+        },
+        {
+          "id": "ZA72SM",
+          "name": "אפור כהה",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#282423"
+        },
+        {
+          "id": "ZA85SM",
+          "name": "חום אדמה",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#604440"
+        },
+        {
+          "id": "ZA86SM",
+          "name": "ירוק יער",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#3d423c"
+        },
+        {
+          "id": "ZA301SM",
+          "name": "לבן צדף",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#f3eddf"
+        },
+        {
+          "id": "ZA300SM",
+          "name": "שחור כהה",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#1e1e1e"
+        },
+        {
+          "id": "ZA37SM",
+          "name": "חרס",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#dfdbd2"
+        },
+        {
+          "id": "ZA39SM",
+          "name": "חלוק נחל",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#d0cfca"
+        },
+        {
+          "id": "ZA36SM",
+          "name": "חול",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#e2dcce"
+        }
+      ]
+    },
+    {
+      "id": "acrylic_gloss",
+      "name": "אקריל PURE מבריק",
+      "items": [
+        {
+          "id": "ZA16HG",
+          "name": "אפור בהיר",
+          "finish": "gloss",
+          "type": "solid",
+          "hex": "#cbc5b5"
+        },
+        {
+          "id": "ZA12HG",
+          "name": "לבן צחור",
+          "finish": "gloss",
+          "type": "solid",
+          "hex": "#fffbf7"
+        },
+        {
+          "id": "ZA15HG",
+          "name": "סהרה",
+          "finish": "gloss",
+          "type": "solid",
+          "hex": "#b9b4a8"
+        },
+        {
+          "id": "ZA13HG",
+          "name": "קרם",
+          "finish": "gloss",
+          "type": "solid",
+          "hex": "#eedfbd"
+        },
+        {
+          "id": "ZA21HG",
+          "name": "שחור",
+          "finish": "gloss",
+          "type": "solid",
+          "hex": "#000000"
+        },
+        {
+          "id": "ZA52HG",
+          "name": "שמנת",
+          "finish": "gloss",
+          "type": "solid",
+          "hex": "#f1ede7"
+        },
+        {
+          "id": "ZA53HG",
+          "name": "שנהב",
+          "finish": "gloss",
+          "type": "solid",
+          "hex": "#fef7ec"
+        }
+      ]
+    },
+    {
+      "id": "aluminum",
+      "name": "אלומיניום",
+      "items": [
+        {
+          "id": "L05",
+          "name": "אפור בהיר מט",
+          "finish": "metal",
+          "type": "solid",
+          "hex": "#cfccc0"
+        },
+        {
+          "id": "Z02",
+          "name": "זהב מט",
+          "finish": "metal",
+          "type": "solid",
+          "hex": "#b29259"
+        },
+        {
+          "id": "Z07",
+          "name": "חום מגורען",
+          "finish": "metal",
+          "type": "solid",
+          "hex": "#2b200f"
+        },
+        {
+          "id": "W03",
+          "name": "לבן מט",
+          "finish": "metal",
+          "type": "solid",
+          "hex": "#ffffff"
+        },
+        {
+          "id": "ZA301ALU",
+          "name": "לבן צדף",
+          "finish": "metal",
+          "type": "solid",
+          "hex": "#fafcf4"
+        },
+        {
+          "id": "P46",
+          "name": "סהרה ננו",
+          "finish": "metal",
+          "type": "solid",
+          "hex": "#c7bfb4"
+        },
+        {
+          "id": "Z03",
+          "name": "פליז מט",
+          "finish": "metal",
+          "type": "solid",
+          "hex": "#68583b"
+        },
+        {
+          "id": "G05",
+          "name": "שחור מגורען",
+          "finish": "metal",
+          "type": "solid",
+          "hex": "#1d1d1d"
+        },
+        {
+          "id": "B06",
+          "name": "שחור מט",
+          "finish": "metal",
+          "type": "solid",
+          "hex": "#141414"
+        },
+        {
+          "id": "ZA35ALU",
+          "name": "גרייז׳",
+          "finish": "metal",
+          "type": "solid",
+          "hex": "#cec7b7"
+        }
+      ]
+    },
+    {
+      "id": "polymer",
+      "name": "פולימר",
+      "items": [
+        {
+          "id": "R37",
+          "name": "אבן",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#a1978c"
+        },
+        {
+          "id": "R38",
+          "name": "אפור עכבר",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#848484"
+        },
+        {
+          "id": "R24",
+          "name": "אפור פחם",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#3f3f3f"
+        },
+        {
+          "id": "R32",
+          "name": "וניל",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#eee8d6"
+        },
+        {
+          "id": "R40",
+          "name": "ירוק מרווה",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#7a8576"
+        },
+        {
+          "id": "R34",
+          "name": "לאטה",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#c5beb3"
+        },
+        {
+          "id": "R28",
+          "name": "לבן שבור",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#efede9"
+        },
+        {
+          "id": "H11",
+          "name": "אפרפר",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#b0aca6"
+        },
+        {
+          "id": "H02",
+          "name": "ירוק עתיק",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#9aa59b"
+        },
+        {
+          "id": "H20",
+          "name": "כחול אינדיגו",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#2f323c"
+        },
+        {
+          "id": "H30",
+          "name": "כחול מעושן",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#364048"
+        },
+        {
+          "id": "H03",
+          "name": "כחול",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#8b9dac"
+        },
+        {
+          "id": "H08",
+          "name": "לבן אלפים",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#eaebe6"
+        },
+        {
+          "id": "H17",
+          "name": "צדפה",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#d1caba"
+        },
+        {
+          "id": "H921",
+          "name": "שמנת",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#ece8dc"
+        },
+        {
+          "id": "R27",
+          "name": "סהרה",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#c7bfb4"
+        },
+        {
+          "id": "R23",
+          "name": "שחור",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#1f1f1f"
+        },
+        {
+          "id": "H32",
+          "name": "אלון בהיר",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#dcbd9d"
+        },
+        {
+          "id": "H31",
+          "name": "אלון כהה",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#44301e"
+        },
+        {
+          "id": "R52",
+          "name": "אלון קלאסי",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#ad9368"
+        }
+      ]
+    },
+    {
+      "id": "glass_effect",
+      "name": "אקריל Glass Effect",
+      "items": [
+        {
+          "id": "ZC43DM",
+          "name": "אפור זית משי",
+          "finish": "silk",
+          "type": "solid",
+          "hex": "#8e8c7c"
+        },
+        {
+          "id": "ZC41DG",
+          "name": "לבן מבריק",
+          "finish": "gloss",
+          "type": "solid",
+          "hex": "#e7e7e7"
+        },
+        {
+          "id": "ZC42DM",
+          "name": "לבן משי",
+          "finish": "silk",
+          "type": "solid",
+          "hex": "#e7e7e7"
+        },
+        {
+          "id": "ZC44DM",
+          "name": "סהרה משי",
+          "finish": "silk",
+          "type": "solid",
+          "hex": "#ac9f8a"
+        },
+        {
+          "id": "ZC77DM",
+          "name": "שחור משי",
+          "finish": "silk",
+          "type": "solid",
+          "hex": "#000000"
+        },
+        {
+          "id": "ZC55DG",
+          "name": "שמנת מבריק",
+          "finish": "gloss",
+          "type": "solid",
+          "hex": "#f8efde"
+        }
+      ]
+    },
+    {
+      "id": "optimatt",
+      "name": "HPL OPTIMATT",
+      "items": [
+        {
+          "id": "PH100UM",
+          "name": "אפור בהיר חם",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#c0c5c6"
+        },
+        {
+          "id": "KH50UM",
+          "name": "אפור בזלת",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#4f5150"
+        },
+        {
+          "id": "KH302UM",
+          "name": "אפור גרפיט",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#4f5152"
+        },
+        {
+          "id": "KH53UM",
+          "name": "גרייז'",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#d9c9b8"
+        },
+        {
+          "id": "KH49UM",
+          "name": "חול מוקה כהה",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#a59e90"
+        },
+        {
+          "id": "KH55UM",
+          "name": "חום כהה",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#3f3333"
+        },
+        {
+          "id": "KH57UM",
+          "name": "חמרה",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#693d33"
+        },
+        {
+          "id": "KH56UM",
+          "name": "טיטניום",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#7a7b78"
+        },
+        {
+          "id": "KH58UM",
+          "name": "ירוק אמזונס",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#384440"
+        },
+        {
+          "id": "ZH48UM",
+          "name": "כחול כהה",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#181b21"
+        },
+        {
+          "id": "KH45UM",
+          "name": "לבן אפרפר",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#ffffff"
+        },
+        {
+          "id": "KH51UM",
+          "name": "לבן יהלום",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#faf9f0"
+        },
+        {
+          "id": "KH52UM",
+          "name": "מגנוליה",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#f8f3e9"
+        },
+        {
+          "id": "ZH56UM",
+          "name": "סהרה",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#cac0b8"
+        },
+        {
+          "id": "KH54UM",
+          "name": "פורטובלו",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#7f6e64"
+        },
+        {
+          "id": "PH300UM",
+          "name": "שחור כהה",
+          "finish": "matte",
+          "type": "solid",
+          "hex": "#191617"
+        }
+      ]
+    },
+    {
+      "id": "fantasy",
+      "name": "Fantasy אקריל/PET מטאלי",
+      "items": [
+        {
+          "id": "ZA84SM",
+          "name": "ברונזה",
+          "finish": "metal",
+          "type": "solid",
+          "hex": "#8d8579"
+        },
+        {
+          "id": "ZA88SM",
+          "name": "חום אפרפר מטאלי",
+          "finish": "metal",
+          "type": "solid",
+          "hex": "#3e372e"
+        },
+        {
+          "id": "ZA89SM",
+          "name": "חום וולקנו מטאלי",
+          "finish": "metal",
+          "type": "solid",
+          "hex": "#6d6251"
+        },
+        {
+          "id": "ZA25HG",
+          "name": "לבן מטאלי",
+          "finish": "metal",
+          "type": "solid",
+          "hex": "#f7f7f7"
+        },
+        {
+          "id": "ZA11SM",
+          "name": "משי אפור מטאלי",
+          "finish": "metal",
+          "type": "solid",
+          "hex": "#464548"
+        },
+        {
+          "id": "ZA10SM",
+          "name": "משי שמפניה מטאלי",
+          "finish": "metal",
+          "type": "solid",
+          "hex": "#988a6f"
+        },
+        {
+          "id": "ZA90SM",
+          "name": "סהרה מטאלי עדין",
+          "finish": "metal",
+          "type": "solid",
+          "hex": "#d0c1ad"
+        },
+        {
+          "id": "ZA83SM",
+          "name": "פיצ'גולד",
+          "finish": "metal",
+          "type": "solid",
+          "hex": "#a2917a"
+        },
+        {
+          "id": "ZA82SM",
+          "name": "רוזגולד",
+          "finish": "metal",
+          "type": "solid",
+          "hex": "#a18f7f"
+        },
+        {
+          "id": "ZA26HG",
+          "name": "שמפניה מטאלי",
+          "finish": "metal",
+          "type": "solid",
+          "hex": "#ab9d82"
+        },
+        {
+          "id": "ZA91SM",
+          "name": "רודיום",
+          "finish": "metal",
+          "type": "solid",
+          "hex": "#4a483f"
+        },
+        {
+          "id": "U02SM",
+          "name": "פנינה מטאלי ברונזה עדינה",
+          "finish": "metal",
+          "type": "solid",
+          "hex": "#89837e"
+        },
+        {
+          "id": "U03SM",
+          "name": "פנינה מטאלי הקסם הסגול",
+          "finish": "metal",
+          "type": "solid",
+          "hex": "#382c40"
+        },
+        {
+          "id": "U01SM",
+          "name": "פנינה מטאלי כסף",
+          "finish": "metal",
+          "type": "solid",
+          "hex": "#969285"
+        }
+      ]
+    },
+    {
+      "id": "italy_smart",
+      "name": "איטליה SM'art",
+      "items": [
+        {
+          "id": "MH100",
+          "name": "סטוקו זעפרן",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/MH100.jpg"
+        },
+        {
+          "id": "MH101",
+          "name": "סטוקו למון גראס",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/MH101.jpg"
+        },
+        {
+          "id": "MH102",
+          "name": "סטוקו הל",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/MH102.jpg"
+        },
+        {
+          "id": "MH103",
+          "name": "סטוקו קינמון",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/MH103.jpg"
+        },
+        {
+          "id": "MH104",
+          "name": "אלון שרף טבעי",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/MH104.jpg"
+        },
+        {
+          "id": "MH105",
+          "name": "אלון שרף זהוב",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/MH105.jpg"
+        },
+        {
+          "id": "MH106",
+          "name": "אלון שרף מושחר",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/MH106.jpg"
+        },
+        {
+          "id": "MH58NT",
+          "name": "אלון בהיר",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/MH58NT.jpg"
+        },
+        {
+          "id": "MH59NT",
+          "name": "אלון חום",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/MH59NT.jpg"
+        },
+        {
+          "id": "MH60NT",
+          "name": "אלון חום כהה",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/MH60NT.jpg"
+        },
+        {
+          "id": "MH61NT",
+          "name": "אלון אפרפר",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/MH61NT.jpg"
+        },
+        {
+          "id": "MH71DT",
+          "name": "בטון מפוספס אפור בהיר",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/MH71DT.jpg"
+        },
+        {
+          "id": "MH72DT",
+          "name": "בטון מפוספס אפור כהה",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/MH72DT.jpg"
+        },
+        {
+          "id": "MH79DT",
+          "name": "בטון מפוספס אפור גרניט",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/MH79DT.jpg"
+        },
+        {
+          "id": "MH83NT",
+          "name": "אלון שטרייף ג'ינג'ר",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/MH83NT.jpg"
+        },
+        {
+          "id": "MH84NT",
+          "name": "אלון שטרייף דבש",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/MH84NT.jpg"
+        },
+        {
+          "id": "MH85NT",
+          "name": "אלון שטרייף מושחר",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/MH85NT.jpg"
+        },
+        {
+          "id": "MH86DT",
+          "name": "אלון שטרייף אדמה",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/MH86DT.jpg"
+        },
+        {
+          "id": "MH87DT",
+          "name": "אלון שטרייף אפרפר",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/MH87DT.jpg"
+        },
+        {
+          "id": "MH88DT",
+          "name": "עופרת מטאלי מוברש",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/MH88DT.jpg"
+        },
+        {
+          "id": "MH89DT",
+          "name": "ארד מטאלי מוברש",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/MH89DT.jpg"
+        },
+        {
+          "id": "MH90DT",
+          "name": "ברזל מטאלי מוברש",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/MH90DT.jpg"
+        },
+        {
+          "id": "MH91DT",
+          "name": "פלדיום מטאלי מוברש",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/MH91DT.jpg"
+        },
+        {
+          "id": "MH97",
+          "name": "אוניקס",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/MH97.jpg"
+        },
+        {
+          "id": "MH98",
+          "name": "טיטניום",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/MH98.jpg"
+        },
+        {
+          "id": "MH99",
+          "name": "קוורץ",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/MH99.jpg"
+        },
+        {
+          "id": "ML92DT",
+          "name": "חולות מדבר",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/ML92DT.jpg"
+        },
+        {
+          "id": "ML93DT",
+          "name": "אבוריו",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/ML93DT.jpg"
+        },
+        {
+          "id": "ML94DT",
+          "name": "אמברה",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/ML94DT.jpg"
+        },
+        {
+          "id": "ML95DT",
+          "name": "אלבה",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/ML95DT.jpg"
+        },
+        {
+          "id": "ML96DT",
+          "name": "בוסקו",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/italy-smart/ML96DT.jpg"
+        }
+      ]
+    },
+    {
+      "id": "hpl_wood",
+      "name": "HPL עצים",
+      "items": [
+        {
+          "id": "5211",
+          "name": "5211",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-wood/5211.jpg"
+        },
+        {
+          "id": "KH14",
+          "name": "KH14",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-wood/KH14.jpg"
+        },
+        {
+          "id": "KH15",
+          "name": "KH15",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-wood/KH15.jpg"
+        },
+        {
+          "id": "KH30",
+          "name": "KH30",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-wood/KH30.jpg"
+        },
+        {
+          "id": "KH31DT",
+          "name": "KH31DT",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-wood/KH31DT.jpg"
+        },
+        {
+          "id": "KH32DT",
+          "name": "KH32DT",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-wood/KH32DT.jpg"
+        },
+        {
+          "id": "KH33",
+          "name": "KH33",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-wood/KH33.jpg"
+        },
+        {
+          "id": "KH37DT",
+          "name": "KH37DT",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-wood/KH37DT.jpg"
+        },
+        {
+          "id": "KH61DT",
+          "name": "KH61DT",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-wood/KH61DT.jpg"
+        },
+        {
+          "id": "KH62DT",
+          "name": "KH62DT",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-wood/KH62DT.jpg"
+        },
+        {
+          "id": "KH63DT",
+          "name": "KH63DT",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-wood/KH63DT.jpg"
+        },
+        {
+          "id": "KH64DT",
+          "name": "KH64DT",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-wood/KH64DT.jpg"
+        },
+        {
+          "id": "KH65DT",
+          "name": "KH65DT",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-wood/KH65DT.jpg"
+        },
+        {
+          "id": "KH66DT",
+          "name": "KH66DT",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-wood/KH66DT.jpg"
+        },
+        {
+          "id": "KH68DT",
+          "name": "KH68DT",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-wood/KH68DT.jpg"
+        },
+        {
+          "id": "KH69DT",
+          "name": "KH69DT",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-wood/KH69DT.jpg"
+        },
+        {
+          "id": "KH74DT",
+          "name": "KH74DT",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-wood/KH74DT.jpg"
+        },
+        {
+          "id": "KH75DT",
+          "name": "KH75DT",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-wood/KH75DT.jpg"
+        },
+        {
+          "id": "KL67",
+          "name": "KL67",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-wood/KL67.jpg"
+        }
+      ]
+    },
+    {
+      "id": "hpl_stone",
+      "name": "HPL סטון",
+      "items": [
+        {
+          "id": "KH11DT",
+          "name": "KH11DT",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-stone/KH11DT.jpg"
+        },
+        {
+          "id": "KH18DT",
+          "name": "KH18DT",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-stone/KH18DT.jpg"
+        },
+        {
+          "id": "KH24DT",
+          "name": "KH24DT",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-stone/KH24DT.jpg"
+        },
+        {
+          "id": "KH70DT",
+          "name": "KH70DT",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-stone/KH70DT.jpg"
+        },
+        {
+          "id": "KH71",
+          "name": "KH71",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-stone/KH71.jpg"
+        },
+        {
+          "id": "PH120KB",
+          "name": "PH120KB",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-stone/PH120KB.jpg"
+        },
+        {
+          "id": "PH123KB",
+          "name": "PH123KB",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-stone/PH123KB.jpg"
+        },
+        {
+          "id": "PH124KB",
+          "name": "PH124KB",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-stone/PH124KB.jpg"
+        },
+        {
+          "id": "PH125KB",
+          "name": "PH125KB",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-stone/PH125KB.jpg"
+        },
+        {
+          "id": "PH126KB",
+          "name": "PH126KB",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-stone/PH126KB.jpg"
+        },
+        {
+          "id": "PH130KB",
+          "name": "PH130KB",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-stone/PH130KB.jpg"
+        },
+        {
+          "id": "PH132KB",
+          "name": "PH132KB",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-stone/PH132KB.jpg"
+        },
+        {
+          "id": "PH137KB",
+          "name": "PH137KB",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-stone/PH137KB.jpg"
+        },
+        {
+          "id": "PH149",
+          "name": "PH149",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-stone/PH149.jpg"
+        }
+      ]
+    },
+    {
+      "id": "hpl_texture",
+      "name": "HPL טקסטורות",
+      "items": [
+        {
+          "id": "KH72",
+          "name": "KH72",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-texture/KH72.jpg"
+        },
+        {
+          "id": "KH73",
+          "name": "KH73",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-texture/KH73.jpg"
+        },
+        {
+          "id": "PH114KB",
+          "name": "PH114KB",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-texture/PH114KB.jpg"
+        },
+        {
+          "id": "PH146",
+          "name": "PH146",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-texture/PH146.jpg"
+        },
+        {
+          "id": "PH32",
+          "name": "PH32",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-texture/PH32.jpg"
+        },
+        {
+          "id": "PH33",
+          "name": "PH33",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-texture/PH33.jpg"
+        },
+        {
+          "id": "PH34",
+          "name": "PH34",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-texture/PH34.jpg"
+        },
+        {
+          "id": "PH35",
+          "name": "PH35",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-texture/PH35.jpg"
+        },
+        {
+          "id": "PH38",
+          "name": "PH38",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-texture/PH38.jpg"
+        },
+        {
+          "id": "PH39",
+          "name": "PH39",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/hpl-texture/PH39.jpg"
+        }
+      ]
+    },
+    {
+      "id": "veneer",
+      "name": "פורניר",
+      "items": [
+        {
+          "id": "KV01",
+          "name": "KV01",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/veneer/KV01.jpg"
+        },
+        {
+          "id": "KV02",
+          "name": "KV02",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/veneer/KV02.jpg"
+        },
+        {
+          "id": "KV03",
+          "name": "KV03",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/veneer/KV03.jpg"
+        },
+        {
+          "id": "KV06",
+          "name": "KV06",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/veneer/KV06.jpg"
+        },
+        {
+          "id": "KV10",
+          "name": "KV10",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/veneer/KV10.jpg"
+        },
+        {
+          "id": "KV14",
+          "name": "KV14",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/veneer/KV14.jpg"
+        },
+        {
+          "id": "KV15",
+          "name": "KV15",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/veneer/KV15.jpg"
+        }
+      ]
+    },
+    {
+      "id": "pp",
+      "name": "PP פוליפרופילן",
+      "items": [
+        {
+          "id": "R10",
+          "name": "R10",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/pp/R10.jpg"
+        },
+        {
+          "id": "R11",
+          "name": "R11",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/pp/R11.jpg"
+        },
+        {
+          "id": "R12",
+          "name": "R12",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/pp/R12.jpg"
+        },
+        {
+          "id": "R13",
+          "name": "R13",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/pp/R13.jpg"
+        },
+        {
+          "id": "R14",
+          "name": "R14",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/pp/R14.jpg"
+        },
+        {
+          "id": "R21",
+          "name": "R21",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/pp/R21.jpg"
+        }
+      ]
+    },
+    {
+      "id": "lamitex",
+      "name": "Lamitex",
+      "items": [
+        {
+          "id": "T04",
+          "name": "T04",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/lamitex/T04.jpg"
+        },
+        {
+          "id": "T10",
+          "name": "T10",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/lamitex/T10.jpg"
+        },
+        {
+          "id": "T17",
+          "name": "T17",
+          "finish": "matte",
+          "type": "texture",
+          "img": "textures/bluran/lamitex/T17.jpg"
+        }
+      ]
+    },
+    {
+      "id": "glass",
+      "name": "זכוכיות",
+      "items": [
+        {
+          "id": "GLASS_אסיד",
+          "name": "אסיד",
+          "finish": "glass",
+          "type": "texture",
+          "img": "textures/bluran/glass/אסיד.jpg"
+        },
+        {
+          "id": "GLASS_גלים_קטנים_שקופה",
+          "name": "גלים קטנים שקופה",
+          "finish": "glass",
+          "type": "texture",
+          "img": "textures/bluran/glass/גלים_קטנים_שקופה.jpg"
+        },
+        {
+          "id": "GLASS_גלים_שקופה",
+          "name": "גלים שקופה",
+          "finish": "glass",
+          "type": "texture",
+          "img": "textures/bluran/glass/גלים_שקופה.jpg"
+        },
+        {
+          "id": "GLASS_מראה",
+          "name": "מראה",
+          "finish": "glass",
+          "type": "texture",
+          "img": "textures/bluran/glass/מראה.jpg"
+        },
+        {
+          "id": "GLASS_מראה_אפורה",
+          "name": "מראה אפורה",
+          "finish": "glass",
+          "type": "texture",
+          "img": "textures/bluran/glass/מראה_אפורה.jpg"
+        },
+        {
+          "id": "GLASS_מראה_ברונזה",
+          "name": "מראה ברונזה",
+          "finish": "glass",
+          "type": "texture",
+          "img": "textures/bluran/glass/מראה_ברונזה.jpg"
+        },
+        {
+          "id": "GLASS_רטרו_סטפס_R55",
+          "name": "רטרו סטפס R55",
+          "finish": "glass",
+          "type": "texture",
+          "img": "textures/bluran/glass/רטרו_סטפס_R55.png"
+        },
+        {
+          "id": "GLASS_רטרו_פולקלור_R71",
+          "name": "רטרו פולקלור R71",
+          "finish": "glass",
+          "type": "texture",
+          "img": "textures/bluran/glass/רטרו_פולקלור_R71.png"
+        },
+        {
+          "id": "GLASS_רפלקטיבית_אפורה",
+          "name": "רפלקטיבית אפורה",
+          "finish": "glass",
+          "type": "texture",
+          "img": "textures/bluran/glass/רפלקטיבית_אפורה.jpg"
+        }
+      ]
+    }
+  ]
+}

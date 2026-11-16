@@ -7043,6 +7043,67 @@ body.viewer-mode #canvas-container canvas {
 }
 .btn-open-tambour-palette:active { transform: translateY(0); }
 
+.btn-open-bluran-palette {
+    width: 100%;
+    margin: 0 0 10px;
+    padding: 11px 14px;
+    border-radius: 10px;
+    border: 1.5px solid rgba(37, 99, 235, 0.35);
+    background: linear-gradient(135deg, #eff6ff, #dbeafe);
+    color: #1d4ed8;
+    font-size: 0.88rem;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.18s ease;
+}
+.btn-open-bluran-palette:hover {
+    background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+    border-color: #2563eb;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.18);
+    transform: translateY(-1px);
+}
+.btn-open-bluran-palette:active { transform: translateY(0); }
+
+.bluran-palette-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 24px;
+    border-bottom: 1px solid #eee;
+    background: #fff;
+    flex-shrink: 0;
+}
+.bluran-cat-tab {
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: #334155;
+    border-radius: 999px;
+    padding: 7px 12px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.bluran-cat-tab:hover { border-color: #93c5fd; background: #eff6ff; }
+.bluran-cat-tab.active {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: #fff;
+}
+.bluran-color-cat {
+    font-size: 0.65rem;
+    color: #94a3b8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .tambour-palette-overlay {
     position: fixed;
     inset: 0;

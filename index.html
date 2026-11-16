@@ -1165,6 +1165,9 @@
             <button type="button" class="btn-open-tambour-palette" title="מניפת גוונים מלאה של טמבור">
                 <i class="fa-solid fa-swatchbook"></i> מניפת טמבור — 1651 גוונים
             </button>
+            <button type="button" class="btn-open-bluran-palette" title="מניפת חומרים של בלורן">
+                <i class="fa-solid fa-palette"></i> מניפת בלורן
+            </button>
 
             <div class="materials-flat-grid">
                 <div class="mat-item" style="grid-column: 1 / -1;">
@@ -2666,6 +2669,9 @@
         <button type="button" class="btn-open-tambour-palette" style="margin-bottom:12px;" title="מניפת גוונים מלאה של טמבור">
             <i class="fa-solid fa-swatchbook"></i> מניפת טמבור — 1651 גוונים
         </button>
+        <button type="button" class="btn-open-bluran-palette" style="margin-bottom:12px;" title="מניפת חומרים של בלורן">
+            <i class="fa-solid fa-palette"></i> מניפת בלורן
+        </button>
         <button id="btn-part-paint-mobile" onclick="enterPartPaintMode()" style="width:100%;border-radius:8px;height:44px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:0.9rem;border:1.5px solid var(--primary);background:linear-gradient(135deg,#f0f9ff,#e0f0ff);color:var(--primary);font-weight:600;cursor:pointer;margin-bottom:10px;">
             <i class="fa-solid fa-paintbrush"></i> עריכת צבעים מתקדמת
         </button>
@@ -3171,6 +3177,7 @@
 <script src="engine-blueprint.js?v=20261116kitSeam"></script>
 <script src="engine-room-plan.js?v=20261110floors"></script>
 <script src="tambour-color-picker.js?v=20261110roomwall"></script>
+<script src="bluran-color-picker.js?v=20261116bluran"></script>
 <script src="room-finishes.js?v=20261110gloss"></script>
 <script src="ui.js?v=20261116kitAppl2"></script>
 <script src="mirror-cabinet.js?v=20261110doormirror"></script>
@@ -3195,6 +3202,26 @@
         </div>
         <div id="tambour-palette-body" class="tambour-palette-body">
             <div id="tambour-colors-grid" class="tambour-colors-grid"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== BLURAN PALETTE MODAL ===== -->
+<div id="bluran-palette-modal" class="tambour-palette-overlay">
+    <div class="tambour-palette-content">
+        <div class="tambour-palette-header">
+            <div class="tambour-palette-header-main">
+                <h2>מניפת חומרים של בלורן</h2>
+                <p id="bluran-palette-count">טוען חומרים...</p>
+            </div>
+            <div class="tambour-palette-search-wrap">
+                <input type="text" id="bluran-palette-search" placeholder="חפש לפי שם, קוד או קטגוריה (למשל: ZA06 או אקריל)...">
+            </div>
+            <button type="button" id="bluran-palette-close" class="tambour-palette-close" aria-label="סגור">✕</button>
+        </div>
+        <div id="bluran-palette-tabs" class="bluran-palette-tabs" role="tablist"></div>
+        <div id="bluran-palette-body" class="tambour-palette-body">
+            <div id="bluran-colors-grid" class="tambour-colors-grid"></div>
         </div>
     </div>
 </div>

@@ -34,3 +34,7 @@ api.txt
 # ── Logs ──────────────────────────────────────────────
 *.log
 .vercel
+
+_bluran_dl/
+color picker/_bluran_crawl.json
+

@@ -3894,6 +3894,74 @@ window._syncTambourPalette = function(palette) {
 };
 
 const textureLoader = new THREE.TextureLoader();
+
+window._bluranMatKey = function(colorId) {
+    return 'bluran_' + String(colorId || '').replace(/[^a-zA-Z0-9]/g, '_');
+};
+
+window._bluranFinishProps = function(finish) {
+    const f = String(finish || 'matte').toLowerCase();
+    if (f === 'gloss' || f === 'dg') return { roughness: 0.18, metalness: 0.05 };
+    if (f === 'silk' || f === 'dm') return { roughness: 0.38, metalness: 0.02 };
+    if (f === 'metal') return { roughness: 0.32, metalness: 0.72 };
+    if (f === 'glass') return { roughness: 0.12, metalness: 0.1 };
+    return { roughness: 0.62, metalness: 0.0 };
+};
+
+window._registerBluranMaterial = function(colorOrId, hexMaybe) {
+    let color = colorOrId;
+    if (typeof colorOrId === 'string') {
+        color = { id: colorOrId, hex: hexMaybe, finish: 'matte', type: 'solid' };
+    }
+    if (!color || !color.id) return null;
+    const key = window._bluranMatKey(color.id);
+    const props = window._bluranFinishProps(color.finish);
+    if (color.img || color.type === 'texture') {
+        if (!materials[key] || !materials[key].map) {
+            const tex = textureLoader.load(color.img);
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
+            tex.repeat.set(1, 1);
+            if (materials[key]) materials[key].dispose();
+            materials[key] = new THREE.MeshStandardMaterial({
+                map: tex,
+                roughness: props.roughness,
+                metalness: props.metalness
+            });
+        }
+    } else {
+        const threeColor = new THREE.Color(color.hex || '#cccccc');
+        if (!materials[key]) {
+            materials[key] = new THREE.MeshStandardMaterial({
+                color: threeColor,
+                roughness: props.roughness,
+                metalness: props.metalness
+            });
+        } else {
+            materials[key].color.copy(threeColor);
+            materials[key].roughness = props.roughness;
+            materials[key].metalness = props.metalness;
+            materials[key].map = null;
+            materials[key].needsUpdate = true;
+        }
+    }
+    return key;
+};
+
+window._syncBluranPalette = function(palette) {
+    if (!palette || typeof palette !== 'object') return;
+    Object.keys(palette).forEach(function(key) {
+        const entry = palette[key];
+        if (!entry) return;
+        window._registerBluranMaterial({
+            id: entry.id || key.replace(/^bluran_/, ''),
+            hex: entry.hex,
+            img: entry.img,
+            finish: entry.finish,
+            type: entry.type || (entry.img ? 'texture' : 'solid')
+        });
+    });
+};
 const textureNames = ['2020', '2024', 'H1367', 'H1307', 'H1227', 'A427', '2025', '2040', '2041', '2044', '2047', '2049', '2062', '5600', '7180', '456', '462', '463', '464', '480'];
 
 textureNames.forEach(name => {
