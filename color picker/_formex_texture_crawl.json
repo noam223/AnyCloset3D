@@ -1,0 +1,49 @@
+{
+  "sections": [
+    {
+      "id": "abet-wood",
+      "name": "ABET · צבעי עץ",
+      "count": 25
+    },
+    {
+      "id": "abet-fantasy",
+      "name": "ABET · פנטזיות וגימורים",
+      "count": 22
+    },
+    {
+      "id": "abet-metal",
+      "name": "ABET · צבעים מטאליים",
+      "count": 0
+    },
+    {
+      "id": "dek-wood",
+      "name": "DEKOPAL · צבעי עץ",
+      "count": 37
+    },
+    {
+      "id": "dek-fantasy",
+      "name": "DEKOPAL · פנטזיות וגימורים",
+      "count": 27
+    },
+    {
+      "id": "dek-metal",
+      "name": "DEKOPAL · צבעים מטאליים",
+      "count": 20
+    },
+    {
+      "id": "nano",
+      "name": "Nano Carbon",
+      "count": 26
+    },
+    {
+      "id": "polymer",
+      "name": "פולימרים",
+      "count": 91
+    },
+    {
+      "id": "egger-formex",
+      "name": "EGGER by Formex",
+      "count": 15
+    }
+  ]
+}

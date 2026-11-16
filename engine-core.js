@@ -3975,19 +3975,34 @@ window._registerFormexMaterial = function(colorOrId, hexMaybe) {
     if (!color || !color.id) return null;
     const key = window._formexMatKey(color.id);
     const props = window._bluranFinishProps(color.finish);
-    const threeColor = new THREE.Color(color.hex || '#cccccc');
-    if (!materials[key]) {
-        materials[key] = new THREE.MeshStandardMaterial({
-            color: threeColor,
-            roughness: props.roughness,
-            metalness: props.metalness
-        });
+    if (color.img || color.type === 'texture') {
+        if (!materials[key] || !materials[key].map) {
+            const tex = textureLoader.load(color.img);
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
+            tex.repeat.set(1, 1);
+            if (materials[key]) materials[key].dispose();
+            materials[key] = new THREE.MeshStandardMaterial({
+                map: tex,
+                roughness: props.roughness,
+                metalness: props.metalness
+            });
+        }
     } else {
-        materials[key].color.copy(threeColor);
-        materials[key].roughness = props.roughness;
-        materials[key].metalness = props.metalness;
-        materials[key].map = null;
-        materials[key].needsUpdate = true;
+        const threeColor = new THREE.Color(color.hex || '#cccccc');
+        if (!materials[key]) {
+            materials[key] = new THREE.MeshStandardMaterial({
+                color: threeColor,
+                roughness: props.roughness,
+                metalness: props.metalness
+            });
+        } else {
+            materials[key].color.copy(threeColor);
+            materials[key].roughness = props.roughness;
+            materials[key].metalness = props.metalness;
+            materials[key].map = null;
+            materials[key].needsUpdate = true;
+        }
     }
     return key;
 };
@@ -4000,8 +4015,9 @@ window._syncFormexPalette = function(palette) {
         window._registerFormexMaterial({
             id: entry.id || key.replace(/^formex_/, ''),
             hex: entry.hex,
+            img: entry.img,
             finish: entry.finish,
-            type: entry.type || 'solid'
+            type: entry.type || (entry.img ? 'texture' : 'solid')
         });
     });
 };
