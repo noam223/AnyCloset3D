@@ -365,24 +365,32 @@ window._configureKitchenCarcass = function(role, opts) {
             spaceBottomPanel: true
         });
     } else if (role === 'corner') {
-        // Stub center for full-corner attachment — no extra base units by default
+        // Center anchors the L; may keep an existing straight run or stay an empty stub.
         cw.plinthHeight = KIT_PLINTH;
         cw.kitchenCornerL = true;
         _applyKitDim('height', KIT_HEIGHT);
         _applyKitDim('depth', KIT_DEPTH);
-        const nCorner = opts.numCols != null ? opts.numCols : 0;
-        if (nCorner <= 0) {
-            cw.columns = [];
-            state.columns = [];
-            // Tiny stub so only the full-corner L is visible and sits flush next to adjacent runs.
-            cw.kitchenCornerL = true;
+        if (opts.columns && opts.columns.length) {
+            // In-place convert: keep the cabinets the user already built
+            cw.columns = JSON.parse(JSON.stringify(opts.columns));
+            state.columns = cw.columns;
             window._kitchenCommitRunWidth(cw);
-            // Re-clear in case anything still tried to seed a column
-            cw.columns = [];
-            state.columns = [];
-            if (typeof _syncColumnCountInputs === 'function') _syncColumnCountInputs(0);
+            if (typeof _syncColumnCountInputs === 'function') _syncColumnCountInputs(cw.columns.length);
         } else {
-            _kitInitColumns({ numCols: nCorner, height: KIT_HEIGHT, topPanel: true });
+            const nCorner = opts.numCols != null ? opts.numCols : 0;
+            if (nCorner <= 0) {
+                cw.columns = [];
+                state.columns = [];
+                // Tiny stub so only the full-corner L is visible and sits flush next to adjacent runs.
+                cw.kitchenCornerL = true;
+                window._kitchenCommitRunWidth(cw);
+                // Re-clear in case anything still tried to seed a column
+                cw.columns = [];
+                state.columns = [];
+                if (typeof _syncColumnCountInputs === 'function') _syncColumnCountInputs(0);
+            } else {
+                _kitInitColumns({ numCols: nCorner, height: KIT_HEIGHT, topPanel: true });
+            }
         }
     } else {
         cw.plinthHeight = KIT_PLINTH;
@@ -453,8 +461,20 @@ window._kitchenMakeCorner = function() {
         b.addEventListener('click', function() {
             close();
             const side = b.dataset.side === 'left' ? 'left' : 'right';
+            // Convert the main run in place — never wipe existing units
+            if (state.wings && state.wings.center) {
+                state.activeWing = 'center';
+                if (typeof syncSidebarToWing === 'function') syncSidebarToWing();
+            }
+            const host = (state.wings && state.wings.center) || _getKitWing();
+            const cols = host && host.columns && host.columns.length
+                ? JSON.parse(JSON.stringify(host.columns))
+                : [];
             if (typeof window._configureKitchenCornerL === 'function') {
-                window._configureKitchenCornerL(side, {});
+                window._configureKitchenCornerL(side, {
+                    host: host,
+                    columns: cols
+                });
             }
             if (typeof buildCabinet === 'function') buildCabinet();
             if (typeof calculatePrice === 'function') calculatePrice();
@@ -468,18 +488,21 @@ window._kitchenMakeCorner = function() {
 };
 
 /**
- * Kitchen corner (ר): full corner with shelves only (IL standard).
- * No extra adjacent units — user adds them later with +60 on either arm.
+ * Kitchen corner (ר): full corner with shelves (IL standard).
+ * Pass opts.columns to keep an existing straight run on center; arm stays empty for +60.
+ * Fresh space kitchenCorner uses empty stub (no columns).
  */
 window._configureKitchenCornerL = function(side, opts) {
     opts = opts || {};
     side = side === 'left' ? 'left' : 'right';
-    // Default 0+0: only the L corner carcass; optional extras via opts
-    const centerCols = opts.numCols != null ? opts.numCols : 0;
+    const preserved = opts.columns && opts.columns.length
+        ? JSON.parse(JSON.stringify(opts.columns))
+        : null;
     const armCols = opts.armCols != null ? opts.armCols : 0;
     if (!window._configureKitchenCarcass('corner', {
         host: opts.host,
-        numCols: centerCols
+        columns: preserved || undefined,
+        numCols: preserved ? preserved.length : (opts.numCols != null ? opts.numCols : 0)
     })) return false;
 
     const cw = state.wings.center;
@@ -487,6 +510,14 @@ window._configureKitchenCornerL = function(side, opts) {
         cw.kitchenRole = 'corner';
         cw.kitchenCornerL = true;
         cw.kitchenCornerSide = side;
+        // Carcass may have cleared/rebuilt — restore exact units if we had them
+        if (preserved && preserved.length) {
+            cw.columns = preserved;
+            state.columns = preserved;
+            if (typeof window._kitchenCommitRunWidth === 'function') {
+                window._kitchenCommitRunWidth(cw);
+            }
+        }
     }
 
     // Clear opposite arm if switching
@@ -501,14 +532,17 @@ window._configureKitchenCornerL = function(side, opts) {
     state.wings[side] = arm;
     if (typeof _showWingTab === 'function') _showWingTab(side);
 
-    // Activate the L arm (not the empty stub) so +60 / unit pick / sidebar target the right wing
-    state.activeWing = side;
+    // Keep focus on the preserved run when converting in place; otherwise the L arm
+    const hasRun = !!(cw && cw.columns && cw.columns.length);
+    state.activeWing = hasRun ? 'center' : side;
     state.viewMode = '3d';
     window._forceCameraAnim = true;
     window._corner3dCamPositioned = false;
     if (typeof syncSidebarToWing === 'function') syncSidebarToWing();
     if (typeof _showToast === 'function') {
-        _showToast('פינת ר מלאה עם מדפים — הוסיפו יחידות עם +60 להמשך הזרועות', 4000);
+        _showToast(hasRun
+            ? 'פינת ר נוספה — היחידות הקיימות נשמרו. הוסיפו לזרוע עם +60'
+            : 'פינת ר מלאה עם מדפים — הוסיפו יחידות עם +60 להמשך הזרועות', 4000);
     }
     return true;
 };
