@@ -1606,15 +1606,15 @@
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(35, 1, 1, 5000);
-        scene.add(new THREE.HemisphereLight(0xfff6ea, 0xb9c6d6, 0.38));
-        const key = new THREE.DirectionalLight(0xfff7ee, 1.25);
+        scene.add(new THREE.HemisphereLight(0xfff6ea, 0xd5dee8, 0.72));
+        const key = new THREE.DirectionalLight(0xfff7ee, 0.85);
         key.castShadow = true;
         key.shadow.mapSize.set(2048, 2048);
         key.shadow.bias = -0.0008;
         key.shadow.normalBias = 1.2;
         scene.add(key);
         scene.add(key.target);
-        const fill = new THREE.DirectionalLight(0xd5e2f2, 0.22);
+        const fill = new THREE.DirectionalLight(0xe7eef6, 0.45);
         fill.position.set(-80, 30, 40);
         scene.add(fill);
         const controls = (typeof THREE.OrbitControls === 'function')
@@ -1635,7 +1635,7 @@
             idle: new THREE.MeshStandardMaterial(Object.assign({ color: 0xf3eee6 }, board)),
             door: new THREE.MeshStandardMaterial(Object.assign({ color: 0xf7f4ee }, board)),
             top: new THREE.MeshStandardMaterial(Object.assign({ color: 0xe7d7c0, roughness: 0.8, metalness: 0.02 })),
-            back: new THREE.MeshStandardMaterial(Object.assign({ color: 0xd5cbbd }, board)),
+            back: new THREE.MeshStandardMaterial(Object.assign({ color: 0xe4dcd2 }, board)),
             sel: new THREE.MeshStandardMaterial({ color: 0x4f46e5, emissive: 0x312e81, roughness: 0.42, metalness: 0.04 }),
             hover: new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xb45309, roughness: 0.4, metalness: 0.02 }),
             edge: new THREE.LineBasicMaterial({ color: 0x8d8274, transparent: true, opacity: 0.9 })
