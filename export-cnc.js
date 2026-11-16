@@ -1079,7 +1079,8 @@
                     c: [p.c.x, p.c.y, p.c.z],
                     ax: p.ax.map(function(a) { return [a.x, a.y, a.z]; }),
                     half: p.half.slice()
-                }]
+                }],
+                hinges: []
             };
             p.ops.forEach(function(o) {
                 const side = (o.face === faceA) ? 'A' : 'B';
@@ -1088,6 +1089,7 @@
                 if (o.type === 'drill') {
                     const q = flip(map(o.p));
                     rec.faces[side].drills.push({ x: _r1(q[0]), y: _r1(q[1]), d: o.d, depth: o.depth, tag: o.tag });
+                    if (o.tag === 'cup') rec.hinges.push([_r1(o.p.x), _r1(o.p.y), _r1(o.p.z)]);
                 } else {
                     const a = flip(map(o.a)), b = flip(map(o.b));
                     rec.faces[side].grooves.push({
@@ -1115,6 +1117,7 @@
                 hit.qty++;
                 r.wings.forEach(function(w) { if (hit.wings.indexOf(w) < 0) hit.wings.push(w); });
                 if (r.poses) hit.poses.push.apply(hit.poses, r.poses);
+                if (r.hinges) hit.hinges.push.apply(hit.hinges, r.hinges);
             } else {
                 byKey.set(key, r);
             }
@@ -1641,6 +1644,14 @@
             if (!UI.view) return;
             UI.view.raf = requestAnimationFrame(loop);
             if (controls) controls.update();
+            if (UI.view.labels && UI.view.labels.length) {
+                const dist = camera.position.distanceTo(controls ? controls.target : new THREE.Vector3());
+                const k = Math.max(8, dist * 0.035);
+                UI.view.labels.forEach(function(s) {
+                    const w = s.userData.wide ? 3.4 : 2.2;
+                    s.scale.set(k * w, k * 0.85, 1);
+                });
+            }
             renderer.render(scene, camera);
         };
         loop();
@@ -1679,7 +1690,9 @@
     // Frame the cabinet to the 3D pane. Keeps the current viewing angle after the first fit.
     function _frame3d(v, resetDir) {
         if (!v || !v.meshes.length) return;
-        const box = new THREE.Box3().setFromObject(v.group);
+        const box = new THREE.Box3();
+        v.meshes.forEach(function(mesh) { box.expandByObject(mesh); });
+        box.expandByScalar(14);
         if (box.isEmpty()) return;
         const center = box.getCenter(new THREE.Vector3());
         const radius = Math.max(box.getBoundingSphere(new THREE.Sphere()).radius, 8);
@@ -1701,16 +1714,128 @@
         if (v.controls) { v.controls.target.copy(center); v.controls.update(); }
         v.framing = false;
     }
+    function _clearAnno(v) {
+        if (!v || !v.anno) return;
+        const seen = [];
+        v.anno.traverse(function(o) {
+            if (o.geometry && seen.indexOf(o.geometry) < 0) { seen.push(o.geometry); o.geometry.dispose(); }
+            if (o.material) {
+                const mats = Array.isArray(o.material) ? o.material : [o.material];
+                mats.forEach(function(mat) {
+                    if (seen.indexOf(mat) >= 0) return;
+                    seen.push(mat);
+                    if (mat.map) mat.map.dispose();
+                    mat.dispose();
+                });
+            }
+        });
+        v.group.remove(v.anno);
+        v.anno = null;
+        v.labels = [];
+    }
+    function _annoLabel(text, wide) {
+        const canvas = document.createElement('canvas');
+        canvas.width = wide ? 512 : 320;
+        canvas.height = 96;
+        const g = canvas.getContext('2d');
+        g.fillStyle = 'rgba(255,255,255,0.94)';
+        g.fillRect(0, 0, canvas.width, canvas.height);
+        g.strokeStyle = wide ? '#1e3a5f' : '#c2410c';
+        g.lineWidth = 4;
+        g.strokeRect(3, 3, canvas.width - 6, canvas.height - 6);
+        g.fillStyle = wide ? '#1e3a5f' : '#9a3412';
+        g.font = 'bold 44px Arial, sans-serif';
+        g.textAlign = 'center';
+        g.textBaseline = 'middle';
+        g.direction = 'rtl';
+        g.fillText(text, canvas.width / 2, canvas.height / 2);
+        const tex = new THREE.CanvasTexture(canvas);
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
+        sprite.renderOrder = 6;
+        sprite.userData.wide = !!wide;
+        sprite.scale.set(wide ? 22 : 14, 5.5, 1);
+        return sprite;
+    }
+    function _annoLine(group, a, b, color) {
+        const geo = new THREE.BufferGeometry().setFromPoints([a, b]);
+        const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: color, depthTest: false }));
+        line.renderOrder = 4;
+        group.add(line);
+    }
+    function _add3dAnno(v) {
+        _clearAnno(v);
+        if (!v.meshes.length) return;
+        const anno = new THREE.Group();
+        v.group.add(anno);
+        v.anno = anno;
+        v.labels = [];
+        const box = new THREE.Box3();
+        v.meshes.forEach(function(mesh) { box.expandByObject(mesh); });
+        if (box.isEmpty()) return;
+        const min = box.min, max = box.max;
+        const gap = 7;
+        const tick = 2.2;
+        const dim = 0x1e3a5f;
+        const put = function(a, b, label, at) {
+            _annoLine(anno, a, b, dim);
+            const dir = b.clone().sub(a);
+            const len = dir.length() || 1;
+            dir.multiplyScalar(tick / len);
+            const n = new THREE.Vector3(-dir.z, 0, dir.x).normalize().multiplyScalar(tick);
+            if (Math.abs(b.y - a.y) > Math.abs(b.x - a.x) && Math.abs(b.y - a.y) > Math.abs(b.z - a.z)) {
+                n.set(tick, 0, 0);
+            }
+            _annoLine(anno, a.clone().sub(n), a.clone().add(n), dim);
+            _annoLine(anno, b.clone().sub(n), b.clone().add(n), dim);
+            const sprite = _annoLabel(label, true);
+            sprite.position.copy(at);
+            anno.add(sprite);
+            v.labels.push(sprite);
+        };
+        const midX = (min.x + max.x) / 2, midY = (min.y + max.y) / 2, midZ = (min.z + max.z) / 2;
+        const wMm = Math.round((max.x - min.x) * 10);
+        const hMm = Math.round((max.y - min.y) * 10);
+        const dMm = Math.round((max.z - min.z) * 10);
+        put(new THREE.Vector3(min.x, min.y, max.z + gap), new THREE.Vector3(max.x, min.y, max.z + gap),
+            'רוחב ' + wMm, new THREE.Vector3(midX, min.y, max.z + gap + 3));
+        put(new THREE.Vector3(min.x - gap, min.y, max.z), new THREE.Vector3(min.x - gap, max.y, max.z),
+            'גובה ' + hMm, new THREE.Vector3(min.x - gap - 3, midY, max.z));
+        put(new THREE.Vector3(max.x + gap, min.y, min.z), new THREE.Vector3(max.x + gap, min.y, max.z),
+            'עומק ' + dMm, new THREE.Vector3(max.x + gap + 3, min.y, midZ));
+
+        const seenY = {};
+        const dotGeo = new THREE.SphereGeometry(0.7, 12, 8);
+        const dotMat = new THREE.MeshBasicMaterial({ color: 0xc2410c, depthTest: false });
+        UI.result.panels.forEach(function(r) {
+            (r.hinges || []).forEach(function(h) {
+                const p = new THREE.Vector3(h[0] / 10, h[1] / 10, h[2] / 10);
+                const dot = new THREE.Mesh(dotGeo, dotMat);
+                dot.position.copy(p);
+                dot.renderOrder = 5;
+                anno.add(dot);
+                const key = Math.round(p.y * 10);
+                if (seenY[key]) return;
+                seenY[key] = true;
+                const fromBottom = Math.round((p.y - min.y) * 10);
+                const tag = _annoLabel('ציר ' + fromBottom, false);
+                tag.position.set(p.x, p.y, max.z + 2);
+                anno.add(tag);
+                v.labels.push(tag);
+            });
+        });
+    }
     function _sync3d() {
         _mount3d();
         const v = UI.view;
         if (!v || !UI.result) return;
         const token = UI.result.panels.map(function(r) {
-            return r.id + ':' + (r.poses || []).map(function(p) { return p.c.map(function(n) { return Math.round(n); }).join(','); }).join(';');
+            return r.id + ':' + (r.poses || []).map(function(p) { return p.c.map(function(n) { return Math.round(n); }).join(','); }).join(';') +
+                '#' + (r.hinges || []).map(function(h) { return h.map(function(n) { return Math.round(n); }).join(','); }).join(';');
         }).join('|');
         if (token !== v.token) {
             const refit = !v.token;
             v.token = token;
+            _clearAnno(v);
             while (v.group.children.length) v.group.remove(v.group.children[0]);
             v.meshes = [];
             const geo = new THREE.BoxGeometry(1, 1, 1);
@@ -1725,6 +1850,7 @@
                     v.meshes.push(mesh);
                 });
             });
+            _add3dAnno(v);
             if (v.meshes.length) _frame3d(v, refit || !v.userMoved);
         }
         _highlight3d();
@@ -1751,6 +1877,7 @@
     function _dispose3d() {
         const v = UI.view;
         if (!v) return;
+        _clearAnno(v);
         if (v.raf) cancelAnimationFrame(v.raf);
         if (v.ro) v.ro.disconnect();
         if (v.controls) v.controls.dispose();
@@ -1822,7 +1949,7 @@
                     '</div>' +
                     '<div id="cnc-3d-wrap" style="width:460px;flex-shrink:0;position:relative;background:#e7e5e4;border-right:1px solid #e2e8f0;">' +
                         '<canvas id="cnc-3d" style="width:100%;height:100%;display:block;"></canvas>' +
-                        '<div style="position:absolute;top:8px;right:10px;left:10px;font-size:.72rem;color:#44403c;pointer-events:none;">מודל הארון · מעבר על שורה מסמן את החלק</div>' +
+                        '<div style="position:absolute;top:8px;right:10px;left:10px;font-size:.72rem;color:#44403c;pointer-events:none;">מידות וצירים במ״מ · מעבר על שורה מסמן את החלק</div>' +
                         '<button type="button" id="cnc-3d-doors" style="position:absolute;bottom:10px;left:10px;z-index:2;border:1px solid #d6d3d1;border-radius:8px;background:rgba(255,255,255,.94);color:#44403c;font:inherit;font-size:.74rem;font-weight:700;padding:6px 10px;cursor:pointer;">הסתר דלתות</button>' +
                     '</div>' +
                 '</div>' +
