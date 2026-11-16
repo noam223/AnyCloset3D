@@ -8411,7 +8411,8 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
             // Shelf merged with a standalone corner desk: one board with the desk — desk color, flush front
             const _cuDeskMat = (!isBP && div.type === 'shelf') ? _cuMergedBoardMat(c, 'shelf', div.idx) : null;
             if (_cuDeskMat) boardMat = _cuDeskMat;
-            if (div.type === 'shelf' && !_cuDeskMat) {
+            // Shelves inside a כוורת sit flush with the front; other shelves stay 2cm back
+            if (div.type === 'shelf' && !_cuDeskMat && !insideBlock) {
                 boardD = Math.max(t, boardD - _shelfFrontSetback);
                 boardZ -= _shelfFrontSetback / 2;
             }
@@ -9415,11 +9416,13 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         }
 
                         if (numShelves > 0) {
-                            const subD = Math.max(t, bodyD - 2 - _shelfFrontSetback);
                             for (let s = 0; s < subShelvesY.length; s++) {
                                 const shelfInHoneycomb = _subZoneIsHoneycomb(si, s) || _subZoneIsHoneycomb(si, s + 1);
                                 const shelfMat = shelfInHoneycomb ? matOpenCell : matInternal;
-                                const shelfZ = (shelfInHoneycomb ? 1 : 0) - _shelfFrontSetback / 2;
+                                const subD = shelfInHoneycomb
+                                    ? Math.max(t, bodyD - 2)
+                                    : Math.max(t, bodyD - 2 - _shelfFrontSetback);
+                                const shelfZ = shelfInHoneycomb ? 1 : -_shelfFrontSetback / 2;
                                 if (shelfInHoneycomb) {
                                     let honeyPaintIdx = si;
                                     while (honeyPaintIdx > 0 && (
