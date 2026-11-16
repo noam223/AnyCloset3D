@@ -4297,11 +4297,27 @@ function updateOverlaysPosition() {
     }
 }
 
+/** Normalize wing ids so full_corner_left / left (etc.) compare equal. */
+function _selectionWingKey(wingId) {
+    if (!wingId) return 'center';
+    const id = String(wingId);
+    if (id === 'full_corner_left' || id.indexOf('upperUnit_left') === 0) return 'left';
+    if (id === 'full_corner_right' || id.indexOf('upperUnit_right') === 0) return 'right';
+    if (id.indexOf('full_corner_') === 0) return id.replace('full_corner_', '');
+    if (id.indexOf('upperUnit_') === 0) return id.replace('upperUnit_', '') || 'center';
+    return id;
+}
+
 /** Column-level hitboxes also use rowIndex -1; only the desk knee-zone one shows the selection tint. */
 function _hitBoxSelected(hb) {
     const u = hb.userData;
     if (u.colIndex !== state.selection.colIndex || !state.selection.rows.includes(u.rowIndex)) return false;
-    return u.rowIndex !== -1 || !!u.deskZone;
+    if (u.rowIndex === -1 && !u.deskZone) return false;
+    // Kitchen (and any multi-wing hit list): same colIndex on another arm must not tint
+    if (u.wingId && state.activeWing) {
+        if (_selectionWingKey(u.wingId) !== _selectionWingKey(state.activeWing)) return false;
+    }
+    return true;
 }
 
 /** True when the selection is the knee space above an internal desk (pseudo-row -1). */
@@ -9688,7 +9704,9 @@ function bindUI() {
             hitBoxes.forEach(hb => {
                 if (hb.userData.noHighlight) return; // invisible trigger zones — never show highlight
                 const isSelected = _hitBoxSelected(hb);
-                const isHovered = (hb.userData.colIndex === state.hoveredColIndex);
+                const sameWing = !hb.userData.wingId || !hoverWingId
+                    || _selectionWingKey(hb.userData.wingId) === _selectionWingKey(hoverWingId);
+                const isHovered = sameWing && (hb.userData.colIndex === state.hoveredColIndex);
                 hb.material.opacity = isSelected ? 0.3 : (isHovered ? 0.05 : 0.0);
             });
             buildDragHandlesUI(); updateQuickEditPanelUI();

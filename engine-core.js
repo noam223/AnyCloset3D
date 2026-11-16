@@ -8505,14 +8505,16 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
                     }
                 }
                 const isHoveredCol = (state.hoveredColIndex === c);
-                // Space companions rebuild with the active cabinet's selection still in state —
-                // never bake that tint onto the other run (same colIndex would "select" both).
+                // Space companions / inactive kitchen arms share colIndex with the active run —
+                // only the active wing may bake selection/hover tint (otherwise two cells light up).
                 const _spacePassive = !!(window._spaceBuildSlot != null || window._spaceCompanionBuilding);
-                const _isSelCell = !_spacePassive && state.selection.colIndex === c && state.selection.rows.includes(r);
+                const _isSelCell = !_spacePassive && _isActiveWingBuild
+                    && state.selection.colIndex === c && state.selection.rows.includes(r);
+                const _bakeHover = !_spacePassive && _isActiveWingBuild && isHoveredCol;
                 const hitMat = new THREE.MeshBasicMaterial({
-                    color: (!_spacePassive && isHoveredCol) ? 0x2ecc71 : 0x3498db,
+                    color: _bakeHover ? 0x2ecc71 : 0x3498db,
                     transparent: true,
-                    opacity: _spacePassive ? 0.0 : (_isSelCell ? 0.3 : (isHoveredCol ? 0.05 : 0.0)),
+                    opacity: _spacePassive ? 0.0 : (_isSelCell ? 0.3 : (_bakeHover ? 0.05 : 0.0)),
                     depthWrite: false
                 });
                 const hitBox = new THREE.Mesh(new THREE.BoxGeometry(col.width, compH, bodyD - backT - 2), hitMat);
