@@ -908,12 +908,11 @@ window._collectDoorMeshLists = function() {
 };
 window._applyHingeVisibility = function() {
     var hingesOn = window._hingesVisible !== false;
-    var doorsOn = window._doorsVisible !== false;
     window._collectDoorMeshLists().forEach(function(list) {
         list.forEach(function(m) {
             if (!m || !m.userData || !m.userData.isHingeHardware) return;
-            // Plate on carcass stays when doors are hidden; cup/arm follow the door
-            m.visible = hingesOn && (m.userData.keepVisibleWhenDoorsHidden || doorsOn);
+            // Only carcass mounting plates are shown — independent of door fronts
+            m.visible = hingesOn;
         });
     });
     var btn = document.getElementById('btn-toggle-hinges');
@@ -4203,9 +4202,97 @@ function _hingeSpreadCm(lo, hi, n, edgeCm) {
 }
 
 /**
- * Procedural Blum-style hinge hardware on the inner carcass face (and cup on the door back).
- * Positions match CNC defaults: cupCenter 21.5mm, hingeEdge 100mm, plateFront 37mm.
- * Door-side cup+arm hide with "הסתר חזיתות"; the mounting plate on the carcass stays visible.
+ * Build a Blum-style cruciform mounting plate (local space).
+ * Local axes: +X = out from the wall, Y = along the long rail, Z = wing span.
+ * Only this carcass plate is shown in the sim — no door cup / arm.
+ */
+function _buildHingeMountPlate() {
+    let mat = _addHingeHardware._mat;
+    let matDark = _addHingeHardware._matDark;
+    if (!mat) {
+        mat = new THREE.MeshStandardMaterial({
+            color: 0xc5c8cc, metalness: 0.9, roughness: 0.28,
+            polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2
+        });
+        _addHingeHardware._mat = mat;
+    }
+    if (!matDark) {
+        matDark = new THREE.MeshStandardMaterial({
+            color: 0x4a4e52, metalness: 0.7, roughness: 0.45,
+            polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2
+        });
+        _addHingeHardware._matDark = matDark;
+    }
+
+    const g = new THREE.Group();
+    // Real-ish sizes in cm (slightly readable at cabinet scale)
+    const railLen = 5.6;   // Y
+    const railW = 1.15;    // Z of raised channel
+    const baseT = 0.12;    // flat sheet thickness (X)
+    const railH = 0.55;    // raised channel height (X)
+    const wingSpan = 3.9;  // total Z across both wings
+    const wingPadY = 1.55; // each wing pad length along Y
+    const wingYOff = 1.55; // center of each wing from plate center
+
+    // Flat vertical spine under the rail
+    const spine = new THREE.Mesh(new THREE.BoxGeometry(baseT, railLen, railW + 0.15), mat);
+    spine.position.set(baseT / 2, 0, 0);
+    g.add(spine);
+
+    // Left / right wing pads (diagonal screw pattern)
+    const wingGeo = new THREE.BoxGeometry(baseT, wingPadY, (wingSpan - railW) / 2 + 0.05);
+    const wingL = new THREE.Mesh(wingGeo, mat);
+    wingL.position.set(baseT / 2, -wingYOff, -(railW / 2 + (wingSpan - railW) / 4));
+    g.add(wingL);
+    const wingR = new THREE.Mesh(wingGeo, mat);
+    wingR.position.set(baseT / 2, wingYOff, railW / 2 + (wingSpan - railW) / 4);
+    g.add(wingR);
+
+    // Raised central channel (hollow look via outer shell + dark inner slot)
+    const channel = new THREE.Mesh(new THREE.BoxGeometry(railH, railLen * 0.92, railW), mat);
+    channel.position.set(baseT + railH / 2, 0, 0);
+    g.add(channel);
+    // Inner slot (dark)
+    const slot = new THREE.Mesh(new THREE.BoxGeometry(railH * 0.55, railLen * 0.55, railW * 0.45), matDark);
+    slot.position.set(baseT + railH * 0.72, -0.15, 0);
+    g.add(slot);
+    // Top clip opening
+    const clip = new THREE.Mesh(new THREE.BoxGeometry(railH * 0.35, 0.55, railW * 0.55), matDark);
+    clip.position.set(baseT + railH * 0.85, railLen * 0.38, 0);
+    g.add(clip);
+
+    // Height-adjustment screw on the right of the channel
+    const screwBoss = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.12, 12), mat);
+    screwBoss.rotation.z = Math.PI / 2;
+    screwBoss.position.set(baseT + railH * 0.55, railLen * 0.22, railW * 0.55);
+    g.add(screwBoss);
+    const screwHead = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.1, 12), matDark);
+    screwHead.rotation.z = Math.PI / 2;
+    screwHead.position.set(baseT + railH * 0.55 + 0.08, railLen * 0.22, railW * 0.55);
+    g.add(screwHead);
+
+    // Countersunk mounting holes (diagonal): lower-left wing, upper-right wing
+    const addHole = (y, z) => {
+        const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.38, 0.06, 14), matDark);
+        ring.rotation.z = Math.PI / 2;
+        ring.position.set(baseT + 0.02, y, z);
+        g.add(ring);
+        const hole = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.08, 10), matDark);
+        hole.rotation.z = Math.PI / 2;
+        hole.position.set(baseT + 0.03, y, z);
+        g.add(hole);
+    };
+    addHole(-wingYOff, -(railW / 2 + (wingSpan - railW) / 4));
+    addHole(wingYOff, railW / 2 + (wingSpan - railW) / 4);
+
+    // Outward extent from wall face (for placement clearance)
+    g.userData.outExtent = baseT + railH;
+    return g;
+}
+
+/**
+ * Mounting plates only on the inner carcass face (CNC plateFront / cup heights).
+ * No door-side cup or arm — just the cruciform plate from the hardware reference.
  */
 function _addHingeHardware(parent, opts) {
     if (!parent || !opts || opts.isBP) return;
@@ -4222,118 +4309,58 @@ function _addHingeHardware(parent, opts) {
     const cupCenter = 2.15;
     const hingeEdge = 10;
     const plateFront = 3.7;
-    const cupR = 1.75;
     const doorLeft = cx - w / 2, doorRight = cx + w / 2;
     const doorBot = cy - h / 2, doorTop = cy + h / 2;
-    const doorBackZ = cz - doorT / 2;
     const carcassFrontZ = isInset ? (bodyD / 2 - boardT) : (bodyD / 2);
     const plateZ = carcassFrontZ - plateFront;
+    const wallClear = 0.08;
 
-    let mat = _addHingeHardware._mat;
-    if (!mat) {
-        mat = new THREE.MeshStandardMaterial({
-            color: 0xb0b4b8, metalness: 0.85, roughness: 0.35,
-            // Pull slightly forward in the depth buffer so coplanar wall faces don't flicker
-            polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2
-        });
-        _addHingeHardware._mat = mat;
-    }
-
-    // Plate stays on the carcass; cup/arm belong to the door and hide with fronts
     const plateGroup = new THREE.Group();
     plateGroup.userData.skipPartPaint = true;
     plateGroup.userData.isHingeHardware = true;
     plateGroup.userData.keepVisibleWhenDoorsHidden = true;
     plateGroup.renderOrder = 2;
 
-    const doorGroup = new THREE.Group();
-    doorGroup.userData.skipPartPaint = true;
-    doorGroup.userData.isHingeHardware = true;
-    doorGroup.renderOrder = 2;
-
-    // Sit fully clear of the carcass face (half plate thickness + air gap) to avoid z-fighting
-    const plateThick = 0.18;
-    const wallClear = 0.1;
-
-    const addCup = (x, y) => {
-        const cup = new THREE.Mesh(new THREE.CylinderGeometry(cupR, cupR, 1.1, 16), mat);
-        cup.rotation.x = Math.PI / 2;
-        cup.position.set(x, y, doorBackZ - 0.15);
-        doorGroup.add(cup);
-    };
-    const addPlateArm = (px, py, pz, alongY) => {
-        const plate = new THREE.Mesh(
-            alongY
-                ? new THREE.BoxGeometry(plateThick, 5.2, 2.2)
-                : new THREE.BoxGeometry(5.2, plateThick, 2.2),
-            mat
-        );
-        plate.position.set(px, py, pz);
-        plateGroup.add(plate);
-        // Short carcass stub (stays visible) + longer arm toward the cup (hides with door)
-        const stub = new THREE.Mesh(
-            alongY ? new THREE.BoxGeometry(0.7, 0.35, 0.9) : new THREE.BoxGeometry(0.35, 0.7, 0.9),
-            mat
-        );
-        const arm = new THREE.Mesh(
-            alongY ? new THREE.BoxGeometry(1.4, 0.3, 0.7) : new THREE.BoxGeometry(0.3, 1.4, 0.7),
-            mat
-        );
-        if (alongY) {
-            const inward = hinge === 'left' ? 1 : -1;
-            stub.position.set(px + inward * (plateThick / 2 + 0.35), py, pz);
-            arm.position.set(px + inward * 1.2, py, (pz + doorBackZ) / 2);
+    const placePlate = (wx, wy, wz, orient) => {
+        const plate = _buildHingeMountPlate();
+        // Local +X points out from the wall into the cabinet; back sits at wallClear
+        if (orient === 'left') {
+            plate.position.set(wx + wallClear, wy, wz);
+        } else if (orient === 'right') {
+            plate.rotation.y = Math.PI;
+            plate.position.set(wx - wallClear, wy, wz);
         } else {
-            stub.position.set(px, py - (plateThick / 2 + 0.35), pz);
-            arm.position.set(px, py - 1.2, (pz + doorBackZ) / 2);
+            // Underside of roof: local +X → world −Y
+            plate.rotation.z = -Math.PI / 2;
+            plate.position.set(wx, wy - wallClear, wz);
         }
-        plateGroup.add(stub);
-        doorGroup.add(arm);
+        plateGroup.add(plate);
     };
 
     if (hinge === 'top') {
-        const ys = doorTop - cupCenter;
         const xs = _hingeSpreadCm(doorLeft, doorRight, _hingeCountCm(w), hingeEdge);
-        // Underside of top + clearance so the plate hangs into the opening, not into the board
         const wallFaceY = doorTop + (isInset ? doorGap / 2 : 0);
-        const plateY = wallFaceY - plateThick / 2 - wallClear;
         xs.forEach(function(x) {
-            addCup(x, ys);
-            addPlateArm(x, plateY, plateZ, false);
+            placePlate(x, wallFaceY, plateZ, 'top');
         });
     } else {
         const ys = _hingeSpreadCm(doorBot, doorTop, _hingeCountCm(h), hingeEdge);
-        const cupX = hinge === 'left' ? (doorLeft + cupCenter) : (doorRight - cupCenter);
-        // Inner face of the supporting side, then offset into the cabinet
         const wallFaceX = isInset
             ? (hinge === 'left' ? doorLeft - doorGap / 2 : doorRight + doorGap / 2)
             : (hinge === 'left' ? doorLeft + boardT - doorGap / 2 : doorRight - boardT + doorGap / 2);
-        const inward = hinge === 'left' ? 1 : -1;
-        const plateX = wallFaceX + inward * (plateThick / 2 + wallClear);
         ys.forEach(function(y) {
-            addCup(cupX, y);
-            addPlateArm(plateX, y, plateZ, true);
+            placePlate(wallFaceX, y, plateZ, hinge);
         });
     }
 
     parent.add(plateGroup);
-    parent.add(doorGroup);
-    if (typeof _registerDoorMesh === 'function') {
-        _registerDoorMesh(doorGroup);
-        // Track plate too so space/companion rebuilds keep it, but never hide with fronts
-        _registerDoorMesh(plateGroup);
-    }
+    if (typeof _registerDoorMesh === 'function') _registerDoorMesh(plateGroup);
     if (typeof window._applyHingeVisibility === 'function') window._applyHingeVisibility();
-    else {
-        if (window._doorsVisible === false) doorGroup.visible = false;
-        if (window._hingesVisible === false) {
-            doorGroup.visible = false;
-            plateGroup.visible = false;
-        }
-    }
+    else if (window._hingesVisible === false) plateGroup.visible = false;
     return plateGroup;
 }
 window._addHingeHardware = _addHingeHardware;
+window._buildHingeMountPlate = _buildHingeMountPlate;
 
 /** External drawer fronts stay visible when "הסתר חזיתות" hides door panels. */
 function _registerExternalDrawerFront(mesh) {
