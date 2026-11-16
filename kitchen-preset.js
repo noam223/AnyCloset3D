@@ -113,8 +113,14 @@ function _makeKitchenCornerArm(side, opts) {
     ].forEach(function(f) {
         if (src[f] !== undefined) w[f] = JSON.parse(JSON.stringify(src[f]));
     });
-    // Return arm beyond the corner (user extends with +60)
-    _kitInitColumnsOnWing(w, { numCols: opts.numCols != null ? opts.numCols : 1, height: KIT_HEIGHT, topPanel: true });
+    // No return units by default — only the full corner; user extends with +60
+    const nArm = opts.numCols != null ? opts.numCols : 0;
+    if (nArm <= 0) {
+        w.columns = [];
+        w.width = (w.fullCorner && w.fullCorner.size) || 90;
+    } else {
+        _kitInitColumnsOnWing(w, { numCols: nArm, height: KIT_HEIGHT, topPanel: true });
+    }
     if (typeof window._distributeFullCornerShelves === 'function') {
         window._distributeFullCornerShelves(w);
     }
@@ -270,12 +276,21 @@ window._configureKitchenCarcass = function(role, opts) {
             spaceBottomPanel: true
         });
     } else if (role === 'corner') {
-        // Center arm of the L — side arm is added by _configureKitchenCornerL
+        // Stub center for full-corner attachment — no extra base units by default
         cw.plinthHeight = KIT_PLINTH;
         cw.kitchenCornerL = true;
         _applyKitDim('height', KIT_HEIGHT);
         _applyKitDim('depth', KIT_DEPTH);
-        _kitInitColumns({ numCols: opts.numCols || 2, height: KIT_HEIGHT, topPanel: true });
+        const nCorner = opts.numCols != null ? opts.numCols : 0;
+        if (nCorner <= 0) {
+            cw.columns = [];
+            state.columns = [];
+            // Narrow stub so only the full-corner L is visible; +60 extends later
+            _applyKitDim('width', KIT_DEPTH);
+            if (typeof _syncColumnCountInputs === 'function') _syncColumnCountInputs(0);
+        } else {
+            _kitInitColumns({ numCols: nCorner, height: KIT_HEIGHT, topPanel: true });
+        }
     } else {
         cw.plinthHeight = KIT_PLINTH;
         _applyKitDim('height', KIT_HEIGHT);
@@ -315,14 +330,15 @@ window._applyKitchenPreset = function() {
 };
 
 /**
- * Kitchen corner (ר): center run + full_corner wing with shelves (IL standard),
- * then +60 extends either arm.
+ * Kitchen corner (ר): full corner with shelves only (IL standard).
+ * No extra adjacent units — user adds them later with +60 on either arm.
  */
 window._configureKitchenCornerL = function(side, opts) {
     opts = opts || {};
     side = side === 'left' ? 'left' : 'right';
-    const centerCols = opts.numCols != null ? opts.numCols : 2;
-    const armCols = opts.armCols != null ? opts.armCols : 1;
+    // Default 0+0: only the L corner carcass; optional extras via opts
+    const centerCols = opts.numCols != null ? opts.numCols : 0;
+    const armCols = opts.armCols != null ? opts.armCols : 0;
     if (!window._configureKitchenCarcass('corner', {
         host: opts.host,
         numCols: centerCols
@@ -352,7 +368,7 @@ window._configureKitchenCornerL = function(side, opts) {
     window._forceCameraAnim = true;
     window._corner3dCamPositioned = false;
     if (typeof _showToast === 'function') {
-        _showToast('פינת ר: פינה מלאה עם מדפים — לחצו על זרוע ו־+60 להארכה', 4000);
+        _showToast('פינת ר מלאה עם מדפים — הוסיפו יחידות עם +60 להמשך הזרועות', 4000);
     }
     return true;
 };
@@ -423,12 +439,11 @@ window._kitchenAddUnit = function(side) {
     const cw = _getKitWing();
     if (!cw) return;
     side = side === 'left' ? 'left' : 'right';
-    const cols = cw.columns || state.columns || [];
-    if (!cols.length) {
-        if (typeof distributeColumns === 'function') distributeColumns(1);
-    }
-    const liveCols = cw.columns || state.columns || [];
-    const template = side === 'left' ? liveCols[0] : liveCols[liveCols.length - 1];
+    if (!Array.isArray(cw.columns)) cw.columns = [];
+    const liveCols = cw.columns;
+    const template = liveCols.length
+        ? (side === 'left' ? liveCols[0] : liveCols[liveCols.length - 1])
+        : null;
     const t = cw.thickness || _kitThickness();
     const newCol = typeof _blankColumn === 'function'
         ? _blankColumn(KIT_UNIT_W, template)
@@ -439,14 +454,19 @@ window._kitchenAddUnit = function(side) {
         };
     newCol.width = KIT_UNIT_W;
     newCol.topPanel = true;
-    newCol.sinkPanel = !!newCol.sinkPanel;
+    newCol.sinkPanel = false;
     newCol.height = cw.globalHeight || KIT_HEIGHT;
+    newCol.noPlinth = false;
 
     cw.columns = side === 'left' ? [newCol].concat(liveCols) : liveCols.concat([newCol]);
     const isCenterArm = state.activeWing === 'center' || (!state.wings.left && !state.wings.right);
     if (isCenterArm) state.columns = cw.columns;
-    // Separate carcass: +unit width + 2 side walls
-    const newW = (cw.width || KIT_WIDTH) + KIT_UNIT_W + 2 * t;
+    // First unit on an empty corner stub: replace stub width; else add unit + 2 walls
+    const wasEmpty = liveCols.length === 0;
+    const addW = KIT_UNIT_W + 2 * t;
+    const newW = wasEmpty
+        ? addW
+        : (cw.width || KIT_WIDTH) + addW;
     cw.width = Math.round(newW * 10) / 10;
     if (isCenterArm) {
         _applyKitDim('width', cw.width);
