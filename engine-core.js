@@ -4195,7 +4195,9 @@ function _addHingeHardware(parent, opts) {
     let mat = _addHingeHardware._mat;
     if (!mat) {
         mat = new THREE.MeshStandardMaterial({
-            color: 0xb0b4b8, metalness: 0.85, roughness: 0.35
+            color: 0xb0b4b8, metalness: 0.85, roughness: 0.35,
+            // Pull slightly forward in the depth buffer so coplanar wall faces don't flicker
+            polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2
         });
         _addHingeHardware._mat = mat;
     }
@@ -4205,10 +4207,16 @@ function _addHingeHardware(parent, opts) {
     plateGroup.userData.skipPartPaint = true;
     plateGroup.userData.isHingeHardware = true;
     plateGroup.userData.keepVisibleWhenDoorsHidden = true;
+    plateGroup.renderOrder = 2;
 
     const doorGroup = new THREE.Group();
     doorGroup.userData.skipPartPaint = true;
     doorGroup.userData.isHingeHardware = true;
+    doorGroup.renderOrder = 2;
+
+    // Sit fully clear of the carcass face (half plate thickness + air gap) to avoid z-fighting
+    const plateThick = 0.18;
+    const wallClear = 0.1;
 
     const addCup = (x, y) => {
         const cup = new THREE.Mesh(new THREE.CylinderGeometry(cupR, cupR, 1.1, 16), mat);
@@ -4219,8 +4227,8 @@ function _addHingeHardware(parent, opts) {
     const addPlateArm = (px, py, pz, alongY) => {
         const plate = new THREE.Mesh(
             alongY
-                ? new THREE.BoxGeometry(0.12, 5.2, 2.2)
-                : new THREE.BoxGeometry(5.2, 0.12, 2.2),
+                ? new THREE.BoxGeometry(plateThick, 5.2, 2.2)
+                : new THREE.BoxGeometry(5.2, plateThick, 2.2),
             mat
         );
         plate.position.set(px, py, pz);
@@ -4236,10 +4244,10 @@ function _addHingeHardware(parent, opts) {
         );
         if (alongY) {
             const inward = hinge === 'left' ? 1 : -1;
-            stub.position.set(px + inward * 0.4, py, pz);
+            stub.position.set(px + inward * (plateThick / 2 + 0.35), py, pz);
             arm.position.set(px + inward * 1.2, py, (pz + doorBackZ) / 2);
         } else {
-            stub.position.set(px, py - 0.4, pz);
+            stub.position.set(px, py - (plateThick / 2 + 0.35), pz);
             arm.position.set(px, py - 1.2, (pz + doorBackZ) / 2);
         }
         plateGroup.add(stub);
@@ -4249,7 +4257,9 @@ function _addHingeHardware(parent, opts) {
     if (hinge === 'top') {
         const ys = doorTop - cupCenter;
         const xs = _hingeSpreadCm(doorLeft, doorRight, _hingeCountCm(w), hingeEdge);
-        const plateY = doorTop + (isInset ? doorGap / 2 : 0) + 0.06;
+        // Underside of top + clearance so the plate hangs into the opening, not into the board
+        const wallFaceY = doorTop + (isInset ? doorGap / 2 : 0);
+        const plateY = wallFaceY - plateThick / 2 - wallClear;
         xs.forEach(function(x) {
             addCup(x, ys);
             addPlateArm(x, plateY, plateZ, false);
@@ -4257,9 +4267,12 @@ function _addHingeHardware(parent, opts) {
     } else {
         const ys = _hingeSpreadCm(doorBot, doorTop, _hingeCountCm(h), hingeEdge);
         const cupX = hinge === 'left' ? (doorLeft + cupCenter) : (doorRight - cupCenter);
-        const plateX = isInset
-            ? (hinge === 'left' ? doorLeft - doorGap / 2 - 0.06 : doorRight + doorGap / 2 + 0.06)
+        // Inner face of the supporting side, then offset into the cabinet
+        const wallFaceX = isInset
+            ? (hinge === 'left' ? doorLeft - doorGap / 2 : doorRight + doorGap / 2)
             : (hinge === 'left' ? doorLeft + boardT - doorGap / 2 : doorRight - boardT + doorGap / 2);
+        const inward = hinge === 'left' ? 1 : -1;
+        const plateX = wallFaceX + inward * (plateThick / 2 + wallClear);
         ys.forEach(function(y) {
             addCup(cupX, y);
             addPlateArm(plateX, y, plateZ, true);
