@@ -9370,11 +9370,12 @@ function bindUI() {
             }
 
             const currentMat = state[state.activeColorPart];
-            const matBtn = document.querySelector(`.material-btn[data-mat="${currentMat}"]`);
-            if (matBtn) matBtn.classList.add('active');
+            const matBtns = document.querySelectorAll(`.material-btn[data-mat="${currentMat}"]`);
+            if (matBtns.length) matBtns.forEach(b => b.classList.add('active'));
             else if (currentMat === 'custom') document.getElementById('btn-upload-texture').classList.add('active');
             if (typeof window._syncEggerPaletteActive === 'function') {
-                window._syncEggerPaletteActive(currentMat, { open: !!matBtn && !!matBtn.closest('.egger-palette-panel') });
+                const inPanel = Array.from(matBtns).some(b => b.closest('.egger-palette-panel'));
+                window._syncEggerPaletteActive(currentMat, { open: inPanel && !(window.EGGER_BUILTIN_KEYS || []).includes(String(currentMat)) });
             }
         });
     });
@@ -9405,8 +9406,8 @@ function bindUI() {
             if(e.target.closest('#btn-upload-texture')) return;
             document.querySelectorAll('.material-btn').forEach(b => b.classList.remove('active'));
             const targetBtn = e.target.classList.contains('material-btn') ? e.target : e.target.closest('.material-btn');
-            targetBtn.classList.add('active');
             const matValue = targetBtn.getAttribute('data-mat');
+            document.querySelectorAll(`.material-btn[data-mat="${matValue}"]`).forEach(b => b.classList.add('active'));
             if (typeof window._syncEggerPaletteActive === 'function') {
                 window._syncEggerPaletteActive(matValue, { open: !!targetBtn.closest('.egger-palette-panel') });
             }

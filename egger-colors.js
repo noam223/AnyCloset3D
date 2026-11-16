@@ -1,6 +1,6 @@
 // ==========================================
-// EGGER melamine decors — collapsed under one "צבעי EGGER" button.
-// Built-in EGGER keys already used in the app keep their original keys (u727, H1367…).
+// EGGER melamine decors — full catalogue under one "צבעי EGGER" button.
+// Built-in EGGER keys (u727, H1367…) also remain in the main solid/texture grids.
 // Extra catalogue decors use eg_* keys. Source: lgegger.co.il.
 // ==========================================
 (function() {
@@ -83,19 +83,6 @@
         });
     }
 
-    /** Strip built-in EGGER swatches from the main solid/texture grids (left outside = non-EGGER only). */
-    function _stripBuiltinFromMainGrids() {
-        var keys = window.EGGER_BUILTIN_KEYS;
-        keys.forEach(function(key) {
-            document.querySelectorAll('.material-btn[data-mat="' + key + '"]').forEach(function(btn) {
-                // Keep buttons that already live inside the EGGER panel
-                if (btn.closest('.egger-palette-panel')) return;
-                var item = btn.closest('.mat-item');
-                if (item) item.remove();
-            });
-        });
-    }
-
     function _injectBlock(afterGrid, mobile) {
         if (!afterGrid) return;
         var parent = afterGrid.parentNode;
@@ -133,11 +120,9 @@
     }
 
     window._injectEggerExtraGrids = function() {
-        _stripBuiltinFromMainGrids();
+        // Built-in EGGER keys stay in the main solid/texture grids AND inside the EGGER panel.
         _injectBlock(document.getElementById('mat-texture-grid'), false);
         _injectBlock(document.getElementById('mob-mat-texture-grid'), true);
-        // Re-strip after inject so any duplicate builtin left outside is gone.
-        _stripBuiltinFromMainGrids();
     };
 
     /** Highlight EGGER toggle when current material is an EGGER colour; optionally open panel. */
