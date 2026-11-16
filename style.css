@@ -1851,8 +1851,9 @@ body.touch-door-dragging, body.touch-door-dragging * { cursor: grabbing !importa
     padding: 0;
     overflow: hidden;
     height: auto;
-    min-height: 0;
+    min-height: auto;
     max-height: none;
+    flex-shrink: 0;
     cursor: pointer;
     transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
     position: relative;
@@ -1947,6 +1948,8 @@ body.touch-door-dragging, body.touch-door-dragging * { cursor: grabbing !importa
     display: flex;
     flex-direction: column;
     gap: 5px;
+    flex-shrink: 0;
+    min-height: auto;
 }
 .cart-space-group.has-editing {
     border-color: var(--secondary);
