@@ -1164,7 +1164,7 @@ function _kitAttachShowcaseUpper(parentId) {
             col.doors = [{
                 startRow: 0,
                 endRow: Math.max(0, col.compartments.length - 1),
-                type: (i % 2) ? 'hinge_left' : 'hinge_right'
+                type: (i % 2) ? 'left' : 'right'
             }];
         } else {
             col.doors = [];
@@ -1222,20 +1222,21 @@ window._buildKitchenShowcase4x4 = function() {
     state.presetId = 'kitchen';
 
     // Main wall ≈ 3.8m (6×60 + walls) ending at the corner; return ≈ 4.1m (ר 90 + 5×60)
+    // Door types must be engine ids: left | right | double | flap
     const centerPlan = [
         { appliance: 'fridge' },
-        { door: 'hinge_right' },
+        { door: 'right' },
         { appliance: 'oven' },
-        { door: 'hinge_left' },
+        { door: 'left' },
         { appliance: 'dishwasher' },
-        { appliance: 'sink', door: 'hinge_right' }
+        { appliance: 'sink', door: 'right' }
     ];
     const armPlan = [
-        { door: 'hinge_left' },
-        { door: 'hinge_right' },
-        { door: 'hinge_left' },
-        { door: 'hinge_right' },
-        { door: 'hinge_left' }
+        { door: 'left' },
+        { door: 'right' },
+        { door: 'left' },
+        { door: 'right' },
+        { door: 'left' }
     ];
     const centerCols = centerPlan.map(function(spec) { return _kitMakeShowcaseCol(spec); });
 
@@ -1277,13 +1278,22 @@ window._buildKitchenShowcase4x4 = function() {
     state._activeUpperUnitParent = null;
     state.viewMode = '3d';
     state.selection = { colIndex: -1, rows: [] };
+    window._orbitFree = false;
     window._forceCameraAnim = true;
     window._corner3dCamPositioned = false;
+
+    // Keep preset chips in sync (kitchen active, not linear)
+    const kitBtn = document.getElementById('preset-btn-kitchen');
+    const mobileKit = document.getElementById('mobile-preset-btn-kitchen');
+    document.querySelectorAll('.preset-btn').forEach(function(b) { b.classList.remove('active'); });
+    if (kitBtn) kitBtn.classList.add('active');
+    if (mobileKit) mobileKit.classList.add('active');
 
     if (typeof syncSidebarToWing === 'function') syncSidebarToWing();
     if (typeof buildCabinet === 'function') buildCabinet();
     if (typeof updateCameraView === 'function') updateCameraView();
     if (typeof calculatePrice === 'function') calculatePrice();
+    if (typeof updateLeftSidebar === 'function') updateLeftSidebar();
     if (typeof saveHistoryState === 'function') saveHistoryState();
     if (typeof window._updateKitchenSectionUI === 'function') window._updateKitchenSectionUI();
     if (typeof window._syncKitchenApplianceToolbar === 'function') window._syncKitchenApplianceToolbar();

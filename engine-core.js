@@ -4802,7 +4802,19 @@ function updateCameraView() {
             window._corner3dCamPositioned = true;
             const pid = state.presetId || '';
             let camPos, camTarget;
-            if (pid === 'corner-right') {
+            const _kitL = pid === 'kitchen' && state.wings && state.wings.center && state.wings.center.kitchenCornerL
+                && (state.wings.left || state.wings.right);
+            if (_kitL) {
+                // Frame both L arms + uppers from the open corner
+                const _kitSide = state.wings.right ? 'right' : 'left';
+                if (_kitSide === 'right') {
+                    camPos    = new THREE.Vector3(420, 320, 520);
+                    camTarget = new THREE.Vector3(40, 90, 120);
+                } else {
+                    camPos    = new THREE.Vector3(-420, 320, 520);
+                    camTarget = new THREE.Vector3(-40, 90, 120);
+                }
+            } else if (pid === 'corner-right') {
                 camPos    = new THREE.Vector3(-221.1, 283.8, 368.5);
                 camTarget = new THREE.Vector3(0, 120, 0);
             } else if (pid === 'corner-left') {
