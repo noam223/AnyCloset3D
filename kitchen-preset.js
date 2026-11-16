@@ -767,6 +767,10 @@ function _syncKitchenModeClass() {
 function _updateKitchenSectionUI() {
     const isKit = window._isKitchenPreset();
     _syncKitchenModeClass();
+    // Kitchen must stay in free edit — wing-edit isolates an arm and drops cell overlays
+    if (isKit && state && state.wingEditMode && typeof window.confirmWingEdit === 'function') {
+        window.confirmWingEdit();
+    }
     const section = document.getElementById('kitchen-section');
     if (section) section.style.display = isKit ? '' : 'none';
 

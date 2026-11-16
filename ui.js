@@ -9910,16 +9910,23 @@ function bindUI() {
                         window._enterUpperUnitEdit(parentId);
                         return;
                     }
-                    // Wing hit box in free mode → enter wing edit mode
-                    // Kitchen: left/right return arms are normal unit runs — don't steal column picks.
-                    // Only the L carcass (full_corner_*) opens wing/FC edit from a 3D click.
+                    // Wing hit box in free mode → enter wing edit mode.
+                    // Kitchen: never — cell edit stays in free mode (like linear), across all arms / ר.
                     if (!state.wingEditMode) {
-                        const _kitSkipArmWing = state.presetId === 'kitchen' &&
-                            (wingId === 'left' || wingId === 'right');
-                        if (!_kitSkipArmWing) {
-                            enterWingEditMode(wingId);
+                        if (state.presetId === 'kitchen') {
+                            // Hover already switches activeWing; a click just keeps free edit
+                            let side = wingId;
+                            if (side === 'full_corner_right') side = 'right';
+                            else if (side === 'full_corner_left') side = 'left';
+                            if (side && state.wings[side] && side !== state.activeWing) {
+                                state.activeWing = side;
+                                if (typeof syncSidebarToWing === 'function') syncSidebarToWing();
+                                if (typeof buildCabinet === 'function') buildCabinet();
+                            }
                             return;
                         }
+                        enterWingEditMode(wingId);
+                        return;
                     }
                 }
             }

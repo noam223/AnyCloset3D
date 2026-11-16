@@ -1374,11 +1374,8 @@ window.applyWalkinPositions = function() {
 
 // ---- Wing edit mode helpers ----
 function _isSingleCabinetPreset() {
-    // Kitchen L corner (ר) has side wings — use wing edit / click-to-select like corner wardrobes
-    if (state.presetId === 'kitchen') {
-        if (state.wings && (state.wings.left || state.wings.right)) return false;
-        return true;
-    }
+    // Kitchen (incl. ר) edits cells in free mode like a linear run — never wing-edit isolation.
+    if (state.presetId === 'kitchen') return true;
     return state.presetId === 'linear' || state.presetId === 'sliding' || state.presetId === 'bathroom' || state.presetId === 'writing-desk' || state.presetId === 'corner-unit';
 }
 
@@ -1404,10 +1401,9 @@ function _setFreeTabActive(isFree) {
         b.style.borderColor = 'var(--border)';
     });
     // When entering free mode, hide edit sections and show placeholder
-    // (but not for linear/sliding — those are always in "edit" mode)
+    // (but not for always-editable presets — kitchen / linear / sliding / …)
     if (isFree) {
-        const _isSingle = (state.presetId === 'linear' || state.presetId === 'sliding');
-        if (!_isSingle) {
+        if (!_isSingleCabinetPreset()) {
             const _ec = document.getElementById('sidebar-edit-content');
             const _ph = document.getElementById('sidebar-edit-placeholder');
             if (_ec) _ec.style.display = 'none';
@@ -1450,6 +1446,27 @@ window.enterWingEditMode = function(wingId) {
     // upperUnit_* are now handled inline — redirect to _enterUpperUnitEdit
     if (wingId && wingId.startsWith('upperUnit_')) {
         window._enterUpperUnitEdit();
+        return;
+    }
+
+    // Kitchen: never isolate a wing. Wing-edit hid the other arm + cell overlays
+    // and left users without עריכת תא. Just switch the active arm in free mode.
+    if (state.presetId === 'kitchen') {
+        let side = wingId || 'center';
+        if (side === 'full_corner_right') side = 'right';
+        else if (side === 'full_corner_left') side = 'left';
+        if (side.indexOf('upperUnit_') === 0) side = side.replace('upperUnit_', '') || 'center';
+        if (!state.wings[side]) side = 'center';
+        if (state.wingEditMode && typeof window.confirmWingEdit === 'function') {
+            window.confirmWingEdit();
+        }
+        state.wingEditMode = false;
+        state.activeWing = side;
+        state.viewMode = state.viewMode === 'blueprint' ? 'blueprint' : '3d';
+        window._orbitFree = window._orbitFree !== false;
+        if (typeof syncSidebarToWing === 'function') syncSidebarToWing();
+        if (typeof buildCabinet === 'function') buildCabinet();
+        if (typeof updateCameraView === 'function') updateCameraView();
         return;
     }
 
