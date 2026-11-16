@@ -1074,7 +1074,12 @@
                 shaped: !!p.poly,
                 faces: { A: { drills: [], grooves: [] }, B: { drills: [], grooves: [] } },
                 marks: { front: frontEdge, top: topEdge },
-                band: band, notes: p.notes.filter(function(s, i, a) { return a.indexOf(s) === i; })
+                band: band, notes: p.notes.filter(function(s, i, a) { return a.indexOf(s) === i; }),
+                poses: [{
+                    c: [p.c.x, p.c.y, p.c.z],
+                    ax: p.ax.map(function(a) { return [a.x, a.y, a.z]; }),
+                    half: p.half.slice()
+                }]
             };
             p.ops.forEach(function(o) {
                 const side = (o.face === faceA) ? 'A' : 'B';
@@ -1109,6 +1114,7 @@
             if (hit) {
                 hit.qty++;
                 r.wings.forEach(function(w) { if (hit.wings.indexOf(w) < 0) hit.wings.push(w); });
+                if (r.poses) hit.poses.push.apply(hit.poses, r.poses);
             } else {
                 byKey.set(key, r);
             }
@@ -1481,7 +1487,7 @@
         { k: 'plinthStrips', label: 'לוחות צוקל לכל בלוק', opts: [[0, 'ללא'], [1, 'פס קדמי'], [2, 'פס קדמי + אחורי']] },
         { k: 'edgeBandThickness', label: 'הפחתת עובי קנט ממידת החיתוך', step: 0.1 }
     ];
-    const UI = { cfg: null, result: null, sel: 0, side: 'A', timer: null };
+    const UI = { cfg: null, result: null, sel: 0, hover: -1, side: 'A', timer: null, view: null };
     function _esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
     function _toast(msg, ms) {
         if (typeof _showToast === 'function') { _showToast(msg, ms || 4000); return; }
@@ -1583,6 +1589,134 @@
         m.querySelector('#cnc-summary').textContent = res.total + ' לוחות · ' + res.panels.length + ' ייחודיים · ' + ops + ' פעולות עיבוד · ' +
             res.stock.map(function(s) { return s.matLabel + ' ' + s.T + ' מ"מ: ' + s.area.toFixed(2) + ' מ"ר'; }).join(' · ');
         m.querySelector('#cnc-download').disabled = !res.panels.length;
+        _sync3d();
+    }
+    function _mount3d() {
+        if (UI.view || typeof THREE === 'undefined') return;
+        const wrap = document.getElementById('cnc-3d-wrap');
+        const canvas = document.getElementById('cnc-3d');
+        if (!wrap || !canvas) return;
+        const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        renderer.setClearColor(0xe7e5e4, 1);
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(35, 1, 1, 5000);
+        scene.add(new THREE.AmbientLight(0xffffff, 0.75));
+        const key = new THREE.DirectionalLight(0xffffff, 0.7);
+        key.position.set(80, 140, 90);
+        scene.add(key);
+        const controls = (typeof THREE.OrbitControls === 'function')
+            ? new THREE.OrbitControls(camera, canvas) : null;
+        if (controls) { controls.enableDamping = true; controls.dampingFactor = 0.12; }
+        const mats = {
+            idle: new THREE.MeshStandardMaterial({ color: 0xd6d3d1, roughness: 0.72, metalness: 0.04 }),
+            sel: new THREE.MeshStandardMaterial({ color: 0x4f46e5, emissive: 0x312e81, roughness: 0.45 }),
+            hover: new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xb45309, roughness: 0.4 })
+        };
+        const group = new THREE.Group();
+        scene.add(group);
+        UI.view = { renderer: renderer, scene: scene, camera: camera, controls: controls, group: group, mats: mats, token: '', meshes: [] };
+        const fit = function() {
+            const w = wrap.clientWidth || 340, h = wrap.clientHeight || 400;
+            renderer.setSize(w, h, false);
+            camera.aspect = w / Math.max(1, h);
+            camera.updateProjectionMatrix();
+        };
+        fit();
+        UI.view.fit = fit;
+        if (window.ResizeObserver) UI.view.ro = new ResizeObserver(fit);
+        if (UI.view.ro) UI.view.ro.observe(wrap);
+        const loop = function() {
+            if (!UI.view) return;
+            UI.view.raf = requestAnimationFrame(loop);
+            if (controls) controls.update();
+            renderer.render(scene, camera);
+        };
+        loop();
+        let down = null;
+        canvas.addEventListener('pointerdown', function(e) { down = [e.clientX, e.clientY]; });
+        canvas.addEventListener('pointerup', function(e) {
+            if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) return;
+            const rect = canvas.getBoundingClientRect();
+            const ndc = new THREE.Vector2(
+                ((e.clientX - rect.left) / rect.width) * 2 - 1,
+                -((e.clientY - rect.top) / rect.height) * 2 + 1
+            );
+            const ray = new THREE.Raycaster();
+            ray.setFromCamera(ndc, camera);
+            const hits = ray.intersectObjects(UI.view.meshes, false);
+            if (!hits.length) return;
+            UI.sel = hits[0].object.userData.row;
+            UI.side = 'A';
+            UI.hover = -1;
+            _render('data');
+            const tr = document.querySelector('#cnc-list [data-cnc-row="' + UI.sel + '"]');
+            if (tr && tr.scrollIntoView) tr.scrollIntoView({ block: 'nearest' });
+        });
+    }
+    function _poseMatrix(pose) {
+        const m = new THREE.Matrix4();
+        const ax = pose.ax, h = pose.half;
+        m.makeBasis(
+            new THREE.Vector3(ax[0][0], ax[0][1], ax[0][2]).multiplyScalar(h[0] / 5),
+            new THREE.Vector3(ax[1][0], ax[1][1], ax[1][2]).multiplyScalar(h[1] / 5),
+            new THREE.Vector3(ax[2][0], ax[2][1], ax[2][2]).multiplyScalar(h[2] / 5)
+        );
+        m.setPosition(pose.c[0] / 10, pose.c[1] / 10, pose.c[2] / 10);
+        return m;
+    }
+    function _sync3d() {
+        _mount3d();
+        const v = UI.view;
+        if (!v || !UI.result) return;
+        const token = UI.result.panels.map(function(r) {
+            return r.id + ':' + (r.poses || []).map(function(p) { return p.c.map(function(n) { return Math.round(n); }).join(','); }).join(';');
+        }).join('|');
+        if (token !== v.token) {
+            const refit = !v.token;
+            v.token = token;
+            while (v.group.children.length) v.group.remove(v.group.children[0]);
+            v.meshes = [];
+            const geo = new THREE.BoxGeometry(1, 1, 1);
+            UI.result.panels.forEach(function(r, i) {
+                (r.poses || []).forEach(function(pose) {
+                    const mesh = new THREE.Mesh(geo, v.mats.idle);
+                    mesh.matrix.copy(_poseMatrix(pose));
+                    mesh.matrixAutoUpdate = false;
+                    mesh.userData.row = i;
+                    v.group.add(mesh);
+                    v.meshes.push(mesh);
+                });
+            });
+            if (refit && v.meshes.length) {
+                const box = new THREE.Box3().setFromObject(v.group);
+                const c = box.getCenter(new THREE.Vector3());
+                const s = box.getSize(new THREE.Vector3());
+                const dist = Math.max(s.x, s.y, s.z, 40) * 1.35;
+                v.camera.position.set(c.x + dist * 0.75, c.y + dist * 0.45, c.z + dist);
+                v.camera.lookAt(c);
+                if (v.controls) { v.controls.target.copy(c); v.controls.update(); }
+            }
+        }
+        _highlight3d();
+    }
+    function _highlight3d() {
+        const v = UI.view;
+        if (!v) return;
+        v.meshes.forEach(function(mesh) {
+            const row = mesh.userData.row;
+            mesh.material = row === UI.hover ? v.mats.hover : (row === UI.sel ? v.mats.sel : v.mats.idle);
+        });
+    }
+    function _dispose3d() {
+        const v = UI.view;
+        if (!v) return;
+        if (v.raf) cancelAnimationFrame(v.raf);
+        if (v.ro) v.ro.disconnect();
+        if (v.controls) v.controls.dispose();
+        v.renderer.dispose();
+        Object.keys(v.mats).forEach(function(k) { v.mats[k].dispose(); });
+        UI.view = null;
     }
     function _recompute(part) {
         try {
@@ -1596,6 +1730,7 @@
         }
     }
     function _close() {
+        _dispose3d();
         const m = document.getElementById('cnc-export-modal');
         if (m) m.remove();
         document.removeEventListener('keydown', _onKey, true);
@@ -1625,6 +1760,7 @@
         _close();
         UI.cfg = _loadSettings();
         UI.sel = 0;
+        UI.hover = -1;
         UI.side = 'A';
         const m = document.createElement('div');
         m.id = 'cnc-export-modal';
@@ -1643,6 +1779,10 @@
                         '<div id="cnc-preview" style="flex:0 0 46%;min-height:0;display:flex;gap:14px;padding:12px 14px;border-bottom:1px solid #e2e8f0;background:#f8fafc;"></div>' +
                         '<div id="cnc-list" style="flex:1;min-height:0;overflow:auto;"></div>' +
                     '</div>' +
+                    '<div id="cnc-3d-wrap" style="width:340px;flex-shrink:0;position:relative;background:#e7e5e4;border-right:1px solid #e2e8f0;">' +
+                        '<canvas id="cnc-3d" style="width:100%;height:100%;display:block;"></canvas>' +
+                        '<div style="position:absolute;top:8px;right:10px;left:10px;font-size:.72rem;color:#44403c;pointer-events:none;">מודל הארון · מעבר על שורה מסמן את החלק</div>' +
+                    '</div>' +
                 '</div>' +
                 '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 18px;border-top:1px solid #e2e8f0;background:#f8fafc;">' +
                     '<div id="cnc-summary" style="font-size:.78rem;color:#475569;"></div>' +
@@ -1654,6 +1794,21 @@
         document.addEventListener('keydown', _onKey, true);
 
         m.addEventListener('mousedown', function(e) { if (e.target === m) _close(); });
+        m.addEventListener('mouseover', function(e) {
+            const row = e.target.closest && e.target.closest('[data-cnc-row]');
+            const next = row ? Number(row.getAttribute('data-cnc-row')) : -1;
+            if (next === UI.hover) return;
+            UI.hover = next;
+            _highlight3d();
+        });
+        m.addEventListener('mouseout', function(e) {
+            const row = e.target.closest && e.target.closest('[data-cnc-row]');
+            if (!row) return;
+            const to = e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('[data-cnc-row]');
+            if (to === row) return;
+            UI.hover = -1;
+            _highlight3d();
+        });
         m.querySelector('#cnc-close').onclick = _close;
         m.addEventListener('change', function(e) {
             const k = e.target.getAttribute && e.target.getAttribute('data-cnc');
@@ -1669,7 +1824,7 @@
         });
         m.addEventListener('click', function(e) {
             const row = e.target.closest && e.target.closest('[data-cnc-row]');
-            if (row) { UI.sel = Number(row.getAttribute('data-cnc-row')); UI.side = 'A'; _render('data'); return; }
+            if (row) { UI.sel = Number(row.getAttribute('data-cnc-row')); UI.hover = -1; UI.side = 'A'; _render('data'); return; }
             const side = e.target.closest && e.target.closest('[data-cnc-side]');
             if (side) { UI.side = side.getAttribute('data-cnc-side'); _render('data'); return; }
             if (e.target.id === 'cnc-reset') {
