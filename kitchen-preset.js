@@ -14,20 +14,20 @@ const KIT_UPPER_D = 35;
 const KIT_UPPER_Y = 145; // floor → bottom of upper (tutorial)
 
 /**
- * Leading stone / porcelain / quartz countertop brands commonly sold in Israel (UI examples only).
- * colorHex = soft preview tint for the worktop mesh (not a real material library).
+ * Leading stone / porcelain / quartz countertop brands commonly sold in Israel (UI examples).
+ * texture = stone-like preview map shown on the worktop (local egger samples); colorHex soft-tints the map.
  */
 window.KITCHEN_COUNTERTOP_BRANDS = [
-    { id: 'caesarstone', label: 'אבן קיסר', kind: 'קוורץ', colorHex: 0xe8e6e1 },
-    { id: 'silestone', label: 'Silestone', kind: 'קוורץ', colorHex: 0xf2efe8 },
-    { id: 'dekton', label: 'Dekton', kind: 'פורצלן', colorHex: 0xc8cbcf },
-    { id: 'neolith', label: 'Neolith', kind: 'פורצלן', colorHex: 0xf5f5f3 },
-    { id: 'laminam', label: 'Laminam', kind: 'פורצלן', colorHex: 0xebe4d8 },
-    { id: 'infinity', label: 'Infinity', kind: 'פורצלן', colorHex: 0xdde1e5 },
-    { id: 'sensa', label: 'Sensa', kind: 'שיש טבעי', colorHex: 0xd4c4a8 },
-    { id: 'corian', label: 'Corian', kind: 'אקריל', colorHex: 0xf7f7f5 },
-    { id: 'compac', label: 'Compac', kind: 'קוורץ', colorHex: 0xefe8dc },
-    { id: 'technistone', label: 'Technistone', kind: 'קוורץ', colorHex: 0xd5d2cc }
+    { id: 'caesarstone', label: 'אבן קיסר', kind: 'קוורץ', colorHex: 0xe8e6e1, texture: 'textures/egger/F426.jpg' },
+    { id: 'silestone', label: 'Silestone', kind: 'קוורץ', colorHex: 0xf2efe8, texture: 'textures/egger/F425.jpg' },
+    { id: 'dekton', label: 'Dekton', kind: 'פורצלן', colorHex: 0xc8cbcf, texture: 'textures/egger/F433.jpg' },
+    { id: 'neolith', label: 'Neolith', kind: 'פורצלן', colorHex: 0xf5f5f3, texture: 'textures/egger/F381.jpg' },
+    { id: 'laminam', label: 'Laminam', kind: 'פורצלן', colorHex: 0xebe4d8, texture: 'textures/egger/F275.jpg' },
+    { id: 'infinity', label: 'Infinity', kind: 'פורצלן', colorHex: 0xdde1e5, texture: 'textures/egger/F424.jpg' },
+    { id: 'sensa', label: 'Sensa', kind: 'שיש טבעי', colorHex: 0xd4c4a8, texture: 'textures/egger/F186.jpg' },
+    { id: 'corian', label: 'Corian', kind: 'אקריל', colorHex: 0xf7f7f5, texture: 'textures/egger/W980.jpg' },
+    { id: 'compac', label: 'Compac', kind: 'קוורץ', colorHex: 0xefe8dc, texture: 'textures/egger/F160.jpg' },
+    { id: 'technistone', label: 'Technistone', kind: 'קוורץ', colorHex: 0xd5d2cc, texture: 'textures/egger/F638.jpg' }
 ];
 // Back-compat alias if anything still reads the old name
 window.KITCHEN_BRAND_EXAMPLES = window.KITCHEN_COUNTERTOP_BRANDS;
@@ -441,21 +441,23 @@ function _renderKitchenBrandExamples() {
     const host = document.getElementById('kitchen-brand-examples');
     if (!host) return;
     const brands = window.KITCHEN_COUNTERTOP_BRANDS || [];
-    if (host.dataset.ready !== 'countertop-v2') {
-        host.innerHTML = brands.map(b =>
-            '<button type="button" class="kit-brand-chip" data-brand="' + b.id + '" ' +
-            'onclick="window._setKitchenCountertopBrand(\'' + b.id + '\')" ' +
-            'title="' + (b.kind || 'משטח') + '" ' +
-            'style="padding:5px 9px;border-radius:999px;border:1.5px solid var(--border);background:var(--bg-light);' +
-            'color:var(--text-dark);font-size:0.72rem;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:5px;">' +
-            '<span style="width:10px;height:10px;border-radius:50%;background:#' +
-            (b.colorHex != null ? b.colorHex.toString(16).padStart(6, '0') : 'ddd') +
-            ';border:1px solid rgba(0,0,0,0.12);flex-shrink:0;"></span>' +
-            b.label +
-            (b.kind ? '<span style="font-size:0.62rem;font-weight:600;opacity:0.65;">' + b.kind + '</span>' : '') +
-            '</button>'
-        ).join('');
-        host.dataset.ready = 'countertop-v2';
+    if (host.dataset.ready !== 'countertop-v3') {
+        host.innerHTML = brands.map(function(b) {
+            const thumb = b.texture
+                ? '<img src="' + b.texture + '" alt="" style="width:22px;height:22px;border-radius:5px;object-fit:cover;border:1px solid rgba(0,0,0,0.12);flex-shrink:0;">'
+                : '<span style="width:22px;height:22px;border-radius:5px;background:#' +
+                    (b.colorHex != null ? b.colorHex.toString(16).padStart(6, '0') : 'ddd') +
+                    ';border:1px solid rgba(0,0,0,0.12);flex-shrink:0;"></span>';
+            return '<button type="button" class="kit-brand-chip" data-brand="' + b.id + '" ' +
+                'onclick="window._setKitchenCountertopBrand(\'' + b.id + '\')" ' +
+                'title="' + (b.kind || 'משטח') + '" ' +
+                'style="padding:5px 9px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg-light);' +
+                'color:var(--text-dark);font-size:0.72rem;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;">' +
+                thumb + b.label +
+                (b.kind ? '<span style="font-size:0.62rem;font-weight:600;opacity:0.65;">' + b.kind + '</span>' : '') +
+                '</button>';
+        }).join('');
+        host.dataset.ready = 'countertop-v3';
     }
     const current = _kitCountertopBrandId();
     host.querySelectorAll('.kit-brand-chip').forEach(btn => {
@@ -510,25 +512,66 @@ window._kitchenBrandLabel = function(brandId) {
     return hit ? hit.label : '';
 };
 
+/** Load / cache a repeating stone preview map for a brand example. */
+window._kitchenBrandTexture = function(brand) {
+    if (!brand || !brand.texture || typeof THREE === 'undefined') return null;
+    if (!window._kitCtTexCache) window._kitCtTexCache = {};
+    const key = brand.texture;
+    const hit = window._kitCtTexCache[key];
+    if (hit && hit.map) return hit.map;
+    if (hit && hit.loading) return null;
+    window._kitCtTexCache[key] = { loading: true, map: null };
+    const loader = new THREE.TextureLoader();
+    loader.load(brand.texture + (brand.texture.indexOf('?') >= 0 ? '' : '?v=20261116ct'), function(tex) {
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.RepeatWrapping;
+        tex.repeat.set(2.2, 2.2);
+        if (tex.colorSpace !== undefined && THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
+        else if (tex.encoding !== undefined && THREE.sRGBEncoding) tex.encoding = THREE.sRGBEncoding;
+        window._kitCtTexCache[key] = { loading: false, map: tex };
+        // Rebuild so the worktop picks up the loaded map
+        if (window._isKitchenPreset && window._isKitchenPreset() && typeof buildCabinet === 'function') {
+            buildCabinet();
+        }
+    }, undefined, function() {
+        window._kitCtTexCache[key] = { loading: false, map: null };
+    });
+    return null;
+};
+
 /** Preview material for kitchen worktop when a countertop brand example is selected. */
 window._kitchenCountertopMaterial = function(fallbackMat) {
     const brand = window._kitchenCountertopBrand && window._kitchenCountertopBrand();
     if (!brand || typeof THREE === 'undefined') return fallbackMat;
     if (!window._kitCtMatCache) window._kitCtMatCache = {};
-    const key = brand.id + '-' + brand.colorHex;
+    const map = window._kitchenBrandTexture(brand);
+    const key = brand.id + '-' + brand.colorHex + (map ? '-tex' : '-solid');
     if (!window._kitCtMatCache[key]) {
-        // Soft stone-like preview: slight roughness + env reflection
         const mat = new THREE.MeshStandardMaterial({
-            color: brand.colorHex,
+            // Keep a light tint over the texture so brands stay distinct
+            color: map ? 0xffffff : brand.colorHex,
+            map: map || null,
             roughness: brand.kind === 'פורצלן' ? 0.28 : (brand.kind === 'שיש טבעי' ? 0.5 : 0.38),
             metalness: brand.kind === 'פורצלן' ? 0.08 : 0.03,
             envMap: window._studioEnvMap || null,
             envMapIntensity: brand.kind === 'פורצלן' ? 0.55 : 0.25
         });
+        if (map && brand.colorHex != null) {
+            // Soft brand tint without killing the texture detail
+            mat.color.setHex(brand.colorHex);
+            mat.color.lerp(new THREE.Color(0xffffff), 0.55);
+        }
         window._kitCtMatCache[key] = mat;
-    } else if (window._studioEnvMap && window._kitCtMatCache[key].envMap !== window._studioEnvMap) {
-        window._kitCtMatCache[key].envMap = window._studioEnvMap;
-        window._kitCtMatCache[key].needsUpdate = true;
+    } else {
+        const mat = window._kitCtMatCache[key];
+        if (map && mat.map !== map) {
+            mat.map = map;
+            mat.needsUpdate = true;
+        }
+        if (window._studioEnvMap && mat.envMap !== window._studioEnvMap) {
+            mat.envMap = window._studioEnvMap;
+            mat.needsUpdate = true;
+        }
     }
     return window._kitCtMatCache[key];
 };
