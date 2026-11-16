@@ -9287,6 +9287,9 @@ function bindUI() {
             state.activeColorPart = clickedPart;
             window._syncGlassTintPanel();
             _updateSandwichColorVisibility();
+            if (typeof window._syncKitchenCountertopBrandsPanel === 'function') {
+                window._syncKitchenCountertopBrandsPanel();
+            }
 
             document.querySelectorAll('.material-btn').forEach(b => b.classList.remove('active'));
             if (clickedPart === 'glassTint') return;
@@ -9361,6 +9364,10 @@ function bindUI() {
                     if (typeof window._syncSideCabinetDoorMaterial === 'function') {
                         window._syncSideCabinetDoorMaterial(state.wings.center);
                     }
+                }
+                // Choosing a regular משטח color clears the kitchen stone-brand override
+                if (state.activeColorPart === 'materialTopPanel' && typeof window._clearKitchenCountertopBrand === 'function') {
+                    window._clearKitchenCountertopBrand();
                 }
             }
             if (state.activeColorPart === 'materialBody' && typeof checkSplits === 'function') checkSplits();

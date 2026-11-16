@@ -128,6 +128,16 @@
                 </button>
             </div>
         </div>
+        <div id="kitchen-unit-tabs" style="display:none;margin:0 0 10px;">
+            <button type="button" id="btn-kitchen-add-unit" class="space-cab-add-btn" onclick="window._kitchenAddUnit('right')">
+                <i class="fa-solid fa-plus"></i> הוסף יחידת מטבח (+60)
+            </button>
+            <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+                <button type="button" class="space-cab-join-btn" style="display:inline-flex;flex:1;" onclick="window._kitchenAddUnit('left')"><i class="fa-solid fa-plus"></i> יחידה משמאל</button>
+                <button type="button" class="space-cab-leave-btn" style="display:inline-flex;flex:1;" onclick="window._kitchenRemoveUnit('right')"><i class="fa-solid fa-minus"></i> הסר יחידה</button>
+            </div>
+            <div style="font-size:0.72rem;color:var(--text-light);margin-top:6px;">יחידות: <strong id="kitchen-unit-count-header">3</strong> · כל יחידה נפרדת (דופן כפולה)</div>
+        </div>
         <div id="space-cab-tabs" style="display:none;">
             <button type="button" id="btn-add-space-cab" class="space-cab-add-btn" onclick="addSpaceCabinet()">
                 <i class="fa-solid fa-plus"></i> הוסף ארון במרחב
@@ -966,31 +976,10 @@
         <!-- ===== KITCHEN SECTION (app-admin only, shown for kitchen preset) ===== -->
         <div class="section" id="kitchen-section" data-sbgroup="cabinet" style="display:none;">
             <div class="section-title"><i class="fa-solid fa-kitchen-set"></i> יחידת מטבח</div>
-            <p style="font-size:0.75rem;color:var(--text-light);margin:0 0 10px;">תחתון סנדוויץ׳ · גובה 88 · עומק 56. הוספת יחידה מוסיפה 60 ס״מ לרוחב.</p>
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;">
+            <p style="font-size:0.75rem;color:var(--text-light);margin:0 0 10px;">תחתון סנדוויץ׳ · גובה 88 · עומק 56. כל יחידה נפרדת (דופן כפולה). הוספת יחידה — מהכפתור מעל (כמו «הוסף ארון במרחב»). סוג משטח — בטאב <strong>צבעים → משטח</strong>.</p>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
                 <span style="font-size:0.8rem;color:var(--text-dark);">יחידות: <strong id="kitchen-unit-count">3</strong></span>
                 <span style="font-size:0.72rem;color:var(--text-light);">גוף: סנדוויץ׳ (נעול)</span>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
-                <button type="button" onclick="window._kitchenAddUnit('right')" style="padding:8px 4px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.78rem;font-weight:600;cursor:pointer;">
-                    <i class="fa-solid fa-plus"></i> יחידה ימין (+60)
-                </button>
-                <button type="button" onclick="window._kitchenAddUnit('left')" style="padding:8px 4px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.78rem;font-weight:600;cursor:pointer;">
-                    <i class="fa-solid fa-plus"></i> יחידה שמאל (+60)
-                </button>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-                <button type="button" onclick="window._kitchenRemoveUnit('right')" style="padding:7px 4px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-light);font-size:0.72rem;font-weight:600;cursor:pointer;">
-                    <i class="fa-solid fa-minus"></i> הסר ימין
-                </button>
-                <button type="button" onclick="window._kitchenRemoveUnit('left')" style="padding:7px 4px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-light);font-size:0.72rem;font-weight:600;cursor:pointer;">
-                    <i class="fa-solid fa-minus"></i> הסר שמאל
-                </button>
-            </div>
-            <div style="margin-top:14px;">
-                <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:6px;">דוגמאות משטחי שיש / פורצלן בישראל</div>
-                <div id="kitchen-brand-examples" style="display:flex;flex-wrap:wrap;gap:5px;"></div>
-                <p style="font-size:0.68rem;color:var(--text-light);margin:6px 0 0;line-height:1.35;">לחיצה צובעת את משטח העבודה בתצוגה — להמחשה בלבד (ללא תמחור / ספריית דגמים).</p>
             </div>
         </div>
 
@@ -1099,6 +1088,11 @@
                     <button class="part-tab-btn" id="tab-materialTopPanel" data-part="materialTopPanel" style="display:none;"><i class="ptb-ic fa-solid fa-grip-lines"></i><span class="ptb-label">משטח</span><em class="ptb-dot"></em></button>
                     <button class="part-tab-btn" id="tab-materialUpperUnit" data-part="materialUpperUnit" style="display:none;"><i class="ptb-ic fa-solid fa-layer-group"></i><span class="ptb-label">חלק עליון</span><em class="ptb-dot"></em></button>
                 </div>
+            </div>
+            <div id="kitchen-countertop-brands-panel" style="display:none;margin:0 0 16px;">
+                <div style="font-size:0.9rem;font-weight:bold;margin-bottom:8px;color:var(--text-dark);">סוג משטח (שיש / פורצלן / קוורץ)</div>
+                <div id="kitchen-brand-examples" style="display:flex;flex-wrap:wrap;gap:5px;"></div>
+                <p style="font-size:0.68rem;color:var(--text-light);margin:6px 0 0;line-height:1.35;">בחירה משנה את צבע/טקסטורת משטח העבודה בתצוגה. אפשר גם לבחור גוון רגיל מהרשימה למטה.</p>
             </div>
             <div class="glass-tint-panel">
                 <div style="font-size: 0.9rem; font-weight: bold; margin-bottom: 12px; color: var(--text-dark);">גוון זכוכית לדלתות:</div>
@@ -2294,6 +2288,15 @@
                 <i class="fa-solid fa-desktop" style="font-size:1rem;"></i><span>שולחן</span>
             </button>
         </div>
+        <div id="mobile-kitchen-unit-tabs" style="display:none;margin:0 0 14px;">
+            <button type="button" class="space-cab-add-btn" onclick="window._kitchenAddUnit('right')">
+                <i class="fa-solid fa-plus"></i> הוסף יחידת מטבח (+60)
+            </button>
+            <div style="display:flex;gap:6px;margin-top:8px;">
+                <button type="button" class="space-cab-join-btn" style="flex:1;" onclick="window._kitchenAddUnit('left')"><i class="fa-solid fa-plus"></i> משמאל</button>
+                <button type="button" class="space-cab-leave-btn" style="flex:1;" onclick="window._kitchenRemoveUnit('right')"><i class="fa-solid fa-minus"></i> הסר</button>
+            </div>
+        </div>
         <div id="mobile-space-cab-tabs" style="display:none;margin:0 0 14px;">
             <button type="button" id="mobile-btn-add-space-cab" class="space-cab-add-btn" onclick="addSpaceCabinet()">
                 <i class="fa-solid fa-plus"></i> הוסף ארון במרחב
@@ -3121,20 +3124,20 @@
 <script src="auth.js?v=20261116kitchen"></script>
 <script src="trial-watermark.js?v=20261008trial"></script>
 <script src="egger-colors.js?v=20261104egger2"></script>
-<script src="state.js?v=20261116kitchen"></script>
+<script src="state.js?v=20261116kitFix"></script>
 <script src="quick-calc.js?v=20261029shoe"></script>
 <script src="bathroom-preset.js?v=20261008types"></script>
-<script src="kitchen-preset.js?v=20261116room2"></script>
+<script src="kitchen-preset.js?v=20261116kitfix"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
 <script src="corner-unit-preset.js?v=20261103deskdoor"></script>
 <script src="engine-appliances.js?v=20261116stone"></script>
-<script src="engine-core.js?v=20261116stone"></script>
+<script src="engine-core.js?v=20261116kitFix"></script>
 <script src="engine-corners.js?v=20261109ridingFlush"></script>
 <script src="engine-blueprint.js?v=20261115spaceBp4"></script>
 <script src="engine-room-plan.js?v=20261110floors"></script>
 <script src="tambour-color-picker.js?v=20261110roomwall"></script>
 <script src="room-finishes.js?v=20261110gloss"></script>
-<script src="ui.js?v=20261116stone"></script>
+<script src="ui.js?v=20261116kitFix"></script>
 <script src="mirror-cabinet.js?v=20261110doormirror"></script>
 <script src="mobile.js?v=20261029inthandle"></script>
 <script src="part-paint.js?v=20261104egger"></script>

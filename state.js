@@ -4022,7 +4022,11 @@ function distributeShelves(col) {
 }
 
 function distributeColumns(numCols) {
-    const innerWidth = state.width - (state.thickness * 2) - (state.thickness * (numCols - 1));
+    // Kitchen: each unit is a separate carcass (2 side walls per unit)
+    const _kit = state.presetId === 'kitchen';
+    const innerWidth = _kit
+        ? (state.width - (state.thickness * 2 * numCols))
+        : (state.width - (state.thickness * 2) - (state.thickness * (numCols - 1)));
 
     // For external (side) wings: the first column is hidden behind the center cabinet.
     // It must be at least centerD + 50 cm wide before a second column can appear.
@@ -4455,7 +4459,10 @@ function _rescaleColumnWidths(newTotalWidth) {
     const t = state.thickness;
     const numCols = state.columns.length;
     const oldInnerWidth = state.columns.reduce((sum, col) => sum + col.width, 0);
-    const newInnerWidth = newTotalWidth - t * 2 - t * (numCols - 1);
+    // Kitchen: 2 walls per unit; otherwise outer 2 + (n-1) shared dividers
+    const newInnerWidth = (state.presetId === 'kitchen')
+        ? (newTotalWidth - t * 2 * numCols)
+        : (newTotalWidth - t * 2 - t * (numCols - 1));
 
     if (oldInnerWidth <= 0 || newInnerWidth <= 0) {
         // Fallback: full redistribute
