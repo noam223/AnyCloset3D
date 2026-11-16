@@ -9,6 +9,9 @@ const KIT_HEIGHT = 88;
 const KIT_DEPTH  = 56;
 const KIT_UNIT_W = 60;
 const KIT_PLINTH = 10; // c9-ish
+const KIT_UPPER_H = 70;
+const KIT_UPPER_D = 35;
+const KIT_UPPER_Y = 145; // floor → bottom of upper (tutorial)
 
 /**
  * Leading stone / porcelain / quartz countertop brands commonly sold in Israel (UI examples only).
@@ -67,24 +70,29 @@ window._kitchenGapBetweenUnits = function() {
     return 2 * _kitThickness();
 };
 
-function _kitInitColumns() {
+function _kitInitColumns(opts) {
+    opts = opts || {};
     const cw = _getKitWing();
     if (!cw) return;
     const t = _kitThickness();
-    const n = 3;
+    const n = Math.max(1, opts.numCols != null ? opts.numCols : 3);
+    const unitH = opts.height != null ? opts.height : KIT_HEIGHT;
+    const topPanel = opts.topPanel !== false;
+    const noPlinth = !!opts.noPlinth;
     const cols = [];
     for (let i = 0; i < n; i++) {
         const col = typeof _blankColumn === 'function'
             ? _blankColumn(KIT_UNIT_W, null)
             : {
-                type: 'normal', width: KIT_UNIT_W, height: KIT_HEIGHT,
+                type: 'normal', width: KIT_UNIT_W, height: unitH,
                 shelves: 0, splitY: null, shelvesY: [], compartments: [], doors: []
             };
         col.width = KIT_UNIT_W;
-        col.height = KIT_HEIGHT;
-        col.topPanel = true;
+        col.height = unitH;
+        col.topPanel = topPanel;
         col.sinkPanel = false;
-        col.noPlinth = false;
+        col.noPlinth = noPlinth;
+        col.spaceBottomPanel = !!opts.spaceBottomPanel;
         col.floorOffset = 0;
         if (typeof distributeShelves === 'function') distributeShelves(col);
         cols.push(col);
@@ -99,21 +107,46 @@ window._isKitchenPreset = function() {
     return !!(state && state.presetId === 'kitchen');
 };
 
-window._applyKitchenPreset = function() {
+window._kitchenRole = function() {
+    if (!window._isKitchenPreset()) return null;
+    const cw = _getKitWing();
+    return (cw && cw.kitchenRole) || 'base';
+};
+
+window._isKitchenUpper = function() {
+    return window._kitchenRole() === 'upper';
+};
+
+window._isKitchenCorner = function() {
+    return window._kitchenRole() === 'corner';
+};
+
+/** Shared kitchen carcass setup (base / upper / corner / extra base in space). */
+window._configureKitchenCarcass = function(role, opts) {
+    opts = opts || {};
+    role = role || 'base';
     if (!window._kitchenAdminUnlocked) {
         if (typeof _showToast === 'function') _showToast('Preset מטבח זמין רק למנהל מערכת', 3500);
-        if (state) state.presetId = 'linear';
-        return;
+        return false;
     }
     const cw = _getKitWing();
-    if (!cw) return;
+    if (!cw) return false;
 
+    state.presetId = 'kitchen';
+    cw.kitchenRole = role;
     cw.cabinetModel = 'c9';
     cw.cabinetTypeId = 'c9';
-    cw.plinthHeight = KIT_PLINTH;
     cw.boardMaterial = 'sandwich';
     cw.slidingDoor = cw.slidingDoor || {};
     cw.slidingDoor.enabled = false;
+
+    if (opts.host) {
+        ['materialBody', 'materialInternal', 'materialExternal', 'materialOpenCell', 'materialBack',
+            'handleType', 'handleStyle', 'handleVariant', 'ridingColor', 'thickness', 'countertopBrand'
+        ].forEach(function(f) {
+            if (opts.host[f] !== undefined) cw[f] = JSON.parse(JSON.stringify(opts.host[f]));
+        });
+    }
 
     const plinthSel = document.getElementById('inp-plinth');
     if (plinthSel) {
@@ -132,16 +165,55 @@ window._applyKitchenPreset = function() {
         mobileBoard.disabled = true;
     }
 
-    _applyKitDim('width', KIT_WIDTH);
-    _applyKitDim('depth', KIT_DEPTH);
-    _applyKitDim('height', KIT_HEIGHT);
-    _kitInitColumns();
+    if (role === 'upper') {
+        cw.plinthHeight = 0;
+        const hostW = opts.host && opts.host.width > 0 ? opts.host.width : KIT_WIDTH;
+        const t = _kitThickness();
+        const n = Math.max(1, Math.round(hostW / (KIT_UNIT_W + 2 * t)) || 3);
+        _applyKitDim('height', KIT_UPPER_H);
+        _applyKitDim('depth', KIT_UPPER_D);
+        _kitInitColumns({
+            numCols: n,
+            height: KIT_UPPER_H,
+            topPanel: false,
+            noPlinth: true,
+            spaceBottomPanel: true
+        });
+    } else if (role === 'corner') {
+        cw.plinthHeight = KIT_PLINTH;
+        _applyKitDim('height', KIT_HEIGHT);
+        _applyKitDim('depth', KIT_DEPTH);
+        _kitInitColumns({ numCols: opts.numCols || 1, height: KIT_HEIGHT, topPanel: true });
+    } else {
+        cw.plinthHeight = KIT_PLINTH;
+        _applyKitDim('height', KIT_HEIGHT);
+        _applyKitDim('depth', KIT_DEPTH);
+        if (opts.matchHostWidth && opts.host && opts.host.width > 0) {
+            const t = _kitThickness();
+            const n = Math.max(1, Math.round(opts.host.width / (KIT_UNIT_W + 2 * t)) || 3);
+            _kitInitColumns({ numCols: n, height: KIT_HEIGHT, topPanel: true });
+        } else {
+            _kitInitColumns({ numCols: opts.numCols || 3, height: KIT_HEIGHT, topPanel: true });
+        }
+    }
+    return true;
+};
+
+window._applyKitchenPreset = function() {
+    if (!window._configureKitchenCarcass('base', { numCols: 3 })) {
+        if (state) state.presetId = 'linear';
+        return;
+    }
     _applyKitchenRoomView();
     _updateKitchenSectionUI();
     if (typeof window._syncKitchenApplianceToolbar === 'function') {
         window._syncKitchenApplianceToolbar();
     }
 };
+
+window.KIT_UPPER_Y = KIT_UPPER_Y;
+window.KIT_UPPER_H = KIT_UPPER_H;
+window.KIT_UPPER_D = KIT_UPPER_D;
 
 /** Kitchen room scenery: hide bedroom furniture. Do not change floor — kitchens may use parquet or tile. */
 function _applyKitchenRoomView() {
@@ -264,13 +336,7 @@ function _updateKitchenSectionUI() {
     if (kitTabs) kitTabs.style.display = isKit ? '' : 'none';
     const mKitTabs = document.getElementById('mobile-kitchen-unit-tabs');
     if (mKitTabs) mKitTabs.style.display = isKit ? '' : 'none';
-    // Hide regular "add space cabinet" while kitchen uses that slot
-    if (isKit) {
-        const spaceRow = document.getElementById('space-cab-tabs');
-        if (spaceRow) spaceRow.style.display = 'none';
-        const mSpaceRow = document.getElementById('mobile-space-cab-tabs');
-        if (mSpaceRow) mSpaceRow.style.display = 'none';
-    }
+    // Space-cab tabs stay available in kitchen (upper / corner / extra runs)
 
     const bathSection = document.getElementById('bathroom-section');
     if (isKit && bathSection) bathSection.style.display = 'none';
@@ -328,8 +394,9 @@ function _updateKitchenSectionUI() {
     const mobileKitBlock = document.getElementById('mobile-kitchen-block');
     if (mobileKitBlock) mobileKitBlock.style.display = 'none';
 
-    // Soft height clamp for base cabinets
-    if (isKit && cw) {
+    // Soft height clamp for floor base cabinets only (not upper wall units)
+    const role = (cw && cw.kitchenRole) || 'base';
+    if (isKit && cw && role === 'base') {
         const h = cw.globalHeight || state.height;
         if (h != null && (h < 80 || h > 95)) {
             _applyKitDim('height', Math.max(80, Math.min(95, h)));
@@ -363,9 +430,11 @@ function _syncKitchenCountertopBrandsPanel() {
     const panel = document.getElementById('kitchen-countertop-brands-panel');
     if (!panel) return;
     const isKit = window._isKitchenPreset && window._isKitchenPreset();
+    const role = window._kitchenRole ? window._kitchenRole() : 'base';
     const onTopTab = !!(state && state.activeColorPart === 'materialTopPanel');
-    panel.style.display = (isKit && onTopTab) ? '' : 'none';
-    if (isKit && onTopTab) _renderKitchenBrandExamples();
+    const show = isKit && onTopTab && role !== 'upper';
+    panel.style.display = show ? '' : 'none';
+    if (show) _renderKitchenBrandExamples();
 }
 
 function _renderKitchenBrandExamples() {

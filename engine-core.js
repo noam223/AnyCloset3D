@@ -9400,6 +9400,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
         // Build column X positions (left edge of each column's inner space)
         const colLeftEdges = [];
         let _cx = -state.width / 2 + t + _ox;
+        const _kitIsUpper = (state.presetId === 'kitchen' && typeof window._isKitchenUpper === 'function' && window._isKitchenUpper());
         const _kitTopGap = (state.presetId === 'kitchen') ? (2 * t) : t;
         for (let c = 0; c < _wingCols.length; c++) {
             colLeftEdges.push(_cx);
@@ -9407,12 +9408,12 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
         }
 
         // Find merged spans: consecutive columns with topPanel=true and same height
-        // Kitchen: never merge — each unit has its own separate worktop
-        const _kitSeparateTops = (state.presetId === 'kitchen');
+        // Kitchen base: never merge — each unit has its own separate worktop (upper units: no worktop)
+        const _kitSeparateTops = (state.presetId === 'kitchen' && !_kitIsUpper);
         let spanStart = -1;
         for (let c = 0; c <= _wingCols.length; c++) {
             const col = _wingCols[c];
-            const inSpan = col && col.topPanel;
+            const inSpan = col && col.topPanel && !_kitIsUpper;
             if (inSpan && spanStart === -1) {
                 spanStart = c;
             } else if ((!inSpan || c === _wingCols.length || _kitSeparateTops) && spanStart !== -1) {
@@ -9421,7 +9422,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                 const spanCols = _wingCols.slice(spanStart, spanEnd);
                 const spanH = spanCols[0].height;
                 const allSameH = !_kitSeparateTops && spanCols.every(sc => Math.abs(sc.height - spanH) < 0.1);
-                const _kitTopMat = (state.presetId === 'kitchen' && typeof window._kitchenCountertopMaterial === 'function')
+                const _kitTopMat = (state.presetId === 'kitchen' && !_kitIsUpper && typeof window._kitchenCountertopMaterial === 'function')
                     ? window._kitchenCountertopMaterial(matTopPanel) : matTopPanel;
 
                 if (allSameH && spanCols.length > 1) {

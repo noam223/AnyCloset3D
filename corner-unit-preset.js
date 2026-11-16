@@ -531,12 +531,19 @@ window._updateExtrasSections = function() {
     const info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
     const planLocked = !!(info && info.planLimitReached);
     const canAdd = canUse && (!info || info.canAddMore || planLocked);
+    const isKit = pid === 'kitchen';
     ['space-units-section', 'mobile-space-units-block'].forEach(function(id) {
         const el = document.getElementById(id);
         if (el) el.style.display = canAdd ? '' : 'none';
     });
     document.querySelectorAll('.space-unit-add-btn').forEach(function(b) {
         b.classList.toggle('plan-locked', planLocked);
+    });
+    document.querySelectorAll('.space-unit-wardrobe-only').forEach(function(b) {
+        b.style.display = (canAdd && !isKit) ? '' : 'none';
+    });
+    document.querySelectorAll('.space-unit-kitchen-only').forEach(function(b) {
+        b.style.display = (canAdd && isKit) ? '' : 'none';
     });
 
     // Plinth / board material rows are meaningless for a corner unit

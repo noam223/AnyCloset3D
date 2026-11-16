@@ -11756,7 +11756,7 @@ window._promptSaveCabinetBeforeSwitch = function(targetIndex) {
 // Multi cabinet in the same 3D space (up to 4: linear / sliding / writing-desk)
 // Slot 0 is the world anchor; slots 1..n each store spaceOffset relative to it.
 // ==========================================
-window._SPACE_COMPATIBLE_PRESETS = ['linear', 'sliding', 'writing-desk', 'corner-unit'];
+window._SPACE_COMPATIBLE_PRESETS = ['linear', 'sliding', 'writing-desk', 'corner-unit', 'kitchen'];
 window._SPACE_MAX_CABINETS = 4;
 
 /** Plan cap (e.g. designer Basic = 2). Slot clamping keeps using the system max so older projects stay intact. */
@@ -11846,7 +11846,13 @@ window._stripSpacePairFromItem = function(item) {
 window._spaceTabLabel = function(item, slot) {
     const name = ((item && item.spec && item.spec.customName) ||
         (item && item.rawState && item.rawState.cabinetName) || '').trim();
-    return name || (_cartIsCornerDesk(item) ? 'שולחן פינתי' : ('ארון ' + (slot + 1)));
+    if (name) return name;
+    const role = item && item.rawState && item.rawState.wings && item.rawState.wings.center
+        && item.rawState.wings.center.kitchenRole;
+    if (role === 'upper') return 'יחידה עליונה';
+    if (role === 'corner') return 'פינת מטבח';
+    if (item && item.rawState && item.rawState.presetId === 'kitchen') return 'מטבח ' + (slot + 1);
+    return _cartIsCornerDesk(item) ? 'שולחן פינתי' : ('ארון ' + (slot + 1));
 };
 
 /** Strip trailing " חלק N" so the shared base name can be edited. */
@@ -12689,6 +12695,11 @@ window.removeCabinetFromSpace = function(index) {
 };
 
 window.addSpaceCabinet = function() {
+    // In kitchen, "הוסף ארון במרחב" adds another kitchen run (not a wardrobe linear)
+    if (window._isKitchenPreset && window._isKitchenPreset()) {
+        window.addSpaceUnit('kitchenBase');
+        return;
+    }
     window.addSpaceUnit('cabinet');
 };
 
@@ -12718,6 +12729,21 @@ window._spaceUnitHostSnapshot = function() {
 window._configureSpaceUnit = function(kind, host) {
     const cw = state.wings && state.wings.center;
     if (!cw) return 0;
+    if (kind === 'kitchenUpper' || kind === 'kitchenBase' || kind === 'kitchenCorner') {
+        const role = kind === 'kitchenUpper' ? 'upper' : (kind === 'kitchenCorner' ? 'corner' : 'base');
+        if (typeof window._configureKitchenCarcass === 'function') {
+            window._configureKitchenCarcass(role, {
+                host: host,
+                matchHostWidth: kind === 'kitchenUpper',
+                numCols: kind === 'kitchenCorner' ? 1 : (kind === 'kitchenBase' ? 2 : undefined)
+            });
+        }
+        if (kind === 'kitchenCorner') {
+            const side = (host && host.cornerSide === 'left') ? 'left' : 'right';
+            return side === 'left' ? 270 : 90;
+        }
+        return 0;
+    }
     if (kind === 'sideDesk') {
         state.presetId = 'writing-desk';
         if (typeof window._applyWritingDeskPreset === 'function') window._applyWritingDeskPreset();
@@ -12765,7 +12791,8 @@ window._askCornerUnitSide = function(kind) {
     const popup = document.createElement('div');
     popup.id = '_corner-side-popup';
     popup.className = 'corner-side-popup';
-    const title = kind === 'cornerDesk' ? 'שולחן פינתי' : 'שידה פינתית';
+    const title = kind === 'cornerDesk' ? 'שולחן פינתי'
+        : (kind === 'kitchenCorner' ? 'פינת מטבח' : 'שידה פינתית');
     popup.innerHTML =
         '<div class="corner-side-popup-title">' + title + ' — לאיזו פינה?</div>' +
         '<div class="corner-side-popup-btns">' +
@@ -12799,7 +12826,7 @@ window.addSpaceUnit = function(kind, opts) {
         return;
     }
     if (existing && !existing.canAddMore) return;
-    const isCornerKind = kind === 'cornerDrawers' || kind === 'cornerDesk';
+    const isCornerKind = kind === 'cornerDrawers' || kind === 'cornerDesk' || kind === 'kitchenCorner';
     if (isCornerKind && !opts.cornerSide) {
         window._askCornerUnitSide(kind);
         return;
@@ -12811,13 +12838,19 @@ window.addSpaceUnit = function(kind, opts) {
     if (idx0 < 0 || !state.orderCart[idx0]) return;
     if (!existing && window._spacePairIdOf(state.orderCart[idx0])) return;
 
-    const host = window._spaceUnitHostSnapshot();
-    if (host && isCornerKind) host.cornerSide = opts.cornerSide;
+    const host = window._spaceUnitHostSnapshot() || {};
+    // Preserve live host frame before reset (width/depth not in material snapshot)
+    const hostCw = state.wings && state.wings.center;
+    host.width = state.width || (hostCw && hostCw.width) || 160;
+    host.depth = state.depth || (hostCw && hostCw.depth) || 54;
+    host.globalHeight = state.height || (hostCw && hostCw.globalHeight) || 240;
+    if (hostCw && hostCw.countertopBrand) host.countertopBrand = hostCw.countertopBrand;
+    if (isCornerKind) host.cornerSide = opts.cornerSide;
     // Host frame for corner placement (offsets are relative to the space anchor)
     const hostSlot = existing ? window._spacePairSlotOf(state.orderCart[idx0]) : 0;
     const hostOff = existing ? window._spaceOffsetForSlot(hostSlot) : { x: 0, y: 0, z: 0, rot: 0 };
-    const hostW = state.width || 160;
-    const hostD = state.depth || 54;
+    const hostW = host.width || 160;
+    const hostD = host.depth || 54;
     let pairId;
     let nextSlot;
     let maxRight;
@@ -12850,7 +12883,7 @@ window.addSpaceUnit = function(kind, opts) {
     const wN = Math.round((rot === 90 || rot === 270) ? (rsN.depth || 54) : (rsN.width || 160));
     let offset = { x: Math.round(maxRight + wN / 2 + 10), y: 0 };
     const cuN = rsN.wings && rsN.wings.center && rsN.wings.center.corner;
-    if (isCornerKind && cuN && !(hostOff.rot)) {
+    if ((kind === 'cornerDrawers' || kind === 'cornerDesk') && cuN && !(hostOff.rot)) {
         // Inner corner: inside the host's width, protruding forward from its front face
         const sgn = opts.cornerSide === 'left' ? -1 : 1;
         offset = {
@@ -12858,9 +12891,31 @@ window.addSpaceUnit = function(kind, opts) {
             y: Math.round(hostOff.y || 0),
             z: Math.round((hostOff.z || 0) + hostD / 2 + (cuN.width || 60) / 2)
         };
+    } else if (kind === 'kitchenUpper') {
+        const upperD = (rsN.depth != null) ? rsN.depth
+            : ((rsN.wings && rsN.wings.center && rsN.wings.center.depth) || window.KIT_UPPER_D || 35);
+        const upperY = window.KIT_UPPER_Y || 145;
+        offset = {
+            x: Math.round(hostOff.x || 0),
+            y: Math.round(upperY),
+            z: Math.round((hostOff.z || 0) + (hostD - upperD) / 2)
+        };
+    } else if (kind === 'kitchenCorner') {
+        // Return run abutting the host end; rot 90/270 swaps width↔depth in world X
+        const sgn = opts.cornerSide === 'left' ? -1 : 1;
+        const newDepth = (rsN.depth != null) ? rsN.depth
+            : ((rsN.wings && rsN.wings.center && rsN.wings.center.depth) || 56);
+        offset = {
+            x: Math.round((hostOff.x || 0) + sgn * (hostW / 2 + newDepth / 2)),
+            y: Math.round(hostOff.y || 0),
+            z: Math.round(hostOff.z || 0)
+        };
     }
     if (rot) offset.rot = rot;
     window._attachSpacePairToItem(itemN, pairId, nextSlot, offset);
+    if (kind === 'kitchenUpper' && typeof window._syncSpaceLiftBottomPanel === 'function') {
+        window._syncSpaceLiftBottomPanel(itemN, true);
+    }
     state.orderCart.push(itemN);
 
     const newIdx = state.orderCart.length - 1;

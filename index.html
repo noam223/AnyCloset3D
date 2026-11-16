@@ -40,7 +40,7 @@
     <link rel="stylesheet" href="style-base.css?v=20260910deskMerge">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
     <link rel="stylesheet" href="style-extras.css?v=20261110doormirror">
-    <link rel="stylesheet" href="style.css?v=20261116kitHide">
+    <link rel="stylesheet" href="style.css?v=20261116kitSpace">
     <link rel="stylesheet" href="quick-calc.css?v=20260929qc">
     <style>
         html.thumb-only-mode #left-sidebar,
@@ -136,7 +136,15 @@
                 <button type="button" class="space-cab-join-btn" style="display:inline-flex;flex:1;" onclick="window._kitchenAddUnit('left')"><i class="fa-solid fa-plus"></i> יחידה משמאל</button>
                 <button type="button" class="space-cab-leave-btn" style="display:inline-flex;flex:1;" onclick="window._kitchenRemoveUnit('right')"><i class="fa-solid fa-minus"></i> הסר יחידה</button>
             </div>
-            <div style="font-size:0.72rem;color:var(--text-light);margin-top:6px;">יחידות: <strong id="kitchen-unit-count-header">3</strong> · כל יחידה נפרדת (דופן כפולה)</div>
+            <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+                <button type="button" class="space-cab-add-btn" style="flex:1;display:inline-flex;" onclick="addSpaceUnit('kitchenUpper')" title="מוסיף יחידה עליונה כארון נפרד במרחב (מעל התחתון)">
+                    <i class="fa-solid fa-arrow-up"></i> יחידה עליונה
+                </button>
+                <button type="button" class="space-cab-add-btn" style="flex:1;display:inline-flex;" onclick="addSpaceUnit('kitchenCorner')" title="מוסיף רגל פינתית כארון נפרד במרחב (סיבוב 90°)">
+                    <i class="fa-solid fa-turn-up"></i> פינת מטבח
+                </button>
+            </div>
+            <div style="font-size:0.72rem;color:var(--text-light);margin-top:6px;">יחידות בשורה: <strong id="kitchen-unit-count-header">3</strong> · עליונה/פינה = ארון נוסף במרחב</div>
         </div>
         <div id="space-cab-tabs" style="display:none;">
             <button type="button" id="btn-add-space-cab" class="space-cab-add-btn" onclick="addSpaceCabinet()">
@@ -667,17 +675,26 @@
         <div class="section" id="space-units-section" data-sbgroup="extras">
             <div class="section-title"><i class="fa-solid fa-plus"></i> הוספת יחידה למרחב</div>
             <div class="space-unit-add-grid">
-                <button type="button" class="space-unit-add-btn" onclick="addSpaceUnit('sideDesk')" title="מוסיף שולחן צד כארון נפרד במרחב">
+                <button type="button" class="space-unit-add-btn space-unit-wardrobe-only" onclick="addSpaceUnit('sideDesk')" title="מוסיף שולחן צד כארון נפרד במרחב">
                     <i class="fa-solid fa-desktop"></i><span>שולחן צד</span>
                 </button>
-                <button type="button" class="space-unit-add-btn" onclick="addSpaceUnit('sideCabinet')" title="מוסיף ארון צד צר כארון נפרד במרחב">
+                <button type="button" class="space-unit-add-btn space-unit-wardrobe-only" onclick="addSpaceUnit('sideCabinet')" title="מוסיף ארון צד צר כארון נפרד במרחב">
                     <i class="fa-solid fa-door-closed"></i><span>ארון צד</span>
                 </button>
-                <button type="button" class="space-unit-add-btn" onclick="addSpaceUnit('cornerDrawers')" title="מוסיף שידה פינתית כארון נפרד במרחב">
+                <button type="button" class="space-unit-add-btn space-unit-wardrobe-only" onclick="addSpaceUnit('cornerDrawers')" title="מוסיף שידה פינתית כארון נפרד במרחב">
                     <i class="fa-solid fa-layer-group"></i><span>שידה פינתית</span>
                 </button>
-                <button type="button" class="space-unit-add-btn" onclick="addSpaceUnit('cornerDesk')" title="מוסיף שולחן פינתי כארון נפרד במרחב">
+                <button type="button" class="space-unit-add-btn space-unit-wardrobe-only" onclick="addSpaceUnit('cornerDesk')" title="מוסיף שולחן פינתי כארון נפרד במרחב">
                     <i class="fa-solid fa-turn-up"></i><span>שולחן פינתי</span>
+                </button>
+                <button type="button" class="space-unit-add-btn space-unit-kitchen-only" onclick="addSpaceUnit('kitchenUpper')" title="מוסיף יחידה עליונה כארון נפרד במרחב" style="display:none;">
+                    <i class="fa-solid fa-arrow-up"></i><span>יחידה עליונה</span>
+                </button>
+                <button type="button" class="space-unit-add-btn space-unit-kitchen-only" onclick="addSpaceUnit('kitchenCorner')" title="מוסיף פינת מטבח כארון נפרד במרחב" style="display:none;">
+                    <i class="fa-solid fa-turn-up"></i><span>פינת מטבח</span>
+                </button>
+                <button type="button" class="space-unit-add-btn space-unit-kitchen-only" onclick="addSpaceUnit('kitchenBase')" title="מוסיף שורת מטבח נוספת במרחב" style="display:none;">
+                    <i class="fa-solid fa-kitchen-set"></i><span>שורת מטבח</span>
                 </button>
             </div>
             <div class="space-unit-add-hint">כל יחידה נוספת כארון נפרד במרחב — אפשר להזיז ולסובב אותה</div>
@@ -978,7 +995,7 @@
         <!-- ===== KITCHEN SECTION (app-admin only, shown for kitchen preset) ===== -->
         <div class="section" id="kitchen-section" data-sbgroup="cabinet" style="display:none;">
             <div class="section-title"><i class="fa-solid fa-kitchen-set"></i> יחידת מטבח</div>
-            <p style="font-size:0.75rem;color:var(--text-light);margin:0 0 10px;">תחתון סנדוויץ׳ · גובה 88 · עומק 56. כל יחידה נפרדת (דופן כפולה). הוספת יחידה — מהכפתור מעל (כמו «הוסף ארון במרחב»). סוג משטח — בטאב <strong>צבעים → משטח</strong>.</p>
+            <p style="font-size:0.75rem;color:var(--text-light);margin:0 0 10px;">תחתון סנדוויץ׳ · גובה 88 · עומק 56. +60 מאריך את השורה. יחידה עליונה / פינה — כארון נוסף במרחב (מיקום X/Y/Z וסיבוב). סוג משטח — בטאב <strong>צבעים → משטח</strong>.</p>
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
                 <span style="font-size:0.8rem;color:var(--text-dark);">יחידות: <strong id="kitchen-unit-count">3</strong></span>
                 <span style="font-size:0.72rem;color:var(--text-light);">גוף: סנדוויץ׳ (נעול)</span>
@@ -2298,6 +2315,10 @@
                 <button type="button" class="space-cab-join-btn" style="flex:1;" onclick="window._kitchenAddUnit('left')"><i class="fa-solid fa-plus"></i> משמאל</button>
                 <button type="button" class="space-cab-leave-btn" style="flex:1;" onclick="window._kitchenRemoveUnit('right')"><i class="fa-solid fa-minus"></i> הסר</button>
             </div>
+            <div style="display:flex;gap:6px;margin-top:8px;">
+                <button type="button" class="space-cab-add-btn" style="flex:1;" onclick="addSpaceUnit('kitchenUpper')"><i class="fa-solid fa-arrow-up"></i> עליונה</button>
+                <button type="button" class="space-cab-add-btn" style="flex:1;" onclick="addSpaceUnit('kitchenCorner')"><i class="fa-solid fa-turn-up"></i> פינה</button>
+            </div>
         </div>
         <div id="mobile-space-cab-tabs" style="display:none;margin:0 0 14px;">
             <button type="button" id="mobile-btn-add-space-cab" class="space-cab-add-btn" onclick="addSpaceCabinet()">
@@ -2431,10 +2452,13 @@
         <div id="mobile-space-units-block">
             <div class="mobile-section-title">הוספת יחידה למרחב</div>
             <div class="space-unit-add-grid" style="margin-bottom:12px;">
-                <button type="button" class="space-unit-add-btn" onclick="addSpaceUnit('sideDesk')"><i class="fa-solid fa-desktop"></i><span>שולחן צד</span></button>
-                <button type="button" class="space-unit-add-btn" onclick="addSpaceUnit('sideCabinet')"><i class="fa-solid fa-door-closed"></i><span>ארון צד</span></button>
-                <button type="button" class="space-unit-add-btn" onclick="addSpaceUnit('cornerDrawers')"><i class="fa-solid fa-layer-group"></i><span>שידה פינתית</span></button>
-                <button type="button" class="space-unit-add-btn" onclick="addSpaceUnit('cornerDesk')"><i class="fa-solid fa-turn-up"></i><span>שולחן פינתי</span></button>
+                <button type="button" class="space-unit-add-btn space-unit-wardrobe-only" onclick="addSpaceUnit('sideDesk')"><i class="fa-solid fa-desktop"></i><span>שולחן צד</span></button>
+                <button type="button" class="space-unit-add-btn space-unit-wardrobe-only" onclick="addSpaceUnit('sideCabinet')"><i class="fa-solid fa-door-closed"></i><span>ארון צד</span></button>
+                <button type="button" class="space-unit-add-btn space-unit-wardrobe-only" onclick="addSpaceUnit('cornerDrawers')"><i class="fa-solid fa-layer-group"></i><span>שידה פינתית</span></button>
+                <button type="button" class="space-unit-add-btn space-unit-wardrobe-only" onclick="addSpaceUnit('cornerDesk')"><i class="fa-solid fa-turn-up"></i><span>שולחן פינתי</span></button>
+                <button type="button" class="space-unit-add-btn space-unit-kitchen-only" onclick="addSpaceUnit('kitchenUpper')" style="display:none;"><i class="fa-solid fa-arrow-up"></i><span>יחידה עליונה</span></button>
+                <button type="button" class="space-unit-add-btn space-unit-kitchen-only" onclick="addSpaceUnit('kitchenCorner')" style="display:none;"><i class="fa-solid fa-turn-up"></i><span>פינת מטבח</span></button>
+                <button type="button" class="space-unit-add-btn space-unit-kitchen-only" onclick="addSpaceUnit('kitchenBase')" style="display:none;"><i class="fa-solid fa-kitchen-set"></i><span>שורת מטבח</span></button>
             </div>
         </div>
         <div id="mobile-side-unit-block" style="display:none;">
@@ -3129,17 +3153,17 @@
 <script src="state.js?v=20261116kitFix"></script>
 <script src="quick-calc.js?v=20261029shoe"></script>
 <script src="bathroom-preset.js?v=20261008types"></script>
-<script src="kitchen-preset.js?v=20261116kitHide"></script>
+<script src="kitchen-preset.js?v=20261116kitSpace"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
-<script src="corner-unit-preset.js?v=20261103deskdoor"></script>
+<script src="corner-unit-preset.js?v=20261116kitSpace"></script>
 <script src="engine-appliances.js?v=20261116stone"></script>
-<script src="engine-core.js?v=20261116kitFix"></script>
+<script src="engine-core.js?v=20261116kitSpace"></script>
 <script src="engine-corners.js?v=20261109ridingFlush"></script>
 <script src="engine-blueprint.js?v=20261115spaceBp4"></script>
 <script src="engine-room-plan.js?v=20261110floors"></script>
 <script src="tambour-color-picker.js?v=20261110roomwall"></script>
 <script src="room-finishes.js?v=20261110gloss"></script>
-<script src="ui.js?v=20261116kitFix"></script>
+<script src="ui.js?v=20261116kitSpace"></script>
 <script src="mirror-cabinet.js?v=20261110doormirror"></script>
 <script src="mobile.js?v=20261029inthandle"></script>
 <script src="part-paint.js?v=20261104egger"></script>
