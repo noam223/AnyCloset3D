@@ -156,8 +156,12 @@ window.updateSlidingDoorPanel = function(doorIndex, panelType) {
     if (!w || !w.slidingDoor) return;
     if (!w.slidingDoor.doorPanels) w.slidingDoor.doorPanels = [];
     w.slidingDoor.doorPanels[doorIndex] = panelType;
+    // Keep color tab on this door while editing its type
+    state.activeColorPart = 'slidingDoor_' + doorIndex;
     buildCabinet(); calculatePrice(); saveHistoryState();
-    if (typeof window._rebuildDoorPanelTabs === 'function') window._rebuildDoorPanelTabs();
+    if (typeof window._syncSlidingDoorTypePanel === 'function') window._syncSlidingDoorTypePanel();
+    if (typeof window._updateMaterialTabVisibility === 'function') window._updateMaterialTabVisibility(w);
+    if (typeof window._syncPartTabDots === 'function') window._syncPartTabDots();
 };
 
 // ---- Update per-door color (for solid panel type) ----
@@ -167,7 +171,8 @@ window.updateSlidingDoorColor = function(doorIndex, colorKey) {
     if (!w.slidingDoor.doorColors) w.slidingDoor.doorColors = [];
     w.slidingDoor.doorColors[doorIndex] = colorKey;
     buildCabinet(); calculatePrice(); saveHistoryState();
-    if (typeof window._rebuildDoorPanelTabs === 'function') window._rebuildDoorPanelTabs();
+    if (typeof window._syncSlidingDoorTypePanel === 'function') window._syncSlidingDoorTypePanel();
+    if (typeof window._syncPartTabDots === 'function') window._syncPartTabDots();
 };
 
 // ---- Helper: create a fresh sideCabinet wing-like object ----
@@ -1905,12 +1910,19 @@ window.syncSidebarToWing = function() {
     }
 
     // Materials
+    const activePart = state.activeColorPart || w.activeColorPart || 'materialBody';
+    state.activeColorPart = activePart;
     document.querySelectorAll('.part-tab-btn').forEach(b => b.classList.remove('active'));
-    const activePartBtn = document.querySelector(`.part-tab-btn[data-part="${w.activeColorPart || 'materialBody'}"]`);
+    const activePartBtn = document.querySelector(`.part-tab-btn[data-part="${activePart}"]`);
     if (activePartBtn) activePartBtn.classList.add('active');
     document.querySelectorAll('.material-btn').forEach(b => b.classList.remove('active'));
-    const currentMat = w[w.activeColorPart || 'materialBody'];
-    const matBtn = document.querySelector(`.material-btn[data-mat="${currentMat}"]`);
+    let currentMat = w[activePart];
+    if (typeof window._isSlidingDoorColorPart === 'function' && window._isSlidingDoorColorPart(activePart)) {
+        const di = window._slidingDoorIndexFromPart(activePart);
+        const sd = w.slidingDoor;
+        currentMat = (sd && sd.doorColors && sd.doorColors[di]) || w.materialBody || 'white_matte';
+    }
+    const matBtn = currentMat ? document.querySelector(`.material-btn[data-mat="${currentMat}"]`) : null;
     if (matBtn) matBtn.classList.add('active');
 
     // Dynamic tab visibility: show/hide tabs based on what's in the cabinet
@@ -2146,26 +2158,40 @@ window._updateMaterialTabVisibility = function(w) {
         return;
     }
 
-    // Sliding wardrobe: door types/colors live in צבעים; hide unrelated part tabs
+    // Sliding wardrobe: door tabs in the colors row; hide unrelated part tabs
     if (state.presetId === 'sliding') {
         _applyPartTabLabels(_partTabDefaultLabels);
-        const slidingAllowed = new Set(['materialBody', 'materialInternal', 'materialBack', 'glassTint']);
+        if (typeof window._rebuildDoorPanelTabs === 'function') window._rebuildDoorPanelTabs();
         const hasGlass = _wingHasGlass(w);
         document.querySelectorAll('.part-tab-btn[data-part]').forEach(btn => {
             const part = btn.getAttribute('data-part');
-            if (part === 'glassTint') btn.style.display = hasGlass ? '' : 'none';
-            else btn.style.display = slidingAllowed.has(part) ? '' : 'none';
+            if (part && part.indexOf('slidingDoor_') === 0) {
+                btn.style.display = '';
+                return;
+            }
+            if (part === 'glassTint') {
+                btn.style.display = hasGlass ? '' : 'none';
+                return;
+            }
+            const keep = part === 'materialBody' || part === 'materialInternal' || part === 'materialBack';
+            btn.style.display = keep ? '' : 'none';
         });
-        const activePart = w.activeColorPart || 'materialBody';
-        if (!slidingAllowed.has(activePart) || (activePart === 'glassTint' && !hasGlass)) {
-            w.activeColorPart = 'materialBody';
+        const activePart = state.activeColorPart || w.activeColorPart || 'materialBody';
+        const isDoorPart = typeof window._isSlidingDoorColorPart === 'function' && window._isSlidingDoorColorPart(activePart);
+        const doorIdx = isDoorPart && typeof window._slidingDoorIndexFromPart === 'function'
+            ? window._slidingDoorIndexFromPart(activePart) : -1;
+        const sd = w.slidingDoor;
+        const doorOk = isDoorPart && sd && doorIdx >= 0 && doorIdx < (sd.numDoors || 0);
+        if ((!doorOk && isDoorPart) || (!isDoorPart && activePart !== 'materialBody' && activePart !== 'materialInternal' && activePart !== 'materialBack' && !(activePart === 'glassTint' && hasGlass))) {
+            state.activeColorPart = 'materialBody';
             document.querySelectorAll('.part-tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.part-tab-btn[data-part="materialBody"]').forEach(b => b.classList.add('active'));
-            document.querySelectorAll('.material-btn').forEach(b => b.classList.remove('active'));
-            const fallbackMat = w.materialBody || 'white_matte';
-            const fallbackBtn = document.querySelector(`.material-btn[data-mat="${fallbackMat}"]`);
-            if (fallbackBtn) fallbackBtn.classList.add('active');
+        } else {
+            state.activeColorPart = activePart;
+            document.querySelectorAll('.part-tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll(`.part-tab-btn[data-part="${activePart}"]`).forEach(b => b.classList.add('active'));
         }
+        if (typeof window._syncSlidingDoorTypePanel === 'function') window._syncSlidingDoorTypePanel();
         window._syncGlassTintPanel(w);
         return;
     }

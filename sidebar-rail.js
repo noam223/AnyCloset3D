@@ -112,6 +112,12 @@
             var uu = state.wings && state.wings['upperUnit_' + state.activeWing];
             return uu ? (uu.materialBody || 'white_matte') : null;
         }
+        if (typeof window._isSlidingDoorColorPart === 'function' && window._isSlidingDoorColorPart(part)) {
+            var idx = window._slidingDoorIndexFromPart(part);
+            var sd = w.slidingDoor;
+            if (sd && sd.doorColors && sd.doorColors[idx]) return sd.doorColors[idx];
+            return w.materialBody || 'white_matte';
+        }
         return w[part] || w.materialBody || 'white_matte';
     }
 

@@ -106,6 +106,11 @@
         var uploadBtn = document.getElementById('btn-upload-texture');
         if (uploadBtn) uploadBtn.classList.remove('active');
 
+        if (typeof window._isSlidingDoorColorPart === 'function' && window._isSlidingDoorColorPart(state.activeColorPart)) {
+            var sdIdx = window._slidingDoorIndexFromPart(state.activeColorPart);
+            if (typeof window.updateSlidingDoorColor === 'function') window.updateSlidingDoorColor(sdIdx, matKey);
+            return;
+        }
         if (state.activeColorPart === 'materialUpperUnit') {
             if (typeof window.applyUpperUnitMaterial === 'function') window.applyUpperUnitMaterial(matKey);
             return;

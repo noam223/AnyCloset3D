@@ -629,6 +629,14 @@ window.updateDeskDrawerCountInput = function(val) {
 }
 
 // ---- Per-door panel type tabs for sliding wardrobe sidebar ----
+window._isSlidingDoorColorPart = function(part) {
+    return typeof part === 'string' && /^slidingDoor_\d+$/.test(part);
+};
+window._slidingDoorIndexFromPart = function(part) {
+    const m = /^slidingDoor_(\d+)$/.exec(String(part || ''));
+    return m ? parseInt(m[1], 10) : -1;
+};
+
 /** Show/hide sliding door color UI inside the צבעים tab (desktop + mobile). */
 window._syncSlidingColorsBlock = function(show) {
     const visible = !!show;
@@ -638,138 +646,133 @@ window._syncSlidingColorsBlock = function(show) {
     if (mob) mob.style.display = visible ? '' : 'none';
     if (visible && typeof window._rebuildDoorPanelTabs === 'function') {
         window._rebuildDoorPanelTabs();
+    } else if (!visible) {
+        document.querySelectorAll('.part-tab-btn.sd-door-part-tab').forEach(b => b.remove());
+        ['sd-door-panels-container', 'mobile-sd-door-panels-container'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = '';
+        });
     }
 };
 
-window._rebuildDoorPanelTabs = function() {
+/** Compact panel-type controls for the currently selected sliding door tab. */
+window._syncSlidingDoorTypePanel = function() {
     const containers = [
         document.getElementById('sd-door-panels-container'),
         document.getElementById('mobile-sd-door-panels-container')
     ].filter(Boolean);
-    if (!containers.length) return;
-    const sd = getSlidingDoor();
-    if (!sd || !sd.enabled) {
-        containers.forEach(c => { c.innerHTML = ''; });
+    const part = state.activeColorPart || '';
+    const doorIdx = window._slidingDoorIndexFromPart(part);
+    const sd = (typeof getSlidingDoor === 'function') ? getSlidingDoor() : null;
+    if (!containers.length || doorIdx < 0 || !sd || !sd.enabled) {
+        containers.forEach(c => { c.innerHTML = ''; c.style.display = 'none'; });
         return;
     }
-    const numDoors = sd.numDoors || 2;
-    if (!sd.doorPanels || sd.doorPanels.length < numDoors) {
-        if (!sd.doorPanels) sd.doorPanels = [];
-        while (sd.doorPanels.length < numDoors) sd.doorPanels.push(sd.doorPanelType || 'solid');
-    }
-    if (!sd.doorColors) sd.doorColors = [];
-
+    const current = (sd.doorPanels && sd.doorPanels[doorIdx]) || sd.doorPanelType || 'solid';
+    const isMirrorActive = current === 'mirror' || current === 'mirror_dark';
     const panelOptions = [
         { value: 'solid',  icon: 'fa-solid fa-square',            label: 'חלק' },
         { value: 'glass',  icon: 'fa-regular fa-square',          label: 'זכוכית' },
         { value: 'mirror', icon: 'fa-solid fa-circle-half-stroke', label: 'מראה' }
     ];
-    // mirror sub-types: shown below the main buttons when mirror/mirror_dark is active
     const mirrorSubOptions = [
         { value: 'mirror',      label: 'מראה רגילה' },
         { value: 'mirror_dark', label: 'מראה כהה' }
     ];
-
-    // All colors available for door coloring (solid + textures)
-    const solidColors = [
-        { key: 'white_matte', bg: '#f7f7f7',  border: '#ccc', label: 'לבן מט 2100' },
-        { key: 'c3110',       bg: '#f0ede9',  border: '#bbb', label: '3110' },
-        { key: 'c795',        bg: '#ece0d4',  border: '#bbb', label: '759' },
-        { key: 'c705',        bg: '#dbd6c6',  border: '#bbb', label: '705' },
-        { key: 'u727',        bg: '#a79786',  border: '#bbb', label: 'U727' },
-        { key: 'w1200',       bg: '#e7e1da',  border: '#bbb', label: 'W1200' },
-        { key: 'u232',        bg: '#c59578',  border: '#bbb', label: 'U232' },
-        { key: 'u604',        bg: '#8f8e76',  border: '#bbb', label: 'U604' },
-        { key: 'u638',        bg: '#c0b598',  border: '#bbb', label: 'U638' },
-        { key: 'c3207',       bg: '#F7ECD9',  border: '#bbb', label: '3207' },
-        { key: 'black_matte', bg: '#2a2a2a',  border: '#444', label: 'שחור מט' },
-        // Wood / texture colors
-        { key: '2020',  img: 'textures/2020.jpg',  border: '#bbb', label: '2020' },
-        { key: '2024',  img: 'textures/2024.jpg',  border: '#bbb', label: '2024' },
-        { key: 'H1367', img: 'textures/H1367.jpg', border: '#bbb', label: 'H1367' },
-        { key: 'H1307', img: 'textures/H1307.jpg', border: '#bbb', label: 'H1307' },
-        { key: 'H1227', img: 'textures/H1227.jpg', border: '#bbb', label: 'H1227' },
-        { key: 'A427',  img: 'textures/A427.jpg?v=20260914fix',  border: '#bbb', label: 'A427' },
-        { key: '2025',  img: 'textures/2025.jpg',  border: '#bbb', label: '2025' },
-        { key: '2040',  img: 'textures/2040.jpg',  border: '#bbb', label: '2040' },
-        { key: '2041',  img: 'textures/2041.jpg',  border: '#bbb', label: '2041' },
-        { key: '2044',  img: 'textures/2044.jpg',  border: '#bbb', label: '2044' },
-        { key: '2047',  img: 'textures/2047.jpg',  border: '#bbb', label: '2047' },
-        { key: '2049',  img: 'textures/2049.jpg',  border: '#bbb', label: '2049' },
-        { key: '2062',  img: 'textures/2062.jpg',  border: '#bbb', label: '2062' },
-        { key: '5600',  img: 'textures/5600.jpg',  border: '#bbb', label: '5600' },
-        { key: '7180',  img: 'textures/7180.jpg',  border: '#bbb', label: '7180' },
-        { key: '456',   img: 'textures/456.jpg',   border: '#bbb', label: '456' },
-        { key: '462',   img: 'textures/462.jpg',   border: '#bbb', label: '462' },
-        { key: '463',   img: 'textures/463.jpg',   border: '#bbb', label: '463' },
-        { key: '464',   img: 'textures/464.jpg',   border: '#bbb', label: '464' },
-        { key: '480',   img: 'textures/480.jpg',   border: '#bbb', label: '480' },
-    ].concat((window.EGGER_EXTRA_COLORS || []).map(c => ({ key: c.key, img: c.img, border: '#bbb', label: c.label })));
-
-    let html = `<div style="font-size:0.78rem;color:var(--text-light);margin-bottom:6px;">סוג פנל לכל דלת</div>`;
-
-    // Get body material key for default color display
-    const bodyMatKey = (state.wings && state.wings.center && state.wings.center.materialBody) || 'white_matte';
-
-    for (let i = 0; i < numDoors; i++) {
-        const current = sd.doorPanels[i] || 'solid';
-        const isMirrorActive = current === 'mirror' || current === 'mirror_dark';
-        const currentColor = sd.doorColors[i] || null; // null = use body color
-        const effectiveColor = currentColor || bodyMatKey; // what engine actually uses
-        const mainRowMargin = (current === 'solid' || isMirrorActive) ? '8px' : '0';
-        html += `<div style="margin-bottom:10px;padding:8px;background:var(--bg-light);border-radius:10px;border:1px solid var(--border);">`;
-        html += `<div style="font-size:0.72rem;font-weight:700;color:var(--text-dark);margin-bottom:6px;">דלת ${i + 1}</div>`;
-        html += `<div style="display:flex;gap:5px;margin-bottom:${mainRowMargin};">`;
-        panelOptions.forEach(opt => {
-            // "מראה" button is active when current is mirror OR mirror_dark
-            const isActive = opt.value === 'mirror' ? isMirrorActive : current === opt.value;
-            html += `<button onclick="updateSlidingDoorPanel(${i},'${opt.value}')"
-                style="flex:1;padding:6px 3px;border-radius:8px;border:${isActive ? '2px solid var(--accent)' : '1.5px solid var(--border)'};
-                background:${isActive ? 'var(--accent-light,#e8f0fe)' : 'white'};
-                color:${isActive ? 'var(--accent)' : 'var(--text-dark)'};
-                font-size:0.72rem;font-weight:600;cursor:pointer;transition:all 0.15s;
-                display:flex;flex-direction:column;align-items:center;gap:2px;">
-                <i class="${opt.icon}" style="font-size:1rem;"></i>
-                <span>${opt.label}</span>
-            </button>`;
+    let html = `<div style="font-size:0.78rem;color:var(--text-light);margin-bottom:6px;">סוג פנל — דלת ${doorIdx + 1}</div>`;
+    html += `<div style="display:flex;gap:5px;margin-bottom:${isMirrorActive ? '8px' : '0'};">`;
+    panelOptions.forEach(opt => {
+        const isActive = opt.value === 'mirror' ? isMirrorActive : current === opt.value;
+        html += `<button type="button" onclick="updateSlidingDoorPanel(${doorIdx},'${opt.value}')"
+            style="flex:1;padding:6px 3px;border-radius:8px;border:${isActive ? '2px solid var(--accent)' : '1.5px solid var(--border)'};
+            background:${isActive ? 'var(--accent-light,#e8f0fe)' : 'white'};
+            color:${isActive ? 'var(--accent)' : 'var(--text-dark)'};
+            font-size:0.72rem;font-weight:600;cursor:pointer;transition:all 0.15s;
+            display:flex;flex-direction:column;align-items:center;gap:2px;">
+            <i class="${opt.icon}" style="font-size:1rem;"></i>
+            <span>${opt.label}</span>
+        </button>`;
+    });
+    html += `</div>`;
+    if (isMirrorActive) {
+        html += `<div style="display:flex;gap:5px;padding-top:6px;border-top:1px solid var(--border);">`;
+        mirrorSubOptions.forEach(sub => {
+            const isSubActive = current === sub.value;
+            html += `<button type="button" onclick="updateSlidingDoorPanel(${doorIdx},'${sub.value}')"
+                style="flex:1;padding:5px 4px;border-radius:7px;border:${isSubActive ? '2px solid var(--accent)' : '1.5px solid var(--border)'};
+                background:${isSubActive ? 'var(--accent-light,#e8f0fe)' : 'white'};
+                color:${isSubActive ? 'var(--accent)' : 'var(--text-dark)'};
+                font-size:0.7rem;font-weight:600;cursor:pointer;">${sub.label}</button>`;
         });
         html += `</div>`;
-        // Mirror sub-row — shown when mirror or mirror_dark is active
-        if (isMirrorActive) {
-            html += `<div style="display:flex;gap:5px;margin-bottom:0;padding:6px 0 2px 0;border-top:1px solid var(--border);">`;
-            mirrorSubOptions.forEach(sub => {
-                const isSubActive = current === sub.value;
-                html += `<button onclick="updateSlidingDoorPanel(${i},'${sub.value}')"
-                    style="flex:1;padding:5px 4px;border-radius:7px;border:${isSubActive ? '2px solid var(--accent)' : '1.5px solid var(--border)'};
-                    background:${isSubActive ? 'var(--accent-light,#e8f0fe)' : 'white'};
-                    color:${isSubActive ? 'var(--accent)' : 'var(--text-dark)'};
-                    font-size:0.7rem;font-weight:600;cursor:pointer;transition:all 0.15s;">
-                    ${sub.label}
-                </button>`;
-            });
-            html += `</div>`;
-        }
-        // Color swatches — only shown when panel type is 'solid'
-        if (current === 'solid') {
-            html += `<div style="font-size:0.7rem;color:var(--text-light);margin-bottom:5px;">צבע דלת:</div>`;
-            html += `<div style="display:flex;flex-wrap:wrap;gap:5px;">`;
-            solidColors.forEach(c => {
-                const isColorActive = c.key === effectiveColor;
-                const bgStyle = c.img
-                    ? `background-image:url('${c.img}');background-size:cover;background-color:#ccc;`
-                    : `background:${c.bg};`;
-                html += `<button onclick="updateSlidingDoorColor(${i},'${c.key}')" title="${c.label}"
-                    style="width:26px;height:26px;border-radius:50%;${bgStyle}
-                    border:${isColorActive ? '2.5px solid var(--accent)' : `1.5px solid ${c.border}`};
-                    cursor:pointer;transition:all 0.15s;outline:${isColorActive ? '2px solid var(--accent)' : 'none'};outline-offset:1px;">
-                </button>`;
-            });
-            html += `</div>`;
-        }
-        html += `</div>`;
+    }
+    containers.forEach(c => {
+        c.style.display = '';
+        c.innerHTML = html;
+    });
+};
+
+/** Inject "דלת 1/2/…" buttons into the shared color part-tabs (same row as גוף/מדפים). */
+window._rebuildDoorPanelTabs = function() {
+    const sd = (typeof getSlidingDoor === 'function') ? getSlidingDoor() : null;
+    const tabRows = [
+        document.querySelector('#materials-section .color-part-tabs'),
+        document.querySelector('#mobile-panel-materials .color-part-tabs')
+    ].filter(Boolean);
+
+    if (!sd || !sd.enabled || state.presetId !== 'sliding') {
+        document.querySelectorAll('.part-tab-btn.sd-door-part-tab').forEach(b => b.remove());
+        if (typeof window._syncSlidingDoorTypePanel === 'function') window._syncSlidingDoorTypePanel();
+        return;
     }
 
-    containers.forEach(c => { c.innerHTML = html; });
+    const numDoors = sd.numDoors || 2;
+    if (!sd.doorPanels) sd.doorPanels = [];
+    while (sd.doorPanels.length < numDoors) sd.doorPanels.push(sd.doorPanelType || 'solid');
+    if (sd.doorPanels.length > numDoors) sd.doorPanels.length = numDoors;
+    if (!sd.doorColors) sd.doorColors = [];
+
+    tabRows.forEach(row => {
+        const isMobile = !!row.closest('#mobile-panel-materials');
+        row.querySelectorAll('.part-tab-btn.sd-door-part-tab').forEach(b => b.remove());
+        let insertAfter = row.querySelector('.part-tab-btn[data-part="materialBack"]')
+            || row.querySelector('.part-tab-btn[data-part="materialInternal"]')
+            || row.lastElementChild;
+        for (let i = 0; i < numDoors; i++) {
+            const part = 'slidingDoor_' + i;
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'part-tab-btn sd-door-part-tab';
+            btn.setAttribute('data-part', part);
+            if (isMobile) {
+                btn.textContent = 'דלת ' + (i + 1);
+            } else {
+                btn.innerHTML = '<i class="ptb-ic fa-solid fa-door-closed"></i>'
+                    + '<span class="ptb-label">דלת ' + (i + 1) + '</span>'
+                    + '<em class="ptb-dot"></em>';
+            }
+            if (state.activeColorPart === part) btn.classList.add('active');
+            btn.addEventListener('click', function() {
+                if (typeof window._selectColorPart === 'function') window._selectColorPart(part, btn);
+            });
+            if (insertAfter && insertAfter.parentNode === row) {
+                insertAfter.after(btn);
+            } else {
+                row.appendChild(btn);
+            }
+            insertAfter = btn;
+        }
+    });
+
+    // If active door index is out of range after door-count change, fall back to body
+    if (window._isSlidingDoorColorPart(state.activeColorPart)) {
+        const idx = window._slidingDoorIndexFromPart(state.activeColorPart);
+        if (idx < 0 || idx >= numDoors) {
+            if (typeof window._selectColorPart === 'function') window._selectColorPart('materialBody');
+        }
+    }
+    if (typeof window._syncSlidingDoorTypePanel === 'function') window._syncSlidingDoorTypePanel();
+    if (typeof window._syncPartTabDots === 'function') window._syncPartTabDots();
 };
 
 window._toggleHoneycombColumnMerge = function(leftColIdx, startR, endR) {
@@ -9356,45 +9359,68 @@ function bindUI() {
         buildCabinet(); saveHistoryState();
     });
 
+    window._selectColorPart = function(clickedPart, btnEl) {
+        if (!clickedPart) return;
+        if (clickedPart === 'materialUpperUnit') {
+            window._selectUpperUnitColorTab(btnEl);
+            return;
+        }
+
+        document.querySelectorAll('.part-tab-btn').forEach(b => b.classList.remove('active'));
+        if (btnEl) btnEl.classList.add('active');
+        else document.querySelectorAll(`.part-tab-btn[data-part="${clickedPart}"]`).forEach(b => b.classList.add('active'));
+
+        state.activeColorPart = clickedPart;
+        window._syncGlassTintPanel();
+        _updateSandwichColorVisibility();
+        if (typeof window._syncKitchenCountertopBrandsPanel === 'function') {
+            window._syncKitchenCountertopBrandsPanel();
+        }
+        if (typeof window._syncSlidingDoorTypePanel === 'function') {
+            window._syncSlidingDoorTypePanel();
+        }
+
+        document.querySelectorAll('.material-btn').forEach(b => b.classList.remove('active'));
+        if (clickedPart === 'glassTint') return;
+
+        if (clickedPart === 'materialSideCabinet') {
+            const sc = state.wings.center ? state.wings.center.sideCabinet : null;
+            const scMat = sc ? sc.materialBody : 'white_matte';
+            const scBtn = document.querySelector(`.material-btn[data-mat="${scMat}"]`);
+            if (scBtn) scBtn.classList.add('active');
+            return;
+        }
+
+        let currentMat = null;
+        if (window._isSlidingDoorColorPart(clickedPart)) {
+            const idx = window._slidingDoorIndexFromPart(clickedPart);
+            const sd = typeof getSlidingDoor === 'function' ? getSlidingDoor() : null;
+            const bodyMat = (state.wings && state.wings.center && state.wings.center.materialBody) || state.materialBody || 'white_matte';
+            currentMat = (sd && sd.doorColors && sd.doorColors[idx]) || bodyMat;
+        } else {
+            currentMat = state[clickedPart];
+        }
+
+        const matBtns = currentMat
+            ? document.querySelectorAll(`.material-btn[data-mat="${currentMat}"]`)
+            : [];
+        if (matBtns.length) matBtns.forEach(b => b.classList.add('active'));
+        else if (currentMat === 'custom') {
+            const upload = document.getElementById('btn-upload-texture');
+            if (upload) upload.classList.add('active');
+        }
+        if (typeof window._syncEggerPaletteActive === 'function' && currentMat) {
+            const inPanel = Array.from(matBtns).some(b => b.closest('.egger-palette-panel'));
+            window._syncEggerPaletteActive(currentMat, {
+                open: inPanel && !(window.EGGER_BUILTIN_KEYS || []).includes(String(currentMat))
+            });
+        }
+        if (typeof window._syncPartTabDots === 'function') window._syncPartTabDots();
+    };
+
     document.querySelectorAll('.part-tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            const clickedPart = btn.getAttribute('data-part');
-
-            // Special: "חלק עליון" tab — delegate to _selectUpperUnitColorTab
-            if (clickedPart === 'materialUpperUnit') {
-                window._selectUpperUnitColorTab(btn);
-                return;
-            }
-
-            document.querySelectorAll('.part-tab-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            state.activeColorPart = clickedPart;
-            window._syncGlassTintPanel();
-            _updateSandwichColorVisibility();
-            if (typeof window._syncKitchenCountertopBrandsPanel === 'function') {
-                window._syncKitchenCountertopBrandsPanel();
-            }
-
-            document.querySelectorAll('.material-btn').forEach(b => b.classList.remove('active'));
-            if (clickedPart === 'glassTint') return;
-
-            // Special: "ארון צד" tab — show the side cabinet's current body color
-            if (clickedPart === 'materialSideCabinet') {
-                const sc = state.wings.center ? state.wings.center.sideCabinet : null;
-                const scMat = sc ? sc.materialBody : 'white_matte';
-                const scBtn = document.querySelector(`.material-btn[data-mat="${scMat}"]`);
-                if (scBtn) scBtn.classList.add('active');
-                return;
-            }
-
-            const currentMat = state[state.activeColorPart];
-            const matBtns = document.querySelectorAll(`.material-btn[data-mat="${currentMat}"]`);
-            if (matBtns.length) matBtns.forEach(b => b.classList.add('active'));
-            else if (currentMat === 'custom') document.getElementById('btn-upload-texture').classList.add('active');
-            if (typeof window._syncEggerPaletteActive === 'function') {
-                const inPanel = Array.from(matBtns).some(b => b.closest('.egger-palette-panel'));
-                window._syncEggerPaletteActive(currentMat, { open: inPanel && !(window.EGGER_BUILTIN_KEYS || []).includes(String(currentMat)) });
-            }
+            window._selectColorPart(btn.getAttribute('data-part'), btn);
         });
     });
 
@@ -9428,6 +9454,14 @@ function bindUI() {
             document.querySelectorAll(`.material-btn[data-mat="${matValue}"]`).forEach(b => b.classList.add('active'));
             if (typeof window._syncEggerPaletteActive === 'function') {
                 window._syncEggerPaletteActive(matValue, { open: !!targetBtn.closest('.egger-palette-panel') });
+            }
+            // Special: sliding door tab — apply color to that door only
+            if (window._isSlidingDoorColorPart(state.activeColorPart)) {
+                const idx = window._slidingDoorIndexFromPart(state.activeColorPart);
+                if (typeof window.updateSlidingDoorColor === 'function') {
+                    window.updateSlidingDoorColor(idx, matValue);
+                }
+                return;
             }
             // Special: "חלק עליון" material tab — apply color to upper unit wing
             if (state.activeColorPart === 'materialUpperUnit') {
