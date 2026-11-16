@@ -8765,11 +8765,11 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
 
                 const partitions = compData.partitions; // sorted array of ratios
                 const colLeft = colCenterX - col.width / 2;
+                const partMat = (compData.type === 'open_cell' || compData.type === 'side_open_cell' || compData.type === 'honeycomb') ? matOpenCell : matInternal;
+                // כוורת partitions sit flush with the front, same as the cubby frame
                 let partD = bodyD - 2;
-                let partZ = 0;
-                if (!isBP && isHiddenByDoor(compCenterY)) { partD = bodyD - t; partZ = -t/2; }
-
-                const partMat = (compData.type === 'open_cell' || compData.type === 'side_open_cell') ? matOpenCell : matInternal;
+                let partZ = (!isBP && partMat === matOpenCell) ? 1 : 0;
+                if (!isBP && partMat !== matOpenCell && isHiddenByDoor(compCenterY)) { partD = bodyD - t; partZ = -t/2; }
 
                 // Helper: render one content type in a sub-compartment zone (3D only)
                 // subIdx: index of this sub-cell within compData.subCells (for adjacency checks)
