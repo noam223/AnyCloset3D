@@ -106,11 +106,69 @@ window._applyKitchenPreset = function() {
     _applyKitDim('depth', KIT_DEPTH);
     _applyKitDim('height', KIT_HEIGHT);
     _kitInitColumns();
+    _applyKitchenRoomView();
     _updateKitchenSectionUI();
     if (typeof window._syncKitchenApplianceToolbar === 'function') {
         window._syncKitchenApplianceToolbar();
     }
 };
+
+/** Switch room scenery from bedroom (bed + parquet) to a kitchen feel (tiles, no bed). */
+function _applyKitchenRoomView() {
+    if (!window._kitchenRoomSnapshot) {
+        window._kitchenRoomSnapshot = {
+            floor: typeof window._normRoomFloorStyle === 'function'
+                ? window._normRoomFloorStyle(window._roomFloorStyle)
+                : Object.assign({}, window._roomFloorStyle || {}),
+            bedVisible: window._bedVisible !== false,
+            chairVisible: window._chairVisible !== false
+        };
+    }
+    window._bedVisible = false;
+    window._chairVisible = false;
+    if (typeof window._setRoomFloorStyle === 'function') {
+        // Porcelain tiles suit kitchens better than bedroom parquet
+        window._setRoomFloorStyle({ kind: 'tile', finish: 'concrete', size: '60x120', gloss: 'matte' });
+    } else if (typeof window._normRoomFloorStyle === 'function') {
+        window._roomFloorStyle = window._normRoomFloorStyle({
+            kind: 'tile', finish: 'concrete', size: '60x120', gloss: 'matte'
+        });
+    }
+    if (typeof window._updateRoomPropsUI === 'function') window._updateRoomPropsUI();
+    _syncKitchenRoomFurnitureUI();
+}
+
+function _leaveKitchenRoomView() {
+    const snap = window._kitchenRoomSnapshot;
+    if (!snap) return;
+    window._kitchenRoomSnapshot = null;
+    window._bedVisible = snap.bedVisible !== false;
+    window._chairVisible = snap.chairVisible !== false;
+    if (snap.floor && typeof window._setRoomFloorStyle === 'function') {
+        window._setRoomFloorStyle(snap.floor);
+    } else if (snap.floor) {
+        window._roomFloorStyle = snap.floor;
+    }
+    if (typeof window._updateRoomPropsUI === 'function') window._updateRoomPropsUI();
+    _syncKitchenRoomFurnitureUI();
+}
+
+function _syncKitchenRoomFurnitureUI() {
+    const isKit = window._isKitchenPreset && window._isKitchenPreset();
+    ['room-btn-toggle-bed', 'room-btn-toggle-chair', 'bed-handles', 'room-props-row'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (id === 'room-props-row') {
+            // room-props-row also depends on room visibility — only force-hide in kitchen
+            if (isKit) el.style.display = 'none';
+            return;
+        }
+        el.style.display = isKit ? 'none' : '';
+    });
+}
+
+window._applyKitchenRoomView = _applyKitchenRoomView;
+window._leaveKitchenRoomView = _leaveKitchenRoomView;
 
 window._kitchenAddUnit = function(side) {
     if (!window._isKitchenPreset()) return;
@@ -239,6 +297,17 @@ function _updateKitchenSectionUI() {
         window._syncKitchenApplianceToolbar();
     }
     _renderKitchenBrandExamples();
+    if (isKit) {
+        // Keep room scenery kitchen-like when restoring / switching wings
+        if (window._bedVisible !== false || window._chairVisible !== false ||
+            !(window._roomFloorStyle && window._roomFloorStyle.kind === 'tile')) {
+            _applyKitchenRoomView();
+        } else {
+            _syncKitchenRoomFurnitureUI();
+        }
+    } else {
+        _syncKitchenRoomFurnitureUI();
+    }
 }
 
 function _kitCountertopBrandId() {
@@ -369,7 +438,9 @@ window._initKitchenAdminGate = async function() {
             if (typeof _showToast === 'function') _showToast('Preset מטבח זמין רק למנהל מערכת', 3500);
             return;
         }
+        const wasKitchen = !!(state && state.presetId === 'kitchen');
         if (typeof _origApplyPreset === 'function') _origApplyPreset(presetId);
+        if (wasKitchen && presetId !== 'kitchen') _leaveKitchenRoomView();
         const kitBtn = document.getElementById('preset-btn-kitchen');
         const mobileKit = document.getElementById('mobile-preset-btn-kitchen');
         if (kitBtn) kitBtn.classList.toggle('active', presetId === 'kitchen');
