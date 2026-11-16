@@ -335,6 +335,51 @@ window._applyKitchenPreset = function() {
 };
 
 /**
+ * Convert the current kitchen cabinet into a corner L (in place).
+ * Does NOT add a second space cabinet next to the existing run.
+ */
+window._kitchenMakeCorner = function() {
+    if (!window._kitchenAdminUnlocked) {
+        if (typeof _showToast === 'function') _showToast('Preset מטבח זמין רק למנהל מערכת', 3500);
+        return;
+    }
+    const old = document.getElementById('_corner-side-popup');
+    if (old) old.remove();
+    const popup = document.createElement('div');
+    popup.id = '_corner-side-popup';
+    popup.className = 'corner-side-popup';
+    popup.innerHTML =
+        '<div class="corner-side-popup-title">פינת מטבח — ר מלאה עם מדפים</div>' +
+        '<div class="corner-side-popup-btns">' +
+        '<button type="button" data-side="right"><i class="fa-solid fa-arrow-right"></i> ר ימין</button>' +
+        '<button type="button" data-side="left"><i class="fa-solid fa-arrow-left"></i> ר שמאל</button>' +
+        '</div>' +
+        '<button type="button" class="corner-side-popup-cancel">ביטול</button>';
+    document.body.appendChild(popup);
+    const close = function() {
+        popup.remove();
+        document.removeEventListener('mousedown', outside, true);
+    };
+    const outside = function(e) { if (!popup.contains(e.target)) close(); };
+    popup.querySelectorAll('button[data-side]').forEach(function(b) {
+        b.addEventListener('click', function() {
+            close();
+            const side = b.dataset.side === 'left' ? 'left' : 'right';
+            if (typeof window._configureKitchenCornerL === 'function') {
+                window._configureKitchenCornerL(side, {});
+            }
+            if (typeof buildCabinet === 'function') buildCabinet();
+            if (typeof calculatePrice === 'function') calculatePrice();
+            if (typeof saveHistoryState === 'function') saveHistoryState();
+            if (typeof window._updateKitchenSectionUI === 'function') window._updateKitchenSectionUI();
+            if (typeof window._syncKitchenApplianceToolbar === 'function') window._syncKitchenApplianceToolbar();
+        });
+    });
+    popup.querySelector('.corner-side-popup-cancel').addEventListener('click', close);
+    setTimeout(function() { document.addEventListener('mousedown', outside, true); }, 0);
+};
+
+/**
  * Kitchen corner (ר): full corner with shelves only (IL standard).
  * No extra adjacent units — user adds them later with +60 on either arm.
  */

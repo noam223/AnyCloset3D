@@ -4577,7 +4577,13 @@ function buildCabinet() {
     // (no cell overlays / drag handles on the lower cabinet while editing the upper unit)
     _isActiveWingBuild = (savedActiveWing === 'center') && !savedActiveUpperUnit;
     // In edit mode, only render the active wing (center cabinet is NOT rendered when editing a side/front wing)
-    if (!inEditMode || savedActiveWing === 'center') {
+    // Kitchen corner stub with 0 columns: hide carcass — only the full-corner L should show
+    const _skipEmptyKitCornerCenter = !!(
+        state.presetId === 'kitchen' &&
+        centerWing && centerWing.kitchenCornerL &&
+        (!centerWing.columns || !centerWing.columns.length)
+    );
+    if ((!inEditMode || savedActiveWing === 'center') && !_skipEmptyKitCornerCenter) {
         // For sliding wardrobes: render at full depth. Door system added by buildSlidingDoorCabinet().
         const _isSliding = state.presetId === 'sliding' && centerWing && centerWing.slidingDoor && centerWing.slidingDoor.enabled;
         _ppWingId = 'center';
@@ -4743,10 +4749,13 @@ function buildCabinet() {
 
     // In free mode: add hit box for center wing (for hover detection) when other wings or side cabinet exist
     const _hasSC = centerWing && centerWing.sideCabinet && centerWing.sideCabinet.side !== 'none';
-    if (!inEditMode && (state.wings.left || state.wings.right || _hasSC)) {
+    if (!inEditMode && (state.wings.left || state.wings.right || _hasSC) && !_skipEmptyKitCornerCenter) {
         const cW = centerWing ? centerWing.width : 160;
         const cD = centerWing ? centerWing.depth : 54;
-        const cH = centerWing ? Math.max(...centerWing.columns.map(c => c.height)) : 240;
+        const cCols = centerWing && centerWing.columns;
+        const cH = (cCols && cCols.length)
+            ? Math.max(...cCols.map(c => c.height))
+            : (centerWing && centerWing.globalHeight) || 240;
         const whbGeo = new THREE.BoxGeometry(cW + 2, cH + 2, cD + 2);
         const whbMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, depthTest: false });
         const whb = new THREE.Mesh(whbGeo, whbMat);
@@ -4792,25 +4801,29 @@ function buildCabinet() {
         leftGroup.position.set(inEditMode ? 0 : leftX, 0, inEditMode ? 0 : leftZ);
         leftGroup.userData.wingId = 'left';
         cabinetGroup.add(leftGroup);
-        state.activeWing = 'left';
-        _buildGroup = leftGroup;
-        // When editing the upper unit of this wing, the lower wing is NOT the active build
-        // (no cell overlays / drag handles on the lower cabinet while editing the upper unit)
-        _isActiveWingBuild = (savedActiveWing === 'left') && !savedActiveUpperUnit;
-        _ppWingId = 'left';
-        _buildWingGeometry(leftGroup, 0, 0, 0, _isActiveWingBuild);
-        _buildGroup = cabinetGroup;
-        // In free mode: add hit box for hover detection (no opacity change here)
-        if (!inEditMode) {
-            const wingH = Math.max(...state.wings.left.columns.map(c => c.height));
-            const whbGeo = new THREE.BoxGeometry(leftWingD + 2, wingH + 2, leftWingW + 2);
-            const whbMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, depthTest: false });
-            const whb = new THREE.Mesh(whbGeo, whbMat);
-            whb.renderOrder = 999;
-            whb.position.set(leftX, wingH / 2, leftZ);
-            whb.userData = { wingId: 'left' };
-            cabinetGroup.add(whb);
-            wingHitBoxes.push(whb);
+        // full_corner with no return units: only buildFullCornerUnit draws the L — skip empty arm carcass
+        const _skipEmptyLeftFC = leftPos === 'full_corner' && (!leftWing.columns || !leftWing.columns.length);
+        if (!_skipEmptyLeftFC) {
+            state.activeWing = 'left';
+            _buildGroup = leftGroup;
+            // When editing the upper unit of this wing, the lower wing is NOT the active build
+            // (no cell overlays / drag handles on the lower cabinet while editing the upper unit)
+            _isActiveWingBuild = (savedActiveWing === 'left') && !savedActiveUpperUnit;
+            _ppWingId = 'left';
+            _buildWingGeometry(leftGroup, 0, 0, 0, _isActiveWingBuild);
+            _buildGroup = cabinetGroup;
+            // In free mode: add hit box for hover detection (no opacity change here)
+            if (!inEditMode && leftWing.columns && leftWing.columns.length) {
+                const wingH = Math.max(...leftWing.columns.map(c => c.height));
+                const whbGeo = new THREE.BoxGeometry(leftWingD + 2, wingH + 2, leftWingW + 2);
+                const whbMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, depthTest: false });
+                const whb = new THREE.Mesh(whbGeo, whbMat);
+                whb.renderOrder = 999;
+                whb.position.set(leftX, wingH / 2, leftZ);
+                whb.userData = { wingId: 'left' };
+                cabinetGroup.add(whb);
+                wingHitBoxes.push(whb);
+            }
         }
     }
 
@@ -4849,24 +4862,28 @@ function buildCabinet() {
         rightGroup.position.set(inEditMode ? 0 : rightX, 0, inEditMode ? 0 : rightZ);
         rightGroup.userData.wingId = 'right';
         cabinetGroup.add(rightGroup);
-        state.activeWing = 'right';
-        _buildGroup = rightGroup;
-        // When editing the upper unit of this wing, the lower wing is NOT the active build
-        _isActiveWingBuild = (savedActiveWing === 'right') && !savedActiveUpperUnit;
-        _ppWingId = 'right';
-        _buildWingGeometry(rightGroup, 0, 0, 0, _isActiveWingBuild);
-        _buildGroup = cabinetGroup;
-        // In free mode: add hit box for hover detection (no opacity change here)
-        if (!inEditMode) {
-            const wingH = Math.max(...state.wings.right.columns.map(c => c.height));
-            const whbGeo = new THREE.BoxGeometry(rightWingD + 2, wingH + 2, rightWingW + 2);
-            const whbMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, depthTest: false });
-            const whb = new THREE.Mesh(whbGeo, whbMat);
-            whb.renderOrder = 999;
-            whb.position.set(rightX, wingH / 2, rightZ);
-            whb.userData = { wingId: 'right' };
-            cabinetGroup.add(whb);
-            wingHitBoxes.push(whb);
+        // full_corner with no return units: only buildFullCornerUnit draws the L — skip empty arm carcass
+        const _skipEmptyRightFC = rightPos === 'full_corner' && (!rightWing.columns || !rightWing.columns.length);
+        if (!_skipEmptyRightFC) {
+            state.activeWing = 'right';
+            _buildGroup = rightGroup;
+            // When editing the upper unit of this wing, the lower wing is NOT the active build
+            _isActiveWingBuild = (savedActiveWing === 'right') && !savedActiveUpperUnit;
+            _ppWingId = 'right';
+            _buildWingGeometry(rightGroup, 0, 0, 0, _isActiveWingBuild);
+            _buildGroup = cabinetGroup;
+            // In free mode: add hit box for hover detection (no opacity change here)
+            if (!inEditMode && rightWing.columns && rightWing.columns.length) {
+                const wingH = Math.max(...rightWing.columns.map(c => c.height));
+                const whbGeo = new THREE.BoxGeometry(rightWingD + 2, wingH + 2, rightWingW + 2);
+                const whbMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, depthTest: false });
+                const whb = new THREE.Mesh(whbGeo, whbMat);
+                whb.renderOrder = 999;
+                whb.position.set(rightX, wingH / 2, rightZ);
+                whb.userData = { wingId: 'right' };
+                cabinetGroup.add(whb);
+                wingHitBoxes.push(whb);
+            }
         }
     }
 

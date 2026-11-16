@@ -143,11 +143,11 @@
                 <button type="button" class="space-cab-add-btn" style="flex:1;display:inline-flex;" onclick="addSpaceUnit('kitchenUpper')" title="מוסיף יחידה עליונה כארון נפרד במרחב (מעל התחתון)">
                     <i class="fa-solid fa-arrow-up"></i> יחידה עליונה
                 </button>
-                <button type="button" class="space-cab-add-btn" style="flex:1;display:inline-flex;" onclick="addSpaceUnit('kitchenCorner')" title="מוסיף פינת מטבח מלאה בצורת ר (שתי זרועות) — אחר כך +60 על כל זרוע">
+                <button type="button" class="space-cab-add-btn" style="flex:1;display:inline-flex;" onclick="window._kitchenMakeCorner()" title="הופך את המטבח הנוכחי לפינת ר מלאה עם מדפים — אחר כך +60 על כל זרוע">
                     <i class="fa-solid fa-turn-up"></i> פינת מטבח
                 </button>
             </div>
-            <div style="font-size:0.72rem;color:var(--text-light);margin-top:6px;">יחידות: <strong id="kitchen-unit-count-header">3</strong> · עליונה/פינה = ארון נוסף במרחב</div>
+            <div style="font-size:0.72rem;color:var(--text-light);margin-top:6px;">יחידות: <strong id="kitchen-unit-count-header">3</strong> · עליונה = ארון נוסף · פינה = המרה לר</div>
             <div id="kitchen-l-hint" style="display:none;font-size:0.72rem;color:var(--accent);margin-top:6px;line-height:1.35;">פינת ר: לחצו על זרוע בהדמיה ואז <strong>+60</strong> כדי להאריך אותה.</div>
         </div>
         <div id="space-cab-tabs" style="display:none;">
@@ -694,7 +694,7 @@
                 <button type="button" class="space-unit-add-btn space-unit-kitchen-only" onclick="addSpaceUnit('kitchenUpper')" title="מוסיף יחידה עליונה כארון נפרד במרחב" style="display:none;">
                     <i class="fa-solid fa-arrow-up"></i><span>יחידה עליונה</span>
                 </button>
-                <button type="button" class="space-unit-add-btn space-unit-kitchen-only" onclick="addSpaceUnit('kitchenCorner')" title="מוסיף פינת מטבח מלאה בצורת ר" style="display:none;">
+                <button type="button" class="space-unit-add-btn space-unit-kitchen-only" onclick="window._kitchenMakeCorner()" title="הופך לפינת ר מלאה עם מדפים" style="display:none;">
                     <i class="fa-solid fa-turn-up"></i><span>פינת מטבח</span>
                 </button>
                 <button type="button" class="space-unit-add-btn space-unit-kitchen-only" onclick="addSpaceUnit('kitchenBase')" title="מוסיף שורת מטבח נוספת במרחב" style="display:none;">
@@ -2321,7 +2321,7 @@
             </div>
             <div style="display:flex;gap:6px;margin-top:8px;">
                 <button type="button" class="space-cab-add-btn" style="flex:1;" onclick="addSpaceUnit('kitchenUpper')"><i class="fa-solid fa-arrow-up"></i> עליונה</button>
-                <button type="button" class="space-cab-add-btn" style="flex:1;" onclick="addSpaceUnit('kitchenCorner')"><i class="fa-solid fa-turn-up"></i> פינה</button>
+                <button type="button" class="space-cab-add-btn" style="flex:1;" onclick="window._kitchenMakeCorner()"><i class="fa-solid fa-turn-up"></i> פינה</button>
             </div>
         </div>
         <div id="mobile-space-cab-tabs" style="display:none;margin:0 0 14px;">
@@ -2461,7 +2461,7 @@
                 <button type="button" class="space-unit-add-btn space-unit-wardrobe-only" onclick="addSpaceUnit('cornerDrawers')"><i class="fa-solid fa-layer-group"></i><span>שידה פינתית</span></button>
                 <button type="button" class="space-unit-add-btn space-unit-wardrobe-only" onclick="addSpaceUnit('cornerDesk')"><i class="fa-solid fa-turn-up"></i><span>שולחן פינתי</span></button>
                 <button type="button" class="space-unit-add-btn space-unit-kitchen-only" onclick="addSpaceUnit('kitchenUpper')" style="display:none;"><i class="fa-solid fa-arrow-up"></i><span>יחידה עליונה</span></button>
-                <button type="button" class="space-unit-add-btn space-unit-kitchen-only" onclick="addSpaceUnit('kitchenCorner')" style="display:none;"><i class="fa-solid fa-turn-up"></i><span>פינת מטבח</span></button>
+                <button type="button" class="space-unit-add-btn space-unit-kitchen-only" onclick="window._kitchenMakeCorner()" style="display:none;"><i class="fa-solid fa-turn-up"></i><span>פינת מטבח</span></button>
                 <button type="button" class="space-unit-add-btn space-unit-kitchen-only" onclick="addSpaceUnit('kitchenBase')" style="display:none;"><i class="fa-solid fa-kitchen-set"></i><span>שורת מטבח</span></button>
             </div>
         </div>
@@ -3157,11 +3157,11 @@
 <script src="state.js?v=20261116kitCornerFix2"></script>
 <script src="quick-calc.js?v=20261029shoe"></script>
 <script src="bathroom-preset.js?v=20261008types"></script>
-<script src="kitchen-preset.js?v=20261116kitCornerFix2"></script>
+<script src="kitchen-preset.js?v=20261116kitCornerOnly2"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
 <script src="corner-unit-preset.js?v=20261116kitSpace"></script>
 <script src="engine-appliances.js?v=20261116sinkCut"></script>
-<script src="engine-core.js?v=20261116sinkCut"></script>
+<script src="engine-core.js?v=20261116kitCornerOnly2"></script>
 <script src="engine-corners.js?v=20261109ridingFlush"></script>
 <script src="engine-blueprint.js?v=20261116kitSeam"></script>
 <script src="engine-room-plan.js?v=20261110floors"></script>
