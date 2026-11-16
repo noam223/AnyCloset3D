@@ -4202,48 +4202,39 @@ function _hingeSpreadCm(lo, hi, n, edgeCm) {
 }
 
 /**
- * Cabinet mounting-plate silhouette: long center rail, wings on opposite corners.
- * Shape XY (X = width, Y = length). No screw hardware — outline only.
+ * Cabinet mounting-plate silhouette: two mirrored wings side by side,
+ * with a short neck rising from the center. Shape XY (X = width, Y = length).
  */
 function _hingePlateShape() {
     const s = new THREE.Shape();
-    const sw = 0.58;   // half width of the center rail
-    const r = 0.32;    // outer corner radius of a wing
-    // CCW. Bottom cap, up the left side, upper-left wing, top cap,
-    // down the right side, lower-right wing, close.
-    s.moveTo(sw, -2.45);
-    s.absarc(0, -2.45, sw, 0, Math.PI, true);          // rounded bottom
-    s.lineTo(-sw, 0.22);
-    s.quadraticCurveTo(-sw, 0.48, -sw - 0.35, 0.55);
-    s.lineTo(-1.72, 0.62);
-    s.quadraticCurveTo(-2.08, 0.66, -2.08, 0.66 + r);
-    s.lineTo(-2.08, 1.72);
-    s.quadraticCurveTo(-2.08, 2.08, -2.08 + r, 2.08);
-    s.lineTo(-sw - 0.28, 2.12);
-    s.quadraticCurveTo(-sw, 2.16, -sw, 2.42);
-    s.lineTo(-sw, 2.45);
-    s.absarc(0, 2.45, sw, Math.PI, 0, true);           // rounded top
-    s.lineTo(sw, -0.22);
-    s.quadraticCurveTo(sw, -0.48, sw + 0.35, -0.55);
-    s.lineTo(1.72, -0.62);
-    s.quadraticCurveTo(2.08, -0.66, 2.08, -0.66 - r);
-    s.lineTo(2.08, -1.72);
-    s.quadraticCurveTo(2.08, -2.08, 2.08 - r, -2.08);
-    s.lineTo(sw + 0.28, -2.12);
-    s.quadraticCurveTo(sw, -2.16, sw, -2.45);
-    // Mounting holes — one on each wing (diagonal)
+    // CCW. Wide mirrored wings, then a short neck on top.
+    s.moveTo(2.05, -1.15);
+    s.quadraticCurveTo(2.05, -1.55, 1.65, -1.55);
+    s.lineTo(-1.65, -1.55);
+    s.quadraticCurveTo(-2.05, -1.55, -2.05, -1.15);
+    s.lineTo(-2.05, 0.45);
+    s.quadraticCurveTo(-2.05, 0.88, -1.62, 0.88);
+    s.lineTo(-0.95, 0.88);
+    s.quadraticCurveTo(-0.55, 0.88, -0.55, 1.28);
+    s.lineTo(-0.55, 1.78);
+    s.absarc(0, 1.78, 0.55, Math.PI, 0, true); // rounded top of the short neck
+    s.lineTo(0.55, 1.28);
+    s.quadraticCurveTo(0.55, 0.88, 0.95, 0.88);
+    s.lineTo(1.62, 0.88);
+    s.quadraticCurveTo(2.05, 0.88, 2.05, 0.45);
+    s.lineTo(2.05, -1.15);
     const h1 = new THREE.Path();
-    h1.absarc(-1.35, 1.28, 0.32, 0, Math.PI * 2, true);
+    h1.absarc(-1.15, -0.25, 0.32, 0, Math.PI * 2, true);
     s.holes.push(h1);
     const h2 = new THREE.Path();
-    h2.absarc(1.35, -1.28, 0.32, 0, Math.PI * 2, true);
+    h2.absarc(1.15, -0.25, 0.32, 0, Math.PI * 2, true);
     s.holes.push(h2);
     return s;
 }
 
 /**
  * 3D cabinet hinge mounting plate. Local +X is out from the wall.
- * Shape matches the offset-wing plate; screws and slots are omitted.
+ * Mirrored wings with a short neck; screws and slots are omitted.
  */
 function _buildHingeMountPlate() {
     let mat = _addHingeHardware._matNi;
@@ -4269,9 +4260,9 @@ function _buildHingeMountPlate() {
     geo.translate(baseDepth / 2 + 0.02, 0, 0);
     g.add(new THREE.Mesh(geo, mat));
 
-    // Shallow raised rail down the center — the part the hinge clips onto
-    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.28, 4.55, 0.72), mat);
-    rail.position.set(baseDepth + 0.16, 0, 0);
+    // Short raised neck in the center — the part the hinge clips onto
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.26, 2.15, 0.62), mat);
+    rail.position.set(baseDepth + 0.15, 0.85, 0);
     g.add(rail);
 
     g.userData.outExtent = baseDepth + 0.32;
