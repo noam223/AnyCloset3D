@@ -270,6 +270,12 @@
                             window._syncBluranPalette(state.bluranPalette);
                         }
                     }
+                    if (snap.formexPalette) {
+                        state.formexPalette = snap.formexPalette;
+                        if (typeof window._syncFormexPalette === 'function') {
+                            window._syncFormexPalette(state.formexPalette);
+                        }
+                    }
                     if (snap.blueprintCutouts) {
                         state.blueprintCutouts = snap.blueprintCutouts;
                     } else if (!state.blueprintCutouts) {
@@ -652,6 +658,7 @@
             closureFrontLine:  window._closureFrontLine  || 'cabinet',
             tambourPalette:            state.tambourPalette || {},
             bluranPalette:             state.bluranPalette || {},
+            formexPalette:             state.formexPalette || {},
             blueprintCutouts:          state.blueprintCutouts || [],
             blueprintCellDimOffsets:   state.blueprintCellDimOffsets || {},
             blueprintDimOffsets:       state.blueprintDimOffsets || {},
@@ -885,6 +892,7 @@ window._saveProjectNow = async function() {
                 statusMode:    (window.Projects && Projects.simpleStatuses) ? 'simple' : 'full',
                 tambourPalette: state.tambourPalette || {},
                 bluranPalette:  state.bluranPalette || {},
+                formexPalette:  state.formexPalette || {},
                 blueprintCutouts: state.blueprintCutouts || [],
                 blueprintCellDimOffsets: state.blueprintCellDimOffsets || {},
                 blueprintDimOffsets:     state.blueprintDimOffsets || {},

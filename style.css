@@ -7072,6 +7072,32 @@ body.viewer-mode #canvas-container canvas {
 }
 .btn-open-bluran-palette:active { transform: translateY(0); }
 
+.btn-open-formex-palette {
+    width: 100%;
+    margin: 0 0 10px;
+    padding: 11px 14px;
+    border-radius: 10px;
+    border: 1.5px solid rgba(180, 83, 9, 0.35);
+    background: linear-gradient(135deg, #fff7ed, #ffedd5);
+    color: #c2410c;
+    font-size: 0.88rem;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.18s ease;
+}
+.btn-open-formex-palette:hover {
+    background: linear-gradient(135deg, #ffedd5, #fed7aa);
+    border-color: #ea580c;
+    box-shadow: 0 4px 14px rgba(234, 88, 12, 0.18);
+    transform: translateY(-1px);
+}
+.btn-open-formex-palette:active { transform: translateY(0); }
+
 .bluran-palette-tabs {
     display: flex;
     flex-wrap: wrap;
@@ -7097,6 +7123,12 @@ body.viewer-mode #canvas-container canvas {
 .bluran-cat-tab.active {
     background: #2563eb;
     border-color: #2563eb;
+    color: #fff;
+}
+.formex-cat-tab:hover { border-color: #fdba74; background: #fff7ed; }
+.formex-cat-tab.active {
+    background: #ea580c;
+    border-color: #ea580c;
     color: #fff;
 }
 .bluran-color-cat {

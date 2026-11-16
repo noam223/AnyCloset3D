@@ -1,0 +1,941 @@
+{
+  "brand": "Formex",
+  "version": 1,
+  "source": "https://www.formex.co.il/קטלוגים/431-צבע",
+  "categories": [
+    {
+      "id": "solids",
+      "name": "צבעים חלקים",
+      "items": [
+        {
+          "id": "M808",
+          "name": "אפור בהיר",
+          "hex": "#b1b1b0",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M810",
+          "name": "אפור כהה",
+          "hex": "#3d3d3f",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M811",
+          "name": "ברנע",
+          "hex": "#817d73",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M812",
+          "name": "תכלת",
+          "hex": "#a7b4c5",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M823",
+          "name": "אפור אבן",
+          "hex": "#b8b9b0",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M901",
+          "name": "שמנת שמנה שמנת",
+          "hex": "#d6d8ca",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M902",
+          "name": "לבן עתיק",
+          "hex": "#e2e3db",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M903",
+          "name": "לאטה חצי לאטה לאטה",
+          "hex": "#cdbfbe",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M904",
+          "name": "אפור אבן",
+          "hex": "#a59998",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M905",
+          "name": "שנהב",
+          "hex": "#c8bbb2",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M906",
+          "name": "לבן עשן",
+          "hex": "#e5e1c2",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M907",
+          "name": "שמפניה",
+          "hex": "#d4d1be",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M908",
+          "name": "וניל",
+          "hex": "#fef6df",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M909",
+          "name": "לבן שלג",
+          "hex": "#f7f8f0",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M910",
+          "name": "לבן",
+          "hex": "#ebf2f2",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M918",
+          "name": "סלע",
+          "hex": "#c0b89f",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M919",
+          "name": "לבן",
+          "hex": "#d5d7d7",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M920",
+          "name": "אפור ים",
+          "hex": "#a9aaa2",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M921",
+          "name": "חול",
+          "hex": "#c4b8b8",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M930",
+          "name": "אפור עתיק",
+          "hex": "#a7aaa1",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M935",
+          "name": "אפור עשן",
+          "hex": "#b8bdb9",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M940",
+          "name": "לאטה",
+          "hex": "#b2aba1",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M943",
+          "name": "מוקה",
+          "hex": "#b8b0a3",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M950",
+          "name": "לבן מיושן",
+          "hex": "#f0e9df",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M960",
+          "name": "חרדל",
+          "hex": "#b4a56c",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M964",
+          "name": "שמנת ת",
+          "hex": "#eddfc5",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M970",
+          "name": "שמיים",
+          "hex": "#a1bfc4",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M971",
+          "name": "תכלת סתווי תכלת סתוו חציי תכלת סתווי",
+          "hex": "#bcbcbe",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M975",
+          "name": "תכול",
+          "hex": "#a2a39e",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M985",
+          "name": "ירוק זית",
+          "hex": "#b1ad7e",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M401",
+          "name": "לבן",
+          "hex": "#cdcabf",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M403",
+          "name": "לבן חם",
+          "hex": "#eaebe3",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M409",
+          "name": "אפור גרפיט",
+          "hex": "#5c5c5c",
+          "finish": "matte",
+          "type": "solid"
+        }
+      ]
+    },
+    {
+      "id": "matte",
+      "name": "צבעים מט (M)",
+      "items": [
+        {
+          "id": "M808",
+          "name": "אפור בהיר",
+          "hex": "#b1b1b0",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M810",
+          "name": "אפור כהה",
+          "hex": "#3d3d3f",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M811",
+          "name": "ברנע",
+          "hex": "#817d73",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M812",
+          "name": "תכלת",
+          "hex": "#a7b4c5",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M823",
+          "name": "אפור אבן",
+          "hex": "#b8b9b0",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M901",
+          "name": "שמנת שמנה שמנת",
+          "hex": "#d6d8ca",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M902",
+          "name": "לבן עתיק",
+          "hex": "#e2e3db",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M903",
+          "name": "לאטה חצי לאטה לאטה",
+          "hex": "#cdbfbe",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M904",
+          "name": "אפור אבן",
+          "hex": "#a59998",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M905",
+          "name": "שנהב",
+          "hex": "#c8bbb2",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M906",
+          "name": "לבן עשן",
+          "hex": "#e5e1c2",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M907",
+          "name": "שמפניה",
+          "hex": "#d4d1be",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M908",
+          "name": "וניל",
+          "hex": "#fef6df",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M909",
+          "name": "לבן שלג",
+          "hex": "#f7f8f0",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M910",
+          "name": "לבן",
+          "hex": "#ebf2f2",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M918",
+          "name": "סלע",
+          "hex": "#c0b89f",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M919",
+          "name": "לבן",
+          "hex": "#d5d7d7",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M920",
+          "name": "אפור ים",
+          "hex": "#a9aaa2",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M921",
+          "name": "חול",
+          "hex": "#c4b8b8",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M930",
+          "name": "אפור עתיק",
+          "hex": "#a7aaa1",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M935",
+          "name": "אפור עשן",
+          "hex": "#b8bdb9",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M940",
+          "name": "לאטה",
+          "hex": "#b2aba1",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M943",
+          "name": "מוקה",
+          "hex": "#b8b0a3",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M950",
+          "name": "לבן מיושן",
+          "hex": "#f0e9df",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M960",
+          "name": "חרדל",
+          "hex": "#b4a56c",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M964",
+          "name": "שמנת ת",
+          "hex": "#eddfc5",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M970",
+          "name": "שמיים",
+          "hex": "#a1bfc4",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M971",
+          "name": "תכלת סתווי תכלת סתוו חציי תכלת סתווי",
+          "hex": "#bcbcbe",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M975",
+          "name": "תכול",
+          "hex": "#a2a39e",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M985",
+          "name": "ירוק זית",
+          "hex": "#b1ad7e",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M401",
+          "name": "לבן",
+          "hex": "#cdcabf",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M403",
+          "name": "לבן חם",
+          "hex": "#eaebe3",
+          "finish": "matte",
+          "type": "solid"
+        },
+        {
+          "id": "M409",
+          "name": "אפור גרפיט",
+          "hex": "#5c5c5c",
+          "finish": "matte",
+          "type": "solid"
+        }
+      ]
+    },
+    {
+      "id": "silk",
+      "name": "צבעים חצי מבריק (H)",
+      "items": [
+        {
+          "id": "H808",
+          "name": "אפור בהיר",
+          "hex": "#b1b1b0",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H810",
+          "name": "אפור כהה",
+          "hex": "#3d3d3f",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H811",
+          "name": "ברנע",
+          "hex": "#817d73",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H812",
+          "name": "תכלת",
+          "hex": "#a7b4c5",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H823",
+          "name": "אפור אבן",
+          "hex": "#b8b9b0",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H901",
+          "name": "שמנת שמנה שמנת",
+          "hex": "#d6d8ca",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H902",
+          "name": "לבן עתיק",
+          "hex": "#e2e3db",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H903",
+          "name": "לאטה חצי לאטה לאטה",
+          "hex": "#cdbfbe",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H904",
+          "name": "אפור אבן",
+          "hex": "#a59998",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H905",
+          "name": "שנהב",
+          "hex": "#c8bbb2",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H906",
+          "name": "לבן עשן",
+          "hex": "#e5e1c2",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H907",
+          "name": "שמפניה",
+          "hex": "#d4d1be",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H908",
+          "name": "וניל",
+          "hex": "#fef6df",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H909",
+          "name": "לבן שלג",
+          "hex": "#f7f8f0",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H910",
+          "name": "לבן",
+          "hex": "#ebf2f2",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H918",
+          "name": "סלע",
+          "hex": "#c0b89f",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H919",
+          "name": "לבן",
+          "hex": "#d5d7d7",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H920",
+          "name": "אפור ים",
+          "hex": "#a9aaa2",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H921",
+          "name": "חול",
+          "hex": "#c4b8b8",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H930",
+          "name": "אפור עתיק",
+          "hex": "#a7aaa1",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H935",
+          "name": "אפור עשן",
+          "hex": "#b8bdb9",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H940",
+          "name": "לאטה",
+          "hex": "#b2aba1",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H943",
+          "name": "מוקה",
+          "hex": "#b8b0a3",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H950",
+          "name": "לבן מיושן",
+          "hex": "#f0e9df",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H960",
+          "name": "חרדל",
+          "hex": "#b4a56c",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H964",
+          "name": "שמנת ת",
+          "hex": "#eddfc5",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H970",
+          "name": "שמיים",
+          "hex": "#a1bfc4",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H971",
+          "name": "תכלת סתווי תכלת סתוו חציי תכלת סתווי",
+          "hex": "#bcbcbe",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H975",
+          "name": "תכול",
+          "hex": "#a2a39e",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H985",
+          "name": "ירוק זית",
+          "hex": "#b1ad7e",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H401",
+          "name": "לבן",
+          "hex": "#cdcabf",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H403",
+          "name": "לבן חם",
+          "hex": "#eaebe3",
+          "finish": "silk",
+          "type": "solid"
+        },
+        {
+          "id": "H409",
+          "name": "אפור גרפיט",
+          "hex": "#5c5c5c",
+          "finish": "silk",
+          "type": "solid"
+        }
+      ]
+    },
+    {
+      "id": "gloss",
+      "name": "צבעים מבריקים (G)",
+      "items": [
+        {
+          "id": "G808",
+          "name": "אפור בהיר",
+          "hex": "#b1b1b0",
+          "finish": "gloss",
+          "type": "solid"
+        },
+        {
+          "id": "G812",
+          "name": "תכלת",
+          "hex": "#a7b4c5",
+          "finish": "gloss",
+          "type": "solid"
+        },
+        {
+          "id": "G823",
+          "name": "אפור אבן",
+          "hex": "#b8b9b0",
+          "finish": "gloss",
+          "type": "solid"
+        },
+        {
+          "id": "G901",
+          "name": "שמנת שמנה שמנת",
+          "hex": "#d6d8ca",
+          "finish": "gloss",
+          "type": "solid"
+        },
+        {
+          "id": "G902",
+          "name": "לבן עתיק",
+          "hex": "#e2e3db",
+          "finish": "gloss",
+          "type": "solid"
+        },
+        {
+          "id": "G903",
+          "name": "לאטה חצי לאטה לאטה",
+          "hex": "#cdbfbe",
+          "finish": "gloss",
+          "type": "solid"
+        },
+        {
+          "id": "G904",
+          "name": "אפור אבן",
+          "hex": "#a59998",
+          "finish": "gloss",
+          "type": "solid"
+        },
+        {
+          "id": "G905",
+          "name": "שנהב",
+          "hex": "#c8bbb2",
+          "finish": "gloss",
+          "type": "solid"
+        },
+        {
+          "id": "G906",
+          "name": "לבן עשן",
+          "hex": "#e5e1c2",
+          "finish": "gloss",
+          "type": "solid"
+        },
+        {
+          "id": "G907",
+          "name": "שמפניה",
+          "hex": "#d4d1be",
+          "finish": "gloss",
+          "type": "solid"
+        },
+        {
+          "id": "G908",
+          "name": "וניל",
+          "hex": "#fef6df",
+          "finish": "gloss",
+          "type": "solid"
+        },
+        {
+          "id": "G909",
+          "name": "לבן שלג",
+          "hex": "#f7f8f0",
+          "finish": "gloss",
+          "type": "solid"
+        },
+        {
+          "id": "G910",
+          "name": "לבן",
+          "hex": "#ebf2f2",
+          "finish": "gloss",
+          "type": "solid"
+        },
+        {
+          "id": "G918",
+          "name": "סלע",
+          "hex": "#c0b89f",
+          "finish": "gloss",
+          "type": "solid"
+        },
+        {
+          "id": "G919",
+          "name": "לבן",
+          "hex": "#d5d7d7",
+          "finish": "gloss",
+          "type": "solid"
+        },
+        {
+          "id": "G920",
+          "name": "אפור ים",
+          "hex": "#a9aaa2",
+          "finish": "gloss",
+          "type": "solid"
+        },
+        {
+          "id": "G921",
+          "name": "חול",
+          "hex": "#c4b8b8",
+          "finish": "gloss",
+          "type": "solid"
+        },
+        {
+          "id": "G930",
+          "name": "אפור עתיק",
+          "hex": "#a7aaa1",
+          "finish": "gloss",
+          "type": "solid"
+        },
+        {
+          "id": "G935",
+          "name": "אפור עשן",
+          "hex": "#b8bdb9",
+          "finish": "gloss",
+          "type": "solid"
+        },
+        {
+          "id": "G940",
+          "name": "לאטה",
+          "hex": "#b2aba1",
+          "finish": "gloss",
+          "type": "solid"
+        },
+        {
+          "id": "G943",
+          "name": "מוקה",
+          "hex": "#b8b0a3",
+          "finish": "gloss",
+          "type": "solid"
+        },
+        {
+          "id": "G950",
+          "name": "לבן מיושן",
+          "hex": "#f0e9df",
+          "finish": "gloss",
+          "type": "solid"
+        },
+        {
+          "id": "G960",
+          "name": "חרדל",
+          "hex": "#b4a56c",
+          "finish": "gloss",
+          "type": "solid"
+        },
+        {
+          "id": "G964",
+          "name": "שמנת ת",
+          "hex": "#eddfc5",
+          "finish": "gloss",
+          "type": "solid"
+        },
+        {
+          "id": "G970",
+          "name": "שמיים",
+          "hex": "#a1bfc4",
+          "finish": "gloss",
+          "type": "solid"
+        },
+        {
+          "id": "G971",
+          "name": "תכלת סתווי תכלת סתוו חציי תכלת סתווי",
+          "hex": "#bcbcbe",
+          "finish": "gloss",
+          "type": "solid"
+        },
+        {
+          "id": "G975",
+          "name": "תכול",
+          "hex": "#a2a39e",
+          "finish": "gloss",
+          "type": "solid"
+        },
+        {
+          "id": "G985",
+          "name": "ירוק זית",
+          "hex": "#b1ad7e",
+          "finish": "gloss",
+          "type": "solid"
+        },
+        {
+          "id": "G401",
+          "name": "לבן",
+          "hex": "#cdcabf",
+          "finish": "gloss",
+          "type": "solid"
+        },
+        {
+          "id": "G403",
+          "name": "לבן חם",
+          "hex": "#eaebe3",
+          "finish": "gloss",
+          "type": "solid"
+        },
+        {
+          "id": "G409",
+          "name": "אפור גרפיט",
+          "hex": "#5c5c5c",
+          "finish": "gloss",
+          "type": "solid"
+        }
+      ]
+    }
+  ]
+}
