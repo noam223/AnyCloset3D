@@ -140,11 +140,12 @@
                 <button type="button" class="space-cab-add-btn" style="flex:1;display:inline-flex;" onclick="addSpaceUnit('kitchenUpper')" title="מוסיף יחידה עליונה כארון נפרד במרחב (מעל התחתון)">
                     <i class="fa-solid fa-arrow-up"></i> יחידה עליונה
                 </button>
-                <button type="button" class="space-cab-add-btn" style="flex:1;display:inline-flex;" onclick="addSpaceUnit('kitchenCorner')" title="מוסיף רגל פינתית כארון נפרד במרחב (סיבוב 90°)">
+                <button type="button" class="space-cab-add-btn" style="flex:1;display:inline-flex;" onclick="addSpaceUnit('kitchenCorner')" title="מוסיף פינת מטבח מלאה בצורת ר (שתי זרועות) — אחר כך +60 על כל זרוע">
                     <i class="fa-solid fa-turn-up"></i> פינת מטבח
                 </button>
             </div>
-            <div style="font-size:0.72rem;color:var(--text-light);margin-top:6px;">יחידות בשורה: <strong id="kitchen-unit-count-header">3</strong> · עליונה/פינה = ארון נוסף במרחב</div>
+            <div style="font-size:0.72rem;color:var(--text-light);margin-top:6px;">יחידות: <strong id="kitchen-unit-count-header">3</strong> · עליונה/פינה = ארון נוסף במרחב</div>
+            <div id="kitchen-l-hint" style="display:none;font-size:0.72rem;color:var(--accent);margin-top:6px;line-height:1.35;">פינת ר: לחצו על זרוע בהדמיה ואז <strong>+60</strong> כדי להאריך אותה.</div>
         </div>
         <div id="space-cab-tabs" style="display:none;">
             <button type="button" id="btn-add-space-cab" class="space-cab-add-btn" onclick="addSpaceCabinet()">
@@ -690,7 +691,7 @@
                 <button type="button" class="space-unit-add-btn space-unit-kitchen-only" onclick="addSpaceUnit('kitchenUpper')" title="מוסיף יחידה עליונה כארון נפרד במרחב" style="display:none;">
                     <i class="fa-solid fa-arrow-up"></i><span>יחידה עליונה</span>
                 </button>
-                <button type="button" class="space-unit-add-btn space-unit-kitchen-only" onclick="addSpaceUnit('kitchenCorner')" title="מוסיף פינת מטבח כארון נפרד במרחב" style="display:none;">
+                <button type="button" class="space-unit-add-btn space-unit-kitchen-only" onclick="addSpaceUnit('kitchenCorner')" title="מוסיף פינת מטבח מלאה בצורת ר" style="display:none;">
                     <i class="fa-solid fa-turn-up"></i><span>פינת מטבח</span>
                 </button>
                 <button type="button" class="space-unit-add-btn space-unit-kitchen-only" onclick="addSpaceUnit('kitchenBase')" title="מוסיף שורת מטבח נוספת במרחב" style="display:none;">
@@ -995,7 +996,7 @@
         <!-- ===== KITCHEN SECTION (app-admin only, shown for kitchen preset) ===== -->
         <div class="section" id="kitchen-section" data-sbgroup="cabinet" style="display:none;">
             <div class="section-title"><i class="fa-solid fa-kitchen-set"></i> יחידת מטבח</div>
-            <p style="font-size:0.75rem;color:var(--text-light);margin:0 0 10px;">תחתון סנדוויץ׳ · גובה 88 · עומק 56. +60 מאריך את השורה. יחידה עליונה / פינה — כארון נוסף במרחב (מיקום X/Y/Z וסיבוב). סוג משטח — בטאב <strong>צבעים → משטח</strong>.</p>
+            <p style="font-size:0.75rem;color:var(--text-light);margin:0 0 10px;">תחתון סנדוויץ׳ · גובה 88 · עומק 56. +60 מאריך את השורה הפעילה. פינה = ר מלאה (שתי זרועות); לוחצים על זרוע בהדמיה ומאריכים. עליונה — ארון נוסף במרחב. סוג משטח — בטאב <strong>צבעים → משטח</strong>.</p>
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
                 <span style="font-size:0.8rem;color:var(--text-dark);">יחידות: <strong id="kitchen-unit-count">3</strong></span>
                 <span style="font-size:0.72rem;color:var(--text-light);">גוף: סנדוויץ׳ (נעול)</span>
@@ -3142,10 +3143,10 @@
 <script src="auth.js?v=20261116kitchen"></script>
 <script src="trial-watermark.js?v=20261008trial"></script>
 <script src="egger-colors.js?v=20261104egger2"></script>
-<script src="state.js?v=20261116kitFix"></script>
+<script src="state.js?v=20261116kitL"></script>
 <script src="quick-calc.js?v=20261029shoe"></script>
 <script src="bathroom-preset.js?v=20261008types"></script>
-<script src="kitchen-preset.js?v=20261116ctTex"></script>
+<script src="kitchen-preset.js?v=20261116kitL"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
 <script src="corner-unit-preset.js?v=20261116kitSpace"></script>
 <script src="engine-appliances.js?v=20261116stone"></script>
@@ -3155,7 +3156,7 @@
 <script src="engine-room-plan.js?v=20261110floors"></script>
 <script src="tambour-color-picker.js?v=20261110roomwall"></script>
 <script src="room-finishes.js?v=20261110gloss"></script>
-<script src="ui.js?v=20261116cardLayout"></script>
+<script src="ui.js?v=20261116kitL"></script>
 <script src="mirror-cabinet.js?v=20261110doormirror"></script>
 <script src="mobile.js?v=20261029inthandle"></script>
 <script src="part-paint.js?v=20261104egger"></script>

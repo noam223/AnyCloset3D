@@ -1366,7 +1366,12 @@ window.applyWalkinPositions = function() {
 
 // ---- Wing edit mode helpers ----
 function _isSingleCabinetPreset() {
-    return state.presetId === 'linear' || state.presetId === 'sliding' || state.presetId === 'bathroom' || state.presetId === 'kitchen' || state.presetId === 'writing-desk' || state.presetId === 'corner-unit';
+    // Kitchen L corner (ר) has side wings — use wing edit / click-to-select like corner wardrobes
+    if (state.presetId === 'kitchen') {
+        if (state.wings && (state.wings.left || state.wings.right)) return false;
+        return true;
+    }
+    return state.presetId === 'linear' || state.presetId === 'sliding' || state.presetId === 'bathroom' || state.presetId === 'writing-desk' || state.presetId === 'corner-unit';
 }
 
 function _syncHeaderDimsPlaceholder(isEditing) {
@@ -1455,8 +1460,10 @@ window.enterWingEditMode = function(wingId) {
     window._wingEditCamInit = true;
     // Hide room when entering wing edit mode (for performance and clarity)
     if (window._roomGroup) window._roomGroup.visible = false;
-    // Switch to front view (3D for full corner so camera can orbit)
-    state.viewMode = isFCEdit ? '3d' : 'front';
+    // Switch to front view (3D for full corner / kitchen L so camera can orbit the ר)
+    const isKitchenL = state.presetId === 'kitchen' && state.wings &&
+        (state.wings.left || state.wings.right);
+    state.viewMode = (isFCEdit || isKitchenL) ? '3d' : 'front';
     window._orbitFree = false;
     // Update tab UI — highlight the active wing tab, deactivate free tab
     _setWingTabActive(isFCEdit ? realSide : wingId);

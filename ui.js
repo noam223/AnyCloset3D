@@ -12730,17 +12730,21 @@ window._configureSpaceUnit = function(kind, host) {
     const cw = state.wings && state.wings.center;
     if (!cw) return 0;
     if (kind === 'kitchenUpper' || kind === 'kitchenBase' || kind === 'kitchenCorner') {
-        const role = kind === 'kitchenUpper' ? 'upper' : (kind === 'kitchenCorner' ? 'corner' : 'base');
+        if (kind === 'kitchenCorner') {
+            const side = (host && host.cornerSide === 'left') ? 'left' : 'right';
+            if (typeof window._configureKitchenCornerL === 'function') {
+                window._configureKitchenCornerL(side, { host: host, numCols: 2 });
+            }
+            // L geometry is built into the cabinet (center + side wing) — no space rotation
+            return 0;
+        }
+        const role = kind === 'kitchenUpper' ? 'upper' : 'base';
         if (typeof window._configureKitchenCarcass === 'function') {
             window._configureKitchenCarcass(role, {
                 host: host,
                 matchHostWidth: kind === 'kitchenUpper',
-                numCols: kind === 'kitchenCorner' ? 1 : (kind === 'kitchenBase' ? 2 : undefined)
+                numCols: kind === 'kitchenBase' ? 2 : undefined
             });
-        }
-        if (kind === 'kitchenCorner') {
-            const side = (host && host.cornerSide === 'left') ? 'left' : 'right';
-            return side === 'left' ? 270 : 90;
         }
         return 0;
     }
@@ -12792,12 +12796,12 @@ window._askCornerUnitSide = function(kind) {
     popup.id = '_corner-side-popup';
     popup.className = 'corner-side-popup';
     const title = kind === 'cornerDesk' ? 'שולחן פינתי'
-        : (kind === 'kitchenCorner' ? 'פינת מטבח' : 'שידה פינתית');
+        : (kind === 'kitchenCorner' ? 'פינת מטבח (ר מלאה)' : 'שידה פינתית');
     popup.innerHTML =
-        '<div class="corner-side-popup-title">' + title + ' — לאיזו פינה?</div>' +
+        '<div class="corner-side-popup-title">' + title + ' — לאיזו כיוון?</div>' +
         '<div class="corner-side-popup-btns">' +
-        '<button type="button" data-side="right"><i class="fa-solid fa-arrow-right"></i> פינה ימין</button>' +
-        '<button type="button" data-side="left"><i class="fa-solid fa-arrow-left"></i> פינה שמאל</button>' +
+        '<button type="button" data-side="right"><i class="fa-solid fa-arrow-right"></i> ר ימין</button>' +
+        '<button type="button" data-side="left"><i class="fa-solid fa-arrow-left"></i> ר שמאל</button>' +
         '</div>' +
         '<button type="button" class="corner-side-popup-cancel">ביטול</button>';
     document.body.appendChild(popup);
@@ -12901,12 +12905,12 @@ window.addSpaceUnit = function(kind, opts) {
             z: Math.round((hostOff.z || 0) + (hostD - upperD) / 2)
         };
     } else if (kind === 'kitchenCorner') {
-        // Return run abutting the host end; rot 90/270 swaps width↔depth in world X
+        // Full L (ר) sits beside the host; turn is in the wing geometry (no space rot)
         const sgn = opts.cornerSide === 'left' ? -1 : 1;
-        const newDepth = (rsN.depth != null) ? rsN.depth
-            : ((rsN.wings && rsN.wings.center && rsN.wings.center.depth) || 56);
+        const newW = (rsN.width != null) ? rsN.width
+            : ((rsN.wings && rsN.wings.center && rsN.wings.center.width) || 128);
         offset = {
-            x: Math.round((hostOff.x || 0) + sgn * (hostW / 2 + newDepth / 2)),
+            x: Math.round((hostOff.x || 0) + sgn * (hostW / 2 + newW / 2 + 8)),
             y: Math.round(hostOff.y || 0),
             z: Math.round(hostOff.z || 0)
         };
@@ -12920,6 +12924,13 @@ window.addSpaceUnit = function(kind, opts) {
 
     const newIdx = state.orderCart.length - 1;
     state.editingCartIndex = newIdx;
+    // Kitchen L: keep 3D free view so the ר is visible; +60 extends the active arm (center by default, click the other arm to switch)
+    if (kind === 'kitchenCorner') {
+        state.viewMode = '3d';
+        state.activeWing = 'center';
+        state.wingEditMode = false;
+        window._forceCameraAnim = true;
+    }
     if (typeof window._roomLinksLoadForHost === 'function') window._roomLinksLoadForHost(newIdx);
     if (typeof window._invalidateSpacePairPreviewImages === 'function' && pairId) {
         window._invalidateSpacePairPreviewImages(pairId);

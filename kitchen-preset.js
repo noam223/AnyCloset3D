@@ -33,7 +33,77 @@ window.KITCHEN_COUNTERTOP_BRANDS = [
 window.KITCHEN_BRAND_EXAMPLES = window.KITCHEN_COUNTERTOP_BRANDS;
 
 function _getKitWing() {
+    // Prefer the active arm (center / left / right) so +60 extends the selected L leg
+    if (typeof getWing === 'function') {
+        const aw = getWing();
+        if (aw && !aw._isUpperUnit) return aw;
+    }
     return state && state.wings && state.wings.center ? state.wings.center : null;
+}
+
+/** True when this kitchen cabinet is a full L (ר) corner with a side arm. */
+window._isKitchenCornerL = function() {
+    if (!window._isKitchenPreset || !window._isKitchenPreset()) return false;
+    const cw = state && state.wings && state.wings.center;
+    if (!cw || !cw.kitchenCornerL) return false;
+    return !!(state.wings.left || state.wings.right);
+};
+
+function _kitInitColumnsOnWing(wing, opts) {
+    if (!wing) return;
+    opts = opts || {};
+    const t = wing.thickness || _kitThickness();
+    const n = Math.max(1, opts.numCols != null ? opts.numCols : 2);
+    const unitH = opts.height != null ? opts.height : KIT_HEIGHT;
+    const topPanel = opts.topPanel !== false;
+    const noPlinth = !!opts.noPlinth;
+    const cols = [];
+    for (let i = 0; i < n; i++) {
+        const col = typeof _blankColumn === 'function'
+            ? _blankColumn(KIT_UNIT_W, null)
+            : {
+                type: 'normal', width: KIT_UNIT_W, height: unitH,
+                shelves: 0, splitY: null, shelvesY: [], compartments: [], doors: []
+            };
+        col.width = KIT_UNIT_W;
+        col.height = unitH;
+        col.topPanel = topPanel;
+        col.sinkPanel = false;
+        col.noPlinth = noPlinth;
+        col.spaceBottomPanel = !!opts.spaceBottomPanel;
+        col.floorOffset = 0;
+        if (typeof distributeShelves === 'function') distributeShelves(col);
+        cols.push(col);
+    }
+    wing.columns = cols;
+    wing.width = window._kitchenTotalWidth(n, KIT_UNIT_W, t);
+}
+
+/** Build a kitchen side arm for the L corner (ר). */
+function _makeKitchenCornerArm(side, opts) {
+    opts = opts || {};
+    const c = state.wings.center;
+    const w = typeof createWingData === 'function' ? createWingData() : {};
+    w.globalHeight = (c && c.globalHeight) || KIT_HEIGHT;
+    w.depth = (c && c.depth) || KIT_DEPTH;
+    w.thickness = (c && c.thickness) || 1.7;
+    w.plinthHeight = KIT_PLINTH;
+    w.boardMaterial = 'sandwich';
+    w.cabinetModel = 'c9';
+    w.cabinetTypeId = 'c9';
+    w.kitchenRole = 'corner';
+    w.kitchenCornerL = true;
+    w.wingPosition = 'side';
+    w.slidingDoor = w.slidingDoor || {};
+    w.slidingDoor.enabled = false;
+    const src = opts.host || c || {};
+    ['materialBody', 'materialInternal', 'materialExternal', 'materialOpenCell', 'materialBack',
+        'materialTopPanel', 'handleType', 'handleStyle', 'handleVariant', 'ridingColor', 'countertopBrand'
+    ].forEach(function(f) {
+        if (src[f] !== undefined) w[f] = JSON.parse(JSON.stringify(src[f]));
+    });
+    _kitInitColumnsOnWing(w, { numCols: opts.numCols || 2, height: KIT_HEIGHT, topPanel: true });
+    return w;
 }
 
 function _applyKitDim(dim, value) {
@@ -180,10 +250,12 @@ window._configureKitchenCarcass = function(role, opts) {
             spaceBottomPanel: true
         });
     } else if (role === 'corner') {
+        // Center arm of the L — side arm is added by _configureKitchenCornerL
         cw.plinthHeight = KIT_PLINTH;
+        cw.kitchenCornerL = true;
         _applyKitDim('height', KIT_HEIGHT);
         _applyKitDim('depth', KIT_DEPTH);
-        _kitInitColumns({ numCols: opts.numCols || 1, height: KIT_HEIGHT, topPanel: true });
+        _kitInitColumns({ numCols: opts.numCols || 2, height: KIT_HEIGHT, topPanel: true });
     } else {
         cw.plinthHeight = KIT_PLINTH;
         _applyKitDim('height', KIT_HEIGHT);
@@ -204,11 +276,61 @@ window._applyKitchenPreset = function() {
         if (state) state.presetId = 'linear';
         return;
     }
+    // Straight base run — clear any leftover L arms
+    if (state.wings) {
+        state.wings.left = null;
+        state.wings.right = null;
+        if (typeof _hideWingTab === 'function') {
+            _hideWingTab('left');
+            _hideWingTab('right');
+        }
+    }
+    const cw0 = _getKitWing();
+    if (cw0) delete cw0.kitchenCornerL;
     _applyKitchenRoomView();
     _updateKitchenSectionUI();
     if (typeof window._syncKitchenApplianceToolbar === 'function') {
         window._syncKitchenApplianceToolbar();
     }
+};
+
+/**
+ * Full kitchen corner in ר / L shape: center arm + perpendicular side arm.
+ * After creation, click an arm in 3D and use +60 to extend that arm.
+ */
+window._configureKitchenCornerL = function(side, opts) {
+    opts = opts || {};
+    side = side === 'left' ? 'left' : 'right';
+    const armCols = opts.numCols != null ? opts.numCols : 2;
+    if (!window._configureKitchenCarcass('corner', {
+        host: opts.host,
+        numCols: armCols
+    })) return false;
+
+    const cw = state.wings.center;
+    if (cw) {
+        cw.kitchenRole = 'corner';
+        cw.kitchenCornerL = true;
+        cw.kitchenCornerSide = side;
+    }
+
+    // Clear opposite arm if switching
+    const other = side === 'left' ? 'right' : 'left';
+    if (state.wings[other]) {
+        state.wings[other] = null;
+        if (typeof _hideWingTab === 'function') _hideWingTab(other);
+    }
+
+    const arm = _makeKitchenCornerArm(side, { host: opts.host || cw, numCols: armCols });
+    arm.kitchenCornerSide = side;
+    state.wings[side] = arm;
+    if (typeof _showWingTab === 'function') _showWingTab(side);
+
+    state.activeWing = 'center';
+    state.viewMode = '3d';
+    window._forceCameraAnim = true;
+    window._corner3dCamPositioned = false;
+    return true;
 };
 
 window.KIT_UPPER_Y = KIT_UPPER_Y;
@@ -271,7 +393,7 @@ window._kitchenAddUnit = function(side) {
     }
     const liveCols = cw.columns || state.columns || [];
     const template = side === 'left' ? liveCols[0] : liveCols[liveCols.length - 1];
-    const t = _kitThickness();
+    const t = cw.thickness || _kitThickness();
     const newCol = typeof _blankColumn === 'function'
         ? _blankColumn(KIT_UNIT_W, template)
         : {
@@ -285,10 +407,17 @@ window._kitchenAddUnit = function(side) {
     newCol.height = cw.globalHeight || KIT_HEIGHT;
 
     cw.columns = side === 'left' ? [newCol].concat(liveCols) : liveCols.concat([newCol]);
-    state.columns = cw.columns;
+    const isCenterArm = state.activeWing === 'center' || (!state.wings.left && !state.wings.right);
+    if (isCenterArm) state.columns = cw.columns;
     // Separate carcass: +unit width + 2 side walls
     const newW = (cw.width || KIT_WIDTH) + KIT_UNIT_W + 2 * t;
-    _applyKitDim('width', Math.round(newW * 10) / 10);
+    cw.width = Math.round(newW * 10) / 10;
+    if (isCenterArm) {
+        _applyKitDim('width', cw.width);
+    } else if (typeof updateDim === 'function') {
+        // Keep wing width in sync with sidebar when editing a side arm
+        updateDim('width', null, cw.width);
+    }
 
     if (typeof _fixEdgeColumnMerges === 'function') _fixEdgeColumnMerges();
     if (typeof _syncColumnCountInputs === 'function') _syncColumnCountInputs(cw.columns.length);
@@ -308,11 +437,18 @@ window._kitchenRemoveUnit = function(side) {
     side = side === 'left' ? 'left' : 'right';
     const removed = side === 'left' ? cw.columns[0] : cw.columns[cw.columns.length - 1];
     const remW = (removed && removed.width) || KIT_UNIT_W;
-    const t = _kitThickness();
+    const t = cw.thickness || _kitThickness();
     cw.columns = side === 'left' ? cw.columns.slice(1) : cw.columns.slice(0, -1);
-    state.columns = cw.columns;
+    if (state.activeWing === 'center' || (!state.wings.left && !state.wings.right)) {
+        state.columns = cw.columns;
+    }
     const newW = Math.max(KIT_UNIT_W + 2 * t, (cw.width || KIT_WIDTH) - remW - 2 * t);
-    _applyKitDim('width', Math.round(newW * 10) / 10);
+    cw.width = Math.round(newW * 10) / 10;
+    if (state.activeWing === 'center' || (!state.wings.left && !state.wings.right)) {
+        _applyKitDim('width', cw.width);
+    } else if (typeof updateDim === 'function') {
+        updateDim('width', null, cw.width);
+    }
     if (typeof _fixEdgeColumnMerges === 'function') _fixEdgeColumnMerges();
     if (typeof _syncColumnCountInputs === 'function') _syncColumnCountInputs(cw.columns.length);
     _updateKitchenSectionUI();
@@ -386,17 +522,30 @@ function _updateKitchenSectionUI() {
 
     const cw = _getKitWing();
     const nUnits = (cw && cw.columns) ? cw.columns.length : 0;
+    let nTotal = nUnits;
+    if (window._isKitchenCornerL && window._isKitchenCornerL()) {
+        nTotal = 0;
+        ['center', 'left', 'right'].forEach(function(s) {
+            const w = state.wings && state.wings[s];
+            if (w && w.columns) nTotal += w.columns.length;
+        });
+    }
     ['kitchen-unit-count', 'kitchen-unit-count-header'].forEach(function(id) {
         const countEl = document.getElementById(id);
-        if (countEl) countEl.textContent = String(nUnits || 0);
+        if (countEl) countEl.textContent = String(nTotal || 0);
     });
+    const kitHint = document.getElementById('kitchen-l-hint');
+    if (kitHint) {
+        const isL = window._isKitchenCornerL && window._isKitchenCornerL();
+        kitHint.style.display = isL ? '' : 'none';
+    }
     // Hide old mobile add block if still present
     const mobileKitBlock = document.getElementById('mobile-kitchen-block');
     if (mobileKitBlock) mobileKitBlock.style.display = 'none';
 
     // Soft height clamp for floor base cabinets only (not upper wall units)
     const role = (cw && cw.kitchenRole) || 'base';
-    if (isKit && cw && role === 'base') {
+    if (isKit && cw && (role === 'base' || role === 'corner')) {
         const h = cw.globalHeight || state.height;
         if (h != null && (h < 80 || h > 95)) {
             _applyKitDim('height', Math.max(80, Math.min(95, h)));
@@ -469,6 +618,15 @@ function _renderKitchenBrandExamples() {
     });
 }
 
+function _kitApplyBrandToAllArms(brandId, clear) {
+    ['center', 'left', 'right'].forEach(function(s) {
+        const w = state && state.wings && state.wings[s];
+        if (!w) return;
+        if (clear) delete w.countertopBrand;
+        else w.countertopBrand = brandId;
+    });
+}
+
 window._setKitchenCountertopBrand = function(brandId) {
     if (!window._isKitchenPreset()) return;
     const brands = window.KITCHEN_COUNTERTOP_BRANDS || [];
@@ -477,10 +635,10 @@ window._setKitchenCountertopBrand = function(brandId) {
     const cw = _getKitWing();
     if (!cw) return;
     if (cw.countertopBrand === brandId) {
-        delete cw.countertopBrand;
+        _kitApplyBrandToAllArms(brandId, true);
         if (state) delete state.countertopBrand;
     } else {
-        cw.countertopBrand = brandId;
+        _kitApplyBrandToAllArms(brandId, false);
         if (state) state.countertopBrand = brandId;
         // Switch colors UI to משטח and clear competing material highlight
         state.activeColorPart = 'materialTopPanel';
@@ -496,8 +654,7 @@ window._setKitchenCountertopBrand = function(brandId) {
 };
 
 window._clearKitchenCountertopBrand = function() {
-    const cw = _getKitWing();
-    if (cw) delete cw.countertopBrand;
+    _kitApplyBrandToAllArms(null, true);
     if (state) delete state.countertopBrand;
     _renderKitchenBrandExamples();
 };
