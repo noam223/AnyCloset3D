@@ -3938,7 +3938,7 @@ window._toggleStretcherShelf = function(colIndex, shelfIdx) {
     if (at >= 0) {
         if (list.length <= 1) {
             if (typeof _showToast === 'function') {
-                _showToast('צריך לפחות קושרת אחת בכל עמודה', 2800);
+                _showToast('המדף כבר מסומן כקושרת (חייבת להישאר לפחות אחת בעמודה)', 3200);
             }
             return false;
         }

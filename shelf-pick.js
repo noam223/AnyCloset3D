@@ -544,11 +544,17 @@
     function _syncStretcherBtnState() {
         const btn = document.getElementById('sp-shelf-stretcher');
         if (!btn || !_selectedRef || _selectedRef.isSub) return;
-        const cols = (typeof state !== 'undefined' && state.columns) ? state.columns : null;
+        const w = (typeof getWing === 'function') ? getWing() : null;
+        const cols = (w && w.columns) || ((typeof state !== 'undefined' && state.columns) ? state.columns : null);
         const col = cols && cols[_selectedRef.colIndex];
+        if (col && typeof window._syncStretcherShelfIdxs === 'function') {
+            window._syncStretcherShelfIdxs(col);
+        }
         const on = typeof window._isStretcherShelf === 'function' &&
             window._isStretcherShelf(col, _selectedRef.shelfIdx);
         btn.classList.toggle('is-on', !!on);
+        const label = btn.querySelector('span');
+        if (label) label.textContent = on ? 'קושרת ✓' : 'קושרת';
         btn.title = on
             ? 'קושרת פעילה — לחץ לביטול (חייבת להישאר לפחות אחת בעמודה)'
             : 'סמן מדף כקושרת לחיבורי גוף (מיניפיקס)';
