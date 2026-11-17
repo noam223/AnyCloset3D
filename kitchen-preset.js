@@ -1373,6 +1373,315 @@ window._initKitchenAdminGate = async function() {
     };
 })();
 
+/** Built-in bay presets for the end "+" → פריסט menu. */
+window.KITCHEN_UNIT_PRESETS = [
+    { id: 'cabinet', label: 'ארון מדפים', icon: 'fa-solid fa-table-columns', spec: { door: 'left' } },
+    { id: 'drawers', label: 'מגירות', icon: 'fa-solid fa-bars', spec: { drawers: 3 } },
+    { id: 'sink', label: 'כיור', icon: 'fa-solid fa-sink', spec: { appliance: 'sink', door: 'right' } },
+    { id: 'dishwasher', label: 'מדיח', icon: 'fa-solid fa-dishwasher', faFallback: 'fa-solid fa-plate-wheat', spec: { appliance: 'dishwasher' } },
+    { id: 'oven', label: 'תנור', icon: 'fa-solid fa-temperature-high', spec: { appliance: 'oven' } },
+    { id: 'fridge', label: 'מקרר', icon: 'fa-solid fa-refrigerator', faFallback: 'fa-solid fa-snowflake', spec: { appliance: 'fridge' } }
+];
+
+function _kitMidHeight(wing) {
+    if (!wing) return KIT_HEIGHT / 2;
+    if (wing.columns && wing.columns.length) {
+        return Math.max.apply(null, wing.columns.map(function(c) { return (c && c.height) || wing.globalHeight || KIT_HEIGHT; })) / 2;
+    }
+    return (wing.globalHeight || KIT_HEIGHT) / 2;
+}
+
+/**
+ * Free kitchen ends where a "+" can extend the run.
+ * Center free ends sit on world X; after a corner the free tip sits on world Z.
+ */
+window._kitchenComputeEndAddAnchors = function() {
+    if (!window._isKitchenPreset || !window._isKitchenPreset()) return [];
+    if (state._activeUpperUnit) return []; // base-run ends only while not editing uppers
+    const cw = state.wings && state.wings.center;
+    if (!cw) return [];
+    const left = state.wings.left;
+    const right = state.wings.right;
+    const hasLeftFC = !!(left && left.wingPosition === 'full_corner' && left.kitchenCornerL);
+    const hasRightFC = !!(right && right.wingPosition === 'full_corner' && right.kitchenCornerL);
+    const centerCols = (cw.columns && cw.columns.length) ? cw.columns.length : 0;
+    const centerIsStub = !!(cw.kitchenCornerL && !centerCols);
+    const centerD = cw.depth || KIT_DEPTH;
+    const gap = 22;
+    const anchors = [];
+
+    function push(a) {
+        if (!a || !isFinite(a.worldX) || !isFinite(a.worldY) || !isFinite(a.worldZ)) return;
+        anchors.push(a);
+    }
+
+    // Straight / main run on center — free X ends where no corner consumes them
+    if (centerCols > 0) {
+        const y = _kitMidHeight(cw);
+        const zFront = centerD / 2;
+        // Corner option only while the run is still straight — L convert clears the other arm
+        const canMakeCorner = !hasLeftFC && !hasRightFC;
+        if (!hasLeftFC) {
+            push({
+                id: 'center-left',
+                wingId: 'center',
+                end: 'left',
+                axis: 'x',
+                canUnit: true,
+                canCorner: canMakeCorner,
+                worldX: -cw.width / 2 - gap,
+                worldY: y,
+                worldZ: zFront
+            });
+        }
+        if (!hasRightFC) {
+            push({
+                id: 'center-right',
+                wingId: 'center',
+                end: 'right',
+                axis: 'x',
+                canUnit: true,
+                canCorner: canMakeCorner,
+                worldX: cw.width / 2 + gap,
+                worldY: y,
+                worldZ: zFront
+            });
+        }
+    } else if (centerIsStub) {
+        // Empty L stub: free tip opposite the corner, still on X
+        const y = _kitMidHeight(cw);
+        const zFront = centerD / 2;
+        if (hasRightFC && !hasLeftFC) {
+            push({
+                id: 'stub-left',
+                wingId: 'center',
+                end: 'left',
+                axis: 'x',
+                canUnit: true,
+                canCorner: false,
+                worldX: -Math.max(cw.width, KIT_CORNER_STUB_W) / 2 - gap,
+                worldY: y,
+                worldZ: zFront
+            });
+        }
+        if (hasLeftFC && !hasRightFC) {
+            push({
+                id: 'stub-right',
+                wingId: 'center',
+                end: 'right',
+                axis: 'x',
+                canUnit: true,
+                canCorner: false,
+                worldX: Math.max(cw.width, KIT_CORNER_STUB_W) / 2 + gap,
+                worldY: y,
+                worldZ: zFront
+            });
+        }
+    }
+
+    // Corner return arms — free tip on Z
+    function armFarAnchor(side, wing) {
+        if (!wing) return;
+        const fcSize = (wing.fullCorner && wing.fullCorner.size) || 90;
+        const wingD = wing.depth || KIT_DEPTH;
+        const wingW = (wing.columns && wing.columns.length) ? (wing.width || 0) : 0;
+        const y = _kitMidHeight(wing.columns && wing.columns.length ? wing : cw);
+        const edgeX = side === 'right'
+            ? (cw.width / 2)
+            : (-cw.width / 2);
+        const sign = side === 'right' ? 1 : -1;
+        // Match engine-core full_corner placement
+        const armX = edgeX + sign * fcSize - sign * wingD / 2;
+        const armStartZ = -centerD / 2 + fcSize;
+        const farZ = wingW > 0
+            ? (armStartZ + wingW + gap)
+            : (armStartZ + gap);
+        push({
+            id: side + '-far',
+            wingId: side,
+            end: side === 'right' ? 'right' : 'left',
+            axis: 'z',
+            canUnit: true,
+            canCorner: false,
+            worldX: armX,
+            worldY: y,
+            worldZ: farZ
+        });
+    }
+    if (hasRightFC) armFarAnchor('right', right);
+    if (hasLeftFC) armFarAnchor('left', left);
+
+    return anchors;
+};
+
+/** Add a 60cm bay on a specific wing/end (does not redirect empty center stub to the L arm). */
+window._kitchenAddUnitOnWing = function(wingId, end, presetSpec) {
+    if (!window._isKitchenPreset || !window._isKitchenPreset()) return false;
+    wingId = wingId || 'center';
+    end = end === 'left' ? 'left' : 'right';
+    const wing = state.wings && state.wings[wingId];
+    if (!wing) return false;
+
+    state.activeWing = wingId;
+    if (typeof syncSidebarToWing === 'function') syncSidebarToWing();
+
+    if (!Array.isArray(wing.columns)) wing.columns = [];
+    const liveCols = wing.columns;
+    let newCol;
+    if (presetSpec && typeof _kitMakeShowcaseCol === 'function') {
+        newCol = _kitMakeShowcaseCol(presetSpec);
+        // Drawer preset: one external_drawers bay
+        if (presetSpec.drawers) {
+            const n = Math.max(2, Math.min(5, presetSpec.drawers | 0));
+            newCol.compartments = [{ type: 'external_drawers', count: n }];
+            newCol.shelves = 0;
+            newCol.shelvesY = [];
+            newCol.doors = [];
+        }
+    } else {
+        const template = liveCols.length
+            ? (end === 'left' ? liveCols[0] : liveCols[liveCols.length - 1])
+            : null;
+        newCol = typeof _blankColumn === 'function'
+            ? _blankColumn(KIT_UNIT_W, template)
+            : {
+                type: 'normal', width: KIT_UNIT_W, height: wing.globalHeight || KIT_HEIGHT,
+                shelves: 0, splitY: null, shelvesY: [], compartments: [], doors: [],
+                floorOffset: 0, topPanel: true, sinkPanel: false, noPlinth: false
+            };
+        newCol.width = KIT_UNIT_W;
+        newCol.sinkPanel = false;
+        newCol.height = wing.globalHeight || KIT_HEIGHT;
+        newCol.topPanel = true;
+        newCol.noPlinth = false;
+        newCol.spaceBottomPanel = false;
+        if (typeof distributeShelves === 'function') distributeShelves(newCol);
+    }
+
+    wing.columns = end === 'left' ? [newCol].concat(liveCols) : liveCols.concat([newCol]);
+    // Leaving empty-stub mode: center becomes a real run beside the L
+    if (wingId === 'center' && wing.kitchenCornerL) {
+        // keep kitchenCornerL so the L arm stays attached
+    }
+    if (wingId === 'center') {
+        try { state.columns = wing.columns; } catch (e) { /* proxy */ }
+    }
+    window._kitchenCommitRunWidth(wing);
+
+    if (typeof _fixEdgeColumnMerges === 'function') _fixEdgeColumnMerges();
+    if (typeof _syncColumnCountInputs === 'function') _syncColumnCountInputs(wing.columns.length);
+    if (typeof _updateKitchenSectionUI === 'function') _updateKitchenSectionUI();
+    if (typeof buildCabinet === 'function') buildCabinet();
+    if (typeof calculatePrice === 'function') calculatePrice();
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+    return true;
+};
+
+/** Turn a free center end into a kitchen L corner (ר). */
+window._kitchenAddCornerAtEnd = function(wingId, end) {
+    if (!window._isKitchenPreset || !window._isKitchenPreset()) return false;
+    if (wingId !== 'center') {
+        if (typeof _showToast === 'function') _showToast('פינה נוספת בקצה הזרוע עדיין לא נתמכת', 3200);
+        return false;
+    }
+    const side = end === 'left' ? 'left' : 'right';
+    if ((side === 'left' && state.wings.left) || (side === 'right' && state.wings.right)) {
+        if (typeof _showToast === 'function') _showToast('כבר יש פינה בצד הזה', 2800);
+        return false;
+    }
+    const host = state.wings.center;
+    if (!host) return false;
+    const cols = host.columns && host.columns.length
+        ? JSON.parse(JSON.stringify(host.columns))
+        : [];
+    state.activeWing = 'center';
+    if (typeof syncSidebarToWing === 'function') syncSidebarToWing();
+    if (typeof window._configureKitchenCornerL === 'function') {
+        window._configureKitchenCornerL(side, { host: host, columns: cols });
+    }
+    if (typeof buildCabinet === 'function') buildCabinet();
+    if (typeof calculatePrice === 'function') calculatePrice();
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+    if (typeof window._updateKitchenSectionUI === 'function') window._updateKitchenSectionUI();
+    if (typeof window._syncKitchenApplianceToolbar === 'function') window._syncKitchenApplianceToolbar();
+    return true;
+};
+
+/** Floating menu for a kitchen end "+" button. */
+window._kitchenOpenEndAddMenu = function(anchor, clientX, clientY) {
+    const old = document.getElementById('kit-end-add-menu');
+    if (old) old.remove();
+    if (!anchor) return;
+
+    const menu = document.createElement('div');
+    menu.id = 'kit-end-add-menu';
+    menu.className = 'kit-end-add-menu';
+    menu.setAttribute('role', 'menu');
+
+    const mkBtn = function(act, label, icon, disabled) {
+        return '<button type="button" class="kit-end-add-item" data-act="' + act + '"' +
+            (disabled ? ' disabled' : '') + '>' +
+            '<i class="' + icon + '"></i><span>' + label + '</span></button>';
+    };
+
+    let html = '<div class="kit-end-add-menu-title">הוספה</div>';
+    html += mkBtn('unit', 'יחידה', 'fa-solid fa-plus', !anchor.canUnit);
+    html += mkBtn('corner', 'פינה', 'fa-solid fa-vector-square', !anchor.canCorner);
+    html += mkBtn('preset', 'פריסט', 'fa-solid fa-layer-group', !anchor.canUnit);
+    html += '<div class="kit-end-preset-list" hidden>';
+    (window.KITCHEN_UNIT_PRESETS || []).forEach(function(p) {
+        const ic = p.icon || p.faFallback || 'fa-solid fa-cube';
+        html += '<button type="button" class="kit-end-add-item kit-end-preset-item" data-preset="' + p.id + '">' +
+            '<i class="' + ic + '"></i><span>' + p.label + '</span></button>';
+    });
+    html += '</div>';
+    html += '<button type="button" class="kit-end-add-cancel">ביטול</button>';
+    menu.innerHTML = html;
+    document.body.appendChild(menu);
+
+    const pad = 10;
+    const mw = menu.offsetWidth || 200;
+    const mh = menu.offsetHeight || 180;
+    let left = (clientX != null ? clientX : window.innerWidth / 2) - mw / 2;
+    let top = (clientY != null ? clientY : window.innerHeight / 2) + 14;
+    left = Math.max(pad, Math.min(window.innerWidth - mw - pad, left));
+    top = Math.max(pad, Math.min(window.innerHeight - mh - pad, top));
+    menu.style.left = left + 'px';
+    menu.style.top = top + 'px';
+
+    const close = function() {
+        menu.remove();
+        document.removeEventListener('mousedown', outside, true);
+    };
+    const outside = function(e) {
+        if (!menu.contains(e.target) && !(e.target.closest && e.target.closest('.kit-end-add-btn'))) close();
+    };
+
+    menu.querySelector('.kit-end-add-cancel').addEventListener('click', close);
+    menu.querySelectorAll('.kit-end-add-item[data-act]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const act = btn.getAttribute('data-act');
+            if (act === 'preset') {
+                const list = menu.querySelector('.kit-end-preset-list');
+                if (list) list.hidden = !list.hidden;
+                return;
+            }
+            close();
+            if (act === 'unit') window._kitchenAddUnitOnWing(anchor.wingId, anchor.end);
+            else if (act === 'corner') window._kitchenAddCornerAtEnd(anchor.wingId, anchor.end);
+        });
+    });
+    menu.querySelectorAll('.kit-end-preset-item').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const id = btn.getAttribute('data-preset');
+            const preset = (window.KITCHEN_UNIT_PRESETS || []).find(function(p) { return p.id === id; });
+            close();
+            window._kitchenAddUnitOnWing(anchor.wingId, anchor.end, preset ? preset.spec : null);
+        });
+    });
+    setTimeout(function() { document.addEventListener('mousedown', outside, true); }, 0);
+};
+
 document.addEventListener('DOMContentLoaded', function() {
     window._setKitchenPresetButtonsVisible(false);
     if (window._initKitchenAdminGate) window._initKitchenAdminGate();

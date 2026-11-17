@@ -3080,6 +3080,99 @@ body.dragging-v { cursor: ns-resize !important; }
     box-shadow: 0 3px 12px rgba(99,102,241,0.5);
 }
 
+/* Kitchen free-end add (+) */
+.kit-end-add-btn {
+    position: absolute;
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: #0d9488;
+    color: #fff;
+    border: 2px solid #fff;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    font-size: 0.95rem;
+    box-shadow: 0 3px 12px rgba(13, 148, 136, 0.4);
+    transform: translate(-50%, -50%);
+    z-index: 45;
+    transition: transform 0.15s, background 0.15s, box-shadow 0.15s;
+    pointer-events: auto;
+}
+.kit-end-add-btn:hover {
+    background: #0f766e;
+    transform: translate(-50%, -50%) scale(1.14);
+    box-shadow: 0 4px 16px rgba(13, 148, 136, 0.55);
+}
+.kit-end-add-menu {
+    position: fixed;
+    z-index: 10060;
+    direction: rtl;
+    min-width: 200px;
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22);
+    padding: 12px 12px 8px;
+    font-family: inherit;
+    text-align: center;
+}
+.kit-end-add-menu-title {
+    font-weight: 800;
+    font-size: 0.9rem;
+    color: #1f2937;
+    margin-bottom: 8px;
+}
+.kit-end-add-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 11px 12px;
+    margin-bottom: 6px;
+    border-radius: 10px;
+    border: 1.5px solid #e5e7eb;
+    background: #f9fafb;
+    font-size: 0.88rem;
+    font-weight: 700;
+    font-family: inherit;
+    color: #111827;
+    cursor: pointer;
+}
+.kit-end-add-item:hover:not(:disabled) {
+    border-color: #0d9488;
+    background: rgba(13, 148, 136, 0.08);
+    color: #0f766e;
+}
+.kit-end-add-item:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+.kit-end-add-item i { width: 18px; text-align: center; color: #0d9488; }
+.kit-end-preset-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 2px 0 8px;
+    padding: 6px;
+    border-radius: 10px;
+    background: #f3f4f6;
+}
+.kit-end-preset-list[hidden] { display: none !important; }
+.kit-end-preset-item {
+    margin-bottom: 0;
+    background: #fff;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+.kit-end-add-cancel {
+    margin-top: 2px;
+    background: none;
+    border: none;
+    color: #6b7280;
+    font-size: 0.78rem;
+    cursor: pointer;
+    font-family: inherit;
+}
+
 .col-tpl-grid {
     display: flex;
     flex-wrap: wrap;

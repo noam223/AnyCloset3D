@@ -1488,6 +1488,37 @@ function buildDimensionsAndButtonsUI() {
         });
     }
 
+    // Kitchen free-end "+" — extend run with unit / corner / preset
+    if (state.presetId === 'kitchen' && !window._VIEWER_MODE &&
+        typeof window._kitchenComputeEndAddAnchors === 'function') {
+        const anchors = window._kitchenComputeEndAddAnchors() || [];
+        anchors.forEach(function(anchor) {
+            const btn = document.createElement('div');
+            btn.className = 'kit-end-add-btn';
+            btn.dataset.world = '1';
+            btn.dataset.worldX = String(anchor.worldX);
+            btn.dataset.worldY = String(anchor.worldY);
+            btn.dataset.worldZ = String(anchor.worldZ);
+            btn.dataset.wingId = anchor.wingId;
+            btn.dataset.end = anchor.end;
+            btn.dataset.anchorId = anchor.id || '';
+            btn.title = 'הוסף יחידה / פינה / פריסט';
+            btn.innerHTML = '<i class="fa-solid fa-plus"></i>';
+            btn.addEventListener('pointerdown', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            });
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (typeof window._kitchenOpenEndAddMenu === 'function') {
+                    window._kitchenOpenEndAddMenu(anchor, e.clientX, e.clientY);
+                }
+            });
+            buttonsLayer.appendChild(btn);
+        });
+    }
+
     updateOverlaysPosition();
 }
 
@@ -4223,6 +4254,33 @@ function _positionWingCellOverlays() {
         const h = el.offsetHeight || 22;
         x = Math.max(w/2 + 5, Math.min(cw - w/2 - 5, x));
         y = Math.max(h/2 + 5, Math.min(ch - h/2 - 5, y));
+        el.style.left = `${x}px`;
+        el.style.top = `${y}px`;
+    });
+
+    // Kitchen end "+" — cabinet-local world XYZ (X ends + Z after corner)
+    document.querySelectorAll('.kit-end-add-btn').forEach(el => {
+        const localPt = new THREE.Vector3(
+            parseFloat(el.dataset.worldX) || 0,
+            parseFloat(el.dataset.worldY) || 0,
+            parseFloat(el.dataset.worldZ) || 0
+        );
+        if (window.cabinetGroup) {
+            window.cabinetGroup.updateMatrixWorld(true);
+            localPt.applyMatrix4(window.cabinetGroup.matrixWorld);
+        }
+        const pos = localPt.project(camera);
+        if (!isFinite(pos.x) || !isFinite(pos.y) || pos.z > 1) {
+            el.style.visibility = 'hidden';
+            return;
+        }
+        el.style.visibility = '';
+        let x = (pos.x * .5 + .5) * cw;
+        let y = (-(pos.y * .5) + .5) * ch;
+        const w = el.offsetWidth || 34;
+        const h = el.offsetHeight || 34;
+        x = Math.max(w / 2 + 5, Math.min(cw - w / 2 - 5, x));
+        y = Math.max(h / 2 + 5, Math.min(ch - h / 2 - 5, y));
         el.style.left = `${x}px`;
         el.style.top = `${y}px`;
     });
@@ -8602,7 +8660,7 @@ function _isCanvasOverlayUiTarget(el) {
     if (!el || !el.closest) return false;
     return !!el.closest(
         '#column-quick-edit, #full-corner-quick-edit, #bottom-floating-toolbar, #bed-toolbar, #room-props-row, #room-furniture-toolbar, #room-plan-layer, #btn-room-plan-view-toggle, ' +
-        '.drag-handle, .dim-container, .col-width-label, .plus-btn, .fc-cell-btn, .select-all-col-btn, .col-template-btn, .cell-select-btn, .sub-cell-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn, .tv-size-btn, #tv-size-menu'
+        '.drag-handle, .dim-container, .col-width-label, .plus-btn, .kit-end-add-btn, .kit-end-add-menu, .fc-cell-btn, .select-all-col-btn, .col-template-btn, .cell-select-btn, .sub-cell-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn, .tv-size-btn, #tv-size-menu'
     );
 }
 
@@ -9751,7 +9809,7 @@ function bindUI() {
             buildDragHandlesUI();
         }
 
-        const isOverUI = e.target.closest('#dimensions-layer, #buttons-layer, #drag-handles-layer, #col-widths-layer, #column-quick-edit, #bottom-floating-toolbar');
+        const isOverUI = e.target.closest('#dimensions-layer, #buttons-layer, #drag-handles-layer, #col-widths-layer, #column-quick-edit, #bottom-floating-toolbar, .kit-end-add-btn, #kit-end-add-menu');
         const isSelected = state.selection.colIndex !== -1;
         const widthFocused = document.activeElement && document.activeElement.closest && document.activeElement.closest('#col-widths-layer');
         // Upper-unit / kitchen edit: keep cell overlays visible without requiring hover
