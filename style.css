@@ -3028,10 +3028,14 @@ body.dragging-v { cursor: ns-resize !important; }
 .qe-toggle-btn i { font-size: 1.15rem; }
 .qe-toggle-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-pale); }
 .qe-toggle-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
-.qe-dropdown { position: relative; display: flex; align-self: stretch; }
+.qe-dropdown { position: relative; display: flex; align-self: stretch; overflow: visible; }
+.qe-back-type-wrap { overflow: visible; }
+.quick-edit-panel { overflow: visible; }
 .qe-dropdown-menu {
     position: absolute;
-    top: calc(100% + 6px);
+    /* QE bar sits near the bottom of the viewport — open upward so the menu isn't clipped */
+    bottom: calc(100% + 6px);
+    top: auto;
     right: 0;
     min-width: 160px;
     background: #fff;
