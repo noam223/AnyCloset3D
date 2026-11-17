@@ -15,8 +15,9 @@
     const MM = 10;
     const LS_KEY = 'anycloset_cnc_settings';
     const CNC_DEFAULTS = {
-        backMode: 'groove',     // 'groove' = back panel sits in a groove · 'between' = as modelled, no groove
-        backSetback: 10,        // groove distance from the rear edge
+        // IL practice: cabinet mezuzah backs are stapled/nailed — grooves are for drawer bottoms, not carcass backs
+        backMode: 'between',    // 'between' = stapled/nailed, no groove · 'groove' = נוט (optional)
+        backSetback: 10,        // groove distance from the rear edge (only when backMode=groove)
         grooveDepth: 8,
         grooveClearance: 0.5,   // groove width = back thickness + clearance
         shelfPins: true,
@@ -79,6 +80,7 @@
     const _tag = function(x) { return _fmt(x).replace('.', 'P').replace('-', 'M'); };
     const _overlap = function(a, b) { return Math.min(a[1], b[1]) - Math.max(a[0], b[0]); };
 
+    const CNC_SETTINGS_VER = 2; // v2: default back = stapled (between), not groove
     function _loadSettings() {
         const cfg = Object.assign({}, CNC_DEFAULTS);
         try {
@@ -87,12 +89,20 @@
                 Object.keys(CNC_DEFAULTS).forEach(function(k) {
                     if (typeof saved[k] === typeof CNC_DEFAULTS[k] && (typeof saved[k] !== 'number' || isFinite(saved[k]))) cfg[k] = saved[k];
                 });
+                // One-time: switch previous default "groove for mezuzah" to local stapled practice
+                if ((saved.settingsVer | 0) < CNC_SETTINGS_VER) {
+                    cfg.backMode = 'between';
+                    _saveSettings(cfg);
+                }
             }
         } catch (e) { /* corrupt or blocked storage — defaults */ }
         return cfg;
     }
     function _saveSettings(cfg) {
-        try { localStorage.setItem(LS_KEY, JSON.stringify(cfg)); } catch (e) { /* private mode */ }
+        try {
+            const toSave = Object.assign({}, cfg, { settingsVer: CNC_SETTINGS_VER });
+            localStorage.setItem(LS_KEY, JSON.stringify(toSave));
+        } catch (e) { /* private mode */ }
     }
 
     // ---------- board geometry helpers ----------
@@ -1568,8 +1578,8 @@
         L.push('INFO              כיתוב בלבד — לא לעיבוד', '');
         L.push('הגדרות שבהן הופק הקובץ', '----------------------');
         L.push('גב: ' + (c.backMode === 'groove'
-            ? 'בחריץ — ' + c.backSetback + ' מ"מ מהקצה האחורי, עומק ' + c.grooveDepth + ', רוחב = עובי הגב + ' + c.grooveClearance + '. הגב גדל ' + Math.max(0, c.grooveDepth - 1) + ' מ"מ לכל צד שנכנס לחריץ.'
-            : 'בין הדפנות, ללא חריץ.'));
+            ? 'בחריץ (נוט) — ' + c.backSetback + ' מ"מ מהקצה האחורי, עומק ' + c.grooveDepth + ', רוחב = עובי הגב + ' + c.grooveClearance + '. הגב גדל ' + Math.max(0, c.grooveDepth - 1) + ' מ"מ לכל צד שנכנס לחריץ.'
+            : 'בין הדפנות ללא חריץ — חיבור בסיכות/מסמרים (נהוג לגב מזונית).'));
         L.push('מדפים: ' + (c.shelfPins
             ? 'חורי פינים Ø' + c.pinDia + ' בעומק ' + c.pinDepth + ', ' + c.pinInset + ' מ"מ מקצה המדף' + (c.pinRows ? ', שורות מלאות בפסיעת ' + c.pinPitch : ', 2 חורים לכל צד')
             : 'ללא חורי פינים') + '. מרווח צד למדף: ' + c.shelfSideGap + ' מ"מ לכל צד.');
@@ -1697,7 +1707,10 @@
     // ---------- dialog ----------
     const FIELDS = [
         { sec: 'גב הארון' },
-        { k: 'backMode', label: 'חיבור הגב', opts: [['groove', 'בחריץ (נוט)'], ['between', 'בין הדפנות, ללא חריץ']] },
+        { k: 'backMode', label: 'חיבור הגב', opts: [
+            ['between', 'סיכות/מסמרים (ללא חריץ)'],
+            ['groove', 'בחריץ (נוט)']
+        ] },
         { k: 'backSetback', label: 'מרחק החריץ מהקצה האחורי', groove: true },
         { k: 'grooveDepth', label: 'עומק חריץ', groove: true },
         { k: 'grooveClearance', label: 'מרווח ברוחב החריץ', groove: true, step: 0.1 },
