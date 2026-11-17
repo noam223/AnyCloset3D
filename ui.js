@@ -11167,9 +11167,19 @@ function _stampColumnNumbersOnFrame(frame, cam, columns, opts) {
     return out;
 }
 
+/** Compact phrase for one back type+color group (no per-column noise). */
+function _backTypeGroupPhrase(type, colorLabel) {
+    if (type === 'mezuzah') return 'מזונית לבן';
+    const typeLabel = (typeof window._BACK_TYPE_LABEL === 'function')
+        ? window._BACK_TYPE_LABEL(type)
+        : type;
+    return typeLabel + ' בגוון ' + (colorLabel || 'לבן מט');
+}
+
 /**
  * Print/summary text for cabinet back color + type on one line.
- * When several type/color combos exist: "עמודה 1: גב 8 מ״מ בגוון … · עמודה 2: …"
+ * Uniform: "מזונית לבן" / "גב 8 מ״מ בגוון …"
+ * Mixed: "עמודה 1,2,4 - מזונית לבן · עמודה 3 - גב 8 מ״מ בגוון …"
  */
 function _formatColorBackWithTypes(rawState, fallbackColorLabel) {
     const rs = rawState || {};
@@ -11187,24 +11197,26 @@ function _formatColorBackWithTypes(rawState, fallbackColorLabel) {
         const type = (col && col.backType) || 'mezuzah';
         const matKey = (byType && byType[type]) || defaultBack;
         const color = _colorKeyLabel(matKey) || fallback;
-        const typeLabel = (typeof window._BACK_TYPE_LABEL === 'function')
-            ? window._BACK_TYPE_LABEL(type)
-            : type;
-        return { n: i + 1, type: type, typeLabel: typeLabel, color: color, key: type + '|' + matKey };
+        return { n: i + 1, type: type, color: color, key: type + '|' + matKey };
     });
 
-    const unique = {};
-    entries.forEach(function(e) { unique[e.key] = e; });
-    const combos = Object.keys(unique);
+    // Preserve first-seen order of groups
+    const groups = [];
+    const byKey = {};
+    entries.forEach(function(e) {
+        if (!byKey[e.key]) {
+            byKey[e.key] = { type: e.type, color: e.color, nums: [] };
+            groups.push(byKey[e.key]);
+        }
+        byKey[e.key].nums.push(e.n);
+    });
 
-    if (combos.length <= 1) {
-        const e = entries[0];
-        return e.color + ' · ' + e.typeLabel;
+    if (groups.length <= 1) {
+        return _backTypeGroupPhrase(groups[0].type, groups[0].color);
     }
 
-    // Mixed types and/or colors — per-column detail in the same colorBack line
-    return entries.map(function(e) {
-        return 'עמודה ' + e.n + ': ' + e.typeLabel + ' בגוון ' + e.color;
+    return groups.map(function(g) {
+        return 'עמודה ' + g.nums.join(',') + ' - ' + _backTypeGroupPhrase(g.type, g.color);
     }).join(' · ');
 }
 
