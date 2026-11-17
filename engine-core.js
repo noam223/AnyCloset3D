@@ -7300,30 +7300,6 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
         return mesh;
     }
 
-    /** Red translucent strip on the front edge (קנט קדמי) of CNC stretcher shelves. */
-    function _addStretcherFrontEdgeHighlight(shelfMesh, boardW, shelfThick, boardD) {
-        if (!shelfMesh || isBP) return;
-        if (!window._stretcherEdgeHighlightMat) {
-            window._stretcherEdgeHighlightMat = new THREE.MeshBasicMaterial({
-                color: 0xef4444,
-                transparent: true,
-                opacity: 0.42,
-                depthWrite: false,
-                side: THREE.DoubleSide
-            });
-        }
-        const stripD = Math.min(0.45, Math.max(0.25, boardD * 0.02));
-        const strip = new THREE.Mesh(
-            new THREE.BoxGeometry(Math.max(boardW * 0.985, 1), Math.max(shelfThick * 1.08, 0.8), stripD),
-            window._stretcherEdgeHighlightMat
-        );
-        // Local +Z is the cabinet front face of the shelf board
-        strip.position.set(0, 0, boardD / 2 - stripD / 2 + 0.04);
-        strip.userData.isStretcherHighlight = true;
-        strip.raycast = function () {};
-        shelfMesh.add(strip);
-    }
-
     /** Invisible taller proxy so thin shelf boards are easy to hover/click from front view.
      *  Depth is inset toward the back so the proxy stays behind closed door faces. */
     function _registerShelfPickMesh(visualMesh, boardW, boardH, boardD) {
@@ -8656,9 +8632,6 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
                     shelfMesh.userData.cncStretcher = _isStretch;
                     shelfMesh.userData.shelfRef = { colIndex: c, shelfIdx: div.idx, isStretcher: _isStretch };
                     _registerShelfPickMesh(shelfMesh, boardW, shelfThick, boardD);
-                    if (_isStretch && shelfMesh.visible !== false) {
-                        _addStretcherFrontEdgeHighlight(shelfMesh, boardW, shelfThick, boardD);
-                    }
                 }
             }
             _ppPartId = '';
