@@ -1880,6 +1880,9 @@ function _buildRoomExtraCabinets(misses) {
         materialExternal: state.materialExternal,
         materialOpenCell: state.materialOpenCell,
         materialBack: state.materialBack,
+        materialBackByType: state.materialBackByType
+            ? JSON.parse(JSON.stringify(state.materialBackByType))
+            : { mezuzah: null, back8: null, back17: null, stretcher: null },
         boardMaterial: state.boardMaterial,
         width: state.width,
         globalHeight: state.globalHeight,
@@ -1929,7 +1932,7 @@ function _buildRoomExtraCabinets(misses) {
             state.presetId = rs.presetId || 'linear';
             state._activeUpperUnit = null;
             ['materialBody', 'materialDoors', 'materialInternal', 'materialExternal',
-             'materialOpenCell', 'materialBack', 'boardMaterial', 'width', 'globalHeight',
+             'materialOpenCell', 'materialBack', 'materialBackByType', 'boardMaterial', 'width', 'globalHeight',
              'depth', 'thickness', 'plinthHeight', 'hasDoors', 'columns', 'desk'].forEach(function(k) {
                 if (rs[k] !== undefined) state[k] = rs[k];
             });
@@ -1964,6 +1967,7 @@ function _buildRoomExtraCabinets(misses) {
     state.materialExternal = saved.materialExternal;
     state.materialOpenCell = saved.materialOpenCell;
     state.materialBack = saved.materialBack;
+    if (saved.materialBackByType) state.materialBackByType = saved.materialBackByType;
     state.boardMaterial = saved.boardMaterial;
     state.width = saved.width;
     state.globalHeight = saved.globalHeight;
@@ -6134,6 +6138,9 @@ window._rebuildSpaceCompanion = function() {
         materialExternal: state.materialExternal,
         materialOpenCell: state.materialOpenCell,
         materialBack: state.materialBack,
+        materialBackByType: state.materialBackByType
+            ? JSON.parse(JSON.stringify(state.materialBackByType))
+            : { mezuzah: null, back8: null, back17: null, stretcher: null },
         boardMaterial: state.boardMaterial,
         width: state.width,
         globalHeight: state.globalHeight,
@@ -6186,7 +6193,7 @@ window._rebuildSpaceCompanion = function() {
             state.presetId = rs.presetId || 'linear';
             state._activeUpperUnit = null;
             ['materialBody', 'materialDoors', 'materialInternal', 'materialExternal',
-             'materialOpenCell', 'materialBack', 'boardMaterial', 'width', 'globalHeight',
+             'materialOpenCell', 'materialBack', 'materialBackByType', 'boardMaterial', 'width', 'globalHeight',
              'depth', 'thickness', 'plinthHeight', 'hasDoors', 'columns', 'desk'].forEach(function(k) {
                 if (rs[k] !== undefined) state[k] = rs[k];
             });
@@ -6922,6 +6929,7 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
     const matBack = isBP ? bpMat : (materials[state.materialBack] || materials[state.materialBody]);
     const matTopPanel = isBP ? bpMat : (materials[state.materialTopPanel] || materials[state.materialBody]);
     const activeEdgeMat = isBP ? new THREE.LineBasicMaterial({ color: 0x000000 }) : edgeMat;
+    if (typeof window._ensureMaterialBackByType === 'function') window._ensureMaterialBackByType();
 
     const _ox = _offsetX || 0;
 
@@ -6945,7 +6953,75 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
     const _slidingPartSetback = 6; // cm — front 6cm reserved for door track
     const _slidingPartD = _isSlidingWardrobe ? (bodyD - _slidingPartSetback) : bodyD;
     const _slidingPartZ = _isSlidingWardrobe ? (-_slidingPartSetback / 2) : 0; // shift back so front face is 6cm behind cabinet front
-    const backT = 0.5;
+    const backT = 0.5; // default / fallback for hitboxes when column not yet known
+    const _backMatForType = function(backType) {
+        if (isBP) return bpMat;
+        const key = (typeof window._getBackMaterialKey === 'function')
+            ? window._getBackMaterialKey(backType || 'mezuzah')
+            : state.materialBack;
+        return materials[key] || matBack || materials[state.materialBody];
+    };
+    const _colBackInfo = function(col) {
+        if (typeof window._ensureColumnBackFields === 'function') window._ensureColumnBackFields(col);
+        const type = (col && col.backType) || 'mezuzah';
+        const def = (window._BACK_TYPE_DEFS || []).find(function(d) { return d.id === type; })
+            || { id: 'mezuzah', thicknessCm: 0.5, grooveInsetCm: 1 };
+        const thick = def.thicknessCm || 0.5;
+        const inset = def.grooveInsetCm || 0;
+        return {
+            type: type,
+            thick: thick,
+            inset: inset,
+            z: -bodyD / 2 + inset + thick / 2,
+            mat: _backMatForType(type),
+            isStretcher: type === 'stretcher'
+        };
+    };
+    const _addColumnBack = function(col, c, colCenterX, bottomY, topY, forceMat) {
+        if (isBP) return backT;
+        const info = _colBackInfo(col);
+        const h = topY - bottomY;
+        if (h < 1) return info.isStretcher ? t : info.thick;
+        if (info.isStretcher) {
+            if (typeof window._syncBackStretcherYs === 'function') window._syncBackStretcherYs(col);
+            const bs = col.backStretchers;
+            const sh = Math.max(5, bs.height || 10);
+            const st = t; // stretcher board thickness = carcass
+            const mat = forceMat || info.mat;
+            (bs.ys || []).forEach(function(y, si) {
+                let cy = y;
+                // Keep stretchers inside the back span
+                cy = Math.max(bottomY + sh / 2 + 0.2, Math.min(topY - sh / 2 - 0.2, cy));
+                bs.ys[si] = Math.round(cy * 10) / 10;
+                _ppPartId = `back_stretcher_c${c}_${si}`;
+                createBoard(col.width, sh, st, colCenterX, bs.ys[si], -bodyD / 2 + st / 2, mat);
+                _ppPartId = '';
+                if (_isActiveWingBuild) {
+                    dragHandlesData.vertical.push({
+                        colIndex: c, stretcherIdx: si, x: colCenterX, y: bs.ys[si],
+                        isBackStretcher: true
+                    });
+                }
+            });
+            return st;
+        }
+        _ppPartId = `back_c${c}`;
+        const mat = forceMat || info.mat;
+        const backMesh = createBoard(col.width, h, info.thick, colCenterX, bottomY + h / 2, info.z, mat);
+        _ppPartId = '';
+        if (backMesh && mat && mat.map) {
+            const uv = backMesh.geometry.attributes.uv;
+            const uScale = col.width / h;
+            const uOffset = (1 - uScale) / 2;
+            const rawU = [0, 1, 0, 1, 0, 1, 0, 1];
+            const rawV = [0, 0, 1, 1, 0, 0, 1, 1];
+            for (let i = 16; i < 24; i++) {
+                uv.setXY(i, uOffset + rawU[i - 16] * uScale, rawV[i - 16]);
+            }
+            uv.needsUpdate = true;
+        }
+        return info.thick;
+    };
     // LED-lit zones of this wing (build-group coords) — glass in front of them shows the light.
     // Kept per wing so the sliding-door overlay, built afterwards, can read the center wing's zones.
     const _ledLitBoxes = [];
@@ -7678,6 +7754,8 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
 
     for (let c = 0; c < _cols.length; c++) {
         const col = _cols[c];
+        const _colBack = _colBackInfo(col);
+        const colBackT = _colBack.isStretcher ? t : _colBack.thick;
         const colCenterX = currentX + col.width/2;
         const isDesk = col.type === 'desk';
         const isLeftmost = (c === 0);
@@ -8290,11 +8368,8 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
             if(!isBP) dragHandlesData.vertical.push({ isInternalDeskClearance: true, colIndex: c, x: colCenterX, y: startShelvesY });
             startShelvesY += t; 
             const backH = col.height - col.deskHeight;
-            if (!isBP) {
-                _ppPartId = `back_c${c}`;
-                createBoard(col.width, backH, backT, colCenterX, col.deskHeight + backH/2, -bodyD/2 + backT/2, matDesk);
-                _ppPartId = '';
-            }
+            const _deskColBackT = _addColumnBack(col, c, colCenterX, col.deskHeight, col.deskHeight + backH, null);
+            void _deskColBackT;
             // Knee space above the desk is not a compartment row — it is selectable as pseudo-row -1
             const _deskZoneTop = col.deskHeight + col.deskClearance;
             if (!isBP && _isActiveWingBuild) {
@@ -8304,7 +8379,7 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
                     const hitH = topY - botY;
                     if (hitH <= 0) return;
                     const hitMat = new THREE.MeshBasicMaterial({ color: isHoveredCol ? 0x2ecc71 : 0x3498db, transparent: true, opacity: selected ? 0.3 : (isHoveredCol ? 0.05 : 0.0), depthWrite: false });
-                const hitBox = new THREE.Mesh(new THREE.BoxGeometry(col.width, hitH, bodyD - backT - 2), hitMat);
+                const hitBox = new THREE.Mesh(new THREE.BoxGeometry(col.width, hitH, bodyD - colBackT - 2), hitMat);
                     hitBox.position.set(colCenterX, botY + hitH / 2, -1);
                     hitBox.userData = Object.assign({ colIndex: c, rowIndex: -1 }, extra);
                 _buildGroup.add(hitBox); hitBoxes.push(hitBox);
@@ -8329,7 +8404,7 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
                 const mH = Math.max(4, col.deskClearance - inset * 2);
                 const backFaceZ = col.deskHoneycomb
                     ? (-bodyD / 2 + t / 2 + 0.6 + t / 2 + 0.2)
-                    : (-bodyD / 2 + backT + 0.2);
+                    : (-bodyD / 2 + colBackT + 0.2);
                 const sheet = new THREE.Mesh(new THREE.BoxGeometry(mW, mH, 0.4), _mirrorMaterial());
                 sheet.position.set(colCenterX, col.deskHeight + col.deskClearance / 2, backFaceZ);
                 _buildGroup.add(sheet);
@@ -8341,27 +8416,7 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
             const backBottomY = (_isSlidingWardrobe || col.noPlinth) ? (fo > 0 ? fo + t : t) : (fo > 0 ? fo + t : state.plinthHeight + t);
             const h = col.height - backBottomY - t;
             if (!isBP) {
-                _ppPartId = `back_c${c}`;
-                const backMesh = createBoard(col.width, h, backT, colCenterX, backBottomY + h/2, -bodyD/2 + backT/2, matBack);
-                _ppPartId = '';
-                // Aspect-ratio-preserving UV on front/back faces (indices 16-23): fit to height, preserve ratio
-                // NOTE: createBoard already scaled UV by (w/100, h/100), so we must use raw 0/1 values directly
-                if (backMesh && matBack.map) {
-                    const uv = backMesh.geometry.attributes.uv;
-                    const uScale = col.width / h;
-                    const uOffset = (1 - uScale) / 2;
-                    // BoxGeometry front/back face raw UV corners (before any scaling):
-                    // i=16:(0,0), i=17:(1,0), i=18:(0,1), i=19:(1,1) — front
-                    // i=20:(0,0), i=21:(1,0), i=22:(0,1), i=23:(1,1) — back
-                    const rawU = [0,1,0,1, 0,1,0,1];
-                    const rawV = [0,0,1,1, 0,0,1,1];
-                    for (let i = 16; i < 24; i++) {
-                        const ru = rawU[i - 16];
-                        const rv = rawV[i - 16];
-                        uv.setXY(i, uOffset + ru * uScale, rv);
-                    }
-                    uv.needsUpdate = true;
-                }
+                _addColumnBack(col, c, colCenterX, backBottomY, backBottomY + h, null);
             }
         }
 
@@ -8642,7 +8697,7 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
                     opacity: (_spacePassive || _kitNoHitTint) ? 0.0 : (_isSelCell ? 0.3 : (_bakeHover ? 0.05 : 0.0)),
                     depthWrite: false
                 });
-                const hitBox = new THREE.Mesh(new THREE.BoxGeometry(col.width, compH, bodyD - backT - 2), hitMat);
+                const hitBox = new THREE.Mesh(new THREE.BoxGeometry(col.width, compH, bodyD - colBackT - 2), hitMat);
                 // Kitchen: keep invisible hitboxes on every arm only for wing hover-switch —
                 // cell pick/select goes through the HTML dim buttons like a normal wardrobe.
                 const _kitPickAlways = state.presetId === 'kitchen' && !_isUpperUnitBuild && !_spacePassive;

@@ -38,6 +38,7 @@ function createWingData(overrides) {
         materialDesk: 'white_matte',
         materialOpenCell: 'white_matte',
         materialBack: 'white_matte',
+        materialBackByType: { mezuzah: null, back8: null, back17: null, stretcher: null },
         materialSideCabinet: 'white_matte',
         materialTopPanel: 'white_matte',
         glassTint: 'clear',
@@ -95,7 +96,9 @@ function _syncSlidingColumns(wing) {
             doors: [],
             floorOffset: 0,
             topPanel: false,
-            sinkPanel: false
+            sinkPanel: false,
+            backType: 'mezuzah',
+            backStretchers: { height: 10, count: 1, ys: [] }
         };
         _distributeShelves(col, wing);
         return col;
@@ -273,7 +276,11 @@ const state = {
     const innerWidth = w.width - (w.thickness * 2) - w.thickness;
     const colWidth = innerWidth / 2;
     w.columns = [0, 1].map(() => {
-        const col = { type: 'normal', width: colWidth, height: w.globalHeight, shelves: 0, splitY: null, shelvesY: [], compartments: [], doors: [], floorOffset: 0 };
+        const col = {
+            type: 'normal', width: colWidth, height: w.globalHeight, shelves: 0, splitY: null,
+            shelvesY: [], compartments: [], doors: [], floorOffset: 0,
+            backType: 'mezuzah', backStretchers: { height: 10, count: 1, ys: [] }
+        };
         _distributeShelves(col, w);
         return col;
     });
@@ -297,10 +304,111 @@ const _wingFields = [
     'cabinetModel','cabinetTypeId','placement','width','globalHeight','depth','thickness','plinthHeight',
     'hasDoors','handleType','handleStyle','handleVariant','ridingColor','cabinetName','cabinetModelLabel','cabinetNotes','boardMaterial',
     'materialBody','materialInternal','materialExternal','materialDesk','materialOpenCell','materialBack',
+    'materialBackByType',
     'materialSideCabinet','materialTopPanel','glassTint',
     'activeColorPart','columns','desk','corner','fullCorner','sideCabinet','manualPrice','manualInstallPrice',
     'slidingDoor'
 ];
+
+/** Column back types used in quick-edit + 3D + color tabs */
+window._BACK_TYPE_DEFS = [
+    { id: 'mezuzah', label: 'גב מזונית', shortLabel: 'מזונית', thicknessCm: 0.5, grooveInsetCm: 1 },
+    { id: 'back8', label: 'גב 8 מ"מ', shortLabel: 'גב 8', thicknessCm: 0.8, grooveInsetCm: 0 },
+    { id: 'back17', label: 'גב 17 מ"מ', shortLabel: 'גב 17', thicknessCm: 1.7, grooveInsetCm: 0 },
+    { id: 'stretcher', label: 'קושרת', shortLabel: 'קושרת', thicknessCm: 1.7, grooveInsetCm: 0 }
+];
+window._BACK_TYPE_LABEL = function(id) {
+    const d = (window._BACK_TYPE_DEFS || []).find(function(x) { return x.id === id; });
+    return d ? d.label : 'גב מזונית';
+};
+window._ensureMaterialBackByType = function(wing) {
+    const w = wing || (typeof getWing === 'function' ? getWing() : null);
+    if (!w) return { mezuzah: null, back8: null, back17: null, stretcher: null };
+    if (!w.materialBackByType || typeof w.materialBackByType !== 'object') {
+        w.materialBackByType = { mezuzah: null, back8: null, back17: null, stretcher: null };
+    }
+    ['mezuzah', 'back8', 'back17', 'stretcher'].forEach(function(k) {
+        if (w.materialBackByType[k] === undefined) w.materialBackByType[k] = null;
+    });
+    return w.materialBackByType;
+};
+window._ensureColumnBackFields = function(col) {
+    if (!col) return col;
+    if (!col.backType || !['mezuzah', 'back8', 'back17', 'stretcher'].includes(col.backType)) {
+        col.backType = 'mezuzah';
+    }
+    if (!col.backStretchers || typeof col.backStretchers !== 'object') {
+        col.backStretchers = { height: 10, count: 1, ys: [] };
+    }
+    if (!(col.backStretchers.height > 0)) col.backStretchers.height = 10;
+    if (!(col.backStretchers.count > 0)) col.backStretchers.count = 1;
+    if (!Array.isArray(col.backStretchers.ys)) col.backStretchers.ys = [];
+    return col;
+};
+window._defaultBackStretcherYs = function(col, count, height) {
+    const t = (typeof state !== 'undefined' && state.thickness) ? state.thickness : 1.7;
+    const plinthH = (typeof state !== 'undefined' && state.plinthHeight) ? state.plinthHeight : 8.75;
+    const fo = col.floorOffset || 0;
+    const bottomEdge = (col.noPlinth || fo > 0)
+        ? ((fo > 0 ? fo : 0) + t)
+        : (plinthH + t);
+    const topEdge = (col.height || 240) - t;
+    const half = (height || 10) / 2;
+    const lo = bottomEdge + half + 0.5;
+    const hi = topEdge - half - 0.5;
+    const n = Math.max(1, Math.min(6, count | 0));
+    if (hi <= lo) return [Math.round(((lo + hi) / 2) * 10) / 10];
+    if (n === 1) return [Math.round(((lo + hi) / 2) * 10) / 10];
+    const ys = [];
+    for (let i = 0; i < n; i++) {
+        ys.push(Math.round((lo + (hi - lo) * (i / (n - 1))) * 10) / 10);
+    }
+    return ys;
+};
+window._syncBackStretcherYs = function(col) {
+    window._ensureColumnBackFields(col);
+    const bs = col.backStretchers;
+    const n = Math.max(1, Math.min(6, Math.round(bs.count) || 1));
+    bs.count = n;
+    const h = bs.height || 10;
+    if (!bs.ys.length) {
+        bs.ys = window._defaultBackStretcherYs(col, n, h);
+        return bs.ys;
+    }
+    if (bs.ys.length > n) bs.ys = bs.ys.slice(0, n);
+    while (bs.ys.length < n) {
+        const defaults = window._defaultBackStretcherYs(col, n, h);
+        const next = defaults.find(function(y) {
+            return bs.ys.every(function(ex) { return Math.abs(ex - y) > h + 1; });
+        });
+        bs.ys.push(next != null ? next : defaults[bs.ys.length] || defaults[0]);
+    }
+    bs.ys.sort(function(a, b) { return a - b; });
+    return bs.ys;
+};
+window._getBackMaterialKey = function(backType) {
+    const type = backType || 'mezuzah';
+    const byType = window._ensureMaterialBackByType();
+    if (byType && byType[type]) return byType[type];
+    return (typeof state !== 'undefined' && state.materialBack) ? state.materialBack : 'white_matte';
+};
+window._collectUsedBackTypes = function(columns) {
+    const cols = columns || (typeof state !== 'undefined' ? state.columns : null) || [];
+    const set = {};
+    cols.forEach(function(col) {
+        if (!col) return;
+        window._ensureColumnBackFields(col);
+        set[col.backType || 'mezuzah'] = true;
+    });
+    const order = ['mezuzah', 'back8', 'back17', 'stretcher'];
+    return order.filter(function(id) { return set[id]; });
+};
+window._backTypeFromColorPart = function(part) {
+    if (!part || typeof part !== 'string') return null;
+    if (part === 'materialBack') return null;
+    const m = part.match(/^materialBack_(mezuzah|back8|back17|stretcher)$/);
+    return m ? m[1] : null;
+};
 
 _wingFields.forEach(field => {
     Object.defineProperty(state, field, {
@@ -374,6 +482,9 @@ window.addWing = function(side) {
     newWing.materialInternal = center.materialInternal;
     newWing.materialExternal = center.materialExternal;
     newWing.materialBack = center.materialBack;
+    newWing.materialBackByType = center.materialBackByType
+        ? JSON.parse(JSON.stringify(center.materialBackByType))
+        : { mezuzah: null, back8: null, back17: null, stretcher: null };
     newWing.cabinetModel = center.cabinetModel;
     // Default width for side wing: ensure visible opening is at least 30cm
     // visible = innerW - centerD, so innerW = centerD + 30, width = innerW + thickness*3
@@ -383,7 +494,8 @@ window.addWing = function(side) {
     const innerW = newWing.width - newWing.thickness * 3;
     newWing.columns = [{
         type: 'normal', width: innerW, height: newWing.globalHeight,
-        shelves: 0, splitY: null, shelvesY: [], compartments: [], doors: [], floorOffset: 0
+        shelves: 0, splitY: null, shelvesY: [], compartments: [], doors: [], floorOffset: 0,
+        backType: 'mezuzah', backStretchers: { height: 10, count: 1, ys: [] }
     }];
     // Run distributeShelves on each col
     newWing.columns.forEach(col => _distributeShelves(col, newWing));
@@ -1927,6 +2039,7 @@ window.syncSidebarToWing = function() {
         // Per-door panel tabs — rebuild dynamically
         if (typeof window._rebuildDoorPanelTabs === 'function') window._rebuildDoorPanelTabs();
     }
+    if (typeof window._rebuildBackTypeColorTabs === 'function') window._rebuildBackTypeColorTabs();
     // Highlight sliding preset buttons (desktop + mobile)
     const slidingPresetBtn = document.getElementById('preset-btn-sliding');
     if (slidingPresetBtn) slidingPresetBtn.classList.toggle('active', isSliding);
@@ -2710,6 +2823,7 @@ window.resetCurrentCabinet = function() {
     w.plinthHeight = 8.75; w.hasDoors = true; w.handleType = ''; w.handleStyle = 'none'; w.handleVariant = 'pipe_silver'; w.ridingColor = 'black'; w.cabinetName = ''; w.cabinetModelLabel = ''; w.cabinetNotes = '';
     w.boardMaterial = 'melamine'; w.materialBody = 'white_matte'; w.materialInternal = 'white_matte';
     w.materialExternal = 'white_matte'; w.materialDesk = 'white_matte'; w.materialOpenCell = 'white_matte'; w.materialBack = 'white_matte';
+    w.materialBackByType = { mezuzah: null, back8: null, back17: null, stretcher: null };
     w.materialSideCabinet = 'white_matte';
     w.desk = { side: 'none', width: 100, height: 80, hasDrawers: true, drawerHeight: 12, drawerCount: null, mergeDrawers: false };
     w.corner = { side: 'none', width: 60, height: 90, depth: 54, type: 'shelves', shelves: 3, drawerCount: 4 };
@@ -4195,7 +4309,9 @@ function distributeColumns(numCols) {
             width: colWidth, height: state.globalHeight, shelves: 0, splitY: null, shelvesY: [], compartments: [], doors: [],
             floorOffset: 0,
             topPanel: false,
-            sinkPanel: false
+            sinkPanel: false,
+            backType: 'mezuzah',
+            backStretchers: { height: 10, count: 1, ys: [] }
         };
         distributeShelves(col);
         return col;
@@ -4440,7 +4556,11 @@ function _blankColumn(width, template) {
         topPanel: false,
         sinkPanel: false,
         noPlinth: !!(template && template.noPlinth),
-        spaceBottomPanel: !!(template && template.spaceBottomPanel)
+        spaceBottomPanel: !!(template && template.spaceBottomPanel),
+        backType: (template && template.backType) || 'mezuzah',
+        backStretchers: (template && template.backStretchers)
+            ? JSON.parse(JSON.stringify(template.backStretchers))
+            : { height: 10, count: 1, ys: [] }
     };
     distributeShelves(col);
     return col;

@@ -506,6 +506,29 @@ function updateQuickEditPanelUI() {
         }
     }
 
+    // Back type + stretcher controls
+    if (typeof window._ensureColumnBackFields === 'function') window._ensureColumnBackFields(col);
+    const backType = col.backType || 'mezuzah';
+    const backLabel = document.getElementById('qe-back-type-label');
+    if (backLabel && typeof window._BACK_TYPE_LABEL === 'function') {
+        backLabel.textContent = window._BACK_TYPE_LABEL(backType);
+    }
+    document.querySelectorAll('#qe-back-type-menu .qe-dropdown-item').forEach(function(btn) {
+        btn.classList.toggle('active', btn.getAttribute('data-back-type') === backType);
+    });
+    const isStretcher = backType === 'stretcher';
+    const stretchHGroup = document.getElementById('qe-stretcher-height-group');
+    const stretchCGroup = document.getElementById('qe-stretcher-count-group');
+    if (stretchHGroup) stretchHGroup.style.display = isStretcher ? '' : 'none';
+    if (stretchCGroup) stretchCGroup.style.display = isStretcher ? '' : 'none';
+    if (isStretcher) {
+        if (typeof window._syncBackStretcherYs === 'function') window._syncBackStretcherYs(col);
+        const hInp = document.getElementById('qe-stretcher-h-val');
+        const cInp = document.getElementById('qe-stretcher-count-val');
+        if (hInp) hInp.value = col.backStretchers.height || 10;
+        if (cInp) cInp.value = col.backStretchers.count || 1;
+    }
+
     _updateCopyPasteGroupVisibility();
     if (typeof window._syncKitchenDeleteSelectedUI === 'function') {
         window._syncKitchenDeleteSelectedUI();
@@ -628,6 +651,91 @@ window.updateDeskDrawerCountInput = function(val) {
     saveHistoryState();
 }
 
+window.toggleBackTypeMenu = function(e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    const menu = document.getElementById('qe-back-type-menu');
+    if (!menu) return;
+    const open = menu.style.display === 'none' || !menu.style.display;
+    menu.style.display = open ? 'block' : 'none';
+    if (open) {
+        const closer = function(ev) {
+            if (ev.target.closest && ev.target.closest('#qe-back-type-group')) return;
+            menu.style.display = 'none';
+            document.removeEventListener('pointerdown', closer, true);
+        };
+        setTimeout(function() { document.addEventListener('pointerdown', closer, true); }, 0);
+    }
+};
+
+window.setColumnBackType = function(type) {
+    if (state.activeEditCol === -1 || !state.columns[state.activeEditCol]) return;
+    if (!['mezuzah', 'back8', 'back17', 'stretcher'].includes(type)) return;
+    const col = state.columns[state.activeEditCol];
+    if (typeof window._ensureColumnBackFields === 'function') window._ensureColumnBackFields(col);
+    col.backType = type;
+    if (type === 'stretcher' && typeof window._syncBackStretcherYs === 'function') {
+        window._syncBackStretcherYs(col);
+    }
+    const menu = document.getElementById('qe-back-type-menu');
+    if (menu) menu.style.display = 'none';
+    buildCabinet(); calculatePrice(); updateQuickEditPanelUI();
+    if (typeof window._rebuildBackTypeColorTabs === 'function') window._rebuildBackTypeColorTabs();
+    if (typeof updateMobileColBarUI === 'function') updateMobileColBarUI();
+    saveHistoryState();
+};
+
+window.updateBackStretcherCount = function(delta) {
+    if (state.activeEditCol === -1 || !state.columns[state.activeEditCol]) return;
+    const col = state.columns[state.activeEditCol];
+    if (typeof window._ensureColumnBackFields === 'function') window._ensureColumnBackFields(col);
+    if (col.backType !== 'stretcher') return;
+    col.backStretchers.count = Math.max(1, Math.min(6, (col.backStretchers.count || 1) + delta));
+    if (typeof window._syncBackStretcherYs === 'function') window._syncBackStretcherYs(col);
+    const inp = document.getElementById('qe-stretcher-count-val');
+    if (inp) inp.value = col.backStretchers.count;
+    buildCabinet(); calculatePrice();
+    saveHistoryState();
+};
+
+window.updateBackStretcherCountInput = function(val) {
+    if (state.activeEditCol === -1 || !state.columns[state.activeEditCol]) return;
+    const col = state.columns[state.activeEditCol];
+    if (typeof window._ensureColumnBackFields === 'function') window._ensureColumnBackFields(col);
+    if (col.backType !== 'stretcher') return;
+    const n = parseInt(val, 10);
+    if (isNaN(n)) return;
+    col.backStretchers.count = Math.max(1, Math.min(6, n));
+    if (typeof window._syncBackStretcherYs === 'function') window._syncBackStretcherYs(col);
+    buildCabinet(); calculatePrice();
+    saveHistoryState();
+};
+
+window.updateBackStretcherHeight = function(delta) {
+    if (state.activeEditCol === -1 || !state.columns[state.activeEditCol]) return;
+    const col = state.columns[state.activeEditCol];
+    if (typeof window._ensureColumnBackFields === 'function') window._ensureColumnBackFields(col);
+    if (col.backType !== 'stretcher') return;
+    col.backStretchers.height = Math.max(5, Math.min(30, (col.backStretchers.height || 10) + delta));
+    if (typeof window._syncBackStretcherYs === 'function') window._syncBackStretcherYs(col);
+    const inp = document.getElementById('qe-stretcher-h-val');
+    if (inp) inp.value = col.backStretchers.height;
+    buildCabinet(); calculatePrice();
+    saveHistoryState();
+};
+
+window.updateBackStretcherHeightInput = function(val) {
+    if (state.activeEditCol === -1 || !state.columns[state.activeEditCol]) return;
+    const col = state.columns[state.activeEditCol];
+    if (typeof window._ensureColumnBackFields === 'function') window._ensureColumnBackFields(col);
+    if (col.backType !== 'stretcher') return;
+    const n = parseInt(val, 10);
+    if (isNaN(n)) return;
+    col.backStretchers.height = Math.max(5, Math.min(30, n));
+    if (typeof window._syncBackStretcherYs === 'function') window._syncBackStretcherYs(col);
+    buildCabinet(); calculatePrice();
+    saveHistoryState();
+};
+
 // ---- Per-door panel type tabs for sliding wardrobe sidebar ----
 window._isSlidingDoorColorPart = function(part) {
     return typeof part === 'string' && /^slidingDoor_\d+$/.test(part);
@@ -712,6 +820,66 @@ window._syncSlidingDoorTypePanel = function() {
     });
 };
 
+/** Inject per-back-type color tabs when the closet uses more than one back type. */
+window._rebuildBackTypeColorTabs = function() {
+    const tabRows = [
+        document.querySelector('#materials-section .color-part-tabs'),
+        document.querySelector('#mobile-panel-materials .color-part-tabs')
+    ].filter(Boolean);
+    if (!tabRows.length) return;
+
+    const used = (typeof window._collectUsedBackTypes === 'function')
+        ? window._collectUsedBackTypes(state.columns)
+        : ['mezuzah'];
+    const multi = used.length > 1;
+
+    tabRows.forEach(function(row) {
+        row.querySelectorAll('.part-tab-btn.back-type-part-tab').forEach(function(b) { b.remove(); });
+        const baseTab = row.querySelector('.part-tab-btn[data-part="materialBack"]');
+        if (baseTab) baseTab.style.display = multi ? 'none' : '';
+        if (!multi) return;
+
+        const isMobile = !!row.closest('#mobile-panel-materials');
+        let insertAfter = baseTab
+            || row.querySelector('.part-tab-btn[data-part="materialInternal"]')
+            || row.lastElementChild;
+        used.forEach(function(typeId) {
+            const part = 'materialBack_' + typeId;
+            const def = (window._BACK_TYPE_DEFS || []).find(function(d) { return d.id === typeId; });
+            const label = def ? def.shortLabel : typeId;
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'part-tab-btn back-type-part-tab';
+            btn.setAttribute('data-part', part);
+            if (isMobile) {
+                btn.textContent = label;
+            } else {
+                btn.innerHTML = '<i class="ptb-ic fa-solid fa-square-full"></i>'
+                    + '<span class="ptb-label">' + label + '</span>'
+                    + '<em class="ptb-dot"></em>';
+            }
+            if (state.activeColorPart === part) btn.classList.add('active');
+            btn.addEventListener('click', function() {
+                if (typeof window._selectColorPart === 'function') window._selectColorPart(part, btn);
+            });
+            if (insertAfter && insertAfter.parentNode === row) insertAfter.after(btn);
+            else row.appendChild(btn);
+            insertAfter = btn;
+        });
+    });
+
+    // If active part points at a removed back-type tab, fall back
+    const activeType = typeof window._backTypeFromColorPart === 'function'
+        ? window._backTypeFromColorPart(state.activeColorPart) : null;
+    if (activeType && used.indexOf(activeType) < 0) {
+        if (typeof window._selectColorPart === 'function') window._selectColorPart('materialBody');
+    } else if (state.activeColorPart === 'materialBack' && multi) {
+        const first = 'materialBack_' + used[0];
+        if (typeof window._selectColorPart === 'function') window._selectColorPart(first);
+    }
+    if (typeof window._syncPartTabDots === 'function') window._syncPartTabDots();
+};
+
 /** Inject "דלת 1/2/…" buttons into the shared color part-tabs (same row as גוף/מדפים). */
 window._rebuildDoorPanelTabs = function() {
     const sd = (typeof getSlidingDoor === 'function') ? getSlidingDoor() : null;
@@ -772,6 +940,7 @@ window._rebuildDoorPanelTabs = function() {
         }
     }
     if (typeof window._syncSlidingDoorTypePanel === 'function') window._syncSlidingDoorTypePanel();
+    if (typeof window._rebuildBackTypeColorTabs === 'function') window._rebuildBackTypeColorTabs();
     if (typeof window._syncPartTabDots === 'function') window._syncPartTabDots();
 };
 
@@ -2474,6 +2643,7 @@ function _upperUnitColumnIndex(colIdx, parentColumns, uuColumns) {
 }
 
 function _serializeColumnForClipboard(col) {
+    if (typeof window._ensureColumnBackFields === 'function') window._ensureColumnBackFields(col);
     return {
         shelves:      col.shelves,
         shelvesY:     col.shelvesY,
@@ -2487,6 +2657,10 @@ function _serializeColumnForClipboard(col) {
         spaceBottomPanel: col.spaceBottomPanel || false,
         topPanel:     col.topPanel || false,
         sinkPanel:    col.sinkPanel || false,
+        backType:     col.backType || 'mezuzah',
+        backStretchers: col.backStretchers
+            ? JSON.parse(JSON.stringify(col.backStretchers))
+            : { height: 10, count: 1, ys: [] },
         _height:      col.height,
         deskHeight:    col.deskHeight,
         deskClearance: col.deskClearance,
@@ -2525,6 +2699,10 @@ function _applyColumnClipboard(target, src) {
     target.spaceBottomPanel = !!srcCopy.spaceBottomPanel;
     target.topPanel     = srcCopy.topPanel || false;
     target.sinkPanel    = srcCopy.sinkPanel || false;
+    target.backType     = srcCopy.backType || 'mezuzah';
+    target.backStretchers = srcCopy.backStretchers
+        ? JSON.parse(JSON.stringify(srcCopy.backStretchers))
+        : { height: 10, count: 1, ys: [] };
     if (srcCopy.type === 'desk') {
         target.deskHeight     = srcCopy.deskHeight;
         target.deskClearance  = srcCopy.deskClearance;
@@ -3297,6 +3475,9 @@ window._serializeCabinetForTemplate = function() {
         materialDesk: state.materialDesk,
         materialOpenCell: state.materialOpenCell,
         materialBack: state.materialBack,
+        materialBackByType: state.materialBackByType
+            ? JSON.parse(JSON.stringify(state.materialBackByType))
+            : { mezuzah: null, back8: null, back17: null, stretcher: null },
         columns: state.columns,
         desk: state.desk,
         wings: state.wings,
@@ -3431,7 +3612,7 @@ window._applyCabinetTemplateRawState = function(rawState) {
         const flatFields = ['cabinetModel','placement','width','globalHeight','depth','thickness',
             'plinthHeight','hasDoors','handleType','handleStyle','cabinetModelLabel','manualPrice','boardMaterial',
             'materialBody','materialInternal','materialExternal','materialDesk','materialOpenCell',
-            'materialBack','columns','desk'];
+            'materialBack','materialBackByType','columns','desk'];
         flatFields.forEach(function(f) { if (rs[f] !== undefined) state[f] = rs[f]; });
     }
 
@@ -6747,6 +6928,30 @@ window.addEventListener('pointermove', e => {
         return;
     }
 
+    if (d.isBackStretcher) {
+        if (typeof window._ensureColumnBackFields === 'function') window._ensureColumnBackFields(col);
+        const bs = col.backStretchers;
+        const sh = bs.height || 10;
+        const fo = col.floorOffset || 0;
+        const bottomEdge = (col.noPlinth || fo > 0)
+            ? ((fo > 0 ? fo : 0) + t)
+            : (state.plinthHeight + t);
+        const topEdge = col.height - t;
+        const others = (bs.ys || []).filter(function(_, i) { return i !== d.stretcherIdx; });
+        let limitMin = bottomEdge + sh / 2 + 0.5;
+        let limitMax = topEdge - sh / 2 - 0.5;
+        others.forEach(function(y) {
+            if (y < startY) limitMin = Math.max(limitMin, y + sh + 1);
+            if (y > startY) limitMax = Math.min(limitMax, y - sh - 1);
+        });
+        const newY = Math.round(Math.max(limitMin, Math.min(limitMax, startY + deltaCm)) * 10) / 10;
+        bs.ys[d.stretcherIdx] = newY;
+        const tip = _findLiveHandleTooltip();
+        if (tip) tip.innerText = 'קושרת · ' + Math.round(newY) + ' ס"מ';
+        buildCabinetDragging();
+        return;
+    }
+
     if (d.isInternalDeskSurface) {
         col.deskHeight = Math.round(Math.max(50, Math.min(col.deskHeight + col.deskClearance - MIN_SHELF_GAP, startY + deltaCm)));
         distributeShelves(col);
@@ -7441,13 +7646,15 @@ function buildDragHandlesUI() {
             if(v.isInternalDeskClearance) text = 'גובה חלל עבודה';
             if(v.isInternalDeskDrawer) text = 'גובה מגירה פנימית';
             if(v.isSubCellShelf) text = 'הזז מדף תא';
+            if(v.isBackStretcher) text = 'הזז קושרת גב';
 
             const sHandle = createHandle('vertical', v.x, v.y, text);
             if(v.isSplit) { sHandle.style.borderColor = '#e74c3c'; sHandle.style.boxShadow = '0 2px 10px rgba(231, 76, 60, 0.4)'; }
             if(v.isInternalDeskSurface || v.isInternalDeskClearance) sHandle.style.borderColor = '#f1c40f';
             if(v.isSubCellShelf) { sHandle.style.borderColor = '#06b6d4'; sHandle.style.boxShadow = '0 2px 10px rgba(6,182,212,0.4)'; }
+            if(v.isBackStretcher) { sHandle.style.borderColor = '#8b5cf6'; sHandle.style.boxShadow = '0 2px 10px rgba(139,92,246,0.4)'; }
             // Store identity so shelf-delete trash can sit next to this handle
-            if (!v.isSplit && !v.isInternalDeskSurface && !v.isInternalDeskClearance && !v.isInternalDeskDrawer) {
+            if (!v.isSplit && !v.isInternalDeskSurface && !v.isInternalDeskClearance && !v.isInternalDeskDrawer && !v.isBackStretcher) {
                 sHandle.dataset.colIndex = v.colIndex;
                 if (v.isSubCellShelf) {
                     sHandle.dataset.subShelf = '1';
@@ -7457,6 +7664,11 @@ function buildDragHandlesUI() {
                 } else {
                     sHandle.dataset.shelfIdx = v.shelfIdx;
                 }
+            }
+            if (v.isBackStretcher) {
+                sHandle.dataset.colIndex = v.colIndex;
+                sHandle.dataset.stretcherIdx = v.stretcherIdx;
+                sHandle.dataset.backStretcher = '1';
             }
             dragLayer.appendChild(sHandle);
 
@@ -7469,11 +7681,14 @@ function buildDragHandlesUI() {
                     _vShelfDragActive.subShelfIdx === v.subShelfIdx) ||
                  (!_vShelfDragActive.isSubCellShelf && !v.isSubCellShelf &&
                     !_vShelfDragActive.isSplit && !v.isSplit &&
+                    !_vShelfDragActive.isBackStretcher && !v.isBackStretcher &&
                     !_vShelfDragActive.isInternalDeskSurface && !v.isInternalDeskSurface &&
                     !_vShelfDragActive.isInternalDeskClearance && !v.isInternalDeskClearance &&
                     !_vShelfDragActive.isInternalDeskDrawer && !v.isInternalDeskDrawer &&
                     _vShelfDragActive.shelfIdx === v.shelfIdx) ||
                  (_vShelfDragActive.isSplit && v.isSplit) ||
+                 (_vShelfDragActive.isBackStretcher && v.isBackStretcher &&
+                    _vShelfDragActive.stretcherIdx === v.stretcherIdx) ||
                  (_vShelfDragActive.isInternalDeskSurface && v.isInternalDeskSurface) ||
                  (_vShelfDragActive.isInternalDeskClearance && v.isInternalDeskClearance) ||
                  (_vShelfDragActive.isInternalDeskDrawer && v.isInternalDeskDrawer))) {
@@ -7487,6 +7702,10 @@ function buildDragHandlesUI() {
 
                 let startY = 0;
                 if (v.isSplit) startY = col.splitY;
+                else if (v.isBackStretcher) {
+                    startY = (col.backStretchers && col.backStretchers.ys)
+                        ? col.backStretchers.ys[v.stretcherIdx] : v.y;
+                }
                 else if (v.isInternalDeskSurface) startY = col.deskHeight;
                 else if (v.isInternalDeskClearance) startY = col.deskHeight + col.deskClearance;
                 else if (v.isInternalDeskDrawer) startY = col.drawerHeight;
@@ -7501,10 +7720,12 @@ function buildDragHandlesUI() {
                 window._vShelfDrag = {
                     colIndex: v.colIndex,
                     shelfIdx: v.shelfIdx,
+                    stretcherIdx: v.stretcherIdx,
                     rowIndex: v.rowIndex,
                     subCellIdx: v.subCellIdx,
                     subShelfIdx: v.subShelfIdx,
                     isSplit: !!v.isSplit,
+                    isBackStretcher: !!v.isBackStretcher,
                     isSubCellShelf: !!v.isSubCellShelf,
                     isInternalDeskSurface: !!v.isInternalDeskSurface,
                     isInternalDeskClearance: !!v.isInternalDeskClearance,
@@ -9505,6 +9726,11 @@ function bindUI() {
             const sd = typeof getSlidingDoor === 'function' ? getSlidingDoor() : null;
             const bodyMat = (state.wings && state.wings.center && state.wings.center.materialBody) || state.materialBody || 'white_matte';
             currentMat = (sd && sd.doorColors && sd.doorColors[idx]) || bodyMat;
+        } else if (typeof window._backTypeFromColorPart === 'function' && window._backTypeFromColorPart(clickedPart)) {
+            const bt = window._backTypeFromColorPart(clickedPart);
+            currentMat = (typeof window._getBackMaterialKey === 'function')
+                ? window._getBackMaterialKey(bt)
+                : (state.materialBack || 'white_matte');
         } else {
             currentMat = state[clickedPart];
         }
@@ -9576,6 +9802,23 @@ function bindUI() {
                 if (typeof window.applyUpperUnitMaterial === 'function') window.applyUpperUnitMaterial(matValue);
                 return;
             }
+            // Special: per-back-type color tab
+            const _backTypePart = (typeof window._backTypeFromColorPart === 'function')
+                ? window._backTypeFromColorPart(state.activeColorPart) : null;
+            if (_backTypePart) {
+                const byType = (typeof window._ensureMaterialBackByType === 'function')
+                    ? window._ensureMaterialBackByType()
+                    : (state.materialBackByType = state.materialBackByType || {});
+                byType[_backTypePart] = matValue;
+                // Keep legacy materialBack in sync when this is the only / primary type
+                const used = (typeof window._collectUsedBackTypes === 'function')
+                    ? window._collectUsedBackTypes(state.columns) : [];
+                if (used.length <= 1 || used[0] === _backTypePart) state.materialBack = matValue;
+                buildCabinet();
+                if (typeof calculatePrice === 'function') calculatePrice();
+                saveHistoryState();
+                return;
+            }
             // Special: "ארון צד" material tab — apply color to all side cabinet material fields
             if (state.activeColorPart === 'materialSideCabinet') {
                 const sc = state.wings.center ? state.wings.center.sideCabinet : null;
@@ -9593,6 +9836,14 @@ function bindUI() {
                 }
             } else {
                 state[state.activeColorPart] = matValue;
+                if (state.activeColorPart === 'materialBack') {
+                    const byType = (typeof window._ensureMaterialBackByType === 'function')
+                        ? window._ensureMaterialBackByType()
+                        : null;
+                    const used = (typeof window._collectUsedBackTypes === 'function')
+                        ? window._collectUsedBackTypes(state.columns) : ['mezuzah'];
+                    if (byType && used.length === 1) byType[used[0]] = matValue;
+                }
                 if (state.activeColorPart === 'materialExternal' && state.wings.center) {
                     if (typeof window._syncSideCabinetDoorMaterial === 'function') {
                         window._syncSideCabinetDoorMaterial(state.wings.center);
@@ -9640,10 +9891,20 @@ function bindUI() {
                         if (state.wings.center) state.wings.center.materialSideCabinet = 'custom';
                     }
                 } else {
-                    state[state.activeColorPart] = 'custom';
-                    if (state.activeColorPart === 'materialExternal' && state.wings.center) {
-                        if (typeof window._syncSideCabinetDoorMaterial === 'function') {
-                            window._syncSideCabinetDoorMaterial(state.wings.center);
+                    const _btUpload = (typeof window._backTypeFromColorPart === 'function')
+                        ? window._backTypeFromColorPart(state.activeColorPart) : null;
+                    if (_btUpload) {
+                        const byType = (typeof window._ensureMaterialBackByType === 'function')
+                            ? window._ensureMaterialBackByType()
+                            : (state.materialBackByType = state.materialBackByType || {});
+                        byType[_btUpload] = 'custom';
+                        state.materialBack = 'custom';
+                    } else {
+                        state[state.activeColorPart] = 'custom';
+                        if (state.activeColorPart === 'materialExternal' && state.wings.center) {
+                            if (typeof window._syncSideCabinetDoorMaterial === 'function') {
+                                window._syncSideCabinetDoorMaterial(state.wings.center);
+                            }
                         }
                     }
                 }
@@ -11547,7 +11808,7 @@ function _applyRawStateForCapture(rawState) {
         state.presetId = rs.presetId || 'linear';
         const flatFromWing = ['cabinetModel', 'placement', 'boardMaterial', 'handleType', 'handleStyle',
             'cabinetName', 'cabinetModelLabel', 'cabinetNotes', 'manualPrice', 'materialBody', 'materialInternal',
-            'materialExternal', 'materialDesk', 'materialOpenCell', 'materialBack'];
+            'materialExternal', 'materialDesk', 'materialOpenCell', 'materialBack', 'materialBackByType'];
         flatFromWing.forEach(f => { if (rs[f] !== undefined) state[f] = rs[f]; });
     } else {
         state.presetId = 'linear';
@@ -11557,7 +11818,7 @@ function _applyRawStateForCapture(rawState) {
         const flatFields = ['cabinetModel', 'placement', 'width', 'globalHeight', 'depth', 'thickness',
             'plinthHeight', 'hasDoors', 'handleType', 'handleStyle', 'cabinetName', 'cabinetModelLabel', 'cabinetNotes', 'manualPrice', 'boardMaterial',
             'materialBody', 'materialInternal', 'materialExternal', 'materialDesk', 'materialOpenCell',
-            'materialBack', 'columns', 'desk'];
+            'materialBack', 'materialBackByType', 'columns', 'desk'];
         flatFields.forEach(f => { if (rs[f] !== undefined) state[f] = rs[f]; });
     }
     state.wingEditMode = false;
@@ -13106,6 +13367,7 @@ window.addSpaceCabinet = function() {
 window._SPACE_UNIT_HOST_FIELDS = [
     'globalHeight', 'depth', 'thickness', 'plinthHeight', 'cabinetModel', 'boardMaterial',
     'materialBody', 'materialInternal', 'materialExternal', 'materialOpenCell', 'materialBack',
+    'materialBackByType',
     'handleType', 'handleStyle', 'handleVariant', 'ridingColor'
 ];
 
@@ -14869,7 +15131,7 @@ window._editCartItemNow = function(index) {
         const flatFields = ['cabinetModel','placement','width','globalHeight','depth','thickness',
             'plinthHeight','hasDoors','handleType','handleStyle','cabinetName','cabinetModelLabel','cabinetNotes','manualPrice','boardMaterial',
             'materialBody','materialInternal','materialExternal','materialDesk','materialOpenCell',
-            'materialBack','columns','desk'];
+            'materialBack','materialBackByType','columns','desk'];
         flatFields.forEach(function(f) { if (rs[f] !== undefined) state[f] = rs[f]; });
     }
 

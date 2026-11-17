@@ -1829,6 +1829,33 @@
                 <i class="fa-solid fa-border-bottom-right"></i> ביטול צוקל
             </button>
         </div>
+        <div class="qe-group qe-back-type-wrap" id="qe-back-type-group">
+            <div class="qe-divider"></div>
+            <div class="qe-dropdown">
+                <button type="button" id="qe-btn-back-type" class="qe-toggle-btn" onclick="toggleBackTypeMenu(event)">
+                    <i class="fa-solid fa-border-all"></i> <span id="qe-back-type-label">גב מזונית</span>
+                    <i class="fa-solid fa-caret-down" style="font-size:.75rem;opacity:.7;"></i>
+                </button>
+                <div id="qe-back-type-menu" class="qe-dropdown-menu" style="display:none;">
+                    <button type="button" class="qe-dropdown-item" data-back-type="mezuzah" onclick="setColumnBackType('mezuzah')">גב מזונית</button>
+                    <button type="button" class="qe-dropdown-item" data-back-type="back8" onclick="setColumnBackType('back8')">גב 8 מ"מ</button>
+                    <button type="button" class="qe-dropdown-item" data-back-type="back17" onclick="setColumnBackType('back17')">גב 17 מ"מ</button>
+                    <button type="button" class="qe-dropdown-item" data-back-type="stretcher" onclick="setColumnBackType('stretcher')">קושרת</button>
+                </div>
+            </div>
+        </div>
+        <div class="qe-group" id="qe-stretcher-height-group" style="display:none;">
+            <span class="qe-label"><i class="fa-solid fa-ruler-vertical"></i> גובה קושרת</span>
+            <button class="qe-btn" onclick="updateBackStretcherHeight(1)"><i class="fa-solid fa-plus"></i></button>
+            <div class="qe-input-wrap"><input class="qe-input qe-input-sm" id="qe-stretcher-h-val" type="number" step="1" min="5" max="30" onchange="updateBackStretcherHeightInput(this.value)"/></div>
+            <button class="qe-btn" onclick="updateBackStretcherHeight(-1)"><i class="fa-solid fa-minus"></i></button>
+        </div>
+        <div class="qe-group" id="qe-stretcher-count-group" style="display:none;">
+            <span class="qe-label"><i class="fa-solid fa-grip-lines"></i> כמות קושרות</span>
+            <button class="qe-btn" onclick="updateBackStretcherCount(1)"><i class="fa-solid fa-plus"></i></button>
+            <div class="qe-input-wrap"><input class="qe-input qe-input-sm" id="qe-stretcher-count-val" type="number" step="1" min="1" max="6" onchange="updateBackStretcherCountInput(this.value)"/></div>
+            <button class="qe-btn" onclick="updateBackStretcherCount(-1)"><i class="fa-solid fa-minus"></i></button>
+        </div>
         <div class="qe-group" id="qe-top-panel-group">
             <div class="qe-divider"></div>
             <button id="qe-btn-top-panel" class="qe-toggle-btn" onclick="toggleTopPanel();">
@@ -2821,6 +2848,37 @@
         <button id="mcb-btn-noplinth" class="mcb-toggle" onclick="toggleNoPlinth(); updateMobileColBarUI()">
             <i class="fa-solid fa-border-bottom-right"></i><span>צוקל</span>
         </button>
+        <div class="mcb-divider"></div>
+        <div class="mcb-group mcb-back-type-wrap" style="position:relative;">
+            <button id="mcb-btn-back-type" class="mcb-toggle" onclick="toggleMobileBackTypeMenu(event)">
+                <i class="fa-solid fa-border-all"></i><span id="mcb-back-type-label">מזונית</span>
+            </button>
+            <div id="mcb-back-type-menu" class="qe-dropdown-menu mcb-dropdown-menu" style="display:none;">
+                <button type="button" class="qe-dropdown-item" data-back-type="mezuzah" onclick="setColumnBackType('mezuzah'); updateMobileColBarUI()">גב מזונית</button>
+                <button type="button" class="qe-dropdown-item" data-back-type="back8" onclick="setColumnBackType('back8'); updateMobileColBarUI()">גב 8 מ"מ</button>
+                <button type="button" class="qe-dropdown-item" data-back-type="back17" onclick="setColumnBackType('back17'); updateMobileColBarUI()">גב 17 מ"מ</button>
+                <button type="button" class="qe-dropdown-item" data-back-type="stretcher" onclick="setColumnBackType('stretcher'); updateMobileColBarUI()">קושרת</button>
+            </div>
+        </div>
+    </div>
+    <div class="mcb-row mcb-row2" id="mcb-stretcher-row" style="display:none;">
+        <div class="mcb-group">
+            <span class="mcb-label">גובה קושרת</span>
+            <div class="mcb-stepper">
+                <button class="mcb-btn" onclick="updateBackStretcherHeight(-1); updateMobileColBarUI()"><i class="fa-solid fa-minus"></i></button>
+                <input type="number" id="mcb-stretcher-h-val" class="mcb-val" value="10" min="5" max="30" onchange="updateBackStretcherHeightInput(this.value); updateMobileColBarUI()">
+                <button class="mcb-btn" onclick="updateBackStretcherHeight(1); updateMobileColBarUI()"><i class="fa-solid fa-plus"></i></button>
+            </div>
+        </div>
+        <div class="mcb-divider"></div>
+        <div class="mcb-group">
+            <span class="mcb-label">כמות</span>
+            <div class="mcb-stepper">
+                <button class="mcb-btn" onclick="updateBackStretcherCount(-1); updateMobileColBarUI()"><i class="fa-solid fa-minus"></i></button>
+                <input type="number" id="mcb-stretcher-count-val" class="mcb-val" value="1" min="1" max="6" onchange="updateBackStretcherCountInput(this.value); updateMobileColBarUI()">
+                <button class="mcb-btn" onclick="updateBackStretcherCount(1); updateMobileColBarUI()"><i class="fa-solid fa-plus"></i></button>
+            </div>
+        </div>
     </div>
     <!-- Split-height shelves: independent lower / upper counters -->
     <div class="mcb-row mcb-row2" id="mcb-split-shelves-row" style="display:none;">

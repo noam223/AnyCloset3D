@@ -137,6 +137,26 @@ function updateMobileColBarUI() {
     if (heightVal)   heightVal.value   = Math.round(col.height || 0);
     if (noplinthBtn) noplinthBtn.classList.toggle('active', !!col.noPlinth);
 
+    if (typeof window._ensureColumnBackFields === 'function') window._ensureColumnBackFields(col);
+    const backType = col.backType || 'mezuzah';
+    const backLbl = document.getElementById('mcb-back-type-label');
+    if (backLbl) {
+        const def = (window._BACK_TYPE_DEFS || []).find(function(d) { return d.id === backType; });
+        backLbl.textContent = def ? def.shortLabel : 'מזונית';
+    }
+    document.querySelectorAll('#mcb-back-type-menu .qe-dropdown-item').forEach(function(btn) {
+        btn.classList.toggle('active', btn.getAttribute('data-back-type') === backType);
+    });
+    const stretchRow = document.getElementById('mcb-stretcher-row');
+    if (stretchRow) stretchRow.style.display = backType === 'stretcher' ? 'flex' : 'none';
+    if (backType === 'stretcher') {
+        if (typeof window._syncBackStretcherYs === 'function') window._syncBackStretcherYs(col);
+        const hInp = document.getElementById('mcb-stretcher-h-val');
+        const cInp = document.getElementById('mcb-stretcher-count-val');
+        if (hInp) hInp.value = col.backStretchers.height || 10;
+        if (cInp) cInp.value = col.backStretchers.count || 1;
+    }
+
     // Desk row — always visible (allows toggling desk on/off)
     const deskRow = document.getElementById('mcb-desk-row');
     const deskBtn = document.getElementById('mcb-btn-desk');
@@ -152,6 +172,22 @@ function updateMobileColBarUI() {
     }
 }
 window.updateMobileColBarUI = updateMobileColBarUI;
+
+window.toggleMobileBackTypeMenu = function(e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    const menu = document.getElementById('mcb-back-type-menu');
+    if (!menu) return;
+    const open = menu.style.display === 'none' || !menu.style.display;
+    menu.style.display = open ? 'block' : 'none';
+    if (open) {
+        const closer = function(ev) {
+            if (ev.target.closest && ev.target.closest('.mcb-back-type-wrap')) return;
+            menu.style.display = 'none';
+            document.removeEventListener('pointerdown', closer, true);
+        };
+        setTimeout(function() { document.addEventListener('pointerdown', closer, true); }, 0);
+    }
+};
 
 // ── Right panel navigation helpers ──────────────────────────────────────────
 
