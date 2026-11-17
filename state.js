@@ -98,7 +98,8 @@ function _syncSlidingColumns(wing) {
             topPanel: false,
             sinkPanel: false,
             backType: 'mezuzah',
-            backStretchers: { height: 10, count: 1, ys: [] }
+            backStretchers: { height: 10, count: 1, ys: [] },
+            stretcherShelfIdxs: []
         };
         _distributeShelves(col, wing);
         return col;
@@ -1731,6 +1732,7 @@ function _hideWingTab(side) {
 window.syncSidebarToWing = function() {
     const w = getWing();
     if (!w) return;
+    if (typeof window._ensureAllStretcherShelfIdxs === 'function') window._ensureAllStretcherShelfIdxs(w);
 
     const _aw = state.activeWing;
     // _isUUEdit: true when the user is editing the upper unit inline (state._activeUpperUnit is set)
@@ -3784,6 +3786,9 @@ function _removePhysicalShelfByIndex(col, si, wingData) {
 
     col.shelvesY.splice(si, 1);
     col.shelves = col.shelvesY.length;
+    if (typeof window._remapStretcherAfterShelfRemove === 'function') {
+        window._remapStretcherAfterShelfRemove(col, si);
+    }
     return true;
 }
 
@@ -3813,6 +3818,9 @@ function _insertPhysicalShelfAtY(col, newY, wingData) {
     if (insertAt < 0) insertAt = col.shelvesY.length;
     col.shelvesY.splice(insertAt, 0, y);
     col.shelves = col.shelvesY.length;
+    if (typeof window._remapStretcherAfterShelfInsert === 'function') {
+        window._remapStretcherAfterShelfInsert(col, insertAt);
+    }
 
     while (col.compartments.length <= hostRow) col.compartments.push(_emptyCompartment());
     col.compartments.splice(hostRow + 1, 0, _emptyCompartment());
@@ -3876,6 +3884,90 @@ function _shiftDoorsRemove(col, at) {
         });
     });
 }
+
+/** Ensure column.stretcherShelfIdxs is valid; default one mid-height shelf when empty. */
+window._syncStretcherShelfIdxs = function(col) {
+    if (!col) return;
+    const n = Array.isArray(col.shelvesY) ? col.shelvesY.length : 0;
+    if (!Array.isArray(col.stretcherShelfIdxs)) col.stretcherShelfIdxs = [];
+    col.stretcherShelfIdxs = col.stretcherShelfIdxs
+        .map(function(i) { return i | 0; })
+        .filter(function(i, idx, arr) { return i >= 0 && i < n && arr.indexOf(i) === idx; })
+        .sort(function(a, b) { return a - b; });
+    if (n === 0) {
+        col.stretcherShelfIdxs = [];
+        return;
+    }
+    if (col.stretcherShelfIdxs.length) return;
+    const baseY = (typeof _columnBaseY === 'function') ? _columnBaseY(col) : (col.floorOffset || 0);
+    const midY = (baseY + (col.height || 0)) / 2;
+    let best = 0;
+    let bestD = Infinity;
+    for (let i = 0; i < n; i++) {
+        const d = Math.abs((col.shelvesY[i] || 0) - midY);
+        if (d < bestD) { bestD = d; best = i; }
+    }
+    col.stretcherShelfIdxs = [best];
+};
+
+window._ensureAllStretcherShelfIdxs = function(wing) {
+    const w = wing || (typeof getWing === 'function' ? getWing() : null);
+    const cols = (w && w.columns) || (typeof state !== 'undefined' && state.columns) || [];
+    cols.forEach(function(col) {
+        if (col) window._syncStretcherShelfIdxs(col);
+    });
+};
+
+window._isStretcherShelf = function(col, shelfIdx) {
+    if (!col || !Array.isArray(col.stretcherShelfIdxs)) return false;
+    return col.stretcherShelfIdxs.indexOf(shelfIdx | 0) >= 0;
+};
+
+/** Toggle stretcher mark; refuses to clear the last stretcher when the column still has shelves. */
+window._toggleStretcherShelf = function(colIndex, shelfIdx) {
+    const cols = (typeof state !== 'undefined' && state.columns) ? state.columns : null;
+    if (!cols || colIndex < 0 || colIndex >= cols.length) return false;
+    const col = cols[colIndex];
+    if (!col || !Array.isArray(col.shelvesY)) return false;
+    const si = shelfIdx | 0;
+    if (si < 0 || si >= col.shelvesY.length) return false;
+    window._syncStretcherShelfIdxs(col);
+    const list = col.stretcherShelfIdxs;
+    const at = list.indexOf(si);
+    if (at >= 0) {
+        if (list.length <= 1) {
+            if (typeof _showToast === 'function') {
+                _showToast('צריך לפחות קושרת אחת בכל עמודה', 2800);
+            }
+            return false;
+        }
+        list.splice(at, 1);
+    } else {
+        list.push(si);
+        list.sort(function(a, b) { return a - b; });
+    }
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+    if (typeof buildCabinet === 'function') buildCabinet();
+    return true;
+};
+
+window._remapStretcherAfterShelfRemove = function(col, removedIdx) {
+    if (!col) return;
+    const si = removedIdx | 0;
+    if (!Array.isArray(col.stretcherShelfIdxs)) col.stretcherShelfIdxs = [];
+    col.stretcherShelfIdxs = col.stretcherShelfIdxs
+        .filter(function(i) { return i !== si; })
+        .map(function(i) { return i > si ? i - 1 : i; });
+    window._syncStretcherShelfIdxs(col);
+};
+
+window._remapStretcherAfterShelfInsert = function(col, insertAt) {
+    if (!col) return;
+    const at = insertAt | 0;
+    if (!Array.isArray(col.stretcherShelfIdxs)) col.stretcherShelfIdxs = [];
+    col.stretcherShelfIdxs = col.stretcherShelfIdxs.map(function(i) { return i >= at ? i + 1 : i; });
+    window._syncStretcherShelfIdxs(col);
+};
 
 /**
  * Delete one physical shelf by shelvesY index, merging the two cells it separated.
@@ -3949,6 +4041,9 @@ window.deleteShelfAt = function(colIndex, shelfIdx) {
 
     col.shelvesY.splice(si, 1);
     col.shelves = col.shelvesY.length;
+    if (typeof window._remapStretcherAfterShelfRemove === 'function') {
+        window._remapStretcherAfterShelfRemove(col, si);
+    }
 
     if (typeof _syncCompartmentCount === 'function') _syncCompartmentCount(col, baseY, t);
     if (typeof _clampDrawerCompartments === 'function') _clampDrawerCompartments(col, baseY, t);
@@ -4274,6 +4369,7 @@ function _distributeShelves(col, wingData) {
         delete col._pendingMergePinComp;
     }
     _clampDrawerCompartments(col, baseY, t);
+    if (typeof window._syncStretcherShelfIdxs === 'function') window._syncStretcherShelfIdxs(col);
 }
 
 function distributeShelves(col) {
@@ -4571,7 +4667,10 @@ function _blankColumn(width, template) {
         backType: (template && template.backType) || 'mezuzah',
         backStretchers: (template && template.backStretchers)
             ? JSON.parse(JSON.stringify(template.backStretchers))
-            : { height: 10, count: 1, ys: [] }
+            : { height: 10, count: 1, ys: [] },
+        stretcherShelfIdxs: Array.isArray(template && template.stretcherShelfIdxs)
+            ? template.stretcherShelfIdxs.slice()
+            : []
     };
     distributeShelves(col);
     return col;

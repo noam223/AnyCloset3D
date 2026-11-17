@@ -6281,9 +6281,15 @@ function _mergeAdjacentRowsIntoPartition(col, rows) {
     shelfIdxs.sort((a, b) => b - a);
     if (!Array.isArray(col.shelvesY)) col.shelvesY = [];
     shelfIdxs.forEach(si => {
-        if (si >= 0 && si < col.shelvesY.length) col.shelvesY.splice(si, 1);
+        if (si >= 0 && si < col.shelvesY.length) {
+            col.shelvesY.splice(si, 1);
+            if (typeof window._remapStretcherAfterShelfRemove === 'function') {
+                window._remapStretcherAfterShelfRemove(col, si);
+            }
+        }
     });
     col.shelves = col.shelvesY.length;
+    if (typeof window._syncStretcherShelfIdxs === 'function') window._syncStretcherShelfIdxs(col);
 
     col.compartments[startR] = seedClone;
     _enablePartitionOnComp(seedClone);

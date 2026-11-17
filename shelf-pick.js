@@ -498,11 +498,60 @@
             document.body.appendChild(btn);
         }
         btn.style.display = 'flex';
+        _showStretcherBtn();
     }
 
     function _hideTrash() {
         const btn = document.getElementById('sp-shelf-trash');
         if (btn) btn.style.display = 'none';
+        _hideStretcherBtn();
+    }
+
+    function _showStretcherBtn() {
+        // Only main shelves can be stretchers (not sub-shelves)
+        if (!_selectedRef || _selectedRef.isSub) {
+            _hideStretcherBtn();
+            return;
+        }
+        let btn = document.getElementById('sp-shelf-stretcher');
+        if (!btn) {
+            btn = document.createElement('button');
+            btn.id = 'sp-shelf-stretcher';
+            btn.type = 'button';
+            btn.className = 'sp-shelf-stretcher';
+            btn.title = 'סמן מדף כקושרת לחיבורי גוף (מיניפיקס)';
+            btn.innerHTML = '<i class="fa-solid fa-link"></i><span>קושרת</span>';
+            btn.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!_selectedRef || _selectedRef.isSub) return;
+                if (typeof window._toggleStretcherShelf === 'function') {
+                    window._toggleStretcherShelf(_selectedRef.colIndex, _selectedRef.shelfIdx);
+                }
+                _syncStretcherBtnState();
+            });
+            document.body.appendChild(btn);
+        }
+        btn.style.display = 'flex';
+        _syncStretcherBtnState();
+    }
+
+    function _hideStretcherBtn() {
+        const btn = document.getElementById('sp-shelf-stretcher');
+        if (btn) btn.style.display = 'none';
+    }
+
+    function _syncStretcherBtnState() {
+        const btn = document.getElementById('sp-shelf-stretcher');
+        if (!btn || !_selectedRef || _selectedRef.isSub) return;
+        const cols = (typeof state !== 'undefined' && state.columns) ? state.columns : null;
+        const col = cols && cols[_selectedRef.colIndex];
+        const on = typeof window._isStretcherShelf === 'function' &&
+            window._isStretcherShelf(col, _selectedRef.shelfIdx);
+        btn.classList.toggle('is-on', !!on);
+        btn.title = on
+            ? 'קושרת פעילה — לחץ לביטול (חייבת להישאר לפחות אחת בעמודה)'
+            : 'סמן מדף כקושרת לחיבורי גוף (מיניפיקס)';
     }
 
     function _findShelfDragHandle() {
@@ -529,27 +578,33 @@
 
     function _updateTrashPos() {
         const btn = document.getElementById('sp-shelf-trash');
+        const stretchBtn = document.getElementById('sp-shelf-stretcher');
         const canvas = _getCanvas();
         const camera = _getCamera();
         if (!btn || !canvas || !camera || !_selectedMesh) return;
 
+        let left;
+        let top;
         const handle = _findShelfDragHandle();
         if (handle) {
             const hr = handle.getBoundingClientRect();
             // Visual right of the up/down drag arrows
-            btn.style.left = Math.round(hr.right + 6) + 'px';
-            btn.style.top = Math.round(hr.top + hr.height / 2) + 'px';
-            return;
+            left = Math.round(hr.right + 6);
+            top = Math.round(hr.top + hr.height / 2);
+        } else {
+            // Fallback: shelf mesh center
+            _selectedMesh.getWorldPosition(_worldPos);
+            _worldPos.project(camera);
+            const rect = canvas.getBoundingClientRect();
+            left = Math.round((_worldPos.x * 0.5 + 0.5) * rect.width + rect.left + 18);
+            top = Math.round((-_worldPos.y * 0.5 + 0.5) * rect.height + rect.top);
         }
-
-        // Fallback: shelf mesh center
-        _selectedMesh.getWorldPosition(_worldPos);
-        _worldPos.project(camera);
-        const rect = canvas.getBoundingClientRect();
-        const x = (_worldPos.x * 0.5 + 0.5) * rect.width + rect.left;
-        const y = (-_worldPos.y * 0.5 + 0.5) * rect.height + rect.top;
-        btn.style.left = Math.round(x + 18) + 'px';
-        btn.style.top = Math.round(y) + 'px';
+        btn.style.left = left + 'px';
+        btn.style.top = top + 'px';
+        if (stretchBtn && stretchBtn.style.display !== 'none') {
+            stretchBtn.style.left = (left + 28) + 'px';
+            stretchBtn.style.top = top + 'px';
+        }
     }
     window._updateShelfTrashPos = _updateTrashPos;
 
@@ -625,7 +680,9 @@
             }
             return 'none';
         }
-        if (e.target && e.target.closest && e.target.closest('#sp-shelf-trash')) return 'handled';
+        if (e.target && e.target.closest && (
+            e.target.closest('#sp-shelf-trash') || e.target.closest('#sp-shelf-stretcher')
+        )) return 'handled';
         const hit = _raycast(e);
         if (!hit) {
             if (_selectedRef) _clearSelectionVisual();

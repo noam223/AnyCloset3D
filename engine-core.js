@@ -4942,6 +4942,7 @@ function buildCabinet() {
     if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
     // Order options panel: LED auto-mark and per-cabinet values follow every rebuild
     if (typeof window._syncOrderOptsUI === 'function') window._syncOrderOptsUI();
+    if (typeof window._ensureAllStretcherShelfIdxs === 'function') window._ensureAllStretcherShelfIdxs();
 
     // Outside תכנון חדר / תצוגה חופשית the room is only an editor backdrop (see _syncRoomBackdrop).
     // While room-plan UI is open, a temporary front view (autosave thumbnail) must not turn
@@ -8627,7 +8628,9 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
                 // Merged: the corner desk's board continues into the column here — keep only the pick target
                 if (_cuDeskMat && shelfMesh) shelfMesh.visible = false;
                 if (!isBP && shelfMesh) {
-                    shelfMesh.userData.shelfRef = { colIndex: c, shelfIdx: div.idx };
+                    const _isStretch = !!(col.stretcherShelfIdxs && col.stretcherShelfIdxs.indexOf(div.idx) >= 0);
+                    shelfMesh.userData.cncStretcher = _isStretch;
+                    shelfMesh.userData.shelfRef = { colIndex: c, shelfIdx: div.idx, isStretcher: _isStretch };
                     _registerShelfPickMesh(shelfMesh, boardW, shelfThick, boardD);
                 }
             }

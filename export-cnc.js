@@ -400,6 +400,7 @@
             p.ops = [];
             p.notes = [];
             p.horizontal = Math.abs(_normal(p).dot(UP)) > 0.9;
+            p.cncStretcher = !!ud.cncStretcher || !!(ud.shelfRef && ud.shelfRef.isStretcher);
             const fl = ud.cncFront || [0, 0, 1];
             p.front = V3(0, 0, 0).addScaledVector(p.ax[0], fl[0]).addScaledVector(p.ax[1], fl[1]).addScaledVector(p.ax[2], fl[2]).normalize();
             p.frontKnown = !!ud.cncFront || !noFront;
@@ -890,9 +891,14 @@
             if (_thick(door) < cfg.cupDepth + 2) model.warnings.push('דלת בעובי ' + _fmt(_thick(door)) + ' מ"מ דקה מדי לכוס ציר בעומק ' + cfg.cupDepth);
         });
 
-        // --- carcass connectors: confirmat / minifix / dowels in sides against fixed horizontals ---
+        // --- carcass connectors: confirmat / minifix / dowels against fixed horizontals + stretcher shelves ---
         const FIXED_H = { TOP: 1, BOTTOM: 1, DESK: 1, SPLIT: 1 };
         const VERT = { SIDE_L: 1, SIDE_R: 1, DIVIDER: 1, UNIT_SIDE: 1, PARTITION: 1 };
+        const _isConnectorHorizontal = function(H) {
+            if (!H || !H.horizontal || H.poly || H.corner) return false;
+            if (FIXED_H[H.role.code]) return true;
+            return H.role.code === 'SHELF' && !!H.cncStretcher;
+        };
         const verts = body.filter(function(p) {
             return VERT[p.role.code] && !p.horizontal && !p.poly && !p.corner && !p.synthetic && _thick(p) >= 12;
         });
@@ -901,8 +907,18 @@
         const wantMini = cfg.carcassConnectors && connType === 'minifix';
         const wantDowel = cfg.carcassConnectors && (connType === 'dowels' || connType === 'confirmat+dowels' || connType === 'minifix');
         if (cfg.carcassConnectors && (wantConf || wantMini || wantDowel)) {
+            // Warn when a column has shelves but no stretcher (minifix cams live on stretchers)
+            if (wantMini && typeof state !== 'undefined' && Array.isArray(state.columns)) {
+                state.columns.forEach(function(col, ci) {
+                    if (!col || !Array.isArray(col.shelvesY) || !col.shelvesY.length) return;
+                    if (typeof window._syncStretcherShelfIdxs === 'function') window._syncStretcherShelfIdxs(col);
+                    if (!col.stretcherShelfIdxs || !col.stretcherShelfIdxs.length) {
+                        model.warnings.push('עמודה ' + (ci + 1) + ': אין מדף מסומן כקושרת — סמן לפחות מדף אחד בעורך');
+                    }
+                });
+            }
             model.panels.forEach(function(H) {
-                if (!FIXED_H[H.role.code] || !H.horizontal || H.poly || H.corner) return;
+                if (!_isConnectorHorizontal(H)) return;
                 const sUp = _iv(H, UP);
                 const y = (sUp[0] + sUp[1]) / 2;
                 const find = function(dir) {
@@ -933,13 +949,43 @@
                 const pos = [];
                 for (let i = 0; i < n; i++) pos.push(dIv[0] + inset + (n === 1 ? 0 : (len - 2 * inset) * i / (n - 1)));
                 let any = false;
+                // Minifix cams sit in the underside of the horizontal (stretcher / top / bottom)
+                const hCamFace = -1;
+                const camEndInset = Math.max((cfg.minifixCamDia || 15) / 2 + 4, 10);
                 pick.sides.forEach(function(side) {
                     side.panels.forEach(function(P) {
                         const pFace = _sgn(-side.dir.dot(_normal(P)));
                         const faceCoord = _iv(P, side.dir)[0];
+                        const hEnd = _iv(H, side.dir)[1];
+                        const hCamAlong = hEnd - camEndInset;
                         pos.forEach(function(dPos) {
                             const pe = _iv(P, depth);
                             if (dPos < pe[0] + 8 || dPos > pe[1] - 8) return;
+                            if (wantMini) {
+                                const hFaceY = _iv(H, UP)[0]; // underside plane of horizontal
+                                const ptH = _pt(side.dir, hCamAlong, depth, dPos, UP, hFaceY);
+                                const pushOnH = function(dia, depthMm, tag, pt) {
+                                    const depthFit = _r1(Math.min(depthMm, _thick(H) - 2));
+                                    if (depthFit < 5) return;
+                                    const clash = H.ops.some(function(o) {
+                                        return o.type === 'drill' && o.face === hCamFace && o.p.distanceTo(pt) < (o.d + dia) / 2 + 2;
+                                    });
+                                    if (clash) return;
+                                    H.ops.push({ type: 'drill', d: dia, depth: depthFit, face: hCamFace, tag: tag, p: pt.clone ? pt.clone() : pt });
+                                    any = true;
+                                };
+                                pushOnH(cfg.minifixCamDia, cfg.minifixCamDepth, 'minifix_cam', ptH);
+                                if (wantDowel) {
+                                    const d2 = Math.min(dIv[1] - 10, Math.max(dIv[0] + 10, dPos + 32));
+                                    const ptH2 = _pt(side.dir, hCamAlong, depth, d2, UP, hFaceY);
+                                    pushOnH(cfg.dowelDia, cfg.dowelDepth, 'dowel', ptH2);
+                                }
+                                if (P.notes.indexOf('מיניפיקס — קידוח פין בקצה הדופן / ידני') < 0) {
+                                    P.notes.push('מיניפיקס — קידוח פין בקצה הדופן / ידני');
+                                }
+                                return;
+                            }
+                            // Confirmat / plain dowels: face drills remain on the upright
                             const pt = _pt(side.dir, faceCoord, depth, dPos, UP, y);
                             const pushDrill = function(dia, depthMm, tag) {
                                 const depthFit = _r1(Math.min(depthMm, _thick(P) - 2));
@@ -952,34 +998,14 @@
                                 any = true;
                             };
                             if (wantConf) pushDrill(cfg.confFaceDia, cfg.confFaceDepth, 'confirmat');
-                            if (wantMini) {
-                                // Cam seat in the side face + pin towards the horizontal
-                                pushDrill(cfg.minifixCamDia, cfg.minifixCamDepth, 'minifix_cam');
-                                pushDrill(cfg.minifixPinDia, cfg.minifixPinDepth, 'minifix_pin');
-                            }
-                            if (wantDowel && !wantMini) pushDrill(cfg.dowelDia, cfg.dowelDepth, 'dowel');
-                            if (wantDowel && wantMini) {
-                                // Offset dowel slightly from cam along depth
-                                const d2 = Math.min(pe[1] - 10, Math.max(pe[0] + 10, dPos + 32));
-                                const pt2 = _pt(side.dir, faceCoord, depth, d2, UP, y);
-                                const depthFit = _r1(Math.min(cfg.dowelDepth, _thick(P) - 2));
-                                if (depthFit >= 5) {
-                                    const clash = P.ops.some(function(o) {
-                                        return o.type === 'drill' && o.face === pFace && o.p.distanceTo(pt2) < (o.d + cfg.dowelDia) / 2 + 2;
-                                    });
-                                    if (!clash) {
-                                        P.ops.push({ type: 'drill', d: cfg.dowelDia, depth: depthFit, face: pFace, tag: 'dowel', p: pt2 });
-                                        any = true;
-                                    }
-                                }
-                            }
+                            if (wantDowel) pushDrill(cfg.dowelDia, cfg.dowelDepth, 'dowel');
                         });
                     });
                 });
                 if (any) {
                     if (wantConf) H.notes.push('קידוח קצה קונפירמט Ø7 בעיבוד קצה / ידני');
-                    if (wantMini) H.notes.push('מיניפיקס — קידוח פין אופקי בלוח זה בעיבוד קצה / ידני');
-                    if (wantDowel) H.notes.push('דיבלים — קידוח קצה תואם בלוח האופקי בעיבוד קצה / ידני');
+                    if (wantMini) H.notes.push('מיניפיקס — כוסות בפנים התחתונות של קושרת/עליון/תחתון');
+                    if (wantDowel && !wantMini) H.notes.push('דיבלים — קידוח קצה תואם בלוח האופקי בעיבוד קצה / ידני');
                 }
             });
         }
@@ -1559,9 +1585,13 @@
               (ct.indexOf('confirmat') >= 0
                 ? ('קונפירמט — קידוח פנים Ø' + c.confFaceDia + ' (עומק עד ' + c.confFaceDepth + '), ' + c.confEdgeInset + ' מ"מ מקצה.')
                 : '') +
-              (ct === 'minifix' ? (' מיניפיקס — כוס Ø' + c.minifixCamDia + '×' + c.minifixCamDepth + ' + פין Ø' + c.minifixPinDia + '.') : '') +
+              (ct === 'minifix'
+                ? (' מיניפיקס — כוסות Ø' + c.minifixCamDia + '×' + c.minifixCamDepth + ' בקושרות/עליון/תחתון; פין Ø' + c.minifixPinDia + ' בקצה הדופן (הערה).')
+                : '') +
               (ct.indexOf('dowel') >= 0 || ct === 'minifix' ? (' דיבלים Ø' + c.dowelDia + '×' + c.dowelDepth + '.') : '') +
-              ' קידוח קצה בלוח האופקי אינו ב-DXF — הערה בלבד.')
+              (ct === 'minifix'
+                ? ' קידוח פין בקצה הדופן אינו ב-DXF — הערה בלבד.'
+                : ' קידוח קצה בלוח האופקי אינו ב-DXF — הערה בלבד.'))
             : 'ללא חיבורי גוף.'));
         L.push('ארגזי מגירות: ' + (c.drawerBoxes ? 'כלולים.' : 'לא כלולים.') +
             ' חורי מסילות: ' + (c.runnerHoles
