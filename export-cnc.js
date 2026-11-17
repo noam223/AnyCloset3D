@@ -52,8 +52,9 @@
         edgeBandThickness: 0,   // subtracted from the cut size on banded edges
         // --- extras (no machine / G-code) ---
         drawerBoxes: true,      // include internal drawer box boards previously skipped
-        runnerHoles: true,      // drill generic runner holes on sides next to drawer fronts
-        runnerHoleDia: 5,
+        runnerHoles: true,      // drill runner holes on sides next to drawer fronts
+        runnerSystem: 'generic_side', // see cnc-runner-systems.js (Blum/Hettich/Grass/…)
+        runnerHoleDia: 5,       // overridden from system when selected
         runnerHoleDepth: 12,
         runnerInsetFront: 37,
         runnerInsetRear: 37,
@@ -983,51 +984,70 @@
             });
         }
 
-        // --- generic runner holes beside drawer fronts (on carcass sides / spacers) ---
+        // --- runner holes beside drawer fronts (manufacturer profile from cnc-runner-systems.js) ---
         if (cfg.runnerHoles) {
+            const baseSys = (typeof window._cncGetRunnerSystem === 'function')
+                ? window._cncGetRunnerSystem(cfg.runnerSystem)
+                : { id: 'generic_side', pitch: 0, yFromBottom: null, brand: 'כללי', series: 'גנרי' };
+            // Catalog pattern + optional manual overrides from settings
+            const runnerSys = Object.assign({}, baseSys, {
+                holeDia: cfg.runnerHoleDia,
+                holeDepth: cfg.runnerHoleDepth,
+                frontInset: cfg.runnerInsetFront,
+                rearInset: cfg.runnerInsetRear
+            });
+            const holeDia = runnerSys.holeDia;
+            const holeDepth = runnerSys.holeDepth;
             const fronts = model.panels.filter(function(p) { return p.role && p.role.code === 'DRAWER_FRONT'; });
             fronts.forEach(function(front) {
                 const f = front.front;
                 const r = V3(0, 0, 0).crossVectors(UP, f).normalize();
-                const ivUp = _iv(front, UP), ivR = _iv(front, r), ivF = _iv(front, f);
+                const ivUp = _iv(front, UP), ivF = _iv(front, f);
+                const depthMm = ivF[1] - ivF[0];
+                const zsFromFront = (typeof window._cncRunnerHoleZsFromFront === 'function')
+                    ? window._cncRunnerHoleZsFromFront(runnerSys, depthMm)
+                    : [cfg.runnerInsetFront, depthMm - cfg.runnerInsetRear];
+                // Y: manufacturer from-bottom, else mid drawer
                 const midY = (ivUp[0] + ivUp[1]) / 2;
+                const holeY = (runnerSys.yFromBottom != null && isFinite(runnerSys.yFromBottom))
+                    ? (ivUp[0] + runnerSys.yFromBottom)
+                    : midY;
                 const sides = verts.filter(function(P) {
                     if (Math.abs(_normal(P).dot(r)) < 0.999) return false;
                     return _overlap(_iv(P, UP), ivUp) > 30 && _overlap(_iv(P, f), ivF) > 40;
                 });
-                // Also allow SPACER boards near drawers
                 model.panels.forEach(function(P) {
                     if (P.role && P.role.code === 'SPACER' && sides.indexOf(P) < 0) {
                         if (_overlap(_iv(P, UP), ivUp) > 20) sides.push(P);
                     }
                 });
                 sides.forEach(function(P) {
-                    const nrm = _normal(P);
-                    const pFace = _sgn(-r.dot(nrm)) || 1;
-                    const faceCoord = _iv(P, nrm)[0]; // approx — use normal axis
-                    // Prefer drilling from the inner face toward the drawer
-                    const faceAxis = Math.abs(nrm.dot(r)) > 0.9 ? r : nrm;
+                    const faceAxis = Math.abs(_normal(P).dot(r)) > 0.9 ? r : _normal(P);
                     const faceSign = _sgn(-faceAxis.dot(_normal(P)));
                     const faceC = _iv(P, faceAxis)[0];
                     const frontEdge = _iv(P, f)[1];
                     const rearEdge = _iv(P, f)[0];
-                    const zFront = frontEdge - cfg.runnerInsetFront;
-                    const zRear = rearEdge + cfg.runnerInsetRear;
-                    const depthFit = _r1(Math.min(cfg.runnerHoleDepth, _thick(P) - 2));
+                    const depthFit = _r1(Math.min(holeDepth, _thick(P) - 2));
                     if (depthFit < 3) return;
-                    [zFront, zRear].forEach(function(z) {
+                    const yUse = Math.max(_iv(P, UP)[0] + 8, Math.min(_iv(P, UP)[1] - 8, holeY));
+                    zsFromFront.forEach(function(zFromFront) {
+                        const z = frontEdge - zFromFront;
                         if (z < rearEdge + 6 || z > frontEdge - 6) return;
-                        const pt = _pt(faceAxis, faceC, f, z, UP, midY);
+                        const pt = _pt(faceAxis, faceC, f, z, UP, yUse);
                         const clash = P.ops.some(function(o) {
-                            return o.type === 'drill' && o.p.distanceTo(pt) < (o.d + cfg.runnerHoleDia) / 2 + 2;
+                            return o.type === 'drill' && o.p.distanceTo(pt) < (o.d + holeDia) / 2 + 2;
                         });
                         if (!clash) {
                             P.ops.push({
-                                type: 'drill', d: cfg.runnerHoleDia, depth: depthFit,
-                                face: faceSign, tag: 'runner', p: pt
+                                type: 'drill', d: holeDia, depth: depthFit,
+                                face: faceSign, tag: 'runner:' + (runnerSys.id || 'generic'), p: pt
                             });
                         }
                     });
+                    if (runnerSys.notes) {
+                        const note = 'מסילה: ' + (runnerSys.brand || '') + ' ' + (runnerSys.series || '');
+                        if (P.notes.indexOf(note) < 0) P.notes.push(note);
+                    }
                 });
             });
         }
@@ -1544,7 +1564,10 @@
               ' קידוח קצה בלוח האופקי אינו ב-DXF — הערה בלבד.')
             : 'ללא חיבורי גוף.'));
         L.push('ארגזי מגירות: ' + (c.drawerBoxes ? 'כלולים.' : 'לא כלולים.') +
-            ' חורי מסילות: ' + (c.runnerHoles ? ('Ø' + c.runnerHoleDia + '×' + c.runnerHoleDepth + ', קדמי ' + c.runnerInsetFront + ' / אחורי ' + c.runnerInsetRear + '.') : 'כבוי.'));
+            ' חורי מסילות: ' + (c.runnerHoles
+                ? ((typeof window._cncRunnerLabel === 'function' ? window._cncRunnerLabel(c.runnerSystem) : c.runnerSystem) +
+                    ' · Ø' + c.runnerHoleDia + '×' + c.runnerHoleDepth + '.')
+                : 'כבוי.'));
         L.push('צוקל: ' + ['בלוק הצוקל לא יוצא', 'פס קדמי לכל בלוק צוקל', 'פס קדמי ואחורי לכל בלוק צוקל'][Math.max(0, Math.min(2, Math.round(c.plinthStrips)))] + '.');
         L.push('קנט: ' + (c.edgeBandThickness > 0 ? 'מידות החיתוך קטנות ב-' + c.edgeBandThickness + ' מ"מ בכל קצה מקונט.' : 'מידות החיתוך הן מידות גמר (ללא הפחתת קנט).'), '');
         L.push('סיכום חומרים', '------------');
@@ -1684,13 +1707,14 @@
         { k: 'minifixPinDepth', label: 'מיניפיקס — עומק פין', step: 0.5 },
         { k: 'dowelDia', label: 'דיבל — קוטר', step: 0.5 },
         { k: 'dowelDepth', label: 'דיבל — עומק', step: 0.5 },
-        { sec: 'מגירות' },
+        { sec: 'מגירות ומסילות' },
         { k: 'drawerBoxes', label: 'כלול ארגזי מגירות פנימיות', check: true },
         { k: 'runnerHoles', label: 'חורי מסילות בדפנות', check: true },
-        { k: 'runnerHoleDia', label: 'קוטר חור מסילה', step: 0.5 },
-        { k: 'runnerHoleDepth', label: 'עומק חור מסילה', step: 0.5 },
-        { k: 'runnerInsetFront', label: 'מסילה — מרחק מקצה קדמי' },
-        { k: 'runnerInsetRear', label: 'מסילה — מרחק מקצה אחורי' },
+        { k: 'runnerSystem', label: 'מערכת מסילה (יצרן)', opts: 'runners' },
+        { k: 'runnerHoleDia', label: 'קוטר חור (דריסה ידנית)', step: 0.5 },
+        { k: 'runnerHoleDepth', label: 'עומק חור (דריסה ידנית)', step: 0.5 },
+        { k: 'runnerInsetFront', label: 'מרחק מקצה קדמי (גנרי)', runnerGeneric: true },
+        { k: 'runnerInsetRear', label: 'מרחק מקצה אחורי (גנרי)', runnerGeneric: true },
         { sec: 'קינון ותוויות' },
         { k: 'nestSheets', label: 'קינון על פלטות מלאי', check: true },
         { k: 'sheetW', label: 'רוחב פלטה (מ"מ)' },
@@ -1713,9 +1737,22 @@
         if (X3().toast) X3().toast(msg);
     }
 
+    function _applyRunnerSystemToCfg(cfg) {
+        if (!cfg || typeof window._cncGetRunnerSystem !== 'function') return cfg;
+        const s = window._cncGetRunnerSystem(cfg.runnerSystem);
+        if (!s) return cfg;
+        if (s.holeDia != null) cfg.runnerHoleDia = s.holeDia;
+        if (s.holeDepth != null) cfg.runnerHoleDepth = s.holeDepth;
+        if (s.frontInset != null) cfg.runnerInsetFront = s.frontInset;
+        if (s.rearInset != null) cfg.runnerInsetRear = s.rearInset;
+        return cfg;
+    }
     function _settingsHtml() {
         const c = UI.cfg;
         const inputCss = 'width:74px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:6px;font:inherit;font-size:.8rem;text-align:center;direction:ltr;';
+        const runnerNote = (typeof window._cncGetRunnerSystem === 'function')
+            ? window._cncGetRunnerSystem(c.runnerSystem)
+            : null;
         return FIELDS.map(function(f) {
             if (f.sec) return '<div style="font-weight:800;font-size:.8rem;color:#4f46e5;margin:12px 0 4px;">' + f.sec + '</div>';
             const dim = (f.groove && c.backMode !== 'groove') ? 'opacity:.4;pointer-events:none;' : '';
@@ -1723,16 +1760,29 @@
             if (f.check) {
                 ctl = '<input type="checkbox" data-cnc="' + f.k + '"' + (c[f.k] ? ' checked' : '') + ' style="width:16px;height:16px;cursor:pointer;">';
             } else if (f.opts) {
-                ctl = '<select data-cnc="' + f.k + '" style="max-width:150px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:6px;font:inherit;font-size:.78rem;">' +
-                    f.opts.map(function(o) { return '<option value="' + o[0] + '"' + (String(c[f.k]) === String(o[0]) ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>';
+                let optsList = f.opts;
+                if (optsList === 'runners') {
+                    optsList = (typeof window._cncRunnerSystemOptions === 'function')
+                        ? window._cncRunnerSystemOptions()
+                        : [['generic_side', 'כללי — מסילת צד']];
+                }
+                ctl = '<select data-cnc="' + f.k + '" style="max-width:168px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:6px;font:inherit;font-size:.72rem;">' +
+                    optsList.map(function(o) { return '<option value="' + o[0] + '"' + (String(c[f.k]) === String(o[0]) ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>';
             } else {
                 ctl = '<input type="number" data-cnc="' + f.k + '" value="' + c[f.k] + '" min="0" step="' + (f.step || 1) + '" style="' + inputCss + '">';
             }
+            let extra = '';
+            if (f.k === 'runnerSystem' && runnerNote && runnerNote.notes) {
+                extra = '<div style="font-size:.66rem;color:#64748b;line-height:1.4;margin:-2px 0 6px;padding:0 2px;">' +
+                    _esc(runnerNote.notes) +
+                    (runnerNote.source ? ' <span style="color:#94a3b8;">(' + _esc(runnerNote.source) + ')</span>' : '') +
+                    '</div>';
+            }
             return '<label style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:3px 0;font-size:.78rem;color:#334155;' + dim + '">' +
-                '<span>' + f.label + '</span>' + ctl + '</label>';
+                '<span>' + f.label + '</span>' + ctl + '</label>' + extra;
         }).join('') +
             '<button type="button" id="cnc-reset" style="margin-top:12px;width:100%;padding:6px;border:1px solid #cbd5e1;background:#fff;border-radius:7px;font:inherit;font-size:.76rem;color:#475569;cursor:pointer;">החזר ברירות מחדל</button>' +
-            '<div style="font-size:.7rem;color:#94a3b8;margin-top:8px;line-height:1.5;">כל המידות במ"מ. ההגדרות נשמרות במכשיר זה.</div>';
+            '<div style="font-size:.7rem;color:#94a3b8;margin-top:8px;line-height:1.5;">כל המידות במ"מ. ההגדרות נשמרות במכשיר זה. תבניות מסילות לפי מפרטי יצרן נפוצים — יש לאמת מול דף ההרכבה של הדגם המדויק.</div>';
     }
     function _listHtml() {
         const res = UI.result;
@@ -2200,6 +2250,10 @@
         if (!X3().collect) { alert('ייצוא CNC אינו זמין — רכיב הייצוא לא נטען.'); return; }
         _close();
         UI.cfg = _loadSettings();
+        if (!UI.cfg.runnerSystem) {
+            UI.cfg.runnerSystem = CNC_DEFAULTS.runnerSystem;
+            _applyRunnerSystemToCfg(UI.cfg);
+        }
         UI.sel = 0;
         UI.hover = -1;
         UI.hideDoors = false;
@@ -2216,7 +2270,7 @@
                     '<button type="button" id="cnc-close" title="סגור" style="border:0;background:none;font-size:1.3rem;color:#64748b;cursor:pointer;padding:4px 8px;">&times;</button>' +
                 '</div>' +
                 '<div style="flex:1;display:flex;min-height:0;">' +
-                    '<div id="cnc-settings" style="width:250px;flex-shrink:0;padding:4px 14px 14px;border-left:1px solid #e2e8f0;overflow:auto;"></div>' +
+                    '<div id="cnc-settings" style="width:280px;flex-shrink:0;padding:4px 14px 14px;border-left:1px solid #e2e8f0;overflow:auto;"></div>' +
                     '<div style="flex:1;min-width:0;display:flex;flex-direction:column;">' +
                         '<div id="cnc-preview" style="flex:0 0 46%;min-height:0;display:flex;gap:14px;padding:12px 14px;border-bottom:1px solid #e2e8f0;background:#f8fafc;"></div>' +
                         '<div id="cnc-list" style="flex:1;min-height:0;overflow:auto;"></div>' +
@@ -2262,8 +2316,9 @@
                 const v = parseFloat(e.target.value);
                 UI.cfg[k] = (isFinite(v) && v >= 0) ? v : def;
             } else UI.cfg[k] = e.target.value;
+            if (k === 'runnerSystem') _applyRunnerSystemToCfg(UI.cfg);
             _saveSettings(UI.cfg);
-            _recompute(k === 'backMode' ? 'settings' : 'data');
+            _recompute((k === 'backMode' || k === 'runnerSystem') ? 'settings' : 'data');
         });
         m.addEventListener('click', function(e) {
             const row = e.target.closest && e.target.closest('[data-cnc-row]');
