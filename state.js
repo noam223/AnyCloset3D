@@ -3925,7 +3925,8 @@ window._isStretcherShelf = function(col, shelfIdx) {
 
 /** Toggle stretcher mark; refuses to clear the last stretcher when the column still has shelves. */
 window._toggleStretcherShelf = function(colIndex, shelfIdx) {
-    const cols = (typeof state !== 'undefined' && state.columns) ? state.columns : null;
+    const w = (typeof getWing === 'function') ? getWing() : null;
+    const cols = (w && w.columns) || ((typeof state !== 'undefined' && state.columns) ? state.columns : null);
     if (!cols || colIndex < 0 || colIndex >= cols.length) return false;
     const col = cols[colIndex];
     if (!col || !Array.isArray(col.shelvesY)) return false;
@@ -3942,9 +3943,11 @@ window._toggleStretcherShelf = function(colIndex, shelfIdx) {
             return false;
         }
         list.splice(at, 1);
+        if (typeof _showToast === 'function') _showToast('בוטל סימון קושרת', 2000);
     } else {
         list.push(si);
         list.sort(function(a, b) { return a - b; });
+        if (typeof _showToast === 'function') _showToast('המדף סומן כקושרת', 2000);
     }
     if (typeof saveHistoryState === 'function') saveHistoryState();
     if (typeof buildCabinet === 'function') buildCabinet();

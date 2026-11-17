@@ -7716,6 +7716,33 @@ function buildDragHandlesUI() {
                     sHandle.dataset.subShelfIdx = v.subShelfIdx;
                 } else {
                     sHandle.dataset.shelfIdx = v.shelfIdx;
+                    // CNC stretcher toggle on the drag handle (works even when doors block shelf pick)
+                    const _col = (state.columns && state.columns[v.colIndex]) || null;
+                    const _isStretch = typeof window._isStretcherShelf === 'function' &&
+                        window._isStretcherShelf(_col, v.shelfIdx);
+                    if (_isStretch) {
+                        sHandle.classList.add('shelf-cnc-stretcher');
+                        sHandle.title = 'קושרת פעילה — לחץ על תגית קושרת לביטול';
+                    }
+                    const stretchBtn = document.createElement('button');
+                    stretchBtn.type = 'button';
+                    stretchBtn.className = 'shelf-stretcher-badge' + (_isStretch ? ' is-on' : '');
+                    stretchBtn.textContent = 'קושרת';
+                    stretchBtn.title = _isStretch
+                        ? 'קושרת פעילה — לחץ לביטול'
+                        : 'סמן מדף זה כקושרת למיניפיקס';
+                    stretchBtn.addEventListener('pointerdown', function(ev) {
+                        ev.stopPropagation();
+                        ev.preventDefault();
+                    });
+                    stretchBtn.addEventListener('click', function(ev) {
+                        ev.stopPropagation();
+                        ev.preventDefault();
+                        if (typeof window._toggleStretcherShelf === 'function') {
+                            window._toggleStretcherShelf(v.colIndex, v.shelfIdx);
+                        }
+                    });
+                    sHandle.appendChild(stretchBtn);
                 }
             }
             if (v.isBackStretcher) {
