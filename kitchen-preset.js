@@ -520,9 +520,15 @@ window._configureKitchenCornerL = function(side, opts) {
         }
     }
 
-    // Clear opposite arm if switching
+    // Clear opposite arm only when replacing / switching sides — not when building a U
+    // (keepOtherArm) or when the other side is already a kitchen L return.
     const other = side === 'left' ? 'right' : 'left';
-    if (state.wings[other]) {
+    const otherWing = state.wings[other];
+    const otherIsKitL = !!(otherWing && otherWing.kitchenCornerL && otherWing.wingPosition === 'full_corner');
+    if (otherWing && !opts.keepOtherArm && !otherIsKitL) {
+        state.wings[other] = null;
+        if (typeof _hideWingTab === 'function') _hideWingTab(other);
+    } else if (otherWing && !opts.keepOtherArm && otherIsKitL && opts.replaceOtherArm) {
         state.wings[other] = null;
         if (typeof _hideWingTab === 'function') _hideWingTab(other);
     }
@@ -1419,8 +1425,8 @@ window._kitchenComputeEndAddAnchors = function() {
     if (centerCols > 0) {
         const y = _kitMidHeight(cw);
         const zFront = centerD / 2;
-        // Corner option only while the run is still straight — L convert clears the other arm
-        const canMakeCorner = !hasLeftFC && !hasRightFC;
+        // Corner is available on any free X tip that doesn't already have an L on that side
+        // (allows first ר, and a second ר on the opposite tip for a U).
         if (!hasLeftFC) {
             push({
                 id: 'center-left',
@@ -1428,7 +1434,7 @@ window._kitchenComputeEndAddAnchors = function() {
                 end: 'left',
                 axis: 'x',
                 canUnit: true,
-                canCorner: canMakeCorner,
+                canCorner: true,
                 worldX: -cw.width / 2 - gap,
                 worldY: y,
                 worldZ: zFront
@@ -1441,7 +1447,7 @@ window._kitchenComputeEndAddAnchors = function() {
                 end: 'right',
                 axis: 'x',
                 canUnit: true,
-                canCorner: canMakeCorner,
+                canCorner: true,
                 worldX: cw.width / 2 + gap,
                 worldY: y,
                 worldZ: zFront
@@ -1577,7 +1583,7 @@ window._kitchenAddUnitOnWing = function(wingId, end, presetSpec) {
     return true;
 };
 
-/** Turn a free center end into a kitchen L corner (ר). */
+/** Turn a free center end into a kitchen L corner (ר). Keeps an existing opposite L (U). */
 window._kitchenAddCornerAtEnd = function(wingId, end) {
     if (!window._isKitchenPreset || !window._isKitchenPreset()) return false;
     if (wingId !== 'center') {
@@ -1585,7 +1591,8 @@ window._kitchenAddCornerAtEnd = function(wingId, end) {
         return false;
     }
     const side = end === 'left' ? 'left' : 'right';
-    if ((side === 'left' && state.wings.left) || (side === 'right' && state.wings.right)) {
+    const existing = state.wings[side];
+    if (existing && existing.kitchenCornerL && existing.wingPosition === 'full_corner') {
         if (typeof _showToast === 'function') _showToast('כבר יש פינה בצד הזה', 2800);
         return false;
     }
@@ -1597,7 +1604,12 @@ window._kitchenAddCornerAtEnd = function(wingId, end) {
     state.activeWing = 'center';
     if (typeof syncSidebarToWing === 'function') syncSidebarToWing();
     if (typeof window._configureKitchenCornerL === 'function') {
-        window._configureKitchenCornerL(side, { host: host, columns: cols });
+        // keepOtherArm: don't delete the opposite kitchen L when adding a second corner
+        window._configureKitchenCornerL(side, {
+            host: host,
+            columns: cols,
+            keepOtherArm: true
+        });
     }
     if (typeof buildCabinet === 'function') buildCabinet();
     if (typeof calculatePrice === 'function') calculatePrice();
