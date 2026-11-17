@@ -6783,12 +6783,16 @@ function _renderInternalDrawerBoxCell(opts) {
 
         // Blueprint is a front elevation: box sides/bottom/back would only double the front outline
         if (isBP) continue;
-        [
-            createBoard(drwW, frameT, drwD, boxCenterX, boxBottomY + frameT / 2, drwCenterZ, matInternal),
-            createBoard(frameT, boxH, drwD, boxCenterX - drwW / 2 + frameT / 2, boxCenterY, drwCenterZ, matInternal),
-            createBoard(frameT, boxH, drwD, boxCenterX + drwW / 2 - frameT / 2, boxCenterY, drwCenterZ, matInternal),
-            createBoard(drwW - frameT * 2, boxH, frameT, boxCenterX, boxCenterY, drwBackZ + frameT / 2, matInternal)
-        ].forEach(function(m) { m.userData.cncSkip = 'drawerBox'; });
+        const _boxParts = [
+            { mesh: createBoard(drwW, frameT, drwD, boxCenterX, boxBottomY + frameT / 2, drwCenterZ, matInternal), role: 'DRAWER_BOTTOM' },
+            { mesh: createBoard(frameT, boxH, drwD, boxCenterX - drwW / 2 + frameT / 2, boxCenterY, drwCenterZ, matInternal), role: 'DRAWER_SIDE' },
+            { mesh: createBoard(frameT, boxH, drwD, boxCenterX + drwW / 2 - frameT / 2, boxCenterY, drwCenterZ, matInternal), role: 'DRAWER_SIDE' },
+            { mesh: createBoard(drwW - frameT * 2, boxH, frameT, boxCenterX, boxCenterY, drwBackZ + frameT / 2, matInternal), role: 'DRAWER_BACK' }
+        ];
+        _boxParts.forEach(function(bp) {
+            bp.mesh.userData.cncSkip = 'drawerBox';
+            bp.mesh.userData.cncRole = bp.role;
+        });
     }
 }
 

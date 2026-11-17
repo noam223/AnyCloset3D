@@ -1,12 +1,13 @@
 // ==========================================
 // CNC export of the cabinet being edited: one layered DXF R12 per board (cut outline, shelf-pin holes,
-// hinge cups, hinge-plate holes, confirmat face holes, back-panel groove), a combined DXF per
-// material/thickness and a CSV cut list — in a zip.
+// hinge cups, hinge-plate holes, confirmat/minifix/dowel face holes, back-panel groove), nesting,
+// printable labels, drawer boxes, a combined DXF per material/thickness and a CSV cut list — in a zip.
 // Boards are read from the built 3D scene (the collector of export-3d.js); manufacturing rules then fix
 // what the visual model simplifies (back panel seat, shelf clearances, plinth blocks, double walls,
 // boards that overlap one another in the scene).
 // Engine units are cm, Y-up; everything here is mm. Each board is drawn flat: X along the grain,
 // origin bottom-left, seen from the machined face (no mirroring).
+// G-code is intentionally NOT generated (machine-specific). See export-cnc-extras.js for nesting/labels/order.
 // ==========================================
 (function() {
     'use strict';
@@ -36,13 +37,38 @@
         platePitch: 32,         // spacing between the two plate screws
         plateFront: 37,         // plate centre from the front edge of the side (overlay)
         carcassConnectors: true,
+        connectorType: 'confirmat', // confirmat | minifix | dowels | confirmat+dowels
         confFaceDia: 5,         // confirmat pilot in the face of the side / divider
         confFaceDepth: 34,      // clamped to board thickness − 2 at drill time
         confEdgeInset: 50,      // from front / rear along the depth
         confCount: 0,           // 0 = auto (2 up to 500 mm depth, else 3)
+        minifixCamDia: 15,
+        minifixCamDepth: 12,
+        minifixPinDia: 8,
+        minifixPinDepth: 34,
+        dowelDia: 8,
+        dowelDepth: 20,
         plinthStrips: 1,        // boards cut for each solid plinth block: 0 none · 1 front · 2 front + rear
-        edgeBandThickness: 0    // subtracted from the cut size on banded edges
+        edgeBandThickness: 0,   // subtracted from the cut size on banded edges
+        // --- extras (no machine / G-code) ---
+        drawerBoxes: true,      // include internal drawer box boards previously skipped
+        runnerHoles: true,      // drill generic runner holes on sides next to drawer fronts
+        runnerHoleDia: 5,
+        runnerHoleDepth: 12,
+        runnerInsetFront: 37,
+        runnerInsetRear: 37,
+        nestSheets: true,       // pack boards onto stock sheets
+        sheetW: 2800,
+        sheetH: 2070,
+        nestGap: 10,
+        nestAllowRotate: true,
+        pdfLabels: true,        // printable HTML label sheet in the ZIP
+        labelW: 70,
+        labelH: 30,
+        exportScope: 'cabinet'  // cabinet | order
     };
+    // Hooks filled by export-cnc-extras.js
+    window._cncExtrasHooks = window._cncExtrasHooks || { afterOps: [], augmentZip: [], buildOrder: null };
 
     const X3 = function() { return window._export3DDebug || {}; };
     const V3 = function(x, y, z) { return new THREE.Vector3(x, y, z); };
@@ -286,6 +312,9 @@
         [/^opencell/, 'OPEN_CELL', 'לוח תא פתוח', 35],
         [/^door_c/, 'DOOR', 'דלת', 80],
         [/^(drawer_ext|desk_int_drawer|desk_drawer_d|wd_drawer_d|desk_merge_(desk|ward)_d)/, 'DRAWER_FRONT', 'חזית מגירה', 85],
+        [/drawer_box_bottom|int_drawer_bottom/, 'DRAWER_BOTTOM', 'תחתית ארגז מגירה', 86],
+        [/drawer_box_side|int_drawer_side/, 'DRAWER_SIDE', 'דופן ארגז מגירה', 87],
+        [/drawer_box_back|int_drawer_back/, 'DRAWER_BACK', 'גב ארגז מגירה', 88],
         [/drawer_bottom/, 'DESK_RAIL', 'תחתית מגירות שולחן', 72],
         [/^desk_merge_frame/, 'DESK_FRAME', 'מסגרת מגירות שולחן', 73],
         [/(^|_)(desk_surface|wd_surface)/, 'DESK', 'משטח שולחן', 70],
@@ -296,6 +325,12 @@
         if (tagged) {
             const hit = ROLES.find(function(r) { return r[1] === tagged; });
             if (hit) return { code: hit[1], name: hit[2], order: hit[3] };
+            // Engine may tag drawer box roles directly
+            if (tagged === 'DRAWER_BOTTOM' || tagged === 'DRAWER_SIDE' || tagged === 'DRAWER_BACK') {
+                const names = { DRAWER_BOTTOM: 'תחתית ארגז מגירה', DRAWER_SIDE: 'דופן ארגז מגירה', DRAWER_BACK: 'גב ארגז מגירה' };
+                const order = { DRAWER_BOTTOM: 86, DRAWER_SIDE: 87, DRAWER_BACK: 88 };
+                return { code: tagged, name: names[tagged], order: order[tagged] };
+            }
         }
         for (let i = 0; i < ROLES.length; i++) {
             if (ROLES[i][0].test(p.suffix)) return { code: ROLES[i][1], name: ROLES[i][2], order: ROLES[i][3] };
@@ -316,7 +351,8 @@
         return { code: 'PANEL_V', name: 'לוח אנכי', order: 41 };
     }
 
-    function _collect() {
+    function _collect(cfg) {
+        cfg = cfg || {};
         const parts = (X3().collect ? X3().collect() : []);
         const lib = _materialIndex();
         const UP = V3(0, 1, 0);
@@ -334,7 +370,15 @@
             }
             if (doorRoot && doorRoot.isGroup && doorRoot.userData.doorLeaf) leafGroups.add(doorRoot);
             if (g.type !== 'BoxGeometry' && g.type !== 'ExtrudeGeometry') return;
-            if (ud.cncSkip) { skipKinds[ud.cncSkip] = (skipKinds[ud.cncSkip] || 0) + 1; return; }
+            // Drawer boxes were historically skipped — include when drawerBoxes is on
+            if (ud.cncSkip) {
+                if (ud.cncSkip === 'drawerBox' && cfg.drawerBoxes) {
+                    // keep going — treat as a normal wood board
+                } else {
+                    skipKinds[ud.cncSkip] = (skipKinds[ud.cncSkip] || 0) + 1;
+                    return;
+                }
+            }
             const wood = _woodKey(lib, mesh, part.material);
             if (!wood) return;
             const p = g.type === 'BoxGeometry' ? _bboxPanel(part) : _extrudePanel(part);
@@ -392,10 +436,19 @@
         if (leafGroups.size) {
             model.warnings.push(leafGroups.size + ' דלתות זכוכית / מראה / מסגרת ללא לוח עץ — לא נכללו בייצוא ויש לייצר אותן בנפרד');
         }
-        if (skipKinds.drawerBox) {
-            model.skipped.push(skipKinds.drawerBox + ' לוחות של ארגזי מגירות פנימיות (תחתית, צדדים, גב) — ארגזי מגירות אינם חלק מהייצוא');
+        if (skipKinds.drawerBox && !cfg.drawerBoxes) {
+            model.skipped.push(skipKinds.drawerBox + ' לוחות של ארגזי מגירות פנימיות (תחתית, צדדים, גב) — הפעילו «ארגזי מגירות» בהגדרות');
         }
-        model.panels.forEach(function(p) { p.role = _roleOf(p); });
+        model.panels.forEach(function(p) {
+            // Infer drawer-box roles when the engine only marked cncSkip
+            if (p.mesh && p.mesh.userData && p.mesh.userData.cncSkip === 'drawerBox' && !p.mesh.userData.cncRole) {
+                const n = String(p.suffix || p.mesh.name || '').toLowerCase();
+                if (/bottom|floor|base/.test(n)) p.mesh.userData.cncRole = 'DRAWER_BOTTOM';
+                else if (/back|rear/.test(n)) p.mesh.userData.cncRole = 'DRAWER_BACK';
+                else if (/side|wall/.test(n)) p.mesh.userData.cncRole = 'DRAWER_SIDE';
+            }
+            p.role = _roleOf(p);
+        });
         return model;
     }
 
@@ -836,13 +889,17 @@
             if (_thick(door) < cfg.cupDepth + 2) model.warnings.push('דלת בעובי ' + _fmt(_thick(door)) + ' מ"מ דקה מדי לכוס ציר בעומק ' + cfg.cupDepth);
         });
 
-        // --- confirmat face holes in sides / dividers against fixed horizontals ---
+        // --- carcass connectors: confirmat / minifix / dowels in sides against fixed horizontals ---
         const FIXED_H = { TOP: 1, BOTTOM: 1, DESK: 1, SPLIT: 1 };
         const VERT = { SIDE_L: 1, SIDE_R: 1, DIVIDER: 1, UNIT_SIDE: 1, PARTITION: 1 };
         const verts = body.filter(function(p) {
             return VERT[p.role.code] && !p.horizontal && !p.poly && !p.corner && !p.synthetic && _thick(p) >= 12;
         });
-        if (cfg.carcassConnectors) {
+        const connType = String(cfg.connectorType || 'confirmat');
+        const wantConf = cfg.carcassConnectors && (connType === 'confirmat' || connType === 'confirmat+dowels');
+        const wantMini = cfg.carcassConnectors && connType === 'minifix';
+        const wantDowel = cfg.carcassConnectors && (connType === 'dowels' || connType === 'confirmat+dowels' || connType === 'minifix');
+        if (cfg.carcassConnectors && (wantConf || wantMini || wantDowel)) {
             model.panels.forEach(function(H) {
                 if (!FIXED_H[H.role.code] || !H.horizontal || H.poly || H.corner) return;
                 const sUp = _iv(H, UP);
@@ -879,22 +936,107 @@
                     side.panels.forEach(function(P) {
                         const pFace = _sgn(-side.dir.dot(_normal(P)));
                         const faceCoord = _iv(P, side.dir)[0];
-                        const depthFit = _r1(Math.min(cfg.confFaceDepth, _thick(P) - 2));
-                        if (depthFit < 5) return;
                         pos.forEach(function(dPos) {
                             const pe = _iv(P, depth);
                             if (dPos < pe[0] + 8 || dPos > pe[1] - 8) return;
                             const pt = _pt(side.dir, faceCoord, depth, dPos, UP, y);
-                            const clash = P.ops.some(function(o) {
-                                return o.type === 'drill' && o.face === pFace && o.p.distanceTo(pt) < (o.d + cfg.confFaceDia) / 2 + 2;
-                            });
-                            if (clash) return;
-                            P.ops.push({ type: 'drill', d: cfg.confFaceDia, depth: depthFit, face: pFace, tag: 'confirmat', p: pt });
-                            any = true;
+                            const pushDrill = function(dia, depthMm, tag) {
+                                const depthFit = _r1(Math.min(depthMm, _thick(P) - 2));
+                                if (depthFit < 5) return;
+                                const clash = P.ops.some(function(o) {
+                                    return o.type === 'drill' && o.face === pFace && o.p.distanceTo(pt) < (o.d + dia) / 2 + 2;
+                                });
+                                if (clash) return;
+                                P.ops.push({ type: 'drill', d: dia, depth: depthFit, face: pFace, tag: tag, p: pt.clone ? pt.clone() : pt });
+                                any = true;
+                            };
+                            if (wantConf) pushDrill(cfg.confFaceDia, cfg.confFaceDepth, 'confirmat');
+                            if (wantMini) {
+                                // Cam seat in the side face + pin towards the horizontal
+                                pushDrill(cfg.minifixCamDia, cfg.minifixCamDepth, 'minifix_cam');
+                                pushDrill(cfg.minifixPinDia, cfg.minifixPinDepth, 'minifix_pin');
+                            }
+                            if (wantDowel && !wantMini) pushDrill(cfg.dowelDia, cfg.dowelDepth, 'dowel');
+                            if (wantDowel && wantMini) {
+                                // Offset dowel slightly from cam along depth
+                                const d2 = Math.min(pe[1] - 10, Math.max(pe[0] + 10, dPos + 32));
+                                const pt2 = _pt(side.dir, faceCoord, depth, d2, UP, y);
+                                const depthFit = _r1(Math.min(cfg.dowelDepth, _thick(P) - 2));
+                                if (depthFit >= 5) {
+                                    const clash = P.ops.some(function(o) {
+                                        return o.type === 'drill' && o.face === pFace && o.p.distanceTo(pt2) < (o.d + cfg.dowelDia) / 2 + 2;
+                                    });
+                                    if (!clash) {
+                                        P.ops.push({ type: 'drill', d: cfg.dowelDia, depth: depthFit, face: pFace, tag: 'dowel', p: pt2 });
+                                        any = true;
+                                    }
+                                }
+                            }
                         });
                     });
                 });
-                if (any) H.notes.push('קידוח קצה קונפירמט Ø7 בעיבוד קצה / ידני');
+                if (any) {
+                    if (wantConf) H.notes.push('קידוח קצה קונפירמט Ø7 בעיבוד קצה / ידני');
+                    if (wantMini) H.notes.push('מיניפיקס — קידוח פין אופקי בלוח זה בעיבוד קצה / ידני');
+                    if (wantDowel) H.notes.push('דיבלים — קידוח קצה תואם בלוח האופקי בעיבוד קצה / ידני');
+                }
+            });
+        }
+
+        // --- generic runner holes beside drawer fronts (on carcass sides / spacers) ---
+        if (cfg.runnerHoles) {
+            const fronts = model.panels.filter(function(p) { return p.role && p.role.code === 'DRAWER_FRONT'; });
+            fronts.forEach(function(front) {
+                const f = front.front;
+                const r = V3(0, 0, 0).crossVectors(UP, f).normalize();
+                const ivUp = _iv(front, UP), ivR = _iv(front, r), ivF = _iv(front, f);
+                const midY = (ivUp[0] + ivUp[1]) / 2;
+                const sides = verts.filter(function(P) {
+                    if (Math.abs(_normal(P).dot(r)) < 0.999) return false;
+                    return _overlap(_iv(P, UP), ivUp) > 30 && _overlap(_iv(P, f), ivF) > 40;
+                });
+                // Also allow SPACER boards near drawers
+                model.panels.forEach(function(P) {
+                    if (P.role && P.role.code === 'SPACER' && sides.indexOf(P) < 0) {
+                        if (_overlap(_iv(P, UP), ivUp) > 20) sides.push(P);
+                    }
+                });
+                sides.forEach(function(P) {
+                    const nrm = _normal(P);
+                    const pFace = _sgn(-r.dot(nrm)) || 1;
+                    const faceCoord = _iv(P, nrm)[0]; // approx — use normal axis
+                    // Prefer drilling from the inner face toward the drawer
+                    const faceAxis = Math.abs(nrm.dot(r)) > 0.9 ? r : nrm;
+                    const faceSign = _sgn(-faceAxis.dot(_normal(P)));
+                    const faceC = _iv(P, faceAxis)[0];
+                    const frontEdge = _iv(P, f)[1];
+                    const rearEdge = _iv(P, f)[0];
+                    const zFront = frontEdge - cfg.runnerInsetFront;
+                    const zRear = rearEdge + cfg.runnerInsetRear;
+                    const depthFit = _r1(Math.min(cfg.runnerHoleDepth, _thick(P) - 2));
+                    if (depthFit < 3) return;
+                    [zFront, zRear].forEach(function(z) {
+                        if (z < rearEdge + 6 || z > frontEdge - 6) return;
+                        const pt = _pt(faceAxis, faceC, f, z, UP, midY);
+                        const clash = P.ops.some(function(o) {
+                            return o.type === 'drill' && o.p.distanceTo(pt) < (o.d + cfg.runnerHoleDia) / 2 + 2;
+                        });
+                        if (!clash) {
+                            P.ops.push({
+                                type: 'drill', d: cfg.runnerHoleDia, depth: depthFit,
+                                face: faceSign, tag: 'runner', p: pt
+                            });
+                        }
+                    });
+                });
+            });
+        }
+
+        // Extras hook (nesting prep etc. — machining additions)
+        const hooks = window._cncExtrasHooks;
+        if (hooks && hooks.afterOps) {
+            hooks.afterOps.forEach(function(fn) {
+                try { fn(model, cfg); } catch (e) { console.warn('[cnc extras afterOps]', e); }
             });
         }
 
@@ -1187,7 +1329,7 @@
 
     function _build(cfg) {
         cfg = Object.assign({}, CNC_DEFAULTS, cfg || {});
-        const model = _ops(_rules(_collect(), cfg), cfg);
+        const model = _ops(_rules(_collect(cfg), cfg), cfg);
         const list = _finalize(model, cfg);
         const warnings = _validate(list, model);
         // Doors that are defined but switched off in the view are not in the scene
@@ -1202,12 +1344,17 @@
             stock[k].area += r.qty * r.L * r.W / 1e6;
             stock[k].items.push(r);
         });
-        return {
+        const result = {
             cfg: cfg, panels: list, warnings: Array.from(new Set(warnings)), skipped: model.skipped,
             stock: Object.keys(stock).map(function(k) { return stock[k]; }),
             total: list.reduce(function(s, r) { return s + r.qty; }, 0),
             tMain: model.tMain
         };
+        // Sheet nesting (extras)
+        if (cfg.nestSheets && typeof window._cncNestSheets === 'function') {
+            try { result.nests = window._cncNestSheets(result); } catch (e) { console.warn('[cnc nest]', e); }
+        }
+        return result;
     }
 
     // ---------- DXF R12 ----------
@@ -1357,7 +1504,9 @@
         L.push('AnyCloset 3D — ייצוא CNC', 'ארון: ' + name, 'תאריך: ' + new Date().toLocaleString('he-IL'), '');
         L.push('תוכן החבילה', '------------');
         L.push('panels/           קובץ DXF לכל לוח ייחודי. לוח עם עיבוד משני הצדדים מקבל קובץ נוסף בסיומת _B.');
-        L.push('all_*.dxf         כל הלוחות של אותו חומר ועובי (כולל כפילויות לפי כמות), פרוסים בשורות — לייבוא אחד ל-CAM ולקינון שם. פנים A בלבד.');
+        L.push('all_*.dxf         כל הלוחות של אותו חומר ועובי (כולל כפילויות לפי כמות), פרוסים בשורות — לייבוא אחד ל-CAM. פנים A בלבד.');
+        if (c.nestSheets) L.push('sheets/          קינון על פלטות מלאי (' + c.sheetW + '×' + c.sheetH + ' מ"מ) — קובץ DXF לכל פלטה.');
+        if (c.pdfLabels) L.push('labels/          דף מדבקות להדפסה (HTML) — פתחו בדפדפן והדפיסו ל-PDF.');
         L.push('cutlist.csv       רשימת חיתוך (נפתחת באקסל).', '');
         L.push('מוסכמות', '-------');
         L.push('DXF R12, יחידות מ"מ, קנה מידה 1:1. ראשית הצירים בפינה השמאלית-תחתונה של הלוח.');
@@ -1384,19 +1533,32 @@
             (c.hingePlates
                 ? ' פלטות בדפנות: Ø' + c.plateDia + '×' + c.plateDepth + ', מרווח ' + c.platePitch + ', מרכז ' + c.plateFront + ' מ"מ מהקצה הקדמי.'
                 : ' ללא חורי פלטות.'));
+        const ct = c.connectorType || 'confirmat';
         L.push('חיבורי גוף: ' + (c.carcassConnectors
-            ? 'קונפירמט — קידוח פנים בדפנות/מחיצות Ø' + c.confFaceDia + ' (עומק עד ' + c.confFaceDepth + ', מצומצם לעובי הלוח), ' +
-              c.confEdgeInset + ' מ"מ מקצה קדמי/אחורי' + (c.confCount > 0 ? ', ' + c.confCount + ' חורים לחיבור.' : ' (2 עד עומק 500, אחרת 3).') +
-              ' קידוח הקצה בלוח האופקי (Ø7) אינו ב-DXF — הערה בלבד.'
-            : 'ללא חורי קונפירמט.'));
+            ? ('סוג=' + ct + '. ' +
+              (ct.indexOf('confirmat') >= 0
+                ? ('קונפירמט — קידוח פנים Ø' + c.confFaceDia + ' (עומק עד ' + c.confFaceDepth + '), ' + c.confEdgeInset + ' מ"מ מקצה.')
+                : '') +
+              (ct === 'minifix' ? (' מיניפיקס — כוס Ø' + c.minifixCamDia + '×' + c.minifixCamDepth + ' + פין Ø' + c.minifixPinDia + '.') : '') +
+              (ct.indexOf('dowel') >= 0 || ct === 'minifix' ? (' דיבלים Ø' + c.dowelDia + '×' + c.dowelDepth + '.') : '') +
+              ' קידוח קצה בלוח האופקי אינו ב-DXF — הערה בלבד.')
+            : 'ללא חיבורי גוף.'));
+        L.push('ארגזי מגירות: ' + (c.drawerBoxes ? 'כלולים.' : 'לא כלולים.') +
+            ' חורי מסילות: ' + (c.runnerHoles ? ('Ø' + c.runnerHoleDia + '×' + c.runnerHoleDepth + ', קדמי ' + c.runnerInsetFront + ' / אחורי ' + c.runnerInsetRear + '.') : 'כבוי.'));
         L.push('צוקל: ' + ['בלוק הצוקל לא יוצא', 'פס קדמי לכל בלוק צוקל', 'פס קדמי ואחורי לכל בלוק צוקל'][Math.max(0, Math.min(2, Math.round(c.plinthStrips)))] + '.');
         L.push('קנט: ' + (c.edgeBandThickness > 0 ? 'מידות החיתוך קטנות ב-' + c.edgeBandThickness + ' מ"מ בכל קצה מקונט.' : 'מידות החיתוך הן מידות גמר (ללא הפחתת קנט).'), '');
         L.push('סיכום חומרים', '------------');
         result.stock.forEach(function(s) { L.push(s.matLabel + ' ' + s.T + ' מ"מ: ' + s.count + ' לוחות, ' + s.area.toFixed(2) + ' מ"ר נטו'); });
+        if (result.nests && result.nests.length) {
+            L.push('');
+            L.push('קינון פלטות', '------------');
+            result.nests.forEach(function(n) {
+                L.push(n.file + ' — ' + n.matLabel + ' ' + n.T + ' מ"מ, ' + n.parts + ' חלקים, ניצולת ~' + n.util + '%');
+            });
+        }
         L.push('');
         L.push('לא כלול', '-------');
-        L.push('מיניפיקס ודיבלים (רק קונפירמט), קידוח קצה קונפירמט בלוח האופקי, ארגזי מגירות וחורי מסילות,');
-        L.push('קינון על גיליון, ייצוא כל ההזמנה בבת אחת, ו-G-code. כיוון הסיבים והקנטים נקבעים לפי מוסכמה — לבדוק מול ההזמנה.', '');
+        L.push('G-code למכונה (דורש פרופיל בקר/כלים לכל סדנה). כיוון הסיבים והקנטים לפי מוסכמה — לבדוק מול ההזמנה.', '');
         if (result.skipped.length) {
             L.push('חלקים שלא יוצאו', '---------------');
             result.skipped.forEach(function(s) { L.push('- ' + s); });
@@ -1408,21 +1570,45 @@
         return '\uFEFF' + L.join('\r\n') + '\r\n';
     }
 
-    async function _download(result) {
+    async function _download(result, opts) {
+        opts = opts || {};
         const x3 = X3();
-        const name = x3.fileBaseName ? x3.fileBaseName() : 'ארון';
+        const name = opts.fileName || (x3.fileBaseName ? x3.fileBaseName() : 'ארון');
         const JSZip = await x3.loadJSZip();
-        const zip = new JSZip();
+        const zip = opts.zip || new JSZip();
+        const root = opts.folder ? (opts.folder.replace(/\/?$/, '/') ) : '';
         result.panels.forEach(function(r) {
-            zip.file(r.file, _panelDxf(r, 'A'));
-            if (r.fileB) zip.file(r.fileB, _panelDxf(r, 'B'));
+            zip.file(root + r.file, _panelDxf(r, 'A'));
+            if (r.fileB) zip.file(root + r.fileB, _panelDxf(r, 'B'));
         });
         result.stock.forEach(function(s) {
-            zip.file('all_' + String(s.matKey).replace(/[^\w.-]+/g, '_') + '_' + _fmt(s.T) + 'mm.dxf', _stockDxf(s.items));
+            zip.file(root + 'all_' + String(s.matKey).replace(/[^\w.-]+/g, '_') + '_' + _fmt(s.T) + 'mm.dxf', _stockDxf(s.items));
         });
-        zip.file('cutlist.csv', _csv(result));
-        zip.file('README.txt', _readme(result, name));
-        x3.download(await zip.generateAsync({ type: 'blob' }), name + ' - CNC.zip');
+        // Nested sheets
+        if (result.nests && result.nests.length) {
+            result.nests.forEach(function(n) {
+                zip.file(root + n.file, n.dxf);
+            });
+        }
+        zip.file(root + 'cutlist.csv', _csv(result));
+        // Printable labels
+        if (result.cfg.pdfLabels && typeof window._cncBuildLabelsHtml === 'function') {
+            try {
+                zip.file(root + 'labels/labels.html', window._cncBuildLabelsHtml(result, name));
+            } catch (e) { console.warn('[cnc labels]', e); }
+        }
+        zip.file(root + 'README.txt', _readme(result, name));
+        // Extra augmenters
+        const hooks = window._cncExtrasHooks;
+        if (hooks && hooks.augmentZip) {
+            for (let i = 0; i < hooks.augmentZip.length; i++) {
+                try { await hooks.augmentZip[i](zip, result, name, root); } catch (e) { console.warn('[cnc augmentZip]', e); }
+            }
+        }
+        if (!opts.zip) {
+            x3.download(await zip.generateAsync({ type: 'blob' }), name + ' - CNC.zip');
+        }
+        return zip;
     }
 
     // ---------- preview ----------
@@ -1481,11 +1667,41 @@
         { k: 'platePitch', label: 'מרווח בין בורגי הפלטה' },
         { k: 'plateFront', label: 'מרכז הפלטה מקצה הדופן הקדמי' },
         { sec: 'חיבורי גוף' },
-        { k: 'carcassConnectors', label: 'חורי קונפירמט בדפנות', check: true },
-        { k: 'confFaceDia', label: 'קוטר קידוח פנים', step: 0.5 },
+        { k: 'carcassConnectors', label: 'חיבורי גוף בדפנות', check: true },
+        { k: 'connectorType', label: 'סוג חיבור', opts: [
+            ['confirmat', 'קונפירמט'],
+            ['minifix', 'מיניפיקס'],
+            ['dowels', 'דיבלים'],
+            ['confirmat+dowels', 'קונפירמט + דיבלים']
+        ] },
+        { k: 'confFaceDia', label: 'קוטר קידוח פנים (קונפירמט)', step: 0.5 },
         { k: 'confFaceDepth', label: 'עומק קידוח פנים', step: 0.5 },
         { k: 'confEdgeInset', label: 'מרחק מקצה קדמי / אחורי' },
         { k: 'confCount', label: 'מספר חורים לחיבור (0=אוטומטי)' },
+        { k: 'minifixCamDia', label: 'מיניפיקס — קוטר כוס', step: 0.5 },
+        { k: 'minifixCamDepth', label: 'מיניפיקס — עומק כוס', step: 0.5 },
+        { k: 'minifixPinDia', label: 'מיניפיקס — קוטר פין', step: 0.5 },
+        { k: 'minifixPinDepth', label: 'מיניפיקס — עומק פין', step: 0.5 },
+        { k: 'dowelDia', label: 'דיבל — קוטר', step: 0.5 },
+        { k: 'dowelDepth', label: 'דיבל — עומק', step: 0.5 },
+        { sec: 'מגירות' },
+        { k: 'drawerBoxes', label: 'כלול ארגזי מגירות פנימיות', check: true },
+        { k: 'runnerHoles', label: 'חורי מסילות בדפנות', check: true },
+        { k: 'runnerHoleDia', label: 'קוטר חור מסילה', step: 0.5 },
+        { k: 'runnerHoleDepth', label: 'עומק חור מסילה', step: 0.5 },
+        { k: 'runnerInsetFront', label: 'מסילה — מרחק מקצה קדמי' },
+        { k: 'runnerInsetRear', label: 'מסילה — מרחק מקצה אחורי' },
+        { sec: 'קינון ותוויות' },
+        { k: 'nestSheets', label: 'קינון על פלטות מלאי', check: true },
+        { k: 'sheetW', label: 'רוחב פלטה (מ"מ)' },
+        { k: 'sheetH', label: 'גובה פלטה (מ"מ)' },
+        { k: 'nestGap', label: 'מרווח בין חלקים', step: 1 },
+        { k: 'nestAllowRotate', label: 'אפשר סיבוב 90° (אם אין נעילת סיבים)', check: true },
+        { k: 'pdfLabels', label: 'דף מדבקות להדפסה (HTML→PDF)', check: true },
+        { k: 'labelW', label: 'רוחב מדבקה (מ"מ)' },
+        { k: 'labelH', label: 'גובה מדבקה (מ"מ)' },
+        { sec: 'היקף ייצוא' },
+        { k: 'exportScope', label: 'מה מייצאים', opts: [['cabinet', 'הארון שבעריכה'], ['order', 'כל ההזמנה (עגלה)']] },
         { sec: 'כללי' },
         { k: 'plinthStrips', label: 'לוחות צוקל לכל בלוק', opts: [[0, 'ללא'], [1, 'פס קדמי'], [2, 'פס קדמי + אחורי']] },
         { k: 'edgeBandThickness', label: 'הפחתת עובי קנט ממידת החיתוך', step: 0.1 }
@@ -1589,7 +1805,9 @@
         const ops = res.panels.reduce(function(s, r) {
             return s + r.qty * (r.faces.A.drills.length + r.faces.B.drills.length + r.faces.A.grooves.length + r.faces.B.grooves.length);
         }, 0);
-        m.querySelector('#cnc-summary').textContent = res.total + ' לוחות · ' + res.panels.length + ' ייחודיים · ' + ops + ' פעולות עיבוד · ' +
+        const nestN = (res.nests && res.nests.length) ? (' · ' + res.nests.length + ' פלטות קינון') : '';
+        const scopeHint = (UI.cfg && UI.cfg.exportScope === 'order') ? ' · ייצוא: כל ההזמנה' : '';
+        m.querySelector('#cnc-summary').textContent = res.total + ' לוחות · ' + res.panels.length + ' ייחודיים · ' + ops + ' פעולות עיבוד' + nestN + scopeHint + ' · ' +
             res.stock.map(function(s) { return s.matLabel + ' ' + s.T + ' מ"מ: ' + s.area.toFixed(2) + ' מ"ר'; }).join(' · ');
         m.querySelector('#cnc-download').disabled = !res.panels.length;
         _sync3d();
@@ -1993,8 +2211,8 @@
         m.innerHTML =
             '<div style="background:#fff;border-radius:14px;width:min(1380px,97vw);height:min(860px,94vh);display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(15,23,42,.35);overflow:hidden;">' +
                 '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid #e2e8f0;">' +
-                    '<div><b style="font-size:1rem;color:#0f172a;"><i class="fa-solid fa-gears" style="color:#4f46e5;margin-left:8px;"></i>ייצוא CNC — DXF ורשימת חיתוך</b>' +
-                    '<div style="font-size:.74rem;color:#64748b;margin-top:2px;">הארון שבעריכה · קובץ DXF שכבתי לכל לוח, קובץ מרוכז לכל חומר ורשימת חיתוך CSV</div></div>' +
+                    '<div><b style="font-size:1rem;color:#0f172a;"><i class="fa-solid fa-gears" style="color:#4f46e5;margin-left:8px;"></i>ייצוא CNC — DXF, קינון ותוויות</b>' +
+                    '<div style="font-size:.74rem;color:#64748b;margin-top:2px;">DXF לכל לוח · קינון פלטות · מדבקות · CSV · ארגזי מגירות / מיניפיקס · ללא G-code</div></div>' +
                     '<button type="button" id="cnc-close" title="סגור" style="border:0;background:none;font-size:1.3rem;color:#64748b;cursor:pointer;padding:4px 8px;">&times;</button>' +
                 '</div>' +
                 '<div style="flex:1;display:flex;min-height:0;">' +
@@ -2068,8 +2286,12 @@
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-left:7px;"></i>מכין קבצים...';
             try {
-                UI.result = _build(UI.cfg);
-                await _download(UI.result);
+                if (UI.cfg.exportScope === 'order' && typeof window._cncBuildOrderZip === 'function') {
+                    await window._cncBuildOrderZip(UI.cfg, _build, _download);
+                } else {
+                    UI.result = _build(UI.cfg);
+                    await _download(UI.result);
+                }
                 _toast('קובצי ה-CNC ירדו בהצלחה');
             } catch (e) {
                 console.error('[cnc]', e);
@@ -2083,6 +2305,7 @@
 
     window._exportCncDebug = {
         defaults: CNC_DEFAULTS, collect: _collect, rules: _rules, ops: _ops, build: _build,
-        dxf: _panelDxf, stockDxf: _stockDxf, csv: _csv, readme: _readme, svg: _svg
+        dxf: _panelDxf, stockDxf: _stockDxf, csv: _csv, readme: _readme, svg: _svg,
+        download: _download, entities: _entities, dxfFile: _dxfFile
     };
 })();
