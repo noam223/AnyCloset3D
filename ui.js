@@ -673,8 +673,11 @@ window.setColumnBackType = function(type) {
     const col = state.columns[state.activeEditCol];
     if (typeof window._ensureColumnBackFields === 'function') window._ensureColumnBackFields(col);
     col.backType = type;
-    if (type === 'stretcher' && typeof window._syncBackStretcherYs === 'function') {
-        window._syncBackStretcherYs(col);
+    if (type === 'stretcher') {
+        // Always re-seed positions (avoid old mid-cell Y that sits under height labels)
+        if (!col.backStretchers) col.backStretchers = { height: 10, count: 1, ys: [] };
+        col.backStretchers.ys = [];
+        if (typeof window._syncBackStretcherYs === 'function') window._syncBackStretcherYs(col);
     }
     const menu = document.getElementById('qe-back-type-menu');
     if (menu) menu.style.display = 'none';
@@ -7652,7 +7655,11 @@ function buildDragHandlesUI() {
             if(v.isSplit) { sHandle.style.borderColor = '#e74c3c'; sHandle.style.boxShadow = '0 2px 10px rgba(231, 76, 60, 0.4)'; }
             if(v.isInternalDeskSurface || v.isInternalDeskClearance) sHandle.style.borderColor = '#f1c40f';
             if(v.isSubCellShelf) { sHandle.style.borderColor = '#06b6d4'; sHandle.style.boxShadow = '0 2px 10px rgba(6,182,212,0.4)'; }
-            if(v.isBackStretcher) { sHandle.style.borderColor = '#8b5cf6'; sHandle.style.boxShadow = '0 2px 10px rgba(139,92,246,0.4)'; }
+            if(v.isBackStretcher) {
+                sHandle.classList.add('back-stretcher-handle');
+                sHandle.style.borderColor = '#8b5cf6';
+                sHandle.style.boxShadow = '0 2px 10px rgba(139,92,246,0.4)';
+            }
             // Store identity so shelf-delete trash can sit next to this handle
             if (!v.isSplit && !v.isInternalDeskSurface && !v.isInternalDeskClearance && !v.isInternalDeskDrawer && !v.isBackStretcher) {
                 sHandle.dataset.colIndex = v.colIndex;

@@ -6997,8 +6997,11 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
                 createBoard(col.width, sh, st, colCenterX, bs.ys[si], -bodyD / 2 + st / 2, mat);
                 _ppPartId = '';
                 if (_isActiveWingBuild) {
+                    // Offset handle toward the column edge so cell-height labels (center) don't cover it
                     dragHandlesData.vertical.push({
-                        colIndex: c, stretcherIdx: si, x: colCenterX, y: bs.ys[si],
+                        colIndex: c, stretcherIdx: si,
+                        x: colCenterX + col.width * 0.38,
+                        y: bs.ys[si],
                         isBackStretcher: true
                     });
                 }

@@ -357,8 +357,9 @@ window._defaultBackStretcherYs = function(col, count, height) {
     const lo = bottomEdge + half + 0.5;
     const hi = topEdge - half - 0.5;
     const n = Math.max(1, Math.min(6, count | 0));
-    if (hi <= lo) return [Math.round(((lo + hi) / 2) * 10) / 10];
-    if (n === 1) return [Math.round(((lo + hi) / 2) * 10) / 10];
+    // Keep stretchers near top/bottom — not mid-cell, where height labels sit and block drag handles
+    if (hi <= lo) return [Math.round(hi * 10) / 10];
+    if (n === 1) return [Math.round(hi * 10) / 10];
     const ys = [];
     for (let i = 0; i < n; i++) {
         ys.push(Math.round((lo + (hi - lo) * (i / (n - 1))) * 10) / 10);
@@ -374,6 +375,15 @@ window._syncBackStretcherYs = function(col) {
     if (!bs.ys.length) {
         bs.ys = window._defaultBackStretcherYs(col, n, h);
         return bs.ys;
+    }
+    // Migrate legacy single stretcher stuck at mid-column (under cell height UI)
+    if (n === 1 && bs.ys.length === 1) {
+        const defaults = window._defaultBackStretcherYs(col, 1, h);
+        const mid = ((col.height || 240) / 2);
+        if (Math.abs(bs.ys[0] - mid) < Math.max(8, h)) {
+            bs.ys = defaults;
+            return bs.ys;
+        }
     }
     if (bs.ys.length > n) bs.ys = bs.ys.slice(0, n);
     while (bs.ys.length < n) {

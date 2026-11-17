@@ -2668,7 +2668,8 @@ body.color-tab-glass #mobile-panel-materials .mobile-panel-body > :not(.color-pa
 #dimensions-layer, #drag-handles-layer, #buttons-layer, #col-widths-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
 #dimensions-layer { z-index: 17; }
 #buttons-layer { z-index: 18; }
-#drag-handles-layer { z-index: 15; }
+#drag-handles-layer { z-index: 19; }
+.drag-handle.back-stretcher-handle { z-index: 22; }
 #col-widths-layer { z-index: 14; opacity: 0; }
 #col-widths-layer.hover-ui-hidden,
 #col-widths-layer.hover-ui-hidden .col-width-label { pointer-events: none !important; }
