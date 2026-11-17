@@ -522,6 +522,15 @@
                     <option value="mdf">MDF (עד 270 ס"מ)</option>
                 </select>
             </div>
+            <div id="cabinet-back-type-row" style="margin-bottom:12px;">
+                <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:3px;">סוג גב ארון</div>
+                <select id="inp-cabinet-back-type" class="editor-select" style="margin:0;" onchange="setCabinetBackType(this.value)">
+                    <option value="mezuzah" selected>גב מזונית</option>
+                    <option value="back8">גב 8 מ"מ</option>
+                    <option value="back17">גב 17 מ"מ</option>
+                    <option value="mixed" disabled hidden>מעורב (לפי עמודה)</option>
+                </select>
+            </div>
             <div id="wing-position-row" style="display:none;margin-top:10px;">
                 <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:3px;">מיקום כנף</div>
                 <select id="inp-wing-position" class="editor-select" style="margin:0;" onchange="updateWingPosition(this.value);">
@@ -2469,6 +2478,14 @@
             <option value="melamine">מלמין (עד 270 ס"מ)</option>
             <option value="sandwich">סנדביץ' (עד 240 ס"מ)</option>
                     <option value="mdf">MDF (עד 270 ס"מ)</option>
+        </select>
+        <div class="mobile-section-title">סוג גב ארון</div>
+        <select id="mobile-inp-cabinet-back-type" class="editor-select" style="margin-bottom:15px;"
+            onchange="setCabinetBackType(this.value)">
+            <option value="mezuzah">גב מזונית</option>
+            <option value="back8">גב 8 מ"מ</option>
+            <option value="back17">גב 17 מ"מ</option>
+            <option value="mixed" disabled hidden>מעורב (לפי עמודה)</option>
         </select>
         <div id="mobile-space-units-block">
             <div class="mobile-section-title">הוספת יחידה למרחב</div>

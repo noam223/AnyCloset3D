@@ -683,8 +683,48 @@ window.setColumnBackType = function(type) {
     if (menu) menu.style.display = 'none';
     buildCabinet(); calculatePrice(); updateQuickEditPanelUI();
     if (typeof window._rebuildBackTypeColorTabs === 'function') window._rebuildBackTypeColorTabs();
+    if (typeof window._syncCabinetBackTypeSelect === 'function') window._syncCabinetBackTypeSelect();
     if (typeof updateMobileColBarUI === 'function') updateMobileColBarUI();
     saveHistoryState();
+};
+
+/** Apply a single back type to every column in the active wing (sidebar control). */
+window.setCabinetBackType = function(type) {
+    if (!['mezuzah', 'back8', 'back17'].includes(type)) return;
+    const cols = state.columns || [];
+    cols.forEach(function(col) {
+        if (!col) return;
+        if (typeof window._ensureColumnBackFields === 'function') window._ensureColumnBackFields(col);
+        col.backType = type;
+    });
+    buildCabinet(); calculatePrice();
+    if (typeof updateQuickEditPanelUI === 'function') updateQuickEditPanelUI();
+    if (typeof window._rebuildBackTypeColorTabs === 'function') window._rebuildBackTypeColorTabs();
+    if (typeof window._syncCabinetBackTypeSelect === 'function') window._syncCabinetBackTypeSelect();
+    if (typeof updateMobileColBarUI === 'function') updateMobileColBarUI();
+    saveHistoryState();
+};
+
+window._syncCabinetBackTypeSelect = function() {
+    const cols = (state.columns || []).filter(Boolean);
+    let value = 'mezuzah';
+    if (cols.length) {
+        const types = cols.map(function(c) {
+            if (typeof window._ensureColumnBackFields === 'function') window._ensureColumnBackFields(c);
+            return c.backType || 'mezuzah';
+        });
+        const first = types[0];
+        const allSame = types.every(function(t) { return t === first; });
+        if (allSame && ['mezuzah', 'back8', 'back17'].includes(first)) value = first;
+        else value = 'mixed';
+    }
+    ['inp-cabinet-back-type', 'mobile-inp-cabinet-back-type'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const mixedOpt = el.querySelector('option[value="mixed"]');
+        if (mixedOpt) mixedOpt.hidden = value !== 'mixed';
+        el.value = value;
+    });
 };
 
 window.updateBackStretcherCount = function(delta) {
@@ -11085,6 +11125,102 @@ function _copyCanvas(src) {
     return c;
 }
 
+/** Draw 1…N column badges above each column on an open (no-doors) capture frame. */
+function _stampColumnNumbersOnFrame(frame, cam, columns, opts) {
+    if (!frame || !cam || !columns || columns.length < 1 || typeof THREE === 'undefined') return frame;
+    opts = opts || {};
+    const t = opts.thickness != null ? opts.thickness : (state.thickness || 1.7);
+    const width = opts.width != null ? opts.width : (state.width || 160);
+    const ox = opts.ox || 0;
+    const out = _copyCanvas(frame);
+    const ctx = out.getContext('2d');
+    const v = new THREE.Vector3();
+    let currentX = -width / 2 + t + ox;
+    const fontPx = Math.max(18, Math.round(Math.min(out.width, out.height) * 0.028));
+    columns.forEach(function(col, i) {
+        if (!col) { currentX += t; return; }
+        const cx = currentX + col.width / 2;
+        const cy = (col.height || opts.height || state.globalHeight || 240) + Math.max(6, t * 2);
+        v.set(cx, cy, 0);
+        v.project(cam);
+        if (v.z < -1 || v.z > 1) {
+            currentX += col.width + t;
+            return;
+        }
+        const px = (v.x * 0.5 + 0.5) * out.width;
+        const py = (-v.y * 0.5 + 0.5) * out.height;
+        const r = fontPx * 0.85;
+        ctx.beginPath();
+        ctx.arc(px, py, r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+        ctx.fill();
+        ctx.lineWidth = Math.max(2, fontPx * 0.08);
+        ctx.strokeStyle = '#fff';
+        ctx.stroke();
+        ctx.fillStyle = '#fff';
+        ctx.font = '700 ' + fontPx + 'px Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(String(i + 1), px, py + 0.5);
+        currentX += col.width + t;
+    });
+    return out;
+}
+
+/**
+ * Print/summary text for cabinet back color + type on one line.
+ * When several type/color combos exist: "עמודה 1: גב 8 מ״מ בגוון … · עמודה 2: …"
+ */
+function _formatColorBackWithTypes(rawState, fallbackColorLabel) {
+    const rs = rawState || {};
+    const wing = (rs.wings && (rs.wings[rs.activeWing] || rs.wings.center)) || rs;
+    const cols = (wing && wing.columns) || rs.columns || [];
+    const byType = (wing && wing.materialBackByType) || rs.materialBackByType || {};
+    const defaultBack = (wing && wing.materialBack) || rs.materialBack || 'white_matte';
+    const fallback = fallbackColorLabel || _colorKeyLabel(defaultBack) || 'לבן מט';
+
+    if (!cols.length) {
+        return fallback;
+    }
+
+    const entries = cols.map(function(col, i) {
+        const type = (col && col.backType) || 'mezuzah';
+        const matKey = (byType && byType[type]) || defaultBack;
+        const color = _colorKeyLabel(matKey) || fallback;
+        const typeLabel = (typeof window._BACK_TYPE_LABEL === 'function')
+            ? window._BACK_TYPE_LABEL(type)
+            : type;
+        return { n: i + 1, type: type, typeLabel: typeLabel, color: color, key: type + '|' + matKey };
+    });
+
+    const unique = {};
+    entries.forEach(function(e) { unique[e.key] = e; });
+    const combos = Object.keys(unique);
+
+    if (combos.length <= 1) {
+        const e = entries[0];
+        return e.color + ' · ' + e.typeLabel;
+    }
+
+    // Mixed types and/or colors — per-column detail in the same colorBack line
+    return entries.map(function(e) {
+        return 'עמודה ' + e.n + ': ' + e.typeLabel + ' בגוון ' + e.color;
+    }).join(' · ');
+}
+
+function _resolveColorBackPrintValue(item, itemObj) {
+    const raw = (itemObj && itemObj.rawState) || null;
+    const fallback = (item && item.colorBack && item.colorBack !== 'undefined')
+        ? item.colorBack
+        : 'לבן מט';
+    if (!raw) return fallback;
+    try {
+        return _formatColorBackWithTypes(raw, fallback);
+    } catch (e) {
+        return fallback;
+    }
+}
+
 /** Bounding box of everything that differs from the corner background color, or null. */
 function _canvasContentBounds(c) {
     const w = c.width, h = c.height;
@@ -11365,6 +11501,18 @@ function _captureFrameAtView(cam, ctrl, ren, scn, view, hasDoors) {
             bounds = _canvasContentBounds(_copyCanvas(ren.domElement));
         } finally {
             companions.forEach(function(g) { g.visible = true; });
+        }
+    }
+    // Open shot: number columns above the carcass for factory / summary prints
+    if (!hasDoors && view.id !== 'space' && !(view.outlineSpaceSlots)) {
+        const cols = state.columns || [];
+        if (cols.length) {
+            frame = _stampColumnNumbersOnFrame(frame, cam, cols, {
+                width: state.width,
+                thickness: state.thickness,
+                height: state.globalHeight,
+                ox: 0
+            });
         }
     }
     const dataUrl = _cropCanvasToContent(frame, 40, bounds);
@@ -13905,7 +14053,20 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
             deskDims: deskDimsInfo,
             colorBody: _colorKeyLabel(state.materialBody),
             colorInternal: _colorKeyLabel(state.materialInternal),
-            colorBack: _colorKeyLabel(state.materialBack),
+            colorBack: (function() {
+                try {
+                    const snapRs = {
+                        wings: state.wings,
+                        activeWing: state.activeWing,
+                        columns: state.columns,
+                        materialBack: state.materialBack,
+                        materialBackByType: state.materialBackByType
+                    };
+                    return _formatColorBackWithTypes(snapRs, _colorKeyLabel(state.materialBack));
+                } catch (e) {
+                    return _colorKeyLabel(state.materialBack);
+                }
+            })(),
             colorExternal: _colorKeyLabel(state.materialExternal),
             colorDesk: _colorKeyLabel(state.materialDesk),
             colorOpenCell: _resolveOpenCellColorLabel(state.wings, state.materialOpenCell),
@@ -16250,7 +16411,9 @@ function _enrichSpecColorsFromRaw(item, rawState) {
     if (mat('materialBody')) item.colorBody = _colorKeyLabel(mat('materialBody'));
     if (mat('materialInternal')) item.colorInternal = _colorKeyLabel(mat('materialInternal'));
     if (mat('materialExternal')) item.colorExternal = _colorKeyLabel(mat('materialExternal'));
-    if (mat('materialBack')) item.colorBack = _colorKeyLabel(mat('materialBack'));
+    if (mat('materialBack') || (wing && wing.columns)) {
+        item.colorBack = _formatColorBackWithTypes(rawState, _colorKeyLabel(mat('materialBack') || 'white_matte'));
+    }
     if (mat('materialDesk')) item.colorDesk = _colorKeyLabel(mat('materialDesk'));
     if (rawState.wings) {
         item.colorOpenCell = _resolveOpenCellColorLabel(rawState.wings, mat('materialOpenCell') || rawState.materialOpenCell);
@@ -16376,7 +16539,10 @@ function _collectWingPrintSpecRows(item, itemObj, unit) {
     rows.push({
         id: prefix + 'colorBack',
         label: 'צבע גב ארון',
-        value: _plainSpecValue(_colorKeyLabel(mat('materialBack') || 'white_matte'))
+        value: _plainSpecValue(_formatColorBackWithTypes(
+            { wings: { center: wing }, activeWing: 'center', columns: wing.columns, materialBack: mat('materialBack'), materialBackByType: wing.materialBackByType },
+            _colorKeyLabel(mat('materialBack') || 'white_matte')
+        ))
     });
     if (openCells > 0) {
         rows.push({
@@ -16566,7 +16732,7 @@ function _collectPrintSpecRows(item, itemObj) {
         } else {
             rows.push({ id: 'colorExternal', label: 'צבע חזיתות (דלתות ומגירות חוץ)', value: _plainSpecValue(item.colorExternal) });
         }
-        rows.push({ id: 'colorBack', label: 'צבע גב ארון', value: _plainSpecValue((item.colorBack && item.colorBack !== 'undefined') ? item.colorBack : 'לבן מט') });
+        rows.push({ id: 'colorBack', label: 'צבע גב ארון', value: _plainSpecValue(_resolveColorBackPrintValue(item, itemObj)) });
         if (_formatDeskAddition(item, itemObj).desk !== 'ללא') rows.push({ id: 'colorDesk', label: 'צבע שולחן עבודה', value: _plainSpecValue(item.colorDesk) });
         if (item.hasOpenCells) rows.push({ id: 'colorOpenCell', label: 'צבע כוורת', value: _plainSpecValue(item.colorOpenCell) });
         const glassTint = itemObj && _resolveGlassTintLabel(itemObj.rawState);
@@ -17595,7 +17761,7 @@ function _printFinishesRows(item, itemObj, thStyle, tdStyle, sectionStyle) {
     } else {
         html += _printTr(thStyle, tdStyle, 'צבע חזיתות (דלתות ומגירות חוץ)', item.colorExternal);
     }
-    html += _printTr(thStyle, tdStyle, 'צבע גב ארון', (item.colorBack && item.colorBack !== 'undefined') ? item.colorBack : 'לבן מט');
+    html += _printTr(thStyle, tdStyle, 'צבע גב ארון', _resolveColorBackPrintValue(item, itemObj));
     if (_formatDeskAddition(item, itemObj).desk !== 'ללא') html += _printTr(thStyle, tdStyle, 'צבע שולחן עבודה', item.colorDesk);
     if (item.hasOpenCells) html += _printTr(thStyle, tdStyle, 'צבע כוורת', item.colorOpenCell);
     const glassTint = itemObj && _resolveGlassTintLabel(itemObj.rawState);
@@ -19612,7 +19778,8 @@ function _buildCustomerSummaryDetails(itemObj) {
 
     const colorInternal = _summarySpecOrRaw(item, rawState, 'colorInternal', 'materialInternal');
     const colorExternal = _summarySpecOrRaw(item, rawState, 'colorExternal', 'materialExternal');
-    const colorBack = _summarySpecOrRaw(item, rawState, 'colorBack', 'materialBack');
+    const colorBack = _resolveColorBackPrintValue(item, itemObj)
+        || _summarySpecOrRaw(item, rawState, 'colorBack', 'materialBack');
     const colorDesk = _summarySpecOrRaw(item, rawState, 'colorDesk', 'materialDesk');
     const colorOpenCell = _summarySpecOrRaw(item, rawState, 'colorOpenCell', 'materialOpenCell');
 

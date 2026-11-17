@@ -2050,6 +2050,7 @@ window.syncSidebarToWing = function() {
         if (typeof window._rebuildDoorPanelTabs === 'function') window._rebuildDoorPanelTabs();
     }
     if (typeof window._rebuildBackTypeColorTabs === 'function') window._rebuildBackTypeColorTabs();
+    if (typeof window._syncCabinetBackTypeSelect === 'function') window._syncCabinetBackTypeSelect();
     // Highlight sliding preset buttons (desktop + mobile)
     const slidingPresetBtn = document.getElementById('preset-btn-sliding');
     if (slidingPresetBtn) slidingPresetBtn.classList.toggle('active', isSliding);
