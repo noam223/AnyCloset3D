@@ -1371,12 +1371,33 @@
                 });
             });
             // Holes from both faces that meet inside the board
-            const meet = r.faces.A.drills.some(function(d) {
-                return r.faces.B.drills.some(function(o) {
-                    return Math.hypot(d.x - (r.L - o.x), d.y - o.y) < (d.d + o.d) / 2 && d.depth + o.depth > r.T - 1;
+            const _drillKindHe = function(tag, d, depth) {
+                const kinds = {
+                    plate: 'פלטת ציר',
+                    pin: 'פין מדף',
+                    cup: 'כוס ציר',
+                    confirmat: 'קונפירמט',
+                    minifix_cam: 'כוס מיניפיקס',
+                    minifix_pin: 'פין מיניפיקס',
+                    dowel: 'דיבל',
+                    runner: 'מסילה'
+                };
+                const kind = kinds[tag] || (tag ? String(tag) : 'קידוח');
+                return kind + ' Ø' + d + '×' + depth;
+            };
+            const meetKinds = [];
+            r.faces.A.drills.forEach(function(d) {
+                r.faces.B.drills.forEach(function(o) {
+                    if (Math.hypot(d.x - (r.L - o.x), d.y - o.y) < (d.d + o.d) / 2 && d.depth + o.depth > r.T - 1) {
+                        const label = _drillKindHe(d.tag, d.d, d.depth) + ' מול ' + _drillKindHe(o.tag, o.d, o.depth)
+                            + ' (סה״כ ' + _fmt(d.depth + o.depth) + ' > עובי ' + _fmt(r.T) + ')';
+                        if (meetKinds.indexOf(label) < 0) meetKinds.push(label);
+                    }
                 });
             });
-            if (meet) w.push(who + ': קידוחים משני צדי הלוח באותו מיקום נפגשים (עומק כולל גדול מעובי הלוח) — לקדוח חור עובר או להקטין עומק');
+            meetKinds.forEach(function(label) {
+                w.push(who + ': קידוחים משני צדי הלוח נפגשים — ' + label + ' — לקדוח חור עובר, להזיז או להקטין עומק');
+            });
         });
         const total = list.reduce(function(s, r) { return s + r.qty; }, 0);
         if (total !== model.sceneBoards) w.push('בדיקת כמות: ' + total + ' לוחות בייצוא מול ' + model.sceneBoards + ' לוחות עץ בהדמיה');
