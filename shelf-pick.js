@@ -529,6 +529,7 @@
                     window._toggleStretcherShelf(_selectedRef.colIndex, _selectedRef.shelfIdx);
                 }
                 _syncStretcherBtnState();
+                btn.blur();
             });
             document.body.appendChild(btn);
         }
