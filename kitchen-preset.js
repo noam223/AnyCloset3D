@@ -557,13 +557,16 @@ window._configureKitchenCornerL = function(side, opts) {
 window._kitchenLinearMeters = function() {
     if (!window._isKitchenPreset || !window._isKitchenPreset()) return 0;
     let cm = 0;
-    ['center', 'left', 'right'].forEach(function(s) {
+    const _meterKeys = Object.keys(state.wings || {}).filter(function(k) {
+        return k === 'center' || k === 'left' || k === 'right' || k.indexOf('gLeg_') === 0;
+    });
+    _meterKeys.forEach(function(s) {
         const w = state.wings && state.wings[s];
         if (!w) return;
         // Empty corner stub is only an L anchor — do not bill its width
         if (s === 'center' && w.kitchenCornerL && (!w.columns || !w.columns.length)) return;
-        // Full-corner arm: count L block + return units (empty arm stores size as width only once)
-        if (w.wingPosition === 'full_corner' && w.fullCorner) {
+        // Full-corner / G-leg: count L block + return units (empty arm stores size as width only once)
+        if ((w.wingPosition === 'full_corner' || w.wingPosition === 'g_leg') && w.fullCorner) {
             const fc = w.fullCorner.size || 90;
             const hasCols = !!(w.columns && w.columns.length);
             cm += hasCols ? (fc + (w.width || 0)) : fc;
@@ -1485,9 +1488,13 @@ window._kitchenComputeEndAddAnchors = function() {
         }
     }
 
-    // Corner return arms — free tip on Z
+    // Corner return arms — free tip on Z (unit and/or 3rd corner → gLeg)
     function armFarAnchor(side, wing) {
         if (!wing) return;
+        const gKey = 'gLeg_' + side;
+        const hasG = !!(state.wings[gKey] && state.wings[gKey].wingPosition === 'g_leg');
+        // Once a G-leg exists, the return tip is consumed by the 3rd corner
+        if (hasG) return;
         const fcSize = (wing.fullCorner && wing.fullCorner.size) || 90;
         const wingD = wing.depth || KIT_DEPTH;
         const wingW = (wing.columns && wing.columns.length) ? (wing.width || 0) : 0;
@@ -1508,7 +1515,7 @@ window._kitchenComputeEndAddAnchors = function() {
             end: side === 'right' ? 'right' : 'left',
             axis: 'z',
             canUnit: true,
-            canCorner: false,
+            canCorner: true, // 3rd kitchen corner (G-leg)
             worldX: armX,
             worldY: y,
             worldZ: farZ
@@ -1517,7 +1524,140 @@ window._kitchenComputeEndAddAnchors = function() {
     if (hasRightFC) armFarAnchor('right', right);
     if (hasLeftFC) armFarAnchor('left', left);
 
+    // G-leg free tip (continues along ±X after the 3rd corner)
+    function gLegFarAnchor(parentSide) {
+        const gKey = 'gLeg_' + parentSide;
+        const gWing = state.wings[gKey];
+        if (!gWing || gWing.wingPosition !== 'g_leg') return;
+        const parent = state.wings[parentSide];
+        if (!parent) return;
+        const tip = window._kitchenGLegTipPose && window._kitchenGLegTipPose(parentSide);
+        if (!tip) return;
+        const gW = (gWing.columns && gWing.columns.length) ? (gWing.width || 0) : 0;
+        const y = _kitMidHeight(gW ? gWing : cw);
+        // Inward run: right parent → −X, left parent → +X
+        const dir = parentSide === 'right' ? -1 : 1;
+        push({
+            id: gKey + '-far',
+            wingId: gKey,
+            // Local +X is the free tip after rot (world −X from right tip, +X from left)
+            end: 'right',
+            axis: 'x',
+            canUnit: true,
+            canCorner: false,
+            worldX: tip.legStartX + dir * (gW + gap),
+            worldY: y,
+            worldZ: tip.legZ
+        });
+    }
+    if (hasRightFC) gLegFarAnchor('right');
+    if (hasLeftFC) gLegFarAnchor('left');
+
     return anchors;
+};
+
+/** Cabinet-local pose for the 3rd corner tip + G-leg on a return arm. */
+window._kitchenGLegTipPose = function(parentSide) {
+    const cw = state.wings && state.wings.center;
+    const parent = state.wings && state.wings[parentSide];
+    if (!cw || !parent) return null;
+    const fcSize = (parent.fullCorner && parent.fullCorner.size) || 90;
+    const centerD = cw.depth || KIT_DEPTH;
+    const wingW = (parent.columns && parent.columns.length) ? (parent.width || 0) : 0;
+    const gWing = state.wings['gLeg_' + parentSide];
+    const gFc = (gWing && gWing.fullCorner && gWing.fullCorner.size) || fcSize;
+    const gD = (gWing && gWing.depth) || parent.depth || KIT_DEPTH;
+    const sign = parentSide === 'right' ? 1 : -1;
+    const tipOuterX = sign * (cw.width / 2 + fcSize);
+    const tipFarZ = -centerD / 2 + fcSize + wingW;
+    // G L back-outer at the return tip; inward horizontal arm toward aisle center
+    const originX = tipOuterX;
+    const originZ = tipFarZ;
+    // Leg runs inward (−X from right tip, +X from left tip), doors face into the U (−Z)
+    const legStartX = tipOuterX - sign * gFc;
+    const legZ = tipFarZ + gFc - gD / 2;
+    return {
+        parentSide: parentSide,
+        sign: sign,
+        gFc: gFc,
+        gD: gD,
+        originX: originX,
+        originZ: originZ,
+        // side for buildKitchenCornerUnit: right tip turns inward like a "left" L locally? 
+        // Use parentSide so horizontal arm goes toward center (right L: −X, left L: +X)
+        cornerSide: parentSide,
+        legStartX: legStartX,
+        legZ: legZ,
+        tipFarZ: tipFarZ,
+        tipOuterX: tipOuterX
+    };
+};
+
+function _makeKitchenGLeg(parentSide, opts) {
+    opts = opts || {};
+    const parent = state.wings[parentSide];
+    const c = state.wings.center;
+    const host = opts.host || parent || c || {};
+    const w = typeof createWingData === 'function' ? createWingData() : {};
+    w.globalHeight = (parent && parent.globalHeight) || (c && c.globalHeight) || KIT_HEIGHT;
+    w.depth = (parent && parent.depth) || (c && c.depth) || KIT_DEPTH;
+    w.thickness = (parent && parent.thickness) || (c && c.thickness) || 1.7;
+    w.plinthHeight = KIT_PLINTH;
+    w.boardMaterial = 'sandwich';
+    w.cabinetModel = 'c9';
+    w.cabinetTypeId = 'c9';
+    w.kitchenRole = 'corner';
+    w.kitchenCornerL = true;
+    w.wingPosition = 'g_leg';
+    w.parentWingId = parentSide;
+    w.gTurn = 'in';
+    w.fullCorner = {
+        size: (parent && parent.fullCorner && parent.fullCorner.size) || 90,
+        shelves: 2,
+        shelvesY: [],
+        compartments: []
+    };
+    w.slidingDoor = w.slidingDoor || {};
+    w.slidingDoor.enabled = false;
+    w.orderOpts = Object.assign({}, w.orderOpts || {}, { levelingFeet: 'yes' });
+    ['materialBody', 'materialInternal', 'materialExternal', 'materialOpenCell', 'materialBack',
+        'materialTopPanel', 'handleType', 'handleStyle', 'handleVariant', 'ridingColor', 'countertopBrand'
+    ].forEach(function(f) {
+        if (host[f] !== undefined) w[f] = JSON.parse(JSON.stringify(host[f]));
+    });
+    w.columns = [];
+    w.width = (w.fullCorner && w.fullCorner.size) || 90;
+    if (typeof window._distributeFullCornerShelves === 'function') {
+        window._distributeFullCornerShelves(w);
+    }
+    return w;
+}
+
+/** Attach a 3rd kitchen corner (G-leg) at the far Z tip of a return arm. */
+window._configureKitchenGLeg = function(parentSide, opts) {
+    opts = opts || {};
+    parentSide = parentSide === 'left' ? 'left' : 'right';
+    if (!window._isKitchenPreset || !window._isKitchenPreset()) return false;
+    const parent = state.wings && state.wings[parentSide];
+    if (!parent || parent.wingPosition !== 'full_corner' || !parent.kitchenCornerL) {
+        if (typeof _showToast === 'function') _showToast('צריך קודם זרוע פינה להמשך ל־3 פינות', 3200);
+        return false;
+    }
+    const key = 'gLeg_' + parentSide;
+    if (state.wings[key] && state.wings[key].wingPosition === 'g_leg') {
+        if (typeof _showToast === 'function') _showToast('כבר יש פינה שלישית בצד הזה', 2800);
+        return false;
+    }
+    const gLeg = _makeKitchenGLeg(parentSide, { host: opts.host || parent });
+    state.wings[key] = gLeg;
+    state.activeWing = key;
+    state.viewMode = '3d';
+    window._forceCameraAnim = true;
+    if (typeof syncSidebarToWing === 'function') syncSidebarToWing();
+    if (typeof _showToast === 'function') {
+        _showToast('פינה שלישית נוספה — הוסיפו יחידות עם + להמשך הזרוע', 4000);
+    }
+    return true;
 };
 
 /** Add a 60cm bay on a specific wing/end (does not redirect empty center stub to the L arm). */
@@ -1583,11 +1723,29 @@ window._kitchenAddUnitOnWing = function(wingId, end, presetSpec) {
     return true;
 };
 
-/** Turn a free center end into a kitchen L corner (ר). Keeps an existing opposite L (U). */
+/**
+ * Add a kitchen corner at a free end:
+ * - center X tip → 1st/2nd ר (L / U)
+ * - left/right Z tip → 3rd corner (G-leg)
+ */
 window._kitchenAddCornerAtEnd = function(wingId, end) {
     if (!window._isKitchenPreset || !window._isKitchenPreset()) return false;
+
+    // 3rd corner at return-arm tip
+    if (wingId === 'left' || wingId === 'right') {
+        if (typeof window._configureKitchenGLeg === 'function') {
+            if (!window._configureKitchenGLeg(wingId)) return false;
+        } else return false;
+        if (typeof buildCabinet === 'function') buildCabinet();
+        if (typeof calculatePrice === 'function') calculatePrice();
+        if (typeof saveHistoryState === 'function') saveHistoryState();
+        if (typeof window._updateKitchenSectionUI === 'function') window._updateKitchenSectionUI();
+        if (typeof window._syncKitchenApplianceToolbar === 'function') window._syncKitchenApplianceToolbar();
+        return true;
+    }
+
     if (wingId !== 'center') {
-        if (typeof _showToast === 'function') _showToast('פינה נוספת בקצה הזרוע עדיין לא נתמכת', 3200);
+        if (typeof _showToast === 'function') _showToast('לא ניתן להוסיף פינה כאן', 2800);
         return false;
     }
     const side = end === 'left' ? 'left' : 'right';

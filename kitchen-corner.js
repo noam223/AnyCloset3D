@@ -78,8 +78,13 @@
         const frontD = Math.min(bodyD, cd - 2 * t);
         const wingD = Math.min(wingData.depth || 56, cw - 2 * t);
         const sign = (side === 'right') ? 1 : -1;
-        const originX = sign * (mainW / 2 + cw) + (opts.offsetX || 0);
-        const originZ = -bodyD / 2 + (opts.offsetZ || 0);
+        // Absolute origin (G-leg tip corners) or classic center-edge placement
+        const originX = (opts.originX != null)
+            ? opts.originX
+            : (sign * (mainW / 2 + cw) + (opts.offsetX || 0));
+        const originZ = (opts.originZ != null)
+            ? opts.originZ
+            : (-bodyD / 2 + (opts.offsetZ || 0));
         const X = a => -sign * a;
 
         if (isBP) {

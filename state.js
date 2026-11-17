@@ -2776,17 +2776,18 @@ function restoreHistoryState() {
     const _prevUU = state._activeUpperUnit;
     const _prevUUParent = state._activeUpperUnitParent;
 
-    // Restore wings (including any upperUnit_* wings)
-    // First remove any upperUnit_* keys not in snapshot
+    // Restore wings (including upperUnit_* / gLeg_* extras)
     Object.keys(state.wings).forEach(function(k) {
-        if (k.startsWith('upperUnit_') && !snapshot.wings[k]) delete state.wings[k];
+        if (k !== 'center' && k !== 'left' && k !== 'right' && !snapshot.wings[k]) {
+            delete state.wings[k];
+        }
     });
     state.wings.center = snapshot.wings.center;
     state.wings.left = snapshot.wings.left;
     state.wings.right = snapshot.wings.right;
-    // Restore upperUnit_* wings from snapshot
     Object.keys(snapshot.wings).forEach(function(k) {
-        if (k.startsWith('upperUnit_')) state.wings[k] = snapshot.wings[k];
+        if (k === 'center' || k === 'left' || k === 'right') return;
+        if (snapshot.wings[k]) state.wings[k] = snapshot.wings[k];
     });
     state.activeWing = snapshot.activeWing || 'center';
     // Restore presetId (needed for sliding wardrobe)

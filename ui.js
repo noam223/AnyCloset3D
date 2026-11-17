@@ -9773,7 +9773,8 @@ function bindUI() {
 
         // Kitchen multi-arm: switch active wing so state.columns points at the hovered unit
         if (state.presetId === 'kitchen' && hoverWingId && !state.wingEditMode &&
-            (hoverWingId === 'left' || hoverWingId === 'right' || hoverWingId === 'center') &&
+            (hoverWingId === 'left' || hoverWingId === 'right' || hoverWingId === 'center' ||
+                String(hoverWingId).indexOf('gLeg_') === 0) &&
             hoverWingId !== state.activeWing && state.wings[hoverWingId]) {
             state.activeWing = hoverWingId;
             if (typeof syncSidebarToWing === 'function') syncSidebarToWing();

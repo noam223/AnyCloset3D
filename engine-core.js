@@ -5497,6 +5497,70 @@ function buildCabinet() {
         }
     }
 
+    // Kitchen G-leg (3rd corner): L at return tip + optional run inward parallel to center
+    Object.keys(state.wings).forEach(function(gKey) {
+        if (!gKey || gKey.indexOf('gLeg_') !== 0) return;
+        const gWing = state.wings[gKey];
+        if (!gWing || gWing.wingPosition !== 'g_leg') return;
+        if (state.presetId !== 'kitchen') return;
+        const parentSide = gWing.parentWingId || gKey.replace(/^gLeg_/, '');
+        const tip = (typeof window._kitchenGLegTipPose === 'function')
+            ? window._kitchenGLegTipPose(parentSide) : null;
+        if (!tip) return;
+
+        // Tip L corner
+        if (typeof window.buildKitchenCornerUnit === 'function') {
+            const gCorner = window.buildKitchenCornerUnit(tip.cornerSide, gWing, {
+                originX: tip.originX,
+                originZ: tip.originZ
+            });
+            if (gCorner && gCorner.isGroup) {
+                gCorner.userData.wingId = gKey;
+                window[`_fullCornerGroup_${gKey}`] = gCorner;
+            }
+        }
+
+        const gCols = gWing.columns || [];
+        if (!gCols.length) return;
+
+        const gGroup = new THREE.Group();
+        const gW = gWing.width || 0;
+        const dir = -tip.sign; // inward
+        const legCenterX = tip.legStartX + dir * (gW / 2);
+        gGroup.position.set(legCenterX, 0, tip.legZ);
+        // Doors face into the U (world −Z): right tip uses π, left tip uses 0
+        gGroup.rotation.y = (parentSide === 'right') ? Math.PI : 0;
+        gGroup.userData.wingId = gKey;
+        cabinetGroup.add(gGroup);
+
+        state.activeWing = gKey;
+        _buildGroup = gGroup;
+        _isActiveWingBuild = (savedActiveWing === gKey) && !savedActiveUpperUnit;
+        _ppWingId = gKey;
+        _buildWingGeometry(gGroup, 0, 0, 0, _isActiveWingBuild);
+        _buildGroup = cabinetGroup;
+
+        if (!inEditMode && gCols.length) {
+            const wingH = Math.max.apply(null, gCols.map(function(c) { return c.height; }));
+            const gD = gWing.depth || 56;
+            const whb = new THREE.Mesh(
+                new THREE.BoxGeometry(gW + 2, wingH + 2, gD + 2),
+                new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, depthTest: false })
+            );
+            whb.renderOrder = 999;
+            whb.position.set(legCenterX, wingH / 2, tip.legZ);
+            whb.userData = { wingId: gKey };
+            cabinetGroup.add(whb);
+            wingHitBoxes.push(whb);
+        }
+
+        if (_isActiveWingBuild && !savedActiveUpperUnit) {
+            window._activeWingGroup = gGroup;
+        }
+        state.activeWing = savedActiveWing;
+        _isActiveWingBuild = (savedActiveWing === 'center') && !savedActiveUpperUnit;
+    });
+
     // Build full corner unit(s) if any wing has wingPosition === 'full_corner'
     // In edit mode: hide full corner when editing a side wing; show ONLY full corner when editing it
     const isFCEditMode = inEditMode && (savedActiveWing === 'full_corner_right' || savedActiveWing === 'full_corner_left');
