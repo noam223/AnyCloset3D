@@ -12487,10 +12487,15 @@ window._promptSaveCabinetBeforeSwitch = function(targetIndex) {
 };
 
 // ==========================================
-// Multi cabinet in the same 3D space (up to 4: linear / sliding / writing-desk)
+// Multi cabinet in the same 3D space (up to 4)
 // Slot 0 is the world anchor; slots 1..n each store spaceOffset relative to it.
+// Compatible hosts: linear / sliding / writing-desk / corner-unit / kitchen /
+// classic corner wardrobes / walk-in. Bathroom stays exclusive (unlinks on switch).
 // ==========================================
-window._SPACE_COMPATIBLE_PRESETS = ['linear', 'sliding', 'writing-desk', 'corner-unit', 'kitchen'];
+window._SPACE_COMPATIBLE_PRESETS = [
+    'linear', 'sliding', 'writing-desk', 'corner-unit', 'kitchen',
+    'corner-left', 'corner-right', 'walkin'
+];
 window._SPACE_MAX_CABINETS = 4;
 
 /** Plan cap (e.g. designer Basic = 2). Slot clamping keeps using the system max so older projects stay intact. */

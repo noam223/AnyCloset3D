@@ -1089,8 +1089,8 @@ function _applyPresetCore(presetId, rightPos, leftPos) {
     }
     state.presetId = presetId;
 
-    // Only unlink when switching to layouts that cannot share a front-view space
-    // (corners / walk-in / bathroom). Allow writing-desk + sliding + linear together.
+    // Unlink only when switching to layouts that cannot share a space (e.g. bathroom).
+    // Corner / walk-in / writing-desk / sliding / linear can share the same 3D space.
     if ((typeof window._isSpaceCompatiblePreset !== 'function'
             ? (presetId !== 'linear' && presetId !== 'sliding')
             : !window._isSpaceCompatiblePreset(presetId)) &&
