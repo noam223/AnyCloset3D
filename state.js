@@ -50,13 +50,13 @@ window._ensurePlinthFrontStyles = function(src) {
 
 window._plinthStyleLabel = function(ps) {
     if (ps === 'recessed') return 'צוקל נסתר';
-    if (ps === 'legs') return 'על רגליים';
-    if (ps === 'floating') return 'ארון מרחף';
+    if (ps === 'legs') return 'רגליים';
+    if (ps === 'floating') return 'תלוי';
     return 'צוקל רגיל';
 };
 
 window._frontStyleLabel = function(fs) {
-    return fs === 'internal' ? 'פנימיות' : 'חיצוניות';
+    return fs === 'internal' ? 'חזיתות פנימיות' : 'חזיתות חיצוניות';
 };
 
 function createWingData(overrides) {

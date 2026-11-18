@@ -14151,7 +14151,7 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
         if (_isWritingDeskCart) plinthTypeText = 'ללא צוקל';
         const frontStyleText = (typeof window._frontStyleLabel === 'function')
             ? window._frontStyleLabel(_fsCart)
-            : (_fsCart === 'internal' ? 'פנימיות' : 'חיצוניות');
+            : (_fsCart === 'internal' ? 'חזיתות פנימיות' : 'חזיתות חיצוניות');
 
         const _deskPack = _formatDeskAddition(null, null, state);
         let deskInfo = _deskPack.desk;
