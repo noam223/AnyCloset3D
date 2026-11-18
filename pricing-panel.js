@@ -418,7 +418,8 @@ function setMode(mode) {
 // ── cabinet types ─────────────────────────────────────────────────────────────
 var _ENGINES = [
     { id: 'maya', label: 'צוקל נסתר' }, { id: 'c9', label: 'צוקל רגיל' },
-    { id: 'regalim', label: 'ארון על רגליים' }, { id: 'sliding', label: 'ארון הזזה' },
+    { id: 'regalim', label: 'ארון על רגליים' }, { id: 'custom_size', label: 'ארון לפי מידה' },
+    { id: 'sliding', label: 'ארון הזזה' },
     { id: 'ab2', label: 'AB2 (חזית פנימית + כוורת)' }, { id: 'ab2_nohoney', label: 'ארון עם חזיתות פנימיות' }
 ];
 
@@ -663,7 +664,7 @@ function fill(cfg) {
     _set('materialsBoardPrice',    _num(c.materialsBoardPrice, 180));
     _set('materialsBoardsPerSqm',  _num(c.materialsBoardsPerSqm, 1.4));
     _set('materialsMultiplier',    _num(c.materialsMultiplier, 2.5));
-    _set('profitMultiplier',       _num(c.profitMultiplier, 1.7));
+    _set('profitMultiplier',       _num(c.profitMultiplier, 1.8));
     _set('heightSurcharge',        _pct(_num(c.heightSurcharge, 0.20)));
     _set('depthSurcharge',         _pct(_num(c.depthSurcharge, 0.20)));
     _set('sandwichSurcharge',      _pct(_num(c.sandwichSurcharge, 0.15)));
@@ -746,7 +747,7 @@ function read() {
         materialsBoardPrice:      _num(_v('materialsBoardPrice'), 180),
         materialsBoardsPerSqm:    _num(_v('materialsBoardsPerSqm'), 1.4),
         materialsMultiplier:      _num(_v('materialsMultiplier'), 2.5),
-        profitMultiplier:         _num(_v('profitMultiplier'), 1.7),
+        profitMultiplier:         _num(_v('profitMultiplier'), 1.8),
         heightSurcharge:          (_frac(_v('heightSurcharge')) || 0),
         depthSurcharge:           (_frac(_v('depthSurcharge')) || 0),
         sandwichSurcharge:        (_frac(_v('sandwichSurcharge')) || 0),

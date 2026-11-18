@@ -582,6 +582,7 @@ window.resetFloorOffset = function() {
     const col = state.columns[state.activeEditCol];
     col.floorOffset = 0;
     col.noPlinth = false;
+    if (typeof window._applyFloatingFromFloorDrag === 'function') window._applyFloatingFromFloorDrag();
     buildCabinet(); calculatePrice(); updateQuickEditPanelUI();
     saveHistoryState();
 }
@@ -592,6 +593,7 @@ window.updateQEFloorOffset = function(delta) {
     const newFO = Math.round(Math.max(0, Math.min(col.height - 10, (col.floorOffset || 0) + delta)));
     col.floorOffset = newFO;
     col.noPlinth = newFO > 0;
+    if (typeof window._applyFloatingFromFloorDrag === 'function') window._applyFloatingFromFloorDrag();
     buildCabinet(); calculatePrice();
     if (typeof updateMobileColSheetUI === 'function') updateMobileColSheetUI();
     updateQuickEditPanelUI();
@@ -3652,11 +3654,12 @@ window._applyCabinetTemplateRawState = function(rawState) {
         state.activeWing = 'center';
         state.wings.left = null;
         state.wings.right = null;
-        const flatFields = ['cabinetModel','placement','width','globalHeight','depth','thickness',
+        const flatFields = ['cabinetModel','plinthStyle','frontStyle','placement','width','globalHeight','depth','thickness',
             'plinthHeight','hasDoors','handleType','handleStyle','cabinetModelLabel','manualPrice','boardMaterial',
             'materialBody','materialInternal','materialExternal','materialDesk','materialOpenCell',
             'materialBack','materialBackByType','columns','desk'];
         flatFields.forEach(function(f) { if (rs[f] !== undefined) state[f] = rs[f]; });
+        if (typeof window._ensurePlinthFrontStyles === 'function') window._ensurePlinthFrontStyles(state);
     }
 
     // Keep the cabinet name / notes / cart slot of the project item being edited
@@ -5495,7 +5498,8 @@ window.closeContentSubPanels = function() {
 
 function _laundryFrontInset() {
     if (state.presetId === 'sliding' && state.slidingDoor && state.slidingDoor.enabled) return 6;
-    return (state.cabinetModel === 'ab2' || state.cabinetModel === 'ab2_nohoney') ? (state.thickness || 1.7) : 0;
+    const fs = state.frontStyle || (typeof window._inferFrontStyle === 'function' ? window._inferFrontStyle(state) : 'external');
+    return (fs === 'internal' || state.cabinetModel === 'ab2' || state.cabinetModel === 'ab2_nohoney') ? (state.thickness || 1.7) : 0;
 }
 
 /** True when the cell's washer/dryer sticks out past the cabinet front, so no door can close over it. */
@@ -7345,6 +7349,7 @@ window.addEventListener('pointerup', () => {
     if (!window._floorDrag) return;
     window._floorDrag = null;
     window._floorSnapActive = false;
+    if (typeof window._applyFloatingFromFloorDrag === 'function') window._applyFloatingFromFloorDrag();
     controls.enabled = true;
     document.body.classList.remove('dragging');
     _endDrag();
@@ -9243,6 +9248,125 @@ function bindUI() {
         });
     }
 
+    /** Show/hide + sync סוג צוקל / סוג חזיתות for C9 and ארון לפי מידה. */
+    window._syncPlinthFrontStyleUI = function() {
+        if (typeof window._ensurePlinthFrontStyles === 'function') window._ensurePlinthFrontStyles(state);
+        const engine = state.cabinetModel || 'c9';
+        const show = (engine === 'c9' || engine === 'custom_size');
+        ['plinth-style-row', 'front-style-row', 'mobile-plinth-style-row', 'mobile-front-style-row'].forEach(function(id) {
+            const el = document.getElementById(id);
+            if (el) el.style.display = show ? '' : 'none';
+        });
+        const ps = state.plinthStyle || 'regular';
+        const fs = state.frontStyle || 'external';
+        const psEl = document.getElementById('inp-plinth-style');
+        const fsEl = document.getElementById('inp-front-style');
+        const mPs = document.getElementById('mobile-inp-plinth-style');
+        const mFs = document.getElementById('mobile-inp-front-style');
+        if (psEl) psEl.value = ps;
+        if (mPs) mPs.value = ps;
+        if (fsEl) {
+            fsEl.value = fs;
+            fsEl.disabled = (ps === 'legs');
+        }
+        if (mFs) {
+            mFs.value = fs;
+            mFs.disabled = (ps === 'legs');
+        }
+    };
+
+    window._applyPlinthStyleToState = function(ps, opts) {
+        opts = opts || {};
+        const prev = state.plinthStyle || 'regular';
+        state.plinthStyle = ps;
+        const w = typeof getWing === 'function' ? getWing() : null;
+        if (w) w.plinthStyle = ps;
+
+        if (ps === 'legs') {
+            state.frontStyle = 'internal';
+            if (w) w.frontStyle = 'internal';
+        }
+
+        // Floating → custom_size pricing + raise off floor
+        if (ps === 'floating') {
+            if (state.cabinetModel !== 'custom_size') {
+                state.cabinetModel = 'custom_size';
+                state.cabinetTypeId = 'custom_size';
+                const sel = document.getElementById('inp-plinth');
+                const mSel = document.getElementById('mobile-inp-plinth');
+                if (sel) sel.value = 'custom_size';
+                if (mSel) mSel.value = 'custom_size';
+            }
+            let anyRaised = false;
+            (state.columns || []).forEach(function(col) {
+                if (!col || col.type === 'desk') return;
+                if ((col.floorOffset || 0) > 0) { anyRaised = true; return; }
+                col.floorOffset = 20;
+                col.noPlinth = true;
+                anyRaised = true;
+            });
+            if (!anyRaised) { /* keep */ }
+        } else if (prev === 'floating' && ps !== 'floating') {
+            (state.columns || []).forEach(function(col) {
+                if (!col || col.type === 'desk') return;
+                if ((col.floorOffset || 0) > 0) {
+                    col.floorOffset = 0;
+                    col.noPlinth = false;
+                }
+            });
+        }
+
+        // Plinth height by style (Maya handled by base-model switch)
+        let nextPlinth = state.plinthHeight || 8.75;
+        if (ps === 'legs') nextPlinth = 10;
+        else if (ps === 'recessed') nextPlinth = 7;
+        else if (ps === 'regular') nextPlinth = 8.75;
+        else if (ps === 'floating') nextPlinth = 0;
+
+        if (!opts.skipHeight) {
+            const prevH = state.plinthHeight || 0;
+            const delta = nextPlinth - prevH;
+            if (delta && ps !== 'floating') {
+                (state.columns || []).forEach(function(col) {
+                    if (!col || col.type === 'desk' || col.noPlinth) return;
+                    if (Array.isArray(col.shelvesY)) {
+                        col.shelvesY = col.shelvesY.map(function(y) { return Math.round((y + delta) * 10) / 10; });
+                    }
+                });
+            }
+            if (typeof window._setPlinthHeight === 'function') window._setPlinthHeight(nextPlinth, true);
+            else {
+                state.plinthHeight = nextPlinth;
+                if (w) w.plinthHeight = nextPlinth;
+            }
+        }
+
+        if (typeof window._syncPlinthFrontStyleUI === 'function') window._syncPlinthFrontStyleUI();
+    };
+
+    /** When bottom wall is dragged up — become floating + לפי מידה. */
+    window._applyFloatingFromFloorDrag = function() {
+        const cols = state.columns || [];
+        const raised = cols.some(function(c) { return c && (c.floorOffset || 0) > 0; });
+        if (!raised) {
+            if (state.plinthStyle === 'floating') {
+                window._applyPlinthStyleToState('regular', { skipHeight: true });
+                state.manualPrice = null;
+                if (typeof calculatePrice === 'function') calculatePrice();
+                if (typeof window._syncPlinthFrontStyleUI === 'function') window._syncPlinthFrontStyleUI();
+            }
+            return;
+        }
+        if (state.plinthStyle === 'floating' && state.cabinetModel === 'custom_size') {
+            if (typeof calculatePrice === 'function') calculatePrice();
+            return;
+        }
+        window._applyPlinthStyleToState('floating', { skipHeight: true });
+        state.manualPrice = null;
+        if (typeof calculatePrice === 'function') calculatePrice();
+        if (typeof saveHistoryState === 'function') saveHistoryState();
+    };
+
     document.getElementById('inp-plinth').addEventListener('change', (e) => {
         const typeId = e.target.value;
         const val = typeof window.cabinetTypeEngine === 'function' ? window.cabinetTypeEngine(typeId) : typeId;
@@ -9262,9 +9386,36 @@ function bindUI() {
         const prevPlinth = state.plinthHeight || 0;
         state.cabinetModel = val;
 
+        // Defaults for plinth/front when switching base model
+        if (val === 'maya') {
+            state.plinthStyle = 'recessed';
+            state.frontStyle = 'external';
+        } else if (val === 'regalim') {
+            state.plinthStyle = 'legs';
+            state.frontStyle = 'external';
+        } else if (val === 'c9' || val === 'custom_size') {
+            if (!state.plinthStyle || prevModel === 'maya' || prevModel === 'regalim' || prevModel === 'ab2' || prevModel === 'ab2_nohoney') {
+                state.plinthStyle = 'regular';
+            }
+            if (state.plinthStyle === 'legs') state.frontStyle = 'internal';
+            else if (!state.frontStyle) state.frontStyle = 'external';
+        } else if (val === 'ab2' || val === 'ab2_nohoney') {
+            state.plinthStyle = 'regular';
+            state.frontStyle = 'internal';
+        }
+        const _wSync = typeof getWing === 'function' ? getWing() : null;
+        if (_wSync) {
+            _wSync.plinthStyle = state.plinthStyle;
+            _wSync.frontStyle = state.frontStyle;
+            _wSync.cabinetModel = val;
+            _wSync.cabinetTypeId = typeId;
+        }
+
         let nextPlinth = prevPlinth;
         if (val === 'maya') nextPlinth = 7;
-        else if (val === 'c9' || val === 'ab2' || val === 'ab2_nohoney') nextPlinth = 8.75;
+        else if (val === 'c9' || val === 'ab2' || val === 'ab2_nohoney' || val === 'custom_size') {
+            nextPlinth = (state.plinthStyle === 'legs') ? 10 : (state.plinthStyle === 'recessed' ? 7 : 8.75);
+        }
         else if (val === 'regalim') nextPlinth = 10;
 
         // Keep existing columns/cells/doors. Only nudge shelf Y so the first cell
@@ -9301,9 +9452,36 @@ function bindUI() {
             if (typeof window._syncCornerDeskHandleUI === 'function') window._syncCornerDeskHandleUI();
         }
 
+        if (typeof window._syncPlinthFrontStyleUI === 'function') window._syncPlinthFrontStyleUI();
         state.manualPrice = null;
         buildCabinet(); calculatePrice(); saveHistoryState();
     });
+
+    const plinthStyleEl = document.getElementById('inp-plinth-style');
+    if (plinthStyleEl) {
+        plinthStyleEl.addEventListener('change', function(e) {
+            window._applyPlinthStyleToState(e.target.value);
+            state.manualPrice = null;
+            buildCabinet(); calculatePrice(); saveHistoryState();
+        });
+    }
+    const frontStyleEl = document.getElementById('inp-front-style');
+    if (frontStyleEl) {
+        frontStyleEl.addEventListener('change', function(e) {
+            if ((state.plinthStyle || '') === 'legs') {
+                e.target.value = 'internal';
+                return;
+            }
+            state.frontStyle = e.target.value;
+            const w = typeof getWing === 'function' ? getWing() : null;
+            if (w) w.frontStyle = state.frontStyle;
+            const mFs = document.getElementById('mobile-inp-front-style');
+            if (mFs) mFs.value = state.frontStyle;
+            state.manualPrice = null;
+            buildCabinet(); calculatePrice(); saveHistoryState();
+        });
+    }
+    if (typeof window._syncPlinthFrontStyleUI === 'function') window._syncPlinthFrontStyleUI();
 
     const placementEl = document.getElementById('inp-placement');
     if (placementEl) {
@@ -11979,20 +12157,22 @@ function _applyRawStateForCapture(rawState) {
         }
         state.activeWing = rs.activeWing || 'center';
         state.presetId = rs.presetId || 'linear';
-        const flatFromWing = ['cabinetModel', 'placement', 'boardMaterial', 'handleType', 'handleStyle',
+        const flatFromWing = ['cabinetModel', 'plinthStyle', 'frontStyle', 'placement', 'boardMaterial', 'handleType', 'handleStyle',
             'cabinetName', 'cabinetModelLabel', 'cabinetNotes', 'manualPrice', 'materialBody', 'materialInternal',
             'materialExternal', 'materialDesk', 'materialOpenCell', 'materialBack', 'materialBackByType'];
         flatFromWing.forEach(f => { if (rs[f] !== undefined) state[f] = rs[f]; });
+        if (typeof window._ensurePlinthFrontStyles === 'function') window._ensurePlinthFrontStyles(state);
     } else {
         state.presetId = 'linear';
         state.activeWing = 'center';
         state.wings.left = null;
         state.wings.right = null;
-        const flatFields = ['cabinetModel', 'placement', 'width', 'globalHeight', 'depth', 'thickness',
+        const flatFields = ['cabinetModel', 'plinthStyle', 'frontStyle', 'placement', 'width', 'globalHeight', 'depth', 'thickness',
             'plinthHeight', 'hasDoors', 'handleType', 'handleStyle', 'cabinetName', 'cabinetModelLabel', 'cabinetNotes', 'manualPrice', 'boardMaterial',
             'materialBody', 'materialInternal', 'materialExternal', 'materialDesk', 'materialOpenCell',
             'materialBack', 'materialBackByType', 'columns', 'desk'];
         flatFields.forEach(f => { if (rs[f] !== undefined) state[f] = rs[f]; });
+        if (typeof window._ensurePlinthFrontStyles === 'function') window._ensurePlinthFrontStyles(state);
     }
     state.wingEditMode = false;
     state.wingEditSnapshot = null;
@@ -13932,8 +14112,10 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
         const extDrawers = contentCounts.drawersExt;
         const openCellsCount = contentCounts.openCells + contentCounts.sideOpenCells;
 
+        if (typeof window._ensurePlinthFrontStyles === 'function') window._ensurePlinthFrontStyles(state);
         let modelNameText = 'מאיה';
         if(state.cabinetModel === 'c9') modelNameText = 'C9';
+        if(state.cabinetModel === 'custom_size') modelNameText = 'ארון לפי מידה';
         if(state.cabinetModel === 'ab2_nohoney') modelNameText = 'ארון עם חזיתות פנימיות';
         if(state.cabinetModel === 'ab2') modelNameText = 'AB2';
         if(state.cabinetModel === 'regalim') modelNameText = 'רגלי ניקל';
@@ -13958,12 +14140,18 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
         ).trim();
         if (_customModelLabel) modelNameText = _customModelLabel;
 
-        let plinthTypeText = 'צוקל נסתר';
-        if(state.cabinetModel === 'c9') plinthTypeText = 'צוקל רגיל';
-        if(state.cabinetModel === 'ab2_nohoney') plinthTypeText = 'ארון עם חזיתות פנימיות';
-        if(state.cabinetModel === 'ab2') plinthTypeText = 'צוקל נסתר (חזית פנימית טאצ\')';
-        if(state.cabinetModel === 'regalim') plinthTypeText = 'רגלי ניקל 10 ס"מ';
+        const _psCart = state.plinthStyle || (typeof window._inferPlinthStyle === 'function' ? window._inferPlinthStyle(state) : 'regular');
+        const _fsCart = state.frontStyle || (typeof window._inferFrontStyle === 'function' ? window._inferFrontStyle(state) : 'external');
+        let plinthTypeText = (typeof window._plinthStyleLabel === 'function')
+            ? window._plinthStyleLabel(_psCart)
+            : 'צוקל רגיל';
+        if (state.cabinetModel === 'maya' && !_psCart) plinthTypeText = 'צוקל נסתר';
+        if (state.cabinetModel === 'regalim' && _psCart === 'legs') plinthTypeText = 'רגלי ניקל 10 ס"מ';
+        if (state.cabinetModel === 'ab2') plinthTypeText = 'צוקל נסתר (חזית פנימית טאצ\')';
         if (_isWritingDeskCart) plinthTypeText = 'ללא צוקל';
+        const frontStyleText = (typeof window._frontStyleLabel === 'function')
+            ? window._frontStyleLabel(_fsCart)
+            : (_fsCart === 'internal' ? 'פנימיות' : 'חיצוניות');
 
         const _deskPack = _formatDeskAddition(null, null, state);
         let deskInfo = _deskPack.desk;
@@ -13975,6 +14163,8 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
 
         const rawState = JSON.parse(JSON.stringify({
             cabinetModel: state.cabinetModel,
+            plinthStyle: state.plinthStyle || _psCart,
+            frontStyle: state.frontStyle || _fsCart,
             placement: state.placement,
             width: state.width, globalHeight: state.globalHeight, depth: state.depth, thickness: state.thickness,
             plinthHeight: state.plinthHeight, hasDoors: state.hasDoors, handleType: state.handleType, handleStyle: state.handleStyle, handleVariant: state.handleVariant, ridingColor: state.ridingColor,
@@ -14068,6 +14258,7 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
 
         const cabinetSpec = {
             customName: state.cabinetName, cabinetNotes: (state.cabinetNotes || '').trim(), modelName: modelNameText, cabinetModelLabel: _customModelLabel, plinthType: plinthTypeText,
+            frontStyle: frontStyleText,
             placement: _isWritingDeskCart ? 'שולחן עמידה' : (placementHebrew[state.placement] || 'ארון קיר חופשי'),
             dimsStr: _wdDimsStr,
             material: state.boardMaterial === 'mdf' ? 'MDF' : state.boardMaterial === 'melamine' ? 'מלמין' : "סנדביץ'",
@@ -15319,11 +15510,12 @@ window._editCartItemNow = function(index) {
             if (k !== 'center' && k !== 'left' && k !== 'right') delete state.wings[k];
         });
         // Apply flat fields to center wing via proxy setters
-        const flatFields = ['cabinetModel','placement','width','globalHeight','depth','thickness',
+        const flatFields = ['cabinetModel','plinthStyle','frontStyle','placement','width','globalHeight','depth','thickness',
             'plinthHeight','hasDoors','handleType','handleStyle','cabinetName','cabinetModelLabel','cabinetNotes','manualPrice','boardMaterial',
             'materialBody','materialInternal','materialExternal','materialDesk','materialOpenCell',
             'materialBack','materialBackByType','columns','desk'];
         flatFields.forEach(function(f) { if (rs[f] !== undefined) state[f] = rs[f]; });
+        if (typeof window._ensurePlinthFrontStyles === 'function') window._ensurePlinthFrontStyles(state);
     }
 
     // Always exit wing edit mode when loading a cabinet (prevents stale wingEditMode from previous corner cabinet)
@@ -16645,6 +16837,7 @@ function _defaultModelNameFromRaw(rawState) {
         || (rawState.wings && rawState.wings.center && rawState.wings.center.cabinetModel)
         || 'maya';
     if (m === 'c9') return 'C9';
+    if (m === 'custom_size') return 'ארון לפי מידה';
     if (m === 'ab2_nohoney') return 'ארון עם חזיתות פנימיות';
     if (m === 'ab2') return 'AB2';
     if (m === 'regalim') return 'רגלי ניקל';
@@ -16739,6 +16932,9 @@ function _collectPrintSpecRows(item, itemObj) {
     rows.push({ id: 'dimsStr', label: 'מידות חיצוניות', value: _plainSpecValue(_resolveCabinetDimsStr(item, itemObj)), rtl: true });
     rows.push({ id: 'material', label: 'חומר גוף', value: _plainSpecValue(item.material) });
     rows.push({ id: 'plinthType', label: isWD ? 'בסיס' : 'סוג רגליים / צוקל', value: _plainSpecValue(isWD ? 'רגליים כפולות' : item.plinthType) });
+    if (!isWD && item.frontStyle) {
+        rows.push({ id: 'frontStyle', label: 'סוג חזיתות', value: _plainSpecValue(item.frontStyle) });
+    }
     if (!isWD) _appendDeskPrintRows(rows, item, itemObj);
 
     rows.push({ id: '_sec_finishes', section: true, label: 'גוונים וגימורים' });
@@ -17057,7 +17253,7 @@ function _buildCompactCabinetSpecHtml(opts) {
     return `${units}${_compactNotesHtml(g)}${opts.priceStrip || ''}`;
 }
 
-const _MU_STRUCT_KEYS = ['material', 'plinthType'];
+const _MU_STRUCT_KEYS = ['material', 'plinthType', 'frontStyle'];
 const _MU_FINISH_KEYS = ['colorBody', 'colorInternal', 'colorExternal', 'colorBack', 'colorOpenCell', 'glassTint', 'colorTopPanel', 'handle'];
 
 function _muParseCount(row, isLed) {
@@ -17760,6 +17956,7 @@ function _printBasicSpecRows(item, itemObj, thStyle, tdStyle) {
     html += _printTr(thStyle, tdStyle, 'מידות חיצוניות', _resolveCabinetDimsStr(item, itemObj) || item.dimsStr, dimsExtra);
     html += _printTr(thStyle, tdStyle, 'חומר גוף', item.material);
     html += _printTr(thStyle, tdStyle, isWD ? 'בסיס' : 'סוג רגליים / צוקל', isWD ? 'רגליים כפולות' : item.plinthType);
+    if (!isWD && item.frontStyle) html += _printTr(thStyle, tdStyle, 'סוג חזיתות', item.frontStyle);
     if (!isWD) {
         const ds = _formatDeskAddition(item, itemObj);
         html += _printTr(thStyle, tdStyle, 'תוספת שולחן', ds.desk);
@@ -20650,7 +20847,7 @@ function _fillUserPricingForm(cfg) {
     _sv('ups-materialsBoardPrice', _upsNum(c.materialsBoardPrice, 180));
     _sv('ups-materialsBoardsPerSqm', _upsNum(c.materialsBoardsPerSqm, 1.4));
     _sv('ups-materialsMultiplier', _upsNum(c.materialsMultiplier, 2.5));
-    _sv('ups-profitMultiplier', _upsNum(c.profitMultiplier, 1.7));
+    _sv('ups-profitMultiplier', _upsNum(c.profitMultiplier, 1.8));
     _sv('ups-heightSurcharge', _upsPct(_upsNum(c.heightSurcharge, 0.20)));
     _sv('ups-depthSurcharge', _upsPct(_upsNum(c.depthSurcharge, 0.20)));
     _sv('ups-sandwichSurcharge', _upsPct(_upsNum(c.sandwichSurcharge, 0.15)));
@@ -20703,7 +20900,7 @@ function _readUserPricingForm() {
         materialsBoardPrice: _upsNum(_gv('ups-materialsBoardPrice'), 180),
         materialsBoardsPerSqm: _upsNum(_gv('ups-materialsBoardsPerSqm'), 1.4),
         materialsMultiplier: _upsNum(_gv('ups-materialsMultiplier'), 2.5),
-        profitMultiplier: _upsNum(_gv('ups-profitMultiplier'), 1.7),
+        profitMultiplier: _upsNum(_gv('ups-profitMultiplier'), 1.8),
         heightSurcharge: _upsFrac(_gv('ups-heightSurcharge')),
         depthSurcharge: _upsFrac(_gv('ups-depthSurcharge')),
         sandwichSurcharge: _upsFrac(_gv('ups-sandwichSurcharge')),

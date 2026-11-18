@@ -16,9 +16,54 @@ const MAX_COLUMNS = 10;
 window.MAX_COLUMNS = MAX_COLUMNS;
 
 // ---- Wing factory ----
+/** Infer plinthStyle from legacy cabinetModel / columns when field missing. */
+window._inferPlinthStyle = function(src) {
+    if (!src) return 'regular';
+    if (src.plinthStyle) return src.plinthStyle;
+    const m = src.cabinetModel || 'c9';
+    if (m === 'maya') return 'recessed';
+    if (m === 'regalim') return 'legs';
+    const cols = src.columns || [];
+    if (cols.some(function(c) { return c && ((c.floorOffset || 0) > 0 || c.noPlinth); })) return 'floating';
+    return 'regular';
+};
+
+/** Infer frontStyle from legacy cabinetModel / plinthStyle when field missing. */
+window._inferFrontStyle = function(src) {
+    if (!src) return 'external';
+    if (src.frontStyle) return src.frontStyle;
+    const m = src.cabinetModel || 'c9';
+    if (m === 'ab2' || m === 'ab2_nohoney') return 'internal';
+    const ps = src.plinthStyle || window._inferPlinthStyle(src);
+    // C9 (or custom_size) on legs → internal fronts
+    if (ps === 'legs' && m !== 'regalim') return 'internal';
+    return 'external';
+};
+
+/** Ensure plinthStyle/frontStyle exist on a wing or state-like object. */
+window._ensurePlinthFrontStyles = function(src) {
+    if (!src) return src;
+    if (!src.plinthStyle) src.plinthStyle = window._inferPlinthStyle(src);
+    if (!src.frontStyle) src.frontStyle = window._inferFrontStyle(src);
+    return src;
+};
+
+window._plinthStyleLabel = function(ps) {
+    if (ps === 'recessed') return 'צוקל נסתר';
+    if (ps === 'legs') return 'על רגליים';
+    if (ps === 'floating') return 'ארון מרחף';
+    return 'צוקל רגיל';
+};
+
+window._frontStyleLabel = function(fs) {
+    return fs === 'internal' ? 'פנימיות' : 'חיצוניות';
+};
+
 function createWingData(overrides) {
     const base = {
         cabinetModel: 'c9',
+        plinthStyle: 'regular',   // regular | recessed | legs | floating
+        frontStyle: 'external',   // external | internal
         placement: 'wall',
         width: 160, globalHeight: 240, depth: 54,
         thickness: 1.7,
@@ -302,7 +347,7 @@ window.getWing = function() {
 // ---- Proxy: read per-wing fields from active wing ----
 // These getters/setters make existing code like state.width work transparently
 const _wingFields = [
-    'cabinetModel','cabinetTypeId','placement','width','globalHeight','depth','thickness','plinthHeight',
+    'cabinetModel','cabinetTypeId','plinthStyle','frontStyle','placement','width','globalHeight','depth','thickness','plinthHeight',
     'hasDoors','handleType','handleStyle','handleVariant','ridingColor','cabinetName','cabinetModelLabel','cabinetNotes','boardMaterial',
     'materialBody','materialInternal','materialExternal','materialDesk','materialOpenCell','materialBack',
     'materialBackByType',
@@ -1838,10 +1883,12 @@ window.syncSidebarToWing = function() {
     setVal('inp-num-width', w.width); setVal('inp-width', w.width);
     setVal('inp-num-height', w.globalHeight); setVal('inp-height', w.globalHeight);
     setVal('inp-num-depth', w.depth); setVal('inp-depth', w.depth);
+    if (typeof window._ensurePlinthFrontStyles === 'function') window._ensurePlinthFrontStyles(w);
     setVal('inp-plinth', typeof window.cabinetTypeSelectValue === 'function'
         ? window.cabinetTypeSelectValue(w.cabinetModel || 'maya', w.cabinetTypeId)
         : (w.cabinetModel || 'maya'));
     setVal('inp-placement', w.placement || 'wall');
+    if (typeof window._syncPlinthFrontStyleUI === 'function') window._syncPlinthFrontStyleUI();
     setVal('inp-board-mat', w.boardMaterial);
     setVal('inp-columns', w.columns.length);
     const valCols = document.getElementById('val-columns'); if (valCols) valCols.innerText = w.columns.length;
@@ -5523,13 +5570,14 @@ var DEFAULT_PRICING_CONFIG = {
     lmHeightBase: 1200, lmHeightBaseNonMel: 1560,
     lmHeightThresholdCm: 240, lmHeightStepCm: 30, lmHeightStepPct: 0.10,
     materialsBoardPrice: 180, materialsBoardsPerSqm: 1.4, materialsMultiplier: 2.5,
-    profitMultiplier: 1.7,
+    profitMultiplier: 1.8,
     installPricePerUnit: 110, installUnitCm: 42.5, installHeightSurcharge: 0.20,
     heightSurcharge: 0.20, depthSurcharge: 0.20, sandwichSurcharge: 0.15,
     cabinetTypes: [
         { id: 'maya', label: 'צוקל נסתר', engine: 'maya' },
         { id: 'c9', label: 'צוקל רגיל', engine: 'c9' },
         { id: 'regalim', label: 'ארון על רגליים', engine: 'regalim' },
+        { id: 'custom_size', label: 'ארון לפי מידה', engine: 'custom_size' },
         { id: 'sliding', label: 'ארון הזזה', engine: 'sliding' }
     ],
     ranges: {
@@ -5552,7 +5600,9 @@ var DEFAULT_PRICING_CONFIG = {
         slidingBase: 800, slidingDoor: 350, slidingGlass: 200, slidingMirror: 350,
         slidingGold: 80, slidingBlack: 50, slidingHeightSurcharge: 0.15,
         nickelLegPrice: 100,
-        ledPair: 650, sorbet: 170, touchHandle: 30
+        ledPair: 650, sorbet: 170, touchHandle: 30,
+        customSizeMel: 1200, customSizeSandwich: 1500, customSizeMdf: 1400,
+        c9RecessedSurcharge: 150, c9LegsSurcharge: 250
     }
 };
 window.DEFAULT_PRICING_CONFIG = DEFAULT_PRICING_CONFIG;
@@ -5658,10 +5708,23 @@ function _rangeTablePrice(rt, ww, engine) {
     return (_priceNum(rt[maxW], 0) / maxW) * ww;
 }
 
-function _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel, wTypeId) {
+function _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel, wTypeId, opts) {
+    opts = opts || {};
     const mode  = cfg.pricingMode || 'ranges';
     const hS    = cfg.heightSurcharge != null ? cfg.heightSurcharge : 0.20;
     const dS    = cfg.depthSurcharge  != null ? cfg.depthSurcharge  : 0.20;
+    const ex = cfg.extras || DEFAULT_PRICING_CONFIG.extras;
+
+    // ארון לפי מידה: volume × rate (no height/depth % surcharges)
+    if (wEffectiveModel === 'custom_size') {
+        const mat = opts.boardMaterial || (wMelamine ? 'melamine' : 'sandwich');
+        let rate;
+        if (mat === 'melamine') rate = _priceNum(ex.customSizeMel, 1200);
+        else if (mat === 'mdf') rate = _priceNum(ex.customSizeMdf, 1400);
+        else rate = _priceNum(ex.customSizeSandwich, 1500);
+        return (ww / 100) * (wh / 100) * (wd / 100) * rate;
+    }
+
     if (mode === 'sqm') {
         const p = wMelamine ? _priceNum(cfg.sqmPrice, 800) : _priceNum(cfg.sqmPriceNonMel, _priceNum(cfg.sqmPrice, 800) * 1.3);
         let bp = p*(ww/100)*(wh/100); if(wd>54) bp*=(1+dS); return bp;
@@ -5702,6 +5765,12 @@ function _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel, wTypeId
     }
     if (wh >= 241) bp *= (1 + hS);
     if (wd > 54) bp *= (1 + dS);
+    // C9 plinth-style cost adders (before profit)
+    if (wEffectiveModel === 'c9') {
+        const ps = opts.plinthStyle || 'regular';
+        if (ps === 'recessed') bp += _priceNum(ex.c9RecessedSurcharge, 150);
+        else if (ps === 'legs') bp += _priceNum(ex.c9LegsSurcharge, 250);
+    }
     return bp;
 }
 
@@ -5770,9 +5839,15 @@ function _calcWingCost(cfg, wing) {
 
         const wModel = wing.cabinetModel || 'maya';
     const wEffectiveModel = wModel === 'ab2_nohoney' ? 'c9' : wModel;
+    const wPlinthStyle = wing.plinthStyle || (typeof window._inferPlinthStyle === 'function'
+        ? window._inferPlinthStyle(wing) : 'regular');
 
-    let basePrice = _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel, wing.cabinetTypeId);
+    let basePrice = _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel, wing.cabinetTypeId, {
+        boardMaterial: wing.boardMaterial,
+        plinthStyle: wPlinthStyle
+    });
         if (SANDWICH_COLORS.has(wing.materialBody)) basePrice *= (1 + sandwichPct);
+        // Standalone regalim: per-leg nickel. C9+legs uses flat c9LegsSurcharge in base price.
         if (wEffectiveModel === 'regalim' && (cfg.pricingMode||'ranges') === 'ranges') {
             const legCount = ww<=110 ? 4 : ww<=180 ? 6 : 8;
             basePrice += legCount * (ex.nickelLegPrice!=null ? ex.nickelLegPrice : 100);
@@ -6015,7 +6090,7 @@ function calculatePrice() {
             ? window._kitchenLinearMeters()
             : ((state.wings && state.wings.center && state.wings.center.width) || state.width || 0) / 100;
         const customerPrice = Math.round(meters * perM);
-        const profitMult = cfg.profitMultiplier != null ? cfg.profitMultiplier : 1.7;
+        const profitMult = cfg.profitMultiplier != null ? cfg.profitMultiplier : 1.8;
         state.currentCostPrice = Math.round(customerPrice / profitMult);
         state.currentInstallPrice = 0;
         const activeWingKit = getWing() || (state.wings && state.wings.center);
@@ -6058,7 +6133,7 @@ function calculatePrice() {
     state.currentInstallPrice = Math.round(totalInstall);
 
     const activeWing       = getWing();
-    const profitMult       = cfg.profitMultiplier != null ? cfg.profitMultiplier : 1.7;
+    const profitMult       = cfg.profitMultiplier != null ? cfg.profitMultiplier : 1.8;
     const priceToCustomer  = totalCost * profitMult + (hasClosures ? window.CLOSURES_PRICE_CUSTOMER : 0);
     const finalDisplayPrice = activeWing.manualPrice !== null ? activeWing.manualPrice : Math.round(priceToCustomer);
 

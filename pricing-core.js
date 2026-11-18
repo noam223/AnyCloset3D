@@ -12,13 +12,14 @@ var DEFAULTS = {
     lmHeightBase: 1200, lmHeightBaseNonMel: 1560,
     lmHeightThresholdCm: 240, lmHeightStepCm: 30, lmHeightStepPct: 0.10,
     materialsBoardPrice: 180, materialsBoardsPerSqm: 1.4, materialsMultiplier: 2.5,
-    profitMultiplier: 1.7,
+    profitMultiplier: 1.8,
     installPricePerUnit: 110, installUnitCm: 42.5, installHeightSurcharge: 0.20,
     heightSurcharge: 0.20, depthSurcharge: 0.20, sandwichSurcharge: 0.15,
     cabinetTypes: [
         { id: 'maya', label: 'צוקל נסתר', engine: 'maya' },
         { id: 'c9', label: 'צוקל רגיל', engine: 'c9' },
         { id: 'regalim', label: 'ארון על רגליים', engine: 'regalim' },
+        { id: 'custom_size', label: 'ארון לפי מידה', engine: 'custom_size' },
         { id: 'sliding', label: 'ארון הזזה', engine: 'sliding' }
     ],
     ranges: {
@@ -41,7 +42,9 @@ var DEFAULTS = {
         slidingBase: 800, slidingDoor: 350, slidingGlass: 200, slidingMirror: 350,
         slidingGold: 80, slidingBlack: 50, slidingHeightSurcharge: 0.15,
         nickelLegPrice: 100,
-        ledPair: 650, sorbet: 170, touchHandle: 30
+        ledPair: 650, sorbet: 170, touchHandle: 30,
+        customSizeMel: 1200, customSizeSandwich: 1500, customSizeMdf: 1400,
+        c9RecessedSurcharge: 150, c9LegsSurcharge: 250
     }
 };
 
@@ -49,6 +52,7 @@ var ENGINES = [
     { id: 'maya', label: 'צוקל נסתר' },
     { id: 'c9', label: 'צוקל רגיל' },
     { id: 'regalim', label: 'ארון על רגליים' },
+    { id: 'custom_size', label: 'ארון לפי מידה' },
     { id: 'sliding', label: 'ארון הזזה' },
     { id: 'ab2', label: 'AB2 (חזית פנימית + כוורת)' },
     { id: 'ab2_nohoney', label: 'ארון עם חזיתות פנימיות' }
@@ -56,6 +60,7 @@ var ENGINES = [
 
 var LEGACY_LABELS = {
     maya: 'צוקל נסתר', c9: 'צוקל רגיל', regalim: 'ארון על רגליים',
+    custom_size: 'ארון לפי מידה',
     ab2: 'AB2', ab2_nohoney: 'ארון עם חזיתות פנימיות', sliding: 'ארון הזזה', other: 'אחר'
 };
 
@@ -89,6 +94,9 @@ function normalizeTypes(cfg) {
         out.push(type);
     });
     if (!out.some(function(t) { return t.engine === 'sliding'; })) out.push({ id: 'sliding', label: 'ארון הזזה', engine: 'sliding' });
+    if (!out.some(function(t) { return t.engine === 'custom_size' || t.id === 'custom_size'; })) {
+        out.push({ id: 'custom_size', label: 'ארון לפי מידה', engine: 'custom_size' });
+    }
     return out;
 }
 
@@ -172,15 +180,39 @@ function rangeTablePrice(rt, ww, engine) {
     return (num(rt[maxW], 0) / maxW) * ww;
 }
 
+/** Volume cost for ארון לפי מידה: (W×H×D in meters) × material rate. No H/D % surcharges. */
+function customSizeVolumePrice(cfg, ww, wh, wd, boardMaterial) {
+    var ex = (cfg && cfg.extras) || DEFAULTS.extras;
+    var rate;
+    if (boardMaterial === 'melamine') rate = num(ex.customSizeMel, 1200);
+    else if (boardMaterial === 'mdf') rate = num(ex.customSizeMdf, 1400);
+    else rate = num(ex.customSizeSandwich, 1500);
+    return (ww / 100) * (wh / 100) * (wd / 100) * rate;
+}
+
+/** C9 plinth-style cost adders (before profit). */
+function c9PlinthSurcharge(cfg, plinthStyle) {
+    var ex = (cfg && cfg.extras) || DEFAULTS.extras;
+    if (plinthStyle === 'recessed') return num(ex.c9RecessedSurcharge, 150);
+    if (plinthStyle === 'legs') return num(ex.c9LegsSurcharge, 250);
+    return 0;
+}
+
 /**
  * Cost of the bare cabinet body (before extras and profit).
  * Width tables are per type; the formula modes are shared and scaled by the type's priceFactor.
+ * opts.boardMaterial / opts.plinthStyle optional (for custom_size + C9 surcharges).
  */
-function basePrice(cfg, ww, wh, wd, melamine, engine, typeId) {
+function basePrice(cfg, ww, wh, wd, melamine, engine, typeId, opts) {
+    opts = opts || {};
     var mode = cfg.pricingMode || 'ranges';
     var hS = cfg.heightSurcharge != null ? cfg.heightSurcharge : 0.20;
     var dS = cfg.depthSurcharge != null ? cfg.depthSurcharge : 0.20;
     var bp;
+    if (engine === 'custom_size') {
+        var mat = opts.boardMaterial || (melamine ? 'melamine' : 'sandwich');
+        return customSizeVolumePrice(cfg, ww, wh, wd, mat);
+    }
     if (mode === 'ranges') {
         var cfgR = cfg.ranges || DEFAULTS.ranges;
         var rt;
@@ -202,6 +234,7 @@ function basePrice(cfg, ww, wh, wd, melamine, engine, typeId) {
         }
         if (wh >= 241) bp *= (1 + hS);
         if (wd > 54) bp *= (1 + dS);
+        if (engine === 'c9') bp += c9PlinthSurcharge(cfg, opts.plinthStyle);
         return bp;
     }
     if (mode === 'sqm') {
@@ -275,14 +308,16 @@ function preview(cfg, opts) {
     var type = findType(cfg, opts.typeId) || normalizeTypes(cfg)[0];
     var engine = type.engine;
     var body, legs = 0;
+    var bpOpts = { boardMaterial: opts.boardMaterial || (opts.melamine ? 'melamine' : 'sandwich'), plinthStyle: opts.plinthStyle };
     if (engine === 'sliding') {
         body = slidingCost(cfg, opts.w, opts.h);
     } else {
-        body = basePrice(cfg, opts.w, opts.h, opts.d, opts.melamine, engine === 'ab2_nohoney' ? 'c9' : engine, type.id);
+        body = basePrice(cfg, opts.w, opts.h, opts.d, opts.melamine, engine === 'ab2_nohoney' ? 'c9' : engine, type.id, bpOpts);
+        // Standalone regalim still charges per-leg nickel; C9+legs uses flat c9LegsSurcharge inside basePrice
         if (engine === 'regalim') legs = regalimLegs(cfg, opts.w);
     }
     var cost = body + legs;
-    var profit = cfg.profitMultiplier != null ? num(cfg.profitMultiplier, 1.7) : 1.7;
+    var profit = cfg.profitMultiplier != null ? num(cfg.profitMultiplier, 1.8) : 1.8;
     return {
         type: type,
         body: Math.round(body),
@@ -301,7 +336,7 @@ function emptyConfig() {
     e.lmPrice = 0; e.lmPriceNonMel = 0;
     e.lmHeightBase = 0; e.lmHeightBaseNonMel = 0;
     e.materialsBoardPrice = 0; e.materialsBoardsPerSqm = 0; e.materialsMultiplier = 0;
-    e.profitMultiplier = 1.7;
+    e.profitMultiplier = 1.8;
     e.installPricePerUnit = 0;
     e.heightSurcharge = 0; e.depthSurcharge = 0; e.sandwichSurcharge = 0;
     e.installHeightSurcharge = 0;
@@ -333,6 +368,8 @@ global.PricingCore = {
     rangeKey: rangeKey,
     rangeTablePrice: rangeTablePrice,
     basePrice: basePrice,
+    customSizeVolumePrice: customSizeVolumePrice,
+    c9PlinthSurcharge: c9PlinthSurcharge,
     includedShelves: includedShelves,
     allowedShelves: allowedShelves,
     installPrice: installPrice,

@@ -2375,11 +2375,12 @@ var _PP_DEFAULT_CABINET_TYPES = [
     { id: 'maya', label: 'צוקל נסתר', engine: 'maya' },
     { id: 'c9', label: 'צוקל רגיל', engine: 'c9' },
     { id: 'regalim', label: 'ארון על רגליים', engine: 'regalim' },
+    { id: 'custom_size', label: 'ארון לפי מידה', engine: 'custom_size' },
     { id: 'sliding', label: 'ארון הזזה', engine: 'sliding' }
 ];
 
 var _PP_LEGACY_TYPE_LABELS = {
-    maya: 'מאיה', c9: 'C9', regalim: 'רגלים', ab2: 'AB2',
+    maya: 'מאיה', c9: 'C9', regalim: 'רגלים', custom_size: 'ארון לפי מידה', ab2: 'AB2',
     ab2_nohoney: 'ארון עם חזיתות פנימיות', other: 'אחר', sliding: 'ארון הזזה'
 };
 
@@ -2388,7 +2389,7 @@ var _PP_EMPTY_WIDTHS = [80, 120, 160, 200, 240];
 var _PP_DEFAULTS = {
     pricingMode:'ranges',sqmPrice:800,sqmPriceNonMel:1040,lmPrice:1200,lmPriceNonMel:1560,
     lmHeightBase:1200,lmHeightBaseNonMel:1560,lmHeightThresholdCm:240,lmHeightStepCm:30,lmHeightStepPct:0.10,
-    materialsBoardPrice:180,materialsBoardsPerSqm:1.4,materialsMultiplier:2.5,profitMultiplier:1.7,
+    materialsBoardPrice:180,materialsBoardsPerSqm:1.4,materialsMultiplier:2.5,profitMultiplier:1.8,
     heightSurcharge:0.20,depthSurcharge:0.20,sandwichSurcharge:0.15,
     installPricePerUnit:110,installUnitCm:42.5,installHeightSurcharge:0.20,
     cabinetTypes: _PP_DEFAULT_CABINET_TYPES.map(function(t) { return Object.assign({}, t); }),
@@ -2404,7 +2405,9 @@ var _PP_DEFAULTS = {
         fullCornerBase:2800,fullCornerShelf:120,wingConnection:400,sideCabMel:12,sideCabNonMel:15,
         sideCabDoors:300,slidingBase:800,slidingDoor:350,slidingGlass:200,slidingMirror:350,
         slidingGold:80,slidingBlack:50,slidingHeightSurcharge:0.15,nickelLegPrice:100,ledPair:650,
-        sorbet:170,touchHandle:30}
+        sorbet:170,touchHandle:30,
+        customSizeMel:1200,customSizeSandwich:1500,customSizeMdf:1400,
+        c9RecessedSurcharge:150,c9LegsSurcharge:250}
 };
 
 /** Empty personal list for carpenters (all cost fields 0) — they enter their own prices. */
@@ -2479,6 +2482,9 @@ function _ppNormalizeCabinetTypes(cfg) {
     });
     if (!list.some(function(t) { return t.engine === 'sliding'; })) {
         list.push({ id: 'sliding', label: 'ארון הזזה', engine: 'sliding' });
+    }
+    if (!list.some(function(t) { return t.engine === 'custom_size' || t.id === 'custom_size'; })) {
+        list.push({ id: 'custom_size', label: 'ארון לפי מידה', engine: 'custom_size' });
     }
     if (!list.length) list = _ppCloneTypes(_PP_DEFAULT_CABINET_TYPES);
     return _ppCloneTypes(list);
@@ -3399,7 +3405,7 @@ function _fillPricingPanel(cfg) {
     _ppSet('pp-materialsBoardPrice', _ppNum(c.materialsBoardPrice, 180));
     _ppSet('pp-materialsBoardsPerSqm', _ppNum(c.materialsBoardsPerSqm, 1.4));
     _ppSet('pp-materialsMultiplier', _ppNum(c.materialsMultiplier, 2.5));
-    _ppSet('pp-profitMultiplier', _ppNum(c.profitMultiplier, 1.7));
+    _ppSet('pp-profitMultiplier', _ppNum(c.profitMultiplier, 1.8));
     _ppSet('pp-heightSurcharge', _ppPct(_ppNum(c.heightSurcharge, 0.20)));
     _ppSet('pp-depthSurcharge', _ppPct(_ppNum(c.depthSurcharge, 0.20)));
     _ppSet('pp-sandwichSurcharge', _ppPct(_ppNum(c.sandwichSurcharge, 0.15)));
@@ -3470,7 +3476,7 @@ function _readPricingPanel() {
         materialsBoardPrice: _ppNum(_ppVal('pp-materialsBoardPrice'), 180),
         materialsBoardsPerSqm: _ppNum(_ppVal('pp-materialsBoardsPerSqm'), 1.4),
         materialsMultiplier: _ppNum(_ppVal('pp-materialsMultiplier'), 2.5),
-        profitMultiplier: _ppNum(_ppVal('pp-profitMultiplier'), 1.7),
+        profitMultiplier: _ppNum(_ppVal('pp-profitMultiplier'), 1.8),
         heightSurcharge: _ppFrac(_ppVal('pp-heightSurcharge')),
         depthSurcharge: _ppFrac(_ppVal('pp-depthSurcharge')),
         sandwichSurcharge: _ppFrac(_ppVal('pp-sandwichSurcharge')),

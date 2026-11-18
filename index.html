@@ -503,6 +503,7 @@
                         <option value="maya">צוקל נסתר</option>
                         <option value="c9" selected>צוקל רגיל</option>
                         <option value="regalim">ארון על רגליים</option>
+                        <option value="custom_size">ארון לפי מידה</option>
                     </select>
                 </div>
                 <div>
@@ -513,6 +514,22 @@
                         <option value="niche">נישה</option>
                     </select>
                 </div>
+            </div>
+            <div id="plinth-style-row" style="display:none;margin-bottom:12px;">
+                <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:3px;">סוג צוקל</div>
+                <select id="inp-plinth-style" class="editor-select" style="margin:0;">
+                    <option value="regular" selected>צוקל רגיל</option>
+                    <option value="recessed">צוקל נסתר</option>
+                    <option value="legs">על רגליים</option>
+                    <option value="floating">ארון מרחף</option>
+                </select>
+            </div>
+            <div id="front-style-row" style="display:none;margin-bottom:12px;">
+                <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:3px;">סוג חזיתות</div>
+                <select id="inp-front-style" class="editor-select" style="margin:0;">
+                    <option value="external" selected>חיצוניות</option>
+                    <option value="internal">פנימיות</option>
+                </select>
             </div>
             <div id="board-mat-row" style="margin-bottom:12px;">
                 <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:3px;">חומר גוף</div>
@@ -2403,6 +2420,7 @@
                     <option value="maya">צוקל נסתר</option>
                     <option value="c9" selected>צוקל רגיל</option>
                     <option value="regalim">ארון על רגליים</option>
+                    <option value="custom_size">ארון לפי מידה</option>
                 </select>
             </div>
             <div>
@@ -2414,6 +2432,24 @@
                     <option value="niche">נישה</option>
                 </select>
             </div>
+        </div>
+        <div id="mobile-plinth-style-row" style="display:none;margin-bottom:12px;">
+            <label class="mobile-label">סוג צוקל:</label>
+            <select id="mobile-inp-plinth-style" class="editor-select" style="margin:0;width:100%;"
+                onchange="document.getElementById('inp-plinth-style').value=this.value; document.getElementById('inp-plinth-style').dispatchEvent(new Event('change'))">
+                <option value="regular" selected>צוקל רגיל</option>
+                <option value="recessed">צוקל נסתר</option>
+                <option value="legs">על רגליים</option>
+                <option value="floating">ארון מרחף</option>
+            </select>
+        </div>
+        <div id="mobile-front-style-row" style="display:none;margin-bottom:12px;">
+            <label class="mobile-label">סוג חזיתות:</label>
+            <select id="mobile-inp-front-style" class="editor-select" style="margin:0;width:100%;"
+                onchange="document.getElementById('inp-front-style').value=this.value; document.getElementById('inp-front-style').dispatchEvent(new Event('change'))">
+                <option value="external" selected>חיצוניות</option>
+                <option value="internal">פנימיות</option>
+            </select>
         </div>
         <div class="mobile-section-title">מידות</div>
         <!-- Width slider -->
@@ -3224,14 +3260,14 @@
 <script src="auth.js?v=20261116kitchen"></script>
 <script src="trial-watermark.js?v=20261008trial"></script>
 <script src="egger-colors.js?v=20261116eggerKeep1"></script>
-<script src="state.js?v=20261118spaceCorner1"></script>
-<script src="quick-calc.js?v=20261029shoe"></script>
+<script src="state.js?v=20261118plinthFront1"></script>
+<script src="quick-calc.js?v=20261118plinthFront1"></script>
 <script src="bathroom-preset.js?v=20261008types"></script>
 <script src="kitchen-preset.js?v=20261117kitG3"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
 <script src="corner-unit-preset.js?v=20261116kitSpace"></script>
 <script src="engine-appliances.js?v=20261116kitOvenGlass5"></script>
-<script src="engine-core.js?v=20261118noStretchEdge"></script>
+<script src="engine-core.js?v=20261118plinthFront1"></script>
 <script src="engine-corners.js?v=20261116cnc1"></script>
 <script src="kitchen-corner.js?v=20261117kitG3"></script>
 <script src="engine-blueprint.js?v=20261116kitSeam"></script>
@@ -3240,7 +3276,7 @@
 <script src="bluran-color-picker.js?v=20261116sdDoorTabs1"></script>
 <script src="formex-color-picker.js?v=20261116sdDoorTabs1"></script>
 <script src="room-finishes.js?v=20261110gloss"></script>
-<script src="ui.js?v=20261118spaceCorner1"></script>
+<script src="ui.js?v=20261118plinthFront1"></script>
 <script src="mirror-cabinet.js?v=20261110doormirror"></script>
 <script src="mobile.js?v=20261029inthandle"></script>
 <script src="part-paint.js?v=20261104egger"></script>

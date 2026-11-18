@@ -1462,7 +1462,8 @@ function _buildAutoClosureStrips(rg, roomH) {
     const fp = _roomHostFootprint();
     const pose = window._getRoomHostPose();
     const cabH = _autoClosureCabHeight();
-    const inset = state.cabinetModel === 'ab2' || state.cabinetModel === 'ab2_nohoney';
+    const _fs = state.frontStyle || (typeof window._inferFrontStyle === 'function' ? window._inferFrontStyle(state) : 'external');
+    const inset = _fs === 'internal' || state.cabinetModel === 'ab2' || state.cabinetModel === 'ab2_nohoney';
     const frontZ = fp.depth / 2 + (inset ? 0 : 1.8);
     const zc = frontZ - _AUTO_CLOSURE_T / 2;
     const c = state.wings.center;
@@ -6893,7 +6894,8 @@ function _wingFrontOverlayCm(t) {
 }
 
 function _centerDepthIncludesFronts() {
-    if (state.cabinetModel === 'ab2' || state.cabinetModel === 'ab2_nohoney') return false;
+    const fs = state.frontStyle || (typeof window._inferFrontStyle === 'function' ? window._inferFrontStyle(state) : 'external');
+    if (fs === 'internal' || state.cabinetModel === 'ab2' || state.cabinetModel === 'ab2_nohoney') return false;
     if (state.presetId === 'sliding' && state.slidingDoor && state.slidingDoor.enabled) return false;
     return !(state.wings && (state.wings.left || state.wings.right));
 }
@@ -7031,10 +7033,12 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
     const _ledLitBoxes = [];
     (window._ledLitBoxesByWing = window._ledLitBoxesByWing || {})[state.activeWing] = _ledLitBoxes;
     const _shelfFrontSetback = 2; // cm — shelves stop 2cm short of cabinet front
-    const isInset = (state.cabinetModel === 'ab2' || state.cabinetModel === 'ab2_nohoney');
+    const _frontStyle = state.frontStyle || (typeof window._inferFrontStyle === 'function' ? window._inferFrontStyle(state) : 'external');
+    const _plinthStyle = state.plinthStyle || (typeof window._inferPlinthStyle === 'function' ? window._inferPlinthStyle(state) : 'regular');
+    const isInset = (_frontStyle === 'internal') || (state.cabinetModel === 'ab2' || state.cabinetModel === 'ab2_nohoney');
     const _handleStyle = _getHandleStyle();
     const isTouch = (_handleStyle === 'touch');
-    const isRegalim = (state.cabinetModel === 'regalim');
+    const isRegalim = (_plinthStyle === 'legs') || (state.cabinetModel === 'regalim');
     // Kitchen base/corner: carcass on leveling feet + continuous external kick plinth (not solid filled צוקל)
     const isKitchenBase = state.presetId === 'kitchen' &&
         !(typeof window._isKitchenUpper === 'function' && window._isKitchenUpper()) &&

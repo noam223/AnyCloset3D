@@ -8,17 +8,19 @@ var _QC_DEFAULT_TYPES = [
     { id: 'maya', label: 'צוקל נסתר', engine: 'maya' },
     { id: 'c9', label: 'צוקל רגיל', engine: 'c9' },
     { id: 'regalim', label: 'ארון על רגליים', engine: 'regalim' },
+    { id: 'custom_size', label: 'ארון לפי מידה', engine: 'custom_size' },
     { id: 'sliding', label: 'ארון הזזה', engine: 'sliding' }
 ];
 
 var _QC_LEGACY_LABELS = {
     maya: 'צוקל נסתר', c9: 'צוקל רגיל', regalim: 'ארון על רגליים',
+    custom_size: 'ארון לפי מידה',
     ab2: 'AB2', ab2_nohoney: 'ארון עם חזיתות פנימיות', sliding: 'ארון הזזה', other: 'אחר'
 };
 
 var _QC_DEFAULT_PRICING = {
     pricingMode: 'ranges',
-    profitMultiplier: 1.7,
+    profitMultiplier: 1.8,
     installPricePerUnit: 110, installUnitCm: 42.5, installHeightSurcharge: 0.20,
     heightSurcharge: 0.20, depthSurcharge: 0.20, sandwichSurcharge: 0.15,
     cabinetTypes: _QC_DEFAULT_TYPES.map(function(t) { return Object.assign({}, t); }),
@@ -33,7 +35,9 @@ var _QC_DEFAULT_PRICING = {
         doorGlassMel: 400, doorGlassBlack: 600, nickelLegPrice: 100, ledPair: 650,
         sorbet: 170, touchHandle: 30,
         slidingBase: 800, slidingDoor: 350, slidingGlass: 200, slidingMirror: 350,
-        slidingGold: 80, slidingBlack: 50, slidingHeightSurcharge: 0.15
+        slidingGold: 80, slidingBlack: 50, slidingHeightSurcharge: 0.15,
+        customSizeMel: 1200, customSizeSandwich: 1500, customSizeMdf: 1400,
+        c9RecessedSurcharge: 150, c9LegsSurcharge: 250
     }
 };
 
@@ -90,6 +94,9 @@ function _qcNormalizeTypes(cfg) {
     });
     if (!list.some(function(t) { return t.engine === 'sliding'; })) {
         list.push({ id: 'sliding', label: 'ארון הזזה', engine: 'sliding' });
+    }
+    if (!list.some(function(t) { return t.engine === 'custom_size' || t.id === 'custom_size'; })) {
+        list.push({ id: 'custom_size', label: 'ארון לפי מידה', engine: 'custom_size' });
     }
     if (!list.length) list = _QC_DEFAULT_TYPES.map(function(t) { return Object.assign({}, t); });
     return list.map(function(t) { return { id: t.id, label: t.label, engine: t.engine }; });
@@ -406,7 +413,7 @@ window.calcQuickPrice = function(autoUpdateShelves = false) {
     _qcSyncExtraRows();
 
     const installPrice = _qcInstall(cfg, w, h);
-    const profitMult = cfg.profitMultiplier != null ? cfg.profitMultiplier : 1.7;
+    const profitMult = cfg.profitMultiplier != null ? cfg.profitMultiplier : 1.8;
     const priceToCustomer = finalCost * profitMult;
 
     window._qcLastResult = {
