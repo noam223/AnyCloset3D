@@ -603,6 +603,10 @@
                     <input type="text" id="inp-handle-type" class="editor-select" placeholder="דגם / הערות (אופציונלי)..." style="margin-bottom: 0;">
                 </div>
             </div>
+            <div id="hinge-type-row" class="control-group" style="margin-top:12px;margin-bottom:0;display:none;">
+                <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:3px;"><i class="fa-solid fa-screwdriver-wrench" style="margin-left:4px;opacity:0.7;"></i> סוג ציר</div>
+                <select id="inp-hinge-type" class="editor-select" style="margin:0;" onchange="updateHingeType(this.value)"></select>
+            </div>
             <div class="control-group" style="margin-top:12px;margin-bottom:0;">
                 <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:3px;"><i class="fa-solid fa-note-sticky" style="margin-left:4px;opacity:0.7;"></i> הערות לארון</div>
                 <textarea id="inp-cabinet-notes" class="editor-select cabinet-notes-input" rows="3" placeholder="הערות לייצור, התקנה או לקוח — יופיעו בהדפסות" style="margin:0;"></textarea>
@@ -2659,6 +2663,11 @@
             <input type="text" id="mobile-inp-handle-type" class="editor-select" placeholder="דגם / הערות..." style="margin:0;"
                 oninput="document.getElementById('inp-handle-type').value=this.value; state.handleType=this.value; saveHistoryState();">
         </div>
+        <div id="mobile-hinge-type-row" style="display:none;margin-bottom:12px;">
+            <div style="font-size:0.78rem;color:var(--text-light);margin-bottom:3px;">סוג ציר</div>
+            <select id="mobile-inp-hinge-type" class="editor-select" style="margin:0;"
+                onchange="updateHingeType(this.value)"></select>
+        </div>
     </div>
 </div>
 
@@ -3275,10 +3284,10 @@
 <script src="auth.js?v=20261116kitchen"></script>
 <script src="trial-watermark.js?v=20261008trial"></script>
 <script src="egger-colors.js?v=20261116eggerKeep1"></script>
-<script src="pricing-core.js?v=20261119stock1"></script>
-<script src="state.js?v=20261119stock1"></script>
+<script src="pricing-core.js?v=20261119hinge1"></script>
+<script src="state.js?v=20261119hinge1"></script>
 <script src="stock-materials.js?v=20261119stock1"></script>
-<script src="quick-calc.js?v=20261119stock1"></script>
+<script src="quick-calc.js?v=20261119hinge1"></script>
 <script src="bathroom-preset.js?v=20261008types"></script>
 <script src="kitchen-preset.js?v=20261117kitG3"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
@@ -3293,7 +3302,7 @@
 <script src="bluran-color-picker.js?v=20261116sdDoorTabs1"></script>
 <script src="formex-color-picker.js?v=20261116sdDoorTabs1"></script>
 <script src="room-finishes.js?v=20261110gloss"></script>
-<script src="ui.js?v=20261119spaceZalign1"></script>
+<script src="ui.js?v=20261119hinge1"></script>
 <script src="mirror-cabinet.js?v=20261110doormirror"></script>
 <script src="mobile.js?v=20261029inthandle"></script>
 <script src="part-paint.js?v=20261104egger"></script>

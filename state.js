@@ -73,6 +73,7 @@ function createWingData(overrides) {
         handleStyle: 'none', // no handle chosen yet — must be picked before a customer order prints
         handleVariant: 'pipe_silver',
         ridingColor: 'black',
+        hingeTypeId: 'std', // selected hinge hardware from pricing hingeTypes
         cabinetName: '',
         cabinetModelLabel: '',
         cabinetNotes: '',
@@ -248,6 +249,7 @@ function _createSideCabinetData(mainWing) {
         handleStyle: w.handleStyle || 'pipe',
         handleVariant: w.handleVariant || 'pipe_silver',
         ridingColor: w.ridingColor || 'black',
+        hingeTypeId: w.hingeTypeId || 'std',
         cabinetModel: w.cabinetModel || 'c9',
         boardMaterial: w.boardMaterial || 'melamine',
         materialBody: w.materialSideCabinet || 'white_matte',
@@ -348,7 +350,7 @@ window.getWing = function() {
 // These getters/setters make existing code like state.width work transparently
 const _wingFields = [
     'cabinetModel','cabinetTypeId','plinthStyle','frontStyle','placement','width','globalHeight','depth','thickness','plinthHeight',
-    'hasDoors','handleType','handleStyle','handleVariant','ridingColor','cabinetName','cabinetModelLabel','cabinetNotes','boardMaterial',
+    'hasDoors','handleType','handleStyle','handleVariant','ridingColor','hingeTypeId','cabinetName','cabinetModelLabel','cabinetNotes','boardMaterial',
     'materialBody','materialInternal','materialExternal','materialDesk','materialOpenCell','materialBack',
     'materialBackByType',
     'materialSideCabinet','materialTopPanel','glassTint',
@@ -532,6 +534,7 @@ window.addWing = function(side) {
     newWing.handleStyle = center.handleStyle;
     newWing.handleVariant = center.handleVariant;
     newWing.ridingColor = center.ridingColor;
+    newWing.hingeTypeId = center.hingeTypeId || 'std';
     newWing.plinthHeight = center.plinthHeight;
     newWing.boardMaterial = center.boardMaterial;
     newWing.materialBody = center.materialBody;
@@ -660,6 +663,7 @@ window.toggleUpperUnit = function(wingId) {
             handleStyle: parentWing.handleStyle || 'none',
             handleVariant: parentWing.handleVariant || 'pipe_silver',
             ridingColor: parentWing.ridingColor || 'black',
+            hingeTypeId: parentWing.hingeTypeId || 'std',
             hasDoors: true,
             wingPosition: 'front', // not a side wing — prevents door/side clipping treating UU as side
             _isUpperUnit: true,
@@ -1861,6 +1865,8 @@ window.syncSidebarToWing = function() {
     if (_boardMatRow) _boardMatRow.style.display = _isUUEdit ? 'none' : '';
     const _handleTypeRow = document.getElementById('handle-type-row');
     if (_handleTypeRow) _handleTypeRow.style.display = _isUUEdit ? 'none' : '';
+    const _hingeTypeRow = document.getElementById('hinge-type-row');
+    if (_hingeTypeRow && _isUUEdit) _hingeTypeRow.style.display = 'none';
 
     const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
     const setChecked = (id, v) => {
@@ -1912,6 +1918,7 @@ window.syncSidebarToWing = function() {
         b.classList.toggle('active', b.dataset.style === _hs);
     });
     if (typeof window._syncHandleVariantUI === 'function') window._syncHandleVariantUI(w);
+    if (typeof window._syncHingeTypeUI === 'function') window._syncHingeTypeUI(w);
     setVal('inp-cabinet-name', (function() {
         const n = w.cabinetName || '';
         const pairInfo = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
@@ -2880,7 +2887,7 @@ window.resetCurrentCabinet = function() {
     w.cabinetModel = 'c9';
     w.placement = 'wall';
     w.width = 160; w.globalHeight = 240; w.depth = 54;
-    w.plinthHeight = 8.75; w.hasDoors = true; w.handleType = ''; w.handleStyle = 'none'; w.handleVariant = 'pipe_silver'; w.ridingColor = 'black'; w.cabinetName = ''; w.cabinetModelLabel = ''; w.cabinetNotes = '';
+    w.plinthHeight = 8.75; w.hasDoors = true; w.handleType = ''; w.handleStyle = 'none'; w.handleVariant = 'pipe_silver'; w.ridingColor = 'black'; w.hingeTypeId = w.hingeTypeId || 'std'; w.cabinetName = ''; w.cabinetModelLabel = ''; w.cabinetNotes = '';
     w.boardMaterial = 'melamine'; w.materialBody = 'white_matte'; w.materialInternal = 'white_matte';
     w.materialExternal = 'white_matte'; w.materialDesk = 'white_matte'; w.materialOpenCell = 'white_matte'; w.materialBack = 'white_matte';
     w.materialBackByType = { mezuzah: null, back8: null, back17: null, stretcher: null };
@@ -3432,6 +3439,65 @@ window.updateHandleStyle = function(style) {
     window._syncHandleVariantUI(w);
     if (typeof window._syncCornerDeskHandleUI === 'function') window._syncCornerDeskHandleUI(w);
     buildCabinet();
+    calculatePrice();
+    saveHistoryState();
+};
+
+/** Hinge types from pricing settings — selectable per project/wing. */
+window._getHingeTypesList = function() {
+    const cfg = window._pricingConfig || window.DEFAULT_PRICING_CONFIG || {};
+    if (window.PricingCore && typeof window.PricingCore.normalizeHingeTypes === 'function') {
+        return window.PricingCore.normalizeHingeTypes(cfg.hingeTypes);
+    }
+    return Array.isArray(cfg.hingeTypes) ? cfg.hingeTypes.filter(function(x) { return x && x.name; }) : [];
+};
+
+window._syncHingeTypeUI = function(w) {
+    const list = window._getHingeTypesList();
+    const row = document.getElementById('hinge-type-row');
+    const mobileRow = document.getElementById('mobile-hinge-type-row');
+    const sel = document.getElementById('inp-hinge-type');
+    const mobileSel = document.getElementById('mobile-inp-hinge-type');
+    const show = list.length > 0;
+    if (row) row.style.display = show ? '' : 'none';
+    if (mobileRow) mobileRow.style.display = show ? '' : 'none';
+    if (!show) return;
+    const cur = (w && w.hingeTypeId) || (list[0] && list[0].id) || 'std';
+    const optsHtml = list.map(function(h) {
+        return '<option value="' + String(h.id).replace(/"/g, '&quot;') + '"' +
+            (h.id === cur ? ' selected' : '') + '>' +
+            String(h.name || h.id).replace(/</g, '&lt;') +
+            (h.price > 0 ? ' (₪' + h.price + ')' : '') +
+            '</option>';
+    }).join('');
+    if (sel) {
+        sel.innerHTML = optsHtml;
+        if (!list.some(function(h) { return h.id === cur; }) && list[0]) sel.value = list[0].id;
+        else sel.value = cur;
+    }
+    if (mobileSel) {
+        mobileSel.innerHTML = optsHtml;
+        mobileSel.value = sel ? sel.value : cur;
+    }
+    if (w && (!w.hingeTypeId || !list.some(function(h) { return h.id === w.hingeTypeId; }))) {
+        w.hingeTypeId = (sel && sel.value) || (list[0] && list[0].id) || 'std';
+    }
+};
+
+window.updateHingeType = function(id) {
+    const w = getWing();
+    if (!w) return;
+    const list = window._getHingeTypesList();
+    if (!list.length) return;
+    const hit = list.find(function(h) { return h.id === id; }) || list[0];
+    w.hingeTypeId = hit.id;
+    const _uu = !state._activeUpperUnit && state.wings['upperUnit_' + state.activeWing];
+    if (_uu) _uu.hingeTypeId = hit.id;
+    if (w.sideCabinet) w.sideCabinet.hingeTypeId = hit.id;
+    const sel = document.getElementById('inp-hinge-type');
+    const mobileSel = document.getElementById('mobile-inp-hinge-type');
+    if (sel) sel.value = hit.id;
+    if (mobileSel) mobileSel.value = hit.id;
     calculatePrice();
     saveHistoryState();
 };
@@ -5607,7 +5673,11 @@ var DEFAULT_PRICING_CONFIG = {
         closuresCustomer: 750, closuresInstall: 300
     },
     customExtras: [],
-    stockMaterials: []
+    stockMaterials: [],
+    hingeTypes: [
+        { id: 'std', name: 'ציר רגיל', price: 25 },
+        { id: 'soft', name: 'ציר טריקה שקטה', price: 45 }
+    ]
 };
 window.DEFAULT_PRICING_CONFIG = DEFAULT_PRICING_CONFIG;
 
@@ -5635,6 +5705,10 @@ function _buildEmptyPricingConfig() {
     Object.keys(e.extras || {}).forEach(function(k) { e.extras[k] = 0; });
     e.customExtras = [];
     e.stockMaterials = [];
+    e.hingeTypes = [
+        { id: 'std', name: 'ציר רגיל', price: 0 },
+        { id: 'soft', name: 'ציר טריקה שקטה', price: 0 }
+    ];
     return e;
 }
 window.EMPTY_PRICING_CONFIG = _buildEmptyPricingConfig();
@@ -5988,6 +6062,66 @@ function _calcWingCost(cfg, wing) {
                 });
             });
         }
+
+    // Hinge hardware — types from pricing settings; count matches CNC rules
+    (function() {
+        if (wModel === 'sliding') return;
+        const htList = (window.PricingCore && typeof window.PricingCore.normalizeHingeTypes === 'function')
+            ? window.PricingCore.normalizeHingeTypes(cfg.hingeTypes)
+            : (Array.isArray(cfg.hingeTypes) ? cfg.hingeTypes.filter(function(x) { return x && x.name; }) : []);
+        if (!htList.length) return;
+        const hingeType = (window.PricingCore && typeof window.PricingCore.findHingeType === 'function')
+            ? window.PricingCore.findHingeType(cfg, wing.hingeTypeId)
+            : (htList.find(function(h) { return h.id === wing.hingeTypeId; }) || htList[0]);
+        const unitPrice = hingeType ? _priceNum(hingeType.price, 0) : 0;
+        if (unitPrice <= 0) return;
+        const countFn = (typeof _hingeCountCm === 'function')
+            ? _hingeCountCm
+            : function(lenCm) {
+                const mm = (lenCm || 0) * 10;
+                return mm <= 900 ? 2 : (mm <= 1600 ? 3 : (mm <= 2000 ? 4 : 5));
+            };
+        const unitsFor = function(type, hCm, wCm) {
+            const t = String(type || '');
+            if (!t || t === 'empty' || t === 'none') return 0;
+            if (t.indexOf('sliding') >= 0) return 0;
+            const hinged = {
+                left: 1, right: 1, double: 1, flap: 1, top: 1,
+                door_left: 1, door_right: 1, door_double: 1, door_flap: 1
+            };
+            if (!hinged[t]) return 0;
+            const leaves = (t === 'double' || t === 'door_double') ? 2 : 1;
+            const flap = (t === 'flap' || t === 'door_flap' || t === 'top');
+            return leaves * countFn(flap ? (wCm || 60) : (hCm || 240));
+        };
+        let hingeCount = 0;
+        if (wing.hasDoors) {
+            (wing.columns || []).forEach(function(col) {
+                const hCm = col.height || wing.globalHeight || 240;
+                const wCm = col.width || 60;
+                (col.doors || []).forEach(function(door) {
+                    hingeCount += unitsFor(door && door.type, hCm, wCm);
+                });
+                (col.compartments || []).forEach(function(comp) {
+                    if (!comp || !comp.partition || !Array.isArray(comp.subCells)) return;
+                    comp.subCells.forEach(function(sub) {
+                        if (!sub || !Array.isArray(sub.zonesType)) return;
+                        sub.zonesType.forEach(function(zt) {
+                            hingeCount += unitsFor(zt, hCm, wCm);
+                        });
+                    });
+                });
+            });
+        }
+        if (wing.sideCabinet && wing.sideCabinet.side !== 'none' && wing.sideCabinet.hasDoors) {
+            const sc = wing.sideCabinet;
+            const scH = wing.globalHeight || 240;
+            const scW = sc.width || sc.widthRight || sc.widthLeft || 40;
+            if (sc.side === 'right' || sc.side === 'both') hingeCount += unitsFor('right', scH, sc.widthRight || scW);
+            if (sc.side === 'left' || sc.side === 'both') hingeCount += unitsFor('left', scH, sc.widthLeft || scW);
+        }
+        if (hingeCount > 0) finalCost += hingeCount * unitPrice;
+    })();
 
     finalCost += sorbets * _priceNum(ex.sorbet, 170);
 

@@ -38,6 +38,7 @@ function _esc(s) {
 var _cabinetTypes = [];
 var _customExtras = [];
 var _stockMaterials = [];
+var _hingeTypes = [];
 var _currentMode  = 'ranges';
 var _opts         = {};
 
@@ -70,6 +71,7 @@ function _buildHtml() {
         _slidingHtml(),
         _customAndClosuresHtml(),
         _stockMaterialsHtml(),
+        _hingeTypesHtml(),
         _customExtrasHtml(),
         s !== false ? _saveBarHtml() : ''
     ].join('');
@@ -417,6 +419,23 @@ function _stockMaterialsHtml() {
 }
 
 /** User-defined extras: product name + unit cost */
+function _hingeTypesHtml() {
+    return '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius,12px);' +
+        'padding:20px 24px;margin-bottom:12px;">' +
+        '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin-bottom:8px;">' +
+            '<i class="fa-solid fa-screwdriver-wrench"></i> צירים</div>' +
+        '<p style="font-size:.78rem;color:var(--muted);margin:0 0 14px;line-height:1.45;">' +
+            'הגדירו סוגי צירים (שם + עלות ליחידה). בפרויקט בוחרים איזה סוג להחיל; הכמות מחושבת אוטומטית לפי גובה הדלת (כמו ב־CNC) ומוכפלת במכפיל הרווח.</p>' +
+        '<div id="' + _id('hinge-types-list') + '"></div>' +
+        '<button type="button" onclick="PricingPanel.addHingeType()" ' +
+            'style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;margin-top:10px;' +
+            'background:rgba(37,99,235,.08);border:1.5px solid rgba(37,99,235,.25);' +
+            'color:#2563eb;border-radius:10px;font-size:.82rem;font-weight:600;cursor:pointer;' +
+            'font-family:inherit;">' +
+            '<i class="fa-solid fa-plus"></i> הוסף סוג ציר</button>' +
+    '</div>';
+}
+
 function _customExtrasHtml() {
     return '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius,12px);' +
         'padding:20px 24px;margin-bottom:12px;">' +
@@ -675,6 +694,72 @@ function _syncStockMaterialsFromDom() {
     _stockMaterials = next;
 }
 
+// ── hinge types (name + unit cost) ───────────────────────────────────────────
+function _renderHingeTypes() {
+    var list = _el('hinge-types-list');
+    if (!list) return;
+    if (!_hingeTypes.length) {
+        list.innerHTML = '<div style="font-size:.8rem;color:var(--muted);padding:6px 0 4px;">' +
+            'עדיין אין סוגי צירים — לחצו על "הוסף סוג ציר".</div>';
+        return;
+    }
+    list.innerHTML = _hingeTypes.map(function(item) {
+        return '<div class="pnl-ht-row" data-id="' + _esc(item.id) + '" ' +
+            'style="display:grid;grid-template-columns:1fr 120px auto;gap:10px;align-items:center;' +
+            'padding:8px 0;border-bottom:1px solid var(--border);">' +
+            '<input type="text" class="pnl-ht-name" value="' + _esc(item.name || '') + '" ' +
+                'placeholder="שם סוג הציר (למשל: טריקה שקטה)" maxlength="80" ' +
+                'style="height:36px;border:1.5px solid var(--border);border-radius:8px;padding:0 12px;' +
+                'font-family:inherit;font-size:.85rem;direction:rtl;text-align:right;">' +
+            '<input type="number" class="pnl-ht-price" value="' + _num(item.price, 0) + '" ' +
+                'min="0" step="1" title="עלות לציר אחד (₪)" ' +
+                'style="height:36px;border:1.5px solid var(--border);border-radius:8px;padding:0 10px;' +
+                'font-family:inherit;font-size:.85rem;direction:ltr;text-align:right;">' +
+            '<button type="button" onclick="PricingPanel._deleteHingeType(this)" title="מחק" ' +
+                'style="width:34px;height:34px;border-radius:8px;border:none;background:#fee2e2;' +
+                'color:#ef4444;cursor:pointer;font-size:.9rem;display:flex;align-items:center;' +
+                'justify-content:center;">✕</button>' +
+        '</div>';
+    }).join('');
+}
+
+function addHingeType() {
+    _syncHingeTypesFromDom();
+    _hingeTypes.push({ id: 'hinge_' + Date.now(), name: '', price: 0 });
+    _renderHingeTypes();
+    var list = _el('hinge-types-list');
+    if (list) {
+        var inputs = list.querySelectorAll('.pnl-ht-name');
+        if (inputs.length) inputs[inputs.length - 1].focus();
+    }
+}
+
+function _deleteHingeType(btn) {
+    var row = btn && btn.closest ? btn.closest('.pnl-ht-row') : null;
+    if (!row) return;
+    var id = row.getAttribute('data-id');
+    _syncHingeTypesFromDom();
+    _hingeTypes = _hingeTypes.filter(function(x) { return x.id !== id; });
+    _renderHingeTypes();
+}
+
+function _syncHingeTypesFromDom() {
+    var list = _el('hinge-types-list');
+    if (!list) return;
+    var next = [];
+    list.querySelectorAll('.pnl-ht-row').forEach(function(row) {
+        var id = row.getAttribute('data-id') || ('hinge_' + Date.now());
+        var nameEl = row.querySelector('.pnl-ht-name');
+        var priceEl = row.querySelector('.pnl-ht-price');
+        next.push({
+            id: id,
+            name: nameEl ? String(nameEl.value || '').trim() : '',
+            price: _num(priceEl ? priceEl.value : 0, 0)
+        });
+    });
+    _hingeTypes = next;
+}
+
 // ── custom extras (name + unit cost) ─────────────────────────────────────────
 function _renderCustomExtras() {
     var list = _el('custom-extras-list');
@@ -914,6 +999,29 @@ function fill(cfg) {
     }
     // Keep blank draft rows when editing? fill only keeps named items; empty drafts via Add.
     _renderCustomExtras();
+    if (PC && typeof PC.normalizeHingeTypes === 'function') {
+        _hingeTypes = PC.normalizeHingeTypes(c.hingeTypes);
+        if (!_hingeTypes.length && !Array.isArray(c.hingeTypes)) {
+            _hingeTypes = [
+                { id: 'std', name: 'ציר רגיל', price: 0 },
+                { id: 'soft', name: 'ציר טריקה שקטה', price: 0 }
+            ];
+        }
+    } else if (Array.isArray(c.hingeTypes) && c.hingeTypes.length) {
+        _hingeTypes = c.hingeTypes.map(function(x, i) {
+            return {
+                id: String((x && x.id) || ('hinge_' + i)),
+                name: String((x && x.name) || '').trim(),
+                price: _num(x && x.price, 0)
+            };
+        }).filter(function(x) { return x.name; });
+    } else {
+        _hingeTypes = [
+            { id: 'std', name: 'ציר רגיל', price: 0 },
+            { id: 'soft', name: 'ציר טריקה שקטה', price: 0 }
+        ];
+    }
+    _renderHingeTypes();
     if (PC && typeof PC.normalizeStockMaterials === 'function') {
         _stockMaterials = PC.normalizeStockMaterials(c.stockMaterials);
     } else {
@@ -1018,6 +1126,8 @@ function read() {
         ex[k] = _num(_v(k), 0);
     });
     ['slidingHeightSurcharge'].forEach(function(k) { ex[k] = (_frac(_v(k)) || 0); });
+    _syncHingeTypesFromDom();
+    _syncCustomExtrasFromDom();
     var customExtras = _customExtras
         .map(function(x) {
             return {
@@ -1029,6 +1139,18 @@ function read() {
         .filter(function(x) { return !!x.name; });
     if (PC && typeof PC.normalizeCustomExtras === 'function') {
         customExtras = PC.normalizeCustomExtras(customExtras);
+    }
+    var hingeTypes = _hingeTypes
+        .map(function(x) {
+            return {
+                id: String(x.id || ('hinge_' + Date.now())),
+                name: String(x.name || '').trim(),
+                price: _num(x.price, 0)
+            };
+        })
+        .filter(function(x) { return !!x.name; });
+    if (PC && typeof PC.normalizeHingeTypes === 'function') {
+        hingeTypes = PC.normalizeHingeTypes(hingeTypes);
     }
     var stockMaterials = _stockMaterials.slice();
     if (PC && typeof PC.normalizeStockMaterials === 'function') {
@@ -1063,6 +1185,7 @@ function read() {
         ranges:                   _readRangesTable(),
         extras:                   ex,
         customExtras:             customExtras,
+        hingeTypes:               hingeTypes,
         stockMaterials:           stockMaterials
     };
 }
@@ -1151,6 +1274,7 @@ global.PricingPanel = {
     updatePreview:  updatePreview,
     addCabinetType: addCabinetType,
     addCustomExtra: addCustomExtra,
+    addHingeType:   addHingeType,
     addStockMaterial: addStockMaterial,
     addRangeRow:    addRangeRow,
     showSavedNote:  showSavedNote,
@@ -1158,6 +1282,7 @@ global.PricingPanel = {
     _toggleMaterial:   _toggleMaterial,
     _deleteType:       _deleteType,
     _deleteCustomExtra:_deleteCustomExtra,
+    _deleteHingeType:  _deleteHingeType,
     _deleteStockMaterial:_deleteStockMaterial,
     _onSave:           _onSave,
     _onReset:          _onReset

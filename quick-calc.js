@@ -42,7 +42,11 @@ var _QC_DEFAULT_PRICING = {
         closuresCustomer: 750, closuresInstall: 300
     },
     customExtras: [],
-    stockMaterials: []
+    stockMaterials: [],
+    hingeTypes: [
+        { id: 'std', name: 'ציר רגיל', price: 25 },
+        { id: 'soft', name: 'ציר טריקה שקטה', price: 45 }
+    ]
 };
 
 function _qcNum(v, fb) {

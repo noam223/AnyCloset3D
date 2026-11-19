@@ -20915,6 +20915,10 @@ function _readUserPricingForm() {
         installHeightSurcharge: _upsFrac(_gv('ups-installHeightSurcharge')),
         cabinetTypes: existing.cabinetTypes || (typeof DEFAULT_PRICING_CONFIG !== 'undefined' ? DEFAULT_PRICING_CONFIG.cabinetTypes : undefined),
         ranges: existing.ranges || {},
+        // Preserve fields managed in the full pricing panel (projects / admin)
+        customExtras: Array.isArray(existing.customExtras) ? existing.customExtras : [],
+        stockMaterials: Array.isArray(existing.stockMaterials) ? existing.stockMaterials : [],
+        hingeTypes: Array.isArray(existing.hingeTypes) ? existing.hingeTypes : [],
         extras: Object.assign({}, existingExtras, {
             internalDrawer: _upsNum(_gv('ups-internalDrawer'), dx.internalDrawer != null ? dx.internalDrawer : 150),
             externalDrawer: _upsNum(_gv('ups-externalDrawer'), dx.externalDrawer != null ? dx.externalDrawer : 200),
@@ -20948,6 +20952,10 @@ async function saveUserPricingConfig() {
         if (error) throw error;
         window._pricingConfig = cfg;
         if (typeof window.applyCabinetTypeSelects === 'function') window.applyCabinetTypeSelects(cfg);
+        if (typeof window._syncHingeTypeUI === 'function') {
+            var _hw = (typeof getWing === 'function') ? getWing() : null;
+            window._syncHingeTypeUI(_hw);
+        }
         closePricingSettings();
         if (typeof _showToast === 'function') _showToast('הגדרות התמחור נשמרו ✓', 3000);
         // Recalculate price with new config

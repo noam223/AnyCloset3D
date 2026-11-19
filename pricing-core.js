@@ -50,7 +50,12 @@ var DEFAULTS = {
     },
     customExtras: [],
     /** Carpenter stock colors / sheets: [{key,label,brand,sheetPrice,sheetW,sheetH,hex,img}] */
-    stockMaterials: []
+    stockMaterials: [],
+    /** Hinge hardware types selectable per project: [{id,name,price}] */
+    hingeTypes: [
+        { id: 'std', name: 'ציר רגיל', price: 25 },
+        { id: 'soft', name: 'ציר טריקה שקטה', price: 45 }
+    ]
 };
 
 var ENGINES = [
@@ -126,6 +131,15 @@ function normalizeConfig(cfg) {
     if (cfg.ranges) cfg.ranges = mergeOtherRanges(cfg.ranges);
     cfg.customExtras = normalizeCustomExtras(cfg.customExtras);
     cfg.stockMaterials = normalizeStockMaterials(cfg.stockMaterials);
+    if (!Array.isArray(cfg.hingeTypes)) {
+        // Legacy configs without hingeTypes — seed editable defaults (prices start at 0)
+        cfg.hingeTypes = [
+            { id: 'std', name: 'ציר רגיל', price: 0 },
+            { id: 'soft', name: 'ציר טריקה שקטה', price: 0 }
+        ];
+    } else {
+        cfg.hingeTypes = normalizeHingeTypes(cfg.hingeTypes);
+    }
     return cfg;
 }
 
@@ -333,6 +347,32 @@ function preview(cfg, opts) {
     };
 }
 
+/** Normalize hinge types: [{id, name, price}]. */
+function normalizeHingeTypes(list) {
+    if (!Array.isArray(list)) return [];
+    var seen = {}, out = [];
+    list.forEach(function(item, i) {
+        if (!item || typeof item !== 'object') return;
+        var name = String(item.name || '').trim();
+        if (!name) return;
+        var id = String(item.id || ('hinge_' + i)).trim();
+        if (!id || seen[id]) id = 'hinge_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+        seen[id] = true;
+        out.push({ id: id, name: name, price: num(item.price, 0) });
+    });
+    return out;
+}
+
+function findHingeType(cfg, id) {
+    var list = normalizeHingeTypes(cfg && cfg.hingeTypes);
+    if (!list.length) return null;
+    if (id) {
+        var hit = list.find(function(x) { return x.id === id; });
+        if (hit) return hit;
+    }
+    return list[0];
+}
+
 /** Normalize user-defined extras: [{id, name, price}]. */
 function normalizeCustomExtras(list) {
     if (!Array.isArray(list)) return [];
@@ -456,6 +496,10 @@ function emptyConfig() {
     e.installHeightSurcharge = 0;
     e.customExtras = [];
     e.stockMaterials = [];
+    e.hingeTypes = [
+        { id: 'std', name: 'ציר רגיל', price: 0 },
+        { id: 'soft', name: 'ציר טריקה שקטה', price: 0 }
+    ];
     Object.keys(e.ranges || {}).forEach(function(engine) {
         ['melamine', 'nonMelamine'].forEach(function(mat) {
             var map = (e.ranges[engine] && e.ranges[engine][mat]) || {};
@@ -479,6 +523,8 @@ global.PricingCore = {
     clone: clone,
     normalizeTypes: normalizeTypes,
     normalizeCustomExtras: normalizeCustomExtras,
+    normalizeHingeTypes: normalizeHingeTypes,
+    findHingeType: findHingeType,
     normalizeStockMaterials: normalizeStockMaterials,
     findStockMaterial: findStockMaterial,
     materialsFaceCost: materialsFaceCost,

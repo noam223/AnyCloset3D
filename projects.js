@@ -3567,6 +3567,10 @@ async function savePricingSettings() {
         if (typeof window.applyCabinetTypeSelects === 'function') window.applyCabinetTypeSelects(cfg);
         if (typeof window._qcRenderCustomExtras === 'function') window._qcRenderCustomExtras(true);
         if (window.StockMaterials && typeof window.StockMaterials.refresh === 'function') window.StockMaterials.refresh();
+        if (typeof window._syncHingeTypeUI === 'function') {
+            var _hw = (typeof getWing === 'function') ? getWing() : null;
+            window._syncHingeTypeUI(_hw);
+        }
         PricingPanel.showSavedNote(3000);
         showToast('הגדרות התמחור נשמרו ✓', 'success');
     } catch(e) {
