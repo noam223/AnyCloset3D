@@ -66,6 +66,7 @@ function _buildHtml() {
         _doorsHtml(),
         _upperCornerHtml(),
         _slidingHtml(),
+        _customAndClosuresHtml(),
         s !== false ? _saveBarHtml() : ''
     ].join('');
 }
@@ -352,6 +353,37 @@ function _slidingHtml() {
             _field('slidingBlack', 'תוספת פרופיל שחור (₪/דלת)', 'min="0" step="10"') +
             _field('slidingHeightSurcharge', 'תוספת גובה הזזה (%)', 'min="0" max="100" step="1"') +
             _field('nickelLegPrice', 'רגל ניקל (₪)', 'min="0" step="10"') +
+        '</div>' +
+    '</div>';
+}
+
+/** ארון לפי מידה, תוספות צוקל רגיל, משטח עליון, סגירות */
+function _customAndClosuresHtml() {
+    return '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius,12px);' +
+        'padding:20px 24px;margin-bottom:12px;">' +
+        '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin-bottom:8px;">' +
+            '<i class="fa-solid fa-ruler-combined"></i> ארון לפי מידה</div>' +
+        '<p style="font-size:.78rem;color:var(--muted);margin:0 0 14px;line-height:1.45;">' +
+            'תמחור נפח: רוחב×גובה×עומק (מטרים) × מחיר למ"ק. ללא תוספות גובה/עומק באחוזים.</p>' +
+        '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">' +
+            _field('customSizeMel', 'מלמין (₪/מ"ק)', 'min="0" step="50"') +
+            _field('customSizeSandwich', 'סנדוויץ\' (₪/מ"ק)', 'min="0" step="50"') +
+            _field('customSizeMdf', 'MDF (₪/מ"ק)', 'min="0" step="50"') +
+        '</div>' +
+        '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin:18px 0 8px;">' +
+            '<i class="fa-solid fa-shoe-prints"></i> צוקל רגיל — סגנונות</div>' +
+        '<p style="font-size:.78rem;color:var(--muted);margin:0 0 14px;line-height:1.45;">' +
+            'תוספת עלות לפני מכפיל רווח. צוקל רגיל ללא תוספת; נסתר / רגליים לפי השדות.</p>' +
+        '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">' +
+            _field('c9RecessedSurcharge', 'צוקל נסתר (תוספת ₪)', 'min="0" step="10"') +
+            _field('c9LegsSurcharge', 'על רגליים (תוספת ₪)', 'min="0" step="10"') +
+        '</div>' +
+        '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin:18px 0 14px;">' +
+            '<i class="fa-solid fa-border-top-left"></i> משטח עליון וסגירות</div>' +
+        '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">' +
+            _field('topPanelPerCm', 'משטח עליון (₪/ס"מ רוחב)', 'min="0" step="1"') +
+            _field('closuresCustomer', 'סגירות — מחיר ללקוח (₪)', 'min="0" step="50"') +
+            _field('closuresInstall', 'סגירות — התקנה (₪)', 'min="0" step="50"') +
         '</div>' +
     '</div>';
 }
@@ -645,6 +677,7 @@ function fill(cfg) {
         { id: 'maya', label: 'צוקל נסתר', engine: 'maya', priceFactor: 0 },
         { id: 'c9', label: 'צוקל רגיל', engine: 'c9', priceFactor: 0 },
         { id: 'regalim', label: 'ארון על רגליים', engine: 'regalim', priceFactor: 0 },
+        { id: 'custom_size', label: 'ארון לפי מידה', engine: 'custom_size', priceFactor: 0 },
         { id: 'sliding', label: 'ארון הזזה', engine: 'sliding', priceFactor: 0 }
     ];
     _renderCabinetTypes();
@@ -713,6 +746,14 @@ function fill(cfg) {
     _set('slidingBlack',    _num(ex.slidingBlack, dx.slidingBlack || 50));
     _set('slidingHeightSurcharge', _pct(_num(ex.slidingHeightSurcharge, dx.slidingHeightSurcharge || 0.15)));
     _set('nickelLegPrice',  _num(ex.nickelLegPrice, dx.nickelLegPrice || 100));
+    _set('customSizeMel',       _num(ex.customSizeMel, dx.customSizeMel != null ? dx.customSizeMel : 1200));
+    _set('customSizeSandwich',  _num(ex.customSizeSandwich, dx.customSizeSandwich != null ? dx.customSizeSandwich : 1500));
+    _set('customSizeMdf',       _num(ex.customSizeMdf, dx.customSizeMdf != null ? dx.customSizeMdf : 1400));
+    _set('c9RecessedSurcharge', _num(ex.c9RecessedSurcharge, dx.c9RecessedSurcharge != null ? dx.c9RecessedSurcharge : 150));
+    _set('c9LegsSurcharge',     _num(ex.c9LegsSurcharge, dx.c9LegsSurcharge != null ? dx.c9LegsSurcharge : 250));
+    _set('topPanelPerCm',       _num(ex.topPanelPerCm, dx.topPanelPerCm != null ? dx.topPanelPerCm : 8));
+    _set('closuresCustomer',    _num(ex.closuresCustomer, dx.closuresCustomer != null ? dx.closuresCustomer : 750));
+    _set('closuresInstall',     _num(ex.closuresInstall, dx.closuresInstall != null ? dx.closuresInstall : 300));
 
     updatePreview();
 }
@@ -729,7 +770,10 @@ function read() {
      'fullCornerBase','fullCornerShelf','wingConnection',
      'sideCabMel','sideCabNonMel','sideCabDoors',
      'slidingBase','slidingDoor','slidingGlass','slidingMirror','slidingGold','slidingBlack',
-     'nickelLegPrice'].forEach(function(k) {
+     'nickelLegPrice',
+     'customSizeMel','customSizeSandwich','customSizeMdf',
+     'c9RecessedSurcharge','c9LegsSurcharge',
+     'topPanelPerCm','closuresCustomer','closuresInstall'].forEach(function(k) {
         ex[k] = _num(_v(k), 0);
     });
     ['slidingHeightSurcharge'].forEach(function(k) { ex[k] = (_frac(_v(k)) || 0); });

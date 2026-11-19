@@ -5602,7 +5602,9 @@ var DEFAULT_PRICING_CONFIG = {
         nickelLegPrice: 100,
         ledPair: 650, sorbet: 170, touchHandle: 30,
         customSizeMel: 1200, customSizeSandwich: 1500, customSizeMdf: 1400,
-        c9RecessedSurcharge: 150, c9LegsSurcharge: 250
+        c9RecessedSurcharge: 150, c9LegsSurcharge: 250,
+        topPanelPerCm: 8,
+        closuresCustomer: 750, closuresInstall: 300
     }
 };
 window.DEFAULT_PRICING_CONFIG = DEFAULT_PRICING_CONFIG;
@@ -6020,7 +6022,7 @@ function _calcWingCost(cfg, wing) {
 
         if (wing.columns && wing.columns.some(col => col.topPanel)) {
             const t = wing.thickness || 1.7;
-        const pricePerCm = ex.topPanelPerCm != null ? ex.topPanelPerCm : 8;
+        const pricePerCm = _priceNum(ex.topPanelPerCm, 8);
             const colLeftEdges = [];
         let _cx = 0;
             for (let ci = 0; ci < wing.columns.length; ci++) {
@@ -6125,14 +6127,18 @@ function calculatePrice() {
     if (numRegularWings >= 1) totalCost += numRegularWings * _priceNum(ex.wingConnection, 400);
 
     const hasClosures = window._orderOpts(state.wings).closures === 'yes';
-    if (hasClosures) totalInstall += window.CLOSURES_PRICE_INSTALL;
+    const closuresInstall = _priceNum(ex.closuresInstall,
+        (window.CLOSURES_PRICE_INSTALL != null ? window.CLOSURES_PRICE_INSTALL : 300));
+    const closuresCustomer = _priceNum(ex.closuresCustomer,
+        (window.CLOSURES_PRICE_CUSTOMER != null ? window.CLOSURES_PRICE_CUSTOMER : 750));
+    if (hasClosures) totalInstall += closuresInstall;
 
     state.currentCostPrice    = Math.round(totalCost);
     state.currentInstallPrice = Math.round(totalInstall);
 
     const activeWing       = getWing();
     const profitMult       = cfg.profitMultiplier != null ? cfg.profitMultiplier : 1.8;
-    const priceToCustomer  = totalCost * profitMult + (hasClosures ? window.CLOSURES_PRICE_CUSTOMER : 0);
+    const priceToCustomer  = totalCost * profitMult + (hasClosures ? closuresCustomer : 0);
     const finalDisplayPrice = activeWing.manualPrice !== null ? activeWing.manualPrice : Math.round(priceToCustomer);
 
     const priceDisplayEl = document.getElementById('price-display');

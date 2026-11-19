@@ -2407,7 +2407,8 @@ var _PP_DEFAULTS = {
         slidingGold:80,slidingBlack:50,slidingHeightSurcharge:0.15,nickelLegPrice:100,ledPair:650,
         sorbet:170,touchHandle:30,
         customSizeMel:1200,customSizeSandwich:1500,customSizeMdf:1400,
-        c9RecessedSurcharge:150,c9LegsSurcharge:250}
+        c9RecessedSurcharge:150,c9LegsSurcharge:250,
+        topPanelPerCm:8,closuresCustomer:750,closuresInstall:300}
 };
 
 /** Empty personal list for carpenters (all cost fields 0) — they enter their own prices. */

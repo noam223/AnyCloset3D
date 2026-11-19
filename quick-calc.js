@@ -37,7 +37,9 @@ var _QC_DEFAULT_PRICING = {
         slidingBase: 800, slidingDoor: 350, slidingGlass: 200, slidingMirror: 350,
         slidingGold: 80, slidingBlack: 50, slidingHeightSurcharge: 0.15,
         customSizeMel: 1200, customSizeSandwich: 1500, customSizeMdf: 1400,
-        c9RecessedSurcharge: 150, c9LegsSurcharge: 250
+        c9RecessedSurcharge: 150, c9LegsSurcharge: 250,
+        topPanelPerCm: 8,
+        closuresCustomer: 750, closuresInstall: 300
     }
 };
 
