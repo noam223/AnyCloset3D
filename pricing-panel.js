@@ -57,7 +57,7 @@ function _buildHtml() {
     return [
         _previewHtml(),
         _modeBtnsHtml(),
-        _cabinetTypesSectionHtml(),
+        _opts.showCabinetTypes !== false ? _cabinetTypesSectionHtml() : '',
         _rangesSectionHtml(),
         _sqmSectionHtml(),
         _lmSectionHtml(),
@@ -363,7 +363,6 @@ function _slidingHtml() {
             _field('slidingGold', 'תוספת פרופיל זהב (₪/דלת)', 'min="0" step="10"') +
             _field('slidingBlack', 'תוספת פרופיל שחור (₪/דלת)', 'min="0" step="10"') +
             _field('slidingHeightSurcharge', 'תוספת גובה הזזה (%)', 'min="0" max="100" step="1"') +
-            _field('nickelLegPrice', 'רגל ניקל (₪)', 'min="0" step="10"') +
         '</div>' +
     '</div>';
 }
@@ -382,12 +381,13 @@ function _customAndClosuresHtml() {
             _field('customSizeMdf', 'MDF (₪/מ"ק)', 'min="0" step="50"') +
         '</div>' +
         '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin:18px 0 8px;">' +
-            '<i class="fa-solid fa-shoe-prints"></i> צוקל רגיל — סגנונות</div>' +
+            '<i class="fa-solid fa-shoe-prints"></i> סגנון צוקל / רגליים</div>' +
         '<p style="font-size:.78rem;color:var(--muted);margin:0 0 14px;line-height:1.45;">' +
-            'תוספת עלות לפני מכפיל רווח. צוקל רגיל ללא תוספת; נסתר / רגליים לפי השדות.</p>' +
+            'תוספת עלות קבועה (₪) לפי סגנון הצוקל שנבחר בפרויקט — לפני מכפיל רווח. צוקל רגיל ללא תוספת.</p>' +
         '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">' +
             _field('c9RecessedSurcharge', 'צוקל נסתר (תוספת ₪)', 'min="0" step="10"') +
             _field('c9LegsSurcharge', 'על רגליים (תוספת ₪)', 'min="0" step="10"') +
+            _field('nickelLegPrice', 'רגל ניקל — ארון על רגליים (₪/רגל)', 'min="0" step="10"') +
         '</div>' +
         '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin:18px 0 14px;">' +
             '<i class="fa-solid fa-border-top-left"></i> משטח עליון וסגירות</div>' +

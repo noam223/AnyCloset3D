@@ -3236,9 +3236,13 @@ function _ensurePricingPanelMounted() {
     if (_ppPanelMounted) return;
     _ppPanelMounted = true;
     var isAgent = _plan && _plan.companyRole === 'agent';
+    var isCarpenter = (_plan && _plan.userType === 'carpenter') ||
+        (typeof window._isCarpenterPricingUser === 'function' && window._isCarpenterPricingUser());
     PricingPanel.mount('pricing-panel-mount', {
         showSaveBar: !isAgent,
         saveLabel: 'שמור הגדרות תמחור',
+        // Carpenters price via materials + flat extras (plinth/legs/hinges) — no type list / % multipliers
+        showCabinetTypes: !isCarpenter,
         onSave: savePricingSettings,
         onReset: resetPricingToDefaults
     });

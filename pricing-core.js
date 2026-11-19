@@ -254,6 +254,7 @@ function basePrice(cfg, ww, wh, wd, melamine, engine, typeId, opts) {
         if (wh >= 241) bp *= (1 + hS);
         if (wd > 54) bp *= (1 + dS);
         if (engine === 'c9') bp += c9PlinthSurcharge(cfg, opts.plinthStyle);
+        if (engine === 'regalim') bp += regalimLegsCost(cfg, ww);
         return bp;
     }
     if (mode === 'sqm') {
@@ -271,6 +272,9 @@ function basePrice(cfg, ww, wh, wd, melamine, engine, typeId, opts) {
         bp = materialsFaceCost(cfg, ww, wh, opts.matKey || opts.materialKey || null);
     }
     if (wd > 54) bp *= (1 + dS);
+    // Flat extras for plinth / legs — same behavior as ranges (not % type multipliers)
+    if (engine === 'c9') bp += c9PlinthSurcharge(cfg, opts.plinthStyle);
+    if (engine === 'regalim') bp += regalimLegsCost(cfg, ww);
     var type = resolveType(cfg, engine, typeId);
     var factor = type ? num(type.priceFactor, 0) : 0;
     return bp * (1 + factor);
@@ -314,11 +318,15 @@ function slidingCost(cfg, w, h) {
     return base;
 }
 
-function regalimLegs(cfg, w) {
-    if ((cfg.pricingMode || 'ranges') !== 'ranges') return 0;
+/** Nickel-leg cost for standalone regalim (count by width). Always applied — not gated by pricing mode. */
+function regalimLegsCost(cfg, w) {
     var ex = cfg.extras || DEFAULTS.extras;
     var count = w <= 110 ? 4 : w <= 180 ? 6 : 8;
     return count * num(ex.nickelLegPrice, 100);
+}
+/** @deprecated use regalimLegsCost — kept for callers; legs are included in basePrice now. */
+function regalimLegs(cfg, w) {
+    return 0;
 }
 
 /** Bare cabinet of the given type and size: body (+ nickel legs), price to customer and installation. */
@@ -330,9 +338,8 @@ function preview(cfg, opts) {
     if (engine === 'sliding') {
         body = slidingCost(cfg, opts.w, opts.h);
     } else {
+        // Legs / plinth surcharges are inside basePrice (flat extras)
         body = basePrice(cfg, opts.w, opts.h, opts.d, opts.melamine, engine === 'ab2_nohoney' ? 'c9' : engine, type.id, bpOpts);
-        // Standalone regalim still charges per-leg nickel; C9+legs uses flat c9LegsSurcharge inside basePrice
-        if (engine === 'regalim') legs = regalimLegs(cfg, opts.w);
     }
     var cost = body + legs;
     var profit = cfg.profitMultiplier != null ? num(cfg.profitMultiplier, 1.8) : 1.8;
@@ -547,6 +554,7 @@ global.PricingCore = {
     installPrice: installPrice,
     slidingCost: slidingCost,
     regalimLegs: regalimLegs,
+    regalimLegsCost: regalimLegsCost,
     preview: preview
 };
 

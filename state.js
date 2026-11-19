@@ -5807,19 +5807,34 @@ function _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel, wTypeId
         return (ww / 100) * (wh / 100) * (wd / 100) * rate;
     }
 
+    const _addPlinthExtras = function(bp) {
+        if (wEffectiveModel === 'c9') {
+            const ps = opts.plinthStyle || 'regular';
+            if (ps === 'recessed') bp += _priceNum(ex.c9RecessedSurcharge, 150);
+            else if (ps === 'legs') bp += _priceNum(ex.c9LegsSurcharge, 250);
+        } else if (wEffectiveModel === 'regalim') {
+            const legCount = ww <= 110 ? 4 : ww <= 180 ? 6 : 8;
+            bp += legCount * _priceNum(ex.nickelLegPrice, 100);
+        }
+        return bp;
+    };
+
     if (mode === 'sqm') {
         const p = wMelamine ? _priceNum(cfg.sqmPrice, 800) : _priceNum(cfg.sqmPriceNonMel, _priceNum(cfg.sqmPrice, 800) * 1.3);
-        let bp = p*(ww/100)*(wh/100); if(wd>54) bp*=(1+dS); return bp;
+        let bp = p*(ww/100)*(wh/100); if(wd>54) bp*=(1+dS);
+        return _addPlinthExtras(bp);
     }
     if (mode === 'lm') {
         const p = wMelamine ? _priceNum(cfg.lmPrice, 1200) : _priceNum(cfg.lmPriceNonMel, _priceNum(cfg.lmPrice, 1200) * 1.3);
-        let bp = p*(ww/100); if(wh>=241) bp*=(1+hS); if(wd>54) bp*=(1+dS); return bp;
+        let bp = p*(ww/100); if(wh>=241) bp*=(1+hS); if(wd>54) bp*=(1+dS);
+        return _addPlinthExtras(bp);
     }
     if (mode === 'lm_height') {
         const base  = wMelamine ? _priceNum(cfg.lmHeightBase, 1200) : _priceNum(cfg.lmHeightBaseNonMel, _priceNum(cfg.lmHeightBase, 1200) * 1.3);
         const steps = Math.max(0, Math.floor((wh-_priceNum(cfg.lmHeightThresholdCm, 240))/_priceNum(cfg.lmHeightStepCm, 30)));
         let bp = base*(ww/100)*(1+steps*_priceNum(cfg.lmHeightStepPct, 0.10));
-        if(wd>54) bp*=(1+dS); return bp;
+        if(wd>54) bp*=(1+dS);
+        return _addPlinthExtras(bp);
     }
     if (mode === 'materials') {
         let bp;
@@ -5844,7 +5859,7 @@ function _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel, wTypeId
             }
         }
         if (wd > 54) bp *= (1 + dS);
-        return bp;
+        return _addPlinthExtras(bp);
     }
     // ranges
     const cfgR = cfg.ranges || DEFAULT_PRICING_CONFIG.ranges;
@@ -5948,11 +5963,7 @@ function _calcWingCost(cfg, wing) {
         matKey: wing.materialBody || null
     });
         if (SANDWICH_COLORS.has(wing.materialBody)) basePrice *= (1 + sandwichPct);
-        // Standalone regalim: per-leg nickel. C9+legs uses flat c9LegsSurcharge in base price.
-        if (wEffectiveModel === 'regalim' && (cfg.pricingMode||'ranges') === 'ranges') {
-            const legCount = ww<=110 ? 4 : ww<=180 ? 6 : 8;
-            basePrice += legCount * (ex.nickelLegPrice!=null ? ex.nickelLegPrice : 100);
-        }
+        // Standalone regalim / C9 plinth extras are already inside _calcWingBasePrice for all modes.
 
         let finalCost = basePrice;
 
