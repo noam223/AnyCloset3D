@@ -13131,10 +13131,13 @@ window._clampSpaceOffsetAgainstOthers = function(x, y, movingSlot, opts) {
     const mCx0 = dM.cx || 0;
     const mCz0 = dM.cz || 0;
     const fp0 = window._spaceCabinetFootprint(0);
-    // Back face may go at most as far back as the anchor cabinet's back (the wall line)
-    const minZ = Math.min(0, ((dM.cz || 0) - dM.d / 2) - ((fp0.cz || 0) - fp0.d / 2));
-    // Keep moving AABB behind/at the wall relative to its own centre offset
-    z = Math.max(minZ - mCz0, z);
+    // Wall line = slot-0 back face. Moving cabinet's back must not go past it.
+    // World back = z + (cz - d/2); require worldBack >= hostBack.
+    // Shallower companion (e.g. d=50 next to host d=70) needs z = (dM - d0)/2 = -10 to align backs.
+    const hostBack = (fp0.cz || 0) - fp0.d / 2;
+    const moverBackLocal = mCz0 - dM.d / 2;
+    const minCenterZ = hostBack - moverBackLocal;
+    z = Math.max(minCenterZ, z);
 
     function overlapZAt(zz, oOffZ, dO) {
         const a0 = (oOffZ + (dO.cz || 0)) - dO.d / 2;
@@ -13174,7 +13177,7 @@ window._clampSpaceOffsetAgainstOthers = function(x, y, movingSlot, opts) {
                 const nextCz = (mCz < oCz || (mCz === oCz && (prevZ + mCz0) < oCz))
                     ? oCz - halfD : oCz + halfD;
                 z = nextCz - mCz0;
-                if (z < minZ - mCz0) z = (oCz + halfD) - mCz0;
+                if (z < minCenterZ) z = (oCz + halfD) - mCz0;
             } else if (pushX) {
                 let sign = dx < 0 ? -1 : (dx > 0 ? 1 : 0);
                 if (!sign && opts.prevX != null) {
