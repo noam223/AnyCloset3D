@@ -2408,7 +2408,8 @@ var _PP_DEFAULTS = {
         sorbet:170,touchHandle:30,
         customSizeMel:1200,customSizeSandwich:1500,customSizeMdf:1400,
         c9RecessedSurcharge:150,c9LegsSurcharge:250,
-        topPanelPerCm:8,closuresCustomer:750,closuresInstall:300}
+        topPanelPerCm:8,closuresCustomer:750,closuresInstall:300},
+    customExtras: []
 };
 
 /** Empty personal list for carpenters (all cost fields 0) — they enter their own prices. */
@@ -3563,6 +3564,7 @@ async function savePricingSettings() {
         _pricingCfg = cfg;
         window._pricingConfig = cfg;
         if (typeof window.applyCabinetTypeSelects === 'function') window.applyCabinetTypeSelects(cfg);
+        if (typeof window._qcRenderCustomExtras === 'function') window._qcRenderCustomExtras(true);
         PricingPanel.showSavedNote(3000);
         showToast('הגדרות התמחור נשמרו ✓', 'success');
     } catch(e) {

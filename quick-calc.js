@@ -40,7 +40,8 @@ var _QC_DEFAULT_PRICING = {
         c9RecessedSurcharge: 150, c9LegsSurcharge: 250,
         topPanelPerCm: 8,
         closuresCustomer: 750, closuresInstall: 300
-    }
+    },
+    customExtras: []
 };
 
 function _qcNum(v, fb) {
@@ -347,6 +348,67 @@ function _qcWingCost(cfg, w, h, d, model, isMelamine, shelves, intDrawers, extDr
 }
 
 
+function _qcListCustomExtras(cfg) {
+    var list = (cfg && Array.isArray(cfg.customExtras)) ? cfg.customExtras : [];
+    if (global.PricingCore && typeof global.PricingCore.normalizeCustomExtras === 'function') {
+        return global.PricingCore.normalizeCustomExtras(list);
+    }
+    return list.filter(function(x) { return x && x.id && String(x.name || '').trim(); })
+        .map(function(x) {
+            return { id: String(x.id), name: String(x.name).trim(), price: _qcNum(x.price, 0) };
+        });
+}
+
+function _qcEscAttr(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+/** Render user-defined extras from pricing settings into the quick-calc form. */
+function _qcRenderCustomExtras(preserveQtys) {
+    var host = document.getElementById('qc-custom-extras');
+    if (!host) return;
+    var prev = {};
+    if (preserveQtys !== false) {
+        host.querySelectorAll('input[data-custom-extra-id]').forEach(function(inp) {
+            prev[inp.getAttribute('data-custom-extra-id')] = parseInt(inp.value) || 0;
+        });
+    }
+    var list = _qcListCustomExtras(_qcCfg());
+    if (!list.length) {
+        host.innerHTML = '';
+        host.style.display = 'none';
+        return;
+    }
+    host.style.display = '';
+    host.innerHTML = list.map(function(item) {
+        var id = 'qc-cx-' + item.id;
+        var qty = prev[item.id] != null ? prev[item.id] : 0;
+        return '<div class="qc-extra">' +
+            '<i class="fa-solid fa-tag qc-extra-ic"></i>' +
+            '<label class="qc-extra-name" for="' + _qcEscAttr(id) + '">' + _qcEscAttr(item.name) +
+                '<small>₪' + Math.round(_qcNum(item.price, 0)).toLocaleString('he-IL') + ' / יח׳</small></label>' +
+            '<div class="qc-stepper">' +
+                '<button type="button" onclick="qcStep(\'' + id.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\',-1)" aria-label="פחות">&minus;</button>' +
+                '<input type="number" id="' + _qcEscAttr(id) + '" data-custom-extra-id="' + _qcEscAttr(item.id) + '" ' +
+                    'value="' + qty + '" min="0" oninput="calcQuickPrice()">' +
+                '<button type="button" onclick="qcStep(\'' + id.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\',1)" aria-label="יותר">+</button>' +
+            '</div></div>';
+    }).join('');
+}
+
+function _qcReadCustomExtraItems(cfg) {
+    var out = [];
+    _qcListCustomExtras(cfg).forEach(function(item) {
+        var el = document.getElementById('qc-cx-' + item.id);
+        var qty = el ? (parseInt(el.value) || 0) : 0;
+        if (qty > 0) {
+            out.push({ id: item.id, name: item.name, price: _qcNum(item.price, 0), qty: qty });
+        }
+    });
+    return out;
+}
+
 /** Mark extra rows that have a non-zero value (or a checked toggle). */
 function _qcSyncExtraRows() {
     document.querySelectorAll('#quick-calc-modal .qc-extra').forEach(function(row) {
@@ -410,6 +472,10 @@ window.calcQuickPrice = function(autoUpdateShelves = false) {
     finalCost += ledPairs * _qcNum(ex.ledPair, 650);
     finalCost += sorbets * _qcNum(ex.sorbet, 170);
     finalCost += touchHandles * _qcNum(ex.touchHandle, 30);
+    const customItems = _qcReadCustomExtraItems(cfg);
+    customItems.forEach(function(ci) {
+        finalCost += (ci.qty || 0) * _qcNum(ci.price, 0);
+    });
     _qcSyncExtraRows();
 
     const installPrice = _qcInstall(cfg, w, h);
@@ -427,7 +493,8 @@ window.calcQuickPrice = function(autoUpdateShelves = false) {
             intDrawers: intDrawers, extDrawers: extDrawers, openCells: openCells,
             partitions: partitions, glassWoodDoors: glassWoodDoors,
             alumDoors: alumDoors, ledPairs: ledPairs, sorbets: sorbets,
-            touchHandles: touchHandles, hasDesk: !!hasDesk
+            touchHandles: touchHandles, hasDesk: !!hasDesk,
+            customItems: customItems
         }
     };
 
@@ -474,6 +541,13 @@ function _qcExtrasSummary(ex) {
     if (ex.sorbets) parts.push(ex.sorbets + ' סורבטו');
     if (ex.touchHandles) parts.push(ex.touchHandles + " ידיות טאצ'");
     if (ex.hasDesk) parts.push('שולחן עבודה');
+    if (Array.isArray(ex.customItems)) {
+        ex.customItems.forEach(function(ci) {
+            if (!ci || !(ci.qty > 0)) return;
+            var label = (ci.name && String(ci.name).trim()) || 'תוספת';
+            parts.push(ci.qty + '× ' + label);
+        });
+    }
     return parts.join(', ');
 }
 
@@ -527,6 +601,13 @@ window.qcLoadFormFromItem = function(item) {
     _qcSetVal('qc-touch', ex.touchHandles || 0);
     _qcSetVal('qc-desk', !!ex.hasDesk);
     _qcSetVal('qc-cab-name', item.name || '');
+    _qcRenderCustomExtras(false);
+    if (Array.isArray(ex.customItems)) {
+        ex.customItems.forEach(function(ci) {
+            if (!ci || !ci.id) return;
+            _qcSetVal('qc-cx-' + ci.id, ci.qty || 0);
+        });
+    }
 };
 
 window._qcSetEditUi = function() {
@@ -1027,6 +1108,7 @@ window.openQuickCalcModal = async function() {
     if (typeof global.applyCabinetTypeSelects === 'function') {
         global.applyCabinetTypeSelects(global._pricingConfig || global.DEFAULT_PRICING_CONFIG || _QC_DEFAULT_PRICING);
     }
+    _qcRenderCustomExtras(true);
     modal.style.display = 'flex';
     _qcBindBackdropClose();
     if (typeof calcQuickPrice === 'function') calcQuickPrice(true);
@@ -1066,8 +1148,11 @@ document.addEventListener('DOMContentLoaded', function() {
     if (typeof global.applyCabinetTypeSelects === 'function') {
         global.applyCabinetTypeSelects(global._pricingConfig || global.DEFAULT_PRICING_CONFIG || _QC_DEFAULT_PRICING);
     }
+    _qcRenderCustomExtras(true);
     if (typeof window._qcSetEditUi === 'function') window._qcSetEditUi();
     if (typeof window._renderQcHistory === 'function') window._renderQcHistory();
 });
+
+global._qcRenderCustomExtras = _qcRenderCustomExtras;
 
 })(typeof window !== "undefined" ? window : globalThis);

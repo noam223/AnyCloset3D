@@ -47,7 +47,8 @@ var DEFAULTS = {
         c9RecessedSurcharge: 150, c9LegsSurcharge: 250,
         topPanelPerCm: 8,
         closuresCustomer: 750, closuresInstall: 300
-    }
+    },
+    customExtras: []
 };
 
 var ENGINES = [
@@ -121,6 +122,7 @@ function normalizeConfig(cfg) {
     if (!cfg || typeof cfg !== 'object') return cfg;
     cfg.cabinetTypes = normalizeTypes(cfg);
     if (cfg.ranges) cfg.ranges = mergeOtherRanges(cfg.ranges);
+    cfg.customExtras = normalizeCustomExtras(cfg.customExtras);
     return cfg;
 }
 
@@ -329,6 +331,22 @@ function preview(cfg, opts) {
     };
 }
 
+/** Normalize user-defined extras: [{id, name, price}]. */
+function normalizeCustomExtras(list) {
+    if (!Array.isArray(list)) return [];
+    var seen = {}, out = [];
+    list.forEach(function(item, i) {
+        if (!item || typeof item !== 'object') return;
+        var name = String(item.name || '').trim();
+        if (!name) return;
+        var id = String(item.id || ('cx_' + i + '_' + Date.now())).trim();
+        if (!id || seen[id]) id = 'cx_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+        seen[id] = true;
+        out.push({ id: id, name: name, price: num(item.price, 0) });
+    });
+    return out;
+}
+
 /** Blank personal price list for carpenters who have not saved their own yet. */
 function emptyConfig() {
     var e = clone(DEFAULTS);
@@ -340,6 +358,7 @@ function emptyConfig() {
     e.installPricePerUnit = 0;
     e.heightSurcharge = 0; e.depthSurcharge = 0; e.sandwichSurcharge = 0;
     e.installHeightSurcharge = 0;
+    e.customExtras = [];
     Object.keys(e.ranges || {}).forEach(function(engine) {
         ['melamine', 'nonMelamine'].forEach(function(mat) {
             var map = (e.ranges[engine] && e.ranges[engine][mat]) || {};
@@ -362,6 +381,7 @@ global.PricingCore = {
     num: num,
     clone: clone,
     normalizeTypes: normalizeTypes,
+    normalizeCustomExtras: normalizeCustomExtras,
     normalizeConfig: normalizeConfig,
     findType: findType,
     resolveType: resolveType,

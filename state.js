@@ -5605,7 +5605,8 @@ var DEFAULT_PRICING_CONFIG = {
         c9RecessedSurcharge: 150, c9LegsSurcharge: 250,
         topPanelPerCm: 8,
         closuresCustomer: 750, closuresInstall: 300
-    }
+    },
+    customExtras: []
 };
 window.DEFAULT_PRICING_CONFIG = DEFAULT_PRICING_CONFIG;
 
@@ -5629,6 +5630,7 @@ function _buildEmptyPricingConfig() {
         });
     });
     Object.keys(e.extras || {}).forEach(function(k) { e.extras[k] = 0; });
+    e.customExtras = [];
     return e;
 }
 window.EMPTY_PRICING_CONFIG = _buildEmptyPricingConfig();

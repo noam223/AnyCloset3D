@@ -36,6 +36,7 @@ function _esc(s) {
 
 // ── state ────────────────────────────────────────────────────────────────────
 var _cabinetTypes = [];
+var _customExtras = [];
 var _currentMode  = 'ranges';
 var _opts         = {};
 
@@ -67,6 +68,7 @@ function _buildHtml() {
         _upperCornerHtml(),
         _slidingHtml(),
         _customAndClosuresHtml(),
+        _customExtrasHtml(),
         s !== false ? _saveBarHtml() : ''
     ].join('');
 }
@@ -388,6 +390,24 @@ function _customAndClosuresHtml() {
     '</div>';
 }
 
+/** User-defined extras: product name + unit cost */
+function _customExtrasHtml() {
+    return '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius,12px);' +
+        'padding:20px 24px;margin-bottom:12px;">' +
+        '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin-bottom:8px;">' +
+            '<i class="fa-solid fa-tags"></i> תוספות אישיות</div>' +
+        '<p style="font-size:.78rem;color:var(--muted);margin:0 0 14px;line-height:1.45;">' +
+            'הוסיפו מוצרים משלכם (שם + מחיר עלות ליחידה). הם יופיעו במחשבון הצעות המחיר ויוכפלו במכפיל הרווח.</p>' +
+        '<div id="' + _id('custom-extras-list') + '"></div>' +
+        '<button type="button" onclick="PricingPanel.addCustomExtra()" ' +
+            'style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;margin-top:10px;' +
+            'background:rgba(37,99,235,.08);border:1.5px solid rgba(37,99,235,.25);' +
+            'color:#2563eb;border-radius:10px;font-size:.82rem;font-weight:600;cursor:pointer;' +
+            'font-family:inherit;">' +
+            '<i class="fa-solid fa-plus"></i> הוסף תוספת</button>' +
+    '</div>';
+}
+
 function _saveBarHtml() {
     return '<div id="' + _id('save-bar') + '" ' +
         'style="padding:16px 0;display:flex;align-items:center;gap:12px;">' +
@@ -519,6 +539,72 @@ function _deleteType(btn) {
     _cabinetTypes = _cabinetTypes.filter(function(t) { return t.id !== id; });
     _renderCabinetTypes();
     _rebuildRangesTableForTypes();
+}
+
+// ── custom extras (name + unit cost) ─────────────────────────────────────────
+function _renderCustomExtras() {
+    var list = _el('custom-extras-list');
+    if (!list) return;
+    if (!_customExtras.length) {
+        list.innerHTML = '<div style="font-size:.8rem;color:var(--muted);padding:6px 0 4px;">' +
+            'עדיין אין תוספות אישיות — לחצו על "הוסף תוספת".</div>';
+        return;
+    }
+    list.innerHTML = _customExtras.map(function(item) {
+        return '<div class="pnl-cx-row" data-id="' + _esc(item.id) + '" ' +
+            'style="display:grid;grid-template-columns:1fr 120px auto;gap:10px;align-items:center;' +
+            'padding:8px 0;border-bottom:1px solid var(--border);">' +
+            '<input type="text" class="pnl-cx-name" value="' + _esc(item.name || '') + '" ' +
+                'placeholder="שם המוצר / התוספת" maxlength="80" ' +
+                'style="height:36px;border:1.5px solid var(--border);border-radius:8px;padding:0 12px;' +
+                'font-family:inherit;font-size:.85rem;direction:rtl;text-align:right;">' +
+            '<input type="number" class="pnl-cx-price" value="' + _num(item.price, 0) + '" ' +
+                'min="0" step="10" title="מחיר עלות ליחידה (₪)" ' +
+                'style="height:36px;border:1.5px solid var(--border);border-radius:8px;padding:0 10px;' +
+                'font-family:inherit;font-size:.85rem;direction:ltr;text-align:right;">' +
+            '<button type="button" onclick="PricingPanel._deleteCustomExtra(this)" title="מחק" ' +
+                'style="width:34px;height:34px;border-radius:8px;border:none;background:#fee2e2;' +
+                'color:#ef4444;cursor:pointer;font-size:.9rem;display:flex;align-items:center;' +
+                'justify-content:center;">✕</button>' +
+        '</div>';
+    }).join('');
+}
+
+function addCustomExtra() {
+    _syncCustomExtrasFromDom();
+    _customExtras.push({ id: 'cx_' + Date.now(), name: '', price: 0 });
+    _renderCustomExtras();
+    var list = _el('custom-extras-list');
+    if (list) {
+        var inputs = list.querySelectorAll('.pnl-cx-name');
+        if (inputs.length) inputs[inputs.length - 1].focus();
+    }
+}
+
+function _deleteCustomExtra(btn) {
+    var row = btn && btn.closest ? btn.closest('.pnl-cx-row') : null;
+    if (!row) return;
+    var id = row.getAttribute('data-id');
+    _syncCustomExtrasFromDom();
+    _customExtras = _customExtras.filter(function(x) { return x.id !== id; });
+    _renderCustomExtras();
+}
+
+function _syncCustomExtrasFromDom() {
+    var list = _el('custom-extras-list');
+    if (!list) return;
+    var next = [];
+    list.querySelectorAll('.pnl-cx-row').forEach(function(row) {
+        var id = row.getAttribute('data-id') || ('cx_' + Date.now());
+        var nameEl = row.querySelector('.pnl-cx-name');
+        var priceEl = row.querySelector('.pnl-cx-price');
+        next.push({
+            id: id,
+            name: nameEl ? String(nameEl.value || '').trim() : '',
+            price: _num(priceEl ? priceEl.value : 0, 0)
+        });
+    });
+    _customExtras = next;
 }
 
 function _syncTypesFromDom() {
@@ -681,6 +767,19 @@ function fill(cfg) {
         { id: 'sliding', label: 'ארון הזזה', engine: 'sliding', priceFactor: 0 }
     ];
     _renderCabinetTypes();
+    if (PC && typeof PC.normalizeCustomExtras === 'function') {
+        _customExtras = PC.normalizeCustomExtras(c.customExtras);
+    } else {
+        _customExtras = Array.isArray(c.customExtras) ? c.customExtras.map(function(x, i) {
+            return {
+                id: String((x && x.id) || ('cx_' + i)),
+                name: String((x && x.name) || '').trim(),
+                price: _num(x && x.price, 0)
+            };
+        }).filter(function(x) { return x.name; }) : [];
+    }
+    // Keep blank draft rows when editing? fill only keeps named items; empty drafts via Add.
+    _renderCustomExtras();
     _buildRangesTable(c.ranges || (D.ranges || {}));
     setMode(mode);
 
@@ -761,6 +860,7 @@ function fill(cfg) {
 // ── read ─────────────────────────────────────────────────────────────────────
 function read() {
     _syncTypesFromDom();
+    _syncCustomExtrasFromDom();
     var ex = {};
     ['internalDrawer','externalDrawer','shoeDrawer','openCell','openCell34','openCell5','partition','shelfFreePerMeter',
      'extraShelfMel','extraShelfNonMel','deskUnit',
@@ -777,6 +877,18 @@ function read() {
         ex[k] = _num(_v(k), 0);
     });
     ['slidingHeightSurcharge'].forEach(function(k) { ex[k] = (_frac(_v(k)) || 0); });
+    var customExtras = _customExtras
+        .map(function(x) {
+            return {
+                id: String(x.id || ('cx_' + Date.now())),
+                name: String(x.name || '').trim(),
+                price: _num(x.price, 0)
+            };
+        })
+        .filter(function(x) { return !!x.name; });
+    if (PC && typeof PC.normalizeCustomExtras === 'function') {
+        customExtras = PC.normalizeCustomExtras(customExtras);
+    }
     return {
         pricingMode:              _currentMode,
         sqmPrice:                 _num(_v('sqmPrice'), 800),
@@ -804,7 +916,8 @@ function read() {
             return out;
         }),
         ranges:                   _readRangesTable(),
-        extras:                   ex
+        extras:                   ex,
+        customExtras:             customExtras
     };
 }
 
@@ -891,13 +1004,15 @@ global.PricingPanel = {
     setMode:        setMode,
     updatePreview:  updatePreview,
     addCabinetType: addCabinetType,
+    addCustomExtra: addCustomExtra,
     addRangeRow:    addRangeRow,
     showSavedNote:  showSavedNote,
     // internal (called from inline onclick):
-    _toggleMaterial: _toggleMaterial,
-    _deleteType:     _deleteType,
-    _onSave:         _onSave,
-    _onReset:        _onReset
+    _toggleMaterial:   _toggleMaterial,
+    _deleteType:       _deleteType,
+    _deleteCustomExtra:_deleteCustomExtra,
+    _onSave:           _onSave,
+    _onReset:          _onReset
 };
 
 })(typeof window !== 'undefined' ? window : globalThis);
