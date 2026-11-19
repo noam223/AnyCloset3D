@@ -349,8 +349,39 @@ function normalizeCustomExtras(list) {
     return out;
 }
 
-var DEFAULT_SHEET_W = 2800;
-var DEFAULT_SHEET_H = 2070;
+/** Standard Israeli board (Tambour/MDF paint, Bluran, Formex, generic melamine). */
+var DEFAULT_SHEET_W = 2750;
+var DEFAULT_SHEET_H = 1220;
+/** EGGER decor boards — larger European sheet. */
+var EGGER_SHEET_W = 2800;
+var EGGER_SHEET_H = 2070;
+
+var EGGER_BUILTIN_KEYS = {
+    u727: 1, w1200: 1, u232: 1, u604: 1, u638: 1,
+    H1367: 1, H1307: 1, H1227: 1
+};
+
+function isEggerMatKey(matKey) {
+    if (!matKey) return false;
+    var k = String(matKey);
+    if (k.indexOf('eg_') === 0) return true;
+    if (EGGER_BUILTIN_KEYS[k]) return true;
+    if (global.EGGER_ALL_COLORS && Array.isArray(global.EGGER_ALL_COLORS)) {
+        return global.EGGER_ALL_COLORS.some(function(c) { return c && c.key === k; });
+    }
+    return false;
+}
+
+/** Sheet size (mm) for a material key — EGGER 2800×2070, everything else 2750×1220. */
+function sheetSizeForMat(matKey) {
+    if (isEggerMatKey(matKey)) return { w: EGGER_SHEET_W, h: EGGER_SHEET_H, brand: 'egger' };
+    var brand = '';
+    var k = String(matKey || '');
+    if (k.indexOf('tambour_') === 0) brand = 'tambour';
+    else if (k.indexOf('bluran_') === 0) brand = 'bluran';
+    else if (k.indexOf('formex_') === 0) brand = 'formex';
+    return { w: DEFAULT_SHEET_W, h: DEFAULT_SHEET_H, brand: brand || 'standard' };
+}
 
 /** Normalize carpenter stock colors: [{key,label,brand,sheetPrice,sheetW,sheetH,hex,img}]. */
 function normalizeStockMaterials(list) {
@@ -366,9 +397,15 @@ function normalizeStockMaterials(list) {
             label: String(item.label || key).trim() || key,
             brand: String(item.brand || '').trim(),
             sheetPrice: num(item.sheetPrice, 0),
-            sheetW: num(item.sheetW, DEFAULT_SHEET_W) || DEFAULT_SHEET_W,
-            sheetH: num(item.sheetH, DEFAULT_SHEET_H) || DEFAULT_SHEET_H
+            sheetW: num(item.sheetW, 0),
+            sheetH: num(item.sheetH, 0)
         };
+        if (!row.sheetW || !row.sheetH) {
+            var sz = sheetSizeForMat(key);
+            if (!row.sheetW) row.sheetW = sz.w;
+            if (!row.sheetH) row.sheetH = sz.h;
+            if (!row.brand && sz.brand) row.brand = sz.brand;
+        }
         if (item.hex) row.hex = String(item.hex);
         if (item.img) row.img = String(item.img);
         out.push(row);
@@ -394,8 +431,9 @@ function materialsFaceCost(cfg, ww, wh, matKey) {
     if (mult <= 0) mult = 1;
     var stock = findStockMaterial(cfg, matKey);
     if (stock && stock.sheetPrice > 0) {
-        var sw = Math.max(100, num(stock.sheetW, DEFAULT_SHEET_W)) / 1000;
-        var sh = Math.max(100, num(stock.sheetH, DEFAULT_SHEET_H)) / 1000;
+        var fallback = sheetSizeForMat(matKey);
+        var sw = Math.max(100, num(stock.sheetW, fallback.w)) / 1000;
+        var sh = Math.max(100, num(stock.sheetH, fallback.h)) / 1000;
         var sheetArea = Math.max(0.01, sw * sh);
         return sqm * (stock.sheetPrice / sheetArea) * mult;
     }
@@ -446,6 +484,10 @@ global.PricingCore = {
     materialsFaceCost: materialsFaceCost,
     DEFAULT_SHEET_W: DEFAULT_SHEET_W,
     DEFAULT_SHEET_H: DEFAULT_SHEET_H,
+    EGGER_SHEET_W: EGGER_SHEET_W,
+    EGGER_SHEET_H: EGGER_SHEET_H,
+    isEggerMatKey: isEggerMatKey,
+    sheetSizeForMat: sheetSizeForMat,
     normalizeConfig: normalizeConfig,
     findType: findType,
     resolveType: resolveType,

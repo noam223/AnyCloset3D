@@ -4,12 +4,21 @@
 (function (global) {
 'use strict';
 
-var DEFAULT_SHEET_W = 2800;
-var DEFAULT_SHEET_H = 2070;
+var DEFAULT_SHEET_W = 2750;
+var DEFAULT_SHEET_H = 1220;
 var _lastMatKey = null;
 var _lastMeta = null;
 
 function _pc() { return global.PricingCore || null; }
+
+function _sizeFor(key) {
+    if (_pc() && typeof _pc().sheetSizeForMat === 'function') return _pc().sheetSizeForMat(key);
+    if (key && (String(key).indexOf('eg_') === 0 ||
+        /^(u727|w1200|u232|u604|u638|H1367|H1307|H1227)$/.test(String(key)))) {
+        return { w: 2800, h: 2070, brand: 'egger' };
+    }
+    return { w: DEFAULT_SHEET_W, h: DEFAULT_SHEET_H, brand: 'standard' };
+}
 
 function normalize(list) {
     if (_pc() && typeof _pc().normalizeStockMaterials === 'function') {
@@ -27,11 +36,17 @@ function normalize(list) {
             label: String(item.label || key).trim() || key,
             brand: String(item.brand || '').trim(),
             sheetPrice: Number(item.sheetPrice) || 0,
-            sheetW: Number(item.sheetW) || DEFAULT_SHEET_W,
-            sheetH: Number(item.sheetH) || DEFAULT_SHEET_H,
+            sheetW: Number(item.sheetW) || 0,
+            sheetH: Number(item.sheetH) || 0,
             hex: item.hex || null,
             img: item.img || null
         });
+        if (!out[out.length - 1].sheetW || !out[out.length - 1].sheetH) {
+            var sz = _sizeFor(key);
+            if (!out[out.length - 1].sheetW) out[out.length - 1].sheetW = sz.w;
+            if (!out[out.length - 1].sheetH) out[out.length - 1].sheetH = sz.h;
+            if (!out[out.length - 1].brand && sz.brand) out[out.length - 1].brand = sz.brand;
+        }
     });
     return out;
 }
@@ -174,8 +189,9 @@ function openModal(matKey) {
     document.getElementById('msp-label').value = stock.label || meta.label || matKey;
     document.getElementById('msp-brand').value = stock.brand || meta.brand || '';
     document.getElementById('msp-price').value = stock.sheetPrice != null ? stock.sheetPrice : '';
-    document.getElementById('msp-w').value = stock.sheetW || DEFAULT_SHEET_W;
-    document.getElementById('msp-h').value = stock.sheetH || DEFAULT_SHEET_H;
+    var sz = _sizeFor(matKey);
+    document.getElementById('msp-w').value = stock.sheetW || sz.w;
+    document.getElementById('msp-h').value = stock.sheetH || sz.h;
     document.getElementById('msp-hex').value = stock.hex || meta.hex || '';
     document.getElementById('msp-img').value = stock.img || meta.img || '';
     var title = document.getElementById('msp-title');
@@ -198,8 +214,8 @@ async function saveFromModal() {
         label: String((document.getElementById('msp-label') || {}).value || key).trim() || key,
         brand: String((document.getElementById('msp-brand') || {}).value || '').trim(),
         sheetPrice: Number((document.getElementById('msp-price') || {}).value) || 0,
-        sheetW: Number((document.getElementById('msp-w') || {}).value) || DEFAULT_SHEET_W,
-        sheetH: Number((document.getElementById('msp-h') || {}).value) || DEFAULT_SHEET_H
+        sheetW: Number((document.getElementById('msp-w') || {}).value) || _sizeFor(key).w,
+        sheetH: Number((document.getElementById('msp-h') || {}).value) || _sizeFor(key).h
     };
     var hex = String((document.getElementById('msp-hex') || {}).value || '').trim();
     var img = String((document.getElementById('msp-img') || {}).value || '').trim();

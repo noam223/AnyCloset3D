@@ -573,8 +573,8 @@ function _deleteType(btn) {
 function _renderStockMaterials() {
     var list = _el('stock-list');
     if (!list) return;
-    var defW = (PC && PC.DEFAULT_SHEET_W) || 2800;
-    var defH = (PC && PC.DEFAULT_SHEET_H) || 2070;
+    var defW = (PC && PC.DEFAULT_SHEET_W) || 2750;
+    var defH = (PC && PC.DEFAULT_SHEET_H) || 1220;
     if (!_stockMaterials.length) {
         list.innerHTML = '<div style="font-size:.8rem;color:var(--muted);padding:6px 0 4px;">' +
             'עדיין אין צבעי מלאי — הוסיפו כאן או מהמעצב.</div>';
@@ -625,15 +625,16 @@ function addStockMaterial() {
         alert('הצבע כבר במלאי');
         return;
     }
-    var defW = (PC && PC.DEFAULT_SHEET_W) || 2800;
-    var defH = (PC && PC.DEFAULT_SHEET_H) || 2070;
+    var sz = (PC && typeof PC.sheetSizeForMat === 'function')
+        ? PC.sheetSizeForMat(key)
+        : { w: (PC && PC.DEFAULT_SHEET_W) || 2750, h: (PC && PC.DEFAULT_SHEET_H) || 1220, brand: '' };
     _stockMaterials.push({
         key: key,
         label: key,
-        brand: '',
+        brand: sz.brand || '',
         sheetPrice: 0,
-        sheetW: defW,
-        sheetH: defH
+        sheetW: sz.w,
+        sheetH: sz.h
     });
     _renderStockMaterials();
 }
@@ -664,8 +665,8 @@ function _syncStockMaterialsFromDom() {
             label: labelEl ? String(labelEl.value || '').trim() || key : key,
             brand: prev.brand || '',
             sheetPrice: _num(priceEl ? priceEl.value : 0, 0),
-            sheetW: _num(wEl ? wEl.value : 2800, 2800),
-            sheetH: _num(hEl ? hEl.value : 2070, 2070)
+            sheetW: _num(wEl ? wEl.value : ((PC && PC.DEFAULT_SHEET_W) || 2750), (PC && PC.DEFAULT_SHEET_W) || 2750),
+            sheetH: _num(hEl ? hEl.value : ((PC && PC.DEFAULT_SHEET_H) || 1220), (PC && PC.DEFAULT_SHEET_H) || 1220)
         };
         if (prev.hex) rowOut.hex = prev.hex;
         if (prev.img) rowOut.img = prev.img;

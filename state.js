@@ -5759,8 +5759,11 @@ function _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel, wTypeId
             const matKey = opts.matKey || opts.materialKey || null;
             const stock = matKey ? stockList.find(function(x) { return x && x.key === matKey; }) : null;
             if (stock && _priceNum(stock.sheetPrice, 0) > 0) {
-                const sw = Math.max(100, _priceNum(stock.sheetW, 2800)) / 1000;
-                const sh = Math.max(100, _priceNum(stock.sheetH, 2070)) / 1000;
+                const fb = (window.PricingCore && typeof window.PricingCore.sheetSizeForMat === 'function')
+                    ? window.PricingCore.sheetSizeForMat(matKey)
+                    : { w: 2750, h: 1220 };
+                const sw = Math.max(100, _priceNum(stock.sheetW, fb.w)) / 1000;
+                const sh = Math.max(100, _priceNum(stock.sheetH, fb.h)) / 1000;
                 bp = sqm * (_priceNum(stock.sheetPrice, 0) / Math.max(0.01, sw * sh)) * mult;
             } else {
                 bp = sqm * _priceNum(cfg.materialsBoardsPerSqm, 1.4) * _priceNum(cfg.materialsBoardPrice, 180) * mult;

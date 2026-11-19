@@ -61,8 +61,9 @@
         runnerInsetFront: 37,
         runnerInsetRear: 37,
         nestSheets: true,       // pack boards onto stock sheets
-        sheetW: 2800,
-        sheetH: 2070,
+        // Defaults for non-EGGER boards (Tambour/MDF/etc). EGGER nests use 2800×2070 per matKey.
+        sheetW: 2750,
+        sheetH: 1220,
         sheetMargin: 15,        // keep cuts inward from sheet edges (edge damage / frame)
         nestGap: 10,
         nestAllowRotate: true,
@@ -82,7 +83,7 @@
     const _tag = function(x) { return _fmt(x).replace('.', 'P').replace('-', 'M'); };
     const _overlap = function(a, b) { return Math.min(a[1], b[1]) - Math.max(a[0], b[0]); };
 
-    const CNC_SETTINGS_VER = 2; // v2: default back = stapled (between), not groove
+    const CNC_SETTINGS_VER = 3; // v3: non-EGGER sheets 2750×1220; EGGER stays 2800×2070 in nesting
     function _loadSettings() {
         const cfg = Object.assign({}, CNC_DEFAULTS);
         try {
@@ -91,11 +92,20 @@
                 Object.keys(CNC_DEFAULTS).forEach(function(k) {
                     if (typeof saved[k] === typeof CNC_DEFAULTS[k] && (typeof saved[k] !== 'number' || isFinite(saved[k]))) cfg[k] = saved[k];
                 });
+                const ver = (saved.settingsVer | 0);
+                let migrated = false;
                 // One-time: switch previous default "groove for mezuzah" to local stapled practice
-                if ((saved.settingsVer | 0) < CNC_SETTINGS_VER) {
+                if (ver < 2) {
                     cfg.backMode = 'between';
-                    _saveSettings(cfg);
+                    migrated = true;
                 }
+                // One-time: previous global sheet was EGGER-sized; non-EGGER default is now 2750×1220
+                if (ver < 3 && cfg.sheetW === 2800 && cfg.sheetH === 2070) {
+                    cfg.sheetW = 2750;
+                    cfg.sheetH = 1220;
+                    migrated = true;
+                }
+                if (migrated || ver < CNC_SETTINGS_VER) _saveSettings(cfg);
             }
         } catch (e) { /* corrupt or blocked storage — defaults */ }
         return cfg;
@@ -1584,7 +1594,7 @@
         L.push('תוכן החבילה', '------------');
         L.push('panels/           קובץ DXF לכל לוח ייחודי. לוח עם עיבוד משני הצדדים מקבל קובץ נוסף בסיומת _B.');
         L.push('all_*.dxf         כל הלוחות של אותו חומר ועובי (כולל כפילויות לפי כמות), פרוסים בשורות — לייבוא אחד ל-CAM. פנים A בלבד.');
-        if (c.nestSheets) L.push('sheets/          קינון על פלטות מלאי (' + c.sheetW + '×' + c.sheetH + ' מ"מ, מרווח קצה ' + (c.sheetMargin != null ? c.sheetMargin : 15) + ' מ"מ) — קובץ DXF לכל פלטה.');
+        if (c.nestSheets) L.push('sheets/          קינון על פלטות מלאי — רגיל ' + c.sheetW + '×' + c.sheetH + ' מ"מ, EGGER 2800×2070, מרווח קצה ' + (c.sheetMargin != null ? c.sheetMargin : 15) + ' מ"מ.');
         if (c.pdfLabels) L.push('labels/          דף מדבקות להדפסה (HTML) — פתחו בדפדפן והדפיסו ל-PDF.');
         L.push('viewer.html       תצוגת סיכום אינטראקטיבית (כמו חלונית הייצוא) — פתחו בדפדפן; לחיצה על חלק מדגישה אותו בהדמיה.');
         L.push('cutlist.csv       רשימת חיתוך (נפתחת באקסל).', '');
@@ -1636,7 +1646,8 @@
         L.push('קנט: ' + (c.edgeBandThickness > 0 ? 'מידות החיתוך קטנות ב-' + c.edgeBandThickness + ' מ"מ בכל קצה מקונט.' : 'מידות החיתוך הן מידות גמר (ללא הפחתת קנט).'));
         if (c.nestSheets) {
             L.push('קינון: חלקים מורחקים ' + (c.sheetMargin != null ? c.sheetMargin : 15) +
-                ' מ"מ מקצה הפלטה (מכות/פגמים במסגרת), ומרווח ' + (c.nestGap != null ? c.nestGap : 10) + ' מ"מ בין חלקים.');
+                ' מ"מ מקצה הפלטה (מכות/פגמים במסגרת), ומרווח ' + (c.nestGap != null ? c.nestGap : 10) +
+                ' מ"מ בין חלקים. מידת פלטה לפי חומר: EGGER 2800×2070, אחרת ' + c.sheetW + '×' + c.sheetH + '.');
         }
         L.push('');
         L.push('סיכום חומרים', '------------');
@@ -1792,8 +1803,8 @@
         { k: 'runnerInsetRear', label: 'מרחק מקצה אחורי (גנרי)', runnerGeneric: true },
         { sec: 'קינון ותוויות' },
         { k: 'nestSheets', label: 'קינון על פלטות מלאי', check: true },
-        { k: 'sheetW', label: 'רוחב פלטה (מ"מ)' },
-        { k: 'sheetH', label: 'גובה פלטה (מ"מ)' },
+        { k: 'sheetW', label: 'רוחב פלטה רגילה (מ"מ) — לא EGGER' },
+        { k: 'sheetH', label: 'גובה פלטה רגילה (מ"מ) — לא EGGER' },
         { k: 'sheetMargin', label: 'מרווח מקצה הפלטה (מ"מ)', step: 1 },
         { k: 'nestGap', label: 'מרווח בין חלקים', step: 1 },
         { k: 'nestAllowRotate', label: 'אפשר סיבוב 90° (אם אין נעילת סיבים)', check: true },

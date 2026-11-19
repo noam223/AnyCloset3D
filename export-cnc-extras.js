@@ -11,24 +11,43 @@
     function _dbg() { return window._exportCncDebug || {}; }
     function _fmt(x) { return String(Math.round(x * 10) / 10); }
 
+    /** Resolve nest sheet size (mm) for a material key.
+     *  EGGER → 2800×2070; everything else → CNC cfg sheetW/sheetH (default 2750×1220). */
+    function _nestSheetSize(cfg, matKey) {
+        if (window.PricingCore && typeof window.PricingCore.sheetSizeForMat === 'function') {
+            var sz = window.PricingCore.sheetSizeForMat(matKey);
+            if (sz && window.PricingCore.isEggerMatKey && window.PricingCore.isEggerMatKey(matKey)) {
+                return { w: sz.w, h: sz.h };
+            }
+        } else if (matKey && (String(matKey).indexOf('eg_') === 0 ||
+            /^(u727|w1200|u232|u604|u638|H1367|H1307|H1227)$/.test(String(matKey)))) {
+            return { w: 2800, h: 2070 };
+        }
+        return {
+            w: Math.max(500, Number(cfg.sheetW) || 2750),
+            h: Math.max(500, Number(cfg.sheetH) || 1220)
+        };
+    }
+
     /** Bottom-left shelf packing per material+thickness stock.
      *  Parts stay inset from the sheet edge (sheetMargin) — shops leave a frame for
      *  edge damage / transport knocks instead of cutting flush to the stock border. */
     window._cncNestSheets = function(result) {
         const cfg = result.cfg || {};
-        const sheetW = Math.max(500, Number(cfg.sheetW) || 2800);
-        const sheetH = Math.max(500, Number(cfg.sheetH) || 2070);
         const margin = Math.max(0, Number(cfg.sheetMargin != null ? cfg.sheetMargin : 15));
         const gap = Math.max(0, Number(cfg.nestGap) || 10);
         const allowRot = cfg.nestAllowRotate !== false;
-        const usableW = Math.max(1, sheetW - 2 * margin);
-        const usableH = Math.max(1, sheetH - 2 * margin);
         const nests = [];
         const dxfFile = _dbg().dxfFile;
         const entities = _dbg().entities;
         if (typeof dxfFile !== 'function' || typeof entities !== 'function') return nests;
 
         (result.stock || []).forEach(function(stock) {
+            const sheetSz = _nestSheetSize(cfg, stock.matKey);
+            const sheetW = sheetSz.w;
+            const sheetH = sheetSz.h;
+            const usableW = Math.max(1, sheetW - 2 * margin);
+            const usableH = Math.max(1, sheetH - 2 * margin);
             // Expand qty into individual rects
             const parts = [];
             (stock.items || []).forEach(function(r) {
