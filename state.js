@@ -5759,10 +5759,8 @@ function _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel, wTypeId
         }
     }
     let bp = _rangeTablePrice(rt, ww, wEffectiveModel);
-    if (bp == null) {
-        const dm = DEFAULT_PRICING_CONFIG.ranges.maya;
-        bp = _rangeTablePrice(wMelamine ? dm.melamine : dm.nonMelamine, ww, wEffectiveModel);
-    }
+    // All-zero / empty carpenter price lists must stay at 0 — do not fall back to built-in defaults.
+    if (bp == null) bp = 0;
     if (wh >= 241) bp *= (1 + hS);
     if (wd > 54) bp *= (1 + dS);
     // C9 plinth-style cost adders (before profit)

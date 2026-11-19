@@ -281,10 +281,8 @@ function _qcBasePrice(cfg, ww, wh, wd, wMelamine, engine, typeId) {
         }
     }
     bp = _qcRangeTablePrice(rt, ww, engine);
-    if (bp == null) {
-        var dm = _QC_DEFAULT_PRICING.ranges.maya;
-        bp = _qcRangeTablePrice(wMelamine ? dm.melamine : dm.nonMelamine, ww, engine);
-    }
+    // All-zero / empty carpenter price lists must stay at 0 — do not fall back to built-in defaults.
+    if (bp == null) bp = 0;
     if (wh >= 241) bp *= (1 + hS);
     if (wd > 54) bp *= (1 + dS);
     return bp;
