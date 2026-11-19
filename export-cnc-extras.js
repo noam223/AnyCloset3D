@@ -11,13 +11,18 @@
     function _dbg() { return window._exportCncDebug || {}; }
     function _fmt(x) { return String(Math.round(x * 10) / 10); }
 
-    /** Bottom-left shelf packing per material+thickness stock. */
+    /** Bottom-left shelf packing per material+thickness stock.
+     *  Parts stay inset from the sheet edge (sheetMargin) — shops leave a frame for
+     *  edge damage / transport knocks instead of cutting flush to the stock border. */
     window._cncNestSheets = function(result) {
         const cfg = result.cfg || {};
         const sheetW = Math.max(500, Number(cfg.sheetW) || 2800);
         const sheetH = Math.max(500, Number(cfg.sheetH) || 2070);
+        const margin = Math.max(0, Number(cfg.sheetMargin != null ? cfg.sheetMargin : 15));
         const gap = Math.max(0, Number(cfg.nestGap) || 10);
         const allowRot = cfg.nestAllowRotate !== false;
+        const usableW = Math.max(1, sheetW - 2 * margin);
+        const usableH = Math.max(1, sheetH - 2 * margin);
         const nests = [];
         const dxfFile = _dbg().dxfFile;
         const entities = _dbg().entities;
@@ -43,7 +48,8 @@
             const sheets = []; // { placements: [{part,x,y,rot}], usedArea }
 
             function fits(sheet, L, W, x, y) {
-                if (x + L > sheetW + 0.01 || y + W > sheetH + 0.01) return false;
+                if (x < margin - 0.01 || y < margin - 0.01) return false;
+                if (x + L > sheetW - margin + 0.01 || y + W > sheetH - margin + 0.01) return false;
                 for (let i = 0; i < sheet.placements.length; i++) {
                     const p = sheet.placements[i];
                     const pL = p.rot ? p.part.W : p.part.L;
@@ -62,8 +68,8 @@
                 } else if (allowRot && !part.grain) {
                     orients.push({ L: part.W, W: part.L, rot: true });
                 }
-                // Candidate positions: origin + right/top of existing
-                const xs = [0], ys = [0];
+                // Candidate positions: inset origin + right/top of existing
+                const xs = [margin], ys = [margin];
                 sheet.placements.forEach(function(p) {
                     const pL = p.rot ? p.part.W : p.part.L;
                     const pW = p.rot ? p.part.L : p.part.W;
@@ -90,10 +96,10 @@
             }
 
             parts.forEach(function(part) {
-                // Skip boards larger than the sheet
+                // Skip boards larger than the usable (inset) area
                 const maxDim = Math.max(part.L, part.W);
                 const minDim = Math.min(part.L, part.W);
-                if (maxDim > Math.max(sheetW, sheetH) + 0.5 || minDim > Math.min(sheetW, sheetH) + 0.5) {
+                if (maxDim > Math.max(usableW, usableH) + 0.5 || minDim > Math.min(usableW, usableH) + 0.5) {
                     // Oversized — dedicated sheet warning via empty util nest entry
                     const over = { placements: [], usedArea: part.L * part.W, oversize: part };
                     sheets.push(over);
@@ -107,8 +113,8 @@
                 if (!placed) {
                     const sheet = { placements: [], usedArea: 0 };
                     if (!tryPlace(sheet, part)) {
-                        // Force at 0,0 even if overflow (should not happen after size check)
-                        sheet.placements.push({ part: part, x: 0, y: 0, rot: false });
+                        // Force at inset origin even if overflow (should not happen after size check)
+                        sheet.placements.push({ part: part, x: margin, y: margin, rot: false });
                         sheet.usedArea += part.L * part.W;
                     }
                     sheets.push(sheet);
@@ -117,14 +123,27 @@
 
             sheets.forEach(function(sheet, idx) {
                 const ents = [];
-                // Sheet outline
+                // Sheet outline (full stock)
                 ents.push({
                     t: 'poly', layer: 'SHEET',
                     pts: [[0, 0], [sheetW, 0], [sheetW, sheetH], [0, sheetH]]
                 });
+                // Usable cut area (inside edge margin)
+                if (margin > 0) {
+                    ents.push({
+                        t: 'poly', layer: 'SHEET_MARGIN',
+                        pts: [
+                            [margin, margin],
+                            [sheetW - margin, margin],
+                            [sheetW - margin, sheetH - margin],
+                            [margin, sheetH - margin]
+                        ]
+                    });
+                }
                 ents.push({
                     t: 'text', layer: 'INFO', x: 20, y: sheetH - 30, h: 18,
-                    text: (stock.matLabel || stock.matKey) + ' ' + _fmt(stock.T) + 'mm  sheet ' + (idx + 1)
+                    text: (stock.matLabel || stock.matKey) + ' ' + _fmt(stock.T) + 'mm  sheet ' + (idx + 1) +
+                        (margin > 0 ? ('  edge+' + _fmt(margin) + 'mm') : '')
                 });
                 if (sheet.oversize) {
                     ents.push({
@@ -166,6 +185,7 @@
                     T: stock.T,
                     parts: sheet.oversize ? 1 : sheet.placements.length,
                     util: sheet.oversize ? 0 : util,
+                    margin: margin,
                     dxf: dxfFile(ents)
                 });
             });

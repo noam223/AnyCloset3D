@@ -63,6 +63,7 @@
         nestSheets: true,       // pack boards onto stock sheets
         sheetW: 2800,
         sheetH: 2070,
+        sheetMargin: 15,        // keep cuts inward from sheet edges (edge damage / frame)
         nestGap: 10,
         nestAllowRotate: true,
         pdfLabels: true,        // printable HTML label sheet in the ZIP
@@ -1436,7 +1437,7 @@
     }
 
     // ---------- DXF R12 ----------
-    const LAYER_COLORS = { CUT_OUT: 7, CUT_IN: 6, INFO: 8 };
+    const LAYER_COLORS = { CUT_OUT: 7, CUT_IN: 6, INFO: 8, SHEET: 8, SHEET_MARGIN: 4 };
     function _drillLayer(d) { return 'DRILL_D' + _tag(d.d) + '_Z' + _tag(d.depth); }
     function _grooveLayer(g) { return 'GROOVE_W' + _tag(g.width) + '_Z' + _tag(g.depth); }
     function _layerColor(name) {
@@ -1583,7 +1584,7 @@
         L.push('תוכן החבילה', '------------');
         L.push('panels/           קובץ DXF לכל לוח ייחודי. לוח עם עיבוד משני הצדדים מקבל קובץ נוסף בסיומת _B.');
         L.push('all_*.dxf         כל הלוחות של אותו חומר ועובי (כולל כפילויות לפי כמות), פרוסים בשורות — לייבוא אחד ל-CAM. פנים A בלבד.');
-        if (c.nestSheets) L.push('sheets/          קינון על פלטות מלאי (' + c.sheetW + '×' + c.sheetH + ' מ"מ) — קובץ DXF לכל פלטה.');
+        if (c.nestSheets) L.push('sheets/          קינון על פלטות מלאי (' + c.sheetW + '×' + c.sheetH + ' מ"מ, מרווח קצה ' + (c.sheetMargin != null ? c.sheetMargin : 15) + ' מ"מ) — קובץ DXF לכל פלטה.');
         if (c.pdfLabels) L.push('labels/          דף מדבקות להדפסה (HTML) — פתחו בדפדפן והדפיסו ל-PDF.');
         L.push('viewer.html       תצוגת סיכום אינטראקטיבית (כמו חלונית הייצוא) — פתחו בדפדפן; לחיצה על חלק מדגישה אותו בהדמיה.');
         L.push('cutlist.csv       רשימת חיתוך (נפתחת באקסל).', '');
@@ -1632,7 +1633,12 @@
                     ' · Ø' + c.runnerHoleDia + '×' + c.runnerHoleDepth + '.')
                 : 'כבוי.'));
         L.push('צוקל: ' + ['בלוק הצוקל לא יוצא', 'פס קדמי לכל בלוק צוקל', 'פס קדמי ואחורי לכל בלוק צוקל'][Math.max(0, Math.min(2, Math.round(c.plinthStrips)))] + '.');
-        L.push('קנט: ' + (c.edgeBandThickness > 0 ? 'מידות החיתוך קטנות ב-' + c.edgeBandThickness + ' מ"מ בכל קצה מקונט.' : 'מידות החיתוך הן מידות גמר (ללא הפחתת קנט).'), '');
+        L.push('קנט: ' + (c.edgeBandThickness > 0 ? 'מידות החיתוך קטנות ב-' + c.edgeBandThickness + ' מ"מ בכל קצה מקונט.' : 'מידות החיתוך הן מידות גמר (ללא הפחתת קנט).'));
+        if (c.nestSheets) {
+            L.push('קינון: חלקים מורחקים ' + (c.sheetMargin != null ? c.sheetMargin : 15) +
+                ' מ"מ מקצה הפלטה (מכות/פגמים במסגרת), ומרווח ' + (c.nestGap != null ? c.nestGap : 10) + ' מ"מ בין חלקים.');
+        }
+        L.push('');
         L.push('סיכום חומרים', '------------');
         result.stock.forEach(function(s) { L.push(s.matLabel + ' ' + s.T + ' מ"מ: ' + s.count + ' לוחות, ' + s.area.toFixed(2) + ' מ"ר נטו'); });
         if (result.nests && result.nests.length) {
@@ -1788,6 +1794,7 @@
         { k: 'nestSheets', label: 'קינון על פלטות מלאי', check: true },
         { k: 'sheetW', label: 'רוחב פלטה (מ"מ)' },
         { k: 'sheetH', label: 'גובה פלטה (מ"מ)' },
+        { k: 'sheetMargin', label: 'מרווח מקצה הפלטה (מ"מ)', step: 1 },
         { k: 'nestGap', label: 'מרווח בין חלקים', step: 1 },
         { k: 'nestAllowRotate', label: 'אפשר סיבוב 90° (אם אין נעילת סיבים)', check: true },
         { k: 'pdfLabels', label: 'דף מדבקות להדפסה (HTML→PDF)', check: true },
