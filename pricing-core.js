@@ -48,7 +48,9 @@ var DEFAULTS = {
         topPanelPerCm: 8,
         closuresCustomer: 750, closuresInstall: 300
     },
-    customExtras: []
+    customExtras: [],
+    /** Carpenter stock colors / sheets: [{key,label,brand,sheetPrice,sheetW,sheetH,hex,img}] */
+    stockMaterials: []
 };
 
 var ENGINES = [
@@ -123,6 +125,7 @@ function normalizeConfig(cfg) {
     cfg.cabinetTypes = normalizeTypes(cfg);
     if (cfg.ranges) cfg.ranges = mergeOtherRanges(cfg.ranges);
     cfg.customExtras = normalizeCustomExtras(cfg.customExtras);
+    cfg.stockMaterials = normalizeStockMaterials(cfg.stockMaterials);
     return cfg;
 }
 
@@ -251,8 +254,7 @@ function basePrice(cfg, ww, wh, wd, melamine, engine, typeId, opts) {
         var steps = Math.max(0, Math.floor((wh - num(cfg.lmHeightThresholdCm, 240)) / num(cfg.lmHeightStepCm, 30)));
         bp = base * (ww / 100) * (1 + steps * num(cfg.lmHeightStepPct, 0.10));
     } else {
-        var sqm = (ww / 100) * (wh / 100);
-        bp = sqm * num(cfg.materialsBoardsPerSqm, 1.4) * num(cfg.materialsBoardPrice, 180) * num(cfg.materialsMultiplier, 2.5);
+        bp = materialsFaceCost(cfg, ww, wh, opts.matKey || opts.materialKey || null);
     }
     if (wd > 54) bp *= (1 + dS);
     var type = resolveType(cfg, engine, typeId);
@@ -347,18 +349,75 @@ function normalizeCustomExtras(list) {
     return out;
 }
 
+var DEFAULT_SHEET_W = 2800;
+var DEFAULT_SHEET_H = 2070;
+
+/** Normalize carpenter stock colors: [{key,label,brand,sheetPrice,sheetW,sheetH,hex,img}]. */
+function normalizeStockMaterials(list) {
+    if (!Array.isArray(list)) return [];
+    var seen = {}, out = [];
+    list.forEach(function(item) {
+        if (!item || typeof item !== 'object') return;
+        var key = String(item.key || '').trim();
+        if (!key || seen[key]) return;
+        seen[key] = true;
+        var row = {
+            key: key,
+            label: String(item.label || key).trim() || key,
+            brand: String(item.brand || '').trim(),
+            sheetPrice: num(item.sheetPrice, 0),
+            sheetW: num(item.sheetW, DEFAULT_SHEET_W) || DEFAULT_SHEET_W,
+            sheetH: num(item.sheetH, DEFAULT_SHEET_H) || DEFAULT_SHEET_H
+        };
+        if (item.hex) row.hex = String(item.hex);
+        if (item.img) row.img = String(item.img);
+        out.push(row);
+    });
+    return out;
+}
+
+function findStockMaterial(cfg, matKey) {
+    if (!matKey) return null;
+    var list = normalizeStockMaterials(cfg && cfg.stockMaterials);
+    var k = String(matKey);
+    return list.find(function(x) { return x.key === k; }) || null;
+}
+
+/**
+ * Cost of cabinet face area in materials mode.
+ * Prefer stock sheet: (sqm / sheetAreaM2) × sheetPrice × wasteMultiplier.
+ * Fallback: sqm × boardsPerSqm × boardPrice × multiplier.
+ */
+function materialsFaceCost(cfg, ww, wh, matKey) {
+    var sqm = (ww / 100) * (wh / 100);
+    var mult = cfg.materialsMultiplier != null ? num(cfg.materialsMultiplier, 1.4) : 1.4;
+    if (mult <= 0) mult = 1;
+    var stock = findStockMaterial(cfg, matKey);
+    if (stock && stock.sheetPrice > 0) {
+        var sw = Math.max(100, num(stock.sheetW, DEFAULT_SHEET_W)) / 1000;
+        var sh = Math.max(100, num(stock.sheetH, DEFAULT_SHEET_H)) / 1000;
+        var sheetArea = Math.max(0.01, sw * sh);
+        return sqm * (stock.sheetPrice / sheetArea) * mult;
+    }
+    return sqm * num(cfg.materialsBoardsPerSqm, 1.4) * num(cfg.materialsBoardPrice, 180) * mult;
+}
+
 /** Blank personal price list for carpenters who have not saved their own yet. */
 function emptyConfig() {
     var e = clone(DEFAULTS);
     e.sqmPrice = 0; e.sqmPriceNonMel = 0;
     e.lmPrice = 0; e.lmPriceNonMel = 0;
     e.lmHeightBase = 0; e.lmHeightBaseNonMel = 0;
-    e.materialsBoardPrice = 0; e.materialsBoardsPerSqm = 0; e.materialsMultiplier = 0;
+    e.pricingMode = 'materials';
+    e.materialsBoardPrice = 0; e.materialsBoardsPerSqm = 0;
+    // Waste / בלאי — keep a usable default so sheet-based costs are not wiped to 0
+    e.materialsMultiplier = 1.4;
     e.profitMultiplier = 1.8;
     e.installPricePerUnit = 0;
     e.heightSurcharge = 0; e.depthSurcharge = 0; e.sandwichSurcharge = 0;
     e.installHeightSurcharge = 0;
     e.customExtras = [];
+    e.stockMaterials = [];
     Object.keys(e.ranges || {}).forEach(function(engine) {
         ['melamine', 'nonMelamine'].forEach(function(mat) {
             var map = (e.ranges[engine] && e.ranges[engine][mat]) || {};
@@ -382,6 +441,11 @@ global.PricingCore = {
     clone: clone,
     normalizeTypes: normalizeTypes,
     normalizeCustomExtras: normalizeCustomExtras,
+    normalizeStockMaterials: normalizeStockMaterials,
+    findStockMaterial: findStockMaterial,
+    materialsFaceCost: materialsFaceCost,
+    DEFAULT_SHEET_W: DEFAULT_SHEET_W,
+    DEFAULT_SHEET_H: DEFAULT_SHEET_H,
     normalizeConfig: normalizeConfig,
     findType: findType,
     resolveType: resolveType,

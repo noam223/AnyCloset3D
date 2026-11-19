@@ -5606,7 +5606,8 @@ var DEFAULT_PRICING_CONFIG = {
         topPanelPerCm: 8,
         closuresCustomer: 750, closuresInstall: 300
     },
-    customExtras: []
+    customExtras: [],
+    stockMaterials: []
 };
 window.DEFAULT_PRICING_CONFIG = DEFAULT_PRICING_CONFIG;
 
@@ -5616,10 +5617,12 @@ function _buildEmptyPricingConfig() {
         return window.PricingCore.emptyConfig();
     }
     var e = JSON.parse(JSON.stringify(DEFAULT_PRICING_CONFIG));
+    e.pricingMode = 'materials';
     e.sqmPrice = 0; e.sqmPriceNonMel = 0;
     e.lmPrice = 0; e.lmPriceNonMel = 0;
     e.lmHeightBase = 0; e.lmHeightBaseNonMel = 0;
-    e.materialsBoardPrice = 0; e.materialsBoardsPerSqm = 0; e.materialsMultiplier = 0;
+    e.materialsBoardPrice = 0; e.materialsBoardsPerSqm = 0;
+    e.materialsMultiplier = 1.4; // בלאי — keep usable for sheet-based costing
     e.installPricePerUnit = 0;
     e.heightSurcharge = 0; e.depthSurcharge = 0; e.sandwichSurcharge = 0;
     e.installHeightSurcharge = 0;
@@ -5631,6 +5634,7 @@ function _buildEmptyPricingConfig() {
     });
     Object.keys(e.extras || {}).forEach(function(k) { e.extras[k] = 0; });
     e.customExtras = [];
+    e.stockMaterials = [];
     return e;
 }
 window.EMPTY_PRICING_CONFIG = _buildEmptyPricingConfig();
@@ -5744,9 +5748,26 @@ function _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel, wTypeId
         if(wd>54) bp*=(1+dS); return bp;
     }
     if (mode === 'materials') {
-        const sqm = (ww/100)*(wh/100);
-        let bp = sqm*_priceNum(cfg.materialsBoardsPerSqm, 1.4)*_priceNum(cfg.materialsBoardPrice, 180)*_priceNum(cfg.materialsMultiplier, 2.5);
-        if(wd>54) bp*=(1+dS); return bp;
+        let bp;
+        if (window.PricingCore && typeof window.PricingCore.materialsFaceCost === 'function') {
+            bp = window.PricingCore.materialsFaceCost(cfg, ww, wh, opts.matKey || opts.materialKey || null);
+        } else {
+            const sqm = (ww / 100) * (wh / 100);
+            let mult = _priceNum(cfg.materialsMultiplier, 1.4);
+            if (mult <= 0) mult = 1;
+            const stockList = (cfg.stockMaterials || []);
+            const matKey = opts.matKey || opts.materialKey || null;
+            const stock = matKey ? stockList.find(function(x) { return x && x.key === matKey; }) : null;
+            if (stock && _priceNum(stock.sheetPrice, 0) > 0) {
+                const sw = Math.max(100, _priceNum(stock.sheetW, 2800)) / 1000;
+                const sh = Math.max(100, _priceNum(stock.sheetH, 2070)) / 1000;
+                bp = sqm * (_priceNum(stock.sheetPrice, 0) / Math.max(0.01, sw * sh)) * mult;
+            } else {
+                bp = sqm * _priceNum(cfg.materialsBoardsPerSqm, 1.4) * _priceNum(cfg.materialsBoardPrice, 180) * mult;
+            }
+        }
+        if (wd > 54) bp *= (1 + dS);
+        return bp;
     }
     // ranges
     const cfgR = cfg.ranges || DEFAULT_PRICING_CONFIG.ranges;
@@ -5846,7 +5867,8 @@ function _calcWingCost(cfg, wing) {
 
     let basePrice = _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel, wing.cabinetTypeId, {
         boardMaterial: wing.boardMaterial,
-        plinthStyle: wPlinthStyle
+        plinthStyle: wPlinthStyle,
+        matKey: wing.materialBody || null
     });
         if (SANDWICH_COLORS.has(wing.materialBody)) basePrice *= (1 + sandwichPct);
         // Standalone regalim: per-leg nickel. C9+legs uses flat c9LegsSurcharge in base price.

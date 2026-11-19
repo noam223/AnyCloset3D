@@ -151,6 +151,9 @@
             || window.DEFAULT_PRICING_CONFIG;
         window.applyCabinetTypeSelects(_typesCfg);
     }
+    if (window.StockMaterials && typeof window.StockMaterials.refresh === 'function') {
+        try { window.StockMaterials.refresh(); } catch (eStock) {}
+    }
 
     // 3c. Load user logo
     if (user && _sb_init) {

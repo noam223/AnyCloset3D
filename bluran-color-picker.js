@@ -81,6 +81,14 @@
             category: color.category || null
         };
         applyMaterialToActivePart(matKey);
+        if (window.StockMaterials && typeof window.StockMaterials.onMaterialSelected === 'function') {
+            window.StockMaterials.onMaterialSelected(matKey, {
+                label: color.name || color.id,
+                brand: 'bluran',
+                hex: color.hex || null,
+                img: color.img || null
+            });
+        }
         if (typeof _showToast === 'function') {
             _showToast('הוחל גוון בלורן ' + color.id + ' — ' + (color.name || ''), 2800);
         }

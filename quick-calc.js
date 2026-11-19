@@ -41,7 +41,8 @@ var _QC_DEFAULT_PRICING = {
         topPanelPerCm: 8,
         closuresCustomer: 750, closuresInstall: 300
     },
-    customExtras: []
+    customExtras: [],
+    stockMaterials: []
 };
 
 function _qcNum(v, fb) {
@@ -265,8 +266,14 @@ function _qcBasePrice(cfg, ww, wh, wd, wMelamine, engine, typeId) {
         return bp;
     }
     if (mode === 'materials') {
-        var sqm = (ww / 100) * (wh / 100);
-        bp = sqm * _qcNum(cfg.materialsBoardsPerSqm, 1.4) * _qcNum(cfg.materialsBoardPrice, 180) * _qcNum(cfg.materialsMultiplier, 2.5);
+        if (global.PricingCore && typeof global.PricingCore.materialsFaceCost === 'function') {
+            bp = global.PricingCore.materialsFaceCost(cfg, ww, wh, null);
+        } else {
+            var sqm = (ww / 100) * (wh / 100);
+            var mult = _qcNum(cfg.materialsMultiplier, 1.4);
+            if (mult <= 0) mult = 1;
+            bp = sqm * _qcNum(cfg.materialsBoardsPerSqm, 1.4) * _qcNum(cfg.materialsBoardPrice, 180) * mult;
+        }
         if (wd > 54) bp *= (1 + dS);
         return bp;
     }

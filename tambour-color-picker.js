@@ -146,6 +146,13 @@
         var matKey = window._registerTambourMaterial(color.id, color.hex);
         state.tambourPalette[matKey] = { id: color.id, hex: color.hex, name: color.name || color.id };
         applyMaterialToActivePart(matKey);
+        if (window.StockMaterials && typeof window.StockMaterials.onMaterialSelected === 'function') {
+            window.StockMaterials.onMaterialSelected(matKey, {
+                label: color.name || color.id,
+                brand: 'tambour',
+                hex: color.hex || null
+            });
+        }
         if (typeof _showToast === 'function') {
             _showToast('הוחל גוון ' + color.id + ' — ' + (color.name || ''), 2800);
         }

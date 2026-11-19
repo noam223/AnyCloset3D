@@ -1144,6 +1144,20 @@
                     <div class="mat-item" onclick="setGlassTint('smoked')"><button class="glass-tint-btn" data-tint="smoked" title="מושחר" style="background: linear-gradient(135deg, #5a5f66 0%, #16181b 55%, #3a3e44 100%);"></button><span>מושחר</span></div>
                 </div>
             </div>
+            <div id="mat-stock-wrap" style="display:none;margin-bottom:18px;">
+                <div style="font-size: 0.9rem; font-weight: bold; margin-bottom: 8px; color: var(--text-dark);display:flex;align-items:center;gap:8px;">
+                    <i class="fa-solid fa-warehouse" style="color:var(--primary);"></i> המלאי שלי
+                </div>
+                <p style="font-size:0.72rem;color:var(--text-light);margin:0 0 10px;line-height:1.4;">הצבעים השוטפים שהגדרתם — מופיעים כאן בראש הרשימה.</p>
+                <div class="materials-flat-grid" id="mat-stock-grid"></div>
+            </div>
+            <div id="mat-sheet-price-bar" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 14px;padding:10px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;">
+                <span id="mat-sheet-price-status" style="flex:1;min-width:140px;font-size:0.78rem;font-weight:600;line-height:1.35;"></span>
+                <button type="button" id="mat-sheet-price-btn" onclick="StockMaterials.openModal()"
+                    style="height:34px;padding:0 12px;border:none;border-radius:8px;background:#1e3a5f;color:#fff;font-size:0.78rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">
+                    הגדר תמחור
+                </button>
+            </div>
             <div style="font-size: 0.9rem; font-weight: bold; margin-bottom: 12px; color: var(--text-dark);">גוונים חלקים:</div>
             <div class="materials-flat-grid" id="mat-solid-grid" style="margin-bottom: 25px;">
                 <div class="mat-item"><button class="material-btn active" data-mat="white_matte" style="background-color: #f7f7f7; border: 1px solid #ccc;" title="לבן מט 2100"></button><span onclick="this.previousElementSibling.click()">לבן מט 2100</span></div>
@@ -3261,8 +3275,10 @@
 <script src="auth.js?v=20261116kitchen"></script>
 <script src="trial-watermark.js?v=20261008trial"></script>
 <script src="egger-colors.js?v=20261116eggerKeep1"></script>
-<script src="state.js?v=20261118plinthFront2"></script>
-<script src="quick-calc.js?v=20261118plinthFront1"></script>
+<script src="pricing-core.js?v=20261119stock1"></script>
+<script src="state.js?v=20261119stock1"></script>
+<script src="stock-materials.js?v=20261119stock1"></script>
+<script src="quick-calc.js?v=20261119stock1"></script>
 <script src="bathroom-preset.js?v=20261008types"></script>
 <script src="kitchen-preset.js?v=20261117kitG3"></script>
 <script src="writing-desk-preset.js?v=20260823h370"></script>
@@ -3435,6 +3451,41 @@
     <i class="fa-solid fa-note-sticky"></i>
     <span id="designer-notes-float-badge" style="display:none;position:absolute;top:-4px;right:-4px;background:#ef4444;color:white;border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:700;align-items:center;justify-content:center;line-height:1;">0</span>
 </button>
+
+<!-- Carpenter: set full-sheet price for a color -->
+<div id="mat-sheet-price-modal" style="display:none;position:fixed;inset:0;z-index:10050;background:rgba(15,23,42,.45);align-items:center;justify-content:center;padding:16px;" onclick="if(event.target===this)StockMaterials.closeModal()">
+    <div style="background:#fff;border-radius:16px;max-width:420px;width:100%;padding:22px 22px 18px;box-shadow:0 20px 50px rgba(0,0,0,.25);direction:rtl;" onclick="event.stopPropagation()">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;">
+            <h3 id="msp-title" style="margin:0;font-size:1rem;color:#1e3a5f;">תמחור פלטה</h3>
+            <button type="button" onclick="StockMaterials.closeModal()" style="border:none;background:#f1f5f9;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:1rem;">✕</button>
+        </div>
+        <p style="margin:0 0 14px;font-size:.8rem;color:#64748b;line-height:1.45;">הזינו כמה עולה לכם פלטה שלמה ואת מידותיה. אם המידות ריקות — 2800×2070 מ״מ.</p>
+        <input type="hidden" id="msp-key">
+        <input type="hidden" id="msp-hex">
+        <input type="hidden" id="msp-img">
+        <input type="hidden" id="msp-brand">
+        <div style="display:grid;gap:10px;">
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.72rem;font-weight:700;color:#64748b;">שם לתצוגה
+                <input id="msp-label" type="text" style="height:40px;border:1.5px solid #e2e8f0;border-radius:10px;padding:0 12px;font-family:inherit;font-size:.9rem;">
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.72rem;font-weight:700;color:#64748b;">מחיר פלטה מלאה (₪)
+                <input id="msp-price" type="number" min="0" step="10" style="height:40px;border:1.5px solid #e2e8f0;border-radius:10px;padding:0 12px;font-family:inherit;font-size:.9rem;direction:ltr;text-align:right;">
+            </label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <label style="display:flex;flex-direction:column;gap:4px;font-size:.72rem;font-weight:700;color:#64748b;">רוחב פלטה (מ״מ)
+                    <input id="msp-w" type="number" min="100" step="10" value="2800" style="height:40px;border:1.5px solid #e2e8f0;border-radius:10px;padding:0 12px;font-family:inherit;font-size:.9rem;direction:ltr;text-align:right;">
+                </label>
+                <label style="display:flex;flex-direction:column;gap:4px;font-size:.72rem;font-weight:700;color:#64748b;">גובה פלטה (מ״מ)
+                    <input id="msp-h" type="number" min="100" step="10" value="2070" style="height:40px;border:1.5px solid #e2e8f0;border-radius:10px;padding:0 12px;font-family:inherit;font-size:.9rem;direction:ltr;text-align:right;">
+                </label>
+            </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:18px;">
+            <button type="button" onclick="StockMaterials.saveFromModal()" style="flex:1;height:42px;border:none;border-radius:10px;background:#1e3a5f;color:#fff;font-weight:700;font-family:inherit;cursor:pointer;">שמור למלאי</button>
+            <button type="button" onclick="StockMaterials.closeModal()" style="height:42px;padding:0 16px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;font-family:inherit;cursor:pointer;">ביטול</button>
+        </div>
+    </div>
+</div>
 
 <script src="notes.js?v=20261114sec"></script>
 <script src="tour.js?v=20261112jsonCompany"></script>

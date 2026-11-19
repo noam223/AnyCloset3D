@@ -10017,6 +10017,9 @@ function bindUI() {
             const targetBtn = e.target.classList.contains('material-btn') ? e.target : e.target.closest('.material-btn');
             const matValue = targetBtn.getAttribute('data-mat');
             document.querySelectorAll(`.material-btn[data-mat="${matValue}"]`).forEach(b => b.classList.add('active'));
+            if (window.StockMaterials && typeof window.StockMaterials.onMaterialSelected === 'function') {
+                window.StockMaterials.onMaterialSelected(matValue);
+            }
             if (typeof window._syncEggerPaletteActive === 'function') {
                 window._syncEggerPaletteActive(matValue, { open: !!targetBtn.closest('.egger-palette-panel') });
             }

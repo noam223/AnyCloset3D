@@ -37,6 +37,7 @@ function _esc(s) {
 // ── state ────────────────────────────────────────────────────────────────────
 var _cabinetTypes = [];
 var _customExtras = [];
+var _stockMaterials = [];
 var _currentMode  = 'ranges';
 var _opts         = {};
 
@@ -68,6 +69,7 @@ function _buildHtml() {
         _upperCornerHtml(),
         _slidingHtml(),
         _customAndClosuresHtml(),
+        _stockMaterialsHtml(),
         _customExtrasHtml(),
         s !== false ? _saveBarHtml() : ''
     ].join('');
@@ -229,10 +231,15 @@ function _lmHeightSectionHtml() {
 }
 
 function _materialsSectionHtml() {
-    return _modeSection('materials', 'fa-layer-group', 'תמחור לפי חומרים',
-        _field('materialsBoardPrice', 'מחיר לוח (₪)', 'min="0" step="5"') +
-        _field('materialsBoardsPerSqm', 'לוחות למ"ר', 'min="0.1" step="0.1"') +
-        _field('materialsMultiplier', 'מכפיל חומרים (כולל בזבוז)', 'min="1" step="0.1"'));
+    return _modeSection('materials', 'fa-layer-group', 'תמחור לפי חומרים (נגרים)',
+        _field('materialsMultiplier', 'מכפיל בלאי / בזבוז', 'min="1" step="0.05"') +
+        _field('materialsBoardPrice', 'מחיר לוח כללי — גיבוי (₪)', 'min="0" step="5"') +
+        _field('materialsBoardsPerSqm', 'לוחות למ"ר — גיבוי', 'min="0" step="0.1"')) +
+        '<div id="' + _id('materials-stock-hint') + '" style="display:none;margin:0 0 12px;padding:10px 14px;' +
+            'background:#eff6ff;border-radius:8px;font-size:.8rem;color:#1e3a5f;line-height:1.45;">' +
+            '<i class="fa-solid fa-circle-info"></i> ' +
+            'לנגרים: העדיפו להגדיר מחיר פלטה מלאה לכל צבע במלאי (למטה / מהמעצב). ' +
+            'החישוב: שטח ארון ÷ שטח פלטה × מחיר פלטה × מכפיל בלאי.</div>';
 }
 
 /* ④ COMMON SURCHARGES — hide heightSurcharge for irrelevant modes */
@@ -390,6 +397,25 @@ function _customAndClosuresHtml() {
     '</div>';
 }
 
+/** Carpenter stock colors / full-sheet prices */
+function _stockMaterialsHtml() {
+    return '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius,12px);' +
+        'padding:20px 24px;margin-bottom:12px;">' +
+        '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin-bottom:8px;">' +
+            '<i class="fa-solid fa-palette"></i> מלאי צבעים ופלטות</div>' +
+        '<p style="font-size:.78rem;color:var(--muted);margin:0 0 14px;line-height:1.45;">' +
+            'הצבעים השוטפים שלכם — מופיעים בראש רשימת הצבעים במעצב. לכל צבע: מחיר פלטה מלאה ומידותיה. ' +
+            'אפשר גם להוסיף צבע מהמעצב (כפתור «הגדר תמחור» כשבוחרים צבע שלא במלאי).</p>' +
+        '<div id="' + _id('stock-list') + '"></div>' +
+        '<button type="button" onclick="PricingPanel.addStockMaterial()" ' +
+            'style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;margin-top:10px;' +
+            'background:rgba(37,99,235,.08);border:1.5px solid rgba(37,99,235,.25);' +
+            'color:#2563eb;border-radius:10px;font-size:.82rem;font-weight:600;cursor:pointer;' +
+            'font-family:inherit;">' +
+            '<i class="fa-solid fa-plus"></i> הוסף צבע למלאי</button>' +
+    '</div>';
+}
+
 /** User-defined extras: product name + unit cost */
 function _customExtrasHtml() {
     return '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius,12px);' +
@@ -461,6 +487,8 @@ function setMode(mode) {
     // Show note in materials mode about both multipliers
     var note = _el('materials-note');
     if (note) note.style.display = (mode === 'materials') ? 'block' : 'none';
+    var stockHint = _el('materials-stock-hint');
+    if (stockHint) stockHint.style.display = (mode === 'materials') ? 'block' : 'none';
 
     // Update preview type select options (filtered to non-sliding for non-ranges modes)
     _refreshPreviewTypeSelect();
@@ -539,6 +567,111 @@ function _deleteType(btn) {
     _cabinetTypes = _cabinetTypes.filter(function(t) { return t.id !== id; });
     _renderCabinetTypes();
     _rebuildRangesTableForTypes();
+}
+
+// ── stock materials (color + full sheet price) ───────────────────────────────
+function _renderStockMaterials() {
+    var list = _el('stock-list');
+    if (!list) return;
+    var defW = (PC && PC.DEFAULT_SHEET_W) || 2800;
+    var defH = (PC && PC.DEFAULT_SHEET_H) || 2070;
+    if (!_stockMaterials.length) {
+        list.innerHTML = '<div style="font-size:.8rem;color:var(--muted);padding:6px 0 4px;">' +
+            'עדיין אין צבעי מלאי — הוסיפו כאן או מהמעצב.</div>';
+        return;
+    }
+    list.innerHTML = _stockMaterials.map(function(item) {
+        var swatch = item.img
+            ? 'background-image:url(\'' + _esc(item.img) + '\');background-size:cover;'
+            : ('background:' + _esc(item.hex || '#e2e8f0') + ';');
+        return '<div class="pnl-stock-row" data-key="' + _esc(item.key) + '" ' +
+            'style="display:grid;grid-template-columns:28px 1fr 100px 72px 72px auto;gap:8px;align-items:center;' +
+            'padding:8px 0;border-bottom:1px solid var(--border);">' +
+            '<span style="width:28px;height:28px;border-radius:6px;border:1px solid #cbd5e1;' + swatch + '"></span>' +
+            '<div style="min-width:0;">' +
+                '<input type="text" class="pnl-stock-label" value="' + _esc(item.label || '') + '" ' +
+                    'placeholder="שם לתצוגה" maxlength="80" ' +
+                    'style="width:100%;height:34px;border:1.5px solid var(--border);border-radius:8px;padding:0 10px;' +
+                    'font-family:inherit;font-size:.82rem;direction:rtl;text-align:right;box-sizing:border-box;">' +
+                '<div style="font-size:.68rem;color:var(--muted);margin-top:2px;font-family:monospace;direction:ltr;text-align:left;">' +
+                    _esc(item.key) + (item.brand ? (' · ' + _esc(item.brand)) : '') + '</div>' +
+            '</div>' +
+            '<input type="number" class="pnl-stock-price" value="' + _num(item.sheetPrice, 0) + '" min="0" step="10" ' +
+                'title="מחיר פלטה מלאה (₪)" placeholder="₪ פלטה" ' +
+                'style="height:34px;border:1.5px solid var(--border);border-radius:8px;padding:0 8px;' +
+                'font-family:inherit;font-size:.82rem;direction:ltr;text-align:right;">' +
+            '<input type="number" class="pnl-stock-w" value="' + _num(item.sheetW, defW) + '" min="100" step="10" ' +
+                'title="רוחב פלטה מ\"מ" ' +
+                'style="height:34px;border:1.5px solid var(--border);border-radius:8px;padding:0 6px;' +
+                'font-family:inherit;font-size:.8rem;direction:ltr;text-align:right;">' +
+            '<input type="number" class="pnl-stock-h" value="' + _num(item.sheetH, defH) + '" min="100" step="10" ' +
+                'title="גובה פלטה מ\"מ" ' +
+                'style="height:34px;border:1.5px solid var(--border);border-radius:8px;padding:0 6px;' +
+                'font-family:inherit;font-size:.8rem;direction:ltr;text-align:right;">' +
+            '<button type="button" onclick="PricingPanel._deleteStockMaterial(this)" title="הסר מהמלאי" ' +
+                'style="width:32px;height:32px;border-radius:8px;border:none;background:#fee2e2;' +
+                'color:#ef4444;cursor:pointer;font-size:.85rem;">✕</button>' +
+        '</div>';
+    }).join('');
+}
+
+function addStockMaterial() {
+    _syncStockMaterialsFromDom();
+    var key = window.prompt('מפתח צבע (למשל white_matte או מפתח מקטלוג):');
+    if (!key) return;
+    key = String(key).trim();
+    if (!key) return;
+    if (_stockMaterials.some(function(x) { return x.key === key; })) {
+        alert('הצבע כבר במלאי');
+        return;
+    }
+    var defW = (PC && PC.DEFAULT_SHEET_W) || 2800;
+    var defH = (PC && PC.DEFAULT_SHEET_H) || 2070;
+    _stockMaterials.push({
+        key: key,
+        label: key,
+        brand: '',
+        sheetPrice: 0,
+        sheetW: defW,
+        sheetH: defH
+    });
+    _renderStockMaterials();
+}
+
+function _deleteStockMaterial(btn) {
+    var row = btn && btn.closest ? btn.closest('.pnl-stock-row') : null;
+    if (!row) return;
+    var key = row.getAttribute('data-key');
+    _syncStockMaterialsFromDom();
+    _stockMaterials = _stockMaterials.filter(function(x) { return x.key !== key; });
+    _renderStockMaterials();
+}
+
+function _syncStockMaterialsFromDom() {
+    var list = _el('stock-list');
+    if (!list) return;
+    var next = [];
+    list.querySelectorAll('.pnl-stock-row').forEach(function(row) {
+        var key = row.getAttribute('data-key');
+        if (!key) return;
+        var prev = _stockMaterials.find(function(x) { return x.key === key; }) || {};
+        var labelEl = row.querySelector('.pnl-stock-label');
+        var priceEl = row.querySelector('.pnl-stock-price');
+        var wEl = row.querySelector('.pnl-stock-w');
+        var hEl = row.querySelector('.pnl-stock-h');
+        var rowOut = {
+            key: key,
+            label: labelEl ? String(labelEl.value || '').trim() || key : key,
+            brand: prev.brand || '',
+            sheetPrice: _num(priceEl ? priceEl.value : 0, 0),
+            sheetW: _num(wEl ? wEl.value : 2800, 2800),
+            sheetH: _num(hEl ? hEl.value : 2070, 2070)
+        };
+        if (prev.hex) rowOut.hex = prev.hex;
+        if (prev.img) rowOut.img = prev.img;
+        next.push(rowOut);
+    });
+    _stockMaterials = next;
 }
 
 // ── custom extras (name + unit cost) ─────────────────────────────────────────
@@ -780,6 +913,12 @@ function fill(cfg) {
     }
     // Keep blank draft rows when editing? fill only keeps named items; empty drafts via Add.
     _renderCustomExtras();
+    if (PC && typeof PC.normalizeStockMaterials === 'function') {
+        _stockMaterials = PC.normalizeStockMaterials(c.stockMaterials);
+    } else {
+        _stockMaterials = Array.isArray(c.stockMaterials) ? c.stockMaterials.slice() : [];
+    }
+    _renderStockMaterials();
     _buildRangesTable(c.ranges || (D.ranges || {}));
     setMode(mode);
 
@@ -861,6 +1000,7 @@ function fill(cfg) {
 function read() {
     _syncTypesFromDom();
     _syncCustomExtrasFromDom();
+    _syncStockMaterialsFromDom();
     var ex = {};
     ['internalDrawer','externalDrawer','shoeDrawer','openCell','openCell34','openCell5','partition','shelfFreePerMeter',
      'extraShelfMel','extraShelfNonMel','deskUnit',
@@ -888,6 +1028,10 @@ function read() {
         .filter(function(x) { return !!x.name; });
     if (PC && typeof PC.normalizeCustomExtras === 'function') {
         customExtras = PC.normalizeCustomExtras(customExtras);
+    }
+    var stockMaterials = _stockMaterials.slice();
+    if (PC && typeof PC.normalizeStockMaterials === 'function') {
+        stockMaterials = PC.normalizeStockMaterials(stockMaterials);
     }
     return {
         pricingMode:              _currentMode,
@@ -917,7 +1061,8 @@ function read() {
         }),
         ranges:                   _readRangesTable(),
         extras:                   ex,
-        customExtras:             customExtras
+        customExtras:             customExtras,
+        stockMaterials:           stockMaterials
     };
 }
 
@@ -1005,12 +1150,14 @@ global.PricingPanel = {
     updatePreview:  updatePreview,
     addCabinetType: addCabinetType,
     addCustomExtra: addCustomExtra,
+    addStockMaterial: addStockMaterial,
     addRangeRow:    addRangeRow,
     showSavedNote:  showSavedNote,
     // internal (called from inline onclick):
     _toggleMaterial:   _toggleMaterial,
     _deleteType:       _deleteType,
     _deleteCustomExtra:_deleteCustomExtra,
+    _deleteStockMaterial:_deleteStockMaterial,
     _onSave:           _onSave,
     _onReset:          _onReset
 };
