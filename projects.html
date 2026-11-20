@@ -1388,157 +1388,6 @@
         <div class="page-tab" id="tab-pricing">
             <div class="pricing-panel-wrap" style="max-width:860px;">
                 <div id="pricing-panel-mount"></div>
-                <!-- Old pp- form (hidden — PricingPanel renders above) -->
-                <div class="pp-section" style="display:none;">
-                    <div class="pp-section-title"></div>
-                    <div class="pricing-mode-row" id="pp-mode-btns">
-                        <button class="pp-mode-btn" data-mode="ranges" onclick="ppSetMode('ranges')">טווחים</button>
-                        <button class="pp-mode-btn" data-mode="sqm" onclick="ppSetMode('sqm')">מ"ר</button>
-                        <button class="pp-mode-btn" data-mode="lm" onclick="ppSetMode('lm')">מ"א</button>
-                        <button class="pp-mode-btn" data-mode="lm_height" onclick="ppSetMode('lm_height')">מ"א + גובה</button>
-                        <button class="pp-mode-btn" data-mode="materials" onclick="ppSetMode('materials')">חומרים</button>
-                    </div>
-                </div>
-                <div class="pp-section" id="pp-section-cabinet-types" style="display:none;">
-                    <div class="pp-section-title"><i class="fa-solid fa-layer-group"></i> סוגי ארונות</div>
-                    <p style="font-size:.78rem;color:var(--muted);margin-bottom:12px;line-height:1.5;">שם התצוגה במחשבון ובמעצב, וסוג הבנייה במערכת. לארון הזזה אין טבלת רוחב — המחיר מוגדר בסקשן ארון הזזה.</p>
-                    <div class="pp-types-list" id="pp-cabinet-types"></div>
-                    <button type="button" onclick="ppAddCabinetType()" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:rgba(37,99,235,.08);border:1.5px solid rgba(37,99,235,.25);color:var(--secondary);border-radius:10px;font-size:.82rem;font-weight:600;cursor:pointer;font-family:inherit;">
-                        <i class="fa-solid fa-plus"></i> הוסף סוג
-                    </button>
-                </div>
-                <!-- RANGES section -->
-                <div class="pp-section pp-mode-section" id="pp-mode-ranges">
-                    <div class="pp-section-title"><i class="fa-solid fa-table-list"></i> טבלת טווחים לפי רוחב</div>
-                    <p style="font-size:.78rem;color:var(--muted);margin-bottom:12px;line-height:1.5;">הגדר מחיר לכל רוחב ארון (ס"מ) לפי סוג. המחיר הוא לארון שלם (מלמין / לא מלמין). רוחב שאינו בטבלה מתומחר לפי השורה הקרובה מעליו, ומעבר לרוחב הגדול ביותר — באופן יחסי. ארון הזזה מתומחר בסקשן הנפרד, לא כאן.</p>
-                    <div style="overflow-x:auto;margin-bottom:12px;">
-                        <table style="width:100%;border-collapse:collapse;font-size:.83rem;" id="pp-ranges-table">
-                            <thead>
-                                <tr style="background:var(--border-l);">
-                                    <th style="padding:8px 10px;text-align:right;font-weight:700;color:var(--primary);border:1px solid var(--border);">סוג ארון</th>
-                                    <th style="padding:8px 10px;text-align:center;font-weight:700;color:var(--primary);border:1px solid var(--border);">רוחב (ס"מ)</th>
-                                    <th style="padding:8px 10px;text-align:center;font-weight:700;color:var(--primary);border:1px solid var(--border);">מלמין ₪</th>
-                                    <th style="padding:8px 10px;text-align:center;font-weight:700;color:var(--primary);border:1px solid var(--border);">לא מלמין ₪</th>
-                                    <th style="padding:8px 10px;text-align:center;border:1px solid var(--border);"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="pp-ranges-tbody"></tbody>
-                        </table>
-                    </div>
-                    <button onclick="ppAddRangeRow()" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:rgba(37,99,235,.08);border:1.5px solid rgba(37,99,235,.25);color:var(--secondary);border-radius:10px;font-size:.82rem;font-weight:600;cursor:pointer;font-family:inherit;">
-                        <i class="fa-solid fa-plus"></i> הוסף שורה
-                    </button>
-                </div>
-
-                <div class="pp-section pp-mode-section" id="pp-mode-sqm">
-                    <div class="pp-section-title"><i class="fa-solid fa-ruler-combined"></i> תמחור לפי מ"ר</div>
-                    <div class="pp-grid-2">
-                        <div class="pp-field"><label class="pp-label">מחיר מ"ר מלמין ₪</label><input class="pp-input" id="pp-sqmPrice" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">מחיר מ"ר לא מלמין ₪</label><input class="pp-input" id="pp-sqmPriceNonMel" type="number" min="0"></div>
-                    </div>
-                </div>
-                <div class="pp-section pp-mode-section" id="pp-mode-lm">
-                    <div class="pp-section-title"><i class="fa-solid fa-ruler-horizontal"></i> תמחור לפי מ"א</div>
-                    <div class="pp-grid-2">
-                        <div class="pp-field"><label class="pp-label">מחיר מ"א מלמין ₪</label><input class="pp-input" id="pp-lmPrice" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">מחיר מ"א לא מלמין ₪</label><input class="pp-input" id="pp-lmPriceNonMel" type="number" min="0"></div>
-                    </div>
-                </div>
-                <div class="pp-section pp-mode-section" id="pp-mode-lm_height">
-                    <div class="pp-section-title"><i class="fa-solid fa-ruler-vertical"></i> תמחור לפי מ"א + גובה</div>
-                    <div class="pp-grid">
-                        <div class="pp-field"><label class="pp-label">בסיס מ"א מלמין ₪</label><input class="pp-input" id="pp-lmHeightBase" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">בסיס מ"א לא מלמין ₪</label><input class="pp-input" id="pp-lmHeightBaseNonMel" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">סף גובה ס"מ</label><input class="pp-input" id="pp-lmHeightThresholdCm" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">צעד גובה ס"מ</label><input class="pp-input" id="pp-lmHeightStepCm" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">תוספת לצעד %</label><input class="pp-input" id="pp-lmHeightStepPct" type="number" min="0"></div>
-                    </div>
-                </div>
-                <div class="pp-section pp-mode-section" id="pp-mode-materials">
-                    <div class="pp-section-title"><i class="fa-solid fa-layer-group"></i> תמחור לפי חומרים</div>
-                    <div class="pp-grid-3">
-                        <div class="pp-field"><label class="pp-label">מחיר לוח ₪</label><input class="pp-input" id="pp-materialsBoardPrice" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">לוחות למ"ר</label><input class="pp-input" id="pp-materialsBoardsPerSqm" type="number" min="0" step="0.1"></div>
-                        <div class="pp-field"><label class="pp-label">מכפיל חומרים</label><input class="pp-input" id="pp-materialsMultiplier" type="number" min="0" step="0.1"></div>
-                    </div>
-                </div>
-                <div class="pp-section">
-                    <div class="pp-section-title"><i class="fa-solid fa-percent"></i> תוספות כלליות</div>
-                    <div class="pp-grid">
-                        <div class="pp-field"><label class="pp-label">מכפיל רווח</label><input class="pp-input" id="pp-profitMultiplier" type="number" min="0" step="0.1"></div>
-                        <div class="pp-field"><label class="pp-label">תוספת גובה %</label><input class="pp-input" id="pp-heightSurcharge" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">תוספת עומק %</label><input class="pp-input" id="pp-depthSurcharge" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">תוספת סנדוויץ' %</label><input class="pp-input" id="pp-sandwichSurcharge" type="number" min="0"></div>
-                    </div>
-                </div>
-                <div class="pp-section">
-                    <div class="pp-section-title"><i class="fa-solid fa-screwdriver-wrench"></i> התקנה</div>
-                    <div class="pp-grid-3">
-                        <div class="pp-field"><label class="pp-label">מחיר ליחידה ₪</label><input class="pp-input" id="pp-installPricePerUnit" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">ס"מ ליחידה</label><input class="pp-input" id="pp-installUnitCm" type="number" min="0" step="0.5"></div>
-                        <div class="pp-field"><label class="pp-label">תוספת גובה %</label><input class="pp-input" id="pp-installHeightSurcharge" type="number" min="0"></div>
-                    </div>
-                </div>
-                <div class="pp-section">
-                    <div class="pp-section-title"><i class="fa-solid fa-plus-circle"></i> תוספות</div>
-                    <div class="pp-grid">
-                        <div class="pp-field"><label class="pp-label">מגירה פנימית ₪</label><input class="pp-input" id="pp-internalDrawer" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">מגירה חיצונית ₪</label><input class="pp-input" id="pp-externalDrawer" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">מגירת נעליים ₪</label><input class="pp-input" id="pp-shoeDrawer" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">כוורת עד 60 ס"מ ₪</label><input class="pp-input" id="pp-openCell" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">כוורת 61-120 ס"מ ₪</label><input class="pp-input" id="pp-openCell34" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">כוורת מעל 120 ס"מ ₪</label><input class="pp-input" id="pp-openCell5" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">מחיצה ₪</label><input class="pp-input" id="pp-partition" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">מדפים חינם/מ'</label><input class="pp-input" id="pp-shelfFreePerMeter" type="number" min="0" step="0.5"></div>
-                        <div class="pp-field"><label class="pp-label">מדף מלמין ₪</label><input class="pp-input" id="pp-extraShelfMel" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">מדף לא מלמין ₪</label><input class="pp-input" id="pp-extraShelfNonMel" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">שולחן צד ₪</label><input class="pp-input" id="pp-deskUnit" type="number" min="0"></div>
-                    </div>
-                </div>
-                <div class="pp-section">
-                    <div class="pp-section-title"><i class="fa-solid fa-door-open"></i> דלתות</div>
-                    <div class="pp-grid">
-                        <div class="pp-field"><label class="pp-label">מסגרת מלמין ₪</label><input class="pp-input" id="pp-doorFramedMel" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">זכוכית מלמין ₪</label><input class="pp-input" id="pp-doorGlassMel" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">זכוכית שחורה ₪</label><input class="pp-input" id="pp-doorGlassBlack" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">מראה ₪</label><input class="pp-input" id="pp-doorMirror" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">מראה בגב תא פתוח ₪</label><input class="pp-input" id="pp-deskMirror" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">זוג לדים ₪</label><input class="pp-input" id="pp-ledPair" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">סורבטו ₪</label><input class="pp-input" id="pp-sorbet" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">ידית טאצ' (לדלת/מגירה) ₪</label><input class="pp-input" id="pp-touchHandle" type="number" min="0"></div>
-                    </div>
-                </div>
-                <div class="pp-section">
-                    <div class="pp-section-title"><i class="fa-solid fa-box"></i> יחידה עילית + פינה + צד</div>
-                    <div class="pp-grid">
-                        <div class="pp-field"><label class="pp-label">יחידה עילית 160 ₪</label><input class="pp-input" id="pp-upperUnit160" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">יחידה עילית 240 ₪</label><input class="pp-input" id="pp-upperUnit240" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">יחידה עילית לס"מ ₪</label><input class="pp-input" id="pp-upperUnitPerCm" type="number" min="0" step="0.25"></div>
-                        <div class="pp-field"><label class="pp-label">פינה מגירות 3 ₪</label><input class="pp-input" id="pp-cornerDrawers3" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">פינה מגירות 4 ₪</label><input class="pp-input" id="pp-cornerDrawers4" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">מגירת פינה נוספת ₪</label><input class="pp-input" id="pp-cornerDrawerExtra" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">פינה שולחן ₪</label><input class="pp-input" id="pp-cornerDesk" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">פינה מלאה בסיס ₪</label><input class="pp-input" id="pp-fullCornerBase" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">מדף פינה מלאה ₪</label><input class="pp-input" id="pp-fullCornerShelf" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">חיבור כנפיים ₪</label><input class="pp-input" id="pp-wingConnection" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">ארון צד מלמין/ס"מ ₪</label><input class="pp-input" id="pp-sideCabMel" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">ארון צד לא מלמין/ס"מ ₪</label><input class="pp-input" id="pp-sideCabNonMel" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">דלתות ארון צד ₪</label><input class="pp-input" id="pp-sideCabDoors" type="number" min="0"></div>
-                    </div>
-                </div>
-                <div class="pp-section">
-                    <div class="pp-section-title"><i class="fa-solid fa-arrows-left-right"></i> ארון הזזה</div>
-                    <div class="pp-grid">
-                        <div class="pp-field"><label class="pp-label">בסיס הזזה ₪</label><input class="pp-input" id="pp-slidingBase" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">דלת הזזה ₪</label><input class="pp-input" id="pp-slidingDoor" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">זכוכית הזזה ₪</label><input class="pp-input" id="pp-slidingGlass" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">מראה הזזה ₪</label><input class="pp-input" id="pp-slidingMirror" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">פרופיל זהב ₪</label><input class="pp-input" id="pp-slidingGold" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">פרופיל שחור ₪</label><input class="pp-input" id="pp-slidingBlack" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">תוספת גובה הזזה %</label><input class="pp-input" id="pp-slidingHeightSurcharge" type="number" min="0"></div>
-                        <div class="pp-field"><label class="pp-label">רגל ניקל ₪</label><input class="pp-input" id="pp-nickelLegPrice" type="number" min="0"></div>
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -2031,11 +1880,11 @@
 
 <script src="auth.js?v=20261115todos2"></script>
 <script src="trial-watermark.js?v=20261008trial"></script>
-<script src="pricing-core.js?v=20261119plinthExtras1"></script>
-<script src="pricing-panel.js?v=20261119plinthExtras1"></script>
+<script src="pricing-core.js?v=20261120pricingCleanup1"></script>
+<script src="pricing-panel.js?v=20261120pricingCleanup1"></script>
 <script src="stock-materials.js?v=20261119stock1"></script>
-<script src="projects.js?v=20261119plinthExtras1"></script>
-<script src="quick-calc.js?v=20261119hinge1"></script>
+<script src="projects.js?v=20261120pricingCleanup1"></script>
+<script src="quick-calc.js?v=20261120pricingCleanup1"></script>
 <script src="accessibility.js?v=20261115c"></script>
 </body>
 </html>

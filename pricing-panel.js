@@ -51,28 +51,47 @@ function mount(containerId, opts) {
     _attachListeners(container);
 }
 
+/** Wrap content in a collapsible card. open=true → starts expanded. */
+function _detailsCard(title, icon, innerHtml, open) {
+    return '<details class="pnl-details"' + (open ? ' open' : '') + ' ' +
+        'style="background:#fff;border:1px solid var(--border);border-radius:var(--radius,12px);' +
+        'padding:0;margin-bottom:12px;">' +
+        '<summary style="list-style:none;cursor:pointer;padding:16px 24px;font-size:.9rem;font-weight:800;' +
+            'color:var(--primary,#1e3a5f);display:flex;align-items:center;gap:8px;user-select:none;">' +
+            '<i class="fa-solid ' + icon + '"></i> ' + title +
+            '<i class="fa-solid fa-chevron-down" style="margin-right:auto;font-size:.7rem;opacity:.55;"></i>' +
+        '</summary>' +
+        '<div style="padding:0 24px 20px;">' + innerHtml + '</div>' +
+    '</details>';
+}
+
 // ── HTML builder ─────────────────────────────────────────────────────────────
 function _buildHtml() {
     var s = _opts.showSaveBar;
     return [
         _previewHtml(),
         _modeBtnsHtml(),
-        _opts.showCabinetTypes !== false ? _cabinetTypesSectionHtml() : '',
+        // Active mode body (only one visible at a time)
         _rangesSectionHtml(),
         _sqmSectionHtml(),
         _lmSectionHtml(),
         _lmHeightSectionHtml(),
         _materialsSectionHtml(),
+        // Stock near materials
+        _stockMaterialsHtml(),
+        // Profit + install always visible
         _commonSurchargesHtml(),
         _installHtml(),
-        _extrasHtml(),
+        // Collapsible extras groups
+        _structureExtrasHtml(),
         _doorsHtml(),
-        _upperCornerHtml(),
-        _slidingHtml(),
         _customAndClosuresHtml(),
-        _stockMaterialsHtml(),
         _hingeTypesHtml(),
         _customExtrasHtml(),
+        // Special units collapsed by default
+        _specialUnitsHtml(),
+        // Cabinet types last (stores/admin only)
+        _opts.showCabinetTypes !== false ? _cabinetTypesSectionHtml() : '',
         s !== false ? _saveBarHtml() : ''
     ].join('');
 }
@@ -101,6 +120,10 @@ function _previewHtml() {
                 'style="height:36px;padding:0 14px;border:none;border-radius:8px;cursor:pointer;' +
                 'font-size:.82rem;font-family:inherit;font-weight:700;background:rgba(255,255,255,.2);' +
                 'color:#fff;" title="לחץ להחלפה">מלמין</button>' +
+            '<select id="' + _id('prev-mat') + '" onchange="PricingPanel.updatePreview()" ' +
+                'title="צבע מהמלאי (שיטת חומרים)" ' +
+                'style="display:none;height:36px;border:none;border-radius:8px;padding:0 10px;max-width:180px;' +
+                'font-size:.83rem;font-family:inherit;color:#1e3a5f;"></select>' +
         '</div>' +
 
         '<div id="' + _id('prev-result') + '" style="text-align:left;min-width:200px;">' +
@@ -116,8 +139,8 @@ function _modeBtnsHtml() {
         { id: 'ranges',    label: 'טווחי מידות',   sub: 'לפי רוחב' },
         { id: 'sqm',       label: 'מ"ר',             sub: 'מחיר למ"ר' },
         { id: 'lm',        label: 'מ"א',             sub: 'מחיר למ"א' },
-        { id: 'lm_height', label: 'מ"א + גובה',     sub: 'עם ступенчатой תוספת' },
-        { id: 'materials', label: 'חומרים',          sub: 'לוחות × מכפיל' }
+        { id: 'lm_height', label: 'מ"א + גובה',     sub: 'עם תוספת מדורגת' },
+        { id: 'materials', label: 'חומרים',          sub: 'חזית × פלטה × בלאי' }
     ];
     return '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius,12px);' +
             'padding:20px 24px;margin-bottom:12px;">' +
@@ -233,15 +256,15 @@ function _lmHeightSectionHtml() {
 }
 
 function _materialsSectionHtml() {
-    return _modeSection('materials', 'fa-layer-group', 'תמחור לפי חומרים (נגרים)',
+    return _modeSection('materials', 'fa-layer-group', 'תמחור לפי חומרים',
         _field('materialsMultiplier', 'מכפיל בלאי / בזבוז', 'min="1" step="0.05"') +
         _field('materialsBoardPrice', 'מחיר לוח כללי — גיבוי (₪)', 'min="0" step="5"') +
         _field('materialsBoardsPerSqm', 'לוחות למ"ר — גיבוי', 'min="0" step="0.1"')) +
-        '<div id="' + _id('materials-stock-hint') + '" style="display:none;margin:0 0 12px;padding:10px 14px;' +
+        '<div id="' + _id('materials-stock-hint') + '" style="display:none;margin:-4px 0 12px;padding:10px 14px;' +
             'background:#eff6ff;border-radius:8px;font-size:.8rem;color:#1e3a5f;line-height:1.45;">' +
             '<i class="fa-solid fa-circle-info"></i> ' +
-            'לנגרים: העדיפו להגדיר מחיר פלטה מלאה לכל צבע במלאי (למטה / מהמעצב). ' +
-            'החישוב: שטח ארון ÷ שטח פלטה × מחיר פלטה × מכפיל בלאי.</div>';
+            'חישוב: שטח חזית (רוחב×גובה) × (מחיר פלטה ÷ שטח פלטה) × מכפיל בלאי. ' +
+            'הגדירו מחיר פלטה לכל צבע במלאי למטה — הגיבוי משמש רק לצבעים בלי מחיר.</div>';
 }
 
 /* ④ COMMON SURCHARGES — hide heightSurcharge for irrelevant modes */
@@ -250,7 +273,7 @@ function _commonSurchargesHtml() {
         'style="background:#fff;border:1px solid var(--border);border-radius:var(--radius,12px);' +
         'padding:20px 24px;margin-bottom:12px;">' +
         '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin-bottom:14px;">' +
-            '<i class="fa-solid fa-percent"></i> תוספות ורווח</div>' +
+            '<i class="fa-solid fa-percent"></i> רווח ותוספות אחוז</div>' +
         '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">' +
             _field('profitMultiplier', 'מכפיל רווח ללקוח', 'min="1" step="0.05"') +
             '<div id="' + _id('row-heightSurcharge') + '">' +
@@ -262,7 +285,7 @@ function _commonSurchargesHtml() {
         '<div id="' + _id('materials-note') + '" style="display:none;margin-top:12px;padding:10px 14px;' +
             'background:#fef3c7;border-radius:8px;font-size:.8rem;color:#92400e;">' +
             '<i class="fa-solid fa-triangle-exclamation"></i> ' +
-            'בשיטת חומרים: מכפיל החומרים כולל בזבוז, שגיאות וכד\'. מכפיל הרווח מוחל אחריו.' +
+            'בשיטת חומרים: מכפיל הבלאי על עלות הלוחות; מכפיל הרווח מוחל אחריו על הסה״כ.' +
         '</div>' +
     '</div>';
 }
@@ -280,11 +303,8 @@ function _installHtml() {
     '</div>';
 }
 
-function _extrasHtml() {
-    return '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius,12px);' +
-        'padding:20px 24px;margin-bottom:12px;">' +
-        '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin-bottom:14px;">' +
-            '<i class="fa-solid fa-plus-circle"></i> מגירות, תאים, מדפים</div>' +
+function _structureExtrasHtml() {
+    var body =
         '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">' +
             _field('internalDrawer', 'מגירה פנימית (₪)', 'min="0" step="10"') +
             _field('externalDrawer', 'מגירה חיצונית (₪)', 'min="0" step="10"') +
@@ -297,15 +317,12 @@ function _extrasHtml() {
             _field('extraShelfMel', 'מדף נוסף — מלמין (₪)', 'min="0" step="5"') +
             _field('extraShelfNonMel', 'מדף נוסף — לא מלמין (₪)', 'min="0" step="5"') +
             _field('deskUnit', 'שולחן צד (₪)', 'min="0" step="50"') +
-        '</div>' +
-    '</div>';
+        '</div>';
+    return _detailsCard('מגירות, תאים ומדפים', 'fa-plus-circle', body, true);
 }
 
 function _doorsHtml() {
-    return '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius,12px);' +
-        'padding:20px 24px;margin-bottom:12px;">' +
-        '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin-bottom:14px;">' +
-            '<i class="fa-solid fa-door-open"></i> דלתות</div>' +
+    var body =
         '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">' +
             _field('doorFramedMel', 'דלת ממסגרת מלמין (₪)', 'min="0" step="10"') +
             _field('doorGlassMel', 'דלת זכוכית מלמין (₪)', 'min="0" step="10"') +
@@ -315,22 +332,19 @@ function _doorsHtml() {
             _field('ledPair', 'זוג לדים (₪)', 'min="0" step="10"') +
             _field('sorbet', 'סורבטו (₪)', 'min="0" step="10"') +
             _field('touchHandle', 'ידית טאצ\' לדלת/מגירה (₪)', 'min="0" step="5"') +
-        '</div>' +
-    '</div>';
+        '</div>';
+    return _detailsCard('דלתות, מראות ולדים', 'fa-door-open', body, true);
 }
 
-function _upperCornerHtml() {
-    return '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius,12px);' +
-        'padding:20px 24px;margin-bottom:12px;">' +
-        '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin-bottom:14px;">' +
-            '<i class="fa-solid fa-layer-group"></i> יחידה עליונה</div>' +
+function _specialUnitsHtml() {
+    var body =
+        '<div style="font-size:.85rem;font-weight:700;color:var(--muted);margin:4px 0 10px;">יחידה עליונה</div>' +
         '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">' +
             _field('upperUnit160', 'יחידה עליונה עד 160 (₪)', 'min="0" step="50"') +
             _field('upperUnit240', 'יחידה עליונה עד 240 (₪)', 'min="0" step="50"') +
             _field('upperUnitPerCm', 'יחידה עליונה מעל 240 (₪/ס"מ)', 'min="0" step="0.25"') +
         '</div>' +
-        '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin:16px 0 14px;">' +
-            '<i class="fa-solid fa-turn-up"></i> יחידת פינה</div>' +
+        '<div style="font-size:.85rem;font-weight:700;color:var(--muted);margin:16px 0 10px;">יחידת פינה</div>' +
         '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">' +
             _field('cornerDrawers3', 'פינה 3 מגירות (₪)', 'min="0" step="10"') +
             _field('cornerDrawers4', 'פינה 4 מגירות (₪)', 'min="0" step="10"') +
@@ -340,21 +354,13 @@ function _upperCornerHtml() {
             _field('fullCornerShelf', 'מדף בפינה מלאה (₪)', 'min="0" step="10"') +
             _field('wingConnection', 'חיבור כנפיים (₪)', 'min="0" step="50"') +
         '</div>' +
-        '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin:16px 0 14px;">' +
-            '<i class="fa-solid fa-box"></i> ארון צד</div>' +
+        '<div style="font-size:.85rem;font-weight:700;color:var(--muted);margin:16px 0 10px;">ארון צד</div>' +
         '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">' +
             _field('sideCabMel', 'ארון צד מלמין (₪/ס"מ)', 'min="0" step="1"') +
             _field('sideCabNonMel', 'ארון צד לא מלמין (₪/ס"מ)', 'min="0" step="1"') +
             _field('sideCabDoors', 'דלתות לארון צד (₪)', 'min="0" step="50"') +
         '</div>' +
-    '</div>';
-}
-
-function _slidingHtml() {
-    return '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius,12px);' +
-        'padding:20px 24px;margin-bottom:12px;">' +
-        '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin-bottom:14px;">' +
-            '<i class="fa-solid fa-arrows-left-right"></i> ארון הזזה</div>' +
+        '<div style="font-size:.85rem;font-weight:700;color:var(--muted);margin:16px 0 10px;">ארון הזזה</div>' +
         '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">' +
             _field('slidingBase', 'בסיס הזזה (₪)', 'min="0" step="50"') +
             _field('slidingDoor', 'דלת הזזה (₪)', 'min="0" step="10"') +
@@ -363,40 +369,34 @@ function _slidingHtml() {
             _field('slidingGold', 'תוספת פרופיל זהב (₪/דלת)', 'min="0" step="10"') +
             _field('slidingBlack', 'תוספת פרופיל שחור (₪/דלת)', 'min="0" step="10"') +
             _field('slidingHeightSurcharge', 'תוספת גובה הזזה (%)', 'min="0" max="100" step="1"') +
-        '</div>' +
-    '</div>';
+        '</div>';
+    return _detailsCard('יחידות מיוחדות (עליונה / פינה / צד / הזזה)', 'fa-box', body, false);
 }
 
 /** ארון לפי מידה, תוספות צוקל רגיל, משטח עליון, סגירות */
 function _customAndClosuresHtml() {
-    return '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius,12px);' +
-        'padding:20px 24px;margin-bottom:12px;">' +
-        '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin-bottom:8px;">' +
-            '<i class="fa-solid fa-ruler-combined"></i> ארון לפי מידה</div>' +
+    var body =
         '<p style="font-size:.78rem;color:var(--muted);margin:0 0 14px;line-height:1.45;">' +
-            'תמחור נפח: רוחב×גובה×עומק (מטרים) × מחיר למ"ק. ללא תוספות גובה/עומק באחוזים.</p>' +
+            'תמחור נפח (לפי מידה): רוחב×גובה×עומק × מחיר למ"ק. צוקל/רגליים — תוספת ₪ קבועה לפי בחירה בפרויקט.</p>' +
+        '<div style="font-size:.85rem;font-weight:700;color:var(--muted);margin:0 0 10px;">ארון לפי מידה</div>' +
         '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">' +
             _field('customSizeMel', 'מלמין (₪/מ"ק)', 'min="0" step="50"') +
             _field('customSizeSandwich', 'סנדוויץ\' (₪/מ"ק)', 'min="0" step="50"') +
             _field('customSizeMdf', 'MDF (₪/מ"ק)', 'min="0" step="50"') +
         '</div>' +
-        '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin:18px 0 8px;">' +
-            '<i class="fa-solid fa-shoe-prints"></i> סגנון צוקל / רגליים</div>' +
-        '<p style="font-size:.78rem;color:var(--muted);margin:0 0 14px;line-height:1.45;">' +
-            'תוספת עלות קבועה (₪) לפי סגנון הצוקל שנבחר בפרויקט — לפני מכפיל רווח. צוקל רגיל ללא תוספת.</p>' +
+        '<div style="font-size:.85rem;font-weight:700;color:var(--muted);margin:16px 0 10px;">סגנון צוקל / רגליים</div>' +
         '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">' +
             _field('c9RecessedSurcharge', 'צוקל נסתר (תוספת ₪)', 'min="0" step="10"') +
             _field('c9LegsSurcharge', 'על רגליים (תוספת ₪)', 'min="0" step="10"') +
             _field('nickelLegPrice', 'רגל ניקל — ארון על רגליים (₪/רגל)', 'min="0" step="10"') +
         '</div>' +
-        '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin:18px 0 14px;">' +
-            '<i class="fa-solid fa-border-top-left"></i> משטח עליון וסגירות</div>' +
+        '<div style="font-size:.85rem;font-weight:700;color:var(--muted);margin:16px 0 10px;">משטח עליון וסגירות</div>' +
         '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">' +
             _field('topPanelPerCm', 'משטח עליון (₪/ס"מ רוחב)', 'min="0" step="1"') +
             _field('closuresCustomer', 'סגירות — מחיר ללקוח (₪)', 'min="0" step="50"') +
             _field('closuresInstall', 'סגירות — התקנה (₪)', 'min="0" step="50"') +
-        '</div>' +
-    '</div>';
+        '</div>';
+    return _detailsCard('לפי מידה, צוקל וסגירות', 'fa-ruler-combined', body, true);
 }
 
 /** Carpenter stock colors / full-sheet prices */
@@ -418,39 +418,32 @@ function _stockMaterialsHtml() {
     '</div>';
 }
 
-/** User-defined extras: product name + unit cost */
 function _hingeTypesHtml() {
-    return '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius,12px);' +
-        'padding:20px 24px;margin-bottom:12px;">' +
-        '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin-bottom:8px;">' +
-            '<i class="fa-solid fa-screwdriver-wrench"></i> צירים</div>' +
+    var body =
         '<p style="font-size:.78rem;color:var(--muted);margin:0 0 14px;line-height:1.45;">' +
-            'הגדירו סוגי צירים (שם + עלות ליחידה). בפרויקט בוחרים איזה סוג להחיל; הכמות מחושבת אוטומטית לפי גובה הדלת (כמו ב־CNC) ומוכפלת במכפיל הרווח.</p>' +
+            'סוגי צירים (שם + עלות ליחידה). בפרויקט בוחרים סוג; הכמות לפי גובה הדלת (כמו CNC).</p>' +
         '<div id="' + _id('hinge-types-list') + '"></div>' +
         '<button type="button" onclick="PricingPanel.addHingeType()" ' +
             'style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;margin-top:10px;' +
             'background:rgba(37,99,235,.08);border:1.5px solid rgba(37,99,235,.25);' +
             'color:#2563eb;border-radius:10px;font-size:.82rem;font-weight:600;cursor:pointer;' +
             'font-family:inherit;">' +
-            '<i class="fa-solid fa-plus"></i> הוסף סוג ציר</button>' +
-    '</div>';
+            '<i class="fa-solid fa-plus"></i> הוסף סוג ציר</button>';
+    return _detailsCard('צירים', 'fa-screwdriver-wrench', body, true);
 }
 
 function _customExtrasHtml() {
-    return '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius,12px);' +
-        'padding:20px 24px;margin-bottom:12px;">' +
-        '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin-bottom:8px;">' +
-            '<i class="fa-solid fa-tags"></i> תוספות אישיות</div>' +
+    var body =
         '<p style="font-size:.78rem;color:var(--muted);margin:0 0 14px;line-height:1.45;">' +
-            'הוסיפו מוצרים משלכם (שם + מחיר עלות ליחידה). הם יופיעו במחשבון הצעות המחיר ויוכפלו במכפיל הרווח.</p>' +
+            'מוצרים משלכם (שם + עלות ליחידה) — מופיעים במחשבון הצעות מחיר ומוכפלים ברווח.</p>' +
         '<div id="' + _id('custom-extras-list') + '"></div>' +
         '<button type="button" onclick="PricingPanel.addCustomExtra()" ' +
             'style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;margin-top:10px;' +
             'background:rgba(37,99,235,.08);border:1.5px solid rgba(37,99,235,.25);' +
             'color:#2563eb;border-radius:10px;font-size:.82rem;font-weight:600;cursor:pointer;' +
             'font-family:inherit;">' +
-            '<i class="fa-solid fa-plus"></i> הוסף תוספת</button>' +
-    '</div>';
+            '<i class="fa-solid fa-plus"></i> הוסף תוספת</button>';
+    return _detailsCard('תוספות אישיות', 'fa-tags', body, false);
 }
 
 function _saveBarHtml() {
@@ -509,8 +502,14 @@ function setMode(mode) {
     var stockHint = _el('materials-stock-hint');
     if (stockHint) stockHint.style.display = (mode === 'materials') ? 'block' : 'none';
 
+    var prevMat = _el('prev-mat');
+    if (prevMat) prevMat.style.display = (mode === 'materials') ? '' : 'none';
+    var prevMel = _el('prev-mel');
+    if (prevMel) prevMel.style.display = (mode === 'materials') ? 'none' : '';
+
     // Update preview type select options (filtered to non-sliding for non-ranges modes)
     _refreshPreviewTypeSelect();
+    _refreshPreviewMatSelect();
     updatePreview();
 }
 
@@ -597,6 +596,7 @@ function _renderStockMaterials() {
     if (!_stockMaterials.length) {
         list.innerHTML = '<div style="font-size:.8rem;color:var(--muted);padding:6px 0 4px;">' +
             'עדיין אין צבעי מלאי — הוסיפו כאן או מהמעצב.</div>';
+        _refreshPreviewMatSelect();
         return;
     }
     list.innerHTML = _stockMaterials.map(function(item) {
@@ -632,6 +632,7 @@ function _renderStockMaterials() {
                 'color:#ef4444;cursor:pointer;font-size:.85rem;">✕</button>' +
         '</div>';
     }).join('');
+    _refreshPreviewMatSelect();
 }
 
 function addStockMaterial() {
@@ -656,6 +657,7 @@ function addStockMaterial() {
         sheetH: sz.h
     });
     _renderStockMaterials();
+    updatePreview();
 }
 
 function _deleteStockMaterial(btn) {
@@ -665,6 +667,7 @@ function _deleteStockMaterial(btn) {
     _syncStockMaterialsFromDom();
     _stockMaterials = _stockMaterials.filter(function(x) { return x.key !== key; });
     _renderStockMaterials();
+    updatePreview();
 }
 
 function _syncStockMaterialsFromDom() {
@@ -1043,7 +1046,7 @@ function fill(cfg) {
     _set('lmHeightStepPct',    _pct(_num(c.lmHeightStepPct, 0.10)));
     _set('materialsBoardPrice',    _num(c.materialsBoardPrice, 180));
     _set('materialsBoardsPerSqm',  _num(c.materialsBoardsPerSqm, 1.4));
-    _set('materialsMultiplier',    _num(c.materialsMultiplier, 2.5));
+    _set('materialsMultiplier',    _num(c.materialsMultiplier, 1.4));
     _set('profitMultiplier',       _num(c.profitMultiplier, 1.8));
     _set('heightSurcharge',        _pct(_num(c.heightSurcharge, 0.20)));
     _set('depthSurcharge',         _pct(_num(c.depthSurcharge, 0.20)));
@@ -1169,7 +1172,7 @@ function read() {
         lmHeightStepPct:          (_frac(_v('lmHeightStepPct')) || 0.10),
         materialsBoardPrice:      _num(_v('materialsBoardPrice'), 180),
         materialsBoardsPerSqm:    _num(_v('materialsBoardsPerSqm'), 1.4),
-        materialsMultiplier:      _num(_v('materialsMultiplier'), 2.5),
+        materialsMultiplier:      _num(_v('materialsMultiplier'), 1.4),
         profitMultiplier:         _num(_v('profitMultiplier'), 1.8),
         heightSurcharge:          (_frac(_v('heightSurcharge')) || 0),
         depthSurcharge:           (_frac(_v('depthSurcharge')) || 0),
@@ -1206,6 +1209,21 @@ function _refreshPreviewTypeSelect() {
     if (!types.some(function(t) { return t.id === curVal; }) && types.length) sel.value = types[0].id;
 }
 
+function _refreshPreviewMatSelect() {
+    var sel = _el('prev-mat');
+    if (!sel) return;
+    var cur = sel.value;
+    var opts = '<option value="">גיבוי (ללא צבע מלאי)</option>';
+    (_stockMaterials || []).forEach(function(m) {
+        if (!m || !m.key) return;
+        var label = (m.label || m.key) + (m.sheetPrice > 0 ? ' · ₪' + m.sheetPrice : '');
+        opts += '<option value="' + _esc(m.key) + '"' + (m.key === cur ? ' selected' : '') + '>' +
+            _esc(label) + '</option>';
+    });
+    sel.innerHTML = opts;
+    if (cur && (_stockMaterials || []).some(function(m) { return m && m.key === cur; })) sel.value = cur;
+}
+
 function _toggleMaterial() {
     _melamine = !_melamine;
     var btn = _el('prev-mel');
@@ -1223,17 +1241,31 @@ function updatePreview() {
     var w  = _num((_el('prev-w') || {}).value, 160);
     var h  = _num((_el('prev-h') || {}).value, 240);
     var d  = 56; // default depth
+    var matKey = ((_el('prev-mat') || {}).value) || null;
 
     try {
         var type = PC.findType(cfg, typeId) || (PC.normalizeTypes(cfg)[0]);
         if (!type) { resultEl.innerHTML = '<div style="font-size:.75rem;opacity:.75;margin-bottom:2px;">תצוגה מקדימה</div><div style="font-size:1rem;">—</div>'; return; }
-        var res = PC.preview(cfg, { typeId: type.id, w: w, h: h, d: d, melamine: _melamine });
-        var mel = _melamine ? 'מלמין' : 'לא מלמין';
+        var res = PC.preview(cfg, {
+            typeId: type.id, w: w, h: h, d: d, melamine: _melamine,
+            matKey: (_currentMode === 'materials') ? matKey : null
+        });
+        var matLabel = '';
+        if (_currentMode === 'materials') {
+            if (matKey) {
+                var hit = (_stockMaterials || []).find(function(m) { return m && m.key === matKey; });
+                matLabel = hit ? (hit.label || hit.key) : matKey;
+            } else {
+                matLabel = 'גיבוי';
+            }
+        } else {
+            matLabel = _melamine ? 'מלמין' : 'לא מלמין';
+        }
         var costLine = (window._showCostPricing === true || (window._features && window._features.showCostPricing))
             ? '<div style="font-size:.75rem;opacity:.75;">עלות: ' + res.cost.toLocaleString() + ' ₪ · התקנה: ' + res.install.toLocaleString() + ' ₪</div>'
             : '<div style="font-size:.75rem;opacity:.75;">התקנה: ' + res.install.toLocaleString() + ' ₪</div>';
         resultEl.innerHTML =
-            '<div style="font-size:.73rem;opacity:.7;margin-bottom:3px;">' + _esc(type.label) + ' ' + w + '×' + h + ' ' + mel + '</div>' +
+            '<div style="font-size:.73rem;opacity:.7;margin-bottom:3px;">' + _esc(type.label) + ' ' + w + '×' + h + ' · ' + _esc(matLabel) + '</div>' +
             '<div style="font-size:1.2rem;font-weight:800;">ללקוח: ' + res.customer.toLocaleString() + ' ₪</div>' +
             costLine;
     } catch (e) {
@@ -1261,7 +1293,10 @@ var _savedTimer;
     style.id = 'pnl-styles';
     style.textContent =
         '.pnl-mode-btn:hover { opacity: .85; }' +
-        '[id^="pnl-"] input:focus { border-color: #2563eb !important; outline: none; }';
+        '[id^="pnl-"] input:focus { border-color: #2563eb !important; outline: none; }' +
+        '.pnl-details > summary::-webkit-details-marker { display: none; }' +
+        '.pnl-details[open] > summary .fa-chevron-down { transform: rotate(180deg); }' +
+        '.pnl-details > summary .fa-chevron-down { transition: transform .15s; }';
     document.head.appendChild(style);
 })();
 

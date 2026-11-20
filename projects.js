@@ -2389,7 +2389,7 @@ var _PP_EMPTY_WIDTHS = [80, 120, 160, 200, 240];
 var _PP_DEFAULTS = {
     pricingMode:'ranges',sqmPrice:800,sqmPriceNonMel:1040,lmPrice:1200,lmPriceNonMel:1560,
     lmHeightBase:1200,lmHeightBaseNonMel:1560,lmHeightThresholdCm:240,lmHeightStepCm:30,lmHeightStepPct:0.10,
-    materialsBoardPrice:180,materialsBoardsPerSqm:1.4,materialsMultiplier:2.5,profitMultiplier:1.8,
+    materialsBoardPrice:180,materialsBoardsPerSqm:1.4,materialsMultiplier:1.4,profitMultiplier:1.8,
     heightSurcharge:0.20,depthSurcharge:0.20,sandwichSurcharge:0.15,
     installPricePerUnit:110,installUnitCm:42.5,installHeightSurcharge:0.20,
     cabinetTypes: _PP_DEFAULT_CABINET_TYPES.map(function(t) { return Object.assign({}, t); }),
@@ -3411,7 +3411,7 @@ function _fillPricingPanel(cfg) {
     _ppSet('pp-lmHeightStepPct', _ppPct(_ppNum(c.lmHeightStepPct, 0.10)));
     _ppSet('pp-materialsBoardPrice', _ppNum(c.materialsBoardPrice, 180));
     _ppSet('pp-materialsBoardsPerSqm', _ppNum(c.materialsBoardsPerSqm, 1.4));
-    _ppSet('pp-materialsMultiplier', _ppNum(c.materialsMultiplier, 2.5));
+    _ppSet('pp-materialsMultiplier', _ppNum(c.materialsMultiplier, 1.4));
     _ppSet('pp-profitMultiplier', _ppNum(c.profitMultiplier, 1.8));
     _ppSet('pp-heightSurcharge', _ppPct(_ppNum(c.heightSurcharge, 0.20)));
     _ppSet('pp-depthSurcharge', _ppPct(_ppNum(c.depthSurcharge, 0.20)));
@@ -3482,7 +3482,7 @@ function _readPricingPanel() {
         lmHeightStepPct: _ppFrac(_ppVal('pp-lmHeightStepPct')),
         materialsBoardPrice: _ppNum(_ppVal('pp-materialsBoardPrice'), 180),
         materialsBoardsPerSqm: _ppNum(_ppVal('pp-materialsBoardsPerSqm'), 1.4),
-        materialsMultiplier: _ppNum(_ppVal('pp-materialsMultiplier'), 2.5),
+        materialsMultiplier: _ppNum(_ppVal('pp-materialsMultiplier'), 1.4),
         profitMultiplier: _ppNum(_ppVal('pp-profitMultiplier'), 1.8),
         heightSurcharge: _ppFrac(_ppVal('pp-heightSurcharge')),
         depthSurcharge: _ppFrac(_ppVal('pp-depthSurcharge')),

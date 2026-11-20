@@ -270,8 +270,17 @@ function _qcBasePrice(cfg, ww, wh, wd, wMelamine, engine, typeId) {
         return bp;
     }
     if (mode === 'materials') {
+        // Prefer first stocked sheet with a price; else fallback board fields
+        var matKey = null;
+        var stockList = cfg.stockMaterials || [];
+        for (var si = 0; si < stockList.length; si++) {
+            if (stockList[si] && _qcNum(stockList[si].sheetPrice, 0) > 0) {
+                matKey = stockList[si].key;
+                break;
+            }
+        }
         if (global.PricingCore && typeof global.PricingCore.materialsFaceCost === 'function') {
-            bp = global.PricingCore.materialsFaceCost(cfg, ww, wh, null);
+            bp = global.PricingCore.materialsFaceCost(cfg, ww, wh, matKey);
         } else {
             var sqm = (ww / 100) * (wh / 100);
             var mult = _qcNum(cfg.materialsMultiplier, 1.4);

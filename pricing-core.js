@@ -11,7 +11,7 @@ var DEFAULTS = {
     lmPrice: 1200, lmPriceNonMel: 1560,
     lmHeightBase: 1200, lmHeightBaseNonMel: 1560,
     lmHeightThresholdCm: 240, lmHeightStepCm: 30, lmHeightStepPct: 0.10,
-    materialsBoardPrice: 180, materialsBoardsPerSqm: 1.4, materialsMultiplier: 2.5,
+    materialsBoardPrice: 180, materialsBoardsPerSqm: 1.4, materialsMultiplier: 1.4,
     profitMultiplier: 1.8,
     installPricePerUnit: 110, installUnitCm: 42.5, installHeightSurcharge: 0.20,
     heightSurcharge: 0.20, depthSurcharge: 0.20, sandwichSurcharge: 0.15,
@@ -334,7 +334,11 @@ function preview(cfg, opts) {
     var type = findType(cfg, opts.typeId) || normalizeTypes(cfg)[0];
     var engine = type.engine;
     var body, legs = 0;
-    var bpOpts = { boardMaterial: opts.boardMaterial || (opts.melamine ? 'melamine' : 'sandwich'), plinthStyle: opts.plinthStyle };
+    var bpOpts = {
+        boardMaterial: opts.boardMaterial || (opts.melamine ? 'melamine' : 'sandwich'),
+        plinthStyle: opts.plinthStyle,
+        matKey: opts.matKey || opts.materialKey || null
+    };
     if (engine === 'sliding') {
         body = slidingCost(cfg, opts.w, opts.h);
     } else {
