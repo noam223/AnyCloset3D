@@ -255,15 +255,17 @@ function _rangesSectionHtml() {
 }
 
 function _modeSection(id, icon, title, fields, helpHtml) {
+    var fieldsHtml = fields
+        ? ('<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">' +
+            fields + '</div>')
+        : '';
     return '<div id="' + _id('section-' + id) + '" class="pnl-mode-section" ' +
         'style="background:#fff;border:1px solid var(--border);border-radius:var(--radius,12px);' +
         'padding:20px 24px;margin-bottom:12px;display:none;">' +
         '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin-bottom:10px;">' +
             '<i class="fa-solid ' + icon + '"></i> ' + title + '</div>' +
         (helpHtml || '') +
-        '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">' +
-            fields +
-        '</div>' +
+        fieldsHtml +
     '</div>';
 }
 
@@ -323,25 +325,18 @@ function _lmHeightSectionHtml() {
 
 function _materialsSectionHtml() {
     return _modeSection('materials', 'fa-layer-group', 'תמחור לפי חומרים',
-        _field('materialsMultiplier', 'מכפיל בלאי / בזבוז (גיבוי)', 'min="1" step="0.05"') +
-        _field('materialsBoardPrice', 'מחיר לוח כללי — גיבוי (₪ לפני מע״מ)', 'min="0" step="5"') +
-        _field('materialsBoardsPerSqm', 'לוחות למ"ר — גיבוי', 'min="0" step="0.1"'),
+        '',
         '<div id="' + _id('materials-stock-hint') + '">' +
             _helpBox(
-                '<b>במעצב (חישוב אמיתי):</b> כל חלקי הארון (צדדים, מדפים, דלתות…) נארזים לפלטות כמו בקינון CNC. ' +
-                'עלות החומר = <b>מספר פלטות × מחיר פלטה</b> לפי צבע במלאי למטה. ' +
-                'כל מחירי הפלטות הם <b>לפני מע״מ</b>. ייצוא CNC לא נפתח — רק מנוע הקינון הפנימי.',
+                '<b>במעצב:</b> כל חלקי הארון נארזים לפלטות (כמו קינון CNC). ' +
+                'עלות החומר = <b>מספר פלטות × מחיר פלטה</b> לפי הצבעים במלאי למטה — <b>לפני מע״מ</b>. ' +
+                'צבע חדש במלאי מקבל אוטומטית <b>400 ₪ לפני מע״מ</b> לפלטה (ניתן לשנות לכל צבע).',
                 'info'
             ) +
             _helpBox(
-                '<b>דוגמה במעצב:</b> הארון יצא ל־3 פלטות לבן מט (₪450 לפני מע״מ) ו־1 פלטת עץ (₪520) → ' +
-                'עלות חומר 3×450 + 1×520 = 1,870 ₪ לפני מע״מ. אחר כך תוספות פרזול/מגירות, ואז × רווח.',
+                '<b>דוגמה:</b> 3 פלטות לבן × 400 ₪ + פלטת עץ אחת × 520 ₪ = 1,720 ₪ עלות חומר לפני מע״מ. ' +
+                'אחר כך תוספות פרזול/מגירות, ואז × מכפיל רווח.',
                 'ex'
-            ) +
-            _helpBox(
-                '<b>כאן בתצוגה מקדימה / מחשבון מהיר</b> (אין ארון תלת־ממד): הערכה לפי שטח חזית × (מחיר פלטה÷שטח פלטה) × מכפיל בלאי. ' +
-                'שדות הגיבוי משמשים רק כשאין מחיר לצבע במלאי.',
-                'warn'
             ) +
         '</div>'
     );
@@ -375,9 +370,9 @@ function _commonSurchargesHtml() {
         '</div>' +
         '<div id="' + _id('materials-note') + '" style="display:none;margin-top:12px;">' +
             _helpBox(
-                'בשיטת <b>חומרים</b>: במעצב הקינון כבר כולל בזבוז אריזה — מכפיל הבלאי משמש בעיקר לגיבוי/תצוגה מקדימה. ' +
-                'מכפיל הרווח תמיד מוחל בסוף על סה״כ העלות.',
-                'warn'
+                'בשיטת <b>חומרים</b>: עלות הפלטות לפי מלאי (ברירת מחדל 400 ₪ לפני מע״מ לפלטה). ' +
+                'מכפיל הרווח מוחל בסוף על סה״כ העלות.',
+                'info'
             ) +
         '</div>' +
     '</div>';
@@ -1756,9 +1751,6 @@ function fill(cfg) {
     _set('lmHeightThresholdCm',_num(c.lmHeightThresholdCm, 240));
     _set('lmHeightStepCm',     _num(c.lmHeightStepCm, 30));
     _set('lmHeightStepPct',    _pct(_num(c.lmHeightStepPct, 0.10)));
-    _set('materialsBoardPrice',    _num(c.materialsBoardPrice, 400));
-    _set('materialsBoardsPerSqm',  _num(c.materialsBoardsPerSqm, 1.4));
-    _set('materialsMultiplier',    _num(c.materialsMultiplier, 1.4));
     _set('profitMultiplier',       _num(c.profitMultiplier, 1.8));
     _set('heightSurcharge',        _pct(_num(c.heightSurcharge, 0.20)));
     _set('depthSurchargeFromCm',   _num(c.depthSurchargeFromCm, 54));
@@ -1883,9 +1875,10 @@ function read() {
         lmHeightThresholdCm:      _num(_v('lmHeightThresholdCm'), 240),
         lmHeightStepCm:           _num(_v('lmHeightStepCm'), 30),
         lmHeightStepPct:          (_frac(_v('lmHeightStepPct')) || 0.10),
-        materialsBoardPrice:      _num(_v('materialsBoardPrice'), 400),
-        materialsBoardsPerSqm:    _num(_v('materialsBoardsPerSqm'), 1.4),
-        materialsMultiplier:      _num(_v('materialsMultiplier'), 1.4),
+        // Fixed internals — no UI; new stock colors default to ₪400/sheet before VAT
+        materialsBoardPrice:      400,
+        materialsBoardsPerSqm:    1.4,
+        materialsMultiplier:      1.4,
         profitMultiplier:         _num(_v('profitMultiplier'), 1.8),
         heightSurcharge:          (_frac(_v('heightSurcharge')) || 0),
         depthSurchargeFromCm:     _num(_v('depthSurchargeFromCm'), 54),
