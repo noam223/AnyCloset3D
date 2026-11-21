@@ -408,7 +408,7 @@ function _stockMaterialsHtml() {
             '<i class="fa-solid fa-palette"></i> מלאי צבעים ופלטות</div>' +
         '<p style="font-size:.78rem;color:var(--muted);margin:0 0 14px;line-height:1.45;">' +
             'הצבעים השוטפים שלכם — מופיעים בראש רשימת הצבעים במעצב. לכל צבע: מחיר פלטה מלאה ומידותיה. ' +
-            'אפשר גם להוסיף צבע מהמעצב (כפתור «הגדר תמחור» כשבוחרים צבע שלא במלאי).</p>' +
+            'הוסיפו מהקטלוג (מערכת / EGGER / פורמקס / בלורן / טמבור) או ידנית לפי מפתח.</p>' +
         '<div id="' + _id('stock-list') + '"></div>' +
         '<div id="' + _id('stock-add-form') + '" style="display:none;flex-direction:column;gap:10px;' +
             'margin-top:12px;padding:12px 14px;background:#f8fafc;' +
@@ -442,12 +442,19 @@ function _stockMaterialsHtml() {
             '</div>' +
             '<div id="' + _id('stock-add-err') + '" style="display:none;font-size:.78rem;color:#dc2626;"></div>' +
         '</div>' +
-        '<button type="button" id="' + _id('stock-add-btn') + '" onclick="PricingPanel.addStockMaterial()" ' +
-            'style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;margin-top:10px;' +
-            'background:rgba(37,99,235,.08);border:1.5px solid rgba(37,99,235,.25);' +
-            'color:#2563eb;border-radius:10px;font-size:.82rem;font-weight:600;cursor:pointer;' +
-            'font-family:inherit;">' +
-            '<i class="fa-solid fa-plus"></i> הוסף צבע למלאי</button>' +
+        '<div id="' + _id('stock-add-btns') + '" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;">' +
+            '<button type="button" id="' + _id('stock-add-btn') + '" onclick="PricingPanel.addStockMaterial()" ' +
+                'style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;' +
+                'background:rgba(37,99,235,.08);border:1.5px solid rgba(37,99,235,.25);' +
+                'color:#2563eb;border-radius:10px;font-size:.82rem;font-weight:600;cursor:pointer;' +
+                'font-family:inherit;">' +
+                '<i class="fa-solid fa-plus"></i> הוסף ידנית</button>' +
+            '<button type="button" id="' + _id('stock-catalog-btn') + '" onclick="PricingPanel.openStockCatalog()" ' +
+                'style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;' +
+                'background:var(--primary,#1e3a5f);border:none;color:#fff;border-radius:10px;' +
+                'font-size:.82rem;font-weight:700;cursor:pointer;font-family:inherit;">' +
+                '<i class="fa-solid fa-swatchbook"></i> מהקטלוג</button>' +
+        '</div>' +
     '</div>';
 }
 
@@ -678,10 +685,10 @@ function _stockAddErr(msg) {
 
 function addStockMaterial() {
     var form = _el('stock-add-form');
-    var btn = _el('stock-add-btn');
+    var btns = _el('stock-add-btns');
     if (!form) return;
     form.style.display = 'flex';
-    if (btn) btn.style.display = 'none';
+    if (btns) btns.style.display = 'none';
     _stockAddErr('');
     var keyInp = _el('stock-add-key');
     var labelInp = _el('stock-add-label');
@@ -692,10 +699,36 @@ function addStockMaterial() {
 
 function cancelAddStockMaterial() {
     var form = _el('stock-add-form');
-    var btn = _el('stock-add-btn');
+    var btns = _el('stock-add-btns');
     if (form) form.style.display = 'none';
-    if (btn) btn.style.display = 'inline-flex';
+    if (btns) btns.style.display = 'flex';
     _stockAddErr('');
+}
+
+function _pushStockItem(item) {
+    if (!item || !item.key) return false;
+    var key = String(item.key).trim();
+    if (!key) return false;
+    if (_stockMaterials.some(function(x) { return x.key === key; })) return false;
+    var sz = (PC && typeof PC.sheetSizeForMat === 'function')
+        ? PC.sheetSizeForMat(key)
+        : { w: (PC && PC.DEFAULT_SHEET_W) || 2750, h: (PC && PC.DEFAULT_SHEET_H) || 1220, brand: '' };
+    var label = String(item.label || '').trim();
+    if (!label && typeof window !== 'undefined' && window.colorNamesHebrew && window.colorNamesHebrew[key]) {
+        label = window.colorNamesHebrew[key];
+    }
+    var row = {
+        key: key,
+        label: label || key,
+        brand: item.brand || sz.brand || '',
+        sheetPrice: _num(item.sheetPrice, 0),
+        sheetW: _num(item.sheetW, 0) || sz.w,
+        sheetH: _num(item.sheetH, 0) || sz.h
+    };
+    if (item.hex) row.hex = item.hex;
+    if (item.img) row.img = item.img;
+    _stockMaterials.push(row);
+    return true;
 }
 
 function confirmAddStockMaterial() {
@@ -713,25 +746,10 @@ function confirmAddStockMaterial() {
         _stockAddErr('הצבע כבר במלאי.');
         return;
     }
-    var sz = (PC && typeof PC.sheetSizeForMat === 'function')
-        ? PC.sheetSizeForMat(key)
-        : { w: (PC && PC.DEFAULT_SHEET_W) || 2750, h: (PC && PC.DEFAULT_SHEET_H) || 1220, brand: '' };
-    // Prefer Hebrew catalog name when available
-    if (!label && typeof window !== 'undefined' && window.colorNamesHebrew && window.colorNamesHebrew[key]) {
-        label = window.colorNamesHebrew[key];
-    }
-    _stockMaterials.push({
-        key: key,
-        label: label || key,
-        brand: sz.brand || '',
-        sheetPrice: 0,
-        sheetW: sz.w,
-        sheetH: sz.h
-    });
+    _pushStockItem({ key: key, label: label });
     cancelAddStockMaterial();
     _renderStockMaterials();
     updatePreview();
-    // Focus price of the new row
     var list = _el('stock-list');
     if (list) {
         var rows = list.querySelectorAll('.pnl-stock-row');
@@ -739,6 +757,409 @@ function confirmAddStockMaterial() {
         var priceEl = last && last.querySelector('.pnl-stock-price');
         if (priceEl) priceEl.focus();
     }
+}
+
+// ── stock catalog picker (all brands) ────────────────────────────────────────
+var _catBrand = 'system';
+var _catSub = 'all';
+var _catQuery = '';
+var _catCache = {};
+var _catFiltered = [];
+var _catRendered = 0;
+var _catPage = 72;
+var _catLoading = false;
+
+var _SYSTEM_COLORS = [
+    { key: 'white_matte', label: 'לבן מט 2100', hex: '#f7f7f7', brand: 'system', cat: 'solids' },
+    { key: 'c3110', label: '3110', hex: '#f0ede9', brand: 'system', cat: 'solids' },
+    { key: 'c795', label: '759', hex: '#ece0d4', brand: 'system', cat: 'solids' },
+    { key: 'c705', label: '705', hex: '#dbd6c6', brand: 'system', cat: 'solids' },
+    { key: 'c3207', label: '3207', hex: '#F7ECD9', brand: 'system', cat: 'solids' },
+    { key: 'black_matte', label: 'שחור מט', hex: '#2a2a2a', brand: 'system', cat: 'solids' },
+    { key: '2020', label: '2020', img: 'textures/2020.jpg', brand: 'system', cat: 'textures' },
+    { key: '2024', label: '2024', img: 'textures/2024.jpg', brand: 'system', cat: 'textures' },
+    { key: 'A427', label: 'A427', img: 'textures/A427.jpg?v=20260914fix', brand: 'system', cat: 'textures' },
+    { key: '2025', label: '2025', img: 'textures/2025.jpg', brand: 'system', cat: 'textures' },
+    { key: '2040', label: '2040', img: 'textures/2040.jpg', brand: 'system', cat: 'textures' },
+    { key: '2041', label: '2041', img: 'textures/2041.jpg', brand: 'system', cat: 'textures' },
+    { key: '2044', label: '2044', img: 'textures/2044.jpg', brand: 'system', cat: 'textures' },
+    { key: '2047', label: '2047', img: 'textures/2047.jpg', brand: 'system', cat: 'textures' },
+    { key: '2049', label: '2049', img: 'textures/2049.jpg', brand: 'system', cat: 'textures' },
+    { key: '2062', label: '2062', img: 'textures/2062.jpg', brand: 'system', cat: 'textures' },
+    { key: '5600', label: '5600', img: 'textures/5600.jpg', brand: 'system', cat: 'textures' },
+    { key: '7180', label: '7180', img: 'textures/7180.jpg', brand: 'system', cat: 'textures' },
+    { key: '456', label: '456', img: 'textures/456.jpg', brand: 'system', cat: 'textures' },
+    { key: '462', label: '462', img: 'textures/462.jpg', brand: 'system', cat: 'textures' },
+    { key: '463', label: '463', img: 'textures/463.jpg', brand: 'system', cat: 'textures' },
+    { key: '464', label: '464', img: 'textures/464.jpg', brand: 'system', cat: 'textures' },
+    { key: '480', label: '480', img: 'textures/480.jpg', brand: 'system', cat: 'textures' }
+];
+
+function _sanitizeMatId(id) {
+    return String(id || '').replace(/[^a-zA-Z0-9]/g, '_');
+}
+
+function _brandMatKey(brand, id) {
+    if (brand === 'formex') return 'formex_' + _sanitizeMatId(id);
+    if (brand === 'bluran') return 'bluran_' + _sanitizeMatId(id);
+    if (brand === 'tambour') return 'tambour_' + _sanitizeMatId(id);
+    return String(id || '');
+}
+
+function _parseCsvLine(line) {
+    var result = [], current = '', inQuotes = false, i, ch;
+    for (i = 0; i < line.length; i++) {
+        ch = line[i];
+        if (ch === '"') inQuotes = !inQuotes;
+        else if (ch === ',' && !inQuotes) { result.push(current.trim()); current = ''; }
+        else current += ch;
+    }
+    result.push(current.trim());
+    return result;
+}
+
+function _flattenBrandCatalog(data, brand) {
+    var list = [];
+    (data.categories || []).forEach(function(cat) {
+        (cat.items || []).forEach(function(it) {
+            if (!it || !it.id) return;
+            list.push({
+                key: _brandMatKey(brand, it.id),
+                id: it.id,
+                label: it.name || it.id,
+                hex: it.hex || null,
+                img: it.img || null,
+                brand: brand,
+                cat: cat.id || 'all',
+                catName: cat.name || ''
+            });
+        });
+    });
+    return list;
+}
+
+function _eggerCatalogItems() {
+    var src = (global.EGGER_ALL_COLORS && global.EGGER_ALL_COLORS.length)
+        ? global.EGGER_ALL_COLORS
+        : [];
+    return src.map(function(c) {
+        return {
+            key: c.key,
+            id: c.code || c.key,
+            label: 'EGGER ' + (c.code || c.label || c.key),
+            hex: c.hex || null,
+            img: c.img || null,
+            brand: 'egger',
+            cat: 'all',
+            catName: 'EGGER'
+        };
+    });
+}
+
+function _ensureCatModal() {
+    var existing = document.getElementById('pnl-stock-catalog-modal');
+    if (existing) return existing;
+    var modal = document.createElement('div');
+    modal.id = 'pnl-stock-catalog-modal';
+    modal.className = 'pnl-cat-overlay';
+    modal.innerHTML =
+        '<div class="pnl-cat-dialog" role="dialog" aria-modal="true" aria-labelledby="pnl-cat-title">' +
+            '<div class="pnl-cat-header">' +
+                '<div class="pnl-cat-header-main">' +
+                    '<h2 id="pnl-cat-title">קטלוג צבעים למלאי</h2>' +
+                    '<p id="pnl-cat-count">בחרו חברה וצבע להוספה</p>' +
+                '</div>' +
+                '<div class="pnl-cat-search-wrap">' +
+                    '<input type="search" id="pnl-cat-search" placeholder="חיפוש לפי שם או קוד..." autocomplete="off">' +
+                '</div>' +
+                '<button type="button" class="pnl-cat-close" id="pnl-cat-close" aria-label="סגור">✕</button>' +
+            '</div>' +
+            '<div class="pnl-cat-brands" id="pnl-cat-brands" role="tablist"></div>' +
+            '<div class="pnl-cat-subs" id="pnl-cat-subs"></div>' +
+            '<div class="pnl-cat-body" id="pnl-cat-body">' +
+                '<div class="pnl-cat-grid" id="pnl-cat-grid"></div>' +
+            '</div>' +
+            '<div class="pnl-cat-footer">' +
+                '<span id="pnl-cat-added-note" class="pnl-cat-added-note"></span>' +
+                '<button type="button" class="pnl-cat-done" id="pnl-cat-done">סגור</button>' +
+            '</div>' +
+        '</div>';
+    document.body.appendChild(modal);
+
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) closeStockCatalog();
+    });
+    document.getElementById('pnl-cat-close').addEventListener('click', closeStockCatalog);
+    document.getElementById('pnl-cat-done').addEventListener('click', closeStockCatalog);
+    document.getElementById('pnl-cat-search').addEventListener('input', function(e) {
+        _catQuery = String(e.target.value || '');
+        _applyCatFilter();
+    });
+    document.getElementById('pnl-cat-body').addEventListener('scroll', function() {
+        var body = document.getElementById('pnl-cat-body');
+        if (!body) return;
+        if (body.scrollTop + body.clientHeight >= body.scrollHeight - 120) {
+            if (_catRendered < _catFiltered.length) _renderCatBatch();
+        }
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && modal.classList.contains('active')) closeStockCatalog();
+    });
+    return modal;
+}
+
+function _renderCatBrands() {
+    var el = document.getElementById('pnl-cat-brands');
+    if (!el) return;
+    var brands = [
+        { id: 'system', label: 'מערכת' },
+        { id: 'egger', label: 'EGGER' },
+        { id: 'formex', label: 'פורמקס' },
+        { id: 'bluran', label: 'בלורן' },
+        { id: 'tambour', label: 'טמבור' }
+    ];
+    el.innerHTML = brands.map(function(b) {
+        return '<button type="button" class="pnl-cat-brand' + (_catBrand === b.id ? ' active' : '') +
+            '" data-brand="' + b.id + '">' + _esc(b.label) + '</button>';
+    }).join('');
+    el.querySelectorAll('.pnl-cat-brand').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            _catBrand = btn.getAttribute('data-brand');
+            _catSub = 'all';
+            _catQuery = '';
+            var search = document.getElementById('pnl-cat-search');
+            if (search) search.value = '';
+            _renderCatBrands();
+            _loadCatBrand();
+        });
+    });
+}
+
+function _renderCatSubs(categories) {
+    var el = document.getElementById('pnl-cat-subs');
+    if (!el) return;
+    var cats = categories || [];
+    if (!cats.length) {
+        el.innerHTML = '';
+        el.style.display = 'none';
+        return;
+    }
+    el.style.display = 'flex';
+    var tabs = [{ id: 'all', name: 'הכל' }].concat(cats);
+    el.innerHTML = tabs.map(function(t) {
+        return '<button type="button" class="pnl-cat-sub' + (_catSub === t.id ? ' active' : '') +
+            '" data-sub="' + _esc(t.id) + '">' + _esc(t.name) + '</button>';
+    }).join('');
+    el.querySelectorAll('.pnl-cat-sub').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            _catSub = btn.getAttribute('data-sub') || 'all';
+            _renderCatSubs(cats);
+            _applyCatFilter();
+        });
+    });
+}
+
+function _setCatCount(text) {
+    var el = document.getElementById('pnl-cat-count');
+    if (el) el.textContent = text;
+}
+
+function _setCatNote(msg) {
+    var el = document.getElementById('pnl-cat-added-note');
+    if (!el) return;
+    el.textContent = msg || '';
+}
+
+function _inStock(key) {
+    return (_stockMaterials || []).some(function(x) { return x && x.key === key; });
+}
+
+function _applyCatFilter() {
+    var items = (_catCache[_catBrand] && _catCache[_catBrand].items) || [];
+    var q = String(_catQuery || '').toLowerCase().trim();
+    _catFiltered = items.filter(function(it) {
+        if (_catSub !== 'all' && it.cat && it.cat !== _catSub) return false;
+        if (!q) return true;
+        return String(it.label || '').toLowerCase().indexOf(q) >= 0 ||
+            String(it.id || '').toLowerCase().indexOf(q) >= 0 ||
+            String(it.key || '').toLowerCase().indexOf(q) >= 0 ||
+            String(it.catName || '').toLowerCase().indexOf(q) >= 0;
+    });
+    var grid = document.getElementById('pnl-cat-grid');
+    if (grid) grid.innerHTML = '';
+    _catRendered = 0;
+    _setCatCount('נמצאו ' + _catFiltered.length + ' גוונים' +
+        (items.length ? (' · ' + items.length + ' בקטלוג') : ''));
+    _renderCatBatch();
+}
+
+function _renderCatBatch() {
+    var grid = document.getElementById('pnl-cat-grid');
+    if (!grid) return;
+    var batch = _catFiltered.slice(_catRendered, _catRendered + _catPage);
+    batch.forEach(function(it) {
+        var inStock = _inStock(it.key);
+        var card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'pnl-cat-card' + (inStock ? ' in-stock' : '');
+        card.setAttribute('data-key', it.key);
+        var swatch = it.img
+            ? 'background-image:url(\'' + _esc(it.img) + '\');background-size:cover;background-position:center;'
+            : ('background-color:' + _esc(it.hex || '#cbd5e1') + ';');
+        card.innerHTML =
+            '<span class="pnl-cat-swatch" style="' + swatch + '"></span>' +
+            '<span class="pnl-cat-meta">' +
+                '<span class="pnl-cat-id">' + _esc(it.id || it.key) + '</span>' +
+                '<span class="pnl-cat-name">' + _esc(it.label || '') + '</span>' +
+                (it.catName ? ('<span class="pnl-cat-cat">' + _esc(it.catName) + '</span>') : '') +
+            '</span>' +
+            '<span class="pnl-cat-badge">' + (inStock ? 'במלאי' : 'הוסף') + '</span>';
+        card.addEventListener('click', function() {
+            _toggleCatalogColor(it, card);
+        });
+        grid.appendChild(card);
+    });
+    _catRendered += batch.length;
+}
+
+function _toggleCatalogColor(it, card) {
+    _syncStockMaterialsFromDom();
+    if (_inStock(it.key)) {
+        _stockMaterials = _stockMaterials.filter(function(x) { return x.key !== it.key; });
+        if (card) {
+            card.classList.remove('in-stock');
+            var badge = card.querySelector('.pnl-cat-badge');
+            if (badge) badge.textContent = 'הוסף';
+        }
+        _setCatNote('הוסר מהמלאי: ' + (it.label || it.key));
+    } else {
+        _pushStockItem({
+            key: it.key,
+            label: it.label || it.id || it.key,
+            brand: it.brand || '',
+            hex: it.hex || null,
+            img: it.img || null
+        });
+        if (card) {
+            card.classList.add('in-stock');
+            var badge2 = card.querySelector('.pnl-cat-badge');
+            if (badge2) badge2.textContent = 'במלאי';
+        }
+        _setCatNote('נוסף למלאי: ' + (it.label || it.key));
+    }
+    _renderStockMaterials();
+    updatePreview();
+}
+
+function _loadCatBrand() {
+    var brand = _catBrand;
+    if (_catCache[brand] && _catCache[brand].items) {
+        _renderCatSubs(_catCache[brand].categories || []);
+        _applyCatFilter();
+        return;
+    }
+    _setCatCount('טוען קטלוג...');
+    var grid = document.getElementById('pnl-cat-grid');
+    if (grid) grid.innerHTML = '<div class="pnl-cat-loading">טוען...</div>';
+    _catLoading = true;
+
+    function done(items, categories) {
+        _catCache[brand] = { items: items || [], categories: categories || [] };
+        _catLoading = false;
+        _renderCatSubs(categories || []);
+        _applyCatFilter();
+    }
+
+    if (brand === 'system') {
+        var sys = _SYSTEM_COLORS.map(function(c) {
+            return {
+                key: c.key, id: c.key, label: c.label, hex: c.hex || null, img: c.img || null,
+                brand: 'system', cat: c.cat || 'all',
+                catName: c.cat === 'textures' ? 'טקסטורות' : 'גוונים חלקים'
+            };
+        });
+        done(sys, [
+            { id: 'solids', name: 'גוונים חלקים' },
+            { id: 'textures', name: 'טקסטורות' }
+        ]);
+        return;
+    }
+
+    if (brand === 'egger') {
+        done(_eggerCatalogItems(), []);
+        return;
+    }
+
+    if (brand === 'formex' || brand === 'bluran') {
+        var url = brand === 'formex'
+            ? 'color%20picker/formex_catalog.json'
+            : 'color%20picker/bluran_catalog.json';
+        fetch(url).then(function(r) { return r.json(); }).then(function(data) {
+            var cats = (data.categories || []).map(function(c) {
+                return { id: c.id, name: c.name };
+            });
+            done(_flattenBrandCatalog(data, brand), cats);
+        }).catch(function(err) {
+            console.error('[stock-catalog]', brand, err);
+            _catLoading = false;
+            _setCatCount('שגיאה בטעינת הקטלוג');
+            if (grid) grid.innerHTML = '<div class="pnl-cat-loading">לא ניתן לטעון את הקטלוג</div>';
+        });
+        return;
+    }
+
+    if (brand === 'tambour') {
+        fetch('color%20picker/tambour_full_colors_1651.csv').then(function(r) { return r.text(); }).then(function(text) {
+            var lines = text.split(/\r?\n/).filter(Boolean);
+            var items = [];
+            for (var i = 1; i < lines.length; i++) {
+                var cols = _parseCsvLine(lines[i]);
+                if (cols.length < 4) continue;
+                var name = cols[0], id = cols[1], hex = cols[3];
+                if (!id || !hex) continue;
+                items.push({
+                    key: _brandMatKey('tambour', id),
+                    id: id,
+                    label: name || id,
+                    hex: hex,
+                    img: null,
+                    brand: 'tambour',
+                    cat: 'all',
+                    catName: 'טמבור'
+                });
+            }
+            done(items, []);
+        }).catch(function(err) {
+            console.error('[stock-catalog] tambour', err);
+            _catLoading = false;
+            _setCatCount('שגיאה בטעינת הקטלוג');
+            if (grid) grid.innerHTML = '<div class="pnl-cat-loading">לא ניתן לטעון את הקטלוג</div>';
+        });
+    }
+}
+
+function openStockCatalog() {
+    cancelAddStockMaterial();
+    var modal = _ensureCatModal();
+    _catBrand = _catBrand || 'system';
+    _catSub = 'all';
+    _catQuery = '';
+    _setCatNote('');
+    _renderCatBrands();
+    var search = document.getElementById('pnl-cat-search');
+    if (search) search.value = '';
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    _loadCatBrand();
+    if (search) setTimeout(function() { search.focus(); }, 50);
+}
+
+function closeStockCatalog() {
+    var modal = document.getElementById('pnl-stock-catalog-modal');
+    if (modal) modal.classList.remove('active');
+    document.body.style.overflow = '';
+    _renderStockMaterials();
+    updatePreview();
 }
 
 function _deleteStockMaterial(btn) {
@@ -1379,7 +1800,53 @@ var _savedTimer;
         '[id^="pnl-"] input:focus { border-color: #2563eb !important; outline: none; }' +
         '.pnl-details > summary::-webkit-details-marker { display: none; }' +
         '.pnl-details[open] > summary .fa-chevron-down { transform: rotate(180deg); }' +
-        '.pnl-details > summary .fa-chevron-down { transition: transform .15s; }';
+        '.pnl-details > summary .fa-chevron-down { transition: transform .15s; }' +
+        '.pnl-cat-overlay{position:fixed;inset:0;z-index:100000;background:rgba(15,23,42,.55);' +
+            'display:none;align-items:center;justify-content:center;padding:16px;}' +
+        '.pnl-cat-overlay.active{display:flex;}' +
+        '.pnl-cat-dialog{background:#fff;border-radius:16px;width:min(960px,100%);height:min(860px,92vh);' +
+            'display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.28);' +
+            'font-family:inherit;direction:rtl;}' +
+        '.pnl-cat-header{display:flex;align-items:flex-start;gap:12px;padding:16px 18px;border-bottom:1px solid #e2e8f0;}' +
+        '.pnl-cat-header-main{flex:1;min-width:0;}' +
+        '.pnl-cat-header-main h2{margin:0;font-size:1.05rem;font-weight:800;color:#1e3a5f;}' +
+        '.pnl-cat-header-main p{margin:4px 0 0;font-size:.78rem;color:#64748b;}' +
+        '.pnl-cat-search-wrap{flex:1;max-width:280px;}' +
+        '.pnl-cat-search-wrap input{width:100%;height:38px;border:1.5px solid #e2e8f0;border-radius:10px;' +
+            'padding:0 12px;font-family:inherit;font-size:.85rem;box-sizing:border-box;}' +
+        '.pnl-cat-search-wrap input:focus{border-color:#2563eb;outline:none;}' +
+        '.pnl-cat-close{width:36px;height:36px;border:none;background:transparent;color:#94a3b8;' +
+            'font-size:1.15rem;cursor:pointer;border-radius:8px;}' +
+        '.pnl-cat-close:hover{color:#0f172a;background:#f1f5f9;}' +
+        '.pnl-cat-brands,.pnl-cat-subs{display:flex;flex-wrap:wrap;gap:6px;padding:10px 16px;' +
+            'border-bottom:1px solid #e2e8f0;background:#f8fafc;}' +
+        '.pnl-cat-brand,.pnl-cat-sub{border:1px solid #e2e8f0;background:#fff;color:#334155;' +
+            'border-radius:999px;padding:6px 12px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:inherit;}' +
+        '.pnl-cat-brand.active,.pnl-cat-sub.active{background:#1e3a5f;border-color:#1e3a5f;color:#fff;}' +
+        '.pnl-cat-body{flex:1;overflow:auto;padding:14px 16px;}' +
+        '.pnl-cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}' +
+        '.pnl-cat-card{display:flex;flex-direction:column;align-items:stretch;gap:8px;text-align:right;' +
+            'border:1.5px solid #e2e8f0;border-radius:12px;padding:8px;background:#fff;cursor:pointer;' +
+            'font-family:inherit;transition:border-color .15s,box-shadow .15s;}' +
+        '.pnl-cat-card:hover{border-color:#93c5fd;box-shadow:0 4px 14px rgba(37,99,235,.12);}' +
+        '.pnl-cat-card.in-stock{border-color:#16a34a;background:#f0fdf4;}' +
+        '.pnl-cat-swatch{display:block;height:72px;border-radius:8px;border:1px solid #e2e8f0;}' +
+        '.pnl-cat-meta{display:flex;flex-direction:column;gap:2px;min-width:0;}' +
+        '.pnl-cat-id{font-size:.7rem;font-weight:700;color:#64748b;font-family:ui-monospace,monospace;' +
+            'direction:ltr;text-align:left;}' +
+        '.pnl-cat-name{font-size:.8rem;font-weight:700;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
+        '.pnl-cat-cat{font-size:.68rem;color:#94a3b8;}' +
+        '.pnl-cat-badge{align-self:flex-start;font-size:.68rem;font-weight:700;padding:3px 8px;' +
+            'border-radius:999px;background:#eff6ff;color:#2563eb;}' +
+        '.pnl-cat-card.in-stock .pnl-cat-badge{background:#dcfce7;color:#15803d;}' +
+        '.pnl-cat-loading{padding:40px;text-align:center;color:#64748b;font-size:.9rem;}' +
+        '.pnl-cat-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;' +
+            'padding:12px 16px;border-top:1px solid #e2e8f0;background:#fff;}' +
+        '.pnl-cat-added-note{font-size:.8rem;color:#15803d;font-weight:600;min-height:1.2em;}' +
+        '.pnl-cat-done{height:38px;padding:0 18px;border:none;border-radius:10px;background:#1e3a5f;' +
+            'color:#fff;font-weight:700;font-size:.85rem;cursor:pointer;font-family:inherit;}' +
+        '@media (max-width:640px){.pnl-cat-dialog{width:100vw;height:100vh;border-radius:0;}' +
+            '.pnl-cat-header{flex-wrap:wrap;}.pnl-cat-search-wrap{max-width:none;width:100%;order:3;}}';
     document.head.appendChild(style);
 })();
 
@@ -1396,6 +1863,8 @@ global.PricingPanel = {
     addStockMaterial: addStockMaterial,
     confirmAddStockMaterial: confirmAddStockMaterial,
     cancelAddStockMaterial: cancelAddStockMaterial,
+    openStockCatalog: openStockCatalog,
+    closeStockCatalog: closeStockCatalog,
     addRangeRow:    addRangeRow,
     showSavedNote:  showSavedNote,
     // internal (called from inline onclick):
