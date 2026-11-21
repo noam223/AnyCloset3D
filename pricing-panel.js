@@ -140,7 +140,7 @@ function _modeBtnsHtml() {
         { id: 'sqm',       label: 'מ"ר',             sub: 'מחיר למ"ר' },
         { id: 'lm',        label: 'מ"א',             sub: 'מחיר למ"א' },
         { id: 'lm_height', label: 'מ"א + גובה',     sub: 'עם תוספת מדורגת' },
-        { id: 'materials', label: 'חומרים',          sub: 'חזית × פלטה × בלאי' },
+        { id: 'materials', label: 'חומרים',          sub: 'פלטות מקינון CNC' },
         { id: 'ranges',    label: 'טווחי מידות',   sub: 'לפי רוחב' }
     ];
     return '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius,12px);' +
@@ -268,8 +268,8 @@ function _materialsSectionHtml() {
         '<div id="' + _id('materials-stock-hint') + '" style="display:none;margin:-4px 0 12px;padding:10px 14px;' +
             'background:#eff6ff;border-radius:8px;font-size:.8rem;color:#1e3a5f;line-height:1.45;">' +
             '<i class="fa-solid fa-circle-info"></i> ' +
-            'חישוב: שטח חזית (רוחב×גובה) × (מחיר פלטה ÷ שטח פלטה) × מכפיל בלאי. ' +
-            'הגדירו מחיר פלטה לכל צבע במלאי למטה — הגיבוי משמש רק לצבעים בלי מחיר.</div>';
+            'במעצב: כל חלקי הארון נארזים לפלטות (כמו CNC) — העלות = מספר פלטות × מחיר פלטה לפי צבע. ' +
+            'הגדירו מחיר ומידות פלטה לכל צבע במלאי. תצוגה מקדימה כאן / מחשבון מהיר בלי ארון תלת־ממד משתמשים בהערכת חזית × בלאי.</div>';
 }
 
 /* ④ COMMON SURCHARGES — hide heightSurcharge for irrelevant modes */

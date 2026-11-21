@@ -473,7 +473,8 @@ function findStockMaterial(cfg, matKey) {
 }
 
 /**
- * Cost of cabinet face area in materials mode.
+ * Face-area estimate for materials mode (preview / quick-calc / no CNC scene).
+ * Live designer pricing prefers CNC sheet nesting (_cncMaterialsNestCost) instead.
  * Prefer stock sheet: (sqm / sheetAreaM2) × sheetPrice × wasteMultiplier.
  * Fallback: sqm × boardsPerSqm × boardPrice × multiplier.
  */

@@ -11,14 +11,30 @@
     function _dbg() { return window._exportCncDebug || {}; }
     function _fmt(x) { return String(Math.round(x * 10) / 10); }
 
+    /** Prefer carpenter stock-material sheet size; else EGGER / CNC defaults. */
+    function _stockSheetSize(matKey) {
+        var pricing = (typeof window._getPricingCfg === 'function')
+            ? window._getPricingCfg()
+            : (window._pricingConfig || null);
+        var list = pricing && Array.isArray(pricing.stockMaterials) ? pricing.stockMaterials : [];
+        var hit = list.find(function(x) { return x && x.key === matKey; });
+        if (hit && Number(hit.sheetW) > 100 && Number(hit.sheetH) > 100) {
+            return { w: Number(hit.sheetW), h: Number(hit.sheetH), fromStock: true };
+        }
+        return null;
+    }
+
     /** Resolve nest sheet size (mm) for a material key.
-     *  EGGER → 2800×2070; everything else → CNC cfg sheetW/sheetH (default 2750×1220). */
+     *  Stock materials → their sheetW/H; EGGER → 2800×2070; else CNC cfg (default 2750×1220). */
     function _nestSheetSize(cfg, matKey) {
+        var stockSz = _stockSheetSize(matKey);
+        if (stockSz) return { w: stockSz.w, h: stockSz.h };
         if (window.PricingCore && typeof window.PricingCore.sheetSizeForMat === 'function') {
             var sz = window.PricingCore.sheetSizeForMat(matKey);
             if (sz && window.PricingCore.isEggerMatKey && window.PricingCore.isEggerMatKey(matKey)) {
                 return { w: sz.w, h: sz.h };
             }
+            if (sz && sz.w && sz.h) return { w: sz.w, h: sz.h };
         } else if (matKey && (String(matKey).indexOf('eg_') === 0 ||
             /^(u727|w1200|u232|u604|u638|H1367|H1307|H1227)$/.test(String(matKey)))) {
             return { w: 2800, h: 2070 };
@@ -309,6 +325,127 @@
             window._restoreEditorState(snap);
             if (typeof buildCabinet === 'function') buildCabinet();
         }
+    };
+
+    /**
+     * Materials pricing from CNC sheet nesting (no export UI).
+     * Counts nested stock sheets per matKey × sheetPrice from pricing stockMaterials.
+     * Returns null when CNC build/nest is unavailable or the scene has no panels.
+     */
+    var _nestCostCache = { key: '', result: null };
+
+    function _nestPricingFingerprint(pricingCfg) {
+        var wings = (typeof state !== 'undefined' && state && state.wings) ? state.wings : {};
+        var stock = (pricingCfg && pricingCfg.stockMaterials) || [];
+        var wingBits = ['center', 'left', 'right'].map(function(side) {
+            var w = wings[side];
+            if (!w) return side + ':0';
+            return [
+                side, w.width, w.globalHeight, w.depth, w.cabinetModel, w.boardMaterial,
+                w.materialBody, w.materialExternal, w.materialInternal, w.materialBack,
+                w.hasDoors ? 1 : 0,
+                (w.columns || []).map(function(c) {
+                    return [c.type, c.width, c.shelves, (c.doors || []).length,
+                        (c.compartments || []).map(function(x) { return x && x.type; }).join('.')].join(':');
+                }).join('|')
+            ].join(',');
+        }).join(';');
+        var stockBits = stock.map(function(s) {
+            return [s.key, s.sheetPrice, s.sheetW, s.sheetH].join(':');
+        }).join('|');
+        return wingBits + '##' + stockBits + '##' +
+            (pricingCfg && pricingCfg.materialsBoardPrice) + ':' +
+            (pricingCfg && pricingCfg.materialsMultiplier);
+    }
+
+    window._cncMaterialsNestCost = function(pricingCfg, opts) {
+        opts = opts || {};
+        pricingCfg = pricingCfg || ((typeof window._getPricingCfg === 'function')
+            ? window._getPricingCfg() : (window._pricingConfig || {}));
+        var dbg = window._exportCncDebug;
+        if (!dbg || typeof dbg.build !== 'function' || typeof window._cncNestSheets !== 'function') {
+            return null;
+        }
+        if (typeof state === 'undefined' || !state || !state.wings) return null;
+
+        var key = _nestPricingFingerprint(pricingCfg);
+        if (!opts.force && _nestCostCache.key === key && _nestCostCache.result) {
+            return _nestCostCache.result;
+        }
+
+        var cncCfg = Object.assign({}, dbg.defaults || {}, {
+            nestSheets: true,
+            pdfLabels: false,
+            exportScope: 'cabinet'
+        }, opts.cnc || {});
+
+        var result;
+        try {
+            result = dbg.build(cncCfg);
+        } catch (err) {
+            console.warn('[materials-nest] build failed', err);
+            return null;
+        }
+        if (!result || !result.total) return null;
+
+        // Ensure nests exist even if build skipped them
+        var nests = result.nests;
+        if (!nests || !nests.length) {
+            try { nests = window._cncNestSheets(result) || []; } catch (e2) { nests = []; }
+        }
+        if (!nests.length) return null;
+
+        var stockList = Array.isArray(pricingCfg.stockMaterials) ? pricingCfg.stockMaterials : [];
+        if (window.PricingCore && typeof window.PricingCore.normalizeStockMaterials === 'function') {
+            stockList = window.PricingCore.normalizeStockMaterials(stockList);
+        }
+        var fallbackPrice = Number(pricingCfg.materialsBoardPrice) || 0;
+        var byMat = {};
+        nests.forEach(function(n) {
+            var mk = n.matKey || 'unknown';
+            if (!byMat[mk]) {
+                byMat[mk] = {
+                    matKey: mk,
+                    matLabel: n.matLabel || mk,
+                    sheets: 0,
+                    sheetPrice: 0,
+                    priced: false
+                };
+            }
+            byMat[mk].sheets++;
+        });
+
+        var lines = [];
+        var cost = 0;
+        var missing = [];
+        Object.keys(byMat).forEach(function(mk) {
+            var row = byMat[mk];
+            var hit = stockList.find(function(x) { return x && x.key === mk; });
+            var price = hit && Number(hit.sheetPrice) > 0 ? Number(hit.sheetPrice) : 0;
+            if (price <= 0 && fallbackPrice > 0) price = fallbackPrice;
+            row.sheetPrice = price;
+            row.priced = price > 0;
+            row.subtotal = row.sheets * price;
+            if (!row.priced) missing.push(mk);
+            cost += row.subtotal;
+            lines.push(row);
+        });
+
+        var out = {
+            ok: true,
+            cost: cost,
+            sheetCount: nests.length,
+            panelCount: result.total,
+            lines: lines,
+            missingPrices: missing,
+            nests: nests
+        };
+        _nestCostCache = { key: key, result: out };
+        return out;
+    };
+
+    window._cncInvalidateMaterialsNestCache = function() {
+        _nestCostCache = { key: '', result: null };
     };
 
     // Register SHEET layer color hint via existing DXF writer (unknown layers default to 4)

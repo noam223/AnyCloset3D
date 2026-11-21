@@ -5930,7 +5930,10 @@ function _cornerUnitCost(ex, cu) {
     return _priceNum(ex.cornerDrawers4, 907) + (n - 4) * _priceNum(ex.cornerDrawerExtra, 200);
 }
 
-function _calcWingCost(cfg, wing) {
+function _calcWingCost(cfg, wing, opts) {
+    opts = opts || {};
+    const skipBase = !!opts.skipBase; // materials nest already priced all wood sheets
+    const skipWoodExtras = !!opts.skipWoodExtras; // shelves etc. already in nest
     const ex  = cfg.extras || DEFAULT_PRICING_CONFIG.extras;
         const ww = wing.width, wh = wing.globalHeight, wd = wing.depth;
         const wMelamine = wing.boardMaterial === 'melamine';
@@ -5958,20 +5961,33 @@ function _calcWingCost(cfg, wing) {
     const wPlinthStyle = wing.plinthStyle || (typeof window._inferPlinthStyle === 'function'
         ? window._inferPlinthStyle(wing) : 'regular');
 
-    let basePrice = _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel, wing.cabinetTypeId, {
-        boardMaterial: wing.boardMaterial,
-        plinthStyle: wPlinthStyle,
-        matKey: wing.materialBody || null
-    });
+    let basePrice = 0;
+    if (!skipBase) {
+        basePrice = _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel, wing.cabinetTypeId, {
+            boardMaterial: wing.boardMaterial,
+            plinthStyle: wPlinthStyle,
+            matKey: wing.materialBody || null
+        });
         if (SANDWICH_COLORS.has(wing.materialBody)) basePrice *= (1 + sandwichPct);
         // Standalone regalim / C9 plinth extras are already inside _calcWingBasePrice for all modes.
+    } else if (wEffectiveModel === 'c9' || wEffectiveModel === 'regalim') {
+        // Nest covers wood only — keep flat plinth/legs adders
+        if (wEffectiveModel === 'c9') {
+            const ps = wPlinthStyle || 'regular';
+            if (ps === 'recessed') basePrice += _priceNum(ex.c9RecessedSurcharge, 150);
+            else if (ps === 'legs') basePrice += _priceNum(ex.c9LegsSurcharge, 250);
+        } else {
+            const legCount = ww <= 110 ? 4 : ww <= 180 ? 6 : 8;
+            basePrice += legCount * _priceNum(ex.nickelLegPrice, 100);
+        }
+    }
 
         let finalCost = basePrice;
 
     const allowedShelves = _calcAllowedShelves(cfg, ww, wh, wModel);
         let actualShelves = 0;
         wing.columns.forEach(col => { actualShelves += (col.shelves||0); });
-        if (actualShelves > allowedShelves)
+        if (!skipWoodExtras && actualShelves > allowedShelves)
         finalCost += (actualShelves-allowedShelves) * (wMelamine ? _priceNum(ex.extraShelfMel, 60) : _priceNum(ex.extraShelfNonMel, 80));
 
         let hasAnyDesk = (wing.desk && wing.desk.side !== 'none') || wing.columns.some(col => col.type === 'desk');
@@ -6286,10 +6302,28 @@ function calculatePrice() {
     // Sum cost across all active wings
     let totalCost = 0;
     let totalInstall = 0;
+    const useNestMaterials = (cfg.pricingMode || 'ranges') === 'materials'
+        && typeof window._cncMaterialsNestCost === 'function';
+    let nestMaterials = null;
+    if (useNestMaterials) {
+        try { nestMaterials = window._cncMaterialsNestCost(cfg); } catch (e) {
+            console.warn('[pricing] materials nest failed', e);
+            nestMaterials = null;
+        }
+    }
+    const nestOk = !!(nestMaterials && nestMaterials.ok && nestMaterials.sheetCount > 0);
+    if (nestOk) {
+        totalCost += nestMaterials.cost;
+        state._materialsNestInfo = nestMaterials; // for UI/debug: sheets × prices
+    } else {
+        state._materialsNestInfo = null;
+    }
     ['center','left','right'].forEach(side => {
         const wing = state.wings[side];
         if (!wing) return;
-        totalCost += _calcWingCost(cfg, wing);
+        totalCost += _calcWingCost(cfg, wing, nestOk
+            ? { skipBase: true, skipWoodExtras: true }
+            : {});
         totalInstall += _calcWingInstallPrice(cfg, wing.width, wing.globalHeight);
     });
 
