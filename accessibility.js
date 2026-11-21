@@ -56,7 +56,10 @@
     'html.ac-a11y-readable,html.ac-a11y-readable body,html.ac-a11y-readable button,html.ac-a11y-readable input,html.ac-a11y-readable select,html.ac-a11y-readable textarea{font-family:Arial,Helvetica,sans-serif!important;letter-spacing:.02em!important;line-height:1.7!important}',
     'html.ac-a11y-nomotion *,html.ac-a11y-nomotion *::before,html.ac-a11y-nomotion *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}',
     'html.ac-a11y-bigcursor,html.ac-a11y-bigcursor *{cursor:url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'48\' height=\'48\' viewBox=\'0 0 24 24\'%3E%3Cpath fill=\'%23000\' stroke=\'%23fff\' stroke-width=\'1.2\' d=\'M4 3l1 16 4-4 3 7 2-1-3-7h5z\'/%3E%3C/svg%3E") 4 4, auto!important}',
-    'html.ac-a11y-focus *:focus{outline:3px solid #00d4ff!important;outline-offset:3px!important}',
+    /* Keyboard-only focus ring — avoid cyan stroke on every mouse click */
+    'html.ac-a11y-focus *:focus{outline:none}',
+    'html.ac-a11y-focus *:focus-visible{outline:3px solid #00d4ff!important;outline-offset:3px!important}',
+    'html.ac-a11y-focus *:focus:not(:focus-visible){outline:none!important}',
     '@media(max-width:480px){#ac-a11y-root{left:10px;bottom:10px}#ac-a11y-btn{width:50px;height:50px}}'
   ].join('');
 
