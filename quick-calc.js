@@ -288,7 +288,7 @@ function _qcBasePrice(cfg, ww, wh, wd, wMelamine, engine, typeId) {
             if (mult <= 0) mult = 1;
             bp = sqm * _qcNum(cfg.materialsBoardsPerSqm, 1.4) * _qcNum(cfg.materialsBoardPrice, 400) * mult;
         }
-        if (wd > dFrom) bp *= (1 + dS);
+        // materials: no depth % — depth is already in parts/sheets
         return bp;
     }
     var cfgR = cfg.ranges || _QC_DEFAULT_PRICING.ranges;

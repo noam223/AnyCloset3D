@@ -5859,7 +5859,7 @@ function _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel, wTypeId
                 bp = sqm * _priceNum(cfg.materialsBoardsPerSqm, 1.4) * _priceNum(cfg.materialsBoardPrice, 400) * mult;
             }
         }
-        if (wd > dFrom) bp *= (1 + dS);
+        // materials: no depth % — depth is already in parts/sheets
         return _addPlinthExtras(bp);
     }
     // ranges
@@ -5962,13 +5962,15 @@ function _calcWingCost(cfg, wing, opts) {
         ? window._inferPlinthStyle(wing) : 'regular');
 
     let basePrice = 0;
+    const materialsMode = (cfg.pricingMode || 'ranges') === 'materials';
     if (!skipBase) {
         basePrice = _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel, wing.cabinetTypeId, {
             boardMaterial: wing.boardMaterial,
             plinthStyle: wPlinthStyle,
             matKey: wing.materialBody || null
         });
-        if (SANDWICH_COLORS.has(wing.materialBody)) basePrice *= (1 + sandwichPct);
+        // Sandwich % only for non-materials modes (materials use sheet prices per color)
+        if (!materialsMode && SANDWICH_COLORS.has(wing.materialBody)) basePrice *= (1 + sandwichPct);
         // Standalone regalim / C9 plinth extras are already inside _calcWingBasePrice for all modes.
     } else if (wEffectiveModel === 'c9' || wEffectiveModel === 'regalim') {
         // Nest covers wood only — keep flat plinth/legs adders

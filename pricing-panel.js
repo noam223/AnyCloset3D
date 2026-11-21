@@ -354,26 +354,34 @@ function _commonSurchargesHtml() {
             '1.8 = רווח של 80% מעל העלות (עלות 1,000 → ללקוח 1,800).',
             'info'
         ) +
-        _helpBox(
-            '<b>דוגמה עומק:</b> סף 54 ס״מ ותוספת 20%. ארון בעומק 60 → עלות הגוף × 1.2. ' +
-            '<b>סנדוויץ\':</b> צבעים מסומנים כסנדוויץ\' מקבלים תוספת אחוז על בסיס הארון.',
-            'ex'
-        ) +
+        '<div id="' + _id('pct-help-other') + '">' +
+            _helpBox(
+                '<b>דוגמה עומק:</b> סף 54 ס״מ ותוספת 20%. ארון בעומק 60 → עלות הגוף × 1.2. ' +
+                '<b>סנדוויץ\':</b> צבעים מסומנים כסנדוויץ\' מקבלים תוספת אחוז על בסיס הארון.',
+                'ex'
+            ) +
+        '</div>' +
+        '<div id="' + _id('materials-note') + '" style="display:none;margin-bottom:14px;">' +
+            _helpBox(
+                'בשיטת <b>חומרים</b> אין תוספת עומק/גובה/סנדוויץ׳ באחוזים — העומק והחומר כבר מגולמים בפלטות. ' +
+                'נשאר רק מכפיל הרווח (ואז התקנה + תוספות ₪ קבועות).',
+                'info'
+            ) +
+        '</div>' +
         '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">' +
             _field('profitMultiplier', 'מכפיל רווח ללקוח', 'min="1" step="0.05"') +
             '<div id="' + _id('row-heightSurcharge') + '">' +
                 _field('heightSurcharge', 'תוספת גובה מעל 240 (%)', 'min="0" max="100" step="1"') +
             '</div>' +
-            _field('depthSurchargeFromCm', 'סף עומק לתוספת (ס"מ)', 'min="1" step="1"') +
-            _field('depthSurcharge', 'תוספת עומק מעל הסף (%)', 'min="0" max="100" step="1"') +
-            _field('sandwichSurcharge', 'תוספת צבע סנדוויץ\' (%)', 'min="0" max="100" step="1"') +
-        '</div>' +
-        '<div id="' + _id('materials-note') + '" style="display:none;margin-top:12px;">' +
-            _helpBox(
-                'בשיטת <b>חומרים</b>: עלות הפלטות לפי מלאי (ברירת מחדל 400 ₪ לפני מע״מ לפלטה). ' +
-                'מכפיל הרווח מוחל בסוף על סה״כ העלות.',
-                'info'
-            ) +
+            '<div id="' + _id('row-depthSurcharge') + '">' +
+                _field('depthSurchargeFromCm', 'סף עומק לתוספת (ס"מ)', 'min="1" step="1"') +
+            '</div>' +
+            '<div id="' + _id('row-depthSurchargePct') + '">' +
+                _field('depthSurcharge', 'תוספת עומק מעל הסף (%)', 'min="0" max="100" step="1"') +
+            '</div>' +
+            '<div id="' + _id('row-sandwichSurcharge') + '">' +
+                _field('sandwichSurcharge', 'תוספת צבע סנדוויץ\' (%)', 'min="0" max="100" step="1"') +
+            '</div>' +
         '</div>' +
     '</div>';
 }
@@ -537,7 +545,7 @@ function _customAndClosuresHtml() {
 
 /** Carpenter stock colors / full-sheet prices */
 function _stockMaterialsHtml() {
-    return '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius,12px);' +
+    return '<div data-pnl-stock-card style="background:#fff;border:1px solid var(--border);border-radius:var(--radius,12px);' +
         'padding:20px 24px;margin-bottom:12px;">' +
         '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin-bottom:8px;">' +
             '<i class="fa-solid fa-palette"></i> מלאי צבעים ופלטות</div>' +
@@ -690,16 +698,29 @@ function setMode(mode) {
         if (sec) sec.style.display = (m === mode) ? 'block' : 'none';
     });
 
-    // ③ hide/show heightSurcharge based on mode
-    // Used only in 'ranges' and 'lm' modes
+    // %-surcharges: not used in materials (sheets already reflect depth/material)
+    var isMaterials = mode === 'materials';
     var hRow = _el('row-heightSurcharge');
     if (hRow) hRow.style.display = (mode === 'ranges' || mode === 'lm') ? '' : 'none';
+    ['row-depthSurcharge', 'row-depthSurchargePct', 'row-sandwichSurcharge'].forEach(function(id) {
+        var el = _el(id);
+        if (el) el.style.display = isMaterials ? 'none' : '';
+    });
+    var pctHelpOther = _el('pct-help-other');
+    if (pctHelpOther) pctHelpOther.style.display = isMaterials ? 'none' : '';
 
-    // Show note in materials mode about both multipliers
     var note = _el('materials-note');
-    if (note) note.style.display = (mode === 'materials') ? 'block' : 'none';
+    if (note) note.style.display = isMaterials ? 'block' : 'none';
     var stockHint = _el('materials-stock-hint');
-    if (stockHint) stockHint.style.display = (mode === 'materials') ? 'block' : 'none';
+    if (stockHint) stockHint.style.display = isMaterials ? 'block' : 'none';
+    // Stock colors block is for materials pricing
+    var stockBlock = document.getElementById(_id('stock-list'));
+    var stockCard = stockBlock && stockBlock.closest
+        ? stockBlock.closest('div[style*="padding:20px 24px"]')
+        : null;
+    // Prefer explicit id if present
+    var stockWrap = document.querySelector('[data-pnl-stock-card]') || stockCard;
+    if (stockWrap) stockWrap.style.display = isMaterials ? '' : 'none';
 
     var prevMat = _el('prev-mat');
     if (prevMat) prevMat.style.display = (mode === 'materials') ? '' : 'none';

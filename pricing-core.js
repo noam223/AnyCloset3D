@@ -270,7 +270,13 @@ function basePrice(cfg, ww, wh, wd, melamine, engine, typeId, opts) {
         var steps = Math.max(0, Math.floor((wh - num(cfg.lmHeightThresholdCm, 240)) / num(cfg.lmHeightStepCm, 30)));
         bp = base * (ww / 100) * (1 + steps * num(cfg.lmHeightStepPct, 0.10));
     } else {
+        // materials — depth already in sheet nesting / face estimate; no % depth surcharge
         bp = materialsFaceCost(cfg, ww, wh, opts.matKey || opts.materialKey || null);
+        if (engine === 'c9') bp += c9PlinthSurcharge(cfg, opts.plinthStyle);
+        if (engine === 'regalim') bp += regalimLegsCost(cfg, ww);
+        var typeM = resolveType(cfg, engine, typeId);
+        var factorM = typeM ? num(typeM.priceFactor, 0) : 0;
+        return bp * (1 + factorM);
     }
     if (wd > dFrom) bp *= (1 + dS);
     // Flat extras for plinth / legs — same behavior as ranges (not % type multipliers)
