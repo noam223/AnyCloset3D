@@ -650,7 +650,7 @@ function _customExtrasHtml() {
 
 function _saveBarHtml() {
     return '<div id="' + _id('save-bar') + '" ' +
-        'style="padding:16px 0;display:flex;align-items:center;gap:12px;">' +
+        'style="padding:16px 0;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">' +
         '<button onclick="PricingPanel._onSave()" ' +
             'style="height:42px;background:var(--primary,#1e3a5f);color:#fff;border:none;' +
             'border-radius:10px;padding:0 22px;font-size:.88rem;font-weight:700;font-family:inherit;cursor:pointer;">' +
@@ -661,6 +661,8 @@ function _saveBarHtml() {
             '<i class="fa-solid fa-rotate-left"></i> אפס</button>' +
         '<span id="' + _id('saved-note') + '" style="display:none;color:#16a34a;font-size:.85rem;font-weight:700;">' +
             '<i class="fa-solid fa-circle-check"></i> נשמר בהצלחה!</span>' +
+        '<span id="' + _id('unsaved-note') + '" style="display:none;color:#b45309;font-size:.82rem;font-weight:700;">' +
+            'יש שינויים שלא נשמרו — לחצו «שמור» למטה</span>' +
     '</div>';
 }
 
@@ -857,6 +859,33 @@ function _stockAddErr(msg) {
     el.textContent = msg;
 }
 
+function _markPricingDirty(reason) {
+    var msg = reason || 'יש שינויים שלא נשמרו — לחצו «שמור הגדרות תמחור» למטה';
+    var note = _el('unsaved-note');
+    if (note) {
+        note.style.display = 'inline';
+        note.textContent = msg;
+    }
+    var saveBtn = document.querySelector('#' + _id('save-bar') + ' button');
+    if (saveBtn) {
+        saveBtn.style.boxShadow = '0 0 0 3px rgba(245,158,11,.45)';
+        saveBtn.style.outline = '2px solid #f59e0b';
+    }
+    if (typeof global.showToast === 'function') {
+        global.showToast(msg, 'success');
+    }
+}
+
+function _clearPricingDirty() {
+    var note = _el('unsaved-note');
+    if (note) note.style.display = 'none';
+    var saveBtn = document.querySelector('#' + _id('save-bar') + ' button');
+    if (saveBtn) {
+        saveBtn.style.boxShadow = '';
+        saveBtn.style.outline = '';
+    }
+}
+
 function addStockMaterial() {
     var form = _el('stock-add-form');
     var btns = _el('stock-add-btns');
@@ -924,6 +953,7 @@ function confirmAddStockMaterial() {
     cancelAddStockMaterial();
     _renderStockMaterials();
     updatePreview();
+    _markPricingDirty('צבע נוסף — לחצו «שמור הגדרות תמחור» למטה');
     var list = _el('stock-list');
     if (list) {
         var rows = list.querySelectorAll('.pnl-stock-row');
@@ -1206,6 +1236,7 @@ function _toggleCatalogColor(it, card) {
             if (badge) badge.textContent = 'הוסף';
         }
         _setCatNote('הוסר מהמלאי: ' + (it.label || it.key));
+        _markPricingDirty('הוסר מהמלאי — לחצו «שמור» למטה');
     } else {
         _pushStockItem({
             key: it.key,
@@ -1219,7 +1250,8 @@ function _toggleCatalogColor(it, card) {
             var badge2 = card.querySelector('.pnl-cat-badge');
             if (badge2) badge2.textContent = 'במלאי';
         }
-        _setCatNote('נוסף למלאי: ' + (it.label || it.key));
+        _setCatNote('נוסף למלאי: ' + (it.label || it.key) + ' — זכרו לשמור למטה');
+        _markPricingDirty('צבע נוסף — לחצו «שמור הגדרות תמחור» למטה');
     }
     _renderStockMaterials();
     updatePreview();
@@ -1344,6 +1376,7 @@ function _deleteStockMaterial(btn) {
     _stockMaterials = _stockMaterials.filter(function(x) { return x.key !== key; });
     _renderStockMaterials();
     updatePreview();
+    _markPricingDirty('הוסר מהמלאי — לחצו «שמור» למטה');
 }
 
 function _syncStockMaterialsFromDom() {
@@ -1956,6 +1989,7 @@ function _onSave()  { if (typeof _opts.onSave  === 'function') _opts.onSave(read
 function _onReset() { if (typeof _opts.onReset === 'function') _opts.onReset(); }
 
 function showSavedNote(ms) {
+    _clearPricingDirty();
     var el = _el('saved-note');
     if (!el) return;
     el.style.display = 'inline';
