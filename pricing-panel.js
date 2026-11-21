@@ -324,18 +324,18 @@ function _lmHeightSectionHtml() {
 function _materialsSectionHtml() {
     return _modeSection('materials', 'fa-layer-group', 'תמחור לפי חומרים',
         _field('materialsMultiplier', 'מכפיל בלאי / בזבוז (גיבוי)', 'min="1" step="0.05"') +
-        _field('materialsBoardPrice', 'מחיר לוח כללי — גיבוי (₪)', 'min="0" step="5"') +
+        _field('materialsBoardPrice', 'מחיר לוח כללי — גיבוי (₪ לפני מע״מ)', 'min="0" step="5"') +
         _field('materialsBoardsPerSqm', 'לוחות למ"ר — גיבוי', 'min="0" step="0.1"'),
         '<div id="' + _id('materials-stock-hint') + '">' +
             _helpBox(
                 '<b>במעצב (חישוב אמיתי):</b> כל חלקי הארון (צדדים, מדפים, דלתות…) נארזים לפלטות כמו בקינון CNC. ' +
                 'עלות החומר = <b>מספר פלטות × מחיר פלטה</b> לפי צבע במלאי למטה. ' +
-                'ייצוא CNC לא נפתח — רק מנוע הקינון הפנימי.',
+                'כל מחירי הפלטות הם <b>לפני מע״מ</b>. ייצוא CNC לא נפתח — רק מנוע הקינון הפנימי.',
                 'info'
             ) +
             _helpBox(
-                '<b>דוגמה במעצב:</b> הארון יצא ל־3 פלטות לבן מט (₪450) ו־1 פלטת עץ (₪520) → ' +
-                'עלות חומר 3×450 + 1×520 = 1,870 ₪. אחר כך נוספות תוספות פרזול/מגירות, ואז × רווח.',
+                '<b>דוגמה במעצב:</b> הארון יצא ל־3 פלטות לבן מט (₪450 לפני מע״מ) ו־1 פלטת עץ (₪520) → ' +
+                'עלות חומר 3×450 + 1×520 = 1,870 ₪ לפני מע״מ. אחר כך תוספות פרזול/מגירות, ואז × רווח.',
                 'ex'
             ) +
             _helpBox(
@@ -548,13 +548,13 @@ function _stockMaterialsHtml() {
             '<i class="fa-solid fa-palette"></i> מלאי צבעים ופלטות</div>' +
         _helpBox(
             'הצבעים השוטפים שלכם — מופיעים בראש רשימת הצבעים במעצב. ' +
-            'לכל צבע מגדירים <b>מחיר פלטה מלאה</b> ומידות (מ״מ). ' +
+            'לכל צבע מגדירים <b>מחיר פלטה מלאה (לפני מע״מ)</b> ומידות (מ״מ). ' +
             'בשיטת חומרים במעצב: העלות נספרת לפי כמה פלטות כאלה נצרכו בקינון.',
             'info'
         ) +
         _helpBox(
-            '<b>דוגמה:</b> לבן מט — פלטה 2750×1220 ב־450 ₪. EGGER — לרוב 2800×2070 (מידה גדולה יותר). ' +
-            'הוסיפו מהקטלוג (מערכת / EGGER / פורמקס / בלורן / טמבור) או ידנית, מלאו מחיר, ושמרו.',
+            '<b>דוגמה:</b> לבן מט — פלטה 2750×1220 ב־400 ₪ <b>לפני מע״מ</b>. EGGER — לרוב 2800×2070. ' +
+            'הוסיפו מהקטלוג, מלאו מחיר, ושמרו. (ברירת מחדל לפלטה חדשה: 400 ₪ לפני מע״מ.)',
             'ex'
         ) +
         '<div id="' + _id('stock-list') + '"></div>' +
@@ -809,7 +809,7 @@ function _renderStockMaterials() {
             'padding:0 0 6px;margin-bottom:2px;border-bottom:1px solid var(--border);">' +
             '<span></span>' +
             '<span style="font-size:.68rem;font-weight:700;color:var(--muted);">שם צבע</span>' +
-            '<span style="font-size:.68rem;font-weight:700;color:var(--muted);text-align:center;">מחיר פלטה (₪)</span>' +
+            '<span style="font-size:.68rem;font-weight:700;color:var(--muted);text-align:center;line-height:1.2;">מחיר פלטה<br><span style="font-weight:600;opacity:.85;">₪ לפני מע״מ</span></span>' +
             '<span style="font-size:.68rem;font-weight:700;color:var(--muted);text-align:center;">רוחב מ״מ</span>' +
             '<span style="font-size:.68rem;font-weight:700;color:var(--muted);text-align:center;">גובה מ״מ</span>' +
             '<span></span>' +
@@ -832,7 +832,7 @@ function _renderStockMaterials() {
                     _esc(item.key) + (item.brand ? (' · ' + _esc(item.brand)) : '') + '</div>' +
             '</div>' +
             '<input type="number" class="pnl-stock-price" value="' + _num(item.sheetPrice, 0) + '" min="0" step="10" ' +
-                'title="מחיר פלטה מלאה (₪)" placeholder="₪" aria-label="מחיר פלטה בשקלים" ' +
+                'title="מחיר פלטה מלאה (₪ לפני מע״מ)" placeholder="₪" aria-label="מחיר פלטה בשקלים לפני מע״מ" ' +
                 'style="height:34px;border:1.5px solid var(--border);border-radius:8px;padding:0 8px;' +
                 'font-family:inherit;font-size:.82rem;direction:ltr;text-align:right;">' +
             '<input type="number" class="pnl-stock-w" value="' + _num(item.sheetW, defW) + '" min="100" step="10" ' +

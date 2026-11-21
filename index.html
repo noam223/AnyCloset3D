@@ -3286,7 +3286,7 @@
 <script src="egger-colors.js?v=20261116eggerKeep1"></script>
 <script src="pricing-core.js?v=20261122sheet400"></script>
 <script src="state.js?v=20261122sheet400"></script>
-<script src="stock-materials.js?v=20261119stock1"></script>
+<script src="stock-materials.js?v=20261122vatNote1"></script>
 <script src="quick-calc.js?v=20261122depthThresh1"></script>
 <script src="bathroom-preset.js?v=20261008types"></script>
 <script src="kitchen-preset.js?v=20261117kitG3"></script>
@@ -3468,7 +3468,7 @@
             <h3 id="msp-title" style="margin:0;font-size:1rem;color:#1e3a5f;">תמחור פלטה</h3>
             <button type="button" onclick="StockMaterials.closeModal()" style="border:none;background:#f1f5f9;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:1rem;">✕</button>
         </div>
-        <p style="margin:0 0 14px;font-size:.8rem;color:#64748b;line-height:1.45;">הזינו כמה עולה לכם פלטה שלמה ואת מידותיה. ברירת מחדל: EGGER 2800×2070, אחרת 2750×1220 מ״מ.</p>
+        <p style="margin:0 0 14px;font-size:.8rem;color:#64748b;line-height:1.45;">הזינו כמה עולה לכם פלטה שלמה <b>לפני מע״מ</b> ואת מידותיה. ברירת מחדל מחיר: 400 ₪ לפני מע״מ · EGGER 2800×2070, אחרת 2750×1220 מ״מ.</p>
         <input type="hidden" id="msp-key">
         <input type="hidden" id="msp-hex">
         <input type="hidden" id="msp-img">
@@ -3477,8 +3477,8 @@
             <label style="display:flex;flex-direction:column;gap:4px;font-size:.72rem;font-weight:700;color:#64748b;">שם לתצוגה
                 <input id="msp-label" type="text" style="height:40px;border:1.5px solid #e2e8f0;border-radius:10px;padding:0 12px;font-family:inherit;font-size:.9rem;">
             </label>
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.72rem;font-weight:700;color:#64748b;">מחיר פלטה מלאה (₪)
-                <input id="msp-price" type="number" min="0" step="10" style="height:40px;border:1.5px solid #e2e8f0;border-radius:10px;padding:0 12px;font-family:inherit;font-size:.9rem;direction:ltr;text-align:right;">
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.72rem;font-weight:700;color:#64748b;">מחיר פלטה מלאה (₪ לפני מע״מ)
+                <input id="msp-price" type="number" min="0" step="10" placeholder="400" style="height:40px;border:1.5px solid #e2e8f0;border-radius:10px;padding:0 12px;font-family:inherit;font-size:.9rem;direction:ltr;text-align:right;">
             </label>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
                 <label style="display:flex;flex-direction:column;gap:4px;font-size:.72rem;font-weight:700;color:#64748b;">רוחב פלטה (מ״מ)

@@ -135,7 +135,7 @@ function renderStockGrid() {
             : ('background-color:' + _esc(item.hex || '#e2e8f0') + ';');
         var priced = item.sheetPrice > 0;
         return '<div class="mat-item mat-stock-item" title="' + _esc(item.label) +
-            (priced ? (' · ₪' + Math.round(item.sheetPrice) + ' / פלטה') : ' · ללא מחיר') + '">' +
+            (priced ? (' · ₪' + Math.round(item.sheetPrice) + ' / פלטה לפני מע״מ') : ' · ללא מחיר') + '">' +
             '<button type="button" class="material-btn" data-mat="' + _esc(item.key) + '" style="' + style +
             (priced ? '' : 'outline:2px dashed #f59e0b;') + '"></button>' +
             '<span onclick="this.previousElementSibling.click()">' + _esc(item.label) + '</span></div>';
@@ -160,7 +160,7 @@ function updatePriceBar(matKey) {
     if (status) {
         if (priced) {
             status.textContent = 'במלאי · ₪' + Math.round(stock.sheetPrice) +
-                ' לפלטה ' + Math.round(stock.sheetW) + '×' + Math.round(stock.sheetH);
+                ' לפלטה לפני מע״מ · ' + Math.round(stock.sheetW) + '×' + Math.round(stock.sheetH);
             status.style.color = '#15803d';
         } else if (inStock) {
             status.textContent = 'במלאי · חסר מחיר פלטה';
@@ -188,7 +188,9 @@ function openModal(matKey) {
     document.getElementById('msp-key').value = matKey;
     document.getElementById('msp-label').value = stock.label || meta.label || matKey;
     document.getElementById('msp-brand').value = stock.brand || meta.brand || '';
-    document.getElementById('msp-price').value = stock.sheetPrice != null ? stock.sheetPrice : '';
+    document.getElementById('msp-price').value = (stock.sheetPrice != null && stock.sheetPrice !== '')
+        ? stock.sheetPrice
+        : 400;
     var sz = _sizeFor(matKey);
     document.getElementById('msp-w').value = stock.sheetW || sz.w;
     document.getElementById('msp-h').value = stock.sheetH || sz.h;
@@ -213,7 +215,7 @@ async function saveFromModal() {
         key: key,
         label: String((document.getElementById('msp-label') || {}).value || key).trim() || key,
         brand: String((document.getElementById('msp-brand') || {}).value || '').trim(),
-        sheetPrice: Number((document.getElementById('msp-price') || {}).value) || 0,
+        sheetPrice: Number((document.getElementById('msp-price') || {}).value) || 400,
         sheetW: Number((document.getElementById('msp-w') || {}).value) || _sizeFor(key).w,
         sheetH: Number((document.getElementById('msp-h') || {}).value) || _sizeFor(key).h
     };
