@@ -14,7 +14,7 @@ var DEFAULTS = {
     materialsBoardPrice: 180, materialsBoardsPerSqm: 1.4, materialsMultiplier: 1.4,
     profitMultiplier: 1.8,
     installPricePerUnit: 110, installUnitCm: 42.5, installHeightSurcharge: 0.20,
-    heightSurcharge: 0.20, depthSurcharge: 0.20, sandwichSurcharge: 0.15,
+    heightSurcharge: 0.20, depthSurcharge: 0.20, depthSurchargeFromCm: 54, sandwichSurcharge: 0.15,
     cabinetTypes: [
         { id: 'maya', label: 'צוקל נסתר', engine: 'maya' },
         { id: 'c9', label: 'צוקל רגיל', engine: 'c9' },
@@ -229,6 +229,7 @@ function basePrice(cfg, ww, wh, wd, melamine, engine, typeId, opts) {
     var mode = cfg.pricingMode || 'ranges';
     var hS = cfg.heightSurcharge != null ? cfg.heightSurcharge : 0.20;
     var dS = cfg.depthSurcharge != null ? cfg.depthSurcharge : 0.20;
+    var dFrom = num(cfg.depthSurchargeFromCm, 54);
     var bp;
     if (engine === 'custom_size') {
         var mat = opts.boardMaterial || (melamine ? 'melamine' : 'sandwich');
@@ -252,7 +253,7 @@ function basePrice(cfg, ww, wh, wd, melamine, engine, typeId, opts) {
         // All-zero / empty carpenter price lists must stay at 0 — do not fall back to built-in defaults.
         if (bp == null) bp = 0;
         if (wh >= 241) bp *= (1 + hS);
-        if (wd > 54) bp *= (1 + dS);
+        if (wd > dFrom) bp *= (1 + dS);
         if (engine === 'c9') bp += c9PlinthSurcharge(cfg, opts.plinthStyle);
         if (engine === 'regalim') bp += regalimLegsCost(cfg, ww);
         return bp;
@@ -271,7 +272,7 @@ function basePrice(cfg, ww, wh, wd, melamine, engine, typeId, opts) {
     } else {
         bp = materialsFaceCost(cfg, ww, wh, opts.matKey || opts.materialKey || null);
     }
-    if (wd > 54) bp *= (1 + dS);
+    if (wd > dFrom) bp *= (1 + dS);
     // Flat extras for plinth / legs — same behavior as ranges (not % type multipliers)
     if (engine === 'c9') bp += c9PlinthSurcharge(cfg, opts.plinthStyle);
     if (engine === 'regalim') bp += regalimLegsCost(cfg, ww);

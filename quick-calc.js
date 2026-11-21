@@ -22,7 +22,7 @@ var _QC_DEFAULT_PRICING = {
     pricingMode: 'ranges',
     profitMultiplier: 1.8,
     installPricePerUnit: 110, installUnitCm: 42.5, installHeightSurcharge: 0.20,
-    heightSurcharge: 0.20, depthSurcharge: 0.20, sandwichSurcharge: 0.15,
+    heightSurcharge: 0.20, depthSurcharge: 0.20, depthSurchargeFromCm: 54, sandwichSurcharge: 0.15,
     cabinetTypes: _QC_DEFAULT_TYPES.map(function(t) { return Object.assign({}, t); }),
     ranges: {
         c9:      { melamine: {80:970, 120:1340,160:1500,200:1870,240:2250}, nonMelamine: {80:1250,120:1600,160:1945,200:2433,240:2920} },
@@ -248,25 +248,26 @@ function _qcBasePrice(cfg, ww, wh, wd, wMelamine, engine, typeId) {
     var mode = cfg.pricingMode || 'ranges';
     var hS = cfg.heightSurcharge != null ? cfg.heightSurcharge : 0.20;
     var dS = cfg.depthSurcharge != null ? cfg.depthSurcharge : 0.20;
+    var dFrom = _qcNum(cfg.depthSurchargeFromCm, 54);
     var bp;
     if (mode === 'sqm') {
         var ps = wMelamine ? _qcNum(cfg.sqmPrice, 800) : _qcNum(cfg.sqmPriceNonMel, _qcNum(cfg.sqmPrice, 800) * 1.3);
         bp = ps * (ww / 100) * (wh / 100);
-        if (wd > 54) bp *= (1 + dS);
+        if (wd > dFrom) bp *= (1 + dS);
         return bp;
     }
     if (mode === 'lm') {
         var pl = wMelamine ? _qcNum(cfg.lmPrice, 1200) : _qcNum(cfg.lmPriceNonMel, _qcNum(cfg.lmPrice, 1200) * 1.3);
         bp = pl * (ww / 100);
         if (wh >= 241) bp *= (1 + hS);
-        if (wd > 54) bp *= (1 + dS);
+        if (wd > dFrom) bp *= (1 + dS);
         return bp;
     }
     if (mode === 'lm_height') {
         var base = wMelamine ? _qcNum(cfg.lmHeightBase, 1200) : _qcNum(cfg.lmHeightBaseNonMel, _qcNum(cfg.lmHeightBase, 1200) * 1.3);
         var steps = Math.max(0, Math.floor((wh - _qcNum(cfg.lmHeightThresholdCm, 240)) / _qcNum(cfg.lmHeightStepCm, 30)));
         bp = base * (ww / 100) * (1 + steps * _qcNum(cfg.lmHeightStepPct, 0.10));
-        if (wd > 54) bp *= (1 + dS);
+        if (wd > dFrom) bp *= (1 + dS);
         return bp;
     }
     if (mode === 'materials') {
@@ -287,7 +288,7 @@ function _qcBasePrice(cfg, ww, wh, wd, wMelamine, engine, typeId) {
             if (mult <= 0) mult = 1;
             bp = sqm * _qcNum(cfg.materialsBoardsPerSqm, 1.4) * _qcNum(cfg.materialsBoardPrice, 180) * mult;
         }
-        if (wd > 54) bp *= (1 + dS);
+        if (wd > dFrom) bp *= (1 + dS);
         return bp;
     }
     var cfgR = cfg.ranges || _QC_DEFAULT_PRICING.ranges;
@@ -307,7 +308,7 @@ function _qcBasePrice(cfg, ww, wh, wd, wMelamine, engine, typeId) {
     // All-zero / empty carpenter price lists must stay at 0 — do not fall back to built-in defaults.
     if (bp == null) bp = 0;
     if (wh >= 241) bp *= (1 + hS);
-    if (wd > 54) bp *= (1 + dS);
+    if (wd > dFrom) bp *= (1 + dS);
     return bp;
 }
 

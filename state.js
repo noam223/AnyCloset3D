@@ -5638,7 +5638,7 @@ var DEFAULT_PRICING_CONFIG = {
     materialsBoardPrice: 180, materialsBoardsPerSqm: 1.4, materialsMultiplier: 1.4,
     profitMultiplier: 1.8,
     installPricePerUnit: 110, installUnitCm: 42.5, installHeightSurcharge: 0.20,
-    heightSurcharge: 0.20, depthSurcharge: 0.20, sandwichSurcharge: 0.15,
+    heightSurcharge: 0.20, depthSurcharge: 0.20, depthSurchargeFromCm: 54, sandwichSurcharge: 0.15,
     cabinetTypes: [
         { id: 'maya', label: 'צוקל נסתר', engine: 'maya' },
         { id: 'c9', label: 'צוקל רגיל', engine: 'c9' },
@@ -5795,6 +5795,7 @@ function _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel, wTypeId
     const mode  = cfg.pricingMode || 'ranges';
     const hS    = cfg.heightSurcharge != null ? cfg.heightSurcharge : 0.20;
     const dS    = cfg.depthSurcharge  != null ? cfg.depthSurcharge  : 0.20;
+    const dFrom = _priceNum(cfg.depthSurchargeFromCm, 54);
     const ex = cfg.extras || DEFAULT_PRICING_CONFIG.extras;
 
     // ארון לפי מידה: volume × rate (no height/depth % surcharges)
@@ -5821,19 +5822,19 @@ function _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel, wTypeId
 
     if (mode === 'sqm') {
         const p = wMelamine ? _priceNum(cfg.sqmPrice, 800) : _priceNum(cfg.sqmPriceNonMel, _priceNum(cfg.sqmPrice, 800) * 1.3);
-        let bp = p*(ww/100)*(wh/100); if(wd>54) bp*=(1+dS);
+        let bp = p*(ww/100)*(wh/100); if (wd > dFrom) bp *= (1 + dS);
         return _addPlinthExtras(bp);
     }
     if (mode === 'lm') {
         const p = wMelamine ? _priceNum(cfg.lmPrice, 1200) : _priceNum(cfg.lmPriceNonMel, _priceNum(cfg.lmPrice, 1200) * 1.3);
-        let bp = p*(ww/100); if(wh>=241) bp*=(1+hS); if(wd>54) bp*=(1+dS);
+        let bp = p*(ww/100); if(wh>=241) bp*=(1+hS); if (wd > dFrom) bp *= (1 + dS);
         return _addPlinthExtras(bp);
     }
     if (mode === 'lm_height') {
         const base  = wMelamine ? _priceNum(cfg.lmHeightBase, 1200) : _priceNum(cfg.lmHeightBaseNonMel, _priceNum(cfg.lmHeightBase, 1200) * 1.3);
         const steps = Math.max(0, Math.floor((wh-_priceNum(cfg.lmHeightThresholdCm, 240))/_priceNum(cfg.lmHeightStepCm, 30)));
         let bp = base*(ww/100)*(1+steps*_priceNum(cfg.lmHeightStepPct, 0.10));
-        if(wd>54) bp*=(1+dS);
+        if (wd > dFrom) bp *= (1 + dS);
         return _addPlinthExtras(bp);
     }
     if (mode === 'materials') {
@@ -5858,7 +5859,7 @@ function _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel, wTypeId
                 bp = sqm * _priceNum(cfg.materialsBoardsPerSqm, 1.4) * _priceNum(cfg.materialsBoardPrice, 180) * mult;
             }
         }
-        if (wd > 54) bp *= (1 + dS);
+        if (wd > dFrom) bp *= (1 + dS);
         return _addPlinthExtras(bp);
     }
     // ranges
@@ -5879,7 +5880,7 @@ function _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel, wTypeId
     // All-zero / empty carpenter price lists must stay at 0 — do not fall back to built-in defaults.
     if (bp == null) bp = 0;
     if (wh >= 241) bp *= (1 + hS);
-    if (wd > 54) bp *= (1 + dS);
+    if (wd > dFrom) bp *= (1 + dS);
     // C9 plinth-style cost adders (before profit)
     if (wEffectiveModel === 'c9') {
         const ps = opts.plinthStyle || 'regular';

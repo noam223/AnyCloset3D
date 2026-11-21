@@ -2390,7 +2390,7 @@ var _PP_DEFAULTS = {
     pricingMode:'ranges',sqmPrice:800,sqmPriceNonMel:1040,lmPrice:1200,lmPriceNonMel:1560,
     lmHeightBase:1200,lmHeightBaseNonMel:1560,lmHeightThresholdCm:240,lmHeightStepCm:30,lmHeightStepPct:0.10,
     materialsBoardPrice:180,materialsBoardsPerSqm:1.4,materialsMultiplier:1.4,profitMultiplier:1.8,
-    heightSurcharge:0.20,depthSurcharge:0.20,sandwichSurcharge:0.15,
+    heightSurcharge:0.20,depthSurcharge:0.20,depthSurchargeFromCm:54,sandwichSurcharge:0.15,
     installPricePerUnit:110,installUnitCm:42.5,installHeightSurcharge:0.20,
     cabinetTypes: _PP_DEFAULT_CABINET_TYPES.map(function(t) { return Object.assign({}, t); }),
     ranges:{

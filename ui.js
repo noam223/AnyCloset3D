@@ -20855,6 +20855,7 @@ function _fillUserPricingForm(cfg) {
     _sv('ups-materialsMultiplier', _upsNum(c.materialsMultiplier, 1.4));
     _sv('ups-profitMultiplier', _upsNum(c.profitMultiplier, 1.8));
     _sv('ups-heightSurcharge', _upsPct(_upsNum(c.heightSurcharge, 0.20)));
+    _sv('ups-depthSurchargeFromCm', _upsNum(c.depthSurchargeFromCm, 54));
     _sv('ups-depthSurcharge', _upsPct(_upsNum(c.depthSurcharge, 0.20)));
     _sv('ups-sandwichSurcharge', _upsPct(_upsNum(c.sandwichSurcharge, 0.15)));
     _sv('ups-installPricePerUnit', _upsNum(c.installPricePerUnit, 110));
@@ -20908,6 +20909,7 @@ function _readUserPricingForm() {
         materialsMultiplier: _upsNum(_gv('ups-materialsMultiplier'), 1.4),
         profitMultiplier: _upsNum(_gv('ups-profitMultiplier'), 1.8),
         heightSurcharge: _upsFrac(_gv('ups-heightSurcharge')),
+        depthSurchargeFromCm: _upsNum(_gv('ups-depthSurchargeFromCm'), existing.depthSurchargeFromCm != null ? existing.depthSurchargeFromCm : 54),
         depthSurcharge: _upsFrac(_gv('ups-depthSurcharge')),
         sandwichSurcharge: _upsFrac(_gv('ups-sandwichSurcharge')),
         installPricePerUnit: _upsNum(_gv('ups-installPricePerUnit'), 110),

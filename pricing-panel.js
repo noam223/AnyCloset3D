@@ -279,7 +279,8 @@ function _commonSurchargesHtml() {
             '<div id="' + _id('row-heightSurcharge') + '">' +
                 _field('heightSurcharge', 'תוספת גובה מעל 240 (%)', 'min="0" max="100" step="1"') +
             '</div>' +
-            _field('depthSurcharge', 'תוספת עומק מעל 54 (%)', 'min="0" max="100" step="1"') +
+            _field('depthSurchargeFromCm', 'סף עומק לתוספת (ס"מ)', 'min="1" step="1"') +
+            _field('depthSurcharge', 'תוספת עומק מעל הסף (%)', 'min="0" max="100" step="1"') +
             _field('sandwichSurcharge', 'תוספת צבע סנדוויץ\' (%)', 'min="0" max="100" step="1"') +
         '</div>' +
         '<div id="' + _id('materials-note') + '" style="display:none;margin-top:12px;padding:10px 14px;' +
@@ -1049,6 +1050,7 @@ function fill(cfg) {
     _set('materialsMultiplier',    _num(c.materialsMultiplier, 1.4));
     _set('profitMultiplier',       _num(c.profitMultiplier, 1.8));
     _set('heightSurcharge',        _pct(_num(c.heightSurcharge, 0.20)));
+    _set('depthSurchargeFromCm',   _num(c.depthSurchargeFromCm, 54));
     _set('depthSurcharge',         _pct(_num(c.depthSurcharge, 0.20)));
     _set('sandwichSurcharge',      _pct(_num(c.sandwichSurcharge, 0.15)));
     _set('installPricePerUnit',    _num(c.installPricePerUnit, 110));
@@ -1175,6 +1177,7 @@ function read() {
         materialsMultiplier:      _num(_v('materialsMultiplier'), 1.4),
         profitMultiplier:         _num(_v('profitMultiplier'), 1.8),
         heightSurcharge:          (_frac(_v('heightSurcharge')) || 0),
+        depthSurchargeFromCm:     _num(_v('depthSurchargeFromCm'), 54),
         depthSurcharge:           (_frac(_v('depthSurcharge')) || 0),
         sandwichSurcharge:        (_frac(_v('sandwichSurcharge')) || 0),
         installPricePerUnit:      _num(_v('installPricePerUnit'), 110),
