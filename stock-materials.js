@@ -1,5 +1,6 @@
 /* stock-materials.js — carpenter stock colors + per-sheet pricing in the designer sidebar.
  * Depends on: window._pricingConfig, Auth/Supabase for save. PricingCore optional.
+ * Carpenter-only: companies/designers never see this UI.
  */
 (function (global) {
 'use strict';
@@ -20,6 +21,21 @@ function _sizeFor(key) {
     return { w: DEFAULT_SHEET_W, h: DEFAULT_SHEET_H, brand: 'standard' };
 }
 
+function _sheetType(t) {
+    if (_pc() && typeof _pc().normalizeSheetType === 'function') return _pc().normalizeSheetType(t);
+    var v = String(t || '').toLowerCase().trim();
+    if (v === 'mdf' || v === 'sandwich') return v;
+    return 'melamine';
+}
+
+function _sheetTypeLabel(t) {
+    if (_pc() && typeof _pc().sheetTypeLabel === 'function') return _pc().sheetTypeLabel(t);
+    var v = _sheetType(t);
+    if (v === 'mdf') return 'MDF';
+    if (v === 'sandwich') return "סנדביץ'";
+    return 'מלמין';
+}
+
 function normalize(list) {
     if (_pc() && typeof _pc().normalizeStockMaterials === 'function') {
         return _pc().normalizeStockMaterials(list);
@@ -29,10 +45,11 @@ function normalize(list) {
     list.forEach(function(item) {
         if (!item || !item.key) return;
         var key = String(item.key).trim();
-        if (!key || seen[key]) return;
-        seen[key] = true;
-        var st = String(item.sheetType || '').toLowerCase().trim();
-        if (st !== 'mdf' && st !== 'sandwich') st = 'melamine';
+        if (!key) return;
+        var st = _sheetType(item.sheetType);
+        var id = key + '::' + st;
+        if (seen[id]) return;
+        seen[id] = true;
         out.push({
             key: key,
             label: String(item.label || key).trim() || key,
@@ -62,10 +79,32 @@ function getList() {
     return normalize(getCfg().stockMaterials);
 }
 
-function find(key) {
+function _activeBoardMaterial() {
+    var w = null;
+    try {
+        if (typeof global.getWing === 'function') w = global.getWing();
+    } catch (e) {}
+    if (!w && global.state && global.state.wings && global.state.activeWingIndex != null) {
+        w = global.state.wings[global.state.activeWingIndex];
+    }
+    var bm = (w && w.boardMaterial) || (global.state && global.state.boardMaterial) || 'melamine';
+    return _sheetType(bm);
+}
+
+/** Prefer exact (key, sheetType); fall back to any row with that key. */
+function find(key, sheetType) {
     if (!key) return null;
+    if (_pc() && typeof _pc().findStockMaterial === 'function') {
+        return _pc().findStockMaterial(getCfg(), key, sheetType != null ? sheetType : _activeBoardMaterial());
+    }
     var k = String(key);
-    return getList().find(function(x) { return x.key === k; }) || null;
+    var list = getList();
+    var want = sheetType != null && sheetType !== '' ? _sheetType(sheetType) : null;
+    if (want) {
+        var exact = list.find(function(x) { return x.key === k && x.sheetType === want; });
+        if (exact) return exact;
+    }
+    return list.find(function(x) { return x.key === k; }) || null;
 }
 
 function isCarpenter() {
@@ -77,21 +116,6 @@ function isCarpenter() {
 function _esc(s) {
     return String(s == null ? '' : s)
         .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-}
-
-function _sheetType(t) {
-    if (_pc() && typeof _pc().normalizeSheetType === 'function') return _pc().normalizeSheetType(t);
-    var v = String(t || '').toLowerCase().trim();
-    if (v === 'mdf' || v === 'sandwich') return v;
-    return 'melamine';
-}
-
-function _sheetTypeLabel(t) {
-    if (_pc() && typeof _pc().sheetTypeLabel === 'function') return _pc().sheetTypeLabel(t);
-    var v = _sheetType(t);
-    if (v === 'mdf') return 'MDF';
-    if (v === 'sandwich') return "סנדביץ'";
-    return 'מלמין';
 }
 
 function _labelForKey(key) {
@@ -132,6 +156,7 @@ function _metaForKey(key) {
     return meta;
 }
 
+/** Stock grid: show rows matching active boardMaterial (carpenter only). */
 function renderStockGrid() {
     var wrap = document.getElementById('mat-stock-wrap');
     var grid = document.getElementById('mat-stock-grid');
@@ -140,7 +165,12 @@ function renderStockGrid() {
         wrap.style.display = 'none';
         return;
     }
-    var list = getList();
+    var board = _activeBoardMaterial();
+    var list = getList().filter(function(item) {
+        return _sheetType(item.sheetType) === board;
+    });
+    // If nothing for this board type, show all stock rows so user still sees inventory
+    if (!list.length) list = getList();
     if (!list.length) {
         wrap.style.display = 'none';
         grid.innerHTML = '';
@@ -152,12 +182,15 @@ function renderStockGrid() {
             ? 'background-image:url(\'' + _esc(item.img) + '\');background-size:cover;'
             : ('background-color:' + _esc(item.hex || '#e2e8f0') + ';');
         var priced = item.sheetPrice > 0;
+        var typeTag = _sheetTypeLabel(item.sheetType);
         return '<div class="mat-item mat-stock-item" title="' + _esc(item.label) +
-            ' · ' + _esc(_sheetTypeLabel(item.sheetType)) +
+            ' · ' + _esc(typeTag) +
             (priced ? (' · ₪' + Math.round(item.sheetPrice) + ' / פלטה לפני מע״מ') : ' · ללא מחיר') + '">' +
             '<button type="button" class="material-btn" data-mat="' + _esc(item.key) + '" style="' + style +
             (priced ? '' : 'outline:2px dashed #f59e0b;') + '"></button>' +
-            '<span onclick="this.previousElementSibling.click()">' + _esc(item.label) + '</span></div>';
+            '<span onclick="this.previousElementSibling.click()">' + _esc(item.label) +
+            '<small style="display:block;font-size:.65rem;opacity:.75;font-weight:600;">' +
+            _esc(typeTag) + '</small></span></div>';
     }).join('');
 }
 
@@ -170,7 +203,8 @@ function updatePriceBar(matKey) {
     }
     _lastMatKey = matKey;
     _lastMeta = _metaForKey(matKey);
-    var stock = find(matKey);
+    var board = _activeBoardMaterial();
+    var stock = find(matKey, board);
     var inStock = !!stock;
     var priced = !!(stock && stock.sheetPrice > 0);
     bar.style.display = 'flex';
@@ -186,7 +220,7 @@ function updatePriceBar(matKey) {
             status.textContent = 'במלאי · ' + _sheetTypeLabel(stock.sheetType) + ' · חסר מחיר פלטה';
             status.style.color = '#b45309';
         } else {
-            status.textContent = 'לא במלאי השוטף — הגדירו מחיר פלטה';
+            status.textContent = 'לא במלאי ל' + _sheetTypeLabel(board) + ' — הגדירו מחיר פלטה';
             status.style.color = '#b45309';
         }
     }
@@ -199,10 +233,12 @@ function onMaterialSelected(matKey, meta) {
 }
 
 function openModal(matKey) {
+    if (!isCarpenter()) return;
     matKey = matKey || _lastMatKey;
     if (!matKey) return;
     var meta = _lastMeta || _metaForKey(matKey);
-    var stock = find(matKey) || {};
+    var board = _activeBoardMaterial();
+    var stock = find(matKey, board) || {};
     var overlay = document.getElementById('mat-sheet-price-modal');
     if (!overlay) return;
     document.getElementById('msp-key').value = matKey;
@@ -212,7 +248,7 @@ function openModal(matKey) {
         ? stock.sheetPrice
         : 400;
     var typeEl = document.getElementById('msp-sheet-type');
-    if (typeEl) typeEl.value = _sheetType(stock.sheetType);
+    if (typeEl) typeEl.value = _sheetType(stock.sheetType || board);
     var sz = _sizeFor(matKey);
     document.getElementById('msp-w').value = stock.sheetW || sz.w;
     document.getElementById('msp-h').value = stock.sheetH || sz.h;
@@ -231,13 +267,15 @@ function closeModal() {
 }
 
 async function saveFromModal() {
+    if (!isCarpenter()) return;
     var key = (document.getElementById('msp-key') || {}).value;
     if (!key) return;
+    var sheetType = _sheetType((document.getElementById('msp-sheet-type') || {}).value);
     var item = {
         key: key,
         label: String((document.getElementById('msp-label') || {}).value || key).trim() || key,
         brand: String((document.getElementById('msp-brand') || {}).value || '').trim(),
-        sheetType: _sheetType((document.getElementById('msp-sheet-type') || {}).value),
+        sheetType: sheetType,
         sheetPrice: Number((document.getElementById('msp-price') || {}).value) || 400,
         sheetW: Number((document.getElementById('msp-w') || {}).value) || _sizeFor(key).w,
         sheetH: Number((document.getElementById('msp-h') || {}).value) || _sizeFor(key).h
@@ -249,7 +287,9 @@ async function saveFromModal() {
 
     var cfg = Object.assign({}, getCfg());
     var list = normalize(cfg.stockMaterials);
-    var idx = list.findIndex(function(x) { return x.key === key; });
+    var idx = list.findIndex(function(x) {
+        return x.key === key && _sheetType(x.sheetType) === sheetType;
+    });
     if (idx >= 0) list[idx] = Object.assign({}, list[idx], item);
     else list.push(item);
     cfg.stockMaterials = normalize(list);
@@ -270,16 +310,11 @@ async function saveFromModal() {
 
 async function persistConfig(cfg) {
     global._pricingConfig = cfg;
-    var sb = global._supabase || (global.supabase && global.Auth ? null : null);
-    if (!sb && global.supabase && typeof global.supabase.createClient === 'function') {
-        // projects page may not expose _supabase the same way
-    }
-    sb = global._supabase;
+    var sb = global._supabase;
     if (!sb && typeof global.Auth !== 'undefined' && Auth.getClient) {
         try { sb = Auth.getClient(); } catch (e) {}
     }
     if (!sb) {
-        // Still update in-memory for this session
         return;
     }
     var user = null;
@@ -302,6 +337,13 @@ async function persistConfig(cfg) {
 }
 
 function refresh() {
+    if (!isCarpenter()) {
+        var wrap = document.getElementById('mat-stock-wrap');
+        var bar = document.getElementById('mat-sheet-price-bar');
+        if (wrap) wrap.style.display = 'none';
+        if (bar) bar.style.display = 'none';
+        return;
+    }
     renderStockGrid();
     var part = (global.state && global.state.activeColorPart) || 'materialBody';
     var mat = null;

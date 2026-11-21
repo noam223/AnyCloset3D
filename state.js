@@ -5839,15 +5839,24 @@ function _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel, wTypeId
     }
     if (mode === 'materials') {
         let bp;
+        const matKey = opts.matKey || opts.materialKey || null;
+        const sheetType = opts.sheetType || opts.boardMaterial || null;
         if (window.PricingCore && typeof window.PricingCore.materialsFaceCost === 'function') {
-            bp = window.PricingCore.materialsFaceCost(cfg, ww, wh, opts.matKey || opts.materialKey || null);
+            bp = window.PricingCore.materialsFaceCost(cfg, ww, wh, matKey, sheetType);
         } else {
             const sqm = (ww / 100) * (wh / 100);
             let mult = _priceNum(cfg.materialsMultiplier, 1.4);
             if (mult <= 0) mult = 1;
-            const stockList = (cfg.stockMaterials || []);
-            const matKey = opts.matKey || opts.materialKey || null;
-            const stock = matKey ? stockList.find(function(x) { return x && x.key === matKey; }) : null;
+            let stock = null;
+            if (window.PricingCore && typeof window.PricingCore.findStockMaterial === 'function') {
+                stock = window.PricingCore.findStockMaterial(cfg, matKey, sheetType);
+            } else {
+                const stockList = (cfg.stockMaterials || []);
+                const want = sheetType ? String(sheetType).toLowerCase() : null;
+                stock = matKey ? (stockList.find(function(x) {
+                    return x && x.key === matKey && (!want || String(x.sheetType || 'melamine').toLowerCase() === want);
+                }) || stockList.find(function(x) { return x && x.key === matKey; })) : null;
+            }
             if (stock && _priceNum(stock.sheetPrice, 0) > 0) {
                 const fb = (window.PricingCore && typeof window.PricingCore.sheetSizeForMat === 'function')
                     ? window.PricingCore.sheetSizeForMat(matKey)

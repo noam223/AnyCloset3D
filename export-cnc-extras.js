@@ -11,15 +11,53 @@
     function _dbg() { return window._exportCncDebug || {}; }
     function _fmt(x) { return String(Math.round(x * 10) / 10); }
 
+    function _normalizeSheetType(t) {
+        if (window.PricingCore && typeof window.PricingCore.normalizeSheetType === 'function') {
+            return window.PricingCore.normalizeSheetType(t);
+        }
+        var v = String(t || '').toLowerCase().trim();
+        if (v === 'mdf' || v === 'sandwich') return v;
+        return 'melamine';
+    }
+
+    /** Best boardMaterial for a matKey from current wings (carpenter materials pricing). */
+    function _boardMaterialForMatKey(matKey) {
+        var wings = (typeof state !== 'undefined' && state && state.wings) ? state.wings : {};
+        var sides = ['center', 'left', 'right'];
+        var k = String(matKey || '');
+        for (var i = 0; i < sides.length; i++) {
+            var w = wings[sides[i]];
+            if (!w) continue;
+            if (w.materialBody === k || w.materialExternal === k || w.materialInternal === k ||
+                w.materialBack === k || w.materialDesk === k || w.materialOpenCell === k) {
+                return _normalizeSheetType(w.boardMaterial);
+            }
+        }
+        var c = wings.center;
+        return _normalizeSheetType(c && c.boardMaterial);
+    }
+
     /** Prefer carpenter stock-material sheet size; else EGGER / CNC defaults. */
-    function _stockSheetSize(matKey) {
+    function _stockSheetSize(matKey, sheetType) {
         var pricing = (typeof window._getPricingCfg === 'function')
             ? window._getPricingCfg()
             : (window._pricingConfig || null);
-        var list = pricing && Array.isArray(pricing.stockMaterials) ? pricing.stockMaterials : [];
-        var hit = list.find(function(x) { return x && x.key === matKey; });
+        var hit = null;
+        if (window.PricingCore && typeof window.PricingCore.findStockMaterial === 'function') {
+            hit = window.PricingCore.findStockMaterial(
+                pricing,
+                matKey,
+                sheetType != null ? sheetType : _boardMaterialForMatKey(matKey)
+            );
+        } else {
+            var list = pricing && Array.isArray(pricing.stockMaterials) ? pricing.stockMaterials : [];
+            var want = _normalizeSheetType(sheetType != null ? sheetType : _boardMaterialForMatKey(matKey));
+            hit = list.find(function(x) {
+                return x && x.key === matKey && _normalizeSheetType(x.sheetType) === want;
+            }) || list.find(function(x) { return x && x.key === matKey; });
+        }
         if (hit && Number(hit.sheetW) > 100 && Number(hit.sheetH) > 100) {
-            return { w: Number(hit.sheetW), h: Number(hit.sheetH), fromStock: true };
+            return { w: Number(hit.sheetW), h: Number(hit.sheetH), fromStock: true, sheetType: hit.sheetType };
         }
         return null;
     }
@@ -351,7 +389,7 @@
             ].join(',');
         }).join(';');
         var stockBits = stock.map(function(s) {
-            return [s.key, s.sheetPrice, s.sheetW, s.sheetH].join(':');
+            return [s.key, s.sheetType || 'melamine', s.sheetPrice, s.sheetW, s.sheetH].join(':');
         }).join('|');
         return wingBits + '##' + stockBits + '##' +
             (pricingCfg && pricingCfg.materialsBoardPrice) + ':' +
@@ -420,10 +458,19 @@
         var missing = [];
         Object.keys(byMat).forEach(function(mk) {
             var row = byMat[mk];
-            var hit = stockList.find(function(x) { return x && x.key === mk; });
+            var boardMat = _boardMaterialForMatKey(mk);
+            var hit = null;
+            if (window.PricingCore && typeof window.PricingCore.findStockMaterial === 'function') {
+                hit = window.PricingCore.findStockMaterial(pricingCfg, mk, boardMat);
+            } else {
+                hit = stockList.find(function(x) {
+                    return x && x.key === mk && _normalizeSheetType(x.sheetType) === boardMat;
+                }) || stockList.find(function(x) { return x && x.key === mk; });
+            }
             var price = hit && Number(hit.sheetPrice) > 0 ? Number(hit.sheetPrice) : 0;
             if (price <= 0 && fallbackPrice > 0) price = fallbackPrice;
             row.sheetPrice = price;
+            row.sheetType = hit ? (hit.sheetType || boardMat) : boardMat;
             row.priced = price > 0;
             row.subtotal = row.sheets * price;
             if (!row.priced) missing.push(mk);

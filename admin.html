@@ -329,9 +329,9 @@
             .admin-tab span { display: none; }
         }
     </style>
-    <script src="pricing-core.js?v=20261122sheetType1"></script>
+    <script src="pricing-core.js?v=20261122multiType1"></script>
     <script src="egger-colors.js?v=20261116eggerKeep1"></script>
-    <script src="pricing-panel.js?v=20261122sheetType1"></script>
+    <script src="pricing-panel.js?v=20261122multiType1"></script>
 </head>
 <body>
 
@@ -1425,6 +1425,11 @@ async function loadPricingForUser(){
         _loadedPricingCfg=null;
         PricingPanel.fill(DEFAULT_PRICING);
     }
+    // Stock (color × sheet type) is carpenter-only — hide for company/designer users
+    var u=_allUsers.find(function(x){return x.id===userId;});
+    var ut=u&&PLAN_USER_TYPE[u.plan];
+    var stockCard=document.querySelector('[data-pnl-stock-card]');
+    if(stockCard) stockCard.style.display=(ut==='carpenter')?'':'none';
     _pricingDirty=false;
 }
 

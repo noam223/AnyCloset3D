@@ -9899,6 +9899,9 @@ function bindUI() {
     document.getElementById('inp-board-mat').addEventListener('change', (e) => {
         state.boardMaterial = e.target.value; state.manualPrice = null;
         _updateSandwichColorVisibility();
+        if (window.StockMaterials && typeof window.StockMaterials.refresh === 'function') {
+            window.StockMaterials.refresh();
+        }
         checkSplits(); buildCabinet(); updateCameraView(); calculatePrice(); saveHistoryState();
     });
 

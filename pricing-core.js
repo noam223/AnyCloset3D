@@ -271,7 +271,11 @@ function basePrice(cfg, ww, wh, wd, melamine, engine, typeId, opts) {
         bp = base * (ww / 100) * (1 + steps * num(cfg.lmHeightStepPct, 0.10));
     } else {
         // materials — depth already in sheet nesting / face estimate; no % depth surcharge
-        bp = materialsFaceCost(cfg, ww, wh, opts.matKey || opts.materialKey || null);
+        bp = materialsFaceCost(
+            cfg, ww, wh,
+            opts.matKey || opts.materialKey || null,
+            opts.sheetType || opts.boardMaterial || null
+        );
         if (engine === 'c9') bp += c9PlinthSurcharge(cfg, opts.plinthStyle);
         if (engine === 'regalim') bp += regalimLegsCost(cfg, ww);
         var typeM = resolveType(cfg, engine, typeId);
@@ -455,20 +459,29 @@ function sheetTypeLabel(t) {
     return 'מלמין';
 }
 
-/** Normalize carpenter stock colors: [{key,label,brand,sheetType,sheetPrice,sheetW,sheetH,hex,img}]. */
+/** Unique stock identity: color key + sheet type. */
+function stockRowId(key, sheetType) {
+    return String(key || '').trim() + '::' + normalizeSheetType(sheetType);
+}
+
+/** Normalize carpenter stock: [{key,label,brand,sheetType,sheetPrice,sheetW,sheetH,hex,img}].
+ * Unique per (key, sheetType) so one color can have melamine + MDF + sandwich rows. */
 function normalizeStockMaterials(list) {
     if (!Array.isArray(list)) return [];
     var seen = {}, out = [];
     list.forEach(function(item) {
         if (!item || typeof item !== 'object') return;
         var key = String(item.key || '').trim();
-        if (!key || seen[key]) return;
-        seen[key] = true;
+        if (!key) return;
+        var sheetType = normalizeSheetType(item.sheetType);
+        var id = stockRowId(key, sheetType);
+        if (seen[id]) return;
+        seen[id] = true;
         var row = {
             key: key,
             label: String(item.label || key).trim() || key,
             brand: String(item.brand || '').trim(),
-            sheetType: normalizeSheetType(item.sheetType),
+            sheetType: sheetType,
             sheetPrice: num(item.sheetPrice, 0),
             sheetW: num(item.sheetW, 0),
             sheetH: num(item.sheetH, 0)
@@ -486,11 +499,27 @@ function normalizeStockMaterials(list) {
     return out;
 }
 
-function findStockMaterial(cfg, matKey) {
+/**
+ * Find stock row by color + sheet type.
+ * Prefer exact (key, sheetType); if missing, fall back to any row with that key (legacy).
+ */
+function findStockMaterial(cfg, matKey, sheetType) {
     if (!matKey) return null;
     var list = normalizeStockMaterials(cfg && cfg.stockMaterials);
     var k = String(matKey);
+    var want = sheetType != null && sheetType !== '' ? normalizeSheetType(sheetType) : null;
+    if (want) {
+        var exact = list.find(function(x) { return x.key === k && x.sheetType === want; });
+        if (exact) return exact;
+    }
     return list.find(function(x) { return x.key === k; }) || null;
+}
+
+function stockTypesForKey(cfg, matKey) {
+    if (!matKey) return [];
+    var k = String(matKey);
+    var list = normalizeStockMaterials(cfg && cfg.stockMaterials);
+    return list.filter(function(x) { return x.key === k; }).map(function(x) { return x.sheetType; });
 }
 
 /**
@@ -498,12 +527,13 @@ function findStockMaterial(cfg, matKey) {
  * Live designer pricing prefers CNC sheet nesting (_cncMaterialsNestCost) instead.
  * Prefer stock sheet: (sqm / sheetAreaM2) × sheetPrice × wasteMultiplier.
  * Fallback: sqm × boardsPerSqm × boardPrice × multiplier.
+ * sheetType / boardMaterial selects which stock row when a color has multiple types.
  */
-function materialsFaceCost(cfg, ww, wh, matKey) {
+function materialsFaceCost(cfg, ww, wh, matKey, sheetType) {
     var sqm = (ww / 100) * (wh / 100);
     var mult = cfg.materialsMultiplier != null ? num(cfg.materialsMultiplier, 1.4) : 1.4;
     if (mult <= 0) mult = 1;
-    var stock = findStockMaterial(cfg, matKey);
+    var stock = findStockMaterial(cfg, matKey, sheetType);
     if (stock && stock.sheetPrice > 0) {
         var fallback = sheetSizeForMat(matKey);
         var sw = Math.max(100, num(stock.sheetW, fallback.w)) / 1000;
@@ -561,8 +591,10 @@ global.PricingCore = {
     findHingeType: findHingeType,
     normalizeSheetType: normalizeSheetType,
     sheetTypeLabel: sheetTypeLabel,
+    stockRowId: stockRowId,
     normalizeStockMaterials: normalizeStockMaterials,
     findStockMaterial: findStockMaterial,
+    stockTypesForKey: stockTypesForKey,
     materialsFaceCost: materialsFaceCost,
     DEFAULT_SHEET_W: DEFAULT_SHEET_W,
     DEFAULT_SHEET_H: DEFAULT_SHEET_H,

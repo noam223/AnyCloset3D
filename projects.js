@@ -3243,6 +3243,8 @@ function _ensurePricingPanelMounted() {
         saveLabel: 'שמור הגדרות תמחור',
         // Carpenters price via materials + flat extras (plinth/legs/hinges) — no type list / % multipliers
         showCabinetTypes: !isCarpenter,
+        // Color × sheet-type stock is carpenter-only (not companies/designers)
+        showStockMaterials: !!isCarpenter,
         onSave: savePricingSettings,
         onReset: resetPricingToDefaults
     });

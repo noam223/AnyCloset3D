@@ -271,17 +271,27 @@ function _qcBasePrice(cfg, ww, wh, wd, wMelamine, engine, typeId) {
         return bp;
     }
     if (mode === 'materials') {
-        // Prefer first stocked sheet with a price; else fallback board fields
+        // Prefer stocked sheet matching melamine/non-mel (board type); else any priced stock
         var matKey = null;
+        var sheetType = wMelamine ? 'melamine' : 'sandwich';
         var stockList = cfg.stockMaterials || [];
         for (var si = 0; si < stockList.length; si++) {
-            if (stockList[si] && _qcNum(stockList[si].sheetPrice, 0) > 0) {
-                matKey = stockList[si].key;
-                break;
+            var sItem = stockList[si];
+            if (!sItem || _qcNum(sItem.sheetPrice, 0) <= 0) continue;
+            var st = String(sItem.sheetType || 'melamine').toLowerCase();
+            if (st === sheetType) { matKey = sItem.key; break; }
+        }
+        if (!matKey) {
+            for (var sj = 0; sj < stockList.length; sj++) {
+                if (stockList[sj] && _qcNum(stockList[sj].sheetPrice, 0) > 0) {
+                    matKey = stockList[sj].key;
+                    sheetType = stockList[sj].sheetType || sheetType;
+                    break;
+                }
             }
         }
         if (global.PricingCore && typeof global.PricingCore.materialsFaceCost === 'function') {
-            bp = global.PricingCore.materialsFaceCost(cfg, ww, wh, matKey);
+            bp = global.PricingCore.materialsFaceCost(cfg, ww, wh, matKey, sheetType);
         } else {
             var sqm = (ww / 100) * (wh / 100);
             var mult = _qcNum(cfg.materialsMultiplier, 1.4);

@@ -88,8 +88,8 @@ function _buildHtml() {
         _lmSectionHtml(),
         _lmHeightSectionHtml(),
         _materialsSectionHtml(),
-        // Stock near materials
-        _stockMaterialsHtml(),
+        // Stock near materials — carpenter personal price lists only
+        (_opts.showStockMaterials !== false ? _stockMaterialsHtml() : ''),
         // Profit + install always visible
         _commonSurchargesHtml(),
         _installHtml(),
@@ -550,14 +550,14 @@ function _stockMaterialsHtml() {
         '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin-bottom:8px;">' +
             '<i class="fa-solid fa-palette"></i> מלאי צבעים ופלטות</div>' +
         _helpBox(
-            'הצבעים השוטפים שלכם — מופיעים בראש רשימת הצבעים במעצב. ' +
-            'לכל צבע מגדירים <b>סוג פלטה</b> (מלמין / MDF / סנדביץ׳), <b>מחיר פלטה מלאה (לפני מע״מ)</b> ומידות (מ״מ). ' +
-            'בשיטת חומרים במעצב: העלות נספרת לפי כמה פלטות כאלה נצרכו בקינון.',
+            'הצבעים השוטפים שלכם (נגרים) — מופיעים בראש רשימת הצבעים במעצב. ' +
+            'אותו צבע יכול להיות במלאי בכמה <b>סוגי פלטה</b> (מלמין / MDF / סנדביץ׳) עם מחיר ומידות נפרדים. ' +
+            'במעצב המחיר נמשך לפי הצבע + סוג הלוח שנבחר.',
             'info'
         ) +
         _helpBox(
-            '<b>דוגמה:</b> לבן מט — מלמין, פלטה 2750×1220 ב־400 ₪ <b>לפני מע״מ</b>. EGGER — לרוב 2800×2070. ' +
-            'הוסיפו מהקטלוג — נשמר אוטומטית. ברירת מחדל: מלמין · 400 ₪ לפני מע״מ.',
+            '<b>דוגמה:</b> לבן מט · מלמין 400 ₪, ואותו לבן · MDF 520 ₪. ' +
+            'לחצו «הוסף סוג» בשורה להוספת סוג חסר. מהקטלוג — נשמר אוטומטית (ברירת מחדל: מלמין · 400 ₪ לפני מע״מ).',
             'ex'
         ) +
         '<div id="' + _id('stock-list') + '"></div>' +
@@ -679,8 +679,7 @@ function _attachListeners(container) {
     });
     container.addEventListener('change', function(e) {
         if (e.target && e.target.classList && e.target.classList.contains('pnl-stock-type')) {
-            updatePreview();
-            _autoSaveStock({ message: 'סוג פלטה נשמר ✓' });
+            _onStockTypeChange(e.target);
         }
     });
 }
@@ -690,6 +689,36 @@ function _normSheetType(t) {
     var v = String(t || '').toLowerCase().trim();
     if (v === 'mdf' || v === 'sandwich') return v;
     return 'melamine';
+}
+
+function _sheetTypeLabel(t) {
+    if (PC && typeof PC.sheetTypeLabel === 'function') return PC.sheetTypeLabel(t);
+    var v = _normSheetType(t);
+    if (v === 'mdf') return 'MDF';
+    if (v === 'sandwich') return "סנדביץ'";
+    return 'מלמין';
+}
+
+function _stockRowId(key, sheetType) {
+    if (PC && typeof PC.stockRowId === 'function') return PC.stockRowId(key, sheetType);
+    return String(key || '').trim() + '::' + _normSheetType(sheetType);
+}
+
+function _SHEET_TYPE_ORDER() {
+    return ['melamine', 'mdf', 'sandwich'];
+}
+
+function _hasStockPair(key, sheetType) {
+    var k = String(key || '').trim();
+    var t = _normSheetType(sheetType);
+    return (_stockMaterials || []).some(function(x) {
+        return x && x.key === k && _normSheetType(x.sheetType) === t;
+    });
+}
+
+function _missingTypesForKey(key) {
+    var k = String(key || '').trim();
+    return _SHEET_TYPE_ORDER().filter(function(t) { return !_hasStockPair(k, t); });
 }
 
 function _sheetTypeOptionsHtml(selected) {
@@ -702,6 +731,43 @@ function _sheetTypeOptionsHtml(selected) {
     return opts.map(function(o) {
         return '<option value="' + o.v + '"' + (cur === o.v ? ' selected' : '') + '>' + o.l + '</option>';
     }).join('');
+}
+
+function _sortStockMaterials() {
+    var order = { melamine: 0, mdf: 1, sandwich: 2 };
+    _stockMaterials.sort(function(a, b) {
+        var ka = String(a.key || '');
+        var kb = String(b.key || '');
+        if (ka !== kb) return ka < kb ? -1 : 1;
+        return (order[_normSheetType(a.sheetType)] || 0) - (order[_normSheetType(b.sheetType)] || 0);
+    });
+}
+
+function _onStockTypeChange(sel) {
+    var row = sel && sel.closest ? sel.closest('.pnl-stock-row') : null;
+    if (!row) return;
+    var key = row.getAttribute('data-key');
+    var prevType = _normSheetType(row.getAttribute('data-sheet-type') || 'melamine');
+    var nextType = _normSheetType(sel.value);
+    if (nextType === prevType) {
+        updatePreview();
+        _autoSaveStock({ message: 'סוג פלטה נשמר ✓' });
+        return;
+    }
+    // Duplicate? another row already has this key+type
+    if (_hasStockPair(key, nextType)) {
+        sel.value = prevType;
+        if (typeof global.showToast === 'function') {
+            global.showToast('כבר יש שורה לצבע הזה בסוג ' + _sheetTypeLabel(nextType), 'error');
+        }
+        return;
+    }
+    row.setAttribute('data-sheet-type', nextType);
+    _syncStockMaterialsFromDom();
+    _sortStockMaterials();
+    _renderStockMaterials();
+    updatePreview();
+    _autoSaveStock({ message: 'סוג פלטה נשמר ✓' });
 }
 
 // ── setMode ──────────────────────────────────────────────────────────────────
@@ -849,9 +915,10 @@ function _renderStockMaterials() {
         _refreshPreviewMatSelect();
         return;
     }
+    _sortStockMaterials();
     var head =
         '<div class="pnl-stock-head" aria-hidden="true" ' +
-            'style="display:grid;grid-template-columns:28px minmax(90px,1fr) 96px 100px 68px 68px 32px;gap:8px;align-items:end;' +
+            'style="display:grid;grid-template-columns:28px minmax(90px,1fr) 96px 100px 68px 68px auto;gap:8px;align-items:end;' +
             'padding:0 0 6px;margin-bottom:2px;border-bottom:1px solid var(--border);">' +
             '<span></span>' +
             '<span style="font-size:.68rem;font-weight:700;color:var(--muted);">שם צבע</span>' +
@@ -862,10 +929,17 @@ function _renderStockMaterials() {
             '<span></span>' +
         '</div>';
     list.innerHTML = head + _stockMaterials.map(function(item) {
+        var st = _normSheetType(item.sheetType);
+        var missing = _missingTypesForKey(item.key);
         var swatch = item.img
             ? 'background-image:url(\'' + _esc(item.img) + '\');background-size:cover;'
             : ('background:' + _esc(item.hex || '#e2e8f0') + ';');
-        return '<div class="pnl-stock-row" data-key="' + _esc(item.key) + '" ' +
+        var addTypeBtn = missing.length
+            ? ('<button type="button" onclick="PricingPanel._addStockType(this)" title="הוסף סוג פלטה נוסף לאותו צבע" aria-label="הוסף סוג" ' +
+                'style="height:32px;padding:0 8px;border-radius:8px;border:1px solid rgba(37,99,235,.3);background:rgba(37,99,235,.08);' +
+                'color:#2563eb;cursor:pointer;font-size:.72rem;font-weight:700;font-family:inherit;white-space:nowrap;">+ סוג</button>')
+            : '';
+        return '<div class="pnl-stock-row" data-key="' + _esc(item.key) + '" data-sheet-type="' + _esc(st) + '" ' +
             'style="display:grid;grid-template-columns:28px minmax(90px,1fr) 96px 100px 68px 68px auto;gap:8px;align-items:center;' +
             'padding:8px 0;border-bottom:1px solid var(--border);">' +
             '<span style="width:28px;height:28px;border-radius:6px;border:1px solid #cbd5e1;' + swatch + '" title="דגימת צבע"></span>' +
@@ -881,7 +955,7 @@ function _renderStockMaterials() {
             '<select class="pnl-stock-type" aria-label="סוג פלטה" title="סוג פלטה" ' +
                 'style="height:34px;border:1.5px solid var(--border);border-radius:8px;padding:0 4px;' +
                 'font-family:inherit;font-size:.78rem;direction:rtl;background:#fff;cursor:pointer;">' +
-                _sheetTypeOptionsHtml(item.sheetType) +
+                _sheetTypeOptionsHtml(st) +
             '</select>' +
             '<input type="number" class="pnl-stock-price" value="' + _num(item.sheetPrice, 0) + '" min="0" step="10" ' +
                 'title="מחיר פלטה מלאה (₪ לפני מע״מ)" placeholder="₪" aria-label="מחיר פלטה בשקלים לפני מע״מ" ' +
@@ -895,9 +969,12 @@ function _renderStockMaterials() {
                 'title="גובה פלטה מ\"מ" placeholder="גובה" aria-label="גובה פלטה במ\"מ" ' +
                 'style="height:34px;border:1.5px solid var(--border);border-radius:8px;padding:0 6px;' +
                 'font-family:inherit;font-size:.8rem;direction:ltr;text-align:right;">' +
-            '<button type="button" onclick="PricingPanel._deleteStockMaterial(this)" title="הסר מהמלאי" aria-label="הסר מהמלאי" ' +
-                'style="width:32px;height:32px;border-radius:8px;border:none;background:#fee2e2;' +
-                'color:#ef4444;cursor:pointer;font-size:.85rem;">✕</button>' +
+            '<div style="display:flex;gap:4px;align-items:center;">' +
+                addTypeBtn +
+                '<button type="button" onclick="PricingPanel._deleteStockMaterial(this)" title="הסר מהמלאי" aria-label="הסר מהמלאי" ' +
+                    'style="width:32px;height:32px;border-radius:8px;border:none;background:#fee2e2;' +
+                    'color:#ef4444;cursor:pointer;font-size:.85rem;">✕</button>' +
+            '</div>' +
         '</div>';
     }).join('');
     _refreshPreviewMatSelect();
@@ -978,7 +1055,8 @@ function _pushStockItem(item) {
     if (!item || !item.key) return false;
     var key = String(item.key).trim();
     if (!key) return false;
-    if (_stockMaterials.some(function(x) { return x.key === key; })) return false;
+    var sheetType = _normSheetType(item.sheetType);
+    if (_hasStockPair(key, sheetType)) return false;
     var sz = (PC && typeof PC.sheetSizeForMat === 'function')
         ? PC.sheetSizeForMat(key)
         : { w: (PC && PC.DEFAULT_SHEET_W) || 2750, h: (PC && PC.DEFAULT_SHEET_H) || 1220, brand: '' };
@@ -986,12 +1064,17 @@ function _pushStockItem(item) {
     if (!label && typeof window !== 'undefined' && window.colorNamesHebrew && window.colorNamesHebrew[key]) {
         label = window.colorNamesHebrew[key];
     }
+    // Prefer label from an existing row of the same color
+    if (!label) {
+        var sibling = (_stockMaterials || []).find(function(x) { return x && x.key === key && x.label; });
+        if (sibling) label = sibling.label;
+    }
     var DEFAULT_SHEET_PRICE = 400;
     var row = {
         key: key,
         label: label || key,
         brand: item.brand || sz.brand || '',
-        sheetType: _normSheetType(item.sheetType),
+        sheetType: sheetType,
         sheetPrice: (item.sheetPrice != null && item.sheetPrice !== '')
             ? _num(item.sheetPrice, DEFAULT_SHEET_PRICE)
             : DEFAULT_SHEET_PRICE,
@@ -1000,6 +1083,14 @@ function _pushStockItem(item) {
     };
     if (item.hex) row.hex = item.hex;
     if (item.img) row.img = item.img;
+    if (!row.hex || !row.img) {
+        var src = (_stockMaterials || []).find(function(x) { return x && x.key === key; });
+        if (src) {
+            if (!row.hex && src.hex) row.hex = src.hex;
+            if (!row.img && src.img) row.img = src.img;
+            if (!row.brand && src.brand) row.brand = src.brand;
+        }
+    }
     _stockMaterials.push(row);
     return true;
 }
@@ -1015,22 +1106,78 @@ function confirmAddStockMaterial() {
         if (keyInp) keyInp.focus();
         return;
     }
-    if (_stockMaterials.some(function(x) { return x.key === key; })) {
-        _stockAddErr('הצבע כבר במלאי.');
+    var missing = _missingTypesForKey(key);
+    if (!missing.length) {
+        _stockAddErr('הצבע כבר במלאי בכל סוגי הפלטה (מלמין / MDF / סנדביץ׳).');
         return;
     }
-    _pushStockItem({ key: key, label: label });
+    var sheetType = missing[0];
+    if (!_pushStockItem({ key: key, label: label, sheetType: sheetType })) {
+        _stockAddErr('לא ניתן להוסיף — כבר קיים.');
+        return;
+    }
     cancelAddStockMaterial();
     _renderStockMaterials();
     updatePreview();
-    _autoSaveStock({ message: 'צבע נוסף למלאי ונשמר ✓' });
+    _autoSaveStock({ message: 'נוסף למלאי (' + _sheetTypeLabel(sheetType) + ') ונשמר ✓' });
     var list = _el('stock-list');
     if (list) {
-        var rows = list.querySelectorAll('.pnl-stock-row');
+        var rows = list.querySelectorAll('.pnl-stock-row[data-key="' + key + '"][data-sheet-type="' + sheetType + '"]');
         var last = rows[rows.length - 1];
         var priceEl = last && last.querySelector('.pnl-stock-price');
         if (priceEl) priceEl.focus();
     }
+}
+
+function _addStockType(btn) {
+    var row = btn && btn.closest ? btn.closest('.pnl-stock-row') : null;
+    if (!row) return;
+    _syncStockMaterialsFromDom();
+    var key = row.getAttribute('data-key');
+    var missing = _missingTypesForKey(key);
+    if (!missing.length) {
+        if (typeof global.showToast === 'function') {
+            global.showToast('כבר יש את כל סוגי הפלטה לצבע הזה', 'info');
+        }
+        return;
+    }
+    var nextType = missing[0];
+    if (missing.length > 1) {
+        var pick = window.prompt(
+            'איזה סוג להוסיף?\n' + missing.map(function(t, i) {
+                return (i + 1) + '. ' + _sheetTypeLabel(t);
+            }).join('\n') + '\n\nהקלידו מספר או שם:',
+            '1'
+        );
+        if (pick == null) return;
+        pick = String(pick).trim();
+        var idx = parseInt(pick, 10);
+        if (idx >= 1 && idx <= missing.length) nextType = missing[idx - 1];
+        else {
+            var byName = missing.find(function(t) {
+                return t === _normSheetType(pick) || _sheetTypeLabel(t) === pick;
+            });
+            if (byName) nextType = byName;
+            else nextType = missing[0];
+        }
+    }
+    var src = (_stockMaterials || []).find(function(x) {
+        return x && x.key === key && _normSheetType(x.sheetType) === _normSheetType(row.getAttribute('data-sheet-type'));
+    }) || (_stockMaterials || []).find(function(x) { return x && x.key === key; }) || {};
+    if (!_pushStockItem({
+        key: key,
+        label: src.label || key,
+        brand: src.brand || '',
+        sheetType: nextType,
+        sheetPrice: src.sheetPrice,
+        sheetW: src.sheetW,
+        sheetH: src.sheetH,
+        hex: src.hex || null,
+        img: src.img || null
+    })) return;
+    _renderStockMaterials();
+    updatePreview();
+    _autoSaveStock({ message: 'נוסף סוג ' + _sheetTypeLabel(nextType) + ' ונשמר ✓' });
 }
 
 // ── stock catalog picker (all brands) ────────────────────────────────────────
@@ -1312,6 +1459,7 @@ function _toggleCatalogColor(it, card) {
             key: it.key,
             label: it.label || it.id || it.key,
             brand: it.brand || '',
+            sheetType: 'melamine',
             hex: it.hex || null,
             img: it.img || null
         });
@@ -1320,7 +1468,7 @@ function _toggleCatalogColor(it, card) {
             var badge2 = card.querySelector('.pnl-cat-badge');
             if (badge2) badge2.textContent = 'במלאי';
         }
-        _setCatNote('נוסף למלאי: ' + (it.label || it.key) + ' — נשמר אוטומטית');
+        _setCatNote('נוסף למלאי (מלמין): ' + (it.label || it.key) + ' — אפשר להוסיף MDF/סנדביץ׳ בטבלה');
         _autoSaveStock({ debounce: 450, message: 'המלאי עודכן ונשמר ✓' });
     }
     _renderStockMaterials();
@@ -1447,23 +1595,35 @@ function _deleteStockMaterial(btn) {
     var row = btn && btn.closest ? btn.closest('.pnl-stock-row') : null;
     if (!row) return;
     var key = row.getAttribute('data-key');
+    var sheetType = _normSheetType(row.getAttribute('data-sheet-type') || 'melamine');
     _syncStockMaterialsFromDom();
-    _stockMaterials = _stockMaterials.filter(function(x) { return x.key !== key; });
+    _stockMaterials = _stockMaterials.filter(function(x) {
+        return !(x.key === key && _normSheetType(x.sheetType) === sheetType);
+    });
     _renderStockMaterials();
     updatePreview();
-    _autoSaveStock({ message: 'צבע הוסר מהמלאי ונשמר ✓' });
+    _autoSaveStock({ message: 'הוסר מהמלאי ונשמר ✓' });
 }
 
 function _syncStockMaterialsFromDom() {
     var list = _el('stock-list');
     if (!list) return;
     var next = [];
+    var seen = {};
     list.querySelectorAll('.pnl-stock-row').forEach(function(row) {
         var key = row.getAttribute('data-key');
         if (!key) return;
-        var prev = _stockMaterials.find(function(x) { return x.key === key; }) || {};
-        var labelEl = row.querySelector('.pnl-stock-label');
         var typeEl = row.querySelector('.pnl-stock-type');
+        var sheetType = _normSheetType(typeEl ? typeEl.value : (row.getAttribute('data-sheet-type') || 'melamine'));
+        var id = _stockRowId(key, sheetType);
+        if (seen[id]) return;
+        seen[id] = true;
+        var prev = _stockMaterials.find(function(x) {
+            return x.key === key && _normSheetType(x.sheetType) === sheetType;
+        }) || _stockMaterials.find(function(x) {
+            return x.key === key && _normSheetType(x.sheetType) === _normSheetType(row.getAttribute('data-sheet-type'));
+        }) || _stockMaterials.find(function(x) { return x.key === key; }) || {};
+        var labelEl = row.querySelector('.pnl-stock-label');
         var priceEl = row.querySelector('.pnl-stock-price');
         var wEl = row.querySelector('.pnl-stock-w');
         var hEl = row.querySelector('.pnl-stock-h');
@@ -1471,7 +1631,7 @@ function _syncStockMaterialsFromDom() {
             key: key,
             label: labelEl ? String(labelEl.value || '').trim() || key : key,
             brand: prev.brand || '',
-            sheetType: _normSheetType(typeEl ? typeEl.value : prev.sheetType),
+            sheetType: sheetType,
             sheetPrice: _num(priceEl ? priceEl.value : 0, 0),
             sheetW: _num(wEl ? wEl.value : ((PC && PC.DEFAULT_SHEET_W) || 2750), (PC && PC.DEFAULT_SHEET_W) || 2750),
             sheetH: _num(hEl ? hEl.value : ((PC && PC.DEFAULT_SHEET_H) || 1220), (PC && PC.DEFAULT_SHEET_H) || 1220)
@@ -1479,6 +1639,7 @@ function _syncStockMaterialsFromDom() {
         if (prev.hex) rowOut.hex = prev.hex;
         if (prev.img) rowOut.img = prev.img;
         next.push(rowOut);
+        row.setAttribute('data-sheet-type', sheetType);
     });
     _stockMaterials = next;
 }
@@ -2002,12 +2163,16 @@ function _refreshPreviewMatSelect() {
     var opts = '<option value="">גיבוי (ללא צבע מלאי)</option>';
     (_stockMaterials || []).forEach(function(m) {
         if (!m || !m.key) return;
-        var label = (m.label || m.key) + (m.sheetPrice > 0 ? ' · ₪' + m.sheetPrice : '');
-        opts += '<option value="' + _esc(m.key) + '"' + (m.key === cur ? ' selected' : '') + '>' +
+        var id = _stockRowId(m.key, m.sheetType);
+        var label = (m.label || m.key) + ' · ' + _sheetTypeLabel(m.sheetType) +
+            (m.sheetPrice > 0 ? ' · ₪' + m.sheetPrice : '');
+        opts += '<option value="' + _esc(id) + '"' + (id === cur ? ' selected' : '') + '>' +
             _esc(label) + '</option>';
     });
     sel.innerHTML = opts;
-    if (cur && (_stockMaterials || []).some(function(m) { return m && m.key === cur; })) sel.value = cur;
+    if (cur && (_stockMaterials || []).some(function(m) {
+        return m && _stockRowId(m.key, m.sheetType) === cur;
+    })) sel.value = cur;
 }
 
 function _toggleMaterial() {
@@ -2027,20 +2192,35 @@ function updatePreview() {
     var w  = _num((_el('prev-w') || {}).value, 160);
     var h  = _num((_el('prev-h') || {}).value, 240);
     var d  = 56; // default depth
-    var matKey = ((_el('prev-mat') || {}).value) || null;
+    var matSel = ((_el('prev-mat') || {}).value) || null;
+    var matKey = null;
+    var matSheetType = null;
+    if (matSel && matSel.indexOf('::') >= 0) {
+        var parts = matSel.split('::');
+        matKey = parts[0];
+        matSheetType = _normSheetType(parts[1]);
+    } else if (matSel) {
+        matKey = matSel;
+    }
 
     try {
         var type = PC.findType(cfg, typeId) || (PC.normalizeTypes(cfg)[0]);
         if (!type) { resultEl.innerHTML = '<div style="font-size:.75rem;opacity:.75;margin-bottom:2px;">תצוגה מקדימה</div><div style="font-size:1rem;">—</div>'; return; }
         var res = PC.preview(cfg, {
             typeId: type.id, w: w, h: h, d: d, melamine: _melamine,
-            matKey: (_currentMode === 'materials') ? matKey : null
+            matKey: (_currentMode === 'materials') ? matKey : null,
+            boardMaterial: (_currentMode === 'materials') ? matSheetType : null,
+            sheetType: (_currentMode === 'materials') ? matSheetType : null
         });
         var matLabel = '';
         if (_currentMode === 'materials') {
             if (matKey) {
-                var hit = (_stockMaterials || []).find(function(m) { return m && m.key === matKey; });
-                matLabel = hit ? (hit.label || hit.key) : matKey;
+                var hit = (_stockMaterials || []).find(function(m) {
+                    return m && m.key === matKey && (!matSheetType || _normSheetType(m.sheetType) === matSheetType);
+                });
+                matLabel = hit
+                    ? ((hit.label || hit.key) + ' · ' + _sheetTypeLabel(hit.sheetType))
+                    : matKey;
             } else {
                 matLabel = 'גיבוי';
             }
@@ -2156,6 +2336,7 @@ global.PricingPanel = {
     _deleteCustomExtra:_deleteCustomExtra,
     _deleteHingeType:  _deleteHingeType,
     _deleteStockMaterial:_deleteStockMaterial,
+    _addStockType:     _addStockType,
     _onSave:           _onSave,
     _onReset:          _onReset
 };
