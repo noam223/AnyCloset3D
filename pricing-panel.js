@@ -410,7 +410,39 @@ function _stockMaterialsHtml() {
             'הצבעים השוטפים שלכם — מופיעים בראש רשימת הצבעים במעצב. לכל צבע: מחיר פלטה מלאה ומידותיה. ' +
             'אפשר גם להוסיף צבע מהמעצב (כפתור «הגדר תמחור» כשבוחרים צבע שלא במלאי).</p>' +
         '<div id="' + _id('stock-list') + '"></div>' +
-        '<button type="button" onclick="PricingPanel.addStockMaterial()" ' +
+        '<div id="' + _id('stock-add-form') + '" style="display:none;flex-direction:column;gap:10px;' +
+            'margin-top:12px;padding:12px 14px;background:#f8fafc;' +
+            'border:1px dashed rgba(37,99,235,.35);border-radius:10px;">' +
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
+                '<div style="display:flex;flex-direction:column;gap:4px;">' +
+                    '<label style="font-size:.72rem;font-weight:700;color:var(--muted);">מפתח צבע (מהקטלוג)</label>' +
+                    '<input id="' + _id('stock-add-key') + '" type="text" placeholder="למשל white_matte או eg_H330" ' +
+                        'style="height:36px;border:1.5px solid var(--border);border-radius:8px;padding:0 10px;' +
+                        'font-family:inherit;font-size:.85rem;direction:ltr;text-align:left;" ' +
+                        'onkeydown="if(event.key===\'Enter\'){event.preventDefault();PricingPanel.confirmAddStockMaterial();}">' +
+                '</div>' +
+                '<div style="display:flex;flex-direction:column;gap:4px;">' +
+                    '<label style="font-size:.72rem;font-weight:700;color:var(--muted);">שם לתצוגה (אופציונלי)</label>' +
+                    '<input id="' + _id('stock-add-label') + '" type="text" placeholder="שם בעברית" ' +
+                        'style="height:36px;border:1.5px solid var(--border);border-radius:8px;padding:0 10px;' +
+                        'font-family:inherit;font-size:.85rem;direction:rtl;text-align:right;" ' +
+                        'onkeydown="if(event.key===\'Enter\'){event.preventDefault();PricingPanel.confirmAddStockMaterial();}">' +
+                '</div>' +
+            '</div>' +
+            '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+                '<button type="button" onclick="PricingPanel.confirmAddStockMaterial()" ' +
+                    'style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;' +
+                    'background:var(--primary,#1e3a5f);color:#fff;border:none;border-radius:8px;' +
+                    'font-size:.82rem;font-weight:700;cursor:pointer;font-family:inherit;">' +
+                    '<i class="fa-solid fa-check"></i> הוסף</button>' +
+                '<button type="button" onclick="PricingPanel.cancelAddStockMaterial()" ' +
+                    'style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;' +
+                    'background:#fff;color:var(--text);border:1px solid var(--border);border-radius:8px;' +
+                    'font-size:.82rem;font-weight:600;cursor:pointer;font-family:inherit;">ביטול</button>' +
+            '</div>' +
+            '<div id="' + _id('stock-add-err') + '" style="display:none;font-size:.78rem;color:#dc2626;"></div>' +
+        '</div>' +
+        '<button type="button" id="' + _id('stock-add-btn') + '" onclick="PricingPanel.addStockMaterial()" ' +
             'style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;margin-top:10px;' +
             'background:rgba(37,99,235,.08);border:1.5px solid rgba(37,99,235,.25);' +
             'color:#2563eb;border-radius:10px;font-size:.82rem;font-weight:600;cursor:pointer;' +
@@ -636,29 +668,77 @@ function _renderStockMaterials() {
     _refreshPreviewMatSelect();
 }
 
+function _stockAddErr(msg) {
+    var el = _el('stock-add-err');
+    if (!el) return;
+    if (!msg) { el.style.display = 'none'; el.textContent = ''; return; }
+    el.style.display = 'block';
+    el.textContent = msg;
+}
+
 function addStockMaterial() {
+    var form = _el('stock-add-form');
+    var btn = _el('stock-add-btn');
+    if (!form) return;
+    form.style.display = 'flex';
+    if (btn) btn.style.display = 'none';
+    _stockAddErr('');
+    var keyInp = _el('stock-add-key');
+    var labelInp = _el('stock-add-label');
+    if (keyInp) keyInp.value = '';
+    if (labelInp) labelInp.value = '';
+    if (keyInp) setTimeout(function() { keyInp.focus(); }, 0);
+}
+
+function cancelAddStockMaterial() {
+    var form = _el('stock-add-form');
+    var btn = _el('stock-add-btn');
+    if (form) form.style.display = 'none';
+    if (btn) btn.style.display = 'inline-flex';
+    _stockAddErr('');
+}
+
+function confirmAddStockMaterial() {
     _syncStockMaterialsFromDom();
-    var key = window.prompt('מפתח צבע (למשל white_matte או מפתח מקטלוג):');
-    if (!key) return;
-    key = String(key).trim();
-    if (!key) return;
+    var keyInp = _el('stock-add-key');
+    var labelInp = _el('stock-add-label');
+    var key = keyInp ? String(keyInp.value || '').trim() : '';
+    var label = labelInp ? String(labelInp.value || '').trim() : '';
+    if (!key) {
+        _stockAddErr('נא להזין מפתח צבע מהקטלוג (למשל white_matte).');
+        if (keyInp) keyInp.focus();
+        return;
+    }
     if (_stockMaterials.some(function(x) { return x.key === key; })) {
-        alert('הצבע כבר במלאי');
+        _stockAddErr('הצבע כבר במלאי.');
         return;
     }
     var sz = (PC && typeof PC.sheetSizeForMat === 'function')
         ? PC.sheetSizeForMat(key)
         : { w: (PC && PC.DEFAULT_SHEET_W) || 2750, h: (PC && PC.DEFAULT_SHEET_H) || 1220, brand: '' };
+    // Prefer Hebrew catalog name when available
+    if (!label && typeof window !== 'undefined' && window.colorNamesHebrew && window.colorNamesHebrew[key]) {
+        label = window.colorNamesHebrew[key];
+    }
     _stockMaterials.push({
         key: key,
-        label: key,
+        label: label || key,
         brand: sz.brand || '',
         sheetPrice: 0,
         sheetW: sz.w,
         sheetH: sz.h
     });
+    cancelAddStockMaterial();
     _renderStockMaterials();
     updatePreview();
+    // Focus price of the new row
+    var list = _el('stock-list');
+    if (list) {
+        var rows = list.querySelectorAll('.pnl-stock-row');
+        var last = rows[rows.length - 1];
+        var priceEl = last && last.querySelector('.pnl-stock-price');
+        if (priceEl) priceEl.focus();
+    }
 }
 
 function _deleteStockMaterial(btn) {
@@ -1314,6 +1394,8 @@ global.PricingPanel = {
     addCustomExtra: addCustomExtra,
     addHingeType:   addHingeType,
     addStockMaterial: addStockMaterial,
+    confirmAddStockMaterial: confirmAddStockMaterial,
+    cancelAddStockMaterial: cancelAddStockMaterial,
     addRangeRow:    addRangeRow,
     showSavedNote:  showSavedNote,
     // internal (called from inline onclick):
