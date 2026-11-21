@@ -135,12 +135,13 @@ function _previewHtml() {
 
 /* ② MODE BUTTONS */
 function _modeBtnsHtml() {
+    // Order: first = right in RTL; ranges last so it sits on the left
     var modes = [
-        { id: 'ranges',    label: 'טווחי מידות',   sub: 'לפי רוחב' },
         { id: 'sqm',       label: 'מ"ר',             sub: 'מחיר למ"ר' },
         { id: 'lm',        label: 'מ"א',             sub: 'מחיר למ"א' },
         { id: 'lm_height', label: 'מ"א + גובה',     sub: 'עם תוספת מדורגת' },
-        { id: 'materials', label: 'חומרים',          sub: 'חזית × פלטה × בלאי' }
+        { id: 'materials', label: 'חומרים',          sub: 'חזית × פלטה × בלאי' },
+        { id: 'ranges',    label: 'טווחי מידות',   sub: 'לפי רוחב' }
     ];
     return '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius,12px);' +
             'padding:20px 24px;margin-bottom:12px;">' +
@@ -148,10 +149,14 @@ function _modeBtnsHtml() {
             '<i class="fa-solid fa-sliders"></i> שיטת תמחור</div>' +
         '<div id="' + _id('mode-btns') + '" style="display:flex;gap:8px;flex-wrap:wrap;">' +
             modes.map(function(m) {
-                return '<button class="pnl-mode-btn' + (m.id === 'ranges' ? ' active' : '') + '" ' +
+                var isActive = m.id === _currentMode;
+                return '<button class="pnl-mode-btn' + (isActive ? ' active' : '') + '" ' +
                     'data-mode="' + m.id + '" onclick="PricingPanel.setMode(\'' + m.id + '\')" ' +
-                    'style="padding:9px 18px;border-radius:9px;border:1.5px solid var(--border);' +
-                    'background:#f8fafc;color:var(--text);font-size:.82rem;font-weight:700;' +
+                    'style="padding:9px 18px;border-radius:9px;border:1.5px solid ' +
+                    (isActive ? 'var(--primary,#1e3a5f)' : 'var(--border)') + ';' +
+                    'background:' + (isActive ? 'var(--primary,#1e3a5f)' : '#f8fafc') + ';' +
+                    'color:' + (isActive ? '#fff' : 'var(--text)') + ';' +
+                    'font-size:.82rem;font-weight:700;' +
                     'font-family:inherit;cursor:pointer;transition:all .15s;display:flex;' +
                     'flex-direction:column;align-items:center;gap:3px;">' +
                     m.label + '<small style="font-size:.68rem;font-weight:500;opacity:.8;">' + m.sub + '</small>' +
