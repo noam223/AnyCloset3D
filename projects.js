@@ -3537,7 +3537,8 @@ function _readPricingPanel() {
     };
 }
 
-async function savePricingSettings() {
+async function savePricingSettings(cfgFromPanel, opts) {
+    opts = opts || {};
     try {
         var sb = supabase.createClient(
             'https://meqxnsjycvfgfhdepguo.supabase.co',
@@ -3549,8 +3550,8 @@ async function savePricingSettings() {
             showToast('רק אדמין החברה יכול לערוך תמחור', 'error');
             return;
         }
-        var cfg = PricingPanel.read();
-        if (cfg.pricingMode === 'ranges') {
+        var cfg = cfgFromPanel || PricingPanel.read();
+        if (cfg.pricingMode === 'ranges' && !opts.quiet) {
             var nonSliding = (cfg.cabinetTypes || []).filter(function(t) { return t.engine !== 'sliding'; });
             var emptyType = nonSliding.find(function(t) { return !cfg.ranges[t.id]; });
             if (emptyType) { showToast('לסוג "' + emptyType.label + '" אין שורות מחיר', 'error'); return; }
@@ -3575,8 +3576,8 @@ async function savePricingSettings() {
             var _hw = (typeof getWing === 'function') ? getWing() : null;
             window._syncHingeTypeUI(_hw);
         }
-        PricingPanel.showSavedNote(3000);
-        showToast('הגדרות התמחור נשמרו ✓', 'success');
+        PricingPanel.showSavedNote(opts.quiet ? 1800 : 3000);
+        showToast(opts.message || (opts.quiet ? 'המלאי נשמר ✓' : 'הגדרות התמחור נשמרו ✓'), 'success');
     } catch(e) {
         showToast('שגיאה בשמירה: ' + e.message, 'error');
     }

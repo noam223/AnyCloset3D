@@ -331,7 +331,7 @@
     </style>
     <script src="pricing-core.js?v=20261122sheet400"></script>
     <script src="egger-colors.js?v=20261116eggerKeep1"></script>
-    <script src="pricing-panel.js?v=20261122noFallback1"></script>
+    <script src="pricing-panel.js?v=20261122stockAuto1"></script>
 </head>
 <body>
 
@@ -1391,7 +1391,10 @@ var _panelMounted=false;
 function _ensurePanelMounted(){
     if(_panelMounted)return;
     _panelMounted=true;
-    PricingPanel.mount('pricing-panel-mount',{showSaveBar:false});
+    PricingPanel.mount('pricing-panel-mount',{
+        showSaveBar:false,
+        onSave:function(cfg, opts){ return savePricingConfig(cfg, opts); }
+    });
 }
 
 // _normalizeCabinetTypes: now delegated to PricingCore.normalizeTypes
@@ -1432,11 +1435,12 @@ function resetPricingToDefaults(){
     _pricingDirty=true;
 }
 
-async function savePricingConfig(){
+async function savePricingConfig(cfgFromPanel, opts){
+    opts=opts||{};
     if(!_currentPricingUserId){showToast('יש לבחור משתמש תחילה','error');return;}
-    var cfg=PricingPanel.read();
-    // Validate range table when ranges mode
-    if(cfg.pricingMode==='ranges'){
+    var cfg=cfgFromPanel||PricingPanel.read();
+    // Validate range table when ranges mode (skip confirm dialogs on quiet stock auto-save)
+    if(cfg.pricingMode==='ranges'&&!opts.quiet){
         var nonSliding=(cfg.cabinetTypes||[]).filter(function(t){return t.engine!=='sliding';});
         var missing=nonSliding.filter(function(t){return !cfg.ranges[t.id]||!Object.keys(cfg.ranges[t.id].melamine||{}).length;});
         if(missing.length){showToast('לסוג "'+missing[0].label+'" אין שורות מחיר בטבלת הרוחב','error');return;}
@@ -1452,10 +1456,10 @@ async function savePricingConfig(){
         if(error)throw error;
         _loadedPricingCfg=cfg;
         _pricingDirty=false;
-        // show saved note
         var note=document.getElementById('pricing-saved-note');
-        if(note){note.style.display='inline';setTimeout(function(){note.style.display='none';},3000);}
-        showToast('התמחור נשמר בהצלחה ✓','success');
+        if(note){note.style.display='inline';setTimeout(function(){note.style.display='none';},opts.quiet?1800:3000);}
+        if(typeof PricingPanel!=='undefined'&&PricingPanel.showSavedNote)PricingPanel.showSavedNote(opts.quiet?1800:3000);
+        showToast(opts.message||(opts.quiet?'המלאי נשמר ✓':'התמחור נשמר בהצלחה ✓'),'success');
     }catch(e){showToast('שגיאה בשמירה: '+e.message,'error');}
 }
 document.addEventListener('input',function(e){if(e.target&&e.target.closest&&e.target.closest('#pricing-form'))_pricingDirty=true;});

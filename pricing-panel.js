@@ -549,7 +549,7 @@ function _stockMaterialsHtml() {
         ) +
         _helpBox(
             '<b>דוגמה:</b> לבן מט — פלטה 2750×1220 ב־400 ₪ <b>לפני מע״מ</b>. EGGER — לרוב 2800×2070. ' +
-            'הוסיפו מהקטלוג, מלאו מחיר, ושמרו. (ברירת מחדל לפלטה חדשה: 400 ₪ לפני מע״מ.)',
+            'הוסיפו מהקטלוג — נשמר אוטומטית. ברירת מחדל לפלטה חדשה: 400 ₪ לפני מע״מ (ניתן לערוך ואז לשמור למטה).',
             'ex'
         ) +
         '<div id="' + _id('stock-list') + '"></div>' +
@@ -854,23 +854,6 @@ function _stockAddErr(msg) {
     el.textContent = msg;
 }
 
-function _markPricingDirty(reason) {
-    var msg = reason || 'יש שינויים שלא נשמרו — לחצו «שמור הגדרות תמחור» למטה';
-    var note = _el('unsaved-note');
-    if (note) {
-        note.style.display = 'inline';
-        note.textContent = msg;
-    }
-    var saveBtn = document.querySelector('#' + _id('save-bar') + ' button');
-    if (saveBtn) {
-        saveBtn.style.boxShadow = '0 0 0 3px rgba(245,158,11,.45)';
-        saveBtn.style.outline = '2px solid #f59e0b';
-    }
-    if (typeof global.showToast === 'function') {
-        global.showToast(msg, 'success');
-    }
-}
-
 function _clearPricingDirty() {
     var note = _el('unsaved-note');
     if (note) note.style.display = 'none';
@@ -879,6 +862,37 @@ function _clearPricingDirty() {
         saveBtn.style.boxShadow = '';
         saveBtn.style.outline = '';
     }
+}
+
+var _stockAutoSaveTimer = null;
+/** Persist stock changes via mount onSave — no need to click the bottom save bar. */
+function _autoSaveStock(opts) {
+    opts = opts || {};
+    var delay = opts.debounce != null ? opts.debounce : 0;
+    var msg = opts.message || 'המלאי נשמר ✓';
+    function run() {
+        _stockAutoSaveTimer = null;
+        if (typeof _opts.onSave !== 'function') {
+            if (typeof global.showToast === 'function') {
+                global.showToast('אין שמירה מחוברת — לחצו «שמור» למטה', 'error');
+            }
+            return;
+        }
+        var cfg = read();
+        try {
+            var ret = _opts.onSave(cfg, { quiet: true, source: 'stock', message: msg });
+            Promise.resolve(ret).then(function() {
+                _clearPricingDirty();
+            }).catch(function(err) {
+                console.warn('[pricing] stock auto-save failed', err);
+            });
+        } catch (err) {
+            console.warn('[pricing] stock auto-save failed', err);
+        }
+    }
+    clearTimeout(_stockAutoSaveTimer);
+    if (delay > 0) _stockAutoSaveTimer = setTimeout(run, delay);
+    else run();
 }
 
 function addStockMaterial() {
@@ -951,7 +965,7 @@ function confirmAddStockMaterial() {
     cancelAddStockMaterial();
     _renderStockMaterials();
     updatePreview();
-    _markPricingDirty('צבע נוסף — לחצו «שמור הגדרות תמחור» למטה');
+    _autoSaveStock({ message: 'צבע נוסף למלאי ונשמר ✓' });
     var list = _el('stock-list');
     if (list) {
         var rows = list.querySelectorAll('.pnl-stock-row');
@@ -1234,7 +1248,7 @@ function _toggleCatalogColor(it, card) {
             if (badge) badge.textContent = 'הוסף';
         }
         _setCatNote('הוסר מהמלאי: ' + (it.label || it.key));
-        _markPricingDirty('הוסר מהמלאי — לחצו «שמור» למטה');
+        _autoSaveStock({ debounce: 450, message: 'המלאי עודכן ונשמר ✓' });
     } else {
         _pushStockItem({
             key: it.key,
@@ -1248,8 +1262,8 @@ function _toggleCatalogColor(it, card) {
             var badge2 = card.querySelector('.pnl-cat-badge');
             if (badge2) badge2.textContent = 'במלאי';
         }
-        _setCatNote('נוסף למלאי: ' + (it.label || it.key) + ' — זכרו לשמור למטה');
-        _markPricingDirty('צבע נוסף — לחצו «שמור הגדרות תמחור» למטה');
+        _setCatNote('נוסף למלאי: ' + (it.label || it.key) + ' — נשמר אוטומטית');
+        _autoSaveStock({ debounce: 450, message: 'המלאי עודכן ונשמר ✓' });
     }
     _renderStockMaterials();
     updatePreview();
@@ -1364,6 +1378,11 @@ function closeStockCatalog() {
     document.body.style.overflow = '';
     _renderStockMaterials();
     updatePreview();
+    // Flush any pending debounced catalog saves
+    if (_stockAutoSaveTimer) {
+        clearTimeout(_stockAutoSaveTimer);
+        _autoSaveStock({ message: 'המלאי נשמר ✓' });
+    }
 }
 
 function _deleteStockMaterial(btn) {
@@ -1374,7 +1393,7 @@ function _deleteStockMaterial(btn) {
     _stockMaterials = _stockMaterials.filter(function(x) { return x.key !== key; });
     _renderStockMaterials();
     updatePreview();
-    _markPricingDirty('הוסר מהמלאי — לחצו «שמור» למטה');
+    _autoSaveStock({ message: 'צבע הוסר מהמלאי ונשמר ✓' });
 }
 
 function _syncStockMaterialsFromDom() {
