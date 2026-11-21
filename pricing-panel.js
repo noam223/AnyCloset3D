@@ -65,6 +65,17 @@ function _detailsCard(title, icon, innerHtml, open) {
     '</details>';
 }
 
+/** Inline help: kind = info | ex | warn */
+function _helpBox(html, kind) {
+    kind = kind || 'info';
+    var bg = kind === 'warn' ? '#fef3c7' : (kind === 'ex' ? '#ecfdf5' : '#eff6ff');
+    var color = kind === 'warn' ? '#92400e' : (kind === 'ex' ? '#065f46' : '#1e3a5f');
+    var icon = kind === 'warn' ? 'fa-triangle-exclamation' : (kind === 'ex' ? 'fa-lightbulb' : 'fa-circle-info');
+    return '<div class="pnl-help" style="margin:0 0 14px;padding:12px 14px;background:' + bg +
+        ';border-radius:10px;font-size:.8rem;color:' + color + ';line-height:1.55;">' +
+        '<i class="fa-solid ' + icon + '" style="margin-left:6px;"></i>' + html + '</div>';
+}
+
 // ── HTML builder ─────────────────────────────────────────────────────────────
 function _buildHtml() {
     var s = _opts.showSaveBar;
@@ -130,6 +141,10 @@ function _previewHtml() {
             '<div style="font-size:.75rem;opacity:.75;margin-bottom:2px;">תצוגה מקדימה (לפני שמירה)</div>' +
             '<div style="font-size:1.15rem;font-weight:800;">— ₪</div>' +
         '</div>' +
+        '<div style="width:100%;font-size:.72rem;opacity:.85;line-height:1.4;margin-top:2px;">' +
+            'משחקים כאן עם מידות ושיטה כדי לראות מחיר מיד. בשיטת חומרים זו הערכה לפי חזית — ' +
+            'במעצב החישוב לפי פלטות אמיתיות מדויק יותר.' +
+        '</div>' +
     '</div>';
 }
 
@@ -145,8 +160,18 @@ function _modeBtnsHtml() {
     ];
     return '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius,12px);' +
             'padding:20px 24px;margin-bottom:12px;">' +
-        '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin-bottom:14px;">' +
+        '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin-bottom:8px;">' +
             '<i class="fa-solid fa-sliders"></i> שיטת תמחור</div>' +
+        _helpBox(
+            '<b>איך זה עובד בכל השיטות:</b> מחשבים <b>עלות</b> לגוף הארון (+ תוספות כמו מגירות/דלתות) ' +
+            'ואז מכפילים ב<b>מכפיל רווח</b> → מחיר ללקוח. <b>התקנה</b> מחושבת בנפרד ולא נכנסת למכפיל הרווח.<br>' +
+            '<b>מתי לבחור מה:</b> ' +
+            '<b>חומרים</b> — נגרים (לפי פלטות אמיתיות במעצב). ' +
+            '<b>מ"ר / מ"א</b> — תמחור פשוט לפי מידה. ' +
+            '<b>מ"א + גובה</b> — כשיש תוספת מדורגת לגובה. ' +
+            '<b>טווחי מידות</b> — טבלת מחירים קבועה לפי רוחב (כמו מחירון ישן).',
+            'info'
+        ) +
         '<div id="' + _id('mode-btns') + '" style="display:flex;gap:8px;flex-wrap:wrap;">' +
             modes.map(function(m) {
                 var isActive = m.id === _currentMode;
@@ -173,9 +198,15 @@ function _cabinetTypesSectionHtml() {
         'padding:20px 24px;margin-bottom:12px;">' +
         '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin-bottom:8px;">' +
             '<i class="fa-solid fa-layer-group"></i> סוגי ארונות</div>' +
-        '<p style="font-size:.8rem;color:var(--muted);margin-bottom:14px;">שם התצוגה במחשבון ובמעצב, וסוג הבנייה. ' +
-            'מכפיל סוג (%) — תוספת/הנחה לסוג זה בשיטות מ"ר / מ"א / חומרים (0 = ללא שינוי). ' +
-            'לארון הזזה אין טבלת רוחב.</p>' +
+        _helpBox(
+            'שם לתצוגה במחשבון ובמעצב, וסוג הבנייה (מנוע). ' +
+            '<b>מכפיל סוג (%)</b> — תוספת/הנחה לסוג בשיטות מ״ר / מ״א / חומרים (0 = ללא שינוי). לארון הזזה אין טבלת רוחב.',
+            'info'
+        ) +
+        _helpBox(
+            '<b>דוגמה:</b> מכפיל סוג +10% על ארון «צוקל רגיל». עלות בסיס 2,000 ₪ → 2,200 ₪ לפני רווח.',
+            'ex'
+        ) +
         '<div id="' + _id('types-list') + '"></div>' +
         '<button type="button" onclick="PricingPanel.addCabinetType()" ' +
             'style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;' +
@@ -193,8 +224,17 @@ function _rangesSectionHtml() {
         'padding:20px 24px;margin-bottom:12px;display:none;">' +
         '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin-bottom:8px;">' +
             '<i class="fa-solid fa-table"></i> טבלת מחירים לפי רוחב</div>' +
-        '<p style="font-size:.8rem;color:var(--muted);margin-bottom:14px;">' +
-            'מחיר עלות לארון שלם לפי סוג ורוחב (ס"מ). רוחב שאינו בטבלה — שורה קרובה מעליו; מעל המקסימום — יחסי.</p>' +
+        _helpBox(
+            'מגדירים <b>מחיר עלות לארון שלם</b> לפי סוג ורוחב (ס״מ), בנפרד למלמין / לא מלמין. ' +
+            'רוחב שלא בטבלה → נלקחת השורה הקרובה <b>מעליו</b>. מעל הרוחב המקסימלי → מחיר יחסי.',
+            'info'
+        ) +
+        _helpBox(
+            '<b>דוגמה:</b> בטבלה יש 120 ס״מ = 3,000 ₪ ו־160 ס״מ = 3,800 ₪. ' +
+            'ארון 140 ס״מ ייקח את מחיר 160 (3,800 ₪). ארון 200 ס״מ כשהמקסימום 160 → ' +
+            '(3,800 ÷ 160) × 200 ≈ 4,750 ₪. אחר כך × מכפיל רווח.',
+            'ex'
+        ) +
         '<div style="overflow-x:auto;"><table id="' + _id('ranges-table') + '" ' +
             'style="width:100%;border-collapse:collapse;font-size:.83rem;">' +
             '<thead><tr style="background:#f1f5f9;">' +
@@ -214,12 +254,13 @@ function _rangesSectionHtml() {
     '</div>';
 }
 
-function _modeSection(id, icon, title, fields) {
+function _modeSection(id, icon, title, fields, helpHtml) {
     return '<div id="' + _id('section-' + id) + '" class="pnl-mode-section" ' +
         'style="background:#fff;border:1px solid var(--border);border-radius:var(--radius,12px);' +
         'padding:20px 24px;margin-bottom:12px;display:none;">' +
-        '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin-bottom:14px;">' +
+        '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin-bottom:10px;">' +
             '<i class="fa-solid ' + icon + '"></i> ' + title + '</div>' +
+        (helpHtml || '') +
         '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">' +
             fields +
         '</div>' +
@@ -242,13 +283,21 @@ function _field(id, label, attrs) {
 function _sqmSectionHtml() {
     return _modeSection('sqm', 'fa-ruler-combined', 'מחיר למ"ר',
         _field('sqmPrice', 'מ"ר — מלמין (₪)', 'min="0" step="10"') +
-        _field('sqmPriceNonMel', 'מ"ר — לא מלמין (₪)', 'min="0" step="10"'));
+        _field('sqmPriceNonMel', 'מ"ר — לא מלמין (₪)', 'min="0" step="10"'),
+        _helpBox('עלות = מחיר למ״ר × (רוחב÷100) × (גובה÷100). מתאים כשעובדים לפי שטח חזית.', 'info') +
+        _helpBox('<b>דוגמה:</b> 800 ₪/מ״ר, ארון 160×240 → 1.6×2.4 = 3.84 מ״ר → עלות 3,072 ₪. ' +
+            'עם מכפיל רווח 1.8 → ללקוח ≈ 5,530 ₪ (+ התקנה בנפרד).', 'ex')
+    );
 }
 
 function _lmSectionHtml() {
     return _modeSection('lm', 'fa-ruler-horizontal', 'מחיר למ"א',
         _field('lmPrice', 'מ"א — מלמין (₪)', 'min="0" step="10"') +
-        _field('lmPriceNonMel', 'מ"א — לא מלמין (₪)', 'min="0" step="10"'));
+        _field('lmPriceNonMel', 'מ"א — לא מלמין (₪)', 'min="0" step="10"'),
+        _helpBox('עלות = מחיר למטר רץ × (רוחב÷100). הגובה לא משפיע על הבסיס (אלא אם מופעלת תוספת גובה למעלה).', 'info') +
+        _helpBox('<b>דוגמה:</b> 1,200 ₪/מ״א, ארון רוחב 160 → 1.6 מ׳ → עלות 1,920 ₪. ' +
+            'אם הגובה ≥ 241 ויש תוספת גובה 20% → 1,920 × 1.2 = 2,304 ₪.', 'ex')
+    );
 }
 
 function _lmHeightSectionHtml() {
@@ -257,19 +306,45 @@ function _lmHeightSectionHtml() {
         _field('lmHeightBaseNonMel', 'בסיס מ"א — לא מלמין (₪)', 'min="0" step="10"') +
         _field('lmHeightThresholdCm', 'סף גובה (ס"מ)', 'min="0" step="10"') +
         _field('lmHeightStepCm', 'צעד גובה (ס"מ)', 'min="1" step="5"') +
-        _field('lmHeightStepPct', 'תוספת לצעד (%)', 'min="0" max="100" step="1"'));
+        _field('lmHeightStepPct', 'תוספת לצעד (%)', 'min="0" max="100" step="1"'),
+        _helpBox(
+            'בסיס למטר רץ, ואז תוספת מדורגת לפי גובה: ' +
+            'מספר צעדים = כמה פעמים עברתם את הסף בקפיצות של «צעד גובה». כל צעד מוסיף את האחוז.',
+            'info'
+        ) +
+        _helpBox(
+            '<b>דוגמה:</b> בסיס 1,200 ₪/מ״א, סף 240, צעד 30 ס״מ, תוספת 10% לצעד. ' +
+            'ארון 160×300 → רוחב 1.6 מ׳, גובה 300 → שני צעדים (240→270, 270→300) → ' +
+            '1,200 × 1.6 × (1 + 2×0.10) = 1,920 × 1.2 = 2,304 ₪ עלות.',
+            'ex'
+        )
+    );
 }
 
 function _materialsSectionHtml() {
     return _modeSection('materials', 'fa-layer-group', 'תמחור לפי חומרים',
-        _field('materialsMultiplier', 'מכפיל בלאי / בזבוז', 'min="1" step="0.05"') +
+        _field('materialsMultiplier', 'מכפיל בלאי / בזבוז (גיבוי)', 'min="1" step="0.05"') +
         _field('materialsBoardPrice', 'מחיר לוח כללי — גיבוי (₪)', 'min="0" step="5"') +
-        _field('materialsBoardsPerSqm', 'לוחות למ"ר — גיבוי', 'min="0" step="0.1"')) +
-        '<div id="' + _id('materials-stock-hint') + '" style="display:none;margin:-4px 0 12px;padding:10px 14px;' +
-            'background:#eff6ff;border-radius:8px;font-size:.8rem;color:#1e3a5f;line-height:1.45;">' +
-            '<i class="fa-solid fa-circle-info"></i> ' +
-            'במעצב: כל חלקי הארון נארזים לפלטות (כמו CNC) — העלות = מספר פלטות × מחיר פלטה לפי צבע. ' +
-            'הגדירו מחיר ומידות פלטה לכל צבע במלאי. תצוגה מקדימה כאן / מחשבון מהיר בלי ארון תלת־ממד משתמשים בהערכת חזית × בלאי.</div>';
+        _field('materialsBoardsPerSqm', 'לוחות למ"ר — גיבוי', 'min="0" step="0.1"'),
+        '<div id="' + _id('materials-stock-hint') + '">' +
+            _helpBox(
+                '<b>במעצב (חישוב אמיתי):</b> כל חלקי הארון (צדדים, מדפים, דלתות…) נארזים לפלטות כמו בקינון CNC. ' +
+                'עלות החומר = <b>מספר פלטות × מחיר פלטה</b> לפי צבע במלאי למטה. ' +
+                'ייצוא CNC לא נפתח — רק מנוע הקינון הפנימי.',
+                'info'
+            ) +
+            _helpBox(
+                '<b>דוגמה במעצב:</b> הארון יצא ל־3 פלטות לבן מט (₪450) ו־1 פלטת עץ (₪520) → ' +
+                'עלות חומר 3×450 + 1×520 = 1,870 ₪. אחר כך נוספות תוספות פרזול/מגירות, ואז × רווח.',
+                'ex'
+            ) +
+            _helpBox(
+                '<b>כאן בתצוגה מקדימה / מחשבון מהיר</b> (אין ארון תלת־ממד): הערכה לפי שטח חזית × (מחיר פלטה÷שטח פלטה) × מכפיל בלאי. ' +
+                'שדות הגיבוי משמשים רק כשאין מחיר לצבע במלאי.',
+                'warn'
+            ) +
+        '</div>'
+    );
 }
 
 /* ④ COMMON SURCHARGES — hide heightSurcharge for irrelevant modes */
@@ -277,8 +352,18 @@ function _commonSurchargesHtml() {
     return '<div id="' + _id('section-surcharges') + '" ' +
         'style="background:#fff;border:1px solid var(--border);border-radius:var(--radius,12px);' +
         'padding:20px 24px;margin-bottom:12px;">' +
-        '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin-bottom:14px;">' +
+        '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin-bottom:8px;">' +
             '<i class="fa-solid fa-percent"></i> רווח ותוספות אחוז</div>' +
+        _helpBox(
+            '<b>מכפיל רווח</b> מוחל על סה״כ העלות (גוף + תוספות) → מחיר ללקוח. ' +
+            '1.8 = רווח של 80% מעל העלות (עלות 1,000 → ללקוח 1,800).',
+            'info'
+        ) +
+        _helpBox(
+            '<b>דוגמה עומק:</b> סף 54 ס״מ ותוספת 20%. ארון בעומק 60 → עלות הגוף × 1.2. ' +
+            '<b>סנדוויץ\':</b> צבעים מסומנים כסנדוויץ\' מקבלים תוספת אחוז על בסיס הארון.',
+            'ex'
+        ) +
         '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">' +
             _field('profitMultiplier', 'מכפיל רווח ללקוח', 'min="1" step="0.05"') +
             '<div id="' + _id('row-heightSurcharge') + '">' +
@@ -288,10 +373,12 @@ function _commonSurchargesHtml() {
             _field('depthSurcharge', 'תוספת עומק מעל הסף (%)', 'min="0" max="100" step="1"') +
             _field('sandwichSurcharge', 'תוספת צבע סנדוויץ\' (%)', 'min="0" max="100" step="1"') +
         '</div>' +
-        '<div id="' + _id('materials-note') + '" style="display:none;margin-top:12px;padding:10px 14px;' +
-            'background:#fef3c7;border-radius:8px;font-size:.8rem;color:#92400e;">' +
-            '<i class="fa-solid fa-triangle-exclamation"></i> ' +
-            'בשיטת חומרים: מכפיל הבלאי על עלות הלוחות; מכפיל הרווח מוחל אחריו על הסה״כ.' +
+        '<div id="' + _id('materials-note') + '" style="display:none;margin-top:12px;">' +
+            _helpBox(
+                'בשיטת <b>חומרים</b>: במעצב הקינון כבר כולל בזבוז אריזה — מכפיל הבלאי משמש בעיקר לגיבוי/תצוגה מקדימה. ' +
+                'מכפיל הרווח תמיד מוחל בסוף על סה״כ העלות.',
+                'warn'
+            ) +
         '</div>' +
     '</div>';
 }
@@ -299,8 +386,18 @@ function _commonSurchargesHtml() {
 function _installHtml() {
     return '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius,12px);' +
         'padding:20px 24px;margin-bottom:12px;">' +
-        '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin-bottom:14px;">' +
+        '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin-bottom:8px;">' +
             '<i class="fa-solid fa-screwdriver-wrench"></i> מחיר התקנה</div>' +
+        _helpBox(
+            'התקנה = מספר יחידות × מחיר ליחידה. מספר יחידות = עיגול כלפי מעלה של (רוחב ÷ רוחב יחידה). ' +
+            'מעל גובה 240 ס״מ אפשר להוסיף אחוז. <b>לא נכנס למכפיל הרווח</b>.',
+            'info'
+        ) +
+        _helpBox(
+            '<b>דוגמה:</b> יחידה 42.5 ס״מ ב־110 ₪. ארון רוחב 160 → ceil(160/42.5)=4 יחידות → 440 ₪. ' +
+            'גובה 260 עם תוספת 20% → 440 × 1.2 = 528 ₪.',
+            'ex'
+        ) +
         '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">' +
             _field('installPricePerUnit', 'מחיר ליחידת התקנה (₪)', 'min="0" step="5"') +
             _field('installUnitCm', 'רוחב יחידת התקנה (ס"מ)', 'min="1" step="0.5"') +
@@ -311,6 +408,16 @@ function _installHtml() {
 
 function _structureExtrasHtml() {
     var body =
+        _helpBox(
+            'תוספות קבועות ב־₪ שנוספות לעלות אחרי מחיר הגוף. במחשבון ובמעצב — לפי מה שבאמת הוגדר בארון. ' +
+            'בשיטת חומרים עם קינון: לוחות המדפים כבר בפלטות, ולכן תוספת «מדף נוסף» לא נגבית שם שוב.',
+            'info'
+        ) +
+        _helpBox(
+            '<b>דוגמה:</b> גוף 2,000 ₪ + 3 מגירות פנימיות × 150 + כוורת 200 = עלות 2,650 ₪. ' +
+            '× רווח 1.8 → ללקוח 4,770 ₪.',
+            'ex'
+        ) +
         '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">' +
             _field('internalDrawer', 'מגירה פנימית (₪)', 'min="0" step="10"') +
             _field('externalDrawer', 'מגירה חיצונית (₪)', 'min="0" step="10"') +
@@ -329,6 +436,16 @@ function _structureExtrasHtml() {
 
 function _doorsHtml() {
     var body =
+        _helpBox(
+            'תוספת סגנון לדלת/עלה (לא מחיר הדלת עצמה בשיטת חומרים — שם העץ כבר בפלטות). ' +
+            'למשל דלת זכוכית = תוספת לפרזול/זכוכית מעבר ללוח.',
+            'info'
+        ) +
+        _helpBox(
+            '<b>דוגמה:</b> 2 דלתות זכוכית שחורה × 600 ₪ = 1,200 ₪ תוספת. זוג לדים 650 ₪. ' +
+            'הכל נוסף לעלות לפני מכפיל הרווח.',
+            'ex'
+        ) +
         '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">' +
             _field('doorFramedMel', 'דלת ממסגרת מלמין (₪)', 'min="0" step="10"') +
             _field('doorGlassMel', 'דלת זכוכית מלמין (₪)', 'min="0" step="10"') +
@@ -344,6 +461,15 @@ function _doorsHtml() {
 
 function _specialUnitsHtml() {
     var body =
+        _helpBox(
+            'מחירים ליחידות מיוחדות שנוספות לפרויקט (עליונה, פינה, ארון צד, הזזה). ' +
+            'ארון הזזה: בסיס + מספר דלתות × מחיר דלת (+ תוספות זכוכית/מראה/פרופיל).',
+            'info'
+        ) +
+        _helpBox(
+            '<b>דוגמה הזזה:</b> בסיס 800 + 3 דלתות × 350 = 1,850 ₪. עם תוספת גובה 15% מעל 240 → ≈ 2,128 ₪ עלות.',
+            'ex'
+        ) +
         '<div style="font-size:.85rem;font-weight:700;color:var(--muted);margin:4px 0 10px;">יחידה עליונה</div>' +
         '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">' +
             _field('upperUnit160', 'יחידה עליונה עד 160 (₪)', 'min="0" step="50"') +
@@ -382,8 +508,17 @@ function _specialUnitsHtml() {
 /** ארון לפי מידה, תוספות צוקל רגיל, משטח עליון, סגירות */
 function _customAndClosuresHtml() {
     var body =
-        '<p style="font-size:.78rem;color:var(--muted);margin:0 0 14px;line-height:1.45;">' +
-            'תמחור נפח (לפי מידה): רוחב×גובה×עומק × מחיר למ"ק. צוקל/רגליים — תוספת ₪ קבועה לפי בחירה בפרויקט.</p>' +
+        _helpBox(
+            '<b>לפי מידה:</b> נפח במ״ק × מחיר למ״ק (לפי חומר). ' +
+            '<b>צוקל/רגליים:</b> תוספת ₪ קבועה לפי בחירה בפרויקט (לא אחוז). ' +
+            'רגלי ניקל בארון על רגליים: מספר רגליים לפי רוחב × מחיר לרגל.',
+            'info'
+        ) +
+        _helpBox(
+            '<b>דוגמה לפי מידה:</b> 100×200×60 ס״מ = 1.2 מ״ק × 1,200 ₪ = 1,440 ₪. ' +
+            '<b>רגליים:</b> רוחב 160 → 6 רגליים × 100 ₪ = 600 ₪ תוספת.',
+            'ex'
+        ) +
         '<div style="font-size:.85rem;font-weight:700;color:var(--muted);margin:0 0 10px;">ארון לפי מידה</div>' +
         '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">' +
             _field('customSizeMel', 'מלמין (₪/מ"ק)', 'min="0" step="50"') +
@@ -411,9 +546,17 @@ function _stockMaterialsHtml() {
         'padding:20px 24px;margin-bottom:12px;">' +
         '<div style="font-size:.9rem;font-weight:800;color:var(--primary,#1e3a5f);margin-bottom:8px;">' +
             '<i class="fa-solid fa-palette"></i> מלאי צבעים ופלטות</div>' +
-        '<p style="font-size:.78rem;color:var(--muted);margin:0 0 14px;line-height:1.45;">' +
-            'הצבעים השוטפים שלכם — מופיעים בראש רשימת הצבעים במעצב. לכל צבע: מחיר פלטה מלאה ומידותיה. ' +
-            'הוסיפו מהקטלוג (מערכת / EGGER / פורמקס / בלורן / טמבור) או ידנית לפי מפתח.</p>' +
+        _helpBox(
+            'הצבעים השוטפים שלכם — מופיעים בראש רשימת הצבעים במעצב. ' +
+            'לכל צבע מגדירים <b>מחיר פלטה מלאה</b> ומידות (מ״מ). ' +
+            'בשיטת חומרים במעצב: העלות נספרת לפי כמה פלטות כאלה נצרכו בקינון.',
+            'info'
+        ) +
+        _helpBox(
+            '<b>דוגמה:</b> לבן מט — פלטה 2750×1220 ב־450 ₪. EGGER — לרוב 2800×2070 (מידה גדולה יותר). ' +
+            'הוסיפו מהקטלוג (מערכת / EGGER / פורמקס / בלורן / טמבור) או ידנית, מלאו מחיר, ושמרו.',
+            'ex'
+        ) +
         '<div id="' + _id('stock-list') + '"></div>' +
         '<div id="' + _id('stock-add-form') + '" style="display:none;flex-direction:column;gap:10px;' +
             'margin-top:12px;padding:12px 14px;background:#f8fafc;' +
@@ -465,8 +608,15 @@ function _stockMaterialsHtml() {
 
 function _hingeTypesHtml() {
     var body =
-        '<p style="font-size:.78rem;color:var(--muted);margin:0 0 14px;line-height:1.45;">' +
-            'סוגי צירים (שם + עלות ליחידה). בפרויקט בוחרים סוג; הכמות לפי גובה הדלת (כמו CNC).</p>' +
+        _helpBox(
+            'סוגי צירים (שם + עלות ליחידה). בפרויקט בוחרים סוג; הכמות לפי גובה הדלת — כמו בכללי CNC ' +
+            '(למשל עד 90 ס״מ ≈ 2 צירים, עד 160 ≈ 3, וכן הלאה).',
+            'info'
+        ) +
+        _helpBox(
+            '<b>דוגמה:</b> ציר טריקה שקטה 25 ₪, דלת בגובה 200 ס״מ → 4 צירים → 100 ₪ לעלה. שתי דלתות = 200 ₪.',
+            'ex'
+        ) +
         '<div id="' + _id('hinge-types-list') + '"></div>' +
         '<button type="button" onclick="PricingPanel.addHingeType()" ' +
             'style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;margin-top:10px;' +
@@ -479,8 +629,15 @@ function _hingeTypesHtml() {
 
 function _customExtrasHtml() {
     var body =
-        '<p style="font-size:.78rem;color:var(--muted);margin:0 0 14px;line-height:1.45;">' +
-            'מוצרים משלכם (שם + עלות ליחידה) — מופיעים במחשבון הצעות מחיר ומוכפלים ברווח.</p>' +
+        _helpBox(
+            'מוצרים משלכם (שם + עלות ליחידה) — מופיעים במחשבון הצעות מחיר, ' +
+            'נוספים לעלות ומוכפלים ברווח כמו שאר התוספות.',
+            'info'
+        ) +
+        _helpBox(
+            '<b>דוגמה:</b> «תוספת התקנה מיוחדת» 300 ₪ × כמות 1 → +300 לעלות → × 1.8 = +540 במחיר ללקוח.',
+            'ex'
+        ) +
         '<div id="' + _id('custom-extras-list') + '"></div>' +
         '<button type="button" onclick="PricingPanel.addCustomExtra()" ' +
             'style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;margin-top:10px;' +
