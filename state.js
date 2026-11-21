@@ -5635,7 +5635,7 @@ var DEFAULT_PRICING_CONFIG = {
     lmPrice: 1200, lmPriceNonMel: 1560,
     lmHeightBase: 1200, lmHeightBaseNonMel: 1560,
     lmHeightThresholdCm: 240, lmHeightStepCm: 30, lmHeightStepPct: 0.10,
-    materialsBoardPrice: 180, materialsBoardsPerSqm: 1.4, materialsMultiplier: 1.4,
+    materialsBoardPrice: 400, materialsBoardsPerSqm: 1.4, materialsMultiplier: 1.4,
     profitMultiplier: 1.8,
     installPricePerUnit: 110, installUnitCm: 42.5, installHeightSurcharge: 0.20,
     heightSurcharge: 0.20, depthSurcharge: 0.20, depthSurchargeFromCm: 54, sandwichSurcharge: 0.15,
@@ -5691,7 +5691,7 @@ function _buildEmptyPricingConfig() {
     e.sqmPrice = 0; e.sqmPriceNonMel = 0;
     e.lmPrice = 0; e.lmPriceNonMel = 0;
     e.lmHeightBase = 0; e.lmHeightBaseNonMel = 0;
-    e.materialsBoardPrice = 0; e.materialsBoardsPerSqm = 0;
+    e.materialsBoardPrice = 400; e.materialsBoardsPerSqm = 1.4;
     e.materialsMultiplier = 1.4; // בלאי — keep usable for sheet-based costing
     e.installPricePerUnit = 0;
     e.heightSurcharge = 0; e.depthSurcharge = 0; e.sandwichSurcharge = 0;
@@ -5856,7 +5856,7 @@ function _calcWingBasePrice(cfg, ww, wh, wd, wMelamine, wEffectiveModel, wTypeId
                 const sh = Math.max(100, _priceNum(stock.sheetH, fb.h)) / 1000;
                 bp = sqm * (_priceNum(stock.sheetPrice, 0) / Math.max(0.01, sw * sh)) * mult;
             } else {
-                bp = sqm * _priceNum(cfg.materialsBoardsPerSqm, 1.4) * _priceNum(cfg.materialsBoardPrice, 180) * mult;
+                bp = sqm * _priceNum(cfg.materialsBoardsPerSqm, 1.4) * _priceNum(cfg.materialsBoardPrice, 400) * mult;
             }
         }
         if (wd > dFrom) bp *= (1 + dS);

@@ -11,7 +11,7 @@ var DEFAULTS = {
     lmPrice: 1200, lmPriceNonMel: 1560,
     lmHeightBase: 1200, lmHeightBaseNonMel: 1560,
     lmHeightThresholdCm: 240, lmHeightStepCm: 30, lmHeightStepPct: 0.10,
-    materialsBoardPrice: 180, materialsBoardsPerSqm: 1.4, materialsMultiplier: 1.4,
+    materialsBoardPrice: 400, materialsBoardsPerSqm: 1.4, materialsMultiplier: 1.4,
     profitMultiplier: 1.8,
     installPricePerUnit: 110, installUnitCm: 42.5, installHeightSurcharge: 0.20,
     heightSurcharge: 0.20, depthSurcharge: 0.20, depthSurchargeFromCm: 54, sandwichSurcharge: 0.15,
@@ -490,7 +490,7 @@ function materialsFaceCost(cfg, ww, wh, matKey) {
         var sheetArea = Math.max(0.01, sw * sh);
         return sqm * (stock.sheetPrice / sheetArea) * mult;
     }
-    return sqm * num(cfg.materialsBoardsPerSqm, 1.4) * num(cfg.materialsBoardPrice, 180) * mult;
+    return sqm * num(cfg.materialsBoardsPerSqm, 1.4) * num(cfg.materialsBoardPrice, 400) * mult;
 }
 
 /** Blank personal price list for carpenters who have not saved their own yet. */
@@ -500,7 +500,7 @@ function emptyConfig() {
     e.lmPrice = 0; e.lmPriceNonMel = 0;
     e.lmHeightBase = 0; e.lmHeightBaseNonMel = 0;
     e.pricingMode = 'materials';
-    e.materialsBoardPrice = 0; e.materialsBoardsPerSqm = 0;
+    e.materialsBoardPrice = 400; e.materialsBoardsPerSqm = 1.4;
     // Waste / בלאי — keep a usable default so sheet-based costs are not wiped to 0
     e.materialsMultiplier = 1.4;
     e.profitMultiplier = 1.8;

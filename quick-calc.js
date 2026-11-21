@@ -286,7 +286,7 @@ function _qcBasePrice(cfg, ww, wh, wd, wMelamine, engine, typeId) {
             var sqm = (ww / 100) * (wh / 100);
             var mult = _qcNum(cfg.materialsMultiplier, 1.4);
             if (mult <= 0) mult = 1;
-            bp = sqm * _qcNum(cfg.materialsBoardsPerSqm, 1.4) * _qcNum(cfg.materialsBoardPrice, 180) * mult;
+            bp = sqm * _qcNum(cfg.materialsBoardsPerSqm, 1.4) * _qcNum(cfg.materialsBoardPrice, 400) * mult;
         }
         if (wd > dFrom) bp *= (1 + dS);
         return bp;

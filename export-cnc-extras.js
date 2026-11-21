@@ -399,7 +399,7 @@
         if (window.PricingCore && typeof window.PricingCore.normalizeStockMaterials === 'function') {
             stockList = window.PricingCore.normalizeStockMaterials(stockList);
         }
-        var fallbackPrice = Number(pricingCfg.materialsBoardPrice) || 0;
+        var fallbackPrice = Number(pricingCfg.materialsBoardPrice) || 400;
         var byMat = {};
         nests.forEach(function(n) {
             var mk = n.matKey || 'unknown';

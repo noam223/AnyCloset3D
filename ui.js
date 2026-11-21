@@ -20850,7 +20850,7 @@ function _fillUserPricingForm(cfg) {
     _sv('ups-lmHeightThresholdCm', _upsNum(c.lmHeightThresholdCm, 240));
     _sv('ups-lmHeightStepCm', _upsNum(c.lmHeightStepCm, 30));
     _sv('ups-lmHeightStepPct', _upsPct(_upsNum(c.lmHeightStepPct, 0.10)));
-    _sv('ups-materialsBoardPrice', _upsNum(c.materialsBoardPrice, 180));
+    _sv('ups-materialsBoardPrice', _upsNum(c.materialsBoardPrice, 400));
     _sv('ups-materialsBoardsPerSqm', _upsNum(c.materialsBoardsPerSqm, 1.4));
     _sv('ups-materialsMultiplier', _upsNum(c.materialsMultiplier, 1.4));
     _sv('ups-profitMultiplier', _upsNum(c.profitMultiplier, 1.8));
@@ -20904,7 +20904,7 @@ function _readUserPricingForm() {
         lmHeightThresholdCm: _upsNum(_gv('ups-lmHeightThresholdCm'), 240),
         lmHeightStepCm: _upsNum(_gv('ups-lmHeightStepCm'), 30),
         lmHeightStepPct: _upsFrac(_gv('ups-lmHeightStepPct')),
-        materialsBoardPrice: _upsNum(_gv('ups-materialsBoardPrice'), 180),
+        materialsBoardPrice: _upsNum(_gv('ups-materialsBoardPrice'), 400),
         materialsBoardsPerSqm: _upsNum(_gv('ups-materialsBoardsPerSqm'), 1.4),
         materialsMultiplier: _upsNum(_gv('ups-materialsMultiplier'), 1.4),
         profitMultiplier: _upsNum(_gv('ups-profitMultiplier'), 1.8),

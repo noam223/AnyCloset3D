@@ -920,11 +920,14 @@ function _pushStockItem(item) {
     if (!label && typeof window !== 'undefined' && window.colorNamesHebrew && window.colorNamesHebrew[key]) {
         label = window.colorNamesHebrew[key];
     }
+    var DEFAULT_SHEET_PRICE = 400;
     var row = {
         key: key,
         label: label || key,
         brand: item.brand || sz.brand || '',
-        sheetPrice: _num(item.sheetPrice, 0),
+        sheetPrice: (item.sheetPrice != null && item.sheetPrice !== '')
+            ? _num(item.sheetPrice, DEFAULT_SHEET_PRICE)
+            : DEFAULT_SHEET_PRICE,
         sheetW: _num(item.sheetW, 0) || sz.w,
         sheetH: _num(item.sheetH, 0) || sz.h
     };
@@ -1753,7 +1756,7 @@ function fill(cfg) {
     _set('lmHeightThresholdCm',_num(c.lmHeightThresholdCm, 240));
     _set('lmHeightStepCm',     _num(c.lmHeightStepCm, 30));
     _set('lmHeightStepPct',    _pct(_num(c.lmHeightStepPct, 0.10)));
-    _set('materialsBoardPrice',    _num(c.materialsBoardPrice, 180));
+    _set('materialsBoardPrice',    _num(c.materialsBoardPrice, 400));
     _set('materialsBoardsPerSqm',  _num(c.materialsBoardsPerSqm, 1.4));
     _set('materialsMultiplier',    _num(c.materialsMultiplier, 1.4));
     _set('profitMultiplier',       _num(c.profitMultiplier, 1.8));
@@ -1880,7 +1883,7 @@ function read() {
         lmHeightThresholdCm:      _num(_v('lmHeightThresholdCm'), 240),
         lmHeightStepCm:           _num(_v('lmHeightStepCm'), 30),
         lmHeightStepPct:          (_frac(_v('lmHeightStepPct')) || 0.10),
-        materialsBoardPrice:      _num(_v('materialsBoardPrice'), 180),
+        materialsBoardPrice:      _num(_v('materialsBoardPrice'), 400),
         materialsBoardsPerSqm:    _num(_v('materialsBoardsPerSqm'), 1.4),
         materialsMultiplier:      _num(_v('materialsMultiplier'), 1.4),
         profitMultiplier:         _num(_v('profitMultiplier'), 1.8),
