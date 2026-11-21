@@ -801,35 +801,47 @@ function _renderStockMaterials() {
         _refreshPreviewMatSelect();
         return;
     }
-    list.innerHTML = _stockMaterials.map(function(item) {
+    var head =
+        '<div class="pnl-stock-head" aria-hidden="true" ' +
+            'style="display:grid;grid-template-columns:28px 1fr 100px 72px 72px 32px;gap:8px;align-items:end;' +
+            'padding:0 0 6px;margin-bottom:2px;border-bottom:1px solid var(--border);">' +
+            '<span></span>' +
+            '<span style="font-size:.68rem;font-weight:700;color:var(--muted);">שם צבע</span>' +
+            '<span style="font-size:.68rem;font-weight:700;color:var(--muted);text-align:center;">מחיר פלטה (₪)</span>' +
+            '<span style="font-size:.68rem;font-weight:700;color:var(--muted);text-align:center;">רוחב מ״מ</span>' +
+            '<span style="font-size:.68rem;font-weight:700;color:var(--muted);text-align:center;">גובה מ״מ</span>' +
+            '<span></span>' +
+        '</div>';
+    list.innerHTML = head + _stockMaterials.map(function(item) {
         var swatch = item.img
             ? 'background-image:url(\'' + _esc(item.img) + '\');background-size:cover;'
             : ('background:' + _esc(item.hex || '#e2e8f0') + ';');
         return '<div class="pnl-stock-row" data-key="' + _esc(item.key) + '" ' +
             'style="display:grid;grid-template-columns:28px 1fr 100px 72px 72px auto;gap:8px;align-items:center;' +
             'padding:8px 0;border-bottom:1px solid var(--border);">' +
-            '<span style="width:28px;height:28px;border-radius:6px;border:1px solid #cbd5e1;' + swatch + '"></span>' +
+            '<span style="width:28px;height:28px;border-radius:6px;border:1px solid #cbd5e1;' + swatch + '" title="דגימת צבע"></span>' +
             '<div style="min-width:0;">' +
+                '<label class="pnl-sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);">שם צבע</label>' +
                 '<input type="text" class="pnl-stock-label" value="' + _esc(item.label || '') + '" ' +
-                    'placeholder="שם לתצוגה" maxlength="80" ' +
+                    'placeholder="שם לתצוגה" maxlength="80" aria-label="שם צבע" ' +
                     'style="width:100%;height:34px;border:1.5px solid var(--border);border-radius:8px;padding:0 10px;' +
                     'font-family:inherit;font-size:.82rem;direction:rtl;text-align:right;box-sizing:border-box;">' +
                 '<div style="font-size:.68rem;color:var(--muted);margin-top:2px;font-family:monospace;direction:ltr;text-align:left;">' +
                     _esc(item.key) + (item.brand ? (' · ' + _esc(item.brand)) : '') + '</div>' +
             '</div>' +
             '<input type="number" class="pnl-stock-price" value="' + _num(item.sheetPrice, 0) + '" min="0" step="10" ' +
-                'title="מחיר פלטה מלאה (₪)" placeholder="₪ פלטה" ' +
+                'title="מחיר פלטה מלאה (₪)" placeholder="₪" aria-label="מחיר פלטה בשקלים" ' +
                 'style="height:34px;border:1.5px solid var(--border);border-radius:8px;padding:0 8px;' +
                 'font-family:inherit;font-size:.82rem;direction:ltr;text-align:right;">' +
             '<input type="number" class="pnl-stock-w" value="' + _num(item.sheetW, defW) + '" min="100" step="10" ' +
-                'title="רוחב פלטה מ\"מ" ' +
+                'title="רוחב פלטה מ\"מ" placeholder="רוחב" aria-label="רוחב פלטה במ\"מ" ' +
                 'style="height:34px;border:1.5px solid var(--border);border-radius:8px;padding:0 6px;' +
                 'font-family:inherit;font-size:.8rem;direction:ltr;text-align:right;">' +
             '<input type="number" class="pnl-stock-h" value="' + _num(item.sheetH, defH) + '" min="100" step="10" ' +
-                'title="גובה פלטה מ\"מ" ' +
+                'title="גובה פלטה מ\"מ" placeholder="גובה" aria-label="גובה פלטה במ\"מ" ' +
                 'style="height:34px;border:1.5px solid var(--border);border-radius:8px;padding:0 6px;' +
                 'font-family:inherit;font-size:.8rem;direction:ltr;text-align:right;">' +
-            '<button type="button" onclick="PricingPanel._deleteStockMaterial(this)" title="הסר מהמלאי" ' +
+            '<button type="button" onclick="PricingPanel._deleteStockMaterial(this)" title="הסר מהמלאי" aria-label="הסר מהמלאי" ' +
                 'style="width:32px;height:32px;border-radius:8px;border:none;background:#fee2e2;' +
                 'color:#ef4444;cursor:pointer;font-size:.85rem;">✕</button>' +
         '</div>';
