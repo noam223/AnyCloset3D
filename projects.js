@@ -84,6 +84,7 @@ var _USER_TYPE_LABELS = {
     projects  = projects  || [];
 
     _plan     = plan;
+    window._plan = plan;
     _projects = projects;
     window._trialWatermark = !!plan.isTrial;
     if (window.Projects && Projects.applyPlanStatuses) Projects.applyPlanStatuses(plan);
@@ -3232,12 +3233,28 @@ function _ppRefreshRangeModelSelects() {
 }
 
 var _ppPanelMounted = false;
+function _isCarpenterPlan() {
+    if (_plan && _plan.userType === 'carpenter') return true;
+    if (_plan && _plan.key && String(_plan.key).indexOf('carpenter') === 0) return true;
+    if (typeof window._isCarpenterPricingUser === 'function' && window._isCarpenterPricingUser()) return true;
+    return false;
+}
+
 function _ensurePricingPanelMounted() {
-    if (_ppPanelMounted) return;
-    _ppPanelMounted = true;
     var isAgent = _plan && _plan.companyRole === 'agent';
-    var isCarpenter = (_plan && _plan.userType === 'carpenter') ||
-        (typeof window._isCarpenterPricingUser === 'function' && window._isCarpenterPricingUser());
+    var isCarpenter = _isCarpenterPlan();
+    // Remount if stock card missing for a carpenter (race: #pricing before plan loaded)
+    if (_ppPanelMounted) {
+        if (isCarpenter && !document.querySelector('[data-pnl-stock-card]')) {
+            _ppPanelMounted = false;
+            var el = document.getElementById('pricing-panel-mount');
+            if (el) el.innerHTML = '';
+        } else {
+            return;
+        }
+    }
+    _ppPanelMounted = true;
+    window._plan = window._plan || _plan;
     PricingPanel.mount('pricing-panel-mount', {
         showSaveBar: !isAgent,
         saveLabel: 'שמור הגדרות תמחור',
@@ -3840,8 +3857,15 @@ async function submitShareProject() {
 // ── Handle URL hash on load ───────────────────────────────────────────────────
 (function() {
     var hash = window.location.hash.replace('#', '');
-    if (hash === 'profile' || hash === 'pricing' || hash === 'renders' || hash === 'agents') {
-        // Delay to let init() finish
-        setTimeout(function() { switchPage(hash); }, 300);
-    }
+    if (hash !== 'profile' && hash !== 'pricing' && hash !== 'renders' && hash !== 'agents') return;
+    // Wait until plan is loaded — fixed 300ms raced ahead of async init and
+    // mounted the pricing panel without carpenter stock colors.
+    var tries = 0;
+    var t = setInterval(function() {
+        tries++;
+        if (_plan || tries > 80) {
+            clearInterval(t);
+            switchPage(hash);
+        }
+    }, 100);
 })();
