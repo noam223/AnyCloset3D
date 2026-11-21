@@ -551,13 +551,13 @@ function _stockMaterialsHtml() {
             '<i class="fa-solid fa-palette"></i> מלאי צבעים ופלטות</div>' +
         _helpBox(
             'הצבעים השוטפים שלכם — מופיעים בראש רשימת הצבעים במעצב. ' +
-            'לכל צבע מגדירים <b>מחיר פלטה מלאה (לפני מע״מ)</b> ומידות (מ״מ). ' +
+            'לכל צבע מגדירים <b>סוג פלטה</b> (מלמין / MDF / סנדביץ׳), <b>מחיר פלטה מלאה (לפני מע״מ)</b> ומידות (מ״מ). ' +
             'בשיטת חומרים במעצב: העלות נספרת לפי כמה פלטות כאלה נצרכו בקינון.',
             'info'
         ) +
         _helpBox(
-            '<b>דוגמה:</b> לבן מט — פלטה 2750×1220 ב־400 ₪ <b>לפני מע״מ</b>. EGGER — לרוב 2800×2070. ' +
-            'הוסיפו מהקטלוג — נשמר אוטומטית. ברירת מחדל לפלטה חדשה: 400 ₪ לפני מע״מ (ניתן לערוך ואז לשמור למטה).',
+            '<b>דוגמה:</b> לבן מט — מלמין, פלטה 2750×1220 ב־400 ₪ <b>לפני מע״מ</b>. EGGER — לרוב 2800×2070. ' +
+            'הוסיפו מהקטלוג — נשמר אוטומטית. ברירת מחדל: מלמין · 400 ₪ לפני מע״מ.',
             'ex'
         ) +
         '<div id="' + _id('stock-list') + '"></div>' +
@@ -671,7 +671,37 @@ function _saveBarHtml() {
 
 // ── event wiring ─────────────────────────────────────────────────────────────
 function _attachListeners(container) {
-    container.addEventListener('input', function() { updatePreview(); });
+    container.addEventListener('input', function(e) {
+        updatePreview();
+        if (e.target && e.target.closest && e.target.closest('.pnl-stock-row')) {
+            _autoSaveStock({ debounce: 700, message: 'המלאי נשמר ✓' });
+        }
+    });
+    container.addEventListener('change', function(e) {
+        if (e.target && e.target.classList && e.target.classList.contains('pnl-stock-type')) {
+            updatePreview();
+            _autoSaveStock({ message: 'סוג פלטה נשמר ✓' });
+        }
+    });
+}
+
+function _normSheetType(t) {
+    if (PC && typeof PC.normalizeSheetType === 'function') return PC.normalizeSheetType(t);
+    var v = String(t || '').toLowerCase().trim();
+    if (v === 'mdf' || v === 'sandwich') return v;
+    return 'melamine';
+}
+
+function _sheetTypeOptionsHtml(selected) {
+    var cur = _normSheetType(selected);
+    var opts = [
+        { v: 'melamine', l: 'מלמין' },
+        { v: 'mdf', l: 'MDF' },
+        { v: 'sandwich', l: "סנדביץ'" }
+    ];
+    return opts.map(function(o) {
+        return '<option value="' + o.v + '"' + (cur === o.v ? ' selected' : '') + '>' + o.l + '</option>';
+    }).join('');
 }
 
 // ── setMode ──────────────────────────────────────────────────────────────────
@@ -821,10 +851,11 @@ function _renderStockMaterials() {
     }
     var head =
         '<div class="pnl-stock-head" aria-hidden="true" ' +
-            'style="display:grid;grid-template-columns:28px 1fr 100px 72px 72px 32px;gap:8px;align-items:end;' +
+            'style="display:grid;grid-template-columns:28px minmax(90px,1fr) 96px 100px 68px 68px 32px;gap:8px;align-items:end;' +
             'padding:0 0 6px;margin-bottom:2px;border-bottom:1px solid var(--border);">' +
             '<span></span>' +
             '<span style="font-size:.68rem;font-weight:700;color:var(--muted);">שם צבע</span>' +
+            '<span style="font-size:.68rem;font-weight:700;color:var(--muted);text-align:center;">סוג פלטה</span>' +
             '<span style="font-size:.68rem;font-weight:700;color:var(--muted);text-align:center;line-height:1.2;">מחיר פלטה<br><span style="font-weight:600;opacity:.85;">₪ לפני מע״מ</span></span>' +
             '<span style="font-size:.68rem;font-weight:700;color:var(--muted);text-align:center;">רוחב מ״מ</span>' +
             '<span style="font-size:.68rem;font-weight:700;color:var(--muted);text-align:center;">גובה מ״מ</span>' +
@@ -835,7 +866,7 @@ function _renderStockMaterials() {
             ? 'background-image:url(\'' + _esc(item.img) + '\');background-size:cover;'
             : ('background:' + _esc(item.hex || '#e2e8f0') + ';');
         return '<div class="pnl-stock-row" data-key="' + _esc(item.key) + '" ' +
-            'style="display:grid;grid-template-columns:28px 1fr 100px 72px 72px auto;gap:8px;align-items:center;' +
+            'style="display:grid;grid-template-columns:28px minmax(90px,1fr) 96px 100px 68px 68px auto;gap:8px;align-items:center;' +
             'padding:8px 0;border-bottom:1px solid var(--border);">' +
             '<span style="width:28px;height:28px;border-radius:6px;border:1px solid #cbd5e1;' + swatch + '" title="דגימת צבע"></span>' +
             '<div style="min-width:0;">' +
@@ -847,6 +878,11 @@ function _renderStockMaterials() {
                 '<div style="font-size:.68rem;color:var(--muted);margin-top:2px;font-family:monospace;direction:ltr;text-align:left;">' +
                     _esc(item.key) + (item.brand ? (' · ' + _esc(item.brand)) : '') + '</div>' +
             '</div>' +
+            '<select class="pnl-stock-type" aria-label="סוג פלטה" title="סוג פלטה" ' +
+                'style="height:34px;border:1.5px solid var(--border);border-radius:8px;padding:0 4px;' +
+                'font-family:inherit;font-size:.78rem;direction:rtl;background:#fff;cursor:pointer;">' +
+                _sheetTypeOptionsHtml(item.sheetType) +
+            '</select>' +
             '<input type="number" class="pnl-stock-price" value="' + _num(item.sheetPrice, 0) + '" min="0" step="10" ' +
                 'title="מחיר פלטה מלאה (₪ לפני מע״מ)" placeholder="₪" aria-label="מחיר פלטה בשקלים לפני מע״מ" ' +
                 'style="height:34px;border:1.5px solid var(--border);border-radius:8px;padding:0 8px;' +
@@ -955,6 +991,7 @@ function _pushStockItem(item) {
         key: key,
         label: label || key,
         brand: item.brand || sz.brand || '',
+        sheetType: _normSheetType(item.sheetType),
         sheetPrice: (item.sheetPrice != null && item.sheetPrice !== '')
             ? _num(item.sheetPrice, DEFAULT_SHEET_PRICE)
             : DEFAULT_SHEET_PRICE,
@@ -1426,6 +1463,7 @@ function _syncStockMaterialsFromDom() {
         if (!key) return;
         var prev = _stockMaterials.find(function(x) { return x.key === key; }) || {};
         var labelEl = row.querySelector('.pnl-stock-label');
+        var typeEl = row.querySelector('.pnl-stock-type');
         var priceEl = row.querySelector('.pnl-stock-price');
         var wEl = row.querySelector('.pnl-stock-w');
         var hEl = row.querySelector('.pnl-stock-h');
@@ -1433,6 +1471,7 @@ function _syncStockMaterialsFromDom() {
             key: key,
             label: labelEl ? String(labelEl.value || '').trim() || key : key,
             brand: prev.brand || '',
+            sheetType: _normSheetType(typeEl ? typeEl.value : prev.sheetType),
             sheetPrice: _num(priceEl ? priceEl.value : 0, 0),
             sheetW: _num(wEl ? wEl.value : ((PC && PC.DEFAULT_SHEET_W) || 2750), (PC && PC.DEFAULT_SHEET_W) || 2750),
             sheetH: _num(hEl ? hEl.value : ((PC && PC.DEFAULT_SHEET_H) || 1220), (PC && PC.DEFAULT_SHEET_H) || 1220)

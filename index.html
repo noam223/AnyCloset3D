@@ -3284,9 +3284,9 @@
 <script src="auth.js?v=20261116kitchen"></script>
 <script src="trial-watermark.js?v=20261008trial"></script>
 <script src="egger-colors.js?v=20261116eggerKeep1"></script>
-<script src="pricing-core.js?v=20261122matClean1"></script>
+<script src="pricing-core.js?v=20261122sheetType1"></script>
 <script src="state.js?v=20261122matClean1"></script>
-<script src="stock-materials.js?v=20261122vatNote1"></script>
+<script src="stock-materials.js?v=20261122sheetType1"></script>
 <script src="quick-calc.js?v=20261122depthThresh1"></script>
 <script src="bathroom-preset.js?v=20261008types"></script>
 <script src="kitchen-preset.js?v=20261117kitG3"></script>
@@ -3476,6 +3476,13 @@
         <div style="display:grid;gap:10px;">
             <label style="display:flex;flex-direction:column;gap:4px;font-size:.72rem;font-weight:700;color:#64748b;">שם לתצוגה
                 <input id="msp-label" type="text" style="height:40px;border:1.5px solid #e2e8f0;border-radius:10px;padding:0 12px;font-family:inherit;font-size:.9rem;">
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.72rem;font-weight:700;color:#64748b;">סוג פלטה
+                <select id="msp-sheet-type" style="height:40px;border:1.5px solid #e2e8f0;border-radius:10px;padding:0 12px;font-family:inherit;font-size:.9rem;background:#fff;cursor:pointer;">
+                    <option value="melamine">מלמין</option>
+                    <option value="mdf">MDF</option>
+                    <option value="sandwich">סנדביץ'</option>
+                </select>
             </label>
             <label style="display:flex;flex-direction:column;gap:4px;font-size:.72rem;font-weight:700;color:#64748b;">מחיר פלטה מלאה (₪ לפני מע״מ)
                 <input id="msp-price" type="number" min="0" step="10" placeholder="400" style="height:40px;border:1.5px solid #e2e8f0;border-radius:10px;padding:0 12px;font-family:inherit;font-size:.9rem;direction:ltr;text-align:right;">

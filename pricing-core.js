@@ -49,7 +49,7 @@ var DEFAULTS = {
         closuresCustomer: 750, closuresInstall: 300
     },
     customExtras: [],
-    /** Carpenter stock colors / sheets: [{key,label,brand,sheetPrice,sheetW,sheetH,hex,img}] */
+    /** Carpenter stock colors / sheets: [{key,label,brand,sheetType,sheetPrice,sheetW,sheetH,hex,img}] */
     stockMaterials: [],
     /** Hinge hardware types selectable per project: [{id,name,price}] */
     hingeTypes: [
@@ -441,7 +441,21 @@ function sheetSizeForMat(matKey) {
     return { w: DEFAULT_SHEET_W, h: DEFAULT_SHEET_H, brand: brand || 'standard' };
 }
 
-/** Normalize carpenter stock colors: [{key,label,brand,sheetPrice,sheetW,sheetH,hex,img}]. */
+/** Board substrate for a stock sheet: melamine | mdf | sandwich. */
+function normalizeSheetType(t) {
+    var v = String(t || '').toLowerCase().trim();
+    if (v === 'mdf' || v === 'sandwich') return v;
+    return 'melamine';
+}
+
+function sheetTypeLabel(t) {
+    var v = normalizeSheetType(t);
+    if (v === 'mdf') return 'MDF';
+    if (v === 'sandwich') return "סנדביץ'";
+    return 'מלמין';
+}
+
+/** Normalize carpenter stock colors: [{key,label,brand,sheetType,sheetPrice,sheetW,sheetH,hex,img}]. */
 function normalizeStockMaterials(list) {
     if (!Array.isArray(list)) return [];
     var seen = {}, out = [];
@@ -454,6 +468,7 @@ function normalizeStockMaterials(list) {
             key: key,
             label: String(item.label || key).trim() || key,
             brand: String(item.brand || '').trim(),
+            sheetType: normalizeSheetType(item.sheetType),
             sheetPrice: num(item.sheetPrice, 0),
             sheetW: num(item.sheetW, 0),
             sheetH: num(item.sheetH, 0)
@@ -544,6 +559,8 @@ global.PricingCore = {
     normalizeCustomExtras: normalizeCustomExtras,
     normalizeHingeTypes: normalizeHingeTypes,
     findHingeType: findHingeType,
+    normalizeSheetType: normalizeSheetType,
+    sheetTypeLabel: sheetTypeLabel,
     normalizeStockMaterials: normalizeStockMaterials,
     findStockMaterial: findStockMaterial,
     materialsFaceCost: materialsFaceCost,

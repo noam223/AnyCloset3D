@@ -31,10 +31,13 @@ function normalize(list) {
         var key = String(item.key).trim();
         if (!key || seen[key]) return;
         seen[key] = true;
+        var st = String(item.sheetType || '').toLowerCase().trim();
+        if (st !== 'mdf' && st !== 'sandwich') st = 'melamine';
         out.push({
             key: key,
             label: String(item.label || key).trim() || key,
             brand: String(item.brand || '').trim(),
+            sheetType: st,
             sheetPrice: Number(item.sheetPrice) || 0,
             sheetW: Number(item.sheetW) || 0,
             sheetH: Number(item.sheetH) || 0,
@@ -74,6 +77,21 @@ function isCarpenter() {
 function _esc(s) {
     return String(s == null ? '' : s)
         .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+function _sheetType(t) {
+    if (_pc() && typeof _pc().normalizeSheetType === 'function') return _pc().normalizeSheetType(t);
+    var v = String(t || '').toLowerCase().trim();
+    if (v === 'mdf' || v === 'sandwich') return v;
+    return 'melamine';
+}
+
+function _sheetTypeLabel(t) {
+    if (_pc() && typeof _pc().sheetTypeLabel === 'function') return _pc().sheetTypeLabel(t);
+    var v = _sheetType(t);
+    if (v === 'mdf') return 'MDF';
+    if (v === 'sandwich') return "סנדביץ'";
+    return 'מלמין';
 }
 
 function _labelForKey(key) {
@@ -135,6 +153,7 @@ function renderStockGrid() {
             : ('background-color:' + _esc(item.hex || '#e2e8f0') + ';');
         var priced = item.sheetPrice > 0;
         return '<div class="mat-item mat-stock-item" title="' + _esc(item.label) +
+            ' · ' + _esc(_sheetTypeLabel(item.sheetType)) +
             (priced ? (' · ₪' + Math.round(item.sheetPrice) + ' / פלטה לפני מע״מ') : ' · ללא מחיר') + '">' +
             '<button type="button" class="material-btn" data-mat="' + _esc(item.key) + '" style="' + style +
             (priced ? '' : 'outline:2px dashed #f59e0b;') + '"></button>' +
@@ -159,11 +178,12 @@ function updatePriceBar(matKey) {
     var btn = document.getElementById('mat-sheet-price-btn');
     if (status) {
         if (priced) {
-            status.textContent = 'במלאי · ₪' + Math.round(stock.sheetPrice) +
+            status.textContent = 'במלאי · ' + _sheetTypeLabel(stock.sheetType) +
+                ' · ₪' + Math.round(stock.sheetPrice) +
                 ' לפלטה לפני מע״מ · ' + Math.round(stock.sheetW) + '×' + Math.round(stock.sheetH);
             status.style.color = '#15803d';
         } else if (inStock) {
-            status.textContent = 'במלאי · חסר מחיר פלטה';
+            status.textContent = 'במלאי · ' + _sheetTypeLabel(stock.sheetType) + ' · חסר מחיר פלטה';
             status.style.color = '#b45309';
         } else {
             status.textContent = 'לא במלאי השוטף — הגדירו מחיר פלטה';
@@ -191,6 +211,8 @@ function openModal(matKey) {
     document.getElementById('msp-price').value = (stock.sheetPrice != null && stock.sheetPrice !== '')
         ? stock.sheetPrice
         : 400;
+    var typeEl = document.getElementById('msp-sheet-type');
+    if (typeEl) typeEl.value = _sheetType(stock.sheetType);
     var sz = _sizeFor(matKey);
     document.getElementById('msp-w').value = stock.sheetW || sz.w;
     document.getElementById('msp-h').value = stock.sheetH || sz.h;
@@ -215,6 +237,7 @@ async function saveFromModal() {
         key: key,
         label: String((document.getElementById('msp-label') || {}).value || key).trim() || key,
         brand: String((document.getElementById('msp-brand') || {}).value || '').trim(),
+        sheetType: _sheetType((document.getElementById('msp-sheet-type') || {}).value),
         sheetPrice: Number((document.getElementById('msp-price') || {}).value) || 400,
         sheetW: Number((document.getElementById('msp-w') || {}).value) || _sizeFor(key).w,
         sheetH: Number((document.getElementById('msp-h') || {}).value) || _sizeFor(key).h
