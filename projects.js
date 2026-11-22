@@ -406,7 +406,7 @@ async function _openPayment(planKey, installments) {
 
     // If webhook not configured yet, go to pricing page
     if (SCENARIO1_WEBHOOK.indexOf('YOUR_SCENARIO1') !== -1) {
-        window.location.href = '/#pricing';
+        window.location.href = 'landing.html#pricing';
         return;
     }
 
