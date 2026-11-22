@@ -40,11 +40,12 @@ window._inferFrontStyle = function(src) {
     return 'external';
 };
 
-/** Ensure plinthStyle/frontStyle exist on a wing or state-like object. */
+/** Ensure plinthStyle/frontStyle/frontFaceStyle exist on a wing or state-like object. */
 window._ensurePlinthFrontStyles = function(src) {
     if (!src) return src;
     if (!src.plinthStyle) src.plinthStyle = window._inferPlinthStyle(src);
     if (!src.frontStyle) src.frontStyle = window._inferFrontStyle(src);
+    if (!src.frontFaceStyle) src.frontFaceStyle = 'solid';
     return src;
 };
 
@@ -59,11 +60,57 @@ window._frontStyleLabel = function(fs) {
     return fs === 'internal' ? 'חזיתות פנימיות' : 'חזיתות חיצוניות';
 };
 
+window._frontFaceStyleLabel = function(ffs) {
+    return ffs === 'profile' ? 'חזיתות פרופיל' : 'רגיל';
+};
+
+/** Value shown in סוג חזיתות select (profile overrides external/internal display). */
+window._frontStyleSelectValue = function(src) {
+    src = src || (typeof state !== 'undefined' ? state : null);
+    if (!src) return 'external';
+    if ((src.frontFaceStyle || 'solid') === 'profile') return 'profile';
+    return src.frontStyle || (typeof window._inferFrontStyle === 'function' ? window._inferFrontStyle(src) : 'external');
+};
+
+/** Apply solid / framed_melamine to every door leaf on a wing (columns + zones + full-corner). */
+window._applyDoorStyleToAllFronts = function(wing, style) {
+    if (!wing) return;
+    const st = style === 'framed_melamine' ? 'framed_melamine' : 'solid';
+    (wing.columns || []).forEach(function(col) {
+        if (!col) return;
+        (col.doors || []).forEach(function(d) { if (d) d.style = st; });
+        (col.compartments || []).forEach(function(comp) {
+            if (!comp) return;
+            if (comp.doorStyle) comp.doorStyle = st;
+            if (Array.isArray(comp.zoneDoorGroups)) {
+                comp.zoneDoorGroups.forEach(function(g) { if (g) g.style = st; });
+            }
+            if (Array.isArray(comp.subCells)) {
+                comp.subCells.forEach(function(sub) {
+                    if (!sub) return;
+                    if (Array.isArray(sub.zonesDoorStyle)) {
+                        for (var i = 0; i < sub.zonesDoorStyle.length; i++) {
+                            if (sub.zonesDoorStyle[i]) sub.zonesDoorStyle[i] = st;
+                        }
+                    }
+                });
+            }
+        });
+    });
+    const fc = wing.fullCorner;
+    if (fc && Array.isArray(fc.compartments)) {
+        fc.compartments.forEach(function(c) {
+            if (c && c.doorStyle) c.doorStyle = st;
+        });
+    }
+};
+
 function createWingData(overrides) {
     const base = {
         cabinetModel: 'c9',
         plinthStyle: 'regular',   // regular | recessed | legs | floating
         frontStyle: 'external',   // external | internal
+        frontFaceStyle: 'solid',  // solid | profile (all fronts = framed melamine)
         placement: 'wall',
         width: 160, globalHeight: 240, depth: 54,
         thickness: 1.7,
@@ -349,7 +396,7 @@ window.getWing = function() {
 // ---- Proxy: read per-wing fields from active wing ----
 // These getters/setters make existing code like state.width work transparently
 const _wingFields = [
-    'cabinetModel','cabinetTypeId','plinthStyle','frontStyle','placement','width','globalHeight','depth','thickness','plinthHeight',
+    'cabinetModel','cabinetTypeId','plinthStyle','frontStyle','frontFaceStyle','placement','width','globalHeight','depth','thickness','plinthHeight',
     'hasDoors','handleType','handleStyle','handleVariant','ridingColor','hingeTypeId','cabinetName','cabinetModelLabel','cabinetNotes','boardMaterial',
     'materialBody','materialInternal','materialExternal','materialDesk','materialOpenCell','materialBack',
     'materialBackByType',
@@ -6085,9 +6132,11 @@ function _calcWingCost(cfg, wing, opts) {
             wing.columns.forEach(col => {
                 if (!col.doors) return;
                 col.doors.forEach(door => {
-                    const style  = door.style || 'solid';
+                    let style = door.style || 'solid';
                     const leaves = (door.type === 'double') ? 2 : 1;
                     let styleExtra = 0;
+                // Profile fronts force framed melamine pricing on every leaf
+                if ((wing.frontFaceStyle || 'solid') === 'profile') style = 'framed_melamine';
                 if      (style === 'framed_melamine')                       styleExtra = _priceNum(ex.doorFramedMel, 80);
                 else if (style === 'glass_melamine')                        styleExtra = _priceNum(ex.doorGlassMel, 400);
                 else if (style === 'glass_black' || style === 'glass_gold') styleExtra = _priceNum(ex.doorGlassBlack, 600);
@@ -6100,6 +6149,11 @@ function _calcWingCost(cfg, wing, opts) {
                 finalCost += styleExtra * (leaves - mirOut) + (mirOut + mirIn) * _priceNum(ex.doorMirror, 350);
                 });
             });
+        }
+
+        // Profile fronts: external drawer fronts also charged as framed melamine
+        if ((wing.frontFaceStyle || 'solid') === 'profile' && extDrawerFronts > 0) {
+            finalCost += extDrawerFronts * _priceNum(ex.doorFramedMel, 80);
         }
 
     // Hinge hardware — types from pricing settings; count matches CNC rules

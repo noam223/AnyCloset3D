@@ -6305,6 +6305,32 @@ window._rebuildSpaceCompanion = function() {
 window.cabinetGroup = cabinetGroup;
 
 // ==========================================
+// Framed-melamine profile rails on a panel mesh (doors / drawer fronts).
+// Rails are children of `parent` in local space (origin = panel center).
+// ==========================================
+function _addFramedMelamineProfile(parent, panelW, panelH, panelT, panelMat) {
+    if (!parent || panelW < 4 || panelH < 4) return;
+    const fw = Math.min(8, Math.max(1.8, Math.min(panelW, panelH) * 0.22));
+    const fd = 1.5;
+    const fz = panelT / 2 + fd / 2;
+    const frameMat = panelMat && panelMat.clone ? panelMat.clone() : new THREE.MeshStandardMaterial({ color: 0xd8cfc4 });
+    const top = new THREE.Mesh(new THREE.BoxGeometry(panelW, fw, fd), frameMat);
+    top.position.set(0, panelH / 2 - fw / 2, fz);
+    parent.add(top);
+    const bot = new THREE.Mesh(new THREE.BoxGeometry(panelW, fw, fd), frameMat);
+    bot.position.set(0, -panelH / 2 + fw / 2, fz);
+    parent.add(bot);
+    const sideH = Math.max(0.5, panelH - fw * 2);
+    const left = new THREE.Mesh(new THREE.BoxGeometry(fw, sideH, fd), frameMat);
+    left.position.set(-panelW / 2 + fw / 2, 0, fz);
+    parent.add(left);
+    const right = new THREE.Mesh(new THREE.BoxGeometry(fw, sideH, fd), frameMat);
+    right.position.set(panelW / 2 - fw / 2, 0, fz);
+    parent.add(right);
+}
+window._addFramedMelamineProfile = _addFramedMelamineProfile;
+
+// ==========================================
 // _drawGroovesOnPanel — bathroom door/drawer fluted rib overlay
 // grooveStyle: 'h_grooves' | 'v_grooves' | 'waves'
 // Renders dense rounded cylinder ribs protruding from the panel face.
@@ -6674,6 +6700,9 @@ function _renderMergedDeskDrawerBand(opts) {
             _ppPartId = `desk_merge_desk_d${i}`;
             const mesh = createBoard(drawerWidth, openingH, t, dx, drawerCenterY, drawerFZ, matDesk);
             _ppPartId = '';
+            if ((state.frontFaceStyle || 'solid') === 'profile') {
+                _addFramedMelamineProfile(mesh, drawerWidth, openingH, t, matDesk);
+            }
             if (!isBP) _addPanelHandleLocal(mesh, drawerWidth, openingH, handleStyle);
         }
     }
@@ -6692,6 +6721,9 @@ function _renderMergedDeskDrawerBand(opts) {
             _ppPartId = `desk_merge_ward_d${d}`;
             const mesh = createBoard(Math.max(2, wardW - gap * 2), eachH, t, wardCenterX, dY, drawerFZ, matDesk);
             _ppPartId = '';
+            if ((state.frontFaceStyle || 'solid') === 'profile') {
+                _addFramedMelamineProfile(mesh, Math.max(2, wardW - gap * 2), eachH, t, matDesk);
+            }
             if (!isBP) {
                 _addPanelHandleLocal(mesh, Math.max(2, wardW - gap * 2), eachH, handleStyle, d % 2 === 1 ? 'upper' : 'lower');
                 if (typeof _registerExternalDrawerFront === 'function') _registerExternalDrawerFront(mesh);
@@ -7457,6 +7489,9 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
                 _ppPartId = `wd_drawer_d${i}`;
                 const mesh = createBoard(drawerWidth, drawerH, t, dx, drawerCenterY, _deskDrawerFZ, matExternal);
                 _ppPartId = '';
+                if ((state.frontFaceStyle || 'solid') === 'profile') {
+                    _addFramedMelamineProfile(mesh, drawerWidth, drawerH, t, matExternal);
+                }
                 if (!isBP) _addPanelHandleLocal(mesh, drawerWidth, drawerH, _handleStyle);
                 if (!isBP) {
                     const backPanel = new THREE.Mesh(new THREE.BoxGeometry(drawerWidth - 2, 2.5, 0.5), new THREE.MeshStandardMaterial({ color: 0x222222 }));
@@ -7523,6 +7558,9 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
                 _ppPartId = `desk_drawer_d${i}`;
                 let mesh = createBoard(drawerWidth, drawerH, t, dx, drawerCenterY, _sideDeskDrawerFZ, matExternal);
                 _ppPartId = '';
+                if ((state.frontFaceStyle || 'solid') === 'profile') {
+                    _addFramedMelamineProfile(mesh, drawerWidth, drawerH, t, matExternal);
+                }
                 if (!isBP) _addPanelHandleLocal(mesh, drawerWidth, drawerH, _handleStyle);
                 if (!isBP) {
                     const backPanel = new THREE.Mesh(new THREE.BoxGeometry(drawerWidth - 2, 2.5, 0.5), new THREE.MeshStandardMaterial({ color: 0x222222 }));
@@ -8358,6 +8396,9 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
                     _ppPartId = `desk_int_drawer_c${c}_d${i}`;
                     let mesh = createBoard(drawerWidth, col.drawerHeight, t, dx, drawerCenterY, _deskDrawerFZ, matExternal);
                     _ppPartId = '';
+                    if ((state.frontFaceStyle || 'solid') === 'profile') {
+                        _addFramedMelamineProfile(mesh, drawerWidth, col.drawerHeight, t, matExternal);
+                    }
                     if (!isBP) _addPanelHandleLocal(mesh, drawerWidth, col.drawerHeight, _handleStyle);
                     const backPanel = new THREE.Mesh(new THREE.BoxGeometry(drawerWidth - 2, 2.5, 0.5), new THREE.MeshStandardMaterial({ color: 0x222222 }));
                     backPanel.position.set(dx, drawerBottomY + col.drawerHeight - 1.25, _deskDrawerFZ - t/2 - 0.25);
@@ -8930,6 +8971,9 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                         const mesh = createBoard(overlayW, extDrawerH, t, overlayCenterX, dY, fZ, matExternal);
                         _ppPartId = '';
                         if (typeof _registerExternalDrawerFront === 'function') _registerExternalDrawerFront(mesh);
+                        if ((state.frontFaceStyle || 'solid') === 'profile') {
+                            _addFramedMelamineProfile(mesh, overlayW, extDrawerH, t, matExternal);
+                        }
                         if (!isBP) _addPanelHandleLocal(mesh, overlayW, extDrawerH, compData.handleStyle || _handleStyle, d % 2 === 1 ? 'upper' : 'lower');
                         // ---- Bathroom groove overlay on external drawer ----
                         const _bathGrooveExt = state.presetId === 'bathroom'
@@ -9002,6 +9046,7 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                 const _renderSubContent = (subType, subCenterX, subW, zoneBottomY, zoneH, subIdx = -1, doorStyle = 'solid', zoneIdx = 0, doorHandleStyle = null) => {
                     if (!subType || subType === 'empty' || subType === 'partition') return;
                     doorStyle = doorStyle || 'solid';
+                    if ((state.frontFaceStyle || 'solid') === 'profile') doorStyle = 'framed_melamine';
                     const hs = doorHandleStyle || _handleStyle;
                     const _subDoorMat = () => {
                         if (doorStyle === 'glass_mirror') {
@@ -9036,6 +9081,9 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             const rawU = [0, 1, 0, 1], rawV = [1, 1, 0, 0];
                             for (let i = 16; i < 24; i++) uv.setXY(i, uStart + rawU[(i - 16) % 4] * uSpan, rawV[(i - 16) % 4]);
                             uv.needsUpdate = true;
+                        }
+                        if (doorStyle === 'framed_melamine') {
+                            _addFramedMelamineProfile(mesh, w, h, t, mat);
                         }
                         _registerDoorMesh(mesh);
                         if (cncHinge && !isBP) {
@@ -9193,6 +9241,9 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             const mesh = createBoard(drawerW, extDrawerH, t, drawerCX, dY, fZ, matExternal);
                             _ppPartId = '';
                             if (typeof _registerExternalDrawerFront === 'function') _registerExternalDrawerFront(mesh);
+                            if ((state.frontFaceStyle || 'solid') === 'profile') {
+                                _addFramedMelamineProfile(mesh, drawerW, extDrawerH, t, matExternal);
+                            }
                             if (!isBP) _addPanelHandleLocal(mesh, drawerW, extDrawerH, handleStyle, d % 2 === 1 ? 'upper' : 'lower');
                         }
                     } else if (subType === 'door_right' || subType === 'door_left' || subType === 'door_double') {
@@ -9697,7 +9748,8 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                     if (!_coveredByColumnDoor && !_keyInDoorGroup(si, z)) {
                                         const doorType = _doorAtEng(sub, z);
                                         if (doorType && doorType !== 'empty') {
-                                            const zoneStyle = (Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[z]) ? sub.zonesDoorStyle[z] : 'solid';
+                                            let zoneStyle = (Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[z]) ? sub.zonesDoorStyle[z] : 'solid';
+                                            if ((state.frontFaceStyle || 'solid') === 'profile') zoneStyle = 'framed_melamine';
                                             const zoneHandle = (Array.isArray(sub.zonesDoorHandleStyle) && sub.zonesDoorHandleStyle[z]) || null;
                                             _handleCtx = _zoneDoorHandleCtx(sub, z);
                                             _renderSubContent(doorType, subCenterX, subW, zoneBottomY, zoneH, si, zoneStyle, z, zoneHandle);
@@ -9716,7 +9768,8 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                             if (!_coveredByColumnDoor && !_keyInDoorGroup(si, 0)) {
                                 const doorType = _doorAtEng(sub, 0);
                                 if (doorType && doorType !== 'empty') {
-                                    const zoneStyle = (Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[0]) ? sub.zonesDoorStyle[0] : 'solid';
+                                    let zoneStyle = (Array.isArray(sub.zonesDoorStyle) && sub.zonesDoorStyle[0]) ? sub.zonesDoorStyle[0] : 'solid';
+                                    if ((state.frontFaceStyle || 'solid') === 'profile') zoneStyle = 'framed_melamine';
                                     const zoneHandle = (Array.isArray(sub.zonesDoorHandleStyle) && sub.zonesDoorHandleStyle[0]) || null;
                                     _handleCtx = _zoneDoorHandleCtx(sub, 0);
                                     _renderSubContent(doorType, subCenterX, subW, prevY, compH, si, zoneStyle, 0, zoneHandle);
@@ -9752,7 +9805,9 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                                 _ppPartId = `opencell_sub_c${c}_r${r}_g${String(group.keys[0]).replace(/[^a-zA-Z0-9_]/g, '_')}`;
                             }
                             _handleCtx = group;
-                            _renderSubContent(group.type, centerX, spanW, minY, spanH, -1, group.style || 'solid', 0, group.handleStyle || null);
+                            let _grpStyle = group.style || 'solid';
+                            if ((state.frontFaceStyle || 'solid') === 'profile') _grpStyle = 'framed_melamine';
+                            _renderSubContent(group.type, centerX, spanW, minY, spanH, -1, _grpStyle, 0, group.handleStyle || null);
                             _handleCtx = null;
                             _ppPartId = '';
                         });
@@ -10181,7 +10236,8 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                     }
                 };
 
-                const doorStyle = door.style || 'solid';
+                let doorStyle = door.style || 'solid';
+                if ((state.frontFaceStyle || 'solid') === 'profile') doorStyle = 'framed_melamine';
                 // Use clipped overlay dimensions (_doorOverlayW / _doorOverlayCenterX)
                 // so doors don't extend into the hidden zone behind the center cabinet
                 // Front face is zPos + t/2 for every style (framed groups are shifted back by their frame depth)

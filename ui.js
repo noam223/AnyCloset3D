@@ -3654,7 +3654,7 @@ window._applyCabinetTemplateRawState = function(rawState) {
         state.activeWing = 'center';
         state.wings.left = null;
         state.wings.right = null;
-        const flatFields = ['cabinetModel','plinthStyle','frontStyle','placement','width','globalHeight','depth','thickness',
+        const flatFields = ['cabinetModel','plinthStyle','frontStyle','frontFaceStyle','placement','width','globalHeight','depth','thickness',
             'plinthHeight','hasDoors','handleType','handleStyle','cabinetModelLabel','manualPrice','boardMaterial',
             'materialBody','materialInternal','materialExternal','materialDesk','materialOpenCell',
             'materialBack','materialBackByType','columns','desk'];
@@ -6574,7 +6574,9 @@ window.applyDoor = function(type) {
     });
     
     if (type !== 'empty' && !isSameType) {
-        state.columns[c].doors.push({ startRow: startR, endRow: endR, type: type });
+        const _newDoor = { startRow: startR, endRow: endR, type: type };
+        if ((state.frontFaceStyle || 'solid') === 'profile') _newDoor.style = 'framed_melamine';
+        state.columns[c].doors.push(_newDoor);
         state.selection.rows.forEach(r => {
             if (state.columns[c].compartments[r] && state.columns[c].compartments[r].type === 'external_drawers') {
                 state.columns[c].compartments[r].type = 'empty';
@@ -9258,21 +9260,32 @@ function bindUI() {
             if (el) el.style.display = show ? '' : 'none';
         });
         const ps = state.plinthStyle || 'regular';
-        const fs = state.frontStyle || 'external';
+        const fsSelect = (typeof window._frontStyleSelectValue === 'function')
+            ? window._frontStyleSelectValue(state)
+            : (state.frontStyle || 'external');
         const psEl = document.getElementById('inp-plinth-style');
         const fsEl = document.getElementById('inp-front-style');
         const mPs = document.getElementById('mobile-inp-plinth-style');
         const mFs = document.getElementById('mobile-inp-front-style');
         if (psEl) psEl.value = ps;
         if (mPs) mPs.value = ps;
+        // Legs lock mounting to internal, but profile fronts stay selectable
+        const fsLocked = (ps === 'legs' && fsSelect !== 'profile');
         if (fsEl) {
-            fsEl.value = fs;
-            fsEl.disabled = (ps === 'legs');
+            fsEl.value = fsSelect;
+            fsEl.disabled = fsLocked;
         }
         if (mFs) {
-            mFs.value = fs;
-            mFs.disabled = (ps === 'legs');
+            mFs.value = fsSelect;
+            mFs.disabled = fsLocked;
         }
+        // Under legs: only internal + profile options make sense
+        [fsEl, mFs].forEach(function(el) {
+            if (!el) return;
+            Array.prototype.forEach.call(el.options, function(opt) {
+                if (opt.value === 'external') opt.disabled = (ps === 'legs');
+            });
+        });
     };
 
     window._applyPlinthStyleToState = function(ps, opts) {
@@ -9407,6 +9420,7 @@ function bindUI() {
         if (_wSync) {
             _wSync.plinthStyle = state.plinthStyle;
             _wSync.frontStyle = state.frontStyle;
+            _wSync.frontFaceStyle = state.frontFaceStyle || 'solid';
             _wSync.cabinetModel = val;
             _wSync.cabinetTypeId = typeId;
         }
@@ -9468,15 +9482,38 @@ function bindUI() {
     const frontStyleEl = document.getElementById('inp-front-style');
     if (frontStyleEl) {
         frontStyleEl.addEventListener('change', function(e) {
-            if ((state.plinthStyle || '') === 'legs') {
-                e.target.value = 'internal';
-                return;
-            }
-            state.frontStyle = e.target.value;
+            const v = e.target.value;
             const w = typeof getWing === 'function' ? getWing() : null;
-            if (w) w.frontStyle = state.frontStyle;
+            const wasProfile = (state.frontFaceStyle || 'solid') === 'profile';
+
+            if (v === 'profile') {
+                state.frontFaceStyle = 'profile';
+                if (w) w.frontFaceStyle = 'profile';
+                // Keep mounting (external/internal); legs stay internal
+                if ((state.plinthStyle || '') === 'legs') {
+                    state.frontStyle = 'internal';
+                    if (w) w.frontStyle = 'internal';
+                }
+                if (typeof window._applyDoorStyleToAllFronts === 'function') {
+                    window._applyDoorStyleToAllFronts(w || state, 'framed_melamine');
+                }
+            } else {
+                if ((state.plinthStyle || '') === 'legs' && v === 'external') {
+                    e.target.value = wasProfile ? 'profile' : 'internal';
+                    return;
+                }
+                state.frontFaceStyle = 'solid';
+                state.frontStyle = v;
+                if (w) {
+                    w.frontFaceStyle = 'solid';
+                    w.frontStyle = v;
+                }
+                if (wasProfile && typeof window._applyDoorStyleToAllFronts === 'function') {
+                    window._applyDoorStyleToAllFronts(w || state, 'solid');
+                }
+            }
             const mFs = document.getElementById('mobile-inp-front-style');
-            if (mFs) mFs.value = state.frontStyle;
+            if (mFs) mFs.value = v;
             state.manualPrice = null;
             buildCabinet(); calculatePrice(); saveHistoryState();
         });
@@ -12163,7 +12200,7 @@ function _applyRawStateForCapture(rawState) {
         }
         state.activeWing = rs.activeWing || 'center';
         state.presetId = rs.presetId || 'linear';
-        const flatFromWing = ['cabinetModel', 'plinthStyle', 'frontStyle', 'placement', 'boardMaterial', 'handleType', 'handleStyle',
+        const flatFromWing = ['cabinetModel', 'plinthStyle', 'frontStyle', 'frontFaceStyle', 'placement', 'boardMaterial', 'handleType', 'handleStyle',
             'cabinetName', 'cabinetModelLabel', 'cabinetNotes', 'manualPrice', 'materialBody', 'materialInternal',
             'materialExternal', 'materialDesk', 'materialOpenCell', 'materialBack', 'materialBackByType'];
         flatFromWing.forEach(f => { if (rs[f] !== undefined) state[f] = rs[f]; });
@@ -12173,7 +12210,7 @@ function _applyRawStateForCapture(rawState) {
         state.activeWing = 'center';
         state.wings.left = null;
         state.wings.right = null;
-        const flatFields = ['cabinetModel', 'plinthStyle', 'frontStyle', 'placement', 'width', 'globalHeight', 'depth', 'thickness',
+        const flatFields = ['cabinetModel', 'plinthStyle', 'frontStyle', 'frontFaceStyle', 'placement', 'width', 'globalHeight', 'depth', 'thickness',
             'plinthHeight', 'hasDoors', 'handleType', 'handleStyle', 'cabinetName', 'cabinetModelLabel', 'cabinetNotes', 'manualPrice', 'boardMaterial',
             'materialBody', 'materialInternal', 'materialExternal', 'materialDesk', 'materialOpenCell',
             'materialBack', 'materialBackByType', 'columns', 'desk'];
@@ -14158,9 +14195,12 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
         if (state.cabinetModel === 'regalim' && _psCart === 'legs') plinthTypeText = 'רגלי ניקל 10 ס"מ';
         if (state.cabinetModel === 'ab2') plinthTypeText = 'צוקל נסתר (חזית פנימית טאצ\')';
         if (_isWritingDeskCart) plinthTypeText = 'ללא צוקל';
-        const frontStyleText = (typeof window._frontStyleLabel === 'function')
-            ? window._frontStyleLabel(_fsCart)
-            : (_fsCart === 'internal' ? 'חזיתות פנימיות' : 'חזיתות חיצוניות');
+        const _ffsCart = state.frontFaceStyle || 'solid';
+        const frontStyleText = (_ffsCart === 'profile')
+            ? ((typeof window._frontFaceStyleLabel === 'function') ? window._frontFaceStyleLabel('profile') : 'חזיתות פרופיל')
+            : ((typeof window._frontStyleLabel === 'function')
+                ? window._frontStyleLabel(_fsCart)
+                : (_fsCart === 'internal' ? 'חזיתות פנימיות' : 'חזיתות חיצוניות'));
 
         const _deskPack = _formatDeskAddition(null, null, state);
         let deskInfo = _deskPack.desk;
@@ -14174,6 +14214,7 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
             cabinetModel: state.cabinetModel,
             plinthStyle: state.plinthStyle || _psCart,
             frontStyle: state.frontStyle || _fsCart,
+            frontFaceStyle: state.frontFaceStyle || _ffsCart,
             placement: state.placement,
             width: state.width, globalHeight: state.globalHeight, depth: state.depth, thickness: state.thickness,
             plinthHeight: state.plinthHeight, hasDoors: state.hasDoors, handleType: state.handleType, handleStyle: state.handleStyle, handleVariant: state.handleVariant, ridingColor: state.ridingColor,
@@ -15519,7 +15560,7 @@ window._editCartItemNow = function(index) {
             if (k !== 'center' && k !== 'left' && k !== 'right') delete state.wings[k];
         });
         // Apply flat fields to center wing via proxy setters
-        const flatFields = ['cabinetModel','plinthStyle','frontStyle','placement','width','globalHeight','depth','thickness',
+        const flatFields = ['cabinetModel','plinthStyle','frontStyle','frontFaceStyle','placement','width','globalHeight','depth','thickness',
             'plinthHeight','hasDoors','handleType','handleStyle','cabinetName','cabinetModelLabel','cabinetNotes','manualPrice','boardMaterial',
             'materialBody','materialInternal','materialExternal','materialDesk','materialOpenCell',
             'materialBack','materialBackByType','columns','desk'];
