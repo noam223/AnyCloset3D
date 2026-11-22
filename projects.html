@@ -852,6 +852,39 @@
         .profile-avatar-info { flex: 1; }
         .profile-avatar-name { font-size: 1.1rem; font-weight: 800; color: var(--text); margin-bottom: 3px; }
         .profile-avatar-email { font-size: .82rem; color: var(--muted); }
+        /* ── Colors editor (carpenter stock) ── */
+        .colors-toolbar { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:22px; }
+        .colors-page-title { font-size:1.15rem; font-weight:800; color:var(--primary); display:flex; align-items:center; gap:10px; }
+        .colors-page-sub { font-size:.84rem; color:var(--muted); margin-top:6px; line-height:1.45; max-width:520px; }
+        .colors-toolbar-actions { display:flex; gap:8px; flex-wrap:wrap; }
+        .colors-btn { height:40px; padding:0 14px; border-radius:10px; border:1.5px solid var(--border); background:#fff; font-family:inherit; font-size:.84rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:7px; color:var(--text); }
+        .colors-btn:hover { border-color:#93c5fd; background:#f8fafc; }
+        .colors-btn.primary { background:var(--primary); color:#fff; border-color:transparent; }
+        .colors-btn.primary:hover { filter:brightness(1.06); }
+        .colors-btn.danger { background:#fee2e2; color:#dc2626; border-color:#fecaca; }
+        .colors-empty { text-align:center; padding:48px 16px; background:#fff; border:1px dashed var(--border); border-radius:16px; color:var(--text-2); display:flex; flex-direction:column; gap:8px; align-items:center; }
+        .colors-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:14px; }
+        .colors-card { background:#fff; border:1px solid var(--border); border-radius:14px; overflow:hidden; box-shadow:var(--shadow-sm); display:flex; flex-direction:column; }
+        .colors-swatch { height:110px; background:#e2e8f0; background-size:cover; background-position:center; border-bottom:1px solid var(--border); }
+        .colors-card-body { padding:12px 14px 14px; display:flex; flex-direction:column; gap:8px; flex:1; }
+        .colors-card-name { font-weight:800; font-size:.92rem; color:var(--text); }
+        .colors-card-meta { font-size:.75rem; color:var(--muted); line-height:1.4; }
+        .colors-card-price { font-size:.88rem; font-weight:800; color:var(--primary); }
+        .colors-card-actions { display:flex; gap:6px; margin-top:auto; }
+        .colors-card-actions .colors-btn { flex:1; height:34px; font-size:.78rem; justify-content:center; padding:0 8px; }
+        .colors-modal { position:fixed; inset:0; z-index:10040; background:rgba(15,23,42,.45); display:flex; align-items:center; justify-content:center; padding:16px; }
+        .colors-modal-card { background:#fff; border-radius:16px; width:100%; max-width:480px; padding:20px 22px 18px; box-shadow:0 20px 50px rgba(0,0,0,.25); direction:rtl; }
+        .colors-modal-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
+        .colors-modal-head h3 { margin:0; font-size:1rem; color:var(--primary); }
+        .colors-modal-x { border:none; background:#f1f5f9; width:32px; height:32px; border-radius:8px; cursor:pointer; font-size:1rem; }
+        .colors-modal-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+        .colors-modal-grid label { display:flex; flex-direction:column; gap:4px; font-size:.72rem; font-weight:700; color:var(--muted); }
+        .colors-modal-grid input, .colors-modal-grid select { height:40px; border:1.5px solid #e2e8f0; border-radius:10px; padding:0 12px; font-family:inherit; font-size:.9rem; background:#fff; }
+        .colors-modal-actions { display:flex; gap:10px; margin-top:16px; }
+        .colors-modal-actions .colors-btn.primary { flex:1; justify-content:center; }
+        @media (max-width:560px) {
+            .colors-modal-grid { grid-template-columns:1fr; }
+        }
         /* ── Pricing panel ── */
         .pricing-panel-wrap { max-width: 860px; }
         .pricing-mode-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
@@ -1049,6 +1082,9 @@
         </a>
         <a class="sidebar-nav-item" id="nav-pricing" href="#" onclick="switchPage('pricing');return false;">
             <i class="fa-solid fa-tags"></i> הגדרות תמחור
+        </a>
+        <a class="sidebar-nav-item" id="nav-colors" href="#" onclick="switchPage('colors');return false;" style="display:none;">
+            <i class="fa-solid fa-palette"></i> עריכת צבעים
         </a>
         <a class="sidebar-nav-item" id="nav-renders" href="#" onclick="switchPage('renders');return false;">
             <i class="fa-solid fa-wand-magic-sparkles" style="color:#c084fc;"></i> הדמיות AI
@@ -1388,6 +1424,75 @@
         <div class="page-tab" id="tab-pricing">
             <div class="pricing-panel-wrap" style="max-width:860px;">
                 <div id="pricing-panel-mount"></div>
+            </div>
+        </div>
+
+        <!-- TAB: COLORS — carpenter stock colors visual editor -->
+        <div class="page-tab" id="tab-colors">
+            <div class="colors-page-wrap" style="max-width:1100px;">
+                <div class="colors-toolbar">
+                    <div>
+                        <div class="colors-page-title"><i class="fa-solid fa-palette"></i> עריכת צבעים</div>
+                        <div class="colors-page-sub">הוספה, עריכה ומחיקה של צבעי המלאי — מופיעים במעצב ובתמחור לפי חומרים.</div>
+                    </div>
+                    <div class="colors-toolbar-actions">
+                        <button type="button" class="colors-btn primary" onclick="openColorsCatalog()">
+                            <i class="fa-solid fa-swatchbook"></i> מהקטלוג
+                        </button>
+                        <button type="button" class="colors-btn" onclick="openColorsEditModal()">
+                            <i class="fa-solid fa-plus"></i> הוסף ידנית
+                        </button>
+                    </div>
+                </div>
+                <div id="colors-empty" class="colors-empty" style="display:none;">
+                    <i class="fa-solid fa-swatchbook" style="font-size:2rem;opacity:.35;"></i>
+                    <div>עדיין אין צבעים במלאי</div>
+                    <div style="font-size:.85rem;color:var(--muted);">הוסיפו מהקטלוג או ידנית</div>
+                </div>
+                <div id="colors-grid" class="colors-grid"></div>
+            </div>
+        </div>
+
+        <!-- Color edit modal -->
+        <div id="colors-edit-modal" class="colors-modal" style="display:none;" onclick="if(event.target===this)closeColorsEditModal()">
+            <div class="colors-modal-card" onclick="event.stopPropagation()">
+                <div class="colors-modal-head">
+                    <h3 id="colors-edit-title">עריכת צבע</h3>
+                    <button type="button" class="colors-modal-x" onclick="closeColorsEditModal()">✕</button>
+                </div>
+                <input type="hidden" id="colors-edit-orig-key">
+                <input type="hidden" id="colors-edit-orig-type">
+                <input type="hidden" id="colors-edit-hex">
+                <input type="hidden" id="colors-edit-img">
+                <input type="hidden" id="colors-edit-brand">
+                <div class="colors-modal-grid">
+                    <label>מפתח צבע
+                        <input id="colors-edit-key" type="text" dir="ltr" placeholder="למשל white_matte">
+                    </label>
+                    <label>שם לתצוגה
+                        <input id="colors-edit-label" type="text" placeholder="שם בעברית">
+                    </label>
+                    <label>סוג פלטה
+                        <select id="colors-edit-type">
+                            <option value="melamine">מלמין</option>
+                            <option value="mdf">MDF</option>
+                            <option value="sandwich">סנדביץ'</option>
+                        </select>
+                    </label>
+                    <label>מחיר פלטה (₪ לפני מע״מ)
+                        <input id="colors-edit-price" type="number" min="0" step="10" value="400" dir="ltr">
+                    </label>
+                    <label>רוחב מ״מ
+                        <input id="colors-edit-w" type="number" min="100" step="10" value="2750" dir="ltr">
+                    </label>
+                    <label>גובה מ״מ
+                        <input id="colors-edit-h" type="number" min="100" step="10" value="1220" dir="ltr">
+                    </label>
+                </div>
+                <div class="colors-modal-actions">
+                    <button type="button" class="colors-btn primary" onclick="saveColorsEditModal()">שמור</button>
+                    <button type="button" class="colors-btn" onclick="closeColorsEditModal()">ביטול</button>
+                </div>
             </div>
         </div>
 
@@ -1884,7 +1989,7 @@
 <script src="egger-colors.js?v=20261116eggerKeep1"></script>
 <script src="pricing-panel.js?v=20261122stockAlign1"></script>
 <script src="stock-materials.js?v=20261122multiType1"></script>
-<script src="projects.js?v=20261122stockFix1"></script>
+<script src="projects.js?v=20261122colorsPage1"></script>
 <script src="quick-calc.js?v=20261122multiType1"></script>
 <script src="accessibility.js?v=20261122focusVis1"></script>
 </body>

@@ -2525,6 +2525,9 @@ function _applyPlanNavGates() {
     var f = (_plan && _plan.features) || {};
     var navPricing = document.getElementById('nav-pricing');
     if (navPricing) navPricing.style.display = _canEditPricing() ? '' : 'none';
+    var navColors = document.getElementById('nav-colors');
+    // Color stock editor is carpenter-only
+    if (navColors) navColors.style.display = _isCarpenterPlan() ? '' : 'none';
     var navCalc = document.getElementById('nav-quick-calc');
     if (navCalc) navCalc.style.display = (f.showPricing !== false && f.canQuickCalc !== false) ? '' : 'none';
 }
@@ -2532,12 +2535,12 @@ function _applyPlanNavGates() {
 // ── Tab switching ─────────────────────────────────────────────────────────────
 function switchPage(page) {
     // Update sidebar nav
-    ['projects','profile','pricing','renders','agents'].forEach(function(p) {
+    ['projects','profile','pricing','colors','renders','agents'].forEach(function(p) {
         var el = document.getElementById('nav-' + p);
         if (el) el.classList.toggle('active', p === page);
     });
     // Show/hide tabs
-    ['projects','profile','pricing','renders','agents'].forEach(function(p) {
+    ['projects','profile','pricing','colors','renders','agents'].forEach(function(p) {
         var tab = document.getElementById('tab-' + p);
         if (tab) tab.classList.toggle('active', p === page);
     });
@@ -2568,6 +2571,17 @@ function switchPage(page) {
         if (heroStats) heroStats.style.display = 'none';
         if (planBar)   planBar.style.display = 'none';
         _loadPricingForm();
+    } else if (page === 'colors') {
+        if (!_isCarpenterPlan()) {
+            showToast('עריכת צבעים זמינה במנוי נגר בלבד', 'error');
+            switchPage('projects');
+            return;
+        }
+        if (heroTitle) heroTitle.textContent = 'עריכת צבעים';
+        if (heroRight) heroRight.style.display = 'none';
+        if (heroStats) heroStats.style.display = 'none';
+        if (planBar)   planBar.style.display = 'none';
+        _loadColorsPage();
     } else if (page === 'renders') {
         if (heroTitle) heroTitle.textContent = 'הדמיות פוטוריאליסטיות';
         if (heroRight) heroRight.style.display = 'none';
@@ -2584,6 +2598,227 @@ function switchPage(page) {
     // Check URL hash
     if (history.replaceState) history.replaceState(null, '', page === 'projects' ? 'projects.html' : 'projects.html#' + page);
 }
+
+// ── Colors page (carpenter stock — visual add/edit/delete) ───────────────────
+function _colorsSheetTypeLabel(t) {
+    if (window.PricingCore && typeof window.PricingCore.sheetTypeLabel === 'function') {
+        return window.PricingCore.sheetTypeLabel(t);
+    }
+    var v = String(t || 'melamine').toLowerCase();
+    if (v === 'mdf') return 'MDF';
+    if (v === 'sandwich') return "סנדביץ'";
+    return 'מלמין';
+}
+
+function _colorsNormType(t) {
+    if (window.PricingCore && typeof window.PricingCore.normalizeSheetType === 'function') {
+        return window.PricingCore.normalizeSheetType(t);
+    }
+    var v = String(t || '').toLowerCase().trim();
+    if (v === 'mdf' || v === 'sandwich') return v;
+    return 'melamine';
+}
+
+function _colorsNormList(list) {
+    if (window.PricingCore && typeof window.PricingCore.normalizeStockMaterials === 'function') {
+        return window.PricingCore.normalizeStockMaterials(list);
+    }
+    return Array.isArray(list) ? list.slice() : [];
+}
+
+function _colorsEsc(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+async function _loadColorsPage() {
+    await _loadPricingForm();
+    _renderColorsGrid();
+}
+
+function _getColorsStock() {
+    var cfg = _pricingCfg || window._pricingConfig || {};
+    return _colorsNormList(cfg.stockMaterials);
+}
+
+function _renderColorsGrid() {
+    var grid = document.getElementById('colors-grid');
+    var empty = document.getElementById('colors-empty');
+    if (!grid) return;
+    var list = _getColorsStock();
+    if (!list.length) {
+        grid.innerHTML = '';
+        if (empty) empty.style.display = 'flex';
+        return;
+    }
+    if (empty) empty.style.display = 'none';
+    grid.innerHTML = list.map(function(item, idx) {
+        var st = _colorsNormType(item.sheetType);
+        var swatch = item.img
+            ? 'background-image:url(\'' + _colorsEsc(item.img) + '\');'
+            : ('background:' + _colorsEsc(item.hex || '#e2e8f0') + ';');
+        var price = Number(item.sheetPrice) > 0
+            ? ('₪' + Math.round(item.sheetPrice) + ' לפני מע״מ')
+            : 'ללא מחיר';
+        return '<div class="colors-card" data-idx="' + idx + '">' +
+            '<div class="colors-swatch" style="' + swatch + '"></div>' +
+            '<div class="colors-card-body">' +
+                '<div class="colors-card-name">' + _colorsEsc(item.label || item.key) + '</div>' +
+                '<div class="colors-card-meta">' + _colorsEsc(_colorsSheetTypeLabel(st)) +
+                    ' · ' + Math.round(item.sheetW || 0) + '×' + Math.round(item.sheetH || 0) + ' מ״מ<br>' +
+                    '<span style="font-family:monospace;direction:ltr;display:inline-block;">' +
+                    _colorsEsc(item.key) + '</span></div>' +
+                '<div class="colors-card-price">' + price + '</div>' +
+                '<div class="colors-card-actions">' +
+                    '<button type="button" class="colors-btn" onclick="openColorsEditModal(' + idx + ')">' +
+                        '<i class="fa-solid fa-pen"></i> ערוך</button>' +
+                    '<button type="button" class="colors-btn danger" onclick="deleteColorsStockItem(' + idx + ')">' +
+                        '<i class="fa-solid fa-trash"></i> מחק</button>' +
+                '</div>' +
+            '</div>' +
+        '</div>';
+    }).join('');
+}
+
+function openColorsEditModal(idx) {
+    var modal = document.getElementById('colors-edit-modal');
+    if (!modal) return;
+    var list = _getColorsStock();
+    var item = (idx != null && idx >= 0) ? list[idx] : null;
+    var isNew = !item;
+    document.getElementById('colors-edit-title').textContent = isNew ? 'הוספת צבע' : 'עריכת צבע';
+    document.getElementById('colors-edit-orig-key').value = item ? item.key : '';
+    document.getElementById('colors-edit-orig-type').value = item ? _colorsNormType(item.sheetType) : '';
+    document.getElementById('colors-edit-key').value = item ? item.key : '';
+    document.getElementById('colors-edit-key').readOnly = !isNew;
+    document.getElementById('colors-edit-label').value = item ? (item.label || '') : '';
+    document.getElementById('colors-edit-type').value = item ? _colorsNormType(item.sheetType) : 'melamine';
+    document.getElementById('colors-edit-price').value = item && item.sheetPrice != null ? item.sheetPrice : 400;
+    document.getElementById('colors-edit-w').value = item && item.sheetW ? item.sheetW : 2750;
+    document.getElementById('colors-edit-h').value = item && item.sheetH ? item.sheetH : 1220;
+    document.getElementById('colors-edit-hex').value = item && item.hex ? item.hex : '';
+    document.getElementById('colors-edit-img').value = item && item.img ? item.img : '';
+    document.getElementById('colors-edit-brand').value = item && item.brand ? item.brand : '';
+    modal.style.display = 'flex';
+    setTimeout(function() {
+        var el = document.getElementById(isNew ? 'colors-edit-key' : 'colors-edit-label');
+        if (el) el.focus();
+    }, 0);
+}
+
+function closeColorsEditModal() {
+    var modal = document.getElementById('colors-edit-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+async function saveColorsEditModal() {
+    var key = String((document.getElementById('colors-edit-key') || {}).value || '').trim();
+    if (!key) { showToast('נא להזין מפתח צבע', 'error'); return; }
+    var sheetType = _colorsNormType((document.getElementById('colors-edit-type') || {}).value);
+    var origKey = String((document.getElementById('colors-edit-orig-key') || {}).value || '').trim();
+    var origType = _colorsNormType((document.getElementById('colors-edit-orig-type') || {}).value || 'melamine');
+    var row = {
+        key: key,
+        label: String((document.getElementById('colors-edit-label') || {}).value || '').trim() || key,
+        sheetType: sheetType,
+        sheetPrice: Number((document.getElementById('colors-edit-price') || {}).value) || 400,
+        sheetW: Number((document.getElementById('colors-edit-w') || {}).value) || 2750,
+        sheetH: Number((document.getElementById('colors-edit-h') || {}).value) || 1220,
+        brand: String((document.getElementById('colors-edit-brand') || {}).value || '').trim(),
+        hex: String((document.getElementById('colors-edit-hex') || {}).value || '').trim() || null,
+        img: String((document.getElementById('colors-edit-img') || {}).value || '').trim() || null
+    };
+    var cfg = Object.assign({}, _pricingCfg || window._pricingConfig || _ppFormDefaults());
+    var list = _colorsNormList(cfg.stockMaterials);
+    var dup = list.find(function(x) {
+        if (!x || x.key !== key || _colorsNormType(x.sheetType) !== sheetType) return false;
+        // Allow keeping the same row when editing
+        if (origKey && x.key === origKey && _colorsNormType(x.sheetType) === origType) return false;
+        return true;
+    });
+    if (dup) {
+        showToast('כבר יש צבע עם אותו מפתח וסוג פלטה', 'error');
+        return;
+    }
+    if (origKey) {
+        list = list.map(function(x) {
+            if (x.key === origKey && _colorsNormType(x.sheetType) === origType) return Object.assign({}, x, row);
+            return x;
+        });
+    } else {
+        list.push(row);
+    }
+    cfg.stockMaterials = _colorsNormList(list);
+    await savePricingSettings(cfg, { quiet: true, source: 'colors', message: 'הצבע נשמר ✓' });
+    _pricingCfg = cfg;
+    window._pricingConfig = cfg;
+    closeColorsEditModal();
+    _renderColorsGrid();
+    // Keep pricing panel in sync if mounted
+    if (window.PricingPanel && typeof window.PricingPanel.fill === 'function' && document.getElementById('pricing-panel-mount')) {
+        try { window.PricingPanel.fill(cfg); } catch (e) {}
+    }
+}
+
+async function deleteColorsStockItem(idx) {
+    var list = _getColorsStock();
+    var item = list[idx];
+    if (!item) return;
+    if (!confirm('למחוק את "' + (item.label || item.key) + '" (' + _colorsSheetTypeLabel(item.sheetType) + ') מהמלאי?')) return;
+    var cfg = Object.assign({}, _pricingCfg || window._pricingConfig || _ppFormDefaults());
+    var next = _colorsNormList(cfg.stockMaterials).filter(function(x) {
+        return !(x.key === item.key && _colorsNormType(x.sheetType) === _colorsNormType(item.sheetType));
+    });
+    cfg.stockMaterials = next;
+    await savePricingSettings(cfg, { quiet: true, source: 'colors', message: 'הצבע הוסר ✓' });
+    _pricingCfg = cfg;
+    window._pricingConfig = cfg;
+    _renderColorsGrid();
+    if (window.PricingPanel && typeof window.PricingPanel.fill === 'function' && document.getElementById('pricing-panel-mount')) {
+        try { window.PricingPanel.fill(cfg); } catch (e) {}
+    }
+}
+
+function openColorsCatalog() {
+    _ensurePricingPanelMounted();
+    if (!_pricingCfg && window._pricingConfig) _pricingCfg = window._pricingConfig;
+    if (window.PricingPanel && typeof window.PricingPanel.fill === 'function') {
+        try { window.PricingPanel.fill(_pricingCfg || _ppFormDefaults()); } catch (e) {}
+    }
+    if (!window.PricingPanel || typeof window.PricingPanel.openStockCatalog !== 'function') {
+        openColorsEditModal();
+        return;
+    }
+    window.PricingPanel.openStockCatalog();
+    // After catalog closes, refresh grid from saved config
+    var tries = 0;
+    var poll = setInterval(function() {
+        tries++;
+        var modal = document.getElementById('pnl-stock-catalog-modal');
+        var open = modal && modal.classList.contains('active');
+        if (!open && tries > 2) {
+            clearInterval(poll);
+            // Prefer live panel read
+            try {
+                if (window.PricingPanel && typeof window.PricingPanel.read === 'function') {
+                    var cfg = window.PricingPanel.read();
+                    if (cfg) {
+                        _pricingCfg = cfg;
+                        window._pricingConfig = cfg;
+                    }
+                }
+            } catch (e) {}
+            _renderColorsGrid();
+        }
+        if (tries > 600) clearInterval(poll);
+    }, 200);
+}
+
+window.openColorsEditModal = openColorsEditModal;
+window.closeColorsEditModal = closeColorsEditModal;
+window.saveColorsEditModal = saveColorsEditModal;
+window.deleteColorsStockItem = deleteColorsStockItem;
+window.openColorsCatalog = openColorsCatalog;
 
 // ── AI Renders gallery (all renders for user) ─────────────────────────────────
 var _RENDER_DELETE_URL = 'https://meqxnsjycvfgfhdepguo.supabase.co/functions/v1/delete-render';
@@ -3857,7 +4092,7 @@ async function submitShareProject() {
 // ── Handle URL hash on load ───────────────────────────────────────────────────
 (function() {
     var hash = window.location.hash.replace('#', '');
-    if (hash !== 'profile' && hash !== 'pricing' && hash !== 'renders' && hash !== 'agents') return;
+    if (hash !== 'profile' && hash !== 'pricing' && hash !== 'colors' && hash !== 'renders' && hash !== 'agents') return;
     // Wait until plan is loaded — fixed 300ms raced ahead of async init and
     // mounted the pricing panel without carpenter stock colors.
     var tries = 0;
