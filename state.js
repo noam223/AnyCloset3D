@@ -3278,7 +3278,7 @@ window.updateCorner = function(field, value) {
         const cuHEl = document.getElementById('inp-corner-height'); const cuHNum = document.getElementById('inp-num-corner-height');
         if (cuHEl) cuHEl.value = w.corner.height; if (cuHNum) cuHNum.value = w.corner.height;
     } else if (field === 'depth') {
-        w.corner.depth = Math.max(30, Math.min(80, parseInt(value) || 54));
+        w.corner.depth = Math.max(30, Math.min(110, parseInt(value) || 54));
         const cuDpEl = document.getElementById('inp-corner-depth'); const cuDpNum = document.getElementById('inp-num-corner-depth');
         if (cuDpEl) cuDpEl.value = w.corner.depth; if (cuDpNum) cuDpNum.value = w.corner.depth;
     } else if (field === 'shelves') {
@@ -5160,7 +5160,7 @@ window.updateDim = function(dim, delta, absoluteValue = null) {
         checkSplits();
     }
     else if (dim === 'depth') {
-        val = Math.max(10, Math.min(80, val));
+        val = Math.max(10, Math.min(110, val));
         state.depth = val;
         document.getElementById('inp-depth').value = val;
         document.getElementById('inp-num-depth').value = val;

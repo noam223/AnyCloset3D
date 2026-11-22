@@ -265,7 +265,7 @@ function _highlightWritingDeskPresetButtons(presetId) {
             state.globalHeight = val;
             _syncWDHeightInputs(val);
         } else if (dim === 'depth') {
-            val = Math.max(10, Math.min(80, val));
+            val = Math.max(10, Math.min(110, val));
             state.depth = val;
             cw.depth = val;
             const dEl = document.getElementById('inp-depth');

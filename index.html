@@ -257,13 +257,13 @@
                     <i class="hdc-ic fa-solid fa-cube"></i>
                     <label for="dim-pill-depth">עומק</label>
                     <div class="header-dim-val">
-                        <input type="number" id="dim-pill-depth" min="10" max="80" value="54" onchange="updateDim('depth',null,this.value);saveHistoryState();">
+                        <input type="number" id="dim-pill-depth" min="10" max="110" value="54" onchange="updateDim('depth',null,this.value);saveHistoryState();">
                         <span>ס"מ</span>
                     </div>
                 </div>
                 <div class="header-slider-row">
                     <button type="button" class="header-slider-btn" onclick="updateDim('depth',-1);saveHistoryState();"><i class="fa-solid fa-minus"></i></button>
-                    <input type="range" id="inp-depth" min="10" max="80" value="54" step="1">
+                    <input type="range" id="inp-depth" min="10" max="110" value="54" step="1">
                     <button type="button" class="header-slider-btn" onclick="updateDim('depth',1);saveHistoryState();"><i class="fa-solid fa-plus"></i></button>
                     <span class="hsr-title">עומק</span>
                 </div>
@@ -292,7 +292,7 @@
         </div>
         <input type="number" id="inp-num-width" class="visually-hidden-dim" value="160" min="10" max="600" onchange="updateDim('width',null,this.value);saveHistoryState()">
         <input type="number" id="inp-num-height" class="visually-hidden-dim" value="240" min="40" max="370" onchange="updateDim('height',null,this.value);saveHistoryState()">
-        <input type="number" id="inp-num-depth" class="visually-hidden-dim" value="54" min="10" max="80" onchange="updateDim('depth',null,this.value);saveHistoryState()">
+        <input type="number" id="inp-num-depth" class="visually-hidden-dim" value="54" min="10" max="110" onchange="updateDim('depth',null,this.value);saveHistoryState()">
         <!-- Wing position sub-menu (shown after selecting corner/walkin preset) -->
         <div id="preset-position-menu" style="display:none;margin-top:8px;padding:0 2px;">
             <!-- Single corner variant -->
@@ -863,10 +863,10 @@
                     </div>
                 </div>
                 <div class="control-group">
-                    <div class="label-row"><span>עומק (ס"מ)</span><input type="number" id="inp-num-corner-depth" class="value-badge-input" value="54" min="30" max="80" onchange="updateCorner('depth', this.value)"></div>
+                    <div class="label-row"><span>עומק (ס"מ)</span><input type="number" id="inp-num-corner-depth" class="value-badge-input" value="54" min="30" max="110" onchange="updateCorner('depth', this.value)"></div>
                     <div class="slider-row">
                         <button class="slider-btn" onclick="updateCorner('depth', (state.corner.depth||54)+1)"><i class="fa-solid fa-plus"></i></button>
-                        <input type="range" id="inp-corner-depth" min="30" max="80" value="54" step="1" oninput="document.getElementById('inp-num-corner-depth').value=this.value; updateCorner('depth', this.value)">
+                        <input type="range" id="inp-corner-depth" min="30" max="110" value="54" step="1" oninput="document.getElementById('inp-num-corner-depth').value=this.value; updateCorner('depth', this.value)">
                         <button class="slider-btn" onclick="updateCorner('depth', (state.corner.depth||54)-1)"><i class="fa-solid fa-minus"></i></button>
                     </div>
                 </div>
@@ -2242,7 +2242,7 @@
                 <span class="dfm-val" id="dfm-val-depth">54</span>
             </div>
             <div class="dfm-slider-row">
-                <input class="dfm-slider" id="dfm-slider-depth" type="range" min="10" max="80" step="1"
+                <input class="dfm-slider" id="dfm-slider-depth" type="range" min="10" max="110" step="1"
                        oninput="_applyDimSlider('depth',this.value)">
                 <span class="dfm-thumb-label" id="dfm-tlbl-depth">54</span>
             </div>
@@ -2506,7 +2506,7 @@
             <div class="dfm-slider-wrap" id="ep-wrap-depth">
                 <div class="dfm-bubble-row"><span class="dfm-val" id="ep-val-depth">54</span></div>
                 <div class="dfm-slider-row">
-                    <input class="dfm-slider" id="ep-slider-depth" type="range" min="10" max="80" step="1"
+                    <input class="dfm-slider" id="ep-slider-depth" type="range" min="10" max="110" step="1"
                            oninput="_epApplySlider('depth',this.value)">
                     <span class="dfm-thumb-label" id="ep-tlbl-depth">54</span>
                 </div>
@@ -3285,12 +3285,12 @@
 <script src="trial-watermark.js?v=20261008trial"></script>
 <script src="egger-colors.js?v=20261116eggerKeep1"></script>
 <script src="pricing-core.js?v=20261122multiType1"></script>
-<script src="state.js?v=20261122multiType1"></script>
+<script src="state.js?v=20261122depth110"></script>
 <script src="stock-materials.js?v=20261122multiType1"></script>
 <script src="quick-calc.js?v=20261122multiType1"></script>
 <script src="bathroom-preset.js?v=20261008types"></script>
 <script src="kitchen-preset.js?v=20261117kitG3"></script>
-<script src="writing-desk-preset.js?v=20260823h370"></script>
+<script src="writing-desk-preset.js?v=20261122depth110"></script>
 <script src="corner-unit-preset.js?v=20261116kitSpace"></script>
 <script src="engine-appliances.js?v=20261116kitOvenGlass5"></script>
 <script src="engine-core.js?v=20261118plinthFront1"></script>
@@ -3304,7 +3304,7 @@
 <script src="room-finishes.js?v=20261110gloss"></script>
 <script src="ui.js?v=20261122multiType1"></script>
 <script src="mirror-cabinet.js?v=20261110doormirror"></script>
-<script src="mobile.js?v=20261029inthandle"></script>
+<script src="mobile.js?v=20261122depth110"></script>
 <script src="part-paint.js?v=20261104egger"></script>
 <script src="shelf-pick.js?v=20261117stretchFocus1"></script>
 <script src="export-3d.js?v=20261116cnc2"></script>
