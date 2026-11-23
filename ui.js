@@ -3000,6 +3000,89 @@ window._deleteTemplate = async function(kind, id) {
 
 window._loadColumnTemplates = function() { return window._listTemplates('column'); };
 
+/** Compact column-template card for the cabinet AI agent (no thumbnails / heavy data). */
+window._summarizeColumnTemplate = function(tpl) {
+    if (!tpl) return null;
+    const col = tpl.column || (tpl.data && tpl.data.column) || null;
+    const comps = (col && Array.isArray(col.compartments)) ? col.compartments : [];
+    const cells = comps.map(function(c) {
+        if (!c) return 'empty';
+        if (c.type === 'external_drawers') return 'ext_drawers:' + (c.count || '?');
+        if (c.type === 'internal_drawers') return 'int_drawers:' + (c.count || '?');
+        if (c.type === 'shoe_drawers') return 'shoe_drawers:' + (c.count || '?');
+        if (c.partition) return 'partition';
+        return c.type || 'empty';
+    });
+    const tags = [];
+    if (cells.some(function(x) { return String(x).indexOf('hanging') === 0 || x === 'cross_hanging'; })) tags.push('hanging');
+    if (cells.some(function(x) { return String(x).indexOf('ext_drawers') === 0; })) tags.push('drawers', 'external');
+    if (cells.some(function(x) { return String(x).indexOf('int_drawers') === 0; })) tags.push('drawers', 'internal');
+    if (cells.some(function(x) { return x === 'empty'; })) tags.push('shelves');
+    if (cells.some(function(x) { return x === 'sorbet'; })) tags.push('sorbet');
+    if (cells.some(function(x) { return x === 'partition'; })) tags.push('partition');
+    const doors = (col && Array.isArray(col.doors)) ? col.doors.length : 0;
+    if (doors > 0) tags.push('doors');
+    let drawerKind = null;
+    let drawerCount = null;
+    cells.forEach(function(x) {
+        const m = String(x).match(/^(ext|int)_drawers:(\d+|\?)$/);
+        if (!m) return;
+        drawerKind = m[1] === 'ext' ? 'external' : 'internal';
+        if (m[2] !== '?') drawerCount = parseInt(m[2], 10);
+    });
+    return {
+        id: tpl.id,
+        name: String(tpl.name || '').trim() || 'תבנית',
+        pattern: cells.join('|') || 'empty',
+        tags: tags,
+        cells: cells.length,
+        hasDoors: doors > 0,
+        drawerKind: drawerKind,
+        drawerCount: drawerCount,
+        sourceHeight: tpl.sourceHeight || (col && col._height) || null
+    };
+};
+
+window._summarizeColumnTemplatesForAI = function() {
+    const list = window._listTemplates('column') || [];
+    return list.map(window._summarizeColumnTemplate).filter(Boolean);
+};
+
+/** Pick best column template for a role: hanging | drawers | shelves. */
+window._matchColumnTemplateForRole = function(role, opts) {
+    opts = opts || {};
+    const list = window._summarizeColumnTemplatesForAI();
+    if (!list.length) return null;
+    let best = null;
+    let bestScore = -1;
+    list.forEach(function(t) {
+        let s = 0;
+        const tags = t.tags || [];
+        if (role === 'hanging') {
+            if (tags.indexOf('hanging') >= 0) s += 20;
+            if (tags.indexOf('shelves') >= 0) s += 6; // hanging+shelves preferred
+            if (tags.indexOf('drawers') >= 0) s -= 8;
+        } else if (role === 'drawers') {
+            if (tags.indexOf('drawers') >= 0) s += 20;
+            if (opts.drawerKind && t.drawerKind === opts.drawerKind) s += 12;
+            if (opts.drawerCount && t.drawerCount === opts.drawerCount) s += 8;
+            if (tags.indexOf('hanging') >= 0) s -= 4;
+        } else { // shelves
+            if (tags.indexOf('shelves') >= 0 && tags.indexOf('hanging') < 0 && tags.indexOf('drawers') < 0) s += 18;
+            else if (tags.indexOf('shelves') >= 0) s += 8;
+            if (tags.indexOf('hanging') >= 0) s -= 6;
+            if (tags.indexOf('drawers') >= 0) s -= 6;
+        }
+        // Prefer named templates that mention the role in Hebrew
+        const n = (t.name || '').toLowerCase();
+        if (role === 'hanging' && /תלי|מוט|בגד/.test(n)) s += 10;
+        if (role === 'drawers' && /מגיר/.test(n)) s += 10;
+        if (role === 'shelves' && /מדפ/.test(n)) s += 10;
+        if (s > bestScore) { bestScore = s; best = t; }
+    });
+    return bestScore >= 8 ? best : null;
+};
+
 function _colTplIsLockedComp(comp) {
     if (!comp) return false;
     const t = comp.type;

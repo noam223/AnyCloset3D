@@ -410,6 +410,15 @@ function normalizeAiActions(actions) {
     if (a.drawerKind === 'internal' || a.drawerKind === 'external') slots.drawerKind = a.drawerKind;
     if (a.frontFaceStyle === 'profile' || a.frontFaceStyle === 'solid') slots.frontFaceStyle = a.frontFaceStyle;
     if (a.frontStyle === 'internal' || a.frontStyle === 'external') slots.frontStyle = a.frontStyle;
+    // Explicit per-column template picks from the AI (ids or names)
+    if (Array.isArray(a.columnTemplates)) {
+        slots.columnTemplates = a.columnTemplates.map(function (x) {
+            if (x == null) return null;
+            if (typeof x === 'string' || typeof x === 'number') return String(x);
+            if (typeof x === 'object') return x.templateId || x.id || x.templateName || x.name || null;
+            return null;
+        });
+    }
     return slots;
 }
 
@@ -481,7 +490,10 @@ async function askCabinetAI(message) {
             message: message,
             current: snapshotCurrentState(),
             pending: SESSION ? { intent: SESSION.intent, slots: SESSION.slots, awaiting: SESSION.awaiting } : null,
-            history: hist
+            history: hist,
+            columnTemplates: (typeof window._summarizeColumnTemplatesForAI === 'function')
+                ? window._summarizeColumnTemplatesForAI()
+                : []
         })
     });
     var data = await res.json().catch(function () { return {}; });
@@ -646,6 +658,49 @@ function planColumnRoles(slots, numCols) {
     return roles;
 }
 
+function _findTemplateByIdOrName(ref) {
+    if (!ref) return null;
+    var list = (typeof window._listTemplates === 'function') ? (window._listTemplates('column') || []) : [];
+    if (!list.length) return null;
+    var s = String(ref).trim();
+    var byId = list.find(function (t) { return t && t.id === s; });
+    if (byId) return byId;
+    var lower = s.toLowerCase();
+    return list.find(function (t) {
+        return t && String(t.name || '').trim().toLowerCase() === lower;
+    }) || list.find(function (t) {
+        return t && String(t.name || '').indexOf(s) >= 0;
+    }) || null;
+}
+
+/**
+ * Apply ready-made column templates when the AI (or local matcher) chose them.
+ * slots.columnTemplates: array of template id/name per column index
+ * Falls back to matching templates by role (hanging/drawers/shelves).
+ */
+function applyColumnTemplatesFromSlots(slots) {
+    var cols = state.columns || [];
+    if (!cols.length) return [];
+    var roles = planColumnRoles(slots, cols.length);
+    var refs = Array.isArray(slots.columnTemplates) ? slots.columnTemplates : null;
+    var applied = [];
+    var drawerOpts = { drawerKind: slots.drawerKind || null, drawerCount: slots.drawerCount || null };
+
+    cols.forEach(function (col, i) {
+        if (!col) return;
+        var tpl = null;
+        if (refs && refs[i]) tpl = _findTemplateByIdOrName(refs[i]);
+        if (!tpl && typeof window._matchColumnTemplateForRole === 'function') {
+            var match = window._matchColumnTemplateForRole(roles[i] || 'shelves', drawerOpts);
+            if (match) tpl = _findTemplateByIdOrName(match.id);
+        }
+        if (!tpl || typeof window._applyColumnTemplateToCol !== 'function') return;
+        window._applyColumnTemplateToCol(col, tpl);
+        applied.push({ col: i, id: tpl.id, name: tpl.name || tpl.id, role: roles[i] });
+    });
+    return applied;
+}
+
 function applyInteriorPlan(slots) {
     var cols = state.columns || [];
     if (!cols.length) return;
@@ -653,8 +708,15 @@ function applyInteriorPlan(slots) {
     var drawerCount = slots.drawerCount || 3;
     var drawerKind = slots.drawerKind || 'external';
 
+    // Prefer ready-made column templates when available
+    var applied = applyColumnTemplatesFromSlots(slots);
+    if (applied.length >= cols.length) return; // all columns covered by templates
+
+    var covered = {};
+    applied.forEach(function (a) { covered[a.col] = true; });
+
     cols.forEach(function (col, i) {
-        if (!col) return;
+        if (!col || covered[i]) return;
         var role = roles[i] || 'shelves';
         if (role === 'drawers') _applyDrawersColumn(col, drawerCount, drawerKind);
         else if (role === 'hanging') _applyHangingWithShelves(col);
@@ -982,6 +1044,11 @@ async function send() {
     var sendBtn = document.getElementById('cabinet-chat-send');
     if (sendBtn) sendBtn.disabled = true;
 
+    // Ensure column templates are loaded before AI / local matching
+    try {
+        if (typeof window._refreshTemplates === 'function') await window._refreshTemplates('column');
+    } catch (eTpl) { /* ignore */ }
+
     var result = null;
     // Prefer AI agent when signed in; fall back to local rules.
     if (AI_ENABLED) {
@@ -1096,6 +1163,9 @@ function injectStyles() {
 function init() {
     injectStyles();
     injectUi();
+    try {
+        if (typeof window._refreshTemplates === 'function') window._refreshTemplates('column');
+    } catch (e) { /* ignore */ }
 }
 
 if (document.readyState === 'loading') {

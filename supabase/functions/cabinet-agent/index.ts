@@ -100,17 +100,72 @@ function extractHintWidth(msg: string, current: CurrentState): number | null {
   return null;
 }
 
+type ColTpl = {
+  id: string; name: string; pattern: string; tags?: string[];
+  cells?: number; hasDoors?: boolean; drawerKind?: string | null; drawerCount?: number | null;
+};
+
+function summarizeTplFromDb(row: { id: string; name: string; data?: Record<string, unknown> }): ColTpl | null {
+  const data = row.data || {};
+  const col = (data.column && typeof data.column === 'object') ? data.column as {
+    compartments?: Array<{ type?: string; count?: number; partition?: boolean }>;
+    doors?: unknown[];
+    _height?: number;
+  } : null;
+  const comps = Array.isArray(col?.compartments) ? col!.compartments! : [];
+  const cells = comps.map((c) => {
+    if (!c) return 'empty';
+    if (c.type === 'external_drawers') return `ext_drawers:${c.count ?? '?'}`;
+    if (c.type === 'internal_drawers') return `int_drawers:${c.count ?? '?'}`;
+    if (c.type === 'shoe_drawers') return `shoe_drawers:${c.count ?? '?'}`;
+    if (c.partition) return 'partition';
+    return c.type || 'empty';
+  });
+  const tags: string[] = [];
+  if (cells.some((x) => x === 'hanging' || x === 'cross_hanging')) tags.push('hanging');
+  if (cells.some((x) => x.startsWith('ext_drawers'))) tags.push('drawers', 'external');
+  if (cells.some((x) => x.startsWith('int_drawers'))) tags.push('drawers', 'internal');
+  if (cells.some((x) => x === 'empty')) tags.push('shelves');
+  if (cells.some((x) => x === 'sorbet')) tags.push('sorbet');
+  let drawerKind: string | null = null;
+  let drawerCount: number | null = null;
+  for (const x of cells) {
+    const m = x.match(/^(ext|int)_drawers:(\d+|\?)$/);
+    if (!m) continue;
+    drawerKind = m[1] === 'ext' ? 'external' : 'internal';
+    if (m[2] !== '?') drawerCount = parseInt(m[2], 10);
+  }
+  return {
+    id: row.id,
+    name: String(row.name || '').trim() || 'תבנית',
+    pattern: cells.join('|') || 'empty',
+    tags,
+    cells: cells.length,
+    hasDoors: Array.isArray(col?.doors) && col!.doors!.length > 0,
+    drawerKind,
+    drawerCount,
+  };
+}
+
+function lineOfTpl(t: ColTpl): string {
+  return `${t.id} | ${t.name} | ${t.pattern} | tags=${(t.tags || []).join(',')}` +
+    (t.drawerKind ? ` | ${t.drawerKind}${t.drawerCount != null ? '×' + t.drawerCount : ''}` : '');
+}
+
 function systemPrompt(): string {
   return [
     'אתה סוכן תכנון ארונות של AnyCloset 3D. ענה בעברית קצרה וברורה.',
     'המטרה: להפוך בקשת משתמש לפעולות מובנות שיוצרים/עורכים ארון ליניארי במערכת.',
     'למד מהדוגמאות מפרויקטים אמיתיים — במיוחד כמה עמודות לרוחב נתון (בדרך כלל 55–95 ס״מ לעמודה, לא לפצל יתר על המידה).',
+    'חשוב מאוד: השתמש בתבניות עמודה המוכנות (column templates). pattern מציג תאים מלמטה למעלה (empty=מדף, hanging=תלייה, ext_drawers/int_drawers=מגירות).',
+    'כשready=true וקיימות תבניות — מלא actions.columnTemplates במערך באורך columns: לכל עמודה id (או שם) של תבנית מתאימה.',
+    'דוגמה: 1 עמודת מגירות + 2 תלייה + שאר מדפים → בחר תבנית drawers, ואז hanging, ואז shelves לפי tags/pattern/שם.',
     'אם מבקשים מגירות בלי לציין פנימיות/חיצוניות — שאל (ready=false, question="drawerKind").',
     'אם חסרים רוחב או גובה ליצירה — שאל (question="width" או "height").',
-    'תלייה: תמיד עם מדפים מעל (לא עמודת תלייה מלאה בלבד). ברירת מחדל לדלתות: כן, אלא אם ביקשו בלי.',
+    'תלייה: העדף תבנית עם hanging+shelves (לא תלייה מלאה בלבד). ברירת מחדל לדלתות: כן, אלא אם ביקשו בלי.',
     'עומק ברירת מחדל 54 אם לא צוין. אל תפתח CNC/ייצוא.',
     'החזר JSON בלבד בפורמט:',
-    '{"reply":"הודעה למשתמש","ready":true|false,"question":null|"width"|"height"|"depth"|"columns"|"drawerKind"|"hasDoors"|"drawerCount"|"walls"|"roomW","intent":"create"|"edit"|"walkin"|"clarify"|"help"|"cancel","actions":{"width":cm|null,"height":cm|null,"depth":cm|null,"columns":n|null,"hasDoors":bool|null,"frontFaceStyle":"solid"|"profile"|null,"frontStyle":"internal"|"external"|null,"hanging":bool|null,"hangingColumns":n|null,"shelves":bool|null,"restShelves":bool|null,"shelfColumns":n|null,"drawers":bool|null,"drawerCount":n|null,"drawerKind":"internal"|"external"|null,"drawerColumns":n|null,"walls":n|null,"roomW":cm|null,"roomD":cm|null}}',
+    '{"reply":"הודעה למשתמש","ready":true|false,"question":null|"width"|"height"|"depth"|"columns"|"drawerKind"|"hasDoors"|"drawerCount"|"walls"|"roomW","intent":"create"|"edit"|"walkin"|"clarify"|"help"|"cancel","actions":{"width":cm|null,"height":cm|null,"depth":cm|null,"columns":n|null,"hasDoors":bool|null,"frontFaceStyle":"solid"|"profile"|null,"frontStyle":"internal"|"external"|null,"hanging":bool|null,"hangingColumns":n|null,"shelves":bool|null,"restShelves":bool|null,"shelfColumns":n|null,"drawers":bool|null,"drawerCount":n|null,"drawerKind":"internal"|"external"|null,"drawerColumns":n|null,"columnTemplates":["tplIdOrName",...]|null,"walls":n|null,"roomW":cm|null,"roomD":cm|null}}',
     'כשready=false מלא רק question+reply; actions יכול להיות חלקי.',
     'כשready=true מלא actions מלאים ליצירה/עריכה. intent=edit כשיש ארון קיים והבקשה היא שינוי.',
   ].join('\n');
@@ -118,9 +173,9 @@ function systemPrompt(): string {
 
 function apiCheatSheet(): string {
   return [
-    'API פנימי (הלקוח מבצע): updateDim(width/height/depth), distributeColumns/_applyColumnCountChange,',
-    'תאים: hanging(+מדפים מעל), empty=מדפים, internal_drawers/external_drawers(+count),',
-    'דלתות לפי עמודות, frontFaceStyle=solid|profile, frontStyle=internal|external, buildCabinet+calculatePrice.',
+    'API פנימי (הלקוח מבצע): updateDim, distributeColumns, החלת תבניות עמודה (_applyColumnTemplateToCol) לפי columnTemplates,',
+    'fallback לתאים: hanging(+מדפים), empty=מדפים, internal_drawers/external_drawers,',
+    'דלתות, frontFaceStyle, buildCabinet+calculatePrice.',
   ].join(' ');
 }
 
@@ -149,6 +204,23 @@ serve(async (req) => {
       role: h.role === 'assistant' || h.role === 'bot' || h.role === 'model' ? 'model' : 'user',
       parts: [{ text: clip(h.text, 800) }],
     }));
+
+  // Column templates from client (preferred) and/or DB
+  let colTpls: ColTpl[] = Array.isArray(body.columnTemplates)
+    ? (body.columnTemplates as ColTpl[]).filter((t) => t && t.id && t.pattern).slice(0, 40)
+    : [];
+  if (!colTpls.length) {
+    const { data: tplRows, error: tplErr } = await sb.from('design_templates')
+      .select('id, name, data')
+      .eq('kind', 'column')
+      .order('created_at', { ascending: true })
+      .limit(40);
+    if (tplErr) console.warn('design_templates:', tplErr.message);
+    colTpls = (tplRows || []).map((r) => summarizeTplFromDb(r as { id: string; name: string; data?: Record<string, unknown> })).filter(Boolean) as ColTpl[];
+  }
+  const tplBlock = colTpls.length
+    ? colTpls.map((t, i) => `[T${i}] ${lineOfTpl(t)}`).join('\n')
+    : '(אין תבניות עמודה שמורות — בנה תאים ידנית לפי hanging/drawers/shelves)';
 
   const { data: examplesRaw, error: exErr } = await sb.rpc('cabinet_chat_examples', { p_limit: 160 });
   if (exErr) console.warn('cabinet_chat_examples:', exErr.message);
@@ -189,6 +261,7 @@ serve(async (req) => {
     })}`,
     pending ? `slots ממתינים משיחה קודמת: ${JSON.stringify(pending)}` : '',
     colTip,
+    `תבניות עמודה מוכנות (בחר מהן ב-columnTemplates):\n${tplBlock}`,
     `דוגמאות מפרויקטים אמיתיים (אנונימיות):\n${exampleBlock}`,
     apiCheatSheet(),
     `בקשת המשתמש: ${message}`,
