@@ -21,6 +21,89 @@ var HEB_NUM = {
 
 var SESSION = null; // { intent, slots, asked }
 var HISTORY = [];
+var STORAGE_PREFIX = 'anycloset:cabinetChat:v1:';
+var MAX_STORED_MSGS = 120;
+var _storageKeyActive = null;
+var _persistTimer = null;
+
+function storageKey() {
+    var pid = (typeof window !== 'undefined' && window._currentProjectId) ? String(window._currentProjectId) : '';
+    return STORAGE_PREFIX + (pid || 'draft');
+}
+
+function persistChatNow() {
+    try {
+        var key = storageKey();
+        _storageKeyActive = key;
+        var payload = {
+            history: HISTORY.slice(-MAX_STORED_MSGS),
+            session: SESSION,
+            expanded: !!(document.getElementById('cabinet-chat') &&
+                document.getElementById('cabinet-chat').classList.contains('expanded')),
+            updatedAt: Date.now()
+        };
+        localStorage.setItem(key, JSON.stringify(payload));
+    } catch (e) { /* quota / private mode */ }
+}
+
+function persistChat() {
+    if (_persistTimer) clearTimeout(_persistTimer);
+    _persistTimer = setTimeout(persistChatNow, 120);
+}
+
+function renderHistoryToDom() {
+    var log = document.getElementById('cabinet-chat-log');
+    if (!log) return;
+    log.innerHTML = '';
+    HISTORY.forEach(function (h) {
+        if (!h || !h.text) return;
+        var div = document.createElement('div');
+        div.className = 'cab-chat-bubble cab-chat-' + (h.role === 'user' ? 'user' : 'bot');
+        div.innerHTML = esc(h.text).replace(/\n/g, '<br>');
+        log.appendChild(div);
+    });
+    log.scrollTop = log.scrollHeight;
+    measureAndSetOffset();
+}
+
+function restoreChat() {
+    var key = storageKey();
+    _storageKeyActive = key;
+    var restored = null;
+    try {
+        restored = JSON.parse(localStorage.getItem(key) || 'null');
+    } catch (e) { restored = null; }
+
+    if (restored && Array.isArray(restored.history) && restored.history.length) {
+        HISTORY = restored.history.slice(-MAX_STORED_MSGS).map(function (h) {
+            return { role: h.role === 'user' ? 'user' : 'bot', text: String(h.text || '') };
+        }).filter(function (h) { return h.text; });
+        SESSION = restored.session && typeof restored.session === 'object' ? restored.session : null;
+        renderHistoryToDom();
+        if (restored.expanded || HISTORY.length > 1) setExpanded(true);
+        return true;
+    }
+
+    HISTORY = [];
+    SESSION = null;
+    renderHistoryToDom();
+    return false;
+}
+
+function ensureWelcome() {
+    if (HISTORY.length) return;
+    appendBubble('bot', 'סוכן AI זול שלומד מפרויקטים קודמים — נסו: «ארון רוחב 275 גובה 270 עם תלייה ומדפים»');
+}
+
+function watchProjectChanges() {
+    setInterval(function () {
+        var key = storageKey();
+        if (key === _storageKeyActive) return;
+        // Project switched — flush previous key already saved; load the new one
+        restoreChat();
+        ensureWelcome();
+    }, 800);
+}
 
 function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -864,7 +947,7 @@ function measureAndSetOffset() {
     setOffset(Math.ceil(h + 8));
 }
 
-function appendBubble(role, text) {
+function appendBubble(role, text, skipPersist) {
     var log = document.getElementById('cabinet-chat-log');
     if (!log) return;
     var div = document.createElement('div');
@@ -873,7 +956,9 @@ function appendBubble(role, text) {
     log.appendChild(div);
     log.scrollTop = log.scrollHeight;
     HISTORY.push({ role: role, text: text });
+    if (HISTORY.length > MAX_STORED_MSGS) HISTORY = HISTORY.slice(-MAX_STORED_MSGS);
     measureAndSetOffset();
+    if (!skipPersist) persistChat();
 }
 
 function setExpanded(on) {
@@ -881,6 +966,7 @@ function setExpanded(on) {
     if (!root) return;
     root.classList.toggle('expanded', !!on);
     measureAndSetOffset();
+    persistChat();
 }
 
 async function send() {
@@ -919,6 +1005,7 @@ async function send() {
     if (thinking) thinking.textContent = '';
     if (sendBtn) sendBtn.disabled = false;
     appendBubble('bot', result.reply || 'בוצע.');
+    persistChatNow();
     if (result.done) setTimeout(function () { measureAndSetOffset(); }, 50);
 }
 
@@ -954,8 +1041,15 @@ function injectUi() {
     window.addEventListener('resize', measureAndSetOffset);
     measureAndSetOffset();
 
-    // Welcome once per session
-    appendBubble('bot', 'סוכן AI זול שלומד מפרויקטים קודמים — נסו: «ארון רוחב 275 גובה 270 עם תלייה ומדפים»');
+    restoreChat();
+    ensureWelcome();
+    watchProjectChanges();
+
+    // Flush on page hide so refreshes don't drop the last reply
+    document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'hidden') persistChatNow();
+    });
+    window.addEventListener('beforeunload', persistChatNow);
 }
 
 function injectStyles() {
@@ -1015,7 +1109,15 @@ window.CabinetChat = {
     parseSlots: parseSlots,
     askAI: askCabinetAI,
     applyAi: applyAiResult,
-    reset: function () { SESSION = null; },
+    reset: function () { SESSION = null; persistChatNow(); },
+    reload: function () { restoreChat(); ensureWelcome(); },
+    clearHistory: function () {
+        HISTORY = [];
+        SESSION = null;
+        try { localStorage.removeItem(storageKey()); } catch (e) {}
+        renderHistoryToDom();
+        ensureWelcome();
+    },
     init: init
 };
 
