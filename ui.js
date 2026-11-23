@@ -12043,8 +12043,9 @@ window._setSpaceGroupOpacity = function(g, opacity) {
     if (!g) return;
     const op = Math.max(0, Math.min(1, Number(opacity)));
     g.userData = g.userData || {};
+    // Coming back from full hide — restore visibility first
+    if (g.userData._occludeHidden) window._setSpaceGroupOccludeHidden(g, false);
     g.userData._ghostOpacity = op;
-    g.userData._occludeOutline = false;
     g.traverse(function(obj) {
         if (!obj || !obj.material) return;
         if (!(obj.isMesh || obj.isLine || obj.isLineSegments)) return;
@@ -12061,16 +12062,6 @@ window._setSpaceGroupOpacity = function(g, opacity) {
             obj.userData._fadeMatReady = true;
         }
         if (obj.userData._fadeSkip) return;
-        // Restore outline-mode material swap if any
-        if (obj.userData._occludeOrigMat) {
-            obj.material = obj.userData._occludeOrigMat;
-            delete obj.userData._occludeOrigMat;
-            delete obj.userData._occludeEdgeMat;
-        }
-        if (obj.userData._occludeSavedVisible !== undefined) {
-            obj.visible = obj.userData._occludeSavedVisible;
-            delete obj.userData._occludeSavedVisible;
-        }
         const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
         mats.forEach(function(m) {
             if (!m) return;
@@ -12082,97 +12073,36 @@ window._setSpaceGroupOpacity = function(g, opacity) {
     });
 };
 
-/** Ensure every solid mesh under a companion has an edge outline (for occlude silhouette). */
-window._ensureSpaceGroupOccludeOutlines = function(g) {
-    if (!g || g.userData._occludeOutlinesReady) return;
-    g.userData._occludeOutlinesReady = true;
-    const meshes = [];
-    g.traverse(function(obj) {
-        if (obj && obj.isMesh && obj.geometry) meshes.push(obj);
-    });
-    meshes.forEach(function(mesh) {
-        const hasEdge = (mesh.children || []).some(function(c) {
-            return c && (c.isLineSegments || c.isLine) && !c.userData._occludeGenerated;
-        });
-        if (hasEdge) return;
-        try {
-            const edges = new THREE.EdgesGeometry(mesh.geometry, 18);
-            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({
-                color: 0x475569, transparent: true, opacity: 0.9, depthTest: true
-            }));
-            line.userData._occludeGenerated = true;
-            line.renderOrder = 12;
-            mesh.add(line);
-        } catch (e) { /* skip bad geometry */ }
-    });
-};
-
 /**
- * Occluding companion: hide solid surfaces completely, keep edge outlines only.
- * Non-occluding: normal / capture fade opacity.
+ * Occluding companion: hide completely (solids + edges). Non-occluding: normal / capture fade.
  */
-window._setSpaceGroupOccludeOutline = function(g, occlude) {
+window._setSpaceGroupOccludeHidden = function(g, hide) {
     if (!g) return;
     g.userData = g.userData || {};
-    if (g.userData._occludeOutline === !!occlude) return;
-    if (occlude) window._ensureSpaceGroupOccludeOutlines(g);
-    g.userData._occludeOutline = !!occlude;
-    g.userData._ghostOpacity = occlude ? 0 : g.userData._ghostOpacity;
+    if (g.userData._occludeHidden === !!hide) return;
+    g.userData._occludeHidden = !!hide;
+    g.userData._ghostOpacity = hide ? 0 : g.userData._ghostOpacity;
 
     g.traverse(function(obj) {
         if (!obj) return;
         if (!obj.userData) obj.userData = {};
         if (obj.userData.spaceCompanion) return;
-
-        if (obj.isMesh && obj.material) {
-            if (!obj.userData._fadeMatReady) {
-                const m0 = Array.isArray(obj.material) ? obj.material[0] : obj.material;
-                if (m0 && m0.transparent && m0.opacity === 0) obj.userData._fadeSkip = true;
-                if (Array.isArray(obj.material)) {
-                    obj.material = obj.material.map(function(m) { return m ? m.clone() : m; });
-                } else if (obj.material.clone) {
-                    obj.material = obj.material.clone();
-                }
-                obj.userData._fadeMatReady = true;
+        if (!(obj.isMesh || obj.isLine || obj.isLineSegments || obj.isSprite)) return;
+        if (hide) {
+            if (obj.userData._occludeSavedVisible === undefined) {
+                obj.userData._occludeSavedVisible = obj.visible !== false;
             }
-            if (obj.userData._fadeSkip) return;
-            const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-            mats.forEach(function(m) {
-                if (!m) return;
-                if (occlude) {
-                    m.transparent = true;
-                    m.opacity = 0;
-                    if ('depthWrite' in m) m.depthWrite = false;
-                }
-                m.needsUpdate = true;
-            });
-            return;
-        }
-
-        if (obj.isLine || obj.isLineSegments) {
-            if (occlude) {
-                if (!obj.userData._occludeEdgeMat) {
-                    obj.userData._occludeOrigMat = obj.material;
-                    obj.userData._occludeEdgeMat = new THREE.LineBasicMaterial({
-                        color: 0x334155, transparent: true, opacity: 0.92, depthTest: true
-                    });
-                }
-                obj.material = obj.userData._occludeEdgeMat;
-                obj.visible = true;
-                obj.renderOrder = 12;
-            } else if (obj.userData._occludeOrigMat) {
-                obj.material = obj.userData._occludeOrigMat;
-                delete obj.userData._occludeOrigMat;
-                delete obj.userData._occludeEdgeMat;
-            }
+            obj.visible = false;
+        } else if (obj.userData._occludeSavedVisible !== undefined) {
+            obj.visible = obj.userData._occludeSavedVisible;
+            delete obj.userData._occludeSavedVisible;
         }
     });
 };
 
 /**
  * Companions that sit between the camera and the focus cabinet (or that the camera is
- * inside / very near) disappear as solids and leave only outline edges — like room walls
- * you can see through.
+ * inside / very near) are hidden completely — solids and outlines.
  */
 window._OCCLUDE_NEAR_CM = 40;
 window._updateSpaceOcclusionGhosts = function() {
@@ -12210,11 +12140,12 @@ window._updateSpaceOcclusionGhosts = function() {
             if (dHit < distFocus - 6) occludes = true;
         }
         if (occludes) {
-            if (g.userData && g.userData._occludeOutline) return;
-            window._setSpaceGroupOccludeOutline(g, true);
+            window._setSpaceGroupOccludeHidden(g, true);
         } else {
-            // Restore solid look (capture fade or full opacity)
-            if (g.userData && g.userData._occludeOutline === false && g.userData._ghostOpacity === baseOp) return;
+            if (g.userData && g.userData._occludeHidden) {
+                window._setSpaceGroupOccludeHidden(g, false);
+            }
+            if (g.userData && g.userData._occludeHidden === false && g.userData._ghostOpacity === baseOp) return;
             window._setSpaceGroupOpacity(g, baseOp);
         }
     });
