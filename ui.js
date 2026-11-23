@@ -7586,7 +7586,7 @@ function buildDragHandlesUI() {
             : `ימין: ${Math.round(colRight.width)} ס"מ | שמאל: ${Math.round(colLeft.width)} ס"מ`;
         const handle = createHandle('horizontal', x3d, null, initialText);
         handle.dataset.idx = index; // used by pointermove to find handle after rebuild
-        handle.title = 'גרור לשינוי רוחב · לחיצה כפולה — עמודות שוות ברוחב';
+        handle.title = 'גרור לשינוי רוחב · לחיצה כפולה — מחזור: שווה / חצי־שמאל / חצי־ימין';
         if (isActiveDrag) handle.classList.add('active'); // restore active class after rebuild
         dragLayer.appendChild(handle);
         
@@ -7616,7 +7616,9 @@ function buildDragHandlesUI() {
                 document.body.classList.remove('dragging', 'dragging-h', 'dragging-v');
                 if (typeof _endDrag === 'function') _endDrag();
             }
-            if (typeof window._equalizeColumnWidths === 'function') {
+            if (typeof window._cycleColumnWidthsFromHandle === 'function') {
+                window._cycleColumnWidthsFromHandle(index);
+            } else if (typeof window._equalizeColumnWidths === 'function') {
                 window._equalizeColumnWidths();
             }
         });
