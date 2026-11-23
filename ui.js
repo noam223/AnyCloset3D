@@ -14808,10 +14808,8 @@ window.exitSpaceIsolateMode = function() {
     if (window._roomGroup && window._roomVisible !== false) {
         window._roomGroup.visible = true;
     }
+    // Hide only — do not restore wing-edit handlers (that re-shows «חזור למצב חופשי»)
     window._showSpaceIsolateBanner(false);
-    if (typeof window._restoreWingEditBannerHandlers === 'function') {
-        window._restoreWingEditBannerHandlers();
-    }
     // Overview prefers front framing of the whole space
     state.viewMode = 'front';
     if (typeof buildCabinet === 'function') buildCabinet();
