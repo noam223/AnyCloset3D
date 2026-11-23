@@ -12363,10 +12363,8 @@ window._savePrintCameraPose = function() {
     if (typeof window._commitCurrentCabinetToCart === 'function' && state.editingCartIndex >= 0) {
         window._commitCurrentCabinetToCart({ flash: false });
     }
-    window._printCamBaseline = window._printCamPoseSnapshot();
-    window._printCamDirty = false;
-    window._syncPrintCamActionButtons();
-    window._syncPrintCamButtonState();
+    // Leave camera-edit mode: hide reset/save, un-press the camera button, keep the saved view
+    window._exitPrintCameraMode({ keepOrbit: true });
     if (typeof _showToast === 'function') {
         _showToast('✓ זווית המצלמה נשמרה להדפסת הארון הזה', 3500);
     }
