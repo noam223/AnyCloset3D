@@ -123,7 +123,8 @@ function importChatState(payload, opts) {
     SESSION = n.session;
     _chatProjectId = pid;
     renderHistoryToDom();
-    if (n.expanded || HISTORY.length > 1) setExpanded(true);
+    // Always start collapsed when loading a project — user opens chat manually
+    setExpanded(false);
     if (!(opts && opts.skipPersist)) persistChatNow();
     return true;
 }
@@ -167,7 +168,8 @@ function restoreChat() {
         SESSION = restored.session;
         _chatProjectId = pid;
         renderHistoryToDom();
-        if (restored.expanded || HISTORY.length > 1) setExpanded(true);
+        // Always start collapsed when opening/switching a project
+        setExpanded(false);
         persistChatNow();
         return true;
     }

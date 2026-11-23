@@ -12074,13 +12074,14 @@ window._setSpaceGroupOpacity = function(g, opacity) {
 };
 
 /**
- * Restore visibility after a previous full-hide pass (kept for backwards compat).
+ * Occluding companion: hide completely (solids + edges). Non-occluding: normal / capture fade.
  */
 window._setSpaceGroupOccludeHidden = function(g, hide) {
     if (!g) return;
     g.userData = g.userData || {};
     if (g.userData._occludeHidden === !!hide) return;
     g.userData._occludeHidden = !!hide;
+    g.userData._ghostOpacity = hide ? 0 : g.userData._ghostOpacity;
 
     g.traverse(function(obj) {
         if (!obj) return;
@@ -12100,11 +12101,10 @@ window._setSpaceGroupOccludeHidden = function(g, hide) {
 };
 
 /**
- * Companions between the camera and the focus cabinet (or very near the camera)
- * get a very low opacity so the focus part stays clear without vanishing entirely.
+ * Companions that sit between the camera and the focus cabinet (or that the camera is
+ * inside / very near) are hidden completely — solids and outlines.
  */
 window._OCCLUDE_NEAR_CM = 40;
-window._OCCLUDE_GHOST_OPACITY = 0.12;
 window._updateSpaceOcclusionGhosts = function() {
     const companions = window._spaceCompanionGroups || [];
     if (!companions.length || !window.camera) return;
@@ -12126,7 +12126,6 @@ window._updateSpaceOcclusionGhosts = function() {
     const baseOp = (window._spaceCaptureCompanionOpacity != null)
         ? window._spaceCaptureCompanionOpacity
         : 1;
-    const ghostOp = window._OCCLUDE_GHOST_OPACITY;
 
     companions.forEach(function(g) {
         if (!g || g.visible === false) return;
@@ -12140,9 +12139,15 @@ window._updateSpaceOcclusionGhosts = function() {
             const dHit = camPos.distanceTo(hit);
             if (dHit < distFocus - 6) occludes = true;
         }
-        const targetOp = occludes ? ghostOp : baseOp;
-        if (g.userData && g.userData._ghostOpacity === targetOp && !g.userData._occludeHidden) return;
-        window._setSpaceGroupOpacity(g, targetOp);
+        if (occludes) {
+            window._setSpaceGroupOccludeHidden(g, true);
+        } else {
+            if (g.userData && g.userData._occludeHidden) {
+                window._setSpaceGroupOccludeHidden(g, false);
+            }
+            if (g.userData && g.userData._occludeHidden === false && g.userData._ghostOpacity === baseOp) return;
+            window._setSpaceGroupOpacity(g, baseOp);
+        }
     });
 };
 
