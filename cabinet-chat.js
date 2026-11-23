@@ -1,6 +1,7 @@
 // ==========================================
 // Cabinet Chat — Hebrew text → create/edit cabinets
-// Rule-based + slot-filling (no LLM). Primary: linear wardrobe.
+// Prefer cheap Gemini agent (cabinet-agent) grounded on past projects;
+// fall back to local slot-filling rules when offline / unsigned / AI fails.
 // ==========================================
 (function () {
 'use strict';
@@ -8,6 +9,8 @@
 var CHAT_OFFSET_VAR = '--cabinet-chat-offset';
 var DEFAULT_DEPTH = 54;
 var DEFAULT_HEIGHT = 240;
+var FN_URL = 'https://meqxnsjycvfgfhdepguo.supabase.co/functions/v1/cabinet-agent';
+var AI_ENABLED = true;
 
 var HEB_NUM = {
     'אפס': 0, 'אחד': 1, 'אחת': 1, 'שניים': 2, 'שתיים': 2, 'שני': 2, 'שתים': 2,
@@ -279,10 +282,128 @@ function questionFor(slot) {
     }
 }
 
+/** Fallback only — prefer ~70cm/col (learned from real projects), not width/60. */
 function defaultColumns(width) {
     var w = width || 160;
-    var n = Math.round(w / 60);
-    return Math.max(2, Math.min(8, n));
+    var n = Math.round(w / 70);
+    return Math.max(1, Math.min(8, n));
+}
+
+function snapshotCurrentState() {
+    var cols = (typeof state !== 'undefined' && state.columns) ? state.columns : [];
+    var hang = 0, drawers = 0;
+    cols.forEach(function (col) {
+        if (!col || !col.compartments) return;
+        var types = col.compartments.map(function (c) { return c && c.type; });
+        if (types.indexOf('hanging') >= 0 || types.indexOf('hanging_double') >= 0) hang++;
+        if (types.indexOf('internal_drawers') >= 0 || types.indexOf('external_drawers') >= 0) drawers++;
+    });
+    return {
+        width: (typeof state !== 'undefined') ? state.width : null,
+        height: (typeof state !== 'undefined') ? state.globalHeight : null,
+        depth: (typeof state !== 'undefined') ? state.depth : null,
+        columns: cols.length || 0,
+        hasDoors: (typeof state !== 'undefined') ? !!state.hasDoors : true,
+        frontFaceStyle: (typeof state !== 'undefined') ? (state.frontFaceStyle || 'solid') : 'solid',
+        frontStyle: (typeof state !== 'undefined') ? (state.frontStyle || 'external') : 'external',
+        hangingColumns: hang,
+        drawerColumns: drawers,
+        model: (typeof state !== 'undefined') ? (state.cabinetModel || 'linear') : 'linear'
+    };
+}
+
+function normalizeAiActions(actions) {
+    var a = actions || {};
+    var slots = {};
+    ['width', 'height', 'depth', 'columns', 'hangingColumns', 'shelfColumns',
+        'drawerCount', 'drawerColumns', 'walls', 'roomW', 'roomD'].forEach(function (k) {
+        if (a[k] != null && a[k] !== '' && isFinite(Number(a[k]))) slots[k] = Number(a[k]);
+    });
+    if (a.hasDoors === true || a.hasDoors === false) slots.hasDoors = a.hasDoors;
+    if (a.hanging === true || a.hanging === false) slots.hanging = a.hanging;
+    if (a.shelves === true || a.shelves === false) slots.shelves = a.shelves;
+    if (a.restShelves === true) slots.restShelves = true;
+    if (a.drawers === true || a.drawers === false) slots.drawers = a.drawers;
+    if (a.drawerKind === 'internal' || a.drawerKind === 'external') slots.drawerKind = a.drawerKind;
+    if (a.frontFaceStyle === 'profile' || a.frontFaceStyle === 'solid') slots.frontFaceStyle = a.frontFaceStyle;
+    if (a.frontStyle === 'internal' || a.frontStyle === 'external') slots.frontStyle = a.frontStyle;
+    return slots;
+}
+
+function applyAiResult(data) {
+    var intent = data.intent || 'create';
+    var actions = normalizeAiActions(data.actions);
+
+    if (data.ready !== true) {
+        var q = data.question || null;
+        SESSION = {
+            intent: intent === 'walkin' ? 'create_walkin' : (intent === 'edit' ? 'edit' : 'create'),
+            slots: mergeSlots((SESSION && SESSION.slots) || {}, actions),
+            awaiting: q || 'width',
+            asked: ((SESSION && SESSION.asked) || []).concat(q ? [q] : []),
+            fromAi: true
+        };
+        return { reply: data.reply || (q ? questionFor(q) : helpText()) };
+    }
+
+    if (intent === 'cancel') {
+        SESSION = null;
+        return { reply: data.reply || 'ביטלתי.' };
+    }
+    if (intent === 'help' || intent === 'clarify') {
+        if (!data.ready) return { reply: data.reply || helpText() };
+    }
+
+    // Merge with any pending session slots from prior clarifying answers
+    if (SESSION && SESSION.slots) actions = mergeSlots(SESSION.slots, actions);
+    SESSION = null;
+
+    var msg;
+    if (intent === 'walkin' || intent === 'create_walkin') {
+        msg = applyWalkin(actions);
+    } else if (intent === 'edit') {
+        msg = applyEdit(actions);
+        if (!msg) msg = data.reply || 'לא זיהיתי שינוי לבצע.';
+        else if (data.reply) msg = data.reply;
+    } else {
+        // create (default) — if missing critical dims, ask locally
+        var miss = missingForCreate(actions);
+        if (miss.length) {
+            SESSION = { intent: 'create', slots: actions, awaiting: miss[0], asked: [miss[0]], fromAi: true };
+            return { reply: (data.reply ? data.reply + '\n' : '') + questionFor(miss[0]) };
+        }
+        msg = applyCreateLinear(actions);
+        if (data.reply) msg = data.reply;
+    }
+    return { reply: msg, done: true };
+}
+
+async function askCabinetAI(message) {
+    var sb = window._supabase;
+    if (!sb) throw new Error('no_supabase');
+    var session = (await sb.auth.getSession()).data.session;
+    if (!session) throw new Error('not_signed_in');
+    var hist = HISTORY.slice(-8).map(function (h) {
+        return { role: h.role === 'bot' ? 'assistant' : h.role, text: h.text };
+    });
+    // Drop the message we just appended as user (last) — server gets it as `message`
+    if (hist.length && hist[hist.length - 1].role === 'user') hist = hist.slice(0, -1);
+    var res = await fetch(FN_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + session.access_token
+        },
+        body: JSON.stringify({
+            message: message,
+            current: snapshotCurrentState(),
+            pending: SESSION ? { intent: SESSION.intent, slots: SESSION.slots, awaiting: SESSION.awaiting } : null,
+            history: hist
+        })
+    });
+    var data = await res.json().catch(function () { return {}; });
+    if (!res.ok) throw new Error(data.error || ('http_' + res.status));
+    return data;
 }
 
 function summarizeSlots(slots) {
@@ -658,11 +779,11 @@ function applyWalkin(slots) {
 }
 
 function helpText() {
-    return 'כתבו בעברית מה תרצו. דוגמאות:\n' +
-        '• «ארון 240 על 60 גובה 270 עם 4 עמודות ודלתות»\n' +
+    return 'כתבו בעברית מה תרצו — הסוכן לומד מפרויקטים קודמים. דוגמאות:\n' +
+        '• «ארון רוחב 275 גובה 270 עם תלייה ומדפים»\n' +
         '• «שנה עומק ל־55»\n' +
         '• «תוסיף חזיתות פרופיל»\n' +
-        '• «3 מגירות חיצוניות»\n' +
+        '• «3 מגירות» (אשאל אם פנימיות או חיצוניות)\n' +
         'אם חסר מידע — אשאל.';
 }
 
@@ -762,7 +883,7 @@ function setExpanded(on) {
     measureAndSetOffset();
 }
 
-function send() {
+async function send() {
     var input = document.getElementById('cabinet-chat-input');
     if (!input) return;
     var text = input.value;
@@ -771,15 +892,32 @@ function send() {
     setExpanded(true);
     appendBubble('user', text);
     var thinking = document.getElementById('cabinet-chat-status');
-    if (thinking) thinking.textContent = '…';
-    var result;
-    try {
-        result = processMessage(text);
-    } catch (err) {
-        console.error('[cabinet-chat]', err);
-        result = { reply: 'משהו השתבש בביצוע. נסו לנסח אחרת או לפרק לבקשה קצרה יותר.' };
+    if (thinking) thinking.textContent = 'חושב…';
+    var sendBtn = document.getElementById('cabinet-chat-send');
+    if (sendBtn) sendBtn.disabled = true;
+
+    var result = null;
+    // Prefer AI agent when signed in; fall back to local rules.
+    if (AI_ENABLED) {
+        try {
+            var ai = await askCabinetAI(text);
+            result = applyAiResult(ai);
+        } catch (aiErr) {
+            console.warn('[cabinet-chat] AI fallback:', aiErr && aiErr.message);
+            // cancel/help still work locally even without AI
+        }
     }
+    if (!result) {
+        try {
+            result = processMessage(text);
+        } catch (err) {
+            console.error('[cabinet-chat]', err);
+            result = { reply: 'משהו השתבש בביצוע. נסו לנסח אחרת או לפרק לבקשה קצרה יותר.' };
+        }
+    }
+
     if (thinking) thinking.textContent = '';
+    if (sendBtn) sendBtn.disabled = false;
     appendBubble('bot', result.reply || 'בוצע.');
     if (result.done) setTimeout(function () { measureAndSetOffset(); }, 50);
 }
@@ -817,7 +955,7 @@ function injectUi() {
     measureAndSetOffset();
 
     // Welcome once per session
-    appendBubble('bot', 'אפשר ליצור ולערוך ארונות במלל. נסו: «ארון 200 גובה 270 עם דלתות»');
+    appendBubble('bot', 'סוכן AI זול שלומד מפרויקטים קודמים — נסו: «ארון רוחב 275 גובה 270 עם תלייה ומדפים»');
 }
 
 function injectStyles() {
@@ -875,6 +1013,8 @@ if (document.readyState === 'loading') {
 window.CabinetChat = {
     process: processMessage,
     parseSlots: parseSlots,
+    askAI: askCabinetAI,
+    applyAi: applyAiResult,
     reset: function () { SESSION = null; },
     init: init
 };

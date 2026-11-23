@@ -13,6 +13,10 @@ verify_jwt = false
 [functions.company-manage-agent]
 verify_jwt = true
 
+# Bottom-bar cabinet design agent (Gemini Flash + project examples). Auth checked in-function.
+[functions.cabinet-agent]
+verify_jwt = true
+
 # Called by pg_cron and outputs/social/schedule.mjs with the x-social-secret header.
 [functions.social-publisher]
 verify_jwt = false
