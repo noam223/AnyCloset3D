@@ -14536,7 +14536,8 @@ window._askCornerUnitSide = function(kind) {
     const popup = document.createElement('div');
     popup.id = '_corner-side-popup';
     popup.className = 'corner-side-popup';
-    const title = kind === 'cornerDesk' ? 'שולחן פינתי'
+    const embeddedDesk = kind === 'embeddedCornerDesk' || kind === 'cornerDesk';
+    const title = embeddedDesk ? 'שולחן פינתי'
         : (kind === 'kitchenCorner' ? 'פינת מטבח — ר מלאה עם מדפים' : 'שידה פינתית');
     popup.innerHTML =
         '<div class="corner-side-popup-title">' + title + ' — כיוון?</div>' +
@@ -14554,7 +14555,11 @@ window._askCornerUnitSide = function(kind) {
     popup.querySelectorAll('button[data-side]').forEach(function(b) {
         b.addEventListener('click', function() {
             close();
-            window.addSpaceUnit(kind, { cornerSide: b.dataset.side });
+            if (embeddedDesk && typeof window.addEmbeddedCornerDesk === 'function') {
+                window.addEmbeddedCornerDesk({ cornerSide: b.dataset.side });
+            } else {
+                window.addSpaceUnit(kind, { cornerSide: b.dataset.side });
+            }
         });
     });
     popup.querySelector('.corner-side-popup-cancel').addEventListener('click', close);

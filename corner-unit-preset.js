@@ -343,6 +343,189 @@ function _cuCommitHostColumns(hostSlot, w) {
     }
 }
 
+/**
+ * Surfaces of a column on the SAME cabinet (embedded desk) — same shape as space-host surfaces.
+ */
+function _cuLocalSurfaces(wing, col) {
+    return _cuHostSurfaces({ wing: wing, col: col, off: { x: 0, y: 0, z: 0 } }, { y: 0 });
+}
+
+/** Insert a shelf whose top lands at targetTopY (cm), then sync compartments. */
+function _cuEnsureShelfAt(wing, col, targetTopY) {
+    const shelfT = _cuShelfT(wing);
+    const y = Math.round((targetTopY - shelfT / 2) * 10) / 10;
+    if (!Array.isArray(col.shelvesY)) col.shelvesY = [];
+    let idx = col.shelvesY.findIndex(function(sy) { return Math.abs(sy - y) < 1.2; });
+    if (idx < 0) {
+        col.shelvesY.push(y);
+        col.shelvesY.sort(function(a, b) { return a - b; });
+        idx = col.shelvesY.findIndex(function(sy) { return Math.abs(sy - y) < 0.05; });
+        if (idx < 0) idx = col.shelvesY.length - 1;
+        col.shelves = col.shelvesY.length;
+        const t = wing.thickness || 1.7;
+        const baseY = (typeof _columnBaseY === 'function') ? _columnBaseY(col, wing) : (col.floorOffset || 0);
+        if (typeof _syncCompartmentCount === 'function') _syncCompartmentCount(col, baseY, t);
+        if (typeof window._syncStretcherShelfIdxs === 'function') window._syncStretcherShelfIdxs(col);
+    }
+    return {
+        kind: 'shelf',
+        idx: idx,
+        y: Math.round((col.shelvesY[idx] + shelfT / 2) * 10) / 10
+    };
+}
+
+/**
+ * Align an embedded corner desk to the end-column shelf/כוורת (or create a shelf),
+ * and build mergeShelf + tongue so the top reads as one continuous board.
+ */
+function _cuAlignEmbeddedDesk(cu, wing) {
+    if (!cu || !wing || cu.standalone || cu.type !== 'desk') return false;
+    const cols = wing.columns || [];
+    if (!cols.length) return false;
+    const side = cu.side === 'left' ? 'left' : 'right';
+    const colIndex = (cu.mergeShelf && cu.mergeShelf.colIndex != null)
+        ? cu.mergeShelf.colIndex
+        : (side === 'left' ? 0 : cols.length - 1);
+    if (colIndex < 0 || colIndex >= cols.length) return false;
+    const col = cols[colIndex];
+    const host = { wing: wing, col: col, colIndex: colIndex, off: { x: 0, y: 0, z: 0 } };
+
+    let surf = null;
+    if (cu.mergeShelf) {
+        surf = _cuCurrentSurface(_cuLocalSurfaces(wing, col), cu.mergeShelf);
+    }
+    if (!surf) {
+        surf = _cuPickSurface(_cuLocalSurfaces(wing, col), cu.height || CU_DEFAULTS.desk.height);
+    }
+    if (!surf) {
+        surf = _cuEnsureShelfAt(wing, col, cu.height || CU_DEFAULTS.desk.height);
+    }
+    if (!surf) return false;
+
+    const edges = _cuDeskEdges(host);
+    const depth = Math.max(30, Math.min(120, Math.round((edges.r - edges.l) * 10) / 10));
+    const boardT = Math.round((surf.kind === 'cubby' ? (wing.thickness || 1.7) : _cuShelfT(wing)) * 100) / 100;
+    const span = _cuColumnSpan(wing, colIndex);
+    const mainW = wing.width || state.width || 160;
+    const sign = side === 'right' ? 1 : -1;
+    const cuCenterX = sign * (mainW / 2 - depth / 2);
+    const r1 = function(v) { return Math.round(v * 100) / 100; };
+    const tongue = {
+        w: r1(col.width || 0),
+        d: r1(Math.max(0, (wing.depth || state.depth || 54) - 2)),
+        cx: r1(span.center - cuCenterX),
+        sx: 0
+    };
+    const changed = Math.abs((cu.height || 0) - surf.y) > 0.05 || Math.abs((cu.depth || 0) - depth) > 0.05;
+    cu.height = surf.y;
+    cu.depth = depth;
+    cu.mergeShelf = {
+        y: surf.y,
+        colIndex: colIndex,
+        kind: surf.kind,
+        idx: surf.idx,
+        boardT: boardT,
+        hostSlot: 'self',
+        embedded: true,
+        tongue: tongue
+    };
+    return changed;
+}
+
+/**
+ * Add a corner desk as part of the CURRENT cabinet (not a separate space unit),
+ * already merged to the chosen corner's end column. Creates a shelf if none exists.
+ */
+window.addEmbeddedCornerDesk = function(opts) {
+    opts = opts || {};
+    if (!opts.cornerSide) {
+        window._askCornerUnitSide('embeddedCornerDesk');
+        return;
+    }
+    const side = opts.cornerSide === 'left' ? 'left' : 'right';
+    if (state.presetId === 'corner-unit' || state.presetId === 'writing-desk' ||
+        state.presetId === 'corner-left' || state.presetId === 'corner-right' ||
+        state.presetId === 'walkin' || state.presetId === 'sliding') {
+        if (typeof _showToast === 'function') {
+            _showToast('שולחן פינתי משובץ זמין בארון רגיל / מטבח', 3200);
+        }
+        return;
+    }
+    const cw = _getCUWing();
+    if (!cw) return;
+    if (!cw.columns || !cw.columns.length) {
+        if (typeof distributeColumns === 'function') {
+            distributeColumns(Math.max(1, state.numColumns || 2));
+        } else {
+            const t = cw.thickness || state.thickness || 1.7;
+            const colW = ((cw.width || state.width || 160) - t * 3) / 2;
+            cw.columns = [0, 1].map(function() {
+                const col = {
+                    type: 'normal', width: colW, height: cw.globalHeight || state.globalHeight || 240,
+                    shelves: 3, splitY: null, shelvesY: [], compartments: [], doors: [], floorOffset: 0
+                };
+                if (typeof _distributeShelves === 'function') _distributeShelves(col, cw);
+                return col;
+            });
+        }
+    }
+    const d = CU_DEFAULTS.desk;
+    cw.corner = {
+        side: side,
+        type: 'desk',
+        width: d.width,
+        height: d.height,
+        depth: cw.depth || state.depth || d.depth,
+        shelves: 3,
+        drawerCount: 4,
+        deskDrawerCount: 0,
+        deskDrawerHeight: 13,
+        deskFloating: false
+    };
+    delete cw.corner.standalone;
+    _cuAlignEmbeddedDesk(cw.corner, cw);
+
+    if (typeof window.updateCorner === 'function') {
+        // Sync side/type button UI without wiping merge
+        document.querySelectorAll('.corner-side-btn').forEach(function(b) {
+            const isActive = b.dataset.side === side;
+            b.classList.toggle('active', isActive);
+            b.style.background = isActive ? 'var(--accent)' : 'var(--bg-light)';
+            b.style.color = isActive ? 'white' : 'var(--text-dark)';
+            b.style.borderColor = isActive ? 'var(--accent)' : 'var(--border)';
+        });
+        document.querySelectorAll('.corner-type-btn').forEach(function(b) {
+            const isActive = b.dataset.type === 'desk';
+            b.classList.toggle('active', isActive);
+            b.style.background = isActive ? 'var(--accent)' : 'var(--bg-light)';
+            b.style.color = isActive ? 'white' : 'var(--text-dark)';
+            b.style.borderColor = isActive ? 'var(--accent)' : 'var(--border)';
+        });
+        const cuControls = document.getElementById('corner-controls');
+        if (cuControls) cuControls.style.display = 'block';
+        const cuDeskDrawerSection = document.getElementById('corner-desk-drawer-section');
+        if (cuDeskDrawerSection) cuDeskDrawerSection.style.display = 'block';
+        const cuDrawerSection = document.getElementById('corner-drawer-section');
+        if (cuDrawerSection) cuDrawerSection.style.display = 'none';
+    }
+
+    window._updateExtrasSections();
+    window._isDirty = true;
+    if (typeof buildCabinet === 'function') buildCabinet();
+    if (typeof updateCameraView === 'function') updateCameraView();
+    if (typeof calculatePrice === 'function') calculatePrice();
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+    if (typeof window._commitCurrentCabinetToCart === 'function' && state.editingCartIndex >= 0) {
+        window._commitCurrentCabinetToCart({ flash: false });
+    }
+    const ms = cw.corner.mergeShelf;
+    const how = ms && ms.kind === 'cubby' ? 'תחתית הכוורת' : 'מדף';
+    if (typeof _showToast === 'function') {
+        _showToast('שולחן פינתי נוסף בפינה ' + (side === 'left' ? 'שמאל' : 'ימין') +
+            ' וממוזג עם ' + how + ' (' + (cw.corner.height || 0) + ' ס"מ)', 3500);
+    }
+};
+
 /** Corner desk ⇄ host column: shared height (כוורת bottom / shelf top) and width (column span). */
 window.toggleCornerDeskShelfMerge = function() {
     const cw = _getCUWing();
@@ -376,14 +559,31 @@ window.toggleCornerDeskShelfMerge = function() {
  * (live state when the desk is being edited, its saved snapshot otherwise).
  */
 function _cuSyncMergedDesks() {
-    if (typeof window._getSpacePairInfo !== 'function') return;
-    const info = window._getSpacePairInfo();
-    // Host boards merged with a desk, per host slot → drawn in the desk color (engine-core)
     const boards = {};
     window._cuMergeBoards = boards;
-    // Host doors under a merged desk's drawer band stop below it (engine-core)
     const doorClamps = {};
     window._cuDeskDoorClamps = doorClamps;
+
+    // Embedded corner desk on the live cabinet (part of the same carcass)
+    const liveWing = _getCUWing();
+    const liveCu = liveWing && liveWing.corner;
+    if (liveCu && !liveCu.standalone && liveCu.type === 'desk' && liveCu.side && liveCu.side !== 'none') {
+        _cuAlignEmbeddedDesk(liveCu, liveWing);
+        const ms = liveCu.mergeShelf;
+        if (ms) {
+            (boards.self = boards.self || []).push({
+                colIndex: ms.colIndex, kind: ms.kind, idx: ms.idx,
+                mat: liveWing.materialDesk || liveWing.materialBody || state.materialDesk || state.materialBody || 'white_matte'
+            });
+            if ((liveCu.deskDrawerCount || 0) > 0) {
+                const drawerBottom = liveCu.height - (ms.boardT || 1.7) - (liveCu.deskDrawerHeight || 13);
+                (doorClamps.self = doorClamps.self || []).push({ colIndex: ms.colIndex, y: drawerBottom });
+            }
+        }
+    }
+
+    if (typeof window._getSpacePairInfo !== 'function') return;
+    const info = window._getSpacePairInfo();
     if (!info) return;
     info.members.forEach(function(m) {
         const live = m.slot === info.activeSlot;
@@ -393,7 +593,7 @@ function _cuSyncMergedDesks() {
         if (!live && (!raw || raw.presetId !== 'corner-unit')) return;
         const wing = live ? _getCUWing() : (raw.wings && raw.wings.center);
         const cu = wing && wing.corner;
-        if (!cu || !cu.mergeShelf || cu.type !== 'desk') return;
+        if (!cu || !cu.mergeShelf || cu.type !== 'desk' || cu.embedded || !cu.standalone) return;
         const changed = _cuAlignDeskToHost(cu, m.slot);
         const ms = cu.mergeShelf;
         if (ms.hostSlot != null && _cuFindHostColumn(cu, m.slot, ms.colIndex)) {
@@ -470,6 +670,7 @@ window._updateExtrasSections = function() {
     const hasLegacyCorner = !!(w && w.corner && w.corner.side && w.corner.side !== 'none' && !w.corner.standalone);
 
     const showSide = !isSliding && !isWD && !isCU && hasLegacySide;
+    // Show corner controls for standalone units, or whenever an embedded corner desk/drawers is active
     const showCorner = isCU || (!isSliding && !hasWings && !isWD && hasLegacyCorner);
 
     const suSection = document.getElementById('side-unit-section');
@@ -501,6 +702,7 @@ window._updateExtrasSections = function() {
     }
     const mergeRow = document.getElementById('corner-desk-merge-row');
     if (mergeRow) {
+        // Embedded desks stay auto-merged; toggle is for standalone space desks only
         const isDesk = isCU && cw && cw.corner && cw.corner.type === 'desk';
         mergeRow.style.display = isDesk ? '' : 'none';
         const merged = !!(isDesk && cw.corner.mergeShelf);
@@ -591,22 +793,37 @@ window._updateExtrasSections = function() {
     ['updateSideUnitType', 'updateCorner'].forEach(function(fn) {
         const orig = window[fn];
         if (typeof orig !== 'function') return;
-        window[fn] = function(field) {
+        window[fn] = function(field, value) {
             // A standalone corner unit always stays attached to its own frame
             if (fn === 'updateCorner' && _isCornerUnitPreset() && field === 'side') return;
             const r = orig.apply(this, arguments);
-            if (fn === 'updateCorner' && _isCornerUnitPreset()) {
+            if (fn === 'updateCorner') {
                 const cw = _getCUWing();
                 if (cw && cw.corner) {
-                    // Switching type resets the height to that type's default
-                    if (field === 'type') {
-                        cw.corner.height = CU_DEFAULTS[cw.corner.type === 'desk' ? 'desk' : 'drawers'].height;
-                        delete cw.corner.mergeShelf;
-                    }
-                    _cuSyncWingDims(cw);
-                    if (field === 'type') {
-                        if (typeof buildCabinet === 'function') buildCabinet();
-                        if (typeof updateCameraView === 'function') updateCameraView();
+                    if (_isCornerUnitPreset()) {
+                        // Switching type resets the height to that type's default
+                        if (field === 'type') {
+                            cw.corner.height = CU_DEFAULTS[cw.corner.type === 'desk' ? 'desk' : 'drawers'].height;
+                            delete cw.corner.mergeShelf;
+                        }
+                        _cuSyncWingDims(cw);
+                        if (field === 'type') {
+                            if (typeof buildCabinet === 'function') buildCabinet();
+                            if (typeof updateCameraView === 'function') updateCameraView();
+                        }
+                    } else if (!cw.corner.standalone) {
+                        // Embedded desk: keep auto-merged to the chosen corner's end column
+                        if (field === 'side' && (value === 'none' || cw.corner.side === 'none')) {
+                            delete cw.corner.mergeShelf;
+                        } else if (cw.corner.type === 'desk' && cw.corner.side && cw.corner.side !== 'none' &&
+                            (field === 'side' || field === 'type' || field === 'height' || field === 'depth')) {
+                            if (field === 'type' && value !== 'desk') {
+                                delete cw.corner.mergeShelf;
+                            } else {
+                                if (field === 'side' || field === 'type') delete cw.corner.mergeShelf;
+                                _cuAlignEmbeddedDesk(cw.corner, cw);
+                            }
+                        }
                     }
                 }
             }

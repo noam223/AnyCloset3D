@@ -675,7 +675,7 @@
                 <button type="button" class="space-unit-add-btn space-unit-wardrobe-only" onclick="addSpaceUnit('cornerDrawers')" title="מוסיף שידה פינתית כארון נפרד במרחב">
                     <i class="fa-solid fa-layer-group"></i><span>שידה פינתית</span>
                 </button>
-                <button type="button" class="space-unit-add-btn space-unit-wardrobe-only" onclick="addSpaceUnit('cornerDesk')" title="מוסיף שולחן פינתי כארון נפרד במרחב">
+                <button type="button" class="space-unit-add-btn space-unit-wardrobe-only" onclick="addEmbeddedCornerDesk()" title="מוסיף שולחן פינתי כחלק מהארון — ממוזג לפינה שנבחרה">
                     <i class="fa-solid fa-turn-up"></i><span>שולחן פינתי</span>
                 </button>
                 <button type="button" class="space-unit-add-btn space-unit-kitchen-only" onclick="addSpaceUnit('kitchenUpper')" title="מוסיף יחידה עליונה כארון נפרד במרחב" style="display:none;">
@@ -688,7 +688,7 @@
                     <i class="fa-solid fa-kitchen-set"></i><span>שורת מטבח</span>
                 </button>
             </div>
-            <div class="space-unit-add-hint">כל יחידה נוספת כארון נפרד במרחב — אפשר להזיז ולסובב. במטבח: עליונה / פינה / שורה נוספת כאן.</div>
+            <div class="space-unit-add-hint">שולחן פינתי מתווסף כחלק מהארון וממוזג לפינה. שאר היחידות נוספות כארון נפרד במרחב — אפשר להזיז ולסובב.</div>
         </div>
 
         <div class="section" id="side-unit-section" data-sbgroup="extras" style="border-bottom:none;padding-bottom:0;">
@@ -2550,7 +2550,7 @@
                 <button type="button" class="space-unit-add-btn space-unit-wardrobe-only" onclick="addSpaceUnit('sideDesk')"><i class="fa-solid fa-desktop"></i><span>שולחן צד</span></button>
                 <button type="button" class="space-unit-add-btn space-unit-wardrobe-only" onclick="addSpaceUnit('sideCabinet')"><i class="fa-solid fa-door-closed"></i><span>ארון צד</span></button>
                 <button type="button" class="space-unit-add-btn space-unit-wardrobe-only" onclick="addSpaceUnit('cornerDrawers')"><i class="fa-solid fa-layer-group"></i><span>שידה פינתית</span></button>
-                <button type="button" class="space-unit-add-btn space-unit-wardrobe-only" onclick="addSpaceUnit('cornerDesk')"><i class="fa-solid fa-turn-up"></i><span>שולחן פינתי</span></button>
+                <button type="button" class="space-unit-add-btn space-unit-wardrobe-only" onclick="addEmbeddedCornerDesk()" title="מוסיף שולחן פינתי כחלק מהארון — ממוזג לפינה שנבחרה"><i class="fa-solid fa-turn-up"></i><span>שולחן פינתי</span></button>
                 <button type="button" class="space-unit-add-btn space-unit-kitchen-only" onclick="addSpaceUnit('kitchenUpper')" style="display:none;"><i class="fa-solid fa-arrow-up"></i><span>יחידה עליונה</span></button>
                 <button type="button" class="space-unit-add-btn space-unit-kitchen-only" onclick="window._kitchenMakeCorner()" style="display:none;"><i class="fa-solid fa-turn-up"></i><span>פינת מטבח</span></button>
                 <button type="button" class="space-unit-add-btn space-unit-kitchen-only" onclick="addSpaceUnit('kitchenBase')" style="display:none;"><i class="fa-solid fa-kitchen-set"></i><span>שורת מטבח</span></button>
@@ -3293,10 +3293,10 @@
 <script src="bathroom-preset.js?v=20261008types"></script>
 <script src="kitchen-preset.js?v=20261117kitG3"></script>
 <script src="writing-desk-preset.js?v=20261122depth110"></script>
-<script src="corner-unit-preset.js?v=20261123cornerW200"></script>
+<script src="corner-unit-preset.js?v=20261123embedDesk1"></script>
 <script src="engine-appliances.js?v=20261116kitOvenGlass5"></script>
-<script src="engine-core.js?v=20261122profile1"></script>
-<script src="engine-corners.js?v=20261116cnc1"></script>
+<script src="engine-core.js?v=20261123embedDesk1"></script>
+<script src="engine-corners.js?v=20261123embedDesk1"></script>
 <script src="kitchen-corner.js?v=20261117kitG3"></script>
 <script src="engine-blueprint.js?v=20261116kitSeam"></script>
 <script src="engine-room-plan.js?v=20261110floors"></script>
@@ -3304,7 +3304,7 @@
 <script src="bluran-color-picker.js?v=20261116sdDoorTabs1"></script>
 <script src="formex-color-picker.js?v=20261116sdDoorTabs1"></script>
 <script src="room-finishes.js?v=20261110gloss"></script>
-<script src="ui.js?v=20261123printCamPersist1"></script>
+<script src="ui.js?v=20261123embedDesk1"></script>
 <script src="mirror-cabinet.js?v=20261110doormirror"></script>
 <script src="mobile.js?v=20261122depth110"></script>
 <script src="part-paint.js?v=20261104egger"></script>

@@ -6042,13 +6042,22 @@ window._clearSpaceCompanion = function() {
 function _cuMergedBoardMat(colIndex, kind, idx) {
     const map = window._cuMergeBoards;
     if (!map) return null;
+    // Companion / space-slot build
     const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
-    if (!info) return null;
-    const slot = window._spaceBuildSlot != null ? window._spaceBuildSlot : info.activeSlot;
-    const list = map[slot];
-    if (!list) return null;
-    const hit = list.find(function(e) { return e.colIndex === colIndex && e.kind === kind && e.idx === idx; });
-    return hit ? (materials[hit.mat] || materials['white_matte'] || null) : null;
+    if (info) {
+        const slot = window._spaceBuildSlot != null ? window._spaceBuildSlot : info.activeSlot;
+        const list = map[slot];
+        if (list) {
+            const hit = list.find(function(e) { return e.colIndex === colIndex && e.kind === kind && e.idx === idx; });
+            if (hit) return materials[hit.mat] || materials['white_matte'] || null;
+        }
+    }
+    // Embedded corner desk on the live cabinet (same carcass)
+    if (window._spaceBuildSlot == null && map.self) {
+        const hitSelf = map.self.find(function(e) { return e.colIndex === colIndex && e.kind === kind && e.idx === idx; });
+        if (hitSelf) return materials[hitSelf.mat] || materials['white_matte'] || null;
+    }
+    return null;
 }
 
 /**
@@ -6058,10 +6067,15 @@ function _cuMergedBoardMat(colIndex, kind, idx) {
 function _cuClampDoorTopUnderDesk(colIndex, bottomY, topY, gap) {
     const map = window._cuDeskDoorClamps;
     if (!map) return topY;
+    let hit = null;
     const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
-    if (!info) return topY;
-    const slot = window._spaceBuildSlot != null ? window._spaceBuildSlot : info.activeSlot;
-    const hit = (map[slot] || []).find(function(e) { return e.colIndex === colIndex; });
+    if (info) {
+        const slot = window._spaceBuildSlot != null ? window._spaceBuildSlot : info.activeSlot;
+        hit = (map[slot] || []).find(function(e) { return e.colIndex === colIndex; });
+    }
+    if (!hit && window._spaceBuildSlot == null && map.self) {
+        hit = map.self.find(function(e) { return e.colIndex === colIndex; });
+    }
     if (!hit || topY <= hit.y || bottomY >= hit.y - 2) return topY;
     return hit.y - gap / 2;
 }

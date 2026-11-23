@@ -357,7 +357,7 @@ function buildCornerUnit() {
     const sign = (cu.side === 'right') ? 1 : -1;
     const _hasCornerDeskDrawers = Math.min(cu.deskDrawerCount || 0, 3) > 0;
     // Merged with a host shelf / כוורת bottom: same board thickness → reads as one continuous board
-    const _mergedBoardT = (standalone && cu.type === 'desk' && cu.mergeShelf && cu.mergeShelf.boardT) || 0;
+    const _mergedBoardT = (cu.type === 'desk' && cu.mergeShelf && cu.mergeShelf.boardT) || 0;
     const deskT = _mergedBoardT || ((typeof window._deskSurfaceThickness === 'function')
         ? window._deskSurfaceThickness(_hasCornerDeskDrawers, t)
         : (_hasCornerDeskDrawers ? t : 2.8));
@@ -436,7 +436,7 @@ function buildCornerUnit() {
         const fingerGap = 2.5;
         const innerGap = 0.4;
         // Surface: full width × full depth (28mm thick)
-        const tongue = (standalone && cu.mergeShelf && cu.mergeShelf.tongue) || null;
+        const tongue = (cu.mergeShelf && cu.mergeShelf.tongue) || null;
         const deskSX = (tongue && tongue.sx) || 0;
         if (tongue && tongue.w > 0 && tongue.d > 0) {
             // Merged with a host shelf / כוורת bottom: ONE board — desk top plus a tongue into the
