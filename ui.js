@@ -11668,42 +11668,72 @@ function _getCornerAngleCaptureView(focusX) {
 }
 
 /**
- * A space part rotated in the room (e.g. a corner desk turned 90°) is shot diagonally into the corner together
- * with its cabinets, slightly from above — the plain front shot would look at it edge-on / from underneath.
+ * Space part with non-zero yaw: shoot from its own front (local +Z after rotation), not world +Z.
+ * - rot 180° used to keep the world-front camera → back of the cabinet in the print form
+ * - rot 90°/270° (corner desk) used a diagonal whole-corner shot → user expects a frontal desk view
  */
 function _rotatedSpacePartCaptureView() {
     const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
-    if (!info || info.count < 2 || !info.activeSlot || typeof cabinetGroup === 'undefined' || !cabinetGroup) return null;
+    if (!info || info.count < 2 || typeof cabinetGroup === 'undefined' || !cabinetGroup) return null;
+    const off = (typeof window._spaceOffsetForSlot === 'function')
+        ? window._spaceOffsetForSlot(info.activeSlot)
+        : null;
+    const rotDeg = ((off && off.rot) || 0) % 360;
+    const rotNorm = (rotDeg + 360) % 360;
     const rotY = cabinetGroup.rotation.y || 0;
-    if (Math.abs(Math.sin(rotY)) < 0.2) return null;
-    // Frame the whole corner (desk + the cabinets around it) so the part is seen in context
+    if (rotNorm < 1 || rotNorm > 359) {
+        if (Math.abs(rotY) < 0.05) return null;
+    }
     const partBox = new THREE.Box3().setFromObject(cabinetGroup);
-    const box = partBox.clone();
-    (window._spaceCompanionGroups || []).forEach(function(g) { if (g) box.union(new THREE.Box3().setFromObject(g)); });
-    if (box.isEmpty() || partBox.isEmpty()) return null;
-    const minY = Math.max(0, box.min.y);
-    // Look into the corner from the open side (where the other cabinets extend), 35° off the room front
-    const partCx = (partBox.min.x + partBox.max.x) / 2;
-    const allCx = (box.min.x + box.max.x) / 2;
-    const side = Math.abs(allCx - partCx) < 1 ? 0 : (allCx < partCx ? -1 : 1);
-    const a = 35 * Math.PI / 180;
-    const ux = side * Math.sin(a), uz = side ? Math.cos(a) : 1;
-    let pMin = Infinity, pMax = -Infinity;
-    [[box.min.x, box.min.z], [box.min.x, box.max.z], [box.max.x, box.min.z], [box.max.x, box.max.z]].forEach(function(p) {
-        const v = p[0] * uz - p[1] * ux;
-        pMin = Math.min(pMin, v); pMax = Math.max(pMax, v);
-    });
-    const tx = (box.min.x + box.max.x) / 2, tz = (box.min.z + box.max.z) / 2;
-    const ty = (minY + box.max.y) / 2;
-    const h = box.max.y - minY;
+    if (partBox.isEmpty()) return null;
+    // World direction of local +Z after yaw (Three.js Y rotation)
+    const fx = Math.sin(rotY);
+    const fz = Math.cos(rotY);
+    const minY = Math.max(0, partBox.min.y);
+    const topY = partBox.max.y;
+    const cx = (partBox.min.x + partBox.max.x) / 2;
+    const cz = (partBox.min.z + partBox.max.z) / 2;
+    const h = Math.max(20, topY - minY);
+    const size = new THREE.Vector3();
+    partBox.getSize(size);
+    // Span across the front face (perpendicular to look direction)
+    const lat = Math.abs(fx) > 0.7 ? size.z : (Math.abs(fz) > 0.7 ? size.x : Math.hypot(size.x, size.z));
+    const depthAlongFront = Math.abs(fx) > 0.7 ? size.x : (Math.abs(fz) > 0.7 ? size.z : Math.min(size.x, size.z));
+
+    const cw = state.wings && state.wings.center;
+    const isDesk = state.presetId === 'corner-unit' && cw && cw.corner && cw.corner.type === 'desk';
+    if (isDesk) {
+        // Elevated frontal from the sitting side. Keep host cabinets — the desk alone is often just a thin board.
+        const elev = 36 * Math.PI / 180;
+        const pull = Math.max(lat * 0.7, depthAlongFront * 1.5, 150);
+        // Light side bias so the desktop reads as a surface (not a flat strip) while staying frontal
+        const side = (cw.corner.side === 'left') ? -1 : 1;
+        const rx = -fz * side * 0.1;
+        const rz = fx * side * 0.1;
+        let maxH = topY;
+        (window._spaceCompanionGroups || []).forEach(function(g) {
+            if (!g) return;
+            const b = new THREE.Box3().setFromObject(g);
+            if (!b.isEmpty()) maxH = Math.max(maxH, b.max.y);
+        });
+        return {
+            id: 'spaceFrontDesk',
+            camPos: [cx + (fx + rx) * pull, topY + Math.tan(elev) * pull, cz + (fz + rz) * pull],
+            camTarget: [cx, Math.max(minY, topY * 0.5), cz],
+            fitH: Math.max(h, maxH * 0.4) + 70,
+            fitW: lat + depthAlongFront * 0.55 + 100,
+            companionOpacity: 0.7,
+            keepCompanions: true
+        };
+    }
     return {
-        id: 'spaceRotated',
-        camPos: [tx + ux, ty + h * 0.35, tz + uz],
-        camTarget: [tx, ty, tz],
-        fitH: h + 80,
-        fitW: (pMax - pMin) + 80,
-        companionOpacity: 0.18,
-        keepCompanions: true
+        id: 'spaceFront',
+        camPos: [cx + fx, (minY + topY) / 2, cz + fz],
+        camTarget: [cx, (minY + topY) / 2, cz],
+        fitH: h + 100,
+        fitW: lat + 100,
+        companionOpacity: 0.1,
+        keepCompanions: false
     };
 }
 
@@ -12122,7 +12152,7 @@ window._captureCabinetPreviewImages = function() {
         multiViewSVG,
         imgSpaceDoors,
         imgSpaceOpen,
-        captureVer: 16
+        captureVer: 17
     };
     } finally {
         restoreRenderSize();
@@ -12163,6 +12193,17 @@ window._cartItemNeedsMediaRefresh = function(itemObj) {
             if (!_cartImageValid(spec.imgSpaceDoors) || !_cartImageValid(spec.imgSpaceOpen)) return true;
             // v16: whole-space shots outline each part in its own color (group overview page)
             if (spec.captureVer < 16 && !spec.imgSpaceDoorsManual) return true;
+            // v17: rotated space parts (180° / desk 90°·270°) use frontal camera, not back/diagonal
+            if (spec.captureVer < 17 && !spec.imgDoorsManual) {
+                let needsFront = false;
+                (state.orderCart || []).forEach(function(it) {
+                    if (window._spacePairIdOf(it) !== pairId) return;
+                    const o = (it && (it.spaceOffset || (it.rawState && it.rawState.spaceOffset))) || {};
+                    const r = ((o.rot || 0) % 360 + 360) % 360;
+                    if (r > 1 && r < 359) needsFront = true;
+                });
+                if (needsFront) return true;
+            }
         }
     }
     if (!spec.multiViewPages || !spec.multiViewPages.length) return true;
