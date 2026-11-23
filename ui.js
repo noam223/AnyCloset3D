@@ -14819,6 +14819,32 @@ window.exitSpaceIsolateMode = function() {
     if (typeof window._syncSpacePairTabs === 'function') window._syncSpacePairTabs();
 };
 
+/** Place exit banner just under the floating top menu (desktop or mobile). */
+window._positionEditExitBanner = function(banner) {
+    if (!banner) return;
+    banner.style.bottom = 'auto';
+    const canvas = document.getElementById('canvas-container');
+    const topBar = document.getElementById('top-bar');
+    const mobileTop = document.getElementById('mobile-top-bar');
+    const canvasRect = canvas ? canvas.getBoundingClientRect() : null;
+    const isVisible = function(el) {
+        if (!el) return false;
+        const cs = window.getComputedStyle(el);
+        return cs.display !== 'none' && cs.visibility !== 'hidden' && el.offsetHeight > 0;
+    };
+    let topPx = 72;
+    if (isVisible(topBar) && canvasRect) {
+        topPx = Math.max(12, Math.round(topBar.getBoundingClientRect().bottom - canvasRect.top + 10));
+    } else if (isVisible(mobileTop) && canvasRect) {
+        // Mobile canvas often starts below the bar — keep a small gap inside the canvas
+        const gap = Math.round(mobileTop.getBoundingClientRect().bottom - canvasRect.top + 8);
+        topPx = gap > 0 ? gap : 12;
+    } else {
+        topPx = 12;
+    }
+    banner.style.top = topPx + 'px';
+};
+
 /** Shared prominent exit banner (space isolate + wing/corner edit). */
 window._styleEditExitBanner = function(opts) {
     const banner = document.getElementById('wing-edit-banner');
@@ -14827,7 +14853,7 @@ window._styleEditExitBanner = function(opts) {
     banner.style.display = 'flex';
     banner.style.padding = '12px 22px';
     banner.style.gap = '16px';
-    banner.style.bottom = '28px';
+    window._positionEditExitBanner(banner);
     const bannerLabel = banner.querySelector('span');
     if (bannerLabel) {
         bannerLabel.style.fontSize = '0.95rem';
@@ -14852,6 +14878,7 @@ window._clearEditExitBannerStyle = function() {
     banner.style.padding = '';
     banner.style.gap = '';
     banner.style.bottom = '';
+    banner.style.top = '';
     const bannerLabel = banner.querySelector('span');
     if (bannerLabel) bannerLabel.style.fontSize = '';
     const btn = banner.querySelector('button');
@@ -14888,6 +14915,16 @@ window._restoreWingEditBannerHandlers = function(labelHtml) {
         btnHtml: '<i class="fa-solid fa-arrow-right"></i> חזור למצב חופשי'
     });
 };
+
+(function _bindEditExitBannerReposition() {
+    if (window._editExitBannerResizeBound) return;
+    window._editExitBannerResizeBound = true;
+    window.addEventListener('resize', function() {
+        const banner = document.getElementById('wing-edit-banner');
+        if (!banner || banner.style.display === 'none') return;
+        window._positionEditExitBanner(banner);
+    });
+})();
 
 window.switchSpaceCabinet = function(slot) {
     const info = window._getSpacePairInfo();
