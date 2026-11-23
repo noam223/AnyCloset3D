@@ -11866,6 +11866,10 @@ function _captureFrameAtView(cam, ctrl, ren, scn, view, hasDoors) {
     if (view.slotOpacity != null && cropSlots.length && typeof window._fadeSpaceCompanionsForCapture === 'function') {
         window._fadeSpaceCompanionsForCapture(view.slotOpacity, (window._spaceCompanionGroups || []).filter(function(g) { return g && isCropSlot(g); }));
     }
+    // Companions that sit between the camera and the focus part go fully ghost (see-through)
+    if (typeof window._updateSpaceOcclusionGhosts === 'function') {
+        window._updateSpaceOcclusionGhosts();
+    }
 
     // Ensure door meshes aren't hidden by the editor "הסתר חזיתות" toggle
     // (open shot = same as the toggle: external drawers and other keep-visible fronts stay)
@@ -12030,31 +12034,87 @@ window._fadeSpaceCompanionsForCapture = function(opacity, onlyGroups) {
     const op = Math.max(0.04, Math.min(1, Number(opacity)));
     groups.forEach(function(g) {
         if (!g) return;
-        g.traverse(function(obj) {
-            if (!obj || !obj.material) return;
-            if (!(obj.isMesh || obj.isLine || obj.isLineSegments)) return;
-            if (obj.userData && obj.userData.spaceCompanion) return;
-            if (!obj.userData) obj.userData = {};
-            if (!obj.userData._fadeMatReady) {
-                const m0 = Array.isArray(obj.material) ? obj.material[0] : obj.material;
-                if (m0 && m0.transparent && m0.opacity === 0) obj.userData._fadeSkip = true;
-                if (Array.isArray(obj.material)) {
-                    obj.material = obj.material.map(function(m) { return m ? m.clone() : m; });
-                } else if (obj.material.clone) {
-                    obj.material = obj.material.clone();
-                }
-                obj.userData._fadeMatReady = true;
+        window._setSpaceGroupOpacity(g, op);
+    });
+};
+
+/** Clone materials once, then set opacity on a space companion (or focus) group. */
+window._setSpaceGroupOpacity = function(g, opacity) {
+    if (!g) return;
+    const op = Math.max(0.04, Math.min(1, Number(opacity)));
+    g.userData = g.userData || {};
+    g.userData._ghostOpacity = op;
+    g.traverse(function(obj) {
+        if (!obj || !obj.material) return;
+        if (!(obj.isMesh || obj.isLine || obj.isLineSegments)) return;
+        if (obj.userData && obj.userData.spaceCompanion) return;
+        if (!obj.userData) obj.userData = {};
+        if (!obj.userData._fadeMatReady) {
+            const m0 = Array.isArray(obj.material) ? obj.material[0] : obj.material;
+            if (m0 && m0.transparent && m0.opacity === 0) obj.userData._fadeSkip = true;
+            if (Array.isArray(obj.material)) {
+                obj.material = obj.material.map(function(m) { return m ? m.clone() : m; });
+            } else if (obj.material.clone) {
+                obj.material = obj.material.clone();
             }
-            if (obj.userData._fadeSkip) return;
-            const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-            mats.forEach(function(m) {
-                if (!m) return;
-                m.transparent = true;
-                m.opacity = op;
-                if ('depthWrite' in m) m.depthWrite = op > 0.85;
-                m.needsUpdate = true;
-            });
+            obj.userData._fadeMatReady = true;
+        }
+        if (obj.userData._fadeSkip) return;
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        mats.forEach(function(m) {
+            if (!m) return;
+            m.transparent = true;
+            m.opacity = op;
+            if ('depthWrite' in m) m.depthWrite = op > 0.85;
+            m.needsUpdate = true;
         });
+    });
+};
+
+/**
+ * Ghost space companions that sit between the camera and the focus cabinet
+ * (or that the camera is inside / very near) — same idea as room walls you can see through.
+ */
+window._OCCLUDE_GHOST_OPACITY = 0.15;
+window._OCCLUDE_NEAR_CM = 40;
+window._updateSpaceOcclusionGhosts = function() {
+    const companions = window._spaceCompanionGroups || [];
+    if (!companions.length || !window.camera) return;
+    if (typeof cabinetGroup === 'undefined' || !cabinetGroup) return;
+    // Blueprint / room-plan 2D: no ghosting needed
+    if (state.viewMode === 'blueprint') return;
+    if (state.viewMode === 'room-plan' && window._roomPlanSubview === '2d') return;
+
+    const camPos = window.camera.position;
+    const focusBox = new THREE.Box3().setFromObject(cabinetGroup);
+    if (focusBox.isEmpty()) return;
+    const focusCenter = focusBox.getCenter(new THREE.Vector3());
+    const toFocus = focusCenter.clone().sub(camPos);
+    const distFocus = toFocus.length();
+    if (distFocus < 0.5) return;
+    const dir = toFocus.normalize();
+    const ray = new THREE.Ray(camPos.clone(), dir);
+    const hit = new THREE.Vector3();
+    const baseOp = (window._spaceCaptureCompanionOpacity != null)
+        ? window._spaceCaptureCompanionOpacity
+        : 1;
+
+    companions.forEach(function(g) {
+        if (!g || g.visible === false) return;
+        const box = new THREE.Box3().setFromObject(g);
+        if (box.isEmpty()) return;
+        let occludes = false;
+        const nearDist = box.distanceToPoint(camPos);
+        if (nearDist < window._OCCLUDE_NEAR_CM || box.containsPoint(camPos)) {
+            occludes = true;
+        } else if (ray.intersectBox(box, hit)) {
+            const dHit = camPos.distanceTo(hit);
+            if (dHit < distFocus - 6) occludes = true;
+        }
+        const op = occludes ? Math.min(baseOp, window._OCCLUDE_GHOST_OPACITY) : baseOp;
+        // Skip redundant writes while orbiting
+        if (g.userData && g.userData._ghostOpacity === op) return;
+        window._setSpaceGroupOpacity(g, op);
     });
 };
 
@@ -21280,6 +21340,11 @@ function animate() {
             const panelTopY = (cabinetGroup ? cabinetGroup.position.y : 0) + m.position.y + (m.geometry && m.geometry.parameters ? m.geometry.parameters.height / 2 : 0);
             m.visible = (camera.position.y < panelTopY);
         });
+    }
+
+    // Space companions that block the camera → ghost (see-through), like room walls from behind
+    if (typeof window._updateSpaceOcclusionGhosts === 'function') {
+        window._updateSpaceOcclusionGhosts();
     }
 
     if (typeof window._syncRoomLighting === 'function') window._syncRoomLighting();
