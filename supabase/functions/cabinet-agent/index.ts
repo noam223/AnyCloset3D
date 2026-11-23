@@ -28,6 +28,7 @@ type CurrentState = {
   width?: number; height?: number; depth?: number; columns?: number;
   hasDoors?: boolean; frontFaceStyle?: string; frontStyle?: string;
   hangingColumns?: number; drawerColumns?: number; model?: string;
+  cartCount?: number;
 };
 
 function lineOf(e: Example): string {
@@ -165,19 +166,21 @@ function systemPrompt(): string {
     'כשכן בוחרים תבניות — מערך columnTemplates באורך columns (id או שם); אחר כך המערכת תתאים drawerCount/drawerKind לפי actions.',
     'אם מבקשים מגירות בלי לציין פנימיות/חיצוניות — שאל (ready=false, question="drawerKind").',
     'אם חסרים רוחב או גובה ליצירה — שאל (question="width" או "height").',
+    'מידות: אורך=רוחב. מספרים ≤12 (למשל 2.66, 2.10) הם מטרים → המר לס״מ (266, 210).',
+    'כמה ארונות בבקשה אחת (ארון 1 / ארון 2…): intent=create_many ו-actions.cabinets=[ {...}, {...} ] — כל פריט עם width/height בס״מ ושם אופציונלי. הלקוח יוצר כמה פריטים ב-orderCart.',
     'תלייה: תמיד עם מדפים מעל (לא תלייה מלאה בלבד). ברירת מחדל לדלתות: כן, אלא אם ביקשו בלי.',
     'עומק ברירת מחדל 54 אם לא צוין. אל תפתח CNC/ייצוא.',
     'החזר JSON בלבד בפורמט:',
-    '{"reply":"הודעה למשתמש","ready":true|false,"question":null|"width"|"height"|"depth"|"columns"|"drawerKind"|"hasDoors"|"drawerCount"|"walls"|"roomW","intent":"create"|"edit"|"walkin"|"clarify"|"help"|"cancel","actions":{"width":cm|null,"height":cm|null,"depth":cm|null,"columns":n|null,"hasDoors":bool|null,"frontFaceStyle":"solid"|"profile"|null,"frontStyle":"internal"|"external"|null,"hanging":bool|null,"hangingColumns":n|null,"shelves":bool|null,"restShelves":bool|null,"shelfColumns":n|null,"drawers":bool|null,"drawerCount":n|null,"drawerKind":"internal"|"external"|null,"drawerColumns":n|null,"columnTemplates":["tplIdOrName"|null,...]|null,"adapt":true|null,"walls":n|null,"roomW":cm|null,"roomD":cm|null}}',
+    '{"reply":"הודעה למשתמש","ready":true|false,"question":null|"width"|"height"|"depth"|"columns"|"drawerKind"|"hasDoors"|"drawerCount"|"walls"|"roomW","intent":"create"|"create_many"|"edit"|"walkin"|"clarify"|"help"|"cancel","actions":{"width":cm|null,"height":cm|null,"depth":cm|null,"columns":n|null,"hasDoors":bool|null,"frontFaceStyle":"solid"|"profile"|null,"frontStyle":"internal"|"external"|null,"hanging":bool|null,"hangingColumns":n|null,"shelves":bool|null,"restShelves":bool|null,"shelfColumns":n|null,"drawers":bool|null,"drawerCount":n|null,"drawerKind":"internal"|"external"|null,"drawerColumns":n|null,"columnTemplates":["tplIdOrName"|null,...]|null,"cabinets":[{"name":"ארון 1","width":cm,"height":cm,"depth":cm|null,"hasDoors":bool,"hanging":bool,"drawers":bool,"drawerKind":"internal"|"external"|null,"drawerCount":n|null,"columns":n|null},...]|null,"adapt":true|null,"walls":n|null,"roomW":cm|null,"roomD":cm|null}}',
     'כשready=false מלא רק question+reply; actions יכול להיות חלקי.',
-    'כשready=true מלא actions מלאים ליצירה/עריכה. intent=edit כשיש ארון קיים והבקשה היא שינוי.',
+    'כשready=true מלא actions מלאים ליצירה/עריכה. intent=edit כשיש ארון קיים והבקשה היא שינוי. intent=create_many כשיש 2+ ארונות.',
   ].join('\n');
 }
 
 function apiCheatSheet(): string {
   return [
-    'API: updateDim, distributeColumns, תבניות כנקודת פתיחה (_applyColumnTemplateToCol) ואז התאמה לפי drawerCount/drawerKind/roles,',
-    'או בנייה חופשית: hanging(+מדפים), empty=מדפים, internal_drawers/external_drawers, דלתות, frontFaceStyle.',
+    'API: create_many→startNewCabinet לכל ארון נוסף ב-orderCart; create→updateDim+distributeColumns+תבניות/תאים;',
+    'hanging(+מדפים), drawers, דלתות, frontFaceStyle. אורך=רוחב; מטרים≤12→ס״מ.',
   ].join(' ');
 }
 
@@ -292,6 +295,7 @@ serve(async (req) => {
       hangingColumns: current.hangingColumns || null,
       drawerColumns: current.drawerColumns || null,
       model: current.model || 'linear',
+      cartCount: current.cartCount || 0,
     })}`,
     pending ? `slots ממתינים משיחה קודמת: ${JSON.stringify(pending)}` : '',
     colTip,

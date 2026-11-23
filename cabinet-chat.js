@@ -139,6 +139,55 @@ function toCm(n, hintMeters) {
     return Math.round(n);
 }
 
+/** Labeled cabinet dim: unit, or values ≤12 → meters (גובה 2.66 / אורך 2.10). */
+function parseCabinetDim(numStr, unit, kind) {
+    var n = parseFloat(String(numStr).replace(',', '.'));
+    if (!isFinite(n) || n <= 0) return null;
+    if (unit && /מטר|מ'|מ\b|m\b|meter/i.test(unit)) return Math.round(n * 100);
+    if (kind === 'depth') {
+        if (n <= 2) return Math.round(n * 100);
+        return Math.round(n);
+    }
+    // width / height / length — 2.66 or bare 3 → meters; 210 / 266 → cm
+    if (n <= 12) return Math.round(n * 100);
+    return Math.round(n);
+}
+
+/**
+ * Split a message into per-cabinet blocks: "ארון 1: … ארון 2: …"
+ * Returns null if fewer than 2 blocks.
+ */
+function splitCabinetBlocks(text) {
+    var raw = String(text || '');
+    var re = /(?:^|\n)\s*ארון\s*(\d+)\s*[:.\-–—]?\s*/gi;
+    var hits = [];
+    var m;
+    while ((m = re.exec(raw))) {
+        hits.push({ n: parseInt(m[1], 10), start: m.index, bodyStart: m.index + m[0].length });
+    }
+    if (hits.length < 2) {
+        // Also: "ארון ראשון" / "הארון השני" light fallback — require numbered form
+        return null;
+    }
+    var blocks = [];
+    for (var i = 0; i < hits.length; i++) {
+        var end = i + 1 < hits.length ? hits[i + 1].start : raw.length;
+        var body = raw.slice(hits[i].bodyStart, end).trim();
+        if (body) blocks.push({ index: hits[i].n, text: body });
+    }
+    return blocks.length >= 2 ? blocks : null;
+}
+
+function parseMultiCabinetSlots(text) {
+    var blocks = splitCabinetBlocks(text);
+    if (!blocks) return null;
+    return blocks.map(function (b) {
+        var slots = parseSlots(b.text);
+        slots.name = 'ארון ' + b.index;
+        return slots;
+    });
+}
+
 function extractNumbers(text) {
     var out = [];
     var re = /(\d+(?:[.,]\d+)?)/g;
@@ -162,10 +211,11 @@ function detectIntent(text) {
     if (hasAny(t, ['בטל', 'ביטול', 'שכח מזה', 'תתחיל מחדש', 'איפוס שיחה'])) return 'cancel';
     if (hasAny(t, ['עזרה', 'מה אפשר', 'איך משתמשים']) || /^[?؟]\s*$/.test(t)) return 'help';
     if (hasAny(t, ['חדר ארונות', 'חדר הלבשה', 'ווקינא', 'walk in', 'walkin'])) return 'create_walkin';
+    if (splitCabinetBlocks(text)) return 'create_many';
     if (hasAny(t, ['צור', 'תיצור', 'תעשה לי', 'ארון חדש', 'בנה', 'תבנה', 'תתחיל ארון'])) return 'create';
     if (hasAny(t, ['שנה', 'תשנה', 'עדכן', 'תעדכן', 'תוסיף', 'תוסיפי', 'תוריד', 'תורידי', 'תגדיל', 'תקטין', 'תשים'])) return 'edit';
     // Bare description without verb → create if no meaningful cabinet yet, else edit
-    if (hasAny(t, ['ארון', 'עמודות', 'מגירות', 'דלתות', 'גובה', 'רוחב', 'עומק', 'חזית'])) {
+    if (hasAny(t, ['ארון', 'עמודות', 'מגירות', 'דלתות', 'גובה', 'רוחב', 'אורך', 'עומק', 'חזית'])) {
         var cols = (typeof state !== 'undefined' && state.columns) ? state.columns.length : 0;
         var w = (typeof state !== 'undefined') ? (state.width || 0) : 0;
         if (!cols || w <= 0) return 'create';
@@ -181,14 +231,14 @@ function parseSlots(text) {
     var slots = {};
     var nums = extractNumbers(t);
 
-    // Explicit labeled dims
+    // Explicit labeled dims (אורך = רוחב; 2.66 / 2.10 → מטרים)
     var m;
-    m = t.match(/רוחב\s*(?:של\s*)?(?:ל\s*[-–—]?\s*)?(\d+(?:[.,]\d+)?)\s*(ס"?מ|סמ|cm|מטר|מ'|מ)?/i);
-    if (m) slots.width = /מטר|מ'|^מ$/.test(m[2] || '') ? Math.round(parseFloat(m[1].replace(',', '.')) * 100) : Math.round(parseFloat(m[1].replace(',', '.')));
-    m = t.match(/גובה\s*(?:של\s*)?(?:הארונות?\s*)?(?:הוא\s*)?(?:ל\s*[-–—]?\s*)?(\d+(?:[.,]\d+)?)\s*(ס"?מ|סמ|cm|מטר|מ'|מ)?/i);
-    if (m) slots.height = /מטר|מ'|^מ$/.test(m[2] || '') ? Math.round(parseFloat(m[1].replace(',', '.')) * 100) : Math.round(parseFloat(m[1].replace(',', '.')));
-    m = t.match(/עומק\s*(?:של\s*)?(?:ל\s*[-–—]?\s*)?(\d+(?:[.,]\d+)?)\s*(ס"?מ|סמ|cm|מטר|מ'|מ)?/i);
-    if (m) slots.depth = /מטר|מ'|^מ$/.test(m[2] || '') ? Math.round(parseFloat(m[1].replace(',', '.')) * 100) : Math.round(parseFloat(m[1].replace(',', '.')));
+    m = t.match(/(?:רוחב|אורך|אורכו)\s*(?:של\s*)?(?:ל\s*[-–—]?\s*)?(\d+(?:[.,]\d+)?)\s*(ס"?מ|סמ|cm|מטר|מ'|מ|m)?/i);
+    if (m) slots.width = parseCabinetDim(m[1], m[2], 'width');
+    m = t.match(/גובה\s*(?:של\s*)?(?:הארונות?\s*)?(?:הוא\s*)?(?:ל\s*[-–—]?\s*)?(\d+(?:[.,]\d+)?)\s*(ס"?מ|סמ|cm|מטר|מ'|מ|m)?/i);
+    if (m) slots.height = parseCabinetDim(m[1], m[2], 'height');
+    m = t.match(/עומק\s*(?:של\s*)?(?:ל\s*[-–—]?\s*)?(\d+(?:[.,]\d+)?)\s*(ס"?מ|סמ|cm|מטר|מ'|מ|m)?/i);
+    if (m) slots.depth = parseCabinetDim(m[1], m[2], 'depth');
 
     // Room "2 על 3 מטר" / "2x3 מ"
     m = t.match(/(\d+(?:[.,]\d+)?)\s*(?:על|x|×)\s*(\d+(?:[.,]\d+)?)\s*(מטר|מ'|מ\b)/i);
@@ -334,6 +384,12 @@ function mergeSlots(base, extra) {
     Object.keys(extra || {}).forEach(function (k) {
         if (extra[k] != null) out[k] = extra[k];
     });
+    // Propagate drawerKind into each cabinet in a multi-create session
+    if (out.cabinets && Array.isArray(out.cabinets) && extra && extra.drawerKind) {
+        out.cabinets = out.cabinets.map(function (c) {
+            return mergeSlots(c, { drawerKind: extra.drawerKind });
+        });
+    }
     return out;
 }
 
@@ -395,7 +451,8 @@ function snapshotCurrentState() {
         frontStyle: (typeof state !== 'undefined') ? (state.frontStyle || 'external') : 'external',
         hangingColumns: hang,
         drawerColumns: drawers,
-        model: (typeof state !== 'undefined') ? (state.cabinetModel || 'linear') : 'linear'
+        model: (typeof state !== 'undefined') ? (state.cabinetModel || 'linear') : 'linear',
+        cartCount: (typeof state !== 'undefined' && state.orderCart) ? state.orderCart.length : 0
     };
 }
 
@@ -421,6 +478,14 @@ function normalizeAiActions(actions) {
             if (typeof x === 'string' || typeof x === 'number') return String(x);
             if (typeof x === 'object') return x.templateId || x.id || x.templateName || x.name || null;
             return null;
+        });
+    }
+    // Multi-cabinet batch from AI
+    if (Array.isArray(a.cabinets) && a.cabinets.length >= 2) {
+        slots.cabinets = a.cabinets.map(function (c, i) {
+            var one = normalizeAiActions(c && typeof c === 'object' ? c : {});
+            if (!one.name) one.name = (c && c.name) ? String(c.name) : ('ארון ' + (i + 1));
+            return one;
         });
     }
     return slots;
@@ -536,8 +601,11 @@ function applyAiResult(data) {
 
     if (data.ready !== true) {
         var q = data.question || null;
+        var pendingIntent = intent === 'walkin' ? 'create_walkin'
+            : (intent === 'edit' ? 'edit'
+                : (intent === 'create_many' || (actions.cabinets && actions.cabinets.length >= 2) ? 'create_many' : 'create'));
         SESSION = {
-            intent: intent === 'walkin' ? 'create_walkin' : (intent === 'edit' ? 'edit' : 'create'),
+            intent: pendingIntent,
             slots: mergeSlots((SESSION && SESSION.slots) || {}, actions),
             awaiting: q || 'width',
             asked: ((SESSION && SESSION.asked) || []).concat(q ? [q] : []),
@@ -565,6 +633,15 @@ function applyAiResult(data) {
         msg = applyEdit(actions);
         if (!msg) msg = data.reply || 'לא זיהיתי שינוי לבצע.';
         else if (data.reply) msg = data.reply;
+    } else if (intent === 'create_many' || (actions.cabinets && actions.cabinets.length >= 2)) {
+        var manyMiss = missingForMany(actions.cabinets);
+        if (manyMiss.length) {
+            SESSION = { intent: 'create_many', slots: actions, awaiting: manyMiss[0], asked: [manyMiss[0]], fromAi: true };
+            return { reply: (data.reply ? data.reply + '\n' : '') + questionFor(manyMiss[0]) };
+        }
+        msg = applyCreateMany(actions.cabinets);
+        if (data.reply) msg = data.reply + '\n' + msg;
+        intent = 'create_many';
     } else {
         // create (default) — if missing critical dims, ask locally
         var miss = missingForCreate(actions);
@@ -939,6 +1016,20 @@ function resolveColumnCount(slots, width) {
     return Math.max(1, Math.min(12, Math.max(fromWidth, fromLayout || 2)));
 }
 
+function setCabinetDisplayName(name) {
+    if (!name) return;
+    try {
+        state.cabinetName = name;
+        if (state.wings && state.wings.center) state.wings.center.cabinetName = name;
+        var idx = state.editingCartIndex;
+        if (idx >= 0 && state.orderCart && state.orderCart[idx]) {
+            var item = state.orderCart[idx];
+            if (item.spec) item.spec.customName = name;
+            if (item.rawState) item.rawState.cabinetName = name;
+        }
+    } catch (e) { /* ignore */ }
+}
+
 function applyCreateLinear(slots) {
     if (typeof window._resetEditorToDefaultLinearCabinet === 'function') {
         window._resetEditorToDefaultLinearCabinet();
@@ -972,18 +1063,57 @@ function applyCreateLinear(slots) {
     applyFrontStyles(slots);
     applyInteriorPlan(slots);
     applyDoorsForPlan(slots, hasDoors);
+    if (slots.name) setCabinetDisplayName(slots.name);
 
     finishApply();
     var roles = planColumnRoles(slots, cols);
     var hangCols = roles.filter(function (r) { return r === 'hanging'; }).length;
     var shelfCols = roles.filter(function (r) { return r === 'shelves'; }).length;
-    return 'יצרתי ארון: ' + summarizeSlots({
+    var label = slots.name ? (slots.name + ': ') : '';
+    return 'יצרתי ' + label + summarizeSlots({
         width: width, height: height, depth: depth, columns: cols,
         hasDoors: hasDoors, frontFaceStyle: slots.frontFaceStyle, frontStyle: slots.frontStyle,
         hanging: hangCols > 0, hangingColumns: hangCols || null,
         shelves: shelfCols > 0, restShelves: shelfCols > 0,
         drawers: slots.drawers, drawerCount: slots.drawerCount, drawerKind: slots.drawerKind
     });
+}
+
+/** Create several independent cart cabinets in the project (orderCart). */
+function applyCreateMany(cabinets) {
+    var list = (cabinets || []).filter(function (c) {
+        return c && c.width != null && c.height != null;
+    });
+    if (list.length < 2) {
+        if (list.length === 1) return applyCreateLinear(list[0]);
+        return 'חסרים מידות לארונות. ציינו גובה ואורך/רוחב לכל ארון.';
+    }
+    var lines = [];
+    list.forEach(function (slots, i) {
+        if (i > 0 && typeof window.startNewCabinet === 'function') {
+            window.startNewCabinet();
+        }
+        if (!slots.name) slots.name = 'ארון ' + (i + 1);
+        lines.push(applyCreateLinear(slots));
+    });
+    // Commit last so project cart matches editor
+    if (typeof window._commitCurrentCabinetToCart === 'function') {
+        window._commitCurrentCabinetToCart({ flash: false });
+    }
+    if (typeof updateLeftSidebar === 'function') updateLeftSidebar({ scrollToActive: true });
+    return 'יצרתי ' + list.length + ' ארונות בפרויקט:\n• ' + lines.join('\n• ');
+}
+
+function missingForMany(cabinets) {
+    var list = cabinets || [];
+    if (list.length < 2) return ['width'];
+    for (var i = 0; i < list.length; i++) {
+        var c = list[i] || {};
+        if (c.width == null) return ['width'];
+        if (c.height == null) return ['height'];
+        if (c.drawers && !c.drawerKind) return ['drawerKind'];
+    }
+    return [];
 }
 
 function applyEdit(slots) {
@@ -1081,11 +1211,11 @@ function applyWalkin(slots) {
 }
 
 function helpText() {
-    return 'כתבו בעברית מה תרצו — הסוכן לומד מפרויקטים קודמים. דוגמאות:\n' +
+    return 'כתבו בעברית מה תרצו — הסוכן לומד מפרויקטים ושיחות. דוגמאות:\n' +
         '• «ארון רוחב 275 גובה 270 עם תלייה ומדפים»\n' +
+        '• «ארון 1: גובה 2.66 אורך 2.10 דלתות מגירות ותלייה» + «ארון 2: …» — יוצר כמה ארונות בפרויקט\n' +
         '• «שנה עומק ל־55»\n' +
         '• «תוסיף חזיתות פרופיל»\n' +
-        '• «3 מגירות» (אשאל אם פנימיות או חיצוניות)\n' +
         'אם חסר מידע — אשאל.';
 }
 
@@ -1095,6 +1225,11 @@ function processMessage(raw) {
 
     var intent = detectIntent(text);
     var slots = parseSlots(text);
+    var multi = parseMultiCabinetSlots(raw);
+    if (multi && multi.length >= 2) {
+        slots.cabinets = multi;
+        intent = 'create_many';
+    }
 
     if (intent === 'cancel') {
         SESSION = null;
@@ -1108,10 +1243,26 @@ function processMessage(raw) {
     }
 
     // Continue session
-    if (SESSION && (intent === 'answer' || intent === 'unknown' || intent === SESSION.intent || intent === 'edit' || intent === 'create')) {
+    if (SESSION && (intent === 'answer' || intent === 'unknown' || intent === SESSION.intent || intent === 'edit' || intent === 'create' || intent === 'create_many')) {
         SESSION.slots = mergeSlots(SESSION.slots, slots);
         slots = SESSION.slots;
         intent = SESSION.intent;
+    }
+
+    if (intent === 'create_many') {
+        var cabs = slots.cabinets || multi;
+        if (!cabs || cabs.length < 2) {
+            return { reply: 'ציינו לפחות שני ארונות, למשל:\nארון 1: גובה 2.66 אורך 2.10 …\nארון 2: גובה 2.65 אורך 1.80 …' };
+        }
+        var missMany = missingForMany(cabs);
+        if (missMany.length) {
+            SESSION = { intent: 'create_many', slots: { cabinets: cabs }, awaiting: missMany[0], asked: (SESSION && SESSION.asked) || [] };
+            SESSION.asked.push(missMany[0]);
+            return { reply: 'הבנתי ' + cabs.length + ' ארונות.\n' + questionFor(missMany[0]) };
+        }
+        SESSION = null;
+        var manyMsg = applyCreateMany(cabs);
+        return { reply: manyMsg, done: true, learnActions: { cabinets: cabs }, learnIntent: 'create_many' };
     }
 
     if (intent === 'create' || intent === 'create_walkin') {
@@ -1131,8 +1282,19 @@ function processMessage(raw) {
 
     if (intent === 'edit') {
         // If mid-create, treat as fill; else edit current
-        if (SESSION && (SESSION.intent === 'create' || SESSION.intent === 'create_walkin')) {
+        if (SESSION && (SESSION.intent === 'create' || SESSION.intent === 'create_walkin' || SESSION.intent === 'create_many')) {
             SESSION.slots = mergeSlots(SESSION.slots, slots);
+            if (SESSION.intent === 'create_many') {
+                var missM = missingForMany(SESSION.slots.cabinets);
+                if (missM.length) {
+                    SESSION.awaiting = missM[0];
+                    return { reply: questionFor(missM[0]) };
+                }
+                var finMany = applyCreateMany(SESSION.slots.cabinets);
+                var finManySlots = SESSION.slots;
+                SESSION = null;
+                return { reply: finMany, done: true, learnActions: finManySlots, learnIntent: 'create_many' };
+            }
             var miss2 = SESSION.intent === 'create_walkin' ? missingForWalkin(SESSION.slots) : missingForCreate(SESSION.slots);
             if (miss2.length) {
                 SESSION.awaiting = miss2[0];
