@@ -333,10 +333,20 @@ function parseSlots(text) {
         slots.askColumns = true;
     }
 
+    // Target cabinet in project: "בארון 2" / "ארון 1"
+    m = t.match(/(?:ב)?ארון\s*(\d+)/);
+    if (m) {
+        var ti = parseInt(m[1], 10);
+        if (ti >= 1 && ti <= 20) slots.targetCabinet = ti;
+    }
+
     // Drawer kind (פנימיות / חיצוניות) — don't match bare words inside "חזיתות פנימיות"
-    if (hasAny(t, ['מגירות חיצוניות', 'מגירה חיצונית'])) slots.drawerKind = 'external';
-    else if (hasAny(t, ['מגירות פנימיות', 'מגירה פנימית'])) slots.drawerKind = 'internal';
-    else if (SESSION && SESSION.awaiting === 'drawerKind') {
+    // "מלמטה" / "שיתחיל מלמטה" → external (visible under doors)
+    if (hasAny(t, ['מגירות חיצוניות', 'מגירה חיצונית']) || /מגיר\w*.*מלמטה|מלמטה.*מגיר|שיתחיל(?:ו)?\s*מלמטה/.test(t)) {
+        slots.drawerKind = 'external';
+    } else if (hasAny(t, ['מגירות פנימיות', 'מגירה פנימית'])) {
+        slots.drawerKind = 'internal';
+    } else if (SESSION && SESSION.awaiting === 'drawerKind') {
         if (/חיצונ|חוץ|external/i.test(t)) slots.drawerKind = 'external';
         else if (/פנימ|פנים|internal/i.test(t)) slots.drawerKind = 'internal';
     }
@@ -581,7 +591,7 @@ function normalizeAiActions(actions) {
     var a = actions || {};
     var slots = {};
     ['width', 'height', 'depth', 'columns', 'hangingColumns', 'shelfColumns',
-        'drawerCount', 'drawerColumns', 'walls', 'roomW', 'roomD'].forEach(function (k) {
+        'drawerCount', 'drawerColumns', 'walls', 'roomW', 'roomD', 'targetCabinet'].forEach(function (k) {
         if (a[k] != null && a[k] !== '' && isFinite(Number(a[k]))) slots[k] = Number(a[k]);
     });
     if (a.hasDoors === true || a.hasDoors === false) slots.hasDoors = a.hasDoors;
@@ -748,13 +758,28 @@ function applyAiResult(data) {
     SESSION = null;
 
     _lastApplyNotes = [];
+    if (actions.targetCabinet != null) switchToTargetCabinet(actions.targetCabinet);
+
     var msg;
     if (intent === 'walkin' || intent === 'create_walkin') {
         msg = applyWalkin(actions);
     } else if (intent === 'edit') {
-        msg = applyEdit(actions);
-        if (!msg) msg = data.reply || 'לא זיהיתי שינוי לבצע.';
-        else if (data.reply) msg = data.reply;
+        // Surgical drawers edit when AI asked for drawers on an existing cabinet
+        var aiDrawersOnly = !!(actions.drawers || actions.drawerCount) &&
+            !actions.hanging && actions.hangingColumns == null &&
+            !actions.shelves && !actions.restShelves;
+        if (aiDrawersOnly) {
+            if (actions.drawerCount == null) {
+                SESSION = { intent: 'edit', slots: actions, awaiting: 'drawerCount', asked: ['drawerCount'], fromAi: true };
+                return { reply: (data.reply ? data.reply + '\n' : '') + questionFor('drawerCount') };
+            }
+            if (!actions.drawerKind) actions.drawerKind = 'external';
+            msg = applyDrawersToOneColumn(actions);
+        } else {
+            msg = applyEdit(actions);
+            if (!msg) msg = data.reply || 'לא זיהיתי שינוי לבצע.';
+            else if (data.reply) msg = data.reply + '\n' + msg;
+        }
     } else if (intent === 'create_many' || (actions.cabinets && actions.cabinets.length >= 2)) {
         var manyMiss = missingForMany(actions.cabinets);
         if (manyMiss.length) {
@@ -915,6 +940,7 @@ function _applyShelvesOnly(col) {
 /**
  * Size bottom cell so N drawers fit (same rules as the editor UI).
  * External: 1→5cm min, stack 12+(n-1)*12; Internal: 22+(n-1)*20.
+ * Never call distributeShelves here — it would equal-space and undo the bottom height.
  */
 function _sizeBottomCellForDrawers(col, neededH) {
     if (!col) return 0;
@@ -928,38 +954,86 @@ function _sizeBottomCellForDrawers(col, neededH) {
     var avail = Math.max(0, topInner - startY);
     if (avail < 20) return 0;
 
-    // Leave room above for hanging/shelves; still try to honor neededH
-    var reserveAbove = Math.min(80, Math.max(30, avail * 0.35));
-    var bottomH = Math.min(Math.max(neededH, 24), Math.max(neededH, avail - reserveAbove));
-    if (bottomH > avail - 20) bottomH = Math.max(neededH, avail - 20);
-    bottomH = Math.min(bottomH, avail - 15);
+    // Prefer exact needed height; leave at least ~40cm above when possible
+    var bottomH = Math.min(neededH + 2, avail - 40);
+    if (bottomH < neededH) bottomH = Math.min(neededH, avail - 25);
+    if (bottomH < neededH) bottomH = Math.min(neededH, avail * 0.55);
+    bottomH = Math.max(neededH, Math.min(bottomH, avail - 15));
 
     var y1 = Math.round((startY + bottomH + shelfT / 2) * 10) / 10;
     var aboveBottom = y1 + shelfT / 2;
     var aboveH = Math.max(0, topInner - aboveBottom);
     var y2 = Math.round((aboveBottom + aboveH / 2) * 10) / 10;
-    if (y2 <= y1 + 2) y2 = Math.round((y1 + Math.max(12, aboveH * 0.5)) * 10) / 10;
+    if (y2 <= y1 + shelfT + 5) y2 = Math.round(Math.min(topInner - 5, y1 + Math.max(20, aboveH * 0.55)) * 10) / 10;
 
-    col.shelves = 2;
-    col.shelvesY = [y1, y2].filter(function (y) { return y > startY && y < topInner; });
-    if (col.shelvesY.length < 1) {
-        col.shelves = 1;
-        col.shelvesY = [y1];
-    }
+    col.shelvesY = [y1];
+    if (y2 > y1 + 8 && y2 < topInner - 2) col.shelvesY.push(y2);
     col.shelves = col.shelvesY.length;
+
+    var baseY = (typeof _columnBaseY === 'function') ? _columnBaseY(col, null) : plinth;
     if (typeof _syncCompartmentCount === 'function') {
-        _syncCompartmentCount(col, typeof _columnBaseY === 'function' ? _columnBaseY(col, null) : plinth, t);
-    } else if (typeof distributeShelves === 'function') {
-        // fallback — keep our shelvesY by re-applying after distribute
-        var keep = col.shelvesY.slice();
-        distributeShelves(col);
-        col.shelvesY = keep;
-        col.shelves = keep.length;
-        if (typeof _syncCompartmentCount === 'function') {
-            _syncCompartmentCount(col, typeof _columnBaseY === 'function' ? _columnBaseY(col, null) : plinth, t);
-        }
+        _syncCompartmentCount(col, baseY, t);
+    } else {
+        var nComps = col.shelves + 1;
+        if (!col.compartments) col.compartments = [];
+        while (col.compartments.length < nComps) col.compartments.push({ type: 'empty' });
+        while (col.compartments.length > nComps) col.compartments.pop();
     }
     return bottomH;
+}
+
+/** Switch editor to cart cabinet N (1-based). Returns true if switched. */
+function switchToTargetCabinet(oneBased) {
+    if (oneBased == null || !isFinite(oneBased)) return false;
+    var idx = Math.max(0, Math.round(oneBased) - 1);
+    if (!state.orderCart || !state.orderCart[idx]) return false;
+    if (state.editingCartIndex === idx) return true;
+    if (typeof window._commitCurrentCabinetToCart === 'function') {
+        try { window._commitCurrentCabinetToCart({ flash: false }); } catch (e) { /* ignore */ }
+    }
+    if (typeof window.editCartItem === 'function') {
+        window.editCartItem(idx, { force: true });
+        return true;
+    }
+    if (typeof window._editCartItemNow === 'function') {
+        window._editCartItemNow(idx);
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Add/replace drawers in one column only — keep other columns' interiors.
+ * Prefer external when "מלמטה" so fronts are visible under doors.
+ */
+function applyDrawersToOneColumn(slots) {
+    var cols = state.columns || [];
+    if (!cols.length) return 'אין עמודות בארון.';
+    var count = Math.max(1, Math.min(8, slots.drawerCount || 4));
+    var kind = slots.drawerKind || 'external';
+    var colIdx = 0;
+    // Prefer an existing drawer column; else first column
+    for (var i = 0; i < cols.length; i++) {
+        var comps = cols[i] && cols[i].compartments;
+        if (!comps) continue;
+        var hasDr = comps.some(function (c) {
+            return c && (c.type === 'external_drawers' || c.type === 'internal_drawers' || c.type === 'shoe_drawers');
+        });
+        if (hasDr) { colIdx = i; break; }
+    }
+    _applyDrawersColumn(cols[colIdx], count, kind);
+    // Keep doors above external drawer stack
+    if (state.hasDoors !== false) {
+        applyDoorsForPlan({ drawers: true, drawerKind: kind }, true);
+    }
+    finishApply();
+    var cellH = _cellHForRow(cols[colIdx], 0);
+    var type = kind === 'internal' ? 'internal_drawers' : 'external_drawers';
+    var actual = (cols[colIdx].compartments[0] && cols[colIdx].compartments[0].count) || 0;
+    return 'שמתי ' + actual + ' מגירות ' + (kind === 'internal' ? 'פנימיות' : 'חיצוניות') +
+        ' בעמודה ' + (colIdx + 1) + ' מלמטה' +
+        (cellH ? (' (גובה תא ~' + Math.round(cellH) + ' ס״מ)') : '') +
+        takeApplyNotesSuffix();
 }
 
 function _cellHForRow(col, row) {
@@ -1379,6 +1453,24 @@ function missingForMany(cabinets) {
 }
 
 function applyEdit(slots) {
+    if (slots.targetCabinet != null) {
+        switchToTargetCabinet(slots.targetCabinet);
+    }
+
+    // Drawers-only edit: don't wipe hanging/shelves on other columns
+    var drawersOnly = !!(slots.drawers || slots.drawerCount || slots.drawerKind) &&
+        !slots.hanging && slots.hangingColumns == null &&
+        !slots.shelves && !slots.restShelves && slots.shelfColumns == null &&
+        slots.width == null && slots.height == null && slots.depth == null && slots.columns == null;
+    if (drawersOnly) {
+        if (slots.drawerCount == null && slots.drawers) {
+            // count still missing — ask instead of guessing
+            return null;
+        }
+        if (!slots.drawerKind) slots.drawerKind = 'external';
+        return applyDrawersToOneColumn(slots);
+    }
+
     var changed = [];
     if (slots.width != null && typeof updateDim === 'function') {
         updateDim('width', 0, slots.width); changed.push('רוחב ' + slots.width);
@@ -1408,34 +1500,44 @@ function applyEdit(slots) {
     var needsInterior = slots.hanging || slots.hangingColumns != null || slots.shelves ||
         slots.restShelves || slots.shelfColumns != null || slots.drawers || slots.drawerKind;
     if (needsInterior) {
-        // Keep existing dims/cols; re-plan interiors from merged intent
-        var editSlots = mergeSlots({
-            hanging: true,
-            shelves: true
-        }, slots);
-        // If only drawers/kind change, don't force hanging on all
-        if (!slots.hanging && slots.hangingColumns == null) delete editSlots.hanging;
-        if (!slots.shelves && !slots.restShelves && slots.shelfColumns == null) delete editSlots.shelves;
-        applyInteriorPlan(editSlots);
-        if (slots.hangingColumns != null) changed.push(slots.hangingColumns + ' תלייה');
-        else if (slots.hanging) changed.push('תלייה');
-        if (slots.restShelves || slots.shelves) changed.push('מדפים');
-        if (slots.drawers || slots.drawerKind) {
-            changed.push((slots.drawerCount || '') + ' מגירות ' +
-                (slots.drawerKind === 'internal' ? 'פנימיות' : (slots.drawerKind === 'external' ? 'חיצוניות' : '')));
+        // If drawers mentioned with other layout changes — still prefer surgical drawer apply when no hanging/shelves counts
+        if ((slots.drawers || slots.drawerCount) && !slots.hanging && slots.hangingColumns == null &&
+            !slots.shelves && !slots.restShelves && slots.shelfColumns == null) {
+            if (!slots.drawerKind) slots.drawerKind = 'external';
+            var dMsg = applyDrawersToOneColumn(slots);
+            changed.push(dMsg);
+        } else {
+            var editSlots = mergeSlots({
+                hanging: true,
+                shelves: true
+            }, slots);
+            if (!slots.hanging && slots.hangingColumns == null) delete editSlots.hanging;
+            if (!slots.shelves && !slots.restShelves && slots.shelfColumns == null) delete editSlots.shelves;
+            applyInteriorPlan(editSlots);
+            if (slots.hangingColumns != null) changed.push(slots.hangingColumns + ' תלייה');
+            else if (slots.hanging) changed.push('תלייה');
+            if (slots.restShelves || slots.shelves) changed.push('מדפים');
+            if (slots.drawers || slots.drawerKind) {
+                changed.push((slots.drawerCount || '') + ' מגירות ' +
+                    (slots.drawerKind === 'internal' ? 'פנימיות' : (slots.drawerKind === 'external' ? 'חיצוניות' : '')));
+            }
+            applyDoorsForPlan(editSlots, state.hasDoors !== false);
+            finishApply();
         }
-        applyDoorsForPlan(editSlots, state.hasDoors !== false);
     }
     if (slots.hasDoors === true) {
         applyDoorsForPlan(slots, true);
         changed.push('דלתות');
+        finishApply();
     } else if (slots.hasDoors === false) {
         clearDoors();
         changed.push('בלי דלתות');
+        finishApply();
     }
     if (!changed.length) return null;
-    finishApply();
-    return 'עדכנתי: ' + changed.join(' · ');
+    // finishApply already called for interior paths that need it
+    if (!(needsInterior || slots.hasDoors === true || slots.hasDoors === false)) finishApply();
+    return 'עדכנתי: ' + changed.join(' · ') + takeApplyNotesSuffix();
 }
 
 function applyWalkin(slots) {
