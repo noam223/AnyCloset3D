@@ -1937,8 +1937,32 @@ function injectStyles() {
     document.head.appendChild(st);
 }
 
+/** One-shot: wipe all legacy/cross-project cabinet-chat keys after scoping fix. */
+function purgeAllLegacyChatStorage() {
+    var flag = 'anycloset:cabinetChat:purged:v2';
+    try {
+        if (localStorage.getItem(flag) === '1') return false;
+        var toRemove = [];
+        for (var i = 0; i < localStorage.length; i++) {
+            var k = localStorage.key(i);
+            if (k && k.indexOf(STORAGE_PREFIX) === 0) toRemove.push(k);
+        }
+        toRemove.forEach(function (k) {
+            try { localStorage.removeItem(k); } catch (e2) { /* ignore */ }
+        });
+        localStorage.setItem(flag, '1');
+        window._projectCabinetChat = null;
+        window._projectCabinetChatForId = null;
+        clearChatMemory();
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
 function init() {
     injectStyles();
+    purgeAllLegacyChatStorage();
     injectUi();
     try {
         if (typeof window._refreshTemplates === 'function') window._refreshTemplates('column');
