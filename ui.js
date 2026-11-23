@@ -17232,6 +17232,12 @@ function _addContentTypeToCounts(counts, type, comp, zoneIdx) {
 function _accumulateCompContentCounts(counts, comp) {
     if (!comp) return;
     if (comp.partition && Array.isArray(comp.subCells)) {
+        // Partitioned כוורת keeps type open_cell / side_open_cell on the parent while
+        // subCells are usually empty shells — count the parent or the color/export row is skipped.
+        if (comp.type === 'open_cell' || comp.type === 'side_open_cell') {
+            _addContentTypeToCounts(counts, comp.type, comp);
+            return;
+        }
         comp.subCells.forEach(function(sub) {
             if (!sub) return;
             if (typeof _ensureZoneDoorSplit === 'function') _ensureZoneDoorSplit(sub);
@@ -17551,6 +17557,31 @@ function _plainSpecValue(v) {
         .replace(/<[^>]*>/g, '')
         .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
         .trim();
+}
+
+/** True when export/print should show צבע כוורת (spec flag or live recount from raw). */
+function _itemShowsOpenCellColor(item, itemObj) {
+    if (item && item.hasOpenCells) return true;
+    if (item && item.colorOpenCell) return true;
+    const rs = itemObj && itemObj.rawState;
+    if (!rs) return false;
+    if (typeof _countCabinetContentFromRawState === 'function') {
+        const c = _countCabinetContentFromRawState(rs);
+        if (((c.openCells || 0) + (c.sideOpenCells || 0)) > 0) return true;
+    }
+    if (rs.wings && typeof _wingHasOpenCellContent === 'function') {
+        return ['center', 'left', 'right'].some(function(side) {
+            return _wingHasOpenCellContent(rs.wings[side]);
+        });
+    }
+    return false;
+}
+
+function _openCellColorFromItemObj(itemObj) {
+    const rs = itemObj && itemObj.rawState;
+    if (!rs) return '';
+    if (rs.wings) return _resolveOpenCellColorLabel(rs.wings, rs.materialOpenCell);
+    return _colorKeyLabel(rs.materialOpenCell || 'white_matte');
 }
 
 /** Refresh display color fields from rawState (fixes stale / wrong-wing labels on reprint). */
@@ -17903,7 +17934,13 @@ function _collectPrintSpecRows(item, itemObj) {
                 rows.push({ id: 'colorDesk', label: 'צבע שולחן עבודה', value: _plainSpecValue(item.colorDesk) });
             }
         }
-        if (item.hasOpenCells) rows.push({ id: 'colorOpenCell', label: 'צבע כוורת', value: _plainSpecValue(item.colorOpenCell) });
+        if (_itemShowsOpenCellColor(item, itemObj)) {
+            rows.push({
+                id: 'colorOpenCell',
+                label: 'צבע כוורת',
+                value: _plainSpecValue(item.colorOpenCell || _openCellColorFromItemObj(itemObj))
+            });
+        }
         const glassTint = itemObj && _resolveGlassTintLabel(itemObj.rawState);
         if (glassTint) rows.push({ id: 'glassTint', label: 'גוון זכוכית', value: glassTint });
         const topPanelColor = itemObj && _resolveTopPanelColorLabel(itemObj.rawState);
@@ -18942,7 +18979,9 @@ function _printFinishesRows(item, itemObj, thStyle, tdStyle, sectionStyle) {
             html += _printTr(thStyle, tdStyle, 'צבע שולחן עבודה', item.colorDesk);
         }
     }
-    if (item.hasOpenCells) html += _printTr(thStyle, tdStyle, 'צבע כוורת', item.colorOpenCell);
+    if (_itemShowsOpenCellColor(item, itemObj)) {
+        html += _printTr(thStyle, tdStyle, 'צבע כוורת', item.colorOpenCell || _openCellColorFromItemObj(itemObj));
+    }
     const glassTint = itemObj && _resolveGlassTintLabel(itemObj.rawState);
     if (glassTint) html += _printTr(thStyle, tdStyle, 'גוון זכוכית', glassTint);
     const topPanelColor = itemObj && _resolveTopPanelColorLabel(itemObj.rawState);
