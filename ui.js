@@ -10901,6 +10901,11 @@ window._applyLoadedJsonProject = function(data, opts) {
     window._currentProjectId   = null;
     window._currentProjectName = null;
     window._isDirty            = false;
+    window._projectCabinetChat = null;
+    window._projectCabinetChatForId = null;
+    if (window.CabinetChat && typeof window.CabinetChat.clearForProjectSwitch === 'function') {
+        try { window.CabinetChat.clearForProjectSwitch(); } catch (e) { /* ignore */ }
+    }
     if (typeof window._syncBrowserTabTitle === 'function') window._syncBrowserTabTitle();
     if (history.replaceState) history.replaceState(null, '', 'index.html');
 
@@ -16112,6 +16117,11 @@ window.newProject = function() {
     state.manualInstallPrice = null;
     window._currentProjectId   = null;
     window._currentProjectName = null;
+    window._projectCabinetChat = null;
+    window._projectCabinetChatForId = null;
+    if (window.CabinetChat && typeof window.CabinetChat.clearForProjectSwitch === 'function') {
+        try { window.CabinetChat.clearForProjectSwitch(); } catch (e) { /* ignore */ }
+    }
     if (typeof window._syncBrowserTabTitle === 'function') window._syncBrowserTabTitle();
     const cabNameInp = document.getElementById('inp-cabinet-name');
     if (cabNameInp) cabNameInp.value = '';

@@ -25,6 +25,8 @@ var STORAGE_PREFIX = 'anycloset:cabinetChat:v1:';
 var MAX_STORED_MSGS = 120;
 var _storageKeyActive = null;
 var _persistTimer = null;
+/** Project id that current HISTORY belongs to ('draft' or uuid). */
+var _chatProjectId = null;
 /** Last lesson saved from a successful apply — used for reject/correct learning. */
 var _lastLessonId = null;
 var _lastLessonRequest = '';
@@ -32,16 +34,26 @@ var _pendingCorrection = false;
 /** Notes from last apply (e.g. drawer count capped by cell height). */
 var _lastApplyNotes = [];
 
+function currentChatProjectId() {
+    return (typeof window !== 'undefined' && window._currentProjectId)
+        ? String(window._currentProjectId)
+        : 'draft';
+}
+
 function storageKey() {
-    var pid = (typeof window !== 'undefined' && window._currentProjectId) ? String(window._currentProjectId) : '';
-    return STORAGE_PREFIX + (pid || 'draft');
+    return STORAGE_PREFIX + currentChatProjectId();
 }
 
 function persistChatNow() {
     try {
+        var pid = currentChatProjectId();
+        // Never write another project's messages into this project's bucket
+        if (_chatProjectId && _chatProjectId !== pid) return;
         var key = storageKey();
         _storageKeyActive = key;
+        _chatProjectId = pid;
         var payload = {
+            projectId: pid,
             history: HISTORY.slice(-MAX_STORED_MSGS),
             session: SESSION,
             expanded: !!(document.getElementById('cabinet-chat') &&
@@ -72,9 +84,13 @@ function renderHistoryToDom() {
     measureAndSetOffset();
 }
 
-function normalizeChatPayload(raw) {
+function normalizeChatPayload(raw, expectProjectId) {
     if (!raw || !Array.isArray(raw.history) || !raw.history.length) return null;
+    var pid = raw.projectId != null ? String(raw.projectId) : null;
+    // Reject chat that belongs to a different project
+    if (expectProjectId && pid && pid !== String(expectProjectId)) return null;
     return {
+        projectId: pid || (expectProjectId ? String(expectProjectId) : null),
         history: raw.history.slice(-MAX_STORED_MSGS).map(function (h) {
             return { role: h.role === 'user' ? 'user' : 'bot', text: String(h.text || '') };
         }).filter(function (h) { return h.text; }),
@@ -85,7 +101,12 @@ function normalizeChatPayload(raw) {
 }
 
 function exportChatState() {
+    var pid = currentChatProjectId();
+    // Only embed chat that actually belongs to the project being saved
+    if (_chatProjectId && _chatProjectId !== pid) return null;
+    if (!HISTORY.length) return null;
     return {
+        projectId: pid,
         history: HISTORY.slice(-MAX_STORED_MSGS),
         session: SESSION,
         expanded: !!(document.getElementById('cabinet-chat') &&
@@ -95,26 +116,45 @@ function exportChatState() {
 }
 
 function importChatState(payload, opts) {
-    var n = normalizeChatPayload(payload);
+    var pid = currentChatProjectId();
+    var n = normalizeChatPayload(payload, pid);
     if (!n || !n.history.length) return false;
     HISTORY = n.history;
     SESSION = n.session;
+    _chatProjectId = pid;
     renderHistoryToDom();
     if (n.expanded || HISTORY.length > 1) setExpanded(true);
     if (!(opts && opts.skipPersist)) persistChatNow();
     return true;
 }
 
+function clearChatMemory() {
+    HISTORY = [];
+    SESSION = null;
+    _chatProjectId = null;
+    renderHistoryToDom();
+}
+
 function restoreChat() {
+    var pid = currentChatProjectId();
     var key = storageKey();
     _storageKeyActive = key;
+
     var local = null;
     try {
-        local = normalizeChatPayload(JSON.parse(localStorage.getItem(key) || 'null'));
+        local = normalizeChatPayload(JSON.parse(localStorage.getItem(key) || 'null'), pid);
     } catch (e) { local = null; }
 
-    // Prefer project-synced chat (other computer) when newer or local empty
-    var fromProject = normalizeChatPayload(window._projectCabinetChat);
+    // Project snap chat — only if loaded for THIS project and stamped with matching projectId
+    // (rejects cross-project leaks saved before projectId tagging)
+    var fromProject = null;
+    if (window._projectCabinetChatForId && String(window._projectCabinetChatForId) === pid) {
+        var rawProj = window._projectCabinetChat;
+        if (rawProj && rawProj.projectId && String(rawProj.projectId) === pid) {
+            fromProject = normalizeChatPayload(rawProj, pid);
+        }
+    }
+
     var restored = local;
     if (fromProject && fromProject.history.length) {
         if (!local || !local.history.length || (fromProject.updatedAt || 0) >= (local.updatedAt || 0)) {
@@ -125,20 +165,21 @@ function restoreChat() {
     if (restored && restored.history.length) {
         HISTORY = restored.history;
         SESSION = restored.session;
+        _chatProjectId = pid;
         renderHistoryToDom();
         if (restored.expanded || HISTORY.length > 1) setExpanded(true);
         persistChatNow();
         return true;
     }
 
-    HISTORY = [];
-    SESSION = null;
-    renderHistoryToDom();
+    clearChatMemory();
+    _storageKeyActive = key;
     return false;
 }
 
 function ensureWelcome() {
     if (HISTORY.length) return;
+    _chatProjectId = currentChatProjectId();
     appendBubble('bot', 'סוכן AI זול שלומד מפרויקטים קודמים — נסו: «ארון רוחב 275 גובה 270 עם תלייה ומדפים»');
 }
 
@@ -146,10 +187,16 @@ function watchProjectChanges() {
     setInterval(function () {
         var key = storageKey();
         if (key === _storageKeyActive) return;
-        // Project switched — flush previous key already saved; load the new one
+        // Project switched — do NOT persist old HISTORY into the new key
+        if (window._projectCabinetChatForId &&
+            String(window._projectCabinetChatForId) !== currentChatProjectId()) {
+            window._projectCabinetChat = null;
+            window._projectCabinetChatForId = null;
+        }
+        clearChatMemory();
         restoreChat();
         ensureWelcome();
-    }, 800);
+    }, 400);
 }
 
 function esc(s) {
@@ -1913,11 +1960,17 @@ window.CabinetChat = {
     importState: importChatState,
     reset: function () { SESSION = null; persistChatNow(); },
     reload: function () { restoreChat(); ensureWelcome(); },
+    clearForProjectSwitch: function () {
+        clearChatMemory();
+        window._projectCabinetChat = null;
+        window._projectCabinetChatForId = null;
+        _storageKeyActive = null;
+        restoreChat();
+        ensureWelcome();
+    },
     clearHistory: function () {
-        HISTORY = [];
-        SESSION = null;
+        clearChatMemory();
         try { localStorage.removeItem(storageKey()); } catch (e) {}
-        renderHistoryToDom();
         ensureWelcome();
     },
     init: init
