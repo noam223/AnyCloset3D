@@ -12074,35 +12074,47 @@ window._setSpaceGroupOpacity = function(g, opacity) {
 };
 
 /**
- * Occluding companion: hide completely (solids + edges). Non-occluding: normal / capture fade.
+ * Occluding companion: hide the whole group (one flag) so Three.js skips the subtree —
+ * no per-mesh traverse, no draw calls, no matrix updates while culled.
  */
 window._setSpaceGroupOccludeHidden = function(g, hide) {
     if (!g) return;
     g.userData = g.userData || {};
     if (g.userData._occludeHidden === !!hide) return;
-    g.userData._occludeHidden = !!hide;
-    g.userData._ghostOpacity = hide ? 0 : g.userData._ghostOpacity;
 
-    g.traverse(function(obj) {
-        if (!obj) return;
-        if (!obj.userData) obj.userData = {};
-        if (obj.userData.spaceCompanion) return;
-        if (!(obj.isMesh || obj.isLine || obj.isLineSegments || obj.isSprite)) return;
-        if (hide) {
-            if (obj.userData._occludeSavedVisible === undefined) {
-                obj.userData._occludeSavedVisible = obj.visible !== false;
-            }
-            obj.visible = false;
-        } else if (obj.userData._occludeSavedVisible !== undefined) {
-            obj.visible = obj.userData._occludeSavedVisible;
-            delete obj.userData._occludeSavedVisible;
+    if (hide) {
+        // Cache world AABB while still visible — used for occlusion tests after cull
+        if (!g.userData._occludeBox) g.userData._occludeBox = new THREE.Box3();
+        g.userData._occludeBox.setFromObject(g);
+        g.userData._occludeWasVisible = g.visible !== false;
+        g.userData._occludePrevMatrixAutoUpdate = g.matrixAutoUpdate;
+        g.userData._occludeHidden = true;
+        g.userData._ghostOpacity = 0;
+        g.visible = false;
+        g.matrixAutoUpdate = false;
+    } else {
+        g.userData._occludeHidden = false;
+        g.visible = g.userData._occludeWasVisible !== false;
+        if (g.userData._occludePrevMatrixAutoUpdate !== undefined) {
+            g.matrixAutoUpdate = g.userData._occludePrevMatrixAutoUpdate;
         }
-    });
+        delete g.userData._occludeWasVisible;
+        delete g.userData._occludePrevMatrixAutoUpdate;
+    }
+};
+
+/** Reused temps — avoid GC churn every render frame. */
+window._occludeTmp = window._occludeTmp || {
+    focusBox: null,
+    focusCenter: null,
+    toFocus: null,
+    hit: null,
+    ray: null
 };
 
 /**
  * Companions that sit between the camera and the focus cabinet (or that the camera is
- * inside / very near) are hidden completely — solids and outlines.
+ * inside / very near) are culled entirely for faster 3D.
  */
 window._OCCLUDE_NEAR_CM = 40;
 window._updateSpaceOcclusionGhosts = function() {
@@ -12113,42 +12125,71 @@ window._updateSpaceOcclusionGhosts = function() {
     if (state.viewMode === 'blueprint') return;
     if (state.viewMode === 'room-plan' && window._roomPlanSubview === '2d') return;
 
+    const T = window._occludeTmp;
+    if (!T.focusBox) {
+        T.focusBox = new THREE.Box3();
+        T.focusCenter = new THREE.Vector3();
+        T.toFocus = new THREE.Vector3();
+        T.hit = new THREE.Vector3();
+        T.ray = new THREE.Ray();
+    }
+
     const camPos = window.camera.position;
-    const focusBox = new THREE.Box3().setFromObject(cabinetGroup);
-    if (focusBox.isEmpty()) return;
-    const focusCenter = focusBox.getCenter(new THREE.Vector3());
-    const toFocus = focusCenter.clone().sub(camPos);
-    const distFocus = toFocus.length();
+    T.focusBox.setFromObject(cabinetGroup);
+    if (T.focusBox.isEmpty()) return;
+    T.focusBox.getCenter(T.focusCenter);
+    T.toFocus.copy(T.focusCenter).sub(camPos);
+    const distFocus = T.toFocus.length();
     if (distFocus < 0.5) return;
-    const dir = toFocus.normalize();
-    const ray = new THREE.Ray(camPos.clone(), dir);
-    const hit = new THREE.Vector3();
+    T.toFocus.multiplyScalar(1 / distFocus);
+    T.ray.origin.copy(camPos);
+    T.ray.direction.copy(T.toFocus);
     const baseOp = (window._spaceCaptureCompanionOpacity != null)
         ? window._spaceCaptureCompanionOpacity
         : 1;
 
-    companions.forEach(function(g) {
-        if (!g || g.visible === false) return;
-        const box = new THREE.Box3().setFromObject(g);
-        if (box.isEmpty()) return;
+    for (let i = 0; i < companions.length; i++) {
+        const g = companions[i];
+        if (!g) continue;
+        // Skip companions hidden for other reasons; keep occlude-culled ones for unhide tests
+        if (g.visible === false && !(g.userData && g.userData._occludeHidden)) continue;
+
+        let box;
+        if (g.userData && g.userData._occludeHidden && g.userData._occludeBox && !g.userData._occludeBox.isEmpty()) {
+            box = g.userData._occludeBox;
+        } else {
+            if (!g.userData) g.userData = {};
+            if (!g.userData._occludeBox) g.userData._occludeBox = new THREE.Box3();
+            g.userData._occludeBox.setFromObject(g);
+            box = g.userData._occludeBox;
+        }
+        if (box.isEmpty()) continue;
+
         let occludes = false;
         const nearDist = box.distanceToPoint(camPos);
         if (nearDist < window._OCCLUDE_NEAR_CM || box.containsPoint(camPos)) {
             occludes = true;
-        } else if (ray.intersectBox(box, hit)) {
-            const dHit = camPos.distanceTo(hit);
-            if (dHit < distFocus - 6) occludes = true;
+        } else if (T.ray.intersectBox(box, T.hit)) {
+            if (camPos.distanceTo(T.hit) < distFocus - 6) occludes = true;
         }
+
         if (occludes) {
             window._setSpaceGroupOccludeHidden(g, true);
-        } else {
-            if (g.userData && g.userData._occludeHidden) {
-                window._setSpaceGroupOccludeHidden(g, false);
-            }
-            if (g.userData && g.userData._occludeHidden === false && g.userData._ghostOpacity === baseOp) return;
+            continue;
+        }
+
+        const wasHidden = !!(g.userData && g.userData._occludeHidden);
+        if (wasHidden) window._setSpaceGroupOccludeHidden(g, false);
+
+        // Only touch materials when opacity actually needs to change (capture fade etc.)
+        const curOp = g.userData ? g.userData._ghostOpacity : undefined;
+        if (wasHidden) {
+            if (baseOp < 0.999) window._setSpaceGroupOpacity(g, baseOp);
+            else g.userData._ghostOpacity = 1;
+        } else if (curOp != null && Math.abs(curOp - baseOp) > 0.001) {
             window._setSpaceGroupOpacity(g, baseOp);
         }
-    });
+    }
 };
 
 // ── Per-cabinet print-camera pose (user can override the default capture angle) ──
