@@ -4739,13 +4739,13 @@ function updateCameraView() {
     const hasAnyWing = leftWing || rightWing;
     const hasCorner = state.corner && state.corner.side !== 'none';
 
-    // Shared-space: front/blueprint frame every part together (not just the active host).
+    // Shared-space: frame every part together (not just the active host).
     // Skip when isolating one unit for edit (mirror corner wing-edit).
+    // Also used in 3d overview — corner+linear spaces must not use single-cabinet corner cams.
     const _spacePairInfo = (typeof window._getSpacePairInfo === 'function')
         ? window._getSpacePairInfo() : null;
     const _spaceCombinedView = (_spacePairInfo && _spacePairInfo.count >= 2
         && !window._spaceIsolateMode
-        && (state.viewMode === 'front' || state.viewMode === 'blueprint')
         && typeof window._computeSpacePairCaptureView === 'function')
         ? window._computeSpacePairCaptureView(_spacePairInfo) : null;
 
@@ -4832,6 +4832,19 @@ function updateCameraView() {
             window._corner3dCamPositioned = true;
             const pid = state.presetId || '';
             let camPos, camTarget;
+            // Multi-cabinet space overview: frame the whole pair AABB (corner L + companions)
+            if (_spaceCombinedView && _spaceCombinedView.camPos && _spaceCombinedView.camTarget) {
+                camPos = new THREE.Vector3(
+                    _spaceCombinedView.camPos[0],
+                    _spaceCombinedView.camPos[1],
+                    _spaceCombinedView.camPos[2]
+                );
+                camTarget = new THREE.Vector3(
+                    _spaceCombinedView.camTarget[0],
+                    _spaceCombinedView.camTarget[1],
+                    _spaceCombinedView.camTarget[2]
+                );
+            } else {
             const _kitL = pid === 'kitchen' && state.wings && state.wings.center && state.wings.center.kitchenCornerL
                 && (state.wings.left || state.wings.right);
             if (_kitL) {
@@ -4856,6 +4869,7 @@ function updateCameraView() {
             } else {
                 camPos    = new THREE.Vector3(-273.30, 268.26, 509.30);
                 camTarget = new THREE.Vector3(85.38, 124.15, 68.29);
+            }
             }
             const oldCamPos2  = camera.position.clone();
             const oldTarget2  = controls.target.clone();
