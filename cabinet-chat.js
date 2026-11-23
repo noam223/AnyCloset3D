@@ -674,23 +674,27 @@ function _findTemplateByIdOrName(ref) {
 }
 
 /**
- * Apply ready-made column templates when the AI (or local matcher) chose them.
- * slots.columnTemplates: array of template id/name per column index
- * Falls back to matching templates by role (hanging/drawers/shelves).
+ * Apply ready-made column templates as a starting point (not a hard lock).
+ * slots.columnTemplates: id/name per column (null = freeform for that column).
+ * Soft auto-match only when AI didn't specify an array at all.
  */
 function applyColumnTemplatesFromSlots(slots) {
     var cols = state.columns || [];
     if (!cols.length) return [];
     var roles = planColumnRoles(slots, cols.length);
     var refs = Array.isArray(slots.columnTemplates) ? slots.columnTemplates : null;
+    var aiChoseList = Array.isArray(slots.columnTemplates);
     var applied = [];
     var drawerOpts = { drawerKind: slots.drawerKind || null, drawerCount: slots.drawerCount || null };
 
     cols.forEach(function (col, i) {
         if (!col) return;
         var tpl = null;
-        if (refs && refs[i]) tpl = _findTemplateByIdOrName(refs[i]);
-        if (!tpl && typeof window._matchColumnTemplateForRole === 'function') {
+        if (aiChoseList) {
+            // Explicit AI pick (or null = leave freeform)
+            if (refs[i]) tpl = _findTemplateByIdOrName(refs[i]);
+        } else if (typeof window._matchColumnTemplateForRole === 'function') {
+            // Soft suggestion only — templates inspire, freeform still fills gaps
             var match = window._matchColumnTemplateForRole(roles[i] || 'shelves', drawerOpts);
             if (match) tpl = _findTemplateByIdOrName(match.id);
         }
@@ -701,6 +705,49 @@ function applyColumnTemplatesFromSlots(slots) {
     return applied;
 }
 
+/** After templates: adapt drawer count/kind and fix roles that don't match the request. */
+function adaptColumnsToRequest(slots, roles) {
+    var cols = state.columns || [];
+    if (!cols.length) return;
+    var drawerCount = slots.drawerCount != null ? slots.drawerCount : null;
+    var drawerKind = slots.drawerKind || null;
+    var wantExt = drawerKind === 'external' ? 'external_drawers' : (drawerKind === 'internal' ? 'internal_drawers' : null);
+
+    cols.forEach(function (col, i) {
+        if (!col || !Array.isArray(col.compartments)) return;
+        var role = (roles && roles[i]) || null;
+
+        // Sync drawer stack to requested count/kind when this is a drawer column
+        var drawerComp = col.compartments.find(function (c) {
+            return c && (c.type === 'external_drawers' || c.type === 'internal_drawers' || c.type === 'shoe_drawers');
+        });
+        if (role === 'drawers' || drawerComp) {
+            if (!drawerComp) {
+                _applyDrawersColumn(col, drawerCount || 3, drawerKind || 'external');
+                return;
+            }
+            if (wantExt) drawerComp.type = wantExt;
+            if (drawerCount != null) drawerComp.count = Math.max(1, Math.min(8, drawerCount));
+        }
+
+        // If role is hanging but template had no hanging — upgrade
+        if (role === 'hanging') {
+            var hasHang = col.compartments.some(function (c) {
+                return c && (c.type === 'hanging' || c.type === 'cross_hanging');
+            });
+            if (!hasHang) _applyHangingWithShelves(col);
+        }
+
+        // If plan says shelves-only but template brought hanging/drawers — rebuild shelves
+        if (role === 'shelves') {
+            var hasSpecial = col.compartments.some(function (c) {
+                return c && c.type && c.type !== 'empty' && c.type !== 'open_cell';
+            });
+            if (hasSpecial) _applyShelvesOnly(col);
+        }
+    });
+}
+
 function applyInteriorPlan(slots) {
     var cols = state.columns || [];
     if (!cols.length) return;
@@ -708,13 +755,12 @@ function applyInteriorPlan(slots) {
     var drawerCount = slots.drawerCount || 3;
     var drawerKind = slots.drawerKind || 'external';
 
-    // Prefer ready-made column templates when available
+    // Templates as inspiration / starting point
     var applied = applyColumnTemplatesFromSlots(slots);
-    if (applied.length >= cols.length) return; // all columns covered by templates
-
     var covered = {};
     applied.forEach(function (a) { covered[a.col] = true; });
 
+    // Freeform for columns without a template
     cols.forEach(function (col, i) {
         if (!col || covered[i]) return;
         var role = roles[i] || 'shelves';
@@ -722,6 +768,9 @@ function applyInteriorPlan(slots) {
         else if (role === 'hanging') _applyHangingWithShelves(col);
         else _applyShelvesOnly(col);
     });
+
+    // Always adapt: drawer counts, kinds, missing hanging, etc.
+    adaptColumnsToRequest(slots, roles);
 }
 
 function applyDoorsForPlan(slots, hasDoors) {

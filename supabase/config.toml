@@ -1,5 +1,6 @@
 # Project is linked via supabase/.temp/linked-project.json (meqxnsjycvfgfhdepguo).
 # The measurer page is public, so this function authenticates with x-ingest-token.
+project_id = "meqxnsjycvfgfhdepguo"
 
 [functions.upload-measurement]
 verify_jwt = false
