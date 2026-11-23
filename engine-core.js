@@ -4777,6 +4777,17 @@ function updateCameraView() {
             fitWidth += 40;
         }
     }
+
+    // Isolate: frame the active unit at its space offset (not scene origin)
+    let _spaceIsoOff = null;
+    let _spaceIsoFront = null;
+    if (window._spaceIsolateMode && _spacePairInfo && typeof window._spaceOffsetForSlot === 'function') {
+        _spaceIsoOff = window._spaceOffsetForSlot(_spacePairInfo.activeSlot) || { x: 0, y: 0, z: 0, rot: 0 };
+        const _isoTh = (_spacePairInfo.activeSlot > 0) ? _spaceRotY(_spaceIsoOff) : 0;
+        _spaceIsoFront = { x: Math.sin(_isoTh), z: Math.cos(_isoTh) };
+        targetX += (_spaceIsoOff.x || 0);
+        targetY += (_spaceIsoOff.y || 0);
+    }
     
     camera.fov = 45;
     camera.updateProjectionMatrix();
@@ -4869,8 +4880,18 @@ function updateCameraView() {
     }
 
     if (state.viewMode === 'front' || state.viewMode === 'blueprint') {
-        const toPosArr = [targetX, targetY, targetDistance];
-        const toTargetArr = [targetX, targetY, 0];
+        let toPosArr = [targetX, targetY, targetDistance];
+        let toTargetArr = [targetX, targetY, 0];
+        // Approach the unit along its local front so rotated / offset slots frame correctly
+        if (_spaceIsoOff && _spaceIsoFront) {
+            const cz = _spaceIsoOff.z || 0;
+            toTargetArr = [targetX, targetY, cz];
+            toPosArr = [
+                targetX + _spaceIsoFront.x * targetDistance,
+                targetY,
+                cz + _spaceIsoFront.z * targetDistance
+            ];
+        }
         controls.enableRotate = (state.viewMode === 'front'); container.classList.add('front-mode');
         dirLight.position.set(120, 510, 600);
         
@@ -4915,8 +4936,17 @@ function updateCameraView() {
     } else {
         // 3D mode — only reset camera if user hasn't manually orbited
         if (!window._orbitFree) {
-            camera.position.set(targetX + targetDistance * 0.6, maxColH * 0.8, targetDistance * 0.8);
-            controls.target.set(targetX, maxColH / 2, 0);
+            const _isoCz = (_spaceIsoOff && _spaceIsoOff.z) || 0;
+            if (_spaceIsoFront) {
+                camera.position.set(
+                    targetX + _spaceIsoFront.x * targetDistance * 0.8 + _spaceIsoFront.z * targetDistance * 0.6,
+                    maxColH * 0.8 + ((_spaceIsoOff && _spaceIsoOff.y) || 0),
+                    _isoCz + _spaceIsoFront.z * targetDistance * 0.8 - _spaceIsoFront.x * targetDistance * 0.6
+                );
+            } else {
+                camera.position.set(targetX + targetDistance * 0.6, maxColH * 0.8, targetDistance * 0.8);
+            }
+            controls.target.set(targetX, maxColH / 2 + ((_spaceIsoOff && _spaceIsoOff.y) || 0), _isoCz);
         }
         controls.enableRotate = true;
         scene.background = new THREE.Color(0xeceff1);
@@ -6033,11 +6063,12 @@ window._clearSpaceCompanion = function() {
     window._spaceCompanionHit = null;
     window._spaceCompanionDoorMeshes = [];
     const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
-    if (cabinetGroup && (!info || info.activeSlot === 0 || window._spaceIsolateMode)) {
+    // Never snap the host to origin while isolating — camera must fly to the unit's space pose.
+    if (cabinetGroup && (!info || info.activeSlot === 0) && !window._spaceIsolateMode) {
         cabinetGroup.position.y = 0;
         cabinetGroup.position.z = 0;
         cabinetGroup.rotation.y = 0;
-        if (info && (info.activeSlot === 0 || window._spaceIsolateMode)) cabinetGroup.position.x = 0;
+        if (info && info.activeSlot === 0) cabinetGroup.position.x = 0;
     }
 };
 
@@ -6140,7 +6171,7 @@ window._isSpaceBlueprintFrontOnly = function() {
 
 window._applySpacePairPositions = function() {
     const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
-    if (!info || window._spaceIsolateMode) {
+    if (!info) {
         if (cabinetGroup) { cabinetGroup.position.set(0, 0, 0); cabinetGroup.rotation.y = 0; }
         return;
     }
@@ -6149,12 +6180,15 @@ window._applySpacePairPositions = function() {
     const activeOff = (typeof window._spaceOffsetForSlot === 'function')
         ? window._spaceOffsetForSlot(info.activeSlot)
         : { x: 0, y: 0 };
+    // Isolate keeps the unit at its space pose so the camera flies TO that unit
+    // (not to origin / ארון 1). Companions stay cleared separately.
     if (cabinetGroup) {
         cabinetGroup.position.x = activeOff.x;
         cabinetGroup.position.y = activeOff.y;
         cabinetGroup.position.z = flattenZ ? 0 : (activeOff.z || 0);
         cabinetGroup.rotation.y = flattenZ ? 0 : (info.activeSlot > 0 ? _spaceRotY(activeOff) : 0);
     }
+    if (window._spaceIsolateMode) return;
     const groups = window._spaceCompanionGroups || [];
     groups.forEach(function(g) {
         if (!g || g.userData.spaceSlot == null) return;
@@ -6182,9 +6216,8 @@ window._rebuildSpaceCompanion = function() {
     // Isolate mode (like wing-edit): hide every other space unit.
     if (!info || window._spaceIsolateMode) {
         window._clearSpaceCompanion();
-        if (window._spaceIsolateMode && cabinetGroup) {
-            cabinetGroup.position.set(0, 0, 0);
-            cabinetGroup.rotation.y = 0;
+        if (window._spaceIsolateMode && typeof window._applySpacePairPositions === 'function') {
+            window._applySpacePairPositions();
         }
         return;
     }
