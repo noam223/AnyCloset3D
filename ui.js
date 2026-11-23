@@ -12464,7 +12464,8 @@ window.openOrderModal = async function(mode, opts) {
     }
 
     if (!opts.skipMediaRefresh) {
-        if (mode === 'customer' && (window._blockIfCustomerDetailsMissing() || window._blockIfHandlesMissing())) return;
+        if (mode === 'customer' && window._blockIfCustomerDetailsMissing()) return;
+        if (mode === 'customer' && (await window._blockIfHandlesMissing())) return;
         if (!(await window._confirmOrderClosing())) return;
     }
 
@@ -14959,13 +14960,94 @@ window._listenOrderSignatures = async function() {
 };
 setTimeout(function() { if (window._listenOrderSignatures) window._listenOrderSignatures(); }, 4000);
 
-/** Customer order cannot print while a cabinet has no handle chosen. */
-window._blockIfHandlesMissing = function() {
+/** Apply a handle style to every cart wing that still needs a choice (and sync the open cabinet). */
+window._applyHandleStyleToMissingCabinets = function(style) {
+    if (style !== 'riding' && style !== 'touch' && style !== 'pipe') return 0;
+    let n = 0;
+    (state.orderCart || []).forEach(function(it) {
+        if (!it || window._cartItemOnHold(it) || !it.rawState || !it.rawState.wings) return;
+        const rs = it.rawState;
+        Object.keys(rs.wings).forEach(function(k) {
+            const w = rs.wings[k];
+            if (!_wingNeedsHandleChoice(w, rs)) return;
+            if (rs.presetId === 'corner-unit' && w.corner && w.corner.type === 'desk' && (w.corner.deskDrawerCount || 0) > 0) {
+                w.corner.deskHandleStyle = style;
+            } else {
+                w.handleStyle = style;
+            }
+            if (rs.handleStyle === 'none' || rs.handleStyle == null) rs.handleStyle = style;
+            n++;
+        });
+    });
+    // Sync currently open cabinet if it was still on "none"
+    try {
+        const cur = typeof getWing === 'function' ? getWing() : (state.wings && state.wings[state.activeWing]);
+        if (cur && _wingNeedsHandleChoice(cur, state) && typeof window.updateHandleStyle === 'function') {
+            window.updateHandleStyle(style);
+        } else if (cur && cur.handleStyle === 'none' && style) {
+            cur.handleStyle = style;
+            state.handleStyle = style;
+        }
+    } catch (e) { /* ignore sync errors */ }
+    if (typeof updateLeftSidebar === 'function') updateLeftSidebar();
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+    return n;
+};
+
+/** Popup: pick one handle style for all cabinets still missing a choice. Resolves to style or null. */
+window._pickMissingHandlesPopup = function(names) {
+    return new Promise(function(resolve) {
+        const esc = function(s) { return String(s).replace(/[&<>"]/g, function(ch) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]; }); };
+        const overlay = document.createElement('div');
+        overlay.className = 'order-confirm-overlay';
+        overlay.innerHTML =
+            '<div class="order-confirm-box" role="dialog" aria-modal="true" dir="rtl" style="width:min(480px,100%)">' +
+                '<div class="order-confirm-title"><i class="fa-solid fa-hand"></i> חסרות ידיות לפני הזמנת לקוח</div>' +
+                '<p style="margin:0 0 10px;font-size:0.9rem;color:#57534e;line-height:1.45">בארונות הבאים עדיין מסומן «ללא». בחרו סוג ידית אחד — יוחל על כולם, ואפשר לשנות אחרי כן לכל ארון בנפרד:</p>' +
+                '<ul class="order-confirm-list">' + names.map(function(n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul>' +
+                '<div class="order-confirm-actions" style="flex-wrap:wrap">' +
+                    '<button type="button" class="order-confirm-ok" data-style="touch">טאצ\' לכולם</button>' +
+                    '<button type="button" class="order-confirm-ok" data-style="riding" style="background:#44403c">רוכבת לכולם</button>' +
+                    '<button type="button" class="order-confirm-ok" data-style="pipe" style="background:#57534e">חיצונית לכולם</button>' +
+                    '<button type="button" class="order-confirm-cancel" style="flex-basis:100%">ביטול</button>' +
+                '</div>' +
+            '</div>';
+        const done = function(style) {
+            document.removeEventListener('keydown', onKey, true);
+            overlay.remove();
+            resolve(style || null);
+        };
+        const onKey = function(e) {
+            if (e.key === 'Escape') { e.preventDefault(); done(null); }
+        };
+        overlay.addEventListener('click', function(e) { if (e.target === overlay) done(null); });
+        overlay.querySelectorAll('[data-style]').forEach(function(btn) {
+            btn.addEventListener('click', function() { done(btn.getAttribute('data-style')); });
+        });
+        overlay.querySelector('.order-confirm-cancel').addEventListener('click', function() { done(null); });
+        document.addEventListener('keydown', onKey, true);
+        document.body.appendChild(overlay);
+        const first = overlay.querySelector('[data-style]');
+        if (first) first.focus();
+    });
+};
+
+/** Customer order cannot print while a cabinet has no handle chosen. Returns true = stay blocked. */
+window._blockIfHandlesMissing = async function() {
     const names = window._cabinetsMissingHandles();
     if (!names.length) return false;
-    alert('לא נבחרו ידיות בארונות הבאים:\n\n• ' + names.join('\n• ') +
-        '\n\nיש לבחור סוג ידית (הגדרות ארון ← סוג ידית / פרזול) לפני הדפסת הזמנת לקוח.');
-    return true;
+    const style = await window._pickMissingHandlesPopup(names);
+    if (!style) return true;
+    const n = window._applyHandleStyleToMissingCabinets(style);
+    if (typeof _showToast === 'function') {
+        _showToast('✓ הוחלה ידית על ' + n + ' ארונות — ממשיכים להזמנה…', 3500);
+    }
+    // Re-check in case something still needs a per-cabinet choice (e.g. corner desk)
+    if (window._cabinetsMissingHandles().length) {
+        alert('עדיין חסרות ידיות בחלק מהארונות. בחרו ידית בהגדרות הארון ואז נסו שוב.');
+        return true;
+    }
+    return false;
 };
 
 window._setCartItemHold = function(item, held) {
