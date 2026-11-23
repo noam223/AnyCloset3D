@@ -461,6 +461,11 @@
                     }
                     if (typeof window._restorePresetUI === 'function') window._restorePresetUI();
                     if (typeof updateLeftSidebar === 'function') updateLeftSidebar();
+                    // Restore cabinet-chat history synced from this project (other devices)
+                    window._projectCabinetChat = snap.cabinetChat || null;
+                    if (window.CabinetChat && typeof window.CabinetChat.reload === 'function') {
+                        try { window.CabinetChat.reload(); } catch (eChat) { console.warn('[Load] cabinet chat:', eChat); }
+                    }
                     saveHistoryState();
                     // Continue the project's saved undo history; otherwise start fresh from the loaded state
                     var _hasSavedHistory = !_thumbOnly && typeof window._loadPersistedUndoHistory === 'function' &&
@@ -677,7 +682,11 @@
             blueprintColWidthDimsDefault: state.blueprintColWidthDimsDefault !== false,
             blueprintColWidthDimShown: state.blueprintColWidthDimShown || {},
             blueprintHeightDimsDefault: state.blueprintHeightDimsDefault !== false,
-            partColors:                state.partColors || {}
+            partColors:                state.partColors || {},
+            // Cross-device cabinet chat transcript (synced with project save)
+            cabinetChat: (window.CabinetChat && typeof window.CabinetChat.exportState === 'function')
+                ? window.CabinetChat.exportState()
+                : (window._projectCabinetChat || null)
         }));
     }
     window._lightCartSpecForSave = _lightCartSpecForSave;

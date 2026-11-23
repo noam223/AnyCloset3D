@@ -29,6 +29,8 @@ var _persistTimer = null;
 var _lastLessonId = null;
 var _lastLessonRequest = '';
 var _pendingCorrection = false;
+/** Notes from last apply (e.g. drawer count capped by cell height). */
+var _lastApplyNotes = [];
 
 function storageKey() {
     var pid = (typeof window !== 'undefined' && window._currentProjectId) ? String(window._currentProjectId) : '';
@@ -70,21 +72,62 @@ function renderHistoryToDom() {
     measureAndSetOffset();
 }
 
+function normalizeChatPayload(raw) {
+    if (!raw || !Array.isArray(raw.history) || !raw.history.length) return null;
+    return {
+        history: raw.history.slice(-MAX_STORED_MSGS).map(function (h) {
+            return { role: h.role === 'user' ? 'user' : 'bot', text: String(h.text || '') };
+        }).filter(function (h) { return h.text; }),
+        session: raw.session && typeof raw.session === 'object' ? raw.session : null,
+        expanded: !!raw.expanded,
+        updatedAt: Number(raw.updatedAt) || 0
+    };
+}
+
+function exportChatState() {
+    return {
+        history: HISTORY.slice(-MAX_STORED_MSGS),
+        session: SESSION,
+        expanded: !!(document.getElementById('cabinet-chat') &&
+            document.getElementById('cabinet-chat').classList.contains('expanded')),
+        updatedAt: Date.now()
+    };
+}
+
+function importChatState(payload, opts) {
+    var n = normalizeChatPayload(payload);
+    if (!n || !n.history.length) return false;
+    HISTORY = n.history;
+    SESSION = n.session;
+    renderHistoryToDom();
+    if (n.expanded || HISTORY.length > 1) setExpanded(true);
+    if (!(opts && opts.skipPersist)) persistChatNow();
+    return true;
+}
+
 function restoreChat() {
     var key = storageKey();
     _storageKeyActive = key;
-    var restored = null;
+    var local = null;
     try {
-        restored = JSON.parse(localStorage.getItem(key) || 'null');
-    } catch (e) { restored = null; }
+        local = normalizeChatPayload(JSON.parse(localStorage.getItem(key) || 'null'));
+    } catch (e) { local = null; }
 
-    if (restored && Array.isArray(restored.history) && restored.history.length) {
-        HISTORY = restored.history.slice(-MAX_STORED_MSGS).map(function (h) {
-            return { role: h.role === 'user' ? 'user' : 'bot', text: String(h.text || '') };
-        }).filter(function (h) { return h.text; });
-        SESSION = restored.session && typeof restored.session === 'object' ? restored.session : null;
+    // Prefer project-synced chat (other computer) when newer or local empty
+    var fromProject = normalizeChatPayload(window._projectCabinetChat);
+    var restored = local;
+    if (fromProject && fromProject.history.length) {
+        if (!local || !local.history.length || (fromProject.updatedAt || 0) >= (local.updatedAt || 0)) {
+            restored = fromProject;
+        }
+    }
+
+    if (restored && restored.history.length) {
+        HISTORY = restored.history;
+        SESSION = restored.session;
         renderHistoryToDom();
         if (restored.expanded || HISTORY.length > 1) setExpanded(true);
+        persistChatNow();
         return true;
     }
 
@@ -704,6 +747,7 @@ function applyAiResult(data) {
     if (SESSION && SESSION.slots) actions = mergeSlots(SESSION.slots, actions);
     SESSION = null;
 
+    _lastApplyNotes = [];
     var msg;
     if (intent === 'walkin' || intent === 'create_walkin') {
         msg = applyWalkin(actions);
@@ -730,6 +774,7 @@ function applyAiResult(data) {
         msg = applyCreateLinear(actions);
         if (data.reply) msg = data.reply;
     }
+    msg = (msg || '') + takeApplyNotesSuffix();
     return { reply: msg, done: true, learnActions: actions, learnIntent: intent };
 }
 
@@ -867,23 +912,140 @@ function _applyShelvesOnly(col) {
     });
 }
 
-/** Drawers in bottom cell + shelves above. */
+/**
+ * Size bottom cell so N drawers fit (same rules as the editor UI).
+ * External: 1→5cm min, stack 12+(n-1)*12; Internal: 22+(n-1)*20.
+ */
+function _sizeBottomCellForDrawers(col, neededH) {
+    if (!col) return 0;
+    var t = (typeof state !== 'undefined' && state.thickness) ? state.thickness : 1.8;
+    var plinth = (typeof state !== 'undefined' && state.plinthHeight) ? state.plinthHeight : 10;
+    var fo = col.floorOffset || 0;
+    var startY = fo > 0 ? fo + t
+        : (col.noPlinth ? t : ((col.type === 'desk') ? ((col.deskHeight || 0) + (col.deskClearance || 0) + t) : plinth + t));
+    var shelfT = (typeof window._shelfThicknessCm === 'function') ? window._shelfThicknessCm(t) : t;
+    var topInner = (col.height || (typeof state !== 'undefined' ? state.globalHeight : 240) || 240) - t;
+    var avail = Math.max(0, topInner - startY);
+    if (avail < 20) return 0;
+
+    // Leave room above for hanging/shelves; still try to honor neededH
+    var reserveAbove = Math.min(80, Math.max(30, avail * 0.35));
+    var bottomH = Math.min(Math.max(neededH, 24), Math.max(neededH, avail - reserveAbove));
+    if (bottomH > avail - 20) bottomH = Math.max(neededH, avail - 20);
+    bottomH = Math.min(bottomH, avail - 15);
+
+    var y1 = Math.round((startY + bottomH + shelfT / 2) * 10) / 10;
+    var aboveBottom = y1 + shelfT / 2;
+    var aboveH = Math.max(0, topInner - aboveBottom);
+    var y2 = Math.round((aboveBottom + aboveH / 2) * 10) / 10;
+    if (y2 <= y1 + 2) y2 = Math.round((y1 + Math.max(12, aboveH * 0.5)) * 10) / 10;
+
+    col.shelves = 2;
+    col.shelvesY = [y1, y2].filter(function (y) { return y > startY && y < topInner; });
+    if (col.shelvesY.length < 1) {
+        col.shelves = 1;
+        col.shelvesY = [y1];
+    }
+    col.shelves = col.shelvesY.length;
+    if (typeof _syncCompartmentCount === 'function') {
+        _syncCompartmentCount(col, typeof _columnBaseY === 'function' ? _columnBaseY(col, null) : plinth, t);
+    } else if (typeof distributeShelves === 'function') {
+        // fallback — keep our shelvesY by re-applying after distribute
+        var keep = col.shelvesY.slice();
+        distributeShelves(col);
+        col.shelvesY = keep;
+        col.shelves = keep.length;
+        if (typeof _syncCompartmentCount === 'function') {
+            _syncCompartmentCount(col, typeof _columnBaseY === 'function' ? _columnBaseY(col, null) : plinth, t);
+        }
+    }
+    return bottomH;
+}
+
+function _cellHForRow(col, row) {
+    if (typeof window._compartmentBounds === 'function') {
+        return Math.round(window._compartmentBounds(col, row).h * 100) / 100;
+    }
+    if (typeof window._cellHeight === 'function') return window._cellHeight(col, row);
+    return 0;
+}
+
+function _clampDrawerCountToCell(cellH, type, requested) {
+    var want = Math.max(1, Math.min(8, requested || 1));
+    var maxC = (typeof window.calcMaxDrawerCount === 'function')
+        ? window.calcMaxDrawerCount(cellH, type) : want;
+    var minC = (typeof window.calcMinDrawerCount === 'function')
+        ? window.calcMinDrawerCount(cellH, type) : (cellH >= 12 ? 1 : 0);
+    if (minC < 1 || maxC < 1) return { count: 0, max: 0, need: (typeof window.minHeightForDrawerCount === 'function') ? window.minHeightForDrawerCount(want, type) : want * 12 };
+    var applied = Math.max(minC, Math.min(want, maxC, 8));
+    return {
+        count: applied,
+        max: maxC,
+        need: (typeof window.minHeightForDrawerCount === 'function') ? window.minHeightForDrawerCount(want, type) : null,
+        capped: applied < want
+    };
+}
+
+/** Drawers in bottom cell + shelves above — sized & capped by real height rules. */
 function _applyDrawersColumn(col, count, kind) {
     count = Math.max(1, Math.min(8, count || 3));
     kind = kind === 'internal' ? 'internal_drawers' : 'external_drawers';
-    _ensureShelves(col, 2); // room above drawers for shelves
+    var needH = (typeof window.minHeightForDrawerCount === 'function')
+        ? window.minHeightForDrawerCount(count, kind)
+        : (kind === 'external_drawers' ? (count === 1 ? 5 : 12 + 12 * (count - 1)) : (22 + 20 * (count - 1)));
+
+    _sizeBottomCellForDrawers(col, needH);
     var comps = col.compartments || [];
-    if (!comps.length) return;
+    if (!comps.length) {
+        _ensureShelves(col, 2);
+        comps = col.compartments || [];
+    }
+    var cellH = _cellHForRow(col, 0);
+    var fit = _clampDrawerCountToCell(cellH, kind, count);
+    if (fit.capped || fit.count < 1) {
+        _lastApplyNotes.push(
+            fit.count < 1
+                ? ('לא ניתן לשים ' + count + ' מגירות — נדרש גובה תא של לפחות ' + (fit.need || '?') + ' ס״מ')
+                : ('ביקשת ' + count + ' מגירות; בגובה התא (' + Math.round(cellH) + ' ס״מ) אפשר עד ' + fit.max + ' — התאמתי ל־' + fit.count)
+        );
+    }
     for (var r = 0; r < comps.length; r++) {
         comps[r] = comps[r] || { type: 'empty' };
         _clearCompExtras(comps[r]);
-        if (r === 0) {
+        if (r === 0 && fit.count >= 1) {
             comps[r].type = kind;
-            comps[r].count = count;
+            comps[r].count = fit.count;
         } else {
             comps[r].type = 'empty';
         }
     }
+}
+
+/** Final safety pass — same clamp the shelf editor uses. */
+function clampDrawersAfterApply() {
+    (state.columns || []).forEach(function (col) {
+        if (!col) return;
+        if (typeof window._clampDrawerCompartments === 'function') {
+            var t = state.thickness || 1.8;
+            var baseY = (typeof _columnBaseY === 'function') ? _columnBaseY(col, null) : (state.plinthHeight || 10);
+            window._clampDrawerCompartments(col, baseY, t);
+            return;
+        }
+        (col.compartments || []).forEach(function (comp, r) {
+            if (!comp || !(comp.type === 'external_drawers' || comp.type === 'internal_drawers' || comp.type === 'shoe_drawers')) return;
+            var cellH = _cellHForRow(col, r);
+            var fit = _clampDrawerCountToCell(cellH, comp.type, comp.count || 1);
+            if (fit.count < 1) {
+                comp.type = 'empty';
+                delete comp.count;
+            } else if (fit.capped) {
+                if (fit.capped) {
+                    _lastApplyNotes.push('התאמתי מגירות ל־' + fit.count + ' לפי גובה התא (' + Math.round(cellH) + ' ס״מ)');
+                }
+                comp.count = fit.count;
+            }
+        });
+    });
 }
 
 /**
@@ -990,7 +1152,20 @@ function adaptColumnsToRequest(slots, roles) {
                 return;
             }
             if (wantExt) drawerComp.type = wantExt;
-            if (drawerCount != null) drawerComp.count = Math.max(1, Math.min(8, drawerCount));
+            if (drawerCount != null || drawerComp.count) {
+                var idx = col.compartments.indexOf(drawerComp);
+                var cellH = _cellHForRow(col, idx >= 0 ? idx : 0);
+                var fit = _clampDrawerCountToCell(cellH, drawerComp.type, drawerCount != null ? drawerCount : drawerComp.count);
+                if (fit.count < 1) {
+                    drawerComp.type = 'empty';
+                    delete drawerComp.count;
+                } else {
+                    if (fit.capped) {
+                        _lastApplyNotes.push('ביקשת ' + (drawerCount || drawerComp.count) + ' מגירות; לפי גובה התא אפשר עד ' + fit.max + ' — שמתי ' + fit.count);
+                    }
+                    drawerComp.count = fit.count;
+                }
+            }
         }
 
         // If role is hanging but template had no hanging — upgrade
@@ -1076,11 +1251,19 @@ function applyFrontStyles(slots) {
 }
 
 function finishApply() {
+    clampDrawersAfterApply();
     if (typeof syncSidebarToWing === 'function') syncSidebarToWing();
     if (typeof buildCabinet === 'function') buildCabinet();
     if (typeof updateCameraView === 'function') updateCameraView();
     if (typeof calculatePrice === 'function') calculatePrice();
     if (typeof saveHistoryState === 'function') saveHistoryState();
+}
+
+function takeApplyNotesSuffix() {
+    if (!_lastApplyNotes.length) return '';
+    var note = '\n⚠️ ' + _lastApplyNotes.join('\n⚠️ ');
+    _lastApplyNotes = [];
+    return note;
 }
 
 function resolveColumnCount(slots, width) {
@@ -1154,7 +1337,7 @@ function applyCreateLinear(slots) {
         hanging: hangCols > 0, hangingColumns: hangCols || null,
         shelves: shelfCols > 0, restShelves: shelfCols > 0,
         drawers: slots.drawers, drawerCount: slots.drawerCount, drawerKind: slots.drawerKind
-    });
+    }) + takeApplyNotesSuffix();
 }
 
 /** Create several independent cart cabinets in the project (orderCart). */
@@ -1624,6 +1807,8 @@ window.CabinetChat = {
     parseSlots: parseSlots,
     askAI: askCabinetAI,
     applyAi: applyAiResult,
+    exportState: exportChatState,
+    importState: importChatState,
     reset: function () { SESSION = null; persistChatNow(); },
     reload: function () { restoreChat(); ensureWelcome(); },
     clearHistory: function () {
