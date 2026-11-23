@@ -4907,6 +4907,7 @@ function _applyColumnCountChange(newCount, side, skipSave) {
     if (typeof calculatePrice === 'function') calculatePrice();
     if (typeof saveHistoryState === 'function') saveHistoryState();
 }
+window._applyColumnCountChange = _applyColumnCountChange;
 
 function _closeColumnSideDialog() {
     const el = document.getElementById('_col-side-dialog');
