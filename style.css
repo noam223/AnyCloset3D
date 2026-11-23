@@ -3122,7 +3122,7 @@ body.dragging-v { cursor: ns-resize !important; }
 .qe-checkbox-row { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; font-weight: 500; color: var(--text-mid); cursor: pointer; white-space: nowrap; }
 .qe-checkbox-row input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-color: var(--secondary); }
 
-/* Column tools: select-all + templates in one capsule */
+/* Column tools: select-all + templates in one capsule (keep distinct colors) */
 .col-tools-capsule {
     position: absolute;
     display: inline-flex;
@@ -3131,7 +3131,7 @@ body.dragging-v { cursor: ns-resize !important; }
     height: 30px;
     border-radius: 999px;
     overflow: hidden;
-    background: rgba(59, 130, 246, 0.92);
+    background: transparent;
     border: 2px solid #fff;
     box-shadow: 0 2px 10px rgba(15, 23, 42, 0.22);
     transform: translate(-50%, -50%);
@@ -3143,15 +3143,13 @@ body.dragging-v { cursor: ns-resize !important; }
     transform: translate(-50%, -50%) scale(1.06);
     box-shadow: 0 3px 14px rgba(15, 23, 42, 0.28);
 }
-.col-tools-capsule.all-selected {
-    background: rgba(16, 185, 129, 0.92);
-}
 .col-tools-capsule-sep {
     width: 1px;
     align-self: stretch;
-    margin: 5px 0;
-    background: rgba(255, 255, 255, 0.45);
+    margin: 0;
+    background: rgba(255, 255, 255, 0.85);
     flex: 0 0 1px;
+    z-index: 1;
 }
 .col-tools-capsule .select-all-col-btn,
 .col-tools-capsule .col-template-btn {
@@ -3163,7 +3161,6 @@ body.dragging-v { cursor: ns-resize !important; }
     padding: 0;
     border: none;
     border-radius: 0;
-    background: transparent;
     color: #fff;
     display: inline-flex;
     align-items: center;
@@ -3173,19 +3170,34 @@ body.dragging-v { cursor: ns-resize !important; }
     box-shadow: none;
     transform: none;
     z-index: auto;
-    transition: background 0.15s;
+    transition: filter 0.15s, background 0.15s;
     pointer-events: auto;
     appearance: none;
     -webkit-appearance: none;
 }
-.col-tools-capsule .select-all-col-btn:hover,
-.col-tools-capsule .col-template-btn:hover {
-    background: rgba(255, 255, 255, 0.18);
+.col-tools-capsule .select-all-col-btn {
+    background: rgba(59, 130, 246, 0.92);
+}
+.col-tools-capsule .select-all-col-btn:hover {
+    background: rgba(37, 99, 235, 0.98);
     transform: none;
     box-shadow: none;
 }
-.col-tools-capsule .select-all-col-btn.all-selected {
-    background: transparent;
+.col-tools-capsule .select-all-col-btn.all-selected,
+.col-tools-capsule.all-selected .select-all-col-btn {
+    background: rgba(16, 185, 129, 0.92);
+}
+.col-tools-capsule .select-all-col-btn.all-selected:hover,
+.col-tools-capsule.all-selected .select-all-col-btn:hover {
+    background: rgba(5, 150, 105, 0.98);
+}
+.col-tools-capsule .col-template-btn {
+    background: linear-gradient(135deg, #8b5cf6, #6366f1);
+}
+.col-tools-capsule .col-template-btn:hover {
+    filter: brightness(1.08);
+    transform: none;
+    box-shadow: none;
 }
 
 /* Kitchen free-end add (+) */
