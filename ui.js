@@ -10637,14 +10637,6 @@ function bindUI() {
             if (!hitOnUuCell && uuIntersects.length === 0) {
                 _pointerDownOnDeadSpace = true;
             }
-        } else if (window._spaceIsolateMode && !state.wingEditMode) {
-            // Space unit isolate: dead space = outside the active cabinet hit boxes
-            const hitIntersects = raycaster.intersectObjects(hitBoxes);
-            if (hitIntersects.length === 0) {
-                _pointerDownOnDeadSpace = true;
-            }
-        }
-
         // Corner desk click — change drawer handle style
         const deskDownHits = (window.deskHitBoxes && window.deskHitBoxes.length > 0)
             ? raycaster.intersectObjects(window.deskHitBoxes) : [];
@@ -10734,15 +10726,6 @@ function bindUI() {
             const hitIntersects = raycaster.intersectObjects(hitBoxes);
             if (hitIntersects.length === 0) {
                 exitWingEditMode();
-                return;
-            }
-        }
-
-        // Space unit isolate: click on dead space → back to shared-space overview
-        if (window._spaceIsolateMode && !state.wingEditMode && _pointerDownOnDeadSpace) {
-            const hitIntersects = raycaster.intersectObjects(hitBoxes);
-            if (hitIntersects.length === 0 && typeof window.exitSpaceIsolateMode === 'function') {
-                window.exitSpaceIsolateMode();
                 return;
             }
         }
@@ -14879,27 +14862,49 @@ window._showSpaceIsolateBanner = function(show) {
         // Don't hide if classic wing-edit is still active
         if (state.wingEditMode) return;
         banner.style.display = 'none';
+        banner.style.padding = '';
+        banner.style.gap = '';
+        banner.style.bottom = '';
         return;
     }
     banner.style.display = 'flex';
+    banner.style.padding = '12px 22px';
+    banner.style.gap = '16px';
+    banner.style.bottom = '28px';
     const bannerLabel = banner.querySelector('span');
     if (bannerLabel) {
+        bannerLabel.style.fontSize = '0.95rem';
         bannerLabel.innerHTML = '<i class="fa-solid fa-pen-to-square" style="margin-left:6px;color:#7eb8f7;"></i>מצב עריכת יחידה במרחב';
     }
     const btn = banner.querySelector('button');
     if (btn) {
         btn.setAttribute('onclick', 'exitSpaceIsolateMode()');
         btn.innerHTML = '<i class="fa-solid fa-arrow-right"></i> חזור למרחב';
+        btn.style.padding = '12px 28px';
+        btn.style.fontSize = '1rem';
+        btn.style.borderRadius = '12px';
+        btn.style.boxShadow = '0 4px 18px rgba(37,99,235,0.45)';
+        btn.style.gap = '10px';
     }
 };
 
 window._restoreWingEditBannerHandlers = function() {
     const banner = document.getElementById('wing-edit-banner');
     if (!banner) return;
+    banner.style.padding = '';
+    banner.style.gap = '';
+    banner.style.bottom = '';
+    const bannerLabel = banner.querySelector('span');
+    if (bannerLabel) bannerLabel.style.fontSize = '';
     const btn = banner.querySelector('button');
     if (btn) {
         btn.setAttribute('onclick', 'exitWingEditMode()');
         btn.innerHTML = '<i class="fa-solid fa-arrow-right"></i> חזור למצב חופשי';
+        btn.style.padding = '';
+        btn.style.fontSize = '';
+        btn.style.borderRadius = '';
+        btn.style.boxShadow = '';
+        btn.style.gap = '';
     }
 };
 
