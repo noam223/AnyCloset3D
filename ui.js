@@ -13879,12 +13879,60 @@ window._suggestNextSpaceOffset = function(newWidth) {
             const off = window._spaceOffsetForSlot(m.slot);
             maxRight = Math.max(maxRight, off.x + (fp.cx || 0) + fp.w / 2);
         });
+    } else if (state.wings && (state.wings.left || state.wings.right ||
+        (state.wings.center && state.wings.center.kitchenCornerL)) &&
+        typeof window._spaceCabinetPlanRects === 'function') {
+        // Pre-pair corner / walk-in / kitchen L — use full plan AABB, not center.width
+        const rects = window._spaceCabinetPlanRects(state.wings);
+        let x1 = -Infinity;
+        rects.forEach(function(r) { x1 = Math.max(x1, r[1]); });
+        maxRight = Number.isFinite(x1) ? x1 : (Math.round(state.width || 160) / 2);
     } else {
-        const w0 = Math.round(state.width || 160);
-        maxRight = w0 / 2;
+        maxRight = Math.round(state.width || 160) / 2;
     }
     const nw = Math.round(newWidth || 160);
     return { x: Math.round(maxRight + nw / 2 + 10), y: 0, z: 0 };
+};
+
+/** Corner / walk-in / kitchen-L need a real 3D overview — front view collapses the L into a mess. */
+window._rawStateNeeds3dView = function(rs) {
+    if (!rs) return false;
+    const pid = rs.presetId || 'linear';
+    if (pid === 'corner-left' || pid === 'corner-right' || pid === 'walkin') return true;
+    if (pid !== 'kitchen') return false;
+    const w = rs.wings || {};
+    return !!(
+        (w.left && w.left.kitchenCornerL) ||
+        (w.right && w.right.kitchenCornerL) ||
+        (w.center && w.center.kitchenCornerL && (w.left || w.right))
+    );
+};
+
+window._spacePairNeeds3dView = function(info) {
+    info = info || ((typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null);
+    if (window._spaceIsolateMode) {
+        return window._rawStateNeeds3dView({ presetId: state.presetId, wings: state.wings });
+    }
+    if (!info || !info.members || !info.members.length) {
+        return window._rawStateNeeds3dView({ presetId: state.presetId, wings: state.wings });
+    }
+    for (let i = 0; i < info.members.length; i++) {
+        const it = state.orderCart && state.orderCart[info.members[i].index];
+        if (it && window._rawStateNeeds3dView(it.rawState)) return true;
+    }
+    return false;
+};
+
+/** When overviewing a shared space that includes a corner/L, force 3d so companions stay intact. */
+window._applySpaceOverviewViewMode = function() {
+    if (window._spaceIsolateMode) return;
+    const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
+    if (!info || info.count < 2) return;
+    state.viewMode = window._spacePairNeeds3dView(info) ? '3d' : 'front';
+    window._orbitFree = false;
+    window._forceCameraAnim = true;
+    window._frontCamPositioned = false;
+    window._corner3dCamPositioned = false;
 };
 
 window._clampSpaceOffsetAgainstOthers = function(x, y, movingSlot, opts) {
@@ -14658,21 +14706,14 @@ window.addSpaceUnit = function(kind, opts) {
     const hostD = host.depth || 54;
     let pairId;
     let nextSlot;
-    let maxRight;
 
     if (existing) {
         pairId = existing.pairId;
         nextSlot = existing.count;
-        maxRight = 0;
-        existing.members.forEach(function(m) {
-            const fp = window._spaceCabinetFootprint(m.slot);
-            const off = window._spaceOffsetForSlot(m.slot);
-            maxRight = Math.max(maxRight, off.x + fp.w / 2);
-        });
     } else {
         pairId = 'sp_' + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36);
         nextSlot = 1;
-        maxRight = Math.round(state.width || 160) / 2;
+        // Attach host first so footprint helpers see the corner/walk-in AABB (not just center.width)
         window._attachSpacePairToItem(state.orderCart[idx0], pairId, 0, { x: 0, y: 0 });
     }
 
@@ -14686,7 +14727,10 @@ window.addSpaceUnit = function(kind, opts) {
     itemN.rawState.partColors = {};
     const rsN = itemN.rawState || {};
     const wN = Math.round((rot === 90 || rot === 270) ? (rsN.depth || 54) : (rsN.width || 160));
-    let offset = { x: Math.round(maxRight + wN / 2 + 10), y: 0 };
+    // Place to the right of the full host footprint (corner L / walk-in), not center.width alone
+    let offset = (typeof window._suggestNextSpaceOffset === 'function')
+        ? window._suggestNextSpaceOffset(wN)
+        : { x: Math.round(hostW / 2 + wN / 2 + 10), y: 0 };
     const cuN = rsN.wings && rsN.wings.center && rsN.wings.center.corner;
     if ((kind === 'cornerDrawers' || kind === 'cornerDesk') && cuN && !(hostOff.rot)) {
         // Inner corner: inside the host's width, protruding forward from its front face
@@ -14751,6 +14795,7 @@ window.addSpaceUnit = function(kind, opts) {
     if (typeof window._restorePresetUI === 'function') window._restorePresetUI();
     if (typeof updateLeftSidebar === 'function') updateLeftSidebar({ scrollToActive: true });
     window._syncSpacePairTabs();
+    if (typeof window._applySpaceOverviewViewMode === 'function') window._applySpaceOverviewViewMode();
     if (typeof buildCabinet === 'function') buildCabinet();
     if (typeof updateCameraView === 'function') updateCameraView();
     if (typeof calculatePrice === 'function') calculatePrice();
@@ -14810,8 +14855,12 @@ window.exitSpaceIsolateMode = function() {
     }
     // Hide only — do not restore wing-edit handlers (that re-shows «חזור למצב חופשי»)
     window._showSpaceIsolateBanner(false);
-    // Overview prefers front framing of the whole space
-    state.viewMode = 'front';
+    // Overview: 3d when the space includes a corner/walk-in/L (front view collapses them)
+    if (typeof window._applySpaceOverviewViewMode === 'function') {
+        window._applySpaceOverviewViewMode();
+    } else {
+        state.viewMode = 'front';
+    }
     if (typeof buildCabinet === 'function') buildCabinet();
     if (typeof updateCameraView === 'function') updateCameraView();
     if (typeof window._syncSpacePairTabs === 'function') window._syncSpacePairTabs();
@@ -16656,6 +16705,10 @@ window._editCartItemNow = function(index) {
             const off = window._getSpaceOffset(_loadedItem);
             if ((off.y || 0) > 0) window._syncSpaceLiftBottomPanel(_loadedItem, true);
         }
+    }
+    // Overview of a space that includes a corner/walk-in must use 3d (front collapses the L)
+    if (!keepSpaceIsolate && typeof window._applySpaceOverviewViewMode === 'function') {
+        window._applySpaceOverviewViewMode();
     }
     if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
     if (typeof window._importLocalPartColors === 'function') {
