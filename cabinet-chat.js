@@ -145,15 +145,27 @@ function parseSlots(text) {
     m = t.match(/עמוד(?:ות|ה)?\s*[:\-]?\s*(\d+)/);
     if (m) slots.columns = Math.max(1, Math.min(12, parseInt(m[1], 10)));
 
-    // Drawer count
+    // Drawer kind (פנימיות / חיצוניות) — don't match bare words inside "חזיתות פנימיות"
+    if (hasAny(t, ['מגירות חיצוניות', 'מגירה חיצונית'])) slots.drawerKind = 'external';
+    else if (hasAny(t, ['מגירות פנימיות', 'מגירה פנימית'])) slots.drawerKind = 'internal';
+    else if (SESSION && SESSION.awaiting === 'drawerKind') {
+        if (/חיצונ|חוץ|external/i.test(t)) slots.drawerKind = 'external';
+        else if (/פנימ|פנים|internal/i.test(t)) slots.drawerKind = 'internal';
+    }
+
+    // Drawer count — "4 מגירות" / "4 מגירות סך הכל"
     m = t.match(/(\d+|שתיים|שני|שלוש|שלושה|ארבע|ארבעה|חמש|חמישה)\s*מגירות/);
     if (m) {
         var dn = parseHebNumberToken(m[1]);
         if (dn != null) slots.drawerCount = Math.max(1, Math.min(8, Math.round(dn)));
         slots.drawers = true;
     }
-    if (hasAny(t, ['מגירות חיצוניות', 'מגירות', 'מגירה'])) slots.drawers = true;
-    if (hasAny(t, ['בלי מגירות', 'ללא מגירות'])) { slots.drawers = false; slots.drawerCount = 0; }
+    if (hasAny(t, ['מגירות', 'מגירה'])) slots.drawers = true;
+    if (hasAny(t, ['בלי מגירות', 'ללא מגירות'])) {
+        slots.drawers = false;
+        slots.drawerCount = 0;
+        slots.drawerKind = null;
+    }
 
     // Front style (before doors — "חזיתות פרופיל" is not a door request)
     if (hasAny(t, ['חזיתות פרופיל', 'פרופיל', 'מסגרת מלמין', 'חזית פרופיל'])) slots.frontFaceStyle = 'profile';
@@ -165,8 +177,28 @@ function parseSlots(text) {
     else if (hasAny(t, ['עם דלתות', 'דלתות', 'דלת'])) slots.hasDoors = true;
     else if (hasAny(t, ['חזיתות']) && !slots.frontFaceStyle && !slots.frontStyle) slots.hasDoors = true;
 
-    // Content
+    // Content layout — "2 תלייה" / "ו2 תליה" = hanging column count
+    m = t.match(/(?:ו)?\s*(\d+|שתיים|שני|שלוש|שלושה|ארבע|ארבעה)\s*תלי[יה]/);
+    if (m) {
+        var hn = parseHebNumberToken(m[1]);
+        if (hn != null) {
+            slots.hangingColumns = Math.max(1, Math.min(12, Math.round(hn)));
+            slots.hanging = true;
+        }
+    }
     if (hasAny(t, ['תלייה', 'תליה', 'מוט', 'בגדים', 'מתלה'])) slots.hanging = true;
+
+    // "כל השאר מדפים" / "השאר מדפים" / N מדפים
+    if (hasAny(t, ['כל השאר מדפים', 'השאר מדפים', 'יתר מדפים', 'שאר מדפים'])) {
+        slots.shelves = true;
+        slots.restShelves = true;
+    }
+    m = t.match(/(\d+|שתיים|שני|שלוש|שלושה|ארבע|ארבעה)\s*עמוד(?:ות|ה)?\s*(?:של\s*)?מדפים/);
+    if (m) {
+        var sn = parseHebNumberToken(m[1]);
+        if (sn != null) slots.shelfColumns = Math.max(1, Math.min(12, Math.round(sn)));
+        slots.shelves = true;
+    }
     if (hasAny(t, ['מדפים', 'מדף'])) slots.shelves = true;
     if (hasAny(t, ['כוורת'])) slots.openCell = true;
 
@@ -219,7 +251,8 @@ function missingForCreate(slots) {
     var miss = [];
     if (slots.width == null) miss.push('width');
     if (slots.height == null) miss.push('height');
-    // depth / columns / doors have smart defaults — only ask if nothing else to go on for doors when vague
+    // Drawers mentioned without kind → ask פנימיות / חיצוניות
+    if (slots.drawers && !slots.drawerKind) miss.push('drawerKind');
     return miss;
 }
 
@@ -238,7 +271,8 @@ function questionFor(slot) {
         case 'depth': return 'מה עומק הארון בס״מ? (ברירת מחדל 54)';
         case 'columns': return 'כמה עמודות?';
         case 'hasDoors': return 'עם דלתות? (כן / לא)';
-        case 'drawerCount': return 'כמה מגירות חיצוניות?';
+        case 'drawerCount': return 'כמה מגירות?';
+        case 'drawerKind': return 'המגירות פנימיות או חיצוניות?';
         case 'roomW': return 'מה מידות החדר? למשל: 2 על 3 מטר';
         case 'walls': return 'כמה דפנות לארון? (2 / 3)';
         default: return 'אפשר לפרט קצת יותר?';
@@ -262,8 +296,14 @@ function summarizeSlots(slots) {
     if (slots.frontFaceStyle === 'profile') parts.push('חזיתות פרופיל');
     else if (slots.frontStyle === 'internal') parts.push('חזיתות פנימיות');
     else if (slots.frontStyle === 'external') parts.push('חזיתות חיצוניות');
-    if (slots.hanging) parts.push('תלייה');
-    if (slots.drawers) parts.push((slots.drawerCount ? (slots.drawerCount + ' ') : '') + 'מגירות');
+    if (slots.hangingColumns != null) parts.push(slots.hangingColumns + ' תלייה');
+    else if (slots.hanging) parts.push('תלייה');
+    if (slots.restShelves || slots.shelfColumns) parts.push('מדפים');
+    else if (slots.shelves) parts.push('מדפים');
+    if (slots.drawers) {
+        var dk = slots.drawerKind === 'internal' ? 'פנימיות' : (slots.drawerKind === 'external' ? 'חיצוניות' : '');
+        parts.push((slots.drawerCount ? (slots.drawerCount + ' ') : '') + 'מגירות' + (dk ? ' ' + dk : ''));
+    }
     if (slots.walls) parts.push(slots.walls + ' דפנות');
     if (slots.roomW && slots.roomD) parts.push('חדר ' + (slots.roomW / 100) + '×' + (slots.roomD / 100) + ' מ׳');
     return parts.join(' · ');
@@ -300,58 +340,144 @@ function clearDoors() {
     });
 }
 
-function applyHangingLayout() {
-    (state.columns || []).forEach(function (col) {
-        if (!col) return;
-        if (!col.compartments || !col.compartments.length) {
-            col.shelves = 1;
-            if (typeof distributeShelves === 'function') distributeShelves(col);
+/** Ensure column has at least `shelfCount` shelf boards → shelfCount+1 cells. */
+function _ensureShelves(col, shelfCount) {
+    if (!col) return;
+    var n = Math.max(0, shelfCount | 0);
+    if ((col.shelves || 0) < n || !(col.compartments && col.compartments.length > n)) {
+        col.shelves = n;
+        if (typeof distributeShelves === 'function') distributeShelves(col);
+    }
+}
+
+function _clearCompExtras(comp) {
+    if (!comp) return;
+    delete comp.partition;
+    delete comp.partitions;
+    delete comp.subCells;
+    delete comp.zoneDoorGroups;
+    delete comp.count;
+}
+
+/** Hanging in lower cell(s) + empty shelf cells above (never full-height hanging alone). */
+function _applyHangingWithShelves(col) {
+    _ensureShelves(col, 2); // 3 cells: hanging bottom + 2 shelf zones above
+    var comps = col.compartments || [];
+    if (!comps.length) return;
+    // Put hanging in the largest lower area: bottom cell only when 3+ cells,
+    // or merge bottom two via leaving bottom hanging and middle empty→hanging if only 2
+    var hangEnd = comps.length >= 3 ? 0 : 0;
+    for (var r = 0; r < comps.length; r++) {
+        comps[r] = comps[r] || { type: 'empty' };
+        _clearCompExtras(comps[r]);
+        if (r <= hangEnd) {
+            comps[r].type = 'hanging';
+        } else {
+            comps[r].type = 'empty'; // shelf cell
         }
-        var comps = col.compartments || [];
-        if (!comps.length) return;
-        // Bottom cell = hanging (or only cell)
-        var bottom = comps[0];
-        if (bottom) {
-            bottom.type = 'hanging';
-            delete bottom.partition;
-            delete bottom.subCells;
-        }
-        // Upper cells stay shelves/empty
-        for (var r = 1; r < comps.length; r++) {
-            if (comps[r] && (!comps[r].type || comps[r].type === 'empty')) comps[r].type = 'empty';
-        }
+    }
+}
+
+/** Shelf-only column — several empty cells (= open shelves). */
+function _applyShelvesOnly(col) {
+    _ensureShelves(col, 3); // 4 shelf cells
+    (col.compartments || []).forEach(function (comp) {
+        if (!comp) return;
+        _clearCompExtras(comp);
+        comp.type = 'empty';
     });
 }
 
-function applyExternalDrawers(count) {
+/** Drawers in bottom cell + shelves above. */
+function _applyDrawersColumn(col, count, kind) {
     count = Math.max(1, Math.min(8, count || 3));
+    kind = kind === 'internal' ? 'internal_drawers' : 'external_drawers';
+    _ensureShelves(col, 2); // room above drawers for shelves
+    var comps = col.compartments || [];
+    if (!comps.length) return;
+    for (var r = 0; r < comps.length; r++) {
+        comps[r] = comps[r] || { type: 'empty' };
+        _clearCompExtras(comps[r]);
+        if (r === 0) {
+            comps[r].type = kind;
+            comps[r].count = count;
+        } else {
+            comps[r].type = 'empty';
+        }
+    }
+}
+
+/**
+ * Assign column roles from slots:
+ *  - drawer column(s) first
+ *  - then hangingColumns (or all-with-shelves if hanging without count)
+ *  - rest = shelves when restShelves / shelves requested
+ */
+function planColumnRoles(slots, numCols) {
+    var roles = [];
+    var i;
+    for (i = 0; i < numCols; i++) roles.push('shelves'); // default smart: shelves not empty hanging
+
+    var drawerN = slots.drawers ? Math.max(1, slots.drawerColumns || 1) : 0;
+    var hangN = 0;
+    if (slots.hangingColumns != null) hangN = slots.hangingColumns;
+    else if (slots.hanging && !slots.restShelves && slots.shelfColumns == null) {
+        // Vague "תלייה/בגדים" without counts → every column gets hanging+shelves above
+        hangN = numCols - drawerN;
+    } else if (slots.hanging) {
+        hangN = Math.min(Math.max(1, Math.floor((numCols - drawerN) / 2)), numCols - drawerN);
+    }
+
+    if (slots.shelfColumns != null) {
+        hangN = Math.min(hangN, Math.max(0, numCols - drawerN - slots.shelfColumns));
+    }
+
+    hangN = Math.max(0, Math.min(hangN, numCols - drawerN));
+    drawerN = Math.max(0, Math.min(drawerN, numCols));
+
+    var idx = 0;
+    for (i = 0; i < drawerN && idx < numCols; i++, idx++) roles[idx] = 'drawers';
+    for (i = 0; i < hangN && idx < numCols; i++, idx++) roles[idx] = 'hanging';
+    for (; idx < numCols; idx++) roles[idx] = 'shelves';
+    return roles;
+}
+
+function applyInteriorPlan(slots) {
     var cols = state.columns || [];
     if (!cols.length) return;
-    // Put drawers in first column bottom (or all columns if few cols)
-    var targets = cols.length <= 2 ? cols : [cols[0]];
-    targets.forEach(function (col) {
+    var roles = planColumnRoles(slots, cols.length);
+    var drawerCount = slots.drawerCount || 3;
+    var drawerKind = slots.drawerKind || 'external';
+
+    cols.forEach(function (col, i) {
         if (!col) return;
-        if (!col.compartments || col.compartments.length < 2) {
-            col.shelves = Math.max(col.shelves || 0, 1);
-            if (typeof distributeShelves === 'function') distributeShelves(col);
+        var role = roles[i] || 'shelves';
+        if (role === 'drawers') _applyDrawersColumn(col, drawerCount, drawerKind);
+        else if (role === 'hanging') _applyHangingWithShelves(col);
+        else _applyShelvesOnly(col);
+    });
+}
+
+function applyDoorsForPlan(slots, hasDoors) {
+    if (!hasDoors) {
+        clearDoors();
+        return;
+    }
+    state.hasDoors = true;
+    var doorStyle = state.frontFaceStyle === 'profile' ? 'framed_melamine' : 'solid';
+    (state.columns || []).forEach(function (col) {
+        if (!col || !col.compartments) return;
+        var start = 0;
+        var comps = col.compartments;
+        // External drawers: doors only above the drawer stack
+        if (comps[0] && comps[0].type === 'external_drawers') start = 1;
+        var endRow = comps.length - 1;
+        if (start > endRow) {
+            col.doors = [];
+            return;
         }
-        var comps = col.compartments || [];
-        if (!comps.length) return;
-        var row = 0;
-        comps[row] = comps[row] || { type: 'empty' };
-        comps[row].type = 'external_drawers';
-        comps[row].count = count;
-        // Remove doors covering that row
-        if (Array.isArray(col.doors)) {
-            col.doors = col.doors.filter(function (d) {
-                return !(d && row >= d.startRow && row <= d.endRow);
-            });
-            // If doors remain above, shrink start
-            col.doors.forEach(function (d) {
-                if (d.startRow <= row && d.endRow > row) d.startRow = row + 1;
-            });
-            col.doors = col.doors.filter(function (d) { return d.endRow >= d.startRow; });
-        }
+        var type = (col.width || 0) >= 55 ? 'double' : 'left';
+        col.doors = [{ startRow: start, endRow: endRow, type: type, style: doorStyle }];
     });
 }
 
@@ -379,6 +505,17 @@ function finishApply() {
     if (typeof saveHistoryState === 'function') saveHistoryState();
 }
 
+function resolveColumnCount(slots, width) {
+    var drawerN = slots.drawers ? Math.max(1, slots.drawerColumns || 1) : 0;
+    var hangN = slots.hangingColumns != null ? slots.hangingColumns : 0;
+    var shelfN = slots.shelfColumns != null ? slots.shelfColumns : 0;
+    var restMin = (slots.restShelves || (slots.shelves && hangN > 0)) ? 1 : 0;
+    var fromLayout = drawerN + hangN + Math.max(shelfN, restMin);
+    var fromWidth = defaultColumns(width);
+    if (slots.columns != null) return Math.max(1, Math.min(12, Math.max(slots.columns, fromLayout)));
+    return Math.max(1, Math.min(12, Math.max(fromWidth, fromLayout || 2)));
+}
+
 function applyCreateLinear(slots) {
     if (typeof window._resetEditorToDefaultLinearCabinet === 'function') {
         window._resetEditorToDefaultLinearCabinet();
@@ -389,7 +526,7 @@ function applyCreateLinear(slots) {
     var width = slots.width;
     var height = slots.height;
     var depth = slots.depth != null ? slots.depth : DEFAULT_DEPTH;
-    var cols = slots.columns != null ? slots.columns : defaultColumns(width);
+    var cols = resolveColumnCount(slots, width);
     var hasDoors = slots.hasDoors != null ? slots.hasDoors : true;
 
     if (typeof updateDim === 'function') {
@@ -404,55 +541,25 @@ function applyCreateLinear(slots) {
 
     if (typeof distributeColumns === 'function') {
         distributeColumns(cols);
-    } else if (typeof _applyColumnCountChange === 'function') {
-        _applyColumnCountChange(cols, 'right', true);
+    } else if (typeof window._applyColumnCountChange === 'function') {
+        window._applyColumnCountChange(cols, 'right', true);
     }
     syncColumnUi(cols);
 
     applyFrontStyles(slots);
-
-    if (slots.hanging || slots.shelves) {
-        (state.columns || []).forEach(function (col) {
-            if (!col) return;
-            col.shelves = slots.hanging ? Math.max(1, col.shelves || 0) : Math.max(2, col.shelves || 0);
-            if (typeof distributeShelves === 'function') distributeShelves(col);
-        });
-    }
-    if (slots.hanging) applyHangingLayout();
-
-    if (slots.drawers) {
-        applyExternalDrawers(slots.drawerCount || 3);
-        // Doors on remaining cells
-        if (hasDoors) {
-            (state.columns || []).forEach(function (col) {
-                if (!col || !col.compartments) return;
-                var start = 0;
-                for (var r = 0; r < col.compartments.length; r++) {
-                    if (col.compartments[r] && col.compartments[r].type === 'external_drawers') start = r + 1;
-                }
-                if (start <= col.compartments.length - 1) {
-                    var type = (col.width || 0) >= 55 ? 'double' : 'left';
-                    var style = state.frontFaceStyle === 'profile' ? 'framed_melamine' : 'solid';
-                    col.doors = [{ startRow: start, endRow: col.compartments.length - 1, type: type, style: style }];
-                } else {
-                    col.doors = [];
-                }
-            });
-            state.hasDoors = true;
-        } else {
-            clearDoors();
-        }
-    } else if (hasDoors) {
-        applyDoorsToAllColumns();
-    } else {
-        clearDoors();
-    }
+    applyInteriorPlan(slots);
+    applyDoorsForPlan(slots, hasDoors);
 
     finishApply();
+    var roles = planColumnRoles(slots, cols);
+    var hangCols = roles.filter(function (r) { return r === 'hanging'; }).length;
+    var shelfCols = roles.filter(function (r) { return r === 'shelves'; }).length;
     return 'יצרתי ארון: ' + summarizeSlots({
         width: width, height: height, depth: depth, columns: cols,
         hasDoors: hasDoors, frontFaceStyle: slots.frontFaceStyle, frontStyle: slots.frontStyle,
-        hanging: slots.hanging, drawers: slots.drawers, drawerCount: slots.drawerCount
+        hanging: hangCols > 0, hangingColumns: hangCols || null,
+        shelves: shelfCols > 0, restShelves: shelfCols > 0,
+        drawers: slots.drawers, drawerCount: slots.drawerCount, drawerKind: slots.drawerKind
     });
 }
 
@@ -483,16 +590,29 @@ function applyEdit(slots) {
         if (slots.frontFaceStyle === 'profile') changed.push('חזיתות פרופיל');
         else if (slots.frontStyle) changed.push(slots.frontStyle === 'internal' ? 'חזיתות פנימיות' : 'חזיתות חיצוניות');
     }
-    if (slots.hanging) {
-        applyHangingLayout();
-        changed.push('תלייה');
-    }
-    if (slots.drawers) {
-        applyExternalDrawers(slots.drawerCount || 3);
-        changed.push((slots.drawerCount || 3) + ' מגירות');
+    var needsInterior = slots.hanging || slots.hangingColumns != null || slots.shelves ||
+        slots.restShelves || slots.shelfColumns != null || slots.drawers || slots.drawerKind;
+    if (needsInterior) {
+        // Keep existing dims/cols; re-plan interiors from merged intent
+        var editSlots = mergeSlots({
+            hanging: true,
+            shelves: true
+        }, slots);
+        // If only drawers/kind change, don't force hanging on all
+        if (!slots.hanging && slots.hangingColumns == null) delete editSlots.hanging;
+        if (!slots.shelves && !slots.restShelves && slots.shelfColumns == null) delete editSlots.shelves;
+        applyInteriorPlan(editSlots);
+        if (slots.hangingColumns != null) changed.push(slots.hangingColumns + ' תלייה');
+        else if (slots.hanging) changed.push('תלייה');
+        if (slots.restShelves || slots.shelves) changed.push('מדפים');
+        if (slots.drawers || slots.drawerKind) {
+            changed.push((slots.drawerCount || '') + ' מגירות ' +
+                (slots.drawerKind === 'internal' ? 'פנימיות' : (slots.drawerKind === 'external' ? 'חיצוניות' : '')));
+        }
+        applyDoorsForPlan(editSlots, state.hasDoors !== false);
     }
     if (slots.hasDoors === true) {
-        applyDoorsToAllColumns();
+        applyDoorsForPlan(slots, true);
         changed.push('דלתות');
     } else if (slots.hasDoors === false) {
         clearDoors();
