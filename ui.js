@@ -1658,14 +1658,19 @@ function buildDimensionsAndButtonsUI() {
             const numRows = _getColumnRowCount(col);
             const allSelected = state.selection.colIndex === item.colIndex && state.selection.rows.length === numRows;
 
-            const btn = document.createElement('div');
-            btn.className = 'select-all-col-btn' + (allSelected ? ' all-selected' : '');
-            btn.dataset.x3d = item.x;
-            btn.dataset.y3d = item.y;
-            btn.dataset.colIndex = item.colIndex;
-            btn.title = allSelected ? 'בטל בחירת כל התאים' : 'בחר את כל התאים בעמודה';
-            btn.innerHTML = allSelected ? '<i class="fa-solid fa-check-double"></i>' : '<i class="fa-solid fa-table-cells"></i>';
+            // Capsule: select-all + column templates as one unit (won't overlap each other)
+            const capsule = document.createElement('div');
+            capsule.className = 'col-tools-capsule' + (allSelected ? ' all-selected' : '');
+            capsule.dataset.x3d = item.x;
+            capsule.dataset.y3d = item.y;
+            capsule.dataset.colIndex = String(item.colIndex);
 
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'select-all-col-btn' + (allSelected ? ' all-selected' : '');
+            btn.title = allSelected ? 'בטל בחירת כל התאים' : 'בחר את כל התאים בעמודה';
+            btn.setAttribute('aria-label', btn.title);
+            btn.innerHTML = allSelected ? '<i class="fa-solid fa-check-double"></i>' : '<i class="fa-solid fa-table-cells"></i>';
             btn.addEventListener('pointerdown', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -1675,16 +1680,19 @@ function buildDimensionsAndButtonsUI() {
                 e.stopPropagation();
                 selectAllColumn(item.colIndex);
             });
-            buttonsLayer.appendChild(btn);
+            capsule.appendChild(btn);
 
-            // Magic-wand: column templates (skip in viewer)
             if (!window._VIEWER_MODE) {
-                const wand = document.createElement('div');
+                const sep = document.createElement('span');
+                sep.className = 'col-tools-capsule-sep';
+                sep.setAttribute('aria-hidden', 'true');
+                capsule.appendChild(sep);
+
+                const wand = document.createElement('button');
+                wand.type = 'button';
                 wand.className = 'col-template-btn';
-                wand.dataset.x3d = item.x + 10;
-                wand.dataset.y3d = item.y;
-                wand.dataset.colIndex = String(item.colIndex);
                 wand.title = 'תבניות עמודה';
+                wand.setAttribute('aria-label', 'תבניות עמודה');
                 wand.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i>';
                 wand.addEventListener('pointerdown', (e) => {
                     e.preventDefault();
@@ -1697,8 +1705,10 @@ function buildDimensionsAndButtonsUI() {
                         window.openColumnTemplatesSheet(item.colIndex);
                     }
                 });
-                buttonsLayer.appendChild(wand);
+                capsule.appendChild(wand);
             }
+
+            buttonsLayer.appendChild(capsule);
         });
     }
 
@@ -4528,7 +4538,7 @@ function _positionWingCellOverlays() {
         return localPt.project(camera);
     };
 
-    document.querySelectorAll('.dim-container, .select-all-col-btn, .col-template-btn, .sub-cell-btn, .cell-select-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn, .led-cell-icon, .tv-size-btn').forEach(el => {
+    document.querySelectorAll('.dim-container, .col-tools-capsule, .sub-cell-btn, .cell-select-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn, .led-cell-icon, .tv-size-btn').forEach(el => {
         if (el.dataset.x3d == null || el.dataset.y3d == null) return;
         const pos = projectWingPoint(parseFloat(el.dataset.x3d), parseFloat(el.dataset.y3d));
         // Behind camera / degenerate projection — hide
@@ -9024,7 +9034,7 @@ function _isCanvasOverlayUiTarget(el) {
     if (!el || !el.closest) return false;
     return !!el.closest(
         '#column-quick-edit, #full-corner-quick-edit, #bottom-floating-toolbar, #bed-toolbar, #room-props-row, #room-furniture-toolbar, #room-plan-layer, #btn-room-plan-view-toggle, ' +
-        '.drag-handle, .dim-container, .col-width-label, .plus-btn, .kit-end-add-btn, .kit-end-add-menu, .fc-cell-btn, .select-all-col-btn, .col-template-btn, .cell-select-btn, .sub-cell-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn, .tv-size-btn, #tv-size-menu'
+        '.drag-handle, .dim-container, .col-width-label, .plus-btn, .kit-end-add-btn, .kit-end-add-menu, .fc-cell-btn, .col-tools-capsule, .select-all-col-btn, .col-template-btn, .cell-select-btn, .sub-cell-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn, .tv-size-btn, #tv-size-menu'
     );
 }
 
