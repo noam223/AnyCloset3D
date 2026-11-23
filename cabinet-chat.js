@@ -1398,15 +1398,15 @@ function processMessage(raw) {
 // ── UI ──────────────────────────────────────────────────────────────────────
 
 function setOffset(px) {
-    // Kept for any leftover consumers; docked chat no longer overlays the canvas.
-    document.documentElement.style.setProperty(CHAT_OFFSET_VAR, '0px');
+    document.documentElement.style.setProperty(CHAT_OFFSET_VAR, Math.max(0, px || 0) + 'px');
     document.body.classList.add('has-cabinet-chat');
 }
 
 function measureAndSetOffset() {
     var root = document.getElementById('cabinet-chat');
     if (!root) return;
-    setOffset(0);
+    var h = Math.ceil(root.getBoundingClientRect().height || 0);
+    setOffset(h);
     // Notify Three.js that the canvas area changed height
     try { window.dispatchEvent(new Event('resize')); } catch (e) { /* ignore */ }
 }
@@ -1584,12 +1584,23 @@ function injectStyles() {
         '.cab-chat-send{background:linear-gradient(135deg,#1e3a5f,#2563eb);color:#fff}' +
         '.cab-chat-toggle{background:rgba(30,58,95,.08);color:#1e3a5f}' +
         '.cab-chat-status{min-height:0;font-size:.75rem;color:#64748b;padding:2px 8px 0}' +
+        /* Float buttons sit above the docked chat (not on top of it) */
+        'body.has-cabinet-chat #btn-help-chat{bottom:calc(var(' + CHAT_OFFSET_VAR + ',64px) + 14px)!important;' +
+        'transition:bottom .15s ease,transform .15s,box-shadow .15s}' +
+        'body.has-cabinet-chat #help-chat{bottom:calc(var(' + CHAT_OFFSET_VAR + ',64px) + 70px)!important}' +
+        'body.has-cabinet-chat #designer-notes-float-btn{bottom:calc(var(' + CHAT_OFFSET_VAR + ',64px) + 70px)!important}' +
         '@media (max-width:768px){' +
         '#cabinet-viewport-stack{position:fixed;top:88px;left:0;width:100vw;' +
         'height:calc(100dvh - 88px - 60px - env(safe-area-inset-bottom,0px));z-index:1;order:unset}' +
         '#cabinet-viewport-stack #canvas-container{position:relative!important;top:auto!important;left:auto!important;' +
         'width:100%!important;height:auto!important;flex:1 1 auto}' +
-        '#cabinet-chat{padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px))}' +
+        '#cabinet-chat{padding:6px 8px 6px}' +
+        'body.has-cabinet-chat #btn-help-chat{bottom:calc(60px + env(safe-area-inset-bottom,0px) + var(' + CHAT_OFFSET_VAR + ',64px) + 10px)!important;' +
+        'right:12px;padding:12px;font-size:0}' +
+        'body.has-cabinet-chat #btn-help-chat i{font-size:1.2rem}' +
+        'body.has-cabinet-chat #help-chat{bottom:0!important;right:0;left:0;width:auto;' +
+        'height:min(85dvh,calc(100dvh - 60px - var(' + CHAT_OFFSET_VAR + ',64px)))}' +
+        'body.has-cabinet-chat #designer-notes-float-btn{bottom:calc(60px + env(safe-area-inset-bottom,0px) + var(' + CHAT_OFFSET_VAR + ',64px) + 66px)!important}' +
         '}';
     document.head.appendChild(st);
 }
