@@ -4950,6 +4950,19 @@ function updateCameraView() {
     } else {
         // 3D mode — only reset camera if user hasn't manually orbited
         if (!window._orbitFree) {
+            if (_spaceCombinedView && _spaceCombinedView.camPos && _spaceCombinedView.camTarget) {
+                // Shared-space overview while editing a linear unit next to a corner/L
+                camera.position.set(
+                    _spaceCombinedView.camPos[0],
+                    _spaceCombinedView.camPos[1],
+                    _spaceCombinedView.camPos[2]
+                );
+                controls.target.set(
+                    _spaceCombinedView.camTarget[0],
+                    _spaceCombinedView.camTarget[1],
+                    _spaceCombinedView.camTarget[2]
+                );
+            } else {
             const _isoCz = (_spaceIsoOff && _spaceIsoOff.z) || 0;
             if (_spaceIsoFront) {
                 camera.position.set(
@@ -4961,6 +4974,7 @@ function updateCameraView() {
                 camera.position.set(targetX + targetDistance * 0.6, maxColH * 0.8, targetDistance * 0.8);
             }
             controls.target.set(targetX, maxColH / 2 + ((_spaceIsoOff && _spaceIsoOff.y) || 0), _isoCz);
+            }
         }
         controls.enableRotate = true;
         scene.background = new THREE.Color(0xeceff1);
