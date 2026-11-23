@@ -11726,14 +11726,38 @@ function _rotatedSpacePartCaptureView() {
             keepCompanions: true
         };
     }
+    // Frontal of this part + translucent companions (same idea as part-1 host with desk).
+    // Stay close enough that other parts sit beside the subject, not between camera and subject.
+    let restCx = 0, restCz = 0, restN = 0, maxH = topY;
+    (window._spaceCompanionGroups || []).forEach(function(g) {
+        if (!g) return;
+        const b = new THREE.Box3().setFromObject(g);
+        if (b.isEmpty()) return;
+        restCx += (b.min.x + b.max.x) / 2;
+        restCz += (b.min.z + b.max.z) / 2;
+        restN++;
+        maxH = Math.max(maxH, b.max.y);
+    });
+    if (restN) { restCx /= restN; restCz /= restN; }
+    else { restCx = cx; restCz = cz; }
+    const toRestX = restCx - cx, toRestZ = restCz - cz;
+    // Lateral axis on the front plane (right when looking along front)
+    const latX = -fz, latZ = fx;
+    const side = (toRestX * latX + toRestZ * latZ) >= 0 ? 1 : -1;
+    const a = 22 * Math.PI / 180;
+    const ux = fx * Math.cos(a) + latX * side * Math.sin(a);
+    const uz = fz * Math.cos(a) + latZ * side * Math.sin(a);
+    // Cap distance so companions stay beside the subject (not between camera and subject)
+    const maxDist = Math.max(lat * 0.95, depthAlongFront * 2.8, 200);
     return {
         id: 'spaceFront',
-        camPos: [cx + fx, (minY + topY) / 2, cz + fz],
-        camTarget: [cx, (minY + topY) / 2, cz],
+        camPos: [cx + ux, (minY + topY) / 2 + h * 0.06, cz + uz],
+        camTarget: [cx - latX * side * lat * 0.06, (minY + topY) / 2, cz - latZ * side * lat * 0.06],
         fitH: h + 100,
-        fitW: lat + 100,
-        companionOpacity: 0.1,
-        keepCompanions: false
+        fitW: lat * 1.12 + depthAlongFront * 0.3 + 70,
+        maxDist: maxDist,
+        companionOpacity: 0.62,
+        keepCompanions: true
     };
 }
 
@@ -11782,7 +11806,10 @@ function _captureFrameAtView(cam, ctrl, ren, scn, view, hasDoors) {
     cam.updateProjectionMatrix();
     const distY = (fitH / 2) / Math.tan(Math.PI * cam.fov / 360);
     const distX = (fitW / 2) / Math.tan(Math.PI * cam.fov / 360) / cam.aspect;
-    const dist = Math.max(distY, distX);
+    let dist = Math.max(distY, distX);
+    if (view.maxDist != null && isFinite(view.maxDist) && view.maxDist > 0) {
+        dist = Math.min(dist, view.maxDist);
+    }
     const midY = view.camPos[1];
 
     const savedWingEdit = state.wingEditMode;
@@ -11811,6 +11838,12 @@ function _captureFrameAtView(cam, ctrl, ren, scn, view, hasDoors) {
             cam.position.set(-dist, midY, 0);
             ctrl.target.set(0, midY, 0);
         }
+    } else if (view.useExactPose && view.camPos && view.camTarget) {
+        // User-saved print angle — keep the exact pose (no fit-distance remapping)
+        state.wingEditMode = false;
+        cam.position.set(view.camPos[0], view.camPos[1], view.camPos[2]);
+        ctrl.target.set(view.camTarget[0], view.camTarget[1], view.camTarget[2]);
+        buildCabinet();
     } else {
         state.wingEditMode = false;
         const dx = view.camPos[0] - view.camTarget[0];
@@ -12025,6 +12058,281 @@ window._fadeSpaceCompanionsForCapture = function(opacity, onlyGroups) {
     });
 };
 
+// ── Per-cabinet print-camera pose (user can override the default capture angle) ──
+window._printCamMode = false;
+window._printCamBaseline = null;
+window._printCamDirty = false;
+
+window._printCamFocusDims = function() {
+    const snapCenterWing = state.wings && state.wings.center;
+    const snapCols = snapCenterWing && snapCenterWing.columns && snapCenterWing.columns.length > 0
+        ? snapCenterWing.columns : null;
+    const snapW = snapCenterWing ? snapCenterWing.width : state.width;
+    const snapH = snapCols ? Math.max.apply(null, snapCols.map(function(c) { return c.height; })) : state.globalHeight;
+    let focusX = 0;
+    let focusY = snapH / 2;
+    try {
+        const pairInfoFocus = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
+        if (pairInfoFocus && pairInfoFocus.count >= 2 && typeof window._spaceOffsetForSlot === 'function') {
+            const off = window._spaceOffsetForSlot(pairInfoFocus.activeSlot) || { x: 0, y: 0 };
+            focusX = off.x || 0;
+            focusY = (snapH / 2) + (off.y || 0);
+        }
+    } catch (e) { /* keep origin */ }
+    return { focusX: focusX, focusY: focusY, snapW: snapW, snapH: snapH };
+};
+
+/** System default print angle for the open cabinet (ignores any saved override). */
+window._computeDefaultPrintCaptureView = function() {
+    const d = window._printCamFocusDims();
+    return _rotatedSpacePartCaptureView()
+        || _cornerDeskHostCaptureView(d.focusX, d.focusY, d.snapW, d.snapH)
+        || {
+            id: 'defaultFront',
+            camPos: [d.focusX, d.focusY, 1],
+            camTarget: [d.focusX, d.focusY, 0],
+            fitH: d.snapH + 120,
+            fitW: d.snapW + 150,
+            companionOpacity: 0.12,
+            keepCompanions: false
+        };
+};
+
+/** Resolve a capture view from state.printCamera (local-to-cabinet → world). */
+window._savedPrintCaptureView = function() {
+    const pc = state.printCamera;
+    if (!pc || !pc.relPos || !pc.relTarget) return null;
+    if (typeof cabinetGroup === 'undefined' || !cabinetGroup) return null;
+    cabinetGroup.updateMatrixWorld(true);
+    const pos = new THREE.Vector3(pc.relPos[0], pc.relPos[1], pc.relPos[2]).applyMatrix4(cabinetGroup.matrixWorld);
+    const tgt = new THREE.Vector3(pc.relTarget[0], pc.relTarget[1], pc.relTarget[2]).applyMatrix4(cabinetGroup.matrixWorld);
+    return {
+        id: 'savedPrint',
+        camPos: [pos.x, pos.y, pos.z],
+        camTarget: [tgt.x, tgt.y, tgt.z],
+        fitH: 360,
+        fitW: 350,
+        useExactPose: true,
+        companionOpacity: pc.companionOpacity != null ? pc.companionOpacity : 0.62,
+        keepCompanions: pc.keepCompanions !== false
+    };
+};
+
+window._resolvePrintViewWorldPose = function(view) {
+    const cam = window.camera;
+    const ctrl = window.controls;
+    if (!cam || !ctrl || !view || !view.camPos || !view.camTarget) return null;
+    if (view.useExactPose) {
+        return {
+            pos: [view.camPos[0], view.camPos[1], view.camPos[2]],
+            target: [view.camTarget[0], view.camTarget[1], view.camTarget[2]]
+        };
+    }
+    const fitH = view.fitH || 360;
+    const fitW = view.fitW || 350;
+    const fov = 45;
+    const aspect = cam.aspect || (16 / 12);
+    let dist = Math.max(
+        (fitH / 2) / Math.tan(Math.PI * fov / 360),
+        (fitW / 2) / Math.tan(Math.PI * fov / 360) / aspect
+    );
+    if (view.maxDist != null && isFinite(view.maxDist) && view.maxDist > 0) {
+        dist = Math.min(dist, view.maxDist);
+    }
+    const dx = view.camPos[0] - view.camTarget[0];
+    const dz = view.camPos[2] - view.camTarget[2];
+    const len = Math.hypot(dx, dz) || 1;
+    const midY = view.camPos[1];
+    return {
+        pos: [
+            view.camTarget[0] + (dx / len) * dist,
+            midY,
+            view.camTarget[2] + (dz / len) * dist
+        ],
+        target: [view.camTarget[0], view.camTarget[1], view.camTarget[2]]
+    };
+};
+
+window._applyPrintCaptureViewLive = function(view) {
+    const cam = window.camera;
+    const ctrl = window.controls;
+    if (!cam || !ctrl || !view) return null;
+    const pose = window._resolvePrintViewWorldPose(view);
+    if (!pose) return null;
+    window._camAnim = null;
+    window._orbitFree = true;
+    cam.position.set(pose.pos[0], pose.pos[1], pose.pos[2]);
+    ctrl.target.set(pose.target[0], pose.target[1], pose.target[2]);
+    ctrl.enableRotate = true;
+    ctrl.update();
+    if (typeof window._fadeSpaceCompanionsForCapture === 'function' && view.companionOpacity != null) {
+        window._fadeSpaceCompanionsForCapture(view.companionOpacity);
+    }
+    if (window.renderer && window.scene) window.renderer.render(window.scene, cam);
+    return pose;
+};
+
+window._printCamPoseSnapshot = function() {
+    const cam = window.camera;
+    const ctrl = window.controls;
+    if (!cam || !ctrl) return null;
+    return {
+        pos: [cam.position.x, cam.position.y, cam.position.z],
+        target: [ctrl.target.x, ctrl.target.y, ctrl.target.z]
+    };
+};
+
+window._printCamPoseChanged = function(a, b) {
+    if (!a || !b) return false;
+    const eps = 0.35;
+    for (let i = 0; i < 3; i++) {
+        if (Math.abs(a.pos[i] - b.pos[i]) > eps) return true;
+        if (Math.abs(a.target[i] - b.target[i]) > eps) return true;
+    }
+    return false;
+};
+
+window._syncPrintCamActionButtons = function() {
+    const resetBtn = document.getElementById('btn-print-cam-reset');
+    const saveBtn = document.getElementById('btn-print-cam-save');
+    const show = !!(window._printCamMode && window._printCamDirty);
+    if (resetBtn) resetBtn.style.display = show ? 'inline-flex' : 'none';
+    if (saveBtn) saveBtn.style.display = show ? 'inline-flex' : 'none';
+};
+
+window._syncPrintCamButtonState = function() {
+    const btn = document.getElementById('btn-print-cam');
+    if (!btn) return;
+    btn.classList.toggle('is-print-cam-active', !!window._printCamMode);
+    btn.classList.toggle('has-saved-print-cam', !!(state.printCamera && state.printCamera.relPos));
+};
+
+window._onPrintCamOrbitChange = function() {
+    if (!window._printCamMode) return;
+    const cur = window._printCamPoseSnapshot();
+    window._printCamDirty = window._printCamPoseChanged(window._printCamBaseline, cur);
+    window._syncPrintCamActionButtons();
+};
+
+window._enterPrintCameraMode = function() {
+    if (state.viewMode === 'blueprint' || state.viewMode === 'room-plan') {
+        state.viewMode = 'front';
+        if (typeof updateCameraView === 'function') updateCameraView();
+    }
+    // Rebuild so space companions exist for a fair preview of the print shot
+    if (typeof buildCabinet === 'function') buildCabinet();
+    const defView = window._computeDefaultPrintCaptureView();
+    const pose = window._applyPrintCaptureViewLive(defView);
+    window._printCamMode = true;
+    window._printCamDirty = false;
+    window._printCamBaseline = pose || window._printCamPoseSnapshot();
+    window._syncPrintCamActionButtons();
+    window._syncPrintCamButtonState();
+    if (typeof _showToast === 'function') {
+        _showToast('זווית ברירת מחדל להדפסה — סובבו את המצלמה, ואז שמרו או אפסו', 4500);
+    }
+};
+
+window._exitPrintCameraMode = function(opts) {
+    opts = opts || {};
+    window._printCamMode = false;
+    window._printCamDirty = false;
+    window._printCamBaseline = null;
+    window._syncPrintCamActionButtons();
+    window._syncPrintCamButtonState();
+    if (!opts.keepOrbit) {
+        window._orbitFree = false;
+        if (typeof updateCameraView === 'function') updateCameraView();
+    }
+};
+
+window._togglePrintCameraMode = function() {
+    if (window._printCamMode) {
+        window._exitPrintCameraMode();
+        return;
+    }
+    window._enterPrintCameraMode();
+};
+
+window._resetPrintCameraPose = function() {
+    if (!window._printCamMode) window._enterPrintCameraMode();
+    else {
+        const defView = window._computeDefaultPrintCaptureView();
+        const pose = window._applyPrintCaptureViewLive(defView);
+        window._printCamBaseline = pose || window._printCamPoseSnapshot();
+        window._printCamDirty = false;
+        window._syncPrintCamActionButtons();
+    }
+    if (typeof _showToast === 'function') _showToast('חזרה לזווית ברירת המחדל', 2200);
+};
+
+window._savePrintCameraPose = function() {
+    const cam = window.camera;
+    const ctrl = window.controls;
+    if (!cam || !ctrl || typeof cabinetGroup === 'undefined' || !cabinetGroup) {
+        if (typeof _showToast === 'function') _showToast('לא ניתן לשמור זווית כרגע', 2500);
+        return;
+    }
+    cabinetGroup.updateMatrixWorld(true);
+    const inv = new THREE.Matrix4().copy(cabinetGroup.matrixWorld).invert();
+    const relPos = cam.position.clone().applyMatrix4(inv);
+    const relTarget = ctrl.target.clone().applyMatrix4(inv);
+    const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
+    const off = (info && typeof window._spaceOffsetForSlot === 'function')
+        ? window._spaceOffsetForSlot(info.activeSlot) : null;
+    const printCamera = {
+        relPos: [relPos.x, relPos.y, relPos.z],
+        relTarget: [relTarget.x, relTarget.y, relTarget.z],
+        companionOpacity: 0.62,
+        keepCompanions: true,
+        savedAt: Date.now(),
+        meta: {
+            presetId: state.presetId || null,
+            spaceSlot: info ? info.activeSlot : null,
+            spaceRot: off && off.rot != null ? off.rot : 0,
+            worldPos: [cam.position.x, cam.position.y, cam.position.z],
+            worldTarget: [ctrl.target.x, ctrl.target.y, ctrl.target.z],
+            cabinetName: state.cabinetName || null
+        }
+    };
+    state.printCamera = printCamera;
+    // Keep a copy for tuning defaults after the user picks a good U-shape angle
+    window._lastSavedPrintCamera = JSON.parse(JSON.stringify(printCamera));
+    try { console.info('[printCamera] saved', window._lastSavedPrintCamera); } catch (e) { /* ignore */ }
+
+    if (typeof window._commitCurrentCabinetToCart === 'function' && state.editingCartIndex >= 0) {
+        window._commitCurrentCabinetToCart({ flash: false });
+    }
+    window._printCamBaseline = window._printCamPoseSnapshot();
+    window._printCamDirty = false;
+    window._syncPrintCamActionButtons();
+    window._syncPrintCamButtonState();
+    if (typeof _showToast === 'function') {
+        _showToast('✓ זווית המצלמה נשמרה להדפסת הארון הזה', 3500);
+    }
+};
+
+window._clearPrintCameraPose = function() {
+    state.printCamera = null;
+    if (typeof window._commitCurrentCabinetToCart === 'function' && state.editingCartIndex >= 0) {
+        window._commitCurrentCabinetToCart({ flash: false });
+    }
+    window._syncPrintCamButtonState();
+};
+
+// Orbit listener for print-camera dirty state
+(function() {
+    const boot = function() {
+        if (!window.controls || window.controls._printCamHooked) return;
+        window.controls._printCamHooked = true;
+        window.controls.addEventListener('change', function() {
+            if (typeof window._onPrintCamOrbitChange === 'function') window._onPrintCamOrbitChange();
+        });
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+    else setTimeout(boot, 0);
+})();
+
 window._captureCabinetPreviewImages = function() {
     const cam = window.camera;
     const ctrl = window.controls;
@@ -12067,12 +12375,15 @@ window._captureCabinetPreviewImages = function() {
             focusY = (snapH / 2) + (off.y || 0);
         }
     } catch (e) { /* keep origin focus */ }
-    const centerView = _rotatedSpacePartCaptureView() || _cornerDeskHostCaptureView(focusX, focusY, snapW, snapH) || {
-        camPos: [focusX, focusY, 1],
-        camTarget: [focusX, focusY, 0],
-        fitH: snapH + 120,
-        fitW: snapW + 150
-    };
+    const centerView = (typeof window._savedPrintCaptureView === 'function' && window._savedPrintCaptureView())
+        || _rotatedSpacePartCaptureView()
+        || _cornerDeskHostCaptureView(focusX, focusY, snapW, snapH)
+        || {
+            camPos: [focusX, focusY, 1],
+            camTarget: [focusX, focusY, 0],
+            fitH: snapH + 120,
+            fitW: snapW + 150
+        };
 
     // Per-part shots: keep companions faintly visible in the background
     window._spaceCaptureCompanionOpacity = 0.12;
@@ -12152,7 +12463,7 @@ window._captureCabinetPreviewImages = function() {
         multiViewSVG,
         imgSpaceDoors,
         imgSpaceOpen,
-        captureVer: 17
+        captureVer: 19
     };
     } finally {
         restoreRenderSize();
@@ -12193,11 +12504,12 @@ window._cartItemNeedsMediaRefresh = function(itemObj) {
             if (!_cartImageValid(spec.imgSpaceDoors) || !_cartImageValid(spec.imgSpaceOpen)) return true;
             // v16: whole-space shots outline each part in its own color (group overview page)
             if (spec.captureVer < 16 && !spec.imgSpaceDoorsManual) return true;
-            // v17: rotated space parts (180° / desk 90°·270°) use frontal camera, not back/diagonal
-            if (spec.captureVer < 17 && !spec.imgDoorsManual) {
+            // v17–18: rotated space frontal (+ translucent companions); v19: honor saved printCamera poses
+            if (spec.captureVer < 19 && !spec.imgDoorsManual) {
                 let needsFront = false;
                 (state.orderCart || []).forEach(function(it) {
                     if (window._spacePairIdOf(it) !== pairId) return;
+                    if (it.rawState && it.rawState.printCamera && it.rawState.printCamera.relPos) needsFront = true;
                     const o = (it && (it.spaceOffset || (it.rawState && it.rawState.spaceOffset))) || {};
                     const r = ((o.rot || 0) % 360 + 360) % 360;
                     if (r > 1 && r < 359) needsFront = true;
@@ -12371,6 +12683,7 @@ function _applyRawStateForCapture(rawState) {
     } else if (rs.partColors) {
         state.partColors = JSON.parse(JSON.stringify(rs.partColors));
     }
+    state.printCamera = rs.printCamera ? JSON.parse(JSON.stringify(rs.printCamera)) : null;
 }
 
 window._snapshotEditorState = _snapshotEditorState;
@@ -14372,7 +14685,8 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
             blueprintHeightDimsDefault: state.blueprintHeightDimsDefault !== false,
             partColors: (typeof window._exportLocalPartColors === 'function')
                 ? window._exportLocalPartColors()
-                : JSON.parse(JSON.stringify(state.partColors || {}))
+                : JSON.parse(JSON.stringify(state.partColors || {})),
+            printCamera: state.printCamera ? JSON.parse(JSON.stringify(state.printCamera)) : null
         }));
         const _cartUid = typeof window._cartUidAt === 'function' ? window._cartUidAt(state.editingCartIndex) : null;
         if (_cartUid) rawState.cartUid = _cartUid;
@@ -15747,6 +16061,9 @@ window.editCartItem = function(index, opts) {
 };
 
 window._editCartItemNow = function(index) {
+    if (typeof window._exitPrintCameraMode === 'function' && window._printCamMode) {
+        window._exitPrintCameraMode({ keepOrbit: true });
+    }
     const rawState = state.orderCart[index].rawState;
     const rs = JSON.parse(JSON.stringify(rawState));
 
@@ -15853,6 +16170,8 @@ window._editCartItemNow = function(index) {
     if (typeof window._importLocalPartColors === 'function') {
         window._importLocalPartColors('cart' + index, rawState.partColors);
     }
+    state.printCamera = rawState.printCamera ? JSON.parse(JSON.stringify(rawState.printCamera)) : null;
+    if (typeof window._syncPrintCamButtonState === 'function') window._syncPrintCamButtonState();
 
     // Explicitly restore manualInstallPrice (not in old rawState saves → default null)
 
@@ -15871,6 +16190,9 @@ window.startNewCabinet = function() {
     if (state.orderCart && state.orderCart.length > 0) {
         window._commitCurrentCabinetToCart({ flash: false });
     }
+    if (typeof window._exitPrintCameraMode === 'function' && window._printCamMode) {
+        window._exitPrintCameraMode({ keepOrbit: true });
+    }
     // Detach from space-pair context before snapshot so the new cabinet is never joined
     if (typeof window._clearSpaceCompanion === 'function') window._clearSpaceCompanion();
     state.editingCartIndex = -1;
@@ -15880,6 +16202,7 @@ window.startNewCabinet = function() {
         applyPreset('linear');
     }
     state.cabinetName = '';
+    state.printCamera = null;
     if (state.wings && state.wings.center) state.wings.center.cabinetName = '';
     const item = window._snapshotCurrentCabinetToCartItem();
     if (typeof window._stripSpacePairFromItem === 'function') {
