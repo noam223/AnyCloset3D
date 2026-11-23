@@ -11866,8 +11866,9 @@ function _captureFrameAtView(cam, ctrl, ren, scn, view, hasDoors) {
     if (view.slotOpacity != null && cropSlots.length && typeof window._fadeSpaceCompanionsForCapture === 'function') {
         window._fadeSpaceCompanionsForCapture(view.slotOpacity, (window._spaceCompanionGroups || []).filter(function(g) { return g && isCropSlot(g); }));
     }
-    // Companions that sit between the camera and the focus part go fully ghost (see-through)
-    if (typeof window._updateSpaceOcclusionGhosts === 'function') {
+    // Companions that sit between the camera and the focus part go fully ghost (see-through).
+    // Skip on whole-space overview — every part must stay visible.
+    if (!view.skipOcclusion && view.id !== 'space' && typeof window._updateSpaceOcclusionGhosts === 'function') {
         window._updateSpaceOcclusionGhosts();
     }
 
@@ -12643,7 +12644,7 @@ window._captureCabinetPreviewImages = function() {
         multiViewSVG,
         imgSpaceDoors,
         imgSpaceOpen,
-        captureVer: 19
+        captureVer: 20
     };
     } finally {
         restoreRenderSize();
@@ -12684,6 +12685,8 @@ window._cartItemNeedsMediaRefresh = function(itemObj) {
             if (!_cartImageValid(spec.imgSpaceDoors) || !_cartImageValid(spec.imgSpaceOpen)) return true;
             // v16: whole-space shots outline each part in its own color (group overview page)
             if (spec.captureVer < 16 && !spec.imgSpaceDoorsManual) return true;
+            // v20: whole-space overview is elevated top-down (מבט על) so U / rotated parts all show
+            if (spec.captureVer < 20 && !spec.imgSpaceDoorsManual) return true;
             // v17–18: rotated space frontal (+ translucent companions); v19: honor saved printCamera poses
             if (spec.captureVer < 19 && !spec.imgDoorsManual) {
                 let needsFront = false;
@@ -13573,30 +13576,70 @@ window._getSpacePairInfo = function() {
     return window._getSpacePairInfoAt(state.editingCartIndex);
 };
 
-/** Front-view camera framing that fits every cabinet in the shared space. */
+/**
+ * Elevated top-down (מבט על) framing for the whole shared space.
+ * Uses plan XZ extents so U-shaped / rotated parts all appear — not a flat +Z
+ * frontal that often shows the back of a 180°-rotated leg.
+ */
 window._computeSpacePairCaptureView = function(info) {
     info = info || window._getSpacePairInfo();
     if (!info || info.count < 2) return null;
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, maxH = 0;
+    let frontX = 0, frontZ = 0, frontN = 0;
     info.members.forEach(function(m) {
-        const fp = window._spaceCabinetFootprint(m.slot);
-        const off = window._spaceOffsetForSlot(m.slot);
-        const fo = fp.floorOffset || 0;
-        minX = Math.min(minX, off.x - fp.w / 2);
-        maxX = Math.max(maxX, off.x + fp.w / 2);
-        minY = Math.min(minY, off.y + fo);
-        maxY = Math.max(maxY, off.y + fp.h);
+        const fp = window._spaceCabinetFootprint(m.slot) || { w: 160, d: 54, h: 240, cx: 0, cz: 0 };
+        const off = window._spaceOffsetForSlot(m.slot) || { x: 0, y: 0, z: 0, rot: 0 };
+        const cx = (off.x || 0) + (fp.cx || 0);
+        const cz = (off.z || 0) + (fp.cz || 0);
+        const hw = (fp.w || 160) / 2;
+        const hd = (fp.d || 54) / 2;
+        minX = Math.min(minX, cx - hw);
+        maxX = Math.max(maxX, cx + hw);
+        minZ = Math.min(minZ, cz - hd);
+        maxZ = Math.max(maxZ, cz + hd);
+        maxH = Math.max(maxH, (off.y || 0) + (fp.h || 240));
+
+        // Local +Z is the cabinet front; rotate into world XZ
+        const rotRad = ((off.rot || 0) * Math.PI) / 180;
+        frontX += Math.sin(rotRad);
+        frontZ += Math.cos(rotRad);
+        frontN++;
     });
-    if (!(maxX > minX) || !(maxY > minY)) return null;
+    if (!(maxX > minX) || !(maxZ > minZ)) return null;
+
     const midX = (minX + maxX) / 2;
-    const midY = (minY + maxY) / 2;
+    const midZ = (minZ + maxZ) / 2;
+    const spanX = maxX - minX;
+    const spanZ = maxZ - minZ;
+    const span = Math.max(spanX, spanZ, 120);
+
+    // Approach from the open side of the layout (opposite average front → look into the U)
+    let ax = frontN ? -frontX / frontN : 0;
+    let az = frontN ? -frontZ / frontN : -1;
+    let aLen = Math.hypot(ax, az);
+    if (aLen < 0.15) { ax = 0; az = -1; aLen = 1; }
+    else { ax /= aLen; az /= aLen; }
+
+    // High bird's-eye with a little lateral bias so depth reads clearly
+    const elev = 62 * Math.PI / 180;
+    const pull = span * 0.95 + Math.max(maxH * 0.55, 160);
+    const camY = Math.max(maxH * 0.55, 80) + Math.tan(elev) * pull * 0.72;
+    const tgtY = Math.max(maxH * 0.22, 40);
+    // Slight side offset so three legs don't stack in a line
+    const sideX = -az * span * 0.12;
+    const sideZ = ax * span * 0.12;
+
     return {
         id: 'space',
-        label: 'מרחב משותף',
-        camPos: [midX, midY, 1],
-        camTarget: [midX, midY, 0],
-        fitH: (maxY - minY) + 140,
-        fitW: (maxX - minX) + 180
+        label: 'מרחב משותף — מבט על',
+        camPos: [midX + ax * pull + sideX, camY, midZ + az * pull + sideZ],
+        camTarget: [midX, tgtY, midZ],
+        fitH: maxH * 0.55 + span * 0.55 + 120,
+        fitW: span * 1.15 + 160,
+        skipOcclusion: true,
+        keepCompanions: true,
+        companionOpacity: 1
     };
 };
 
