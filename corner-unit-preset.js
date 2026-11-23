@@ -629,7 +629,7 @@ window._updateExtrasSections = function() {
         if (!cw || !cw.corner) return;
         const cu = cw.corner;
         const key = dim;
-        const limits = { width: [30, 120], depth: [30, 120], height: [40, 280] }[key];
+        const limits = { width: [30, 200], depth: [30, 120], height: [40, 280] }[key];
         const cur = cu[key] || CU_DEFAULTS.drawers[key];
         let val = (absoluteValue !== null && absoluteValue !== undefined) ? parseInt(absoluteValue, 10) : cur + (delta || 0);
         if (isNaN(val)) return;

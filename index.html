@@ -848,10 +848,10 @@
                 </div>
                 <div id="corner-dims-group">
                 <div class="control-group">
-                    <div class="label-row"><span>רוחב (ס"מ)</span><input type="number" id="inp-num-corner-width" class="value-badge-input" value="60" min="30" max="120" onchange="updateCorner('width', this.value)"></div>
+                    <div class="label-row"><span>רוחב (ס"מ)</span><input type="number" id="inp-num-corner-width" class="value-badge-input" value="60" min="30" max="200" onchange="updateCorner('width', this.value)"></div>
                     <div class="slider-row">
                         <button class="slider-btn" onclick="updateCorner('width', (state.corner.width||60)+1)"><i class="fa-solid fa-plus"></i></button>
-                        <input type="range" id="inp-corner-width" min="30" max="120" value="60" step="1" oninput="document.getElementById('inp-num-corner-width').value=this.value; updateCorner('width', this.value)">
+                        <input type="range" id="inp-corner-width" min="30" max="200" value="60" step="1" oninput="document.getElementById('inp-num-corner-width').value=this.value; updateCorner('width', this.value)">
                         <button class="slider-btn" onclick="updateCorner('width', (state.corner.width||60)-1)"><i class="fa-solid fa-minus"></i></button>
                     </div>
                 </div>
@@ -3293,7 +3293,7 @@
 <script src="bathroom-preset.js?v=20261008types"></script>
 <script src="kitchen-preset.js?v=20261117kitG3"></script>
 <script src="writing-desk-preset.js?v=20261122depth110"></script>
-<script src="corner-unit-preset.js?v=20261116kitSpace"></script>
+<script src="corner-unit-preset.js?v=20261123cornerW200"></script>
 <script src="engine-appliances.js?v=20261116kitOvenGlass5"></script>
 <script src="engine-core.js?v=20261122profile1"></script>
 <script src="engine-corners.js?v=20261116cnc1"></script>
