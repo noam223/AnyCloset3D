@@ -12449,6 +12449,7 @@ window._savePrintCameraPose = function() {
         if (typeof window._commitCurrentCabinetToCart === 'function' && state.editingCartIndex >= 0) {
             window._commitCurrentCabinetToCart({ flash: false });
         }
+        window._isDirty = true;
         window._printCamResetToDefault = false;
         window._exitPrintCameraMode({ keepOrbit: true });
         if (typeof _showToast === 'function') {
@@ -12487,6 +12488,7 @@ window._savePrintCameraPose = function() {
     if (typeof window._commitCurrentCabinetToCart === 'function' && state.editingCartIndex >= 0) {
         window._commitCurrentCabinetToCart({ flash: false });
     }
+    window._isDirty = true;
     window._exitPrintCameraMode({ keepOrbit: true });
     if (typeof _showToast === 'function') {
         _showToast('✓ זווית המצלמה נשמרה להדפסת הארון הזה', 3500);
@@ -12498,6 +12500,7 @@ window._clearPrintCameraPose = function() {
     if (typeof window._commitCurrentCabinetToCart === 'function' && state.editingCartIndex >= 0) {
         window._commitCurrentCabinetToCart({ flash: false });
     }
+    window._isDirty = true;
     window._syncPrintCamButtonState();
 };
 
@@ -13266,7 +13269,9 @@ window._buildCurrentCabinetCompareRaw = function() {
         blueprintColWidthDimsDefault: state.blueprintColWidthDimsDefault !== false,
         blueprintColWidthDimShown: state.blueprintColWidthDimShown || {},
         blueprintHeightDimsDefault: state.blueprintHeightDimsDefault !== false,
-        partColors: partColors || {}
+        partColors: partColors || {},
+        // Per-cabinet print/export camera — must survive project save (live raw overwrites cart raw)
+        printCamera: state.printCamera ? JSON.parse(JSON.stringify(state.printCamera)) : null
     }));
     const _pairLive = typeof window._spacePairFieldsForRaw === 'function' ? window._spacePairFieldsForRaw() : {};
     if (_pairLive && _pairLive.spacePairId) Object.assign(raw, _pairLive);
