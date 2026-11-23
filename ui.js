@@ -809,6 +809,86 @@ window._syncSlidingColorsBlock = function(show) {
 };
 
 /** Compact panel-type controls for the currently selected sliding door tab. */
+/** True when active wing has an embedded/standalone corner desk. */
+window._wingHasCornerDesk = function(w) {
+    w = w || (typeof getWing === 'function' ? getWing() : null);
+    return !!(w && w.corner && w.corner.side !== 'none' && w.corner.type === 'desk');
+};
+
+window._rawHasCornerDesk = function(rawState) {
+    if (!rawState) return false;
+    if (window._wingHasCornerDesk(rawState)) return true;
+    const wings = rawState.wings || {};
+    return Object.keys(wings).some(function(k) {
+        return window._wingHasCornerDesk(wings[k]);
+    });
+};
+
+/** After selecting the שולחן color tab on a corner desk: גוף שולחן vs מגירת שולחן. */
+window._syncCornerDeskColorPanel = function() {
+    const containers = [
+        document.getElementById('corner-desk-color-panel'),
+        document.getElementById('mobile-corner-desk-color-panel')
+    ].filter(Boolean);
+    const part = state.activeColorPart || '';
+    const isDeskPart = part === 'materialDesk' || part === 'materialDeskDrawer';
+    const hasCornerDesk = window._wingHasCornerDesk();
+    if (!containers.length || !isDeskPart || !hasCornerDesk) {
+        containers.forEach(c => { c.innerHTML = ''; c.style.display = 'none'; });
+        return;
+    }
+    if (!state.materialDeskDrawer) {
+        state.materialDeskDrawer = state.materialExternal || state.materialDesk || 'white_matte';
+    }
+    const activeTarget = part === 'materialDeskDrawer' ? 'drawer' : 'body';
+    const opts = [
+        { id: 'body', label: 'גוף שולחן', icon: 'fa-solid fa-desktop' },
+        { id: 'drawer', label: 'מגירת שולחן', icon: 'fa-solid fa-inbox' }
+    ];
+    let html = `<div style="font-size:0.78rem;color:var(--text-light);margin-bottom:6px;">חלק לצביעה — שולחן פינתי</div>`;
+    html += `<div style="display:flex;gap:5px;">`;
+    opts.forEach(opt => {
+        const isActive = activeTarget === opt.id;
+        html += `<button type="button" onclick="window._selectCornerDeskColorTarget('${opt.id}')"
+            style="flex:1;padding:6px 3px;border-radius:8px;border:${isActive ? '2px solid var(--accent)' : '1.5px solid var(--border)'};
+            background:${isActive ? 'var(--accent-light,#e8f0fe)' : 'white'};
+            color:${isActive ? 'var(--accent)' : 'var(--text-dark)'};
+            font-size:0.72rem;font-weight:600;cursor:pointer;transition:all 0.15s;
+            display:flex;flex-direction:column;align-items:center;gap:2px;">
+            <i class="${opt.icon}" style="font-size:1rem;"></i>
+            <span>${opt.label}</span>
+        </button>`;
+    });
+    html += `</div>`;
+    containers.forEach(c => {
+        c.style.display = '';
+        c.innerHTML = html;
+    });
+};
+
+window._selectCornerDeskColorTarget = function(target) {
+    const nextPart = target === 'drawer' ? 'materialDeskDrawer' : 'materialDesk';
+    state.activeColorPart = nextPart;
+    document.querySelectorAll('.part-tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.part-tab-btn[data-part="materialDesk"]').forEach(b => b.classList.add('active'));
+    document.querySelectorAll('.material-btn').forEach(b => b.classList.remove('active'));
+    const currentMat = state[nextPart] || state.materialDesk || 'white_matte';
+    const matBtns = document.querySelectorAll(`.material-btn[data-mat="${currentMat}"]`);
+    if (matBtns.length) matBtns.forEach(b => b.classList.add('active'));
+    else if (currentMat === 'custom') {
+        const upload = document.getElementById('btn-upload-texture');
+        if (upload) upload.classList.add('active');
+    }
+    if (typeof window._syncEggerPaletteActive === 'function' && currentMat) {
+        const inPanel = Array.from(matBtns).some(b => b.closest('.egger-palette-panel'));
+        window._syncEggerPaletteActive(currentMat, {
+            open: inPanel && !(window.EGGER_BUILTIN_KEYS || []).includes(String(currentMat))
+        });
+    }
+    window._syncCornerDeskColorPanel();
+    if (typeof window._syncPartTabDots === 'function') window._syncPartTabDots();
+};
+
 window._syncSlidingDoorTypePanel = function() {
     const containers = [
         document.getElementById('sd-door-panels-container'),
@@ -3611,6 +3691,7 @@ window._serializeCabinetForTemplate = function() {
         materialInternal: state.materialInternal,
         materialExternal: state.materialExternal,
         materialDesk: state.materialDesk,
+        materialDeskDrawer: state.materialDeskDrawer || state.materialDesk,
         materialOpenCell: state.materialOpenCell,
         materialBack: state.materialBack,
         materialBackByType: state.materialBackByType
@@ -3749,7 +3830,7 @@ window._applyCabinetTemplateRawState = function(rawState) {
         state.wings.right = null;
         const flatFields = ['cabinetModel','plinthStyle','frontStyle','frontFaceStyle','placement','width','globalHeight','depth','thickness',
             'plinthHeight','hasDoors','handleType','handleStyle','cabinetModelLabel','manualPrice','boardMaterial',
-            'materialBody','materialInternal','materialExternal','materialDesk','materialOpenCell',
+            'materialBody','materialInternal','materialExternal','materialDesk','materialDeskDrawer','materialOpenCell',
             'materialBack','materialBackByType','columns','desk'];
         flatFields.forEach(function(f) { if (rs[f] !== undefined) state[f] = rs[f]; });
         if (typeof window._ensurePlinthFrontStyles === 'function') window._ensurePlinthFrontStyles(state);
@@ -10089,6 +10170,9 @@ function bindUI() {
         if (typeof window._syncSlidingDoorTypePanel === 'function') {
             window._syncSlidingDoorTypePanel();
         }
+        if (typeof window._syncCornerDeskColorPanel === 'function') {
+            window._syncCornerDeskColorPanel();
+        }
 
         document.querySelectorAll('.material-btn').forEach(b => b.classList.remove('active'));
         if (clickedPart === 'glassTint') return;
@@ -10736,7 +10820,7 @@ function bindUI() {
             plinthHeight: state.plinthHeight, hasDoors: state.hasDoors, handleType: state.handleType, handleStyle: state.handleStyle, handleVariant: state.handleVariant, ridingColor: state.ridingColor,
             cabinetName: state.cabinetName, cabinetModelLabel: (state.wings && state.wings.center && state.wings.center.cabinetModelLabel) || state.cabinetModelLabel || '', cabinetNotes: state.cabinetNotes, manualPrice: state.manualPrice,
             boardMaterial: state.boardMaterial, materialBody: state.materialBody, materialInternal: state.materialInternal,
-            materialExternal: state.materialExternal, materialDesk: state.materialDesk, materialOpenCell: state.materialOpenCell, materialBack: state.materialBack, columns: state.columns, desk: state.desk
+            materialExternal: state.materialExternal, materialDesk: state.materialDesk, materialDeskDrawer: state.materialDeskDrawer || state.materialDesk, materialOpenCell: state.materialOpenCell, materialBack: state.materialBack, columns: state.columns, desk: state.desk
         }));
 
         const projectData = {
@@ -12830,7 +12914,7 @@ function _applyRawStateForCapture(rawState) {
         state.presetId = rs.presetId || 'linear';
         const flatFromWing = ['cabinetModel', 'plinthStyle', 'frontStyle', 'frontFaceStyle', 'placement', 'boardMaterial', 'handleType', 'handleStyle',
             'cabinetName', 'cabinetModelLabel', 'cabinetNotes', 'manualPrice', 'materialBody', 'materialInternal',
-            'materialExternal', 'materialDesk', 'materialOpenCell', 'materialBack', 'materialBackByType'];
+            'materialExternal', 'materialDesk', 'materialDeskDrawer', 'materialOpenCell', 'materialBack', 'materialBackByType'];
         flatFromWing.forEach(f => { if (rs[f] !== undefined) state[f] = rs[f]; });
         if (typeof window._ensurePlinthFrontStyles === 'function') window._ensurePlinthFrontStyles(state);
     } else {
@@ -12840,7 +12924,7 @@ function _applyRawStateForCapture(rawState) {
         state.wings.right = null;
         const flatFields = ['cabinetModel', 'plinthStyle', 'frontStyle', 'frontFaceStyle', 'placement', 'width', 'globalHeight', 'depth', 'thickness',
             'plinthHeight', 'hasDoors', 'handleType', 'handleStyle', 'cabinetName', 'cabinetModelLabel', 'cabinetNotes', 'manualPrice', 'boardMaterial',
-            'materialBody', 'materialInternal', 'materialExternal', 'materialDesk', 'materialOpenCell',
+            'materialBody', 'materialInternal', 'materialExternal', 'materialDesk', 'materialDeskDrawer', 'materialOpenCell',
             'materialBack', 'materialBackByType', 'columns', 'desk'];
         flatFields.forEach(f => { if (rs[f] !== undefined) state[f] = rs[f]; });
         if (typeof window._ensurePlinthFrontStyles === 'function') window._ensurePlinthFrontStyles(state);
@@ -13248,6 +13332,7 @@ window._buildCurrentCabinetCompareRaw = function() {
         materialInternal: state.materialInternal,
         materialExternal: state.materialExternal,
         materialDesk: state.materialDesk,
+        materialDeskDrawer: state.materialDeskDrawer || state.materialDesk,
         materialOpenCell: state.materialOpenCell,
         materialBack: state.materialBack,
         columns: state.columns,
@@ -14905,7 +14990,7 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
             cabinetName: state.cabinetName, cabinetModelLabel: (state.wings && state.wings.center && state.wings.center.cabinetModelLabel) || state.cabinetModelLabel || '', cabinetNotes: state.cabinetNotes, manualPrice: state.manualPrice,
             manualInstallPrice: getWing().manualInstallPrice != null ? getWing().manualInstallPrice : null,
             boardMaterial: state.boardMaterial, materialBody: state.materialBody, materialInternal: state.materialInternal,
-            materialExternal: state.materialExternal, materialDesk: state.materialDesk, materialOpenCell: state.materialOpenCell, materialBack: state.materialBack, columns: state.columns, desk: state.desk,
+            materialExternal: state.materialExternal, materialDesk: state.materialDesk, materialDeskDrawer: state.materialDeskDrawer || state.materialDesk, materialOpenCell: state.materialOpenCell, materialBack: state.materialBack, columns: state.columns, desk: state.desk,
             // Wing system — needed to restore corner/walkin/sliding cabinets correctly
             wings: state.wings, activeWing: state.activeWing, presetId: state.presetId,
             // Room wall position (closure panel)
@@ -15018,6 +15103,9 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
             })(),
             colorExternal: _colorKeyLabel(state.materialExternal),
             colorDesk: _colorKeyLabel(state.materialDesk),
+            colorDeskDrawer: (typeof window._wingHasCornerDesk === 'function' && window._wingHasCornerDesk())
+                ? _colorKeyLabel(state.materialDeskDrawer || state.materialDesk)
+                : undefined,
             colorOpenCell: _resolveOpenCellColorLabel(state.wings, state.materialOpenCell),
             colorDrawers: _isWritingDeskCart ? _colorKeyLabel(state.materialExternal) : undefined,
             isWritingDesk: _isWritingDeskCart,
@@ -16331,7 +16419,7 @@ window._editCartItemNow = function(index) {
         // Apply flat fields to center wing via proxy setters
         const flatFields = ['cabinetModel','plinthStyle','frontStyle','frontFaceStyle','placement','width','globalHeight','depth','thickness',
             'plinthHeight','hasDoors','handleType','handleStyle','cabinetName','cabinetModelLabel','cabinetNotes','manualPrice','boardMaterial',
-            'materialBody','materialInternal','materialExternal','materialDesk','materialOpenCell',
+            'materialBody','materialInternal','materialExternal','materialDesk','materialDeskDrawer','materialOpenCell',
             'materialBack','materialBackByType','columns','desk'];
         flatFields.forEach(function(f) { if (rs[f] !== undefined) state[f] = rs[f]; });
         if (typeof window._ensurePlinthFrontStyles === 'function') window._ensurePlinthFrontStyles(state);
@@ -17480,6 +17568,9 @@ function _enrichSpecColorsFromRaw(item, rawState) {
         item.colorBack = _formatColorBackWithTypes(rawState, _colorKeyLabel(mat('materialBack') || 'white_matte'));
     }
     if (mat('materialDesk')) item.colorDesk = _colorKeyLabel(mat('materialDesk'));
+    if (mat('materialDeskDrawer') || (typeof window._rawHasCornerDesk === 'function' && window._rawHasCornerDesk(rawState))) {
+        item.colorDeskDrawer = _colorKeyLabel(mat('materialDeskDrawer') || mat('materialDesk') || 'white_matte');
+    }
     if (rawState.wings) {
         item.colorOpenCell = _resolveOpenCellColorLabel(rawState.wings, mat('materialOpenCell') || rawState.materialOpenCell);
     } else if (mat('materialOpenCell')) {
@@ -17802,7 +17893,16 @@ function _collectPrintSpecRows(item, itemObj) {
             rows.push({ id: 'colorExternal', label: 'צבע חזיתות (דלתות ומגירות חוץ)', value: _plainSpecValue(item.colorExternal) });
         }
         rows.push({ id: 'colorBack', label: 'צבע גב ארון', value: _plainSpecValue(_resolveColorBackPrintValue(item, itemObj)) });
-        if (_formatDeskAddition(item, itemObj).desk !== 'ללא') rows.push({ id: 'colorDesk', label: 'צבע שולחן עבודה', value: _plainSpecValue(item.colorDesk) });
+        if (_formatDeskAddition(item, itemObj).desk !== 'ללא') {
+            const hasCornerDesk = item.colorDeskDrawer
+                || (itemObj && typeof window._rawHasCornerDesk === 'function' && window._rawHasCornerDesk(itemObj.rawState));
+            if (hasCornerDesk) {
+                rows.push({ id: 'colorDesk', label: 'צבע גוף שולחן', value: _plainSpecValue(item.colorDesk) });
+                rows.push({ id: 'colorDeskDrawer', label: 'צבע מגירת שולחן', value: _plainSpecValue(item.colorDeskDrawer || item.colorDesk) });
+            } else {
+                rows.push({ id: 'colorDesk', label: 'צבע שולחן עבודה', value: _plainSpecValue(item.colorDesk) });
+            }
+        }
         if (item.hasOpenCells) rows.push({ id: 'colorOpenCell', label: 'צבע כוורת', value: _plainSpecValue(item.colorOpenCell) });
         const glassTint = itemObj && _resolveGlassTintLabel(itemObj.rawState);
         if (glassTint) rows.push({ id: 'glassTint', label: 'גוון זכוכית', value: glassTint });
@@ -18832,7 +18932,16 @@ function _printFinishesRows(item, itemObj, thStyle, tdStyle, sectionStyle) {
         html += _printTr(thStyle, tdStyle, 'צבע חזיתות (דלתות ומגירות חוץ)', item.colorExternal);
     }
     html += _printTr(thStyle, tdStyle, 'צבע גב ארון', _resolveColorBackPrintValue(item, itemObj));
-    if (_formatDeskAddition(item, itemObj).desk !== 'ללא') html += _printTr(thStyle, tdStyle, 'צבע שולחן עבודה', item.colorDesk);
+    if (_formatDeskAddition(item, itemObj).desk !== 'ללא') {
+        const hasCornerDesk = item.colorDeskDrawer
+            || (itemObj && typeof window._rawHasCornerDesk === 'function' && window._rawHasCornerDesk(itemObj.rawState));
+        if (hasCornerDesk) {
+            html += _printTr(thStyle, tdStyle, 'צבע גוף שולחן', item.colorDesk);
+            html += _printTr(thStyle, tdStyle, 'צבע מגירת שולחן', item.colorDeskDrawer || item.colorDesk);
+        } else {
+            html += _printTr(thStyle, tdStyle, 'צבע שולחן עבודה', item.colorDesk);
+        }
+    }
     if (item.hasOpenCells) html += _printTr(thStyle, tdStyle, 'צבע כוורת', item.colorOpenCell);
     const glassTint = itemObj && _resolveGlassTintLabel(itemObj.rawState);
     if (glassTint) html += _printTr(thStyle, tdStyle, 'גוון זכוכית', glassTint);
@@ -20851,6 +20960,8 @@ function _buildCustomerSummaryDetails(itemObj) {
     const colorBack = _resolveColorBackPrintValue(item, itemObj)
         || _summarySpecOrRaw(item, rawState, 'colorBack', 'materialBack');
     const colorDesk = _summarySpecOrRaw(item, rawState, 'colorDesk', 'materialDesk');
+    const colorDeskDrawer = item.colorDeskDrawer
+        || _summarySpecOrRaw(item, rawState, 'colorDeskDrawer', 'materialDeskDrawer');
     const colorOpenCell = _summarySpecOrRaw(item, rawState, 'colorOpenCell', 'materialOpenCell');
 
     if (colorBody) details.push('צבע גוף וצוקל: ' + colorBody);
@@ -20858,7 +20969,16 @@ function _buildCustomerSummaryDetails(itemObj) {
     if (colorExternal) details.push('צבע חזיתות (דלתות ומגירות חוץ): ' + colorExternal);
     if (colorBack && colorBack !== 'undefined') details.push('צבע גב ארון: ' + colorBack);
     const deskSummary = _formatDeskAddition(item, itemObj);
-    if (deskSummary.desk !== 'ללא' && colorDesk) details.push('צבע שולחן עבודה: ' + colorDesk);
+    const hasCornerDeskSummary = !!(colorDeskDrawer
+        || (typeof window._rawHasCornerDesk === 'function' && window._rawHasCornerDesk(rawState)));
+    if (deskSummary.desk !== 'ללא' && colorDesk) {
+        if (hasCornerDeskSummary) {
+            details.push('צבע גוף שולחן: ' + colorDesk);
+            details.push('צבע מגירת שולחן: ' + (colorDeskDrawer || colorDesk));
+        } else {
+            details.push('צבע שולחן עבודה: ' + colorDesk);
+        }
+    }
 
     if (content.openCells > 0) {
         details.push('כוורת פתוחה: ' + content.openCells + (content.openCells === 1 ? ' תא' : ' תאים'));

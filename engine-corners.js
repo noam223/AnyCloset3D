@@ -430,8 +430,11 @@ function buildCornerUnit() {
     const innerD     = cuW - t;                     // inner depth in Z
 
     if (cu.type === 'desk') {
-        // Standalone corner desk has no separate "שולחן" color tab — it is the unit's body
+        // Standalone: body tab paints the desk; embedded: materialDesk = גוף, materialDeskDrawer = מגירות
         const matDesk = standalone ? matBody : (materials[state.materialDesk] || matBody);
+        const matDeskDrawer = standalone
+            ? matExternal
+            : (materials[state.materialDeskDrawer || state.materialDesk || state.materialExternal] || matExternal || matDesk);
         const deskH = cu.height || 80;
         const fingerGap = 2.5;
         const innerGap = 0.4;
@@ -528,7 +531,7 @@ function buildCornerUnit() {
                 const actualDY = useFingerGap ? (dY - fingerGap / 2) : dY;
                 const boxH = actualDrawerH;
                 const boxBottomY = actualDY - boxH / 2;
-                const dMesh = addBoard(t, boxH, drwW, drwFrontX, actualDY, dZ, matExternal);
+                const dMesh = addBoard(t, boxH, drwW, drwFrontX, actualDY, dZ, matDeskDrawer, 'corner_desk_drawer_front');
                 dMesh.userData.cncRole = 'DRAWER_FRONT'; // CNC export part name
                 if (!isBP) {
                     _cuAddDrawerHandle(dMesh, drwW, drawerH, sign, t, handleStyle);

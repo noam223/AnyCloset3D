@@ -129,6 +129,7 @@ function createWingData(overrides) {
         materialInternal: 'white_matte',
         materialExternal: 'white_matte',
         materialDesk: 'white_matte',
+        materialDeskDrawer: 'white_matte',
         materialOpenCell: 'white_matte',
         materialBack: 'white_matte',
         materialBackByType: { mezuzah: null, back8: null, back17: null, stretcher: null },
@@ -398,7 +399,7 @@ window.getWing = function() {
 const _wingFields = [
     'cabinetModel','cabinetTypeId','plinthStyle','frontStyle','frontFaceStyle','placement','width','globalHeight','depth','thickness','plinthHeight',
     'hasDoors','handleType','handleStyle','handleVariant','ridingColor','hingeTypeId','cabinetName','cabinetModelLabel','cabinetNotes','boardMaterial',
-    'materialBody','materialInternal','materialExternal','materialDesk','materialOpenCell','materialBack',
+    'materialBody','materialInternal','materialExternal','materialDesk','materialDeskDrawer','materialOpenCell','materialBack',
     'materialBackByType',
     'materialSideCabinet','materialTopPanel','glassTint',
     'activeColorPart','columns','desk','corner','fullCorner','sideCabinet','manualPrice','manualInstallPrice',
@@ -2377,7 +2378,8 @@ window._updateMaterialTabVisibility = function(w) {
         materialInternal: ['מדפים ופנים', 'פנים'],
         materialBack:     ['גב ארון', 'גב'],
         materialExternal: ['חזיתות', 'חזיתות'],
-        materialDesk:     ['שולחן', 'שולחן'],
+        materialDesk:       ['שולחן', 'שולחן'],
+        materialDeskDrawer: ['מגירת שולחן', 'מגירת שולחן'],
         materialOpenCell: ['כוורת', 'כוורת'],
         materialSideCabinet: ['ארון צד', 'ארון צד'],
         materialTopPanel: ['משטח', 'משטח'],
@@ -2508,7 +2510,8 @@ window._updateMaterialTabVisibility = function(w) {
 
     // If active tab is now hidden, switch to materialBody
     const activePart = w.activeColorPart || 'materialBody';
-    const activeTabEl = document.querySelector(`.part-tab-btn[data-part="${activePart}"]`);
+    const tabLookupPart = (activePart === 'materialDeskDrawer') ? 'materialDesk' : activePart;
+    const activeTabEl = document.querySelector(`.part-tab-btn[data-part="${tabLookupPart}"]`);
     if (activeTabEl && activeTabEl.style.display === 'none') {
         w.activeColorPart = 'materialBody';
         document.querySelectorAll('.part-tab-btn').forEach(b => b.classList.remove('active'));
@@ -2519,6 +2522,7 @@ window._updateMaterialTabVisibility = function(w) {
         if (fallbackBtn) fallbackBtn.classList.add('active');
     }
     window._syncGlassTintPanel(w);
+    if (typeof window._syncCornerDeskColorPanel === 'function') window._syncCornerDeskColorPanel();
 };
 
 // ---- Apply material to upper unit (both body and external) ----
@@ -2936,7 +2940,7 @@ window.resetCurrentCabinet = function() {
     w.width = 160; w.globalHeight = 240; w.depth = 54;
     w.plinthHeight = 8.75; w.hasDoors = true; w.handleType = ''; w.handleStyle = 'none'; w.handleVariant = 'pipe_silver'; w.ridingColor = 'black'; w.hingeTypeId = w.hingeTypeId || 'std'; w.cabinetName = ''; w.cabinetModelLabel = ''; w.cabinetNotes = '';
     w.boardMaterial = 'melamine'; w.materialBody = 'white_matte'; w.materialInternal = 'white_matte';
-    w.materialExternal = 'white_matte'; w.materialDesk = 'white_matte'; w.materialOpenCell = 'white_matte'; w.materialBack = 'white_matte';
+    w.materialExternal = 'white_matte'; w.materialDesk = 'white_matte'; w.materialDeskDrawer = 'white_matte'; w.materialOpenCell = 'white_matte'; w.materialBack = 'white_matte';
     w.materialBackByType = { mezuzah: null, back8: null, back17: null, stretcher: null };
     w.materialSideCabinet = 'white_matte';
     w.desk = { side: 'none', width: 100, height: 80, hasDrawers: true, drawerHeight: 12, drawerCount: null, mergeDrawers: false };
