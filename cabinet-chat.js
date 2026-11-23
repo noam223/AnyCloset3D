@@ -1736,13 +1736,24 @@ function setOffset(px) {
     document.body.classList.add('has-cabinet-chat');
 }
 
+var _chatOffsetBusy = false;
+var _lastChatOffsetH = -1;
 function measureAndSetOffset() {
+    // Guard: we dispatch window 'resize' below, and also listen to it — avoid infinite recursion
+    if (_chatOffsetBusy) return;
     var root = document.getElementById('cabinet-chat');
     if (!root) return;
     var h = Math.ceil(root.getBoundingClientRect().height || 0);
-    setOffset(h);
-    // Notify Three.js that the canvas area changed height
-    try { window.dispatchEvent(new Event('resize')); } catch (e) { /* ignore */ }
+    if (h === _lastChatOffsetH) return;
+    _lastChatOffsetH = h;
+    _chatOffsetBusy = true;
+    try {
+        setOffset(h);
+        // Notify Three.js that the canvas area changed height
+        try { window.dispatchEvent(new Event('resize')); } catch (e) { /* ignore */ }
+    } finally {
+        _chatOffsetBusy = false;
+    }
 }
 
 /** Put chat under the 3D viewport (same column as #canvas-container), not floating on body. */

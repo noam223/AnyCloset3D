@@ -10637,6 +10637,8 @@ function bindUI() {
             if (!hitOnUuCell && uuIntersects.length === 0) {
                 _pointerDownOnDeadSpace = true;
             }
+        }
+
         // Corner desk click — change drawer handle style
         const deskDownHits = (window.deskHitBoxes && window.deskHitBoxes.length > 0)
             ? raycaster.intersectObjects(window.deskHitBoxes) : [];
