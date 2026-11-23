@@ -194,24 +194,15 @@ body {
     background: #fff;
     color: #1e293b;
 }
-.cart-thumb-cam-btn.is-print-cam-active {
-    color: #1d4ed8;
-    background: #dbeafe;
-    box-shadow: inset 0 0 0 1.5px rgba(37, 99, 235, 0.55), 0 1px 4px rgba(37, 99, 235, 0.25);
-}
-.cart-thumb-cam-btn.has-saved-print-cam:not(.is-print-cam-active)::after {
-    content: '';
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: #059669;
+.cart-thumb-cam-btn.has-saved-print-cam {
+    color: #047857;
+    background: #ecfdf5;
+    box-shadow: inset 0 0 0 1.5px rgba(5, 150, 105, 0.45), 0 1px 4px rgba(15, 23, 42, 0.18);
 }
 .cart-thumb-cam-btn { position: relative; }
 .cart-thumb-cam-reset {
     color: #64748b;
+    background: rgba(255, 255, 255, 0.95);
 }
 
 /* Show room / show doors: gray when off, blue glow when on */

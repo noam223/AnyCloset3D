@@ -12369,48 +12369,22 @@ window._syncPrintCamActionButtons = function() {
 window._syncPrintCamButtonState = function() {
     document.querySelectorAll('[data-print-cam-btn]').forEach(function(btn) {
         const idx = Number(btn.getAttribute('data-print-cam-btn'));
-        const active = !!(window._printCamMode && window._printCamCartIndex === idx);
-        btn.classList.toggle('is-print-cam-active', active);
-        btn.classList.toggle('has-saved-print-cam', window._cartItemHasSavedPrintCam(idx));
+        const hasSaved = window._cartItemHasSavedPrintCam(idx);
+        btn.classList.toggle('is-print-cam-active', false);
+        btn.classList.toggle('has-saved-print-cam', hasSaved);
     });
     document.querySelectorAll('[data-print-cam-reset]').forEach(function(btn) {
         const idx = Number(btn.getAttribute('data-print-cam-reset'));
-        const active = !!(window._printCamMode && window._printCamCartIndex === idx);
-        btn.style.display = active ? 'inline-flex' : 'none';
+        // Reset visible whenever this cabinet has a custom saved angle
+        btn.style.display = window._cartItemHasSavedPrintCam(idx) ? 'inline-flex' : 'none';
     });
 };
 
 window._onPrintCamOrbitChange = function() {
-    if (!window._printCamMode) return;
-    const cur = window._printCamPoseSnapshot();
-    window._printCamDirty = window._printCamPoseChanged(window._printCamBaseline, cur);
-    if (window._printCamDirty) window._printCamResetToDefault = false;
+    // No toggle-mode tracking — camera button saves on click
 };
 
-window._enterPrintCameraMode = function(index) {
-    if (index == null || !isFinite(index)) index = state.editingCartIndex;
-    index = Number(index);
-    if (!isFinite(index) || index < 0) return;
-
-    if (state.viewMode === 'blueprint' || state.viewMode === 'room-plan') {
-        state.viewMode = 'front';
-        if (typeof updateCameraView === 'function') updateCameraView();
-    }
-    // Rebuild so space companions exist for a fair preview of the print shot
-    if (typeof buildCabinet === 'function') buildCabinet();
-    const startView = window._savedPrintCaptureView() || window._computeDefaultPrintCaptureView();
-    const pose = window._applyPrintCaptureViewLive(startView);
-    window._printCamMode = true;
-    window._printCamCartIndex = index;
-    window._printCamDirty = false;
-    window._printCamResetToDefault = false;
-    window._printCamBaseline = pose || window._printCamPoseSnapshot();
-    window._syncPrintCamButtonState();
-    if (typeof _showToast === 'function') {
-        _showToast('סובבו את המצלמה למקום הרצוי, ואז לחצו שוב על המצלמה לשמירה', 4500);
-    }
-};
-
+window._enterPrintCameraMode = function() { /* legacy no-op */ };
 window._exitPrintCameraMode = function(opts) {
     opts = opts || {};
     window._printCamMode = false;
@@ -12418,6 +12392,7 @@ window._exitPrintCameraMode = function(opts) {
     window._printCamDirty = false;
     window._printCamResetToDefault = false;
     window._printCamBaseline = null;
+    window._pendingPrintCamEnterIndex = null;
     window._syncPrintCamButtonState();
     if (!opts.keepOrbit) {
         window._orbitFree = false;
@@ -12425,38 +12400,54 @@ window._exitPrintCameraMode = function(opts) {
     }
 };
 
+/** One click: save the current 3D camera angle as this cabinet's print pose. */
 window._togglePrintCameraMode = function(index) {
     index = Number(index);
     if (!isFinite(index) || index < 0) return;
 
-    // Second click on the active camera → confirm and save
-    if (window._printCamMode && window._printCamCartIndex === index) {
+    if (state.editingCartIndex !== index) {
+        if (typeof _showToast === 'function') {
+            _showToast('פתחו קודם את הארון, כוונו את המצלמה, ואז לחצו על המצלמה לשמירה', 3500);
+        }
+        if (typeof editCartItem === 'function') editCartItem(index);
+        return;
+    }
+
+    if (window._cartItemHasSavedPrintCam(index)) {
         if (!confirm('בטוחים שרוצים לשנות את זווית תמונת הארון?')) return;
-        window._savePrintCameraPose();
-        return;
     }
-
-    if (window._printCamMode) {
-        window._exitPrintCameraMode({ keepOrbit: true });
-    }
-
-    if (state.editingCartIndex === index) {
-        window._enterPrintCameraMode(index);
-        return;
-    }
-
-    window._pendingPrintCamEnterIndex = index;
-    if (typeof editCartItem === 'function') editCartItem(index);
+    window._savePrintCameraPose();
 };
 
-window._resetPrintCameraPose = function() {
-    if (!window._printCamMode) return;
+/** Clear custom print angle and restore software default. */
+window._resetPrintCameraPose = function(index) {
+    if (index == null || !isFinite(Number(index))) index = state.editingCartIndex;
+    index = Number(index);
+    if (!isFinite(index) || index < 0) return;
+
+    if (state.editingCartIndex !== index) {
+        window._pendingPrintCamResetIndex = index;
+        if (typeof editCartItem === 'function') editCartItem(index);
+        return;
+    }
+
+    state.printCamera = null;
+    window._lastSavedPrintCamera = null;
+    if (typeof window._commitCurrentCabinetToCart === 'function') {
+        window._commitCurrentCabinetToCart({ flash: false });
+    }
+    window._isDirty = true;
+
+    if (state.viewMode === 'blueprint' || state.viewMode === 'room-plan') {
+        state.viewMode = 'front';
+    }
+    if (typeof buildCabinet === 'function') buildCabinet();
     const defView = window._computeDefaultPrintCaptureView();
-    const pose = window._applyPrintCaptureViewLive(defView);
-    window._printCamBaseline = pose || window._printCamPoseSnapshot();
-    window._printCamDirty = false;
-    window._printCamResetToDefault = true;
-    if (typeof _showToast === 'function') _showToast('חזרה לזווית ברירת המחדל', 2200);
+    window._applyPrintCaptureViewLive(defView);
+    window._syncPrintCamButtonState();
+    if (typeof _showToast === 'function') {
+        _showToast('✓ חזרה לזווית ברירת המחדל של התוכנה', 2800);
+    }
 };
 
 window._savePrintCameraPose = function() {
@@ -12464,22 +12455,6 @@ window._savePrintCameraPose = function() {
     const ctrl = window.controls;
     if (!cam || !ctrl || typeof cabinetGroup === 'undefined' || !cabinetGroup) {
         if (typeof _showToast === 'function') _showToast('לא ניתן לשמור זווית כרגע', 2500);
-        return;
-    }
-
-    // If user reset to software default and did not move away, clear the override
-    if (window._printCamResetToDefault && !window._printCamDirty) {
-        state.printCamera = null;
-        window._lastSavedPrintCamera = null;
-        if (typeof window._commitCurrentCabinetToCart === 'function' && state.editingCartIndex >= 0) {
-            window._commitCurrentCabinetToCart({ flash: false });
-        }
-        window._isDirty = true;
-        window._printCamResetToDefault = false;
-        window._exitPrintCameraMode({ keepOrbit: true });
-        if (typeof _showToast === 'function') {
-            _showToast('✓ חזרה לזווית ברירת המחדל של התוכנה', 3500);
-        }
         return;
     }
 
@@ -12507,14 +12482,13 @@ window._savePrintCameraPose = function() {
     };
     state.printCamera = printCamera;
     window._lastSavedPrintCamera = JSON.parse(JSON.stringify(printCamera));
-    window._printCamResetToDefault = false;
     try { console.info('[printCamera] saved', window._lastSavedPrintCamera); } catch (e) { /* ignore */ }
 
     if (typeof window._commitCurrentCabinetToCart === 'function' && state.editingCartIndex >= 0) {
         window._commitCurrentCabinetToCart({ flash: false });
     }
     window._isDirty = true;
-    window._exitPrintCameraMode({ keepOrbit: true });
+    window._syncPrintCamButtonState();
     if (typeof _showToast === 'function') {
         _showToast('✓ זווית המצלמה נשמרה להדפסת הארון הזה', 3500);
     }
@@ -16445,10 +16419,10 @@ window._editCartItemNow = function(index) {
     if (typeof window._syncSpacePairTabs === 'function') window._syncSpacePairTabs();
     buildCabinet(); updateCameraView(); calculatePrice(); updateLeftSidebar({ scrollToActive: true }); saveHistoryState();
     if (typeof window._markCurrentCabinetClean === 'function') window._markCurrentCabinetClean();
-    if (window._pendingPrintCamEnterIndex === index) {
-        window._pendingPrintCamEnterIndex = null;
+    if (window._pendingPrintCamResetIndex === index) {
+        window._pendingPrintCamResetIndex = null;
         setTimeout(function() {
-            if (typeof window._enterPrintCameraMode === 'function') window._enterPrintCameraMode(index);
+            if (typeof window._resetPrintCameraPose === 'function') window._resetPrintCameraPose(index);
         }, 0);
     }
 }
@@ -16934,13 +16908,13 @@ window.updateLeftSidebar = function(opts) {
         const thumbCamTools = `
             <div class="cart-thumb-cam-tools" onclick="event.stopPropagation();">
                 <button type="button" class="cart-thumb-cam-btn" data-print-cam-btn="${index}"
-                    title="זווית מצלמה להדפסה — לחיצה לעריכה, לחיצה נוספת לשמירה"
+                    title="שמירת זווית המצלמה הנוכחית להדפסה"
                     onclick="event.stopPropagation(); window._togglePrintCameraMode && window._togglePrintCameraMode(${index});">
                     <i class="fa-solid fa-camera"></i>
                 </button>
                 <button type="button" class="cart-thumb-cam-reset" data-print-cam-reset="${index}" style="display:none;"
                     title="חזרה לזווית ברירת המחדל של התוכנה"
-                    onclick="event.stopPropagation(); window._resetPrintCameraPose && window._resetPrintCameraPose();">
+                    onclick="event.stopPropagation(); window._resetPrintCameraPose && window._resetPrintCameraPose(${index});">
                     <i class="fa-solid fa-rotate-left"></i>
                 </button>
             </div>`;
