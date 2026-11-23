@@ -4660,6 +4660,91 @@ window.updateQEInput = function(field, value, unit) {
 }
 
 /** Set column width in cm from the green label above the column. Returns applied width. */
+/**
+ * Equalize all column widths (same total cabinet width). Keeps each column's contents.
+ * Used by double-click on a horizontal column divider handle.
+ */
+window._equalizeColumnWidths = function() {
+    const cols = state.columns;
+    if (!cols || cols.length < 2) return false;
+    const numCols = cols.length;
+    const t = state.thickness || 1.7;
+    const isKit = state.presetId === 'kitchen';
+    const minW = (typeof MIN_COL_WIDTH !== 'undefined') ? MIN_COL_WIDTH : 1;
+
+    if (isKit) {
+        // Separate carcasses: set every unit to the average width, then recompute run width
+        const avg = Math.round(cols.reduce(function(s, c) { return s + (c.width || 0); }, 0) / numCols);
+        const w = Math.max(minW, avg);
+        cols.forEach(function(c) { c.width = w; });
+        if (typeof window._kitchenCommitRunWidth === 'function') {
+            window._kitchenCommitRunWidth(state.wings[state.activeWing]);
+        }
+    } else {
+        const innerWidth = state.width - (t * 2) - (t * (numCols - 1));
+        const activeWingData = state.wings[state.activeWing];
+        const wingPos = activeWingData ? (activeWingData.wingPosition || 'side') : null;
+        const centerWingData = state.wings.center;
+        const centerD = centerWingData ? centerWingData.depth : state.depth;
+        const minHiddenColW = (wingPos === 'side' && state.activeWing !== 'center') ? (centerD + 30) : 0;
+        const hiddenColIsLast = (state.activeWing === 'left');
+
+        let widths;
+        if (minHiddenColW > 0) {
+            const hiddenW = Math.max(minHiddenColW, Math.round(innerWidth / numCols));
+            const remain = innerWidth - hiddenW;
+            const otherBase = Math.floor((remain / (numCols - 1)) * 10) / 10;
+            widths = [];
+            let used = 0;
+            for (let i = 0; i < numCols; i++) {
+                const isHidden = hiddenColIsLast ? (i === numCols - 1) : (i === 0);
+                if (isHidden) {
+                    widths.push(hiddenW);
+                    used += hiddenW;
+                } else if (i === (hiddenColIsLast ? numCols - 2 : numCols - 1)) {
+                    widths.push(Math.round((innerWidth - used) * 10) / 10);
+                } else {
+                    widths.push(otherBase);
+                    used += otherBase;
+                }
+            }
+        } else {
+            const base = Math.floor((innerWidth / numCols) * 10) / 10;
+            widths = [];
+            let used = 0;
+            for (let i = 0; i < numCols; i++) {
+                if (i === numCols - 1) {
+                    widths.push(Math.round((innerWidth - used) * 10) / 10);
+                } else {
+                    widths.push(base);
+                    used += base;
+                }
+            }
+        }
+
+        for (let i = 0; i < numCols; i++) {
+            cols[i].width = Math.max(minW, widths[i]);
+        }
+        // Fix rounding so the sum still matches the carcass inner width
+        const sum = cols.reduce(function(s, c) { return s + c.width; }, 0);
+        const drift = Math.round((innerWidth - sum) * 10) / 10;
+        if (Math.abs(drift) >= 0.05) {
+            cols[numCols - 1].width = Math.max(minW, Math.round((cols[numCols - 1].width + drift) * 10) / 10);
+        }
+    }
+
+    if (typeof buildCabinet === 'function') buildCabinet();
+    if (typeof updateCameraView === 'function') updateCameraView();
+    if (typeof buildDragHandlesUI === 'function') buildDragHandlesUI();
+    if (typeof updateOverlaysPosition === 'function') updateOverlaysPosition();
+    if (typeof calculatePrice === 'function') calculatePrice();
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+    if (typeof _showToast === 'function') {
+        _showToast('רוחב העמודות שווה בשווה', 2200);
+    }
+    return true;
+};
+
 window._setColumnWidthCm = function(cIndex, desiredCm) {
     const cols = state.columns;
     if (!cols || cIndex < 0 || cIndex >= cols.length) return null;
