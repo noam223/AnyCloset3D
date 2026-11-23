@@ -12153,8 +12153,11 @@ window._updateSpaceOcclusionGhosts = function() {
 
 // ── Per-cabinet print-camera pose (user can override the default capture angle) ──
 window._printCamMode = false;
+window._printCamCartIndex = -1;
 window._printCamBaseline = null;
 window._printCamDirty = false;
+window._printCamResetToDefault = false;
+window._pendingPrintCamEnterIndex = null;
 
 window._printCamFocusDims = function() {
     const snapCenterWing = state.wings && state.wings.center;
@@ -12285,53 +12288,69 @@ window._printCamPoseChanged = function(a, b) {
     return false;
 };
 
+window._cartItemHasSavedPrintCam = function(index) {
+    if (state.editingCartIndex === index && state.printCamera && state.printCamera.relPos) return true;
+    const item = state.orderCart && state.orderCart[index];
+    const pc = item && item.rawState && item.rawState.printCamera;
+    return !!(pc && pc.relPos);
+};
+
 window._syncPrintCamActionButtons = function() {
-    const resetBtn = document.getElementById('btn-print-cam-reset');
-    const saveBtn = document.getElementById('btn-print-cam-save');
-    const show = !!(window._printCamMode && window._printCamDirty);
-    if (resetBtn) resetBtn.style.display = show ? 'inline-flex' : 'none';
-    if (saveBtn) saveBtn.style.display = show ? 'inline-flex' : 'none';
+    if (typeof window._syncPrintCamButtonState === 'function') window._syncPrintCamButtonState();
 };
 
 window._syncPrintCamButtonState = function() {
-    const btn = document.getElementById('btn-print-cam');
-    if (!btn) return;
-    btn.classList.toggle('is-print-cam-active', !!window._printCamMode);
-    btn.classList.toggle('has-saved-print-cam', !!(state.printCamera && state.printCamera.relPos));
+    document.querySelectorAll('[data-print-cam-btn]').forEach(function(btn) {
+        const idx = Number(btn.getAttribute('data-print-cam-btn'));
+        const active = !!(window._printCamMode && window._printCamCartIndex === idx);
+        btn.classList.toggle('is-print-cam-active', active);
+        btn.classList.toggle('has-saved-print-cam', window._cartItemHasSavedPrintCam(idx));
+    });
+    document.querySelectorAll('[data-print-cam-reset]').forEach(function(btn) {
+        const idx = Number(btn.getAttribute('data-print-cam-reset'));
+        const active = !!(window._printCamMode && window._printCamCartIndex === idx);
+        btn.style.display = active ? 'inline-flex' : 'none';
+    });
 };
 
 window._onPrintCamOrbitChange = function() {
     if (!window._printCamMode) return;
     const cur = window._printCamPoseSnapshot();
     window._printCamDirty = window._printCamPoseChanged(window._printCamBaseline, cur);
-    window._syncPrintCamActionButtons();
+    if (window._printCamDirty) window._printCamResetToDefault = false;
 };
 
-window._enterPrintCameraMode = function() {
+window._enterPrintCameraMode = function(index) {
+    if (index == null || !isFinite(index)) index = state.editingCartIndex;
+    index = Number(index);
+    if (!isFinite(index) || index < 0) return;
+
     if (state.viewMode === 'blueprint' || state.viewMode === 'room-plan') {
         state.viewMode = 'front';
         if (typeof updateCameraView === 'function') updateCameraView();
     }
     // Rebuild so space companions exist for a fair preview of the print shot
     if (typeof buildCabinet === 'function') buildCabinet();
-    const defView = window._computeDefaultPrintCaptureView();
-    const pose = window._applyPrintCaptureViewLive(defView);
+    const startView = window._savedPrintCaptureView() || window._computeDefaultPrintCaptureView();
+    const pose = window._applyPrintCaptureViewLive(startView);
     window._printCamMode = true;
+    window._printCamCartIndex = index;
     window._printCamDirty = false;
+    window._printCamResetToDefault = false;
     window._printCamBaseline = pose || window._printCamPoseSnapshot();
-    window._syncPrintCamActionButtons();
     window._syncPrintCamButtonState();
     if (typeof _showToast === 'function') {
-        _showToast('זווית ברירת מחדל להדפסה — סובבו את המצלמה, ואז שמרו או אפסו', 4500);
+        _showToast('סובבו את המצלמה למקום הרצוי, ואז לחצו שוב על המצלמה לשמירה', 4500);
     }
 };
 
 window._exitPrintCameraMode = function(opts) {
     opts = opts || {};
     window._printCamMode = false;
+    window._printCamCartIndex = -1;
     window._printCamDirty = false;
+    window._printCamResetToDefault = false;
     window._printCamBaseline = null;
-    window._syncPrintCamActionButtons();
     window._syncPrintCamButtonState();
     if (!opts.keepOrbit) {
         window._orbitFree = false;
@@ -12339,23 +12358,37 @@ window._exitPrintCameraMode = function(opts) {
     }
 };
 
-window._togglePrintCameraMode = function() {
-    if (window._printCamMode) {
-        window._exitPrintCameraMode();
+window._togglePrintCameraMode = function(index) {
+    index = Number(index);
+    if (!isFinite(index) || index < 0) return;
+
+    // Second click on the active camera → confirm and save
+    if (window._printCamMode && window._printCamCartIndex === index) {
+        if (!confirm('בטוחים שרוצים לשנות את זווית תמונת הארון?')) return;
+        window._savePrintCameraPose();
         return;
     }
-    window._enterPrintCameraMode();
+
+    if (window._printCamMode) {
+        window._exitPrintCameraMode({ keepOrbit: true });
+    }
+
+    if (state.editingCartIndex === index) {
+        window._enterPrintCameraMode(index);
+        return;
+    }
+
+    window._pendingPrintCamEnterIndex = index;
+    if (typeof editCartItem === 'function') editCartItem(index);
 };
 
 window._resetPrintCameraPose = function() {
-    if (!window._printCamMode) window._enterPrintCameraMode();
-    else {
-        const defView = window._computeDefaultPrintCaptureView();
-        const pose = window._applyPrintCaptureViewLive(defView);
-        window._printCamBaseline = pose || window._printCamPoseSnapshot();
-        window._printCamDirty = false;
-        window._syncPrintCamActionButtons();
-    }
+    if (!window._printCamMode) return;
+    const defView = window._computeDefaultPrintCaptureView();
+    const pose = window._applyPrintCaptureViewLive(defView);
+    window._printCamBaseline = pose || window._printCamPoseSnapshot();
+    window._printCamDirty = false;
+    window._printCamResetToDefault = true;
     if (typeof _showToast === 'function') _showToast('חזרה לזווית ברירת המחדל', 2200);
 };
 
@@ -12366,6 +12399,22 @@ window._savePrintCameraPose = function() {
         if (typeof _showToast === 'function') _showToast('לא ניתן לשמור זווית כרגע', 2500);
         return;
     }
+
+    // If user reset to software default and did not move away, clear the override
+    if (window._printCamResetToDefault && !window._printCamDirty) {
+        state.printCamera = null;
+        window._lastSavedPrintCamera = null;
+        if (typeof window._commitCurrentCabinetToCart === 'function' && state.editingCartIndex >= 0) {
+            window._commitCurrentCabinetToCart({ flash: false });
+        }
+        window._printCamResetToDefault = false;
+        window._exitPrintCameraMode({ keepOrbit: true });
+        if (typeof _showToast === 'function') {
+            _showToast('✓ חזרה לזווית ברירת המחדל של התוכנה', 3500);
+        }
+        return;
+    }
+
     cabinetGroup.updateMatrixWorld(true);
     const inv = new THREE.Matrix4().copy(cabinetGroup.matrixWorld).invert();
     const relPos = cam.position.clone().applyMatrix4(inv);
@@ -12389,14 +12438,13 @@ window._savePrintCameraPose = function() {
         }
     };
     state.printCamera = printCamera;
-    // Keep a copy for tuning defaults after the user picks a good U-shape angle
     window._lastSavedPrintCamera = JSON.parse(JSON.stringify(printCamera));
+    window._printCamResetToDefault = false;
     try { console.info('[printCamera] saved', window._lastSavedPrintCamera); } catch (e) { /* ignore */ }
 
     if (typeof window._commitCurrentCabinetToCart === 'function' && state.editingCartIndex >= 0) {
         window._commitCurrentCabinetToCart({ flash: false });
     }
-    // Leave camera-edit mode: hide reset/save, un-press the camera button, keep the saved view
     window._exitPrintCameraMode({ keepOrbit: true });
     if (typeof _showToast === 'function') {
         _showToast('✓ זווית המצלמה נשמרה להדפסת הארון הזה', 3500);
@@ -13229,18 +13277,22 @@ window._promptSaveCabinetBeforeSwitch = function(targetIndex) {
     `;
     document.body.appendChild(toast);
 
-    const close = () => { const t = document.getElementById('_unsaved-cabinet-toast'); if (t) t.remove(); };
-    toast.querySelector('#_unsaved-cab-cancel').onclick = close;
+    const close = (cancelled) => {
+        const t = document.getElementById('_unsaved-cabinet-toast');
+        if (t) t.remove();
+        if (cancelled) window._pendingPrintCamEnterIndex = null;
+    };
+    toast.querySelector('#_unsaved-cab-cancel').onclick = () => close(true);
     toast.querySelector('#_unsaved-cab-discard').onclick = () => {
-        close();
+        close(false);
         window._editCartItemNow(targetIndex);
     };
     toast.querySelector('#_unsaved-cab-save').onclick = () => {
-        close();
+        close(false);
         window._commitCurrentCabinetToCart({ flash: false });
         window._editCartItemNow(targetIndex);
     };
-    toast.addEventListener('click', (e) => { if (e.target === toast) close(); });
+    toast.addEventListener('click', (e) => { if (e.target === toast) close(true); });
 };
 
 // ==========================================
@@ -16274,6 +16326,12 @@ window._editCartItemNow = function(index) {
     if (typeof window._syncSpacePairTabs === 'function') window._syncSpacePairTabs();
     buildCabinet(); updateCameraView(); calculatePrice(); updateLeftSidebar({ scrollToActive: true }); saveHistoryState();
     if (typeof window._markCurrentCabinetClean === 'function') window._markCurrentCabinetClean();
+    if (window._pendingPrintCamEnterIndex === index) {
+        window._pendingPrintCamEnterIndex = null;
+        setTimeout(function() {
+            if (typeof window._enterPrintCameraMode === 'function') window._enterPrintCameraMode(index);
+        }, 0);
+    }
 }
 
 window.startNewCabinet = function() {
@@ -16754,9 +16812,22 @@ window.updateLeftSidebar = function(opts) {
                 }
             }
         }
+        const thumbCamTools = `
+            <div class="cart-thumb-cam-tools" onclick="event.stopPropagation();">
+                <button type="button" class="cart-thumb-cam-btn" data-print-cam-btn="${index}"
+                    title="זווית מצלמה להדפסה — לחיצה לעריכה, לחיצה נוספת לשמירה"
+                    onclick="event.stopPropagation(); window._togglePrintCameraMode && window._togglePrintCameraMode(${index});">
+                    <i class="fa-solid fa-camera"></i>
+                </button>
+                <button type="button" class="cart-thumb-cam-reset" data-print-cam-reset="${index}" style="display:none;"
+                    title="חזרה לזווית ברירת המחדל של התוכנה"
+                    onclick="event.stopPropagation(); window._resetPrintCameraPose && window._resetPrintCameraPose();">
+                    <i class="fa-solid fa-rotate-left"></i>
+                </button>
+            </div>`;
         const thumbHtml = thumbSrc
-            ? `<div class="cart-mini-thumb"><img src="${thumbSrc}" alt=""></div>`
-            : `<div class="cart-mini-thumb cart-mini-thumb-empty"><i class="fa-solid fa-cube"></i></div>`;
+            ? `<div class="cart-mini-thumb"><img src="${thumbSrc}" alt="">${thumbCamTools}</div>`
+            : `<div class="cart-mini-thumb cart-mini-thumb-empty"><i class="fa-solid fa-cube"></i>${thumbCamTools}</div>`;
 
         const card = document.createElement('div');
         card.className = `cart-mini-card ${activeClass}${heldClass}${nestedClass}`;
@@ -16894,6 +16965,7 @@ window.updateLeftSidebar = function(opts) {
     if (typeof window._updateCartNotesBadges === 'function' && window._currentShareToken) {
         window._updateCartNotesBadges(window._currentShareToken);
     }
+    if (typeof window._syncPrintCamButtonState === 'function') window._syncPrintCamButtonState();
     if (opts.scrollToActive) {
         // Defer so patched wrappers (mobile list clone) finish first
         requestAnimationFrame(function() {

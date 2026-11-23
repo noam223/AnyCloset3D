@@ -40,7 +40,7 @@
     <link rel="stylesheet" href="style-base.css?v=20261116cartCompact">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
     <link rel="stylesheet" href="style-extras.css?v=20261110doormirror">
-    <link rel="stylesheet" href="style.css?v=20261123occludeGhost1">
+    <link rel="stylesheet" href="style.css?v=20261123thumbCam1">
     <link rel="stylesheet" href="quick-calc.css?v=20260929qc">
     <style>
         html.thumb-only-mode #left-sidebar,
@@ -1499,17 +1499,6 @@
     <button class="view-btn" id="btn-blueprint-view" style="display:none;"><i class="fa-solid fa-compass-drafting"></i> שרטוט</button>
     <button class="view-btn" id="btn-multiview-blueprint" onclick="openMultiViewBlueprint()" style="display:none;"><i class="fa-solid fa-compass-drafting"></i> שרטוט</button>
     <button class="view-btn icon-btn" id="btn-reset-view" title="איפוס זווית מצלמה" style="display:none;" onclick="window._orbitFree=false; const b=document.getElementById('btn-reset-view'); if(b) b.style.display='none'; updateCameraView();"><i class="fa-solid fa-arrows-rotate"></i></button>
-    <div id="print-cam-group" class="print-cam-group" title="זווית מצלמה להדפסת הזמנת לקוח">
-        <button type="button" class="view-btn icon-btn" id="btn-print-cam" title="זווית מצלמה להדפסה — לחיצה מציגה את ברירת המחדל" onclick="window._togglePrintCameraMode && window._togglePrintCameraMode()">
-            <i class="fa-solid fa-camera"></i>
-        </button>
-        <button type="button" class="view-btn icon-btn print-cam-action" id="btn-print-cam-reset" style="display:none;" title="איפוס — חזרה לזווית ברירת המחדל" onclick="window._resetPrintCameraPose && window._resetPrintCameraPose()">
-            <i class="fa-solid fa-rotate-left"></i>
-        </button>
-        <button type="button" class="view-btn icon-btn print-cam-action print-cam-save" id="btn-print-cam-save" style="display:none;" title="שמירת הזווית החדשה להדפסה של הארון הזה" onclick="window._savePrintCameraPose && window._savePrintCameraPose()">
-            <i class="fa-solid fa-check"></i>
-        </button>
-    </div>
     <button class="view-btn" id="btn-room-plan" title="תצוגת חדר — מבט על 2D עם גרירת ריהוט" onclick="window._toggleRoomPlanMode()"><i class="fa-solid fa-couch"></i> תצוגת חדר</button>
     <button class="view-btn" id="btn-mirror-cabinet" title="היפוך כיוון הארון — מה שבימין עובר לשמאל (גם כל הארונות במרחב יחד). לחיצה נוספת מחזירה." onclick="window.mirrorCabinet && window.mirrorCabinet()"><i class="fa-solid fa-left-right"></i> שנה כיוון</button>
     <button class="view-btn toggle-btn" id="btn-toggle-doors" title="הצג/הסתר חזיתות (תצוגה בלבד — לא משנה את השמירה)" onclick="window._toggleDoors && window._toggleDoors()"><i class="fa-solid fa-door-closed"></i><span>הצג דלתות</span></button>
@@ -3315,7 +3304,7 @@
 <script src="bluran-color-picker.js?v=20261116sdDoorTabs1"></script>
 <script src="formex-color-picker.js?v=20261116sdDoorTabs1"></script>
 <script src="room-finishes.js?v=20261110gloss"></script>
-<script src="ui.js?v=20261123occludeHide1"></script>
+<script src="ui.js?v=20261123thumbCam1"></script>
 <script src="mirror-cabinet.js?v=20261110doormirror"></script>
 <script src="mobile.js?v=20261122depth110"></script>
 <script src="part-paint.js?v=20261104egger"></script>
