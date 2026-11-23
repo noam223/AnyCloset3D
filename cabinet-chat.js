@@ -25,6 +25,10 @@ var STORAGE_PREFIX = 'anycloset:cabinetChat:v1:';
 var MAX_STORED_MSGS = 120;
 var _storageKeyActive = null;
 var _persistTimer = null;
+/** Last lesson saved from a successful apply — used for reject/correct learning. */
+var _lastLessonId = null;
+var _lastLessonRequest = '';
+var _pendingCorrection = false;
 
 function storageKey() {
     var pid = (typeof window !== 'undefined' && window._currentProjectId) ? String(window._currentProjectId) : '';
@@ -422,6 +426,110 @@ function normalizeAiActions(actions) {
     return slots;
 }
 
+function looksLikeNegativeFeedback(text) {
+    var t = normalize(text);
+    return /לא\s*(טוב|ככה|נכון|זה|מתאים)|תקן|תתקן|שנה\s*את|תשנה|בטל\s*את|לא\s*מה\s*ש|הפוך|מחדש\s*בלי/.test(t);
+}
+
+/** Recent user turns that led to this apply (for learning context). */
+function collectRequestTranscript(fallbackMsg) {
+    var parts = [];
+    for (var i = HISTORY.length - 1; i >= 0 && parts.length < 6; i--) {
+        var h = HISTORY[i];
+        if (!h) continue;
+        if (h.role === 'user') parts.unshift(String(h.text || '').slice(0, 400));
+        else if (h.role === 'bot' && parts.length) break;
+    }
+    if (!parts.length && fallbackMsg) parts = [String(fallbackMsg).slice(0, 800)];
+    return parts.join(' | ').slice(0, 1800);
+}
+
+function compactActionsForLesson(actions) {
+    var a = actions || {};
+    var out = {};
+    Object.keys(a).forEach(function (k) {
+        if (a[k] == null || a[k] === '') return;
+        if (k === 'columnTemplates' && Array.isArray(a[k])) {
+            out[k] = a[k].map(function (x) { return x == null ? null : String(x).slice(0, 40); });
+            return;
+        }
+        out[k] = a[k];
+    });
+    return out;
+}
+
+function outcomeLineFromState() {
+    var s = snapshotCurrentState();
+    var bits = [];
+    if (s.width) bits.push('W' + s.width);
+    if (s.height) bits.push('H' + s.height);
+    if (s.depth) bits.push('D' + s.depth);
+    if (s.columns) bits.push(s.columns + 'עמודות');
+    if (s.hangingColumns) bits.push(s.hangingColumns + 'תלייה');
+    if (s.drawerColumns) bits.push(s.drawerColumns + 'מגירות');
+    bits.push(s.hasDoors ? 'עם-דלתות' : 'בלי-דלתות');
+    if (s.frontFaceStyle === 'profile') bits.push('פרופיל');
+    return bits.join(' ').slice(0, 700);
+}
+
+async function markLastLessonRejected() {
+    if (!_lastLessonId) return;
+    var sb = window._supabase;
+    if (!sb) return;
+    try {
+        await sb.from('cabinet_chat_lessons')
+            .update({ feedback: 'rejected' })
+            .eq('id', _lastLessonId);
+        _pendingCorrection = true;
+    } catch (e) {
+        console.warn('[cabinet-chat] reject lesson:', e && e.message);
+    }
+}
+
+async function recordLesson(opts) {
+    var sb = window._supabase;
+    if (!sb) return null;
+    try {
+        var session = (await sb.auth.getSession()).data.session;
+        if (!session) return null;
+        var row = {
+            request: String(opts.request || '').slice(0, 2000),
+            actions: compactActionsForLesson(opts.actions || {}),
+            outcome: String(opts.outcome || '').slice(0, 800),
+            feedback: opts.feedback || 'applied',
+            kind: opts.kind || 'create'
+        };
+        var res = await sb.from('cabinet_chat_lessons').insert(row).select('id').single();
+        if (res.error) {
+            console.warn('[cabinet-chat] lesson save:', res.error.message);
+            return null;
+        }
+        _lastLessonId = res.data && res.data.id;
+        _lastLessonRequest = row.request;
+        _pendingCorrection = false;
+        return _lastLessonId;
+    } catch (e) {
+        console.warn('[cabinet-chat] lesson save:', e && e.message);
+        return null;
+    }
+}
+
+function learnFromSuccessfulApply(actions, intent) {
+    var request = collectRequestTranscript(_lastLessonRequest);
+    var kind = _pendingCorrection ? 'correction'
+        : (intent === 'walkin' || intent === 'create_walkin') ? 'walkin'
+            : (intent === 'edit') ? 'edit' : 'create';
+    var feedback = _pendingCorrection ? 'corrected' : 'applied';
+    // Fire-and-forget; don't block UI
+    recordLesson({
+        request: request,
+        actions: actions,
+        outcome: outcomeLineFromState(),
+        kind: kind,
+        feedback: feedback
+    });
+}
+
 function applyAiResult(data) {
     var intent = data.intent || 'create';
     var actions = normalizeAiActions(data.actions);
@@ -467,7 +575,7 @@ function applyAiResult(data) {
         msg = applyCreateLinear(actions);
         if (data.reply) msg = data.reply;
     }
-    return { reply: msg, done: true };
+    return { reply: msg, done: true, learnActions: actions, learnIntent: intent };
 }
 
 async function askCabinetAI(message) {
@@ -1018,7 +1126,7 @@ function processMessage(raw) {
         }
         SESSION = null;
         var msg = intent === 'create_walkin' ? applyWalkin(slots) : applyCreateLinear(slots);
-        return { reply: msg, done: true };
+        return { reply: msg, done: true, learnActions: slots, learnIntent: intent };
     }
 
     if (intent === 'edit') {
@@ -1030,15 +1138,17 @@ function processMessage(raw) {
                 SESSION.awaiting = miss2[0];
                 return { reply: questionFor(miss2[0]) };
             }
-            var fin = SESSION.intent === 'create_walkin' ? applyWalkin(SESSION.slots) : applyCreateLinear(SESSION.slots);
+            var finIntent = SESSION.intent;
+            var finSlots = SESSION.slots;
+            var fin = finIntent === 'create_walkin' ? applyWalkin(finSlots) : applyCreateLinear(finSlots);
             SESSION = null;
-            return { reply: fin, done: true };
+            return { reply: fin, done: true, learnActions: finSlots, learnIntent: finIntent };
         }
         var editMsg = applyEdit(slots);
         if (!editMsg) {
             return { reply: 'מה לשנות? למשל: «שנה רוחב ל־200», «4 עמודות», «חזיתות פרופיל».' };
         }
-        return { reply: editMsg, done: true };
+        return { reply: editMsg, done: true, learnActions: slots, learnIntent: 'edit' };
     }
 
     return { reply: 'לא הצלחתי לבצע. ' + helpText() };
@@ -1093,6 +1203,11 @@ async function send() {
     var sendBtn = document.getElementById('cabinet-chat-send');
     if (sendBtn) sendBtn.disabled = true;
 
+    // Soft signal: user rejected previous result → don't reinforce that lesson
+    if (looksLikeNegativeFeedback(text)) {
+        markLastLessonRejected();
+    }
+
     // Ensure column templates are loaded before AI / local matching
     try {
         if (typeof window._refreshTemplates === 'function') await window._refreshTemplates('column');
@@ -1122,7 +1237,10 @@ async function send() {
     if (sendBtn) sendBtn.disabled = false;
     appendBubble('bot', result.reply || 'בוצע.');
     persistChatNow();
-    if (result.done) setTimeout(function () { measureAndSetOffset(); }, 50);
+    if (result.done) {
+        if (result.learnActions) learnFromSuccessfulApply(result.learnActions, result.learnIntent || 'create');
+        setTimeout(function () { measureAndSetOffset(); }, 50);
+    }
 }
 
 function injectUi() {

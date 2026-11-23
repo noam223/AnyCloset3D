@@ -157,6 +157,7 @@ function systemPrompt(): string {
     'אתה סוכן תכנון ארונות של AnyCloset 3D. ענה בעברית קצרה וברורה.',
     'המטרה: להפוך בקשת משתמש לפעולות מובנות שיוצרים/עורכים ארון ליניארי במערכת.',
     'למד מהדוגמאות מפרויקטים אמיתיים — במיוחד כמה עמודות לרוחב נתון (בדרך כלל 55–95 ס״מ לעמודה, לא לפצל יתר על המידה).',
+    'למד גם משיעורים מהשיחות (בקשה→פעולות→תוצאה). העדף שיעורים של המשתמש הנוכחי; אל תחזור על שיעורים שסומנו rejected.',
     'תבניות עמודה הן ספריית השראה — לא חובה להעתיק אותן אחד־לאחד.',
     'השתמש בבינה: הבן את הבקשה, בחר תבנית קרובה כשעוזרת, ואז התאם (מספר מגירות, פנימי/חיצוני, כמה תלייה/מדפים, דלתות).',
     'מותר להשאיר columnTemplates=null או לשים null בעמודה מסוימת ולבנות אותה חופשי לפי hangingColumns/drawers/shelves.',
@@ -223,6 +224,38 @@ serve(async (req) => {
     ? colTpls.map((t, i) => `[T${i}] ${lineOfTpl(t)}`).join('\n')
     : '(אין תבניות עמודה שמורות — בנה תאים ידנית לפי hanging/drawers/shelves)';
 
+  // Lessons from chat (this user first, then recent successful from others — anonymized)
+  type Lesson = {
+    request: string; actions: Record<string, unknown>; outcome: string | null;
+    feedback: string; kind: string; user_id?: string;
+  };
+  const lineOfLesson = (L: Lesson, i: number, mine: boolean) => {
+    const act = JSON.stringify(L.actions || {}).slice(0, 280);
+    return `[L${i}${mine ? '*' : ''}] ${clip(L.request, 220)} → ${act}` +
+      (L.outcome ? ` ⇒ ${clip(L.outcome, 120)}` : '') +
+      (L.feedback === 'corrected' ? ' (תוקן אחרי משוב)' : '');
+  };
+  const { data: myLessonsRaw } = await sb.from('cabinet_chat_lessons')
+    .select('request, actions, outcome, feedback, kind')
+    .eq('user_id', user.id)
+    .in('feedback', ['applied', 'corrected'])
+    .order('created_at', { ascending: false })
+    .limit(12);
+  const myLessons = (myLessonsRaw || []) as Lesson[];
+  const { data: otherLessonsRaw } = await sb.from('cabinet_chat_lessons')
+    .select('request, actions, outcome, feedback, kind')
+    .neq('user_id', user.id)
+    .eq('feedback', 'applied')
+    .order('created_at', { ascending: false })
+    .limit(8);
+  const otherLessons = (otherLessonsRaw || []) as Lesson[];
+  const lessonLines: string[] = [];
+  myLessons.forEach((L, i) => lessonLines.push(lineOfLesson(L, i, true)));
+  otherLessons.forEach((L, i) => lessonLines.push(lineOfLesson(L, myLessons.length + i, false)));
+  const lessonBlock = lessonLines.length
+    ? lessonLines.join('\n')
+    : '(אין עדיין שיעורים משיחות — למד מהדוגמאות והתבניות)';
+
   const { data: examplesRaw, error: exErr } = await sb.rpc('cabinet_chat_examples', { p_limit: 160 });
   if (exErr) console.warn('cabinet_chat_examples:', exErr.message);
   const all = (examplesRaw || []) as Example[];
@@ -262,6 +295,7 @@ serve(async (req) => {
     })}`,
     pending ? `slots ממתינים משיחה קודמת: ${JSON.stringify(pending)}` : '',
     colTip,
+    `שיעורים משיחות (L* = שלך — העדף אותם):\n${lessonBlock}`,
     `תבניות עמודה (השראה — אפשר לבחור/לשלב/להתעלם ולהתאים):\n${tplBlock}`,
     `דוגמאות מפרויקטים אמיתיים (אנונימיות):\n${exampleBlock}`,
     apiCheatSheet(),
