@@ -276,7 +276,7 @@ function parseSlots(text) {
         }
     }
 
-    // Columns
+    // Columns — with or without a number (bare "עמודות" → ask count later)
     m = t.match(/(\d+|שתיים|שני|שלוש|שלושה|ארבע|ארבעה|חמש|חמישה|שש|שישה)\s*עמוד(?:ות|ה)?/);
     if (m) {
         var cn = parseHebNumberToken(m[1]);
@@ -284,6 +284,11 @@ function parseSlots(text) {
     }
     m = t.match(/עמוד(?:ות|ה)?\s*[:\-]?\s*(\d+)/);
     if (m) slots.columns = Math.max(1, Math.min(12, parseInt(m[1], 10)));
+    if (slots.columns == null && /עמוד(?:ות|ה)/.test(t) &&
+        !/עמוד(?:ות|ה)?\s*(?:של\s*)?(?:מדפ|תלי|מגיר)/.test(t) &&
+        !/(?:מדפ|תלי|מגיר)\w*\s*עמוד/.test(t)) {
+        slots.askColumns = true;
+    }
 
     // Drawer kind (פנימיות / חיצוניות) — don't match bare words inside "חזיתות פנימיות"
     if (hasAny(t, ['מגירות חיצוניות', 'מגירה חיצונית'])) slots.drawerKind = 'external';
@@ -293,7 +298,7 @@ function parseSlots(text) {
         else if (/פנימ|פנים|internal/i.test(t)) slots.drawerKind = 'internal';
     }
 
-    // Drawer count — "4 מגירות" / "4 מגירות סך הכל"
+    // Drawer count — "4 מגירות" / bare "מגירות" → ask count later
     m = t.match(/(\d+|שתיים|שני|שלוש|שלושה|ארבע|ארבעה|חמש|חמישה)\s*מגירות/);
     if (m) {
         var dn = parseHebNumberToken(m[1]);
@@ -305,6 +310,16 @@ function parseSlots(text) {
         slots.drawers = false;
         slots.drawerCount = 0;
         slots.drawerKind = null;
+    }
+    // "עמודת מגירות" / "עמודות מגירות" without count
+    m = t.match(/(\d+|שתיים|שני|שלוש|שלושה|ארבע|ארבעה)\s*עמוד(?:ות|ה)?\s*(?:של\s*)?מגירות/);
+    if (m) {
+        var dcn = parseHebNumberToken(m[1]);
+        if (dcn != null) slots.drawerColumns = Math.max(1, Math.min(6, Math.round(dcn)));
+        slots.drawers = true;
+    } else if (/עמוד(?:ות|ה)?\s*(?:של\s*)?מגירות|מגירות\s*ב\s*עמוד/.test(t)) {
+        slots.drawers = true;
+        slots.askDrawerColumns = true;
     }
 
     // Front style (before doors — "חזיתות פרופיל" is not a door request)
@@ -326,6 +341,17 @@ function parseSlots(text) {
             slots.hanging = true;
         }
     }
+    m = t.match(/(\d+|שתיים|שני|שלוש|שלושה|ארבע|ארבעה)\s*עמוד(?:ות|ה)?\s*(?:של\s*)?תלי[יה]/);
+    if (m) {
+        var hcn = parseHebNumberToken(m[1]);
+        if (hcn != null) {
+            slots.hangingColumns = Math.max(1, Math.min(12, Math.round(hcn)));
+            slots.hanging = true;
+        }
+    } else if (/עמוד(?:ות|ה)?\s*(?:של\s*)?תלי[יה]/.test(t)) {
+        slots.hanging = true;
+        slots.askHangingColumns = true;
+    }
     if (hasAny(t, ['תלייה', 'תליה', 'מוט', 'בגדים', 'מתלה'])) slots.hanging = true;
 
     // "כל השאר מדפים" / "השאר מדפים" / N מדפים
@@ -338,6 +364,9 @@ function parseSlots(text) {
         var sn = parseHebNumberToken(m[1]);
         if (sn != null) slots.shelfColumns = Math.max(1, Math.min(12, Math.round(sn)));
         slots.shelves = true;
+    } else if (/עמוד(?:ות|ה)?\s*(?:של\s*)?מדפים/.test(t)) {
+        slots.shelves = true;
+        slots.askShelfColumns = true;
     }
     if (hasAny(t, ['מדפים', 'מדף'])) slots.shelves = true;
     if (hasAny(t, ['כוורת'])) slots.openCell = true;
@@ -349,6 +378,9 @@ function parseSlots(text) {
         if (wn != null) slots.walls = Math.max(2, Math.min(4, Math.round(wn)));
     }
     if (hasAny(t, ['שלוש דפנות', '3 דפנות'])) slots.walls = 3;
+    if (slots.walls == null && /דפנות|דופן/.test(t) && hasAny(t, ['חדר ארונות', 'חדר הלבשה', 'ווקינ', 'walk'])) {
+        slots.askWalls = true;
+    }
 
     // Lone height after "גובה … 270" already handled; if only one large number + גובה word nearby
     if (slots.height == null && /גובה/.test(t) && nums.length) {
@@ -357,17 +389,39 @@ function parseSlots(text) {
         }
     }
 
-    // Answer mode: single number fills awaiting slot
-    if (SESSION && SESSION.awaiting && nums.length === 1 && Object.keys(slots).length === 0) {
-        var only = Math.round(nums[0].value);
-        if (SESSION.awaiting === 'width') slots.width = only <= 12 ? only * 100 : only;
-        else if (SESSION.awaiting === 'height') slots.height = only <= 12 ? only * 100 : only;
-        else if (SESSION.awaiting === 'depth') slots.depth = only <= 3 ? only * 100 : only;
-        else if (SESSION.awaiting === 'columns') slots.columns = only;
-        else if (SESSION.awaiting === 'drawerCount') slots.drawerCount = only;
-        else if (SESSION.awaiting === 'hasDoors') {
-        if (hasAny(t, ['כן', 'עם', 'בטח'])) slots.hasDoors = true;
-        else if (hasAny(t, ['לא', 'בלי'])) slots.hasDoors = false;
+    // Answer mode: single number fills awaiting quantity/dim slot
+    if (SESSION && SESSION.awaiting && nums.length === 1) {
+        var onlyKeys = Object.keys(slots).filter(function (k) {
+            return slots[k] != null && k !== 'askColumns' && k !== 'askHangingColumns' &&
+                k !== 'askShelfColumns' && k !== 'askDrawerColumns' && k !== 'askWalls';
+        });
+        var bareAnswer = onlyKeys.length === 0;
+        var awaitQty = /^(width|height|depth|columns|drawerCount|hangingColumns|shelfColumns|drawerColumns|walls)$/
+            .test(SESSION.awaiting);
+        if (bareAnswer || (awaitQty && slots[SESSION.awaiting] == null)) {
+            var only = Math.round(nums[0].value);
+            if (SESSION.awaiting === 'width') slots.width = only <= 12 ? only * 100 : only;
+            else if (SESSION.awaiting === 'height') slots.height = only <= 12 ? only * 100 : only;
+            else if (SESSION.awaiting === 'depth') slots.depth = only <= 3 ? only * 100 : only;
+            else if (SESSION.awaiting === 'columns') slots.columns = Math.max(1, Math.min(12, only));
+            else if (SESSION.awaiting === 'drawerCount') {
+                slots.drawerCount = Math.max(1, Math.min(8, only));
+                slots.drawers = true;
+            } else if (SESSION.awaiting === 'hangingColumns') {
+                slots.hangingColumns = Math.max(1, Math.min(12, only));
+                slots.hanging = true;
+            } else if (SESSION.awaiting === 'shelfColumns') {
+                slots.shelfColumns = Math.max(1, Math.min(12, only));
+                slots.shelves = true;
+            } else if (SESSION.awaiting === 'drawerColumns') {
+                slots.drawerColumns = Math.max(1, Math.min(6, only));
+                slots.drawers = true;
+            } else if (SESSION.awaiting === 'walls') {
+                slots.walls = Math.max(2, Math.min(4, only));
+            } else if (SESSION.awaiting === 'hasDoors') {
+                if (hasAny(t, ['כן', 'עם', 'בטח'])) slots.hasDoors = true;
+                else if (hasAny(t, ['לא', 'בלי'])) slots.hasDoors = false;
+            }
         }
     }
     // Yes/no answers
@@ -384,22 +438,43 @@ function mergeSlots(base, extra) {
     Object.keys(extra || {}).forEach(function (k) {
         if (extra[k] != null) out[k] = extra[k];
     });
-    // Propagate drawerKind into each cabinet in a multi-create session
-    if (out.cabinets && Array.isArray(out.cabinets) && extra && extra.drawerKind) {
-        out.cabinets = out.cabinets.map(function (c) {
-            return mergeSlots(c, { drawerKind: extra.drawerKind });
+    // Propagate shared answers into each cabinet in a multi-create session
+    if (out.cabinets && Array.isArray(out.cabinets) && extra) {
+        var prop = {};
+        ['drawerKind', 'drawerCount', 'drawerColumns', 'hangingColumns', 'shelfColumns', 'columns'].forEach(function (k) {
+            if (extra[k] != null) prop[k] = extra[k];
         });
+        if (Object.keys(prop).length) {
+            out.cabinets = out.cabinets.map(function (c) {
+                return mergeSlots(c, prop);
+            });
+        }
     }
     return out;
+}
+
+/** Quantity / choice slots that must be asked when the user mentioned the feature without a number. */
+function missingQuantities(slots) {
+    var miss = [];
+    if (!slots) return miss;
+    if (slots.drawers && (slots.drawerCount == null || slots.drawerCount === '')) miss.push('drawerCount');
+    if (slots.drawers && !slots.drawerKind) miss.push('drawerKind');
+    if ((slots.askDrawerColumns || (slots.drawers && slots.drawerColumns === 0)) && slots.drawerColumns == null) {
+        // only when explicitly asked for drawer-columns without a number
+        if (slots.askDrawerColumns) miss.push('drawerColumns');
+    }
+    if (slots.askColumns && slots.columns == null) miss.push('columns');
+    if (slots.askHangingColumns && slots.hangingColumns == null) miss.push('hangingColumns');
+    if (slots.askShelfColumns && slots.shelfColumns == null) miss.push('shelfColumns');
+    if (slots.askWalls && slots.walls == null) miss.push('walls');
+    return miss;
 }
 
 function missingForCreate(slots) {
     var miss = [];
     if (slots.width == null) miss.push('width');
     if (slots.height == null) miss.push('height');
-    // Drawers mentioned without kind → ask פנימיות / חיצוניות
-    if (slots.drawers && !slots.drawerKind) miss.push('drawerKind');
-    return miss;
+    return miss.concat(missingQuantities(slots));
 }
 
 function missingForWalkin(slots) {
@@ -407,7 +482,7 @@ function missingForWalkin(slots) {
     if (slots.roomW == null && slots.width == null) miss.push('roomW');
     if (slots.height == null) miss.push('height');
     if (slots.walls == null) miss.push('walls');
-    return miss;
+    return miss.concat(missingQuantities(slots));
 }
 
 function questionFor(slot) {
@@ -418,6 +493,9 @@ function questionFor(slot) {
         case 'columns': return 'כמה עמודות?';
         case 'hasDoors': return 'עם דלתות? (כן / לא)';
         case 'drawerCount': return 'כמה מגירות?';
+        case 'drawerColumns': return 'בכמה עמודות לשים מגירות?';
+        case 'hangingColumns': return 'בכמה עמודות לשים תלייה?';
+        case 'shelfColumns': return 'בכמה עמודות לשים מדפים?';
         case 'drawerKind': return 'המגירות פנימיות או חיצוניות?';
         case 'roomW': return 'מה מידות החדר? למשל: 2 על 3 מטר';
         case 'walls': return 'כמה דפנות לארון? (2 / 3)';
@@ -1111,7 +1189,8 @@ function missingForMany(cabinets) {
         var c = list[i] || {};
         if (c.width == null) return ['width'];
         if (c.height == null) return ['height'];
-        if (c.drawers && !c.drawerKind) return ['drawerKind'];
+        var q = missingQuantities(c);
+        if (q.length) return [q[0]];
     }
     return [];
 }
