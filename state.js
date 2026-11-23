@@ -1726,18 +1726,18 @@ window.enterWingEditMode = function(wingId) {
     window._orbitFree = false;
     // Update tab UI — highlight the active wing tab, deactivate free tab
     _setWingTabActive(isFCEdit ? realSide : wingId);
-    // Show edit mode banner with appropriate label
+    // Show edit mode banner — same prominent exit CTA as space isolate (no dead-space click exit)
+    const wingLabelHtml = isFCEdit
+        ? '<i class="fa-solid fa-pen-to-square" style="margin-left:6px;color:#7eb8f7;"></i>מצב עריכת פינה מלאה'
+        : '<i class="fa-solid fa-pen-to-square" style="margin-left:6px;color:#7eb8f7;"></i>מצב עריכת כנף';
     if (typeof window._restoreWingEditBannerHandlers === 'function') {
-        window._restoreWingEditBannerHandlers();
-    }
-    const banner = document.getElementById('wing-edit-banner');
-    if (banner) {
-        banner.style.display = 'flex';
-        const bannerLabel = banner.querySelector('span');
-        if (bannerLabel) {
-            bannerLabel.innerHTML = isFCEdit
-                ? '<i class="fa-solid fa-pen-to-square" style="margin-left:6px;color:#7eb8f7;"></i>מצב עריכת פינה מלאה'
-                : '<i class="fa-solid fa-pen-to-square" style="margin-left:6px;color:#7eb8f7;"></i>מצב עריכת כנף';
+        window._restoreWingEditBannerHandlers(wingLabelHtml);
+    } else {
+        const banner = document.getElementById('wing-edit-banner');
+        if (banner) {
+            banner.style.display = 'flex';
+            const bannerLabel = banner.querySelector('span');
+            if (bannerLabel) bannerLabel.innerHTML = wingLabelHtml;
         }
     }
     syncSidebarToWing();
@@ -1771,6 +1771,7 @@ window.confirmWingEdit = function() {
         window._showSpaceIsolateBanner(true);
     } else if (banner) {
         banner.style.display = 'none';
+        if (typeof window._clearEditExitBannerStyle === 'function') window._clearEditExitBannerStyle();
     }
     // Restore free tab as active
     _setFreeTabActive(true);
@@ -1829,7 +1830,10 @@ window.cancelWingEdit = function() {
     const _uuBanner2 = document.getElementById('upper-unit-edit-banner');
     if (_uuBanner2) _uuBanner2.style.display = 'none';
     const banner = document.getElementById('wing-edit-banner');
-    if (banner) banner.style.display = 'none';
+    if (banner) {
+        banner.style.display = 'none';
+        if (typeof window._clearEditExitBannerStyle === 'function') window._clearEditExitBannerStyle();
+    }
     // Restore free tab as active
     _setFreeTabActive(true);
     syncSidebarToWing();

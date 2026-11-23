@@ -10597,32 +10597,9 @@ function bindUI() {
         mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
 
-        // In wing edit mode: record if pointerdown is on dead space
-        const _isFCEditNow = state.activeWing === 'full_corner_right' || state.activeWing === 'full_corner_left';
-        if (state.wingEditMode && !_isFCEditNow) {
-            // Regular wing edit: dead space = not hitting any hitBox mesh AND not hitting an upperUnit hit box
-            const hitIntersects = raycaster.intersectObjects(hitBoxes);
-            const uuHitBoxes = (wingHitBoxes || []).filter(h => h.userData.wingId && h.userData.wingId.startsWith('upperUnit_'));
-            const uuIntersects = uuHitBoxes.length > 0 ? raycaster.intersectObjects(uuHitBoxes) : [];
-            if (hitIntersects.length === 0 && uuIntersects.length === 0) {
-                _pointerDownOnDeadSpace = true;
-            }
-        } else if (state.wingEditMode && _isFCEditNow) {
-            // FC edit mode: dead space = not hitting the full corner group meshes
-            const fcSide = state.activeWing.replace('full_corner_', '');
-            const fcGroup = window[`_fullCornerGroup_${fcSide}`];
-            if (fcGroup) {
-                const fcMeshes = [];
-                fcGroup.traverse(obj => { if (obj.isMesh) fcMeshes.push(obj); });
-                const fcIntersects = raycaster.intersectObjects(fcMeshes);
-                if (fcIntersects.length === 0) {
-                    _pointerDownOnDeadSpace = true;
-                }
-            } else {
-                // No FC group found — treat any click as dead space exit
-                _pointerDownOnDeadSpace = true;
-            }
-        } else if (state._activeUpperUnit) {
+        // Wing/corner edit: exit only via banner button (no dead-space click), same as space isolate.
+        // Upper-unit edit still uses dead-space to return to the lower cabinet.
+        if (state._activeUpperUnit) {
             // Upper-unit edit: dead space = outside THIS upper unit (not lower run / empty room)
             const uuKey = state._activeUpperUnit;
             const hitIntersects = raycaster.intersectObjects(hitBoxes);
@@ -10713,21 +10690,6 @@ function bindUI() {
                 if (typeof window.openCornerDeskHandlePicker === 'function') {
                     window.openCornerDeskHandlePicker();
                 }
-                return;
-            }
-        }
-
-        // In wing edit mode: click on dead space → exit to free mode
-        if (state.wingEditMode && _pointerDownOnDeadSpace) {
-            const _isFCExitNow = state.activeWing === 'full_corner_right' || state.activeWing === 'full_corner_left';
-            if (_isFCExitNow) {
-                // FC edit mode: any click outside the FC group exits
-                exitWingEditMode();
-                return;
-            }
-            const hitIntersects = raycaster.intersectObjects(hitBoxes);
-            if (hitIntersects.length === 0) {
-                exitWingEditMode();
                 return;
             }
         }
@@ -14857,18 +14819,11 @@ window.exitSpaceIsolateMode = function() {
     if (typeof window._syncSpacePairTabs === 'function') window._syncSpacePairTabs();
 };
 
-window._showSpaceIsolateBanner = function(show) {
+/** Shared prominent exit banner (space isolate + wing/corner edit). */
+window._styleEditExitBanner = function(opts) {
     const banner = document.getElementById('wing-edit-banner');
-    if (!banner) return;
-    if (!show) {
-        // Don't hide if classic wing-edit is still active
-        if (state.wingEditMode) return;
-        banner.style.display = 'none';
-        banner.style.padding = '';
-        banner.style.gap = '';
-        banner.style.bottom = '';
-        return;
-    }
+    if (!banner) return null;
+    opts = opts || {};
     banner.style.display = 'flex';
     banner.style.padding = '12px 22px';
     banner.style.gap = '16px';
@@ -14876,21 +14831,22 @@ window._showSpaceIsolateBanner = function(show) {
     const bannerLabel = banner.querySelector('span');
     if (bannerLabel) {
         bannerLabel.style.fontSize = '0.95rem';
-        bannerLabel.innerHTML = '<i class="fa-solid fa-pen-to-square" style="margin-left:6px;color:#7eb8f7;"></i>מצב עריכת יחידה במרחב';
+        if (opts.labelHtml) bannerLabel.innerHTML = opts.labelHtml;
     }
     const btn = banner.querySelector('button');
     if (btn) {
-        btn.setAttribute('onclick', 'exitSpaceIsolateMode()');
-        btn.innerHTML = '<i class="fa-solid fa-arrow-right"></i> חזור למרחב';
+        if (opts.onclick) btn.setAttribute('onclick', opts.onclick);
+        if (opts.btnHtml) btn.innerHTML = opts.btnHtml;
         btn.style.padding = '12px 28px';
         btn.style.fontSize = '1rem';
         btn.style.borderRadius = '12px';
         btn.style.boxShadow = '0 4px 18px rgba(37,99,235,0.45)';
         btn.style.gap = '10px';
     }
+    return banner;
 };
 
-window._restoreWingEditBannerHandlers = function() {
+window._clearEditExitBannerStyle = function() {
     const banner = document.getElementById('wing-edit-banner');
     if (!banner) return;
     banner.style.padding = '';
@@ -14900,14 +14856,37 @@ window._restoreWingEditBannerHandlers = function() {
     if (bannerLabel) bannerLabel.style.fontSize = '';
     const btn = banner.querySelector('button');
     if (btn) {
-        btn.setAttribute('onclick', 'exitWingEditMode()');
-        btn.innerHTML = '<i class="fa-solid fa-arrow-right"></i> חזור למצב חופשי';
         btn.style.padding = '';
         btn.style.fontSize = '';
         btn.style.borderRadius = '';
         btn.style.boxShadow = '';
         btn.style.gap = '';
     }
+};
+
+window._showSpaceIsolateBanner = function(show) {
+    const banner = document.getElementById('wing-edit-banner');
+    if (!banner) return;
+    if (!show) {
+        // Don't hide if classic wing-edit is still active
+        if (state.wingEditMode) return;
+        banner.style.display = 'none';
+        window._clearEditExitBannerStyle();
+        return;
+    }
+    window._styleEditExitBanner({
+        labelHtml: '<i class="fa-solid fa-pen-to-square" style="margin-left:6px;color:#7eb8f7;"></i>מצב עריכת יחידה במרחב',
+        onclick: 'exitSpaceIsolateMode()',
+        btnHtml: '<i class="fa-solid fa-arrow-right"></i> חזור למרחב'
+    });
+};
+
+window._restoreWingEditBannerHandlers = function(labelHtml) {
+    window._styleEditExitBanner({
+        labelHtml: labelHtml || '<i class="fa-solid fa-pen-to-square" style="margin-left:6px;color:#7eb8f7;"></i>מצב עריכת כנף',
+        onclick: 'exitWingEditMode()',
+        btnHtml: '<i class="fa-solid fa-arrow-right"></i> חזור למצב חופשי'
+    });
 };
 
 window.switchSpaceCabinet = function(slot) {
