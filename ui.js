@@ -13328,7 +13328,10 @@ window._promptSaveCabinetBeforeSwitch = function(targetIndex) {
     const close = (cancelled) => {
         const t = document.getElementById('_unsaved-cabinet-toast');
         if (t) t.remove();
-        if (cancelled) window._pendingPrintCamEnterIndex = null;
+        if (cancelled) {
+            window._pendingPrintCamEnterIndex = null;
+            window._pendingPrintCamResetIndex = null;
+        }
     };
     toast.querySelector('#_unsaved-cab-cancel').onclick = () => close(true);
     toast.querySelector('#_unsaved-cab-discard').onclick = () => {
