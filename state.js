@@ -1727,6 +1727,9 @@ window.enterWingEditMode = function(wingId) {
     // Update tab UI — highlight the active wing tab, deactivate free tab
     _setWingTabActive(isFCEdit ? realSide : wingId);
     // Show edit mode banner with appropriate label
+    if (typeof window._restoreWingEditBannerHandlers === 'function') {
+        window._restoreWingEditBannerHandlers();
+    }
     const banner = document.getElementById('wing-edit-banner');
     if (banner) {
         banner.style.display = 'flex';
@@ -1763,7 +1766,12 @@ window.confirmWingEdit = function() {
     state.wingEditMode = false;
     state.wingEditSnapshot = null;
     const banner = document.getElementById('wing-edit-banner');
-    if (banner) banner.style.display = 'none';
+    // If still isolating a space unit, keep the space-isolate banner; otherwise hide
+    if (window._spaceIsolateMode && typeof window._showSpaceIsolateBanner === 'function') {
+        window._showSpaceIsolateBanner(true);
+    } else if (banner) {
+        banner.style.display = 'none';
+    }
     // Restore free tab as active
     _setFreeTabActive(true);
     // Clear inline upper unit edit state
@@ -1771,13 +1779,25 @@ window.confirmWingEdit = function() {
     state._activeUpperUnitParent = null;
     const _uuBanner1 = document.getElementById('upper-unit-edit-banner');
     if (_uuBanner1) _uuBanner1.style.display = 'none';
-    // Reset viewMode to 3d BEFORE buildCabinet so buildDimensionsAndButtonsUI
-    // doesn't populate dimLayer with stale wing-edit dimensions
-    state.viewMode = '3d';
+    // Reset viewMode — stay in space-isolate front edit when relevant
+    if (window._spaceIsolateMode) {
+        const pid = state.presetId || 'linear';
+        const kitchenL = pid === 'kitchen' && !!(
+            state.wings && ((state.wings.left && state.wings.left.kitchenCornerL) ||
+                (state.wings.right && state.wings.right.kitchenCornerL) ||
+                (state.wings.center && state.wings.center.kitchenCornerL && (state.wings.left || state.wings.right)))
+        );
+        state.viewMode = (pid === 'corner-left' || pid === 'corner-right' || pid === 'walkin' || kitchenL) ? '3d' : 'front';
+    } else {
+        // Reset viewMode to 3d BEFORE buildCabinet so buildDimensionsAndButtonsUI
+        // doesn't populate dimLayer with stale wing-edit dimensions
+        state.viewMode = '3d';
+    }
     // Force camera animation back to default position (reset _orbitFree so updateCameraView animates)
     window._orbitFree = false;
     window._forceCameraAnim = true;
     window._corner3dCamPositioned = false;
+    window._frontCamPositioned = false;
     window._wingEditCamInit = false;
     saveHistoryState();
     buildCabinet(); calculatePrice();

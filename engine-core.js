@@ -4739,10 +4739,12 @@ function updateCameraView() {
     const hasAnyWing = leftWing || rightWing;
     const hasCorner = state.corner && state.corner.side !== 'none';
 
-    // Shared-space: front/blueprint frame every part together (not just the active host)
+    // Shared-space: front/blueprint frame every part together (not just the active host).
+    // Skip when isolating one unit for edit (mirror corner wing-edit).
     const _spacePairInfo = (typeof window._getSpacePairInfo === 'function')
         ? window._getSpacePairInfo() : null;
     const _spaceCombinedView = (_spacePairInfo && _spacePairInfo.count >= 2
+        && !window._spaceIsolateMode
         && (state.viewMode === 'front' || state.viewMode === 'blueprint')
         && typeof window._computeSpacePairCaptureView === 'function')
         ? window._computeSpacePairCaptureView(_spacePairInfo) : null;
@@ -6021,18 +6023,61 @@ window._clearSpaceCompanion = function() {
     groups.forEach(function(g) {
         if (g && g.parent) g.parent.remove(g);
     });
+    if (window._spaceHostHit && window._spaceHostHit.parent) {
+        window._spaceHostHit.parent.remove(window._spaceHostHit);
+    }
+    window._spaceHostHit = null;
     window._spaceCompanionGroups = [];
     window._spaceCompanionHits = [];
     window._spaceCompanionGroup = null;
     window._spaceCompanionHit = null;
     window._spaceCompanionDoorMeshes = [];
     const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
-    if (cabinetGroup && (!info || info.activeSlot === 0)) {
+    if (cabinetGroup && (!info || info.activeSlot === 0 || window._spaceIsolateMode)) {
         cabinetGroup.position.y = 0;
         cabinetGroup.position.z = 0;
         cabinetGroup.rotation.y = 0;
-        if (info && info.activeSlot === 0) cabinetGroup.position.x = 0;
+        if (info && (info.activeSlot === 0 || window._spaceIsolateMode)) cabinetGroup.position.x = 0;
     }
+};
+
+/** Invisible hit volume on the active host so overview click isolates that unit. */
+window._ensureSpaceHostHit = function(info) {
+    info = info || ((typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null);
+    if (window._spaceHostHit && window._spaceHostHit.parent) {
+        window._spaceHostHit.parent.remove(window._spaceHostHit);
+    }
+    window._spaceHostHit = null;
+    if (!info || info.count < 2 || window._spaceIsolateMode || !cabinetGroup) return;
+    const cw = state.wings && state.wings.center;
+    let hitW = (cw && cw.width) || state.width || 160;
+    let hitH = (cw && cw.globalHeight) || state.globalHeight || 240;
+    let hitD = (cw && cw.depth) || state.depth || 54;
+    const hitMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+    const hit = new THREE.Mesh(new THREE.BoxGeometry(hitW, hitH, hitD), hitMat);
+    hit.position.set(0, hitH / 2, 0);
+    try {
+        const box = new THREE.Box3().setFromObject(cabinetGroup);
+        if (!box.isEmpty()) {
+            const size = box.getSize(new THREE.Vector3());
+            const ctr = box.getCenter(new THREE.Vector3()).sub(cabinetGroup.position);
+            hit.geometry.dispose();
+            hit.geometry = new THREE.BoxGeometry(
+                Math.max(size.x, 40),
+                Math.max(size.y, 40),
+                Math.max(size.z, 20)
+            );
+            hit.position.copy(ctr);
+        }
+    } catch (e) { /* keep fallback size */ }
+    hit.userData.spaceCompanion = true;
+    hit.userData.spaceHost = true;
+    hit.userData.spaceSlot = info.activeSlot;
+    hit.userData.cartIndex = info.activeIndex;
+    cabinetGroup.add(hit);
+    window._spaceHostHit = hit;
+    if (!window._spaceCompanionHits) window._spaceCompanionHits = [];
+    window._spaceCompanionHits.push(hit);
 };
 
 /**
@@ -6095,7 +6140,7 @@ window._isSpaceBlueprintFrontOnly = function() {
 
 window._applySpacePairPositions = function() {
     const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
-    if (!info) {
+    if (!info || window._spaceIsolateMode) {
         if (cabinetGroup) { cabinetGroup.position.set(0, 0, 0); cabinetGroup.rotation.y = 0; }
         return;
     }
@@ -6134,8 +6179,13 @@ window._rebuildSpaceCompanion = function() {
     const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
     // Blueprint used to clear companions (single-cabinet side elevation). For shared-space
     // cabinets we keep companions so front/blueprint show every part together.
-    if (!info) {
+    // Isolate mode (like wing-edit): hide every other space unit.
+    if (!info || window._spaceIsolateMode) {
         window._clearSpaceCompanion();
+        if (window._spaceIsolateMode && cabinetGroup) {
+            cabinetGroup.position.set(0, 0, 0);
+            cabinetGroup.rotation.y = 0;
+        }
         return;
     }
     if (!info.others || !info.others.length || typeof window.buildCabinetIntoGroup !== 'function') {
@@ -6266,6 +6316,8 @@ window._rebuildSpaceCompanion = function() {
         window._spaceCompanionGroup = window._spaceCompanionGroups[0] || null;
         window._spaceCompanionHit = window._spaceCompanionHits[0] || null;
         if (typeof window._applySpacePairPositions === 'function') window._applySpacePairPositions();
+        // Host hit so clicking the active unit in overview also enters isolate mode
+        if (typeof window._ensureSpaceHostHit === 'function') window._ensureSpaceHostHit(info);
         // Apply current door / hinge visibility to companion meshes immediately
         if (window._doorsVisible === false) {
             (window._spaceCompanionDoorMeshes || []).forEach(function(m) {

@@ -8411,7 +8411,7 @@ function _spaceGizmoTarget() {
     if (!info || info.activeSlot <= 0) return null;
     if (window._spaceActiveLocked()) return null;
     if (state.viewMode !== 'front' && state.viewMode !== '3d') return null;
-    if (state.wingEditMode || document.body.classList.contains('room-plan-mode')) return null;
+    if (state.wingEditMode || window._spaceIsolateMode || document.body.classList.contains('room-plan-mode')) return null;
     const item = window._getSpaceMovableItem();
     if (!item) return null;
     const off = window._getSpaceOffset(item);
@@ -10637,6 +10637,12 @@ function bindUI() {
             if (!hitOnUuCell && uuIntersects.length === 0) {
                 _pointerDownOnDeadSpace = true;
             }
+        } else if (window._spaceIsolateMode && !state.wingEditMode) {
+            // Space unit isolate: dead space = outside the active cabinet hit boxes
+            const hitIntersects = raycaster.intersectObjects(hitBoxes);
+            if (hitIntersects.length === 0) {
+                _pointerDownOnDeadSpace = true;
+            }
         }
 
         // Corner desk click — change drawer handle style
@@ -10728,6 +10734,15 @@ function bindUI() {
             const hitIntersects = raycaster.intersectObjects(hitBoxes);
             if (hitIntersects.length === 0) {
                 exitWingEditMode();
+                return;
+            }
+        }
+
+        // Space unit isolate: click on dead space → back to shared-space overview
+        if (window._spaceIsolateMode && !state.wingEditMode && _pointerDownOnDeadSpace) {
+            const hitIntersects = raycaster.intersectObjects(hitBoxes);
+            if (hitIntersects.length === 0 && typeof window.exitSpaceIsolateMode === 'function') {
+                window.exitSpaceIsolateMode();
                 return;
             }
         }
@@ -14435,6 +14450,10 @@ window._unlinkSpacePair = function(opts) {
         pairId = window._spacePairIdOf(cart[state.editingCartIndex]);
     }
     if (!pairId) return;
+    window._spaceIsolateMode = false;
+    window._spaceIsolateCamInit = false;
+    window._spaceIsolateKeep = false;
+    if (typeof window._showSpaceIsolateBanner === 'function') window._showSpaceIsolateBanner(false);
     cart.forEach(function(it) {
         if (window._spacePairIdOf(it) === pairId) window._stripSpacePairFromItem(it);
     });
@@ -14792,15 +14811,127 @@ window.addSpaceUnit = function(kind, opts) {
     if (typeof window._markCurrentCabinetClean === 'function') window._markCurrentCabinetClean();
 };
 
+/**
+ * Isolate one space unit for editing (like wing-edit on a corner cabinet):
+ * hide companions, place host at origin, animate camera, show banner.
+ */
+window.enterSpaceIsolateMode = function(opts) {
+    opts = opts || {};
+    const info = window._getSpacePairInfo();
+    if (!info || info.count < 2) return false;
+    const already = !!window._spaceIsolateMode;
+    window._spaceIsolateMode = true;
+    window._orbitFree = false;
+    window._forceCameraAnim = true;
+    window._frontCamPositioned = false;
+    window._corner3dCamPositioned = false;
+    window._spaceIsolateCamInit = true;
+    if (window._roomGroup) window._roomGroup.visible = false;
+    // Prefer front edit for linear-like units; keep 3d for classic corner / walk-in / kitchen L
+    const pid = state.presetId || 'linear';
+    const kitchenL = pid === 'kitchen' && !!(
+        state.wings && ((state.wings.left && state.wings.left.kitchenCornerL) ||
+            (state.wings.right && state.wings.right.kitchenCornerL) ||
+            (state.wings.center && state.wings.center.kitchenCornerL && (state.wings.left || state.wings.right)))
+    );
+    const use3d = pid === 'corner-left' || pid === 'corner-right' || pid === 'walkin' || kitchenL;
+    if (!opts.keepViewMode) state.viewMode = use3d ? '3d' : 'front';
+    window._showSpaceIsolateBanner(true);
+    if (!opts.skipRebuild) {
+        if (typeof buildCabinet === 'function') buildCabinet();
+        if (typeof updateCameraView === 'function') updateCameraView();
+    } else if (!already && typeof updateCameraView === 'function') {
+        updateCameraView();
+    }
+    return true;
+};
+
+window.exitSpaceIsolateMode = function() {
+    if (!window._spaceIsolateMode) return;
+    // Finish nested wing edit first
+    if (state.wingEditMode && typeof window.confirmWingEdit === 'function') {
+        window.confirmWingEdit();
+    }
+    window._spaceIsolateMode = false;
+    window._spaceIsolateCamInit = false;
+    window._orbitFree = false;
+    window._forceCameraAnim = true;
+    window._frontCamPositioned = false;
+    window._corner3dCamPositioned = false;
+    if (window._roomGroup && window._roomVisible !== false) {
+        window._roomGroup.visible = true;
+    }
+    window._showSpaceIsolateBanner(false);
+    if (typeof window._restoreWingEditBannerHandlers === 'function') {
+        window._restoreWingEditBannerHandlers();
+    }
+    // Overview prefers front framing of the whole space
+    state.viewMode = 'front';
+    if (typeof buildCabinet === 'function') buildCabinet();
+    if (typeof updateCameraView === 'function') updateCameraView();
+    if (typeof window._syncSpacePairTabs === 'function') window._syncSpacePairTabs();
+};
+
+window._showSpaceIsolateBanner = function(show) {
+    const banner = document.getElementById('wing-edit-banner');
+    if (!banner) return;
+    if (!show) {
+        // Don't hide if classic wing-edit is still active
+        if (state.wingEditMode) return;
+        banner.style.display = 'none';
+        return;
+    }
+    banner.style.display = 'flex';
+    const bannerLabel = banner.querySelector('span');
+    if (bannerLabel) {
+        bannerLabel.innerHTML = '<i class="fa-solid fa-pen-to-square" style="margin-left:6px;color:#7eb8f7;"></i>מצב עריכת יחידה במרחב';
+    }
+    const btn = banner.querySelector('button');
+    if (btn) {
+        btn.setAttribute('onclick', 'exitSpaceIsolateMode()');
+        btn.innerHTML = '<i class="fa-solid fa-arrow-right"></i> חזור למרחב';
+    }
+};
+
+window._restoreWingEditBannerHandlers = function() {
+    const banner = document.getElementById('wing-edit-banner');
+    if (!banner) return;
+    const btn = banner.querySelector('button');
+    if (btn) {
+        btn.setAttribute('onclick', 'exitWingEditMode()');
+        btn.innerHTML = '<i class="fa-solid fa-arrow-right"></i> חזור למצב חופשי';
+    }
+};
+
 window.switchSpaceCabinet = function(slot) {
     const info = window._getSpacePairInfo();
     if (!info || info.slotIndices[slot] == null) return;
     const targetIdx = info.slotIndices[slot];
-    if (targetIdx === state.editingCartIndex) return;
+    const alreadyEditing = targetIdx === state.editingCartIndex;
+    const wantIsolate = info.count >= 2;
+
+    // Same unit: enter isolate if still in overview
+    if (alreadyEditing) {
+        if (wantIsolate && !window._spaceIsolateMode) window.enterSpaceIsolateMode();
+        return;
+    }
+
     if (typeof window._commitCurrentCabinetToCart === 'function') {
         window._commitCurrentCabinetToCart({ flash: false });
     }
+    // Keep isolate across the cart switch so companions stay hidden and camera re-animates
+    if (wantIsolate) {
+        window._spaceIsolateKeep = true;
+        window._spaceIsolateMode = true;
+        window._spaceIsolateCamInit = true;
+        window._orbitFree = false;
+        window._forceCameraAnim = true;
+        window._frontCamPositioned = false;
+        window._corner3dCamPositioned = false;
+        if (window._roomGroup) window._roomGroup.visible = false;
+    }
     if (typeof window._editCartItemNow === 'function') window._editCartItemNow(targetIdx);
+    if (wantIsolate) window._showSpaceIsolateBanner(true);
 };
 
 function _wingsFromSource(src) {
@@ -16393,6 +16524,16 @@ window._editCartItemNow = function(index) {
     if (typeof window._exitPrintCameraMode === 'function' && window._printCamMode) {
         window._exitPrintCameraMode({ keepOrbit: true });
     }
+    // Space isolate survives only when switchSpaceCabinet asked to keep it
+    const keepSpaceIsolate = !!window._spaceIsolateKeep;
+    window._spaceIsolateKeep = false;
+    if (!keepSpaceIsolate) {
+        window._spaceIsolateMode = false;
+        window._spaceIsolateCamInit = false;
+        if (typeof window._showSpaceIsolateBanner === 'function') {
+            window._showSpaceIsolateBanner(false);
+        }
+    }
     const rawState = state.orderCart[index].rawState;
     const rs = JSON.parse(JSON.stringify(rawState));
 
@@ -16528,6 +16669,10 @@ window.startNewCabinet = function() {
     if (typeof window._exitPrintCameraMode === 'function' && window._printCamMode) {
         window._exitPrintCameraMode({ keepOrbit: true });
     }
+    window._spaceIsolateMode = false;
+    window._spaceIsolateCamInit = false;
+    window._spaceIsolateKeep = false;
+    if (typeof window._showSpaceIsolateBanner === 'function') window._showSpaceIsolateBanner(false);
     // Detach from space-pair context before snapshot so the new cabinet is never joined
     if (typeof window._clearSpaceCompanion === 'function') window._clearSpaceCompanion();
     state.editingCartIndex = -1;
