@@ -1398,15 +1398,32 @@ function processMessage(raw) {
 // ── UI ──────────────────────────────────────────────────────────────────────
 
 function setOffset(px) {
-    document.documentElement.style.setProperty(CHAT_OFFSET_VAR, (px || 0) + 'px');
-    document.body.classList.toggle('has-cabinet-chat', !!px);
+    // Kept for any leftover consumers; docked chat no longer overlays the canvas.
+    document.documentElement.style.setProperty(CHAT_OFFSET_VAR, '0px');
+    document.body.classList.add('has-cabinet-chat');
 }
 
 function measureAndSetOffset() {
     var root = document.getElementById('cabinet-chat');
     if (!root) return;
-    var h = root.getBoundingClientRect().height || 0;
-    setOffset(Math.ceil(h + 8));
+    setOffset(0);
+    // Notify Three.js that the canvas area changed height
+    try { window.dispatchEvent(new Event('resize')); } catch (e) { /* ignore */ }
+}
+
+/** Put chat under the 3D viewport (same column as #canvas-container), not floating on body. */
+function ensureViewportStack() {
+    var canvas = document.getElementById('canvas-container');
+    if (!canvas) return null;
+    var stack = document.getElementById('cabinet-viewport-stack');
+    if (stack && stack.contains(canvas)) return stack;
+    stack = document.createElement('div');
+    stack.id = 'cabinet-viewport-stack';
+    var parent = canvas.parentNode;
+    if (!parent) return null;
+    parent.insertBefore(stack, canvas);
+    stack.appendChild(canvas);
+    return stack;
 }
 
 function appendBubble(role, text, skipPersist) {
@@ -1427,7 +1444,8 @@ function setExpanded(on) {
     var root = document.getElementById('cabinet-chat');
     if (!root) return;
     root.classList.toggle('expanded', !!on);
-    measureAndSetOffset();
+    // Expanded log changes dock height → reflow 3D canvas
+    requestAnimationFrame(measureAndSetOffset);
     persistChat();
 }
 
@@ -1488,6 +1506,9 @@ function injectUi() {
     if (document.getElementById('cabinet-chat')) return;
     if (!document.getElementById('canvas-container')) return;
 
+    var stack = ensureViewportStack();
+    if (!stack) return;
+
     var wrap = document.createElement('div');
     wrap.id = 'cabinet-chat';
     wrap.setAttribute('dir', 'rtl');
@@ -1499,7 +1520,8 @@ function injectUi() {
         '  <button type="button" id="cabinet-chat-send" class="cab-chat-send" title="שלח" aria-label="שלח"><i class="fa-solid fa-paper-plane"></i></button>' +
         '</div>' +
         '<div id="cabinet-chat-status" class="cab-chat-status"></div>';
-    document.body.appendChild(wrap);
+    stack.appendChild(wrap);
+    document.body.classList.add('has-cabinet-chat');
 
     document.getElementById('cabinet-chat-send').addEventListener('click', send);
     document.getElementById('cabinet-chat-input').addEventListener('keydown', function (e) {
@@ -1514,7 +1536,11 @@ function injectUi() {
     });
 
     window.addEventListener('resize', measureAndSetOffset);
-    measureAndSetOffset();
+    // After layout settles (stack wrap + chat height), resize the 3D view
+    requestAnimationFrame(function () {
+        measureAndSetOffset();
+        setTimeout(measureAndSetOffset, 80);
+    });
 
     restoreChat();
     ensureWelcome();
@@ -1533,37 +1559,37 @@ function injectStyles() {
     st.id = 'cabinet-chat-styles';
     st.textContent =
         ':root{' + CHAT_OFFSET_VAR + ':0px}' +
-        '#cabinet-chat{position:fixed;z-index:9200;left:calc(var(--layout-sidebar-left,360px) + 16px);' +
-        'right:calc(var(--layout-sidebar-right,420px) + 16px);bottom:12px;display:flex;flex-direction:column;' +
-        'gap:6px;pointer-events:none;font-family:inherit;direction:rtl}' +
-        '#cabinet-chat > *{pointer-events:auto}' +
-        '#cabinet-chat .cab-chat-log{display:none;max-height:min(28vh,220px);overflow-y:auto;padding:8px 4px;' +
+        /* Viewport column: 3D on top, chat docked underneath */
+        '#cabinet-viewport-stack{flex:1 1 auto;order:2;display:flex;flex-direction:column;' +
+        'min-width:0;min-height:0;height:100%;position:relative;overflow:hidden}' +
+        '#cabinet-viewport-stack #canvas-container{flex:1 1 auto;order:unset;min-height:0;min-width:0;width:100%}' +
+        '#cabinet-chat{flex:0 0 auto;position:relative;z-index:30;left:auto;right:auto;bottom:auto;' +
+        'display:flex;flex-direction:column;gap:0;pointer-events:auto;font-family:inherit;direction:rtl;' +
+        'background:var(--bg-sidebar,#fff);border-top:1px solid var(--border,#e2e8f0);' +
+        'box-shadow:0 -4px 18px rgba(15,23,42,.06);padding:8px 10px 10px}' +
+        '#cabinet-chat .cab-chat-log{display:none;max-height:min(22vh,180px);overflow-y:auto;padding:4px 2px 8px;' +
         'flex-direction:column;gap:6px}' +
         '#cabinet-chat.expanded .cab-chat-log{display:flex}' +
-        '.cab-chat-bubble{max-width:92%;padding:8px 12px;border-radius:14px;font-size:.86rem;line-height:1.45;' +
-        'box-shadow:0 4px 14px rgba(15,23,42,.08)}' +
-        '.cab-chat-bot{align-self:flex-start;background:rgba(255,255,255,.96);border:1px solid rgba(30,58,95,.12);color:#1e293b}' +
+        '.cab-chat-bubble{max-width:92%;padding:8px 12px;border-radius:12px;font-size:.86rem;line-height:1.45;' +
+        'box-shadow:0 2px 8px rgba(15,23,42,.06)}' +
+        '.cab-chat-bot{align-self:flex-start;background:#f8fafc;border:1px solid rgba(30,58,95,.1);color:#1e293b}' +
         '.cab-chat-user{align-self:flex-end;background:linear-gradient(135deg,#1e3a5f,#2563eb);color:#fff}' +
-        '.cab-chat-row{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.94);' +
-        'backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(30,58,95,.12);' +
-        'border-radius:999px;padding:6px 8px 6px 6px;box-shadow:0 8px 28px rgba(15,23,42,.14)}' +
+        '.cab-chat-row{display:flex;align-items:center;gap:8px;background:var(--bg-light,#f8fafc);' +
+        'border:1px solid var(--border,#e2e8f0);border-radius:12px;padding:4px 6px 4px 4px}' +
         '#cabinet-chat-input{flex:1;border:none;outline:none;background:transparent;font:inherit;font-size:.9rem;' +
         'padding:8px 6px;min-width:0;color:#0f172a}' +
         '#cabinet-chat-input::placeholder{color:#94a3b8}' +
-        '.cab-chat-send,.cab-chat-toggle{width:40px;height:40px;border:none;border-radius:50%;cursor:pointer;' +
+        '.cab-chat-send,.cab-chat-toggle{width:38px;height:38px;border:none;border-radius:10px;cursor:pointer;' +
         'display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}' +
         '.cab-chat-send{background:linear-gradient(135deg,#1e3a5f,#2563eb);color:#fff}' +
         '.cab-chat-toggle{background:rgba(30,58,95,.08);color:#1e3a5f}' +
-        '.cab-chat-status{min-height:0;font-size:.75rem;color:#64748b;padding:0 12px}' +
-        /* Keep canvas / floating UI above the chat */
-        'body.has-cabinet-chat #canvas-container{padding-bottom:var(' + CHAT_OFFSET_VAR + ')}' +
-        'body.has-cabinet-chat #room-furniture-toolbar{bottom:calc(22px + var(' + CHAT_OFFSET_VAR + ')) !important}' +
-        'body.has-cabinet-chat #btn-help-chat{bottom:calc(12px + var(' + CHAT_OFFSET_VAR + ')) !important}' +
-        'body.has-cabinet-chat #designer-notes-float-btn{bottom:calc(80px + var(' + CHAT_OFFSET_VAR + ')) !important}' +
+        '.cab-chat-status{min-height:0;font-size:.75rem;color:#64748b;padding:2px 8px 0}' +
         '@media (max-width:768px){' +
-        '#cabinet-chat{left:10px;right:10px;bottom:calc(66px + env(safe-area-inset-bottom,0px))}' +
-        'body.has-cabinet-chat #btn-help-chat{bottom:calc(130px + env(safe-area-inset-bottom,0px) + var(' + CHAT_OFFSET_VAR + ')) !important}' +
-        'body.has-cabinet-chat #mobile-bottom-nav{/* chat sits above nav */}' +
+        '#cabinet-viewport-stack{position:fixed;top:88px;left:0;width:100vw;' +
+        'height:calc(100dvh - 88px - 60px - env(safe-area-inset-bottom,0px));z-index:1;order:unset}' +
+        '#cabinet-viewport-stack #canvas-container{position:relative!important;top:auto!important;left:auto!important;' +
+        'width:100%!important;height:auto!important;flex:1 1 auto}' +
+        '#cabinet-chat{padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px))}' +
         '}';
     document.head.appendChild(st);
 }
