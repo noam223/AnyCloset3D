@@ -18750,7 +18750,7 @@ function _collectPrintSpecRows(item, itemObj) {
         if (ledPairs > 0) rows.push({ id: 'ledPairs', label: 'תאורת לד', value: _formatLedPairs(ledPairs) });
     }
 
-    if (!isWD) _pushOrderOptionRows(rows, itemObj);
+    _pushOrderOptionRows(rows, itemObj);
     const notes = (item.cabinetNotes || '').trim();
     if (notes) rows.push({ id: 'cabinetNotes', label: 'הערות', value: notes, multiline: true });
 
@@ -18771,6 +18771,11 @@ function _pushOrderOptionRows(rows, itemObj) {
         id: 'engraving',
         label: 'חריטות בחזיתות',
         value: o.engraving === 'yes' ? 'כן — ' + (o.engravingColor === 'gold' ? 'זהב' : 'שחור') : 'לא'
+    });
+    rows.push({
+        id: 'backPanelClearance',
+        label: 'פינוי פאנלים בגב הארון',
+        value: o.backPanelClearance === 'yes' ? 'כן' : 'לא'
     });
     const wingsForCount = wings || {};
     const br = (typeof window._countShelfThicknessBreakdown === 'function')
@@ -21768,6 +21773,9 @@ function _buildCustomerSummaryDetails(itemObj) {
         } else {
             details.push('מגירות: ללא');
         }
+        if (typeof window._appendOrderOptsSummaryLines === 'function') {
+            window._appendOrderOptsSummaryLines(details, rawState);
+        }
         if (item.cabinetNotes && item.cabinetNotes.trim()) {
             details.push('הערות: ' + item.cabinetNotes.trim());
         }
@@ -21844,12 +21852,44 @@ function _buildCustomerSummaryDetails(itemObj) {
         details.push(cu.standalone ? ('שידה פינתית — ' + (cu.drawerCount || 4) + ' מגירות')
             : ('יחידה פינתית מגירות ×' + (cu.drawerCount || 4) + ' (' + cuSide + ')'));
     }
+    if (typeof window._appendOrderOptsSummaryLines === 'function') {
+        window._appendOrderOptsSummaryLines(details, rawState);
+    }
     if (item.cabinetNotes && item.cabinetNotes.trim()) {
         details.push('הערות: ' + item.cabinetNotes.trim());
     }
 
     return details;
 }
+
+/** Append order-closing option lines into customer-summary / Excel detail lists. */
+window._appendOrderOptsSummaryLines = function(details, rawState) {
+    if (!details || typeof window._orderOpts !== 'function') return;
+    const orderWings = (rawState && rawState.wings) || null;
+    const o = window._orderOpts(orderWings || {});
+    details.push('רגלי פילוס: ' + (o.levelingFeet === 'yes' ? 'כן' : 'ללא'));
+    details.push('סגירות: ' + (o.closures === 'yes' ? 'כן' : 'ללא'));
+    const ledsEff = (typeof window._orderLedsEffective === 'function')
+        ? window._orderLedsEffective(orderWings || {})
+        : o.leds;
+    details.push('לדים: ' + (ledsEff === 'yes' ? 'כן' : 'לא'));
+    details.push('חריטות בחזיתות: ' + (o.engraving === 'yes'
+        ? ('כן — ' + (o.engravingColor === 'gold' ? 'זהב' : 'שחור'))
+        : 'לא'));
+    details.push('פינוי פאנלים בגב הארון: ' + (o.backPanelClearance === 'yes' ? 'כן' : 'לא'));
+    if (typeof window._countShelfThicknessBreakdown === 'function') {
+        const br = window._countShelfThicknessBreakdown(orderWings || {});
+        if (br && br.mixed) {
+            details.push('עובי מדפים: ' + br.n17 + ' × 17 מ"מ · ' + br.n28 + ' × 28 מ"מ');
+        } else if (br && br.total > 0 && br.n28 === br.total) {
+            details.push('עובי מדפים: 28 מ"מ');
+        } else {
+            details.push('עובי מדפים: ' + (o.shelfThickness === 28 ? 28 : 17) + ' מ"מ');
+        }
+    } else {
+        details.push('עובי מדפים: ' + (o.shelfThickness === 28 ? 28 : 17) + ' מ"מ');
+    }
+};
 
 // Helper: build cart data array for reuse in HTML + Excel
 // Shared-space members collapse to one customer-summary row (same as print grouping).

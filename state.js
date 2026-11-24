@@ -2273,7 +2273,16 @@ function _wingHasGlass(w) {
 window._wingHasGlass = _wingHasGlass;
 
 // ── Order-closing options (per cabinet, stored on the center wing so every save/restore path keeps them) ──
-window.ORDER_OPTS_DEFAULT = { levelingFeet: 'no', closures: 'no', closureCeiling: 'yes', leds: 'no', engraving: 'no', engravingColor: 'black', shelfThickness: 17 };
+window.ORDER_OPTS_DEFAULT = {
+    levelingFeet: 'no',
+    closures: 'no',
+    closureCeiling: 'yes',
+    leds: 'no',
+    engraving: 'no',
+    engravingColor: 'black',
+    backPanelClearance: 'no',
+    shelfThickness: 17
+};
 window.CLOSURES_PRICE_CUSTOMER = 750;
 window.CLOSURES_PRICE_INSTALL = 300;
 
@@ -2285,6 +2294,9 @@ window._orderOpts = function(wings) {
     if (o.levelingFeet !== 'yes') o.levelingFeet = 'no';
     if (o.closures !== 'yes') o.closures = 'no';
     if (o.closureCeiling !== 'no') o.closureCeiling = 'yes';
+    if (o.backPanelClearance !== 'yes') o.backPanelClearance = 'no';
+    if (o.engraving !== 'yes') o.engraving = 'no';
+    if (o.leds !== 'yes') o.leds = 'no';
     return o;
 };
 
