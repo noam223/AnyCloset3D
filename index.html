@@ -40,7 +40,7 @@
     <link rel="stylesheet" href="style-base.css?v=20261116cartCompact">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
     <link rel="stylesheet" href="style-extras.css?v=20261110doormirror">
-    <link rel="stylesheet" href="style.css?v=20261124spaceApp1">
+    <link rel="stylesheet" href="style.css?v=20261124spaceProp1">
     <link rel="stylesheet" href="quick-calc.css?v=20260929qc">
     <style>
         html.thumb-only-mode #left-sidebar,
@@ -678,7 +678,7 @@
                 <button type="button" class="space-unit-add-btn space-unit-any" onclick="addSpaceUnit('floatingShelf')" title="מוסיף מדף במרחב — אפשר לשלוט באורך, ברוחב ובעובי">
                     <i class="fa-solid fa-minus"></i><span>מדף</span>
                 </button>
-                <button type="button" class="space-unit-add-btn space-unit-any" onclick="window._askSpaceApplianceType()" title="מוסיף מוצר חשמל חופשי למרחב — עם שליטת מיקום וסיבוב">
+                <button type="button" class="space-unit-add-btn space-unit-any" onclick="window._askSpaceApplianceType()" title="מוסיף מוצר חשמל למרחב של הארון הנוכחי — GIZMO ומחיקה, בלי ארון נפרד">
                     <i class="fa-solid fa-plug"></i><span>מוצר חשמל</span>
                 </button>
                 <button type="button" class="space-unit-add-btn space-unit-wardrobe-only" onclick="addEmbeddedCornerDesk()" title="מוסיף שולחן פינתי כחלק מהארון — ממוזג לפינה שנבחרה">
@@ -708,25 +708,16 @@
         </div>
 
         <div class="section" id="space-appliance-section" data-sbgroup="extras" style="display:none;">
-            <div class="section-title"><i class="fa-solid fa-plug"></i> מוצר חשמל במרחב</div>
-            <div class="space-unit-add-hint" style="margin-bottom:10px;">מוצר חופשי במרחב — הזזה ב־GIZMO וסיבוב ב־90°. לא משויך לתא בארון.</div>
-            <div class="label-row"><span>סוג נוכחי</span><span id="sa-type-label" class="value-badge">מכונת כביסה</span></div>
-            <div class="sa-type-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;">
-                <button type="button" class="sa-type-btn side-unit-btn" data-sa-type="washer" onclick="window._setSpaceApplianceType('washer')"><i class="fa-solid fa-soap"></i> מכונת כביסה</button>
-                <button type="button" class="sa-type-btn side-unit-btn" data-sa-type="dryer" onclick="window._setSpaceApplianceType('dryer')"><i class="fa-solid fa-wind"></i> מייבש</button>
-                <button type="button" class="sa-type-btn side-unit-btn" data-sa-type="dishwasher" onclick="window._setSpaceApplianceType('dishwasher')"><i class="fa-solid fa-droplet"></i> מדיח</button>
-                <button type="button" class="sa-type-btn side-unit-btn" data-sa-type="oven" onclick="window._setSpaceApplianceType('oven')"><i class="fa-solid fa-fire-burner"></i> תנור</button>
-                <button type="button" class="sa-type-btn side-unit-btn" data-sa-type="fridge" onclick="window._setSpaceApplianceType('fridge')"><i class="fa-solid fa-snowflake"></i> מקרר</button>
-                <button type="button" class="sa-type-btn side-unit-btn" data-sa-type="tv" onclick="window._setSpaceApplianceType('tv')"><i class="fa-solid fa-tv"></i> טלוויזיה</button>
-            </div>
-            <div id="sa-tv-size-row" style="display:none;margin-top:10px;">
-                <div class="label-row"><span>גודל מסך</span><span id="sa-tv-inch-label" class="value-badge">43″</span></div>
-                <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
-                    <button type="button" class="sa-tv-inch-btn side-unit-btn" data-inch="32" onclick="window._setSpaceApplianceTvInch(32)">32″</button>
-                    <button type="button" class="sa-tv-inch-btn side-unit-btn" data-inch="43" onclick="window._setSpaceApplianceTvInch(43)">43″</button>
-                    <button type="button" class="sa-tv-inch-btn side-unit-btn" data-inch="50" onclick="window._setSpaceApplianceTvInch(50)">50″</button>
-                    <button type="button" class="sa-tv-inch-btn side-unit-btn" data-inch="55" onclick="window._setSpaceApplianceTvInch(55)">55″</button>
-                    <button type="button" class="sa-tv-inch-btn side-unit-btn" data-inch="60" onclick="window._setSpaceApplianceTvInch(60)">60″</button>
+            <div class="section-title"><i class="fa-solid fa-plug"></i> מוצרי חשמל במרחב</div>
+            <div class="space-unit-add-hint" style="margin-bottom:10px;">לתצוגת לקוח בלבד — מופיעים בתמונת המרחב המלאה, בלי מידות ובלי ארון נפרד בפרויקט. הזזה ב־GIZMO ומחיקה.</div>
+            <div id="sa-prop-list" class="sa-prop-list"></div>
+            <div id="sa-prop-rot-row" style="display:none;margin-top:10px;">
+                <div class="label-row"><span>סיבוב נבחר</span></div>
+                <div style="display:flex;gap:6px;margin-top:6px;">
+                    <button type="button" class="sa-prop-rot-btn side-unit-btn" data-rot="0">0°</button>
+                    <button type="button" class="sa-prop-rot-btn side-unit-btn" data-rot="90">90°</button>
+                    <button type="button" class="sa-prop-rot-btn side-unit-btn" data-rot="180">180°</button>
+                    <button type="button" class="sa-prop-rot-btn side-unit-btn" data-rot="270">270°</button>
                 </div>
             </div>
         </div>
@@ -2602,7 +2593,7 @@
                 <button type="button" class="space-unit-add-btn space-unit-wardrobe-only" onclick="addSpaceUnit('sideCabinet')"><i class="fa-solid fa-door-closed"></i><span>ארון צד</span></button>
                 <button type="button" class="space-unit-add-btn space-unit-wardrobe-only" onclick="addSpaceUnit('cornerDrawers')"><i class="fa-solid fa-layer-group"></i><span>שידה פינתית</span></button>
                 <button type="button" class="space-unit-add-btn space-unit-any" onclick="addSpaceUnit('floatingShelf')" title="מוסיף מדף במרחב — אפשר לשלוט באורך, ברוחב ובעובי"><i class="fa-solid fa-minus"></i><span>מדף</span></button>
-                <button type="button" class="space-unit-add-btn space-unit-any" onclick="window._askSpaceApplianceType()" title="מוסיף מוצר חשמל חופשי למרחב — עם שליטת מיקום וסיבוב"><i class="fa-solid fa-plug"></i><span>מוצר חשמל</span></button>
+                <button type="button" class="space-unit-add-btn space-unit-any" onclick="window._askSpaceApplianceType()" title="מוסיף מוצר חשמל למרחב של הארון הנוכחי — GIZMO ומחיקה, בלי ארון נפרד"><i class="fa-solid fa-plug"></i><span>מוצר חשמל</span></button>
                 <button type="button" class="space-unit-add-btn space-unit-wardrobe-only" onclick="addEmbeddedCornerDesk()" title="מוסיף שולחן פינתי כחלק מהארון — ממוזג לפינה שנבחרה"><i class="fa-solid fa-turn-up"></i><span>שולחן פינתי</span></button>
                 <button type="button" class="space-unit-add-btn space-unit-kitchen-only" onclick="addSpaceUnit('kitchenUpper')" style="display:none;"><i class="fa-solid fa-arrow-up"></i><span>יחידה עליונה</span></button>
                 <button type="button" class="space-unit-add-btn space-unit-kitchen-only" onclick="window._kitchenMakeCorner()" style="display:none;"><i class="fa-solid fa-turn-up"></i><span>פינת מטבח</span></button>
@@ -3350,8 +3341,8 @@
 <script src="floating-shelf-preset.js?v=20261124fs1"></script>
 <script src="corner-unit-preset.js?v=20261124spaceApp1"></script>
 <script src="engine-appliances.js?v=20261124spaceApp1"></script>
-<script src="space-appliance-preset.js?v=20261124spaceApp1"></script>
-<script src="engine-core.js?v=20261124hostMove1"></script>
+<script src="space-appliance-preset.js?v=20261124spaceProp1"></script>
+<script src="engine-core.js?v=20261124spaceProp1"></script>
 <script src="engine-corners.js?v=20261123deskColors1"></script>
 <script src="kitchen-corner.js?v=20261117kitG3"></script>
 <script src="engine-blueprint.js?v=20261124shelfThick28"></script>
@@ -3360,7 +3351,7 @@
 <script src="bluran-color-picker.js?v=20261116sdDoorTabs1"></script>
 <script src="formex-color-picker.js?v=20261116sdDoorTabs1"></script>
 <script src="room-finishes.js?v=20261110gloss"></script>
-<script src="ui.js?v=20261124hostMove1"></script>
+<script src="ui.js?v=20261124spaceProp1"></script>
 <script src="mirror-cabinet.js?v=20261110doormirror"></script>
 <script src="mobile.js?v=20261122depth110"></script>
 <script src="part-paint.js?v=20261104egger"></script>

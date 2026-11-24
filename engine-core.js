@@ -5894,6 +5894,7 @@ function buildCabinet() {
 
     if (typeof window._rebuildSpaceCompanion === 'function') window._rebuildSpaceCompanion();
     if (typeof window._applySpacePairPositions === 'function') window._applySpacePairPositions();
+    if (typeof window._rebuildSpaceProps === 'function') window._rebuildSpaceProps();
 
     if (typeof addBlueprintSprites === 'function') addBlueprintSprites();
     if(typeof buildDimensionsAndButtonsUI === 'function') buildDimensionsAndButtonsUI();

@@ -3886,6 +3886,12 @@ window._applyCabinetTemplateRawState = function(rawState) {
     state.blueprintColWidthDimsDefault = rs.blueprintColWidthDimsDefault !== false;
     state.blueprintColWidthDimShown = rs.blueprintColWidthDimShown ? JSON.parse(JSON.stringify(rs.blueprintColWidthDimShown)) : {};
     state.blueprintHeightDimsDefault = rs.blueprintHeightDimsDefault !== false;
+    state.spaceProps = Array.isArray(rs.spaceProps) ? JSON.parse(JSON.stringify(rs.spaceProps)) : [];
+    if (savedEditIdx >= 0 && state.orderCart && state.orderCart[savedEditIdx]) {
+        state.orderCart[savedEditIdx].spaceProps = state.spaceProps;
+        if (!state.orderCart[savedEditIdx].rawState) state.orderCart[savedEditIdx].rawState = {};
+        state.orderCart[savedEditIdx].rawState.spaceProps = state.spaceProps;
+    }
 
     if (typeof window._syncPartColorScope === 'function') window._syncPartColorScope();
     if (typeof window._importLocalPartColors === 'function' && savedEditIdx >= 0) {
@@ -8480,10 +8486,28 @@ function _pickSpaceCabinetSlot(ndc) {
 }
 
 function _spaceGizmoTarget() {
-    const info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
-    if (!info || info.count < 2) return null;
     if (state.viewMode !== 'front' && state.viewMode !== '3d') return null;
     if (state.wingEditMode || document.body.classList.contains('room-plan-mode')) return null;
+
+    // Space props (appliances): drag / hover win; else keep selected prop gizmo
+    const propId = window._spacePropGizmoDragId
+        || window._spacePropGizmoHoverId
+        || (window._spaceGizmoHoverSlot == null ? window._spacePropSelectedId : null);
+    if (propId && typeof window._getSpacePropById === 'function') {
+        const prop = window._getSpacePropById(propId);
+        if (prop) {
+            const off = prop.offset || { x: 0, y: 0, z: 0, rot: 0 };
+            const pivotH = (typeof window._spacePropPivotH === 'function')
+                ? window._spacePropPivotH(prop) : 40;
+            return { kind: 'prop', propId: prop.id, prop: prop, off: off, pivotH: pivotH };
+        }
+    }
+
+    const info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
+    if (!info || info.count < 2) {
+        // Single cabinet: still allow gizmo on a selected prop
+        return null;
+    }
 
     let slot = null;
     // Isolate editor: always target the open cabinet (host or companion)
@@ -8511,7 +8535,7 @@ function _spaceGizmoTarget() {
     const pivotH = Math.max(20, (typeof window._spaceCarcassPivotLocalY === 'function')
         ? window._spaceCarcassPivotLocalY(fp)
         : ((fp.h || 200) / 2));
-    return { slot: slot, off: off, pivotH: pivotH, item: item, floorOffset: fp.floorOffset || 0 };
+    return { kind: 'slot', slot: slot, off: off, pivotH: pivotH, item: item, floorOffset: fp.floorOffset || 0 };
 }
 
 function _ensureSpaceGizmo() {
@@ -8586,10 +8610,17 @@ function _ensureSpaceGizmo() {
     g.addEventListener('mouseDown', function() {
         window._spaceGizmoBlockClick = true;
         const t = _spaceGizmoTarget();
-        window._spaceGizmoDragSlot = t ? t.slot : window._spaceGizmoHoverSlot;
+        if (t && t.kind === 'prop') {
+            window._spacePropGizmoDragId = t.propId;
+            window._spaceGizmoDragSlot = null;
+        } else {
+            window._spacePropGizmoDragId = null;
+            window._spaceGizmoDragSlot = t ? t.slot : window._spaceGizmoHoverSlot;
+        }
     });
     g.addEventListener('mouseUp', function() {
         window._spaceGizmoDragSlot = null;
+        window._spacePropGizmoDragId = null;
         setTimeout(function() { window._spaceGizmoBlockClick = false; }, 0);
     });
     g.addEventListener('dragging-changed', function(ev) {
@@ -8597,6 +8628,7 @@ function _ensureSpaceGizmo() {
         document.body.classList.toggle('dragging', !!ev.value);
         if (!ev.value) {
             window._spaceGizmoDragSlot = null;
+            window._spacePropGizmoDragId = null;
             if (typeof saveHistoryState === 'function') saveHistoryState();
         }
     });
@@ -8605,6 +8637,16 @@ function _ensureSpaceGizmo() {
         if (!t || !g.dragging) return;
         const axis = (g.axis || '').toLowerCase();
         const prefer = (axis === 'x' || axis === 'y' || axis === 'z') ? axis : undefined;
+        if (t.kind === 'prop') {
+            window._setSpacePropOffset(t.propId, proxy.position.x, proxy.position.y - t.pivotH, {
+                dragging: true, z: proxy.position.z
+            });
+            const prop = window._getSpacePropById(t.propId);
+            const cur = (prop && prop.offset) || { x: 0, y: 0, z: 0 };
+            proxy.position.set(cur.x || 0, (cur.y || 0) + t.pivotH, cur.z || 0);
+            if (typeof window._updateSpacePropDeleteHandle === 'function') window._updateSpacePropDeleteHandle();
+            return;
+        }
         window._setSpaceOffset(proxy.position.x, proxy.position.y - t.pivotH, {
             dragging: true, preferAxis: prefer, z: proxy.position.z, slot: t.slot, snapAxes: axis
         });
@@ -8641,30 +8683,49 @@ function _bindSpaceGizmoHover() {
             window._spaceGizmoHover = true;
             return;
         }
-        const info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
-        if (!info || info.count < 2 || state.wingEditMode ||
-            document.body.classList.contains('room-plan-mode')) {
+        if (state.wingEditMode || document.body.classList.contains('room-plan-mode')) {
             window._spaceGizmoHoverSlot = null;
+            window._spacePropGizmoHoverId = null;
             window._spaceGizmoHover = false;
             return;
         }
+        const info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
+        const rect = el.getBoundingClientRect();
+        ndc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        ndc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+        // Prefer hovering a space prop (appliance) when under the pointer
+        if (typeof window._pickSpacePropId === 'function') {
+            const propId = window._pickSpacePropId(ndc);
+            if (propId) {
+                window._spacePropGizmoHoverId = propId;
+                window._spaceGizmoHoverSlot = null;
+                window._spaceGizmoHover = true;
+                return;
+            }
+        }
+        window._spacePropGizmoHoverId = null;
+
         // Isolating any space cabinet: keep gizmo on that unit (including main / slot 0)
         if (window._spaceIsolateMode) {
-            if (info.activeSlot != null && info.activeSlot >= 0 && !window._spaceSlotLocked(info.activeSlot)) {
+            if (info && info.activeSlot != null && info.activeSlot >= 0 && !window._spaceSlotLocked(info.activeSlot)) {
                 window._spaceGizmoHoverSlot = info.activeSlot;
                 window._spaceGizmoHover = true;
             } else {
                 window._spaceGizmoHoverSlot = null;
-                window._spaceGizmoHover = false;
+                window._spaceGizmoHover = !!window._spacePropSelectedId;
             }
             return;
         }
-        const rect = el.getBoundingClientRect();
-        ndc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-        ndc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        if (!info || info.count < 2) {
+            window._spaceGizmoHoverSlot = null;
+            window._spaceGizmoHover = !!window._spacePropSelectedId;
+            return;
+        }
         const slot = _pickSpaceCabinetSlot(ndc);
         window._spaceGizmoHoverSlot = slot;
-        window._spaceGizmoHover = (slot != null && slot >= 0 && !window._spaceSlotLocked(slot));
+        window._spaceGizmoHover = (slot != null && slot >= 0 && !window._spaceSlotLocked(slot))
+            || !!window._spacePropSelectedId;
     });
     el.addEventListener('pointerleave', function() {
         if (window._spaceGizmo && window._spaceGizmo.dragging) return;
@@ -8678,6 +8739,7 @@ function _spaceGizmoShouldShow(g) {
     if (_spaceGizmoAlwaysOn()) return true;
     if (window._spaceIsolateMode) return true;
     if (g && g.dragging) return true;
+    if (window._spacePropSelectedId || window._spacePropGizmoHoverId) return true;
     return !!(window._spaceGizmoHover || window._spaceRotHover);
 }
 
@@ -8698,6 +8760,7 @@ window._syncAndRenderSpaceGizmo = function() {
     if (!t || (!want && fade <= 0)) {
         if (g.object) g.detach();
         g.enabled = false;
+        if (typeof window._updateSpacePropDeleteHandle === 'function') window._updateSpacePropDeleteHandle();
         return;
     }
     const proxy = window._spaceGizmoProxy;
@@ -8710,6 +8773,7 @@ window._syncAndRenderSpaceGizmo = function() {
     renderer.clearDepth();
     renderer.render(window._spaceGizmoScene, camera);
     renderer.autoClear = prevAuto;
+    if (typeof window._updateSpacePropDeleteHandle === 'function') window._updateSpacePropDeleteHandle();
 };
 
 function createHandle(dir, x3d, y3d = null, text = 'גרירה') {
@@ -10884,6 +10948,16 @@ function bindUI() {
         mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
 
+        // Click a space appliance prop → select it (gizmo + delete)
+        if (typeof window._pickSpacePropId === 'function') {
+            const ndcProp = new THREE.Vector2(mouse.x, mouse.y);
+            const clickedProp = window._pickSpacePropId(ndcProp);
+            if (clickedProp) {
+                if (typeof window._selectSpaceProp === 'function') window._selectSpaceProp(clickedProp);
+                return;
+            }
+        }
+
         // Overview only — in isolate mode companions are ghosted and disabled
         if (!window._spaceIsolateMode) {
             const _spaceHits = (window._spaceCompanionHits && window._spaceCompanionHits.length)
@@ -10894,6 +10968,7 @@ function bindUI() {
                 if (compHits.length > 0 && typeof window.switchSpaceCabinet === 'function') {
                     const slot = compHits[0].object.userData.spaceSlot;
                     if (slot != null && slot >= 0) {
+                        if (typeof window._selectSpaceProp === 'function') window._selectSpaceProp(null);
                         window.switchSpaceCabinet(slot);
                         return;
                     }
@@ -13775,7 +13850,7 @@ window._promptSaveCabinetBeforeSwitch = function(targetIndex) {
 // classic corner wardrobes / walk-in. Bathroom stays exclusive (unlinks on switch).
 // ==========================================
 window._SPACE_COMPATIBLE_PRESETS = [
-    'linear', 'sliding', 'writing-desk', 'corner-unit', 'floating-shelf', 'space-appliance', 'kitchen',
+    'linear', 'sliding', 'writing-desk', 'corner-unit', 'floating-shelf', 'kitchen',
     'corner-left', 'corner-right', 'walkin'
 ];
 window._SPACE_MAX_CABINETS = 10;
@@ -14618,6 +14693,10 @@ window._setSpaceRotation = function(rot, slotOpt) {
 
 window._rotateSpaceCabinet = function() {
     const t = typeof _spaceGizmoTarget === 'function' ? _spaceGizmoTarget() : null;
+    if (t && t.kind === 'prop') {
+        if (typeof window._rotateSelectedSpaceProp === 'function') window._rotateSelectedSpaceProp();
+        return;
+    }
     const slot = t ? t.slot : null;
     const item = t && t.item ? t.item
         : (slot != null ? window._getSpaceSlotItem(slot) : window._getSpaceMovableItem());
@@ -14892,6 +14971,9 @@ window._syncSpacePairTabs = function() {
     }
     if (info) window._syncSpaceOffsetUI();
     if (typeof window._updateExtrasSections === 'function') window._updateExtrasSections();
+    if (typeof window._updateSpaceApplianceSectionVisibility === 'function') {
+        window._updateSpaceApplianceSectionVisibility();
+    }
 };
 
 window._unlinkSpacePair = function(opts) {
@@ -15072,12 +15154,9 @@ window._configureSpaceUnit = function(kind, host, opts) {
         return 0;
     }
     if (kind === 'spaceAppliance') {
-        state.presetId = 'space-appliance';
-        if (typeof window._applySpaceAppliancePreset === 'function') {
-            window._applySpaceAppliancePreset(
-                opts.applianceType || (host && host.applianceType) || 'washer',
-                opts
-            );
+        // Legacy path — appliances are space props now (not cart units)
+        if (typeof window._addSpaceApplianceProp === 'function') {
+            window._addSpaceApplianceProp(opts.applianceType || (host && host.applianceType) || 'washer', opts);
         }
         return 0;
     }
@@ -15147,6 +15226,13 @@ window._askCornerUnitSide = function(kind) {
 window.addSpaceUnit = function(kind, opts) {
     kind = kind || 'cabinet';
     opts = opts || {};
+    // Appliances are space props — never create a cart / slot unit
+    if (kind === 'spaceAppliance') {
+        if (typeof window._addSpaceApplianceProp === 'function') {
+            window._addSpaceApplianceProp(opts.applianceType || 'washer', opts);
+        }
+        return;
+    }
     if (!window._spacePairCanUse()) return;
     const existing = window._getSpacePairInfo();
     if (existing && existing.planLimitReached && typeof window._showPlanUpsell === 'function') {
@@ -15238,11 +15324,6 @@ window.addSpaceUnit = function(kind, opts) {
     } else if (kind === 'floatingShelf') {
         // Float near mid-height of the host cabinet; X/Z from suggestNext
         offset.y = Math.round((host.globalHeight || host.height || 240) * 0.5);
-    } else if (kind === 'spaceAppliance') {
-        // Floor-standing by default; TV starts near eye height (gizmo can move it)
-        const saType = opts.applianceType || (host && host.applianceType) || 'washer';
-        if (saType === 'tv') offset.y = 100;
-        else offset.y = 0;
     }
     if (rot) offset.rot = rot;
     window._attachSpacePairToItem(itemN, pairId, nextSlot, offset);
@@ -15707,7 +15788,10 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
             partColors: (typeof window._exportLocalPartColors === 'function')
                 ? window._exportLocalPartColors()
                 : JSON.parse(JSON.stringify(state.partColors || {})),
-            printCamera: state.printCamera ? JSON.parse(JSON.stringify(state.printCamera)) : null
+            printCamera: state.printCamera ? JSON.parse(JSON.stringify(state.printCamera)) : null,
+            spaceProps: (typeof window._getSpaceProps === 'function')
+                ? JSON.parse(JSON.stringify(window._getSpaceProps()))
+                : (Array.isArray(state.spaceProps) ? JSON.parse(JSON.stringify(state.spaceProps)) : [])
         }));
         const _cartUid = typeof window._cartUidAt === 'function' ? window._cartUidAt(state.editingCartIndex) : null;
         if (_cartUid) rawState.cartUid = _cartUid;
@@ -15783,6 +15867,7 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
             dimsStr: _wdDimsStr,
             isFloatingShelf: _isFloatingShelfCart,
             floatingShelfThicknessMm: _isFloatingShelfCart ? _fsThickMmCart : undefined,
+            isSpaceAppliance: state.presetId === 'space-appliance',
             material: state.boardMaterial === 'mdf' ? 'MDF' : state.boardMaterial === 'melamine' ? 'מלמין' : "סנדביץ'",
             handle: window._handleStyleLabel(state.handleStyle, state.handleVariant, state.handleType, state.ridingColor),
             desk: deskInfo,
@@ -15840,7 +15925,9 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
             multiViewPages: multiViewPages,
             multiViewLabels: multiViewLabels
         };
-    return { spec: cabinetSpec, rawState: rawState };
+    const snapItem = { spec: cabinetSpec, rawState: rawState };
+    if (Array.isArray(rawState.spaceProps)) snapItem.spaceProps = rawState.spaceProps;
+    return snapItem;
 };
 
 window._commitCurrentCabinetToCart = function(opts) {
@@ -18279,6 +18366,13 @@ function _cartIsFloatingShelf(itemObj) {
     return !!(rs && rs.presetId === 'floating-shelf');
 }
 
+function _cartIsSpaceAppliance(itemObj) {
+    if (!itemObj) return false;
+    if (itemObj.spec && itemObj.spec.isSpaceAppliance) return true;
+    const rs = itemObj.rawState;
+    return !!(rs && rs.presetId === 'space-appliance');
+}
+
 /** Corner data of a standalone corner-unit cart item (corner drawers / corner desk), else null. */
 function _cartStandaloneCorner(itemObj) {
     const rs = itemObj && itemObj.rawState;
@@ -20119,6 +20213,8 @@ function _groupCartItemsForPrint() {
             });
             return;
         }
+        // Standalone legacy appliance units: skip (visual props only; no dim pages)
+        if (_cartIsSpaceAppliance(itemObj)) return;
         groups.push({ type: 'single', itemObj: itemObj, index: index });
     });
     return groups;
@@ -20403,13 +20499,14 @@ function _spaceGroupIsWide(group, bpSvg) {
 function _printSpaceGroupOverviewHtml(group) {
     const src = group.members.map(function(m) { return m.itemObj.spec || {}; })
         .find(function(s) { return _cartImageValid(s.imgSpaceDoors) || _cartImageValid(s.imgSpaceOpen); }) || {};
-    const bpSvg = _spaceGroupBlueprintSvg(group);
+    const dimMembers = group.members.filter(function(m) { return !_cartIsSpaceAppliance(m.itemObj); });
+    const bpSvg = _spaceGroupBlueprintSvg({ members: dimMembers, baseName: group.baseName, pairId: group.pairId });
     const imgs = [[src.imgSpaceDoors, 'סגור — עם דלתות']];
     if (!bpSvg) imgs.push([src.imgSpaceOpen, 'פתוח — ללא דלתות']);
     const imgHtml = imgs.filter(function(x) { return _cartImageValid(x[0]); })
         .map(function(x) { return `<div class="mu-angle"><div class="cmp-cap">${x[1]}</div><img src="${x[0]}" alt=""></div>`; }).join('')
         + (bpSvg ? `<div class="mu-angle"><div class="cmp-cap">שרטוט — כל החלקים יחד</div><div class="mu-space-bp">${bpSvg}</div></div>` : '');
-    const rows = group.members.map(function(m, i) {
+    const rows = dimMembers.map(function(m, i) {
         const rs = m.itemObj.rawState || {};
         const wing = (rs.wings && rs.wings.center) || {};
         const col = _spaceSlotColor(m.slot);
@@ -20422,7 +20519,7 @@ function _printSpaceGroupOverviewHtml(group) {
         </tr>`;
     }).join('');
     return `<div class="cmp-block mu-angle-page" style="page-break-after:always;">
-        <div class="cmp-bar"><span>${_escPrintHtml(group.baseName)}</span><small>${group.members.length} חלקים במרחב</small></div>
+        <div class="cmp-bar"><span>${_escPrintHtml(group.baseName)}</span><small>${dimMembers.length} חלקים במרחב</small></div>
         ${_spaceGroupIsWide(group, bpSvg) ? `<div class="mu-space-stack">${imgHtml}</div>` : `<div class="mu-angle-row">${imgHtml}</div>`}
         <table class="mu-parts">
             <thead><tr><th>חלק</th><th>רוחב</th><th>גובה</th><th>עומק</th></tr></thead>
@@ -20440,6 +20537,8 @@ function _printSpaceGroupBlockHtml(group, opts) {
 
     let totalPrice = 0, totalInstall = 0, totalCost = 0;
     group.members.forEach(function(m) {
+        // Appliances are visual-only in the space overview photo — no dim / blueprint pages
+        if (_cartIsSpaceAppliance(m.itemObj)) return;
         const partTitle = _printSpacePartTitle(group, m);
         const block = _printSingleCabinetBlockHtml(m.itemObj, m.index, {
             isFactory: opts.isFactory,
