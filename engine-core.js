@@ -836,10 +836,10 @@ function _editorRoomWanted() {
     if (state.viewMode !== 'front' && state.viewMode !== '3d') return false;
     // Kitchen already has denser carcass meshes; room backdrop + lighting makes orbit feel sluggish
     if (state.presetId === 'kitchen') return false;
-    // Editor page only (the viewer has its own scene); spaces place cabinets outside the room rectangle
+    // Editor page only (the viewer has its own scene)
     if (!document.getElementById('btn-toggle-room3d')) return false;
-    const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
-    return !(info && info.others && info.others.length);
+    // Shared-space pairs are allowed — room width/depth expand to fit companions (see _getRoomRect)
+    return true;
 }
 window._syncEditorRoomButton = function() {
     const btn = document.getElementById('btn-toggle-room3d');
@@ -851,7 +851,12 @@ window._toggleEditorRoom = function() {
     window._room3dPref = !window._room3dPref;
     try { localStorage.setItem('ac_room3d_v2', window._room3dPref ? '1' : '0'); } catch (e) { /* ignore */ }
     window._syncEditorRoomButton();
+    // Apply immediately — don't wait for an incidental rebuild (was flaky in shared-space)
+    if (state.viewMode === 'front' || state.viewMode === '3d') {
+        window._roomVisible = !!window._room3dPref && !state.wingEditMode && state.presetId !== 'kitchen';
+    }
     if (typeof buildCabinet === 'function') buildCabinet();
+    if (window._roomVisible && typeof _buildRoom === 'function') _buildRoom();
 };
 window._syncEditorRoomButton();
 
@@ -1240,7 +1245,7 @@ window._autoRoomHeight = function() {
 
 /** Room rectangle in room coordinates. Independent of the left/center/right wall setting. */
 window._getRoomRect = function() {
-    const D = (window._roomDepth && window._roomDepth > 0) ? window._roomDepth : 500;
+    let D = (window._roomDepth && window._roomDepth > 0) ? window._roomDepth : 500;
     const H = (window._roomHeight && window._roomHeight > 0) ? window._roomHeight : window._autoRoomHeight();
     let W = (window._roomWidth && window._roomWidth > 0) ? window._roomWidth : 0;
     if (!W) {
@@ -1255,6 +1260,27 @@ window._getRoomRect = function() {
                 const item = state.orderCart && state.orderCart[p.cartIndex];
                 if (item) W = Math.max(W, window._getCartCabinetDims(item).w + 100);
             });
+        }
+    }
+    // Shared space: grow auto room so companion cabinets aren't outside the walls
+    const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
+    if (info && info.count >= 2 && typeof window._spaceCabinetFootprint === 'function') {
+        let minX = Infinity, maxX = -Infinity, maxFront = 0;
+        info.members.forEach(function(m) {
+            const fp = window._spaceCabinetFootprint(m.slot) || { w: 160, d: 54, cx: 0, cz: 0 };
+            const off = (typeof window._spaceOffsetForSlot === 'function')
+                ? window._spaceOffsetForSlot(m.slot) : { x: 0, y: 0, z: 0 };
+            const cx = (off.x || 0) + (fp.cx || 0);
+            const cz = (off.z || 0) + (fp.cz || 0);
+            minX = Math.min(minX, cx - (fp.w || 160) / 2);
+            maxX = Math.max(maxX, cx + (fp.w || 160) / 2);
+            maxFront = Math.max(maxFront, cz + (fp.d || 54) / 2);
+        });
+        if (Number.isFinite(minX) && Number.isFinite(maxX)) {
+            W = Math.max(W, (maxX - minX) + 120);
+        }
+        if (!(window._roomDepth > 0) && maxFront > 0) {
+            D = Math.max(D, Math.ceil(maxFront + 80));
         }
     }
     return { leftX: -W / 2, rightX: W / 2, backZ: 0, frontZ: D, height: H };

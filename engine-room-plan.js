@@ -1811,9 +1811,18 @@
     window._enterRoomPlanMode = function() {
         if (state.viewMode === 'room-plan') return;
 
+        // Leave space-isolate so the full room + all cabinets are available
+        if (window._spaceIsolateMode && typeof window.exitSpaceIsolateMode === 'function') {
+            try { window.exitSpaceIsolateMode(); } catch (e) { /* ignore */ }
+        }
+        if (state.wingEditMode && typeof window.confirmWingEdit === 'function') {
+            try { window.confirmWingEdit(); } catch (e) { /* ignore */ }
+        }
+
         window._roomPlanSaved = {
             viewMode: state.viewMode,
             roomVisible: window._roomVisible,
+            room3dPref: !!window._room3dPref,
             orbitFree: window._orbitFree
         };
 
@@ -1878,15 +1887,23 @@
 
         window._roomPlan3dCamSet = false;
 
-        if (window._roomPlanSaved) {
-            state.viewMode = window._roomPlanSaved.viewMode || 'front';
-            window._orbitFree = window._roomPlanSaved.orbitFree || false;
-            window._roomPlanSaved = null;
+        const saved = window._roomPlanSaved;
+        window._roomPlanSaved = null;
+        if (saved) {
+            state.viewMode = saved.viewMode || 'front';
+            window._orbitFree = saved.orbitFree || false;
+            if (saved.room3dPref != null) window._room3dPref = !!saved.room3dPref;
         } else {
             state.viewMode = 'front';
         }
 
-        window._roomVisible = false;
+        // Restore backdrop room from user preference (was always forced off — felt intermittent)
+        if (typeof window._syncEditorRoomButton === 'function') window._syncEditorRoomButton();
+        if (state.viewMode === 'front' || state.viewMode === '3d') {
+            window._roomVisible = !!window._room3dPref && !state.wingEditMode && state.presetId !== 'kitchen';
+        } else {
+            window._roomVisible = false;
+        }
         if (typeof _buildRoom === 'function') _buildRoom();
 
         const furnBar = document.getElementById('room-furniture-toolbar');
@@ -1895,6 +1912,7 @@
         document.querySelectorAll('.view-btn').forEach(function(b) { b.classList.remove('active'); });
         const activeBtn = document.getElementById(
             state.viewMode === 'room-plan' ? 'btn-room-plan'
+            : state.viewMode === '3d' ? 'btn-front-view'
             : state.viewMode === 'front' ? 'btn-front-view'
             : 'btn-blueprint-view'
         );
