@@ -2009,6 +2009,34 @@ body.touch-door-dragging, body.touch-door-dragging * { cursor: grabbing !importa
     padding: 4px 6px 8px;
     border-bottom: 1px solid #e2e8f0;
 }
+.cart-space-group-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+.cart-space-group-thumb {
+    position: relative;
+    flex: 0 0 72px;
+    width: 72px;
+    height: 72px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #e2e8f0;
+    border: 1px solid #cbd5e1;
+}
+.cart-space-group-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.cart-space-group-thumb .cart-thumb-cam-tools {
+    opacity: 1;
+}
+.cart-space-group-info {
+    flex: 1 1 auto;
+    min-width: 0;
+}
 .cart-space-group-title {
     font-weight: 800;
     color: var(--primary);

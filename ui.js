@@ -12541,6 +12541,115 @@ window._syncPrintCamButtonState = function() {
         // Reset visible whenever this cabinet has a custom saved angle
         btn.style.display = window._cartItemHasSavedPrintCam(idx) ? 'inline-flex' : 'none';
     });
+    document.querySelectorAll('[data-space-print-cam-btn]').forEach(function(btn) {
+        const pairId = btn.getAttribute('data-space-print-cam-btn');
+        const hasSaved = window._spacePairHasSavedPrintCam(pairId);
+        btn.classList.toggle('has-saved-print-cam', hasSaved);
+    });
+    document.querySelectorAll('[data-space-print-cam-reset]').forEach(function(btn) {
+        const pairId = btn.getAttribute('data-space-print-cam-reset');
+        btn.style.display = window._spacePairHasSavedPrintCam(pairId) ? 'inline-flex' : 'none';
+    });
+};
+
+/** Save current world camera as the shared-space group thumbnail / print pose. */
+window._saveSpacePrintCameraPose = function(pairId) {
+    const cam = window.camera;
+    const ctrl = window.controls;
+    if (!cam || !ctrl || !pairId) {
+        if (typeof _showToast === 'function') _showToast('לא ניתן לשמור זווית כרגע', 2500);
+        return;
+    }
+    const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
+    if (!info || info.pairId !== pairId || info.count < 2) {
+        if (typeof _showToast === 'function') {
+            _showToast('פתחו ארון מהמרחב, כוונו את המצלמה על כל החלקים, ואז שמרו', 3500);
+        }
+        return;
+    }
+    // Prefer overview (all cabinets visible) when saving the group shot
+    if (window._spaceIsolateMode && typeof window.exitSpaceIsolateMode === 'function') {
+        window.exitSpaceIsolateMode();
+    }
+    const printCameraSpace = {
+        worldPos: [cam.position.x, cam.position.y, cam.position.z],
+        worldTarget: [ctrl.target.x, ctrl.target.y, ctrl.target.z],
+        savedAt: Date.now()
+    };
+    window._setSpacePairPrintCamera(pairId, printCameraSpace);
+    if (typeof window._invalidateSpacePairPreviewImages === 'function') {
+        window._invalidateSpacePairPreviewImages(pairId);
+    }
+    window._isDirty = true;
+    window._syncPrintCamButtonState();
+    if (typeof _showToast === 'function') {
+        _showToast('✓ זווית המרחב נשמרה — מרענן תמונה…', 2800);
+    }
+    if (typeof window._refreshCartMediaForPrint === 'function') {
+        Promise.resolve(window._refreshCartMediaForPrint({ force: true })).then(function() {
+            if (typeof updateLeftSidebar === 'function') updateLeftSidebar();
+            window._syncPrintCamButtonState();
+        }).catch(function() { /* ignore */ });
+    } else if (typeof updateLeftSidebar === 'function') {
+        updateLeftSidebar();
+    }
+};
+
+window._toggleSpacePrintCameraMode = function(pairId) {
+    if (!pairId) return;
+    const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
+    const inPair = info && info.pairId === pairId && info.count >= 2;
+    if (!inPair) {
+        // Open first member of the pair so the user can frame the space
+        const cart = state.orderCart || [];
+        let firstIdx = -1;
+        for (let i = 0; i < cart.length; i++) {
+            if (window._spacePairIdOf(cart[i]) === pairId) { firstIdx = i; break; }
+        }
+        if (firstIdx >= 0 && typeof editCartItem === 'function') {
+            if (typeof _showToast === 'function') {
+                _showToast('פתחו את המרחב, כוונו את המצלמה, ואז לחצו שוב על המצלמה לשמירה', 3500);
+            }
+            editCartItem(firstIdx);
+        }
+        return;
+    }
+    if (window._spacePairHasSavedPrintCam(pairId)) {
+        if (!confirm('בטוחים שרוצים לשנות את זווית תמונת המרחב?')) return;
+    }
+    window._saveSpacePrintCameraPose(pairId);
+};
+
+window._resetSpacePrintCameraPose = function(pairId) {
+    if (!pairId) return;
+    window._setSpacePairPrintCamera(pairId, null);
+    if (typeof window._invalidateSpacePairPreviewImages === 'function') {
+        window._invalidateSpacePairPreviewImages(pairId);
+    }
+    window._isDirty = true;
+    // Snap live camera to the new default front-facing overview if this pair is open
+    const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
+    if (info && info.pairId === pairId && typeof window._computeSpacePairCaptureView === 'function') {
+        if (window._spaceIsolateMode && typeof window.exitSpaceIsolateMode === 'function') {
+            window.exitSpaceIsolateMode();
+        }
+        const view = window._computeSpacePairCaptureView(info);
+        if (view && typeof window._applyPrintCaptureViewLive === 'function') {
+            window._applyPrintCaptureViewLive(view);
+        }
+    }
+    window._syncPrintCamButtonState();
+    if (typeof _showToast === 'function') {
+        _showToast('✓ חזרה לזווית ברירת המחדל של המרחב', 2800);
+    }
+    if (typeof window._refreshCartMediaForPrint === 'function') {
+        Promise.resolve(window._refreshCartMediaForPrint({ force: true })).then(function() {
+            if (typeof updateLeftSidebar === 'function') updateLeftSidebar();
+            window._syncPrintCamButtonState();
+        }).catch(function() { /* ignore */ });
+    } else if (typeof updateLeftSidebar === 'function') {
+        updateLeftSidebar();
+    }
 };
 
 window._onPrintCamOrbitChange = function() {
@@ -12809,7 +12918,7 @@ window._captureCabinetPreviewImages = function() {
         multiViewSVG,
         imgSpaceDoors,
         imgSpaceOpen,
-        captureVer: 20
+        captureVer: 21
     };
     } finally {
         restoreRenderSize();
@@ -12852,6 +12961,8 @@ window._cartItemNeedsMediaRefresh = function(itemObj) {
             if (spec.captureVer < 16 && !spec.imgSpaceDoorsManual) return true;
             // v20: whole-space overview is elevated top-down (מבט על) so U / rotated parts all show
             if (spec.captureVer < 20 && !spec.imgSpaceDoorsManual) return true;
+            // v21: space overview approaches from the FRONT (was accidentally from the back)
+            if (spec.captureVer < 21 && !spec.imgSpaceDoorsManual) return true;
             // v17–18: rotated space frontal (+ translucent companions); v19: honor saved printCamera poses
             if (spec.captureVer < 19 && !spec.imgDoorsManual) {
                 let needsFront = false;
@@ -13747,14 +13858,67 @@ window._getSpacePairInfo = function() {
     return window._getSpacePairInfoAt(state.editingCartIndex);
 };
 
+/** Saved whole-space print camera (world pose), shared across pair members. */
+window._getSpacePairPrintCamera = function(infoOrPairId) {
+    let pairId = null;
+    if (typeof infoOrPairId === 'string') pairId = infoOrPairId;
+    else if (infoOrPairId && infoOrPairId.pairId) pairId = infoOrPairId.pairId;
+    else {
+        const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
+        pairId = info && info.pairId;
+    }
+    if (!pairId) return null;
+    const cart = state.orderCart || [];
+    for (let i = 0; i < cart.length; i++) {
+        const it = cart[i];
+        if (!it || window._spacePairIdOf(it) !== pairId) continue;
+        const pc = it.rawState && it.rawState.printCameraSpace;
+        if (pc && pc.worldPos && pc.worldTarget) return pc;
+    }
+    return null;
+};
+
+window._spacePairHasSavedPrintCam = function(pairId) {
+    return !!window._getSpacePairPrintCamera(pairId);
+};
+
+window._setSpacePairPrintCamera = function(pairId, printCameraSpace) {
+    if (!pairId) return;
+    (state.orderCart || []).forEach(function(it) {
+        if (!it || window._spacePairIdOf(it) !== pairId) return;
+        if (!it.rawState) it.rawState = {};
+        if (printCameraSpace) {
+            it.rawState.printCameraSpace = JSON.parse(JSON.stringify(printCameraSpace));
+        } else {
+            delete it.rawState.printCameraSpace;
+        }
+    });
+};
+
 /**
- * Elevated top-down (מבט על) framing for the whole shared space.
- * Uses plan XZ extents so U-shaped / rotated parts all appear — not a flat +Z
- * frontal that often shows the back of a 180°-rotated leg.
+ * Elevated front-facing (מבט על מקדימה) framing for the whole shared space.
+ * Uses plan XZ extents so U-shaped / rotated parts all appear.
+ * Honors a saved printCameraSpace world pose when present.
  */
 window._computeSpacePairCaptureView = function(info) {
     info = info || window._getSpacePairInfo();
     if (!info || info.count < 2) return null;
+
+    const saved = window._getSpacePairPrintCamera(info);
+    if (saved && saved.worldPos && saved.worldTarget) {
+        return {
+            id: 'spaceSaved',
+            label: 'מרחב משותף — זווית שמורה',
+            camPos: [saved.worldPos[0], saved.worldPos[1], saved.worldPos[2]],
+            camTarget: [saved.worldTarget[0], saved.worldTarget[1], saved.worldTarget[2]],
+            useExactPose: true,
+            fitH: 360,
+            fitW: 350,
+            skipOcclusion: true,
+            keepCompanions: true,
+            companionOpacity: 1
+        };
+    }
 
     let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, maxH = 0;
     let frontX = 0, frontZ = 0, frontN = 0;
@@ -13785,25 +13949,25 @@ window._computeSpacePairCaptureView = function(info) {
     const spanZ = maxZ - minZ;
     const span = Math.max(spanX, spanZ, 120);
 
-    // Approach from the open side of the layout (opposite average front → look into the U)
-    let ax = frontN ? -frontX / frontN : 0;
-    let az = frontN ? -frontZ / frontN : -1;
+    // Approach FROM the average front (same side as editor front view) so we see door faces,
+    // not the backs. Editor front-view camera sits on +Z looking toward -Z.
+    let ax = frontN ? frontX / frontN : 0;
+    let az = frontN ? frontZ / frontN : 1;
     let aLen = Math.hypot(ax, az);
-    if (aLen < 0.15) { ax = 0; az = -1; aLen = 1; }
+    if (aLen < 0.15) { ax = 0; az = 1; aLen = 1; }
     else { ax /= aLen; az /= aLen; }
 
-    // High bird's-eye with a little lateral bias so depth reads clearly
-    const elev = 62 * Math.PI / 180;
+    // High bird's-eye from the front with a little lateral bias so depth reads clearly
+    const elev = 52 * Math.PI / 180;
     const pull = span * 0.95 + Math.max(maxH * 0.55, 160);
     const camY = Math.max(maxH * 0.55, 80) + Math.tan(elev) * pull * 0.72;
     const tgtY = Math.max(maxH * 0.22, 40);
-    // Slight side offset so three legs don't stack in a line
     const sideX = -az * span * 0.12;
     const sideZ = ax * span * 0.12;
 
     return {
         id: 'space',
-        label: 'מרחב משותף — מבט על',
+        label: 'מרחב משותף — מבט על מקדימה',
         camPos: [midX + ax * pull + sideX, camY, midZ + az * pull + sideZ],
         camTarget: [midX, tgtY, midZ],
         fitH: maxH * 0.55 + span * 0.55 + 120,
@@ -17437,13 +17601,44 @@ window.updateLeftSidebar = function(opts) {
             if (!isNaN(p)) groupPrice += p;
             groupInstall += (m.it.spec && m.it.spec.installPrice) || 0;
         });
+        // Group thumbnail = shared space closed shot (same image used in print overview)
+        let groupThumbSrc = null;
+        for (let mi = 0; mi < entry.members.length; mi++) {
+            const sp = entry.members[mi].it && entry.members[mi].it.spec;
+            if (sp && typeof _cartImageValid === 'function' && _cartImageValid(sp.imgSpaceDoors)) {
+                groupThumbSrc = sp.imgSpaceDoors;
+                break;
+            }
+        }
+        const pairIdEsc = String(entry.pairId || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        const groupThumbCam = `
+            <div class="cart-thumb-cam-tools" onclick="event.stopPropagation();">
+                <button type="button" class="cart-thumb-cam-btn" data-space-print-cam-btn="${pairIdEsc}"
+                    title="שמירת זווית המצלמה הנוכחית לתמונת כל הארונות במרחב"
+                    onclick="event.stopPropagation(); window._toggleSpacePrintCameraMode && window._toggleSpacePrintCameraMode('${pairIdEsc}');">
+                    <i class="fa-solid fa-camera"></i>
+                </button>
+                <button type="button" class="cart-thumb-cam-reset" data-space-print-cam-reset="${pairIdEsc}" style="display:none;"
+                    title="חזרה לזווית ברירת המחדל של המרחב"
+                    onclick="event.stopPropagation(); window._resetSpacePrintCameraPose && window._resetSpacePrintCameraPose('${pairIdEsc}');">
+                    <i class="fa-solid fa-rotate-left"></i>
+                </button>
+            </div>`;
+        const groupThumbHtml = groupThumbSrc
+            ? `<div class="cart-space-group-thumb"><img src="${groupThumbSrc}" alt="מרחב">${groupThumbCam}</div>`
+            : `<div class="cart-space-group-thumb cart-mini-thumb-empty"><i class="fa-solid fa-layer-group"></i>${groupThumbCam}</div>`;
         group.innerHTML = `
             <div class="cart-space-group-header">
-                <div class="cart-space-group-title"><i class="fa-solid fa-layer-group"></i> ${groupTitle}</div>
-                <div class="cart-space-group-meta">${entry.members.length} חלקים במרחב</div>
+                <div class="cart-space-group-top">
+                    ${groupThumbHtml}
+                    <div class="cart-space-group-info">
+                        <div class="cart-space-group-title"><i class="fa-solid fa-layer-group"></i> ${groupTitle}</div>
+                        <div class="cart-space-group-meta">${entry.members.length} חלקים במרחב</div>
+                    </div>
+                </div>
                 <div class="cart-space-group-actions">
-                    <button type="button" class="cart-mini-btn cart-space-group-dup" onclick="event.stopPropagation(); duplicateSpaceGroup('${entry.pairId}');" title="שכפל את כל הארונות שבמרחב כקבוצה חדשה — עם אותו סידור ומיקומים"><i class="fa-solid fa-clone"></i> שכפל</button>
-                    <button type="button" class="cart-mini-btn cart-space-group-del" onclick="event.stopPropagation(); deleteSpaceGroup('${entry.pairId}');" title="מחק את כל הארונות שבמרחב — יעברו לפח, ניתן לבטל עם Ctrl+Z"><i class="fa-solid fa-trash"></i> מחק</button>
+                    <button type="button" class="cart-mini-btn cart-space-group-dup" onclick="event.stopPropagation(); duplicateSpaceGroup('${pairIdEsc}');" title="שכפל את כל הארונות שבמרחב כקבוצה חדשה — עם אותו סידור ומיקומים"><i class="fa-solid fa-clone"></i> שכפל</button>
+                    <button type="button" class="cart-mini-btn cart-space-group-del" onclick="event.stopPropagation(); deleteSpaceGroup('${pairIdEsc}');" title="מחק את כל הארונות שבמרחב — יעברו לפח, ניתן לבטל עם Ctrl+Z"><i class="fa-solid fa-trash"></i> מחק</button>
                 </div>
                 ${window._showPricing !== false ? `<div class="cart-space-group-price"><span dir="ltr">₪${groupPrice.toLocaleString()}</span> <span class="cart-space-group-install">+ <span dir="ltr">₪${groupInstall.toLocaleString()}</span> התקנה</span></div>` : ''}
             </div>
