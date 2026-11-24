@@ -539,6 +539,7 @@ function _customAndClosuresHtml() {
             _field('topPanelPerCm', 'משטח עליון (₪/ס"מ רוחב)', 'min="0" step="1"') +
             _field('closuresCustomer', 'סגירות — מחיר ללקוח (₪)', 'min="0" step="50"') +
             _field('closuresInstall', 'סגירות — התקנה (₪)', 'min="0" step="50"') +
+            _field('backPanelClearanceCost', 'פינוי פאנלים בגב — עלות (₪)', 'min="0" step="10"') +
         '</div>';
     return _detailsCard('לפי מידה, צוקל וסגירות', 'fa-ruler-combined', body, true);
 }
@@ -2051,6 +2052,7 @@ function fill(cfg) {
     _set('topPanelPerCm',       _num(ex.topPanelPerCm, dx.topPanelPerCm != null ? dx.topPanelPerCm : 8));
     _set('closuresCustomer',    _num(ex.closuresCustomer, dx.closuresCustomer != null ? dx.closuresCustomer : 750));
     _set('closuresInstall',     _num(ex.closuresInstall, dx.closuresInstall != null ? dx.closuresInstall : 300));
+    _set('backPanelClearanceCost', _num(ex.backPanelClearanceCost, dx.backPanelClearanceCost != null ? dx.backPanelClearanceCost : 350));
 
     updatePreview();
 }
@@ -2072,7 +2074,7 @@ function read() {
      'nickelLegPrice',
      'customSizeMel','customSizeSandwich','customSizeMdf',
      'c9RecessedSurcharge','c9LegsSurcharge',
-     'topPanelPerCm','closuresCustomer','closuresInstall'].forEach(function(k) {
+     'topPanelPerCm','closuresCustomer','closuresInstall','backPanelClearanceCost'].forEach(function(k) {
         ex[k] = _num(_v(k), 0);
     });
     ['slidingHeightSurcharge'].forEach(function(k) { ex[k] = (_frac(_v(k)) || 0); });

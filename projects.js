@@ -2409,7 +2409,7 @@ var _PP_DEFAULTS = {
         sorbet:170,touchHandle:30,
         customSizeMel:1200,customSizeSandwich:1500,customSizeMdf:1400,
         c9RecessedSurcharge:150,c9LegsSurcharge:250,
-        topPanelPerCm:8,closuresCustomer:750,closuresInstall:300},
+        topPanelPerCm:8,closuresCustomer:750,closuresInstall:300,backPanelClearanceCost:350},
     customExtras: [],
     stockMaterials: []
 };

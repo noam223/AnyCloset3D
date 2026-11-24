@@ -2436,6 +2436,8 @@ window.setOrderOpt = function(key, value) {
         if (typeof buildCabinet === 'function') buildCabinet();
         if (typeof calculatePrice === 'function') calculatePrice();
         if (typeof window._renderRoomPlan2D === 'function') window._renderRoomPlan2D();
+    } else if (key === 'backPanelClearance') {
+        if (typeof calculatePrice === 'function') calculatePrice();
     }
     window._syncOrderOptsUI();
     if (typeof saveHistoryState === 'function') saveHistoryState();
@@ -6007,7 +6009,8 @@ var DEFAULT_PRICING_CONFIG = {
         customSizeMel: 1200, customSizeSandwich: 1500, customSizeMdf: 1400,
         c9RecessedSurcharge: 150, c9LegsSurcharge: 250,
         topPanelPerCm: 8,
-        closuresCustomer: 750, closuresInstall: 300
+        closuresCustomer: 750, closuresInstall: 300,
+        backPanelClearanceCost: 350
     },
     customExtras: [],
     stockMaterials: [],
@@ -6698,12 +6701,18 @@ function calculatePrice() {
     const numRegularWings = (hasLeftWing ? 1 : 0) + (hasRightWing ? 1 : 0);
     if (numRegularWings >= 1) totalCost += numRegularWings * _priceNum(ex.wingConnection, 400);
 
-    const hasClosures = window._orderOpts(state.wings).closures === 'yes';
+    const orderOptsLive = window._orderOpts(state.wings);
+    const hasClosures = orderOptsLive.closures === 'yes';
     const closuresInstall = _priceNum(ex.closuresInstall,
         (window.CLOSURES_PRICE_INSTALL != null ? window.CLOSURES_PRICE_INSTALL : 300));
     const closuresCustomer = _priceNum(ex.closuresCustomer,
         (window.CLOSURES_PRICE_CUSTOMER != null ? window.CLOSURES_PRICE_CUSTOMER : 750));
     if (hasClosures) totalInstall += closuresInstall;
+
+    // Back-panel clearance is a cost adder (my cost); customer price follows via profitMult
+    if (orderOptsLive.backPanelClearance === 'yes') {
+        totalCost += _priceNum(ex.backPanelClearanceCost, 350);
+    }
 
     state.currentCostPrice    = Math.round(totalCost);
     state.currentInstallPrice = Math.round(totalInstall);
