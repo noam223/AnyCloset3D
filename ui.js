@@ -8405,7 +8405,9 @@ window._buildSpaceCabMoveHandle = function() {
 // ── 3D axis gizmo (TransformControls) for shared-space cabinets ──
 // Lives in its own overlay scene so captures / thumbnails of `scene` never include it.
 // In overview, the gizmo follows whichever cabinet is under the pointer (not only the
-// left-sidebar "active" / editing unit). Slot 0 stays the space origin (no gizmo).
+// left-sidebar "active" / editing unit). While isolating a movable unit (slot > 0),
+// the gizmo stays on that open cabinet so it can be repositioned from its own editor.
+// Slot 0 stays the space origin (no gizmo).
 window._spaceGizmoScene = null;
 window._spaceGizmo = null;
 window._spaceGizmoProxy = null;
@@ -8464,16 +8466,23 @@ function _spaceGizmoTarget() {
     const info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
     if (!info || info.count < 2) return null;
     if (state.viewMode !== 'front' && state.viewMode !== '3d') return null;
-    if (state.wingEditMode || window._spaceIsolateMode || document.body.classList.contains('room-plan-mode')) return null;
+    if (state.wingEditMode || document.body.classList.contains('room-plan-mode')) return null;
 
-    // Prefer the slot being dragged, then hovered; touch/coarse always-on falls back to a movable slot
-    let slot = window._spaceGizmoDragSlot;
-    if (slot == null) slot = window._spaceGizmoHoverSlot;
-    if (slot == null && _spaceGizmoAlwaysOn()) {
-        if (info.activeSlot > 0) slot = info.activeSlot;
-        else {
-            const mov = (info.members || []).find(function(m) { return m.slot > 0; });
-            if (mov) slot = mov.slot;
+    let slot = null;
+    // Isolate editor of a movable (non-origin) unit: always target that open cabinet
+    if (window._spaceIsolateMode) {
+        if (info.activeSlot <= 0) return null;
+        slot = info.activeSlot;
+    } else {
+        // Overview: prefer drag, then hover; touch/coarse falls back to a movable slot
+        slot = window._spaceGizmoDragSlot;
+        if (slot == null) slot = window._spaceGizmoHoverSlot;
+        if (slot == null && _spaceGizmoAlwaysOn()) {
+            if (info.activeSlot > 0) slot = info.activeSlot;
+            else {
+                const mov = (info.members || []).find(function(m) { return m.slot > 0; });
+                if (mov) slot = mov.slot;
+            }
         }
     }
     if (slot == null || slot <= 0) return null;
@@ -8594,8 +8603,8 @@ function _ensureSpaceGizmo() {
     return g;
 }
 
-// Gizmo shows while the pointer is over ANY movable space cabinet (or its arrows / rotate btn).
-// Slot is picked by hover — not limited to the left-sidebar editing unit.
+// Overview: gizmo while pointer is over ANY movable space cabinet (or its arrows / rotate btn).
+// Isolate (movable unit): always on for the open cabinet — no hover required.
 window._spaceGizmoHover = false;
 function _spaceGizmoAlwaysOn() {
     return !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
@@ -8615,10 +8624,21 @@ function _bindSpaceGizmoHover() {
             return;
         }
         const info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
-        if (!info || info.count < 2 || window._spaceIsolateMode || state.wingEditMode ||
+        if (!info || info.count < 2 || state.wingEditMode ||
             document.body.classList.contains('room-plan-mode')) {
             window._spaceGizmoHoverSlot = null;
             window._spaceGizmoHover = false;
+            return;
+        }
+        // Editing a non-origin space cabinet: keep gizmo on that unit
+        if (window._spaceIsolateMode) {
+            if (info.activeSlot > 0 && !window._spaceSlotLocked(info.activeSlot)) {
+                window._spaceGizmoHoverSlot = info.activeSlot;
+                window._spaceGizmoHover = true;
+            } else {
+                window._spaceGizmoHoverSlot = null;
+                window._spaceGizmoHover = false;
+            }
             return;
         }
         const rect = el.getBoundingClientRect();
@@ -8630,12 +8650,15 @@ function _bindSpaceGizmoHover() {
     });
     el.addEventListener('pointerleave', function() {
         if (window._spaceGizmo && window._spaceGizmo.dragging) return;
+        // Isolate keeps the gizmo visible without pointer-over
+        if (window._spaceIsolateMode) return;
         window._spaceGizmoHover = false;
         window._spaceGizmoHoverSlot = null;
     });
 }
 function _spaceGizmoShouldShow(g) {
     if (_spaceGizmoAlwaysOn()) return true;
+    if (window._spaceIsolateMode) return true;
     if (g && g.dragging) return true;
     return !!(window._spaceGizmoHover || window._spaceRotHover);
 }
