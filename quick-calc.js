@@ -413,13 +413,17 @@ function _qcRenderCustomExtras(preserveQtys) {
         return;
     }
     host.style.display = '';
+    var cfg = _qcCfg();
+    var profitMult = (cfg && cfg.profitMultiplier != null) ? cfg.profitMultiplier : 1.8;
     host.innerHTML = list.map(function(item) {
         var id = 'qc-cx-' + item.id;
         var qty = prev[item.id] != null ? prev[item.id] : 0;
+        // Show customer unit price (cost × profit), never raw cost / רכש
+        var custUnit = Math.round(_qcNum(item.price, 0) * profitMult);
         return '<div class="qc-extra">' +
             '<i class="fa-solid fa-tag qc-extra-ic"></i>' +
             '<label class="qc-extra-name" for="' + _qcEscAttr(id) + '">' + _qcEscAttr(item.name) +
-                '<small>₪' + Math.round(_qcNum(item.price, 0)).toLocaleString('he-IL') + ' / יח׳</small></label>' +
+                '<small>₪' + custUnit.toLocaleString('he-IL') + ' / יח׳</small></label>' +
             '<div class="qc-stepper">' +
                 '<button type="button" onclick="qcStep(\'' + id.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\',-1)" aria-label="פחות">&minus;</button>' +
                 '<input type="number" id="' + _qcEscAttr(id) + '" data-custom-extra-id="' + _qcEscAttr(item.id) + '" ' +
@@ -534,8 +538,8 @@ window.calcQuickPrice = function(autoUpdateShelves = false) {
     const costRow = document.getElementById('qc-cost-row');
     const installEl = document.getElementById('qc-install');
     const custEl = document.getElementById('qc-total-cust');
-    const showCost = window._showCostPricing === true || (window._features && window._features.showCostPricing === true);
-    if (costRow) costRow.style.display = showCost ? '' : 'none';
+    // Cost / רכש stays internal — never show on the client-facing calculator screen
+    if (costRow) costRow.style.display = 'none';
     if (costEl) costEl.innerText = '₪' + Math.round(finalCost).toLocaleString();
     if (installEl) installEl.innerText = '₪' + Math.round(installPrice).toLocaleString();
     if (custEl) custEl.innerText = '₪' + Math.round(priceToCustomer).toLocaleString();

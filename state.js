@@ -2487,6 +2487,30 @@ window._syncOrderOptsUI = function() {
     if (ledHint) ledHint.style.display = ledPairs > 0 ? '' : 'none';
     const engColors = document.getElementById('order-engraving-colors');
     if (engColors) engColors.style.display = o.engraving === 'yes' ? '' : 'none';
+
+    // Price hints show customer amounts only (never cost / רכש — client may see this screen)
+    try {
+        const cfg = window._pricingConfig || {};
+        const ex = (cfg && cfg.extras) || {};
+        const profitMult = (cfg && cfg.profitMultiplier != null) ? cfg.profitMultiplier : 1.8;
+        const closuresCust = Math.round(Number(ex.closuresCustomer != null ? ex.closuresCustomer
+            : (window.CLOSURES_PRICE_CUSTOMER != null ? window.CLOSURES_PRICE_CUSTOMER : 750)) || 750);
+        const closuresInst = Math.round(Number(ex.closuresInstall != null ? ex.closuresInstall
+            : (window.CLOSURES_PRICE_INSTALL != null ? window.CLOSURES_PRICE_INSTALL : 300)) || 300);
+        const backCost = Number(ex.backPanelClearanceCost != null ? ex.backPanelClearanceCost : 350) || 350;
+        const backCust = Math.round(backCost * profitMult);
+        const closuresHint = document.getElementById('order-closures-price-hint');
+        if (closuresHint) {
+            closuresHint.innerHTML = '<i class="fa-solid fa-circle-info"></i> כן: ‎+₪'
+                + closuresCust.toLocaleString('he-IL') + ' למחיר הארון, ‎+₪'
+                + closuresInst.toLocaleString('he-IL') + ' להתקנה';
+        }
+        const backHint = document.getElementById('order-back-clearance-price-hint');
+        if (backHint) {
+            backHint.innerHTML = '<i class="fa-solid fa-circle-info"></i> כן: ‎+₪'
+                + backCust.toLocaleString('he-IL') + ' למחיר הארון';
+        }
+    } catch (e) { /* keep static fallback text */ }
 };
 
 /** Show the glass-tint swatches instead of the board colours while the "זכוכית" tab is active. */
