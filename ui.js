@@ -10668,16 +10668,19 @@ function bindUI() {
         mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
 
-        const _spaceHits = (window._spaceCompanionHits && window._spaceCompanionHits.length)
-            ? window._spaceCompanionHits
-            : (window._spaceCompanionHit ? [window._spaceCompanionHit] : []);
-        if (_spaceHits.length) {
-            const compHits = raycaster.intersectObjects(_spaceHits, false);
-            if (compHits.length > 0 && typeof window.switchSpaceCabinet === 'function') {
-                const slot = compHits[0].object.userData.spaceSlot;
-                if (slot != null && slot >= 0) {
-                    window.switchSpaceCabinet(slot);
-                    return;
+        // Overview only — in isolate mode companions are ghosted and disabled
+        if (!window._spaceIsolateMode) {
+            const _spaceHits = (window._spaceCompanionHits && window._spaceCompanionHits.length)
+                ? window._spaceCompanionHits
+                : (window._spaceCompanionHit ? [window._spaceCompanionHit] : []);
+            if (_spaceHits.length) {
+                const compHits = raycaster.intersectObjects(_spaceHits, false);
+                if (compHits.length > 0 && typeof window.switchSpaceCabinet === 'function') {
+                    const slot = compHits[0].object.userData.spaceSlot;
+                    if (slot != null && slot >= 0) {
+                        window.switchSpaceCabinet(slot);
+                        return;
+                    }
                 }
             }
         }
@@ -12198,6 +12201,24 @@ window._updateSpaceOcclusionGhosts = function() {
     // Blueprint / room-plan 2D: no ghosting needed
     if (state.viewMode === 'blueprint') return;
     if (state.viewMode === 'room-plan' && window._roomPlanSubview === '2d') return;
+
+    // Isolate edit: keep every other unit at fixed low opacity — never cull
+    if (window._spaceIsolateMode) {
+        const op = window._SPACE_ISOLATE_COMPANION_OPACITY != null
+            ? window._SPACE_ISOLATE_COMPANION_OPACITY : 0.1;
+        for (let i = 0; i < companions.length; i++) {
+            const g = companions[i];
+            if (!g) continue;
+            if (g.userData && g.userData._occludeHidden) {
+                window._setSpaceGroupOccludeHidden(g, false);
+            }
+            const cur = g.userData && g.userData._ghostOpacity;
+            if (cur == null || Math.abs(cur - op) > 0.001) {
+                window._setSpaceGroupOpacity(g, op);
+            }
+        }
+        return;
+    }
 
     const T = window._occludeTmp;
     if (!T.focusBox) {

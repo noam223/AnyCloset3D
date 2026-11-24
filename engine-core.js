@@ -6209,14 +6209,13 @@ window._applySpacePairPositions = function() {
         ? window._spaceOffsetForSlot(info.activeSlot)
         : { x: 0, y: 0 };
     // Isolate keeps the unit at its space pose so the camera flies TO that unit
-    // (not to origin / ארון 1). Companions stay cleared separately.
+    // (not to origin / ארון 1). Ghost companions stay visible at low opacity.
     if (cabinetGroup) {
         cabinetGroup.position.x = activeOff.x;
         cabinetGroup.position.y = activeOff.y;
         cabinetGroup.position.z = flattenZ ? 0 : (activeOff.z || 0);
         cabinetGroup.rotation.y = flattenZ ? 0 : (info.activeSlot > 0 ? _spaceRotY(activeOff) : 0);
     }
-    if (window._spaceIsolateMode) return;
     const groups = window._spaceCompanionGroups || [];
     groups.forEach(function(g) {
         if (!g || g.userData.spaceSlot == null) return;
@@ -6236,21 +6235,24 @@ window._applySpacePairPositions = function() {
     }
 };
 
+/** Opacity of other space units while editing one (isolate mode). */
+window._SPACE_ISOLATE_COMPANION_OPACITY = 0.1;
+
 window._rebuildSpaceCompanion = function() {
     if (window._spaceCompanionBuilding) return;
     const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
     // Blueprint used to clear companions (single-cabinet side elevation). For shared-space
     // cabinets we keep companions so front/blueprint show every part together.
-    // Isolate mode (like wing-edit): hide every other space unit.
-    if (!info || window._spaceIsolateMode) {
+    // Isolate mode: keep companions as disabled ghosts (see fade below).
+    if (!info) {
         window._clearSpaceCompanion();
-        if (window._spaceIsolateMode && typeof window._applySpacePairPositions === 'function') {
-            window._applySpacePairPositions();
-        }
         return;
     }
     if (!info.others || !info.others.length || typeof window.buildCabinetIntoGroup !== 'function') {
         window._clearSpaceCompanion();
+        if (window._spaceIsolateMode && typeof window._applySpacePairPositions === 'function') {
+            window._applySpacePairPositions();
+        }
         return;
     }
 
@@ -6371,7 +6373,12 @@ window._rebuildSpaceCompanion = function() {
             g.add(hit);
 
             window._spaceCompanionGroups.push(g);
-            window._spaceCompanionHits.push(hit);
+            // Isolate: keep ghosts visible but not clickable
+            if (!window._spaceIsolateMode) {
+                window._spaceCompanionHits.push(hit);
+            } else {
+                hit.raycast = function() {};
+            }
         });
         // Legacy pointers → first companion (older click paths)
         window._spaceCompanionGroup = window._spaceCompanionGroups[0] || null;
@@ -6387,6 +6394,16 @@ window._rebuildSpaceCompanion = function() {
             });
         }
         if (typeof window._applyHingeVisibility === 'function') window._applyHingeVisibility();
+        // Isolate edit: other cabinets at ~10% opacity, disabled
+        if (window._spaceIsolateMode) {
+            window._spaceCompanionHits = [];
+            window._spaceCompanionHit = null;
+            const ghostOp = window._SPACE_ISOLATE_COMPANION_OPACITY != null
+                ? window._SPACE_ISOLATE_COMPANION_OPACITY : 0.1;
+            if (typeof window._fadeSpaceCompanionsForCapture === 'function') {
+                window._fadeSpaceCompanionsForCapture(ghostOp);
+            }
+        }
     } catch (e) {
         console.warn('[spaceCompanion] failed to build', e);
         window._clearSpaceCompanion();
