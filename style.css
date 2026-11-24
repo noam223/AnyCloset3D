@@ -5699,6 +5699,43 @@ body.part-paint-active #canvas-container {
 .sp-shelf-stretcher:focus-visible {
     outline: none;
 }
+.sp-shelf-thick {
+    position: fixed;
+    z-index: 9100;
+    height: 22px;
+    min-width: 22px;
+    padding: 0 7px;
+    margin: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    border: 1.5px solid #64748b;
+    border-radius: 11px;
+    background: #fff;
+    color: #334155;
+    font-size: 0.62rem;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+    transform: translate(0, -50%);
+    white-space: nowrap;
+}
+.sp-shelf-thick:hover {
+    border-color: #0d9488;
+    color: #0f766e;
+    transform: translate(0, -50%) scale(1.05);
+}
+.sp-shelf-thick.is-28 {
+    background: #0d9488;
+    border-color: #0d9488;
+    color: #fff;
+}
+.sp-shelf-thick:focus,
+.sp-shelf-thick:focus-visible {
+    outline: none;
+}
 
 /* Mode banner */
 .pp-mode-banner {

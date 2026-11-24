@@ -7787,8 +7787,12 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
         let startShelvesY = _fo > 0 ? _fo + t : state.plinthHeight + t;
         if (col.type === 'desk') startShelvesY = col.deskHeight + col.deskClearance + _deskT(!!col.hasDrawers);
         let dividers = [];
-        const _shelfT = window._shelfThicknessCm ? window._shelfThicknessCm(t) : t;
-        col.shelvesY.forEach((y, idx) => dividers.push({ y: y, type: 'shelf', thick: _shelfT, idx: idx }));
+        col.shelvesY.forEach((y, idx) => {
+            const st = (typeof window._shelfThicknessCmAt === 'function')
+                ? window._shelfThicknessCmAt(col, idx, t)
+                : (window._shelfThicknessCm ? window._shelfThicknessCm(t) : t);
+            dividers.push({ y: y, type: 'shelf', thick: st, idx: idx });
+        });
         if (col.splitY && col.splitY > startShelvesY) dividers.push({ y: col.splitY, type: 'split', thick: 2*t, idx: -1 });
         dividers.sort((a, b) => a.y - b.y);
         
@@ -8652,8 +8656,12 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
         }
 
         let dividers = [];
-        const _shelfT = window._shelfThicknessCm ? window._shelfThicknessCm(t) : t;
-        col.shelvesY.forEach((y, idx) => dividers.push({ y: y, type: 'shelf', thick: _shelfT, idx: idx }));
+        col.shelvesY.forEach((y, idx) => {
+            const st = (typeof window._shelfThicknessCmAt === 'function')
+                ? window._shelfThicknessCmAt(col, idx, t)
+                : (window._shelfThicknessCm ? window._shelfThicknessCm(t) : t);
+            dividers.push({ y: y, type: 'shelf', thick: st, idx: idx });
+        });
         if (col.splitY && col.splitY > startShelvesY) dividers.push({ y: col.splitY, type: 'split', thick: 2*t, idx: -1 });
         
         // --- אלגוריתם זיהוי מדפים המוסתרים מאחורי חזיתות פנימיות ---

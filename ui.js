@@ -2788,6 +2788,8 @@ function _serializeColumnForClipboard(col) {
     return {
         shelves:      col.shelves,
         shelvesY:     col.shelvesY,
+        shelfThicknessMm: Array.isArray(col.shelfThicknessMm) ? col.shelfThicknessMm.slice() : [],
+        stretcherShelfIdxs: Array.isArray(col.stretcherShelfIdxs) ? col.stretcherShelfIdxs.slice() : [],
         compartments: col.compartments,
         doors:        col.doors,
         leds:         col.leds || [],
@@ -2834,6 +2836,8 @@ function _applyColumnClipboard(target, src) {
     }
     target.doors        = srcCopy.doors;
     target.leds         = srcCopy.leds || [];
+    target.shelfThicknessMm = Array.isArray(srcCopy.shelfThicknessMm) ? srcCopy.shelfThicknessMm.slice() : [];
+    target.stretcherShelfIdxs = Array.isArray(srcCopy.stretcherShelfIdxs) ? srcCopy.stretcherShelfIdxs.slice() : [];
     target.type         = srcCopy.type;
     target.floorOffset  = srcCopy.floorOffset;
     target.noPlinth     = srcCopy.noPlinth;
@@ -18715,7 +18719,23 @@ function _pushOrderOptionRows(rows, itemObj) {
         label: 'חריטות בחזיתות',
         value: o.engraving === 'yes' ? 'כן — ' + (o.engravingColor === 'gold' ? 'זהב' : 'שחור') : 'לא'
     });
-    rows.push({ id: 'shelfThickness', label: 'עובי מדפים', value: (o.shelfThickness === 28 ? 28 : 17) + ' מ"מ' });
+    const wingsForCount = wings || {};
+    const br = (typeof window._countShelfThicknessBreakdown === 'function')
+        ? window._countShelfThicknessBreakdown(wingsForCount)
+        : null;
+    if (br && br.mixed) {
+        rows.push({
+            id: 'shelfThickness',
+            label: 'עובי מדפים',
+            value: br.n17 + ' מדפים 17 מ"מ · ' + br.n28 + ' מדפים 28 מ"מ'
+        });
+    } else if (br && br.total > 0 && br.n28 === br.total) {
+        rows.push({ id: 'shelfThickness', label: 'עובי מדפים', value: '28 מ"מ' });
+    } else if (br && br.total > 0 && br.n17 === br.total) {
+        rows.push({ id: 'shelfThickness', label: 'עובי מדפים', value: '17 מ"מ' });
+    } else {
+        rows.push({ id: 'shelfThickness', label: 'עובי מדפים', value: (o.shelfThickness === 28 ? 28 : 17) + ' מ"מ' });
+    }
 }
 
 function _hashPrintSpecSource(rows) {

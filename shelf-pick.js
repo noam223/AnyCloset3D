@@ -499,12 +499,14 @@
         }
         btn.style.display = 'flex';
         _showStretcherBtn();
+        _showThicknessBtn();
     }
 
     function _hideTrash() {
         const btn = document.getElementById('sp-shelf-trash');
         if (btn) btn.style.display = 'none';
         _hideStretcherBtn();
+        _hideThicknessBtn();
     }
 
     function _showStretcherBtn() {
@@ -561,6 +563,59 @@
             : 'סמן מדף כקושרת לחיבורי גוף (מיניפיקס)';
     }
 
+    function _showThicknessBtn() {
+        // Main shelves only — sub-shelves stay on the cabinet default thickness
+        if (!_selectedRef || _selectedRef.isSub) {
+            _hideThicknessBtn();
+            return;
+        }
+        let btn = document.getElementById('sp-shelf-thick');
+        if (!btn) {
+            btn = document.createElement('button');
+            btn.id = 'sp-shelf-thick';
+            btn.type = 'button';
+            btn.className = 'sp-shelf-thick';
+            btn.title = 'החלף עובי מדף בין 17 מ"מ ל-28 מ"מ';
+            btn.innerHTML = '<i class="fa-solid fa-ruler-vertical"></i><span>17</span>';
+            btn.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!_selectedRef || _selectedRef.isSub) return;
+                if (typeof window._toggleShelfThicknessMm === 'function') {
+                    window._toggleShelfThicknessMm(_selectedRef.colIndex, _selectedRef.shelfIdx);
+                }
+                _syncThicknessBtnState();
+                btn.blur();
+            });
+            document.body.appendChild(btn);
+        }
+        btn.style.display = 'flex';
+        _syncThicknessBtnState();
+    }
+
+    function _hideThicknessBtn() {
+        const btn = document.getElementById('sp-shelf-thick');
+        if (btn) btn.style.display = 'none';
+    }
+
+    function _syncThicknessBtnState() {
+        const btn = document.getElementById('sp-shelf-thick');
+        if (!btn || !_selectedRef || _selectedRef.isSub) return;
+        const w = (typeof getWing === 'function') ? getWing() : null;
+        const cols = (w && w.columns) || ((typeof state !== 'undefined' && state.columns) ? state.columns : null);
+        const col = cols && cols[_selectedRef.colIndex];
+        const mm = (typeof window._shelfThicknessMmAt === 'function')
+            ? window._shelfThicknessMmAt(col, _selectedRef.shelfIdx)
+            : 17;
+        const is28 = mm === 28;
+        btn.classList.toggle('is-28', is28);
+        const label = btn.querySelector('span');
+        if (label) label.textContent = is28 ? '28 מ״מ' : '17 מ״מ';
+        btn.title = is28
+            ? 'עובי מדף 28 מ"מ — לחץ להחלפה ל-17 מ"מ'
+            : 'עובי מדף 17 מ"מ — לחץ להחלפה ל-28 מ"מ';
+    }
+
     function _findShelfDragHandle() {
         if (!_selectedRef) return null;
         const handles = document.querySelectorAll('#drag-handles-layer .drag-handle.vertical');
@@ -608,9 +663,16 @@
         }
         btn.style.left = left + 'px';
         btn.style.top = top + 'px';
+        let nextLeft = left + 28;
         if (stretchBtn && stretchBtn.style.display !== 'none') {
-            stretchBtn.style.left = (left + 28) + 'px';
+            stretchBtn.style.left = nextLeft + 'px';
             stretchBtn.style.top = top + 'px';
+            nextLeft += 72;
+        }
+        const thickBtn = document.getElementById('sp-shelf-thick');
+        if (thickBtn && thickBtn.style.display !== 'none') {
+            thickBtn.style.left = nextLeft + 'px';
+            thickBtn.style.top = top + 'px';
         }
     }
     window._updateShelfTrashPos = _updateTrashPos;

@@ -2290,6 +2290,94 @@ window._shelfThicknessCm = function(bodyT) {
     return window._orderOpts().shelfThickness === 28 ? 2.8 : body;
 };
 
+/** Keep col.shelfThicknessMm aligned with shelvesY (null/undefined = inherit cabinet default). */
+window._syncShelfThicknessMm = function(col) {
+    if (!col) return;
+    const n = Array.isArray(col.shelvesY) ? col.shelvesY.length : 0;
+    if (!Array.isArray(col.shelfThicknessMm)) col.shelfThicknessMm = [];
+    while (col.shelfThicknessMm.length < n) col.shelfThicknessMm.push(null);
+    if (col.shelfThicknessMm.length > n) col.shelfThicknessMm.length = n;
+};
+
+/** Effective shelf thickness in mm (17 or 28) for one shelf index. */
+window._shelfThicknessMmAt = function(col, shelfIdx, wings) {
+    const i = shelfIdx | 0;
+    const arr = col && col.shelfThicknessMm;
+    if (Array.isArray(arr) && (arr[i] === 28 || arr[i] === 17)) return arr[i];
+    return window._orderOpts(wings).shelfThickness === 28 ? 28 : 17;
+};
+
+/** Effective shelf thickness in cm for one shelf index. */
+window._shelfThicknessCmAt = function(col, shelfIdx, bodyT, wings) {
+    const body = bodyT || (typeof state !== 'undefined' && state.thickness) || 1.7;
+    return window._shelfThicknessMmAt(col, shelfIdx, wings) === 28 ? 2.8 : body;
+};
+
+window._remapShelfThicknessAfterRemove = function(col, removedIdx) {
+    if (!col || !Array.isArray(col.shelfThicknessMm)) return;
+    const si = removedIdx | 0;
+    col.shelfThicknessMm.splice(si, 1);
+    window._syncShelfThicknessMm(col);
+};
+
+window._remapShelfThicknessAfterInsert = function(col, insertAt) {
+    if (!col) return;
+    window._syncShelfThicknessMm(col);
+    const at = insertAt | 0;
+    if (!Array.isArray(col.shelfThicknessMm)) col.shelfThicknessMm = [];
+    col.shelfThicknessMm.splice(at, 0, null);
+    window._syncShelfThicknessMm(col);
+};
+
+/** Toggle one shelf between 17 mm and 28 mm (explicit override). */
+window._toggleShelfThicknessMm = function(colIndex, shelfIdx) {
+    const w = (typeof getWing === 'function') ? getWing() : null;
+    const cols = (w && w.columns) || ((typeof state !== 'undefined' && state.columns) ? state.columns : null);
+    if (!cols || colIndex < 0 || colIndex >= cols.length) return false;
+    const col = cols[colIndex];
+    if (!col || !Array.isArray(col.shelvesY)) return false;
+    const si = shelfIdx | 0;
+    if (si < 0 || si >= col.shelvesY.length) return false;
+    window._syncShelfThicknessMm(col);
+    const cur = window._shelfThicknessMmAt(col, si);
+    const next = cur === 28 ? 17 : 28;
+    col.shelfThicknessMm[si] = next;
+    if (typeof _showToast === 'function') _showToast('עובי מדף: ' + next + ' מ"מ', 2000);
+    if (typeof saveHistoryState === 'function') saveHistoryState();
+    if (typeof buildCabinet === 'function') buildCabinet();
+    if (typeof calculatePrice === 'function') calculatePrice();
+    return true;
+};
+
+/**
+ * Count 17 mm vs 28 mm shelves across wings (or flat columns).
+ * @returns {{ n17: number, n28: number, total: number, mixed: boolean }}
+ */
+window._countShelfThicknessBreakdown = function(wingsOrColumns) {
+    let n17 = 0, n28 = 0;
+    function countCols(cols, wings) {
+        (cols || []).forEach(function(col) {
+            const n = Array.isArray(col && col.shelvesY) ? col.shelvesY.length : (col && col.shelves) || 0;
+            for (let i = 0; i < n; i++) {
+                if (window._shelfThicknessMmAt(col, i, wings) === 28) n28++;
+                else n17++;
+            }
+        });
+    }
+    if (!wingsOrColumns) {
+        countCols((typeof state !== 'undefined' && state.columns) || [], (typeof state !== 'undefined' && state.wings) || null);
+    } else if (Array.isArray(wingsOrColumns)) {
+        countCols(wingsOrColumns, null);
+    } else {
+        const wings = wingsOrColumns;
+        ['center', 'left', 'right'].forEach(function(side) {
+            const w = wings[side];
+            if (w) countCols(w.columns, wings);
+        });
+    }
+    return { n17: n17, n28: n28, total: n17 + n28, mixed: n17 > 0 && n28 > 0 };
+};
+
 /** LED pairs placed in the 3D model of a wings object (all main wings incl. full-corner units). */
 window._ledPairsInWings = function(wings) {
     if (!wings) return 0;
@@ -3743,8 +3831,12 @@ function _compartmentBounds(col, r, wingData) {
         : ((col && col.type === 'desk') ? col.deskHeight + col.deskClearance + t
             : ((col && col.noPlinth) ? t : plinthH + t));
     const dividers = [];
-    const shelfT = window._shelfThicknessCm(t);
-    ((col && col.shelvesY) || []).forEach(y => dividers.push({ y: y, thick: shelfT }));
+    ((col && col.shelvesY) || []).forEach(function(y, idx) {
+        const st = (typeof window._shelfThicknessCmAt === 'function')
+            ? window._shelfThicknessCmAt(col, idx, t, wingData)
+            : window._shelfThicknessCm(t);
+        dividers.push({ y: y, thick: st });
+    });
     if (col && col.splitY && col.splitY > startY) dividers.push({ y: col.splitY, thick: 2 * t });
     dividers.sort((a, b) => a.y - b.y);
     const bottomY = (r <= 0) ? startY
@@ -3791,7 +3883,12 @@ function _getDeskMergePinInfo(col, wingData) {
     const baseY = _columnBaseY(col, wingData);
     const startY = baseY + t;
     const dividers = [];
-    (col.shelvesY || []).forEach((y, idx) => dividers.push({ y: y, type: 'shelf', idx: idx, thick: window._shelfThicknessCm(t) }));
+    (col.shelvesY || []).forEach((y, idx) => dividers.push({
+        y: y, type: 'shelf', idx: idx,
+        thick: (typeof window._shelfThicknessCmAt === 'function')
+            ? window._shelfThicknessCmAt(col, idx, t, wingData)
+            : window._shelfThicknessCm(t)
+    }));
     if (_hasActiveSplit(col, baseY, t)) {
         dividers.push({ y: col.splitY, type: 'split', idx: -1, thick: 2 * t });
     }
@@ -4008,6 +4105,9 @@ function _insertPhysicalShelfAtY(col, newY, wingData) {
     col.shelves = col.shelvesY.length;
     if (typeof window._remapStretcherAfterShelfInsert === 'function') {
         window._remapStretcherAfterShelfInsert(col, insertAt);
+    }
+    if (typeof window._remapShelfThicknessAfterInsert === 'function') {
+        window._remapShelfThicknessAfterInsert(col, insertAt);
     }
 
     while (col.compartments.length <= hostRow) col.compartments.push(_emptyCompartment());
@@ -4234,6 +4334,9 @@ window.deleteShelfAt = function(colIndex, shelfIdx) {
     col.shelves = col.shelvesY.length;
     if (typeof window._remapStretcherAfterShelfRemove === 'function') {
         window._remapStretcherAfterShelfRemove(col, si);
+    }
+    if (typeof window._remapShelfThicknessAfterRemove === 'function') {
+        window._remapShelfThicknessAfterRemove(col, si);
     }
 
     if (typeof _syncCompartmentCount === 'function') _syncCompartmentCount(col, baseY, t);
@@ -4974,6 +5077,9 @@ function _blankColumn(width, template) {
             : { height: 10, count: 1, ys: [] },
         stretcherShelfIdxs: Array.isArray(template && template.stretcherShelfIdxs)
             ? template.stretcherShelfIdxs.slice()
+            : [],
+        shelfThicknessMm: Array.isArray(template && template.shelfThicknessMm)
+            ? template.shelfThicknessMm.slice()
             : []
     };
     distributeShelves(col);
@@ -5579,7 +5685,12 @@ function _ensureDeskBandCell(col, band, preferredRows) {
 
     // Divider list matching _compartmentBounds (shelves + optional קושרת)
     const dividers = [];
-    col.shelvesY.forEach((y, idx) => dividers.push({ y: y, type: 'shelf', idx: idx, thick: window._shelfThicknessCm(t) }));
+    col.shelvesY.forEach((y, idx) => dividers.push({
+        y: y, type: 'shelf', idx: idx,
+        thick: (typeof window._shelfThicknessCmAt === 'function')
+            ? window._shelfThicknessCmAt(col, idx, t)
+            : window._shelfThicknessCm(t)
+    }));
     if (col.splitY && col.splitY > startY) {
         dividers.push({ y: col.splitY, type: 'split', thick: 2 * t, idx: -1 });
     }

@@ -820,6 +820,24 @@ function _bpShelfBoardTCm() {
     return (typeof window._shelfThicknessCm === 'function') ? window._shelfThicknessCm(_bpShelfTCm()) : _bpShelfTCm();
 }
 
+/** Per-shelf thickness in cm (falls back to cabinet default). */
+function _bpShelfTAtCol(col, shelfIdx) {
+    if (typeof window._shelfThicknessCmAt === 'function') {
+        return window._shelfThicknessCmAt(col, shelfIdx, _bpShelfTCm());
+    }
+    return _bpShelfBoardTCm();
+}
+
+/** Thickness of the shelf whose center is at boundCm (from column bottom). */
+function _bpShelfTForBound(col, boundCm, fo) {
+    const shelves = (col && col.shelvesY) || [];
+    const f = fo || 0;
+    for (let i = 0; i < shelves.length; i++) {
+        if (Math.abs((shelves[i] - f) - boundCm) < 0.2) return _bpShelfTAtCol(col, i);
+    }
+    return _bpShelfBoardTCm();
+}
+
 // Match engine-core startShelvesY — bottom of first clear cell row (cm from floor)
 function _bpRowBaseCm(col, plinthH) {
     const t = _bpShelfTCm();
@@ -954,19 +972,20 @@ function _bpDrawOuterSideWalls(p, drawVline, ox, dW, colXPositions, sc) {
  *   - intermediate = shelf centers (shelvesY)
  *   - last-row top = column outer height (top board sits at height - t/2)
  */
-function _bpClearCellHeightCm(rowBotCm, rowTopCm, shelfT, isBottomRow, isTopRow) {
-    const t = shelfT != null ? shelfT : _bpShelfBoardTCm();
-    const botFace = isBottomRow ? (+rowBotCm) : (+rowBotCm) + t / 2;
-    const topFace = isTopRow ? (+rowTopCm) - _bpShelfTCm() : (+rowTopCm) - t / 2;
+function _bpClearCellHeightCm(rowBotCm, rowTopCm, shelfT, isBottomRow, isTopRow, topShelfT) {
+    const tBot = shelfT != null ? shelfT : _bpShelfBoardTCm();
+    const tTop = topShelfT != null ? topShelfT : tBot;
+    const botFace = isBottomRow ? (+rowBotCm) : (+rowBotCm) + tBot / 2;
+    const topFace = isTopRow ? (+rowTopCm) - _bpShelfTCm() : (+rowTopCm) - tTop / 2;
     return Math.max(0, topFace - botFace);
 }
 
-function _bpClearCellHeightMm(rowBotCm, rowTopCm, shelfT, isBottomRow, isTopRow) {
-    return _bpMm(_bpClearCellHeightCm(rowBotCm, rowTopCm, shelfT, isBottomRow, isTopRow));
+function _bpClearCellHeightMm(rowBotCm, rowTopCm, shelfT, isBottomRow, isTopRow, topShelfT) {
+    return _bpMm(_bpClearCellHeightCm(rowBotCm, rowTopCm, shelfT, isBottomRow, isTopRow, topShelfT));
 }
 
-function _bpClearCellHeightLabel(rowBotCm, rowTopCm, shelfT, isBottomRow, isTopRow) {
-    return _bpClearCellHeightMm(rowBotCm, rowTopCm, shelfT, isBottomRow, isTopRow);
+function _bpClearCellHeightLabel(rowBotCm, rowTopCm, shelfT, isBottomRow, isTopRow, topShelfT) {
+    return _bpClearCellHeightMm(rowBotCm, rowTopCm, shelfT, isBottomRow, isTopRow, topShelfT);
 }
 
 /** Red translucent strip over the part of a cabinet face hidden by the adjoining cabinet (same rule as the designer's red zone). */
@@ -2605,11 +2624,13 @@ window._generateMultiViewBlueprintSVG = function() {
             }
             const rowBoundsEarly = [deskBaseEarly, ..._allBoundsEarly.filter(sy => sy > deskBaseEarly), _visibleH];
             const _hcBlocksOld = _bpHoneycombBlocksFromCompartments(col.compartments, rowBoundsEarly.length - 1);
-            (col.shelvesY || []).forEach(sy => {
+            (col.shelvesY || []).forEach(function(sy, sIdx) {
                 const syAdjusted = sy - _fo;
                 if (_splitYOld > 0 && syAdjusted >= _splitYOld && syAdjusted <= _splitYOld + _splitTOld) return;
                 if (_bpIsHoneycombInternalShelf(_hcBlocksOld, rowBoundsEarly, syAdjusted)) return;
-                if (syAdjusted > 0 && syAdjusted < _visibleH) shelfLine(colX, _colBotY - syAdjusted*sc, colX + colW, sc);
+                if (syAdjusted > 0 && syAdjusted < _visibleH) {
+                    shelfLine(colX, _colBotY - syAdjusted*sc, colX + colW, sc, _bpShelfTAtCol(col, sIdx));
+                }
             });
             // Structural top + bottom boards (17mm) — already in cell math, now visible
             _bpDrawTopBottomBoards(
@@ -2679,11 +2700,12 @@ window._generateMultiViewBlueprintSVG = function() {
             const _splitYOldAdj = _splitYOldAdjE;
             const _splitTopOldAdj = _splitTopOldAdjE;
             const numRows = rowBounds.length - 1;
-            const _t_shelf = _bpShelfBoardTCm();
             for (let ri = 0; ri < numRows; ri++) {
                 const rowBotCm = rowBounds[ri];
                 const rowTopCm = rowBounds[ri + 1];
-                const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _t_shelf, ri === 0, ri === numRows - 1);
+                const _tBot = (ri === 0) ? _bpShelfTCm() : _bpShelfTForBound(col, rowBotCm, _fo);
+                const _tTop = (ri === numRows - 1) ? _bpShelfTCm() : _bpShelfTForBound(col, rowTopCm, _fo);
+                const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _tBot, ri === 0, ri === numRows - 1, _tTop);
                 const cellY1 = _colBotY - rowTopCm * sc; // SVG top of cell
                 const cellY2 = _colBotY - rowBotCm * sc; // SVG bottom of cell
                 const cellH = cellY2 - cellY1;
@@ -3642,11 +3664,13 @@ window._generateMultiViewBlueprintPages = function() {
             // Shelf lines — skip internal honeycomb shelves (drawn with block geometry)
             const _splitY2 = col.splitY || 0;
             const _splitT2 = (state.thickness || 1.7) * 2;
-            (col.shelvesY || []).forEach(sy => {
+            (col.shelvesY || []).forEach(function(sy, sIdx) {
                 const syAdj = sy - _fo2;
                 if (_splitY2 > 0 && syAdj >= _splitY2 && syAdj <= _splitY2 + _splitT2) return;
                 if (_bpIsHoneycombInternalShelf(_hcBlocks, rowBounds, syAdj)) return;
-                if (syAdj > 0 && syAdj < _visibleH2) makeShelfLine(p, colX, _colBotSvgY - syAdj*sc, colX + colW, sc);
+                if (syAdj > 0 && syAdj < _visibleH2) {
+                    makeShelfLine(p, colX, _colBotSvgY - syAdj*sc, colX + colW, sc, _bpShelfTAtCol(col, sIdx));
+                }
             });
             // Structural top + bottom boards (17mm) — already in cell math, now visible
             _bpDrawTopBottomBoards(
@@ -3712,11 +3736,12 @@ window._generateMultiViewBlueprintPages = function() {
                 p.push(`<text x="${(colX+colW/2).toFixed(1)}" y="${lblY.toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" fill="${STROKE}" opacity="0.5">שולחן</text>`);
             }
 
-            const _t_shelf2 = _bpShelfBoardTCm();
             for (let ri = 0; ri < numRows; ri++) {
                 const rowBotCm = rowBounds[ri];
                 const rowTopCm = rowBounds[ri + 1];
-                const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _t_shelf2, ri === 0, ri === numRows - 1);
+                const _tBot2 = (ri === 0) ? _bpShelfTCm() : _bpShelfTForBound(col, rowBotCm, _fo2);
+                const _tTop2 = (ri === numRows - 1) ? _bpShelfTCm() : _bpShelfTForBound(col, rowTopCm, _fo2);
+                const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _tBot2, ri === 0, ri === numRows - 1, _tTop2);
                 const cellY1 = _colBotSvgY - rowTopCm * sc;
                 const cellY2 = _colBotSvgY - rowBotCm * sc;
                 const cellH = cellY2 - cellY1;
@@ -4132,11 +4157,12 @@ window._generateMultiViewBlueprintPages = function() {
         const shelvesY = fcData.shelvesY || [];
         const fcSplitY = fcData.splitY || 0;
         const fcSplitT = (state.thickness || 1.7) * 2;
-        shelvesY.forEach(sy => {
+        const _fcShelfCol = { shelvesY: shelvesY, shelfThicknessMm: fcData.shelfThicknessMm };
+        shelvesY.forEach(function(sy, sIdx) {
             // Skip shelves inside the split band
             if (fcSplitY > 0 && sy >= fcSplitY && sy <= fcSplitY + fcSplitT) return;
             const sy_px = oy + dH - sy * sc;
-            makeShelfLine(p, ox, sy_px, ox + dW, sc);
+            makeShelfLine(p, ox, sy_px, ox + dW, sc, _bpShelfTAtCol(_fcShelfCol, sIdx));
         });
         _bpDrawTopBottomBoards(
             function(x1, sy, x2, tCm) { makeShelfLine(p, x1, sy, x2, sc, tCm); },
@@ -4168,12 +4194,14 @@ window._generateMultiViewBlueprintPages = function() {
         }
         const _fcRowBase = _bpRowBaseCm({ noPlinth: false, floorOffset: 0 }, pH);
         const rowBounds = [_fcRowBase, ...fcAllBounds.filter(sy => sy > _fcRowBase), cH];
-        const _t_shelfFC = _bpShelfBoardTCm();
+        const _fcColLike = { shelvesY: shelvesY, shelfThicknessMm: fcData.shelfThicknessMm };
         const _fcNumRows = rowBounds.length - 1;
         for (let ri = 0; ri < _fcNumRows; ri++) {
             const rowBotCm = rowBounds[ri];
             const rowTopCm = rowBounds[ri + 1];
-            const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _t_shelfFC, ri === 0, ri === _fcNumRows - 1);
+            const _tBotFC = (ri === 0) ? _bpShelfTCm() : _bpShelfTForBound(_fcColLike, rowBotCm, 0);
+            const _tTopFC = (ri === _fcNumRows - 1) ? _bpShelfTCm() : _bpShelfTForBound(_fcColLike, rowTopCm, 0);
+            const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _tBotFC, ri === 0, ri === _fcNumRows - 1, _tTopFC);
             const cellY1 = oy + dH - rowTopCm * sc;
             const cellY2 = oy + dH - rowBotCm * sc;
             const cellH = cellY2 - cellY1;
@@ -4269,10 +4297,10 @@ window._generateMultiViewBlueprintPages = function() {
 
             const _splitYFC = col.splitY || 0;
             const _splitTFC = (state.thickness || 1.7) * 2;
-            (col.shelvesY || []).forEach(sy => {
+            (col.shelvesY || []).forEach(function(sy, sIdx) {
                 // Skip shelves inside the split band
                 if (_splitYFC > 0 && sy >= _splitYFC && sy <= _splitYFC + _splitTFC) return;
-                makeShelfLine(p, colX, oy + dH - sy*sc, colX + colW, sc);
+                makeShelfLine(p, colX, oy + dH - sy*sc, colX + colW, sc, _bpShelfTAtCol(col, sIdx));
             });
             _bpDrawTopBottomBoards(
                 function(x1, sy, x2, tCm) { makeShelfLine(p, x1, sy, x2, sc, tCm); },
@@ -4307,11 +4335,12 @@ window._generateMultiViewBlueprintPages = function() {
             const _rowBaseFC = _bpRowBaseCm(col, colPlinthH);
             const rowBounds = [_rowBaseFC, ..._allBoundsFC.filter(sy => sy > _rowBaseFC), wg.h];
             const numRows = rowBounds.length - 1;
-            const _t_shelfFCW = _bpShelfBoardTCm();
             for (let ri = 0; ri < numRows; ri++) {
                 const rowBotCm = rowBounds[ri];
                 const rowTopCm = rowBounds[ri + 1];
-                const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _t_shelfFCW, ri === 0, ri === numRows - 1);
+                const _tBotFCW = (ri === 0) ? _bpShelfTCm() : _bpShelfTForBound(col, rowBotCm, 0);
+                const _tTopFCW = (ri === numRows - 1) ? _bpShelfTCm() : _bpShelfTForBound(col, rowTopCm, 0);
+                const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _tBotFCW, ri === 0, ri === numRows - 1, _tTopFCW);
                 const cellY1 = oy + dH - rowTopCm * sc;
                 const cellY2 = oy + dH - rowBotCm * sc;
                 const cellH = cellY2 - cellY1;
@@ -4384,7 +4413,7 @@ window._generateMultiViewBlueprintPages = function() {
                     rowBotCm >= _splitYFCAdj - 0.1 && rowTopCm <= _splitTopFCAdj + 0.1;
                 const _hasPartFC = !!(comp && comp.partition && Array.isArray(comp.subCells) && comp.subCells.length);
                 if (_bpIsHoneycombType(cellType)) {
-                    _bpMaybePushHoneycombInnerHeight(p, colX, cellY1, cellY2, rowBotCm, rowTopCm, sc, _t_shelfFCW, _bpViewKey, `c${ci}r${ri}hcH`);
+                    _bpMaybePushHoneycombInnerHeight(p, colX, cellY1, cellY2, rowBotCm, rowTopCm, sc, _tBotFCW, _bpViewKey, `c${ci}r${ri}hcH`);
                 } else if (cellHeightLabel > 0 && cellH > 14 && !_isSplitBandFC && !_hasPartFC) {
                     const lblCX = colX + colW / 2;
                     const lblCY = (cellY1 + cellY2) / 2 + 4;
@@ -4551,9 +4580,9 @@ window._generateMultiViewBlueprintPages = function() {
                     }
                     const _splitYSC = col.splitY || 0;
                     const _splitTSC = (state.thickness || 1.7) * 2;
-                    (col.shelvesY || []).forEach(sy => {
+                    (col.shelvesY || []).forEach(function(sy, sIdx) {
                         if (_splitYSC > 0 && sy >= _splitYSC && sy <= _splitYSC + _splitTSC) return;
-                        makeShelfLine(p, colX, oy + dH - sy*scScale, colX + colW, scScale);
+                        makeShelfLine(p, colX, oy + dH - sy*scScale, colX + colW, scScale, _bpShelfTAtCol(col, sIdx));
                     });
                     _bpDrawTopBottomBoards(
                         function(x1, sy, x2, tCm) { makeShelfLine(p, x1, sy, x2, scScale, tCm); },
@@ -4587,11 +4616,12 @@ window._generateMultiViewBlueprintPages = function() {
                     }
                     const rowBounds = [_rowBaseSC, ..._allBoundsSC.filter(sy => sy > _rowBaseSC), scH];
                     const numRows = rowBounds.length - 1;
-                    const _t_shelfSC = _bpShelfBoardTCm();
                     for (let ri = 0; ri < numRows; ri++) {
                         const rowBotCm = rowBounds[ri];
                         const rowTopCm = rowBounds[ri + 1];
-                        const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _t_shelfSC, ri === 0, ri === numRows - 1);
+                        const _tBotSC = (ri === 0) ? _bpShelfTCm() : _bpShelfTForBound(col, rowBotCm, 0);
+                        const _tTopSC = (ri === numRows - 1) ? _bpShelfTCm() : _bpShelfTForBound(col, rowTopCm, 0);
+                        const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _tBotSC, ri === 0, ri === numRows - 1, _tTopSC);
                         const cellY1 = oy + dH - rowTopCm * scScale;
                         const cellY2 = oy + dH - rowBotCm * scScale;
                         const cellH  = cellY2 - cellY1;
@@ -4667,7 +4697,7 @@ window._generateMultiViewBlueprintPages = function() {
                             rowBotCm >= _splitYSCAdj - 0.1 && rowTopCm <= _splitTopSCAdj + 0.1;
                         const _hasPartSC = !!(comp && comp.partition && Array.isArray(comp.subCells) && comp.subCells.length);
                         if (_bpIsHoneycombType(cellType)) {
-                            _bpMaybePushHoneycombInnerHeight(p, colX, cellY1, cellY2, rowBotCm, rowTopCm, scScale, _t_shelfSC, _bpViewKey, `c${ci}r${ri}hcH`);
+                            _bpMaybePushHoneycombInnerHeight(p, colX, cellY1, cellY2, rowBotCm, rowTopCm, scScale, _tBotSC, _bpViewKey, `c${ci}r${ri}hcH`);
                         } else if (cellHeightLabel > 0 && cellH > 14 && !_isSplitBandSC && !_hasPartSC) {
                             _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, cellCX, (cellY1 + cellY2) / 2 + 4, cellHeightLabel,
                                 { x: colX, y: cellY1, w: colW, h: cellH });
@@ -4746,9 +4776,9 @@ window._generateMultiViewBlueprintPages = function() {
                 const _splitYSC = col.splitY || 0;
                 const _splitTSC = (state.thickness || 1.7) * 2;
 
-                (col.shelvesY || []).forEach(sy => {
+                (col.shelvesY || []).forEach(function(sy, sIdx) {
                     if (_splitYSC > 0 && sy >= _splitYSC && sy <= _splitYSC + _splitTSC) return;
-                    makeShelfLine(p, ox, oy + dH - sy*scScale, ox + dW, scScale);
+                    makeShelfLine(p, ox, oy + dH - sy*scScale, ox + dW, scScale, _bpShelfTAtCol(col, sIdx));
                 });
                 _bpDrawTopBottomBoards(
                     function(x1, sy, x2, tCm) { makeShelfLine(p, x1, sy, x2, scScale, tCm); },
@@ -4778,13 +4808,14 @@ window._generateMultiViewBlueprintPages = function() {
                 }
                 const rowBounds = [_rowBaseSC, ..._allBoundsSC.filter(sy => sy > _rowBaseSC), scH];
                 const numRows = rowBounds.length - 1;
-                const _t_shelfSC = _bpShelfBoardTCm();
                 const cellCX = ox + dW / 2;
 
                 for (let ri = 0; ri < numRows; ri++) {
                     const rowBotCm = rowBounds[ri];
                     const rowTopCm = rowBounds[ri + 1];
-                    const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _t_shelfSC, ri === 0, ri === numRows - 1);
+                    const _tBotSC2 = (ri === 0) ? _bpShelfTCm() : _bpShelfTForBound(col, rowBotCm, 0);
+                    const _tTopSC2 = (ri === numRows - 1) ? _bpShelfTCm() : _bpShelfTForBound(col, rowTopCm, 0);
+                    const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _tBotSC2, ri === 0, ri === numRows - 1, _tTopSC2);
                     const cellY1 = oy + dH - rowTopCm * scScale;
                     const cellY2 = oy + dH - rowBotCm * scScale;
                     const cellH  = cellY2 - cellY1;
@@ -4829,7 +4860,7 @@ window._generateMultiViewBlueprintPages = function() {
                     const _isSplitBandSC = _splitYSC > 0 &&
                         rowBotCm >= _splitYSCAdj - 0.1 && rowTopCm <= _splitTopSCAdj + 0.1;
                     if (_bpIsHoneycombType(cellType)) {
-                        _bpMaybePushHoneycombInnerHeight(p, ox, cellY1, cellY2, rowBotCm, rowTopCm, scScale, _t_shelfSC, _bpViewKey, `svc0r${ri}hcH`);
+                        _bpMaybePushHoneycombInnerHeight(p, ox, cellY1, cellY2, rowBotCm, rowTopCm, scScale, _tBotSC2, _bpViewKey, `svc0r${ri}hcH`);
                     } else if (cellHeightLabel > 0 && cellH > 14 && !_isSplitBandSC) {
                         _bpPushCellDimLabel(p, _bpViewKey, `svc0r${ri}`, cellCX, (cellY1 + cellY2) / 2 + 4, cellHeightLabel,
                             { x: ox, y: cellY1, w: dW, h: cellH });
@@ -5034,8 +5065,8 @@ window._generateMultiViewBlueprintPages = function() {
             }
 
             // Shelf lines
-            (col.shelvesY || []).forEach(sy => {
-                makeShelfLine(p, colX, oy + dH - sy*sc, colX + colW, sc);
+            (col.shelvesY || []).forEach(function(sy, sIdx) {
+                makeShelfLine(p, colX, oy + dH - sy*sc, colX + colW, sc, _bpShelfTAtCol(col, sIdx));
             });
             // Upper unit: no plinth — bottom + top boards (17mm)
             _bpDrawTopBottomBoards(
@@ -5048,12 +5079,13 @@ window._generateMultiViewBlueprintPages = function() {
             const shelvesArr = (col.shelvesY || []).slice().sort((a,b) => a-b);
             const _uuRowBase = _bpRowBaseCm(Object.assign({}, col, { noPlinth: true }), 0);
             const rowBounds = [_uuRowBase, ...shelvesArr.filter(sy => sy > _uuRowBase && sy < uuH), uuH];
-            const _t_shelfUU = _bpShelfBoardTCm();
             const _uuNumRows = rowBounds.length - 1;
             for (let ri = 0; ri < _uuNumRows; ri++) {
                 const rowBotCm = rowBounds[ri];
                 const rowTopCm = rowBounds[ri + 1];
-                const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _t_shelfUU, ri === 0, ri === _uuNumRows - 1);
+                const _tBotUU = (ri === 0) ? _bpShelfTCm() : _bpShelfTForBound(col, rowBotCm, 0);
+                const _tTopUU = (ri === _uuNumRows - 1) ? _bpShelfTCm() : _bpShelfTForBound(col, rowTopCm, 0);
+                const cellHeightLabel = _bpClearCellHeightLabel(rowBotCm, rowTopCm, _tBotUU, ri === 0, ri === _uuNumRows - 1, _tTopUU);
                 const cellY1 = oy + dH - rowTopCm * sc;
                 const cellY2 = oy + dH - rowBotCm * sc;
                 const cellH = cellY2 - cellY1;
@@ -5101,7 +5133,7 @@ window._generateMultiViewBlueprintPages = function() {
                 });
 
                 if (_bpIsHoneycombType(cellType)) {
-                    _bpMaybePushHoneycombInnerHeight(p, colX, cellY1, cellY2, rowBotCm, rowTopCm, sc, _t_shelfUU, _bpViewKey, `c${ci}r${ri}hcH`);
+                    _bpMaybePushHoneycombInnerHeight(p, colX, cellY1, cellY2, rowBotCm, rowTopCm, sc, _tBotUU, _bpViewKey, `c${ci}r${ri}hcH`);
                 } else if (cellHeightLabel > 0 && cellH > 14 && !(comp && comp.partition && Array.isArray(comp.subCells) && comp.subCells.length)) {
                     _bpPushCellDimLabel(p, _bpViewKey, `c${ci}r${ri}`, cellCX, (cellY1 + cellY2) / 2 + 4, cellHeightLabel,
                         { x: colX, y: cellY1, w: colW, h: cellH });
