@@ -142,6 +142,7 @@ function createWingData(overrides) {
         desk: { side: 'none', width: 100, height: 80, hasDrawers: true, drawerHeight: 12, drawerCount: null, mergeDrawers: false },
         writingDesk: { height: 75, hasDrawers: true, drawerCount: 2, drawerHeight: 12 },
         floatingShelf: { thicknessMm: 17 },
+        spaceAppliance: null,
         corner: { side: 'none', width: 60, height: 90, depth: 54, type: 'shelves', shelves: 3, drawerCount: 4 },
         fullCorner: { size: 100, shelves: 2, shelvesY: [], compartments: [] },
         sideCabinet: null,
@@ -1250,6 +1251,9 @@ function _applyPresetCore(presetId, rightPos, leftPos) {
     } else if (presetId === 'floating-shelf') {
         // Floating shelf board — handled by floating-shelf-preset.js
         if (typeof window._applyFloatingShelfPreset === 'function') window._applyFloatingShelfPreset();
+    } else if (presetId === 'space-appliance') {
+        // Freestanding appliance — handled by space-appliance-preset.js
+        if (typeof window._applySpaceAppliancePreset === 'function') window._applySpaceAppliancePreset();
     } else if (presetId === 'corner-unit') {
         // Standalone corner drawers / corner desk — handled by corner-unit-preset.js
         if (typeof window._applyCornerUnitPreset === 'function') window._applyCornerUnitPreset();
@@ -1291,7 +1295,7 @@ function _applyPresetCore(presetId, rightPos, leftPos) {
 
     // Linear/bathroom cabinet: go directly to front/edit view (no wings to orbit around)
     // Corner/walkin: stay in 3D so user sees the full layout
-    state.viewMode = (presetId === 'linear' || presetId === 'sliding' || presetId === 'bathroom' || presetId === 'kitchen' || presetId === 'writing-desk' || presetId === 'corner-unit' || presetId === 'floating-shelf') ? 'front' : '3d';
+    state.viewMode = (presetId === 'linear' || presetId === 'sliding' || presetId === 'bathroom' || presetId === 'kitchen' || presetId === 'writing-desk' || presetId === 'corner-unit' || presetId === 'floating-shelf' || presetId === 'space-appliance') ? 'front' : '3d';
     _setFreeTabActive(true);
     syncSidebarToWing();
     if (typeof window._syncSpacePairTabs === 'function') window._syncSpacePairTabs();
@@ -1521,7 +1525,7 @@ window.applyPreset = function(presetId) {
     _pendingPresetId = presetId;
     _pendingWingPositions = { left: 'side', right: 'side' };
 
-    if (presetId === 'linear' || presetId === 'sliding' || presetId === 'bathroom' || presetId === 'kitchen' || presetId === 'writing-desk' || presetId === 'corner-unit' || presetId === 'floating-shelf') {
+    if (presetId === 'linear' || presetId === 'sliding' || presetId === 'bathroom' || presetId === 'kitchen' || presetId === 'writing-desk' || presetId === 'corner-unit' || presetId === 'floating-shelf' || presetId === 'space-appliance') {
         // No position needed — apply immediately
         _applyPresetCore(presetId, null, null);
         const ppm = document.getElementById('preset-position-menu');
@@ -1614,7 +1618,7 @@ window.applyWalkinPositions = function() {
 function _isSingleCabinetPreset() {
     // Kitchen (incl. ר) edits cells in free mode like a linear run — never wing-edit isolation.
     if (state.presetId === 'kitchen') return true;
-    return state.presetId === 'linear' || state.presetId === 'sliding' || state.presetId === 'bathroom' || state.presetId === 'writing-desk' || state.presetId === 'corner-unit' || state.presetId === 'floating-shelf';
+    return state.presetId === 'linear' || state.presetId === 'sliding' || state.presetId === 'bathroom' || state.presetId === 'writing-desk' || state.presetId === 'corner-unit' || state.presetId === 'floating-shelf' || state.presetId === 'space-appliance';
 }
 
 function _syncHeaderDimsPlaceholder(isEditing) {
@@ -2525,6 +2529,14 @@ window._updateMaterialTabVisibility = function(w) {
             (labelEl || btn).textContent = isMobile ? lbl[1] : lbl[0];
         });
     };
+
+    // Freestanding space appliance: no material part tabs (mesh has its own finish)
+    if (state.presetId === 'space-appliance') {
+        document.querySelectorAll('.part-tab-btn[data-part]').forEach(btn => {
+            btn.style.display = 'none';
+        });
+        return;
+    }
 
     // Floating shelf: body color only
     if (state.presetId === 'floating-shelf') {
@@ -6307,6 +6319,11 @@ function _calcWingCost(cfg, wing, opts) {
         if (thickMm >= 25) cost += _priceNum(ex.floatingShelfThickSurcharge, 40);
         if (SANDWICH_COLORS.has(wing.materialBody)) cost *= (1 + sandwichPct);
         return cost;
+    }
+
+    if (state.presetId === 'space-appliance') {
+        // Visual appliance in the room — no cabinet wood cost (client supplies the machine)
+        return _priceNum(ex.spaceApplianceCost, 0);
     }
 
     if (state.presetId === 'corner-unit') {

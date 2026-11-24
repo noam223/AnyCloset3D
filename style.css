@@ -2873,6 +2873,15 @@ body.color-tab-glass #mobile-panel-materials .mobile-panel-body > :not(.color-pa
     font-size:0.85rem; font-weight:700; cursor:pointer; font-family:inherit; display:flex; flex-direction:column; align-items:center; gap:6px;
 }
 .corner-side-popup-btns button:hover { border-color:#0d9488; background:rgba(13,148,136,0.08); color:#0f766e; }
+.corner-side-popup-btns.sa-picker-btns {
+    display:grid; grid-template-columns:1fr 1fr; gap:8px;
+}
+.corner-side-popup-btns.sa-picker-btns button { flex:unset; min-width:0; }
+.sa-type-btn, .sa-tv-inch-btn {
+    padding:8px 6px; border-radius:8px; border:1.5px solid var(--border); background:var(--bg-light);
+    color:var(--text-dark); font-size:0.72rem; font-weight:700; cursor:pointer; font-family:inherit;
+}
+.sa-tv-inch-btn { flex:1; min-width:52px; }
 .corner-side-popup-cancel { margin-top:10px; background:none; border:none; color:#6b7280; font-size:0.78rem; cursor:pointer; font-family:inherit; }
 .space-cab-join-btn {
     width:100%; margin-top:6px; padding:9px 12px; border-radius:8px; border:1.5px dashed #0d9488;

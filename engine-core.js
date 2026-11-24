@@ -7100,7 +7100,7 @@ function _renderShoeDrawerCell(opts) {
  */
 function _wingFrontOverlayCm(t) {
     if (!_centerDepthIncludesFronts()) return 0;
-    if (state.presetId === 'writing-desk' || state.presetId === 'corner-unit' || state.presetId === 'floating-shelf') return 0;
+    if (state.presetId === 'writing-desk' || state.presetId === 'corner-unit' || state.presetId === 'floating-shelf' || state.presetId === 'space-appliance') return 0;
     const cols = state.columns || [];
     const hasDoorFronts = !!state.hasDoors && cols.some(c => c && c.doors && c.doors.length);
     const hasDrawerFronts = cols.some(c => c && (c.compartments || []).some(comp => comp && comp.type === 'external_drawers'));
@@ -7635,6 +7635,42 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
         }
 
         uv.needsUpdate = true;
+    }
+
+    if (state.presetId === 'space-appliance') {
+        const cw = state.wings && state.wings.center;
+        const sa = (cw && cw.spaceAppliance) || {};
+        const type = sa.type || 'washer';
+        const dims = (typeof window._spaceApplianceDims === 'function')
+            ? window._spaceApplianceDims(type, { inch: sa.inch })
+            : { W: state.width || 60, H: state.globalHeight || 85, D: state.depth || 60 };
+        const dW = dims.W, dH = dims.H, dD = dims.D;
+        if (isBP) {
+            createBoard(dW, dH, dD, 0, dH / 2, 0, matBody);
+            if (isActiveWing) {
+                state.bpData.push({ type: 'width', val: Math.round(dW), x: 0, y: -20, halfW: dW / 2 });
+                state.bpData.push({ type: 'height', val: Math.round(dH), x: dW / 2 + 18, y: dH / 2, halfH: dH / 2 });
+            }
+        } else if (typeof window._buildSpaceApplianceMesh === 'function') {
+            const mesh = window._buildSpaceApplianceMesh(type, { inch: sa.inch });
+            if (mesh) {
+                // Laundry/kitchen templates sit on y=0 with front at +D/2; keep that convention
+                _buildGroup.add(mesh);
+            } else {
+                createBoard(dW, dH, dD, 0, dH / 2, 0, matBody);
+            }
+            if (isActiveWing) {
+                const hitMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.0, depthWrite: false });
+                const hitBox = new THREE.Mesh(new THREE.BoxGeometry(dW + 2, dH + 2, dD + 2), hitMat);
+                hitBox.position.set(0, dH / 2, 0);
+                hitBox.userData = { isSpaceAppliance: true, applianceType: type };
+                _buildGroup.add(hitBox);
+                deskHitBoxes.push(hitBox);
+                state.dimData.push({ isDeskWidth: true, x: 0, y: dH + 14, h: dW });
+                state.dimData.push({ isDeskHeight: true, x: dW / 2 + 16, y: dH / 2, h: dH });
+            }
+        }
+        return;
     }
 
     if (state.presetId === 'floating-shelf') {

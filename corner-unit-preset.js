@@ -767,9 +767,13 @@ window._updateExtrasSections = function() {
         if (sh) sh.max = 280;
     }
 
-    // Floating shelf remaps header dim labels (אורך / רוחב / עובי) — run last
+    // Floating shelf remaps header dim labels (אורך / רוחב / עובי)
     if (typeof window._updateFloatingShelfSectionVisibility === 'function') {
         window._updateFloatingShelfSectionVisibility();
+    }
+    // Space appliance hides cabinet chrome — must run after floating-shelf restore
+    if (typeof window._updateSpaceApplianceSectionVisibility === 'function') {
+        window._updateSpaceApplianceSectionVisibility();
     }
 };
 

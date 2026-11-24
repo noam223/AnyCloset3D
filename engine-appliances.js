@@ -567,6 +567,63 @@ window._tvLargestFit = tvLargestFit;
 window.addTvToCell = addTvToCell;
 
 window.LAUNDRY_RULES = LAUNDRY_RULES;
+window.LA_TYPES = LA_TYPES;
+window.buildLaundryAppliance = buildLaundryAppliance;
+
+/** Freestanding appliance catalog for shared-space placement (not cell-bound). */
+window.SPACE_APPLIANCE_CATALOG = [
+    { id: 'washer', label: 'מכונת כביסה', group: 'laundry', icon: 'fa-solid fa-soap' },
+    { id: 'dryer', label: 'מייבש', group: 'laundry', icon: 'fa-solid fa-wind' },
+    { id: 'dishwasher', label: 'מדיח כלים', group: 'kitchen', icon: 'fa-solid fa-droplet' },
+    { id: 'oven', label: 'תנור', group: 'kitchen', icon: 'fa-solid fa-fire-burner' },
+    { id: 'fridge', label: 'מקרר', group: 'kitchen', icon: 'fa-solid fa-snowflake' },
+    { id: 'tv', label: 'טלוויזיה', group: 'media', icon: 'fa-solid fa-tv' }
+];
+
+window._spaceApplianceDims = function(type, opts) {
+    opts = opts || {};
+    if (type === 'tv') {
+        const inch = opts.inch || TV_DEFAULT_INCH;
+        const d = tvDims(inch);
+        return { W: d.W, H: d.totalH, D: Math.max(d.footD || 20, d.panelT + d.housingT + 4), inch: inch };
+    }
+    if (LA_TYPES[type]) {
+        const t = LA_TYPES[type];
+        return { W: t.W, H: t.H, D: t.D };
+    }
+    if (KIT_APPLIANCE_TYPES[type]) {
+        const t = KIT_APPLIANCE_TYPES[type];
+        return { W: t.W, H: t.H, D: t.D };
+    }
+    return { W: 60, H: 85, D: 60 };
+};
+
+window._buildSpaceApplianceMesh = function(type, opts) {
+    opts = opts || {};
+    if (type === 'tv') {
+        const inch = opts.inch || TV_DEFAULT_INCH;
+        const m = _tvTemplate(inch, false).clone();
+        m.userData.isTv = true;
+        m.userData.applianceType = 'tv';
+        m.userData.isSpaceAppliance = true;
+        return m;
+    }
+    if (LA_TYPES[type]) {
+        const m = _template(type).clone();
+        m.userData.isLaundryAppliance = true;
+        m.userData.applianceType = type;
+        m.userData.isSpaceAppliance = true;
+        return m;
+    }
+    if (KIT_APPLIANCE_TYPES[type] && type !== 'sink') {
+        const m = _kitTemplate(type).clone();
+        m.userData.isKitchenAppliance = true;
+        m.userData.applianceType = type;
+        m.userData.isSpaceAppliance = true;
+        return m;
+    }
+    return null;
+};
 window._laundryFit = _laundryFit;
 window._laundryIsSideBySide = _laundryIsSideBySide;
 window._laundryProtrudes = laundryProtrudes;

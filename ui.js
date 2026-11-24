@@ -13780,7 +13780,7 @@ window._promptSaveCabinetBeforeSwitch = function(targetIndex) {
 // classic corner wardrobes / walk-in. Bathroom stays exclusive (unlinks on switch).
 // ==========================================
 window._SPACE_COMPATIBLE_PRESETS = [
-    'linear', 'sliding', 'writing-desk', 'corner-unit', 'floating-shelf', 'kitchen',
+    'linear', 'sliding', 'writing-desk', 'corner-unit', 'floating-shelf', 'space-appliance', 'kitchen',
     'corner-left', 'corner-right', 'walkin'
 ];
 window._SPACE_MAX_CABINETS = 10;
@@ -15030,7 +15030,8 @@ window._spaceUnitHostSnapshot = function() {
 };
 
 /** Turns the freshly reset editor cabinet into the requested add-on unit. Returns the space rotation. */
-window._configureSpaceUnit = function(kind, host) {
+window._configureSpaceUnit = function(kind, host, opts) {
+    opts = opts || {};
     const cw = state.wings && state.wings.center;
     if (!cw) return 0;
     if (kind === 'kitchenUpper' || kind === 'kitchenBase' || kind === 'kitchenCorner') {
@@ -15071,6 +15072,16 @@ window._configureSpaceUnit = function(kind, host) {
         state.presetId = 'floating-shelf';
         if (typeof window._applyFloatingShelfPreset === 'function') {
             window._applyFloatingShelfPreset(host);
+        }
+        return 0;
+    }
+    if (kind === 'spaceAppliance') {
+        state.presetId = 'space-appliance';
+        if (typeof window._applySpaceAppliancePreset === 'function') {
+            window._applySpaceAppliancePreset(
+                opts.applianceType || (host && host.applianceType) || 'washer',
+                opts
+            );
         }
         return 0;
     }
@@ -15188,7 +15199,8 @@ window.addSpaceUnit = function(kind, opts) {
     if (typeof window._resetEditorToDefaultLinearCabinet === 'function') {
         window._resetEditorToDefaultLinearCabinet();
     }
-    const rot = window._configureSpaceUnit(kind, host);
+    if (kind === 'spaceAppliance' && opts.applianceType) host.applianceType = opts.applianceType;
+    const rot = window._configureSpaceUnit(kind, host, opts);
     // The snapshot reads the live price fields
     if (typeof calculatePrice === 'function') calculatePrice();
     const itemN = window._snapshotCurrentCabinetToCartItem();
@@ -15230,6 +15242,11 @@ window.addSpaceUnit = function(kind, opts) {
     } else if (kind === 'floatingShelf') {
         // Float near mid-height of the host cabinet; X/Z from suggestNext
         offset.y = Math.round((host.globalHeight || host.height || 240) * 0.5);
+    } else if (kind === 'spaceAppliance') {
+        // Floor-standing by default; TV starts near eye height (gizmo can move it)
+        const saType = opts.applianceType || (host && host.applianceType) || 'washer';
+        if (saType === 'tv') offset.y = 100;
+        else offset.y = 0;
     }
     if (rot) offset.rot = rot;
     window._attachSpacePairToItem(itemN, pairId, nextSlot, offset);
@@ -15617,6 +15634,12 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
             ? (state.wings.center.floatingShelf || {}) : {};
         if (_isWritingDeskCart) modelNameText = 'שולחן כתיבה';
         if (_isFloatingShelfCart) modelNameText = 'מדף';
+        if (state.presetId === 'space-appliance') {
+            const _saLive = state.wings && state.wings.center && state.wings.center.spaceAppliance;
+            modelNameText = (typeof window._spaceApplianceLabel === 'function')
+                ? window._spaceApplianceLabel((_saLive && _saLive.type) || 'washer')
+                : 'מוצר חשמל';
+        }
         // Sliding wardrobe: override model name based on whether any door panel is a mirror
         if (state.presetId === 'sliding') {
             const _sdWing = state.wings.center;
@@ -18535,6 +18558,13 @@ function _defaultModelNameFromRaw(rawState) {
     if (!rawState) return 'מאיה';
     if (rawState.presetId === 'writing-desk') return 'שולחן כתיבה';
     if (rawState.presetId === 'floating-shelf') return 'מדף';
+    if (rawState.presetId === 'space-appliance') {
+        const sa = rawState.wings && rawState.wings.center && rawState.wings.center.spaceAppliance;
+        const t = (sa && sa.type) || 'washer';
+        return (typeof window._spaceApplianceLabel === 'function')
+            ? window._spaceApplianceLabel(t)
+            : 'מוצר חשמל';
+    }
     if (rawState.presetId === 'corner-unit') {
         const cu = rawState.wings && rawState.wings.center && rawState.wings.center.corner;
         return (cu && cu.type === 'desk') ? 'שולחן פינתי' : 'שידה פינתית';
