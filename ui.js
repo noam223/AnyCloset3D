@@ -13779,11 +13779,11 @@ window._SPACE_COMPATIBLE_PRESETS = [
     'linear', 'sliding', 'writing-desk', 'corner-unit', 'kitchen',
     'corner-left', 'corner-right', 'walkin'
 ];
-window._SPACE_MAX_CABINETS = 4;
+window._SPACE_MAX_CABINETS = 10;
 
 /** Plan cap (e.g. designer Basic = 2). Slot clamping keeps using the system max so older projects stay intact. */
 window._spacePlanMax = function() {
-    const sys = window._SPACE_MAX_CABINETS || 4;
+    const sys = window._SPACE_MAX_CABINETS || 10;
     const p = window._plan && window._plan.maxSpaceCabinets;
     return p ? Math.min(p, sys) : sys;
 };
@@ -13806,7 +13806,7 @@ window._spacePairSlotOf = function(item) {
     const s = (item.spaceSlot != null) ? item.spaceSlot
         : (item.rawState && item.rawState.spaceSlot);
     const n = Math.round(Number(s) || 0);
-    const max = (window._SPACE_MAX_CABINETS || 4) - 1;
+    const max = (window._SPACE_MAX_CABINETS || 10) - 1;
     return Math.max(0, Math.min(max, n));
 };
 
@@ -13992,7 +13992,7 @@ window._getSpacePairInfoAt = function(cartIndex) {
         others: others,
         count: members.length,
         canAddMore: members.length < window._spacePlanMax(),
-        planLimitReached: members.length >= window._spacePlanMax() && members.length < (window._SPACE_MAX_CABINETS || 4),
+        planLimitReached: members.length >= window._spacePlanMax() && members.length < (window._SPACE_MAX_CABINETS || 10),
         slotIndices: slotIndices,
         // Legacy 2-cab fields (kept for older call sites)
         otherIndex: others.length ? others[0].index : -1,
@@ -14822,7 +14822,7 @@ window.joinExistingSpaceCabinet = function(otherIndex) {
 window._syncSpacePairTabs = function() {
     const canUse = window._spacePairCanUse();
     const info = window._getSpacePairInfo();
-    const maxCab = window._SPACE_MAX_CABINETS || 4;
+    const maxCab = window._SPACE_MAX_CABINETS || 10;
     const row = document.getElementById('space-cab-tabs');
     const mRow = document.getElementById('mobile-space-cab-tabs');
     const addBtn = document.getElementById('btn-add-space-cab');
@@ -14861,9 +14861,22 @@ window._syncSpacePairTabs = function() {
     if (offsetRow) offsetRow.style.display = showOffset ? '' : 'none';
     if (mOffsetRow) mOffsetRow.style.display = showOffset ? '' : 'none';
 
+    function ensureTab(wrap, idPrefix, slot) {
+        let btn = document.getElementById(idPrefix + slot);
+        if (btn || !wrap) return btn;
+        btn = document.createElement('button');
+        btn.type = 'button';
+        btn.id = idPrefix + slot;
+        btn.className = 'space-cab-tab';
+        btn.style.display = 'none';
+        btn.onclick = function() { window.switchSpaceCabinet(slot); };
+        wrap.appendChild(btn);
+        return btn;
+    }
+
     for (let s = 0; s < maxCab; s++) {
-        const a = document.getElementById('space-cab-tab-' + s);
-        const b = document.getElementById('mobile-space-cab-tab-' + s);
+        const a = ensureTab(tabsWrap, 'space-cab-tab-', s);
+        const b = ensureTab(mTabsWrap, 'mobile-space-cab-tab-', s);
         const visible = !!(info && info.slotIndices[s] != null);
         const item = visible ? state.orderCart[info.slotIndices[s]] : null;
         const label = visible ? window._spaceTabLabel(item, s) : ('ארון ' + (s + 1));
