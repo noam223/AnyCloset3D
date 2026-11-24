@@ -11850,6 +11850,29 @@ function _copyCanvas(src) {
     return c;
 }
 
+/** Draw a numbered circle badge at a projected 3D point on a capture frame. */
+function _stampNumberBadgeOnCtx(ctx, cam, outW, outH, x, y, z, num, fontPx) {
+    if (!ctx || !cam || typeof THREE === 'undefined') return;
+    const v = new THREE.Vector3(x, y, z);
+    v.project(cam);
+    if (v.z < -1 || v.z > 1) return;
+    const px = (v.x * 0.5 + 0.5) * outW;
+    const py = (-v.y * 0.5 + 0.5) * outH;
+    const r = fontPx * 0.85;
+    ctx.beginPath();
+    ctx.arc(px, py, r, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+    ctx.fill();
+    ctx.lineWidth = Math.max(2, fontPx * 0.08);
+    ctx.strokeStyle = '#fff';
+    ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.font = '700 ' + fontPx + 'px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(num), px, py + 0.5);
+}
+
 /** Draw 1…N column badges above each column on an open (no-doors) capture frame. */
 function _stampColumnNumbersOnFrame(frame, cam, columns, opts) {
     if (!frame || !cam || !columns || columns.length < 1 || typeof THREE === 'undefined') return frame;
@@ -11859,36 +11882,46 @@ function _stampColumnNumbersOnFrame(frame, cam, columns, opts) {
     const ox = opts.ox || 0;
     const out = _copyCanvas(frame);
     const ctx = out.getContext('2d');
-    const v = new THREE.Vector3();
     let currentX = -width / 2 + t + ox;
     const fontPx = Math.max(18, Math.round(Math.min(out.width, out.height) * 0.028));
     columns.forEach(function(col, i) {
         if (!col) { currentX += t; return; }
         const cx = currentX + col.width / 2;
         const cy = (col.height || opts.height || state.globalHeight || 240) + Math.max(6, t * 2);
-        v.set(cx, cy, 0);
-        v.project(cam);
-        if (v.z < -1 || v.z > 1) {
-            currentX += col.width + t;
-            return;
-        }
-        const px = (v.x * 0.5 + 0.5) * out.width;
-        const py = (-v.y * 0.5 + 0.5) * out.height;
-        const r = fontPx * 0.85;
-        ctx.beginPath();
-        ctx.arc(px, py, r, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
-        ctx.fill();
-        ctx.lineWidth = Math.max(2, fontPx * 0.08);
-        ctx.strokeStyle = '#fff';
-        ctx.stroke();
-        ctx.fillStyle = '#fff';
-        ctx.font = '700 ' + fontPx + 'px Arial, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(String(i + 1), px, py + 0.5);
+        _stampNumberBadgeOnCtx(ctx, cam, out.width, out.height, cx, cy, 0, i + 1, fontPx);
         currentX += col.width + t;
     });
+    return out;
+}
+
+/** Draw 1…N badges on each sliding door panel (closed-doors capture). */
+function _stampSlidingDoorNumbersOnFrame(frame, cam, opts) {
+    if (!frame || !cam || typeof THREE === 'undefined') return frame;
+    opts = opts || {};
+    const width = opts.width != null ? opts.width : (state.width || 160);
+    const height = opts.height != null ? opts.height : (state.globalHeight || 240);
+    const plinthH = opts.plinthHeight != null ? opts.plinthHeight : (state.plinthHeight || 7);
+    const profileT = opts.profileT != null ? opts.profileT : 1.7;
+    const bodyD = opts.depth != null ? opts.depth : (state.depth || 60);
+    const numDoors = Math.max(2, parseInt(opts.numDoors, 10) || 2);
+    const doorAreaW = width - profileT * 2;
+    const doorW = doorAreaW / numDoors;
+    const doorH = height - plinthH;
+    const frameFrontZ = bodyD / 2;
+    const doorT = 2.0;
+    const trackGap = 2.0;
+    const trackFrontZ = frameFrontZ - doorT / 2;
+    const trackBackZ = frameFrontZ - doorT - trackGap - doorT / 2;
+    const out = _copyCanvas(frame);
+    const ctx = out.getContext('2d');
+    const fontPx = Math.max(20, Math.round(Math.min(out.width, out.height) * 0.032));
+    for (let i = 0; i < numDoors; i++) {
+        const isBackTrack = (i % 2 === 0);
+        const dz = (isBackTrack ? trackBackZ : trackFrontZ) + doorT / 2 + 0.4;
+        const dx = -width / 2 + profileT + doorW * i + doorW / 2;
+        const dy = plinthH + doorH * 0.55;
+        _stampNumberBadgeOnCtx(ctx, cam, out.width, out.height, dx, dy, dz, i + 1, fontPx);
+    }
     return out;
 }
 
@@ -12320,6 +12353,21 @@ function _captureFrameAtView(cam, ctrl, ren, scn, view, hasDoors) {
             });
         }
     }
+    // Sliding closed shot: stamp door numbers 1…N on each door panel
+    if (hasDoors && view.id !== 'space' && !(view.outlineSpaceSlots) &&
+            state.presetId === 'sliding') {
+        const sdWing = state.wings && state.wings.center;
+        const sd = (sdWing && sdWing.slidingDoor) || state.slidingDoor;
+        if (sd && sd.enabled) {
+            frame = _stampSlidingDoorNumbersOnFrame(frame, cam, {
+                width: (sdWing && sdWing.width) || state.width,
+                height: (sdWing && sdWing.globalHeight) || state.globalHeight,
+                depth: (sdWing && sdWing.depth) || state.depth,
+                plinthHeight: (sdWing && sdWing.plinthHeight) || state.plinthHeight || 7,
+                numDoors: sd.numDoors || 2
+            });
+        }
+    }
     const dataUrl = _cropCanvasToContent(frame, 40, bounds);
 
     state.wingEditMode = savedWingEdit;
@@ -12370,9 +12418,11 @@ function _orderPreviewImagesHtml(item, rawState, opts) {
     opts = opts || {};
     opts.item = item;
     const multiFront = _cartHasMultiFrontViews(rawState);
-    const centerOutLabel = multiFront ? 'תצוגת חוץ (חזית מרכזית)' : 'תצוגת חוץ (חזיתות)';
+    const isSliding = !!(rawState && rawState.presetId === 'sliding');
+    const centerOutLabel = multiFront ? 'תצוגת חוץ (חזית מרכזית)'
+        : (isSliding ? 'תצוגת דלתות (ממוספרות)' : 'תצוגת חוץ (חזיתות)');
     const centerInLabel = multiFront ? 'תצוגת פנים (חזית מרכזית)' : 'תצוגת פנים (חלוקה טכנית)';
-    let html = _orderPreviewImageCardHtml(centerOutLabel, item.imgDoors, 'ארון סגור', opts, 'imgDoors')
+    let html = _orderPreviewImageCardHtml(centerOutLabel, item.imgDoors, isSliding ? 'דלתות הזזה' : 'ארון סגור', opts, 'imgDoors')
         + _orderPreviewImageCardHtml(centerInLabel, item.imgOpen, 'ארון פתוח', opts, 'imgOpen');
     if (item.imgSpaceDoors || item.imgSpaceOpen) {
         html += _orderPreviewImageCardHtml(
@@ -12398,19 +12448,27 @@ function _orderPrintPreviewImagesHtml(item, rawState, opts) {
     const omitSpace = !!opts.omitSpace;
     const centerOnly = !!opts.centerOnly;
     const multiFront = _cartHasMultiFrontViews(rawState);
-    const centerOutLabel = multiFront ? 'תצוגת חוץ (חזית מרכזית)' : 'תצוגת חוץ (חזיתות)';
+    const isSliding = !!(rawState && rawState.presetId === 'sliding');
+    const centerOutLabel = multiFront ? 'תצוגת חוץ (חזית מרכזית)'
+        : (isSliding ? 'תצוגת דלתות (ממוספרות)' : 'תצוגת חוץ (חזיתות)');
     const centerInLabel = multiFront ? 'תצוגת פנים (חזית מרכזית)' : 'תצוגת פנים (חלוקה טכנית)';
     const imgStyle = 'display:block;align-self:center;width:auto;height:auto;max-width:100%;max-height:120mm;border:1px solid #e2e8f0;border-radius:4px;';
     const lblStyle = 'font-size:0.85rem;font-weight:600;color:#475569;margin-bottom:4px;padding:4px 8px;background:#f1f5f8;border-radius:4px;';
     const wrapStyle = 'flex:1;display:flex;flex-direction:column;min-height:0;';
+    const doorsSrc = item.imgDoors || '';
+    const openSrc = item.imgOpen || '';
     let html = opts.extrasOnly ? '' : `
                     <div style="${wrapStyle}">
                         <div style="${lblStyle}">${centerOutLabel}</div>
-                        <img src="${item.imgDoors}" style="${imgStyle}" alt="ארון סגור">
+                        ${doorsSrc
+                            ? `<img src="${doorsSrc}" style="${imgStyle}" alt="${isSliding ? 'דלתות הזזה' : 'ארון סגור'}">`
+                            : `<div style="padding:24px;border:1px dashed #cbd5e1;border-radius:4px;color:#94a3b8;text-align:center;font-size:0.85rem;">אין תמונת דלתות — רעננו את הייצוא</div>`}
                     </div>
                     <div style="${wrapStyle}">
                         <div style="${lblStyle}">${centerInLabel}</div>
-                        <img src="${item.imgOpen}" style="${imgStyle}" alt="ארון פתוח">
+                        ${openSrc
+                            ? `<img src="${openSrc}" style="${imgStyle}" alt="ארון פתוח">`
+                            : `<div style="padding:24px;border:1px dashed #cbd5e1;border-radius:4px;color:#94a3b8;text-align:center;font-size:0.85rem;">אין תמונת פנים — רעננו את הייצוא</div>`}
                     </div>`;
     if (centerOnly) return html;
     if (!omitSpace && (item.imgSpaceDoors || item.imgSpaceOpen)) {
@@ -13181,7 +13239,7 @@ window._captureCabinetPreviewImages = function() {
         multiViewSVG,
         imgSpaceDoors,
         imgSpaceOpen,
-        captureVer: 21
+        captureVer: 22
     };
     } finally {
         restoreRenderSize();
@@ -13267,8 +13325,62 @@ window._cartItemNeedsMediaRefresh = function(itemObj) {
     if (!spec.captureVer || spec.captureVer < 14) return true;
     const pid = itemObj.rawState.presetId;
     if ((pid === 'corner-left' || pid === 'corner-right') && !(spec.cornerAngle && _cartImageValid(spec.cornerAngle.imgDoors))) return true;
+    // v22: sliding door numbers stamped on closed-doors photo
+    if (pid === 'sliding' && (!spec.captureVer || spec.captureVer < 22) && !spec.imgDoorsManual) return true;
     return false;
 };
+
+/** Build sliding-door export summary (per-door color / glass / mirror). */
+function _buildSlidingDoorSpec(sd, mats) {
+    if (!sd || !sd.enabled) return null;
+    mats = mats || {};
+    const _panelTypeLabel = { solid: 'אטום', glass: 'זכוכית', mirror: 'מראה רגילה', mirror_dark: 'מראה חומה' };
+    const _glassTintLabelMap = (window.GLASS_TINTS) || {
+        clear: { label: 'שקופה' }, smoked: { label: 'אנטי סאן' }
+    };
+    const _profileColorLabel = { nickel: 'ניקל', black: 'שחור', white: 'לבן', cream: 'קרם', gold_matte: 'זהב מט' };
+    const numDoors = sd.numDoors || 2;
+    const doorPanels = sd.doorPanels || [];
+    const doorColors = sd.doorColors || [];
+    const doorGlassTints = sd.doorGlassTints || [];
+    const bodyMatKey = mats.materialExternal || mats.materialBody || 'white_matte';
+    const glassTintFallback = mats.glassTint || 'clear';
+    const hasMirror = doorPanels.some(function(p) { return p === 'mirror' || p === 'mirror_dark'; });
+    const doorColorsList = Array.from({ length: numDoors }, function(_, i) {
+        const panel = doorPanels[i] || 'solid';
+        if (panel === 'mirror' || panel === 'mirror_dark') return _panelTypeLabel[panel] || 'מראה';
+        if (panel === 'glass') {
+            const tintKey = doorGlassTints[i] || glassTintFallback;
+            const tintLbl = (_glassTintLabelMap[tintKey] && _glassTintLabelMap[tintKey].label) || 'שקופה';
+            return 'זכוכית ' + tintLbl;
+        }
+        const colorKey = doorColors[i] || bodyMatKey;
+        return _colorKeyLabel(colorKey);
+    });
+    return {
+        numDoors: numDoors,
+        profileColor: _profileColorLabel[sd.profileColor] || sd.profileColor || 'ניקל',
+        hasMirror: hasMirror,
+        doorColorsList: doorColorsList,
+        doorColorsStr: doorColorsList.map(function(c, i) { return 'דלת ' + (i + 1) + ': ' + c; }).join(' | ')
+    };
+}
+
+/** Ensure cart item has slidingDoor spec (rebuild from rawState if missing/stale). */
+function _ensureSlidingDoorSpec(itemObj) {
+    if (!itemObj || !itemObj.spec) return null;
+    const rs = itemObj.rawState || {};
+    if (rs.presetId !== 'sliding') return itemObj.spec.slidingDoor || null;
+    const wing = rs.wings && rs.wings.center;
+    const sd = (wing && wing.slidingDoor) || rs.slidingDoor;
+    const rebuilt = _buildSlidingDoorSpec(sd, {
+        materialExternal: (wing && wing.materialExternal) || rs.materialExternal,
+        materialBody: (wing && wing.materialBody) || rs.materialBody,
+        glassTint: (wing && wing.glassTint) || rs.glassTint
+    });
+    if (rebuilt) itemObj.spec.slidingDoor = rebuilt;
+    return itemObj.spec.slidingDoor || null;
+}
 
 function _snapshotEditorState() {
     const cam = window.camera;
@@ -13491,6 +13603,8 @@ window._refreshCartMediaForPrint = async function(opts) {
             itemObj.spec.cornerAngle = media.cornerAngle || null;
             if (media.multiViewSVG) itemObj.spec.multiViewSVG = media.multiViewSVG;
             if (media.captureVer) itemObj.spec.captureVer = media.captureVer;
+            // Keep sliding door finish list in sync (older carts often had slidingDoor: null)
+            if (typeof _ensureSlidingDoorSpec === 'function') _ensureSlidingDoorSpec(itemObj);
 
             // Shared-space shots — copy to every member of the same pair
             if (media.imgSpaceDoors || media.imgSpaceOpen) {
@@ -13538,6 +13652,10 @@ window.openOrderModal = async function(mode, opts) {
     if (!state.wingEditMode && typeof window._isCurrentCabinetDirty === 'function' && window._isCurrentCabinetDirty()) {
         window._commitCurrentCabinetToCart({ flash: false });
     }
+    // Rebuild sliding-door finish lists from rawState even when cart wasn't dirty
+    (state.orderCart || []).forEach(function(it) {
+        if (typeof _ensureSlidingDoorSpec === 'function') _ensureSlidingDoorSpec(it);
+    });
 
     if (!opts.skipMediaRefresh) {
         if (mode === 'customer' && window._blockIfCustomerDetailsMissing()) return;
@@ -13551,6 +13669,9 @@ window.openOrderModal = async function(mode, opts) {
         try {
             await window._refreshCartMediaForPrint({ force: true });
             await window._refreshCartBlueprintPagesForPrint();
+            (state.orderCart || []).forEach(function(it) {
+                if (typeof _ensureSlidingDoorSpec === 'function') _ensureSlidingDoorSpec(it);
+            });
         } catch (e) {
             console.warn('[openOrderModal] media refresh failed:', e);
             _showToast('⚠️ חלק מהתמונות לא עודכנו — נסה שוב', 4000);
@@ -15841,45 +15962,15 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
 
         const extraColorsStr = _extraColorsLabel(rawState.partColors);
 
-        // Build sliding door summary for spec sheet
-        const _sd = state.presetId === 'sliding' && state.slidingDoor && state.slidingDoor.enabled ? state.slidingDoor : null;
-        let slidingDoorSpec = null;
-        if (_sd) {
-            const _panelTypeLabel = { solid: 'אטום', glass: 'זכוכית', mirror: 'מראה רגילה', mirror_dark: 'מראה חומה' };
-            const _glassTintLabelMap = (window.GLASS_TINTS) || {
-                clear: { label: 'שקופה' }, smoked: { label: 'אנטי סאן' }
-            };
-            const _profileColorLabel = { nickel: 'ניקל', black: 'שחור', white: 'לבן', cream: 'קרם', gold_matte: 'זהב מט' };
-            const numDoors = _sd.numDoors || 2;
-            const doorPanels = _sd.doorPanels || [];
-            const doorColors = _sd.doorColors || [];
-            const doorGlassTints = _sd.doorGlassTints || [];
-            const bodyMatKey = state.materialExternal || state.materialBody;
-
-            // Check if any door is mirror
-            const hasMirror = doorPanels.some(p => p === 'mirror' || p === 'mirror_dark');
-
-            // Build per-door finish list — solid=color, glass=tint type, mirror=mirror kind
-            const doorColorsList = Array.from({ length: numDoors }, (_, i) => {
-                const panel = doorPanels[i] || 'solid';
-                if (panel === 'mirror' || panel === 'mirror_dark') return _panelTypeLabel[panel] || 'מראה';
-                if (panel === 'glass') {
-                    const tintKey = doorGlassTints[i] || state.glassTint || 'clear';
-                    const tintLbl = (_glassTintLabelMap[tintKey] && _glassTintLabelMap[tintKey].label) || 'שקופה';
-                    return 'זכוכית ' + tintLbl;
-                }
-                const colorKey = doorColors[i] || bodyMatKey;
-                return _colorKeyLabel(colorKey);
-            });
-
-            slidingDoorSpec = {
-                numDoors,
-                profileColor: _profileColorLabel[_sd.profileColor] || _sd.profileColor || 'ניקל',
-                hasMirror,
-                doorColorsList,   // array of per-door color/type strings
-                doorColorsStr: doorColorsList.map((c, i) => `דלת ${i + 1}: ${c}`).join(' | ')
-            };
-        }
+        // Build sliding door summary for spec sheet (prefer wing data via getSlidingDoor)
+        const _sdLive = (state.presetId === 'sliding')
+            ? ((typeof getSlidingDoor === 'function' ? getSlidingDoor() : null) || state.slidingDoor)
+            : null;
+        const slidingDoorSpec = _buildSlidingDoorSpec(_sdLive, {
+            materialExternal: state.materialExternal,
+            materialBody: state.materialBody,
+            glassTint: state.glassTint
+        });
 
         let multiViewPages = [];
         let multiViewLabels = [];
@@ -18853,8 +18944,17 @@ function _collectPrintSpecRows(item, itemObj) {
     } else {
         rows.push({ id: 'colorBody', label: 'צבע גוף וצוקל', value: _plainSpecValue(item.colorBody) });
         rows.push({ id: 'colorInternal', label: 'צבע פנים (מדפים/מגירות)', value: _plainSpecValue(item.colorInternal) });
-        if (item.slidingDoor) {
-            rows.push({ id: 'slidingDoorColors', label: 'חזיתות הזזה', value: _plainSpecValue(item.slidingDoor.doorColorsStr) });
+        const _sdSpec = (itemObj && _ensureSlidingDoorSpec(itemObj)) || item.slidingDoor;
+        if (_sdSpec && Array.isArray(_sdSpec.doorColorsList) && _sdSpec.doorColorsList.length) {
+            _sdSpec.doorColorsList.forEach(function(finish, di) {
+                rows.push({
+                    id: 'slidingDoor_' + di,
+                    label: 'דלת ' + (di + 1),
+                    value: _plainSpecValue(finish)
+                });
+            });
+        } else if (_sdSpec) {
+            rows.push({ id: 'slidingDoorColors', label: 'חזיתות הזזה', value: _plainSpecValue(_sdSpec.doorColorsStr) });
         } else {
             rows.push({ id: 'colorExternal', label: 'צבע חזיתות (דלתות ומגירות חוץ)', value: _plainSpecValue(item.colorExternal) });
         }
@@ -18876,7 +18976,8 @@ function _collectPrintSpecRows(item, itemObj) {
                 value: _plainSpecValue(item.colorOpenCell || _openCellColorFromItemObj(itemObj))
             });
         }
-        const glassTint = itemObj && _resolveGlassTintLabel(itemObj.rawState);
+        // Sliding: glass tint is listed per door — skip global glass tint row
+        const glassTint = (!_sdSpec && itemObj) ? _resolveGlassTintLabel(itemObj.rawState) : null;
         if (glassTint) rows.push({ id: 'glassTint', label: 'גוון זכוכית', value: glassTint });
         const topPanelColor = itemObj && _resolveTopPanelColorLabel(itemObj.rawState);
         if (topPanelColor) rows.push({ id: 'colorTopPanel', label: 'צבע משטח עליון', value: _plainSpecValue(topPanelColor) });
@@ -18895,10 +18996,11 @@ function _collectPrintSpecRows(item, itemObj) {
         } else {
             rows.push({ id: 'writingDeskDrawers', label: 'מגירות', value: 'ללא' });
         }
-    } else if (item.slidingDoor) {
-        rows.push({ id: 'slidingNumDoors', label: 'מספר דלתות הזזה', value: `${item.slidingDoor.numDoors} דלתות` });
-        rows.push({ id: 'slidingProfileColor', label: 'צבע פרופיל הזזה', value: _plainSpecValue(item.slidingDoor.profileColor) });
-        if (item.slidingDoor.hasMirror) {
+    } else if ((itemObj && _ensureSlidingDoorSpec(itemObj)) || item.slidingDoor) {
+        const _sdHw = (itemObj && itemObj.spec && itemObj.spec.slidingDoor) || item.slidingDoor;
+        rows.push({ id: 'slidingNumDoors', label: 'מספר דלתות הזזה', value: `${_sdHw.numDoors} דלתות` });
+        rows.push({ id: 'slidingProfileColor', label: 'צבע פרופיל הזזה', value: _plainSpecValue(_sdHw.profileColor) });
+        if (_sdHw.hasMirror) {
             rows.push({ id: 'slidingMirror', label: 'דלת מראה', value: '✓ כולל דלת מראה' });
         }
     } else {
@@ -18906,8 +19008,12 @@ function _collectPrintSpecRows(item, itemObj) {
     }
     if (itemObj && itemObj.rawState) _pushTouchHandleRows(rows, '', _countTouchHandlesFromRawState(itemObj.rawState));
     if (!isWD) {
-        const doorsN = _countDoorsFromRawState(itemObj && itemObj.rawState);
-        if (doorsN > 0) rows.push({ id: 'doorsCount', label: 'דלתות', value: doorsN + ' יחידות' });
+        const _isSlidingHw = !!((itemObj && itemObj.spec && itemObj.spec.slidingDoor) || item.slidingDoor
+            || (itemObj && itemObj.rawState && itemObj.rawState.presetId === 'sliding'));
+        if (!_isSlidingHw) {
+            const doorsN = _countDoorsFromRawState(itemObj && itemObj.rawState);
+            if (doorsN > 0) rows.push({ id: 'doorsCount', label: 'דלתות', value: doorsN + ' יחידות' });
+        }
         const extN = itemObj && itemObj.rawState ? _countCabinetContentFromRawState(itemObj.rawState).drawersExt : item.drawersExt;
         rows.push({ id: 'drawersExt', label: 'מגירות חיצוניות', value: `${extN} יחידות` });
         rows.push({ id: 'drawersInt', label: 'מגירות פנימיות', value: `${item.drawersInt} יחידות` });
@@ -19919,8 +20025,13 @@ function _printFinishesRows(item, itemObj, thStyle, tdStyle, sectionStyle) {
     }
     html += _printTr(thStyle, tdStyle, 'צבע גוף וצוקל', item.colorBody);
     html += _printTr(thStyle, tdStyle, 'צבע פנים (מדפים/מגירות)', item.colorInternal);
-    if (item.slidingDoor) {
-        html += _printTr(thStyle, tdStyle, 'חזיתות הזזה', item.slidingDoor.doorColorsStr);
+    const _sdFin = (itemObj && _ensureSlidingDoorSpec(itemObj)) || item.slidingDoor;
+    if (_sdFin && Array.isArray(_sdFin.doorColorsList) && _sdFin.doorColorsList.length) {
+        _sdFin.doorColorsList.forEach(function(finish, di) {
+            html += _printTr(thStyle, tdStyle, 'דלת ' + (di + 1), finish);
+        });
+    } else if (_sdFin) {
+        html += _printTr(thStyle, tdStyle, 'חזיתות הזזה', _sdFin.doorColorsStr);
     } else {
         html += _printTr(thStyle, tdStyle, 'צבע חזיתות (דלתות ומגירות חוץ)', item.colorExternal);
     }
@@ -19938,7 +20049,7 @@ function _printFinishesRows(item, itemObj, thStyle, tdStyle, sectionStyle) {
     if (_itemShowsOpenCellColor(item, itemObj)) {
         html += _printTr(thStyle, tdStyle, 'צבע כוורת', item.colorOpenCell || _openCellColorFromItemObj(itemObj));
     }
-    const glassTint = itemObj && _resolveGlassTintLabel(itemObj.rawState);
+    const glassTint = (!_sdFin && itemObj) ? _resolveGlassTintLabel(itemObj.rawState) : null;
     if (glassTint) html += _printTr(thStyle, tdStyle, 'גוון זכוכית', glassTint);
     const topPanelColor = itemObj && _resolveTopPanelColorLabel(itemObj.rawState);
     if (topPanelColor) html += _printTr(thStyle, tdStyle, 'צבע משטח עליון', topPanelColor);
@@ -19961,10 +20072,11 @@ function _printHardwareRows(item, itemObj, thStyle, tdStyle, sectionStyle) {
         }
         return html;
     }
-    if (item.slidingDoor) {
-        html += _printTr(thStyle, tdStyle, 'מספר דלתות הזזה', `${item.slidingDoor.numDoors} דלתות`);
-        html += _printTr(thStyle, tdStyle, 'צבע פרופיל הזזה', item.slidingDoor.profileColor);
-        if (item.slidingDoor.hasMirror) {
+    const _sdHwPrint = (itemObj && _ensureSlidingDoorSpec(itemObj)) || item.slidingDoor;
+    if (_sdHwPrint) {
+        html += _printTr(thStyle, tdStyle, 'מספר דלתות הזזה', `${_sdHwPrint.numDoors} דלתות`);
+        html += _printTr(thStyle, tdStyle, 'צבע פרופיל הזזה', _sdHwPrint.profileColor);
+        if (_sdHwPrint.hasMirror) {
             html += _printTr(thStyle, tdStyle, 'דלת מראה', '<strong style="color:#1e3a5f;">✓ כולל דלת מראה</strong>');
         }
     } else {
@@ -21998,10 +22110,18 @@ function _buildCustomerSummaryDetails(itemObj) {
     if (colorTopPanel) details.push('צבע משטח עליון: ' + colorTopPanel);
     if (_resolveExtraColors(item, itemObj)) details.push('צבעים נוספים: ' + _resolveExtraColors(item, itemObj));
 
-    if (item.slidingDoor) {
-        details.push('ארון הזזה — ' + item.slidingDoor.numDoors + ' דלתות | פרופיל: ' + item.slidingDoor.profileColor);
-        details.push(item.slidingDoor.doorColorsStr);
-        if (item.slidingDoor.hasMirror) details.push('✓ כולל דלת מראה');
+    const _sdDet = (itemObj && typeof _ensureSlidingDoorSpec === 'function' && _ensureSlidingDoorSpec(itemObj))
+        || item.slidingDoor;
+    if (_sdDet) {
+        details.push('ארון הזזה — ' + _sdDet.numDoors + ' דלתות | פרופיל: ' + _sdDet.profileColor);
+        if (Array.isArray(_sdDet.doorColorsList)) {
+            _sdDet.doorColorsList.forEach(function(finish, di) {
+                details.push('דלת ' + (di + 1) + ': ' + finish);
+            });
+        } else if (_sdDet.doorColorsStr) {
+            details.push(_sdDet.doorColorsStr);
+        }
+        if (_sdDet.hasMirror) details.push('✓ כולל דלת מראה');
     } else if (item.handle) {
         details.push('סוג ידיות: ' + item.handle);
     } else if (rawState && rawState.handleStyle) {

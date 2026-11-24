@@ -4974,7 +4974,7 @@ window._generateMultiViewBlueprintPages = function() {
                 const fillColor = doorColors[i % 2];
                 makeRect(p, dx, dy, dw, dh, fillColor, STROKE, 1);
 
-                // Door panel type label (per-door: solid / glass tint / mirror kind)
+                // Door panel type label (per-door number + solid / glass tint / mirror kind)
                 const doorPanel = (sd.doorPanels && sd.doorPanels[i]) || sd.doorPanelType || 'solid';
                 let panelLabel = 'חלק';
                 if (doorPanel === 'mirror_dark') panelLabel = 'מראה חומה';
@@ -4984,7 +4984,13 @@ window._generateMultiViewBlueprintPages = function() {
                     const tintLbl = (window.GLASS_TINTS && window.GLASS_TINTS[tintKey] && window.GLASS_TINTS[tintKey].label) || 'שקופה';
                     panelLabel = 'זכוכית ' + tintLbl;
                 }
-                p.push(`<text x="${(dx + dw / 2).toFixed(1)}" y="${(dy + dh / 2).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="14" fill="${STROKE}" opacity="0.7">${panelLabel}</text>`);
+                const doorNum = i + 1;
+                const badgeR = 11;
+                const badgeCy = dy + Math.min(28, dh * 0.12);
+                const badgeCx = dx + dw / 2;
+                p.push(`<circle cx="${badgeCx.toFixed(1)}" cy="${badgeCy.toFixed(1)}" r="${badgeR}" fill="${STROKE}" opacity="0.9"/>`);
+                p.push(`<text x="${badgeCx.toFixed(1)}" y="${(badgeCy + 4).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="13" font-weight="700" fill="#fff">${doorNum}</text>`);
+                p.push(`<text x="${badgeCx.toFixed(1)}" y="${(dy + dh / 2).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="13" fill="${STROKE}" opacity="0.75">${doorNum}. ${panelLabel}</text>`);
 
                 // Vertical divider if door > 110cm
                 if (doorW > 110) {
