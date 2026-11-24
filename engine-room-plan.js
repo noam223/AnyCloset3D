@@ -68,7 +68,8 @@
         nightstand:  { fill: '#f5f0e8', stroke: '#92706a', label: 'שידה' },
         'room-desk': { fill: '#fef3c7', stroke: '#d97706', label: 'שולחן עבודה' },
         'room-door': { fill: '#dbeafe', stroke: '#0284c7', label: 'דלת' },
-        'room-cab':  { fill: '#dcfce7', stroke: '#059669', label: 'פריט מהפרויקט' }
+        'room-cab':  { fill: '#dcfce7', stroke: '#059669', label: 'פריט מהפרויקט' },
+        'space-cab': { fill: '#dcfce7', stroke: '#047857', label: 'ארון במרחב' }
     };
 
     function _rectFromCenter(cx, cz, halfW, halfD, rotDeg) {
@@ -109,6 +110,10 @@
         return String(id || '').indexOf('room-cab-') === 0;
     }
 
+    function _isSpacePairCabId(id) {
+        return String(id || '').indexOf('space-cab-') === 0;
+    }
+
     function _isProjectDesk(item) {
         if (!item) return false;
         if (item.spec && item.spec.isWritingDesk) return true;
@@ -129,6 +134,7 @@
             return { fill: _colorToSvg(item.customColor), stroke: '#64748b' };
         }
         if (_isRoomExtraCabId(item.id)) return FURN_COLORS['room-cab'];
+        if (item.isSpacePairCab || _isSpacePairCabId(item.id)) return FURN_COLORS['space-cab'];
         if (item.isRoomDoor) return FURN_COLORS['room-door'];
         return FURN_COLORS[item.id] || FURN_COLORS.chair;
     }
@@ -414,6 +420,55 @@
                 halfD: dims.d / 2,
                 front: _cabFront(prop.x || 0, prop.z || 0, dims.w, dims.d, prop.rotation || 0)
             });
+        });
+    }
+
+    /**
+     * Other cabinets in the shared space (מרחב) — fixed relative to the open host.
+     * They belong in the same room and move with the host pose; not independently draggable.
+     */
+    function _getSpacePairCabinetRects() {
+        const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
+        if (!info || info.count < 2) return [];
+        const pose = (typeof window._getRoomHostPose === 'function') ? window._getRoomHostPose() : null;
+        return info.members.filter(function(m) {
+            return m.slot !== info.activeSlot;
+        }).map(function(m) {
+            const fp = (typeof window._spaceCabinetFootprint === 'function')
+                ? (window._spaceCabinetFootprint(m.slot) || { w: 160, d: 54, cx: 0, cz: 0 })
+                : { w: 160, d: 54, cx: 0, cz: 0 };
+            const off = (typeof window._spaceOffsetForSlot === 'function')
+                ? (window._spaceOffsetForSlot(m.slot) || { x: 0, y: 0, z: 0, rot: 0 })
+                : { x: 0, y: 0, z: 0, rot: 0 };
+            const cx = (off.x || 0) + (fp.cx || 0);
+            const cz = (off.z || 0) + (fp.cz || 0);
+            const hw = (fp.w || 160) / 2;
+            const hd = (fp.d || 54) / 2;
+            const rect = _toRoomRect(cx - hw, cx + hw, cz - hd, cz + hd);
+            const cartIdx = (info.slotIndices && info.slotIndices[m.slot] != null)
+                ? info.slotIndices[m.slot]
+                : m.index;
+            const cartItem = state.orderCart && state.orderCart[cartIdx];
+            const label = (typeof window._getCartCabinetLabel === 'function')
+                ? window._getCartCabinetLabel(cartItem, cartIdx)
+                : ('ארון במרחב ' + (m.slot + 1));
+            const extra = {
+                isSpacePairCab: true,
+                spaceSlot: m.slot,
+                cartIndex: cartIdx,
+                halfW: hw,
+                halfD: hd
+            };
+            if (pose) {
+                const localW = (fp.rot === 90 || fp.rot === 270) ? (fp.d || 54) : (fp.w || 160);
+                const localD = (fp.rot === 90 || fp.rot === 270) ? (fp.w || 160) : (fp.d || 54);
+                const roomPt = (typeof window._worldToRoomXZ === 'function')
+                    ? window._worldToRoomXZ(cx, cz)
+                    : { x: cx, z: cz };
+                const totalRot = ((pose.rotation || 0) + (off.rot || 0)) % 360;
+                extra.front = _cabFront(roomPt.x, roomPt.z, localW, localD, totalRot, 0);
+            }
+            return _makeFurnItem('space-cab-' + m.slot, rect, false, label, extra);
         });
     }
 
@@ -777,6 +832,7 @@
         // Wall features first → furniture standing against them stays grabbable
         _getWallFeatureRects().forEach(function(item) { items.push(item); });
         if (cab) items.push(cab);
+        _getSpacePairCabinetRects().forEach(function(item) { items.push(item); });
         if (cabDesk) items.push(cabDesk);
         if (bed) items.push(bed);
         if (nightstand) items.push(nightstand);
@@ -1261,7 +1317,8 @@
             _drawBed2D(g, box, tf, isActive);
             return;
         }
-        if (item.id === 'cabinet' || item.isRoomExtraCab || _isRoomExtraCabId(item.id)) {
+        if (item.id === 'cabinet' || item.isRoomExtraCab || _isRoomExtraCabId(item.id)
+            || item.isSpacePairCab || _isSpacePairCabId(item.id)) {
             _drawCabinet2D(g, item, tf, box, isActive);
             _drawPill(g, cx, cy, item.label, 11, box.fw - 6);
             return;
@@ -1656,6 +1713,7 @@
             const row = document.createElement('div');
             row.className = 'room-plan-furn-row';
             const isExtraCab = item.isRoomExtraCab || _isRoomExtraCabId(item.id);
+            const isSpaceCab = item.isSpacePairCab || _isSpacePairCabId(item.id);
             const icon = item.id === 'bed' ? 'fa-bed'
                 : item.id === 'chair' ? 'fa-chair'
                 : item.id === 'nightstand' ? 'fa-table-cells'
@@ -1665,7 +1723,7 @@
                 : item.isRoomWindow ? 'fa-border-all'
                 : item.isWallFeature ? (item.feat.type === 'niche' ? 'fa-inbox' : 'fa-square')
                 : String(item.id).indexOf('custom-') === 0 ? 'fa-cube'
-                : isExtraCab ? _projectItemIcon(state.orderCart && state.orderCart[item.cartIndex])
+                : isExtraCab || isSpaceCab ? _projectItemIcon(state.orderCart && state.orderCart[item.cartIndex])
                 : item.id === 'cabinet' ? 'fa-door-closed'
                 : 'fa-cube';
             row.innerHTML =
