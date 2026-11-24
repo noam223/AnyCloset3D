@@ -9154,6 +9154,19 @@ window._roomWall          = window._roomWall          || 'center';
 window._roomWidth         = window._roomWidth         || 0;   // 0 = auto (based on cabinet)
 window._roomDepth         = window._roomDepth         || 0;   // 0 = auto
 window._roomHeight        = window._roomHeight        || 0;   // 0 = auto (275cm, raised to the tallest cabinet)
+
+/** Sync room size inputs from window._roomWidth/_roomDepth/_roomHeight (0 = leave HTML / auto display). */
+window._syncRoomSizeUI = function() {
+    [['width', window._roomWidth, 500], ['depth', window._roomDepth, 500], ['height', window._roomHeight, 275]].forEach(function(row) {
+        var dim = row[0], val = row[1], fallback = row[2];
+        var show = (val > 0) ? val : fallback;
+        var numEl = document.getElementById('inp-num-room-' + dim);
+        var slEl  = document.getElementById('inp-room-' + dim);
+        if (numEl) numEl.value = show;
+        if (typeof window._setRangeEl === 'function') window._setRangeEl(slEl, show);
+        else if (slEl) slEl.value = show;
+    });
+};
 window._closureEnabled    = true;
 window._closureWidth      = window._closureWidth      || 1.8; // cm — left side panel width
 window._closureWidthRight = window._closureWidthRight || 1.8; // cm — right side panel width (for 'both' mode)
@@ -9280,6 +9293,8 @@ window._setRoomSize = function(dim, val) {
     if (state.viewMode === 'room-plan' && typeof window._renderRoomPlan2D === 'function') {
         window._renderRoomPlan2D();
     }
+    // Persist via project autosave / dirty flag (room dims live on window, not wing state)
+    if (typeof saveHistoryState === 'function') saveHistoryState();
 };
 
 window._updateRoomWallUI = function() {

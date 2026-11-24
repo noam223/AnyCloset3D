@@ -314,6 +314,11 @@
                         state.roomWall   = 'center';
                         window._roomWall = 'center';
                     }
+                    // Room dimensions (custom W/D/H — 0 = auto)
+                    window._roomWidth  = (typeof snap.roomWidth  === 'number' && snap.roomWidth  > 0) ? snap.roomWidth  : 0;
+                    window._roomDepth  = (typeof snap.roomDepth  === 'number' && snap.roomDepth  > 0) ? snap.roomDepth  : 0;
+                    window._roomHeight = (typeof snap.roomHeight === 'number' && snap.roomHeight > 0) ? snap.roomHeight : 0;
+                    if (typeof window._syncRoomSizeUI === 'function') window._syncRoomSizeUI();
                     // Room door + windows
                     if (snap.roomDoor && typeof snap.roomDoor === 'object') {
                         window._roomDoor = Object.assign({
@@ -629,6 +634,9 @@
             orderStatus:       window._currentOrderStatus || 'quote',
             statusMode:        (window.Projects && Projects.simpleStatuses) ? 'simple' : 'full',
             roomWall:          window._roomWall || state.roomWall || 'center',
+            roomWidth:         (window._roomWidth  > 0) ? window._roomWidth  : 0,
+            roomDepth:         (window._roomDepth  > 0) ? window._roomDepth  : 0,
+            roomHeight:        (window._roomHeight > 0) ? window._roomHeight : 0,
             roomDoor: window._roomDoor ? {
                 wall: window._roomDoor.wall, t: window._roomDoor.t,
                 width: window._roomDoor.width, height: window._roomDoor.height,
