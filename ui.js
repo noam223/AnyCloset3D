@@ -8294,13 +8294,16 @@ window._buildSpaceCabMoveHandle = function() {
     const info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
     const gizmoReady = !!(window.THREE && THREE.TransformControls);
     window._spaceRotHover = false;
-    if (!info || info.activeSlot <= 0) return;
-    if (window._spaceActiveLocked()) return;
+    // Overview: rotate/move UI available whenever the space has a movable (non-origin) unit
+    if (!info || info.count < 2) return;
+    const hasMovable = (info.members || []).some(function(m) { return m.slot > 0; });
+    if (!hasMovable) return;
     if (state.viewMode !== 'front' && !(state.viewMode === '3d' && gizmoReady)) return;
-    const item = window._getSpaceMovableItem();
+    const item = window._getSpaceMovableItem() || window._getSpaceSlotItem(1);
+    if (!item) return;
     const off = window._getSpaceOffset(item);
     const h = window._spaceSlot1Height();
-    const n = info.activeSlot + 1;
+    const n = (info.activeSlot > 0 ? info.activeSlot : 1) + 1;
     const handle = document.createElement('div');
     handle.className = 'drag-handle space-move-handle';
     handle.dataset.worldY = String(h);
@@ -8399,24 +8402,89 @@ window._buildSpaceCabMoveHandle = function() {
     window.addEventListener('pointerup', window._spaceCabUpHandler);
 };
 
-// ── 3D axis gizmo (TransformControls) for the active extra cabinet in a shared space ──
+// ── 3D axis gizmo (TransformControls) for shared-space cabinets ──
 // Lives in its own overlay scene so captures / thumbnails of `scene` never include it.
+// In overview, the gizmo follows whichever cabinet is under the pointer (not only the
+// left-sidebar "active" / editing unit). Slot 0 stays the space origin (no gizmo).
 window._spaceGizmoScene = null;
 window._spaceGizmo = null;
 window._spaceGizmoProxy = null;
 window._spaceGizmoBlockClick = false;
+window._spaceGizmoHoverSlot = null;
+window._spaceGizmoDragSlot = null;
+
+/** True when a space-pair member is a corner desk merged into a host column (not independently movable). */
+window._spaceSlotLocked = function(slot) {
+    const item = typeof window._getSpaceSlotItem === 'function' ? window._getSpaceSlotItem(slot) : null;
+    if (!item || !item.rawState) {
+        // Live editor cabinet
+        if (slot === ((typeof window._getSpacePairInfo === 'function' && window._getSpacePairInfo() || {}).activeSlot)) {
+            return !!window._spaceActiveLocked();
+        }
+        return false;
+    }
+    const rs = item.rawState;
+    if (rs.presetId !== 'corner-unit') return false;
+    const cw = rs.wings && rs.wings.center;
+    return !!(cw && cw.corner && cw.corner.type === 'desk' && cw.corner.mergeShelf);
+};
+
+/** Ray-pick which space cabinet is under the pointer (host or companion). */
+function _pickSpaceCabinetSlot(ndc) {
+    const info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
+    if (!info || info.count < 2 || !camera) return null;
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(ndc, camera);
+    let bestSlot = null;
+    let bestDist = Infinity;
+    function consider(obj, slot) {
+        if (obj == null || slot == null || slot < 0) return;
+        const hits = ray.intersectObject(obj, true);
+        if (!hits.length) return;
+        if (hits[0].distance < bestDist) {
+            bestDist = hits[0].distance;
+            bestSlot = slot;
+        }
+    }
+    if (typeof cabinetGroup !== 'undefined' && cabinetGroup) {
+        consider(cabinetGroup, info.activeSlot);
+    }
+    (window._spaceCompanionGroups || []).forEach(function(g) {
+        if (!g || !g.visible) return;
+        consider(g, g.userData && g.userData.spaceSlot);
+    });
+    (window._spaceCompanionHits || []).forEach(function(h) {
+        if (!h) return;
+        consider(h, h.userData && h.userData.spaceSlot);
+    });
+    return bestSlot;
+}
 
 function _spaceGizmoTarget() {
     const info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
-    if (!info || info.activeSlot <= 0) return null;
-    if (window._spaceActiveLocked()) return null;
+    if (!info || info.count < 2) return null;
     if (state.viewMode !== 'front' && state.viewMode !== '3d') return null;
     if (state.wingEditMode || window._spaceIsolateMode || document.body.classList.contains('room-plan-mode')) return null;
-    const item = window._getSpaceMovableItem();
+
+    // Prefer the slot being dragged, then hovered; touch/coarse always-on falls back to a movable slot
+    let slot = window._spaceGizmoDragSlot;
+    if (slot == null) slot = window._spaceGizmoHoverSlot;
+    if (slot == null && _spaceGizmoAlwaysOn()) {
+        if (info.activeSlot > 0) slot = info.activeSlot;
+        else {
+            const mov = (info.members || []).find(function(m) { return m.slot > 0; });
+            if (mov) slot = mov.slot;
+        }
+    }
+    if (slot == null || slot <= 0) return null;
+    if (info.slotIndices[slot] == null) return null;
+    if (window._spaceSlotLocked(slot)) return null;
+
+    const item = window._getSpaceSlotItem(slot);
     if (!item) return null;
     const off = window._getSpaceOffset(item);
-    const fp = window._spaceCabinetFootprint(info.activeSlot);
-    return { slot: info.activeSlot, off: off, pivotH: Math.max(20, (fp.h || 200) / 2) };
+    const fp = window._spaceCabinetFootprint(slot);
+    return { slot: slot, off: off, pivotH: Math.max(20, (fp.h || 200) / 2), item: item };
 }
 
 function _ensureSpaceGizmo() {
@@ -8488,14 +8556,22 @@ function _ensureSpaceGizmo() {
         };
     }
 
-    g.addEventListener('mouseDown', function() { window._spaceGizmoBlockClick = true; });
+    g.addEventListener('mouseDown', function() {
+        window._spaceGizmoBlockClick = true;
+        const t = _spaceGizmoTarget();
+        window._spaceGizmoDragSlot = t ? t.slot : window._spaceGizmoHoverSlot;
+    });
     g.addEventListener('mouseUp', function() {
+        window._spaceGizmoDragSlot = null;
         setTimeout(function() { window._spaceGizmoBlockClick = false; }, 0);
     });
     g.addEventListener('dragging-changed', function(ev) {
         controls.enabled = !ev.value;
         document.body.classList.toggle('dragging', !!ev.value);
-        if (!ev.value && typeof saveHistoryState === 'function') saveHistoryState();
+        if (!ev.value) {
+            window._spaceGizmoDragSlot = null;
+            if (typeof saveHistoryState === 'function') saveHistoryState();
+        }
     });
     g.addEventListener('objectChange', function() {
         const t = _spaceGizmoTarget();
@@ -8506,7 +8582,8 @@ function _ensureSpaceGizmo() {
             dragging: true, preferAxis: prefer, z: proxy.position.z, slot: t.slot, snapAxes: axis
         });
         // Snap the gizmo back onto the clamped (collision / room-limited) position
-        const cur = window._getSpaceOffset(window._getSpaceMovableItem());
+        const item = t.item || window._getSpaceSlotItem(t.slot);
+        const cur = window._getSpaceOffset(item);
         proxy.position.set(cur.x, cur.y + t.pivotH, cur.z || 0);
     });
 
@@ -8517,28 +8594,45 @@ function _ensureSpaceGizmo() {
     return g;
 }
 
-// Gizmo shows only while the pointer is over the active cabinet, on one of its arrows, or on the
-// rotate button. The gizmo's own pointermove listener runs first, so `g.axis` is already set when the
-// pointer slides from the cabinet onto an arrow tip outside it.
+// Gizmo shows while the pointer is over ANY movable space cabinet (or its arrows / rotate btn).
+// Slot is picked by hover — not limited to the left-sidebar editing unit.
 window._spaceGizmoHover = false;
 function _spaceGizmoAlwaysOn() {
     return !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
 }
 function _bindSpaceGizmoHover() {
-    const ray = new THREE.Raycaster();
     const ndc = new THREE.Vector2();
     const el = renderer.domElement;
     el.addEventListener('pointermove', function(e) {
         const g = window._spaceGizmo;
-        if (g && g.object && g.axis) { window._spaceGizmoHover = true; return; }
-        if (!cabinetGroup || !_spaceGizmoTarget()) { window._spaceGizmoHover = false; return; }
+        if (g && g.dragging) {
+            window._spaceGizmoHover = true;
+            return;
+        }
+        // Sliding onto an arrow tip outside the mesh — keep current hover slot
+        if (g && g.object && g.axis) {
+            window._spaceGizmoHover = true;
+            return;
+        }
+        const info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
+        if (!info || info.count < 2 || window._spaceIsolateMode || state.wingEditMode ||
+            document.body.classList.contains('room-plan-mode')) {
+            window._spaceGizmoHoverSlot = null;
+            window._spaceGizmoHover = false;
+            return;
+        }
         const rect = el.getBoundingClientRect();
         ndc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
         ndc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-        ray.setFromCamera(ndc, camera);
-        window._spaceGizmoHover = ray.intersectObject(cabinetGroup, true).length > 0;
+        const slot = _pickSpaceCabinetSlot(ndc);
+        window._spaceGizmoHoverSlot = slot;
+        window._spaceGizmoHover = (slot != null && slot > 0 && !window._spaceSlotLocked(slot));
     });
-    el.addEventListener('pointerleave', function() { window._spaceGizmoHover = false; });
+    el.addEventListener('pointerleave', function() {
+        if (window._spaceGizmo && window._spaceGizmo.dragging) return;
+        window._spaceGizmoHover = false;
+        window._spaceGizmoHoverSlot = null;
+    });
 }
 function _spaceGizmoShouldShow(g) {
     if (_spaceGizmoAlwaysOn()) return true;
@@ -14172,12 +14266,18 @@ window._spaceSnapOffset = function(x, y, z, slot, axes) {
     return { x: x, y: y, z: z };
 };
 
-/** Rotate the active extra cabinet in the shared space to `rot` (0/90/180/270) around its own centre. */
-window._setSpaceRotation = function(rot) {
+/** Rotate a space-pair cabinet to `rot` (0/90/180/270) around its own centre. */
+window._setSpaceRotation = function(rot, slotOpt) {
     const info = window._getSpacePairInfo();
-    if (!info || info.activeSlot <= 0) return;
-    if (window._spaceActiveLocked()) return;
-    const item = state.orderCart[info.slotIndices[info.activeSlot]];
+    if (!info) return;
+    let slot = slotOpt;
+    if (slot == null) {
+        const t = typeof _spaceGizmoTarget === 'function' ? _spaceGizmoTarget() : null;
+        slot = t ? t.slot : info.activeSlot;
+    }
+    if (slot == null || slot <= 0 || info.slotIndices[slot] == null) return;
+    if (window._spaceSlotLocked(slot)) return;
+    const item = state.orderCart[info.slotIndices[slot]];
     if (!item) return;
     const prev = window._getSpaceOffset(item);
     const next = window._normSpaceRot(rot);
@@ -14187,7 +14287,7 @@ window._setSpaceRotation = function(rot) {
     if (!item.rawState) item.rawState = {};
     item.rawState.spaceOffset = stored;
     // The footprint changed (w/d swap) — re-resolve overlaps and the wall line
-    window._setSpaceOffset(prev.x, prev.y, { slot: info.activeSlot, z: prev.z, silent: true });
+    window._setSpaceOffset(prev.x, prev.y, { slot: slot, z: prev.z, silent: true });
     if (typeof window._invalidateSpacePairPreviewImages === 'function') {
         window._invalidateSpacePairPreviewImages(info.pairId);
     }
@@ -14195,9 +14295,12 @@ window._setSpaceRotation = function(rot) {
 };
 
 window._rotateSpaceCabinet = function() {
-    const item = window._getSpaceMovableItem();
+    const t = typeof _spaceGizmoTarget === 'function' ? _spaceGizmoTarget() : null;
+    const slot = t ? t.slot : null;
+    const item = t && t.item ? t.item
+        : (slot != null ? window._getSpaceSlotItem(slot) : window._getSpaceMovableItem());
     if (!item) return;
-    window._setSpaceRotation((window._getSpaceOffset(item).rot || 0) + 90);
+    window._setSpaceRotation((window._getSpaceOffset(item).rot || 0) + 90, slot);
 };
 
 /** When a shared-space cabinet is raised off the floor, convert plinth → bottom panel. */
