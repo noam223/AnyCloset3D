@@ -15613,7 +15613,7 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
         const _isFloatingShelfCart = state.presetId === 'floating-shelf';
         const _wdCart = _isWritingDeskCart && state.wings && state.wings.center
             ? (state.wings.center.writingDesk || {}) : {};
-        const _fsCart = _isFloatingShelfCart && state.wings && state.wings.center
+        const _floatShelfCart = _isFloatingShelfCart && state.wings && state.wings.center
             ? (state.wings.center.floatingShelf || {}) : {};
         if (_isWritingDeskCart) modelNameText = 'שולחן כתיבה';
         if (_isFloatingShelfCart) modelNameText = 'מדף';
@@ -15748,8 +15748,8 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
         const _wdHeightCart = _wdCart.height != null ? _wdCart.height : state.globalHeight;
         const _wdDrawerCountCart = (_wdCart.hasDrawers === false) ? 0
             : (_wdCart.drawerCount != null ? _wdCart.drawerCount : (state.width <= 80 ? 1 : 2));
-        const _fsThickMmCart = _fsCart.thicknessMm != null
-            ? _fsCart.thicknessMm
+        const _fsThickMmCart = _floatShelfCart.thicknessMm != null
+            ? _floatShelfCart.thicknessMm
             : Math.round((state.globalHeight || 1.7) * 10);
         const _wdDimsStr = _isFloatingShelfCart
             ? `אורך: ${state.width} ס"מ | רוחב: ${state.depth} ס"מ | עובי: ${_fsThickMmCart} מ"מ`
