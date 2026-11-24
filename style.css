@@ -5635,106 +5635,93 @@ body.part-paint-active #canvas-container {
     cursor: crosshair;
 }
 
-.sp-shelf-trash {
+.sp-shelf-bar {
     position: fixed;
     z-index: 9100;
-    width: 22px;
-    height: 22px;
-    margin: 0;
     display: none;
+    align-items: stretch;
+    height: 26px;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    border-radius: 13px;
+    background: #fff;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.16);
+    transform: translate(0, -50%);
+    direction: rtl;
+    font-family: inherit;
+}
+.sp-shelf-bar__seg {
+    display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 4px;
+    height: 100%;
+    margin: 0;
+    padding: 0 9px;
     border: none;
-    border-radius: 50%;
-    background: #ef4444;
-    color: #fff;
-    font-size: 0.65rem;
-    cursor: pointer;
-    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
-    transform: translate(0, -50%);
-    transition: transform 0.15s, background 0.15s;
-}
-.sp-shelf-trash:hover {
-    background: #dc2626;
-    transform: translate(0, -50%) scale(1.1);
-}
-.sp-shelf-trash:focus,
-.sp-shelf-trash:focus-visible {
-    outline: none;
-}
-.sp-shelf-stretcher {
-    position: fixed;
-    z-index: 9100;
-    height: 22px;
-    min-width: 22px;
-    padding: 0 7px;
-    margin: 0;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    border: 1.5px solid #64748b;
-    border-radius: 11px;
-    background: #fff;
-    color: #334155;
-    font-size: 0.62rem;
-    font-weight: 700;
-    cursor: pointer;
-    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
-    transform: translate(0, -50%);
-    transition: transform 0.15s, background 0.15s, border-color 0.15s, color 0.15s;
-    white-space: nowrap;
-}
-.sp-shelf-stretcher:hover {
-    border-color: #4f46e5;
-    color: #4f46e5;
-    transform: translate(0, -50%) scale(1.05);
-}
-.sp-shelf-stretcher.is-on {
-    background: #4f46e5;
-    border-color: #4f46e5;
-    color: #fff;
-}
-.sp-shelf-stretcher:focus,
-.sp-shelf-stretcher:focus-visible {
-    outline: none;
-}
-.sp-shelf-thick {
-    position: fixed;
-    z-index: 9100;
-    height: 22px;
-    min-width: 22px;
-    padding: 0 7px;
-    margin: 0;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    border: 1.5px solid #64748b;
-    border-radius: 11px;
-    background: #fff;
+    border-radius: 0;
+    border-inline-start: 1px solid rgba(15, 23, 42, 0.1);
+    background: transparent;
     color: #334155;
     font-size: 0.62rem;
     font-weight: 700;
     font-family: inherit;
+    line-height: 1;
     cursor: pointer;
-    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
-    transform: translate(0, -50%);
     white-space: nowrap;
+    transition: background 0.15s, color 0.15s;
 }
-.sp-shelf-thick:hover {
-    border-color: #0d9488;
-    color: #0f766e;
-    transform: translate(0, -50%) scale(1.05);
+.sp-shelf-bar__seg:first-child {
+    border-inline-start: none;
 }
-.sp-shelf-thick.is-28 {
-    background: #0d9488;
-    border-color: #0d9488;
+.sp-shelf-bar__seg:focus,
+.sp-shelf-bar__seg:focus-visible {
+    outline: none;
+}
+.sp-shelf-bar__seg[hidden] {
+    display: none !important;
+}
+.sp-shelf-bar__trash {
+    width: 28px;
+    padding: 0;
+    background: #ef4444;
+    color: #fff;
+    font-size: 0.68rem;
+}
+.sp-shelf-bar__trash:hover {
+    background: #dc2626;
+}
+.sp-shelf-bar__stretch {
+    background: #f8fafc;
+    color: #4338ca;
+}
+.sp-shelf-bar__stretch:hover {
+    background: #eef2ff;
+}
+.sp-shelf-bar__stretch.is-on {
+    background: #4f46e5;
     color: #fff;
 }
-.sp-shelf-thick:focus,
-.sp-shelf-thick:focus-visible {
-    outline: none;
+.sp-shelf-bar__stretch.is-on:hover {
+    background: #4338ca;
+}
+.sp-shelf-bar__thick {
+    background: #f0fdfa;
+    color: #0f766e;
+}
+.sp-shelf-bar__thick:hover {
+    background: #ccfbf1;
+}
+.sp-shelf-bar__thick.is-28 {
+    background: #0d9488;
+    color: #fff;
+}
+.sp-shelf-bar__thick.is-28:hover {
+    background: #0f766e;
+}
+.sp-shelf-bar.is-sub .sp-shelf-bar__trash {
+    border-radius: 13px;
 }
 
 /* Mode banner */

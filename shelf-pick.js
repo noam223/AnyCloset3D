@@ -481,139 +481,121 @@
         return shelfHits[0].object;
     }
 
+    function _ensureShelfBar() {
+        let bar = document.getElementById('sp-shelf-bar');
+        if (bar) return bar;
+
+        // Remove legacy separate buttons if still in the DOM
+        ['sp-shelf-trash', 'sp-shelf-stretcher', 'sp-shelf-thick'].forEach(function (id) {
+            const old = document.getElementById(id);
+            if (old && old.parentNode) old.parentNode.removeChild(old);
+        });
+
+        bar = document.createElement('div');
+        bar.id = 'sp-shelf-bar';
+        bar.className = 'sp-shelf-bar';
+        bar.setAttribute('role', 'toolbar');
+        bar.setAttribute('aria-label', 'פעולות מדף');
+        bar.innerHTML =
+            '<button type="button" class="sp-shelf-bar__seg sp-shelf-bar__trash" id="sp-shelf-trash" title="מחק מדף (Delete)">' +
+                '<i class="fa-solid fa-trash"></i>' +
+            '</button>' +
+            '<button type="button" class="sp-shelf-bar__seg sp-shelf-bar__stretch" id="sp-shelf-stretcher" title="סמן מדף כקושרת לחיבורי גוף (מיניפיקס)">' +
+                '<i class="fa-solid fa-link"></i><span>קושרת</span>' +
+            '</button>' +
+            '<button type="button" class="sp-shelf-bar__seg sp-shelf-bar__thick" id="sp-shelf-thick" title="החלף עובי מדף בין 17 מ&quot;מ ל-28 מ&quot;מ">' +
+                '<i class="fa-solid fa-ruler-vertical"></i><span>17 מ״מ</span>' +
+            '</button>';
+
+        bar.querySelector('#sp-shelf-trash').addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.deleteSelectedShelf();
+        });
+        bar.querySelector('#sp-shelf-stretcher').addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!_selectedRef || _selectedRef.isSub) return;
+            if (typeof window._toggleStretcherShelf === 'function') {
+                window._toggleStretcherShelf(_selectedRef.colIndex, _selectedRef.shelfIdx);
+            }
+            _syncShelfBarState();
+            e.currentTarget.blur();
+        });
+        bar.querySelector('#sp-shelf-thick').addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!_selectedRef || _selectedRef.isSub) return;
+            if (typeof window._toggleShelfThicknessMm === 'function') {
+                window._toggleShelfThicknessMm(_selectedRef.colIndex, _selectedRef.shelfIdx);
+            }
+            _syncShelfBarState();
+            e.currentTarget.blur();
+        });
+
+        document.body.appendChild(bar);
+        return bar;
+    }
+
     function _showTrash() {
-        let btn = document.getElementById('sp-shelf-trash');
-        if (!btn) {
-            btn = document.createElement('button');
-            btn.id = 'sp-shelf-trash';
-            btn.type = 'button';
-            btn.className = 'sp-shelf-trash';
-            btn.title = 'מחק מדף (Delete)';
-            btn.innerHTML = '<i class="fa-solid fa-trash"></i>';
-            btn.addEventListener('click', function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-                window.deleteSelectedShelf();
-            });
-            document.body.appendChild(btn);
-        }
-        btn.style.display = 'flex';
-        _showStretcherBtn();
-        _showThicknessBtn();
+        const bar = _ensureShelfBar();
+        const isSub = !!(!_selectedRef || _selectedRef.isSub);
+        bar.classList.toggle('is-sub', isSub);
+        const stretchBtn = bar.querySelector('#sp-shelf-stretcher');
+        const thickBtn = bar.querySelector('#sp-shelf-thick');
+        if (stretchBtn) stretchBtn.hidden = isSub;
+        if (thickBtn) thickBtn.hidden = isSub;
+        bar.style.display = 'inline-flex';
+        _syncShelfBarState();
     }
 
     function _hideTrash() {
-        const btn = document.getElementById('sp-shelf-trash');
-        if (btn) btn.style.display = 'none';
-        _hideStretcherBtn();
-        _hideThicknessBtn();
+        const bar = document.getElementById('sp-shelf-bar');
+        if (bar) bar.style.display = 'none';
     }
 
-    function _showStretcherBtn() {
-        // Only main shelves can be stretchers (not sub-shelves)
-        if (!_selectedRef || _selectedRef.isSub) {
-            _hideStretcherBtn();
+    function _syncShelfBarState() {
+        const bar = document.getElementById('sp-shelf-bar');
+        if (!bar || !_selectedRef) return;
+        const stretchBtn = bar.querySelector('#sp-shelf-stretcher');
+        const thickBtn = bar.querySelector('#sp-shelf-thick');
+        if (_selectedRef.isSub) {
+            if (stretchBtn) stretchBtn.hidden = true;
+            if (thickBtn) thickBtn.hidden = true;
             return;
         }
-        let btn = document.getElementById('sp-shelf-stretcher');
-        if (!btn) {
-            btn = document.createElement('button');
-            btn.id = 'sp-shelf-stretcher';
-            btn.type = 'button';
-            btn.className = 'sp-shelf-stretcher';
-            btn.title = 'סמן מדף כקושרת לחיבורי גוף (מיניפיקס)';
-            btn.innerHTML = '<i class="fa-solid fa-link"></i><span>קושרת</span>';
-            btn.addEventListener('click', function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-                if (!_selectedRef || _selectedRef.isSub) return;
-                if (typeof window._toggleStretcherShelf === 'function') {
-                    window._toggleStretcherShelf(_selectedRef.colIndex, _selectedRef.shelfIdx);
-                }
-                _syncStretcherBtnState();
-                btn.blur();
-            });
-            document.body.appendChild(btn);
-        }
-        btn.style.display = 'flex';
-        _syncStretcherBtnState();
-    }
-
-    function _hideStretcherBtn() {
-        const btn = document.getElementById('sp-shelf-stretcher');
-        if (btn) btn.style.display = 'none';
-    }
-
-    function _syncStretcherBtnState() {
-        const btn = document.getElementById('sp-shelf-stretcher');
-        if (!btn || !_selectedRef || _selectedRef.isSub) return;
         const w = (typeof getWing === 'function') ? getWing() : null;
         const cols = (w && w.columns) || ((typeof state !== 'undefined' && state.columns) ? state.columns : null);
         const col = cols && cols[_selectedRef.colIndex];
-        if (col && typeof window._syncStretcherShelfIdxs === 'function') {
-            window._syncStretcherShelfIdxs(col);
-        }
-        const on = typeof window._isStretcherShelf === 'function' &&
-            window._isStretcherShelf(col, _selectedRef.shelfIdx);
-        btn.classList.toggle('is-on', !!on);
-        const label = btn.querySelector('span');
-        if (label) label.textContent = on ? 'קושרת ✓' : 'קושרת';
-        btn.title = on
-            ? 'קושרת פעילה — לחץ לביטול (חייבת להישאר לפחות אחת בעמודה)'
-            : 'סמן מדף כקושרת לחיבורי גוף (מיניפיקס)';
-    }
 
-    function _showThicknessBtn() {
-        // Main shelves only — sub-shelves stay on the cabinet default thickness
-        if (!_selectedRef || _selectedRef.isSub) {
-            _hideThicknessBtn();
-            return;
+        if (stretchBtn) {
+            stretchBtn.hidden = false;
+            if (col && typeof window._syncStretcherShelfIdxs === 'function') {
+                window._syncStretcherShelfIdxs(col);
+            }
+            const on = typeof window._isStretcherShelf === 'function' &&
+                window._isStretcherShelf(col, _selectedRef.shelfIdx);
+            stretchBtn.classList.toggle('is-on', !!on);
+            const label = stretchBtn.querySelector('span');
+            if (label) label.textContent = on ? 'קושרת ✓' : 'קושרת';
+            stretchBtn.title = on
+                ? 'קושרת פעילה — לחץ לביטול (חייבת להישאר לפחות אחת בעמודה)'
+                : 'סמן מדף כקושרת לחיבורי גוף (מיניפיקס)';
         }
-        let btn = document.getElementById('sp-shelf-thick');
-        if (!btn) {
-            btn = document.createElement('button');
-            btn.id = 'sp-shelf-thick';
-            btn.type = 'button';
-            btn.className = 'sp-shelf-thick';
-            btn.title = 'החלף עובי מדף בין 17 מ"מ ל-28 מ"מ';
-            btn.innerHTML = '<i class="fa-solid fa-ruler-vertical"></i><span>17</span>';
-            btn.addEventListener('click', function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-                if (!_selectedRef || _selectedRef.isSub) return;
-                if (typeof window._toggleShelfThicknessMm === 'function') {
-                    window._toggleShelfThicknessMm(_selectedRef.colIndex, _selectedRef.shelfIdx);
-                }
-                _syncThicknessBtnState();
-                btn.blur();
-            });
-            document.body.appendChild(btn);
+
+        if (thickBtn) {
+            thickBtn.hidden = false;
+            const mm = (typeof window._shelfThicknessMmAt === 'function')
+                ? window._shelfThicknessMmAt(col, _selectedRef.shelfIdx)
+                : 17;
+            const is28 = mm === 28;
+            thickBtn.classList.toggle('is-28', is28);
+            const label = thickBtn.querySelector('span');
+            if (label) label.textContent = is28 ? '28 מ״מ' : '17 מ״מ';
+            thickBtn.title = is28
+                ? 'עובי מדף 28 מ"מ — לחץ להחלפה ל-17 מ"מ'
+                : 'עובי מדף 17 מ"מ — לחץ להחלפה ל-28 מ"מ';
         }
-        btn.style.display = 'flex';
-        _syncThicknessBtnState();
-    }
-
-    function _hideThicknessBtn() {
-        const btn = document.getElementById('sp-shelf-thick');
-        if (btn) btn.style.display = 'none';
-    }
-
-    function _syncThicknessBtnState() {
-        const btn = document.getElementById('sp-shelf-thick');
-        if (!btn || !_selectedRef || _selectedRef.isSub) return;
-        const w = (typeof getWing === 'function') ? getWing() : null;
-        const cols = (w && w.columns) || ((typeof state !== 'undefined' && state.columns) ? state.columns : null);
-        const col = cols && cols[_selectedRef.colIndex];
-        const mm = (typeof window._shelfThicknessMmAt === 'function')
-            ? window._shelfThicknessMmAt(col, _selectedRef.shelfIdx)
-            : 17;
-        const is28 = mm === 28;
-        btn.classList.toggle('is-28', is28);
-        const label = btn.querySelector('span');
-        if (label) label.textContent = is28 ? '28 מ״מ' : '17 מ״מ';
-        btn.title = is28
-            ? 'עובי מדף 28 מ"מ — לחץ להחלפה ל-17 מ"מ'
-            : 'עובי מדף 17 מ"מ — לחץ להחלפה ל-28 מ"מ';
     }
 
     function _findShelfDragHandle() {
@@ -639,11 +621,10 @@
     }
 
     function _updateTrashPos() {
-        const btn = document.getElementById('sp-shelf-trash');
-        const stretchBtn = document.getElementById('sp-shelf-stretcher');
+        const bar = document.getElementById('sp-shelf-bar');
         const canvas = _getCanvas();
         const camera = _getCamera();
-        if (!btn || !canvas || !camera || !_selectedMesh) return;
+        if (!bar || bar.style.display === 'none' || !canvas || !camera || !_selectedMesh) return;
 
         let left;
         let top;
@@ -661,19 +642,8 @@
             left = Math.round((_worldPos.x * 0.5 + 0.5) * rect.width + rect.left + 18);
             top = Math.round((-_worldPos.y * 0.5 + 0.5) * rect.height + rect.top);
         }
-        btn.style.left = left + 'px';
-        btn.style.top = top + 'px';
-        let nextLeft = left + 28;
-        if (stretchBtn && stretchBtn.style.display !== 'none') {
-            stretchBtn.style.left = nextLeft + 'px';
-            stretchBtn.style.top = top + 'px';
-            nextLeft += 72;
-        }
-        const thickBtn = document.getElementById('sp-shelf-thick');
-        if (thickBtn && thickBtn.style.display !== 'none') {
-            thickBtn.style.left = nextLeft + 'px';
-            thickBtn.style.top = top + 'px';
-        }
+        bar.style.left = left + 'px';
+        bar.style.top = top + 'px';
     }
     window._updateShelfTrashPos = _updateTrashPos;
 
@@ -749,9 +719,7 @@
             }
             return 'none';
         }
-        if (e.target && e.target.closest && (
-            e.target.closest('#sp-shelf-trash') || e.target.closest('#sp-shelf-stretcher')
-        )) return 'handled';
+        if (e.target && e.target.closest && e.target.closest('#sp-shelf-bar')) return 'handled';
         const hit = _raycast(e);
         if (!hit) {
             if (_selectedRef) _clearSelectionVisual();
