@@ -12411,8 +12411,12 @@ window._occludeTmp = window._occludeTmp || {
 /**
  * Companions that sit between the camera and the focus cabinet (or that the camera is
  * inside / very near) are culled entirely for faster 3D.
+ * Exception: stacked / co-located space parts (same plan footprint) must NEVER be culled —
+ * the camera ray always hits them "before" the focus unit and would hide a different
+ * חלק every time you switch which one is open.
  */
 window._OCCLUDE_NEAR_CM = 40;
+window._OCCLUDE_STACK_OVERLAP_CM = 8;
 window._updateSpaceOcclusionGhosts = function() {
     const companions = window._spaceCompanionGroups || [];
     if (!companions.length || !window.camera) return;
@@ -12461,6 +12465,8 @@ window._updateSpaceOcclusionGhosts = function() {
     const baseOp = (window._spaceCaptureCompanionOpacity != null)
         ? window._spaceCaptureCompanionOpacity
         : 1;
+    const stackOverlap = window._OCCLUDE_STACK_OVERLAP_CM != null
+        ? window._OCCLUDE_STACK_OVERLAP_CM : 8;
 
     for (let i = 0; i < companions.length; i++) {
         const g = companions[i];
@@ -12478,6 +12484,23 @@ window._updateSpaceOcclusionGhosts = function() {
             box = g.userData._occludeBox;
         }
         if (box.isEmpty()) continue;
+
+        // Same XZ stack as the open unit (floating shelves / stacked parts) — always keep
+        const overlapX = Math.min(T.focusBox.max.x, box.max.x) - Math.max(T.focusBox.min.x, box.min.x);
+        const overlapZ = Math.min(T.focusBox.max.z, box.max.z) - Math.max(T.focusBox.min.z, box.min.z);
+        const stackedWithFocus = overlapX > stackOverlap && overlapZ > stackOverlap;
+        if (stackedWithFocus) {
+            const wasHiddenStack = !!(g.userData && g.userData._occludeHidden);
+            if (wasHiddenStack) window._setSpaceGroupOccludeHidden(g, false);
+            const curOpStack = g.userData ? g.userData._ghostOpacity : undefined;
+            if (wasHiddenStack) {
+                if (baseOp < 0.999) window._setSpaceGroupOpacity(g, baseOp);
+                else g.userData._ghostOpacity = 1;
+            } else if (curOpStack != null && Math.abs(curOpStack - baseOp) > 0.001) {
+                window._setSpaceGroupOpacity(g, baseOp);
+            }
+            continue;
+        }
 
         let occludes = false;
         const nearDist = box.distanceToPoint(camPos);
