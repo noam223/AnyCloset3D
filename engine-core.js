@@ -94,11 +94,15 @@ function _ledLitUV(boxes, px0, px1, py0, py1) {
 window._ledLitUV = _ledLitUV;
 
 /**
- * Tint a glass panel material for its wing (שקוף / מושחר) and light it where LEDs burn behind it:
- * warm glow on the glass, and smoked glass turns more see-through there so the lit cell reads through.
+ * Tint a glass panel material (שקופה / אנטי סאן) and light it where LEDs burn behind it:
+ * warm glow on the glass, and anti-sun glass turns more see-through there so the lit cell reads through.
+ * Optional tintKeyOverride: per-door sliding tint ('clear' | 'smoked').
  */
-function _applyGlassTint(mat, wing, lit) {
-    const tint = window.GLASS_TINTS && window.GLASS_TINTS[window._glassTintKey(wing)];
+function _applyGlassTint(mat, wing, lit, tintKeyOverride) {
+    const key = (tintKeyOverride && window.GLASS_TINTS && window.GLASS_TINTS[tintKeyOverride])
+        ? tintKeyOverride
+        : window._glassTintKey(wing);
+    const tint = window.GLASS_TINTS && window.GLASS_TINTS[key];
     if (!tint) return mat;
     if (tint.color != null) mat.color.setHex(tint.color);
     if (tint.opacity != null) mat.opacity = tint.opacity;

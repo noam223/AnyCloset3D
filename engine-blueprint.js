@@ -4975,7 +4975,7 @@ window._generateMultiViewBlueprintPages = function() {
                 makeRect(p, dx, dy, dw, dh, fillColor, STROKE, 1);
 
                 // Door panel type label
-                const panelLabel = sd.doorPanelType === 'glass' ? 'זכוכית' : sd.doorPanelType === 'mirror' ? 'מראה' : sd.doorPanelType === 'mirror_dark' ? 'מראה כהה' : 'חלק';
+                const panelLabel = sd.doorPanelType === 'glass' ? 'זכוכית' : sd.doorPanelType === 'mirror' ? 'מראה' : sd.doorPanelType === 'mirror_dark' ? 'מראה חומה' : 'חלק';
                 p.push(`<text x="${(dx + dw / 2).toFixed(1)}" y="${(dy + dh / 2).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="14" fill="${STROKE}" opacity="0.7">${panelLabel}</text>`);
 
                 // Vertical divider if door > 110cm
@@ -5002,7 +5002,7 @@ window._generateMultiViewBlueprintPages = function() {
 
             // Info text: profile color + panel type
             const profileColorHeb = { nickel: 'ניקל מוברש', black: 'שחור', white: 'לבן', cream: 'שמנת', gold_matte: 'זהב מט' };
-            const panelTypeHeb = { solid: 'חלק', glass: 'זכוכית', mirror: 'מראה', mirror_dark: 'מראה כהה' };
+            const panelTypeHeb = { solid: 'חלק', glass: 'זכוכית', mirror: 'מראה', mirror_dark: 'מראה חומה' };
             p.push(`<text x="${(MARGIN + 10).toFixed(1)}" y="${(PAGE_H - MARGIN - 30).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}">פרזול: ${profileColorHeb[sd.profileColor] || sd.profileColor} | פנל: ${panelTypeHeb[sd.doorPanelType] || sd.doorPanelType} | ${sdNumDoors} דלתות</text>`);
 
             const _sdDW = sdW * sc, _sdDH = sdH * sc;

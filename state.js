@@ -256,11 +256,32 @@ window.updateSlidingDoorPanel = function(doorIndex, panelType) {
     if (!w || !w.slidingDoor) return;
     if (!w.slidingDoor.doorPanels) w.slidingDoor.doorPanels = [];
     w.slidingDoor.doorPanels[doorIndex] = panelType;
+    if (panelType === 'glass') {
+        if (!w.slidingDoor.doorGlassTints) w.slidingDoor.doorGlassTints = [];
+        if (!w.slidingDoor.doorGlassTints[doorIndex]) {
+            w.slidingDoor.doorGlassTints[doorIndex] = w.glassTint || 'clear';
+        }
+    }
     // Keep color tab on this door while editing its type
     state.activeColorPart = 'slidingDoor_' + doorIndex;
     buildCabinet(); calculatePrice(); saveHistoryState();
     if (typeof window._syncSlidingDoorTypePanel === 'function') window._syncSlidingDoorTypePanel();
     if (typeof window._updateMaterialTabVisibility === 'function') window._updateMaterialTabVisibility(w);
+    if (typeof window._syncPartTabDots === 'function') window._syncPartTabDots();
+};
+
+/** Per-door glass tint for sliding panels (שקופה / אנטי סאן). */
+window.updateSlidingDoorGlassTint = function(doorIndex, tintKey) {
+    const w = getWing();
+    if (!w || !w.slidingDoor) return;
+    if (!window.GLASS_TINTS || !window.GLASS_TINTS[tintKey]) return;
+    if (!w.slidingDoor.doorGlassTints) w.slidingDoor.doorGlassTints = [];
+    w.slidingDoor.doorGlassTints[doorIndex] = tintKey;
+    // Keep wing-level tint in sync for the first glass door (hinged helpers / legacy)
+    w.glassTint = tintKey;
+    state.activeColorPart = 'slidingDoor_' + doorIndex;
+    buildCabinet(); calculatePrice(); saveHistoryState();
+    if (typeof window._syncSlidingDoorTypePanel === 'function') window._syncSlidingDoorTypePanel();
     if (typeof window._syncPartTabDots === 'function') window._syncPartTabDots();
 };
 
@@ -2245,8 +2266,8 @@ function _compHasOpenCell(comp) {
  * Over LED-lit cells `reveal` scales the glass opacity and `glow` is the warm light seen on it.
  */
 const GLASS_TINTS = {
-    clear:  { label: 'שקוף',  color: null,     opacity: null, reveal: 1,    glow: 0.35 },
-    smoked: { label: 'מושחר', color: 0x16181b, opacity: 0.72, reveal: 0.5, glow: 1.1 }
+    clear:  { label: 'שקופה',   color: null,     opacity: null, reveal: 1,    glow: 0.35 },
+    smoked: { label: 'אנטי סאן', color: 0x16181b, opacity: 0.72, reveal: 0.5, glow: 1.1 }
 };
 window.GLASS_TINTS = GLASS_TINTS;
 window._glassTintKey = function(w) {
@@ -2471,7 +2492,9 @@ window._syncOrderOptsUI = function() {
 /** Show the glass-tint swatches instead of the board colours while the "זכוכית" tab is active. */
 window._syncGlassTintPanel = function(w) {
     if (!w) w = getWing();
-    document.body.classList.toggle('color-tab-glass', !!w && w.activeColorPart === 'glassTint');
+    const isGlassTab = !!w && w.activeColorPart === 'glassTint';
+    document.body.classList.toggle('color-tab-glass', isGlassTab);
+    if (isGlassTab) document.body.classList.remove('color-tab-sd-nocolor');
     const key = window._glassTintKey(w);
     document.querySelectorAll('.glass-tint-btn').forEach(b => b.classList.toggle('active', b.dataset.tint === key));
 };
@@ -2585,15 +2608,15 @@ window._updateMaterialTabVisibility = function(w) {
     if (state.presetId === 'sliding') {
         _applyPartTabLabels(_partTabDefaultLabels);
         if (typeof window._rebuildDoorPanelTabs === 'function') window._rebuildDoorPanelTabs();
-        const hasGlass = _wingHasGlass(w);
         document.querySelectorAll('.part-tab-btn[data-part]').forEach(btn => {
             const part = btn.getAttribute('data-part');
             if (part && part.indexOf('slidingDoor_') === 0) {
                 btn.style.display = '';
                 return;
             }
+            // Glass tint is chosen per door (שקופה / אנטי סאן) — no global זכוכית tab
             if (part === 'glassTint') {
-                btn.style.display = hasGlass ? '' : 'none';
+                btn.style.display = 'none';
                 return;
             }
             const keep = part === 'materialBody' || part === 'materialInternal' || part === 'materialBack';
@@ -2605,10 +2628,11 @@ window._updateMaterialTabVisibility = function(w) {
             ? window._slidingDoorIndexFromPart(activePart) : -1;
         const sd = w.slidingDoor;
         const doorOk = isDoorPart && sd && doorIdx >= 0 && doorIdx < (sd.numDoors || 0);
-        if ((!doorOk && isDoorPart) || (!isDoorPart && activePart !== 'materialBody' && activePart !== 'materialInternal' && activePart !== 'materialBack' && !(activePart === 'glassTint' && hasGlass))) {
+        if ((!doorOk && isDoorPart) || (!isDoorPart && activePart !== 'materialBody' && activePart !== 'materialInternal' && activePart !== 'materialBack')) {
             state.activeColorPart = 'materialBody';
             document.querySelectorAll('.part-tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.part-tab-btn[data-part="materialBody"]').forEach(b => b.classList.add('active'));
+            document.body.classList.remove('color-tab-sd-nocolor');
         } else {
             state.activeColorPart = activePart;
             document.querySelectorAll('.part-tab-btn').forEach(b => b.classList.remove('active'));

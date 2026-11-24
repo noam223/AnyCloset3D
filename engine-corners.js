@@ -117,10 +117,10 @@ function buildSlidingDoorCabinet(targetGroup) {
             if (mirrorMap) { mat.envMap = mirrorMap; mat.needsUpdate = true; }
             return mat;
         } else if (panelType === 'mirror_dark') {
-            // Dark mirror: same as regular mirror but fixed envMapIntensity of 1.1
+            // Brown mirror (מראה חומה): warm bronze tint + softer reflection
             const mat = new THREE.MeshStandardMaterial({
-                color: 0x888888, metalness: 1.0, roughness: 0.0,
-                envMapIntensity: 1.1
+                color: 0xa67c52, metalness: 1.0, roughness: 0.08,
+                envMapIntensity: 1.25
             });
             const mirrorMap = window._hdrEnvMapSharp || window._hdrEnvMap;
             if (mirrorMap) { mat.envMap = mirrorMap; mat.needsUpdate = true; }
@@ -231,7 +231,8 @@ function buildSlidingDoorCabinet(targetGroup) {
         const panelH = doorH - fT * 2 - 0.4;
         if (!isBP && panelType === 'glass') {
             const litBoxes = window._ledLitBoxesByWing && window._ledLitBoxesByWing.center;
-            _applyGlassTint(thisDoorMat, wing, _ledLitUV(litBoxes, dx - panelW / 2, dx + panelW / 2, dy - panelH / 2, dy + panelH / 2));
+            const doorTint = (sd.doorGlassTints && sd.doorGlassTints[i]) || null;
+            _applyGlassTint(thisDoorMat, wing, _ledLitUV(litBoxes, dx - panelW / 2, dx + panelW / 2, dy - panelH / 2, dy + panelH / 2), doorTint);
         }
         addBoxTo(doorsGroup, panelW, panelH, doorT, dx, dy, dz, thisDoorMat);
 

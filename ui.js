@@ -905,10 +905,21 @@ window._syncSlidingDoorTypePanel = function() {
     const sd = (typeof getSlidingDoor === 'function') ? getSlidingDoor() : null;
     if (!containers.length || doorIdx < 0 || !sd || !sd.enabled) {
         containers.forEach(c => { c.innerHTML = ''; c.style.display = 'none'; });
+        document.body.classList.remove('color-tab-sd-nocolor');
         return;
     }
     const current = (sd.doorPanels && sd.doorPanels[doorIdx]) || sd.doorPanelType || 'solid';
     const isMirrorActive = current === 'mirror' || current === 'mirror_dark';
+    const isGlassActive = current === 'glass';
+    const hideColors = isMirrorActive || isGlassActive;
+    document.body.classList.toggle('color-tab-sd-nocolor', hideColors);
+    // Door-level glass options replace the global glassTint tab for sliding
+    document.body.classList.remove('color-tab-glass');
+
+    if (!sd.doorGlassTints) sd.doorGlassTints = [];
+    const glassTint = sd.doorGlassTints[doorIdx]
+        || ((typeof window._glassTintKey === 'function') ? window._glassTintKey(typeof getWing === 'function' ? getWing() : null) : 'clear');
+
     const panelOptions = [
         { value: 'solid',  icon: 'fa-solid fa-square',            label: 'חלק' },
         { value: 'glass',  icon: 'fa-regular fa-square',          label: 'זכוכית' },
@@ -916,10 +927,15 @@ window._syncSlidingDoorTypePanel = function() {
     ];
     const mirrorSubOptions = [
         { value: 'mirror',      label: 'מראה רגילה' },
-        { value: 'mirror_dark', label: 'מראה כהה' }
+        { value: 'mirror_dark', label: 'מראה חומה' }
     ];
+    const glassSubOptions = [
+        { value: 'clear',  label: 'שקופה' },
+        { value: 'smoked', label: 'אנטי סאן' }
+    ];
+    const showSub = isMirrorActive || isGlassActive;
     let html = `<div style="font-size:0.78rem;color:var(--text-light);margin-bottom:6px;">סוג פנל — דלת ${doorIdx + 1}</div>`;
-    html += `<div style="display:flex;gap:5px;margin-bottom:${isMirrorActive ? '8px' : '0'};">`;
+    html += `<div style="display:flex;gap:5px;margin-bottom:${showSub ? '8px' : '0'};">`;
     panelOptions.forEach(opt => {
         const isActive = opt.value === 'mirror' ? isMirrorActive : current === opt.value;
         html += `<button type="button" onclick="updateSlidingDoorPanel(${doorIdx},'${opt.value}')"
@@ -938,6 +954,18 @@ window._syncSlidingDoorTypePanel = function() {
         mirrorSubOptions.forEach(sub => {
             const isSubActive = current === sub.value;
             html += `<button type="button" onclick="updateSlidingDoorPanel(${doorIdx},'${sub.value}')"
+                style="flex:1;padding:5px 4px;border-radius:7px;border:${isSubActive ? '2px solid var(--accent)' : '1.5px solid var(--border)'};
+                background:${isSubActive ? 'var(--accent-light,#e8f0fe)' : 'white'};
+                color:${isSubActive ? 'var(--accent)' : 'var(--text-dark)'};
+                font-size:0.7rem;font-weight:600;cursor:pointer;">${sub.label}</button>`;
+        });
+        html += `</div>`;
+    } else if (isGlassActive) {
+        html += `<div style="font-size:0.72rem;color:var(--text-light);margin:4px 0 6px;">סוג זכוכית — בלי בחירת צבע</div>`;
+        html += `<div style="display:flex;gap:5px;padding-top:6px;border-top:1px solid var(--border);">`;
+        glassSubOptions.forEach(sub => {
+            const isSubActive = glassTint === sub.value;
+            html += `<button type="button" onclick="updateSlidingDoorGlassTint(${doorIdx},'${sub.value}')"
                 style="flex:1;padding:5px 4px;border-radius:7px;border:${isSubActive ? '2px solid var(--accent)' : '1.5px solid var(--border)'};
                 background:${isSubActive ? 'var(--accent-light,#e8f0fe)' : 'white'};
                 color:${isSubActive ? 'var(--accent)' : 'var(--text-dark)'};
@@ -15802,21 +15830,29 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
         const _sd = state.presetId === 'sliding' && state.slidingDoor && state.slidingDoor.enabled ? state.slidingDoor : null;
         let slidingDoorSpec = null;
         if (_sd) {
-            const _panelTypeLabel = { solid: 'אטום', glass: 'זכוכית', mirror: 'מראה רגילה', mirror_dark: 'מראה כהה' };
+            const _panelTypeLabel = { solid: 'אטום', glass: 'זכוכית', mirror: 'מראה רגילה', mirror_dark: 'מראה חומה' };
+            const _glassTintLabelMap = (window.GLASS_TINTS) || {
+                clear: { label: 'שקופה' }, smoked: { label: 'אנטי סאן' }
+            };
             const _profileColorLabel = { nickel: 'ניקל', black: 'שחור', white: 'לבן', cream: 'קרם', gold_matte: 'זהב מט' };
             const numDoors = _sd.numDoors || 2;
             const doorPanels = _sd.doorPanels || [];
             const doorColors = _sd.doorColors || [];
+            const doorGlassTints = _sd.doorGlassTints || [];
             const bodyMatKey = state.materialExternal || state.materialBody;
 
             // Check if any door is mirror
             const hasMirror = doorPanels.some(p => p === 'mirror' || p === 'mirror_dark');
 
-            // Build per-door color list — use per-door override or fall back to external/body color
+            // Build per-door finish list — solid=color, glass=tint type, mirror=mirror kind
             const doorColorsList = Array.from({ length: numDoors }, (_, i) => {
                 const panel = doorPanels[i] || 'solid';
-                const isMirrorDoor = panel === 'mirror' || panel === 'mirror_dark';
-                if (isMirrorDoor) return _panelTypeLabel[panel] || 'מראה';
+                if (panel === 'mirror' || panel === 'mirror_dark') return _panelTypeLabel[panel] || 'מראה';
+                if (panel === 'glass') {
+                    const tintKey = doorGlassTints[i] || state.glassTint || 'clear';
+                    const tintLbl = (_glassTintLabelMap[tintKey] && _glassTintLabelMap[tintKey].label) || 'שקופה';
+                    return 'זכוכית ' + tintLbl;
+                }
                 const colorKey = doorColors[i] || bodyMatKey;
                 return _colorKeyLabel(colorKey);
             });
@@ -18803,7 +18839,7 @@ function _collectPrintSpecRows(item, itemObj) {
         rows.push({ id: 'colorBody', label: 'צבע גוף וצוקל', value: _plainSpecValue(item.colorBody) });
         rows.push({ id: 'colorInternal', label: 'צבע פנים (מדפים/מגירות)', value: _plainSpecValue(item.colorInternal) });
         if (item.slidingDoor) {
-            rows.push({ id: 'slidingDoorColors', label: 'צבע חזיתות הזזה', value: _plainSpecValue(item.slidingDoor.doorColorsStr) });
+            rows.push({ id: 'slidingDoorColors', label: 'חזיתות הזזה', value: _plainSpecValue(item.slidingDoor.doorColorsStr) });
         } else {
             rows.push({ id: 'colorExternal', label: 'צבע חזיתות (דלתות ומגירות חוץ)', value: _plainSpecValue(item.colorExternal) });
         }
@@ -19869,7 +19905,7 @@ function _printFinishesRows(item, itemObj, thStyle, tdStyle, sectionStyle) {
     html += _printTr(thStyle, tdStyle, 'צבע גוף וצוקל', item.colorBody);
     html += _printTr(thStyle, tdStyle, 'צבע פנים (מדפים/מגירות)', item.colorInternal);
     if (item.slidingDoor) {
-        html += _printTr(thStyle, tdStyle, 'צבע חזיתות הזזה', item.slidingDoor.doorColorsStr);
+        html += _printTr(thStyle, tdStyle, 'חזיתות הזזה', item.slidingDoor.doorColorsStr);
     } else {
         html += _printTr(thStyle, tdStyle, 'צבע חזיתות (דלתות ומגירות חוץ)', item.colorExternal);
     }
