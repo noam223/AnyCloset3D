@@ -8273,7 +8273,7 @@ function buildDragHandlesUI() {
 window._spaceSlot1Height = function() {
     const info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
     if (!info) return 240;
-    const slot = info.activeSlot > 0 ? info.activeSlot : 1;
+    const slot = (info.activeSlot != null && info.activeSlot >= 0) ? info.activeSlot : 0;
     if (typeof window._spaceCabinetFootprint === 'function' &&
         typeof window._spaceCarcassPivotLocalY === 'function') {
         return window._spaceCarcassPivotLocalY(window._spaceCabinetFootprint(slot));
@@ -8314,16 +8314,14 @@ window._buildSpaceCabMoveHandle = function() {
     const info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
     const gizmoReady = !!(window.THREE && THREE.TransformControls);
     window._spaceRotHover = false;
-    // Overview: rotate/move UI available whenever the space has a movable (non-origin) unit
+    // Overview: rotate/move UI whenever the shared space has 2+ cabinets
     if (!info || info.count < 2) return;
-    const hasMovable = (info.members || []).some(function(m) { return m.slot > 0; });
-    if (!hasMovable) return;
     if (state.viewMode !== 'front' && !(state.viewMode === '3d' && gizmoReady)) return;
-    const item = window._getSpaceMovableItem() || window._getSpaceSlotItem(1);
+    const item = window._getSpaceMovableItem() || window._getSpaceSlotItem(0) || window._getSpaceSlotItem(1);
     if (!item) return;
     const off = window._getSpaceOffset(item);
     const h = window._spaceSlot1Height();
-    const n = (info.activeSlot > 0 ? info.activeSlot : 1) + 1;
+    const n = (info.activeSlot != null && info.activeSlot >= 0 ? info.activeSlot : 0) + 1;
     const handle = document.createElement('div');
     handle.className = 'drag-handle space-move-handle';
     handle.dataset.worldY = String(h);
@@ -8425,9 +8423,8 @@ window._buildSpaceCabMoveHandle = function() {
 // ── 3D axis gizmo (TransformControls) for shared-space cabinets ──
 // Lives in its own overlay scene so captures / thumbnails of `scene` never include it.
 // In overview, the gizmo follows whichever cabinet is under the pointer (not only the
-// left-sidebar "active" / editing unit). While isolating a movable unit (slot > 0),
-// the gizmo stays on that open cabinet so it can be repositioned from its own editor.
-// Slot 0 stays the space origin (no gizmo).
+// left-sidebar "active" / editing unit). While isolating a unit, the gizmo stays on that
+// open cabinet — including the main cabinet (slot 0).
 window._spaceGizmoScene = null;
 window._spaceGizmo = null;
 window._spaceGizmoProxy = null;
@@ -8489,23 +8486,20 @@ function _spaceGizmoTarget() {
     if (state.wingEditMode || document.body.classList.contains('room-plan-mode')) return null;
 
     let slot = null;
-    // Isolate editor of a movable (non-origin) unit: always target that open cabinet
+    // Isolate editor: always target the open cabinet (host or companion)
     if (window._spaceIsolateMode) {
-        if (info.activeSlot <= 0) return null;
+        if (info.activeSlot == null || info.activeSlot < 0) return null;
         slot = info.activeSlot;
     } else {
-        // Overview: prefer drag, then hover; touch/coarse falls back to a movable slot
+        // Overview: prefer drag, then hover; touch/coarse falls back to active / first slot
         slot = window._spaceGizmoDragSlot;
         if (slot == null) slot = window._spaceGizmoHoverSlot;
         if (slot == null && _spaceGizmoAlwaysOn()) {
-            if (info.activeSlot > 0) slot = info.activeSlot;
-            else {
-                const mov = (info.members || []).find(function(m) { return m.slot > 0; });
-                if (mov) slot = mov.slot;
-            }
+            if (info.activeSlot != null && info.activeSlot >= 0) slot = info.activeSlot;
+            else if (info.members && info.members.length) slot = info.members[0].slot;
         }
     }
-    if (slot == null || slot <= 0) return null;
+    if (slot == null || slot < 0) return null;
     if (info.slotIndices[slot] == null) return null;
     if (window._spaceSlotLocked(slot)) return null;
 
@@ -8654,9 +8648,9 @@ function _bindSpaceGizmoHover() {
             window._spaceGizmoHover = false;
             return;
         }
-        // Editing a non-origin space cabinet: keep gizmo on that unit
+        // Isolating any space cabinet: keep gizmo on that unit (including main / slot 0)
         if (window._spaceIsolateMode) {
-            if (info.activeSlot > 0 && !window._spaceSlotLocked(info.activeSlot)) {
+            if (info.activeSlot != null && info.activeSlot >= 0 && !window._spaceSlotLocked(info.activeSlot)) {
                 window._spaceGizmoHoverSlot = info.activeSlot;
                 window._spaceGizmoHover = true;
             } else {
@@ -8670,7 +8664,7 @@ function _bindSpaceGizmoHover() {
         ndc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
         const slot = _pickSpaceCabinetSlot(ndc);
         window._spaceGizmoHoverSlot = slot;
-        window._spaceGizmoHover = (slot != null && slot > 0 && !window._spaceSlotLocked(slot));
+        window._spaceGizmoHover = (slot != null && slot >= 0 && !window._spaceSlotLocked(slot));
     });
     el.addEventListener('pointerleave', function() {
         if (window._spaceGizmo && window._spaceGizmo.dragging) return;
@@ -8784,14 +8778,14 @@ function updateDragHandlesPosition() {
             const off = typeof window._getSpaceOffset === 'function' ? window._getSpaceOffset(item) : { x: 0, y: 0 };
             const hy = parseFloat(handle.dataset.worldY) || 0;
             const info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
-            const fp = (info && info.activeSlot > 0 && typeof window._spaceCabinetFootprint === 'function')
+            const fp = (info && info.activeSlot != null && info.activeSlot >= 0 && typeof window._spaceCabinetFootprint === 'function')
                 ? window._spaceCabinetFootprint(info.activeSlot) : null;
             const halfD = fp ? fp.d / 2 : (state.depth || 54) / 2;
             worldPt = new THREE.Vector3(off.x, off.y + hy, (off.z || 0) + halfD);
         } else if (handle.classList.contains('space-z-handle')) {
-            // Front edge of the side panel facing away from the anchor cabinet, at mid height
+            // Front edge of the side panel facing away from the other cabinets, at mid height
             const info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
-            const slot = info && info.activeSlot > 0 ? info.activeSlot : 1;
+            const slot = info && info.activeSlot != null && info.activeSlot >= 0 ? info.activeSlot : 0;
             const off = window._getSpaceOffset(window._getSpaceMovableItem());
             const fp = window._spaceCabinetFootprint(slot);
             const side = off.x >= 0 ? 1 : -1;
@@ -9692,11 +9686,10 @@ function bindUI() {
     /**
      * In a shared space, turn floorOffset into a real shorter cabinet + higher space Y:
      * empty gap below becomes spaceOffset.y, column heights shrink, floorOffset clears.
-     * Slot 0 cannot move in Y (space origin) — only non-origin units bake.
      */
     window._bakeFloorOffsetIntoSpaceBase = function() {
         const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
-        if (!info || info.count < 2 || info.activeSlot <= 0) return false;
+        if (!info || info.count < 2 || info.activeSlot == null || info.activeSlot < 0) return false;
         const cols = (state.columns || []).filter(function(c) { return c && c.type !== 'desk'; });
         if (!cols.length) return false;
         const bake = Math.min.apply(null, cols.map(function(c) { return Math.max(0, c.floorOffset || 0); }));
@@ -13775,7 +13768,9 @@ window._promptSaveCabinetBeforeSwitch = function(targetIndex) {
 
 // ==========================================
 // Multi cabinet in the same 3D space (up to 4)
-// Slot 0 is the world anchor; slots 1..n each store spaceOffset relative to it.
+// Shared space: every slot (including the main cabinet / slot 0) stores an absolute
+// spaceOffset in the shared scene frame. Companions used to be relative to a fixed
+// slot-0 origin; the host is now movable with the same gizmo + rotation.
 // Compatible hosts: linear / sliding / writing-desk / corner-unit / kitchen /
 // classic corner wardrobes / walk-in. Bathroom stays exclusive (unlinks on switch).
 // ==========================================
@@ -14172,7 +14167,7 @@ window._getSpaceSlotItem = function(slot) {
 
 window._getSpaceMovableItem = function() {
     const info = window._getSpacePairInfo();
-    if (!info || info.activeSlot <= 0) return null;
+    if (!info || info.activeSlot == null || info.activeSlot < 0) return null;
     return state.orderCart[info.activeIndex] || null;
 };
 
@@ -14296,7 +14291,7 @@ window._spaceCabinetFootprint = function(slot) {
         h += (uu._upperGap || 0) + uuH;
     }
     // World-axis extents: a quarter turn swaps width (X) and depth (Z), and their centres
-    const rot = slot > 0 ? (window._spaceOffsetForSlot(slot).rot || 0) : 0;
+    const rot = (window._spaceOffsetForSlot(slot).rot || 0);
     if (rot === 90 || rot === 270) {
         return { w: d, h: h, d: w, cx: cz, cz: -cx, floorOffset: fo, rot: rot };
     }
@@ -14304,7 +14299,6 @@ window._spaceCabinetFootprint = function(slot) {
 };
 
 window._spaceOffsetForSlot = function(slot) {
-    if (slot === 0) return { x: 0, y: 0, z: 0 };
     const item = window._getSpaceSlotItem(slot);
     return window._getSpaceOffset(item);
 };
@@ -14386,14 +14380,17 @@ window._clampSpaceOffsetAgainstOthers = function(x, y, movingSlot, opts) {
     const foM = dM.floorOffset || 0;
     const mCx0 = dM.cx || 0;
     const mCz0 = dM.cz || 0;
-    const fp0 = window._spaceCabinetFootprint(0);
-    // Wall line = slot-0 back face. Moving cabinet's back must not go past it.
-    // World back = z + (cz - d/2); require worldBack >= hostBack.
-    // Shallower companion (e.g. d=50 next to host d=70) needs z = (dM - d0)/2 = -10 to align backs.
-    const hostBack = (fp0.cz || 0) - fp0.d / 2;
-    const moverBackLocal = mCz0 - dM.d / 2;
-    const minCenterZ = hostBack - moverBackLocal;
-    z = Math.max(minCenterZ, z);
+    // Wall line = main cabinet (slot 0) back face. Companions must not pass behind it.
+    // When moving the main cabinet itself, skip — room bounds clamp instead.
+    let minCenterZ = -Infinity;
+    if (movingSlot !== 0) {
+        const fp0 = window._spaceCabinetFootprint(0);
+        const off0 = window._spaceOffsetForSlot(0);
+        const hostBack = (off0.z || 0) + (fp0.cz || 0) - fp0.d / 2;
+        const moverBackLocal = mCz0 - dM.d / 2;
+        minCenterZ = hostBack - moverBackLocal;
+        z = Math.max(minCenterZ, z);
+    }
 
     function overlapZAt(zz, oOffZ, dO) {
         const a0 = (oOffZ + (dO.cz || 0)) - dO.d / 2;
@@ -14491,7 +14488,8 @@ window._spaceRoomBoundsScene = function() {
 // Back-compat alias
 window._clampSpaceOffsetAgainstPrimary = function(x, y, opts) {
     const info = window._getSpacePairInfo();
-    const movingSlot = (info && info.activeSlot > 0) ? info.activeSlot : 1;
+    const movingSlot = (info && info.activeSlot != null && info.activeSlot >= 0)
+        ? info.activeSlot : 0;
     return window._clampSpaceOffsetAgainstOthers(x, y, movingSlot, opts);
 };
 
@@ -14500,8 +14498,8 @@ window._setSpaceOffset = function(x, y, opts) {
     const info = window._getSpacePairInfo();
     if (!info) return;
     const movingSlot = (opts.slot != null) ? opts.slot
-        : (info.activeSlot > 0 ? info.activeSlot : 1);
-    if (movingSlot <= 0 || info.slotIndices[movingSlot] == null) return;
+        : (info.activeSlot != null && info.activeSlot >= 0 ? info.activeSlot : 0);
+    if (movingSlot < 0 || info.slotIndices[movingSlot] == null) return;
     const item = state.orderCart[info.slotIndices[movingSlot]];
     if (!item) return;
     const prev = window._getSpaceOffset(item);
@@ -14599,7 +14597,7 @@ window._setSpaceRotation = function(rot, slotOpt) {
         const t = typeof _spaceGizmoTarget === 'function' ? _spaceGizmoTarget() : null;
         slot = t ? t.slot : info.activeSlot;
     }
-    if (slot == null || slot <= 0 || info.slotIndices[slot] == null) return;
+    if (slot == null || slot < 0 || info.slotIndices[slot] == null) return;
     if (window._spaceSlotLocked(slot)) return;
     const item = state.orderCart[info.slotIndices[slot]];
     if (!item) return;
@@ -14696,7 +14694,7 @@ window._syncSpaceOffsetUI = function() {
     });
     const label = document.getElementById('space-cab-offset-label');
     const mLabel = document.getElementById('mobile-space-cab-offset-label');
-    const n = info && info.activeSlot > 0 ? (info.activeSlot + 1) : 2;
+    const n = info && info.activeSlot != null && info.activeSlot >= 0 ? (info.activeSlot + 1) : 1;
     const locked = window._spaceActiveLocked();
     ['inp-num-space-x', 'mobile-inp-num-space-x', 'inp-num-space-y', 'mobile-inp-num-space-y',
      'inp-num-space-z', 'mobile-inp-num-space-z'].forEach(function(id) {
@@ -14847,7 +14845,8 @@ window._syncSpacePairTabs = function() {
     [addBtn, mAddBtn, joinBtn, mJoinBtn].forEach(function(b) {
         if (b) b.classList.toggle('plan-locked', planLocked);
     });
-    const showOffset = !!(info && info.activeSlot > 0);
+    // Offset/rotation controls for every space member, including the main cabinet
+    const showOffset = !!(info && info.count >= 2 && info.activeSlot != null && info.activeSlot >= 0);
     const showLeave = !!(info && info.count >= 2);
 
     if (row) row.style.display = canUse ? '' : 'none';
@@ -14936,17 +14935,14 @@ window._renumberSpacePairSlots = function(pairId) {
         return;
     }
     members.sort(function(a, b) { return a.slot - b.slot; });
-    const anchorOff = members[0].offset || { x: 0, y: 0, z: 0 };
+    // Keep absolute scene offsets (main cabinet may have moved) — only renumber slots
     members.forEach(function(m, newSlot) {
-        const rebased = newSlot === 0
-            ? { x: 0, y: 0, z: 0 }
-            : {
-                x: Math.round((m.offset.x || 0) - (anchorOff.x || 0)),
-                y: Math.round((m.offset.y || 0) - (anchorOff.y || 0)),
-                z: Math.round((m.offset.z || 0) - (anchorOff.z || 0)),
-                rot: m.offset.rot || 0
-            };
-        window._attachSpacePairToItem(m.it, pairId, newSlot, rebased);
+        window._attachSpacePairToItem(m.it, pairId, newSlot, {
+            x: Math.round(m.offset.x || 0),
+            y: Math.round(m.offset.y || 0),
+            z: Math.round(m.offset.z || 0),
+            rot: m.offset.rot || 0
+        });
     });
     const base = window._spacePairBaseNameFromItem(members[0].it) ||
         window._stripSpacePartSuffix((members[0].it.spec && members[0].it.spec.customName) || '');

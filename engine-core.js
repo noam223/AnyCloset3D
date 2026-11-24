@@ -4809,7 +4809,7 @@ function updateCameraView() {
     let _spaceIsoFront = null;
     if (window._spaceIsolateMode && _spacePairInfo && typeof window._spaceOffsetForSlot === 'function') {
         _spaceIsoOff = window._spaceOffsetForSlot(_spacePairInfo.activeSlot) || { x: 0, y: 0, z: 0, rot: 0 };
-        const _isoTh = (_spacePairInfo.activeSlot > 0) ? _spaceRotY(_spaceIsoOff) : 0;
+        const _isoTh = _spaceRotY(_spaceIsoOff);
         _spaceIsoFront = { x: Math.sin(_isoTh), z: Math.cos(_isoTh) };
         targetX += (_spaceIsoOff.x || 0);
         targetY += (_spaceIsoOff.y || 0);
@@ -6117,12 +6117,12 @@ window._clearSpaceCompanion = function() {
     window._spaceCompanionHit = null;
     window._spaceCompanionDoorMeshes = [];
     const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
-    // Never snap the host to origin while isolating — camera must fly to the unit's space pose.
-    if (cabinetGroup && (!info || info.activeSlot === 0) && !window._spaceIsolateMode) {
-        cabinetGroup.position.y = 0;
-        cabinetGroup.position.z = 0;
+    // No space pair → reset. With a pair, host keeps its spaceOffset (may be non-zero).
+    if (cabinetGroup && !info && !window._spaceIsolateMode) {
+        cabinetGroup.position.set(0, 0, 0);
         cabinetGroup.rotation.y = 0;
-        if (info && info.activeSlot === 0) cabinetGroup.position.x = 0;
+    } else if (info && typeof window._applySpacePairPositions === 'function') {
+        window._applySpacePairPositions();
     }
 };
 
@@ -6240,7 +6240,7 @@ window._applySpacePairPositions = function() {
         cabinetGroup.position.x = activeOff.x;
         cabinetGroup.position.y = activeOff.y;
         cabinetGroup.position.z = flattenZ ? 0 : (activeOff.z || 0);
-        cabinetGroup.rotation.y = flattenZ ? 0 : (info.activeSlot > 0 ? _spaceRotY(activeOff) : 0);
+        cabinetGroup.rotation.y = flattenZ ? 0 : _spaceRotY(activeOff);
     }
     const groups = window._spaceCompanionGroups || [];
     groups.forEach(function(g) {
@@ -6249,7 +6249,7 @@ window._applySpacePairPositions = function() {
             ? window._spaceOffsetForSlot(g.userData.spaceSlot)
             : { x: 0, y: 0 };
         g.position.set(off.x, off.y, flattenZ ? 0 : (off.z || 0));
-        g.rotation.y = flattenZ ? 0 : (g.userData.spaceSlot > 0 ? _spaceRotY(off) : 0);
+        g.rotation.y = flattenZ ? 0 : _spaceRotY(off);
     });
     // Legacy single-group fallback
     if ((!groups.length) && window._spaceCompanionGroup) {
