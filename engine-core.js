@@ -6377,19 +6377,31 @@ window._rebuildSpaceCompanion = function() {
 
             const cw = state.wings && state.wings.center;
             const hitW = (cw && cw.width) || state.width || 160;
-            const hitH = (cw && cw.globalHeight) || state.globalHeight || 240;
+            let hitH = (cw && cw.globalHeight) || state.globalHeight || 240;
             const hitD = (cw && cw.depth) || state.depth || 54;
+            // Hit only the remaining carcass — empty floorOffset below must stay click-through
+            let hitFo = 0;
+            const hitCols = (cw && cw.columns) || state.columns || [];
+            if (hitCols.length) {
+                hitH = Math.max.apply(null, hitCols.map(function(col) { return (col && col.height) || hitH; }));
+                hitFo = Math.min.apply(null, hitCols.map(function(col) { return (col && col.floorOffset) || 0; }));
+            }
+            const carcassH = Math.max(20, hitH - hitFo);
             const hitMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
-            const hit = new THREE.Mesh(new THREE.BoxGeometry(hitW, hitH, hitD), hitMat);
-            hit.position.set(0, hitH / 2, 0);
-            if (state.presetId === 'kitchen' && cw && cw.kitchenCornerL) {
-                // ר part: the body is the L beside the stub — cover the whole built part
+            const hit = new THREE.Mesh(new THREE.BoxGeometry(hitW, carcassH, hitD), hitMat);
+            hit.position.set(0, hitFo + carcassH / 2, 0);
+            {
+                // Prefer real mesh AABB so raised/shortened units match what you see
                 const kBox = new THREE.Box3().setFromObject(g);
                 if (!kBox.isEmpty()) {
                     const kSize = kBox.getSize(new THREE.Vector3());
                     const kCtr = kBox.getCenter(new THREE.Vector3()).sub(g.position);
                     hit.geometry.dispose();
-                    hit.geometry = new THREE.BoxGeometry(kSize.x + 2, kSize.y + 2, kSize.z + 2);
+                    hit.geometry = new THREE.BoxGeometry(
+                        Math.max(kSize.x, 40),
+                        Math.max(kSize.y, 20),
+                        Math.max(kSize.z, 20)
+                    );
                     hit.position.copy(kCtr);
                 }
             }

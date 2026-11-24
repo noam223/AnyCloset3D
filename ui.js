@@ -579,9 +579,11 @@ window.toggleSinkPanel = function() {
 
 window.resetFloorOffset = function() {
     if (state.activeEditCol === -1 || !state.columns[state.activeEditCol]) return;
-    const col = state.columns[state.activeEditCol];
-    col.floorOffset = 0;
-    col.noPlinth = false;
+    (state.columns || []).forEach(function(c) {
+        if (!c || c.type === 'desk') return;
+        c.floorOffset = 0;
+        if (!c.spaceBottomPanel) c.noPlinth = false;
+    });
     if (typeof window._applyFloatingFromFloorDrag === 'function') window._applyFloatingFromFloorDrag();
     buildCabinet(); calculatePrice(); updateQuickEditPanelUI();
     saveHistoryState();
@@ -591,8 +593,12 @@ window.updateQEFloorOffset = function(delta) {
     if (state.activeEditCol === -1 || !state.columns[state.activeEditCol]) return;
     const col = state.columns[state.activeEditCol];
     const newFO = Math.round(Math.max(0, Math.min(col.height - 10, (col.floorOffset || 0) + delta)));
-    col.floorOffset = newFO;
-    col.noPlinth = newFO > 0;
+    (state.columns || []).forEach(function(c) {
+        if (!c || c.type === 'desk') return;
+        const maxFO = Math.max(0, (c.height || 0) - 10);
+        c.floorOffset = Math.min(maxFO, newFO);
+        c.noPlinth = c.floorOffset > 0;
+    });
     if (typeof window._applyFloatingFromFloorDrag === 'function') window._applyFloatingFromFloorDrag();
     buildCabinet(); calculatePrice();
     if (typeof updateMobileColSheetUI === 'function') updateMobileColSheetUI();
@@ -7514,9 +7520,15 @@ window.addEventListener('pointermove', e => {
     }
     window._floorSnapActive = _floorSnapped;
 
-    col.floorOffset = Math.round(_desiredFO);
-    col.noPlinth = col.floorOffset > 0;
-    d.tooltipText = col.floorOffset > 0 ? `תחתית: ${col.floorOffset} ס"מ` : 'גרור למעלה ליחידה תלויה';
+    const newFO = Math.round(_desiredFO);
+    // Shorten the whole cabinet from the bottom — keep every column's base aligned
+    (state.columns || []).forEach(function(c) {
+        if (!c || c.type === 'desk') return;
+        const maxFO = Math.max(0, (c.height || 0) - 10);
+        c.floorOffset = Math.min(maxFO, newFO);
+        c.noPlinth = c.floorOffset > 0;
+    });
+    d.tooltipText = newFO > 0 ? `תחתית: ${newFO} ס"מ` : 'גרור למעלה ליחידה תלויה';
     buildCabinetDragging();
     updateQuickEditPanelUI();
 });
@@ -8258,6 +8270,10 @@ window._spaceSlot1Height = function() {
     const info = typeof window._getSpacePairInfo === 'function' ? window._getSpacePairInfo() : null;
     if (!info) return 240;
     const slot = info.activeSlot > 0 ? info.activeSlot : 1;
+    if (typeof window._spaceCabinetFootprint === 'function' &&
+        typeof window._spaceCarcassPivotLocalY === 'function') {
+        return window._spaceCarcassPivotLocalY(window._spaceCabinetFootprint(slot));
+    }
     if (info.activeSlot === slot) {
         if (state.columns && state.columns.length) {
             return Math.max.apply(null, state.columns.map(function(c) { return c.height || 0; }));
@@ -8493,7 +8509,11 @@ function _spaceGizmoTarget() {
     if (!item) return null;
     const off = window._getSpaceOffset(item);
     const fp = window._spaceCabinetFootprint(slot);
-    return { slot: slot, off: off, pivotH: Math.max(20, (fp.h || 200) / 2), item: item };
+    // Pivot on the centre of the remaining carcass (not the empty floorOffset gap below)
+    const pivotH = Math.max(20, (typeof window._spaceCarcassPivotLocalY === 'function')
+        ? window._spaceCarcassPivotLocalY(fp)
+        : ((fp.h || 200) / 2));
+    return { slot: slot, off: off, pivotH: pivotH, item: item, floorOffset: fp.floorOffset || 0 };
 }
 
 function _ensureSpaceGizmo() {
@@ -9665,12 +9685,94 @@ function bindUI() {
         if (typeof window._syncPlinthFrontStyleUI === 'function') window._syncPlinthFrontStyleUI();
     };
 
-    /** When bottom wall is dragged up — become floating + לפי מידה. */
+    /**
+     * In a shared space, turn floorOffset into a real shorter cabinet + higher space Y:
+     * empty gap below becomes spaceOffset.y, column heights shrink, floorOffset clears.
+     * Slot 0 cannot move in Y (space origin) — only non-origin units bake.
+     */
+    window._bakeFloorOffsetIntoSpaceBase = function() {
+        const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
+        if (!info || info.count < 2 || info.activeSlot <= 0) return false;
+        const cols = (state.columns || []).filter(function(c) { return c && c.type !== 'desk'; });
+        if (!cols.length) return false;
+        const bake = Math.min.apply(null, cols.map(function(c) { return Math.max(0, c.floorOffset || 0); }));
+        if (!(bake > 0)) return false;
+
+        cols.forEach(function(col) {
+            const fo = Math.max(0, col.floorOffset || 0);
+            const take = Math.min(bake, fo);
+            if (!(take > 0)) return;
+            col.floorOffset = Math.max(0, fo - take);
+            col.height = Math.max(10, Math.round((col.height || 0) - take));
+            if (Array.isArray(col.shelvesY)) {
+                col.shelvesY = col.shelvesY.map(function(y) { return Math.round((y - take) * 10) / 10; });
+            }
+            if (col.floorOffset <= 0 && !(col.spaceBottomPanel)) {
+                // keep noPlinth if space Y will still lift the unit
+            }
+        });
+        const maxH = Math.max.apply(null, cols.map(function(c) { return c.height || 0; }));
+        state.globalHeight = maxH;
+        if (state.wings && state.wings.center) {
+            state.wings.center.globalHeight = maxH;
+            if (Array.isArray(state.wings.center.columns)) {
+                // columns are the same refs as state.columns for center wing
+            }
+        }
+
+        const item = state.orderCart && state.orderCart[info.slotIndices[info.activeSlot]];
+        if (!item) return false;
+        const prev = (typeof window._getSpaceOffset === 'function')
+            ? window._getSpaceOffset(item)
+            : { x: 0, y: 0, z: 0 };
+        if (typeof window._setSpaceOffset === 'function') {
+            window._setSpaceOffset(prev.x, (prev.y || 0) + bake, {
+                slot: info.activeSlot,
+                z: prev.z,
+                preferAxis: 'y',
+                silent: true
+            });
+        } else {
+            const next = { x: prev.x, y: (prev.y || 0) + bake, z: prev.z || 0, rot: prev.rot || 0 };
+            item.spaceOffset = next;
+            if (!item.rawState) item.rawState = {};
+            item.rawState.spaceOffset = next;
+        }
+        if (typeof window._syncSpaceLiftBottomPanel === 'function') {
+            window._syncSpaceLiftBottomPanel(item, true);
+        }
+        // Clear leftover fo after bake so occupancy matches the shortened carcass
+        cols.forEach(function(col) {
+            if ((col.floorOffset || 0) <= 0) {
+                col.floorOffset = 0;
+                if ((prev.y || 0) + bake > 0) {
+                    col.noPlinth = true;
+                    col.spaceBottomPanel = true;
+                }
+            }
+        });
+        return true;
+    };
+
+    /** When bottom wall is dragged up — become floating + לפי מידה; in space, bake into real base. */
     window._applyFloatingFromFloorDrag = function() {
+        const baked = (typeof window._bakeFloorOffsetIntoSpaceBase === 'function')
+            && window._bakeFloorOffsetIntoSpaceBase();
+        if (baked) {
+            if (typeof buildCabinet === 'function') buildCabinet();
+            if (typeof calculatePrice === 'function') calculatePrice();
+            if (typeof updateQuickEditPanelUI === 'function') updateQuickEditPanelUI();
+            if (typeof window._syncSpaceOffsetUI === 'function') window._syncSpaceOffsetUI();
+            return;
+        }
         const cols = state.columns || [];
         const raised = cols.some(function(c) { return c && (c.floorOffset || 0) > 0; });
+        const editing = state.orderCart && state.orderCart[state.editingCartIndex];
+        const spaceLifted = !!(editing && typeof window._getSpaceOffset === 'function' &&
+            ((window._getSpaceOffset(editing).y) || 0) > 0);
+
         if (!raised) {
-            if (state.plinthStyle === 'floating') {
+            if (state.plinthStyle === 'floating' && !spaceLifted) {
                 window._applyPlinthStyleToState('regular', { skipHeight: true });
                 state.manualPrice = null;
                 if (typeof calculatePrice === 'function') calculatePrice();
@@ -14110,6 +14212,14 @@ window._spaceCabinetPlanRects = function(wings) {
     });
     if (!rects.length) rects.push([-cW / 2, cW / 2, -cD / 2, cD / 2]);
     return rects;
+};
+
+/** Local Y of the remaining carcass centre (above floorOffset), for gizmo / handles. */
+window._spaceCarcassPivotLocalY = function(fp) {
+    fp = fp || {};
+    const h = Math.max(1, fp.h || 200);
+    const fo = Math.max(0, Math.min(h - 1, fp.floorOffset || 0));
+    return fo + (h - fo) / 2;
 };
 
 window._spaceCabinetFootprint = function(slot) {
