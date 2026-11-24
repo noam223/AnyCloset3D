@@ -3579,11 +3579,11 @@ function buildSlidingDoorCabinet() {
             if (mirrorMap) { mat.envMap = mirrorMap; mat.needsUpdate = true; }
             return mat;
         } else if (panelType === 'mirror_dark') {
-            // Brown mirror (מראה חומה): ~20% of full bronze tint vs regular mirror
-            // Full brown was #a67c52; regular mirror #888888 — keep 20% of that shift (80% reduction)
+            // Brown mirror (מראה חומה): ~26% of full bronze tint vs regular mirror
+            // Full brown #a67c52 vs regular #888888 — was 20%, then +30% stronger → ~26%
             const mat = new THREE.MeshStandardMaterial({
-                color: 0x8e867d, metalness: 1.0, roughness: 0.016,
-                envMapIntensity: 2.49
+                color: 0x8f857a, metalness: 1.0, roughness: 0.021,
+                envMapIntensity: 2.40
             });
             const mirrorMap = window._hdrEnvMapSharp || window._hdrEnvMap;
             if (mirrorMap) { mat.envMap = mirrorMap; mat.needsUpdate = true; }
