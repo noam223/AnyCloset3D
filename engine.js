@@ -6159,8 +6159,16 @@ window._generateMultiViewBlueprintPages = function() {
                 const fillColor = doorColors[i % 2];
                 makeRect(p, dx, dy, dw, dh, fillColor, STROKE, 1);
 
-                // Door panel type label
-                const panelLabel = sd.doorPanelType === 'glass' ? 'זכוכית' : sd.doorPanelType === 'mirror' ? 'מראה' : sd.doorPanelType === 'mirror_dark' ? 'מראה כהה' : 'חלק';
+                // Door panel type label (per-door: solid / glass tint / mirror kind)
+                const doorPanel = (sd.doorPanels && sd.doorPanels[i]) || sd.doorPanelType || 'solid';
+                let panelLabel = 'חלק';
+                if (doorPanel === 'mirror_dark') panelLabel = 'מראה חומה';
+                else if (doorPanel === 'mirror') panelLabel = 'מראה רגילה';
+                else if (doorPanel === 'glass') {
+                    const tintKey = (sd.doorGlassTints && sd.doorGlassTints[i]) || 'clear';
+                    const tintLbl = (window.GLASS_TINTS && window.GLASS_TINTS[tintKey] && window.GLASS_TINTS[tintKey].label) || 'שקופה';
+                    panelLabel = 'זכוכית ' + tintLbl;
+                }
                 p.push(`<text x="${(dx + dw / 2).toFixed(1)}" y="${(dy + dh / 2).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="14" fill="${STROKE}" opacity="0.7">${panelLabel}</text>`);
 
                 // Vertical divider if door > 110cm
@@ -6185,10 +6193,20 @@ window._generateMultiViewBlueprintPages = function() {
                 makeDimH(p, dx1, dx2, oy - 16, `${Math.round(doorW)}`);
             }
 
-            // Info text: profile color + panel type
+            // Info text: profile color + per-door panel finishes
             const profileColorHeb = { nickel: 'ניקל מוברש', black: 'שחור', white: 'לבן', cream: 'שמנת', gold_matte: 'זהב מט' };
-            const panelTypeHeb = { solid: 'חלק', glass: 'זכוכית', mirror: 'מראה', mirror_dark: 'מראה כהה' };
-            p.push(`<text x="${(MARGIN + 10).toFixed(1)}" y="${(PAGE_H - MARGIN - 30).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}">פרזול: ${profileColorHeb[sd.profileColor] || sd.profileColor} | פנל: ${panelTypeHeb[sd.doorPanelType] || sd.doorPanelType} | ${sdNumDoors} דלתות</text>`);
+            const doorFinishLabels = Array.from({ length: sdNumDoors }, (_, di) => {
+                const pt = (sd.doorPanels && sd.doorPanels[di]) || sd.doorPanelType || 'solid';
+                if (pt === 'mirror_dark') return 'מראה חומה';
+                if (pt === 'mirror') return 'מראה רגילה';
+                if (pt === 'glass') {
+                    const tk = (sd.doorGlassTints && sd.doorGlassTints[di]) || 'clear';
+                    const tl = (window.GLASS_TINTS && window.GLASS_TINTS[tk] && window.GLASS_TINTS[tk].label) || 'שקופה';
+                    return 'זכוכית ' + tl;
+                }
+                return 'חלק';
+            });
+            p.push(`<text x="${(MARGIN + 10).toFixed(1)}" y="${(PAGE_H - MARGIN - 30).toFixed(1)}" font-family="${FONT}" font-size="11" fill="${STROKE}">פרזול: ${profileColorHeb[sd.profileColor] || sd.profileColor} | פנל: ${doorFinishLabels.join(' · ')} | ${sdNumDoors} דלתות</text>`);
 
             pages.push({ label: 'ארון הזזה — חזית', svgParts: p });
         }

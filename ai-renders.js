@@ -824,7 +824,7 @@ function _buildAiRenderPrompt(spec, opts) {
     L.push('');
     L.push('חזיתות — חלוקה מדויקת (משמאל לימין כפי שרואים את הארון מלפנים):');
     if (spec.numSlidingDoors) {
-        var panelHe = { solid: 'פנל אטום', glass: 'זכוכית', mirror: 'מראה', mirror_dark: 'מראה כהה' };
+        var panelHe = { solid: 'פנל אטום', glass: 'זכוכית', mirror: 'מראה רגילה', mirror_dark: 'מראה חומה' };
         line('ארון הזזה: בדיוק ' + spec.numSlidingDoors + ' דלתות הזזה על מסילה עליונה ותחתונה, ללא צירים וללא ידיות בולטות.');
         if (spec.slidingPanels && spec.slidingPanels.length) {
             line(spec.slidingPanels.map(function(p, i) { return 'דלת ' + (i + 1) + ': ' + (panelHe[p] || panelHe.solid); }).join(', ') + '.');
