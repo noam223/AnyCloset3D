@@ -40,7 +40,7 @@
     <link rel="stylesheet" href="style-base.css?v=20261116cartCompact">
     <link rel="stylesheet" href="style-mobile.css?v=20260828delDate">
     <link rel="stylesheet" href="style-extras.css?v=20261110doormirror">
-    <link rel="stylesheet" href="style.css?v=20261124shelfBar1">
+    <link rel="stylesheet" href="style.css?v=20261124fsShelf1">
     <link rel="stylesheet" href="quick-calc.css?v=20260929qc">
     <style>
         html.thumb-only-mode #left-sidebar,
@@ -675,6 +675,9 @@
                 <button type="button" class="space-unit-add-btn space-unit-wardrobe-only" onclick="addSpaceUnit('cornerDrawers')" title="מוסיף שידה פינתית כארון נפרד במרחב">
                     <i class="fa-solid fa-layer-group"></i><span>שידה פינתית</span>
                 </button>
+                <button type="button" class="space-unit-add-btn space-unit-any" onclick="addSpaceUnit('floatingShelf')" title="מוסיף מדף במרחב — אפשר לשלוט באורך, ברוחב ובעובי">
+                    <i class="fa-solid fa-minus"></i><span>מדף</span>
+                </button>
                 <button type="button" class="space-unit-add-btn space-unit-wardrobe-only" onclick="addEmbeddedCornerDesk()" title="מוסיף שולחן פינתי כחלק מהארון — ממוזג לפינה שנבחרה">
                     <i class="fa-solid fa-turn-up"></i><span>שולחן פינתי</span>
                 </button>
@@ -689,6 +692,16 @@
                 </button>
             </div>
             <div class="space-unit-add-hint">שולחן פינתי מתווסף כחלק מהארון וממוזג לפינה. שאר היחידות נוספות כארון נפרד במרחב — אפשר להזיז ולסובב.</div>
+        </div>
+
+        <div class="section" id="floating-shelf-section" data-sbgroup="extras" style="display:none;">
+            <div class="section-title"><i class="fa-solid fa-minus"></i> מדף במרחב</div>
+            <div class="space-unit-add-hint" style="margin-bottom:10px;">שליטה במידות מהכותרת: <strong>אורך</strong>, <strong>רוחב</strong> ו<strong>עובי</strong>. מיקום אנכי — בהזזה במרחב (ציר Y).</div>
+            <div class="label-row"><span>עובי מהיר</span><span id="fs-thick-label" class="value-badge">17 מ"מ</span></div>
+            <div style="display:flex;gap:6px;margin-top:6px;">
+                <button type="button" class="fs-thick-preset side-unit-btn" data-mm="17" onclick="window._setFloatingShelfThicknessMm(17)" style="flex:1;padding:8px 4px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.78rem;font-weight:700;cursor:pointer;">17 מ"מ</button>
+                <button type="button" class="fs-thick-preset side-unit-btn" data-mm="28" onclick="window._setFloatingShelfThicknessMm(28)" style="flex:1;padding:8px 4px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-light);color:var(--text-dark);font-size:0.78rem;font-weight:700;cursor:pointer;">28 מ"מ</button>
+            </div>
         </div>
 
         <div class="section" id="side-unit-section" data-sbgroup="extras" style="border-bottom:none;padding-bottom:0;">
@@ -2552,6 +2565,7 @@
                 <button type="button" class="space-unit-add-btn space-unit-wardrobe-only" onclick="addSpaceUnit('sideDesk')"><i class="fa-solid fa-desktop"></i><span>שולחן צד</span></button>
                 <button type="button" class="space-unit-add-btn space-unit-wardrobe-only" onclick="addSpaceUnit('sideCabinet')"><i class="fa-solid fa-door-closed"></i><span>ארון צד</span></button>
                 <button type="button" class="space-unit-add-btn space-unit-wardrobe-only" onclick="addSpaceUnit('cornerDrawers')"><i class="fa-solid fa-layer-group"></i><span>שידה פינתית</span></button>
+                <button type="button" class="space-unit-add-btn space-unit-any" onclick="addSpaceUnit('floatingShelf')" title="מוסיף מדף במרחב — אפשר לשלוט באורך, ברוחב ובעובי"><i class="fa-solid fa-minus"></i><span>מדף</span></button>
                 <button type="button" class="space-unit-add-btn space-unit-wardrobe-only" onclick="addEmbeddedCornerDesk()" title="מוסיף שולחן פינתי כחלק מהארון — ממוזג לפינה שנבחרה"><i class="fa-solid fa-turn-up"></i><span>שולחן פינתי</span></button>
                 <button type="button" class="space-unit-add-btn space-unit-kitchen-only" onclick="addSpaceUnit('kitchenUpper')" style="display:none;"><i class="fa-solid fa-arrow-up"></i><span>יחידה עליונה</span></button>
                 <button type="button" class="space-unit-add-btn space-unit-kitchen-only" onclick="window._kitchenMakeCorner()" style="display:none;"><i class="fa-solid fa-turn-up"></i><span>פינת מטבח</span></button>
@@ -3290,15 +3304,16 @@
 <script src="trial-watermark.js?v=20261008trial"></script>
 <script src="egger-colors.js?v=20261116eggerKeep1"></script>
 <script src="pricing-core.js?v=20261122multiType1"></script>
-<script src="state.js?v=20261124shelfThick28"></script>
+<script src="state.js?v=20261124fsShelf1"></script>
 <script src="stock-materials.js?v=20261122multiType1"></script>
 <script src="quick-calc.js?v=20261122multiType1"></script>
 <script src="bathroom-preset.js?v=20261008types"></script>
 <script src="kitchen-preset.js?v=20261117kitG3"></script>
-<script src="writing-desk-preset.js?v=20261122depth110"></script>
-<script src="corner-unit-preset.js?v=20261123embedDesk1"></script>
+<script src="writing-desk-preset.js?v=20261124fsShelf1"></script>
+<script src="floating-shelf-preset.js?v=20261124fs1"></script>
+<script src="corner-unit-preset.js?v=20261124fsShelf1"></script>
 <script src="engine-appliances.js?v=20261116kitOvenGlass5"></script>
-<script src="engine-core.js?v=20261124shelfThick28"></script>
+<script src="engine-core.js?v=20261124fsShelf1"></script>
 <script src="engine-corners.js?v=20261123deskColors1"></script>
 <script src="kitchen-corner.js?v=20261117kitG3"></script>
 <script src="engine-blueprint.js?v=20261124shelfThick28"></script>
@@ -3307,7 +3322,7 @@
 <script src="bluran-color-picker.js?v=20261116sdDoorTabs1"></script>
 <script src="formex-color-picker.js?v=20261116sdDoorTabs1"></script>
 <script src="room-finishes.js?v=20261110gloss"></script>
-<script src="ui.js?v=20261124shelfThick28"></script>
+<script src="ui.js?v=20261124fsShelf1"></script>
 <script src="mirror-cabinet.js?v=20261110doormirror"></script>
 <script src="mobile.js?v=20261122depth110"></script>
 <script src="part-paint.js?v=20261104egger"></script>

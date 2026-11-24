@@ -13780,7 +13780,7 @@ window._promptSaveCabinetBeforeSwitch = function(targetIndex) {
 // classic corner wardrobes / walk-in. Bathroom stays exclusive (unlinks on switch).
 // ==========================================
 window._SPACE_COMPATIBLE_PRESETS = [
-    'linear', 'sliding', 'writing-desk', 'corner-unit', 'kitchen',
+    'linear', 'sliding', 'writing-desk', 'corner-unit', 'floating-shelf', 'kitchen',
     'corner-left', 'corner-right', 'walkin'
 ];
 window._SPACE_MAX_CABINETS = 10;
@@ -15067,6 +15067,13 @@ window._configureSpaceUnit = function(kind, host) {
         }
         return 0;
     }
+    if (kind === 'floatingShelf') {
+        state.presetId = 'floating-shelf';
+        if (typeof window._applyFloatingShelfPreset === 'function') {
+            window._applyFloatingShelfPreset(host);
+        }
+        return 0;
+    }
     if (kind === 'cornerDrawers' || kind === 'cornerDesk') {
         state.presetId = 'corner-unit';
         const side = (host && host.cornerSide === 'left') ? 'left' : 'right';
@@ -15220,6 +15227,9 @@ window.addSpaceUnit = function(kind, opts) {
             y: Math.round(hostOff.y || 0),
             z: Math.round(hostOff.z || 0)
         };
+    } else if (kind === 'floatingShelf') {
+        // Float near mid-height of the host cabinet; X/Z from suggestNext
+        offset.y = Math.round((host.globalHeight || host.height || 240) * 0.5);
     }
     if (rot) offset.rot = rot;
     window._attachSpacePairToItem(itemN, pairId, nextSlot, offset);
@@ -15600,9 +15610,13 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
         const _customType = _cfgTypes.find(t => t && t.id === state.cabinetTypeId && t.engine === state.cabinetModel && t.id !== t.engine);
         if (_customType && _customType.label) modelNameText = _customType.label;
         const _isWritingDeskCart = state.presetId === 'writing-desk';
+        const _isFloatingShelfCart = state.presetId === 'floating-shelf';
         const _wdCart = _isWritingDeskCart && state.wings && state.wings.center
             ? (state.wings.center.writingDesk || {}) : {};
+        const _fsCart = _isFloatingShelfCart && state.wings && state.wings.center
+            ? (state.wings.center.floatingShelf || {}) : {};
         if (_isWritingDeskCart) modelNameText = 'שולחן כתיבה';
+        if (_isFloatingShelfCart) modelNameText = 'מדף';
         // Sliding wardrobe: override model name based on whether any door panel is a mirror
         if (state.presetId === 'sliding') {
             const _sdWing = state.wings.center;
@@ -15625,7 +15639,7 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
         if (state.cabinetModel === 'maya' && !_psCart) plinthTypeText = 'צוקל נסתר';
         if (state.cabinetModel === 'regalim' && _psCart === 'legs') plinthTypeText = 'רגלי ניקל 10 ס"מ';
         if (state.cabinetModel === 'ab2') plinthTypeText = 'צוקל נסתר (חזית פנימית טאצ\')';
-        if (_isWritingDeskCart) plinthTypeText = 'ללא צוקל';
+        if (_isWritingDeskCart || _isFloatingShelfCart) plinthTypeText = 'ללא צוקל';
         const _ffsCart = state.frontFaceStyle || 'solid';
         const frontStyleText = (_ffsCart === 'profile')
             ? ((typeof window._frontFaceStyleLabel === 'function') ? window._frontFaceStyleLabel('profile') : 'חזיתות פרופיל')
@@ -15734,15 +15748,22 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
         const _wdHeightCart = _wdCart.height != null ? _wdCart.height : state.globalHeight;
         const _wdDrawerCountCart = (_wdCart.hasDrawers === false) ? 0
             : (_wdCart.drawerCount != null ? _wdCart.drawerCount : (state.width <= 80 ? 1 : 2));
-        const _wdDimsStr = _isWritingDeskCart
-            ? `רוחב: ${state.width} ס"מ | גובה: ${_wdHeightCart} ס"מ | עומק: ${state.depth} ס"מ`
-            : `רוחב: ${state.width} ס"מ | גובה: ${_wingBodyHeightFromData(typeof getWing === 'function' ? getWing() : { columns: state.columns, globalHeight: state.globalHeight }, state.globalHeight)} ס"מ | עומק: ${state.depth} ס"מ`;
+        const _fsThickMmCart = _fsCart.thicknessMm != null
+            ? _fsCart.thicknessMm
+            : Math.round((state.globalHeight || 1.7) * 10);
+        const _wdDimsStr = _isFloatingShelfCart
+            ? `אורך: ${state.width} ס"מ | רוחב: ${state.depth} ס"מ | עובי: ${_fsThickMmCart} מ"מ`
+            : (_isWritingDeskCart
+                ? `רוחב: ${state.width} ס"מ | גובה: ${_wdHeightCart} ס"מ | עומק: ${state.depth} ס"מ`
+                : `רוחב: ${state.width} ס"מ | גובה: ${_wingBodyHeightFromData(typeof getWing === 'function' ? getWing() : { columns: state.columns, globalHeight: state.globalHeight }, state.globalHeight)} ס"מ | עומק: ${state.depth} ס"מ`);
 
         const cabinetSpec = {
             customName: state.cabinetName, cabinetNotes: (state.cabinetNotes || '').trim(), modelName: modelNameText, cabinetModelLabel: _customModelLabel, plinthType: plinthTypeText,
             frontStyle: frontStyleText,
-            placement: _isWritingDeskCart ? 'שולחן עמידה' : (placementHebrew[state.placement] || 'ארון קיר חופשי'),
+            placement: _isFloatingShelfCart ? 'מדף במרחב' : (_isWritingDeskCart ? 'שולחן עמידה' : (placementHebrew[state.placement] || 'ארון קיר חופשי')),
             dimsStr: _wdDimsStr,
+            isFloatingShelf: _isFloatingShelfCart,
+            floatingShelfThicknessMm: _isFloatingShelfCart ? _fsThickMmCart : undefined,
             material: state.boardMaterial === 'mdf' ? 'MDF' : state.boardMaterial === 'melamine' ? 'מלמין' : "סנדביץ'",
             handle: window._handleStyleLabel(state.handleStyle, state.handleVariant, state.handleType, state.ridingColor),
             desk: deskInfo,
@@ -15776,12 +15797,12 @@ const preview = (typeof window._captureCabinetPreviewImages === 'function')
             writingDeskDrawerHeight: _isWritingDeskCart && _wdCart.drawerHeight != null ? _wdCart.drawerHeight : undefined,
             hasOpenCells: openCellsCount > 0,
             extraColors: extraColorsStr,
-            shelves: _isWritingDeskCart ? 0 : totalShelves,
-            hanging: _isWritingDeskCart ? 0 : hangingRods,
-            sorbetCount: _isWritingDeskCart ? 0 : contentCounts.sorbet,
-            drawersInt: _isWritingDeskCart ? 0 : intDrawers,
-            drawersShoe: _isWritingDeskCart ? 0 : (contentCounts.drawersShoe || 0),
-            drawersExt: _isWritingDeskCart ? _wdDrawerCountCart : extDrawers,
+            shelves: (_isWritingDeskCart || _isFloatingShelfCart) ? 0 : totalShelves,
+            hanging: (_isWritingDeskCart || _isFloatingShelfCart) ? 0 : hangingRods,
+            sorbetCount: (_isWritingDeskCart || _isFloatingShelfCart) ? 0 : contentCounts.sorbet,
+            drawersInt: (_isWritingDeskCart || _isFloatingShelfCart) ? 0 : intDrawers,
+            drawersShoe: (_isWritingDeskCart || _isFloatingShelfCart) ? 0 : (contentCounts.drawersShoe || 0),
+            drawersExt: _isWritingDeskCart ? _wdDrawerCountCart : (_isFloatingShelfCart ? 0 : extDrawers),
             price: priceStr, costPrice: '₪' + (state.currentCostPrice || 0).toLocaleString(),
             installPrice: getWing().manualInstallPrice != null ? getWing().manualInstallPrice : state.currentInstallPrice,
             imgDoors: imgWithDoors, imgOpen: imgNoDoors, imgBlueprint: imgBlueprint,
@@ -18232,6 +18253,13 @@ function _cartIsWritingDesk(itemObj) {
     return !!(rs && rs.presetId === 'writing-desk');
 }
 
+function _cartIsFloatingShelf(itemObj) {
+    if (!itemObj) return false;
+    if (itemObj.spec && itemObj.spec.isFloatingShelf) return true;
+    const rs = itemObj.rawState;
+    return !!(rs && rs.presetId === 'floating-shelf');
+}
+
 /** Corner data of a standalone corner-unit cart item (corner drawers / corner desk), else null. */
 function _cartStandaloneCorner(itemObj) {
     const rs = itemObj && itemObj.rawState;
@@ -18506,6 +18534,7 @@ function _collectWingPrintSpecRows(item, itemObj, unit) {
 function _defaultModelNameFromRaw(rawState) {
     if (!rawState) return 'מאיה';
     if (rawState.presetId === 'writing-desk') return 'שולחן כתיבה';
+    if (rawState.presetId === 'floating-shelf') return 'מדף';
     if (rawState.presetId === 'corner-unit') {
         const cu = rawState.wings && rawState.wings.center && rawState.wings.center.corner;
         return (cu && cu.type === 'desk') ? 'שולחן פינתי' : 'שידה פינתית';
@@ -18542,8 +18571,32 @@ function _resolvePrintModelName(item, itemObj) {
 
 function _collectPrintSpecRows(item, itemObj) {
     const isWD = _cartIsWritingDesk(itemObj);
+    const isFS = _cartIsFloatingShelf(itemObj);
     if (itemObj && itemObj.rawState) _enrichSpecColorsFromRaw(item, itemObj.rawState);
     const rows = [];
+    if (isFS) {
+        const rs = itemObj && itemObj.rawState;
+        const cw = rs && rs.wings && rs.wings.center;
+        const thickMm = (item && item.floatingShelfThicknessMm)
+            || (cw && cw.floatingShelf && cw.floatingShelf.thicknessMm)
+            || Math.round(((cw && cw.globalHeight) || (rs && rs.globalHeight) || 1.7) * 10);
+        const lenCm = Math.round((cw && cw.width) || (rs && rs.width) || 80);
+        const widCm = Math.round((cw && cw.depth) || (rs && rs.depth) || 30);
+        rows.push({ id: 'modelName', label: 'סוג מוצר', value: _plainSpecValue(_resolvePrintModelName(item, itemObj) || 'מדף') });
+        rows.push({
+            id: 'dimsStr',
+            label: 'מידות',
+            rtl: true,
+            value: _plainSpecValue('אורך: ' + lenCm + ' ס"מ | רוחב: ' + widCm + ' ס"מ | עובי: ' + thickMm + ' מ"מ')
+        });
+        rows.push({ id: '_sec_finishes', section: true, label: 'גוונים וגימורים' });
+        rows.push({ id: 'colorBody', label: 'צבע מדף', value: _plainSpecValue(item.colorBody || '—') });
+        rows.push({ id: 'material', label: 'חומר', value: _plainSpecValue(item.material || 'מלמין') });
+        _pushOrderOptionRows(rows, itemObj);
+        const notesFS = (item.cabinetNotes || '').trim();
+        if (notesFS) rows.push({ id: 'cabinetNotes', label: 'הערות', value: notesFS, multiline: true });
+        return rows;
+    }
     const cuRaw = _cartStandaloneCorner(itemObj);
     if (cuRaw) {
         const isDeskCU = cuRaw.type === 'desk';

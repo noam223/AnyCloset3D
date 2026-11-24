@@ -5723,6 +5723,11 @@ body.part-paint-active #canvas-container {
 .sp-shelf-bar.is-sub .sp-shelf-bar__trash {
     border-radius: 13px;
 }
+.fs-thick-preset.active {
+    border-color: #0d9488 !important;
+    background: #0d9488 !important;
+    color: #fff !important;
+}
 
 /* Mode banner */
 .pp-mode-banner {

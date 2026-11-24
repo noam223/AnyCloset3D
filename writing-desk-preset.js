@@ -164,7 +164,9 @@ window._updateWritingDeskSectionVisibility = function() {
     if (plinthCard) plinthCard.style.display = isWD ? 'none' : '';
 
     const heightLabel = document.querySelector('label[for="dim-pill-height"]');
-    if (heightLabel) heightLabel.textContent = isWD ? 'גובה שולחן' : 'גובה';
+    if (heightLabel && state.presetId !== 'floating-shelf') {
+        heightLabel.textContent = isWD ? 'גובה שולחן' : 'גובה';
+    }
 
     if (isWD) {
         const ph = document.getElementById('dim-pill-height');
@@ -174,7 +176,7 @@ window._updateWritingDeskSectionVisibility = function() {
         if (sh) sh.max = 120;
         _syncWDHeightInputs(h);
         _updateWritingDeskSectionUI();
-    } else {
+    } else if (state.presetId !== 'floating-shelf') {
         const ph = document.getElementById('dim-pill-height');
         const sh = document.getElementById('inp-height');
         if (ph) ph.max = (window.MAX_GLOBAL_HEIGHT || 370);

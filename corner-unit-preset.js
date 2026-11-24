@@ -747,6 +747,9 @@ window._updateExtrasSections = function() {
     document.querySelectorAll('.space-unit-kitchen-only').forEach(function(b) {
         b.style.display = (canAdd && isKit) ? '' : 'none';
     });
+    document.querySelectorAll('.space-unit-any').forEach(function(b) {
+        b.style.display = canAdd ? '' : 'none';
+    });
 
     // Plinth / board material rows are meaningless for a corner unit
     if (isCU) {
@@ -762,6 +765,11 @@ window._updateExtrasSections = function() {
         const sh = document.getElementById('inp-height');
         if (ph) ph.max = 280;
         if (sh) sh.max = 280;
+    }
+
+    // Floating shelf remaps header dim labels (אורך / רוחב / עובי) — run last
+    if (typeof window._updateFloatingShelfSectionVisibility === 'function') {
+        window._updateFloatingShelfSectionVisibility();
     }
 };
 

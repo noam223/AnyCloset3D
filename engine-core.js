@@ -7100,7 +7100,7 @@ function _renderShoeDrawerCell(opts) {
  */
 function _wingFrontOverlayCm(t) {
     if (!_centerDepthIncludesFronts()) return 0;
-    if (state.presetId === 'writing-desk' || state.presetId === 'corner-unit') return 0;
+    if (state.presetId === 'writing-desk' || state.presetId === 'corner-unit' || state.presetId === 'floating-shelf') return 0;
     const cols = state.columns || [];
     const hasDoorFronts = !!state.hasDoors && cols.some(c => c && c.doors && c.doors.length);
     const hasDrawerFronts = cols.some(c => c && (c.compartments || []).some(comp => comp && comp.type === 'external_drawers'));
@@ -7635,6 +7635,38 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
         }
 
         uv.needsUpdate = true;
+    }
+
+    if (state.presetId === 'floating-shelf') {
+        const cw = state.wings && state.wings.center;
+        const dWidth = (cw && cw.width) || state.width || 80;
+        const dDepth = bodyD;
+        const thickCm = (typeof window._fsThicknessCm === 'function')
+            ? window._fsThicknessCm(cw)
+            : Math.max(1, (cw && cw.globalHeight) || state.globalHeight || 1.7);
+        _ppPartId = 'fs_board';
+        createBoard(dWidth, thickCm, dDepth, 0, thickCm / 2, 0, matBody);
+        _ppPartId = '';
+        if (isActiveWing) {
+            state.dimData.push({ isDeskWidth: true, x: 0, y: thickCm + 12, h: dWidth });
+            if (isBP) {
+                state.bpData.push({ type: 'width', val: Math.round(dWidth), x: 0, y: -20, halfW: dWidth / 2 });
+                state.bpData.push({ type: 'height', val: Math.round(thickCm * 10) / 10, x: dWidth / 2 + 18, y: thickCm / 2, halfH: thickCm / 2 });
+                if (!window._isSpaceBlueprintFrontOnly || !window._isSpaceBlueprintFrontOnly()) {
+                    state.bpData.push({ type: 'width', val: Math.round(state.depth), x: 0, y: -45, halfW: state.depth / 2 });
+                }
+            }
+            if (!isBP) {
+                const hitMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.0, depthWrite: false });
+                const pickH = Math.max(thickCm * 4, 6);
+                const hitBox = new THREE.Mesh(new THREE.BoxGeometry(dWidth, pickH, dDepth), hitMat);
+                hitBox.position.set(0, thickCm / 2, 0);
+                hitBox.userData = { isFloatingShelf: true };
+                _buildGroup.add(hitBox);
+                deskHitBoxes.push(hitBox);
+            }
+        }
+        return;
     }
 
     if (state.presetId === 'writing-desk') {

@@ -141,6 +141,7 @@ function createWingData(overrides) {
         wingPosition: 'side',
         desk: { side: 'none', width: 100, height: 80, hasDrawers: true, drawerHeight: 12, drawerCount: null, mergeDrawers: false },
         writingDesk: { height: 75, hasDrawers: true, drawerCount: 2, drawerHeight: 12 },
+        floatingShelf: { thicknessMm: 17 },
         corner: { side: 'none', width: 60, height: 90, depth: 54, type: 'shelves', shelves: 3, drawerCount: 4 },
         fullCorner: { size: 100, shelves: 2, shelvesY: [], compartments: [] },
         sideCabinet: null,
@@ -1246,6 +1247,9 @@ function _applyPresetCore(presetId, rightPos, leftPos) {
     } else if (presetId === 'writing-desk') {
         // Standalone writing desk — handled by writing-desk-preset.js
         if (typeof window._applyWritingDeskPreset === 'function') window._applyWritingDeskPreset();
+    } else if (presetId === 'floating-shelf') {
+        // Floating shelf board — handled by floating-shelf-preset.js
+        if (typeof window._applyFloatingShelfPreset === 'function') window._applyFloatingShelfPreset();
     } else if (presetId === 'corner-unit') {
         // Standalone corner drawers / corner desk — handled by corner-unit-preset.js
         if (typeof window._applyCornerUnitPreset === 'function') window._applyCornerUnitPreset();
@@ -1287,7 +1291,7 @@ function _applyPresetCore(presetId, rightPos, leftPos) {
 
     // Linear/bathroom cabinet: go directly to front/edit view (no wings to orbit around)
     // Corner/walkin: stay in 3D so user sees the full layout
-    state.viewMode = (presetId === 'linear' || presetId === 'sliding' || presetId === 'bathroom' || presetId === 'kitchen' || presetId === 'writing-desk' || presetId === 'corner-unit') ? 'front' : '3d';
+    state.viewMode = (presetId === 'linear' || presetId === 'sliding' || presetId === 'bathroom' || presetId === 'kitchen' || presetId === 'writing-desk' || presetId === 'corner-unit' || presetId === 'floating-shelf') ? 'front' : '3d';
     _setFreeTabActive(true);
     syncSidebarToWing();
     if (typeof window._syncSpacePairTabs === 'function') window._syncSpacePairTabs();
@@ -1517,7 +1521,7 @@ window.applyPreset = function(presetId) {
     _pendingPresetId = presetId;
     _pendingWingPositions = { left: 'side', right: 'side' };
 
-    if (presetId === 'linear' || presetId === 'sliding' || presetId === 'bathroom' || presetId === 'kitchen' || presetId === 'writing-desk' || presetId === 'corner-unit') {
+    if (presetId === 'linear' || presetId === 'sliding' || presetId === 'bathroom' || presetId === 'kitchen' || presetId === 'writing-desk' || presetId === 'corner-unit' || presetId === 'floating-shelf') {
         // No position needed — apply immediately
         _applyPresetCore(presetId, null, null);
         const ppm = document.getElementById('preset-position-menu');
@@ -1610,7 +1614,7 @@ window.applyWalkinPositions = function() {
 function _isSingleCabinetPreset() {
     // Kitchen (incl. ר) edits cells in free mode like a linear run — never wing-edit isolation.
     if (state.presetId === 'kitchen') return true;
-    return state.presetId === 'linear' || state.presetId === 'sliding' || state.presetId === 'bathroom' || state.presetId === 'writing-desk' || state.presetId === 'corner-unit';
+    return state.presetId === 'linear' || state.presetId === 'sliding' || state.presetId === 'bathroom' || state.presetId === 'writing-desk' || state.presetId === 'corner-unit' || state.presetId === 'floating-shelf';
 }
 
 function _syncHeaderDimsPlaceholder(isEditing) {
@@ -2507,6 +2511,27 @@ window._updateMaterialTabVisibility = function(w) {
             (labelEl || btn).textContent = isMobile ? lbl[1] : lbl[0];
         });
     };
+
+    // Floating shelf: body color only
+    if (state.presetId === 'floating-shelf') {
+        _applyPartTabLabels({
+            materialBody: ['מדף', 'מדף'],
+        });
+        document.querySelectorAll('.part-tab-btn[data-part]').forEach(btn => {
+            const part = btn.getAttribute('data-part');
+            btn.style.display = (part === 'materialBody') ? '' : 'none';
+        });
+        w.activeColorPart = 'materialBody';
+        if (state) state.activeColorPart = 'materialBody';
+        document.querySelectorAll('.part-tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.part-tab-btn[data-part="materialBody"]').forEach(b => b.classList.add('active'));
+        document.querySelectorAll('.material-btn').forEach(b => b.classList.remove('active'));
+        const currentMatFS = w.materialBody || 'white_matte';
+        const matBtnFS = document.querySelector(`.material-btn[data-mat="${currentMatFS}"]`);
+        if (matBtnFS) matBtnFS.classList.add('active');
+        window._syncGlassTintPanel(w);
+        return;
+    }
 
     // Writing desk: only body (legs + surface) and drawers
     if (state.presetId === 'writing-desk' || state.presetId === 'corner-unit') {
@@ -6255,6 +6280,16 @@ function _calcWingCost(cfg, wing, opts) {
             const n = wd.drawerCount != null ? wd.drawerCount : ((ww || 120) <= 80 ? 1 : 2);
             cost += n * _priceNum(ex.internalDrawer, 150);
         }
+        if (SANDWICH_COLORS.has(wing.materialBody)) cost *= (1 + sandwichPct);
+        return cost;
+    }
+
+    if (state.presetId === 'floating-shelf') {
+        // Area-based board cost (₪ / m²) with a small base for cutting/handling
+        const areaM2 = Math.max(0.02, ((ww || 80) * (wd || 30)) / 10000);
+        let cost = _priceNum(ex.floatingShelfBase, 80) + areaM2 * _priceNum(ex.floatingShelfPerM2, 350);
+        const thickMm = (wing.floatingShelf && wing.floatingShelf.thicknessMm) || Math.round((wh || 1.7) * 10);
+        if (thickMm >= 25) cost += _priceNum(ex.floatingShelfThickSurcharge, 40);
         if (SANDWICH_COLORS.has(wing.materialBody)) cost *= (1 + sandwichPct);
         return cost;
     }
