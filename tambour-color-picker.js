@@ -3,6 +3,8 @@
 (function() {
     var CSV_URL = 'color%20picker/tambour_full_colors_1651.csv';
     var ITEMS_PER_PAGE = 100;
+    var RECENT_STORAGE_KEY = 'anycloset_tambour_recent';
+    var MAX_RECENT = 12;
 
     var allColors = [];
     var filteredColors = [];
@@ -81,7 +83,78 @@
         }
     };
 
-    var modal, grid, searchInput, scrollContainer, counterLabel;
+    var modal, grid, searchInput, scrollContainer, counterLabel, recentSection, recentGrid;
+
+    function loadRecentColors() {
+        try {
+            var raw = localStorage.getItem(RECENT_STORAGE_KEY);
+            var list = raw ? JSON.parse(raw) : [];
+            if (!Array.isArray(list)) return [];
+            return list.filter(function(c) {
+                return c && c.id && c.hex;
+            }).slice(0, MAX_RECENT);
+        } catch (err) {
+            return [];
+        }
+    }
+
+    function saveRecentColors(list) {
+        try {
+            localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify((list || []).slice(0, MAX_RECENT)));
+        } catch (err) { /* ignore quota / private mode */ }
+    }
+
+    function rememberRecentTambourColor(color) {
+        if (!color || !color.id || !color.hex) return;
+        var id = String(color.id);
+        var list = loadRecentColors().filter(function(c) { return String(c.id) !== id; });
+        list.unshift({
+            id: id,
+            name: color.name || id,
+            hex: color.hex
+        });
+        saveRecentColors(list);
+    }
+
+    function createColorCard(color) {
+        var card = document.createElement('div');
+        card.className = 'tambour-color-card';
+        card.innerHTML =
+            '<div class="tambour-color-swatch" style="background-color:' + color.hex + ';"></div>' +
+            '<div class="tambour-color-meta">' +
+                '<span class="tambour-color-id">' + escapeHtml(color.id) + '</span>' +
+                '<span class="tambour-color-name" title="' + escapeHtml(color.name) + '">' + escapeHtml(color.name) + '</span>' +
+            '</div>';
+        card.addEventListener('click', function() {
+            rememberRecentTambourColor(color);
+            var handler = pickHandler;
+            if (handler) handler(color);
+            else window.applyTambourColor(color);
+            closeTambourPalette();
+        });
+        return card;
+    }
+
+    function renderRecentSection() {
+        if (!recentSection || !recentGrid) return;
+        var list = loadRecentColors();
+        var searchText = searchInput ? searchInput.value.toLowerCase().trim() : '';
+        if (searchText) {
+            list = list.filter(function(color) {
+                return String(color.name || '').toLowerCase().includes(searchText)
+                    || String(color.id || '').toLowerCase().includes(searchText);
+            });
+        }
+        recentGrid.innerHTML = '';
+        if (!list.length) {
+            recentSection.hidden = true;
+            return;
+        }
+        recentSection.hidden = false;
+        list.forEach(function(color) {
+            recentGrid.appendChild(createColorCard(color));
+        });
+    }
 
     function parseCSVLine(line) {
         var result = [], current = '', inQuotes = false, i, char;
@@ -239,6 +312,7 @@
     window.applyTambourColor = function(color) {
         if (!color || !color.hex || !color.id) return;
         ensurePaletteState();
+        rememberRecentTambourColor(color);
         var matKey = window._registerTambourMaterial(color.id, color.hex);
         state.tambourPalette[matKey] = { id: color.id, hex: color.hex, name: color.name || color.id };
         applyMaterialToActivePart(matKey);
@@ -259,21 +333,7 @@
     function renderNextBatch() {
         var nextBatch = filteredColors.slice(renderedCount, renderedCount + ITEMS_PER_PAGE);
         nextBatch.forEach(function(color) {
-            var card = document.createElement('div');
-            card.className = 'tambour-color-card';
-            card.innerHTML =
-                '<div class="tambour-color-swatch" style="background-color:' + color.hex + ';"></div>' +
-                '<div class="tambour-color-meta">' +
-                    '<span class="tambour-color-id">' + escapeHtml(color.id) + '</span>' +
-                    '<span class="tambour-color-name" title="' + escapeHtml(color.name) + '">' + escapeHtml(color.name) + '</span>' +
-                '</div>';
-            card.addEventListener('click', function() {
-                var handler = pickHandler;
-                if (handler) handler(color);
-                else window.applyTambourColor(color);
-                closeTambourPalette();
-            });
-            grid.appendChild(card);
+            grid.appendChild(createColorCard(color));
         });
         renderedCount += nextBatch.length;
     }
@@ -325,6 +385,7 @@
         if (!modal) return;
         if (typeof closeMobilePanel === 'function') closeMobilePanel();
         await loadCSVData();
+        renderRecentSection();
         modal.classList.add('active');
         document.body.style.overflow = 'hidden';
         if (renderedCount === 0 && filteredColors.length) renderNextBatch();
@@ -344,6 +405,7 @@
             return color.name.toLowerCase().includes(text) || color.id.toLowerCase().includes(text);
         });
         resetGrid();
+        renderRecentSection();
         renderNextBatch();
         if (counterLabel) {
             counterLabel.textContent = curatedMode
@@ -358,6 +420,8 @@
         searchInput = document.getElementById('tambour-palette-search');
         scrollContainer = document.getElementById('tambour-palette-body');
         counterLabel = document.getElementById('tambour-palette-count');
+        recentSection = document.getElementById('tambour-recent-section');
+        recentGrid = document.getElementById('tambour-recent-grid');
         if (!modal || !grid) return;
 
         var closeBtn = document.getElementById('tambour-palette-close');

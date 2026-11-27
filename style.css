@@ -7637,6 +7637,21 @@ body.viewer-mode #canvas-container canvas {
     padding: 24px;
     overflow-y: auto;
 }
+.tambour-recent-section {
+    margin-bottom: 22px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid #eee;
+}
+.tambour-recent-title {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #475569;
+    margin-bottom: 12px;
+    letter-spacing: 0.01em;
+}
+.tambour-recent-grid {
+    margin-bottom: 0;
+}
 .tambour-colors-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
