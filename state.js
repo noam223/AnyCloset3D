@@ -2245,6 +2245,7 @@ window.syncSidebarToWing = function() {
     _syncDimPills();
     if (typeof window._syncAllRangeFills === 'function') window._syncAllRangeFills();
     if (typeof window._syncPartTabDots === 'function') window._syncPartTabDots();
+    if (typeof window._syncTambourPaletteButton === 'function') window._syncTambourPaletteButton();
 };
 
 function _compHasOpenCell(comp) {

@@ -10836,6 +10836,7 @@ function bindUI() {
             });
         }
         if (typeof window._syncPartTabDots === 'function') window._syncPartTabDots();
+        if (typeof window._syncTambourPaletteButton === 'function') window._syncTambourPaletteButton();
     };
 
     document.querySelectorAll('.part-tab-btn').forEach(btn => {
@@ -10884,11 +10885,13 @@ function bindUI() {
                 if (typeof window.updateSlidingDoorColor === 'function') {
                     window.updateSlidingDoorColor(idx, matValue);
                 }
+                if (typeof window._syncTambourPaletteButton === 'function') window._syncTambourPaletteButton();
                 return;
             }
             // Special: "חלק עליון" material tab — apply color to upper unit wing
             if (state.activeColorPart === 'materialUpperUnit') {
                 if (typeof window.applyUpperUnitMaterial === 'function') window.applyUpperUnitMaterial(matValue);
+                if (typeof window._syncTambourPaletteButton === 'function') window._syncTambourPaletteButton();
                 return;
             }
             // Special: per-back-type color tab
@@ -10906,6 +10909,7 @@ function bindUI() {
                 buildCabinet();
                 if (typeof calculatePrice === 'function') calculatePrice();
                 saveHistoryState();
+                if (typeof window._syncTambourPaletteButton === 'function') window._syncTambourPaletteButton();
                 return;
             }
             // Special: "ארון צד" material tab — apply color to all side cabinet material fields
@@ -10947,6 +10951,7 @@ function bindUI() {
             buildCabinet();
             if (typeof calculatePrice === 'function') calculatePrice();
             saveHistoryState();
+            if (typeof window._syncTambourPaletteButton === 'function') window._syncTambourPaletteButton();
         });
     });
 

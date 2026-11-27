@@ -61,11 +61,6 @@
 
     window._setTambourCuratedMode = function(on) {
         curatedMode = !!on;
-        document.querySelectorAll('.btn-open-tambour-palette').forEach(function(btn) {
-            btn.innerHTML = curatedMode
-                ? '<i class="fa-solid fa-swatchbook"></i> מניפת טמבור — ' + CURATED_COLORS.length + ' גוונים נבחרים'
-                : '<i class="fa-solid fa-swatchbook"></i> מניפת טמבור — 1651 גוונים';
-        });
         if (curatedMode) {
             allColors = CURATED_COLORS.slice();
             filteredColors = allColors.slice();
@@ -78,6 +73,12 @@
         }
         if (searchInput) searchInput.value = '';
         resetGrid();
+        if (typeof window._syncTambourPaletteButton === 'function') window._syncTambourPaletteButton();
+        else {
+            document.querySelectorAll('.btn-open-tambour-palette').forEach(function(btn) {
+                btn.innerHTML = defaultTambourBtnHtml();
+            });
+        }
     };
 
     var modal, grid, searchInput, scrollContainer, counterLabel;
@@ -98,6 +99,71 @@
         if (typeof state !== 'undefined' && !state.tambourPalette) state.tambourPalette = {};
     }
 
+    function defaultTambourBtnHtml() {
+        return curatedMode
+            ? '<i class="fa-solid fa-swatchbook"></i> מניפת טמבור — ' + CURATED_COLORS.length + ' גוונים נבחרים'
+            : '<i class="fa-solid fa-swatchbook"></i> מניפת טמבור — 1651 גוונים';
+    }
+
+    function resolveActivePartMatKey() {
+        if (typeof state === 'undefined') return null;
+        var part = state.activeColorPart || 'materialBody';
+        if (typeof window._isSlidingDoorColorPart === 'function' && window._isSlidingDoorColorPart(part)) {
+            var idx = window._slidingDoorIndexFromPart(part);
+            var sd = typeof getSlidingDoor === 'function' ? getSlidingDoor() : null;
+            var bodyMat = (state.wings && state.wings.center && state.wings.center.materialBody) || state.materialBody || 'white_matte';
+            return (sd && sd.doorColors && sd.doorColors[idx]) || bodyMat;
+        }
+        if (part === 'materialUpperUnit') {
+            var uuKey = state._activeUpperUnit || ('upperUnit_' + state.activeWing);
+            var uuWing = state.wings && state.wings[uuKey];
+            return (uuWing && uuWing.materialBody) || null;
+        }
+        if (part === 'materialSideCabinet') {
+            var sc = state.wings && state.wings.center ? state.wings.center.sideCabinet : null;
+            return (sc && sc.materialBody) || state.materialSideCabinet || null;
+        }
+        var backType = (typeof window._backTypeFromColorPart === 'function')
+            ? window._backTypeFromColorPart(part) : null;
+        if (backType) {
+            return (typeof window._getBackMaterialKey === 'function')
+                ? window._getBackMaterialKey(backType)
+                : (state.materialBack || null);
+        }
+        if (part === 'materialBack') {
+            var used = (typeof window._collectUsedBackTypes === 'function')
+                ? window._collectUsedBackTypes(state.columns) : ['mezuzah'];
+            var type = used[0] || 'mezuzah';
+            return (typeof window._getBackMaterialKey === 'function')
+                ? window._getBackMaterialKey(type)
+                : (state.materialBack || null);
+        }
+        return state[part] || null;
+    }
+
+    window._syncTambourPaletteButton = function() {
+        ensurePaletteState();
+        var matKey = resolveActivePartMatKey();
+        var entry = (matKey && state.tambourPalette && state.tambourPalette[matKey]) || null;
+        if (!entry && matKey && String(matKey).indexOf('tambour_') === 0) {
+            entry = { id: String(matKey).replace(/^tambour_/, ''), name: String(matKey).replace(/^tambour_/, ''), hex: null };
+        }
+        document.querySelectorAll('.btn-open-tambour-palette').forEach(function(btn) {
+            if (entry && (entry.name || entry.id)) {
+                var name = entry.name || entry.id;
+                var id = entry.id || '';
+                var label = id && name !== id ? (name + ' — ' + id) : name;
+                btn.innerHTML = '<i class="fa-solid fa-swatchbook"></i> ' + escapeHtml(label);
+                btn.title = 'טמבור: ' + label;
+                btn.classList.add('has-tambour-selection');
+            } else {
+                btn.innerHTML = defaultTambourBtnHtml();
+                btn.title = 'מניפת גוונים מלאה של טמבור';
+                btn.classList.remove('has-tambour-selection');
+            }
+        });
+    };
+
     function applyMaterialToActivePart(matKey) {
         if (typeof state === 'undefined') return;
         ensurePaletteState();
@@ -115,6 +181,22 @@
             if (typeof window.applyUpperUnitMaterial === 'function') window.applyUpperUnitMaterial(matKey);
             return;
         }
+        // Per-back-type color tab (גב מזונית / גב 8 / …) — must write materialBackByType
+        var backTypePart = (typeof window._backTypeFromColorPart === 'function')
+            ? window._backTypeFromColorPart(state.activeColorPart) : null;
+        if (backTypePart) {
+            var byTypeBT = (typeof window._ensureMaterialBackByType === 'function')
+                ? window._ensureMaterialBackByType()
+                : (state.materialBackByType = state.materialBackByType || {});
+            byTypeBT[backTypePart] = matKey;
+            var usedBT = (typeof window._collectUsedBackTypes === 'function')
+                ? window._collectUsedBackTypes(state.columns) : [];
+            if (usedBT.length <= 1 || usedBT[0] === backTypePart) state.materialBack = matKey;
+            if (typeof buildCabinet === 'function') buildCabinet();
+            if (typeof calculatePrice === 'function') calculatePrice();
+            if (typeof saveHistoryState === 'function') saveHistoryState();
+            return;
+        }
         if (state.activeColorPart === 'materialSideCabinet') {
             var sc = state.wings.center ? state.wings.center.sideCabinet : null;
             if (sc) {
@@ -130,13 +212,27 @@
             }
         } else {
             state[state.activeColorPart || 'materialBody'] = matKey;
+            // Keep materialBackByType in sync — render prefers byType over materialBack
+            if (state.activeColorPart === 'materialBack') {
+                var byType = (typeof window._ensureMaterialBackByType === 'function')
+                    ? window._ensureMaterialBackByType()
+                    : null;
+                var used = (typeof window._collectUsedBackTypes === 'function')
+                    ? window._collectUsedBackTypes(state.columns) : ['mezuzah'];
+                if (byType && used.length === 1) byType[used[0]] = matKey;
+            }
             if (state.activeColorPart === 'materialExternal' && state.wings.center) {
                 if (typeof window._syncSideCabinetDoorMaterial === 'function') {
                     window._syncSideCabinetDoorMaterial(state.wings.center);
                 }
             }
+            if (state.activeColorPart === 'materialTopPanel' && typeof window._clearKitchenCountertopBrand === 'function') {
+                window._clearKitchenCountertopBrand();
+            }
         }
+        if (state.activeColorPart === 'materialBody' && typeof checkSplits === 'function') checkSplits();
         if (typeof buildCabinet === 'function') buildCabinet();
+        if (typeof calculatePrice === 'function') calculatePrice();
         if (typeof saveHistoryState === 'function') saveHistoryState();
     }
 
@@ -146,6 +242,8 @@
         var matKey = window._registerTambourMaterial(color.id, color.hex);
         state.tambourPalette[matKey] = { id: color.id, hex: color.hex, name: color.name || color.id };
         applyMaterialToActivePart(matKey);
+        if (typeof window._syncTambourPaletteButton === 'function') window._syncTambourPaletteButton();
+        if (typeof window._syncPartTabDots === 'function') window._syncPartTabDots();
         if (window.StockMaterials && typeof window.StockMaterials.onMaterialSelected === 'function') {
             window.StockMaterials.onMaterialSelected(matKey, {
                 label: color.name || color.id,
