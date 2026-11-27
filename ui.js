@@ -10084,12 +10084,19 @@ function bindUI() {
     /**
      * In a shared space, turn floorOffset into a real shorter cabinet + higher space Y:
      * empty gap below becomes spaceOffset.y, column heights shrink, floorOffset clears.
+     *
+     * Skipped when a robot-vac is in the cabinet: the dock must stay on the room floor
+     * (local y=0) while the carcass hangs via floorOffset with an open bottom.
      */
     window._bakeFloorOffsetIntoSpaceBase = function() {
         const info = (typeof window._getSpacePairInfo === 'function') ? window._getSpacePairInfo() : null;
         if (!info || info.count < 2 || info.activeSlot == null || info.activeSlot < 0) return false;
         const cols = (state.columns || []).filter(function(c) { return c && c.type !== 'desk'; });
         if (!cols.length) return false;
+        if (typeof window._colHasRobotVac === 'function' &&
+            cols.some(function(c) { return window._colHasRobotVac(c); })) {
+            return false;
+        }
         const bake = Math.min.apply(null, cols.map(function(c) { return Math.max(0, c.floorOffset || 0); }));
         if (!(bake > 0)) return false;
 

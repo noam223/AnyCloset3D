@@ -909,10 +909,20 @@ function addRobotVacToCell(parent, opts) {
     const backFaceZ = -bodyD / 2 + backT + 0.4;
     const dockH = window._robotVacClampH(opts.dockH != null ? opts.dockH : ROBOTVAC.dockH, opts.maxH);
 
+    // If the cabinet group was lifted via spaceOffset.y, compensate so the dock
+    // still sits on the room floor (local y = -spaceY).
+    let floorY = 0;
+    if (typeof window._getSpacePairInfo === 'function' && typeof window._spaceOffsetForSlot === 'function') {
+        const info = window._getSpacePairInfo();
+        if (info && info.activeSlot != null) {
+            const off = window._spaceOffsetForSlot(info.activeSlot) || {};
+            floorY = -Math.max(0, off.y || 0);
+        }
+    }
+
     const dock = _robotVacDockTemplate(dockH).clone();
-    // Sit on the floor; back of the assembly flush to the carcass back so the
-    // built-in robot protrusion exits through the front.
-    dock.position.set(x, 0, backFaceZ + ROBOTVAC.dockD / 2);
+    // Sit on the room floor; back flush to carcass so the built-in robot nose exits +Z.
+    dock.position.set(x, floorY, backFaceZ + ROBOTVAC.dockD / 2);
     dock.userData.isRobotVac = true;
     dock.userData.applianceType = 'robotvac';
     dock.userData.robotVacPart = 'dock';
@@ -922,13 +932,13 @@ function addRobotVacToCell(parent, opts) {
     if (_robotVacHasSeparateRobot) {
         const frontFaceZ = bodyD / 2 - (opts.frontInset || 0);
         const robot = buildRobotVacBody();
-        robot.position.set(x, 0, frontFaceZ);
+        robot.position.set(x, floorY, frontFaceZ);
         robot.userData.isRobotVac = true;
         robot.userData.applianceType = 'robotvac';
         robot.userData.robotVacPart = 'robot';
         parent.add(robot);
     }
-    return { dockH: dockH, x: x, topY: dockH, rightX: x + ROBOTVAC.dockW / 2 };
+    return { dockH: dockH, x: x, topY: floorY + dockH, rightX: x + ROBOTVAC.dockW / 2 };
 }
 window.addRobotVacToCell = addRobotVacToCell;
 window.buildRobotVacBody = buildRobotVacBody;
