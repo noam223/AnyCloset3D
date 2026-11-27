@@ -5787,7 +5787,7 @@ function _restorePlinthAfterRobotVac(col) {
     }
 }
 
-/** Keep צוקל cancelled while robot-vac is present; restore when it is cleared by any path. */
+/** Keep צוקל / דופן תחתונה cancelled while robot-vac is present; keep hanging floorOffset. */
 window._syncRobotVacPlinth = function(col) {
     if (!col) return;
     const has = typeof window._colHasRobotVac === 'function' && window._colHasRobotVac(col);
@@ -5798,9 +5798,9 @@ window._syncRobotVacPlinth = function(col) {
                 spaceBottomPanel: !!col.spaceBottomPanel
             };
         }
-        col.noPlinth = true;
+        // Floor-standing: cancel plinth. Hanging (floorOffset>0): keep height, only open the bottom.
+        if (!(col.floorOffset > 0)) col.noPlinth = true;
         col.spaceBottomPanel = false;
-        col.floorOffset = 0;
     } else if (col._robotVacPrevPlinth) {
         _restorePlinthAfterRobotVac(col);
     }
@@ -5817,7 +5817,8 @@ window._syncAllRobotVacPlinths = function() {
 
 /**
  * Robot vacuum + charging dock — bottom cell only.
- * Cancels צוקל / דופן תחתונה so the unit sits on the floor; door keeps a 13 cm exit gap.
+ * Fits against clearance from the cell top down to the room floor (so hanging
+ * cabinets count the air gap below). Cancels צוקל / דופן תחתונה but keeps floorOffset.
  */
 window._toggleCellRobotVac = function() {
     if (state.selection.colIndex === -1 || state.selection.rows.length === 0) return;
@@ -5827,7 +5828,7 @@ window._toggleCellRobotVac = function() {
     const fmt = v => (Math.round(v * 10) / 10).toString();
     const rows = state.selection.rows;
     if (rows.some(r => r !== 0)) {
-        _showToast('שואב רובוטי ניתן להוסיף רק בתא התחתון של העמודה (על הרצפה)', 4500);
+        _showToast('שואב רובוטי ניתן להוסיף רק בתא התחתון של העמודה', 4500);
         return;
     }
     if (col.width < (R.minWidth || 36) - 0.2) {
@@ -5849,12 +5850,12 @@ window._toggleCellRobotVac = function() {
         return;
     }
 
-    // After cancelling the plinth the bottom cell grows — check against that height
-    const hNow = _cellHeight(col, 0);
-    const plinthGain = (!col.noPlinth && !(col.floorOffset > 0)) ? (state.plinthHeight || 0) : 0;
-    const hAfter = hNow + plinthGain;
-    if (hAfter < (R.singleHeight || 60) - 0.5) {
-        _showToast(`גובה התא התחתון ${fmt(hAfter)} ס"מ — לעמדת הטעינה נדרש כ־${R.singleHeight} ס"מ לפחות`, 4500);
+    // Height from the TOP of the bottom cell down to the floor (y=0), not to the bottom board
+    const hFloor = (typeof window._robotVacFloorClearanceH === 'function')
+        ? window._robotVacFloorClearanceH(col)
+        : _cellHeight(col, 0);
+    if (hFloor < (R.singleHeight || 60) - 0.5) {
+        _showToast(`גובה מהרצפה עד ראש התא ${fmt(hFloor)} ס"מ — לעמדת הטעינה נדרש כ־${R.singleHeight} ס"מ לפחות`, 5000);
         return;
     }
 
@@ -5864,9 +5865,8 @@ window._toggleCellRobotVac = function() {
             spaceBottomPanel: !!col.spaceBottomPanel
         };
     }
-    col.noPlinth = true;
+    if (!(col.floorOffset > 0)) col.noPlinth = true;
     col.spaceBottomPanel = false;
-    col.floorOffset = 0;
 
     delete comp.tv;
     comp.type = 'empty';
@@ -5884,7 +5884,13 @@ window._toggleCellRobotVac = function() {
     updateToolbarButtonHighlights();
     if (typeof updateQuickEditPanelUI === 'function') updateQuickEditPanelUI();
     const gap = R.doorGap || 13;
-    _showToast(`שואב רובוטי + עמדת טעינה — הצוקל בוטל, פתח יציאה ${gap} ס"מ מתחת לדלת`, 4500);
+    const fo = col.floorOffset || 0;
+    _showToast(
+        fo > 0
+            ? `שואב רובוטי על הרצפה מתחת לארון התלוי — פתח יציאה מתחת לגוף הארון`
+            : `שואב רובוטי + עמדת טעינה — הצוקל בוטל, פתח יציאה ${gap} ס"מ מתחת לדלת`,
+        4500
+    );
 };
 
 // Toggle laundry or kitchen appliance in the selected cell(s).

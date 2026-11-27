@@ -8080,14 +8080,16 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
         const overlayCenterX = (overlayLeftX + overlayRightX) / 2;
         
         const fo = col.floorOffset || 0;
+        const _hasRobotVacCol = typeof window._colHasRobotVac === 'function' && window._colHasRobotVac(col);
         if (!isDesk) {
-            if (fo > 0) {
+            if (fo > 0 && !_hasRobotVacCol) {
                 // יחידה תלויה: דופן תחתונה בגובה floorOffset
+                // (skipped when robot-vac needs an open path from the floor up into the cell)
                 _ppPartId = `plinth_c${c}`;
                 const floorMesh = createBoard(col.width, t, bodyD, colCenterX, fo + t/2, 0);
                 _ppPartId = '';
                 _applyHorizBoardUV(floorMesh, currentX, col.width, bodyD, state.width);
-            } else if (col.noPlinth && !_isSlidingWardrobe && !isRegalim && !isKitchenBase && (_isUpperUnitBuild || col.spaceBottomPanel)) {
+            } else if (col.noPlinth && !_isSlidingWardrobe && !isRegalim && !isKitchenBase && (_isUpperUnitBuild || col.spaceBottomPanel) && !_hasRobotVacCol) {
                 // יחידה עליונה / ארון מורם במרחב: דופן תחתונה בעובי לוח (בלי צוקל)
                 _ppPartId = `plinth_c${c}`;
                 const plinthTopMesh = createBoard(col.width, t, bodyD, colCenterX, t/2, 0);

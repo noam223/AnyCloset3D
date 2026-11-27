@@ -638,19 +638,18 @@ window.addLaundryAppliancesToCell = addLaundryAppliancesToCell;
 const ROBOTVAC = {
     id: 'robotvac',
     label: 'שואב רובוטי',
-    // Docking / charging station (cm) — overall assembly footprint when robot is docked
-    dockW: 34, dockD: 45.7, dockH: 59,
-    // Robot body (cm) — used when a separate robot mesh is available
+    // Overall assembly target (cm). Updated GLB already includes the robot
+    // protruding past the dock — depth covers station (45.7) + nose outside.
+    dockW: 34, dockD: 63, dockH: 59,
     robotW: 35, robotD: 35, robotH: 11.1, robotHFolded: 8.9,
     doorGap: 13,
     minWidth: 36,
     minHeight: 60,
-    glbPath: 'images/dreamex50.glb',
-    // Tripo export faces +X; cabinet front is +Z → yaw −90°
-    glbYaw: -Math.PI / 2,
-    // How far the docked-robot nose sticks past the cabinet front (cm)
-    protrudeCm: 17.5
+    glbPath: 'images/dreamex50.glb?v=20261127b',
+    // Raw mesh extends in +X (robot nose). Cabinet front is +Z → yaw +90°.
+    glbYaw: Math.PI / 2
 };
+window.ROBOTVAC = ROBOTVAC;
 window.ROBOTVAC_RULES = {
     minWidth: ROBOTVAC.minWidth,
     singleHeight: ROBOTVAC.minHeight,
@@ -839,17 +838,39 @@ window._colHasRobotVac = function(col) {
     return !!(bottom && !bottom.partition && Array.isArray(bottom.appliances) && bottom.appliances.includes('robotvac'));
 };
 
-/** Door bottom clearance (cm) when a robot vac occupies the bottom cell; else 0. */
-window._robotVacDoorGapCm = function(col) {
-    return window._colHasRobotVac(col) ? ROBOTVAC.doorGap : 0;
+/**
+ * Clear height from the room floor (y=0) up to the top of the bottom cell.
+ * Used for fit checks so a hanging cabinet still measures to the floor below,
+ * not only to its bottom board / floorOffset.
+ */
+window._robotVacFloorClearanceH = function(col) {
+    if (!col) return 0;
+    if (typeof window._compartmentBounds === 'function') {
+        return Math.round(window._compartmentBounds(col, 0).topY * 100) / 100;
+    }
+    const t = (state && state.thickness) || 1.7;
+    if (col.shelvesY && col.shelvesY.length) {
+        return Math.round((col.shelvesY[0] - t / 2) * 100) / 100;
+    }
+    return Math.round(((col.height || 0) - t) * 100) / 100;
 };
 
 /**
- * Place the Dreame assembly in the cell.
- * Current GLB is a single fused dock+robot mesh — oriented to face +Z and
- * pushed forward so the robot nose sticks ~half outside the cabinet front.
- * When a future FBX exposes separate dock/robot meshes, `_robotVacHasSeparateRobot`
- * enables the split placement (dock inside + robot half-out).
+ * Door bottom Y (cm from floor) when robot-vac is present.
+ * Hanging cabinets already open below floorOffset — only raise the door when
+ * that gap is shorter than the 13 cm exit opening.
+ */
+window._robotVacDoorGapCm = function(col) {
+    if (!window._colHasRobotVac(col)) return 0;
+    const fo = (col && col.floorOffset) || 0;
+    if (fo >= ROBOTVAC.doorGap) return 0; // under-carcass gap is enough
+    return ROBOTVAC.doorGap;
+};
+
+/**
+ * Place the Dreame assembly on the room floor (y = 0), back against the
+ * carcass. The updated GLB already has the robot nose past the dock — after
+ * +90° yaw that nose points out the cabinet front (+Z).
  * opts: { x, bodyD, backT, frontInset }
  */
 function addRobotVacToCell(parent, opts) {
@@ -857,32 +878,20 @@ function addRobotVacToCell(parent, opts) {
     _robotVacEnsureGlb();
     const bodyD = opts.bodyD || 54;
     const backT = opts.backT || 0.5;
-    const frontInset = opts.frontInset || 0;
     const x = opts.x || 0;
-    const frontFaceZ = bodyD / 2 - frontInset;
     const backFaceZ = -bodyD / 2 + backT + 0.4;
-    const availD = Math.max(20, frontFaceZ - backFaceZ);
 
     const dock = _robotVacDockTemplate().clone();
-    const targetD = Math.min(ROBOTVAC.dockD, availD + ROBOTVAC.protrudeCm);
-    if (Math.abs(targetD - ROBOTVAC.dockD) > 0.2) {
-        dock.scale.z *= targetD / ROBOTVAC.dockD;
-    }
-
-    // Combined mesh: keep the station mostly inside, let the docked robot nose
-    // protrude past the front face by protrudeCm.
-    const frontOfAssembly = frontFaceZ + ROBOTVAC.protrudeCm;
-    const dockCenterZ = frontOfAssembly - targetD / 2;
-    // Clamp so the back of the assembly doesn't go behind the carcass back
-    const minCenterZ = backFaceZ + targetD / 2;
-    dock.position.set(x, 0, Math.max(minCenterZ, dockCenterZ));
+    // Sit on the floor; back of the assembly flush to the carcass back so the
+    // built-in robot protrusion exits through the front.
+    dock.position.set(x, 0, backFaceZ + ROBOTVAC.dockD / 2);
     dock.userData.isRobotVac = true;
     dock.userData.applianceType = 'robotvac';
     dock.userData.robotVacPart = 'dock';
     parent.add(dock);
 
-    // Separate robot only when the source file actually has a distinct robot mesh
     if (_robotVacHasSeparateRobot) {
+        const frontFaceZ = bodyD / 2 - (opts.frontInset || 0);
         const robot = buildRobotVacBody();
         robot.position.set(x, 0, frontFaceZ);
         robot.userData.isRobotVac = true;
