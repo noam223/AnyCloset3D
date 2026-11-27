@@ -638,14 +638,18 @@ window.addLaundryAppliancesToCell = addLaundryAppliancesToCell;
 const ROBOTVAC = {
     id: 'robotvac',
     label: 'שואב רובוטי',
-    // Docking / charging station (cm)
+    // Docking / charging station (cm) — overall assembly footprint when robot is docked
     dockW: 34, dockD: 45.7, dockH: 59,
-    // Robot body (cm) — open-sensor height for clearance
+    // Robot body (cm) — used when a separate robot mesh is available
     robotW: 35, robotD: 35, robotH: 11.1, robotHFolded: 8.9,
     doorGap: 13,
     minWidth: 36,
     minHeight: 60,
-    glbPath: 'images/dreamex50.glb'
+    glbPath: 'images/dreamex50.glb',
+    // Tripo export faces +X; cabinet front is +Z → yaw −90°
+    glbYaw: -Math.PI / 2,
+    // How far the docked-robot nose sticks past the cabinet front (cm)
+    protrudeCm: 17.5
 };
 window.ROBOTVAC_RULES = {
     minWidth: ROBOTVAC.minWidth,
@@ -660,10 +664,48 @@ window.ROBOTVAC_RULES = {
     }
 };
 
-let _robotVacGlbRoot = null;   // normalized, unscaled (bottom at y=0, centred xz, size = raw)
-let _robotVacGlbSize = null;   // THREE.Vector3 of raw size before cm scale
+let _robotVacGlbRoot = null;   // normalized (yaw fixed, bottom y=0, centred xz), unit size = raw after yaw
+let _robotVacGlbSize = null;   // THREE.Vector3 after yaw (before cm scale)
 let _robotVacGlbLoading = false;
+let _robotVacHasSeparateRobot = false; // true only when FBX/GLB exposes a distinct robot mesh
 const _robotVacDockCache = { key: '', group: null };
+
+function _robotVacPrepMaterials(root) {
+    root.traverse(function(ch) {
+        if (!ch.isMesh) return;
+        ch.castShadow = true;
+        ch.receiveShadow = true;
+        if (!ch.material) return;
+        const mats = Array.isArray(ch.material) ? ch.material : [ch.material];
+        mats.forEach(function(m) {
+            if (!m) return;
+            if (m.envMap == null && window._studioEnvMap) {
+                m.envMap = window._studioEnvMap;
+                m.envMapIntensity = m.envMapIntensity != null ? m.envMapIntensity : 0.7;
+                m.needsUpdate = true;
+            }
+        });
+    });
+}
+
+/** Centre XZ, sit on y=0, return size of the (already oriented) object. */
+function _robotVacNormalizeRoot(obj) {
+    obj.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(obj);
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    box.getSize(size);
+    box.getCenter(center);
+    const root = new THREE.Group();
+    obj.position.x -= center.x;
+    obj.position.z -= center.z;
+    obj.position.y -= box.min.y;
+    root.add(obj);
+    root.updateMatrixWorld(true);
+    const size2 = new THREE.Vector3();
+    new THREE.Box3().setFromObject(root).getSize(size2);
+    return { root: root, size: size2 };
+}
 
 function _robotVacEnsureGlb(onReady) {
     if (_robotVacGlbRoot) {
@@ -678,45 +720,31 @@ function _robotVacEnsureGlb(onReady) {
     _robotVacGlbLoading = true;
     new THREE.GLTFLoader().load(ROBOTVAC.glbPath, function(gltf) {
         const raw = gltf.scene || gltf.scenes[0];
-        const box = new THREE.Box3().setFromObject(raw);
-        const size = new THREE.Vector3();
-        const center = new THREE.Vector3();
-        box.getSize(size);
-        box.getCenter(center);
-        // Re-root: bottom on y=0, XZ centred
-        const root = new THREE.Group();
-        raw.position.sub(center);
-        raw.position.y += size.y / 2;
-        root.add(raw);
-        root.traverse(function(ch) {
-            if (ch.isMesh) {
-                ch.castShadow = true;
-                ch.receiveShadow = true;
-                if (ch.material) {
-                    const mats = Array.isArray(ch.material) ? ch.material : [ch.material];
-                    mats.forEach(function(m) {
-                        if (!m) return;
-                        if (m.envMap == null && window._studioEnvMap) {
-                            m.envMap = window._studioEnvMap;
-                            m.envMapIntensity = m.envMapIntensity != null ? m.envMapIntensity : 0.7;
-                            m.needsUpdate = true;
-                        }
-                    });
-                }
-            }
-        });
-        _robotVacGlbRoot = root;
-        _robotVacGlbSize = size.clone();
+        // Pivot yaw so the station faces cabinet front (+Z), then remeasure
+        const oriented = new THREE.Group();
+        oriented.add(raw);
+        oriented.rotation.y = ROBOTVAC.glbYaw;
+        oriented.updateMatrixWorld(true);
+        const norm = _robotVacNormalizeRoot(oriented);
+        _robotVacPrepMaterials(norm.root);
+        _robotVacGlbRoot = norm.root;
+        _robotVacGlbSize = norm.size;
         _robotVacGlbLoading = false;
+        _robotVacDockCache.key = '';
+        _robotVacDockCache.group = null;
         if (typeof buildCabinet === 'function') buildCabinet();
-        if (onReady) onReady(root);
+        if (onReady) onReady(norm.root);
     }, undefined, function(err) {
         console.warn('[robotvac] glb load error:', err);
         _robotVacGlbLoading = false;
     });
 }
 
-/** Procedural robot (separate from the dock GLB) — low disc + LIDAR bump. */
+/**
+ * Optional separate robot mesh — only used when an FBX/GLB provides a distinct
+ * robot object (set via _robotVacRegisterParts). Until then we show the combined
+ * dock+robot GLB only (no duplicate procedural robot).
+ */
 function buildRobotVacBody() {
     const W = ROBOTVAC.robotW, D = ROBOTVAC.robotD, H = ROBOTVAC.robotH;
     const r = Math.min(W, D) / 2;
@@ -754,12 +782,10 @@ function buildRobotVacBody() {
     bumper.position.y = 1.1;
     g.add(bumper);
 
-    // Front accent strip (faces +Z)
     const strip = new THREE.Mesh(new THREE.BoxGeometry(r * 1.1, 1.2, 0.35), accentMat);
     strip.position.set(0, bodyH * 0.45, r - 0.85);
     g.add(strip);
 
-    // LIDAR / sensor tower (raises to open height)
     const tower = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.8, bumpH + 0.3, 24), lidMat);
     tower.position.set(0, bodyH + bumpH / 2 - 0.05, -r * 0.15);
     g.add(tower);
@@ -774,20 +800,20 @@ function buildRobotVacBody() {
 function _robotVacDockTemplate() {
     const env = window._studioEnvMap || null;
     const glbReady = !!( _robotVacGlbRoot && _robotVacGlbSize );
-    const key = (env ? env.uuid : 'noenv') + '|' + (glbReady ? 'glb' : 'ph');
+    const key = (env ? env.uuid : 'noenv') + '|' + (glbReady ? 'glb2' : 'ph') + '|yaw' + ROBOTVAC.glbYaw;
     if (_robotVacDockCache.group && _robotVacDockCache.key === key) return _robotVacDockCache.group;
 
     const wrap = new THREE.Group();
     wrap.name = 'robotvac-dock';
     if (glbReady) {
         const clone = _robotVacGlbRoot.clone(true);
+        // After yaw, size.x = width, size.z = depth of the facing-forward model
         const sx = ROBOTVAC.dockW / Math.max(1e-6, _robotVacGlbSize.x);
         const sy = ROBOTVAC.dockH / Math.max(1e-6, _robotVacGlbSize.y);
         const sz = ROBOTVAC.dockD / Math.max(1e-6, _robotVacGlbSize.z);
         clone.scale.set(sx, sy, sz);
         wrap.add(clone);
     } else {
-        // Placeholder dock until GLB loads
         _robotVacEnsureGlb();
         const mat = new THREE.MeshStandardMaterial({
             color: 0x2c3036, roughness: 0.45, metalness: 0.3,
@@ -819,9 +845,12 @@ window._robotVacDoorGapCm = function(col) {
 };
 
 /**
- * Place dock (inside) + robot (half outside) into the cell.
+ * Place the Dreame assembly in the cell.
+ * Current GLB is a single fused dock+robot mesh — oriented to face +Z and
+ * pushed forward so the robot nose sticks ~half outside the cabinet front.
+ * When a future FBX exposes separate dock/robot meshes, `_robotVacHasSeparateRobot`
+ * enables the split placement (dock inside + robot half-out).
  * opts: { x, bodyD, backT, frontInset }
- * Always sits on the floor (y = 0), independent of cell bottomY / plinth.
  */
 function addRobotVacToCell(parent, opts) {
     opts = opts || {};
@@ -831,32 +860,51 @@ function addRobotVacToCell(parent, opts) {
     const frontInset = opts.frontInset || 0;
     const x = opts.x || 0;
     const frontFaceZ = bodyD / 2 - frontInset;
+    const backFaceZ = -bodyD / 2 + backT + 0.4;
+    const availD = Math.max(20, frontFaceZ - backFaceZ);
 
-    // Dock: flush to the back, fully inside the carcass
-    const dockD = Math.min(ROBOTVAC.dockD, Math.max(20, bodyD - backT - 2));
     const dock = _robotVacDockTemplate().clone();
-    // If available depth is shorter than nominal, squash Z only
-    if (Math.abs(dockD - ROBOTVAC.dockD) > 0.2) {
-        dock.scale.z *= dockD / ROBOTVAC.dockD;
+    const targetD = Math.min(ROBOTVAC.dockD, availD + ROBOTVAC.protrudeCm);
+    if (Math.abs(targetD - ROBOTVAC.dockD) > 0.2) {
+        dock.scale.z *= targetD / ROBOTVAC.dockD;
     }
-    const dockBackZ = -bodyD / 2 + backT + 0.4;
-    const dockCenterZ = dockBackZ + dockD / 2;
-    dock.position.set(x, 0, dockCenterZ);
+
+    // Combined mesh: keep the station mostly inside, let the docked robot nose
+    // protrude past the front face by protrudeCm.
+    const frontOfAssembly = frontFaceZ + ROBOTVAC.protrudeCm;
+    const dockCenterZ = frontOfAssembly - targetD / 2;
+    // Clamp so the back of the assembly doesn't go behind the carcass back
+    const minCenterZ = backFaceZ + targetD / 2;
+    dock.position.set(x, 0, Math.max(minCenterZ, dockCenterZ));
     dock.userData.isRobotVac = true;
     dock.userData.applianceType = 'robotvac';
     dock.userData.robotVacPart = 'dock';
     parent.add(dock);
 
-    // Robot: separate mesh, half past the cabinet front (+Z)
-    const robot = buildRobotVacBody();
-    robot.position.set(x, 0, frontFaceZ);
-    robot.userData.isRobotVac = true;
-    robot.userData.applianceType = 'robotvac';
-    robot.userData.robotVacPart = 'robot';
-    parent.add(robot);
+    // Separate robot only when the source file actually has a distinct robot mesh
+    if (_robotVacHasSeparateRobot) {
+        const robot = buildRobotVacBody();
+        robot.position.set(x, 0, frontFaceZ);
+        robot.userData.isRobotVac = true;
+        robot.userData.applianceType = 'robotvac';
+        robot.userData.robotVacPart = 'robot';
+        parent.add(robot);
+    }
 }
 window.addRobotVacToCell = addRobotVacToCell;
 window.buildRobotVacBody = buildRobotVacBody;
+/** Hook for a future FBX with separate dock / robot objects. */
+window._robotVacRegisterParts = function(parts) {
+    parts = parts || {};
+    if (parts.dockRoot && parts.dockSize) {
+        _robotVacGlbRoot = parts.dockRoot;
+        _robotVacGlbSize = parts.dockSize;
+        _robotVacDockCache.key = '';
+        _robotVacDockCache.group = null;
+    }
+    _robotVacHasSeparateRobot = !!parts.separateRobot;
+    if (typeof buildCabinet === 'function') buildCabinet();
+};
 _robotVacEnsureGlb();
 
 // =====================================================================
