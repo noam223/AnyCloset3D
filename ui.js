@@ -1179,6 +1179,7 @@ function buildDimensionsAndButtonsUI() {
         if (d.isHoneycombMergeBtn) return;
         if (d.isDeskDrawerMergeBtn) return;
         if (d.isTvSizeBtn) return;
+        if (d.isRobotVacHBtn) return;
         if (d.isDeskZoneCell) return;
 
         // ---- Column width label above each column (editable) ----
@@ -1639,6 +1640,24 @@ function buildDimensionsAndButtonsUI() {
             btn.addEventListener('click', e => {
                 e.stopPropagation();
                 _openTvSizeMenu(d.colIndex, d.rowIndex, btn);
+            });
+            dimLayer.appendChild(btn);
+        });
+
+        state.dimData.filter(d => d.isRobotVacHBtn).forEach(d => {
+            const btn = document.createElement('div');
+            btn.className = 'tv-size-btn robotvac-h-btn';
+            btn.dataset.x3d = d.x;
+            btn.dataset.y3d = d.y;
+            btn.title = 'גובה עמדת טעינה (ס״מ)';
+            btn.innerHTML = '<i class="fa-solid fa-arrows-up-down"></i><span>' + d.dockH + ' ס״מ</span>';
+            btn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); });
+            btn.addEventListener('pointerup', e => e.stopPropagation());
+            btn.addEventListener('click', e => {
+                e.stopPropagation();
+                if (typeof window._openRobotVacHMenu === 'function') {
+                    window._openRobotVacHMenu(d.colIndex, d.rowIndex, btn);
+                }
             });
             dimLayer.appendChild(btn);
         });
@@ -5843,6 +5862,7 @@ window._toggleCellRobotVac = function() {
     if (!turnOn) {
         const others = Array.isArray(comp.appliances) ? comp.appliances.filter(t => t !== 'robotvac') : [];
         if (others.length) comp.appliances = others; else delete comp.appliances;
+        delete comp.robotVacH;
         _restorePlinthAfterRobotVac(col);
         buildCabinet(); calculatePrice(); saveHistoryState();
         updateToolbarButtonHighlights();
@@ -5854,8 +5874,10 @@ window._toggleCellRobotVac = function() {
     const hFloor = (typeof window._robotVacFloorClearanceH === 'function')
         ? window._robotVacFloorClearanceH(col)
         : _cellHeight(col, 0);
-    if (hFloor < (R.singleHeight || 60) - 0.5) {
-        _showToast(`גובה מהרצפה עד ראש התא ${fmt(hFloor)} ס"מ — לעמדת הטעינה נדרש כ־${R.singleHeight} ס"מ לפחות`, 5000);
+    const minH = R.singleHeight || 40;
+    const defH = R.defaultHeight || 60;
+    if (hFloor < minH - 0.5) {
+        _showToast(`גובה מהרצפה עד ראש התא ${fmt(hFloor)} ס"מ — לעמדת הטעינה נדרש כ־${minH} ס"מ לפחות`, 5000);
         return;
     }
 
@@ -5871,6 +5893,10 @@ window._toggleCellRobotVac = function() {
     delete comp.tv;
     comp.type = 'empty';
     comp.appliances = ['robotvac'];
+    // Default station height 60 cm, capped by floor→cell clearance
+    comp.robotVacH = (typeof window._robotVacClampH === 'function')
+        ? window._robotVacClampH(defH, hFloor)
+        : Math.min(defH, Math.floor(hFloor));
     if (comp.partition && typeof _clearSubCellSelection === 'function') _clearSubCellSelection();
     delete comp.partition;
     delete comp.partitions;
@@ -5885,10 +5911,11 @@ window._toggleCellRobotVac = function() {
     if (typeof updateQuickEditPanelUI === 'function') updateQuickEditPanelUI();
     const gap = R.doorGap || 13;
     const fo = col.floorOffset || 0;
+    const hSet = comp.robotVacH || defH;
     _showToast(
         fo > 0
-            ? `שואב רובוטי על הרצפה מתחת לארון התלוי — פתח יציאה מתחת לגוף הארון`
-            : `שואב רובוטי + עמדת טעינה — הצוקל בוטל, פתח יציאה ${gap} ס"מ מתחת לדלת`,
+            ? `שואב רובוטי על הרצפה — גובה עמדה ${hSet} ס"מ (ניתן לשינוי מהתג על העמדה)`
+            : `עמדת טעינה ${hSet} ס"מ · צוקל בוטל · פתח יציאה ${gap} ס"מ — ניתן לשנות גובה מהתג`,
         4500
     );
 };
@@ -5966,6 +5993,7 @@ window.toggleCellAppliance = function(type) {
             // One kitchen appliance per cell in v1
             if (r === 0 && Array.isArray(comp.appliances) && comp.appliances.includes('robotvac')) {
                 _restorePlinthAfterRobotVac(col);
+                delete comp.robotVacH;
             }
             comp.appliances = [type];
         } else {
@@ -5981,6 +6009,7 @@ window.toggleCellAppliance = function(type) {
             }
             if (r === 0 && Array.isArray(comp.appliances) && comp.appliances.includes('robotvac')) {
                 _restorePlinthAfterRobotVac(col);
+                delete comp.robotVacH;
             }
             comp.appliances = ['washer', 'dryer'].filter(t => next.includes(t));
         }
@@ -6072,6 +6101,7 @@ window.toggleCellTv = function() {
         if (!inch) { noFit = true; return; }
         comp.tv = { inch: inch };
         delete comp.appliances;
+        delete comp.robotVacH;
         if (r === 0) window._syncRobotVacPlinth(col);
         if (_clearCompForWholeCellItem(comp, r, c)) clearedPartition = true;
         inserted = inch;
@@ -6166,6 +6196,131 @@ function _openTvSizeMenu(colIndex, rowIndex, anchor) {
     setTimeout(() => document.addEventListener('pointerdown', _tvMenuOutside, true), 0);
 }
 window._openTvSizeMenu = _openTvSizeMenu;
+
+function _closeRobotVacHMenu() {
+    const m = document.getElementById('robotvac-h-menu');
+    if (m) m.remove();
+    document.removeEventListener('pointerdown', _robotVacHMenuOutside, true);
+}
+function _robotVacHMenuOutside(e) {
+    const m = document.getElementById('robotvac-h-menu');
+    if (m && !m.contains(e.target) && !(e.target.closest && e.target.closest('.robotvac-h-btn'))) {
+        _closeRobotVacHMenu();
+    }
+}
+
+/** Menu to set customer docking-station height (cm). Caps to floor→cell clearance. */
+window._openRobotVacHMenu = function(colIndex, rowIndex, anchor) {
+    const wasOpen = document.getElementById('robotvac-h-menu');
+    _closeRobotVacHMenu();
+    if (wasOpen && wasOpen.dataset.key === colIndex + ':' + rowIndex) return;
+    const col = state.columns[colIndex];
+    const comp = col && col.compartments[rowIndex];
+    if (!comp || !Array.isArray(comp.appliances) || !comp.appliances.includes('robotvac')) return;
+
+    const RV = window.ROBOTVAC || {};
+    const clearH = (typeof window._robotVacFloorClearanceH === 'function')
+        ? window._robotVacFloorClearanceH(col) : 999;
+    const current = (typeof window._robotVacPreferredH === 'function')
+        ? window._robotVacPreferredH(comp) : (comp.robotVacH || 60);
+    const shown = (typeof window._robotVacClampH === 'function')
+        ? window._robotVacClampH(current, clearH) : current;
+    const presets = RV.heightPresets || [45, 50, 55, 60, 65, 70, 75, 80, 85, 90];
+
+    const menu = document.createElement('div');
+    menu.id = 'robotvac-h-menu';
+    menu.className = 'tv-size-menu-like';
+    menu.dataset.key = colIndex + ':' + rowIndex;
+    menu.innerHTML = '<div class="tv-size-title">גובה עמדת טעינה (ס״מ)</div>';
+
+    const grid = document.createElement('div');
+    grid.className = 'tv-size-grid';
+    presets.forEach(function(h) {
+        const fits = h <= clearH + 0.05;
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'tv-size-opt' + (h === shown ? ' active' : '');
+        b.disabled = !fits;
+        b.textContent = h;
+        b.title = fits
+            ? ('גובה עמדה ' + h + ' ס״מ')
+            : ('גובה מהרצפה עד ראש התא ' + Math.round(clearH) + ' ס״מ — לא מספיק');
+        b.addEventListener('click', function(e) {
+            e.stopPropagation();
+            if (!fits) return;
+            comp.robotVacH = h;
+            _closeRobotVacHMenu();
+            buildCabinet(); calculatePrice(); saveHistoryState();
+        });
+        grid.appendChild(b);
+    });
+    menu.appendChild(grid);
+
+    const fitBtn = document.createElement('button');
+    fitBtn.type = 'button';
+    fitBtn.className = 'tv-float-opt';
+    const fitH = (typeof window._robotVacClampH === 'function')
+        ? window._robotVacClampH(Math.floor(clearH), clearH)
+        : Math.floor(clearH);
+    fitBtn.innerHTML = '<i class="fa-solid fa-maximize"></i><span>התאם לגובה התא (' + fitH + ' ס״מ)</span>';
+    fitBtn.title = 'מתאים את עמדת הטעינה לגובה הפנוי מהרצפה עד ראש התא';
+    fitBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        comp.robotVacH = fitH;
+        _closeRobotVacHMenu();
+        buildCabinet(); calculatePrice(); saveHistoryState();
+    });
+    menu.appendChild(fitBtn);
+
+    const customRow = document.createElement('div');
+    customRow.style.cssText = 'display:flex;gap:6px;align-items:center;margin-top:8px;direction:rtl;';
+    const customInp = document.createElement('input');
+    customInp.type = 'number';
+    customInp.min = String(RV.minDockH || 40);
+    customInp.max = String(Math.min(RV.maxDockH || 120, Math.floor(clearH)));
+    customInp.step = '1';
+    customInp.value = String(shown);
+    customInp.style.cssText = 'width:72px;padding:6px 8px;border:1px solid #c7d2fe;border-radius:8px;font-size:0.85rem;text-align:center;';
+    const customBtn = document.createElement('button');
+    customBtn.type = 'button';
+    customBtn.className = 'tv-size-opt';
+    customBtn.style.flex = '1';
+    customBtn.textContent = 'החל גובה';
+    customBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const v = (typeof window._robotVacClampH === 'function')
+            ? window._robotVacClampH(customInp.value, clearH)
+            : Math.round(Number(customInp.value) || 60);
+        if (v > clearH + 0.05) {
+            if (typeof _showToast === 'function') {
+                _showToast('הגובה המקסימלי לתא זה הוא ' + Math.floor(clearH) + ' ס״מ', 3500);
+            }
+            return;
+        }
+        comp.robotVacH = v;
+        _closeRobotVacHMenu();
+        buildCabinet(); calculatePrice(); saveHistoryState();
+    });
+    customRow.appendChild(customInp);
+    customRow.appendChild(customBtn);
+    menu.appendChild(customRow);
+
+    const note = document.createElement('div');
+    note.className = 'tv-size-note';
+    note.textContent = 'פנוי מהרצפה עד ראש התא: ' + Math.round(clearH * 10) / 10 + ' ס״מ · ברירת מחדל 60';
+    menu.appendChild(note);
+
+    document.body.appendChild(menu);
+    const rect = anchor.getBoundingClientRect();
+    const mw = menu.offsetWidth, mh = menu.offsetHeight;
+    let left = rect.left + rect.width / 2 - mw / 2;
+    let top = rect.bottom + 8;
+    if (top + mh > window.innerHeight - 8) top = rect.top - mh - 8;
+    left = Math.max(8, Math.min(window.innerWidth - mw - 8, left));
+    menu.style.left = left + 'px';
+    menu.style.top = Math.max(8, top) + 'px';
+    setTimeout(function() { document.addEventListener('pointerdown', _robotVacHMenuOutside, true); }, 0);
+};
 
 // Drag the sidebar "טאצ'" button onto a door: a double-door leaf gets door.touchLeaf
 // (the other leaf keeps its handle); a single door gets a per-door touch handle. Drop again to undo.
@@ -9510,7 +9665,7 @@ function _isCanvasOverlayUiTarget(el) {
     if (!el || !el.closest) return false;
     return !!el.closest(
         '#column-quick-edit, #full-corner-quick-edit, #bottom-floating-toolbar, #bed-toolbar, #room-props-row, #room-furniture-toolbar, #room-plan-layer, #btn-room-plan-view-toggle, ' +
-        '.drag-handle, .dim-container, .col-width-label, .plus-btn, .kit-end-add-btn, .kit-end-add-menu, .fc-cell-btn, .col-tools-capsule, .select-all-col-btn, .col-template-btn, .cell-select-btn, .sub-cell-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn, .tv-size-btn, #tv-size-menu'
+        '.drag-handle, .dim-container, .col-width-label, .plus-btn, .kit-end-add-btn, .kit-end-add-menu, .fc-cell-btn, .col-tools-capsule, .select-all-col-btn, .col-template-btn, .cell-select-btn, .sub-cell-btn, .honeycomb-merge-btn, .desk-drawer-merge-btn, .tv-size-btn, #tv-size-menu, #robotvac-h-menu'
     );
 }
 

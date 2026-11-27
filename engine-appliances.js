@@ -640,11 +640,14 @@ const ROBOTVAC = {
     label: 'שואב רובוטי',
     // Overall assembly target (cm). Updated GLB already includes the robot
     // protruding past the dock — depth covers station (45.7) + nose outside.
-    dockW: 34, dockD: 63, dockH: 59,
+    dockW: 34, dockD: 63, dockH: 60, // default station height (customer can change)
+    minDockH: 40,
+    maxDockH: 120,
+    heightPresets: [45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 100],
     robotW: 35, robotD: 35, robotH: 11.1, robotHFolded: 8.9,
     doorGap: 13,
     minWidth: 36,
-    minHeight: 60,
+    minHeight: 40, // minimum floor→cell-top clearance to place a station
     glbPath: 'images/dreamex50.glb?v=20261127b',
     // Raw mesh extends in +X (robot nose). Cabinet front is +Z → yaw +90°.
     glbYaw: Math.PI / 2
@@ -653,6 +656,7 @@ window.ROBOTVAC = ROBOTVAC;
 window.ROBOTVAC_RULES = {
     minWidth: ROBOTVAC.minWidth,
     singleHeight: ROBOTVAC.minHeight,
+    defaultHeight: ROBOTVAC.dockH,
     doorGap: ROBOTVAC.doorGap,
     dims: {
         robotvac: {
@@ -796,19 +800,41 @@ function buildRobotVacBody() {
     return g;
 }
 
-function _robotVacDockTemplate() {
+/** Clamp a preferred dock height (cm) into the allowed range. */
+window._robotVacClampH = function(h, maxClearance) {
+    let v = Math.round(Number(h) || ROBOTVAC.dockH);
+    v = Math.max(ROBOTVAC.minDockH, Math.min(ROBOTVAC.maxDockH, v));
+    if (maxClearance != null && isFinite(maxClearance) && maxClearance > 0) {
+        v = Math.min(v, Math.max(ROBOTVAC.minDockH, Math.floor(maxClearance * 10) / 10));
+    }
+    return v;
+};
+
+/** Preferred height stored on the cell, default 60. */
+window._robotVacPreferredH = function(comp) {
+    const raw = comp && comp.robotVacH;
+    if (raw == null || raw === '') return ROBOTVAC.dockH;
+    return window._robotVacClampH(raw);
+};
+
+/**
+ * Build (or reuse) a dock mesh scaled to height `dockH` cm.
+ * Width/depth stay at the catalog footprint; only Y scales with the customer station.
+ */
+function _robotVacDockTemplate(dockH) {
+    dockH = window._robotVacClampH(dockH);
     const env = window._studioEnvMap || null;
     const glbReady = !!( _robotVacGlbRoot && _robotVacGlbSize );
-    const key = (env ? env.uuid : 'noenv') + '|' + (glbReady ? 'glb2' : 'ph') + '|yaw' + ROBOTVAC.glbYaw;
+    const key = (env ? env.uuid : 'noenv') + '|' + (glbReady ? 'glb2' : 'ph') +
+        '|yaw' + ROBOTVAC.glbYaw + '|h' + dockH;
     if (_robotVacDockCache.group && _robotVacDockCache.key === key) return _robotVacDockCache.group;
 
     const wrap = new THREE.Group();
     wrap.name = 'robotvac-dock';
     if (glbReady) {
         const clone = _robotVacGlbRoot.clone(true);
-        // After yaw, size.x = width, size.z = depth of the facing-forward model
         const sx = ROBOTVAC.dockW / Math.max(1e-6, _robotVacGlbSize.x);
-        const sy = ROBOTVAC.dockH / Math.max(1e-6, _robotVacGlbSize.y);
+        const sy = dockH / Math.max(1e-6, _robotVacGlbSize.y);
         const sz = ROBOTVAC.dockD / Math.max(1e-6, _robotVacGlbSize.z);
         clone.scale.set(sx, sy, sz);
         wrap.add(clone);
@@ -819,13 +845,13 @@ function _robotVacDockTemplate() {
             envMap: env, envMapIntensity: 0.7
         });
         const body = new THREE.Mesh(
-            new THREE.BoxGeometry(ROBOTVAC.dockW, ROBOTVAC.dockH, ROBOTVAC.dockD),
+            new THREE.BoxGeometry(ROBOTVAC.dockW, dockH, ROBOTVAC.dockD),
             mat
         );
-        body.position.y = ROBOTVAC.dockH / 2;
+        body.position.y = dockH / 2;
         wrap.add(body);
     }
-    wrap.userData.dims = { W: ROBOTVAC.dockW, H: ROBOTVAC.dockH, D: ROBOTVAC.dockD };
+    wrap.userData.dims = { W: ROBOTVAC.dockW, H: dockH, D: ROBOTVAC.dockD };
     _robotVacDockCache.key = key;
     _robotVacDockCache.group = wrap;
     return wrap;
@@ -869,9 +895,9 @@ window._robotVacDoorGapCm = function(col) {
 
 /**
  * Place the Dreame assembly on the room floor (y = 0), back against the
- * carcass. The updated GLB already has the robot nose past the dock — after
- * +90° yaw that nose points out the cabinet front (+Z).
- * opts: { x, bodyD, backT, frontInset }
+ * carcass. Height follows opts.dockH (customer station), capped by floor→cell clearance.
+ * opts: { x, bodyD, backT, frontInset, dockH, maxH }
+ * Returns { dockH, x, topY } for the size badge, or null.
  */
 function addRobotVacToCell(parent, opts) {
     opts = opts || {};
@@ -880,14 +906,16 @@ function addRobotVacToCell(parent, opts) {
     const backT = opts.backT || 0.5;
     const x = opts.x || 0;
     const backFaceZ = -bodyD / 2 + backT + 0.4;
+    const dockH = window._robotVacClampH(opts.dockH != null ? opts.dockH : ROBOTVAC.dockH, opts.maxH);
 
-    const dock = _robotVacDockTemplate().clone();
+    const dock = _robotVacDockTemplate(dockH).clone();
     // Sit on the floor; back of the assembly flush to the carcass back so the
     // built-in robot protrusion exits through the front.
     dock.position.set(x, 0, backFaceZ + ROBOTVAC.dockD / 2);
     dock.userData.isRobotVac = true;
     dock.userData.applianceType = 'robotvac';
     dock.userData.robotVacPart = 'dock';
+    dock.userData.dockH = dockH;
     parent.add(dock);
 
     if (_robotVacHasSeparateRobot) {
@@ -899,6 +927,7 @@ function addRobotVacToCell(parent, opts) {
         robot.userData.robotVacPart = 'robot';
         parent.add(robot);
     }
+    return { dockH: dockH, x: x, topY: dockH, rightX: x + ROBOTVAC.dockW / 2 };
 }
 window.addRobotVacToCell = addRobotVacToCell;
 window.buildRobotVacBody = buildRobotVacBody;

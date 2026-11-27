@@ -3505,7 +3505,8 @@ body.kitchen-mode .mirror-drag-row {
     display: none !important;
 }
 
-#tv-size-menu {
+#tv-size-menu,
+#robotvac-h-menu {
     position: fixed;
     z-index: 2000;
     background: #fff;
@@ -3516,9 +3517,13 @@ body.kitchen-mode .mirror-drag-row {
     width: 196px;
     direction: rtl;
 }
-#tv-size-menu .tv-size-title { font-size: 0.75rem; font-weight: 800; color: var(--primary); margin-bottom: 8px; text-align: center; }
-#tv-size-menu .tv-size-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
-#tv-size-menu .tv-size-opt {
+#robotvac-h-menu { width: 230px; }
+#tv-size-menu .tv-size-title,
+#robotvac-h-menu .tv-size-title { font-size: 0.75rem; font-weight: 800; color: var(--primary); margin-bottom: 8px; text-align: center; }
+#tv-size-menu .tv-size-grid,
+#robotvac-h-menu .tv-size-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+#tv-size-menu .tv-size-opt,
+#robotvac-h-menu .tv-size-opt {
     border: 1.5px solid var(--border);
     background: #f8fafc;
     border-radius: 8px;
@@ -3529,11 +3534,16 @@ body.kitchen-mode .mirror-drag-row {
     color: var(--primary);
     cursor: pointer;
 }
-#tv-size-menu .tv-size-opt:hover:not(:disabled) { border-color: var(--secondary); background: #eef2ff; }
-#tv-size-menu .tv-size-opt.active { background: var(--primary); border-color: var(--primary); color: #fff; }
-#tv-size-menu .tv-size-opt:disabled { opacity: 0.35; cursor: not-allowed; }
-#tv-size-menu .tv-size-note { font-size: 0.65rem; color: var(--text-light); margin-top: 7px; text-align: center; }
-#tv-size-menu .tv-float-opt {
+#tv-size-menu .tv-size-opt:hover:not(:disabled),
+#robotvac-h-menu .tv-size-opt:hover:not(:disabled) { border-color: var(--secondary); background: #eef2ff; }
+#tv-size-menu .tv-size-opt.active,
+#robotvac-h-menu .tv-size-opt.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+#tv-size-menu .tv-size-opt:disabled,
+#robotvac-h-menu .tv-size-opt:disabled { opacity: 0.35; cursor: not-allowed; }
+#tv-size-menu .tv-size-note,
+#robotvac-h-menu .tv-size-note { font-size: 0.65rem; color: var(--text-light); margin-top: 7px; text-align: center; }
+#tv-size-menu .tv-float-opt,
+#robotvac-h-menu .tv-float-opt {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -3550,8 +3560,10 @@ body.kitchen-mode .mirror-drag-row {
     color: var(--primary);
     cursor: pointer;
 }
-#tv-size-menu .tv-float-opt:hover { border-color: var(--secondary); background: #eef2ff; }
-#tv-size-menu .tv-float-opt.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+#tv-size-menu .tv-float-opt:hover,
+#robotvac-h-menu .tv-float-opt:hover { border-color: var(--secondary); background: #eef2ff; }
+#tv-size-menu .tv-float-opt.active,
+#robotvac-h-menu .tv-float-opt.active { background: var(--primary); border-color: var(--primary); color: #fff; }
 
 #order-modal {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;

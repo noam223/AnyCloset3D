@@ -9056,11 +9056,22 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
                         frontInset: _appInset
                     });
                 }
-                // Robot vac only in the bottom cell (r === 0) — dock inside, robot half-out
+                // Robot vac only in the bottom cell (r === 0) — dock on floor, height from cell
                 if (_robotVacOn && r === 0 && typeof window.addRobotVacToCell === 'function') {
-                    window.addRobotVacToCell(_buildGroup, {
-                        x: colCenterX, bodyD: bodyD, backT: backT, frontInset: _appInset
+                    const _rvClearH = (typeof window._robotVacFloorClearanceH === 'function')
+                        ? window._robotVacFloorClearanceH(col) : compH;
+                    const _rvPrefH = (typeof window._robotVacPreferredH === 'function')
+                        ? window._robotVacPreferredH(compData) : 60;
+                    const _rvInfo = window.addRobotVacToCell(_buildGroup, {
+                        x: colCenterX, bodyD: bodyD, backT: backT, frontInset: _appInset,
+                        dockH: _rvPrefH, maxH: _rvClearH
                     });
+                    if (_rvInfo && _isActiveWingBuild) {
+                        state.dimData.push({
+                            isRobotVacHBtn: true, colIndex: c, rowIndex: r,
+                            dockH: _rvInfo.dockH, x: _rvInfo.rightX - 2, y: _rvInfo.topY - 4
+                        });
+                    }
                 }
             }
             if (!isBP && compData && !compData.partition && compData.tv && typeof window.addTvToCell === 'function') {
