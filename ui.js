@@ -16303,7 +16303,7 @@ window.sendOrderForSignature = async function() {
         _showToast('אין ארונות לייצוא — כל הארונות מושהים.', 4000);
         return;
     }
-    if (window._blockIfCustomerDetailsMissing() || window._blockIfHandlesMissing()) return;
+    if (window._blockIfCustomerDetailsMissing() || await window._blockIfHandlesMissing()) return;
     if (!window._currentProjectId) {
         alert('יש לשמור את הפרויקט לפני שליחה לחתימה (כפתור "שמור").');
         return;
@@ -20992,7 +20992,7 @@ window.printCustomer = async function() {
         _showToast('אין ארונות לייצוא — כל הארונות מושהים. הפעילו ארון כדי לכלול אותו.', 5000);
         return;
     }
-    if (window._blockIfCustomerDetailsMissing() || window._blockIfHandlesMissing()) return;
+    if (window._blockIfCustomerDetailsMissing() || await window._blockIfHandlesMissing()) return;
     _showToast('🔄 מרענן תמונות לפני הדפסה...', 3000);
     try { await window._refreshCartMediaForPrint({ force: true }); } catch (e) { console.warn('[printCustomer]', e); }
     try { await window._refreshCartBlueprintPagesForPrint(); } catch (e) { console.warn('[printCustomer] blueprint refresh failed:', e); }
