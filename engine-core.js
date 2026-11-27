@@ -5034,6 +5034,8 @@ function buildCabinet() {
     // Order options panel: LED auto-mark and per-cabinet values follow every rebuild
     if (typeof window._syncOrderOptsUI === 'function') window._syncOrderOptsUI();
     if (typeof window._ensureAllStretcherShelfIdxs === 'function') window._ensureAllStretcherShelfIdxs();
+    // Robot-vac keeps צוקל cancelled; restore plinth if the appliance was cleared elsewhere
+    if (typeof window._syncAllRobotVacPlinths === 'function') window._syncAllRobotVacPlinths();
 
     // Outside תכנון חדר / תצוגה חופשית the room is only an editor backdrop (see _syncRoomBackdrop).
     // While room-plan UI is open, a temporary front view (autosave thumbnail) must not turn
@@ -9034,6 +9036,7 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
                 const _laundList = compData.appliances.filter(function(a) {
                     return a === 'washer' || a === 'dryer';
                 });
+                const _robotVacOn = compData.appliances.indexOf('robotvac') !== -1;
                 const _appInset = _isSlidingWardrobe ? _slidingPartSetback : (isInset ? t : 0);
                 if (_kitList.length && typeof window.addKitchenAppliancesToCell === 'function') {
                     window.addKitchenAppliancesToCell(_buildGroup, {
@@ -9049,6 +9052,12 @@ function _buildWingGeometryCore(targetGroup, _offsetX, _offsetY, _offsetZ, isAct
                         list: _laundList, x: colCenterX, bottomY: prevY,
                         cellW: col.width, cellH: compH, bodyD: bodyD, backT: backT,
                         frontInset: _appInset
+                    });
+                }
+                // Robot vac only in the bottom cell (r === 0) — dock inside, robot half-out
+                if (_robotVacOn && r === 0 && typeof window.addRobotVacToCell === 'function') {
+                    window.addRobotVacToCell(_buildGroup, {
+                        x: colCenterX, bodyD: bodyD, backT: backT, frontInset: _appInset
                     });
                 }
             }
@@ -10163,28 +10172,35 @@ if (compData && compData.type === 'hanging' && !(compData.partition)) {
                 const _safeEndRow   = Math.max(0, Math.min(door.endRow,   dividersAsc.length));
                 // Door floor reference: ביטול צוקל keeps doors aligned with other columns
                 // (gap under the door for robot vacuum). Upper units still flush to y=0.
-                const _doorAlignBaseY = (fo > 0)
-                    ? fo
-                    : (_isUpperUnitBuild ? 0 : state.plinthHeight);
+                // Robot-vac bottom cell: fixed 13 cm exit opening under the door.
+                const _robotDoorGap = (_safeStartRow === 0 && col.type !== 'desk' && typeof window._robotVacDoorGapCm === 'function')
+                    ? (window._robotVacDoorGapCm(col) || 0)
+                    : 0;
+                const _doorAlignBaseY = _robotDoorGap > 0
+                    ? _robotDoorGap
+                    : ((fo > 0)
+                        ? fo
+                        : (_isUpperUnitBuild ? 0 : state.plinthHeight));
                 // Use dividersAsc (ascending by Y) — dividers was re-sorted descending at line 729
                 if (isInset) {
                     let baseForInset = col.type === 'desk'
                         ? col.deskHeight + col.deskClearance
                         : _doorAlignBaseY;
-                    doorBottomY = (_safeStartRow === 0) ? (baseForInset + t) : (dividersAsc[_safeStartRow - 1].y + dividersAsc[_safeStartRow - 1].thick/2);
+                    doorBottomY = (_safeStartRow === 0) ? (baseForInset + (_robotDoorGap > 0 ? 0 : t)) : (dividersAsc[_safeStartRow - 1].y + dividersAsc[_safeStartRow - 1].thick/2);
                     doorTopY = (_safeEndRow === dividersAsc.length) ? (col.height - t) : (dividersAsc[_safeEndRow].y - dividersAsc[_safeEndRow].thick/2);
                     doorBottomY += doorGap/2;
                     doorTopY -= doorGap/2;
                 } else {
                     // For bathroom regalim: extend door fronts down by t to cover the bottom plate face.
-                    const _bathRegalimDoor = (state.presetId === 'bathroom' && isRegalim && door.startRow === 0 && fo === 0 && col.type !== 'desk');
+                    const _bathRegalimDoor = (state.presetId === 'bathroom' && isRegalim && door.startRow === 0 && fo === 0 && col.type !== 'desk' && !_robotDoorGap);
                     let baseY = col.type === 'desk'
                         ? col.deskHeight + col.deskClearance
                         : (_bathRegalimDoor
                             ? state.plinthHeight - t
                             : _doorAlignBaseY);
                     // Maya (plinth 7): overlay doors stop at 1.5cm — same with ביטול צוקל
-                    if (_safeStartRow === 0 && col.type !== 'desk' && state.plinthHeight === 7 && fo === 0 && !_bathRegalimDoor && !_isUpperUnitBuild) baseY = 1.5;
+                    // (skipped when robot-vac needs a fixed 13 cm exit gap)
+                    if (!_robotDoorGap && _safeStartRow === 0 && col.type !== 'desk' && state.plinthHeight === 7 && fo === 0 && !_bathRegalimDoor && !_isUpperUnitBuild) baseY = 1.5;
                     doorBottomY = (_safeStartRow === 0) ? (baseY + doorGap/2) : (dividersAsc[_safeStartRow - 1].y + doorGap/2);
                     doorTopY = (_safeEndRow === dividersAsc.length) ? (col.height - doorGap/2) : (dividersAsc[_safeEndRow].y - doorGap/2);
                 }

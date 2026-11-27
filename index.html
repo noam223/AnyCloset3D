@@ -1759,6 +1759,7 @@
                     <div class="toolbar-sub-divider"></div>
                     <button class="toolbar-btn appliance-laundry" data-appliance-type="washer" onclick="toggleCellAppliance('washer')"><i class="la-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="2.5" width="16" height="19" rx="2.5"/><path d="M4 7h16"/><circle cx="12" cy="14" r="4.5"/><path d="M9.6 14.6c.8-.8 1.6.8 2.4 0s1.6.8 2.4 0"/></svg></i><span>מכונת כביסה</span></button>
                     <button class="toolbar-btn appliance-laundry" data-appliance-type="dryer" onclick="toggleCellAppliance('dryer')"><i class="la-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="2.5" width="16" height="19" rx="2.5"/><path d="M4 7h16"/><circle cx="12" cy="14" r="4.5"/><path d="M10.6 12.2c-.7.9.7 1.9 0 2.9M13.4 12.2c-.7.9.7 1.9 0 2.9"/></svg></i><span>מייבש</span></button>
+                    <button class="toolbar-btn appliance-laundry" data-appliance-type="robotvac" onclick="toggleCellAppliance('robotvac')" title="שואב רובוטי + עמדת טעינה — רק בתא תחתון, מבטל צוקל, פתח יציאה 13 ס״מ"><i class="fa-solid fa-robot"></i><span>שואב רובוטי</span></button>
                     <button class="toolbar-btn appliance-laundry" data-appliance-type="tv" onclick="toggleCellTv()"><i class="fa-solid fa-tv"></i><span>טלוויזיה</span></button>
                     <button class="toolbar-btn appliance-kitchen" data-appliance-type="sink" onclick="toggleCellAppliance('sink')" style="display:none;"><i class="fa-solid fa-sink"></i><span>כיור</span></button>
                     <button class="toolbar-btn appliance-kitchen" data-appliance-type="dishwasher" onclick="toggleCellAppliance('dishwasher')" style="display:none;"><i class="fa-solid fa-droplet"></i><span>מדיח</span></button>
@@ -3144,6 +3145,9 @@
             <button class="mcell-side-btn appliance-laundry" id="mcp-appliance-dryer" onclick="toggleCellAppliance('dryer'); updateMobileCellSheetState();">
                 <i class="la-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="2.5" width="16" height="19" rx="2.5"/><path d="M4 7h16"/><circle cx="12" cy="14" r="4.5"/><path d="M10.6 12.2c-.7.9.7 1.9 0 2.9M13.4 12.2c-.7.9.7 1.9 0 2.9"/></svg></i><span>מייבש</span>
             </button>
+            <button class="mcell-side-btn appliance-laundry" id="mcp-appliance-robotvac" onclick="toggleCellAppliance('robotvac'); updateMobileCellSheetState();">
+                <i class="fa-solid fa-robot"></i><span>שואב</span>
+            </button>
             <button class="mcell-side-btn appliance-laundry" id="mcp-appliance-tv" onclick="toggleCellTv(); updateMobileCellSheetState();">
                 <i class="fa-solid fa-tv"></i><span>טלוויזיה</span>
             </button>
@@ -3340,9 +3344,9 @@
 <script src="writing-desk-preset.js?v=20261124fsShelf1"></script>
 <script src="floating-shelf-preset.js?v=20261124fs1"></script>
 <script src="corner-unit-preset.js?v=20261124spaceApp1"></script>
-<script src="engine-appliances.js?v=20261124spaceApp1"></script>
+<script src="engine-appliances.js?v=20261127robotVac1"></script>
 <script src="space-appliance-preset.js?v=20261124spaceProp1"></script>
-<script src="engine-core.js?v=20261124sdGlass1"></script>
+<script src="engine-core.js?v=20261127robotVac1"></script>
 <script src="engine-corners.js?v=20261125mirrorTint40"></script>
 <script src="kitchen-corner.js?v=20261117kitG3"></script>
 <script src="engine-blueprint.js?v=20261124sdDoors1"></script>
@@ -3351,7 +3355,7 @@
 <script src="bluran-color-picker.js?v=20261116sdDoorTabs1"></script>
 <script src="formex-color-picker.js?v=20261116sdDoorTabs1"></script>
 <script src="room-finishes.js?v=20261110gloss"></script>
-<script src="ui.js?v=20261127signAwait1"></script>
+<script src="ui.js?v=20261127robotVac1"></script>
 <script src="mirror-cabinet.js?v=20261110doormirror"></script>
 <script src="mobile.js?v=20261122depth110"></script>
 <script src="part-paint.js?v=20261104egger"></script>

@@ -5749,7 +5749,7 @@ window._syncKitchenApplianceToolbar = function() {
     });
     const btn = document.getElementById('tb-btn-appliances');
     if (btn) {
-        btn.title = isKit ? 'כיור, מדיח, תנור ומקרר' : 'מכונת כביסה, מייבש וטלוויזיה';
+        btn.title = isKit ? 'כיור, מדיח, תנור ומקרר' : 'מכונת כביסה, מייבש, שואב רובוטי וטלוויזיה';
     }
     if (isKit && typeof window._renderKitchenBrandExamples === 'function') {
         window._renderKitchenBrandExamples();
@@ -5773,8 +5773,126 @@ function _removeDoorsBlockedByAppliances(colIndex) {
 }
 window._removeDoorsBlockedByAppliances = _removeDoorsBlockedByAppliances;
 
+/** Restore plinth / bottom board after removing a robot vac from a column. */
+function _restorePlinthAfterRobotVac(col) {
+    if (!col) return;
+    const prev = col._robotVacPrevPlinth;
+    if (prev) {
+        col.noPlinth = !!prev.noPlinth;
+        col.spaceBottomPanel = !!prev.spaceBottomPanel;
+        delete col._robotVacPrevPlinth;
+    } else {
+        col.noPlinth = false;
+        col.spaceBottomPanel = false;
+    }
+}
+
+/** Keep צוקל cancelled while robot-vac is present; restore when it is cleared by any path. */
+window._syncRobotVacPlinth = function(col) {
+    if (!col) return;
+    const has = typeof window._colHasRobotVac === 'function' && window._colHasRobotVac(col);
+    if (has) {
+        if (!col._robotVacPrevPlinth) {
+            col._robotVacPrevPlinth = {
+                noPlinth: !!col.noPlinth,
+                spaceBottomPanel: !!col.spaceBottomPanel
+            };
+        }
+        col.noPlinth = true;
+        col.spaceBottomPanel = false;
+        col.floorOffset = 0;
+    } else if (col._robotVacPrevPlinth) {
+        _restorePlinthAfterRobotVac(col);
+    }
+};
+window._syncAllRobotVacPlinths = function() {
+    (state.columns || []).forEach(window._syncRobotVacPlinth);
+    if (state.wings) {
+        Object.keys(state.wings).forEach(function(k) {
+            const w = state.wings[k];
+            if (w && Array.isArray(w.columns)) w.columns.forEach(window._syncRobotVacPlinth);
+        });
+    }
+};
+
+/**
+ * Robot vacuum + charging dock — bottom cell only.
+ * Cancels צוקל / דופן תחתונה so the unit sits on the floor; door keeps a 13 cm exit gap.
+ */
+window._toggleCellRobotVac = function() {
+    if (state.selection.colIndex === -1 || state.selection.rows.length === 0) return;
+    const col = state.columns[state.selection.colIndex];
+    if (!col || col.type === 'desk') return;
+    const R = window.ROBOTVAC_RULES || { minWidth: 36, singleHeight: 60, doorGap: 13 };
+    const fmt = v => (Math.round(v * 10) / 10).toString();
+    const rows = state.selection.rows;
+    if (rows.some(r => r !== 0)) {
+        _showToast('שואב רובוטי ניתן להוסיף רק בתא התחתון של העמודה (על הרצפה)', 4500);
+        return;
+    }
+    if (col.width < (R.minWidth || 36) - 0.2) {
+        _showToast(`רוחב התא ${fmt(col.width)} ס"מ — לשואב רובוטי נדרש רוחב של ${R.minWidth} ס"מ לפחות`, 4500);
+        return;
+    }
+    const first = col.compartments[0];
+    const turnOn = !(first && !first.partition && Array.isArray(first.appliances) && first.appliances.includes('robotvac'));
+    const comp = col.compartments[0];
+    if (!comp) return;
+
+    if (!turnOn) {
+        const others = Array.isArray(comp.appliances) ? comp.appliances.filter(t => t !== 'robotvac') : [];
+        if (others.length) comp.appliances = others; else delete comp.appliances;
+        _restorePlinthAfterRobotVac(col);
+        buildCabinet(); calculatePrice(); saveHistoryState();
+        updateToolbarButtonHighlights();
+        if (typeof updateQuickEditPanelUI === 'function') updateQuickEditPanelUI();
+        return;
+    }
+
+    // After cancelling the plinth the bottom cell grows — check against that height
+    const hNow = _cellHeight(col, 0);
+    const plinthGain = (!col.noPlinth && !(col.floorOffset > 0)) ? (state.plinthHeight || 0) : 0;
+    const hAfter = hNow + plinthGain;
+    if (hAfter < (R.singleHeight || 60) - 0.5) {
+        _showToast(`גובה התא התחתון ${fmt(hAfter)} ס"מ — לעמדת הטעינה נדרש כ־${R.singleHeight} ס"מ לפחות`, 4500);
+        return;
+    }
+
+    if (!col._robotVacPrevPlinth) {
+        col._robotVacPrevPlinth = {
+            noPlinth: !!col.noPlinth,
+            spaceBottomPanel: !!col.spaceBottomPanel
+        };
+    }
+    col.noPlinth = true;
+    col.spaceBottomPanel = false;
+    col.floorOffset = 0;
+
+    delete comp.tv;
+    comp.type = 'empty';
+    comp.appliances = ['robotvac'];
+    if (comp.partition && typeof _clearSubCellSelection === 'function') _clearSubCellSelection();
+    delete comp.partition;
+    delete comp.partitions;
+    delete comp.subCells;
+    delete comp.zoneDoorGroups;
+    if (typeof _onCompartmentTypeChangedForDeskMerge === 'function') {
+        _onCompartmentTypeChangedForDeskMerge(comp, 0, state.selection.colIndex);
+    }
+
+    buildCabinet(); calculatePrice(); saveHistoryState();
+    updateToolbarButtonHighlights();
+    if (typeof updateQuickEditPanelUI === 'function') updateQuickEditPanelUI();
+    const gap = R.doorGap || 13;
+    _showToast(`שואב רובוטי + עמדת טעינה — הצוקל בוטל, פתח יציאה ${gap} ס"מ מתחת לדלת`, 4500);
+};
+
 // Toggle laundry or kitchen appliance in the selected cell(s).
 window.toggleCellAppliance = function(type) {
+    if (type === 'robotvac') {
+        window._toggleCellRobotVac();
+        return;
+    }
     const isKitType = typeof window._isKitchenApplianceType === 'function' && window._isKitchenApplianceType(type);
     const R = isKitType ? window.KITCHEN_RULES : window.LAUNDRY_RULES;
     if (!R || !R.dims || !R.dims[type]) return;
@@ -5783,7 +5901,8 @@ window.toggleCellAppliance = function(type) {
     if (!col) return;
     const names = {
         washer: 'מכונת כביסה', dryer: 'מייבש',
-        sink: 'כיור', dishwasher: 'מדיח', oven: 'תנור', fridge: 'מקרר'
+        sink: 'כיור', dishwasher: 'מדיח', oven: 'תנור', fridge: 'מקרר',
+        robotvac: 'שואב רובוטי'
     };
     const fmt = v => (Math.round(v * 10) / 10).toString();
     const sideW = R.sideBySideWidth || 122;
@@ -5805,12 +5924,16 @@ window.toggleCellAppliance = function(type) {
         if (!comp) return;
         const others = (!comp.partition && Array.isArray(comp.appliances)) ? comp.appliances.filter(t => t !== type) : [];
         if (!turnOn) {
+            const hadRobot = Array.isArray(comp.appliances) && comp.appliances.includes('robotvac');
             if (others.length) comp.appliances = others; else delete comp.appliances;
             // Restore base bay after removing a tall fridge
             if (type === 'fridge' && col._kitFridgePrev) {
                 col.height = col._kitFridgePrev.height;
                 col.topPanel = col._kitFridgePrev.topPanel;
                 delete col._kitFridgePrev;
+            }
+            if (hadRobot && r === 0 && !(comp.appliances && comp.appliances.includes('robotvac'))) {
+                _restorePlinthAfterRobotVac(col);
             }
             changed++;
             return;
@@ -5835,6 +5958,9 @@ window.toggleCellAppliance = function(type) {
                 : h;
             if (type !== 'sink' && needH && hCheck < needH - 5) { tooShortH = hCheck; return; }
             // One kitchen appliance per cell in v1
+            if (r === 0 && Array.isArray(comp.appliances) && comp.appliances.includes('robotvac')) {
+                _restorePlinthAfterRobotVac(col);
+            }
             comp.appliances = [type];
         } else {
             let next = others.filter(t => t === 'washer' || t === 'dryer').concat(type);
@@ -5846,6 +5972,9 @@ window.toggleCellAppliance = function(type) {
                     swappedH = h;
                     swappedW = col.width;
                 }
+            }
+            if (r === 0 && Array.isArray(comp.appliances) && comp.appliances.includes('robotvac')) {
+                _restorePlinthAfterRobotVac(col);
             }
             comp.appliances = ['washer', 'dryer'].filter(t => next.includes(t));
         }
@@ -5937,6 +6066,7 @@ window.toggleCellTv = function() {
         if (!inch) { noFit = true; return; }
         comp.tv = { inch: inch };
         delete comp.appliances;
+        if (r === 0) window._syncRobotVacPlinth(col);
         if (_clearCompForWholeCellItem(comp, r, c)) clearedPartition = true;
         inserted = inch;
         changed++;

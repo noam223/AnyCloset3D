@@ -630,6 +630,236 @@ window._laundryProtrudes = laundryProtrudes;
 window.addLaundryAppliancesToCell = addLaundryAppliancesToCell;
 
 // =====================================================================
+// Robot vacuum + docking station (Dreame X50) — bottom cell only.
+// Dock sits on the floor inside the carcass; the robot is a separate mesh
+// half outside the front so it can leave through a 13 cm door gap.
+// Applying the appliance cancels the column plinth / bottom board.
+// =====================================================================
+const ROBOTVAC = {
+    id: 'robotvac',
+    label: 'שואב רובוטי',
+    // Docking / charging station (cm)
+    dockW: 34, dockD: 45.7, dockH: 59,
+    // Robot body (cm) — open-sensor height for clearance
+    robotW: 35, robotD: 35, robotH: 11.1, robotHFolded: 8.9,
+    doorGap: 13,
+    minWidth: 36,
+    minHeight: 60,
+    glbPath: 'images/dreamex50.glb'
+};
+window.ROBOTVAC_RULES = {
+    minWidth: ROBOTVAC.minWidth,
+    singleHeight: ROBOTVAC.minHeight,
+    doorGap: ROBOTVAC.doorGap,
+    dims: {
+        robotvac: {
+            W: Math.max(ROBOTVAC.dockW, ROBOTVAC.robotW),
+            H: ROBOTVAC.dockH,
+            D: ROBOTVAC.dockD
+        }
+    }
+};
+
+let _robotVacGlbRoot = null;   // normalized, unscaled (bottom at y=0, centred xz, size = raw)
+let _robotVacGlbSize = null;   // THREE.Vector3 of raw size before cm scale
+let _robotVacGlbLoading = false;
+const _robotVacDockCache = { key: '', group: null };
+
+function _robotVacEnsureGlb(onReady) {
+    if (_robotVacGlbRoot) {
+        if (onReady) onReady(_robotVacGlbRoot);
+        return;
+    }
+    if (_robotVacGlbLoading) return;
+    if (typeof THREE === 'undefined' || typeof THREE.GLTFLoader === 'undefined') {
+        setTimeout(function() { _robotVacEnsureGlb(onReady); }, 200);
+        return;
+    }
+    _robotVacGlbLoading = true;
+    new THREE.GLTFLoader().load(ROBOTVAC.glbPath, function(gltf) {
+        const raw = gltf.scene || gltf.scenes[0];
+        const box = new THREE.Box3().setFromObject(raw);
+        const size = new THREE.Vector3();
+        const center = new THREE.Vector3();
+        box.getSize(size);
+        box.getCenter(center);
+        // Re-root: bottom on y=0, XZ centred
+        const root = new THREE.Group();
+        raw.position.sub(center);
+        raw.position.y += size.y / 2;
+        root.add(raw);
+        root.traverse(function(ch) {
+            if (ch.isMesh) {
+                ch.castShadow = true;
+                ch.receiveShadow = true;
+                if (ch.material) {
+                    const mats = Array.isArray(ch.material) ? ch.material : [ch.material];
+                    mats.forEach(function(m) {
+                        if (!m) return;
+                        if (m.envMap == null && window._studioEnvMap) {
+                            m.envMap = window._studioEnvMap;
+                            m.envMapIntensity = m.envMapIntensity != null ? m.envMapIntensity : 0.7;
+                            m.needsUpdate = true;
+                        }
+                    });
+                }
+            }
+        });
+        _robotVacGlbRoot = root;
+        _robotVacGlbSize = size.clone();
+        _robotVacGlbLoading = false;
+        if (typeof buildCabinet === 'function') buildCabinet();
+        if (onReady) onReady(root);
+    }, undefined, function(err) {
+        console.warn('[robotvac] glb load error:', err);
+        _robotVacGlbLoading = false;
+    });
+}
+
+/** Procedural robot (separate from the dock GLB) — low disc + LIDAR bump. */
+function buildRobotVacBody() {
+    const W = ROBOTVAC.robotW, D = ROBOTVAC.robotD, H = ROBOTVAC.robotH;
+    const r = Math.min(W, D) / 2;
+    const bodyH = ROBOTVAC.robotHFolded;
+    const bumpH = Math.max(0.4, H - bodyH);
+    const g = new THREE.Group();
+    g.name = 'robotvac-body';
+    const env = window._studioEnvMap || null;
+    const bodyMat = new THREE.MeshStandardMaterial({
+        color: 0x2a2d31, roughness: 0.42, metalness: 0.35,
+        envMap: env, envMapIntensity: 0.85
+    });
+    const lidMat = new THREE.MeshStandardMaterial({
+        color: 0x3a3e44, roughness: 0.35, metalness: 0.45,
+        envMap: env, envMapIntensity: 0.9
+    });
+    const accentMat = new THREE.MeshStandardMaterial({
+        color: 0xd0d4d8, roughness: 0.25, metalness: 0.6,
+        envMap: env, envMapIntensity: 1
+    });
+    const bumperMat = new THREE.MeshStandardMaterial({
+        color: 0x1a1c1e, roughness: 0.7, metalness: 0.1
+    });
+
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(r - 0.4, r - 0.15, bodyH - 0.6, 48), bodyMat);
+    body.position.y = (bodyH - 0.6) / 2 + 0.15;
+    g.add(body);
+
+    const lid = new THREE.Mesh(new THREE.CylinderGeometry(r - 0.9, r - 0.55, 0.55, 48), lidMat);
+    lid.position.y = bodyH - 0.35;
+    g.add(lid);
+
+    const bumper = new THREE.Mesh(new THREE.TorusGeometry(r - 0.55, 0.55, 10, 48), bumperMat);
+    bumper.rotation.x = Math.PI / 2;
+    bumper.position.y = 1.1;
+    g.add(bumper);
+
+    // Front accent strip (faces +Z)
+    const strip = new THREE.Mesh(new THREE.BoxGeometry(r * 1.1, 1.2, 0.35), accentMat);
+    strip.position.set(0, bodyH * 0.45, r - 0.85);
+    g.add(strip);
+
+    // LIDAR / sensor tower (raises to open height)
+    const tower = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.8, bumpH + 0.3, 24), lidMat);
+    tower.position.set(0, bodyH + bumpH / 2 - 0.05, -r * 0.15);
+    g.add(tower);
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2.2, 0.35, 20), accentMat);
+    cap.position.set(0, bodyH + bumpH - 0.05, -r * 0.15);
+    g.add(cap);
+
+    g.userData.dims = { W, H, D };
+    return g;
+}
+
+function _robotVacDockTemplate() {
+    const env = window._studioEnvMap || null;
+    const glbReady = !!( _robotVacGlbRoot && _robotVacGlbSize );
+    const key = (env ? env.uuid : 'noenv') + '|' + (glbReady ? 'glb' : 'ph');
+    if (_robotVacDockCache.group && _robotVacDockCache.key === key) return _robotVacDockCache.group;
+
+    const wrap = new THREE.Group();
+    wrap.name = 'robotvac-dock';
+    if (glbReady) {
+        const clone = _robotVacGlbRoot.clone(true);
+        const sx = ROBOTVAC.dockW / Math.max(1e-6, _robotVacGlbSize.x);
+        const sy = ROBOTVAC.dockH / Math.max(1e-6, _robotVacGlbSize.y);
+        const sz = ROBOTVAC.dockD / Math.max(1e-6, _robotVacGlbSize.z);
+        clone.scale.set(sx, sy, sz);
+        wrap.add(clone);
+    } else {
+        // Placeholder dock until GLB loads
+        _robotVacEnsureGlb();
+        const mat = new THREE.MeshStandardMaterial({
+            color: 0x2c3036, roughness: 0.45, metalness: 0.3,
+            envMap: env, envMapIntensity: 0.7
+        });
+        const body = new THREE.Mesh(
+            new THREE.BoxGeometry(ROBOTVAC.dockW, ROBOTVAC.dockH, ROBOTVAC.dockD),
+            mat
+        );
+        body.position.y = ROBOTVAC.dockH / 2;
+        wrap.add(body);
+    }
+    wrap.userData.dims = { W: ROBOTVAC.dockW, H: ROBOTVAC.dockH, D: ROBOTVAC.dockD };
+    _robotVacDockCache.key = key;
+    _robotVacDockCache.group = wrap;
+    return wrap;
+}
+
+window._colHasRobotVac = function(col) {
+    const comps = col && col.compartments;
+    if (!comps || !comps.length) return false;
+    const bottom = comps[0];
+    return !!(bottom && !bottom.partition && Array.isArray(bottom.appliances) && bottom.appliances.includes('robotvac'));
+};
+
+/** Door bottom clearance (cm) when a robot vac occupies the bottom cell; else 0. */
+window._robotVacDoorGapCm = function(col) {
+    return window._colHasRobotVac(col) ? ROBOTVAC.doorGap : 0;
+};
+
+/**
+ * Place dock (inside) + robot (half outside) into the cell.
+ * opts: { x, bodyD, backT, frontInset }
+ * Always sits on the floor (y = 0), independent of cell bottomY / plinth.
+ */
+function addRobotVacToCell(parent, opts) {
+    opts = opts || {};
+    _robotVacEnsureGlb();
+    const bodyD = opts.bodyD || 54;
+    const backT = opts.backT || 0.5;
+    const frontInset = opts.frontInset || 0;
+    const x = opts.x || 0;
+    const frontFaceZ = bodyD / 2 - frontInset;
+
+    // Dock: flush to the back, fully inside the carcass
+    const dockD = Math.min(ROBOTVAC.dockD, Math.max(20, bodyD - backT - 2));
+    const dock = _robotVacDockTemplate().clone();
+    // If available depth is shorter than nominal, squash Z only
+    if (Math.abs(dockD - ROBOTVAC.dockD) > 0.2) {
+        dock.scale.z *= dockD / ROBOTVAC.dockD;
+    }
+    const dockBackZ = -bodyD / 2 + backT + 0.4;
+    const dockCenterZ = dockBackZ + dockD / 2;
+    dock.position.set(x, 0, dockCenterZ);
+    dock.userData.isRobotVac = true;
+    dock.userData.applianceType = 'robotvac';
+    dock.userData.robotVacPart = 'dock';
+    parent.add(dock);
+
+    // Robot: separate mesh, half past the cabinet front (+Z)
+    const robot = buildRobotVacBody();
+    robot.position.set(x, 0, frontFaceZ);
+    robot.userData.isRobotVac = true;
+    robot.userData.applianceType = 'robotvac';
+    robot.userData.robotVacPart = 'robot';
+    parent.add(robot);
+}
+window.addRobotVacToCell = addRobotVacToCell;
+window.buildRobotVacBody = buildRobotVacBody;
+_robotVacEnsureGlb();
+
+// =====================================================================
 // Kitchen appliances (sink / dishwasher / oven / fridge)
 // Bodies that use _laSlab extrude +Z from local 0 — place at z = frontZ - D.
 // =====================================================================
