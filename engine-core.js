@@ -4138,6 +4138,52 @@ window.splitJointSeamMat = splitJointSeamMat;
 
 const cabinetGroup = new THREE.Group();
 scene.add(cabinetGroup);
+
+// ── Fixed editor floor grid (like Blender / SketchUp / 3ds Max) ──────────────
+// Always on the room floor (y ≈ 0). Minor cells = 10 cm, major lines every 100 cm.
+(function _initEditorFloorGrid() {
+    const SIZE = 1000; // cm span
+    const grp = new THREE.Group();
+    grp.name = 'editorFloorGrid';
+    function _styleGrid(helper, opacity) {
+        const mats = Array.isArray(helper.material) ? helper.material : [helper.material];
+        mats.forEach(function(m) {
+            if (!m) return;
+            m.transparent = true;
+            m.opacity = opacity;
+            m.depthWrite = false;
+        });
+    }
+    // Fine 10 cm grid
+    const minor = new THREE.GridHelper(SIZE, 100, 0xd0d5dd, 0xe8ebf0);
+    _styleGrid(minor, 0.7);
+    // Major 100 cm grid (stronger)
+    const major = new THREE.GridHelper(SIZE, 10, 0x64748b, 0x94a3b8);
+    _styleGrid(major, 0.9);
+    // Slightly above y=0 to avoid z-fighting with the room floor mesh
+    minor.position.y = 0.08;
+    major.position.y = 0.1;
+    grp.add(minor);
+    grp.add(major);
+    // Don't cast/receive shadows
+    grp.traverse(function(o) {
+        o.castShadow = false;
+        o.receiveShadow = false;
+        o.frustumCulled = false;
+    });
+    scene.add(grp);
+    window._editorFloorGrid = grp;
+})();
+
+window._syncEditorFloorGrid = function() {
+    const g = window._editorFloorGrid;
+    if (!g) return;
+    const hide = !!(window._VIEWER_MODE)
+        || (typeof state !== 'undefined' && state.viewMode === 'blueprint')
+        || !!window._hideEditorGridForCapture;
+    g.visible = !hide;
+};
+
 // Current build target group (set before each wing render)
 let _buildGroup = cabinetGroup;
 // Whether the current wing being built is the active (interactive) wing
@@ -4548,6 +4594,7 @@ let dragHandlesData = { horizontal: [], vertical: [], roofs: [], desk: [] };
 const raycaster = new THREE.Raycaster(); const mouse = new THREE.Vector2();
 
 function updateCameraView() {
+    if (typeof window._syncEditorFloorGrid === 'function') window._syncEditorFloorGrid();
     // ---- Inline upper unit edit mode: keep camera stable (don't re-animate to lower cabinet) ----
     if (state._activeUpperUnit) {
         // Just rebuild drag handles and overlays without moving the camera
@@ -5036,6 +5083,7 @@ function buildCabinet() {
     if (typeof window._ensureAllStretcherShelfIdxs === 'function') window._ensureAllStretcherShelfIdxs();
     // Robot-vac keeps צוקל cancelled; restore plinth if the appliance was cleared elsewhere
     if (typeof window._syncAllRobotVacPlinths === 'function') window._syncAllRobotVacPlinths();
+    if (typeof window._syncEditorFloorGrid === 'function') window._syncEditorFloorGrid();
 
     // Outside תכנון חדר / תצוגה חופשית the room is only an editor backdrop (see _syncRoomBackdrop).
     // While room-plan UI is open, a temporary front view (autosave thumbnail) must not turn
