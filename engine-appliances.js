@@ -648,9 +648,10 @@ const ROBOTVAC = {
     doorGap: 13,
     minWidth: 36,
     minHeight: 40, // minimum floor→cell-top clearance to place a station
-    glbPath: 'images/dreamex50.glb?v=20261127b',
-    // Raw mesh extends in +X (robot nose). Cabinet front is +Z → yaw +90°.
-    glbYaw: Math.PI / 2
+    glbPath: 'images/dreamex50.glb?v=20261127c',
+    // Raw mesh: robot/dock face along an axis; cabinet front is +Z.
+    // +90° left the station back facing the camera — use −90° so the dock faces out.
+    glbYaw: -Math.PI / 2
 };
 window.ROBOTVAC = ROBOTVAC;
 window.ROBOTVAC_RULES = {
